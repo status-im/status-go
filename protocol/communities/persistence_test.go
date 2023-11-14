@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"math/big"
+	"reflect"
 	"testing"
 	"time"
 
@@ -633,4 +634,35 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 	s.Require().NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
 	s.Require().Len(rtjResult, 4)
 	s.Require().Len(rtjResult[3].RevealedAccounts, 0)
+}
+
+func (s *PersistenceSuite) TestCuratedCommunities() {
+	communities, err := s.db.GetCuratedCommunities()
+	s.Require().NoError(err)
+	s.Require().Empty(communities.ContractCommunities)
+	s.Require().Empty(communities.ContractFeaturedCommunities)
+
+	setCommunities := &CuratedCommunities{
+		ContractCommunities:         []string{"x", "d"},
+		ContractFeaturedCommunities: []string{"x"},
+	}
+
+	err = s.db.SetCuratedCommunities(setCommunities)
+	s.Require().NoError(err)
+
+	communities, err = s.db.GetCuratedCommunities()
+	s.Require().NoError(err)
+	s.Require().True(reflect.DeepEqual(communities, setCommunities))
+
+	setCommunities = &CuratedCommunities{
+		ContractCommunities:         []string{"p", "a", "t", "r", "y", "k"},
+		ContractFeaturedCommunities: []string{"p", "k"},
+	}
+
+	err = s.db.SetCuratedCommunities(setCommunities)
+	s.Require().NoError(err)
+
+	communities, err = s.db.GetCuratedCommunities()
+	s.Require().NoError(err)
+	s.Require().True(reflect.DeepEqual(communities, setCommunities))
 }

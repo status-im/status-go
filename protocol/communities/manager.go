@@ -637,37 +637,45 @@ type CommunityShard struct {
 	Shard       *common.Shard `json:"shard"`
 }
 
-type KnownCommunitiesResponse struct {
-	ContractCommunities         []string              `json:"contractCommunities"`         // TODO: use CommunityShard
-	ContractFeaturedCommunities []string              `json:"contractFeaturedCommunities"` // TODO: use CommunityShard
-	Descriptions                map[string]*Community `json:"communities"`
-	UnknownCommunities          []string              `json:"unknownCommunities"` // TODO: use CommunityShard
-
+type CuratedCommunities struct {
+	ContractCommunities         []string
+	ContractFeaturedCommunities []string
 }
 
-func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexBytes) (response *KnownCommunitiesResponse, err error) {
-	response = &KnownCommunitiesResponse{
+type KnownCommunitiesResponse struct {
+	ContractCommunities         []string              `json:"contractCommunities"`
+	ContractFeaturedCommunities []string              `json:"contractFeaturedCommunities"`
+	Descriptions                map[string]*Community `json:"communities"`
+	UnknownCommunities          []string              `json:"unknownCommunities"`
+}
+
+func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []string) (*KnownCommunitiesResponse, error) {
+	response := &KnownCommunitiesResponse{
 		Descriptions: make(map[string]*Community),
 	}
 
 	for i := range communityIDs {
-		communityID := communityIDs[i].String()
-		var community *Community
-		community, err = m.GetByID(communityIDs[i])
+		communityID := communityIDs[i]
+		communityIDBytes, err := types.DecodeHex(communityID)
 		if err != nil {
-			return
+			return nil, err
 		}
 
-		response.ContractCommunities = append(response.ContractCommunities, communityID)
+		community, err := m.GetByID(types.HexBytes(communityIDBytes))
+		if err != nil {
+			return nil, err
+		}
 
 		if community != nil {
 			response.Descriptions[community.IDString()] = community
 		} else {
 			response.UnknownCommunities = append(response.UnknownCommunities, communityID)
 		}
+
+		response.ContractCommunities = append(response.ContractCommunities, communityID)
 	}
 
-	return
+	return response, nil
 }
 
 func (m *Manager) Joined() ([]*Community, error) {
@@ -5106,4 +5114,12 @@ func (m *Manager) SafeGetSignerPubKey(chainID uint64, communityID string) (strin
 	defer cancel()
 
 	return m.ownerVerifier.SafeGetSignerPubKey(ctx, chainID, communityID)
+}
+
+func (m *Manager) GetCuratedCommunities() (*CuratedCommunities, error) {
+	return m.persistence.GetCuratedCommunities()
+}
+
+func (m *Manager) SetCuratedCommunities(communities *CuratedCommunities) error {
+	return m.persistence.SetCuratedCommunities(communities)
 }

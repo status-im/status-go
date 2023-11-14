@@ -112,6 +112,7 @@
 // 1699041816_profile_showcase_contacts.up.sql (2.206kB)
 // 1699554099_message_segments.up.sql (426B)
 // 1700044186_message_segments_timestamp.up.sql (322B)
+// 1700044187_curated_communities.up.sql (131B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -2276,7 +2277,7 @@ func _1697699419_community_control_node_syncUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1697699419_community_control_node_sync.up.sql", size: 435, mode: os.FileMode(0644), modTime: time.Unix(1699030398, 0)}
+	info := bindataFileInfo{name: "1697699419_community_control_node_sync.up.sql", size: 435, mode: os.FileMode(0644), modTime: time.Unix(1700066424, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x11, 0xd6, 0x63, 0x10, 0x1b, 0x16, 0x35, 0x57, 0xf1, 0x4a, 0x4, 0x51, 0xe0, 0x1, 0xe1, 0xfc, 0x12, 0x3a, 0x10, 0x4f, 0xb1, 0x96, 0x53, 0x2, 0xf5, 0x66, 0x7b, 0xe0, 0x8a, 0xdf, 0x78, 0x53}}
 	return a, nil
 }
@@ -2296,7 +2297,7 @@ func _1698137561_add_profile_showcase_tablesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1698137561_add_profile_showcase_tables.up.sql", size: 440, mode: os.FileMode(0644), modTime: time.Unix(1699030398, 0)}
+	info := bindataFileInfo{name: "1698137561_add_profile_showcase_tables.up.sql", size: 440, mode: os.FileMode(0644), modTime: time.Unix(1700066424, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7c, 0xef, 0x89, 0x68, 0x42, 0xbf, 0xff, 0xb9, 0x8f, 0x8f, 0x19, 0x91, 0xd2, 0x6a, 0x85, 0xda, 0x2c, 0x63, 0x5f, 0x3c, 0x84, 0x4, 0x93, 0x16, 0x10, 0xf0, 0xe0, 0xd9, 0x9b, 0xbe, 0x8d, 0x62}}
 	return a, nil
 }
@@ -2316,7 +2317,7 @@ func _1698137562_fix_encryption_key_idUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1698137562_fix_encryption_key_id.up.sql", size: 758, mode: os.FileMode(0644), modTime: time.Unix(1699030398, 0)}
+	info := bindataFileInfo{name: "1698137562_fix_encryption_key_id.up.sql", size: 758, mode: os.FileMode(0644), modTime: time.Unix(1700066424, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe5, 0x61, 0x1b, 0x6a, 0xb1, 0x44, 0x8d, 0x47, 0xde, 0x55, 0x45, 0x77, 0x8e, 0x4f, 0xb, 0x6a, 0x7f, 0x83, 0x56, 0x9c, 0x80, 0xc0, 0xae, 0xda, 0xd8, 0xaf, 0x7e, 0x2b, 0xb4, 0x5e, 0xc3, 0x63}}
 	return a, nil
 }
@@ -2336,7 +2337,7 @@ func _1698414646_add_paddingUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1698414646_add_padding.up.sql", size: 69, mode: os.FileMode(0644), modTime: time.Unix(1699030398, 0)}
+	info := bindataFileInfo{name: "1698414646_add_padding.up.sql", size: 69, mode: os.FileMode(0644), modTime: time.Unix(1700066424, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xbf, 0x48, 0x8e, 0x18, 0x1b, 0x81, 0x78, 0xab, 0x42, 0xcb, 0x11, 0xf5, 0xe, 0x44, 0xd4, 0x35, 0x33, 0x4e, 0x8, 0x6f, 0x14, 0x90, 0xe6, 0x2b, 0x59, 0xee, 0x87, 0xb, 0x96, 0x62, 0x3, 0x45}}
 	return a, nil
 }
@@ -2356,7 +2357,7 @@ func _1698746210_add_signature_to_revealed_addressesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1698746210_add_signature_to_revealed_addresses.up.sql", size: 87, mode: os.FileMode(0644), modTime: time.Unix(1699030398, 0)}
+	info := bindataFileInfo{name: "1698746210_add_signature_to_revealed_addresses.up.sql", size: 87, mode: os.FileMode(0644), modTime: time.Unix(1700066424, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8f, 0x64, 0xef, 0xe7, 0x5d, 0x82, 0x3e, 0x7d, 0x5a, 0x34, 0xd2, 0xa, 0x5c, 0x48, 0xef, 0x40, 0xb4, 0x7d, 0x78, 0xc8, 0x11, 0xbc, 0xf3, 0xc5, 0x1d, 0xd5, 0xe9, 0x39, 0xd9, 0xfa, 0xc8, 0x27}}
 	return a, nil
 }
@@ -2376,7 +2377,7 @@ func _1699041816_profile_showcase_contactsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1699041816_profile_showcase_contacts.up.sql", size: 2206, mode: os.FileMode(0644), modTime: time.Unix(1699887700, 0)}
+	info := bindataFileInfo{name: "1699041816_profile_showcase_contacts.up.sql", size: 2206, mode: os.FileMode(0644), modTime: time.Unix(1700066424, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd5, 0x7b, 0x55, 0xda, 0x93, 0x4a, 0x92, 0xf8, 0x45, 0xb2, 0x9f, 0x32, 0xf4, 0x37, 0xc, 0x5f, 0x62, 0xba, 0x33, 0xe2, 0x5c, 0x91, 0x1c, 0xc, 0x7, 0x9, 0xc2, 0x27, 0x5, 0x90, 0x94, 0xf3}}
 	return a, nil
 }
@@ -2396,7 +2397,7 @@ func _1699554099_message_segmentsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1699554099_message_segments.up.sql", size: 426, mode: os.FileMode(0644), modTime: time.Unix(1699976109, 0)}
+	info := bindataFileInfo{name: "1699554099_message_segments.up.sql", size: 426, mode: os.FileMode(0644), modTime: time.Unix(1700066424, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x73, 0xca, 0xd, 0xfa, 0xfa, 0x17, 0xef, 0x7e, 0x24, 0xf9, 0x28, 0xbd, 0x39, 0x75, 0xff, 0x34, 0x31, 0x27, 0x58, 0x3c, 0x17, 0x77, 0xfd, 0xc2, 0x66, 0x47, 0x63, 0x58, 0x3e, 0xb3, 0x88, 0x1a}}
 	return a, nil
 }
@@ -2416,8 +2417,28 @@ func _1700044186_message_segments_timestampUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1700044186_message_segments_timestamp.up.sql", size: 322, mode: os.FileMode(0644), modTime: time.Unix(1700049804, 0)}
+	info := bindataFileInfo{name: "1700044186_message_segments_timestamp.up.sql", size: 322, mode: os.FileMode(0644), modTime: time.Unix(1700066437, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3e, 0x4e, 0x7, 0x86, 0x71, 0xc8, 0x1f, 0x2f, 0xf4, 0xbc, 0xc5, 0xc4, 0x37, 0x56, 0xa1, 0x47, 0xd9, 0xc9, 0xfd, 0xdf, 0x9a, 0x48, 0x1d, 0xfd, 0xb4, 0xeb, 0xb6, 0xb1, 0xc2, 0x73, 0x11, 0x19}}
+	return a, nil
+}
+
+var __1700044187_curated_communitiesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x34\xcc\xb1\x0a\xc2\x30\x10\x87\xf1\xbd\x4f\xf1\x1f\x15\x7c\x03\xa7\xab\x5e\x21\x78\x26\x92\x5c\xa1\x9d\x4a\x69\x22\x64\xa8\x42\x4d\x06\xdf\x5e\x28\xb8\x7e\x7c\xfc\x2e\x9e\x49\x19\x4a\xad\x30\x4c\x07\xeb\x14\x3c\x98\xa0\x01\x4b\xdd\xe6\x92\xe2\xb4\xbc\xd7\xb5\xbe\x72\xc9\xe9\x83\x43\x03\x00\xff\xf2\x9d\x72\x84\xf2\xa0\x78\x78\x73\x27\x3f\xe2\xc6\xe3\x69\x5f\x9e\x69\x2e\x75\x4b\x11\xad\x73\xc2\x64\x77\xd8\xf6\x22\xb8\x72\x47\xbd\x28\x3a\x92\xc0\xcd\xf1\xdc\xfc\x02\x00\x00\xff\xff\xb5\x80\x91\xfe\x83\x00\x00\x00")
+
+func _1700044187_curated_communitiesUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1700044187_curated_communitiesUpSql,
+		"1700044187_curated_communities.up.sql",
+	)
+}
+
+func _1700044187_curated_communitiesUpSql() (*asset, error) {
+	bytes, err := _1700044187_curated_communitiesUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1700044187_curated_communities.up.sql", size: 131, mode: os.FileMode(0644), modTime: time.Unix(1700066437, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xed, 0xf1, 0xf1, 0x57, 0xb5, 0x83, 0xad, 0x9d, 0x9b, 0xf, 0x49, 0xe, 0x3d, 0xa5, 0xf6, 0xf5, 0x9c, 0x7f, 0xb3, 0xf7, 0x22, 0x43, 0x8a, 0xa0, 0x49, 0xfa, 0xcc, 0x9b, 0xea, 0xac, 0xc0, 0xb9}}
 	return a, nil
 }
 
@@ -2664,8 +2685,9 @@ var _bindata = map[string]func() (*asset, error){
 	"1699041816_profile_showcase_contacts.up.sql":                                 _1699041816_profile_showcase_contactsUpSql,
 	"1699554099_message_segments.up.sql":                                          _1699554099_message_segmentsUpSql,
 	"1700044186_message_segments_timestamp.up.sql":                                _1700044186_message_segments_timestampUpSql,
-	"README.md": readmeMd,
-	"doc.go":    docGo,
+	"1700044187_curated_communities.up.sql":                                       _1700044187_curated_communitiesUpSql,
+	"README.md":                                                                   readmeMd,
+	"doc.go":                                                                      docGo,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -2826,8 +2848,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1699041816_profile_showcase_contacts.up.sql":                                 {_1699041816_profile_showcase_contactsUpSql, map[string]*bintree{}},
 	"1699554099_message_segments.up.sql":                                          {_1699554099_message_segmentsUpSql, map[string]*bintree{}},
 	"1700044186_message_segments_timestamp.up.sql":                                {_1700044186_message_segments_timestampUpSql, map[string]*bintree{}},
-	"README.md": {readmeMd, map[string]*bintree{}},
-	"doc.go":    {docGo, map[string]*bintree{}},
+	"1700044187_curated_communities.up.sql":                                       {_1700044187_curated_communitiesUpSql, map[string]*bintree{}},
+	"README.md":                                                                   {readmeMd, map[string]*bintree{}},
+	"doc.go":                                                                      {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

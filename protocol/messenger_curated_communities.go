@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"reflect"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -15,66 +14,56 @@ import (
 )
 
 const (
-	fetchError       int = 0
-	fetchSuccess     int = 1
-	fetchHasUnknowns int = 2
+	curatedCommunitiesUpdateInterval = 2 * time.Minute
 )
 
 // Regularly gets list of curated communities and signals them to client
 func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 	logger := m.logger.Named("startCuratedCommunitiesUpdateLoop")
 
-	type curatedCommunities struct {
-		ContractCommunities         []string
-		ContractFeaturedCommunities []string
-		UnknownCommunities          []string
-	}
-
 	go func() {
+		// Initialize interval to 0 for immediate execution
+		var interval time.Duration = 0
 
-		var fetchResultsHistory = make([]int, 0)
-		var mu = sync.RWMutex{}
-		var c = curatedCommunities{}
+		cache, err := m.communitiesManager.GetCuratedCommunities()
+		if err != nil {
+			logger.Error("failed to start curated communities loop", zap.Error(err))
+			return
+		}
 
 		for {
-			response, err := m.CuratedCommunities()
-
-			if err != nil {
-				fetchResultsHistory = append(fetchResultsHistory, fetchError)
-			} else {
-				mu.Lock()
-				// Check if it's the same values we had
-				if !reflect.DeepEqual(c.ContractCommunities, response.ContractCommunities) ||
-					!reflect.DeepEqual(c.ContractFeaturedCommunities, response.ContractFeaturedCommunities) ||
-					!reflect.DeepEqual(c.UnknownCommunities, response.UnknownCommunities) {
-					// One of the communities is different, send the updated response
-					m.config.messengerSignalsHandler.SendCuratedCommunitiesUpdate(response)
-
-					// Update the values
-					c.ContractCommunities = response.ContractCommunities
-					c.ContractFeaturedCommunities = response.ContractFeaturedCommunities
-					c.UnknownCommunities = response.UnknownCommunities
-				}
-				mu.Unlock()
-
-				if len(response.UnknownCommunities) == 0 {
-					fetchResultsHistory = append(fetchResultsHistory, fetchSuccess)
-
-				} else {
-					fetchResultsHistory = append(fetchResultsHistory, fetchHasUnknowns)
-				}
-			}
-
-			//keep only 2 last fetch results
-			if len(fetchResultsHistory) > 2 {
-				fetchResultsHistory = fetchResultsHistory[1:]
-			}
-
-			timeTillNextUpdate := calcTimeTillNextUpdate(fetchResultsHistory)
-			logger.Debug("Next curated communities update will happen in", zap.Duration("timeTillNextUpdate", timeTillNextUpdate))
-
 			select {
-			case <-time.After(timeTillNextUpdate):
+			case <-time.After(interval):
+				// Immediate execution on first run, then set to regular interval
+				interval = curatedCommunitiesUpdateInterval
+
+				curatedCommunities, err := m.getCuratedCommunitiesFromContract()
+				if err != nil {
+					logger.Error("failed to get curated communities from contract", zap.Error(err))
+					continue
+				}
+
+				if reflect.DeepEqual(cache.ContractCommunities, curatedCommunities.ContractCommunities) &&
+					reflect.DeepEqual(cache.ContractFeaturedCommunities, curatedCommunities.ContractFeaturedCommunities) {
+					// nothing changed
+					continue
+				}
+
+				err = m.communitiesManager.SetCuratedCommunities(curatedCommunities)
+				if err == nil {
+					cache = curatedCommunities
+				} else {
+					logger.Error("failed to save curated communities", zap.Error(err))
+				}
+
+				response, err := m.fetchCuratedCommunities(curatedCommunities)
+				if err != nil {
+					logger.Error("failed to fetch curated communities", zap.Error(err))
+					continue
+				}
+
+				m.config.messengerSignalsHandler.SendCuratedCommunitiesUpdate(response)
+
 			case <-m.quit:
 				return
 			}
@@ -82,39 +71,7 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 	}()
 }
 
-func calcTimeTillNextUpdate(fetchResultsHistory []int) time.Duration {
-	// TODO lower this back again once the real curated community contract is up
-	// The current contract contains communities that are no longer accessible on waku
-	const shortTimeout = 30 * time.Second
-	const averageTimeout = 60 * time.Second
-	const longTimeout = 300 * time.Second
-
-	twoConsecutiveErrors := (len(fetchResultsHistory) == 2 &&
-		fetchResultsHistory[0] == fetchError &&
-		fetchResultsHistory[1] == fetchError)
-
-	twoConsecutiveHasUnknowns := (len(fetchResultsHistory) == 2 &&
-		fetchResultsHistory[0] == fetchHasUnknowns &&
-		fetchResultsHistory[1] == fetchHasUnknowns)
-
-	var timeTillNextUpdate time.Duration
-
-	if twoConsecutiveErrors || twoConsecutiveHasUnknowns {
-		timeTillNextUpdate = longTimeout
-	} else {
-		switch fetchResultsHistory[len(fetchResultsHistory)-1] {
-		case fetchError:
-			timeTillNextUpdate = shortTimeout
-		case fetchSuccess:
-			timeTillNextUpdate = longTimeout
-		case fetchHasUnknowns:
-			timeTillNextUpdate = averageTimeout
-		}
-	}
-	return timeTillNextUpdate
-}
-
-func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse, error) {
+func (m *Messenger) getCuratedCommunitiesFromContract() (*communities.CuratedCommunities, error) {
 	if m.contractMaker == nil {
 		m.logger.Warn("contract maker not initialized")
 		return nil, errors.New("contract maker not initialized")
@@ -137,28 +94,36 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 
 	callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
 
-	curatedCommunities, err := directory.GetCommunities(callOpts)
+	contractCommunities, err := directory.GetCommunities(callOpts)
 	if err != nil {
 		return nil, err
 	}
-	var communityIDs []types.HexBytes
-	for _, c := range curatedCommunities {
-		communityIDs = append(communityIDs, c)
+	var contractCommunityIDs []string
+	for _, c := range contractCommunities {
+		contractCommunityIDs = append(contractCommunityIDs, types.HexBytes(c).String())
 	}
 
-	response, err := m.communitiesManager.GetStoredDescriptionForCommunities(communityIDs)
+	featuredContractCommunities, err := directory.GetFeaturedCommunities(callOpts)
 	if err != nil {
 		return nil, err
 	}
+	var contractFeaturedCommunityIDs []string
+	for _, c := range featuredContractCommunities {
+		contractFeaturedCommunityIDs = append(contractFeaturedCommunityIDs, types.HexBytes(c).String())
+	}
 
-	featuredCommunities, err := directory.GetFeaturedCommunities(callOpts)
+	return &communities.CuratedCommunities{
+		ContractCommunities:         contractCommunityIDs,
+		ContractFeaturedCommunities: contractFeaturedCommunityIDs,
+	}, nil
+}
+
+func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.CuratedCommunities) (*communities.KnownCommunitiesResponse, error) {
+	response, err := m.communitiesManager.GetStoredDescriptionForCommunities(curatedCommunities.ContractCommunities)
 	if err != nil {
 		return nil, err
 	}
-
-	for _, c := range featuredCommunities {
-		response.ContractFeaturedCommunities = append(response.ContractFeaturedCommunities, types.HexBytes(c).String())
-	}
+	response.ContractFeaturedCommunities = curatedCommunities.ContractFeaturedCommunities
 
 	// TODO: use mechanism to obtain shard from community ID (https://github.com/status-im/status-desktop/issues/12585)
 	var unknownCommunities []communities.CommunityShard
@@ -171,4 +136,12 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 	go m.requestCommunitiesFromMailserver(unknownCommunities)
 
 	return response, nil
+}
+
+func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse, error) {
+	curatedCommunities, err := m.communitiesManager.GetCuratedCommunities()
+	if err != nil {
+		return nil, err
+	}
+	return m.fetchCuratedCommunities(curatedCommunities)
 }
