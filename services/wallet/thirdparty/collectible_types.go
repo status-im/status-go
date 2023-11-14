@@ -1,6 +1,7 @@
 package thirdparty
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -196,23 +197,23 @@ type CollectibleContractOwnership struct {
 
 type CollectibleContractOwnershipProvider interface {
 	CollectibleProvider
-	FetchCollectibleOwnersByContractAddress(chainID w_common.ChainID, contractAddress common.Address) (*CollectibleContractOwnership, error)
+	FetchCollectibleOwnersByContractAddress(ctx context.Context, chainID w_common.ChainID, contractAddress common.Address) (*CollectibleContractOwnership, error)
 }
 
 type CollectibleAccountOwnershipProvider interface {
 	CollectibleProvider
-	FetchAllAssetsByOwner(chainID w_common.ChainID, owner common.Address, cursor string, limit int) (*FullCollectibleDataContainer, error)
-	FetchAllAssetsByOwnerAndContractAddress(chainID w_common.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*FullCollectibleDataContainer, error)
+	FetchAllAssetsByOwner(ctx context.Context, chainID w_common.ChainID, owner common.Address, cursor string, limit int) (*FullCollectibleDataContainer, error)
+	FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, chainID w_common.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*FullCollectibleDataContainer, error)
 }
 
 type CollectibleDataProvider interface {
 	CollectibleProvider
-	FetchAssetsByCollectibleUniqueID(uniqueIDs []CollectibleUniqueID) ([]FullCollectibleData, error)
+	FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs []CollectibleUniqueID) ([]FullCollectibleData, error)
 }
 
 type CollectionDataProvider interface {
 	CollectibleProvider
-	FetchCollectionsDataByContractID(ids []ContractID) ([]CollectionData, error)
+	FetchCollectionsDataByContractID(ctx context.Context, ids []ContractID) ([]CollectionData, error)
 }
 
 type CollectibleCommunityInfoProvider interface {

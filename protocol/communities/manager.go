@@ -156,7 +156,7 @@ func (m *DefaultTokenManager) GetAllChainIDs() ([]uint64, error) {
 }
 
 type CollectiblesManager interface {
-	FetchBalancesByOwnerAndContractAddress(chainID walletcommon.ChainID, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error)
+	FetchBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletcommon.ChainID, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error)
 }
 
 func (m *DefaultTokenManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error) {
@@ -2639,6 +2639,8 @@ func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tok
 		return nil, errors.New("no collectibles manager")
 	}
 
+	ctx := context.Background()
+
 	ownedERC721Tokens := make(CollectiblesByChain)
 
 	for chainID, erc721Tokens := range tokenRequirements {
@@ -2664,7 +2666,7 @@ func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tok
 		}
 
 		for _, owner := range walletAddresses {
-			balances, err := m.collectiblesManager.FetchBalancesByOwnerAndContractAddress(walletcommon.ChainID(chainID), owner, contractAddresses)
+			balances, err := m.collectiblesManager.FetchBalancesByOwnerAndContractAddress(ctx, walletcommon.ChainID(chainID), owner, contractAddresses)
 			if err != nil {
 				m.logger.Info("couldn't fetch owner assets", zap.Error(err))
 				return nil, err

@@ -1,6 +1,7 @@
 package alchemy
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -94,8 +95,8 @@ func NewClient(apiKeys map[uint64]string) *Client {
 	}
 }
 
-func (o *Client) doQuery(url string) (*http.Response, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+func (o *Client) doQuery(ctx context.Context, url string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +104,7 @@ func (o *Client) doQuery(url string) (*http.Response, error) {
 	return o.doWithRetries(req)
 }
 
-func (o *Client) doPostWithJSON(url string, payload any) (*http.Response, error) {
+func (o *Client) doPostWithJSON(ctx context.Context, url string, payload any) (*http.Response, error) {
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -112,7 +113,7 @@ func (o *Client) doPostWithJSON(url string, payload any) (*http.Response, error)
 	payloadString := string(payloadJSON)
 	payloadReader := strings.NewReader(payloadString)
 
-	req, err := http.NewRequest("POST", url, payloadReader)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, payloadReader)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +155,7 @@ func (o *Client) doWithRetries(req *http.Request) (*http.Response, error) {
 	return backoff.RetryWithData(op, &b)
 }
 
-func (o *Client) FetchCollectibleOwnersByContractAddress(chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
+func (o *Client) FetchCollectibleOwnersByContractAddress(ctx context.Context, chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
 	ownership := thirdparty.CollectibleContractOwnership{
 		ContractAddress: contractAddress,
 		Owners:          make([]thirdparty.CollectibleOwner, 0),
@@ -174,9 +175,11 @@ func (o *Client) FetchCollectibleOwnersByContractAddress(chainID walletCommon.Ch
 	for {
 		url := fmt.Sprintf("%s/getOwnersForContract?%s", baseURL, queryParams.Encode())
 
-		resp, err := o.doQuery(url)
+		resp, err := o.doQuery(ctx, url)
 		if err != nil {
-			o.connectionStatus.SetIsConnected(false)
+			if ctx.Err() == nil {
+				o.connectionStatus.SetIsConnected(false)
+			}
 			return nil, err
 		}
 		o.connectionStatus.SetIsConnected(true)
@@ -206,23 +209,23 @@ func (o *Client) FetchCollectibleOwnersByContractAddress(chainID walletCommon.Ch
 	return &ownership, nil
 }
 
-func (o *Client) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+func (o *Client) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	queryParams := url.Values{}
 
-	return o.fetchOwnedAssets(chainID, owner, queryParams, cursor, limit)
+	return o.fetchOwnedAssets(ctx, chainID, owner, queryParams, cursor, limit)
 }
 
-func (o *Client) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+func (o *Client) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	queryParams := url.Values{}
 
 	for _, contractAddress := range contractAddresses {
 		queryParams.Add("contractAddresses", contractAddress.String())
 	}
 
-	return o.fetchOwnedAssets(chainID, owner, queryParams, cursor, limit)
+	return o.fetchOwnedAssets(ctx, chainID, owner, queryParams, cursor, limit)
 }
 
-func (o *Client) fetchOwnedAssets(chainID walletCommon.ChainID, owner common.Address, queryParams url.Values, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+func (o *Client) fetchOwnedAssets(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, queryParams url.Values, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	assets := new(thirdparty.FullCollectibleDataContainer)
 
 	queryParams["owner"] = []string{owner.String()}
@@ -243,9 +246,11 @@ func (o *Client) fetchOwnedAssets(chainID walletCommon.ChainID, owner common.Add
 	for {
 		url := fmt.Sprintf("%s/getNFTsForOwner?%s", baseURL, queryParams.Encode())
 
-		resp, err := o.doQuery(url)
+		resp, err := o.doQuery(ctx, url)
 		if err != nil {
-			o.connectionStatus.SetIsConnected(false)
+			if ctx.Err() == nil {
+				o.connectionStatus.SetIsConnected(false)
+			}
 			return nil, err
 		}
 		o.connectionStatus.SetIsConnected(true)
@@ -313,7 +318,7 @@ func getCollectibleUniqueIDBatches(ids []thirdparty.CollectibleUniqueID) []Batch
 	return batches
 }
 
-func (o *Client) fetchAssetsByBatchTokenIDs(chainID walletCommon.ChainID, batchIDs BatchTokenIDs) ([]thirdparty.FullCollectibleData, error) {
+func (o *Client) fetchAssetsByBatchTokenIDs(ctx context.Context, chainID walletCommon.ChainID, batchIDs BatchTokenIDs) ([]thirdparty.FullCollectibleData, error) {
 	baseURL, err := getNFTBaseURL(chainID, o.apiKeys[uint64(chainID)])
 	if err != nil {
 		return nil, err
@@ -321,7 +326,7 @@ func (o *Client) fetchAssetsByBatchTokenIDs(chainID walletCommon.ChainID, batchI
 
 	url := fmt.Sprintf("%s/getNFTMetadataBatch", baseURL)
 
-	resp, err := o.doPostWithJSON(url, batchIDs)
+	resp, err := o.doPostWithJSON(ctx, url, batchIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +354,7 @@ func (o *Client) fetchAssetsByBatchTokenIDs(chainID walletCommon.ChainID, batchI
 	return ret, nil
 }
 
-func (o *Client) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
+func (o *Client) FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
 	ret := make([]thirdparty.FullCollectibleData, 0, len(uniqueIDs))
 
 	idsPerChainID := thirdparty.GroupCollectibleUIDsByChainID(uniqueIDs)
@@ -357,7 +362,7 @@ func (o *Client) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.Collect
 	for chainID, ids := range idsPerChainID {
 		batches := getCollectibleUniqueIDBatches(ids)
 		for _, batch := range batches {
-			assets, err := o.fetchAssetsByBatchTokenIDs(chainID, batch)
+			assets, err := o.fetchAssetsByBatchTokenIDs(ctx, chainID, batch)
 			if err != nil {
 				return nil, err
 			}
@@ -393,7 +398,7 @@ func getContractAddressBatches(ids []thirdparty.ContractID) []BatchContractAddre
 	return batches
 }
 
-func (o *Client) fetchCollectionsDataByBatchContractAddresses(chainID walletCommon.ChainID, batchAddresses BatchContractAddresses) ([]thirdparty.CollectionData, error) {
+func (o *Client) fetchCollectionsDataByBatchContractAddresses(ctx context.Context, chainID walletCommon.ChainID, batchAddresses BatchContractAddresses) ([]thirdparty.CollectionData, error) {
 	baseURL, err := getNFTBaseURL(chainID, o.apiKeys[uint64(chainID)])
 	if err != nil {
 		return nil, err
@@ -401,7 +406,7 @@ func (o *Client) fetchCollectionsDataByBatchContractAddresses(chainID walletComm
 
 	url := fmt.Sprintf("%s/getContractMetadataBatch", baseURL)
 
-	resp, err := o.doPostWithJSON(url, batchAddresses)
+	resp, err := o.doPostWithJSON(ctx, url, batchAddresses)
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +434,7 @@ func (o *Client) fetchCollectionsDataByBatchContractAddresses(chainID walletComm
 	return ret, nil
 }
 
-func (o *Client) FetchCollectionsDataByContractID(contractIDs []thirdparty.ContractID) ([]thirdparty.CollectionData, error) {
+func (o *Client) FetchCollectionsDataByContractID(ctx context.Context, contractIDs []thirdparty.ContractID) ([]thirdparty.CollectionData, error) {
 	ret := make([]thirdparty.CollectionData, 0, len(contractIDs))
 
 	idsPerChainID := thirdparty.GroupContractIDsByChainID(contractIDs)
@@ -437,7 +442,7 @@ func (o *Client) FetchCollectionsDataByContractID(contractIDs []thirdparty.Contr
 	for chainID, ids := range idsPerChainID {
 		batches := getContractAddressBatches(ids)
 		for _, batch := range batches {
-			contractsData, err := o.fetchCollectionsDataByBatchContractAddresses(chainID, batch)
+			contractsData, err := o.fetchCollectionsDataByBatchContractAddresses(ctx, chainID, batch)
 			if err != nil {
 				return nil, err
 			}

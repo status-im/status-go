@@ -111,11 +111,23 @@ func (s *Service) FilterActivityAsync(requestID int32, addresses []common.Addres
 
 		s.sendResponseEvent(&requestID, EventActivityFilteringDone, res, err)
 
-		// Report details post-response to ensure updates have a match
-		if res.Activities != nil {
-			go s.lazyLoadDetails(requestID, res.Activities)
-		}
+		s.getActivityDetailsAsync(requestID, res.Activities)
 	})
+}
+
+func (s *Service) getActivityDetailsAsync(requestID int32, entries []Entry) {
+	if len(entries) == 0 {
+		return
+	}
+
+	ctx := context.Background()
+
+	go func() {
+		activityData, err := s.getActivityDetails(ctx, entries)
+		if len(activityData) != 0 {
+			s.sendResponseEvent(&requestID, EventActivityFilteringUpdate, activityData, err)
+		}
+	}()
 }
 
 type CollectibleHeader struct {
@@ -141,7 +153,7 @@ func (s *Service) GetActivityCollectiblesAsync(requestID int32, chainIDs []w_com
 			return nil, err
 		}
 
-		data, err := s.collectibles.FetchAssetsByCollectibleUniqueID(collectibles)
+		data, err := s.collectibles.FetchAssetsByCollectibleUniqueID(ctx, collectibles)
 		if err != nil {
 			return nil, err
 		}
@@ -184,8 +196,8 @@ func (s *Service) GetTxDetails(ctx context.Context, id string) (*EntryDetails, e
 	return getTxDetails(ctx, s.db, id)
 }
 
-// lazyLoadDetails check if any of the entries have details that are not loaded then fetch and emit result
-func (s *Service) lazyLoadDetails(requestID int32, entries []Entry) {
+// getActivityDetails check if any of the entries have details that are not loaded then fetch and emit result
+func (s *Service) getActivityDetails(ctx context.Context, entries []Entry) ([]*EntryData, error) {
 	res := make([]*EntryData, 0)
 	var err error
 	ids := make([]thirdparty.CollectibleUniqueID, 0)
@@ -205,15 +217,15 @@ func (s *Service) lazyLoadDetails(requestID int32, entries []Entry) {
 	}
 
 	if len(ids) == 0 {
-		return
+		return nil, nil
 	}
 
-	log.Debug("wallet.activity.Service lazyLoadDetails", "requestID", requestID, "entries.len", len(entries), "ids.len", len(ids))
+	log.Debug("wallet.activity.Service lazyLoadDetails", "entries.len", len(entries), "ids.len", len(ids))
 
-	colData, err := s.collectibles.FetchAssetsByCollectibleUniqueID(ids)
+	colData, err := s.collectibles.FetchAssetsByCollectibleUniqueID(ctx, ids)
 	if err != nil {
 		log.Error("Error fetching collectible details", "error", err)
-		return
+		return nil, err
 	}
 
 	for _, col := range colData {
@@ -236,9 +248,7 @@ func (s *Service) lazyLoadDetails(requestID int32, entries []Entry) {
 		res = append(res, data)
 	}
 
-	if len(res) > 0 {
-		s.sendResponseEvent(&requestID, EventActivityFilteringUpdate, res, err)
-	}
+	return res, nil
 }
 
 type GetRecipientsResponse struct {

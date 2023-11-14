@@ -1,6 +1,7 @@
 package opensea
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -71,7 +72,7 @@ func NewClientV2(apiKey string, httpClient *HTTPClient) *ClientV2 {
 	}
 }
 
-func (o *ClientV2) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+func (o *ClientV2) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	// No dedicated endpoint to filter owned assets by contract address.
 	// Will probably be available at some point, for now do the filtering ourselves.
 	assets := new(thirdparty.FullCollectibleDataContainer)
@@ -91,7 +92,7 @@ func (o *ClientV2) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.
 	assets.Provider = o.ID()
 
 	for {
-		assetsPage, err := o.FetchAllAssetsByOwner(chainID, owner, assets.NextCursor, assetLimitV2)
+		assetsPage, err := o.FetchAllAssetsByOwner(ctx, chainID, owner, assets.NextCursor, assetLimitV2)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +117,7 @@ func (o *ClientV2) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.
 	return assets, nil
 }
 
-func (o *ClientV2) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+func (o *ClientV2) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	pathParams := []string{
 		"chain", chainIDToChainString(chainID),
 		"account", owner.String(),
@@ -125,14 +126,14 @@ func (o *ClientV2) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner com
 
 	queryParams := url.Values{}
 
-	return o.fetchAssets(chainID, pathParams, queryParams, limit, cursor)
+	return o.fetchAssets(ctx, chainID, pathParams, queryParams, limit, cursor)
 }
 
-func (o *ClientV2) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
-	return o.fetchDetailedAssets(uniqueIDs)
+func (o *ClientV2) FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
+	return o.fetchDetailedAssets(ctx, uniqueIDs)
 }
 
-func (o *ClientV2) fetchAssets(chainID walletCommon.ChainID, pathParams []string, queryParams url.Values, limit int, cursor string) (*thirdparty.FullCollectibleDataContainer, error) {
+func (o *ClientV2) fetchAssets(ctx context.Context, chainID walletCommon.ChainID, pathParams []string, queryParams url.Values, limit int, cursor string) (*thirdparty.FullCollectibleDataContainer, error) {
 	assets := new(thirdparty.FullCollectibleDataContainer)
 
 	tmpLimit := assetLimitV2
@@ -154,7 +155,7 @@ func (o *ClientV2) fetchAssets(chainID walletCommon.ChainID, pathParams []string
 			return nil, err
 		}
 
-		body, err := o.client.doGetRequest(url, o.apiKey)
+		body, err := o.client.doGetRequest(ctx, url, o.apiKey)
 		if err != nil {
 			o.connectionStatus.SetIsConnected(false)
 			return nil, err
@@ -198,7 +199,7 @@ func (o *ClientV2) fetchAssets(chainID walletCommon.ChainID, pathParams []string
 	return assets, nil
 }
 
-func (o *ClientV2) fetchDetailedAssets(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
+func (o *ClientV2) fetchDetailedAssets(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
 	assets := make([]thirdparty.FullCollectibleData, 0, len(uniqueIDs))
 
 	for _, id := range uniqueIDs {
@@ -208,9 +209,11 @@ func (o *ClientV2) fetchDetailedAssets(uniqueIDs []thirdparty.CollectibleUniqueI
 			return nil, err
 		}
 
-		body, err := o.client.doGetRequest(url, o.apiKey)
+		body, err := o.client.doGetRequest(ctx, url, o.apiKey)
 		if err != nil {
-			o.connectionStatus.SetIsConnected(false)
+			if ctx.Err() == nil {
+				o.connectionStatus.SetIsConnected(false)
+			}
 			return nil, err
 		}
 		o.connectionStatus.SetIsConnected(true)
@@ -232,16 +235,18 @@ func (o *ClientV2) fetchDetailedAssets(uniqueIDs []thirdparty.CollectibleUniqueI
 	return assets, nil
 }
 
-func (o *ClientV2) fetchContractDataByContractID(id thirdparty.ContractID) (*ContractData, error) {
+func (o *ClientV2) fetchContractDataByContractID(ctx context.Context, id thirdparty.ContractID) (*ContractData, error) {
 	path := fmt.Sprintf("chain/%s/contract/%s", chainIDToChainString(id.ChainID), id.Address.String())
 	url, err := o.urlGetter(id.ChainID, path)
 	if err != nil {
 		return nil, err
 	}
 
-	body, err := o.client.doGetRequest(url, o.apiKey)
+	body, err := o.client.doGetRequest(ctx, url, o.apiKey)
 	if err != nil {
-		o.connectionStatus.SetIsConnected(false)
+		if ctx.Err() == nil {
+			o.connectionStatus.SetIsConnected(false)
+		}
 		return nil, err
 	}
 	o.connectionStatus.SetIsConnected(true)
@@ -260,14 +265,14 @@ func (o *ClientV2) fetchContractDataByContractID(id thirdparty.ContractID) (*Con
 	return &contract, nil
 }
 
-func (o *ClientV2) fetchCollectionDataBySlug(chainID walletCommon.ChainID, slug string) (*CollectionData, error) {
+func (o *ClientV2) fetchCollectionDataBySlug(ctx context.Context, chainID walletCommon.ChainID, slug string) (*CollectionData, error) {
 	path := fmt.Sprintf("collections/%s", slug)
 	url, err := o.urlGetter(chainID, path)
 	if err != nil {
 		return nil, err
 	}
 
-	body, err := o.client.doGetRequest(url, o.apiKey)
+	body, err := o.client.doGetRequest(ctx, url, o.apiKey)
 	if err != nil {
 		o.connectionStatus.SetIsConnected(false)
 		return nil, err
@@ -288,11 +293,11 @@ func (o *ClientV2) fetchCollectionDataBySlug(chainID walletCommon.ChainID, slug 
 	return &collection, nil
 }
 
-func (o *ClientV2) FetchCollectionsDataByContractID(contractIDs []thirdparty.ContractID) ([]thirdparty.CollectionData, error) {
+func (o *ClientV2) FetchCollectionsDataByContractID(ctx context.Context, contractIDs []thirdparty.ContractID) ([]thirdparty.CollectionData, error) {
 	ret := make([]thirdparty.CollectionData, 0, len(contractIDs))
 
 	for _, id := range contractIDs {
-		contractData, err := o.fetchContractDataByContractID(id)
+		contractData, err := o.fetchContractDataByContractID(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -301,7 +306,7 @@ func (o *ClientV2) FetchCollectionsDataByContractID(contractIDs []thirdparty.Con
 			continue
 		}
 
-		collectionData, err := o.fetchCollectionDataBySlug(id.ChainID, contractData.Collection)
+		collectionData, err := o.fetchCollectionDataBySlug(ctx, id.ChainID, contractData.Collection)
 		if err != nil {
 			return nil, err
 		}

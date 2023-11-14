@@ -119,7 +119,7 @@ func (s *Service) FilterOwnedCollectiblesAsync(requestID int32, chainIDs []walle
 		if err != nil {
 			return nil, err
 		}
-		data, err := s.manager.FetchAssetsByCollectibleUniqueID(collectibles)
+		data, err := s.manager.FetchAssetsByCollectibleUniqueID(ctx, collectibles)
 		if err != nil {
 			return nil, err
 		}
@@ -156,7 +156,7 @@ func (s *Service) FilterOwnedCollectiblesAsync(requestID int32, chainIDs []walle
 
 func (s *Service) GetCollectiblesDetailsAsync(requestID int32, uniqueIDs []thirdparty.CollectibleUniqueID) {
 	s.scheduler.Enqueue(requestID, getCollectiblesDataTask, func(ctx context.Context) (interface{}, error) {
-		collectibles, err := s.manager.FetchAssetsByCollectibleUniqueID(uniqueIDs)
+		collectibles, err := s.manager.FetchAssetsByCollectibleUniqueID(ctx, uniqueIDs)
 		if err != nil {
 			return nil, err
 		}

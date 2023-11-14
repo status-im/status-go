@@ -1,6 +1,7 @@
 package opensea
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -27,7 +28,7 @@ func NewHTTPClient() *HTTPClient {
 	}
 }
 
-func (o *HTTPClient) doGetRequest(url string, apiKey string) ([]byte, error) {
+func (o *HTTPClient) doGetRequest(ctx context.Context, url string, apiKey string) ([]byte, error) {
 	// Ensure only one thread makes a request at a time
 	o.getRequestLock.Lock()
 	defer o.getRequestLock.Unlock()
@@ -39,7 +40,7 @@ func (o *HTTPClient) doGetRequest(url string, apiKey string) ([]byte, error) {
 	tmpAPIKey := ""
 
 	for {
-		req, err := http.NewRequest(http.MethodGet, url, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return nil, err
 		}

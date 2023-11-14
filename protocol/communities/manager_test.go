@@ -110,7 +110,7 @@ func (m *testCollectiblesManager) setResponse(chainID uint64, walletAddress geth
 	m.response[chainID][walletAddress][contractAddress] = balances
 }
 
-func (m *testCollectiblesManager) FetchBalancesByOwnerAndContractAddress(chainID walletCommon.ChainID, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
+func (m *testCollectiblesManager) FetchBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
 	return m.response[uint64(chainID)][ownerAddress], nil
 }
 
