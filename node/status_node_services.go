@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
@@ -327,7 +327,7 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig, telemetryServe
 			EnableDiscV5:            nodeConfig.WakuV2Config.EnableDiscV5,
 			UDPPort:                 nodeConfig.WakuV2Config.UDPPort,
 			AutoUpdate:              nodeConfig.WakuV2Config.AutoUpdate,
-			DefaultShardPubsubTopic: transport.DefaultShardPubsubTopic(),
+			DefaultShardPubsubTopic: shard.DefaultShardPubsubTopic(),
 			UseShardAsDefaultTopic:  nodeConfig.WakuV2Config.UseShardAsDefaultTopic,
 			TelemetryServerURL:      telemetryServerURL,
 		}

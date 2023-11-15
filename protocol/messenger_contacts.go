@@ -468,7 +468,7 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 	if !deprecation.ChatProfileDeprecated {
 		response.AddChat(profileChat)
 
-		_, err = m.transport.InitFilters([]transport.FiltersToInitialize{{ChatID: profileChat.ID, PubsubTopic: transport.DefaultShardPubsubTopic()}}, []*ecdsa.PublicKey{publicKey})
+		_, err = m.transport.InitFilters([]transport.FiltersToInitialize{{ChatID: profileChat.ID}}, []*ecdsa.PublicKey{publicKey})
 		if err != nil {
 			return nil, err
 		}

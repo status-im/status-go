@@ -234,7 +234,7 @@ func TestWakuV2Filter(t *testing.T) {
 	msgTimestamp := w.timestamp()
 	contentTopic := maps.Keys(filter.ContentTopics)[0]
 
-	_, err = w.Send(relay.DefaultWakuTopic, &pb.WakuMessage{
+	_, err = w.Send("", &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: contentTopic.ContentTopic(),
 		Version:      0,
@@ -242,7 +242,7 @@ func TestWakuV2Filter(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(15 * time.Second)
 
 	// Ensure there is at least 1 active filter subscription
 	subscriptions := w.node.FilterLightnode().Subscriptions()

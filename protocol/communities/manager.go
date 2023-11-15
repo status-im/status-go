@@ -25,11 +25,13 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/account"
+	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/ens"
@@ -633,8 +635,8 @@ func (m *Manager) All() ([]*Community, error) {
 }
 
 type CommunityShard struct {
-	CommunityID string        `json:"communityID"`
-	Shard       *common.Shard `json:"shard"`
+	CommunityID string       `json:"communityID"`
+	Shard       *shard.Shard `json:"shard"`
 }
 
 type KnownCommunitiesResponse struct {
@@ -1078,13 +1080,13 @@ func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 	return m.persistence.DeleteCommunitySettings(id)
 }
 
-func (m *Manager) UpdateShard(community *Community, shard *common.Shard) error {
+func (m *Manager) UpdateShard(community *Community, shard *shard.Shard) error {
 	community.config.Shard = shard
 	return m.persistence.SaveCommunity(community)
 }
 
 // SetShard assigns a shard to a community
-func (m *Manager) SetShard(communityID types.HexBytes, shard *common.Shard) (*Community, error) {
+func (m *Manager) SetShard(communityID types.HexBytes, shard *shard.Shard) (*Community, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
@@ -1110,7 +1112,8 @@ func (m *Manager) UpdatePubsubTopicPrivateKey(community *Community, privKey *ecd
 	community.SetPubsubTopicPrivateKey(privKey)
 
 	if privKey != nil {
-		if err := m.transport.StorePubsubTopicKey(community.PubsubTopic(), privKey); err != nil {
+		topic := community.PubsubTopic()
+		if err := m.transport.StorePubsubTopicKey(topic, privKey); err != nil {
 			return err
 		}
 	}
@@ -2900,7 +2903,7 @@ func UnwrapCommunityDescriptionMessage(payload []byte) (*ecdsa.PublicKey, *proto
 	if applicationMetadataMessage.Type != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
 		return nil, nil, ErrInvalidMessage
 	}
-	signer, err := applicationMetadataMessage.RecoverKey()
+	signer, err := utils.RecoverKey(applicationMetadataMessage)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -3197,7 +3200,8 @@ func (m *Manager) initializeCommunity(community *Community) error {
 	}
 
 	if m.transport != nil && m.transport.WakuVersion() == 2 {
-		privKey, err := m.transport.RetrievePubsubTopicKey(community.PubsubTopic())
+		topic := community.PubsubTopic()
+		privKey, err := m.transport.RetrievePubsubTopicKey(topic)
 		if err != nil {
 			return err
 		}
@@ -3358,19 +3362,6 @@ func (m *Manager) AcceptedPendingRequestsToJoinForCommunity(id types.HexBytes) (
 func (m *Manager) DeclinedPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
 	return m.persistence.DeclinedPendingRequestsToJoinForCommunity(id)
 
-}
-
-func (m *Manager) GetPubsubTopic(communityID string) (string, error) {
-	community, err := m.GetByIDString(communityID)
-	if err != nil {
-		return "", err
-	}
-
-	if community == nil {
-		return transport.DefaultShardPubsubTopic(), nil
-	}
-
-	return transport.GetPubsubTopic(community.Shard().TransportShard()), nil
 }
 
 func (m *Manager) RequestsToJoinForCommunityAwaitingAddresses(id types.HexBytes) ([]*RequestToJoin, error) {

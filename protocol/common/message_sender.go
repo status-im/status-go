@@ -455,8 +455,6 @@ func (s *MessageSender) sendPrivate(
 
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
 	rawMessage.ID = types.EncodeHex(messageID)
-	rawMessage.PubsubTopic = transport.DefaultShardPubsubTopic() // TODO: determine which pubsub topic should be used for 1:1 messages
-
 	if rawMessage.BeforeDispatch != nil {
 		if err := rawMessage.BeforeDispatch(rawMessage); err != nil {
 			return nil, err
