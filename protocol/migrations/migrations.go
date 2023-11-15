@@ -111,6 +111,7 @@
 // 1698746210_add_signature_to_revealed_addresses.up.sql (87B)
 // 1699041816_profile_showcase_contacts.up.sql (2.206kB)
 // 1699554099_message_segments.up.sql (426B)
+// 1700044186_message_segments_timestamp.up.sql (322B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -2375,7 +2376,7 @@ func _1699041816_profile_showcase_contactsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1699041816_profile_showcase_contacts.up.sql", size: 2206, mode: os.FileMode(0644), modTime: time.Unix(1699622242, 0)}
+	info := bindataFileInfo{name: "1699041816_profile_showcase_contacts.up.sql", size: 2206, mode: os.FileMode(0644), modTime: time.Unix(1699887700, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd5, 0x7b, 0x55, 0xda, 0x93, 0x4a, 0x92, 0xf8, 0x45, 0xb2, 0x9f, 0x32, 0xf4, 0x37, 0xc, 0x5f, 0x62, 0xba, 0x33, 0xe2, 0x5c, 0x91, 0x1c, 0xc, 0x7, 0x9, 0xc2, 0x27, 0x5, 0x90, 0x94, 0xf3}}
 	return a, nil
 }
@@ -2395,8 +2396,28 @@ func _1699554099_message_segmentsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1699554099_message_segments.up.sql", size: 426, mode: os.FileMode(0644), modTime: time.Unix(1699622242, 0)}
+	info := bindataFileInfo{name: "1699554099_message_segments.up.sql", size: 426, mode: os.FileMode(0644), modTime: time.Unix(1699976109, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x73, 0xca, 0xd, 0xfa, 0xfa, 0x17, 0xef, 0x7e, 0x24, 0xf9, 0x28, 0xbd, 0x39, 0x75, 0xff, 0x34, 0x31, 0x27, 0x58, 0x3c, 0x17, 0x77, 0xfd, 0xc2, 0x66, 0x47, 0x63, 0x58, 0x3e, 0xb3, 0x88, 0x1a}}
+	return a, nil
+}
+
+var __1700044186_message_segments_timestampUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\xc8\x4d\x2d\x2e\x4e\x4c\x4f\x8d\x2f\x4e\x4d\xcf\x4d\xcd\x2b\x29\xe6\x72\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x28\xc9\xcc\x4d\x2d\x2e\x49\xcc\x2d\x50\xf0\xf4\x0b\x71\x75\x77\x0d\x52\x70\x71\x75\x73\x0c\xf5\x09\x51\x30\xb0\xe6\xe2\xc2\x67\x4a\x7c\x72\x7e\x6e\x41\x4e\x6a\x49\x6a\x0a\xf1\xe6\x39\x07\xb9\x3a\x86\xb8\x2a\x78\xfa\xb9\xb8\x46\x28\x64\xa6\x54\xc4\x63\x18\x8a\xd0\xef\xef\x87\x61\xa5\x06\x5c\x56\xd3\x9a\x08\xb3\xe0\x0e\xc4\x6f\x2a\x42\x1d\x8a\xf9\x80\x00\x00\x00\xff\xff\x95\x31\x20\x93\x42\x01\x00\x00")
+
+func _1700044186_message_segments_timestampUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1700044186_message_segments_timestampUpSql,
+		"1700044186_message_segments_timestamp.up.sql",
+	)
+}
+
+func _1700044186_message_segments_timestampUpSql() (*asset, error) {
+	bytes, err := _1700044186_message_segments_timestampUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1700044186_message_segments_timestamp.up.sql", size: 322, mode: os.FileMode(0644), modTime: time.Unix(1700049804, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3e, 0x4e, 0x7, 0x86, 0x71, 0xc8, 0x1f, 0x2f, 0xf4, 0xbc, 0xc5, 0xc4, 0x37, 0x56, 0xa1, 0x47, 0xd9, 0xc9, 0xfd, 0xdf, 0x9a, 0x48, 0x1d, 0xfd, 0xb4, 0xeb, 0xb6, 0xb1, 0xc2, 0x73, 0x11, 0x19}}
 	return a, nil
 }
 
@@ -2642,8 +2663,9 @@ var _bindata = map[string]func() (*asset, error){
 	"1698746210_add_signature_to_revealed_addresses.up.sql":                       _1698746210_add_signature_to_revealed_addressesUpSql,
 	"1699041816_profile_showcase_contacts.up.sql":                                 _1699041816_profile_showcase_contactsUpSql,
 	"1699554099_message_segments.up.sql":                                          _1699554099_message_segmentsUpSql,
-	"README.md":                                                                   readmeMd,
-	"doc.go":                                                                      docGo,
+	"1700044186_message_segments_timestamp.up.sql":                                _1700044186_message_segments_timestampUpSql,
+	"README.md": readmeMd,
+	"doc.go":    docGo,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -2803,8 +2825,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1698746210_add_signature_to_revealed_addresses.up.sql":                       {_1698746210_add_signature_to_revealed_addressesUpSql, map[string]*bintree{}},
 	"1699041816_profile_showcase_contacts.up.sql":                                 {_1699041816_profile_showcase_contactsUpSql, map[string]*bintree{}},
 	"1699554099_message_segments.up.sql":                                          {_1699554099_message_segmentsUpSql, map[string]*bintree{}},
-	"README.md":                                                                   {readmeMd, map[string]*bintree{}},
-	"doc.go":                                                                      {docGo, map[string]*bintree{}},
+	"1700044186_message_segments_timestamp.up.sql":                                {_1700044186_message_segments_timestampUpSql, map[string]*bintree{}},
+	"README.md": {readmeMd, map[string]*bintree{}},
+	"doc.go":    {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

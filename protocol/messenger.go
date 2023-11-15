@@ -824,6 +824,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.startSettingsChangesLoop()
 	m.startCommunityRekeyLoop()
 	m.startCuratedCommunitiesUpdateLoop()
+	m.startMessageSegmentsCleanupLoop()
 
 	if err := m.cleanTopics(); err != nil {
 		return nil, err
@@ -5723,4 +5724,27 @@ func (m *Messenger) handleSyncSocialLinks(message *protobuf.SyncSocialLinks, cal
 
 func (m *Messenger) GetDeleteForMeMessages() ([]*protobuf.SyncDeleteForMeMessage, error) {
 	return m.persistence.GetDeleteForMeMessages()
+}
+
+func (m *Messenger) startMessageSegmentsCleanupLoop() {
+	logger := m.logger.Named("messageSegmentsCleanupLoop")
+
+	go func() {
+		var interval time.Duration = 0
+		for {
+			select {
+			case <-time.After(interval):
+				// Immediate execution on first run, then set to regular interval
+				interval = 1 * time.Hour
+
+				err := m.sender.CleanupSegments()
+				if err != nil {
+					logger.Error("failed to cleanup segments", zap.Error(err))
+				}
+
+			case <-m.quit:
+				return
+			}
+		}
+	}()
 }

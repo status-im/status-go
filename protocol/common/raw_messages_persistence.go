@@ -347,11 +347,11 @@ func (db *RawMessagesPersistence) IsMessageAlreadyCompleted(hash []byte) (bool, 
 	return alreadyCompleted > 0, nil
 }
 
-func (db *RawMessagesPersistence) SaveMessageSegment(segment *protobuf.SegmentMessage, sigPubKey *ecdsa.PublicKey) error {
+func (db *RawMessagesPersistence) SaveMessageSegment(segment *protobuf.SegmentMessage, sigPubKey *ecdsa.PublicKey, timestamp int64) error {
 	sigPubKeyBlob := crypto.CompressPubkey(sigPubKey)
 
-	_, err := db.db.Exec("INSERT INTO message_segments (hash, segment_index, segments_count, sig_pub_key, payload) VALUES (?, ?, ?, ?, ?)",
-		segment.EntireMessageHash, segment.Index, segment.SegmentsCount, sigPubKeyBlob, segment.Payload)
+	_, err := db.db.Exec("INSERT INTO message_segments (hash, segment_index, segments_count, sig_pub_key, payload, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
+		segment.EntireMessageHash, segment.Index, segment.SegmentsCount, sigPubKeyBlob, segment.Payload, timestamp)
 
 	return err
 }
@@ -383,7 +383,12 @@ func (db *RawMessagesPersistence) GetMessageSegments(hash []byte, sigPubKey *ecd
 	return segments, nil
 }
 
-func (db *RawMessagesPersistence) CompleteMessageSegments(hash []byte, sigPubKey *ecdsa.PublicKey) error {
+func (db *RawMessagesPersistence) RemoveMessageSegmentsOlderThan(timestamp int64) error {
+	_, err := db.db.Exec("DELETE FROM message_segments WHERE timestamp < ?", timestamp)
+	return err
+}
+
+func (db *RawMessagesPersistence) CompleteMessageSegments(hash []byte, sigPubKey *ecdsa.PublicKey, timestamp int64) error {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -405,10 +410,15 @@ func (db *RawMessagesPersistence) CompleteMessageSegments(hash []byte, sigPubKey
 		return err
 	}
 
-	_, err = tx.Exec("INSERT INTO message_segments_completed (hash, sig_pub_key) VALUES (?,?)", hash, sigPubKeyBlob)
+	_, err = tx.Exec("INSERT INTO message_segments_completed (hash, sig_pub_key, timestamp) VALUES (?,?,?)", hash, sigPubKeyBlob, timestamp)
 	if err != nil {
 		return err
 	}
 
+	return err
+}
+
+func (db *RawMessagesPersistence) RemoveMessageSegmentsCompletedOlderThan(timestamp int64) error {
+	_, err := db.db.Exec("DELETE FROM message_segments_completed WHERE timestamp < ?", timestamp)
 	return err
 }
