@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 )
 
@@ -94,7 +95,7 @@ func (u *StatusUnfurler) fillCommunityImages(community *communities.Community, i
 	return nil
 }
 
-func (u *StatusUnfurler) buildCommunityData(communityID string, shard *common.Shard) (*communities.Community, *common.StatusCommunityLinkPreview, error) {
+func (u *StatusUnfurler) buildCommunityData(communityID string, shard *shard.Shard) (*communities.Community, *common.StatusCommunityLinkPreview, error) {
 	// This automatically checks the database
 	community, err := u.m.FetchCommunity(&FetchCommunityRequest{
 		CommunityKey:    communityID,
@@ -127,7 +128,7 @@ func (u *StatusUnfurler) buildCommunityData(communityID string, shard *common.Sh
 	return community, c, nil
 }
 
-func (u *StatusUnfurler) buildChannelData(channelUUID string, communityID string, communityShard *common.Shard) (*common.StatusCommunityChannelLinkPreview, error) {
+func (u *StatusUnfurler) buildChannelData(channelUUID string, communityID string, communityShard *shard.Shard) (*common.StatusCommunityChannelLinkPreview, error) {
 	community, communityData, err := u.buildCommunityData(communityID, communityShard)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build channel community data: %w", err)

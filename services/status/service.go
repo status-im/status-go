@@ -10,7 +10,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 )
 
 // Make sure that Service implements node.Lifecycle interface.
@@ -70,7 +70,7 @@ type PublicAPI struct {
 	service *Service
 }
 
-func (p *PublicAPI) CommunityInfo(communityID types.HexBytes, shard *common.Shard) (json.RawMessage, error) {
+func (p *PublicAPI) CommunityInfo(communityID types.HexBytes, shard *shard.Shard) (json.RawMessage, error) {
 	if p.service.messenger == nil {
 		return nil, ErrNotInitialized
 	}

@@ -19,10 +19,10 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/v1"
 )
 
@@ -47,7 +47,7 @@ type Config struct {
 	MemberIdentity                      *ecdsa.PublicKey
 	SyncedAt                            uint64
 	EventsData                          *EventsData
-	Shard                               *common.Shard
+	Shard                               *shard.Shard
 	PubsubTopicPrivateKey               *ecdsa.PrivateKey
 }
 
@@ -147,7 +147,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		ActiveMembersCount      uint64                               `json:"activeMembersCount"`
 		PubsubTopic             string                               `json:"pubsubTopic"`
 		PubsubTopicKey          string                               `json:"pubsubTopicKey"`
-		Shard                   *common.Shard                        `json:"shard"`
+		Shard                   *shard.Shard                         `json:"shard"`
 	}{
 		ID:             o.ID(),
 		Verified:       o.config.Verified,
@@ -265,7 +265,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		ActiveMembersCount          uint64                               `json:"activeMembersCount"`
 		PubsubTopic                 string                               `json:"pubsubTopic"`
 		PubsubTopicKey              string                               `json:"pubsubTopicKey"`
-		Shard                       *common.Shard                        `json:"shard"`
+		Shard                       *shard.Shard                         `json:"shard"`
 	}{
 		ID:                          o.ID(),
 		MemberRole:                  o.MemberRole(o.MemberIdentity()),
@@ -382,7 +382,7 @@ func (o *Community) DescriptionText() string {
 	return ""
 }
 
-func (o *Community) Shard() *common.Shard {
+func (o *Community) Shard() *shard.Shard {
 	if o != nil && o.config != nil {
 		return o.config.Shard
 	}
@@ -1321,7 +1321,7 @@ func (o *Community) MemberUpdateChannelID() string {
 }
 
 func (o *Community) PubsubTopic() string {
-	return transport.GetPubsubTopic(o.Shard().TransportShard())
+	return o.Shard().PubsubTopic()
 }
 
 func (o *Community) PubsubTopicPrivateKey() *ecdsa.PrivateKey {
@@ -1337,25 +1337,6 @@ func (o *Community) PubsubTopicKey() string {
 		return ""
 	}
 	return hexutil.Encode(crypto.FromECDSAPub(&o.config.PubsubTopicPrivateKey.PublicKey))
-}
-
-func (o *Community) DefaultFilters() []transport.FiltersToInitialize {
-	cID := o.IDString()
-	uncompressedPubKey := common.PubkeyToHex(o.config.ID)[2:]
-	updatesChannelID := o.StatusUpdatesChannelID()
-	mlChannelID := o.MagnetlinkMessageChannelID()
-	memberUpdateChannelID := o.MemberUpdateChannelID()
-
-	communityPubsubTopic := o.PubsubTopic()
-
-	return []transport.FiltersToInitialize{
-		{ChatID: cID, PubsubTopic: communityPubsubTopic},
-		{ChatID: uncompressedPubKey, PubsubTopic: transport.DefaultNonProtectedPubsubTopic(o.Shard().TransportShard())},
-		{ChatID: uncompressedPubKey, PubsubTopic: communityPubsubTopic},
-		{ChatID: updatesChannelID, PubsubTopic: communityPubsubTopic},
-		{ChatID: mlChannelID, PubsubTopic: communityPubsubTopic},
-		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
-	}
 }
 
 func (o *Community) PrivateKey() *ecdsa.PrivateKey {

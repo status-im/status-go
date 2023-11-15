@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -45,7 +46,7 @@ type URLDataResponse struct {
 	Community *CommunityURLData        `json:"community"`
 	Channel   *CommunityChannelURLData `json:"channel"`
 	Contact   *ContactURLData          `json:"contact"`
-	Shard     *common.Shard            `json:"shard,omitempty"`
+	Shard     *shard.Shard             `json:"shard,omitempty"`
 }
 
 const baseShareURL = "https://status.app"
@@ -197,7 +198,7 @@ func parseCommunityURLWithData(data string, chatKey string) (*URLDataResponse, e
 			TagIndices:   communityProto.TagIndices,
 			CommunityID:  types.EncodeHex(communityID),
 		},
-		Shard: common.ShardFromProtobuff(urlDataProto.Shard),
+		Shard: shard.FromProtobuff(urlDataProto.Shard),
 	}, nil
 }
 
@@ -366,7 +367,7 @@ func parseCommunityChannelURLWithData(data string, chatKey string) (*URLDataResp
 			Color:       channelProto.Color,
 			ChannelUUID: channelProto.Uuid,
 		},
-		Shard: common.ShardFromProtobuff(urlDataProto.Shard),
+		Shard: shard.FromProtobuff(urlDataProto.Shard),
 	}, nil
 }
 

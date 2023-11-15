@@ -255,7 +255,7 @@ func (m *Messenger) syncBackup() error {
 
 	to := m.calculateMailserverTo()
 	from := uint32(m.getTimesource().GetCurrentTime()/1000) - oneMonthInSeconds
-	batch := MailserverBatch{From: from, To: to, PubsubTopic: transport.DefaultShardPubsubTopic(), Topics: []types.TopicType{filter.ContentTopic}}
+	batch := MailserverBatch{From: from, To: to, Topics: []types.TopicType{filter.ContentTopic}}
 	err := m.processMailserverBatch(batch)
 	if err != nil {
 		return err

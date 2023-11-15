@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/discord"
@@ -1228,7 +1229,7 @@ func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*c
 
 // Deprecated: RequestCommunityInfoFromMailserverWithShard is deprecated in favor of
 // configurable FetchCommunity.
-func (api *PublicAPI) RequestCommunityInfoFromMailserverWithShard(communityID string, shard *common.Shard) (*communities.Community, error) {
+func (api *PublicAPI) RequestCommunityInfoFromMailserverWithShard(communityID string, shard *shard.Shard) (*communities.Community, error) {
 	request := &protocol.FetchCommunityRequest{
 		CommunityKey:    communityID,
 		Shard:           shard,
@@ -1253,7 +1254,7 @@ func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string
 
 // Deprecated: RequestCommunityInfoFromMailserverAsyncWithShard is deprecated in favor of
 // configurable FetchCommunity.
-func (api *PublicAPI) RequestCommunityInfoFromMailserverAsyncWithShard(communityID string, shard *common.Shard) error {
+func (api *PublicAPI) RequestCommunityInfoFromMailserverAsyncWithShard(communityID string, shard *shard.Shard) error {
 	request := &protocol.FetchCommunityRequest{
 		CommunityKey:    communityID,
 		Shard:           shard,
