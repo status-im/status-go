@@ -34,12 +34,11 @@ type Controller struct {
 	pendingTxManager   *transactions.PendingTxTracker
 	tokenManager       *token.Manager
 	balanceCacher      balance.Cacher
-	loadAllTransfers   bool
 }
 
 func NewTransferController(db *sql.DB, accountsDB *statusaccounts.Database, rpcClient *rpc.Client, accountFeed *event.Feed, transferFeed *event.Feed,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker, tokenManager *token.Manager,
-	balanceCacher balance.Cacher, loadAllTransfers bool) *Controller {
+	balanceCacher balance.Cacher) *Controller {
 
 	blockDAO := &BlockDAO{db}
 	return &Controller{
@@ -53,7 +52,6 @@ func NewTransferController(db *sql.DB, accountsDB *statusaccounts.Database, rpcC
 		pendingTxManager:   pendingTxManager,
 		tokenManager:       tokenManager,
 		balanceCacher:      balanceCacher,
-		loadAllTransfers:   loadAllTransfers,
 	}
 }
 
@@ -93,7 +91,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 	}
 
 	if c.reactor != nil {
-		err := c.reactor.restart(chainClients, accounts, c.loadAllTransfers)
+		err := c.reactor.restart(chainClients, accounts)
 		if err != nil {
 			return err
 		}
@@ -114,13 +112,13 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 		c.reactor = NewReactor(c.db, c.blockDAO, c.TransferFeed, c.transactionManager,
 			c.pendingTxManager, c.tokenManager, c.balanceCacher, omitHistory)
 
-		err = c.reactor.start(chainClients, accounts, c.loadAllTransfers)
+		err = c.reactor.start(chainClients, accounts)
 		if err != nil {
 			return err
 		}
 
 		c.group.Add(func(ctx context.Context) error {
-			return watchAccountsChanges(ctx, c.accountFeed, c.reactor, chainClients, accounts, c.loadAllTransfers)
+			return watchAccountsChanges(ctx, c.accountFeed, c.reactor, chainClients, accounts)
 		})
 	}
 	return nil
@@ -129,7 +127,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 // watchAccountsChanges subscribes to a feed and watches for changes in accounts list. If there are new or removed accounts
 // reactor will be restarted.
 func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor *Reactor,
-	chainClients map[uint64]chain.ClientInterface, initial []common.Address, loadAllTransfers bool) error {
+	chainClients map[uint64]chain.ClientInterface, initial []common.Address) error {
 
 	ch := make(chan accountsevent.Event, 1) // it may block if the rate of updates will be significantly higher
 	sub := accountFeed.Subscribe(ch)
@@ -167,7 +165,7 @@ func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor 
 			listenList := mapToList(listen)
 			log.Debug("list of accounts was changed from a previous version. reactor will be restarted", "new", listenList)
 
-			err := reactor.restart(chainClients, listenList, loadAllTransfers)
+			err := reactor.restart(chainClients, listenList)
 			if err != nil {
 				log.Error("failed to restart reactor with new accounts", "error", err)
 			}
@@ -225,7 +223,7 @@ func (c *Controller) LoadTransferByHash(ctx context.Context, rpcClient *rpc.Clie
 func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, address common.Address, toBlock *big.Int,
 	limit int64, fetchMore bool) ([]View, error) {
 
-	rst, err := c.reactor.getTransfersByAddress(ctx, chainID, address, toBlock, limit, fetchMore)
+	rst, err := c.reactor.getTransfersByAddress(ctx, chainID, address, toBlock, limit)
 	if err != nil {
 		log.Error("[WalletAPI:: GetTransfersByAddress] can't fetch transfers", "err", err)
 		return nil, err
