@@ -1017,7 +1017,7 @@ func (w *Waku) broadcast() {
 			var err error
 			logger := w.logger.With(zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", pubsubTopic), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().Timestamp))
 			if w.settings.LightClient {
-				w.logger.Info("publishing message via lightpush")
+				logger.Info("publishing message via lightpush")
 				_, err = w.node.Lightpush().Publish(context.Background(), envelope.Message(), lightpush.WithPubSubTopic(pubsubTopic))
 			} else {
 				logger.Info("publishing message via relay")
@@ -1324,8 +1324,7 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 		w.statusTelemetryClient.PushReceivedEnvelope(envelope)
 	}
 
-	logger := w.logger.With(zap.String("hash", recvMessage.Hash().Hex()))
-
+	logger := w.logger.With(zap.String("hash", recvMessage.Hash().Hex()), zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().Timestamp))
 	logger.Debug("received new envelope")
 	trouble := false
 
@@ -1397,6 +1396,8 @@ func (w *Waku) processQueue() {
 		case <-w.ctx.Done():
 			return
 		case e := <-w.msgQueue:
+			logger := w.logger.With(zap.String("hash", e.Hash().String()), zap.String("envelopeHash", hexutil.Encode(e.Envelope.Hash())), zap.String("contentTopic", e.ContentTopic.ContentTopic()), zap.Int64("timestamp", e.Envelope.Message().Timestamp))
+			logger.Debug("received message from queue")
 			if e.MsgType == common.StoreMessageType {
 				// We need to insert it first, and then remove it if not matched,
 				// as messages are processed asynchronously
@@ -1409,7 +1410,7 @@ func (w *Waku) processQueue() {
 
 			// If not matched we remove it
 			if !matched {
-				w.logger.Debug("filters did not match", zap.String("hash", e.Hash().String()), zap.String("contentTopic", e.ContentTopic.ContentTopic()))
+				logger.Debug("filters did not match")
 				w.storeMsgIDsMu.Lock()
 				delete(w.storeMsgIDs, e.Hash())
 				w.storeMsgIDsMu.Unlock()
