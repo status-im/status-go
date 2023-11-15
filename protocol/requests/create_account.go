@@ -20,6 +20,7 @@ type CreateAccount struct {
 	Password           string `json:"password"`
 	ImagePath          string `json:"imagePath"`
 	CustomizationColor string `json:"customizationColor"`
+	Emoji              string `json:"emoji"`
 
 	WakuV2Nameserver  *string `json:"wakuV2Nameserver"`
 	WakuV2LightClient bool    `json:"wakuV2LightClient"`
