@@ -7,6 +7,7 @@ import (
 var ErrCreateAccountInvalidDisplayName = errors.New("create-account: invalid display name")
 var ErrCreateAccountInvalidPassword = errors.New("create-account: invalid password")
 var ErrCreateAccountInvalidCustomizationColor = errors.New("create-account: invalid customization color")
+var ErrCreateAccountInvalidEmoji = errors.New("create-account: invalid emoji")
 var ErrCreateAccountInvalidRootKeystoreDir = errors.New("create-account: invalid root keystore directory")
 var ErrCreateAccountInvalidBackupDisabledDataDir = errors.New("create-account: invalid backup disabled data directory")
 var ErrCreateAccountInvalidLogFilePath = errors.New("create-account: invalid log file path")
@@ -80,6 +81,10 @@ func ValidateAccountCreationRequest(c CreateAccount) error {
 
 	if len(c.CustomizationColor) == 0 {
 		return ErrCreateAccountInvalidCustomizationColor
+	}
+
+	if len(c.Emoji) == 0 {
+		return ErrCreateAccountInvalidEmoji
 	}
 
 	if len(c.BackupDisabledDataDir) == 0 {
