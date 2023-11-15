@@ -532,8 +532,6 @@ type WalletConfig struct {
 	AlchemyAPIKeys     map[uint64]string `json:"AlchemyAPIKeys"`
 	InfuraAPIKey       string            `json:"InfuraAPIKey"`
 	InfuraAPIKeySecret string            `json:"InfuraAPIKeySecret"`
-	// LoadAllTransfers should be false to reduce network traffic and harddrive space consumption when loading tranfers
-	LoadAllTransfers bool `json:"LoadAllTransfers"`
 }
 
 // LocalNotificationsConfig extra configuration for localnotifications.Service.

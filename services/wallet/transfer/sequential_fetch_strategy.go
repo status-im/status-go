@@ -103,11 +103,10 @@ func (s *SequentialFetchStrategy) kind() FetchStrategyType {
 	return SequentialFetchStrategyType
 }
 
-// TODO: remove fetchMore parameter from here and interface, it is used by OnDemandFetchStrategy only
 func (s *SequentialFetchStrategy) getTransfersByAddress(ctx context.Context, chainID uint64, address common.Address, toBlock *big.Int,
-	limit int64, fetchMore bool) ([]Transfer, error) {
+	limit int64) ([]Transfer, error) {
 
-	log.Info("[WalletAPI:: GetTransfersByAddress] get transfers for an address", "address", address, "fetchMore", fetchMore,
+	log.Debug("[WalletAPI:: GetTransfersByAddress] get transfers for an address", "address", address,
 		"chainID", chainID, "toBlock", toBlock, "limit", limit)
 
 	rst, err := s.db.GetTransfersByAddress(chainID, address, toBlock, limit)
