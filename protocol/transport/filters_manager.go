@@ -11,16 +11,12 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common/shard"
 )
 
 const (
 	minPow = 0.0
 )
-
-type Shard struct {
-	Cluster uint16
-	Index   uint16
-}
 
 type RawFilter struct {
 	FilterID string
@@ -145,11 +141,11 @@ func (f *FiltersManager) InitPublicFilters(publicFiltersToInit []FiltersToInitia
 }
 
 type CommunityFilterToInitialize struct {
-	Shard   *Shard
+	Shard   *shard.Shard
 	PrivKey *ecdsa.PrivateKey
 }
 
-func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize) ([]*Filter, error) {
+func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize, useShards bool) ([]*Filter, error) {
 	var filters []*Filter
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
@@ -159,10 +155,15 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 			continue
 		}
 
-		communityPubsubTopic := GetPubsubTopic(cf.Shard)
-		topics := []string{communityPubsubTopic}
-		if communityPubsubTopic != DefaultShardPubsubTopic() {
-			topics = append(topics, DefaultShardPubsubTopic())
+		topics := make([]string, 0)
+		if useShards {
+			topics = append(topics, shard.DefaultShardPubsubTopic())
+			if cf.Shard.PubsubTopic() != "" {
+				topics = append(topics, cf.Shard.PubsubTopic())
+			}
+		} else {
+			topics = append(topics, "") // empty PubsubTopic means default pubsub topic,
+			// to be overridden with proper value in Waku layer
 		}
 
 		// TODO: requests to join / cancels are currently being sent into the default waku topic.
@@ -386,11 +387,9 @@ func (f *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 		return f.filters[chatID], nil
 	}
 
-	pubsubTopic := DefaultShardPubsubTopic()
-
 	// We set up a filter so we can publish,
 	// but we discard envelopes if listen is false.
-	filter, err := f.addAsymmetric(chatID, pubsubTopic, identity, listen)
+	filter, err := f.addAsymmetric(chatID, "", identity, listen)
 	if err != nil {
 		f.logger.Debug("could not register personal topic filter", zap.Error(err))
 		return nil, err
@@ -400,7 +399,6 @@ func (f *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 		ChatID:       chatID,
 		FilterID:     filter.FilterID,
 		ContentTopic: filter.Topic,
-		PubsubTopic:  pubsubTopic,
 		Identity:     PublicKeyToStr(publicKey),
 		Listen:       listen,
 		OneToOne:     true,
@@ -427,11 +425,9 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 		return f.filters[chatID], nil
 	}
 
-	pubsubTopic := DefaultShardPubsubTopic()
-
 	// We set up a filter so we can publish,
 	// but we discard envelopes if listen is false.
-	filter, err := f.addAsymmetric(chatID, pubsubTopic, identity, listen)
+	filter, err := f.addAsymmetric(chatID, "", identity, listen)
 	if err != nil {
 		f.logger.Debug("could not register partitioned topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
@@ -441,7 +437,6 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 		ChatID:       chatID,
 		FilterID:     filter.FilterID,
 		ContentTopic: filter.Topic,
-		PubsubTopic:  pubsubTopic,
 		Identity:     PublicKeyToStr(publicKey),
 		Listen:       listen,
 		Ephemeral:    ephemeral,
@@ -466,9 +461,8 @@ func (f *FiltersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter,
 		return f.filters[chatID], nil
 	}
 
-	pubsubTopic := DefaultShardPubsubTopic()
 	keyString := hex.EncodeToString(secret.Key)
-	filter, err := f.addSymmetric(keyString, pubsubTopic)
+	filter, err := f.addSymmetric(keyString, "")
 	if err != nil {
 		f.logger.Debug("could not register negotiated topic", zap.Error(err))
 		return nil, err
@@ -477,7 +471,6 @@ func (f *FiltersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter,
 	chat := &Filter{
 		ChatID:       chatID,
 		ContentTopic: filter.Topic,
-		PubsubTopic:  pubsubTopic,
 		SymKeyID:     filter.SymKeyID,
 		FilterID:     filter.FilterID,
 		Identity:     PublicKeyToStr(secret.PublicKey),
@@ -518,12 +511,11 @@ func (f *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 
 	// Load personal discovery
 	personalDiscoveryChat := &Filter{
-		ChatID:      personalDiscoveryTopic,
-		Identity:    identityStr,
-		PubsubTopic: DefaultShardPubsubTopic(),
-		Discovery:   true,
-		Listen:      true,
-		OneToOne:    true,
+		ChatID:    personalDiscoveryTopic,
+		Identity:  identityStr,
+		Discovery: true,
+		Listen:    true,
+		OneToOne:  true,
 	}
 
 	discoveryResponse, err := f.addAsymmetric(personalDiscoveryChat.ChatID, personalDiscoveryChat.PubsubTopic, f.privateKey, true)
@@ -591,9 +583,7 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 		return f.filters[chatID], nil
 	}
 
-	pubsubTopic := DefaultShardPubsubTopic()
-
-	contactCodeFilter, err := f.addSymmetric(chatID, pubsubTopic)
+	contactCodeFilter, err := f.addSymmetric(chatID, "")
 	if err != nil {
 		f.logger.Debug("could not register contact code topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
@@ -605,7 +595,6 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 		ContentTopic: contactCodeFilter.Topic,
 		SymKeyID:     contactCodeFilter.SymKeyID,
 		Identity:     PublicKeyToStr(pubKey),
-		PubsubTopic:  pubsubTopic,
 		Listen:       true,
 	}
 

@@ -616,12 +616,19 @@ func (w *Waku) runPeerExchangeLoop() {
 	}
 }
 
+func (w *Waku) getPubsubTopic(topic string) string {
+	if topic == "" || !w.cfg.UseShardAsDefaultTopic {
+		topic = w.settings.DefaultPubsubTopic
+	}
+	return topic
+}
+
 func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.PublicKey) error {
 	if w.settings.LightClient {
 		return errors.New("only available for full nodes")
 	}
 
-	topic = getPubsubTopic(topic, w.cfg.UseShardAsDefaultTopic, w.settings.DefaultPubsubTopic)
+	topic = w.getPubsubTopic(topic)
 
 	if w.node.Relay().IsSubscribed(topic) {
 		return nil
@@ -949,10 +956,7 @@ func (w *Waku) GetSymKey(id string) ([]byte, error) {
 // Subscribe installs a new message handler used for filtering, decrypting
 // and subsequent storing of incoming messages.
 func (w *Waku) Subscribe(f *common.Filter) (string, error) {
-	if f.PubsubTopic == "" {
-		f.PubsubTopic = w.settings.DefaultPubsubTopic
-	}
-
+	f.PubsubTopic = w.getPubsubTopic(f.PubsubTopic)
 	id, err := w.filters.Install(f)
 	if err != nil {
 		return id, err
@@ -1005,20 +1009,11 @@ func (w *Waku) UnsubscribeMany(ids []string) error {
 	return nil
 }
 
-func getPubsubTopic(pubsubTopic string, useShardAsDefaultTopic bool, defaultShardPubsubTopic string) string {
-	// Override the pubsub topic used, in case the default shard is being used
-	// and the configuration indicates we need to use the default waku topic from relay
-	if !useShardAsDefaultTopic && pubsubTopic == defaultShardPubsubTopic {
-		pubsubTopic = relay.DefaultWakuTopic
-	}
-	return pubsubTopic
-}
-
 func (w *Waku) broadcast() {
 	for {
 		select {
 		case envelope := <-w.sendQueue:
-			pubsubTopic := getPubsubTopic(envelope.PubsubTopic(), w.cfg.UseShardAsDefaultTopic, w.cfg.DefaultShardPubsubTopic)
+			pubsubTopic := envelope.PubsubTopic()
 			var err error
 			logger := w.logger.With(zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", pubsubTopic), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().Timestamp))
 			if w.settings.LightClient {
@@ -1055,10 +1050,7 @@ func (w *Waku) broadcast() {
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
 func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
-	if pubsubTopic == "" {
-		pubsubTopic = w.settings.DefaultPubsubTopic
-	}
-
+	pubsubTopic = w.getPubsubTopic(pubsubTopic)
 	if w.protectedTopicStore != nil {
 		privKey, err := w.protectedTopicStore.FetchPrivateKey(pubsubTopic)
 		if err != nil {
@@ -1323,12 +1315,6 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 		return nil
 	}
 
-	// Override the message pubsub topci in case the configuration indicates we shouldn't
-	// use the default shard but the default waku topic from relay instead
-	if !w.cfg.UseShardAsDefaultTopic && recvMessage.PubsubTopic == relay.DefaultWakuTopic {
-		recvMessage.PubsubTopic = w.cfg.DefaultShardPubsubTopic
-	}
-
 	if w.statusTelemetryClient != nil {
 		w.statusTelemetryClient.PushReceivedEnvelope(envelope)
 	}
@@ -1483,6 +1469,8 @@ func (w *Waku) ListenAddresses() []string {
 }
 
 func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) error {
+	topic = w.getPubsubTopic(topic)
+
 	if !w.settings.LightClient {
 		err := w.subscribeToPubsubTopicWithWakuRelay(topic, pubkey)
 		if err != nil {
@@ -1493,6 +1481,7 @@ func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) err
 }
 
 func (w *Waku) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
+	topic = w.getPubsubTopic(topic)
 	if w.protectedTopicStore == nil {
 		return nil, nil
 	}
@@ -1501,6 +1490,7 @@ func (w *Waku) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
 }
 
 func (w *Waku) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
+	topic = w.getPubsubTopic(topic)
 	if w.protectedTopicStore == nil {
 		return nil
 	}

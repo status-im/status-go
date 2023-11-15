@@ -1778,8 +1778,8 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		}
 
 		// Init the community filter so we can receive messages on the community
-		_, err = m.transport.InitCommunityFilters([]transport.CommunityFilterToInitialize{{
-			Shard:   discordCommunity.Shard().TransportShard(),
+		_, err = m.InitCommunityFilters([]transport.CommunityFilterToInitialize{{
+			Shard:   discordCommunity.Shard(),
 			PrivKey: discordCommunity.PrivateKey(),
 		}})
 		if err != nil {
@@ -1799,7 +1799,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			return
 		}
 
-		_, err = m.transport.InitPublicFilters(discordCommunity.DefaultFilters())
+		_, err = m.transport.InitPublicFilters(m.DefaultFilters(discordCommunity))
 		if err != nil {
 			m.cleanUpImport(communityID)
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
