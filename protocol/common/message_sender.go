@@ -1349,7 +1349,7 @@ func (s *MessageSender) handleSegmentationLayer(message *v1protocol.StatusMessag
 		return ErrMessageSegmentsInvalidCount
 	}
 
-	err = s.persistence.SaveMessageSegment(&segmentMessage, message.TransportLayer.SigPubKey)
+	err = s.persistence.SaveMessageSegment(&segmentMessage, message.TransportLayer.SigPubKey, time.Now().Unix())
 	if err != nil {
 		return err
 	}
@@ -1378,12 +1378,29 @@ func (s *MessageSender) handleSegmentationLayer(message *v1protocol.StatusMessag
 		return ErrMessageSegmentsHashMismatch
 	}
 
-	err = s.persistence.CompleteMessageSegments(segmentMessage.EntireMessageHash, message.TransportLayer.SigPubKey)
+	err = s.persistence.CompleteMessageSegments(segmentMessage.EntireMessageHash, message.TransportLayer.SigPubKey, time.Now().Unix())
 	if err != nil {
 		return err
 	}
 
 	message.TransportLayer.Payload = entirePayload.Bytes()
+
+	return nil
+}
+
+func (s *MessageSender) CleanupSegments() error {
+	weekAgo := time.Now().AddDate(0, 0, -7).Unix()
+	monthAgo := time.Now().AddDate(0, -1, 0).Unix()
+
+	err := s.persistence.RemoveMessageSegmentsOlderThan(weekAgo)
+	if err != nil {
+		return err
+	}
+
+	err = s.persistence.RemoveMessageSegmentsCompletedOlderThan(monthAgo)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
