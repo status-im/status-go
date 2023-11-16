@@ -1194,6 +1194,8 @@ func (api *PublicAPI) GetTextURLsToUnfurl(text string) *protocol.URLsUnfurlPlan 
 	return api.service.messenger.GetTextURLsToUnfurl(text)
 }
 
+// Deprecated: GetTextURLs is deprecated in favor of more generic GetTextURLsToUnfurl.
+//
 // GetTextURLs parses text and returns a deduplicated and (somewhat) normalized
 // slice of URLs. The returned URLs can be used as cache keys by clients.
 func (api *PublicAPI) GetTextURLs(text string) []string {
