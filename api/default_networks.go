@@ -9,14 +9,17 @@ import (
 )
 
 const (
-	mainnetChainID        uint64 = 1
-	goerliChainID         uint64 = 5
-	optimismChainID       uint64 = 10
-	optimismGoerliChainID uint64 = 420
-	arbitrumChainID       uint64 = 42161
-	arbitrumGoerliChainID uint64 = 421613
-	sntSymbol                    = "SNT"
-	sttSymbol                    = "STT"
+	mainnetChainID         uint64 = 1
+	goerliChainID          uint64 = 5
+	sepoliaChainID         uint64 = 11155111
+	optimismChainID        uint64 = 10
+	optimismGoerliChainID  uint64 = 420
+	optimismSepoliaChainID uint64 = 11155420
+	arbitrumChainID        uint64 = 42161
+	arbitrumGoerliChainID  uint64 = 421613
+	arbitrumSepoliaChainID uint64 = 421614
+	sntSymbol                     = "SNT"
+	sttSymbol                     = "STT"
 )
 
 var ganacheTokenAddress = common.HexToAddress("0x8571Ddc46b10d31EF963aF49b6C7799Ea7eff818")
