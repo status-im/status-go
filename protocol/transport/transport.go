@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/connection"
@@ -191,7 +192,7 @@ func (t *Transport) ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*Fil
 }
 
 func (t *Transport) JoinPublic(chatID string) (*Filter, error) {
-	return t.filters.LoadPublic(chatID, DefaultShardPubsubTopic())
+	return t.filters.LoadPublic(chatID, relay.DefaultWakuTopic)
 }
 
 func (t *Transport) LeavePublic(chatID string) error {
@@ -682,25 +683,5 @@ func GetPubsubTopic(shard *Shard) string {
 		return protocol.NewStaticShardingPubsubTopic(shard.Cluster, shard.Index).String()
 	}
 
-	return DefaultShardPubsubTopic()
-}
-
-func DefaultNonProtectedPubsubTopic(shard *Shard) string {
-	if shard != nil {
-		return GetPubsubTopic(&Shard{
-			Cluster: MainStatusShardCluster,
-			Index:   NonProtectedShardIndex,
-		})
-	}
-
-	return DefaultShardPubsubTopic()
-}
-
-const MainStatusShardCluster = 16
-const DefaultShardIndex = 32
-const NonProtectedShardIndex = 64
-const UndefinedShardValue = 0
-
-func DefaultShardPubsubTopic() string {
-	return protocol.NewStaticShardingPubsubTopic(MainStatusShardCluster, DefaultShardIndex).String()
+	return relay.DefaultWakuTopic
 }

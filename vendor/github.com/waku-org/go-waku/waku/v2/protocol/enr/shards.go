@@ -13,9 +13,9 @@ func deleteShardingENREntries(localnode *enode.LocalNode) {
 	localnode.Delete(enr.WithEntry(ShardingIndicesListEnrField, struct{}{}))
 }
 
-func WithWakuRelayShardList(rs protocol.RelayShards) ENROption {
+func WithWakuRelayShardingIndicesList(rs protocol.RelayShards) ENROption {
 	return func(localnode *enode.LocalNode) error {
-		value, err := rs.ShardList()
+		value, err := rs.IndicesList()
 		if err != nil {
 			return err
 		}
@@ -35,11 +35,11 @@ func WithWakuRelayShardingBitVector(rs protocol.RelayShards) ENROption {
 
 func WithWakuRelaySharding(rs protocol.RelayShards) ENROption {
 	return func(localnode *enode.LocalNode) error {
-		if len(rs.ShardIDs) >= 64 {
+		if len(rs.Indices) >= 64 {
 			return WithWakuRelayShardingBitVector(rs)(localnode)
 		}
 
-		return WithWakuRelayShardList(rs)(localnode)
+		return WithWakuRelayShardingIndicesList(rs)(localnode)
 	}
 }
 
@@ -60,7 +60,7 @@ func WithWakuRelayShardingTopics(topics ...string) ENROption {
 
 // ENR record accessors
 
-func RelayShardList(record *enr.Record) (*protocol.RelayShards, error) {
+func RelayShardingIndicesList(record *enr.Record) (*protocol.RelayShards, error) {
 	var field []byte
 	if err := record.Load(enr.WithEntry(ShardingIndicesListEnrField, &field)); err != nil {
 		if enr.IsNotFound(err) {
@@ -69,7 +69,7 @@ func RelayShardList(record *enr.Record) (*protocol.RelayShards, error) {
 		return nil, err
 	}
 
-	res, err := protocol.FromShardList(field)
+	res, err := protocol.FromIndicesList(field)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func RelayShardingBitVector(record *enr.Record) (*protocol.RelayShards, error) {
 }
 
 func RelaySharding(record *enr.Record) (*protocol.RelayShards, error) {
-	res, err := RelayShardList(record)
+	res, err := RelayShardingIndicesList(record)
 	if err != nil {
 		return nil, err
 	}
@@ -122,22 +122,22 @@ func ContainsShard(record *enr.Record, cluster uint16, index uint16) bool {
 	return rs.Contains(cluster, index)
 }
 
-func ContainsShardWithWakuTopic(record *enr.Record, topic protocol.WakuPubSubTopic) bool {
-	if shardTopic, err := protocol.ToShardPubsubTopic(topic); err != nil {
+func ContainsShardWithNsTopic(record *enr.Record, topic protocol.NamespacedPubsubTopic) bool {
+	if topic.Kind() != protocol.StaticSharding {
 		return false
-	} else {
-		return ContainsShard(record, shardTopic.Cluster(), shardTopic.Shard())
 	}
+	shardTopic := topic.(protocol.StaticShardingPubsubTopic)
+	return ContainsShard(record, shardTopic.Cluster(), shardTopic.Shard())
 }
 
 func ContainsRelayShard(record *enr.Record, topic protocol.StaticShardingPubsubTopic) bool {
-	return ContainsShardWithWakuTopic(record, topic)
+	return ContainsShardWithNsTopic(record, topic)
 }
 
 func ContainsShardTopic(record *enr.Record, topic string) bool {
-	shardTopic, err := protocol.ToWakuPubsubTopic(topic)
+	shardTopic, err := protocol.ToShardedPubsubTopic(topic)
 	if err != nil {
 		return false
 	}
-	return ContainsShardWithWakuTopic(record, shardTopic)
+	return ContainsShardWithNsTopic(record, shardTopic)
 }

@@ -11,6 +11,8 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -255,7 +257,7 @@ func (m *Messenger) syncBackup() error {
 
 	to := m.calculateMailserverTo()
 	from := uint32(m.getTimesource().GetCurrentTime()/1000) - oneMonthInSeconds
-	batch := MailserverBatch{From: from, To: to, PubsubTopic: transport.DefaultShardPubsubTopic(), Topics: []types.TopicType{filter.ContentTopic}}
+	batch := MailserverBatch{From: from, To: to, PubsubTopic: relay.DefaultWakuTopic, Topics: []types.TopicType{filter.ContentTopic}}
 	err := m.processMailserverBatch(batch)
 	if err != nil {
 		return err

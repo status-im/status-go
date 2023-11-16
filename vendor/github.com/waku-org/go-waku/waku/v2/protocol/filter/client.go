@@ -24,7 +24,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"go.uber.org/zap"
-	"golang.org/x/exp/slices"
 )
 
 // FilterPushID_v20beta1 is the current Waku Filter protocol identifier used to allow
@@ -106,39 +105,25 @@ func (wf *WakuFilterLightNode) Stop() {
 	})
 }
 
-func (wf *WakuFilterLightNode) onRequest(ctx context.Context) func(network.Stream) {
-	return func(stream network.Stream) {
-		peerID := stream.Conn().RemotePeer()
-		logger := wf.log.With(logging.HostID("peer", peerID))
-		if !wf.subscriptions.IsSubscribedTo(peerID) {
-			logger.Warn("received message push from unknown peer", logging.HostID("peerID", peerID))
+func (wf *WakuFilterLightNode) onRequest(ctx context.Context) func(s network.Stream) {
+	return func(s network.Stream) {
+		defer s.Close()
+		logger := wf.log.With(logging.HostID("peer", s.Conn().RemotePeer()))
+		if !wf.subscriptions.IsSubscribedTo(s.Conn().RemotePeer()) {
+			logger.Warn("received message push from unknown peer", logging.HostID("peerID", s.Conn().RemotePeer()))
 			wf.metrics.RecordError(unknownPeerMessagePush)
-			if err := stream.Reset(); err != nil {
-				wf.log.Error("resetting connection", zap.Error(err))
-			}
 			return
 		}
 
-		reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
+		reader := pbio.NewDelimitedReader(s, math.MaxInt32)
 
 		messagePush := &pb.MessagePushV2{}
 		err := reader.ReadMsg(messagePush)
 		if err != nil {
 			logger.Error("reading message push", zap.Error(err))
 			wf.metrics.RecordError(decodeRPCFailure)
-			if err := stream.Reset(); err != nil {
-				wf.log.Error("resetting connection", zap.Error(err))
-			}
 			return
 		}
-
-		stream.Close()
-
-		if err = messagePush.Validate(); err != nil {
-			logger.Warn("received invalid messagepush")
-			return
-		}
-
 		pubSubTopic := ""
 		//For now returning failure, this will get addressed with autosharding changes for filter.
 		if messagePush.PubsubTopic == nil {
@@ -146,17 +131,14 @@ func (wf *WakuFilterLightNode) onRequest(ctx context.Context) func(network.Strea
 			if err != nil {
 				logger.Error("could not derive pubSubTopic from contentTopic", zap.Error(err))
 				wf.metrics.RecordError(decodeRPCFailure)
-				if err := stream.Reset(); err != nil {
-					wf.log.Error("resetting connection", zap.Error(err))
-				}
 				return
 			}
 		} else {
 			pubSubTopic = *messagePush.PubsubTopic
 		}
-		if !wf.subscriptions.Has(peerID, protocol.NewContentFilter(pubSubTopic, messagePush.WakuMessage.ContentTopic)) {
+		if !wf.subscriptions.Has(s.Conn().RemotePeer(), protocol.NewContentFilter(pubSubTopic, messagePush.WakuMessage.ContentTopic)) {
 			logger.Warn("received messagepush with invalid subscription parameters",
-				zap.String("topic", pubSubTopic),
+				logging.HostID("peerID", s.Conn().RemotePeer()), zap.String("topic", pubSubTopic),
 				zap.String("contentTopic", messagePush.WakuMessage.ContentTopic))
 			wf.metrics.RecordError(invalidSubscriptionMessage)
 			return
@@ -164,7 +146,7 @@ func (wf *WakuFilterLightNode) onRequest(ctx context.Context) func(network.Strea
 
 		wf.metrics.RecordMessage()
 
-		wf.notify(peerID, pubSubTopic, messagePush.WakuMessage)
+		wf.notify(s.Conn().RemotePeer(), pubSubTopic, messagePush.WakuMessage)
 
 		logger.Info("received message push")
 	}
@@ -183,6 +165,16 @@ func (wf *WakuFilterLightNode) notify(remotePeerID peer.ID, pubsubTopic string, 
 
 func (wf *WakuFilterLightNode) request(ctx context.Context, params *FilterSubscribeParameters,
 	reqType pb.FilterSubscribeRequest_FilterSubscribeType, contentFilter protocol.ContentFilter) error {
+	conn, err := wf.h.NewStream(ctx, params.selectedPeer, FilterSubscribeID_v20beta1)
+	if err != nil {
+		wf.metrics.RecordError(dialFailure)
+		return err
+	}
+	defer conn.Close()
+
+	writer := pbio.NewDelimitedWriter(conn)
+	reader := pbio.NewDelimitedReader(conn, math.MaxInt32)
+
 	request := &pb.FilterSubscribeRequest{
 		RequestId:           hex.EncodeToString(params.requestID),
 		FilterSubscribeType: reqType,
@@ -190,28 +182,11 @@ func (wf *WakuFilterLightNode) request(ctx context.Context, params *FilterSubscr
 		ContentTopics:       contentFilter.ContentTopicsList(),
 	}
 
-	err := request.Validate()
-	if err != nil {
-		return err
-	}
-
-	stream, err := wf.h.NewStream(ctx, params.selectedPeer, FilterSubscribeID_v20beta1)
-	if err != nil {
-		wf.metrics.RecordError(dialFailure)
-		return err
-	}
-
-	writer := pbio.NewDelimitedWriter(stream)
-	reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
-
 	wf.log.Debug("sending FilterSubscribeRequest", zap.Stringer("request", request))
 	err = writer.WriteMsg(request)
 	if err != nil {
 		wf.metrics.RecordError(writeRequestFailure)
 		wf.log.Error("sending FilterSubscribeRequest", zap.Error(err))
-		if err := stream.Reset(); err != nil {
-			wf.log.Error("resetting connection", zap.Error(err))
-		}
 		return err
 	}
 
@@ -220,20 +195,8 @@ func (wf *WakuFilterLightNode) request(ctx context.Context, params *FilterSubscr
 	if err != nil {
 		wf.log.Error("receiving FilterSubscribeResponse", zap.Error(err))
 		wf.metrics.RecordError(decodeRPCFailure)
-		if err := stream.Reset(); err != nil {
-			wf.log.Error("resetting connection", zap.Error(err))
-		}
 		return err
 	}
-
-	stream.Close()
-
-	if err = filterSubscribeResponse.Validate(); err != nil {
-		wf.metrics.RecordError(decodeRPCFailure)
-		return err
-
-	}
-
 	if filterSubscribeResponse.RequestId != request.RequestId {
 		wf.log.Error("requestID mismatch", zap.String("expected", request.RequestId), zap.String("received", filterSubscribeResponse.RequestId))
 		wf.metrics.RecordError(requestIDMismatch)
@@ -250,6 +213,29 @@ func (wf *WakuFilterLightNode) request(ctx context.Context, params *FilterSubscr
 	return nil
 }
 
+// This function converts a contentFilter into a map of pubSubTopics and corresponding contentTopics
+func contentFilterToPubSubTopicMap(contentFilter protocol.ContentFilter) (map[string][]string, error) {
+	pubSubTopicMap := make(map[string][]string)
+
+	if contentFilter.PubsubTopic != "" {
+		pubSubTopicMap[contentFilter.PubsubTopic] = contentFilter.ContentTopicsList()
+	} else {
+		//Parse the content-Topics to figure out shards.
+		for _, cTopicString := range contentFilter.ContentTopicsList() {
+			pTopicStr, err := protocol.GetPubSubTopicFromContentTopic(cTopicString)
+			if err != nil {
+				return nil, err
+			}
+			_, ok := pubSubTopicMap[pTopicStr]
+			if !ok {
+				pubSubTopicMap[pTopicStr] = []string{}
+			}
+			pubSubTopicMap[pTopicStr] = append(pubSubTopicMap[pTopicStr], cTopicString)
+		}
+	}
+	return pubSubTopicMap, nil
+}
+
 // Subscribe setups a subscription to receive messages that match a specific content filter
 // If contentTopics passed result in different pubSub topics (due to Auto/Static sharding), then multiple subscription requests are sent to the peer.
 // This may change if Filterv2 protocol is updated to handle such a scenario in a single request.
@@ -261,6 +247,14 @@ func (wf *WakuFilterLightNode) Subscribe(ctx context.Context, contentFilter prot
 		return nil, err
 	}
 
+	if len(contentFilter.ContentTopics) == 0 {
+		return nil, errors.New("at least one content topic is required")
+	}
+
+	if len(contentFilter.ContentTopics) > MaxContentTopicsPerRequest {
+		return nil, fmt.Errorf("exceeds maximum content topics: %d", MaxContentTopicsPerRequest)
+	}
+
 	params := new(FilterSubscribeParameters)
 	params.log = wf.log
 	params.host = wf.h
@@ -269,62 +263,31 @@ func (wf *WakuFilterLightNode) Subscribe(ctx context.Context, contentFilter prot
 	optList := DefaultSubscriptionOptions()
 	optList = append(optList, opts...)
 	for _, opt := range optList {
-		err := opt(params)
-		if err != nil {
-			return nil, err
-		}
+		opt(params)
 	}
 
-	pubSubTopicMap, err := protocol.ContentFilterToPubSubTopicMap(contentFilter)
+	if params.selectedPeer == "" {
+		wf.metrics.RecordError(peerNotFoundFailure)
+		return nil, ErrNoPeersAvailable
+	}
 
+	pubSubTopicMap, err := contentFilterToPubSubTopicMap(contentFilter)
 	if err != nil {
 		return nil, err
 	}
 	failedContentTopics := []string{}
 	subscriptions := make([]*subscription.SubscriptionDetails, 0)
 	for pubSubTopic, cTopics := range pubSubTopicMap {
-		var selectedPeer peer.ID
-		//TO Optimize: find a peer with all pubSubTopics in the list if possible, if not only then look for single pubSubTopic
-		if params.pm != nil && params.selectedPeer == "" {
-			selectedPeer, err = wf.pm.SelectPeer(
-				peermanager.PeerSelectionCriteria{
-					SelectionType: params.peerSelectionType,
-					Proto:         FilterSubscribeID_v20beta1,
-					PubsubTopic:   pubSubTopic,
-					SpecificPeers: params.preferredPeers,
-					Ctx:           ctx,
-				},
-			)
-		} else {
-			selectedPeer = params.selectedPeer
-		}
-		if selectedPeer == "" {
-			wf.metrics.RecordError(peerNotFoundFailure)
-			wf.log.Error("selecting peer", zap.String("pubSubTopic", pubSubTopic), zap.Strings("contentTopics", cTopics),
-				zap.Error(err))
-			failedContentTopics = append(failedContentTopics, cTopics...)
-			continue
-		}
-
 		var cFilter protocol.ContentFilter
 		cFilter.PubsubTopic = pubSubTopic
 		cFilter.ContentTopics = protocol.NewContentTopicSet(cTopics...)
-
-		paramsCopy := params.Copy()
-		paramsCopy.selectedPeer = selectedPeer
-		err := wf.request(
-			ctx,
-			paramsCopy,
-			pb.FilterSubscribeRequest_SUBSCRIBE,
-			cFilter,
-		)
+		err := wf.request(ctx, params, pb.FilterSubscribeRequest_SUBSCRIBE, cFilter)
 		if err != nil {
 			wf.log.Error("Failed to subscribe", zap.String("pubSubTopic", pubSubTopic), zap.Strings("contentTopics", cTopics),
 				zap.Error(err))
 			failedContentTopics = append(failedContentTopics, cTopics...)
-			continue
 		}
-		subscriptions = append(subscriptions, wf.subscriptions.NewSubscription(selectedPeer, cFilter))
+		subscriptions = append(subscriptions, wf.subscriptions.NewSubscription(params.selectedPeer, cFilter))
 	}
 
 	if len(failedContentTopics) > 0 {
@@ -354,33 +317,22 @@ func (wf *WakuFilterLightNode) getUnsubscribeParameters(opts ...FilterSubscribeO
 	params.log = wf.log
 	opts = append(DefaultUnsubscribeOptions(), opts...)
 	for _, opt := range opts {
-		err := opt(params)
-		if err != nil {
-			return nil, err
-		}
+		opt(params)
 	}
 
 	return params, nil
 }
 
-func (wf *WakuFilterLightNode) Ping(ctx context.Context, peerID peer.ID, opts ...FilterPingOption) error {
+func (wf *WakuFilterLightNode) Ping(ctx context.Context, peerID peer.ID) error {
 	wf.RLock()
 	defer wf.RUnlock()
 	if err := wf.ErrOnNotRunning(); err != nil {
 		return err
 	}
 
-	params := &FilterPingParameters{}
-	for _, opt := range opts {
-		opt(params)
-	}
-	if len(params.requestID) == 0 {
-		params.requestID = protocol.GenerateRequestID()
-	}
-
 	return wf.request(
 		ctx,
-		&FilterSubscribeParameters{selectedPeer: peerID, requestID: params.requestID},
+		&FilterSubscribeParameters{selectedPeer: peerID, requestID: protocol.GenerateRequestID()},
 		pb.FilterSubscribeRequest_SUBSCRIBER_PING,
 		protocol.ContentFilter{})
 }
@@ -458,10 +410,6 @@ func (wf *WakuFilterLightNode) Unsubscribe(ctx context.Context, contentFilter pr
 		return nil, errors.New("at least one content topic is required")
 	}
 
-	if slices.Contains[string](contentFilter.ContentTopicsList(), "") {
-		return nil, errors.New("one or more content topics specified is empty")
-	}
-
 	if len(contentFilter.ContentTopics) > MaxContentTopicsPerRequest {
 		return nil, fmt.Errorf("exceeds maximum content topics: %d", MaxContentTopicsPerRequest)
 	}
@@ -471,7 +419,7 @@ func (wf *WakuFilterLightNode) Unsubscribe(ctx context.Context, contentFilter pr
 		return nil, err
 	}
 
-	pubSubTopicMap, err := protocol.ContentFilterToPubSubTopicMap(contentFilter)
+	pubSubTopicMap, err := contentFilterToPubSubTopicMap(contentFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -546,9 +494,7 @@ func (wf *WakuFilterLightNode) UnsubscribeWithSubscription(ctx context.Context, 
 
 	if !wf.subscriptions.Has(sub.PeerID, sub.ContentFilter) {
 		// Last sub for this [peer, contentFilter] pair
-		paramsCopy := params.Copy()
-		paramsCopy.selectedPeer = sub.PeerID
-		err = wf.unsubscribeFromServer(ctx, paramsCopy, sub.ContentFilter)
+		err = wf.unsubscribeFromServer(ctx, &FilterSubscribeParameters{selectedPeer: sub.PeerID, requestID: params.requestID}, sub.ContentFilter)
 		resultChan <- WakuFilterPushResult{
 			Err:    err,
 			PeerID: sub.PeerID,
@@ -602,11 +548,9 @@ func (wf *WakuFilterLightNode) unsubscribeAll(ctx context.Context, opts ...Filte
 				}
 			}()
 
-			paramsCopy := params.Copy()
-			paramsCopy.selectedPeer = peerID
 			err := wf.request(
 				ctx,
-				params,
+				&FilterSubscribeParameters{selectedPeer: peerID, requestID: params.requestID},
 				pb.FilterSubscribeRequest_UNSUBSCRIBE_ALL,
 				protocol.ContentFilter{})
 			if err != nil {

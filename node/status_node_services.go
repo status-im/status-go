@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
@@ -309,27 +308,25 @@ func (b *StatusNode) wakuService(wakuCfg *params.WakuConfig, clusterCfg *params.
 func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig, telemetryServerURL string) (*wakuv2.Waku, error) {
 	if b.wakuV2Srvc == nil {
 		cfg := &wakuv2.Config{
-			MaxMessageSize:          wakucommon.DefaultMaxMessageSize,
-			Host:                    nodeConfig.WakuV2Config.Host,
-			Port:                    nodeConfig.WakuV2Config.Port,
-			LightClient:             nodeConfig.WakuV2Config.LightClient,
-			KeepAliveInterval:       nodeConfig.WakuV2Config.KeepAliveInterval,
-			Rendezvous:              nodeConfig.Rendezvous,
-			WakuNodes:               nodeConfig.ClusterConfig.WakuNodes,
-			PeerExchange:            nodeConfig.WakuV2Config.PeerExchange,
-			EnableFilterFullNode:    nodeConfig.WakuV2Config.EnableFilterFullNode,
-			EnableStore:             nodeConfig.WakuV2Config.EnableStore,
-			StoreCapacity:           nodeConfig.WakuV2Config.StoreCapacity,
-			StoreSeconds:            nodeConfig.WakuV2Config.StoreSeconds,
-			DiscoveryLimit:          nodeConfig.WakuV2Config.DiscoveryLimit,
-			DiscV5BootstrapNodes:    nodeConfig.ClusterConfig.DiscV5BootstrapNodes,
-			Nameserver:              nodeConfig.WakuV2Config.Nameserver,
-			EnableDiscV5:            nodeConfig.WakuV2Config.EnableDiscV5,
-			UDPPort:                 nodeConfig.WakuV2Config.UDPPort,
-			AutoUpdate:              nodeConfig.WakuV2Config.AutoUpdate,
-			DefaultShardPubsubTopic: transport.DefaultShardPubsubTopic(),
-			UseShardAsDefaultTopic:  nodeConfig.WakuV2Config.UseShardAsDefaultTopic,
-			TelemetryServerURL:      telemetryServerURL,
+			MaxMessageSize:       wakucommon.DefaultMaxMessageSize,
+			Host:                 nodeConfig.WakuV2Config.Host,
+			Port:                 nodeConfig.WakuV2Config.Port,
+			LightClient:          nodeConfig.WakuV2Config.LightClient,
+			KeepAliveInterval:    nodeConfig.WakuV2Config.KeepAliveInterval,
+			Rendezvous:           nodeConfig.Rendezvous,
+			WakuNodes:            nodeConfig.ClusterConfig.WakuNodes,
+			PeerExchange:         nodeConfig.WakuV2Config.PeerExchange,
+			EnableFilterFullNode: nodeConfig.WakuV2Config.EnableFilterFullNode,
+			EnableStore:          nodeConfig.WakuV2Config.EnableStore,
+			StoreCapacity:        nodeConfig.WakuV2Config.StoreCapacity,
+			StoreSeconds:         nodeConfig.WakuV2Config.StoreSeconds,
+			DiscoveryLimit:       nodeConfig.WakuV2Config.DiscoveryLimit,
+			DiscV5BootstrapNodes: nodeConfig.ClusterConfig.DiscV5BootstrapNodes,
+			Nameserver:           nodeConfig.WakuV2Config.Nameserver,
+			EnableDiscV5:         nodeConfig.WakuV2Config.EnableDiscV5,
+			UDPPort:              nodeConfig.WakuV2Config.UDPPort,
+			AutoUpdate:           nodeConfig.WakuV2Config.AutoUpdate,
+			TelemetryServerURL:   telemetryServerURL,
 		}
 
 		if nodeConfig.WakuV2Config.MaxMessageSize > 0 {

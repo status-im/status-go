@@ -28,20 +28,7 @@ func (wakuPX *WakuPeerExchange) Request(ctx context.Context, numPeers int, opts 
 	for _, opt := range optList {
 		opt(params)
 	}
-	if params.pm != nil && params.selectedPeer == "" {
-		var err error
-		params.selectedPeer, err = wakuPX.pm.SelectPeer(
-			peermanager.PeerSelectionCriteria{
-				SelectionType: params.peerSelectionType,
-				Proto:         PeerExchangeID_v20alpha1,
-				SpecificPeers: params.preferredPeers,
-				Ctx:           ctx,
-			},
-		)
-		if err != nil {
-			return err
-		}
-	}
+
 	if params.selectedPeer == "" {
 		wakuPX.metrics.RecordError(dialFailure)
 		return ErrNoPeersAvailable
@@ -53,31 +40,24 @@ func (wakuPX *WakuPeerExchange) Request(ctx context.Context, numPeers int, opts 
 		},
 	}
 
-	stream, err := wakuPX.h.NewStream(ctx, params.selectedPeer, PeerExchangeID_v20alpha1)
+	connOpt, err := wakuPX.h.NewStream(ctx, params.selectedPeer, PeerExchangeID_v20alpha1)
 	if err != nil {
 		return err
 	}
+	defer connOpt.Close()
 
-	writer := pbio.NewDelimitedWriter(stream)
+	writer := pbio.NewDelimitedWriter(connOpt)
 	err = writer.WriteMsg(requestRPC)
 	if err != nil {
-		if err := stream.Reset(); err != nil {
-			wakuPX.log.Error("resetting connection", zap.Error(err))
-		}
 		return err
 	}
 
-	reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
+	reader := pbio.NewDelimitedReader(connOpt, math.MaxInt32)
 	responseRPC := &pb.PeerExchangeRPC{}
 	err = reader.ReadMsg(responseRPC)
 	if err != nil {
-		if err := stream.Reset(); err != nil {
-			wakuPX.log.Error("resetting connection", zap.Error(err))
-		}
 		return err
 	}
-
-	stream.Close()
 
 	return wakuPX.handleResponse(ctx, responseRPC.Response)
 }

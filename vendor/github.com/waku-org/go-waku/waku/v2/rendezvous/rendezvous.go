@@ -80,7 +80,7 @@ const registerMaxRetries = 7
 
 // Discover is used to find a number of peers that use the default pubsub topic
 func (r *Rendezvous) Discover(ctx context.Context, rp *RendezvousPoint, numPeers int) {
-	r.DiscoverWithNamespace(ctx, protocol.DefaultPubsubTopic{}.String(), rp, numPeers)
+	r.DiscoverWithNamespace(ctx, protocol.DefaultPubsubTopic().String(), rp, numPeers)
 }
 
 // DiscoverShard is used to find a number of peers that support an specific cluster and shard index
@@ -137,7 +137,7 @@ func (r *Rendezvous) callRegister(ctx context.Context, namespace string, rendezv
 
 // Register registers the node in the rendezvous points using the default pubsub topic as namespace
 func (r *Rendezvous) Register(ctx context.Context, rendezvousPoints []*RendezvousPoint) {
-	r.RegisterWithNamespace(ctx, protocol.DefaultPubsubTopic{}.String(), rendezvousPoints)
+	r.RegisterWithNamespace(ctx, protocol.DefaultPubsubTopic().String(), rendezvousPoints)
 }
 
 // RegisterShard registers the node in the rendezvous points using a shard as namespace
@@ -148,8 +148,8 @@ func (r *Rendezvous) RegisterShard(ctx context.Context, cluster uint16, shard ui
 
 // RegisterRelayShards registers the node in the rendezvous point by specifying a RelayShards struct (more than one shard index can be registered)
 func (r *Rendezvous) RegisterRelayShards(ctx context.Context, rs protocol.RelayShards, rendezvousPoints []*RendezvousPoint) {
-	for _, idx := range rs.ShardIDs {
-		go r.RegisterShard(ctx, rs.ClusterID, idx, rendezvousPoints)
+	for _, idx := range rs.Indices {
+		go r.RegisterShard(ctx, rs.Cluster, idx, rendezvousPoints)
 	}
 }
 

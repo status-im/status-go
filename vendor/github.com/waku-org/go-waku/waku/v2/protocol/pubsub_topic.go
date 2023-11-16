@@ -7,27 +7,18 @@ import (
 	"strings"
 )
 
-type WakuPubSubTopic interface {
-	String() string
-}
-
-const defaultPubsubTopic = "/waku/2/default-waku/proto"
-
-type DefaultPubsubTopic struct{}
-
-func (DefaultPubsubTopic) String() string {
-	return defaultPubsubTopic
-}
+// Waku2PubsubTopicPrefix is the expected prefix to be used for pubsub topics
+const Waku2PubsubTopicPrefix = "/waku/2"
 
 // StaticShardingPubsubTopicPrefix is the expected prefix to be used for static sharding pubsub topics
-const StaticShardingPubsubTopicPrefix = "/waku/2/rs"
+const StaticShardingPubsubTopicPrefix = Waku2PubsubTopicPrefix + "/rs"
 
-// waku pubsub topic errors
-var ErrNotWakuPubsubTopic = errors.New("not a waku pubsub topic")
-
-// shard pubsub topic errors
-var ErrNotShardPubsubTopic = errors.New("not a shard pubsub topic")
+// ErrInvalidStructure indicates that the pubsub topic is malformed
 var ErrInvalidStructure = errors.New("invalid topic structure")
+
+// ErrInvalidTopicPrefix indicates that the pubsub topic is missing the prefix /waku/2
+var ErrInvalidTopicPrefix = errors.New("must start with " + Waku2PubsubTopicPrefix)
+var ErrMissingTopicName = errors.New("missing topic-name")
 var ErrInvalidShardedTopicPrefix = errors.New("must start with " + StaticShardingPubsubTopicPrefix)
 var ErrMissingClusterIndex = errors.New("missing shard_cluster_index")
 var ErrMissingShardNumber = errors.New("missing shard_number")
@@ -35,38 +26,113 @@ var ErrMissingShardNumber = errors.New("missing shard_number")
 // ErrInvalidNumberFormat indicates that a number exceeds the allowed range
 var ErrInvalidNumberFormat = errors.New("only 2^16 numbers are allowed")
 
+// NamespacedPubsubTopicKind used to represent kind of NamespacedPubsubTopicKind
+type NamespacedPubsubTopicKind int
+
+const (
+	StaticSharding NamespacedPubsubTopicKind = iota
+	NamedSharding
+)
+
+// NamespacedPubsubTopic is an interface for namespace based pubSub topic
+type NamespacedPubsubTopic interface {
+	String() string
+	Kind() NamespacedPubsubTopicKind
+	Equal(NamespacedPubsubTopic) bool
+}
+
+// NamedShardingPubsubTopic is object for a NamedSharding type pubSub topic
+type NamedShardingPubsubTopic struct {
+	NamespacedPubsubTopic
+	kind NamespacedPubsubTopicKind
+	name string
+}
+
+// NewNamedShardingPubsubTopic creates a new NamedShardingPubSubTopic
+func NewNamedShardingPubsubTopic(name string) NamespacedPubsubTopic {
+	return NamedShardingPubsubTopic{
+		kind: NamedSharding,
+		name: name,
+	}
+}
+
+// Kind returns the type of PubsubTopic whether it is StaticShared or NamedSharded
+func (n NamedShardingPubsubTopic) Kind() NamespacedPubsubTopicKind {
+	return n.kind
+}
+
+// Name is the name of the NamedSharded pubsub topic.
+func (n NamedShardingPubsubTopic) Name() string {
+	return n.name
+}
+
+// Equal compares NamedShardingPubsubTopic
+func (n NamedShardingPubsubTopic) Equal(t2 NamespacedPubsubTopic) bool {
+	return n.String() == t2.String()
+}
+
+// String formats NamedShardingPubsubTopic to RFC 23 specific string format for pubsub topic.
+func (n NamedShardingPubsubTopic) String() string {
+	return fmt.Sprintf("%s/%s", Waku2PubsubTopicPrefix, n.name)
+}
+
+// Parse parses a topic string into a NamedShardingPubsubTopic
+func (n *NamedShardingPubsubTopic) Parse(topic string) error {
+	if !strings.HasPrefix(topic, Waku2PubsubTopicPrefix) {
+		return ErrInvalidTopicPrefix
+	}
+
+	topicName := topic[8:]
+	if len(topicName) == 0 {
+		return ErrMissingTopicName
+	}
+
+	n.kind = NamedSharding
+	n.name = topicName
+
+	return nil
+}
+
 // StaticShardingPubsubTopic describes a pubSub topic as per StaticSharding
 type StaticShardingPubsubTopic struct {
-	clusterID uint16
-	shardID   uint16
+	NamespacedPubsubTopic
+	kind    NamespacedPubsubTopicKind
+	cluster uint16
+	shard   uint16
 }
 
 // NewStaticShardingPubsubTopic creates a new pubSub topic
 func NewStaticShardingPubsubTopic(cluster uint16, shard uint16) StaticShardingPubsubTopic {
 	return StaticShardingPubsubTopic{
-		clusterID: cluster,
-		shardID:   shard,
+		kind:    StaticSharding,
+		cluster: cluster,
+		shard:   shard,
 	}
 }
 
 // Cluster returns the sharded cluster index
 func (s StaticShardingPubsubTopic) Cluster() uint16 {
-	return s.clusterID
+	return s.cluster
 }
 
 // Shard returns the shard number
 func (s StaticShardingPubsubTopic) Shard() uint16 {
-	return s.shardID
+	return s.shard
+}
+
+// Kind returns the type of PubsubTopic whether it is StaticShared or NamedSharded
+func (s StaticShardingPubsubTopic) Kind() NamespacedPubsubTopicKind {
+	return s.kind
 }
 
 // Equal compares StaticShardingPubsubTopic
-func (s StaticShardingPubsubTopic) Equal(t2 StaticShardingPubsubTopic) bool {
+func (s StaticShardingPubsubTopic) Equal(t2 NamespacedPubsubTopic) bool {
 	return s.String() == t2.String()
 }
 
 // String formats StaticShardingPubsubTopic to RFC 23 specific string format for pubsub topic.
 func (s StaticShardingPubsubTopic) String() string {
-	return fmt.Sprintf("%s/%d/%d", StaticShardingPubsubTopicPrefix, s.clusterID, s.shardID)
+	return fmt.Sprintf("%s/%d/%d", StaticShardingPubsubTopicPrefix, s.cluster, s.shard)
 }
 
 // Parse parses a topic string into a StaticShardingPubsubTopic
@@ -100,32 +166,33 @@ func (s *StaticShardingPubsubTopic) Parse(topic string) error {
 		return ErrInvalidNumberFormat
 	}
 
-	s.shardID = uint16(shardInt)
-	s.clusterID = uint16(clusterInt)
+	s.shard = uint16(shardInt)
+	s.cluster = uint16(clusterInt)
+	s.kind = StaticSharding
 
 	return nil
 }
 
-func ToShardPubsubTopic(topic WakuPubSubTopic) (StaticShardingPubsubTopic, error) {
-	result, ok := topic.(StaticShardingPubsubTopic)
-	if !ok {
-		return StaticShardingPubsubTopic{}, ErrNotShardPubsubTopic
-	}
-	return result, nil
-}
-
-// ToWakuPubsubTopic takes a pubSub topic string and creates a WakuPubsubTopic object.
-func ToWakuPubsubTopic(topic string) (WakuPubSubTopic, error) {
-	if topic == defaultPubsubTopic {
-		return DefaultPubsubTopic{}, nil
-	}
+// ToShardedPubsubTopic takes a pubSub topic string and creates a NamespacedPubsubTopic object.
+func ToShardedPubsubTopic(topic string) (NamespacedPubsubTopic, error) {
 	if strings.HasPrefix(topic, StaticShardingPubsubTopicPrefix) {
 		s := StaticShardingPubsubTopic{}
 		err := s.Parse(topic)
 		if err != nil {
-			return s, err
+			return nil, err
 		}
 		return s, nil
 	}
-	return nil, ErrNotWakuPubsubTopic
+
+	s := NamedShardingPubsubTopic{}
+	err := s.Parse(topic)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// DefaultPubsubTopic is the default pubSub topic used in waku
+func DefaultPubsubTopic() NamespacedPubsubTopic {
+	return NewNamedShardingPubsubTopic("default-waku/proto")
 }

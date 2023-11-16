@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -8,36 +9,15 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
-func (old *FilterSubscribeParameters) Copy() *FilterSubscribeParameters {
-	return &FilterSubscribeParameters{
-		selectedPeer: old.selectedPeer,
-		requestID:    old.requestID,
-	}
-}
-
-type (
-	FilterPingParameters struct {
-		requestID []byte
-	}
-	FilterPingOption func(*FilterPingParameters)
-)
-
-func WithPingRequestId(requestId []byte) FilterPingOption {
-	return func(params *FilterPingParameters) {
-		params.requestID = requestId
-	}
-}
-
 type (
 	FilterSubscribeParameters struct {
-		selectedPeer      peer.ID
-		peerSelectionType peermanager.PeerSelection
-		preferredPeers    peer.IDSlice
-		requestID         []byte
-		log               *zap.Logger
+		selectedPeer peer.ID
+		requestID    []byte
+		log          *zap.Logger
 
 		// Subscribe-specific
 		host host.Host
@@ -55,7 +35,7 @@ type (
 
 	Option func(*FilterParameters)
 
-	FilterSubscribeOption func(*FilterSubscribeParameters) error
+	FilterSubscribeOption func(*FilterSubscribeParameters)
 )
 
 func WithTimeout(timeout time.Duration) Option {
@@ -65,9 +45,8 @@ func WithTimeout(timeout time.Duration) Option {
 }
 
 func WithPeer(p peer.ID) FilterSubscribeOption {
-	return func(params *FilterSubscribeParameters) error {
+	return func(params *FilterSubscribeParameters) {
 		params.selectedPeer = p
-		return nil
 	}
 }
 
@@ -75,10 +54,19 @@ func WithPeer(p peer.ID) FilterSubscribeOption {
 // If a list of specific peers is passed, the peer will be chosen from that list assuming it
 // supports the chosen protocol, otherwise it will chose a peer from the node peerstore
 func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) FilterSubscribeOption {
-	return func(params *FilterSubscribeParameters) error {
-		params.peerSelectionType = peermanager.Automatic
-		params.preferredPeers = fromThesePeers
-		return nil
+	return func(params *FilterSubscribeParameters) {
+		var p peer.ID
+		var err error
+		if params.pm == nil {
+			p, err = utils.SelectPeer(params.host, FilterSubscribeID_v20beta1, fromThesePeers, params.log)
+		} else {
+			p, err = params.pm.SelectPeer(FilterSubscribeID_v20beta1, "", fromThesePeers...)
+		}
+		if err == nil {
+			params.selectedPeer = p
+		} else {
+			params.log.Info("selecting peer", zap.Error(err))
+		}
 	}
 }
 
@@ -86,28 +74,30 @@ func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) FilterSubscribeOption
 // with the lowest ping If a list of specific peers is passed, the peer will be chosen
 // from that list assuming it supports the chosen protocol, otherwise it will chose a
 // peer from the node peerstore
-func WithFastestPeerSelection(fromThesePeers ...peer.ID) FilterSubscribeOption {
-	return func(params *FilterSubscribeParameters) error {
-		params.peerSelectionType = peermanager.LowestRTT
-		return nil
+func WithFastestPeerSelection(ctx context.Context, fromThesePeers ...peer.ID) FilterSubscribeOption {
+	return func(params *FilterSubscribeParameters) {
+		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, FilterSubscribeID_v20beta1, fromThesePeers, params.log)
+		if err == nil {
+			params.selectedPeer = p
+		} else {
+			params.log.Info("selecting peer", zap.Error(err))
+		}
 	}
 }
 
 // WithRequestID is an option to set a specific request ID to be used when
 // creating/removing a filter subscription
 func WithRequestID(requestID []byte) FilterSubscribeOption {
-	return func(params *FilterSubscribeParameters) error {
+	return func(params *FilterSubscribeParameters) {
 		params.requestID = requestID
-		return nil
 	}
 }
 
 // WithAutomaticRequestID is an option to automatically generate a request ID
 // when creating a filter subscription
 func WithAutomaticRequestID() FilterSubscribeOption {
-	return func(params *FilterSubscribeParameters) error {
+	return func(params *FilterSubscribeParameters) {
 		params.requestID = protocol.GenerateRequestID()
-		return nil
 	}
 }
 
@@ -119,27 +109,24 @@ func DefaultSubscriptionOptions() []FilterSubscribeOption {
 }
 
 func UnsubscribeAll() FilterSubscribeOption {
-	return func(params *FilterSubscribeParameters) error {
+	return func(params *FilterSubscribeParameters) {
 		params.unsubscribeAll = true
-		return nil
 	}
 }
 
 // WithWaitGroup allows specifying a waitgroup to wait until all
 // unsubscribe requests are complete before the function is complete
 func WithWaitGroup(wg *sync.WaitGroup) FilterSubscribeOption {
-	return func(params *FilterSubscribeParameters) error {
+	return func(params *FilterSubscribeParameters) {
 		params.wg = wg
-		return nil
 	}
 }
 
 // DontWait is used to fire and forget an unsubscription, and don't
 // care about the results of it
 func DontWait() FilterSubscribeOption {
-	return func(params *FilterSubscribeParameters) error {
+	return func(params *FilterSubscribeParameters) {
 		params.wg = nil
-		return nil
 	}
 }
 

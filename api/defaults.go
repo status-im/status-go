@@ -31,7 +31,6 @@ const (
 	statusTestFleet = "status.test"
 	wakuv2ProdFleet = "wakuv2.prod"
 	wakuv2TestFleet = "wakuv2.test"
-	shardsTest      = "shards.test"
 )
 
 var defaultWakuNodes = map[string][]string{
@@ -39,7 +38,6 @@ var defaultWakuNodes = map[string][]string{
 	statusTestFleet: []string{"enrtree://AIO6LUM3IVWCU2KCPBBI6FEH2W42IGK3ASCZHZGG5TIXUR56OGQUO@test.status.nodes.status.im"},
 	wakuv2ProdFleet: []string{"enrtree://ANEDLO25QVUGJOUTQFRYKWX6P4Z4GKVESBMHML7DZ6YK4LGS5FC5O@prod.wakuv2.nodes.status.im"},
 	wakuv2TestFleet: []string{"enrtree://AO47IDOLBKH72HIZZOXQP6NMRESAN7CHYWIBNXDXWRJRZWLODKII6@test.wakuv2.nodes.status.im"},
-	shardsTest:      []string{"enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"},
 }
 
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {

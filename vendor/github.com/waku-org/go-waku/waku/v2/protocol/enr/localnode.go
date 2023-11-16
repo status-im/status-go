@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand"
 	"net"
+	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
@@ -27,6 +28,7 @@ func WithMultiaddress(multiaddrs ...multiaddr.Multiaddr) ENROption {
 	return func(localnode *enode.LocalNode) (err error) {
 
 		// Randomly shuffle multiaddresses
+		rand.Seed(time.Now().UnixNano())
 		rand.Shuffle(len(multiaddrs), func(i, j int) { multiaddrs[i], multiaddrs[j] = multiaddrs[j], multiaddrs[i] })
 
 		// Adding extra multiaddresses. Should probably not exceed the enr max size of 300bytes

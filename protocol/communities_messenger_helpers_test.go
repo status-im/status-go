@@ -32,7 +32,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/communitytokens"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
@@ -147,9 +146,7 @@ func (c *CollectiblesServiceMock) DeploymentSignatureDigest(chainID uint64, addr
 }
 
 func newWakuV2(s *suite.Suite, logger *zap.Logger, useLocalWaku bool) *waku.Waku {
-	config := &waku.Config{
-		DefaultShardPubsubTopic: transport.DefaultShardPubsubTopic(),
-	}
+	config := &waku.Config{}
 
 	var onPeerStats func(connStatus types.ConnStatus)
 	var connStatusChan chan struct{}

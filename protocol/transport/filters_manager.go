@@ -10,6 +10,8 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
 	"github.com/status-im/status-go/eth-node/types"
 )
 
@@ -161,8 +163,8 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 
 		communityPubsubTopic := GetPubsubTopic(cf.Shard)
 		topics := []string{communityPubsubTopic}
-		if communityPubsubTopic != DefaultShardPubsubTopic() {
-			topics = append(topics, DefaultShardPubsubTopic())
+		if communityPubsubTopic != relay.DefaultWakuTopic {
+			topics = append(topics, relay.DefaultWakuTopic)
 		}
 
 		// TODO: requests to join / cancels are currently being sent into the default waku topic.
@@ -385,7 +387,7 @@ func (f *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 		return f.filters[chatID], nil
 	}
 
-	pubsubTopic := DefaultShardPubsubTopic()
+	pubsubTopic := relay.DefaultWakuTopic
 
 	// We set up a filter so we can publish,
 	// but we discard envelopes if listen is false.
@@ -426,7 +428,7 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 		return f.filters[chatID], nil
 	}
 
-	pubsubTopic := DefaultShardPubsubTopic()
+	pubsubTopic := relay.DefaultWakuTopic
 
 	// We set up a filter so we can publish,
 	// but we discard envelopes if listen is false.
@@ -465,7 +467,7 @@ func (f *FiltersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter,
 		return f.filters[chatID], nil
 	}
 
-	pubsubTopic := DefaultShardPubsubTopic()
+	pubsubTopic := relay.DefaultWakuTopic
 	keyString := hex.EncodeToString(secret.Key)
 	filter, err := f.addSymmetric(keyString, pubsubTopic)
 	if err != nil {
@@ -519,7 +521,7 @@ func (f *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 	personalDiscoveryChat := &Filter{
 		ChatID:      personalDiscoveryTopic,
 		Identity:    identityStr,
-		PubsubTopic: DefaultShardPubsubTopic(),
+		PubsubTopic: relay.DefaultWakuTopic,
 		Discovery:   true,
 		Listen:      true,
 		OneToOne:    true,
@@ -590,7 +592,7 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 		return f.filters[chatID], nil
 	}
 
-	pubsubTopic := DefaultShardPubsubTopic()
+	pubsubTopic := relay.DefaultWakuTopic
 
 	contactCodeFilter, err := f.addSymmetric(chatID, pubsubTopic)
 	if err != nil {

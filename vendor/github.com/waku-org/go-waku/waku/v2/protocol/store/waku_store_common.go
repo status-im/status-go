@@ -18,17 +18,29 @@ import (
 const StoreID_v20beta4 = libp2pProtocol.ID("/vac/waku/store/2.0.0-beta4")
 
 // MaxPageSize is the maximum number of waku messages to return per page
-const MaxPageSize = 20
+const MaxPageSize = 100
+
+// MaxContentFilters is the maximum number of allowed content filters in a query
+const MaxContentFilters = 10
 
 var (
+	// ErrMaxContentFilters is returned when the number of content topics in the query
+	// exceeds the limit
+	ErrMaxContentFilters = errors.New("exceeds the maximum number of content filters allowed")
 
 	// ErrNoPeersAvailable is returned when there are no store peers in the peer store
 	// that could be used to retrieve message history
 	ErrNoPeersAvailable = errors.New("no suitable remote peers")
 
+	// ErrInvalidID is returned when no RequestID is given
+	ErrInvalidID = errors.New("invalid request id")
+
 	// ErrFailedToResumeHistory is returned when the node attempted to retrieve historic
 	// messages to fill its own message history but for some reason it failed
 	ErrFailedToResumeHistory = errors.New("failed to resume the history")
+
+	// ErrFailedQuery is emitted when the query fails to return results
+	ErrFailedQuery = errors.New("failed to resolve the query")
 )
 
 type WakuSwap interface {
@@ -40,7 +52,7 @@ type WakuStore struct {
 	cancel     context.CancelFunc
 	timesource timesource.Timesource
 	metrics    Metrics
-	MsgC       *relay.Subscription
+	MsgC       relay.Subscription
 	wg         *sync.WaitGroup
 
 	log *zap.Logger

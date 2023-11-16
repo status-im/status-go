@@ -9,64 +9,29 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 )
 
-type BroadcasterParameters struct {
-	dontConsume bool //Indicates whether to consume messages from subscription or drop
-	chLen       int
-}
-
-type BroadcasterOption func(*BroadcasterParameters)
-
-// WithoutConsumer option let's a user subscribe to a broadcaster without consuming messages received.
-// This is useful for a relayNode where only a subscribe is required in order to relay messages in gossipsub network.
-func DontConsume() BroadcasterOption {
-	return func(params *BroadcasterParameters) {
-		params.dontConsume = true
-	}
-}
-
-func WithConsumerOption(dontConsume bool) BroadcasterOption {
-	return func(params *BroadcasterParameters) {
-		params.dontConsume = dontConsume
-	}
-}
-
-// WithBufferSize option let's a user set channel buffer to be set.
-func WithBufferSize(size int) BroadcasterOption {
-	return func(params *BroadcasterParameters) {
-		params.chLen = size
-	}
-}
-
-// DefaultBroadcasterOptions specifies default options for broadcaster
-func DefaultBroadcasterOptions() []BroadcasterOption {
-	return []BroadcasterOption{
-		WithBufferSize(0),
-	}
-}
-
-type Subscriptions struct {
+type chStore struct {
 	mu           sync.RWMutex
-	topicsToSubs map[string]map[int]*Subscription //map of pubSubTopic to subscriptions
+	topicToChans map[string]map[int]chan *protocol.Envelope
 	id           int
 }
 
-func newSubStore() Subscriptions {
-	return Subscriptions{
-		topicsToSubs: make(map[string]map[int]*Subscription),
+func newChStore() chStore {
+	return chStore{
+		topicToChans: make(map[string]map[int]chan *protocol.Envelope),
 	}
 }
-func (s *Subscriptions) createNewSubscription(contentFilter protocol.ContentFilter, dontConsume bool, chLen int) *Subscription {
+func (s *chStore) getNewCh(topic string, chLen int) Subscription {
 	ch := make(chan *protocol.Envelope, chLen)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.id++
-	pubsubTopic := contentFilter.PubsubTopic
-	if s.topicsToSubs[pubsubTopic] == nil {
-		s.topicsToSubs[pubsubTopic] = make(map[int]*Subscription)
+	//
+	if s.topicToChans[topic] == nil {
+		s.topicToChans[topic] = make(map[int]chan *protocol.Envelope)
 	}
 	id := s.id
-	sub := Subscription{
-		ID: id,
+	s.topicToChans[topic][id] = ch
+	return Subscription{
 		// read only channel,will not block forever, returns once closed.
 		Ch: ch,
 		// Unsubscribe function is safe, can be called multiple times
@@ -74,25 +39,21 @@ func (s *Subscriptions) createNewSubscription(contentFilter protocol.ContentFilt
 		Unsubscribe: func() {
 			s.mu.Lock()
 			defer s.mu.Unlock()
-			if s.topicsToSubs[pubsubTopic] == nil {
+			if s.topicToChans[topic] == nil {
 				return
 			}
-			if sub := s.topicsToSubs[pubsubTopic][id]; sub != nil {
-				close(sub.Ch)
-				delete(s.topicsToSubs[pubsubTopic], id)
+			if ch := s.topicToChans[topic][id]; ch != nil {
+				close(ch)
+				delete(s.topicToChans[topic], id)
 			}
 		},
-		contentFilter: contentFilter,
-		noConsume:     dontConsume,
 	}
-	s.topicsToSubs[pubsubTopic][id] = &sub
-	return &sub
 }
 
-func (s *Subscriptions) broadcast(ctx context.Context, m *protocol.Envelope) {
+func (s *chStore) broadcast(ctx context.Context, m *protocol.Envelope) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	for _, sub := range s.topicsToSubs[m.PubsubTopic()] {
+	for _, ch := range s.topicToChans[m.PubsubTopic()] {
 		select {
 		// using ctx.Done for returning on cancellation is needed
 		// reason:
@@ -101,40 +62,36 @@ func (s *Subscriptions) broadcast(ctx context.Context, m *protocol.Envelope) {
 		// this will also block the chStore close function as it uses same mutex
 		case <-ctx.Done():
 			return
-		default:
-			sub.Submit(ctx, m)
+		case ch <- m:
 		}
 	}
-
-	// send to all wildcard subscribers
-	for _, sub := range s.topicsToSubs[""] {
+	// send to all registered subscribers
+	for _, ch := range s.topicToChans[""] {
 		select {
 		case <-ctx.Done():
 			return
-		default:
-			sub.Submit(ctx, m)
+		case ch <- m:
 		}
 	}
 }
 
-func (s *Subscriptions) close() {
+func (s *chStore) close() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for _, subs := range s.topicsToSubs {
-		for _, sub := range subs {
-			close(sub.Ch)
+	for _, chans := range s.topicToChans {
+		for _, ch := range chans {
+			close(ch)
 		}
 	}
-	s.topicsToSubs = nil
+	s.topicToChans = nil
 }
 
 // Broadcaster is used to create a fanout for an envelope that will be received by any subscriber interested in the topic of the message
 type Broadcaster interface {
 	Start(ctx context.Context) error
 	Stop()
-	Register(contentFilter protocol.ContentFilter, opts ...BroadcasterOption) *Subscription
-	RegisterForAll(opts ...BroadcasterOption) *Subscription
-	UnRegister(pubsubTopic string)
+	Register(topic string, chLen ...int) Subscription
+	RegisterForAll(chLen ...int) Subscription
 	Submit(*protocol.Envelope)
 }
 
@@ -149,8 +106,8 @@ type broadcaster struct {
 	cancel context.CancelFunc
 	input  chan *protocol.Envelope
 	//
-	subscriptions Subscriptions
-	running       atomic.Bool
+	chStore chStore
+	running atomic.Bool
 }
 
 // NewBroadcaster creates a new instance of a broadcaster
@@ -167,7 +124,7 @@ func (b *broadcaster) Start(ctx context.Context) error {
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	b.cancel = cancel
-	b.subscriptions = newSubStore()
+	b.chStore = newChStore()
 	b.input = make(chan *protocol.Envelope, b.bufLen)
 	go b.run(ctx)
 	return nil
@@ -180,7 +137,7 @@ func (b *broadcaster) run(ctx context.Context) {
 			return
 		case msg, ok := <-b.input:
 			if ok {
-				b.subscriptions.broadcast(ctx, msg)
+				b.chStore.broadcast(ctx, msg)
 			}
 		}
 	}
@@ -192,41 +149,28 @@ func (b *broadcaster) Stop() {
 		return
 	}
 	// cancel must be before chStore.close(), so that broadcast releases lock before chStore.close() acquires it.
-	b.cancel()              // exit the run loop,
-	b.subscriptions.close() // close all channels that we send to
-	close(b.input)          // close input channel
+	b.cancel()        // exit the run loop,
+	b.chStore.close() // close all channels that we send to
+	close(b.input)    // close input channel
 }
 
-// Register returns a subscription for an specific pubsub topic and/or list of contentTopics
-func (b *broadcaster) Register(contentFilter protocol.ContentFilter, opts ...BroadcasterOption) *Subscription {
-	params := b.ProcessOpts(opts...)
-	return b.subscriptions.createNewSubscription(contentFilter, params.dontConsume, params.chLen)
-}
-
-func (b *broadcaster) ProcessOpts(opts ...BroadcasterOption) *BroadcasterParameters {
-	params := new(BroadcasterParameters)
-	optList := DefaultBroadcasterOptions()
-	optList = append(optList, opts...)
-	for _, opt := range optList {
-		opt(params)
-	}
-	return params
-}
-
-// UnRegister removes all subscriptions for an specific pubsub topic
-func (b *broadcaster) UnRegister(pubsubTopic string) {
-	subs := b.subscriptions.topicsToSubs[pubsubTopic]
-	if len(subs) > 0 {
-		for _, sub := range subs {
-			sub.Unsubscribe()
-		}
-	}
+// Register returns a subscription for an specific topic
+func (b *broadcaster) Register(topic string, chLen ...int) Subscription {
+	return b.chStore.getNewCh(topic, getChLen(chLen))
 }
 
 // RegisterForAll returns a subscription for all topics
-func (b *broadcaster) RegisterForAll(opts ...BroadcasterOption) *Subscription {
-	params := b.ProcessOpts(opts...)
-	return b.subscriptions.createNewSubscription(protocol.NewContentFilter(""), params.dontConsume, params.chLen)
+func (b *broadcaster) RegisterForAll(chLen ...int) Subscription {
+
+	return b.chStore.getNewCh("", getChLen(chLen))
+}
+
+func getChLen(chLen []int) int {
+	l := 0
+	if len(chLen) > 0 {
+		l = chLen[0]
+	}
+	return l
 }
 
 // Submit is used to broadcast messages to subscribers. It only accepts value when running.

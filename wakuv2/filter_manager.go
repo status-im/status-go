@@ -296,7 +296,10 @@ func (mgr *FilterManager) buildContentFilter(pubsubTopic string, contentTopicSet
 		contentTopics[i] = ct.ContentTopic()
 	}
 
-	return protocol.NewContentFilter(pubsubTopic, contentTopics...)
+	return protocol.ContentFilter{
+		PubsubTopic:   pubsubTopic,
+		ContentTopics: protocol.NewContentTopicSet(contentTopics...),
+	}
 }
 
 // Find suitable peer(s)

@@ -26,6 +26,8 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
 
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -53,9 +55,6 @@ type Filters struct {
 	// Map of random ID to Filter
 	watchers map[string]*Filter
 
-	// Pubsub topic to use when no pubsub topic is specified on a filter
-	defaultPubsubTopic string
-
 	// map a topic to the filters that are interested in being notified when a message matches that topic
 	topicMatcher PubsubTopicToContentTopic
 
@@ -68,13 +67,12 @@ type Filters struct {
 }
 
 // NewFilters returns a newly created filter collection
-func NewFilters(defaultPubsubTopic string, logger *zap.Logger) *Filters {
+func NewFilters(logger *zap.Logger) *Filters {
 	return &Filters{
-		watchers:           make(map[string]*Filter),
-		topicMatcher:       make(PubsubTopicToContentTopic),
-		allTopicsMatcher:   make(map[*Filter]struct{}),
-		defaultPubsubTopic: defaultPubsubTopic,
-		logger:             logger,
+		watchers:         make(map[string]*Filter),
+		topicMatcher:     make(PubsubTopicToContentTopic),
+		allTopicsMatcher: make(map[*Filter]struct{}),
+		logger:           logger,
 	}
 }
 
@@ -142,7 +140,7 @@ func (fs *Filters) AllTopics() []TopicType {
 // If the filter's Topics array is empty, it will be tried on every topic.
 // Otherwise, it will be tried on the topics specified.
 func (fs *Filters) addTopicMatcher(watcher *Filter) {
-	if len(watcher.ContentTopics) == 0 && (watcher.PubsubTopic == fs.defaultPubsubTopic || watcher.PubsubTopic == "") {
+	if len(watcher.ContentTopics) == 0 && (watcher.PubsubTopic == relay.DefaultWakuTopic || watcher.PubsubTopic == "") {
 		fs.allTopicsMatcher[watcher] = struct{}{}
 	} else {
 		filtersPerContentTopic, ok := fs.topicMatcher[watcher.PubsubTopic]

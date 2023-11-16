@@ -13,6 +13,8 @@ import (
 	datasyncproto "github.com/vacp2p/mvds/protobuf"
 	"go.uber.org/zap"
 
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/datasync"
@@ -455,7 +457,7 @@ func (s *MessageSender) sendPrivate(
 
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
 	rawMessage.ID = types.EncodeHex(messageID)
-	rawMessage.PubsubTopic = transport.DefaultShardPubsubTopic() // TODO: determine which pubsub topic should be used for 1:1 messages
+	rawMessage.PubsubTopic = relay.DefaultWakuTopic // TODO: determine which pubsub topic should be used for 1:1 messages
 
 	if rawMessage.BeforeDispatch != nil {
 		if err := rawMessage.BeforeDispatch(rawMessage); err != nil {

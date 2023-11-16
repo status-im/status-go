@@ -3,7 +3,9 @@ package relay
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -15,7 +17,9 @@ import (
 	proto "google.golang.org/protobuf/proto"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/waku-org/go-waku/logging"
+	"github.com/waku-org/go-waku/waku/v2/hash"
 	waku_proto "github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
@@ -25,7 +29,7 @@ import (
 const WakuRelayID_v200 = protocol.ID("/vac/waku/relay/2.0.0")
 
 // DefaultWakuTopic is the default pubsub topic used across all Waku protocols
-var DefaultWakuTopic string = waku_proto.DefaultPubsubTopic{}.String()
+var DefaultWakuTopic string = waku_proto.DefaultPubsubTopic().String()
 
 // WakuRelay is the implementation of the Waku Relay protocol
 type WakuRelay struct {
@@ -61,13 +65,40 @@ type WakuRelay struct {
 		EvtRelayUnsubscribed event.Emitter
 		EvtPeerTopic         event.Emitter
 	}
-	contentSubs map[string]map[int]*Subscription
+
 	*waku_proto.CommonService
 }
 
+// EvtRelaySubscribed is an event emitted when a new subscription to a pubsub topic is created
+type EvtRelaySubscribed struct {
+	Topic     string
+	TopicInst *pubsub.Topic
+}
+
+// EvtRelayUnsubscribed is an event emitted when a subscription to a pubsub topic is closed
+type EvtRelayUnsubscribed struct {
+	Topic string
+}
+
+type PeerTopicState int
+
+const (
+	PEER_JOINED = iota
+	PEER_LEFT
+)
+
+type EvtPeerTopic struct {
+	PubsubTopic string
+	PeerID      peer.ID
+	State       PeerTopicState
+}
+
+func msgIDFn(pmsg *pubsub_pb.Message) string {
+	return string(hash.SHA256(pmsg.Data))
+}
+
 // NewWakuRelay returns a new instance of a WakuRelay struct
-func NewWakuRelay(bcaster Broadcaster, minPeersToPublish int, timesource timesource.Timesource,
-	reg prometheus.Registerer, log *zap.Logger, opts ...pubsub.Option) *WakuRelay {
+func NewWakuRelay(bcaster Broadcaster, minPeersToPublish int, timesource timesource.Timesource, reg prometheus.Registerer, log *zap.Logger, opts ...pubsub.Option) *WakuRelay {
 	w := new(WakuRelay)
 	w.timesource = timesource
 	w.wakuRelayTopics = make(map[string]*pubsub.Topic)
@@ -81,9 +112,95 @@ func NewWakuRelay(bcaster Broadcaster, minPeersToPublish int, timesource timesou
 	w.events = eventbus.NewBus()
 	w.metrics = newMetrics(reg, w.log)
 
+	cfg := pubsub.DefaultGossipSubParams()
+	cfg.PruneBackoff = time.Minute
+	cfg.UnsubscribeBackoff = 5 * time.Second
+	cfg.GossipFactor = 0.25
+	cfg.D = waku_proto.GossipSubOptimalFullMeshSize
+	cfg.Dlo = 4
+	cfg.Dhi = 12
+	cfg.Dout = 3
+	cfg.Dlazy = waku_proto.GossipSubOptimalFullMeshSize
+	cfg.HeartbeatInterval = time.Second
+	cfg.HistoryLength = 6
+	cfg.HistoryGossip = 3
+	cfg.FanoutTTL = time.Minute
+
+	w.peerScoreParams = &pubsub.PeerScoreParams{
+		Topics:        make(map[string]*pubsub.TopicScoreParams),
+		DecayInterval: 12 * time.Second, // how often peer scoring is updated
+		DecayToZero:   0.01,             // below this we consider the parameter to be zero
+		RetainScore:   10 * time.Minute, // remember peer score during x after it disconnects
+		// p5: application specific, unset
+		AppSpecificScore: func(p peer.ID) float64 {
+			return 0
+		},
+		AppSpecificWeight: 0.0,
+		// p6: penalizes peers sharing more than threshold ips
+		IPColocationFactorWeight:    -50,
+		IPColocationFactorThreshold: 5.0,
+		// p7: penalizes bad behaviour (weight and decay)
+		BehaviourPenaltyWeight: -10,
+		BehaviourPenaltyDecay:  0.986,
+	}
+
+	w.peerScoreThresholds = &pubsub.PeerScoreThresholds{
+		GossipThreshold:             -100,   // no gossip is sent to peers below this score
+		PublishThreshold:            -1000,  // no self-published msgs are sent to peers below this score
+		GraylistThreshold:           -10000, // used to trigger disconnections + ignore peer if below this score
+		OpportunisticGraftThreshold: 0,      // grafts better peers if the mesh median score drops below this. unset.
+	}
+
+	w.topicParams = &pubsub.TopicScoreParams{
+		TopicWeight: 1,
+		// p1: favours peers already in the mesh
+		TimeInMeshWeight:  0.01,
+		TimeInMeshQuantum: time.Second,
+		TimeInMeshCap:     10.0,
+		// p2: rewards fast peers
+		FirstMessageDeliveriesWeight: 1.0,
+		FirstMessageDeliveriesDecay:  0.5,
+		FirstMessageDeliveriesCap:    10.0,
+		// p3: penalizes lazy peers. safe low value
+		MeshMessageDeliveriesWeight:     0,
+		MeshMessageDeliveriesDecay:      0,
+		MeshMessageDeliveriesCap:        0,
+		MeshMessageDeliveriesThreshold:  0,
+		MeshMessageDeliveriesWindow:     0,
+		MeshMessageDeliveriesActivation: 0,
+		// p3b: tracks history of prunes
+		MeshFailurePenaltyWeight: 0,
+		MeshFailurePenaltyDecay:  0,
+		// p4: penalizes invalid messages. highly penalize peers sending wrong messages
+		InvalidMessageDeliveriesWeight: -100.0,
+		InvalidMessageDeliveriesDecay:  0.5,
+	}
+
 	// default options required by WakuRelay
-	w.opts = append(w.defaultPubsubOptions(), opts...)
-	w.contentSubs = make(map[string]map[int]*Subscription)
+	w.opts = append([]pubsub.Option{
+		pubsub.WithMessageSignaturePolicy(pubsub.StrictNoSign),
+		pubsub.WithNoAuthor(),
+		pubsub.WithMessageIdFn(msgIDFn),
+		pubsub.WithGossipSubProtocols(
+			[]protocol.ID{WakuRelayID_v200, pubsub.GossipSubID_v11, pubsub.GossipSubID_v10, pubsub.FloodSubID},
+			func(feat pubsub.GossipSubFeature, proto protocol.ID) bool {
+				switch feat {
+				case pubsub.GossipSubFeatureMesh:
+					return proto == pubsub.GossipSubID_v11 || proto == pubsub.GossipSubID_v10 || proto == WakuRelayID_v200
+				case pubsub.GossipSubFeaturePX:
+					return proto == pubsub.GossipSubID_v11 || proto == WakuRelayID_v200
+				default:
+					return false
+				}
+			},
+		),
+		pubsub.WithGossipSubParams(cfg),
+		pubsub.WithFloodPublish(true),
+		pubsub.WithSeenMessagesTTL(2 * time.Minute),
+		pubsub.WithPeerScore(w.peerScoreParams, w.peerScoreThresholds),
+		pubsub.WithPeerScoreInspect(w.peerScoreInspector, 6*time.Second),
+	}, opts...)
+
 	return w
 }
 
@@ -114,16 +231,22 @@ func (w *WakuRelay) Start(ctx context.Context) error {
 }
 
 func (w *WakuRelay) start() error {
-	if w.bcaster == nil {
-		return errors.New("broadcaster not specified for relay")
-	}
 	ps, err := pubsub.NewGossipSub(w.Context(), w.host, w.opts...)
 	if err != nil {
 		return err
 	}
 	w.pubsub = ps
 
-	err = w.CreateEventEmitters()
+	w.emitters.EvtRelaySubscribed, err = w.events.Emitter(new(EvtRelaySubscribed))
+	if err != nil {
+		return err
+	}
+	w.emitters.EvtRelayUnsubscribed, err = w.events.Emitter(new(EvtRelayUnsubscribed))
+	if err != nil {
+		return err
+	}
+
+	w.emitters.EvtPeerTopic, err = w.events.Emitter(new(EvtPeerTopic))
 	if err != nil {
 		return err
 	}
@@ -189,7 +312,7 @@ func (w *WakuRelay) upsertTopic(topic string) (*pubsub.Topic, error) {
 	return pubSubTopic, nil
 }
 
-func (w *WakuRelay) subscribeToPubsubTopic(topic string) (subs *pubsub.Subscription, err error) {
+func (w *WakuRelay) subscribe(topic string) (subs *pubsub.Subscription, err error) {
 	sub, ok := w.relaySubs[topic]
 	if !ok {
 		pubSubTopic, err := w.upsertTopic(topic)
@@ -197,13 +320,10 @@ func (w *WakuRelay) subscribeToPubsubTopic(topic string) (subs *pubsub.Subscript
 			return nil, err
 		}
 
-		sub, err = pubSubTopic.Subscribe(pubsub.WithBufferSize(1024))
+		sub, err = pubSubTopic.Subscribe()
 		if err != nil {
 			return nil, err
 		}
-
-		w.WaitGroup().Add(1)
-		go w.pubsubTopicMsgHandler(topic, sub)
 
 		evtHandler, err := w.addPeerTopicEventListener(pubSubTopic)
 		if err != nil {
@@ -217,16 +337,18 @@ func (w *WakuRelay) subscribeToPubsubTopic(topic string) (subs *pubsub.Subscript
 			return nil, err
 		}
 
+		if w.bcaster != nil {
+			w.WaitGroup().Add(1)
+			go w.subscribeToTopic(topic, sub)
+		}
 		w.log.Info("subscribing to topic", zap.String("topic", sub.Topic()))
 	}
 
 	return sub, nil
 }
 
-// PublishToTopic is used to broadcast a WakuMessage to a pubsub topic. The pubsubTopic is derived from contentTopic
-// specified in the message via autosharding. To publish to a specific pubsubTopic, the `WithPubSubTopic` option should
-// be provided
-func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage, opts ...PublishOption) ([]byte, error) {
+// PublishToTopic is used to broadcast a WakuMessage to a pubsub topic
+func (w *WakuRelay) PublishToTopic(ctx context.Context, message *pb.WakuMessage, topic string) ([]byte, error) {
 	// Publish a `WakuMessage` to a PubSub topic.
 	if w.pubsub == nil {
 		return nil, errors.New("PubSub hasn't been set")
@@ -236,28 +358,12 @@ func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage, opts .
 		return nil, errors.New("message can't be null")
 	}
 
-	err := message.Validate()
-	if err != nil {
-		return nil, err
-	}
-
-	params := new(publishParameters)
-	for _, opt := range opts {
-		opt(params)
-	}
-
-	if params.pubsubTopic == "" {
-		params.pubsubTopic, err = waku_proto.GetPubSubTopicFromContentTopic(message.ContentTopic)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if !w.EnoughPeersToPublishToTopic(params.pubsubTopic) {
+	if !w.EnoughPeersToPublishToTopic(topic) {
 		return nil, errors.New("not enough peers to publish")
 	}
 
-	pubSubTopic, err := w.upsertTopic(params.pubsubTopic)
+	pubSubTopic, err := w.upsertTopic(topic)
+
 	if err != nil {
 		return nil, err
 	}
@@ -272,26 +378,16 @@ func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage, opts .
 		return nil, err
 	}
 
-	hash := message.Hash(params.pubsubTopic)
+	hash := message.Hash(topic)
 
-	w.log.Debug("waku.relay published", zap.String("pubsubTopic", params.pubsubTopic), logging.HexString("hash", hash), zap.Int64("publishTime", w.timesource.Now().UnixNano()), zap.Int("payloadSizeBytes", len(message.Payload)))
+	w.log.Debug("waku.relay published", zap.String("pubsubTopic", topic), logging.HexString("hash", hash), zap.Int64("publishTime", w.timesource.Now().UnixNano()), zap.Int("payloadSizeBytes", len(message.Payload)))
 
 	return hash, nil
 }
 
-func (w *WakuRelay) GetSubscription(contentTopic string) (*Subscription, error) {
-	pubSubTopic, err := waku_proto.GetPubSubTopicFromContentTopic(contentTopic)
-	if err != nil {
-		return nil, err
-	}
-	contentFilter := waku_proto.NewContentFilter(pubSubTopic, contentTopic)
-	cSubs := w.contentSubs[pubSubTopic]
-	for _, sub := range cSubs {
-		if sub.contentFilter.Equals(contentFilter) {
-			return sub, nil
-		}
-	}
-	return nil, errors.New("no subscription found for content topic")
+// Publish is used to broadcast a WakuMessage to the default waku pubsub topic
+func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage) ([]byte, error) {
+	return w.PublishToTopic(ctx, message, DefaultWakuTopic)
 }
 
 // Stop unmounts the relay protocol and stops all subscriptions
@@ -313,173 +409,112 @@ func (w *WakuRelay) EnoughPeersToPublishToTopic(topic string) bool {
 	return len(w.PubSub().ListPeers(topic)) >= w.minPeersToPublish
 }
 
-// subscribe returns list of Subscription to receive messages based on content filter
-func (w *WakuRelay) subscribe(ctx context.Context, contentFilter waku_proto.ContentFilter, opts ...RelaySubscribeOption) ([]*Subscription, error) {
-
-	var subscriptions []*Subscription
-	pubSubTopicMap, err := waku_proto.ContentFilterToPubSubTopicMap(contentFilter)
+// SubscribeToTopic returns a Subscription to receive messages from a pubsub topic
+func (w *WakuRelay) SubscribeToTopic(ctx context.Context, topic string) (*Subscription, error) {
+	_, err := w.subscribe(topic)
 	if err != nil {
 		return nil, err
 	}
-	params := new(RelaySubscribeParameters)
 
-	var optList []RelaySubscribeOption
-	optList = append(optList, opts...)
-	for _, opt := range optList {
-		err := opt(params)
-		if err != nil {
-			return nil, err
-		}
+	// Create client subscription
+	subscription := NoopSubscription()
+	if w.bcaster != nil {
+		subscription = w.bcaster.Register(topic, 1024)
 	}
-
-	for pubSubTopic, cTopics := range pubSubTopicMap {
-		w.log.Info("subscribing to", zap.String("pubsubTopic", pubSubTopic), zap.Strings("contenTopics", cTopics))
-		var cFilter waku_proto.ContentFilter
-		cFilter.PubsubTopic = pubSubTopic
-		cFilter.ContentTopics = waku_proto.NewContentTopicSet(cTopics...)
-
-		//Check if gossipsub subscription already exists for pubSubTopic
-		if !w.IsSubscribed(pubSubTopic) {
-			_, err := w.subscribeToPubsubTopic(cFilter.PubsubTopic)
-			if err != nil {
-				//TODO: Handle partial errors.
-				return nil, err
-			}
-		}
-
-		subscription := w.bcaster.Register(cFilter, WithBufferSize(DefaultRelaySubscriptionBufferSize),
-			WithConsumerOption(params.dontConsume))
-
-		// Create Content subscription
-		w.topicsMutex.RLock()
-		if _, ok := w.contentSubs[pubSubTopic]; !ok {
-			w.contentSubs[pubSubTopic] = map[int]*Subscription{}
-		}
-		w.contentSubs[pubSubTopic][subscription.ID] = subscription
-
-		w.topicsMutex.RUnlock()
-		subscriptions = append(subscriptions, subscription)
-		go func() {
-			<-ctx.Done()
-			subscription.Unsubscribe()
-		}()
-	}
-
-	return subscriptions, nil
+	go func() {
+		<-ctx.Done()
+		subscription.Unsubscribe()
+	}()
+	return &subscription, nil
 }
 
-// Subscribe returns a Subscription to receive messages as per contentFilter
-// contentFilter can contain pubSubTopic and contentTopics or only contentTopics(in case of autosharding)
-func (w *WakuRelay) Subscribe(ctx context.Context, contentFilter waku_proto.ContentFilter, opts ...RelaySubscribeOption) ([]*Subscription, error) {
-	return w.subscribe(ctx, contentFilter, opts...)
+// Subscribe returns a Subscription to receive messages from the default waku pubsub topic
+func (w *WakuRelay) Subscribe(ctx context.Context) (*Subscription, error) {
+	return w.SubscribeToTopic(ctx, DefaultWakuTopic)
 }
 
 // Unsubscribe closes a subscription to a pubsub topic
-func (w *WakuRelay) Unsubscribe(ctx context.Context, contentFilter waku_proto.ContentFilter) error {
-
-	pubSubTopicMap, err := waku_proto.ContentFilterToPubSubTopicMap(contentFilter)
-	if err != nil {
-		return err
-	}
-
+func (w *WakuRelay) Unsubscribe(ctx context.Context, topic string) error {
 	w.topicsMutex.Lock()
 	defer w.topicsMutex.Unlock()
 
-	for pubSubTopic, cTopics := range pubSubTopicMap {
-		cfTemp := waku_proto.NewContentFilter(pubSubTopic, cTopics...)
-		pubsubUnsubscribe := false
-		sub, ok := w.relaySubs[pubSubTopic]
-		if !ok {
-			return errors.New("not subscribed to topic")
-		}
-		cSubs := w.contentSubs[pubSubTopic]
-		if cSubs != nil {
-			//Remove relevant subscription
-			for subID, sub := range cSubs {
-				if sub.contentFilter.Equals(cfTemp) {
-					sub.Unsubscribe()
-					delete(cSubs, subID)
-				}
-			}
-			if len(cSubs) == 0 {
-				pubsubUnsubscribe = true
-			}
-		} else {
-			//Should not land here ideally
-			w.log.Error("pubsub subscriptions exists, but contentSubscription doesn't for contentFilter",
-				zap.String("pubsubTopic", pubSubTopic), zap.Strings("contentTopics", cTopics))
-
-			return errors.New("unexpected error in unsubscribe")
-		}
-
-		if pubsubUnsubscribe {
-			err = w.unsubscribeFromPubsubTopic(sub)
-			if err != nil {
-				return err
-			}
-		}
+	sub, ok := w.relaySubs[topic]
+	if !ok {
+		return fmt.Errorf("not subscribed to topic")
 	}
-	return nil
-}
+	w.log.Info("unsubscribing from topic", zap.String("topic", sub.Topic()))
 
-// unsubscribeFromPubsubTopic unsubscribes subscription from underlying pubsub.
-// Note: caller has to acquire topicsMutex in order to avoid race conditions
-func (w *WakuRelay) unsubscribeFromPubsubTopic(sub *pubsub.Subscription) error {
+	w.relaySubs[topic].Cancel()
+	delete(w.relaySubs, topic)
 
-	pubSubTopic := sub.Topic()
-	w.log.Info("unsubscribing from topic", zap.String("topic", pubSubTopic))
-
-	sub.Cancel()
-	delete(w.relaySubs, pubSubTopic)
-
-	w.bcaster.UnRegister(pubSubTopic)
-
-	delete(w.contentSubs, pubSubTopic)
-
-	evtHandler, ok := w.topicEvtHanders[pubSubTopic]
+	evtHandler, ok := w.topicEvtHanders[topic]
 	if ok {
 		evtHandler.Cancel()
-		delete(w.topicEvtHanders, pubSubTopic)
+		delete(w.topicEvtHanders, topic)
 	}
 
-	err := w.wakuRelayTopics[pubSubTopic].Close()
+	err := w.wakuRelayTopics[topic].Close()
 	if err != nil {
 		return err
 	}
-	delete(w.wakuRelayTopics, pubSubTopic)
+	delete(w.wakuRelayTopics, topic)
 
-	w.RemoveTopicValidator(pubSubTopic)
+	w.RemoveTopicValidator(topic)
 
-	err = w.emitters.EvtRelayUnsubscribed.Emit(EvtRelayUnsubscribed{pubSubTopic})
+	err = w.emitters.EvtRelayUnsubscribed.Emit(EvtRelayUnsubscribed{topic})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
-func (w *WakuRelay) pubsubTopicMsgHandler(pubsubTopic string, sub *pubsub.Subscription) {
+func (w *WakuRelay) nextMessage(ctx context.Context, sub *pubsub.Subscription) <-chan *pubsub.Message {
+	msgChannel := make(chan *pubsub.Message, 1024)
+	go func() {
+		defer close(msgChannel)
+		for {
+			msg, err := sub.Next(ctx)
+			if err != nil {
+				if !errors.Is(err, context.Canceled) {
+					w.log.Error("getting message from subscription", zap.Error(err))
+				}
+				sub.Cancel()
+				return
+			}
+			msgChannel <- msg
+		}
+	}()
+	return msgChannel
+}
+
+func (w *WakuRelay) subscribeToTopic(pubsubTopic string, sub *pubsub.Subscription) {
 	defer w.WaitGroup().Done()
 
+	subChannel := w.nextMessage(w.Context(), sub)
 	for {
-		msg, err := sub.Next(w.Context())
-		if err != nil {
-			if !errors.Is(err, context.Canceled) {
-				w.log.Error("getting message from subscription", zap.Error(err))
+		select {
+		case <-w.Context().Done():
+			return
+			// TODO: if there are no more relay subscriptions, close the pubsub subscription
+		case msg, ok := <-subChannel:
+			if !ok {
+				return
 			}
-			sub.Cancel()
-			return
+			wakuMessage := &pb.WakuMessage{}
+			if err := proto.Unmarshal(msg.Data, wakuMessage); err != nil {
+				w.log.Error("decoding message", zap.Error(err))
+				return
+			}
+
+			envelope := waku_proto.NewEnvelope(wakuMessage, w.timesource.Now().UnixNano(), pubsubTopic)
+
+			w.metrics.RecordMessage(envelope)
+
+			if w.bcaster != nil {
+				w.bcaster.Submit(envelope)
+			}
 		}
-
-		wakuMessage, err := pb.Unmarshal(msg.Data)
-		if err != nil {
-			w.log.Error("decoding message", zap.Error(err))
-			return
-		}
-
-		envelope := waku_proto.NewEnvelope(wakuMessage, w.timesource.Now().UnixNano(), pubsubTopic)
-		w.metrics.RecordMessage(envelope)
-
-		w.bcaster.Submit(envelope)
 	}
 
 }
@@ -487,4 +522,52 @@ func (w *WakuRelay) pubsubTopicMsgHandler(pubsubTopic string, sub *pubsub.Subscr
 // Params returns the gossipsub configuration parameters used by WakuRelay
 func (w *WakuRelay) Params() pubsub.GossipSubParams {
 	return w.params
+}
+
+// Events returns the event bus on which WakuRelay events will be emitted
+func (w *WakuRelay) Events() event.Bus {
+	return w.events
+}
+
+func (w *WakuRelay) addPeerTopicEventListener(topic *pubsub.Topic) (*pubsub.TopicEventHandler, error) {
+	handler, err := topic.EventHandler()
+	if err != nil {
+		return nil, err
+	}
+	w.WaitGroup().Add(1)
+	go w.topicEventPoll(topic.String(), handler)
+	return handler, nil
+}
+
+func (w *WakuRelay) topicEventPoll(topic string, handler *pubsub.TopicEventHandler) {
+	defer w.WaitGroup().Done()
+	for {
+		evt, err := handler.NextPeerEvent(w.Context())
+		if err != nil {
+			if err == context.Canceled {
+				break
+			}
+			w.log.Error("failed to get next peer event", zap.String("topic", topic), zap.Error(err))
+			continue
+		}
+		if evt.Peer.Validate() != nil { //Empty peerEvent is returned when context passed in done.
+			break
+		}
+		if evt.Type == pubsub.PeerJoin {
+			w.log.Debug("received a PeerJoin event", zap.String("topic", topic), logging.HostID("peerID", evt.Peer))
+			err = w.emitters.EvtPeerTopic.Emit(EvtPeerTopic{PubsubTopic: topic, PeerID: evt.Peer, State: PEER_JOINED})
+			if err != nil {
+				w.log.Error("failed to emit PeerJoin", zap.String("topic", topic), zap.Error(err))
+			}
+		} else if evt.Type == pubsub.PeerLeave {
+			w.log.Debug("received a PeerLeave event", zap.String("topic", topic), logging.HostID("peerID", evt.Peer))
+			err = w.emitters.EvtPeerTopic.Emit(EvtPeerTopic{PubsubTopic: topic, PeerID: evt.Peer, State: PEER_LEFT})
+			if err != nil {
+				w.log.Error("failed to emit PeerLeave", zap.String("topic", topic), zap.Error(err))
+			}
+		} else {
+			w.log.Error("unknown event type received", zap.String("topic", topic),
+				zap.Int("eventType", int(evt.Type)))
+		}
+	}
 }

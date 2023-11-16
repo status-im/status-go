@@ -6,6 +6,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 )
 
 type peerMap struct {
@@ -25,7 +26,7 @@ func (pm *peerMap) getRandom() (peer.ID, error) {
 	for pID := range pm.m {
 		return pID, nil
 	}
-	return "", ErrNoPeersAvailable
+	return "", utils.ErrNoPeersAvailable
 
 }
 

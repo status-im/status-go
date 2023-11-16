@@ -16,8 +16,10 @@ import (
 // the number of connections per IP address
 type ConnectionGater struct {
 	sync.Mutex
-	logger  *zap.Logger
-	limiter map[string]int
+	logger   *zap.Logger
+	limiter  map[string]int
+	inbound  int
+	outbound int
 }
 
 const maxConnsPerIP = 10
@@ -25,8 +27,10 @@ const maxConnsPerIP = 10
 // NewConnectionGater creates a new instance of ConnectionGater
 func NewConnectionGater(logger *zap.Logger) *ConnectionGater {
 	c := &ConnectionGater{
-		logger:  logger.Named("connection-gater"),
-		limiter: make(map[string]int),
+		logger:   logger.Named("connection-gater"),
+		limiter:  make(map[string]int),
+		inbound:  0,
+		outbound: 0,
 	}
 
 	return c
@@ -54,6 +58,11 @@ func (c *ConnectionGater) InterceptAccept(n network.ConnMultiaddrs) (allow bool)
 	if !c.validateInboundConn(n.RemoteMultiaddr()) {
 		runtime.Gosched() // Allow other go-routines to run in the event
 		c.logger.Info("exceeds allowed inbound connections from this ip", zap.String("multiaddr", n.RemoteMultiaddr().String()))
+		return false
+	}
+
+	if false { // inbound > someLimit
+		c.logger.Info("connection not accepted. Max inbound connections reached", zap.String("multiaddr", n.RemoteMultiaddr().String()))
 		return false
 	}
 

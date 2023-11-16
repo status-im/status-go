@@ -15,14 +15,14 @@ import (
 type SubscriptionDetails struct {
 	sync.RWMutex
 
-	ID     string `json:"subscriptionID"`
+	ID     string
 	mapRef *SubscriptionsMap
-	Closed bool `json:"-"`
+	Closed bool
 	once   sync.Once
 
-	PeerID        peer.ID                 `json:"peerID"`
-	ContentFilter protocol.ContentFilter  `json:"contentFilters"`
-	C             chan *protocol.Envelope `json:"-"`
+	PeerID        peer.ID
+	ContentFilter protocol.ContentFilter
+	C             chan *protocol.Envelope
 }
 
 // Map of SubscriptionDetails.ID to subscriptions

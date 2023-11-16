@@ -1341,7 +1341,7 @@ func (o *Community) DefaultFilters() []transport.FiltersToInitialize {
 
 	return []transport.FiltersToInitialize{
 		{ChatID: cID, PubsubTopic: communityPubsubTopic},
-		{ChatID: uncompressedPubKey, PubsubTopic: transport.DefaultNonProtectedPubsubTopic(o.Shard().TransportShard())},
+		{ChatID: uncompressedPubKey, PubsubTopic: common.DefaultNonProtectedPubsubTopic(o.Shard())},
 		{ChatID: uncompressedPubKey, PubsubTopic: communityPubsubTopic},
 		{ChatID: updatesChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: mlChannelID, PubsubTopic: communityPubsubTopic},

@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"database/sql"
 	"fmt"
 )
 
@@ -19,7 +20,7 @@ type Queries struct {
 
 // CreateQueries Function creates a set of queries for an SQL table.
 // Note: Do not use this function to create queries for a table, rather use <rdb>.NewQueries to create table as well as queries.
-func CreateQueries(tbl string) *Queries {
+func CreateQueries(tbl string, db *sql.DB) *Queries {
 	return &Queries{
 		deleteQuery:  fmt.Sprintf("DELETE FROM %s WHERE key = $1", tbl),
 		existsQuery:  fmt.Sprintf("SELECT exists(SELECT 1 FROM %s WHERE key=$1)", tbl),
