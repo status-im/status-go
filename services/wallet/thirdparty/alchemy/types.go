@@ -81,19 +81,25 @@ type RawMetadata struct {
 	Attributes []Attribute `json:"attributes"`
 }
 
+type RawFull struct {
+	RawMetadata RawMetadata `json:"metadata"`
+}
+
 type Raw struct {
 	RawMetadata interface{} `json:"metadata"`
 }
 
 func (r *Raw) UnmarshalJSON(b []byte) error {
-	metadata := RawMetadata{
-		Attributes: make([]Attribute, 0),
+	raw := RawFull{
+		RawMetadata{
+			Attributes: make([]Attribute, 0),
+		},
 	}
 
 	// Field structure is not known in advance
-	_ = json.Unmarshal(b, &metadata)
+	_ = json.Unmarshal(b, &raw)
 
-	r.RawMetadata = metadata
+	r.RawMetadata = raw.RawMetadata
 	return nil
 }
 
