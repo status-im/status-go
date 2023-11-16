@@ -156,9 +156,6 @@ func (m *Messenger) GetTextURLsToUnfurl(text string) *URLsUnfurlPlan {
 			IsStatusSharedURL: IsStatusSharedURL(url),
 		}
 
-		//if len(result.URLs) == UnfurledLinksPerMessageLimit {
-		//	metadata.Permission = URLUnfurlingForbiddenByLimit
-		//}
 		if !URLUnfurlingSupported(rawURL) {
 			metadata.Permission = URLUnfurlingNotSupported
 		} else if metadata.IsStatusSharedURL {
