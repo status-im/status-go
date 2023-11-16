@@ -260,7 +260,7 @@ func (s *Service) fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibl
 		header := fullCollectibleDataToHeader(c)
 
 		if c.CollectibleData.CommunityID != "" {
-			communityInfo, err := s.communityDB.GetCommunityInfo(c.CollectibleData.CommunityID)
+			communityInfo, _, err := s.communityDB.GetCommunityInfo(c.CollectibleData.CommunityID)
 			if err != nil {
 				return nil, err
 			}
@@ -282,7 +282,7 @@ func (s *Service) fullCollectiblesDataToDetails(data []thirdparty.FullCollectibl
 		details := fullCollectibleDataToDetails(c)
 
 		if c.CollectibleData.CommunityID != "" {
-			communityInfo, err := s.communityDB.GetCommunityInfo(c.CollectibleData.CommunityID)
+			communityInfo, _, err := s.communityDB.GetCommunityInfo(c.CollectibleData.CommunityID)
 			if err != nil {
 				return nil, err
 			}

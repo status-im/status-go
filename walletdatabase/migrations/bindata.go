@@ -10,6 +10,7 @@
 // 1696853635_input_data.up.sql (23.14kB)
 // 1698117918_add_community_id_to_tokens.up.sql (61B)
 // 1698257443_add_community_metadata_to_wallet_db.up.sql (323B)
+// 1699987075_add_timestamp_and_state_to_community_data_cache.up.sql (865B)
 // doc.go (74B)
 
 package migrations
@@ -20,7 +21,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,7 +30,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -38,7 +38,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func _1691753758_initialUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1691753758_initial.up.sql", size: 5738, mode: os.FileMode(0644), modTime: time.Unix(1699005553, 0)}
+	info := bindataFileInfo{name: "1691753758_initial.up.sql", size: 5738, mode: os.FileMode(0644), modTime: time.Unix(1698840720, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6b, 0x25, 0x31, 0xc8, 0x27, 0x3, 0x6b, 0x9f, 0x15, 0x42, 0x2f, 0x85, 0xfb, 0xe3, 0x6, 0xea, 0xf7, 0x97, 0x12, 0x56, 0x3c, 0x9a, 0x5b, 0x1a, 0xca, 0xb1, 0x23, 0xfa, 0xcd, 0x57, 0x25, 0x5c}}
 	return a, nil
 }
@@ -114,7 +114,7 @@ func _1692701329_add_collectibles_and_collections_data_cacheUpSql() (*asset, err
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1692701329_add_collectibles_and_collections_data_cache.up.sql", size: 1808, mode: os.FileMode(0644), modTime: time.Unix(1699005553, 0)}
+	info := bindataFileInfo{name: "1692701329_add_collectibles_and_collections_data_cache.up.sql", size: 1808, mode: os.FileMode(0644), modTime: time.Unix(1698840720, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1, 0x51, 0xf4, 0x2b, 0x92, 0xde, 0x59, 0x65, 0xd8, 0x9b, 0x57, 0xe0, 0xfd, 0x7b, 0x12, 0xb, 0x29, 0x6e, 0x9d, 0xb5, 0x90, 0xe, 0xfa, 0x12, 0x97, 0xd, 0x61, 0x60, 0x7f, 0x32, 0x1d, 0xc3}}
 	return a, nil
 }
@@ -134,7 +134,7 @@ func _1692701339_add_scope_to_pendingUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1692701339_add_scope_to_pending.up.sql", size: 576, mode: os.FileMode(0644), modTime: time.Unix(1699005553, 0)}
+	info := bindataFileInfo{name: "1692701339_add_scope_to_pending.up.sql", size: 576, mode: os.FileMode(0644), modTime: time.Unix(1698840720, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x36, 0x8a, 0x5e, 0xe2, 0x63, 0x15, 0x37, 0xba, 0x55, 0x18, 0xf3, 0xcc, 0xe0, 0x5, 0x84, 0xe1, 0x5b, 0xe8, 0x1, 0x32, 0x6b, 0x9f, 0x7d, 0x9f, 0xd9, 0x23, 0x6c, 0xa9, 0xb5, 0xdc, 0xf4, 0x93}}
 	return a, nil
 }
@@ -154,7 +154,7 @@ func _1694540071_add_collectibles_ownership_update_timestampUpSql() (*asset, err
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1694540071_add_collectibles_ownership_update_timestamp.up.sql", size: 349, mode: os.FileMode(0644), modTime: time.Unix(1699005553, 0)}
+	info := bindataFileInfo{name: "1694540071_add_collectibles_ownership_update_timestamp.up.sql", size: 349, mode: os.FileMode(0644), modTime: time.Unix(1698840720, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7f, 0x45, 0xc7, 0xce, 0x79, 0x63, 0xbc, 0x6f, 0x83, 0x5f, 0xe2, 0x3, 0x56, 0xcc, 0x5, 0x2f, 0x85, 0xda, 0x7e, 0xea, 0xf5, 0xd2, 0xac, 0x19, 0xd4, 0xd8, 0x5e, 0xdd, 0xed, 0xe2, 0xa9, 0x97}}
 	return a, nil
 }
@@ -174,7 +174,7 @@ func _1694692748_add_raw_balance_to_token_balancesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1694692748_add_raw_balance_to_token_balances.up.sql", size: 165, mode: os.FileMode(0644), modTime: time.Unix(1699005553, 0)}
+	info := bindataFileInfo{name: "1694692748_add_raw_balance_to_token_balances.up.sql", size: 165, mode: os.FileMode(0644), modTime: time.Unix(1698840720, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd4, 0xe0, 0x5b, 0x42, 0xf0, 0x96, 0xa5, 0xf5, 0xed, 0xc0, 0x97, 0x88, 0xb0, 0x6d, 0xfe, 0x7d, 0x97, 0x2e, 0x17, 0xd2, 0x16, 0xbc, 0x2a, 0xf2, 0xcc, 0x67, 0x9e, 0xc5, 0x47, 0xf6, 0x69, 0x1}}
 	return a, nil
 }
@@ -194,7 +194,7 @@ func _1695133989_add_community_id_to_collectibles_and_collections_data_cacheUpSq
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1695133989_add_community_id_to_collectibles_and_collections_data_cache.up.sql", size: 275, mode: os.FileMode(0644), modTime: time.Unix(1699005553, 0)}
+	info := bindataFileInfo{name: "1695133989_add_community_id_to_collectibles_and_collections_data_cache.up.sql", size: 275, mode: os.FileMode(0644), modTime: time.Unix(1698840720, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfa, 0x2, 0xa, 0x7f, 0x4b, 0xd1, 0x3, 0xd0, 0x3, 0x29, 0x84, 0x31, 0xed, 0x49, 0x4f, 0xb1, 0x2d, 0xd7, 0x80, 0x41, 0x5b, 0xfa, 0x6, 0xae, 0xb4, 0xf6, 0x6b, 0x49, 0xee, 0x57, 0x33, 0x76}}
 	return a, nil
 }
@@ -214,7 +214,7 @@ func _1695932536_balance_history_v2UpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1695932536_balance_history_v2.up.sql", size: 653, mode: os.FileMode(0644), modTime: time.Unix(1699005553, 0)}
+	info := bindataFileInfo{name: "1695932536_balance_history_v2.up.sql", size: 653, mode: os.FileMode(0644), modTime: time.Unix(1698840720, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x37, 0xf4, 0x14, 0x91, 0xf6, 0x5f, 0xc4, 0x9b, 0xb7, 0x83, 0x32, 0x72, 0xbe, 0x82, 0x42, 0x39, 0xa4, 0x3b, 0xc9, 0x78, 0x3d, 0xca, 0xd4, 0xbf, 0xfc, 0x7a, 0x33, 0x1e, 0xcd, 0x9e, 0xe4, 0x85}}
 	return a, nil
 }
@@ -234,7 +234,7 @@ func _1696853635_input_dataUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1696853635_input_data.up.sql", size: 23140, mode: os.FileMode(0644), modTime: time.Unix(1699005553, 0)}
+	info := bindataFileInfo{name: "1696853635_input_data.up.sql", size: 23140, mode: os.FileMode(0644), modTime: time.Unix(1698840720, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x89, 0x30, 0x33, 0x33, 0x55, 0xc5, 0x57, 0x2b, 0xaf, 0xef, 0x3d, 0x8d, 0x2a, 0xaa, 0x5c, 0x32, 0xd1, 0xf4, 0xd, 0x4a, 0xd0, 0x33, 0x4a, 0xe8, 0xf6, 0x8, 0x6b, 0x65, 0xcc, 0xba, 0xed, 0x42}}
 	return a, nil
 }
@@ -254,7 +254,7 @@ func _1698117918_add_community_id_to_tokensUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1698117918_add_community_id_to_tokens.up.sql", size: 61, mode: os.FileMode(0644), modTime: time.Unix(1699005553, 0)}
+	info := bindataFileInfo{name: "1698117918_add_community_id_to_tokens.up.sql", size: 61, mode: os.FileMode(0644), modTime: time.Unix(1698840720, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb3, 0x82, 0xdb, 0xde, 0x3, 0x3, 0xc, 0x67, 0xf3, 0x54, 0xc4, 0xad, 0xd6, 0xce, 0x56, 0xfb, 0xc1, 0x87, 0xd7, 0xda, 0xab, 0xec, 0x1, 0xe1, 0x7d, 0xb3, 0x63, 0xd6, 0xe5, 0x5d, 0x1c, 0x15}}
 	return a, nil
 }
@@ -274,8 +274,28 @@ func _1698257443_add_community_metadata_to_wallet_dbUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1698257443_add_community_metadata_to_wallet_db.up.sql", size: 323, mode: os.FileMode(0644), modTime: time.Unix(1699005553, 0)}
+	info := bindataFileInfo{name: "1698257443_add_community_metadata_to_wallet_db.up.sql", size: 323, mode: os.FileMode(0644), modTime: time.Unix(1698840720, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x22, 0xd3, 0x4, 0x25, 0xfa, 0x23, 0x1, 0x48, 0x83, 0x26, 0x20, 0xf2, 0x3d, 0xbc, 0xc1, 0xa7, 0x7c, 0x27, 0x7c, 0x1d, 0x63, 0x3, 0xa, 0xd0, 0xce, 0x47, 0x86, 0xdc, 0xa1, 0x3c, 0x2, 0x1c}}
+	return a, nil
+}
+
+var __1699987075_add_timestamp_and_state_to_community_data_cacheUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x94\x92\xcd\x6a\xdc\x30\x14\x85\xf7\x7a\x8a\xb3\xcc\x80\x67\x91\xf5\xac\x34\xf6\xf5\x54\xd4\x23\x05\x59\x81\x64\x65\x84\xac\x36\x02\xff\x84\x91\x4c\xe9\xdb\x17\xdb\xa1\x25\xe0\x31\xe9\xd6\xfe\x3e\xee\xb9\xf7\xe8\x78\xc4\xb7\xb1\x6b\x23\xdc\xd8\xf7\xd3\x10\xd2\x6f\xf4\x3e\xd9\xd6\x26\x8b\x98\x6c\xf2\x2c\xd7\xc4\x0d\xc1\xf0\x73\x45\x10\x25\xa4\x32\xa0\x17\x51\x9b\xfa\x9f\xd3\xcc\x7c\xe3\xac\x7b\xf3\xcd\x62\xe1\x81\x01\x40\x68\x61\xe8\xc5\xe0\x49\x8b\x2b\xd7\xaf\xf8\x4e\xaf\x8b\x2f\x9f\xab\x2a\x5b\x88\xce\xc6\xd4\x4c\xef\xad\x4d\xbe\x49\xa1\xf7\x31\xd9\xfe\x1d\xcf\xb2\x16\x17\x49\x05\xce\xe2\x22\xa4\xd9\x71\xe2\xe4\x9c\x8f\xf1\xc7\xd4\xe1\xac\x54\x45\x5c\xfe\x85\xd9\xe1\xc4\x98\x90\x35\x69\x03\x21\x8d\xda\x8d\x1b\xda\x6c\x3b\x4b\x76\x67\xdc\x81\x01\x35\x55\x94\x1b\xcc\xee\x63\x86\x47\x94\x5a\x5d\x37\xa7\x9c\x18\x3b\x1e\xa1\xbd\xbb\xf9\x79\xda\x16\x82\x5f\x21\xbd\xad\x27\x87\x1b\x87\x98\x6e\x36\x0c\x29\x32\x5e\x19\xd2\x1f\xd7\xdf\xf4\x34\x49\x7e\x25\xdc\xdb\x6f\xec\xda\x13\xfb\xdf\x12\xbf\x5c\xdf\x60\x7b\xbf\x32\x9f\xbf\xbb\xb1\x1b\x6f\x5b\x3f\x42\x6f\x7f\x6e\x1a\xa5\xd2\x24\x2e\x72\x9e\xf1\x10\xda\x03\x34\x95\xa4\x49\xe6\xb4\xf7\xcc\x16\x52\x49\x14\x54\x91\x21\xe4\xbc\xce\x79\x41\x5f\x2a\xfe\x73\x7d\xf3\x1e\xd9\x9a\x3a\x5b\x33\x32\xdc\xaf\xf3\xe3\xa8\x85\x56\x4f\x3b\xcd\xac\xd4\x9f\x00\x00\x00\xff\xff\x44\x65\xb5\xf4\x61\x03\x00\x00")
+
+func _1699987075_add_timestamp_and_state_to_community_data_cacheUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1699987075_add_timestamp_and_state_to_community_data_cacheUpSql,
+		"1699987075_add_timestamp_and_state_to_community_data_cache.up.sql",
+	)
+}
+
+func _1699987075_add_timestamp_and_state_to_community_data_cacheUpSql() (*asset, error) {
+	bytes, err := _1699987075_add_timestamp_and_state_to_community_data_cacheUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1699987075_add_timestamp_and_state_to_community_data_cache.up.sql", size: 865, mode: os.FileMode(0644), modTime: time.Unix(1700084408, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc3, 0xee, 0x37, 0xf9, 0x7f, 0x9e, 0xfe, 0x93, 0x66, 0x2b, 0xd, 0x57, 0xf4, 0x89, 0x6c, 0x51, 0xfd, 0x14, 0xe9, 0xcd, 0xab, 0x65, 0xe7, 0xa7, 0x83, 0x7e, 0xe0, 0x5c, 0x14, 0x49, 0xf3, 0xe5}}
 	return a, nil
 }
 
@@ -294,7 +314,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 74, mode: os.FileMode(0644), modTime: time.Unix(1699005553, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 74, mode: os.FileMode(0644), modTime: time.Unix(1698840720, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xde, 0x7c, 0x28, 0xcd, 0x47, 0xf2, 0xfa, 0x7c, 0x51, 0x2d, 0xd8, 0x38, 0xb, 0xb0, 0x34, 0x9d, 0x4c, 0x62, 0xa, 0x9e, 0x28, 0xc3, 0x31, 0x23, 0xd9, 0xbb, 0x89, 0x9f, 0xa0, 0x89, 0x1f, 0xe8}}
 	return a, nil
 }
@@ -390,38 +410,34 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"1691753758_initial.up.sql": _1691753758_initialUpSql,
-
-	"1692701329_add_collectibles_and_collections_data_cache.up.sql": _1692701329_add_collectibles_and_collections_data_cacheUpSql,
-
-	"1692701339_add_scope_to_pending.up.sql": _1692701339_add_scope_to_pendingUpSql,
-
-	"1694540071_add_collectibles_ownership_update_timestamp.up.sql": _1694540071_add_collectibles_ownership_update_timestampUpSql,
-
-	"1694692748_add_raw_balance_to_token_balances.up.sql": _1694692748_add_raw_balance_to_token_balancesUpSql,
-
+	"1691753758_initial.up.sql":                                                     _1691753758_initialUpSql,
+	"1692701329_add_collectibles_and_collections_data_cache.up.sql":                 _1692701329_add_collectibles_and_collections_data_cacheUpSql,
+	"1692701339_add_scope_to_pending.up.sql":                                        _1692701339_add_scope_to_pendingUpSql,
+	"1694540071_add_collectibles_ownership_update_timestamp.up.sql":                 _1694540071_add_collectibles_ownership_update_timestampUpSql,
+	"1694692748_add_raw_balance_to_token_balances.up.sql":                           _1694692748_add_raw_balance_to_token_balancesUpSql,
 	"1695133989_add_community_id_to_collectibles_and_collections_data_cache.up.sql": _1695133989_add_community_id_to_collectibles_and_collections_data_cacheUpSql,
-
-	"1695932536_balance_history_v2.up.sql": _1695932536_balance_history_v2UpSql,
-
-	"1696853635_input_data.up.sql": _1696853635_input_dataUpSql,
-
-	"1698117918_add_community_id_to_tokens.up.sql": _1698117918_add_community_id_to_tokensUpSql,
-
-	"1698257443_add_community_metadata_to_wallet_db.up.sql": _1698257443_add_community_metadata_to_wallet_dbUpSql,
-
+	"1695932536_balance_history_v2.up.sql":                                          _1695932536_balance_history_v2UpSql,
+	"1696853635_input_data.up.sql":                                                  _1696853635_input_dataUpSql,
+	"1698117918_add_community_id_to_tokens.up.sql":                                  _1698117918_add_community_id_to_tokensUpSql,
+	"1698257443_add_community_metadata_to_wallet_db.up.sql":                         _1698257443_add_community_metadata_to_wallet_dbUpSql,
+	"1699987075_add_timestamp_and_state_to_community_data_cache.up.sql":             _1699987075_add_timestamp_and_state_to_community_data_cacheUpSql,
 	"doc.go": docGo,
 }
+
+// AssetDebug is true if the assets were built with the debug flag enabled.
+const AssetDebug = false
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -454,17 +470,18 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"1691753758_initial.up.sql":                                                     &bintree{_1691753758_initialUpSql, map[string]*bintree{}},
-	"1692701329_add_collectibles_and_collections_data_cache.up.sql":                 &bintree{_1692701329_add_collectibles_and_collections_data_cacheUpSql, map[string]*bintree{}},
-	"1692701339_add_scope_to_pending.up.sql":                                        &bintree{_1692701339_add_scope_to_pendingUpSql, map[string]*bintree{}},
-	"1694540071_add_collectibles_ownership_update_timestamp.up.sql":                 &bintree{_1694540071_add_collectibles_ownership_update_timestampUpSql, map[string]*bintree{}},
-	"1694692748_add_raw_balance_to_token_balances.up.sql":                           &bintree{_1694692748_add_raw_balance_to_token_balancesUpSql, map[string]*bintree{}},
-	"1695133989_add_community_id_to_collectibles_and_collections_data_cache.up.sql": &bintree{_1695133989_add_community_id_to_collectibles_and_collections_data_cacheUpSql, map[string]*bintree{}},
-	"1695932536_balance_history_v2.up.sql":                                          &bintree{_1695932536_balance_history_v2UpSql, map[string]*bintree{}},
-	"1696853635_input_data.up.sql":                                                  &bintree{_1696853635_input_dataUpSql, map[string]*bintree{}},
-	"1698117918_add_community_id_to_tokens.up.sql":                                  &bintree{_1698117918_add_community_id_to_tokensUpSql, map[string]*bintree{}},
-	"1698257443_add_community_metadata_to_wallet_db.up.sql":                         &bintree{_1698257443_add_community_metadata_to_wallet_dbUpSql, map[string]*bintree{}},
-	"doc.go": &bintree{docGo, map[string]*bintree{}},
+	"1691753758_initial.up.sql":                                                     {_1691753758_initialUpSql, map[string]*bintree{}},
+	"1692701329_add_collectibles_and_collections_data_cache.up.sql":                 {_1692701329_add_collectibles_and_collections_data_cacheUpSql, map[string]*bintree{}},
+	"1692701339_add_scope_to_pending.up.sql":                                        {_1692701339_add_scope_to_pendingUpSql, map[string]*bintree{}},
+	"1694540071_add_collectibles_ownership_update_timestamp.up.sql":                 {_1694540071_add_collectibles_ownership_update_timestampUpSql, map[string]*bintree{}},
+	"1694692748_add_raw_balance_to_token_balances.up.sql":                           {_1694692748_add_raw_balance_to_token_balancesUpSql, map[string]*bintree{}},
+	"1695133989_add_community_id_to_collectibles_and_collections_data_cache.up.sql": {_1695133989_add_community_id_to_collectibles_and_collections_data_cacheUpSql, map[string]*bintree{}},
+	"1695932536_balance_history_v2.up.sql":                                          {_1695932536_balance_history_v2UpSql, map[string]*bintree{}},
+	"1696853635_input_data.up.sql":                                                  {_1696853635_input_dataUpSql, map[string]*bintree{}},
+	"1698117918_add_community_id_to_tokens.up.sql":                                  {_1698117918_add_community_id_to_tokensUpSql, map[string]*bintree{}},
+	"1698257443_add_community_metadata_to_wallet_db.up.sql":                         {_1698257443_add_community_metadata_to_wallet_dbUpSql, map[string]*bintree{}},
+	"1699987075_add_timestamp_and_state_to_community_data_cache.up.sql":             {_1699987075_add_timestamp_and_state_to_community_data_cacheUpSql, map[string]*bintree{}},
+	"doc.go": {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
@@ -481,7 +498,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}

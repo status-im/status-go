@@ -175,7 +175,7 @@ func (c *Controller) stopPeriodicalOwnershipFetch() {
 
 // Starts (or restarts) periodical fetching for the given account address for all chains
 func (c *Controller) startPeriodicalOwnershipFetchForAccount(address common.Address) error {
-	log.Debug("wallet.api.collectibles.Controller", "Start periodical fetching", "address", address)
+	log.Debug("wallet.api.collectibles.Controller Start periodical fetching", "address", address)
 
 	networks, err := c.networkManager.Get(false)
 	if err != nil {
@@ -204,7 +204,7 @@ func (c *Controller) startPeriodicalOwnershipFetchForAccount(address common.Addr
 
 // Starts (or restarts) periodical fetching for the given account address for all chains
 func (c *Controller) startPeriodicalOwnershipFetchForAccountAndChainID(address common.Address, chainID walletCommon.ChainID, delayed bool) error {
-	log.Debug("wallet.api.collectibles.Controller", "Start periodical fetching", "address", address, "chainID", chainID, "delayed", delayed)
+	log.Debug("wallet.api.collectibles.Controller Start periodical fetching", "address", address, "chainID", chainID, "delayed", delayed)
 
 	if !c.isPeriodicalOwnershipFetchRunning() {
 		return errors.New("periodical fetch not initialized")
@@ -240,7 +240,7 @@ func (c *Controller) startPeriodicalOwnershipFetchForAccountAndChainID(address c
 
 // Stop periodical fetching for the given account address for all chains
 func (c *Controller) stopPeriodicalOwnershipFetchForAccount(address common.Address) error {
-	log.Debug("wallet.api.collectibles.Controller", "Stop periodical fetching", "address", address)
+	log.Debug("wallet.api.collectibles.Controller Stop periodical fetching", "address", address)
 
 	if !c.isPeriodicalOwnershipFetchRunning() {
 		return errors.New("periodical fetch not initialized")
@@ -260,7 +260,7 @@ func (c *Controller) stopPeriodicalOwnershipFetchForAccount(address common.Addre
 }
 
 func (c *Controller) stopPeriodicalOwnershipFetchForAccountAndChainID(address common.Address, chainID walletCommon.ChainID) error {
-	log.Debug("wallet.api.collectibles.Controller", "Stop periodical fetching", "address", address, "chainID", chainID)
+	log.Debug("wallet.api.collectibles.Controller Stop periodical fetching", "address", address, "chainID", chainID)
 
 	if !c.isPeriodicalOwnershipFetchRunning() {
 		return errors.New("periodical fetch not initialized")
@@ -417,7 +417,7 @@ func (c *Controller) notifyCommunityCollectiblesReceived(ownedCollectibles Owned
 			continue
 		}
 
-		communityInfo, err := c.communityDB.GetCommunityInfo(communityID)
+		communityInfo, _, err := c.communityDB.GetCommunityInfo(communityID)
 
 		if err != nil {
 			log.Error("Error fetching community info", "error", err)

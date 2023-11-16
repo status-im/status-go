@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"math/big"
 	"net/http"
 	"strings"
@@ -26,6 +27,7 @@ import (
 )
 
 const requestTimeout = 5 * time.Second
+const failedCommunityFetchRetryDelay = 1 * time.Hour
 
 const hystrixContractOwnershipClientName = "contractOwnershipClient"
 
@@ -616,18 +618,56 @@ func (o *Manager) fillCommunityID(asset *thirdparty.FullCollectibleData) error {
 	return nil
 }
 
-func (o *Manager) fillCommunityInfo(communityID string, communityAssets []*thirdparty.FullCollectibleData) error {
+func (o *Manager) mustFetchCommunityInfo(communityID string) bool {
+	// See if we have cached data
+	_, state, err := o.communityDataDB.GetCommunityInfo(communityID)
+	if err != nil {
+		return true
+	}
+
+	// If we don't have a state, this community has never been fetched before
+	if state == nil {
+		return true
+	}
+
+	// If the last fetch was successful, we can safely refresh our cache
+	if state.LastUpdateSuccesful {
+		return true
+	}
+
+	// If the last fetch was not successful, we should only retry after a delay
+	if time.Unix(int64(state.LastUpdateTimestamp), 0).Add(failedCommunityFetchRetryDelay).Before(time.Now()) {
+		return true
+	}
+
+	return false
+}
+
+func (o *Manager) fetchCommunityInfo(communityID string) (*thirdparty.CommunityInfo, error) {
+	if !o.mustFetchCommunityInfo(communityID) {
+		return nil, fmt.Errorf("backing off fetchCommunityInfo for id: %s", communityID)
+	}
+
 	communityInfo, err := o.communityInfoProvider.FetchCommunityInfo(communityID)
+	if err != nil {
+		dbErr := o.communityDataDB.SetCommunityInfo(communityID, nil)
+		if dbErr != nil {
+			log.Error("SetCommunityInfo failed", "communityID", communityID, "err", dbErr)
+		}
+		return nil, err
+	}
+
+	err = o.communityDataDB.SetCommunityInfo(communityID, communityInfo)
+	return communityInfo, err
+}
+
+func (o *Manager) fillCommunityInfo(communityID string, communityAssets []*thirdparty.FullCollectibleData) error {
+	communityInfo, err := o.fetchCommunityInfo(communityID)
 	if err != nil {
 		return err
 	}
 
 	if communityInfo != nil {
-		err := o.communityDataDB.SetCommunityInfo(communityID, *communityInfo)
-		if err != nil {
-			return err
-		}
-
 		for _, communityAsset := range communityAssets {
 			err := o.communityInfoProvider.FillCollectibleMetadata(communityAsset)
 			if err != nil {
