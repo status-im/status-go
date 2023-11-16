@@ -12,7 +12,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +21,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -30,7 +29,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -86,7 +85,7 @@ func configPublicChainAccountsJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/public-chain-accounts.json", size: 307, mode: os.FileMode(0644), modTime: time.Unix(1699005551, 0)}
+	info := bindataFileInfo{name: "config/public-chain-accounts.json", size: 307, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x76, 0x5d, 0xc0, 0xfe, 0x57, 0x50, 0x18, 0xec, 0x2d, 0x61, 0x1b, 0xa9, 0x81, 0x11, 0x5f, 0x77, 0xf7, 0xb6, 0x67, 0x82, 0x1, 0x40, 0x68, 0x9d, 0xc5, 0x41, 0xaf, 0xce, 0x43, 0x81, 0x92, 0x96}}
 	return a, nil
 }
@@ -106,7 +105,7 @@ func configStatusChainAccountsJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/status-chain-accounts.json", size: 543, mode: os.FileMode(0644), modTime: time.Unix(1699005551, 0)}
+	info := bindataFileInfo{name: "config/status-chain-accounts.json", size: 543, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8e, 0xb3, 0x61, 0x51, 0x70, 0x3c, 0x12, 0x3e, 0xf1, 0x1c, 0x81, 0xfb, 0x9a, 0x7c, 0xe3, 0x63, 0xd0, 0x8f, 0x12, 0xc5, 0x2d, 0xf4, 0xea, 0x27, 0x33, 0xef, 0xca, 0xf9, 0x3f, 0x72, 0x44, 0xbf}}
 	return a, nil
 }
@@ -126,7 +125,7 @@ func configTestDataJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/test-data.json", size: 84, mode: os.FileMode(0644), modTime: time.Unix(1699005551, 0)}
+	info := bindataFileInfo{name: "config/test-data.json", size: 84, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xce, 0x9d, 0x80, 0xf5, 0x87, 0xfa, 0x57, 0x1d, 0xa1, 0xd5, 0x7a, 0x10, 0x3, 0xac, 0xd7, 0xf4, 0x64, 0x32, 0x96, 0x2b, 0xb7, 0x21, 0xb7, 0xa6, 0x80, 0x40, 0xe9, 0x65, 0xe3, 0xd6, 0xbd, 0x40}}
 	return a, nil
 }
@@ -223,21 +222,24 @@ func AssetNames() []string {
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
 	"config/public-chain-accounts.json": configPublicChainAccountsJson,
-
 	"config/status-chain-accounts.json": configStatusChainAccountsJson,
-
-	"config/test-data.json": configTestDataJson,
+	"config/test-data.json":             configTestDataJson,
 }
+
+// AssetDebug is true if the assets were built with the debug flag enabled.
+const AssetDebug = false
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -270,10 +272,10 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"config": &bintree{nil, map[string]*bintree{
-		"public-chain-accounts.json": &bintree{configPublicChainAccountsJson, map[string]*bintree{}},
-		"status-chain-accounts.json": &bintree{configStatusChainAccountsJson, map[string]*bintree{}},
-		"test-data.json":             &bintree{configTestDataJson, map[string]*bintree{}},
+	"config": {nil, map[string]*bintree{
+		"public-chain-accounts.json": {configPublicChainAccountsJson, map[string]*bintree{}},
+		"status-chain-accounts.json": {configStatusChainAccountsJson, map[string]*bintree{}},
+		"test-data.json":             {configTestDataJson, map[string]*bintree{}},
 	}},
 }}
 
@@ -291,7 +293,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}
