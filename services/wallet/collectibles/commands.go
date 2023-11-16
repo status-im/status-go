@@ -17,7 +17,7 @@ import (
 
 const (
 	fetchLimit                          = 50 // Limit number of collectibles we fetch per provider call
-	accountOwnershipUpdateInterval      = 30 * time.Minute
+	accountOwnershipUpdateInterval      = 60 * time.Minute
 	accountOwnershipUpdateDelayInterval = 30 * time.Second
 )
 

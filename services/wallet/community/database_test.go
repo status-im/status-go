@@ -39,14 +39,30 @@ func TestUpdateCommunityInfo(t *testing.T) {
 	defer cleanup()
 
 	communityData := generateTestCommunityInfo(10)
-	for communityID, communityInfo := range communityData {
-		err := db.SetCommunityInfo(communityID, communityInfo)
-		require.NoError(t, err)
-	}
+	extraCommunityID := "extra-community-id"
 
 	for communityID, communityInfo := range communityData {
-		communityInfoFromDB, err := db.GetCommunityInfo(communityID)
+		communityInfo := communityInfo // Prevent lint warning G601: Implicit memory aliasing in for loop.
+		err := db.SetCommunityInfo(communityID, &communityInfo)
 		require.NoError(t, err)
-		require.Equal(t, communityInfo, *communityInfoFromDB)
 	}
+	err := db.SetCommunityInfo(extraCommunityID, nil)
+	require.NoError(t, err)
+
+	for communityID, communityInfo := range communityData {
+		info, state, err := db.GetCommunityInfo(communityID)
+		require.NoError(t, err)
+		require.Equal(t, communityInfo, *info)
+		require.True(t, state.LastUpdateSuccesful)
+	}
+	info, state, err := db.GetCommunityInfo(extraCommunityID)
+	require.NoError(t, err)
+	require.Empty(t, info)
+	require.False(t, state.LastUpdateSuccesful)
+
+	randomCommunityID := "random-community-id"
+	info, state, err = db.GetCommunityInfo(randomCommunityID)
+	require.NoError(t, err)
+	require.Empty(t, info)
+	require.Empty(t, state)
 }

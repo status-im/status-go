@@ -3,6 +3,7 @@ package community
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
@@ -17,10 +18,18 @@ func NewDataDB(sqlDb *sql.DB) *DataDB {
 	}
 }
 
-const communityDataColumns = "id, name, color, image"
-const selectCommunityDataColumns = "name, color, image"
+type InfoState struct {
+	LastUpdateTimestamp uint64
+	LastUpdateSuccesful bool
+}
 
-func (o *DataDB) SetCommunityInfo(id string, c thirdparty.CommunityInfo) (err error) {
+const communityInfoColumns = "id, name, color, image"
+const selectCommunityInfoColumns = "name, color, image"
+
+const communityInfoStateColumns = "id, last_update_timestamp, last_update_successful"
+const selectCommunityInfoStateColumns = "last_update_timestamp, last_update_successful"
+
+func (o *DataDB) SetCommunityInfo(id string, c *thirdparty.CommunityInfo) (err error) {
 	tx, err := o.db.Begin()
 	if err != nil {
 		return err
@@ -33,45 +42,87 @@ func (o *DataDB) SetCommunityInfo(id string, c thirdparty.CommunityInfo) (err er
 		_ = tx.Rollback()
 	}()
 
-	update, err := tx.Prepare(fmt.Sprintf(`INSERT OR REPLACE INTO community_data_cache (%s) 
-		VALUES (?, ?, ?, ?)`, communityDataColumns))
+	setState, err := tx.Prepare(fmt.Sprintf(`INSERT OR REPLACE INTO community_data_cache_state (%s) 
+		VALUES (?, ?, ?)`, communityInfoStateColumns))
 	if err != nil {
 		return err
 	}
 
-	_, err = update.Exec(
+	valid := c != nil
+	_, err = setState.Exec(
 		id,
-		c.CommunityName,
-		c.CommunityColor,
-		c.CommunityImage,
+		time.Now().Unix(),
+		valid,
 	)
-
-	return err
-}
-
-func (o *DataDB) GetCommunityInfo(id string) (*thirdparty.CommunityInfo, error) {
-	var ret thirdparty.CommunityInfo
-
-	getData, err := o.db.Prepare(fmt.Sprintf(`SELECT %s
-		FROM community_data_cache
-		WHERE id=?`, selectCommunityDataColumns))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	row := getData.QueryRow(id)
+	if valid {
+		setInfo, err := tx.Prepare(fmt.Sprintf(`INSERT OR REPLACE INTO community_data_cache (%s) 
+			VALUES (?, ?, ?, ?)`, communityInfoColumns))
+		if err != nil {
+			return err
+		}
+
+		_, err = setInfo.Exec(
+			id,
+			c.CommunityName,
+			c.CommunityColor,
+			c.CommunityImage,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (o *DataDB) GetCommunityInfo(id string) (*thirdparty.CommunityInfo, *InfoState, error) {
+	var info thirdparty.CommunityInfo
+	var state InfoState
+	var row *sql.Row
+
+	getState, err := o.db.Prepare(fmt.Sprintf(`SELECT %s
+	FROM community_data_cache_state 
+	WHERE id=?`, selectCommunityInfoStateColumns))
+	if err != nil {
+		return nil, nil, err
+	}
+	row = getState.QueryRow(id)
 
 	err = row.Scan(
-		&ret.CommunityName,
-		&ret.CommunityColor,
-		&ret.CommunityImage,
+		&state.LastUpdateTimestamp,
+		&state.LastUpdateSuccesful,
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, nil
+		return nil, nil, nil
 	} else if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &ret, nil
+	getInfo, err := o.db.Prepare(fmt.Sprintf(`SELECT %s
+		FROM community_data_cache
+		WHERE id=?`, selectCommunityInfoColumns))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	row = getInfo.QueryRow(id)
+
+	err = row.Scan(
+		&info.CommunityName,
+		&info.CommunityColor,
+		&info.CommunityImage,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, &state, nil
+	} else if err != nil {
+		return nil, nil, err
+	}
+
+	return &info, &state, nil
 }
