@@ -52,10 +52,13 @@ type WalletSecretsConfig struct {
 	GanacheURL                  string `json:"ganacheURL"`
 	AlchemyEthereumMainnetToken string `json:"alchemyEthereumMainnetToken"`
 	AlchemyEthereumGoerliToken  string `json:"alchemyEthereumGoerliToken"`
+	AlchemyEthereumSepoliaToken string `json:"alchemyEthereumSepoliaToken"`
 	AlchemyArbitrumMainnetToken string `json:"alchemyArbitrumMainnetToken"`
 	AlchemyArbitrumGoerliToken  string `json:"alchemyArbitrumGoerliToken"`
+	AlchemyArbitrumSepoliaToken string `json:"alchemyArbitrumSepoliaToken"`
 	AlchemyOptimismMainnetToken string `json:"alchemyOptimismMainnetToken"`
 	AlchemyOptimismGoerliToken  string `json:"alchemyOptimismGoerliToken"`
+	AlchemyOptimismSepoliaToken string `json:"alchemyOptimismSepoliaToken"`
 }
 
 func (c *CreateAccount) Validate() error {

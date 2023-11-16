@@ -14,6 +14,7 @@ const (
 	EthereumSepolia uint64 = 11155111
 	OptimismMainnet uint64 = 10
 	OptimismGoerli  uint64 = 420
+	OptimismSepolia uint64 = 11155420
 	ArbitrumMainnet uint64 = 42161
 	ArbitrumGoerli  uint64 = 421613
 	ArbitrumSepolia uint64 = 421614
@@ -30,6 +31,7 @@ func AllChainIDs() []ChainID {
 		ChainID(EthereumSepolia),
 		ChainID(OptimismMainnet),
 		ChainID(OptimismGoerli),
+		ChainID(OptimismSepolia),
 		ChainID(ArbitrumMainnet),
 		ChainID(ArbitrumGoerli),
 		ChainID(ArbitrumSepolia),

@@ -173,17 +173,26 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 	if request.AlchemyEthereumGoerliToken != "" {
 		nodeConfig.WalletConfig.AlchemyAPIKeys[goerliChainID] = request.AlchemyEthereumGoerliToken
 	}
+	if request.AlchemyEthereumSepoliaToken != "" {
+		nodeConfig.WalletConfig.AlchemyAPIKeys[sepoliaChainID] = request.AlchemyEthereumSepoliaToken
+	}
 	if request.AlchemyArbitrumMainnetToken != "" {
 		nodeConfig.WalletConfig.AlchemyAPIKeys[arbitrumChainID] = request.AlchemyArbitrumMainnetToken
 	}
 	if request.AlchemyArbitrumGoerliToken != "" {
 		nodeConfig.WalletConfig.AlchemyAPIKeys[arbitrumGoerliChainID] = request.AlchemyArbitrumGoerliToken
 	}
+	if request.AlchemyArbitrumSepoliaToken != "" {
+		nodeConfig.WalletConfig.AlchemyAPIKeys[arbitrumSepoliaChainID] = request.AlchemyArbitrumSepoliaToken
+	}
 	if request.AlchemyOptimismMainnetToken != "" {
 		nodeConfig.WalletConfig.AlchemyAPIKeys[optimismChainID] = request.AlchemyOptimismMainnetToken
 	}
 	if request.AlchemyOptimismGoerliToken != "" {
 		nodeConfig.WalletConfig.AlchemyAPIKeys[optimismGoerliChainID] = request.AlchemyOptimismGoerliToken
+	}
+	if request.AlchemyOptimismSepoliaToken != "" {
+		nodeConfig.WalletConfig.AlchemyAPIKeys[optimismSepoliaChainID] = request.AlchemyOptimismSepoliaToken
 	}
 
 	nodeConfig.LocalNotificationsConfig = params.LocalNotificationsConfig{Enabled: true}
