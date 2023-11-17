@@ -157,17 +157,12 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 
 		topics := make([]string, 0)
 		if useShards {
-			topics = append(topics, shard.DefaultShardPubsubTopic())
-			if cf.Shard.PubsubTopic() != "" {
-				topics = append(topics, cf.Shard.PubsubTopic())
-			}
+			topics = append(topics, shard.DefaultNonProtectedPubsubTopic())
 		} else {
 			topics = append(topics, "") // empty PubsubTopic means default pubsub topic,
 			// to be overridden with proper value in Waku layer
 		}
 
-		// TODO: requests to join / cancels are currently being sent into the default waku topic.
-		// They must be sent into an specific non protected shard
 		for _, pubsubTopic := range topics {
 			pk := &cf.PrivKey.PublicKey
 			identityStr := PublicKeyToStr(pk)

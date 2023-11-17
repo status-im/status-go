@@ -40,6 +40,7 @@ import (
 	sociallinkssettings "github.com/status-im/status-go/multiaccounts/settings_social_links"
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
@@ -1670,6 +1671,14 @@ func (m *Messenger) Init() error {
 
 	logger := m.logger.With(zap.String("site", "Init"))
 
+	if m.useShards() {
+		// Community requests will arrive in this pubsub topic
+		err := m.SubscribeToPubsubTopic(shard.DefaultNonProtectedPubsubTopic(), nil)
+		if err != nil {
+			return err
+		}
+	}
+
 	var (
 		filtersToInit []transport.FiltersToInitialize
 		publicKeys    []*ecdsa.PublicKey
@@ -1729,25 +1738,6 @@ func (m *Messenger) Init() error {
 	}
 	for _, org := range spectatedCommunities {
 		filtersToInit = append(filtersToInit, m.DefaultFilters(org)...)
-	}
-
-	// Init filters for the communities we control
-	var communityFiltersToInitialize []transport.CommunityFilterToInitialize
-	controlledCommunities, err := m.communitiesManager.Controlled()
-	if err != nil {
-		return err
-	}
-
-	for _, c := range controlledCommunities {
-		communityFiltersToInitialize = append(communityFiltersToInitialize, transport.CommunityFilterToInitialize{
-			Shard:   c.Shard(),
-			PrivKey: c.PrivateKey(),
-		})
-	}
-
-	_, err = m.InitCommunityFilters(communityFiltersToInitialize)
-	if err != nil {
-		return err
 	}
 
 	// Get chat IDs and public keys from the existing chats.
@@ -1869,7 +1859,30 @@ func (m *Messenger) Init() error {
 	}
 
 	_, err = m.transport.InitFilters(filtersToInit, publicKeys)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Init filters for the communities we control
+	var communityFiltersToInitialize []transport.CommunityFilterToInitialize
+	controlledCommunities, err := m.communitiesManager.Controlled()
+	if err != nil {
+		return err
+	}
+
+	for _, c := range controlledCommunities {
+		communityFiltersToInitialize = append(communityFiltersToInitialize, transport.CommunityFilterToInitialize{
+			Shard:   c.Shard(),
+			PrivKey: c.PrivateKey(),
+		})
+	}
+
+	_, err = m.InitCommunityFilters(communityFiltersToInitialize)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Shutdown takes care of ensuring a clean shutdown of Messenger
