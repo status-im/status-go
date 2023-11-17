@@ -157,6 +157,9 @@ type Messenger struct {
 	requestedCommunitiesLock sync.RWMutex
 	requestedCommunities     map[string]*transport.Filter
 
+	requestedShardsLock sync.RWMutex
+	requestedShards     map[string]*transport.Filter
+
 	requestedContactsLock sync.RWMutex
 	requestedContacts     map[string]*transport.Filter
 
