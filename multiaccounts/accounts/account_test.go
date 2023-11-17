@@ -10,7 +10,7 @@ import (
 )
 
 func TestIsOwnAccount(t *testing.T) {
-	account := Account{Wallet: true}
+	account := Account{Wallet: true, Type: AccountTypeGenerated}
 	require.True(t, account.IsWalletNonWatchOnlyAccount())
 
 	account = Account{

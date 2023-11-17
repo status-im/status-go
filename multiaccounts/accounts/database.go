@@ -116,7 +116,7 @@ const (
 
 // Returns true if an account is a wallet account that logged in user has a control over, otherwise returns false.
 func (a *Account) IsWalletNonWatchOnlyAccount() bool {
-	return !a.Chat && a.Type != AccountTypeWatch
+	return !a.Chat && len(a.Type) > 0 && a.Type != AccountTypeWatch
 }
 
 // Returns true if an account is a wallet account that is ready for sending transactions, otherwise returns false.
