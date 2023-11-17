@@ -937,7 +937,10 @@ func (m *Messenger) ConnectionChanged(state connection.State) {
 	}
 
 	if m.connectionState.Offline && !state.Offline {
-		m.sender.StartDatasync()
+		err := m.sender.StartDatasync()
+		if err != nil {
+			m.logger.Error("failed to start datasync", zap.Error(err))
+		}
 	}
 
 	m.connectionState = state

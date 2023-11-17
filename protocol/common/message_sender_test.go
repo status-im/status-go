@@ -90,7 +90,9 @@ func (s *MessageSenderSuite) SetupTest() {
 		encryptionProtocol,
 		whisperTransport,
 		s.logger,
-		FeatureFlags{},
+		FeatureFlags{
+			Datasync: true,
+		},
 	)
 	s.Require().NoError(err)
 }
