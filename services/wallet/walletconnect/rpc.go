@@ -1,9 +1,15 @@
 package walletconnect
 
 import (
+	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/transactions"
@@ -58,39 +64,75 @@ func (n *sendTransactionParams) MarshalJSON() ([]byte, error) {
 	return json.Marshal(n.SendTxArgs)
 }
 
-func (s *Service) sendTransaction(request SessionRequest, hashedPassword string) (response *SessionRequestResponse, err error) {
+func (s *Service) buildTransaction(request SessionRequest) (response *SessionRequestResponse, err error) {
 	if len(request.Params.Request.Params) != 1 {
 		return nil, ErrorInvalidParamsCount
 	}
 
 	var params sendTransactionParams
-	if err := json.Unmarshal(request.Params.Request.Params[0], &params); err != nil {
+	if err = json.Unmarshal(request.Params.Request.Params[0], &params); err != nil {
 		return nil, err
 	}
 
-	acc, err := s.gethManager.GetVerifiedWalletAccount(s.accountsDB, params.From.Hex(), hashedPassword)
+	account, err := s.accountsDB.GetAccountByAddress(params.From)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active account: %w", err)
+	}
+
+	kp, err := s.accountsDB.GetKeypairByKeyUID(account.KeyUID)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: export it as a JSON parsable type
 	chainID, err := parseCaip2ChainID(request.Params.ChainID)
 	if err != nil {
 		return nil, err
 	}
 
-	hash, err := s.transactor.SendTransactionWithChainID(chainID, params.SendTxArgs, acc)
+	// In this case we can ignore `unlock` function received from `ValidateAndBuildTransaction` cause `Nonce`
+	// will be always set by the initiator of this transaction (by the dapp).
+	// Though we will need sort out completely that part since Nonce kept in the local cache is not the most recent one,
+	// instead of that we should always ask network what's the most recent known Nonce for the account.
+	// Logged issue to handle that: https://github.com/status-im/status-go/issues/4335
+	txBeingSigned, _, err := s.transactor.ValidateAndBuildTransaction(chainID, params.SendTxArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	s.txSignDetails = &txSigningDetails{
+		from:          common.Address(account.Address),
+		chainID:       chainID,
+		txBeingSigned: txBeingSigned,
+	}
+
+	signer := ethTypes.NewLondonSigner(new(big.Int).SetUint64(s.txSignDetails.chainID))
+	return &SessionRequestResponse{
+		KeyUID:        account.KeyUID,
+		Address:       account.Address,
+		AddressPath:   account.Path,
+		SignOnKeycard: kp.MigratedToKeycard(),
+		MesageToSign:  signer.Hash(s.txSignDetails.txBeingSigned),
+	}, nil
+}
+
+func (s *Service) sendTransaction(signature string) (response *SessionRequestResponse, err error) {
+	if s.txSignDetails.txBeingSigned == nil {
+		return response, errors.New("no tx to sign")
+	}
+
+	signatureBytes, _ := hex.DecodeString(signature)
+
+	hash, err := s.transactor.SendBuiltTransactionWithSignature(s.txSignDetails.chainID, s.txSignDetails.txBeingSigned, signatureBytes)
 	if err != nil {
 		return nil, err
 	}
 
 	return &SessionRequestResponse{
-		SessionRequest: request,
-		Signed:         hash.Bytes(),
+		SignedMessage: hash,
 	}, nil
 }
 
-func (s *Service) personalSign(request SessionRequest, hashedPassword string) (response *SessionRequestResponse, err error) {
+func (s *Service) buildPersonalSingMessage(request SessionRequest) (response *SessionRequestResponse, err error) {
 	if len(request.Params.Request.Params) != 2 {
 		return nil, ErrorInvalidParamsCount
 	}
@@ -100,7 +142,12 @@ func (s *Service) personalSign(request SessionRequest, hashedPassword string) (r
 		return nil, err
 	}
 
-	acc, err := s.gethManager.GetVerifiedWalletAccount(s.accountsDB, address.Hex(), hashedPassword)
+	account, err := s.accountsDB.GetAccountByAddress(address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active account: %w", err)
+	}
+
+	kp, err := s.accountsDB.GetKeypairByKeyUID(account.KeyUID)
 	if err != nil {
 		return nil, err
 	}
@@ -112,15 +159,11 @@ func (s *Service) personalSign(request SessionRequest, hashedPassword string) (r
 
 	hash := crypto.TextHash(dBytes)
 
-	sig, err := crypto.Sign(hash, acc.AccountKey.PrivateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	sig[64] += 27 // Transform V from 0/1 to 27/28 according to the yellow paper
-
 	return &SessionRequestResponse{
-		SessionRequest: request,
-		Signed:         types.HexBytes(sig),
+		KeyUID:        account.KeyUID,
+		Address:       account.Address,
+		AddressPath:   account.Path,
+		SignOnKeycard: kp.MigratedToKeycard(),
+		MesageToSign:  types.HexBytes(hash),
 	}, nil
 }

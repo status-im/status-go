@@ -3,14 +3,24 @@ package walletconnect
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/transactions"
 )
+
+type txSigningDetails struct {
+	chainID       uint64
+	from          common.Address
+	txBeingSigned *ethTypes.Transaction
+}
 
 type Service struct {
 	networkManager *network.Manager
@@ -19,16 +29,36 @@ type Service struct {
 
 	transactor  *transactions.Transactor
 	gethManager *account.GethManager
+
+	config        *params.NodeConfig
+	txSignDetails *txSigningDetails
 }
 
-func NewService(networkManager *network.Manager, accountsDB *accounts.Database, transactor *transactions.Transactor, gethManager *account.GethManager, eventFeed *event.Feed) *Service {
+func NewService(networkManager *network.Manager, accountsDB *accounts.Database, transactor *transactions.Transactor,
+	gethManager *account.GethManager, eventFeed *event.Feed, config *params.NodeConfig) *Service {
 	return &Service{
 		networkManager: networkManager,
 		accountsDB:     accountsDB,
 		eventFeed:      eventFeed,
 		transactor:     transactor,
 		gethManager:    gethManager,
+		config:         config,
 	}
+}
+
+func (s *Service) SignMessage(message types.HexBytes, address common.Address, password string) (string, error) {
+	selectedAccount, err := s.gethManager.VerifyAccountPassword(s.config.KeyStoreDir, address.Hex(), password)
+	if err != nil {
+		return "", err
+	}
+
+	signature, err := crypto.Sign(message[:], selectedAccount.PrivateKey)
+
+	return types.EncodeHex(signature), err
+}
+
+func (s *Service) SendTransaction(signature string) (response *SessionRequestResponse, err error) {
+	return s.sendTransaction(signature)
 }
 
 func (s *Service) PairSessionProposal(proposal SessionProposal) (*PairSessionResponse, error) {
@@ -55,7 +85,7 @@ func (s *Service) PairSessionProposal(proposal SessionProposal) (*PairSessionRes
 	// Filter out non-own accounts
 	usableAccounts := make([]*accounts.Account, 0, 1)
 	for _, acc := range activeAccounts {
-		if !acc.IsOwnAccount() || acc.Operable != accounts.AccountFullyOperable {
+		if !acc.IsWalletAccountReadyForTransaction() {
 			continue
 		}
 		usableAccounts = append(usableAccounts, acc)
@@ -73,14 +103,14 @@ func (s *Service) PairSessionProposal(proposal SessionProposal) (*PairSessionRes
 	}, nil
 }
 
-func (s *Service) SessionRequest(request SessionRequest, hashedPassword string) (response *SessionRequestResponse, err error) {
+func (s *Service) SessionRequest(request SessionRequest) (response *SessionRequestResponse, err error) {
 	// TODO #12434: should we check topic for validity? It might make sense if we
 	// want to cache the paired sessions
 
 	if request.Params.Request.Method == params.SendTransactionMethodName {
-		return s.sendTransaction(request, hashedPassword)
+		return s.buildTransaction(request)
 	} else if request.Params.Request.Method == params.PersonalSignMethodName {
-		return s.personalSign(request, hashedPassword)
+		return s.buildPersonalSingMessage(request)
 	}
 
 	// TODO #12434: respond async

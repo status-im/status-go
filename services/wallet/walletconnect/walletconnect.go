@@ -88,8 +88,12 @@ type SessionRequest struct {
 }
 
 type SessionRequestResponse struct {
-	SessionRequest SessionRequest `json:"sessionRequest"`
-	Signed         types.HexBytes `json:"signed"`
+	KeyUID        string        `json:"keyUid,omitempty"`
+	Address       types.Address `json:"address,omitempty"`
+	AddressPath   string        `json:"addressPath,omitempty"`
+	SignOnKeycard bool          `json:"signOnKeycard,omitempty"`
+	MesageToSign  interface{}   `json:"messageToSign,omitempty"`
+	SignedMessage interface{}   `json:"signedMessage,omitempty"`
 }
 
 func sessionProposalToSupportedChain(caipChains []string, supportsChain func(uint64) bool) (chains []uint64, eipChains []string) {
