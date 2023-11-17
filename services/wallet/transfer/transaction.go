@@ -400,9 +400,11 @@ func (tm *TransactionManager) ProceedWithTransactionsSignatures(ctx context.Cont
 	hashes := make(map[uint64][]types.Hash)
 	for _, desc := range tm.transactionsForKeycardSingning {
 		hash, err := tm.transactor.SendBuiltTransactionWithSignature(desc.chainID, desc.builtTx, desc.signature)
-		defer func() {
-			desc.unlock(err == nil, desc.builtTx.Nonce())
-		}()
+		if desc.unlock != nil {
+			defer func() {
+				desc.unlock(err == nil, desc.builtTx.Nonce())
+			}()
+		}
 		if err != nil {
 			return nil, err
 		}

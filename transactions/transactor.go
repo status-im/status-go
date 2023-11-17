@@ -157,9 +157,11 @@ func (t *Transactor) SendTransactionWithSignature(chainID uint64, args SendTxArg
 	if err != nil {
 		return hash, err
 	}
-	defer func() {
-		unlock(err == nil, expectedNonce)
-	}()
+	if unlock != nil {
+		defer func() {
+			unlock(err == nil, expectedNonce)
+		}()
+	}
 
 	if tx.Nonce() != expectedNonce {
 		return hash, &ErrBadNonce{tx.Nonce(), expectedNonce}
@@ -179,7 +181,9 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 	if err != nil {
 		return validatedArgs, hash, err
 	}
-	defer unlock(false, 0)
+	if unlock != nil {
+		defer unlock(false, 0)
+	}
 
 	gasPrice := (*big.Int)(args.GasPrice)
 	gasFeeCap := (*big.Int)(args.MaxFeePerGas)
@@ -273,13 +277,16 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 		return tx, nil, ErrInvalidSendTxArgs
 	}
 
-	nonce, unlock, err := t.nonce.Next(rpcWrapper, args.From)
-	if err != nil {
-		return tx, nil, err
-	}
+	var nonce uint64
 	if args.Nonce != nil {
 		nonce = uint64(*args.Nonce)
+	} else {
+		nonce, unlock, err = t.nonce.Next(rpcWrapper, args.From)
+		if err != nil {
+			return tx, nil, err
+		}
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
 

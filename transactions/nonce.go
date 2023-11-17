@@ -25,6 +25,10 @@ func NewNonce() *Nonce {
 func (n *Nonce) Next(rpcWrapper *rpcWrapper, from types.Address) (uint64, UnlockNonceFunc, error) {
 	n.addrLock.LockAddr(from)
 	current, err := n.GetCurrent(rpcWrapper, from)
+	if err != nil {
+		return 0, nil, err
+	}
+
 	unlock := func(inc bool, nonce uint64) {
 		if inc {
 			if _, ok := n.localNonce[rpcWrapper.chainID]; !ok {
@@ -36,7 +40,7 @@ func (n *Nonce) Next(rpcWrapper *rpcWrapper, from types.Address) (uint64, Unlock
 		n.addrLock.UnlockAddr(from)
 	}
 
-	return current, unlock, err
+	return current, unlock, nil
 }
 
 func (n *Nonce) GetCurrent(rpcWrapper *rpcWrapper, from types.Address) (uint64, error) {
