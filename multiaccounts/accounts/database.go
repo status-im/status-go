@@ -114,11 +114,14 @@ const (
 	TestSepoliaPreferredChainIDsDefault = "11155111:420:421614"
 )
 
-// IsOwnAccount returns true if this is an account we have the private key for
-// NOTE: Wallet flag can't be used as it actually indicates that it's the default
-// Wallet
-func (a *Account) IsOwnAccount() bool {
-	return a.Wallet || a.Type == AccountTypeSeed || a.Type == AccountTypeGenerated || a.Type == AccountTypeKey
+// Returns true if an account is a wallet account that logged in user has a control over, otherwise returns false.
+func (a *Account) IsWalletNonWatchOnlyAccount() bool {
+	return !a.Chat && a.Type != AccountTypeWatch
+}
+
+// Returns true if an account is a wallet account that is ready for sending transactions, otherwise returns false.
+func (a *Account) IsWalletAccountReadyForTransaction() bool {
+	return a.IsWalletNonWatchOnlyAccount() && a.Operable != AccountNonOperable
 }
 
 func (a *Account) MarshalJSON() ([]byte, error) {

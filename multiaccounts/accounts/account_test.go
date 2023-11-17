@@ -11,30 +11,30 @@ import (
 
 func TestIsOwnAccount(t *testing.T) {
 	account := Account{Wallet: true}
-	require.True(t, account.IsOwnAccount())
+	require.True(t, account.IsWalletNonWatchOnlyAccount())
 
 	account = Account{
 		Type: AccountTypeGenerated,
 	}
-	require.True(t, account.IsOwnAccount())
+	require.True(t, account.IsWalletNonWatchOnlyAccount())
 
 	account = Account{
 		Type: AccountTypeKey,
 	}
-	require.True(t, account.IsOwnAccount())
+	require.True(t, account.IsWalletNonWatchOnlyAccount())
 
 	account = Account{
 		Type: AccountTypeSeed,
 	}
-	require.True(t, account.IsOwnAccount())
+	require.True(t, account.IsWalletNonWatchOnlyAccount())
 
 	account = Account{
 		Type: AccountTypeWatch,
 	}
-	require.False(t, account.IsOwnAccount())
+	require.False(t, account.IsWalletNonWatchOnlyAccount())
 
 	account = Account{}
-	require.False(t, account.IsOwnAccount())
+	require.False(t, account.IsWalletNonWatchOnlyAccount())
 }
 
 func TestUnmarshal(t *testing.T) {

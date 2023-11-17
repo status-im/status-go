@@ -336,7 +336,7 @@ func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct
 			}
 			var wallets []types.Address
 			for _, account := range accounts {
-				if account.IsOwnAccount() {
+				if account.IsWalletNonWatchOnlyAccount() {
 					wallets = append(wallets, types.BytesToAddress(account.Address.Bytes()))
 				}
 			}
