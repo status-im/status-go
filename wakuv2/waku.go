@@ -426,6 +426,7 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 
 func (w *Waku) addWakuV2Peers(ctx context.Context, cfg *Config) error {
 	fnApply := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
+		defer wg.Done()
 		if len(d.PeerInfo.Addrs) != 0 {
 			go w.identifyAndConnect(ctx, w.settings.LightClient, d.PeerInfo)
 		}
@@ -1159,6 +1160,7 @@ func (w *Waku) Start() error {
 	if err != nil {
 		return err
 	}
+	idService.Start()
 
 	w.identifyService = idService
 
