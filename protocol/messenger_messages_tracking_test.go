@@ -151,12 +151,13 @@ func (s *MessengerMessagesTrackingSuite) newMessenger(waku types.Waku, logger *z
 	return messenger, interceptor
 }
 
-func (s *MessengerMessagesTrackingSuite) TestMessageMarkedAsSent() {
+func (s *MessengerMessagesTrackingSuite) testMessageMarkedAsSent(textSize int) {
 	//when message sent, its sent field should be "false" until we got confirmation
 	chat := CreatePublicChat("test-chat", s.bob.getTimesource())
 	err := s.bob.SaveChat(chat)
 	s.Require().NoError(err)
 	inputMessage := buildTestMessage(*chat)
+	inputMessage.Text = string(make([]byte, textSize))
 
 	_, err = s.bob.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
@@ -181,4 +182,11 @@ func (s *MessengerMessagesTrackingSuite) TestMessageMarkedAsSent() {
 		return nil
 	}, options)
 	s.Require().NoError(err)
+}
+
+func (s *MessengerMessagesTrackingSuite) TestMessageMarkedAsSent() {
+	s.testMessageMarkedAsSent(1)
+}
+func (s *MessengerMessagesTrackingSuite) TestSegmentedMessageMarkedAsSent() {
+	s.testMessageMarkedAsSent(4 * 1024 * 1024) // 4MB - ensure message is segmented
 }

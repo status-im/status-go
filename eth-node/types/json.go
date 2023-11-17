@@ -94,6 +94,15 @@ func EncodeHex(b []byte) string {
 	return string(enc)
 }
 
+// EncodeHex encodes bs as a hex strings with 0x prefix.
+func EncodeHexes(bs [][]byte) []string {
+	result := make([]string, len(bs))
+	for i, b := range bs {
+		result[i] = EncodeHex(b)
+	}
+	return result
+}
+
 // DecodeHex decodes a hex string with 0x prefix.
 func DecodeHex(input string) ([]byte, error) {
 	if len(input) == 0 {

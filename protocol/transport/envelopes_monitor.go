@@ -65,6 +65,9 @@ func NewEnvelopesMonitor(w types.Waku, config EnvelopesMonitorConfig) *Envelopes
 
 		// key is hash of the batch (event.Batch)
 		batches: map[types.Hash]map[types.Hash]struct{}{},
+
+		// key is stringified message identifier
+		identifierHashes: make(map[string][]types.Hash),
 	}
 }
 
@@ -84,8 +87,9 @@ type EnvelopesMonitor struct {
 
 	mu sync.Mutex
 
-	envelopes map[types.Hash]*monitoredEnvelope
-	batches   map[types.Hash]map[types.Hash]struct{}
+	envelopes        map[types.Hash]*monitoredEnvelope
+	batches          map[types.Hash]map[types.Hash]struct{}
+	identifierHashes map[string][]types.Hash
 
 	awaitOnlyMailServerConfirmations bool
 
@@ -112,24 +116,31 @@ func (m *EnvelopesMonitor) Stop() {
 	m.wg.Wait()
 }
 
-// Add hash to a tracker.
-func (m *EnvelopesMonitor) Add(identifiers [][]byte, envelopeHash types.Hash, message types.NewMessage) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+// Add hashes to a tracker.
+// Identifiers may be backed by multiple envelopes. It happens when message is split in segmentation layer.
+func (m *EnvelopesMonitor) Add(identifiers [][]byte, envelopeHashes []types.Hash, messages []*types.NewMessage) error {
+	if len(envelopeHashes) != len(messages) {
+		return errors.New("hashes don't match messages")
+	}
 
-	if envelope, ok := m.envelopes[envelopeHash]; !ok {
-		m.envelopes[envelopeHash] = &monitoredEnvelope{
-			state:       EnvelopePosted,
-			attempts:    1,
-			message:     &message,
-			identifiers: identifiers,
-		}
-	} else if envelope.state == EnvelopeSent {
-		// If it's already been marked as sent, we notify the client
-		if m.handler != nil {
-			m.handler.EnvelopeSent(envelope.identifiers)
+	for _, identifier := range identifiers {
+		m.identifierHashes[string(identifier)] = envelopeHashes
+	}
+
+	for i, envelopeHash := range envelopeHashes {
+		if _, ok := m.envelopes[envelopeHash]; !ok {
+			m.envelopes[envelopeHash] = &monitoredEnvelope{
+				state:       EnvelopePosted,
+				attempts:    1,
+				message:     messages[i],
+				identifiers: identifiers,
+			}
 		}
 	}
+
+	m.processIdentifiers(identifiers)
+
+	return nil
 }
 
 func (m *EnvelopesMonitor) GetState(hash types.Hash) EnvelopeState {
@@ -210,9 +221,7 @@ func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
 	} else {
 		m.logger.Debug("confirmation not expected, marking as sent")
 		envelope.state = EnvelopeSent
-		if m.handler != nil {
-			m.handler.EnvelopeSent(envelope.identifiers)
-		}
+		m.processIdentifiers(envelope.identifiers)
 	}
 }
 
@@ -259,9 +268,7 @@ func (m *EnvelopesMonitor) handleAcknowledgedBatch(event types.EnvelopeEvent) {
 			continue
 		}
 		envelope.state = EnvelopeSent
-		if m.handler != nil {
-			m.handler.EnvelopeSent(envelope.identifiers)
-		}
+		m.processIdentifiers(envelope.identifiers)
 	}
 	delete(m.batches, event.Batch)
 }
@@ -318,13 +325,46 @@ func (m *EnvelopesMonitor) handleEventEnvelopeReceived(event types.EnvelopeEvent
 	}
 	m.logger.Debug("expected envelope received", zap.String("hash", event.Hash.String()), zap.String("peer", event.Peer.String()))
 	envelope.state = EnvelopeSent
-	if m.handler != nil {
-		m.handler.EnvelopeSent(envelope.identifiers)
+	m.processIdentifiers(envelope.identifiers)
+}
+
+func (m *EnvelopesMonitor) processIdentifiers(identifiers [][]byte) {
+	sentIdentifiers := make([][]byte, 0, len(identifiers))
+
+	for _, identifier := range identifiers {
+		hashes, ok := m.identifierHashes[string(identifier)]
+		if !ok {
+			continue
+		}
+
+		sent := true
+		// Consider identifier as sent if all corresponding envelopes are in EnvelopeSent state
+		for _, hash := range hashes {
+			envelope, ok := m.envelopes[hash]
+			if !ok || envelope.state != EnvelopeSent {
+				sent = false
+				break
+			}
+		}
+		if sent {
+			sentIdentifiers = append(sentIdentifiers, identifier)
+		}
+	}
+
+	if len(sentIdentifiers) > 0 && m.handler != nil {
+		m.handler.EnvelopeSent(sentIdentifiers)
 	}
 }
 
 // clearMessageState removes all message and envelope state.
 // not thread-safe, should be protected on a higher level.
 func (m *EnvelopesMonitor) clearMessageState(envelopeID types.Hash) {
+	envelope, ok := m.envelopes[envelopeID]
+	if !ok {
+		return
+	}
 	delete(m.envelopes, envelopeID)
+	for _, identifier := range envelope.identifiers {
+		delete(m.identifierHashes, string(identifier))
+	}
 }
