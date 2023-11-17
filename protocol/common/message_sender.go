@@ -129,11 +129,7 @@ func NewMessageSender(
 	// but actual encrypt and send calls are postponed.
 	// sendDataSync is responsible for encrypting and sending postponed messages.
 	if features.Datasync {
-		// We set the max message size to 3/4 of the allowed message size, to leave
-		// room for encryption.
-		// Messages will be tried to send in any case, even if they exceed this
-		// value
-		ds.Init(p.sendDataSync, transport.MaxMessageSize()/4*3, logger)
+		ds.Init(p.sendDataSync, logger)
 		ds.Start(datasync.DatasyncTicker)
 	}
 
@@ -1238,7 +1234,7 @@ func (s *MessageSender) StartDatasync() {
 	ds := datasync.New(dataSyncNode, dataSyncTransport, true, s.logger)
 
 	if s.datasyncEnabled {
-		ds.Init(s.sendDataSync, s.transport.MaxMessageSize()/4*3, s.logger)
+		ds.Init(s.sendDataSync, s.logger)
 		ds.Start(datasync.DatasyncTicker)
 	}
 
