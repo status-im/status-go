@@ -57,3 +57,7 @@ func NegotiatedTopic(publicKey *ecdsa.PublicKey) string {
 func DiscoveryTopic() string {
 	return discoveryTopic
 }
+
+func PublicCommunityShardInfoTopic(communityID string) string {
+	return communityID + "-shardInfo"
+}

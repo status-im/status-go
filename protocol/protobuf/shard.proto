@@ -7,4 +7,15 @@ message Shard {
     int32 cluster = 1;
     int32 index = 2;
 }
-  
+
+message PublicCommunityShardInfo {
+    Shard shard = 1;
+    uint64 chainId = 2;
+}
+
+message SignedPublicCommunityShardInfo {
+    // Signature of the payload field
+    bytes signature = 1;
+    // Marshaled PublicCommunityShardInfo
+    bytes payload = 2;
+}

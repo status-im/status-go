@@ -2030,6 +2030,11 @@ func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*Mes
 		return nil, err
 	}
 
+	err = m.sendPublicCommunityShardInfoToStoreNode(community)
+	if err != nil {
+		return nil, err
+	}
+
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 
@@ -2461,6 +2466,44 @@ func (m *Messenger) SendCommunityShardKey(community *communities.Community, pubk
 	return err
 }
 
+func (m *Messenger) sendPublicCommunityShardInfoToStoreNode(community *communities.Community) error {
+	if m.transport.WakuVersion() != 2 {
+		return nil
+	}
+
+	if !community.IsControlNode() {
+		return nil
+	}
+
+	publicCommunityShardInfo := &protobuf.PublicCommunityShardInfo{
+		Shard:   community.Shard().Protobuffer(),
+		ChainId: communities.CommunityDescriptionTokenOwnerChainID(community.Description()),
+	}
+
+	signedShardInfo, err := communities.CreateSignedPublicCommunityShardInfo(publicCommunityShardInfo, m.identity)
+	if err != nil {
+		return err
+	}
+
+	payload, err := proto.Marshal(signedShardInfo)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		Payload: payload,
+		Sender:  community.PrivateKey(),
+		// we don't want to wrap in an encryption layer message
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_SHARD_INFO,
+		PubsubTopic:         transport.DefaultShardPubsubTopic(), // it must be sent to default shard pubsub topic
+	}
+
+	chatName := transport.PublicCommunityShardInfoTopic(community.IDString())
+	_, err = m.sender.SendPublic(context.Background(), chatName, rawMessage)
+	return err
+}
+
 func (m *Messenger) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunity) (*MessengerResponse, error) {
 	community, err := m.communitiesManager.UnbanUserFromCommunity(request)
 	if err != nil {
@@ -2558,6 +2601,68 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 	}
 
 	return m.requestCommunityInfoFromMailserver(communityID, request.Shard, request.WaitForResponse)
+}
+
+// requestCommunityShardInfoFromMailserver requests public shard info by a community ID from the mailserver
+// Note: this is a blocking operation
+func (m *Messenger) requestCommunityShardInfoFromMailserver(communityID string) (*common.Shard, error) {
+
+	m.logger.Info("requesting shard info", zap.String("communityID", communityID))
+
+	m.requestedCommunitiesLock.Lock()
+	defer m.requestedCommunitiesLock.Unlock()
+
+	if _, ok := m.requestedCommunities[communityID]; ok {
+		return nil, nil
+	}
+
+	//If filter wasn't installed we create it and remember for deinstalling after
+	//response received
+	shardInfoCommunityID := transport.PublicCommunityShardInfoTopic(communityID)
+	filter := m.transport.FilterByChatID(shardInfoCommunityID)
+	if filter == nil {
+		filters, err := m.transport.InitPublicFilters([]transport.FiltersToInitialize{{
+			ChatID:      shardInfoCommunityID,
+			PubsubTopic: transport.DefaultShardPubsubTopic(),
+		}})
+		if err != nil {
+			return nil, fmt.Errorf("Can't install filter for community: %v", err)
+		}
+		if len(filters) != 1 {
+			return nil, fmt.Errorf("Unexpected amount of filters created")
+		}
+		filter = filters[0]
+		m.requestedCommunities[shardInfoCommunityID] = filter
+	} else {
+		//we don't remember filter id associated with community because it was already installed
+		m.requestedCommunities[shardInfoCommunityID] = nil
+	}
+
+	defer m.forgetCommunityRequest(shardInfoCommunityID)
+
+	to := uint32(m.transport.GetCurrentTime() / 1000)
+	from := to - oneMonthInSeconds
+
+	// QUESTION: how can I make it blocking and get shard info?
+	_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
+		batch := MailserverBatch{
+			From:        from,
+			To:          to,
+			Topics:      []types.TopicType{filter.ContentTopic},
+			PubsubTopic: filter.PubsubTopic,
+			ChatIDs:     []string{shardInfoCommunityID},
+		}
+		m.logger.Info("requesting historic", zap.Any("batch", batch))
+		err := m.processMailserverBatch(batch)
+		return nil, err
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, err
+
 }
 
 // requestCommunityInfoFromMailserver installs filter for community and requests its details
