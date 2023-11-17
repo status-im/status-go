@@ -2501,17 +2501,21 @@ func (m *Messenger) sendPublicCommunityShardInfoToStoreNode(community *communiti
 		return err
 	}
 
+	chatName := transport.PublicCommunityShardInfoTopic(community.IDString())
+
 	rawMessage := common.RawMessage{
-		Payload: payload,
-		Sender:  community.PrivateKey(),
+		Payload:     payload,
+		LocalChatID: chatName,
+		Sender:      community.PrivateKey(),
 		// we don't want to wrap in an encryption layer message
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_SHARD_INFO,
-		PubsubTopic:         transport.DefaultShardPubsubTopic(), // it must be sent to default shard pubsub topic
+		PubsubTopic:         shard.DefaultShardPubsubTopic(), // it must be sent to default shard pubsub topic
 	}
 
-	chatName := transport.PublicCommunityShardInfoTopic(community.IDString())
-	_, err = m.sender.SendPublic(context.Background(), chatName, rawMessage)
+	id, err := m.sender.SendPublic(context.Background(), chatName, rawMessage)
+
+	fmt.Println("-------sendPublicCommunityShardInfoToStoreNode--------", id, chatName)
 	return err
 }
 
@@ -2612,6 +2616,7 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 	}
 
 	if request.Shard == nil {
+		fmt.Println("-----FetchCommunity-----request.Shard----")
 		err := m.requestCommunityShardInfoFromMailserver(communityID)
 		if err != nil {
 			return nil, err
@@ -2648,7 +2653,7 @@ func (m *Messenger) requestCommunityShardInfoFromMailserver(communityID string) 
 	if filter == nil {
 		filters, err := m.transport.InitPublicFilters([]transport.FiltersToInitialize{{
 			ChatID:      shardInfoCommunityID,
-			PubsubTopic: transport.DefaultShardPubsubTopic(),
+			PubsubTopic: shard.DefaultShardPubsubTopic(),
 		}})
 		if err != nil {
 			return fmt.Errorf("Can't install filter for community: %v", err)
@@ -2659,11 +2664,14 @@ func (m *Messenger) requestCommunityShardInfoFromMailserver(communityID string) 
 		filter = filters[0]
 		m.requestedCommunities[communityID] = filter
 	} else {
+		fmt.Println("----------------requestCommunityShardInfoFromMailserver--not good---")
 		//we don't remember filter id associated with community because it was already installed
 		m.requestedCommunities[communityID] = nil
 	}
 
-	defer m.forgetShardsRequest(communityID)
+	fmt.Println("----------------requestCommunityShardInfoFromMailserver--shardInfoCommunityID---", shardInfoCommunityID)
+
+	//defer m.forgetShardsRequest(communityID)
 
 	to := uint32(m.transport.GetCurrentTime() / 1000)
 	from := to - oneMonthInSeconds
@@ -3211,6 +3219,8 @@ func (m *Messenger) verifyPublicShardInfoSigner(a *protobuf.CommunityPublicShard
 }
 
 func (m *Messenger) HandleCommunityPublicShardInfo(state *ReceivedMessageState, a *protobuf.CommunityPublicShardInfo, statusMessage *v1protocol.StatusMessage) error {
+	fmt.Println("---------HandleCommunityPublicShardInfo-----------")
+
 	decodedShardInfo := protobuf.CommunityShardInfo{}
 	err := proto.Unmarshal(a.Payload, &decodedShardInfo)
 	if err != nil {
@@ -3231,7 +3241,7 @@ func (m *Messenger) HandleCommunityPublicShardInfo(state *ReceivedMessageState, 
 
 	_, err = m.FetchCommunity(&FetchCommunityRequest{
 		CommunityKey:    communityID,
-		Shard:           common.ShardFromProtobuff(decodedShardInfo.Shard),
+		Shard:           shard.FromProtobuff(decodedShardInfo.Shard),
 		TryDatabase:     false,
 		WaitForResponse: false,
 	})
