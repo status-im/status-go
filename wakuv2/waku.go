@@ -1142,6 +1142,9 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 // Start implements node.Service, starting the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Start() error {
+	if w.ctx == nil {
+		w.ctx, w.cancel = context.WithCancel(context.Background())
+	}
 
 	var err error
 	if w.node, err = node.New(w.settings.Options...); err != nil {
@@ -1303,6 +1306,10 @@ func (w *Waku) Stop() error {
 
 	close(w.connectionChanged)
 	w.wg.Wait()
+
+	w.ctx = nil
+	w.cancel = nil
+
 	return nil
 }
 
