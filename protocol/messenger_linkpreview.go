@@ -3,6 +3,7 @@ package protocol
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	neturl "net/url"
 	"regexp"
@@ -18,6 +19,29 @@ import (
 )
 
 const UnfurledLinksPerMessageLimit = 5
+
+type URLUnfurlPermission int
+
+const (
+	URLUnfurlingAllowed URLUnfurlPermission = iota
+	URLUnfurlingAskUser
+	URLUnfurlingForbiddenBySettings
+	URLUnfurlingNotSupported
+)
+
+type URLUnfurlingMetadata struct {
+	URL               string              `json:"url"`
+	Permission        URLUnfurlPermission `json:"permission"`
+	IsStatusSharedURL bool                `json:"isStatusSharedURL"`
+}
+
+type URLsUnfurlPlan struct {
+	URLs []URLUnfurlingMetadata `json:"urls"`
+}
+
+func URLUnfurlingSupported(url string) bool {
+	return !strings.HasSuffix(url, ".gif")
+}
 
 type UnfurlURLsResponse struct {
 	LinkPreviews       []*common.LinkPreview       `json:"linkPreviews,omitempty"`
@@ -92,17 +116,22 @@ func parseValidURL(rawURL string) (*neturl.URL, error) {
 	return u, nil
 }
 
-// GetURLs returns only what we consider unfurleable URLs.
-//
-// If we wanted to be extra precise and help improve UX, we could ignore URLs
-// that we know can't be unfurled. This is at least possible with the oEmbed
-// protocol because providers must specify an endpoint scheme.
-func GetURLs(text string) []string {
+func (m *Messenger) GetTextURLsToUnfurl(text string) *URLsUnfurlPlan {
+	s, err := m.getSettings()
+	if err != nil {
+		// log the error and keep parsing the text
+		m.logger.Error("GetTextURLsToUnfurl: failed to get settings", zap.Error(err))
+		s.URLUnfurlingMode = settings.URLUnfurlingDisableAll
+	}
+
+	indexedUrls := map[string]struct{}{}
+	result := &URLsUnfurlPlan{
+		// The usage of `UnfurledLinksPerMessageLimit` is quite random here. I wanted to allocate
+		// some not-zero place here, using the limit number is at least some binding.
+		URLs: make([]URLUnfurlingMetadata, 0, UnfurledLinksPerMessageLimit),
+	}
 	parsedText := markdown.Parse([]byte(text), nil)
 	visitor := common.RunLinksVisitor(parsedText)
-
-	urls := make([]string, 0, len(visitor.Links))
-	indexed := make(map[string]any, len(visitor.Links))
 
 	for _, rawURL := range visitor.Links {
 		parsedURL, err := parseValidURL(rawURL)
@@ -116,23 +145,54 @@ func GetURLs(text string) []string {
 		// case-sensitive, some websites encode base64 in the path, etc.
 		parsedURL.Host = strings.ToLower(parsedURL.Host)
 
-		idx := parsedURL.String()
-		// Removes the spurious trailing forward slash.
-		idx = strings.TrimRight(idx, "/")
-		if _, exists := indexed[idx]; exists {
+		url := parsedURL.String()
+		url = strings.TrimRight(url, "/") // Removes the spurious trailing forward slash.
+		if _, exists := indexedUrls[url]; exists {
 			continue
-		} else {
-			indexed[idx] = nil
-			urls = append(urls, idx)
 		}
 
-		// This is a temporary limitation solution,
-		// should be changed with https://github.com/status-im/status-go/issues/4235
-		if len(urls) == UnfurledLinksPerMessageLimit {
+		metadata := URLUnfurlingMetadata{
+			URL:               url,
+			IsStatusSharedURL: IsStatusSharedURL(url),
+		}
+
+		if !URLUnfurlingSupported(rawURL) {
+			metadata.Permission = URLUnfurlingNotSupported
+		} else if metadata.IsStatusSharedURL {
+			metadata.Permission = URLUnfurlingAllowed
+		} else {
+			switch s.URLUnfurlingMode {
+			case settings.URLUnfurlingAlwaysAsk:
+				metadata.Permission = URLUnfurlingAskUser
+			case settings.URLUnfurlingEnableAll:
+				metadata.Permission = URLUnfurlingAllowed
+			case settings.URLUnfurlingDisableAll:
+				metadata.Permission = URLUnfurlingForbiddenBySettings
+			default:
+				metadata.Permission = URLUnfurlingForbiddenBySettings
+			}
+		}
+
+		result.URLs = append(result.URLs, metadata)
+	}
+
+	return result
+}
+
+// Deprecated: GetURLs is deprecated in favor of more generic GetTextURLsToUnfurl.
+//
+// This is a wrapper around GetTextURLsToUnfurl that returns the list of URLs found in the text
+// without any additional information.
+func (m *Messenger) GetURLs(text string) []string {
+	plan := m.GetTextURLsToUnfurl(text)
+	limit := int(math.Min(UnfurledLinksPerMessageLimit, float64(len(plan.URLs))))
+	urls := make([]string, 0, limit)
+	for _, metadata := range plan.URLs {
+		urls = append(urls, metadata.URL)
+		if len(urls) == limit {
 			break
 		}
 	}
-
 	return urls
 }
 
@@ -144,11 +204,6 @@ func NewDefaultHTTPClient() *http.Client {
 // processed by GetURLs.
 func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlURLsResponse, error) {
 	response := UnfurlURLsResponse{}
-
-	s, err := m.getSettings()
-	if err != nil {
-		return response, fmt.Errorf("failed to get settigs: %w", err)
-	}
 
 	// Unfurl in a loop
 
@@ -170,12 +225,6 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlUR
 				continue
 			}
 			response.StatusLinkPreviews = append(response.StatusLinkPreviews, preview)
-			continue
-		}
-
-		// `AlwaysAsk` mode should be handled on the app side
-		// and is considered as equal to `EnableAll` in status-go.
-		if s.URLUnfurlingMode == settings.URLUnfurlingDisableAll {
 			continue
 		}
 

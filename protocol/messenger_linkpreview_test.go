@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -186,7 +187,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_GetLinks() {
 	}
 
 	for _, ex := range examples {
-		links := GetURLs(ex.args)
+		links := s.m.GetURLs(ex.args)
 		s.Require().Equal(ex.expected, links, "Failed for args: '%s'", ex.args)
 	}
 }
@@ -606,86 +607,82 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined()
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
-
 	// Create website stub
-	ogLink := "https://github.com"
-	requestsCount := 0
+	const ogLink = "https://github.com"
+	const statusUserLink = "https://status.app/c#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
+	const gifLink = "https://media1.giphy.com/media/lcG3qwtTKSNI2i5vst/giphy.gif"
 
-	transport := StubTransport{}
-	transport.AddURLMatcherRoundTrip(
-		ogLink,
-		func(req *http.Request) *http.Response {
-			requestsCount++
-			responseBody := []byte(`<html><head><meta property="og:title" content="TestTitle"></head></html>`)
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(responseBody)),
-			}
-		},
-	)
-	stubbedClient := http.Client{Transport: &transport}
-
-	// Add contact
-	identity, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	c, err := BuildContactFromPublicKey(&identity.PublicKey)
-	s.Require().NoError(err)
-	s.Require().NotNil(c)
-
-	c.Bio = "TestBio_1"
-	c.DisplayName = "TestDisplayName_2"
-	s.m.allContacts.Store(c.ID, c)
-	statusUserLink, err := s.m.ShareUserURLWithData(c.ID)
-	s.Require().NoError(err)
-
-	linksToUnfurl := []string{ogLink, statusUserLink}
+	linksToUnfurl := []string{ogLink, statusUserLink, gifLink}
+	text := strings.Join(linksToUnfurl, " ")
 
 	// Test `AlwaysAsk`
-	// NOTE: on status-go side `AlwaysAsk` == `EnableAll`, "asking" should be processed by the app
 
-	requestsCount = 0
-	err = s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingAlwaysAsk)
+	err := s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingAlwaysAsk)
 	s.Require().NoError(err)
 
-	linkPreviews, err := s.m.UnfurlURLs(&stubbedClient, linksToUnfurl)
-	s.Require().NoError(err)
-	s.Require().Len(linkPreviews.LinkPreviews, 1)
-	s.Require().Len(linkPreviews.StatusLinkPreviews, 1)
-	s.Require().Equal(requestsCount, 1)
+	plan := s.m.GetTextURLsToUnfurl(text)
+	s.Require().Len(plan.URLs, len(linksToUnfurl))
+
+	s.Require().Equal(plan.URLs[0].URL, ogLink)
+	s.Require().Equal(plan.URLs[0].IsStatusSharedURL, false)
+	s.Require().Equal(plan.URLs[0].Permission, URLUnfurlingAskUser)
+
+	s.Require().Equal(plan.URLs[1].URL, statusUserLink)
+	s.Require().Equal(plan.URLs[1].IsStatusSharedURL, true)
+	s.Require().Equal(plan.URLs[1].Permission, URLUnfurlingAllowed)
+
+	s.Require().Equal(plan.URLs[2].URL, gifLink)
+	s.Require().Equal(plan.URLs[2].IsStatusSharedURL, false)
+	s.Require().Equal(plan.URLs[2].Permission, URLUnfurlingNotSupported)
 
 	// Test `EnableAll`
-	requestsCount = 0
 	err = s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingEnableAll)
 	s.Require().NoError(err)
 
-	linkPreviews, err = s.m.UnfurlURLs(&stubbedClient, linksToUnfurl)
-	s.Require().NoError(err)
-	s.Require().Len(linkPreviews.LinkPreviews, 1)
-	s.Require().Len(linkPreviews.StatusLinkPreviews, 1)
-	s.Require().Equal(requestsCount, 1)
+	plan = s.m.GetTextURLsToUnfurl(text)
+	s.Require().Len(plan.URLs, len(linksToUnfurl))
+
+	s.Require().Equal(plan.URLs[0].URL, ogLink)
+	s.Require().Equal(plan.URLs[0].IsStatusSharedURL, false)
+	s.Require().Equal(plan.URLs[0].Permission, URLUnfurlingAllowed)
+
+	s.Require().Equal(plan.URLs[1].URL, statusUserLink)
+	s.Require().Equal(plan.URLs[1].IsStatusSharedURL, true)
+	s.Require().Equal(plan.URLs[1].Permission, URLUnfurlingAllowed)
+
+	s.Require().Equal(plan.URLs[2].URL, gifLink)
+	s.Require().Equal(plan.URLs[2].IsStatusSharedURL, false)
+	s.Require().Equal(plan.URLs[2].Permission, URLUnfurlingNotSupported)
 
 	// Test `DisableAll`
-	requestsCount = 0
 	err = s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingDisableAll)
 	s.Require().NoError(err)
 
-	linkPreviews, err = s.m.UnfurlURLs(&stubbedClient, linksToUnfurl)
-	s.Require().NoError(err)
-	s.Require().Len(linkPreviews.LinkPreviews, 0)
-	s.Require().Len(linkPreviews.StatusLinkPreviews, 1) // Status links are always unfurled
-	s.Require().Equal(requestsCount, 0)
+	plan = s.m.GetTextURLsToUnfurl(text)
+	s.Require().Len(plan.URLs, len(linksToUnfurl))
+
+	s.Require().Equal(plan.URLs[0].URL, ogLink)
+	s.Require().Equal(plan.URLs[0].IsStatusSharedURL, false)
+	s.Require().Equal(plan.URLs[0].Permission, URLUnfurlingForbiddenBySettings)
+
+	s.Require().Equal(plan.URLs[1].URL, statusUserLink)
+	s.Require().Equal(plan.URLs[1].IsStatusSharedURL, true)
+	s.Require().Equal(plan.URLs[1].Permission, URLUnfurlingAllowed)
+
+	s.Require().Equal(plan.URLs[2].URL, gifLink)
+	s.Require().Equal(plan.URLs[2].IsStatusSharedURL, false)
+	s.Require().Equal(plan.URLs[2].Permission, URLUnfurlingNotSupported)
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Limit() {
-	linksToUnfurl := "https://www.youtube.com/watch?v=6dkDepLX0rk " +
+	text := "https://www.youtube.com/watch?v=6dkDepLX0rk " +
 		"https://www.youtube.com/watch?v=ferZnZ0_rSM " +
 		"https://www.youtube.com/watch?v=bdneye4pzMw " +
 		"https://www.youtube.com/watch?v=pRERgcQe-fQ " +
 		"https://www.youtube.com/watch?v=j82L3pLjb_0 " +
 		"https://www.youtube.com/watch?v=hxsJvKYyVyg " +
-		"https://www.youtube.com/watch?v=jIIuzB11dsA"
+		"https://www.youtube.com/watch?v=jIIuzB11dsA "
 
-	urls := GetURLs(linksToUnfurl)
+	urls := s.m.GetURLs(text)
 	s.Require().Equal(UnfurledLinksPerMessageLimit, len(urls))
 }

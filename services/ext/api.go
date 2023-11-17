@@ -1187,10 +1187,19 @@ func (api *PublicAPI) GetLinkPreviewData(link string) (previewData urls.LinkPrev
 	return urls.GetLinkPreviewData(link)
 }
 
+// GetTextURLsToUnfurl parses text and returns a deduplicated and (somewhat) normalized
+// slice of URLs. The returned URLs can be used as cache keys by clients.
+// For each URL there's a corresponding metadata which should be used as to plan the unfurling.
+func (api *PublicAPI) GetTextURLsToUnfurl(text string) *protocol.URLsUnfurlPlan {
+	return api.service.messenger.GetTextURLsToUnfurl(text)
+}
+
+// Deprecated: GetTextURLs is deprecated in favor of more generic GetTextURLsToUnfurl.
+//
 // GetTextURLs parses text and returns a deduplicated and (somewhat) normalized
 // slice of URLs. The returned URLs can be used as cache keys by clients.
 func (api *PublicAPI) GetTextURLs(text string) []string {
-	return protocol.GetURLs(text)
+	return api.service.messenger.GetURLs(text)
 }
 
 // UnfurlURLs uses a best-effort approach to unfurl each URL. Failed URLs will
