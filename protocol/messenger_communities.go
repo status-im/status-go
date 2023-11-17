@@ -1906,7 +1906,6 @@ func (m *Messenger) DefaultFilters(o *communities.Community) []transport.Filters
 
 	filters := []transport.FiltersToInitialize{
 		{ChatID: cID, PubsubTopic: communityPubsubTopic},
-		{ChatID: uncompressedPubKey, PubsubTopic: communityPubsubTopic},
 		{ChatID: updatesChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: mlChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
@@ -1914,6 +1913,8 @@ func (m *Messenger) DefaultFilters(o *communities.Community) []transport.Filters
 
 	if m.useShards() {
 		filters = append(filters, transport.FiltersToInitialize{ChatID: uncompressedPubKey, PubsubTopic: shard.DefaultNonProtectedPubsubTopic()})
+	} else {
+		filters = append(filters, transport.FiltersToInitialize{ChatID: uncompressedPubKey, PubsubTopic: communityPubsubTopic})
 	}
 
 	return filters
@@ -2315,6 +2316,7 @@ func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*Messenger
 		message := common.NewMessage()
 		message.ChatId = pk.String()
 		message.CommunityID = request.CommunityID.String()
+		message.Shard = community.Shard().Protobuffer()
 		message.Text = fmt.Sprintf("Community %s has been shared with you", community.Name())
 		if request.InviteMessage != "" {
 			message.Text = request.InviteMessage
@@ -2804,8 +2806,8 @@ func (m *Messenger) passStoredCommunityInfoToSignalHandler(communityID string) {
 }
 
 // handleCommunityDescription handles an community description
-func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte) error {
-	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload, nil)
+func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte, shard *protobuf.Shard) error {
+	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload, nil, shard)
 	if err != nil {
 		return err
 	}
@@ -3188,7 +3190,8 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 		return err
 	}
 
-	err = m.handleCommunityDescription(messageState, orgPubKey, &cd, syncCommunity.Description)
+	// TODO: handle shard
+	err = m.handleCommunityDescription(messageState, orgPubKey, &cd, syncCommunity.Description, nil)
 	if err != nil {
 		logger.Debug("m.handleCommunityDescription error", zap.Error(err))
 		return err
