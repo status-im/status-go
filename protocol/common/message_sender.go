@@ -97,24 +97,9 @@ func NewMessageSender(
 	logger *zap.Logger,
 	features FeatureFlags,
 ) (*MessageSender, error) {
-	dataSyncTransport := datasync.NewNodeTransport()
-	dataSyncNode, err := datasyncnode.NewPersistentNode(
-		database,
-		dataSyncTransport,
-		datasyncpeer.PublicKeyToPeerID(identity.PublicKey),
-		datasyncnode.BATCH,
-		datasync.CalculateSendTime,
-		logger,
-	)
-	if err != nil {
-		return nil, err
-	}
-	ds := datasync.New(dataSyncNode, dataSyncTransport, features.Datasync, logger)
-
 	p := &MessageSender{
 		identity:        identity,
 		datasyncEnabled: features.Datasync,
-		datasync:        ds,
 		protocol:        enc,
 		database:        database,
 		persistence:     NewRawMessagesPersistence(database),
@@ -128,9 +113,11 @@ func NewMessageSender(
 	// With DataSync enabled, messages are added to the DataSync
 	// but actual encrypt and send calls are postponed.
 	// sendDataSync is responsible for encrypting and sending postponed messages.
-	if features.Datasync {
-		ds.Init(p.sendDataSync, logger)
-		ds.Start(datasync.DatasyncTicker)
+	if p.datasyncEnabled {
+		err := p.StartDatasync()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return p, nil
@@ -141,7 +128,7 @@ func (s *MessageSender) Stop() {
 		close(c)
 	}
 	s.messageEventsSubscriptions = nil
-	s.datasync.Stop() // idempotent op
+	s.StopDatasync()
 }
 
 func (s *MessageSender) SetHandleSharedSecrets(handler func([]*sharedsecret.Secret) error) {
@@ -876,12 +863,14 @@ func (s *MessageSender) handleMessage(wakuMessage *types.Message) (*handleMessag
 		}
 	}
 
-	datasyncMessages, as, err := unwrapDatasyncMessage(response.Message, s.datasync)
-	if err != nil {
-		hlogger.Debug("failed to handle datasync message", zap.Error(err))
-	} else {
-		response.DatasyncMessages = append(response.DatasyncMessages, datasyncMessages...)
-		response.DatasyncAcks = append(response.DatasyncAcks, as...)
+	if s.datasync != nil && s.datasyncEnabled {
+		datasyncMessages, as, err := unwrapDatasyncMessage(response.Message, s.datasync)
+		if err != nil {
+			hlogger.Debug("failed to handle datasync message", zap.Error(err))
+		} else {
+			response.DatasyncMessages = append(response.DatasyncMessages, datasyncMessages...)
+			response.DatasyncAcks = append(response.DatasyncAcks, as...)
+		}
 	}
 
 	for _, msg := range response.Messages() {
@@ -1215,10 +1204,16 @@ func calculatePoW(payload []byte) float64 {
 }
 
 func (s *MessageSender) StopDatasync() {
-	s.datasync.Stop()
+	if s.datasync != nil {
+		s.datasync.Stop()
+	}
 }
 
-func (s *MessageSender) StartDatasync() {
+func (s *MessageSender) StartDatasync() error {
+	if !s.datasyncEnabled {
+		return nil
+	}
+
 	dataSyncTransport := datasync.NewNodeTransport()
 	dataSyncNode, err := datasyncnode.NewPersistentNode(
 		s.database,
@@ -1229,16 +1224,15 @@ func (s *MessageSender) StartDatasync() {
 		s.logger,
 	)
 	if err != nil {
-		return
-	}
-	ds := datasync.New(dataSyncNode, dataSyncTransport, true, s.logger)
-
-	if s.datasyncEnabled {
-		ds.Init(s.sendDataSync, s.logger)
-		ds.Start(datasync.DatasyncTicker)
+		return err
 	}
 
-	s.datasync = ds
+	s.datasync = datasync.New(dataSyncNode, dataSyncTransport, true, s.logger)
+
+	s.datasync.Init(s.sendDataSync, s.logger)
+	s.datasync.Start(datasync.DatasyncTicker)
+
+	return nil
 }
 
 // GetCurrentKeyForGroup returns the latest key timestampID belonging to a key group
