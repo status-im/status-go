@@ -168,7 +168,8 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 		// TODO: requests to join / cancels are currently being sent into the default waku topic.
 		// They must be sent into an specific non protected shard
 		for _, pubsubTopic := range topics {
-			identityStr := PublicKeyToStr(&cf.PrivKey.PublicKey)
+			pk := &cf.PrivKey.PublicKey
+			identityStr := PublicKeyToStr(pk)
 			rawFilter, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey, true)
 			if err != nil {
 				f.logger.Debug("could not register community filter", zap.Error(err))
