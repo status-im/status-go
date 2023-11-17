@@ -291,7 +291,6 @@ func (s *MessageSender) sendCommunity(
 		return nil, err
 	}
 	rawMessage.ID = types.EncodeHex(messageID)
-	messageIDs := [][]byte{messageID}
 
 	if rawMessage.BeforeDispatch != nil {
 		if err := rawMessage.BeforeDispatch(rawMessage); err != nil {
@@ -320,7 +319,7 @@ func (s *MessageSender) sendCommunity(
 
 			for i, spec := range keyExMessageSpecs {
 				recipient := rawMessage.Recipients[i]
-				_, _, err = s.sendMessageSpec(ctx, recipient, spec, messageIDs)
+				_, _, err = s.sendMessageSpec(ctx, recipient, spec, [][]byte{messageID})
 				if err != nil {
 					return nil, err
 				}
@@ -404,7 +403,7 @@ func (s *MessageSender) sendCommunity(
 
 		sentMessage := &SentMessage{
 			Spec:       messageSpec,
-			MessageIDs: messageIDs,
+			MessageIDs: [][]byte{messageID},
 		}
 
 		s.notifyOnSentMessage(sentMessage)
@@ -417,17 +416,15 @@ func (s *MessageSender) sendCommunity(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to decompress pubkey")
 		}
-		hashes, newMessages, err = s.dispatchCommunityMessage(ctx, pubkey, payload, messageIDs, rawMessage.PubsubTopic)
+		hashes, newMessages, err = s.dispatchCommunityMessage(ctx, pubkey, payload, rawMessage.PubsubTopic)
 		if err != nil {
 			s.logger.Error("failed to send a community message", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
 	}
 
-	for i, newMessage := range newMessages {
-		s.logger.Debug("sent community message ", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hashes[i])))
-		s.transport.Track(messageIDs, hashes[i], newMessage)
-	}
+	s.logger.Debug("sent community message ", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
+	s.transport.Track(messageID, hashes, newMessages)
 
 	return messageID, nil
 }
@@ -479,17 +476,14 @@ func (s *MessageSender) sendPrivate(
 		}
 	} else if rawMessage.SkipEncryptionLayer {
 		// When SkipProtocolLayer is set we don't pass the message to the encryption layer
-		messageIDs := [][]byte{messageID}
-		hashes, newMessages, err := s.sendPrivateRawMessage(ctx, rawMessage, recipient, wrappedMessage, messageIDs)
+		hashes, newMessages, err := s.sendPrivateRawMessage(ctx, rawMessage, recipient, wrappedMessage)
 		if err != nil {
 			s.logger.Error("failed to send a private message", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
 
-		for i, newMessage := range newMessages {
-			s.logger.Debug("sent private message skipProtocolLayer", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hashes[i])))
-			s.transport.Track(messageIDs, hashes[i], newMessage)
-		}
+		s.logger.Debug("sent private message skipProtocolLayer", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
+		s.transport.Track(messageID, hashes, newMessages)
 
 	} else {
 		messageSpec, err := s.protocol.BuildEncryptedMessage(rawMessage.Sender, recipient, wrappedMessage)
@@ -507,17 +501,14 @@ func (s *MessageSender) sendPrivate(
 
 		}
 
-		messageIDs := [][]byte{messageID}
-		hashes, newMessages, err := s.sendMessageSpec(ctx, recipient, messageSpec, messageIDs)
+		hashes, newMessages, err := s.sendMessageSpec(ctx, recipient, messageSpec, [][]byte{messageID})
 		if err != nil {
 			s.logger.Error("failed to send a private message", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
 
-		for i, newMessage := range newMessages {
-			s.logger.Debug("sent private message without datasync", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hashes[i])))
-			s.transport.Track(messageIDs, hashes[i], newMessage)
-		}
+		s.logger.Debug("sent private message without datasync", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
+		s.transport.Track(messageID, hashes, newMessages)
 	}
 
 	return messageID, nil
@@ -542,16 +533,13 @@ func (s *MessageSender) SendPairInstallation(
 	}
 
 	messageID := v1protocol.MessageID(&s.identity.PublicKey, wrappedMessage)
-	messageIDs := [][]byte{messageID}
 
-	hashes, newMessages, err := s.sendMessageSpec(ctx, recipient, messageSpec, messageIDs)
+	hashes, newMessages, err := s.sendMessageSpec(ctx, recipient, messageSpec, [][]byte{messageID})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to send a message spec")
 	}
 
-	for i, newMessage := range newMessages {
-		s.transport.Track(messageIDs, hashes[i], newMessage)
-	}
+	s.transport.Track(messageID, hashes, newMessages)
 
 	return messageID, nil
 }
@@ -708,7 +696,6 @@ func (s *MessageSender) SendPublic(
 			return nil, err
 		}
 		hashes = append(hashes, hash)
-		s.logger.Debug("sent public message", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hash)))
 	}
 
 	sentMessage := &SentMessage{
@@ -718,9 +705,8 @@ func (s *MessageSender) SendPublic(
 
 	s.notifyOnSentMessage(sentMessage)
 
-	for i, newMessage := range newMessages {
-		s.transport.Track([][]byte{messageID}, hashes[i], newMessage)
-	}
+	s.logger.Debug("sent public message", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
+	s.transport.Track(messageID, hashes, newMessages)
 
 	return messageID, nil
 }
@@ -1011,16 +997,14 @@ func (s *MessageSender) sendDataSync(ctx context.Context, publicKey *ecdsa.Publi
 		return err
 	}
 
-	for i, newMessage := range newMessages {
-		s.logger.Debug("sent private messages", zap.Any("messageIDs", hexMessageIDs), zap.String("hash", types.EncodeHex(hashes[i])))
-		s.transport.Track(messageIDs, hashes[i], newMessage)
-	}
+	s.logger.Debug("sent private messages", zap.Any("messageIDs", hexMessageIDs), zap.Strings("hashes", types.EncodeHexes(hashes)))
+	s.transport.TrackMany(messageIDs, hashes, newMessages)
 
 	return nil
 }
 
 // sendPrivateRawMessage sends a message not wrapped in an encryption layer
-func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *RawMessage, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([][]byte, []*types.NewMessage, error) {
+func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *RawMessage, publicKey *ecdsa.PublicKey, payload []byte) ([][]byte, []*types.NewMessage, error) {
 	newMessage := &types.NewMessage{
 		TTL:         whisperTTL,
 		Payload:     payload,
@@ -1053,7 +1037,7 @@ func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *R
 
 // sendCommunityMessage sends a message not wrapped in an encryption layer
 // to a community
-func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte, pubsubTopic string) ([][]byte, []*types.NewMessage, error) {
+func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, pubsubTopic string) ([][]byte, []*types.NewMessage, error) {
 	newMessage := &types.NewMessage{
 		TTL:         whisperTTL,
 		Payload:     payload,

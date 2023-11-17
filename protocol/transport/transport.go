@@ -387,9 +387,23 @@ func (t *Transport) addSig(newMessage *types.NewMessage) error {
 	return nil
 }
 
-func (t *Transport) Track(identifiers [][]byte, hash []byte, newMessage *types.NewMessage) {
-	if t.envelopesMonitor != nil {
-		t.envelopesMonitor.Add(identifiers, types.BytesToHash(hash), *newMessage)
+func (t *Transport) Track(identifier []byte, hashes [][]byte, newMessages []*types.NewMessage) {
+	t.TrackMany([][]byte{identifier}, hashes, newMessages)
+}
+
+func (t *Transport) TrackMany(identifiers [][]byte, hashes [][]byte, newMessages []*types.NewMessage) {
+	if t.envelopesMonitor == nil {
+		return
+	}
+
+	envelopeHashes := make([]types.Hash, len(hashes))
+	for i, hash := range hashes {
+		envelopeHashes[i] = types.BytesToHash(hash)
+	}
+
+	err := t.envelopesMonitor.Add(identifiers, envelopeHashes, newMessages)
+	if err != nil {
+		t.logger.Error("failed to track messages", zap.Error(err))
 	}
 }
 
