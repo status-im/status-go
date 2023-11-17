@@ -257,7 +257,7 @@ func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint6
 
 	for _, token := range customTokens {
 		if token.Address == address {
-			tm.discoverTokenCommunityID(context.Background(), token, address)
+			tm.discoverTokenCommunityID(ctx, token, address)
 			return token
 		}
 	}
@@ -272,7 +272,7 @@ func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint6
 		return nil
 	}
 
-	tm.discoverTokenCommunityID(context.Background(), token, address)
+	tm.discoverTokenCommunityID(ctx, token, address)
 	return token
 }
 
