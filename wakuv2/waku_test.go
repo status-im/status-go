@@ -20,7 +20,9 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/wakuv2/common"
 )
 
@@ -115,7 +117,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, w.Start())
 
 	// DNSDiscovery
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), 90*time.Second)
 	defer cancel()
 
 	discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrTreeAddress)
@@ -133,7 +135,7 @@ func TestBasicWakuV2(t *testing.T) {
 
 	// Sanity check, not great, but it's probably helpful
 	err = tt.RetryWithBackOff(func() error {
-		if len(w.Peers()) > 2 {
+		if len(w.Peers()) == 0 {
 			return errors.New("no peers discovered")
 		}
 		return nil
@@ -143,7 +145,7 @@ func TestBasicWakuV2(t *testing.T) {
 
 	filter := &common.Filter{
 		Messages:      common.NewMemoryMessageStore(),
-		ContentTopics: common.NewTopicSetFromBytes([][]byte{[]byte{1, 2, 3, 4}}),
+		ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
 	}
 
 	_, err = w.Subscribe(filter)
@@ -166,7 +168,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.Len(t, messages, 1)
 
 	timestampInSeconds := msgTimestamp / int64(time.Second)
-	marginInSeconds := 20
+	marginInSeconds := 5
 
 	options = func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 60 * time.Second
@@ -174,6 +176,92 @@ func TestBasicWakuV2(t *testing.T) {
 	}
 	err = tt.RetryWithBackOff(func() error {
 		storeResult, err := w.query(context.Background(), storeNode.PeerID, relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-int64(marginInSeconds)), uint64(timestampInSeconds+int64(marginInSeconds)), []store.HistoryRequestOption{})
+		if err != nil || len(storeResult.Messages) == 0 {
+			// in case of failure extend timestamp margin up to 40secs
+			if marginInSeconds < 40 {
+				marginInSeconds += 5
+			}
+			return errors.New("no messages received from store node")
+		}
+		return nil
+	}, options)
+	require.NoError(t, err)
+
+	require.NoError(t, w.Stop())
+}
+
+func TestBasicWakuV2WithStore(t *testing.T) {
+	enrTreeAddress := testENRBootstrap
+	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
+	if envEnrTreeAddress != "" {
+		enrTreeAddress = envEnrTreeAddress
+	}
+
+	sql, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	config := &Config{}
+	config.Port = 0
+	config.EnableStore = true
+	config.EnableDiscV5 = true
+	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
+	config.DiscoveryLimit = 20
+	config.WakuNodes = []string{enrTreeAddress}
+	w, err := New("", "", config, nil, sql, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, w.Start())
+
+	options := func(b *backoff.ExponentialBackOff) {
+		b.MaxElapsedTime = 30 * time.Second
+	}
+
+	// Sanity check, not great, but it's probably helpful
+	err = tt.RetryWithBackOff(func() error {
+		if len(w.Peers()) == 0 {
+			return errors.New("no peers discovered")
+		}
+		return nil
+	}, options)
+
+	require.NoError(t, err)
+
+	filter := &common.Filter{
+		Messages:      common.NewMemoryMessageStore(),
+		ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
+	}
+
+	_, err = w.Subscribe(filter)
+	require.NoError(t, err)
+
+	msgTimestamp := w.timestamp()
+	contentTopic := maps.Keys(filter.ContentTopics)[0]
+
+	_, err = w.Send(relay.DefaultWakuTopic, &pb.WakuMessage{
+		Payload:      []byte{1, 2, 3, 4, 5},
+		ContentTopic: contentTopic.ContentTopic(),
+		Version:      0,
+		Timestamp:    msgTimestamp,
+	})
+	require.NoError(t, err)
+
+	time.Sleep(5 * time.Second)
+
+	messages := filter.Retrieve()
+	require.Len(t, messages, 1)
+
+	timestampInSeconds := msgTimestamp / int64(time.Second)
+	marginInSeconds := 20
+
+	options = func(b *backoff.ExponentialBackOff) {
+		b.MaxElapsedTime = 60 * time.Second
+		b.InitialInterval = 500 * time.Millisecond
+	}
+
+	selfNodeID := w.node.Host().ID()
+	err = tt.RetryWithBackOff(func() error {
+		storeResult, err := w.query(context.Background(), selfNodeID, relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-int64(marginInSeconds)), uint64(timestampInSeconds+int64(marginInSeconds)), []store.HistoryRequestOption{
+			store.WithLocalQuery(),
+		})
 		if err != nil || len(storeResult.Messages) == 0 {
 			// in case of failure extend timestamp margin up to 40secs
 			if marginInSeconds < 40 {

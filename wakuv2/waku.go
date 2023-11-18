@@ -308,6 +308,9 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	}
 
 	if cfg.EnableStore {
+		if appDB == nil {
+			return nil, errors.New("appDB is required for store")
+		}
 		opts = append(opts, node.WithWakuStore())
 		dbStore, err := persistence.NewDBStore(logger, persistence.WithDB(appDB), persistence.WithRetentionPolicy(cfg.StoreCapacity, time.Duration(cfg.StoreSeconds)*time.Second))
 		if err != nil {
@@ -1410,6 +1413,7 @@ func (w *Waku) processQueue() {
 				delete(w.storeMsgIDs, e.Hash())
 				w.storeMsgIDsMu.Unlock()
 			} else {
+				logger.Debug("filters did match")
 				e.Processed.Store(true)
 			}
 

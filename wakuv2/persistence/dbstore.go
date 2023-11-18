@@ -189,11 +189,20 @@ func (d *DBStore) Put(env *protocol.Envelope) error {
 		return err
 	}
 
+	if env.Message().ContentTopic == "/waku/1/0x01020304/rfc26" {
+		d.log.Info("PPPPPP put", zap.String("contentTopic", env.Message().ContentTopic))
+	} else {
+		d.log.Info("NN put", zap.String("contentTopic", env.Message().ContentTopic))
+	}
+
 	return nil
 }
 
 // Query retrieves messages from the DB
 func (d *DBStore) Query(query *storepb.HistoryQuery) (*storepb.Index, []gowakuPersistence.StoredMessage, error) {
+	if query.ContentFilters[0].ContentTopic == "/waku/1/0x01020304/rfc26" {
+		d.log.Info("CCCCCCC query", zap.Any("query", query))
+	}
 	start := time.Now()
 	defer func() {
 		elapsed := time.Since(start)
