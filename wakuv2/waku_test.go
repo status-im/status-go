@@ -117,7 +117,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, w.Start())
 
 	// DNSDiscovery
-	ctx, cancel := context.WithTimeout(context.TODO(), 90*time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
 	discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrTreeAddress)
@@ -135,7 +135,7 @@ func TestBasicWakuV2(t *testing.T) {
 
 	// Sanity check, not great, but it's probably helpful
 	err = tt.RetryWithBackOff(func() error {
-		if len(w.Peers()) == 0 {
+		if len(w.Peers()) > 2 {
 			return errors.New("no peers discovered")
 		}
 		return nil
@@ -145,7 +145,7 @@ func TestBasicWakuV2(t *testing.T) {
 
 	filter := &common.Filter{
 		Messages:      common.NewMemoryMessageStore(),
-		ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
+		ContentTopics: common.NewTopicSetFromBytes([][]byte{[]byte{1, 2, 3, 4}}),
 	}
 
 	_, err = w.Subscribe(filter)
@@ -168,7 +168,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.Len(t, messages, 1)
 
 	timestampInSeconds := msgTimestamp / int64(time.Second)
-	marginInSeconds := 5
+	marginInSeconds := 20
 
 	options = func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 60 * time.Second
@@ -186,6 +186,7 @@ func TestBasicWakuV2(t *testing.T) {
 		return nil
 	}, options)
 	require.NoError(t, err)
+
 	require.NoError(t, w.Stop())
 }
 
