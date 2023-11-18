@@ -1394,8 +1394,7 @@ func (w *Waku) processQueue() {
 		case <-w.ctx.Done():
 			return
 		case e := <-w.msgQueue:
-			logger := w.logger.With(zap.String("hash", e.Hash().String()), zap.String("envelopeHash", hexutil.Encode(e.Envelope.Hash())), zap.String("contentTopic", e.ContentTopic.ContentTopic()), zap.Int64("timestamp", e.Envelope.Message().Timestamp))
-			logger.Debug("received message from queue")
+			logger := w.logger.With(zap.String("hash", e.Hash().String()), zap.String("contentTopic", e.ContentTopic.ContentTopic()), zap.Int64("timestamp", e.Envelope.Message().Timestamp))
 			if e.MsgType == common.StoreMessageType {
 				// We need to insert it first, and then remove it if not matched,
 				// as messages are processed asynchronously
