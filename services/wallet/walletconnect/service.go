@@ -1,12 +1,15 @@
 package walletconnect
 
 import (
+	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -23,6 +26,7 @@ type txSigningDetails struct {
 }
 
 type Service struct {
+	db             *sql.DB
 	networkManager *network.Manager
 	accountsDB     *accounts.Database
 	eventFeed      *event.Feed
@@ -34,9 +38,9 @@ type Service struct {
 	txSignDetails *txSigningDetails
 }
 
-func NewService(networkManager *network.Manager, accountsDB *accounts.Database, transactor *transactions.Transactor,
-	gethManager *account.GethManager, eventFeed *event.Feed, config *params.NodeConfig) *Service {
+func NewService(db *sql.DB, networkManager *network.Manager, accountsDB *accounts.Database, transactor *transactions.Transactor, gethManager *account.GethManager, eventFeed *event.Feed, config *params.NodeConfig) *Service {
 	return &Service{
+		db:             db,
 		networkManager: networkManager,
 		accountsDB:     accountsDB,
 		eventFeed:      eventFeed,
@@ -101,6 +105,27 @@ func (s *Service) PairSessionProposal(proposal SessionProposal) (*PairSessionRes
 			Eip155: namespace,
 		},
 	}, nil
+}
+
+func (s *Service) RecordSuccessfulPairing(proposal SessionProposal) error {
+	var icon string
+	if len(proposal.Params.Proposer.Metadata.Icons) > 0 {
+		icon = proposal.Params.Proposer.Metadata.Icons[0]
+	}
+	return InsertPairing(s.db, Pairing{
+		Topic:       proposal.Params.PairingTopic,
+		Expiry:      proposal.Params.Expiry,
+		Active:      true,
+		AppName:     proposal.Params.Proposer.Metadata.Name,
+		URL:         proposal.Params.Proposer.Metadata.URL,
+		Description: proposal.Params.Proposer.Metadata.Description,
+		Icon:        icon,
+		Verified:    proposal.Params.Verify.Verified,
+	})
+}
+
+func (s *Service) HasActivePairings() (bool, error) {
+	return HasActivePairings(s.db, time.Now().Unix())
 }
 
 func (s *Service) SessionRequest(request SessionRequest) (response *SessionRequestResponse, err error) {
