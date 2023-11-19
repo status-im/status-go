@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-// TODO #12434: respond async
 // func sendResponseEvent(eventFeed *event.Feed, eventType walletevent.EventType, payloadObj interface{}, resErr error) {
 // 	payload, err := json.Marshal(payloadObj)
 // 	if err != nil {
@@ -17,14 +16,14 @@ import (
 // 		err = resErr
 // 	}
 
-// 	log.Debug("wallet.api.wc RESPONSE", "eventType", eventType, "error", err, "payload.len", len(payload))
-
 // 	event := walletevent.Event{
 // 		Type:    eventType,
 // 		Message: string(payload),
 // 	}
 
-// 	eventFeed.Send(event)
+// 	sentCount := eventFeed.Send(event)
+
+// 	log.Debug("wallet.api.wc RESPONSE", "eventType", eventType, "error", err, "payload.len", len(payload), "sentCount", sentCount)
 // }
 
 func parseCaip2ChainID(str string) (uint64, error) {

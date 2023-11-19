@@ -18,6 +18,8 @@ var ErrorChainsNotSupported = errors.New("chains not supported")
 var ErrorInvalidParamsCount = errors.New("invalid params count")
 var ErrorMethodNotSupported = errors.New("method not supported")
 
+type Topic string
+
 type Namespace struct {
 	Methods  []string `json:"methods"`
 	Chains   []string `json:"chains"` // CAIP-2 format e.g. ["eip155:1"]
@@ -43,18 +45,20 @@ type Namespaces struct {
 	// We ignore non ethereum namespaces
 }
 
+type Verified struct {
+	VerifyURL  string `json:"verifyUrl"`
+	Validation string `json:"validation"`
+	Origin     string `json:"origin"`
+	IsScam     bool   `json:"isScam,omitempty"`
+}
+
 type VerifyContext struct {
-	Verified struct {
-		VerifyURL  string `json:"verifyUrl"`
-		Validation string `json:"validation"`
-		Origin     string `json:"origin"`
-		IsScam     bool   `json:"isScam,omitempty"`
-	} `json:"verified"`
+	Verified Verified `json:"verified"`
 }
 
 type Params struct {
 	ID                 int64         `json:"id"`
-	PairingTopic       string        `json:"pairingTopic"`
+	PairingTopic       Topic         `json:"pairingTopic"`
 	Expiry             int64         `json:"expiry"`
 	RequiredNamespaces Namespaces    `json:"requiredNamespaces"`
 	OptionalNamespaces Namespaces    `json:"optionalNamespaces"`
@@ -63,7 +67,7 @@ type Params struct {
 }
 
 type SessionProposal struct {
-	ID     uint64 `json:"id"`
+	ID     int64  `json:"id"`
 	Params Params `json:"params"`
 }
 
@@ -82,9 +86,14 @@ type RequestParams struct {
 
 type SessionRequest struct {
 	ID     int64         `json:"id"`
-	Topic  string        `json:"topic"`
+	Topic  Topic         `json:"topic"`
 	Params RequestParams `json:"params"`
 	Verify VerifyContext `json:"verifyContext"`
+}
+
+type SessionDelete struct {
+	ID    int64 `json:"id"`
+	Topic Topic `json:"topic"`
 }
 
 type SessionRequestResponse struct {
