@@ -358,7 +358,6 @@ func TestWakuV2Store(t *testing.T) {
 	// Send a message from the first node
 	msgTimestamp := w1.CurrentTime().UnixNano()
 	contentTopic := maps.Keys(filter.ContentTopics)[0]
-
 	_, err = w1.Send(relay.DefaultWakuTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: contentTopic.ContentTopic(),
@@ -380,8 +379,6 @@ func TestWakuV2Store(t *testing.T) {
 	storeResult, err := w1.query(context.Background(), w2.node.Host().ID(), relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-int64(marginInSeconds)), uint64(timestampInSeconds+int64(marginInSeconds)), []store.HistoryRequestOption{
 		store.WithLocalQuery(),
 	})
-	if err != nil || len(storeResult.Messages) == 0 {
-		t.Fail()
-	}
-
+	require.NoError(t, err)
+	require.True(t, len(storeResult.Messages) > 0, "no messages received from store node")
 }
