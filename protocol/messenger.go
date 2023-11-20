@@ -670,7 +670,7 @@ func (m *Messenger) processSentMessages(ids []string) error {
 }
 
 func shouldResendMessage(message *common.RawMessage, t common.TimeSource) (bool, error) {
-	if !(message.MessageType == protobuf.ApplicationMetadataMessage_EMOJI_REACTION ||
+	if !(message.ResendAutomatically || message.MessageType == protobuf.ApplicationMetadataMessage_EMOJI_REACTION ||
 		message.MessageType == protobuf.ApplicationMetadataMessage_CHAT_MESSAGE) {
 		return false, errors.Errorf("Should resend only specific types of messages, can't resend %v", message.MessageType)
 	}
