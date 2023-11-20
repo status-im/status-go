@@ -306,3 +306,161 @@ func (s *MessengerActivityCenterMessageSuite) TestMuteCommunityActivityCenterNot
 	s.Require().True(response.Messages()[0].Mentioned)
 	s.Require().Len(response.ActivityCenterNotifications(), 0)
 }
+
+func (s *MessengerActivityCenterMessageSuite) prepareCommunityChannelWithMentionAndReply() (*Messenger, *Messenger, *common.Message, *common.Message, *communities.Community) {
+	alice := s.m
+	bob := s.newMessenger()
+	_, err := bob.Start()
+	s.Require().NoError(err)
+	defer bob.Shutdown() // nolint: errcheck
+
+	// Create a community
+	community, chat := s.createCommunity(bob)
+	s.Require().NotNil(community)
+	s.Require().NotNil(chat)
+
+	// Alice joins the community
+	s.advertiseCommunityTo(community, bob, alice)
+	s.joinCommunity(community, bob, alice)
+
+	// Bob sends a mention message
+	mentionMessage := common.NewMessage()
+	mentionMessage.ChatId = chat.ID
+	mentionMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	mentionMessage.Text = "Good news, @" + common.EveryoneMentionTag + " !"
+
+	response, err := bob.SendChatMessage(context.Background(), mentionMessage)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().True(response.Messages()[0].Mentioned)
+
+	// check alice got the mention message
+	response, err = WaitOnMessengerResponse(
+		alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Messages()) == 1 && len(r.ActivityCenterNotifications()) == 1 &&
+				r.Messages()[0].ID == r.ActivityCenterNotifications()[0].Message.ID
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	s.Require().NotNil(response.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(ActivityCenterNotificationTypeMention, response.ActivityCenterNotifications()[0].Type)
+	s.Require().False(response.ActivityCenterNotifications()[0].Read)
+	mentionMessage = response.Messages()[0]
+
+	// Alice sends a community message
+	inputMessage := common.NewMessage()
+	inputMessage.ChatId = chat.ID
+	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	inputMessage.Text = "test message"
+
+	response, err = alice.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+
+	// Check the community message is received by Bob
+	response, err = WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool { return len(r.Messages()) == 1 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+
+	// Bob sends a reply message
+	replyMessage := common.NewMessage()
+	replyMessage.ChatId = chat.ID
+	replyMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	replyMessage.Text = "test message reply"
+	replyMessage.ResponseTo = response.Messages()[0].ID
+
+	response, err = bob.SendChatMessage(context.Background(), replyMessage)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 2)
+
+	// Check Alice got the reply message
+	response, err = WaitOnMessengerResponse(
+		alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1 &&
+				(r.Messages()[0].ID == r.ActivityCenterNotifications()[0].Message.ID ||
+					r.Messages()[1].ID == r.ActivityCenterNotifications()[0].Message.ID)
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Equal(ActivityCenterNotificationTypeReply, response.ActivityCenterNotifications()[0].Type)
+	s.Require().False(response.ActivityCenterNotifications()[0].Read)
+	replyMessage = response.Messages()[0]
+
+	return alice, bob, mentionMessage, replyMessage, community
+}
+
+func (s *MessengerActivityCenterMessageSuite) confirmMentionAndReplyNotificationsRead(user *Messenger, mentionMessage *common.Message, replyMessage *common.Message) {
+	// Confirm reply notification
+	notifResponse, err := user.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
+		Limit:         8,
+		ReadType:      ActivityCenterQueryParamsReadAll,
+		ActivityTypes: []ActivityCenterType{ActivityCenterNotificationTypeReply, ActivityCenterNotificationTypeMention},
+	})
+	s.Require().NoError(err)
+	s.Require().Len(notifResponse.Notifications, 2)
+
+	s.Require().True(notifResponse.Notifications[0].Read)
+	s.Require().True(notifResponse.Notifications[1].Read)
+}
+
+func (s *MessengerActivityCenterMessageSuite) TestMarkMessagesSeenMarksNotificationsRead() {
+	alice, _, mentionMessage, replyMessage, _ := s.prepareCommunityChannelWithMentionAndReply()
+
+	_, _, notifications, err := alice.MarkMessagesSeen(replyMessage.ChatId, []string{mentionMessage.ID, replyMessage.ID})
+
+	s.Require().NoError(err)
+	s.Require().Len(notifications, 2)
+	s.Require().True(notifications[0].Read)
+	s.Require().True(notifications[1].Read)
+
+	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage)
+}
+
+func (s *MessengerActivityCenterMessageSuite) TestMarkAllReadMarksNotificationsRead() {
+	alice, _, mentionMessage, replyMessage, _ := s.prepareCommunityChannelWithMentionAndReply()
+
+	response, err := alice.MarkAllRead(context.Background(), mentionMessage.ChatId)
+
+	s.Require().NoError(err)
+	s.Require().Len(response.ActivityCenterNotifications(), 2)
+	s.Require().True(response.ActivityCenterNotifications()[0].Read)
+	s.Require().True(response.ActivityCenterNotifications()[1].Read)
+
+	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage)
+}
+
+func (s *MessengerActivityCenterMessageSuite) TestMarkAllReadInCommunityMarksNotificationsRead() {
+	alice, _, mentionMessage, replyMessage, community := s.prepareCommunityChannelWithMentionAndReply()
+
+	response, err := alice.MarkAllReadInCommunity(context.Background(), community.IDString())
+
+	s.Require().NoError(err)
+	s.Require().Len(response.ActivityCenterNotifications(), 2)
+	s.Require().True(response.ActivityCenterNotifications()[0].Read)
+	s.Require().True(response.ActivityCenterNotifications()[1].Read)
+
+	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage)
+}
+
+func (s *MessengerActivityCenterMessageSuite) TestMarkAllActivityCenterNotificationsReadMarksMessagesAsSeen() {
+	alice, _, mentionMessage, replyMessage, _ := s.prepareCommunityChannelWithMentionAndReply()
+
+	response, err := alice.MarkAllActivityCenterNotificationsRead(context.Background())
+
+	s.Require().NoError(err)
+	s.Require().Len(response.ActivityCenterNotifications(), 3)
+	s.Require().True(response.ActivityCenterNotifications()[0].Read)
+	s.Require().True(response.ActivityCenterNotifications()[1].Read)
+	s.Require().True(response.ActivityCenterNotifications()[2].Read)
+
+	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage)
+}

@@ -3494,6 +3494,7 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 			Author:        message.From,
 			UpdatedAt:     m.GetCurrentTimeInMillis(),
 			AlbumMessages: albumMessages,
+			Read:          message.Seen,
 		}
 
 		return m.addActivityCenterNotification(r.Response, notification, nil)
@@ -4141,7 +4142,7 @@ func (m *Messenger) DeleteMessagesByChatID(id string) error {
 // MarkMessagesSeen marks messages with `ids` as seen in the chat `chatID`.
 // It returns the number of affected messages or error. If there is an error,
 // the number of affected messages is always zero.
-func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint64, error) {
+func (m *Messenger) markMessagesSeenImpl(chatID string, ids []string) (uint64, uint64, error) {
 	count, countWithMentions, err := m.persistence.MarkMessagesSeen(chatID, ids)
 	if err != nil {
 		return 0, 0, err
@@ -4152,6 +4153,32 @@ func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint6
 	}
 	m.allChats.Store(chatID, chat)
 	return count, countWithMentions, nil
+}
+
+func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint64, []*ActivityCenterNotification, error) {
+	count, countWithMentions, err := m.markMessagesSeenImpl(chatID, ids)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+
+	hexBytesIds := []types.HexBytes{}
+	for _, id := range ids {
+		hexBytesIds = append(hexBytesIds, types.FromHex(id))
+	}
+
+	// Mark notifications as read in the database
+	updatedAt := m.GetCurrentTimeInMillis()
+	err = m.persistence.MarkActivityCenterNotificationsRead(hexBytesIds, updatedAt)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+
+	notifications, err := m.persistence.GetActivityCenterNotificationsByID(hexBytesIds)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+
+	return count, countWithMentions, notifications, nil
 }
 
 func (m *Messenger) syncChatMessagesRead(ctx context.Context, chatID string, clock uint64, rawMessageHandler RawMessageHandler) error {
@@ -4215,30 +4242,40 @@ func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool
 	return m.persistence.SaveChats([]*Chat{chat})
 }
 
-func (m *Messenger) MarkAllRead(ctx context.Context, chatID string) error {
-	_, err := m.DismissAllActivityCenterNotificationsFromChatID(ctx, chatID, m.GetCurrentTimeInMillis())
+func (m *Messenger) MarkAllRead(ctx context.Context, chatID string) (*MessengerResponse, error) {
+	response := &MessengerResponse{}
+
+	notifications, err := m.DismissAllActivityCenterNotificationsFromChatID(ctx, chatID, m.GetCurrentTimeInMillis())
 	if err != nil {
-		return err
+		return nil, err
 	}
+	response.AddActivityCenterNotifications(notifications)
 
 	clock, _ := m.latestIncomingMessageClock(chatID)
 
 	if clock == 0 {
 		chat, ok := m.allChats.Load(chatID)
 		if !ok {
-			return errors.New("chat not found")
+			return nil, errors.New("chat not found")
 		}
 		clock, _ = chat.NextClockAndTimestamp(m.getTimesource())
 	}
 
-	return m.markAllRead(chatID, clock, true)
-}
-
-func (m *Messenger) MarkAllReadInCommunity(ctx context.Context, communityID string) ([]string, error) {
-	_, err := m.DismissAllActivityCenterNotificationsFromCommunity(ctx, communityID, m.GetCurrentTimeInMillis())
+	err = m.markAllRead(chatID, clock, true)
 	if err != nil {
 		return nil, err
 	}
+	return response, nil
+}
+
+func (m *Messenger) MarkAllReadInCommunity(ctx context.Context, communityID string) (*MessengerResponse, error) {
+	response := &MessengerResponse{}
+
+	notifications, err := m.DismissAllActivityCenterNotificationsFromCommunity(ctx, communityID, m.GetCurrentTimeInMillis())
+	if err != nil {
+		return nil, err
+	}
+	response.AddActivityCenterNotifications(notifications)
 
 	chatIDs, err := m.persistence.AllChatIDsByCommunity(nil, communityID)
 	if err != nil {
@@ -4257,14 +4294,12 @@ func (m *Messenger) MarkAllReadInCommunity(ctx context.Context, communityID stri
 			chat.UnviewedMessagesCount = 0
 			chat.UnviewedMentionsCount = 0
 			m.allChats.Store(chat.ID, chat)
+			response.AddChat(chat)
 		} else {
 			err = errors.New(fmt.Sprintf("chat with chatID %s not found", chatID))
 		}
 	}
-	if err != nil {
-		return chatIDs, err
-	}
-	return chatIDs, err
+	return response, err
 }
 
 // MuteChat signals to the messenger that we don't want to be notified

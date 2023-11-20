@@ -605,26 +605,40 @@ func (db sqlitePersistence) GetActivityCenterNotificationsByID(ids []types.HexBy
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	rows, err := db.db.Query("SELECT a.id, a.read, a.accepted, a.dismissed FROM activity_center_notifications a WHERE a.id IN ("+inVector+") AND NOT a.deleted", idsArgs...) // nolint: gosec
+	// nolint: gosec
+	rows, err := db.db.Query(
+		`
+		SELECT
+		a.id,
+		a.timestamp,
+		a.notification_type,
+		a.chat_id,
+		a.community_id,
+		a.membership_status,
+		a.read,
+		a.accepted,
+		a.dismissed,
+		a.message,
+		c.last_message,
+		a.reply_message,
+		a.contact_verification_status,
+		c.name,
+		a.author,
+		substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || hex(a.id) as cursor,
+		a.updated_at
+		FROM activity_center_notifications a
+		LEFT JOIN chats c
+		ON
+		c.id = a.chat_id
+		WHERE a.id IN (`+inVector+`) AND NOT a.deleted`, idsArgs...)
 
 	if err != nil {
 		return nil, err
 	}
 
-	var notifications []*ActivityCenterNotification
-	for rows.Next() {
-		notification := &ActivityCenterNotification{}
-		err := rows.Scan(
-			&notification.ID,
-			&notification.Read,
-			&notification.Accepted,
-			&notification.Dismissed)
-
-		if err != nil {
-			return nil, err
-		}
-
-		notifications = append(notifications, notification)
+	_, notifications, err := db.unmarshalActivityCenterNotificationRows(rows)
+	if err != nil {
+		return nil, nil
 	}
 
 	return notifications, nil

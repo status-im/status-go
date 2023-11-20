@@ -268,16 +268,18 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 	err = s.m.SaveMessages([]*common.Message{inputMessage1, inputMessage2})
 	s.Require().NoError(err)
 
-	count, countWithMentions, err := s.m.MarkMessagesSeen(chat.ID, []string{inputMessage1.ID})
+	count, countWithMentions, notifications, err := s.m.MarkMessagesSeen(chat.ID, []string{inputMessage1.ID})
 	s.Require().NoError(err)
 	s.Require().Equal(uint64(1), count)
 	s.Require().Equal(uint64(1), countWithMentions)
+	s.Require().Len(notifications, 0)
 
 	// Make sure that if it's not seen, it does not return a count of 1
-	count, countWithMentions, err = s.m.MarkMessagesSeen(chat.ID, []string{inputMessage1.ID})
+	count, countWithMentions, notifications, err = s.m.MarkMessagesSeen(chat.ID, []string{inputMessage1.ID})
 	s.Require().NoError(err)
 	s.Require().Equal(uint64(0), count)
 	s.Require().Equal(uint64(0), countWithMentions)
+	s.Require().Len(notifications, 0)
 
 	chats := s.m.Chats()
 	for _, c := range chats {
@@ -305,7 +307,7 @@ func (s *MessengerSuite) TestMarkAllRead() {
 	err = s.m.SaveMessages([]*common.Message{inputMessage1, inputMessage2})
 	s.Require().NoError(err)
 
-	err = s.m.MarkAllRead(context.Background(), chat.ID)
+	_, err = s.m.MarkAllRead(context.Background(), chat.ID)
 	s.Require().NoError(err)
 
 	chats := s.m.Chats()

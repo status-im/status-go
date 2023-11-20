@@ -139,14 +139,15 @@ func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids
 		notification.Read = true
 		response.AddActivityCenterNotification(notification)
 
-		if notification.Type == ActivityCenterNotificationTypeMention || notification.Type == ActivityCenterNotificationTypeReply {
-			repliesAndMentions[notification.ChatID] = append(repliesAndMentions[notification.ChatID], notification.ID.String())
+		if notification.Message != nil &&
+			(notification.Type == ActivityCenterNotificationTypeMention || notification.Type == ActivityCenterNotificationTypeReply) {
+			repliesAndMentions[notification.ChatID] = append(repliesAndMentions[notification.ChatID], notification.Message.ID)
 		}
 	}
 
 	// Mark messages as seen
 	for chatID, messageIDs := range repliesAndMentions {
-		_, _, err := m.MarkMessagesSeen(chatID, messageIDs)
+		_, _, err := m.markMessagesSeenImpl(chatID, messageIDs)
 		if err != nil {
 			return nil, err
 		}
