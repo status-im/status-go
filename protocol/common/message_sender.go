@@ -631,7 +631,7 @@ func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMes
 		return nil, nil, err
 	}
 
-	hashes := make([][]byte, len(newMessages))
+	hashes := make([][]byte, 0, len(newMessages))
 	for _, newMessage := range newMessages {
 		hash, err := s.transport.SendPublic(ctx, newMessage, rawMessage.LocalChatID)
 		if err != nil {
@@ -701,7 +701,7 @@ func (s *MessageSender) SendPublic(
 		return nil, err
 	}
 
-	hashes := make([][]byte, len(newMessages))
+	hashes := make([][]byte, 0, len(newMessages))
 	for _, newMessage := range newMessages {
 		hash, err := s.transport.SendPublic(ctx, newMessage, chatName)
 		if err != nil {
@@ -1034,7 +1034,7 @@ func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *R
 		return nil, nil, err
 	}
 
-	hashes := make([][]byte, len(newMessages))
+	hashes := make([][]byte, 0, len(newMessages))
 	var hash []byte
 	for _, newMessage := range newMessages {
 		if rawMessage.SendOnPersonalTopic {
@@ -1067,7 +1067,7 @@ func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey 
 		return nil, nil, err
 	}
 
-	hashes := make([][]byte, len(newMessages))
+	hashes := make([][]byte, 0, len(newMessages))
 	for _, newMessage := range newMessages {
 		hash, err := s.transport.SendCommunityMessage(ctx, newMessage, publicKey)
 		if err != nil {
@@ -1093,7 +1093,7 @@ func (s *MessageSender) sendMessageSpec(ctx context.Context, publicKey *ecdsa.Pu
 		return nil, nil, err
 	}
 
-	hashes := make([][]byte, len(newMessages))
+	hashes := make([][]byte, 0, len(newMessages))
 	var hash []byte
 	for _, newMessage := range newMessages {
 		// process shared secret
