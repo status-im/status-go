@@ -31,8 +31,10 @@ help: ##@other Show this help
 
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOPATH ?= $(HOME)/go
+
+GIT_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 GIT_COMMIT = $(shell git rev-parse --short HEAD)
-AUTHOR ?= $(shell git config user.email || echo $$USER)
+GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 ENABLE_METRICS ?= true
 BUILD_TAGS ?= gowaku_no_rln
@@ -113,7 +115,7 @@ statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
 	@echo "Building docker image for ststusd-prune..."
 	docker build --file _assets/build/Dockerfile-prune . \
 		--label "commit=$(GIT_COMMIT)" \
-		--label "author=$(AUTHOR)" \
+		--label "author=$(GIT_AUTHOR)" \
 		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(STATUSD_PRUNE_IMAGE_NAME):latest
 
@@ -188,7 +190,7 @@ docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the ima
 		--build-arg "build_flags=$(BUILD_FLAGS)" \
 		--build-arg "build_target=$(BUILD_TARGET)" \
 		--label "commit=$(GIT_COMMIT)" \
-		--label "author=$(AUTHOR)" \
+		--label "author=$(GIT_AUTHOR)" \
 		-t $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(DOCKER_IMAGE_NAME):latest
 
@@ -198,7 +200,7 @@ bootnode-image:
 		--build-arg "build_tags=$(BUILD_TAGS)" \
 		--build-arg "build_flags=$(BUILD_FLAGS)" \
 		--label "commit=$(GIT_COMMIT)" \
-		--label "author=$(AUTHOR)" \
+		--label "author=$(GIT_AUTHOR)" \
 		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(BOOTNODE_IMAGE_NAME):latest
 
@@ -405,7 +407,8 @@ migration-wallet:
 	touch $(DEFAULT_WALLET_MIGRATION_PATH)/$(shell date +%s)_$(D).up.sql
 
 install-git-hooks:
-	@ln -srf $(shell pwd)/_assets/hooks/* .git/hooks
+	@ln -sf $(if $(filter $(detected_OS), Linux),-r,) \
+		$(GIT_ROOT)/_assets/hooks/* $(GIT_ROOT)/.git/hooks
 
 -include install-git-hooks
 .PHONY: install-git-hooks
