@@ -387,6 +387,7 @@ func waitForPeerConnection(t *testing.T, peerID string, peerCh chan []string) {
 			}
 		case <-ctx.Done():
 			require.Fail(t, "timed out waiting for peer "+peerID)
+			return
 		}
 	}
 }
@@ -402,6 +403,7 @@ func waitForEnvelope(t *testing.T, contentTopic string, envCh chan common.Envelo
 			}
 		case <-ctx.Done():
 			require.Fail(t, "timed out waiting for envelope's topic "+contentTopic)
+			return
 		}
 	}
 }
