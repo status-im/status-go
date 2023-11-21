@@ -1,3 +1,4 @@
+#!/usr/bin/env groovy
 library 'status-jenkins-lib@v1.7.0'
 
 pipeline {
@@ -9,12 +10,22 @@ pipeline {
       defaultValue: 'develop',
       description: 'Name of branch to build.'
     )
+    string(
+      name: 'UNIT_TEST_COUNT',
+      defaultValue: getDefaultUnitTestCount(),
+      description: 'How many times to run tests?'
+    )
+    booleanParam(
+      name: 'UNIT_TEST_FAILFAST',
+      defaultValue: getDefaultUnitTestFailfast(),
+      description: 'Should the job fail fast on first test failure?'
+    )
   }
 
   options {
     timestamps()
     /* Prevent Jenkins jobs from running forever */
-    timeout(time: 40, unit: 'MINUTES')
+    timeout(time: getDefaultTimeout(), unit: 'MINUTES')
     disableConcurrentBuilds()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
@@ -99,3 +110,24 @@ pipeline {
     cleanup { dir(env.TMPDIR) { deleteDir() } }
   } // post
 } // pipeline
+
+def getDefaultUnitTestCount() {
+  if (env.JOB_BASE_NAME == 'tests-nightly') {
+    return '10'
+  }
+  return '1'
+}
+
+def getDefaultUnitTestFailfast() {
+  if (env.JOB_BASE_NAME == 'tests-nightly') {
+    return false
+  }
+  return true
+}
+
+def getDefaultTimeout() {
+  if (env.JOB_BASE_NAME == 'tests-nightly') {
+    return 8*60
+  }
+  return 40
+}
