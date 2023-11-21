@@ -23,6 +23,7 @@ const (
 	ethereumGoerliString  = "goerli"
 	ethereumSepoliaString = "sepolia"
 	arbitrumGoerliString  = "arbitrum_goerli"
+	arbitrumSepoliaString = "arbitrum_sepolia"
 	optimismGoerliString  = "optimism_goerli"
 )
 
@@ -43,6 +44,8 @@ func chainIDToChainString(chainID walletCommon.ChainID) string {
 		chainString = ethereumSepoliaString
 	case walletCommon.ArbitrumGoerli:
 		chainString = arbitrumGoerliString
+	case walletCommon.ArbitrumSepolia:
+		chainString = arbitrumSepoliaString
 	case walletCommon.OptimismGoerli:
 		chainString = optimismGoerliString
 	}
