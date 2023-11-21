@@ -2,6 +2,7 @@ package history
 
 import (
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 
@@ -33,8 +34,21 @@ type entry struct {
 
 type assetIdentity struct {
 	ChainID     uint64
-	Address     common.Address
+	Addresses   []common.Address
 	TokenSymbol string
+}
+
+func (a *assetIdentity) addressesToString() string {
+	var addressesStr string
+	for i, address := range a.Addresses {
+		addressStr := hex.EncodeToString(address[:])
+		if i == 0 {
+			addressesStr = "X'" + addressStr + "'"
+		} else {
+			addressesStr += ", X'" + addressStr + "'"
+		}
+	}
+	return addressesStr
 }
 
 func (e *entry) String() string {
@@ -87,8 +101,9 @@ func (b *BalanceDB) getEntriesWithoutBalances(chainID uint64, address common.Add
 
 func (b *BalanceDB) getNewerThan(identity *assetIdentity, timestamp uint64) (entries []*entry, err error) {
 	// DISTINCT removes duplicates that can happen when a block has multiple transfers of same token
-	rawQueryStr := "SELECT DISTINCT block, timestamp, balance FROM balance_history WHERE chain_id = ? AND address = ? AND currency = ? AND timestamp > ? ORDER BY timestamp"
-	rows, err := b.db.Query(rawQueryStr, identity.ChainID, identity.Address, identity.TokenSymbol, timestamp)
+	rawQueryStr := "SELECT DISTINCT block, timestamp, balance, address FROM balance_history WHERE chain_id = ? AND address IN (%s) AND currency = ? AND timestamp > ? ORDER BY timestamp"
+	queryString := fmt.Sprintf(rawQueryStr, identity.addressesToString())
+	rows, err := b.db.Query(queryString, identity.ChainID, identity.TokenSymbol, timestamp)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
@@ -101,12 +116,11 @@ func (b *BalanceDB) getNewerThan(identity *assetIdentity, timestamp uint64) (ent
 	for rows.Next() {
 		entry := &entry{
 			chainID:     identity.ChainID,
-			address:     identity.Address,
 			tokenSymbol: identity.TokenSymbol,
 			block:       new(big.Int),
 			balance:     new(big.Int),
 		}
-		err := rows.Scan((*bigint.SQLBigInt)(entry.block), &entry.timestamp, (*bigint.SQLBigIntBytes)(entry.balance))
+		err := rows.Scan((*bigint.SQLBigInt)(entry.block), &entry.timestamp, (*bigint.SQLBigIntBytes)(entry.balance), &entry.address)
 		if err != nil {
 			return nil, err
 		}
