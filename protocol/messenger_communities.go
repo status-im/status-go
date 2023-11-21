@@ -1212,12 +1212,11 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		PubsubTopic:         common.DefaultNonProtectedPubsubTopic(community.Shard()),
 	}
 
-	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
+	_, err = m.SendMessageToControlNode(community, rawMessage)
 	if err != nil {
 		return nil, err
 	}
 
-	// send request to join to privileged members
 	if !community.AutoAccept() {
 		privilegedMembers := community.GetFilteredPrivilegedMembers(map[string]struct{}{})
 
@@ -1367,7 +1366,7 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
 
-	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
+	_, err = m.SendMessageToControlNode(community, rawMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -1530,8 +1529,8 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
 		PubsubTopic:         common.DefaultNonProtectedPubsubTopic(community.Shard()),
 	}
-	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
 
+	_, err = m.SendMessageToControlNode(community, rawMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -1820,7 +1819,8 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
 			PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in the community pubsub topic
 		}
-		_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
+
+		_, err = m.SendMessageToControlNode(community, rawMessage)
 		if err != nil {
 			return nil, err
 		}
@@ -6147,4 +6147,12 @@ func (m *Messenger) CreateResponseWithACNotification(communityID string, acType 
 	}
 
 	return response, nil
+}
+
+func (m *Messenger) SendMessageToControlNode(community *communities.Community, rawMessage common.RawMessage) ([]byte, error) {
+	if !community.PublicKey().Equal(community.ControlNode()) {
+		return m.sender.SendPrivate(context.Background(), community.ControlNode(), &rawMessage)
+	}
+
+	return m.sender.SendCommunityMessage(context.Background(), rawMessage)
 }
