@@ -21,6 +21,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/wakuv2/common"
@@ -285,24 +286,26 @@ func TestWakuV2Filter(t *testing.T) {
 
 func TestWakuV2Store(t *testing.T) {
 	// Configuration for the first Waku node
-	sql1, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	require.NoError(t, err)
 	config1 := &Config{
 		Port:              0,
 		EnableDiscV5:      false,
 		DiscoveryLimit:    20,
-		EnableStore:       true,
+		EnableStore:       false,
 		StoreCapacity:     100,
 		StoreSeconds:      3600,
 		KeepAliveInterval: 10,
 	}
+	w1PeersCh := make(chan []string, 100) // buffered not to block on the send side
 
 	// Start the first Waku node
-	w1, err := New("", "", config1, nil, sql1, nil, nil, nil)
+	w1, err := New("", "", config1, nil, nil, nil, nil, func(cs types.ConnStatus) {
+		w1PeersCh <- maps.Keys(cs.Peers)
+	})
 	require.NoError(t, err)
 	require.NoError(t, w1.Start())
 	defer func() {
 		require.NoError(t, w1.Stop())
+		close(w1PeersCh)
 	}()
 
 	// Configuration for the second Waku node
@@ -322,8 +325,11 @@ func TestWakuV2Store(t *testing.T) {
 	w2, err := New("", "", config2, nil, sql2, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w2.Start())
+	w2EnvelopeCh := make(chan common.EnvelopeEvent, 100)
+	w2.SubscribeEnvelopeEvents(w2EnvelopeCh)
 	defer func() {
 		require.NoError(t, w2.Stop())
+		close(w2EnvelopeCh)
 	}()
 
 	// Connect the two nodes directly
@@ -331,20 +337,7 @@ func TestWakuV2Store(t *testing.T) {
 	err = w1.node.DialPeer(context.Background(), peer2Addr)
 	require.NoError(t, err)
 
-	// Sanity check, not great, but it's probably helpful
-	options := func(b *backoff.ExponentialBackOff) {
-		b.MaxElapsedTime = 30 * time.Second
-	}
-	err = tt.RetryWithBackOff(func() error {
-		if len(w1.Peers()) == 0 {
-			return errors.New("no peers discovered")
-		}
-		return nil
-	}, options)
-	require.NoError(t, err)
-
-	// Wait for the nodes to discover each other
-	time.Sleep(1 * time.Second)
+	waitForPeerConnection(t, w2.node.ID(), w1PeersCh)
 
 	// Create a filter for the second node to catch messages
 	filter := &common.Filter{
@@ -366,8 +359,8 @@ func TestWakuV2Store(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Wait for the message to be transferred
-	time.Sleep(1 * time.Second)
+	waitForEnvelope(t, contentTopic.ContentTopic(), w2EnvelopeCh)
+
 	// Retrieve the message from the second node's filter
 	messages := filter.Retrieve()
 	require.Len(t, messages, 1)
@@ -376,9 +369,39 @@ func TestWakuV2Store(t *testing.T) {
 	marginInSeconds := 5
 
 	// Query the second node's store for the message
-	storeResult, err := w1.query(context.Background(), w2.node.Host().ID(), relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-int64(marginInSeconds)), uint64(timestampInSeconds+int64(marginInSeconds)), []store.HistoryRequestOption{
-		store.WithLocalQuery(),
-	})
+	storeResult, err := w1.query(context.Background(), w2.node.Host().ID(), relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-int64(marginInSeconds)), uint64(timestampInSeconds+int64(marginInSeconds)), []store.HistoryRequestOption{})
 	require.NoError(t, err)
 	require.True(t, len(storeResult.Messages) > 0, "no messages received from store node")
+}
+
+func waitForPeerConnection(t *testing.T, peerID string, peerCh chan []string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	for {
+		select {
+		case peers := <-peerCh:
+			for _, p := range peers {
+				if p == peerID {
+					return
+				}
+			}
+		case <-ctx.Done():
+			require.Fail(t, "timed out waiting for peer "+peerID)
+		}
+	}
+}
+
+func waitForEnvelope(t *testing.T, contentTopic string, envCh chan common.EnvelopeEvent) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	for {
+		select {
+		case env := <-envCh:
+			if env.Topic.ContentTopic() == contentTopic {
+				return
+			}
+		case <-ctx.Done():
+			require.Fail(t, "timed out waiting for envelope's topic "+contentTopic)
+		}
+	}
 }
