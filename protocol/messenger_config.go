@@ -114,6 +114,9 @@ type config struct {
 
 	telemetryServerURL string
 	wakuService        *wakuv2.Waku
+
+	messageResendMinDelay int
+	messageResendMaxCount int
 }
 
 type Option func(*config) error
@@ -137,6 +140,14 @@ func WithCustomLogger(logger *zap.Logger) Option {
 func WithVerifyTransactionClient(client EthClient) Option {
 	return func(c *config) error {
 		c.verifyTransactionClient = client
+		return nil
+	}
+}
+
+func WithResendParams(minDelay int, maxCount int) Option {
+	return func(c *config) error {
+		c.messageResendMinDelay = minDelay
+		c.messageResendMaxCount = maxCount
 		return nil
 	}
 }
