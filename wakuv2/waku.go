@@ -1102,6 +1102,7 @@ func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *storepb.Index, err error) {
 	requestID := protocol.GenerateRequestID()
 	opts = append(opts, store.WithRequestID(requestID))
+	pubsubTopic = w.getPubsubTopic(pubsubTopic)
 	result, err := w.query(ctx, peerID, pubsubTopic, topics, from, to, opts)
 	if err != nil {
 		w.logger.Error("error querying storenode", zap.String("requestID", hexutil.Encode(requestID)), zap.String("peerID", peerID.String()), zap.Error(err))
