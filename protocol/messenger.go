@@ -177,6 +177,9 @@ type Messenger struct {
 	processBackedupMessages bool
 
 	communityTokensService communitytokens.ServiceInterface
+
+	// used to track dispatched messages
+	dispatchMessageTestCallback func(common.RawMessage)
 }
 
 type connStatus int
@@ -2242,6 +2245,9 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 		return rawMessage, err
 	}
 
+	if m.dispatchMessageTestCallback != nil {
+		m.dispatchMessageTestCallback(rawMessage)
+	}
 	return rawMessage, nil
 }
 

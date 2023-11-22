@@ -250,7 +250,7 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 	)
 }
 
-func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, contactRequestID string) (*MessengerResponse, error) {
+func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, contactRequestID string, fromSyncing bool) (*MessengerResponse, error) {
 
 	m.logger.Debug("updateAcceptedContactRequest", zap.String("contactRequestID", contactRequestID))
 
@@ -286,23 +286,24 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	clock, _ := chat.NextClockAndTimestamp(m.transport)
 	contact.AcceptContactRequest(clock)
 
-	acceptContactRequest := &protobuf.AcceptContactRequest{
-		Id:    contactRequest.ID,
-		Clock: clock,
-	}
-	encodedMessage, err := proto.Marshal(acceptContactRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = m.dispatchMessage(context.Background(), common.RawMessage{
-		LocalChatID:         contactRequest.From,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_REQUEST,
-		ResendAutomatically: true,
-	})
-	if err != nil {
-		return nil, err
+	if !fromSyncing {
+		acceptContactRequest := &protobuf.AcceptContactRequest{
+			Id:    contactRequest.ID,
+			Clock: clock,
+		}
+		encodedMessage, err := proto.Marshal(acceptContactRequest)
+		if err != nil {
+			return nil, err
+		}
+		_, err = m.dispatchMessage(context.Background(), common.RawMessage{
+			LocalChatID:         contactRequest.From,
+			Payload:             encodedMessage,
+			MessageType:         protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_REQUEST,
+			ResendAutomatically: true,
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if response == nil {
@@ -455,7 +456,7 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 	}
 
 	if len(contactRequestID) != 0 {
-		updatedResponse, err := m.updateAcceptedContactRequest(response, contactRequestID)
+		updatedResponse, err := m.updateAcceptedContactRequest(response, contactRequestID, false)
 		if err != nil {
 			return nil, err
 		}
