@@ -103,11 +103,25 @@ pipeline {
   post {
     always  {
       script { env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText" }
-      junit '**/report.xml'
+      junit testResults:          '**/report.xml',
+            skipOldReports:       true,
+            skipPublishingChecks: true
+      publishHTML target: [
+        allowMissing:           true,
+        alwaysLinkToLastBuild:  true,
+        keepAll:                true,
+        reportDir:              'reports',
+        reportFiles:            'test_stats.txt',
+        reportName:             'Reports',
+        reportTitles:           'Test Stats'
+      ]
     }
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
-    cleanup { dir(env.TMPDIR) { deleteDir() } }
+    cleanup {
+      dir(env.TMPDIR) { deleteDir() }
+      sh "make git-clean"
+    }
   } // post
 } // pipeline
 

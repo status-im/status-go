@@ -40,17 +40,22 @@ for package in ${UNIT_TEST_PACKAGES}; do
   fi
 
   if [[ "${go_test_exit}" -ne 0 ]]; then
-    echo -e "${YLW}Failed, see the log:${RST} ${BLD}${output_file}${RST}"
+    if [[ "${CI}" == 'true' ]]; then
+      echo -e "${YLW}Failed, see the log:${RST} ${BLD}${output_file}${RST}"
+    fi
+
     if [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
       exit "${go_test_exit}"
     fi
+
     last_failing_exit_code="${go_test_exit}"
   fi
 done
 
 if [[ "${last_failing_exit_code}" -ne 0 ]]; then
   if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
-    "${GIT_ROOT}/_assets/scripts/test_stats.py"
+    mkdir -p "${GIT_ROOT}/reports"
+    "${GIT_ROOT}/_assets/scripts/test_stats.py" | redirect_stdout "${GIT_ROOT}/reports/test_stats.txt"
   fi
 
   exit "${last_failing_exit_code}"
