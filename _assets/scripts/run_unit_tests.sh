@@ -6,12 +6,14 @@ GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 source "${GIT_ROOT}/_assets/scripts/colors.sh"
 
 if [[ $UNIT_TEST_FAILFAST == 'true' ]]; then
-  GOTEST_EXTRAFLAGS="${GOTEST_EXTRAFLAGS} --failfast"
+  GOTEST_EXTRAFLAGS="${GOTEST_EXTRAFLAGS} -failfast"
 fi
 
 if [[ -z "${UNIT_TEST_COUNT}" ]]; then
   UNIT_TEST_COUNT=1
 fi
+
+UNIT_TEST_PACKAGE_TIMEOUT="$((UNIT_TEST_COUNT * 30))m"
 
 redirect_stdout() {
   output_file=$1
@@ -31,7 +33,10 @@ for package in ${UNIT_TEST_PACKAGES}; do
   package_dir=$(go list -f "{{.Dir}}" "${package}")
   output_file=${package_dir}/test.log
 
-  go test -timeout 30m -count="${UNIT_TEST_COUNT}" -tags "${BUILD_TAGS}" -v "${package}" ${GOTEST_EXTRAFLAGS} | \
+  go test "${package}" -v ${GOTEST_EXTRAFLAGS} \
+    -timeout "${UNIT_TEST_PACKAGE_TIMEOUT}" \
+    -count "${UNIT_TEST_COUNT}" \
+    -tags "${BUILD_TAGS}" | \
     redirect_stdout "${output_file}"
   go_test_exit=$?
 
