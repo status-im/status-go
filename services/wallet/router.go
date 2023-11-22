@@ -406,7 +406,7 @@ func newSuggestedRoutes(
 
 func NewRouter(s *Service) *Router {
 	bridges := make(map[string]bridge.Bridge)
-	transfer := bridge.NewTransferBridge(s.transactor)
+	transfer := bridge.NewTransferBridge(s.rpcClient, s.transactor)
 	erc721Transfer := bridge.NewERC721TransferBridge(s.rpcClient, s.transactor)
 	cbridge := bridge.NewCbridge(s.rpcClient, s.transactor, s.tokenManager)
 	hop := bridge.NewHopBridge(s.rpcClient, s.transactor, s.tokenManager)
@@ -648,6 +648,7 @@ func (r *Router) suggestedRoutes(
 					} else {
 						gasLimit = sendType.EstimateGas(r.s, network, addrFrom, tokenID)
 					}
+
 					requiredNativeBalance := new(big.Int).Mul(gweiToWei(maxFees), big.NewInt(int64(gasLimit)))
 					// Removed the required fees from maxAMount in case of native token tx
 					if token.IsNative() {
