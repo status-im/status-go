@@ -88,6 +88,7 @@ type settings struct {
 	Nameserver          string // Optional nameserver to use for dns discovery
 	EnableDiscV5        bool   // Indicates whether discv5 is enabled or not
 	Options             []node.WakuNodeOption
+	SkipPublishToTopic  bool // used in testing
 }
 
 type ITelemetryClient interface {
@@ -995,15 +996,23 @@ func (w *Waku) UnsubscribeMany(ids []string) error {
 	return nil
 }
 
+func (w *Waku) SkipPublishToTopic(value bool) {
+	w.settings.SkipPublishToTopic = value
+}
+
 func (w *Waku) broadcast() {
 	for {
 		select {
 		case envelope := <-w.sendQueue:
+			pubsubTopic := envelope.PubsubTopic()
 			var err error
-			logger := w.logger.With(zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", envelope.PubsubTopic()), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().Timestamp))
-			if w.settings.LightClient {
+			logger := w.logger.With(zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", pubsubTopic), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().Timestamp))
+			// For now only used in testing to simulate going offline
+			if w.settings.SkipPublishToTopic {
+				err = errors.New("Test send failure")
+			} else if w.settings.LightClient {
 				w.logger.Info("publishing message via lightpush")
-				_, err = w.node.Lightpush().PublishToTopic(context.Background(), envelope.Message(), lightpush.WithPubSubTopic(envelope.PubsubTopic()))
+				_, err = w.node.Lightpush().Publish(w.ctx, envelope.Message(), lightpush.WithPubSubTopic(pubsubTopic))
 			} else {
 				logger.Info("publishing message via relay")
 				_, err = w.node.Relay().PublishToTopic(context.Background(), envelope.Message(), envelope.PubsubTopic())
