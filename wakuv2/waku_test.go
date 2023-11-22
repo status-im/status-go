@@ -192,6 +192,60 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, w.Stop())
 }
 
+func TestPeerExchange(t *testing.T) {
+	configs := make([]*Config, 3)
+	for i := 0; i < 3; i++ {
+		config := PeerExchangeConfig()
+		configs[i] = config
+	}
+
+	nodes := CreateLocalNetwork(t, configs)
+	defer DropLocalWakuNetwork(t, nodes)
+
+	config := &Config{}
+	config.PeerExchange = true
+	config.WakuNodes = []string{nodes[0].ListenAddresses()[0]}
+	pxServer, err := New("", "", config, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, pxServer.Start())
+
+	pxServer.AddRelayPeer(nodes[1].ListenAddresses()[0])
+	pxServer.AddRelayPeer(nodes[2].ListenAddresses()[0])
+
+	t.Log("pxServer.ListenAddresses()[0]: ", pxServer.ListenAddresses()[0])
+	t.Log("pxServer peers: ", len(pxServer.Peers()))
+
+	time.Sleep(1 * time.Second)
+
+	config = &Config{}
+	config.PeerExchange = true
+	config.LightClient = true
+	config.WakuNodes = []string{pxServer.ListenAddresses()[0]}
+	w, err := New("", "", config, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, w.Start())
+
+	// Sanity check, not great, but it's probably helpful
+	options := func(b *backoff.ExponentialBackOff) {
+		b.MaxElapsedTime = 30 * time.Second
+	}
+	err = tt.RetryWithBackOff(func() error {
+		countpx := len(pxServer.Peers())
+		t.Log("w.countpx(): ", countpx)
+		count := len(w.Peers())
+		t.Log("w.count(): ", count)
+		if len(w.Peers()) > 1 {
+			t.Log("w.Peers(): ", w.Peers())
+			return nil
+		}
+		return errors.New("no peers discovered")
+	}, options)
+	require.NoError(t, err)
+
+	require.NoError(t, w.Stop())
+	require.NoError(t, pxServer.Stop())
+}
+
 func TestWakuV2Filter(t *testing.T) {
 	enrTreeAddress := testENRBootstrap
 	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
