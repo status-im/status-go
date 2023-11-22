@@ -3496,7 +3496,6 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 			AlbumMessages: albumMessages,
 			Read:          message.Seen,
 		}
-
 		return m.addActivityCenterNotification(r.Response, notification, nil)
 	}
 

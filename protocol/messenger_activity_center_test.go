@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -339,15 +340,15 @@ func (s *MessengerActivityCenterMessageSuite) prepareCommunityChannelWithMention
 		alice,
 		func(r *MessengerResponse) bool {
 			return len(r.Messages()) == 1 && len(r.ActivityCenterNotifications()) == 1 &&
-				r.Messages()[0].ID == r.ActivityCenterNotifications()[0].Message.ID
+				r.Messages()[0].ID == r.ActivityCenterNotifications()[0].Message.ID &&
+				r.ActivityCenterNotifications()[0].Type == ActivityCenterNotificationTypeMention
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
 
-	s.Require().NotNil(response.ActivityCenterNotifications()[0].Message)
-	s.Require().Equal(ActivityCenterNotificationTypeMention, response.ActivityCenterNotifications()[0].Type)
 	s.Require().False(response.ActivityCenterNotifications()[0].Read)
+	s.Require().Equal(response.ActivityCenterNotifications()[0].ID.String(), response.ActivityCenterNotifications()[0].Message.ID)
 	mentionMessage = response.Messages()[0]
 
 	// Alice sends a community message
@@ -361,13 +362,12 @@ func (s *MessengerActivityCenterMessageSuite) prepareCommunityChannelWithMention
 	s.Require().Len(response.Messages(), 1)
 
 	// Check the community message is received by Bob
-	response, err = WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		bob,
 		func(r *MessengerResponse) bool { return len(r.Messages()) == 1 },
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(response.Messages(), 1)
 
 	// Bob sends a reply message
 	replyMessage := common.NewMessage()
@@ -386,30 +386,48 @@ func (s *MessengerActivityCenterMessageSuite) prepareCommunityChannelWithMention
 		func(r *MessengerResponse) bool {
 			return len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1 &&
 				(r.Messages()[0].ID == r.ActivityCenterNotifications()[0].Message.ID ||
-					r.Messages()[1].ID == r.ActivityCenterNotifications()[0].Message.ID)
+					r.Messages()[1].ID == r.ActivityCenterNotifications()[0].Message.ID) &&
+				r.ActivityCenterNotifications()[0].Type == ActivityCenterNotificationTypeReply
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Equal(ActivityCenterNotificationTypeReply, response.ActivityCenterNotifications()[0].Type)
 	s.Require().False(response.ActivityCenterNotifications()[0].Read)
-	replyMessage = response.Messages()[0]
+
+	// There is an extra message with reply
+	if response.Messages()[0].ID == response.ActivityCenterNotifications()[0].Message.ID {
+		replyMessage = response.Messages()[0]
+	} else if response.Messages()[1].ID == response.ActivityCenterNotifications()[0].Message.ID {
+		replyMessage = response.Messages()[1]
+	} else {
+		s.Error(errors.New("can't find corresponding message in the response"))
+	}
+
+	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage, false)
 
 	return alice, bob, mentionMessage, replyMessage, community
 }
 
-func (s *MessengerActivityCenterMessageSuite) confirmMentionAndReplyNotificationsRead(user *Messenger, mentionMessage *common.Message, replyMessage *common.Message) {
+func (s *MessengerActivityCenterMessageSuite) confirmMentionAndReplyNotificationsRead(user *Messenger, mentionMessage *common.Message, replyMessage *common.Message, read bool) {
 	// Confirm reply notification
 	notifResponse, err := user.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
 		Limit:         8,
 		ReadType:      ActivityCenterQueryParamsReadAll,
-		ActivityTypes: []ActivityCenterType{ActivityCenterNotificationTypeReply, ActivityCenterNotificationTypeMention},
+		ActivityTypes: []ActivityCenterType{ActivityCenterNotificationTypeReply},
 	})
 	s.Require().NoError(err)
-	s.Require().Len(notifResponse.Notifications, 2)
+	s.Require().Len(notifResponse.Notifications, 1)
+	s.Require().Equal(read, notifResponse.Notifications[0].Read)
 
-	s.Require().True(notifResponse.Notifications[0].Read)
-	s.Require().True(notifResponse.Notifications[1].Read)
+	// Confirm mention notification
+	notifResponse, err = user.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
+		Limit:         8,
+		ReadType:      ActivityCenterQueryParamsReadAll,
+		ActivityTypes: []ActivityCenterType{ActivityCenterNotificationTypeMention},
+	})
+	s.Require().NoError(err)
+	s.Require().Len(notifResponse.Notifications, 1)
+	s.Require().Equal(read, notifResponse.Notifications[0].Read)
 }
 
 func (s *MessengerActivityCenterMessageSuite) TestMarkMessagesSeenMarksNotificationsRead() {
@@ -422,7 +440,7 @@ func (s *MessengerActivityCenterMessageSuite) TestMarkMessagesSeenMarksNotificat
 	s.Require().True(notifications[0].Read)
 	s.Require().True(notifications[1].Read)
 
-	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage)
+	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage, true)
 }
 
 func (s *MessengerActivityCenterMessageSuite) TestMarkAllReadMarksNotificationsRead() {
@@ -435,7 +453,7 @@ func (s *MessengerActivityCenterMessageSuite) TestMarkAllReadMarksNotificationsR
 	s.Require().True(response.ActivityCenterNotifications()[0].Read)
 	s.Require().True(response.ActivityCenterNotifications()[1].Read)
 
-	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage)
+	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage, true)
 }
 
 func (s *MessengerActivityCenterMessageSuite) TestMarkAllReadInCommunityMarksNotificationsRead() {
@@ -448,7 +466,7 @@ func (s *MessengerActivityCenterMessageSuite) TestMarkAllReadInCommunityMarksNot
 	s.Require().True(response.ActivityCenterNotifications()[0].Read)
 	s.Require().True(response.ActivityCenterNotifications()[1].Read)
 
-	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage)
+	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage, true)
 }
 
 func (s *MessengerActivityCenterMessageSuite) TestMarkAllActivityCenterNotificationsReadMarksMessagesAsSeen() {
@@ -462,5 +480,5 @@ func (s *MessengerActivityCenterMessageSuite) TestMarkAllActivityCenterNotificat
 	s.Require().True(response.ActivityCenterNotifications()[1].Read)
 	s.Require().True(response.ActivityCenterNotifications()[2].Read)
 
-	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage)
+	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage, true)
 }

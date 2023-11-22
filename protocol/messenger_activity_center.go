@@ -115,17 +115,25 @@ func (m *Messenger) MarkAsSeenActivityCenterNotifications() (*MessengerResponse,
 }
 
 func (m *Messenger) MarkAllActivityCenterNotificationsRead(ctx context.Context) (*MessengerResponse, error) {
-	updateAt := m.GetCurrentTimeInMillis()
-
 	ids, err := m.persistence.GetNotReadActivityCenterNotificationIds()
 	if err != nil {
 		return nil, err
 	}
 
+	updateAt := m.GetCurrentTimeInMillis()
 	return m.MarkActivityCenterNotificationsRead(ctx, toHexBytes(ids), updateAt, true)
 }
 
 func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids []types.HexBytes, updatedAt uint64, sync bool) (*MessengerResponse, error) {
+	// Mark notifications as read in the database
+	if updatedAt == 0 {
+		updatedAt = m.GetCurrentTimeInMillis()
+	}
+	err := m.persistence.MarkActivityCenterNotificationsRead(ids, updatedAt)
+	if err != nil {
+		return nil, err
+	}
+
 	notifications, err := m.persistence.GetActivityCenterNotificationsByID(ids)
 	if err != nil {
 		return nil, err
@@ -136,7 +144,6 @@ func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids
 
 	// When marking as read Mention or Reply notification, the corresponding chat message should also be read.
 	for _, notification := range notifications {
-		notification.Read = true
 		response.AddActivityCenterNotification(notification)
 
 		if notification.Message != nil &&
@@ -151,15 +158,6 @@ func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	// Mark notifications as read in the database
-	if updatedAt == 0 {
-		updatedAt = m.GetCurrentTimeInMillis()
-	}
-	err = m.persistence.MarkActivityCenterNotificationsRead(ids, updatedAt)
-	if err != nil {
-		return nil, err
 	}
 
 	state, err := m.persistence.GetActivityCenterState()
