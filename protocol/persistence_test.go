@@ -736,6 +736,7 @@ func TestMessagesIDsByType(t *testing.T) {
 }
 
 func TestExpiredMessagesIDs(t *testing.T) {
+	messageResendMaxCount := 30
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := newSQLitePersistence(db)
