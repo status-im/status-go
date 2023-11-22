@@ -110,6 +110,7 @@
 // 1698414646_add_padding.up.sql (69B)
 // 1698746210_add_signature_to_revealed_addresses.up.sql (87B)
 // 1699041816_profile_showcase_contacts.up.sql (2.206kB)
+// 1700820989_add_resend_automatically_index.up.sql (77B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -2377,6 +2378,26 @@ func _1699041816_profile_showcase_contactsUpSql() (*asset, error) {
 
 	info := bindataFileInfo{name: "1699041816_profile_showcase_contacts.up.sql", size: 2206, mode: os.FileMode(0644), modTime: time.Unix(1699551852, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd5, 0x7b, 0x55, 0xda, 0x93, 0x4a, 0x92, 0xf8, 0x45, 0xb2, 0x9f, 0x32, 0xf4, 0x37, 0xc, 0x5f, 0x62, 0xba, 0x33, 0xe2, 0x5c, 0x91, 0x1c, 0xc, 0x7, 0x9, 0xc2, 0x27, 0x5, 0x90, 0x94, 0xf3}}
+	return a, nil
+}
+
+var __1700820989_add_resend_automatically_indexUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x0e\x72\x75\x0c\x71\x55\xf0\xf4\x73\x71\x8d\x50\xc8\x4c\xa9\x88\x2f\x4a\x2d\x4e\xcd\x4b\x89\x4f\x2c\x2d\xc9\xcf\x4d\x2c\xc9\x4c\x4e\xcc\xc9\xa9\x54\xf0\xf7\x53\x28\x4a\x2c\x8f\xcf\x4d\x2d\x2e\x4e\x4c\x4f\x2d\xd6\xc0\xa6\x48\xd3\x9a\x0b\x10\x00\x00\xff\xff\xc6\x11\x2e\xab\x4d\x00\x00\x00")
+
+func _1700820989_add_resend_automatically_indexUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1700820989_add_resend_automatically_indexUpSql,
+		"1700820989_add_resend_automatically_index.up.sql",
+	)
+}
+
+func _1700820989_add_resend_automatically_indexUpSql() (*asset, error) {
+	bytes, err := _1700820989_add_resend_automatically_indexUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1700820989_add_resend_automatically_index.up.sql", size: 77, mode: os.FileMode(0644), modTime: time.Unix(1701334033, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x5a, 0x6a, 0xd4, 0xd2, 0x34, 0xa7, 0x68, 0xaa, 0xe5, 0x69, 0x9, 0xce, 0xcf, 0xcb, 0x13, 0x94, 0x9d, 0x3, 0x4c, 0x59, 0xac, 0x5f, 0x71, 0xb2, 0xe4, 0xda, 0x67, 0x42, 0xbe, 0xf2, 0x1d, 0xe8}}
 	return a, nil
 }
 

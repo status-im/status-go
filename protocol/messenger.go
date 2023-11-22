@@ -81,9 +81,6 @@ const (
 	privateChat chatContext = "private-chat"
 )
 
-const messageResendMinDelay = 30
-const messageResendMaxCount = 3
-
 var communityAdvertiseIntervalSecond int64 = 60 * 60
 
 // messageCacheIntervalMs is how long we should keep processed messages in the cache, in ms
@@ -285,7 +282,7 @@ func NewMessenger(
 ) (*Messenger, error) {
 	var messenger *Messenger
 
-	c := config{}
+	c := config{messageResendMinDelay: 30, messageResendMaxCount: 3}
 
 	for _, opt := range opts {
 		if err := opt(&c); err != nil {
@@ -668,22 +665,9 @@ func (m *Messenger) processSentMessages(ids []string) error {
 	return nil
 }
 
-func shouldResendMessage(message *common.RawMessage, t common.TimeSource) (bool, error) {
-	if !(message.MessageType == protobuf.ApplicationMetadataMessage_EMOJI_REACTION ||
-		message.MessageType == protobuf.ApplicationMetadataMessage_CHAT_MESSAGE) {
-		return false, errors.Errorf("Should resend only specific types of messages, can't resend %v", message.MessageType)
-	}
-
-	if message.Sent {
-		return false, errors.New("Should resend only non-sent messages")
-	}
-
-	if message.SendCount > messageResendMaxCount {
-		return false, nil
-	}
-
+func (m *Messenger) shouldResendMessage(message *common.RawMessage, t common.TimeSource) (bool, error) {
 	//exponential backoff depends on how many attempts to send message already made
-	backoff := uint64(math.Pow(2, float64(message.SendCount-1))) * messageResendMinDelay * uint64(time.Second.Milliseconds())
+	backoff := uint64(math.Pow(2, float64(message.SendCount-1))) * uint64(m.config.messageResendMinDelay) * uint64(time.Second.Milliseconds())
 	backoffElapsed := t.GetCurrentTime() > (message.LastSent + backoff)
 	return backoffElapsed, nil
 }
@@ -693,7 +677,7 @@ func (m *Messenger) resendExpiredMessages() error {
 		return errors.New("offline")
 	}
 
-	ids, err := m.persistence.ExpiredMessagesIDs(messageResendMaxCount)
+	ids, err := m.persistence.ExpiredMessagesIDs(m.config.messageResendMaxCount)
 	if err != nil {
 		return errors.Wrapf(err, "Can't get expired reactions from db")
 	}
@@ -713,7 +697,7 @@ func (m *Messenger) resendExpiredMessages() error {
 			return errors.New("Only public chats and community chats messages are resent")
 		}
 
-		ok, err = shouldResendMessage(rawMessage, m.getTimesource())
+		ok, err = m.shouldResendMessage(rawMessage, m.getTimesource())
 		if err != nil {
 			return err
 		}

@@ -296,6 +296,7 @@ func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, l
 		WithMultiAccounts(madb),
 		WithAccount(iai.ToMultiAccount()),
 		WithDatasync(),
+		WithResendParams(3, 3),
 		WithTokenManager(tokenManager),
 	}
 
