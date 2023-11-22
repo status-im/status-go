@@ -89,6 +89,7 @@ type settings struct {
 	EnableDiscV5        bool   // Indicates whether discv5 is enabled or not
 	DefaultPubsubTopic  string // Pubsub topic to be used by default for messages that do not have a topic assigned (depending whether sharding is used or not)
 	Options             []node.WakuNodeOption
+	SkipPublishToTopic  bool // used in testing
 }
 
 type ITelemetryClient interface {
@@ -1013,6 +1014,10 @@ func (w *Waku) UnsubscribeMany(ids []string) error {
 	return nil
 }
 
+func (w *Waku) SkipPublishToTopic(value bool) {
+	w.settings.SkipPublishToTopic = value
+}
+
 func (w *Waku) broadcast() {
 	for {
 		select {
@@ -1020,8 +1025,11 @@ func (w *Waku) broadcast() {
 			pubsubTopic := envelope.PubsubTopic()
 			var err error
 			logger := w.logger.With(zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", pubsubTopic), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().Timestamp))
-			if w.settings.LightClient {
-				logger.Info("publishing message via lightpush")
+			// For now only used in testing to simulate going offline
+			if w.settings.SkipPublishToTopic {
+				err = errors.New("Test send failure")
+			} else if w.settings.LightClient {
+				w.logger.Info("publishing message via lightpush")
 				_, err = w.node.Lightpush().Publish(w.ctx, envelope.Message(), lightpush.WithPubSubTopic(pubsubTopic))
 			} else {
 				logger.Info("publishing message via relay")
