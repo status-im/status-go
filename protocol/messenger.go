@@ -62,6 +62,7 @@ import (
 	"github.com/status-im/status-go/services/communitytokens"
 	ensservice "github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/ext/mailservers"
+	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -135,7 +136,6 @@ type Messenger struct {
 	mailserverCycle            mailserverCycle
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
-	mailservers                *mailserversDB.Database
 	settings                   *accounts.Database
 	account                    *multiaccounts.Account
 	mailserversDatabase        *mailserversDB.Database
@@ -198,6 +198,7 @@ type peerStatus struct {
 }
 type mailserverCycle struct {
 	sync.RWMutex
+	allMailservers            []mailserversDB.Mailserver
 	activeMailserver          *mailserversDB.Mailserver
 	peers                     map[string]peerStatus
 	events                    chan *p2p.PeerEvent
@@ -480,8 +481,6 @@ func NewMessenger(
 		return nil, err
 	}
 
-	mailservers := mailserversDB.NewDB(database)
-
 	savedAddressesManager := wallet.NewSavedAddressesManager(c.walletDb)
 
 	selfContact, err := buildSelfContact(identity, settings, c.multiAccount, c.account)
@@ -529,7 +528,6 @@ func NewMessenger(
 		settings:                settings,
 		peerStore:               peerStore,
 		verificationDatabase:    verification.NewPersistence(database),
-		mailservers:             mailservers,
 		mailserverCycle: mailserverCycle{
 			peers:                     make(map[string]peerStatus),
 			availabilitySubscriptions: make([]chan struct{}, 0),
@@ -838,7 +836,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	response.Mailservers = mailservers
-	err = m.StartMailserverCycle()
+	err = m.StartMailserverCycle(mailservers)
 	if err != nil {
 		return nil, err
 	}
@@ -1444,13 +1442,7 @@ func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
 		}
 	}
 
-	m.logger.Info("calling on contacts")
-	if m.config.onContactENSVerified != nil {
-		m.logger.Info("called on contacts")
-		response := &MessengerResponse{Contacts: contacts}
-		m.config.onContactENSVerified(response)
-	}
-
+	m.PublishMessengerResponse(&MessengerResponse{Contacts: contacts})
 }
 
 func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.VerificationRecord) {
@@ -3277,6 +3269,46 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 	}
 
 	return m.handleRetrievedMessages(chatWithMessages, true, false)
+}
+
+func (m *Messenger) StartRetrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
+	go func() {
+		ticker := time.NewTicker(tick)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				// We might be shutting down here
+				if m == nil {
+					return
+				}
+				m.ProcessAllMessages()
+			case <-cancel:
+				return
+			}
+		}
+	}()
+}
+
+func (m *Messenger) ProcessAllMessages() {
+	response, err := m.RetrieveAll()
+	if err != nil {
+		m.logger.Error("failed to retrieve raw messages", zap.Error(err))
+		return
+	}
+	m.PublishMessengerResponse(response)
+}
+
+func (m *Messenger) PublishMessengerResponse(response *MessengerResponse) {
+	if response.IsEmpty() {
+		return
+	}
+
+	notifications := response.Notifications()
+	// Clear notifications as not used for now
+	response.ClearNotifications()
+	signal.SendNewMessages(response)
+	localnotifications.PushMessages(notifications)
 }
 
 func (m *Messenger) GetStats() types.StatsSummary {

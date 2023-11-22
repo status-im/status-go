@@ -2589,6 +2589,11 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard
 		}
 		filter = filters[0]
 		m.requestedCommunities[communityID] = filter
+		m.logger.Debug("created filter for community",
+			zap.String("filterID", filter.FilterID),
+			zap.String("communityID", communityID),
+			zap.String("PubsubTopic", filter.PubsubTopic),
+		)
 	} else {
 		//we don't remember filter id associated with community because it was already installed
 		m.requestedCommunities[communityID] = nil
@@ -2623,6 +2628,9 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard
 	if !waitForResponse {
 		return nil, nil
 	}
+
+	// TODO: We can force to process all messages then we don't have to wait?
+	//m.ProcessAllMessages()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

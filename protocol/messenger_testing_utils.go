@@ -2,16 +2,28 @@ package protocol
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"go.uber.org/zap"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
+	"github.com/status-im/status-go/appdatabase"
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/t/helpers"
+	waku2 "github.com/status-im/status-go/wakuv2"
 )
+
+const testENRBootstrap = "enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
 
 // WaitOnMessengerResponse Wait until the condition is true or the timeout is reached.
 func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bool, errorMessage string) (*MessengerResponse, error) {
@@ -184,4 +196,129 @@ func SetIdentityImagesAndWaitForChange(s *suite.Suite, messenger *Messenger, tim
 	wg.Wait()
 
 	s.Require().True(ok)
+}
+
+func WaitForAvailableStoreNode(s *suite.Suite, m *Messenger, timeout time.Duration) {
+	finish := make(chan struct{})
+	cancel := make(chan struct{})
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		defer func() {
+			wg.Done()
+		}()
+		for !m.isActiveMailserverAvailable() {
+			select {
+			case <-m.SubscribeMailserverAvailable():
+			case <-cancel:
+				return
+			}
+		}
+	}()
+
+	go func() {
+		defer func() {
+			close(finish)
+		}()
+		wg.Wait()
+	}()
+
+	select {
+	case <-finish:
+	case <-time.After(timeout):
+		close(cancel)
+	}
+
+	s.Require().True(m.isActiveMailserverAvailable())
+}
+
+func NewWakuV2(s *suite.Suite, logger *zap.Logger, useLocalWaku bool, enableStore bool) *waku2.Waku {
+	wakuConfig := &waku2.Config{
+		DefaultShardPubsubTopic: relay.DefaultWakuTopic, // shard.DefaultShardPubsubTopic(),
+	}
+
+	var onPeerStats func(connStatus types.ConnStatus)
+	var connStatusChan chan struct{}
+	var db *sql.DB
+
+	if !useLocalWaku {
+		enrTreeAddress := testENRBootstrap
+		envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
+		if envEnrTreeAddress != "" {
+			enrTreeAddress = envEnrTreeAddress
+		}
+
+		wakuConfig.EnableDiscV5 = true
+		wakuConfig.DiscV5BootstrapNodes = []string{enrTreeAddress}
+		wakuConfig.DiscoveryLimit = 20
+		wakuConfig.WakuNodes = []string{enrTreeAddress}
+
+		connStatusChan = make(chan struct{})
+		terminator := sync.Once{}
+		onPeerStats = func(connStatus types.ConnStatus) {
+			if connStatus.IsOnline {
+				terminator.Do(func() {
+					connStatusChan <- struct{}{}
+				})
+			}
+		}
+	}
+
+	if enableStore {
+		var err error
+		db, err = helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+		s.Require().NoError(err)
+
+		wakuConfig.EnableStore = true
+		wakuConfig.StoreCapacity = 200
+		wakuConfig.StoreSeconds = 200
+	}
+
+	wakuNode, err := waku2.New("", "", wakuConfig, logger, db, nil, nil, onPeerStats)
+	s.Require().NoError(err)
+	s.Require().NoError(wakuNode.Start())
+
+	if !useLocalWaku {
+		select {
+		case <-time.After(30 * time.Second):
+			s.Require().Fail("timeout elapsed")
+		case <-connStatusChan:
+			// proceed, peers found
+			close(connStatusChan)
+		}
+	}
+
+	return wakuNode
+}
+
+func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []string) []types.Waku {
+	nodes := make([]*waku2.Waku, len(nodeNames))
+	for i, name := range nodeNames {
+		logger := parentLogger.With(zap.String("name", name+"-waku"))
+		wakuNode := NewWakuV2(s, logger, true, false)
+		nodes[i] = wakuNode
+	}
+
+	// Setup local network graph
+	for i := 0; i < len(nodes); i++ {
+		for j := 0; j < len(nodes); j++ {
+			if i == j {
+				continue
+			}
+
+			addrs := nodes[j].ListenAddresses()
+			s.Require().Greater(len(addrs), 0)
+			_, err := nodes[i].AddRelayPeer(addrs[0])
+			s.Require().NoError(err)
+			err = nodes[i].DialPeer(addrs[0])
+			s.Require().NoError(err)
+		}
+	}
+	wrappers := make([]types.Waku, len(nodes))
+	for i, n := range nodes {
+		wrappers[i] = gethbridge.NewGethWakuV2Wrapper(n)
+	}
+	return wrappers
 }

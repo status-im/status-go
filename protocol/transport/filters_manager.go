@@ -562,7 +562,12 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 
 	f.filters[chatID] = chat
 
-	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "public"), zap.String("topic", filterAndTopic.Topic.String()))
+	f.logger.Debug("registering filter for",
+		zap.String("chatID", chatID),
+		zap.String("type", "public"),
+		zap.String("ContentTopic", filterAndTopic.Topic.String()),
+		zap.String("PubsubTopic", pubsubTopic),
+	)
 
 	return chat, nil
 }

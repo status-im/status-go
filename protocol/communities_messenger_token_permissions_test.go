@@ -26,7 +26,6 @@ import (
 
 const testChainID1 = 1
 
-const testENRBootstrap = "enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
 const ownerPassword = "123456"
 const alicePassword = "qwerty"
 const bobPassword = "bob123"
@@ -130,7 +129,7 @@ type MessengerCommunitiesTokenPermissionsSuite struct {
 func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	wakuNodes := createWakuNetwork(&s.Suite, s.logger, []string{"owner", "bob", "alice"})
+	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "bob", "alice"})
 
 	ownerLogger := s.logger.With(zap.String("name", "owner"))
 	s.ownerWaku = wakuNodes[0]
