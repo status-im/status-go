@@ -513,38 +513,41 @@ func (m *Manager) getTCPandUDPport(portNumber int) (int, error) {
 
 	// Find free port
 	for i := 0; i < 10; i++ {
-		tcpAddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("localhost", "0"))
-		if err != nil {
-			m.logger.Warn("unable to resolve tcp addr: %v", zap.Error(err))
-			continue
+		port := func() int {
+			tcpAddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("localhost", "0"))
+			if err != nil {
+				m.logger.Warn("unable to resolve tcp addr: %v", zap.Error(err))
+				return 0
+			}
+
+			tcpListener, err := net.ListenTCP("tcp", tcpAddr)
+			if err != nil {
+				m.logger.Warn("unable to listen on addr", zap.Stringer("addr", tcpAddr), zap.Error(err))
+				return 0
+			}
+			defer tcpListener.Close()
+
+			port := tcpListener.Addr().(*net.TCPAddr).Port
+
+			udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("localhost", fmt.Sprintf("%d", port)))
+			if err != nil {
+				m.logger.Warn("unable to resolve udp addr: %v", zap.Error(err))
+				return 0
+			}
+
+			udpListener, err := net.ListenUDP("udp", udpAddr)
+			if err != nil {
+				m.logger.Warn("unable to listen on addr", zap.Stringer("addr", udpAddr), zap.Error(err))
+				return 0
+			}
+			defer udpListener.Close()
+
+			return port
+		}()
+
+		if port != 0 {
+			return port, nil
 		}
-
-		tcpListener, err := net.ListenTCP("tcp", tcpAddr)
-		if err != nil {
-			tcpListener.Close()
-			m.logger.Warn("unable to listen on addr", zap.Stringer("addr", tcpAddr), zap.Error(err))
-			continue
-		}
-
-		port := tcpListener.Addr().(*net.TCPAddr).Port
-		tcpListener.Close()
-
-		udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("localhost", fmt.Sprintf("%d", port)))
-		if err != nil {
-			m.logger.Warn("unable to resolve udp addr: %v", zap.Error(err))
-			continue
-		}
-
-		udpListener, err := net.ListenUDP("udp", udpAddr)
-		if err != nil {
-			udpListener.Close()
-			m.logger.Warn("unable to listen on addr", zap.Stringer("addr", udpAddr), zap.Error(err))
-			continue
-		}
-
-		udpListener.Close()
-
-		return port, nil
 	}
 
 	return 0, fmt.Errorf("no free port found")
