@@ -44,13 +44,13 @@ func (s *EnvelopesMonitorSuite) SetupTest() {
 func (s *EnvelopesMonitorSuite) TestEnvelopePosted() {
 	s.monitor.Add(testIDs, testHash, types.NewMessage{})
 	s.Contains(s.monitor.envelopes, testHash)
-	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash])
+	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash].state)
 	s.monitor.handleEvent(types.EnvelopeEvent{
 		Event: types.EventEnvelopeSent,
 		Hash:  testHash,
 	})
 	s.Contains(s.monitor.envelopes, testHash)
-	s.Equal(EnvelopeSent, s.monitor.envelopes[testHash])
+	s.Equal(EnvelopeSent, s.monitor.envelopes[testHash].state)
 }
 
 func (s *EnvelopesMonitorSuite) TestEnvelopePostedOutOfOrder() {
@@ -61,7 +61,7 @@ func (s *EnvelopesMonitorSuite) TestEnvelopePostedOutOfOrder() {
 
 	s.monitor.Add(testIDs, testHash, types.NewMessage{})
 	s.Require().Contains(s.monitor.envelopes, testHash)
-	s.Require().Equal(EnvelopeSent, s.monitor.envelopes[testHash])
+	s.Require().Equal(EnvelopeSent, s.monitor.envelopes[testHash].state)
 }
 
 func (s *EnvelopesMonitorSuite) TestConfirmedWithAcknowledge() {
@@ -71,20 +71,20 @@ func (s *EnvelopesMonitorSuite) TestConfirmedWithAcknowledge() {
 	node := enode.NewV4(&pkey.PublicKey, nil, 0, 0)
 	s.monitor.Add(testIDs, testHash, types.NewMessage{})
 	s.Contains(s.monitor.envelopes, testHash)
-	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash])
+	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash].state)
 	s.monitor.handleEvent(types.EnvelopeEvent{
 		Event: types.EventEnvelopeSent,
 		Hash:  testHash,
 		Batch: testBatch,
 	})
-	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash])
+	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash].state)
 	s.monitor.handleEvent(types.EnvelopeEvent{
 		Event: types.EventBatchAcknowledged,
 		Batch: testBatch,
 		Peer:  types.EnodeID(node.ID()),
 	})
 	s.Contains(s.monitor.envelopes, testHash)
-	s.Equal(EnvelopeSent, s.monitor.envelopes[testHash])
+	s.Equal(EnvelopeSent, s.monitor.envelopes[testHash].state)
 }
 
 func (s *EnvelopesMonitorSuite) TestRemoved() {
