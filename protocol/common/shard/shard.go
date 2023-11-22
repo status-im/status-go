@@ -1,8 +1,9 @@
 package shard
 
 import (
-	"github.com/status-im/status-go/protocol/protobuf"
 	wakuproto "github.com/waku-org/go-waku/waku/v2/protocol"
+
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type Shard struct {

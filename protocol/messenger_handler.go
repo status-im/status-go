@@ -3519,7 +3519,7 @@ func (m *Messenger) HandleSyncContactRequestDecision(state *ReceivedMessageState
 	var response *MessengerResponse
 
 	if message.DecisionStatus == protobuf.SyncContactRequestDecision_ACCEPTED {
-		response, err = m.updateAcceptedContactRequest(nil, message.RequestId)
+		response, err = m.updateAcceptedContactRequest(nil, message.RequestId, true)
 	} else {
 		response, err = m.declineContactRequest(message.RequestId, true)
 	}
