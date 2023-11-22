@@ -2030,6 +2030,11 @@ func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*Mes
 		return nil, err
 	}
 
+	err = m.sendPublicCommunityShardInfoToStoreNode(community)
+	if err != nil {
+		return nil, err
+	}
+
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 
@@ -2461,6 +2466,59 @@ func (m *Messenger) SendCommunityShardKey(community *communities.Community, pubk
 	return err
 }
 
+func (m *Messenger) sendPublicCommunityShardInfoToStoreNode(community *communities.Community) error {
+	if m.transport.WakuVersion() != 2 {
+		return nil
+	}
+
+	if !community.IsControlNode() {
+		return nil
+	}
+
+	communityShardInfo := &protobuf.CommunityShardInfo{
+		Shard:   community.Shard().Protobuffer(),
+		ChainId: communities.CommunityDescriptionTokenOwnerChainID(community.Description()),
+	}
+
+	payload, err := proto.Marshal(communityShardInfo)
+	if err != nil {
+		return err
+	}
+
+	signature, err := crypto.Sign(crypto.Keccak256(payload), m.identity)
+	if err != nil {
+		return err
+	}
+
+	signedShardInfo := &protobuf.CommunityPublicShardInfo{
+		Signature:   signature,
+		Payload:     payload,
+		CommunityId: community.ID(),
+	}
+
+	payload, err = proto.Marshal(signedShardInfo)
+	if err != nil {
+		return err
+	}
+
+	chatName := transport.PublicCommunityShardInfoTopic(community.IDString())
+
+	rawMessage := common.RawMessage{
+		Payload:     payload,
+		LocalChatID: chatName,
+		Sender:      community.PrivateKey(),
+		// we don't want to wrap in an encryption layer message
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_SHARD_INFO,
+		PubsubTopic:         shard.DefaultShardPubsubTopic(), // it must be sent to default shard pubsub topic
+	}
+
+	id, err := m.sender.SendPublic(context.Background(), chatName, rawMessage)
+
+	fmt.Println("-------sendPublicCommunityShardInfoToStoreNode--------", id, chatName)
+	return err
+}
+
 func (m *Messenger) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunity) (*MessengerResponse, error) {
 	community, err := m.communitiesManager.UnbanUserFromCommunity(request)
 	if err != nil {
@@ -2557,7 +2615,81 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 		}
 	}
 
+	if request.Shard == nil {
+		fmt.Println("-----FetchCommunity-----request.Shard----")
+		err := m.requestCommunityShardInfoFromMailserver(communityID)
+		if err != nil {
+			return nil, err
+		}
+
+		if !request.WaitForResponse {
+			return nil, nil
+		}
+
+		return m.waitForCommunityResponse(communityID)
+	}
+
 	return m.requestCommunityInfoFromMailserver(communityID, request.Shard, request.WaitForResponse)
+}
+
+// requestCommunityShardInfoFromMailserver requests public shard info by a community ID from the mailserver
+// Note: this is a blocking operation
+func (m *Messenger) requestCommunityShardInfoFromMailserver(communityID string) error {
+
+	m.logger.Info("requesting shard info", zap.String("communityID", communityID))
+
+	m.requestedShardsLock.Lock()
+	defer m.requestedShardsLock.Unlock()
+
+	shardInfoCommunityID := transport.PublicCommunityShardInfoTopic(communityID)
+
+	if _, ok := m.requestedShards[communityID]; ok {
+		return nil
+	}
+
+	//If filter wasn't installed we create it and remember for deinstalling after
+	//response received
+	filter := m.transport.FilterByChatID(shardInfoCommunityID)
+	if filter == nil {
+		filters, err := m.transport.InitPublicFilters([]transport.FiltersToInitialize{{
+			ChatID:      shardInfoCommunityID,
+			PubsubTopic: shard.DefaultShardPubsubTopic(),
+		}})
+		if err != nil {
+			return fmt.Errorf("Can't install filter for community: %v", err)
+		}
+		if len(filters) != 1 {
+			return fmt.Errorf("Unexpected amount of filters created")
+		}
+		filter = filters[0]
+		m.requestedCommunities[communityID] = filter
+	} else {
+		fmt.Println("----------------requestCommunityShardInfoFromMailserver--not good---")
+		//we don't remember filter id associated with community because it was already installed
+		m.requestedCommunities[communityID] = nil
+	}
+
+	fmt.Println("----------------requestCommunityShardInfoFromMailserver--shardInfoCommunityID---", shardInfoCommunityID)
+
+	//defer m.forgetShardsRequest(communityID)
+
+	to := uint32(m.transport.GetCurrentTime() / 1000)
+	from := to - oneMonthInSeconds
+
+	_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
+		batch := MailserverBatch{
+			From:        from,
+			To:          to,
+			Topics:      []types.TopicType{filter.ContentTopic},
+			PubsubTopic: filter.PubsubTopic,
+			ChatIDs:     []string{shardInfoCommunityID},
+		}
+		m.logger.Info("requesting historic", zap.Any("batch", batch))
+		err := m.processMailserverBatch(batch)
+		return nil, err
+	})
+
+	return err
 }
 
 // requestCommunityInfoFromMailserver installs filter for community and requests its details
@@ -2624,6 +2756,10 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard
 		return nil, nil
 	}
 
+	return m.waitForCommunityResponse(communityID)
+}
+
+func (m *Messenger) waitForCommunityResponse(communityID string) (*communities.Community, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -2777,6 +2913,25 @@ func (m *Messenger) forgetCommunityRequest(communityID string) {
 	}
 
 	delete(m.requestedCommunities, communityID)
+}
+
+// forgetShardsRequest removes shards from requested ones and removes filter
+func (m *Messenger) forgetShardsRequest(communityID string) {
+	m.logger.Info("forgetting community request", zap.String("communityID", communityID))
+
+	filter, ok := m.requestedShards[communityID]
+	if !ok {
+		return
+	}
+
+	if filter != nil {
+		err := m.transport.RemoveFilters([]*transport.Filter{filter})
+		if err != nil {
+			m.logger.Warn("cant remove filter", zap.Error(err))
+		}
+	}
+
+	delete(m.requestedShards, communityID)
 }
 
 // passStoredCommunityInfoToSignalHandler calls signal handler with community info
@@ -3024,6 +3179,72 @@ func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communiti
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func (m *Messenger) verifyPublicShardInfoSigner(a *protobuf.CommunityPublicShardInfo, communityID string, chainID uint64) error {
+	if a.Signature == nil || len(a.Signature) == 0 {
+		return errors.New("missing signature in community public shard info")
+	}
+
+	signer, err := crypto.SigToPub(
+		crypto.Keccak256(a.Payload),
+		a.Signature,
+	)
+	if err != nil {
+		return errors.New("failed to recover signer in community public shard info")
+	}
+
+	pubKeyStr := common.PubkeyToHex(signer)
+
+	if pubKeyStr == communityID {
+		return nil
+	}
+
+	if chainID == 0 {
+		return errors.New("community public shard info wasn't signed by a community private key")
+	}
+
+	owner, err := m.communitiesManager.SafeGetSignerPubKey(chainID, communityID)
+	if err != nil {
+		m.logger.Error("failed to get owner for verifying community public shard info signer ", zap.Error(err))
+		return err
+	}
+
+	if pubKeyStr != owner {
+		return errors.New("community public shard info wasn't signed not by a community owner private key")
+	}
+	return nil
+}
+
+func (m *Messenger) HandleCommunityPublicShardInfo(state *ReceivedMessageState, a *protobuf.CommunityPublicShardInfo, statusMessage *v1protocol.StatusMessage) error {
+	fmt.Println("---------HandleCommunityPublicShardInfo-----------")
+
+	decodedShardInfo := protobuf.CommunityShardInfo{}
+	err := proto.Unmarshal(a.Payload, &decodedShardInfo)
+	if err != nil {
+		return err
+	}
+
+	communityID := types.EncodeHex(a.CommunityId)
+
+	err = m.verifyPublicShardInfoSigner(a, communityID, decodedShardInfo.ChainId)
+	if err != nil {
+		return err
+	}
+
+	//if shard was among requested ones, send its info and remove filter
+	if _, exists := m.requestedShards[communityID]; exists {
+		m.forgetShardsRequest(communityID)
+	}
+
+	_, err = m.FetchCommunity(&FetchCommunityRequest{
+		CommunityKey:    communityID,
+		Shard:           shard.FromProtobuff(decodedShardInfo.Shard),
+		TryDatabase:     false,
+		WaitForResponse: false,
+	})
 
 	return nil
 }

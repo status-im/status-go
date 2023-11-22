@@ -7,4 +7,20 @@ message Shard {
     int32 cluster = 1;
     int32 index = 2;
 }
-  
+
+message CommunityShardInfo {
+    // shard info of the community
+    Shard shard = 1;
+    // chain id of minted community smart contract
+    // used to get the owner from the smart contract
+    uint64 chainId = 2;
+}
+
+message CommunityPublicShardInfo {
+    // Signature of the payload field
+    bytes signature = 1;
+    // Marshaled PublicCommunityShardInfo
+    bytes payload = 2;
+    // Community ID of public shard info
+    bytes community_id = 3;
+}
