@@ -2843,7 +2843,7 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	isControlNodeSigner := common.IsPubKeyEqual(community.PublicKey(), signer)
+	isControlNodeSigner := common.IsPubKeyEqual(community.ControlNode(), signer)
 	if !isControlNodeSigner {
 		return nil, ErrNotAuthorized
 	}
