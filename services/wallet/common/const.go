@@ -24,6 +24,18 @@ func (c ChainID) String() string {
 	return strconv.Itoa(int(c))
 }
 
+func (c ChainID) IsMainnet() bool {
+	switch uint64(c) {
+	case EthereumMainnet, OptimismMainnet, ArbitrumMainnet:
+		return true
+	case EthereumGoerli, EthereumSepolia, OptimismGoerli, OptimismSepolia, ArbitrumGoerli, ArbitrumSepolia:
+		return false
+	case UnknownChainID:
+		return false
+	}
+	return false
+}
+
 func AllChainIDs() []ChainID {
 	return []ChainID{
 		ChainID(EthereumMainnet),

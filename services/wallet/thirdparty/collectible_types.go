@@ -14,7 +14,8 @@ import (
 )
 
 var (
-	ErrChainIDNotSupported = errors.New("chainID not supported")
+	ErrChainIDNotSupported  = errors.New("chainID not supported")
+	ErrEndpointNotSupported = errors.New("endpoint not supported")
 )
 
 const FetchNoLimit = 0
