@@ -48,6 +48,7 @@ type Config struct {
 	EnableFilterFullNode    bool     `toml:",omitempty"`
 	DefaultShardPubsubTopic string   `toml:",omitempty"`
 	UseShardAsDefaultTopic  bool     `toml:",omitempty"`
+	ClusterId               uint16   `toml:",omitempty"`
 }
 
 var DefaultConfig = Config{

@@ -330,6 +330,7 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig, telemetryServe
 			DefaultShardPubsubTopic: shard.DefaultShardPubsubTopic(),
 			UseShardAsDefaultTopic:  nodeConfig.WakuV2Config.UseShardAsDefaultTopic,
 			TelemetryServerURL:      telemetryServerURL,
+			ClusterId:               nodeConfig.ClusterConfig.ClusterID,
 		}
 
 		if nodeConfig.WakuV2Config.MaxMessageSize > 0 {
