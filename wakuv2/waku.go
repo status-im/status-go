@@ -285,6 +285,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
 		node.WithMaxPeerConnections(cfg.DiscoveryLimit),
 		node.WithLogger(logger),
+		node.WithClusterID(cfg.ClusterID),
 	}
 
 	if cfg.EnableDiscV5 {

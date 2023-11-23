@@ -271,6 +271,9 @@ type ClusterConfig struct {
 
 	// DiscV5Nodes is a list of enr to be used for ambient discovery
 	DiscV5BootstrapNodes []string
+
+	//Waku network identifier
+	ClusterID uint16
 }
 
 // String dumps config object as nicely indented JSON

@@ -115,7 +115,6 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 		return err
 	}
 	nodeConfig.ClusterConfig = *clusterConfig
-
 	nodeConfig.ClusterConfig.WakuNodes = defaultWakuNodes[fleet]
 	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = defaultWakuNodes[fleet]
 
