@@ -150,7 +150,9 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	for _, cf := range communityFiltersToInitialize {
+	for _, communityFilter := range communityFiltersToInitialize {
+		// to satisfy gosec: C601 checks
+		cf := communityFilter
 		if cf.PrivKey == nil {
 			continue
 		}

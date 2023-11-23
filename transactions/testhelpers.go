@@ -143,7 +143,9 @@ func MockTestTransactions(t *testing.T, chainClient *MockChainClient, testTxs []
 				return false
 			}
 			for i := range b {
-				for _, sum := range chainSummaries {
+				for _, localSummary := range chainSummaries {
+					// to satisfy gosec: C601 checks
+					sum := localSummary
 					tx := &sum.tx
 					if sum.answered {
 						continue
@@ -165,7 +167,9 @@ func MockTestTransactions(t *testing.T, chainClient *MockChainClient, testTxs []
 				require.True(t, ok)
 				require.NotNil(t, receiptWrapper)
 				// Simulate parsing of eth_getTransactionReceipt response
-				for _, sum := range chainSummaries {
+				for _, localSum := range chainSummaries {
+					// to satisfy gosec: C601 checks
+					sum := localSum
 					tx := &sum.tx
 					if tx.Hash == elems[i].Args[0].(eth.Hash) {
 						if !sum.summary.DontConfirm {

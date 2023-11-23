@@ -499,7 +499,9 @@ func (s *Service) notifyCommunityCollectiblesReceived(ownedCollectibles OwnedCol
 	}
 
 	groups := make(map[CollectibleGroup]Collectible)
-	for _, collectible := range communityCollectibles {
+	for _, localCollectible := range communityCollectibles {
+		// to satisfy gosec: C601 checks
+		collectible := localCollectible
 		txHash := ""
 		for key, value := range hashMap {
 			if key.Same(&collectible.ID) {

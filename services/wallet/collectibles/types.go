@@ -159,7 +159,9 @@ func fullCollectiblesDataToDetails(data []thirdparty.FullCollectibleData) []Coll
 func fullCollectiblesDataToCommunityHeader(data []thirdparty.FullCollectibleData) []Collectible {
 	res := make([]Collectible, 0, len(data))
 
-	for _, c := range data {
+	for _, localCollectibleData := range data {
+		// to satisfy gosec: C601 checks
+		c := localCollectibleData
 		collectibleID := c.CollectibleData.ID
 		communityID := c.CollectibleData.CommunityID
 

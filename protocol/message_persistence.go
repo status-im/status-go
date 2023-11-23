@@ -3016,7 +3016,7 @@ func (db sqlitePersistence) findStatusMessageIDForBridgeMessageID(tx *sql.Tx, me
 }
 
 func (db sqlitePersistence) updateStatusMessagesWithResponse(tx *sql.Tx, statusMessagesToUpdate []string, responseValue string) error {
-	sql := "UPDATE user_messages SET response_to = ? WHERE id IN (?" + strings.Repeat(",?", len(statusMessagesToUpdate)-1) + ")"
+	sql := "UPDATE user_messages SET response_to = ? WHERE id IN (?" + strings.Repeat(",?", len(statusMessagesToUpdate)-1) + ")" //nolint: gosec
 	stmt, err := tx.Prepare(sql)
 	if err != nil {
 		return err

@@ -960,7 +960,7 @@ func (p *Persistence) GetLatestWakuMessageTimestamp(topics []types.TopicType) (u
 
 func (p *Persistence) GetWakuMessagesByFilterTopic(topics []types.TopicType, from uint64, to uint64) ([]types.Message, error) {
 
-	query := "SELECT sig, timestamp, topic, payload, padding, hash, third_party_id FROM waku_messages WHERE timestamp >= " + fmt.Sprint(from) + " AND timestamp < " + fmt.Sprint(to) + " AND ("
+	query := "SELECT sig, timestamp, topic, payload, padding, hash, third_party_id FROM waku_messages WHERE timestamp >= " + fmt.Sprint(from) + " AND timestamp < " + fmt.Sprint(to) + " AND (" //nolint: gosec
 
 	for i, topic := range topics {
 		query += `topic = "` + topic.String() + `"`

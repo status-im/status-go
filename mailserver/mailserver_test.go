@@ -107,7 +107,9 @@ func (s *MailserverSuite) TestInit() {
 		},
 	}
 
-	for _, tc := range testCases {
+	for _, testCase := range testCases {
+		// to satisfy gosec: C601 checks
+		tc := testCase
 		s.T().Run(tc.info, func(*testing.T) {
 			mailServer := &WakuMailServer{}
 			shh := waku.New(&waku.DefaultConfig, nil)
@@ -299,7 +301,9 @@ func (s *MailserverSuite) TestMailServer() {
 			info: "Processing a request where difference between from and to is > 24 should fail",
 		},
 	}
-	for _, tc := range testCases {
+	for _, testCase := range testCases {
+		// to satisfy gosec: C601 checks
+		tc := testCase
 		s.T().Run(tc.info, func(*testing.T) {
 			request := s.createRequest(tc.params)
 			src := crypto.FromECDSAPub(&tc.params.key.PublicKey)
