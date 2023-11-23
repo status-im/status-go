@@ -80,9 +80,6 @@ func (s *MessengerStoreNodeRequestSuite) SetupTest() {
 	storeNodeLogger := s.logger.With(zap.String("name", "store-node-waku"))
 	s.wakuStoreNode = NewWakuV2(&s.Suite, storeNodeLogger, true, true)
 
-	//protocols := s.wakuStoreNode.Protocols()
-	//s.Require().Contains(protocols, store.StoreID_v20beta4)
-
 	storeNodeListenAddresses := s.wakuStoreNode.ListenAddresses()
 	s.Require().LessOrEqual(1, len(storeNodeListenAddresses))
 
