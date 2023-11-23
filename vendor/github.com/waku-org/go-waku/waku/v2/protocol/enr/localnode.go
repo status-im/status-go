@@ -79,10 +79,6 @@ func WithIP(ipAddr *net.TCPAddr) ENROption {
 
 func WithUDPPort(udpPort uint) ENROption {
 	return func(localnode *enode.LocalNode) (err error) {
-		if udpPort == 0 {
-			return nil
-		}
-
 		if udpPort > math.MaxUint16 {
 			return errors.New("invalid udp port number")
 		}

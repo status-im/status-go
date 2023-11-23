@@ -1,6 +1,6 @@
 module github.com/status-im/status-go
 
-go 1.19
+go 1.20
 
 replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.13
 
@@ -49,7 +49,7 @@ require (
 	github.com/prometheus/client_golang v1.16.0
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
-	github.com/status-im/markdown v0.0.0-20240404192634-b7e33c6ac3d4
+	github.com/status-im/markdown v0.0.0-20231114210825-6c2d15b5dc57
 	github.com/status-im/migrate/v4 v4.6.2-status.3
 	github.com/status-im/mvds v0.0.27-0.20240111144448-92d364e4be82
 	github.com/status-im/rendezvous v1.3.7
@@ -82,7 +82,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/gorilla/sessions v1.2.1
 	github.com/ipfs/go-log/v2 v2.5.1
-	github.com/jellydator/ttlcache/v3 v3.2.0
+	github.com/jellydator/ttlcache/v3 v3.1.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/ladydascalie/currency v1.6.0
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
@@ -90,7 +90,7 @@ require (
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
 	github.com/urfave/cli/v2 v2.24.4
-	github.com/waku-org/go-waku v0.8.1-0.20240415131212-6d889ca3e2fe
+	github.com/waku-org/go-waku v0.8.1-0.20240301034357-3aa391058a0b
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	github.com/yeqown/go-qrcode/v2 v2.2.1
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1

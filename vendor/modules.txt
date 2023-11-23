@@ -436,7 +436,7 @@ github.com/jackpal/go-nat-pmp
 # github.com/jbenet/go-temp-err-catcher v0.1.0
 ## explicit; go 1.13
 github.com/jbenet/go-temp-err-catcher
-# github.com/jellydator/ttlcache/v3 v3.2.0
+# github.com/jellydator/ttlcache/v3 v3.1.0
 ## explicit; go 1.18
 github.com/jellydator/ttlcache/v3
 # github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
@@ -924,7 +924,7 @@ github.com/status-im/go-multiaddr-ethv4
 # github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969
 ## explicit
 github.com/status-im/keycard-go/derivationpath
-# github.com/status-im/markdown v0.0.0-20240404192634-b7e33c6ac3d4
+# github.com/status-im/markdown v0.0.0-20231114210825-6c2d15b5dc57
 ## explicit; go 1.12
 github.com/status-im/markdown
 github.com/status-im/markdown/ast
@@ -1020,7 +1020,7 @@ github.com/waku-org/go-discover/discover/v5wire
 github.com/waku-org/go-libp2p-rendezvous
 github.com/waku-org/go-libp2p-rendezvous/db
 github.com/waku-org/go-libp2p-rendezvous/pb
-# github.com/waku-org/go-waku v0.8.1-0.20240415131212-6d889ca3e2fe
+# github.com/waku-org/go-waku v0.8.1-0.20240301034357-3aa391058a0b
 ## explicit; go 1.19
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/waku/persistence

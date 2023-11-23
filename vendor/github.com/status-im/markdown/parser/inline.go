@@ -181,7 +181,7 @@ func statusTag(p *Parser, data []byte, offset int) (int, ast.Node) {
 
 	i := 1
 	for i < n {
-		if isValidTerminatingMentionChar(data[i]) {
+		if isSpace(data[i]) {
 			break
 		}
 		if !isValidStatusTagChar(data[i]) {
