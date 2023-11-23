@@ -1,6 +1,12 @@
 package protocol
 
 import (
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/suite"
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/appdatabase"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
@@ -10,10 +16,6 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
-	"testing"
-	"time"
 
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	waku2 "github.com/status-im/status-go/wakuv2"
@@ -45,10 +47,10 @@ func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *za
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	mailserversSqlDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	mailserversSQLDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err)
 
-	mailserversDatabase := mailserversDB.NewDB(mailserversSqlDb)
+	mailserversDatabase := mailserversDB.NewDB(mailserversSQLDb)
 	err = mailserversDatabase.Add(mailserversDB.Mailserver{
 		ID:      localMailserverID,
 		Name:    localMailserverID,
