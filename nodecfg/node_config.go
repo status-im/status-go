@@ -245,6 +245,16 @@ func insertWakuV2ShardConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	WHERE synthetic_id = 'id'`,
 		c.WakuV2Config.UseShardAsDefaultTopic,
 	)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`
+	UPDATE cluster_config
+	SET cluster_id = ?
+	WHERE synthetic_id = 'id'`,
+		c.ClusterConfig.ClusterID,
+	)
 
 	return err
 }
@@ -516,7 +526,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		nodecfg.Networks = append(nodecfg.Networks, n)
 	}
 
-	err = tx.QueryRow("SELECT enabled, fleet FROM cluster_config WHERE synthetic_id = 'id'").Scan(&nodecfg.ClusterConfig.Enabled, &nodecfg.ClusterConfig.Fleet)
+	err = tx.QueryRow("SELECT enabled, fleet, cluster_id FROM cluster_config WHERE synthetic_id = 'id'").Scan(&nodecfg.ClusterConfig.Enabled, &nodecfg.ClusterConfig.Fleet, &nodecfg.ClusterConfig.ClusterID)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
