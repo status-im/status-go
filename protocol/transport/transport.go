@@ -15,9 +15,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -167,8 +164,8 @@ func (t *Transport) LoadFilters(filters []*Filter) ([]*Filter, error) {
 	return t.filters.InitWithFilters(filters)
 }
 
-func (t *Transport) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize) ([]*Filter, error) {
-	return t.filters.InitCommunityFilters(communityFiltersToInitialize)
+func (t *Transport) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize, useShards bool) ([]*Filter, error) {
+	return t.filters.InitCommunityFilters(communityFiltersToInitialize, useShards)
 }
 
 func (t *Transport) RemoveFilters(filters []*Filter) error {
@@ -192,7 +189,7 @@ func (t *Transport) ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*Fil
 }
 
 func (t *Transport) JoinPublic(chatID string) (*Filter, error) {
-	return t.filters.LoadPublic(chatID, relay.DefaultWakuTopic)
+	return t.filters.LoadPublic(chatID, "")
 }
 
 func (t *Transport) LeavePublic(chatID string) error {
@@ -289,6 +286,7 @@ func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage
 
 	newMessage.SymKeyID = filter.SymKeyID
 	newMessage.Topic = filter.ContentTopic
+	newMessage.PubsubTopic = filter.PubsubTopic
 
 	return t.api.Post(ctx, *newMessage)
 }
@@ -308,6 +306,7 @@ func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage 
 
 	newMessage.SymKeyID = filter.SymKeyID
 	newMessage.Topic = filter.ContentTopic
+	newMessage.PubsubTopic = filter.PubsubTopic
 	newMessage.PublicKey = nil
 
 	return t.api.Post(ctx, *newMessage)
@@ -323,6 +322,7 @@ func (t *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *
 		return nil, err
 	}
 
+	newMessage.PubsubTopic = filter.PubsubTopic
 	newMessage.Topic = filter.ContentTopic
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
@@ -339,6 +339,7 @@ func (t *Transport) SendPrivateOnPersonalTopic(ctx context.Context, newMessage *
 		return nil, err
 	}
 
+	newMessage.PubsubTopic = filter.PubsubTopic
 	newMessage.Topic = filter.ContentTopic
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
@@ -364,6 +365,7 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.
 		return nil, err
 	}
 
+	newMessage.PubsubTopic = filter.PubsubTopic
 	newMessage.Topic = filter.ContentTopic
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
@@ -676,12 +678,4 @@ func (t *Transport) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey)
 
 func (t *Transport) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
 	return t.waku.RetrievePubsubTopicKey(topic)
-}
-
-func GetPubsubTopic(shard *Shard) string {
-	if shard != nil {
-		return protocol.NewStaticShardingPubsubTopic(shard.Cluster, shard.Index).String()
-	}
-
-	return relay.DefaultWakuTopic
 }

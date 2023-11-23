@@ -1,12 +1,13 @@
-package protobuf
+package common
 
 import (
 	"crypto/ecdsa"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-func (m *ApplicationMetadataMessage) RecoverKey() (*ecdsa.PublicKey, error) {
+func RecoverKey(m *protobuf.ApplicationMetadataMessage) (*ecdsa.PublicKey, error) {
 	if m.Signature == nil {
 		return nil, nil
 	}

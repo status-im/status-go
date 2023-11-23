@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -106,7 +107,7 @@ type ChannelGroup struct {
 	CheckChannelPermissionResponses map[string]*communities.CheckChannelPermissionsResponse `json:"checkChannelPermissionResponses"`
 	PubsubTopic                     string                                                  `json:"pubsubTopic"`
 	PubsubTopicKey                  string                                                  `json:"pubsubTopicKey"`
-	Shard                           *common.Shard                                           `json:"shard"`
+	Shard                           *shard.Shard                                            `json:"shard"`
 }
 
 func NewAPI(service *Service) *API {

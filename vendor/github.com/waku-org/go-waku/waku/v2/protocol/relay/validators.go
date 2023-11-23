@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
-	proto "google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/hash"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
@@ -62,8 +61,7 @@ func (w *WakuRelay) RemoveTopicValidator(topic string) {
 
 func (w *WakuRelay) topicValidator(topic string) func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool {
 	return func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool {
-		msg := new(pb.WakuMessage)
-		err := proto.Unmarshal(message.Data, msg)
+		msg, err := pb.Unmarshal(message.Data)
 		if err != nil {
 			return false
 		}

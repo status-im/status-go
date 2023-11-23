@@ -3,7 +3,6 @@ package filter
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"net/http"
 	"time"
@@ -31,7 +30,7 @@ const peerHasNoSubscription = "peer has no subscriptions"
 type (
 	WakuFilterFullNode struct {
 		h       host.Host
-		msgSub  relay.Subscription
+		msgSub  *relay.Subscription
 		metrics Metrics
 		log     *zap.Logger
 		*protocol.CommonService
@@ -66,13 +65,13 @@ func (wf *WakuFilterFullNode) SetHost(h host.Host) {
 	wf.h = h
 }
 
-func (wf *WakuFilterFullNode) Start(ctx context.Context, sub relay.Subscription) error {
+func (wf *WakuFilterFullNode) Start(ctx context.Context, sub *relay.Subscription) error {
 	return wf.CommonService.Start(ctx, func() error {
 		return wf.start(sub)
 	})
 }
 
-func (wf *WakuFilterFullNode) start(sub relay.Subscription) error {
+func (wf *WakuFilterFullNode) start(sub *relay.Subscription) error {
 	wf.h.SetStreamHandlerMatch(FilterSubscribeID_v20beta1, protocol.PrefixTextMatch(string(FilterSubscribeID_v20beta1)), wf.onRequest(wf.Context()))
 
 	wf.msgSub = sub
@@ -83,18 +82,20 @@ func (wf *WakuFilterFullNode) start(sub relay.Subscription) error {
 	return nil
 }
 
-func (wf *WakuFilterFullNode) onRequest(ctx context.Context) func(s network.Stream) {
-	return func(s network.Stream) {
-		defer s.Close()
-		logger := wf.log.With(logging.HostID("peer", s.Conn().RemotePeer()))
+func (wf *WakuFilterFullNode) onRequest(ctx context.Context) func(network.Stream) {
+	return func(stream network.Stream) {
+		logger := wf.log.With(logging.HostID("peer", stream.Conn().RemotePeer()))
 
-		reader := pbio.NewDelimitedReader(s, math.MaxInt32)
+		reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
 
 		subscribeRequest := &pb.FilterSubscribeRequest{}
 		err := reader.ReadMsg(subscribeRequest)
 		if err != nil {
 			wf.metrics.RecordError(decodeRPCFailure)
 			logger.Error("reading request", zap.Error(err))
+			if err := stream.Reset(); err != nil {
+				wf.log.Error("resetting connection", zap.Error(err))
+			}
 			return
 		}
 
@@ -102,16 +103,22 @@ func (wf *WakuFilterFullNode) onRequest(ctx context.Context) func(s network.Stre
 
 		start := time.Now()
 
-		switch subscribeRequest.FilterSubscribeType {
-		case pb.FilterSubscribeRequest_SUBSCRIBE:
-			wf.subscribe(ctx, s, subscribeRequest)
-		case pb.FilterSubscribeRequest_SUBSCRIBER_PING:
-			wf.ping(ctx, s, subscribeRequest)
-		case pb.FilterSubscribeRequest_UNSUBSCRIBE:
-			wf.unsubscribe(ctx, s, subscribeRequest)
-		case pb.FilterSubscribeRequest_UNSUBSCRIBE_ALL:
-			wf.unsubscribeAll(ctx, s, subscribeRequest)
+		if err := subscribeRequest.Validate(); err != nil {
+			wf.reply(ctx, stream, subscribeRequest, http.StatusBadRequest, err.Error())
+		} else {
+			switch subscribeRequest.FilterSubscribeType {
+			case pb.FilterSubscribeRequest_SUBSCRIBE:
+				wf.subscribe(ctx, stream, subscribeRequest)
+			case pb.FilterSubscribeRequest_SUBSCRIBER_PING:
+				wf.ping(ctx, stream, subscribeRequest)
+			case pb.FilterSubscribeRequest_UNSUBSCRIBE:
+				wf.unsubscribe(ctx, stream, subscribeRequest)
+			case pb.FilterSubscribeRequest_UNSUBSCRIBE_ALL:
+				wf.unsubscribeAll(ctx, stream, subscribeRequest)
+			}
 		}
+
+		stream.Close()
 
 		wf.metrics.RecordRequest(subscribeRequest.FilterSubscribeType.String(), time.Since(start))
 
@@ -119,7 +126,7 @@ func (wf *WakuFilterFullNode) onRequest(ctx context.Context) func(s network.Stre
 	}
 }
 
-func (wf *WakuFilterFullNode) reply(ctx context.Context, s network.Stream, request *pb.FilterSubscribeRequest, statusCode int, description ...string) {
+func (wf *WakuFilterFullNode) reply(ctx context.Context, stream network.Stream, request *pb.FilterSubscribeRequest, statusCode int, description ...string) {
 	response := &pb.FilterSubscribeResponse{
 		RequestId:  request.RequestId,
 		StatusCode: uint32(statusCode),
@@ -131,45 +138,34 @@ func (wf *WakuFilterFullNode) reply(ctx context.Context, s network.Stream, reque
 		response.StatusDesc = http.StatusText(statusCode)
 	}
 
-	writer := pbio.NewDelimitedWriter(s)
+	writer := pbio.NewDelimitedWriter(stream)
 	err := writer.WriteMsg(response)
 	if err != nil {
 		wf.metrics.RecordError(writeResponseFailure)
 		wf.log.Error("sending response", zap.Error(err))
+		if err := stream.Reset(); err != nil {
+			wf.log.Error("resetting connection", zap.Error(err))
+		}
 	}
 }
 
-func (wf *WakuFilterFullNode) ping(ctx context.Context, s network.Stream, request *pb.FilterSubscribeRequest) {
-	exists := wf.subscriptions.Has(s.Conn().RemotePeer())
+func (wf *WakuFilterFullNode) ping(ctx context.Context, stream network.Stream, request *pb.FilterSubscribeRequest) {
+	exists := wf.subscriptions.Has(stream.Conn().RemotePeer())
 
 	if exists {
-		wf.reply(ctx, s, request, http.StatusOK)
+		wf.reply(ctx, stream, request, http.StatusOK)
 	} else {
-		wf.reply(ctx, s, request, http.StatusNotFound, peerHasNoSubscription)
+		wf.reply(ctx, stream, request, http.StatusNotFound, peerHasNoSubscription)
 	}
 }
 
-func (wf *WakuFilterFullNode) subscribe(ctx context.Context, s network.Stream, request *pb.FilterSubscribeRequest) {
-	if request.PubsubTopic == nil {
-		wf.reply(ctx, s, request, http.StatusBadRequest, "pubsubtopic can't be empty")
-		return
-	}
-
-	if len(request.ContentTopics) == 0 {
-		wf.reply(ctx, s, request, http.StatusBadRequest, "at least one contenttopic should be specified")
-		return
-	}
-
-	if len(request.ContentTopics) > MaxContentTopicsPerRequest {
-		wf.reply(ctx, s, request, http.StatusBadRequest, fmt.Sprintf("exceeds maximum content topics: %d", MaxContentTopicsPerRequest))
-	}
-
+func (wf *WakuFilterFullNode) subscribe(ctx context.Context, stream network.Stream, request *pb.FilterSubscribeRequest) {
 	if wf.subscriptions.Count() >= wf.maxSubscriptions {
-		wf.reply(ctx, s, request, http.StatusServiceUnavailable, "node has reached maximum number of subscriptions")
+		wf.reply(ctx, stream, request, http.StatusServiceUnavailable, "node has reached maximum number of subscriptions")
 		return
 	}
 
-	peerID := s.Conn().RemotePeer()
+	peerID := stream.Conn().RemotePeer()
 
 	if totalSubs, exists := wf.subscriptions.Get(peerID); exists {
 		ctTotal := 0
@@ -178,7 +174,7 @@ func (wf *WakuFilterFullNode) subscribe(ctx context.Context, s network.Stream, r
 		}
 
 		if ctTotal+len(request.ContentTopics) > MaxCriteriaPerSubscription {
-			wf.reply(ctx, s, request, http.StatusServiceUnavailable, "peer has reached maximum number of filter criteria")
+			wf.reply(ctx, stream, request, http.StatusServiceUnavailable, "peer has reached maximum number of filter criteria")
 			return
 		}
 	}
@@ -186,40 +182,26 @@ func (wf *WakuFilterFullNode) subscribe(ctx context.Context, s network.Stream, r
 	wf.subscriptions.Set(peerID, *request.PubsubTopic, request.ContentTopics)
 
 	wf.metrics.RecordSubscriptions(wf.subscriptions.Count())
-	wf.reply(ctx, s, request, http.StatusOK)
+	wf.reply(ctx, stream, request, http.StatusOK)
 }
 
-func (wf *WakuFilterFullNode) unsubscribe(ctx context.Context, s network.Stream, request *pb.FilterSubscribeRequest) {
-	if request.PubsubTopic == nil {
-		wf.reply(ctx, s, request, http.StatusBadRequest, "pubsubtopic can't be empty")
-		return
-	}
-
-	if len(request.ContentTopics) == 0 {
-		wf.reply(ctx, s, request, http.StatusBadRequest, "at least one contenttopic should be specified")
-		return
-	}
-
-	if len(request.ContentTopics) > MaxContentTopicsPerRequest {
-		wf.reply(ctx, s, request, http.StatusBadRequest, fmt.Sprintf("exceeds maximum content topics: %d", MaxContentTopicsPerRequest))
-	}
-
-	err := wf.subscriptions.Delete(s.Conn().RemotePeer(), *request.PubsubTopic, request.ContentTopics)
+func (wf *WakuFilterFullNode) unsubscribe(ctx context.Context, stream network.Stream, request *pb.FilterSubscribeRequest) {
+	err := wf.subscriptions.Delete(stream.Conn().RemotePeer(), *request.PubsubTopic, request.ContentTopics)
 	if err != nil {
-		wf.reply(ctx, s, request, http.StatusNotFound, peerHasNoSubscription)
+		wf.reply(ctx, stream, request, http.StatusNotFound, peerHasNoSubscription)
 	} else {
 		wf.metrics.RecordSubscriptions(wf.subscriptions.Count())
-		wf.reply(ctx, s, request, http.StatusOK)
+		wf.reply(ctx, stream, request, http.StatusOK)
 	}
 }
 
-func (wf *WakuFilterFullNode) unsubscribeAll(ctx context.Context, s network.Stream, request *pb.FilterSubscribeRequest) {
-	err := wf.subscriptions.DeleteAll(s.Conn().RemotePeer())
+func (wf *WakuFilterFullNode) unsubscribeAll(ctx context.Context, stream network.Stream, request *pb.FilterSubscribeRequest) {
+	err := wf.subscriptions.DeleteAll(stream.Conn().RemotePeer())
 	if err != nil {
-		wf.reply(ctx, s, request, http.StatusNotFound, peerHasNoSubscription)
+		wf.reply(ctx, stream, request, http.StatusNotFound, peerHasNoSubscription)
 	} else {
 		wf.metrics.RecordSubscriptions(wf.subscriptions.Count())
-		wf.reply(ctx, s, request, http.StatusOK)
+		wf.reply(ctx, stream, request, http.StatusOK)
 	}
 }
 
@@ -279,7 +261,7 @@ func (wf *WakuFilterFullNode) pushMessage(ctx context.Context, peerID peer.ID, e
 	ctx, cancel := context.WithTimeout(ctx, MessagePushTimeout)
 	defer cancel()
 
-	conn, err := wf.h.NewStream(ctx, peerID, FilterPushID_v20beta1)
+	stream, err := wf.h.NewStream(ctx, peerID, FilterPushID_v20beta1)
 	if err != nil {
 		wf.subscriptions.FlagAsFailure(peerID)
 		if errors.Is(context.DeadlineExceeded, err) {
@@ -291,8 +273,7 @@ func (wf *WakuFilterFullNode) pushMessage(ctx context.Context, peerID peer.ID, e
 		return err
 	}
 
-	defer conn.Close()
-	writer := pbio.NewDelimitedWriter(conn)
+	writer := pbio.NewDelimitedWriter(stream)
 	err = writer.WriteMsg(messagePush)
 	if err != nil {
 		if errors.Is(context.DeadlineExceeded, err) {
@@ -302,12 +283,17 @@ func (wf *WakuFilterFullNode) pushMessage(ctx context.Context, peerID peer.ID, e
 		}
 		logger.Error("pushing messages to peer", zap.Error(err))
 		wf.subscriptions.FlagAsFailure(peerID)
+		if err := stream.Reset(); err != nil {
+			wf.log.Error("resetting connection", zap.Error(err))
+		}
 		return nil
 	}
 
+	stream.Close()
+
 	wf.subscriptions.FlagAsSuccess(peerID)
 
-	logger.Info("message pushed succesfully") // TODO: remove or change to debug once dogfooding of filter is complete
+	logger.Debug("message pushed succesfully")
 
 	return nil
 }

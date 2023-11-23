@@ -39,6 +39,7 @@ import (
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -673,7 +674,7 @@ func (s *Service) fetchCommunity(communityID string) (*communities.Community, er
 	// TODO: we need the shard information in the collectible to be able to retrieve info for
 	// communities that have specific shards
 
-	var shard *common.Shard = nil // TODO: build this with info from token
+	var shard *shard.Shard = nil // TODO: build this with info from token
 	community, err := s.messenger.FetchCommunity(&protocol.FetchCommunityRequest{
 		CommunityKey:    communityID,
 		Shard:           shard,

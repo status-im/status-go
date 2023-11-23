@@ -99,6 +99,12 @@ func NewBaseClient(c *ConnectionParams, logger *zap.Logger) (*BaseClient, error)
 		signal.SendLocalPairingEvent(Event{Type: EventConnectionError, Error: err.Error(), Action: ActionConnect})
 		return nil, err
 	}
+	// if client and server aren't on the same network, netIPs maybe empty, we should check it before invoking findServerCert
+	if len(netIPs) == 0 {
+		logger.Error("[local pair client] no reachable addresses found")
+		signal.SendLocalPairingEvent(Event{Type: EventConnectionError, Error: "no reachable addresses found", Action: ActionConnect})
+		return nil, fmt.Errorf("no reachable addresses found")
+	}
 
 	maxRetries := 3
 	for i := 0; i < maxRetries; i++ {

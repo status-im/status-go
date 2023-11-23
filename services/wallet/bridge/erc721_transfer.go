@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -60,11 +61,15 @@ func (s *ERC721TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwor
 	if err != nil {
 		return 0, err
 	}
-
+	id, success := big.NewInt(0).SetString(token.Symbol, 0)
+	if !success {
+		return 0, fmt.Errorf("failed to convert %s to big.Int", token.Symbol)
+	}
 	input, err = abi.Pack("safeTransferFrom",
 		from,
 		to,
-		new(big.Int))
+		id,
+	)
 
 	if err != nil {
 		return 0, err

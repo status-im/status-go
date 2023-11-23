@@ -1,23 +1,30 @@
 package bridge
 
 import (
+	"context"
 	"math/big"
+	"strings"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
 
 type TransferBridge struct {
+	rpcClient  *rpc.Client
 	transactor *transactions.Transactor
 }
 
-func NewTransferBridge(transactor *transactions.Transactor) *TransferBridge {
-	return &TransferBridge{transactor: transactor}
+func NewTransferBridge(rpcClient *rpc.Client, transactor *transactions.Transactor) *TransferBridge {
+	return &TransferBridge{rpcClient: rpcClient, transactor: transactor}
 }
 
 func (s *TransferBridge) Name() string {
@@ -33,10 +40,45 @@ func (s *TransferBridge) CalculateFees(from, to *params.Network, token *token.To
 }
 
 func (s *TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
-	// TODO fix for ERC20
-	estimation, err := s.transactor.EstimateGas(fromNetwork, from, to, amountIn, []byte("eth_sendRawTransaction"))
-	if err != nil {
-		return 0, err
+	estimation := uint64(0)
+	var err error
+	if token.Symbol == "ETH" {
+		estimation, err = s.transactor.EstimateGas(fromNetwork, from, to, amountIn, []byte("eth_sendRawTransaction"))
+		if err != nil {
+			return 0, err
+		}
+	} else {
+		ethClient, err := s.rpcClient.EthClient(fromNetwork.ChainID)
+		if err != nil {
+			return 0, err
+		}
+
+		abi, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
+		if err != nil {
+			return 0, err
+		}
+		input, err := abi.Pack("transfer",
+			to,
+			amountIn,
+		)
+
+		if err != nil {
+			return 0, err
+		}
+
+		ctx := context.Background()
+
+		msg := ethereum.CallMsg{
+			From: from,
+			To:   &token.Address,
+			Data: input,
+		}
+
+		estimation, err = ethClient.EstimateGas(ctx, msg)
+		if err != nil {
+			return 0, err
+		}
+
 	}
 	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
 	return uint64(increasedEstimation), nil

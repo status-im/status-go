@@ -22,8 +22,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
@@ -42,6 +40,7 @@ import (
 	sociallinkssettings "github.com/status-im/status-go/multiaccounts/settings_social_links"
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
@@ -1672,6 +1671,14 @@ func (m *Messenger) Init() error {
 
 	logger := m.logger.With(zap.String("site", "Init"))
 
+	if m.useShards() {
+		// Community requests will arrive in this pubsub topic
+		err := m.SubscribeToPubsubTopic(shard.DefaultNonProtectedPubsubTopic(), nil)
+		if err != nil {
+			return err
+		}
+	}
+
 	var (
 		filtersToInit []transport.FiltersToInitialize
 		publicKeys    []*ecdsa.PublicKey
@@ -1683,7 +1690,7 @@ func (m *Messenger) Init() error {
 	}
 	for _, org := range joinedCommunities {
 		// the org advertise on the public topic derived by the pk
-		filtersToInit = append(filtersToInit, org.DefaultFilters()...)
+		filtersToInit = append(filtersToInit, m.DefaultFilters(org)...)
 
 		// This is for status-go versions that didn't have `CommunitySettings`
 		// We need to ensure communities that existed before community settings
@@ -1729,28 +1736,8 @@ func (m *Messenger) Init() error {
 	if err != nil {
 		return err
 	}
-
 	for _, org := range spectatedCommunities {
-		filtersToInit = append(filtersToInit, org.DefaultFilters()...)
-	}
-
-	// Init filters for the communities we control
-	var communityFiltersToInitialize []transport.CommunityFilterToInitialize
-	controlledCommunities, err := m.communitiesManager.Controlled()
-	if err != nil {
-		return err
-	}
-
-	for _, c := range controlledCommunities {
-		communityFiltersToInitialize = append(communityFiltersToInitialize, transport.CommunityFilterToInitialize{
-			Shard:   c.Shard().TransportShard(),
-			PrivKey: c.PrivateKey(),
-		})
-	}
-
-	_, err = m.transport.InitCommunityFilters(communityFiltersToInitialize)
-	if err != nil {
-		return err
+		filtersToInit = append(filtersToInit, m.DefaultFilters(org)...)
 	}
 
 	// Get chat IDs and public keys from the existing chats.
@@ -1780,7 +1767,7 @@ func (m *Messenger) Init() error {
 
 		switch chat.ChatType {
 		case ChatTypePublic, ChatTypeProfile:
-			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: relay.DefaultWakuTopic})
+			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID})
 		case ChatTypeCommunityChat:
 			communityID, err := hexutil.Decode(chat.CommunityID)
 			if err != nil {
@@ -1796,7 +1783,7 @@ func (m *Messenger) Init() error {
 				communityInfo[chat.CommunityID] = community
 			}
 
-			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: transport.GetPubsubTopic(community.Shard().TransportShard())})
+			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: community.PubsubTopic()})
 		case ChatTypeOneToOne:
 			pk, err := chat.PublicKey()
 			if err != nil {
@@ -1872,7 +1859,30 @@ func (m *Messenger) Init() error {
 	}
 
 	_, err = m.transport.InitFilters(filtersToInit, publicKeys)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Init filters for the communities we control
+	var communityFiltersToInitialize []transport.CommunityFilterToInitialize
+	controlledCommunities, err := m.communitiesManager.Controlled()
+	if err != nil {
+		return err
+	}
+
+	for _, c := range controlledCommunities {
+		communityFiltersToInitialize = append(communityFiltersToInitialize, transport.CommunityFilterToInitialize{
+			Shard:   c.Shard(),
+			PrivKey: c.PrivateKey(),
+		})
+	}
+
+	_, err = m.InitCommunityFilters(communityFiltersToInitialize)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Shutdown takes care of ensuring a clean shutdown of Messenger
@@ -2153,10 +2163,12 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			return rawMessage, err
 		}
 	case ChatTypeCommunityChat:
-		rawMessage.PubsubTopic, err = m.communitiesManager.GetPubsubTopic(chat.CommunityID)
+
+		community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
 		if err != nil {
 			return rawMessage, err
 		}
+		rawMessage.PubsubTopic = community.PubsubTopic()
 
 		// TODO: add grant
 		canPost, err := m.communitiesManager.CanPost(&m.identity.PublicKey, chat.CommunityID, chat.CommunityChatID(), nil)

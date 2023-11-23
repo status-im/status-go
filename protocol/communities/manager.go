@@ -18,8 +18,6 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/golang/protobuf/proto"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -27,11 +25,13 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/account"
+	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/ens"
@@ -462,7 +462,7 @@ func (m *Manager) runOwnerVerificationLoop() {
 						}
 
 						// TODO: handle shards
-						response, err := m.HandleCommunityDescriptionMessage(signer, description, communityToValidate.payload, ownerPK)
+						response, err := m.HandleCommunityDescriptionMessage(signer, description, communityToValidate.payload, ownerPK, nil)
 						if err != nil {
 							m.logger.Error("failed to handle community", zap.Error(err))
 							err = m.persistence.DeleteCommunityToValidate(communityToValidate.id, communityToValidate.clock)
@@ -513,38 +513,41 @@ func (m *Manager) getTCPandUDPport(portNumber int) (int, error) {
 
 	// Find free port
 	for i := 0; i < 10; i++ {
-		tcpAddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("localhost", "0"))
-		if err != nil {
-			m.logger.Warn("unable to resolve tcp addr: %v", zap.Error(err))
-			continue
+		port := func() int {
+			tcpAddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("localhost", "0"))
+			if err != nil {
+				m.logger.Warn("unable to resolve tcp addr: %v", zap.Error(err))
+				return 0
+			}
+
+			tcpListener, err := net.ListenTCP("tcp", tcpAddr)
+			if err != nil {
+				m.logger.Warn("unable to listen on addr", zap.Stringer("addr", tcpAddr), zap.Error(err))
+				return 0
+			}
+			defer tcpListener.Close()
+
+			port := tcpListener.Addr().(*net.TCPAddr).Port
+
+			udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("localhost", fmt.Sprintf("%d", port)))
+			if err != nil {
+				m.logger.Warn("unable to resolve udp addr: %v", zap.Error(err))
+				return 0
+			}
+
+			udpListener, err := net.ListenUDP("udp", udpAddr)
+			if err != nil {
+				m.logger.Warn("unable to listen on addr", zap.Stringer("addr", udpAddr), zap.Error(err))
+				return 0
+			}
+			defer udpListener.Close()
+
+			return port
+		}()
+
+		if port != 0 {
+			return port, nil
 		}
-
-		tcpListener, err := net.ListenTCP("tcp", tcpAddr)
-		if err != nil {
-			tcpListener.Close()
-			m.logger.Warn("unable to listen on addr", zap.Stringer("addr", tcpAddr), zap.Error(err))
-			continue
-		}
-
-		port := tcpListener.Addr().(*net.TCPAddr).Port
-		tcpListener.Close()
-
-		udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("localhost", fmt.Sprintf("%d", port)))
-		if err != nil {
-			m.logger.Warn("unable to resolve udp addr: %v", zap.Error(err))
-			continue
-		}
-
-		udpListener, err := net.ListenUDP("udp", udpAddr)
-		if err != nil {
-			udpListener.Close()
-			m.logger.Warn("unable to listen on addr", zap.Stringer("addr", udpAddr), zap.Error(err))
-			continue
-		}
-
-		udpListener.Close()
-
-		return port, nil
 	}
 
 	return 0, fmt.Errorf("no free port found")
@@ -635,8 +638,8 @@ func (m *Manager) All() ([]*Community, error) {
 }
 
 type CommunityShard struct {
-	CommunityID string        `json:"communityID"`
-	Shard       *common.Shard `json:"shard"`
+	CommunityID string       `json:"communityID"`
+	Shard       *shard.Shard `json:"shard"`
 }
 
 type KnownCommunitiesResponse struct {
@@ -1080,13 +1083,13 @@ func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 	return m.persistence.DeleteCommunitySettings(id)
 }
 
-func (m *Manager) UpdateShard(community *Community, shard *common.Shard) error {
+func (m *Manager) UpdateShard(community *Community, shard *shard.Shard) error {
 	community.config.Shard = shard
 	return m.persistence.SaveCommunity(community)
 }
 
 // SetShard assigns a shard to a community
-func (m *Manager) SetShard(communityID types.HexBytes, shard *common.Shard) (*Community, error) {
+func (m *Manager) SetShard(communityID types.HexBytes, shard *shard.Shard) (*Community, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
@@ -1112,7 +1115,8 @@ func (m *Manager) UpdatePubsubTopicPrivateKey(community *Community, privKey *ecd
 	community.SetPubsubTopicPrivateKey(privKey)
 
 	if privKey != nil {
-		if err := m.transport.StorePubsubTopicKey(community.PubsubTopic(), privKey); err != nil {
+		topic := community.PubsubTopic()
+		if err := m.transport.StorePubsubTopicKey(topic, privKey); err != nil {
 			return err
 		}
 	}
@@ -1568,7 +1572,7 @@ func (m *Manager) Queue(signer *ecdsa.PublicKey, community *Community, clock uin
 	return nil
 }
 
-func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte, verifiedOwner *ecdsa.PublicKey) (*CommunityResponse, error) {
+func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte, verifiedOwner *ecdsa.PublicKey, communityShard *protobuf.Shard) (*CommunityResponse, error) {
 	if signer == nil {
 		return nil, errors.New("signer can't be nil")
 	}
@@ -1609,6 +1613,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 			MemberIdentity:                      &m.identity.PublicKey,
 			ID:                                  pubKey,
 			ControlNode:                         signer,
+			Shard:                               shard.FromProtobuff(communityShard),
 		}
 
 		community, err = New(config, m.timesource)
@@ -2838,7 +2843,7 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	isControlNodeSigner := common.IsPubKeyEqual(community.PublicKey(), signer)
+	isControlNodeSigner := common.IsPubKeyEqual(community.ControlNode(), signer)
 	if !isControlNodeSigner {
 		return nil, ErrNotAuthorized
 	}
@@ -2902,7 +2907,7 @@ func UnwrapCommunityDescriptionMessage(payload []byte) (*ecdsa.PublicKey, *proto
 	if applicationMetadataMessage.Type != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
 		return nil, nil, ErrInvalidMessage
 	}
-	signer, err := applicationMetadataMessage.RecoverKey()
+	signer, err := utils.RecoverKey(applicationMetadataMessage)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -3199,7 +3204,8 @@ func (m *Manager) initializeCommunity(community *Community) error {
 	}
 
 	if m.transport != nil && m.transport.WakuVersion() == 2 {
-		privKey, err := m.transport.RetrievePubsubTopicKey(community.PubsubTopic())
+		topic := community.PubsubTopic()
+		privKey, err := m.transport.RetrievePubsubTopicKey(topic)
 		if err != nil {
 			return err
 		}
@@ -3360,19 +3366,6 @@ func (m *Manager) AcceptedPendingRequestsToJoinForCommunity(id types.HexBytes) (
 func (m *Manager) DeclinedPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
 	return m.persistence.DeclinedPendingRequestsToJoinForCommunity(id)
 
-}
-
-func (m *Manager) GetPubsubTopic(communityID string) (string, error) {
-	community, err := m.GetByIDString(communityID)
-	if err != nil {
-		return "", err
-	}
-
-	if community == nil {
-		return relay.DefaultWakuTopic, nil
-	}
-
-	return transport.GetPubsubTopic(community.Shard().TransportShard()), nil
 }
 
 func (m *Manager) RequestsToJoinForCommunityAwaitingAddresses(id types.HexBytes) ([]*RequestToJoin, error) {

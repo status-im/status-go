@@ -43,11 +43,13 @@ func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.M
 		ip4 := ipAddr.IP.To4()
 		ip6 := ipAddr.IP.To16()
 		if ip4 != nil && !ip4.IsUnspecified() {
+			localnode.SetFallbackIP(ip4)
 			localnode.Set(enr.IPv4(ip4))
 			localnode.Set(enr.TCP(uint16(ipAddr.Port)))
 		} else {
 			localnode.Delete(enr.IPv4{})
 			localnode.Delete(enr.TCP(0))
+			localnode.SetFallbackIP(net.IP{127, 0, 0, 1})
 		}
 
 		if ip4 == nil && ip6 != nil && !ip6.IsUnspecified() {
@@ -58,8 +60,6 @@ func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.M
 			localnode.Delete(enr.TCP6(0))
 		}
 	}
-
-	localnode.SetFallbackIP(net.IP{127, 0, 0, 1})
 
 	return wenr.Update(localnode, options...)
 }
@@ -191,7 +191,7 @@ func decapsulateCircuitRelayAddr(addr ma.Multiaddr) (ma.Multiaddr, error) {
 	return addr, nil
 }
 
-func selectWSSListenAddresses(addresses []ma.Multiaddr) ([]ma.Multiaddr, error) {
+func selectWSListenAddresses(addresses []ma.Multiaddr) ([]ma.Multiaddr, error) {
 	var result []ma.Multiaddr
 	for _, addr := range addresses {
 		// It's a p2p-circuit address. We dont use these at this stage yet
@@ -200,14 +200,9 @@ func selectWSSListenAddresses(addresses []ma.Multiaddr) ([]ma.Multiaddr, error) 
 			continue
 		}
 
-		// Only WSS with a domain name are allowed
-		_, err = addr.ValueForProtocol(ma.P_DNS4)
-		if err != nil {
-			continue
-		}
-
-		_, err = addr.ValueForProtocol(ma.P_WSS)
-		if err != nil {
+		_, noWS := addr.ValueForProtocol(ma.P_WSS)
+		_, noWSS := addr.ValueForProtocol(ma.P_WS)
+		if noWS != nil && noWSS != nil { // Neither WS or WSS found
 			continue
 		}
 
@@ -240,22 +235,22 @@ func (w *WakuNode) getENRAddresses(addrs []ma.Multiaddr) (extAddr *net.TCPAddr, 
 		return nil, nil, err
 	}
 
-	wssAddrs, err := selectWSSListenAddresses(addrs)
+	wssAddrs, err := selectWSListenAddresses(addrs)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	multiaddr = append(multiaddr, wssAddrs...)
+	circuitAddrs, err := selectCircuitRelayListenAddresses(addrs)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	// to use WSS, you should have a valid certificate with a domain name.
-	// that means you're reachable. So circuit relay addresses are ignored
-	if len(wssAddrs) == 0 {
-		circuitAddrs, err := selectCircuitRelayListenAddresses(addrs)
-		if err != nil {
-			return nil, nil, err
-		}
-
+	if len(circuitAddrs) != 0 {
+		// Node is unreachable, hence why we have circuit relay multiaddr
+		// We prefer these instead of any ws/s address
 		multiaddr = append(multiaddr, circuitAddrs...)
+	} else {
+		multiaddr = append(multiaddr, wssAddrs...)
 	}
 
 	return
@@ -324,7 +319,7 @@ func (w *WakuNode) watchTopicShards(ctx context.Context) error {
 
 				if len(rs) == 1 {
 					w.log.Info("updating advertised relay shards in ENR")
-					if len(rs[0].Indices) != len(topics) {
+					if len(rs[0].ShardIDs) != len(topics) {
 						w.log.Warn("A mix of named and static shards found. ENR shard will contain only the following shards", zap.Any("shards", rs[0]))
 					}
 

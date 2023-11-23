@@ -214,6 +214,9 @@ type WakuV2Config struct {
 
 	// EnableFilterNode indicates if WakuFilter Full Node should be enabled
 	EnableFilterFullNode bool
+
+	// UseShardAsDefaultTopic indicates whether the default shard should be used instead of the default relay topic
+	UseShardAsDefaultTopic bool
 }
 
 // ----------
@@ -268,6 +271,9 @@ type ClusterConfig struct {
 
 	// DiscV5Nodes is a list of enr to be used for ambient discovery
 	DiscV5BootstrapNodes []string
+
+	//Waku network identifier
+	ClusterID uint16
 }
 
 // String dumps config object as nicely indented JSON

@@ -2,6 +2,7 @@
   "Rendezvous": false,
   "NoDiscovery": true,
   "ClusterConfig": {
+    "ClusterID": 16,
     "Enabled": true,
     "Fleet": "status.prod",
     "BootNodes": [],

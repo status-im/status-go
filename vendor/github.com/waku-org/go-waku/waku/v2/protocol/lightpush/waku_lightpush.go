@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/libp2p/go-libp2p/core/host"
@@ -76,72 +77,84 @@ func (wakuLP *WakuLightPush) relayIsNotAvailable() bool {
 	return wakuLP.relay == nil
 }
 
-func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(s network.Stream) {
-	return func(s network.Stream) {
-		defer s.Close()
-		logger := wakuLP.log.With(logging.HostID("peer", s.Conn().RemotePeer()))
+func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(network.Stream) {
+	return func(stream network.Stream) {
+		logger := wakuLP.log.With(logging.HostID("peer", stream.Conn().RemotePeer()))
 		requestPushRPC := &pb.PushRPC{}
 
-		writer := pbio.NewDelimitedWriter(s)
-		reader := pbio.NewDelimitedReader(s, math.MaxInt32)
+		reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
 
 		err := reader.ReadMsg(requestPushRPC)
 		if err != nil {
 			logger.Error("reading request", zap.Error(err))
 			wakuLP.metrics.RecordError(decodeRPCFailure)
+			if err := stream.Reset(); err != nil {
+				wakuLP.log.Error("resetting connection", zap.Error(err))
+			}
 			return
 		}
 
-		logger.Info("request received")
-		if requestPushRPC.Query != nil {
-			logger.Info("push request")
-			response := new(pb.PushResponse)
-
-			pubSubTopic := requestPushRPC.Query.PubsubTopic
-			message := requestPushRPC.Query.Message
-
-			wakuLP.metrics.RecordMessage()
-
-			// TODO: Assumes success, should probably be extended to check for network, peers, etc
-			// It might make sense to use WithReadiness option here?
-
-			_, err := wakuLP.relay.PublishToTopic(ctx, message, pubSubTopic)
-
-			if err != nil {
-				logger.Error("publishing message", zap.Error(err))
-				wakuLP.metrics.RecordError(messagePushFailure)
-				response.Info = "Could not publish message"
-			} else {
-				response.IsSuccess = true
-				response.Info = "Totally" // TODO: ask about this
-			}
-
-			responsePushRPC := &pb.PushRPC{}
-			responsePushRPC.RequestId = requestPushRPC.RequestId
-			responsePushRPC.Response = response
-
-			err = writer.WriteMsg(responsePushRPC)
-			if err != nil {
-				wakuLP.metrics.RecordError(writeResponseFailure)
-				logger.Error("writing response", zap.Error(err))
-				_ = s.Reset()
-			} else {
-				logger.Info("response sent")
-			}
-		} else {
-			wakuLP.metrics.RecordError(emptyRequestBodyFailure)
+		responsePushRPC := &pb.PushRPC{
+			RequestId: requestPushRPC.RequestId,
+			Response:  &pb.PushResponse{},
 		}
 
-		if requestPushRPC.Response != nil {
-			if requestPushRPC.Response.IsSuccess {
-				logger.Info("request success")
-			} else {
-				logger.Info("request failure", zap.String("info=", requestPushRPC.Response.Info))
-			}
+		if err := requestPushRPC.ValidateRequest(); err != nil {
+			responsePushRPC.Response.Info = err.Error()
+			wakuLP.metrics.RecordError(requestBodyFailure)
+			wakuLP.reply(stream, responsePushRPC, logger)
+			return
+		}
+
+		logger = logger.With(zap.String("requestID", requestPushRPC.RequestId))
+
+		logger.Info("push request")
+
+		pubSubTopic := requestPushRPC.Query.PubsubTopic
+		message := requestPushRPC.Query.Message
+
+		wakuLP.metrics.RecordMessage()
+
+		// TODO: Assumes success, should probably be extended to check for network, peers, etc
+		// It might make sense to use WithReadiness option here?
+
+		_, err = wakuLP.relay.Publish(ctx, message, relay.WithPubSubTopic(pubSubTopic))
+		if err != nil {
+			logger.Error("publishing message", zap.Error(err))
+			wakuLP.metrics.RecordError(messagePushFailure)
+			responsePushRPC.Response.Info = fmt.Sprintf("Could not publish message: %s", err.Error())
+			return
 		} else {
-			wakuLP.metrics.RecordError(emptyResponseBodyFailure)
+			responsePushRPC.Response.IsSuccess = true
+			responsePushRPC.Response.Info = "OK"
+		}
+
+		wakuLP.reply(stream, responsePushRPC, logger)
+
+		logger.Info("response sent")
+
+		stream.Close()
+
+		if responsePushRPC.Response.IsSuccess {
+			logger.Info("request success")
+		} else {
+			logger.Info("request failure", zap.String("info", responsePushRPC.Response.Info))
 		}
 	}
+}
+
+func (wakuLP *WakuLightPush) reply(stream network.Stream, responsePushRPC *pb.PushRPC, logger *zap.Logger) {
+	writer := pbio.NewDelimitedWriter(stream)
+	err := writer.WriteMsg(responsePushRPC)
+	if err != nil {
+		wakuLP.metrics.RecordError(writeResponseFailure)
+		logger.Error("writing response", zap.Error(err))
+		if err := stream.Reset(); err != nil {
+			wakuLP.log.Error("resetting connection", zap.Error(err))
+		}
+		return
+	}
+	stream.Close()
 }
 
 // request sends a message via lightPush protocol to either a specified peer or peer that is selected.
@@ -150,42 +163,30 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, p
 		return nil, errors.New("lightpush params are mandatory")
 	}
 
-	if params.selectedPeer == "" {
-		wakuLP.metrics.RecordError(peerNotFoundFailure)
-		return nil, ErrNoPeersAvailable
-	}
-
 	if len(params.requestID) == 0 {
 		return nil, ErrInvalidID
 	}
 
 	logger := wakuLP.log.With(logging.HostID("peer", params.selectedPeer))
 
-	connOpt, err := wakuLP.h.NewStream(ctx, params.selectedPeer, LightPushID_v20beta1)
+	stream, err := wakuLP.h.NewStream(ctx, params.selectedPeer, LightPushID_v20beta1)
 	if err != nil {
 		logger.Error("creating stream to peer", zap.Error(err))
 		wakuLP.metrics.RecordError(dialFailure)
 		return nil, err
 	}
-
-	defer connOpt.Close()
-	defer func() {
-		err := connOpt.Reset()
-		if err != nil {
-			wakuLP.metrics.RecordError(dialFailure)
-			logger.Error("resetting connection", zap.Error(err))
-		}
-	}()
-
 	pushRequestRPC := &pb.PushRPC{RequestId: hex.EncodeToString(params.requestID), Query: req}
 
-	writer := pbio.NewDelimitedWriter(connOpt)
-	reader := pbio.NewDelimitedReader(connOpt, math.MaxInt32)
+	writer := pbio.NewDelimitedWriter(stream)
+	reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
 
 	err = writer.WriteMsg(pushRequestRPC)
 	if err != nil {
 		wakuLP.metrics.RecordError(writeRequestFailure)
 		logger.Error("writing request", zap.Error(err))
+		if err := stream.Reset(); err != nil {
+			wakuLP.log.Error("resetting connection", zap.Error(err))
+		}
 		return nil, err
 	}
 
@@ -194,6 +195,16 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, p
 	if err != nil {
 		logger.Error("reading response", zap.Error(err))
 		wakuLP.metrics.RecordError(decodeRPCFailure)
+		if err := stream.Reset(); err != nil {
+			wakuLP.log.Error("resetting connection", zap.Error(err))
+		}
+		return nil, err
+	}
+
+	stream.Close()
+
+	if err = pushResponseRPC.ValidateResponse(pushRequestRPC.RequestId); err != nil {
+		wakuLP.metrics.RecordError(responseBodyFailure)
 		return nil, err
 	}
 
@@ -210,16 +221,12 @@ func (wakuLP *WakuLightPush) Stop() {
 	wakuLP.h.RemoveStreamHandler(LightPushID_v20beta1)
 }
 
-// Optional PublishToTopic is used to broadcast a WakuMessage to a pubsub topic via lightpush protocol
-// If pubSubTopic is not provided, then contentTopic is use to derive the relevant pubSubTopic via autosharding.
-func (wakuLP *WakuLightPush) PublishToTopic(ctx context.Context, message *wpb.WakuMessage, opts ...Option) ([]byte, error) {
-	if message == nil {
-		return nil, errors.New("message can't be null")
-	}
+func (wakuLP *WakuLightPush) handleOpts(ctx context.Context, message *wpb.WakuMessage, opts ...Option) (*lightPushParameters, error) {
 	params := new(lightPushParameters)
 	params.host = wakuLP.h
 	params.log = wakuLP.log
 	params.pm = wakuLP.pm
+	var err error
 
 	optList := append(DefaultOptions(wakuLP.h), opts...)
 	for _, opt := range optList {
@@ -227,11 +234,44 @@ func (wakuLP *WakuLightPush) PublishToTopic(ctx context.Context, message *wpb.Wa
 	}
 
 	if params.pubsubTopic == "" {
-		var err error
 		params.pubsubTopic, err = protocol.GetPubSubTopicFromContentTopic(message.ContentTopic)
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if params.pm != nil && params.selectedPeer == "" {
+		params.selectedPeer, err = wakuLP.pm.SelectPeer(
+			peermanager.PeerSelectionCriteria{
+				SelectionType: params.peerSelectionType,
+				Proto:         LightPushID_v20beta1,
+				PubsubTopic:   params.pubsubTopic,
+				SpecificPeers: params.preferredPeers,
+				Ctx:           ctx,
+			},
+		)
+	}
+	if params.selectedPeer == "" {
+		if err != nil {
+			params.log.Error("selecting peer", zap.Error(err))
+			wakuLP.metrics.RecordError(peerNotFoundFailure)
+			return nil, ErrNoPeersAvailable
+		}
+	}
+	return params, nil
+}
+
+// Publish is used to broadcast a WakuMessage to the pubSubTopic (which is derived from the
+// contentTopic) via lightpush protocol. If auto-sharding is not to be used, then the
+// `WithPubSubTopic` option should be provided to publish the message to an specific pubSubTopic
+func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *wpb.WakuMessage, opts ...Option) ([]byte, error) {
+	if message == nil {
+		return nil, errors.New("message can't be null")
+	}
+
+	params, err := wakuLP.handleOpts(ctx, message, opts...)
+	if err != nil {
+		return nil, err
 	}
 	req := new(pb.PushRequest)
 	req.Message = message
@@ -249,10 +289,4 @@ func (wakuLP *WakuLightPush) PublishToTopic(ctx context.Context, message *wpb.Wa
 	}
 
 	return nil, errors.New(response.Info)
-}
-
-// Publish is used to broadcast a WakuMessage to the pubSubTopic (which is derived from the contentTopic) via lightpush protocol
-// If auto-sharding is not to be used, then PublishToTopic API should be used
-func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *wpb.WakuMessage, opts ...Option) ([]byte, error) {
-	return wakuLP.PublishToTopic(ctx, message, opts...)
 }

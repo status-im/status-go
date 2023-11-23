@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"testing"
 	"time"
@@ -450,4 +451,103 @@ func (s *MessengerCommunitiesSignersSuite) TestAutoAcceptOnOwnershipChangeReques
 	// community = validateResults(s.john)
 	// s.Require().False(community.IsControlNode())
 	// s.Require().False(community.IsOwner())
+}
+
+func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {
+	// Create a community
+	// Transfer ownership
+	// New owner accepts new request to join
+	community := s.createCommunity(s.john)
+
+	s.advertiseCommunityTo(s.john, community, s.alice)
+
+	s.joinCommunity(s.john, community, s.alice)
+
+	// john mints owner token
+	var chainID uint64 = 1
+	tokenAddress := "token-address"
+	tokenName := "tokenName"
+	tokenSymbol := "TSM"
+	_, err := s.john.SaveCommunityToken(&token.CommunityToken{
+		TokenType:       protobuf.CommunityTokenType_ERC721,
+		CommunityID:     community.IDString(),
+		Address:         tokenAddress,
+		ChainID:         int(chainID),
+		Name:            tokenName,
+		Supply:          &bigint.BigInt{},
+		Symbol:          tokenSymbol,
+		PrivilegesLevel: token.OwnerLevel,
+	}, nil)
+	s.Require().NoError(err)
+
+	// john adds minted owner token to community
+	err = s.john.AddCommunityToken(community.IDString(), int(chainID), tokenAddress)
+	s.Require().NoError(err)
+
+	// update mock - the signer for the community returned by the contracts should be john
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.john.identity.PublicKey))
+	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
+		&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
+
+	// alice accepts community update
+	_, err = WaitOnSignaledMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && len(r.Communities()[0].TokenPermissions()) == 1
+		},
+		"no communities",
+	)
+	s.Require().NoError(err)
+
+	// Ownership token will be transferred to Alice and she will kick all members
+	// and request kicked members to rejoin
+	// the signer for the community returned by the contracts should be alice
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+
+	response, err := s.alice.PromoteSelfToControlNode(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	community, err = s.alice.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.IsControlNode())
+	s.Require().True(common.IsPubKeyEqual(community.ControlNode(), &s.alice.identity.PublicKey))
+	s.Require().True(community.IsOwner())
+
+	// check that John received kick event, also he will receive
+	// request to share RevealedAddresses and send request to join to the control node
+	_, err = WaitOnSignaledMessengerResponse(
+		s.john,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && !r.Communities()[0].HasMember(&s.john.identity.PublicKey)
+		},
+		"John was not kicked from the community",
+	)
+	s.Require().NoError(err)
+
+	// Alice advertises community to Bob
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.bob.identity.PublicKey), &s.bob.identity.PublicKey, s.bob.transport)
+
+	inputMessage := common.NewMessage()
+	inputMessage.ChatId = chat.ID
+	inputMessage.Text = "some text"
+	inputMessage.CommunityID = community.IDString()
+
+	err = s.alice.SaveChat(chat)
+	s.Require().NoError(err)
+	_, err = s.alice.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+
+	_, err = WaitOnSignaledMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0
+		},
+		"Community was not advertised to Bob",
+	)
+	s.Require().NoError(err)
+
+	// Bob joins the community
+	s.joinCommunity(s.alice, community, s.bob)
+
 }

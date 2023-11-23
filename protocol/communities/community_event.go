@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -382,7 +383,7 @@ func validateAndGetEventsMessageCommunityDescription(signedDescription []byte, s
 		return nil, ErrInvalidMessage
 	}
 
-	signer, err := metadata.RecoverKey()
+	signer, err := utils.RecoverKey(metadata)
 	if err != nil {
 		return nil, err
 	}

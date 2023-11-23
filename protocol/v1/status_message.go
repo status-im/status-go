@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/encryption"
@@ -152,12 +153,13 @@ func (m *StatusMessage) HandleEncryptionLayer(myKey *ecdsa.PrivateKey, senderKey
 }
 
 func (m *StatusMessage) HandleApplicationLayer() error {
+
 	message, err := protobuf.Unmarshal(m.EncryptionLayer.Payload)
 	if err != nil {
 		return err
 	}
 
-	recoveredKey, err := message.RecoverKey()
+	recoveredKey, err := utils.RecoverKey(message)
 	if err != nil {
 		return err
 	}

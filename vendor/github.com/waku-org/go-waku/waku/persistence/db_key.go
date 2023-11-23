@@ -35,7 +35,10 @@ func (k *DBKey) Bytes() []byte {
 
 // NewDBKey creates a new DBKey with the given values.
 func NewDBKey(senderTimestamp uint64, receiverTimestamp uint64, pubsubTopic string, digest []byte) *DBKey {
-	pubSubHash := hash.SHA256([]byte(pubsubTopic))
+	pubSubHash := make([]byte, PubsubTopicLength)
+	if pubsubTopic != "" {
+		pubSubHash = hash.SHA256([]byte(pubsubTopic))
+	}
 
 	var k DBKey
 	k.raw = make([]byte, DBKeyLength)

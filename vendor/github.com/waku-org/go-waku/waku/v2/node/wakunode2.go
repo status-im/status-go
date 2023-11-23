@@ -36,6 +36,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
+	"github.com/waku-org/go-waku/waku/v2/protocol/metadata"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
@@ -93,6 +94,7 @@ type WakuNode struct {
 	discoveryV5     Service
 	peerExchange    Service
 	rendezvous      Service
+	metadata        Service
 	legacyFilter    ReceptorService
 	filterFullNode  ReceptorService
 	filterLightNode Service
@@ -252,6 +254,8 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		w.log.Error("creating localnode", zap.Error(err))
 	}
 
+	w.metadata = metadata.NewWakuMetadata(w.opts.clusterID, w.localNode, w.log)
+
 	//Initialize peer manager.
 	w.peermanager = peermanager.NewPeerManager(w.opts.maxPeerConnections, w.opts.peerStoreCapacity, w.log)
 
@@ -283,6 +287,8 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		}
 	}
 
+	w.opts.legacyFilterOpts = append(w.opts.legacyFilterOpts, legacy_filter.WithPeerManager(w.peermanager))
+
 	w.legacyFilter = legacy_filter.NewWakuFilter(w.bcaster, w.opts.isLegacyFilterFullNode, w.timesource, w.opts.prometheusReg, w.log, w.opts.legacyFilterOpts...)
 	w.filterFullNode = filter.NewWakuFilterFullNode(w.timesource, w.opts.prometheusReg, w.log, w.opts.filterOpts...)
 	w.filterLightNode = filter.NewWakuFilterLightNode(w.bcaster, w.peermanager, w.timesource, w.opts.prometheusReg, w.log)
@@ -304,7 +310,8 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 func (w *WakuNode) watchMultiaddressChanges(ctx context.Context) {
 	defer w.wg.Done()
 
-	addrs := w.ListenAddresses()
+	addrsSet := utils.MultiAddrSet(w.ListenAddresses()...)
+
 	first := make(chan struct{}, 1)
 	first <- struct{}{}
 	for {
@@ -312,22 +319,13 @@ func (w *WakuNode) watchMultiaddressChanges(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-first:
-			w.log.Info("listening", logging.MultiAddrs("multiaddr", addrs...))
+			addr := utils.MultiAddrFromSet(addrsSet)
+			w.log.Info("listening", logging.MultiAddrs("multiaddr", addr...))
 		case <-w.addressChangesSub.Out():
-			newAddrs := w.ListenAddresses()
-			diff := false
-			if len(addrs) != len(newAddrs) {
-				diff = true
-			} else {
-				for i := range newAddrs {
-					if addrs[i].String() != newAddrs[i].String() {
-						diff = true
-						break
-					}
-				}
-			}
-			if diff {
-				addrs = newAddrs
+			newAddrs := utils.MultiAddrSet(w.ListenAddresses()...)
+			if !utils.MultiAddrSetEquals(addrsSet, newAddrs) {
+				addrsSet = newAddrs
+				addrs := utils.MultiAddrFromSet(addrsSet)
 				w.log.Info("listening addresses update received", logging.MultiAddrs("multiaddr", addrs...))
 				err := w.setupENR(ctx, addrs)
 				if err != nil {
@@ -391,6 +389,12 @@ func (w *WakuNode) Start(ctx context.Context) error {
 	if w.opts.keepAliveInterval > time.Duration(0) {
 		w.wg.Add(1)
 		go w.startKeepAlive(ctx, w.opts.keepAliveInterval)
+	}
+
+	w.metadata.SetHost(host)
+	err = w.metadata.Start(ctx)
+	if err != nil {
+		return err
 	}
 
 	w.peerConnector.SetHost(host)
@@ -513,6 +517,8 @@ func (w *WakuNode) Stop() {
 	defer w.identificationEventSub.Close()
 	defer w.addressChangesSub.Close()
 
+	w.host.Network().StopNotify(w.connectionNotif)
+
 	w.relay.Stop()
 	w.lightPush.Stop()
 	w.store.Stop()
@@ -629,6 +635,11 @@ func (w *WakuNode) FilterLightnode() *filter.WakuFilterLightNode {
 	return nil
 }
 
+// PeerManager for getting peer filterv2 protocol
+func (w *WakuNode) PeerManager() *peermanager.PeerManager {
+	return w.peermanager
+}
+
 // Lightpush is used to access any operation related to Waku Lightpush protocol
 func (w *WakuNode) Lightpush() *lightpush.WakuLightPush {
 	if result, ok := w.lightPush.(*lightpush.WakuLightPush); ok {
@@ -684,7 +695,7 @@ func (w *WakuNode) mountDiscV5() error {
 	return err
 }
 
-func (w *WakuNode) startStore(ctx context.Context, sub relay.Subscription) error {
+func (w *WakuNode) startStore(ctx context.Context, sub *relay.Subscription) error {
 	err := w.store.Start(ctx, sub)
 	if err != nil {
 		w.log.Error("starting store", zap.Error(err))
@@ -887,7 +898,6 @@ func (w *WakuNode) findRelayNodes(ctx context.Context) {
 		}
 
 		// Shuffle peers
-		rand.Seed(time.Now().UnixNano())
 		rand.Shuffle(len(peers), func(i, j int) { peers[i], peers[j] = peers[j], peers[i] })
 
 		for _, p := range peers {

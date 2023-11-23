@@ -1000,9 +1000,15 @@ func SwitchFleet(fleet string, configJSON string) string {
 		}
 	}
 
-	conf.ClusterConfig.Fleet = fleet
+	clusterConfig, err := params.LoadClusterConfigFromFleet(fleet)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
 
-	err := statusBackend.SwitchFleet(fleet, &conf)
+	conf.ClusterConfig.Fleet = fleet
+	conf.ClusterConfig.ClusterID = clusterConfig.ClusterID
+
+	err = statusBackend.SwitchFleet(fleet, &conf)
 
 	return makeJSONResponse(err)
 }
