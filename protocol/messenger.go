@@ -142,9 +142,10 @@ type Messenger struct {
 	browserDatabase            *browsers.Database
 	httpServer                 *server.MediaServer
 
-	quit   chan struct{}
-	ctx    context.Context
-	cancel context.CancelFunc
+	quit              chan struct{}
+	ctx               context.Context
+	cancel            context.CancelFunc
+	shutdownWaitGroup sync.WaitGroup
 
 	importingCommunities map[string]bool
 	importingChannels    map[string]bool
@@ -160,13 +161,12 @@ type Messenger struct {
 	requestedContactsLock sync.RWMutex
 	requestedContacts     map[string]*transport.Filter
 
-	connectionState                      connection.State
-	telemetryClient                      *telemetry.Client
-	contractMaker                        *contracts.ContractMaker
-	downloadHistoryArchiveTasksWaitGroup sync.WaitGroup
-	verificationDatabase                 *verification.Persistence
-	savedAddressesManager                *wallet.SavedAddressesManager
-	walletAPI                            *wallet.API
+	connectionState       connection.State
+	telemetryClient       *telemetry.Client
+	contractMaker         *contracts.ContractMaker
+	verificationDatabase  *verification.Persistence
+	savedAddressesManager *wallet.SavedAddressesManager
+	walletAPI             *wallet.API
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex                     sync.Mutex
@@ -1884,7 +1884,7 @@ func (m *Messenger) Init() error {
 func (m *Messenger) Shutdown() (err error) {
 	close(m.quit)
 	m.cancel()
-	m.downloadHistoryArchiveTasksWaitGroup.Wait()
+	m.shutdownWaitGroup.Wait()
 	for i, task := range m.shutdownTasks {
 		m.logger.Debug("running shutdown task", zap.Int("n", i))
 		if tErr := task(); tErr != nil {
@@ -3272,16 +3272,14 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 }
 
 func (m *Messenger) StartRetrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
+	m.shutdownWaitGroup.Add(1)
 	go func() {
+		defer m.shutdownWaitGroup.Done()
 		ticker := time.NewTicker(tick)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
-				// We might be shutting down here
-				if m == nil {
-					return
-				}
 				m.ProcessAllMessages()
 			case <-cancel:
 				return
