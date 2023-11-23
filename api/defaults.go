@@ -23,7 +23,6 @@ const defaultMnemonicLength = 12
 const walletAccountDefaultName = "Ethereum account"
 const keystoreRelativePath = "keystore"
 const defaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
-const wakuClusterID uint16 = 16 // as per https://rfc.vac.dev/spec/51/#static-sharding 16 is assigned for Status app
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
 
@@ -116,9 +115,6 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 		return err
 	}
 	nodeConfig.ClusterConfig = *clusterConfig
-	if fleet == shardsTest {
-		nodeConfig.ClusterConfig.ClusterID = wakuClusterID
-	}
 	nodeConfig.ClusterConfig.WakuNodes = defaultWakuNodes[fleet]
 	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = defaultWakuNodes[fleet]
 

@@ -95,6 +95,7 @@
 // 1697123233_drop_include_watch_only_account_to_settings_sync_clock.up.sql (72B)
 // 1697623289_add_omit_transfers_history_scan_to_settings.up.sql (92B)
 // 1699577175_use_shards.up.sql (84B)
+// 1700741911_clusterID.up.sql (75B)
 // doc.go (74B)
 // report.xml (266B)
 
@@ -2060,8 +2061,28 @@ func _1699577175_use_shardsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1699577175_use_shards.up.sql", size: 84, mode: os.FileMode(0664), modTime: time.Unix(1699578013, 0)}
+	info := bindataFileInfo{name: "1699577175_use_shards.up.sql", size: 84, mode: os.FileMode(0664), modTime: time.Unix(1699884737, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3c, 0xc9, 0x51, 0x6d, 0x40, 0xb9, 0x96, 0xd2, 0xe3, 0xfc, 0xd8, 0xb1, 0xdf, 0xc7, 0x55, 0xf6, 0x63, 0xb4, 0xec, 0xc1, 0xe5, 0xb9, 0xcc, 0xa, 0xaa, 0xac, 0x49, 0x20, 0x7f, 0xdd, 0xa2, 0x71}}
+	return a, nil
+}
+
+var __1700741911_clusteridUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\xce\x29\x2d\x2e\x49\x2d\x8a\x4f\xce\xcf\x4b\xcb\x4c\x57\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x83\xcb\x64\xa6\x28\x78\xfa\x85\x28\xf8\xf9\x87\x28\xf8\x85\xfa\xf8\x28\xb8\xb8\xba\x39\x86\xfa\x84\x28\xa8\x1b\xa8\x5b\x73\x01\x02\x00\x00\xff\xff\xce\x90\x14\xb6\x4b\x00\x00\x00")
+
+func _1700741911_clusteridUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1700741911_clusteridUpSql,
+		"1700741911_clusterID.up.sql",
+	)
+}
+
+func _1700741911_clusteridUpSql() (*asset, error) {
+	bytes, err := _1700741911_clusteridUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1700741911_clusterID.up.sql", size: 75, mode: os.FileMode(0664), modTime: time.Unix(1700742797, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x38, 0x60, 0x13, 0x88, 0x61, 0x66, 0xe0, 0xf3, 0x38, 0x91, 0x1a, 0x91, 0xa7, 0x0, 0x7b, 0x32, 0x5e, 0x8, 0xa9, 0xb3, 0x76, 0x5, 0xeb, 0xf, 0x37, 0x85, 0xdf, 0x5c, 0xed, 0x34, 0x50, 0x9e}}
 	return a, nil
 }
 
@@ -2386,6 +2407,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1699577175_use_shards.up.sql": _1699577175_use_shardsUpSql,
 
+	"1700741911_clusterID.up.sql": _1700741911_clusteridUpSql,
+
 	"doc.go": docGo,
 
 	"report.xml": reportXml,
@@ -2527,6 +2550,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1697123233_drop_include_watch_only_account_to_settings_sync_clock.up.sql": &bintree{_1697123233_drop_include_watch_only_account_to_settings_sync_clockUpSql, map[string]*bintree{}},
 	"1697623289_add_omit_transfers_history_scan_to_settings.up.sql":            &bintree{_1697623289_add_omit_transfers_history_scan_to_settingsUpSql, map[string]*bintree{}},
 	"1699577175_use_shards.up.sql":                                             &bintree{_1699577175_use_shardsUpSql, map[string]*bintree{}},
+	"1700741911_clusterID.up.sql":                                              &bintree{_1700741911_clusteridUpSql, map[string]*bintree{}},
 	"doc.go":                                                                   &bintree{docGo, map[string]*bintree{}},
 	"report.xml":                                                               &bintree{reportXml, map[string]*bintree{}},
 }}
