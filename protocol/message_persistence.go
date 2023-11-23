@@ -365,6 +365,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		if quotedDeleted.Bool || quotedDeletedForMe.Bool {
 			message.QuotedMessage = &common.QuotedMessage{
 				ID:           quotedID.String,
+				From:         quotedFrom.String,
 				Deleted:      quotedDeleted.Bool,
 				DeletedForMe: quotedDeletedForMe.Bool,
 			}
