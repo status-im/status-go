@@ -98,3 +98,6 @@ alice.log
 bob.log
 test-alice/
 test-bob/
+
+# Nix
+/.nix-gcroots/

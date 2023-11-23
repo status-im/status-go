@@ -10,7 +10,7 @@ ARG build_target=statusgo
 RUN mkdir -p /go/src/github.com/status-im/status-go
 WORKDIR /go/src/github.com/status-im/status-go
 ADD . .
-RUN make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags"
+RUN make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" SHELL="/bin/sh"
 
 # Copy the binary to the second image
 FROM alpine:latest

@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.7.0'
+library 'status-jenkins-lib@v1.8.10'
 
 pipeline {
   agent { label 'linux && x86_64 && nix-2.14' }
@@ -31,7 +31,7 @@ pipeline {
   }
 
   environment {
-    TARGET   = 'linux'
+    PLATFORM = 'linux'
     TMPDIR   = "${WORKSPACE_TMP}"
     GOPATH   = "${WORKSPACE_TMP}/go"
     GOCACHE  = "${WORKSPACE_TMP}/gocache"
