@@ -10,6 +10,10 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+	ethdnsdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/require"
 
@@ -122,7 +126,7 @@ func TestBasicWakuV2(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
-	discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrTreeAddress)
+	discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrTreeAddress, nil)
 	require.NoError(t, err)
 
 	// Peer used for retrieving history
@@ -192,58 +196,94 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, w.Stop())
 }
 
-func TestPeerExchange(t *testing.T) {
-	configs := make([]*Config, 3)
-	for i := 0; i < 3; i++ {
-		config := PeerExchangeConfig()
-		configs[i] = config
+type mapResolver map[string]string
+
+func (mr mapResolver) LookupTXT(ctx context.Context, name string) ([]string, error) {
+	if record, ok := mr[name]; ok {
+		return []string{record}, nil
 	}
+	return nil, errors.New("not found")
+}
 
-	nodes := CreateLocalNetwork(t, configs)
-	defer DropLocalWakuNetwork(t, nodes)
+var signingKeyForTesting, _ = crypto.ToECDSA(hexutil.MustDecode("0xdc599867fc513f8f5e2c2c9c489cde5e71362d1d9ec6e693e0de063236ed1240"))
 
+func makeTestTree(domain string, nodes []*enode.Node, links []string) (*ethdnsdisc.Tree, string) {
+	tree, err := ethdnsdisc.MakeTree(1, nodes, links)
+	if err != nil {
+		panic(err)
+	}
+	url, err := tree.Sign(signingKeyForTesting, domain)
+	if err != nil {
+		panic(err)
+	}
+	return tree, url
+}
+
+func TestPeerExchange(t *testing.T) {
+	// start node which serve as PeerExchange server
 	config := &Config{}
+	config.EnableDiscV5 = true
 	config.PeerExchange = true
-	config.WakuNodes = []string{nodes[0].ListenAddresses()[0]}
-	pxServer, err := New("", "", config, nil, nil, nil, nil, nil)
+	wsPort := 0
+	wsConfig := WebsocketConfig{
+		Enabled: true,
+		Port:    &wsPort,
+		Host:    "0.0.0.0",
+	}
+	config.WebSocket = &wsConfig
+	pxServerNode, err := New("", "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
-	require.NoError(t, pxServer.Start())
-
-	pxServer.AddRelayPeer(nodes[1].ListenAddresses()[0])
-	pxServer.AddRelayPeer(nodes[2].ListenAddresses()[0])
-
-	t.Log("pxServer.ListenAddresses()[0]: ", pxServer.ListenAddresses()[0])
-	t.Log("pxServer peers: ", len(pxServer.Peers()))
+	require.NoError(t, pxServerNode.Start())
 
 	time.Sleep(1 * time.Second)
 
+	// start node that will be discovered by PeerExchange
+	config = &Config{}
+	config.EnableDiscV5 = true
+	config.DiscV5BootstrapNodes = []string{pxServerNode.node.ENR().String()}
+	node, err := New("", "", config, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, node.Start())
+
+	time.Sleep(1 * time.Second)
+
+	// start light node which use PeerExchange to discover peers
 	config = &Config{}
 	config.PeerExchange = true
 	config.LightClient = true
-	config.WakuNodes = []string{pxServer.ListenAddresses()[0]}
-	w, err := New("", "", config, nil, nil, nil, nil, nil)
+
+	enrNodes := []*enode.Node{pxServerNode.node.ENR()}
+	tree, url := makeTestTree("n", enrNodes, nil)
+	resolver := mapResolver(tree.ToTXT("n"))
+
+	config.WakuNodes = []string{url}
+	lightNode, err := New("", "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
-	require.NoError(t, w.Start())
+
+	lightNode.dnsResolver = resolver
+
+	require.NoError(t, lightNode.Start())
 
 	// Sanity check, not great, but it's probably helpful
 	options := func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 30 * time.Second
 	}
 	err = tt.RetryWithBackOff(func() error {
-		countpx := len(pxServer.Peers())
-		t.Log("w.countpx(): ", countpx)
-		count := len(w.Peers())
+		countpx := len(pxServerNode.Peers())
+		t.Log("pxServerNode(): ", countpx)
+		count := len(lightNode.Peers())
 		t.Log("w.count(): ", count)
-		if len(w.Peers()) > 1 {
-			t.Log("w.Peers(): ", w.Peers())
+		if len(lightNode.Peers()) == 13 {
+			t.Log("w.Peers(): ", lightNode.Peers())
 			return nil
 		}
 		return errors.New("no peers discovered")
 	}, options)
 	require.NoError(t, err)
 
-	require.NoError(t, w.Stop())
-	require.NoError(t, pxServer.Stop())
+	require.NoError(t, lightNode.Stop())
+	require.NoError(t, pxServerNode.Stop())
+	require.NoError(t, node.Stop())
 }
 
 func TestWakuV2Filter(t *testing.T) {

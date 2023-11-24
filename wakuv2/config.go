@@ -26,30 +26,40 @@ import (
 
 // Config represents the configuration state of a waku node.
 type Config struct {
-	MaxMessageSize          uint32   `toml:",omitempty"`
-	Host                    string   `toml:",omitempty"`
-	Port                    int      `toml:",omitempty"`
-	PeerExchange            bool     `toml:",omitempty"`
-	KeepAliveInterval       int      `toml:",omitempty"`
-	MinPeersForRelay        int      `toml:",omitempty"`
-	MinPeersForFilter       int      `toml:",omitempty"`
-	LightClient             bool     `toml:",omitempty"`
-	WakuNodes               []string `toml:",omitempty"`
-	Rendezvous              bool     `toml:",omitempty"`
-	DiscV5BootstrapNodes    []string `toml:",omitempty"`
-	Nameserver              string   `toml:",omitempty"`
-	EnableDiscV5            bool     `toml:",omitempty"`
-	DiscoveryLimit          int      `toml:",omitempty"`
-	AutoUpdate              bool     `toml:",omitempty"`
-	UDPPort                 int      `toml:",omitempty"`
-	EnableStore             bool     `toml:",omitempty"`
-	StoreCapacity           int      `toml:",omitempty"`
-	StoreSeconds            int      `toml:",omitempty"`
-	TelemetryServerURL      string   `toml:",omitempty"`
-	EnableFilterFullNode    bool     `toml:",omitempty"`
-	DefaultShardPubsubTopic string   `toml:",omitempty"`
-	UseShardAsDefaultTopic  bool     `toml:",omitempty"`
-	ClusterID               uint16   `toml:",omitempty"`
+	MaxMessageSize          uint32           `toml:",omitempty"`
+	Host                    string           `toml:",omitempty"`
+	Port                    int              `toml:",omitempty"`
+	PeerExchange            bool             `toml:",omitempty"`
+	KeepAliveInterval       int              `toml:",omitempty"`
+	MinPeersForRelay        int              `toml:",omitempty"`
+	MinPeersForFilter       int              `toml:",omitempty"`
+	LightClient             bool             `toml:",omitempty"`
+	WakuNodes               []string         `toml:",omitempty"`
+	Rendezvous              bool             `toml:",omitempty"`
+	DiscV5BootstrapNodes    []string         `toml:",omitempty"`
+	Nameserver              string           `toml:",omitempty"`
+	EnableDiscV5            bool             `toml:",omitempty"`
+	DiscoveryLimit          int              `toml:",omitempty"`
+	AutoUpdate              bool             `toml:",omitempty"`
+	UDPPort                 int              `toml:",omitempty"`
+	EnableStore             bool             `toml:",omitempty"`
+	StoreCapacity           int              `toml:",omitempty"`
+	StoreSeconds            int              `toml:",omitempty"`
+	TelemetryServerURL      string           `toml:",omitempty"`
+	EnableFilterFullNode    bool             `toml:",omitempty"`
+	DefaultShardPubsubTopic string           `toml:",omitempty"`
+	UseShardAsDefaultTopic  bool             `toml:",omitempty"`
+	ClusterID               uint16           `toml:",omitempty"`
+	WebSocket               *WebsocketConfig `toml:",omitempty"`
+}
+
+type WebsocketConfig struct {
+	Enabled  bool   `toml:",omitempty"`
+	Host     string `toml:",omitempty"`
+	Port     *int   `toml:",omitempty"`
+	Secure   bool   `toml:",omitempty"`
+	CertPath string `toml:",omitempty"`
+	KeyPath  string `toml:",omitempty"`
 }
 
 var DefaultConfig = Config{

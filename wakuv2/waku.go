@@ -47,6 +47,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
+	ethdnsdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rpc"
 
@@ -106,6 +107,7 @@ type Waku struct {
 
 	dnsAddressCache     map[string][]dnsdisc.DiscoveredNode // Map to store the multiaddresses returned by dns discovery
 	dnsAddressCacheLock *sync.RWMutex                       // lock to handle access to the map
+	dnsResolver         ethdnsdisc.Resolver                 // Resolver to use for dns discovery
 
 	// Filter-related
 	filters       *common.Filters // Message filters installed with Subscribe function
@@ -326,6 +328,15 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		opts = append(opts, node.WithWakuFilterFullNode())
 	}
 
+	if cfg.WebSocket != nil {
+		if cfg.WebSocket.Secure {
+			opts = append(opts, node.WithSecureWebsockets(cfg.WebSocket.Host, *cfg.WebSocket.Port, cfg.WebSocket.CertPath, cfg.WebSocket.KeyPath))
+		} else {
+			opts = append(opts, node.WithWebsockets(cfg.WebSocket.Host, *cfg.WebSocket.Port))
+
+		}
+	}
+
 	if appDB != nil {
 		waku.protectedTopicStore, err = persistence.NewProtectedTopicsStore(logger, appDB)
 		if err != nil {
@@ -410,7 +421,7 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 			opts = append(opts, dnsdisc.WithNameserver(nameserver))
 		}
 
-		discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrtreeAddress, opts...)
+		discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrtreeAddress, w.dnsResolver, opts...)
 		if err != nil {
 			w.logger.Warn("dns discovery error ", zap.Error(err))
 			return
