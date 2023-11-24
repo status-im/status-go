@@ -194,6 +194,7 @@ type peerStatus struct {
 }
 type mailserverCycle struct {
 	sync.RWMutex
+	allMailservers            []mailserversDB.Mailserver
 	activeMailserver          *mailserversDB.Mailserver
 	peers                     map[string]peerStatus
 	events                    chan *p2p.PeerEvent
@@ -820,7 +821,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	response.Mailservers = mailservers
-	err = m.StartMailserverCycle()
+	err = m.StartMailserverCycle(mailservers)
 	if err != nil {
 		return nil, err
 	}
