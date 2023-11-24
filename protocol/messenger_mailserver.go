@@ -945,3 +945,53 @@ func (m *Messenger) ConnectionChanged(state connection.State) {
 
 	m.connectionState = state
 }
+
+func (m *Messenger) SyncChatOneMonth(chatID string) (uint32, error) {
+	to := uint32(m.getTimesource().GetCurrentTime() / 1000)
+	from := to - oneMonthInSeconds
+	_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
+		pubsubTopic, topics, err := m.topicsForChat(chatID)
+		if err != nil {
+			return nil, nil
+		}
+
+		chat, ok := m.allChats.Load(chatID)
+		if !ok {
+			return nil, ErrChatNotFound
+		}
+
+		batch := MailserverBatch{
+			ChatIDs:     []string{chatID},
+			From:        from,
+			To:          to,
+			PubsubTopic: pubsubTopic,
+			Topics:      topics,
+		}
+		if m.config.messengerSignalsHandler != nil {
+			m.config.messengerSignalsHandler.HistoryRequestStarted(1)
+		}
+
+		err = m.processMailserverBatch(batch)
+		if err != nil {
+			return nil, err
+		}
+
+		if m.config.messengerSignalsHandler != nil {
+			m.config.messengerSignalsHandler.HistoryRequestCompleted()
+		}
+		if chat.SyncedFrom == 0 || chat.SyncedFrom > batch.From {
+			chat.SyncedFrom = batch.From
+		}
+
+		m.logger.Debug("setting sync timestamps", zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
+
+		err = m.persistence.SetSyncTimestamps(batch.From, chat.SyncedTo, chat.ID)
+		from = batch.From
+		return nil, err
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	return from, nil
+}

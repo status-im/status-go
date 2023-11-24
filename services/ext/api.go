@@ -1681,6 +1681,10 @@ func (api *PublicAPI) PromoteSelfToControlMode(communityID string) error {
 	return err
 }
 
+func (api *PublicAPI) SyncChat(request *requests.SyncChat) error {
+	return api.service.messenger.SyncChat(request)
+}
+
 // -----
 // HELPER
 // -----
