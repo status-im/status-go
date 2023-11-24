@@ -633,3 +633,24 @@ func (m *Messenger) clearHistory(id string) (*MessengerResponse, error) {
 	response.AddChat(chat)
 	return response, nil
 }
+
+func (m *Messenger) SyncChat(request *requests.SyncChat) error {
+
+	if err := request.Validate(); err != nil {
+		return err
+	}
+
+	id := request.ID
+
+	chat, ok := m.allChats.Load(id)
+	if !ok {
+		return ErrChatNotFound
+	}
+
+	_, err := m.SyncChatOneMonth(chat.ID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
