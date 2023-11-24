@@ -24,6 +24,7 @@ type txSigningDetails struct {
 	chainID       uint64
 	from          common.Address
 	txBeingSigned *ethTypes.Transaction
+	txHash        common.Hash
 }
 
 type Service struct {
@@ -62,8 +63,43 @@ func (s *Service) SignMessage(message types.HexBytes, address common.Address, pa
 	return types.EncodeHex(signature), err
 }
 
-func (s *Service) SendTransaction(signature string) (response *SessionRequestResponse, err error) {
-	return s.sendTransaction(signature)
+func (s *Service) BuildRawTransaction(signature string) (string, error) {
+	txWithSignature, err := s.addSignatureToTransaction(signature)
+	if err != nil {
+		return "", err
+	}
+
+	data, err := txWithSignature.MarshalBinary()
+	if err != nil {
+		return "", err
+	}
+
+	s.txSignDetails.txHash = txWithSignature.Hash()
+
+	return types.EncodeHex(data), nil
+}
+
+func (s *Service) SendRawTransaction(rawTx string) (string, error) {
+	err := s.transactor.SendRawTransaction(s.txSignDetails.chainID, rawTx)
+	if err != nil {
+		return "", err
+	}
+
+	return s.txSignDetails.txHash.Hex(), nil
+}
+
+func (s *Service) SendTransactionWithSignature(signature string) (string, error) {
+	txWithSignature, err := s.addSignatureToTransaction(signature)
+	if err != nil {
+		return "", err
+	}
+
+	hash, err := s.transactor.SendTransactionWithSignature(txWithSignature)
+	if err != nil {
+		return "", err
+	}
+
+	return hash.Hex(), nil
 }
 
 func (s *Service) PairSessionProposal(proposal SessionProposal) (*PairSessionResponse, error) {
@@ -129,7 +165,12 @@ func (s *Service) PairSessionProposal(proposal SessionProposal) (*PairSessionRes
 		SupportedNamespaces: map[string]Namespace{
 			SupportedEip155Namespace: Namespace{
 				Methods: []string{params.SendTransactionMethodName,
+					params.SendRawTransactionMethodName,
 					params.PersonalSignMethodName,
+					params.SignMethodName,
+					params.SignTransactionMethodName,
+					params.SignTypedDataMethodName,
+					params.WalletSwitchEthereumChainMethodName,
 				},
 				Events:   []string{"accountsChanged", "chainChanged"},
 				Chains:   eipChains,
@@ -169,8 +210,14 @@ func (s *Service) SessionRequest(request SessionRequest) (response *SessionReque
 
 	if request.Params.Request.Method == params.SendTransactionMethodName {
 		return s.buildTransaction(request)
+	} else if request.Params.Request.Method == params.SignTransactionMethodName {
+		return s.buildTransaction(request)
 	} else if request.Params.Request.Method == params.PersonalSignMethodName {
-		return s.buildPersonalSingMessage(request)
+		return s.buildMessage(request, 1, 0, false)
+	} else if request.Params.Request.Method == params.SignMethodName {
+		return s.buildMessage(request, 0, 1, false)
+	} else if request.Params.Request.Method == params.SignTypedDataMethodName {
+		return s.buildMessage(request, 0, 1, true)
 	}
 
 	// TODO #12434: respond async

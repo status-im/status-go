@@ -26,7 +26,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
-	"github.com/status-im/status-go/services/wallet/walletconnect"
 	wc "github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
@@ -609,16 +608,32 @@ func (api *API) FetchChainIDForURL(ctx context.Context, rpcURL string) (*big.Int
 	return client.ChainID(ctx)
 }
 
+// WCSignMessage signs a message for the passed address using the provided password and returns the signature
 func (api *API) WCSignMessage(ctx context.Context, message types.HexBytes, address common.Address, password string) (string, error) {
 	log.Debug("wallet.api.wc.SignMessage", "message", message, "address", address, "password", password)
 
 	return api.s.walletConnect.SignMessage(message, address, password)
 }
 
-func (api *API) WCSendTransaction(signature string) (response *walletconnect.SessionRequestResponse, err error) {
-	log.Debug("wallet.api.wc.SendTransaction", "signature", signature)
+// WCBuildRawTransaction builds raw transaction using the provided signature and returns the RLP-encoded transaction object
+func (api *API) WCBuildRawTransaction(signature string) (string, error) {
+	log.Debug("wallet.api.wc.BuildRawTransaction", "signature", signature)
 
-	return api.s.walletConnect.SendTransaction(signature)
+	return api.s.walletConnect.BuildRawTransaction(signature)
+}
+
+// WCSendRawTransaction sends provided raw transaction and returns the transaction hash
+func (api *API) WCSendRawTransaction(rawTx string) (string, error) {
+	log.Debug("wallet.api.wc.SendRawTransaction", "rawTx", rawTx)
+
+	return api.s.walletConnect.SendRawTransaction(rawTx)
+}
+
+// WCSendTransactionWithSignature sends transaction with the provided signature and returns the transaction hash
+func (api *API) WCSendTransactionWithSignature(signature string) (string, error) {
+	log.Debug("wallet.api.wc.SendTransactionWithSignature", "signature", signature)
+
+	return api.s.walletConnect.SendTransactionWithSignature(signature)
 }
 
 // WCPairSessionProposal responds to "session_proposal" event
@@ -655,11 +670,11 @@ func (api *API) WCHasActivePairings(ctx context.Context) (bool, error) {
 }
 
 // WCSessionRequest responds to "session_request" event
-func (api *API) WCSessionRequest(ctx context.Context, sessionRequestJSON string) (response *wc.SessionRequestResponse, err error) {
+func (api *API) WCSessionRequest(ctx context.Context, sessionRequestJSON string) (*wc.SessionRequestResponse, error) {
 	log.Debug("wallet.api.wc.SessionRequest", "request.len", len(sessionRequestJSON))
 
 	var request wc.SessionRequest
-	err = json.Unmarshal([]byte(sessionRequestJSON), &request)
+	err := json.Unmarshal([]byte(sessionRequestJSON), &request)
 	if err != nil {
 		return nil, err
 	}

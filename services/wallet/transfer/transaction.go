@@ -399,7 +399,7 @@ func (tm *TransactionManager) ProceedWithTransactionsSignatures(ctx context.Cont
 	// send transactions
 	hashes := make(map[uint64][]types.Hash)
 	for _, desc := range tm.transactionsForKeycardSingning {
-		hash, err := tm.transactor.SendBuiltTransactionWithSignature(desc.chainID, desc.builtTx, desc.signature)
+		hash, err := tm.transactor.AddSignatureToTransactionAndSend(desc.chainID, desc.builtTx, desc.signature)
 		if desc.unlock != nil {
 			defer func() {
 				desc.unlock(err == nil, desc.builtTx.Nonce())

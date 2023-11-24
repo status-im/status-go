@@ -108,7 +108,6 @@ type SessionRequestResponse struct {
 	AddressPath   string        `json:"addressPath,omitempty"`
 	SignOnKeycard bool          `json:"signOnKeycard,omitempty"`
 	MesageToSign  interface{}   `json:"messageToSign,omitempty"`
-	SignedMessage interface{}   `json:"signedMessage,omitempty"`
 }
 
 // Valid namespace
