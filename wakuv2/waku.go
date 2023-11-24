@@ -309,6 +309,9 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	}
 
 	if cfg.EnableStore {
+		if appDB == nil {
+			return nil, errors.New("appDB is required for store")
+		}
 		opts = append(opts, node.WithWakuStore())
 		dbStore, err := persistence.NewDBStore(logger, persistence.WithDB(appDB), persistence.WithRetentionPolicy(cfg.StoreCapacity, time.Duration(cfg.StoreSeconds)*time.Second))
 		if err != nil {
@@ -1393,8 +1396,7 @@ func (w *Waku) processQueue() {
 		case <-w.ctx.Done():
 			return
 		case e := <-w.msgQueue:
-			logger := w.logger.With(zap.String("hash", e.Hash().String()), zap.String("envelopeHash", hexutil.Encode(e.Envelope.Hash())), zap.String("contentTopic", e.ContentTopic.ContentTopic()), zap.Int64("timestamp", e.Envelope.Message().Timestamp))
-			logger.Debug("received message from queue")
+			logger := w.logger.With(zap.String("hash", e.Hash().String()), zap.String("contentTopic", e.ContentTopic.ContentTopic()), zap.Int64("timestamp", e.Envelope.Message().Timestamp))
 			if e.MsgType == common.StoreMessageType {
 				// We need to insert it first, and then remove it if not matched,
 				// as messages are processed asynchronously
@@ -1412,6 +1414,7 @@ func (w *Waku) processQueue() {
 				delete(w.storeMsgIDs, e.Hash())
 				w.storeMsgIDsMu.Unlock()
 			} else {
+				logger.Debug("filters did match")
 				e.Processed.Store(true)
 			}
 
