@@ -374,7 +374,7 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 					Return(common.Hash{}, nil)
 			}
 
-			_, err = s.manager.SendTransactionWithSignature(s.nodeConfig.NetworkID, args, sig)
+			_, err = s.manager.BuildTransactionAndSendWithSignature(s.nodeConfig.NetworkID, args, sig)
 			if scenario.expectError {
 				s.Error(err)
 				// local nonce should not be incremented
@@ -393,7 +393,7 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 
 func (s *TransactorSuite) TestSendTransactionWithSignature_InvalidSignature() {
 	args := SendTxArgs{}
-	_, err := s.manager.SendTransactionWithSignature(1, args, []byte{})
+	_, err := s.manager.BuildTransactionAndSendWithSignature(1, args, []byte{})
 	s.Equal(ErrInvalidSignatureSize, err)
 }
 

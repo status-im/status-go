@@ -55,6 +55,11 @@ func (w *rpcWrapper) EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uin
 	return uint64(hex), nil
 }
 
+// Does the `eth_sendRawTransaction` call with the given raw transaction hex string.
+func (w *rpcWrapper) SendRawTransaction(ctx context.Context, rawTx string) error {
+	return w.RPCClient.CallContext(ctx, nil, w.chainID, "eth_sendRawTransaction", rawTx)
+}
+
 // SendTransaction injects a signed transaction into the pending pool for execution.
 //
 // If the transaction was a contract creation use the TransactionReceipt method to get the
@@ -64,7 +69,7 @@ func (w *rpcWrapper) SendTransaction(ctx context.Context, tx *gethtypes.Transact
 	if err != nil {
 		return err
 	}
-	return w.RPCClient.CallContext(ctx, nil, w.chainID, "eth_sendRawTransaction", types.EncodeHex(data))
+	return w.SendRawTransaction(ctx, types.EncodeHex(data))
 }
 
 func toCallArg(msg ethereum.CallMsg) interface{} {

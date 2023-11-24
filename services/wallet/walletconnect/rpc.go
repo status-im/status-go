@@ -10,7 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/transactions"
@@ -106,40 +106,41 @@ func (s *Service) buildTransaction(request SessionRequest) (response *SessionReq
 		txBeingSigned: txBeingSigned,
 	}
 
-	signer := ethTypes.NewLondonSigner(new(big.Int).SetUint64(s.txSignDetails.chainID))
+	signer := ethTypes.NewLondonSigner(new(big.Int).SetUint64(chainID))
 	return &SessionRequestResponse{
 		KeyUID:        account.KeyUID,
 		Address:       account.Address,
 		AddressPath:   account.Path,
 		SignOnKeycard: kp.MigratedToKeycard(),
-		MesageToSign:  signer.Hash(s.txSignDetails.txBeingSigned),
+		MesageToSign:  signer.Hash(txBeingSigned),
 	}, nil
 }
 
-func (s *Service) sendTransaction(signature string) (response *SessionRequestResponse, err error) {
+func (s *Service) addSignatureToTransaction(signature string) (*ethTypes.Transaction, error) {
 	if s.txSignDetails.txBeingSigned == nil {
-		return response, errors.New("no tx to sign")
+		return nil, errors.New("no tx to sign")
 	}
 
-	signatureBytes, _ := hex.DecodeString(signature)
-
-	hash, err := s.transactor.SendBuiltTransactionWithSignature(s.txSignDetails.chainID, s.txSignDetails.txBeingSigned, signatureBytes)
+	signatureBytes, err := hex.DecodeString(signature)
 	if err != nil {
 		return nil, err
 	}
 
-	return &SessionRequestResponse{
-		SignedMessage: hash,
-	}, nil
+	return s.transactor.AddSignatureToTransaction(s.txSignDetails.chainID, s.txSignDetails.txBeingSigned, signatureBytes)
 }
 
-func (s *Service) buildPersonalSingMessage(request SessionRequest) (response *SessionRequestResponse, err error) {
+func (s *Service) buildMessage(request SessionRequest, addressIndex int, messageIndex int,
+	handleTypedData bool) (response *SessionRequestResponse, err error) {
 	if len(request.Params.Request.Params) != 2 {
 		return nil, ErrorInvalidParamsCount
 	}
 
+	if addressIndex > 1 || addressIndex < 0 || messageIndex > 1 || messageIndex < 0 {
+		return nil, ErrorInvalidAddressMsgIndex
+	}
+
 	var address types.Address
-	if err := json.Unmarshal(request.Params.Request.Params[1], &address); err != nil {
+	if err := json.Unmarshal(request.Params.Request.Params[addressIndex], &address); err != nil {
 		return nil, err
 	}
 
@@ -153,12 +154,29 @@ func (s *Service) buildPersonalSingMessage(request SessionRequest) (response *Se
 		return nil, err
 	}
 
-	var dBytes types.HexBytes
-	if err := json.Unmarshal(request.Params.Request.Params[0], &dBytes); err != nil {
-		return nil, err
-	}
+	var hash []byte
+	if !handleTypedData {
+		var dBytes types.HexBytes
+		if err := json.Unmarshal(request.Params.Request.Params[messageIndex], &dBytes); err != nil {
+			return nil, err
+		}
+		hash = crypto.TextHash(dBytes)
+	} else {
+		var typedDataJSON string
+		if err := json.Unmarshal(request.Params.Request.Params[messageIndex], &typedDataJSON); err != nil {
+			return nil, err
+		}
 
-	hash := crypto.TextHash(dBytes)
+		var typedData apitypes.TypedData
+		if err := json.Unmarshal([]byte(typedDataJSON), &typedData); err != nil {
+			return nil, err
+		}
+
+		hash, _, err = apitypes.TypedDataAndHash(typedData)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return &SessionRequestResponse{
 		KeyUID:        account.KeyUID,

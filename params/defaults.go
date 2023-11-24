@@ -6,16 +6,30 @@ const (
 	// StatusDatabase path relative to DataDir.
 	StatusDatabase = "status-db"
 
-	// SendTransactionMethodName defines the name for a giving transaction.
+	// SendTransactionMethodName https://docs.walletconnect.com/advanced/rpc-reference/ethereum-rpc#eth_sendtransaction
 	SendTransactionMethodName = "eth_sendTransaction"
+
+	// SendTransactionMethodName https://docs.walletconnect.com/advanced/rpc-reference/ethereum-rpc#eth_sendrawtransaction
+	SendRawTransactionMethodName = "eth_sendRawTransaction"
 
 	BalanceMethodName = "eth_getBalance"
 
 	// AccountsMethodName defines the name for listing the currently signed accounts.
 	AccountsMethodName = "eth_accounts"
 
-	// PersonalSignMethodName defines the name for `personal.sign` API.
+	// PersonalSignMethodName https://docs.walletconnect.com/advanced/rpc-reference/ethereum-rpc#personal_sign
 	PersonalSignMethodName = "personal_sign"
+
+	// SignMethodName https://docs.walletconnect.com/advanced/rpc-reference/ethereum-rpc#eth_sign
+	SignMethodName = "eth_sign"
+
+	// SignTransactionMethodName https://docs.walletconnect.com/advanced/rpc-reference/ethereum-rpc#eth_signtransaction
+	SignTransactionMethodName = "eth_signTransaction"
+
+	// SignTypedDataMethodName https://docs.walletconnect.com/advanced/rpc-reference/ethereum-rpc#eth_signtypeddata
+	SignTypedDataMethodName = "eth_signTypedData"
+
+	WalletSwitchEthereumChainMethodName = "wallet_switchEthereumChain"
 
 	// PersonalRecoverMethodName defines the name for `personal.recover` API.
 	PersonalRecoverMethodName = "personal_ecRecover"

@@ -116,33 +116,57 @@ func (t *Transactor) ValidateAndBuildTransaction(chainID uint64, sendArgs SendTx
 	return
 }
 
-func (t *Transactor) SendBuiltTransactionWithSignature(chainID uint64, tx *gethtypes.Transaction, sig []byte) (hash types.Hash, err error) {
+func (t *Transactor) AddSignatureToTransaction(chainID uint64, tx *gethtypes.Transaction, sig []byte) (*gethtypes.Transaction, error) {
 	if len(sig) != ValidSignatureSize {
-		return hash, ErrInvalidSignatureSize
+		return nil, ErrInvalidSignatureSize
 	}
 
 	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
 	chID := big.NewInt(int64(rpcWrapper.chainID))
 
 	signer := gethtypes.NewLondonSigner(chID)
-	signedTx, err := tx.WithSignature(signer, sig)
+	txWithSignature, err := tx.WithSignature(signer, sig)
 	if err != nil {
-		return hash, err
+		return nil, err
 	}
+
+	return txWithSignature, nil
+}
+
+func (t *Transactor) SendRawTransaction(chainID uint64, rawTx string) error {
+	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
 
-	if err := rpcWrapper.SendTransaction(ctx, signedTx); err != nil {
-		return hash, err
-	}
-	return types.Hash(signedTx.Hash()), nil
+	return rpcWrapper.SendRawTransaction(ctx, rawTx)
 }
 
-// SendTransactionWithSignature receive a transaction and a signature, serialize them together and propage it to the network.
+func (t *Transactor) SendTransactionWithSignature(tx *gethtypes.Transaction) (hash types.Hash, err error) {
+	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, tx.ChainId().Uint64())
+
+	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	defer cancel()
+
+	if err := rpcWrapper.SendTransaction(ctx, tx); err != nil {
+		return hash, err
+	}
+	return types.Hash(tx.Hash()), nil
+}
+
+func (t *Transactor) AddSignatureToTransactionAndSend(chainID uint64, tx *gethtypes.Transaction, sig []byte) (hash types.Hash, err error) {
+	txWithSignature, err := t.AddSignatureToTransaction(chainID, tx, sig)
+	if err != nil {
+		return hash, err
+	}
+
+	return t.SendTransactionWithSignature(txWithSignature)
+}
+
+// BuildTransactionAndSendWithSignature receive a transaction and a signature, serialize them together and propage it to the network.
 // It's different from eth_sendRawTransaction because it receives a signature and not a serialized transaction with signature.
 // Since the transactions is already signed, we assume it was validated and used the right nonce.
-func (t *Transactor) SendTransactionWithSignature(chainID uint64, args SendTxArgs, sig []byte) (hash types.Hash, err error) {
+func (t *Transactor) BuildTransactionAndSendWithSignature(chainID uint64, args SendTxArgs, sig []byte) (hash types.Hash, err error) {
 	if !args.Valid() {
 		return hash, ErrInvalidSendTxArgs
 	}
@@ -167,7 +191,7 @@ func (t *Transactor) SendTransactionWithSignature(chainID uint64, args SendTxArg
 		return hash, &ErrBadNonce{tx.Nonce(), expectedNonce}
 	}
 
-	return t.SendBuiltTransactionWithSignature(chainID, tx, sig)
+	return t.AddSignatureToTransactionAndSend(chainID, tx, sig)
 }
 
 func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs, hash types.Hash, err error) {
