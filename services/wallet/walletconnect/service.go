@@ -3,6 +3,7 @@ package walletconnect
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -66,45 +67,79 @@ func (s *Service) SendTransaction(signature string) (response *SessionRequestRes
 }
 
 func (s *Service) PairSessionProposal(proposal SessionProposal) (*PairSessionResponse, error) {
-	namespace := Namespace{
-		Methods: []string{params.SendTransactionMethodName, params.PersonalSignMethodName},
-		Events:  []string{"accountsChanged", "chainChanged"},
+	if !proposal.Valid() {
+		return nil, ErrorInvalidSessionProposal
 	}
 
-	proposedChains := proposal.Params.RequiredNamespaces.Eip155.Chains
-	chains, eipChains := sessionProposalToSupportedChain(proposedChains, func(chainID uint64) bool {
-		return s.networkManager.Find(chainID) != nil
-	})
-	if len(chains) != len(proposedChains) {
-		log.Warn("Some chains are not supported; wanted: ", proposedChains, "; supported: ", chains)
-		return nil, ErrorChainsNotSupported
+	var (
+		chains    []uint64
+		eipChains []string
+	)
+
+	if len(proposal.Params.RequiredNamespaces) == 0 {
+		// return all we support
+		allChains, err := s.networkManager.GetAll()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get all chains: %w", err)
+		}
+		for _, chain := range allChains {
+			chains = append(chains, chain.ChainID)
+			eipChains = append(eipChains, fmt.Sprintf("%s:%d", SupportedEip155Namespace, chain.ChainID))
+		}
+	} else {
+		var proposedChains []string
+		for key, ns := range proposal.Params.RequiredNamespaces {
+			if !strings.Contains(key, SupportedEip155Namespace) {
+				log.Warn("Some namespaces are not supported; wanted: ", key, "; supported: ", SupportedEip155Namespace)
+				return nil, ErrorNamespaceNotSupported
+			}
+
+			if strings.Contains(key, ":") {
+				proposedChains = append(proposedChains, key)
+			} else {
+				proposedChains = append(proposedChains, ns.Chains...)
+			}
+		}
+
+		chains, eipChains = sessionProposalToSupportedChain(proposedChains, func(chainID uint64) bool {
+			return s.networkManager.Find(chainID) != nil
+		})
+
+		if len(chains) != len(proposedChains) {
+			log.Warn("Some chains are not supported; wanted: ", proposedChains, "; supported: ", chains)
+			return nil, ErrorChainsNotSupported
+		}
 	}
-	namespace.Chains = eipChains
 
 	activeAccounts, err := s.accountsDB.GetActiveAccounts()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active accounts: %w", err)
 	}
 
-	// Filter out non-own accounts
-	usableAccounts := make([]*accounts.Account, 0, 1)
+	allWalletAccountsReadyForTransaction := make([]*accounts.Account, 0, 1)
 	for _, acc := range activeAccounts {
 		if !acc.IsWalletAccountReadyForTransaction() {
 			continue
 		}
-		usableAccounts = append(usableAccounts, acc)
+		allWalletAccountsReadyForTransaction = append(allWalletAccountsReadyForTransaction, acc)
 	}
 
-	addresses := activeToOwnedAccounts(usableAccounts)
-	namespace.Accounts = caip10Accounts(addresses, chains)
+	result := &PairSessionResponse{
+		SessionProposal: proposal,
+		SupportedNamespaces: map[string]Namespace{
+			SupportedEip155Namespace: Namespace{
+				Methods: []string{params.SendTransactionMethodName,
+					params.PersonalSignMethodName,
+				},
+				Events:   []string{"accountsChanged", "chainChanged"},
+				Chains:   eipChains,
+				Accounts: caip10Accounts(allWalletAccountsReadyForTransaction, chains),
+			},
+		},
+	}
 
 	// TODO #12434: respond async
-	return &PairSessionResponse{
-		SessionProposal: proposal,
-		SupportedNamespaces: Namespaces{
-			Eip155: namespace,
-		},
-	}, nil
+	return result, nil
 }
 
 func (s *Service) RecordSuccessfulPairing(proposal SessionProposal) error {
