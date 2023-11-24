@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -2601,7 +2602,7 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard
 
 	defer m.forgetCommunityRequest(communityID)
 
-	to := uint32(m.transport.GetCurrentTime() / 1000)
+	to := uint32(math.Ceil(float64(m.GetCurrentTimeInMillis()) / 1000))
 	from := to - oneMonthInSeconds
 
 	_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
