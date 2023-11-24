@@ -3,7 +3,9 @@ package walletconnect
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/log"
 
@@ -12,11 +14,20 @@ import (
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
-const ProposeUserPairEvent = walletevent.EventType("WalletConnectProposeUserPair")
+const (
+	SupportedEip155Namespace = "eip155"
 
-var ErrorChainsNotSupported = errors.New("chains not supported")
-var ErrorInvalidParamsCount = errors.New("invalid params count")
-var ErrorMethodNotSupported = errors.New("method not supported")
+	ProposeUserPairEvent = walletevent.EventType("WalletConnectProposeUserPair")
+)
+
+var (
+	ErrorInvalidSessionProposal = errors.New("invalid session proposal")
+	ErrorNamespaceNotSupported  = errors.New("namespace not supported")
+	ErrorChainsNotSupported     = errors.New("chains not supported")
+	ErrorInvalidParamsCount     = errors.New("invalid params count")
+	ErrorInvalidAddressMsgIndex = errors.New("invalid address and/or msg index (must be 0 or 1)")
+	ErrorMethodNotSupported     = errors.New("method not supported")
+)
 
 type Topic string
 
@@ -40,11 +51,6 @@ type Proposer struct {
 	Metadata  Metadata `json:"metadata"`
 }
 
-type Namespaces struct {
-	Eip155 Namespace `json:"eip155"`
-	// We ignore non ethereum namespaces
-}
-
 type Verified struct {
 	VerifyURL  string `json:"verifyUrl"`
 	Validation string `json:"validation"`
@@ -57,13 +63,13 @@ type VerifyContext struct {
 }
 
 type Params struct {
-	ID                 int64         `json:"id"`
-	PairingTopic       Topic         `json:"pairingTopic"`
-	Expiry             int64         `json:"expiry"`
-	RequiredNamespaces Namespaces    `json:"requiredNamespaces"`
-	OptionalNamespaces Namespaces    `json:"optionalNamespaces"`
-	Proposer           Proposer      `json:"proposer"`
-	Verify             VerifyContext `json:"verifyContext"`
+	ID                 int64                `json:"id"`
+	PairingTopic       Topic                `json:"pairingTopic"`
+	Expiry             int64                `json:"expiry"`
+	RequiredNamespaces map[string]Namespace `json:"requiredNamespaces"`
+	OptionalNamespaces map[string]Namespace `json:"optionalNamespaces"`
+	Proposer           Proposer             `json:"proposer"`
+	Verify             VerifyContext        `json:"verifyContext"`
 }
 
 type SessionProposal struct {
@@ -72,8 +78,8 @@ type SessionProposal struct {
 }
 
 type PairSessionResponse struct {
-	SessionProposal     SessionProposal `json:"sessionProposal"`
-	SupportedNamespaces Namespaces      `json:"supportedNamespaces"`
+	SessionProposal     SessionProposal      `json:"sessionProposal"`
+	SupportedNamespaces map[string]Namespace `json:"supportedNamespaces"`
 }
 
 type RequestParams struct {
@@ -105,11 +111,67 @@ type SessionRequestResponse struct {
 	SignedMessage interface{}   `json:"signedMessage,omitempty"`
 }
 
+// Valid namespace
+func (n *Namespace) Valid(namespaceName string, chainID *uint64) bool {
+	if chainID == nil {
+		if len(n.Chains) == 0 {
+			log.Warn("namespace doesn't refer to any chain")
+			return false
+		}
+		for _, caip2Str := range n.Chains {
+			resolvedNamespaceName, _, err := parseCaip2ChainID(caip2Str)
+			if err != nil {
+				log.Warn("namespace chain not in caip2 format", "chain", caip2Str, "error", err)
+				return false
+			}
+
+			if resolvedNamespaceName != namespaceName {
+				log.Warn("namespace name doesn't match", "namespace", namespaceName, "chain", caip2Str)
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// Valid params
+func (p *Params) Valid() bool {
+	for key, ns := range p.RequiredNamespaces {
+		var chainID *uint64
+		if strings.Contains(key, ":") {
+			resolvedNamespaceName, cID, err := parseCaip2ChainID(key)
+			if err != nil {
+				log.Warn("params validation failed CAIP-2", "str", key, "error", err)
+				return false
+			}
+			key = resolvedNamespaceName
+			chainID = &cID
+		}
+
+		if !isValidNamespaceName(key) {
+			log.Warn("invalid namespace name", "namespace", key)
+			return false
+		}
+
+		if !ns.Valid(key, chainID) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Valid session propsal
+// https://specs.walletconnect.com/2.0/specs/clients/sign/namespaces#controller-side-validation-of-incoming-proposal-namespaces-wallet
+func (p *SessionProposal) Valid() bool {
+	return p.Params.Valid()
+}
+
 func sessionProposalToSupportedChain(caipChains []string, supportsChain func(uint64) bool) (chains []uint64, eipChains []string) {
 	chains = make([]uint64, 0, 1)
 	eipChains = make([]string, 0, 1)
 	for _, caip2Str := range caipChains {
-		chainID, err := parseCaip2ChainID(caip2Str)
+		_, chainID, err := parseCaip2ChainID(caip2Str)
 		if err != nil {
 			log.Warn("Failed parsing CAIP-2", "str", caip2Str, "error", err)
 			continue
@@ -125,22 +187,12 @@ func sessionProposalToSupportedChain(caipChains []string, supportsChain func(uin
 	return
 }
 
-func activeToOwnedAccounts(activeAccounts []*accounts.Account) []types.Address {
-	addresses := make([]types.Address, 0, 1)
-	for _, account := range activeAccounts {
-		if account.Type != accounts.AccountTypeWatch {
-			addresses = append(addresses, account.Address)
+func caip10Accounts(accounts []*accounts.Account, chains []uint64) []string {
+	addresses := make([]string, 0, len(accounts)*len(chains))
+	for _, acc := range accounts {
+		for _, chainID := range chains {
+			addresses = append(addresses, fmt.Sprintf("%s:%s:%s", SupportedEip155Namespace, strconv.FormatUint(chainID, 10), acc.Address.Hex()))
 		}
 	}
 	return addresses
-}
-
-func caip10Accounts(addresses []types.Address, chains []uint64) []string {
-	accounts := make([]string, 0, len(addresses)*len(chains))
-	for _, address := range addresses {
-		for _, chainID := range chains {
-			accounts = append(accounts, "eip155:"+strconv.FormatUint(chainID, 10)+":"+address.Hex())
-		}
-	}
-	return accounts
 }

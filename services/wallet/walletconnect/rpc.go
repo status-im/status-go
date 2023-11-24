@@ -85,7 +85,7 @@ func (s *Service) buildTransaction(request SessionRequest) (response *SessionReq
 		return nil, err
 	}
 
-	chainID, err := parseCaip2ChainID(request.Params.ChainID)
+	_, chainID, err := parseCaip2ChainID(request.Params.ChainID)
 	if err != nil {
 		return nil, err
 	}
