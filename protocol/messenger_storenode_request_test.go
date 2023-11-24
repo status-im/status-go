@@ -102,10 +102,13 @@ func (s *MessengerStoreNodeRequestSuite) SetupTest() {
 	bobLogger := s.logger.With(zap.String("name", "bob"))
 	s.bob = s.newMessenger(s.bobWaku, bobLogger, storeNodeAddress)
 	s.bob.StartRetrieveMessagesLoop(time.Second, nil)
+
+	// Connect owner to storenode so message is stored
+	err := s.ownerWaku.DialPeer(storeNodeAddress)
+	s.Require().NoError(err)
 }
 
 func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityInfo() {
-
 	WaitForAvailableStoreNode(&s.Suite, s.owner, time.Second)
 
 	createCommunityRequest := &requests.CreateCommunity{
