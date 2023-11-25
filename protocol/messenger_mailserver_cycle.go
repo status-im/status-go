@@ -194,15 +194,17 @@ func (m *Messenger) allMailservers() ([]mailservers.Mailserver, error) {
 	allMailservers := m.mailserversByFleet(fleet)
 
 	// Add custom configured mailservers
-	customMailservers, err := m.mailserversDatabase.Mailservers()
-	if err != nil {
-		return nil, err
-	}
+	if m.mailserversDatabase != nil {
+		customMailservers, err := m.mailserversDatabase.Mailservers()
+		if err != nil {
+			return nil, err
+		}
 
-	for _, c := range customMailservers {
-		if c.Fleet == fleet {
-			c.Version = m.transport.WakuVersion()
-			allMailservers = append(allMailservers, c)
+		for _, c := range customMailservers {
+			if c.Fleet == fleet {
+				c.Version = m.transport.WakuVersion()
+				allMailservers = append(allMailservers, c)
+			}
 		}
 	}
 
@@ -642,8 +644,6 @@ func (m *Messenger) updateWakuV2PeerStatus() {
 			}
 
 		case <-m.quit:
-			close(m.mailserverCycle.events)
-			m.mailserverCycle.subscription.Unsubscribe()
 			connSubscription.Unsubscribe()
 			return
 		}
@@ -666,11 +666,6 @@ func (m *Messenger) getPinnedMailserver() (*mailservers.Mailserver, error) {
 		return nil, nil
 	}
 
-	customMailservers, err := m.mailserversDatabase.Mailservers()
-	if err != nil {
-		return nil, err
-	}
-
 	fleetMailservers := mailservers.DefaultMailservers()
 
 	for _, c := range fleetMailservers {
@@ -679,10 +674,17 @@ func (m *Messenger) getPinnedMailserver() (*mailservers.Mailserver, error) {
 		}
 	}
 
-	for _, c := range customMailservers {
-		if c.Fleet == fleet && c.ID == pinnedMailserver {
-			c.Version = m.transport.WakuVersion()
-			return &c, nil
+	if m.mailserversDatabase != nil {
+		customMailservers, err := m.mailserversDatabase.Mailservers()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, c := range customMailservers {
+			if c.Fleet == fleet && c.ID == pinnedMailserver {
+				c.Version = m.transport.WakuVersion()
+				return &c, nil
+			}
 		}
 	}
 
