@@ -5,8 +5,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
-	"os"
-
 	"io/ioutil"
 	"sync"
 	"time"
@@ -21,7 +19,6 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/appdatabase"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
@@ -29,7 +26,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -38,7 +34,6 @@ import (
 	walletToken "github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions"
-	waku "github.com/status-im/status-go/wakuv2"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -144,83 +139,6 @@ func (c *CollectiblesServiceMock) SetMockAssetContractData(chainID uint64, contr
 
 func (c *CollectiblesServiceMock) DeploymentSignatureDigest(chainID uint64, addressFrom string, communityID string) ([]byte, error) {
 	return gethcommon.Hex2Bytes("ccbb375343347491706cf4b43796f7b96ccc89c9e191a8b78679daeba1684ec7"), nil
-}
-
-func newWakuV2(s *suite.Suite, logger *zap.Logger, useLocalWaku bool) *waku.Waku {
-	config := &waku.Config{
-		DefaultShardPubsubTopic: shard.DefaultShardPubsubTopic(),
-	}
-
-	var onPeerStats func(connStatus types.ConnStatus)
-	var connStatusChan chan struct{}
-	if !useLocalWaku {
-		enrTreeAddress := testENRBootstrap
-		envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
-		if envEnrTreeAddress != "" {
-			enrTreeAddress = envEnrTreeAddress
-		}
-		config.EnableDiscV5 = true
-		config.DiscV5BootstrapNodes = []string{enrTreeAddress}
-		config.DiscoveryLimit = 20
-		config.WakuNodes = []string{enrTreeAddress}
-
-		connStatusChan = make(chan struct{})
-		terminator := sync.Once{}
-		onPeerStats = func(connStatus types.ConnStatus) {
-			if connStatus.IsOnline {
-				terminator.Do(func() {
-					connStatusChan <- struct{}{}
-				})
-			}
-
-		}
-	}
-
-	waku, err := waku.New("", "", config, logger, nil, nil, nil, onPeerStats)
-	s.Require().NoError(err)
-	s.Require().NoError(waku.Start())
-
-	if !useLocalWaku {
-		select {
-		case <-time.After(30 * time.Second):
-			s.Require().Fail("timeout elapsed")
-		case <-connStatusChan:
-			// proceed, peers found
-			close(connStatusChan)
-		}
-	}
-
-	return waku
-}
-
-func createWakuNetwork(s *suite.Suite, parentLogger *zap.Logger, nodeNames []string) []types.Waku {
-	nodes := make([]*waku.Waku, len(nodeNames))
-	for i, name := range nodeNames {
-		logger := parentLogger.With(zap.String("name", name+"-waku"))
-		node := newWakuV2(s, logger, true)
-		nodes[i] = node
-	}
-
-	// Setup local network graph
-	for i := 0; i < len(nodes); i++ {
-		for j := 0; j < len(nodes); j++ {
-			if i == j {
-				continue
-			}
-
-			addrs := nodes[j].ListenAddresses()
-			s.Require().Greater(len(addrs), 0)
-			_, err := nodes[i].AddRelayPeer(addrs[0])
-			s.Require().NoError(err)
-			err = nodes[i].DialPeer(addrs[0])
-			s.Require().NoError(err)
-		}
-	}
-	wrappers := make([]types.Waku, len(nodes))
-	for i, n := range nodes {
-		wrappers[i] = gethbridge.NewGethWakuV2Wrapper(n)
-	}
-	return wrappers
 }
 
 func newMessenger(s *suite.Suite, shh types.Waku, logger *zap.Logger, password string, walletAddresses []string,

@@ -68,11 +68,6 @@ type MessengerSignalsHandler interface {
 }
 
 type config struct {
-	// This needs to be exposed until we move here mailserver logic
-	// as otherwise the client is not notified of a new filter and
-	// won't be pulling messages from mailservers until it reloads the chats/filters
-	onContactENSVerified func(*MessengerResponse)
-
 	// systemMessagesTranslations holds translations for system-messages
 	systemMessagesTranslations *systemMessageTranslationsMap
 	// Config for the envelopes monitor
@@ -283,9 +278,8 @@ func WithSignalsHandler(h MessengerSignalsHandler) Option {
 	}
 }
 
-func WithENSVerificationConfig(onENSVerified func(*MessengerResponse), url, address string) Option {
+func WithENSVerificationConfig(url, address string) Option {
 	return func(c *config) error {
-		c.onContactENSVerified = onENSVerified
 		c.verifyENSURL = url
 		c.verifyENSContractAddress = address
 		return nil

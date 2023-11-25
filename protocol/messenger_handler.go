@@ -1333,8 +1333,8 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 				defer task.Waiter.Done()
 
 				// this wait groups tracks all ongoing tasks across communities
-				m.downloadHistoryArchiveTasksWaitGroup.Add(1)
-				defer m.downloadHistoryArchiveTasksWaitGroup.Done()
+				m.shutdownWaitGroup.Add(1)
+				defer m.shutdownWaitGroup.Done()
 				m.downloadAndImportHistoryArchives(communityID, magnetlink, task.CancelChan)
 			}(currentTask, id)
 
@@ -1646,8 +1646,8 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 					task.Waiter.Add(1)
 					defer task.Waiter.Done()
 
-					m.downloadHistoryArchiveTasksWaitGroup.Add(1)
-					defer m.downloadHistoryArchiveTasksWaitGroup.Done()
+					m.shutdownWaitGroup.Add(1)
+					defer m.shutdownWaitGroup.Done()
 
 					m.downloadAndImportHistoryArchives(community.ID(), magnetlink, task.CancelChan)
 				}(currentTask)

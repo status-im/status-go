@@ -10,8 +10,6 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
-	"github.com/status-im/status-go/signal"
 )
 
 type RawMessageHandler func(ctx context.Context, rawMessage common.RawMessage) (common.RawMessage, error)
@@ -313,17 +311,6 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 	if err != nil {
 		return err
 	}
-	publishMessengerResponse(response)
+	m.PublishMessengerResponse(response)
 	return nil
-}
-
-// this is a copy implementation of the one in ext/service.go, we should refactor this?
-func publishMessengerResponse(response *MessengerResponse) {
-	if !response.IsEmpty() {
-		notifications := response.Notifications()
-		// Clear notifications as not used for now
-		response.ClearNotifications()
-		signal.SendNewMessages(response)
-		localnotifications.PushMessages(notifications)
-	}
 }

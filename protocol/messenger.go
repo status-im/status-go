@@ -62,6 +62,7 @@ import (
 	"github.com/status-im/status-go/services/communitytokens"
 	ensservice "github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/ext/mailservers"
+	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -135,16 +136,16 @@ type Messenger struct {
 	mailserverCycle            mailserverCycle
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
-	mailservers                *mailserversDB.Database
 	settings                   *accounts.Database
 	account                    *multiaccounts.Account
 	mailserversDatabase        *mailserversDB.Database
 	browserDatabase            *browsers.Database
 	httpServer                 *server.MediaServer
 
-	quit   chan struct{}
-	ctx    context.Context
-	cancel context.CancelFunc
+	quit              chan struct{}
+	ctx               context.Context
+	cancel            context.CancelFunc
+	shutdownWaitGroup sync.WaitGroup
 
 	importingCommunities map[string]bool
 	importingChannels    map[string]bool
@@ -160,13 +161,12 @@ type Messenger struct {
 	requestedContactsLock sync.RWMutex
 	requestedContacts     map[string]*transport.Filter
 
-	connectionState                      connection.State
-	telemetryClient                      *telemetry.Client
-	contractMaker                        *contracts.ContractMaker
-	downloadHistoryArchiveTasksWaitGroup sync.WaitGroup
-	verificationDatabase                 *verification.Persistence
-	savedAddressesManager                *wallet.SavedAddressesManager
-	walletAPI                            *wallet.API
+	connectionState       connection.State
+	telemetryClient       *telemetry.Client
+	contractMaker         *contracts.ContractMaker
+	verificationDatabase  *verification.Persistence
+	savedAddressesManager *wallet.SavedAddressesManager
+	walletAPI             *wallet.API
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex                     sync.Mutex
@@ -198,6 +198,7 @@ type peerStatus struct {
 }
 type mailserverCycle struct {
 	sync.RWMutex
+	allMailservers            []mailserversDB.Mailserver
 	activeMailserver          *mailserversDB.Mailserver
 	peers                     map[string]peerStatus
 	events                    chan *p2p.PeerEvent
@@ -480,8 +481,6 @@ func NewMessenger(
 		return nil, err
 	}
 
-	mailservers := mailserversDB.NewDB(database)
-
 	savedAddressesManager := wallet.NewSavedAddressesManager(c.walletDb)
 
 	selfContact, err := buildSelfContact(identity, settings, c.multiAccount, c.account)
@@ -529,7 +528,6 @@ func NewMessenger(
 		settings:                settings,
 		peerStore:               peerStore,
 		verificationDatabase:    verification.NewPersistence(database),
-		mailservers:             mailservers,
 		mailserverCycle: mailserverCycle{
 			peers:                     make(map[string]peerStatus),
 			availabilitySubscriptions: make([]chan struct{}, 0),
@@ -838,7 +836,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	response.Mailservers = mailservers
-	err = m.StartMailserverCycle()
+	err = m.StartMailserverCycle(mailservers)
 	if err != nil {
 		return nil, err
 	}
@@ -1444,13 +1442,7 @@ func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
 		}
 	}
 
-	m.logger.Info("calling on contacts")
-	if m.config.onContactENSVerified != nil {
-		m.logger.Info("called on contacts")
-		response := &MessengerResponse{Contacts: contacts}
-		m.config.onContactENSVerified(response)
-	}
-
+	m.PublishMessengerResponse(&MessengerResponse{Contacts: contacts})
 }
 
 func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.VerificationRecord) {
@@ -1892,7 +1884,7 @@ func (m *Messenger) Init() error {
 func (m *Messenger) Shutdown() (err error) {
 	close(m.quit)
 	m.cancel()
-	m.downloadHistoryArchiveTasksWaitGroup.Wait()
+	m.shutdownWaitGroup.Wait()
 	for i, task := range m.shutdownTasks {
 		m.logger.Debug("running shutdown task", zap.Int("n", i))
 		if tErr := task(); tErr != nil {
@@ -3277,6 +3269,44 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 	}
 
 	return m.handleRetrievedMessages(chatWithMessages, true, false)
+}
+
+func (m *Messenger) StartRetrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
+	m.shutdownWaitGroup.Add(1)
+	go func() {
+		defer m.shutdownWaitGroup.Done()
+		ticker := time.NewTicker(tick)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				m.ProcessAllMessages()
+			case <-cancel:
+				return
+			}
+		}
+	}()
+}
+
+func (m *Messenger) ProcessAllMessages() {
+	response, err := m.RetrieveAll()
+	if err != nil {
+		m.logger.Error("failed to retrieve raw messages", zap.Error(err))
+		return
+	}
+	m.PublishMessengerResponse(response)
+}
+
+func (m *Messenger) PublishMessengerResponse(response *MessengerResponse) {
+	if response.IsEmpty() {
+		return
+	}
+
+	notifications := response.Notifications()
+	// Clear notifications as not used for now
+	response.ClearNotifications()
+	signal.SendNewMessages(response)
+	localnotifications.PushMessages(notifications)
 }
 
 func (m *Messenger) GetStats() types.StatsSummary {

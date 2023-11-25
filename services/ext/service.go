@@ -51,7 +51,6 @@ import (
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/ext/mailservers"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
 	w_common "github.com/status-im/status-go/services/wallet/common"
@@ -194,7 +193,7 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	go s.retrieveMessagesLoop(time.Second, s.cancelMessenger)
+	s.messenger.StartRetrieveMessagesLoop(time.Second, s.cancelMessenger)
 	go s.verifyTransactionLoop(30*time.Second, s.cancelMessenger)
 
 	if s.config.ShhextConfig.BandwidthStatsEnabled {
@@ -202,39 +201,6 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 	}
 
 	return response, nil
-}
-
-func publishMessengerResponse(response *protocol.MessengerResponse) {
-	if !response.IsEmpty() {
-		notifications := response.Notifications()
-		// Clear notifications as not used for now
-		response.ClearNotifications()
-		PublisherSignalHandler{}.NewMessages(response)
-		localnotifications.PushMessages(notifications)
-	}
-}
-
-func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
-	ticker := time.NewTicker(tick)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			// We might be shutting down here
-			if s.messenger == nil {
-				return
-			}
-			response, err := s.messenger.RetrieveAll()
-			if err != nil {
-				log.Error("failed to retrieve raw messages", "err", err)
-				continue
-			}
-			publishMessengerResponse(response)
-		case <-cancel:
-			return
-		}
-	}
 }
 
 func (s *Service) retrieveStats(tick time.Duration, cancel <-chan struct{}) {
@@ -346,7 +312,7 @@ func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct
 				log.Error("failed to validate transactions", "err", err)
 				continue
 			}
-			publishMessengerResponse(response)
+			s.messenger.PublishMessengerResponse(response)
 
 		case <-cancel:
 			cancelVerifyTransaction()
@@ -436,7 +402,7 @@ func buildMessengerOptions(
 		protocol.WithBrowserDatabase(browsers.NewDB(appDb)),
 		protocol.WithEnvelopesMonitorConfig(envelopesMonitorConfig),
 		protocol.WithSignalsHandler(messengerSignalsHandler),
-		protocol.WithENSVerificationConfig(publishMessengerResponse, config.ShhextConfig.VerifyENSURL, config.ShhextConfig.VerifyENSContractAddress),
+		protocol.WithENSVerificationConfig(config.ShhextConfig.VerifyENSURL, config.ShhextConfig.VerifyENSContractAddress),
 		protocol.WithClusterConfig(config.ClusterConfig),
 		protocol.WithTorrentConfig(&config.TorrentConfig),
 		protocol.WithHTTPServer(httpServer),
