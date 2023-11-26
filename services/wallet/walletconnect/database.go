@@ -2,6 +2,7 @@ package walletconnect
 
 import (
 	"database/sql"
+	"errors"
 )
 
 type Pairing struct {
@@ -20,6 +21,25 @@ func InsertPairing(db *sql.DB, pairing Pairing) error {
 
 	_, err := db.Exec(insertSQL, pairing.Topic, pairing.Expiry, pairing.Active, pairing.AppName, pairing.URL, pairing.Description, pairing.Icon, pairing.Verified.IsScam, pairing.Verified.Origin, pairing.Verified.VerifyURL, pairing.Verified.Validation)
 	return err
+}
+
+func ChangePairingState(db *sql.DB, topic Topic, active bool) error {
+	stmt, err := db.Prepare("UPDATE wallet_connect_pairings SET active = ? WHERE topic = ?")
+	if err != nil {
+		return err
+	}
+
+	res, err := stmt.Exec(active, topic)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if rowsAffected == 0 {
+		return errors.New("unable to locate pairing entry for DB state change")
+	}
+
+	return nil
 }
 
 func GetPairingByTopic(db *sql.DB, topic Topic) (*Pairing, error) {

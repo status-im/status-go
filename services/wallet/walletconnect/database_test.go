@@ -66,6 +66,23 @@ func TestInsertAndGetPairing(t *testing.T) {
 	require.Equal(t, entry, *retrievedPairing)
 }
 
+func TestChangePairingState(t *testing.T) {
+	db, close := setupTestDB(t)
+	defer close()
+
+	entry := generateTestData(1)[0]
+	err := InsertPairing(db, entry)
+	require.NoError(t, err)
+
+	err = ChangePairingState(db, entry.Topic, false)
+	require.NoError(t, err)
+
+	retrievedPairing, err := GetPairingByTopic(db, entry.Topic)
+	require.NoError(t, err)
+
+	require.Equal(t, false, retrievedPairing.Active)
+}
+
 func TestGet(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()

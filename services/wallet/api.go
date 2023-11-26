@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/services/wallet/walletconnect"
 	wc "github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
@@ -681,7 +682,7 @@ func (api *API) WCPairSessionProposal(ctx context.Context, sessionProposalJSON s
 	return api.s.walletConnect.PairSessionProposal(data)
 }
 
-// WCPairEstablished confirms that a pairing has been established
+// WCRecordSuccessfulPairing confirms that a pairing has been established
 func (api *API) WCRecordSuccessfulPairing(ctx context.Context, sessionProposalJSON string) error {
 	log.Debug("wallet.api.wc.RecordSuccessfulPairing", "proposal.len", len(sessionProposalJSON))
 
@@ -694,7 +695,13 @@ func (api *API) WCRecordSuccessfulPairing(ctx context.Context, sessionProposalJS
 	return api.s.walletConnect.RecordSuccessfulPairing(data)
 }
 
-// WCSessionRequest responds to "session_request" event
+// WCChangePairingState changes the active state of a pairing
+func (api *API) WCChangePairingState(ctx context.Context, topic walletconnect.Topic, active bool) error {
+	log.Debug("wallet.api.wc.ChangePairingState", "topic", topic, "active", active)
+
+	return api.s.walletConnect.ChangePairingState(topic, active)
+}
+
 func (api *API) WCHasActivePairings(ctx context.Context) (bool, error) {
 	log.Debug("wallet.api.wc.HasActivePairings")
 

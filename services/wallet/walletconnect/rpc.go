@@ -112,7 +112,7 @@ func (s *Service) buildTransaction(request SessionRequest) (response *SessionReq
 		Address:       account.Address,
 		AddressPath:   account.Path,
 		SignOnKeycard: kp.MigratedToKeycard(),
-		MesageToSign:  signer.Hash(txBeingSigned),
+		MessageToSign: signer.Hash(txBeingSigned),
 	}, nil
 }
 
@@ -183,6 +183,6 @@ func (s *Service) buildMessage(request SessionRequest, addressIndex int, message
 		Address:       account.Address,
 		AddressPath:   account.Path,
 		SignOnKeycard: kp.MigratedToKeycard(),
-		MesageToSign:  types.HexBytes(hash),
+		MessageToSign: types.HexBytes(hash),
 	}, nil
 }
