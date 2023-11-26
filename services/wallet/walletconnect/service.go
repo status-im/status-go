@@ -200,6 +200,10 @@ func (s *Service) RecordSuccessfulPairing(proposal SessionProposal) error {
 	})
 }
 
+func (s *Service) ChangePairingState(topic Topic, active bool) error {
+	return ChangePairingState(s.db, topic, active)
+}
+
 func (s *Service) HasActivePairings() (bool, error) {
 	return HasActivePairings(s.db, time.Now().Unix())
 }
