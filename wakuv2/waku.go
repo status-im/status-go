@@ -601,11 +601,7 @@ func (w *Waku) runPeerExchangeLoop() {
 					}
 
 					// Obtaining peer ID
-					peerIDString, err := discoveredNode.PeerInfo.Addrs[0].ValueForProtocol(multiaddr.P_P2P)
-					if err != nil {
-						w.logger.Warn("multiaddress does not contain peerID", zap.String("multiaddr", discoveredNode.PeerInfo.Addrs[0].String()))
-						continue // No peer ID available somehow
-					}
+					peerIDString := discoveredNode.PeerID.String()
 
 					peerID, err := peer.Decode(peerIDString)
 					if err != nil {
@@ -1190,6 +1186,13 @@ func (w *Waku) Start() error {
 
 	if w.cfg.EnableDiscV5 {
 		err := w.node.DiscV5().Start(w.ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	if w.cfg.PeerExchange {
+		err := w.node.PeerExchange().Start(w.ctx)
 		if err != nil {
 			return err
 		}

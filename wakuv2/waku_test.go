@@ -269,12 +269,7 @@ func TestPeerExchange(t *testing.T) {
 		b.MaxElapsedTime = 30 * time.Second
 	}
 	err = tt.RetryWithBackOff(func() error {
-		countpx := len(pxServerNode.Peers())
-		t.Log("pxServerNode(): ", countpx)
-		count := len(lightNode.Peers())
-		t.Log("w.count(): ", count)
-		if len(lightNode.Peers()) == 13 {
-			t.Log("w.Peers(): ", lightNode.Peers())
+		if len(lightNode.Peers()) == 2 {
 			return nil
 		}
 		return errors.New("no peers discovered")
