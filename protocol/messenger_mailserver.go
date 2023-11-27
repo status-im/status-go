@@ -946,9 +946,9 @@ func (m *Messenger) ConnectionChanged(state connection.State) {
 	m.connectionState = state
 }
 
-func (m *Messenger) SyncChatOneMonth(chatID string) (uint32, error) {
+func (m *Messenger) fetchMessages(chatID string, duration uint32) (uint32, error) {
 	to := uint32(m.getTimesource().GetCurrentTime() / 1000)
-	from := to - oneMonthInSeconds
+	from := to - duration
 	_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
 		pubsubTopic, topics, err := m.topicsForChat(chatID)
 		if err != nil {

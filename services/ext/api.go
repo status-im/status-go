@@ -1681,12 +1681,20 @@ func (api *PublicAPI) PromoteSelfToControlMode(communityID string) error {
 	return err
 }
 
-func (api *PublicAPI) SyncChat(request *requests.SyncChat) error {
-	return api.service.messenger.SyncChat(request)
+func (api *PublicAPI) FetchMessages(request *requests.FetchMessages) error {
+	return api.service.messenger.FetchMessages(request)
 }
 
 func (api *PublicAPI) SetLightClient(request *requests.SetLightClient) error {
 	return api.service.messenger.SetLightClient(request)
+}
+
+func (api *PublicAPI) SetLogLevel(request *requests.SetLogLevel) error {
+	return api.service.messenger.SetLogLevel(request)
+}
+
+func (api *PublicAPI) SetCustomNodes(request *requests.SetCustomNodes) error {
+	return api.service.messenger.SetCustomNodes(request)
 }
 
 // -----

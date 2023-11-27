@@ -634,7 +634,7 @@ func (m *Messenger) clearHistory(id string) (*MessengerResponse, error) {
 	return response, nil
 }
 
-func (m *Messenger) SyncChat(request *requests.SyncChat) error {
+func (m *Messenger) FetchMessages(request *requests.FetchMessages) error {
 
 	if err := request.Validate(); err != nil {
 		return err
@@ -647,7 +647,7 @@ func (m *Messenger) SyncChat(request *requests.SyncChat) error {
 		return ErrChatNotFound
 	}
 
-	_, err := m.SyncChatOneMonth(chat.ID)
+	_, err := m.fetchMessages(chat.ID, oneMonthInSeconds)
 	if err != nil {
 		return err
 	}
