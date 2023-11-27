@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"math/big"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -15,6 +16,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/transfer"
 
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -23,6 +25,12 @@ import (
 // WalletTickReload emitted every 15mn to reload the wallet balance and history
 const EventWalletTickReload walletevent.EventType = "wallet-tick-reload"
 const EventWalletTickCheckConnected walletevent.EventType = "wallet-tick-check-connected"
+
+const (
+	walletTickReloadPeriod      = 10 * time.Minute
+	activityReloadDelay         = 30 // Wait this many seconds after activity is detected before triggering a wallet reload
+	activityReloadMarginSeconds = 30 // Trigger a wallet reload if activity is detected this many seconds before the last reload
+)
 
 func getFixedCurrencies() []string {
 	return []string{"USD"}
@@ -40,23 +48,27 @@ func belongsToMandatoryTokens(symbol string) bool {
 
 func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, marketManager *market.Manager, accountsDB *accounts.Database, persistence *Persistence, walletFeed *event.Feed) *Reader {
 	return &Reader{
-		rpcClient,
-		tokenManager,
-		marketManager,
-		accountsDB,
-		persistence,
-		walletFeed,
-		nil}
+		rpcClient:                      rpcClient,
+		tokenManager:                   tokenManager,
+		marketManager:                  marketManager,
+		accountsDB:                     accountsDB,
+		persistence:                    persistence,
+		walletFeed:                     walletFeed,
+		lastWalletTokenUpdateTimestamp: atomic.Int64{},
+	}
 }
 
 type Reader struct {
-	rpcClient     *rpc.Client
-	tokenManager  *token.Manager
-	marketManager *market.Manager
-	accountsDB    *accounts.Database
-	persistence   *Persistence
-	walletFeed    *event.Feed
-	cancel        context.CancelFunc
+	rpcClient                      *rpc.Client
+	tokenManager                   *token.Manager
+	marketManager                  *market.Manager
+	accountsDB                     *accounts.Database
+	persistence                    *Persistence
+	walletFeed                     *event.Feed
+	cancel                         context.CancelFunc
+	walletEventsWatcher            *walletevent.Watcher
+	lastWalletTokenUpdateTimestamp atomic.Int64
+	reloadDelayTimer               *time.Timer
 }
 
 type TokenMarketValues struct {
@@ -138,17 +150,17 @@ func (r *Reader) Start() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	r.cancel = cancel
 
+	r.startWalletEventsWatcher()
+
 	go func() {
-		ticker := time.NewTicker(10 * time.Minute)
+		ticker := time.NewTicker(walletTickReloadPeriod)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				r.walletFeed.Send(walletevent.Event{
-					Type: EventWalletTickReload,
-				})
+				r.triggerWalletReload()
 			}
 		}
 	}()
@@ -158,6 +170,64 @@ func (r *Reader) Start() error {
 func (r *Reader) Stop() {
 	if r.cancel != nil {
 		r.cancel()
+	}
+
+	r.stopWalletEventsWatcher()
+
+	r.cancelDelayedWalletReload()
+
+	r.lastWalletTokenUpdateTimestamp.Store(0)
+}
+
+func (r *Reader) triggerWalletReload() {
+	r.cancelDelayedWalletReload()
+
+	r.walletFeed.Send(walletevent.Event{
+		Type: EventWalletTickReload,
+	})
+}
+
+func (r *Reader) triggerDelayedWalletReload() {
+	r.cancelDelayedWalletReload()
+
+	r.reloadDelayTimer = time.AfterFunc(time.Duration(activityReloadDelay)*time.Second, r.triggerWalletReload)
+}
+
+func (r *Reader) cancelDelayedWalletReload() {
+
+	if r.reloadDelayTimer != nil {
+		r.reloadDelayTimer.Stop()
+		r.reloadDelayTimer = nil
+	}
+}
+
+func (r *Reader) startWalletEventsWatcher() {
+	if r.walletEventsWatcher != nil {
+		return
+	}
+
+	// Respond to ETH/Token transfers
+	walletEventCb := func(event walletevent.Event) {
+		if event.Type != transfer.EventInternalETHTransferDetected &&
+			event.Type != transfer.EventInternalERC20TransferDetected {
+			return
+		}
+
+		timecheck := r.lastWalletTokenUpdateTimestamp.Load() - activityReloadMarginSeconds
+		if event.At > timecheck {
+			r.triggerDelayedWalletReload()
+		}
+	}
+
+	r.walletEventsWatcher = walletevent.NewWatcher(r.walletFeed, walletEventCb)
+
+	r.walletEventsWatcher.Start()
+}
+
+func (r *Reader) stopWalletEventsWatcher() {
+	if r.walletEventsWatcher != nil {
+		r.walletEventsWatcher.Stop()
+		r.walletEventsWatcher = nil
 	}
 }
 
@@ -347,6 +417,8 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 			result[address][index].MarketValuesPerCurrency = marketValuesPerCurrency
 		}
 	}
+
+	r.lastWalletTokenUpdateTimestamp.Store(time.Now().Unix())
 
 	return result, r.persistence.SaveTokens(result)
 }
