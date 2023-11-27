@@ -683,9 +683,10 @@ type ApplicationMessagesResponse struct {
 	Cursor   string            `json:"cursor"`
 }
 
-type MarkMessagSeenResponse struct {
-	Count             uint64 `json:"count"`
-	CountWithMentions uint64 `json:"countWithMentions"`
+type MarkMessageSeenResponse struct {
+	Count                       uint64                                 `json:"count"`
+	CountWithMentions           uint64                                 `json:"countWithMentions"`
+	ActivityCenterNotifications []*protocol.ActivityCenterNotification `json:"activityCenterNotifications,omitempty"`
 }
 
 type ApplicationPinnedMessagesResponse struct {
@@ -801,21 +802,25 @@ func (api *PublicAPI) DeleteMessagesByChatID(id string) error {
 	return api.service.messenger.DeleteMessagesByChatID(id)
 }
 
-func (api *PublicAPI) MarkMessagesSeen(chatID string, ids []string) (*MarkMessagSeenResponse, error) {
-	count, withMentions, err := api.service.messenger.MarkMessagesSeen(chatID, ids)
+func (api *PublicAPI) MarkMessagesSeen(chatID string, ids []string) (*MarkMessageSeenResponse, error) {
+	count, withMentions, notifications, err := api.service.messenger.MarkMessagesSeen(chatID, ids)
 	if err != nil {
 		return nil, err
 	}
 
-	response := &MarkMessagSeenResponse{Count: count, CountWithMentions: withMentions}
+	response := &MarkMessageSeenResponse{
+		Count:                       count,
+		CountWithMentions:           withMentions,
+		ActivityCenterNotifications: notifications,
+	}
 	return response, nil
 }
 
-func (api *PublicAPI) MarkAllRead(ctx context.Context, chatID string) error {
+func (api *PublicAPI) MarkAllRead(ctx context.Context, chatID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.MarkAllRead(ctx, chatID)
 }
 
-func (api *PublicAPI) MarkAllReadInCommunity(ctx context.Context, communityID string) ([]string, error) {
+func (api *PublicAPI) MarkAllReadInCommunity(ctx context.Context, communityID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.MarkAllReadInCommunity(ctx, communityID)
 }
 
