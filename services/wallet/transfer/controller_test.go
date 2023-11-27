@@ -45,7 +45,7 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	chainID := uint64(777)
 	// Insert blocks
 	database := NewDB(walletDB)
-	err = database.SaveBlocks(chainID, address, []*DBHeader{
+	err = database.SaveBlocks(chainID, []*DBHeader{
 		{
 			Number:  big.NewInt(1),
 			Hash:    common.Hash{1},
@@ -70,7 +70,7 @@ func TestController_watchAccountsChanges(t *testing.T) {
 
 	// Insert block ranges
 	blockRangesDAO := &BlockRangeSequentialDAO{walletDB}
-	err = blockRangesDAO.upsertRange(chainID, address, NewBlockRange())
+	err = blockRangesDAO.upsertRange(chainID, address, newEthTokensBlockRanges())
 	require.NoError(t, err)
 
 	ranges, err := blockRangesDAO.getBlockRange(chainID, address)
@@ -112,7 +112,8 @@ func TestController_watchAccountsChanges(t *testing.T) {
 
 	ranges, err = blockRangesDAO.getBlockRange(chainID, address)
 	require.NoError(t, err)
-	require.Nil(t, ranges)
+	require.Nil(t, ranges.eth)
+	require.Nil(t, ranges.tokens)
 
 }
 
@@ -152,7 +153,7 @@ func TestController_cleanupAccountLeftovers(t *testing.T) {
 	chainID := uint64(777)
 	// Insert blocks
 	database := NewDB(walletDB)
-	err = database.SaveBlocks(chainID, removedAddr, []*DBHeader{
+	err = database.SaveBlocks(chainID, []*DBHeader{
 		{
 			Number:  big.NewInt(1),
 			Hash:    common.Hash{1},
@@ -162,7 +163,7 @@ func TestController_cleanupAccountLeftovers(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	err = database.SaveBlocks(chainID, common.Address(existingAddr), []*DBHeader{
+	err = database.SaveBlocks(chainID, []*DBHeader{
 		{
 			Number:  big.NewInt(2),
 			Hash:    common.Hash{2},

@@ -23,39 +23,31 @@ func setupTestDB(t *testing.T) (*Database, *BlockDAO, func()) {
 	}
 }
 
-func TestDBProcessBlocks(t *testing.T) {
-	db, block, stop := setupTestDB(t)
+func TestDBSaveBlocks(t *testing.T) {
+	db, _, stop := setupTestDB(t)
 	defer stop()
 	address := common.Address{1}
-	from := big.NewInt(0)
-	to := big.NewInt(10)
 	blocks := []*DBHeader{
 		{
-			Number: big.NewInt(1),
-			Hash:   common.Hash{1},
+			Number:  big.NewInt(1),
+			Hash:    common.Hash{1},
+			Address: address,
 		},
 		{
-			Number: big.NewInt(2),
-			Hash:   common.Hash{2},
+			Number:  big.NewInt(2),
+			Hash:    common.Hash{2},
+			Address: address,
 		}}
-	t.Log(blocks)
-	nonce := int64(0)
-	lastBlock := &Block{
-		Number:  to,
-		Balance: big.NewInt(0),
-		Nonce:   &nonce,
-	}
-	require.NoError(t, db.ProcessBlocks(777, common.Address{1}, from, lastBlock, blocks))
-	t.Log(block.GetLastBlockByAddress(777, common.Address{1}, 40))
+	require.NoError(t, db.SaveBlocks(777, blocks))
 	transfers := []Transfer{
 		{
 			ID:          common.Hash{1},
 			Type:        w_common.EthTransfer,
 			BlockHash:   common.Hash{2},
 			BlockNumber: big.NewInt(1),
-			Address:     common.Address{1},
+			Address:     address,
 			Timestamp:   123,
-			From:        common.Address{1},
+			From:        address,
 		},
 	}
 	tx, err := db.client.BeginTx(context.Background(), nil)
@@ -65,15 +57,16 @@ func TestDBProcessBlocks(t *testing.T) {
 	require.NoError(t, tx.Commit())
 }
 
-func TestDBProcessTransfer(t *testing.T) {
+func TestDBSaveTransfers(t *testing.T) {
 	db, _, stop := setupTestDB(t)
 	defer stop()
+	address := common.Address{1}
 	header := &DBHeader{
 		Number:  big.NewInt(1),
 		Hash:    common.Hash{1},
-		Address: common.Address{1},
+		Address: address,
 	}
-	tx := types.NewTransaction(1, common.Address{1}, nil, 10, big.NewInt(10), nil)
+	tx := types.NewTransaction(1, address, nil, 10, big.NewInt(10), nil)
 	transfers := []Transfer{
 		{
 			ID:                 common.Hash{1},
@@ -82,62 +75,12 @@ func TestDBProcessTransfer(t *testing.T) {
 			BlockNumber:        header.Number,
 			Transaction:        tx,
 			Receipt:            types.NewReceipt(nil, false, 100),
-			Address:            common.Address{1},
+			Address:            address,
 			MultiTransactionID: 0,
 		},
 	}
-	nonce := int64(0)
-	lastBlock := &Block{
-		Number:  big.NewInt(0),
-		Balance: big.NewInt(0),
-		Nonce:   &nonce,
-	}
-	require.NoError(t, db.ProcessBlocks(777, common.Address{1}, big.NewInt(1), lastBlock, []*DBHeader{header}))
-	require.NoError(t, db.ProcessTransfers(777, transfers, []*DBHeader{}))
-}
-
-func TestDBReorgTransfers(t *testing.T) {
-	db, _, stop := setupTestDB(t)
-	defer stop()
-	rcpt := types.NewReceipt(nil, false, 100)
-	rcpt.Logs = []*types.Log{}
-	original := &DBHeader{
-		Number:  big.NewInt(1),
-		Hash:    common.Hash{1},
-		Address: common.Address{1},
-	}
-	replaced := &DBHeader{
-		Number:  big.NewInt(1),
-		Hash:    common.Hash{2},
-		Address: common.Address{1},
-	}
-	originalTX := types.NewTransaction(1, common.Address{1}, nil, 10, big.NewInt(10), nil)
-	replacedTX := types.NewTransaction(2, common.Address{1}, nil, 10, big.NewInt(10), nil)
-	nonce := int64(0)
-	lastBlock := &Block{
-		Number:  original.Number,
-		Balance: big.NewInt(0),
-		Nonce:   &nonce,
-	}
-	require.NoError(t, db.ProcessBlocks(777, original.Address, original.Number, lastBlock, []*DBHeader{original}))
-	require.NoError(t, db.ProcessTransfers(777, []Transfer{
-		{w_common.EthTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, 100, originalTX, true, 1777, common.Address{1}, rcpt, nil, nil, nil, "2100", NoMultiTransactionID},
-	}, []*DBHeader{}))
-	nonce = int64(0)
-	lastBlock = &Block{
-		Number:  replaced.Number,
-		Balance: big.NewInt(0),
-		Nonce:   &nonce,
-	}
-	require.NoError(t, db.ProcessBlocks(777, replaced.Address, replaced.Number, lastBlock, []*DBHeader{replaced}))
-	require.NoError(t, db.ProcessTransfers(777, []Transfer{
-		{w_common.EthTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, 100, replacedTX, true, 1777, common.Address{1}, rcpt, nil, nil, nil, "2100", NoMultiTransactionID},
-	}, []*DBHeader{original}))
-
-	all, err := db.GetTransfers(777, big.NewInt(0), nil)
-	require.NoError(t, err)
-	require.Len(t, all, 1)
-	require.Equal(t, replacedTX.Hash(), all[0].Transaction.Hash())
+	require.NoError(t, db.SaveBlocks(777, []*DBHeader{header}))
+	require.NoError(t, saveTransfersMarkBlocksLoaded(db.client, 777, address, transfers, []*big.Int{header.Number}))
 }
 
 func TestDBGetTransfersFromBlock(t *testing.T) {
@@ -145,14 +88,17 @@ func TestDBGetTransfersFromBlock(t *testing.T) {
 	defer stop()
 	headers := []*DBHeader{}
 	transfers := []Transfer{}
+	address := common.Address{1}
+	blockNumbers := []*big.Int{}
 	for i := 1; i < 10; i++ {
 		header := &DBHeader{
 			Number:  big.NewInt(int64(i)),
 			Hash:    common.Hash{byte(i)},
-			Address: common.Address{1},
+			Address: address,
 		}
 		headers = append(headers, header)
-		tx := types.NewTransaction(uint64(i), common.Address{1}, nil, 10, big.NewInt(10), nil)
+		blockNumbers = append(blockNumbers, header.Number)
+		tx := types.NewTransaction(uint64(i), address, nil, 10, big.NewInt(10), nil)
 		receipt := types.NewReceipt(nil, false, 100)
 		receipt.Logs = []*types.Log{}
 		transfer := Transfer{
@@ -162,18 +108,12 @@ func TestDBGetTransfersFromBlock(t *testing.T) {
 			BlockHash:   header.Hash,
 			Transaction: tx,
 			Receipt:     receipt,
-			Address:     common.Address{1},
+			Address:     address,
 		}
 		transfers = append(transfers, transfer)
 	}
-	nonce := int64(0)
-	lastBlock := &Block{
-		Number:  headers[len(headers)-1].Number,
-		Balance: big.NewInt(0),
-		Nonce:   &nonce,
-	}
-	require.NoError(t, db.ProcessBlocks(777, headers[0].Address, headers[0].Number, lastBlock, headers))
-	require.NoError(t, db.ProcessTransfers(777, transfers, []*DBHeader{}))
+	require.NoError(t, db.SaveBlocks(777, headers))
+	require.NoError(t, saveTransfersMarkBlocksLoaded(db.client, 777, address, transfers, blockNumbers))
 	rst, err := db.GetTransfers(777, big.NewInt(7), nil)
 	require.NoError(t, err)
 	require.Len(t, rst, 3)

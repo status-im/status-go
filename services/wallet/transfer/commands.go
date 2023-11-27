@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"time"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
@@ -113,7 +115,6 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 
 type erc20HistoricalCommand struct {
 	erc20       BatchDownloader
-	address     common.Address
 	chainClient chain.ClientInterface
 	feed        *event.Feed
 
@@ -151,13 +152,13 @@ func getErc20BatchSize(chainID uint64) *big.Int {
 }
 
 func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
-	log.Debug("wallet historical downloader for erc20 transfers start", "chainID", c.chainClient.NetworkID(), "address", c.address,
+	log.Debug("wallet historical downloader for erc20 transfers start", "chainID", c.chainClient.NetworkID(),
 		"from", c.from, "to", c.to)
 
 	start := time.Now()
 	if c.iterator == nil {
 		c.iterator, err = SetupIterativeDownloader(
-			c.chainClient, c.address,
+			c.chainClient,
 			c.erc20, getErc20BatchSize(c.chainClient.NetworkID()), c.to, c.from)
 		if err != nil {
 			log.Error("failed to setup historical downloader for erc20")
@@ -172,7 +173,7 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 		}
 		c.foundHeaders = append(c.foundHeaders, headers...)
 	}
-	log.Debug("wallet historical downloader for erc20 transfers finished", "chainID", c.chainClient.NetworkID(), "address", c.address,
+	log.Debug("wallet historical downloader for erc20 transfers finished", "chainID", c.chainClient.NetworkID(),
 		"from", c.from, "to", c.to, "time", time.Since(start), "headers", len(c.foundHeaders))
 	return nil
 }
@@ -501,7 +502,7 @@ func (c *loadTransfersCommand) Command() async.Command {
 }
 
 func (c *loadTransfersCommand) LoadTransfers(ctx context.Context, limit int, blocksByAddress map[common.Address][]*big.Int) error {
-	return loadTransfers(ctx, c.accounts, c.blockDAO, c.db, c.chainClient, limit, blocksByAddress,
+	return loadTransfers(ctx, c.blockDAO, c.db, c.chainClient, limit, blocksByAddress,
 		c.transactionManager, c.pendingTxManager, c.tokenManager, c.feed)
 }
 
@@ -510,16 +511,17 @@ func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
 	return
 }
 
-func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *BlockDAO, db *Database,
+func loadTransfers(ctx context.Context, blockDAO *BlockDAO, db *Database,
 	chainClient chain.ClientInterface, blocksLimitPerAccount int, blocksByAddress map[common.Address][]*big.Int,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager, feed *event.Feed) error {
 
-	log.Debug("loadTransfers start", "accounts", accounts, "chain", chainClient.NetworkID(), "limit", blocksLimitPerAccount)
+	log.Debug("loadTransfers start", "chain", chainClient.NetworkID(), "limit", blocksLimitPerAccount)
 
 	start := time.Now()
 	group := async.NewGroup(ctx)
 
+	accounts := maps.Keys(blocksByAddress)
 	for _, address := range accounts {
 		transfers := &transfersCommand{
 			db:          db,

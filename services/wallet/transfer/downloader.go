@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"time"
 
+	"golang.org/x/exp/slices" // since 1.21, this is in the standard library
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -326,26 +328,28 @@ type ERC20TransfersDownloader struct {
 	signer types.Signer
 }
 
-func (d *ERC20TransfersDownloader) paddedAddress(address common.Address) common.Hash {
-	rst := common.Hash{}
-	copy(rst[12:], address[:])
+func topicFromAddressSlice(addresses []common.Address) []common.Hash {
+	rst := make([]common.Hash, len(addresses))
+	for i, address := range addresses {
+		rst[i] = common.BytesToHash(address.Bytes())
+	}
 	return rst
 }
 
-func (d *ERC20TransfersDownloader) inboundTopics(address common.Address) [][]common.Hash {
-	return [][]common.Hash{{d.signature}, {}, {d.paddedAddress(address)}}
+func (d *ERC20TransfersDownloader) inboundTopics(addresses []common.Address) [][]common.Hash {
+	return [][]common.Hash{{d.signature}, {}, topicFromAddressSlice(addresses)}
 }
 
-func (d *ERC20TransfersDownloader) outboundTopics(address common.Address) [][]common.Hash {
-	return [][]common.Hash{{d.signature}, {d.paddedAddress(address)}, {}}
+func (d *ERC20TransfersDownloader) outboundTopics(addresses []common.Address) [][]common.Hash {
+	return [][]common.Hash{{d.signature}, topicFromAddressSlice(addresses), {}}
 }
 
-func (d *ERC20TransfersDownloader) inboundERC20OutboundERC1155Topics(address common.Address) [][]common.Hash {
-	return [][]common.Hash{{d.signature, d.signatureErc1155Single, d.signatureErc1155Batch}, {}, {d.paddedAddress(address)}}
+func (d *ERC20TransfersDownloader) inboundERC20OutboundERC1155Topics(addresses []common.Address) [][]common.Hash {
+	return [][]common.Hash{{d.signature, d.signatureErc1155Single, d.signatureErc1155Batch}, {}, topicFromAddressSlice(addresses)}
 }
 
-func (d *ERC20TransfersDownloader) inboundTopicsERC1155(address common.Address) [][]common.Hash {
-	return [][]common.Hash{{d.signatureErc1155Single, d.signatureErc1155Batch}, {}, {}, {d.paddedAddress(address)}}
+func (d *ERC20TransfersDownloader) inboundTopicsERC1155(addresses []common.Address) [][]common.Hash {
+	return [][]common.Hash{{d.signatureErc1155Single, d.signatureErc1155Batch}, {}, {}, topicFromAddressSlice(addresses)}
 }
 
 func (d *ETHDownloader) fetchTransactionReceipt(parent context.Context, txHash common.Hash) (*types.Receipt, error) {
@@ -454,7 +458,7 @@ func (d *ETHDownloader) subTransactionsFromTransactionData(address, from common.
 	return rst, nil
 }
 
-func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs []types.Log, address common.Address) ([]*DBHeader, error) {
+func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs []types.Log) ([]*DBHeader, error) {
 	concurrent := NewConcurrentDownloader(parent, NoThreadLimit)
 
 	for i := range logs {
@@ -464,15 +468,20 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 			continue
 		}
 
+		var address common.Address
 		from, to, txIDs, tokenIDs, values, err := w_common.ParseTransferLog(l)
 		if err != nil {
-			log.Error("failed to parse transfer log", "log", l, "address", address, "error", err)
+			log.Error("failed to parse transfer log", "log", l, "address", d.accounts, "error", err)
 			continue
 		}
 
 		// Double check provider returned the correct log
-		if from != address && to != address {
-			log.Error("from/to address mismatch", "log", l, "address", address)
+		if slices.Contains(d.accounts, from) {
+			address = from
+		} else if !slices.Contains(d.accounts, to) {
+			address = to
+		} else {
+			log.Error("from/to address mismatch", "log", l, "addresses", d.accounts)
 			continue
 		}
 
@@ -480,7 +489,7 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 		logType := w_common.EventTypeToSubtransactionType(eventType)
 
 		for i, txID := range txIDs {
-			log.Debug("block from logs", "block", l.BlockNumber, "log", l, "logType", logType, "address", address, "txID", txID)
+			log.Debug("block from logs", "block", l.BlockNumber, "log", l, "logType", logType, "txID", txID)
 
 			// For ERC20 there is no tokenID, so we use nil
 			var tokenID *big.Int
@@ -489,8 +498,9 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 			}
 
 			header := &DBHeader{
-				Number: big.NewInt(int64(l.BlockNumber)),
-				Hash:   l.BlockHash,
+				Number:  big.NewInt(int64(l.BlockNumber)),
+				Hash:    l.BlockHash,
+				Address: address,
 				PreloadedTransactions: []*PreloadedTransaction{{
 					ID:      txID,
 					Type:    logType,
@@ -523,65 +533,62 @@ func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, fro
 	headers := []*DBHeader{}
 	ctx := context.Background()
 	var err error
-	for _, address := range d.accounts {
-		outbound := []types.Log{}
-		var inboundOrMixed []types.Log // inbound ERC20 or outbound ERC1155 share the same signature for our purposes
-		if !d.incomingOnly {
-			outbound, err = d.client.FilterLogs(ctx, ethereum.FilterQuery{
-				FromBlock: from,
-				ToBlock:   to,
-				Topics:    d.outboundTopics(address),
-			})
-			if err != nil {
-				return nil, err
-			}
-			inboundOrMixed, err = d.client.FilterLogs(ctx, ethereum.FilterQuery{
-				FromBlock: from,
-				ToBlock:   to,
-				Topics:    d.inboundERC20OutboundERC1155Topics(address),
-			})
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			inboundOrMixed, err = d.client.FilterLogs(ctx, ethereum.FilterQuery{
-				FromBlock: from,
-				ToBlock:   to,
-				Topics:    d.inboundTopics(address),
-			})
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		inbound1155, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
+	outbound := []types.Log{}
+	var inboundOrMixed []types.Log // inbound ERC20 or outbound ERC1155 share the same signature for our purposes
+	if !d.incomingOnly {
+		outbound, err = d.client.FilterLogs(ctx, ethereum.FilterQuery{
 			FromBlock: from,
 			ToBlock:   to,
-			Topics:    d.inboundTopicsERC1155(address),
+			Topics:    d.outboundTopics(d.accounts),
 		})
 		if err != nil {
 			return nil, err
 		}
-
-		logs := concatLogs(outbound, inboundOrMixed, inbound1155)
-
-		if len(logs) == 0 {
-			log.Debug("no logs found for account")
-			continue
-		}
-
-		rst, err := d.blocksFromLogs(parent, logs, address)
+		inboundOrMixed, err = d.client.FilterLogs(ctx, ethereum.FilterQuery{
+			FromBlock: from,
+			ToBlock:   to,
+			Topics:    d.inboundERC20OutboundERC1155Topics(d.accounts),
+		})
 		if err != nil {
 			return nil, err
 		}
-		if len(rst) == 0 {
-			log.Warn("no headers found in logs for account", "chainID", d.client.NetworkID(), "address", address, "from", from, "to", to)
-			continue
-		} else {
-			headers = append(headers, rst...)
-			log.Debug("found erc20 transfers for account", "chainID", d.client.NetworkID(), "address", address,
-				"from", from, "to", to, "headers", len(headers))
+	} else {
+		inboundOrMixed, err = d.client.FilterLogs(ctx, ethereum.FilterQuery{
+			FromBlock: from,
+			ToBlock:   to,
+			Topics:    d.inboundTopics(d.accounts),
+		})
+		if err != nil {
+			return nil, err
 		}
+	}
+
+	inbound1155, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
+		FromBlock: from,
+		ToBlock:   to,
+		Topics:    d.inboundTopicsERC1155(d.accounts),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	logs := concatLogs(outbound, inboundOrMixed, inbound1155)
+
+	if len(logs) == 0 {
+		log.Debug("no logs found for account")
+		return nil, nil
+	}
+
+	rst, err := d.blocksFromLogs(parent, logs)
+	if err != nil {
+		return nil, err
+	}
+	if len(rst) == 0 {
+		log.Warn("no headers found in logs for account", "chainID", d.client.NetworkID(), "addresses", d.accounts, "from", from, "to", to)
+	} else {
+		headers = append(headers, rst...)
+		log.Debug("found erc20 transfers for account", "chainID", d.client.NetworkID(), "addresses", d.accounts,
+			"from", from, "to", to, "headers", len(headers))
 	}
 
 	log.Debug("get erc20 transfers in range end", "chainID", d.client.NetworkID(),

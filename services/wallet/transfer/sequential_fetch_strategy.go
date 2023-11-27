@@ -60,9 +60,9 @@ type SequentialFetchStrategy struct {
 }
 
 func (s *SequentialFetchStrategy) newCommand(chainClient chain.ClientInterface,
-	account common.Address) async.Commander {
+	accounts []common.Address) async.Commander {
 
-	return newLoadBlocksAndTransfersCommand(account, s.db, s.accountsDB, s.blockDAO, s.blockRangesSeqDAO, chainClient, s.feed,
+	return newLoadBlocksAndTransfersCommand(accounts, s.db, s.accountsDB, s.blockDAO, s.blockRangesSeqDAO, chainClient, s.feed,
 		s.transactionManager, s.pendingTxManager, s.tokenManager, s.balanceCacher, s.omitHistory)
 }
 
@@ -83,10 +83,8 @@ func (s *SequentialFetchStrategy) start() error {
 	}
 
 	for _, chainClient := range s.chainClients {
-		for _, address := range s.accounts {
-			ctl := s.newCommand(chainClient, address)
-			s.group.Add(ctl.Command())
-		}
+		ctl := s.newCommand(chainClient, s.accounts)
+		s.group.Add(ctl.Command())
 	}
 
 	return nil
