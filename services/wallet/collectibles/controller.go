@@ -330,7 +330,8 @@ func (c *Controller) startWalletEventsWatcher() {
 
 	walletEventCb := func(event walletevent.Event) {
 		// EventRecentHistoryReady ?
-		if event.Type != transfer.EventInternalERC721TransferDetected {
+		if event.Type != transfer.EventInternalERC721TransferDetected &&
+			event.Type != transfer.EventInternalERC1155TransferDetected {
 			return
 		}
 
