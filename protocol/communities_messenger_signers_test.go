@@ -2,12 +2,14 @@ package protocol
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
+
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -37,6 +39,10 @@ type MessengerCommunitiesSignersSuite struct {
 	logger *zap.Logger
 
 	collectiblesServiceMock *CollectiblesServiceMock
+
+	accountsTestData map[string]string
+
+	mockedBalances map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
 }
 
 func (s *MessengerCommunitiesSignersSuite) SetupTest() {
@@ -53,15 +59,23 @@ func (s *MessengerCommunitiesSignersSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
-	s.john = s.newMessenger()
-	s.bob = s.newMessenger()
-	s.alice = s.newMessenger()
+	aliceAccountAddress := "0x0777100000000000000000000000000000000000"
+	bobAccountAddress := "0x0330000000000000000000000000000000000000"
+	accountPassword := "QWERTY"
+
+	s.john = s.newMessenger("", []string{})
+	s.bob = s.newMessenger(accountPassword, []string{aliceAccountAddress})
+	s.alice = s.newMessenger(accountPassword, []string{bobAccountAddress})
 	_, err := s.john.Start()
 	s.Require().NoError(err)
 	_, err = s.bob.Start()
 	s.Require().NoError(err)
 	_, err = s.alice.Start()
 	s.Require().NoError(err)
+
+	s.accountsTestData = make(map[string]string)
+	s.accountsTestData[common.PubkeyToHex(&s.bob.identity.PublicKey)] = bobAccountAddress
+	s.accountsTestData[common.PubkeyToHex(&s.alice.identity.PublicKey)] = aliceAccountAddress
 }
 
 func (s *MessengerCommunitiesSignersSuite) TearDownTest() {
@@ -71,18 +85,25 @@ func (s *MessengerCommunitiesSignersSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerCommunitiesSignersSuite) newMessengerWithKey(privateKey *ecdsa.PrivateKey) *Messenger {
-	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger, nil, nil, s.collectiblesServiceMock)
-	s.Require().NoError(err)
-
-	return messenger
-}
-
-func (s *MessengerCommunitiesSignersSuite) newMessenger() *Messenger {
+func (s *MessengerCommunitiesSignersSuite) newMessenger(password string, walletAddresses []string) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	return s.newMessengerWithKey(privateKey)
+	accountsManagerMock := &AccountManagerMock{}
+	accountsManagerMock.AccountsMap = make(map[string]string)
+
+	for _, walletAddress := range walletAddresses {
+		accountsManagerMock.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(password)))
+	}
+
+	tokenManagerMock := &TokenManagerMock{
+		Balances: &s.mockedBalances,
+	}
+
+	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger, accountsManagerMock, tokenManagerMock, s.collectiblesServiceMock)
+	s.Require().NoError(err)
+
+	return messenger
 }
 
 func (s *MessengerCommunitiesSignersSuite) createCommunity(controlNode *Messenger) *communities.Community {
@@ -95,18 +116,40 @@ func (s *MessengerCommunitiesSignersSuite) advertiseCommunityTo(controlNode *Mes
 }
 
 func (s *MessengerCommunitiesSignersSuite) joinCommunity(controlNode *Messenger, community *communities.Community, user *Messenger) {
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	accTestData := s.accountsTestData[common.PubkeyToHex(&s.alice.identity.PublicKey)]
+	array64Bytes := common.HashPublicKey(&s.alice.identity.PublicKey)
+	signature := append([]byte{0}, array64Bytes...)
+
+	request := &requests.RequestToJoinCommunity{
+		CommunityID:       community.ID(),
+		AddressesToReveal: []string{accTestData},
+		AirdropAddress:    accTestData,
+		Signatures:        []types.HexBytes{signature},
+	}
+
 	joinCommunity(&s.Suite, community, controlNode, user, request, "")
 }
 
 func (s *MessengerCommunitiesSignersSuite) joinOnRequestCommunity(controlNode *Messenger, community *communities.Community, user *Messenger) {
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	accTestData := s.accountsTestData[common.PubkeyToHex(&s.alice.identity.PublicKey)]
+	array64Bytes := common.HashPublicKey(&s.alice.identity.PublicKey)
+	signature := append([]byte{0}, array64Bytes...)
+
+	request := &requests.RequestToJoinCommunity{
+		CommunityID:       community.ID(),
+		AddressesToReveal: []string{accTestData},
+		AirdropAddress:    accTestData,
+		Signatures:        []types.HexBytes{signature},
+	}
+
 	joinOnRequestCommunity(&s.Suite, community, controlNode, user, request)
 }
 
 // John crates a community
 // Ownership is transferred to Alice
-// Alice kick all members Bob and John rejoins
+// Alice kick all members Bob and John
+// Bob automatically rejoin
+// John receive AC notification to share the address and join to the community
 // Bob and John accepts the changes
 
 func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
@@ -193,19 +236,26 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	)
 	s.Require().NoError(err)
 
-	// check that John received kick event, also he will receive
-	// request to share RevealedAddresses and send request to join to the control node
+	// check that John received kick event, and AC notification msg created
+	// John, as ex-owner must manually join the community
 	_, err = WaitOnSignaledMessengerResponse(
 		s.john,
 		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && !r.Communities()[0].HasMember(&s.john.identity.PublicKey)
+			wasKicked := len(r.Communities()) > 0 && !r.Communities()[0].HasMember(&s.john.identity.PublicKey)
+			sharedNotificationExist := false
+			for _, acNotification := range r.ActivityCenterNotifications() {
+				if acNotification.Type == ActivityCenterNotificationTypeShareAccounts {
+					sharedNotificationExist = true
+					break
+				}
+			}
+			return wasKicked && sharedNotificationExist
 		},
 		"John was not kicked from the community",
 	)
 	s.Require().NoError(err)
 
 	// Alice auto-accept requests to join with RevealedAddresses
-	// TODO: please, check TODO's in this test and uncomment them if Members() == 3
 	_, err = WaitOnMessengerResponse(
 		s.alice,
 		func(r *MessengerResponse) bool {
@@ -243,20 +293,8 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	s.Require().False(community.IsControlNode())
 	s.Require().False(community.IsOwner())
 
-	// TODO: uncomment when ex-owner will start sharing request to join with revealed address
-	// // Jonh is a community member again
-	// _, err = WaitOnMessengerResponse(
-	// 	s.bob,
-	// 	func(r *MessengerResponse) bool {
-	// 		return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&s.bob.identity.PublicKey)
-	// 	},
-	// 	"John was auto-accepted",
-	// )
-	// s.Require().NoError(err)
-
-	// community = validateResults(s.john)
-	// s.Require().False(community.IsControlNode())
-	// s.Require().False(community.IsOwner())
+	// John manually joins the community
+	s.joinCommunity(s.alice, community, s.john)
 
 	// Alice change community name
 
@@ -290,15 +328,14 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 
 	validateNameInDB(s.alice)
 
-	// TODO: uncomment when ex-owner will start sharing request to join with revealed address
 	// john accepts community update from alice (new control node)
-	// _, err = WaitOnMessengerResponse(
-	// 	s.john,
-	// validateNameInResponse,
-	// 	"john did not receive community name update",
-	// )
-	// s.Require().NoError(err)
-	// validateNameInDB(s.john)
+	_, err = WaitOnMessengerResponse(
+		s.john,
+		validateNameInResponse,
+		"john did not receive community name update",
+	)
+	s.Require().NoError(err)
+	validateNameInDB(s.john)
 
 	// bob accepts community update from alice (new control node)
 	_, err = WaitOnMessengerResponse(
@@ -394,14 +431,21 @@ func (s *MessengerCommunitiesSignersSuite) TestAutoAcceptOnOwnershipChangeReques
 	_, err = WaitOnSignaledMessengerResponse(
 		s.john,
 		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && !r.Communities()[0].HasMember(&s.john.identity.PublicKey)
+			wasKicked := len(r.Communities()) > 0 && !r.Communities()[0].HasMember(&s.john.identity.PublicKey)
+			sharedNotificationExist := false
+			for _, acNotification := range r.ActivityCenterNotifications() {
+				if acNotification.Type == ActivityCenterNotificationTypeShareAccounts {
+					sharedNotificationExist = true
+					break
+				}
+			}
+			return wasKicked && sharedNotificationExist
 		},
 		"John was not kicked from the community",
 	)
 	s.Require().NoError(err)
 
 	// Alice auto-accept requests to join with RevealedAddresses
-	// TODO: please, check TODO's in this test and uncomment them if Members() == 3
 	_, err = WaitOnMessengerResponse(
 		s.alice,
 		func(r *MessengerResponse) bool {
@@ -437,20 +481,6 @@ func (s *MessengerCommunitiesSignersSuite) TestAutoAcceptOnOwnershipChangeReques
 	community = validateResults(s.bob)
 	s.Require().False(community.IsControlNode())
 	s.Require().False(community.IsOwner())
-
-	// TODO: uncomment when ex-owner will start sharing request to join with revealed address
-	// _, err = WaitOnMessengerResponse(
-	// 	s.john,
-	// 	func(r *MessengerResponse) bool {
-	// 		return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&s.bob.identity.PublicKey)
-	// 	},
-	// 	"John was auto-accepted",
-	// )
-	// s.Require().NoError(err)
-
-	// community = validateResults(s.john)
-	// s.Require().False(community.IsControlNode())
-	// s.Require().False(community.IsOwner())
 }
 
 func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {

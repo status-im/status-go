@@ -41,3 +41,5 @@ var ErrNotEnoughPermissions = errors.New("not enough permissions for this commun
 var ErrCannotRemoveOwnerOrAdmin = errors.New("not allowed to remove admin or owner")
 var ErrCannotBanOwnerOrAdmin = errors.New("not allowed to ban admin or owner")
 var ErrInvalidManageTokensPermission = errors.New("no privileges to manage tokens")
+var ErrRevealedAccountsAbsent = errors.New("revealed accounts is absent")
+var ErrNoRevealedAccountsSignature = errors.New("revealed accounts without the signature")
