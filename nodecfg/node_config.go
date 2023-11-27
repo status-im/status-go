@@ -786,3 +786,8 @@ func GetNodeConfigFromDB(db *sql.DB) (*params.NodeConfig, error) {
 
 	return loadNodeConfig(tx)
 }
+
+func SetLightClient(db *sql.DB, enabled bool) error {
+	_, err := db.Exec(`UPDATE wakuv2_config SET light_client = ?`, enabled)
+	return err
+}

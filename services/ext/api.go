@@ -1685,6 +1685,10 @@ func (api *PublicAPI) SyncChat(request *requests.SyncChat) error {
 	return api.service.messenger.SyncChat(request)
 }
 
+func (api *PublicAPI) SetLightClient(request *requests.SetLightClient) error {
+	return api.service.messenger.SetLightClient(request)
+}
+
 // -----
 // HELPER
 // -----
