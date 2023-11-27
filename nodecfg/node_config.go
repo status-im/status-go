@@ -214,11 +214,16 @@ func insertWakuV2Config(tx *sql.Tx, c *params.NodeConfig) error {
 		return err
 	}
 
+	return setWakuV2CustomNodes(tx, c.WakuV2Config.CustomNodes)
+}
+
+func setWakuV2CustomNodes(tx *sql.Tx, customNodes map[string]string) error {
 	if _, err := tx.Exec(`DELETE FROM wakuv2_custom_nodes WHERE synthetic_id = 'id'`); err != nil {
 		return err
 	}
 
-	for name, multiaddress := range c.WakuV2Config.CustomNodes {
+	for name, multiaddress := range customNodes {
+		// NOTE: synthetic id is redundant, name is effectively the primary key
 		_, err := tx.Exec(`INSERT OR REPLACE INTO wakuv2_custom_nodes (name, multiaddress, synthetic_id) VALUES (?, ?, 'id')`, name, multiaddress)
 		if err != nil {
 			return err
@@ -790,4 +795,26 @@ func GetNodeConfigFromDB(db *sql.DB) (*params.NodeConfig, error) {
 func SetLightClient(db *sql.DB, enabled bool) error {
 	_, err := db.Exec(`UPDATE wakuv2_config SET light_client = ?`, enabled)
 	return err
+}
+
+func SetLogLevel(db *sql.DB, logLevel string) error {
+	_, err := db.Exec(`UPDATE log_config SET log_level = ?`, logLevel)
+	return err
+}
+
+func SetWakuV2CustomNodes(db *sql.DB, customNodes map[string]string) error {
+	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+	return setWakuV2CustomNodes(tx, customNodes)
 }
