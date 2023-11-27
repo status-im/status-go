@@ -180,6 +180,8 @@ type Messenger struct {
 	processBackedupMessages bool
 
 	communityTokensService communitytokens.ServiceInterface
+
+	dispatchMessageTestCallback func(common.RawMessage)
 }
 
 type connStatus int
@@ -2133,6 +2135,11 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 	chat, ok := m.allChats.Load(rawMessage.LocalChatID)
 	if !ok {
 		return rawMessage, errors.New("no chat found")
+	}
+
+	// If callback provided, notify tests about sent messages
+	if m.dispatchMessageTestCallback != nil {
+		m.dispatchMessageTestCallback(rawMessage)
 	}
 
 	switch chat.ChatType {

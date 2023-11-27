@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -12,7 +11,6 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 )
 
 type MessengerSyncContactRequestDecisionSuite struct {
@@ -85,6 +83,16 @@ func (s *MessengerSyncContactRequestDecisionSuite) TestSyncAcceptContactRequest(
 	}, "contact request not received on device 2")
 	s.Require().NoError(err)
 
+	sentContactRequestAcceptances := 0
+	crAcceptanceHandler := func(message common.RawMessage) {
+		if message.MessageType == protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_REQUEST {
+			sentContactRequestAcceptances++
+		}
+	}
+
+	s.m.dispatchMessageTestCallback = crAcceptanceHandler
+	s.m2.dispatchMessageTestCallback = crAcceptanceHandler
+
 	// m accept contact request from userB
 	_, err = s.m.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: contactRequestMessageID})
 	s.Require().NoError(err)
@@ -95,21 +103,5 @@ func (s *MessengerSyncContactRequestDecisionSuite) TestSyncAcceptContactRequest(
 	}, "contact request not accepted on device 2")
 	s.Require().NoError(err)
 
-	numAcceptMessageReceived := 0
-	retryError := errors.New("retry error")
-	err = tt.RetryWithBackOff(func() error {
-		r, err := userB.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		for _, m := range r.Messages() {
-			if m.GetContentType() == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED {
-				numAcceptMessageReceived++
-			}
-		}
-		// always return error so that we retry until timeout
-		return retryError
-	})
-	s.Require().ErrorIs(err, retryError)
-	s.Require().Equal(1, numAcceptMessageReceived, "we should receive only 1 message(contact request accepted)")
+	s.Require().Equal(1, sentContactRequestAcceptances)
 }
