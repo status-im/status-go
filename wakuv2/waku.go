@@ -328,15 +328,6 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		opts = append(opts, node.WithWakuFilterFullNode())
 	}
 
-	if cfg.WebSocket != nil {
-		if cfg.WebSocket.Secure {
-			opts = append(opts, node.WithSecureWebsockets(cfg.WebSocket.Host, *cfg.WebSocket.Port, cfg.WebSocket.CertPath, cfg.WebSocket.KeyPath))
-		} else {
-			opts = append(opts, node.WithWebsockets(cfg.WebSocket.Host, *cfg.WebSocket.Port))
-
-		}
-	}
-
 	if appDB != nil {
 		waku.protectedTopicStore, err = persistence.NewProtectedTopicsStore(logger, appDB)
 		if err != nil {

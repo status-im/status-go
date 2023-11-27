@@ -224,13 +224,6 @@ func TestPeerExchange(t *testing.T) {
 	config := &Config{}
 	config.EnableDiscV5 = true
 	config.PeerExchange = true
-	wsPort := 0
-	wsConfig := WebsocketConfig{
-		Enabled: true,
-		Port:    &wsPort,
-		Host:    "0.0.0.0",
-	}
-	config.WebSocket = &wsConfig
 	pxServerNode, err := New("", "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, pxServerNode.Start())
