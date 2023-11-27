@@ -213,7 +213,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	alice := s.newMessenger()
 	_, err = alice.Start()
 	s.Require().NoError(err)
-	defer alice.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice)
 
 	// Create 1-1 chat
 	ourOneOneChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.transport)

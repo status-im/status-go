@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"sync"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
@@ -186,11 +186,7 @@ func newMessenger(s *suite.Suite, shh types.Waku, logger *zap.Logger, password s
 
 func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, accountsManager account.Manager,
 	tokenManager communities.TokenManager, collectiblesService communitytokens.ServiceInterface) (*Messenger, error) {
-	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
-	if err != nil {
-		return nil, err
-	}
-	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
+	madb, err := multiaccounts.InitializeDB(dbsetup.InMemoryPath)
 	if err != nil {
 		return nil, err
 	}

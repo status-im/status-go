@@ -2,19 +2,14 @@ package protocol
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"testing"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/protocol/verification"
-	"github.com/status-im/status-go/waku"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
 )
@@ -24,26 +19,11 @@ func TestMessengerVerificationRequests(t *testing.T) { // nolint: deadcode,unuse
 }
 
 type MessengerVerificationRequests struct {
-	suite.Suite
-	m          *Messenger        // main instance of Messenger
-	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
-
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh types.Waku
-
-	logger *zap.Logger
+	MessengerBaseTestSuite
 }
 
 func (s *MessengerVerificationRequests) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-	s.m = s.newMessenger(s.shh)
-	s.privateKey = s.m.identity
+	s.MessengerBaseTestSuite.SetupTest()
 	// We start the messenger in order to receive installations
 	_, err := s.m.Start()
 	s.Require().NoError(err)
@@ -160,7 +140,7 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
 
@@ -286,7 +266,7 @@ func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
 
@@ -399,7 +379,7 @@ func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests()
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
 
@@ -527,7 +507,7 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
 
@@ -639,7 +619,7 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
 
@@ -726,10 +706,6 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().Equal(challenge, resp.Messages()[0].Text)
 	s.Require().Equal(resp.Messages()[0].ContactVerificationState, common.ContactVerificationStateCanceled)
-}
-
-func (s *MessengerVerificationRequests) TearDownTest() {
-	s.Require().NoError(s.m.Shutdown())
 }
 
 func (s *MessengerVerificationRequests) newMessenger(shh types.Waku) *Messenger {

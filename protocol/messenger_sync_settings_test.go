@@ -102,7 +102,7 @@ func (s *MessengerSyncSettingsSuite) SetupTest() {
 }
 
 func (s *MessengerSyncSettingsSuite) TearDownTest() {
-	s.Require().NoError(s.alice.Shutdown())
+	TearDownMessenger(&s.Suite, s.alice)
 	_ = s.logger.Sync()
 }
 

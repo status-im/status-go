@@ -59,7 +59,7 @@ func (s *MessengerPushNotificationSuite) SetupTest() {
 }
 
 func (s *MessengerPushNotificationSuite) TearDownTest() {
-	s.Require().NoError(s.m.Shutdown())
+	TearDownMessenger(&s.Suite, s.m)
 	_ = s.logger.Sync()
 }
 
@@ -93,18 +93,18 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	bob1 := s.m
 	bob2, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, []Option{WithPushNotifications()})
 	s.Require().NoError(err)
-	defer bob2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob2)
 
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	server := s.newPushNotificationServer(s.shh, serverKey)
-	defer server.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, server)
 
 	alice := s.newMessenger(s.shh)
 	// start alice and enable sending push notifications
 	_, err = alice.Start()
 	s.Require().NoError(err)
-	defer alice.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob1.installationID, bob2.installationID}
 
@@ -281,13 +281,13 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	server := s.newPushNotificationServer(s.shh, serverKey)
-	defer server.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, server)
 
 	alice := s.newMessenger(s.shh)
 	// start alice and enable push notifications
 	_, err = alice.Start()
 	s.Require().NoError(err)
-	defer alice.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}
 
@@ -423,18 +423,19 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	server := s.newPushNotificationServer(s.shh, serverKey)
-	defer server.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, server)
 
 	alice := s.newMessenger(s.shh)
 	// another contact to invalidate the token
 	frank := s.newMessenger(s.shh)
 	_, err = frank.Start()
 	s.Require().NoError(err)
-	defer frank.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, frank)
+
 	// start alice and enable push notifications
 	_, err = alice.Start()
 	s.Require().NoError(err)
-	defer alice.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}
 
@@ -651,13 +652,13 @@ func (s *MessengerPushNotificationSuite) TestContactCode() {
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	server := s.newPushNotificationServer(s.shh, serverKey)
-	defer server.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, server)
 
 	alice := s.newMessenger(s.shh)
 	// start alice and enable sending push notifications
 	_, err = alice.Start()
 	s.Require().NoError(err)
-	defer alice.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 
 	// Register bob1
@@ -712,13 +713,13 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	server := s.newPushNotificationServer(s.shh, serverKey)
-	defer server.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, server)
 
 	alice := s.newMessenger(s.shh)
 	// start alice and enable sending push notifications
 	_, err = alice.Start()
 	s.Require().NoError(err)
-	defer alice.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}
 
@@ -853,13 +854,13 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	server := s.newPushNotificationServer(s.shh, serverKey)
-	defer server.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, server)
 
 	alice := s.newMessenger(s.shh)
 	// start alice and enable sending push notifications
 	_, err = alice.Start()
 	s.Require().NoError(err)
-	defer alice.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 
 	// Register bob
@@ -984,18 +985,18 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 	bob1 := s.m
 	bob2, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, []Option{WithPushNotifications()})
 	s.Require().NoError(err)
-	defer bob2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob2)
 
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	server := s.newPushNotificationServer(s.shh, serverKey)
-	defer server.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, server)
 
 	alice := s.newMessenger(s.shh)
 	// start alice and enable sending push notifications
 	_, err = alice.Start()
 	s.Require().NoError(err)
-	defer alice.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob1.installationID, bob2.installationID}
 

@@ -74,9 +74,9 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 }
 
 func (s *MessengerCommunitiesSuite) TearDownTest() {
-	s.Require().NoError(s.owner.Shutdown())
-	s.Require().NoError(s.bob.Shutdown())
-	s.Require().NoError(s.alice.Shutdown())
+	TearDownMessenger(&s.Suite, s.owner)
+	TearDownMessenger(&s.Suite, s.bob)
+	TearDownMessenger(&s.Suite, s.alice)
 	_ = s.logger.Sync()
 }
 

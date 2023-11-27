@@ -43,7 +43,7 @@ func (s *MessengerSyncActivityCenterSuite) SetupTest() {
 }
 
 func (s *MessengerSyncActivityCenterSuite) TearDownTest() {
-	s.Require().NoError(s.m2.Shutdown())
+	TearDownMessenger(&s.Suite, s.m2)
 	s.MessengerBaseTestSuite.TearDownTest()
 }
 

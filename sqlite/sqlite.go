@@ -267,13 +267,15 @@ func OpenUnecryptedDB(path string) (*sql.DB, error) {
 	// readers do not block writers and faster i/o operations
 	// https://www.sqlite.org/draft/wal.html
 	// must be set after db is encrypted
-	var mode string
-	err = db.QueryRow("PRAGMA journal_mode=WAL").Scan(&mode)
-	if err != nil {
-		return nil, err
-	}
-	if mode != WALMode {
-		return nil, fmt.Errorf("unable to set journal_mode to WAL. actual mode %s", mode)
+	if path != InMemoryPath {
+		var mode string
+		err = db.QueryRow("PRAGMA journal_mode=WAL").Scan(&mode)
+		if err != nil {
+			return nil, err
+		}
+		if mode != WALMode {
+			return nil, fmt.Errorf("unable to set journal_mode to WAL. actual mode %s", mode)
+		}
 	}
 
 	return db, nil

@@ -75,8 +75,8 @@ func (s *MessengerSyncChatSuite) SetupTest() {
 }
 
 func (s *MessengerSyncChatSuite) TearDownTest() {
-	s.Require().NoError(s.alice1.Shutdown())
-	s.Require().NoError(s.alice2.Shutdown())
+	TearDownMessenger(&s.Suite, s.alice1)
+	TearDownMessenger(&s.Suite, s.alice2)
 	_ = s.logger.Sync()
 }
 

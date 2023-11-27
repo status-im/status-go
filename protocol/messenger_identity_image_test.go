@@ -45,7 +45,7 @@ func (s *MessengerProfilePictureHandlerSuite) SetupSuite() {
 	s.logger = tt.MustCreateTestLogger()
 }
 
-func (s *MessengerProfilePictureHandlerSuite) setup() {
+func (s *MessengerProfilePictureHandlerSuite) SetupTest() {
 	var err error
 
 	// Setup Waku things
@@ -80,38 +80,13 @@ func (s *MessengerProfilePictureHandlerSuite) setup() {
 	s.logger.Debug("alice setupMultiAccount after")
 }
 
-func (s *MessengerProfilePictureHandlerSuite) setupTest() {
-	s.logger.Debug("setupTest fired")
-	s.setup()
-	s.logger.Debug("setupTest completed")
-}
-
-func (s *MessengerProfilePictureHandlerSuite) SetupTest() {
-	s.logger.Debug("SetupTest fired")
-	s.setup()
-	s.logger.Debug("SetupTest completed")
-}
-
-func (s *MessengerProfilePictureHandlerSuite) tearDown() {
+func (s *MessengerProfilePictureHandlerSuite) TearDownTest() {
 	// Shutdown messengers
-	s.NoError(s.alice.Shutdown())
+	TearDownMessenger(&s.Suite, s.alice)
 	s.alice = nil
-	s.NoError(s.bob.Shutdown())
+	TearDownMessenger(&s.Suite, s.bob)
 	s.bob = nil
 	_ = s.logger.Sync()
-	//time.Sleep(2 * time.Second)
-}
-
-func (s *MessengerProfilePictureHandlerSuite) tearDownTest() {
-	s.logger.Debug("tearDownTest fired")
-	s.tearDown()
-	s.logger.Debug("tearDownTest completed")
-}
-
-func (s *MessengerProfilePictureHandlerSuite) TearDownTest() {
-	s.logger.Debug("TearDownTest fired")
-	s.tearDown()
-	s.logger.Debug("TearDownTest completed")
 }
 
 func (s *MessengerProfilePictureHandlerSuite) generateKeyUID(publicKey *ecdsa.PublicKey) string {
@@ -221,7 +196,6 @@ func (s *MessengerProfilePictureHandlerSuite) TestEncryptDecryptIdentityImagesWi
 }
 
 func (s *MessengerProfilePictureHandlerSuite) TestPictureInPrivateChatOneSided() {
-	s.setupTest()
 	err := s.bob.settings.SaveSettingField(settings.ProfilePicturesVisibility, settings.ProfilePicturesShowToEveryone)
 	s.Require().NoError(err)
 
@@ -295,7 +269,7 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 				for _, ac := range isContactFor["alice"] {
 					for _, bc := range isContactFor["bob"] {
 						s.logger.Debug("top of the loop")
-						s.setupTest()
+						s.SetupTest()
 						s.logger.Info("testing with criteria:",
 							zap.String("chat context type", string(cc)),
 							zap.String("profile picture Show Settings", sn),
@@ -465,7 +439,7 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 								zap.Bool("bob in Alice's Contacts", ac),
 								zap.Bool("alice in Bob's Contacts", bc),
 							)
-							s.tearDownTest()
+							s.TearDownTest()
 							continue
 						}
 
@@ -526,14 +500,14 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 							zap.Bool("bob in Alice's Contacts", ac),
 							zap.Bool("alice in Bob's Contacts", bc),
 						)
-						s.tearDownTest()
+						s.TearDownTest()
 					}
 				}
 			}
 		}
 	}
 
-	s.setupTest()
+	s.SetupTest()
 }
 
 func resultExpected(ss settings.ProfilePicturesShowToType, vs settings.ProfilePicturesVisibilityType, ac, bc bool) (bool, error) {

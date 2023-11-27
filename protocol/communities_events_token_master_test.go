@@ -79,9 +79,9 @@ func (s *TokenMasterCommunityEventsSuite) SetupTest() {
 }
 
 func (s *TokenMasterCommunityEventsSuite) TearDownTest() {
-	s.Require().NoError(s.controlNode.Shutdown())
-	s.Require().NoError(s.tokenMaster.Shutdown())
-	s.Require().NoError(s.alice.Shutdown())
+	TearDownMessenger(&s.Suite, s.controlNode)
+	TearDownMessenger(&s.Suite, s.tokenMaster)
+	TearDownMessenger(&s.Suite, s.alice)
 	_ = s.logger.Sync()
 }
 

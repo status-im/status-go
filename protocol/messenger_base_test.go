@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"crypto/ecdsa"
-	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/common/dbsetup"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -44,7 +44,7 @@ func (s *MessengerBaseTestSuite) SetupTest() {
 }
 
 func (s *MessengerBaseTestSuite) TearDownTest() {
-	s.Require().NoError(s.m.Shutdown())
+	TearDownMessenger(&s.Suite, s.m)
 	_ = s.logger.Sync()
 }
 
@@ -68,11 +68,7 @@ type MessengerBaseTestSuite struct {
 }
 
 func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, extraOptions []Option) (*Messenger, error) {
-	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
-	if err != nil {
-		return nil, err
-	}
-	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
+	madb, err := multiaccounts.InitializeDB(dbsetup.InMemoryPath)
 	if err != nil {
 		return nil, err
 	}

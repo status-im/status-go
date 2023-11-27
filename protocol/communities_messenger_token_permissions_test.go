@@ -160,20 +160,20 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
 	if s.owner != nil {
-		s.Require().NoError(s.owner.Shutdown())
+		TearDownMessenger(&s.Suite, s.owner)
 	}
 	if s.ownerWaku != nil {
 		s.Require().NoError(gethbridge.GetGethWakuV2From(s.ownerWaku).Stop())
 	}
 
 	if s.bob != nil {
-		s.Require().NoError(s.bob.Shutdown())
+		TearDownMessenger(&s.Suite, s.bob)
 	}
 	if s.bobWaku != nil {
 		s.Require().NoError(gethbridge.GetGethWakuV2From(s.bobWaku).Stop())
 	}
 	if s.alice != nil {
-		s.Require().NoError(s.alice.Shutdown())
+		TearDownMessenger(&s.Suite, s.alice)
 	}
 	if s.aliceWaku != nil {
 		s.Require().NoError(gethbridge.GetGethWakuV2From(s.aliceWaku).Stop())

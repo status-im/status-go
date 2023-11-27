@@ -109,8 +109,8 @@ func (s *MessengerSyncKeycardsStateSuite) SetupTest() {
 }
 
 func (s *MessengerSyncKeycardsStateSuite) TearDownTest() {
-	s.Require().NoError(s.other.Shutdown())
-	s.Require().NoError(s.main.Shutdown())
+	TearDownMessenger(&s.Suite, s.other)
+	TearDownMessenger(&s.Suite, s.main)
 }
 
 func (s *MessengerSyncKeycardsStateSuite) newMessenger(shh types.Waku) *Messenger {

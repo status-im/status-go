@@ -31,7 +31,7 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 
 	bob, err := newMessengerWithKey(s.shh, key, s.logger, nil)
 	s.Require().NoError(err)
-	defer bob.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob)
 
 	chatID := statusChatID
 
@@ -112,7 +112,7 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	alice := s.newMessenger()
 	_, err := alice.Start()
 	s.Require().NoError(err)
-	defer alice.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice)
 	response, err := bob.CreateGroupChatWithMembers(context.Background(), "test", []string{})
 	s.NoError(err)
 

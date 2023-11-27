@@ -2,21 +2,14 @@ package protocol
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"errors"
 	"testing"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
-
-	"github.com/status-im/status-go/eth-node/types"
 )
 
 func TestMessengerSocialLinksHandlerSuite(t *testing.T) {
@@ -24,45 +17,7 @@ func TestMessengerSocialLinksHandlerSuite(t *testing.T) {
 }
 
 type MessengerSocialLinksHandlerSuite struct {
-	suite.Suite
-	m          *Messenger        // main instance of Messenger
-	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
-
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh types.Waku
-
-	logger *zap.Logger
-}
-
-func (s *MessengerSocialLinksHandlerSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	s.m = s.newMessenger(s.shh)
-	s.privateKey = s.m.identity
-	// We start the messenger in order to receive installations
-	_, err := s.m.Start()
-	s.Require().NoError(err)
-}
-
-func (s *MessengerSocialLinksHandlerSuite) TearDownTest() {
-	s.Require().NoError(s.m.Shutdown())
-}
-
-func (s *MessengerSocialLinksHandlerSuite) newMessenger(shh types.Waku) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
-	s.Require().NoError(err)
-
-	return messenger
+	MessengerBaseTestSuite
 }
 
 func profileSocialLinks() identity.SocialLinks {

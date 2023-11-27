@@ -323,3 +323,13 @@ func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []s
 	}
 	return wrappers
 }
+
+func TearDownMessenger(s *suite.Suite, m *Messenger) {
+	s.Require().NoError(m.Shutdown())
+	if m.database != nil {
+		s.Require().NoError(m.database.Close())
+	}
+	if m.multiAccounts != nil {
+		s.Require().NoError(m.multiAccounts.Close())
+	}
+}
