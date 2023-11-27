@@ -494,13 +494,13 @@ func (w *Waku) identifyAndConnect(ctx context.Context, isLightClient bool, peerI
 	case <-w.ctx.Done():
 		return
 	case <-w.identifyService.IdentifyWait(conns[0]):
-		if isLightClient {
-			err = w.node.Host().Network().ClosePeer(peerInfo.ID)
-			if err != nil {
-				w.logger.Error("could not close connections to peer", zap.Stringer("peer", peerInfo.ID), zap.Error(err))
-			}
-			return
-		}
+		// if isLightClient {
+		// 	err = w.node.Host().Network().ClosePeer(peerInfo.ID)
+		// 	if err != nil {
+		// 		w.logger.Error("could not close connections to peer", zap.Stringer("peer", peerInfo.ID), zap.Error(err))
+		// 	}
+		// 	return
+		// }
 
 		supportedProtocols, err := w.node.Host().Peerstore().SupportsProtocols(peerInfo.ID, relay.WakuRelayID_v200)
 		if err != nil {
