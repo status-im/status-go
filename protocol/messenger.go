@@ -3457,6 +3457,23 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 		return fmt.Errorf("chat ID '%s' not present", message.LocalChatID)
 	}
 
+	isNotification, notificationType := showMentionOrReplyActivityCenterNotification(publicKey, message, chat, responseTo)
+	if !isNotification {
+		return nil
+	}
+
+	if chat.CommunityChat() {
+		joinedClock, err := m.communitiesManager.GetCommunityRequestToJoinClock(&publicKey, message.CommunityID)
+		if err != nil {
+			return err
+		}
+
+		// Ignore mentions & replies in community before joining
+		if message.Clock < joinedClock {
+			return nil
+		}
+	}
+
 	// Use albumId as notificationId to prevent multiple notifications
 	// for same message with multiple images
 	var notificationID string
@@ -3480,26 +3497,22 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 		notificationID = message.ID
 	}
 
-	isNotification, notificationType := showMentionOrReplyActivityCenterNotification(publicKey, message, chat, responseTo)
-	if isNotification {
-		notification := &ActivityCenterNotification{
-			ID:            types.FromHex(notificationID),
-			Name:          chat.Name,
-			Message:       message,
-			ReplyMessage:  responseTo,
-			Type:          notificationType,
-			Timestamp:     message.WhisperTimestamp,
-			ChatID:        chat.ID,
-			CommunityID:   chat.CommunityID,
-			Author:        message.From,
-			UpdatedAt:     m.GetCurrentTimeInMillis(),
-			AlbumMessages: albumMessages,
-			Read:          message.Seen,
-		}
-		return m.addActivityCenterNotification(r.Response, notification, nil)
+	notification := &ActivityCenterNotification{
+		ID:            types.FromHex(notificationID),
+		Name:          chat.Name,
+		Message:       message,
+		ReplyMessage:  responseTo,
+		Type:          notificationType,
+		Timestamp:     message.WhisperTimestamp,
+		ChatID:        chat.ID,
+		CommunityID:   chat.CommunityID,
+		Author:        message.From,
+		UpdatedAt:     m.GetCurrentTimeInMillis(),
+		AlbumMessages: albumMessages,
+		Read:          message.Seen,
 	}
 
-	return nil
+	return m.addActivityCenterNotification(r.Response, notification, nil)
 }
 
 func (m *Messenger) buildMessageState() *ReceivedMessageState {

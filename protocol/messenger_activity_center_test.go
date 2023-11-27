@@ -441,3 +441,57 @@ func (s *MessengerActivityCenterMessageSuite) TestMarkAllActivityCenterNotificat
 
 	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage, true)
 }
+
+func (s *MessengerActivityCenterMessageSuite) TestAliceDoesNotReceiveCommunityNotificationsBeforeJoined() {
+	alice := s.m
+	bob := s.newMessenger()
+	_, err := bob.Start()
+	s.Require().NoError(err)
+	defer bob.Shutdown() // nolint: errcheck
+
+	// Create a community
+	community, chat := s.createCommunity(bob)
+	s.Require().NotNil(community)
+	s.Require().NotNil(chat)
+
+	// Bob sends a mention message
+	mentionMessage := common.NewMessage()
+	mentionMessage.ChatId = chat.ID
+	mentionMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	mentionMessage.Text = "Good news, @" + common.EveryoneMentionTag + " !"
+
+	response, err := bob.SendChatMessage(context.Background(), mentionMessage)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().True(response.Messages()[0].Mentioned)
+
+	// Alice joins the community
+	s.advertiseCommunityTo(community, bob, alice)
+	s.joinCommunity(community, bob, alice)
+
+	// Bob sends an another mention message
+	mentionMessage = common.NewMessage()
+	mentionMessage.ChatId = chat.ID
+	mentionMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	mentionMessage.Text = "Welcome new joiners, @" + common.EveryoneMentionTag + " !"
+
+	response, err = bob.SendChatMessage(context.Background(), mentionMessage)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().True(response.Messages()[0].Mentioned)
+
+	// check alice got only second mention message
+	response, err = WaitOnMessengerResponse(
+		alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Messages()) == 1 && len(r.ActivityCenterNotifications()) == 1 &&
+				r.Messages()[0].ID == r.ActivityCenterNotifications()[0].Message.ID &&
+				r.ActivityCenterNotifications()[0].Type == ActivityCenterNotificationTypeMention
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	s.Require().False(response.ActivityCenterNotifications()[0].Read)
+	s.Require().Equal(response.ActivityCenterNotifications()[0].ID.String(), response.ActivityCenterNotifications()[0].Message.ID)
+}
