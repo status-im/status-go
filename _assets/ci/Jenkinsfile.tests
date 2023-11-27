@@ -115,6 +115,11 @@ pipeline {
         reportName:             'Reports',
         reportTitles:           'Test Stats'
       ]
+      script {
+        if (isTestNightlyJob()) {
+          archiveArtifacts artifacts: '**/report.xml, **/test.log'
+        }
+      }
     }
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
@@ -125,23 +130,10 @@ pipeline {
   } // post
 } // pipeline
 
-def getDefaultUnitTestCount() {
-  if (env.JOB_BASE_NAME == 'tests-nightly') {
-    return '20'
-  }
-  return '1'
-}
+def isTestNightlyJob() { env.JOB_BASE_NAME == 'tests-nightly' }
 
-def getDefaultUnitTestFailfast() {
-  if (env.JOB_BASE_NAME == 'tests-nightly') {
-    return false
-  }
-  return true
-}
+def getDefaultUnitTestCount() { isTestNightlyJob() ? '20' : '1' }
 
-def getDefaultTimeout() {
-  if (env.JOB_BASE_NAME == 'tests-nightly') {
-    return 5*60
-  }
-  return 40
-}
+def getDefaultUnitTestFailfast() { isTestNightlyJob() ? false : true }
+
+def getDefaultTimeout() { isTestNightlyJob() ? 5*60 : 40 }
