@@ -141,7 +141,7 @@ def getDefaultUnitTestFailfast() {
 
 def getDefaultTimeout() {
   if (env.JOB_BASE_NAME == 'tests-nightly') {
-    return 8*60
+    return 5*60
   }
   return 40
 }
