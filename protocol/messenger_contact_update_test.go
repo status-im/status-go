@@ -7,13 +7,10 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/deprecation"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
 )
 
 func TestMessengerContactUpdateSuite(t *testing.T) {
@@ -25,16 +22,7 @@ type MessengerContactUpdateSuite struct {
 }
 
 func (s *MessengerContactUpdateSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	s.m = s.newMessenger()
-	s.privateKey = s.m.identity
+	s.MessengerBaseTestSuite.SetupTest()
 	_, err := s.m.Start()
 	s.Require().NoError(err)
 }
@@ -47,7 +35,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	// Set ENS name
 	err = theirMessenger.settings.SaveSettingField(settings.PreferredName, theirName)
@@ -125,7 +113,7 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: contactID})
 	s.Require().NoError(err)
@@ -164,7 +152,7 @@ func (s *MessengerContactUpdateSuite) TestAddContactWithENS() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.Require().NoError(theirMessenger.ENSVerified(contactID, ensName))
 

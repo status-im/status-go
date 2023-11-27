@@ -79,7 +79,7 @@ func (s *MessengerSyncSavedAddressesSuite) SetupTest() {
 }
 
 func (s *MessengerSyncSavedAddressesSuite) TearDownTest() {
-	s.Require().NoError(s.main.Shutdown())
+	TearDownMessenger(&s.Suite, s.main)
 }
 
 func (s *MessengerSyncSavedAddressesSuite) newMessenger(shh types.Waku) *Messenger {

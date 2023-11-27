@@ -79,9 +79,9 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) SetupTest() {
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TearDownTest() {
-	s.Require().NoError(s.controlNode.Shutdown())
-	s.Require().NoError(s.ownerWithoutCommunityKey.Shutdown())
-	s.Require().NoError(s.alice.Shutdown())
+	TearDownMessenger(&s.Suite, s.controlNode)
+	TearDownMessenger(&s.Suite, s.ownerWithoutCommunityKey)
+	TearDownMessenger(&s.Suite, s.alice)
 	_ = s.logger.Sync()
 }
 

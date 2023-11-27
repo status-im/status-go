@@ -1026,7 +1026,7 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	s := base.GetSuite()
 
 	s.Require().NoError(err)
-	defer user.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(s, user)
 
 	advertiseCommunityTo(s, community, base.GetControlNode(), user)
 
@@ -1156,7 +1156,7 @@ func testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 	s := base.GetSuite()
 
 	s.Require().NoError(err)
-	defer user.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(s, user)
 
 	advertiseCommunityTo(s, community, base.GetControlNode(), user)
 
@@ -1234,7 +1234,7 @@ func testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 	s := base.GetSuite()
 
 	s.Require().NoError(err)
-	defer user.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(s, user)
 
 	advertiseCommunityTo(s, community, base.GetControlNode(), user)
 
@@ -1311,7 +1311,7 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 
 	s := base.GetSuite()
 	s.Require().NoError(err)
-	defer user.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(s, user)
 
 	advertiseCommunityTo(s, community, base.GetControlNode(), user)
 
@@ -1409,7 +1409,7 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 
 	s := base.GetSuite()
 	s.Require().NoError(err)
-	defer user.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(s, user)
 
 	advertiseCommunityTo(s, community, base.GetControlNode(), user)
 

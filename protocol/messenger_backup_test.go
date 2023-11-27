@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -18,8 +17,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
 )
 
 func TestMessengerBackupSuite(t *testing.T) {
@@ -31,22 +28,9 @@ type MessengerBackupSuite struct {
 }
 
 func (s *MessengerBackupSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	s.m = s.newMessenger()
-	s.privateKey = s.m.identity
+	s.MessengerBaseTestSuite.SetupTest()
 	_, err := s.m.Start()
 	s.Require().NoError(err)
-}
-
-func (s *MessengerBackupSuite) TearDownTest() {
-	s.Require().NoError(s.m.Shutdown())
 }
 
 func (s *MessengerBackupSuite) TestBackupContacts() {
@@ -56,7 +40,7 @@ func (s *MessengerBackupSuite) TestBackupContacts() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
-	defer bob2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Create 2 contacts
 
@@ -178,7 +162,7 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
-	defer bob2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Check bob1
 	storedBob1DisplayName, err := bob1.settings.DisplayName()
@@ -310,7 +294,7 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
-	defer bob2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Check bob1
 	storedBob1DisplayName, err := bob1.settings.DisplayName()
@@ -430,7 +414,7 @@ func (s *MessengerBackupSuite) TestBackupContactsGreaterThanBatch() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
-	defer bob2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Create contacts
 
@@ -473,7 +457,7 @@ func (s *MessengerBackupSuite) TestBackupRemovedContact() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
-	defer bob2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Create 2 contacts on bob 1
 
@@ -548,7 +532,7 @@ func (s *MessengerBackupSuite) TestBackupLocalNickname() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
-	defer bob2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Set contact nickname
 
@@ -599,7 +583,7 @@ func (s *MessengerBackupSuite) TestBackupBlockedContacts() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
-	defer bob2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Create contact
 	contact1Key, err := crypto.GenerateKey()
@@ -656,7 +640,7 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
-	defer bob2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Create a communitie
 
@@ -728,7 +712,7 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
-	defer bob2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Backup
 	_, err = bob1.BackupData(context.Background())
@@ -801,7 +785,7 @@ func (s *MessengerBackupSuite) TestBackupKeycards() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
-	defer bob2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Backup
 	_, err = bob1.BackupData(context.Background())
@@ -846,7 +830,7 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
-	defer bob2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Backup
 	_, err = bob1.BackupData(context.Background())
@@ -889,7 +873,7 @@ func (s *MessengerBackupSuite) TestBackupChats() {
 	alice := s.newMessenger()
 	_, err = alice.Start()
 	s.Require().NoError(err)
-	defer alice.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice)
 
 	ourOneOneChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.transport)
 	err = bob1.SaveChat(ourOneOneChat)
@@ -900,7 +884,7 @@ func (s *MessengerBackupSuite) TestBackupChats() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
-	defer bob2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Backup
 	_, err = bob1.BackupData(context.Background())

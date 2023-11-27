@@ -508,7 +508,7 @@ func (s *MessengerSuite) TestRetrieveTheirPublic() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	theirChat := CreatePublicChat("status", s.m.transport)
 	err = theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
@@ -552,7 +552,7 @@ func (s *MessengerSuite) TestDropAudioMessageInPublicGroup() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	theirChat := CreatePublicChat("status", s.m.transport)
 	err = theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
@@ -579,7 +579,7 @@ func (s *MessengerSuite) TestDeletedAtClockValue() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	theirChat := CreatePublicChat("status", s.m.transport)
 	err = theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
@@ -611,7 +611,7 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreatePublicChat("status", s.m.transport)
 	err = theirMessenger.SaveChat(theirChat)
@@ -691,7 +691,7 @@ func (s *MessengerSuite) TestResendPublicMessage() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	theirChat := CreatePublicChat("status", s.m.transport)
 	err = theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
@@ -747,7 +747,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	theirChat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey, s.m.transport)
 	err = theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
@@ -790,7 +790,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	chat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey, s.m.transport)
 	err = theirMessenger.SaveChat(chat)
 	s.NoError(err)
@@ -829,7 +829,7 @@ func (s *MessengerSuite) TestRetrieveTheirPublicChatNonExisting() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	chat := CreatePublicChat("test-chat", s.m.transport)
 	err = theirMessenger.SaveChat(chat)
 	s.NoError(err)
@@ -855,7 +855,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	response, err = s.m.CreateGroupChatWithMembers(context.Background(), "id", []string{})
 	s.NoError(err)
 	s.Require().Len(response.Chats(), 1)
@@ -924,7 +924,7 @@ func (s *MessengerSuite) TestChangeNameGroupChat() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	response, err = s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
 	s.NoError(err)
 	s.Require().Len(response.Chats(), 1)
@@ -981,7 +981,7 @@ func (s *MessengerSuite) TestReInvitedToGroupChat() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	response, err = s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
 	s.NoError(err)
 	s.Require().Len(response.Chats(), 1)
@@ -1514,7 +1514,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	myPkString := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
@@ -1609,7 +1609,7 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	receiverAddress := crypto.PubkeyToAddress(theirMessenger.identity.PublicKey)
@@ -1713,7 +1713,7 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	receiverAddress := crypto.PubkeyToAddress(theirMessenger.identity.PublicKey)
@@ -1816,7 +1816,7 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	myPkString := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
@@ -1914,7 +1914,7 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
@@ -2004,7 +2004,7 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
@@ -2514,7 +2514,7 @@ func (s *MessengerSuite) TestSendMessageMention() {
 	alice, bob := s.m, s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
-	defer bob.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob)
 
 	// Set display names for Bob and Alice
 	s.Require().NoError(bob.settings.SaveSettingField(settings.DisplayName, "bobby"))

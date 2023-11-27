@@ -7,10 +7,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/browsers"
-	"github.com/status-im/status-go/waku"
 )
 
 func TestBrowserSuite(t *testing.T) {
@@ -22,22 +19,9 @@ type BrowserSuite struct {
 }
 
 func (s *BrowserSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	s.m = s.newMessenger()
-	s.privateKey = s.m.identity
+	s.MessengerBaseTestSuite.SetupTest()
 	_, err := s.m.Start()
 	s.Require().NoError(err)
-}
-
-func (s *BrowserSuite) TearDownTest() {
-	s.Require().NoError(s.m.Shutdown())
 }
 
 func (s *MessengerBackupSuite) TestBrowsersOrderedNewestFirst() {

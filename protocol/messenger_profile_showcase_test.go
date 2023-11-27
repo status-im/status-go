@@ -2,21 +2,16 @@ package protocol
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
 )
 
 func TestMessengerProfileShowcaseSuite(t *testing.T) { // nolint: deadcode,unused
@@ -24,41 +19,7 @@ func TestMessengerProfileShowcaseSuite(t *testing.T) { // nolint: deadcode,unuse
 }
 
 type TestMessengerProfileShowcase struct {
-	suite.Suite
-	m          *Messenger        // main instance of Messenger
-	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
-
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh types.Waku
-
-	logger *zap.Logger
-}
-
-func (s *TestMessengerProfileShowcase) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-	s.m = s.newMessenger(s.shh)
-	s.privateKey = s.m.identity
-	// We start the messenger in order to receive installations
-	_, err := s.m.Start()
-	s.Require().NoError(err)
-}
-
-func (s *TestMessengerProfileShowcase) TearDownTest() {
-	s.Require().NoError(s.m.Shutdown())
-}
-
-func (s *TestMessengerProfileShowcase) newMessenger(shh types.Waku) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
-	s.Require().NoError(err)
-	return messenger
+	MessengerBaseTestSuite
 }
 
 func (s *TestMessengerProfileShowcase) mutualContact(theirMessenger *Messenger) {
@@ -224,10 +185,10 @@ func (s *TestMessengerProfileShowcase) TestSetAndGetProfileShowcasePreferences()
 
 func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntries() {
 	// Add mutual contact
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
 
@@ -309,18 +270,18 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.Require().NoError(err)
 
 	// Add mutual contact
-	mutualContact := s.newMessenger(s.shh)
+	mutualContact := s.newMessenger()
 	_, err = mutualContact.Start()
 	s.Require().NoError(err)
-	defer mutualContact.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, mutualContact)
 
 	s.mutualContact(mutualContact)
 
 	// Add identity verified contact
-	verifiedContact := s.newMessenger(s.shh)
+	verifiedContact := s.newMessenger()
 	_, err = verifiedContact.Start()
 	s.Require().NoError(err)
-	defer verifiedContact.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, verifiedContact)
 
 	s.mutualContact(verifiedContact)
 	s.verifiedContact(verifiedContact)

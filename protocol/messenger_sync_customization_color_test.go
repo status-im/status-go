@@ -52,8 +52,8 @@ func (s *MessengerSyncAccountCustomizationColorSuite) SetupTest() {
 }
 
 func (s *MessengerSyncAccountCustomizationColorSuite) TearDownTest() {
-	s.Require().NoError(s.alice.Shutdown())
-	s.Require().NoError(s.alice2.Shutdown())
+	TearDownMessenger(&s.Suite, s.alice)
+	TearDownMessenger(&s.Suite, s.alice2)
 	_ = s.logger.Sync()
 }
 

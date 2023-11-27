@@ -107,14 +107,15 @@ func (s *MessengerMessagesTrackingSuite) SetupTest() {
 
 func (s *MessengerMessagesTrackingSuite) TearDownTest() {
 	if s.bob != nil {
-		s.Require().NoError(s.bob.Shutdown())
+		TearDownMessenger(&s.Suite, s.bob)
+
 	}
 	if s.bobWaku != nil {
 		s.Require().NoError(gethbridge.GetGethWakuV2From(s.bobWaku).Stop())
 	}
 
 	if s.alice != nil {
-		s.Require().NoError(s.alice.Shutdown())
+		TearDownMessenger(&s.Suite, s.alice)
 	}
 	if s.aliceWaku != nil {
 		s.Require().NoError(gethbridge.GetGethWakuV2From(s.aliceWaku).Stop())

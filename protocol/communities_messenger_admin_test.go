@@ -83,9 +83,9 @@ func (s *AdminCommunityEventsSuite) SetupTest() {
 }
 
 func (s *AdminCommunityEventsSuite) TearDownTest() {
-	s.Require().NoError(s.owner.Shutdown())
-	s.Require().NoError(s.admin.Shutdown())
-	s.Require().NoError(s.alice.Shutdown())
+	TearDownMessenger(&s.Suite, s.owner)
+	TearDownMessenger(&s.Suite, s.admin)
+	TearDownMessenger(&s.Suite, s.alice)
 	_ = s.logger.Sync()
 }
 

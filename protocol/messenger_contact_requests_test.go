@@ -435,7 +435,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() { //
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
@@ -453,7 +453,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
@@ -471,7 +471,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.Require().NoError(theirMessenger.settings.SaveSettingField(settings.MutualContactEnabled, true))
 
@@ -497,7 +497,7 @@ func (s *MessengerContactRequestSuite) TestAliceTriesToSpamBobWithContactRequest
 	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
-	defer bob.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob)
 
 	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
@@ -548,7 +548,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice()
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
@@ -592,7 +592,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
@@ -687,7 +687,7 @@ func (s *MessengerContactRequestSuite) TestDismissLatestContactRequestForContact
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
@@ -723,7 +723,7 @@ func (s *MessengerContactRequestSuite) TestPairedDevicesRemoveContact() {
 
 	_, err = alice2.Start()
 	s.Require().NoError(err)
-	defer alice2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice2)
 
 	prepAliceMessengersForPairing(&s.Suite, alice1, alice2)
 
@@ -733,7 +733,7 @@ func (s *MessengerContactRequestSuite) TestPairedDevicesRemoveContact() {
 	bob := s.newMessenger()
 	_, err = bob.Start()
 	s.Require().NoError(err)
-	defer bob.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob)
 
 	// Alice sends a contact request to bob
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
@@ -797,7 +797,7 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateSendContactRequest()
 	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
-	defer bob.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob)
 
 	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
@@ -820,7 +820,7 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateSendContactRequest()
 
 	_, err = alice2.Start()
 	s.Require().NoError(err)
-	defer alice2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice2)
 
 	// adds bob again to her device
 	s.sendContactRequest(request, alice2)
@@ -869,7 +869,7 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateReceiveContactReques
 	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
-	defer bob.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob)
 
 	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
@@ -892,7 +892,7 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateReceiveContactReques
 
 	_, err = alice2.Start()
 	s.Require().NoError(err)
-	defer alice2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice2)
 
 	// We want to facilitate the discovery of the x3dh bundl here, since bob does not know about alice device
 
@@ -950,7 +950,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsCorrectOrd
 	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
-	defer bob.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob)
 
 	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
@@ -1000,7 +1000,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsWrongOrder
 	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
-	defer bob.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob)
 
 	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
@@ -1052,7 +1052,7 @@ func (s *MessengerContactRequestSuite) TestAliceResendsContactRequestAfterRemovi
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer theirMessenger.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
@@ -1108,7 +1108,7 @@ func (s *MessengerContactRequestSuite) TestBobSendsContactRequestAfterDecliningO
 	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
-	defer bob.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob)
 
 	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
@@ -1240,7 +1240,7 @@ func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFrom
 	bob1 := s.newMessenger()
 	_, err := bob1.Start()
 	s.Require().NoError(err)
-	defer bob1.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob1)
 
 	aliceID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
 	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob1.identity.PublicKey))
@@ -1262,7 +1262,7 @@ func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFrom
 
 	_, err = bob2.Start()
 	s.Require().NoError(err)
-	defer bob2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Get bob perspective of alice for backup
 	aliceFromBob := bob1.Contacts()[0]
@@ -1320,7 +1320,7 @@ func (s *MessengerContactRequestSuite) TestAliceRestoresOutgoingContactRequestFr
 	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
-	defer bob.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob)
 
 	aliceID := types.EncodeHex(crypto.FromECDSAPub(&alice1.identity.PublicKey))
 	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
@@ -1342,7 +1342,7 @@ func (s *MessengerContactRequestSuite) TestAliceRestoresOutgoingContactRequestFr
 
 	_, err = alice2.Start()
 	s.Require().NoError(err)
-	defer alice2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice2)
 
 	// Get bob perspective of alice for backup
 	bobFromAlice := alice1.Contacts()[0]
@@ -1511,7 +1511,7 @@ func (s *MessengerContactRequestSuite) TestBlockedContactSyncing() {
 	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
-	defer bob.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob)
 	_ = bob.SetDisplayName("bob-1")
 	s.logger.Info("Bob account set up", zap.String("publicKey", bob.IdentityPublicKeyString()))
 
@@ -1524,7 +1524,7 @@ func (s *MessengerContactRequestSuite) TestBlockedContactSyncing() {
 	s.Require().NoError(err)
 	_, err = alice2.Start()
 	s.Require().NoError(err)
-	defer alice2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice2)
 
 	// Pair alice-1 <-> alice-2
 	// NOTE: This doesn't include initial data sync. Local pairing could be used.
