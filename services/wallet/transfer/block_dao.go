@@ -388,39 +388,3 @@ func insertRange(chainID uint64, creator statementCreator, account common.Addres
 	_, err = insert.Exec(chainID, account, (*bigint.SQLBigInt)(from), (*bigint.SQLBigInt)(to))
 	return err
 }
-
-func upsertRange(chainID uint64, creator statementCreator, account common.Address, from *big.Int, to *Block) (err error) {
-	log.Debug("upsert blocks range", "account", account, "network id", chainID, "from", from, "to", to.Number, "balance", to.Balance)
-	update, err := creator.Prepare(`UPDATE blocks_ranges
-                SET blk_to = ?, balance = ?, nonce = ?
-                WHERE address = ?
-                AND network_id = ?
-                AND blk_to = ?`)
-
-	if err != nil {
-		return err
-	}
-
-	res, err := update.Exec((*bigint.SQLBigInt)(to.Number), (*bigint.SQLBigIntBytes)(to.Balance), to.Nonce, account, chainID, (*bigint.SQLBigInt)(from))
-
-	if err != nil {
-		return err
-	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if affected == 0 {
-		insert, err := creator.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to, balance, nonce) VALUES (?, ?, ?, ?, ?, ?)")
-		if err != nil {
-			return err
-		}
-
-		_, err = insert.Exec(chainID, account, (*bigint.SQLBigInt)(from), (*bigint.SQLBigInt)(to.Number), (*bigint.SQLBigIntBytes)(to.Balance), to.Nonce)
-		if err != nil {
-			return err
-		}
-	}
-
-	return
-}

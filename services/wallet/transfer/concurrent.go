@@ -187,7 +187,7 @@ func checkRangesWithStartBlock(parent context.Context, client balance.Reader, ca
 				if err != nil {
 					return err
 				}
-				c.PushHeader(toDBHeader(header, *firstTransaction.BlockHash))
+				c.PushHeader(toDBHeader(header, *firstTransaction.BlockHash, account))
 				return nil
 			}
 			mid := new(big.Int).Add(from, to)

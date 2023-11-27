@@ -946,7 +946,7 @@ func TestFindBlocksCommand(t *testing.T) {
 		accDB, err := accounts.NewDB(appdb)
 		require.NoError(t, err)
 		fbc := &findBlocksCommand{
-			account:                   common.HexToAddress("0x1234"),
+			accounts:                  []common.Address{common.HexToAddress("0x1234")},
 			db:                        wdb,
 			blockRangeDAO:             &BlockRangeSequentialDAO{wdb.client},
 			accountsDB:                accDB,
@@ -1067,13 +1067,14 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 		},
 	})
 
+	address := common.HexToAddress("0x1234")
 	chainClient := newMockChainClient()
 	tracker := transactions.NewPendingTxTracker(db, chainClient, nil, &event.Feed{}, transactions.PendingCheckInterval)
 	accDB, err := accounts.NewDB(wdb.client)
 	require.NoError(t, err)
 
 	cmd := &loadBlocksAndTransfersCommand{
-		account:            common.HexToAddress("0x1234"),
+		accounts:           []common.Address{address},
 		db:                 wdb,
 		blockRangeDAO:      &BlockRangeSequentialDAO{wdb.client},
 		blockDAO:           &BlockDAO{db},
@@ -1098,7 +1099,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 	fromNum := big.NewInt(0)
 	toNum, err := getHeadBlockNumber(ctx, cmd.chainClient)
 	require.NoError(t, err)
-	err = cmd.fetchHistoryBlocks(ctx, group, fromNum, toNum, blockChannel)
+	err = cmd.fetchHistoryBlocks(ctx, group, address, fromNum, toNum, blockChannel)
 	require.NoError(t, err)
 
 	select {

@@ -23,8 +23,17 @@ func NewBlockRange() *BlockRange {
 	return &BlockRange{Start: &big.Int{}, FirstKnown: &big.Int{}, LastKnown: &big.Int{}}
 }
 
-func (b *BlockRangeSequentialDAO) getBlockRange(chainID uint64, address common.Address) (blockRange *BlockRange, err error) {
-	query := `SELECT blk_start, blk_first, blk_last FROM blocks_ranges_sequential
+type ethTokensBlockRanges struct {
+	eth    *BlockRange
+	tokens *BlockRange
+}
+
+func newEthTokensBlockRanges() *ethTokensBlockRanges {
+	return &ethTokensBlockRanges{eth: NewBlockRange(), tokens: NewBlockRange()}
+}
+
+func (b *BlockRangeSequentialDAO) getBlockRange(chainID uint64, address common.Address) (blockRange *ethTokensBlockRanges, err error) {
+	query := `SELECT blk_start, blk_first, blk_last, token_blk_start, token_blk_first, token_blk_last FROM blocks_ranges_sequential
 	WHERE address = ?
 	AND network_id = ?`
 
@@ -34,9 +43,11 @@ func (b *BlockRangeSequentialDAO) getBlockRange(chainID uint64, address common.A
 	}
 	defer rows.Close()
 
+	blockRange = &ethTokensBlockRanges{}
 	if rows.Next() {
-		blockRange = NewBlockRange()
-		err = rows.Scan((*bigint.SQLBigInt)(blockRange.Start), (*bigint.SQLBigInt)(blockRange.FirstKnown), (*bigint.SQLBigInt)(blockRange.LastKnown))
+		blockRange = newEthTokensBlockRanges()
+		err = rows.Scan((*bigint.SQLBigInt)(blockRange.eth.Start), (*bigint.SQLBigInt)(blockRange.eth.FirstKnown), (*bigint.SQLBigInt)(blockRange.eth.LastKnown),
+			(*bigint.SQLBigInt)(blockRange.tokens.Start), (*bigint.SQLBigInt)(blockRange.tokens.FirstKnown), (*bigint.SQLBigInt)(blockRange.tokens.LastKnown))
 		if err != nil {
 			return nil, err
 		}
@@ -44,7 +55,7 @@ func (b *BlockRangeSequentialDAO) getBlockRange(chainID uint64, address common.A
 		return blockRange, nil
 	}
 
-	return nil, nil
+	return blockRange, nil
 }
 
 func (b *BlockRangeSequentialDAO) deleteRange(account common.Address) error {
@@ -59,44 +70,43 @@ func (b *BlockRangeSequentialDAO) deleteRange(account common.Address) error {
 	return err
 }
 
-func (b *BlockRangeSequentialDAO) upsertRange(chainID uint64, account common.Address,
-	newBlockRange *BlockRange) (err error) {
-
-	log.Debug("upsert blocks range", "account", account, "chainID", chainID,
-		"start", newBlockRange.Start, "first", newBlockRange.FirstKnown, "last", newBlockRange.LastKnown)
-
-	blockRange, err := b.getBlockRange(chainID, account)
+func (b *BlockRangeSequentialDAO) upsertRange(chainID uint64, account common.Address, newBlockRange *ethTokensBlockRanges) (err error) {
+	ethTokensBlockRange, err := b.getBlockRange(chainID, account)
 	if err != nil {
 		return err
 	}
 
-	// Update existing range
-	if blockRange != nil {
-		// Ovewrite start block if there was not any or if new one is older, because it can be precised only
-		// to a greater value, because no history can be before some block that is considered
-		// as a start of history, but due to concurrent block range checks, a newer greater block
-		// can be found that matches criteria of a start block (nonce is zero, balances are equal)
-		if newBlockRange.Start != nil && (blockRange.Start == nil || blockRange.Start.Cmp(newBlockRange.Start) < 0) {
-			blockRange.Start = newBlockRange.Start
-		}
+	ethBlockRange := prepareUpdatedBlockRange(chainID, account, ethTokensBlockRange.eth, newBlockRange.eth)
+	tokensBlockRange := prepareUpdatedBlockRange(chainID, account, ethTokensBlockRange.tokens, newBlockRange.tokens)
 
-		// Overwrite first known block if there was not any or if new one is older
-		if (blockRange.FirstKnown == nil && newBlockRange.FirstKnown != nil) ||
-			(blockRange.FirstKnown != nil && newBlockRange.FirstKnown != nil && blockRange.FirstKnown.Cmp(newBlockRange.FirstKnown) > 0) {
-			blockRange.FirstKnown = newBlockRange.FirstKnown
-		}
+	log.Debug("update eth and tokens blocks range", "account", account, "chainID", chainID,
+		"eth.start", ethBlockRange.Start, "eth.first", ethBlockRange.FirstKnown, "eth.last", ethBlockRange.LastKnown,
+		"tokens.start", tokensBlockRange.Start, "tokens.first", ethBlockRange.FirstKnown, "eth.last", ethBlockRange.LastKnown)
 
-		// Overwrite last known block if there was not any or if new one is newer
-		if (blockRange.LastKnown == nil && newBlockRange.LastKnown != nil) ||
-			(blockRange.LastKnown != nil && newBlockRange.LastKnown != nil && blockRange.LastKnown.Cmp(newBlockRange.LastKnown) < 0) {
-			blockRange.LastKnown = newBlockRange.LastKnown
-		}
-
-		log.Debug("update blocks range", "account", account, "chainID", chainID,
-			"start", blockRange.Start, "first", blockRange.FirstKnown, "last", blockRange.LastKnown)
-	} else {
-		blockRange = newBlockRange
+	upsert, err := b.db.Prepare(`REPLACE INTO blocks_ranges_sequential
+					(network_id, address, blk_start, blk_first, blk_last, token_blk_start, token_blk_first, token_blk_last) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
 	}
+
+	_, err = upsert.Exec(chainID, account, (*bigint.SQLBigInt)(ethBlockRange.Start), (*bigint.SQLBigInt)(ethBlockRange.FirstKnown), (*bigint.SQLBigInt)(ethBlockRange.LastKnown),
+		(*bigint.SQLBigInt)(tokensBlockRange.Start), (*bigint.SQLBigInt)(tokensBlockRange.FirstKnown), (*bigint.SQLBigInt)(tokensBlockRange.LastKnown))
+
+	return err
+}
+
+func (b *BlockRangeSequentialDAO) upsertEthRange(chainID uint64, account common.Address,
+	newBlockRange *BlockRange) (err error) {
+
+	ethTokensBlockRange, err := b.getBlockRange(chainID, account)
+	if err != nil {
+		return err
+	}
+
+	blockRange := prepareUpdatedBlockRange(chainID, account, ethTokensBlockRange.eth, newBlockRange)
+
+	log.Debug("update eth blocks range", "account", account, "chainID", chainID,
+		"start", blockRange.Start, "first", blockRange.FirstKnown, "last", blockRange.LastKnown)
 
 	upsert, err := b.db.Prepare(`REPLACE INTO blocks_ranges_sequential
 					(network_id, address, blk_start, blk_first, blk_last) VALUES (?, ?, ?, ?, ?)`)
@@ -107,5 +117,61 @@ func (b *BlockRangeSequentialDAO) upsertRange(chainID uint64, account common.Add
 	_, err = upsert.Exec(chainID, account, (*bigint.SQLBigInt)(blockRange.Start), (*bigint.SQLBigInt)(blockRange.FirstKnown),
 		(*bigint.SQLBigInt)(blockRange.LastKnown))
 
-	return
+	return err
+}
+
+func (b *BlockRangeSequentialDAO) upsertTokenRange(chainID uint64, account common.Address,
+	newBlockRange *BlockRange) (err error) {
+
+	ethTokensBlockRange, err := b.getBlockRange(chainID, account)
+	if err != nil {
+		return err
+	}
+
+	blockRange := prepareUpdatedBlockRange(chainID, account, ethTokensBlockRange.tokens, newBlockRange)
+
+	log.Debug("update tokens blocks range", "account", account, "chainID", chainID,
+		"start", blockRange.Start, "first", blockRange.FirstKnown, "last", blockRange.LastKnown)
+
+	upsert, err := b.db.Prepare(`REPLACE INTO blocks_ranges_sequential
+					(network_id, address, token_blk_start, token_blk_first, token_blk_last) VALUES (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	_, err = upsert.Exec(chainID, account, (*bigint.SQLBigInt)(blockRange.Start), (*bigint.SQLBigInt)(blockRange.FirstKnown),
+		(*bigint.SQLBigInt)(blockRange.LastKnown))
+
+	return err
+}
+
+func prepareUpdatedBlockRange(chainID uint64, account common.Address, blockRange, newBlockRange *BlockRange) *BlockRange {
+	// Update existing range
+	if blockRange != nil {
+		if newBlockRange != nil {
+			// Ovewrite start block if there was not any or if new one is older, because it can be precised only
+			// to a greater value, because no history can be before some block that is considered
+			// as a start of history, but due to concurrent block range checks, a newer greater block
+			// can be found that matches criteria of a start block (nonce is zero, balances are equal)
+			if newBlockRange.Start != nil && (blockRange.Start == nil || blockRange.Start.Cmp(newBlockRange.Start) < 0) {
+				blockRange.Start = newBlockRange.Start
+			}
+
+			// Overwrite first known block if there was not any or if new one is older
+			if (blockRange.FirstKnown == nil && newBlockRange.FirstKnown != nil) ||
+				(blockRange.FirstKnown != nil && newBlockRange.FirstKnown != nil && blockRange.FirstKnown.Cmp(newBlockRange.FirstKnown) > 0) {
+				blockRange.FirstKnown = newBlockRange.FirstKnown
+			}
+
+			// Overwrite last known block if there was not any or if new one is newer
+			if (blockRange.LastKnown == nil && newBlockRange.LastKnown != nil) ||
+				(blockRange.LastKnown != nil && newBlockRange.LastKnown != nil && blockRange.LastKnown.Cmp(newBlockRange.LastKnown) < 0) {
+				blockRange.LastKnown = newBlockRange.LastKnown
+			}
+		}
+	} else {
+		blockRange = newBlockRange
+	}
+
+	return blockRange
 }

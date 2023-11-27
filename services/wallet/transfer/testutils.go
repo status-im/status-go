@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/services/wallet/common"
-	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/testutils"
 	"github.com/status-im/status-go/services/wallet/token"
 
@@ -325,7 +324,7 @@ func InsertTestTransferWithOptions(tb testing.TB, db *sql.DB, address eth_common
 		blockHash:          blkHash,
 		blockNumber:        big.NewInt(tr.BlkNumber),
 		sender:             tr.From,
-		transferType:       w_common.Type(tokenType),
+		transferType:       common.Type(tokenType),
 		timestamp:          uint64(tr.Timestamp),
 		multiTransactionID: tr.MultiTransactionID,
 		baseGasFees:        "0x0",
@@ -374,4 +373,9 @@ func InsertTestMultiTransaction(tb testing.TB, db *sql.DB, tr *TestMultiTransact
 	require.NoError(tb, err)
 	tr.MultiTransactionID = MultiTransactionIDType(rowID)
 	return tr.MultiTransactionID
+}
+
+// For using in tests only outside the package
+func SaveTransfersMarkBlocksLoaded(database *Database, chainID uint64, address eth_common.Address, transfers []Transfer, blocks []*big.Int) error {
+	return saveTransfersMarkBlocksLoaded(database.client, chainID, address, transfers, blocks)
 }

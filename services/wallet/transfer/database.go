@@ -32,12 +32,13 @@ type DBHeader struct {
 	Loaded bool
 }
 
-func toDBHeader(header *types.Header, blockHash common.Hash) *DBHeader {
+func toDBHeader(header *types.Header, blockHash common.Hash, account common.Address) *DBHeader {
 	return &DBHeader{
 		Hash:      blockHash,
 		Number:    header.Number,
 		Timestamp: header.Time,
 		Loaded:    false,
+		Address:   account,
 	}
 }
 
@@ -87,37 +88,7 @@ func (db *Database) Close() error {
 	return db.client.Close()
 }
 
-func (db *Database) ProcessBlocks(chainID uint64, account common.Address, from *big.Int, to *Block, headers []*DBHeader) (err error) {
-	var (
-		tx *sql.Tx
-	)
-
-	tx, err = db.client.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		_ = tx.Rollback()
-	}()
-
-	err = insertBlocksWithTransactions(chainID, tx, account, headers)
-	if err != nil {
-		return
-	}
-
-	err = upsertRange(chainID, tx, account, from, to)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func (db *Database) SaveBlocks(chainID uint64, account common.Address, headers []*DBHeader) (err error) {
+func (db *Database) SaveBlocks(chainID uint64, headers []*DBHeader) (err error) {
 	var (
 		tx *sql.Tx
 	)
@@ -133,7 +104,7 @@ func (db *Database) SaveBlocks(chainID uint64, account common.Address, headers [
 		_ = tx.Rollback()
 	}()
 
-	err = insertBlocksWithTransactions(chainID, tx, account, headers)
+	err = insertBlocksWithTransactions(chainID, tx, headers)
 	if err != nil {
 		return
 	}
@@ -141,42 +112,13 @@ func (db *Database) SaveBlocks(chainID uint64, account common.Address, headers [
 	return
 }
 
-// ProcessTransfers atomically adds/removes blocks and adds new transfers.
-func (db *Database) ProcessTransfers(chainID uint64, transfers []Transfer, removed []*DBHeader) (err error) {
-	var (
-		tx *sql.Tx
-	)
-	tx, err = db.client.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		_ = tx.Rollback()
-	}()
-
-	err = deleteHeaders(tx, removed)
+func saveTransfersMarkBlocksLoaded(creator statementCreator, chainID uint64, address common.Address, transfers []Transfer, blocks []*big.Int) (err error) {
+	err = updateOrInsertTransfers(chainID, creator, transfers)
 	if err != nil {
 		return
 	}
 
-	err = updateOrInsertTransfers(chainID, tx, transfers)
-	if err != nil {
-		return
-	}
-	return
-}
-
-func saveTransfersMarkBlocksLoaded(tx statementCreator, chainID uint64, address common.Address, transfers []Transfer, blocks []*big.Int) (err error) {
-	err = updateOrInsertTransfers(chainID, tx, transfers)
-	if err != nil {
-		return
-	}
-
-	err = markBlocksAsLoaded(chainID, tx, address, blocks)
+	err = markBlocksAsLoaded(chainID, creator, address, blocks)
 	if err != nil {
 		return
 	}
@@ -258,9 +200,15 @@ func (db *Database) GetTransfersForIdentities(ctx context.Context, identities []
 func (db *Database) GetTransactionsToLoad(chainID uint64, address common.Address, blockNumber *big.Int) (rst []*PreloadedTransaction, err error) {
 	query := newTransfersQueryForPreloadedTransactions().
 		FilterNetwork(chainID).
-		FilterAddress(address).
-		FilterBlockNumber(blockNumber).
 		FilterLoaded(0)
+
+	if address != (common.Address{}) {
+		query.FilterAddress(address)
+	}
+
+	if blockNumber != nil {
+		query.FilterBlockNumber(blockNumber)
+	}
 
 	rows, err := db.client.Query(query.String(), query.Args()...)
 	if err != nil {
@@ -273,29 +221,6 @@ func (db *Database) GetTransactionsToLoad(chainID uint64, address common.Address
 // statementCreator allows to pass transaction or database to use in consumer.
 type statementCreator interface {
 	Prepare(query string) (*sql.Stmt, error)
-}
-
-func deleteHeaders(creator statementCreator, headers []*DBHeader) error {
-	delete, err := creator.Prepare("DELETE FROM blocks WHERE blk_hash = ?")
-	if err != nil {
-		return err
-	}
-	deleteTransfers, err := creator.Prepare("DELETE FROM transfers WHERE blk_hash = ?")
-	if err != nil {
-		return err
-	}
-	for _, h := range headers {
-		_, err = delete.Exec(h.Hash)
-		if err != nil {
-			return err
-		}
-
-		_, err = deleteTransfers.Exec(h.Hash)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // Only used by status-mobile
@@ -341,7 +266,7 @@ func insertBlockDBFields(creator statementCreator, block blockDBFields) error {
 	return err
 }
 
-func insertBlocksWithTransactions(chainID uint64, creator statementCreator, account common.Address, headers []*DBHeader) error {
+func insertBlocksWithTransactions(chainID uint64, creator statementCreator, headers []*DBHeader) error {
 	insert, err := creator.Prepare("INSERT OR IGNORE INTO blocks(network_id, address, blk_number, blk_hash, loaded) VALUES (?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
@@ -361,7 +286,7 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 	}
 
 	for _, header := range headers {
-		_, err = insert.Exec(chainID, account, (*bigint.SQLBigInt)(header.Number), header.Hash, header.Loaded)
+		_, err = insert.Exec(chainID, header.Address, (*bigint.SQLBigInt)(header.Number), header.Hash, header.Loaded)
 		if err != nil {
 			return err
 		}
@@ -371,7 +296,7 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 				logIndex = new(uint)
 				*logIndex = transaction.Log.Index
 			}
-			res, err := updateTx.Exec(&JSONBlob{transaction.Log}, logIndex, chainID, account, transaction.ID)
+			res, err := updateTx.Exec(&JSONBlob{transaction.Log}, logIndex, chainID, header.Address, transaction.ID)
 			if err != nil {
 				return err
 			}
@@ -385,7 +310,8 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 
 			tokenID := (*bigint.SQLBigIntBytes)(transaction.TokenID)
 			txValue := sqlite.BigIntToPadded128BitsStr(transaction.Value)
-			_, err = insertTx.Exec(chainID, account, account, transaction.ID, (*bigint.SQLBigInt)(header.Number), header.Hash, transaction.Type, &JSONBlob{transaction.Log}, logIndex, tokenID, txValue)
+			// Is that correct to set sender as account address?
+			_, err = insertTx.Exec(chainID, header.Address, header.Address, transaction.ID, (*bigint.SQLBigInt)(header.Number), header.Hash, transaction.Type, &JSONBlob{transaction.Log}, logIndex, tokenID, txValue)
 			if err != nil {
 				log.Error("error saving token transfer", "err", err)
 				return err
@@ -567,7 +493,10 @@ func updateOrInsertTransfersDBFields(creator statementCreator, transfers []trans
 	return nil
 }
 
-// markBlocksAsLoaded(tx, address, chainID, blocks)
+// markBlocksAsLoaded(chainID, tx, address, blockNumbers)
+// In case block contains both ETH and token transfers, it will be marked as loaded on ETH transfer processing.
+// This is not a problem since for token transfers we have preloaded transactions and blocks 'loaded' flag is needed
+// for ETH transfers only.
 func markBlocksAsLoaded(chainID uint64, creator statementCreator, address common.Address, blocks []*big.Int) error {
 	update, err := creator.Prepare("UPDATE blocks SET loaded=? WHERE address=? AND blk_number=? AND network_id=?")
 	if err != nil {
