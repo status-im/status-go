@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"golang.org/x/exp/slices" // since 1.21, this is in the standard library
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
@@ -13,9 +15,7 @@ import (
 	statusaccounts "github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
-	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
@@ -26,10 +26,11 @@ type Controller struct {
 	accountsDB         *statusaccounts.Database
 	rpcClient          *rpc.Client
 	blockDAO           *BlockDAO
+	blockRangesSeqDAO  *BlockRangeSequentialDAO
 	reactor            *Reactor
 	accountFeed        *event.Feed
 	TransferFeed       *event.Feed
-	group              *async.Group
+	accWatcher         *accountsevent.Watcher
 	transactionManager *TransactionManager
 	pendingTxManager   *transactions.PendingTxTracker
 	tokenManager       *token.Manager
@@ -45,6 +46,7 @@ func NewTransferController(db *sql.DB, accountsDB *statusaccounts.Database, rpcC
 		db:                 NewDB(db),
 		accountsDB:         accountsDB,
 		blockDAO:           blockDAO,
+		blockRangesSeqDAO:  &BlockRangeSequentialDAO{db},
 		rpcClient:          rpcClient,
 		accountFeed:        accountFeed,
 		TransferFeed:       transferFeed,
@@ -56,7 +58,7 @@ func NewTransferController(db *sql.DB, accountsDB *statusaccounts.Database, rpcC
 }
 
 func (c *Controller) Start() {
-	c.group = async.NewGroup(context.Background())
+	go func() { _ = c.cleanupAccountsLeftovers() }()
 }
 
 func (c *Controller) Stop() {
@@ -64,10 +66,9 @@ func (c *Controller) Stop() {
 		c.reactor.stop()
 	}
 
-	if c.group != nil {
-		c.group.Stop()
-		c.group.Wait()
-		c.group = nil
+	if c.accWatcher != nil {
+		c.accWatcher.Stop()
+		c.accWatcher = nil
 	}
 }
 
@@ -109,7 +110,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 			}
 		}
 
-		c.reactor = NewReactor(c.db, c.blockDAO, c.TransferFeed, c.transactionManager,
+		c.reactor = NewReactor(c.db, c.blockDAO, c.blockRangesSeqDAO, c.TransferFeed, c.transactionManager,
 			c.pendingTxManager, c.tokenManager, c.balanceCacher, omitHistory)
 
 		err = c.reactor.start(chainClients, accounts)
@@ -117,68 +118,45 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 			return err
 		}
 
-		c.group.Add(func(ctx context.Context) error {
-			return watchAccountsChanges(ctx, c.accountFeed, c.reactor, chainClients, accounts)
-		})
+		c.startAccountWatcher(chainIDs)
 	}
 	return nil
 }
 
-// watchAccountsChanges subscribes to a feed and watches for changes in accounts list. If there are new or removed accounts
-// reactor will be restarted.
-func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor *Reactor,
-	chainClients map[uint64]chain.ClientInterface, initial []common.Address) error {
-
-	ch := make(chan accountsevent.Event, 1) // it may block if the rate of updates will be significantly higher
-	sub := accountFeed.Subscribe(ch)
-	defer sub.Unsubscribe()
-	listen := make(map[common.Address]struct{}, len(initial))
-	for _, address := range initial {
-		listen[address] = struct{}{}
-	}
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case err := <-sub.Err():
-			if err != nil {
-				log.Error("accounts watcher subscription failed", "error", err)
-			}
-		case ev := <-ch:
-			restart := false
-
-			for _, address := range ev.Accounts {
-				_, exist := listen[address]
-				if ev.Type == accountsevent.EventTypeAdded && !exist {
-					listen[address] = struct{}{}
-					restart = true
-				} else if ev.Type == accountsevent.EventTypeRemoved && exist {
-					delete(listen, address)
-					restart = true
-				}
-			}
-
-			if !restart {
-				continue
-			}
-
-			listenList := mapToList(listen)
-			log.Debug("list of accounts was changed from a previous version. reactor will be restarted", "new", listenList)
-
-			err := reactor.restart(chainClients, listenList)
-			if err != nil {
-				log.Error("failed to restart reactor with new accounts", "error", err)
-			}
-		}
+func (c *Controller) startAccountWatcher(chainIDs []uint64) {
+	if c.accWatcher == nil {
+		c.accWatcher = accountsevent.NewWatcher(c.accountsDB, c.accountFeed, func(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address) {
+			c.onAccountsChanged(changedAddresses, eventType, currentAddresses, chainIDs)
+		})
+		c.accWatcher.Start()
 	}
 }
 
-func mapToList(m map[common.Address]struct{}) []common.Address {
-	rst := make([]common.Address, 0, len(m))
-	for address := range m {
-		rst = append(rst, address)
+func (c *Controller) onAccountsChanged(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address, chainIDs []uint64) {
+	if eventType == accountsevent.EventTypeRemoved {
+		for _, address := range changedAddresses {
+			c.cleanUpRemovedAccount(address)
+		}
 	}
-	return rst
+
+	if c.reactor == nil {
+		log.Warn("reactor is not initialized")
+		return
+	}
+
+	if eventType == accountsevent.EventTypeAdded || eventType == accountsevent.EventTypeRemoved {
+		log.Debug("list of accounts was changed from a previous version. reactor will be restarted", "new", currentAddresses)
+
+		chainClients, err := c.rpcClient.EthClients(chainIDs)
+		if err != nil {
+			return
+		}
+
+		err = c.reactor.restart(chainClients, currentAddresses)
+		if err != nil {
+			log.Error("failed to restart reactor with new accounts", "error", err)
+		}
+	}
 }
 
 // Only used by status-mobile
@@ -249,4 +227,59 @@ func (c *Controller) GetCachedBalances(ctx context.Context, chainID uint64, addr
 	}
 
 	return blocksToViews(result), nil
+}
+
+func (c *Controller) cleanUpRemovedAccount(address common.Address) {
+	// Transfers will be deleted by foreign key constraint by cascade
+	err := deleteBlocks(c.db.client, address)
+	if err != nil {
+		log.Error("Failed to delete blocks", "error", err)
+	}
+	err = deleteAllRanges(c.db.client, address)
+	if err != nil {
+		log.Error("Failed to delete old blocks ranges", "error", err)
+	}
+
+	err = c.blockRangesSeqDAO.deleteRange(address)
+	if err != nil {
+		log.Error("Failed to delete blocks ranges sequential", "error", err)
+	}
+}
+
+func (c *Controller) cleanupAccountsLeftovers() error {
+	// We clean up accounts that were deleted and soft removed
+	accounts, err := c.accountsDB.GetWalletAddresses()
+	if err != nil {
+		log.Error("Failed to get accounts", "error", err)
+		return err
+	}
+
+	existingAddresses := make([]common.Address, len(accounts))
+	for i, account := range accounts {
+		existingAddresses[i] = (common.Address)(account)
+	}
+
+	addressesInWalletDB, err := getAddresses(c.db.client)
+	if err != nil {
+		log.Error("Failed to get addresses from wallet db", "error", err)
+		return err
+	}
+
+	missing := findMissingItems(addressesInWalletDB, existingAddresses)
+	for _, address := range missing {
+		c.cleanUpRemovedAccount(address)
+	}
+
+	return nil
+}
+
+// find items from one slice that are not in another
+func findMissingItems(slice1 []common.Address, slice2 []common.Address) []common.Address {
+	var missing []common.Address
+	for _, item := range slice1 {
+		if !slices.Contains(slice2, item) {
+			missing = append(missing, item)
+		}
+	}
+	return missing
 }

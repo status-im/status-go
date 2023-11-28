@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, feed *event.Feed,
+func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, blockRangesSeqDAO *BlockRangeSequentialDAO, feed *event.Feed,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager,
 	chainClients map[uint64]chain.ClientInterface,
@@ -28,6 +28,7 @@ func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, feed *event.Fe
 	return &SequentialFetchStrategy{
 		db:                 db,
 		blockDAO:           blockDAO,
+		blockRangesSeqDAO:  blockRangesSeqDAO,
 		feed:               feed,
 		transactionManager: transactionManager,
 		pendingTxManager:   pendingTxManager,
@@ -42,6 +43,7 @@ func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, feed *event.Fe
 type SequentialFetchStrategy struct {
 	db                 *Database
 	blockDAO           *BlockDAO
+	blockRangesSeqDAO  *BlockRangeSequentialDAO
 	feed               *event.Feed
 	mu                 sync.Mutex
 	group              *async.Group
@@ -57,7 +59,7 @@ type SequentialFetchStrategy struct {
 func (s *SequentialFetchStrategy) newCommand(chainClient chain.ClientInterface,
 	account common.Address) async.Commander {
 
-	return newLoadBlocksAndTransfersCommand(account, s.db, s.blockDAO, chainClient, s.feed,
+	return newLoadBlocksAndTransfersCommand(account, s.db, s.blockDAO, s.blockRangesSeqDAO, chainClient, s.feed,
 		s.transactionManager, s.pendingTxManager, s.tokenManager, s.balanceCacher, s.omitHistory)
 }
 

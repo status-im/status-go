@@ -368,6 +368,16 @@ func deleteRange(chainID uint64, creator statementCreator, account common.Addres
 	return err
 }
 
+func deleteAllRanges(creator statementCreator, account common.Address) error {
+	delete, err := creator.Prepare(`DELETE FROM blocks_ranges WHERE address = ?`)
+	if err != nil {
+		return err
+	}
+
+	_, err = delete.Exec(account)
+	return err
+}
+
 func insertRange(chainID uint64, creator statementCreator, account common.Address, from *big.Int, to *big.Int) error {
 	log.Info("insert blocks range", "account", account, "network", chainID, "from", from, "to", to)
 	insert, err := creator.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to) VALUES (?, ?, ?, ?)")

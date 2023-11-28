@@ -170,7 +170,7 @@ func (db *Database) ProcessTransfers(chainID uint64, transfers []Transfer, remov
 	return
 }
 
-func saveTransfersMarkBlocksLoaded(tx *sql.Tx, chainID uint64, address common.Address, transfers []Transfer, blocks []*big.Int) (err error) {
+func saveTransfersMarkBlocksLoaded(tx statementCreator, chainID uint64, address common.Address, transfers []Transfer, blocks []*big.Int) (err error) {
 	err = updateOrInsertTransfers(chainID, tx, transfers)
 	if err != nil {
 		return
@@ -591,4 +591,40 @@ func GetOwnedMultiTransactionID(tx *sql.Tx, chainID w_common.ChainID, id common.
 		return 0, err
 	}
 	return mTID, nil
+}
+
+// Delete blocks for address and chainID
+// Transfers will be deleted by cascade
+func deleteBlocks(creator statementCreator, address common.Address) error {
+	delete, err := creator.Prepare("DELETE FROM blocks WHERE address = ?")
+	if err != nil {
+		return err
+	}
+
+	_, err = delete.Exec(address)
+	return err
+}
+
+func getAddresses(creator statementCreator) (rst []common.Address, err error) {
+	stmt, err := creator.Prepare(`SELECT address FROM transfers UNION SELECT address FROM blocks UNION
+		SELECT address FROM blocks_ranges_sequential UNION SELECT address FROM blocks_ranges`)
+	if err != nil {
+		return
+	}
+	rows, err := stmt.Query()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	address := common.Address{}
+	for rows.Next() {
+		err = rows.Scan(&address)
+		if err != nil {
+			return nil, err
+		}
+		rst = append(rst, address)
+	}
+
+	return rst, nil
 }

@@ -514,14 +514,14 @@ func loadTransfersLoop(ctx context.Context, account common.Address, blockDAO *Bl
 }
 
 func newLoadBlocksAndTransfersCommand(account common.Address, db *Database,
-	blockDAO *BlockDAO, chainClient chain.ClientInterface, feed *event.Feed,
+	blockDAO *BlockDAO, blockRangesSeqDAO *BlockRangeSequentialDAO, chainClient chain.ClientInterface, feed *event.Feed,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager, balanceCacher balance.Cacher, omitHistory bool) *loadBlocksAndTransfersCommand {
 
 	return &loadBlocksAndTransfersCommand{
 		account:            account,
 		db:                 db,
-		blockRangeDAO:      &BlockRangeSequentialDAO{db.client},
+		blockRangeDAO:      blockRangesSeqDAO,
 		blockDAO:           blockDAO,
 		chainClient:        chainClient,
 		feed:               feed,
