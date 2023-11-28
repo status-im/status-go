@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"os"
 	"strings"
@@ -2472,7 +2472,7 @@ func buildImageWithAlbumIDMessage(chat Chat, albumID string) (*common.Message, e
 	}
 	defer file.Close()
 
-	payload, err := ioutil.ReadAll(file)
+	payload, err := io.ReadAll(file)
 	if err != err {
 		return nil, err
 	}

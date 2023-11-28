@@ -816,6 +816,20 @@ func (api *PublicAPI) MarkMessagesSeen(chatID string, ids []string) (*MarkMessag
 	return response, nil
 }
 
+func (api *PublicAPI) MarkMessageAsUnread(chatID string, messageID string) (*MarkMessageSeenResponse, error) {
+	count, withMentions, notifications, err := api.service.messenger.MarkMessageAsUnread(chatID, messageID)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MarkMessageSeenResponse{
+		Count:                       count,
+		CountWithMentions:           withMentions,
+		ActivityCenterNotifications: notifications,
+	}
+	return response, nil
+}
+
 func (api *PublicAPI) MarkAllRead(ctx context.Context, chatID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.MarkAllRead(ctx, chatID)
 }

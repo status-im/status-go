@@ -1891,6 +1891,99 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint6
 	return countWithMentions + countNoMentions, countWithMentions, err
 }
 
+func (db sqlitePersistence) GetMessageIdsWithGreaterTimestamp(chatID string, messageID string) ([]string, error) {
+	var err error
+	var rows *sql.Rows
+	query := "SELECT id FROM user_messages WHERE local_chat_id = ? AND timestamp >= (SELECT timestamp FROM user_messages WHERE id = ?)"
+
+	rows, err = db.db.Query(query, chatID, messageID)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []string
+
+	for rows.Next() {
+		var messageID string
+		err = rows.Scan(&messageID)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, messageID)
+	}
+
+	return ids, nil
+}
+
+func (db sqlitePersistence) MarkMessageAsUnread(chatID string, messageID string) (uint64, uint64, error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return 0, 0, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	// TODO : Reduce number of queries for getting (total unread messages, total messages with mention)
+	// The function expected result is a pair (total unread messages, total messages with mention)
+	// Currently a 2 step operation is needed to obtain this pair
+	_, err = tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND NOT(seen)`, chatID)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	_, err = tx.Exec(
+		`UPDATE user_messages
+			SET seen = 0
+			WHERE local_chat_id = ?
+			AND seen = 1
+			AND (mentioned OR replied)
+			AND timestamp >= (SELECT timestamp FROM user_messages WHERE id = ?)`, chatID, messageID)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	var countWithMentions uint64
+	row := tx.QueryRow("SELECT changes();")
+	if err := row.Scan(&countWithMentions); err != nil {
+		return 0, 0, err
+	}
+
+	_, err = tx.Exec(
+		`UPDATE user_messages 
+			SET seen = 0 
+			WHERE local_chat_id = ? 
+			AND seen = 1 
+			AND NOT(mentioned OR replied) 
+			AND timestamp >= (SELECT timestamp FROM user_messages WHERE id = ?)`, chatID, messageID)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	var countNoMentions uint64
+	row = tx.QueryRow("SELECT changes();")
+	if err := row.Scan(&countNoMentions); err != nil {
+		return 0, 0, err
+	}
+
+	count := countWithMentions + countNoMentions
+
+	_, err = tx.Exec(
+		`UPDATE chats
+            SET unviewed_message_count = ?, unviewed_mentions_count = ?,
+			highlight = 0
+			WHERE id = ?`, count, countWithMentions, chatID)
+
+	return count, countWithMentions, err
+}
+
 func (db sqlitePersistence) UpdateMessageOutgoingStatus(id string, newOutgoingStatus string) error {
 	_, err := db.db.Exec(`
 		UPDATE user_messages
