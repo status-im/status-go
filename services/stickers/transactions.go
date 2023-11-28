@@ -14,75 +14,8 @@ import (
 	"github.com/status-im/status-go/contracts/snt"
 	"github.com/status-im/status-go/contracts/stickers"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
-	wcommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/transactions"
 )
-
-func (api *API) Buy(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, packID *bigint.BigInt, password string) (string, error) {
-	snt, err := api.contractMaker.NewSNT(chainID)
-	if err != nil {
-		return "", err
-	}
-
-	stickerType, err := api.contractMaker.NewStickerType(chainID)
-	if err != nil {
-		return "", err
-	}
-
-	callOpts := &bind.CallOpts{Context: api.ctx, Pending: false}
-
-	packInfo, err := stickerType.GetPackData(callOpts, packID.Int)
-	if err != nil {
-		return "", err
-	}
-
-	stickerMarketABI, err := abi.JSON(strings.NewReader(stickers.StickerMarketABI))
-	if err != nil {
-		return "", err
-	}
-
-	extraData, err := stickerMarketABI.Pack("buyToken", packID.Int, txArgs.From, packInfo.Price)
-	if err != nil {
-		return "", err
-	}
-
-	stickerMarketAddress, err := stickers.StickerMarketContractAddress(chainID)
-	if err != nil {
-		return "", err
-	}
-
-	txOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.keyStoreDir, txArgs.From, password))
-	tx, err := snt.ApproveAndCall(
-		txOpts,
-		stickerMarketAddress,
-		packInfo.Price,
-		extraData,
-	)
-
-	if err != nil {
-		return "", err
-	}
-
-	err = api.AddPending(chainID, packID)
-	if err != nil {
-		return "", err
-	}
-
-	err = api.pendingTracker.TrackPendingTransaction(
-		wcommon.ChainID(chainID),
-		tx.Hash(),
-		common.Address(txArgs.From),
-		transactions.BuyStickerPack,
-		transactions.AutoDelete,
-	)
-	if err != nil {
-		return "", err
-	}
-
-	return tx.Hash().String(), nil
-}
 
 func (api *API) BuyPrepareTxCallMsg(chainID uint64, from types.Address, packID *bigint.BigInt) (ethereum.CallMsg, error) {
 	callOpts := &bind.CallOpts{Context: api.ctx, Pending: false}
