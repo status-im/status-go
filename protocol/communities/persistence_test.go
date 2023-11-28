@@ -634,3 +634,56 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 	s.Require().Len(rtjResult, 4)
 	s.Require().Len(rtjResult[3].RevealedAccounts, 0)
 }
+
+func (s *PersistenceSuite) TestGetCommunityRequestToJoinWithRevealedAddresses() {
+	identity, err := crypto.GenerateKey()
+	s.Require().NoError(err, "crypto.GenerateKey shouldn't give any error")
+
+	clock := uint64(time.Now().Unix())
+	communityID := types.HexBytes{7, 7, 7, 7, 7, 7, 7, 7}
+	revealedAddresses := []string{"address1", "address2", "address3"}
+	chainIds := []uint64{1, 2}
+	publicKey := common.PubkeyToHex(&identity.PublicKey)
+	signature := []byte("test")
+
+	// No data in database
+	_, err = s.db.GetCommunityRequestToJoinWithRevealedAddresses(publicKey, communityID)
+	s.Require().ErrorIs(err, sql.ErrNoRows)
+
+	// RTJ with 2 withoutRevealed Addresses
+	expectedRtj := &RequestToJoin{
+		ID:          types.HexBytes{1, 2, 3, 4, 5, 6, 7, 8},
+		PublicKey:   publicKey,
+		Clock:       clock,
+		CommunityID: communityID,
+		State:       RequestToJoinStateAccepted,
+		RevealedAccounts: []*protobuf.RevealedAccount{
+			{
+				Address:          revealedAddresses[2],
+				ChainIds:         chainIds,
+				IsAirdropAddress: true,
+				Signature:        signature,
+			},
+		},
+	}
+	err = s.db.SaveRequestToJoin(expectedRtj)
+	s.Require().NoError(err, "SaveRequestToJoin shouldn't give any error")
+
+	// check that there will be no error if revealed account is absent
+	rtjResult, err := s.db.GetCommunityRequestToJoinWithRevealedAddresses(publicKey, communityID)
+	s.Require().NoError(err, "RevealedAccounts empty, shouldn't give any error")
+
+	s.Require().Len(rtjResult.RevealedAccounts, 0)
+
+	// save revealed accounts for previous request to join
+	err = s.db.SaveRequestToJoinRevealedAddresses(expectedRtj.ID, expectedRtj.RevealedAccounts)
+	s.Require().NoError(err)
+
+	rtjResult, err = s.db.GetCommunityRequestToJoinWithRevealedAddresses(publicKey, communityID)
+	s.Require().NoError(err)
+	s.Require().Equal(expectedRtj.ID, rtjResult.ID)
+	s.Require().Equal(expectedRtj.PublicKey, rtjResult.PublicKey)
+	s.Require().Equal(expectedRtj.Clock, rtjResult.Clock)
+	s.Require().Equal(expectedRtj.CommunityID, rtjResult.CommunityID)
+	s.Require().Len(rtjResult.RevealedAccounts, 1)
+}
