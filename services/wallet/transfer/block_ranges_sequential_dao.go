@@ -47,20 +47,15 @@ func (b *BlockRangeSequentialDAO) getBlockRange(chainID uint64, address common.A
 	return nil, nil
 }
 
-// TODO call it when account is removed
-//
-//lint:ignore U1000 Ignore unused function temporarily
-func (b *BlockRangeSequentialDAO) deleteRange(chainID uint64, account common.Address) error {
-	log.Debug("delete blocks range", "account", account, "network", chainID)
-	delete, err := b.db.Prepare(`DELETE FROM blocks_ranges_sequential
-                                        WHERE address = ?
-                                        AND network_id = ?`)
+func (b *BlockRangeSequentialDAO) deleteRange(account common.Address) error {
+	log.Debug("delete blocks range", "account", account)
+	delete, err := b.db.Prepare(`DELETE FROM blocks_ranges_sequential WHERE address = ?`)
 	if err != nil {
 		log.Error("Failed to prepare deletion of sequential block range", "error", err)
 		return err
 	}
 
-	_, err = delete.Exec(account, chainID)
+	_, err = delete.Exec(account)
 	return err
 }
 

@@ -48,6 +48,7 @@ type HistoryFetcher interface {
 type Reactor struct {
 	db                 *Database
 	blockDAO           *BlockDAO
+	blockRangesSeqDAO  *BlockRangeSequentialDAO
 	feed               *event.Feed
 	transactionManager *TransactionManager
 	pendingTxManager   *transactions.PendingTxTracker
@@ -57,12 +58,13 @@ type Reactor struct {
 	omitHistory        bool
 }
 
-func NewReactor(db *Database, blockDAO *BlockDAO, feed *event.Feed, tm *TransactionManager,
+func NewReactor(db *Database, blockDAO *BlockDAO, blockRangesSeqDAO *BlockRangeSequentialDAO, feed *event.Feed, tm *TransactionManager,
 	pendingTxManager *transactions.PendingTxTracker, tokenManager *token.Manager,
 	balanceCacher balance.Cacher, omitHistory bool) *Reactor {
 	return &Reactor{
 		db:                 db,
 		blockDAO:           blockDAO,
+		blockRangesSeqDAO:  blockRangesSeqDAO,
 		feed:               feed,
 		transactionManager: tm,
 		pendingTxManager:   pendingTxManager,
@@ -98,6 +100,7 @@ func (r *Reactor) createFetchStrategy(chainClients map[uint64]chain.ClientInterf
 	return NewSequentialFetchStrategy(
 		r.db,
 		r.blockDAO,
+		r.blockRangesSeqDAO,
 		r.feed,
 		r.transactionManager,
 		r.pendingTxManager,
