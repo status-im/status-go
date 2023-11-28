@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -399,8 +400,13 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					// control node changed and we were kicked out. It now awaits our addresses
 					if communityResponse.Changes.ControlNodeChanged != nil && communityResponse.Changes.MemberKicked {
 						requestToJoin, err := m.sendSharedAddressToControlNode(communityResponse.Community.ControlNode(), communityResponse.Community)
+
 						if err != nil {
 							m.logger.Error("share address to control node failed", zap.String("id", types.EncodeHex(communityResponse.Community.ID())), zap.Error(err))
+
+							if err == communities.ErrRevealedAccountsAbsent || err == communities.ErrNoRevealedAccountsSignature {
+								m.AddActivityCenterNotificationToResponse(communityResponse.Community.IDString(), ActivityCenterNotificationTypeShareAccounts, response)
+							}
 						} else {
 							state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
 						}
@@ -3263,7 +3269,28 @@ func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, co
 
 	requestToJoin, err := m.communitiesManager.GetCommunityRequestToJoinWithRevealedAddresses(pk, community.ID())
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, communities.ErrRevealedAccountsAbsent
+		}
 		return nil, err
+	}
+
+	if len(requestToJoin.RevealedAccounts) == 0 {
+		return nil, communities.ErrRevealedAccountsAbsent
+	}
+
+	// check if at least one account is signed
+	// old community users can not keep locally the signature of their revealed accounts in the DB
+	revealedAccountSigned := false
+	for _, account := range requestToJoin.RevealedAccounts {
+		revealedAccountSigned = len(account.Signature) > 0
+		if revealedAccountSigned {
+			break
+		}
+	}
+
+	if !revealedAccountSigned {
+		return nil, communities.ErrNoRevealedAccountsSignature
 	}
 
 	requestToJoin.Clock = uint64(time.Now().Unix())
@@ -6197,4 +6224,22 @@ func (m *Messenger) SendMessageToControlNode(community *communities.Community, r
 	}
 
 	return m.sender.SendCommunityMessage(context.Background(), rawMessage)
+}
+
+func (m *Messenger) AddActivityCenterNotificationToResponse(communityID string, acType ActivityCenterType, response *MessengerResponse) {
+	// Activity Center notification
+	notification := &ActivityCenterNotification{
+		ID:          types.FromHex(uuid.New().String()),
+		Type:        acType,
+		Timestamp:   m.getTimesource().GetCurrentTime(),
+		CommunityID: communityID,
+		Read:        false,
+		Deleted:     false,
+		UpdatedAt:   m.GetCurrentTimeInMillis(),
+	}
+
+	err := m.addActivityCenterNotification(response, notification, nil)
+	if err != nil {
+		m.logger.Error("failed to save notification", zap.Error(err))
+	}
 }
