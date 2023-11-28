@@ -19,8 +19,6 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/bridge"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
@@ -28,111 +26,6 @@ import (
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
-
-type MultiTransactionIDType int64
-
-const (
-	NoMultiTransactionID = MultiTransactionIDType(0)
-
-	// EventMTTransactionUpdate is emitted when a multi-transaction is updated (added or deleted)
-	EventMTTransactionUpdate walletevent.EventType = "multi-transaction-update"
-)
-
-type SignatureDetails struct {
-	R string `json:"r"`
-	S string `json:"s"`
-	V string `json:"v"`
-}
-
-type TransactionDescription struct {
-	chainID   uint64
-	builtTx   *ethTypes.Transaction
-	signature []byte
-	unlock    transactions.UnlockNonceFunc
-}
-
-type TransactionManager struct {
-	db             *sql.DB
-	gethManager    *account.GethManager
-	transactor     *transactions.Transactor
-	config         *params.NodeConfig
-	accountsDB     *accounts.Database
-	pendingTracker *transactions.PendingTxTracker
-	eventFeed      *event.Feed
-
-	multiTransactionForKeycardSigning *MultiTransaction
-	transactionsBridgeData            []*bridge.TransactionBridge
-	transactionsForKeycardSingning    map[common.Hash]*TransactionDescription
-}
-
-func NewTransactionManager(
-	db *sql.DB,
-	gethManager *account.GethManager,
-	transactor *transactions.Transactor,
-	config *params.NodeConfig,
-	accountsDB *accounts.Database,
-	pendingTxManager *transactions.PendingTxTracker,
-	eventFeed *event.Feed,
-) *TransactionManager {
-	return &TransactionManager{
-		db:             db,
-		gethManager:    gethManager,
-		transactor:     transactor,
-		config:         config,
-		accountsDB:     accountsDB,
-		pendingTracker: pendingTxManager,
-		eventFeed:      eventFeed,
-	}
-}
-
-var (
-	emptyHash = common.Hash{}
-)
-
-type MultiTransactionType uint8
-
-const (
-	MultiTransactionSend = iota
-	MultiTransactionSwap
-	MultiTransactionBridge
-)
-
-type MultiTransaction struct {
-	ID            uint                 `json:"id"`
-	Timestamp     uint64               `json:"timestamp"`
-	FromNetworkID uint64               `json:"fromNetworkID"`
-	ToNetworkID   uint64               `json:"toNetworkID"`
-	FromTxHash    common.Hash          `json:"fromTxHash"`
-	ToTxHash      common.Hash          `json:"toTxHash"`
-	FromAddress   common.Address       `json:"fromAddress"`
-	ToAddress     common.Address       `json:"toAddress"`
-	FromAsset     string               `json:"fromAsset"`
-	ToAsset       string               `json:"toAsset"`
-	FromAmount    *hexutil.Big         `json:"fromAmount"`
-	ToAmount      *hexutil.Big         `json:"toAmount"`
-	Type          MultiTransactionType `json:"type"`
-	CrossTxID     string
-}
-
-type MultiTransactionCommand struct {
-	FromAddress common.Address       `json:"fromAddress"`
-	ToAddress   common.Address       `json:"toAddress"`
-	FromAsset   string               `json:"fromAsset"`
-	ToAsset     string               `json:"toAsset"`
-	FromAmount  *hexutil.Big         `json:"fromAmount"`
-	Type        MultiTransactionType `json:"type"`
-}
-
-type MultiTransactionCommandResult struct {
-	ID     int64                   `json:"id"`
-	Hashes map[uint64][]types.Hash `json:"hashes"`
-}
-
-type TransactionIdentity struct {
-	ChainID wallet_common.ChainID `json:"chainId"`
-	Hash    common.Hash           `json:"hash"`
-	Address common.Address        `json:"address"`
-}
 
 const multiTransactionColumns = "from_network_id, from_tx_hash, from_address, from_asset, from_amount, to_network_id, to_tx_hash, to_address, to_asset, to_amount, type, cross_tx_id, timestamp"
 const selectMultiTransactionColumns = "COALESCE(from_network_id, 0), from_tx_hash, from_address, from_asset, from_amount, COALESCE(to_network_id, 0), to_tx_hash, to_address, to_asset, to_amount, type, cross_tx_id, timestamp"

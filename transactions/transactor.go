@@ -191,7 +191,8 @@ func (t *Transactor) BuildTransactionAndSendWithSignature(chainID uint64, args S
 		return hash, &ErrBadNonce{tx.Nonce(), expectedNonce}
 	}
 
-	return t.AddSignatureToTransactionAndSend(chainID, tx, sig)
+	hash, err = t.AddSignatureToTransactionAndSend(chainID, tx, sig)
+	return hash, err
 }
 
 func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs, hash types.Hash, err error) {
@@ -387,10 +388,24 @@ func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccoun
 }
 
 func (t *Transactor) buildTransaction(args SendTxArgs) *gethtypes.Transaction {
-	nonce := uint64(*args.Nonce)
-	value := (*big.Int)(args.Value)
-	gas := uint64(*args.Gas)
-	gasPrice := (*big.Int)(args.GasPrice)
+	var (
+		nonce    uint64
+		value    *big.Int
+		gas      uint64
+		gasPrice *big.Int
+	)
+	if args.Nonce != nil {
+		nonce = uint64(*args.Nonce)
+	}
+	if args.Value != nil {
+		value = (*big.Int)(args.Value)
+	}
+	if args.Gas != nil {
+		gas = uint64(*args.Gas)
+	}
+	if args.GasPrice != nil {
+		gasPrice = (*big.Int)(args.GasPrice)
+	}
 
 	return t.buildTransactionWithOverrides(nonce, value, gas, gasPrice, args)
 }

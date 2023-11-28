@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -522,6 +523,37 @@ func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address s
 
 	result.HasActivity = balance.Cmp(big.NewInt(0)) != 0
 	return result, nil
+}
+
+func (api *API) SignMessage(ctx context.Context, message types.HexBytes, address common.Address, password string) (string, error) {
+	log.Debug("[WalletAPI::SignMessage]", "message", message, "address", address)
+	return api.s.transactionManager.SignMessage(message, address, password)
+}
+
+func (api *API) BuildTransaction(ctx context.Context, chainID uint64, sendTxArgsJSON string) (response *transfer.TxResponse, err error) {
+	log.Debug("[WalletAPI::BuildTransaction]", "chainID", chainID, "sendTxArgsJSON", sendTxArgsJSON)
+	var params transactions.SendTxArgs
+	err = json.Unmarshal([]byte(sendTxArgsJSON), &params)
+	if err != nil {
+		return nil, err
+	}
+	return api.s.transactionManager.BuildTransaction(chainID, params)
+}
+
+func (api *API) SendTransactionWithSignature(ctx context.Context, chainID uint64, txType transactions.PendingTrxType,
+	sendTxArgsJSON string, signature string) (hash types.Hash, err error) {
+	log.Debug("[WalletAPI::SendTransactionWithSignature]", "chainID", chainID, "txType", txType, "sendTxArgsJSON", sendTxArgsJSON, "signature", signature)
+	sig, err := hex.DecodeString(signature)
+	if err != nil {
+		return hash, err
+	}
+
+	var params transactions.SendTxArgs
+	err = json.Unmarshal([]byte(sendTxArgsJSON), &params)
+	if err != nil {
+		return hash, err
+	}
+	return api.s.transactionManager.SendTransactionWithSignature(chainID, txType, params, sig)
 }
 
 func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionCommand *transfer.MultiTransactionCommand, data []*bridge.TransactionBridge, password string) (*transfer.MultiTransactionCommandResult, error) {
