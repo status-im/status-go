@@ -111,7 +111,7 @@ type Messenger struct {
 	pushNotificationClient    *pushnotificationclient.Client
 	pushNotificationServer    *pushnotificationserver.Server
 	communitiesManager        *communities.Manager
-	communitiesKeyDistributor CommunitiesKeyDistributor
+	communitiesKeyDistributor communities.KeyDistributor
 	accountsManager           account.Manager
 	mentionsManager           *MentionManager
 	storeNodeRequestsManager  *StoreNodeRequestManager
@@ -467,7 +467,12 @@ func NewMessenger(
 		managerOptions = append(managerOptions, communities.WithCommunityTokensService(c.communityTokensService))
 	}
 
-	communitiesManager, err := communities.NewManager(identity, installationID, database, encryptionProtocol, logger, ensVerifier, c.communityTokensService, transp, transp, c.torrentConfig, managerOptions...)
+	communitiesKeyDistributor := &CommunitiesKeyDistributorImpl{
+		sender:    sender,
+		encryptor: encryptionProtocol,
+	}
+
+	communitiesManager, err := communities.NewManager(identity, installationID, database, encryptionProtocol, logger, ensVerifier, c.communityTokensService, transp, transp, communitiesKeyDistributor, c.torrentConfig, managerOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -487,24 +492,21 @@ func NewMessenger(
 	ctx, cancel := context.WithCancel(context.Background())
 
 	messenger = &Messenger{
-		config:                 &c,
-		node:                   node,
-		identity:               identity,
-		persistence:            sqlitePersistence,
-		transport:              transp,
-		encryptor:              encryptionProtocol,
-		sender:                 sender,
-		anonMetricsClient:      anonMetricsClient,
-		anonMetricsServer:      anonMetricsServer,
-		telemetryClient:        telemetryClient,
-		communityTokensService: c.communityTokensService,
-		pushNotificationClient: pushNotificationClient,
-		pushNotificationServer: pushNotificationServer,
-		communitiesManager:     communitiesManager,
-		communitiesKeyDistributor: &CommunitiesKeyDistributorImpl{
-			sender:    sender,
-			encryptor: encryptionProtocol,
-		},
+		config:                     &c,
+		node:                       node,
+		identity:                   identity,
+		persistence:                sqlitePersistence,
+		transport:                  transp,
+		encryptor:                  encryptionProtocol,
+		sender:                     sender,
+		anonMetricsClient:          anonMetricsClient,
+		anonMetricsServer:          anonMetricsServer,
+		telemetryClient:            telemetryClient,
+		communityTokensService:     c.communityTokensService,
+		pushNotificationClient:     pushNotificationClient,
+		pushNotificationServer:     pushNotificationServer,
+		communitiesManager:         communitiesManager,
+		communitiesKeyDistributor:  communitiesKeyDistributor,
 		accountsManager:            accountsManager,
 		ensVerifier:                ensVerifier,
 		featureFlags:               c.featureFlags,
