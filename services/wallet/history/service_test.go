@@ -5,13 +5,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
 func Test_entriesToDataPoints(t *testing.T) {
 	type args struct {
-		chainIDs []uint64
-		data     []*entry
+		data []*entry
 	}
 	tests := []struct {
 		name    string
@@ -22,7 +22,6 @@ func Test_entriesToDataPoints(t *testing.T) {
 		{
 			name: "zeroAllChainsSameTimestamp",
 			args: args{
-				chainIDs: []uint64{1, 2},
 				data: []*entry{
 					{
 						chainID:   1,
@@ -49,7 +48,6 @@ func Test_entriesToDataPoints(t *testing.T) {
 		{
 			name: "oneZeroAllChainsDifferentTimestamp",
 			args: args{
-				chainIDs: []uint64{1, 2},
 				data: []*entry{
 					{
 						chainID:   2,
@@ -80,7 +78,6 @@ func Test_entriesToDataPoints(t *testing.T) {
 		{
 			name: "nonZeroAllChainsDifferentTimestamp",
 			args: args{
-				chainIDs: []uint64{1, 2},
 				data: []*entry{
 					{
 						chainID:   2,
@@ -100,7 +97,7 @@ func Test_entriesToDataPoints(t *testing.T) {
 					Timestamp: 1,
 				},
 				{
-					Balance:   (*hexutil.Big)(big.NewInt(2)),
+					Balance:   (*hexutil.Big)(big.NewInt(3)),
 					Timestamp: 2,
 				},
 			},
@@ -109,7 +106,6 @@ func Test_entriesToDataPoints(t *testing.T) {
 		{
 			name: "sameChainDifferentTimestamp",
 			args: args{
-				chainIDs: []uint64{1, 2},
 				data: []*entry{
 					{
 						chainID:   1,
@@ -149,7 +145,6 @@ func Test_entriesToDataPoints(t *testing.T) {
 		{
 			name: "sameChainDifferentTimestampOtherChainsEmpty",
 			args: args{
-				chainIDs: []uint64{1, 2},
 				data: []*entry{
 					{
 						chainID:   1,
@@ -195,7 +190,6 @@ func Test_entriesToDataPoints(t *testing.T) {
 		{
 			name: "onlyEdgePointsOnManyChainsWithPadding",
 			args: args{
-				chainIDs: []uint64{1, 2, 3},
 				data: []*entry{
 					// Left edge - same timestamp
 					{
@@ -271,11 +265,67 @@ func Test_entriesToDataPoints(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "multipleAddresses",
+			args: args{
+				data: []*entry{
+					{
+						chainID:   2,
+						balance:   big.NewInt(5),
+						timestamp: 1,
+						address:   common.Address{1},
+					},
+					{
+						chainID:   1,
+						balance:   big.NewInt(6),
+						timestamp: 1,
+						address:   common.Address{2},
+					},
+					{
+						chainID:   1,
+						balance:   big.NewInt(1),
+						timestamp: 2,
+						address:   common.Address{1},
+					},
+					{
+						chainID:   1,
+						balance:   big.NewInt(2),
+						timestamp: 3,
+						address:   common.Address{2},
+					},
+					{
+						chainID:   1,
+						balance:   big.NewInt(4),
+						timestamp: 4,
+						address:   common.Address{2},
+					},
+				},
+			},
+			want: []*DataPoint{
+				{
+					Balance:   (*hexutil.Big)(big.NewInt(11)),
+					Timestamp: 1,
+				},
+				{
+					Balance:   (*hexutil.Big)(big.NewInt(12)),
+					Timestamp: 2,
+				},
+				{
+					Balance:   (*hexutil.Big)(big.NewInt(8)),
+					Timestamp: 3,
+				},
+				{
+					Balance:   (*hexutil.Big)(big.NewInt(10)),
+					Timestamp: 4,
+				},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := entriesToDataPoints(tt.args.chainIDs, tt.args.data)
+			got, err := entriesToDataPoints(tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("entriesToDataPoints() error = %v, wantErr %v", err, tt.wantErr)
 				return

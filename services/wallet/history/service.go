@@ -108,8 +108,8 @@ func (s *Service) Start() {
 	}()
 }
 
-func (s *Service) mergeChainsBalances(chainIDs []uint64, address common.Address, tokenSymbol string, fromTimestamp uint64, data map[uint64][]*entry) ([]*DataPoint, error) {
-	log.Debug("Merging balances", "address", address, "tokenSymbol", tokenSymbol, "fromTimestamp", fromTimestamp, "len(data)", len(data))
+func (s *Service) mergeChainsBalances(chainIDs []uint64, addresses []common.Address, tokenSymbol string, fromTimestamp uint64, data map[uint64][]*entry) ([]*DataPoint, error) {
+	log.Debug("Merging balances", "address", addresses, "tokenSymbol", tokenSymbol, "fromTimestamp", fromTimestamp, "len(data)", len(data))
 
 	toTimestamp := uint64(time.Now().UTC().Unix())
 	allData := make([]*entry, 0)
@@ -118,7 +118,7 @@ func (s *Service) mergeChainsBalances(chainIDs []uint64, address common.Address,
 	// Iterate over chainIDs param, not data keys, because data may not contain all the chains, but we need edge points for all of them
 	for _, chainID := range chainIDs {
 		// edge points are needed to properly calculate total balance, as they contain the balance for the first and last timestamp
-		chainData, err := s.balance.addEdgePoints(chainID, tokenSymbol, address, fromTimestamp, toTimestamp, data[chainID])
+		chainData, err := s.balance.addEdgePoints(chainID, tokenSymbol, addresses, fromTimestamp, toTimestamp, data[chainID])
 		if err != nil {
 			return nil, err
 		}
@@ -137,34 +137,60 @@ func (s *Service) mergeChainsBalances(chainIDs []uint64, address common.Address,
 
 	// Add padding points to make chart look nice
 	if len(allData) < minPointsForGraph {
-		allData, _ = addPaddingPoints(tokenSymbol, address, toTimestamp, allData, minPointsForGraph)
+		allData, _ = addPaddingPoints(tokenSymbol, addresses, toTimestamp, allData, minPointsForGraph)
 	}
 
-	return entriesToDataPoints(chainIDs, allData)
+	return entriesToDataPoints(allData)
 }
 
 // Expects sorted data
-func entriesToDataPoints(chainIDs []uint64, data []*entry) ([]*DataPoint, error) {
+func entriesToDataPoints(data []*entry) ([]*DataPoint, error) {
 	var resSlice []*DataPoint
 	var groupedEntries []*entry // Entries with the same timestamp
 
-	sumBalances := func(entries []*entry) *big.Int {
+	type AddressKey struct {
+		Address common.Address
+		ChainID uint64
+	}
+
+	sumBalances := func(balanceMap map[AddressKey]*big.Int) *big.Int {
+		// Sum balances of all accounts and chains in current timestamp
 		sum := big.NewInt(0)
-		for _, entry := range entries {
-			sum.Add(sum, entry.balance)
+		for _, balance := range balanceMap {
+			sum.Add(sum, balance)
 		}
 		return sum
 	}
 
-	// calculate balance for entries with the same timestam and add a single point for them
+	updateBalanceMap := func(balanceMap map[AddressKey]*big.Int, entries []*entry) map[AddressKey]*big.Int {
+		// Update balance map for this timestamp
+		for _, entry := range entries {
+			if entry.chainID == 0 {
+				continue
+			}
+			key := AddressKey{
+				Address: entry.address,
+				ChainID: entry.chainID,
+			}
+			balanceMap[key] = entry.balance
+		}
+		return balanceMap
+	}
+
+	// Balance map always contains current balance for each address in specific timestamp
+	// It is required to sum up balances from previous timestamp from accounts not present in current timestamp
+	balanceMap := make(map[AddressKey]*big.Int)
+
 	for _, entry := range data {
 		if len(groupedEntries) > 0 {
 			if entry.timestamp == groupedEntries[0].timestamp {
 				groupedEntries = append(groupedEntries, entry)
 				continue
 			} else {
-				// Calculate balance for the grouped entries
-				cumulativeBalance := sumBalances(groupedEntries)
+				// Split grouped entries into addresses
+				balanceMap = updateBalanceMap(balanceMap, groupedEntries)
+				// Calculate balance for all the addresses
+				cumulativeBalance := sumBalances(balanceMap)
 				// Points in slice contain balances for all chains
 				resSlice = appendPointToSlice(resSlice, &DataPoint{
 					Timestamp: uint64(groupedEntries[0].timestamp),
@@ -182,7 +208,10 @@ func entriesToDataPoints(chainIDs []uint64, data []*entry) ([]*DataPoint, error)
 
 	// If only edge points are present, groupedEntries will be non-empty
 	if len(groupedEntries) > 0 {
-		cumulativeBalance := sumBalances(groupedEntries)
+		// Split grouped entries into addresses
+		balanceMap = updateBalanceMap(balanceMap, groupedEntries)
+		// Calculate balance for all the addresses
+		cumulativeBalance := sumBalances(balanceMap)
 		resSlice = appendPointToSlice(resSlice, &DataPoint{
 			Timestamp: uint64(groupedEntries[0].timestamp),
 			Balance:   (*hexutil.Big)(cumulativeBalance),
@@ -210,12 +239,12 @@ func appendPointToSlice(slice []*DataPoint, point *DataPoint) []*DataPoint {
 }
 
 // GetBalanceHistory returns token count balance
-func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, address common.Address, tokenSymbol string, currencySymbol string, fromTimestamp uint64) ([]*ValuePoint, error) {
-	log.Debug("GetBalanceHistory", "chainIDs", chainIDs, "address", address.String(), "tokenSymbol", tokenSymbol, "currencySymbol", currencySymbol, "fromTimestamp", fromTimestamp)
+func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, addresses []common.Address, tokenSymbol string, currencySymbol string, fromTimestamp uint64) ([]*ValuePoint, error) {
+	log.Debug("GetBalanceHistory", "chainIDs", chainIDs, "address", addresses, "tokenSymbol", tokenSymbol, "currencySymbol", currencySymbol, "fromTimestamp", fromTimestamp)
 
 	chainDataMap := make(map[uint64][]*entry)
 	for _, chainID := range chainIDs {
-		chainData, err := s.balance.get(ctx, chainID, tokenSymbol, address, fromTimestamp) // TODO Make chainID a slice?
+		chainData, err := s.balance.get(ctx, chainID, tokenSymbol, addresses, fromTimestamp) // TODO Make chainID a slice?
 		if err != nil {
 			return nil, err
 		}
@@ -228,7 +257,8 @@ func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, addr
 	}
 
 	// Need to get balance for all the chains for the first timestamp, otherwise total values will be incorrect
-	data, err := s.mergeChainsBalances(chainIDs, address, tokenSymbol, fromTimestamp, chainDataMap)
+	data, err := s.mergeChainsBalances(chainIDs, addresses, tokenSymbol, fromTimestamp, chainDataMap)
+
 	if err != nil {
 		return nil, err
 	} else if len(data) == 0 {

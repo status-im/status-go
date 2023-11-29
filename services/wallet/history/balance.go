@@ -58,10 +58,10 @@ func NewBalance(db *BalanceDB) *Balance {
 }
 
 // get returns the balance history for the given address from the given timestamp till now
-func (b *Balance) get(ctx context.Context, chainID uint64, currency string, address common.Address, fromTimestamp uint64) ([]*entry, error) {
-	log.Debug("Getting balance history", "chainID", chainID, "currency", currency, "address", address, "fromTimestamp", fromTimestamp)
+func (b *Balance) get(ctx context.Context, chainID uint64, currency string, addresses []common.Address, fromTimestamp uint64) ([]*entry, error) {
+	log.Debug("Getting balance history", "chainID", chainID, "currency", currency, "address", addresses, "fromTimestamp", fromTimestamp)
 
-	cached, err := b.db.getNewerThan(&assetIdentity{chainID, address, currency}, fromTimestamp)
+	cached, err := b.db.getNewerThan(&assetIdentity{chainID, addresses, currency}, fromTimestamp)
 	if err != nil {
 		return nil, err
 	}
@@ -69,69 +69,85 @@ func (b *Balance) get(ctx context.Context, chainID uint64, currency string, addr
 	return cached, nil
 }
 
-func (b *Balance) addEdgePoints(chainID uint64, currency string, address common.Address, fromTimestamp, toTimestamp uint64, data []*entry) (res []*entry, err error) {
-	log.Debug("Adding edge points", "chainID", chainID, "currency", currency, "address", address, "fromTimestamp", fromTimestamp)
+func (b *Balance) addEdgePoints(chainID uint64, currency string, addresses []common.Address, fromTimestamp, toTimestamp uint64, data []*entry) (res []*entry, err error) {
+	log.Debug("Adding edge points", "chainID", chainID, "currency", currency, "address", addresses, "fromTimestamp", fromTimestamp)
 
-	var firstEntry *entry
+	res = data
 
-	if len(data) > 0 {
-		firstEntry = data[0]
-	} else {
-		firstEntry = &entry{
-			chainID:     chainID,
-			address:     address,
-			tokenSymbol: currency,
-			timestamp:   int64(fromTimestamp),
+	for _, address := range addresses {
+		var firstEntry *entry
+
+		if len(data) > 0 {
+			for _, entry := range data {
+				if entry.address == address {
+					firstEntry = entry
+					break
+				}
+			}
 		}
-	}
-
-	previous, err := b.db.getEntryPreviousTo(firstEntry)
-	if err != nil {
-		return nil, err
-	}
-
-	firstTimestamp, lastTimestamp := timestampBoundaries(fromTimestamp, toTimestamp, data)
-
-	if previous != nil {
-		previous.timestamp = int64(firstTimestamp) // We might need to use another minimal offset respecting the time interval
-		previous.block = nil
-		res = append([]*entry{previous}, data...)
-	} else {
-		// Add a zero point at the beginning to draw a line from
-		res = append([]*entry{
-			{
+		if firstEntry == nil {
+			firstEntry = &entry{
 				chainID:     chainID,
 				address:     address,
 				tokenSymbol: currency,
-				timestamp:   int64(firstTimestamp),
-				balance:     big.NewInt(0),
-			},
-		}, data...)
-	}
+				timestamp:   int64(fromTimestamp),
+			}
+		}
 
-	if res[len(res)-1].timestamp < int64(lastTimestamp) {
-		// Add a last point to draw a line to
-		res = append(res, &entry{
-			chainID:     chainID,
-			address:     address,
-			tokenSymbol: currency,
-			timestamp:   int64(lastTimestamp),
-			balance:     res[len(res)-1].balance,
-		})
+		previous, err := b.db.getEntryPreviousTo(firstEntry)
+		if err != nil {
+			return nil, err
+		}
+
+		firstTimestamp, lastTimestamp := timestampBoundaries(fromTimestamp, toTimestamp, address, data)
+
+		if previous != nil {
+			previous.timestamp = int64(firstTimestamp) // We might need to use another minimal offset respecting the time interval
+			previous.block = nil
+			res = append([]*entry{previous}, res...)
+		} else {
+			// Add a zero point at the beginning to draw a line from
+			res = append([]*entry{
+				{
+					chainID:     chainID,
+					address:     address,
+					tokenSymbol: currency,
+					timestamp:   int64(firstTimestamp),
+					balance:     big.NewInt(0),
+				},
+			}, res...)
+		}
+
+		if res[len(res)-1].timestamp < int64(lastTimestamp) {
+			// Add a last point to draw a line to
+			res = append(res, &entry{
+				chainID:     chainID,
+				address:     address,
+				tokenSymbol: currency,
+				timestamp:   int64(lastTimestamp),
+				balance:     res[len(res)-1].balance,
+			})
+		}
 	}
 
 	return res, nil
 }
 
-func timestampBoundaries(fromTimestamp, toTimestamp uint64, data []*entry) (firstTimestamp, lastTimestamp uint64) {
+func timestampBoundaries(fromTimestamp, toTimestamp uint64, address common.Address, data []*entry) (firstTimestamp, lastTimestamp uint64) {
 	firstTimestamp = fromTimestamp
 	if fromTimestamp == 0 {
 		if len(data) > 0 {
-			if data[0].timestamp == 0 {
-				panic("data[0].timestamp must never be 0")
+			for _, entry := range data {
+				if entry.address == address {
+					if entry.timestamp == 0 {
+						panic("data[0].timestamp must never be 0")
+					}
+					firstTimestamp = uint64(entry.timestamp) - 1
+					break
+				}
 			}
-			firstTimestamp = uint64(data[0].timestamp) - 1
-		} else {
+		}
+		if firstTimestamp == fromTimestamp {
 			firstTimestamp = genesisTimestamp
 		}
 	}
@@ -145,8 +161,8 @@ func timestampBoundaries(fromTimestamp, toTimestamp uint64, data []*entry) (firs
 	return firstTimestamp, lastTimestamp
 }
 
-func addPaddingPoints(currency string, address common.Address, toTimestamp uint64, data []*entry, limit int) (res []*entry, err error) {
-	log.Debug("addPaddingPoints start", "currency", currency, "address", address, "len(data)", len(data), "data", data, "limit", limit)
+func addPaddingPoints(currency string, addresses []common.Address, toTimestamp uint64, data []*entry, limit int) (res []*entry, err error) {
+	log.Debug("addPaddingPoints start", "currency", currency, "address", addresses, "len(data)", len(data), "data", data, "limit", limit)
 
 	if len(data) < 2 { // Edge points must be added separately during the previous step
 		return nil, errors.New("slice is empty")
@@ -161,6 +177,11 @@ func addPaddingPoints(currency string, address common.Address, toTimestamp uint6
 
 	res = make([]*entry, len(data))
 	copy(res, data)
+
+	var address common.Address
+	if len(addresses) > 0 {
+		address = addresses[0]
+	}
 
 	for i, j, index := 1, 0, 0; len(res) < limit; index++ {
 		// Add a last point to draw a line to. For some cases we might not need it,

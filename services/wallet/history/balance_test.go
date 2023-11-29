@@ -30,7 +30,7 @@ func dbWithEntries(t *testing.T, entries []*entry) *BalanceDB {
 func TestBalance_addPaddingPoints(t *testing.T) {
 	type args struct {
 		currency         string
-		address          common.Address
+		addresses        []common.Address
 		fromTimestamp    uint64
 		currentTimestamp uint64
 		data             []*entry
@@ -46,7 +46,7 @@ func TestBalance_addPaddingPoints(t *testing.T) {
 			name: "addOnePaddingPointAtMiddle",
 			args: args{
 				currency:         "ETH",
-				address:          common.Address{1},
+				addresses:        []common.Address{common.Address{1}},
 				fromTimestamp:    0,
 				currentTimestamp: 2,
 				data: []*entry{
@@ -91,7 +91,7 @@ func TestBalance_addPaddingPoints(t *testing.T) {
 			name: "noPaddingEqualsLimit",
 			args: args{
 				currency:         "ETH",
-				address:          common.Address{1},
+				addresses:        []common.Address{common.Address{1}},
 				fromTimestamp:    0,
 				currentTimestamp: 2,
 				data: []*entry{
@@ -134,7 +134,7 @@ func TestBalance_addPaddingPoints(t *testing.T) {
 			name: "limitLessThanDataSize",
 			args: args{
 				currency:         "ETH",
-				address:          common.Address{1},
+				addresses:        []common.Address{common.Address{1}},
 				fromTimestamp:    0,
 				currentTimestamp: 2,
 				data: []*entry{
@@ -177,7 +177,7 @@ func TestBalance_addPaddingPoints(t *testing.T) {
 			name: "addMultiplePaddingPoints",
 			args: args{
 				currency:         "ETH",
-				address:          common.Address{1},
+				addresses:        []common.Address{common.Address{1}},
 				fromTimestamp:    1,
 				currentTimestamp: 5,
 				data: []*entry{
@@ -240,7 +240,7 @@ func TestBalance_addPaddingPoints(t *testing.T) {
 			name: "addMultiplePaddingPointsDuplicateTimestamps",
 			args: args{
 				currency:         "ETH",
-				address:          common.Address{1},
+				addresses:        []common.Address{common.Address{1}},
 				fromTimestamp:    1,
 				currentTimestamp: 5,
 				data: []*entry{
@@ -309,7 +309,7 @@ func TestBalance_addPaddingPoints(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotRes, err := addPaddingPoints(tt.args.currency, tt.args.address, tt.args.currentTimestamp, tt.args.data, tt.args.limit)
+			gotRes, err := addPaddingPoints(tt.args.currency, tt.args.addresses, tt.args.currentTimestamp, tt.args.data, tt.args.limit)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Balance.addPaddingPoints() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -331,7 +331,7 @@ func TestBalance_addEdgePoints(t *testing.T) {
 	type args struct {
 		chainID       uint64
 		currency      string
-		address       common.Address
+		addresses     []common.Address
 		fromTimestamp uint64
 		toTimestamp   uint64
 		data          []*entry
@@ -351,7 +351,7 @@ func TestBalance_addEdgePoints(t *testing.T) {
 			args: args{
 				chainID:       111,
 				currency:      "SNT",
-				address:       common.Address{1},
+				addresses:     []common.Address{common.Address{1}},
 				fromTimestamp: 1,
 				toTimestamp:   2,
 				data:          []*entry{},
@@ -382,7 +382,7 @@ func TestBalance_addEdgePoints(t *testing.T) {
 			args: args{
 				chainID:       111,
 				currency:      "SNT",
-				address:       common.Address{1},
+				addresses:     []common.Address{common.Address{1}},
 				fromTimestamp: 0, // will set to genesisTimestamp
 				toTimestamp:   genesisTimestamp + 1,
 				data:          []*entry{},
@@ -422,7 +422,7 @@ func TestBalance_addEdgePoints(t *testing.T) {
 			args: args{
 				chainID:       111,
 				currency:      "SNT",
-				address:       common.Address{1},
+				addresses:     []common.Address{common.Address{1}},
 				fromTimestamp: 2,
 				toTimestamp:   4,
 				data: []*entry{
@@ -477,7 +477,7 @@ func TestBalance_addEdgePoints(t *testing.T) {
 			b := &Balance{
 				db: tt.fields.db,
 			}
-			gotRes, err := b.addEdgePoints(tt.args.chainID, tt.args.currency, tt.args.address, tt.args.fromTimestamp, tt.args.toTimestamp, tt.args.data)
+			gotRes, err := b.addEdgePoints(tt.args.chainID, tt.args.currency, tt.args.addresses, tt.args.fromTimestamp, tt.args.toTimestamp, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Balance.addEdgePoints() error = %v, wantErr %v", err, tt.wantErr)
 				return
