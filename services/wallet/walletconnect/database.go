@@ -35,6 +35,9 @@ func ChangePairingState(db *sql.DB, topic Topic, active bool) error {
 	}
 
 	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
 	if rowsAffected == 0 {
 		return errors.New("unable to locate pairing entry for DB state change")
 	}
