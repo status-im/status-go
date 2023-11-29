@@ -2977,7 +2977,7 @@ func (m *Manager) GetRequestToJoinIDByPkAndCommunityID(pk *ecdsa.PublicKey, comm
 
 func (m *Manager) GetCommunityRequestToJoinClock(pk *ecdsa.PublicKey, communityID string) (uint64, error) {
 	request, err := m.persistence.GetRequestToJoinByPkAndCommunityID(common.PubkeyToHex(pk), []byte(communityID))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
 	} else if err != nil {
 		return 0, err
