@@ -751,3 +751,29 @@ func getProtocolVersion(bundles []*Bundle, installationID string) uint32 {
 
 	return defaultMinVersion
 }
+
+func (p *Protocol) EncryptWithHashRatchet(groupID []byte, payload []byte) ([]byte, *HashRatchetKeyCompatibility, uint32, error) {
+	ratchet, err := p.encryptor.persistence.GetCurrentKeyForGroup(groupID)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+
+	encryptedPayload, newSeqNo, err := p.encryptor.EncryptWithHR(ratchet, payload)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+
+	return encryptedPayload, ratchet, newSeqNo, nil
+}
+
+func (p *Protocol) DecryptWithHashRatchet(keyID []byte, seqNo uint32, payload []byte) ([]byte, error) {
+	ratchet, err := p.encryptor.persistence.GetHashRatchetKeyByID(keyID)
+	if err != nil {
+		return nil, err
+	}
+	if ratchet == nil {
+		return nil, errors.New("no ratchet key for given keyID")
+	}
+
+	return p.encryptor.DecryptWithHR(ratchet, seqNo, payload)
+}

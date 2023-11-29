@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -98,6 +100,7 @@ type Manager struct {
 	stopped                          bool
 	RekeyInterval                    time.Duration
 	PermissionChecker                PermissionChecker
+	keyDistributor                   KeyDistributor
 }
 
 type HistoryArchiveDownloadTask struct {
@@ -218,7 +221,7 @@ type OwnerVerifier interface {
 	SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error)
 }
 
-func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, ensverifier *ens.Verifier, ownerVerifier OwnerVerifier, transport *transport.Transport, timesource common.TimeSource, torrentConfig *params.TorrentConfig, opts ...ManagerOption) (*Manager, error) {
+func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, ensverifier *ens.Verifier, ownerVerifier OwnerVerifier, transport *transport.Transport, timesource common.TimeSource, keyDistributor KeyDistributor, torrentConfig *params.TorrentConfig, opts ...ManagerOption) (*Manager, error) {
 	if identity == nil {
 		return nil, errors.New("empty identity")
 	}
@@ -257,6 +260,7 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 		torrentConfig:               torrentConfig,
 		torrentTasks:                make(map[string]metainfo.Hash),
 		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
+		keyDistributor:              keyDistributor,
 	}
 
 	manager.persistence = &Persistence{
@@ -741,7 +745,12 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		CommunityDescription: description,
 		Shard:                nil,
 	}
-	community, err := New(config, m.timesource)
+
+	var descriptionEncryptor DescriptionEncryptor
+	if m.encryptor != nil {
+		descriptionEncryptor = m
+	}
+	community, err := New(config, m.timesource, descriptionEncryptor)
 	if err != nil {
 		return nil, err
 	}
@@ -777,9 +786,21 @@ func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommuni
 		return nil, nil, err
 	}
 
+	originCommunity := community.CreateDeepCopy()
+
 	community, changes, err := m.createCommunityTokenPermission(request, community)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// ensure key is generated before marshaling,
+	// as it requires key to encrypt description
+	if m.keyDistributor != nil && community.IsControlNode() {
+		encryptionKeyActions := EvaluateCommunityEncryptionKeyActions(originCommunity, community)
+		err := m.keyDistributor.Generate(community, encryptionKeyActions)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	err = m.saveAndPublish(community)
@@ -1209,11 +1230,15 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 			MemberIdentity:       &m.identity.PublicKey,
 			CommunityDescription: description,
 		}
-		community, err = New(config, m.timesource)
+
+		var descriptionEncryptor DescriptionEncryptor
+		if m.encryptor != nil {
+			descriptionEncryptor = m
+		}
+		community, err = New(config, m.timesource, descriptionEncryptor)
 		if err != nil {
 			return nil, err
 		}
-
 	} else {
 		community.config.PrivateKey = key
 		community.config.ControlDevice = true
@@ -1541,13 +1566,15 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		id = crypto.CompressPubkey(signer)
 	}
 
-	community, err := m.GetByID(id)
+	err = m.preprocessDescription(id, description)
 	if err != nil {
 		return nil, err
 	}
 
-	// Workaround for https://github.com/status-im/status-desktop/issues/12188
-	HydrateChannelsMembers(types.EncodeHex(id), description)
+	community, err := m.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
 
 	// We should queue only if the community has a token owner, and the owner has been verified
 	hasTokenOwnership := HasTokenOwnership(description)
@@ -1568,7 +1595,11 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 			Shard:                               shard.FromProtobuff(communityShard),
 		}
 
-		community, err = New(config, m.timesource)
+		var descriptionEncryptor DescriptionEncryptor
+		if m.encryptor != nil {
+			descriptionEncryptor = m
+		}
+		community, err = New(config, m.timesource, descriptionEncryptor)
 		if err != nil {
 			return nil, err
 		}
@@ -1608,7 +1639,20 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	return m.handleCommunityDescriptionMessageCommon(community, description, payload, verifiedOwner)
 }
 
+func (m *Manager) preprocessDescription(id types.HexBytes, description *protobuf.CommunityDescription) error {
+	err := decryptDescription(m, description, m.logger)
+	if err != nil {
+		return err
+	}
+
+	// Workaround for https://github.com/status-im/status-desktop/issues/12188
+	hydrateChannelsMembers(types.EncodeHex(id), description)
+
+	return nil
+}
+
 func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte, newControlNode *ecdsa.PublicKey) (*CommunityResponse, error) {
+
 	changes, err := community.UpdateCommunityDescription(description, payload, newControlNode)
 	if err != nil {
 		return nil, err
@@ -1797,6 +1841,15 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 	if community.IsControlNode() {
 		community.config.EventsData = nil // clear events, they are already applied
 		community.increaseClock()
+
+		if m.keyDistributor != nil {
+			encryptionKeyActions := EvaluateCommunityEncryptionKeyActions(originCommunity, community)
+			err := m.keyDistributor.Generate(community, encryptionKeyActions)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		err = m.persistence.SaveCommunity(community)
 		if err != nil {
 			return nil, err
@@ -2828,6 +2881,11 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, ErrNotAuthorized
 	}
 
+	err = m.preprocessDescription(community.ID(), request.Community)
+	if err != nil {
+		return nil, err
+	}
+
 	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg, nil)
 	if err != nil {
 		return nil, err
@@ -3195,8 +3253,18 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 }
 
 func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Community, error) {
-	return recordBundleToCommunity(r, &m.identity.PublicKey, m.installationID, m.logger, m.timesource, func(community *Community) error {
-		err := community.updateCommunityDescriptionByEvents()
+	var descriptionEncryptor DescriptionEncryptor
+	if m.encryptor != nil {
+		descriptionEncryptor = m
+	}
+
+	return recordBundleToCommunity(r, &m.identity.PublicKey, m.installationID, m.logger, m.timesource, descriptionEncryptor, func(community *Community) error {
+		err := m.preprocessDescription(community.ID(), community.config.CommunityDescription)
+		if err != nil {
+			return err
+		}
+
+		err = community.updateCommunityDescriptionByEvents()
 		if err != nil {
 			return err
 		}
@@ -3209,9 +3277,6 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 			}
 			community.config.PubsubTopicPrivateKey = privKey
 		}
-
-		// Workaround for https://github.com/status-im/status-desktop/issues/12188
-		HydrateChannelsMembers(community.IDString(), community.config.CommunityDescription)
 
 		return nil
 	})
@@ -5112,6 +5177,65 @@ func (m *Manager) GetCuratedCommunities() (*CuratedCommunities, error) {
 
 func (m *Manager) SetCuratedCommunities(communities *CuratedCommunities) error {
 	return m.persistence.SetCuratedCommunities(communities)
+}
+
+func (m *Manager) encryptCommunityDescriptionImpl(groupID []byte, d *protobuf.CommunityDescription) (string, []byte, error) {
+	payload, err := proto.Marshal(d)
+	if err != nil {
+		return "", nil, err
+	}
+
+	encryptedPayload, ratchet, newSeqNo, err := m.encryptor.EncryptWithHashRatchet(groupID, payload)
+	if err != nil {
+		return "", nil, err
+	}
+
+	keyID, err := ratchet.GetKeyID()
+	if err != nil {
+		return "", nil, err
+	}
+
+	keyIDSeqNo := fmt.Sprintf("%s%d", hex.EncodeToString(keyID), newSeqNo)
+
+	return keyIDSeqNo, encryptedPayload, nil
+}
+
+func (m *Manager) encryptCommunityDescription(community *Community, d *protobuf.CommunityDescription) (string, []byte, error) {
+	return m.encryptCommunityDescriptionImpl(community.ID(), d)
+}
+
+func (m *Manager) encryptCommunityDescriptionChannel(community *Community, channelID string, d *protobuf.CommunityDescription) (string, []byte, error) {
+	return m.encryptCommunityDescriptionImpl([]byte(community.IDString()+channelID), d)
+}
+
+func (m *Manager) decryptCommunityDescription(keyIDSeqNo string, d []byte) (*protobuf.CommunityDescription, error) {
+	const hashHexLength = 64
+	if len(keyIDSeqNo) <= hashHexLength {
+		return nil, errors.New("invalid keyIDSeqNo")
+	}
+
+	keyID, err := hex.DecodeString(keyIDSeqNo[:hashHexLength])
+	if err != nil {
+		return nil, err
+	}
+
+	seqNo, err := strconv.ParseUint(keyIDSeqNo[hashHexLength:], 10, 32)
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedPayload, err := m.encryptor.DecryptWithHashRatchet(keyID, uint32(seqNo), d)
+	if err != nil {
+		return nil, err
+	}
+
+	var description protobuf.CommunityDescription
+	err = proto.Unmarshal(decryptedPayload, &description)
+	if err != nil {
+		return nil, err
+	}
+
+	return &description, nil
 }
 
 func ToLinkPreveiwThumbnail(image images.IdentityImage) (*common.LinkPreviewThumbnail, error) {

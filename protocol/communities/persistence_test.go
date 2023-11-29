@@ -46,7 +46,7 @@ func (s *PersistenceSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	s.db = &Persistence{db: db, recordBundleToCommunity: func(r *CommunityRecordBundle) (*Community, error) {
-		return recordBundleToCommunity(r, &s.identity.PublicKey, "", nil, &TimeSourceStub{}, nil)
+		return recordBundleToCommunity(r, &s.identity.PublicKey, "", nil, &TimeSourceStub{}, &DescriptionEncryptorMock{}, nil)
 	}}
 }
 
@@ -263,7 +263,7 @@ func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Communi
 		ControlNode:    &comPrivKey.PublicKey,
 		ControlDevice:  true,
 		ID:             &comPrivKey.PublicKey,
-	}, &TimeSourceStub{})
+	}, &TimeSourceStub{}, &DescriptionEncryptorMock{})
 	s.NoError(err, "New shouldn't give any error")
 
 	md, err := com.MarshaledDescription()

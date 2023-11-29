@@ -348,7 +348,7 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 			ratchet.Timestamp = uint64(header.DeprecatedKeyId)
 		}
 
-		decryptedPayload, err := s.decryptWithHR(ratchet, header.SeqNo, payload)
+		decryptedPayload, err := s.DecryptWithHR(ratchet, header.SeqNo, payload)
 
 		return decryptedPayload, err
 	}
@@ -650,43 +650,11 @@ func (s *encryptor) EncryptHashRatchetPayload(ratchet *HashRatchetKeyCompatibili
 	defer s.mutex.Unlock()
 
 	logger.Debug("encrypting hash ratchet message")
-	dmp, err := s.encryptWithHR(ratchet, payload)
-	response := make(map[string]*EncryptedMessageProtocol)
-	response[noInstallationID] = dmp
-	return response, err
-}
-
-func samePublicKeys(pubKey1, pubKey2 ecdsa.PublicKey) bool {
-	return pubKey1.X.Cmp(pubKey2.X) == 0 && pubKey1.Y.Cmp(pubKey2.Y) == 0
-}
-
-func (s *encryptor) encryptWithHR(ratchet *HashRatchetKeyCompatibility, payload []byte) (*EncryptedMessageProtocol, error) {
-	hrCache, err := s.persistence.GetHashRatchetKeyByID(ratchet, 0) // Get latest seqNo
-
+	encryptedPayload, newSeqNo, err := s.EncryptWithHR(ratchet, payload)
 	if err != nil {
 		return nil, err
 	}
-	if hrCache == nil {
-		return nil, errors.New("no encryption key found for the community")
-	}
 
-	var dbHash []byte
-	if len(hrCache.Hash) == 0 {
-		dbHash = hrCache.Key
-	} else {
-		dbHash = hrCache.Hash
-	}
-
-	hash := crypto.Keccak256Hash(dbHash)
-	encryptedPayload, err := crypto.EncryptSymmetric(hash.Bytes(), payload)
-	if err != nil {
-		return nil, err
-	}
-	newSeqNo := hrCache.SeqNo + 1
-	err = s.persistence.SaveHashRatchetKeyHash(ratchet, hash.Bytes(), newSeqNo)
-	if err != nil {
-		return nil, err
-	}
 	keyID, err := ratchet.GetKeyID()
 	if err != nil {
 		return nil, err
@@ -701,16 +669,54 @@ func (s *encryptor) encryptWithHR(ratchet *HashRatchetKeyCompatibility, payload 
 		},
 		Payload: encryptedPayload,
 	}
-	return dmp, nil
+
+	response := make(map[string]*EncryptedMessageProtocol)
+	response[noInstallationID] = dmp
+	return response, err
 }
 
-func (s *encryptor) decryptWithHR(ratchet *HashRatchetKeyCompatibility, seqNo uint32, payload []byte) ([]byte, error) {
+func samePublicKeys(pubKey1, pubKey2 ecdsa.PublicKey) bool {
+	return pubKey1.X.Cmp(pubKey2.X) == 0 && pubKey1.Y.Cmp(pubKey2.Y) == 0
+}
+
+func (s *encryptor) EncryptWithHR(ratchet *HashRatchetKeyCompatibility, payload []byte) ([]byte, uint32, error) {
+	hrCache, err := s.persistence.GetHashRatchetCache(ratchet, 0) // Get latest seqNo
+
+	if err != nil {
+		return nil, 0, err
+	}
+	if hrCache == nil {
+		return nil, 0, errors.New("no encryption key found for the community")
+	}
+
+	var dbHash []byte
+	if len(hrCache.Hash) == 0 {
+		dbHash = hrCache.Key
+	} else {
+		dbHash = hrCache.Hash
+	}
+
+	hash := crypto.Keccak256Hash(dbHash)
+	encryptedPayload, err := crypto.EncryptSymmetric(hash.Bytes(), payload)
+	if err != nil {
+		return nil, 0, err
+	}
+	newSeqNo := hrCache.SeqNo + 1
+	err = s.persistence.SaveHashRatchetKeyHash(ratchet, hash.Bytes(), newSeqNo)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return encryptedPayload, newSeqNo, nil
+}
+
+func (s *encryptor) DecryptWithHR(ratchet *HashRatchetKeyCompatibility, seqNo uint32, payload []byte) ([]byte, error) {
 	// Key exchange message, nothing to decrypt
 	if seqNo == 0 {
 		return payload, nil
 	}
 
-	hrCache, err := s.persistence.GetHashRatchetKeyByID(ratchet, seqNo)
+	hrCache, err := s.persistence.GetHashRatchetCache(ratchet, seqNo)
 	if err != nil {
 		return nil, err
 	}

@@ -292,7 +292,16 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 	}()
 
 	publishOrgAndDistributeEncryptionKeys := func(community *communities.Community) {
-		err := m.publishOrg(community)
+		recentlyPublishedOrg := recentlyPublishedOrgs[community.IDString()]
+
+		// evaluate and distribute encryption keys (if any)
+		encryptionKeyActions := communities.EvaluateCommunityEncryptionKeyActions(recentlyPublishedOrg, community)
+		err := m.communitiesKeyDistributor.Distribute(community, encryptionKeyActions)
+		if err != nil {
+			m.logger.Warn("failed to distribute encryption keys", zap.Error(err))
+		}
+
+		err = m.publishOrg(community)
 		if err != nil {
 			m.logger.Warn("failed to publish org", zap.Error(err))
 			return
@@ -307,8 +316,6 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 		}
 		m.logger.Debug("published public shard info")
 
-		recentlyPublishedOrg := recentlyPublishedOrgs[community.IDString()]
-
 		// signal client with published community
 		if m.config.messengerSignalsHandler != nil {
 			if recentlyPublishedOrg == nil || community.Clock() > recentlyPublishedOrg.Clock() {
@@ -316,13 +323,6 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 				response.AddCommunity(community)
 				m.config.messengerSignalsHandler.MessengerResponse(response)
 			}
-		}
-
-		// evaluate and distribute encryption keys (if any)
-		encryptionKeyActions := communities.EvaluateCommunityEncryptionKeyActions(recentlyPublishedOrg, community)
-		err = m.communitiesKeyDistributor.Distribute(community, encryptionKeyActions)
-		if err != nil {
-			m.logger.Warn("failed to distribute encryption keys", zap.Error(err))
 		}
 
 		recentlyPublishedOrgs[community.IDString()] = community.CreateDeepCopy()

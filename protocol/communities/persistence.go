@@ -260,32 +260,7 @@ func (p *Persistence) queryCommunities(memberIdentity *ecdsa.PublicKey, query st
 		return nil, err
 	}
 
-	defer func() {
-		if err != nil {
-			// Don't shadow original error
-			_ = rows.Close()
-			return
-
-		}
-		err = rows.Close()
-	}()
-
-	for rows.Next() {
-		r, err := scanCommunity(rows.Scan)
-		if err != nil {
-			return nil, err
-		}
-
-		org, err := p.recordBundleToCommunity(r)
-		if err != nil {
-			return nil, err
-		}
-
-		response = append(response, org)
-	}
-
-	return response, nil
-
+	return p.rowsToCommunities(rows)
 }
 
 func (p *Persistence) AllCommunities(memberIdentity *ecdsa.PublicKey) ([]*Community, error) {
@@ -302,7 +277,7 @@ func (p *Persistence) SpectatedCommunities(memberIdentity *ecdsa.PublicKey) ([]*
 	return p.queryCommunities(memberIdentity, query)
 }
 
-func (p *Persistence) rowsToCommunities(memberIdentity *ecdsa.PublicKey, rows *sql.Rows) (comms []*Community, err error) {
+func (p *Persistence) rowsToCommunityRecords(rows *sql.Rows) (result []*CommunityRecordBundle, err error) {
 	defer func() {
 		if err != nil {
 			// Don't shadow original error
@@ -318,8 +293,20 @@ func (p *Persistence) rowsToCommunities(memberIdentity *ecdsa.PublicKey, rows *s
 		if err != nil {
 			return nil, err
 		}
+		result = append(result, r)
+	}
 
-		org, err := p.recordBundleToCommunity(r)
+	return result, nil
+}
+
+func (p *Persistence) rowsToCommunities(rows *sql.Rows) (comms []*Community, err error) {
+	records, err := p.rowsToCommunityRecords(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, record := range records {
+		org, err := p.recordBundleToCommunity(record)
 		if err != nil {
 			return nil, err
 		}
@@ -338,7 +325,7 @@ func (p *Persistence) JoinedAndPendingCommunitiesWithRequests(memberIdentity *ec
 		return nil, err
 	}
 
-	return p.rowsToCommunities(memberIdentity, rows)
+	return p.rowsToCommunities(rows)
 }
 
 func (p *Persistence) DeletedCommunities(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
@@ -349,7 +336,7 @@ func (p *Persistence) DeletedCommunities(memberIdentity *ecdsa.PublicKey) (comms
 		return nil, err
 	}
 
-	return p.rowsToCommunities(memberIdentity, rows)
+	return p.rowsToCommunities(rows)
 }
 
 func (p *Persistence) CommunitiesWithPrivateKey(memberIdentity *ecdsa.PublicKey) ([]*Community, error) {
