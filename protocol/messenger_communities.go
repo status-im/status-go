@@ -3254,6 +3254,12 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 		return err
 	}
 
+	// TODO: if the community is token gated, it will be validated asynchronously
+	// syncing needs to be adjusted in this case
+	if savedCommunity == nil {
+		return nil
+	}
+
 	if err := m.handleCommunityTokensMetadataByPrivilegedMembers(savedCommunity); err != nil {
 		logger.Debug("m.handleCommunityTokensMetadataByPrivilegedMembers", zap.Error(err))
 		return err
