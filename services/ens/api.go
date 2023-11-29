@@ -374,6 +374,38 @@ func (api *API) Release(ctx context.Context, chainID uint64, txArgs transactions
 	return tx.Hash().String(), nil
 }
 
+func (api *API) ReleasePrepareTxCallMsg(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string) (ethereum.CallMsg, error) {
+	registrarABI, err := abi.JSON(strings.NewReader(registrar.UsernameRegistrarABI))
+	if err != nil {
+		return ethereum.CallMsg{}, err
+	}
+
+	data, err := registrarABI.Pack("release", usernameToLabel(username))
+	if err != nil {
+		return ethereum.CallMsg{}, err
+	}
+
+	sntAddress, err := snt.ContractAddress(chainID)
+	if err != nil {
+		return ethereum.CallMsg{}, err
+	}
+	return ethereum.CallMsg{
+		From:  common.Address(txArgs.From),
+		To:    &sntAddress,
+		Value: big.NewInt(0),
+		Data:  data,
+	}, nil
+}
+
+func (api *API) ReleasePrepareTx(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string) (interface{}, error) {
+	callMsg, err := api.ReleasePrepareTxCallMsg(ctx, chainID, txArgs, username)
+	if err != nil {
+		return nil, err
+	}
+
+	return toCallArg(callMsg), nil
+}
+
 func (api *API) ReleaseEstimate(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string) (uint64, error) {
 	registrarABI, err := abi.JSON(strings.NewReader(registrar.UsernameRegistrarABI))
 	if err != nil {
