@@ -101,6 +101,7 @@ func NewService(
 	transactionManager := transfer.NewTransactionManager(db, gethManager, transactor, config, accountsDB, pendingTxManager, feed)
 	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountFeed, feed, transactionManager, pendingTxManager,
 		tokenManager, balanceCacher)
+	transferController.Start()
 	cryptoCompare := cryptocompare.NewClient()
 	coingecko := coingecko.NewClient()
 	marketManager := market.NewManager(cryptoCompare, coingecko, feed)
