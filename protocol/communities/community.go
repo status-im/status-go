@@ -45,7 +45,6 @@ type Config struct {
 	RequestedToJoinAt                   uint64
 	RequestsToJoin                      []*RequestToJoin
 	MemberIdentity                      *ecdsa.PublicKey
-	SyncedAt                            uint64
 	EventsData                          *EventsData
 	Shard                               *shard.Shard
 	PubsubTopicPrivateKey               *ecdsa.PrivateKey
@@ -2122,7 +2121,6 @@ func (o *Community) CreateDeepCopy() *Community {
 			RequestedToJoinAt:                   o.config.RequestedToJoinAt,
 			RequestsToJoin:                      o.config.RequestsToJoin,
 			MemberIdentity:                      o.config.MemberIdentity,
-			SyncedAt:                            o.config.SyncedAt,
 			EventsData:                          o.config.EventsData,
 		},
 		timesource: o.timesource,

@@ -28,7 +28,8 @@ func TestPersistenceSuite(t *testing.T) {
 type PersistenceSuite struct {
 	suite.Suite
 
-	db *Persistence
+	db       *Persistence
+	identity *ecdsa.PrivateKey
 }
 
 func (s *PersistenceSuite) SetupTest() {
@@ -40,24 +41,26 @@ func (s *PersistenceSuite) SetupTest() {
 	err = sqlite.Migrate(db)
 	s.Require().NoError(err, "protocol migrate")
 
-	s.db = &Persistence{db: db, timesource: &TimeSourceStub{}}
+	s.identity, err = crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	s.db = &Persistence{db: db, recordBundleToCommunity: func(r *CommunityRecordBundle) (*Community, error) {
+		return recordBundleToCommunity(r, &s.identity.PublicKey, "", nil, &TimeSourceStub{}, nil)
+	}}
 }
 
 func (s *PersistenceSuite) TestSaveCommunity() {
-	id, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
 	// there is one community inserted by default
-	communities, err := s.db.AllCommunities(&id.PublicKey, "")
+	communities, err := s.db.AllCommunities(&s.identity.PublicKey)
 	s.Require().NoError(err)
 	s.Require().Len(communities, 1)
 
 	community := Community{
 		config: &Config{
-			PrivateKey:           id,
-			ControlNode:          &id.PublicKey,
+			PrivateKey:           s.identity,
+			ControlNode:          &s.identity.PublicKey,
 			ControlDevice:        true,
-			ID:                   &id.PublicKey,
+			ID:                   &s.identity.PublicKey,
 			Joined:               true,
 			Spectated:            true,
 			Verified:             true,
@@ -68,10 +71,10 @@ func (s *PersistenceSuite) TestSaveCommunity() {
 	}
 	s.Require().NoError(s.db.SaveCommunity(&community))
 
-	communities, err = s.db.AllCommunities(&id.PublicKey, "")
+	communities, err = s.db.AllCommunities(&s.identity.PublicKey)
 	s.Require().NoError(err)
 	s.Require().Len(communities, 2)
-	s.Equal(types.HexBytes(crypto.CompressPubkey(&id.PublicKey)), communities[1].ID())
+	s.Equal(types.HexBytes(crypto.CompressPubkey(&s.identity.PublicKey)), communities[1].ID())
 	s.Equal(true, communities[1].Joined())
 	s.Equal(true, communities[1].Spectated())
 	s.Equal(true, communities[1].Verified())
@@ -181,25 +184,20 @@ func (s *PersistenceSuite) TestSetPrivateKey() {
 	s.Zero(rcr.PrivateKey, "private key must be zero value")
 
 	// Set private key
-	pk, err := crypto.GenerateKey()
-	s.Require().NoError(err, "crypto.GenerateKey")
-	err = s.db.SetPrivateKey(sc.Id, pk)
+	err = s.db.SetPrivateKey(sc.Id, s.identity)
 	s.Require().NoError(err, "SetPrivateKey")
 
 	// retrieve row from db again, private key must match the given key
 	rcr, err = s.db.getRawCommunityRow(sc.Id)
 	s.Require().NoError(err, "getRawCommunityRow")
-	s.Equal(crypto.FromECDSA(pk), rcr.PrivateKey, "private key must match given key")
+	s.Equal(crypto.FromECDSA(s.identity), rcr.PrivateKey, "private key must match given key")
 }
 
 func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
-	identity, err := crypto.GenerateKey()
-	s.Require().NoError(err, "crypto.GenerateKey shouldn't give any error")
-
 	clock := uint64(time.Now().Unix())
 
 	// Add a new community that we have joined
-	com := s.makeNewCommunity(identity)
+	com := s.makeNewCommunity(s.identity)
 	com.Join()
 	sc, err := com.ToSyncInstallationCommunityProtobuf(clock, nil, nil)
 	s.Require().NoError(err, "Community.ToSyncInstallationCommunityProtobuf shouldn't give any error")
@@ -207,13 +205,13 @@ func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
 	s.Require().NoError(err, "saveRawCommunityRow")
 
 	// Add a new community that we have requested to join, but not yet joined
-	com2 := s.makeNewCommunity(identity)
+	com2 := s.makeNewCommunity(s.identity)
 	err = s.db.SaveCommunity(com2)
 	s.Require().NoError(err, "SaveCommunity shouldn't give any error")
 
 	rtj := &RequestToJoin{
 		ID:          types.HexBytes{1, 2, 3, 4, 5, 6, 7, 8},
-		PublicKey:   common.PubkeyToHex(&identity.PublicKey),
+		PublicKey:   common.PubkeyToHex(&s.identity.PublicKey),
 		Clock:       clock,
 		CommunityID: com2.ID(),
 		State:       RequestToJoinStatePending,
@@ -221,7 +219,7 @@ func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
 	err = s.db.SaveRequestToJoin(rtj)
 	s.Require().NoError(err, "SaveRequestToJoin shouldn't give any error")
 
-	comms, err := s.db.JoinedAndPendingCommunitiesWithRequests(&identity.PublicKey, "")
+	comms, err := s.db.JoinedAndPendingCommunitiesWithRequests(&s.identity.PublicKey)
 	s.Require().NoError(err, "JoinedAndPendingCommunitiesWithRequests shouldn't give any error")
 	s.Len(comms, 2, "Should have 2 communities")
 
@@ -516,9 +514,6 @@ func (s *PersistenceSuite) TestSaveCheckChannelPermissionResponse() {
 }
 
 func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses() {
-	identity, err := crypto.GenerateKey()
-	s.Require().NoError(err, "crypto.GenerateKey shouldn't give any error")
-
 	clock := uint64(time.Now().Unix())
 	communityID := types.HexBytes{7, 7, 7, 7, 7, 7, 7, 7}
 	revealedAddresses := []string{"address1", "address2", "address3"}
@@ -532,7 +527,7 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 	// RTJ with 2 revealed Addresses
 	expectedRtj1 := &RequestToJoin{
 		ID:          types.HexBytes{1, 2, 3, 4, 5, 6, 7, 8},
-		PublicKey:   common.PubkeyToHex(&identity.PublicKey),
+		PublicKey:   common.PubkeyToHex(&s.identity.PublicKey),
 		Clock:       clock,
 		CommunityID: communityID,
 		State:       RequestToJoinStateAccepted,
@@ -568,7 +563,7 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 	signature := []byte("test")
 	expectedRtj2 := &RequestToJoin{
 		ID:          types.HexBytes{8, 7, 6, 5, 4, 3, 2, 1},
-		PublicKey:   common.PubkeyToHex(&identity.PublicKey),
+		PublicKey:   common.PubkeyToHex(&s.identity.PublicKey),
 		Clock:       clock,
 		CommunityID: communityID,
 		State:       RequestToJoinStateAccepted,
@@ -600,7 +595,7 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 	// RTJ without RevealedAccounts
 	expectedRtjWithoutRevealedAccounts := &RequestToJoin{
 		ID:          types.HexBytes{1, 6, 6, 6, 6, 6, 6, 6},
-		PublicKey:   common.PubkeyToHex(&identity.PublicKey),
+		PublicKey:   common.PubkeyToHex(&s.identity.PublicKey),
 		Clock:       clock,
 		CommunityID: communityID,
 		State:       RequestToJoinStateAccepted,
@@ -617,7 +612,7 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 	// RTJ with RevealedAccount but with empty Address
 	expectedRtjWithEmptyAddress := &RequestToJoin{
 		ID:          types.HexBytes{2, 6, 6, 6, 6, 6, 6, 6},
-		PublicKey:   common.PubkeyToHex(&identity.PublicKey),
+		PublicKey:   common.PubkeyToHex(&s.identity.PublicKey),
 		Clock:       clock,
 		CommunityID: communityID,
 		State:       RequestToJoinStateAccepted,
@@ -668,18 +663,15 @@ func (s *PersistenceSuite) TestCuratedCommunities() {
 }
 
 func (s *PersistenceSuite) TestGetCommunityRequestToJoinWithRevealedAddresses() {
-	identity, err := crypto.GenerateKey()
-	s.Require().NoError(err, "crypto.GenerateKey shouldn't give any error")
-
 	clock := uint64(time.Now().Unix())
 	communityID := types.HexBytes{7, 7, 7, 7, 7, 7, 7, 7}
 	revealedAddresses := []string{"address1", "address2", "address3"}
 	chainIds := []uint64{1, 2}
-	publicKey := common.PubkeyToHex(&identity.PublicKey)
+	publicKey := common.PubkeyToHex(&s.identity.PublicKey)
 	signature := []byte("test")
 
 	// No data in database
-	_, err = s.db.GetCommunityRequestToJoinWithRevealedAddresses(publicKey, communityID)
+	_, err := s.db.GetCommunityRequestToJoinWithRevealedAddresses(publicKey, communityID)
 	s.Require().ErrorIs(err, sql.ErrNoRows)
 
 	// RTJ with 2 withoutRevealed Addresses

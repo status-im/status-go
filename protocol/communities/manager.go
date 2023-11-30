@@ -256,11 +256,11 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 		torrentConfig:               torrentConfig,
 		torrentTasks:                make(map[string]metainfo.Hash),
 		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
-		persistence: &Persistence{
-			logger:     logger,
-			db:         db,
-			timesource: timesource,
-		},
+	}
+
+	manager.persistence = &Persistence{
+		db:                      db,
+		recordBundleToCommunity: manager.dbRecordBundleToCommunity,
 	}
 
 	if managerConfig.accountsManager != nil {
@@ -622,19 +622,7 @@ func (m *Manager) publish(subscription *Subscription) {
 }
 
 func (m *Manager) All() ([]*Community, error) {
-	communities, err := m.persistence.AllCommunities(&m.identity.PublicKey, m.installationID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, c := range communities {
-		err = m.initializeCommunity(c)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return communities, nil
+	return m.persistence.AllCommunities(&m.identity.PublicKey)
 }
 
 type CommunityShard struct {
@@ -684,71 +672,23 @@ func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []string) (*Kn
 }
 
 func (m *Manager) Joined() ([]*Community, error) {
-	communities, err := m.persistence.JoinedCommunities(&m.identity.PublicKey, m.installationID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, c := range communities {
-		err = m.initializeCommunity(c)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return communities, nil
+	return m.persistence.JoinedCommunities(&m.identity.PublicKey)
 }
 
 func (m *Manager) Spectated() ([]*Community, error) {
-	communities, err := m.persistence.SpectatedCommunities(&m.identity.PublicKey, m.installationID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, c := range communities {
-		err = m.initializeCommunity(c)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return communities, nil
+	return m.persistence.SpectatedCommunities(&m.identity.PublicKey)
 }
 
 func (m *Manager) JoinedAndPendingCommunitiesWithRequests() ([]*Community, error) {
-	communities, err := m.persistence.JoinedAndPendingCommunitiesWithRequests(&m.identity.PublicKey, m.installationID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, c := range communities {
-		err = m.initializeCommunity(c)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return communities, nil
+	return m.persistence.JoinedAndPendingCommunitiesWithRequests(&m.identity.PublicKey)
 }
 
 func (m *Manager) DeletedCommunities() ([]*Community, error) {
-	communities, err := m.persistence.DeletedCommunities(&m.identity.PublicKey, m.installationID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, c := range communities {
-		err = m.initializeCommunity(c)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return communities, nil
+	return m.persistence.DeletedCommunities(&m.identity.PublicKey)
 }
 
 func (m *Manager) Controlled() ([]*Community, error) {
-	communities, err := m.persistence.CommunitiesWithPrivateKey(&m.identity.PublicKey, m.installationID)
+	communities, err := m.persistence.CommunitiesWithPrivateKey(&m.identity.PublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -757,10 +697,6 @@ func (m *Manager) Controlled() ([]*Community, error) {
 
 	for _, c := range communities {
 		if c.IsControlNode() {
-			err = m.initializeCommunity(c)
-			if err != nil {
-				return nil, err
-			}
 			controlled = append(controlled, c)
 		}
 	}
@@ -3220,43 +3156,31 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 	return community, nil
 }
 
-// Apply events to raw community
-func (m *Manager) initializeCommunity(community *Community) error {
-	err := community.updateCommunityDescriptionByEvents()
-	if err != nil {
-		return err
-	}
-
-	if m.transport != nil && m.transport.WakuVersion() == 2 {
-		topic := community.PubsubTopic()
-		privKey, err := m.transport.RetrievePubsubTopicKey(topic)
+func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Community, error) {
+	return recordBundleToCommunity(r, &m.identity.PublicKey, m.installationID, m.logger, m.timesource, func(community *Community) error {
+		err := community.updateCommunityDescriptionByEvents()
 		if err != nil {
 			return err
 		}
-		community.config.PubsubTopicPrivateKey = privKey
-	}
 
-	// Workaround for https://github.com/status-im/status-desktop/issues/12188
-	HydrateChannelsMembers(community.IDString(), community.config.CommunityDescription)
+		if m.transport != nil && m.transport.WakuVersion() == 2 {
+			topic := community.PubsubTopic()
+			privKey, err := m.transport.RetrievePubsubTopicKey(topic)
+			if err != nil {
+				return err
+			}
+			community.config.PubsubTopicPrivateKey = privKey
+		}
 
-	return nil
+		// Workaround for https://github.com/status-im/status-desktop/issues/12188
+		HydrateChannelsMembers(community.IDString(), community.config.CommunityDescription)
+
+		return nil
+	})
 }
 
 func (m *Manager) GetByID(id []byte) (*Community, error) {
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, m.installationID, id)
-	if err != nil {
-		return nil, err
-	}
-	if community == nil {
-		return nil, nil
-	}
-
-	err = m.initializeCommunity(community)
-	if err != nil {
-		return nil, err
-	}
-
-	return community, nil
+	return m.persistence.GetByID(&m.identity.PublicKey, id)
 }
 
 func (m *Manager) GetByIDString(idString string) (*Community, error) {
