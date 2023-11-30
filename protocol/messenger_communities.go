@@ -2938,8 +2938,8 @@ func (m *Messenger) passStoredCommunityInfoToSignalHandler(communityID string) {
 }
 
 // handleCommunityDescription handles an community description
-func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte) error {
-	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload, nil)
+func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte, verifiedOwner *ecdsa.PublicKey) error {
+	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload, verifiedOwner)
 	if err != nil {
 		return err
 	}
@@ -3280,7 +3280,7 @@ func (m *Messenger) HandleSyncInstallationCommunity(messageState *ReceivedMessag
 }
 
 func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessageState, syncCommunity *protobuf.SyncInstallationCommunity, statusMessage *v1protocol.StatusMessage) error {
-	logger := m.logger.Named("handleSyncCommunity")
+	logger := m.logger.Named("handleSyncInstallationCommunity")
 
 	// Should handle community
 	shouldHandle, err := m.communitiesManager.ShouldHandleSyncCommunity(syncCommunity)
@@ -3343,7 +3343,9 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 		return err
 	}
 
-	err = m.handleCommunityDescription(messageState, orgPubKey, &cd, syncCommunity.Description)
+	// This is our own message, so we can trust the set community owner
+	// This is good to do so that we don't have to queue all the actions done after the handled community description.
+	err = m.handleCommunityDescription(messageState, orgPubKey, &cd, syncCommunity.Description, orgPubKey)
 	if err != nil {
 		logger.Debug("m.handleCommunityDescription error", zap.Error(err))
 		return err
@@ -3363,16 +3365,6 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 			logger.Debug("m.SetSyncControlNode", zap.Error(err))
 			return err
 		}
-	}
-
-	savedCommunity, err := m.communitiesManager.GetByID(syncCommunity.Id)
-	if err != nil {
-		return err
-	}
-
-	if err := m.handleCommunityTokensMetadataByPrivilegedMembers(savedCommunity); err != nil {
-		logger.Debug("m.handleCommunityTokensMetadataByPrivilegedMembers", zap.Error(err))
-		return err
 	}
 
 	// if we are not waiting for approval, join or leave the community

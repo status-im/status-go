@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -580,4 +581,89 @@ func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {
 	// Bob joins the community
 	s.joinCommunity(s.alice, community, s.bob)
 
+}
+
+func (s *MessengerCommunitiesSignersSuite) TestSyncTokenGatedCommunity() {
+
+	community := s.createCommunity(s.john)
+	s.advertiseCommunityTo(s.john, community, s.alice)
+	s.joinCommunity(s.john, community, s.alice)
+
+	// john mints owner token
+	var chainID uint64 = 1
+	tokenAddress := "token-address"
+	tokenName := "tokenName"
+	tokenSymbol := "TSM"
+	_, err := s.john.SaveCommunityToken(&token.CommunityToken{
+		TokenType:       protobuf.CommunityTokenType_ERC721,
+		CommunityID:     community.IDString(),
+		Address:         tokenAddress,
+		ChainID:         int(chainID),
+		Name:            tokenName,
+		Supply:          &bigint.BigInt{},
+		Symbol:          tokenSymbol,
+		PrivilegesLevel: token.OwnerLevel,
+	}, nil)
+	s.Require().NoError(err)
+
+	// john adds minted owner token to community
+	err = s.john.AddCommunityToken(community.IDString(), int(chainID), tokenAddress)
+	s.Require().NoError(err)
+
+	// update mock - the signer for the community returned by the contracts should be john
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.john.identity.PublicKey))
+	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
+		&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
+
+	// alice accepts community update
+	_, err = WaitOnSignaledMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && len(r.Communities()[0].TokenPermissions()) == 1
+		},
+		"no communities",
+	)
+	s.Require().NoError(err)
+
+	// Create alice second instance
+	alice2, err := newMessengerWithKey(
+		s.shh,
+		s.alice.identity,
+		s.logger.With(zap.String("name", "alice-2")),
+		nil)
+
+	s.Require().NoError(err)
+
+	_, err = alice2.Start()
+	s.Require().NoError(err)
+	defer alice2.Shutdown() // nolint: errcheck
+
+	// Create communities backup
+
+	clock, _ := s.alice.getLastClockWithRelatedChat()
+	communitiesBackup, err := s.alice.backupCommunities(context.Background(), clock)
+	s.Require().NoError(err)
+
+	// Find wanted communities in the backup
+
+	var syncCommunityMessages []*protobuf.SyncInstallationCommunity
+
+	for _, b := range communitiesBackup {
+		for _, c := range b.Communities {
+			if bytes.Equal(c.Id, community.ID()) {
+				syncCommunityMessages = append(syncCommunityMessages, c)
+			}
+		}
+	}
+	s.Require().Len(syncCommunityMessages, 1)
+
+	// Push the backup into second instance
+
+	messageState := alice2.buildMessageState()
+	err = alice2.HandleSyncInstallationCommunity(messageState, syncCommunityMessages[0], nil)
+
+	s.Require().NoError(err)
+	s.Require().Len(messageState.Response.Communities(), 1)
+	s.Require().Equal(community.IDString(), messageState.Response.Communities()[0].IDString())
+	s.Require().Equal(community.ControlNode(), messageState.Response.Communities()[0].ControlNode())
 }
