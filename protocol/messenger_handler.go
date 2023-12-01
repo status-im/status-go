@@ -2299,7 +2299,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 			return err
 		}
 
-		err = m.handleCommunityDescription(state, signer, description, receivedMessage.GetCommunity())
+		err = m.handleCommunityDescription(state, signer, description, receivedMessage.GetCommunity(), nil)
 		if err != nil {
 			return err
 		}
@@ -3587,7 +3587,7 @@ func (m *Messenger) HandlePushNotificationRequest(state *ReceivedMessageState, m
 
 func (m *Messenger) HandleCommunityDescription(state *ReceivedMessageState, message *protobuf.CommunityDescription, statusMessage *v1protocol.StatusMessage) error {
 
-	err := m.handleCommunityDescription(state, state.CurrentMessageState.PublicKey, message, statusMessage.EncryptionLayer.Payload)
+	err := m.handleCommunityDescription(state, state.CurrentMessageState.PublicKey, message, statusMessage.EncryptionLayer.Payload, nil)
 	if err != nil {
 		m.logger.Warn("failed to handle CommunityDescription", zap.Error(err))
 		return err
