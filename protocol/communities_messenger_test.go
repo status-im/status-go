@@ -182,6 +182,96 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	s.Require().Equal(community.IDString(), response.Messages()[0].CommunityID)
 }
 
+func (s *MessengerCommunitiesSuite) TestJoiningOpenCommunityReturnsChatsResponse() {
+	ctx := context.Background()
+
+	openCommunityDescription := &requests.CreateCommunity{
+		Name:                         "open community",
+		Description:                  "open community to join with no requests",
+		Color:                        "#26a69a",
+		HistoryArchiveSupportEnabled: true,
+		Membership:                   protobuf.CommunityPermissions_AUTO_ACCEPT,
+		PinMessageAllMembersEnabled:  false,
+	}
+
+	response, err := s.bob.CreateCommunity(openCommunityDescription, true)
+	generalChannelChatID := response.Chats()[0].ID
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.CommunitiesSettings(), 1)
+	s.Require().Len(response.Chats(), 1)
+
+	community := response.Communities()[0]
+
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+
+	s.Require().NoError(s.bob.SaveChat(chat))
+
+	message := buildTestMessage(*chat)
+	message.CommunityID = community.IDString()
+
+	// Bob sends the community link to Alice
+	response, err = s.bob.SendChatMessage(ctx, message)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// Retrieve community link & community for Alice
+	response, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0
+		},
+		"message not received",
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats(), 1)
+
+	// Alice request to join community
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+
+	response, err = s.alice.RequestToJoinCommunity(request)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	requestToJoin := response.RequestsToJoinCommunity[0]
+	s.Require().NotNil(requestToJoin)
+	s.Require().Equal(community.ID(), requestToJoin.CommunityID)
+	s.Require().NotEmpty(requestToJoin.ID)
+	s.Require().NotEmpty(requestToJoin.Clock)
+	s.Require().Equal(requestToJoin.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin.State)
+
+	// Bobs receives the request to join and it's automatically accepted
+	response, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && len(r.RequestsToJoinCommunity) > 0
+		},
+		"message not received",
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// Alice receives the updated community description with channel information
+	response, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && len(r.chats) > 0
+		},
+		"message not received",
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// Check whether community's general chat is available for Alice
+	_, exists := response.chats[generalChannelChatID]
+	s.Require().True(exists)
+}
+
 func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	ctx := context.Background()
 

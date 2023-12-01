@@ -1620,11 +1620,16 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		if err != nil {
 			return err
 		}
+
+		// we merge to include chats in response signal to joining a community
+		err = state.Response.Merge(response)
+		if err != nil {
+			return err
+		}
+
 		if len(response.Communities()) > 0 {
 			communitySettings := response.CommunitiesSettings()[0]
 			community := response.Communities()[0]
-			state.Response.AddCommunity(community)
-			state.Response.AddCommunitySettings(communitySettings)
 
 			magnetlink := requestToJoinResponseProto.MagnetUri
 			if m.torrentClientReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {

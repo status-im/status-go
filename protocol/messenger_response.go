@@ -316,6 +316,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddMessages(response.Messages())
 	r.AddContacts(response.Contacts)
 	r.AddCommunities(response.Communities())
+	r.UpdateCommunitySettings(response.CommunitiesSettings())
 	r.AddPinMessages(response.PinMessages())
 	r.AddVerificationRequests(response.VerificationRequests())
 	r.AddTrustStatuses(response.trustStatus)
@@ -360,6 +361,12 @@ func (r *MessengerResponse) AddCommunitySettings(c *communities.CommunitySetting
 	}
 
 	r.communitiesSettings[c.CommunityID] = c
+}
+
+func (r *MessengerResponse) UpdateCommunitySettings(communitySettings []*communities.CommunitySettings) {
+	for _, communitySetting := range communitySettings {
+		r.AddCommunitySettings(communitySetting)
+	}
 }
 
 func (r *MessengerResponse) AddRequestsToJoinCommunity(requestsToJoin []*communities.RequestToJoin) {
