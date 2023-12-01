@@ -241,20 +241,18 @@ func TestPeerExchange(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// start light node which use PeerExchange to discover peers
-	config = &Config{}
-	config.PeerExchange = true
-	config.LightClient = true
-
 	enrNodes := []*enode.Node{pxServerNode.node.ENR()}
 	tree, url := makeTestTree("n", enrNodes, nil)
 	resolver := mapResolver(tree.ToTXT("n"))
 
+	config = &Config{}
+	config.PeerExchange = true
+	config.LightClient = true
+	config.Resolver = resolver
+
 	config.WakuNodes = []string{url}
 	lightNode, err := New("", "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
-
-	lightNode.dnsResolver = resolver
-
 	require.NoError(t, lightNode.Start())
 
 	// Sanity check, not great, but it's probably helpful

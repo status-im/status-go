@@ -44,6 +44,12 @@ func WithResolver(resolver dnsdisc.Resolver) DNSDiscoveryOption {
 	}
 }
 
+func WithResolver(resolver dnsdisc.Resolver) DNSDiscoveryOption {
+	return func(params *dnsDiscoveryParameters) {
+		params.resolver = resolver
+	}
+}
+
 type DiscoveredNode struct {
 	PeerID   peer.ID
 	PeerInfo peer.AddrInfo
@@ -62,7 +68,7 @@ func init() {
 }
 
 // RetrieveNodes returns a list of multiaddress given a url to a DNS discoverable ENR tree
-func RetrieveNodes(ctx context.Context, url string, resolver dnsdisc.Resolver, opts ...DNSDiscoveryOption) ([]DiscoveredNode, error) {
+func RetrieveNodes(ctx context.Context, url string, opts ...DNSDiscoveryOption) ([]DiscoveredNode, error) {
 	var discoveredNodes []DiscoveredNode
 
 	params := new(dnsDiscoveryParameters)
@@ -77,8 +83,8 @@ func RetrieveNodes(ctx context.Context, url string, resolver dnsdisc.Resolver, o
 		params.resolver = GetResolver(ctx, params.nameserver)
 	}
 
-	if resolver == nil {
-		resolver = GetResolver(ctx, params.nameserver)
+	if params.resolver == nil {
+		params.resolver = GetResolver(ctx, params.nameserver)
 	}
 	client := dnsdisc.NewClient(dnsdisc.Config{
 		Resolver: params.resolver,
