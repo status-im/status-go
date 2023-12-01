@@ -1380,6 +1380,10 @@ func (o *Community) Description() *protobuf.CommunityDescription {
 	return o.config.CommunityDescription
 }
 
+func (o *Community) DescriptionProtocolMessage() []byte {
+	return o.config.CommunityDescriptionProtocolMessage
+}
+
 func (o *Community) marshaledDescription() ([]byte, error) {
 	// This is only workaround to lower the size of the message that goes over the wire,
 	// see https://github.com/status-im/status-desktop/issues/12188

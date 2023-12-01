@@ -3345,7 +3345,14 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 
 	// This is our own message, so we can trust the set community owner
 	// This is good to do so that we don't have to queue all the actions done after the handled community description.
-	err = m.handleCommunityDescription(messageState, orgPubKey, &cd, syncCommunity.Description, orgPubKey)
+	// `signer` is `communityID` for a community with no owner token and `owner public key` otherwise
+	signer, err := amm.RecoverKey()
+	if err != nil {
+		logger.Debug("failed to recover community description signer", zap.Error(err))
+		return err
+	}
+
+	err = m.handleCommunityDescription(messageState, signer, &cd, syncCommunity.Description, signer)
 	if err != nil {
 		logger.Debug("m.handleCommunityDescription error", zap.Error(err))
 		return err
@@ -3420,10 +3427,6 @@ func (m *Messenger) HandleSyncCommunitySettings(messageState *ReceivedMessageSta
 
 	messageState.Response.AddCommunitySettings(communitySettings)
 	return nil
-}
-
-func (m *Messenger) handleCommunityTokensMetadataByPrivilegedMembers(community *communities.Community) error {
-	return m.communitiesManager.HandleCommunityTokensMetadataByPrivilegedMembers(community)
 }
 
 func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community) {

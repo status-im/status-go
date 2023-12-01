@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/protobuf/proto"
+
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
@@ -583,47 +585,87 @@ func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {
 
 }
 
-func (s *MessengerCommunitiesSignersSuite) TestSyncTokenGatedCommunity() {
+func (s *MessengerCommunitiesSignersSuite) testDescriptionSignature(description []byte) {
+	var amm protobuf.ApplicationMetadataMessage
+	err := proto.Unmarshal(description, &amm)
+	s.Require().NoError(err)
+
+	signer, err := amm.RecoverKey()
+	s.Require().NoError(err)
+	s.NotNil(signer)
+}
+
+func (s *MessengerCommunitiesSignersSuite) forceCommunityChange(community *communities.Community, owner *Messenger, user *Messenger) {
+	newDescription := community.DescriptionText() + " new"
+	_, err := owner.EditCommunity(&requests.EditCommunity{
+		CommunityID: community.ID(),
+		CreateCommunity: requests.CreateCommunity{
+			Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+			Name:        community.Name(),
+			Color:       community.Color(),
+			Description: newDescription,
+		},
+	})
+	s.Require().NoError(err)
+
+	// alice receives new description
+	_, err = WaitOnMessengerResponse(user, func(r *MessengerResponse) bool {
+		return len(r.Communities()) > 0 && r.Communities()[0].DescriptionText() == newDescription
+	}, "new description not received")
+	s.Require().NoError(err)
+}
+
+func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool) {
 
 	community := s.createCommunity(s.john)
 	s.advertiseCommunityTo(s.john, community, s.alice)
 	s.joinCommunity(s.john, community, s.alice)
 
-	// john mints owner token
-	var chainID uint64 = 1
-	tokenAddress := "token-address"
-	tokenName := "tokenName"
-	tokenSymbol := "TSM"
-	_, err := s.john.SaveCommunityToken(&token.CommunityToken{
-		TokenType:       protobuf.CommunityTokenType_ERC721,
-		CommunityID:     community.IDString(),
-		Address:         tokenAddress,
-		ChainID:         int(chainID),
-		Name:            tokenName,
-		Supply:          &bigint.BigInt{},
-		Symbol:          tokenSymbol,
-		PrivilegesLevel: token.OwnerLevel,
-	}, nil)
-	s.Require().NoError(err)
+	// FIXME: Remove this workaround when fixed:
+	// https://github.com/status-im/status-go/issues/4413
+	s.forceCommunityChange(community, s.john, s.alice)
 
-	// john adds minted owner token to community
-	err = s.john.AddCommunityToken(community.IDString(), int(chainID), tokenAddress)
+	aliceCommunity, err := s.alice.GetCommunityByID(community.ID())
 	s.Require().NoError(err)
+	s.testDescriptionSignature(aliceCommunity.DescriptionProtocolMessage())
 
-	// update mock - the signer for the community returned by the contracts should be john
-	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.john.identity.PublicKey))
-	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
-		&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
+	if mintOwnerToken {
+		// john mints owner token
+		var chainID uint64 = 1
+		tokenAddress := "token-address"
+		tokenName := "tokenName"
+		tokenSymbol := "TSM"
+		_, err := s.john.SaveCommunityToken(&token.CommunityToken{
+			TokenType:       protobuf.CommunityTokenType_ERC721,
+			CommunityID:     community.IDString(),
+			Address:         tokenAddress,
+			ChainID:         int(chainID),
+			Name:            tokenName,
+			Supply:          &bigint.BigInt{},
+			Symbol:          tokenSymbol,
+			PrivilegesLevel: token.OwnerLevel,
+		}, nil)
+		s.Require().NoError(err)
 
-	// alice accepts community update
-	_, err = WaitOnSignaledMessengerResponse(
-		s.alice,
-		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && len(r.Communities()[0].TokenPermissions()) == 1
-		},
-		"no communities",
-	)
-	s.Require().NoError(err)
+		// john adds minted owner token to community
+		err = s.john.AddCommunityToken(community.IDString(), int(chainID), tokenAddress)
+		s.Require().NoError(err)
+
+		// update mock - the signer for the community returned by the contracts should be john
+		s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.john.identity.PublicKey))
+		s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
+			&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
+
+		// alice accepts community update
+		_, err = WaitOnSignaledMessengerResponse(
+			s.alice,
+			func(r *MessengerResponse) bool {
+				return len(r.Communities()) > 0 && len(r.Communities()[0].TokenPermissions()) == 1
+			},
+			"no communities",
+		)
+		s.Require().NoError(err)
+	}
 
 	// Create alice second instance
 	alice2, err := newMessengerWithKey(
@@ -657,6 +699,8 @@ func (s *MessengerCommunitiesSignersSuite) TestSyncTokenGatedCommunity() {
 	}
 	s.Require().Len(syncCommunityMessages, 1)
 
+	s.testDescriptionSignature(syncCommunityMessages[0].Description)
+
 	// Push the backup into second instance
 
 	messageState := alice2.buildMessageState()
@@ -664,6 +708,35 @@ func (s *MessengerCommunitiesSignersSuite) TestSyncTokenGatedCommunity() {
 
 	s.Require().NoError(err)
 	s.Require().Len(messageState.Response.Communities(), 1)
-	s.Require().Equal(community.IDString(), messageState.Response.Communities()[0].IDString())
-	s.Require().Equal(community.ControlNode(), messageState.Response.Communities()[0].ControlNode())
+
+	expectedControlNode := community.PublicKey()
+	if mintOwnerToken {
+		expectedControlNode = &s.john.identity.PublicKey
+	}
+
+	responseCommunity := messageState.Response.Communities()[0]
+	s.Require().Equal(community.IDString(), responseCommunity.IDString())
+	s.Require().True(common.IsPubKeyEqual(expectedControlNode, responseCommunity.ControlNode()))
+}
+
+func (s *MessengerCommunitiesSignersSuite) TestSyncTokenGatedCommunity() {
+	testCases := []struct {
+		name           string
+		mintOwnerToken bool
+	}{
+		{
+			name:           "general community sync",
+			mintOwnerToken: false,
+		},
+		{
+			name:           "community with token ownership",
+			mintOwnerToken: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			s.testSyncCommunity(tc.mintOwnerToken)
+		})
+	}
 }
