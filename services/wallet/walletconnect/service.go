@@ -6,26 +6,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/network"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/transfer"
 )
-
-type txSigningDetails struct {
-	chainID       uint64
-	from          common.Address
-	txBeingSigned *ethTypes.Transaction
-	txHash        common.Hash
-}
 
 type Service struct {
 	db             *sql.DB
@@ -33,73 +22,24 @@ type Service struct {
 	accountsDB     *accounts.Database
 	eventFeed      *event.Feed
 
-	transactor  *transactions.Transactor
-	gethManager *account.GethManager
+	transactionManager *transfer.TransactionManager
+	gethManager        *account.GethManager
 
-	config        *params.NodeConfig
-	txSignDetails *txSigningDetails
+	config *params.NodeConfig
 }
 
-func NewService(db *sql.DB, networkManager *network.Manager, accountsDB *accounts.Database, transactor *transactions.Transactor, gethManager *account.GethManager, eventFeed *event.Feed, config *params.NodeConfig) *Service {
+func NewService(db *sql.DB, networkManager *network.Manager, accountsDB *accounts.Database,
+	transactionManager *transfer.TransactionManager, gethManager *account.GethManager, eventFeed *event.Feed,
+	config *params.NodeConfig) *Service {
 	return &Service{
-		db:             db,
-		networkManager: networkManager,
-		accountsDB:     accountsDB,
-		eventFeed:      eventFeed,
-		transactor:     transactor,
-		gethManager:    gethManager,
-		config:         config,
+		db:                 db,
+		networkManager:     networkManager,
+		accountsDB:         accountsDB,
+		eventFeed:          eventFeed,
+		transactionManager: transactionManager,
+		gethManager:        gethManager,
+		config:             config,
 	}
-}
-
-func (s *Service) SignMessage(message types.HexBytes, address common.Address, password string) (string, error) {
-	selectedAccount, err := s.gethManager.VerifyAccountPassword(s.config.KeyStoreDir, address.Hex(), password)
-	if err != nil {
-		return "", err
-	}
-
-	signature, err := crypto.Sign(message[:], selectedAccount.PrivateKey)
-
-	return types.EncodeHex(signature), err
-}
-
-func (s *Service) BuildRawTransaction(signature string) (string, error) {
-	txWithSignature, err := s.addSignatureToTransaction(signature)
-	if err != nil {
-		return "", err
-	}
-
-	data, err := txWithSignature.MarshalBinary()
-	if err != nil {
-		return "", err
-	}
-
-	s.txSignDetails.txHash = txWithSignature.Hash()
-
-	return types.EncodeHex(data), nil
-}
-
-func (s *Service) SendRawTransaction(rawTx string) (string, error) {
-	err := s.transactor.SendRawTransaction(s.txSignDetails.chainID, rawTx)
-	if err != nil {
-		return "", err
-	}
-
-	return s.txSignDetails.txHash.Hex(), nil
-}
-
-func (s *Service) SendTransactionWithSignature(signature string) (string, error) {
-	txWithSignature, err := s.addSignatureToTransaction(signature)
-	if err != nil {
-		return "", err
-	}
-
-	hash, err := s.transactor.SendTransactionWithSignature(txWithSignature)
-	if err != nil {
-		return "", err
-	}
-
-	return hash.Hex(), nil
 }
 
 func (s *Service) PairSessionProposal(proposal SessionProposal) (*PairSessionResponse, error) {
@@ -208,7 +148,7 @@ func (s *Service) HasActivePairings() (bool, error) {
 	return HasActivePairings(s.db, time.Now().Unix())
 }
 
-func (s *Service) SessionRequest(request SessionRequest) (response *SessionRequestResponse, err error) {
+func (s *Service) SessionRequest(request SessionRequest) (response *transfer.TxResponse, err error) {
 	// TODO #12434: should we check topic for validity? It might make sense if we
 	// want to cache the paired sessions
 

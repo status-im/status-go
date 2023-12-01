@@ -9,7 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -100,14 +99,6 @@ type SessionRequest struct {
 type SessionDelete struct {
 	ID    int64 `json:"id"`
 	Topic Topic `json:"topic"`
-}
-
-type SessionRequestResponse struct {
-	KeyUID        string        `json:"keyUid,omitempty"`
-	Address       types.Address `json:"address,omitempty"`
-	AddressPath   string        `json:"addressPath,omitempty"`
-	SignOnKeycard bool          `json:"signOnKeycard,omitempty"`
-	MessageToSign interface{}   `json:"messageToSign,omitempty"`
 }
 
 // Valid namespace
