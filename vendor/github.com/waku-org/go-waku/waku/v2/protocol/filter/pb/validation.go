@@ -52,7 +52,7 @@ func (x *FilterSubscribeResponse) Validate() error {
 	return nil
 }
 
-func (x *MessagePushV2) Validate() error {
+func (x *MessagePush) Validate() error {
 	if x.WakuMessage == nil {
 		return errMissingMessage
 	}

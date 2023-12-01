@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/hashicorp/golang-lru/simplelru"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange/pb"
+	"go.uber.org/zap"
 )
 
 // simpleLRU internal uses container/list, which is ring buffer(double linked list)
@@ -17,14 +18,16 @@ type enrCache struct {
 	data *simplelru.LRU
 	rng  *rand.Rand
 	mu   sync.RWMutex
+	log  *zap.Logger
 }
 
 // err on negative size
-func newEnrCache(size int) (*enrCache, error) {
+func newEnrCache(size int, log *zap.Logger) (*enrCache, error) {
 	inner, err := simplelru.NewLRU(size, nil)
 	return &enrCache{
 		data: inner,
 		rng:  rand.New(rand.NewSource(rand.Int63())),
+		log:  log.Named("enr-cache"),
 	}, err
 }
 
@@ -35,6 +38,7 @@ func (c *enrCache) updateCache(node *enode.Node) {
 	currNode, ok := c.data.Get(node.ID())
 	if !ok || node.Seq() > currNode.(*enode.Node).Seq() {
 		c.data.Add(node.ID(), node)
+		c.log.Debug("discovered px peer via discv5", zap.Stringer("enr", node))
 	}
 }
 
@@ -67,7 +71,7 @@ func (c *enrCache) getENRs(neededPeers int) ([]*pb.PeerInfo, error) {
 		}
 		writer.Flush()
 		result = append(result, &pb.PeerInfo{
-			ENR: b.Bytes(),
+			Enr: b.Bytes(),
 		})
 	}
 	return result, nil

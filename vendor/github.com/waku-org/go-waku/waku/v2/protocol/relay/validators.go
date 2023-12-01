@@ -21,10 +21,10 @@ import (
 
 func msgHash(pubSubTopic string, msg *pb.WakuMessage) []byte {
 	timestampBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(timestampBytes, uint64(msg.Timestamp))
+	binary.LittleEndian.PutUint64(timestampBytes, uint64(msg.GetTimestamp()))
 
 	var ephemeralByte byte
-	if msg.Ephemeral {
+	if msg.GetEphemeral() {
 		ephemeralByte = 1
 	}
 
@@ -67,9 +67,10 @@ func (w *WakuRelay) topicValidator(topic string) func(ctx context.Context, peerI
 		}
 
 		w.topicValidatorMutex.RLock()
-		validators, exists := w.topicValidators[topic]
+		validators := w.topicValidators[topic]
 		validators = append(validators, w.defaultTopicValidators...)
 		w.topicValidatorMutex.RUnlock()
+		exists := len(validators) > 0
 
 		if exists {
 			for _, v := range validators {
@@ -101,12 +102,12 @@ func (w *WakuRelay) AddSignedTopicValidator(topic string, publicKey *ecdsa.Publi
 const messageWindowDuration = time.Minute * 5
 
 func withinTimeWindow(t timesource.Timesource, msg *pb.WakuMessage) bool {
-	if msg.Timestamp == 0 {
+	if msg.GetTimestamp() == 0 {
 		return false
 	}
 
 	now := t.Now()
-	msgTime := time.Unix(0, msg.Timestamp)
+	msgTime := time.Unix(0, msg.GetTimestamp())
 
 	return now.Sub(msgTime).Abs() <= messageWindowDuration
 }

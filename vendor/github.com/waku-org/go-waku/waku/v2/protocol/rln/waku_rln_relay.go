@@ -11,9 +11,11 @@ import (
 	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager"
+	rlnpb "github.com/waku-org/go-waku/waku/v2/protocol/rln/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-zerokit-rln/rln"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 type WakuRLNRelay struct {
@@ -45,10 +47,8 @@ func GetRLNInstanceAndRootTracker(treePath string) (*rln.RLN, *group_manager.Mer
 		return nil, nil, err
 	}
 
-	rootTracker, err := group_manager.NewMerkleRootTracker(acceptableRootWindowSize, rlnInstance)
-	if err != nil {
-		return nil, nil, err
-	}
+	rootTracker := group_manager.NewMerkleRootTracker(acceptableRootWindowSize, rlnInstance)
+
 	return rlnInstance, rootTracker, nil
 }
 func New(
@@ -106,7 +106,12 @@ func (rlnRelay *WakuRLNRelay) ValidateMessage(msg *pb.WakuMessage, optionalTime 
 		epoch = rln.CalcEpoch(rlnRelay.timesource.Now())
 	}
 
-	msgProof := toRateLimitProof(msg)
+	msgProof, err := BytesToRateLimitProof(msg.RateLimitProof)
+	if err != nil {
+		rlnRelay.log.Debug("invalid message: could not extract proof", zap.Error(err))
+		rlnRelay.metrics.RecordInvalidMessage(proofExtractionErr)
+	}
+
 	if msgProof == nil {
 		// message does not contain a proof
 		rlnRelay.log.Debug("invalid message: message does not contain a proof")
@@ -133,7 +138,7 @@ func (rlnRelay *WakuRLNRelay) ValidateMessage(msg *pb.WakuMessage, optionalTime 
 	}
 
 	if !(rlnRelay.RootTracker.ContainsRoot(msgProof.MerkleRoot)) {
-		rlnRelay.log.Debug("invalid message: unexpected root", logging.HexBytes("msgRoot", msg.RateLimitProof.MerkleRoot))
+		rlnRelay.log.Debug("invalid message: unexpected root", logging.HexBytes("msgRoot", msgProof.MerkleRoot[:]))
 		rlnRelay.metrics.RecordInvalidMessage(invalidRoot)
 		return invalidMessage, nil
 	}
@@ -206,7 +211,12 @@ func (rlnRelay *WakuRLNRelay) AppendRLNProof(msg *pb.WakuMessage, senderEpochTim
 	}
 	rlnRelay.metrics.RecordProofGeneration(time.Since(start))
 
-	msg.RateLimitProof = proof
+	b, err := proto.Marshal(proof)
+	if err != nil {
+		return err
+	}
+
+	msg.RateLimitProof = b
 
 	return nil
 }
@@ -262,7 +272,7 @@ func (rlnRelay *WakuRLNRelay) Validator(
 	}
 }
 
-func (rlnRelay *WakuRLNRelay) generateProof(input []byte, epoch rln.Epoch) (*pb.RateLimitProof, error) {
+func (rlnRelay *WakuRLNRelay) generateProof(input []byte, epoch rln.Epoch) (*rlnpb.RateLimitProof, error) {
 	identityCredentials, err := rlnRelay.GroupManager.IdentityCredentials()
 	if err != nil {
 		return nil, err
@@ -275,7 +285,7 @@ func (rlnRelay *WakuRLNRelay) generateProof(input []byte, epoch rln.Epoch) (*pb.
 		return nil, err
 	}
 
-	return &pb.RateLimitProof{
+	return &rlnpb.RateLimitProof{
 		Proof:         proof.Proof[:],
 		MerkleRoot:    proof.MerkleRoot[:],
 		Epoch:         proof.Epoch[:],

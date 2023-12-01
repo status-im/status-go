@@ -3,7 +3,9 @@ package rln
 import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	rlnpb "github.com/waku-org/go-waku/waku/v2/protocol/rln/pb"
 	"github.com/waku-org/go-zerokit-rln/rln"
+	"google.golang.org/protobuf/proto"
 )
 
 type messageValidationResult int
@@ -37,20 +39,27 @@ func toRLNSignal(wakuMessage *pb.WakuMessage) []byte {
 	return append(wakuMessage.Payload, contentTopicBytes...)
 }
 
-func toRateLimitProof(msg *pb.WakuMessage) *rln.RateLimitProof {
-	if msg == nil || msg.RateLimitProof == nil {
-		return nil
+// Bytres2RateLimitProof converts a slice of bytes into a RateLimitProof instance
+func BytesToRateLimitProof(data []byte) (*rln.RateLimitProof, error) {
+	if data == nil {
+		return nil, nil
+	}
+
+	rateLimitProof := &rlnpb.RateLimitProof{}
+	err := proto.Unmarshal(data, rateLimitProof)
+	if err != nil {
+		return nil, err
 	}
 
 	result := &rln.RateLimitProof{
-		Proof:         rln.ZKSNARK(rln.Bytes128(msg.RateLimitProof.Proof)),
-		MerkleRoot:    rln.MerkleNode(rln.Bytes32(msg.RateLimitProof.MerkleRoot)),
-		Epoch:         rln.Epoch(rln.Bytes32(msg.RateLimitProof.Epoch)),
-		ShareX:        rln.MerkleNode(rln.Bytes32(msg.RateLimitProof.ShareX)),
-		ShareY:        rln.MerkleNode(rln.Bytes32(msg.RateLimitProof.ShareY)),
-		Nullifier:     rln.Nullifier(rln.Bytes32(msg.RateLimitProof.Nullifier)),
-		RLNIdentifier: rln.RLNIdentifier(rln.Bytes32(msg.RateLimitProof.RlnIdentifier)),
+		Proof:         rln.ZKSNARK(rln.Bytes128(rateLimitProof.Proof)),
+		MerkleRoot:    rln.MerkleNode(rln.Bytes32(rateLimitProof.MerkleRoot)),
+		Epoch:         rln.Epoch(rln.Bytes32(rateLimitProof.Epoch)),
+		ShareX:        rln.MerkleNode(rln.Bytes32(rateLimitProof.ShareX)),
+		ShareY:        rln.MerkleNode(rln.Bytes32(rateLimitProof.ShareY)),
+		Nullifier:     rln.Nullifier(rln.Bytes32(rateLimitProof.Nullifier)),
+		RLNIdentifier: rln.RLNIdentifier(rln.Bytes32(rateLimitProof.RlnIdentifier)),
 	}
 
-	return result
+	return result, nil
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"math"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -57,6 +56,7 @@ func (wakuM *WakuMetadata) SetHost(h host.Host) {
 func (wakuM *WakuMetadata) Start(ctx context.Context) error {
 	if wakuM.clusterID == 0 {
 		wakuM.log.Warn("no clusterID is specified. Protocol will not be initialized")
+		return nil
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -135,16 +135,21 @@ func (wakuM *WakuMetadata) Request(ctx context.Context, peerID peer.ID) (*protoc
 	stream.Close()
 
 	if response.ClusterId == nil {
-		return nil, nil // Node is not using sharding
+		return nil, errors.New("node did not provide a waku clusterid")
 	}
 
-	result := &protocol.RelayShards{}
-	result.ClusterID = uint16(*response.ClusterId)
+	rClusterID := uint16(*response.ClusterId)
+	var rShardIDs []uint16
 	for _, i := range response.Shards {
-		result.ShardIDs = append(result.ShardIDs, uint16(i))
+		rShardIDs = append(rShardIDs, uint16(i))
 	}
 
-	return result, nil
+	rs, err := protocol.NewRelayShards(rClusterID, rShardIDs...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &rs, nil
 }
 
 func (wakuM *WakuMetadata) onRequest(ctx context.Context) func(network.Stream) {
@@ -209,6 +214,15 @@ func (wakuM *WakuMetadata) ListenClose(n network.Network, m multiaddr.Multiaddr)
 	// Do nothing
 }
 
+func (wakuM *WakuMetadata) disconnectPeer(peerID peer.ID, reason error) {
+	logger := wakuM.log.With(logging.HostID("peerID", peerID))
+	logger.Error("disconnecting from peer", zap.Error(reason))
+	wakuM.h.Peerstore().RemovePeer(peerID)
+	if err := wakuM.h.Network().ClosePeer(peerID); err != nil {
+		logger.Error("could not disconnect from peer", zap.Error(err))
+	}
+}
+
 // Connected is called when a connection is opened
 func (wakuM *WakuMetadata) Connected(n network.Network, cc network.Conn) {
 	go func() {
@@ -219,30 +233,14 @@ func (wakuM *WakuMetadata) Connected(n network.Network, cc network.Conn) {
 
 		peerID := cc.RemotePeer()
 
-		logger := wakuM.log.With(logging.HostID("peerID", peerID))
-
-		shouldDisconnect := true
 		shard, err := wakuM.Request(wakuM.ctx, peerID)
-		if err == nil {
-			if shard == nil {
-				err = errors.New("no shard reported")
-			} else if shard.ClusterID != wakuM.clusterID {
-				err = errors.New("different clusterID reported")
-			}
-		} else {
-			// Only disconnect from peers if they support the protocol
-			// TODO: open a PR in go-libp2p to create a var with this error to not have to compare strings but use errors.Is instead
-			if strings.Contains(err.Error(), "protocols not supported") {
-				shouldDisconnect = false
-			}
+		if err != nil {
+			wakuM.disconnectPeer(peerID, err)
+			return
 		}
 
-		if shouldDisconnect && err != nil {
-			logger.Error("disconnecting from peer", zap.Error(err))
-			wakuM.h.Peerstore().RemovePeer(peerID)
-			if err := wakuM.h.Network().ClosePeer(peerID); err != nil {
-				logger.Error("could not disconnect from peer", zap.Error(err))
-			}
+		if shard.ClusterID != wakuM.clusterID {
+			wakuM.disconnectPeer(peerID, errors.New("different clusterID reported"))
 		}
 	}()
 }

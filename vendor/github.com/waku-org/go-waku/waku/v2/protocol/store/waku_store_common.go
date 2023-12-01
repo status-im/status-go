@@ -16,6 +16,7 @@ import (
 
 // StoreID_v20beta4 is the current Waku Store protocol identifier
 const StoreID_v20beta4 = libp2pProtocol.ID("/vac/waku/store/2.0.0-beta4")
+const StoreENRField = uint8(1 << 1)
 
 // MaxPageSize is the maximum number of waku messages to return per page
 const MaxPageSize = 20
@@ -64,5 +65,8 @@ func NewWakuStore(p MessageProvider, pm *peermanager.PeerManager, timesource tim
 	wakuStore.pm = pm
 	wakuStore.metrics = newMetrics(reg)
 
+	if pm != nil {
+		pm.RegisterWakuProtocol(StoreID_v20beta4, StoreENRField)
+	}
 	return wakuStore
 }

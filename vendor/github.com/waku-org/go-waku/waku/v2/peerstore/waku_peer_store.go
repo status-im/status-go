@@ -59,6 +59,7 @@ type WakuPeerstore interface {
 	RemovePubSubTopic(p peer.ID, topic string) error
 	PubSubTopics(p peer.ID) ([]string, error)
 	SetPubSubTopics(p peer.ID, topics []string) error
+	PeersByPubSubTopics(pubSubTopics []string, specificPeers ...peer.ID) peer.IDSlice
 	PeersByPubSubTopic(pubSubTopic string, specificPeers ...peer.ID) peer.IDSlice
 }
 
@@ -207,7 +208,38 @@ func (ps *WakuPeerstoreImpl) PubSubTopics(p peer.ID) ([]string, error) {
 	return result.([]string), nil
 }
 
-// PeersByPubSubTopic Returns list of peers by pubSubTopic
+// PeersByPubSubTopic Returns list of peers that support list of pubSubTopics
+// If specifiPeers are listed, filtering is done from them otherwise from all peers in peerstore
+func (ps *WakuPeerstoreImpl) PeersByPubSubTopics(pubSubTopics []string, specificPeers ...peer.ID) peer.IDSlice {
+	if specificPeers == nil {
+		specificPeers = ps.Peers()
+	}
+	var result peer.IDSlice
+	for _, p := range specificPeers {
+		topics, err := ps.PubSubTopics(p)
+		if err == nil {
+			//Convoluted and crazy logic to find subset of topics
+			// Could not find a better way to do it?
+			peerTopicMap := make(map[string]struct{})
+			match := true
+			for _, topic := range topics {
+				peerTopicMap[topic] = struct{}{}
+			}
+			for _, topic := range pubSubTopics {
+				if _, ok := peerTopicMap[topic]; !ok {
+					match = false
+					break
+				}
+			}
+			if match {
+				result = append(result, p)
+			}
+		} //Note: skipping a peer in case of an error as there would be others available.
+	}
+	return result
+}
+
+// PeersByPubSubTopic Returns list of peers that support a single pubSubTopic
 // If specifiPeers are listed, filtering is done from them otherwise from all peers in peerstore
 func (ps *WakuPeerstoreImpl) PeersByPubSubTopic(pubSubTopic string, specificPeers ...peer.ID) peer.IDSlice {
 	if specificPeers == nil {

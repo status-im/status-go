@@ -1011,7 +1011,7 @@ github.com/waku-org/go-discover/discover/v5wire
 github.com/waku-org/go-libp2p-rendezvous
 github.com/waku-org/go-libp2p-rendezvous/db
 github.com/waku-org/go-libp2p-rendezvous/pb
-# github.com/waku-org/go-waku v0.8.1-0.20231103161423-351dd55a1498
+# github.com/waku-org/go-waku v0.8.1-0.20231201063231-bdd5d02a91a3
 ## explicit; go 1.19
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/waku/persistence
@@ -1042,11 +1042,13 @@ github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager
 github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager/dynamic
 github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager/static
 github.com/waku-org/go-waku/waku/v2/protocol/rln/keystore
+github.com/waku-org/go-waku/waku/v2/protocol/rln/pb
 github.com/waku-org/go-waku/waku/v2/protocol/rln/web3
 github.com/waku-org/go-waku/waku/v2/protocol/store
 github.com/waku-org/go-waku/waku/v2/protocol/store/pb
 github.com/waku-org/go-waku/waku/v2/protocol/subscription
 github.com/waku-org/go-waku/waku/v2/rendezvous
+github.com/waku-org/go-waku/waku/v2/service
 github.com/waku-org/go-waku/waku/v2/timesource
 github.com/waku-org/go-waku/waku/v2/utils
 # github.com/waku-org/go-zerokit-rln v0.1.14-0.20230916173259-d284a3d8f2fd
@@ -1296,12 +1298,14 @@ golang.org/x/xerrors/internal
 google.golang.org/protobuf/cmd/protoc-gen-go
 google.golang.org/protobuf/cmd/protoc-gen-go/internal_gengo
 google.golang.org/protobuf/compiler/protogen
+google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
 google.golang.org/protobuf/internal/descfmt
 google.golang.org/protobuf/internal/descopts
 google.golang.org/protobuf/internal/detrand
 google.golang.org/protobuf/internal/encoding/defval
+google.golang.org/protobuf/internal/encoding/json
 google.golang.org/protobuf/internal/encoding/messageset
 google.golang.org/protobuf/internal/encoding/tag
 google.golang.org/protobuf/internal/encoding/text

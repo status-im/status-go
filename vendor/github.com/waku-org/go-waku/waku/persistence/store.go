@@ -14,8 +14,8 @@ import (
 	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 // MessageProvider is an interface that provides access to store/retrieve messages from a persistence store.
@@ -212,7 +212,7 @@ func (d *DBStore) cleanOlderRecords(ctx context.Context) error {
 	if d.maxDuration > 0 {
 		start := time.Now()
 		sqlStmt := `DELETE FROM message WHERE receiverTimestamp < $1`
-		_, err := d.db.Exec(sqlStmt, utils.GetUnixEpochFrom(d.timesource.Now().Add(-d.maxDuration)))
+		_, err := d.db.Exec(sqlStmt, d.timesource.Now().Add(-d.maxDuration).UnixNano())
 		if err != nil {
 			d.metrics.RecordError(retPolicyFailure)
 			return err
@@ -287,11 +287,11 @@ func (d *DBStore) Validate(env *protocol.Envelope) error {
 	lowerBound := n.Add(-MaxTimeVariance)
 
 	// Ensure that messages don't "jump" to the front of the queue with future timestamps
-	if env.Message().Timestamp > upperBound.UnixNano() {
+	if env.Message().GetTimestamp() > upperBound.UnixNano() {
 		return ErrFutureMessage
 	}
 
-	if env.Message().Timestamp < lowerBound.UnixNano() {
+	if env.Message().GetTimestamp() < lowerBound.UnixNano() {
 		return ErrMessageTooOld
 	}
 
@@ -310,7 +310,7 @@ func (d *DBStore) Put(env *protocol.Envelope) error {
 	dbKey := NewDBKey(uint64(cursor.SenderTime), uint64(cursor.ReceiverTime), env.PubsubTopic(), env.Index().Digest)
 
 	start := time.Now()
-	_, err = stmt.Exec(dbKey.Bytes(), cursor.ReceiverTime, env.Message().Timestamp, env.Message().ContentTopic, env.PubsubTopic(), env.Message().Payload, env.Message().Version)
+	_, err = stmt.Exec(dbKey.Bytes(), cursor.ReceiverTime, env.Message().GetTimestamp(), env.Message().ContentTopic, env.PubsubTopic(), env.Message().Payload, env.Message().GetVersion())
 	if err != nil {
 		return err
 	}
@@ -361,15 +361,17 @@ func (d *DBStore) handleQueryCursor(query *pb.HistoryQuery, paramCnt *int, condi
 		parameters = append(parameters, timeDBKey.Bytes())
 	}
 
-	if query.StartTime != 0 {
+	startTime := query.GetStartTime()
+	if startTime != 0 {
 		if !usesCursor || query.PagingInfo.Direction == pb.PagingInfo_BACKWARD {
-			handleTimeParam(query.StartTime, ">=")
+			handleTimeParam(startTime, ">=")
 		}
 	}
 
-	if query.EndTime != 0 {
+	endTime := query.GetEndTime()
+	if endTime != 0 {
 		if !usesCursor || query.PagingInfo.Direction == pb.PagingInfo_FORWARD {
-			handleTimeParam(query.EndTime+1, "<")
+			handleTimeParam(endTime+1, "<")
 		}
 	}
 	return conditions, parameters, nil
@@ -564,8 +566,14 @@ func (d *DBStore) GetStoredMessage(row *sql.Rows) (StoredMessage, error) {
 	msg := new(wpb.WakuMessage)
 	msg.ContentTopic = contentTopic
 	msg.Payload = payload
-	msg.Timestamp = senderTimestamp
-	msg.Version = version
+
+	if senderTimestamp != 0 {
+		msg.Timestamp = proto.Int64(senderTimestamp)
+	}
+
+	if version > 0 {
+		msg.Version = proto.Uint32(version)
+	}
 
 	record := StoredMessage{
 		ID:           id,

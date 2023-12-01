@@ -14,15 +14,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
+	"github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush/pb"
 	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
 // LightPushID_v20beta1 is the current Waku LightPush protocol identifier
 const LightPushID_v20beta1 = libp2pProtocol.ID("/vac/waku/lightpush/2.0.0-beta1")
+const LightPushENRField = uint8(1 << 3)
 
 var (
 	ErrNoPeersAvailable = errors.New("no suitable remote peers")
@@ -49,6 +52,7 @@ func NewWakuLightPush(relay *relay.WakuRelay, pm *peermanager.PeerManager, reg p
 	wakuLP.log = log.Named("lightpush")
 	wakuLP.pm = pm
 	wakuLP.metrics = newMetrics(reg)
+
 	return wakuLP
 }
 
@@ -69,6 +73,9 @@ func (wakuLP *WakuLightPush) Start(ctx context.Context) error {
 	wakuLP.h.SetStreamHandlerMatch(LightPushID_v20beta1, protocol.PrefixTextMatch(string(LightPushID_v20beta1)), wakuLP.onRequest(ctx))
 	wakuLP.log.Info("Light Push protocol started")
 
+	if wakuLP.pm != nil {
+		wakuLP.pm.RegisterWakuProtocol(LightPushID_v20beta1, LightPushENRField)
+	}
 	return nil
 }
 
@@ -80,7 +87,7 @@ func (wakuLP *WakuLightPush) relayIsNotAvailable() bool {
 func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(network.Stream) {
 	return func(stream network.Stream) {
 		logger := wakuLP.log.With(logging.HostID("peer", stream.Conn().RemotePeer()))
-		requestPushRPC := &pb.PushRPC{}
+		requestPushRPC := &pb.PushRpc{}
 
 		reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
 
@@ -94,13 +101,14 @@ func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(network.Stream)
 			return
 		}
 
-		responsePushRPC := &pb.PushRPC{
+		responsePushRPC := &pb.PushRpc{
 			RequestId: requestPushRPC.RequestId,
 			Response:  &pb.PushResponse{},
 		}
 
 		if err := requestPushRPC.ValidateRequest(); err != nil {
-			responsePushRPC.Response.Info = err.Error()
+			responseMsg := err.Error()
+			responsePushRPC.Response.Info = &responseMsg
 			wakuLP.metrics.RecordError(requestBodyFailure)
 			wakuLP.reply(stream, responsePushRPC, logger)
 			return
@@ -110,8 +118,8 @@ func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(network.Stream)
 
 		logger.Info("push request")
 
-		pubSubTopic := requestPushRPC.Query.PubsubTopic
-		message := requestPushRPC.Query.Message
+		pubSubTopic := requestPushRPC.Request.PubsubTopic
+		message := requestPushRPC.Request.Message
 
 		wakuLP.metrics.RecordMessage()
 
@@ -122,11 +130,13 @@ func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(network.Stream)
 		if err != nil {
 			logger.Error("publishing message", zap.Error(err))
 			wakuLP.metrics.RecordError(messagePushFailure)
-			responsePushRPC.Response.Info = fmt.Sprintf("Could not publish message: %s", err.Error())
+			responseMsg := fmt.Sprintf("Could not publish message: %s", err.Error())
+			responsePushRPC.Response.Info = &responseMsg
 			return
 		} else {
 			responsePushRPC.Response.IsSuccess = true
-			responsePushRPC.Response.Info = "OK"
+			responseMsg := "OK"
+			responsePushRPC.Response.Info = &responseMsg
 		}
 
 		wakuLP.reply(stream, responsePushRPC, logger)
@@ -138,12 +148,12 @@ func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(network.Stream)
 		if responsePushRPC.Response.IsSuccess {
 			logger.Info("request success")
 		} else {
-			logger.Info("request failure", zap.String("info", responsePushRPC.Response.Info))
+			logger.Info("request failure", zap.String("info", responsePushRPC.GetResponse().GetInfo()))
 		}
 	}
 }
 
-func (wakuLP *WakuLightPush) reply(stream network.Stream, responsePushRPC *pb.PushRPC, logger *zap.Logger) {
+func (wakuLP *WakuLightPush) reply(stream network.Stream, responsePushRPC *pb.PushRpc, logger *zap.Logger) {
 	writer := pbio.NewDelimitedWriter(stream)
 	err := writer.WriteMsg(responsePushRPC)
 	if err != nil {
@@ -175,7 +185,7 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, p
 		wakuLP.metrics.RecordError(dialFailure)
 		return nil, err
 	}
-	pushRequestRPC := &pb.PushRPC{RequestId: hex.EncodeToString(params.requestID), Query: req}
+	pushRequestRPC := &pb.PushRpc{RequestId: hex.EncodeToString(params.requestID), Request: req}
 
 	writer := pbio.NewDelimitedWriter(stream)
 	reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
@@ -190,7 +200,7 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, p
 		return nil, err
 	}
 
-	pushResponseRPC := &pb.PushRPC{}
+	pushResponseRPC := &pb.PushRpc{}
 	err = reader.ReadMsg(pushResponseRPC)
 	if err != nil {
 		logger.Error("reading response", zap.Error(err))
@@ -230,7 +240,10 @@ func (wakuLP *WakuLightPush) handleOpts(ctx context.Context, message *wpb.WakuMe
 
 	optList := append(DefaultOptions(wakuLP.h), opts...)
 	for _, opt := range optList {
-		opt(params)
+		err := opt(params)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if params.pubsubTopic == "" {
@@ -240,12 +253,21 @@ func (wakuLP *WakuLightPush) handleOpts(ctx context.Context, message *wpb.WakuMe
 		}
 	}
 
+	if params.pm != nil && params.peerAddr != nil {
+		pData, err := wakuLP.pm.AddPeer(params.peerAddr, peerstore.Static, []string{params.pubsubTopic}, LightPushID_v20beta1)
+		if err != nil {
+			return nil, err
+		}
+		wakuLP.pm.Connect(pData)
+		params.selectedPeer = pData.AddrInfo.ID
+	}
+
 	if params.pm != nil && params.selectedPeer == "" {
 		params.selectedPeer, err = wakuLP.pm.SelectPeer(
 			peermanager.PeerSelectionCriteria{
 				SelectionType: params.peerSelectionType,
 				Proto:         LightPushID_v20beta1,
-				PubsubTopic:   params.pubsubTopic,
+				PubsubTopics:  []string{params.pubsubTopic},
 				SpecificPeers: params.preferredPeers,
 				Ctx:           ctx,
 			},
@@ -284,9 +306,14 @@ func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *wpb.WakuMessa
 
 	if response.IsSuccess {
 		hash := message.Hash(params.pubsubTopic)
-		wakuLP.log.Info("waku.lightpush published", logging.HexString("hash", hash))
+		utils.MessagesLogger("lightpush").Debug("waku.lightpush published", logging.HexBytes("hash", hash))
 		return hash, nil
 	}
 
-	return nil, errors.New(response.Info)
+	errMsg := "lightpush error"
+	if response.Info != nil {
+		errMsg = *response.Info
+	}
+
+	return nil, errors.New(errMsg)
 }
