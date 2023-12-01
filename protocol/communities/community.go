@@ -1758,7 +1758,7 @@ func (o *Community) VerifyGrantSignature(data []byte) (*protobuf.Grant, error) {
 		return nil, err
 	}
 
-	if !common.IsPubKeyEqual(o.config.ID, extractedPublicKey) {
+	if !common.IsPubKeyEqual(o.ControlNode(), extractedPublicKey) {
 		return nil, ErrInvalidGrant
 	}
 
@@ -1778,7 +1778,7 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, grantBytes []byt
 	}
 
 	// community creator can always post, return immediately
-	if common.IsPubKeyEqual(pk, o.config.ID) {
+	if common.IsPubKeyEqual(pk, o.ControlNode()) {
 		return true, nil
 	}
 

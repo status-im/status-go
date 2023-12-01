@@ -187,7 +187,7 @@ func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEven
 	defer o.mutex.Unlock()
 
 	// Validate that EventsBaseCommunityDescription was signed by the control node
-	description, err := validateAndGetEventsMessageCommunityDescription(communityEventMessage.EventsBaseCommunityDescription, o.config.ID)
+	description, err := validateAndGetEventsMessageCommunityDescription(communityEventMessage.EventsBaseCommunityDescription, o.ControlNode())
 	if err != nil {
 		return err
 	}
@@ -342,7 +342,7 @@ func (o *Community) addNewCommunityEvent(event *CommunityEvent) error {
 	// If there were no events before, extract CommunityDescription from CommunityDescriptionProtocolMessage
 	// and check the signature
 	if o.config.EventsData == nil || len(o.config.EventsData.EventsBaseCommunityDescription) == 0 {
-		_, err := validateAndGetEventsMessageCommunityDescription(o.config.CommunityDescriptionProtocolMessage, o.config.ID)
+		_, err := validateAndGetEventsMessageCommunityDescription(o.config.CommunityDescriptionProtocolMessage, o.ControlNode())
 		if err != nil {
 			return err
 		}
