@@ -1639,7 +1639,12 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	if hasTokenOwnership {
 		// Override verified owner
 		if verifiedOwner != nil {
-			m.logger.Info("updating verified owner", zap.String("communityID", community.IDString()), zap.String("owner", common.PubkeyToHex(verifiedOwner)))
+			m.logger.Info("updating verified owner",
+				zap.String("communityID", community.IDString()),
+				zap.String("verifiedOwner", common.PubkeyToHex(verifiedOwner)),
+				zap.String("signer", common.PubkeyToHex(signer)),
+				zap.String("controlNode", common.PubkeyToHex(community.ControlNode())),
+			)
 
 			// If we are not the verified owner anymore, drop the private key
 			if !common.IsPubKeyEqual(verifiedOwner, &m.identity.PublicKey) {
