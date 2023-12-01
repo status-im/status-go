@@ -359,6 +359,7 @@ const (
 	BurnCommunityToken        PendingTrxType = "BurnCommunityToken"
 	DeployOwnerToken          PendingTrxType = "DeployOwnerToken"
 	SetSignerPublicKey        PendingTrxType = "SetSignerPublicKey"
+	WalletConnectTransfer     PendingTrxType = "WalletConnectTransfer"
 )
 
 type PendingTransaction struct {

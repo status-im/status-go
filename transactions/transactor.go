@@ -167,32 +167,50 @@ func (t *Transactor) AddSignatureToTransactionAndSend(chainID uint64, tx *gethty
 // It's different from eth_sendRawTransaction because it receives a signature and not a serialized transaction with signature.
 // Since the transactions is already signed, we assume it was validated and used the right nonce.
 func (t *Transactor) BuildTransactionAndSendWithSignature(chainID uint64, args SendTxArgs, sig []byte) (hash types.Hash, err error) {
+	txWithSignature, unlock, err := t.BuildTransactionWithSignature(chainID, args, sig)
+	if unlock != nil {
+		defer func() {
+			var nonce uint64
+			if txWithSignature != nil {
+				nonce = txWithSignature.Nonce()
+			}
+			unlock(err == nil, nonce)
+		}()
+	}
+	if err != nil {
+		return hash, err
+	}
+
+	hash, err = t.SendTransactionWithSignature(txWithSignature)
+	return hash, err
+}
+
+func (t *Transactor) BuildTransactionWithSignature(chainID uint64, args SendTxArgs, sig []byte) (*gethtypes.Transaction, UnlockNonceFunc, error) {
 	if !args.Valid() {
-		return hash, ErrInvalidSendTxArgs
+		return nil, nil, ErrInvalidSendTxArgs
 	}
 
 	if len(sig) != ValidSignatureSize {
-		return hash, ErrInvalidSignatureSize
+		return nil, nil, ErrInvalidSignatureSize
 	}
 
 	tx := t.buildTransaction(args)
 	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
 	expectedNonce, unlock, err := t.nonce.Next(rpcWrapper, args.From)
 	if err != nil {
-		return hash, err
-	}
-	if unlock != nil {
-		defer func() {
-			unlock(err == nil, expectedNonce)
-		}()
+		return nil, nil, err
 	}
 
 	if tx.Nonce() != expectedNonce {
-		return hash, &ErrBadNonce{tx.Nonce(), expectedNonce}
+		return nil, unlock, &ErrBadNonce{tx.Nonce(), expectedNonce}
 	}
 
-	hash, err = t.AddSignatureToTransactionAndSend(chainID, tx, sig)
-	return hash, err
+	txWithSignature, err := t.AddSignatureToTransaction(chainID, tx, sig)
+	if err != nil {
+		return nil, unlock, err
+	}
+
+	return txWithSignature, unlock, nil
 }
 
 func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs, hash types.Hash, err error) {

@@ -132,8 +132,10 @@ type TxResponse struct {
 	AddressPath   string                  `json:"addressPath,omitempty"`
 	SignOnKeycard bool                    `json:"signOnKeycard,omitempty"`
 	ChainID       uint64                  `json:"chainId,omitempty"`
-	MesageToSign  interface{}             `json:"messageToSign,omitempty"`
+	MessageToSign interface{}             `json:"messageToSign,omitempty"`
 	TxArgs        transactions.SendTxArgs `json:"txArgs,omitempty"`
+	RawTx         string                  `json:"rawTx,omitempty"`
+	TxHash        common.Hash             `json:"txHash,omitempty"`
 }
 
 func (tm *TransactionManager) SignMessage(message types.HexBytes, address common.Address, password string) (string, error) {
@@ -159,14 +161,14 @@ func (tm *TransactionManager) BuildTransaction(chainID uint64, sendArgs transact
 	}
 
 	txBeingSigned, unlock, err := tm.transactor.ValidateAndBuildTransaction(chainID, sendArgs)
-	if err != nil {
-		return nil, err
-	}
 	// We have to unlock the nonce, cause we don't know what will happen on the client side (will user accept/reject) an action.
 	if unlock != nil {
 		defer func() {
 			unlock(false, 0)
 		}()
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	// Set potential missing fields that were added while building the transaction
@@ -178,17 +180,24 @@ func (tm *TransactionManager) BuildTransaction(chainID uint64, sendArgs transact
 		nonce := hexutil.Uint64(txBeingSigned.Nonce())
 		sendArgs.Nonce = &nonce
 	}
+	if sendArgs.Gas == nil {
+		gas := hexutil.Uint64(txBeingSigned.Gas())
+		sendArgs.Gas = &gas
+	}
 	if sendArgs.GasPrice == nil {
 		gasPrice := hexutil.Big(*txBeingSigned.GasPrice())
 		sendArgs.GasPrice = &gasPrice
 	}
-	if sendArgs.MaxPriorityFeePerGas == nil {
-		maxPriorityFeePerGas := hexutil.Big(*txBeingSigned.GasTipCap())
-		sendArgs.MaxPriorityFeePerGas = &maxPriorityFeePerGas
-	}
-	if sendArgs.MaxFeePerGas == nil {
-		maxFeePerGas := hexutil.Big(*txBeingSigned.GasFeeCap())
-		sendArgs.MaxFeePerGas = &maxFeePerGas
+
+	if sendArgs.IsDynamicFeeTx() {
+		if sendArgs.MaxPriorityFeePerGas == nil {
+			maxPriorityFeePerGas := hexutil.Big(*txBeingSigned.GasTipCap())
+			sendArgs.MaxPriorityFeePerGas = &maxPriorityFeePerGas
+		}
+		if sendArgs.MaxFeePerGas == nil {
+			maxFeePerGas := hexutil.Big(*txBeingSigned.GasFeeCap())
+			sendArgs.MaxFeePerGas = &maxFeePerGas
+		}
 	}
 
 	signer := ethTypes.NewLondonSigner(new(big.Int).SetUint64(chainID))
@@ -199,8 +208,33 @@ func (tm *TransactionManager) BuildTransaction(chainID uint64, sendArgs transact
 		AddressPath:   account.Path,
 		SignOnKeycard: kp.MigratedToKeycard(),
 		ChainID:       chainID,
-		MesageToSign:  signer.Hash(txBeingSigned),
+		MessageToSign: signer.Hash(txBeingSigned),
 		TxArgs:        sendArgs,
+	}, nil
+}
+
+func (tm *TransactionManager) BuildRawTransaction(chainID uint64, sendArgs transactions.SendTxArgs, signature []byte) (response *TxResponse, err error) {
+	tx, unlock, err := tm.transactor.BuildTransactionWithSignature(chainID, sendArgs, signature)
+	// We have to unlock the nonce, cause we don't know what will happen on the client side (will user accept/reject) an action.
+	if unlock != nil {
+		defer func() {
+			unlock(false, 0)
+		}()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := tx.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	return &TxResponse{
+		ChainID: chainID,
+		TxArgs:  sendArgs,
+		RawTx:   types.EncodeHex(data),
+		TxHash:  tx.Hash(),
 	}, nil
 }
 

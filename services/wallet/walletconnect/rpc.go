@@ -1,18 +1,14 @@
 package walletconnect
 
 import (
-	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
-	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -65,7 +61,7 @@ func (n *sendTransactionParams) MarshalJSON() ([]byte, error) {
 	return json.Marshal(n.SendTxArgs)
 }
 
-func (s *Service) buildTransaction(request SessionRequest) (response *SessionRequestResponse, err error) {
+func (s *Service) buildTransaction(request SessionRequest) (response *transfer.TxResponse, err error) {
 	if len(request.Params.Request.Params) != 1 {
 		return nil, ErrorInvalidParamsCount
 	}
@@ -75,62 +71,16 @@ func (s *Service) buildTransaction(request SessionRequest) (response *SessionReq
 		return nil, err
 	}
 
-	account, err := s.accountsDB.GetAccountByAddress(params.From)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get active account: %w", err)
-	}
-
-	kp, err := s.accountsDB.GetKeypairByKeyUID(account.KeyUID)
-	if err != nil {
-		return nil, err
-	}
-
 	_, chainID, err := parseCaip2ChainID(request.Params.ChainID)
 	if err != nil {
 		return nil, err
 	}
 
-	// In this case we can ignore `unlock` function received from `ValidateAndBuildTransaction` cause `Nonce`
-	// will be always set by the initiator of this transaction (by the dapp).
-	// Though we will need sort out completely that part since Nonce kept in the local cache is not the most recent one,
-	// instead of that we should always ask network what's the most recent known Nonce for the account.
-	// Logged issue to handle that: https://github.com/status-im/status-go/issues/4335
-	txBeingSigned, _, err := s.transactor.ValidateAndBuildTransaction(chainID, params.SendTxArgs)
-	if err != nil {
-		return nil, err
-	}
-
-	s.txSignDetails = &txSigningDetails{
-		from:          common.Address(account.Address),
-		chainID:       chainID,
-		txBeingSigned: txBeingSigned,
-	}
-
-	signer := ethTypes.NewLondonSigner(new(big.Int).SetUint64(chainID))
-	return &SessionRequestResponse{
-		KeyUID:        account.KeyUID,
-		Address:       account.Address,
-		AddressPath:   account.Path,
-		SignOnKeycard: kp.MigratedToKeycard(),
-		MessageToSign: signer.Hash(txBeingSigned),
-	}, nil
-}
-
-func (s *Service) addSignatureToTransaction(signature string) (*ethTypes.Transaction, error) {
-	if s.txSignDetails.txBeingSigned == nil {
-		return nil, errors.New("no tx to sign")
-	}
-
-	signatureBytes, err := hex.DecodeString(signature)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.transactor.AddSignatureToTransaction(s.txSignDetails.chainID, s.txSignDetails.txBeingSigned, signatureBytes)
+	return s.transactionManager.BuildTransaction(chainID, params.SendTxArgs)
 }
 
 func (s *Service) buildMessage(request SessionRequest, addressIndex int, messageIndex int,
-	handleTypedData bool) (response *SessionRequestResponse, err error) {
+	handleTypedData bool) (response *transfer.TxResponse, err error) {
 	if len(request.Params.Request.Params) != 2 {
 		return nil, ErrorInvalidParamsCount
 	}
@@ -178,7 +128,7 @@ func (s *Service) buildMessage(request SessionRequest, addressIndex int, message
 		}
 	}
 
-	return &SessionRequestResponse{
+	return &transfer.TxResponse{
 		KeyUID:        account.KeyUID,
 		Address:       account.Address,
 		AddressPath:   account.Path,
