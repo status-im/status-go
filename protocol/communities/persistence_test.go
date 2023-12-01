@@ -711,3 +711,51 @@ func (s *PersistenceSuite) TestGetCommunityRequestToJoinWithRevealedAddresses() 
 	s.Require().Equal(expectedRtj.CommunityID, rtjResult.CommunityID)
 	s.Require().Len(rtjResult.RevealedAccounts, 1)
 }
+
+func (s *PersistenceSuite) TestAllNonApprovedCommunitiesRequestsToJoin() {
+	// check on empty db
+	result, err := s.db.AllNonApprovedCommunitiesRequestsToJoin()
+	s.Require().NoError(err)
+	s.Require().Len(result, 0)
+
+	identity, err := crypto.GenerateKey()
+	s.Require().NoError(err, "crypto.GenerateKey shouldn't give any error")
+
+	clock := uint64(time.Now().Unix())
+
+	// add a new community
+	community := s.makeNewCommunity(identity)
+	err = s.db.SaveCommunity(community)
+	s.Require().NoError(err)
+
+	// add requests to join to the community
+	allStates := []RequestToJoinState{
+		RequestToJoinStatePending,
+		RequestToJoinStateDeclined,
+		RequestToJoinStateAccepted,
+		RequestToJoinStateCanceled,
+		RequestToJoinStateAcceptedPending,
+		RequestToJoinStateDeclinedPending,
+		RequestToJoinStateAwaitingAddresses,
+	}
+
+	for i := range allStates {
+		identity, err := crypto.GenerateKey()
+		s.Require().NoError(err)
+
+		rtj := &RequestToJoin{
+			ID:          types.HexBytes{1, 2, 3, 4, 5, 6, 7, byte(i)},
+			PublicKey:   common.PubkeyToHex(&identity.PublicKey),
+			Clock:       clock,
+			CommunityID: community.ID(),
+			State:       allStates[i],
+		}
+		err = s.db.SaveRequestToJoin(rtj)
+		s.Require().NoError(err, "SaveRequestToJoin shouldn't give any error")
+	}
+
+	result, err = s.db.AllNonApprovedCommunitiesRequestsToJoin()
+	s.Require().NoError(err)
+	s.Require().Len(result, 1)
+	s.Require().Len(result[community.IDString()], 6) // all except RequestToJoinStateAccepted
+}

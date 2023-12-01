@@ -4201,11 +4201,14 @@ func (m *Messenger) PromoteSelfToControlNode(communityID types.HexBytes) (*Messe
 		return nil, err
 	}
 
+	var response MessengerResponse
+
 	if len(changes.MembersRemoved) > 0 {
-		err = m.communitiesManager.GenerateRequestsToJoinForAutoApprovalOnNewOwnership(changes.Community.ID(), changes.MembersRemoved)
+		requestsToJoin, err := m.communitiesManager.GenerateRequestsToJoinForAutoApprovalOnNewOwnership(changes.Community.ID(), changes.MembersRemoved)
 		if err != nil {
 			return nil, err
 		}
+		response.AddRequestsToJoinCommunity(requestsToJoin)
 	}
 
 	err = m.syncCommunity(context.Background(), changes.Community, m.dispatchMessage)
@@ -4213,9 +4216,12 @@ func (m *Messenger) PromoteSelfToControlNode(communityID types.HexBytes) (*Messe
 		return nil, err
 	}
 
-	var response MessengerResponse
 	response.AddCommunity(changes.Community)
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
+
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.MessengerResponse(&response)
+	}
 
 	return &response, nil
 }
