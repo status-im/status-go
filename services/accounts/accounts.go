@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
@@ -82,6 +83,14 @@ func (api *API) UpdateKeypairName(ctx context.Context, keyUID string, name strin
 
 func (api *API) MoveWalletAccount(ctx context.Context, fromPosition int64, toPosition int64) error {
 	return (*api.messenger).MoveWalletAccount(fromPosition, toPosition)
+}
+
+func (api *API) UpdateTokenPreferences(ctx context.Context, preferences []walletsettings.TokenPreferences) error {
+	return (*api.messenger).UpdateTokenPreferences(preferences)
+}
+
+func (api *API) GetTokenPreferences(ctx context.Context) ([]walletsettings.TokenPreferences, error) {
+	return (*api.messenger).GetTokenPreferences()
 }
 
 func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {

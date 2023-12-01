@@ -397,6 +397,11 @@ var (
 		dBColumnName:   "is_sepolia_enabled",
 		valueHandler:   BoolHandler,
 	}
+	TokenGroupByCommunity = SettingField{
+		reactFieldName: "token-group-by-community?",
+		dBColumnName:   "wallet_token_preferences_group_by_community",
+		valueHandler:   BoolHandler,
+	}
 	UseMailservers = SettingField{
 		reactFieldName: "use-mailservers?",
 		dBColumnName:   "use_mailservers",
@@ -526,6 +531,7 @@ var (
 		WebviewAllowPermissionRequests,
 		ProfileMigrationNeeded,
 		IsSepoliaEnabled,
+		TokenGroupByCommunity,
 		URLUnfurlingMode,
 	}
 )

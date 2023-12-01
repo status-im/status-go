@@ -407,3 +407,17 @@ message SyncAccountCustomizationColor {
   string customization_color = 2;
   string key_uid = 3;
 }
+
+message TokenPreferences {
+  string key = 1;
+  int64 position = 2;
+  int64 groupPosition = 3;
+  bool visible = 4;
+  string communityId = 5;
+}
+
+message SyncTokenPreferences {
+  uint64 clock = 1;
+  bool testnet = 2;
+  repeated TokenPreferences preferences = 3;
+}

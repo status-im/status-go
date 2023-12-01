@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
@@ -49,6 +50,7 @@ type MessengerResponse struct {
 	WatchOnlyAccounts             []*accounts.Account
 	Keypairs                      []*accounts.Keypair
 	AccountsPositions             []*accounts.Account
+	TokenPreferences              []walletsettings.TokenPreferences
 	DiscordCategories             []*discord.Category
 	DiscordChannels               []*discord.Channel
 	DiscordOldestMessageTimestamp int
@@ -114,6 +116,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		WatchOnlyAccounts             []*accounts.Account                  `json:"watchOnlyAccounts,omitempty"`
 		Keypairs                      []*accounts.Keypair                  `json:"keypairs,omitempty"`
 		AccountsPositions             []*accounts.Account                  `json:"accountsPositions,omitempty"`
+		TokenPreferences              []walletsettings.TokenPreferences    `json:"tokenPreferences,omitempty"`
 		DiscordCategories             []*discord.Category                  `json:"discordCategories,omitempty"`
 		DiscordChannels               []*discord.Channel                   `json:"discordChannels,omitempty"`
 		DiscordOldestMessageTimestamp int                                  `json:"discordOldestMessageTimestamp"`
@@ -138,6 +141,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		WatchOnlyAccounts:       r.WatchOnlyAccounts,
 		Keypairs:                r.Keypairs,
 		AccountsPositions:       r.AccountsPositions,
+		TokenPreferences:        r.TokenPreferences,
 
 		Messages:                      r.Messages(),
 		VerificationRequests:          r.VerificationRequests(),
@@ -279,6 +283,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.WatchOnlyAccounts)+
 		len(r.Keypairs)+
 		len(r.AccountsPositions)+
+		len(r.TokenPreferences)+
 		len(r.notifications)+
 		len(r.statusUpdates)+
 		len(r.activityCenterNotifications)+
@@ -328,7 +333,8 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.CustomizationColor = response.CustomizationColor
 	r.WatchOnlyAccounts = append(r.WatchOnlyAccounts, response.WatchOnlyAccounts...)
 	r.Keypairs = append(r.Keypairs, response.Keypairs...)
-	r.WatchOnlyAccounts = append(r.AccountsPositions, response.AccountsPositions...)
+	r.AccountsPositions = append(r.AccountsPositions, response.AccountsPositions...)
+	r.TokenPreferences = append(r.TokenPreferences, response.TokenPreferences...)
 	r.SocialLinksInfo = response.SocialLinksInfo
 
 	return nil

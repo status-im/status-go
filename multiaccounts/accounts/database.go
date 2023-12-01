@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	notificationssettings "github.com/status-im/status-go/multiaccounts/settings_notifications"
 	sociallinkssettings "github.com/status-im/status-go/multiaccounts/settings_social_links"
+	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 )
@@ -285,6 +286,7 @@ type Database struct {
 	*settings.Database
 	*notificationssettings.NotificationsSettings
 	*sociallinkssettings.SocialLinksSettings
+	*walletsettings.WalletSettings
 	db *sql.DB
 }
 
@@ -296,8 +298,9 @@ func NewDB(db *sql.DB) (*Database, error) {
 	}
 	sn := notificationssettings.NewNotificationsSettings(db)
 	ssl := sociallinkssettings.NewSocialLinksSettings(db)
+	sw := walletsettings.NewWalletSettings(db)
 
-	return &Database{sDB, sn, ssl, db}, nil
+	return &Database{sDB, sn, ssl, sw, db}, nil
 }
 
 // DB Gets db sql.DB

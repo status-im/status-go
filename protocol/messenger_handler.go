@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
@@ -52,6 +53,7 @@ var (
 	ErrSomeFieldsMissingForWalletAccount     = errors.New("some fields are missing for wallet account")
 	ErrUnknownKeypairForWalletAccount        = errors.New("keypair is not known for the wallet account")
 	ErrInvalidCommunityID                    = errors.New("invalid community id")
+	ErrTryingToApplyOldTokenPreferences      = errors.New("trying to apply old token preferences")
 )
 
 // HandleMembershipUpdate updates a Chat instance according to the membership updates.
@@ -3226,6 +3228,46 @@ func (m *Messenger) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount, fr
 	return acc, nil
 }
 
+func (m *Messenger) handleSyncTokenPreferences(message *protobuf.SyncTokenPreferences) ([]walletsettings.TokenPreferences, error) {
+	if len(message.Preferences) == 0 {
+		return nil, nil
+	}
+
+	dbLastUpdate, err := m.settings.GetClockOfLastTokenPreferencesChange()
+	if err != nil {
+		return nil, err
+	}
+
+	groupByCommunity, err := m.settings.GetTokenGroupByCommunity()
+	if err != nil {
+		return nil, err
+	}
+
+	// Since adding new token preferences updates `ClockOfLastTokenPreferencesChange` we should handle token preferences changes
+	// even they are with the same clock, that ensures the correct order in case of syncing devices.
+	if message.Clock < dbLastUpdate {
+		return nil, ErrTryingToApplyOldTokenPreferences
+	}
+
+	var tokenPreferences []walletsettings.TokenPreferences
+	for _, pref := range message.Preferences {
+		tokenPref := walletsettings.TokenPreferences{
+			Key:           pref.Key,
+			Position:      int(pref.Position),
+			GroupPosition: int(pref.GroupPosition),
+			Visible:       pref.Visible,
+			CommunityID:   pref.CommunityId,
+		}
+		tokenPreferences = append(tokenPreferences, tokenPref)
+	}
+
+	err = m.settings.UpdateTokenPreferences(tokenPreferences, groupByCommunity, message.Testnet, message.Clock)
+	if err != nil {
+		return nil, err
+	}
+	return tokenPreferences, nil
+}
+
 func (m *Messenger) handleSyncAccountsPositions(message *protobuf.SyncAccountsPositions) ([]*accounts.Account, error) {
 	if len(message.Accounts) == 0 {
 		return nil, nil
@@ -3455,6 +3497,21 @@ func (m *Messenger) HandleSyncAccountsPositions(state *ReceivedMessageState, mes
 	}
 
 	state.Response.AccountsPositions = append(state.Response.AccountsPositions, accs...)
+
+	return nil
+}
+
+func (m *Messenger) HandleSyncTokenPreferences(state *ReceivedMessageState, message *protobuf.SyncTokenPreferences, statusMessage *v1protocol.StatusMessage) error {
+	tokenPreferences, err := m.handleSyncTokenPreferences(message)
+	if err != nil {
+		if err == ErrTryingToApplyOldTokenPreferences {
+			m.logger.Warn("syncing token preferences issue", zap.Error(err))
+			return nil
+		}
+		return err
+	}
+
+	state.Response.TokenPreferences = append(state.Response.TokenPreferences, tokenPreferences...)
 
 	return nil
 }

@@ -232,6 +232,9 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
            case protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_COMMUNITY_REQUEST_DECISION:
 		return m.handleSyncActivityCenterCommunityRequestDecisionProtobuf(messageState, protoBytes, msg, filter)
         
+           case protobuf.ApplicationMetadataMessage_SYNC_TOKEN_PREFERENCES:
+		return m.handleSyncTokenPreferencesProtobuf(messageState, protoBytes, msg, filter)
+        
 	default:
 		m.logger.Info("protobuf type not found", zap.String("type", string(msg.ApplicationLayer.Type)))
                 return errors.New("protobuf type not found")
@@ -1651,6 +1654,29 @@ func (m *Messenger) handleSyncActivityCenterCommunityRequestDecisionProtobuf(mes
 	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.ApplicationLayer.Type, p)
 
 	return m.HandleSyncActivityCenterCommunityRequestDecision(messageState, p, msg)
+	
+}
+
+
+func (m *Messenger) handleSyncTokenPreferencesProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
+	m.logger.Info("handling SyncTokenPreferences")
+	
+	if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+		m.logger.Warn("not coming from us, ignoring")
+		return nil
+	}
+	
+
+	
+	p := &protobuf.SyncTokenPreferences{}
+	err := proto.Unmarshal(protoBytes, p)
+	if err != nil {
+		return err
+	}
+
+	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.ApplicationLayer.Type, p)
+
+	return m.HandleSyncTokenPreferences(messageState, p, msg)
 	
 }
 
