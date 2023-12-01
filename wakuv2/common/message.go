@@ -166,7 +166,7 @@ func NewReceivedMessage(env *protocol.Envelope, msgType MessageType) *ReceivedMe
 	return &ReceivedMessage{
 		Envelope:     env,
 		MsgType:      msgType,
-		Sent:         uint32(env.Message().Timestamp / int64(time.Second)),
+		Sent:         uint32(*env.Message().Timestamp / int64(time.Second)),
 		ContentTopic: ct,
 		PubsubTopic:  env.PubsubTopic(),
 	}
@@ -240,7 +240,7 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 	result.Signature = raw.Signature
 	result.Src = raw.PubKey
 
-	result.Sent = uint32(msg.Envelope.Message().Timestamp / int64(time.Second))
+	result.Sent = uint32(*msg.Envelope.Message().Timestamp / int64(time.Second))
 
 	ct, err := ExtractTopicFromContentTopic(msg.Envelope.Message().ContentTopic)
 	if err != nil {

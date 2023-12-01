@@ -244,13 +244,14 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		return nil, err
 	}
 
+	time := api.w.timestamp()
 	wakuMsg := &pb.WakuMessage{
 		Payload:      payload,
-		Version:      version,
+		Version:      &version,
 		ContentTopic: req.ContentTopic.ContentTopic(),
-		Timestamp:    api.w.timestamp(),
+		Timestamp:    &time,
 		Meta:         []byte{}, // TODO: empty for now. Once we use Waku Archive v2, we should deprecate the timestamp and use an ULID here
-		Ephemeral:    req.Ephemeral,
+		Ephemeral:    &req.Ephemeral,
 	}
 
 	hash, err := api.w.Send(req.PubsubTopic, wakuMsg)
