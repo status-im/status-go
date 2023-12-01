@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -49,6 +50,7 @@ type Reactor struct {
 	db                 *Database
 	blockDAO           *BlockDAO
 	blockRangesSeqDAO  *BlockRangeSequentialDAO
+	accountsDB         *accounts.Database
 	feed               *event.Feed
 	transactionManager *TransactionManager
 	pendingTxManager   *transactions.PendingTxTracker
@@ -58,11 +60,12 @@ type Reactor struct {
 	omitHistory        bool
 }
 
-func NewReactor(db *Database, blockDAO *BlockDAO, blockRangesSeqDAO *BlockRangeSequentialDAO, feed *event.Feed, tm *TransactionManager,
+func NewReactor(db *Database, blockDAO *BlockDAO, blockRangesSeqDAO *BlockRangeSequentialDAO, accountsDB *accounts.Database, feed *event.Feed, tm *TransactionManager,
 	pendingTxManager *transactions.PendingTxTracker, tokenManager *token.Manager,
 	balanceCacher balance.Cacher, omitHistory bool) *Reactor {
 	return &Reactor{
 		db:                 db,
+		accountsDB:         accountsDB,
 		blockDAO:           blockDAO,
 		blockRangesSeqDAO:  blockRangesSeqDAO,
 		feed:               feed,
@@ -101,6 +104,7 @@ func (r *Reactor) createFetchStrategy(chainClients map[uint64]chain.ClientInterf
 		r.db,
 		r.blockDAO,
 		r.blockRangesSeqDAO,
+		r.accountsDB,
 		r.feed,
 		r.transactionManager,
 		r.pendingTxManager,

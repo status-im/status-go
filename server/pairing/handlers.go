@@ -46,7 +46,7 @@ func handleReceiveAccount(logger *zap.Logger, pr PayloadReceiver) http.HandlerFu
 	}
 }
 
-func handleSendAccount(logger *zap.Logger, pm PayloadMounter) http.HandlerFunc {
+func handleSendAccount(logger *zap.Logger, pm PayloadMounter, beforeSending func()) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingAccount})
 		w.Header().Set("Content-Type", "application/octet-stream")
@@ -58,6 +58,7 @@ func handleSendAccount(logger *zap.Logger, pm PayloadMounter) http.HandlerFunc {
 			return
 		}
 
+		beforeSending()
 		_, err = w.Write(pm.ToSend())
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
@@ -96,7 +97,7 @@ func handleParingSyncDeviceReceive(logger *zap.Logger, pr PayloadReceiver) http.
 	}
 }
 
-func handlePairingSyncDeviceSend(logger *zap.Logger, pm PayloadMounter) http.HandlerFunc {
+func handlePairingSyncDeviceSend(logger *zap.Logger, pm PayloadMounter, beforeSending func()) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionSyncDevice})
 		w.Header().Set("Content-Type", "application/octet-stream")
@@ -110,6 +111,7 @@ func handlePairingSyncDeviceSend(logger *zap.Logger, pm PayloadMounter) http.Han
 			return
 		}
 
+		beforeSending()
 		_, err = w.Write(pm.ToSend())
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
@@ -148,7 +150,7 @@ func handleReceiveInstallation(logger *zap.Logger, pmr PayloadMounterReceiver) h
 	}
 }
 
-func handleSendInstallation(logger *zap.Logger, pmr PayloadMounterReceiver) http.HandlerFunc {
+func handleSendInstallation(logger *zap.Logger, pmr PayloadMounterReceiver, beforeSending func()) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingInstallation})
 		w.Header().Set("Content-Type", "application/octet-stream")
@@ -160,6 +162,7 @@ func handleSendInstallation(logger *zap.Logger, pmr PayloadMounterReceiver) http
 			return
 		}
 
+		beforeSending()
 		_, err = w.Write(pmr.ToSend())
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})

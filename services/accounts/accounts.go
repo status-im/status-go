@@ -293,6 +293,10 @@ func (api *API) AddAccount(ctx context.Context, password string, account *accoun
 		}
 	}
 
+	if account.Type == accounts.AccountTypeGenerated {
+		account.AddressWasNotShown = true
+	}
+
 	return api.SaveAccount(ctx, account)
 }
 
@@ -586,4 +590,8 @@ func (api *API) DeleteAllKeycardsWithKeyUID(ctx context.Context, keyUID string) 
 
 func (api *API) UpdateKeycardUID(ctx context.Context, oldKeycardUID string, newKeycardUID string) error {
 	return (*api.messenger).UpdateKeycardUID(ctx, oldKeycardUID, newKeycardUID)
+}
+
+func (api *API) AddressWasShown(address types.Address) error {
+	return api.db.AddressWasShown(address)
 }

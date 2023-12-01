@@ -108,6 +108,7 @@ type SenderServer struct {
 	accountMounter      PayloadMounter
 	rawMessageMounter   PayloadMounter
 	installationMounter PayloadMounterReceiver
+	backend             *api.GethStatusBackend
 }
 
 // NewSenderServer returns a *SenderServer init from the given *SenderServerConfig
@@ -130,14 +131,24 @@ func NewSenderServer(backend *api.GethStatusBackend, config *SenderServerConfig)
 		accountMounter:      am,
 		rawMessageMounter:   rmm,
 		installationMounter: imr,
+		backend:             backend,
 	}, nil
 }
 
 func (s *SenderServer) startSendingData() error {
+	logger := s.GetLogger()
+	beforeSending := func() {
+		if s.backend != nil {
+			err := s.backend.LocalPairingStarted()
+			if err != nil {
+				logger.Error("startSendingData backend.LocalPairingStarted()", zap.Error(err))
+			}
+		}
+	}
 	s.SetHandlers(server.HandlerPatternMap{
 		pairingChallenge:      handlePairingChallenge(s.challengeGiver),
-		pairingSendAccount:    middlewareChallenge(s.challengeGiver, handleSendAccount(s.GetLogger(), s.accountMounter)),
-		pairingSendSyncDevice: middlewareChallenge(s.challengeGiver, handlePairingSyncDeviceSend(s.GetLogger(), s.rawMessageMounter)),
+		pairingSendAccount:    middlewareChallenge(s.challengeGiver, handleSendAccount(logger, s.accountMounter, beforeSending)),
+		pairingSendSyncDevice: middlewareChallenge(s.challengeGiver, handlePairingSyncDeviceSend(logger, s.rawMessageMounter, beforeSending)),
 		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
 		//  the other handlers.
 		//  https://github.com/status-im/status-go/issues/3304
@@ -205,6 +216,7 @@ type ReceiverServer struct {
 	accountReceiver      PayloadReceiver
 	rawMessageReceiver   PayloadReceiver
 	installationReceiver PayloadMounterReceiver
+	backend              *api.GethStatusBackend
 }
 
 // NewReceiverServer returns a *SenderServer init from the given *ReceiverServerConfig
@@ -227,19 +239,29 @@ func NewReceiverServer(backend *api.GethStatusBackend, config *ReceiverServerCon
 		accountReceiver:      ar,
 		rawMessageReceiver:   rmr,
 		installationReceiver: imr,
+		backend:              backend,
 	}, nil
 }
 
 func (s *ReceiverServer) startReceivingData() error {
+	logger := s.GetLogger()
+	beforeSending := func() {
+		if s.backend != nil {
+			err := s.backend.LocalPairingStarted()
+			if err != nil {
+				logger.Error("startSendingData backend.LocalPairingStarted()", zap.Error(err))
+			}
+		}
+	}
 	s.SetHandlers(server.HandlerPatternMap{
 		pairingChallenge:         handlePairingChallenge(s.challengeGiver),
-		pairingReceiveAccount:    handleReceiveAccount(s.GetLogger(), s.accountReceiver),
-		pairingReceiveSyncDevice: handleParingSyncDeviceReceive(s.GetLogger(), s.rawMessageReceiver),
+		pairingReceiveAccount:    handleReceiveAccount(logger, s.accountReceiver),
+		pairingReceiveSyncDevice: handleParingSyncDeviceReceive(logger, s.rawMessageReceiver),
 		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
 		//  the other handlers.
 		//  https://github.com/status-im/status-go/issues/3304
 		// send installation data back to sender
-		pairingSendInstallation: middlewareChallenge(s.challengeGiver, handleSendInstallation(s.GetLogger(), s.installationReceiver)),
+		pairingSendInstallation: middlewareChallenge(s.challengeGiver, handleSendInstallation(logger, s.installationReceiver, beforeSending)),
 	})
 	return s.Start()
 }
@@ -301,6 +323,7 @@ func StartUpReceiverServer(backend *api.GethStatusBackend, configJSON string) (s
 type KeystoreFilesSenderServer struct {
 	*BaseServer
 	keystoreFilesMounter PayloadMounter
+	backend              *api.GethStatusBackend
 }
 
 func NewKeystoreFilesSenderServer(backend *api.GethStatusBackend, config *KeystoreFilesSenderServerConfig) (*KeystoreFilesSenderServer, error) {
@@ -320,13 +343,23 @@ func NewKeystoreFilesSenderServer(backend *api.GethStatusBackend, config *Keysto
 	return &KeystoreFilesSenderServer{
 		BaseServer:           bs,
 		keystoreFilesMounter: kfm,
+		backend:              backend,
 	}, nil
 }
 
 func (s *KeystoreFilesSenderServer) startSendingData() error {
+	logger := s.GetLogger()
+	beforeSending := func() {
+		if s.backend != nil {
+			err := s.backend.LocalPairingStarted()
+			if err != nil {
+				logger.Error("startSendingData backend.LocalPairingStarted()", zap.Error(err))
+			}
+		}
+	}
 	s.SetHandlers(server.HandlerPatternMap{
 		pairingChallenge:   handlePairingChallenge(s.challengeGiver),
-		pairingSendAccount: middlewareChallenge(s.challengeGiver, handleSendAccount(s.GetLogger(), s.keystoreFilesMounter)),
+		pairingSendAccount: middlewareChallenge(s.challengeGiver, handleSendAccount(logger, s.keystoreFilesMounter, beforeSending)),
 	})
 	return s.Start()
 }

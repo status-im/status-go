@@ -452,7 +452,11 @@ var (
 		dBColumnName:   "omit_transfers_history_scan",
 		valueHandler:   BoolHandler,
 	}
-
+	MnemonicWasNotShown = SettingField{
+		reactFieldName: "mnemonic-was-not-shown?",
+		dBColumnName:   "mnemonic_was_not_shown",
+		valueHandler:   BoolHandler,
+	}
 	SettingFieldRegister = []SettingField{
 		AnonMetricsShouldSend,
 		Appearance,

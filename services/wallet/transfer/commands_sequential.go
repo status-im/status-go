@@ -9,6 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	nodetypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
@@ -74,6 +76,7 @@ func (c *findNewBlocksCommand) Run(parent context.Context) (err error) {
 type findBlocksCommand struct {
 	account                   common.Address
 	db                        *Database
+	accountsDB                *accounts.Database
 	blockRangeDAO             *BlockRangeSequentialDAO
 	chainClient               chain.ClientInterface
 	balanceCacher             balance.Cacher
@@ -223,8 +226,27 @@ func (c *findBlocksCommand) checkERC20Tail(parent context.Context) ([]*DBHeader,
 	return foundHeaders, nil
 }
 
+var mnemonicCheckEnabled = false
+
 func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 	log.Debug("start findBlocksCommand", "account", c.account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit, "from", c.fromBlockNumber, "to", c.toBlockNumber)
+	mnemonicWasNotShown, err := c.accountsDB.GetMnemonicWasNotShown()
+	if err != nil {
+		c.error = err
+		return err
+	}
+
+	if mnemonicCheckEnabled && mnemonicWasNotShown {
+		account, err := c.accountsDB.GetAccountByAddress(nodetypes.BytesToAddress(c.account.Bytes()))
+		if err != nil {
+			c.error = err
+			return err
+		}
+		if account.AddressWasNotShown {
+			log.Info("skip findBlocksCommand, mnemonic has not been shown and the address has not been shared yet", "address", c.account)
+			return nil
+		}
+	}
 
 	rangeSize := big.NewInt(int64(c.defaultNodeBlockChunkSize))
 
@@ -513,7 +535,7 @@ func loadTransfersLoop(ctx context.Context, account common.Address, blockDAO *Bl
 	}
 }
 
-func newLoadBlocksAndTransfersCommand(account common.Address, db *Database,
+func newLoadBlocksAndTransfersCommand(account common.Address, db *Database, accountsDB *accounts.Database,
 	blockDAO *BlockDAO, blockRangesSeqDAO *BlockRangeSequentialDAO, chainClient chain.ClientInterface, feed *event.Feed,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager, balanceCacher balance.Cacher, omitHistory bool) *loadBlocksAndTransfersCommand {
@@ -522,6 +544,7 @@ func newLoadBlocksAndTransfersCommand(account common.Address, db *Database,
 		account:            account,
 		db:                 db,
 		blockRangeDAO:      blockRangesSeqDAO,
+		accountsDB:         accountsDB,
 		blockDAO:           blockDAO,
 		chainClient:        chainClient,
 		feed:               feed,
@@ -537,6 +560,7 @@ func newLoadBlocksAndTransfersCommand(account common.Address, db *Database,
 type loadBlocksAndTransfersCommand struct {
 	account       common.Address
 	db            *Database
+	accountsDB    *accounts.Database
 	blockRangeDAO *BlockRangeSequentialDAO
 	blockDAO      *BlockDAO
 	chainClient   chain.ClientInterface
@@ -554,7 +578,7 @@ type loadBlocksAndTransfersCommand struct {
 }
 
 func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) error {
-	log.Debug("start load all transfers command", "chain", c.chainClient.NetworkID(), "account", c.account)
+	log.Info("start load all transfers command", "chain", c.chainClient.NetworkID(), "account", c.account)
 
 	ctx := parent
 
@@ -609,7 +633,6 @@ func (c *loadBlocksAndTransfersCommand) startTransfersLoop(ctx context.Context) 
 }
 
 func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocks(ctx context.Context, group *async.Group, fromNum, toNum *big.Int, blocksLoadedCh chan []*DBHeader) error {
-
 	log.Debug("fetchHistoryBlocks start", "chainID", c.chainClient.NetworkID(), "account", c.account, "omit", c.omitHistory)
 
 	if c.omitHistory {
@@ -633,6 +656,7 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocks(ctx context.Context, 
 		fbc := &findBlocksCommand{
 			account:                   c.account,
 			db:                        c.db,
+			accountsDB:                c.accountsDB,
 			blockRangeDAO:             c.blockRangeDAO,
 			chainClient:               c.chainClient,
 			balanceCacher:             c.balanceCacher,
@@ -667,12 +691,13 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocks(ctx context.Context, 
 
 func (c *loadBlocksAndTransfersCommand) startFetchingNewBlocks(group *async.Group, address common.Address, blocksLoadedCh chan<- []*DBHeader) {
 
-	log.Debug("startFetchingNewBlocks", "chainID", c.chainClient.NetworkID(), "account", address)
+	log.Debug("startFetchingNewBlocks", "chainID", c.chainClient.NetworkID(), "account", address, "db", c.accountsDB)
 
 	newBlocksCmd := &findNewBlocksCommand{
 		findBlocksCommand: &findBlocksCommand{
 			account:                   address,
 			db:                        c.db,
+			accountsDB:                c.accountsDB,
 			blockRangeDAO:             c.blockRangeDAO,
 			chainClient:               c.chainClient,
 			balanceCacher:             c.balanceCacher,

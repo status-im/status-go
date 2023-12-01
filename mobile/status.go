@@ -354,6 +354,7 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 
 	if *settings.Mnemonic != "" {
 		settings.OmitTransfersHistoryScan = true
+		settings.MnemonicWasNotShown = true
 	}
 
 	var conf params.NodeConfig

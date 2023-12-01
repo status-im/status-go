@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
@@ -16,7 +17,7 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, blockRangesSeqDAO *BlockRangeSequentialDAO, feed *event.Feed,
+func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, blockRangesSeqDAO *BlockRangeSequentialDAO, accountsDB *accounts.Database, feed *event.Feed,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager,
 	chainClients map[uint64]chain.ClientInterface,
@@ -29,6 +30,7 @@ func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, blockRangesSeq
 		db:                 db,
 		blockDAO:           blockDAO,
 		blockRangesSeqDAO:  blockRangesSeqDAO,
+		accountsDB:         accountsDB,
 		feed:               feed,
 		transactionManager: transactionManager,
 		pendingTxManager:   pendingTxManager,
@@ -44,6 +46,7 @@ type SequentialFetchStrategy struct {
 	db                 *Database
 	blockDAO           *BlockDAO
 	blockRangesSeqDAO  *BlockRangeSequentialDAO
+	accountsDB         *accounts.Database
 	feed               *event.Feed
 	mu                 sync.Mutex
 	group              *async.Group
@@ -59,7 +62,7 @@ type SequentialFetchStrategy struct {
 func (s *SequentialFetchStrategy) newCommand(chainClient chain.ClientInterface,
 	account common.Address) async.Commander {
 
-	return newLoadBlocksAndTransfersCommand(account, s.db, s.blockDAO, s.blockRangesSeqDAO, chainClient, s.feed,
+	return newLoadBlocksAndTransfersCommand(account, s.db, s.accountsDB, s.blockDAO, s.blockRangesSeqDAO, chainClient, s.feed,
 		s.transactionManager, s.pendingTxManager, s.tokenManager, s.balanceCacher, s.omitHistory)
 }
 

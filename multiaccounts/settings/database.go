@@ -126,10 +126,11 @@ INSERT INTO settings (
   profile_pictures_show_to,
   profile_pictures_visibility,
   url_unfurling_mode,
-  omit_transfers_history_scan
+  omit_transfers_history_scan,
+  mnemonic_was_not_shown
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,?,?,?,
-?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?)`,
+?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
@@ -157,6 +158,7 @@ INSERT INTO settings (
 		s.ProfilePicturesVisibility,
 		s.URLUnfurlingMode,
 		s.OmitTransfersHistoryScan,
+		s.MnemonicWasNotShown,
 	)
 	if err != nil {
 		return err
@@ -352,7 +354,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates, gif_recents,
 		gif_favorites, opensea_enabled, last_backup, backup_enabled, telemetry_server_url, auto_message_enabled, gif_api_key,
 		test_networks_enabled, mutual_contact_enabled, profile_migration_needed, is_sepolia_enabled, url_unfurling_mode,
-                omit_transfers_history_scan
+                omit_transfers_history_scan, mnemonic_was_not_shown
 	FROM
 		settings
 	WHERE
@@ -429,6 +431,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.IsSepoliaEnabled,
 		&s.URLUnfurlingMode,
 		&s.OmitTransfersHistoryScan,
+		&s.MnemonicWasNotShown,
 	)
 
 	return s, err
@@ -613,6 +616,14 @@ func (db *Database) MnemonicRemoved() (result bool, err error) {
 	return result, err
 }
 
+func (db *Database) GetMnemonicWasNotShown() (result bool, err error) {
+	err = db.makeSelectRow(MnemonicWasNotShown).Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
+}
+
 func (db *Database) GifAPIKey() (string, error) {
 	return db.makeSelectString(GifAPIKey)
 }
@@ -741,4 +752,8 @@ func (db *Database) postChangesToSubscribers(change *SyncSettingField) {
 			log.Warn("settings changes subscription channel full, dropping message")
 		}
 	}
+}
+
+func (db *Database) MnemonicWasShown() error {
+	return db.SaveSettingField(MnemonicWasNotShown, false)
 }

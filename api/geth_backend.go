@@ -1352,6 +1352,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 	if mnemonic == "" {
 		settings.Mnemonic = &info.Mnemonic
 		settings.OmitTransfersHistoryScan = true
+		//settings.MnemonicWasNotShown = true
 	}
 
 	nodeConfig, err := defaultNodeConfig(settings.InstallationID, request)
@@ -1375,6 +1376,10 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		Wallet:    true,
 		Path:      pathDefaultWallet,
 		Name:      walletAccountDefaultName,
+	}
+
+	if mnemonic == "" {
+		walletAccount.AddressWasNotShown = true
 	}
 
 	chatDerivedAccount := derivedAddresses[pathDefaultChat]
@@ -2292,6 +2297,19 @@ func (b *GethStatusBackend) GetActiveAccount() (*multiaccounts.Account, error) {
 	}
 
 	return b.account, nil
+}
+
+func (b *GethStatusBackend) LocalPairingStarted() error {
+	if b.account == nil {
+		return errors.New("master key account is nil in the GethStatusBackend")
+	}
+
+	accountDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
+
+	return accountDB.MnemonicWasShown()
 }
 
 func (b *GethStatusBackend) injectAccountsIntoWakuService(w types.WakuKeyManager, st *ext.Service) error {

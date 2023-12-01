@@ -58,6 +58,7 @@ type Account struct {
 	Address               types.Address             `json:"address"`
 	KeyUID                string                    `json:"key-uid"`
 	Wallet                bool                      `json:"wallet"`
+	AddressWasNotShown    bool                      `json:"address-was-not-shown,omitempty"`
 	Chat                  bool                      `json:"chat"`
 	Type                  AccountType               `json:"type,omitempty"`
 	Path                  string                    `json:"path,omitempty"`
@@ -354,6 +355,7 @@ func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) 
 		accRemoved               sql.NullBool
 		accProdPreferredChainIDs sql.NullString
 		accTestPreferredChainIDs sql.NullString
+		accAddressWasNotShown    sql.NullBool
 	)
 
 	for rows.Next() {
@@ -364,7 +366,7 @@ func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) 
 			&kpKeyUID, &kpName, &kpType, &kpDerivedFrom, &kpLastUsedDerivationIndex, &kpSyncedFrom, &kpClock, &kpRemoved,
 			&accAddress, &accKeyUID, &pubkey, &accPath, &accName, &accColorID, &accEmoji,
 			&accWallet, &accChat, &accHidden, &accOperable, &accClock, &accCreatedAt, &accPosition, &accRemoved,
-			&accProdPreferredChainIDs, &accTestPreferredChainIDs)
+			&accProdPreferredChainIDs, &accTestPreferredChainIDs, &accAddressWasNotShown)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -439,6 +441,9 @@ func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) 
 		}
 		if accTestPreferredChainIDs.Valid {
 			acc.TestPreferredChainIDs = accTestPreferredChainIDs.String
+		}
+		if accAddressWasNotShown.Valid {
+			acc.AddressWasNotShown = accAddressWasNotShown.Bool
 		}
 		if lth := len(pubkey); lth > 0 {
 			acc.PublicKey = make(types.HexBytes, lth)
@@ -529,7 +534,8 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) 
 			ka.position,
 			ka.removed,
 			ka.prod_preferred_chain_ids,
-			ka.test_preferred_chain_ids
+			ka.test_preferred_chain_ids,
+                        ka.address_was_not_shown
 		FROM
 			keypairs k
 		LEFT JOIN
@@ -631,7 +637,8 @@ func (db *Database) getAccounts(tx *sql.Tx, address types.Address, includeRemove
 			ka.position,
 			ka.removed,
 			ka.prod_preferred_chain_ids,
-			ka.test_preferred_chain_ids
+			ka.test_preferred_chain_ids,
+			ka.address_was_not_shown
 		FROM
 			keypairs_accounts ka
 		LEFT JOIN
@@ -994,9 +1001,9 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 
 		_, err = tx.Exec(`
 			INSERT OR IGNORE INTO
-				keypairs_accounts (address, key_uid, pubkey, path, wallet, chat, created_at, updated_at)
+				keypairs_accounts (address, key_uid, pubkey, path, wallet, address_was_not_shown, chat, created_at, updated_at)
 			VALUES
-				(?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'));
+				(?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'));
 
 			UPDATE
 				keypairs_accounts
@@ -1015,7 +1022,7 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 			WHERE
 				address = ?;
 		`,
-			acc.Address, keyUID, acc.PublicKey, acc.Path, acc.Wallet, acc.Chat,
+			acc.Address, keyUID, acc.PublicKey, acc.Path, acc.Wallet, acc.AddressWasNotShown, acc.Chat,
 			acc.Name, acc.ColorID, acc.Emoji, acc.Hidden, acc.Operable, acc.Clock, acc.Position, acc.Removed,
 			acc.ProdPreferredChainIDs, acc.TestPreferredChainIDs, acc.Address)
 
@@ -1643,4 +1650,21 @@ func (db *Database) CheckAndDeleteExpiredKeypairsAndAccounts(time uint64) error 
 	}
 
 	return nil
+}
+
+func (db *Database) AddressWasShown(address types.Address) error {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	_, err = tx.Exec(`UPDATE keypairs_accounts SET address_was_not_shown = 0 WHERE address = ?`, address)
+	return err
 }

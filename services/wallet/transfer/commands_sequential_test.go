@@ -30,6 +30,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/t/helpers"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	statusRpc "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
@@ -942,10 +943,13 @@ func TestFindBlocksCommand(t *testing.T) {
 				Verified: true,
 			},
 		})
+		accDB, err := accounts.NewDB(appdb)
+		require.NoError(t, err)
 		fbc := &findBlocksCommand{
 			account:                   common.HexToAddress("0x1234"),
 			db:                        wdb,
 			blockRangeDAO:             &BlockRangeSequentialDAO{wdb.client},
+			accountsDB:                accDB,
 			chainClient:               tc,
 			balanceCacher:             balance.NewCacherWithTTL(5 * time.Minute),
 			feed:                      &event.Feed{},
@@ -1065,11 +1069,15 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 
 	chainClient := newMockChainClient()
 	tracker := transactions.NewPendingTxTracker(db, chainClient, nil, &event.Feed{}, transactions.PendingCheckInterval)
+	accDB, err := accounts.NewDB(wdb.client)
+	require.NoError(t, err)
+
 	cmd := &loadBlocksAndTransfersCommand{
 		account:            common.HexToAddress("0x1234"),
 		db:                 wdb,
 		blockRangeDAO:      &BlockRangeSequentialDAO{wdb.client},
 		blockDAO:           &BlockDAO{db},
+		accountsDB:         accDB,
 		chainClient:        tc,
 		feed:               &event.Feed{},
 		balanceCacher:      balance.NewCacherWithTTL(5 * time.Minute),

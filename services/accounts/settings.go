@@ -186,3 +186,7 @@ func (api *SettingsAPI) AddOrReplaceSocialLinks(links identity.SocialLinks) erro
 
 	return (*api.messenger).AddOrReplaceSocialLinks(links)
 }
+
+func (api *SettingsAPI) MnemonicWasShown() error {
+	return api.db.MnemonicWasShown()
+}

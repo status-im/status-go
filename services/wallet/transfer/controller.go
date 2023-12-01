@@ -110,7 +110,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 			}
 		}
 
-		c.reactor = NewReactor(c.db, c.blockDAO, c.blockRangesSeqDAO, c.TransferFeed, c.transactionManager,
+		c.reactor = NewReactor(c.db, c.blockDAO, c.blockRangesSeqDAO, c.accountsDB, c.TransferFeed, c.transactionManager,
 			c.pendingTxManager, c.tokenManager, c.balanceCacher, omitHistory)
 
 		err = c.reactor.start(chainClients, accounts)
