@@ -103,7 +103,7 @@ func (d *DBStore) Validate(env *protocol.Envelope) error {
 		return ErrFutureMessage
 	}
 
-	if *env.Message().Timestamp < lowerBound.UnixNano() {
+	if env.Message().GetTimestamp() < lowerBound.UnixNano() {
 		return ErrMessageTooOld
 	}
 
@@ -255,21 +255,21 @@ func (d *DBStore) Query(query *storepb.HistoryQuery) (*storepb.Index, []gowakuPe
 		}
 	}
 
-	if *query.StartTime != 0 {
+	if query.GetStartTime() != 0 {
 		if !usesCursor || query.PagingInfo.Direction == storepb.PagingInfo_BACKWARD {
 			paramCnt++
 			conditions = append(conditions, fmt.Sprintf("id >= $%d", paramCnt))
-			startTimeDBKey := gowakuPersistence.NewDBKey(uint64(*query.StartTime), uint64(*query.StartTime), "", []byte{})
+			startTimeDBKey := gowakuPersistence.NewDBKey(uint64(query.GetStartTime()), uint64(query.GetStartTime()), "", []byte{})
 			parameters = append(parameters, startTimeDBKey.Bytes())
 		}
 
 	}
 
-	if *query.EndTime != 0 {
+	if query.GetEndTime() != 0 {
 		if !usesCursor || query.PagingInfo.Direction == storepb.PagingInfo_FORWARD {
 			paramCnt++
 			conditions = append(conditions, fmt.Sprintf("id <= $%d", paramCnt))
-			endTimeDBKey := gowakuPersistence.NewDBKey(uint64(*query.EndTime), uint64(*query.EndTime), "", []byte{})
+			endTimeDBKey := gowakuPersistence.NewDBKey(uint64(query.GetEndTime()), uint64(query.GetEndTime()), "", []byte{})
 			parameters = append(parameters, endTimeDBKey.Bytes())
 		}
 	}
