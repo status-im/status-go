@@ -102,7 +102,7 @@ type Token struct {
 	MarketValuesPerCurrency map[string]TokenMarketValues `json:"marketValuesPerCurrency"`
 	PegSymbol               string                       `json:"pegSymbol"`
 	Verified                bool                         `json:"verified"`
-	CommunitID              string                       `json:"communityId"`
+	CommunityID             string                       `json:"communityId"`
 }
 
 func splitVerifiedTokens(tokens []*token.Token) ([]*token.Token, []*token.Token) {
@@ -337,7 +337,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 					Decimals:         decimals,
 					PegSymbol:        token.GetTokenPegSymbol(symbol),
 					Verified:         tokens[0].Verified,
-					CommunitID:       communityID,
+					CommunityID:      communityID,
 				}
 
 				tokenSymbols = append(tokenSymbols, symbol)

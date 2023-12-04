@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -415,6 +416,99 @@ func (m *Messenger) prepareSyncKeypairMessage(kp *accounts.Keypair) (*protobuf.S
 	}
 
 	return message, nil
+}
+
+func (m *Messenger) UpdateTokenPreferences(preferences []walletsettings.TokenPreferences) error {
+	clock, _ := m.getLastClockWithRelatedChat()
+	testNetworksEnabled, err := m.settings.GetTestNetworksEnabled()
+	if err != nil {
+		return err
+	}
+
+	groupByCommunity, err := m.settings.GetTokenGroupByCommunity()
+	if err != nil {
+		return err
+	}
+
+	err = m.settings.UpdateTokenPreferences(preferences, groupByCommunity, testNetworksEnabled, clock)
+	if err != nil {
+		return err
+	}
+
+	return m.syncTokenPreferences(m.dispatchMessage)
+}
+
+func (m *Messenger) GetTokenPreferences() ([]walletsettings.TokenPreferences, error) {
+	testNetworksEnabled, err := m.settings.GetTestNetworksEnabled()
+	if err != nil {
+		return nil, err
+	}
+
+	list, err := m.settings.GetTokenPreferences(testNetworksEnabled)
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func (m *Messenger) prepareTokenPreferencesMessage(pref walletsettings.TokenPreferences) *protobuf.TokenPreferences {
+	return &protobuf.TokenPreferences{
+		Key:           pref.Key,
+		Position:      int64(pref.Position),
+		GroupPosition: int64(pref.GroupPosition),
+		Visible:       pref.Visible,
+		CommunityId:   pref.CommunityID,
+	}
+}
+
+func (m *Messenger) syncTokenPreferences(rawMessageHandler RawMessageHandler) error {
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, chat := m.getLastClockWithRelatedChat()
+
+	lastUpdate, err := m.settings.GetClockOfLastTokenPreferencesChange()
+	if err != nil {
+		return err
+	}
+
+	testNetworksEnabled, err := m.settings.GetTestNetworksEnabled()
+	if err != nil {
+		return err
+	}
+
+	preferences, err := m.GetTokenPreferences()
+	if err != nil {
+		return err
+	}
+
+	message := &protobuf.SyncTokenPreferences{
+		Clock:   lastUpdate,
+		Testnet: testNetworksEnabled,
+	}
+
+	for _, pref := range preferences {
+		message.Preferences = append(message.Preferences, m.prepareTokenPreferencesMessage(pref))
+	}
+
+	encodedMessage, err := proto.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_TOKEN_PREFERENCES,
+		ResendAutomatically: true,
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
+	return err
 }
 
 func (m *Messenger) syncAccountsPositions(rawMessageHandler RawMessageHandler) error {
