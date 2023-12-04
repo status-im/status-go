@@ -1673,6 +1673,14 @@ func newDefaultStore() *DefaultStore {
 				TokenListID: "status",
 			},
 			&Token{
+				Address:     common.HexToAddress("0xE452027cdEF746c7Cd3DB31CB700428b16cD8E51"),
+				Name:        "Status Test Token",
+				Symbol:      "STT",
+				Decimals:    18,
+				ChainID:     11155111,
+				TokenListID: "status",
+			},
+			&Token{
 				Address:     common.HexToAddress("0x3e622317f8c93f7328350cf0b56d9ed4c620c5d6"),
 				Name:        "Dai Stablecoin",
 				Symbol:      "DAI",
