@@ -99,7 +99,7 @@ func (d *DBStore) Validate(env *protocol.Envelope) error {
 	lowerBound := n.Add(-MaxTimeVariance)
 
 	// Ensure that messages don't "jump" to the front of the queue with future timestamps
-	if *env.Message().Timestamp > upperBound.UnixNano() {
+	if env.Message().GetTimestamp() > upperBound.UnixNano() {
 		return ErrFutureMessage
 	}
 
