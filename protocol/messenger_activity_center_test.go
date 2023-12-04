@@ -267,6 +267,31 @@ func (s *MessengerActivityCenterMessageSuite) TestMuteCommunityActivityCenterNot
 	s.Require().Len(response.ActivityCenterNotifications(), 0)
 }
 
+func (s *MessengerActivityCenterMessageSuite) TestReadCommunityOverviewNotifications() {
+	alice := s.m
+	bob := s.newMessenger()
+	_, err := bob.Start()
+	s.Require().NoError(err)
+	defer bob.Shutdown() // nolint: errcheck
+
+	// Create a community
+	community, chat := s.createCommunity(bob)
+	s.Require().NotNil(community)
+	s.Require().NotNil(chat)
+
+	// Alice joins the community
+	s.advertiseCommunityTo(community, bob, alice)
+	s.joinCommunity(community, bob, alice)
+
+	// Mark community overview notification read
+	err = alice.DismissActivityCenterNotificationsByCommunity(context.Background(), &requests.DismissCommunityNotifications{CommunityID: community.ID()})
+	s.Require().NoError(err)
+
+	response, err := alice.GetActivityCenterState()
+	s.Require().NoError(err)
+	s.Require().Equal(response.HasSeen, true)
+}
+
 func (s *MessengerActivityCenterMessageSuite) prepareCommunityChannelWithMentionAndReply() (*Messenger, *Messenger, *common.Message, *common.Message, *communities.Community) {
 	alice := s.m
 	bob := s.newMessenger()
