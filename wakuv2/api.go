@@ -28,6 +28,7 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/status-im/status-go/wakuv2/common"
 
@@ -244,12 +245,11 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		return nil, err
 	}
 
-	time := api.w.timestamp()
 	wakuMsg := &pb.WakuMessage{
 		Payload:      payload,
 		Version:      &version,
 		ContentTopic: req.ContentTopic.ContentTopic(),
-		Timestamp:    &time,
+		Timestamp:    proto.Int64(api.w.timestamp()),
 		Meta:         []byte{}, // TODO: empty for now. Once we use Waku Archive v2, we should deprecate the timestamp and use an ULID here
 		Ephemeral:    &req.Ephemeral,
 	}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/require"
 
 	"golang.org/x/exp/maps"
@@ -155,11 +156,10 @@ func TestBasicWakuV2(t *testing.T) {
 	msgTimestamp := w.timestamp()
 	contentTopic := maps.Keys(filter.ContentTopics)[0]
 
-	var version uint32 = 0
 	_, err = w.Send(relay.DefaultWakuTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: contentTopic.ContentTopic(),
-		Version:      &version,
+		Version:      proto.Uint32(0),
 		Timestamp:    &msgTimestamp,
 	})
 	require.NoError(t, err)
@@ -238,11 +238,10 @@ func TestWakuV2Filter(t *testing.T) {
 	msgTimestamp := w.timestamp()
 	contentTopic := maps.Keys(filter.ContentTopics)[0]
 
-	var version uint32 = 0
 	_, err = w.Send("", &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: contentTopic.ContentTopic(),
-		Version:      &version,
+		Version:      proto.Uint32(0),
 		Timestamp:    &msgTimestamp,
 	})
 	require.NoError(t, err)
@@ -351,13 +350,12 @@ func TestWakuV2Store(t *testing.T) {
 	require.NoError(t, err)
 
 	// Send a message from the first node
-	var version uint32 = 0
 	msgTimestamp := w1.CurrentTime().UnixNano()
 	contentTopic := maps.Keys(filter.ContentTopics)[0]
 	_, err = w1.Send(relay.DefaultWakuTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: contentTopic.ContentTopic(),
-		Version:      &version,
+		Version:      proto.Uint32(0),
 		Timestamp:    &msgTimestamp,
 	})
 	require.NoError(t, err)
