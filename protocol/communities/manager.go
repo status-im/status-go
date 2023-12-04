@@ -622,7 +622,21 @@ func (m *Manager) publish(subscription *Subscription) {
 }
 
 func (m *Manager) All() ([]*Community, error) {
-	return m.persistence.AllCommunities(&m.identity.PublicKey)
+	communities, err := m.persistence.AllCommunities(&m.identity.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	nonApprovedRequestsToJoin, err := m.persistence.AllNonApprovedCommunitiesRequestsToJoin()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, community := range communities {
+		community.config.RequestsToJoin = nonApprovedRequestsToJoin[community.IDString()]
+	}
+
+	return communities, nil
 }
 
 type CommunityShard struct {
@@ -1475,7 +1489,7 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 	return changes.Community, changes, nil
 }
 
-func (m *Manager) GenerateRequestsToJoinForAutoApprovalOnNewOwnership(communityID types.HexBytes, kickedMembers map[string]*protobuf.CommunityMember) error {
+func (m *Manager) GenerateRequestsToJoinForAutoApprovalOnNewOwnership(communityID types.HexBytes, kickedMembers map[string]*protobuf.CommunityMember) ([]*RequestToJoin, error) {
 	var requestsToJoin []*RequestToJoin
 	clock := uint64(time.Now().Unix())
 	for pubKeyStr := range kickedMembers {
@@ -1493,7 +1507,7 @@ func (m *Manager) GenerateRequestsToJoinForAutoApprovalOnNewOwnership(communityI
 		requestsToJoin = append(requestsToJoin, requestToJoin)
 	}
 
-	return m.persistence.SaveRequestsToJoin(requestsToJoin)
+	return requestsToJoin, m.persistence.SaveRequestsToJoin(requestsToJoin)
 }
 
 func (m *Manager) Queue(signer *ecdsa.PublicKey, community *Community, clock uint64, payload []byte) error {
