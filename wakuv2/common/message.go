@@ -166,7 +166,7 @@ func NewReceivedMessage(env *protocol.Envelope, msgType MessageType) *ReceivedMe
 	return &ReceivedMessage{
 		Envelope:     env,
 		MsgType:      msgType,
-		Sent:         uint32(*env.Message().Timestamp / int64(time.Second)),
+		Sent:         uint32(env.Message().GetTimestamp() / int64(time.Second)),
 		ContentTopic: ct,
 		PubsubTopic:  env.PubsubTopic(),
 	}
