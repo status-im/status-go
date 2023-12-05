@@ -189,13 +189,20 @@ func parseCommunityURLWithData(data string, chatKey string) (*URLDataResponse, e
 		return nil, err
 	}
 
+	var tagIndices []uint32
+	if communityProto.TagIndices != nil {
+		tagIndices = communityProto.TagIndices
+	} else {
+		tagIndices = []uint32{}
+	}
+
 	return &URLDataResponse{
 		Community: &CommunityURLData{
 			DisplayName:  communityProto.DisplayName,
 			Description:  communityProto.Description,
 			MembersCount: communityProto.MembersCount,
 			Color:        communityProto.Color,
-			TagIndices:   communityProto.TagIndices,
+			TagIndices:   tagIndices,
 			CommunityID:  types.EncodeHex(communityID),
 		},
 		Shard: shard.FromProtobuff(urlDataProto.Shard),
@@ -351,13 +358,20 @@ func parseCommunityChannelURLWithData(data string, chatKey string) (*URLDataResp
 		return nil, err
 	}
 
+	var tagIndices []uint32
+	if channelProto.Community.TagIndices != nil {
+		tagIndices = channelProto.Community.TagIndices
+	} else {
+		tagIndices = []uint32{}
+	}
+
 	return &URLDataResponse{
 		Community: &CommunityURLData{
 			DisplayName:  channelProto.Community.DisplayName,
 			Description:  channelProto.Community.Description,
 			MembersCount: channelProto.Community.MembersCount,
 			Color:        channelProto.Community.Color,
-			TagIndices:   channelProto.Community.TagIndices,
+			TagIndices:   tagIndices,
 			CommunityID:  types.EncodeHex(communityID),
 		},
 		Channel: &CommunityChannelURLData{
