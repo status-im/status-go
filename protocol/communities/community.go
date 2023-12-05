@@ -265,7 +265,6 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		PubsubTopic                 string                               `json:"pubsubTopic"`
 		PubsubTopicKey              string                               `json:"pubsubTopicKey"`
 		Shard                       *shard.Shard                         `json:"shard"`
-		RequestsToJoinCommunity     []*RequestToJoin                     `json:"requestsToJoinCommunity"`
 	}{
 		ID:                          o.ID(),
 		MemberRole:                  o.MemberRole(o.MemberIdentity()),
@@ -288,7 +287,6 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		PubsubTopic:                 o.PubsubTopic(),
 		PubsubTopicKey:              o.PubsubTopicKey(),
 		Shard:                       o.Shard(),
-		RequestsToJoinCommunity:     []*RequestToJoin{},
 	}
 	if o.config.CommunityDescription != nil {
 		for id, c := range o.config.CommunityDescription.Categories {
@@ -327,7 +325,6 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
 		communityItem.CommunityTokensMetadata = o.config.CommunityDescription.CommunityTokensMetadata
 		communityItem.ActiveMembersCount = o.config.CommunityDescription.ActiveMembersCount
-		communityItem.RequestsToJoinCommunity = o.config.RequestsToJoin
 
 		if o.config.CommunityDescription.Identity != nil {
 			communityItem.Name = o.Name()

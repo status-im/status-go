@@ -2359,39 +2359,8 @@ func (m *Messenger) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, err
 	return m.communitiesManager.PendingRequestsToJoinForUser(&m.identity.PublicKey)
 }
 
-func (m *Messenger) MyAwaitingAddressesRequestsToJoin() ([]*communities.RequestToJoin, error) {
-	return m.communitiesManager.AwaitingAddressesRequestsToJoinForUser(&m.identity.PublicKey)
-}
-
 func (m *Messenger) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.PendingRequestsToJoinForCommunity(id)
-}
-
-func (m *Messenger) AllPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
-	// TODO: optimize and extract via one query
-	pendingRequests, err := m.communitiesManager.PendingRequestsToJoinForCommunity(id)
-	if err != nil {
-		return nil, err
-	}
-	acceptedPendingRequests, err := m.communitiesManager.AcceptedPendingRequestsToJoinForCommunity(id)
-	if err != nil {
-		return nil, err
-	}
-	declinedPendingRequests, err := m.communitiesManager.DeclinedPendingRequestsToJoinForCommunity(id)
-	if err != nil {
-		return nil, err
-	}
-
-	ownershipChangedRequests, err := m.communitiesManager.RequestsToJoinForCommunityAwaitingAddresses(id)
-	if err != nil {
-		return nil, err
-	}
-
-	pendingRequests = append(pendingRequests, acceptedPendingRequests...)
-	pendingRequests = append(pendingRequests, declinedPendingRequests...)
-	pendingRequests = append(pendingRequests, ownershipChangedRequests...)
-
-	return pendingRequests, nil
 }
 
 func (m *Messenger) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
@@ -2412,6 +2381,10 @@ func (m *Messenger) AcceptedPendingRequestsToJoinForCommunity(id types.HexBytes)
 
 func (m *Messenger) DeclinedPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.DeclinedPendingRequestsToJoinForCommunity(id)
+}
+
+func (m *Messenger) AllNonApprovedCommunitiesRequestsToJoin() ([]*communities.RequestToJoin, error) {
+	return m.communitiesManager.AllNonApprovedCommunitiesRequestsToJoin()
 }
 
 func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) (*MessengerResponse, error) {

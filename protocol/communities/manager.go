@@ -622,21 +622,7 @@ func (m *Manager) publish(subscription *Subscription) {
 }
 
 func (m *Manager) All() ([]*Community, error) {
-	communities, err := m.persistence.AllCommunities(&m.identity.PublicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	nonApprovedRequestsToJoin, err := m.persistence.AllNonApprovedCommunitiesRequestsToJoin()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, community := range communities {
-		community.config.RequestsToJoin = nonApprovedRequestsToJoin[community.IDString()]
-	}
-
-	return communities, nil
+	return m.persistence.AllCommunities(&m.identity.PublicKey)
 }
 
 type CommunityShard struct {
@@ -3297,10 +3283,6 @@ func (m *Manager) PendingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestT
 	return m.persistence.RequestsToJoinForUserByState(common.PubkeyToHex(pk), RequestToJoinStatePending)
 }
 
-func (m *Manager) AwaitingAddressesRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
-	return m.persistence.RequestsToJoinForUserByState(common.PubkeyToHex(pk), RequestToJoinStateAwaitingAddresses)
-}
-
 func (m *Manager) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
 	m.logger.Info("fetching pending invitations", zap.String("community-id", id.String()))
 	return m.persistence.PendingRequestsToJoinForCommunity(id)
@@ -3327,7 +3309,11 @@ func (m *Manager) AcceptedPendingRequestsToJoinForCommunity(id types.HexBytes) (
 
 func (m *Manager) DeclinedPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
 	return m.persistence.DeclinedPendingRequestsToJoinForCommunity(id)
+}
 
+func (m *Manager) AllNonApprovedCommunitiesRequestsToJoin() ([]*RequestToJoin, error) {
+	m.logger.Info("fetching all non-approved invitations for all communities")
+	return m.persistence.AllNonApprovedCommunitiesRequestsToJoin()
 }
 
 func (m *Manager) RequestsToJoinForCommunityAwaitingAddresses(id types.HexBytes) ([]*RequestToJoin, error) {

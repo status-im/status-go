@@ -1647,8 +1647,8 @@ func (p *Persistence) SetCuratedCommunities(communities *CuratedCommunities) err
 	return nil
 }
 
-func (p *Persistence) AllNonApprovedCommunitiesRequestsToJoin() (map[string][]*RequestToJoin, error) {
-	nonApprovedRequestsToJoin := make(map[string][]*RequestToJoin)
+func (p *Persistence) AllNonApprovedCommunitiesRequestsToJoin() ([]*RequestToJoin, error) {
+	nonApprovedRequestsToJoin := []*RequestToJoin{}
 	rows, err := p.db.Query(`SELECT id,public_key,clock,ens_name,chat_id,community_id,state FROM communities_requests_to_join WHERE state != ?`, RequestToJoinStateAccepted)
 
 	if err == sql.ErrNoRows {
@@ -1665,9 +1665,7 @@ func (p *Persistence) AllNonApprovedCommunitiesRequestsToJoin() (map[string][]*R
 		if err != nil {
 			return nil, err
 		}
-
-		communityID := types.EncodeHex(request.CommunityID)
-		nonApprovedRequestsToJoin[communityID] = append(nonApprovedRequestsToJoin[communityID], request)
+		nonApprovedRequestsToJoin = append(nonApprovedRequestsToJoin, request)
 	}
 	return nonApprovedRequestsToJoin, nil
 }

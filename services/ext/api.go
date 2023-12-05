@@ -558,11 +558,6 @@ func (api *PublicAPI) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, e
 	return api.service.messenger.MyPendingRequestsToJoin()
 }
 
-// MyAwaitingAddressesRequestsToJoin returns requests to join, which must be auto-accepted when control node will be online
-func (api *PublicAPI) MyAwaitingAddressesRequestsToJoin() ([]*communities.RequestToJoin, error) {
-	return api.service.messenger.MyAwaitingAddressesRequestsToJoin()
-}
-
 // MyCanceledRequestsToJoin returns the pending requests for the logged in user
 func (api *PublicAPI) MyCanceledRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.MyCanceledRequestsToJoin()
@@ -573,11 +568,6 @@ func (api *PublicAPI) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*c
 	return api.service.messenger.PendingRequestsToJoinForCommunity(id)
 }
 
-// AllPendingRequestsToJoinForCommunity returns the all the pending requests to join, including accepted and rejected ones, for a given community
-func (api *PublicAPI) AllPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
-	return api.service.messenger.AllPendingRequestsToJoinForCommunity(id)
-}
-
 // DeclinedRequestsToJoinForCommunity returns the declined requests to join for a given community
 func (api *PublicAPI) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.DeclinedRequestsToJoinForCommunity(id)
@@ -586,6 +576,11 @@ func (api *PublicAPI) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*
 // CanceledRequestsToJoinForCommunity returns the declined requests to join for a given community
 func (api *PublicAPI) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.CanceledRequestsToJoinForCommunity(id)
+}
+
+// AllNonApprovedCommunitiesRequestsToJoin returns the all non-approved requests to join for all communities
+func (api *PublicAPI) AllNonApprovedCommunitiesRequestsToJoin() ([]*communities.RequestToJoin, error) {
+	return api.service.messenger.AllNonApprovedCommunitiesRequestsToJoin()
 }
 
 // Generates a single hash for each address that needs to be revealed to a community.

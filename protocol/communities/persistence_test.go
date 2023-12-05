@@ -725,7 +725,6 @@ func (s *PersistenceSuite) TestAllNonApprovedCommunitiesRequestsToJoin() {
 
 	// add a new community
 	community := s.makeNewCommunity(identity)
-	err = s.db.SaveCommunity(community)
 	s.Require().NoError(err)
 
 	// add requests to join to the community
@@ -756,6 +755,5 @@ func (s *PersistenceSuite) TestAllNonApprovedCommunitiesRequestsToJoin() {
 
 	result, err = s.db.AllNonApprovedCommunitiesRequestsToJoin()
 	s.Require().NoError(err)
-	s.Require().Len(result, 1)
-	s.Require().Len(result[community.IDString()], 6) // all except RequestToJoinStateAccepted
+	s.Require().Len(result, 6) // all except RequestToJoinStateAccepted
 }
