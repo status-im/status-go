@@ -52,10 +52,11 @@ import (
 const discoveryConnectTimeout = 20 * time.Second
 
 type Peer struct {
-	ID        peer.ID        `json:"peerID"`
-	Protocols []protocol.ID  `json:"protocols"`
-	Addrs     []ma.Multiaddr `json:"addrs"`
-	Connected bool           `json:"connected"`
+	ID           peer.ID        `json:"peerID"`
+	Protocols    []protocol.ID  `json:"protocols"`
+	Addrs        []ma.Multiaddr `json:"addrs"`
+	Connected    bool           `json:"connected"`
+	PubsubTopics []string       `json:"pubsubTopics"`
 }
 
 type storeFactory func(w *WakuNode) store.Store
@@ -857,11 +858,16 @@ func (w *WakuNode) Peers() ([]*Peer, error) {
 		}
 
 		addrs := utils.EncapsulatePeerID(peerId, w.host.Peerstore().Addrs(peerId)...)
+		topics, err := w.host.Peerstore().(*wps.WakuPeerstoreImpl).PubSubTopics(peerId)
+		if err != nil {
+			return nil, err
+		}
 		peers = append(peers, &Peer{
-			ID:        peerId,
-			Protocols: protocols,
-			Connected: connected,
-			Addrs:     addrs,
+			ID:           peerId,
+			Protocols:    protocols,
+			Connected:    connected,
+			Addrs:        addrs,
+			PubsubTopics: topics,
 		})
 	}
 	return peers, nil
