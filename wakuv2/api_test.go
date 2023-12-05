@@ -19,11 +19,13 @@
 package wakuv2
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"golang.org/x/exp/maps"
 
+	"github.com/stretchr/testify/require"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/wakuv2/common"
@@ -69,4 +71,25 @@ func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
 	if !found {
 		t.Fatalf("Could not find filter with both topics")
 	}
+}
+
+func TestExceedMaxMessageSize(t *testing.T) {
+	w, err := New("", "", nil, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	api := NewPublicWakuAPI(w)
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 2*time.Second)
+	defer cancel()
+
+	keyID, err := w.GenerateSymKey()
+	require.NoError(t, err)
+	msg := NewMessage{
+		SymKeyID:     keyID,
+		Payload:      make([]byte, 1024*1024),
+		ContentTopic: common.TopicType([4]byte{0xde, 0xea, 0xbe, 0xef}),
+	}
+
+	_, err = api.Post(ctx, msg)
+	require.EqualError(t, err, "message size exceeds max size allowed by waku node")
 }

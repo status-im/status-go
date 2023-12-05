@@ -255,6 +255,14 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		Ephemeral:    &req.Ephemeral,
 	}
 
+	encodedMsg, err := proto.Marshal(wakuMsg)
+	if err != nil {
+		return nil, err
+	}
+	if len(encodedMsg) > int(api.w.MaxMessageSize()) {
+		return nil, errors.New("message size exceeds max size allowed by waku node")
+	}
+
 	hash, err := api.w.Send(req.PubsubTopic, wakuMsg)
 
 	if err != nil {
