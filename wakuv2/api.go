@@ -28,7 +28,6 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/status-im/status-go/wakuv2/common"
 
@@ -36,6 +35,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
+
+	"google.golang.org/protobuf/proto"
 )
 
 // List of errors
