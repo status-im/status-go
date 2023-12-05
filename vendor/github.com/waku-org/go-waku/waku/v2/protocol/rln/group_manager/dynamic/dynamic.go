@@ -244,10 +244,7 @@ func (gm *DynamicGroupManager) InsertMembers(toInsert *om.OrderedMap) error {
 
 		gm.metrics.RecordRegisteredMembership(gm.rln.LeavesSet())
 
-		_, err = gm.rootTracker.UpdateLatestRoot(pair.Key.(uint64))
-		if err != nil {
-			return err
-		}
+		gm.rootTracker.UpdateLatestRoot(pair.Key.(uint64))
 	}
 	return nil
 }

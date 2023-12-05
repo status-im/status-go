@@ -25,6 +25,9 @@ const (
 	None       KeyKind = "None"
 )
 
+const Unencrypted = 0
+const V1Encryption = 1
+
 // Payload contains the data of the message to encode
 type Payload struct {
 	Data    []byte   // Raw message payload
@@ -94,7 +97,7 @@ func EncodeWakuMessage(message *pb.WakuMessage, keyInfo *KeyInfo) error {
 		Key:  keyInfo,
 	}
 
-	encodedBytes, err := payload.Encode(message.Version)
+	encodedBytes, err := payload.Encode(message.GetVersion())
 	if err != nil {
 		return err
 	}
@@ -106,7 +109,7 @@ func EncodeWakuMessage(message *pb.WakuMessage, keyInfo *KeyInfo) error {
 // DecodePayload decodes a WakuMessage depending on the version parameter.
 // 0 for raw unencrypted data, and 1 for using WakuV1 decoding
 func DecodePayload(message *pb.WakuMessage, keyInfo *KeyInfo) (*DecodedPayload, error) {
-	switch message.Version {
+	switch message.GetVersion() {
 	case uint32(0):
 		return &DecodedPayload{Data: message.Payload}, nil
 	case uint32(1):

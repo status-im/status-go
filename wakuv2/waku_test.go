@@ -11,6 +11,7 @@ import (
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
 	"golang.org/x/exp/maps"
 
@@ -155,8 +156,8 @@ func TestBasicWakuV2(t *testing.T) {
 	_, err = w.Send(relay.DefaultWakuTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: contentTopic.ContentTopic(),
-		Version:      0,
-		Timestamp:    msgTimestamp,
+		Version:      proto.Uint32(0),
+		Timestamp:    proto.Int64(msgTimestamp),
 	})
 	require.NoError(t, err)
 
@@ -237,8 +238,8 @@ func TestWakuV2Filter(t *testing.T) {
 	_, err = w.Send("", &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: contentTopic.ContentTopic(),
-		Version:      0,
-		Timestamp:    msgTimestamp,
+		Version:      proto.Uint32(0),
+		Timestamp:    proto.Int64(msgTimestamp),
 	})
 	require.NoError(t, err)
 

@@ -1,10 +1,11 @@
-package peermanager
+package discv5
 
 import (
 	"context"
 	"sync"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/waku-org/go-waku/waku/v2/service"
 )
 
 // TestPeerDiscoverer is mock peer discoverer for testing
@@ -23,7 +24,7 @@ func NewTestPeerDiscoverer() *TestPeerDiscoverer {
 }
 
 // Subscribe is for subscribing to peer discoverer
-func (t *TestPeerDiscoverer) Subscribe(ctx context.Context, ch <-chan PeerData) {
+func (t *TestPeerDiscoverer) Subscribe(ctx context.Context, ch <-chan service.PeerData) {
 	go func() {
 		for {
 			select {

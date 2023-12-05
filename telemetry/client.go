@@ -63,7 +63,7 @@ func (c *Client) PushReceivedEnvelope(envelope *v2protocol.Envelope) {
 	url := fmt.Sprintf("%s/received-envelope", c.serverURL)
 	postBody := map[string]interface{}{
 		"messageHash":    types.EncodeHex(envelope.Hash()),
-		"sentAt":         uint32(envelope.Message().Timestamp / int64(time.Second)),
+		"sentAt":         uint32(envelope.Message().GetTimestamp() / int64(time.Second)),
 		"pubsubTopic":    envelope.PubsubTopic(),
 		"topic":          envelope.Message().ContentTopic,
 		"receiverKeyUID": c.keyUID,

@@ -14,7 +14,7 @@ func WithPubSubTopic(pubsubTopic string) PublishOption {
 	}
 }
 
-// WithPubSubTopic is used to indicate that the message should be broadcasted in the default pubsub topic
+// WithDefaultPubsubTopic is used to indicate that the message should be broadcasted in the default pubsub topic
 func WithDefaultPubsubTopic() PublishOption {
 	return func(params *publishParameters) {
 		params.pubsubTopic = DefaultWakuTopic

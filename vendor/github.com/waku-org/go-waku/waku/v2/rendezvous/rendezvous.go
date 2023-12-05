@@ -8,9 +8,9 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/host"
 	rvs "github.com/waku-org/go-libp2p-rendezvous"
-	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/service"
 	"go.uber.org/zap"
 )
 
@@ -31,12 +31,12 @@ type Rendezvous struct {
 	peerConnector PeerConnector
 
 	log *zap.Logger
-	*peermanager.CommonDiscoveryService
+	*service.CommonDiscoveryService
 }
 
 // PeerConnector will subscribe to a channel containing the information for all peers found by this discovery protocol
 type PeerConnector interface {
-	Subscribe(context.Context, <-chan peermanager.PeerData)
+	Subscribe(context.Context, <-chan service.PeerData)
 }
 
 // NewRendezvous creates an instance of Rendezvous struct
@@ -46,7 +46,7 @@ func NewRendezvous(db *DB, peerConnector PeerConnector, log *zap.Logger) *Rendez
 		db:                     db,
 		peerConnector:          peerConnector,
 		log:                    logger,
-		CommonDiscoveryService: peermanager.NewCommonDiscoveryService(),
+		CommonDiscoveryService: service.NewCommonDiscoveryService(),
 	}
 }
 
@@ -104,10 +104,10 @@ func (r *Rendezvous) DiscoverWithNamespace(ctx context.Context, namespace string
 		rp.SetSuccess(cookie)
 
 		for _, p := range addrInfo {
-			peer := peermanager.PeerData{
+			peer := service.PeerData{
 				Origin:       peerstore.Rendezvous,
 				AddrInfo:     p,
-				PubSubTopics: []string{namespace},
+				PubsubTopics: []string{namespace},
 			}
 			if !r.PushToChan(peer) {
 				r.log.Error("could push to closed channel/context completed")

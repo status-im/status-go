@@ -101,10 +101,11 @@ var (
 type invalidCategory string
 
 var (
-	invalidNoProof invalidCategory = "no_proof"
-	invalidEpoch   invalidCategory = "invalid_epoch"
-	invalidRoot    invalidCategory = "invalid_root"
-	invalidProof   invalidCategory = "invalid_proof"
+	invalidNoProof     invalidCategory = "no_proof"
+	invalidEpoch       invalidCategory = "invalid_epoch"
+	invalidRoot        invalidCategory = "invalid_root"
+	invalidProof       invalidCategory = "invalid_proof"
+	proofExtractionErr invalidCategory = "invalid_proof_extract_err"
 )
 
 // Metrics exposes the functions required to update prometheus metrics for lightpush protocol

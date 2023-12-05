@@ -9,6 +9,7 @@ import (
 )
 
 var log *zap.Logger
+var messageLoggers map[string]*zap.Logger
 
 // Logger creates a zap.Logger with some reasonable defaults
 func Logger() *zap.Logger {
@@ -16,6 +17,20 @@ func Logger() *zap.Logger {
 		InitLogger("console", "stdout")
 	}
 	return log
+}
+
+// MessagesLogger returns a logger used for debug logging of receivent/sent messages
+func MessagesLogger(prefix string) *zap.Logger {
+	if messageLoggers == nil {
+		messageLoggers = make(map[string]*zap.Logger)
+	}
+	logger := messageLoggers[prefix]
+	if logger == nil {
+		logger = logging.Logger(prefix + ".messages").Desugar()
+		messageLoggers[prefix] = logger
+	}
+
+	return logger
 }
 
 // InitLogger initializes a global logger using an specific encoding
@@ -50,10 +65,12 @@ func InitLogger(encoding string, output string) {
 			cfg.File = "./waku.log"
 		}
 	}
+	if cfg.Level == logging.LevelError {
+		// Override default level setting
+		cfg.Level = logging.LevelInfo
+	}
 
 	logging.SetupLogging(cfg)
 
 	log = logging.Logger("gowaku").Desugar()
-
-	logging.SetAllLoggers(logging.LevelInfo)
 }

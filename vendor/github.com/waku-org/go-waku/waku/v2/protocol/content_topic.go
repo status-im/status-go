@@ -15,7 +15,7 @@ var ErrInvalidGeneration = errors.New("generation should be a number")
 type ContentTopic struct {
 	ContentTopicParams
 	ApplicationName    string
-	ApplicationVersion uint32
+	ApplicationVersion string
 	ContentTopicName   string
 	Encoding           string
 }
@@ -35,12 +35,13 @@ type ContentTopicOption func(*ContentTopicParams)
 
 // String formats a content topic in string format as per RFC 23.
 func (ct ContentTopic) String() string {
-	return fmt.Sprintf("/%s/%d/%s/%s", ct.ApplicationName, ct.ApplicationVersion, ct.ContentTopicName, ct.Encoding)
+	return fmt.Sprintf("/%s/%s/%s/%s", ct.ApplicationName, ct.ApplicationVersion, ct.ContentTopicName, ct.Encoding)
 }
 
 // NewContentTopic creates a new content topic based on params specified.
 // Returns ErrInvalidGeneration if an unsupported generation is specified.
-func NewContentTopic(applicationName string, applicationVersion uint32,
+// Note that this is recommended to be used for autosharding where contentTopic format is enforced as per https://rfc.vac.dev/spec/51/#content-topics-format-for-autosharding
+func NewContentTopic(applicationName string, applicationVersion string,
 	contentTopicName string, encoding string, opts ...ContentTopicOption) (ContentTopic, error) {
 
 	params := new(ContentTopicParams)
@@ -83,18 +84,19 @@ func (ct ContentTopic) Equal(ct2 ContentTopic) bool {
 }
 
 // StringToContentTopic can be used to create a ContentTopic object from a string
+// Note that this has to be used only when following the rfc format of contentTopic, which is currently validated only for Autosharding.
+// For static and named-sharding, contentTopic can be of any format and hence it is not recommended to use this function.
+// This can be updated if required to handle such a case.
 func StringToContentTopic(s string) (ContentTopic, error) {
 	p := strings.Split(s, "/")
 	switch len(p) {
 	case 5:
-		vNum, err := strconv.ParseUint(p[2], 10, 32)
-		if err != nil {
+		if len(p[1]) == 0 || len(p[2]) == 0 || len(p[3]) == 0 || len(p[4]) == 0 {
 			return ContentTopic{}, ErrInvalidFormat
 		}
-
 		return ContentTopic{
 			ApplicationName:    p[1],
-			ApplicationVersion: uint32(vNum),
+			ApplicationVersion: p[2],
 			ContentTopicName:   p[3],
 			Encoding:           p[4],
 		}, nil
@@ -106,15 +108,13 @@ func StringToContentTopic(s string) (ContentTopic, error) {
 		if err != nil || generation > 0 {
 			return ContentTopic{}, ErrInvalidGeneration
 		}
-		vNum, err := strconv.ParseUint(p[3], 10, 32)
-		if err != nil {
+		if len(p[2]) == 0 || len(p[3]) == 0 || len(p[4]) == 0 || len(p[5]) == 0 {
 			return ContentTopic{}, ErrInvalidFormat
 		}
-
 		return ContentTopic{
 			ContentTopicParams: ContentTopicParams{Generation: generation},
 			ApplicationName:    p[2],
-			ApplicationVersion: uint32(vNum),
+			ApplicationVersion: p[3],
 			ContentTopicName:   p[4],
 			Encoding:           p[5],
 		}, nil

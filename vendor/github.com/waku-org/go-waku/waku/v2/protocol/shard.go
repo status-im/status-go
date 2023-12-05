@@ -225,7 +225,7 @@ func FromBitVector(buf []byte) (RelayShards, error) {
 // This is based on Autosharding algorithm defined in RFC 51
 func GetShardFromContentTopic(topic ContentTopic, shardCount int) StaticShardingPubsubTopic {
 	bytes := []byte(topic.ApplicationName)
-	bytes = append(bytes, []byte(fmt.Sprintf("%d", topic.ApplicationVersion))...)
+	bytes = append(bytes, []byte(topic.ApplicationVersion)...)
 
 	hash := hash.SHA256(bytes)
 	//We only use the last 64 bits of the hash as having more shards is unlikely.
@@ -244,4 +244,27 @@ func GetPubSubTopicFromContentTopic(cTopicString string) (string, error) {
 	pTopic := GetShardFromContentTopic(cTopic, GenerationZeroShardsCount)
 
 	return pTopic.String(), nil
+}
+
+func GeneratePubsubToContentTopicMap(pubsubTopic string, contentTopics []string) (map[string][]string, error) {
+
+	pubSubTopicMap := make(map[string][]string, 0)
+
+	if pubsubTopic == "" {
+		//Should we derive pubsub topic from contentTopic so that peer selection and discovery can be done accordingly?
+		for _, cTopic := range contentTopics {
+			pTopic, err := GetPubSubTopicFromContentTopic(cTopic)
+			if err != nil {
+				return nil, err
+			}
+			_, ok := pubSubTopicMap[pTopic]
+			if !ok {
+				pubSubTopicMap[pTopic] = []string{}
+			}
+			pubSubTopicMap[pTopic] = append(pubSubTopicMap[pTopic], cTopic)
+		}
+	} else {
+		pubSubTopicMap[pubsubTopic] = append(pubSubTopicMap[pubsubTopic], contentTopics...)
+	}
+	return pubSubTopicMap, nil
 }

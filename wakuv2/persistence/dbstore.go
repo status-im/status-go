@@ -15,6 +15,7 @@ import (
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
+	"google.golang.org/protobuf/proto"
 
 	"go.uber.org/zap"
 )
@@ -99,11 +100,11 @@ func (d *DBStore) Validate(env *protocol.Envelope) error {
 	lowerBound := n.Add(-MaxTimeVariance)
 
 	// Ensure that messages don't "jump" to the front of the queue with future timestamps
-	if env.Message().Timestamp > upperBound.UnixNano() {
+	if env.Message().GetTimestamp() > upperBound.UnixNano() {
 		return ErrFutureMessage
 	}
 
-	if env.Message().Timestamp < lowerBound.UnixNano() {
+	if env.Message().GetTimestamp() < lowerBound.UnixNano() {
 		return ErrMessageTooOld
 	}
 
@@ -255,21 +256,21 @@ func (d *DBStore) Query(query *storepb.HistoryQuery) (*storepb.Index, []gowakuPe
 		}
 	}
 
-	if query.StartTime != 0 {
+	if query.GetStartTime() != 0 {
 		if !usesCursor || query.PagingInfo.Direction == storepb.PagingInfo_BACKWARD {
 			paramCnt++
 			conditions = append(conditions, fmt.Sprintf("id >= $%d", paramCnt))
-			startTimeDBKey := gowakuPersistence.NewDBKey(uint64(query.StartTime), uint64(query.StartTime), "", []byte{})
+			startTimeDBKey := gowakuPersistence.NewDBKey(uint64(query.GetStartTime()), uint64(query.GetStartTime()), "", []byte{})
 			parameters = append(parameters, startTimeDBKey.Bytes())
 		}
 
 	}
 
-	if query.EndTime != 0 {
+	if query.GetEndTime() != 0 {
 		if !usesCursor || query.PagingInfo.Direction == storepb.PagingInfo_FORWARD {
 			paramCnt++
 			conditions = append(conditions, fmt.Sprintf("id <= $%d", paramCnt))
-			endTimeDBKey := gowakuPersistence.NewDBKey(uint64(query.EndTime), uint64(query.EndTime), "", []byte{})
+			endTimeDBKey := gowakuPersistence.NewDBKey(uint64(query.GetEndTime()), uint64(query.GetEndTime()), "", []byte{})
 			parameters = append(parameters, endTimeDBKey.Bytes())
 		}
 	}
@@ -407,8 +408,8 @@ func (d *DBStore) GetStoredMessage(row *sql.Rows) (gowakuPersistence.StoredMessa
 	msg := new(pb.WakuMessage)
 	msg.ContentTopic = contentTopic
 	msg.Payload = payload
-	msg.Timestamp = senderTimestamp
-	msg.Version = version
+	msg.Timestamp = proto.Int64(senderTimestamp)
+	msg.Version = proto.Uint32(version)
 
 	record := gowakuPersistence.StoredMessage{
 		ID:           id,

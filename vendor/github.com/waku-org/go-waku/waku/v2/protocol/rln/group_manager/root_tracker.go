@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"sync"
 
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"github.com/waku-org/go-zerokit-rln/rln"
+	"go.uber.org/zap"
 )
 
 // RootsPerBlock stores the merkle root generated at N block number
@@ -27,18 +29,15 @@ type MerkleRootTracker struct {
 const maxBufferSize = 20
 
 // NewMerkleRootTracker creates an instance of MerkleRootTracker
-func NewMerkleRootTracker(acceptableRootWindowSize int, rlnInstance *rln.RLN) (*MerkleRootTracker, error) {
+func NewMerkleRootTracker(acceptableRootWindowSize int, rlnInstance *rln.RLN) *MerkleRootTracker {
 	result := &MerkleRootTracker{
 		acceptableRootWindowSize: acceptableRootWindowSize,
 		rln:                      rlnInstance,
 	}
 
-	_, err := result.UpdateLatestRoot(0)
-	if err != nil {
-		return nil, err
-	}
+	result.UpdateLatestRoot(0)
 
-	return result, nil
+	return result
 }
 
 // Backfill is used to pop merkle roots when there is a chain fork
@@ -102,18 +101,18 @@ func (m *MerkleRootTracker) IndexOf(root [32]byte) int {
 
 // UpdateLatestRoot should be called when a block containing a new
 // IDCommitment is received so we can keep track of the merkle root change
-func (m *MerkleRootTracker) UpdateLatestRoot(blockNumber uint64) (rln.MerkleNode, error) {
+func (m *MerkleRootTracker) UpdateLatestRoot(blockNumber uint64) rln.MerkleNode {
 	m.Lock()
 	defer m.Unlock()
 
 	root, err := m.rln.GetMerkleRoot()
 	if err != nil {
-		return [32]byte{}, err
+		utils.Logger().Named("root-tracker").Panic("could not retrieve merkle root", zap.Error(err))
 	}
 
 	m.pushRoot(blockNumber, root)
 
-	return root, nil
+	return root
 }
 
 func (m *MerkleRootTracker) pushRoot(blockNumber uint64, root [32]byte) {

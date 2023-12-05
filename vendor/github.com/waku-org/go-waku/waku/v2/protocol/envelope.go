@@ -27,7 +27,7 @@ func NewEnvelope(msg *wpb.WakuMessage, receiverTime int64, pubSubTopic string) *
 		index: &pb.Index{
 			Digest:       digest[:],
 			ReceiverTime: receiverTime,
-			SenderTime:   msg.Timestamp,
+			SenderTime:   msg.GetTimestamp(),
 			PubsubTopic:  pubSubTopic,
 		},
 	}

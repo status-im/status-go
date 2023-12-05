@@ -8,20 +8,22 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-msgio/pbio"
+	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/zap"
 
 	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
+	"github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 )
 
 type Query struct {
-	Topic         string
+	PubsubTopic   string
 	ContentTopics []string
-	StartTime     int64
-	EndTime       int64
+	StartTime     *int64
+	EndTime       *int64
 }
 
 // Result represents a valid response from a store node
@@ -78,10 +80,11 @@ func (r *Result) GetMessages() []*wpb.WakuMessage {
 	return r.Messages
 }
 
-type criteriaFN = func(msg *wpb.WakuMessage) (bool, error)
+type CriteriaFN = func(msg *wpb.WakuMessage) (bool, error)
 
 type HistoryRequestParameters struct {
 	selectedPeer      peer.ID
+	peerAddr          multiaddr.Multiaddr
 	peerSelectionType peermanager.PeerSelection
 	preferredPeers    peer.IDSlice
 	localQuery        bool
@@ -93,12 +96,31 @@ type HistoryRequestParameters struct {
 	s *WakuStore
 }
 
-type HistoryRequestOption func(*HistoryRequestParameters)
+type HistoryRequestOption func(*HistoryRequestParameters) error
 
-// WithPeer is an option used to specify the peerID to request the message history
+// WithPeer is an option used to specify the peerID to request the message history.
+// Note that this option is mutually exclusive to WithPeerAddr, only one of them can be used.
 func WithPeer(p peer.ID) HistoryRequestOption {
-	return func(params *HistoryRequestParameters) {
+	return func(params *HistoryRequestParameters) error {
 		params.selectedPeer = p
+		if params.peerAddr != nil {
+			return errors.New("peerId and peerAddr options are mutually exclusive")
+		}
+		return nil
+	}
+}
+
+//WithPeerAddr is an option used to specify a peerAddress to request the message history.
+// This new peer will be added to peerStore.
+// Note that this option is mutually exclusive to WithPeerAddr, only one of them can be used.
+
+func WithPeerAddr(pAddr multiaddr.Multiaddr) HistoryRequestOption {
+	return func(params *HistoryRequestParameters) error {
+		params.peerAddr = pAddr
+		if params.selectedPeer != "" {
+			return errors.New("peerAddr and peerId options are mutually exclusive")
+		}
+		return nil
 	}
 }
 
@@ -108,9 +130,10 @@ func WithPeer(p peer.ID) HistoryRequestOption {
 // from the node peerstore
 // Note: This option is avaiable only with peerManager
 func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) HistoryRequestOption {
-	return func(params *HistoryRequestParameters) {
+	return func(params *HistoryRequestParameters) error {
 		params.peerSelectionType = peermanager.Automatic
 		params.preferredPeers = fromThesePeers
+		return nil
 	}
 }
 
@@ -120,44 +143,50 @@ func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) HistoryRequestOption 
 // from the node peerstore
 // Note: This option is avaiable only with peerManager
 func WithFastestPeerSelection(fromThesePeers ...peer.ID) HistoryRequestOption {
-	return func(params *HistoryRequestParameters) {
+	return func(params *HistoryRequestParameters) error {
 		params.peerSelectionType = peermanager.LowestRTT
+		return nil
 	}
 }
 
 // WithRequestID is an option to set a specific request ID to be used when
 // creating a store request
 func WithRequestID(requestID []byte) HistoryRequestOption {
-	return func(params *HistoryRequestParameters) {
+	return func(params *HistoryRequestParameters) error {
 		params.requestID = requestID
+		return nil
 	}
 }
 
 // WithAutomaticRequestID is an option to automatically generate a request ID
 // when creating a store request
 func WithAutomaticRequestID() HistoryRequestOption {
-	return func(params *HistoryRequestParameters) {
+	return func(params *HistoryRequestParameters) error {
 		params.requestID = protocol.GenerateRequestID()
+		return nil
 	}
 }
 
 func WithCursor(c *pb.Index) HistoryRequestOption {
-	return func(params *HistoryRequestParameters) {
+	return func(params *HistoryRequestParameters) error {
 		params.cursor = c
+		return nil
 	}
 }
 
 // WithPaging is an option used to specify the order and maximum number of records to return
 func WithPaging(asc bool, pageSize uint64) HistoryRequestOption {
-	return func(params *HistoryRequestParameters) {
+	return func(params *HistoryRequestParameters) error {
 		params.asc = asc
 		params.pageSize = pageSize
+		return nil
 	}
 }
 
 func WithLocalQuery() HistoryRequestOption {
-	return func(params *HistoryRequestParameters) {
+	return func(params *HistoryRequestParameters) error {
 		params.localQuery = true
+		return nil
 	}
 }
 
@@ -166,7 +195,7 @@ func DefaultOptions() []HistoryRequestOption {
 	return []HistoryRequestOption{
 		WithAutomaticRequestID(),
 		WithAutomaticPeerSelection(),
-		WithPaging(true, MaxPageSize),
+		WithPaging(true, DefaultPageSize),
 	}
 }
 
@@ -247,35 +276,62 @@ func (store *WakuStore) localQuery(historyQuery *pb.HistoryRPC) (*pb.HistoryResp
 }
 
 func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryRequestOption) (*Result, error) {
-
 	params := new(HistoryRequestParameters)
 	params.s = store
 
 	optList := DefaultOptions()
 	optList = append(optList, opts...)
 	for _, opt := range optList {
-		opt(params)
-	}
-	if store.pm != nil && params.selectedPeer == "" {
-		var err error
-		params.selectedPeer, err = store.pm.SelectPeer(
-			peermanager.PeerSelectionCriteria{
-				SelectionType: params.peerSelectionType,
-				Proto:         StoreID_v20beta4,
-				PubsubTopic:   query.Topic,
-				SpecificPeers: params.preferredPeers,
-				Ctx:           ctx,
-			},
-		)
+		err := opt(params)
 		if err != nil {
 			return nil, err
+		}
+	}
+
+	if !params.localQuery {
+		pubsubTopics := []string{}
+		if query.PubsubTopic == "" {
+			for _, cTopic := range query.ContentTopics {
+				pubsubTopic, err := protocol.GetPubSubTopicFromContentTopic(cTopic)
+				if err != nil {
+					return nil, err
+				}
+				pubsubTopics = append(pubsubTopics, pubsubTopic)
+			}
+		} else {
+			pubsubTopics = append(pubsubTopics, query.PubsubTopic)
+		}
+
+		//Add Peer to peerstore.
+		if store.pm != nil && params.peerAddr != nil {
+			pData, err := store.pm.AddPeer(params.peerAddr, peerstore.Static, pubsubTopics, StoreID_v20beta4)
+			if err != nil {
+				return nil, err
+			}
+			store.pm.Connect(pData)
+			params.selectedPeer = pData.AddrInfo.ID
+		}
+		if store.pm != nil && params.selectedPeer == "" {
+			var err error
+			params.selectedPeer, err = store.pm.SelectPeer(
+				peermanager.PeerSelectionCriteria{
+					SelectionType: params.peerSelectionType,
+					Proto:         StoreID_v20beta4,
+					PubsubTopics:  pubsubTopics,
+					SpecificPeers: params.preferredPeers,
+					Ctx:           ctx,
+				},
+			)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
 	historyRequest := &pb.HistoryRPC{
 		RequestId: hex.EncodeToString(params.requestID),
 		Query: &pb.HistoryQuery{
-			PubsubTopic:    query.Topic,
+			PubsubTopic:    query.PubsubTopic,
 			ContentFilters: []*pb.ContentFilter{},
 			StartTime:      query.StartTime,
 			EndTime:        query.EndTime,
@@ -303,7 +359,9 @@ func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryR
 	}
 
 	pageSize := params.pageSize
-	if pageSize == 0 || pageSize > uint64(MaxPageSize) {
+	if pageSize == 0 {
+		pageSize = DefaultPageSize
+	} else if pageSize > uint64(MaxPageSize) {
 		pageSize = MaxPageSize
 	}
 	historyRequest.Query.PagingInfo.PageSize = pageSize
@@ -343,7 +401,7 @@ func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryR
 }
 
 // Find the first message that matches a criteria. criteriaCB is a function that will be invoked for each message and returns true if the message matches the criteria
-func (store *WakuStore) Find(ctx context.Context, query Query, cb criteriaFN, opts ...HistoryRequestOption) (*wpb.WakuMessage, error) {
+func (store *WakuStore) Find(ctx context.Context, query Query, cb CriteriaFN, opts ...HistoryRequestOption) (*wpb.WakuMessage, error) {
 	if cb == nil {
 		return nil, errors.New("callback can't be null")
 	}
@@ -396,23 +454,9 @@ func (store *WakuStore) Next(ctx context.Context, r *Result) (*Result, error) {
 
 	historyRequest := &pb.HistoryRPC{
 		RequestId: hex.EncodeToString(protocol.GenerateRequestID()),
-		Query: &pb.HistoryQuery{
-			PubsubTopic:    r.Query().PubsubTopic,
-			ContentFilters: r.Query().ContentFilters,
-			StartTime:      r.Query().StartTime,
-			EndTime:        r.Query().EndTime,
-			PagingInfo: &pb.PagingInfo{
-				PageSize:  r.Query().PagingInfo.PageSize,
-				Direction: r.Query().PagingInfo.Direction,
-				Cursor: &pb.Index{
-					Digest:       r.Cursor().Digest,
-					ReceiverTime: r.Cursor().ReceiverTime,
-					SenderTime:   r.Cursor().SenderTime,
-					PubsubTopic:  r.Cursor().PubsubTopic,
-				},
-			},
-		},
+		Query:     r.Query(),
 	}
+	historyRequest.Query.PagingInfo.Cursor = r.Cursor()
 
 	response, err := store.queryFrom(ctx, historyRequest, r.PeerID())
 	if err != nil {

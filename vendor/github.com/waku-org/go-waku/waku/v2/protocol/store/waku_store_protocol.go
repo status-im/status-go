@@ -30,7 +30,9 @@ func findMessages(query *pb.HistoryQuery, msgProvider MessageProvider) ([]*wpb.W
 		}
 	}
 
-	if query.PagingInfo.PageSize == 0 || query.PagingInfo.PageSize > uint64(MaxPageSize) {
+	if query.PagingInfo.PageSize == 0 {
+		query.PagingInfo.PageSize = DefaultPageSize
+	} else if query.PagingInfo.PageSize > uint64(MaxPageSize) {
 		query.PagingInfo.PageSize = MaxPageSize
 	}
 
@@ -84,7 +86,7 @@ type Store interface {
 	SetHost(h host.Host)
 	Start(context.Context, *relay.Subscription) error
 	Query(ctx context.Context, query Query, opts ...HistoryRequestOption) (*Result, error)
-	Find(ctx context.Context, query Query, cb criteriaFN, opts ...HistoryRequestOption) (*wpb.WakuMessage, error)
+	Find(ctx context.Context, query Query, cb CriteriaFN, opts ...HistoryRequestOption) (*wpb.WakuMessage, error)
 	Next(ctx context.Context, r *Result) (*Result, error)
 	Resume(ctx context.Context, pubsubTopic string, peerList []peer.ID) (int, error)
 	Stop()
@@ -133,7 +135,7 @@ func (store *WakuStore) Start(ctx context.Context, sub *relay.Subscription) erro
 
 func (store *WakuStore) storeMessage(env *protocol.Envelope) error {
 
-	if env.Message().Ephemeral {
+	if env.Message().GetEphemeral() {
 		return nil
 	}
 
@@ -337,8 +339,8 @@ func (store *WakuStore) Resume(ctx context.Context, pubsubTopic string, peerList
 
 	rpc := &pb.HistoryQuery{
 		PubsubTopic: pubsubTopic,
-		StartTime:   lastSeenTime,
-		EndTime:     currentTime,
+		StartTime:   &lastSeenTime,
+		EndTime:     &currentTime,
 		PagingInfo: &pb.PagingInfo{
 			PageSize:  0,
 			Direction: pb.PagingInfo_BACKWARD,
