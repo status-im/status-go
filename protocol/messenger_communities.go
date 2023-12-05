@@ -3026,16 +3026,16 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 		return err
 	}
 
+	if community == nil {
+		return communities.ErrOrgNotFound
+	}
+
 	// Currently this type of msg coming from the control node.
 	// If it will change in the future, check that events types starting from
 	// CONTROL_NODE were sent by a control node
-	isControlNodeMsg := common.IsPubKeyEqual(community.PublicKey(), signer)
+	isControlNodeMsg := common.IsPubKeyEqual(community.ControlNode(), signer)
 	if !isControlNodeMsg {
 		return errors.New("accepted/requested to join sync messages can be send only by the control node")
-	}
-
-	if community == nil {
-		return errors.New("community not found")
 	}
 
 	err = m.communitiesManager.ValidateCommunityPrivilegedUserSyncMessage(message)
@@ -3054,11 +3054,11 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 		state.Response.AddRequestsToJoinCommunity(requestsToJoin)
 
 	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ALL_SYNC_REQUESTS_TO_JOIN:
-		requestsToJoin, err := m.communitiesManager.HandleSyncAllRequestToJoinForNewPrivilegedMember(message, community.ID())
+		nonAcceptedRequestsToJoin, err := m.communitiesManager.HandleSyncAllRequestToJoinForNewPrivilegedMember(message, community.ID())
 		if err != nil {
 			return nil
 		}
-		state.Response.AddRequestsToJoinCommunity(requestsToJoin)
+		state.Response.AddRequestsToJoinCommunity(nonAcceptedRequestsToJoin)
 	}
 
 	return nil

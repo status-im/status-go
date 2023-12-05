@@ -1459,7 +1459,7 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 	// control node receives event sender 1's and 2's decision
 	_, err = WaitOnMessengerResponse(
 		base.GetControlNode(),
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
 		"control node did not receive event senders decision",
 	)
 	s.Require().NoError(err)
@@ -2032,15 +2032,6 @@ func testJoinedPrivilegedMemberReceiveRequestsToJoin(base CommunityEventsTestsIn
 	advertiseCommunityTo(s, community, base.GetControlNode(), bob)
 	advertiseCommunityTo(s, community, base.GetControlNode(), newPrivilegedUser)
 
-	requestMember := &requests.RequestToJoinCommunity{
-		CommunityID:       community.ID(),
-		AddressesToReveal: []string{bobAccountAddress},
-		ENSName:           "bob",
-		AirdropAddress:    bobAccountAddress,
-	}
-
-	requestToJoinCommunity(s, base.GetControlNode(), bob, requestMember)
-
 	requestNewPrivilegedUser := &requests.RequestToJoinCommunity{
 		CommunityID:       community.ID(),
 		AddressesToReveal: []string{eventsSenderAccountAddress},
@@ -2060,38 +2051,39 @@ func testJoinedPrivilegedMemberReceiveRequestsToJoin(base CommunityEventsTestsIn
 	s.Require().NotNil(updatedCommunity)
 	s.Require().True(updatedCommunity.HasMember(&newPrivilegedUser.identity.PublicKey))
 
-	// privileged user should receive request to join from user and its shared addresses from control node
 	_, err = WaitOnMessengerResponse(
-		newPrivilegedUser,
+		base.GetEventSender(),
 		func(r *MessengerResponse) bool {
-			requestsToJoin, err := newPrivilegedUser.communitiesManager.GetCommunityRequestsToJoinWithRevealedAddresses(community.ID())
-			if err != nil {
-				return false
-			}
-			if len(requestsToJoin) != 4 {
-				s.T().Log("invalid requests to join count:", len(requestsToJoin))
-				return false
-			}
-
-			for _, request := range requestsToJoin {
-				if tokenPermissionType == protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER {
-					if len(request.RevealedAccounts) != 1 {
-						s.T().Log("no accounts revealed")
-						return false
-					}
-				} else {
-					if len(request.RevealedAccounts) != 0 {
-						s.T().Log("unexpected accounts revealed")
-						return false
-					}
-				}
-			}
-
-			return true
+			return len(r.Communities()) > 0 &&
+				len(r.Communities()[0].TokenPermissionsByType(tokenPermissionType)) > 0 &&
+				r.Communities()[0].HasPermissionToSendCommunityEvents()
 		},
-		"newPrivilegedUser did not receive all requests to join from the control node",
+		"newPrivilegedUser did not receive privileged role",
 	)
+
 	s.Require().NoError(err)
+
+	expectedLength := 3
+	// newPrivilegedUser user should receive all requests to join with shared addresses from the control node
+	waitAndCheckRequestsToJoin(s, newPrivilegedUser, expectedLength, community.ID(), tokenPermissionType == protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+
+	// bob joins the community
+	requestMember := &requests.RequestToJoinCommunity{
+		CommunityID:       community.ID(),
+		AddressesToReveal: []string{bobAccountAddress},
+		ENSName:           "bob",
+		AirdropAddress:    bobAccountAddress,
+	}
+
+	bobRequestToJoinID := requestToJoinCommunity(s, base.GetControlNode(), bob, requestMember)
+
+	// accept join request
+	acceptRequestToJoin = &requests.AcceptRequestToJoinCommunity{ID: bobRequestToJoinID}
+	_, err = base.GetControlNode().AcceptRequestToJoinCommunity(acceptRequestToJoin)
+	s.Require().NoError(err)
+
+	expectedLength = 4
+	waitAndCheckRequestsToJoin(s, newPrivilegedUser, expectedLength, community.ID(), tokenPermissionType == protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 }
 
 func testMemberReceiveRequestsToJoinAfterGettingNewRole(base CommunityEventsTestsInterface, bob *Messenger, tokenPermissionType protobuf.CommunityTokenPermission_Type) {
@@ -2102,7 +2094,6 @@ func testMemberReceiveRequestsToJoinAfterGettingNewRole(base CommunityEventsTest
 
 	// control node creates a community and chat
 	community := createTestCommunity(base, protobuf.CommunityPermissions_MANUAL_ACCEPT)
-	refreshMessengerResponses(base)
 
 	advertiseCommunityTo(s, community, base.GetControlNode(), base.GetEventSender())
 	advertiseCommunityTo(s, community, base.GetControlNode(), base.GetMember())
@@ -2152,27 +2143,56 @@ func testMemberReceiveRequestsToJoinAfterGettingNewRole(base CommunityEventsTest
 	s.Require().NoError(err)
 	assertCheckTokenPermissionCreated(s, ownerCommunity, rolePermission.Type)
 
-	// receive request to join msg
 	_, err = WaitOnMessengerResponse(
 		base.GetEventSender(),
 		func(r *MessengerResponse) bool {
-			return len(r.RequestsToJoinCommunity) > 2
+			return len(r.Communities()) > 0 &&
+				len(r.Communities()[0].TokenPermissionsByType(tokenPermissionType)) > 0 &&
+				r.Communities()[0].HasPermissionToSendCommunityEvents()
 		},
-		"Event sender did not receive all requests to join from the control node",
+		"event sender did not receive privileged role",
+	)
+
+	s.Require().NoError(err)
+
+	expectedLength := 3
+	waitAndCheckRequestsToJoin(s, base.GetEventSender(), expectedLength, community.ID(), tokenPermissionType == protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+}
+
+func waitAndCheckRequestsToJoin(s *suite.Suite, user *Messenger, expectedLength int, communityID types.HexBytes, checkRevealedAddresses bool) {
+	_, err := WaitOnMessengerResponse(
+		user,
+		func(r *MessengerResponse) bool {
+			requestsToJoin, err := user.communitiesManager.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
+			if err != nil {
+				return false
+			}
+			if len(requestsToJoin) != expectedLength {
+				s.T().Log("invalid requests to join count:", len(requestsToJoin))
+				return false
+			}
+
+			for _, request := range requestsToJoin {
+				if request.PublicKey == common.PubkeyToHex(&user.identity.PublicKey) {
+					if len(request.RevealedAccounts) != 1 {
+						s.T().Log("our own requests to join must always have accounts revealed")
+						return false
+					}
+				} else if checkRevealedAddresses {
+					if len(request.RevealedAccounts) != 1 {
+						s.T().Log("no accounts revealed")
+						return false
+					}
+				} else {
+					if len(request.RevealedAccounts) != 0 {
+						s.T().Log("unexpected accounts revealed")
+						return false
+					}
+				}
+			}
+			return true
+		},
+		"user did not receive all requests to join from the control node",
 	)
 	s.Require().NoError(err)
-
-	requestsToJoin, err := base.GetEventSender().communitiesManager.GetCommunityRequestsToJoinWithRevealedAddresses(community.ID())
-	s.Require().NoError(err)
-	// event sender, bob and alice requests
-	s.Require().Len(requestsToJoin, 3)
-
-	// check if revealed addresses are present based on the role
-	for _, request := range requestsToJoin {
-		if tokenPermissionType == protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER {
-			s.Require().Len(request.RevealedAccounts, 1)
-		} else {
-			s.Require().Len(request.RevealedAccounts, 0)
-		}
-	}
 }

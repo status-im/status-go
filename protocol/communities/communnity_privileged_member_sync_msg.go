@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -33,22 +34,6 @@ func (m *Manager) HandleRequestToJoinPrivilegedUserSyncMessage(message *protobuf
 		}
 		requestToJoin.CalculateID()
 
-		_, err := m.saveOrUpdateRequestToJoin(communityID, requestToJoin)
-		if err != nil {
-			return nil, err
-		}
-		requestsToJoin = append(requestsToJoin, requestToJoin)
-	}
-
-	return requestsToJoin, nil
-}
-
-func (m *Manager) HandleSyncAllRequestToJoinForNewPrivilegedMember(message *protobuf.CommunityPrivilegedUserSyncMessage, communityID types.HexBytes) ([]*RequestToJoin, error) {
-	requestsToJoin := []*RequestToJoin{}
-	for _, syncRequestToJoin := range message.SyncRequestsToJoin {
-		requestToJoin := new(RequestToJoin)
-		requestToJoin.InitFromSyncProtobuf(syncRequestToJoin)
-
 		if _, err := m.saveOrUpdateRequestToJoin(communityID, requestToJoin); err != nil {
 			return nil, err
 		}
@@ -62,7 +47,41 @@ func (m *Manager) HandleSyncAllRequestToJoinForNewPrivilegedMember(message *prot
 				return nil, err
 			}
 		}
+
 		requestsToJoin = append(requestsToJoin, requestToJoin)
 	}
+
 	return requestsToJoin, nil
+}
+
+func (m *Manager) HandleSyncAllRequestToJoinForNewPrivilegedMember(message *protobuf.CommunityPrivilegedUserSyncMessage, communityID types.HexBytes) ([]*RequestToJoin, error) {
+	nonAcceptedRequestsToJoin := []*RequestToJoin{}
+
+	myPk := common.PubkeyToHex(&m.identity.PublicKey)
+
+	// We received all requests to join from the control node. Remove all requests to join except our own
+	err := m.persistence.RemoveAllCommunityRequestsToJoinWithRevealedAddressesExceptPublicKey(myPk, communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, syncRequestToJoin := range message.SyncRequestsToJoin {
+		requestToJoin := new(RequestToJoin)
+		requestToJoin.InitFromSyncProtobuf(syncRequestToJoin)
+
+		if _, err := m.saveOrUpdateRequestToJoin(communityID, requestToJoin); err != nil {
+			return nil, err
+		}
+
+		if requestToJoin.RevealedAccounts != nil && len(requestToJoin.RevealedAccounts) > 0 {
+			if err := m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin.ID, requestToJoin.RevealedAccounts); err != nil {
+				return nil, err
+			}
+		}
+
+		if requestToJoin.State != RequestToJoinStateAccepted {
+			nonAcceptedRequestsToJoin = append(nonAcceptedRequestsToJoin, requestToJoin)
+		}
+	}
+	return nonAcceptedRequestsToJoin, nil
 }
