@@ -77,19 +77,16 @@ func TestExceedMaxMessageSize(t *testing.T) {
 	w, err := New("", "", nil, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 
-	api := NewPublicWakuAPI(w)
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 2*time.Second)
-	defer cancel()
-
 	keyID, err := w.GenerateSymKey()
 	require.NoError(t, err)
+
 	msg := NewMessage{
 		SymKeyID:     keyID,
 		Payload:      make([]byte, 1024*1024),
 		ContentTopic: common.TopicType([4]byte{0xde, 0xea, 0xbe, 0xef}),
 	}
 
-	_, err = api.Post(ctx, msg)
+	api := NewPublicWakuAPI(w)
+	_, err = api.Post(context.TODO(), msg)
 	require.EqualError(t, err, "message size exceeds max size allowed by waku node")
 }
