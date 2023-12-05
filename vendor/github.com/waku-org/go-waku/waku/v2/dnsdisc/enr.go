@@ -77,9 +77,6 @@ func RetrieveNodes(ctx context.Context, url string, opts ...DNSDiscoveryOption) 
 		params.resolver = GetResolver(ctx, params.nameserver)
 	}
 
-	if params.resolver == nil {
-		params.resolver = GetResolver(ctx, params.nameserver)
-	}
 	client := dnsdisc.NewClient(dnsdisc.Config{
 		Resolver: params.resolver,
 	})

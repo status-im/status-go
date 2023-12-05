@@ -14,10 +14,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	ethdnsdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/require"
-
 	"golang.org/x/exp/maps"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
@@ -126,7 +125,7 @@ func TestBasicWakuV2(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
-	discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrTreeAddress, nil)
+	discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrTreeAddress)
 	require.NoError(t, err)
 
 	// Peer used for retrieving history
