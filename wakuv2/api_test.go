@@ -26,6 +26,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/wakuv2/common"
