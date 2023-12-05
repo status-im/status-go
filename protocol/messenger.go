@@ -796,10 +796,14 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchPendingCommunityRequestToJoin()
 	m.broadcastLatestUserStatus()
 	m.timeoutAutomaticStatusUpdates()
-	m.startBackupLoop()
-	err = m.startAutoMessageLoop()
-	if err != nil {
-		return nil, err
+	if !m.config.featureFlags.DisableCheckingForBackup {
+		m.startBackupLoop()
+	}
+	if !m.config.featureFlags.DisableAutoMessageLoop {
+		err = m.startAutoMessageLoop()
+		if err != nil {
+			return nil, err
+		}
 	}
 	m.startSyncSettingsLoop()
 	m.startSettingsChangesLoop()
@@ -930,7 +934,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 	m.ensVerifier.SetOnline(online)
 }
 
-func (m *Messenger) online() bool {
+func (m *Messenger) Online() bool {
 	switch m.transport.WakuVersion() {
 	case 2:
 		return m.transport.PeerCount() > 0
@@ -1443,13 +1447,13 @@ func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.Verification
 // watchConnectionChange checks the connection status and call handleConnectionChange when this changes
 func (m *Messenger) watchConnectionChange() {
 	m.logger.Debug("watching connection changes")
-	state := m.online()
+	state := m.Online()
 	m.handleConnectionChange(state)
 	go func() {
 		for {
 			select {
 			case <-time.After(200 * time.Millisecond):
-				newState := m.online()
+				newState := m.Online()
 				if state != newState {
 					state = newState
 					m.logger.Debug("connection changed", zap.Bool("online", state))
@@ -1526,7 +1530,7 @@ func (m *Messenger) watchExpiredMessages() {
 		for {
 			select {
 			case <-time.After(time.Second):
-				if m.online() {
+				if m.Online() {
 					err := m.resendExpiredMessages()
 					if err != nil {
 						m.logger.Debug("Error when resending expired emoji reactions", zap.Error(err))
@@ -1609,7 +1613,7 @@ func (m *Messenger) PublishIdentityImage() error {
 	}
 
 	// If not online, we schedule it
-	if !m.online() {
+	if !m.Online() {
 		m.shouldPublishContactCode = true
 		return nil
 	}
