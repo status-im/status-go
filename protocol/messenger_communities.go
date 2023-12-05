@@ -427,7 +427,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 
 			case <-ticker.C:
 				// If we are not online, we don't even try
-				if !m.online() {
+				if !m.Online() {
 					continue
 				}
 
