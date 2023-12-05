@@ -35,16 +35,6 @@ func (bArr byteArr) MarshalLogArray(encoder zapcore.ArrayEncoder) error {
 	return nil
 }
 
-type hexByte []byte
-
-func HexString(key string, byteVal hexByte) zapcore.Field {
-	return zap.Stringer(key, hexByte(byteVal))
-}
-
-func (h hexByte) String() string {
-	return "0x" + hex.EncodeToString(h)
-}
-
 // List of multiaddrs
 type multiaddrs []multiaddr.Multiaddr
 

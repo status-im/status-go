@@ -18,6 +18,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_filter/pb"
 	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	"github.com/waku-org/go-waku/waku/v2/service"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -47,7 +48,7 @@ type (
 	}
 
 	WakuFilter struct {
-		*protocol.CommonService
+		*service.CommonService
 		h          host.Host
 		pm         *peermanager.PeerManager
 		isFullNode bool
@@ -76,7 +77,7 @@ func NewWakuFilter(broadcaster relay.Broadcaster, isFullNode bool, timesource ti
 	}
 
 	wf.isFullNode = isFullNode
-	wf.CommonService = protocol.NewCommonService()
+	wf.CommonService = service.NewCommonService()
 	wf.filters = NewFilterMap(broadcaster, timesource)
 	wf.subscribers = NewSubscribers(params.Timeout)
 	wf.metrics = newMetrics(reg)
@@ -108,7 +109,7 @@ func (wf *WakuFilter) onRequest(ctx context.Context) func(network.Stream) {
 		peerID := stream.Conn().RemotePeer()
 		logger := wf.log.With(logging.HostID("peer", peerID))
 
-		filterRPCRequest := &pb.FilterRPC{}
+		filterRPCRequest := &pb.FilterRpc{}
 
 		reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
 
@@ -165,7 +166,7 @@ func (wf *WakuFilter) onRequest(ctx context.Context) func(network.Stream) {
 }
 
 func (wf *WakuFilter) pushMessage(ctx context.Context, subscriber Subscriber, msg *wpb.WakuMessage) error {
-	pushRPC := &pb.FilterRPC{RequestId: subscriber.requestID, Push: &pb.MessagePush{Messages: []*wpb.WakuMessage{msg}}}
+	pushRPC := &pb.FilterRpc{RequestId: subscriber.requestID, Push: &pb.MessagePush{Messages: []*wpb.WakuMessage{msg}}}
 	logger := wf.log.With(logging.HostID("peer", subscriber.peer))
 
 	stream, err := wf.h.NewStream(ctx, subscriber.peer, FilterID_v20beta1)
@@ -255,7 +256,7 @@ func (wf *WakuFilter) requestSubscription(ctx context.Context, filter ContentFil
 			peermanager.PeerSelectionCriteria{
 				SelectionType: params.peerSelectionType,
 				Proto:         FilterID_v20beta1,
-				PubsubTopic:   filter.Topic,
+				PubsubTopics:  []string{filter.Topic},
 				SpecificPeers: params.preferredPeers,
 				Ctx:           ctx,
 			},
@@ -287,7 +288,7 @@ func (wf *WakuFilter) requestSubscription(ctx context.Context, filter ContentFil
 	requestID := hex.EncodeToString(protocol.GenerateRequestID())
 
 	writer := pbio.NewDelimitedWriter(stream)
-	filterRPC := &pb.FilterRPC{RequestId: requestID, Request: request}
+	filterRPC := &pb.FilterRpc{RequestId: requestID, Request: request}
 	wf.log.Debug("sending filterRPC", zap.Stringer("rpc", filterRPC))
 	err = writer.WriteMsg(filterRPC)
 	if err != nil {
@@ -331,7 +332,7 @@ func (wf *WakuFilter) Unsubscribe(ctx context.Context, contentFilter ContentFilt
 	}
 
 	writer := pbio.NewDelimitedWriter(stream)
-	filterRPC := &pb.FilterRPC{RequestId: hex.EncodeToString(id), Request: request}
+	filterRPC := &pb.FilterRpc{RequestId: hex.EncodeToString(id), Request: request}
 	err = writer.WriteMsg(filterRPC)
 	if err != nil {
 		wf.metrics.RecordError(writeRequestFailure)

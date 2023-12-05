@@ -1,11 +1,13 @@
 package filter
 
 import (
+	"errors"
 	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"go.uber.org/zap"
@@ -34,6 +36,7 @@ func WithPingRequestId(requestId []byte) FilterPingOption {
 type (
 	FilterSubscribeParameters struct {
 		selectedPeer      peer.ID
+		peerAddr          multiaddr.Multiaddr
 		peerSelectionType peermanager.PeerSelection
 		preferredPeers    peer.IDSlice
 		requestID         []byte
@@ -51,6 +54,7 @@ type (
 	FilterParameters struct {
 		Timeout        time.Duration
 		MaxSubscribers int
+		pm             *peermanager.PeerManager
 	}
 
 	Option func(*FilterParameters)
@@ -64,9 +68,27 @@ func WithTimeout(timeout time.Duration) Option {
 	}
 }
 
+// WithPeer is an option used to specify the peerID to request the message history.
+// Note that this option is mutually exclusive to WithPeerAddr, only one of them can be used.
 func WithPeer(p peer.ID) FilterSubscribeOption {
 	return func(params *FilterSubscribeParameters) error {
 		params.selectedPeer = p
+		if params.peerAddr != nil {
+			return errors.New("peerAddr and peerId options are mutually exclusive")
+		}
+		return nil
+	}
+}
+
+// WithPeerAddr is an option used to specify a peerAddress.
+// This new peer will be added to peerStore.
+// Note that this option is mutually exclusive to WithPeerAddr, only one of them can be used.
+func WithPeerAddr(pAddr multiaddr.Multiaddr) FilterSubscribeOption {
+	return func(params *FilterSubscribeParameters) error {
+		params.peerAddr = pAddr
+		if params.selectedPeer != "" {
+			return errors.New("peerAddr and peerId options are mutually exclusive")
+		}
 		return nil
 	}
 }
@@ -153,6 +175,12 @@ func DefaultUnsubscribeOptions() []FilterSubscribeOption {
 func WithMaxSubscribers(maxSubscribers int) Option {
 	return func(params *FilterParameters) {
 		params.MaxSubscribers = maxSubscribers
+	}
+}
+
+func WithPeerManager(pm *peermanager.PeerManager) Option {
+	return func(params *FilterParameters) {
+		params.pm = pm
 	}
 }
 

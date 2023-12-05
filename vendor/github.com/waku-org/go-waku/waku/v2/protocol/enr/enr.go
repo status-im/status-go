@@ -146,6 +146,8 @@ func EnodeToPeerInfo(node *enode.Node) (*peer.AddrInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	if len(res) == 0 {
+		return nil, errors.New("could not retrieve peer addresses from enr")
+	}
 	return &res[0], nil
 }

@@ -15,6 +15,7 @@ var DefaultRelaySubscriptionBufferSize int = 1024
 
 type RelaySubscribeParameters struct {
 	dontConsume bool
+	cacheSize   uint
 }
 
 type RelaySubscribeOption func(*RelaySubscribeParameters) error
@@ -24,6 +25,13 @@ type RelaySubscribeOption func(*RelaySubscribeParameters) error
 func WithoutConsumer() RelaySubscribeOption {
 	return func(params *RelaySubscribeParameters) error {
 		params.dontConsume = true
+		return nil
+	}
+}
+
+func WithCacheSize(size uint) RelaySubscribeOption {
+	return func(params *RelaySubscribeParameters) error {
+		params.cacheSize = size
 		return nil
 	}
 }

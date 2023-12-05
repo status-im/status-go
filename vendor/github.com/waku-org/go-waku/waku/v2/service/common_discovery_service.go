@@ -1,4 +1,4 @@
-package peermanager
+package service
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p/core/peer"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
-	"github.com/waku-org/go-waku/waku/v2/protocol"
 )
 
 // PeerData contains information about a peer useful in establishing connections with it.
@@ -15,17 +14,17 @@ type PeerData struct {
 	Origin       wps.Origin
 	AddrInfo     peer.AddrInfo
 	ENR          *enode.Node
-	PubSubTopics []string
+	PubsubTopics []string
 }
 
 type CommonDiscoveryService struct {
-	commonService *protocol.CommonService
+	commonService *CommonService
 	channel       chan PeerData
 }
 
 func NewCommonDiscoveryService() *CommonDiscoveryService {
 	return &CommonDiscoveryService{
-		commonService: protocol.NewCommonService(),
+		commonService: NewCommonService(),
 	}
 }
 

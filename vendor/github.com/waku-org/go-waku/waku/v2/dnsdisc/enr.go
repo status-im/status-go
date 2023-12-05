@@ -2,6 +2,7 @@ package dnsdisc
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ethereum/go-ethereum/p2p/dnsdisc"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -15,14 +16,31 @@ import (
 
 type dnsDiscoveryParameters struct {
 	nameserver string
+	resolver   dnsdisc.Resolver
 }
 
-type DNSDiscoveryOption func(*dnsDiscoveryParameters)
+type DNSDiscoveryOption func(*dnsDiscoveryParameters) error
+
+var ErrExclusiveOpts = errors.New("cannot set both nameserver and resolver")
 
 // WithNameserver is a DnsDiscoveryOption that configures the nameserver to use
 func WithNameserver(nameserver string) DNSDiscoveryOption {
-	return func(params *dnsDiscoveryParameters) {
+	return func(params *dnsDiscoveryParameters) error {
+		if params.resolver != nil {
+			return ErrExclusiveOpts
+		}
 		params.nameserver = nameserver
+		return nil
+	}
+}
+
+func WithResolver(resolver dnsdisc.Resolver) DNSDiscoveryOption {
+	return func(params *dnsDiscoveryParameters) error {
+		if params.nameserver != "" {
+			return ErrExclusiveOpts
+		}
+		params.resolver = resolver
+		return nil
 	}
 }
 
@@ -49,11 +67,18 @@ func RetrieveNodes(ctx context.Context, url string, opts ...DNSDiscoveryOption) 
 
 	params := new(dnsDiscoveryParameters)
 	for _, opt := range opts {
-		opt(params)
+		err := opt(params)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if params.resolver == nil {
+		params.resolver = GetResolver(ctx, params.nameserver)
 	}
 
 	client := dnsdisc.NewClient(dnsdisc.Config{
-		Resolver: GetResolver(ctx, params.nameserver),
+		Resolver: params.resolver,
 	})
 
 	tree, err := client.SyncTree(url)

@@ -14,13 +14,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waku-org/go-discover/discover"
 	"github.com/waku-org/go-waku/logging"
-	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/peerstore"
 	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
+	"github.com/waku-org/go-waku/waku/v2/service"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 )
 
@@ -28,7 +29,7 @@ var ErrNoDiscV5Listener = errors.New("no discv5 listener")
 
 // PeerConnector will subscribe to a channel containing the information for all peers found by this discovery protocol
 type PeerConnector interface {
-	Subscribe(context.Context, <-chan peermanager.PeerData)
+	Subscribe(context.Context, <-chan service.PeerData)
 }
 
 type DiscoveryV5 struct {
@@ -45,7 +46,7 @@ type DiscoveryV5 struct {
 
 	log *zap.Logger
 
-	*peermanager.CommonDiscoveryService
+	*service.CommonDiscoveryService
 }
 
 type discV5Parameters struct {
@@ -138,7 +139,7 @@ func NewDiscoveryV5(priv *ecdsa.PrivateKey, localnode *enode.LocalNode, peerConn
 		params:                 params,
 		peerConnector:          peerConnector,
 		NAT:                    NAT,
-		CommonDiscoveryService: peermanager.NewCommonDiscoveryService(),
+		CommonDiscoveryService: service.NewCommonDiscoveryService(),
 		localnode:              localnode,
 		metrics:                newMetrics(reg),
 		config: discover.Config{
@@ -250,40 +251,40 @@ func (d *DiscoveryV5) Stop() {
 	})
 }
 
-/*
 func isWakuNode(node *enode.Node) bool {
-	enrField := new(utils.WakuEnrBitfield)
-	if err := node.Record().Load(enr.WithEntry(utils.WakuENRField, &enrField)); err != nil {
+	enrField := new(wenr.WakuEnrBitfield)
+	if err := node.Record().Load(enr.WithEntry(wenr.WakuENRField, &enrField)); err != nil {
 		if !enr.IsNotFound(err) {
-			utils.Logger().Named("discv5").Error("could not retrieve port for enr ", zap.Any("node", node))
+			utils.Logger().Named("discv5").Error("could not retrieve waku2 ENR field for enr ", zap.Any("node", node))
 		}
 		return false
 	}
 
 	if enrField != nil {
-		return *enrField != uint8(0)
+		return *enrField != uint8(0) // #RFC 31 requirement
 	}
 
 	return false
 }
-*/
 
 func (d *DiscoveryV5) evaluateNode() func(node *enode.Node) bool {
 	return func(node *enode.Node) bool {
 		if node == nil {
 			return false
 		}
+		d.log.Debug("found a peer", logging.ENode("enr", node))
 
-		//  TODO: consider node filtering based on ENR; we do not filter based on ENR in the first waku discv5 beta stage
-		/*if !isWakuNode(node) {
+		//  node filtering based on ENR; we do not filter based on ENR in the first waku discv5 beta stage
+		if !isWakuNode(node) {
+			d.log.Debug("peer is not waku node", logging.ENode("enr", node))
 			return false
-		}*/
-
+		}
+		d.log.Debug("peer is a waku node", logging.ENode("enr", node))
 		_, err := wenr.EnodeToPeerInfo(node)
 
 		if err != nil {
 			d.metrics.RecordError(peerInfoFailure)
-			utils.Logger().Named("discv5").Error("obtaining peer info from enode", logging.ENode("enr", node), zap.Error(err))
+			d.log.Error("obtaining peer info from enode", logging.ENode("enr", node), zap.Error(err))
 			return false
 		}
 
@@ -405,21 +406,25 @@ func (d *DiscoveryV5) DefaultPredicate() Predicate {
 
 		nodeRS, err := wenr.RelaySharding(n.Record())
 		if err != nil {
+			d.log.Debug("failed to get relay shards from node record", logging.ENode("node", n), zap.Error(err))
 			return false
 		}
 
 		if nodeRS == nil {
+			d.log.Debug("node has no shards registered", logging.ENode("node", n))
 			// Node has no shards registered.
 			return false
 		}
 
 		if nodeRS.ClusterID != localRS.ClusterID {
+			d.log.Debug("cluster id mismatch from local clusterid", logging.ENode("node", n), zap.Error(err))
 			return false
 		}
 
 		// Contains any
 		for _, idx := range localRS.ShardIDs {
 			if nodeRS.Contains(localRS.ClusterID, idx) {
+				d.log.Debug("shards match for discovered node", logging.ENode("node", n))
 				return true
 			}
 		}
@@ -439,7 +444,7 @@ func (d *DiscoveryV5) peerLoop(ctx context.Context) error {
 	defer iterator.Close()
 
 	d.Iterate(ctx, iterator, func(n *enode.Node, p peer.AddrInfo) error {
-		peer := peermanager.PeerData{
+		peer := service.PeerData{
 			Origin:   peerstore.Discv5,
 			AddrInfo: p,
 			ENR:      n,

@@ -17,14 +17,16 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	"github.com/waku-org/go-waku/waku/v2/service"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
 // FilterSubscribeID_v20beta1 is the current Waku Filter protocol identifier for servers to
 // allow filter clients to subscribe, modify, refresh and unsubscribe a desired set of filter criteria
 const FilterSubscribeID_v20beta1 = libp2pProtocol.ID("/vac/waku/filter-subscribe/2.0.0-beta1")
-
+const FilterSubscribeENRField = uint8(1 << 2)
 const peerHasNoSubscription = "peer has no subscriptions"
 
 type (
@@ -33,7 +35,7 @@ type (
 		msgSub  *relay.Subscription
 		metrics Metrics
 		log     *zap.Logger
-		*protocol.CommonService
+		*service.CommonService
 		subscriptions *SubscribersMap
 
 		maxSubscriptions int
@@ -52,11 +54,13 @@ func NewWakuFilterFullNode(timesource timesource.Timesource, reg prometheus.Regi
 		opt(params)
 	}
 
-	wf.CommonService = protocol.NewCommonService()
+	wf.CommonService = service.NewCommonService()
 	wf.metrics = newMetrics(reg)
 	wf.subscriptions = NewSubscribersMap(params.Timeout)
 	wf.maxSubscriptions = params.MaxSubscribers
-
+	if params.pm != nil {
+		params.pm.RegisterWakuProtocol(FilterSubscribeID_v20beta1, FilterSubscribeENRField)
+	}
 	return wf
 }
 
@@ -133,9 +137,10 @@ func (wf *WakuFilterFullNode) reply(ctx context.Context, stream network.Stream, 
 	}
 
 	if len(description) != 0 {
-		response.StatusDesc = description[0]
+		response.StatusDesc = &description[0]
 	} else {
-		response.StatusDesc = http.StatusText(statusCode)
+		desc := http.StatusText(statusCode)
+		response.StatusDesc = &desc
 	}
 
 	writer := pbio.NewDelimitedWriter(stream)
@@ -213,20 +218,23 @@ func (wf *WakuFilterFullNode) filterListener(ctx context.Context) {
 	handle := func(envelope *protocol.Envelope) error {
 		msg := envelope.Message()
 		pubsubTopic := envelope.PubsubTopic()
-		logger := wf.log.With(logging.HexBytes("envelopeHash", envelope.Hash()))
+		logger := utils.MessagesLogger("filter").With(logging.HexBytes("hash", envelope.Hash()),
+			zap.String("pubsubTopic", envelope.PubsubTopic()),
+			zap.String("contentTopic", envelope.Message().ContentTopic),
+		)
+		logger.Debug("push message to filter subscribers")
 
 		// Each subscriber is a light node that earlier on invoked
 		// a FilterRequest on this node
 		for subscriber := range wf.subscriptions.Items(pubsubTopic, msg.ContentTopic) {
-			logger := logger.With(logging.HostID("subscriber", subscriber))
-			subscriber := subscriber // https://golang.org/doc/faq#closures_and_goroutines
+			logger := logger.With(logging.HostID("peer", subscriber))
 			// Do a message push to light node
-			logger.Info("pushing message to light node")
+			logger.Debug("pushing message to light node")
 			wf.WaitGroup().Add(1)
 			go func(subscriber peer.ID) {
 				defer wf.WaitGroup().Done()
 				start := time.Now()
-				err := wf.pushMessage(ctx, subscriber, envelope)
+				err := wf.pushMessage(ctx, logger, subscriber, envelope)
 				if err != nil {
 					logger.Error("pushing message", zap.Error(err))
 					return
@@ -245,15 +253,9 @@ func (wf *WakuFilterFullNode) filterListener(ctx context.Context) {
 	}
 }
 
-func (wf *WakuFilterFullNode) pushMessage(ctx context.Context, peerID peer.ID, env *protocol.Envelope) error {
-	logger := wf.log.With(
-		logging.HostID("peer", peerID),
-		logging.HexBytes("envelopeHash", env.Hash()),
-		zap.String("pubsubTopic", env.PubsubTopic()),
-		zap.String("contentTopic", env.Message().ContentTopic),
-	)
+func (wf *WakuFilterFullNode) pushMessage(ctx context.Context, logger *zap.Logger, peerID peer.ID, env *protocol.Envelope) error {
 	pubSubTopic := env.PubsubTopic()
-	messagePush := &pb.MessagePushV2{
+	messagePush := &pb.MessagePush{
 		PubsubTopic: &pubSubTopic,
 		WakuMessage: env.Message(),
 	}

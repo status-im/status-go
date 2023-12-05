@@ -35,6 +35,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
+
+	"google.golang.org/protobuf/proto"
 )
 
 // List of errors
@@ -246,11 +248,11 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 
 	wakuMsg := &pb.WakuMessage{
 		Payload:      payload,
-		Version:      version,
+		Version:      &version,
 		ContentTopic: req.ContentTopic.ContentTopic(),
-		Timestamp:    api.w.timestamp(),
+		Timestamp:    proto.Int64(api.w.timestamp()),
 		Meta:         []byte{}, // TODO: empty for now. Once we use Waku Archive v2, we should deprecate the timestamp and use an ULID here
-		Ephemeral:    req.Ephemeral,
+		Ephemeral:    &req.Ephemeral,
 	}
 
 	hash, err := api.w.Send(req.PubsubTopic, wakuMsg)

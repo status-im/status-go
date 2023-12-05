@@ -35,6 +35,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	"github.com/multiformats/go-multiaddr"
+	"google.golang.org/protobuf/proto"
 
 	"go.uber.org/zap"
 
@@ -1024,7 +1025,7 @@ func (w *Waku) broadcast() {
 		case envelope := <-w.sendQueue:
 			pubsubTopic := envelope.PubsubTopic()
 			var err error
-			logger := w.logger.With(zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", pubsubTopic), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().Timestamp))
+			logger := w.logger.With(zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", pubsubTopic), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().GetTimestamp()))
 			// For now only used in testing to simulate going offline
 			if w.settings.SkipPublishToTopic {
 				err = errors.New("Test send failure")
@@ -1077,7 +1078,7 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
 		}
 	}
 
-	envelope := protocol.NewEnvelope(msg, msg.Timestamp, pubsubTopic)
+	envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), pubsubTopic)
 
 	w.sendQueue <- envelope
 
@@ -1102,10 +1103,10 @@ func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 	opts = append(opts, store.WithPeer(peerID))
 
 	query := store.Query{
-		StartTime:     int64(from) * int64(time.Second),
-		EndTime:       int64(to) * int64(time.Second),
+		StartTime:     proto.Int64(int64(from) * int64(time.Second)),
+		EndTime:       proto.Int64(int64(to) * int64(time.Second)),
 		ContentTopics: strTopics,
-		Topic:         pubsubTopic,
+		PubsubTopic:   pubsubTopic,
 	}
 
 	return w.node.Store().Query(ctx, query, opts...)
@@ -1129,7 +1130,7 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 		// See https://github.com/vacp2p/rfc/issues/563
 		msg.RateLimitProof = nil
 
-		envelope := protocol.NewEnvelope(msg, msg.Timestamp, pubsubTopic)
+		envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), pubsubTopic)
 		w.logger.Info("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", pubsubTopic))
 		err = w.OnNewEnvelopes(envelope, common.StoreMessageType)
 		if err != nil {
@@ -1335,7 +1336,7 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 	logger := w.logger.With(
 		zap.String("envelopeHash", hexutil.Encode(envelope.Hash())),
 		zap.String("contentTopic", envelope.Message().ContentTopic),
-		zap.Int64("timestamp", envelope.Message().Timestamp),
+		zap.Int64("timestamp", envelope.Message().GetTimestamp()),
 	)
 
 	logger.Debug("received new envelope")
@@ -1413,7 +1414,7 @@ func (w *Waku) processQueue() {
 				zap.String("envelopeHash", hexutil.Encode(e.Envelope.Hash())),
 				zap.String("pubsubTopic", e.PubsubTopic),
 				zap.String("contentTopic", e.ContentTopic.ContentTopic()),
-				zap.Int64("timestamp", e.Envelope.Message().Timestamp),
+				zap.Int64("timestamp", e.Envelope.Message().GetTimestamp()),
 			)
 			if e.MsgType == common.StoreMessageType {
 				// We need to insert it first, and then remove it if not matched,

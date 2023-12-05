@@ -68,10 +68,7 @@ func (gm *StaticGroupManager) insertMembers(idCommitments []rln.IDCommitment) er
 
 	latestIndex := gm.nextIndex + uint64(len(idCommitments))
 
-	_, err = gm.rootTracker.UpdateLatestRoot(latestIndex)
-	if err != nil {
-		return err
-	}
+	gm.rootTracker.UpdateLatestRoot(latestIndex)
 
 	gm.nextIndex = latestIndex + 1
 

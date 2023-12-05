@@ -11,27 +11,27 @@ var (
 	errMissingResponse    = errors.New("missing Response field")
 )
 
-func (x *PushRPC) ValidateRequest() error {
+func (x *PushRpc) ValidateRequest() error {
 	if x.RequestId == "" {
 		return errMissingRequestID
 	}
 
-	if x.Query == nil {
+	if x.Request == nil {
 		return errMissingQuery
 	}
 
-	if x.Query.PubsubTopic == "" {
+	if x.Request.PubsubTopic == "" {
 		return errMissingPubsubTopic
 	}
 
-	if x.Query.Message == nil {
+	if x.Request.Message == nil {
 		return errMissingMessage
 	}
 
-	return x.Query.Message.Validate()
+	return x.Request.Message.Validate()
 }
 
-func (x *PushRPC) ValidateResponse(requestID string) error {
+func (x *PushRpc) ValidateResponse(requestID string) error {
 	if x.RequestId == "" {
 		return errMissingRequestID
 	}

@@ -1,8 +1,11 @@
 package peer_exchange
 
 import (
+	"errors"
+
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"go.uber.org/zap"
 )
@@ -10,18 +13,36 @@ import (
 type PeerExchangeParameters struct {
 	host              host.Host
 	selectedPeer      peer.ID
+	peerAddr          multiaddr.Multiaddr
 	peerSelectionType peermanager.PeerSelection
 	preferredPeers    peer.IDSlice
 	pm                *peermanager.PeerManager
 	log               *zap.Logger
 }
 
-type PeerExchangeOption func(*PeerExchangeParameters)
+type PeerExchangeOption func(*PeerExchangeParameters) error
 
-// WithPeer is an option used to specify the peerID to push a waku message to
+// WithPeer is an option used to specify the peerID to fetch peers from
 func WithPeer(p peer.ID) PeerExchangeOption {
-	return func(params *PeerExchangeParameters) {
+	return func(params *PeerExchangeParameters) error {
 		params.selectedPeer = p
+		if params.peerAddr != nil {
+			return errors.New("peerAddr and peerId options are mutually exclusive")
+		}
+		return nil
+	}
+}
+
+// WithPeerAddr is an option used to specify a peerAddress to fetch peers from
+// This new peer will be added to peerStore.
+// Note that this option is mutually exclusive to WithPeerAddr, only one of them can be used.
+func WithPeerAddr(pAddr multiaddr.Multiaddr) PeerExchangeOption {
+	return func(params *PeerExchangeParameters) error {
+		params.peerAddr = pAddr
+		if params.selectedPeer != "" {
+			return errors.New("peerAddr and peerId options are mutually exclusive")
+		}
+		return nil
 	}
 }
 
@@ -31,9 +52,10 @@ func WithPeer(p peer.ID) PeerExchangeOption {
 // from the node peerstore
 // Note: this option can only be used if WakuNode is initialized which internally intializes the peerManager
 func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) PeerExchangeOption {
-	return func(params *PeerExchangeParameters) {
+	return func(params *PeerExchangeParameters) error {
 		params.peerSelectionType = peermanager.Automatic
 		params.preferredPeers = fromThesePeers
+		return nil
 	}
 }
 
@@ -42,9 +64,10 @@ func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) PeerExchangeOption {
 // from that list assuming it supports the chosen protocol, otherwise it will chose a peer
 // from the node peerstore
 func WithFastestPeerSelection(fromThesePeers ...peer.ID) PeerExchangeOption {
-	return func(params *PeerExchangeParameters) {
+	return func(params *PeerExchangeParameters) error {
 		params.peerSelectionType = peermanager.LowestRTT
 		params.preferredPeers = fromThesePeers
+		return nil
 	}
 }
 

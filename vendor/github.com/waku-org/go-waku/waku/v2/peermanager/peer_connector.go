@@ -18,6 +18,7 @@ import (
 	"github.com/waku-org/go-waku/logging"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	waku_proto "github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/service"
 
 	"go.uber.org/zap"
 
@@ -34,7 +35,7 @@ type PeerConnectionStrategy struct {
 
 	paused      atomic.Bool
 	dialTimeout time.Duration
-	*CommonDiscoveryService
+	*service.CommonDiscoveryService
 	subscriptions []subscription
 
 	backoff backoff.BackoffFactory
@@ -43,7 +44,7 @@ type PeerConnectionStrategy struct {
 
 type subscription struct {
 	ctx context.Context
-	ch  <-chan PeerData
+	ch  <-chan service.PeerData
 }
 
 // backoff describes the strategy used to decide how long to backoff after previously attempting to connect to a peer
@@ -71,7 +72,7 @@ func NewPeerConnectionStrategy(pm *PeerManager,
 	pc := &PeerConnectionStrategy{
 		cache:                  cache,
 		dialTimeout:            dialTimeout,
-		CommonDiscoveryService: NewCommonDiscoveryService(),
+		CommonDiscoveryService: service.NewCommonDiscoveryService(),
 		pm:                     pm,
 		backoff:                getBackOff(),
 		logger:                 logger.Named("discovery-connector"),
@@ -86,7 +87,7 @@ type connCacheData struct {
 }
 
 // Subscribe receives channels on which discovered peers should be pushed
-func (c *PeerConnectionStrategy) Subscribe(ctx context.Context, ch <-chan PeerData) {
+func (c *PeerConnectionStrategy) Subscribe(ctx context.Context, ch <-chan service.PeerData) {
 	// if not running yet, store the subscription and return
 	if err := c.ErrOnNotRunning(); err != nil {
 		c.mux.Lock()
@@ -129,6 +130,7 @@ func (c *PeerConnectionStrategy) consumeSubscription(s subscription) {
 				if len(c.host.Network().Peers()) < waku_proto.GossipSubOptimalFullMeshSize {
 					triggerImmediateConnection = true
 				}
+				c.logger.Debug("adding discovered peer", logging.HostID("peer", p.AddrInfo.ID))
 				c.pm.AddDiscoveredPeer(p, triggerImmediateConnection)
 
 			case <-time.After(1 * time.Second):
