@@ -44,12 +44,6 @@ func WithResolver(resolver dnsdisc.Resolver) DNSDiscoveryOption {
 	}
 }
 
-func WithResolver(resolver dnsdisc.Resolver) DNSDiscoveryOption {
-	return func(params *dnsDiscoveryParameters) {
-		params.resolver = resolver
-	}
-}
-
 type DiscoveredNode struct {
 	PeerID   peer.ID
 	PeerInfo peer.AddrInfo
