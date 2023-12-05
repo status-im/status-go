@@ -10,10 +10,12 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	ethdnsdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/proto"
