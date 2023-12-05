@@ -126,7 +126,7 @@ func (c *findNewBlocksCommand) markTokenBlockRangeChecked(accounts []common.Addr
 	log.Debug("markTokenBlockRangeChecked", "chain", c.chainClient.NetworkID(), "from", from.Uint64(), "to", to.Uint64())
 
 	for _, account := range accounts {
-		err := c.blockRangeDAO.upsertTokenRange(c.chainClient.NetworkID(), account, &BlockRange{LastKnown: to})
+		err := c.blockRangeDAO.updateTokenRange(c.chainClient.NetworkID(), account, &BlockRange{LastKnown: to})
 		if err != nil {
 			c.error = err
 			log.Error("findNewBlocksCommand upsertTokenRange", "error", err)
