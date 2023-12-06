@@ -399,7 +399,8 @@ func (c *transfersCommand) checkAndProcessBridgeMultiTx(ctx context.Context, tx 
 
 func (c *transfersCommand) processUnknownErc20CommunityTransactions(ctx context.Context, allTransfers []Transfer) {
 	for _, tx := range allTransfers {
-		if tx.Type == w_common.Erc20Transfer {
+		// To can be nil in case of erc20 contract creation
+		if tx.Type == w_common.Erc20Transfer && tx.Transaction.To() != nil {
 			// Find token in db or if this is a community token, find its metadata
 			_ = c.tokenManager.FindOrCreateTokenByAddress(ctx, tx.NetworkID, *tx.Transaction.To())
 		}
