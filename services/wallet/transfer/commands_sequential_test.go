@@ -1076,7 +1076,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 	address := common.HexToAddress("0x1234")
 	chainClient := newMockChainClient()
 	tracker := transactions.NewPendingTxTracker(db, chainClient, nil, &event.Feed{}, transactions.PendingCheckInterval)
-	accDB, err := accounts.NewDB(wdb.client)
+	accDB, err := accounts.NewDB(appdb)
 	require.NoError(t, err)
 
 	cmd := &loadBlocksAndTransfersCommand{
@@ -1153,7 +1153,7 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 	blockChannel := make(chan []*DBHeader, 10)
 
 	address := common.HexToAddress("0x1234")
-	accDB, err := accounts.NewDB(wdb.client)
+	accDB, err := accounts.NewDB(appdb)
 	require.NoError(t, err)
 
 	for idx, testCase := range getNewBlocksCases() {
@@ -1229,7 +1229,7 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 
 	address1 := common.HexToAddress("0x1234")
 	address2 := common.HexToAddress("0x5678")
-	accDB, err := accounts.NewDB(wdb.client)
+	accDB, err := accounts.NewDB(appdb)
 	require.NoError(t, err)
 
 	tc := &TestClient{

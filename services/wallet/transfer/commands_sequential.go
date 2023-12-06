@@ -54,7 +54,25 @@ func (c *findNewBlocksCommand) Run(parent context.Context) (err error) {
 
 func (c *findNewBlocksCommand) findAndSaveEthBlocks(parent context.Context, fromNum, headNum *big.Int) {
 	// Check ETH transfers for each account independently
+	mnemonicWasNotShown, err := c.accountsDB.GetMnemonicWasNotShown()
+	if err != nil {
+		c.error = err
+		return
+	}
+
 	for _, account := range c.accounts {
+		if mnemonicCheckEnabled && mnemonicWasNotShown {
+			acc, err := c.accountsDB.GetAccountByAddress(nodetypes.Address(account))
+			if err != nil {
+				c.error = err
+				return
+			}
+			if acc.AddressWasNotShown {
+				log.Info("skip findNewBlocksCommand, mnemonic has not been shown and the address has not been shared yet", "address", account)
+				continue
+			}
+		}
+
 		log.Debug("start findNewBlocksCommand", "account", account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit, "from", fromNum, "to", headNum)
 
 		headers, startBlockNum, _ := c.findBlocksWithEthTransfers(parent, account, fromNum, headNum)
