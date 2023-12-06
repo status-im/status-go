@@ -709,3 +709,10 @@ func (api *API) WCSessionRequest(ctx context.Context, sessionRequestJSON string)
 
 	return api.s.walletConnect.SessionRequest(request)
 }
+
+// WCAuthRequest responds to "auth_request" event
+func (api *API) WCAuthRequest(ctx context.Context, address common.Address, authMessage string) (*transfer.TxResponse, error) {
+	log.Debug("wallet.api.wc.AuthRequest", "address", address, "authMessage", authMessage)
+
+	return api.s.walletConnect.AuthRequest(address, authMessage)
+}

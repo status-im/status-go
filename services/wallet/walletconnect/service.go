@@ -6,10 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/network"
@@ -166,4 +169,27 @@ func (s *Service) SessionRequest(request SessionRequest) (response *transfer.TxR
 
 	// TODO #12434: respond async
 	return nil, ErrorMethodNotSupported
+}
+
+func (s *Service) AuthRequest(address common.Address, authMessage string) (*transfer.TxResponse, error) {
+	account, err := s.accountsDB.GetAccountByAddress(types.Address(address))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active account: %w", err)
+	}
+
+	kp, err := s.accountsDB.GetKeypairByKeyUID(account.KeyUID)
+	if err != nil {
+		return nil, err
+	}
+
+	byteArray := []byte(authMessage)
+	hash := crypto.TextHash(byteArray)
+
+	return &transfer.TxResponse{
+		KeyUID:        account.KeyUID,
+		Address:       account.Address,
+		AddressPath:   account.Path,
+		SignOnKeycard: kp.MigratedToKeycard(),
+		MessageToSign: types.HexBytes(hash),
+	}, nil
 }
