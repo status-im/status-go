@@ -29,6 +29,7 @@ func TestCreateAccountAndLogin(t *testing.T) {
     "verifyTransactionChainID":1,
     "currentNetwork":"mainnet_rpc",
     "customizationColor":"blue",
+	"emoji": "some",
     "previewPrivacy":true,
     "verifyTransactionURL":"https://eth-archival.gateway.pokt.network/v1/lb/3ef2018191814b7e1009b8d9",
     "imagePath":null,
