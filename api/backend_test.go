@@ -1368,6 +1368,7 @@ func TestSetFleet(t *testing.T) {
 		BackupDisabledDataDir: tmpdir,
 		NetworkID:             1,
 		LogFilePath:           tmpdir + "/log",
+		Emoji:                 "some",
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
