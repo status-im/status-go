@@ -217,6 +217,10 @@ func (rlnRelay *WakuRLNRelay) AppendRLNProof(msg *pb.WakuMessage, senderEpochTim
 	}
 
 	msg.RateLimitProof = b
+	//If msgTimeStamp is not set, then set it to timestamp of proof
+	if msg.Timestamp == nil {
+		msg.Timestamp = proto.Int64(senderEpochTime.Unix())
+	}
 
 	return nil
 }

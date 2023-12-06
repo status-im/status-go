@@ -208,8 +208,16 @@ func (pm *PeerManager) ensureMinRelayConnsPerTopic() {
 	pm.topicMutex.RLock()
 	defer pm.topicMutex.RUnlock()
 	for topicStr, topicInst := range pm.subRelayTopics {
-		curPeers := topicInst.topic.ListPeers()
-		curPeerLen := len(curPeers)
+
+		// @cammellos reported that ListPeers returned an invalid number of
+		// peers. This will ensure that the peers returned by this function
+		// match those peers that are currently connected
+		curPeerLen := 0
+		for _, p := range topicInst.topic.ListPeers() {
+			if pm.host.Network().Connectedness(p) == network.Connected {
+				curPeerLen++
+			}
+		}
 		if curPeerLen < waku_proto.GossipSubOptimalFullMeshSize {
 			pm.logger.Debug("subscribed topic is unhealthy, initiating more connections to maintain health",
 				zap.String("pubSubTopic", topicStr), zap.Int("connectedPeerCount", curPeerLen),
@@ -341,9 +349,14 @@ func (pm *PeerManager) AddDiscoveredPeer(p service.PeerData, connectNow bool) {
 	//Check if the peer is already present, if so skip adding
 	_, err := pm.host.Peerstore().(wps.WakuPeerstore).Origin(p.AddrInfo.ID)
 	if err == nil {
-		pm.logger.Debug("peer already in peerStore", logging.HostID("peer", p.AddrInfo.ID))
-		return
+		enr, err := pm.host.Peerstore().(wps.WakuPeerstore).ENR(p.AddrInfo.ID)
+		// Verifying if the enr record is more recent (DiscV5 and peer exchange can return peers already seen)
+		if err == nil && enr.Record().Seq() > p.ENR.Seq() {
+			pm.logger.Debug("found discovered peer already in peerStore", logging.HostID("peer", p.AddrInfo.ID))
+			return
+		}
 	}
+
 	supportedProtos := []protocol.ID{}
 	if len(p.PubsubTopics) == 0 && p.ENR != nil {
 		// Try to fetch shard info and supported protocols from ENR to arrive at pubSub topics.
