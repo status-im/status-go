@@ -759,7 +759,7 @@ func TestLoginAccount(t *testing.T) {
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:           "some-display-name",
 		CustomizationColor:    "#ffffff",
-		Emoji:                 "😊",
+		Emoji:                 "some",
 		Password:              password,
 		BackupDisabledDataDir: tmpdir,
 		NetworkID:             1,
@@ -1304,7 +1304,7 @@ func TestCreateWallet(t *testing.T) {
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:           "some-display-name",
 		CustomizationColor:    "#ffffff",
-		Emoji:                 "😊",
+		Emoji:                 "some",
 		Password:              password,
 		BackupDisabledDataDir: tmpdir,
 		NetworkID:             1,
