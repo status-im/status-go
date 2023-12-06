@@ -759,6 +759,7 @@ func TestLoginAccount(t *testing.T) {
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:           "some-display-name",
 		CustomizationColor:    "#ffffff",
+		Emoji:                 "some",
 		Password:              password,
 		BackupDisabledDataDir: tmpdir,
 		NetworkID:             1,
@@ -1303,6 +1304,7 @@ func TestCreateWallet(t *testing.T) {
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:           "some-display-name",
 		CustomizationColor:    "#ffffff",
+		Emoji:                 "emoji",
 		Password:              password,
 		BackupDisabledDataDir: tmpdir,
 		NetworkID:             1,
@@ -1366,6 +1368,7 @@ func TestSetFleet(t *testing.T) {
 		BackupDisabledDataDir: tmpdir,
 		NetworkID:             1,
 		LogFilePath:           tmpdir + "/log",
+		Emoji:                 "some",
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
