@@ -220,11 +220,11 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 	if watcher.expectsAsymmetricEncryption() {
 		keyInfo.Kind = payload.Asymmetric
 		keyInfo.PrivKey = watcher.KeyAsym
-		msg.Dst = &watcher.KeyAsym.PublicKey
+		result.Dst = &watcher.KeyAsym.PublicKey
 	} else if watcher.expectsSymmetricEncryption() {
 		keyInfo.Kind = payload.Symmetric
 		keyInfo.SymKey = watcher.KeySym
-		msg.SymKeyHash = crypto.Keccak256Hash(watcher.KeySym)
+		result.SymKeyHash = crypto.Keccak256Hash(watcher.KeySym)
 	}
 
 	raw, err := payload.DecodePayload(msg.Envelope.Message(), keyInfo)
