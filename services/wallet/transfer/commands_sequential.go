@@ -743,8 +743,14 @@ func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) error {
 	// by canceling the context which does not happen here, as we don't call group.Stop().
 	group := async.NewGroup(ctx)
 
+	fromNum := big.NewInt(0)
+	headNum, err := getHeadBlockNumber(ctx, c.chainClient)
+	if err != nil {
+		return err
+	}
+
 	// It will start loadTransfersCommand which will run until success when all transfers from DB are loaded
-	err := c.fetchTransfersForLoadedBlocks(group)
+	err = c.fetchTransfersForLoadedBlocks(group)
 	for err != nil {
 		return err
 	}
@@ -752,11 +758,6 @@ func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) error {
 	// Start transfers loop to load transfers for new blocks
 	c.startTransfersLoop(ctx)
 
-	fromNum := big.NewInt(0)
-	headNum, err := getHeadBlockNumber(ctx, c.chainClient)
-	if err != nil {
-		return err
-	}
 	// This will start findBlocksCommand which will run until success when all blocks are loaded
 	// Iterate over all accounts and load blocks for each account
 	for _, account := range c.accounts {
