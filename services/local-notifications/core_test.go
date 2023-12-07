@@ -121,9 +121,8 @@ func TestTransactionNotification(t *testing.T) {
 	require.NoError(t, transfer.SaveTransfersMarkBlocksLoaded(walletDb, 1777, header.Address, transfers, []*big.Int{header.Number}))
 
 	feed.Send(walletevent.Event{
-		Type:        transfer.EventRecentHistoryReady,
-		BlockNumber: big.NewInt(0),
-		Accounts:    []common.Address{header.Address},
+		Type:     transfer.EventRecentHistoryReady,
+		Accounts: []common.Address{header.Address},
 	})
 
 	feed.Send(walletevent.Event{

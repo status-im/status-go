@@ -143,7 +143,7 @@ func (s *Service) SubscribeWallet(publisher *event.Feed) error {
 
 	s.StartWalletWatcher()
 
-	return nil
+	return err
 }
 
 // StartWalletWatcher - Forward wallet events to notifications
@@ -167,6 +167,7 @@ func (s *Service) StartWalletWatcher() {
 	maxKnownBlocks := map[common.Address]*big.Int{}
 	go func() {
 		defer s.walletTransmitter.wg.Done()
+		historyReady := false
 		for {
 			select {
 			case <-s.walletTransmitter.quit:
@@ -180,7 +181,7 @@ func (s *Service) StartWalletWatcher() {
 				}
 				return
 			case event := <-events:
-				if event.Type == transfer.EventNewTransfers && len(maxKnownBlocks) > 0 && event.BlockNumber != nil {
+				if event.Type == transfer.EventNewTransfers && historyReady && event.BlockNumber != nil {
 					newBlocks := false
 					for _, address := range event.Accounts {
 						if _, ok := maxKnownBlocks[address]; !ok {
@@ -200,9 +201,12 @@ func (s *Service) StartWalletWatcher() {
 						})
 					}
 				} else if event.Type == transfer.EventRecentHistoryReady {
-					for _, address := range event.Accounts {
-						if _, ok := maxKnownBlocks[address]; !ok {
-							maxKnownBlocks[address] = event.BlockNumber
+					historyReady = true
+					if event.BlockNumber != nil {
+						for _, address := range event.Accounts {
+							if _, ok := maxKnownBlocks[address]; !ok {
+								maxKnownBlocks[address] = event.BlockNumber
+							}
 						}
 					}
 				}

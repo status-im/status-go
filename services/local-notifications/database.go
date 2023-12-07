@@ -41,6 +41,9 @@ func (db *Database) GetWalletPreference() (rst NotificationPreference, err error
 	pref := db.db.QueryRow("SELECT service, event, identifier, enabled FROM local_notifications_preferences WHERE service = 'wallet' AND event = 'transaction' AND identifier = 'all'")
 
 	err = pref.Scan(&rst.Service, &rst.Event, &rst.Identifier, &rst.Enabled)
+	if err == sql.ErrNoRows {
+		return rst, nil
+	}
 	return
 }
 

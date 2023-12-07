@@ -817,7 +817,7 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocks(ctx context.Context, 
 	// If we blockRange is nil, we need to load all blocks from `fromNum` to `toNum`
 	// As current implementation checks ETH first then tokens, tokens ranges maybe behind ETH ranges in
 	// cases when block searching was interrupted, so we use tokens ranges
-	if blockRange != nil {
+	if blockRange != nil && blockRange.tokens != nil {
 		if blockRange.tokens.LastKnown != nil && toNum.Cmp(blockRange.tokens.LastKnown) > 0 {
 			ranges = append(ranges, []*big.Int{blockRange.tokens.LastKnown, toNum})
 		}
