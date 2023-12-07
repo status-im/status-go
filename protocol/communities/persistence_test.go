@@ -757,3 +757,108 @@ func (s *PersistenceSuite) TestAllNonApprovedCommunitiesRequestsToJoin() {
 	s.Require().NoError(err)
 	s.Require().Len(result, 6) // all except RequestToJoinStateAccepted
 }
+
+func (s *PersistenceSuite) TestRemoveAllCommunityRequestsToJoinWithRevealedAddressesExceptPublicKey() {
+	myIdentity, err := crypto.GenerateKey()
+	s.Require().NoError(err, "crypto.GenerateKey shouldn't give any error")
+
+	myPk := common.PubkeyToHex(&myIdentity.PublicKey)
+
+	clock := uint64(time.Now().Unix())
+
+	// add a new community
+	community := s.makeNewCommunity(myIdentity)
+	err = s.db.SaveCommunity(community)
+	s.Require().NoError(err)
+
+	// check on empty db
+	err = s.db.RemoveAllCommunityRequestsToJoinWithRevealedAddressesExceptPublicKey(myPk, community.ID())
+	s.Require().NoError(err)
+
+	// add requests to join to the community
+	allStates := []RequestToJoinState{
+		RequestToJoinStatePending,
+		RequestToJoinStateDeclined,
+		RequestToJoinStateAccepted,
+		RequestToJoinStateCanceled,
+		RequestToJoinStateAcceptedPending,
+		RequestToJoinStateDeclinedPending,
+		RequestToJoinStateAwaitingAddresses,
+	}
+
+	allRequestsToJoinIDs := [][]byte{}
+
+	for i := range allStates {
+		identity, err := crypto.GenerateKey()
+		s.Require().NoError(err)
+
+		revealedAccounts := []*protobuf.RevealedAccount{}
+		for j := 0; j < i; j++ {
+			acc := &protobuf.RevealedAccount{
+				Address:          "testAddr",
+				ChainIds:         []uint64{123},
+				IsAirdropAddress: true,
+				Signature:        []byte{},
+			}
+			revealedAccounts = append(revealedAccounts, acc)
+		}
+
+		rtj := &RequestToJoin{
+			ID:               types.HexBytes{1, 2, 3, 4, 5, 6, 7, byte(i)},
+			PublicKey:        common.PubkeyToHex(&identity.PublicKey),
+			Clock:            clock,
+			CommunityID:      community.ID(),
+			State:            allStates[i],
+			RevealedAccounts: revealedAccounts,
+		}
+
+		allRequestsToJoinIDs = append(allRequestsToJoinIDs, rtj.ID)
+
+		err = s.db.SaveRequestToJoin(rtj)
+		s.Require().NoError(err, "SaveRequestToJoin shouldn't give any error")
+		err = s.db.SaveRequestToJoinRevealedAddresses(rtj.ID, rtj.RevealedAccounts)
+		s.Require().NoError(err)
+	}
+
+	err = s.db.RemoveAllCommunityRequestsToJoinWithRevealedAddressesExceptPublicKey(myPk, community.ID())
+	s.Require().NoError(err)
+
+	requests, err := s.db.GetCommunityRequestsToJoinWithRevealedAddresses(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(requests, 0)
+
+	for _, rtjID := range allRequestsToJoinIDs {
+		accounts, err := s.db.GetRequestToJoinRevealedAddresses(rtjID)
+		s.Require().NoError(err)
+		s.Require().Len(accounts, 0)
+	}
+
+	myRtj := &RequestToJoin{
+		ID:          types.HexBytes{1, 2, 3, 4, 5, 6, 7, 8},
+		PublicKey:   myPk,
+		Clock:       clock,
+		CommunityID: community.ID(),
+		State:       RequestToJoinStateAccepted,
+		RevealedAccounts: []*protobuf.RevealedAccount{
+			{
+				Address:          "testAddr",
+				ChainIds:         []uint64{123},
+				IsAirdropAddress: true,
+				Signature:        []byte{},
+			},
+		},
+	}
+
+	err = s.db.SaveRequestToJoin(myRtj)
+	s.Require().NoError(err, "SaveRequestToJoin shouldn't give any error")
+	err = s.db.SaveRequestToJoinRevealedAddresses(myRtj.ID, myRtj.RevealedAccounts)
+	s.Require().NoError(err)
+
+	err = s.db.RemoveAllCommunityRequestsToJoinWithRevealedAddressesExceptPublicKey(myPk, community.ID())
+	s.Require().NoError(err)
+
+	requests, err = s.db.GetCommunityRequestsToJoinWithRevealedAddresses(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(requests, 1)
+	s.Require().Len(requests[0].RevealedAccounts, 1)
+}

@@ -1580,24 +1580,20 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		}
 	}
 
-	if hasTokenOwnership {
+	if hasTokenOwnership && verifiedOwner != nil {
 		// Override verified owner
-		if verifiedOwner != nil {
-			m.logger.Info("updating verified owner", zap.String("communityID", community.IDString()), zap.String("owner", common.PubkeyToHex(verifiedOwner)))
+		m.logger.Info("updating verified owner", zap.String("communityID", community.IDString()), zap.String("owner", common.PubkeyToHex(verifiedOwner)))
 
-			// If we are not the verified owner anymore, drop the private key
-			if !common.IsPubKeyEqual(verifiedOwner, &m.identity.PublicKey) {
-				community.config.PrivateKey = nil
-			}
+		// If we are not the verified owner anymore, drop the private key
+		if !common.IsPubKeyEqual(verifiedOwner, &m.identity.PublicKey) {
+			community.config.PrivateKey = nil
+		}
 
-			// new control node will be set in the 'UpdateCommunityDescription'
-			if !common.IsPubKeyEqual(verifiedOwner, signer) {
-				return nil, ErrNotAuthorized
-			}
-		} else if !common.IsPubKeyEqual(community.ControlNode(), signer) {
+		// new control node will be set in the 'UpdateCommunityDescription'
+		if !common.IsPubKeyEqual(verifiedOwner, signer) {
 			return nil, ErrNotAuthorized
 		}
-	} else if !common.IsPubKeyEqual(community.PublicKey(), signer) {
+	} else if !common.IsPubKeyEqual(community.ControlNode(), signer) {
 		return nil, ErrNotAuthorized
 	}
 
@@ -2227,6 +2223,7 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 			return nil, err
 		}
 
+		dbRequest.RevealedAccounts = revealedAccounts
 		if err = m.shareAcceptedRequestToJoinWithPrivilegedMembers(community, dbRequest); err != nil {
 			return nil, err
 		}
@@ -4925,7 +4922,7 @@ func (m *Manager) shareRequestsToJoinWithNewPrivilegedMembers(community *Communi
 		case protobuf.CommunityMember_ROLE_ADMIN:
 			subscriptionMsg.CommunityPrivilegedUserSyncMessage = syncMsgWithoutRevealedAccounts
 		case protobuf.CommunityMember_ROLE_OWNER:
-			fallthrough
+			continue
 		case protobuf.CommunityMember_ROLE_TOKEN_MASTER:
 			subscriptionMsg.CommunityPrivilegedUserSyncMessage = syncMsgWitRevealedAccounts
 		}
