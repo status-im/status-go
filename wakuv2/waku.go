@@ -54,6 +54,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
 
+	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
@@ -79,16 +80,17 @@ const bootnodesQueryBackoffMs = 200
 const bootnodesMaxRetries = 7
 
 type settings struct {
-	LightClient         bool   // Indicates if the node is a light client
-	MinPeersForRelay    int    // Indicates the minimum number of peers required for using Relay Protocol
-	MinPeersForFilter   int    // Indicates the minimum number of peers required for using Filter Protocol
-	MaxMsgSize          uint32 // Maximal message length allowed by the waku node
-	EnableConfirmations bool   // Enable sending message confirmations
-	PeerExchange        bool   // Enable peer exchange
-	DiscoveryLimit      int    // Indicates the number of nodes to discover
-	Nameserver          string // Optional nameserver to use for dns discovery
-	EnableDiscV5        bool   // Indicates whether discv5 is enabled or not
-	DefaultPubsubTopic  string // Pubsub topic to be used by default for messages that do not have a topic assigned (depending whether sharding is used or not)
+	LightClient         bool             // Indicates if the node is a light client
+	MinPeersForRelay    int              // Indicates the minimum number of peers required for using Relay Protocol
+	MinPeersForFilter   int              // Indicates the minimum number of peers required for using Filter Protocol
+	MaxMsgSize          uint32           // Maximal message length allowed by the waku node
+	EnableConfirmations bool             // Enable sending message confirmations
+	PeerExchange        bool             // Enable peer exchange
+	DiscoveryLimit      int              // Indicates the number of nodes to discover
+	Nameserver          string           // Optional nameserver to use for dns discovery
+	Resolver            ethdisc.Resolver // Optional resolver to use for dns discovery
+	EnableDiscV5        bool             // Indicates whether discv5 is enabled or not
+	DefaultPubsubTopic  string           // Pubsub topic to be used by default for messages that do not have a topic assigned (depending whether sharding is used or not)
 	Options             []node.WakuNodeOption
 	SkipPublishToTopic  bool // used in testing
 }
@@ -242,6 +244,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		PeerExchange:      cfg.PeerExchange,
 		DiscoveryLimit:    cfg.DiscoveryLimit,
 		Nameserver:        cfg.Nameserver,
+		Resolver:          cfg.Resolver,
 		EnableDiscV5:      cfg.EnableDiscV5,
 	}
 
@@ -403,11 +406,15 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 	if !ok {
 		w.settingsMu.RLock()
 		nameserver := w.settings.Nameserver
+		resolver := w.settings.Resolver
 		w.settingsMu.RUnlock()
 
 		var opts []dnsdisc.DNSDiscoveryOption
 		if nameserver != "" {
 			opts = append(opts, dnsdisc.WithNameserver(nameserver))
+		}
+		if resolver != nil {
+			opts = append(opts, dnsdisc.WithResolver(resolver))
 		}
 
 		discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrtreeAddress, opts...)
@@ -590,11 +597,7 @@ func (w *Waku) runPeerExchangeLoop() {
 					}
 
 					// Obtaining peer ID
-					peerIDString, err := discoveredNode.PeerInfo.Addrs[0].ValueForProtocol(multiaddr.P_P2P)
-					if err != nil {
-						w.logger.Warn("multiaddress does not contain peerID", zap.String("multiaddr", discoveredNode.PeerInfo.Addrs[0].String()))
-						continue // No peer ID available somehow
-					}
+					peerIDString := discoveredNode.PeerID.String()
 
 					peerID, err := peer.Decode(peerIDString)
 					if err != nil {
@@ -1179,6 +1182,13 @@ func (w *Waku) Start() error {
 
 	if w.cfg.EnableDiscV5 {
 		err := w.node.DiscV5().Start(w.ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	if w.cfg.PeerExchange {
+		err := w.node.PeerExchange().Start(w.ctx)
 		if err != nil {
 			return err
 		}

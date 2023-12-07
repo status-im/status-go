@@ -10,10 +10,15 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
-	"github.com/golang/protobuf/proto"
-	"github.com/stretchr/testify/require"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+	ethdnsdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
+	"github.com/ethereum/go-ethereum/p2p/enode"
+
+	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
@@ -190,6 +195,82 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, w.Stop())
+}
+
+type mapResolver map[string]string
+
+func (mr mapResolver) LookupTXT(ctx context.Context, name string) ([]string, error) {
+	if record, ok := mr[name]; ok {
+		return []string{record}, nil
+	}
+	return nil, errors.New("not found")
+}
+
+var signingKeyForTesting, _ = crypto.ToECDSA(hexutil.MustDecode("0xdc599867fc513f8f5e2c2c9c489cde5e71362d1d9ec6e693e0de063236ed1240"))
+
+func makeTestTree(domain string, nodes []*enode.Node, links []string) (*ethdnsdisc.Tree, string) {
+	tree, err := ethdnsdisc.MakeTree(1, nodes, links)
+	if err != nil {
+		panic(err)
+	}
+	url, err := tree.Sign(signingKeyForTesting, domain)
+	if err != nil {
+		panic(err)
+	}
+	return tree, url
+}
+
+func TestPeerExchange(t *testing.T) {
+	// start node which serve as PeerExchange server
+	config := &Config{}
+	config.EnableDiscV5 = true
+	config.PeerExchange = true
+	pxServerNode, err := New("", "", config, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, pxServerNode.Start())
+
+	time.Sleep(1 * time.Second)
+
+	// start node that will be discovered by PeerExchange
+	config = &Config{}
+	config.EnableDiscV5 = true
+	config.DiscV5BootstrapNodes = []string{pxServerNode.node.ENR().String()}
+	node, err := New("", "", config, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, node.Start())
+
+	time.Sleep(1 * time.Second)
+
+	// start light node which use PeerExchange to discover peers
+	enrNodes := []*enode.Node{pxServerNode.node.ENR()}
+	tree, url := makeTestTree("n", enrNodes, nil)
+	resolver := mapResolver(tree.ToTXT("n"))
+
+	config = &Config{}
+	config.PeerExchange = true
+	config.LightClient = true
+	config.Resolver = resolver
+
+	config.WakuNodes = []string{url}
+	lightNode, err := New("", "", config, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, lightNode.Start())
+
+	// Sanity check, not great, but it's probably helpful
+	options := func(b *backoff.ExponentialBackOff) {
+		b.MaxElapsedTime = 30 * time.Second
+	}
+	err = tt.RetryWithBackOff(func() error {
+		if len(lightNode.Peers()) == 2 {
+			return nil
+		}
+		return errors.New("no peers discovered")
+	}, options)
+	require.NoError(t, err)
+
+	require.NoError(t, lightNode.Stop())
+	require.NoError(t, pxServerNode.Stop())
+	require.NoError(t, node.Stop())
 }
 
 func TestWakuV2Filter(t *testing.T) {
