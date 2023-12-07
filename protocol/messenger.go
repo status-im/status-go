@@ -4260,22 +4260,22 @@ func (m *Messenger) MarkMessageAsUnread(chatID string, messageID string) (*Messe
 // MarkMessagesSeen marks messages with `ids` as seen in the chat `chatID`.
 // It returns the number of affected messages or error. If there is an error,
 // the number of affected messages is always zero.
-func (m *Messenger) markMessagesSeenImpl(chatID string, ids []string) (uint64, uint64, error) {
+func (m *Messenger) markMessagesSeenImpl(chatID string, ids []string) (uint64, uint64, *Chat, error) {
 	count, countWithMentions, err := m.persistence.MarkMessagesSeen(chatID, ids)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, nil, err
 	}
 	chat, err := m.persistence.Chat(chatID)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, nil, err
 	}
 	m.allChats.Store(chatID, chat)
-	return count, countWithMentions, nil
+	return count, countWithMentions, chat, nil
 }
 
 // Deprecated: Use MarkMessagesRead instead
 func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint64, []*ActivityCenterNotification, error) {
-	count, countWithMentions, err := m.markMessagesSeenImpl(chatID, ids)
+	count, countWithMentions, _, err := m.markMessagesSeenImpl(chatID, ids)
 	if err != nil {
 		return 0, 0, nil, err
 	}
@@ -4301,7 +4301,7 @@ func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint6
 }
 
 func (m *Messenger) MarkMessagesRead(chatID string, ids []string) (*MessengerResponse, error) {
-	count, countWithMentions, err := m.markMessagesSeenImpl(chatID, ids)
+	count, countWithMentions, _, err := m.markMessagesSeenImpl(chatID, ids)
 	if err != nil {
 		return nil, err
 	}
