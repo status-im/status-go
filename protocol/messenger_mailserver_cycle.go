@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -22,7 +23,8 @@ import (
 
 const defaultBackoff = 10 * time.Second
 const graylistBackoff = 3 * time.Minute
-const findNearestMailServer = false
+const isAndroidEmulator = runtime.GOOS == "android" && runtime.GOARCH == "amd64"
+const findNearestMailServer = !isAndroidEmulator
 
 func (m *Messenger) mailserversByFleet(fleet string) []mailservers.Mailserver {
 	var items []mailservers.Mailserver
@@ -325,7 +327,7 @@ func (m *Messenger) findNewMailserver() error {
 		m.logger.Info("connecting to mailserver", zap.String("address", ms.Address))
 		return m.connectToMailserver(ms)
 	}
-	
+
 	mailserversByAddress := make(map[string]mailservers.Mailserver)
 	for idx := range allMailservers {
 		mailserversByAddress[allMailservers[idx].Address] = allMailservers[idx]
