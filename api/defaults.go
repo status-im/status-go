@@ -106,7 +106,7 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 }
 
 func SetDefaultFleet(nodeConfig *params.NodeConfig) error {
-	return SetFleet(statusProdFleet, nodeConfig)
+	return SetFleet(shardsTest, nodeConfig)
 }
 
 func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
