@@ -991,6 +991,24 @@ func GetPasswordStrengthScore(paramsJSON string) string {
 	return string(data)
 }
 
+type FleetDescription struct {
+	DefaultFleet string              `json:"defaultFleet"`
+	Fleets       map[string][]string `json:"fleets"`
+}
+
+func Fleets() string {
+	fleets := FleetDescription{
+		DefaultFleet: api.DefaultFleet,
+		Fleets:       api.DefaultWakuNodes,
+	}
+
+	data, err := json.Marshal(fleets)
+	if err != nil {
+		return makeJSONResponse(fmt.Errorf("Error marshalling to json: %v", err))
+	}
+	return string(data)
+}
+
 func SwitchFleet(fleet string, configJSON string) string {
 	var conf params.NodeConfig
 	if configJSON != "" {

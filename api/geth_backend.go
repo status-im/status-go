@@ -630,7 +630,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	var fleet string
 	fleetPtr := settings.Fleet
 	if fleetPtr == nil || *fleetPtr == "" {
-		fleet = shardsTest
+		fleet = DefaultFleet
 	} else {
 		fleet = *fleetPtr
 	}
