@@ -4033,6 +4033,7 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 		}
 
 	}
+
 	if m.httpServer != nil {
 		for idx := range msgs {
 			m.prepareMessage(msgs[idx], m.httpServer)
