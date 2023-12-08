@@ -1596,6 +1596,16 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		return ErrInvalidCommunityID
 	}
 
+	myCancelledRequestToJoin, err := m.MyCanceledRequestToJoinForCommunityID(requestToJoinResponseProto.CommunityId)
+
+	if err != nil {
+		return err
+	}
+
+	if myCancelledRequestToJoin != nil {
+		return nil
+	}
+
 	updatedRequest, err := m.communitiesManager.HandleCommunityRequestToJoinResponse(signer, requestToJoinResponseProto)
 	if err != nil {
 		return err
@@ -1683,7 +1693,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		notification.UpdatedAt = m.GetCurrentTimeInMillis()
 		err = m.addActivityCenterNotification(state.Response, notification, nil)
 		if err != nil {
-			m.logger.Warn("failed to update notification", zap.Error(err))
+			m.logger.Error("failed to update notification", zap.Error(err))
 			return err
 		}
 	}

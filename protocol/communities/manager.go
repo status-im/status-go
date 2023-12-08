@@ -66,6 +66,7 @@ func SetValidateInterval(duration time.Duration) {
 var (
 	ErrTorrentTimedout                 = errors.New("torrent has timed out")
 	ErrCommunityRequestAlreadyRejected = errors.New("that user was already rejected from the community")
+	ErrInvalidClock                    = errors.New("invalid clock to cancel request to join")
 )
 
 type Manager struct {
@@ -2326,6 +2327,15 @@ func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, re
 		return nil, ErrOrgNotFound
 	}
 
+	previousRequestToJoin, err := m.GetRequestToJoinByPkAndCommunityID(signer, community.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	if request.Clock <= previousRequestToJoin.Clock {
+		return nil, ErrInvalidClock
+	}
+
 	retainDeclined, err := m.shouldUserRetainDeclined(signer, community, request.Clock)
 	if err != nil {
 		return nil, err
@@ -2342,6 +2352,18 @@ func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, re
 	requestToJoin, err := m.persistence.GetRequestToJoinByPk(common.PubkeyToHex(signer), community.ID(), RequestToJoinStateCanceled)
 	if err != nil {
 		return nil, err
+	}
+
+	if community.HasMember(signer) {
+		_, err = community.RemoveUserFromOrg(signer)
+		if err != nil {
+			return nil, err
+		}
+
+		err = m.saveAndPublish(community)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return requestToJoin, nil
@@ -2922,6 +2944,10 @@ func (m *Manager) GetCommunityRequestToJoinClock(pk *ecdsa.PublicKey, communityI
 	return request.Clock, nil
 }
 
+func (m *Manager) GetRequestToJoinByPkAndCommunityID(pk *ecdsa.PublicKey, communityID []byte) (*RequestToJoin, error) {
+	return m.persistence.GetRequestToJoinByPkAndCommunityID(common.PubkeyToHex(pk), communityID)
+}
+
 func (m *Manager) UpdateCommunityDescriptionMagnetlinkMessageClock(communityID types.HexBytes, clock uint64) error {
 	community, err := m.GetByIDString(communityID.String())
 	if err != nil {
@@ -3270,6 +3296,10 @@ func (m *Manager) SaveRequestToJoin(request *RequestToJoin) error {
 
 func (m *Manager) CanceledRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
 	return m.persistence.CanceledRequestsToJoinForUser(common.PubkeyToHex(pk))
+}
+
+func (m *Manager) CanceledRequestToJoinForUserForCommunityID(pk *ecdsa.PublicKey, communityID []byte) (*RequestToJoin, error) {
+	return m.persistence.CanceledRequestToJoinForUserForCommunityID(common.PubkeyToHex(pk), communityID)
 }
 
 func (m *Manager) PendingRequestsToJoin() ([]*RequestToJoin, error) {
