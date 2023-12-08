@@ -17,12 +17,14 @@ import (
 )
 
 const (
-	userURL              = "https://status.app/u#zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj"
-	userURLWithData      = "https://status.app/u/G10A4B0JdgwyRww90WXtnP1oNH1ZLQNM0yX0Ja9YyAMjrqSZIYINOHCbFhrnKRAcPGStPxCMJDSZlGCKzmZrJcimHY8BbcXlORrElv_BbQEegnMDPx1g9C5VVNl0fE4y#zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj"
-	communityURL         = "https://status.app/c#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
-	communityURLWithData = "https://status.app/c/iyKACkQKB0Rvb2RsZXMSJ0NvbG9yaW5nIHRoZSB3b3JsZCB3aXRoIGpveSDigKIg4bSXIOKAohiYohsiByMxMzFEMkYqAwEhMwM=#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
-	channelURL           = "https://status.app/cc/003cdcd5-e065-48f9-b166-b1a94ac75a11#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
-	channelURLWithData   = "https://status.app/cc/G54AAKwObLdpiGjXnckYzRcOSq0QQAS_CURGfqVU42ceGHCObstUIknTTZDOKF3E8y2MSicncpO7fTskXnoACiPKeejvjtLTGWNxUhlT7fyQS7Jrr33UVHluxv_PLjV2ePGw5GQ33innzeK34pInIgUGs5RjdQifMVmURalxxQKwiuoY5zwIjixWWRHqjHM=#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
+	userURL                      = "https://status.app/u#zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj"
+	userURLWithData              = "https://status.app/u/G10A4B0JdgwyRww90WXtnP1oNH1ZLQNM0yX0Ja9YyAMjrqSZIYINOHCbFhrnKRAcPGStPxCMJDSZlGCKzmZrJcimHY8BbcXlORrElv_BbQEegnMDPx1g9C5VVNl0fE4y#zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj"
+	communityURL                 = "https://status.app/c#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
+	communityURLWithData         = "https://status.app/c/iyKACkQKB0Rvb2RsZXMSJ0NvbG9yaW5nIHRoZSB3b3JsZCB3aXRoIGpveSDigKIg4bSXIOKAohiYohsiByMxMzFEMkYqAwEhMwM=#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
+	communityURLWithDataNoTags   = "https://status.app/c/CxCACh8KBFBJR1MSDHdlIGxvdmUgcGlncxgBIgcjRDM0NEM1Aw==#zQ3shZp9gY1FXfYkcd3CMrFLHriHQfrXvpF9XbZMwJhTcZsq8"
+	communityURLWithDataWithTags = "https://status.app/c/CxKACiMKBFBJR1MSDHdlIGxvdmUgcGlncxgBIgcjRDM0NEM1KgIjHgM=#zQ3shZp9gY1FXfYkcd3CMrFLHriHQfrXvpF9XbZMwJhTcZsq8"
+	channelURL                   = "https://status.app/cc/003cdcd5-e065-48f9-b166-b1a94ac75a11#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
+	channelURLWithData           = "https://status.app/cc/G54AAKwObLdpiGjXnckYzRcOSq0QQAS_CURGfqVU42ceGHCObstUIknTTZDOKF3E8y2MSicncpO7fTskXnoACiPKeejvjtLTGWNxUhlT7fyQS7Jrr33UVHluxv_PLjV2ePGw5GQ33innzeK34pInIgUGs5RjdQifMVmURalxxQKwiuoY5zwIjixWWRHqjHM=#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
 )
 
 func TestMessengerShareUrlsSuite(t *testing.T) {
@@ -259,6 +261,34 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
 	s.Require().Equal(uint32(446744), urlData.Community.MembersCount)
 	s.Require().Equal("#131D2F", urlData.Community.Color)
 	s.Require().Equal([]uint32{1, 33, 51}, urlData.Community.TagIndices)
+}
+
+func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithDataNoTags() {
+	urlData, err := ParseSharedURL(communityURLWithDataNoTags)
+	s.Require().NoError(err)
+	s.Require().NotNil(urlData)
+
+	s.Require().NotNil(urlData.Community)
+	s.Require().Equal("0x02b84843377a24ff498b6c37bd63e2b285c1ee2ccbab82d7a4afa25fff8c5076df", urlData.Community.CommunityID)
+	s.Require().Equal("PIGS", urlData.Community.DisplayName)
+	s.Require().Equal("we love pigs", urlData.Community.Description)
+	s.Require().Equal(uint32(0x1), urlData.Community.MembersCount)
+	s.Require().Equal("#D344C5", urlData.Community.Color)
+	s.Require().Equal([]uint32{}, urlData.Community.TagIndices)
+}
+
+func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithDataWithTags() {
+	urlData, err := ParseSharedURL(communityURLWithDataWithTags)
+	s.Require().NoError(err)
+	s.Require().NotNil(urlData)
+
+	s.Require().NotNil(urlData.Community)
+	s.Require().Equal("0x02b84843377a24ff498b6c37bd63e2b285c1ee2ccbab82d7a4afa25fff8c5076df", urlData.Community.CommunityID)
+	s.Require().Equal("PIGS", urlData.Community.DisplayName)
+	s.Require().Equal("we love pigs", urlData.Community.Description)
+	s.Require().Equal(uint32(0x1), urlData.Community.MembersCount)
+	s.Require().Equal("#D344C5", urlData.Community.Color)
+	s.Require().Equal([]uint32{0x23, 0x1e}, urlData.Community.TagIndices)
 }
 
 func (s *MessengerShareUrlsSuite) TestShareAndParseCommunityURLWithData() {
