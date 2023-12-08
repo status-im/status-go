@@ -686,6 +686,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		MainAccount:    walletAddr,
 	}
 
+	b.log.Info("starting node with config", "config", b.config)
 	err = b.StartNode(b.config)
 	if err != nil {
 		b.log.Info("failed to start node")
