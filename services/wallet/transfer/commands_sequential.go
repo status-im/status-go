@@ -196,7 +196,7 @@ func (c *findNewBlocksCommand) findBlocksWithEthTransfers(parent context.Context
 
 		var newFromBlock *Block
 		var ethHeaders []*DBHeader
-		newFromBlock, ethHeaders, startBlockNum, err = c.fastIndex(parent, c.balanceCacher, fromBlock, to)
+		newFromBlock, ethHeaders, startBlockNum, err = c.fastIndex(parent, account, c.balanceCacher, fromBlock, to)
 		if err != nil {
 			log.Error("findNewBlocksCommand checkRange fastIndex", "err", err, "account", account,
 				"chain", c.chainClient.NetworkID())
@@ -517,7 +517,7 @@ func (c *findBlocksCommand) checkRange(parent context.Context, from *big.Int, to
 	account := c.accounts[0]
 	fromBlock := &Block{Number: from}
 
-	newFromBlock, ethHeaders, startBlock, err := c.fastIndex(parent, c.balanceCacher, fromBlock, to)
+	newFromBlock, ethHeaders, startBlock, err := c.fastIndex(parent, account, c.balanceCacher, fromBlock, to)
 	if err != nil {
 		log.Error("findBlocksCommand checkRange fastIndex", "err", err, "account", account,
 			"chain", c.chainClient.NetworkID())
@@ -592,11 +592,10 @@ func areAllHistoryBlocksLoadedForAddress(blockRangeDAO *BlockRangeSequentialDAO,
 
 // run fast indexing for every accont up to canonical chain head minus safety depth.
 // every account will run it from last synced header.
-func (c *findBlocksCommand) fastIndex(ctx context.Context, bCacher balance.Cacher,
+func (c *findBlocksCommand) fastIndex(ctx context.Context, account common.Address, bCacher balance.Cacher,
 	fromBlock *Block, toBlockNumber *big.Int) (resultingFrom *Block, headers []*DBHeader,
 	startBlock *big.Int, err error) {
 
-	account := c.accounts[0]
 	log.Debug("fast index started", "chainID", c.chainClient.NetworkID(), "account", account,
 		"from", fromBlock.Number, "to", toBlockNumber)
 
