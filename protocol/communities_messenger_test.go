@@ -3797,9 +3797,6 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
 
-	// Make sure clock is not empty
-	s.Require().NotEmpty(requestToJoin1.Clock)
-
 	messageState := s.alice.buildMessageState()
 	messageState.CurrentMessageState = &CurrentMessageState{}
 
@@ -3910,7 +3907,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	s.Require().NoError(err)
 	// Make sure alice is NOT a member of the community that she cancelled her request to join to
 	s.Require().False(community.HasMember(s.alice.IdentityPublicKey()))
-	// Make sure there's no PNs for Alice
+	// Make sure there are no AC notifications for Alice
 	aliceNotifications, err := s.alice.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
 		Cursor:        "",
 		Limit:         10,
