@@ -3774,3 +3774,164 @@ func (s *MessengerCommunitiesSuite) TestRetrieveBigCommunity() {
 	}, "updated description not received")
 	s.Require().NoError(err)
 }
+
+func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() {
+	ctx := context.Background()
+
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	// We try to join the org
+	response, err := s.alice.RequestToJoinCommunity(request)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	requestToJoin1 := response.RequestsToJoinCommunity[0]
+	s.Require().NotNil(requestToJoin1)
+	s.Require().Equal(community.ID(), requestToJoin1.CommunityID)
+	s.Require().True(requestToJoin1.Our)
+	s.Require().NotEmpty(requestToJoin1.ID)
+	s.Require().NotEmpty(requestToJoin1.Clock)
+	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
+
+	messageState := s.alice.buildMessageState()
+	messageState.CurrentMessageState = &CurrentMessageState{}
+
+	messageState.CurrentMessageState.PublicKey = &s.alice.identity.PublicKey
+
+	statusMessage := v1protocol.StatusMessage{}
+	statusMessage.TransportLayer.Dst = community.PublicKey()
+
+	requestToJoinProto := &protobuf.CommunityRequestToJoin{
+		Clock:       requestToJoin1.Clock,
+		EnsName:     requestToJoin1.ENSName,
+		DisplayName: "Alice",
+		CommunityId: community.ID(),
+	}
+
+	err = s.owner.HandleCommunityRequestToJoin(messageState, requestToJoinProto, &statusMessage)
+	s.Require().NoError(err)
+	ownerCommunity, err := s.owner.GetCommunityByID(community.ID())
+	// Check Alice has successfully joined at owner side, Because message order was correct
+	s.Require().True(ownerCommunity.HasMember(s.alice.IdentityPublicKey()))
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Equal(response.Communities()[0].RequestedToJoinAt(), requestToJoin1.Clock)
+
+	// pull all communities to make sure we set RequestedToJoinAt
+
+	allCommunities, err := s.alice.Communities()
+	s.Require().NoError(err)
+	s.Require().Len(allCommunities, 2)
+
+	if bytes.Equal(allCommunities[0].ID(), community.ID()) {
+		s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
+	} else {
+		s.Require().Equal(allCommunities[1].RequestedToJoinAt(), requestToJoin1.Clock)
+	}
+
+	// pull to make sure it has been saved
+	requestsToJoin, err := s.alice.MyPendingRequestsToJoin()
+	s.Require().NoError(err)
+	s.Require().Len(requestsToJoin, 1)
+
+	// Make sure the requests are fetched also by community
+	requestsToJoin, err = s.alice.PendingRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(requestsToJoin, 1)
+
+	requestToJoin2 := response.RequestsToJoinCommunity[0]
+
+	s.Require().NotNil(requestToJoin2)
+	s.Require().Equal(community.ID(), requestToJoin2.CommunityID)
+	s.Require().NotEmpty(requestToJoin2.ID)
+	s.Require().NotEmpty(requestToJoin2.Clock)
+	s.Require().Equal(requestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin2.State)
+
+	s.Require().Equal(requestToJoin1.ID, requestToJoin2.ID)
+
+	requestToCancel := &requests.CancelRequestToJoinCommunity{ID: requestToJoin1.ID}
+	response, err = s.alice.CancelRequestToJoinCommunity(ctx, requestToCancel)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Equal(communities.RequestToJoinStateCanceled, response.RequestsToJoinCommunity[0].State)
+
+	messageState = s.alice.buildMessageState()
+	messageState.CurrentMessageState = &CurrentMessageState{}
+
+	messageState.CurrentMessageState.PublicKey = &s.alice.identity.PublicKey
+
+	statusMessage.TransportLayer.Dst = community.PublicKey()
+
+	requestToJoinCancelProto := &protobuf.CommunityRequestToJoinResponse{
+		CommunityId: community.ID(),
+		Clock:       requestToJoin1.Clock + 1,
+		Accepted:    true,
+	}
+
+	err = s.alice.HandleCommunityRequestToJoinResponse(messageState, requestToJoinCancelProto, &statusMessage)
+	s.Require().NoError(err)
+	aliceJoinedCommunities, err := s.alice.JoinedCommunities()
+	s.Require().NoError(err)
+	// Make sure on Alice side she hasn't joined any communities
+	s.Require().Empty(aliceJoinedCommunities)
+
+	// pull to make sure it has been saved
+	cancelRequestsToJoin, err := s.alice.MyCanceledRequestToJoinForCommunityID(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(cancelRequestsToJoin)
+	s.Require().Equal(cancelRequestsToJoin.State, communities.RequestToJoinStateCanceled)
+
+	s.Require().NoError(err)
+
+	messageState = s.alice.buildMessageState()
+	messageState.CurrentMessageState = &CurrentMessageState{}
+
+	messageState.CurrentMessageState.PublicKey = &s.alice.identity.PublicKey
+
+	statusMessage.TransportLayer.Dst = community.PublicKey()
+
+	requestToJoinResponseProto := &protobuf.CommunityRequestToJoinResponse{
+		Clock:       cancelRequestsToJoin.Clock,
+		CommunityId: community.ID(),
+		Accepted:    true,
+	}
+
+	err = s.alice.HandleCommunityRequestToJoinResponse(messageState, requestToJoinResponseProto, &statusMessage)
+	s.Require().NoError(err)
+	// Make sure alice is NOT a member of the community that she cancelled her request to join to
+	s.Require().False(community.HasMember(s.alice.IdentityPublicKey()))
+	// Make sure there are no AC notifications for Alice
+	aliceNotifications, err := s.alice.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
+		Cursor:        "",
+		Limit:         10,
+		ActivityTypes: []ActivityCenterType{},
+		ReadType:      ActivityCenterQueryParamsReadUnread,
+	})
+	s.Require().NoError(err)
+	s.Require().Len(aliceNotifications.Notifications, 0)
+
+	// Retrieve activity center notifications for admin to make sure the request notification is deleted
+	notifications, err := s.owner.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
+		Cursor:        "",
+		Limit:         10,
+		ActivityTypes: []ActivityCenterType{},
+		ReadType:      ActivityCenterQueryParamsReadUnread,
+	})
+
+	s.Require().NoError(err)
+	s.Require().Len(notifications.Notifications, 0)
+	cancelRequestToJoin2 := response.RequestsToJoinCommunity[0]
+	s.Require().NotNil(cancelRequestToJoin2)
+	s.Require().Equal(community.ID(), cancelRequestToJoin2.CommunityID)
+	s.Require().False(cancelRequestToJoin2.Our)
+	s.Require().NotEmpty(cancelRequestToJoin2.ID)
+	s.Require().NotEmpty(cancelRequestToJoin2.Clock)
+	s.Require().Equal(cancelRequestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+}

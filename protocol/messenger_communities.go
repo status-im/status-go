@@ -2355,6 +2355,10 @@ func (m *Messenger) MyCanceledRequestsToJoin() ([]*communities.RequestToJoin, er
 	return m.communitiesManager.CanceledRequestsToJoinForUser(&m.identity.PublicKey)
 }
 
+func (m *Messenger) MyCanceledRequestToJoinForCommunityID(communityID []byte) (*communities.RequestToJoin, error) {
+	return m.communitiesManager.CanceledRequestToJoinForUserForCommunityID(&m.identity.PublicKey, communityID)
+}
+
 func (m *Messenger) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.PendingRequestsToJoinForUser(&m.identity.PublicKey)
 }
