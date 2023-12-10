@@ -1100,12 +1100,12 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 	tc.traceAPICalls = true
 
 	ctx := context.Background()
-	group := async.NewGroup(ctx)
+	group := async.NewAtomicGroup(ctx)
 
 	fromNum := big.NewInt(0)
 	toNum, err := getHeadBlockNumber(ctx, cmd.chainClient)
 	require.NoError(t, err)
-	err = cmd.fetchHistoryBlocks(ctx, group, address, fromNum, toNum, blockChannel)
+	err = cmd.fetchHistoryBlocksForAccount(group, address, fromNum, toNum, blockChannel)
 	require.NoError(t, err)
 
 	select {
