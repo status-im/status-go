@@ -225,7 +225,6 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
 	}
 
 	for _, watcher := range candidates {
-		matched = true
 		if decodedMsg == nil {
 			decodedMsg = recvMessage.Open(watcher)
 			if decodedMsg == nil {
