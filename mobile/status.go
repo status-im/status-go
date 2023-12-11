@@ -305,7 +305,7 @@ func LoginAccount(requestJSON string) string {
 	api.RunAsync(func() error {
 		err := statusBackend.LoginAccount(&request)
 		if err != nil {
-			log.Error("loginAccount error", err)
+			log.Error("loginAccount failed", "error", err)
 			return err
 		}
 		log.Debug("loginAccount started node")
