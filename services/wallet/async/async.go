@@ -9,7 +9,7 @@ import (
 type Command func(context.Context) error
 
 type Commander interface {
-	Command() Command
+	Command(inteval ...time.Duration) Command
 }
 
 // SingleShotCommand runs once.

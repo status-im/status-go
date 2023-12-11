@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/exp/slices" // since 1.21, this is in the standard library
 
@@ -29,6 +30,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/t/utils"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -1336,4 +1338,162 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 	require.Equal(t, tc.currentBlock, cmd.fromBlockNumber.Uint64())
 	// We must check all the logs for all accounts with a single iteration of eth_getLogs call
 	require.Equal(t, 3, tc.callsCounter["FilterLogs"], "calls to FilterLogs")
+}
+
+type TestClientWithError struct {
+	*TestClient
+}
+
+func (tc *TestClientWithError) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
+	tc.incCounter("HeaderByNumber")
+	if tc.traceAPICalls {
+		tc.t.Log("HeaderByNumber", number)
+	}
+
+	return nil, errors.New("Network error")
+}
+
+func TestLoadBlocksAndTransfersCommand_StopOnErrorsOverflow(t *testing.T) {
+	tc := &TestClientWithError{
+		&TestClient{
+			t:            t,
+			callsCounter: map[string]int{},
+		},
+	}
+
+	cmd := &loadBlocksAndTransfersCommand{
+		chainClient:  tc,
+		errorCounter: *newErrorCounter("testLoadBlocksAndTransfersCommand"),
+	}
+
+	ctx := context.Background()
+	group := async.NewGroup(ctx)
+
+	group.Add(cmd.Command(1 * time.Millisecond))
+
+	select {
+	case <-ctx.Done():
+		t.Log("Done")
+	case <-group.WaitAsync():
+		t.Log("Command finished", "error", cmd.Error())
+		require.Equal(t, cmd.maxErrors, tc.callsCounter["HeaderByNumber"])
+
+		_, expectedErr := tc.HeaderByNumber(ctx, nil)
+		require.Error(t, expectedErr, cmd.Error())
+	}
+}
+
+type BlockRangeSequentialDAOMockError struct {
+	*BlockRangeSequentialDAO
+}
+
+func (b *BlockRangeSequentialDAOMockError) getBlockRange(chainID uint64, address common.Address) (blockRange *ethTokensBlockRanges, err error) {
+	return nil, errors.New("DB error")
+}
+
+func TestLoadBlocksAndTransfersCommand_StopOnErrorsOverflowWhenStarted(t *testing.T) {
+	appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	wdb := NewDB(db)
+	tc := &TestClient{
+		t:            t,
+		callsCounter: map[string]int{},
+	}
+	accDB, err := accounts.NewDB(appdb)
+	require.NoError(t, err)
+
+	cmd := &loadBlocksAndTransfersCommand{
+		accounts:    []common.Address{common.HexToAddress("0x1234")},
+		chainClient: tc,
+		blockDAO:    &BlockDAO{db},
+		blockRangeDAO: &BlockRangeSequentialDAOMockError{
+			&BlockRangeSequentialDAO{
+				wdb.client,
+			},
+		},
+		accountsDB: accDB,
+	}
+
+	ctx := context.Background()
+	group := async.NewGroup(ctx)
+
+	group.Add(cmd.Command(1 * time.Millisecond))
+
+	select {
+	case <-ctx.Done():
+		t.Log("Done")
+	case <-group.WaitAsync():
+		t.Log("Command finished", "error", cmd.Error())
+		_, expectedErr := cmd.blockRangeDAO.getBlockRange(0, common.Address{})
+		require.Error(t, expectedErr, cmd.Error())
+		require.NoError(t, utils.Eventually(func() error {
+			if !cmd.isStarted() {
+				return nil
+			}
+			return errors.New("command is still running")
+		}, 100*time.Millisecond, 10*time.Millisecond))
+	}
+}
+
+type BlockRangeSequentialDAOMockSuccess struct {
+	*BlockRangeSequentialDAO
+}
+
+func (b *BlockRangeSequentialDAOMockSuccess) getBlockRange(chainID uint64, address common.Address) (blockRange *ethTokensBlockRanges, err error) {
+	return newEthTokensBlockRanges(), nil
+}
+
+func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.T) {
+	appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	wdb := NewDB(db)
+	tc := &TestClient{
+		t:            t,
+		callsCounter: map[string]int{},
+	}
+	accDB, err := accounts.NewDB(appdb)
+	require.NoError(t, err)
+
+	cmd := &loadBlocksAndTransfersCommand{
+		accounts:    []common.Address{common.HexToAddress("0x1234")},
+		chainClient: tc,
+		blockDAO:    &BlockDAO{db},
+		blockRangeDAO: &BlockRangeSequentialDAOMockSuccess{
+			&BlockRangeSequentialDAO{
+				wdb.client,
+			},
+		},
+		accountsDB: accDB,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	group := async.NewGroup(ctx)
+
+	group.Add(cmd.Command(1 * time.Millisecond))
+
+	select {
+	case <-ctx.Done():
+		cancel() // linter is not happy if cancel is not called on all code paths
+		t.Log("Done")
+	case <-group.WaitAsync():
+		t.Log("Command finished", "error", cmd.Error())
+		require.NoError(t, cmd.Error())
+		require.True(t, cmd.isStarted())
+
+		cancel()
+		require.NoError(t, utils.Eventually(func() error {
+			if !cmd.isStarted() {
+				return nil
+			}
+			return errors.New("command is still running")
+		}, 100*time.Millisecond, 10*time.Millisecond))
+	}
 }
