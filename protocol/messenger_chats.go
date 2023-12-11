@@ -383,7 +383,9 @@ func (m *Messenger) DeactivateChat(request *requests.DeactivateChat) (*Messenger
 		return nil, err
 	}
 
-	return m.deactivateChat(request.ID, 0, true, true)
+	doClearHistory := !request.PreserveHistory
+
+	return m.deactivateChat(request.ID, 0, true, doClearHistory)
 }
 
 func (m *Messenger) deactivateChat(chatID string, deactivationClock uint64, shouldBeSynced bool, doClearHistory bool) (*MessengerResponse, error) {
