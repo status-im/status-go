@@ -669,7 +669,7 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 				}
 				return
 			case env := <-sub[0].Ch:
-				err := w.OnNewEnvelopes(env, common.RelayedMessageType)
+				err := w.OnNewEnvelopes(env, common.RelayedMessageType, false)
 				if err != nil {
 					w.logger.Error("OnNewEnvelopes error", zap.Error(err))
 				}
@@ -1121,7 +1121,7 @@ func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 	return w.node.Store().Query(ctx, query, opts...)
 }
 
-func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *storepb.Index, err error) {
+func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption, processEnvelopes bool) (cursor *storepb.Index, envelopesCount int, err error) {
 	requestID := protocol.GenerateRequestID()
 	opts = append(opts, store.WithRequestID(requestID))
 	pubsubTopic = w.getPubsubTopic(pubsubTopic)
@@ -1131,8 +1131,10 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 		if w.onHistoricMessagesRequestFailed != nil {
 			w.onHistoricMessagesRequestFailed(requestID, peerID, err)
 		}
-		return nil, err
+		return nil, 0, err
 	}
+
+	envelopesCount = len(result.Messages)
 
 	for _, msg := range result.Messages {
 		// Temporarily setting RateLimitProof to nil so it matches the WakuMessage protobuffer we are sending
@@ -1141,9 +1143,10 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 
 		envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), pubsubTopic)
 		w.logger.Info("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", pubsubTopic))
-		err = w.OnNewEnvelopes(envelope, common.StoreMessageType)
+
+		err = w.OnNewEnvelopes(envelope, common.StoreMessageType, processEnvelopes)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 	}
 
@@ -1256,7 +1259,7 @@ func (w *Waku) Start() error {
 		w.filterManager = newFilterManager(w.ctx, w.logger,
 			func(id string) *common.Filter { return w.GetFilter(id) },
 			w.settings,
-			func(env *protocol.Envelope) error { return w.OnNewEnvelopes(env, common.RelayedMessageType) },
+			func(env *protocol.Envelope) error { return w.OnNewEnvelopes(env, common.RelayedMessageType, false) },
 			w.node)
 
 		w.wg.Add(1)
@@ -1270,7 +1273,7 @@ func (w *Waku) Start() error {
 
 	numCPU := runtime.NumCPU()
 	for i := 0; i < numCPU; i++ {
-		go w.processQueue()
+		go w.processQueueLoop()
 	}
 
 	go w.broadcast()
@@ -1335,7 +1338,7 @@ func (w *Waku) Stop() error {
 	return nil
 }
 
-func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.MessageType) error {
+func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.MessageType, processImmediately bool) error {
 	if envelope == nil {
 		return nil
 	}
@@ -1358,7 +1361,7 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 	logger.Debug("received new envelope")
 	trouble := false
 
-	_, err := w.add(recvMessage)
+	_, err := w.add(recvMessage, processImmediately)
 	if err != nil {
 		logger.Info("invalid envelope received", zap.Error(err))
 		trouble = true
@@ -1382,7 +1385,7 @@ func (w *Waku) addEnvelope(envelope *common.ReceivedMessage) {
 	w.poolMu.Unlock()
 }
 
-func (w *Waku) add(recvMessage *common.ReceivedMessage) (bool, error) {
+func (w *Waku) add(recvMessage *common.ReceivedMessage, processImmediately bool) (bool, error) {
 	common.EnvelopesReceivedCounter.Inc()
 
 	hash := recvMessage.Hash()
@@ -1407,8 +1410,13 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage) (bool, error) {
 	}
 
 	if !alreadyCached || !envelope.Processed.Load() {
-		logger.Debug("waku: posting event")
-		w.postEvent(recvMessage) // notify the local node about the new message
+		if processImmediately {
+			logger.Debug("immediately processing envelope")
+			w.processReceivedMessage(recvMessage)
+		} else {
+			logger.Debug("posting event")
+			w.postEvent(recvMessage) // notify the local node about the new message
+		}
 	}
 
 	return true, nil
@@ -1419,47 +1427,52 @@ func (w *Waku) postEvent(envelope *common.ReceivedMessage) {
 	w.msgQueue <- envelope
 }
 
-// processQueue delivers the messages to the watchers during the lifetime of the waku node.
-func (w *Waku) processQueue() {
+// processQueueLoop delivers the messages to the watchers during the lifetime of the waku node.
+func (w *Waku) processQueueLoop() {
 	for {
 		select {
 		case <-w.ctx.Done():
 			return
 		case e := <-w.msgQueue:
-			logger := w.logger.With(
-				zap.String("envelopeHash", hexutil.Encode(e.Envelope.Hash())),
-				zap.String("pubsubTopic", e.PubsubTopic),
-				zap.String("contentTopic", e.ContentTopic.ContentTopic()),
-				zap.Int64("timestamp", e.Envelope.Message().GetTimestamp()),
-			)
-			if e.MsgType == common.StoreMessageType {
-				// We need to insert it first, and then remove it if not matched,
-				// as messages are processed asynchronously
-				w.storeMsgIDsMu.Lock()
-				w.storeMsgIDs[e.Hash()] = true
-				w.storeMsgIDsMu.Unlock()
-			}
-
-			matched := w.filters.NotifyWatchers(e)
-
-			// If not matched we remove it
-			if !matched {
-				logger.Debug("filters did not match")
-				w.storeMsgIDsMu.Lock()
-				delete(w.storeMsgIDs, e.Hash())
-				w.storeMsgIDsMu.Unlock()
-			} else {
-				logger.Debug("filters did match")
-				e.Processed.Store(true)
-			}
-
-			w.envelopeFeed.Send(common.EnvelopeEvent{
-				Topic: e.ContentTopic,
-				Hash:  e.Hash(),
-				Event: common.EventEnvelopeAvailable,
-			})
+			w.processReceivedMessage(e)
 		}
 	}
+}
+
+func (w *Waku) processReceivedMessage(e *common.ReceivedMessage) {
+	logger := w.logger.With(
+		zap.String("envelopeHash", hexutil.Encode(e.Envelope.Hash())),
+		zap.String("pubsubTopic", e.PubsubTopic),
+		zap.String("contentTopic", e.ContentTopic.ContentTopic()),
+		zap.Int64("timestamp", e.Envelope.Message().GetTimestamp()),
+	)
+
+	if e.MsgType == common.StoreMessageType {
+		// We need to insert it first, and then remove it if not matched,
+		// as messages are processed asynchronously
+		w.storeMsgIDsMu.Lock()
+		w.storeMsgIDs[e.Hash()] = true
+		w.storeMsgIDsMu.Unlock()
+	}
+
+	matched := w.filters.NotifyWatchers(e)
+
+	// If not matched we remove it
+	if !matched {
+		logger.Debug("filters did not match")
+		w.storeMsgIDsMu.Lock()
+		delete(w.storeMsgIDs, e.Hash())
+		w.storeMsgIDsMu.Unlock()
+	} else {
+		logger.Debug("filters did match")
+		e.Processed.Store(true)
+	}
+
+	w.envelopeFeed.Send(common.EnvelopeEvent{
+		Topic: e.ContentTopic,
+		Hash:  e.Hash(),
+		Event: common.EventEnvelopeAvailable,
+	})
 }
 
 // Envelopes retrieves all the messages currently pooled by the node.

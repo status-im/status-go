@@ -151,7 +151,7 @@ type Waku interface {
 	SendMessagesRequest(peerID []byte, request MessagesRequest) error
 
 	// RequestStoreMessages uses the WAKU2-STORE protocol to request historic messages
-	RequestStoreMessages(ctx context.Context, peerID []byte, request MessagesRequest) (*StoreRequestCursor, error)
+	RequestStoreMessages(ctx context.Context, peerID []byte, request MessagesRequest, processEnvelopes bool) (*StoreRequestCursor, int, error)
 
 	// ProcessingP2PMessages indicates whether there are in-flight p2p messages
 	ProcessingP2PMessages() bool

@@ -20,6 +20,10 @@ import (
 	"github.com/status-im/status-go/services/mailservers"
 )
 
+const (
+	defaultStoreNodeRequestPageSize = 20
+)
+
 // tolerance is how many seconds of potentially out-of-order messages we want to fetch
 var tolerance uint32 = 60
 
@@ -621,6 +625,7 @@ type work struct {
 	contentTopics []types.TopicType
 	cursor        []byte
 	storeCursor   *types.StoreRequestCursor
+	limit         uint32
 }
 
 type messageRequester interface {
@@ -632,11 +637,23 @@ type messageRequester interface {
 		previousStoreCursor *types.StoreRequestCursor,
 		pubsubTopic string,
 		contentTopics []types.TopicType,
+		limit uint32,
 		waitForResponse bool,
-	) (cursor []byte, storeCursor *types.StoreRequestCursor, err error)
+		processEnvelopes bool,
+	) (cursor []byte, storeCursor *types.StoreRequestCursor, envelopesCount int, err error)
 }
 
-func processMailserverBatch(ctx context.Context, messageRequester messageRequester, batch MailserverBatch, mailserverID []byte, logger *zap.Logger) error {
+func processMailserverBatch(
+	ctx context.Context,
+	messageRequester messageRequester,
+	batch MailserverBatch,
+	mailserverID []byte,
+	logger *zap.Logger,
+	pageLimit uint32,
+	shouldProcessNextPage func(int) (bool, uint32),
+	processEnvelopes bool,
+) error {
+
 	var topicStrings []string
 	for _, t := range batch.Topics {
 		topicStrings = append(topicStrings, t.String())
@@ -680,6 +697,7 @@ func processMailserverBatch(ctx context.Context, messageRequester messageRequest
 				workCh <- work{
 					pubsubTopic:   batch.PubsubTopic,
 					contentTopics: batch.Topics[i:j],
+					limit:         pageLimit,
 				}
 				time.Sleep(50 * time.Millisecond)
 			}
@@ -719,7 +737,7 @@ loop:
 				}()
 
 				queryCtx, queryCancel := context.WithTimeout(ctx, mailserverRequestTimeout)
-				cursor, storeCursor, err := messageRequester.SendMessagesRequestForTopics(queryCtx, mailserverID, batch.From, batch.To, w.cursor, w.storeCursor, w.pubsubTopic, w.contentTopics, true)
+				cursor, storeCursor, envelopesCount, err := messageRequester.SendMessagesRequestForTopics(queryCtx, mailserverID, batch.From, batch.To, w.cursor, w.storeCursor, w.pubsubTopic, w.contentTopics, w.limit, true, processEnvelopes)
 
 				queryCancel()
 
@@ -729,16 +747,32 @@ loop:
 					return
 				}
 
-				if len(cursor) != 0 || storeCursor != nil {
-					logger.Debug("processBatch producer - creating work (cursor)")
+				processNextPage := true
+				nextPageLimit := pageLimit
 
-					workWg.Add(1)
-					workCh <- work{
-						pubsubTopic:   w.pubsubTopic,
-						contentTopics: w.contentTopics,
-						cursor:        cursor,
-						storeCursor:   storeCursor,
-					}
+				if shouldProcessNextPage != nil {
+					processNextPage, nextPageLimit = shouldProcessNextPage(envelopesCount)
+				}
+
+				if !processNextPage {
+					return
+				}
+
+				// Check the cursor after calling `shouldProcessNextPage`.
+				// The app might use process the fetched envelopes in the callback for own needs.
+				if len(cursor) == 0 && storeCursor == nil {
+					return
+				}
+
+				logger.Debug("processBatch producer - creating work (cursor)")
+
+				workWg.Add(1)
+				workCh <- work{
+					pubsubTopic:   w.pubsubTopic,
+					contentTopics: w.contentTopics,
+					cursor:        cursor,
+					storeCursor:   storeCursor,
+					limit:         nextPageLimit,
 				}
 			}(w)
 		case err := <-errCh:
@@ -768,7 +802,16 @@ func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 		return err
 	}
 
-	return processMailserverBatch(m.ctx, m.transport, batch, mailserverID, m.logger)
+	return processMailserverBatch(m.ctx, m.transport, batch, mailserverID, m.logger, defaultStoreNodeRequestPageSize, nil, false)
+}
+
+func (m *Messenger) processMailserverBatchWithOptions(batch MailserverBatch, pageLimit uint32, shouldProcessNextPage func(int) (bool, uint32), processEnvelopes bool) error {
+	mailserverID, err := m.activeMailserverID()
+	if err != nil {
+		return err
+	}
+
+	return processMailserverBatch(m.ctx, m.transport, batch, mailserverID, m.logger, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 type MailserverBatch struct {

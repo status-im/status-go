@@ -1519,6 +1519,8 @@ func (m *Manager) Queue(signer *ecdsa.PublicKey, community *Community, clock uin
 }
 
 func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte, verifiedOwner *ecdsa.PublicKey, communityShard *protobuf.Shard) (*CommunityResponse, error) {
+	m.logger.Debug("HandleCommunityDescriptionMessage", zap.String("communityID", description.ID))
+
 	if signer == nil {
 		return nil, errors.New("signer can't be nil")
 	}
