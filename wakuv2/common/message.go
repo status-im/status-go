@@ -12,7 +12,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -224,7 +223,7 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 	} else if watcher.expectsSymmetricEncryption() {
 		keyInfo.Kind = payload.Symmetric
 		keyInfo.SymKey = watcher.KeySym
-		result.SymKeyHash = crypto.Keccak256Hash(watcher.KeySym)
+		result.SymKeyHash = msg.SymKeyHash
 	}
 
 	raw, err := payload.DecodePayload(msg.Envelope.Message(), keyInfo)

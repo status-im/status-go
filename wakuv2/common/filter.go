@@ -231,9 +231,8 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
 			if decodedMsg == nil {
 				log.Debug("processing message: failed to open", "message", recvMessage.Hash().Hex(), "filter", watcher.id)
 			}
-		} else {
-			matched = watcher.MatchMessage(decodedMsg)
 		}
+		matched = watcher.MatchMessage(decodedMsg)
 
 		if matched && decodedMsg != nil {
 			log.Debug("processing message: decrypted", "hash", recvMessage.Hash().Hex())
