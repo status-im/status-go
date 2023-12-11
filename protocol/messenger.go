@@ -4142,6 +4142,49 @@ func (m *Messenger) DeleteMessagesByChatID(id string) error {
 	return m.persistence.DeleteMessagesByChatID(id)
 }
 
+func (m *Messenger) MarkMessageAsUnreadImpl(chatID string, messageID string) (uint64, uint64, error) {
+	count, countWithMentions, err := m.persistence.MarkMessageAsUnread(chatID, messageID)
+
+	if err != nil {
+		return 0, 0, err
+	}
+
+	chat, err := m.persistence.Chat(chatID)
+	if err != nil {
+		return 0, 0, err
+	}
+	m.allChats.Store(chatID, chat)
+	return count, countWithMentions, nil
+}
+
+func (m *Messenger) MarkMessageAsUnread(chatID string, messageID string) (uint64, uint64, []*ActivityCenterNotification, error) {
+	count, countWithMentions, err := m.MarkMessageAsUnreadImpl(chatID, messageID)
+
+	if err != nil {
+		return 0, 0, nil, err
+	}
+
+	ids, err := m.persistence.GetMessageIdsWithGreaterTimestamp(chatID, messageID)
+
+	if err != nil {
+		return 0, 0, nil, err
+	}
+
+	hexBytesIds := []types.HexBytes{}
+	for _, id := range ids {
+		hexBytesIds = append(hexBytesIds, types.FromHex(id))
+	}
+
+	updatedAt := m.GetCurrentTimeInMillis()
+	notifications, err := m.persistence.MarkActivityCenterNotificationsUnread(hexBytesIds, updatedAt)
+
+	if err != nil {
+		return 0, 0, nil, err
+	}
+
+	return count, countWithMentions, notifications, nil
+}
+
 // MarkMessagesSeen marks messages with `ids` as seen in the chat `chatID`.
 // It returns the number of affected messages or error. If there is an error,
 // the number of affected messages is always zero.
