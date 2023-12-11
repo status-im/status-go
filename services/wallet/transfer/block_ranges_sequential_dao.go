@@ -9,6 +9,13 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
+type BlockRangeDAOer interface {
+	getBlockRange(chainID uint64, address common.Address) (blockRange *ethTokensBlockRanges, err error)
+	upsertRange(chainID uint64, account common.Address, newBlockRange *ethTokensBlockRanges) (err error)
+	updateTokenRange(chainID uint64, account common.Address, newBlockRange *BlockRange) (err error)
+	upsertEthRange(chainID uint64, account common.Address, newBlockRange *BlockRange) (err error)
+}
+
 type BlockRangeSequentialDAO struct {
 	db *sql.DB
 }
