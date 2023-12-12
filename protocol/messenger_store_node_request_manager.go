@@ -67,7 +67,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(community communities.Community
 		return nil, FetchCommunityStats{}, nil
 	}
 
-	result := <-*channel
+	result := <-channel
 	return result.community, result.stats, result.err
 }
 
@@ -99,7 +99,7 @@ func (m *StoreNodeRequestManager) FetchCommunities(communities []communities.Com
 // subscribeToCommunityRequest checks if a request for given community is already in progress, creates and installs
 // a new one if not found, and returns a subscription to the result of the found/started request.
 // The subscription can then be used to get the result of the request, this could be either a community or an error.
-func (m *StoreNodeRequestManager) subscribeToCommunityRequest(community communities.CommunityShard) (*communitySubscriptionChannel, error) {
+func (m *StoreNodeRequestManager) subscribeToCommunityRequest(community communities.CommunityShard) (communitySubscriptionChannel, error) {
 	// It's important to unlock only after getting the subscription channel.
 	// We also lock `activeRequestsLock` during finalizing the requests. This ensures that the subscription
 	// created in this function will get the result even if the requests proceeds faster than this function ends.
@@ -134,7 +134,7 @@ func (m *StoreNodeRequestManager) subscribeToCommunityRequest(community communit
 func (m *StoreNodeRequestManager) newStoreNodeRequest() *storeNodeRequest {
 	return &storeNodeRequest{
 		manager:       m,
-		subscriptions: make([]*communitySubscriptionChannel, 0),
+		subscriptions: make([]communitySubscriptionChannel, 0),
 	}
 }
 
@@ -189,7 +189,7 @@ type storeNodeRequest struct {
 
 	// internal fields
 	manager       *StoreNodeRequestManager
-	subscriptions []*communitySubscriptionChannel
+	subscriptions []communitySubscriptionChannel
 	result        fetchCommunityResult
 }
 
@@ -206,10 +206,10 @@ type fetchCommunityResult struct {
 
 type communitySubscriptionChannel = chan fetchCommunityResult
 
-func (r *storeNodeRequest) subscribe() *communitySubscriptionChannel {
+func (r *storeNodeRequest) subscribe() communitySubscriptionChannel {
 	channel := make(communitySubscriptionChannel, 100)
-	r.subscriptions = append(r.subscriptions, &channel)
-	return &channel
+	r.subscriptions = append(r.subscriptions, channel)
+	return channel
 }
 
 func (r *storeNodeRequest) finalize() {
@@ -224,7 +224,8 @@ func (r *storeNodeRequest) finalize() {
 	// Send the result to subscribers
 	// It's important that this is done with `activeRequestsLock` locked.
 	for _, s := range r.subscriptions {
-		*s <- r.result
+		s <- r.result
+		close(s)
 	}
 
 	if r.result.community != nil {
@@ -310,7 +311,7 @@ func (r *storeNodeRequest) routine() {
 			r.manager.onPerformingBatch(batch)
 		}
 
-		return nil, r.manager.messenger.processMailserverBatchWithOptions(batch, 1, r.shouldFetchNextPage, true)
+		return nil, r.manager.messenger.processMailserverBatchWithOptions(batch, initialStoreNodeRequestPageSize, r.shouldFetchNextPage, true)
 	})
 
 	r.result.err = err

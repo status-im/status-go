@@ -21,6 +21,7 @@ import (
 )
 
 const (
+	initialStoreNodeRequestPageSize = 4
 	defaultStoreNodeRequestPageSize = 20
 )
 

@@ -778,6 +778,8 @@ func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
 	case <-finish:
 	case <-time.After(timeout):
 		close(cancel)
+	case <-m.ctx.Done():
+		close(cancel)
 	}
 
 	return m.isActiveMailserverAvailable()
