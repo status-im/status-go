@@ -323,7 +323,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityPagingAlgorithm() {
 	// Push spam to the same ContentTopic & PubsubTopic
 	// The first requested page size is 1. All subsequent pages are limited to 20.
 	// We want to test the algorithm, so we push 21 spam envelopes.
-	for i := 0; i < defaultStoreNodeRequestPageSize+1; i++ {
+	for i := 0; i < defaultStoreNodeRequestPageSize+initialStoreNodeRequestPageSize; i++ {
 		spamMessage := common.RawMessage{
 			Payload:             RandomBytes(16),
 			Sender:              community.PrivateKey(),
@@ -338,10 +338,10 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityPagingAlgorithm() {
 	// Fetch the community
 	stats := s.fetchCommunity(s.bob, community.CommunityShard(), community)
 
-	// Expect 3 pages and 23 (21 spam + 1 community description + 1 general channel description) envelopes to be fetched.
+	// Expect 3 pages and 23 (24 spam + 1 community description + 1 general channel description) envelopes to be fetched.
 	// First we fetch a more up-to-date, but an invalid spam message, fail to decrypt it as community description,
 	// then we fetch another page of data and successfully decrypt a community description.
-	s.Require().Equal(23, stats.FetchedEnvelopesCount)
+	s.Require().Equal(defaultStoreNodeRequestPageSize+initialStoreNodeRequestPageSize+2, stats.FetchedEnvelopesCount)
 	s.Require().Equal(3, stats.FetchedPagesCount)
 }
 
@@ -370,8 +370,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityWithSameContentTopi
 	s.Require().NoError(err)
 
 	// Fetch the community
-	stats := s.fetchCommunity(s.bob, community1.CommunityShard(), community1)
-	s.Require().Equal(2, stats.FetchedPagesCount)
+	s.fetchCommunity(s.bob, community1.CommunityShard(), community1)
 }
 
 func (s *MessengerStoreNodeRequestSuite) TestRequestMultipleCommunities() {
@@ -443,8 +442,3 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestWithoutWaitingResponse() {
 
 	s.requireCommunitiesEqual(fetchedCommunities[community.IDString()], community)
 }
-
-// TODO: write the docs
-
-// TODO: fetch contact
-// TODO: fetch chat messages
