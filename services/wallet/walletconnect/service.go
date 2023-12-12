@@ -113,6 +113,8 @@ func (s *Service) PairSessionProposal(proposal SessionProposal) (*PairSessionRes
 					params.SignMethodName,
 					params.SignTransactionMethodName,
 					params.SignTypedDataMethodName,
+					params.SignTypedDataV3MethodName,
+					params.SignTypedDataV4MethodName,
 					params.WalletSwitchEthereumChainMethodName,
 				},
 				Events:   []string{"accountsChanged", "chainChanged"},
@@ -163,7 +165,9 @@ func (s *Service) SessionRequest(request SessionRequest) (response *transfer.TxR
 		return s.buildMessage(request, 1, 0, false)
 	} else if request.Params.Request.Method == params.SignMethodName {
 		return s.buildMessage(request, 0, 1, false)
-	} else if request.Params.Request.Method == params.SignTypedDataMethodName {
+	} else if request.Params.Request.Method == params.SignTypedDataMethodName ||
+		request.Params.Request.Method == params.SignTypedDataV3MethodName ||
+		request.Params.Request.Method == params.SignTypedDataV4MethodName {
 		return s.buildMessage(request, 0, 1, true)
 	}
 
