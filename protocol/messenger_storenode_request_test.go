@@ -31,7 +31,7 @@ const (
 	localMailserverID         = "local-test-mailserver"
 	storeNodeConnectTimeout   = 500 * time.Millisecond
 	messageRetrieveLoopPeriod = 1000 * time.Millisecond
-	runLocalTests             = true
+	runLocalTests             = false
 )
 
 func TestMessengerStoreNodeRequestSuite(t *testing.T) {
@@ -259,6 +259,8 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityInfoWithStoreNodeDi
 	s.fetchCommunity(s.bob, community.CommunityShard(), community)
 }
 
+// This test is intended to only run locally to test how fast is a big community fetched
+// Shouldn't be executed in CI, because it relies on connection to status.prod store nodes.
 func (s *MessengerStoreNodeRequestSuite) TestRequestBigCommunity() {
 	if !runLocalTests {
 		return
