@@ -6,7 +6,6 @@ import (
 
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
 
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -287,8 +286,6 @@ func (s *MessengerSuite) TestMarkMessageWithNotificationAsUnreadInCommunityChatS
 		Description: "This is just a test description for the community",
 	}
 
-	inviteMessage := "You are invited to community testing message"
-
 	response, err := other.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -303,29 +300,7 @@ func (s *MessengerSuite) TestMarkMessageWithNotificationAsUnreadInCommunityChatS
 	err = other.communitiesManager.SaveCommunity(community)
 	s.Require().NoError(err)
 
-	response, err = other.ShareCommunity(
-		&requests.ShareCommunity{
-			CommunityID:   community.ID(),
-			Users:         []types.HexBytes{common.PubkeyToHexBytes(&s.m.identity.PublicKey)},
-			InviteMessage: inviteMessage,
-		},
-	)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Messages(), 1)
-
-	response, err = s.retrieveAllWithRetry("community link not received")
-
-	s.Require().NoError(err)
-	s.Require().Len(response.Messages(), 1)
-
-	message := response.Messages()[0]
-	s.Require().Equal(community.IDString(), message.CommunityID)
-	s.Require().Equal(inviteMessage, message.Text)
-
-	communityInResponse := response.Communities()[0]
-	s.Require().Equal(community.ID(), communityInResponse.ID())
-	s.Require().True(communityInResponse.Joined())
+	advertiseCommunityToUserOldWay(&s.Suite, community, other, s.m)
 
 	inputMessage1 := buildTestMessage(*communityChat)
 	inputMessage1.ChatId = communityChat.ID
