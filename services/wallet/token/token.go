@@ -19,9 +19,11 @@ import (
 	"github.com/status-im/status-go/contracts/ierc20"
 	eth_node_types "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/async"
 )
@@ -42,10 +44,18 @@ type Token struct {
 	// ISO 4217 alphabetic code. For example, an empty string means it is not
 	// pegged, while "USD" means it's pegged to the United States Dollar.
 	PegSymbol string `json:"pegSymbol"`
+	Image     string `json:"image,omitempty"`
 
-	CommunityID *string `json:"communityId,omitempty"`
-	Verified    bool    `json:"verified"`
-	TokenListID string  `json:"tokenListId"`
+	CommunityData *CommunityData `json:"community_data,omitempty"`
+	Verified      bool           `json:"verified"`
+	TokenListID   string         `json:"tokenListId"`
+}
+
+type CommunityData struct {
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	Color    string  `json:"color"`
+	ImageURL *string `json:"image_url,omitempty"`
 }
 
 func (t *Token) IsNative() bool {
@@ -70,11 +80,12 @@ type ManagerInterface interface {
 
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
 type Manager struct {
-	db             *sql.DB
-	RPCClient      *rpc.Client
-	contractMaker  *contracts.ContractMaker
-	networkManager *network.Manager
-	stores         []store // Set on init, not changed afterwards
+	db                *sql.DB
+	RPCClient         *rpc.Client
+	contractMaker     *contracts.ContractMaker
+	networkManager    *network.Manager
+	stores            []store // Set on init, not changed afterwards
+	communityTokensDB *communitytokens.Database
 
 	tokens []*Token
 
@@ -100,6 +111,7 @@ func NewTokenManager(
 	db *sql.DB,
 	RPCClient *rpc.Client,
 	networkManager *network.Manager,
+	appDB *sql.DB,
 ) *Manager {
 	maker, _ := contracts.NewContractMaker(RPCClient)
 	stores := []store{newUniswapStore(), newDefaultStore()}
@@ -127,12 +139,13 @@ func NewTokenManager(
 	}
 
 	return &Manager{
-		db:             db,
-		RPCClient:      RPCClient,
-		contractMaker:  maker,
-		networkManager: networkManager,
-		stores:         stores,
-		tokens:         tokens,
+		db:                db,
+		RPCClient:         RPCClient,
+		contractMaker:     maker,
+		networkManager:    networkManager,
+		stores:            stores,
+		communityTokensDB: communitytokens.NewCommunityTokensDatabase(appDB),
+		tokens:            tokens,
 	}
 }
 
@@ -277,7 +290,7 @@ func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint6
 }
 
 func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *Token, address common.Address) {
-	if token == nil || token.CommunityID != nil {
+	if token == nil || token.CommunityData != nil {
 		// Token is invalid or is alrady discovered. Nothing to do here.
 		return
 	}
@@ -482,6 +495,13 @@ func (tm *Manager) DiscoverToken(ctx context.Context, chainID uint64, address co
 }
 
 func (tm *Manager) getTokensFromDB(query string, args ...any) ([]*Token, error) {
+
+	communityTokens := []*token.CommunityToken{}
+	if tm.communityTokensDB != nil {
+		// Error is skipped because it's only returning optional metadata
+		communityTokens, _ = tm.communityTokensDB.GetCommunityERC20Metadata()
+	}
+
 	rows, err := tm.db.Query(query, args...)
 	if err != nil {
 		return nil, err
@@ -498,7 +518,18 @@ func (tm *Manager) getTokensFromDB(query string, args ...any) ([]*Token, error) 
 		}
 
 		if communityIDDB.Valid {
-			token.CommunityID = &communityIDDB.String
+			communityID := communityIDDB.String
+			for _, communityToken := range communityTokens {
+				if communityToken.CommunityID != communityID || uint64(communityToken.ChainID) != token.ChainID || communityToken.Symbol != token.Symbol {
+					continue
+				}
+				token.Image = communityToken.Base64Image
+				break
+			}
+
+			token.CommunityData = &CommunityData{
+				ID: communityID,
+			}
 		}
 
 		rst = append(rst, token)
