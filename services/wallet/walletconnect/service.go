@@ -145,7 +145,7 @@ func (s *Service) RecordSuccessfulPairing(proposal SessionProposal) error {
 	})
 }
 
-func (s *Service) ChangePairingState(topic Topic, active bool) error {
+func (s *Service) ChangePairingState(topic PairingTopic, active bool) error {
 	return ChangePairingState(s.db, topic, active)
 }
 

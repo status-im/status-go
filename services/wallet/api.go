@@ -671,9 +671,9 @@ func (api *API) WCPairSessionProposal(ctx context.Context, sessionProposalJSON s
 	return api.s.walletConnect.PairSessionProposal(data)
 }
 
-// WCRecordSuccessfulPairing confirms that a pairing has been established
-func (api *API) WCRecordSuccessfulPairing(ctx context.Context, sessionProposalJSON string) error {
-	log.Debug("wallet.api.wc.RecordSuccessfulPairing", "proposal.len", len(sessionProposalJSON))
+// WCUpsertSession confirms that a pairing has been established
+func (api *API) WCUpsertSession(ctx context.Context, sessionJSON string) error {
+	log.Debug("wallet.api.wc.UpsertSession", "session.len", len(sessionJSON))
 
 	var data wc.SessionProposal
 	err := json.Unmarshal([]byte(sessionProposalJSON), &data)
@@ -685,7 +685,7 @@ func (api *API) WCRecordSuccessfulPairing(ctx context.Context, sessionProposalJS
 }
 
 // WCChangePairingState changes the active state of a pairing
-func (api *API) WCChangePairingState(ctx context.Context, topic walletconnect.Topic, active bool) error {
+func (api *API) WCChangePairingState(ctx context.Context, topic walletconnect.PairingTopic, active bool) error {
 	log.Debug("wallet.api.wc.ChangePairingState", "topic", topic, "active", active)
 
 	return api.s.walletConnect.ChangePairingState(topic, active)

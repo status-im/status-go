@@ -29,6 +29,7 @@ var (
 )
 
 type Topic string
+type PairingTopic string
 
 type Namespace struct {
 	Methods  []string `json:"methods"`
@@ -63,7 +64,7 @@ type VerifyContext struct {
 
 type Params struct {
 	ID                 int64                `json:"id"`
-	PairingTopic       Topic                `json:"pairingTopic"`
+	PairingTopic       PairingTopic         `json:"pairingTopic"`
 	Expiry             int64                `json:"expiry"`
 	RequiredNamespaces map[string]Namespace `json:"requiredNamespaces"`
 	OptionalNamespaces map[string]Namespace `json:"optionalNamespaces"`
@@ -91,14 +92,20 @@ type RequestParams struct {
 
 type SessionRequest struct {
 	ID     int64         `json:"id"`
-	Topic  Topic         `json:"topic"`
+	Topic  PairingTopic  `json:"topic"`
 	Params RequestParams `json:"params"`
 	Verify VerifyContext `json:"verifyContext"`
 }
 
+type Session struct {
+	Topic    Topic    `json:"topic"`
+	Expiry   int64    `json:"expiry"`
+	Proposer Proposer `json:"peer"`
+}
+
 type SessionDelete struct {
-	ID    int64 `json:"id"`
-	Topic Topic `json:"topic"`
+	ID    int64        `json:"id"`
+	Topic PairingTopic `json:"topic"`
 }
 
 // Valid namespace

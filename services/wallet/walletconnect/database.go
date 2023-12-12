@@ -6,14 +6,14 @@ import (
 )
 
 type Pairing struct {
-	Topic       Topic    `json:"topic"`
-	Expiry      int64    `json:"expiry"`
-	Active      bool     `json:"active"`
-	AppName     string   `json:"appName"`
-	URL         string   `json:"url"`
-	Description string   `json:"description"`
-	Icon        string   `json:"icon"`
-	Verified    Verified `json:"verified"`
+	Topic       PairingTopic `json:"topic"`
+	Expiry      int64        `json:"expiry"`
+	Active      bool         `json:"active"`
+	AppName     string       `json:"appName"`
+	URL         string       `json:"url"`
+	Description string       `json:"description"`
+	Icon        string       `json:"icon"`
+	Verified    Verified     `json:"verified"`
 }
 
 func InsertPairing(db *sql.DB, pairing Pairing) error {
@@ -23,7 +23,7 @@ func InsertPairing(db *sql.DB, pairing Pairing) error {
 	return err
 }
 
-func ChangePairingState(db *sql.DB, topic Topic, active bool) error {
+func ChangePairingState(db *sql.DB, topic PairingTopic, active bool) error {
 	stmt, err := db.Prepare("UPDATE wallet_connect_pairings SET active = ? WHERE topic = ?")
 	if err != nil {
 		return err
@@ -45,7 +45,7 @@ func ChangePairingState(db *sql.DB, topic Topic, active bool) error {
 	return nil
 }
 
-func GetPairingByTopic(db *sql.DB, topic Topic) (*Pairing, error) {
+func GetPairingByTopic(db *sql.DB, topic PairingTopic) (*Pairing, error) {
 	querySQL := `SELECT topic, expiry_timestamp, active, app_name, url, description, icon, verified_is_scam, verified_origin, verified_verify_url, verified_validation FROM wallet_connect_pairings WHERE topic = ?`
 
 	row := db.QueryRow(querySQL, topic)

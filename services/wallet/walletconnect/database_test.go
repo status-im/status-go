@@ -27,7 +27,7 @@ func generateTestData(count int) []Pairing {
 	for i := 0; i < count; i++ {
 		strI := strconv.Itoa(i)
 		res[i] = Pairing{
-			Topic:       Topic(strI + "abcdef1234567890"),
+			Topic:       PairingTopic(strI + "abcdef1234567890"),
 			Expiry:      1234567890 + int64(i),
 			Active:      (i % 2) == 0,
 			AppName:     "TestApp" + strI,
