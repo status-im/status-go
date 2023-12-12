@@ -79,22 +79,6 @@ func (u *StatusUnfurler) buildContactData(publicKey string) (*common.StatusConta
 	return c, nil
 }
 
-func (u *StatusUnfurler) fillCommunityImages(community *communities.Community, icon *common.LinkPreviewThumbnail, banner *common.LinkPreviewThumbnail) error {
-	if image, ok := community.Images()[images.SmallDimName]; ok {
-		if err := updateThumbnail(&images.IdentityImage{Payload: image.Payload}, icon); err != nil {
-			u.logger.Warn("unfurling status link: failed to set community thumbnail", zap.Error(err))
-		}
-	}
-
-	if image, ok := community.Images()[images.BannerIdentityName]; ok {
-		if err := updateThumbnail(&images.IdentityImage{Payload: image.Payload}, banner); err != nil {
-			u.logger.Warn("unfurling status link: failed to set community banner", zap.Error(err))
-		}
-	}
-
-	return nil
-}
-
 func (u *StatusUnfurler) buildCommunityData(communityID string, shard *shard.Shard) (*communities.Community, *common.StatusCommunityLinkPreview, error) {
 	// This automatically checks the database
 	community, err := u.m.FetchCommunity(&FetchCommunityRequest{
@@ -112,20 +96,12 @@ func (u *StatusUnfurler) buildCommunityData(communityID string, shard *shard.Sha
 		return community, nil, fmt.Errorf("community info fetched, but it is empty")
 	}
 
-	c := &common.StatusCommunityLinkPreview{
-		CommunityID:  community.IDString(),
-		DisplayName:  community.Name(),
-		Description:  community.DescriptionText(),
-		MembersCount: uint32(community.MembersCount()),
-		Color:        community.Color(),
-	}
-
-	err = u.fillCommunityImages(community, &c.Icon, &c.Banner)
+	statusCommunityLinkPreviews, err := community.ToStatusLinkPreview()
 	if err != nil {
-		return community, c, err
+		return nil, nil, fmt.Errorf("failed to get status community link preview for communityID '%s': %w", communityID, err)
 	}
 
-	return community, c, nil
+	return community, statusCommunityLinkPreviews, nil
 }
 
 func (u *StatusUnfurler) buildChannelData(channelUUID string, communityID string, communityShard *shard.Shard) (*common.StatusCommunityChannelLinkPreview, error) {
