@@ -27,7 +27,9 @@ const (
 	SignTransactionMethodName = "eth_signTransaction"
 
 	// SignTypedDataMethodName https://docs.walletconnect.com/advanced/rpc-reference/ethereum-rpc#eth_signtypeddata
-	SignTypedDataMethodName = "eth_signTypedData"
+	SignTypedDataMethodName   = "eth_signTypedData"
+	SignTypedDataV3MethodName = "eth_signTypedData_v3"
+	SignTypedDataV4MethodName = "eth_signTypedData_v4"
 
 	WalletSwitchEthereumChainMethodName = "wallet_switchEthereumChain"
 
