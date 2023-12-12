@@ -2251,8 +2251,6 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
 		Description: "status community description",
 	}
 
-	inviteMessage := "invite to community testing message"
-
 	// Create an community chat
 	response, err := s.bob.CreateCommunity(description, true)
 	s.Require().NoError(err)
@@ -2287,41 +2285,13 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
 	err = s.bob.communitiesManager.SaveCommunity(community)
 	s.Require().NoError(err)
 
-	response, err = s.bob.ShareCommunity(
-		&requests.ShareCommunity{
-			CommunityID:   community.ID(),
-			Users:         []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
-			InviteMessage: inviteMessage,
-		},
-	)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Messages(), 1)
+	advertiseCommunityToUserOldWay(&s.Suite, community, s.bob, s.alice)
 
 	// Add bob to contacts so it does not go on activity center
 	bobPk := common.PubkeyToHex(&s.bob.identity.PublicKey)
 	request := &requests.AddContact{ID: bobPk}
 	_, err = s.alice.AddContact(context.Background(), request)
 	s.Require().NoError(err)
-
-	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.messages) == 0 {
-			return errors.New("community link not received")
-		}
-		return nil
-	})
-
-	s.Require().NoError(err)
-	s.Require().Len(response.Messages(), 1)
-
-	message := response.Messages()[0]
-	s.Require().Equal(community.IDString(), message.CommunityID)
-	s.Require().Equal(inviteMessage, message.Text)
 
 	// Alice should have the Joined status for the community
 	communityInResponse := response.Communities()[0]
