@@ -17,14 +17,26 @@ func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 	require.NoError(t, err)
 
 	return &Manager{
-			db:             db,
-			RPCClient:      nil,
-			contractMaker:  nil,
-			networkManager: nil,
-			stores:         nil,
+			db:                db,
+			RPCClient:         nil,
+			contractMaker:     nil,
+			networkManager:    nil,
+			stores:            nil,
+			communityTokensDB: nil,
 		}, func() {
 			require.NoError(t, db.Close())
 		}
+}
+
+func upsertCommunityToken(t *testing.T, token *Token, manager *Manager) {
+	require.NotNil(t, token.CommunityData)
+
+	err := manager.UpsertCustom(*token)
+	require.NoError(t, err)
+
+	// Community ID is only discovered by calling contract, so must be updated manually
+	_, err = manager.db.Exec("UPDATE tokens SET community_id = ? WHERE address = ?", token.CommunityData.ID, token.Address)
+	require.NoError(t, err)
 }
 
 func TestCustoms(t *testing.T) {
@@ -57,6 +69,50 @@ func TestCustoms(t *testing.T) {
 	rst, err = manager.GetCustoms(false)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(rst))
+}
+
+func TestCommunityTokens(t *testing.T) {
+	manager, stop := setupTestTokenDB(t)
+	defer stop()
+
+	rst, err := manager.GetCustoms(true)
+	require.NoError(t, err)
+	require.Nil(t, rst)
+
+	token := Token{
+		Address:  common.Address{1},
+		Name:     "Zilliqa",
+		Symbol:   "ZIL",
+		Decimals: 12,
+		ChainID:  777,
+	}
+
+	err = manager.UpsertCustom(token)
+	require.NoError(t, err)
+
+	communityToken := Token{
+		Address:  common.Address{2},
+		Name:     "Communitia",
+		Symbol:   "COM",
+		Decimals: 12,
+		ChainID:  777,
+		CommunityData: &CommunityData{
+			ID: "random_community_id",
+		},
+	}
+
+	upsertCommunityToken(t, &communityToken, manager)
+
+	rst, err = manager.GetCustoms(false)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(rst))
+	require.Equal(t, token, *rst[0])
+	require.Equal(t, communityToken, *rst[1])
+
+	rst, err = manager.GetCustoms(true)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rst))
+	require.Equal(t, communityToken, *rst[0])
 }
 
 func toTokenMap(tokens []*Token) storeMap {

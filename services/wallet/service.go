@@ -45,6 +45,7 @@ const (
 func NewService(
 	db *sql.DB,
 	accountsDB *accounts.Database,
+	appDB *sql.DB,
 	rpcClient *rpc.Client,
 	accountFeed *event.Feed,
 	settingsFeed *event.Feed,
@@ -96,7 +97,7 @@ func NewService(
 	})
 
 	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
-	tokenManager := token.NewTokenManager(db, rpcClient, rpcClient.NetworkManager)
+	tokenManager := token.NewTokenManager(db, rpcClient, rpcClient.NetworkManager, appDB)
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(db, gethManager, transactor, config, accountsDB, pendingTxManager, feed)
 	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountFeed, feed, transactionManager, pendingTxManager,
