@@ -100,6 +100,7 @@
 // 1701084317_add_mnemonic_was_not_shown_to_settings.up.sql (87B)
 // 1701444172_token_preferences.up.sql (511B)
 // 1701961850_shards_test.up.sql (1.276kB)
+// 1702395750_fix_enr_shards_test.up.sql (1.234kB)
 // doc.go (74B)
 // report.xml (266B)
 
@@ -2105,7 +2106,7 @@ func _1701084316_add_wallet_was_not_shown_to_keypairs_accountsUpSql() (*asset, e
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1701084316_add_wallet_was_not_shown_to_keypairs_accounts.up.sql", size: 95, mode: os.FileMode(0664), modTime: time.Unix(1702046611, 0)}
+	info := bindataFileInfo{name: "1701084316_add_wallet_was_not_shown_to_keypairs_accounts.up.sql", size: 95, mode: os.FileMode(0664), modTime: time.Unix(1702396886, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x23, 0xe, 0x28, 0xdd, 0x95, 0xfb, 0xf4, 0xd2, 0xf4, 0xed, 0xd4, 0xdf, 0x14, 0xde, 0xa, 0x53, 0x60, 0x3, 0xa5, 0xbc, 0xd6, 0xdb, 0x7b, 0xd5, 0x62, 0x1c, 0xc3, 0xc6, 0xae, 0x8e, 0x4d, 0x85}}
 	return a, nil
 }
@@ -2125,7 +2126,7 @@ func _1701084317_add_mnemonic_was_not_shown_to_settingsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1701084317_add_mnemonic_was_not_shown_to_settings.up.sql", size: 87, mode: os.FileMode(0664), modTime: time.Unix(1702046611, 0)}
+	info := bindataFileInfo{name: "1701084317_add_mnemonic_was_not_shown_to_settings.up.sql", size: 87, mode: os.FileMode(0664), modTime: time.Unix(1702396886, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x90, 0xcd, 0xc9, 0x6b, 0x4, 0x7, 0xec, 0x71, 0x55, 0x7a, 0xce, 0x2f, 0xa4, 0xd3, 0xfb, 0x58, 0xcc, 0x5a, 0xa0, 0x19, 0xb1, 0x85, 0xb8, 0xa6, 0xcd, 0xcd, 0x5a, 0x5c, 0xa3, 0x39, 0xe5, 0x8e}}
 	return a, nil
 }
@@ -2145,7 +2146,7 @@ func _1701444172_token_preferencesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1701444172_token_preferences.up.sql", size: 511, mode: os.FileMode(0664), modTime: time.Unix(1702046611, 0)}
+	info := bindataFileInfo{name: "1701444172_token_preferences.up.sql", size: 511, mode: os.FileMode(0664), modTime: time.Unix(1702396886, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x49, 0xe, 0x76, 0xb9, 0x1d, 0xd4, 0xf0, 0xa, 0x12, 0xd3, 0x3, 0x42, 0x1, 0x4, 0x25, 0x93, 0xab, 0xb8, 0x30, 0xff, 0x12, 0x91, 0x1e, 0xc1, 0x1a, 0x7a, 0xf8, 0xc5, 0xbc, 0x3e, 0x29, 0x5a}}
 	return a, nil
 }
@@ -2165,8 +2166,28 @@ func _1701961850_shards_testUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1701961850_shards_test.up.sql", size: 1276, mode: os.FileMode(0664), modTime: time.Unix(1702046763, 0)}
+	info := bindataFileInfo{name: "1701961850_shards_test.up.sql", size: 1276, mode: os.FileMode(0664), modTime: time.Unix(1702395723, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x72, 0x86, 0x27, 0x90, 0xff, 0x69, 0x70, 0xe4, 0xe3, 0x38, 0x57, 0x4b, 0x47, 0x33, 0xfb, 0xcd, 0xe2, 0xc9, 0x87, 0xd9, 0x6c, 0x92, 0xc3, 0x90, 0xf1, 0x4c, 0x41, 0xdc, 0x39, 0x16, 0x2a, 0x69}}
+	return a, nil
+}
+
+var __1702395750_fix_enr_shards_testUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xb4\xd1\xbb\xae\xaa\x58\x00\xc6\xf1\x7e\x3f\x85\xb1\x3a\x27\xd9\x26\x5c\x15\x67\x32\xc5\x92\xeb\x42\x58\x08\x72\x5b\x34\x06\x58\x08\xc8\x4d\x05\x44\x78\xfa\xc9\xd9\xd5\xec\x6a\x92\xc9\x99\xe6\xeb\xbe\xe6\xff\x93\x64\x43\x76\xe5\x95\xe2\x58\xe6\x2a\xad\xc7\x7e\xc8\x9e\x97\xb6\x23\x59\xbf\x0a\x34\xd9\x91\x57\xc3\x7c\xcf\x56\x7f\xad\xd6\xa4\xec\x53\x9f\x4f\xba\x6e\x58\xff\xf9\xf1\x01\xd1\x59\x76\xdc\x15\x44\xae\xf5\xfd\xf5\xe3\xd7\x7e\x7e\xbd\x3e\x57\xfd\xdc\x0e\x45\x36\x94\xe9\xa5\x24\x3f\x3f\x7c\x60\x78\xf2\x79\xf5\x63\x9d\xb5\xcf\x3f\x36\x68\xe6\x6c\xa8\x12\xed\xf9\x64\x6d\x5b\x9c\xd5\xe5\xd9\x51\x4d\x9d\xe9\x71\x40\x0a\x0c\x39\x47\x8f\x4a\xe9\x7d\x71\xaf\x94\xdb\x9e\x2d\xc4\xa2\xbb\x7e\xa2\xea\x9d\x5b\xb1\xef\x6b\xa6\x3f\x54\xb1\x82\x99\x6c\x7b\xb4\x97\x56\x93\xb8\x6d\xc6\x31\x11\xb9\x21\x3f\x08\x4a\x84\x0f\x79\x53\x57\x79\x8b\xa9\xbc\xa9\xa7\xe2\x48\x6e\xf2\xbc\x39\x26\xa1\xdf\x13\xb5\x2e\x22\xd5\x99\xd3\xad\x00\x0c\x17\x77\xb8\xd9\xbf\x88\x48\x4d\xe6\x99\xaf\x92\x99\x2e\x92\xd0\x5c\x8c\x16\x75\x38\xd4\xab\x74\xe6\xa9\x28\x44\x94\xd1\x22\x0a\x87\x0e\x9d\x32\xf5\x60\x34\x7c\x4d\x40\xc4\x84\x9c\x3e\xa7\x5c\x0f\x64\x60\x03\x08\x0e\xe0\x6b\x60\xbd\x44\x01\x9a\xcc\x9b\xc7\xc4\x8b\x5a\x80\x61\x4b\x25\x8e\x27\x77\x1a\x1a\x8d\xba\xed\x4d\x9a\xe9\x3d\xe6\x04\xed\xe9\x30\x5d\x0d\xa8\x0b\xf1\x25\x3a\xc9\x98\xd9\x38\x6d\x95\xb3\xce\x2d\x85\x3a\x13\x72\x88\x8e\x34\x51\x84\x73\xa9\x10\x46\x79\x12\x17\xa2\xf5\xe7\x3f\xcb\x7f\xae\x4b\xb2\xfe\xf9\x5b\xfa\x5b\x31\x67\x1b\xef\xcb\xfc\x3e\x05\xe1\x1d\x08\xc1\xde\xd5\x2b\x2d\x49\x6e\xdb\x22\x4b\xb7\xce\x31\xc8\xc3\xaa\xdb\x29\x6f\xb6\x80\xe9\x89\x08\x9e\x17\xb6\x85\xc6\x9e\x4f\xdb\x8c\xd6\x6f\x74\x73\x3c\xe4\x53\xd0\x1c\x39\xb2\x0d\x13\xab\xb2\xa9\xcc\x2a\xf6\xec\x24\xbc\x53\xca\xec\xbe\xf7\x17\x8f\x9a\xe4\x67\xdf\xfb\xef\x72\x0e\x48\x98\x31\x03\xfd\x95\xb0\xf6\x60\x4a\xf2\x18\x31\xe6\x40\x42\x73\xc0\x8c\x3f\x12\x4d\x2f\x12\x49\x1e\xf0\x99\x5f\x62\x55\x99\x23\xcd\x1c\x89\xea\x2f\x44\xe4\x17\xa2\x2a\x14\x09\xd1\x3d\x39\xf3\x63\x14\xda\x2a\xa9\x37\x62\xda\x5a\x06\x38\x00\x19\x88\x00\xd8\x5f\x23\xea\x29\xe3\xdf\x52\x09\xd2\xa8\xe9\xdf\x9d\x6d\xa8\xd6\x03\x20\xc9\x49\x74\x05\x6e\x8f\x7e\xe1\x5e\xb1\x29\x35\xee\x3e\x65\x3c\xeb\xb8\x64\x89\xef\xd3\x99\xfd\x64\xe5\xe5\x61\x73\x88\xc2\xac\x28\x92\x7a\x23\x91\xc0\x99\xf2\xd2\xec\x8a\x90\x14\x31\xeb\xcd\x92\xfd\xbf\x6a\xa0\xf2\xd5\x7b\x58\x82\xc9\xf4\xb8\x46\x8d\xa2\x94\x1b\x81\x19\x1b\xc8\xdf\xe3\x6b\x71\x45\xe5\xa3\xba\x75\x37\x8d\xa6\x38\xe5\x85\x60\x51\x9d\xa0\x55\xe3\xfd\xb5\x11\xd4\x2d\xc7\x46\xd6\xe3\x95\x4f\x05\xe4\xcf\x21\x3f\xa6\x59\xa5\x2b\x55\x57\x27\x42\x50\xed\xec\xef\x1a\xe0\x16\x2b\xd4\xfc\xaf\x1a\x38\xf8\x25\xc1\x0d\xb1\xba\x1f\x23\x66\x78\x25\x4d\x3a\xe0\xf9\x77\x69\x98\x97\x5e\x1f\x54\x97\xcf\xbb\x16\x70\x9e\xb7\x14\x2d\x43\x76\x86\x8d\xf7\xcb\x80\x85\xba\x33\x40\x7c\xae\x68\xed\xe8\x3f\x47\x0c\xff\x83\xc6\xdf\x01\x00\x00\xff\xff\x47\xca\xf8\xab\xd2\x04\x00\x00")
+
+func _1702395750_fix_enr_shards_testUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1702395750_fix_enr_shards_testUpSql,
+		"1702395750_fix_enr_shards_test.up.sql",
+	)
+}
+
+func _1702395750_fix_enr_shards_testUpSql() (*asset, error) {
+	bytes, err := _1702395750_fix_enr_shards_testUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1702395750_fix_enr_shards_test.up.sql", size: 1234, mode: os.FileMode(0664), modTime: time.Unix(1702396887, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9b, 0x99, 0xd8, 0xc9, 0xe0, 0xf0, 0xe1, 0xf1, 0x77, 0xf, 0x5f, 0x97, 0xfc, 0x54, 0xd4, 0x8d, 0xc1, 0xa4, 0xbb, 0x4f, 0x5c, 0x50, 0x5d, 0xef, 0xb2, 0xa3, 0xc1, 0x13, 0x2, 0xbd, 0x9, 0x30}}
 	return a, nil
 }
 
@@ -2185,7 +2206,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 74, mode: os.FileMode(0664), modTime: time.Unix(1663713040, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 74, mode: os.FileMode(0664), modTime: time.Unix(1702396846, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xde, 0x7c, 0x28, 0xcd, 0x47, 0xf2, 0xfa, 0x7c, 0x51, 0x2d, 0xd8, 0x38, 0xb, 0xb0, 0x34, 0x9d, 0x4c, 0x62, 0xa, 0x9e, 0x28, 0xc3, 0x31, 0x23, 0xd9, 0xbb, 0x89, 0x9f, 0xa0, 0x89, 0x1f, 0xe8}}
 	return a, nil
 }
@@ -2501,6 +2522,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1701961850_shards_test.up.sql": _1701961850_shards_testUpSql,
 
+	"1702395750_fix_enr_shards_test.up.sql": _1702395750_fix_enr_shards_testUpSql,
+
 	"doc.go": docGo,
 
 	"report.xml": reportXml,
@@ -2647,6 +2670,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1701084317_add_mnemonic_was_not_shown_to_settings.up.sql":                 &bintree{_1701084317_add_mnemonic_was_not_shown_to_settingsUpSql, map[string]*bintree{}},
 	"1701444172_token_preferences.up.sql":                                      &bintree{_1701444172_token_preferencesUpSql, map[string]*bintree{}},
 	"1701961850_shards_test.up.sql":                                            &bintree{_1701961850_shards_testUpSql, map[string]*bintree{}},
+	"1702395750_fix_enr_shards_test.up.sql":                                    &bintree{_1702395750_fix_enr_shards_testUpSql, map[string]*bintree{}},
 	"doc.go":                                                                   &bintree{docGo, map[string]*bintree{}},
 	"report.xml":                                                               &bintree{reportXml, map[string]*bintree{}},
 }}
