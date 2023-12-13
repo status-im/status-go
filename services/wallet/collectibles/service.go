@@ -29,6 +29,7 @@ const (
 	EventCollectiblesOwnershipUpdateFinished          walletevent.EventType = "wallet-collectibles-ownership-update-finished"
 	EventCollectiblesOwnershipUpdateFinishedWithError walletevent.EventType = "wallet-collectibles-ownership-update-finished-with-error"
 	EventCommunityCollectiblesReceived                walletevent.EventType = "wallet-collectibles-community-collectibles-received"
+	EventCollectiblesDataUpdated                      walletevent.EventType = "wallet-collectibles-data-updated"
 
 	EventOwnedCollectiblesFilteringDone walletevent.EventType = "wallet-owned-collectibles-filtering-done"
 	EventGetCollectiblesDetailsDone     walletevent.EventType = "wallet-get-collectibles-details-done"
@@ -76,6 +77,7 @@ type Service struct {
 	communityManager *community.Manager
 	walletFeed       *event.Feed
 	scheduler        *async.MultiClientScheduler
+	group            *async.Group
 }
 
 func NewService(
@@ -95,6 +97,7 @@ func NewService(
 		communityManager: communityManager,
 		walletFeed:       walletFeed,
 		scheduler:        async.NewMultiClientScheduler(),
+		group:            async.NewGroup(context.Background()),
 	}
 	s.controller.SetReceivedCollectiblesCb(s.notifyCommunityCollectiblesReceived)
 	return s
@@ -380,136 +383,32 @@ func (s *Service) collectibleIDsToDataType(ctx context.Context, ids []thirdparty
 	case CollectibleDataTypeUniqueID:
 		return idsToCollectibles(ids), nil
 	case CollectibleDataTypeHeader, CollectibleDataTypeDetails, CollectibleDataTypeCommunityHeader:
-		collectibles, err := s.manager.FetchAssetsByCollectibleUniqueID(ctx, ids)
+		collectibles, err := s.manager.FetchAssetsByCollectibleUniqueID(ctx, ids, true)
 		if err != nil {
 			return nil, err
 		}
 		switch dataType {
 		case CollectibleDataTypeHeader:
-			return s.fullCollectiblesDataToHeaders(collectibles)
+			return fullCollectiblesDataToHeaders(collectibles), nil
 		case CollectibleDataTypeDetails:
-			return s.fullCollectiblesDataToDetails(collectibles)
+			return fullCollectiblesDataToDetails(collectibles), nil
 		case CollectibleDataTypeCommunityHeader:
-			return s.fullCollectiblesDataToCommunityHeader(collectibles)
+			return fullCollectiblesDataToCommunityHeader(collectibles), nil
 		}
 	}
 	return nil, errors.New("unknown data type")
 }
 
-func idsToCollectibles(ids []thirdparty.CollectibleUniqueID) []Collectible {
-	res := make([]Collectible, 0, len(ids))
-
-	for _, id := range ids {
-		c := idToCollectible(id)
-		res = append(res, c)
-	}
-
-	return res
-}
-
-func (s *Service) fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibleData) ([]Collectible, error) {
-	res := make([]Collectible, 0, len(data))
-
-	for _, c := range data {
-		header := fullCollectibleDataToHeader(c)
-
-		ownership, err := s.ownershipDB.GetOwnership(c.CollectibleData.ID)
-		if err != nil {
-			return nil, err
-		}
-		header.Ownership = ownership
-
-		if c.CollectibleData.CommunityID != "" {
-			communityInfo, _, err := s.communityManager.GetCommunityInfo(c.CollectibleData.CommunityID)
-			if err != nil {
-				return nil, err
-			}
-
-			communityData := communityInfoToData(c.CollectibleData.CommunityID, communityInfo, c.CommunityInfo)
-			header.CommunityData = &communityData
-		}
-
-		res = append(res, header)
-	}
-
-	return res, nil
-}
-
-func (s *Service) fullCollectiblesDataToDetails(data []thirdparty.FullCollectibleData) ([]Collectible, error) {
-	res := make([]Collectible, 0, len(data))
-
-	for _, c := range data {
-		details := fullCollectibleDataToDetails(c)
-
-		ownership, err := s.ownershipDB.GetOwnership(c.CollectibleData.ID)
-		if err != nil {
-			return nil, err
-		}
-		details.Ownership = ownership
-
-		if c.CollectibleData.CommunityID != "" {
-			communityInfo, _, err := s.communityManager.GetCommunityInfo(c.CollectibleData.CommunityID)
-			if err != nil {
-				return nil, err
-			}
-
-			communityData := communityInfoToData(c.CollectibleData.CommunityID, communityInfo, c.CommunityInfo)
-			details.CommunityData = &communityData
-		}
-
-		res = append(res, details)
-	}
-
-	return res, nil
-}
-
-func (s *Service) fullCollectiblesDataToCommunityHeader(data []thirdparty.FullCollectibleData) ([]Collectible, error) {
-	res := make([]Collectible, 0, len(data))
-
-	for _, c := range data {
-		collectibleID := c.CollectibleData.ID
-		communityID := c.CollectibleData.CommunityID
-
-		if communityID == "" {
-			continue
-		}
-
-		communityInfo, _, err := s.communityManager.GetCommunityInfo(communityID)
-		if err != nil {
-			log.Error("Error fetching community info", "error", err)
-			continue
-		}
-
-		communityData := communityInfoToData(communityID, communityInfo, c.CommunityInfo)
-
-		header := Collectible{
-			ID: collectibleID,
-			CollectibleData: &CollectibleData{
-				Name: c.CollectibleData.Name,
-			},
-			CommunityData: &communityData,
-		}
-
-		res = append(res, header)
-	}
-
-	return res, nil
-}
-
 func (s *Service) notifyCommunityCollectiblesReceived(ownedCollectibles OwnedCollectibles) {
 	ctx := context.Background()
 
-	collectiblesData, err := s.manager.FetchAssetsByCollectibleUniqueID(ctx, ownedCollectibles.ids)
+	collectiblesData, err := s.manager.FetchAssetsByCollectibleUniqueID(ctx, ownedCollectibles.ids, false)
 	if err != nil {
 		log.Error("Error fetching collectibles data", "error", err)
 		return
 	}
 
-	communityCollectibles, err := s.fullCollectiblesDataToCommunityHeader(collectiblesData)
-	if err != nil {
-		log.Error("Error converting received collectibles data", "error", err)
-		return
-	}
+	communityCollectibles := fullCollectiblesDataToCommunityHeader(collectiblesData)
 
 	if len(communityCollectibles) == 0 {
 		return

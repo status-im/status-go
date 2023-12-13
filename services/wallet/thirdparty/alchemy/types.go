@@ -194,6 +194,7 @@ func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty
 		ImageURL:     c.Image.ImageURL,
 		AnimationURL: c.Image.CachedAnimationURL,
 		Traits:       alchemyToCollectibleTraits(rawMetadata.Attributes),
+		TokenURI:     c.TokenURI,
 	}
 }
 
