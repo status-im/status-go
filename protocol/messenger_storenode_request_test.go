@@ -27,11 +27,10 @@ import (
 )
 
 const (
-	localFleet                = "local-test-fleet-1"
-	localMailserverID         = "local-test-mailserver"
-	storeNodeConnectTimeout   = 500 * time.Millisecond
-	messageRetrieveLoopPeriod = 1000 * time.Millisecond
-	runLocalTests             = false
+	localFleet              = "local-test-fleet-1"
+	localMailserverID       = "local-test-mailserver"
+	storeNodeConnectTimeout = 500 * time.Millisecond
+	runLocalTests           = false
 )
 
 func TestMessengerStoreNodeRequestSuite(t *testing.T) {
@@ -101,7 +100,6 @@ func (s *MessengerStoreNodeRequestSuite) createBob() {
 
 	messengerLogger := s.logger.Named("bob-messenger")
 	s.bob = s.newMessenger(s.bobWaku, messengerLogger, s.storeNodeAddress)
-	s.bob.StartRetrieveMessagesLoop(messageRetrieveLoopPeriod, nil)
 }
 
 func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *zap.Logger, mailserverAddress string) *Messenger {
@@ -300,15 +298,13 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestBigCommunity() {
 	s.bob, err = newMessengerWithKey(userWaku, privateKey, messengerLogger, options)
 	s.Require().NoError(err)
 
-	s.bob.StartRetrieveMessagesLoop(messageRetrieveLoopPeriod, s.cancel)
-
 	fetchedCommunity, stats, err := s.bob.storeNodeRequestsManager.FetchCommunity(communityShard, true)
 
 	s.Require().NoError(err)
 	s.Require().NotNil(fetchedCommunity)
 	s.Require().Equal(communityID, fetchedCommunity.IDString())
 
-	s.Require().Equal(1, stats.FetchedEnvelopesCount)
+	s.Require().Equal(initialStoreNodeRequestPageSize, stats.FetchedEnvelopesCount)
 	s.Require().Equal(1, stats.FetchedPagesCount)
 }
 

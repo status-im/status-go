@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	storeNodeAvailableTimeout = 5 * time.Second
+	storeNodeAvailableTimeout = 30 * time.Second
 )
 
 // FetchCommunityStats is used in tests
@@ -216,7 +216,7 @@ func (r *storeNodeRequest) finalize() {
 	r.manager.activeRequestsLock.Lock()
 	defer r.manager.activeRequestsLock.Unlock()
 
-	r.manager.logger.Debug("request finished",
+	r.manager.logger.Info("request finished",
 		zap.String("communityID", r.communityID),
 		zap.Bool("communityFound", r.result.community != nil),
 		zap.Error(r.result.err))
@@ -279,6 +279,12 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 }
 
 func (r *storeNodeRequest) routine() {
+	r.manager.logger.Info("starting store node request",
+		zap.String("communityID", r.communityID),
+		zap.String("pubsubTopic", r.pubsubTopic),
+		zap.Any("contentTopic", r.contentTopic),
+	)
+
 	// Return a nil community and no error when request was
 	// performed successfully, but no community found.
 	r.result = fetchCommunityResult{
