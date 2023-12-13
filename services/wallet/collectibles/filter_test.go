@@ -35,8 +35,8 @@ func TestFilterOwnedCollectibles(t *testing.T) {
 	cDB := NewCollectibleDataDB(db)
 
 	const nData = 50
-	data := generateTestCollectiblesData(nData)
-	communityData := generateTestCommunityData(nData)
+	data := thirdparty.GenerateTestCollectiblesData(nData)
+	communityData := thirdparty.GenerateTestCollectiblesCommunityData(nData)
 
 	ownerAddresses := []common.Address{
 		common.HexToAddress("0x1234"),

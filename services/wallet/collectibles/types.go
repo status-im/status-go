@@ -47,6 +47,17 @@ func idToCollectible(id thirdparty.CollectibleUniqueID) Collectible {
 	return ret
 }
 
+func idsToCollectibles(ids []thirdparty.CollectibleUniqueID) []Collectible {
+	res := make([]Collectible, 0, len(ids))
+
+	for _, id := range ids {
+		c := idToCollectible(id)
+		res = append(res, c)
+	}
+
+	return res
+}
+
 func fullCollectibleDataToHeader(c thirdparty.FullCollectibleData) Collectible {
 	ret := Collectible{
 		DataType: CollectibleDataTypeHeader,
@@ -66,13 +77,28 @@ func fullCollectibleDataToHeader(c thirdparty.FullCollectibleData) Collectible {
 			ImageURL: c.CollectionData.ImageURL,
 		}
 	}
-
+	if c.CollectibleData.CommunityID != "" {
+		communityData := communityInfoToData(c.CollectibleData.CommunityID, c.CommunityInfo, c.CollectibleCommunityInfo)
+		ret.CommunityData = &communityData
+	}
+	ret.Ownership = c.Ownership
 	return ret
+}
+
+func fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibleData) []Collectible {
+	res := make([]Collectible, 0, len(data))
+
+	for _, c := range data {
+		header := fullCollectibleDataToHeader(c)
+		res = append(res, header)
+	}
+
+	return res
 }
 
 func fullCollectibleDataToDetails(c thirdparty.FullCollectibleData) Collectible {
 	ret := Collectible{
-		DataType: CollectibleDataTypeHeader,
+		DataType: CollectibleDataTypeDetails,
 		ID:       c.CollectibleData.ID,
 		CollectibleData: &CollectibleData{
 			Name:               c.CollectibleData.Name,
@@ -91,7 +117,51 @@ func fullCollectibleDataToDetails(c thirdparty.FullCollectibleData) Collectible 
 			ImageURL: c.CollectionData.ImageURL,
 		}
 	}
+	if c.CollectibleData.CommunityID != "" {
+		communityData := communityInfoToData(c.CollectibleData.CommunityID, c.CommunityInfo, c.CollectibleCommunityInfo)
+		ret.CommunityData = &communityData
+	}
+	ret.Ownership = c.Ownership
 	return ret
+}
+
+func fullCollectiblesDataToDetails(data []thirdparty.FullCollectibleData) []Collectible {
+	res := make([]Collectible, 0, len(data))
+
+	for _, c := range data {
+		details := fullCollectibleDataToDetails(c)
+		res = append(res, details)
+	}
+
+	return res
+}
+
+func fullCollectiblesDataToCommunityHeader(data []thirdparty.FullCollectibleData) []Collectible {
+	res := make([]Collectible, 0, len(data))
+
+	for _, c := range data {
+		collectibleID := c.CollectibleData.ID
+		communityID := c.CollectibleData.CommunityID
+
+		if communityID == "" {
+			continue
+		}
+
+		communityData := communityInfoToData(communityID, c.CommunityInfo, c.CollectibleCommunityInfo)
+
+		header := Collectible{
+			ID: collectibleID,
+			CollectibleData: &CollectibleData{
+				Name: c.CollectibleData.Name,
+			},
+			CommunityData: &communityData,
+			Ownership:     c.Ownership,
+		}
+
+		res = append(res, header)
+	}
+
+	return res
 }
 
 func communityInfoToData(communityID string, community *thirdparty.CommunityInfo, communityCollectible *thirdparty.CollectibleCommunityInfo) CommunityData {
