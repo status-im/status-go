@@ -101,6 +101,20 @@ type SessionDelete struct {
 	Topic Topic `json:"topic"`
 }
 
+type Session struct {
+	Acknowledged       bool                 `json:"acknowledged"`
+	Controller         string               `json:"controller"`
+	Expiry             int64                `json:"expiry"`
+	Namespaces         map[string]Namespace `json:"namespaces"`
+	OptionalNamespaces map[string]Namespace `json:"optionalNamespaces"`
+	PairingTopic       Topic                `json:"pairingTopic"`
+	Peer               Proposer             `json:"peer"`
+	Relay              json.RawMessage      `json:"relay"`
+	RequiredNamespaces map[string]Namespace `json:"requiredNamespaces"`
+	Self               Proposer             `json:"self"`
+	Topic              Topic                `json:"topic"`
+}
+
 // Valid namespace
 func (n *Namespace) Valid(namespaceName string, chainID *uint64) bool {
 	if chainID == nil {
