@@ -9,13 +9,14 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+
 	gowakuPersistence "github.com/waku-org/go-waku/waku/persistence"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
-	"google.golang.org/protobuf/proto"
 
 	"go.uber.org/zap"
 )
