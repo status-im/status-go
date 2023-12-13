@@ -26,9 +26,10 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/status-im/status-go/wakuv2/common"
 
