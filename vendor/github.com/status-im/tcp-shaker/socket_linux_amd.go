@@ -17,10 +17,8 @@ const maxEpollEvents = 32
 func createSocketZeroLinger(zeroLinger bool) (fd int, err error) {
 	// Create socket
 	fd, err = _createNonBlockingSocket()
-	if err == nil {
-		if zeroLinger {
-			err = _setZeroLinger(fd)
-		}
+	if err == nil && zeroLinger {
+		err = _setZeroLinger(fd)
 	}
 	return
 }

@@ -935,7 +935,7 @@ github.com/status-im/rendezvous/server
 # github.com/status-im/status-go/extkeys v1.1.2
 ## explicit; go 1.13
 github.com/status-im/status-go/extkeys
-# github.com/status-im/tcp-shaker v1.1.0-status.0.20231031102228-6293bd9dbf4a
+# github.com/status-im/tcp-shaker v1.1.1-status
 ## explicit; go 1.13
 github.com/status-im/tcp-shaker
 # github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857

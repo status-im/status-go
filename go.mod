@@ -53,7 +53,7 @@ require (
 	github.com/status-im/migrate/v4 v4.6.2-status.3
 	github.com/status-im/rendezvous v1.3.7
 	github.com/status-im/status-go/extkeys v1.1.2
-	github.com/status-im/tcp-shaker v1.1.0-status.0.20231031102228-6293bd9dbf4a
+	github.com/status-im/tcp-shaker v1.1.1-status
 	github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
 	github.com/stretchr/testify v1.8.4
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a
