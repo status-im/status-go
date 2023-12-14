@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"math/big"
 	"net/http"
 	"strings"
@@ -27,7 +26,6 @@ import (
 )
 
 const requestTimeout = 5 * time.Second
-const failedCommunityFetchRetryDelay = 1 * time.Hour
 
 const hystrixContractOwnershipClientName = "contractOwnershipClient"
 
@@ -56,13 +54,12 @@ type Manager struct {
 	collectibleDataProviders   []thirdparty.CollectibleDataProvider
 	collectionDataProviders    []thirdparty.CollectionDataProvider
 	collectibleProviders       []thirdparty.CollectibleProvider
-	communityInfoProvider      thirdparty.CollectibleCommunityInfoProvider
 
 	httpClient *http.Client
 
 	collectiblesDataDB *CollectibleDataDB
 	collectionsDataDB  *CollectionDataDB
-	communityDataDB    *community.DataDB
+	communityManager   *community.Manager
 
 	statuses       map[string]*connection.Status
 	statusNotifier *connection.StatusNotifier
@@ -71,6 +68,7 @@ type Manager struct {
 func NewManager(
 	db *sql.DB,
 	rpcClient *rpc.Client,
+	communityManager *community.Manager,
 	contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider,
 	accountOwnershipProviders []thirdparty.CollectibleAccountOwnershipProvider,
 	collectibleDataProviders []thirdparty.CollectibleDataProvider,
@@ -136,7 +134,7 @@ func NewManager(
 		},
 		collectiblesDataDB: NewCollectibleDataDB(db),
 		collectionsDataDB:  NewCollectionDataDB(db),
-		communityDataDB:    community.NewDataDB(db),
+		communityManager:   communityManager,
 		statuses:           statuses,
 		statusNotifier:     statusNotifier,
 	}
@@ -196,11 +194,6 @@ func (o *Manager) doContentTypeRequest(ctx context.Context, url string) (string,
 	}()
 
 	return resp.Header.Get("Content-Type"), nil
-}
-
-// Used to break circular dependency, call once as soon as possible after initialization
-func (o *Manager) SetCommunityInfoProvider(communityInfoProvider thirdparty.CollectibleCommunityInfoProvider) {
-	o.communityInfoProvider = communityInfoProvider
 }
 
 // Need to combine different providers to support all needed ChainIDs
@@ -611,65 +604,22 @@ func (o *Manager) fillCommunityID(asset *thirdparty.FullCollectibleData) error {
 
 	communityID := ""
 	if tokenURI != "" {
-		communityID = o.communityInfoProvider.GetCommunityID(tokenURI)
+		communityID = o.communityManager.GetCommunityID(tokenURI)
 	}
 
 	asset.CollectibleData.CommunityID = communityID
 	return nil
 }
 
-func (o *Manager) mustFetchCommunityInfo(communityID string) bool {
-	// See if we have cached data
-	_, state, err := o.communityDataDB.GetCommunityInfo(communityID)
-	if err != nil {
-		return true
-	}
-
-	// If we don't have a state, this community has never been fetched before
-	if state == nil {
-		return true
-	}
-
-	// If the last fetch was successful, we can safely refresh our cache
-	if state.LastUpdateSuccesful {
-		return true
-	}
-
-	// If the last fetch was not successful, we should only retry after a delay
-	if time.Unix(int64(state.LastUpdateTimestamp), 0).Add(failedCommunityFetchRetryDelay).Before(time.Now()) {
-		return true
-	}
-
-	return false
-}
-
-func (o *Manager) fetchCommunityInfo(communityID string) (*thirdparty.CommunityInfo, error) {
-	if !o.mustFetchCommunityInfo(communityID) {
-		return nil, fmt.Errorf("backing off fetchCommunityInfo for id: %s", communityID)
-	}
-
-	communityInfo, err := o.communityInfoProvider.FetchCommunityInfo(communityID)
-	if err != nil {
-		dbErr := o.communityDataDB.SetCommunityInfo(communityID, nil)
-		if dbErr != nil {
-			log.Error("SetCommunityInfo failed", "communityID", communityID, "err", dbErr)
-		}
-		return nil, err
-	}
-
-	err = o.communityDataDB.SetCommunityInfo(communityID, communityInfo)
-	return communityInfo, err
-}
-
 func (o *Manager) fillCommunityInfo(communityID string, communityAssets []*thirdparty.FullCollectibleData) error {
-	communityInfo, err := o.fetchCommunityInfo(communityID)
+	communityInfo, err := o.communityManager.FetchCommunityInfo(communityID)
 	if err != nil {
 		return err
 	}
 
 	if communityInfo != nil {
 		for _, communityAsset := range communityAssets {
-			err := o.communityInfoProvider.FillCollectibleMetadata(communityAsset)
+			err := o.communityManager.FillCollectibleMetadata(communityAsset)
 			if err != nil {
 				return err
 			}

@@ -23,6 +23,7 @@ func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 			networkManager:    nil,
 			stores:            nil,
 			communityTokensDB: nil,
+			communityManager:  nil,
 		}, func() {
 			require.NoError(t, db.Close())
 		}

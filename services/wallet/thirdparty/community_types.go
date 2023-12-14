@@ -10,4 +10,7 @@ type CommunityInfo struct {
 type CommunityInfoProvider interface {
 	GetCommunityID(tokenURI string) string
 	FetchCommunityInfo(communityID string) (*CommunityInfo, error)
+
+	// Collectible-related methods
+	FillCollectibleMetadata(collectible *FullCollectibleData) error
 }

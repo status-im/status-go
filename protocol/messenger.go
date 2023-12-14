@@ -65,6 +65,7 @@ import (
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/telemetry"
@@ -459,7 +460,7 @@ func NewMessenger(
 	if c.tokenManager != nil {
 		managerOptions = append(managerOptions, communities.WithTokenManager(c.tokenManager))
 	} else if c.rpcClient != nil {
-		tokenManager := token.NewTokenManager(c.walletDb, c.rpcClient, c.rpcClient.NetworkManager, database)
+		tokenManager := token.NewTokenManager(c.walletDb, c.rpcClient, community.NewManager(database), c.rpcClient.NetworkManager, database)
 		managerOptions = append(managerOptions, communities.WithTokenManager(communities.NewDefaultTokenManager(tokenManager)))
 	}
 

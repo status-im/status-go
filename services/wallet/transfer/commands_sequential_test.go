@@ -29,6 +29,7 @@ import (
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
+	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 
@@ -932,7 +933,7 @@ func TestFindBlocksCommand(t *testing.T) {
 		}
 		client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 		client.SetClient(tc.NetworkID(), tc)
-		tokenManager := token.NewTokenManager(db, client, network.NewManager(appdb), appdb)
+		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb), network.NewManager(appdb), appdb)
 		tokenManager.SetTokens([]*token.Token{
 			{
 				Address:  tokenTXXAddress,
@@ -1054,7 +1055,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 
 	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, network.NewManager(appdb), appdb)
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb), network.NewManager(appdb), appdb)
 
 	tokenManager.SetTokens([]*token.Token{
 		{
@@ -1171,7 +1172,7 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 
 		client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 		client.SetClient(tc.NetworkID(), tc)
-		tokenManager := token.NewTokenManager(db, client, network.NewManager(appdb), appdb)
+		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb), network.NewManager(appdb), appdb)
 
 		tokenManager.SetTokens([]*token.Token{
 			{
@@ -1245,7 +1246,7 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 
 	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, network.NewManager(appdb), appdb)
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb), network.NewManager(appdb), appdb)
 
 	tokenManager.SetTokens([]*token.Token{
 		{
