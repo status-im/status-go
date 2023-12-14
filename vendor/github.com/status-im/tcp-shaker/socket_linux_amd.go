@@ -1,6 +1,5 @@
-//go:build linux && !(android && amd64)
-// +build linux
-// +build !android !amd64
+//go:build android && amd64
+// +build android,amd64
 
 package tcp
 
@@ -18,10 +17,8 @@ const maxEpollEvents = 32
 func createSocketZeroLinger(zeroLinger bool) (fd int, err error) {
 	// Create socket
 	fd, err = _createNonBlockingSocket()
-	if err == nil {
-		if zeroLinger {
-			err = _setZeroLinger(fd)
-		}
+	if err == nil && zeroLinger {
+		err = _setZeroLinger(fd)
 	}
 	return
 }
@@ -88,31 +85,48 @@ func registerEvents(pollerFd int, fd int) error {
 }
 
 func pollEvents(pollerFd int, timeout time.Duration) ([]event, error) {
-	var timeoutMS = int(timeout.Nanoseconds() / 1e6)
-	var epollEvents [maxEpollEvents]unix.EpollEvent
-	// this blocks, waiting for socket events
-	nEvents, err := unix.EpollWait(pollerFd, epollEvents[:], timeoutMS)
-	if err != nil {
-		if err == unix.EINTR {
-			return nil, nil
+	eventCh := make(chan event)
+	errorCh := make(chan error)
+	doneCh := make(chan bool)
+
+	go func(fd int) {
+		for {
+			select {
+			case <-doneCh:
+				return
+			default:
+				n, _, err := unix.Recvfrom(fd, nil, unix.MSG_DONTWAIT|unix.MSG_PEEK)
+				if err != nil && err != unix.EAGAIN && err != unix.EWOULDBLOCK {
+					errorCh <- os.NewSyscallError("recvfrom", err)
+					return
+				}
+				if n > 0 {
+					eventCh <- event{Fd: fd, Err: nil}
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
 		}
-		return nil, os.NewSyscallError("epoll_wait", err)
+	}(pollerFd)
+
+	var events []event
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+Loop:
+	for {
+		select {
+		case evt := <-eventCh:
+			events = append(events, evt)
+		case err := <-errorCh:
+			return nil, err
+		case <-timer.C:
+			break Loop
+		}
 	}
 
-	var events = make([]event, 0, nEvents)
+	// Signal the goroutine to stop.
+	close(doneCh)
 
-	for i := 0; i < nEvents; i++ {
-		var fd = int(epollEvents[i].Fd)
-		var evt = event{Fd: fd, Err: nil}
-
-		errCode, err := unix.GetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_ERROR)
-		if err != nil {
-			evt.Err = os.NewSyscallError("getsockopt", err)
-		}
-		if errCode != 0 {
-			evt.Err = newErrConnect(errCode)
-		}
-		events = append(events, evt)
-	}
 	return events, nil
 }
