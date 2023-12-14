@@ -797,6 +797,7 @@ func (api *PublicAPI) DeleteMessagesByChatID(id string) error {
 	return api.service.messenger.DeleteMessagesByChatID(id)
 }
 
+// Deprecated: Use MarkMessagesRead instead
 func (api *PublicAPI) MarkMessagesSeen(chatID string, ids []string) (*MarkMessageSeenResponse, error) {
 	count, withMentions, notifications, err := api.service.messenger.MarkMessagesSeen(chatID, ids)
 	if err != nil {
@@ -811,18 +812,12 @@ func (api *PublicAPI) MarkMessagesSeen(chatID string, ids []string) (*MarkMessag
 	return response, nil
 }
 
-func (api *PublicAPI) MarkMessageAsUnread(chatID string, messageID string) (*MarkMessageSeenResponse, error) {
-	count, withMentions, notifications, err := api.service.messenger.MarkMessageAsUnread(chatID, messageID)
-	if err != nil {
-		return nil, err
-	}
+func (api *PublicAPI) MarkMessagesRead(chatID string, ids []string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.MarkMessagesRead(chatID, ids)
+}
 
-	response := &MarkMessageSeenResponse{
-		Count:                       count,
-		CountWithMentions:           withMentions,
-		ActivityCenterNotifications: notifications,
-	}
-	return response, nil
+func (api *PublicAPI) MarkMessageAsUnread(chatID string, messageID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.MarkMessageAsUnread(chatID, messageID)
 }
 
 func (api *PublicAPI) MarkAllRead(ctx context.Context, chatID string) (*protocol.MessengerResponse, error) {

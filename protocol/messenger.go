@@ -4143,7 +4143,7 @@ func (m *Messenger) DeleteMessagesByChatID(id string) error {
 	return m.persistence.DeleteMessagesByChatID(id)
 }
 
-func (m *Messenger) MarkMessageAsUnreadImpl(chatID string, messageID string) (uint64, uint64, error) {
+func (m *Messenger) markMessageAsUnreadImpl(chatID string, messageID string) (uint64, uint64, error) {
 	count, countWithMentions, err := m.persistence.MarkMessageAsUnread(chatID, messageID)
 
 	if err != nil {
@@ -4158,17 +4158,23 @@ func (m *Messenger) MarkMessageAsUnreadImpl(chatID string, messageID string) (ui
 	return count, countWithMentions, nil
 }
 
-func (m *Messenger) MarkMessageAsUnread(chatID string, messageID string) (uint64, uint64, []*ActivityCenterNotification, error) {
-	count, countWithMentions, err := m.MarkMessageAsUnreadImpl(chatID, messageID)
-
+func (m *Messenger) MarkMessageAsUnread(chatID string, messageID string) (*MessengerResponse, error) {
+	count, countWithMentions, err := m.markMessageAsUnreadImpl(chatID, messageID)
 	if err != nil {
-		return 0, 0, nil, err
+		return nil, err
 	}
 
-	ids, err := m.persistence.GetMessageIdsWithGreaterTimestamp(chatID, messageID)
+	response := &MessengerResponse{}
+	response.AddSeenAndUnseenMessages(&SeenUnseenMessages{
+		ChatID:            chatID,
+		Count:             count,
+		CountWithMentions: countWithMentions,
+		Seen:              false,
+	})
 
+	ids, err := m.persistence.GetMessageIdsWithGreaterTimestamp(chatID, messageID)
 	if err != nil {
-		return 0, 0, nil, err
+		return nil, err
 	}
 
 	hexBytesIds := []types.HexBytes{}
@@ -4178,12 +4184,13 @@ func (m *Messenger) MarkMessageAsUnread(chatID string, messageID string) (uint64
 
 	updatedAt := m.GetCurrentTimeInMillis()
 	notifications, err := m.persistence.MarkActivityCenterNotificationsUnread(hexBytesIds, updatedAt)
-
 	if err != nil {
-		return 0, 0, nil, err
+		return nil, err
 	}
 
-	return count, countWithMentions, notifications, nil
+	response.AddActivityCenterNotifications(notifications)
+
+	return response, nil
 }
 
 // MarkMessagesSeen marks messages with `ids` as seen in the chat `chatID`.
@@ -4202,6 +4209,7 @@ func (m *Messenger) markMessagesSeenImpl(chatID string, ids []string) (uint64, u
 	return count, countWithMentions, nil
 }
 
+// Deprecated: Use MarkMessagesRead instead
 func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint64, []*ActivityCenterNotification, error) {
 	count, countWithMentions, err := m.markMessagesSeenImpl(chatID, ids)
 	if err != nil {
@@ -4226,6 +4234,42 @@ func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint6
 	}
 
 	return count, countWithMentions, notifications, nil
+}
+
+func (m *Messenger) MarkMessagesRead(chatID string, ids []string) (*MessengerResponse, error) {
+	count, countWithMentions, err := m.markMessagesSeenImpl(chatID, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddSeenAndUnseenMessages(&SeenUnseenMessages{
+		ChatID:            chatID,
+		Count:             count,
+		CountWithMentions: countWithMentions,
+		Seen:              true,
+	})
+
+	hexBytesIds := []types.HexBytes{}
+	for _, id := range ids {
+		hexBytesIds = append(hexBytesIds, types.FromHex(id))
+	}
+
+	// Mark notifications as read in the database
+	updatedAt := m.GetCurrentTimeInMillis()
+	err = m.persistence.MarkActivityCenterNotificationsRead(hexBytesIds, updatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	notifications, err := m.persistence.GetActivityCenterNotificationsByID(hexBytesIds)
+	if err != nil {
+		return nil, err
+	}
+
+	response.AddActivityCenterNotifications(notifications)
+
+	return response, nil
 }
 
 func (m *Messenger) syncChatMessagesRead(ctx context.Context, chatID string, clock uint64, rawMessageHandler RawMessageHandler) error {
