@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/anacrolix/torrent"
@@ -3972,6 +3973,22 @@ func (m *Manager) SeedHistoryArchiveTorrent(communityID types.HexBytes) error {
 	if err != nil {
 		return err
 	}
+
+	var stat syscall.Statfs_t
+	wd, _ := os.Getwd()
+
+	err = syscall.Statfs(wd, &stat)
+	if err != nil {
+		return err
+	}
+
+	// Available blocks * size per block = available space in bytes
+	freeSpace := stat.Bavail * uint64(stat.Bsize)
+
+	if freeSpace <= uint64(torrent.Length()) {
+		return ErrNoFreeSpaceForHistoryArchives
+	}
+
 	torrent.DownloadAll()
 
 	m.publish(&Subscription{
