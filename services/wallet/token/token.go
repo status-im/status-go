@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/community"
 )
 
 var requestTimeout = 20 * time.Second
@@ -52,10 +53,10 @@ type Token struct {
 }
 
 type CommunityData struct {
-	ID       string  `json:"id"`
-	Name     string  `json:"name"`
-	Color    string  `json:"color"`
-	ImageURL *string `json:"image_url,omitempty"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
+	Image string `json:"image,omitempty"`
 }
 
 func (t *Token) IsNative() bool {
@@ -86,6 +87,7 @@ type Manager struct {
 	networkManager    *network.Manager
 	stores            []store // Set on init, not changed afterwards
 	communityTokensDB *communitytokens.Database
+	communityManager  *community.Manager
 
 	tokens []*Token
 
@@ -110,6 +112,7 @@ func mergeTokens(sliceLists [][]*Token) []*Token {
 func NewTokenManager(
 	db *sql.DB,
 	RPCClient *rpc.Client,
+	communityManager *community.Manager,
 	networkManager *network.Manager,
 	appDB *sql.DB,
 ) *Manager {
@@ -143,6 +146,7 @@ func NewTokenManager(
 		RPCClient:         RPCClient,
 		contractMaker:     maker,
 		networkManager:    networkManager,
+		communityManager:  communityManager,
 		stores:            stores,
 		communityTokensDB: communitytokens.NewCommunityTokensDatabase(appDB),
 		tokens:            tokens,
@@ -529,6 +533,16 @@ func (tm *Manager) getTokensFromDB(query string, args ...any) ([]*Token, error) 
 
 			token.CommunityData = &CommunityData{
 				ID: communityID,
+			}
+		}
+
+		if tm.communityManager != nil && token.CommunityData != nil {
+			communityInfo, _, err := tm.communityManager.GetCommunityInfo(token.CommunityData.ID)
+			if err == nil && communityInfo != nil {
+				// Fetched data from cache. Cache is refreshed during every wallet token list call.
+				token.CommunityData.Name = communityInfo.CommunityName
+				token.CommunityData.Color = communityInfo.CommunityColor
+				token.CommunityData.Image = communityInfo.CommunityImage
 			}
 		}
 

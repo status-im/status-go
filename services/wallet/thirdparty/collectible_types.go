@@ -216,8 +216,3 @@ type CollectionDataProvider interface {
 	CollectibleProvider
 	FetchCollectionsDataByContractID(ctx context.Context, ids []ContractID) ([]CollectionData, error)
 }
-
-type CollectibleCommunityInfoProvider interface {
-	CommunityInfoProvider
-	FillCollectibleMetadata(collectible *FullCollectibleData) error
-}
