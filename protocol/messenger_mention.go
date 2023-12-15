@@ -289,7 +289,7 @@ func (m *MentionManager) ReplaceWithPublicKey(chatID, text string) (string, erro
 		return "", err
 	}
 	newText := ReplaceMentions(text, mentionableUsers)
-	checkedForEveryoneMention := strings.ReplaceAll(newText, "@everyone", "@"+common.EveryoneMentionTag)
+	checkedForEveryoneMention := strings.ReplaceAll(newText, "@everyone ", "@"+common.EveryoneMentionTag)
 	m.ClearMentions(chatID)
 	return checkedForEveryoneMention, nil
 }
