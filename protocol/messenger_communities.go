@@ -6,11 +6,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
-	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"golang.org/x/time/rate"
 
@@ -72,6 +70,9 @@ type FetchCommunityRequest struct {
 func (r *FetchCommunityRequest) Validate() error {
 	if len(r.CommunityKey) <= 2 {
 		return fmt.Errorf("community key is too short")
+	}
+	if _, err := types.DecodeHex(r.CommunityKey); err != nil {
+		return fmt.Errorf("invalid community key")
 	}
 	return nil
 }
@@ -2554,260 +2555,26 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 		}
 	}
 
-	return m.requestCommunityInfoFromMailserver(communityID, request.Shard, request.WaitForResponse)
+	community, _, err := m.storeNodeRequestsManager.FetchCommunity(communities.CommunityShard{
+		CommunityID: communityID,
+		Shard:       request.Shard,
+	}, request.WaitForResponse)
+
+	return community, err
 }
 
-// requestCommunityInfoFromMailserver installs filter for community and requests its details
-// from mailserver. When response received it will be passed through signals handler
-func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard *shard.Shard, waitForResponse bool) (*communities.Community, error) {
-
-	m.logger.Info("requesting community info", zap.String("communityID", communityID), zap.Any("shard", shard))
-
-	m.requestedCommunitiesLock.Lock()
-	defer m.requestedCommunitiesLock.Unlock()
-
-	if _, ok := m.requestedCommunities[communityID]; ok {
-		return nil, nil
-	}
-
-	//If filter wasn't installed we create it and remember for deinstalling after
-	//response received
-	filter := m.transport.FilterByChatID(communityID)
-	if filter == nil {
-		filters, err := m.transport.InitPublicFilters([]transport.FiltersToInitialize{{
-			ChatID:      communityID,
-			PubsubTopic: shard.PubsubTopic(),
-		}})
-		if err != nil {
-			return nil, fmt.Errorf("Can't install filter for community: %v", err)
-		}
-		if len(filters) != 1 {
-			return nil, fmt.Errorf("Unexpected amount of filters created")
-		}
-		filter = filters[0]
-		m.requestedCommunities[communityID] = filter
-		m.logger.Debug("created filter for community",
-			zap.String("filterID", filter.FilterID),
-			zap.String("communityID", communityID),
-			zap.String("PubsubTopic", filter.PubsubTopic),
-		)
-	} else {
-		//we don't remember filter id associated with community because it was already installed
-		m.requestedCommunities[communityID] = nil
-	}
-
-	defer m.forgetCommunityRequest(communityID)
-
-	to := uint32(math.Ceil(float64(m.GetCurrentTimeInMillis()) / 1000))
-	from := to - oneMonthInSeconds
-
-	_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
-		batch := MailserverBatch{
-			From:        from,
-			To:          to,
-			Topics:      []types.TopicType{filter.ContentTopic},
-			PubsubTopic: filter.PubsubTopic,
-		}
-		m.logger.Info("requesting historic", zap.Any("batch", batch))
-		err := m.processMailserverBatch(batch)
-		return nil, err
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	m.logger.Info("mailserver request performed",
-		zap.String("communityID", communityID),
-		zap.Bool("waitForResponse", waitForResponse),
-	)
-
-	if !waitForResponse {
-		return nil, nil
-	}
-
-	// TODO: We can force to process all messages then we don't have to wait?
-	//m.ProcessAllMessages()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	for {
-		select {
-		case <-time.After(200 * time.Millisecond):
-			//send signal to client that message status updated
-			community, err := m.communitiesManager.GetByIDString(communityID)
-			if err != nil {
-				return nil, err
-			}
-			if community != nil && community.Name() != "" && community.DescriptionText() != "" {
-				m.logger.Debug("community info found",
-					zap.String("communityID", communityID),
-					zap.String("displayName", community.Name()))
-				return community, nil
-			}
-
-		case <-ctx.Done():
-			m.logger.Error("failed to request community info", zap.String("communityID", communityID), zap.Error(ctx.Err()))
-			return nil, fmt.Errorf("failed to request community info for id '%s' from mailserver: %w", communityID, ctx.Err())
-		}
-	}
-}
-
-// requestCommunitiesFromMailserver installs filter for community and requests its details
-// from mailserver. When response received it will be passed through signals handler
-func (m *Messenger) requestCommunitiesFromMailserver(communities []communities.CommunityShard) {
-	m.requestedCommunitiesLock.Lock()
-	defer m.requestedCommunitiesLock.Unlock()
-
-	// we group topics by PubsubTopic
-	groupedTopics := map[string]map[types.TopicType]struct{}{}
-
-	for _, c := range communities {
-		if _, ok := m.requestedCommunities[c.CommunityID]; ok {
-			continue
-		}
-
-		//If filter wasn't installed we create it and remember for deinstalling after
-		//response received
-		filter := m.transport.FilterByChatID(c.CommunityID)
-		if filter == nil {
-			filters, err := m.transport.InitPublicFilters([]transport.FiltersToInitialize{{
-				ChatID:      c.CommunityID,
-				PubsubTopic: c.Shard.PubsubTopic(),
-			}})
-			if err != nil {
-				m.logger.Error("Can't install filter for community", zap.Error(err))
-				continue
-			}
-			if len(filters) != 1 {
-				m.logger.Error("Unexpected amount of filters created")
-				continue
-			}
-			filter = filters[0]
-			m.requestedCommunities[c.CommunityID] = filter
-		} else {
-			//we don't remember filter id associated with community because it was already installed
-			m.requestedCommunities[c.CommunityID] = nil
-		}
-
-		if _, ok := groupedTopics[filter.PubsubTopic]; !ok {
-			groupedTopics[filter.PubsubTopic] = map[types.TopicType]struct{}{}
-		}
-
-		groupedTopics[filter.PubsubTopic][filter.ContentTopic] = struct{}{}
-	}
-
-	defer func() {
-		for _, c := range communities {
-			m.forgetCommunityRequest(c.CommunityID)
-		}
-	}()
-
-	to := uint32(m.transport.GetCurrentTime() / 1000)
-	from := to - oneMonthInSeconds
-
-	wg := sync.WaitGroup{}
-
-	for pubsubTopic, contentTopics := range groupedTopics {
-		wg.Add(1)
-		go func(pubsubTopic string, contentTopics map[types.TopicType]struct{}) {
-			batch := MailserverBatch{
-				From:        from,
-				To:          to,
-				Topics:      maps.Keys(contentTopics),
-				PubsubTopic: pubsubTopic,
-			}
-			_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
-				m.logger.Info("requesting historic", zap.Any("batch", batch))
-				err := m.processMailserverBatch(batch)
-				return nil, err
-			})
-			if err != nil {
-				m.logger.Error("error performing mailserver request", zap.Any("batch", batch), zap.Error(err))
-			}
-			wg.Done()
-		}(pubsubTopic, contentTopics)
-	}
-
-	wg.Wait()
-
-	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-
-	fetching := true
-	for fetching {
-		select {
-		case <-time.After(200 * time.Millisecond):
-			allLoaded := true
-			for _, c := range communities {
-				community, err := m.communitiesManager.GetByIDString(c.CommunityID)
-				if err != nil {
-					m.logger.Error("Error loading community", zap.Error(err))
-					break
-				}
-
-				if community == nil || community.Name() == "" || community.DescriptionText() == "" {
-					allLoaded = false
-					break
-				}
-			}
-
-			if allLoaded {
-				fetching = false
-			}
-
-		case <-ctx.Done():
-			fetching = false
-		}
-	}
-
-}
-
-// forgetCommunityRequest removes community from requested ones and removes filter
-func (m *Messenger) forgetCommunityRequest(communityID string) {
-	m.logger.Info("forgetting community request", zap.String("communityID", communityID))
-
-	filter, ok := m.requestedCommunities[communityID]
-	if !ok {
-		return
-	}
-
-	if filter != nil {
-		err := m.transport.RemoveFilters([]*transport.Filter{filter})
-		if err != nil {
-			m.logger.Warn("cant remove filter", zap.Error(err))
-		}
-	}
-
-	delete(m.requestedCommunities, communityID)
+// fetchCommunities installs filter for community and requests its details from store node.
+// When response received it will be passed through signals handler.
+func (m *Messenger) fetchCommunities(communities []communities.CommunityShard) error {
+	return m.storeNodeRequestsManager.FetchCommunities(communities)
 }
 
 // passStoredCommunityInfoToSignalHandler calls signal handler with community info
-func (m *Messenger) passStoredCommunityInfoToSignalHandler(communityID string) {
+func (m *Messenger) passStoredCommunityInfoToSignalHandler(community *communities.Community) {
 	if m.config.messengerSignalsHandler == nil {
 		return
 	}
-
-	//send signal to client that message status updated
-	community, err := m.communitiesManager.GetByIDString(communityID)
-	if community == nil {
-		return
-	}
-
-	if err != nil {
-		m.logger.Warn("cant get community and pass it to signal handler", zap.Error(err))
-		return
-	}
-
-	//if there is no info helpful for client, we don't post it
-	if community.Name() == "" && community.DescriptionText() == "" && community.MembersCount() == 0 {
-		return
-	}
-
 	m.config.messengerSignalsHandler.CommunityInfoFound(community)
-	m.forgetCommunityRequest(communityID)
 }
 
 // handleCommunityDescription handles an community description

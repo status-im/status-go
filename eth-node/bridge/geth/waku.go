@@ -268,8 +268,8 @@ func (w *gethWakuWrapper) MarkP2PMessageAsProcessed(hash common.Hash) {
 	w.waku.MarkP2PMessageAsProcessed(hash)
 }
 
-func (w *gethWakuWrapper) RequestStoreMessages(ctx context.Context, peerID []byte, r types.MessagesRequest) (*types.StoreRequestCursor, error) {
-	return nil, errors.New("not implemented")
+func (w *gethWakuWrapper) RequestStoreMessages(ctx context.Context, peerID []byte, r types.MessagesRequest, processEnvelopes bool) (*types.StoreRequestCursor, int, error) {
+	return nil, 0, errors.New("not implemented")
 }
 func (w *gethWakuWrapper) ConnectionChanged(_ connection.State) {}
 

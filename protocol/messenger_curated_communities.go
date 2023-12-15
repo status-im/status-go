@@ -133,7 +133,9 @@ func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.Cura
 		})
 	}
 
-	go m.requestCommunitiesFromMailserver(unknownCommunities)
+	go func() {
+		_ = m.fetchCommunities(unknownCommunities)
+	}()
 
 	return response, nil
 }

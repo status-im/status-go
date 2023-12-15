@@ -469,7 +469,7 @@ func (t *Transport) createMessagesRequestV1(
 	topics []types.TopicType,
 	waitForResponse bool,
 ) (cursor []byte, err error) {
-	r := createMessagesRequest(from, to, previousCursor, nil, "", topics)
+	r := createMessagesRequest(from, to, previousCursor, nil, "", topics, 1000)
 
 	events := make(chan types.EnvelopeEvent, 10)
 	sub := t.waku.SubscribeEnvelopeEvents(events)
@@ -502,33 +502,37 @@ func (t *Transport) createMessagesRequestV2(
 	previousStoreCursor *types.StoreRequestCursor,
 	pubsubTopic string,
 	contentTopics []types.TopicType,
+	limit uint32,
 	waitForResponse bool,
-) (storeCursor *types.StoreRequestCursor, err error) {
-	r := createMessagesRequest(from, to, nil, previousStoreCursor, pubsubTopic, contentTopics)
+	processEnvelopes bool,
+) (storeCursor *types.StoreRequestCursor, envelopesCount int, err error) {
+	r := createMessagesRequest(from, to, nil, previousStoreCursor, pubsubTopic, contentTopics, limit)
 
 	if waitForResponse {
 		resultCh := make(chan struct {
-			storeCursor *types.StoreRequestCursor
-			err         error
+			storeCursor    *types.StoreRequestCursor
+			envelopesCount int
+			err            error
 		})
 
 		go func() {
-			storeCursor, err = t.waku.RequestStoreMessages(ctx, peerID, r)
+			storeCursor, envelopesCount, err = t.waku.RequestStoreMessages(ctx, peerID, r, processEnvelopes)
 			resultCh <- struct {
-				storeCursor *types.StoreRequestCursor
-				err         error
-			}{storeCursor, err}
+				storeCursor    *types.StoreRequestCursor
+				envelopesCount int
+				err            error
+			}{storeCursor, envelopesCount, err}
 		}()
 
 		select {
 		case result := <-resultCh:
-			return result.storeCursor, result.err
+			return result.storeCursor, result.envelopesCount, result.err
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, 0, ctx.Err()
 		}
 	} else {
 		go func() {
-			_, err = t.waku.RequestStoreMessages(ctx, peerID, r)
+			_, _, err = t.waku.RequestStoreMessages(ctx, peerID, r, false)
 			if err != nil {
 				t.logger.Error("failed to request store messages", zap.Error(err))
 			}
@@ -546,11 +550,13 @@ func (t *Transport) SendMessagesRequestForTopics(
 	previousStoreCursor *types.StoreRequestCursor,
 	pubsubTopic string,
 	contentTopics []types.TopicType,
+	limit uint32,
 	waitForResponse bool,
-) (cursor []byte, storeCursor *types.StoreRequestCursor, err error) {
+	processEnvelopes bool,
+) (cursor []byte, storeCursor *types.StoreRequestCursor, envelopesCount int, err error) {
 	switch t.waku.Version() {
 	case 2:
-		storeCursor, err = t.createMessagesRequestV2(ctx, peerID, from, to, previousStoreCursor, pubsubTopic, contentTopics, waitForResponse)
+		storeCursor, envelopesCount, err = t.createMessagesRequestV2(ctx, peerID, from, to, previousStoreCursor, pubsubTopic, contentTopics, limit, waitForResponse, processEnvelopes)
 	case 1:
 		cursor, err = t.createMessagesRequestV1(ctx, peerID, from, to, previousCursor, contentTopics, waitForResponse)
 	default:
@@ -559,7 +565,7 @@ func (t *Transport) SendMessagesRequestForTopics(
 	return
 }
 
-func createMessagesRequest(from, to uint32, cursor []byte, storeCursor *types.StoreRequestCursor, pubsubTopic string, topics []types.TopicType) types.MessagesRequest {
+func createMessagesRequest(from, to uint32, cursor []byte, storeCursor *types.StoreRequestCursor, pubsubTopic string, topics []types.TopicType, limit uint32) types.MessagesRequest {
 	aUUID := uuid.New()
 	// uuid is 16 bytes, converted to hex it's 32 bytes as expected by types.MessagesRequest
 	id := []byte(hex.EncodeToString(aUUID[:]))
@@ -571,7 +577,7 @@ func createMessagesRequest(from, to uint32, cursor []byte, storeCursor *types.St
 		ID:            id,
 		From:          from,
 		To:            to,
-		Limit:         1000,
+		Limit:         limit,
 		Cursor:        cursor,
 		PubsubTopic:   pubsubTopic,
 		ContentTopics: topicBytes,

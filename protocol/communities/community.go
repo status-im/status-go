@@ -389,6 +389,13 @@ func (o *Community) Shard() *shard.Shard {
 	return nil
 }
 
+func (o *Community) CommunityShard() CommunityShard {
+	return CommunityShard{
+		CommunityID: o.IDString(),
+		Shard:       o.Shard(),
+	}
+}
+
 func (o *Community) IntroMessage() string {
 	if o != nil &&
 		o.config != nil &&

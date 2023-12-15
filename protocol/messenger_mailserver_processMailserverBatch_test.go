@@ -43,8 +43,10 @@ func (t *mockTransport) SendMessagesRequestForTopics(
 	previousStoreCursor *types.StoreRequestCursor,
 	pubsubTopic string,
 	contentTopics []types.TopicType,
+	limit uint32,
 	waitForResponse bool,
-) (cursor []byte, storeCursor *types.StoreRequestCursor, err error) {
+	processEnvelopes bool,
+) (cursor []byte, storeCursor *types.StoreRequestCursor, envelopesCount int, err error) {
 	var response queryResponse
 	if previousCursor == nil {
 		initialResponse := getInitialResponseKey(contentTopics)
@@ -52,7 +54,7 @@ func (t *mockTransport) SendMessagesRequestForTopics(
 	} else {
 		response = t.queryResponses[hex.EncodeToString(previousCursor)]
 	}
-	return response.cursor, nil, response.err
+	return response.cursor, nil, 0, response.err
 }
 
 func (t *mockTransport) Populate(topics []types.TopicType, responses int, includeRandomError bool) error {
@@ -130,7 +132,7 @@ func TestProcessMailserverBatchHappyPath(t *testing.T) {
 		Topics: topics,
 	}
 
-	err = processMailserverBatch(context.TODO(), testTransport, testBatch, mailserverID, logger)
+	err = processMailserverBatch(context.TODO(), testTransport, testBatch, mailserverID, logger, defaultStoreNodeRequestPageSize, nil, false)
 	require.NoError(t, err)
 }
 
@@ -151,6 +153,6 @@ func TestProcessMailserverBatchFailure(t *testing.T) {
 		Topics: topics,
 	}
 
-	err = processMailserverBatch(context.TODO(), testTransport, testBatch, mailserverID, logger)
+	err = processMailserverBatch(context.TODO(), testTransport, testBatch, mailserverID, logger, defaultStoreNodeRequestPageSize, nil, false)
 	require.Error(t, err)
 }

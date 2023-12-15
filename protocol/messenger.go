@@ -114,6 +114,7 @@ type Messenger struct {
 	communitiesKeyDistributor CommunitiesKeyDistributor
 	accountsManager           account.Manager
 	mentionsManager           *MentionManager
+	storeNodeRequestsManager  *StoreNodeRequestManager
 	logger                    *zap.Logger
 
 	outputCSV bool
@@ -152,9 +153,6 @@ type Messenger struct {
 		wait chan struct{}
 		once sync.Once
 	}
-
-	requestedCommunitiesLock sync.RWMutex
-	requestedCommunities     map[string]*transport.Filter
 
 	requestedContactsLock sync.RWMutex
 	requestedContacts     map[string]*transport.Filter
@@ -533,18 +531,16 @@ func NewMessenger(
 			peers:                     make(map[string]peerStatus),
 			availabilitySubscriptions: make([]chan struct{}, 0),
 		},
-		mailserversDatabase:      c.mailserversDatabase,
-		account:                  c.account,
-		quit:                     make(chan struct{}),
-		ctx:                      ctx,
-		cancel:                   cancel,
-		requestedCommunitiesLock: sync.RWMutex{},
-		requestedCommunities:     make(map[string]*transport.Filter),
-		requestedContactsLock:    sync.RWMutex{},
-		requestedContacts:        make(map[string]*transport.Filter),
-		importingCommunities:     make(map[string]bool),
-		importingChannels:        make(map[string]bool),
-		importRateLimiter:        rate.NewLimiter(rate.Every(importSlowRate), 1),
+		mailserversDatabase:   c.mailserversDatabase,
+		account:               c.account,
+		quit:                  make(chan struct{}),
+		ctx:                   ctx,
+		cancel:                cancel,
+		requestedContactsLock: sync.RWMutex{},
+		requestedContacts:     make(map[string]*transport.Filter),
+		importingCommunities:  make(map[string]bool),
+		importingChannels:     make(map[string]bool),
+		importRateLimiter:     rate.NewLimiter(rate.Every(importSlowRate), 1),
 		importDelayer: struct {
 			wait chan struct{}
 			once sync.Once
@@ -587,6 +583,7 @@ func NewMessenger(
 	}
 
 	messenger.mentionsManager = NewMentionManager(messenger)
+	messenger.storeNodeRequestsManager = NewCommunityRequestsManager(messenger)
 
 	if c.walletService != nil {
 		messenger.walletAPI = walletAPI
@@ -791,7 +788,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.handleCommunitiesSubscription(m.communitiesManager.Subscribe())
 	m.handleCommunitiesHistoryArchivesSubscription(m.communitiesManager.Subscribe())
 	m.updateCommunitiesActiveMembersPeriodically()
-	m.handleConnectionChange(m.online())
 	m.handleENSVerificationSubscription(ensSubscription)
 	m.watchConnectionChange()
 	m.watchChatsAndCommunitiesToUnmute()
@@ -926,13 +922,6 @@ func (m *Messenger) handleConnectionChange(online bool) {
 			}
 			m.shouldPublishContactCode = false
 		}
-		go func() {
-			_, err := m.RequestAllHistoricMessagesWithRetries(false)
-			if err != nil {
-				m.logger.Warn("failed to fetch historic messages", zap.Error(err))
-			}
-		}()
-
 	} else {
 		if m.pushNotificationClient != nil {
 			m.pushNotificationClient.Offline()
@@ -1457,6 +1446,7 @@ func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.Verification
 func (m *Messenger) watchConnectionChange() {
 	m.logger.Debug("watching connection changes")
 	state := m.online()
+	m.handleConnectionChange(state)
 	go func() {
 		for {
 			select {
@@ -1870,6 +1860,9 @@ func (m *Messenger) Init() error {
 
 // Shutdown takes care of ensuring a clean shutdown of Messenger
 func (m *Messenger) Shutdown() (err error) {
+	if m == nil {
+		return nil
+	}
 	close(m.quit)
 	m.cancel()
 	m.shutdownWaitGroup.Wait()
