@@ -76,7 +76,22 @@ func MakeNewDB(db *sql.DB) (*Database, error) {
 	return dbInstances[filename], nil
 }
 
-// Set a notifier for setting changes
+func (db *Database) GetDB() *sql.DB {
+	return db.db
+}
+
+func (db *Database) GetSyncQueue() chan SyncSettingField {
+	return db.SyncQueue
+}
+
+func (db *Database) GetChangesSubscriptions() []chan *SyncSettingField {
+	return db.changesSubscriptions
+}
+
+func (db *Database) GetNotifier() Notifier {
+	return db.notifier
+}
+
 func (db *Database) SetSettingsNotifier(n Notifier) {
 	db.notifier = n
 }
