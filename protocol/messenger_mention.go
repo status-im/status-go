@@ -722,6 +722,7 @@ func matchMention(text string, users map[string]*MentionableUser, mentionKeyIdx 
 	}
 	if word := wordRegex.FindString(string(tr[nextWordIdx:])); word != "" {
 		newWords := append(words, word)
+
 		t := strings.TrimSpace(strings.ToLower(strings.Join(newWords, "")))
 		tt := []rune(t)
 		searchedText := t
@@ -787,6 +788,7 @@ func replaceMentions(text string, users map[string]*MentionableUser, idxs []int,
 	if strings.TrimSpace(text) == "" || len(idxs) == 0 {
 		return text
 	}
+
 	mentionKeyIdx := idxs[0] - diff
 
 	if len(users) == 0 {
