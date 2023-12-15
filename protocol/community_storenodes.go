@@ -48,6 +48,9 @@ func (m *communityStoreNodes) HasStorenodeSetup(communityID string) bool {
 
 // ReloadFromDB loads or reloads the mailservers from the database (on adding/deleting mailservers)
 func (m *communityStoreNodes) ReloadFromDB() error {
+	if m.storenodesDatabase == nil {
+		return nil
+	}
 	m.storenodesByCommunityIDMutex.RLock()
 	defer m.storenodesByCommunityIDMutex.RUnlock()
 	dbMailservers, err := m.storenodesDatabase.GetMailserversForCommunities()
