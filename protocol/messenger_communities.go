@@ -2311,22 +2311,35 @@ func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*Messenger
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
-	response := &MessengerResponse{}
-
-	community, err := m.communitiesManager.GetByID(request.CommunityID)
+	community, err := m.GetCommunityByID(request.CommunityID)
 	if err != nil {
 		return nil, err
 	}
 
+	response := &MessengerResponse{}
+	communityURL, err := m.ShareCommunityURLWithData(request.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+
+	var statusLinkPreview common.StatusLinkPreview
+	statusCommunityLinkPreview, err := community.ToStatusLinkPreview()
+	if err != nil {
+		return nil, err
+	}
+
+	statusLinkPreview.URL = communityURL
+	statusLinkPreview.Community = statusCommunityLinkPreview
 	var messages []*common.Message
 	for _, pk := range request.Users {
 		message := common.NewMessage()
+		message.StatusLinkPreviews = []common.StatusLinkPreview{statusLinkPreview}
 		message.ChatId = pk.String()
-		message.CommunityID = request.CommunityID.String()
 		message.Shard = community.Shard().Protobuffer()
-		message.Text = fmt.Sprintf("Community %s has been shared with you", community.Name())
+		message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+		message.Text = communityURL
 		if request.InviteMessage != "" {
-			message.Text = request.InviteMessage
+			message.Text = fmt.Sprintf("%s\n%s", request.InviteMessage, communityURL)
 		}
 		messages = append(messages, message)
 		r, err := m.CreateOneToOneChat(&requests.CreateOneToOneChat{ID: pk})
