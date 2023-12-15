@@ -2156,7 +2156,6 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			return rawMessage, err
 		}
 	case ChatTypeCommunityChat:
-		// TODO pablo this might end up in a store node?? I don't know
 		community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
 		if err != nil {
 			return rawMessage, err
