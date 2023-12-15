@@ -2207,7 +2207,7 @@ func _1702651464_community_mailserversUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1702651464_community_mailservers.up.sql", size: 635, mode: os.FileMode(0644), modTime: time.Unix(1702641035, 0)}
+	info := bindataFileInfo{name: "1702651464_community_mailservers.up.sql", size: 635, mode: os.FileMode(0644), modTime: time.Unix(1702653884, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x92, 0x5f, 0xb5, 0x4e, 0xd1, 0x95, 0xb6, 0xa, 0xe2, 0xad, 0x9c, 0x16, 0xef, 0x30, 0x30, 0x40, 0xf, 0x37, 0xdf, 0x76, 0x56, 0xc9, 0xc1, 0x38, 0x11, 0x3f, 0x6c, 0x8e, 0xd4, 0x53, 0x67, 0x3e}}
 	return a, nil
 }
