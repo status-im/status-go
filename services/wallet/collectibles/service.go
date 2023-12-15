@@ -419,8 +419,8 @@ func (s *Service) fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibl
 				return nil, err
 			}
 
-			communityHeader := communityInfoToHeader(c.CollectibleData.CommunityID, communityInfo, c.CommunityInfo)
-			header.CommunityData = &communityHeader
+			communityData := communityInfoToData(c.CollectibleData.CommunityID, communityInfo, c.CommunityInfo)
+			header.CommunityData = &communityData
 		}
 
 		res = append(res, header)
@@ -441,8 +441,8 @@ func (s *Service) fullCollectiblesDataToDetails(data []thirdparty.FullCollectibl
 				return nil, err
 			}
 
-			communityDetails := communityInfoToDetails(c.CollectibleData.CommunityID, communityInfo, c.CommunityInfo)
-			details.CommunityData = &communityDetails
+			communityData := communityInfoToData(c.CollectibleData.CommunityID, communityInfo, c.CommunityInfo)
+			details.CommunityData = &communityData
 		}
 
 		res = append(res, details)
@@ -468,14 +468,14 @@ func (s *Service) fullCollectiblesDataToCommunityHeader(data []thirdparty.FullCo
 			continue
 		}
 
-		communityHeader := communityInfoToHeader(communityID, communityInfo, c.CommunityInfo)
+		communityData := communityInfoToData(communityID, communityInfo, c.CommunityInfo)
 
 		header := Collectible{
 			ID: collectibleID,
 			CollectibleData: &CollectibleData{
 				Name: c.CollectibleData.Name,
 			},
-			CommunityData: &communityHeader,
+			CommunityData: &communityData,
 		}
 
 		res = append(res, header)
