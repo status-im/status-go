@@ -51,6 +51,7 @@ func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *za
 	mailserversSQLDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err)
 	err = sqlite.Migrate(mailserversSQLDb) // migrate default
+	s.Require().NoError(err)
 
 	mailserversDatabase := mailserversDB.NewDB(mailserversSQLDb)
 	err = mailserversDatabase.Add(mailserversDB.Mailserver{
