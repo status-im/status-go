@@ -6,6 +6,7 @@ import (
 	"errors"
 	"image"
 	"image/color"
+	"math/big"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,11 +16,14 @@ import (
 
 	"go.uber.org/zap"
 
+	eth_common "github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/ring"
+	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
 const (
@@ -31,6 +35,11 @@ const (
 	discordAttachmentsPath         = basePath + "/discord/attachments"
 	LinkPreviewThumbnailPath       = "/link-preview/thumbnail"
 	StatusLinkPreviewThumbnailPath = "/status-link-preview/thumbnail"
+
+	walletBasePath              = "/wallet"
+	walletCommunityImagesPath   = walletBasePath + "/communityImages"
+	walletCollectionImagesPath  = walletBasePath + "/collectionImages"
+	walletCollectibleImagesPath = walletBasePath + "/collectibleImages"
 
 	// Handler routes for pairing
 	accountImagesPath   = "/accountImages"
@@ -917,6 +926,167 @@ func handleQRCodeGeneration(multiaccountsDB *multiaccounts.Database, logger *zap
 
 		if err != nil {
 			logger.Error("failed to write image", zap.Error(err))
+		}
+	}
+}
+
+func handleWalletCommunityImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		params := r.URL.Query()
+
+		if len(params["communityID"]) == 0 {
+			logger.Error("no communityID")
+			return
+		}
+
+		var image []byte
+		err := db.QueryRow(`SELECT image_payload FROM community_data_cache WHERE id = ?`, params["communityID"][0]).Scan(&image)
+		if err != nil {
+			logger.Error("failed to find wallet community image", zap.Error(err))
+			return
+		}
+		if len(image) == 0 {
+			logger.Error("empty wallet community image")
+			return
+		}
+		mime, err := images.GetProtobufImageMime(image)
+		if err != nil {
+			logger.Error("failed to get wallet community image mime", zap.Error(err))
+		}
+
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-store")
+
+		_, err = w.Write(image)
+		if err != nil {
+			logger.Error("failed to write wallet community image", zap.Error(err))
+		}
+	}
+}
+
+func handleWalletCollectionImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		params := r.URL.Query()
+
+		if len(params["chainID"]) == 0 {
+			logger.Error("no chainID")
+			return
+		}
+
+		if len(params["contractAddress"]) == 0 {
+			logger.Error("no contractAddress")
+			return
+		}
+
+		chainID, err := strconv.ParseUint(params["chainID"][0], 10, 64)
+		if err != nil {
+			logger.Error("invalid chainID in wallet collectible image", zap.Error(err))
+			return
+		}
+		contractAddress := eth_common.HexToAddress(params["contractAddress"][0])
+		if len(contractAddress) == 0 {
+			logger.Error("invalid contractAddress in wallet collectible image", zap.Error(err))
+			return
+		}
+
+		var image []byte
+		err = db.QueryRow(`SELECT image_payload FROM collection_data_cache WHERE chain_id = ? AND contract_address = ?`,
+			chainID,
+			contractAddress).Scan(&image)
+		if err != nil {
+			logger.Error("failed to find wallet collection image", zap.Error(err))
+			return
+		}
+		if len(image) == 0 {
+			logger.Error("empty wallet collection image")
+			return
+		}
+		mime, err := images.GetProtobufImageMime(image)
+		if err != nil {
+			logger.Error("failed to get wallet collection image mime", zap.Error(err))
+		}
+
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-store")
+
+		_, err = w.Write(image)
+		if err != nil {
+			logger.Error("failed to write wallet collection image", zap.Error(err))
+		}
+	}
+}
+
+func handleWalletCollectibleImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		params := r.URL.Query()
+
+		if len(params["chainID"]) == 0 {
+			logger.Error("no chainID")
+			return
+		}
+
+		if len(params["contractAddress"]) == 0 {
+			logger.Error("no contractAddress")
+			return
+		}
+
+		if len(params["tokenID"]) == 0 {
+			logger.Error("no tokenID")
+			return
+		}
+
+		chainID, err := strconv.ParseUint(params["chainID"][0], 10, 64)
+		if err != nil {
+			logger.Error("invalid chainID in wallet collectible image", zap.Error(err))
+			return
+		}
+		contractAddress := eth_common.HexToAddress(params["contractAddress"][0])
+		if len(contractAddress) == 0 {
+			logger.Error("invalid contractAddress in wallet collectible image", zap.Error(err))
+			return
+		}
+		tokenID, ok := big.NewInt(0).SetString(params["tokenID"][0], 10)
+		if !ok {
+			logger.Error("invalid tokenID in wallet collectible image", zap.Error(err))
+			return
+		}
+
+		var image []byte
+		err = db.QueryRow(`SELECT image_payload FROM collectible_data_cache WHERE chain_id = ? AND contract_address = ? AND token_id = ?`,
+			chainID,
+			contractAddress,
+			(*bigint.SQLBigIntBytes)(tokenID)).Scan(&image)
+		if err != nil {
+			logger.Error("failed to find wallet collectible image", zap.Error(err))
+			return
+		}
+		if len(image) == 0 {
+			logger.Error("empty image")
+			return
+		}
+		mime, err := images.GetProtobufImageMime(image)
+		if err != nil {
+			logger.Error("failed to get wallet collectible image mime", zap.Error(err))
+		}
+
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-store")
+
+		_, err = w.Write(image)
+		if err != nil {
+			logger.Error("failed to write wallet collectible image", zap.Error(err))
 		}
 	}
 }

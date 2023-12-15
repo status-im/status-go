@@ -2292,7 +2292,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // }
 
 func (s *MessengerSuite) TestSendMessageWithPreviews() {
-	httpServer, err := server.NewMediaServer(s.m.database, nil, nil)
+	httpServer, err := server.NewMediaServer(s.m.database, nil, nil, nil)
 	s.Require().NoError(err)
 	err = httpServer.SetPort(9876)
 	s.NoError(err)

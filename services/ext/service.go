@@ -580,9 +580,11 @@ func (s *Service) FillCollectibleMetadata(collectible *thirdparty.FullCollectibl
 		privilegesLevel = permissionTypeToPrivilegesLevel(permission.GetType())
 	}
 
+	imagePayload, _ := images.GetPayloadFromURI(tokenMetadata.GetImage())
+
 	collectible.CollectibleData.Name = tokenMetadata.GetName()
 	collectible.CollectibleData.Description = tokenMetadata.GetDescription()
-	collectible.CollectibleData.ImageURL = tokenMetadata.GetImage()
+	collectible.CollectibleData.ImagePayload = imagePayload
 	collectible.CollectibleData.Traits = getCollectibleCommunityTraits(communityToken)
 
 	if collectible.CollectionData == nil {
@@ -592,7 +594,7 @@ func (s *Service) FillCollectibleMetadata(collectible *thirdparty.FullCollectibl
 		}
 	}
 	collectible.CollectionData.Name = tokenMetadata.GetName()
-	collectible.CollectionData.ImageURL = tokenMetadata.GetImage()
+	collectible.CollectionData.ImagePayload = imagePayload
 
 	collectible.CommunityInfo = &thirdparty.CollectibleCommunityInfo{
 		PrivilegesLevel: privilegesLevel,
@@ -622,9 +624,9 @@ func (s *Service) FetchCommunityInfo(communityID string) (*thirdparty.CommunityI
 	}
 
 	communityInfo := &thirdparty.CommunityInfo{
-		CommunityName:  community.Name(),
-		CommunityColor: community.Color(),
-		CommunityImage: fetchCommunityImage(community),
+		CommunityName:         community.Name(),
+		CommunityColor:        community.Color(),
+		CommunityImagePayload: fetchCommunityImage(community),
 	}
 
 	return communityInfo, nil
@@ -737,7 +739,7 @@ func fetchCommunityCollectiblePermission(community *communities.Community, id th
 	return nil
 }
 
-func fetchCommunityImage(community *communities.Community) string {
+func fetchCommunityImage(community *communities.Community) []byte {
 	imageTypes := []string{
 		images.LargeDimName,
 		images.SmallDimName,
@@ -747,14 +749,11 @@ func fetchCommunityImage(community *communities.Community) string {
 
 	for _, imageType := range imageTypes {
 		if pbImage, ok := communityImages[imageType]; ok {
-			imageBase64, err := images.GetPayloadDataURI(pbImage.Payload)
-			if err == nil {
-				return imageBase64
-			}
+			return pbImage.Payload
 		}
 	}
 
-	return ""
+	return nil
 }
 
 func boolToString(value bool) string {

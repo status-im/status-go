@@ -40,12 +40,13 @@ func generateTestCollectionsData(count int) (result []thirdparty.CollectionData)
 				ChainID: w_common.ChainID(i),
 				Address: common.BigToAddress(bigI),
 			},
-			Provider:    fmt.Sprintf("provider-%d", i),
-			Name:        fmt.Sprintf("name-%d", i),
-			Slug:        fmt.Sprintf("slug-%d", i),
-			ImageURL:    fmt.Sprintf("imageurl-%d", i),
-			Traits:      traits,
-			CommunityID: fmt.Sprintf("community-%d", i),
+			Provider:     fmt.Sprintf("provider-%d", i),
+			Name:         fmt.Sprintf("name-%d", i),
+			Slug:         fmt.Sprintf("slug-%d", i),
+			ImageURL:     fmt.Sprintf("imageurl-%d", i),
+			ImagePayload: []byte(fmt.Sprintf("imagepayload-%d", i)),
+			Traits:       traits,
+			CommunityID:  fmt.Sprintf("community-%d", i),
 		}
 		result = append(result, newCollection)
 	}

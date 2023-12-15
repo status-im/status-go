@@ -24,9 +24,10 @@ func generateTestCommunityInfo(count int) map[string]thirdparty.CommunityInfo {
 	for i := 0; i < count; i++ {
 		communityID := fmt.Sprintf("communityid-%d", i)
 		newCommunity := thirdparty.CommunityInfo{
-			CommunityName:  fmt.Sprintf("communityname-%d", i),
-			CommunityColor: fmt.Sprintf("communitycolor-%d", i),
-			CommunityImage: fmt.Sprintf("communityimage-%d", i),
+			CommunityName:         fmt.Sprintf("communityname-%d", i),
+			CommunityColor:        fmt.Sprintf("communitycolor-%d", i),
+			CommunityImage:        fmt.Sprintf("communityimage-%d", i),
+			CommunityImagePayload: []byte(fmt.Sprintf("communityimagepayload-%d", i)),
 		}
 		result[communityID] = newCommunity
 	}

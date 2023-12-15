@@ -23,8 +23,8 @@ type InfoState struct {
 	LastUpdateSuccesful bool
 }
 
-const communityInfoColumns = "id, name, color, image"
-const selectCommunityInfoColumns = "name, color, image"
+const communityInfoColumns = "id, name, color, image, image_payload"
+const selectCommunityInfoColumns = "name, color, image, image_payload"
 
 const communityInfoStateColumns = "id, last_update_timestamp, last_update_successful"
 const selectCommunityInfoStateColumns = "last_update_timestamp, last_update_successful"
@@ -60,7 +60,7 @@ func (o *DataDB) SetCommunityInfo(id string, c *thirdparty.CommunityInfo) (err e
 
 	if valid {
 		setInfo, err := tx.Prepare(fmt.Sprintf(`INSERT OR REPLACE INTO community_data_cache (%s) 
-			VALUES (?, ?, ?, ?)`, communityInfoColumns))
+			VALUES (?, ?, ?, ?, ?)`, communityInfoColumns))
 		if err != nil {
 			return err
 		}
@@ -70,6 +70,7 @@ func (o *DataDB) SetCommunityInfo(id string, c *thirdparty.CommunityInfo) (err e
 			c.CommunityName,
 			c.CommunityColor,
 			c.CommunityImage,
+			c.CommunityImagePayload,
 		)
 		if err != nil {
 			return err
@@ -116,6 +117,7 @@ func (o *DataDB) GetCommunityInfo(id string) (*thirdparty.CommunityInfo, *InfoSt
 		&info.CommunityName,
 		&info.CommunityColor,
 		&info.CommunityImage,
+		&info.CommunityImagePayload,
 	)
 
 	if err == sql.ErrNoRows {

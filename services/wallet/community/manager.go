@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
@@ -14,11 +15,13 @@ const failedCommunityFetchRetryDelay = 1 * time.Hour
 type Manager struct {
 	db                    *DataDB
 	communityInfoProvider thirdparty.CommunityInfoProvider
+	mediaServer           *server.MediaServer
 }
 
-func NewManager(db *sql.DB) *Manager {
+func NewManager(db *sql.DB, mediaServer *server.MediaServer) *Manager {
 	return &Manager{
-		db: NewDataDB(db),
+		db:          NewDataDB(db),
+		mediaServer: mediaServer,
 	}
 }
 
@@ -28,7 +31,14 @@ func (cm *Manager) SetCommunityInfoProvider(communityInfoProvider thirdparty.Com
 }
 
 func (cm *Manager) GetCommunityInfo(id string) (*thirdparty.CommunityInfo, *InfoState, error) {
-	return cm.db.GetCommunityInfo(id)
+	communityInfo, state, err := cm.db.GetCommunityInfo(id)
+	if err != nil {
+		return nil, nil, err
+	}
+	if cm.mediaServer != nil && communityInfo != nil && len(communityInfo.CommunityImagePayload) > 0 {
+		communityInfo.CommunityImage = cm.mediaServer.MakeWalletCommunityImagesURL(id)
+	}
+	return communityInfo, state, err
 }
 
 func (cm *Manager) GetCommunityID(tokenURI string) string {

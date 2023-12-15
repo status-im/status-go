@@ -18,7 +18,7 @@ func NewCollectionDataDB(sqlDb *sql.DB) *CollectionDataDB {
 	}
 }
 
-const collectionDataColumns = "chain_id, contract_address, provider, name, slug, image_url, community_id"
+const collectionDataColumns = "chain_id, contract_address, provider, name, slug, image_url, image_payload, community_id"
 const collectionTraitsColumns = "chain_id, contract_address, trait_type, min, max"
 const selectCollectionTraitsColumns = "trait_type, min, max"
 
@@ -100,7 +100,7 @@ func upsertCollectionTraits(creator sqlite.StatementCreator, id thirdparty.Contr
 
 func upsertCollectionsData(creator sqlite.StatementCreator, collections []thirdparty.CollectionData) error {
 	insertCollection, err := creator.Prepare(fmt.Sprintf(`INSERT OR REPLACE INTO collection_data_cache (%s) 
-																				VALUES (?, ?, ?, ?, ?, ?, ?)`, collectionDataColumns))
+																				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, collectionDataColumns))
 	if err != nil {
 		return err
 	}
@@ -113,6 +113,7 @@ func upsertCollectionsData(creator sqlite.StatementCreator, collections []thirdp
 			c.Name,
 			c.Slug,
 			c.ImageURL,
+			c.ImagePayload,
 			c.CommunityID,
 		)
 		if err != nil {
@@ -161,6 +162,7 @@ func scanCollectionsDataRow(row *sql.Row) (*thirdparty.CollectionData, error) {
 		&c.Name,
 		&c.Slug,
 		&c.ImageURL,
+		&c.ImagePayload,
 		&c.CommunityID,
 	)
 	if err != nil {
