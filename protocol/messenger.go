@@ -2304,7 +2304,6 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 	return &response, nil
 }
 
-// TODO pablo maybe here as well, this should eventually end up in a store node I guess
 // sendChatMessage takes a minimal message and sends it based on the corresponding chat
 func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
 	displayName, err := m.settings.DisplayName()
