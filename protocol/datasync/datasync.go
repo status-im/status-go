@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	datasyncnode "github.com/vacp2p/mvds/node"
+	"github.com/vacp2p/mvds/protobuf"
 	datasyncproto "github.com/vacp2p/mvds/protobuf"
 	datasynctransport "github.com/vacp2p/mvds/transport"
 	"go.uber.org/zap"
@@ -25,35 +26,25 @@ func New(node *datasyncnode.Node, transport *NodeTransport, sendingEnabled bool,
 	return &DataSync{Node: node, NodeTransport: transport, sendingEnabled: sendingEnabled, logger: logger}
 }
 
-// UnwrapPayloadsAndAcks tries to unwrap datasync message and return messages payloads
-// and acknowledgements for previously sent messages
-func (d *DataSync) UnwrapPayloadsAndAcks(sender *ecdsa.PublicKey, payload []byte) ([][]byte, [][]byte, error) {
-	var payloads [][]byte
-	var acks [][]byte
+// Unwrap tries to unwrap datasync message and passes back the message to datasync in order to acknowledge any potential message and mark messages as acknowledged
+func (d *DataSync) Unwrap(sender *ecdsa.PublicKey, payload []byte) (*protobuf.Payload, error) {
 	logger := d.logger.With(zap.String("site", "Handle"))
 
 	datasyncMessage, err := unwrap(payload)
 	// If it failed to decode is not a protobuf message, if it successfully decoded but body is empty, is likedly a protobuf wrapped message
 	if err != nil {
 		logger.Debug("Unwrapping datasync message failed", zap.Error(err))
-		return nil, nil, err
+		return nil, err
 	} else if !datasyncMessage.IsValid() {
-		return nil, nil, errors.New("handling non-datasync message")
+		return nil, errors.New("handling non-datasync message")
 	} else {
 		logger.Debug("handling datasync message")
-		// datasync message
-		for _, message := range datasyncMessage.Messages {
-			payloads = append(payloads, message.Body)
-		}
-
-		acks = append(acks, datasyncMessage.Acks...)
-
 		if d.sendingEnabled {
 			d.add(sender, datasyncMessage)
 		}
 	}
 
-	return payloads, acks, nil
+	return &datasyncMessage, nil
 }
 
 func (d *DataSync) Stop() {

@@ -118,8 +118,9 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesWrapped() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = wrappedPayload
 
-	decodedMessages, _, err := s.sender.HandleMessages(message)
+	response, err := s.sender.HandleMessages(message)
 	s.Require().NoError(err)
+	decodedMessages := response.StatusMessages
 
 	s.Require().Equal(1, len(decodedMessages))
 	s.Require().Equal(&authorKey.PublicKey, decodedMessages[0].SigPubKey())
@@ -152,8 +153,9 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = marshalledDataSyncMessage
 
-	decodedMessages, _, err := s.sender.HandleMessages(message)
+	response, err := s.sender.HandleMessages(message)
 	s.Require().NoError(err)
+	decodedMessages := response.StatusMessages
 
 	// We send two messages, the unwrapped one will be attributed to the relayer, while the wrapped one will be attributed to the author
 	s.Require().Equal(1, len(decodedMessages))
@@ -217,8 +219,9 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = encryptedPayload
 
-	decodedMessages, _, err := s.sender.HandleMessages(message)
+	response, err := s.sender.HandleMessages(message)
 	s.Require().NoError(err)
+	decodedMessages := response.StatusMessages
 
 	// We send two messages, the unwrapped one will be attributed to the relayer,
 	// while the wrapped one will be attributed to the author.
@@ -277,7 +280,7 @@ func (s *MessageSenderSuite) TestHandleOutOfOrderHashRatchet() {
 	message.Hash = []byte{0x1}
 	message.Payload = encryptedPayload2
 
-	_, _, err = s.sender.HandleMessages(message)
+	_, err = s.sender.HandleMessages(message)
 	s.Require().NoError(err)
 
 	keyID, err := ratchet.GetKeyID()
@@ -293,8 +296,9 @@ func (s *MessageSenderSuite) TestHandleOutOfOrderHashRatchet() {
 	message.Hash = []byte{0x2}
 	message.Payload = encryptedPayload1
 
-	decodedMessages2, _, err := s.sender.HandleMessages(message)
+	response, err := s.sender.HandleMessages(message)
 	s.Require().NoError(err)
+	decodedMessages2 := response.StatusMessages
 	s.Require().NotNil(decodedMessages2)
 
 	// It should have 2 messages, the key exchange and the one from the database
@@ -330,14 +334,16 @@ func (s *MessageSenderSuite) TestHandleSegmentMessages() {
 	message.Payload = segmentedMessages[0].Payload
 
 	// First segment is received, no messages are decoded
-	decodedMessages, _, err := s.sender.HandleMessages(message)
+	response, err := s.sender.HandleMessages(message)
 	s.Require().NoError(err)
-	s.Require().Len(decodedMessages, 0)
+	s.Require().Nil(response)
 
 	// Second (and final) segment is received, reassembled message is decoded
 	message.Payload = segmentedMessages[1].Payload
-	decodedMessages, _, err = s.sender.HandleMessages(message)
+	response, err = s.sender.HandleMessages(message)
 	s.Require().NoError(err)
+
+	decodedMessages := response.StatusMessages
 	s.Require().Len(decodedMessages, 1)
 	s.Require().Equal(&authorKey.PublicKey, decodedMessages[0].SigPubKey())
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ApplicationLayer.ID)
@@ -345,6 +351,6 @@ func (s *MessageSenderSuite) TestHandleSegmentMessages() {
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].ApplicationLayer.Type)
 
 	// Receiving another segment after the message has been reassembled is considered an error
-	_, _, err = s.sender.HandleMessages(message)
+	_, err = s.sender.HandleMessages(message)
 	s.Require().ErrorIs(err, ErrMessageSegmentsAlreadyCompleted)
 }
