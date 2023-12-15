@@ -1774,6 +1774,16 @@ func (w *Waku) MarkP2PMessageAsProcessed(hash gethcommon.Hash) {
 	delete(w.storeMsgIDs, hash)
 }
 
+func (w *Waku) Clean() error {
+	w.msgQueue = make(chan *common.ReceivedMessage, messageQueueLimit)
+
+	for _, f := range w.filters.All() {
+		f.Messages = common.NewMemoryMessageStore()
+	}
+
+	return nil
+}
+
 // validatePrivateKey checks the format of the given private key.
 func validatePrivateKey(k *ecdsa.PrivateKey) bool {
 	if k == nil || k.D == nil || k.D.Sign() == 0 {

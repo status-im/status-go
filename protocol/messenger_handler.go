@@ -29,6 +29,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/identity"
+	"github.com/status-im/status-go/protocol/peersyncing"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
@@ -2071,7 +2072,6 @@ func handleContactRequestChatMessage(receivedMessage *common.Message, contact *C
 
 func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen bool) error {
 	logger := m.logger.With(zap.String("site", "handleChatMessage"))
-	logger.Info("state", zap.Any("state", state))
 	if err := ValidateReceivedChatMessage(state.CurrentMessageState.Message, state.CurrentMessageState.WhisperTimestamp); err != nil {
 		logger.Warn("failed to validate message", zap.Error(err))
 		return err
@@ -2347,10 +2347,37 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		}
 	}
 
+	err = m.addPeersyncingMessage(chat, state.CurrentMessageState.StatusMessage)
+	if err != nil {
+		m.logger.Warn("failed to add peersyncing message", zap.Error(err))
+	}
+
 	receivedMessage.New = true
 	state.Response.AddMessage(receivedMessage)
 
 	return nil
+}
+
+func (m *Messenger) addPeersyncingMessage(chat *Chat, msg *v1protocol.StatusMessage) error {
+	if msg == nil {
+		return nil
+	}
+	var syncMessageType peersyncing.SyncMessageType
+	if chat.OneToOne() {
+		syncMessageType = peersyncing.SyncMessageOneToOneType
+	} else if chat.CommunityChat() {
+		syncMessageType = peersyncing.SyncMessageCommunityType
+	} else if chat.PrivateGroupChat() {
+		syncMessageType = peersyncing.SyncMessagePrivateGroup
+	}
+	syncMessage := peersyncing.SyncMessage{
+		Type:      syncMessageType,
+		ID:        msg.ApplicationLayer.ID,
+		GroupID:   []byte(chat.ID),
+		Payload:   msg.EncryptionLayer.Payload,
+		Timestamp: uint64(msg.TransportLayer.Message.Timestamp),
+	}
+	return m.peersyncing.Add(syncMessage)
 }
 
 func (m *Messenger) HandleChatMessage(state *ReceivedMessageState, message *protobuf.ChatMessage, statusMessage *v1protocol.StatusMessage, fromArchive bool) error {

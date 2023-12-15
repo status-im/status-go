@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -50,6 +49,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
+	"github.com/status-im/status-go/protocol/peersyncing"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
@@ -177,6 +177,10 @@ type Messenger struct {
 
 	// used to track dispatched messages
 	dispatchMessageTestCallback func(common.RawMessage)
+
+	peersyncing         *peersyncing.PeerSyncing
+	peersyncingOffers   map[string]uint64
+	peersyncingRequests map[string]uint64
 }
 
 type connStatus int
@@ -524,6 +528,9 @@ func NewMessenger(
 		database:                database,
 		multiAccounts:           c.multiAccount,
 		settings:                settings,
+		peersyncing:             peersyncing.New(peersyncing.Config{Database: database, Timesource: transp}),
+		peersyncingOffers:       make(map[string]uint64),
+		peersyncingRequests:     make(map[string]uint64),
 		peerStore:               peerStore,
 		verificationDatabase:    verification.NewPersistence(database),
 		mailserverCycle: mailserverCycle{
@@ -663,6 +670,9 @@ func (m *Messenger) processSentMessages(ids []string) error {
 }
 
 func (m *Messenger) shouldResendMessage(message *common.RawMessage, t common.TimeSource) (bool, error) {
+	if m.featureFlags.ResendRawMessagesDisabled {
+		return false, nil
+	}
 	//exponential backoff depends on how many attempts to send message already made
 	backoff := uint64(math.Pow(2, float64(message.SendCount-1))) * uint64(m.config.messageResendMinDelay) * uint64(time.Second.Milliseconds())
 	backoffElapsed := t.GetCurrentTime() > (message.LastSent + backoff)
@@ -769,6 +779,9 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 
 	// set shared secret handles
 	m.sender.SetHandleSharedSecrets(m.handleSharedSecrets)
+	if err := m.sender.StartDatasync(m.sendDataSync); err != nil {
+		return nil, err
+	}
 
 	subscriptions, err := m.encryptor.Start(m.identity)
 	if err != nil {
@@ -804,6 +817,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 			return nil, err
 		}
 	}
+	m.startPeerSyncingLoop()
 	m.startSyncSettingsLoop()
 	m.startSettingsChangesLoop()
 	m.startCommunityRekeyLoop()
@@ -2392,6 +2406,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	// the sent status in a different table and join on query for messages,
 	// but that's a much larger change and it would require an expensive migration of clients
 	rawMessage.BeforeDispatch = func(rawMessage *common.RawMessage) error {
+
 		if rawMessage.Sent {
 			message.OutgoingStatus = common.OutgoingStatusSent
 		}
@@ -2406,10 +2421,43 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			return err
 		}
 
+		err := m.persistence.SaveMessages([]*common.Message{message})
+		if err != nil {
+			return err
+		}
+
+		var syncMessageType peersyncing.SyncMessageType
+		if chat.OneToOne() {
+			syncMessageType = peersyncing.SyncMessageOneToOneType
+		} else if chat.CommunityChat() {
+			syncMessageType = peersyncing.SyncMessageCommunityType
+		} else if chat.PrivateGroupChat() {
+			syncMessageType = peersyncing.SyncMessagePrivateGroup
+
+		}
+
+		wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, rawMessage.Sender)
+		if err != nil {
+			return errors.Wrap(err, "failed to wrap message")
+		}
+
+		syncMessage := peersyncing.SyncMessage{
+			Type:      syncMessageType,
+			ID:        types.Hex2Bytes(rawMessage.ID),
+			GroupID:   []byte(chat.ID),
+			Payload:   wrappedMessage,
+			Timestamp: m.transport.GetCurrentTime() / 1000,
+		}
+
+		// If the chat type is not supported, skip saving it
+		if syncMessageType == 0 {
+			return nil
+		}
+
 		// ensure that the message is saved only once
 		rawMessage.BeforeDispatch = nil
 
-		return m.persistence.SaveMessages([]*common.Message{message})
+		return m.peersyncing.Add(syncMessage)
 	}
 
 	rawMessage, err = m.dispatchMessage(ctx, rawMessage)
@@ -3328,6 +3376,8 @@ type CurrentMessageState struct {
 	Contact *Contact
 	// PublicKey is the public key of the author of the message
 	PublicKey *ecdsa.PublicKey
+
+	StatusMessage *v1protocol.StatusMessage
 }
 
 type ReceivedMessageState struct {
@@ -3358,36 +3408,6 @@ type ReceivedMessageState struct {
 	AllBookmarks            map[string]*browsers.Bookmark
 	AllVerificationRequests []*verification.Request
 	AllTrustStatus          map[string]verification.TrustStatus
-}
-
-func (m *Messenger) markDeliveredMessages(acks [][]byte) {
-	for _, ack := range acks {
-		//get message ID from database by datasync ID, with at-least-one
-		// semantic
-		messageIDBytes, err := m.persistence.MarkAsConfirmed(ack, true)
-		if err != nil {
-			m.logger.Info("got datasync acknowledge for message we don't have in db", zap.String("ack", hex.EncodeToString(ack)))
-			continue
-		}
-
-		messageID := messageIDBytes.String()
-		//mark messages as delivered
-
-		err = m.UpdateMessageOutgoingStatus(messageID, common.OutgoingStatusDelivered)
-		if err != nil {
-			m.logger.Debug("Can't set message status as delivered", zap.Error(err))
-		}
-
-		//send signal to client that message status updated
-		if m.config.messengerSignalsHandler != nil {
-			message, err := m.persistence.MessageByID(messageID)
-			if err != nil {
-				m.logger.Debug("Can't get message from database", zap.Error(err))
-				continue
-			}
-			m.config.messengerSignalsHandler.MessageDelivered(message.LocalChatID, messageID)
-		}
-	}
 }
 
 // addNewMessageNotification takes a common.Message and generates a new NotificationBody and appends it to the
@@ -3611,6 +3631,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 					WhisperTimestamp: uint64(msg.TransportLayer.Message.Timestamp) * 1000,
 					Contact:          contact,
 					PublicKey:        publicKey,
+					StatusMessage:    msg,
 				}
 
 				if msg.ApplicationLayer.Payload != nil {
@@ -3740,7 +3761,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			if m.telemetryClient != nil {
 				go m.telemetryClient.PushReceivedMessages(filter, shhMessage, statusMessages)
 			}
-			m.markDeliveredMessages(handleMessagesResponse.DatasyncAcks)
+
+			err = m.handleDatasyncMetadata(handleMessagesResponse)
+			if err != nil {
+				m.logger.Warn("failed to handle datasync metadata", zap.Error(err))
+			}
 
 			logger.Debug("processing messages further", zap.Int("count", len(statusMessages)))
 
@@ -3802,6 +3827,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					WhisperTimestamp: uint64(msg.TransportLayer.Message.Timestamp) * 1000,
 					Contact:          contact,
 					PublicKey:        publicKey,
+					StatusMessage:    msg,
 				}
 
 				if msg.ApplicationLayer.Payload != nil {

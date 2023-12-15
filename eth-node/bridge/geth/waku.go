@@ -271,6 +271,7 @@ func (w *gethWakuWrapper) MarkP2PMessageAsProcessed(hash common.Hash) {
 func (w *gethWakuWrapper) RequestStoreMessages(ctx context.Context, peerID []byte, r types.MessagesRequest, processEnvelopes bool) (*types.StoreRequestCursor, int, error) {
 	return nil, 0, errors.New("not implemented")
 }
+
 func (w *gethWakuWrapper) ConnectionChanged(_ connection.State) {}
 
 type wakuFilterWrapper struct {

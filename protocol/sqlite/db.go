@@ -9,7 +9,7 @@ import (
 	"github.com/status-im/migrate/v4"
 	"github.com/status-im/migrate/v4/database/sqlcipher"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
-	mvdsmigrations "github.com/vacp2p/mvds/persistenceutil"
+	mvdsmigrations "github.com/status-im/mvds/persistenceutil"
 )
 
 var migrationsTable = "status_protocol_go_" + sqlcipher.DefaultMigrationsTable

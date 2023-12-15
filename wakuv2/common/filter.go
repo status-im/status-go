@@ -203,6 +203,16 @@ func (fs *Filters) Get(id string) *Filter {
 	return fs.watchers[id]
 }
 
+func (fs *Filters) All() []*Filter {
+	fs.RLock()
+	defer fs.RUnlock()
+	var filters []*Filter
+	for _, f := range fs.watchers {
+		filters = append(filters, f)
+	}
+	return filters
+}
+
 func (fs *Filters) GetFilters() map[string]*Filter {
 	fs.RLock()
 	defer fs.RUnlock()

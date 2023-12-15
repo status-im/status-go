@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
 func TestMessengerContactRequestSuite(t *testing.T) {
@@ -1289,6 +1290,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	state.CurrentMessageState = &CurrentMessageState{
 		PublicKey:        &contactKey.PublicKey,
 		MessageID:        "0xa",
+		StatusMessage:    &v1protocol.StatusMessage{TransportLayer: v1protocol.TransportLayer{Message: &types.Message{Timestamp: 1}}, ApplicationLayer: v1protocol.ApplicationLayer{ID: []byte("test-id")}},
 		Contact:          contact,
 		WhisperTimestamp: 1,
 	}

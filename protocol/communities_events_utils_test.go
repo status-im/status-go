@@ -1492,15 +1492,25 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 		"control node did not receive event senders decision",
 	)
 	s.Require().NoError(err)
-	// request to join is now marked as rejected
-	rejectedRequests, err := base.GetControlNode().DeclinedRequestsToJoinForCommunity(community.ID())
+
+	err = tt.RetryWithBackOff(func() error {
+		// request to join is now marked as rejected
+		rejectedRequests, err := base.GetControlNode().DeclinedRequestsToJoinForCommunity(community.ID())
+		if err != nil {
+			return err
+		}
+		if len(rejectedRequests) != 1 {
+			return errors.New("rejected requests should be 1")
+		}
+
+		return nil
+	})
 	s.Require().NoError(err)
-	s.Require().NotNil(rejectedRequests)
-	s.Require().Len(rejectedRequests, 1)
 
 	// event sender 2 accepts request to join
 	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: sentRequest.ID}
 	_, err = additionalEventSender.AcceptRequestToJoinCommunity(acceptRequestToJoin)
+
 	s.Require().NoError(err)
 	// request to join is now marked as accepted pending for event sender 2
 	acceptedPendingRequests, err := additionalEventSender.AcceptedPendingRequestsToJoinForCommunity(community.ID())
@@ -1515,12 +1525,23 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 		"control node did not receive event senders decision",
 	)
 	s.Require().NoError(err)
-	rejectedRequests, err = base.GetControlNode().DeclinedRequestsToJoinForCommunity(community.ID())
+
+	err = tt.RetryWithBackOff(func() error {
+		rejectedRequests, err := base.GetControlNode().DeclinedRequestsToJoinForCommunity(community.ID())
+		if err != nil {
+			return err
+		}
+		if len(rejectedRequests) != 1 {
+			return errors.New("rejected requests should be 1")
+		}
+		// we expect user's request to join still to be rejected
+		if rejectedRequests[0].PublicKey != common.PubkeyToHex(&user.identity.PublicKey) {
+			return errors.New("public key of rejected request not matching")
+		}
+		return nil
+
+	})
 	s.Require().NoError(err)
-	s.Require().NotNil(rejectedRequests)
-	s.Require().Len(rejectedRequests, 1)
-	// we expect user's request to join still to be rejected
-	s.Require().Equal(rejectedRequests[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
 }
 */
 

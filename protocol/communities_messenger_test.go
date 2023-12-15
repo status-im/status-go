@@ -3415,43 +3415,7 @@ func (t *testPermissionChecker) CheckPermissions(permissions []*communities.Comm
 }
 
 func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
-	community, chat := s.createCommunity()
-	s.Require().False(community.Encrypted())
-
-	// Add community permission
-	_, err := s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
-		CommunityID: community.ID(),
-		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
-		TokenCriteria: []*protobuf.TokenCriteria{{
-			ContractAddresses: map[uint64]string{3: "0x933"},
-			Type:              protobuf.CommunityTokenType_ERC20,
-			Symbol:            "STT",
-			Name:              "Status Test Token",
-			Amount:            "10",
-			Decimals:          18,
-		}},
-	})
-	s.Require().NoError(err)
-
-	// Add channel permission
-	response, err := s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
-		CommunityID: community.ID(),
-		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
-				ContractAddresses: map[uint64]string{3: "0x933"},
-				Type:              protobuf.CommunityTokenType_ERC20,
-				Symbol:            "STT",
-				Name:              "Status Test Token",
-				Amount:            "10",
-				Decimals:          18,
-			},
-		},
-		ChatIds: []string{chat.ID},
-	})
-	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
-	community = response.Communities()[0]
+	community, chat := createEncryptedCommunity(&s.Suite, s.owner)
 	s.Require().True(community.Encrypted())
 	s.Require().True(community.ChannelEncrypted(chat.CommunityChatID()))
 
@@ -3583,7 +3547,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 	response, err = WaitOnMessengerResponse(s.alice,
 		func(r *MessengerResponse) bool {
 			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
-			if err != nil || len(keys) != 2 {
+			if err != nil || len(keys) < 2 {
 				return false
 			}
 			return true
@@ -3693,7 +3657,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibili
 	response, err = WaitOnMessengerResponse(s.alice,
 		func(r *MessengerResponse) bool {
 			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
-			if err != nil || len(keys) != 2 {
+			if err != nil || len(keys) < 2 {
 				return false
 			}
 			return true

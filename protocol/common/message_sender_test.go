@@ -14,11 +14,12 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	datasyncproto "github.com/vacp2p/mvds/protobuf"
+	datasyncproto "github.com/status-im/mvds/protobuf"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/datasync"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -142,6 +143,9 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
+	ds := datasync.New(nil, nil, false, s.sender.logger)
+	s.sender.datasync = ds
+
 	dataSyncMessage := datasyncproto.Payload{
 		Messages: []*datasyncproto.Message{
 			{Body: wrappedPayload},
@@ -218,6 +222,9 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	message := &types.Message{}
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = encryptedPayload
+
+	ds := datasync.New(nil, nil, false, s.sender.logger)
+	s.sender.datasync = ds
 
 	response, err := s.sender.HandleMessages(message)
 	s.Require().NoError(err)
