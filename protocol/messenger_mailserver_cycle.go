@@ -418,7 +418,7 @@ func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 
 			// Query mailserver
 			go func() {
-				_, err := m.performMailserverRequest(func() (*MessengerResponse, error) { return m.RequestAllHistoricMessages(false) })
+				_, err := m.performMailserverRequest(&ms, func(_ mailservers.Mailserver) (*MessengerResponse, error) { return m.RequestAllHistoricMessages(false) })
 				if err != nil {
 					m.logger.Error("could not perform mailserver request", zap.Error(err))
 				}
