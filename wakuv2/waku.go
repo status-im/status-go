@@ -1024,7 +1024,9 @@ func (w *Waku) broadcast() {
 			var fn publishFn
 			if w.settings.SkipPublishToTopic {
 				// For now only used in testing to simulate going offline
-				fn = func(env *protocol.Envelope, logger *zap.Logger) error { return errors.New("test send failure") }
+				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
+					return errors.New("test send failure")
+				}
 			} else if w.settings.LightClient {
 				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
 					logger.Info("publishing message via lightpush")
@@ -1039,6 +1041,7 @@ func (w *Waku) broadcast() {
 				}
 			}
 
+			w.wg.Add(1)
 			go w.publishEnvelope(envelope, fn, logger)
 		case <-w.ctx.Done():
 			return
@@ -1049,6 +1052,8 @@ func (w *Waku) broadcast() {
 type publishFn = func(envelope *protocol.Envelope, logger *zap.Logger) error
 
 func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publishFn, logger *zap.Logger) {
+	defer w.wg.Done()
+
 	var event common.EventType
 	if err := publishFn(envelope, logger); err != nil {
 		logger.Error("could not send message", zap.Error(err))
