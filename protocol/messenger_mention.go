@@ -428,6 +428,7 @@ func (m *MentionManager) ToInputField(chatID, text string) (*ChatMentionContext,
 	if err != nil {
 		return nil, err
 	}
+	text = strings.ReplaceAll(text, "@everyone ", "@"+common.EveryoneMentionTag)
 	textWithMentions := toInputField(text)
 	newText := ""
 	for i, segment := range textWithMentions {
