@@ -668,8 +668,8 @@ func kickMember(base CommunityEventsTestsInterface, communityID types.HexBytes, 
 			return errors.New("alice should not be not kicked (yet)")
 		}
 
-		if len(modifiedCommmunity.PendingAndBannedMembers()) > 0 {
-			return errors.New("alice should not know about banned and pending members")
+		if len(modifiedCommmunity.PendingAndBannedMembers()) == 0 {
+			return errors.New("alice should know about banned and pending members")
 		}
 
 		return nil
@@ -749,8 +749,8 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 			return errors.New("alice should not be not banned (yet)")
 		}
 
-		if len(modifiedCommmunity.PendingAndBannedMembers()) > 0 {
-			return errors.New("alice should not know about banned and pending members")
+		if len(modifiedCommmunity.PendingAndBannedMembers()) == 0 {
+			return errors.New("alice should know about banned and pending members")
 		}
 
 		return nil
@@ -817,8 +817,8 @@ func unbanMember(base CommunityEventsTestsInterface, unbanRequest *requests.Unba
 			return err
 		}
 
-		if len(modifiedCommmunity.PendingAndBannedMembers()) > 0 {
-			return errors.New("alice should not know about banned and pending members")
+		if len(modifiedCommmunity.PendingAndBannedMembers()) == 0 {
+			return errors.New("alice should know about banned and pending members")
 		}
 
 		return nil
