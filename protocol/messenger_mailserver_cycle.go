@@ -354,19 +354,14 @@ func (m *Messenger) findNewMailserver() error {
 
 }
 
-func (m *Messenger) activeMailserverStatus() (connStatus, error) {
-	if m.mailserverCycle.activeMailserver == nil {
-		return disconnected, errors.New("Active mailserver is not set")
+func (m *Messenger) mailserverStatus(mailserverID string) connStatus {
+	m.mailPeersMutex.RLock()
+	defer m.mailPeersMutex.RUnlock()
+	peer, ok := m.mailserverCycle.peers[mailserverID]
+	if !ok {
+		return disconnected
 	}
-
-	mailserverID := m.mailserverCycle.activeMailserver.ID
-
-	m.mailPeersMutex.Lock()
-	status := m.mailserverCycle.peers[mailserverID].status
-	m.mailPeersMutex.Unlock()
-
-	return status, nil
-
+	return peer.status
 }
 
 func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
@@ -381,11 +376,7 @@ func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 	// received after the peer was added. So we first set the peer status as
 	// Connecting and once a peerConnected signal is received, we mark it as
 	// Connected
-	activeMailserverStatus, err := m.activeMailserverStatus()
-	if err != nil {
-		return err
-	}
-
+	activeMailserverStatus := m.mailserverStatus(ms.ID)
 	if ms.Version != m.transport.WakuVersion() {
 		return errors.New("mailserver waku version doesn't match")
 	}
@@ -437,20 +428,51 @@ func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 	return nil
 }
 
-func (m *Messenger) getActiveMailserver() *mailservers.Mailserver {
-	return m.mailserverCycle.activeMailserver
+func (m *Messenger) getActiveMailserverByChatID(chatID string) *mailservers.Mailserver {
+	communityID := "" // defualt to none
+	chat, ok := m.allChats.Load(chatID)
+	if ok && chat.CommunityChat() && m.communityStorenodes.HasStorenodeSetup(chat.CommunityID) {
+		communityID = chat.CommunityID
+	}
+	return m.getActiveMailserver(communityID)
+}
+
+// getActiveMailserver returns the active mailserver if a communityID is present then it'll return the mailserver
+// for that community if it has a mailserver setup otherwise it'll return the global mailserver
+func (m *Messenger) getActiveMailserver(communityID ...string) *mailservers.Mailserver {
+	if len(communityID) == 0 || communityID[0] == "" {
+		return m.mailserverCycle.activeMailserver
+	}
+	ms, err := m.communityStorenodes.GetStorenodeByCommunnityID(communityID[0])
+	if err != nil {
+		if err == ErrNotFound {
+			m.logger.Debug("not found specific mailserver for community, using global", zap.String("communityID", communityID[0]))
+		} else {
+			m.logger.Error("not found specific mailserver for community, using global", zap.String("communityID", communityID[0]), zap.Error(err))
+		}
+		// if we don't find a specific mailserver for the community, we use the global one
+		return m.mailserverCycle.activeMailserver
+	}
+	return &ms
+}
+
+// getActiveMailserverID returns the ID of the active mailserver or an empty string if none is set
+func (m *Messenger) getActiveMailserverID() string {
+	if m.mailserverCycle.activeMailserver != nil {
+		return m.mailserverCycle.activeMailserver.ID
+	}
+	return ""
 }
 
 func (m *Messenger) isActiveMailserverAvailable() bool {
-	mailserverStatus, err := m.activeMailserverStatus()
-	if err != nil {
-		return false
-	}
-
-	return mailserverStatus == connected
+	return m.mailserverStatus(m.getActiveMailserverID()) == connected
 }
 
-func (m *Messenger) mailserverAddressToID(uniqueID string, allMailservers []mailservers.Mailserver) (string, error) {
+func (m *Messenger) isMailserverAvailable(mailserverID string) bool {
+	return m.mailserverStatus(mailserverID) == connected
+}
+
+func mailserverAddressToID(uniqueID string, allMailservers []mailservers.Mailserver) (string, error) {
 	for _, ms := range allMailservers {
 		if uniqueID == ms.UniqueID() {
 			return ms.ID, nil
@@ -489,6 +511,7 @@ func (m *Messenger) penalizeMailserver(id string) {
 	m.mailserverCycle.peers[id] = pInfo
 }
 
+// handleMailserverCycleEvent runs every 1 second or when updating peers to keep the data of the active mailserver updated
 func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) error {
 	m.logger.Debug("mailserver cycle event",
 		zap.Any("connected", connectedPeers),
@@ -505,7 +528,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 
 		found := false
 		for _, connectedPeer := range connectedPeers {
-			id, err := m.mailserverAddressToID(connectedPeer.UniqueID, m.mailserverCycle.allMailservers)
+			id, err := mailserverAddressToID(connectedPeer.UniqueID, m.mailserverCycle.allMailservers)
 			if err != nil {
 				m.logger.Error("failed to convert id to hex", zap.Error(err))
 				return err
@@ -531,7 +554,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 	// not available error
 	if m.mailserverCycle.activeMailserver != nil {
 		for _, connectedPeer := range connectedPeers {
-			id, err := m.mailserverAddressToID(connectedPeer.UniqueID, m.mailserverCycle.allMailservers)
+			id, err := mailserverAddressToID(connectedPeer.UniqueID, m.mailserverCycle.allMailservers)
 			if err != nil {
 				m.logger.Error("failed to convert id to hex", zap.Error(err))
 				return err
@@ -559,7 +582,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 				}
 				// Query mailserver
 				go func() {
-					_, err := m.performMailserverRequest(func() (*MessengerResponse, error) { return m.RequestAllHistoricMessages(false) })
+					_, err := m.RequestAllHistoricMessages(false, true)
 					if err != nil {
 						m.logger.Error("could not perform mailserver request", zap.Error(err))
 					}

@@ -132,6 +132,7 @@ type Messenger struct {
 	modifiedInstallations      *stringBoolMap
 	installationID             string
 	mailserverCycle            mailserverCycle
+	communityStorenodes        *communityStoreNodes
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
 	settings                   *accounts.Database
@@ -168,7 +169,7 @@ type Messenger struct {
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex                     sync.Mutex
-	mailPeersMutex            sync.Mutex
+	mailPeersMutex            sync.RWMutex
 	handleMessagesMutex       sync.Mutex
 	handleImportMessagesMutex sync.Mutex
 
@@ -533,7 +534,12 @@ func NewMessenger(
 			peers:                     make(map[string]peerStatus),
 			availabilitySubscriptions: make([]chan struct{}, 0),
 		},
-		mailserversDatabase:      c.mailserversDatabase,
+		mailserversDatabase: c.mailserversDatabase,
+		communityStorenodes: &communityStoreNodes{
+			storenodesByCommunityIDMutex: &sync.RWMutex{},
+			storenodesByCommunityID:      make(map[string]storenodesData),
+			storenodesDatabase:           c.mailserversDatabase,
+		},
 		account:                  c.account,
 		quit:                     make(chan struct{}),
 		ctx:                      ctx,
@@ -829,6 +835,10 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
+	if err := m.communityStorenodes.ReloadFromDB(); err != nil {
+		return nil, err
+	}
+
 	controlledCommunities, err := m.communitiesManager.Controlled()
 	if err != nil {
 		return nil, err
@@ -927,7 +937,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 			m.shouldPublishContactCode = false
 		}
 		go func() {
-			_, err := m.RequestAllHistoricMessagesWithRetries(false)
+			_, err := m.RequestAllHistoricMessages(false, true)
 			if err != nil {
 				m.logger.Warn("failed to fetch historic messages", zap.Error(err))
 			}
@@ -2146,7 +2156,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			return rawMessage, err
 		}
 	case ChatTypeCommunityChat:
-
+		// TODO pablo this might end up in a store node?? I don't know
 		community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
 		if err != nil {
 			return rawMessage, err
@@ -2294,6 +2304,7 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 	return &response, nil
 }
 
+// TODO pablo maybe here as well, this should eventually end up in a store node I guess
 // sendChatMessage takes a minimal message and sends it based on the corresponding chat
 func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
 	displayName, err := m.settings.DisplayName()

@@ -74,8 +74,9 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 	}
 
 	go func() {
-		_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
-			response, err := m.syncChatWithFilters(chat.ID)
+		ms := m.getActiveMailserver(chat.CommunityID)
+		_, err = m.performMailserverRequest(ms, func(mailServer mailservers.Mailserver) (*MessengerResponse, error) {
+			response, err := m.syncChatWithFilters(chat.ID) // TODO mailserver selection here
 
 			if err != nil {
 				m.logger.Error("failed to sync chat", zap.Error(err))
@@ -110,43 +111,40 @@ func (m *Messenger) connectToNewMailserverAndWait() error {
 	return m.findNewMailserver()
 }
 
-func (m *Messenger) performMailserverRequest(fn func() (*MessengerResponse, error)) (*MessengerResponse, error) {
+func (m *Messenger) performMailserverRequest(ms *mailservers.Mailserver, fn func(mailServer mailservers.Mailserver) (*MessengerResponse, error)) (*MessengerResponse, error) {
+	if ms == nil {
+		return nil, errors.New("mailserver not available")
+	}
 
 	m.mailserverCycle.RLock()
 	defer m.mailserverCycle.RUnlock()
 	var tries uint = 0
 	for tries < mailserverMaxTries {
-		if !m.isActiveMailserverAvailable() {
+		if !m.isMailserverAvailable(ms.ID) {
 			return nil, errors.New("mailserver not available")
 		}
-
-		m.logger.Info("trying performing mailserver requests", zap.Uint("try", tries))
-		activeMailserver := m.getActiveMailserver()
-		// Make sure we are connected to a mailserver
-		if activeMailserver == nil {
-			return nil, errors.New("mailserver not available")
-		}
+		m.logger.Info("trying performing mailserver requests", zap.Uint("try", tries), zap.String("mailserverID", ms.ID))
 
 		// Peform request
-		response, err := fn()
+		response, err := fn(*ms) // pass by value because we don't want the fn to modify the mailserver
 		if err == nil {
 			// Reset failed requests
-			activeMailserver.FailedRequests = 0
+			ms.FailedRequests = 0
 			return response, nil
 		}
 
 		m.logger.Error("failed to perform mailserver request",
-			zap.String("mailserverID", activeMailserver.ID),
+			zap.String("mailserverID", ms.ID),
 			zap.Uint("tries", tries),
 			zap.Error(err),
 		)
 
 		tries++
 		// Increment failed requests
-		activeMailserver.FailedRequests++
+		ms.FailedRequests++
 
 		// Change mailserver
-		if activeMailserver.FailedRequests >= mailserverMaxFailedRequests {
+		if ms.FailedRequests >= mailserverMaxFailedRequests {
 			return nil, errors.New("too many failed requests")
 		}
 		// Wait a couple of second not to spam
@@ -168,21 +166,36 @@ func (m *Messenger) scheduleSyncFilters(filters []*transport.Filter) (bool, erro
 	}
 
 	go func() {
-		_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
-			response, err := m.syncFilters(filters)
+		// split filters by community store node so we can request the filters to the correct mailserver
+		filtersByMs := make(map[string][]*transport.Filter, len(filters))
+		for _, f := range filters {
+			communityID := "" // none by default
+			if chat, ok := m.allChats.Load(f.ChatID); ok && chat.CommunityChat() && m.communityStorenodes.HasStorenodeSetup(chat.CommunityID) {
+				communityID = chat.CommunityID
+			}
+			if _, exists := filtersByMs[communityID]; !exists {
+				filtersByMs[communityID] = make([]*transport.Filter, 0, len(filters))
+			}
+			filtersByMs[communityID] = append(filtersByMs[communityID], f)
+		}
+		for communityID, filtersForMs := range filtersByMs {
+			ms := m.getActiveMailserver(communityID)
+			_, err := m.performMailserverRequest(ms, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
+				response, err := m.syncFilters(ms, filtersForMs)
 
+				if err != nil {
+					m.logger.Error("failed to sync filter", zap.Error(err))
+					return nil, err
+				}
+
+				if m.config.messengerSignalsHandler != nil {
+					m.config.messengerSignalsHandler.MessengerResponse(response)
+				}
+				return response, nil
+			})
 			if err != nil {
-				m.logger.Error("failed to sync filter", zap.Error(err))
-				return nil, err
+				m.logger.Error("failed to perform mailserver request", zap.Error(err))
 			}
-
-			if m.config.messengerSignalsHandler != nil {
-				m.config.messengerSignalsHandler.MessengerResponse(response)
-			}
-			return response, nil
-		})
-		if err != nil {
-			m.logger.Error("failed to perform mailserver request", zap.Error(err))
 		}
 
 	}()
@@ -245,7 +258,9 @@ func (m *Messenger) syncChatWithFilters(chatID string) (*MessengerResponse, erro
 	if err != nil {
 		return nil, err
 	}
-	return m.syncFilters(filters)
+
+	ms := m.getActiveMailserverByChatID(chatID)
+	return m.syncFilters(*ms, filters)
 }
 
 func (m *Messenger) syncBackup() error {
@@ -258,7 +273,8 @@ func (m *Messenger) syncBackup() error {
 	to := m.calculateMailserverTo()
 	from := uint32(m.getTimesource().GetCurrentTime()/1000) - oneMonthInSeconds
 	batch := MailserverBatch{From: from, To: to, Topics: []types.TopicType{filter.ContentTopic}}
-	err := m.processMailserverBatch(batch)
+	ms := m.getActiveMailserver(filter.ChatID)
+	err := m.processMailserverBatch(*ms, batch)
 	if err != nil {
 		return err
 	}
@@ -301,13 +317,25 @@ func (m *Messenger) resetFiltersPriority(filters []*transport.Filter) {
 	}
 }
 
-func (m *Messenger) RequestAllHistoricMessagesWithRetries(forceFetchingBackup bool) (*MessengerResponse, error) {
-	return m.performMailserverRequest(func() (*MessengerResponse, error) { return m.RequestAllHistoricMessages(forceFetchingBackup) })
+func (m *Messenger) SplitFiltersByStoreNode(filters []*transport.Filter) map[string][]*transport.Filter {
+	// split filters by community store node so we can request the filters to the correct mailserver
+	filtersByMs := make(map[string][]*transport.Filter, len(filters))
+	for _, f := range filters {
+		communityID := "" // none by default
+		if chat, ok := m.allChats.Load(f.ChatID); ok && chat.CommunityChat() && m.communityStorenodes.HasStorenodeSetup(chat.CommunityID) {
+			communityID = chat.CommunityID
+		}
+		if _, exists := filtersByMs[communityID]; !exists {
+			filtersByMs[communityID] = make([]*transport.Filter, 0, len(filters))
+		}
+		filtersByMs[communityID] = append(filtersByMs[communityID], f)
+	}
+	return filtersByMs
 }
 
 // RequestAllHistoricMessages requests all the historic messages for any topic
-func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup bool) (*MessengerResponse, error) {
-	shouldSync, err := m.shouldSync()
+func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries bool) (*MessengerResponse, error) {
+	shouldSync, err := m.shouldSync() // TODO pablo mailserver here
 	if err != nil {
 		return nil, err
 	}
@@ -333,18 +361,36 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup bool) (*Messe
 	filters := m.transport.Filters()
 	m.updateFiltersPriority(filters)
 	defer m.resetFiltersPriority(filters)
-	response, err := m.syncFilters(filters)
-	if err != nil {
-		return nil, err
+
+	filtersByMs := m.SplitFiltersByStoreNode(filters)
+	responses := make([]*MessengerResponse, 0, len(filtersByMs))
+	for communityID, filtersForMs := range filtersByMs {
+		ms := m.getActiveMailserver(communityID)
+		if withRetries {
+			response, err := m.performMailserverRequest(ms, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
+				return m.syncFilters(ms, filtersForMs)
+			})
+			if err != nil {
+				return nil, err
+			}
+			responses = append(responses, response)
+			continue
+		}
+		response, err := m.syncFilters(*ms, filtersForMs)
+		if err != nil {
+			return nil, err
+		}
+		responses = append(responses, response)
 	}
-	return response, nil
+	// TODO pablo return array!
+	return responses[0], nil
 }
 
 func getPrioritizedBatches() []int {
 	return []int{1, 5, 10}
 }
 
-func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uint32) (*MessengerResponse, error) {
+func (m *Messenger) syncFiltersFrom(ms mailservers.Mailserver, filters []*transport.Filter, lastRequest uint32) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 	topicInfo, err := m.mailserversDatabase.Topics()
 	if err != nil {
@@ -515,13 +561,38 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 		}
 	}
 
-	i := 0
+	// TODO pablo we can remove this if we are passing the right mailserver
 	for _, batch := range batches24h {
-		i++
-		err := m.processMailserverBatch(batch)
-		if err != nil {
-			m.logger.Error("error syncing topics", zap.Error(err))
-			return nil, err
+		// split batches based on chat IDs that might belong to a community
+		batches24hByCommunity := make(map[string]MailserverBatch)
+		for _, chatID := range batch.ChatIDs {
+			communityIDForChat := "" // default to no community
+			chat, ok := m.allChats.Load(chatID)
+			if ok && chat.CommunityChat() && m.communityStorenodes.HasStorenodeSetup(chat.CommunityID) {
+				communityIDForChat = chat.CommunityID
+			}
+			communityBatch, exists := batches24hByCommunity[communityIDForChat]
+			if !exists {
+				communityBatch = MailserverBatch{
+					To:          batch.To,
+					Cursor:      batch.Cursor,
+					PubsubTopic: batch.PubsubTopic,
+					Topics:      batch.Topics,
+					ChatIDs:     make([]string, 0, len(batch.ChatIDs)),
+				}
+			}
+			communityBatch.ChatIDs = append(communityBatch.ChatIDs, chatID)
+			batches24hByCommunity[communityIDForChat] = communityBatch
+		}
+
+		// Process batches
+		for communityID, communityBatch := range batches24hByCommunity {
+			ms := m.getActiveMailserver(communityID)
+			err := m.processMailserverBatch(*ms, communityBatch)
+			if err != nil {
+				m.logger.Error("error syncing community topics", zap.Error(err))
+				return nil, err
+			}
 		}
 	}
 
@@ -576,8 +647,8 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 	return response, nil
 }
 
-func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse, error) {
-	return m.syncFiltersFrom(filters, 0)
+func (m *Messenger) syncFilters(ms mailservers.Mailserver, filters []*transport.Filter) (*MessengerResponse, error) {
+	return m.syncFiltersFrom(ms, filters, 0)
 }
 
 func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Message, error) {
@@ -762,12 +833,11 @@ loop:
 	return result
 }
 
-func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
-	mailserverID, err := m.activeMailserverID()
+func (m *Messenger) processMailserverBatch(ms mailservers.Mailserver, batch MailserverBatch) error {
+	mailserverID, err := ms.IDBytes()
 	if err != nil {
 		return err
 	}
-
 	return processMailserverBatch(m.ctx, m.transport, batch, mailserverID, m.logger)
 }
 
@@ -781,16 +851,17 @@ type MailserverBatch struct {
 }
 
 func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
+	chat, ok := m.allChats.Load(chatID)
+	if !ok {
+		return 0, ErrChatNotFound
+	}
+
+	ms := m.getActiveMailserver(chat.CommunityID)
 	var from uint32
-	_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
+	_, err := m.performMailserverRequest(ms, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
 		pubsubTopic, topics, err := m.topicsForChat(chatID)
 		if err != nil {
 			return nil, nil
-		}
-
-		chat, ok := m.allChats.Load(chatID)
-		if !ok {
-			return nil, ErrChatNotFound
 		}
 
 		defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
@@ -809,7 +880,7 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 			m.config.messengerSignalsHandler.HistoryRequestStarted(1)
 		}
 
-		err = m.processMailserverBatch(batch)
+		err = m.processMailserverBatch(ms, batch)
 		if err != nil {
 			return nil, err
 		}
@@ -840,7 +911,7 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 		return err
 	}
 
-	_, ok := m.allChats.Load(chatID)
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return errors.New("chat not existing")
 	}
@@ -878,7 +949,8 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 		m.config.messengerSignalsHandler.HistoryRequestStarted(1)
 	}
 
-	err = m.processMailserverBatch(batch)
+	ms := m.getActiveMailserver(chat.CommunityID)
+	err = m.processMailserverBatch(*ms, batch)
 	if err != nil {
 		return err
 	}
@@ -960,15 +1032,16 @@ func (m *Messenger) ConnectionChanged(state connection.State) {
 func (m *Messenger) fetchMessages(chatID string, duration uint32) (uint32, error) {
 	to := uint32(m.getTimesource().GetCurrentTime() / 1000)
 	from := to - duration
-	_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
+	chat, ok := m.allChats.Load(chatID)
+	if !ok {
+		return 0, ErrChatNotFound
+	}
+
+	ms := m.getActiveMailserver(chat.CommunityID)
+	_, err := m.performMailserverRequest(ms, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
 		pubsubTopic, topics, err := m.topicsForChat(chatID)
 		if err != nil {
 			return nil, nil
-		}
-
-		chat, ok := m.allChats.Load(chatID)
-		if !ok {
-			return nil, ErrChatNotFound
 		}
 
 		batch := MailserverBatch{
@@ -982,7 +1055,7 @@ func (m *Messenger) fetchMessages(chatID string, duration uint32) (uint32, error
 			m.config.messengerSignalsHandler.HistoryRequestStarted(1)
 		}
 
-		err = m.processMailserverBatch(batch)
+		err = m.processMailserverBatch(ms, batch)
 		if err != nil {
 			return nil, err
 		}

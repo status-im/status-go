@@ -37,6 +37,7 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/signal"
 )
@@ -2043,6 +2044,57 @@ func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*Mes
 	return response, nil
 }
 
+func (m *Messenger) SetCommunityMailServers(request *requests.SetCommunityMailServers) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+	community, err := m.communitiesManager.GetByID(request.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, communities.ErrOrgNotFound
+	}
+	if !community.IsControlNode() {
+		return nil, errors.New("not admin or owner")
+	}
+
+	err = m.mailserversDatabase.SaveMailserversForCommunity(request.CommunityID, request.MailServers)
+	if err != nil {
+		return nil, err
+	}
+	if err := m.communityStorenodes.ReloadFromDB(); err != nil {
+		return nil, err
+	}
+	response := &MessengerResponse{
+		Mailservers: request.MailServers,
+	}
+	return response, nil
+}
+
+func (m *Messenger) GetCommunityMailServers(id types.HexBytes) (*MessengerResponse, error) {
+	community, err := m.communitiesManager.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, communities.ErrOrgNotFound
+	}
+	if !community.IsControlNode() {
+		return nil, errors.New("not admin or owner")
+	}
+
+	mailservers, err := m.mailserversDatabase.GetMailserversForCommunity(id)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{
+		Mailservers: mailservers,
+	}
+	return response, nil
+}
+
 func (m *Messenger) UpdateCommunityFilters(community *communities.Community) error {
 	defaultFilters := m.DefaultFilters(community)
 	publicFiltersToInit := make([]transport.FiltersToInitialize, 0, len(defaultFilters)+len(community.Chats()))
@@ -2588,7 +2640,8 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard
 	to := uint32(math.Ceil(float64(m.GetCurrentTimeInMillis()) / 1000))
 	from := to - oneMonthInSeconds
 
-	_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
+	ms := m.getActiveMailserver(communityID)
+	_, err := m.performMailserverRequest(ms, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
 		batch := MailserverBatch{
 			From:        from,
 			To:          to,
@@ -2596,7 +2649,7 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard
 			PubsubTopic: filter.PubsubTopic,
 		}
 		m.logger.Info("requesting historic", zap.Any("batch", batch))
-		err := m.processMailserverBatch(batch)
+		err := m.processMailserverBatch(ms, batch)
 		return nil, err
 	})
 
@@ -2647,8 +2700,12 @@ func (m *Messenger) requestCommunitiesFromMailserver(communities []communities.C
 	m.requestedCommunitiesLock.Lock()
 	defer m.requestedCommunitiesLock.Unlock()
 
+	type topicData struct {
+		contentTopics map[types.TopicType]struct{}
+		communityID   string
+	}
 	// we group topics by PubsubTopic
-	groupedTopics := map[string]map[types.TopicType]struct{}{}
+	var groupedTopics map[string]topicData
 
 	for _, c := range communities {
 		if _, ok := m.requestedCommunities[c.CommunityID]; ok {
@@ -2679,10 +2736,12 @@ func (m *Messenger) requestCommunitiesFromMailserver(communities []communities.C
 		}
 
 		if _, ok := groupedTopics[filter.PubsubTopic]; !ok {
-			groupedTopics[filter.PubsubTopic] = map[types.TopicType]struct{}{}
+			groupedTopics[filter.PubsubTopic] = topicData{
+				contentTopics: make(map[types.TopicType]struct{}),
+				communityID:   c.CommunityID,
+			}
 		}
-
-		groupedTopics[filter.PubsubTopic][filter.ContentTopic] = struct{}{}
+		groupedTopics[filter.PubsubTopic].contentTopics[filter.ContentTopic] = struct{}{}
 	}
 
 	defer func() {
@@ -2696,25 +2755,27 @@ func (m *Messenger) requestCommunitiesFromMailserver(communities []communities.C
 
 	wg := sync.WaitGroup{}
 
-	for pubsubTopic, contentTopics := range groupedTopics {
+	for pubsubTopic, data := range groupedTopics {
 		wg.Add(1)
-		go func(pubsubTopic string, contentTopics map[types.TopicType]struct{}) {
+		go func(pubsubTopic string, data topicData) {
 			batch := MailserverBatch{
 				From:        from,
 				To:          to,
-				Topics:      maps.Keys(contentTopics),
+				Topics:      maps.Keys(data.contentTopics),
 				PubsubTopic: pubsubTopic,
 			}
-			_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
+
+			ms := m.getActiveMailserver(data.communityID)
+			_, err := m.performMailserverRequest(ms, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
 				m.logger.Info("requesting historic", zap.Any("batch", batch))
-				err := m.processMailserverBatch(batch)
+				err := m.processMailserverBatch(ms, batch)
 				return nil, err
 			})
 			if err != nil {
 				m.logger.Error("error performing mailserver request", zap.Any("batch", batch), zap.Error(err))
 			}
 			wg.Done()
-		}(pubsubTopic, contentTopics)
+		}(pubsubTopic, data)
 	}
 
 	wg.Wait()
@@ -3364,7 +3425,8 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			}
 
 			// Request possibly missed waku messages for community
-			_, err = m.syncFiltersFrom(filters, uint32(latestWakuMessageTimestamp))
+			ms := m.getActiveMailserver(c.ID().String())
+			_, err = m.syncFiltersFrom(*ms, filters, uint32(latestWakuMessageTimestamp))
 			if err != nil {
 				m.communitiesManager.LogStdout("failed to request missing messages", zap.Error(err))
 				continue

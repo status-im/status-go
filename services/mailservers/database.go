@@ -13,6 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
 )
 
@@ -25,6 +26,7 @@ type Mailserver struct {
 	Fleet          string `json:"fleet"`
 	Version        uint   `json:"version"`
 	FailedRequests uint   `json:"-"`
+	CommunityOnly  string `json:"communityOnly"`
 }
 
 func (m Mailserver) Enode() (*enode.Node, error) {
@@ -128,6 +130,149 @@ func NewDB(db *sql.DB) *Database {
 	return &Database{db: db}
 }
 
+func (d *Database) SaveMailserversForCommunity(communityID types.HexBytes, mailserver []Mailserver) (err error) {
+	var tx *sql.Tx
+	tx, err = d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	for _, m := range mailserver {
+		// TODO for now only allow one mailserver per community
+		var count *sql.Rows
+		count, err = tx.Query(`SELECT COUNT(*) FROM community_mailservers WHERE community_id = ?`, communityID)
+		if err != nil {
+			return err
+		}
+		defer count.Close()
+		var c int
+		if count.Next() {
+			if err := count.Scan(&c); err != nil {
+				return err
+			}
+		}
+		if c > 0 {
+			return fmt.Errorf("only one mailserver per community is allowed")
+		}
+		_, err = tx.Exec(`INSERT OR IGNORE INTO mailservers(
+			id,
+			name,
+			address,
+			password,
+			fleet,
+			community_only
+		) VALUES (?, ?, ?, ?, ?, ?)`,
+			m.ID,
+			m.Name,
+			m.Address,
+			m.nullablePassword(),
+			m.Fleet,
+			true,
+		)
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(`INSERT OR IGNORE INTO community_mailservers(
+			community_id,
+			mailserver_id
+		) VALUES (?, ?)`,
+			communityID,
+			m.ID,
+		)
+		if err != nil {
+			return err
+		}
+
+	}
+	return nil
+}
+
+func (d *Database) GetMailserversForCommunities() (map[string][]Mailserver, error) {
+	var result = make(map[string][]Mailserver)
+
+	rows, err := d.db.Query(`
+		SELECT cm.community_id, m.id, m.name, m.address, m.password, m.fleet, m.community_only 
+		FROM mailservers AS m
+		JOIN community_mailservers AS cm ON m.id = cm.mailserver_id
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			m           Mailserver
+			communityID types.HexBytes
+			password    sql.NullString
+		)
+		if err := rows.Scan(
+			&communityID,
+			&m.ID,
+			&m.Name,
+			&m.Address,
+			&password,
+			&m.Fleet,
+			&m.CommunityOnly,
+		); err != nil {
+			return nil, err
+		}
+		m.Custom = true
+		if password.Valid {
+			m.Password = password.String
+		}
+		result[communityID.String()] = append(result[communityID.String()], m)
+	}
+
+	return result, nil
+}
+
+func (d *Database) GetMailserversForCommunity(communityID types.HexBytes) ([]Mailserver, error) {
+	var result []Mailserver
+
+	rows, err := d.db.Query(`
+		SELECT m.id, m.name, m.address, m.password, m.fleet, m.community_only 
+		FROM mailservers AS m
+		JOIN community_mailservers AS cm ON m.id = cm.mailserver_id
+		WHERE cm.community_id = ?
+	`, communityID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			m        Mailserver
+			password sql.NullString
+		)
+		if err := rows.Scan(
+			&m.ID,
+			&m.Name,
+			&m.Address,
+			&password,
+			&m.Fleet,
+			&m.CommunityOnly,
+		); err != nil {
+			return nil, err
+		}
+		m.Custom = true
+		if password.Valid {
+			m.Password = password.String
+		}
+		result = append(result, m)
+	}
+
+	return result, nil
+}
+
 func (d *Database) Add(mailserver Mailserver) error {
 	_, err := d.db.Exec(`INSERT OR REPLACE INTO mailservers(
 			id,
@@ -148,7 +293,7 @@ func (d *Database) Add(mailserver Mailserver) error {
 func (d *Database) Mailservers() ([]Mailserver, error) {
 	var result []Mailserver
 
-	rows, err := d.db.Query(`SELECT id, name, address, password, fleet FROM mailservers`)
+	rows, err := d.db.Query(`SELECT id, name, address, password, fleet, community_only FROM mailservers WHERE community_only = 0`)
 	if err != nil {
 		return nil, err
 	}
@@ -165,6 +310,7 @@ func (d *Database) Mailservers() ([]Mailserver, error) {
 			&m.Address,
 			&password,
 			&m.Fleet,
+			&m.CommunityOnly,
 		); err != nil {
 			return nil, err
 		}
@@ -198,7 +344,7 @@ func (d *Database) AddGaps(gaps []MailserverRequestGap) error {
 
 	for _, gap := range gaps {
 
-		_, err := tx.Exec(`INSERT OR REPLACE INTO mailserver_request_gaps(
+		_, err = tx.Exec(`INSERT OR REPLACE INTO mailserver_request_gaps(
 				id,
 				chat_id,
 				gap_from,
