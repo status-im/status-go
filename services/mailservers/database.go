@@ -235,8 +235,6 @@ func (d *Database) GetMailserversForCommunities() (map[string][]Mailserver, erro
 }
 
 func (d *Database) GetMailserversForCommunity(communityID types.HexBytes) ([]Mailserver, error) {
-	var result []Mailserver
-
 	rows, err := d.db.Query(`
 		SELECT m.id, m.name, m.address, m.password, m.fleet, m.community_only 
 		FROM mailservers AS m
@@ -247,30 +245,7 @@ func (d *Database) GetMailserversForCommunity(communityID types.HexBytes) ([]Mai
 		return nil, err
 	}
 	defer rows.Close()
-
-	for rows.Next() {
-		var (
-			m        Mailserver
-			password sql.NullString
-		)
-		if err := rows.Scan(
-			&m.ID,
-			&m.Name,
-			&m.Address,
-			&password,
-			&m.Fleet,
-			&m.CommunityOnly,
-		); err != nil {
-			return nil, err
-		}
-		m.Custom = true
-		if password.Valid {
-			m.Password = password.String
-		}
-		result = append(result, m)
-	}
-
-	return result, nil
+	return toMailservers(rows)
 }
 
 func (d *Database) Add(mailserver Mailserver) error {
@@ -291,13 +266,16 @@ func (d *Database) Add(mailserver Mailserver) error {
 }
 
 func (d *Database) Mailservers() ([]Mailserver, error) {
-	var result []Mailserver
-
 	rows, err := d.db.Query(`SELECT id, name, address, password, fleet, community_only FROM mailservers WHERE community_only = 0`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+	return toMailservers(rows)
+}
+
+func toMailservers(rows *sql.Rows) ([]Mailserver, error) {
+	var result []Mailserver
 
 	for rows.Next() {
 		var (

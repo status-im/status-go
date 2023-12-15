@@ -167,17 +167,7 @@ func (m *Messenger) scheduleSyncFilters(filters []*transport.Filter) (bool, erro
 
 	go func() {
 		// split filters by community store node so we can request the filters to the correct mailserver
-		filtersByMs := make(map[string][]*transport.Filter, len(filters))
-		for _, f := range filters {
-			communityID := "" // none by default
-			if chat, ok := m.allChats.Load(f.ChatID); ok && chat.CommunityChat() && m.communityStorenodes.HasStorenodeSetup(chat.CommunityID) {
-				communityID = chat.CommunityID
-			}
-			if _, exists := filtersByMs[communityID]; !exists {
-				filtersByMs[communityID] = make([]*transport.Filter, 0, len(filters))
-			}
-			filtersByMs[communityID] = append(filtersByMs[communityID], f)
-		}
+		filtersByMs := m.SplitFiltersByStoreNode(filters)
 		for communityID, filtersForMs := range filtersByMs {
 			ms := m.getActiveMailserver(communityID)
 			_, err := m.performMailserverRequest(ms, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
