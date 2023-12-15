@@ -1580,6 +1580,17 @@ func (w *Waku) MarkP2PMessageAsProcessed(hash gethcommon.Hash) {
 	delete(w.p2pMsgIDs, hash)
 }
 
+func (w *Waku) Clean() error {
+	w.poolMu.Lock()
+	defer w.poolMu.Unlock()
+	w.envelopes = make(map[gethcommon.Hash]*common.Envelope)
+	for _, f := range w.filters.All() {
+		f.Messages = common.NewMemoryMessageStore()
+	}
+
+	return nil
+}
+
 // validatePrivateKey checks the format of the given private key.
 func validatePrivateKey(k *ecdsa.PrivateKey) bool {
 	if k == nil || k.D == nil || k.D.Sign() == 0 {

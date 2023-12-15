@@ -798,6 +798,10 @@ loop:
 }
 
 func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
+	if m.featureFlags.StoreNodesDisabled {
+		return nil
+	}
+
 	mailserverID, err := m.activeMailserverID()
 	if err != nil {
 		return err
@@ -807,6 +811,10 @@ func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 }
 
 func (m *Messenger) processMailserverBatchWithOptions(batch MailserverBatch, pageLimit uint32, shouldProcessNextPage func(int) (bool, uint32), processEnvelopes bool) error {
+	if m.featureFlags.StoreNodesDisabled {
+		return nil
+	}
+
 	mailserverID, err := m.activeMailserverID()
 	if err != nil {
 		return err
@@ -992,7 +1000,7 @@ func (m *Messenger) ConnectionChanged(state connection.State) {
 	}
 
 	if m.connectionState.Offline && !state.Offline {
-		err := m.sender.StartDatasync()
+		err := m.sender.StartDatasync(m.sendDataSync)
 		if err != nil {
 			m.logger.Error("failed to start datasync", zap.Error(err))
 		}

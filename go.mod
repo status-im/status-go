@@ -51,6 +51,7 @@ require (
 	github.com/status-im/doubleratchet v3.0.0+incompatible
 	github.com/status-im/markdown v0.0.0-20231114210825-6c2d15b5dc57
 	github.com/status-im/migrate/v4 v4.6.2-status.3
+	github.com/status-im/mvds v0.0.27-0.20240111144448-92d364e4be82
 	github.com/status-im/rendezvous v1.3.7
 	github.com/status-im/status-go/extkeys v1.1.2
 	github.com/status-im/tcp-shaker v1.1.1-status
@@ -58,7 +59,6 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a
 	github.com/tsenart/tb v0.0.0-20181025101425-0d2499c8b6e9
-	github.com/vacp2p/mvds v0.0.24-0.20201124060106-26d8e94130d8
 	github.com/wealdtech/go-ens/v3 v3.5.0
 	github.com/wealdtech/go-multicodec v1.4.0
 	github.com/xeipuuv/gojsonschema v1.2.0
@@ -76,6 +76,7 @@ require (
 require github.com/fogleman/gg v1.3.0
 
 require (
+	github.com/Masterminds/squirrel v1.5.4
 	github.com/afex/hystrix-go v0.0.0-20180502004556-fa1af6a1f4f5
 	github.com/andybalholm/brotli v1.0.5
 	github.com/cenkalti/backoff/v4 v4.2.1
@@ -101,7 +102,6 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
-	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/PuerkitoBio/goquery v1.6.1 // indirect
 	github.com/RoaringBitmap/roaring v0.9.4 // indirect
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect

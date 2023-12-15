@@ -230,10 +230,63 @@ func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, l
 		WithAppSettings(setting, config),
 	}
 
-	return newTestMessenger(shh, testMessengerConfig{
+	m, err := newTestMessenger(shh, testMessengerConfig{
 		privateKey: privateKey,
 		logger:     logger,
 	}, options)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = m.Start()
+	if err != nil {
+		return nil, err
+	}
+
+	return m, nil
+}
+
+func createEncryptedCommunity(s *suite.Suite, owner *Messenger) (*communities.Community, *Chat) {
+	community, chat := createCommunityConfigurable(s, owner, protobuf.CommunityPermissions_AUTO_ACCEPT)
+	// Add community permission
+	_, err := owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{{
+			ContractAddresses: map[uint64]string{3: "0x933"},
+			Type:              protobuf.CommunityTokenType_ERC20,
+			Symbol:            "STT",
+			Name:              "Status Test Token",
+			Amount:            "10",
+			Decimals:          18,
+		}},
+	})
+	s.Require().NoError(err)
+
+	// Add channel permission
+	response, err := owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				ContractAddresses: map[uint64]string{3: "0x933"},
+				Type:              protobuf.CommunityTokenType_ERC20,
+				Symbol:            "STT",
+				Name:              "Status Test Token",
+				Amount:            "10",
+				Decimals:          18,
+			},
+		},
+		ChatIds: []string{chat.ID},
+	})
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	community = response.Communities()[0]
+	s.Require().True(community.Encrypted())
+	s.Require().True(community.ChannelEncrypted(chat.CommunityChatID()))
+
+	return community, chat
+
 }
 
 func createCommunity(s *suite.Suite, owner *Messenger) (*communities.Community, *Chat) {
@@ -420,6 +473,7 @@ func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, co
 	s.Require().NoError(err)
 }
 
+/*
 func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text string) *common.Message {
 	msg := &common.Message{
 		ChatMessage: &protobuf.ChatMessage{
@@ -433,7 +487,7 @@ func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text stri
 	s.Require().NoError(err)
 
 	return msg
-}
+}*/
 
 func grantPermission(s *suite.Suite, community *communities.Community, controlNode *Messenger, target *Messenger, role protobuf.CommunityMember_Roles) {
 	responseAddRole, err := controlNode.AddRoleToMember(&requests.AddRoleToMember{

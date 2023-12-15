@@ -128,8 +128,8 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	message := buildTestMessage(*chat)
 
 	response, err := otherMessenger.SendChatMessage(context.Background(), message)
-	messageID := response.Messages()[0].ID
 	s.Require().NoError(err)
+	messageID := response.Messages()[0].ID
 
 	var receivedPubChatMessage *common.Message
 	var alice1ReceivedMessage, alice2ReceivedMessage bool

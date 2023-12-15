@@ -17,4 +17,13 @@ type FeatureFlags struct {
 
 	// DisableAutoMessageLoop disables auto message loop
 	DisableAutoMessageLoop bool
+
+	// ResendRawMessagesDisabled indicates whether we should be disabling sending raw messages
+	ResendRawMessagesDisabled bool
+
+	// StoreNodesDisabled indicates whether we should fetch messages from store nodes
+	StoreNodesDisabled bool
+
+	// Peersyncing indicates whether we should advertise and sync messages with other peers
+	Peersyncing bool
 }

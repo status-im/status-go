@@ -30,6 +30,7 @@ type RawMessage struct {
 	Sender                *ecdsa.PrivateKey
 	Recipients            []*ecdsa.PublicKey
 	SkipGroupMessageWrap  bool
+	SkipApplicationWrap   bool
 	SendOnPersonalTopic   bool
 	CommunityID           []byte
 	CommunityKeyExMsgType CommKeyExMsgType
