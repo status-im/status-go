@@ -93,24 +93,7 @@ func fullCollectibleDataToDetails(c thirdparty.FullCollectibleData) Collectible 
 	return ret
 }
 
-func communityInfoToHeader(communityID string, community *thirdparty.CommunityInfo, communityCollectible *thirdparty.CollectibleCommunityInfo) CommunityData {
-	ret := CommunityData{
-		ID: communityID,
-	}
-
-	if community != nil {
-		ret.Name = community.CommunityName
-		ret.Color = community.CommunityColor
-	}
-
-	if communityCollectible != nil {
-		ret.PrivilegesLevel = communityCollectible.PrivilegesLevel
-	}
-
-	return ret
-}
-
-func communityInfoToDetails(communityID string, community *thirdparty.CommunityInfo, communityCollectible *thirdparty.CollectibleCommunityInfo) CommunityData {
+func communityInfoToData(communityID string, community *thirdparty.CommunityInfo, communityCollectible *thirdparty.CollectibleCommunityInfo) CommunityData {
 	ret := CommunityData{
 		ID: communityID,
 	}
