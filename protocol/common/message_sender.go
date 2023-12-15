@@ -713,26 +713,30 @@ func (s *MessageSender) SendPublic(
 
 // unwrapDatasyncMessage tries to unwrap message as datasync one and in case of success
 // returns cloned messages with replaced payloads
-func unwrapDatasyncMessage(m *v1protocol.StatusMessage, datasync *datasync.DataSync) ([]*v1protocol.StatusMessage, [][]byte, error) {
-	var statusMessages []*v1protocol.StatusMessage
+func (s *MessageSender) unwrapDatasyncMessage(m *v1protocol.StatusMessage, response *handleMessageResponse) error {
 
-	payloads, acks, err := datasync.UnwrapPayloadsAndAcks(
+	datasyncMessage, err := s.datasync.Unwrap(
 		m.SigPubKey(),
 		m.EncryptionLayer.Payload,
 	)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	for _, payload := range payloads {
+	response.DatasyncAcks = append(response.DatasyncAcks, datasyncMessage.Acks...)
+	response.DatasyncOffers = append(response.DatasyncAcks, datasyncMessage.Offers...)
+	response.DatasyncRequests = append(response.DatasyncRequests, datasyncMessage.Requests...)
+
+	for _, ds := range datasyncMessage.Messages {
 		message, err := m.Clone()
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
-		message.EncryptionLayer.Payload = payload
-		statusMessages = append(statusMessages, message)
+		message.EncryptionLayer.Payload = ds.Body
+		response.DatasyncMessages = append(response.DatasyncMessages, message)
+
 	}
-	return statusMessages, acks, nil
+	return nil
 }
 
 // HandleMessages expects a whisper message as input, and it will go through
@@ -740,48 +744,43 @@ func unwrapDatasyncMessage(m *v1protocol.StatusMessage, datasync *datasync.DataS
 // layer message, or in case of Raw methods, the processing stops at the layer
 // before.
 // It returns an error only if the processing of required steps failed.
-func (s *MessageSender) HandleMessages(wakuMessage *types.Message) ([]*v1protocol.StatusMessage, [][]byte, error) {
+func (s *MessageSender) HandleMessages(wakuMessage *types.Message) (*HandleMessageResponse, error) {
 	logger := s.logger.With(zap.String("site", "HandleMessages"))
 	hlogger := logger.With(zap.String("hash", types.HexBytes(wakuMessage.Hash).String()))
-
-	var statusMessages []*v1protocol.StatusMessage
-	var acks [][]byte
 
 	response, err := s.handleMessage(wakuMessage)
 	if err != nil {
 		// Hash ratchet with a group id not found yet, save the message for future processing
 		if err == encryption.ErrHashRatchetGroupIDNotFound && len(response.Message.EncryptionLayer.HashRatchetInfo) == 1 {
 			info := response.Message.EncryptionLayer.HashRatchetInfo[0]
-			return nil, nil, s.persistence.SaveHashRatchetMessage(info.GroupID, info.KeyID, wakuMessage)
+			return nil, s.persistence.SaveHashRatchetMessage(info.GroupID, info.KeyID, wakuMessage)
 		}
 
 		// The current message segment has been successfully retrieved.
 		// However, the collection of segments is not yet complete.
 		if err == ErrMessageSegmentsIncomplete {
-			return nil, nil, nil
+			return nil, nil
 		}
 
-		return nil, nil, err
+		return nil, err
 	}
-	statusMessages = append(statusMessages, response.Messages()...)
-	acks = append(acks, response.DatasyncAcks...)
 
 	// Process queued hash ratchet messages
 	for _, hashRatchetInfo := range response.Message.EncryptionLayer.HashRatchetInfo {
 		messages, err := s.persistence.GetHashRatchetMessages(hashRatchetInfo.KeyID)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		var processedIds [][]byte
 		for _, message := range messages {
-			response, err := s.handleMessage(message)
+			r, err := s.handleMessage(message)
 			if err != nil {
 				hlogger.Debug("failed to handle hash ratchet message", zap.Error(err))
 				continue
 			}
-			statusMessages = append(statusMessages, response.Messages()...)
-			acks = append(acks, response.DatasyncAcks...)
+			response.DatasyncMessages = append(response.toPublicResponse().StatusMessages, r.Messages()...)
+			response.DatasyncAcks = append(response.DatasyncAcks, r.DatasyncAcks...)
 
 			processedIds = append(processedIds, message.Hash)
 		}
@@ -789,17 +788,35 @@ func (s *MessageSender) HandleMessages(wakuMessage *types.Message) ([]*v1protoco
 		err = s.persistence.DeleteHashRatchetMessages(processedIds)
 		if err != nil {
 			s.logger.Warn("failed to delete hash ratchet messages", zap.Error(err))
-			return nil, nil, err
+			return nil, err
 		}
 	}
 
-	return statusMessages, acks, nil
+	return response.toPublicResponse(), nil
+}
+
+type HandleMessageResponse struct {
+	StatusMessages   []*v1protocol.StatusMessage
+	DatasyncAcks     [][]byte
+	DatasyncOffers   [][]byte
+	DatasyncRequests [][]byte
+}
+
+func (h *handleMessageResponse) toPublicResponse() *HandleMessageResponse {
+	return &HandleMessageResponse{
+		StatusMessages:   h.Messages(),
+		DatasyncAcks:     h.DatasyncAcks,
+		DatasyncOffers:   h.DatasyncOffers,
+		DatasyncRequests: h.DatasyncRequests,
+	}
 }
 
 type handleMessageResponse struct {
 	Message          *v1protocol.StatusMessage
 	DatasyncMessages []*v1protocol.StatusMessage
 	DatasyncAcks     [][]byte
+	DatasyncOffers   [][]byte
+	DatasyncRequests [][]byte
 }
 
 func (h *handleMessageResponse) Messages() []*v1protocol.StatusMessage {
@@ -813,19 +830,21 @@ func (s *MessageSender) handleMessage(wakuMessage *types.Message) (*handleMessag
 	logger := s.logger.With(zap.String("site", "handleMessage"))
 	hlogger := logger.With(zap.ByteString("hash", wakuMessage.Hash))
 
+	message := &v1protocol.StatusMessage{}
+
 	response := &handleMessageResponse{
-		Message:          &v1protocol.StatusMessage{},
+		Message:          message,
 		DatasyncMessages: []*v1protocol.StatusMessage{},
 		DatasyncAcks:     [][]byte{},
 	}
 
-	err := response.Message.HandleTransportLayer(wakuMessage)
+	err := message.HandleTransportLayer(wakuMessage)
 	if err != nil {
 		hlogger.Error("failed to handle transport layer message", zap.Error(err))
 		return nil, err
 	}
 
-	err = s.handleSegmentationLayer(response.Message)
+	err = s.handleSegmentationLayer(message)
 	if err != nil {
 		hlogger.Debug("failed to handle segmentation layer message", zap.Error(err))
 
@@ -839,7 +858,7 @@ func (s *MessageSender) handleMessage(wakuMessage *types.Message) (*handleMessag
 		}
 	}
 
-	err = s.handleEncryptionLayer(context.Background(), response.Message)
+	err = s.handleEncryptionLayer(context.Background(), message)
 	if err != nil {
 		hlogger.Debug("failed to handle an encryption message", zap.Error(err))
 
@@ -850,12 +869,9 @@ func (s *MessageSender) handleMessage(wakuMessage *types.Message) (*handleMessag
 	}
 
 	if s.datasync != nil && s.datasyncEnabled {
-		datasyncMessages, as, err := unwrapDatasyncMessage(response.Message, s.datasync)
+		err := s.unwrapDatasyncMessage(message, response)
 		if err != nil {
 			hlogger.Debug("failed to handle datasync message", zap.Error(err))
-		} else {
-			response.DatasyncMessages = append(response.DatasyncMessages, datasyncMessages...)
-			response.DatasyncAcks = append(response.DatasyncAcks, as...)
 		}
 	}
 
