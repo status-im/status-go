@@ -51,7 +51,7 @@ func (s *ServerURLSuite) SetupTest() {
 	s.SetupKeyComponents(s.T())
 	s.SetupLoggerComponents()
 
-	mediaServer, err := NewMediaServer(nil, nil, nil)
+	mediaServer, err := NewMediaServer(nil, nil, nil, nil)
 	s.Require().NoError(err)
 
 	s.serverForQR = mediaServer

@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/community"
@@ -61,6 +62,8 @@ type Manager struct {
 	collectionsDataDB  *CollectionDataDB
 	communityManager   *community.Manager
 
+	mediaServer *server.MediaServer
+
 	statuses       map[string]*connection.Status
 	statusNotifier *connection.StatusNotifier
 }
@@ -73,6 +76,7 @@ func NewManager(
 	accountOwnershipProviders []thirdparty.CollectibleAccountOwnershipProvider,
 	collectibleDataProviders []thirdparty.CollectibleDataProvider,
 	collectionDataProviders []thirdparty.CollectionDataProvider,
+	mediaServer *server.MediaServer,
 	feed *event.Feed) *Manager {
 	hystrix.ConfigureCommand(hystrixContractOwnershipClientName, hystrix.CommandConfig{
 		Timeout:               10000,
@@ -135,6 +139,7 @@ func NewManager(
 		collectiblesDataDB: NewCollectibleDataDB(db),
 		collectionsDataDB:  NewCollectionDataDB(db),
 		communityManager:   communityManager,
+		mediaServer:        mediaServer,
 		statuses:           statuses,
 		statusNotifier:     statusNotifier,
 	}
@@ -670,6 +675,9 @@ func (o *Manager) getCacheFullCollectibleData(uniqueIDs []thirdparty.Collectible
 				ID: id,
 			}
 		}
+		if o.mediaServer != nil && len(collectibleData.ImagePayload) > 0 {
+			collectibleData.ImageURL = o.mediaServer.MakeWalletCollectibleImagesURL(collectibleData.ID)
+		}
 
 		collectionData, ok := collectionsData[id.ContractID.HashKey()]
 		if !ok {
@@ -677,6 +685,9 @@ func (o *Manager) getCacheFullCollectibleData(uniqueIDs []thirdparty.Collectible
 			collectionData = thirdparty.CollectionData{
 				ID: id.ContractID,
 			}
+		}
+		if o.mediaServer != nil && len(collectionData.ImagePayload) > 0 {
+			collectionData.ImageURL = o.mediaServer.MakeWalletCollectionImagesURL(collectionData.ID)
 		}
 
 		communityInfo, err := o.collectiblesDataDB.GetCommunityInfo(id)

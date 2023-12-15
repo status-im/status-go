@@ -207,7 +207,7 @@ func (n *StatusNode) StartMediaServerWithoutDB() error {
 		}
 	}
 
-	httpServer, err := server.NewMediaServer(nil, nil, n.multiaccountsDB)
+	httpServer, err := server.NewMediaServer(nil, nil, n.multiaccountsDB, nil)
 	if err != nil {
 		return err
 	}
@@ -279,7 +279,7 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 		}
 	}
 
-	httpServer, err := server.NewMediaServer(n.appDB, n.downloader, n.multiaccountsDB)
+	httpServer, err := server.NewMediaServer(n.appDB, n.downloader, n.multiaccountsDB, n.walletDB)
 	if err != nil {
 		return err
 	}
