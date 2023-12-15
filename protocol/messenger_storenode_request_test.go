@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
+
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -149,14 +151,20 @@ func (s *MessengerStoreNodeRequestSuite) createCommunity(m *Messenger) *communit
 	return response.Communities()[0]
 }
 
-func (s *MessengerStoreNodeRequestSuite) requireCommunitiesEqual(fetchedCommunity *communities.Community, expectedCommunityInfo *communities.Community) {
-	s.Require().Equal(expectedCommunityInfo.Name(), fetchedCommunity.Name())
-	s.Require().Equal(expectedCommunityInfo.Identity().Description, fetchedCommunity.Identity().Description)
-	s.Require().Equal(expectedCommunityInfo.Color(), fetchedCommunity.Color())
-	s.Require().Equal(expectedCommunityInfo.Tags(), fetchedCommunity.Tags())
+func (s *MessengerStoreNodeRequestSuite) requireCommunitiesEqual(c *communities.Community, expected *communities.Community) {
+	s.Require().Equal(expected.Name(), c.Name())
+	s.Require().Equal(expected.Identity().Description, c.Identity().Description)
+	s.Require().Equal(expected.Color(), c.Color())
+	s.Require().Equal(expected.Tags(), c.Tags())
 }
 
-func (s *MessengerStoreNodeRequestSuite) fetchCommunity(m *Messenger, communityShard communities.CommunityShard, expectedCommunityInfo *communities.Community) FetchCommunityStats {
+func (s *MessengerStoreNodeRequestSuite) requireContactsEqual(c *Contact, expected *Contact) {
+	s.Require().Equal(expected.DisplayName, c.DisplayName)
+	s.Require().Equal(expected.Bio, c.Bio)
+	s.Require().Equal(expected.SocialLinks, c.SocialLinks)
+}
+
+func (s *MessengerStoreNodeRequestSuite) fetchCommunity(m *Messenger, communityShard communities.CommunityShard, expectedCommunityInfo *communities.Community) FetchStats {
 	fetchedCommunity, stats, err := m.storeNodeRequestsManager.FetchCommunity(communityShard, true)
 
 	s.Require().NoError(err)
@@ -168,6 +176,17 @@ func (s *MessengerStoreNodeRequestSuite) fetchCommunity(m *Messenger, communityS
 	}
 
 	return stats
+}
+
+func (s *MessengerStoreNodeRequestSuite) fetchProfile(m *Messenger, contactID string, expectedContact *Contact) {
+	fetchedContact, err := m.FetchContact(contactID, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(fetchedContact)
+	s.Require().Equal(contactID, fetchedContact.ID)
+
+	if expectedContact != nil {
+		s.requireContactsEqual(fetchedContact, expectedContact)
+	}
 }
 
 func (s *MessengerStoreNodeRequestSuite) waitForAvailableStoreNode(messenger *Messenger) {
@@ -437,4 +456,34 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestWithoutWaitingResponse() {
 	s.Require().Contains(fetchedCommunities, community.IDString())
 
 	s.requireCommunitiesEqual(fetchedCommunities[community.IDString()], community)
+}
+
+func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfo() {
+	s.createOwner()
+
+	// Set keypair
+	ownerProfileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	ownerProfileKp.KeyUID = s.owner.account.KeyUID
+	ownerProfileKp.Accounts[0].KeyUID = s.owner.account.KeyUID
+
+	err := s.owner.settings.SaveOrUpdateKeypair(ownerProfileKp)
+	s.Require().NoError(err)
+
+	// Set display name, this will also publish contact code
+	err = s.owner.SetDisplayName("super-owner")
+	s.Require().NoError(err)
+
+	//s.waitForAvailableStoreNode(s.owner)
+	//err = s.owner.publishContactCode()
+	//s.Require().NoError(err)
+
+	s.createBob()
+	//s.waitForAvailableStoreNode(s.bob)
+	//
+	//cancel := make(chan struct{}, 1)
+	//s.bob.StartRetrieveMessagesLoop(1*time.Second, cancel)
+
+	s.fetchProfile(s.bob, s.owner.selfContact.ID, s.owner.selfContact)
+
+	//close(cancel)
 }
