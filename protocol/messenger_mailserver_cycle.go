@@ -55,14 +55,6 @@ func (s byRTTMsAndCanConnectBefore) Less(i, j int) bool {
 	return s[i].CanConnectAfter.Before(s[j].CanConnectAfter)
 }
 
-func (m *Messenger) activeMailserverID() ([]byte, error) {
-	if m.mailserverCycle.activeMailserver == nil {
-		return nil, nil
-	}
-
-	return m.mailserverCycle.activeMailserver.IDBytes()
-}
-
 func (m *Messenger) StartMailserverCycle(mailservers []mailservers.Mailserver) error {
 	m.mailserverCycle.allMailservers = mailservers
 

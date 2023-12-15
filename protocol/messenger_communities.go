@@ -2705,7 +2705,7 @@ func (m *Messenger) requestCommunitiesFromMailserver(communities []communities.C
 		communityID   string
 	}
 	// we group topics by PubsubTopic
-	var groupedTopics map[string]topicData
+	groupedTopics := make(map[string]topicData)
 
 	for _, c := range communities {
 		if _, ok := m.requestedCommunities[c.CommunityID]; ok {
