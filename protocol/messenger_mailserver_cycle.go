@@ -451,18 +451,6 @@ func (m *Messenger) getActiveMailserver(communityID ...string) *mailservers.Mail
 	return &ms
 }
 
-// getActiveMailserverID returns the ID of the active mailserver or an empty string if none is set
-func (m *Messenger) getActiveMailserverID() string {
-	if m.mailserverCycle.activeMailserver != nil {
-		return m.mailserverCycle.activeMailserver.ID
-	}
-	return ""
-}
-
-func (m *Messenger) isActiveMailserverAvailable() bool {
-	return m.mailserverStatus(m.getActiveMailserverID()) == connected
-}
-
 func (m *Messenger) isMailserverAvailable(mailserverID string) bool {
 	return m.mailserverStatus(mailserverID) == connected
 }
