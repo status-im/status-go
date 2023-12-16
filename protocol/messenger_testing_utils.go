@@ -2,11 +2,15 @@ package protocol
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"errors"
+	"math/big"
 	"os"
 	"sync"
 	"time"
+
+	"golang.org/x/exp/maps"
 
 	"go.uber.org/zap"
 
@@ -18,13 +22,18 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/helpers"
 	waku2 "github.com/status-im/status-go/wakuv2"
 )
 
 const testENRBootstrap = "enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
+
+var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+var hexRunes = []rune("0123456789abcdef")
 
 // WaitOnMessengerResponse Wait until the condition is true or the timeout is reached.
 func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bool, errorMessage string) (*MessengerResponse, error) {
@@ -51,7 +60,8 @@ func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bo
 type MessengerSignalsHandlerMock struct {
 	MessengerSignalsHandler
 
-	responseChan chan *MessengerResponse
+	responseChan       chan *MessengerResponse
+	communityFoundChan chan *communities.Community
 }
 
 func (m *MessengerSignalsHandlerMock) MessengerResponse(response *MessengerResponse) {
@@ -63,6 +73,13 @@ func (m *MessengerSignalsHandlerMock) MessengerResponse(response *MessengerRespo
 }
 
 func (m *MessengerSignalsHandlerMock) MessageDelivered(chatID string, messageID string) {}
+
+func (m *MessengerSignalsHandlerMock) CommunityInfoFound(community *communities.Community) {
+	select {
+	case m.communityFoundChan <- community:
+	default:
+	}
+}
 
 func WaitOnSignaledMessengerResponse(m *Messenger, condition func(*MessengerResponse) bool, errorMessage string) (*MessengerResponse, error) {
 	interval := 500 * time.Millisecond
@@ -99,6 +116,38 @@ func WaitOnSignaledMessengerResponse(m *Messenger, condition func(*MessengerResp
 
 		default: // No immediate response, rest & loop back to retrieve again
 			time.Sleep(interval)
+		}
+	}
+}
+
+func WaitOnSignaledCommunityFound(m *Messenger, action func(), condition func(community *communities.Community) bool, timeout time.Duration, errorMessage string) error {
+	timeoutChan := time.After(timeout)
+
+	if m.config.messengerSignalsHandler != nil {
+		return errors.New("messengerSignalsHandler already provided/mocked")
+	}
+
+	communityFoundChan := make(chan *communities.Community, 1)
+	m.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{
+		communityFoundChan: communityFoundChan,
+	}
+
+	defer func() {
+		m.config.messengerSignalsHandler = nil
+	}()
+
+	// Call the action after setting up the mock
+	action()
+
+	// Wait for condition after
+	for {
+		select {
+		case c := <-communityFoundChan:
+			if condition(c) {
+				return nil
+			}
+		case <-timeoutChan:
+			return errors.New("timed out: " + errorMessage)
 		}
 	}
 }
@@ -200,39 +249,10 @@ func SetIdentityImagesAndWaitForChange(s *suite.Suite, messenger *Messenger, tim
 }
 
 func WaitForAvailableStoreNode(s *suite.Suite, m *Messenger, timeout time.Duration) {
-	finish := make(chan struct{})
-	cancel := make(chan struct{})
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	go func() {
-		defer func() {
-			wg.Done()
-		}()
-		for !m.isActiveMailserverAvailable() {
-			select {
-			case <-m.SubscribeMailserverAvailable():
-			case <-cancel:
-				return
-			}
-		}
-	}()
-
-	go func() {
-		defer func() {
-			close(finish)
-		}()
-		wg.Wait()
-	}()
-
-	select {
-	case <-finish:
-	case <-time.After(timeout):
-		close(cancel)
-	}
-
-	s.Require().True(m.isActiveMailserverAvailable())
+	ms := m.getActiveMailserver()
+	s.Require().NotNil(ms)
+	available := m.waitForAvailableStoreNode(ms.ID, timeout)
+	s.Require().True(available)
 }
 
 func NewWakuV2(s *suite.Suite, logger *zap.Logger, useLocalWaku bool, enableStore bool) *waku2.Waku {
@@ -332,4 +352,55 @@ func TearDownMessenger(s *suite.Suite, m *Messenger) {
 	if m.multiAccounts != nil {
 		s.Require().NoError(m.multiAccounts.Close())
 	}
+}
+
+func randomInt(length int) int {
+	max := big.NewInt(int64(length))
+	value, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		panic(err)
+	}
+	return int(value.Int64())
+}
+
+func randomString(length int, runes []rune) string {
+	out := make([]rune, length)
+	for i := range out {
+		out[i] = runes[randomInt(len(runes))] // nolint: gosec
+	}
+	return string(out)
+}
+
+func RandomLettersString(length int) string {
+	return randomString(length, letterRunes)
+}
+
+func RandomColor() string {
+	return "#" + randomString(6, hexRunes)
+}
+
+func RandomCommunityTags(count int) []string {
+	all := maps.Keys(requests.TagsEmojies)
+	tags := make([]string, 0, count)
+	indexes := map[int]struct{}{}
+
+	for len(indexes) != count {
+		index := randomInt(len(all))
+		indexes[index] = struct{}{}
+	}
+
+	for index := range indexes {
+		tags = append(tags, all[index])
+	}
+
+	return tags
+}
+
+func RandomBytes(length int) []byte {
+	out := make([]byte, length)
+	_, err := rand.Read(out)
+	if err != nil {
+		panic(err)
+	}
+	return out
 }

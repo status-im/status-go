@@ -3665,13 +3665,6 @@ func (m *Messenger) HandleCommunityDescription(state *ReceivedMessageState, mess
 		m.logger.Warn("failed to handle CommunityDescription", zap.Error(err))
 		return err
 	}
-
-	//if community was among requested ones, send its info and remove filter
-	for communityID := range m.requestedCommunities {
-		if _, ok := state.Response.communities[communityID]; ok {
-			m.passStoredCommunityInfoToSignalHandler(communityID)
-		}
-	}
 	return nil
 }
 

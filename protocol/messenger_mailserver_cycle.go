@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -578,10 +579,9 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 				go func() {
 					_, err := m.RequestAllHistoricMessages(false, true)
 					if err != nil {
-						m.logger.Error("could not perform mailserver request", zap.Error(err))
+						m.logger.Error("failed to request historic messages", zap.Error(err))
 					}
 				}()
-
 			} else {
 				m.mailPeersMutex.Unlock()
 			}
@@ -757,4 +757,47 @@ func (m *Messenger) disconnectStorenodeIfRequired() error {
 	}
 
 	return nil
+}
+
+func (m *Messenger) waitForAvailableStoreNode(mailserverID string, timeout time.Duration) bool {
+	// Add 1 second to timeout, because the mailserver cycle has 1 second ticker, which doesn't tick on start.
+	// This can be improved after merging https://github.com/status-im/status-go/pull/4380.
+	// NOTE: https://stackoverflow.com/questions/32705582/how-to-get-time-tick-to-tick-immediately
+	timeout += time.Second
+
+	finish := make(chan struct{})
+	cancel := make(chan struct{})
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		defer func() {
+			wg.Done()
+		}()
+		for !m.isMailserverAvailable(mailserverID) {
+			select {
+			case <-m.SubscribeMailserverAvailable():
+			case <-cancel:
+				return
+			}
+		}
+	}()
+
+	go func() {
+		defer func() {
+			close(finish)
+		}()
+		wg.Wait()
+	}()
+
+	select {
+	case <-finish:
+	case <-time.After(timeout):
+		close(cancel)
+	case <-m.ctx.Done():
+		close(cancel)
+	}
+
+	return m.isMailserverAvailable(mailserverID)
 }

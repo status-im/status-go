@@ -176,13 +176,14 @@ func (w *gethWakuV2Wrapper) SendMessagesRequest(peerID []byte, r types.MessagesR
 	return errors.New("DEPRECATED")
 }
 
-func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID []byte, r types.MessagesRequest) (*types.StoreRequestCursor, error) {
+func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID []byte, r types.MessagesRequest, processEnvelopes bool) (*types.StoreRequestCursor, int, error) {
 	var options []store.HistoryRequestOption
 
 	peer, err := peer.Decode(string(peerID))
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
+
 	options = []store.HistoryRequestOption{
 		store.WithPaging(false, uint64(r.Limit)),
 	}
@@ -201,9 +202,9 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID []b
 		contentTopics = append(contentTopics, wakucommon.BytesToTopic(topic))
 	}
 
-	pbCursor, err := w.waku.Query(ctx, peer, r.PubsubTopic, contentTopics, uint64(r.From), uint64(r.To), options)
+	pbCursor, envelopesCount, err := w.waku.Query(ctx, peer, r.PubsubTopic, contentTopics, uint64(r.From), uint64(r.To), options, processEnvelopes)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	if pbCursor != nil {
@@ -212,10 +213,10 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID []b
 			ReceiverTime: pbCursor.ReceiverTime,
 			SenderTime:   pbCursor.SenderTime,
 			PubsubTopic:  pbCursor.PubsubTopic,
-		}, nil
+		}, envelopesCount, nil
 	}
 
-	return nil, nil
+	return nil, envelopesCount, nil
 }
 
 // DEPRECATED: Not used in waku V2

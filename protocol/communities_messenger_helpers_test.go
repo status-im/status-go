@@ -29,7 +29,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/communitytokens"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/t/helpers"
@@ -320,29 +319,19 @@ func createCommunityConfigurable(s *suite.Suite, owner *Messenger, permission pr
 }
 
 func advertiseCommunityTo(s *suite.Suite, community *communities.Community, owner *Messenger, user *Messenger) {
-	chat := CreateOneToOneChat(common.PubkeyToHex(&user.identity.PublicKey), &user.identity.PublicKey, user.transport)
-
-	inputMessage := common.NewMessage()
-	inputMessage.ChatId = chat.ID
-	inputMessage.Text = "some text"
-	inputMessage.CommunityID = community.IDString()
-
-	err := owner.SaveChat(chat)
-	s.Require().NoError(err)
-	_, err = owner.SendChatMessage(context.Background(), inputMessage)
+	// Create wrapped (Signed) community data.
+	wrappedCommunity, err := community.ToProtocolMessageBytes()
 	s.Require().NoError(err)
 
-	// Ensure community is received
-	err = tt.RetryWithBackOff(func() error {
-		response, err := user.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-		return nil
-	})
+	// Unwrap signer (Admin) data at user side.
+	signer, description, err := communities.UnwrapCommunityDescriptionMessage(wrappedCommunity)
+	s.Require().NoError(err)
+
+	// Handle community data state at receiver side
+	messageState := user.buildMessageState()
+	messageState.CurrentMessageState = &CurrentMessageState{}
+	messageState.CurrentMessageState.PublicKey = &user.identity.PublicKey
+	err = user.handleCommunityDescription(messageState, signer, description, wrappedCommunity, nil)
 	s.Require().NoError(err)
 }
 
