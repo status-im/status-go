@@ -556,38 +556,11 @@ func (m *Messenger) syncFiltersFrom(ms mailservers.Mailserver, filters []*transp
 		}
 	}
 
-	// TODO pablo we can remove this if we are passing the right mailserver
 	for _, batch := range batches24h {
-		// split batches based on chat IDs that might belong to a community
-		batches24hByCommunity := make(map[string]MailserverBatch)
-		for _, chatID := range batch.ChatIDs {
-			communityIDForChat := "" // default to no community
-			chat, ok := m.allChats.Load(chatID)
-			if ok && chat.CommunityChat() && m.communityStorenodes.HasStorenodeSetup(chat.CommunityID) {
-				communityIDForChat = chat.CommunityID
-			}
-			communityBatch, exists := batches24hByCommunity[communityIDForChat]
-			if !exists {
-				communityBatch = MailserverBatch{
-					To:          batch.To,
-					Cursor:      batch.Cursor,
-					PubsubTopic: batch.PubsubTopic,
-					Topics:      batch.Topics,
-					ChatIDs:     make([]string, 0, len(batch.ChatIDs)),
-				}
-			}
-			communityBatch.ChatIDs = append(communityBatch.ChatIDs, chatID)
-			batches24hByCommunity[communityIDForChat] = communityBatch
-		}
-
-		// Process batches
-		for communityID, communityBatch := range batches24hByCommunity {
-			ms := m.getActiveMailserver(communityID)
-			err := m.processMailserverBatch(*ms, communityBatch)
-			if err != nil {
-				m.logger.Error("error syncing community topics", zap.Error(err))
-				return nil, err
-			}
+		err := m.processMailserverBatch(ms, batch)
+		if err != nil {
+			m.logger.Error("error syncing topics", zap.Error(err))
+			return nil, err
 		}
 	}
 
