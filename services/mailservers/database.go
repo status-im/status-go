@@ -26,7 +26,7 @@ type Mailserver struct {
 	Fleet          string `json:"fleet"`
 	Version        uint   `json:"version"`
 	FailedRequests uint   `json:"-"`
-	CommunityOnly  string `json:"communityOnly"`
+	CommunityOnly  bool   `json:"communityOnly"`
 }
 
 func (m Mailserver) Enode() (*enode.Node, error) {
