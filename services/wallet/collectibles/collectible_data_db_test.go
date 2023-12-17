@@ -42,6 +42,7 @@ func generateTestCollectiblesData(count int) (result []thirdparty.CollectibleDat
 			Description:        fmt.Sprintf("description-%d", i),
 			Permalink:          fmt.Sprintf("permalink-%d", i),
 			ImageURL:           fmt.Sprintf("imageurl-%d", i),
+			ImagePayload:       []byte(fmt.Sprintf("imagepayload-%d", i)),
 			AnimationURL:       fmt.Sprintf("animationurl-%d", i),
 			AnimationMediaType: fmt.Sprintf("animationmediatype-%d", i),
 			Traits: []thirdparty.CollectibleTrait{

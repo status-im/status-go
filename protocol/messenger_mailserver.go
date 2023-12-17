@@ -20,6 +20,11 @@ import (
 	"github.com/status-im/status-go/services/mailservers"
 )
 
+const (
+	initialStoreNodeRequestPageSize = 4
+	defaultStoreNodeRequestPageSize = 20
+)
+
 // tolerance is how many seconds of potentially out-of-order messages we want to fetch
 var tolerance uint32 = 60
 
@@ -27,6 +32,8 @@ var mailserverRequestTimeout = 30 * time.Second
 var oneMonthInSeconds uint32 = 31 * 24 * 60 * 60
 var mailserverMaxTries uint = 2
 var mailserverMaxFailedRequests uint = 2
+
+const OneDayInSeconds = 86400
 
 // maxTopicsPerRequest sets the batch size to limit the number of topics per store query
 var maxTopicsPerRequest int = 10
@@ -354,7 +361,7 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 		topicsData[fmt.Sprintf("%s-%s", topic.PubsubTopic, topic.ContentTopic)] = topic
 	}
 
-	batches := make(map[int]MailserverBatch)
+	batches := make(map[string]map[int]MailserverBatch)
 
 	to := m.calculateMailserverTo()
 	var syncedTopics []mailservers.MailserverTopic
@@ -391,6 +398,10 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 	}
 
 	for pubsubTopic, contentTopics := range contentTopicsPerPubsubTopic {
+		if _, ok := batches[pubsubTopic]; !ok {
+			batches[pubsubTopic] = make(map[int]MailserverBatch)
+		}
+
 		for _, filter := range contentTopics {
 			var chatID string
 			// If the filter has an identity, we use it as a chatID, otherwise is a public chat/community chat filter
@@ -419,7 +430,7 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 			batchID := topicData.LastRequest
 
 			if currentBatch < len(prioritizedBatches) {
-				batch, ok := batches[currentBatch]
+				batch, ok := batches[pubsubTopic][currentBatch]
 				if ok {
 					prevTopicData, ok := topicsData[batch.PubsubTopic+batch.Topics[0].String()]
 					if (!ok && topicData.LastRequest != int(defaultPeriodFromNow)) ||
@@ -438,7 +449,7 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 				}
 			}
 
-			batch, ok := batches[batchID]
+			batch, ok := batches[pubsubTopic][batchID]
 			if !ok {
 				from := uint32(topicData.LastRequest)
 				if capToDefaultSyncPeriod {
@@ -453,7 +464,8 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 			batch.ChatIDs = append(batch.ChatIDs, chatID)
 			batch.PubsubTopic = pubsubTopic
 			batch.Topics = append(batch.Topics, filter.ContentTopic)
-			batches[batchID] = batch
+			batches[pubsubTopic][batchID] = batch
+
 			// Set last request to the new `to`
 			topicData.LastRequest = int(to)
 			syncedTopics = append(syncedTopics, topicData)
@@ -464,46 +476,48 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 		m.config.messengerSignalsHandler.HistoryRequestStarted(len(batches))
 	}
 
-	batchKeys := make([]int, 0, len(batches))
-	for k := range batches {
-		batchKeys = append(batchKeys, k)
-	}
-	sort.Ints(batchKeys)
-
 	var batches24h []MailserverBatch
-	keysToIterate := append([]int{}, batchKeys...)
-	for {
-		// For all batches
-		var tmpKeysToIterate []int
-		for _, k := range keysToIterate {
-			batch := batches[k]
+	for pubsubTopic := range batches {
+		batchKeys := make([]int, 0, len(batches[pubsubTopic]))
+		for k := range batches[pubsubTopic] {
+			batchKeys = append(batchKeys, k)
+		}
+		sort.Ints(batchKeys)
 
-			dayBatch := MailserverBatch{
-				To:          batch.To,
-				Cursor:      batch.Cursor,
-				PubsubTopic: batch.PubsubTopic,
-				Topics:      batch.Topics,
-				ChatIDs:     batch.ChatIDs,
+		keysToIterate := append([]int{}, batchKeys...)
+		for {
+			// For all batches
+			var tmpKeysToIterate []int
+			for _, k := range keysToIterate {
+				batch := batches[pubsubTopic][k]
+
+				dayBatch := MailserverBatch{
+					To:          batch.To,
+					Cursor:      batch.Cursor,
+					PubsubTopic: batch.PubsubTopic,
+					Topics:      batch.Topics,
+					ChatIDs:     batch.ChatIDs,
+				}
+
+				from := batch.To - OneDayInSeconds
+				if from > batch.From {
+					dayBatch.From = from
+					batches24h = append(batches24h, dayBatch)
+
+					// Replace og batch with new dates
+					batch.To = from
+					batches[pubsubTopic][k] = batch
+					tmpKeysToIterate = append(tmpKeysToIterate, k)
+				} else {
+					batches24h = append(batches24h, batch)
+				}
 			}
 
-			from := batch.To - 86400
-			if from > batch.From {
-				dayBatch.From = from
-				batches24h = append(batches24h, dayBatch)
-
-				// Replace og batch with new dates
-				batch.To = from
-				batches[k] = batch
-				tmpKeysToIterate = append(tmpKeysToIterate, k)
-			} else {
-				batches24h = append(batches24h, batch)
+			if len(tmpKeysToIterate) == 0 {
+				break
 			}
+			keysToIterate = tmpKeysToIterate
 		}
-
-		if len(tmpKeysToIterate) == 0 {
-			break
-		}
-		keysToIterate = tmpKeysToIterate
 	}
 
 	i := 0
@@ -527,31 +541,33 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 	}
 
 	var messagesToBeSaved []*common.Message
-	for _, batch := range batches {
-		for _, id := range batch.ChatIDs {
-			chat, ok := m.allChats.Load(id)
-			if !ok || !chat.Active || chat.Timeline() || chat.ProfileUpdates() {
-				continue
-			}
-			gap, err := m.calculateGapForChat(chat, batch.From)
-			if err != nil {
-				return nil, err
-			}
-			if chat.SyncedFrom == 0 || chat.SyncedFrom > batch.From {
-				chat.SyncedFrom = batch.From
-			}
+	for _, batches := range batches {
+		for _, batch := range batches {
+			for _, id := range batch.ChatIDs {
+				chat, ok := m.allChats.Load(id)
+				if !ok || !chat.Active || chat.Timeline() || chat.ProfileUpdates() {
+					continue
+				}
+				gap, err := m.calculateGapForChat(chat, batch.From)
+				if err != nil {
+					return nil, err
+				}
+				if chat.SyncedFrom == 0 || chat.SyncedFrom > batch.From {
+					chat.SyncedFrom = batch.From
+				}
 
-			chat.SyncedTo = to
+				chat.SyncedTo = to
 
-			err = m.persistence.SetSyncTimestamps(chat.SyncedFrom, chat.SyncedTo, chat.ID)
-			if err != nil {
-				return nil, err
-			}
+				err = m.persistence.SetSyncTimestamps(chat.SyncedFrom, chat.SyncedTo, chat.ID)
+				if err != nil {
+					return nil, err
+				}
 
-			response.AddChat(chat)
-			if gap != nil {
-				response.AddMessage(gap)
-				messagesToBeSaved = append(messagesToBeSaved, gap)
+				response.AddChat(chat)
+				if gap != nil {
+					response.AddMessage(gap)
+					messagesToBeSaved = append(messagesToBeSaved, gap)
+				}
 			}
 		}
 	}
@@ -610,6 +626,7 @@ type work struct {
 	contentTopics []types.TopicType
 	cursor        []byte
 	storeCursor   *types.StoreRequestCursor
+	limit         uint32
 }
 
 type messageRequester interface {
@@ -621,11 +638,23 @@ type messageRequester interface {
 		previousStoreCursor *types.StoreRequestCursor,
 		pubsubTopic string,
 		contentTopics []types.TopicType,
+		limit uint32,
 		waitForResponse bool,
-	) (cursor []byte, storeCursor *types.StoreRequestCursor, err error)
+		processEnvelopes bool,
+	) (cursor []byte, storeCursor *types.StoreRequestCursor, envelopesCount int, err error)
 }
 
-func processMailserverBatch(ctx context.Context, messageRequester messageRequester, batch MailserverBatch, mailserverID []byte, logger *zap.Logger) error {
+func processMailserverBatch(
+	ctx context.Context,
+	messageRequester messageRequester,
+	batch MailserverBatch,
+	mailserverID []byte,
+	logger *zap.Logger,
+	pageLimit uint32,
+	shouldProcessNextPage func(int) (bool, uint32),
+	processEnvelopes bool,
+) error {
+
 	var topicStrings []string
 	for _, t := range batch.Topics {
 		topicStrings = append(topicStrings, t.String())
@@ -669,6 +698,7 @@ func processMailserverBatch(ctx context.Context, messageRequester messageRequest
 				workCh <- work{
 					pubsubTopic:   batch.PubsubTopic,
 					contentTopics: batch.Topics[i:j],
+					limit:         pageLimit,
 				}
 				time.Sleep(50 * time.Millisecond)
 			}
@@ -708,7 +738,7 @@ loop:
 				}()
 
 				queryCtx, queryCancel := context.WithTimeout(ctx, mailserverRequestTimeout)
-				cursor, storeCursor, err := messageRequester.SendMessagesRequestForTopics(queryCtx, mailserverID, batch.From, batch.To, w.cursor, w.storeCursor, w.pubsubTopic, w.contentTopics, true)
+				cursor, storeCursor, envelopesCount, err := messageRequester.SendMessagesRequestForTopics(queryCtx, mailserverID, batch.From, batch.To, w.cursor, w.storeCursor, w.pubsubTopic, w.contentTopics, w.limit, true, processEnvelopes)
 
 				queryCancel()
 
@@ -718,16 +748,32 @@ loop:
 					return
 				}
 
-				if len(cursor) != 0 || storeCursor != nil {
-					logger.Debug("processBatch producer - creating work (cursor)")
+				processNextPage := true
+				nextPageLimit := pageLimit
 
-					workWg.Add(1)
-					workCh <- work{
-						pubsubTopic:   w.pubsubTopic,
-						contentTopics: w.contentTopics,
-						cursor:        cursor,
-						storeCursor:   storeCursor,
-					}
+				if shouldProcessNextPage != nil {
+					processNextPage, nextPageLimit = shouldProcessNextPage(envelopesCount)
+				}
+
+				if !processNextPage {
+					return
+				}
+
+				// Check the cursor after calling `shouldProcessNextPage`.
+				// The app might use process the fetched envelopes in the callback for own needs.
+				if len(cursor) == 0 && storeCursor == nil {
+					return
+				}
+
+				logger.Debug("processBatch producer - creating work (cursor)")
+
+				workWg.Add(1)
+				workCh <- work{
+					pubsubTopic:   w.pubsubTopic,
+					contentTopics: w.contentTopics,
+					cursor:        cursor,
+					storeCursor:   storeCursor,
+					limit:         nextPageLimit,
 				}
 			}(w)
 		case err := <-errCh:
@@ -757,7 +803,16 @@ func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 		return err
 	}
 
-	return processMailserverBatch(m.ctx, m.transport, batch, mailserverID, m.logger)
+	return processMailserverBatch(m.ctx, m.transport, batch, mailserverID, m.logger, defaultStoreNodeRequestPageSize, nil, false)
+}
+
+func (m *Messenger) processMailserverBatchWithOptions(batch MailserverBatch, pageLimit uint32, shouldProcessNextPage func(int) (bool, uint32), processEnvelopes bool) error {
+	mailserverID, err := m.activeMailserverID()
+	if err != nil {
+		return err
+	}
+
+	return processMailserverBatch(m.ctx, m.transport, batch, mailserverID, m.logger, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 type MailserverBatch struct {

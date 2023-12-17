@@ -22,6 +22,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -496,8 +497,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 
 	// create community and make bob and alice join to it
 	community, _ := s.createCommunity()
-	s.advertiseCommunityTo(community, s.owner, s.bob)
-	s.advertiseCommunityTo(community, s.owner, s.alice)
+	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.bob)
+	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.alice)
 
 	s.joinCommunity(community, s.owner, s.bob)
 	s.joinCommunity(community, s.owner, s.alice)
@@ -2106,8 +2107,8 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 
 func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 	community, _ := s.createCommunity()
-	s.advertiseCommunityTo(community, s.owner, s.alice)
-	s.advertiseCommunityTo(community, s.owner, s.bob)
+	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.alice)
+	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.bob)
 
 	s.joinCommunity(community, s.owner, s.alice)
 	s.joinCommunity(community, s.owner, s.bob)
@@ -2192,57 +2193,54 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 
 func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "status",
-		Color:       "#ffffff",
 		Description: "status community description",
+		Color:       "#FFFFFF",
+		Image:       "../_assets/tests/status.png",
+		ImageAx:     0,
+		ImageAy:     0,
+		ImageBx:     256,
+		ImageBy:     256,
+		Banner: images.CroppedImage{
+			ImagePath: "../_assets/tests/IMG_1205.HEIC.jpg",
+			X:         0,
+			Y:         0,
+			Width:     160,
+			Height:    90,
+		},
 	}
 
-	inviteMessage := "invite to community testing message"
+	response, err := s.owner.CreateCommunity(description, true)
 
-	// Create an community
-	response, err := s.bob.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
-
+	s.Require().Len(response.Chats(), 1)
 	community := response.Communities()[0]
 
-	response, err = s.bob.ShareCommunity(
-		&requests.ShareCommunity{
-			CommunityID:   community.ID(),
-			Users:         []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
-			InviteMessage: inviteMessage,
-		},
-	)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Messages(), 1)
-
-	// Add bob to contacts so it does not go on activity center
-	bobPk := common.PubkeyToHex(&s.bob.identity.PublicKey)
-	request := &requests.AddContact{ID: bobPk}
-	_, err = s.alice.AddContact(context.Background(), request)
-	s.Require().NoError(err)
-
-	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.messages) == 0 {
-			return errors.New("community link not received")
-		}
-		return nil
+	inputMessageText := "Come on alice, You'll like it here!"
+	// Alice shares community with Bob
+	response, err = s.owner.ShareCommunity(&requests.ShareCommunity{
+		CommunityID:   community.ID(),
+		Users:         []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
+		InviteMessage: inputMessageText,
 	})
 
 	s.Require().NoError(err)
+	s.Require().NotNil(response)
 	s.Require().Len(response.Messages(), 1)
+	sentMessageText := response.Messages()[0].Text
 
-	message := response.Messages()[0]
-	s.Require().Equal(community.IDString(), message.CommunityID)
-	s.Require().Equal(inviteMessage, message.Text)
+	_, err = WaitOnMessengerResponse(s.alice, func(r *MessengerResponse) bool {
+		return len(r.Messages()) > 0
+	}, "Messages not received")
+
+	communityURL := response.Messages()[0].UnfurledStatusLinks.GetUnfurledStatusLinks()[0].Url
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(fmt.Sprintf("%s\n%s", inputMessageText, communityURL), sentMessageText)
+	s.Require().NotNil(response.Messages()[0].UnfurledStatusLinks.GetUnfurledStatusLinks()[0].GetCommunity().CommunityId)
 }
 
 func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
@@ -2252,8 +2250,6 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
 		Color:       "#ffffff",
 		Description: "status community description",
 	}
-
-	inviteMessage := "invite to community testing message"
 
 	// Create an community chat
 	response, err := s.bob.CreateCommunity(description, true)
@@ -2289,41 +2285,13 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
 	err = s.bob.communitiesManager.SaveCommunity(community)
 	s.Require().NoError(err)
 
-	response, err = s.bob.ShareCommunity(
-		&requests.ShareCommunity{
-			CommunityID:   community.ID(),
-			Users:         []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
-			InviteMessage: inviteMessage,
-		},
-	)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Messages(), 1)
+	advertiseCommunityToUserOldWay(&s.Suite, community, s.bob, s.alice)
 
 	// Add bob to contacts so it does not go on activity center
 	bobPk := common.PubkeyToHex(&s.bob.identity.PublicKey)
 	request := &requests.AddContact{ID: bobPk}
 	_, err = s.alice.AddContact(context.Background(), request)
 	s.Require().NoError(err)
-
-	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.messages) == 0 {
-			return errors.New("community link not received")
-		}
-		return nil
-	})
-
-	s.Require().NoError(err)
-	s.Require().Len(response.Messages(), 1)
-
-	message := response.Messages()[0]
-	s.Require().Equal(community.IDString(), message.CommunityID)
-	s.Require().Equal(inviteMessage, message.Text)
 
 	// Alice should have the Joined status for the community
 	communityInResponse := response.Communities()[0]

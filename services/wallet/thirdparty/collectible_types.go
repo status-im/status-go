@@ -104,13 +104,14 @@ type CollectionTrait struct {
 
 // Collection info
 type CollectionData struct {
-	ID          ContractID                 `json:"id"`
-	CommunityID string                     `json:"community_id"`
-	Provider    string                     `json:"provider"`
-	Name        string                     `json:"name"`
-	Slug        string                     `json:"slug"`
-	ImageURL    string                     `json:"image_url"`
-	Traits      map[string]CollectionTrait `json:"traits"`
+	ID           ContractID `json:"id"`
+	CommunityID  string     `json:"community_id"`
+	Provider     string     `json:"provider"`
+	Name         string     `json:"name"`
+	Slug         string     `json:"slug"`
+	ImageURL     string     `json:"image_url"`
+	ImagePayload []byte
+	Traits       map[string]CollectionTrait `json:"traits"`
 }
 
 type CollectibleTrait struct {
@@ -129,11 +130,12 @@ type CollectibleData struct {
 	Description        string              `json:"description"`
 	Permalink          string              `json:"permalink"`
 	ImageURL           string              `json:"image_url"`
-	AnimationURL       string              `json:"animation_url"`
-	AnimationMediaType string              `json:"animation_media_type"`
-	Traits             []CollectibleTrait  `json:"traits"`
-	BackgroundColor    string              `json:"background_color"`
-	TokenURI           string              `json:"token_uri"`
+	ImagePayload       []byte
+	AnimationURL       string             `json:"animation_url"`
+	AnimationMediaType string             `json:"animation_media_type"`
+	Traits             []CollectibleTrait `json:"traits"`
+	BackgroundColor    string             `json:"background_color"`
+	TokenURI           string             `json:"token_uri"`
 }
 
 // Community-related collectible info. Present only for collectibles minted in a community.
@@ -215,9 +217,4 @@ type CollectibleDataProvider interface {
 type CollectionDataProvider interface {
 	CollectibleProvider
 	FetchCollectionsDataByContractID(ctx context.Context, ids []ContractID) ([]CollectionData, error)
-}
-
-type CollectibleCommunityInfoProvider interface {
-	CommunityInfoProvider
-	FillCollectibleMetadata(collectible *FullCollectibleData) error
 }

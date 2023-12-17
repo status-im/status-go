@@ -25,7 +25,7 @@ func TestKeycardPairingsFile(t *testing.T) {
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
-	service := NewService(db, accountsDb, appDB, &rpc.Client{NetworkManager: network.NewManager(db)}, nil, nil, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil)
+	service := NewService(db, accountsDb, appDB, &rpc.Client{NetworkManager: network.NewManager(db)}, nil, nil, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, nil)
 
 	data, err := service.KeycardPairings().GetPairingsJSONFileContent()
 	require.NoError(t, err)

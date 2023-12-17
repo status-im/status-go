@@ -215,17 +215,9 @@ func (s *MessengerSyncActivityCenterSuite) addContactAndShareCommunity(userB *Me
 		return false
 	}, "contact request not accepted on device 2")
 	s.Require().NoError(err)
-
-	_, err = s.m.ShareCommunity(&requests.ShareCommunity{
-		CommunityID:   communityID,
-		Users:         []types.HexBytes{common.PubkeyToHexBytes(&userB.identity.PublicKey)},
-		InviteMessage: "invite to community testing message",
-	})
+	community, err := s.m.GetCommunityByID(communityID)
 	s.Require().NoError(err)
-	_, err = WaitOnMessengerResponse(userB, func(r *MessengerResponse) bool {
-		return len(r.Communities()) > 0
-	}, "community not received")
-	s.Require().NoError(err)
+	advertiseCommunityToUserOldWay(&s.Suite, community, s.m, userB)
 }
 
 func (s *MessengerSyncActivityCenterSuite) requestToJoinCommunity(userB *Messenger, communityID types.HexBytes) {

@@ -16,11 +16,13 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/wallet/activity"
 	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/collectibles"
+	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/market"
@@ -56,6 +58,7 @@ func NewService(
 	stickers *stickers.Service,
 	pendingTxManager *transactions.PendingTxTracker,
 	feed *event.Feed,
+	mediaServer *server.MediaServer,
 ) *Service {
 	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceStatic,
@@ -96,8 +99,9 @@ func NewService(
 		})
 	})
 
+	communityManager := community.NewManager(db, mediaServer)
 	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
-	tokenManager := token.NewTokenManager(db, rpcClient, rpcClient.NetworkManager, appDB)
+	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB)
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(db, gethManager, transactor, config, accountsDB, pendingTxManager, feed)
 	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountFeed, feed, transactionManager, pendingTxManager,
@@ -140,8 +144,8 @@ func NewService(
 		alchemyClient,
 	}
 
-	collectiblesManager := collectibles.NewManager(db, rpcClient, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, feed)
-	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, settingsFeed, rpcClient.NetworkManager, collectiblesManager)
+	collectiblesManager := collectibles.NewManager(db, rpcClient, communityManager, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, mediaServer, feed)
+	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, settingsFeed, communityManager, rpcClient.NetworkManager, collectiblesManager)
 
 	activity := activity.NewService(db, tokenManager, collectiblesManager, feed)
 
@@ -152,6 +156,7 @@ func NewService(
 		accountsDB:            accountsDB,
 		rpcClient:             rpcClient,
 		tokenManager:          tokenManager,
+		communityManager:      communityManager,
 		savedAddressesManager: savedAddressesManager,
 		transactionManager:    transactionManager,
 		pendingTxManager:      pendingTxManager,
@@ -185,6 +190,7 @@ type Service struct {
 	rpcClient             *rpc.Client
 	savedAddressesManager *SavedAddressesManager
 	tokenManager          *token.Manager
+	communityManager      *community.Manager
 	transactionManager    *transfer.TransactionManager
 	pendingTxManager      *transactions.PendingTxTracker
 	cryptoOnRampManager   *CryptoOnRampManager
@@ -223,8 +229,8 @@ func (s *Service) Start() error {
 }
 
 // Set external Collectibles community info provider
-func (s *Service) SetCollectibleCommunityInfoProvider(provider thirdparty.CollectibleCommunityInfoProvider) {
-	s.collectiblesManager.SetCommunityInfoProvider(provider)
+func (s *Service) SetWalletCommunityInfoProvider(provider thirdparty.CommunityInfoProvider) {
+	s.communityManager.SetCommunityInfoProvider(provider)
 }
 
 // Stop reactor and close db.

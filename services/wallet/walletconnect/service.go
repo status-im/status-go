@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -128,29 +127,28 @@ func (s *Service) PairSessionProposal(proposal SessionProposal) (*PairSessionRes
 	return result, nil
 }
 
-func (s *Service) RecordSuccessfulPairing(proposal SessionProposal) error {
+func (s *Service) SaveOrUpdateSession(session Session) error {
 	var icon string
-	if len(proposal.Params.Proposer.Metadata.Icons) > 0 {
-		icon = proposal.Params.Proposer.Metadata.Icons[0]
+	if len(session.Peer.Metadata.Icons) > 0 {
+		icon = session.Peer.Metadata.Icons[0]
 	}
-	return InsertPairing(s.db, Pairing{
-		Topic:       proposal.Params.PairingTopic,
-		Expiry:      proposal.Params.Expiry,
-		Active:      true,
-		AppName:     proposal.Params.Proposer.Metadata.Name,
-		URL:         proposal.Params.Proposer.Metadata.URL,
-		Description: proposal.Params.Proposer.Metadata.Description,
-		Icon:        icon,
-		Verified:    proposal.Params.Verify.Verified,
+
+	return UpsertSession(s.db, DbSession{
+		Topic:           session.Topic,
+		PairingTopic:    session.PairingTopic,
+		Expiry:          session.Expiry,
+		Active:          true,
+		DappName:        session.Peer.Metadata.Name,
+		DappURL:         session.Peer.Metadata.URL,
+		DappDescription: session.Peer.Metadata.Description,
+		DappIcon:        icon,
+		DappVerifyURL:   session.Peer.Metadata.VerifyURL,
+		DappPublicKey:   session.Peer.PublicKey,
 	})
 }
 
-func (s *Service) ChangePairingState(topic Topic, active bool) error {
-	return ChangePairingState(s.db, topic, active)
-}
-
-func (s *Service) HasActivePairings() (bool, error) {
-	return HasActivePairings(s.db, time.Now().Unix())
+func (s *Service) ChangeSessionState(topic Topic, active bool) error {
+	return ChangeSessionState(s.db, topic, active)
 }
 
 func (s *Service) SessionRequest(request SessionRequest) (response *transfer.TxResponse, err error) {

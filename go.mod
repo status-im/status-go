@@ -4,6 +4,8 @@ go 1.19
 
 replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.11
 
+replace github.com/rjeczalik/notify => github.com/status-im/notify v1.0.2-status
+
 replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.20190717161051-705d9623b7c1
 
 replace github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088
@@ -51,7 +53,7 @@ require (
 	github.com/status-im/migrate/v4 v4.6.2-status.3
 	github.com/status-im/rendezvous v1.3.7
 	github.com/status-im/status-go/extkeys v1.1.2
-	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
+	github.com/status-im/tcp-shaker v1.1.1-status
 	github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
 	github.com/stretchr/testify v1.8.4
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a

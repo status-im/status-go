@@ -671,30 +671,24 @@ func (api *API) WCPairSessionProposal(ctx context.Context, sessionProposalJSON s
 	return api.s.walletConnect.PairSessionProposal(data)
 }
 
-// WCRecordSuccessfulPairing confirms that a pairing has been established
-func (api *API) WCRecordSuccessfulPairing(ctx context.Context, sessionProposalJSON string) error {
-	log.Debug("wallet.api.wc.RecordSuccessfulPairing", "proposal.len", len(sessionProposalJSON))
+// WCSaveOrUpdateSession records a session established between Status app and dapp
+func (api *API) WCSaveOrUpdateSession(ctx context.Context, sessionProposalJSON string) error {
+	log.Debug("wallet.api.wc.WCSaveOrUpdateSession", "proposal.len", len(sessionProposalJSON))
 
-	var data wc.SessionProposal
+	var data wc.Session
 	err := json.Unmarshal([]byte(sessionProposalJSON), &data)
 	if err != nil {
 		return err
 	}
 
-	return api.s.walletConnect.RecordSuccessfulPairing(data)
+	return api.s.walletConnect.SaveOrUpdateSession(data)
 }
 
-// WCChangePairingState changes the active state of a pairing
-func (api *API) WCChangePairingState(ctx context.Context, topic walletconnect.Topic, active bool) error {
-	log.Debug("wallet.api.wc.ChangePairingState", "topic", topic, "active", active)
+// WCChangeSessionState changes the active state of a session
+func (api *API) WCChangeSessionState(ctx context.Context, topic walletconnect.Topic, active bool) error {
+	log.Debug("wallet.api.wc.WCChangeSessionState", "topic", topic, "active", active)
 
-	return api.s.walletConnect.ChangePairingState(topic, active)
-}
-
-func (api *API) WCHasActivePairings(ctx context.Context) (bool, error) {
-	log.Debug("wallet.api.wc.HasActivePairings")
-
-	return api.s.walletConnect.HasActivePairings()
+	return api.s.walletConnect.ChangeSessionState(topic, active)
 }
 
 // WCSessionRequest responds to "session_request" event

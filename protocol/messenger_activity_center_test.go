@@ -140,7 +140,7 @@ func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 	defer TearDownMessenger(&s.Suite, bob)
 
 	// create an http server
-	mediaServer, err := server.NewMediaServer(nil, nil, nil)
+	mediaServer, err := server.NewMediaServer(nil, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(mediaServer)
 	s.Require().NoError(mediaServer.Start())

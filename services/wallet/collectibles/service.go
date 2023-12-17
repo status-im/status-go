@@ -69,13 +69,13 @@ var (
 )
 
 type Service struct {
-	manager     *Manager
-	controller  *Controller
-	db          *sql.DB
-	ownershipDB *OwnershipDB
-	communityDB *community.DataDB
-	walletFeed  *event.Feed
-	scheduler   *async.MultiClientScheduler
+	manager          *Manager
+	controller       *Controller
+	db               *sql.DB
+	ownershipDB      *OwnershipDB
+	communityManager *community.Manager
+	walletFeed       *event.Feed
+	scheduler        *async.MultiClientScheduler
 }
 
 func NewService(
@@ -84,16 +84,17 @@ func NewService(
 	accountsDB *accounts.Database,
 	accountsFeed *event.Feed,
 	settingsFeed *event.Feed,
+	communityManager *community.Manager,
 	networkManager *network.Manager,
 	manager *Manager) *Service {
 	s := &Service{
-		manager:     manager,
-		controller:  NewController(db, walletFeed, accountsDB, accountsFeed, settingsFeed, networkManager, manager),
-		db:          db,
-		ownershipDB: NewOwnershipDB(db),
-		communityDB: community.NewDataDB(db),
-		walletFeed:  walletFeed,
-		scheduler:   async.NewMultiClientScheduler(),
+		manager:          manager,
+		controller:       NewController(db, walletFeed, accountsDB, accountsFeed, settingsFeed, networkManager, manager),
+		db:               db,
+		ownershipDB:      NewOwnershipDB(db),
+		communityManager: communityManager,
+		walletFeed:       walletFeed,
+		scheduler:        async.NewMultiClientScheduler(),
 	}
 	s.controller.SetReceivedCollectiblesCb(s.notifyCommunityCollectiblesReceived)
 	return s
@@ -413,13 +414,13 @@ func (s *Service) fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibl
 		header := fullCollectibleDataToHeader(c)
 
 		if c.CollectibleData.CommunityID != "" {
-			communityInfo, _, err := s.communityDB.GetCommunityInfo(c.CollectibleData.CommunityID)
+			communityInfo, _, err := s.communityManager.GetCommunityInfo(c.CollectibleData.CommunityID)
 			if err != nil {
 				return nil, err
 			}
 
-			communityHeader := communityInfoToHeader(c.CollectibleData.CommunityID, communityInfo, c.CommunityInfo)
-			header.CommunityData = &communityHeader
+			communityData := communityInfoToData(c.CollectibleData.CommunityID, communityInfo, c.CommunityInfo)
+			header.CommunityData = &communityData
 		}
 
 		res = append(res, header)
@@ -435,13 +436,13 @@ func (s *Service) fullCollectiblesDataToDetails(data []thirdparty.FullCollectibl
 		details := fullCollectibleDataToDetails(c)
 
 		if c.CollectibleData.CommunityID != "" {
-			communityInfo, _, err := s.communityDB.GetCommunityInfo(c.CollectibleData.CommunityID)
+			communityInfo, _, err := s.communityManager.GetCommunityInfo(c.CollectibleData.CommunityID)
 			if err != nil {
 				return nil, err
 			}
 
-			communityDetails := communityInfoToDetails(c.CollectibleData.CommunityID, communityInfo, c.CommunityInfo)
-			details.CommunityData = &communityDetails
+			communityData := communityInfoToData(c.CollectibleData.CommunityID, communityInfo, c.CommunityInfo)
+			details.CommunityData = &communityData
 		}
 
 		res = append(res, details)
@@ -461,20 +462,20 @@ func (s *Service) fullCollectiblesDataToCommunityHeader(data []thirdparty.FullCo
 			continue
 		}
 
-		communityInfo, _, err := s.communityDB.GetCommunityInfo(communityID)
+		communityInfo, _, err := s.communityManager.GetCommunityInfo(communityID)
 		if err != nil {
 			log.Error("Error fetching community info", "error", err)
 			continue
 		}
 
-		communityHeader := communityInfoToHeader(communityID, communityInfo, c.CommunityInfo)
+		communityData := communityInfoToData(communityID, communityInfo, c.CommunityInfo)
 
 		header := Collectible{
 			ID: collectibleID,
 			CollectibleData: &CollectibleData{
 				Name: c.CollectibleData.Name,
 			},
-			CommunityData: &communityHeader,
+			CommunityData: &communityData,
 		}
 
 		res = append(res, header)

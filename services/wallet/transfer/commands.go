@@ -502,14 +502,9 @@ func (c *loadTransfersCommand) Command() async.Command {
 	}.Run
 }
 
-func (c *loadTransfersCommand) LoadTransfers(ctx context.Context, limit int, blocksByAddress map[common.Address][]*big.Int) error {
-	return loadTransfers(ctx, c.blockDAO, c.db, c.chainClient, limit, blocksByAddress,
-		c.transactionManager, c.pendingTxManager, c.tokenManager, c.feed)
-}
-
 func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
-	err = c.LoadTransfers(parent, c.blocksLimit, c.blocksByAddress)
-	return
+	return loadTransfers(parent, c.blockDAO, c.db, c.chainClient, c.blocksLimit, c.blocksByAddress,
+		c.transactionManager, c.pendingTxManager, c.tokenManager, c.feed)
 }
 
 func loadTransfers(ctx context.Context, blockDAO *BlockDAO, db *Database,
@@ -544,13 +539,14 @@ func loadTransfers(ctx context.Context, blockDAO *BlockDAO, db *Database,
 		group.Add(transfers.Command())
 	}
 
+	// loadTransfers command will be restarted in case of error, but if context is cancelled, we should stop
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		log.Debug("loadTransfers cancelled", "chain", chainClient.NetworkID(), "error", ctx.Err())
 	case <-group.WaitAsync():
 		log.Debug("loadTransfers finished for account", "in", time.Since(start), "chain", chainClient.NetworkID())
-		return nil
 	}
+	return nil
 }
 
 func isBinanceChain(chainID uint64) bool {

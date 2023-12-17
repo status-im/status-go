@@ -21,7 +21,7 @@ func NewCollectibleDataDB(sqlDb *sql.DB) *CollectibleDataDB {
 	}
 }
 
-const collectibleDataColumns = "chain_id, contract_address, token_id, provider, name, description, permalink, image_url, animation_url, animation_media_type, background_color, token_uri, community_id"
+const collectibleDataColumns = "chain_id, contract_address, token_id, provider, name, description, permalink, image_url, image_payload, animation_url, animation_media_type, background_color, token_uri, community_id"
 const collectibleCommunityDataColumns = "community_privileges_level"
 const collectibleTraitsColumns = "chain_id, contract_address, token_id, trait_type, trait_value, display_type, max_value"
 const selectCollectibleTraitsColumns = "trait_type, trait_value, display_type, max_value"
@@ -108,7 +108,7 @@ func upsertCollectibleTraits(creator sqlite.StatementCreator, id thirdparty.Coll
 
 func upsertCollectiblesData(creator sqlite.StatementCreator, collectibles []thirdparty.CollectibleData) error {
 	insertCollectible, err := creator.Prepare(fmt.Sprintf(`INSERT OR REPLACE INTO collectible_data_cache (%s) 
-																				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, collectibleDataColumns))
+																				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, collectibleDataColumns))
 	if err != nil {
 		return err
 	}
@@ -123,6 +123,7 @@ func upsertCollectiblesData(creator sqlite.StatementCreator, collectibles []thir
 			c.Description,
 			c.Permalink,
 			c.ImageURL,
+			c.ImagePayload,
 			c.AnimationURL,
 			c.AnimationMediaType,
 			c.BackgroundColor,
@@ -180,6 +181,7 @@ func scanCollectiblesDataRow(row *sql.Row) (*thirdparty.CollectibleData, error) 
 		&c.Description,
 		&c.Permalink,
 		&c.ImageURL,
+		&c.ImagePayload,
 		&c.AnimationURL,
 		&c.AnimationMediaType,
 		&c.BackgroundColor,

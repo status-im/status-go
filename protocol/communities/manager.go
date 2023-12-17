@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/anacrolix/torrent"
@@ -1518,6 +1519,8 @@ func (m *Manager) Queue(signer *ecdsa.PublicKey, community *Community, clock uin
 }
 
 func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte, verifiedOwner *ecdsa.PublicKey, communityShard *protobuf.Shard) (*CommunityResponse, error) {
+	m.logger.Debug("HandleCommunityDescriptionMessage", zap.String("communityID", description.ID))
+
 	if signer == nil {
 		return nil, errors.New("signer can't be nil")
 	}
@@ -3972,6 +3975,22 @@ func (m *Manager) SeedHistoryArchiveTorrent(communityID types.HexBytes) error {
 	if err != nil {
 		return err
 	}
+
+	var stat syscall.Statfs_t
+	wd, _ := os.Getwd()
+
+	err = syscall.Statfs(wd, &stat)
+	if err != nil {
+		return err
+	}
+
+	// Available blocks * size per block = available space in bytes
+	freeSpace := stat.Bavail * uint64(stat.Bsize)
+
+	if freeSpace <= uint64(torrent.Length()) {
+		return ErrNoFreeSpaceForHistoryArchives
+	}
+
 	torrent.DownloadAll()
 
 	m.publish(&Subscription{
@@ -5084,4 +5103,54 @@ func (m *Manager) GetCuratedCommunities() (*CuratedCommunities, error) {
 
 func (m *Manager) SetCuratedCommunities(communities *CuratedCommunities) error {
 	return m.persistence.SetCuratedCommunities(communities)
+}
+
+func ToLinkPreveiwThumbnail(image images.IdentityImage) (*common.LinkPreviewThumbnail, error) {
+	thumbnail := &common.LinkPreviewThumbnail{}
+
+	if image.IsEmpty() {
+		return nil, nil
+	}
+
+	width, height, err := images.GetImageDimensions(image.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get image dimensions: %w", err)
+	}
+
+	dataURI, err := image.GetDataURI()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get data uri: %w", err)
+	}
+
+	thumbnail.Width = width
+	thumbnail.Height = height
+	thumbnail.DataURI = dataURI
+	return thumbnail, nil
+}
+
+func (c *Community) ToStatusLinkPreview() (*common.StatusCommunityLinkPreview, error) {
+	communityLinkPreview := &common.StatusCommunityLinkPreview{}
+	if image, ok := c.Images()[images.SmallDimName]; ok {
+		thumbnail, err := ToLinkPreveiwThumbnail(images.IdentityImage{Payload: image.Payload})
+		if err != nil {
+			c.config.Logger.Warn("unfurling status link: failed to set community thumbnail", zap.Error(err))
+		}
+		communityLinkPreview.Icon = *thumbnail
+	}
+
+	if image, ok := c.Images()[images.BannerIdentityName]; ok {
+		thumbnail, err := ToLinkPreveiwThumbnail(images.IdentityImage{Payload: image.Payload})
+		if err != nil {
+			c.config.Logger.Warn("unfurling status link: failed to set community thumbnail", zap.Error(err))
+		}
+		communityLinkPreview.Banner = *thumbnail
+	}
+
+	communityLinkPreview.CommunityID = c.IDString()
+	communityLinkPreview.DisplayName = c.Name()
+	communityLinkPreview.Description = c.DescriptionText()
+	communityLinkPreview.MembersCount = uint32(c.MembersCount())
+	communityLinkPreview.Color = c.Color()
+
+	return communityLinkPreview, nil
 }
