@@ -353,7 +353,7 @@ func (api *PublicAPI) GetContactByID(parent context.Context, id string) *protoco
 }
 
 func (api *PublicAPI) RequestContactInfoFromMailserver(pubkey string) (*protocol.Contact, error) {
-	return api.service.messenger.RequestContactInfoFromMailserver(pubkey, true)
+	return api.service.messenger.FetchContact(pubkey, true)
 }
 
 func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*transport.Filter) error {

@@ -461,7 +461,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestWithoutWaitingResponse() {
 func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfo() {
 	s.createOwner()
 
-	// Set keypair
+	// Set keypair (to be able to set displayName)
 	ownerProfileKp := accounts.GetProfileKeypairForTest(true, false, false)
 	ownerProfileKp.KeyUID = s.owner.account.KeyUID
 	ownerProfileKp.Accounts[0].KeyUID = s.owner.account.KeyUID
@@ -473,17 +473,6 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfo() {
 	err = s.owner.SetDisplayName("super-owner")
 	s.Require().NoError(err)
 
-	//s.waitForAvailableStoreNode(s.owner)
-	//err = s.owner.publishContactCode()
-	//s.Require().NoError(err)
-
 	s.createBob()
-	//s.waitForAvailableStoreNode(s.bob)
-	//
-	//cancel := make(chan struct{}, 1)
-	//s.bob.StartRetrieveMessagesLoop(1*time.Second, cancel)
-
 	s.fetchProfile(s.bob, s.owner.selfContact.ID, s.owner.selfContact)
-
-	//close(cancel)
 }

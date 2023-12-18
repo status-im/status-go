@@ -5,8 +5,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"time"
-
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
@@ -1221,95 +1219,6 @@ func (m *Messenger) scheduleSyncFiltersForContact(publicKey *ecdsa.PublicKey) (*
 func (m *Messenger) FetchContact(contactID string, waitForResponse bool) (*Contact, error) {
 	contact, _, err := m.storeNodeRequestsManager.FetchContact(contactID, waitForResponse)
 	return contact, err
-}
-
-func (m *Messenger) RequestContactInfoFromMailserver(pubkey string, waitForResponse bool) (*Contact, error) {
-
-	err := m.requestContactInfoFromMailserver(pubkey)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if !waitForResponse {
-		return nil, nil
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-
-	defer func() {
-		cancel()
-		m.forgetContactInfoRequest(pubkey)
-	}()
-
-	for {
-		select {
-		case <-time.After(200 * time.Millisecond):
-			contact, ok := m.allContacts.Load(pubkey)
-			if ok && contact != nil && contact.DisplayName != "" {
-				return contact, nil
-			}
-
-		case <-ctx.Done():
-			return nil, fmt.Errorf("failed to request contact info from mailserver: %w", ctx.Err())
-		}
-	}
-}
-
-func (m *Messenger) requestContactInfoFromMailserver(pubkey string) error {
-
-	m.requestedContactsLock.Lock()
-	defer m.requestedContactsLock.Unlock()
-
-	if _, ok := m.requestedContacts[pubkey]; ok {
-		return nil
-	}
-
-	m.logger.Debug("requesting contact info from mailserver", zap.String("publicKey", pubkey))
-
-	c, err := buildContactFromPkString(pubkey)
-
-	if err != nil {
-		return err
-	}
-
-	publicKey, err := c.PublicKey()
-
-	if err != nil {
-		return err
-	}
-
-	var filter *transport.Filter
-	filter, err = m.scheduleSyncFiltersForContact(publicKey)
-
-	if err != nil {
-		return err
-	}
-
-	m.requestedContacts[pubkey] = filter
-
-	return nil
-}
-
-func (m *Messenger) forgetContactInfoRequest(publicKey string) {
-
-	m.requestedContactsLock.Lock()
-	defer m.requestedContactsLock.Unlock()
-
-	filter, ok := m.requestedContacts[publicKey]
-	if !ok {
-		return
-	}
-
-	m.logger.Debug("forgetting contact info request", zap.String("publicKey", publicKey))
-
-	err := m.transport.RemoveFilters([]*transport.Filter{filter})
-
-	if err != nil {
-		m.logger.Warn("failed to remove filter", zap.Error(err))
-	}
-
-	delete(m.requestedContacts, publicKey)
 }
 
 func (m *Messenger) SubscribeToSelfContactChanges() chan *SelfContactChangeEvent {
