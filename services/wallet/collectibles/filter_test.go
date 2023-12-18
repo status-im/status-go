@@ -3,11 +3,13 @@ package collectibles
 import (
 	"context"
 	"database/sql"
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/t/helpers"
@@ -45,7 +47,7 @@ func TestFilterOwnedCollectibles(t *testing.T) {
 
 	dataPerID := make(map[string]thirdparty.CollectibleData)
 	communityDataPerID := make(map[string]thirdparty.CollectibleCommunityInfo)
-	idsPerChainIDAndOwner := make(map[w_common.ChainID]map[common.Address][]thirdparty.CollectibleUniqueID)
+	balancesPerChainIDAndOwner := make(map[w_common.ChainID]map[common.Address]thirdparty.TokenBalancesPerContractAddress)
 
 	var err error
 
@@ -56,21 +58,30 @@ func TestFilterOwnedCollectibles(t *testing.T) {
 		chainID := data[i].ID.ContractID.ChainID
 		ownerAddress := ownerAddresses[i%len(ownerAddresses)]
 
-		if _, ok := idsPerChainIDAndOwner[chainID]; !ok {
-			idsPerChainIDAndOwner[chainID] = make(map[common.Address][]thirdparty.CollectibleUniqueID)
+		if _, ok := balancesPerChainIDAndOwner[chainID]; !ok {
+			balancesPerChainIDAndOwner[chainID] = make(map[common.Address]thirdparty.TokenBalancesPerContractAddress)
 		}
-		if _, ok := idsPerChainIDAndOwner[chainID][ownerAddress]; !ok {
-			idsPerChainIDAndOwner[chainID][ownerAddress] = make([]thirdparty.CollectibleUniqueID, 0, len(data))
+		if _, ok := balancesPerChainIDAndOwner[chainID][ownerAddress]; !ok {
+			balancesPerChainIDAndOwner[chainID][ownerAddress] = make(thirdparty.TokenBalancesPerContractAddress)
 		}
 
-		idsPerChainIDAndOwner[chainID][ownerAddress] = append(idsPerChainIDAndOwner[chainID][ownerAddress], data[i].ID)
+		contractAddress := data[i].ID.ContractID.Address
+		if _, ok := balancesPerChainIDAndOwner[chainID][ownerAddress][contractAddress]; !ok {
+			balancesPerChainIDAndOwner[chainID][ownerAddress][contractAddress] = make([]thirdparty.TokenBalance, 0, len(data))
+		}
+
+		tokenBalance := thirdparty.TokenBalance{
+			TokenID: data[i].ID.TokenID,
+			Balance: &bigint.BigInt{Int: big.NewInt(int64(i % 10))},
+		}
+		balancesPerChainIDAndOwner[chainID][ownerAddress][contractAddress] = append(balancesPerChainIDAndOwner[chainID][ownerAddress][contractAddress], tokenBalance)
 	}
 
 	timestamp := int64(1234567890)
 
-	for chainID, idsPerOwner := range idsPerChainIDAndOwner {
-		for ownerAddress, ids := range idsPerOwner {
-			err = oDB.Update(chainID, ownerAddress, ids, timestamp)
+	for chainID, balancesPerOwner := range balancesPerChainIDAndOwner {
+		for ownerAddress, balances := range balancesPerOwner {
+			err = oDB.Update(chainID, ownerAddress, balances, timestamp)
 			require.NoError(t, err)
 		}
 	}

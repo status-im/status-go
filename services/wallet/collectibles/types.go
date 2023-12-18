@@ -12,6 +12,7 @@ type Collectible struct {
 	CollectibleData *CollectibleData               `json:"collectible_data,omitempty"`
 	CollectionData  *CollectionData                `json:"collection_data,omitempty"`
 	CommunityData   *CommunityData                 `json:"community_data,omitempty"`
+	Ownership       []thirdparty.AccountBalance    `json:"ownership,omitempty"`
 }
 
 type CollectibleData struct {
