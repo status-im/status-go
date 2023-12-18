@@ -413,6 +413,12 @@ func (s *Service) fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibl
 	for _, c := range data {
 		header := fullCollectibleDataToHeader(c)
 
+		ownership, err := s.ownershipDB.GetOwnership(c.CollectibleData.ID)
+		if err != nil {
+			return nil, err
+		}
+		header.Ownership = ownership
+
 		if c.CollectibleData.CommunityID != "" {
 			communityInfo, _, err := s.communityManager.GetCommunityInfo(c.CollectibleData.CommunityID)
 			if err != nil {
@@ -434,6 +440,12 @@ func (s *Service) fullCollectiblesDataToDetails(data []thirdparty.FullCollectibl
 
 	for _, c := range data {
 		details := fullCollectibleDataToDetails(c)
+
+		ownership, err := s.ownershipDB.GetOwnership(c.CollectibleData.ID)
+		if err != nil {
+			return nil, err
+		}
+		details.Ownership = ownership
 
 		if c.CollectibleData.CommunityID != "" {
 			communityInfo, _, err := s.communityManager.GetCommunityInfo(c.CollectibleData.CommunityID)

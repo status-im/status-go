@@ -198,6 +198,11 @@ type CollectibleContractOwnership struct {
 	Owners          []CollectibleOwner `json:"owners"`
 }
 
+type AccountBalance struct {
+	Address common.Address `json:"address"`
+	Balance *bigint.BigInt `json:"balance"`
+}
+
 type CollectibleContractOwnershipProvider interface {
 	CollectibleProvider
 	FetchCollectibleOwnersByContractAddress(ctx context.Context, chainID w_common.ChainID, contractAddress common.Address) (*CollectibleContractOwnership, error)
