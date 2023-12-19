@@ -274,3 +274,11 @@ func (s *TokenMasterCommunityEventsSuite) TestReceiveRequestsToJoinWithRevealedA
 	bob := s.newMessenger(accountPassword, []string{bobAccountAddress})
 	testMemberReceiveRequestsToJoinAfterGettingNewRole(s, bob, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 }
+
+func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAcceptsRequestToJoinAfterMemberLeave() {
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{})
+
+	// set up additional user that will send request to join
+	user := s.newMessenger("", []string{})
+	testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(s, community, user)
+}

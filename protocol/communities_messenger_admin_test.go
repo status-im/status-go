@@ -433,3 +433,11 @@ func (s *AdminCommunityEventsSuite) TestAdminDoesNotHaveRejectedEventsLoop() {
 	}, "no communities in response")
 	s.Require().Error(err)
 }
+
+func (s *AdminCommunityEventsSuite) TestAdminAcceptsRequestToJoinAfterMemberLeave() {
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})
+
+	// set up additional user that will send request to join
+	user := s.newMessenger("", []string{})
+	testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(s, community, user)
+}

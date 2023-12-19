@@ -2422,6 +2422,14 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 			if err != nil {
 				return nil, nil, err
 			}
+		case RequestToJoinStateAccepted:
+			// if member leaved the community and tries to request to join again
+			if !community.HasMember(signer) {
+				err = m.SaveRequestToJoin(requestToJoin)
+				if err != nil {
+					return nil, nil, err
+				}
+			}
 		}
 	}
 
