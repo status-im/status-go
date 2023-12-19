@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -3875,7 +3876,7 @@ func (m *Messenger) GetCommunityMembersForWalletAddresses(communityID types.HexB
 
 			contact, ok := m.allContacts.Load(memberPubKeyStr)
 			if ok {
-				membersForAddresses[revealedAccount.Address] = contact
+				membersForAddresses[strings.ToUpper(revealedAccount.Address)] = contact
 			} else {
 				m.logger.Error("community member is not a contact", zap.String("contact ID", memberPubKeyStr))
 			}
