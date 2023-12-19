@@ -2336,6 +2336,7 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 	community = response.Communities()[0]
 	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
 	s.Require().True(community.IsBanned(&s.alice.identity.PublicKey))
+	s.Require().Len(community.PendingAndBannedMembers(), 1)
 
 	response, err = s.owner.UnbanUserFromCommunity(
 		&requests.UnbanUserFromCommunity{

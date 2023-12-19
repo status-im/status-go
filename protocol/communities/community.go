@@ -1555,13 +1555,12 @@ func (o *Community) tokenPermissions() map[string]*CommunityTokenPermission {
 func (o *Community) PendingAndBannedMembers() map[string]CommunityMemberState {
 	result := make(map[string]CommunityMemberState)
 
-	// Non-privileged members should not see pending and banned members
-	if o.config.EventsData == nil || !o.IsPrivilegedMember(o.MemberIdentity()) {
-		return result
-	}
-
 	for _, bannedMemberID := range o.config.CommunityDescription.BanList {
 		result[bannedMemberID] = CommunityMemberBanned
+	}
+
+	if o.config.EventsData == nil {
+		return result
 	}
 
 	processedEvents := make(map[string]bool)
