@@ -539,7 +539,69 @@ func (s *MessengerContactRequestSuite) TestAliceTriesToSpamBobWithContactRequest
 	)
 	s.Require().Error(err)
 	s.Require().ErrorContains(err, "no messages")
+}
 
+// The scenario tested is as follow:
+// 1) Alice sends a contact request to Bob
+// 2) Bob accepts the contact
+// 3) Bob accepts the contact request (again!)
+// 4) No extra mesages on Alice's side
+func (s *MessengerContactRequestSuite) TestAliceSeesOnlyOneAcceptFromBob() {
+	messageTextAlice := "You wanna play with fire, Bobby?!"
+	alice := s.m
+
+	bob := s.newMessenger()
+	_, err := bob.Start()
+	s.Require().NoError(err)
+	defer TearDownMessenger(&s.Suite, bob)
+
+	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+
+	// Alice sends a contact request to Bob
+	request := &requests.SendContactRequest{
+		ID:      bobID,
+		Message: messageTextAlice,
+	}
+	s.sendContactRequest(request, alice)
+
+	contactRequest := s.receiveContactRequest(messageTextAlice, bob)
+	s.Require().NotNil(contactRequest)
+
+	// Bob accepts the contact request
+	s.acceptContactRequest(contactRequest, alice, bob)
+
+	// Accept contact request again
+	_, err = bob.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequest.ID)})
+	s.Require().NoError(err)
+
+	// Check we don't have extra messages on Alice's side
+	resp, err := WaitOnMessengerResponse(alice,
+		func(r *MessengerResponse) bool {
+			return len(r.ActivityCenterNotifications()) == 1 && len(r.Messages()) == 1
+		},
+		"contact request acceptance not received",
+	)
+	s.logResponse(resp, "acceptContactRequest")
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+
+	// Check activity center notification is of the right type
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, true)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Accepted, true)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Dismissed, false)
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+
+	// Make sure the message is updated, sender side
+	s.Require().Len(resp.Messages(), 1)
+
+	contactRequest = s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	s.Require().NotNil(contactRequest)
+
+	s.Require().Equal(common.ContactRequestStateAccepted, contactRequest.ContactRequestState)
+	s.Require().Equal(request.Message, contactRequest.Text)
 }
 
 func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice() { //nolint: unused
