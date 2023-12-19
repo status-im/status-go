@@ -362,9 +362,8 @@ func (s *CBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.Sel
 	return types.Hash(tx.Hash()), nil
 }
 
-func (s *CBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, transactions.UnlockNonceFunc, error) {
-	tx, err := s.sendOrBuild(sendArgs, nil)
-	return tx, nil, err
+func (s *CBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error) {
+	return s.sendOrBuild(sendArgs, nil)
 }
 
 func (s *CBridge) CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error) {
