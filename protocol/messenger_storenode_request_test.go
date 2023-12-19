@@ -65,7 +65,7 @@ func (s *MessengerStoreNodeRequestSuite) SetupTest() {
 
 	s.cancel = make(chan struct{}, 10)
 
-	storeNodeLogger := s.logger.With(zap.String("name", "store-node-waku"))
+	storeNodeLogger := s.logger.Named("store-node-waku")
 	s.wakuStoreNode = NewWakuV2(&s.Suite, storeNodeLogger, true, true)
 
 	storeNodeListenAddresses := s.wakuStoreNode.ListenAddresses()
@@ -164,7 +164,7 @@ func (s *MessengerStoreNodeRequestSuite) requireContactsEqual(c *Contact, expect
 	s.Require().Equal(expected.SocialLinks, c.SocialLinks)
 }
 
-func (s *MessengerStoreNodeRequestSuite) fetchCommunity(m *Messenger, communityShard communities.CommunityShard, expectedCommunityInfo *communities.Community) FetchStats {
+func (s *MessengerStoreNodeRequestSuite) fetchCommunity(m *Messenger, communityShard communities.CommunityShard, expectedCommunityInfo *communities.Community) StoreNodeRequestStats {
 	fetchedCommunity, stats, err := m.storeNodeRequestsManager.FetchCommunity(communityShard, true)
 
 	s.Require().NoError(err)

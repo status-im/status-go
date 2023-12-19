@@ -578,7 +578,7 @@ func NewMessenger(
 	}
 
 	messenger.mentionsManager = NewMentionManager(messenger)
-	messenger.storeNodeRequestsManager = NewCommunityRequestsManager(messenger)
+	messenger.storeNodeRequestsManager = NewStoreNodeRequestManager(messenger)
 
 	if c.walletService != nil {
 		messenger.walletAPI = walletAPI

@@ -20,17 +20,15 @@ const (
 	storeNodeAvailableTimeout = 30 * time.Second
 )
 
-// FetchStats is used in tests
-type FetchStats struct {
+// StoreNodeRequestStats is used in tests
+type StoreNodeRequestStats struct {
 	FetchedEnvelopesCount int
 	FetchedPagesCount     int
 }
 
-// WARNING: Is this needed?
-// This helps to fix collisions between communityID and contactID. Is this case actually supported by design?
 type storeNodeRequestID struct {
-	requestType storeNodeRequestType
-	typedID     string
+	RequestType storeNodeRequestType `json:"requestType"`
+	DataID      string               `json:"dataID"`
 }
 
 type StoreNodeRequestManager struct {
@@ -38,9 +36,9 @@ type StoreNodeRequestManager struct {
 	logger    *zap.Logger
 
 	// activeRequests contain all ongoing store node requests.
-	// Map is indexed with `typedID`.
+	// Map is indexed with `DataID`.
 	// Request might be duplicated in the map in case of contentType collisions.
-	activeRequests map[string]*storeNodeRequest
+	activeRequests map[storeNodeRequestID]*storeNodeRequest
 
 	// activeRequestsLock should be locked each time activeRequests is being accessed or changed.
 	activeRequestsLock sync.RWMutex
@@ -48,11 +46,11 @@ type StoreNodeRequestManager struct {
 	onPerformingBatch func(MailserverBatch)
 }
 
-func NewCommunityRequestsManager(m *Messenger) *StoreNodeRequestManager {
+func NewStoreNodeRequestManager(m *Messenger) *StoreNodeRequestManager {
 	return &StoreNodeRequestManager{
 		messenger:          m,
 		logger:             m.logger.Named("StoreNodeRequestManager"),
-		activeRequests:     map[string]*storeNodeRequest{},
+		activeRequests:     map[storeNodeRequestID]*storeNodeRequest{},
 		activeRequestsLock: sync.RWMutex{},
 		onPerformingBatch:  nil,
 	}
@@ -63,18 +61,18 @@ func NewCommunityRequestsManager(m *Messenger) *StoreNodeRequestManager {
 // the function will also wait for the store node response and return the fetched community.
 // Automatically waits for an available store node.
 // When a `nil` community and `nil` error is returned, that means the community wasn't found at the store node.
-func (m *StoreNodeRequestManager) FetchCommunity(community communities.CommunityShard, waitForResponse bool) (*communities.Community, FetchStats, error) {
+func (m *StoreNodeRequestManager) FetchCommunity(community communities.CommunityShard, waitForResponse bool) (*communities.Community, StoreNodeRequestStats, error) {
 	m.logger.Info("requesting community from store node",
 		zap.Any("community", community),
 		zap.Bool("waitForResponse", waitForResponse))
 
 	channel, err := m.subscribeToRequest(storeNodeCommunityRequest, community.CommunityID, community.Shard)
 	if err != nil {
-		return nil, FetchStats{}, fmt.Errorf("failed to create a request for community: %w", err)
+		return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a request for community: %w", err)
 	}
 
 	if !waitForResponse {
-		return nil, FetchStats{}, nil
+		return nil, StoreNodeRequestStats{}, nil
 	}
 
 	result := <-channel
@@ -106,35 +104,40 @@ func (m *StoreNodeRequestManager) FetchCommunities(communities []communities.Com
 	return outErr
 }
 
-func (m *StoreNodeRequestManager) FetchContact(contactID string, waitForResponse bool) (*Contact, FetchStats, error) {
+func (m *StoreNodeRequestManager) FetchContact(contactID string, waitForResponse bool) (*Contact, StoreNodeRequestStats, error) {
 	m.logger.Info("requesting contact from store node",
 		zap.Any("contactID", contactID),
 		zap.Bool("waitForResponse", waitForResponse))
 
 	channel, err := m.subscribeToRequest(storeNodeContactRequest, contactID, nil)
 	if err != nil {
-		return nil, FetchStats{}, fmt.Errorf("failed to create a request for community: %w", err)
+		return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a request for community: %w", err)
 	}
 
 	if !waitForResponse {
-		return nil, FetchStats{}, nil
+		return nil, StoreNodeRequestStats{}, nil
 	}
 
 	result := <-channel
 	return result.contact, result.stats, result.err
 }
 
-// subscribeToRequest checks if a request for given community is already in progress, creates and installs
+// subscribeToRequest checks if a request for given community/contact is already in progress, creates and installs
 // a new one if not found, and returns a subscription to the result of the found/started request.
-// The subscription can then be used to get the result of the request, this could be either a community or an error.
-func (m *StoreNodeRequestManager) subscribeToRequest(requestType storeNodeRequestType, typedID string, shard *shard.Shard) (communitySubscriptionChannel, error) {
+// The subscription can then be used to get the result of the request, this could be either a community/contact or an error.
+func (m *StoreNodeRequestManager) subscribeToRequest(requestType storeNodeRequestType, dataID string, shard *shard.Shard) (storeNodeResponseSubscription, error) {
 	// It's important to unlock only after getting the subscription channel.
 	// We also lock `activeRequestsLock` during finalizing the requests. This ensures that the subscription
 	// created in this function will get the result even if the requests proceeds faster than this function ends.
 	m.activeRequestsLock.Lock()
 	defer m.activeRequestsLock.Unlock()
 
-	request, requestFound := m.activeRequests[typedID]
+	requestID := storeNodeRequestID{
+		RequestType: requestType,
+		DataID:      dataID,
+	}
+
+	request, requestFound := m.activeRequests[requestID]
 
 	if !requestFound {
 		// Create corresponding filter
@@ -142,7 +145,7 @@ func (m *StoreNodeRequestManager) subscribeToRequest(requestType storeNodeReques
 		var filter *transport.Filter
 		filterCreated := false
 
-		filter, filterCreated, err = m.getFilter(requestType, typedID, shard)
+		filter, filterCreated, err = m.getFilter(requestType, dataID, shard)
 		if err != nil {
 			if filterCreated {
 				m.forgetFilter(filter)
@@ -152,14 +155,13 @@ func (m *StoreNodeRequestManager) subscribeToRequest(requestType storeNodeReques
 
 		request = m.newStoreNodeRequest()
 		request.pubsubTopic = filter.PubsubTopic
-		request.requestType = requestType
-		request.typedID = typedID
+		request.requestID = requestID
 		request.contentTopic = filter.ContentTopic
 		if filterCreated {
 			request.filterToForget = filter
 		}
 
-		m.activeRequests[typedID] = request
+		m.activeRequests[requestID] = request
 		request.start()
 	}
 
@@ -170,15 +172,15 @@ func (m *StoreNodeRequestManager) subscribeToRequest(requestType storeNodeReques
 func (m *StoreNodeRequestManager) newStoreNodeRequest() *storeNodeRequest {
 	return &storeNodeRequest{
 		manager:       m,
-		subscriptions: make([]communitySubscriptionChannel, 0),
+		subscriptions: make([]storeNodeResponseSubscription, 0),
 	}
 }
 
 // getFilter checks if a filter for a given community is already created and creates one of not found.
 // Returns the found/created filter, a flag if the filter was created by the function and an error.
-func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, typedID string, shard *shard.Shard) (*transport.Filter, bool, error) {
+func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, dataID string, shard *shard.Shard) (*transport.Filter, bool, error) {
 	// First check if such filter already exists.
-	filter := m.messenger.transport.FilterByChatID(typedID)
+	filter := m.messenger.transport.FilterByChatID(dataID)
 	if filter != nil {
 		//we don't remember filter id associated with community because it was already installed
 		return filter, false, nil
@@ -189,7 +191,7 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, ty
 		// If filter wasn't installed we create it and
 		// remember for uninstalling after response is received
 		filters, err := m.messenger.transport.InitPublicFilters([]transport.FiltersToInitialize{{
-			ChatID:      typedID,
+			ChatID:      dataID,
 			PubsubTopic: shard.PubsubTopic(),
 		}})
 
@@ -205,7 +207,7 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, ty
 
 		filter = filters[0]
 	case storeNodeContactRequest:
-		publicKeyBytes, err := types.DecodeHex(typedID)
+		publicKeyBytes, err := types.DecodeHex(dataID)
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to decode contact id: %w", err)
 		}
@@ -246,6 +248,8 @@ const (
 // storeNodeRequest represents a single store node batch request.
 // For a valid storeNodeRequest to be performed, the user must set all the struct fields and call start method.
 type storeNodeRequest struct {
+	requestID storeNodeRequestID
+
 	// request parameters
 	pubsubTopic  string
 	contentTopic types.TopicType
@@ -253,32 +257,30 @@ type storeNodeRequest struct {
 	// request corresponding metadata to be used in finalize
 	filterToForget *transport.Filter
 
-	requestType storeNodeRequestType
-	typedID     string // FIXME: rename
-
 	// internal fields
 	manager       *StoreNodeRequestManager
-	subscriptions []communitySubscriptionChannel
-	result        fetchCommunityResult
+	subscriptions []storeNodeResponseSubscription
+	result        storeNodeRequestResult
 }
 
-// fetchCommunityResult contains result of a single storeNodeRequest
+// storeNodeRequestResult contains result of a single storeNodeRequest
+// Further by using `data` we mean community/contact, depending on request type.
 // If any error occurs during the request, err field will be set.
-// If a community was successfully fetched, community field will contain the fetched information.
-// If a community wasn't found in store node, then a community will be set to `nil`.
+// If data was successfully fetched, data field will contain the fetched information.
+// If data wasn't found in store node, then a data will be set to `nil`.
 // stats will contain information about the performed request that might be useful for testing.
-type fetchCommunityResult struct {
+type storeNodeRequestResult struct {
 	err   error
-	stats FetchStats
-	// One of community or contact will be present depending on the requested info
+	stats StoreNodeRequestStats
+	// One of data fields (community or contact) will be present depending on request type
 	community *communities.Community
 	contact   *Contact
 }
 
-type communitySubscriptionChannel = chan fetchCommunityResult
+type storeNodeResponseSubscription = chan storeNodeRequestResult
 
-func (r *storeNodeRequest) subscribe() communitySubscriptionChannel {
-	channel := make(communitySubscriptionChannel, 100)
+func (r *storeNodeRequest) subscribe() storeNodeResponseSubscription {
+	channel := make(storeNodeResponseSubscription, 100)
 	r.subscriptions = append(r.subscriptions, channel)
 	return channel
 }
@@ -288,8 +290,9 @@ func (r *storeNodeRequest) finalize() {
 	defer r.manager.activeRequestsLock.Unlock()
 
 	r.manager.logger.Info("request finished",
-		zap.String("typedID", r.typedID),
+		zap.Any("requestID", r.requestID),
 		zap.Bool("communityFound", r.result.community != nil),
+		zap.Bool("contactFound", r.result.contact != nil),
 		zap.Error(r.result.err))
 
 	// Send the result to subscribers
@@ -303,7 +306,7 @@ func (r *storeNodeRequest) finalize() {
 		r.manager.messenger.passStoredCommunityInfoToSignalHandler(r.result.community)
 	}
 
-	delete(r.manager.activeRequests, r.typedID)
+	delete(r.manager.activeRequests, r.requestID)
 
 	if r.filterToForget != nil {
 		r.manager.forgetFilter(r.filterToForget)
@@ -312,7 +315,7 @@ func (r *storeNodeRequest) finalize() {
 
 func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32) {
 	logger := r.manager.logger.With(
-		zap.String("typedID", r.typedID),
+		zap.Any("requestID", r.requestID),
 		zap.Int("envelopesCount", envelopesCount))
 
 	r.result.stats.FetchedEnvelopesCount += envelopesCount
@@ -322,15 +325,15 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 	r.manager.messenger.ProcessAllMessages()
 
 	// Try to get community from database
-	switch r.requestType {
+	switch r.requestID.RequestType {
 	case storeNodeCommunityRequest:
-		community, err := r.manager.messenger.communitiesManager.GetByIDString(r.typedID)
+		community, err := r.manager.messenger.communitiesManager.GetByIDString(r.requestID.DataID)
 
 		if err != nil {
 			logger.Error("failed to read from database",
-				zap.String("communityID", r.typedID),
+				zap.String("communityID", r.requestID.DataID),
 				zap.Error(err))
-			r.result = fetchCommunityResult{
+			r.result = storeNodeRequestResult{
 				community: nil,
 				err:       fmt.Errorf("failed to read from database: %w", err),
 			}
@@ -349,7 +352,7 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 		r.result.community = community
 
 	case storeNodeContactRequest:
-		contact := r.manager.messenger.GetContactByID(r.typedID)
+		contact := r.manager.messenger.GetContactByID(r.requestID.DataID)
 
 		if contact == nil {
 			// contact not found in the database, request next page
@@ -368,16 +371,17 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 
 func (r *storeNodeRequest) routine() {
 	r.manager.logger.Info("starting store node request",
-		zap.String("typedID", r.typedID),
+		zap.Any("requestID", r.requestID),
 		zap.String("pubsubTopic", r.pubsubTopic),
 		zap.Any("contentTopic", r.contentTopic),
 	)
 
 	// Return a nil community and no error when request was
-	// performed successfully, but no community found.
-	r.result = fetchCommunityResult{
-		community: nil,
+	// performed successfully, but no community/contact found.
+	r.result = storeNodeRequestResult{
 		err:       nil,
+		community: nil,
+		contact:   nil,
 	}
 
 	defer func() {
@@ -385,7 +389,6 @@ func (r *storeNodeRequest) routine() {
 	}()
 
 	if !r.manager.messenger.waitForAvailableStoreNode(storeNodeAvailableTimeout) {
-		r.result.community = nil
 		r.result.err = fmt.Errorf("store node is not available")
 		return
 	}
@@ -412,11 +415,5 @@ func (r *storeNodeRequest) routine() {
 }
 
 func (r *storeNodeRequest) start() {
-	r.manager.logger.Debug("starting new community request",
-		zap.Any("typedID", r.typedID),
-		zap.String("pubsubTopic", r.pubsubTopic),
-		zap.Any("contentTopic", r.contentTopic),
-	)
-
 	go r.routine()
 }
