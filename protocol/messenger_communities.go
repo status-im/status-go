@@ -351,9 +351,12 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 						accept := &requests.AcceptRequestToJoinCommunity{
 							ID: requestID,
 						}
-						_, err := m.AcceptRequestToJoinCommunity(accept)
+						response, err := m.AcceptRequestToJoinCommunity(accept)
 						if err != nil {
 							m.logger.Warn("failed to accept request to join ", zap.Error(err))
+						}
+						if m.config.messengerSignalsHandler != nil {
+							m.config.messengerSignalsHandler.MessengerResponse(response)
 						}
 					}
 				}
@@ -363,9 +366,12 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 						reject := &requests.DeclineRequestToJoinCommunity{
 							ID: requestID,
 						}
-						_, err := m.DeclineRequestToJoinCommunity(reject)
+						response, err := m.DeclineRequestToJoinCommunity(reject)
 						if err != nil {
 							m.logger.Warn("failed to decline request to join ", zap.Error(err))
+						}
+						if m.config.messengerSignalsHandler != nil {
+							m.config.messengerSignalsHandler.MessengerResponse(response)
 						}
 					}
 				}

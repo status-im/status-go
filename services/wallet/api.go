@@ -336,24 +336,6 @@ func (api *API) GetCollectiblesByUniqueIDAsync(requestID int32, uniqueIDs []thir
 	return nil
 }
 
-// @deprecated
-func (api *API) GetCollectiblesByOwnerWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
-	log.Debug("call to GetCollectiblesByOwnerWithCursor")
-	return api.s.collectiblesManager.FetchAllAssetsByOwner(ctx, chainID, owner, cursor, limit, thirdparty.FetchFromAnyProvider)
-}
-
-// @deprecated
-func (api *API) GetCollectiblesByOwnerAndContractAddressWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
-	log.Debug("call to GetCollectiblesByOwnerAndContractAddressWithCursor")
-	return api.s.collectiblesManager.FetchAllAssetsByOwnerAndContractAddress(ctx, chainID, owner, contractAddresses, cursor, limit, thirdparty.FetchFromAnyProvider)
-}
-
-// @deprecated
-func (api *API) GetCollectiblesByUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
-	log.Debug("call to GetCollectiblesByUniqueID")
-	return api.s.collectiblesManager.FetchAssetsByCollectibleUniqueID(ctx, uniqueIDs)
-}
-
 func (api *API) GetCollectibleOwnersByContractAddress(ctx context.Context, chainID wcommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
 	log.Debug("call to GetCollectibleOwnersByContractAddress")
 	return api.s.collectiblesManager.FetchCollectibleOwnersByContractAddress(ctx, chainID, contractAddress)

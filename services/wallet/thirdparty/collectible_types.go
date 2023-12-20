@@ -146,9 +146,11 @@ type CollectibleCommunityInfo struct {
 // Combined Collection+Collectible info returned by the CollectibleProvider
 // Some providers may not return the CollectionData in the same API call, so it's optional
 type FullCollectibleData struct {
-	CollectibleData CollectibleData
-	CollectionData  *CollectionData
-	CommunityInfo   *CollectibleCommunityInfo
+	CollectibleData          CollectibleData
+	CollectionData           *CollectionData
+	CommunityInfo            *CommunityInfo
+	CollectibleCommunityInfo *CollectibleCommunityInfo
+	Ownership                []AccountBalance
 }
 
 type CollectiblesContainer[T any] struct {
@@ -196,6 +198,11 @@ type CollectibleOwner struct {
 type CollectibleContractOwnership struct {
 	ContractAddress common.Address     `json:"contractAddress"`
 	Owners          []CollectibleOwner `json:"owners"`
+}
+
+type AccountBalance struct {
+	Address common.Address `json:"address"`
+	Balance *bigint.BigInt `json:"balance"`
 }
 
 type CollectibleContractOwnershipProvider interface {

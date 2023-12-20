@@ -3545,11 +3545,12 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 	for filter, messages := range messagesToHandle {
 		for _, shhMessage := range messages {
 
-			statusMessages, _, err := m.sender.HandleMessages(shhMessage)
+			handleMessageResponse, err := m.sender.HandleMessages(shhMessage)
 			if err != nil {
 				logger.Info("failed to decode messages", zap.Error(err))
 				continue
 			}
+			statusMessages := handleMessageResponse.StatusMessages
 
 			for _, msg := range statusMessages {
 				logger := logger.With(zap.String("message-id", msg.TransportLayer.Message.ThirdPartyID))
@@ -3697,7 +3698,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				}
 			}
 
-			statusMessages, acks, err := m.sender.HandleMessages(shhMessage)
+			handleMessagesResponse, err := m.sender.HandleMessages(shhMessage)
 			if err != nil {
 				if m.telemetryClient != nil {
 					go m.telemetryClient.UpdateEnvelopeProcessingError(shhMessage, err)
@@ -3706,10 +3707,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				continue
 			}
 
+			if handleMessagesResponse == nil {
+				continue
+			}
+
+			statusMessages := handleMessagesResponse.StatusMessages
+
 			if m.telemetryClient != nil {
 				go m.telemetryClient.PushReceivedMessages(filter, shhMessage, statusMessages)
 			}
-			m.markDeliveredMessages(acks)
+			m.markDeliveredMessages(handleMessagesResponse.DatasyncAcks)
 
 			logger.Debug("processing messages further", zap.Int("count", len(statusMessages)))
 

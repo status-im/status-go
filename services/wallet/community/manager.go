@@ -2,15 +2,11 @@ package community
 
 import (
 	"database/sql"
-	"fmt"
-	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
-
-const failedCommunityFetchRetryDelay = 1 * time.Hour
 
 type Manager struct {
 	db                    *DataDB
@@ -53,36 +49,7 @@ func (cm *Manager) setCommunityInfo(id string, c *thirdparty.CommunityInfo) (err
 	return cm.db.SetCommunityInfo(id, c)
 }
 
-func (cm *Manager) mustFetchCommunityInfo(communityID string) bool {
-	// See if we have cached data
-	_, state, err := cm.GetCommunityInfo(communityID)
-	if err != nil {
-		return true
-	}
-
-	// If we don't have a state, this community has never been fetched before
-	if state == nil {
-		return true
-	}
-
-	// If the last fetch was successful, we can safely refresh our cache
-	if state.LastUpdateSuccesful {
-		return true
-	}
-
-	// If the last fetch was not successful, we should only retry after a delay
-	if time.Unix(int64(state.LastUpdateTimestamp), 0).Add(failedCommunityFetchRetryDelay).Before(time.Now()) {
-		return true
-	}
-
-	return false
-}
-
 func (cm *Manager) FetchCommunityInfo(communityID string) (*thirdparty.CommunityInfo, error) {
-	if !cm.mustFetchCommunityInfo(communityID) {
-		return nil, fmt.Errorf("backing off fetchCommunityInfo for id: %s", communityID)
-	}
-
 	communityInfo, err := cm.communityInfoProvider.FetchCommunityInfo(communityID)
 	if err != nil {
 		dbErr := cm.setCommunityInfo(communityID, nil)

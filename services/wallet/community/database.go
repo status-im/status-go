@@ -81,6 +81,10 @@ func (o *DataDB) SetCommunityInfo(id string, c *thirdparty.CommunityInfo) (err e
 }
 
 func (o *DataDB) GetCommunityInfo(id string) (*thirdparty.CommunityInfo, *InfoState, error) {
+	if id == "" {
+		return nil, nil, nil
+	}
+
 	var info thirdparty.CommunityInfo
 	var state InfoState
 	var row *sql.Row

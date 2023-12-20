@@ -28,8 +28,9 @@ func NewOwnershipDB(sqlDb *sql.DB) *OwnershipDB {
 	}
 }
 
-const ownershipColumns = "chain_id, contract_address, token_id, owner_address"
+const ownershipColumns = "chain_id, contract_address, token_id, owner_address, balance"
 const selectOwnershipColumns = "chain_id, contract_address, token_id"
+const selectAccountBalancesColumns = "owner_address, balance"
 
 const ownershipTimestampColumns = "owner_address, chain_id, timestamp"
 const selectOwnershipTimestampColumns = "timestamp"
@@ -48,17 +49,19 @@ func removeAddressOwnership(creator sqlite.StatementCreator, chainID w_common.Ch
 	return nil
 }
 
-func insertAddressOwnership(creator sqlite.StatementCreator, ownerAddress common.Address, collectibles []thirdparty.CollectibleUniqueID) error {
+func insertAddressOwnership(creator sqlite.StatementCreator, chainID w_common.ChainID, ownerAddress common.Address, balancesPerContractAdddress thirdparty.TokenBalancesPerContractAddress) error {
 	insertOwnership, err := creator.Prepare(fmt.Sprintf(`INSERT INTO collectibles_ownership_cache (%s) 
-																				VALUES (?, ?, ?, ?)`, ownershipColumns))
+																				VALUES (?, ?, ?, ?, ?)`, ownershipColumns))
 	if err != nil {
 		return err
 	}
 
-	for _, c := range collectibles {
-		_, err = insertOwnership.Exec(c.ContractID.ChainID, c.ContractID.Address, (*bigint.SQLBigIntBytes)(c.TokenID.Int), ownerAddress)
-		if err != nil {
-			return err
+	for contractAddress, balances := range balancesPerContractAdddress {
+		for _, balance := range balances {
+			_, err = insertOwnership.Exec(chainID, contractAddress, (*bigint.SQLBigIntBytes)(balance.TokenID.Int), ownerAddress, (*bigint.SQLBigIntBytes)(balance.Balance.Int))
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -113,7 +116,7 @@ func (o *OwnershipDB) GetIDsNotInDB(
 	return ret, nil
 }
 
-func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Address, collectibles []thirdparty.CollectibleUniqueID, timestamp int64) (err error) {
+func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Address, balances thirdparty.TokenBalancesPerContractAddress, timestamp int64) (err error) {
 	var (
 		tx *sql.Tx
 	)
@@ -136,7 +139,7 @@ func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Addre
 	}
 
 	// Insert new ownership data
-	err = insertAddressOwnership(tx, ownerAddress, collectibles)
+	err = insertAddressOwnership(tx, chainID, ownerAddress, balances)
 	if err != nil {
 		return err
 	}
@@ -251,4 +254,40 @@ func (o *OwnershipDB) GetLatestOwnershipUpdateTimestamp(chainID walletCommon.Cha
 	}
 
 	return InvalidTimestamp, nil
+}
+
+func (o *OwnershipDB) GetOwnership(id thirdparty.CollectibleUniqueID) ([]thirdparty.AccountBalance, error) {
+	query := fmt.Sprintf(`SELECT %s
+		FROM collectibles_ownership_cache
+		WHERE chain_id = ? AND contract_address = ? AND token_id = ?`, selectAccountBalancesColumns)
+
+	stmt, err := o.db.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(id.ContractID.ChainID, id.ContractID.Address, (*bigint.SQLBigIntBytes)(id.TokenID.Int))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ret []thirdparty.AccountBalance
+	for rows.Next() {
+		accountBalance := thirdparty.AccountBalance{
+			Balance: &bigint.BigInt{Int: big.NewInt(0)},
+		}
+		err = rows.Scan(
+			&accountBalance.Address,
+			(*bigint.SQLBigIntBytes)(accountBalance.Balance.Int),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		ret = append(ret, accountBalance)
+	}
+
+	return ret, nil
 }

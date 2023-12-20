@@ -15,6 +15,7 @@
 // 1701101493_add_token_blocks_range.up.sql (469B)
 // 1702467441_wallet_connect_sessions_instead_of_pairings.up.sql (356B)
 // 1702577524_add_community_collections_and_collectibles_images_cache.up.sql (210B)
+// 1702867707_add_balance_to_collectibles_ownership_cache.up.sql (289B)
 // doc.go (74B)
 
 package migrations
@@ -378,8 +379,28 @@ func _1702577524_add_community_collections_and_collectibles_images_cacheUpSql() 
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1702577524_add_community_collections_and_collectibles_images_cache.up.sql", size: 210, mode: os.FileMode(0644), modTime: time.Unix(1702580163, 0)}
+	info := bindataFileInfo{name: "1702577524_add_community_collections_and_collectibles_images_cache.up.sql", size: 210, mode: os.FileMode(0644), modTime: time.Unix(1702866853, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8e, 0x1b, 0x32, 0x2c, 0xfa, 0x11, 0x5e, 0x5e, 0x5d, 0xef, 0x92, 0xa0, 0x29, 0x52, 0xbf, 0x6e, 0xe3, 0x30, 0xe4, 0xdf, 0xdc, 0x5, 0xbe, 0xd1, 0xf8, 0x3e, 0xd9, 0x9b, 0xd6, 0x9b, 0x95, 0x96}}
+	return a, nil
+}
+
+var __1702867707_add_balance_to_collectibles_ownership_cacheUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x84\x8d\x31\x4b\xc4\x30\x18\x40\xf7\xfe\x8a\x6f\x3b\x85\x1b\x74\x3e\x1c\xd2\x4b\x0e\x0a\x31\x91\x36\x81\x6e\x21\xfd\xfa\x49\x83\x21\x91\x24\xa0\x3f\x5f\xea\x50\x5c\xd4\xf9\xf1\xde\x63\xd2\x88\x11\x0c\xeb\xa5\x00\xcc\x31\x12\xb6\xb0\x44\xaa\x2e\x7f\x24\x2a\x75\x0b\xef\x0e\x3d\x6e\x04\x8c\x73\xb8\x6a\x69\x9f\x15\x2c\x3e\xfa\x84\x04\xbd\xd4\x3d\x28\x6d\x40\x59\x29\x81\x8b\x1b\xb3\xd2\xc0\xe7\xe9\xe1\xf1\x74\xe9\x3a\xfb\xc2\x99\xf9\x27\x3a\x09\x73\xd4\x9e\x0e\xf3\x3a\x8a\xdd\x1c\x14\x17\x33\x0c\xb7\xef\x85\x98\x87\xc9\x4c\xbf\xd5\x5e\x43\x6c\x54\xdc\x0f\x0a\x5a\xfd\xbd\xbe\xc3\xcd\x87\xe4\xc2\x7a\x06\xcc\xa9\x15\x8f\xcd\xf9\x75\x2d\x54\xeb\x19\x5a\x7e\xa3\x9d\xdd\x5f\xba\xaf\x00\x00\x00\xff\xff\x19\x3b\x1b\x24\x21\x01\x00\x00")
+
+func _1702867707_add_balance_to_collectibles_ownership_cacheUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1702867707_add_balance_to_collectibles_ownership_cacheUpSql,
+		"1702867707_add_balance_to_collectibles_ownership_cache.up.sql",
+	)
+}
+
+func _1702867707_add_balance_to_collectibles_ownership_cacheUpSql() (*asset, error) {
+	bytes, err := _1702867707_add_balance_to_collectibles_ownership_cacheUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1702867707_add_balance_to_collectibles_ownership_cache.up.sql", size: 289, mode: os.FileMode(0644), modTime: time.Unix(1702904956, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6f, 0x63, 0x30, 0x11, 0x22, 0xb9, 0xee, 0xae, 0xb8, 0xc4, 0xe6, 0xd3, 0x7, 0xc, 0xe6, 0xa3, 0x72, 0x8c, 0x6, 0x9d, 0x6c, 0x97, 0x8f, 0xb2, 0xd0, 0x37, 0x69, 0x69, 0x6, 0x7f, 0x67, 0x94}}
 	return a, nil
 }
 
@@ -509,6 +530,7 @@ var _bindata = map[string]func() (*asset, error){
 	"1701101493_add_token_blocks_range.up.sql":                                      _1701101493_add_token_blocks_rangeUpSql,
 	"1702467441_wallet_connect_sessions_instead_of_pairings.up.sql":                 _1702467441_wallet_connect_sessions_instead_of_pairingsUpSql,
 	"1702577524_add_community_collections_and_collectibles_images_cache.up.sql":     _1702577524_add_community_collections_and_collectibles_images_cacheUpSql,
+	"1702867707_add_balance_to_collectibles_ownership_cache.up.sql":                 _1702867707_add_balance_to_collectibles_ownership_cacheUpSql,
 	"doc.go": docGo,
 }
 
@@ -573,6 +595,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1701101493_add_token_blocks_range.up.sql":                                      {_1701101493_add_token_blocks_rangeUpSql, map[string]*bintree{}},
 	"1702467441_wallet_connect_sessions_instead_of_pairings.up.sql":                 {_1702467441_wallet_connect_sessions_instead_of_pairingsUpSql, map[string]*bintree{}},
 	"1702577524_add_community_collections_and_collectibles_images_cache.up.sql":     {_1702577524_add_community_collections_and_collectibles_images_cacheUpSql, map[string]*bintree{}},
+	"1702867707_add_balance_to_collectibles_ownership_cache.up.sql":                 {_1702867707_add_balance_to_collectibles_ownership_cacheUpSql, map[string]*bintree{}},
 	"doc.go": {docGo, map[string]*bintree{}},
 }}
 

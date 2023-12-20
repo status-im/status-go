@@ -1,13 +1,11 @@
 package collectibles
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -25,74 +23,11 @@ func setupCollectibleDataDBTest(t *testing.T) (*CollectibleDataDB, func()) {
 	}
 }
 
-func generateTestCollectiblesData(count int) (result []thirdparty.CollectibleData) {
-	result = make([]thirdparty.CollectibleData, 0, count)
-	for i := 0; i < count; i++ {
-		bigI := big.NewInt(int64(i))
-		newCollectible := thirdparty.CollectibleData{
-			ID: thirdparty.CollectibleUniqueID{
-				ContractID: thirdparty.ContractID{
-					ChainID: w_common.ChainID(i % 4),
-					Address: common.BigToAddress(bigI),
-				},
-				TokenID: &bigint.BigInt{Int: bigI},
-			},
-			Provider:           fmt.Sprintf("provider-%d", i),
-			Name:               fmt.Sprintf("name-%d", i),
-			Description:        fmt.Sprintf("description-%d", i),
-			Permalink:          fmt.Sprintf("permalink-%d", i),
-			ImageURL:           fmt.Sprintf("imageurl-%d", i),
-			ImagePayload:       []byte(fmt.Sprintf("imagepayload-%d", i)),
-			AnimationURL:       fmt.Sprintf("animationurl-%d", i),
-			AnimationMediaType: fmt.Sprintf("animationmediatype-%d", i),
-			Traits: []thirdparty.CollectibleTrait{
-				{
-					TraitType:   fmt.Sprintf("traittype-%d", i),
-					Value:       fmt.Sprintf("traitvalue-%d", i),
-					DisplayType: fmt.Sprintf("displaytype-%d", i),
-					MaxValue:    fmt.Sprintf("maxvalue-%d", i),
-				},
-				{
-					TraitType:   fmt.Sprintf("traittype-%d", i),
-					Value:       fmt.Sprintf("traitvalue-%d", i),
-					DisplayType: fmt.Sprintf("displaytype-%d", i),
-					MaxValue:    fmt.Sprintf("maxvalue-%d", i),
-				},
-				{
-					TraitType:   fmt.Sprintf("traittype-%d", i),
-					Value:       fmt.Sprintf("traitvalue-%d", i),
-					DisplayType: fmt.Sprintf("displaytype-%d", i),
-					MaxValue:    fmt.Sprintf("maxvalue-%d", i),
-				},
-			},
-			BackgroundColor: fmt.Sprintf("backgroundcolor-%d", i),
-			TokenURI:        fmt.Sprintf("tokenuri-%d", i),
-			CommunityID:     fmt.Sprintf("communityid-%d", i%5),
-		}
-		if i%5 == 0 {
-			newCollectible.CommunityID = ""
-		}
-		result = append(result, newCollectible)
-	}
-	return result
-}
-
-func generateTestCommunityData(count int) []thirdparty.CollectibleCommunityInfo {
-	result := make([]thirdparty.CollectibleCommunityInfo, 0, count)
-	for i := 0; i < count; i++ {
-		newCommunityInfo := thirdparty.CollectibleCommunityInfo{
-			PrivilegesLevel: token.PrivilegesLevel(i) % (token.CommunityLevel + 1),
-		}
-		result = append(result, newCommunityInfo)
-	}
-	return result
-}
-
 func TestUpdateCollectiblesData(t *testing.T) {
 	db, cleanDB := setupCollectibleDataDBTest(t)
 	defer cleanDB()
 
-	data := generateTestCollectiblesData(50)
+	data := thirdparty.GenerateTestCollectiblesData(50)
 
 	var err error
 
@@ -168,8 +103,8 @@ func TestUpdateCommunityData(t *testing.T) {
 	defer cleanDB()
 
 	const nData = 50
-	data := generateTestCollectiblesData(nData)
-	communityData := generateTestCommunityData(nData)
+	data := thirdparty.GenerateTestCollectiblesData(nData)
+	communityData := thirdparty.GenerateTestCollectiblesCommunityData(nData)
 
 	var err error
 

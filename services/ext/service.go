@@ -59,6 +59,7 @@ import (
 )
 
 const infinityString = "∞"
+const providerID = "community"
 
 // EnvelopeEventsHandler used for two different event types.
 type EnvelopeEventsHandler interface {
@@ -548,7 +549,7 @@ func (s *Service) FillCollectibleMetadata(collectible *thirdparty.FullCollectibl
 		return fmt.Errorf("invalid communityID")
 	}
 
-	community, err := s.fetchCommunity(communityID)
+	community, err := s.fetchCommunity(communityID, true)
 
 	if err != nil {
 		return err
@@ -582,6 +583,7 @@ func (s *Service) FillCollectibleMetadata(collectible *thirdparty.FullCollectibl
 
 	imagePayload, _ := images.GetPayloadFromURI(tokenMetadata.GetImage())
 
+	collectible.CollectibleData.Provider = providerID
 	collectible.CollectibleData.Name = tokenMetadata.GetName()
 	collectible.CollectibleData.Description = tokenMetadata.GetDescription()
 	collectible.CollectibleData.ImagePayload = imagePayload
@@ -593,10 +595,13 @@ func (s *Service) FillCollectibleMetadata(collectible *thirdparty.FullCollectibl
 			CommunityID: communityID,
 		}
 	}
+	collectible.CollectionData.Provider = providerID
 	collectible.CollectionData.Name = tokenMetadata.GetName()
 	collectible.CollectionData.ImagePayload = imagePayload
 
-	collectible.CommunityInfo = &thirdparty.CollectibleCommunityInfo{
+	collectible.CommunityInfo = communityToInfo(community)
+
+	collectible.CollectibleCommunityInfo = &thirdparty.CollectibleCommunityInfo{
 		PrivilegesLevel: privilegesLevel,
 	}
 
@@ -614,25 +619,28 @@ func permissionTypeToPrivilegesLevel(permissionType protobuf.CommunityTokenPermi
 	}
 }
 
-func (s *Service) FetchCommunityInfo(communityID string) (*thirdparty.CommunityInfo, error) {
-	community, err := s.fetchCommunity(communityID)
-	if err != nil {
-		return nil, err
-	}
+func communityToInfo(community *communities.Community) *thirdparty.CommunityInfo {
 	if community == nil {
-		return nil, nil
+		return nil
 	}
 
-	communityInfo := &thirdparty.CommunityInfo{
+	return &thirdparty.CommunityInfo{
 		CommunityName:         community.Name(),
 		CommunityColor:        community.Color(),
 		CommunityImagePayload: fetchCommunityImage(community),
 	}
-
-	return communityInfo, nil
 }
 
-func (s *Service) fetchCommunity(communityID string) (*communities.Community, error) {
+func (s *Service) FetchCommunityInfo(communityID string) (*thirdparty.CommunityInfo, error) {
+	community, err := s.fetchCommunity(communityID, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return communityToInfo(community), nil
+}
+
+func (s *Service) fetchCommunity(communityID string, tryDatabase bool) (*communities.Community, error) {
 	if s.messenger == nil {
 		return nil, fmt.Errorf("messenger not ready")
 	}
@@ -646,7 +654,7 @@ func (s *Service) fetchCommunity(communityID string) (*communities.Community, er
 	community, err := s.messenger.FetchCommunity(&protocol.FetchCommunityRequest{
 		CommunityKey:    communityID,
 		Shard:           shard,
-		TryDatabase:     true,
+		TryDatabase:     tryDatabase,
 		WaitForResponse: true,
 	})
 
