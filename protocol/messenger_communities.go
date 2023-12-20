@@ -299,6 +299,14 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 		}
 		m.logger.Debug("published org")
 
+		// publish shard information
+		err = m.sendPublicCommunityShardInfo(community)
+		if err != nil {
+			m.logger.Warn("failed to publish public shard info", zap.Error(err))
+			return
+		}
+		m.logger.Debug("published public shard info")
+
 		recentlyPublishedOrg := recentlyPublishedOrgs[community.IDString()]
 
 		// signal client with published community
@@ -2040,6 +2048,11 @@ func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*Mes
 	}
 
 	err = m.SendCommunityShardKey(community, community.GetMemberPubkeys())
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.sendPublicCommunityShardInfo(community)
 	if err != nil {
 		return nil, err
 	}

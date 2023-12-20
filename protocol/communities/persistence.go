@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -70,11 +71,13 @@ type CommunityRecordBundle struct {
 const OR = " OR "
 const communitiesBaseQuery = `
 	SELECT
-		c.id, c.private_key, c.control_node, c.description, c.joined, c.spectated, c.verified, c.muted, c.muted_till, c.shard_cluster, c.shard_index,
+		c.id, c.private_key, c.control_node, c.description, c.joined, c.spectated, c.verified, c.muted, c.muted_till,
+		csd.shard_cluster, csd.shard_index,
 		r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.state,
 		ae.raw_events, ae.raw_description,
 		ccn.installation_id
 	FROM communities_communities c
+	LEFT JOIN communities_shards csd ON c.id = csd.community_id
 	LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
 	LEFT JOIN communities_events ae ON c.id = ae.id
 	LEFT JOIN communities_control_node ccn ON c.id = ccn.community_id`
@@ -170,12 +173,10 @@ func (p *Persistence) saveCommunity(r *CommunityRecord) error {
 	_, err := p.db.Exec(`
         INSERT INTO communities_communities (
             id, private_key, control_node, description,
-            joined, spectated, verified, muted,
-            muted_till, shard_cluster, shard_index
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            joined, spectated, verified, muted, muted_till
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		r.id, r.privateKey, r.controlNode, r.description,
-		r.joined, r.spectated, r.verified, r.muted,
-		r.mutedTill, r.shardCluster, r.shardIndex)
+		r.joined, r.spectated, r.verified, r.muted, r.mutedTill)
 	return err
 }
 
@@ -211,7 +212,8 @@ func (p *Persistence) SaveCommunityEvents(community *Community) error {
 
 func (p *Persistence) DeleteCommunity(id types.HexBytes) error {
 	_, err := p.db.Exec(`DELETE FROM communities_communities WHERE id = ?;
-						 DELETE FROM communities_events WHERE id = ?;`, id, id)
+						 DELETE FROM communities_events WHERE id = ?;
+						 DELETE FROM communities_shards WHERE community_id = ?`, id, id, id)
 	return err
 }
 
@@ -1696,5 +1698,55 @@ func (p *Persistence) RemoveAllCommunityRequestsToJoinWithRevealedAddressesExcep
 		WHERE request_id IN (SELECT id FROM communities_requests_to_join WHERE community_id = ? AND public_key != ?);
 	DELETE FROM communities_requests_to_join
 		WHERE community_id = ? AND public_key != ?;`, communityID, pk, communityID, pk)
+	return err
+}
+
+func (p *Persistence) SaveCommunityShard(communityID types.HexBytes, shard *shard.Shard, clock uint64) error {
+	var dbClock uint64
+	// Fetch existing Community Shard
+	err := p.db.QueryRow(`SELECT clock FROM communities_shards WHERE community_id = ? `, communityID).Scan(&dbClock)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	if dbClock >= clock {
+		return errors.New("old request to leave")
+	}
+
+	var cluster, index *uint16
+	if shard != nil {
+		cluster = &shard.Cluster
+		index = &shard.Index
+	}
+
+	_, err = p.db.Exec(`
+	INSERT INTO communities_shards (community_id, shard_cluster, shard_index, clock) VALUES (?,?,?,?)`,
+		communityID, &cluster, &index, clock)
+	return err
+}
+
+// if data will not be found, will return sql.ErrNoRows. Must be handled on the caller side
+func (p *Persistence) GetCommunityShard(communityID types.HexBytes) (*shard.Shard, error) {
+	var cluster sql.NullInt64
+	var index sql.NullInt64
+	err := p.db.QueryRow(`SELECT shard_cluster, shard_index FROM communities_shards WHERE community_id = ?`,
+		communityID).Scan(&cluster, &index)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !cluster.Valid || !index.Valid {
+		return nil, nil
+	}
+
+	return &shard.Shard{
+		Cluster: uint16(cluster.Int64),
+		Index:   uint16(index.Int64),
+	}, nil
+}
+
+func (p *Persistence) DeleteCommunityShard(communityID types.HexBytes) error {
+	_, err := p.db.Exec(`DELETE FROM communities_shards WHERE community_id = ?`, communityID)
 	return err
 }

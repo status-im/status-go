@@ -1030,7 +1030,7 @@ func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 
 func (m *Manager) UpdateShard(community *Community, shard *shard.Shard) error {
 	community.config.Shard = shard
-	return m.persistence.SaveCommunity(community)
+	return m.persistence.SaveCommunityShard(community.ID(), shard, community.Clock())
 }
 
 // SetShard assigns a shard to a community
@@ -3222,6 +3222,26 @@ func (m *Manager) GetByIDString(idString string) (*Community, error) {
 		return nil, err
 	}
 	return m.GetByID(id)
+}
+
+func (m *Manager) GetCommunityShard(communityID string) (*shard.Shard, error) {
+	id, err := types.DecodeHex(communityID)
+	if err != nil {
+		return nil, err
+	}
+	return m.persistence.GetCommunityShard(id)
+}
+
+func (m *Manager) SaveCommunityShard(communityID types.HexBytes, shard *shard.Shard, clock uint64) error {
+	return m.persistence.SaveCommunityShard(communityID, shard, clock)
+}
+
+func (m *Manager) DeleteCommunityShard(communityID string) error {
+	id, err := types.DecodeHex(communityID)
+	if err != nil {
+		return err
+	}
+	return m.persistence.DeleteCommunityShard(id)
 }
 
 func (m *Manager) SaveRequestToJoinRevealedAddresses(requestID types.HexBytes, revealedAccounts []*protobuf.RevealedAccount) error {

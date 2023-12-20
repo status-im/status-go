@@ -3,6 +3,7 @@ package protocol
 import (
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -66,17 +67,45 @@ func (m *StoreNodeRequestManager) FetchCommunity(community communities.Community
 		zap.Any("community", community),
 		zap.Bool("waitForResponse", waitForResponse))
 
-	channel, err := m.subscribeToRequest(storeNodeCommunityRequest, community.CommunityID, community.Shard)
-	if err != nil {
-		return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a request for community: %w", err)
+	requestCommunity := func(communityID string, shard *shard.Shard) (*communities.Community, StoreNodeRequestStats, error) {
+		channel, err := m.subscribeToRequest(storeNodeCommunityRequest, communityID, shard)
+		if err != nil {
+			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a request for community: %w", err)
+		}
+
+		if !waitForResponse {
+			return nil, StoreNodeRequestStats{}, nil
+		}
+
+		result := <-channel
+		return result.community, result.stats, result.err
 	}
 
-	if !waitForResponse {
-		return nil, StoreNodeRequestStats{}, nil
+	// if shard was not passed or nil, request shard first
+	communityShard := community.Shard
+	if communityShard == nil {
+		id := transport.CommunityShardInfoTopic(community.CommunityID)
+		shard, err := m.subscribeToRequest(storeNodeShardRequest, id, shard.DefaultShard())
+		if err != nil {
+			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a shard info request: %w", err)
+		}
+
+		if !waitForResponse {
+			go func() {
+				shardResult := <-shard
+				communityShard = shardResult.shard
+
+				_, _, _ = requestCommunity(community.CommunityID, communityShard)
+			}()
+			return nil, StoreNodeRequestStats{}, nil
+		}
+
+		shardResult := <-shard
+		communityShard = shardResult.shard
 	}
 
-	result := <-channel
-	return result.community, result.stats, result.err
+	// request community with on shard
+	return requestCommunity(community.CommunityID, communityShard)
 }
 
 // FetchCommunities makes a FetchCommunity for each element in given `communities` list.
@@ -187,6 +216,8 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 	}
 
 	switch requestType {
+	case storeNodeShardRequest:
+		fallthrough
 	case storeNodeCommunityRequest:
 		// If filter wasn't installed we create it and
 		// remember for uninstalling after response is received
@@ -243,6 +274,7 @@ type storeNodeRequestType int
 const (
 	storeNodeCommunityRequest storeNodeRequestType = iota
 	storeNodeContactRequest
+	storeNodeShardRequest
 )
 
 // storeNodeRequest represents a single store node batch request.
@@ -275,6 +307,7 @@ type storeNodeRequestResult struct {
 	// One of data fields (community or contact) will be present depending on request type
 	community *communities.Community
 	contact   *Contact
+	shard     *shard.Shard
 }
 
 type storeNodeResponseSubscription = chan storeNodeRequestResult
@@ -293,6 +326,7 @@ func (r *storeNodeRequest) finalize() {
 		zap.Any("requestID", r.requestID),
 		zap.Bool("communityFound", r.result.community != nil),
 		zap.Bool("contactFound", r.result.contact != nil),
+		zap.Bool("shardFound", r.result.shard != nil),
 		zap.Error(r.result.err))
 
 	// Send the result to subscribers
@@ -351,6 +385,25 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 
 		r.result.community = community
 
+	case storeNodeShardRequest:
+		communityID := strings.TrimSuffix(r.requestID.DataID, transport.CommunityShardInfoTopicPrefix())
+		shardResult, err := r.manager.messenger.communitiesManager.GetCommunityShard(communityID)
+		if err != nil {
+			logger.Error("failed to read from database",
+				zap.String("communityID", communityID),
+				zap.Error(err))
+			r.result = storeNodeRequestResult{
+				shard: nil,
+				err:   fmt.Errorf("failed to read from database: %w", err),
+			}
+			return false, 0 // failed to read from database, no sense to continue the procedure
+		}
+
+		logger.Debug("shard found for ",
+			zap.String("community", communityID))
+
+		r.result.shard = shardResult
+
 	case storeNodeContactRequest:
 		contact := r.manager.messenger.GetContactByID(r.requestID.DataID)
 
@@ -382,6 +435,7 @@ func (r *storeNodeRequest) routine() {
 		err:       nil,
 		community: nil,
 		contact:   nil,
+		shard:     nil,
 	}
 
 	defer func() {
