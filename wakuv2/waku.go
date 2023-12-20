@@ -54,13 +54,14 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
 
-	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
+	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"

@@ -154,9 +154,6 @@ type Messenger struct {
 		once sync.Once
 	}
 
-	requestedContactsLock sync.RWMutex
-	requestedContacts     map[string]*transport.Filter
-
 	connectionState       connection.State
 	telemetryClient       *telemetry.Client
 	contractMaker         *contracts.ContractMaker
@@ -531,16 +528,14 @@ func NewMessenger(
 			peers:                     make(map[string]peerStatus),
 			availabilitySubscriptions: make([]chan struct{}, 0),
 		},
-		mailserversDatabase:   c.mailserversDatabase,
-		account:               c.account,
-		quit:                  make(chan struct{}),
-		ctx:                   ctx,
-		cancel:                cancel,
-		requestedContactsLock: sync.RWMutex{},
-		requestedContacts:     make(map[string]*transport.Filter),
-		importingCommunities:  make(map[string]bool),
-		importingChannels:     make(map[string]bool),
-		importRateLimiter:     rate.NewLimiter(rate.Every(importSlowRate), 1),
+		mailserversDatabase:  c.mailserversDatabase,
+		account:              c.account,
+		quit:                 make(chan struct{}),
+		ctx:                  ctx,
+		cancel:               cancel,
+		importingCommunities: make(map[string]bool),
+		importingChannels:    make(map[string]bool),
+		importRateLimiter:    rate.NewLimiter(rate.Every(importSlowRate), 1),
 		importDelayer: struct {
 			wait chan struct{}
 			once sync.Once
@@ -583,7 +578,7 @@ func NewMessenger(
 	}
 
 	messenger.mentionsManager = NewMentionManager(messenger)
-	messenger.storeNodeRequestsManager = NewCommunityRequestsManager(messenger)
+	messenger.storeNodeRequestsManager = NewStoreNodeRequestManager(messenger)
 
 	if c.walletService != nil {
 		messenger.walletAPI = walletAPI
@@ -3745,11 +3740,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 				contact, contactFound := messageState.AllContacts.Load(senderID)
 
-				if _, ok := m.requestedContacts[senderID]; !ok {
-					// Check for messages from blocked users
-					if contactFound && contact.Blocked {
-						continue
-					}
+				// Check for messages from blocked users
+				if contactFound && contact.Blocked {
+					continue
 				}
 
 				// Don't process duplicates
@@ -3773,7 +3766,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					contact = c
 					if msg.ApplicationLayer.Type != protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY {
 						messageState.AllContacts.Store(senderID, contact)
-						m.forgetContactInfoRequest(senderID)
 					}
 				}
 				messageState.CurrentMessageState = &CurrentMessageState{
