@@ -354,6 +354,20 @@ func setMultiTxID(tx Transaction, multiTxID MultiTransactionIDType) {
 	}
 }
 
+func (c *transfersCommand) markMultiTxTokensAsPreviouslyOwned(ctx context.Context, multiTransaction *MultiTransaction, ownerAddress common.Address) {
+	if multiTransaction == nil {
+		return
+	}
+	if len(multiTransaction.ToAsset) > 0 && multiTransaction.ToNetworkID > 0 {
+		token := c.tokenManager.GetToken(multiTransaction.ToNetworkID, multiTransaction.ToAsset)
+		_ = c.tokenManager.MarkAsPreviouslyOwnedToken(token, ownerAddress)
+	}
+	if len(multiTransaction.FromAsset) > 0 && multiTransaction.FromNetworkID > 0 {
+		token := c.tokenManager.GetToken(multiTransaction.FromNetworkID, multiTransaction.FromAsset)
+		_ = c.tokenManager.MarkAsPreviouslyOwnedToken(token, ownerAddress)
+	}
+}
+
 func (c *transfersCommand) checkAndProcessSwapMultiTx(ctx context.Context, tx Transaction) (bool, error) {
 	for _, subTx := range tx {
 		switch subTx.Type {
@@ -370,6 +384,7 @@ func (c *transfersCommand) checkAndProcessSwapMultiTx(ctx context.Context, tx Tr
 					return false, err
 				}
 				setMultiTxID(tx, id)
+				c.markMultiTxTokensAsPreviouslyOwned(ctx, multiTransaction, subTx.Address)
 				return true, nil
 			}
 		}
@@ -390,6 +405,7 @@ func (c *transfersCommand) checkAndProcessBridgeMultiTx(ctx context.Context, tx 
 
 			if multiTransaction != nil {
 				setMultiTxID(tx, MultiTransactionIDType(multiTransaction.ID))
+				c.markMultiTxTokensAsPreviouslyOwned(ctx, multiTransaction, subTx.Address)
 				return true, nil
 			}
 		}
@@ -403,7 +419,10 @@ func (c *transfersCommand) processUnknownErc20CommunityTransactions(ctx context.
 		// To can be nil in case of erc20 contract creation
 		if tx.Type == w_common.Erc20Transfer && tx.Transaction.To() != nil {
 			// Find token in db or if this is a community token, find its metadata
-			_ = c.tokenManager.FindOrCreateTokenByAddress(ctx, tx.NetworkID, *tx.Transaction.To())
+			token := c.tokenManager.FindOrCreateTokenByAddress(ctx, tx.NetworkID, *tx.Transaction.To())
+			if token != nil && (token.Verified || token.CommunityData != nil) {
+				_ = c.tokenManager.MarkAsPreviouslyOwnedToken(token, tx.Address)
+			}
 		}
 	}
 }

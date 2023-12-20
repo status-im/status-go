@@ -3,6 +3,7 @@ package token
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"math/big"
 	"strconv"
 	"strings"
@@ -291,6 +292,22 @@ func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint6
 
 	tm.discoverTokenCommunityID(ctx, token, address)
 	return token
+}
+
+func (tm *Manager) MarkAsPreviouslyOwnedToken(token *Token, owner common.Address) error {
+	if token == nil {
+		return errors.New("token is nil")
+	}
+	if (owner == common.Address{}) {
+		return errors.New("owner is nil")
+	}
+	count := 0
+	err := tm.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM token_balances WHERE user_address = ? AND token_address = ? AND chain_id = ?)`, owner.Hex(), token.Address.Hex(), token.ChainID).Scan(&count)
+	if err != nil || count > 0 {
+		return err
+	}
+	_, err = tm.db.Exec(`INSERT INTO token_balances(user_address,token_name,token_symbol,token_address,token_decimals,chain_id,token_decimals,raw_balance,balance) VALUES (?,?,?,?,?,?,?,?,?)`, owner.Hex(), token.Name, token.Symbol, token.Address.Hex(), token.Decimals, token.ChainID, 0, "0", "0")
+	return err
 }
 
 func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *Token, address common.Address) {
