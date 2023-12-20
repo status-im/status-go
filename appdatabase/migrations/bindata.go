@@ -101,6 +101,7 @@
 // 1701444172_token_preferences.up.sql (511B)
 // 1701961850_shards_test.up.sql (1.276kB)
 // 1702395750_fix_enr_shards_test.up.sql (1.234kB)
+// 1702999401_add_dns_discovery_url.up.sql (284B)
 // doc.go (74B)
 // report.xml (266B)
 
@@ -2106,7 +2107,7 @@ func _1701084316_add_wallet_was_not_shown_to_keypairs_accountsUpSql() (*asset, e
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1701084316_add_wallet_was_not_shown_to_keypairs_accounts.up.sql", size: 95, mode: os.FileMode(0664), modTime: time.Unix(1702396886, 0)}
+	info := bindataFileInfo{name: "1701084316_add_wallet_was_not_shown_to_keypairs_accounts.up.sql", size: 95, mode: os.FileMode(0664), modTime: time.Unix(1702905918, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x23, 0xe, 0x28, 0xdd, 0x95, 0xfb, 0xf4, 0xd2, 0xf4, 0xed, 0xd4, 0xdf, 0x14, 0xde, 0xa, 0x53, 0x60, 0x3, 0xa5, 0xbc, 0xd6, 0xdb, 0x7b, 0xd5, 0x62, 0x1c, 0xc3, 0xc6, 0xae, 0x8e, 0x4d, 0x85}}
 	return a, nil
 }
@@ -2126,7 +2127,7 @@ func _1701084317_add_mnemonic_was_not_shown_to_settingsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1701084317_add_mnemonic_was_not_shown_to_settings.up.sql", size: 87, mode: os.FileMode(0664), modTime: time.Unix(1702396886, 0)}
+	info := bindataFileInfo{name: "1701084317_add_mnemonic_was_not_shown_to_settings.up.sql", size: 87, mode: os.FileMode(0664), modTime: time.Unix(1702905918, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x90, 0xcd, 0xc9, 0x6b, 0x4, 0x7, 0xec, 0x71, 0x55, 0x7a, 0xce, 0x2f, 0xa4, 0xd3, 0xfb, 0x58, 0xcc, 0x5a, 0xa0, 0x19, 0xb1, 0x85, 0xb8, 0xa6, 0xcd, 0xcd, 0x5a, 0x5c, 0xa3, 0x39, 0xe5, 0x8e}}
 	return a, nil
 }
@@ -2146,7 +2147,7 @@ func _1701444172_token_preferencesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1701444172_token_preferences.up.sql", size: 511, mode: os.FileMode(0664), modTime: time.Unix(1702396886, 0)}
+	info := bindataFileInfo{name: "1701444172_token_preferences.up.sql", size: 511, mode: os.FileMode(0664), modTime: time.Unix(1702905918, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x49, 0xe, 0x76, 0xb9, 0x1d, 0xd4, 0xf0, 0xa, 0x12, 0xd3, 0x3, 0x42, 0x1, 0x4, 0x25, 0x93, 0xab, 0xb8, 0x30, 0xff, 0x12, 0x91, 0x1e, 0xc1, 0x1a, 0x7a, 0xf8, 0xc5, 0xbc, 0x3e, 0x29, 0x5a}}
 	return a, nil
 }
@@ -2186,8 +2187,28 @@ func _1702395750_fix_enr_shards_testUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1702395750_fix_enr_shards_test.up.sql", size: 1234, mode: os.FileMode(0664), modTime: time.Unix(1702396887, 0)}
+	info := bindataFileInfo{name: "1702395750_fix_enr_shards_test.up.sql", size: 1234, mode: os.FileMode(0664), modTime: time.Unix(1702497488, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9b, 0x99, 0xd8, 0xc9, 0xe0, 0xf0, 0xe1, 0xf1, 0x77, 0xf, 0x5f, 0x97, 0xfc, 0x54, 0xd4, 0x8d, 0xc1, 0xa4, 0xbb, 0x4f, 0x5c, 0x50, 0x5d, 0xef, 0xb2, 0xa3, 0xc1, 0x13, 0x2, 0xbd, 0x9, 0x30}}
+	return a, nil
+}
+
+var __1702999401_add_dns_discovery_urlUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x84\x8f\x41\x6b\x83\x30\x1c\xc5\xef\x7e\x8a\x3f\x81\xd1\x16\xc4\xc2\xe8\x14\x56\x06\x0b\x98\x75\x66\x1a\x9d\x89\xa9\xf6\x52\x3a\x13\x68\x60\xd3\x61\xfe\x3d\xf4\xdb\x0f\x7b\xda\x4e\xbb\xbc\xc3\xe3\xf1\x7e\xef\xa5\x2c\x67\x8a\xc1\x4b\x5d\x16\xd0\x7f\x5e\x3c\xda\xe9\x38\x8c\xc6\x7a\xd8\xbf\xb2\x9a\x01\x5e\xbf\x2d\x3c\x01\x31\xce\xf7\xfa\xe1\x63\x1c\x91\x00\x15\x29\xcc\x19\xc8\xb3\x37\x06\x8b\xbb\xe7\xd9\x8e\xd0\x7a\x8c\xfc\xf9\x34\x19\x1f\xdd\x1a\x22\x8f\x27\xbc\xf8\xc8\x7d\x2d\xb6\x41\x90\x09\xc9\x6a\x05\x99\x50\xe5\x5f\xd0\x72\xd6\xf0\x06\x0a\xc1\x5f\x07\x3c\x5b\x74\xfd\xd1\x99\x55\xa0\x69\xde\x30\x09\x4b\x62\x87\x09\x27\x6b\x1f\xd7\x6b\x5a\x94\x5c\x1f\xda\x8d\x8e\x59\x5b\x25\x42\xf1\xaa\xa0\x1d\xef\xa4\xba\x7f\xaf\x62\xca\xdb\x6e\x9f\xc4\x59\x13\xeb\x1d\x97\x49\xa3\xa5\x48\xbb\xc3\x6e\xf3\xef\x40\x12\xfe\x3e\x18\x12\x67\xc8\x6a\x1b\xfc\x04\x00\x00\xff\xff\xdc\x40\x6b\xc7\x1c\x01\x00\x00")
+
+func _1702999401_add_dns_discovery_urlUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1702999401_add_dns_discovery_urlUpSql,
+		"1702999401_add_dns_discovery_url.up.sql",
+	)
+}
+
+func _1702999401_add_dns_discovery_urlUpSql() (*asset, error) {
+	bytes, err := _1702999401_add_dns_discovery_urlUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1702999401_add_dns_discovery_url.up.sql", size: 284, mode: os.FileMode(0664), modTime: time.Unix(1702999719, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xec, 0x31, 0xf8, 0x99, 0xf5, 0xe2, 0xd1, 0xae, 0x95, 0x13, 0xbf, 0x73, 0x84, 0xd3, 0xd1, 0x90, 0x25, 0x9b, 0x3d, 0x9e, 0xd7, 0x55, 0x2, 0x7a, 0x61, 0x68, 0x6f, 0xca, 0x1e, 0x9d, 0x8f, 0x42}}
 	return a, nil
 }
 
@@ -2524,6 +2545,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1702395750_fix_enr_shards_test.up.sql": _1702395750_fix_enr_shards_testUpSql,
 
+	"1702999401_add_dns_discovery_url.up.sql": _1702999401_add_dns_discovery_urlUpSql,
+
 	"doc.go": docGo,
 
 	"report.xml": reportXml,
@@ -2671,8 +2694,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1701444172_token_preferences.up.sql":                                      &bintree{_1701444172_token_preferencesUpSql, map[string]*bintree{}},
 	"1701961850_shards_test.up.sql":                                            &bintree{_1701961850_shards_testUpSql, map[string]*bintree{}},
 	"1702395750_fix_enr_shards_test.up.sql":                                    &bintree{_1702395750_fix_enr_shards_testUpSql, map[string]*bintree{}},
-	"doc.go":                                                                   &bintree{docGo, map[string]*bintree{}},
-	"report.xml":                                                               &bintree{reportXml, map[string]*bintree{}},
+	"1702999401_add_dns_discovery_url.up.sql":                                  &bintree{_1702999401_add_dns_discovery_urlUpSql, map[string]*bintree{}},
+	"doc.go":     &bintree{docGo, map[string]*bintree{}},
+	"report.xml": &bintree{reportXml, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

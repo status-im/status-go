@@ -1124,6 +1124,8 @@ func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 		PubsubTopic:   pubsubTopic,
 	}
 
+	w.logger.Debug("store.query", zap.Int64p("startTime", query.StartTime), zap.Int64p("endTime", query.EndTime), zap.Strings("contentTopics", query.ContentTopics), zap.String("pubsubTopic", query.PubsubTopic), zap.Stringer("peerID", peerID))
+
 	return w.node.Store().Query(ctx, query, opts...)
 }
 
