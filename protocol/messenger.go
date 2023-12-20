@@ -3666,8 +3666,19 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message, storeWakuMessages bool, fromArchive bool) (*MessengerResponse, error) {
 
+	m.logger.Debug("<<< handleRetrievedMessages")
+
+	for filter, msg := range chatWithMessages {
+		m.logger.Debug("<<< chatWithMessages",
+			zap.String("chat", filter.ChatID),
+			zap.Int("totalEnvelopesCount", len(msg)),
+		)
+	}
+
 	m.handleMessagesMutex.Lock()
 	defer m.handleMessagesMutex.Unlock()
+
+	m.logger.Debug("<<< 1")
 
 	messageState := m.buildMessageState()
 
@@ -3679,9 +3690,15 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	}
 
 	for filter, messages := range chatWithMessages {
+		logger.Debug("<<< 2")
+
 		var processedMessages []string
 		for _, shhMessage := range messages {
+
 			logger := logger.With(zap.String("hash", types.EncodeHex(shhMessage.Hash)))
+
+			logger.Debug("processing message")
+
 			// Indicates tha all messages in the batch have been processed correctly
 			allMessagesProcessed := true
 

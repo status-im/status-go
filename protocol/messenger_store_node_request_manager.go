@@ -321,8 +321,12 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 	r.result.stats.FetchedEnvelopesCount += envelopesCount
 	r.result.stats.FetchedPagesCount++
 
+	r.manager.logger.Debug("<<< start ProcessAllMessages")
+
 	// Force all received envelopes to be processed
 	r.manager.messenger.ProcessAllMessages()
+
+	r.manager.logger.Debug("<<< end ProcessAllMessages")
 
 	// Try to get community from database
 	switch r.requestID.RequestType {

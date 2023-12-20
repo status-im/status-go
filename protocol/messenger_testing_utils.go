@@ -256,6 +256,7 @@ func WaitForAvailableStoreNode(s *suite.Suite, m *Messenger, timeout time.Durati
 func NewWakuV2(s *suite.Suite, logger *zap.Logger, useLocalWaku bool, enableStore bool) *waku2.Waku {
 	wakuConfig := &waku2.Config{
 		DefaultShardPubsubTopic: relay.DefaultWakuTopic, // shard.DefaultShardPubsubTopic(),
+		UseShardAsDefaultTopic:  true,
 	}
 
 	var onPeerStats func(connStatus types.ConnStatus)

@@ -32,7 +32,7 @@ const (
 	localFleet              = "local-test-fleet-1"
 	localMailserverID       = "local-test-mailserver"
 	storeNodeConnectTimeout = 500 * time.Millisecond
-	runLocalTests           = false
+	runLocalTests           = true
 )
 
 func TestMessengerStoreNodeRequestSuite(t *testing.T) {
@@ -284,7 +284,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestBigCommunity() {
 	}
 
 	// Status CC community
-	const communityID = "0x03073514d4c14a7d10ae9fc9b0f05abc904d84166a6ac80add58bf6a3542a4e50a"
+	const communityID = "0x036206427408407464ade24aa5ad97785b4b32323a9a820132a3c2b1d6cf37f151"
 
 	communityShard := communities.CommunityShard{
 		CommunityID: communityID,
@@ -309,7 +309,8 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestBigCommunity() {
 	options := []Option{
 		WithMailserversDatabase(mailserversDatabase),
 		WithClusterConfig(params.ClusterConfig{
-			Fleet: params.FleetStatusProd,
+			Fleet:     params.FleetShardsTest,
+			ClusterID: 16,
 		}),
 	}
 
@@ -318,6 +319,10 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestBigCommunity() {
 	s.Require().NoError(err)
 
 	fetchedCommunity, stats, err := s.bob.storeNodeRequestsManager.FetchCommunity(communityShard, true)
+
+	// failing store nodes (EOF):
+	// - store-01.do-ams3.shards.test
+	// - store-02.do-ams3.shards.test
 
 	s.Require().NoError(err)
 	s.Require().NotNil(fetchedCommunity)
