@@ -487,6 +487,32 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 }
 
 // The scenario tested is as follow:
+//  1. Repeat 5 times:
+//     2.1) Alice sends a contact request to Bob
+//     2.2) Bob accepts the contact request
+//     2.3) Alice removes bob from contacts
+func (s *MessengerContactRequestSuite) TestAcceptCRRemoveAndRepeat() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+	defer TearDownMessenger(&s.Suite, theirMessenger)
+
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+
+	for i := 0; i < 5; i++ {
+		messageText := fmt.Sprintf("hello %d", i)
+		request := &requests.SendContactRequest{
+			ID:      contactID,
+			Message: messageText,
+		}
+		s.sendContactRequest(request, s.m)
+		contactRequest := s.receiveContactRequest(messageText, theirMessenger)
+		s.acceptContactRequest(contactRequest, s.m, theirMessenger)
+		s.retractContactRequest(contactID, theirMessenger)
+	}
+}
+
+// The scenario tested is as follow:
 // 1) Alice sends a contact request to Bob
 // 2) Bob declines the contact request
 // 3) Alice fails to send a new contact request to Bob
@@ -581,7 +607,6 @@ func (s *MessengerContactRequestSuite) TestAliceSeesOnlyOneAcceptFromBob() {
 		},
 		"contact request acceptance not received",
 	)
-	s.logResponse(resp, "acceptContactRequest")
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
@@ -1534,6 +1559,7 @@ func (s *MessengerContactRequestSuite) blockContactAndSync(alice1 *Messenger, al
 	s.Require().Equal(ContactRequestStateReceived, respContact.ContactRequestRemoteState)
 
 	// Check chats list
+	s.Require().Len(alice2.Chats(), 2)
 	//s.Require().Len(alice2.Chats(), 1) // FIXME: Uncomment after https://github.com/status-im/status-go/issues/3800
 }
 
@@ -1565,6 +1591,7 @@ func (s *MessengerContactRequestSuite) unblockContactAndSync(alice1 *Messenger, 
 	s.Require().Equal(respContact.ContactRequestRemoteState, ContactRequestStateNone)
 
 	// Check chats list
+	s.Require().Len(alice2.Chats(), 2)
 	//s.Require().Len(alice2.Chats(), 1) // FIXME: Uncomment after https://github.com/status-im/status-go/issues/3800
 }
 
