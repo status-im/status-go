@@ -35,6 +35,7 @@ const (
 	discordAttachmentsPath         = basePath + "/discord/attachments"
 	LinkPreviewThumbnailPath       = "/link-preview/thumbnail"
 	StatusLinkPreviewThumbnailPath = "/status-link-preview/thumbnail"
+	communityTokenImagesPath       = "/communityTokenImages"
 
 	walletBasePath              = "/wallet"
 	walletCommunityImagesPath   = walletBasePath + "/communityImages"
@@ -926,6 +927,63 @@ func handleQRCodeGeneration(multiaccountsDB *multiaccounts.Database, logger *zap
 
 		if err != nil {
 			logger.Error("failed to write image", zap.Error(err))
+		}
+	}
+}
+
+func handleCommunityTokenImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		params := r.URL.Query()
+
+		if len(params["communityID"]) == 0 {
+			logger.Error("no communityID")
+			return
+		}
+		if len(params["chainID"]) == 0 {
+			logger.Error("no chainID")
+			return
+		}
+		if len(params["symbol"]) == 0 {
+			logger.Error("no symbol")
+			return
+		}
+
+		chainID, err := strconv.ParseUint(params["chainID"][0], 10, 64)
+		if err != nil {
+			logger.Error("invalid chainID in community token image", zap.Error(err))
+			return
+		}
+
+		var base64Image string
+		err = db.QueryRow("SELECT image_base64 FROM community_tokens WHERE community_id = ? AND chain_id = ? AND symbol = ?", params["communityID"][0], chainID, params["symbol"][0]).Scan(&base64Image)
+		if err != nil {
+			logger.Error("failed to find community token image", zap.Error(err))
+			return
+		}
+		if len(base64Image) == 0 {
+			logger.Error("empty community token image")
+			return
+		}
+		imagePayload, err := images.GetPayloadFromURI(base64Image)
+		if err != nil {
+			logger.Error("failed to get community token image payload", zap.Error(err))
+			return
+		}
+		mime, err := images.GetProtobufImageMime(imagePayload)
+		if err != nil {
+			logger.Error("failed to get community token image mime", zap.Error(err))
+		}
+
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-store")
+
+		_, err = w.Write(imagePayload)
+		if err != nil {
+			logger.Error("failed to write community token image", zap.Error(err))
 		}
 	}
 }

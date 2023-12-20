@@ -47,7 +47,7 @@ func (db *Database) GetTokenPrivilegesLevel(chainID uint64, contractAddress stri
 }
 
 func (db *Database) GetCommunityERC20Metadata() ([]*token.CommunityToken, error) {
-	rows, err := db.db.Query(`SELECT community_id, address, name, symbol, chain_id, image_base64 FROM community_tokens WHERE type = ?`, protobuf.CommunityTokenType_ERC20)
+	rows, err := db.db.Query(`SELECT community_id, address, name, symbol, chain_id FROM community_tokens WHERE type = ?`, protobuf.CommunityTokenType_ERC20)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (db *Database) GetCommunityERC20Metadata() ([]*token.CommunityToken, error)
 	var result []*token.CommunityToken
 	for rows.Next() {
 		token := token.CommunityToken{}
-		err := rows.Scan(&token.CommunityID, &token.Address, &token.Name, &token.Symbol, &token.ChainID, &token.Base64Image)
+		err := rows.Scan(&token.CommunityID, &token.Address, &token.Name, &token.Symbol, &token.ChainID)
 		if err != nil {
 			return nil, err
 		}
