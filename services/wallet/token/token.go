@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/async"
@@ -89,6 +90,7 @@ type Manager struct {
 	stores            []store // Set on init, not changed afterwards
 	communityTokensDB *communitytokens.Database
 	communityManager  *community.Manager
+	mediaServer       *server.MediaServer
 
 	tokens []*Token
 
@@ -116,6 +118,7 @@ func NewTokenManager(
 	communityManager *community.Manager,
 	networkManager *network.Manager,
 	appDB *sql.DB,
+	mediaServer *server.MediaServer,
 ) *Manager {
 	maker, _ := contracts.NewContractMaker(RPCClient)
 	stores := []store{newUniswapStore(), newDefaultStore()}
@@ -151,6 +154,7 @@ func NewTokenManager(
 		stores:            stores,
 		communityTokensDB: communitytokens.NewCommunityTokensDatabase(appDB),
 		tokens:            tokens,
+		mediaServer:       mediaServer,
 	}
 }
 
@@ -516,7 +520,6 @@ func (tm *Manager) DiscoverToken(ctx context.Context, chainID uint64, address co
 }
 
 func (tm *Manager) getTokensFromDB(query string, args ...any) ([]*Token, error) {
-
 	communityTokens := []*token.CommunityToken{}
 	if tm.communityTokensDB != nil {
 		// Error is skipped because it's only returning optional metadata
@@ -544,7 +547,7 @@ func (tm *Manager) getTokensFromDB(query string, args ...any) ([]*Token, error) 
 				if communityToken.CommunityID != communityID || uint64(communityToken.ChainID) != token.ChainID || communityToken.Symbol != token.Symbol {
 					continue
 				}
-				token.Image = communityToken.Base64Image
+				token.Image = tm.mediaServer.MakeCommunityTokenImagesURL(communityID, token.ChainID, token.Symbol)
 				break
 			}
 
