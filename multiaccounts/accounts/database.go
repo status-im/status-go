@@ -283,7 +283,7 @@ func (a *Keypair) Operability() AccountOperable {
 
 // Database sql wrapper for operations with browser objects.
 type Database struct {
-	*settings.Database
+	settings.DatabaseSettingsManager
 	*notificationssettings.NotificationsSettings
 	*sociallinkssettings.SocialLinksSettings
 	*walletsettings.WalletSettings
