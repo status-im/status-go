@@ -250,6 +250,11 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 		availableNetworks = append(availableNetworks, network)
 	}
 
+	cachedTokens, err := r.GetCachedWalletTokensWithoutMarketData()
+	if err != nil {
+		return nil, err
+	}
+
 	chainIDs := make([]uint64, 0)
 	for _, network := range availableNetworks {
 		chainIDs = append(chainIDs, network.ChainID)
@@ -296,7 +301,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 			for symbol, tokens := range getTokenBySymbols(tokenList) {
 				balancesPerChain := make(map[uint64]ChainBalance)
 				decimals := tokens[0].Decimals
-				anyPositiveBalance := false
+				isVisible := false
 				for _, token := range tokens {
 					hexBalance := balances[token.ChainID][address][token.Address]
 					balance := big.NewFloat(0.0)
@@ -310,8 +315,8 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 					if client, ok := clients[token.ChainID]; ok {
 						hasError = err != nil || !client.GetIsConnected()
 					}
-					if !anyPositiveBalance {
-						anyPositiveBalance = balance.Cmp(big.NewFloat(0.0)) > 0
+					if !isVisible {
+						isVisible = balance.Cmp(big.NewFloat(0.0)) > 0 || r.isCachedToken(cachedTokens, address, token.Symbol, token.ChainID)
 					}
 					balancesPerChain[token.ChainID] = ChainBalance{
 						RawBalance: hexBalance.ToInt().String(),
@@ -322,7 +327,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 					}
 				}
 
-				if !anyPositiveBalance && !belongsToMandatoryTokens(symbol) {
+				if !isVisible && !belongsToMandatoryTokens(symbol) {
 					continue
 				}
 
@@ -418,6 +423,21 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	r.lastWalletTokenUpdateTimestamp.Store(time.Now().Unix())
 
 	return result, r.persistence.SaveTokens(result)
+}
+
+func (r *Reader) isCachedToken(cachedTokens map[common.Address][]Token, address common.Address, symbol string, chainID uint64) bool {
+	if tokens, ok := cachedTokens[address]; ok {
+		for _, t := range tokens {
+			if t.Symbol != symbol {
+				continue
+			}
+			_, ok := t.BalancesPerChain[chainID]
+			if ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // GetCachedWalletTokensWithoutMarketData returns the latest fetched balances, minus
