@@ -2206,7 +2206,7 @@ func _1702999401_add_dns_discovery_urlUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1702999401_add_dns_discovery_url.up.sql", size: 284, mode: os.FileMode(0644), modTime: time.Unix(1703097117, 0)}
+	info := bindataFileInfo{name: "1702999401_add_dns_discovery_url.up.sql", size: 284, mode: os.FileMode(0644), modTime: time.Unix(1703150105, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xec, 0x31, 0xf8, 0x99, 0xf5, 0xe2, 0xd1, 0xae, 0x95, 0x13, 0xbf, 0x73, 0x84, 0xd3, 0xd1, 0x90, 0x25, 0x9b, 0x3d, 0x9e, 0xd7, 0x55, 0x2, 0x7a, 0x61, 0x68, 0x6f, 0xca, 0x1e, 0x9d, 0x8f, 0x42}}
 	return a, nil
 }

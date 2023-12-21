@@ -400,7 +400,7 @@ func _1702867707_add_balance_to_collectibles_ownership_cacheUpSql() (*asset, err
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1702867707_add_balance_to_collectibles_ownership_cache.up.sql", size: 289, mode: os.FileMode(0644), modTime: time.Unix(1703037356, 0)}
+	info := bindataFileInfo{name: "1702867707_add_balance_to_collectibles_ownership_cache.up.sql", size: 289, mode: os.FileMode(0644), modTime: time.Unix(1703149969, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6f, 0x63, 0x30, 0x11, 0x22, 0xb9, 0xee, 0xae, 0xb8, 0xc4, 0xe6, 0xd3, 0x7, 0xc, 0xe6, 0xa3, 0x72, 0x8c, 0x6, 0x9d, 0x6c, 0x97, 0x8f, 0xb2, 0xd0, 0x37, 0x69, 0x69, 0x6, 0x7f, 0x67, 0x94}}
 	return a, nil
 }

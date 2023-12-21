@@ -2480,7 +2480,7 @@ func _1702996953_add_communities_shards_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1702996953_add_communities_shards_table.up.sql", size: 208, mode: os.FileMode(0644), modTime: time.Unix(1703097117, 0)}
+	info := bindataFileInfo{name: "1702996953_add_communities_shards_table.up.sql", size: 208, mode: os.FileMode(0644), modTime: time.Unix(1703177998, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6, 0x40, 0x38, 0xcb, 0x1e, 0x85, 0x1, 0x6b, 0xe6, 0xe9, 0xf0, 0xf9, 0xe6, 0x6d, 0x23, 0x4d, 0xe6, 0x12, 0x61, 0xc8, 0x12, 0x25, 0x31, 0x39, 0x7d, 0x40, 0xad, 0x64, 0xfa, 0xf1, 0x87, 0x86}}
 	return a, nil
 }

@@ -1702,27 +1702,37 @@ func (p *Persistence) RemoveAllCommunityRequestsToJoinWithRevealedAddressesExcep
 }
 
 func (p *Persistence) SaveCommunityShard(communityID types.HexBytes, shard *shard.Shard, clock uint64) error {
-	var dbClock uint64
-	// Fetch existing Community Shard
-	err := p.db.QueryRow(`SELECT clock FROM communities_shards WHERE community_id = ? `, communityID).Scan(&dbClock)
-	if err != nil && err != sql.ErrNoRows {
-		return err
-	}
-
-	if dbClock >= clock {
-		return errors.New("old request to leave")
-	}
-
 	var cluster, index *uint16
+
 	if shard != nil {
 		cluster = &shard.Cluster
 		index = &shard.Index
 	}
 
-	_, err = p.db.Exec(`
-	INSERT INTO communities_shards (community_id, shard_cluster, shard_index, clock) VALUES (?,?,?,?)`,
-		communityID, &cluster, &index, clock)
-	return err
+	result, err := p.db.Exec(`
+		INSERT INTO communities_shards (community_id, shard_cluster, shard_index, clock)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(community_id)
+		DO UPDATE SET
+			shard_cluster = CASE WHEN excluded.clock > communities_shards.clock THEN excluded.shard_cluster ELSE communities_shards.shard_cluster END,
+			shard_index = CASE WHEN excluded.clock > communities_shards.clock THEN excluded.shard_index ELSE communities_shards.shard_index END,
+			clock = CASE WHEN excluded.clock > communities_shards.clock THEN excluded.clock ELSE communities_shards.clock END
+		WHERE excluded.clock > communities_shards.clock OR communities_shards.community_id IS NULL`,
+		communityID, cluster, index, clock)
+
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return errors.New("saving shard failed, clock is too old")
+	}
+	return nil
 }
 
 // if data will not be found, will return sql.ErrNoRows. Must be handled on the caller side

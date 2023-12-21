@@ -869,7 +869,7 @@ func (s *PersistenceSuite) TestSaveShardInfo() {
 	clock := uint64(1)
 	// get non existing community shard
 	resultShard, err := s.db.GetCommunityShard(communityID)
-	s.Require().Error(sql.ErrNoRows)
+	s.Require().Error(err, sql.ErrNoRows)
 	s.Require().Nil(resultShard)
 
 	// shard info is nil
@@ -889,10 +889,18 @@ func (s *PersistenceSuite) TestSaveShardInfo() {
 		Cluster: 1,
 		Index:   2,
 	}
+
+	// save shard info with the same clock and check that data was not modified
+	err = s.db.SaveCommunityShard(communityID, expectedShard, clock)
+	s.Require().Error(err)
+	resultShard, err = s.db.GetCommunityShard(communityID)
+	s.Require().NoError(err)
+	s.Require().Nil(resultShard)
+
+	// update the clock and save the shard info
 	clock += clock
 	err = s.db.SaveCommunityShard(communityID, expectedShard, clock)
 	s.Require().NoError(err)
-
 	resultShard, err = s.db.GetCommunityShard(communityID)
 	s.Require().NoError(err)
 	s.Require().NotNil(resultShard)
@@ -902,6 +910,6 @@ func (s *PersistenceSuite) TestSaveShardInfo() {
 	err = s.db.DeleteCommunityShard(communityID)
 	s.Require().NoError(err)
 	resultShard, err = s.db.GetCommunityShard(communityID)
-	s.Require().Error(sql.ErrNoRows)
+	s.Require().Error(err, sql.ErrNoRows)
 	s.Require().Nil(resultShard)
 }

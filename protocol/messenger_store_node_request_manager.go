@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"database/sql"
 	"fmt"
 	"math"
 	"strings"
@@ -386,21 +387,30 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 		r.result.community = community
 
 	case storeNodeShardRequest:
-		communityID := strings.TrimSuffix(r.requestID.DataID, transport.CommunityShardInfoTopicPrefix())
+		communityIDStr := strings.TrimSuffix(r.requestID.DataID, transport.CommunityShardInfoTopicPrefix())
+		communityID, err := types.DecodeHex(communityIDStr)
+		if err != nil {
+			logger.Error("decode community ID failed",
+				zap.String("communityID", communityIDStr),
+				zap.Error(err))
+			return false, 0
+		}
 		shardResult, err := r.manager.messenger.communitiesManager.GetCommunityShard(communityID)
 		if err != nil {
-			logger.Error("failed to read from database",
-				zap.String("communityID", communityID),
-				zap.Error(err))
-			r.result = storeNodeRequestResult{
-				shard: nil,
-				err:   fmt.Errorf("failed to read from database: %w", err),
+			if err != sql.ErrNoRows {
+				logger.Error("failed to read from database",
+					zap.String("communityID", communityIDStr),
+					zap.Error(err))
+				r.result = storeNodeRequestResult{
+					shard: nil,
+					err:   fmt.Errorf("failed to read from database: %w", err),
+				}
+				return false, 0 // failed to read from database, no sense to continue the procedure
 			}
-			return false, 0 // failed to read from database, no sense to continue the procedure
 		}
 
 		logger.Debug("shard found for ",
-			zap.String("community", communityID))
+			zap.String("community", communityIDStr))
 
 		r.result.shard = shardResult
 

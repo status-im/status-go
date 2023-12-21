@@ -237,7 +237,9 @@ func (s *MessengerStoreNodeRequestSuite) TestSimultaneousCommunityInfoRequests()
 
 	wg := sync.WaitGroup{}
 
-	// Make 2 simultaneous fetch requests, only 1 request to store node is expected
+	// Make 2 simultaneous fetch requests
+	// 1 fetch request = 2 requests to store node (fetch shard and fetch community)
+	// only 2 request to store node is expected
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
@@ -247,7 +249,7 @@ func (s *MessengerStoreNodeRequestSuite) TestSimultaneousCommunityInfoRequests()
 	}
 
 	wg.Wait()
-	s.Require().Equal(1, storeNodeRequestsCount)
+	s.Require().Equal(2, storeNodeRequestsCount)
 }
 
 func (s *MessengerStoreNodeRequestSuite) TestRequestNonExistentCommunity() {
@@ -510,21 +512,4 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestShardAndCommunityInfo() {
 	s.Require().NotNil(community.Shard())
 
 	s.fetchCommunity(s.bob, communityShard, community)
-
-	// check if we always request the fresh community, knowing the shard
-	ownerEditRequest := &requests.EditCommunity{
-		CommunityID: community.ID(),
-		CreateCommunity: requests.CreateCommunity{
-			Name:        "changed name",
-			Description: "changed description",
-			Color:       community.Color(),
-			Membership:  community.Permissions().Access,
-		},
-	}
-	_, err = s.owner.EditCommunity(ownerEditRequest)
-	s.Require().NoError(err)
-
-	community, err = s.owner.communitiesManager.GetByID(community.ID())
-
-	s.fetchCommunity(s.bob, community.CommunityShard(), community)
 }

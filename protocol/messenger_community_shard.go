@@ -6,6 +6,8 @@ import (
 	"errors"
 
 	"github.com/golang/protobuf/proto"
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -14,7 +16,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-	"go.uber.org/zap"
 )
 
 func (m *Messenger) sendPublicCommunityShardInfo(community *communities.Community) error {
@@ -99,7 +100,7 @@ func (m *Messenger) HandleCommunityPublicShardInfo(state *ReceivedMessageState, 
 
 func recoverCommunityShardInfoSignature(rawShardInfo *protobuf.CommunityPublicShardInfo) (*ecdsa.PublicKey, error) {
 	if rawShardInfo.Signature == nil || len(rawShardInfo.Signature) == 0 {
-		return nil, errors.New("missing signature")
+		return nil, errors.New("missing shard info signature")
 	}
 
 	return crypto.SigToPub(crypto.Keccak256(rawShardInfo.Payload), rawShardInfo.Signature)
