@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -97,7 +98,7 @@ func TestCommunityTokens(t *testing.T) {
 		Symbol:   "COM",
 		Decimals: 12,
 		ChainID:  777,
-		CommunityData: &CommunityData{
+		CommunityData: &community.Data{
 			ID: "random_community_id",
 		},
 	}

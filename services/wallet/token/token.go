@@ -49,16 +49,9 @@ type Token struct {
 	PegSymbol string `json:"pegSymbol"`
 	Image     string `json:"image,omitempty"`
 
-	CommunityData *CommunityData `json:"community_data,omitempty"`
-	Verified      bool           `json:"verified"`
-	TokenListID   string         `json:"tokenListId"`
-}
-
-type CommunityData struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Color string `json:"color"`
-	Image string `json:"image,omitempty"`
+	CommunityData *community.Data `json:"community_data,omitempty"`
+	Verified      bool            `json:"verified"`
+	TokenListID   string          `json:"tokenListId"`
 }
 
 func (t *Token) IsNative() bool {
@@ -551,7 +544,7 @@ func (tm *Manager) getTokensFromDB(query string, args ...any) ([]*Token, error) 
 				break
 			}
 
-			token.CommunityData = &CommunityData{
+			token.CommunityData = &community.Data{
 				ID: communityID,
 			}
 		}

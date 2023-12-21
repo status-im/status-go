@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -46,11 +47,12 @@ func belongsToMandatoryTokens(symbol string) bool {
 	return false
 }
 
-func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, marketManager *market.Manager, accountsDB *accounts.Database, persistence *Persistence, walletFeed *event.Feed) *Reader {
+func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, marketManager *market.Manager, communityManager *community.Manager, accountsDB *accounts.Database, persistence *Persistence, walletFeed *event.Feed) *Reader {
 	return &Reader{
 		rpcClient:                      rpcClient,
 		tokenManager:                   tokenManager,
 		marketManager:                  marketManager,
+		communityManager:               communityManager,
 		accountsDB:                     accountsDB,
 		persistence:                    persistence,
 		walletFeed:                     walletFeed,
@@ -62,6 +64,7 @@ type Reader struct {
 	rpcClient                      *rpc.Client
 	tokenManager                   *token.Manager
 	marketManager                  *market.Manager
+	communityManager               *community.Manager
 	accountsDB                     *accounts.Database
 	persistence                    *Persistence
 	walletFeed                     *event.Feed
@@ -103,7 +106,7 @@ type Token struct {
 	PegSymbol               string                       `json:"pegSymbol"`
 	Verified                bool                         `json:"verified"`
 	Image                   string                       `json:"image,omitempty"`
-	CommunityData           *token.CommunityData         `json:"community_data,omitempty"`
+	CommunityData           *community.Data              `json:"community_data,omitempty"`
 }
 
 func splitVerifiedTokens(tokens []*token.Token) ([]*token.Token, []*token.Token) {
@@ -389,6 +392,8 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 		return nil, err
 	}
 
+	communities := make(map[string]bool)
+
 	for address, tokens := range result {
 		for index, token := range tokens {
 			marketValuesPerCurrency := make(map[string]TokenMarketValues)
@@ -409,6 +414,10 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 				}
 			}
 
+			if token.CommunityData != nil {
+				communities[token.CommunityData.ID] = true
+			}
+
 			if _, ok := tokenDetails[token.Symbol]; !ok {
 				continue
 			}
@@ -421,6 +430,10 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	}
 
 	r.lastWalletTokenUpdateTimestamp.Store(time.Now().Unix())
+
+	for communityID := range communities {
+		r.communityManager.FetchCommunityMetadataAsync(communityID)
+	}
 
 	return result, r.persistence.SaveTokens(result)
 }
