@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -1559,8 +1560,7 @@ func (s *MessengerContactRequestSuite) blockContactAndSync(alice1 *Messenger, al
 	s.Require().Equal(ContactRequestStateReceived, respContact.ContactRequestRemoteState)
 
 	// Check chats list
-	s.Require().Len(alice2.Chats(), 2)
-	//s.Require().Len(alice2.Chats(), 1) // FIXME: Uncomment after https://github.com/status-im/status-go/issues/3800
+	s.Require().Len(alice2.Chats(), deprecation.AddChatsCount(2))
 }
 
 func (s *MessengerContactRequestSuite) unblockContactAndSync(alice1 *Messenger, alice2 *Messenger, bob *Messenger) {
@@ -1591,8 +1591,7 @@ func (s *MessengerContactRequestSuite) unblockContactAndSync(alice1 *Messenger, 
 	s.Require().Equal(respContact.ContactRequestRemoteState, ContactRequestStateNone)
 
 	// Check chats list
-	s.Require().Len(alice2.Chats(), 2)
-	//s.Require().Len(alice2.Chats(), 1) // FIXME: Uncomment after https://github.com/status-im/status-go/issues/3800
+	s.Require().Len(alice2.Chats(), deprecation.AddChatsCount(2))
 }
 
 func (s *MessengerContactRequestSuite) TestBlockedContactSyncing() {
