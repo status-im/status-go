@@ -135,6 +135,7 @@ func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *za
 }
 
 func (s *MessengerStoreNodeRequestSuite) createCommunity(m *Messenger) *communities.Community {
+	s.waitForAvailableStoreNode(m)
 
 	createCommunityRequest := &requests.CreateCommunity{
 		Name:        RandomLettersString(10),
@@ -144,7 +145,7 @@ func (s *MessengerStoreNodeRequestSuite) createCommunity(m *Messenger) *communit
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 	}
 
-	response, err := s.owner.CreateCommunity(createCommunityRequest, true)
+	response, err := m.CreateCommunity(createCommunityRequest, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -200,7 +201,6 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityInfo() {
 	s.createOwner()
 	s.createBob()
 
-	s.waitForAvailableStoreNode(s.owner)
 	community := s.createCommunity(s.owner)
 
 	s.waitForAvailableStoreNode(s.bob)
@@ -211,7 +211,6 @@ func (s *MessengerStoreNodeRequestSuite) TestConsecutiveRequests() {
 	s.createOwner()
 	s.createBob()
 
-	s.waitForAvailableStoreNode(s.owner)
 	community := s.createCommunity(s.owner)
 
 	// Test consecutive requests to check that requests in manager are finalized
@@ -225,7 +224,6 @@ func (s *MessengerStoreNodeRequestSuite) TestSimultaneousCommunityInfoRequests()
 	s.createOwner()
 	s.createBob()
 
-	s.waitForAvailableStoreNode(s.owner)
 	community := s.createCommunity(s.owner)
 
 	storeNodeRequestsCount := 0
@@ -274,7 +272,6 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityInfoWithStoreNodeDi
 	s.createOwner()
 	s.createBob()
 
-	s.waitForAvailableStoreNode(s.owner)
 	community := s.createCommunity(s.owner)
 
 	// WaitForAvailableStoreNode is done internally
@@ -337,7 +334,6 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityPagingAlgorithm() {
 	s.createBob()
 
 	// Create a community
-	s.waitForAvailableStoreNode(s.owner)
 	community := s.createCommunity(s.owner)
 
 	// Push spam to the same ContentTopic & PubsubTopic
@@ -369,8 +365,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityWithSameContentTopi
 	s.createOwner()
 	s.createBob()
 
-	// Create a community
-	s.waitForAvailableStoreNode(s.owner)
+	// Create 2 communities
 	community1 := s.createCommunity(s.owner)
 	community2 := s.createCommunity(s.owner)
 
@@ -398,7 +393,6 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestMultipleCommunities() {
 	s.createBob()
 
 	// Create 2 communities
-	s.waitForAvailableStoreNode(s.owner)
 	community1 := s.createCommunity(s.owner)
 	community2 := s.createCommunity(s.owner)
 
@@ -430,7 +424,6 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestWithoutWaitingResponse() {
 	s.createBob()
 
 	// Create a community
-	s.waitForAvailableStoreNode(s.owner)
 	community := s.createCommunity(s.owner)
 
 	request := FetchCommunityRequest{
@@ -512,4 +505,40 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestShardAndCommunityInfo() {
 	s.Require().NotNil(community.Shard())
 
 	s.fetchCommunity(s.bob, communityShard, community)
+}
+
+func (s *MessengerStoreNodeRequestSuite) TestFiltersNotRemoved() {
+	s.createOwner()
+	s.createBob()
+
+	community := s.createCommunity(s.owner)
+
+	// The owner is a member of the community, so he has a filter for community description content topic.
+	// We want to check that filter is not removed by `FetchCommunity` call.
+	filterBefore := s.owner.transport.FilterByChatID(community.IDString())
+	s.Require().NotNil(filterBefore)
+
+	s.fetchCommunity(s.owner, community.CommunityShard(), community)
+
+	filterAfter := s.owner.transport.FilterByChatID(community.IDString())
+	s.Require().NotNil(filterAfter)
+
+	s.Require().Equal(filterBefore.FilterID, filterAfter.FilterID)
+}
+
+func (s *MessengerStoreNodeRequestSuite) TestFiltersRemoved() {
+	s.createOwner()
+	s.createBob()
+
+	community := s.createCommunity(s.owner)
+
+	// The bob is a member of the community, so he has no filters for community description content topic.
+	// We want to check that filter created by `FetchCommunity` is removed on request finish.
+	filterBefore := s.bob.transport.FilterByChatID(community.IDString())
+	s.Require().Nil(filterBefore)
+
+	s.fetchCommunity(s.bob, community.CommunityShard(), community)
+
+	filterAfter := s.bob.transport.FilterByChatID(community.IDString())
+	s.Require().Nil(filterAfter)
 }
