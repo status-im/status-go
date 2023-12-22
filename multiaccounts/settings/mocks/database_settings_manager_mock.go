@@ -125,8 +125,6 @@ func (mr *MockDatabaseSettingsManagerMockRecorder) CanUseMailservers() *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CanUseMailservers", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).CanUseMailservers))
 }
 
-
-
 // DeviceName mocks base method.
 func (m *MockDatabaseSettingsManager) DeviceName() (string, error) {
 	m.ctrl.T.Helper()
@@ -201,7 +199,6 @@ func (mr *MockDatabaseSettingsManagerMockRecorder) GetEIP1581Address() *gomock.C
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEIP1581Address", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).GetEIP1581Address))
 }
-
 
 // GetInstalledStickerPacks mocks base method.
 func (m *MockDatabaseSettingsManager) GetInstalledStickerPacks() (*json.RawMessage, error) {
