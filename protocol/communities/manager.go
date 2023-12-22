@@ -1030,7 +1030,7 @@ func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 
 func (m *Manager) UpdateShard(community *Community, shard *shard.Shard) error {
 	community.config.Shard = shard
-	return m.persistence.SaveCommunity(community)
+	return m.persistence.SaveCommunityShard(community.ID(), shard, community.Clock())
 }
 
 // SetShard assigns a shard to a community
@@ -1046,12 +1046,17 @@ func (m *Manager) SetShard(communityID types.HexBytes, shard *shard.Shard) (*Com
 		return nil, errors.New("not admin or owner")
 	}
 
+	community.increaseClock()
+
 	err = m.UpdateShard(community, shard)
 	if err != nil {
 		return nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
+	err = m.saveAndPublish(community)
+	if err != nil {
+		return nil, err
+	}
 
 	return community, nil
 }
@@ -3222,6 +3227,18 @@ func (m *Manager) GetByIDString(idString string) (*Community, error) {
 		return nil, err
 	}
 	return m.GetByID(id)
+}
+
+func (m *Manager) GetCommunityShard(communityID types.HexBytes) (*shard.Shard, error) {
+	return m.persistence.GetCommunityShard(communityID)
+}
+
+func (m *Manager) SaveCommunityShard(communityID types.HexBytes, shard *shard.Shard, clock uint64) error {
+	return m.persistence.SaveCommunityShard(communityID, shard, clock)
+}
+
+func (m *Manager) DeleteCommunityShard(communityID types.HexBytes) error {
+	return m.persistence.DeleteCommunityShard(communityID)
 }
 
 func (m *Manager) SaveRequestToJoinRevealedAddresses(requestID types.HexBytes, revealedAccounts []*protobuf.RevealedAccount) error {

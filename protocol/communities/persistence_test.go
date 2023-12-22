@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -861,4 +862,54 @@ func (s *PersistenceSuite) TestRemoveAllCommunityRequestsToJoinWithRevealedAddre
 	s.Require().NoError(err)
 	s.Require().Len(requests, 1)
 	s.Require().Len(requests[0].RevealedAccounts, 1)
+}
+
+func (s *PersistenceSuite) TestSaveShardInfo() {
+	communityID := types.HexBytes{1, 2, 3, 4, 5, 6, 7, 8}
+	clock := uint64(1)
+	// get non existing community shard
+	resultShard, err := s.db.GetCommunityShard(communityID)
+	s.Require().Error(err, sql.ErrNoRows)
+	s.Require().Nil(resultShard)
+
+	// shard info is nil
+	err = s.db.SaveCommunityShard(communityID, nil, clock)
+	s.Require().NoError(err)
+
+	// save shard info with the same clock
+	err = s.db.SaveCommunityShard(communityID, nil, clock)
+	s.Require().Error(err, ErrOldShardInfo)
+
+	resultShard, err = s.db.GetCommunityShard(communityID)
+	s.Require().NoError(err)
+	s.Require().Nil(resultShard)
+
+	// not nil shard
+	expectedShard := &shard.Shard{
+		Cluster: 1,
+		Index:   2,
+	}
+
+	// save shard info with the same clock and check that data was not modified
+	err = s.db.SaveCommunityShard(communityID, expectedShard, clock)
+	s.Require().Error(err, ErrOldShardInfo)
+	resultShard, err = s.db.GetCommunityShard(communityID)
+	s.Require().NoError(err)
+	s.Require().Nil(resultShard)
+
+	// update the clock and save the shard info
+	clock += clock
+	err = s.db.SaveCommunityShard(communityID, expectedShard, clock)
+	s.Require().NoError(err)
+	resultShard, err = s.db.GetCommunityShard(communityID)
+	s.Require().NoError(err)
+	s.Require().NotNil(resultShard)
+	s.Require().Equal(expectedShard, resultShard)
+
+	// check shard deleting
+	err = s.db.DeleteCommunityShard(communityID)
+	s.Require().NoError(err)
+	resultShard, err = s.db.GetCommunityShard(communityID)
+	s.Require().Error(err, sql.ErrNoRows)
+	s.Require().Nil(resultShard)
 }

@@ -10,6 +10,7 @@ import (
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/tt"
 
@@ -152,10 +153,12 @@ func (s *MessengerStoreNodeRequestSuite) createCommunity(m *Messenger) *communit
 }
 
 func (s *MessengerStoreNodeRequestSuite) requireCommunitiesEqual(c *communities.Community, expected *communities.Community) {
+	s.Require().Equal(expected.Clock(), c.Clock())
 	s.Require().Equal(expected.Name(), c.Name())
 	s.Require().Equal(expected.Identity().Description, c.Identity().Description)
 	s.Require().Equal(expected.Color(), c.Color())
 	s.Require().Equal(expected.Tags(), c.Tags())
+	s.Require().Equal(expected.Shard(), c.Shard())
 }
 
 func (s *MessengerStoreNodeRequestSuite) requireContactsEqual(c *Contact, expected *Contact) {
@@ -234,7 +237,9 @@ func (s *MessengerStoreNodeRequestSuite) TestSimultaneousCommunityInfoRequests()
 
 	wg := sync.WaitGroup{}
 
-	// Make 2 simultaneous fetch requests, only 1 request to store node is expected
+	// Make 2 simultaneous fetch requests
+	// 1 fetch request = 2 requests to store node (fetch shard and fetch community)
+	// only 2 request to store node is expected
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
@@ -244,7 +249,7 @@ func (s *MessengerStoreNodeRequestSuite) TestSimultaneousCommunityInfoRequests()
 	}
 
 	wg.Wait()
-	s.Require().Equal(1, storeNodeRequestsCount)
+	s.Require().Equal(2, storeNodeRequestsCount)
 }
 
 func (s *MessengerStoreNodeRequestSuite) TestRequestNonExistentCommunity() {
@@ -475,4 +480,36 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfo() {
 
 	s.createBob()
 	s.fetchProfile(s.bob, s.owner.selfContact.ID, s.owner.selfContact)
+}
+
+func (s *MessengerStoreNodeRequestSuite) TestRequestShardAndCommunityInfo() {
+	s.createOwner()
+	s.createBob()
+
+	s.waitForAvailableStoreNode(s.owner)
+	community := s.createCommunity(s.owner)
+
+	expectedShard := &shard.Shard{
+		Cluster: shard.MainStatusShardCluster,
+		Index:   23,
+	}
+
+	shardRequest := &requests.SetCommunityShard{
+		CommunityID: community.ID(),
+		Shard:       expectedShard,
+	}
+
+	_, err := s.owner.SetCommunityShard(shardRequest)
+	s.Require().NoError(err)
+
+	s.waitForAvailableStoreNode(s.bob)
+
+	communityShard := community.CommunityShard()
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(community)
+	s.Require().NotNil(community.Shard())
+
+	s.fetchCommunity(s.bob, communityShard, community)
 }
