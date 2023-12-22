@@ -30,6 +30,7 @@ type Persistence struct {
 
 var ErrOldRequestToJoin = errors.New("old request to join")
 var ErrOldRequestToLeave = errors.New("old request to leave")
+var ErrOldShardInfo = errors.New("old shard info")
 
 type CommunityRecord struct {
 	id           []byte
@@ -1730,7 +1731,7 @@ func (p *Persistence) SaveCommunityShard(communityID types.HexBytes, shard *shar
 	}
 
 	if rowsAffected == 0 {
-		return errors.New("saving shard failed, clock is too old")
+		return ErrOldShardInfo
 	}
 	return nil
 }

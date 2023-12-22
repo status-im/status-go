@@ -878,7 +878,7 @@ func (s *PersistenceSuite) TestSaveShardInfo() {
 
 	// save shard info with the same clock
 	err = s.db.SaveCommunityShard(communityID, nil, clock)
-	s.Require().Error(err)
+	s.Require().Error(err, ErrOldShardInfo)
 
 	resultShard, err = s.db.GetCommunityShard(communityID)
 	s.Require().NoError(err)
@@ -892,7 +892,7 @@ func (s *PersistenceSuite) TestSaveShardInfo() {
 
 	// save shard info with the same clock and check that data was not modified
 	err = s.db.SaveCommunityShard(communityID, expectedShard, clock)
-	s.Require().Error(err)
+	s.Require().Error(err, ErrOldShardInfo)
 	resultShard, err = s.db.GetCommunityShard(communityID)
 	s.Require().NoError(err)
 	s.Require().Nil(resultShard)

@@ -92,10 +92,11 @@ func (m *Messenger) HandleCommunityPublicShardInfo(state *ReceivedMessageState, 
 	}
 
 	err = m.communitiesManager.SaveCommunityShard(publicShardInfo.CommunityId, shard.FromProtobuff(publicShardInfo.Shard), publicShardInfo.Clock)
-	if err != nil {
+	if err != nil && err != communities.ErrOldShardInfo {
 		logError(err)
+		return err
 	}
-	return err
+	return nil
 }
 
 func recoverCommunityShardInfoSignature(rawShardInfo *protobuf.CommunityPublicShardInfo) (*ecdsa.PublicKey, error) {
