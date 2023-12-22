@@ -19,12 +19,8 @@ import (
 )
 
 func (m *Messenger) sendPublicCommunityShardInfo(community *communities.Community) error {
-	if m.transport.WakuVersion() != 2 {
-		return nil
-	}
-
 	if !community.IsControlNode() {
-		return nil
+		return communities.ErrNotControlNode
 	}
 
 	publicShardInfo := &protobuf.PublicShardInfo{
