@@ -11,6 +11,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -2418,7 +2419,15 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	response.SetMessages(msg)
 	response.AddChat(chat)
 
-	m.logger.Debug("sent message", zap.String("id", message.ID))
+	m.logger.Debug("inside sendChatMessage",
+		zap.String("id", message.ID),
+		zap.String("text", message.Text),
+		zap.String("from", message.From),
+		zap.String("displayName", message.DisplayName),
+		zap.String("ChatId", message.ChatId),
+		zap.String("Clock", strconv.FormatUint(message.Clock, 10)),
+		zap.String("Timestamp", strconv.FormatUint(message.Timestamp, 10)),
+	)
 	m.prepareMessages(response.messages)
 
 	return &response, m.saveChat(chat)
