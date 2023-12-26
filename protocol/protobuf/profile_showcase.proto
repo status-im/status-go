@@ -19,11 +19,14 @@ message ProfileShowcaseAccount {
 message ProfileShowcaseCollectible {
   string uid = 1;
   uint32 order = 2;
+  string community_id = 3;
 }
 
 message ProfileShowcaseAsset {
   string symbol = 1;
   uint32 order = 2;
+  string contract_address = 3;
+  string community_id = 4;
 }
 
 message ProfileShowcaseEntries {

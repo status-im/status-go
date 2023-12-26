@@ -141,21 +141,40 @@ func (s *TestMessengerProfileShowcase) prepareShowcasePreferences() *ProfileShow
 
 	collectibleEntry := &ProfileShowcaseCollectiblePreference{
 		UID:                "0x12378534257568678487683576",
+		CommunityID:        "0x01312357798976535",
 		ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
 		Order:              17,
 	}
 
-	assetEntry := &ProfileShowcaseAssetPreference{
-		Symbol:             "SNT",
+	assetEntry1 := &ProfileShowcaseAssetPreference{
+		Symbol:             "ETH",
+		ContractAddress:    "0xABCDEF123456789",
+		CommunityID:        "",
 		ShowcaseVisibility: ProfileShowcaseVisibilityNoOne,
+		Order:              12,
+	}
+
+	assetEntry2 := &ProfileShowcaseAssetPreference{
+		Symbol:             "DAI",
+		ContractAddress:    "0x123456789ABCDEF",
+		CommunityID:        "",
+		ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
 		Order:              17,
+	}
+
+	assetEntry3 := &ProfileShowcaseAssetPreference{
+		Symbol:             "SNT",
+		ContractAddress:    "0x1234ABCDEF56789",
+		CommunityID:        "0x01312357798976535",
+		ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+		Order:              14,
 	}
 
 	return &ProfileShowcasePreferences{
 		Communities:  []*ProfileShowcaseCommunityPreference{communityEntry1, communityEntry2, communityEntry3},
 		Accounts:     []*ProfileShowcaseAccountPreference{accountEntry},
 		Collectibles: []*ProfileShowcaseCollectiblePreference{collectibleEntry},
-		Assets:       []*ProfileShowcaseAssetPreference{assetEntry},
+		Assets:       []*ProfileShowcaseAssetPreference{assetEntry1, assetEntry2, assetEntry3},
 	}
 }
 
@@ -179,8 +198,10 @@ func (s *TestMessengerProfileShowcase) TestSetAndGetProfileShowcasePreferences()
 	s.Require().Len(response.Collectibles, 1)
 	s.Require().Equal(response.Collectibles[0], request.Collectibles[0])
 
-	s.Require().Len(response.Assets, 1)
+	s.Require().Len(response.Assets, 3)
 	s.Require().Equal(response.Assets[0], request.Assets[0])
+	s.Require().Equal(response.Assets[1], request.Assets[1])
+	s.Require().Equal(response.Assets[2], request.Assets[2])
 }
 
 func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntries() {
@@ -212,18 +233,31 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 				Order:   1,
 			},
 		},
+		Collectibles: []*protobuf.ProfileShowcaseCollectible{
+			&protobuf.ProfileShowcaseCollectible{
+				Uid:         "dj31nk13nrjn312jrmi1mjjd",
+				CommunityId: "0x12378534257568678487683576",
+				Order:       0,
+			},
+		},
 		Assets: []*protobuf.ProfileShowcaseAsset{
 			&protobuf.ProfileShowcaseAsset{
-				Symbol: "ETH",
-				Order:  2,
+				Symbol:          "ETH",
+				CommunityId:     "0x01312357798976535235432345",
+				ContractAddress: "",
+				Order:           2,
 			},
 			&protobuf.ProfileShowcaseAsset{
-				Symbol: "DAI",
-				Order:  3,
+				Symbol:          "DAI",
+				CommunityId:     "",
+				ContractAddress: "0x123456789ABCDEF",
+				Order:           3,
 			},
 			&protobuf.ProfileShowcaseAsset{
-				Symbol: "SNT",
-				Order:  1,
+				Symbol:          "SNT",
+				CommunityId:     "0x12378534257568678487683576",
+				ContractAddress: "0xABCDEF123456789",
+				Order:           1,
 			},
 		},
 	}
@@ -233,28 +267,35 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 	entriesBack, err := theirMessenger.DecryptProfileShowcaseEntriesWithPubKey(&s.m.identity.PublicKey, data)
 	s.Require().NoError(err)
 
-	s.Require().Equal(2, len(entriesBack.Communities))
-	s.Require().Equal(entries.Communities[0].CommunityId, entriesBack.Communities[0].CommunityId)
-	s.Require().Equal(entries.Communities[0].Order, entriesBack.Communities[0].Order)
-	s.Require().Equal(entries.Communities[1].CommunityId, entriesBack.Communities[1].CommunityId)
-	s.Require().Equal(entries.Communities[1].Order, entriesBack.Communities[1].Order)
+	s.Require().Equal(len(entries.Communities), len(entriesBack.Communities))
+	for i := 0; i < len(entriesBack.Communities); i++ {
+		s.Require().Equal(entries.Communities[i].CommunityId, entriesBack.Communities[i].CommunityId)
+		s.Require().Equal(entries.Communities[i].Order, entriesBack.Communities[i].Order)
+	}
 
-	s.Require().Equal(1, len(entriesBack.Accounts))
-	s.Require().Equal(entries.Accounts[0].Address, entriesBack.Accounts[0].Address)
-	s.Require().Equal(entries.Accounts[0].Name, entriesBack.Accounts[0].Name)
-	s.Require().Equal(entries.Accounts[0].ColorId, entriesBack.Accounts[0].ColorId)
-	s.Require().Equal(entries.Accounts[0].Emoji, entriesBack.Accounts[0].Emoji)
-	s.Require().Equal(entries.Accounts[0].Order, entriesBack.Accounts[0].Order)
+	s.Require().Equal(len(entries.Accounts), len(entriesBack.Accounts))
+	for i := 0; i < len(entriesBack.Accounts); i++ {
+		s.Require().Equal(entries.Accounts[i].Address, entriesBack.Accounts[i].Address)
+		s.Require().Equal(entries.Accounts[i].Name, entriesBack.Accounts[i].Name)
+		s.Require().Equal(entries.Accounts[i].ColorId, entriesBack.Accounts[i].ColorId)
+		s.Require().Equal(entries.Accounts[i].Emoji, entriesBack.Accounts[i].Emoji)
+		s.Require().Equal(entries.Accounts[i].Order, entriesBack.Accounts[i].Order)
+	}
 
-	s.Require().Equal(0, len(entriesBack.Collectibles))
+	s.Require().Equal(len(entries.Collectibles), len(entriesBack.Collectibles))
+	for i := 0; i < len(entriesBack.Collectibles); i++ {
+		s.Require().Equal(entries.Collectibles[i].Uid, entriesBack.Collectibles[i].Uid)
+		s.Require().Equal(entries.Collectibles[i].CommunityId, entriesBack.Collectibles[i].CommunityId)
+		s.Require().Equal(entries.Collectibles[i].Order, entriesBack.Collectibles[i].Order)
+	}
 
-	s.Require().Equal(3, len(entriesBack.Assets))
-	s.Require().Equal(entries.Assets[0].Symbol, entriesBack.Assets[0].Symbol)
-	s.Require().Equal(entries.Assets[0].Order, entriesBack.Assets[0].Order)
-	s.Require().Equal(entries.Assets[1].Symbol, entriesBack.Assets[1].Symbol)
-	s.Require().Equal(entries.Assets[1].Order, entriesBack.Assets[1].Order)
-	s.Require().Equal(entries.Assets[2].Symbol, entriesBack.Assets[2].Symbol)
-	s.Require().Equal(entries.Assets[2].Order, entriesBack.Assets[2].Order)
+	s.Require().Equal(len(entries.Assets), len(entriesBack.Assets))
+	for i := 0; i < len(entriesBack.Assets); i++ {
+		s.Require().Equal(entries.Assets[i].Symbol, entriesBack.Assets[i].Symbol)
+		s.Require().Equal(entries.Assets[i].CommunityId, entriesBack.Assets[i].CommunityId)
+		s.Require().Equal(entries.Assets[i].ContractAddress, entriesBack.Assets[i].ContractAddress)
+		s.Require().Equal(entries.Assets[i].Order, entriesBack.Assets[i].Order)
+	}
 }
 
 func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
@@ -323,7 +364,12 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.Require().Equal(profileShowcase.Accounts[0].Order, request.Accounts[0].Order)
 
 	s.Require().Len(profileShowcase.Collectibles, 0)
-	s.Require().Len(profileShowcase.Assets, 0)
+
+	s.Require().Len(profileShowcase.Assets, 1)
+	s.Require().Equal(profileShowcase.Assets[0].Symbol, request.Assets[2].Symbol)
+	s.Require().Equal(profileShowcase.Assets[0].CommunityID, request.Assets[2].CommunityID)
+	s.Require().Equal(profileShowcase.Assets[0].ContractAddress, request.Assets[2].ContractAddress)
+	s.Require().Equal(profileShowcase.Assets[0].Order, request.Assets[2].Order)
 
 	// Get summarised profile data for verified contact
 	resp, err = WaitOnMessengerResponse(
@@ -363,7 +409,16 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 
 	s.Require().Len(profileShowcase.Collectibles, 1)
 	s.Require().Equal(profileShowcase.Collectibles[0].UID, request.Collectibles[0].UID)
+	s.Require().Equal(profileShowcase.Collectibles[0].CommunityID, request.Collectibles[0].CommunityID)
 	s.Require().Equal(profileShowcase.Collectibles[0].Order, request.Collectibles[0].Order)
 
-	s.Require().Len(profileShowcase.Assets, 0)
+	s.Require().Len(profileShowcase.Assets, 2)
+	s.Require().Equal(profileShowcase.Assets[0].Symbol, request.Assets[2].Symbol)
+	s.Require().Equal(profileShowcase.Assets[0].CommunityID, request.Assets[2].CommunityID)
+	s.Require().Equal(profileShowcase.Assets[0].ContractAddress, request.Assets[2].ContractAddress)
+	s.Require().Equal(profileShowcase.Assets[0].Order, request.Assets[2].Order)
+	s.Require().Equal(profileShowcase.Assets[1].Symbol, request.Assets[1].Symbol)
+	s.Require().Equal(profileShowcase.Assets[1].CommunityID, request.Assets[1].CommunityID)
+	s.Require().Equal(profileShowcase.Assets[1].ContractAddress, request.Assets[1].ContractAddress)
+	s.Require().Equal(profileShowcase.Assets[1].Order, request.Assets[1].Order)
 }

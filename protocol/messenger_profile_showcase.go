@@ -53,8 +53,9 @@ func toProfileShowcaseCollectibleProto(preferences []*ProfileShowcaseCollectible
 		}
 
 		collectibles = append(collectibles, &protobuf.ProfileShowcaseCollectible{
-			Uid:   preference.UID,
-			Order: uint32(preference.Order),
+			Uid:         preference.UID,
+			CommunityId: preference.CommunityID,
+			Order:       uint32(preference.Order),
 		})
 	}
 	return collectibles
@@ -68,8 +69,10 @@ func toProfileShowcaseAssetProto(preferences []*ProfileShowcaseAssetPreference, 
 		}
 
 		assets = append(assets, &protobuf.ProfileShowcaseAsset{
-			Symbol: preference.Symbol,
-			Order:  uint32(preference.Order),
+			Symbol:          preference.Symbol,
+			CommunityId:     preference.CommunityID,
+			ContractAddress: preference.ContractAddress,
+			Order:           uint32(preference.Order),
 		})
 	}
 	return assets
@@ -104,8 +107,9 @@ func fromProfileShowcaseCollectibleProto(messages []*protobuf.ProfileShowcaseCol
 	collectibles := []*ProfileShowcaseCollectible{}
 	for _, entry := range messages {
 		collectibles = append(collectibles, &ProfileShowcaseCollectible{
-			UID:   entry.Uid,
-			Order: int(entry.Order),
+			UID:         entry.Uid,
+			CommunityID: entry.CommunityId,
+			Order:       int(entry.Order),
 		})
 	}
 	return collectibles
@@ -115,8 +119,10 @@ func fromProfileShowcaseAssetProto(messages []*protobuf.ProfileShowcaseAsset) []
 	assets := []*ProfileShowcaseAsset{}
 	for _, entry := range messages {
 		assets = append(assets, &ProfileShowcaseAsset{
-			Symbol: entry.Symbol,
-			Order:  int(entry.Order),
+			Symbol:          entry.Symbol,
+			CommunityID:     entry.CommunityId,
+			ContractAddress: entry.ContractAddress,
+			Order:           int(entry.Order),
 		})
 	}
 	return assets
