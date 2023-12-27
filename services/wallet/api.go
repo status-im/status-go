@@ -65,6 +65,17 @@ func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) 
 	return api.reader.GetWalletToken(ctx, addresses)
 }
 
+// GetBalancesByChain return a map with key as chain id and value as map of account address and map of token address and balance
+// [chainID][account][token]balance
+func (api *API) GetBalancesByChain(ctx context.Context, chainIDs []uint64, addresses, tokens []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
+	clients, err := api.s.rpcClient.EthClients(chainIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.s.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokens)
+}
+
 func (api *API) GetCachedWalletTokensWithoutMarketData(ctx context.Context) (map[common.Address][]Token, error) {
 	return api.reader.GetCachedWalletTokensWithoutMarketData()
 }

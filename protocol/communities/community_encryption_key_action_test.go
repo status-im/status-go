@@ -33,7 +33,7 @@ func createTestCommunity(identity *ecdsa.PrivateKey) (*Community, error) {
 		MemberIdentity: &identity.PublicKey,
 	}
 
-	return New(config, &TimeSourceStub{})
+	return New(config, &TimeSourceStub{}, &DescriptionEncryptorMock{})
 }
 
 func TestCommunityEncryptionKeyActionSuite(t *testing.T) {

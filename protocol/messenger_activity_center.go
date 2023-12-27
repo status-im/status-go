@@ -143,7 +143,7 @@ func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids
 	response := &MessengerResponse{}
 	repliesAndMentions := make(map[string][]string)
 
-	// When marking as read Mention or Reply notification, the corresponding chat message should also be read.
+	// When marking as read Mention or Reply notification, the corresponding chat message should also be seen.
 	for _, notification := range notifications {
 		response.AddActivityCenterNotification(notification)
 
@@ -155,10 +155,17 @@ func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids
 
 	// Mark messages as seen
 	for chatID, messageIDs := range repliesAndMentions {
-		_, _, err := m.markMessagesSeenImpl(chatID, messageIDs)
+		count, countWithMentions, err := m.markMessagesSeenImpl(chatID, messageIDs)
 		if err != nil {
 			return nil, err
 		}
+
+		response.AddSeenAndUnseenMessages(&SeenUnseenMessages{
+			ChatID:            chatID,
+			Count:             count,
+			CountWithMentions: countWithMentions,
+			Seen:              true,
+		})
 	}
 
 	state, err := m.persistence.GetActivityCenterState()
@@ -182,11 +189,15 @@ func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids
 }
 
 func (m *Messenger) MarkActivityCenterNotificationsUnread(ctx context.Context, ids []types.HexBytes, updatedAt uint64, sync bool) (*MessengerResponse, error) {
-	response := &MessengerResponse{}
 	notifications, err := m.persistence.MarkActivityCenterNotificationsUnread(ids, updatedAt)
 	if err != nil {
 		return nil, err
 	}
+
+	response := &MessengerResponse{}
+	response.AddActivityCenterNotifications(notifications)
+
+	// Don't mark messages unseen in chat, that looks weird
 
 	state, err := m.persistence.GetActivityCenterState()
 	if err != nil {

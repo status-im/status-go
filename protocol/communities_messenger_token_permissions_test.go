@@ -47,6 +47,10 @@ type TestCommunitiesKeyDistributor struct {
 	mutex         sync.RWMutex
 }
 
+func (tckd *TestCommunitiesKeyDistributor) Generate(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
+	return tckd.CommunitiesKeyDistributorImpl.Generate(community, keyActions)
+}
+
 func (tckd *TestCommunitiesKeyDistributor) Distribute(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
 	err := tckd.CommunitiesKeyDistributorImpl.Distribute(community, keyActions)
 	if err != nil {
@@ -659,12 +663,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	s.Require().Len(community.Members(), 1)
 
 	// bob receives community changes
+	// chats and members should be empty,
+	// this info is available only to members
 	_, err = WaitOnMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0
+			return len(r.Communities()) > 0 && len(r.Communities()[0].Members()) == 0 && len(r.Communities()[0].Chats()) == 0
 		},
-		"no community",
+		"no community that satisfies criteria",
 	)
 	s.Require().NoError(err)
 
@@ -982,6 +988,22 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 	s.Require().NoError(err)
 
 	err = <-waitOnChannelToBeRekeyedOnceBobIsKicked
+	s.Require().NoError(err)
+
+	// bob receives community changes
+	// channel members should be empty,
+	// this info is available only to channel members
+	_, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			if len(r.Communities()) == 0 {
+				return false
+			}
+			channel := r.Communities()[0].Chats()[chat.CommunityChatID()]
+			return channel != nil && len(channel.Members) == 0
+		},
+		"no community that satisfies criteria",
+	)
 	s.Require().NoError(err)
 
 	// send message to the channel

@@ -35,6 +35,13 @@ type ClearedHistory struct {
 	ClearedAt uint64 `json:"clearedAt"`
 }
 
+type SeenUnseenMessages struct {
+	ChatID            string `json:"chatId"`
+	Count             uint64 `json:"count"`
+	CountWithMentions uint64 `json:"countWithMentions"`
+	Seen              bool   `json:"seen"`
+}
+
 type MessengerResponse struct {
 	Contacts                      []*Contact
 	Installations                 []*multidevice.Installation
@@ -81,6 +88,7 @@ type MessengerResponse struct {
 	SocialLinksInfo             *identity.SocialLinksInfo
 	ensUsernameDetails          []*ensservice.UsernameDetail
 	updatedProfileShowcases     map[string]*ProfileShowcase
+	seenAndUnseenMessages       map[string]*SeenUnseenMessages
 }
 
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
@@ -126,6 +134,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		SocialLinksInfo               *identity.SocialLinksInfo            `json:"socialLinksInfo,omitempty"`
 		EnsUsernameDetails            []*ensservice.UsernameDetail         `json:"ensUsernameDetails,omitempty"`
 		UpdatedProfileShowcases       []*ProfileShowcase                   `json:"updatedProfileShowcases,omitempty"`
+		SeenAndUnseenMessages         []*SeenUnseenMessages                `json:"seenAndUnseenMessages,omitempty"`
 	}{
 		Contacts:                r.Contacts,
 		Installations:           r.Installations,
@@ -164,6 +173,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		SocialLinksInfo:               r.SocialLinksInfo,
 		EnsUsernameDetails:            r.EnsUsernameDetails(),
 		UpdatedProfileShowcases:       r.GetUpdatedProfileShowcases(),
+		SeenAndUnseenMessages:         r.GetSeenAndUnseenMessages(),
 	}
 
 	responseItem.TrustStatus = r.TrustStatus()
@@ -292,6 +302,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.RequestsToJoinCommunity)+
 		len(r.savedAddresses)+
 		len(r.updatedProfileShowcases)+
+		len(r.seenAndUnseenMessages)+
 		len(r.ensUsernameDetails) == 0 &&
 		r.currentStatus == nil &&
 		r.activityCenterState == nil &&
@@ -329,6 +340,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddRequestsToJoinCommunity(response.RequestsToJoinCommunity)
 	r.AddBookmarks(response.GetBookmarks())
 	r.AddProfileShowcases(response.GetUpdatedProfileShowcases())
+	r.AddSeveralSeenAndUnseenMessages(response.GetSeenAndUnseenMessages())
 	r.CommunityChanges = append(r.CommunityChanges, response.CommunityChanges...)
 	r.BackupHandled = response.BackupHandled
 	r.CustomizationColor = response.CustomizationColor
@@ -811,4 +823,26 @@ func (r *MessengerResponse) GetUpdatedProfileShowcases() []*ProfileShowcase {
 		showcases = append(showcases, showcase)
 	}
 	return showcases
+}
+
+func (r *MessengerResponse) AddSeveralSeenAndUnseenMessages(messages []*SeenUnseenMessages) {
+	for _, message := range messages {
+		r.AddSeenAndUnseenMessages(message)
+	}
+}
+
+func (r *MessengerResponse) AddSeenAndUnseenMessages(message *SeenUnseenMessages) {
+	if r.seenAndUnseenMessages == nil {
+		r.seenAndUnseenMessages = make(map[string]*SeenUnseenMessages)
+	}
+
+	r.seenAndUnseenMessages[message.ChatID] = message
+}
+
+func (r *MessengerResponse) GetSeenAndUnseenMessages() []*SeenUnseenMessages {
+	var messages []*SeenUnseenMessages
+	for _, message := range r.seenAndUnseenMessages {
+		messages = append(messages, message)
+	}
+	return messages
 }

@@ -235,6 +235,9 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
            case protobuf.ApplicationMetadataMessage_SYNC_TOKEN_PREFERENCES:
 		return m.handleSyncTokenPreferencesProtobuf(messageState, protoBytes, msg, filter)
         
+           case protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_SHARD_INFO:
+		return m.handleCommunityPublicShardInfoProtobuf(messageState, protoBytes, msg, filter)
+        
 	default:
 		m.logger.Info("protobuf type not found", zap.String("type", string(msg.ApplicationLayer.Type)))
                 return errors.New("protobuf type not found")
@@ -1677,6 +1680,24 @@ func (m *Messenger) handleSyncTokenPreferencesProtobuf(messageState *ReceivedMes
 	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.ApplicationLayer.Type, p)
 
 	return m.HandleSyncTokenPreferences(messageState, p, msg)
+	
+}
+
+
+func (m *Messenger) handleCommunityPublicShardInfoProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
+	m.logger.Info("handling CommunityPublicShardInfo")
+	
+
+	
+	p := &protobuf.CommunityPublicShardInfo{}
+	err := proto.Unmarshal(protoBytes, p)
+	if err != nil {
+		return err
+	}
+
+	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.ApplicationLayer.Type, p)
+
+	return m.HandleCommunityPublicShardInfo(messageState, p, msg)
 	
 }
 
