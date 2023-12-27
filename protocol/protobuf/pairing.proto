@@ -306,14 +306,15 @@ message SyncAccountsPositions {
 
 message SyncSavedAddress {
   reserved 4;
-  bytes  address = 1;
+  bytes address = 1;
   string name = 2;
-  bool   favourite = 3;
-  bool   removed = 5;
+  bool favourite = 3;
+  bool removed = 5;
   uint64 update_clock = 7;
   string chain_short_names = 8;
   string ens = 9;
-  bool   is_test= 10;
+  bool is_test = 10;
+  string color = 11;
 }
 
 message SyncCommunitySettings {

@@ -7,6 +7,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	multiAccCommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -72,6 +73,7 @@ func (m *Messenger) syncNewSavedAddress(ctx context.Context, savedAddress *walle
 		ChainShortNames: savedAddress.ChainShortNames,
 		Ens:             savedAddress.ENSName,
 		IsTest:          savedAddress.IsTest,
+		Color:           string(savedAddress.ColorID),
 	}, rawMessageHandler)
 }
 
@@ -115,6 +117,7 @@ func (m *Messenger) HandleSyncSavedAddress(state *ReceivedMessageState, syncMess
 			ChainShortNames: syncMessage.ChainShortNames,
 			ENSName:         syncMessage.Ens,
 			IsTest:          syncMessage.IsTest,
+			ColorID:         multiAccCommon.CustomizationColor(syncMessage.Color),
 		}
 
 		_, err = m.savedAddressesManager.AddSavedAddressIfNewerUpdate(sa, syncMessage.UpdateClock)
