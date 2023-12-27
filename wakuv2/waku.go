@@ -1150,7 +1150,11 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 		msg.RateLimitProof = nil
 
 		envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), pubsubTopic)
-		w.logger.Info("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", pubsubTopic))
+		w.logger.Info("received waku2 store message",
+			zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())),
+			zap.String("pubsubTopic", pubsubTopic),
+			zap.Int64p("timestamp", envelope.Message().Timestamp),
+		)
 
 		err = w.OnNewEnvelopes(envelope, common.StoreMessageType, processEnvelopes)
 		if err != nil {

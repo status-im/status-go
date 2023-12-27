@@ -1218,7 +1218,10 @@ func (m *Messenger) scheduleSyncFiltersForContact(publicKey *ecdsa.PublicKey) (*
 }
 
 func (m *Messenger) FetchContact(contactID string, waitForResponse bool) (*Contact, error) {
-	contact, _, err := m.storeNodeRequestsManager.FetchContact(contactID, waitForResponse)
+	options := []StoreNodeRequestOption{
+		WithWaitForResponseOption(waitForResponse),
+	}
+	contact, _, err := m.storeNodeRequestsManager.FetchContact(contactID, options)
 	return contact, err
 }
 

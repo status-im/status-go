@@ -2574,10 +2574,16 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 		}
 	}
 
-	community, _, err := m.storeNodeRequestsManager.FetchCommunity(communities.CommunityShard{
+	communityAddress := communities.CommunityShard{
 		CommunityID: communityID,
 		Shard:       request.Shard,
-	}, request.WaitForResponse)
+	}
+
+	options := []StoreNodeRequestOption{
+		WithWaitForResponseOption(request.WaitForResponse),
+	}
+
+	community, _, err := m.storeNodeRequestsManager.FetchCommunity(communityAddress, options)
 
 	return community, err
 }
@@ -2585,7 +2591,7 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 // fetchCommunities installs filter for community and requests its details from store node.
 // When response received it will be passed through signals handler.
 func (m *Messenger) fetchCommunities(communities []communities.CommunityShard) error {
-	return m.storeNodeRequestsManager.FetchCommunities(communities)
+	return m.storeNodeRequestsManager.FetchCommunities(communities, []StoreNodeRequestOption{})
 }
 
 // passStoredCommunityInfoToSignalHandler calls signal handler with community info
