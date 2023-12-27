@@ -10,34 +10,48 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-type CommunitiesKeyDistributor interface {
-	Distribute(community *communities.Community, keyActions *communities.EncryptionKeyActions) error
-}
-
 type CommunitiesKeyDistributorImpl struct {
 	sender    *common.MessageSender
 	encryptor *encryption.Protocol
+}
+
+func (ckd *CommunitiesKeyDistributorImpl) Generate(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
+	if !community.IsControlNode() {
+		return communities.ErrNotControlNode
+	}
+	return iterateActions(community, keyActions, ckd.generateKey)
 }
 
 func (ckd *CommunitiesKeyDistributorImpl) Distribute(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
 	if !community.IsControlNode() {
 		return communities.ErrNotControlNode
 	}
+	return iterateActions(community, keyActions, ckd.distributeKey)
+}
 
-	err := ckd.distributeKey(community, community.ID(), &keyActions.CommunityKeyAction)
+func iterateActions(community *communities.Community, keyActions *communities.EncryptionKeyActions, fn func(community *communities.Community, hashRatchetGroupID []byte, keyAction *communities.EncryptionKeyAction) error) error {
+	err := fn(community, community.ID(), &keyActions.CommunityKeyAction)
 	if err != nil {
 		return err
 	}
 
 	for channelID := range keyActions.ChannelKeysActions {
 		keyAction := keyActions.ChannelKeysActions[channelID]
-		err := ckd.distributeKey(community, []byte(community.IDString()+channelID), &keyAction)
+		err := fn(community, []byte(community.IDString()+channelID), &keyAction)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (ckd *CommunitiesKeyDistributorImpl) generateKey(community *communities.Community, hashRatchetGroupID []byte, keyAction *communities.EncryptionKeyAction) error {
+	if keyAction.ActionType != communities.EncryptionKeyAdd {
+		return nil
+	}
+	_, err := ckd.encryptor.GenerateHashRatchetKey(hashRatchetGroupID)
+	return err
 }
 
 func (ckd *CommunitiesKeyDistributorImpl) distributeKey(community *communities.Community, hashRatchetGroupID []byte, keyAction *communities.EncryptionKeyAction) error {
@@ -50,7 +64,11 @@ func (ckd *CommunitiesKeyDistributorImpl) distributeKey(community *communities.C
 
 	switch keyAction.ActionType {
 	case communities.EncryptionKeyAdd:
-		fallthrough
+		// key must be already generated
+		err := ckd.sendKeyExchangeMessage(community, hashRatchetGroupID, pubkeys, common.KeyExMsgReuse)
+		if err != nil {
+			return err
+		}
 
 	case communities.EncryptionKeyRekey:
 		err := ckd.sendKeyExchangeMessage(community, hashRatchetGroupID, pubkeys, common.KeyExMsgRekey)

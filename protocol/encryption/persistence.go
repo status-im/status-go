@@ -738,10 +738,10 @@ type HRCache struct {
 	SeqNo           uint32
 }
 
-// GetHashRatchetKeyByID retrieves a hash ratchet key by group ID and seqNo.
+// GetHashRatchetCache retrieves a hash ratchet key by group ID and seqNo.
 // If cache data with given seqNo (e.g. 0) is not found,
 // then the query will return the cache data with the latest seqNo
-func (s *sqlitePersistence) GetHashRatchetKeyByID(ratchet *HashRatchetKeyCompatibility, seqNo uint32) (*HRCache, error) {
+func (s *sqlitePersistence) GetHashRatchetCache(ratchet *HashRatchetKeyCompatibility, seqNo uint32) (*HRCache, error) {
 	stmt, err := s.DB.Prepare(`WITH input AS (
        select ? AS group_id, ? AS key_id, ? as seq_no, ? AS old_key_id
      ),
@@ -982,4 +982,24 @@ func (s *sqlitePersistence) SaveHashRatchetKey(ratchet *HashRatchetKeyCompatibil
 	_, err = stmt.Exec(ratchet.GroupID, keyID, ratchet.Timestamp, ratchet.DeprecatedKeyID(), ratchet.Key)
 
 	return err
+}
+
+func (s *sqlitePersistence) GetHashRatchetKeyByID(keyID []byte) (*HashRatchetKeyCompatibility, error) {
+	ratchet := &HashRatchetKeyCompatibility{
+		keyID: keyID,
+	}
+
+	err := s.DB.QueryRow(`
+		SELECT group_id, key_timestamp, key
+		FROM hash_ratchet_encryption
+		WHERE key_id = ?`, keyID).Scan(&ratchet.GroupID, &ratchet.Timestamp, &ratchet.Key)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return ratchet, nil
 }

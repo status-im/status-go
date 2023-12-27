@@ -2,22 +2,39 @@ package community
 
 import (
 	"database/sql"
+	"encoding/json"
 
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/walletevent"
+)
+
+// These events are used to notify the UI of state changes
+const (
+	EventCommmunityDataUpdated walletevent.EventType = "wallet-community-data-updated"
 )
 
 type Manager struct {
 	db                    *DataDB
 	communityInfoProvider thirdparty.CommunityInfoProvider
 	mediaServer           *server.MediaServer
+	feed                  *event.Feed
 }
 
-func NewManager(db *sql.DB, mediaServer *server.MediaServer) *Manager {
+type Data struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
+	Image string `json:"image,omitempty"`
+}
+
+func NewManager(db *sql.DB, mediaServer *server.MediaServer, feed *event.Feed) *Manager {
 	return &Manager{
 		db:          NewDataDB(db),
 		mediaServer: mediaServer,
+		feed:        feed,
 	}
 }
 
@@ -58,7 +75,43 @@ func (cm *Manager) FetchCommunityInfo(communityID string) (*thirdparty.Community
 		}
 		return nil, err
 	}
-
 	err = cm.setCommunityInfo(communityID, communityInfo)
 	return communityInfo, err
+}
+
+func (cm *Manager) FetchCommunityMetadataAsync(communityID string) {
+	go func() {
+		communityInfo, err := cm.FetchCommunityInfo(communityID)
+		if err != nil {
+			log.Error("FetchCommunityInfo failed", "communityID", communityID, "err", err)
+			return
+		}
+
+		cm.signalUpdatedCommunityMetadata(communityID, communityInfo)
+	}()
+}
+
+func (cm *Manager) signalUpdatedCommunityMetadata(communityID string, communityInfo *thirdparty.CommunityInfo) {
+	if communityInfo == nil {
+		return
+	}
+	data := Data{
+		ID:    communityID,
+		Name:  communityInfo.CommunityName,
+		Color: communityInfo.CommunityColor,
+		Image: communityInfo.CommunityImage, // TODO make media server url after merging community token media server changes
+	}
+
+	payload, err := json.Marshal(data)
+	if err != nil {
+		log.Error("Error marshaling response: %v", err)
+		return
+	}
+
+	event := walletevent.Event{
+		Type:    EventCommmunityDataUpdated,
+		Message: string(payload),
+	}
+
+	cm.feed.Send(event)
 }

@@ -2361,7 +2361,7 @@ func testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(base CommunityEven
 
 	// check event sender received member leave update from ControlNode
 	_, err = WaitOnMessengerResponse(
-		base.GetControlNode(),
+		base.GetEventSender(),
 		checkMemberLeave,
 		"event sender did not receive member leave update",
 	)

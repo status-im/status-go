@@ -28,13 +28,7 @@ const isAndroidEmulator = runtime.GOOS == "android" && runtime.GOARCH == "amd64"
 const findNearestMailServer = !isAndroidEmulator
 
 func (m *Messenger) mailserversByFleet(fleet string) []mailservers.Mailserver {
-	var items []mailservers.Mailserver
-	for _, ms := range mailservers.DefaultMailservers() {
-		if ms.Fleet == fleet {
-			items = append(items, ms)
-		}
-	}
-	return items
+	return mailservers.DefaultMailserversByFleet(fleet)
 }
 
 type byRTTMsAndCanConnectBefore []SortedMailserver

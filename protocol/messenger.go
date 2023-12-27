@@ -11,6 +11,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -111,7 +112,7 @@ type Messenger struct {
 	pushNotificationClient    *pushnotificationclient.Client
 	pushNotificationServer    *pushnotificationserver.Server
 	communitiesManager        *communities.Manager
-	communitiesKeyDistributor CommunitiesKeyDistributor
+	communitiesKeyDistributor communities.KeyDistributor
 	accountsManager           account.Manager
 	mentionsManager           *MentionManager
 	storeNodeRequestsManager  *StoreNodeRequestManager
@@ -153,9 +154,6 @@ type Messenger struct {
 		wait chan struct{}
 		once sync.Once
 	}
-
-	requestedContactsLock sync.RWMutex
-	requestedContacts     map[string]*transport.Filter
 
 	connectionState       connection.State
 	telemetryClient       *telemetry.Client
@@ -458,7 +456,7 @@ func NewMessenger(
 	if c.tokenManager != nil {
 		managerOptions = append(managerOptions, communities.WithTokenManager(c.tokenManager))
 	} else if c.rpcClient != nil {
-		tokenManager := token.NewTokenManager(c.walletDb, c.rpcClient, community.NewManager(database, c.httpServer), c.rpcClient.NetworkManager, database)
+		tokenManager := token.NewTokenManager(c.walletDb, c.rpcClient, community.NewManager(database, c.httpServer, nil), c.rpcClient.NetworkManager, database, c.httpServer)
 		managerOptions = append(managerOptions, communities.WithTokenManager(communities.NewDefaultTokenManager(tokenManager)))
 	}
 
@@ -470,7 +468,12 @@ func NewMessenger(
 		managerOptions = append(managerOptions, communities.WithCommunityTokensService(c.communityTokensService))
 	}
 
-	communitiesManager, err := communities.NewManager(identity, installationID, database, encryptionProtocol, logger, ensVerifier, c.communityTokensService, transp, transp, c.torrentConfig, managerOptions...)
+	communitiesKeyDistributor := &CommunitiesKeyDistributorImpl{
+		sender:    sender,
+		encryptor: encryptionProtocol,
+	}
+
+	communitiesManager, err := communities.NewManager(identity, installationID, database, encryptionProtocol, logger, ensVerifier, c.communityTokensService, transp, transp, communitiesKeyDistributor, c.torrentConfig, managerOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -490,24 +493,21 @@ func NewMessenger(
 	ctx, cancel := context.WithCancel(context.Background())
 
 	messenger = &Messenger{
-		config:                 &c,
-		node:                   node,
-		identity:               identity,
-		persistence:            sqlitePersistence,
-		transport:              transp,
-		encryptor:              encryptionProtocol,
-		sender:                 sender,
-		anonMetricsClient:      anonMetricsClient,
-		anonMetricsServer:      anonMetricsServer,
-		telemetryClient:        telemetryClient,
-		communityTokensService: c.communityTokensService,
-		pushNotificationClient: pushNotificationClient,
-		pushNotificationServer: pushNotificationServer,
-		communitiesManager:     communitiesManager,
-		communitiesKeyDistributor: &CommunitiesKeyDistributorImpl{
-			sender:    sender,
-			encryptor: encryptionProtocol,
-		},
+		config:                     &c,
+		node:                       node,
+		identity:                   identity,
+		persistence:                sqlitePersistence,
+		transport:                  transp,
+		encryptor:                  encryptionProtocol,
+		sender:                     sender,
+		anonMetricsClient:          anonMetricsClient,
+		anonMetricsServer:          anonMetricsServer,
+		telemetryClient:            telemetryClient,
+		communityTokensService:     c.communityTokensService,
+		pushNotificationClient:     pushNotificationClient,
+		pushNotificationServer:     pushNotificationServer,
+		communitiesManager:         communitiesManager,
+		communitiesKeyDistributor:  communitiesKeyDistributor,
 		accountsManager:            accountsManager,
 		ensVerifier:                ensVerifier,
 		featureFlags:               c.featureFlags,
@@ -531,16 +531,14 @@ func NewMessenger(
 			peers:                     make(map[string]peerStatus),
 			availabilitySubscriptions: make([]chan struct{}, 0),
 		},
-		mailserversDatabase:   c.mailserversDatabase,
-		account:               c.account,
-		quit:                  make(chan struct{}),
-		ctx:                   ctx,
-		cancel:                cancel,
-		requestedContactsLock: sync.RWMutex{},
-		requestedContacts:     make(map[string]*transport.Filter),
-		importingCommunities:  make(map[string]bool),
-		importingChannels:     make(map[string]bool),
-		importRateLimiter:     rate.NewLimiter(rate.Every(importSlowRate), 1),
+		mailserversDatabase:  c.mailserversDatabase,
+		account:              c.account,
+		quit:                 make(chan struct{}),
+		ctx:                  ctx,
+		cancel:               cancel,
+		importingCommunities: make(map[string]bool),
+		importingChannels:    make(map[string]bool),
+		importRateLimiter:    rate.NewLimiter(rate.Every(importSlowRate), 1),
 		importDelayer: struct {
 			wait chan struct{}
 			once sync.Once
@@ -583,7 +581,7 @@ func NewMessenger(
 	}
 
 	messenger.mentionsManager = NewMentionManager(messenger)
-	messenger.storeNodeRequestsManager = NewCommunityRequestsManager(messenger)
+	messenger.storeNodeRequestsManager = NewStoreNodeRequestManager(messenger)
 
 	if c.walletService != nil {
 		messenger.walletAPI = walletAPI
@@ -2421,7 +2419,15 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	response.SetMessages(msg)
 	response.AddChat(chat)
 
-	m.logger.Debug("sent message", zap.String("id", message.ID))
+	m.logger.Debug("inside sendChatMessage",
+		zap.String("id", message.ID),
+		zap.String("text", message.Text),
+		zap.String("from", message.From),
+		zap.String("displayName", message.DisplayName),
+		zap.String("ChatId", message.ChatId),
+		zap.String("Clock", strconv.FormatUint(message.Clock, 10)),
+		zap.String("Timestamp", strconv.FormatUint(message.Timestamp, 10)),
+	)
 	m.prepareMessages(response.messages)
 
 	return &response, m.saveChat(chat)
@@ -3745,11 +3751,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 				contact, contactFound := messageState.AllContacts.Load(senderID)
 
-				if _, ok := m.requestedContacts[senderID]; !ok {
-					// Check for messages from blocked users
-					if contactFound && contact.Blocked {
-						continue
-					}
+				// Check for messages from blocked users
+				if contactFound && contact.Blocked {
+					continue
 				}
 
 				// Don't process duplicates
@@ -3773,7 +3777,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					contact = c
 					if msg.ApplicationLayer.Type != protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY {
 						messageState.AllContacts.Store(senderID, contact)
-						m.forgetContactInfoRequest(senderID)
 					}
 				}
 				messageState.CurrentMessageState = &CurrentMessageState{
@@ -4143,7 +4146,7 @@ func (m *Messenger) DeleteMessagesByChatID(id string) error {
 	return m.persistence.DeleteMessagesByChatID(id)
 }
 
-func (m *Messenger) MarkMessageAsUnreadImpl(chatID string, messageID string) (uint64, uint64, error) {
+func (m *Messenger) markMessageAsUnreadImpl(chatID string, messageID string) (uint64, uint64, error) {
 	count, countWithMentions, err := m.persistence.MarkMessageAsUnread(chatID, messageID)
 
 	if err != nil {
@@ -4158,17 +4161,23 @@ func (m *Messenger) MarkMessageAsUnreadImpl(chatID string, messageID string) (ui
 	return count, countWithMentions, nil
 }
 
-func (m *Messenger) MarkMessageAsUnread(chatID string, messageID string) (uint64, uint64, []*ActivityCenterNotification, error) {
-	count, countWithMentions, err := m.MarkMessageAsUnreadImpl(chatID, messageID)
-
+func (m *Messenger) MarkMessageAsUnread(chatID string, messageID string) (*MessengerResponse, error) {
+	count, countWithMentions, err := m.markMessageAsUnreadImpl(chatID, messageID)
 	if err != nil {
-		return 0, 0, nil, err
+		return nil, err
 	}
 
-	ids, err := m.persistence.GetMessageIdsWithGreaterTimestamp(chatID, messageID)
+	response := &MessengerResponse{}
+	response.AddSeenAndUnseenMessages(&SeenUnseenMessages{
+		ChatID:            chatID,
+		Count:             count,
+		CountWithMentions: countWithMentions,
+		Seen:              false,
+	})
 
+	ids, err := m.persistence.GetMessageIdsWithGreaterTimestamp(chatID, messageID)
 	if err != nil {
-		return 0, 0, nil, err
+		return nil, err
 	}
 
 	hexBytesIds := []types.HexBytes{}
@@ -4178,12 +4187,13 @@ func (m *Messenger) MarkMessageAsUnread(chatID string, messageID string) (uint64
 
 	updatedAt := m.GetCurrentTimeInMillis()
 	notifications, err := m.persistence.MarkActivityCenterNotificationsUnread(hexBytesIds, updatedAt)
-
 	if err != nil {
-		return 0, 0, nil, err
+		return nil, err
 	}
 
-	return count, countWithMentions, notifications, nil
+	response.AddActivityCenterNotifications(notifications)
+
+	return response, nil
 }
 
 // MarkMessagesSeen marks messages with `ids` as seen in the chat `chatID`.
@@ -4202,6 +4212,7 @@ func (m *Messenger) markMessagesSeenImpl(chatID string, ids []string) (uint64, u
 	return count, countWithMentions, nil
 }
 
+// Deprecated: Use MarkMessagesRead instead
 func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint64, []*ActivityCenterNotification, error) {
 	count, countWithMentions, err := m.markMessagesSeenImpl(chatID, ids)
 	if err != nil {
@@ -4226,6 +4237,42 @@ func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint6
 	}
 
 	return count, countWithMentions, notifications, nil
+}
+
+func (m *Messenger) MarkMessagesRead(chatID string, ids []string) (*MessengerResponse, error) {
+	count, countWithMentions, err := m.markMessagesSeenImpl(chatID, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddSeenAndUnseenMessages(&SeenUnseenMessages{
+		ChatID:            chatID,
+		Count:             count,
+		CountWithMentions: countWithMentions,
+		Seen:              true,
+	})
+
+	hexBytesIds := []types.HexBytes{}
+	for _, id := range ids {
+		hexBytesIds = append(hexBytesIds, types.FromHex(id))
+	}
+
+	// Mark notifications as read in the database
+	updatedAt := m.GetCurrentTimeInMillis()
+	err = m.persistence.MarkActivityCenterNotificationsRead(hexBytesIds, updatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	notifications, err := m.persistence.GetActivityCenterNotificationsByID(hexBytesIds)
+	if err != nil {
+		return nil, err
+	}
+
+	response.AddActivityCenterNotifications(notifications)
+
+	return response, nil
 }
 
 func (m *Messenger) syncChatMessagesRead(ctx context.Context, chatID string, clock uint64, rawMessageHandler RawMessageHandler) error {

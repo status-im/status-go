@@ -2,6 +2,16 @@ package mailservers
 
 import "github.com/status-im/status-go/params"
 
+func DefaultMailserversByFleet(fleet string) []Mailserver {
+	var items []Mailserver
+	for _, ms := range DefaultMailservers() {
+		if ms.Fleet == fleet {
+			items = append(items, ms)
+		}
+	}
+	return items
+}
+
 func DefaultMailservers() []Mailserver {
 
 	return []Mailserver{

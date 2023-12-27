@@ -69,11 +69,14 @@ func (s *MessengerSuite) TestMarkMessageAsUnreadWhenMessageListContainsSingleMes
 	s.Require().False(actualChat.Highlight)
 	s.checkMessageSeen(inputMessage1.ID, true)
 
-	count, countWithMentions, notifications, err := s.m.MarkMessageAsUnread(chat.ID, inputMessage1.ID)
+	response, err := s.m.MarkMessageAsUnread(chat.ID, inputMessage1.ID)
 	s.Require().NoError(err)
-	s.Require().Equal(uint64(1), count)
-	s.Require().Equal(uint64(1), countWithMentions)
-	s.Require().Len(notifications, 0)
+	s.Require().Len(response.GetSeenAndUnseenMessages(), 1)
+	s.Require().Equal(chat.ID, response.GetSeenAndUnseenMessages()[0].ChatID)
+	s.Require().Equal(uint64(1), response.GetSeenAndUnseenMessages()[0].Count)
+	s.Require().Equal(uint64(1), response.GetSeenAndUnseenMessages()[0].CountWithMentions)
+	s.Require().Equal(false, response.GetSeenAndUnseenMessages()[0].Seen)
+	s.Require().Len(response.ActivityCenterNotifications(), 0)
 
 	chats = s.m.allChats
 
@@ -134,7 +137,7 @@ func (s *MessengerSuite) TestMarkMessageAsUnreadWhenMessageListContainsSeveralMe
 	s.checkMessageSeen(inputMessage2.ID, true)
 	s.checkMessageSeen(inputMessage3.ID, true)
 
-	count, countWithMentions, notifications, err := s.m.MarkMessageAsUnread(chat.ID, inputMessage2.ID)
+	response, err := s.m.MarkMessageAsUnread(chat.ID, inputMessage2.ID)
 	s.Require().NoError(err)
 
 	// count is 2 because the messages are layout the following way :
@@ -147,9 +150,11 @@ func (s *MessengerSuite) TestMarkMessageAsUnreadWhenMessageListContainsSeveralMe
 	// And the inputMessage3 has greater timestamp than inputMessage2
 	// Similarly, the mentioned message is inputMessage1, therefore the
 	// countWithMentions is 0
-	s.Require().Equal(uint64(2), count)
-	s.Require().Equal(uint64(0), countWithMentions)
-	s.Require().Len(notifications, 0)
+	s.Require().Len(response.GetSeenAndUnseenMessages(), 1)
+	s.Require().Equal(chat.ID, response.GetSeenAndUnseenMessages()[0].ChatID)
+	s.Require().Equal(uint64(2), response.GetSeenAndUnseenMessages()[0].Count)
+	s.Require().Equal(uint64(0), response.GetSeenAndUnseenMessages()[0].CountWithMentions)
+	s.Require().Equal(false, response.GetSeenAndUnseenMessages()[0].Seen)
 
 	chats = s.m.allChats
 	actualChat, ok = chats.Load(chat.ID)
@@ -190,11 +195,13 @@ func (s *MessengerSuite) TestMarkMessageAsUnreadWhenMessageIsAlreadyInUnreadStat
 	s.Require().True(actualChat.Highlight)
 	s.checkMessageSeen(inputMessage1.ID, false)
 
-	count, countWithMentions, notifications, err := s.m.MarkMessageAsUnread(chat.ID, inputMessage1.ID)
+	response, err := s.m.MarkMessageAsUnread(chat.ID, inputMessage1.ID)
 	s.Require().NoError(err)
-	s.Require().Equal(uint64(1), count)
-	s.Require().Equal(uint64(0), countWithMentions)
-	s.Require().Len(notifications, 0)
+	s.Require().Len(response.GetSeenAndUnseenMessages(), 1)
+	s.Require().Equal(chat.ID, response.GetSeenAndUnseenMessages()[0].ChatID)
+	s.Require().Equal(uint64(1), response.GetSeenAndUnseenMessages()[0].Count)
+	s.Require().Equal(uint64(0), response.GetSeenAndUnseenMessages()[0].CountWithMentions)
+	s.Require().Equal(false, response.GetSeenAndUnseenMessages()[0].Seen)
 
 	chats = s.m.allChats
 	actualChat, ok = chats.Load(chat.ID)
@@ -249,13 +256,15 @@ func (s *MessengerSuite) TestMarkMessageAsUnreadInOneChatDoesNotImpactOtherChats
 	s.checkMessageSeen(inputMessage1.ID, true)
 	s.checkMessageSeen(inputMessage2.ID, true)
 
-	count, countWithMentions, notifications, err := s.m.MarkMessageAsUnread(chat1.ID, inputMessage1.ID)
+	response, err := s.m.MarkMessageAsUnread(chat1.ID, inputMessage1.ID)
 
 	s.Require().NoError(err)
-	s.Require().Equal(uint(1), chat2.UnviewedMessagesCount)
-	s.Require().Equal(uint64(2), count)
-	s.Require().Equal(uint64(0), countWithMentions)
-	s.Require().Len(notifications, 0)
+	s.Require().Len(response.GetSeenAndUnseenMessages(), 1)
+	s.Require().Equal(chat1.ID, response.GetSeenAndUnseenMessages()[0].ChatID)
+	s.Require().Equal(uint64(2), response.GetSeenAndUnseenMessages()[0].Count)
+	s.Require().Equal(uint64(0), response.GetSeenAndUnseenMessages()[0].CountWithMentions)
+	s.Require().Equal(false, response.GetSeenAndUnseenMessages()[0].Seen)
+	s.Require().Len(response.ActivityCenterNotifications(), 0)
 
 	chats := s.m.allChats
 	actualChat, ok := chats.Load(chat1.ID)
@@ -325,11 +334,14 @@ func (s *MessengerSuite) TestMarkMessageWithNotificationAsUnreadInCommunityChatS
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 	s.Require().True(response.ActivityCenterNotifications()[0].Read)
 
-	count, countWithMentions, notifications, err := s.m.MarkMessageAsUnread(communityChat.ID, inputMessage1.ID)
+	response, err = s.m.MarkMessageAsUnread(communityChat.ID, inputMessage1.ID)
 
 	s.Require().NoError(err)
-	s.Require().Equal(count, uint64(1))
-	s.Require().Equal(countWithMentions, uint64(1))
-	s.Require().Len(notifications, 1)
-	s.Require().False(notifications[0].Read)
+	s.Require().Len(response.GetSeenAndUnseenMessages(), 1)
+	s.Require().Equal(communityChat.ID, response.GetSeenAndUnseenMessages()[0].ChatID)
+	s.Require().Equal(uint64(1), response.GetSeenAndUnseenMessages()[0].Count)
+	s.Require().Equal(uint64(1), response.GetSeenAndUnseenMessages()[0].CountWithMentions)
+	s.Require().Equal(false, response.GetSeenAndUnseenMessages()[0].Seen)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+	s.Require().False(response.ActivityCenterNotifications()[0].Read)
 }

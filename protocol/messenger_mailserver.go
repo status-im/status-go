@@ -23,17 +23,17 @@ import (
 const (
 	initialStoreNodeRequestPageSize = 4
 	defaultStoreNodeRequestPageSize = 20
+
+	// tolerance is how many seconds of potentially out-of-order messages we want to fetch
+	tolerance uint32 = 60
+
+	mailserverRequestTimeout           = 30 * time.Second
+	oneMonthInSeconds           uint32 = 31 * 24 * 60 * 60
+	mailserverMaxTries          uint   = 2
+	mailserverMaxFailedRequests uint   = 2
+
+	OneDayInSeconds = 86400
 )
-
-// tolerance is how many seconds of potentially out-of-order messages we want to fetch
-var tolerance uint32 = 60
-
-var mailserverRequestTimeout = 30 * time.Second
-var oneMonthInSeconds uint32 = 31 * 24 * 60 * 60
-var mailserverMaxTries uint = 2
-var mailserverMaxFailedRequests uint = 2
-
-const OneDayInSeconds = 86400
 
 // maxTopicsPerRequest sets the batch size to limit the number of topics per store query
 var maxTopicsPerRequest int = 10

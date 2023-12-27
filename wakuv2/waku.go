@@ -54,13 +54,14 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
 
-	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
+	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
@@ -1123,6 +1124,8 @@ func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 		PubsubTopic:   pubsubTopic,
 	}
 
+	w.logger.Debug("store.query", zap.Int64p("startTime", query.StartTime), zap.Int64p("endTime", query.EndTime), zap.Strings("contentTopics", query.ContentTopics), zap.String("pubsubTopic", query.PubsubTopic), zap.Stringer("peerID", peerID))
+
 	return w.node.Store().Query(ctx, query, opts...)
 }
 
@@ -1147,7 +1150,11 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 		msg.RateLimitProof = nil
 
 		envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), pubsubTopic)
-		w.logger.Info("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", pubsubTopic))
+		w.logger.Info("received waku2 store message",
+			zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())),
+			zap.String("pubsubTopic", pubsubTopic),
+			zap.Int64p("timestamp", envelope.Message().Timestamp),
+		)
 
 		err = w.OnNewEnvelopes(envelope, common.StoreMessageType, processEnvelopes)
 		if err != nil {

@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -97,7 +98,7 @@ func TestCommunityTokens(t *testing.T) {
 		Symbol:   "COM",
 		Decimals: 12,
 		ChainID:  777,
-		CommunityData: &CommunityData{
+		CommunityData: &community.Data{
 			ID: "random_community_id",
 		},
 	}
@@ -192,4 +193,53 @@ func TestTokenOverride(t *testing.T) {
 	require.False(t, found)
 	require.Equal(t, common.Address{33}, tokenMap[2][common.Address{33}].Address)
 	require.Equal(t, common.Address{4}, tokenMap[2][common.Address{4}].Address)
+}
+
+func TestMarkAsPreviouslyOwnedToken(t *testing.T) {
+	manager, stop := setupTestTokenDB(t)
+	defer stop()
+
+	owner := common.HexToAddress("0x1234567890abcdef")
+	token := &Token{
+		Address:  common.HexToAddress("0xabcdef1234567890"),
+		Name:     "TestToken",
+		Symbol:   "TT",
+		Decimals: 18,
+		ChainID:  1,
+	}
+
+	err := manager.MarkAsPreviouslyOwnedToken(nil, owner)
+	require.Error(t, err)
+
+	err = manager.MarkAsPreviouslyOwnedToken(token, common.Address{})
+	require.Error(t, err)
+
+	err = manager.MarkAsPreviouslyOwnedToken(token, owner)
+	require.NoError(t, err)
+
+	// Verify that the token balance was inserted correctly
+	var count int
+	err = manager.db.QueryRow(`SELECT count(*) FROM token_balances`).Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	token.Name = "123"
+
+	err = manager.MarkAsPreviouslyOwnedToken(token, owner)
+	require.NoError(t, err)
+
+	// Not updated because already exists
+	err = manager.db.QueryRow(`SELECT count(*) FROM token_balances`).Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	token.ChainID = 2
+
+	err = manager.MarkAsPreviouslyOwnedToken(token, owner)
+	require.NoError(t, err)
+
+	// Same token on different chains counts as different token
+	err = manager.db.QueryRow(`SELECT count(*) FROM token_balances`).Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 2, count)
 }
