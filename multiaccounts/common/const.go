@@ -12,7 +12,7 @@ const (
 	CustomizationColorYellow    CustomizationColor = "yellow"
 	CustomizationColorOrange    CustomizationColor = "orange"
 	CustomizationColorRed       CustomizationColor = "red"
-	CustomizationColorPink      CustomizationColor = "pink"
+	CustomizationColorFlamingo  CustomizationColor = "flamingo"
 	CustomizationColorBrown     CustomizationColor = "brown"
 	CustomizationColorSky       CustomizationColor = "sky"
 	CustomizationColorArmy      CustomizationColor = "army"

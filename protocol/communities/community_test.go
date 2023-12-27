@@ -440,7 +440,7 @@ func (s *CommunitySuite) TestValidateRequestToJoin() {
 
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
-			org, err := New(tc.config, &TimeSourceStub{})
+			org, err := New(tc.config, &TimeSourceStub{}, &DescriptionEncryptorMock{})
 			s.Require().NoError(err)
 			err = org.ValidateRequestToJoin(tc.signer, tc.request)
 			s.Require().Equal(tc.err, err)
@@ -512,7 +512,7 @@ func (s *CommunitySuite) TestCanPost() {
 		s.Run(tc.name, func() {
 			var grant []byte
 			var err error
-			org, err := New(tc.config, &TimeSourceStub{})
+			org, err := New(tc.config, &TimeSourceStub{}, &DescriptionEncryptorMock{})
 			s.Require().NoError(err)
 
 			if tc.grant == validGrant {
@@ -882,7 +882,7 @@ func (s *CommunitySuite) buildCommunity(owner *ecdsa.PublicKey) *Community {
 	config.ID = owner
 	config.CommunityDescription = s.buildCommunityDescription()
 
-	org, err := New(config, &TimeSourceStub{})
+	org, err := New(config, &TimeSourceStub{}, &DescriptionEncryptorMock{})
 	s.Require().NoError(err)
 	return org
 }

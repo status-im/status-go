@@ -20,6 +20,7 @@ const pathEIP1581 = "m/43'/60'/1581'"
 const pathDefaultChat = pathEIP1581 + "/0'/0"
 const pathDefaultWallet = pathWalletRoot + "/0"
 const defaultMnemonicLength = 12
+const shardsTestClusterID = 16
 const walletAccountDefaultName = "Ethereum account"
 const keystoreRelativePath = "keystore"
 const defaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
@@ -34,13 +35,15 @@ const (
 	shardsTest      = "shards.test"
 )
 
-var defaultWakuNodes = map[string][]string{
+var DefaultWakuNodes = map[string][]string{
 	statusProdFleet: []string{"enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"},
 	statusTestFleet: []string{"enrtree://AIO6LUM3IVWCU2KCPBBI6FEH2W42IGK3ASCZHZGG5TIXUR56OGQUO@test.status.nodes.status.im"},
 	wakuv2ProdFleet: []string{"enrtree://ANEDLO25QVUGJOUTQFRYKWX6P4Z4GKVESBMHML7DZ6YK4LGS5FC5O@prod.wakuv2.nodes.status.im"},
 	wakuv2TestFleet: []string{"enrtree://AO47IDOLBKH72HIZZOXQP6NMRESAN7CHYWIBNXDXWRJRZWLODKII6@test.wakuv2.nodes.status.im"},
 	shardsTest:      []string{"enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"},
 }
+
+var DefaultFleet = shardsTest
 
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
@@ -106,17 +109,32 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 }
 
 func SetDefaultFleet(nodeConfig *params.NodeConfig) error {
-	return SetFleet(statusProdFleet, nodeConfig)
+	return SetFleet(DefaultFleet, nodeConfig)
 }
 
 func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
+	nodeConfig.WakuV2Config = params.WakuV2Config{
+		Enabled:        true,
+		EnableDiscV5:   true,
+		DiscoveryLimit: 20,
+		Host:           "0.0.0.0",
+		AutoUpdate:     true,
+		PeerExchange:   true,
+	}
+
 	clusterConfig, err := params.LoadClusterConfigFromFleet(fleet)
 	if err != nil {
 		return err
 	}
 	nodeConfig.ClusterConfig = *clusterConfig
-	nodeConfig.ClusterConfig.WakuNodes = defaultWakuNodes[fleet]
-	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = defaultWakuNodes[fleet]
+	nodeConfig.ClusterConfig.Fleet = fleet
+	nodeConfig.ClusterConfig.WakuNodes = DefaultWakuNodes[fleet]
+	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = DefaultWakuNodes[fleet]
+
+	if fleet == shardsTest {
+		nodeConfig.ClusterConfig.ClusterID = shardsTestClusterID
+		nodeConfig.WakuV2Config.UseShardAsDefaultTopic = true
+	}
 
 	return nil
 }
@@ -207,20 +225,11 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
 	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
 
+	nodeConfig.ListenAddr = ":0"
+
 	err := SetDefaultFleet(nodeConfig)
 	if err != nil {
 		return nil, err
-	}
-
-	nodeConfig.ListenAddr = ":0"
-
-	nodeConfig.WakuV2Config = params.WakuV2Config{
-		Enabled:        true,
-		EnableDiscV5:   true,
-		DiscoveryLimit: 20,
-		Host:           "0.0.0.0",
-		AutoUpdate:     true,
-		PeerExchange:   true,
 	}
 
 	if request.WakuV2LightClient {

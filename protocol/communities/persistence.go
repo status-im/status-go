@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -29,6 +30,7 @@ type Persistence struct {
 
 var ErrOldRequestToJoin = errors.New("old request to join")
 var ErrOldRequestToLeave = errors.New("old request to leave")
+var ErrOldShardInfo = errors.New("old shard info")
 
 type CommunityRecord struct {
 	id           []byte
@@ -70,11 +72,13 @@ type CommunityRecordBundle struct {
 const OR = " OR "
 const communitiesBaseQuery = `
 	SELECT
-		c.id, c.private_key, c.control_node, c.description, c.joined, c.spectated, c.verified, c.muted, c.muted_till, c.shard_cluster, c.shard_index,
+		c.id, c.private_key, c.control_node, c.description, c.joined, c.spectated, c.verified, c.muted, c.muted_till,
+		csd.shard_cluster, csd.shard_index,
 		r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.state,
 		ae.raw_events, ae.raw_description,
 		ccn.installation_id
 	FROM communities_communities c
+	LEFT JOIN communities_shards csd ON c.id = csd.community_id
 	LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
 	LEFT JOIN communities_events ae ON c.id = ae.id
 	LEFT JOIN communities_control_node ccn ON c.id = ccn.community_id`
@@ -170,12 +174,10 @@ func (p *Persistence) saveCommunity(r *CommunityRecord) error {
 	_, err := p.db.Exec(`
         INSERT INTO communities_communities (
             id, private_key, control_node, description,
-            joined, spectated, verified, muted,
-            muted_till, shard_cluster, shard_index
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            joined, spectated, verified, muted, muted_till
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		r.id, r.privateKey, r.controlNode, r.description,
-		r.joined, r.spectated, r.verified, r.muted,
-		r.mutedTill, r.shardCluster, r.shardIndex)
+		r.joined, r.spectated, r.verified, r.muted, r.mutedTill)
 	return err
 }
 
@@ -211,7 +213,8 @@ func (p *Persistence) SaveCommunityEvents(community *Community) error {
 
 func (p *Persistence) DeleteCommunity(id types.HexBytes) error {
 	_, err := p.db.Exec(`DELETE FROM communities_communities WHERE id = ?;
-						 DELETE FROM communities_events WHERE id = ?;`, id, id)
+						 DELETE FROM communities_events WHERE id = ?;
+						 DELETE FROM communities_shards WHERE community_id = ?`, id, id, id)
 	return err
 }
 
@@ -257,32 +260,7 @@ func (p *Persistence) queryCommunities(memberIdentity *ecdsa.PublicKey, query st
 		return nil, err
 	}
 
-	defer func() {
-		if err != nil {
-			// Don't shadow original error
-			_ = rows.Close()
-			return
-
-		}
-		err = rows.Close()
-	}()
-
-	for rows.Next() {
-		r, err := scanCommunity(rows.Scan)
-		if err != nil {
-			return nil, err
-		}
-
-		org, err := p.recordBundleToCommunity(r)
-		if err != nil {
-			return nil, err
-		}
-
-		response = append(response, org)
-	}
-
-	return response, nil
-
+	return p.rowsToCommunities(rows)
 }
 
 func (p *Persistence) AllCommunities(memberIdentity *ecdsa.PublicKey) ([]*Community, error) {
@@ -299,7 +277,7 @@ func (p *Persistence) SpectatedCommunities(memberIdentity *ecdsa.PublicKey) ([]*
 	return p.queryCommunities(memberIdentity, query)
 }
 
-func (p *Persistence) rowsToCommunities(memberIdentity *ecdsa.PublicKey, rows *sql.Rows) (comms []*Community, err error) {
+func (p *Persistence) rowsToCommunityRecords(rows *sql.Rows) (result []*CommunityRecordBundle, err error) {
 	defer func() {
 		if err != nil {
 			// Don't shadow original error
@@ -315,8 +293,20 @@ func (p *Persistence) rowsToCommunities(memberIdentity *ecdsa.PublicKey, rows *s
 		if err != nil {
 			return nil, err
 		}
+		result = append(result, r)
+	}
 
-		org, err := p.recordBundleToCommunity(r)
+	return result, nil
+}
+
+func (p *Persistence) rowsToCommunities(rows *sql.Rows) (comms []*Community, err error) {
+	records, err := p.rowsToCommunityRecords(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, record := range records {
+		org, err := p.recordBundleToCommunity(record)
 		if err != nil {
 			return nil, err
 		}
@@ -335,7 +325,7 @@ func (p *Persistence) JoinedAndPendingCommunitiesWithRequests(memberIdentity *ec
 		return nil, err
 	}
 
-	return p.rowsToCommunities(memberIdentity, rows)
+	return p.rowsToCommunities(rows)
 }
 
 func (p *Persistence) DeletedCommunities(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
@@ -346,7 +336,7 @@ func (p *Persistence) DeletedCommunities(memberIdentity *ecdsa.PublicKey) (comms
 		return nil, err
 	}
 
-	return p.rowsToCommunities(memberIdentity, rows)
+	return p.rowsToCommunities(rows)
 }
 
 func (p *Persistence) CommunitiesWithPrivateKey(memberIdentity *ecdsa.PublicKey) ([]*Community, error) {
@@ -1696,5 +1686,65 @@ func (p *Persistence) RemoveAllCommunityRequestsToJoinWithRevealedAddressesExcep
 		WHERE request_id IN (SELECT id FROM communities_requests_to_join WHERE community_id = ? AND public_key != ?);
 	DELETE FROM communities_requests_to_join
 		WHERE community_id = ? AND public_key != ?;`, communityID, pk, communityID, pk)
+	return err
+}
+
+func (p *Persistence) SaveCommunityShard(communityID types.HexBytes, shard *shard.Shard, clock uint64) error {
+	var cluster, index *uint16
+
+	if shard != nil {
+		cluster = &shard.Cluster
+		index = &shard.Index
+	}
+
+	result, err := p.db.Exec(`
+		INSERT INTO communities_shards (community_id, shard_cluster, shard_index, clock)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(community_id)
+		DO UPDATE SET
+			shard_cluster = CASE WHEN excluded.clock > communities_shards.clock THEN excluded.shard_cluster ELSE communities_shards.shard_cluster END,
+			shard_index = CASE WHEN excluded.clock > communities_shards.clock THEN excluded.shard_index ELSE communities_shards.shard_index END,
+			clock = CASE WHEN excluded.clock > communities_shards.clock THEN excluded.clock ELSE communities_shards.clock END
+		WHERE excluded.clock > communities_shards.clock OR communities_shards.community_id IS NULL`,
+		communityID, cluster, index, clock)
+
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return ErrOldShardInfo
+	}
+	return nil
+}
+
+// if data will not be found, will return sql.ErrNoRows. Must be handled on the caller side
+func (p *Persistence) GetCommunityShard(communityID types.HexBytes) (*shard.Shard, error) {
+	var cluster sql.NullInt64
+	var index sql.NullInt64
+	err := p.db.QueryRow(`SELECT shard_cluster, shard_index FROM communities_shards WHERE community_id = ?`,
+		communityID).Scan(&cluster, &index)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !cluster.Valid || !index.Valid {
+		return nil, nil
+	}
+
+	return &shard.Shard{
+		Cluster: uint16(cluster.Int64),
+		Index:   uint16(index.Int64),
+	}, nil
+}
+
+func (p *Persistence) DeleteCommunityShard(communityID types.HexBytes) error {
+	_, err := p.db.Exec(`DELETE FROM communities_shards WHERE community_id = ?`, communityID)
 	return err
 }

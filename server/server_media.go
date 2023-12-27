@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"net/url"
+	"strconv"
 
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/logutils"
@@ -52,6 +53,7 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 		ipfsPath:                       handleIPFS(s.downloader, s.logger),
 		LinkPreviewThumbnailPath:       handleLinkPreviewThumbnail(s.db, s.logger),
 		StatusLinkPreviewThumbnailPath: handleStatusLinkPreviewThumbnail(s.db, s.logger),
+		communityTokenImagesPath:       handleCommunityTokenImages(s.db, s.logger),
 		walletCommunityImagesPath:      handleWalletCommunityImages(s.walletDB, s.logger),
 		walletCollectionImagesPath:     handleWalletCollectionImages(s.walletDB, s.logger),
 		walletCollectibleImagesPath:    handleWalletCollectibleImages(s.walletDB, s.logger),
@@ -142,6 +144,18 @@ func (s *MediaServer) MakeContactImageURL(publicKey string, imageType string) st
 	u := s.MakeBaseURL()
 	u.Path = contactImagesPath
 	u.RawQuery = url.Values{"publicKey": {publicKey}, "imageName": {imageType}}.Encode()
+
+	return u.String()
+}
+
+func (s *MediaServer) MakeCommunityTokenImagesURL(communityID string, chainID uint64, symbol string) string {
+	u := s.MakeBaseURL()
+	u.Path = communityTokenImagesPath
+	u.RawQuery = url.Values{
+		"communityID": {communityID},
+		"chainID":     {strconv.FormatUint(chainID, 10)},
+		"symbol":      {symbol},
+	}.Encode()
 
 	return u.String()
 }

@@ -292,14 +292,29 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 	}()
 
 	publishOrgAndDistributeEncryptionKeys := func(community *communities.Community) {
-		err := m.publishOrg(community)
+		recentlyPublishedOrg := recentlyPublishedOrgs[community.IDString()]
+
+		// evaluate and distribute encryption keys (if any)
+		encryptionKeyActions := communities.EvaluateCommunityEncryptionKeyActions(recentlyPublishedOrg, community)
+		err := m.communitiesKeyDistributor.Distribute(community, encryptionKeyActions)
+		if err != nil {
+			m.logger.Warn("failed to distribute encryption keys", zap.Error(err))
+		}
+
+		err = m.publishOrg(community)
 		if err != nil {
 			m.logger.Warn("failed to publish org", zap.Error(err))
 			return
 		}
 		m.logger.Debug("published org")
 
-		recentlyPublishedOrg := recentlyPublishedOrgs[community.IDString()]
+		// publish shard information
+		err = m.sendPublicCommunityShardInfo(community)
+		if err != nil {
+			m.logger.Warn("failed to publish public shard info", zap.Error(err))
+			return
+		}
+		m.logger.Debug("published public shard info")
 
 		// signal client with published community
 		if m.config.messengerSignalsHandler != nil {
@@ -308,13 +323,6 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 				response.AddCommunity(community)
 				m.config.messengerSignalsHandler.MessengerResponse(response)
 			}
-		}
-
-		// evaluate and distribute encryption keys (if any)
-		encryptionKeyActions := communities.EvaluateCommunityEncryptionKeyActions(recentlyPublishedOrg, community)
-		err = m.communitiesKeyDistributor.Distribute(community, encryptionKeyActions)
-		if err != nil {
-			m.logger.Warn("failed to distribute encryption keys", zap.Error(err))
 		}
 
 		recentlyPublishedOrgs[community.IDString()] = community.CreateDeepCopy()
@@ -2044,6 +2052,11 @@ func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*Mes
 		return nil, err
 	}
 
+	err = m.sendPublicCommunityShardInfo(community)
+	if err != nil {
+		return nil, err
+	}
+
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 
@@ -2561,10 +2574,16 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 		}
 	}
 
-	community, _, err := m.storeNodeRequestsManager.FetchCommunity(communities.CommunityShard{
+	communityAddress := communities.CommunityShard{
 		CommunityID: communityID,
 		Shard:       request.Shard,
-	}, request.WaitForResponse)
+	}
+
+	options := []StoreNodeRequestOption{
+		WithWaitForResponseOption(request.WaitForResponse),
+	}
+
+	community, _, err := m.storeNodeRequestsManager.FetchCommunity(communityAddress, options)
 
 	return community, err
 }
@@ -2572,7 +2591,7 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 // fetchCommunities installs filter for community and requests its details from store node.
 // When response received it will be passed through signals handler.
 func (m *Messenger) fetchCommunities(communities []communities.CommunityShard) error {
-	return m.storeNodeRequestsManager.FetchCommunities(communities)
+	return m.storeNodeRequestsManager.FetchCommunities(communities, []StoreNodeRequestOption{})
 }
 
 // passStoredCommunityInfoToSignalHandler calls signal handler with community info

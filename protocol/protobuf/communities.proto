@@ -100,6 +100,9 @@ message CommunityDescription {
   repeated CommunityTokenMetadata community_tokens_metadata = 16;
   uint64 active_members_count = 17;
   string ID = 18;
+
+  // key is hash ratchet key_id + seq_no
+  map<string, bytes> privateData = 100;
 }
 
 message CommunityAdminSettings {

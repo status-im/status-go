@@ -200,6 +200,13 @@ func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEven
 	// during saving the community
 	o.mergeCommunityEvents(communityEventMessage)
 
+	if o.encryptor != nil {
+		err = decryptDescription(o.encryptor, description, o.config.Logger)
+		if err != nil {
+			return err
+		}
+	}
+
 	o.config.CommunityDescription = description
 	o.config.CommunityDescriptionProtocolMessage = communityEventMessage.EventsBaseCommunityDescription
 
