@@ -217,7 +217,7 @@ func (s *MessengerSyncActivityCenterSuite) addContactAndShareCommunity(userB *Me
 	s.Require().NoError(err)
 	community, err := s.m.GetCommunityByID(communityID)
 	s.Require().NoError(err)
-	advertiseCommunityToUserOldWay(&s.Suite, community, s.m, userB)
+	advertiseCommunityTo(&s.Suite, community.ID(), s.m, userB)
 }
 
 func (s *MessengerSyncActivityCenterSuite) requestToJoinCommunity(userB *Messenger, communityID types.HexBytes) {

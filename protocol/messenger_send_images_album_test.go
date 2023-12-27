@@ -21,8 +21,8 @@ type MessengerSendImagesAlbumSuite struct {
 	MessengerBaseTestSuite
 }
 
-func (s *MessengerSendImagesAlbumSuite) advertiseCommunityTo(community *communities.Community, user *Messenger) {
-	advertiseCommunityTo(&s.Suite, community, s.m, user)
+func (s *MessengerSendImagesAlbumSuite) advertiseCommunityTo(communityID types.HexBytes, user *Messenger) {
+	advertiseCommunityTo(&s.Suite, communityID, s.m, user)
 }
 
 func (s *MessengerSendImagesAlbumSuite) joinCommunity(community *communities.Community, user *Messenger) {
@@ -152,7 +152,7 @@ func (s *MessengerSendImagesAlbumSuite) TestSingleImageMessageWithMentionInCommu
 
 	community, chat := createCommunity(&s.Suite, s.m)
 
-	s.advertiseCommunityTo(community, theirMessenger)
+	s.advertiseCommunityTo(community.ID(), theirMessenger)
 
 	s.joinCommunity(community, theirMessenger)
 
@@ -286,7 +286,7 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImagesMessageWithMentionInCommu
 
 	community, chat := createCommunity(&s.Suite, s.m)
 
-	s.advertiseCommunityTo(community, theirMessenger)
+	s.advertiseCommunityTo(community.ID(), theirMessenger)
 
 	s.joinCommunity(community, theirMessenger)
 

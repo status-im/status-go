@@ -111,8 +111,8 @@ func (s *MessengerCommunitiesSignersSuite) createCommunity(controlNode *Messenge
 	return community
 }
 
-func (s *MessengerCommunitiesSignersSuite) advertiseCommunityTo(controlNode *Messenger, community *communities.Community, user *Messenger) {
-	advertiseCommunityTo(&s.Suite, community, controlNode, user)
+func (s *MessengerCommunitiesSignersSuite) advertiseCommunityTo(controlNode *Messenger, communityID types.HexBytes, user *Messenger) {
+	advertiseCommunityTo(&s.Suite, communityID, controlNode, user)
 }
 
 func (s *MessengerCommunitiesSignersSuite) joinCommunity(controlNode *Messenger, community *communities.Community, user *Messenger) {
@@ -158,8 +158,8 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	// Process message
 	community := s.createCommunity(s.john)
 
-	s.advertiseCommunityTo(s.john, community, s.bob)
-	s.advertiseCommunityTo(s.john, community, s.alice)
+	s.advertiseCommunityTo(s.john, community.ID(), s.bob)
+	s.advertiseCommunityTo(s.john, community.ID(), s.alice)
 
 	s.joinCommunity(s.john, community, s.bob)
 	s.joinCommunity(s.john, community, s.alice)
@@ -350,8 +350,8 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 func (s *MessengerCommunitiesSignersSuite) TestAutoAcceptOnOwnershipChangeRequestRequired() {
 	community, _ := createOnRequestCommunity(&s.Suite, s.john)
 
-	s.advertiseCommunityTo(s.john, community, s.bob)
-	s.advertiseCommunityTo(s.john, community, s.alice)
+	s.advertiseCommunityTo(s.john, community.ID(), s.bob)
+	s.advertiseCommunityTo(s.john, community.ID(), s.alice)
 
 	s.joinOnRequestCommunity(s.john, community, s.bob)
 	s.joinOnRequestCommunity(s.john, community, s.alice)
@@ -489,7 +489,7 @@ func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {
 	// New owner accepts new request to join
 	community := s.createCommunity(s.john)
 
-	s.advertiseCommunityTo(s.john, community, s.alice)
+	s.advertiseCommunityTo(s.john, community.ID(), s.alice)
 
 	s.joinCommunity(s.john, community, s.alice)
 

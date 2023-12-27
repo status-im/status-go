@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"errors"
+	"github.com/status-im/status-go/eth-node/types"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -22,8 +23,8 @@ func (s *MessengerActivityCenterMessageSuite) createCommunity(owner *Messenger) 
 	return createCommunity(&s.Suite, owner)
 }
 
-func (s *MessengerActivityCenterMessageSuite) advertiseCommunityTo(community *communities.Community, owner *Messenger, user *Messenger) {
-	advertiseCommunityTo(&s.Suite, community, owner, user)
+func (s *MessengerActivityCenterMessageSuite) advertiseCommunityTo(communityID types.HexBytes, owner *Messenger, user *Messenger) {
+	advertiseCommunityTo(&s.Suite, communityID, owner, user)
 }
 
 func (s *MessengerActivityCenterMessageSuite) joinCommunity(community *communities.Community, owner *Messenger, user *Messenger) {
@@ -103,7 +104,7 @@ func (s *MessengerActivityCenterMessageSuite) TestEveryoneMentionTag() {
 	s.Require().NotNil(chat)
 
 	// Alice joins the community
-	s.advertiseCommunityTo(community, bob, alice)
+	s.advertiseCommunityTo(community.ID(), bob, alice)
 	s.joinCommunity(community, bob, alice)
 
 	// alice sends a community message
@@ -152,7 +153,7 @@ func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 	s.Require().NotNil(chat)
 
 	// Alice joins the community
-	s.advertiseCommunityTo(community, bob, alice)
+	s.advertiseCommunityTo(community.ID(), bob, alice)
 	s.joinCommunity(community, bob, alice)
 
 	// Alice sends a community message
@@ -228,7 +229,7 @@ func (s *MessengerActivityCenterMessageSuite) TestMuteCommunityActivityCenterNot
 	s.Require().NotNil(chat)
 
 	// Alice joins the community
-	s.advertiseCommunityTo(community, bob, alice)
+	s.advertiseCommunityTo(community.ID(), bob, alice)
 	s.joinCommunity(community, bob, alice)
 
 	// Bob mutes the community
@@ -280,7 +281,7 @@ func (s *MessengerActivityCenterMessageSuite) TestReadCommunityOverviewNotificat
 	s.Require().NotNil(chat)
 
 	// Alice joins the community
-	s.advertiseCommunityTo(community, bob, alice)
+	s.advertiseCommunityTo(community.ID(), bob, alice)
 	s.joinCommunity(community, bob, alice)
 
 	// Mark community overview notification read
@@ -305,7 +306,7 @@ func (s *MessengerActivityCenterMessageSuite) prepareCommunityChannelWithMention
 	s.Require().NotNil(chat)
 
 	// Alice joins the community
-	s.advertiseCommunityTo(community, bob, alice)
+	s.advertiseCommunityTo(community.ID(), bob, alice)
 	s.joinCommunity(community, bob, alice)
 
 	// Bob sends a mention message
@@ -491,7 +492,7 @@ func (s *MessengerActivityCenterMessageSuite) TestAliceDoesNotReceiveCommunityNo
 	s.Require().True(response.Messages()[0].Mentioned)
 
 	// Alice joins the community
-	s.advertiseCommunityTo(community, bob, alice)
+	s.advertiseCommunityTo(community.ID(), bob, alice)
 	s.joinCommunity(community, bob, alice)
 
 	// Bob sends an another mention message

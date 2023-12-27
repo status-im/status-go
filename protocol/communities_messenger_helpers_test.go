@@ -318,7 +318,10 @@ func createCommunityConfigurable(s *suite.Suite, owner *Messenger, permission pr
 	return community, response.Chats()[0]
 }
 
-func advertiseCommunityTo(s *suite.Suite, community *communities.Community, owner *Messenger, user *Messenger) {
+func advertiseCommunityTo(s *suite.Suite, communityID types.HexBytes, owner *Messenger, user *Messenger) {
+	community, err := owner.GetCommunityByID(communityID)
+	s.Require().NoError(err)
+
 	// Create wrapped (Signed) community data.
 	wrappedCommunity, err := community.ToProtocolMessageBytes()
 	s.Require().NoError(err)
@@ -333,6 +336,12 @@ func advertiseCommunityTo(s *suite.Suite, community *communities.Community, owne
 	messageState.CurrentMessageState.PublicKey = &user.identity.PublicKey
 	err = user.handleCommunityDescription(messageState, signer, description, wrappedCommunity, nil)
 	s.Require().NoError(err)
+
+	user.processCommunityChanges(messageState)
+
+	userCommunity, err := user.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Equal(community.ID(), userCommunity.ID())
 }
 
 func joinCommunity(s *suite.Suite, community *communities.Community, owner *Messenger, user *Messenger, request *requests.RequestToJoinCommunity, password string) {

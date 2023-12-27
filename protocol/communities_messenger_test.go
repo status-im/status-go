@@ -60,9 +60,9 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
-	s.owner = s.newMessenger()
-	s.bob = s.newMessenger()
-	s.alice = s.newMessenger()
+	s.owner = s.newMessenger("owner-messenger")
+	s.bob = s.newMessenger("bob-messenger")
+	s.alice = s.newMessenger("alice-messenger")
 
 	s.owner.communitiesManager.RekeyInterval = 50 * time.Millisecond
 
@@ -81,18 +81,18 @@ func (s *MessengerCommunitiesSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerCommunitiesSuite) newMessengerWithKey(privateKey *ecdsa.PrivateKey) *Messenger {
-	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger, nil, nil, nil)
+func (s *MessengerCommunitiesSuite) newMessengerWithKey(privateKey *ecdsa.PrivateKey, loggerName string) *Messenger {
+	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger.Named(loggerName), nil, nil, nil)
 	s.Require().NoError(err)
 
 	return messenger
 }
 
-func (s *MessengerCommunitiesSuite) newMessenger() *Messenger {
+func (s *MessengerCommunitiesSuite) newMessenger(loggerName string) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	return s.newMessengerWithKey(privateKey)
+	return s.newMessengerWithKey(privateKey, loggerName)
 }
 
 func (s *MessengerCommunitiesSuite) TestCreateCommunity() {
@@ -127,7 +127,7 @@ func (s *MessengerCommunitiesSuite) TestCreateCommunity_WithoutDefaultChannel() 
 }
 
 func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
-	alice := s.newMessenger()
+	alice := s.newMessenger("alice-messenger")
 
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
@@ -477,8 +477,8 @@ func (s *MessengerCommunitiesSuite) createCommunity() (*communities.Community, *
 	return createCommunity(&s.Suite, s.owner)
 }
 
-func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *communities.Community, owner *Messenger, user *Messenger) {
-	advertiseCommunityTo(&s.Suite, community, owner, user)
+func (s *MessengerCommunitiesSuite) advertiseCommunityTo(communityID types.HexBytes, owner *Messenger, user *Messenger) {
+	advertiseCommunityTo(&s.Suite, communityID, owner, user)
 }
 
 func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Community, owner *Messenger, user *Messenger) {
@@ -497,8 +497,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 
 	// create community and make bob and alice join to it
 	community, _ := s.createCommunity()
-	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.bob)
-	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.owner, s.bob)
+	s.advertiseCommunityTo(community.ID(), s.owner, s.alice)
 
 	s.joinCommunity(community, s.owner, s.bob)
 	s.joinCommunity(community, s.owner, s.alice)
@@ -540,7 +540,7 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 
 	ctx := context.Background()
 
-	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.owner, s.alice)
 
 	// Send message without even spectating fails
 	_, err := s.alice.SendChatMessage(ctx, inputMessage)
@@ -628,7 +628,7 @@ func (s *MessengerCommunitiesSuite) TestPinMessageInCommunityChat() {
 	chat := response.Chats()[0]
 	s.Require().NotNil(chat)
 
-	s.advertiseCommunityTo(community, s.owner, s.bob)
+	s.advertiseCommunityTo(community.ID(), s.owner, s.bob)
 	s.joinCommunity(community, s.owner, s.bob)
 
 	inputMessage := common.NewMessage()
@@ -679,7 +679,7 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	s.Require().NoError(err)
 	community = response.Communities()[0]
 
-	s.advertiseCommunityTo(community, s.owner, s.bob)
+	s.advertiseCommunityTo(community.ID(), s.owner, s.bob)
 	s.joinCommunity(community, s.owner, s.bob)
 
 	privateKey, err := s.owner.ExportCommunity(community.ID())
@@ -2107,8 +2107,8 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 
 func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 	community, _ := s.createCommunity()
-	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.alice)
-	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.bob)
+	advertiseCommunityTo(&s.Suite, community.ID(), s.owner, s.alice)
+	advertiseCommunityTo(&s.Suite, community.ID(), s.owner, s.bob)
 
 	s.joinCommunity(community, s.owner, s.alice)
 	s.joinCommunity(community, s.owner, s.bob)
@@ -2171,7 +2171,7 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 			numberInactiveChats++
 		}
 	}
-	s.Require().Equal(3, numberInactiveChats)
+	s.Require().Equal(2, numberInactiveChats)
 
 	// alice can rejoin
 	s.joinCommunity(community, s.owner, s.alice)
@@ -2188,7 +2188,7 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 			numberInactiveChats++
 		}
 	}
-	s.Require().Equal(1, numberInactiveChats)
+	s.Require().Equal(0, numberInactiveChats)
 }
 
 func (s *MessengerCommunitiesSuite) TestShareCommunity() {
@@ -2285,7 +2285,7 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
 	err = s.bob.communitiesManager.SaveCommunity(community)
 	s.Require().NoError(err)
 
-	advertiseCommunityToUserOldWay(&s.Suite, community, s.bob, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.bob, s.alice)
 
 	// Add bob to contacts so it does not go on activity center
 	bobPk := common.PubkeyToHex(&s.bob.identity.PublicKey)
@@ -2294,9 +2294,9 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
 	s.Require().NoError(err)
 
 	// Alice should have the Joined status for the community
-	communityInResponse := response.Communities()[0]
-	s.Require().Equal(community.ID(), communityInResponse.ID())
-	s.Require().True(communityInResponse.Joined())
+	aliceCommunity, err := s.alice.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(aliceCommunity.Joined())
 
 	// Alice is able to receive messages in the community
 	inputMessage := buildTestMessage(*communityChat)
@@ -2308,7 +2308,7 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
 	response, err = WaitOnMessengerResponse(
 		s.alice,
 		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
-		"no messages",
+		"community message not received",
 	)
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
@@ -2319,7 +2319,7 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
 func (s *MessengerCommunitiesSuite) TestBanUser() {
 	community, _ := s.createCommunity()
 
-	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.owner, s.alice)
 	s.joinCommunity(community, s.owner, s.alice)
 
 	response, err := s.owner.BanUserFromCommunity(
@@ -2353,7 +2353,7 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 }
 
 func (s *MessengerCommunitiesSuite) createOtherDevice(m1 *Messenger) *Messenger {
-	m2 := s.newMessengerWithKey(m1.identity)
+	m2 := s.newMessengerWithKey(m1.identity, "m2")
 
 	tcs, err := m2.communitiesManager.All()
 	s.Require().NoError(err, "m2.communitiesManager.All")
@@ -3277,7 +3277,7 @@ func (s *MessengerCommunitiesSuite) TestExtractDiscordChannelsAndCategories_With
 func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 	community, _ := s.createCommunity()
 
-	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.owner, s.alice)
 	s.joinCommunity(community, s.owner, s.alice)
 
 	response, err := s.owner.BanUserFromCommunity(
@@ -3338,7 +3338,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 func (s *MessengerCommunitiesSuite) TestHandleImport() {
 	community, chat := s.createCommunity()
 
-	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.owner, s.alice)
 	s.joinCommunity(community, s.owner, s.alice)
 
 	// Check that there are no messages in the chat at first
@@ -3452,8 +3452,8 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 
 	s.owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
 
-	s.advertiseCommunityTo(community, s.owner, s.bob)
-	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.owner, s.bob)
+	s.advertiseCommunityTo(community.ID(), s.owner, s.alice)
 	s.joinCommunity(community, s.owner, s.bob)
 	s.joinCommunity(community, s.owner, s.alice)
 
@@ -3483,7 +3483,7 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
-	owner := s.newMessenger()
+	owner := s.newMessenger("owner-messenger")
 
 	owner.communitiesManager.RekeyInterval = 500 * time.Minute
 
@@ -3528,8 +3528,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 	s.Require().NoError(err)
 	s.Require().True(c.Encrypted())
 
-	s.advertiseCommunityTo(c, owner, s.bob)
-	s.advertiseCommunityTo(c, owner, s.alice)
+	s.advertiseCommunityTo(c.ID(), owner, s.bob)
+	s.advertiseCommunityTo(c.ID(), owner, s.alice)
 
 	owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
 
@@ -3592,7 +3592,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibility() {
-	owner := s.newMessenger()
+	owner := s.newMessenger("owner-messenger")
 	common.RekeyCompatibility = false
 
 	owner.communitiesManager.RekeyInterval = 500 * time.Minute
@@ -3638,8 +3638,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibili
 	s.Require().NoError(err)
 	s.Require().True(c.Encrypted())
 
-	s.advertiseCommunityTo(c, owner, s.bob)
-	s.advertiseCommunityTo(c, owner, s.alice)
+	s.advertiseCommunityTo(c.ID(), owner, s.bob)
+	s.advertiseCommunityTo(c.ID(), owner, s.alice)
 
 	owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
 
@@ -3719,7 +3719,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveBigCommunity() {
 	s.Require().Len(response.Communities(), 1)
 	community := response.Communities()[0]
 
-	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.owner, s.alice)
 	s.joinCommunity(community, s.owner, s.alice)
 
 	// checks that public messages are segmented
@@ -3748,7 +3748,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	ctx := context.Background()
 
 	community, _ := s.createCommunity()
-	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.owner, s.alice)
 
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	// We try to join the org

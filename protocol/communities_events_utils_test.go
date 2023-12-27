@@ -116,8 +116,8 @@ func setUpCommunityAndRoles(base CommunityEventsTestsInterface, role protobuf.Co
 	refreshMessengerResponses(base)
 
 	// add events sender and member to the community
-	advertiseCommunityToUserOldWay(suite, community, base.GetControlNode(), base.GetEventSender())
-	advertiseCommunityToUserOldWay(suite, community, base.GetControlNode(), base.GetMember())
+	advertiseCommunityTo(suite, community.ID(), base.GetControlNode(), base.GetEventSender())
+	advertiseCommunityTo(suite, community.ID(), base.GetControlNode(), base.GetMember())
 
 	request := &requests.RequestToJoinCommunity{
 		CommunityID:       community.ID(),
@@ -417,8 +417,8 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 	community := createTestCommunity(base, protobuf.CommunityPermissions_MANUAL_ACCEPT)
 	refreshMessengerResponses(base)
 
-	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), base.GetEventSender())
-	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), base.GetMember())
+	advertiseCommunityTo(s, community.ID(), base.GetControlNode(), base.GetEventSender())
+	advertiseCommunityTo(s, community.ID(), base.GetControlNode(), base.GetMember())
 
 	requestEventSender := &requests.RequestToJoinCommunity{
 		CommunityID:       community.ID(),
@@ -451,7 +451,7 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 	waitOnMessengerResponse(s, checkPermissionGranted, base.GetMember())
 
 	for _, eventSender := range additionalEventSenders {
-		advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), eventSender)
+		advertiseCommunityTo(s, community.ID(), base.GetControlNode(), eventSender)
 		joinOnRequestCommunity(s, community, base.GetControlNode(), eventSender, requestEventSender)
 
 		grantPermission(s, community, base.GetControlNode(), eventSender, role)
@@ -1019,34 +1019,6 @@ func testCreateEditDeleteBecomeMemberPermission(base CommunityEventsTestsInterfa
 	deleteTokenPermission(base, community, deleteTokenPermissionRequest)
 }
 
-// To be removed in https://github.com/status-im/status-go/issues/4437
-func advertiseCommunityToUserOldWay(s *suite.Suite, community *communities.Community, owner *Messenger, user *Messenger) {
-
-	chat := CreateOneToOneChat(common.PubkeyToHex(&user.identity.PublicKey), &user.identity.PublicKey, user.transport)
-
-	inputMessage := common.NewMessage()
-	inputMessage.ChatId = chat.ID
-	inputMessage.Text = "some text"
-	inputMessage.CommunityID = community.IDString()
-
-	err := owner.SaveChat(chat)
-	s.Require().NoError(err)
-	_, err = owner.SendChatMessage(context.Background(), inputMessage)
-	s.Require().NoError(err)
-
-	// Ensure community is received
-	response, err := WaitOnMessengerResponse(
-		user,
-		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0
-		},
-		"event sender did not receive community request to join",
-	)
-	s.Require().NoError(err)
-	communityInResponse := response.Communities()[0]
-	s.Require().Equal(community.ID(), communityInResponse.ID())
-}
-
 func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger) {
 	// set up additional user that will send request to join
 	_, err := user.Start()
@@ -1056,7 +1028,7 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	s.Require().NoError(err)
 	defer TearDownMessenger(s, user)
 
-	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
+	advertiseCommunityTo(s, community.ID(), base.GetControlNode(), user)
 
 	// user sends request to join
 	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID(), ENSName: "testName"}
@@ -1186,7 +1158,7 @@ func testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 	s.Require().NoError(err)
 	defer TearDownMessenger(s, user)
 
-	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
+	advertiseCommunityTo(s, community.ID(), base.GetControlNode(), user)
 
 	// user sends request to join
 	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
@@ -1264,7 +1236,7 @@ func testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 	s.Require().NoError(err)
 	defer TearDownMessenger(s, user)
 
-	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
+	advertiseCommunityTo(s, community.ID(), base.GetControlNode(), user)
 
 	// user sends request to join
 	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
@@ -1341,7 +1313,7 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	s.Require().NoError(err)
 	defer TearDownMessenger(s, user)
 
-	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
+	advertiseCommunityTo(s, community.ID(), base.GetControlNode(), user)
 
 	// user sends request to join
 	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
@@ -1439,7 +1411,7 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 	s.Require().NoError(err)
 	defer TearDownMessenger(s, user)
 
-	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
+	advertiseCommunityTo(s, community.ID(), base.GetControlNode(), user)
 
 	// user sends request to join
 	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
@@ -2057,8 +2029,8 @@ func testJoinedPrivilegedMemberReceiveRequestsToJoin(base CommunityEventsTestsIn
 
 	s := base.GetSuite()
 
-	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), bob)
-	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), newPrivilegedUser)
+	advertiseCommunityTo(s, community.ID(), base.GetControlNode(), bob)
+	advertiseCommunityTo(s, community.ID(), base.GetControlNode(), newPrivilegedUser)
 
 	requestNewPrivilegedUser := &requests.RequestToJoinCommunity{
 		CommunityID:       community.ID(),
@@ -2123,9 +2095,9 @@ func testMemberReceiveRequestsToJoinAfterGettingNewRole(base CommunityEventsTest
 	// control node creates a community and chat
 	community := createTestCommunity(base, protobuf.CommunityPermissions_MANUAL_ACCEPT)
 
-	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), base.GetEventSender())
-	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), base.GetMember())
-	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), bob)
+	advertiseCommunityTo(s, community.ID(), base.GetControlNode(), base.GetEventSender())
+	advertiseCommunityTo(s, community.ID(), base.GetControlNode(), base.GetMember())
+	advertiseCommunityTo(s, community.ID(), base.GetControlNode(), bob)
 
 	requestAlice := &requests.RequestToJoinCommunity{
 		CommunityID:       community.ID(),
@@ -2234,7 +2206,7 @@ func testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(base CommunityEven
 	s.Require().NoError(err)
 	defer TearDownMessenger(s, user)
 
-	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
+	advertiseCommunityTo(s, community.ID(), base.GetControlNode(), user)
 
 	// user sends request to join
 	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID(), ENSName: "testName"}

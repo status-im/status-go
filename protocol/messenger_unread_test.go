@@ -309,7 +309,7 @@ func (s *MessengerSuite) TestMarkMessageWithNotificationAsUnreadInCommunityChatS
 	err = other.communitiesManager.SaveCommunity(community)
 	s.Require().NoError(err)
 
-	advertiseCommunityToUserOldWay(&s.Suite, community, other, s.m)
+	advertiseCommunityTo(&s.Suite, community.ID(), other, s.m)
 
 	inputMessage1 := buildTestMessage(*communityChat)
 	inputMessage1.ChatId = communityChat.ID

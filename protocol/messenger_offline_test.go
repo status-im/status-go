@@ -96,8 +96,8 @@ func (s *MessengerOfflineSuite) newMessenger(waku types.Waku, logger *zap.Logger
 	return m
 }
 
-func (s *MessengerOfflineSuite) advertiseCommunityTo(community *communities.Community, owner *Messenger, user *Messenger) {
-	advertiseCommunityTo(&s.Suite, community, owner, user)
+func (s *MessengerOfflineSuite) advertiseCommunityTo(communityID types.HexBytes, owner *Messenger, user *Messenger) {
+	advertiseCommunityTo(&s.Suite, communityID, owner, user)
 }
 
 func (s *MessengerOfflineSuite) joinCommunity(community *communities.Community, owner *Messenger, user *Messenger) {
@@ -116,7 +116,7 @@ func (s *MessengerOfflineSuite) TestCommunityOfflineEdit() {
 
 	ctx := context.Background()
 
-	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.owner, s.alice)
 	s.joinCommunity(community, s.owner, s.alice)
 
 	_, err := s.alice.SendChatMessage(ctx, inputMessage)

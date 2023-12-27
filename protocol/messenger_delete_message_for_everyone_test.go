@@ -73,10 +73,10 @@ func (s *MessengerDeleteMessageForEveryoneSuite) TestDeleteMessageForEveryone() 
 
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 
-	advertiseCommunityTo(&s.Suite, community, s.admin, s.moderator)
+	advertiseCommunityTo(&s.Suite, community.ID(), s.admin, s.moderator)
 	joinCommunity(&s.Suite, community, s.admin, s.moderator, request, "")
 
-	advertiseCommunityTo(&s.Suite, community, s.admin, s.bob)
+	advertiseCommunityTo(&s.Suite, community.ID(), s.admin, s.bob)
 	joinCommunity(&s.Suite, community, s.admin, s.bob, request, "")
 
 	response, err := s.admin.AddRoleToMember(&requests.AddRoleToMember{

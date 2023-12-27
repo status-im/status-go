@@ -203,8 +203,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunityWithAirdropAddr
 	joinCommunity(&s.Suite, community, s.owner, user, request, passwdHash)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) advertiseCommunityTo(community *communities.Community, user *Messenger) {
-	advertiseCommunityTo(&s.Suite, community, s.owner, user)
+func (s *MessengerCommunitiesTokenPermissionsSuite) advertiseCommunityTo(communityID types.HexBytes, user *Messenger) {
+	advertiseCommunityTo(&s.Suite, communityID, s.owner, user)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) createCommunity() (*communities.Community, *Chat) {
@@ -369,7 +369,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
 
-	s.advertiseCommunityTo(community, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.alice)
 
 	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	// We try to join the org
@@ -401,8 +401,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSharedAddress() {
 	community, _ := s.createCommunity()
-	s.advertiseCommunityTo(community, s.alice)
-	s.advertiseCommunityTo(community, s.bob)
+	s.advertiseCommunityTo(community.ID(), s.alice)
+	s.advertiseCommunityTo(community.ID(), s.bob)
 
 	s.joinCommunity(community, s.alice, alicePassword, []string{})
 	s.joinCommunity(community, s.bob, bobPassword, []string{})
@@ -451,7 +451,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSh
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSelectedSharedAddress() {
 	community, _ := s.createCommunity()
-	s.advertiseCommunityTo(community, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.alice)
 
 	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress2})
 
@@ -479,7 +479,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSe
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersMultipleSelectedSharedAddresses() {
 	community, _ := s.createCommunity()
-	s.advertiseCommunityTo(community, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.alice)
 
 	s.joinCommunityWithAirdropAddress(community, s.alice, alicePassword, []string{aliceAddress1, aliceAddress2}, aliceAddress2)
 
@@ -509,7 +509,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersMu
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 	community, _ := s.createCommunity()
-	s.advertiseCommunityTo(community, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.alice)
 
 	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress2})
 
@@ -603,7 +603,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	community, chat := s.createCommunity()
 
 	// bob joins the community
-	s.advertiseCommunityTo(community, s.bob)
+	s.advertiseCommunityTo(community.ID(), s.bob)
 	s.joinCommunity(community, s.bob, bobPassword, []string{})
 
 	// send message to the channel
@@ -763,7 +763,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPe
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
 
-	s.advertiseCommunityTo(community, s.bob)
+	s.advertiseCommunityTo(community.ID(), s.bob)
 
 	// Bob should still be able to join even if there is a permission to be an admin
 	s.joinCommunity(community, s.bob, bobPassword, []string{})
@@ -831,7 +831,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWit
 	// make bob satisfy the member criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, permissionRequestMember.TokenCriteria[0])
 
-	s.advertiseCommunityTo(response.Communities()[0], s.bob)
+	s.advertiseCommunityTo(response.Communities()[0].ID(), s.bob)
 
 	// Bob should still be able to join even though he doesn't satisfy the admin requirement
 	// because he satisfies the member one
@@ -903,7 +903,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWith
 	s.Require().NoError(err)
 	s.Require().Len(community.TokenPermissions(), 2)
 
-	s.advertiseCommunityTo(community, s.bob)
+	s.advertiseCommunityTo(community.ID(), s.bob)
 
 	// make bob satisfy the admin criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, permissionRequestAdmin.TokenCriteria[0])
@@ -923,7 +923,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 	community, chat := s.createCommunity()
 
 	// bob joins the community
-	s.advertiseCommunityTo(community, s.bob)
+	s.advertiseCommunityTo(community.ID(), s.bob)
 	s.joinCommunity(community, s.bob, bobPassword, []string{})
 
 	// send message to the channel
@@ -1119,7 +1119,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().NoError(err)
 	s.Require().True(community.HasTokenPermissions())
 
-	s.advertiseCommunityTo(community, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.alice)
 
 	var tokenPermission *communities.CommunityTokenPermission
 	for _, tokenPermission = range community.TokenPermissions() {
@@ -1228,7 +1228,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	err = <-waitOnCommunityPermissionCreated
 	s.Require().NoError(err)
 
-	s.advertiseCommunityTo(community, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.alice)
 
 	var tokenPermission *communities.CommunityTokenPermission
 	var tokenMemberPermission *communities.CommunityTokenPermission

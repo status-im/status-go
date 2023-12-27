@@ -202,7 +202,7 @@ message ChatMessage {
     StickerMessage sticker = 9;
     ImageMessage image = 10;
     AudioMessage audio = 11;
-    bytes community = 12;
+    bytes community = 12 [deprecated = true];
     DiscordMessage discord_message = 99;
   }
 
