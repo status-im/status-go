@@ -140,7 +140,9 @@ func (s *TestMessengerProfileShowcase) prepareShowcasePreferences() *ProfileShow
 	}
 
 	collectibleEntry := &ProfileShowcaseCollectiblePreference{
-		UID:                "0x12378534257568678487683576",
+		ContractAddress:    "0x12378534257568678487683576",
+		ChainID:            "0x888",
+		TokenID:            "0x12321389592999f903",
 		CommunityID:        "0x01312357798976535",
 		ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
 		Order:              17,
@@ -396,7 +398,7 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.Require().Equal(profileShowcase.Communities[1].CommunityID, request.Communities[1].CommunityID)
 	s.Require().Equal(profileShowcase.Communities[1].Order, request.Communities[1].Order)
 
-	// For id verified
+	// For id verified contacts
 	s.Require().Equal(profileShowcase.Communities[2].CommunityID, request.Communities[2].CommunityID)
 	s.Require().Equal(profileShowcase.Communities[2].Order, request.Communities[2].Order)
 
@@ -408,15 +410,21 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.Require().Equal(profileShowcase.Accounts[0].Order, request.Accounts[0].Order)
 
 	s.Require().Len(profileShowcase.Collectibles, 1)
-	s.Require().Equal(profileShowcase.Collectibles[0].UID, request.Collectibles[0].UID)
+	s.Require().Equal(profileShowcase.Collectibles[0].ContractAddress, request.Collectibles[0].ContractAddress)
+	s.Require().Equal(profileShowcase.Collectibles[0].ChainID, request.Collectibles[0].ChainID)
+	s.Require().Equal(profileShowcase.Collectibles[0].TokenID, request.Collectibles[0].TokenID)
 	s.Require().Equal(profileShowcase.Collectibles[0].CommunityID, request.Collectibles[0].CommunityID)
 	s.Require().Equal(profileShowcase.Collectibles[0].Order, request.Collectibles[0].Order)
 
 	s.Require().Len(profileShowcase.Assets, 2)
+
+	// For contacts
 	s.Require().Equal(profileShowcase.Assets[0].Symbol, request.Assets[2].Symbol)
 	s.Require().Equal(profileShowcase.Assets[0].CommunityID, request.Assets[2].CommunityID)
 	s.Require().Equal(profileShowcase.Assets[0].ContractAddress, request.Assets[2].ContractAddress)
 	s.Require().Equal(profileShowcase.Assets[0].Order, request.Assets[2].Order)
+
+	// For id verified contacts
 	s.Require().Equal(profileShowcase.Assets[1].Symbol, request.Assets[1].Symbol)
 	s.Require().Equal(profileShowcase.Assets[1].CommunityID, request.Assets[1].CommunityID)
 	s.Require().Equal(profileShowcase.Assets[1].ContractAddress, request.Assets[1].ContractAddress)

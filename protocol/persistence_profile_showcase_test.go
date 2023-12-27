@@ -47,8 +47,10 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 		},
 		Collectibles: []*ProfileShowcaseCollectiblePreference{
 			&ProfileShowcaseCollectiblePreference{
-				UID:                "6rertjlqhtlig;fjgfsgffdgnk",
-				CommunityID:        "0x163423124442144",
+				ContractAddress:    "0x12378534257568678487683576",
+				ChainID:            "0x888",
+				TokenID:            "0x12321389592999f903",
+				CommunityID:        "0x01312357798976535",
 				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
@@ -140,9 +142,11 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 		},
 		Collectibles: []*ProfileShowcaseCollectible{
 			&ProfileShowcaseCollectible{
-				UID:         "6rertjlqhtlig;fjgfsgffdgnk",
-				CommunityID: "0x163423124442144",
-				Order:       0,
+				ContractAddress: "0x12378534257568678487683576",
+				ChainID:         "0x888",
+				TokenID:         "0x12321389592999f903",
+				CommunityID:     "0x01312357798976535",
+				Order:           0,
 			},
 		},
 		Assets: []*ProfileShowcaseAsset{
@@ -183,8 +187,11 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 		},
 		Collectibles: []*ProfileShowcaseCollectible{
 			&ProfileShowcaseCollectible{
-				UID:   "d378662f-3d71-44e0-81ee-ff7f1778c13a",
-				Order: 1,
+				ContractAddress: "0x12378534257568678487683576",
+				ChainID:         "0x888",
+				TokenID:         "0x12321389592999f903",
+				CommunityID:     "0x01312357798976535",
+				Order:           1,
 			},
 		},
 	}

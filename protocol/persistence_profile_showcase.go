@@ -20,11 +20,11 @@ const selectProfileShowcaseCommunityPreferenceQuery = "SELECT community_id, visi
 const upsertProfileShowcaseAccountPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_accounts_preferences(address, name, color_id, emoji, visibility, sort_order) VALUES (?, ?, ?, ?, ?, ?)"
 const selectProfileShowcaseAccountPreferenceQuery = "SELECT address, name, color_id, emoji, visibility, sort_order FROM profile_showcase_accounts_preferences"
 
-const upsertProfileShowcaseCollectiblePreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_preferences(uid, community_id, visibility, sort_order) VALUES (?, ?, ?, ?)"
-const selectProfileShowcaseCollectiblePreferenceQuery = "SELECT uid, community_id, visibility, sort_order FROM profile_showcase_collectibles_preferences"
+const upsertProfileShowcaseCollectiblePreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_preferences(contract_address, chain_id, token_id, community_id, visibility, sort_order) VALUES (?, ?, ?, ?, ?, ?)"
+const selectProfileShowcaseCollectiblePreferenceQuery = "SELECT contract_address, chain_id, token_id, community_id, visibility, sort_order FROM profile_showcase_collectibles_preferences"
 
-const upsertProfileShowcaseAssetPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_assets_preferences(symbol, community_id, contract_address, visibility, sort_order) VALUES (?, ?, ?, ?, ?)"
-const selectProfileShowcaseAssetPreferenceQuery = "SELECT symbol, community_id, contract_address, visibility, sort_order FROM profile_showcase_assets_preferences"
+const upsertProfileShowcaseAssetPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_assets_preferences(contract_address, community_id, symbol, visibility, sort_order) VALUES (?, ?, ?, ?, ?)"
+const selectProfileShowcaseAssetPreferenceQuery = "SELECT contract_address, community_id, symbol, visibility, sort_order FROM profile_showcase_assets_preferences"
 
 const upsertContactProfileShowcaseCommunityQuery = "INSERT OR REPLACE INTO profile_showcase_communities_contacts(contact_id, community_id, sort_order) VALUES (?, ?, ?)"
 const selectContactProfileShowcaseCommunityQuery = "SELECT community_id, sort_order FROM profile_showcase_communities_contacts WHERE contact_id = ?"
@@ -34,12 +34,12 @@ const upsertContactProfileShowcaseAccountQuery = "INSERT OR REPLACE INTO profile
 const selectContactProfileShowcaseAccountQuery = "SELECT address, name, color_id, emoji, sort_order FROM profile_showcase_accounts_contacts WHERE contact_id = ?"
 const removeContactProfileShowcaseAccountQuery = "DELETE FROM profile_showcase_accounts_contacts WHERE contact_id = ?"
 
-const upsertContactProfileShowcaseCollectibleQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_contacts(contact_id, uid, community_id, sort_order) VALUES (?, ?, ?, ?)"
-const selectContactProfileShowcaseCollectibleQuery = "SELECT uid, community_id, sort_order FROM profile_showcase_collectibles_contacts WHERE contact_id = ?"
+const upsertContactProfileShowcaseCollectibleQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_contacts(contact_id, contract_address, chain_id, token_id, community_id, sort_order) VALUES (?, ?, ?, ?, ?, ?)"
+const selectContactProfileShowcaseCollectibleQuery = "SELECT contract_address, chain_id, token_id, community_id, sort_order FROM profile_showcase_collectibles_contacts WHERE contact_id = ?"
 const removeContactProfileShowcaseCollectibleQuery = "DELETE FROM profile_showcase_collectibles_contacts WHERE contact_id = ?"
 
-const upsertContactProfileShowcaseAssetQuery = "INSERT OR REPLACE INTO profile_showcase_assets_contacts(contact_id, symbol, community_id, contract_address, sort_order) VALUES (?, ?, ?, ?, ?)"
-const selectContactProfileShowcaseAssetQuery = "SELECT symbol, community_id, contract_address, sort_order FROM profile_showcase_assets_contacts WHERE contact_id = ?"
+const upsertContactProfileShowcaseAssetQuery = "INSERT OR REPLACE INTO profile_showcase_assets_contacts(contact_id, contract_address, community_id, symbol, sort_order) VALUES (?, ?, ?, ?, ?)"
+const selectContactProfileShowcaseAssetQuery = "SELECT contract_address, community_id, symbol, sort_order FROM profile_showcase_assets_contacts WHERE contact_id = ?"
 const removeContactProfileShowcaseAssetQuery = "DELETE FROM profile_showcase_assets_contacts WHERE contact_id = ?"
 
 type ProfileShowcaseCommunityPreference struct {
@@ -58,16 +58,18 @@ type ProfileShowcaseAccountPreference struct {
 }
 
 type ProfileShowcaseCollectiblePreference struct {
-	UID                string                    `json:"uid"`
+	ChainID            string                    `json:"chainId"`
+	TokenID            string                    `json:"tokenId"`
+	ContractAddress    string                    `json:"contractAddress"`
 	CommunityID        string                    `json:"communityId"`
 	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
 	Order              int                       `json:"order"`
 }
 
 type ProfileShowcaseAssetPreference struct {
-	Symbol             string                    `json:"symbol"`
-	CommunityID        string                    `json:"communityId"`
 	ContractAddress    string                    `json:"contractAddress"`
+	CommunityID        string                    `json:"communityId"`
+	Symbol             string                    `json:"symbol"`
 	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
 	Order              int                       `json:"order"`
 }
@@ -93,15 +95,17 @@ type ProfileShowcaseAccount struct {
 }
 
 type ProfileShowcaseCollectible struct {
-	UID         string `json:"uid"`
-	CommunityID string `json:"communityId"`
-	Order       int    `json:"order"`
+	ChainID         string `json:"chainId"`
+	TokenID         string `json:"tokenId"`
+	ContractAddress string `json:"contractAddress"`
+	CommunityID     string `json:"communityId"`
+	Order           int    `json:"order"`
 }
 
 type ProfileShowcaseAsset struct {
-	Symbol          string `json:"symbol"`
-	CommunityID     string `json:"communityId"`
 	ContractAddress string `json:"contractAddress"`
+	CommunityID     string `json:"communityId"`
+	Symbol          string `json:"symbol"`
 	Order           int    `json:"order"`
 }
 
@@ -194,7 +198,9 @@ func (db sqlitePersistence) getProfileShowcaseAccountsPreferences(tx *sql.Tx) ([
 
 func (db sqlitePersistence) saveProfileShowcaseCollectiblePreference(tx *sql.Tx, collectible *ProfileShowcaseCollectiblePreference) error {
 	_, err := tx.Exec(upsertProfileShowcaseCollectiblePreferenceQuery,
-		collectible.UID,
+		collectible.ContractAddress,
+		collectible.ChainID,
+		collectible.TokenID,
 		collectible.CommunityID,
 		collectible.ShowcaseVisibility,
 		collectible.Order,
@@ -215,7 +221,9 @@ func (db sqlitePersistence) getProfileShowcaseCollectiblesPreferences(tx *sql.Tx
 		collectible := &ProfileShowcaseCollectiblePreference{}
 
 		err := rows.Scan(
-			&collectible.UID,
+			&collectible.ContractAddress,
+			&collectible.ChainID,
+			&collectible.TokenID,
 			&collectible.CommunityID,
 			&collectible.ShowcaseVisibility,
 			&collectible.Order,
@@ -232,9 +240,9 @@ func (db sqlitePersistence) getProfileShowcaseCollectiblesPreferences(tx *sql.Tx
 
 func (db sqlitePersistence) saveProfileShowcaseAssetPreference(tx *sql.Tx, asset *ProfileShowcaseAssetPreference) error {
 	_, err := tx.Exec(upsertProfileShowcaseAssetPreferenceQuery,
-		asset.Symbol,
-		asset.CommunityID,
 		asset.ContractAddress,
+		asset.CommunityID,
+		asset.Symbol,
 		asset.ShowcaseVisibility,
 		asset.Order,
 	)
@@ -254,9 +262,9 @@ func (db sqlitePersistence) getProfileShowcaseAssetsPreferences(tx *sql.Tx) ([]*
 		asset := &ProfileShowcaseAssetPreference{}
 
 		err := rows.Scan(
-			&asset.Symbol,
-			&asset.CommunityID,
 			&asset.ContractAddress,
+			&asset.CommunityID,
+			&asset.Symbol,
 			&asset.ShowcaseVisibility,
 			&asset.Order,
 		)
@@ -353,7 +361,9 @@ func (db sqlitePersistence) clearProfileShowcaseAccountsContact(tx *sql.Tx, cont
 func (db sqlitePersistence) saveProfileShowcaseCollectibleContact(tx *sql.Tx, contactID string, collectible *ProfileShowcaseCollectible) error {
 	_, err := tx.Exec(upsertContactProfileShowcaseCollectibleQuery,
 		contactID,
-		collectible.UID,
+		collectible.ContractAddress,
+		collectible.ChainID,
+		collectible.TokenID,
 		collectible.CommunityID,
 		collectible.Order,
 	)
@@ -373,7 +383,9 @@ func (db sqlitePersistence) getProfileShowcaseCollectiblesContact(tx *sql.Tx, co
 		collectible := &ProfileShowcaseCollectible{}
 
 		err := rows.Scan(
-			&collectible.UID,
+			&collectible.ContractAddress,
+			&collectible.ChainID,
+			&collectible.TokenID,
 			&collectible.CommunityID,
 			&collectible.Order)
 		if err != nil {
@@ -393,9 +405,9 @@ func (db sqlitePersistence) clearProfileShowcaseCollectiblesContact(tx *sql.Tx, 
 func (db sqlitePersistence) saveProfileShowcaseAssetContact(tx *sql.Tx, contactID string, asset *ProfileShowcaseAsset) error {
 	_, err := tx.Exec(upsertContactProfileShowcaseAssetQuery,
 		contactID,
-		asset.Symbol,
-		asset.CommunityID,
 		asset.ContractAddress,
+		asset.CommunityID,
+		asset.Symbol,
 		asset.Order,
 	)
 
@@ -414,9 +426,9 @@ func (db sqlitePersistence) getProfileShowcaseAssetsContact(tx *sql.Tx, contactI
 		asset := &ProfileShowcaseAsset{}
 
 		err := rows.Scan(
-			&asset.Symbol,
-			&asset.CommunityID,
 			&asset.ContractAddress,
+			&asset.CommunityID,
+			&asset.Symbol,
 			&asset.Order)
 		if err != nil {
 			return nil, err

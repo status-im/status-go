@@ -17,9 +17,12 @@ message ProfileShowcaseAccount {
 }
 
 message ProfileShowcaseCollectible {
-  string uid = 1;
+  string uid = 1 [deprecated = true];
   uint32 order = 2;
-  string community_id = 3;
+  string contract_address = 3;
+  string community_id = 4;
+  string chain_id = 5;
+  string token_id = 6;
 }
 
 message ProfileShowcaseAsset {

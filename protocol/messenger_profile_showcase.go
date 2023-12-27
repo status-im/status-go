@@ -53,9 +53,11 @@ func toProfileShowcaseCollectibleProto(preferences []*ProfileShowcaseCollectible
 		}
 
 		collectibles = append(collectibles, &protobuf.ProfileShowcaseCollectible{
-			Uid:         preference.UID,
-			CommunityId: preference.CommunityID,
-			Order:       uint32(preference.Order),
+			ContractAddress: preference.ContractAddress,
+			ChainId:         preference.ChainID,
+			TokenId:         preference.TokenID,
+			CommunityId:     preference.CommunityID,
+			Order:           uint32(preference.Order),
 		})
 	}
 	return collectibles
@@ -107,9 +109,11 @@ func fromProfileShowcaseCollectibleProto(messages []*protobuf.ProfileShowcaseCol
 	collectibles := []*ProfileShowcaseCollectible{}
 	for _, entry := range messages {
 		collectibles = append(collectibles, &ProfileShowcaseCollectible{
-			UID:         entry.Uid,
-			CommunityID: entry.CommunityId,
-			Order:       int(entry.Order),
+			ContractAddress: entry.ContractAddress,
+			ChainID:         entry.ChainId,
+			TokenID:         entry.TokenId,
+			CommunityID:     entry.CommunityId,
+			Order:           int(entry.Order),
 		})
 	}
 	return collectibles
