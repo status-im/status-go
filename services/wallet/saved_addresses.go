@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	multiAccCommon "github.com/status-im/status-go/multiaccounts/common"
 )
 
 type savedAddressMeta struct {
@@ -17,12 +18,13 @@ type SavedAddress struct {
 	Address common.Address `json:"address"`
 	// TODO: Add Emoji
 	// Emoji	string		   `json:"emoji"`
-	Name            string `json:"name"`
-	Favourite       bool   `json:"favourite"`
-	ChainShortNames string `json:"chainShortNames"` // used with address only, not with ENSName
-	ENSName         string `json:"ens"`
-	IsTest          bool   `json:"isTest"`
-	CreatedAt       int64  `json:"createdAt"`
+	Name            string                            `json:"name"`
+	Favourite       bool                              `json:"favourite"`
+	ChainShortNames string                            `json:"chainShortNames"` // used with address only, not with ENSName
+	ENSName         string                            `json:"ens"`
+	ColorID         multiAccCommon.CustomizationColor `json:"colorId"`
+	IsTest          bool                              `json:"isTest"`
+	CreatedAt       int64                             `json:"createdAt"`
 	savedAddressMeta
 }
 
@@ -38,7 +40,7 @@ func NewSavedAddressesManager(db *sql.DB) *SavedAddressesManager {
 	return &SavedAddressesManager{db: db}
 }
 
-const rawQueryColumnsOrder = "address, name, favourite, removed, update_clock, chain_short_names, ens_name, is_test, created_at"
+const rawQueryColumnsOrder = "address, name, favourite, removed, update_clock, chain_short_names, ens_name, is_test, created_at, color"
 
 // getSavedAddressesFromDBRows retrieves all data based on SELECT Query using rawQueryColumnsOrder
 func getSavedAddressesFromDBRows(rows *sql.Rows) ([]SavedAddress, error) {
@@ -46,7 +48,18 @@ func getSavedAddressesFromDBRows(rows *sql.Rows) ([]SavedAddress, error) {
 	for rows.Next() {
 		sa := SavedAddress{}
 		// based on rawQueryColumnsOrder
-		err := rows.Scan(&sa.Address, &sa.Name, &sa.Favourite, &sa.Removed, &sa.UpdateClock, &sa.ChainShortNames, &sa.ENSName, &sa.IsTest, &sa.CreatedAt)
+		err := rows.Scan(
+			&sa.Address,
+			&sa.Name,
+			&sa.Favourite,
+			&sa.Removed,
+			&sa.UpdateClock,
+			&sa.ChainShortNames,
+			&sa.ENSName,
+			&sa.IsTest,
+			&sa.CreatedAt,
+			&sa.ColorID,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -115,13 +128,30 @@ func (sam *SavedAddressesManager) upsertSavedAddress(sa SavedAddress, tx *sql.Tx
 			break
 		}
 	}
-	sqlStatement := "INSERT OR REPLACE INTO saved_addresses (address, name, favourite, removed, update_clock, chain_short_names, ens_name, is_test, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	sqlStatement := `
+	INSERT OR REPLACE
+	INTO
+		saved_addresses (
+			address,
+			name,
+			favourite,
+			removed,
+			update_clock,
+			chain_short_names,
+			ens_name, is_test,
+			created_at,
+			color
+		)
+	VALUES
+		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
 	insert, err := tx.Prepare(sqlStatement)
 	if err != nil {
 		return err
 	}
 	defer insert.Close()
-	_, err = insert.Exec(sa.Address, sa.Name, sa.Favourite, sa.Removed, sa.UpdateClock, sa.ChainShortNames, sa.ENSName, sa.IsTest, sa.CreatedAt)
+	_, err = insert.Exec(sa.Address, sa.Name, sa.Favourite, sa.Removed, sa.UpdateClock, sa.ChainShortNames, sa.ENSName,
+		sa.IsTest, sa.CreatedAt, sa.ColorID)
 	return err
 }
 
