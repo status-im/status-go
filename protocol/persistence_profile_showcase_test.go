@@ -51,6 +51,7 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 				ChainID:            "0x888",
 				TokenID:            "0x12321389592999f903",
 				CommunityID:        "0x01312357798976535",
+				AccountAddress:     "0x32433445133424",
 				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},

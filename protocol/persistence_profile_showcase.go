@@ -20,8 +20,8 @@ const selectProfileShowcaseCommunityPreferenceQuery = "SELECT community_id, visi
 const upsertProfileShowcaseAccountPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_accounts_preferences(address, name, color_id, emoji, visibility, sort_order) VALUES (?, ?, ?, ?, ?, ?)"
 const selectProfileShowcaseAccountPreferenceQuery = "SELECT address, name, color_id, emoji, visibility, sort_order FROM profile_showcase_accounts_preferences"
 
-const upsertProfileShowcaseCollectiblePreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_preferences(contract_address, chain_id, token_id, community_id, visibility, sort_order) VALUES (?, ?, ?, ?, ?, ?)"
-const selectProfileShowcaseCollectiblePreferenceQuery = "SELECT contract_address, chain_id, token_id, community_id, visibility, sort_order FROM profile_showcase_collectibles_preferences"
+const upsertProfileShowcaseCollectiblePreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_preferences(contract_address, chain_id, token_id, community_id, account_address, visibility, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)"
+const selectProfileShowcaseCollectiblePreferenceQuery = "SELECT contract_address, chain_id, token_id, community_id, account_address, visibility, sort_order FROM profile_showcase_collectibles_preferences"
 
 const upsertProfileShowcaseAssetPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_assets_preferences(contract_address, community_id, symbol, visibility, sort_order) VALUES (?, ?, ?, ?, ?)"
 const selectProfileShowcaseAssetPreferenceQuery = "SELECT contract_address, community_id, symbol, visibility, sort_order FROM profile_showcase_assets_preferences"
@@ -34,8 +34,8 @@ const upsertContactProfileShowcaseAccountQuery = "INSERT OR REPLACE INTO profile
 const selectContactProfileShowcaseAccountQuery = "SELECT address, name, color_id, emoji, sort_order FROM profile_showcase_accounts_contacts WHERE contact_id = ?"
 const removeContactProfileShowcaseAccountQuery = "DELETE FROM profile_showcase_accounts_contacts WHERE contact_id = ?"
 
-const upsertContactProfileShowcaseCollectibleQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_contacts(contact_id, contract_address, chain_id, token_id, community_id, sort_order) VALUES (?, ?, ?, ?, ?, ?)"
-const selectContactProfileShowcaseCollectibleQuery = "SELECT contract_address, chain_id, token_id, community_id, sort_order FROM profile_showcase_collectibles_contacts WHERE contact_id = ?"
+const upsertContactProfileShowcaseCollectibleQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_contacts(contact_id, contract_address, chain_id, token_id, community_id, account_address, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)"
+const selectContactProfileShowcaseCollectibleQuery = "SELECT contract_address, chain_id, token_id, community_id, account_address, sort_order FROM profile_showcase_collectibles_contacts WHERE contact_id = ?"
 const removeContactProfileShowcaseCollectibleQuery = "DELETE FROM profile_showcase_collectibles_contacts WHERE contact_id = ?"
 
 const upsertContactProfileShowcaseAssetQuery = "INSERT OR REPLACE INTO profile_showcase_assets_contacts(contact_id, contract_address, community_id, symbol, sort_order) VALUES (?, ?, ?, ?, ?)"
@@ -62,6 +62,7 @@ type ProfileShowcaseCollectiblePreference struct {
 	TokenID            string                    `json:"tokenId"`
 	ContractAddress    string                    `json:"contractAddress"`
 	CommunityID        string                    `json:"communityId"`
+	AccountAddress     string                    `json:"accountAddress"`
 	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
 	Order              int                       `json:"order"`
 }
@@ -99,6 +100,7 @@ type ProfileShowcaseCollectible struct {
 	TokenID         string `json:"tokenId"`
 	ContractAddress string `json:"contractAddress"`
 	CommunityID     string `json:"communityId"`
+	AccountAddress  string `json:"accountAddress"`
 	Order           int    `json:"order"`
 }
 
@@ -202,6 +204,7 @@ func (db sqlitePersistence) saveProfileShowcaseCollectiblePreference(tx *sql.Tx,
 		collectible.ChainID,
 		collectible.TokenID,
 		collectible.CommunityID,
+		collectible.AccountAddress,
 		collectible.ShowcaseVisibility,
 		collectible.Order,
 	)
@@ -225,6 +228,7 @@ func (db sqlitePersistence) getProfileShowcaseCollectiblesPreferences(tx *sql.Tx
 			&collectible.ChainID,
 			&collectible.TokenID,
 			&collectible.CommunityID,
+			&collectible.AccountAddress,
 			&collectible.ShowcaseVisibility,
 			&collectible.Order,
 		)
@@ -365,6 +369,7 @@ func (db sqlitePersistence) saveProfileShowcaseCollectibleContact(tx *sql.Tx, co
 		collectible.ChainID,
 		collectible.TokenID,
 		collectible.CommunityID,
+		collectible.AccountAddress,
 		collectible.Order,
 	)
 
@@ -387,6 +392,7 @@ func (db sqlitePersistence) getProfileShowcaseCollectiblesContact(tx *sql.Tx, co
 			&collectible.ChainID,
 			&collectible.TokenID,
 			&collectible.CommunityID,
+			&collectible.AccountAddress,
 			&collectible.Order)
 		if err != nil {
 			return nil, err

@@ -12,6 +12,12 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+var errorNoAccountProvidedWithAssetOrCollectible = errors.New("no account provided with asset or collectible")
+var errorDublicateAccountAddress = errors.New("duplicate account address")
+var errorNoAccountAddressForCollectible = errors.New("no account found for collectible")
+var errorAccountVisibilityLowerThanCollectible = errors.New("account visibility lower than collectible")
+var errorDecryptingPayloadEncryptionKey = errors.New("decrypting the payload encryption key resulted in no error and a nil key")
+
 func toProfileShowcaseCommunityProto(preferences []*ProfileShowcaseCommunityPreference, visibility ProfileShowcaseVisibility) []*protobuf.ProfileShowcaseCommunity {
 	communities := []*protobuf.ProfileShowcaseCommunity{}
 	for _, preference := range preferences {
@@ -57,6 +63,7 @@ func toProfileShowcaseCollectibleProto(preferences []*ProfileShowcaseCollectible
 			ChainId:         preference.ChainID,
 			TokenId:         preference.TokenID,
 			CommunityId:     preference.CommunityID,
+			AccountAddress:  preference.AccountAddress,
 			Order:           uint32(preference.Order),
 		})
 	}
@@ -132,8 +139,40 @@ func fromProfileShowcaseAssetProto(messages []*protobuf.ProfileShowcaseAsset) []
 	return assets
 }
 
+func Validate(preferences *ProfileShowcasePreferences) error {
+	if (len(preferences.Assets) > 0 || len(preferences.Collectibles) > 0) &&
+		len(preferences.Accounts) == 0 {
+		return errorNoAccountProvidedWithAssetOrCollectible
+	}
+
+	accountsMap := make(map[string]*ProfileShowcaseAccountPreference)
+	for _, account := range preferences.Accounts {
+		if _, ok := accountsMap[account.Address]; ok {
+			return errorDublicateAccountAddress
+		}
+		accountsMap[account.Address] = account
+	}
+
+	for _, collectible := range preferences.Collectibles {
+		if account, ok := accountsMap[collectible.AccountAddress]; ok {
+			if account.ShowcaseVisibility < collectible.ShowcaseVisibility {
+				return errorAccountVisibilityLowerThanCollectible
+			}
+		} else {
+			return errorNoAccountAddressForCollectible
+		}
+	}
+
+	return nil
+}
+
 func (m *Messenger) SetProfileShowcasePreferences(preferences *ProfileShowcasePreferences) error {
-	err := m.persistence.SaveProfileShowcasePreferences(preferences)
+	err := Validate(preferences)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.SaveProfileShowcasePreferences(preferences)
 	if err != nil {
 		return err
 	}
@@ -217,7 +256,7 @@ func (m *Messenger) DecryptProfileShowcaseEntriesWithPubKey(senderPubKey *ecdsa.
 			return nil, err
 		}
 		if dAESKey == nil {
-			return nil, errors.New("decrypting the payload encryption key resulted in no error and a nil key")
+			return nil, errorDecryptingPayloadEncryptionKey
 		}
 
 		// Decrypt profile entries with the newly decrypted main encryption AES key
@@ -333,6 +372,9 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState
 		collectibles = append(collectibles, fromProfileShowcaseCollectibleProto(forIDVerifiedContacts.Collectibles)...)
 		assets = append(assets, fromProfileShowcaseAssetProto(forIDVerifiedContacts.Assets)...)
 	}
+
+	// TODO: validate community membership here (https://github.com/status-im/status-desktop/issues/13081)
+	// TODO: validate collectible ownership here (https://github.com/status-im/status-desktop/issues/13073)
 
 	newShowcase := &ProfileShowcase{
 		ContactID:    contactID,

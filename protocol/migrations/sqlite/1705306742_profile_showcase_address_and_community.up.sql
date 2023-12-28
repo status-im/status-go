@@ -5,6 +5,7 @@ CREATE TABLE profile_showcase_collectibles_preferences (
     chain_id TEXT NOT NULL,
     token_id TEXT NOT NULL,
     community_id TEXT DEFAULT "",
+    account_address TEXT NOT NULL,
     visibility INT NOT NULL DEFAULT 0,
     sort_order INT DEFAULT 0
 );
@@ -26,6 +27,7 @@ CREATE TABLE profile_showcase_collectibles_contacts (
     chain_id TEXT NOT NULL,
     token_id TEXT NOT NULL,
     community_id TEXT DEFAULT "",
+    account_address TEXT NOT NULL,
     sort_order INT DEFAULT 0,
     contact_id TEXT NOT NULL,
     PRIMARY KEY (contact_id, chain_id, contract_address, token_id)

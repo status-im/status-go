@@ -131,7 +131,7 @@ func (s *TestMessengerProfileShowcase) prepareShowcasePreferences() *ProfileShow
 	}
 
 	accountEntry := &ProfileShowcaseAccountPreference{
-		Address:            "0cx34662234",
+		Address:            "0x32433445133424",
 		Name:               "Status Account",
 		ColorID:            "blue",
 		Emoji:              ">:-]",
@@ -144,6 +144,7 @@ func (s *TestMessengerProfileShowcase) prepareShowcasePreferences() *ProfileShow
 		ChainID:            "0x888",
 		TokenID:            "0x12321389592999f903",
 		CommunityID:        "0x01312357798976535",
+		AccountAddress:     "0x32433445133424",
 		ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
 		Order:              17,
 	}
@@ -180,7 +181,7 @@ func (s *TestMessengerProfileShowcase) prepareShowcasePreferences() *ProfileShow
 	}
 }
 
-func (s *TestMessengerProfileShowcase) TestSetAndGetProfileShowcasePreferences() {
+func (s *TestMessengerProfileShowcase) TestSaveAndGetProfileShowcasePreferences() {
 	request := s.prepareShowcasePreferences()
 	err := s.m.SetProfileShowcasePreferences(request)
 	s.Require().NoError(err)
@@ -204,6 +205,35 @@ func (s *TestMessengerProfileShowcase) TestSetAndGetProfileShowcasePreferences()
 	s.Require().Equal(response.Assets[0], request.Assets[0])
 	s.Require().Equal(response.Assets[1], request.Assets[1])
 	s.Require().Equal(response.Assets[2], request.Assets[2])
+}
+
+func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesWithWrongVisibility() {
+	accountEntry := &ProfileShowcaseAccountPreference{
+		Address:            "0x32433445133424",
+		Name:               "Status Account",
+		ColorID:            "blue",
+		Emoji:              ">:-]",
+		ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
+		Order:              17,
+	}
+
+	collectibleEntry := &ProfileShowcaseCollectiblePreference{
+		ContractAddress:    "0x12378534257568678487683576",
+		ChainID:            "0x888",
+		TokenID:            "0x12321389592999f903",
+		CommunityID:        "0x01312357798976535",
+		AccountAddress:     "0x32433445133424",
+		ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+		Order:              17,
+	}
+
+	request := &ProfileShowcasePreferences{
+		Accounts:     []*ProfileShowcaseAccountPreference{accountEntry},
+		Collectibles: []*ProfileShowcaseCollectiblePreference{collectibleEntry},
+	}
+
+	err := s.m.SetProfileShowcasePreferences(request)
+	s.Require().Equal(errorAccountVisibilityLowerThanCollectible, err)
 }
 
 func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntries() {
@@ -237,16 +267,19 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 		},
 		Collectibles: []*protobuf.ProfileShowcaseCollectible{
 			&protobuf.ProfileShowcaseCollectible{
-				Uid:         "dj31nk13nrjn312jrmi1mjjd",
-				CommunityId: "0x12378534257568678487683576",
-				Order:       0,
+				ContractAddress: "0x12378534257568678487683576",
+				ChainId:         "0x888",
+				TokenId:         "0x12321389592999f903",
+				AccountAddress:  "0x32433445133424",
+				CommunityId:     "0x12378534257568678487683576",
+				Order:           0,
 			},
 		},
 		Assets: []*protobuf.ProfileShowcaseAsset{
 			&protobuf.ProfileShowcaseAsset{
 				Symbol:          "ETH",
 				CommunityId:     "0x01312357798976535235432345",
-				ContractAddress: "",
+				ContractAddress: "0xABCDEF123456789",
 				Order:           2,
 			},
 			&protobuf.ProfileShowcaseAsset{
@@ -286,7 +319,10 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 
 	s.Require().Equal(len(entries.Collectibles), len(entriesBack.Collectibles))
 	for i := 0; i < len(entriesBack.Collectibles); i++ {
-		s.Require().Equal(entries.Collectibles[i].Uid, entriesBack.Collectibles[i].Uid)
+		s.Require().Equal(entries.Collectibles[i].TokenId, entriesBack.Collectibles[i].TokenId)
+		s.Require().Equal(entries.Collectibles[i].ChainId, entriesBack.Collectibles[i].ChainId)
+		s.Require().Equal(entries.Collectibles[i].ContractAddress, entriesBack.Collectibles[i].ContractAddress)
+		s.Require().Equal(entries.Collectibles[i].AccountAddress, entriesBack.Collectibles[i].AccountAddress)
 		s.Require().Equal(entries.Collectibles[i].CommunityId, entriesBack.Collectibles[i].CommunityId)
 		s.Require().Equal(entries.Collectibles[i].Order, entriesBack.Collectibles[i].Order)
 	}

@@ -23,6 +23,7 @@ message ProfileShowcaseCollectible {
   string community_id = 4;
   string chain_id = 5;
   string token_id = 6;
+  string account_address = 7;
 }
 
 message ProfileShowcaseAsset {

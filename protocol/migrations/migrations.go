@@ -115,11 +115,11 @@
 // 1700044187_curated_communities.up.sql (131B)
 // 1700820989_add_resend_automatically_index.up.sql (77B)
 // 1702996953_add_communities_shards_table.up.sql (208B)
-// 1703576571_profile_showcase_address_and_community.up.sql (1.777kB)
 // 1704489636_add_album_images.up.sql (66B)
 // 1704821941_add_joined_at_for_community.up.sql (84B)
 // 1704832511_add_last_opened_at_for_communities.up.sql (89B)
 // 1704832512_add_peersyncing.up.sql (276B)
+// 1705306742_profile_showcase_address_and_community.up.sql (1.847kB)
 // README.md (554B)
 // doc.go (850B)
 
@@ -2490,26 +2490,6 @@ func _1702996953_add_communities_shards_tableUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __1703576571_profile_showcase_address_and_communityUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xb4\x93\xcb\x6e\xea\x30\x10\x86\xf7\x79\x8a\x11\x8b\x23\x90\x82\x74\xf6\xac\xd2\x60\xa4\xa8\x69\x82\xa2\x20\xc1\x2a\x32\xce\x50\xac\x86\x18\xd9\xa6\x15\x6f\x5f\x81\x83\xb9\x84\x4b\xd2\x96\xb5\xe7\x83\xc9\xf7\xff\xd3\xef\x43\x82\x4c\x22\xd5\x08\x9a\xce\x0b\x54\xb0\x10\x12\x94\x16\x92\x97\xef\xc0\x36\x52\x62\xa9\x61\xa3\x50\xc2\x5a\x8a\x05\x2f\x10\xd4\x52\x7c\x31\xaa\x10\x98\x28\x0a\x64\x9a\xef\xb1\x7f\x40\x95\x42\xad\x60\x2d\x71\x81\x12\x4b\x86\xca\x19\x26\xf1\x18\x52\xef\x25\x24\x07\x3a\x3b\xd0\xd9\x29\x9d\x9d\x40\x03\xc7\x4f\x88\x97\x92\xb6\x1c\x74\x1d\x00\x00\x26\x4a\x2d\x29\xd3\x19\xcd\x73\x89\x4a\x41\x4a\xa6\x29\x8c\x93\xe0\xcd\x4b\x66\xf0\x4a\x66\x10\x47\xe0\xc7\xd1\x28\x0c\xfc\x14\x12\x32\x0e\x3d\x9f\xb8\x06\x5d\x52\x5e\x66\x3c\x37\x48\x14\xa7\x10\x4d\xc2\xd0\xbc\x69\xf1\x81\xb7\xde\x98\x58\xad\x36\x25\xd7\x5b\xfb\x3e\x24\x23\x6f\x12\xa6\xd0\xe9\x98\x89\x4f\xae\xf8\x9c\x17\x5c\x6f\x21\x88\x8e\xb8\x9d\xfb\x6f\xc6\x94\x90\x3a\x13\x32\x47\xb9\x1f\xb3\xaf\x4e\x6f\xe0\xdc\x75\x69\xd4\xb7\xb1\x58\x27\xfe\xc0\xdf\x43\x0f\x6a\xbb\x9a\x8b\xe2\x79\x8e\x1e\xd4\xb9\x61\x83\x77\x08\x52\xb6\xdc\xbb\xa0\x4c\x1b\xf5\x41\x34\x24\xd3\x07\x75\xac\x80\x8c\xe7\x83\xe6\xdd\xaf\xa0\x76\xc5\x3f\x40\x77\x53\xbb\xa8\xe9\xd3\xea\x7d\x2b\x13\xd7\xee\x66\xa4\x5c\xfb\xf5\xd3\x66\x75\x8f\xa3\xae\x5d\xd7\xad\x7d\x9c\x6b\xd7\xed\xed\x52\xaf\xac\xb5\xcb\x67\xd7\xe2\xa6\x86\x8f\x94\xbd\xc3\x1b\x7f\x56\x5d\x55\xd3\x1a\x9c\x8f\x37\xbd\xd9\x9f\x44\xff\xab\xcb\x7c\x4e\xbc\x17\x6b\x37\x88\xb2\x66\xf7\x6a\x88\x35\x4b\x67\xf1\x7d\x07\x00\x00\xff\xff\xbf\x30\xb2\x30\xf1\x06\x00\x00")
-
-func _1703576571_profile_showcase_address_and_communityUpSqlBytes() ([]byte, error) {
-	return bindataRead(
-		__1703576571_profile_showcase_address_and_communityUpSql,
-		"1703576571_profile_showcase_address_and_community.up.sql",
-	)
-}
-
-func _1703576571_profile_showcase_address_and_communityUpSql() (*asset, error) {
-	bytes, err := _1703576571_profile_showcase_address_and_communityUpSqlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "1703576571_profile_showcase_address_and_community.up.sql", size: 1777, mode: os.FileMode(0644), modTime: time.Unix(1706026825, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x29, 0xaf, 0x2c, 0xa2, 0x8e, 0x7a, 0x89, 0xc8, 0xee, 0x1a, 0xfb, 0x94, 0x84, 0x6a, 0xb6, 0xf2, 0x3b, 0xd5, 0x8e, 0x5, 0xd0, 0x14, 0x3d, 0x2b, 0x72, 0xa8, 0x6e, 0x6, 0x32, 0x29, 0x94, 0xab}}
-	return a, nil
-}
-
 var __1704489636_add_album_imagesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x2d\x4e\x2d\x8a\xcf\x4d\x2d\x2e\x4e\x4c\x4f\x2d\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\xcc\x49\x2a\xcd\x8d\xcf\xcc\x05\x8b\x87\xb8\x46\x84\x28\xb8\xb8\xba\x39\x86\xfa\x84\x28\x28\x29\x59\x03\x02\x00\x00\xff\xff\x67\x96\x07\xf7\x42\x00\x00\x00")
 
 func _1704489636_add_album_imagesUpSqlBytes() ([]byte, error) {
@@ -2587,6 +2567,26 @@ func _1704832512_add_peersyncingUpSql() (*asset, error) {
 
 	info := bindataFileInfo{name: "1704832512_add_peersyncing.up.sql", size: 276, mode: os.FileMode(0644), modTime: time.Unix(1706026769, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x32, 0xfc, 0x4c, 0x13, 0x67, 0xfb, 0x26, 0x58, 0xd3, 0x7f, 0x72, 0xd0, 0xe7, 0xd7, 0x28, 0x41, 0xa8, 0xa3, 0xf3, 0x9f, 0x1, 0x4c, 0xdd, 0xb6, 0x7b, 0xa4, 0x2a, 0x27, 0xb2, 0x31, 0xb1, 0x30}}
+	return a, nil
+}
+
+var __1705306742_profile_showcase_address_and_communityUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xc4\x93\x4b\x6f\x82\x40\x10\xc7\xef\x7c\x8a\x89\x87\x46\x13\x4c\x7a\xf7\x44\x71\x4d\x48\x29\x18\x82\x89\x9e\xc8\xba\x8c\x75\x53\x64\xcd\xee\xd2\xc6\x6f\xdf\xe8\x22\x3e\xf0\x01\xad\x4d\xcf\x33\x3f\xd8\xf9\x3f\xfa\x7d\x88\x90\x49\xa4\x1a\x41\xd3\x79\x86\x0a\x16\x42\x82\xd2\x42\xf2\xfc\x1d\x58\x21\x25\xe6\x1a\x0a\x85\x12\xd6\x52\x2c\x78\x86\xa0\x96\xe2\x8b\x51\x85\xc0\x44\x96\x21\xd3\x7c\x87\x3d\x01\x55\x0a\xb5\x82\xb5\xc4\x05\x4a\xcc\x19\x2a\x6b\x18\x85\x63\x88\x9d\x17\x9f\xec\xe9\x64\x4f\x27\xc7\x74\x72\x04\x0d\x2c\x37\x22\x4e\x4c\xda\x72\xd0\xb5\x00\x00\x98\xc8\xb5\xa4\x4c\x27\x34\x4d\x25\x2a\x05\x31\x99\xc6\x30\x8e\xbc\x37\x27\x9a\xc1\x2b\x99\x41\x18\x80\x1b\x06\x23\xdf\x73\x63\x88\xc8\xd8\x77\x5c\x62\x1b\x74\x49\x79\x9e\xf0\xd4\x20\x41\x18\x43\x30\xf1\x7d\x33\xd3\xe2\x03\xaf\xcd\x98\x58\xad\x8a\x9c\xeb\x4d\x35\x1f\x92\x91\x33\xf1\x63\xe8\x74\xcc\x06\x65\x4c\x14\xf9\xd9\x9b\x4e\x3f\xf2\xc9\x15\x9f\xf3\x8c\xeb\x0d\x78\xc1\x61\x58\x7d\xea\xd9\xac\x29\x21\x75\x22\x64\x8a\x72\xb7\x56\x4d\xad\xde\xc0\xba\x29\xb7\x71\xa7\x8d\xd0\x75\xe2\x01\x12\xdf\x95\x4a\x6d\x56\x73\x91\x5d\x9e\x3d\x42\xa3\x3b\x89\x6f\x18\xf2\x2d\x82\x94\x2d\x77\x5a\x50\xa6\x8d\xf4\x5e\x30\x24\xd3\x3b\x89\x2d\x81\x84\xa7\x83\xe6\xf5\x28\xa1\x76\xdd\xd8\x43\x37\x5d\x3b\x4b\xf2\x7f\x36\xe0\x9a\x6d\x76\xf5\x7c\xa3\xdb\x25\xf6\x38\x7c\xdd\xc3\xaa\x5d\x5d\x64\xd7\xee\xb7\xab\x8b\x7a\xdb\x60\x94\xc2\xb6\xb3\x70\x1b\xf4\xa6\x26\x1c\xa8\xaa\xaa\x57\x7e\x56\x16\xaf\x69\x52\x4e\xd7\x9b\xd6\xfa\x27\xe9\xf8\x55\x79\xff\xc6\xde\xb3\x67\x37\xb0\xb2\xa6\xee\x45\x13\x6b\x2a\x9d\xd8\xf7\x1d\x00\x00\xff\xff\x49\xc9\x19\x5d\x37\x07\x00\x00")
+
+func _1705306742_profile_showcase_address_and_communityUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1705306742_profile_showcase_address_and_communityUpSql,
+		"1705306742_profile_showcase_address_and_community.up.sql",
+	)
+}
+
+func _1705306742_profile_showcase_address_and_communityUpSql() (*asset, error) {
+	bytes, err := _1705306742_profile_showcase_address_and_communityUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1705306742_profile_showcase_address_and_community.up.sql", size: 1847, mode: os.FileMode(0644), modTime: time.Unix(1706026854, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xda, 0xd8, 0x79, 0xed, 0xe1, 0x43, 0x7b, 0xcf, 0xe9, 0x8, 0xef, 0x23, 0x6b, 0xcc, 0xb7, 0x3c, 0x2a, 0xd2, 0x38, 0xca, 0x65, 0x37, 0xec, 0x83, 0xf7, 0xe4, 0xae, 0x64, 0xd0, 0x68, 0xf0, 0x39}}
 	return a, nil
 }
 
@@ -2951,8 +2951,6 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1702996953_add_communities_shards_table.up.sql": _1702996953_add_communities_shards_tableUpSql,
 
-	"1703576571_profile_showcase_address_and_community.up.sql": _1703576571_profile_showcase_address_and_communityUpSql,
-
 	"1704489636_add_album_images.up.sql": _1704489636_add_album_imagesUpSql,
 
 	"1704821941_add_joined_at_for_community.up.sql": _1704821941_add_joined_at_for_communityUpSql,
@@ -2960,6 +2958,8 @@ var _bindata = map[string]func() (*asset, error){
 	"1704832511_add_last_opened_at_for_communities.up.sql": _1704832511_add_last_opened_at_for_communitiesUpSql,
 
 	"1704832512_add_peersyncing.up.sql": _1704832512_add_peersyncingUpSql,
+
+	"1705306742_profile_showcase_address_and_community.up.sql": _1705306742_profile_showcase_address_and_communityUpSql,
 
 	"README.md": readmeMd,
 
@@ -3122,13 +3122,13 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1700044187_curated_communities.up.sql":                                       &bintree{_1700044187_curated_communitiesUpSql, map[string]*bintree{}},
 	"1700820989_add_resend_automatically_index.up.sql":                            &bintree{_1700820989_add_resend_automatically_indexUpSql, map[string]*bintree{}},
 	"1702996953_add_communities_shards_table.up.sql":                              &bintree{_1702996953_add_communities_shards_tableUpSql, map[string]*bintree{}},
-	"1703576571_profile_showcase_address_and_community.up.sql":                    &bintree{_1703576571_profile_showcase_address_and_communityUpSql, map[string]*bintree{}},
 	"1704489636_add_album_images.up.sql":                                          &bintree{_1704489636_add_album_imagesUpSql, map[string]*bintree{}},
 	"1704821941_add_joined_at_for_community.up.sql":                               &bintree{_1704821941_add_joined_at_for_communityUpSql, map[string]*bintree{}},
 	"1704832511_add_last_opened_at_for_communities.up.sql":                        &bintree{_1704832511_add_last_opened_at_for_communitiesUpSql, map[string]*bintree{}},
 	"1704832512_add_peersyncing.up.sql":                                           &bintree{_1704832512_add_peersyncingUpSql, map[string]*bintree{}},
-	"README.md":                                                                   &bintree{readmeMd, map[string]*bintree{}},
-	"doc.go":                                                                      &bintree{docGo, map[string]*bintree{}},
+	"1705306742_profile_showcase_address_and_community.up.sql":                    &bintree{_1705306742_profile_showcase_address_and_communityUpSql, map[string]*bintree{}},
+	"README.md": &bintree{readmeMd, map[string]*bintree{}},
+	"doc.go":    &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
