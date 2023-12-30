@@ -532,6 +532,7 @@ func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB,
 			b.stickersService(accountsDB),
 			b.pendingTracker,
 			walletFeed,
+			b.httpServer,
 		)
 	}
 	return b.walletSrvc

@@ -2,6 +2,11 @@ package communities
 
 import "github.com/status-im/status-go/protocol/protobuf"
 
+type KeyDistributor interface {
+	Generate(community *Community, keyActions *EncryptionKeyActions) error
+	Distribute(community *Community, keyActions *EncryptionKeyActions) error
+}
+
 type EncryptionKeyActionType int
 
 const (

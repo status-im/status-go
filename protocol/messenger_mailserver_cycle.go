@@ -28,13 +28,7 @@ const isAndroidEmulator = runtime.GOOS == "android" && runtime.GOARCH == "amd64"
 const findNearestMailServer = !isAndroidEmulator
 
 func (m *Messenger) mailserversByFleet(fleet string) []mailservers.Mailserver {
-	var items []mailservers.Mailserver
-	for _, ms := range mailservers.DefaultMailservers() {
-		if ms.Fleet == fleet {
-			items = append(items, ms)
-		}
-	}
-	return items
+	return mailservers.DefaultMailserversByFleet(fleet)
 }
 
 type byRTTMsAndCanConnectBefore []SortedMailserver
@@ -64,7 +58,7 @@ func (m *Messenger) StartMailserverCycle(mailservers []mailservers.Mailserver) e
 	switch version {
 	case 1:
 		if m.server == nil {
-			m.logger.Warn("not starting mailserver cycle")
+			m.logger.Warn("not starting mailserver cycle: no p2p server is set")
 			return nil
 		}
 
@@ -73,6 +67,10 @@ func (m *Messenger) StartMailserverCycle(mailservers []mailservers.Mailserver) e
 		go m.updateWakuV1PeerStatus()
 
 	case 2:
+		if len(mailservers) == 0 {
+			m.logger.Warn("not starting mailserver cycle: empty mailservers list")
+			return nil
+		}
 		for _, storenode := range mailservers {
 			_, err := m.transport.AddStorePeer(storenode.Address)
 			if err != nil {

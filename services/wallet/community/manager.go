@@ -2,23 +2,39 @@ package community
 
 import (
 	"database/sql"
-	"fmt"
-	"time"
+	"encoding/json"
 
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
-const failedCommunityFetchRetryDelay = 1 * time.Hour
+// These events are used to notify the UI of state changes
+const (
+	EventCommmunityDataUpdated walletevent.EventType = "wallet-community-data-updated"
+)
 
 type Manager struct {
 	db                    *DataDB
 	communityInfoProvider thirdparty.CommunityInfoProvider
+	mediaServer           *server.MediaServer
+	feed                  *event.Feed
 }
 
-func NewManager(db *sql.DB) *Manager {
+type Data struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
+	Image string `json:"image,omitempty"`
+}
+
+func NewManager(db *sql.DB, mediaServer *server.MediaServer, feed *event.Feed) *Manager {
 	return &Manager{
-		db: NewDataDB(db),
+		db:          NewDataDB(db),
+		mediaServer: mediaServer,
+		feed:        feed,
 	}
 }
 
@@ -28,7 +44,14 @@ func (cm *Manager) SetCommunityInfoProvider(communityInfoProvider thirdparty.Com
 }
 
 func (cm *Manager) GetCommunityInfo(id string) (*thirdparty.CommunityInfo, *InfoState, error) {
-	return cm.db.GetCommunityInfo(id)
+	communityInfo, state, err := cm.db.GetCommunityInfo(id)
+	if err != nil {
+		return nil, nil, err
+	}
+	if cm.mediaServer != nil && communityInfo != nil && len(communityInfo.CommunityImagePayload) > 0 {
+		communityInfo.CommunityImage = cm.mediaServer.MakeWalletCommunityImagesURL(id)
+	}
+	return communityInfo, state, err
 }
 
 func (cm *Manager) GetCommunityID(tokenURI string) string {
@@ -43,36 +66,7 @@ func (cm *Manager) setCommunityInfo(id string, c *thirdparty.CommunityInfo) (err
 	return cm.db.SetCommunityInfo(id, c)
 }
 
-func (cm *Manager) mustFetchCommunityInfo(communityID string) bool {
-	// See if we have cached data
-	_, state, err := cm.GetCommunityInfo(communityID)
-	if err != nil {
-		return true
-	}
-
-	// If we don't have a state, this community has never been fetched before
-	if state == nil {
-		return true
-	}
-
-	// If the last fetch was successful, we can safely refresh our cache
-	if state.LastUpdateSuccesful {
-		return true
-	}
-
-	// If the last fetch was not successful, we should only retry after a delay
-	if time.Unix(int64(state.LastUpdateTimestamp), 0).Add(failedCommunityFetchRetryDelay).Before(time.Now()) {
-		return true
-	}
-
-	return false
-}
-
 func (cm *Manager) FetchCommunityInfo(communityID string) (*thirdparty.CommunityInfo, error) {
-	if !cm.mustFetchCommunityInfo(communityID) {
-		return nil, fmt.Errorf("backing off fetchCommunityInfo for id: %s", communityID)
-	}
-
 	communityInfo, err := cm.communityInfoProvider.FetchCommunityInfo(communityID)
 	if err != nil {
 		dbErr := cm.setCommunityInfo(communityID, nil)
@@ -81,7 +75,43 @@ func (cm *Manager) FetchCommunityInfo(communityID string) (*thirdparty.Community
 		}
 		return nil, err
 	}
-
 	err = cm.setCommunityInfo(communityID, communityInfo)
 	return communityInfo, err
+}
+
+func (cm *Manager) FetchCommunityMetadataAsync(communityID string) {
+	go func() {
+		communityInfo, err := cm.FetchCommunityInfo(communityID)
+		if err != nil {
+			log.Error("FetchCommunityInfo failed", "communityID", communityID, "err", err)
+			return
+		}
+
+		cm.signalUpdatedCommunityMetadata(communityID, communityInfo)
+	}()
+}
+
+func (cm *Manager) signalUpdatedCommunityMetadata(communityID string, communityInfo *thirdparty.CommunityInfo) {
+	if communityInfo == nil {
+		return
+	}
+	data := Data{
+		ID:    communityID,
+		Name:  communityInfo.CommunityName,
+		Color: communityInfo.CommunityColor,
+		Image: communityInfo.CommunityImage, // TODO make media server url after merging community token media server changes
+	}
+
+	payload, err := json.Marshal(data)
+	if err != nil {
+		log.Error("Error marshaling response: %v", err)
+		return
+	}
+
+	event := walletevent.Event{
+		Type:    EventCommmunityDataUpdated,
+		Message: string(payload),
+	}
+
+	cm.feed.Send(event)
 }

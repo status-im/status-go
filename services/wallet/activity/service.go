@@ -153,7 +153,7 @@ func (s *Service) GetActivityCollectiblesAsync(requestID int32, chainIDs []w_com
 			return nil, err
 		}
 
-		data, err := s.collectibles.FetchAssetsByCollectibleUniqueID(ctx, collectibles)
+		data, err := s.collectibles.FetchAssetsByCollectibleUniqueID(ctx, collectibles, true)
 		if err != nil {
 			return nil, err
 		}
@@ -222,7 +222,7 @@ func (s *Service) getActivityDetails(ctx context.Context, entries []Entry) ([]*E
 
 	log.Debug("wallet.activity.Service lazyLoadDetails", "entries.len", len(entries), "ids.len", len(ids))
 
-	colData, err := s.collectibles.FetchAssetsByCollectibleUniqueID(ctx, ids)
+	colData, err := s.collectibles.FetchAssetsByCollectibleUniqueID(ctx, ids, true)
 	if err != nil {
 		log.Error("Error fetching collectible details", "error", err)
 		return nil, err

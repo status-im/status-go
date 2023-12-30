@@ -54,13 +54,14 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
 
-	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
+	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
@@ -1030,7 +1031,9 @@ func (w *Waku) broadcast() {
 			var fn publishFn
 			if w.settings.SkipPublishToTopic {
 				// For now only used in testing to simulate going offline
-				fn = func(env *protocol.Envelope, logger *zap.Logger) error { return errors.New("test send failure") }
+				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
+					return errors.New("test send failure")
+				}
 			} else if w.settings.LightClient {
 				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
 					logger.Info("publishing message via lightpush")
@@ -1045,6 +1048,7 @@ func (w *Waku) broadcast() {
 				}
 			}
 
+			w.wg.Add(1)
 			go w.publishEnvelope(envelope, fn, logger)
 		case <-w.ctx.Done():
 			return
@@ -1055,6 +1059,8 @@ func (w *Waku) broadcast() {
 type publishFn = func(envelope *protocol.Envelope, logger *zap.Logger) error
 
 func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publishFn, logger *zap.Logger) {
+	defer w.wg.Done()
+
 	var event common.EventType
 	if err := publishFn(envelope, logger); err != nil {
 		logger.Error("could not send message", zap.Error(err))
@@ -1118,6 +1124,8 @@ func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 		PubsubTopic:   pubsubTopic,
 	}
 
+	w.logger.Debug("store.query", zap.Int64p("startTime", query.StartTime), zap.Int64p("endTime", query.EndTime), zap.Strings("contentTopics", query.ContentTopics), zap.String("pubsubTopic", query.PubsubTopic), zap.Stringer("peerID", peerID))
+
 	return w.node.Store().Query(ctx, query, opts...)
 }
 
@@ -1142,7 +1150,11 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 		msg.RateLimitProof = nil
 
 		envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), pubsubTopic)
-		w.logger.Info("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", pubsubTopic))
+		w.logger.Info("received waku2 store message",
+			zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())),
+			zap.String("pubsubTopic", pubsubTopic),
+			zap.Int64p("timestamp", envelope.Message().Timestamp),
+		)
 
 		err = w.OnNewEnvelopes(envelope, common.StoreMessageType, processEnvelopes)
 		if err != nil {

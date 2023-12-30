@@ -3,6 +3,7 @@ package collectibles
 import (
 	"context"
 	"errors"
+	"math/big"
 	"sync/atomic"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -181,6 +183,18 @@ func (c *loadOwnedCollectiblesCommand) triggerEvent(eventType walletevent.EventT
 	})
 }
 
+func ownedTokensToTokenBalancesPerContractAddress(ownership []thirdparty.CollectibleUniqueID) thirdparty.TokenBalancesPerContractAddress {
+	ret := make(thirdparty.TokenBalancesPerContractAddress)
+	for _, id := range ownership {
+		balance := thirdparty.TokenBalance{
+			TokenID: id.TokenID,
+			Balance: &bigint.BigInt{Int: big.NewInt(1)},
+		}
+		ret[id.ContractID.Address] = append(ret[id.ContractID.Address], balance)
+	}
+	return ret
+}
+
 func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 	log.Debug("start loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account)
 
@@ -233,7 +247,12 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 					return err
 				}
 
-				err = c.ownershipDB.Update(c.chainID, c.account, c.partialOwnership, start.Unix())
+				// Token balances should come from the providers. For now we assume all balances are 1, which
+				// is only valid for ERC721.
+				// TODO (#13025): Fetch balances from the providers.
+				balances := ownedTokensToTokenBalancesPerContractAddress(c.partialOwnership)
+
+				err = c.ownershipDB.Update(c.chainID, c.account, balances, start.Unix())
 				if err != nil {
 					log.Error("failed updating ownershipDB in loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "error", err)
 					c.err = err

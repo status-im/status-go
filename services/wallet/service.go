@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/wallet/activity"
@@ -57,6 +58,7 @@ func NewService(
 	stickers *stickers.Service,
 	pendingTxManager *transactions.PendingTxTracker,
 	feed *event.Feed,
+	mediaServer *server.MediaServer,
 ) *Service {
 	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceStatic,
@@ -97,9 +99,9 @@ func NewService(
 		})
 	})
 
-	communityManager := community.NewManager(db)
+	communityManager := community.NewManager(db, mediaServer, feed)
 	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
-	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB)
+	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer)
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(db, gethManager, transactor, config, accountsDB, pendingTxManager, feed)
 	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountFeed, feed, transactionManager, pendingTxManager,
@@ -108,7 +110,7 @@ func NewService(
 	cryptoCompare := cryptocompare.NewClient()
 	coingecko := coingecko.NewClient()
 	marketManager := market.NewManager(cryptoCompare, coingecko, feed)
-	reader := NewReader(rpcClient, tokenManager, marketManager, accountsDB, NewPersistence(db), feed)
+	reader := NewReader(rpcClient, tokenManager, marketManager, communityManager, accountsDB, NewPersistence(db), feed)
 	history := history.NewService(db, accountsDB, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
 	blockChainState := NewBlockChainState(rpcClient, accountsDB)
@@ -142,7 +144,7 @@ func NewService(
 		alchemyClient,
 	}
 
-	collectiblesManager := collectibles.NewManager(db, rpcClient, communityManager, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, feed)
+	collectiblesManager := collectibles.NewManager(db, rpcClient, communityManager, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, mediaServer, feed)
 	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, settingsFeed, communityManager, rpcClient.NetworkManager, collectiblesManager)
 
 	activity := activity.NewService(db, tokenManager, collectiblesManager, feed)

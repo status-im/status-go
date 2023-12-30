@@ -19,8 +19,9 @@
 package wakuv2
 
 import (
-	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
+	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 
 	"github.com/status-im/status-go/wakuv2/common"
 )

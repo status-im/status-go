@@ -226,15 +226,15 @@ func (h *HopBridge) GetContractAddress(network *params.Network, token *token.Tok
 	return &address
 }
 
-func (h *HopBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (tx *ethTypes.Transaction, unlock transactions.UnlockNonceFunc, err error) {
+func (h *HopBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
 	fromNetwork := h.contractMaker.RPCClient.NetworkManager.Find(sendArgs.ChainID)
 	if fromNetwork == nil {
-		return tx, nil, err
+		return tx, err
 	}
 
-	nonce, unlock, err := h.transactor.NextNonce(h.contractMaker.RPCClient, sendArgs.ChainID, sendArgs.HopTx.From)
+	nonce, err := h.transactor.NextNonce(h.contractMaker.RPCClient, sendArgs.ChainID, sendArgs.HopTx.From)
 	if err != nil {
-		return tx, nil, err
+		return tx, err
 	}
 
 	argNonce := hexutil.Uint64(nonce)
@@ -243,26 +243,21 @@ func (h *HopBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.Signe
 	token := h.tokenManager.FindToken(fromNetwork, sendArgs.HopTx.Symbol)
 	if fromNetwork.Layer == 1 {
 		tx, err = h.sendToL2(sendArgs.ChainID, sendArgs.HopTx, signerFn, token)
-		return tx, unlock, err
+		return tx, err
 	}
 	tx, err = h.swapAndSend(sendArgs.ChainID, sendArgs.HopTx, signerFn, token)
-	return tx, unlock, err
+	return tx, err
 }
 
 func (h *HopBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
-	tx, unlock, err := h.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.HopTx.From, verifiedAccount))
-	defer func() {
-		if unlock != nil {
-			unlock(err == nil, tx.Nonce())
-		}
-	}()
+	tx, err := h.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.HopTx.From, verifiedAccount))
 	if err != nil {
 		return types.Hash{}, err
 	}
 	return types.Hash(tx.Hash()), nil
 }
 
-func (h *HopBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, transactions.UnlockNonceFunc, error) {
+func (h *HopBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error) {
 	return h.sendOrBuild(sendArgs, nil)
 }
 

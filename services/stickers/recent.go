@@ -10,23 +10,43 @@ import (
 const maxNumberRecentStickers = 24
 
 func (api *API) recentStickers() ([]Sticker, error) {
-	recentStickersList := make([]Sticker, 0)
+	installedStickersPacksJSON, err := api.accountsDB.GetInstalledStickerPacks()
+
+	if err != nil || installedStickersPacksJSON == nil {
+		return []Sticker{}, nil
+	}
 
 	recentStickersJSON, err := api.accountsDB.GetRecentStickers()
-	if err != nil {
-		return recentStickersList, err
+
+	if err != nil || recentStickersJSON == nil {
+		return []Sticker{}, nil
 	}
 
-	if recentStickersJSON == nil {
-		return recentStickersList, nil
+	recentStickersList := make([]Sticker, 0)
+	if err := json.Unmarshal(*recentStickersJSON, &recentStickersList); err != nil {
+		return []Sticker{}, err
 	}
 
-	err = json.Unmarshal(*recentStickersJSON, &recentStickersList)
-	if err != nil {
-		return recentStickersList, err
+	var installedStickersPacks map[string]StickerPack
+	if err := json.Unmarshal(*installedStickersPacksJSON, &installedStickersPacks); err != nil {
+		return []Sticker{}, err
 	}
 
-	return recentStickersList, nil
+	recentStickersListInExistingPacks := make([]Sticker, 0)
+	existingPackIDs := make(map[string]bool)
+
+	for k := range installedStickersPacks {
+		existingPackIDs[k] = true
+	}
+
+	for _, s := range recentStickersList {
+		packIDStr := s.PackID.String()
+		if _, exists := existingPackIDs[packIDStr]; exists {
+			recentStickersListInExistingPacks = append(recentStickersListInExistingPacks, s)
+		}
+	}
+
+	return recentStickersListInExistingPacks, nil
 }
 
 func (api *API) ClearRecent() error {

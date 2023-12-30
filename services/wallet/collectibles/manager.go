@@ -3,6 +3,7 @@ package collectibles
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"math/big"
 	"net/http"
@@ -17,6 +18,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/community"
@@ -26,6 +29,7 @@ import (
 )
 
 const requestTimeout = 5 * time.Second
+const signalUpdatedCollectiblesDataPageSize = 10
 
 const hystrixContractOwnershipClientName = "contractOwnershipClient"
 
@@ -44,7 +48,7 @@ var (
 )
 
 type ManagerInterface interface {
-	FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error)
+	FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID, asyncFetch bool) ([]thirdparty.FullCollectibleData, error)
 }
 
 type Manager struct {
@@ -60,9 +64,13 @@ type Manager struct {
 	collectiblesDataDB *CollectibleDataDB
 	collectionsDataDB  *CollectionDataDB
 	communityManager   *community.Manager
+	ownershipDB        *OwnershipDB
+
+	mediaServer *server.MediaServer
 
 	statuses       map[string]*connection.Status
 	statusNotifier *connection.StatusNotifier
+	feed           *event.Feed
 }
 
 func NewManager(
@@ -73,6 +81,7 @@ func NewManager(
 	accountOwnershipProviders []thirdparty.CollectibleAccountOwnershipProvider,
 	collectibleDataProviders []thirdparty.CollectibleDataProvider,
 	collectionDataProviders []thirdparty.CollectionDataProvider,
+	mediaServer *server.MediaServer,
 	feed *event.Feed) *Manager {
 	hystrix.ConfigureCommand(hystrixContractOwnershipClientName, hystrix.CommandConfig{
 		Timeout:               10000,
@@ -135,8 +144,11 @@ func NewManager(
 		collectiblesDataDB: NewCollectibleDataDB(db),
 		collectionsDataDB:  NewCollectionDataDB(db),
 		communityManager:   communityManager,
+		ownershipDB:        ownershipDB,
+		mediaServer:        mediaServer,
 		statuses:           statuses,
 		statusNotifier:     statusNotifier,
+		feed:               feed,
 	}
 }
 
@@ -257,7 +269,7 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, c
 			continue
 		}
 
-		err = o.processFullCollectibleData(ctx, assetContainer.Items)
+		_, err = o.processFullCollectibleData(ctx, assetContainer.Items, true)
 		if err != nil {
 			return nil, err
 		}
@@ -290,7 +302,7 @@ func (o *Manager) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommo
 			continue
 		}
 
-		err = o.processFullCollectibleData(ctx, assetContainer.Items)
+		_, err = o.processFullCollectibleData(ctx, assetContainer.Items, true)
 		if err != nil {
 			return nil, err
 		}
@@ -316,7 +328,10 @@ func (o *Manager) FetchCollectibleOwnershipByOwner(ctx context.Context, chainID 
 	return &ret, nil
 }
 
-func (o *Manager) FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
+// Returns collectible metadata for the given unique IDs.
+// If asyncFetch is true, empty metadata will be returned for any missing collectibles and an EventCollectiblesDataUpdated will be sent when the data is ready.
+// If asyncFetch is false, it will wait for all collectibles' metadata to be retrieved before returning.
+func (o *Manager) FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID, asyncFetch bool) ([]thirdparty.FullCollectibleData, error) {
 	missingIDs, err := o.collectiblesDataDB.GetIDsNotInDB(uniqueIDs)
 	if err != nil {
 		return nil, err
@@ -324,27 +339,40 @@ func (o *Manager) FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueID
 
 	missingIDsPerChainID := thirdparty.GroupCollectibleUIDsByChainID(missingIDs)
 
-	for chainID, idsToFetch := range missingIDsPerChainID {
-		defer o.checkConnectionStatus(chainID)
+	group := async.NewGroup(ctx)
+	group.Add(func(ctx context.Context) error {
+		for chainID, idsToFetch := range missingIDsPerChainID {
+			defer o.checkConnectionStatus(chainID)
 
-		for _, provider := range o.collectibleDataProviders {
-			if !provider.IsChainSupported(chainID) {
-				continue
+			for _, provider := range o.collectibleDataProviders {
+				if !provider.IsChainSupported(chainID) {
+					continue
+				}
+
+				fetchedAssets, err := provider.FetchAssetsByCollectibleUniqueID(ctx, idsToFetch)
+				if err != nil {
+					log.Error("FetchAssetsByCollectibleUniqueID failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+					continue
+				}
+
+				updatedCollectibles, err := o.processFullCollectibleData(ctx, fetchedAssets, asyncFetch)
+				if err != nil {
+					log.Error("processFullCollectibleData failed for", "provider", provider.ID(), "chainID", chainID, "len(fetchedAssets)", len(fetchedAssets), "err", err)
+					return err
+				}
+
+				if asyncFetch {
+					o.signalUpdatedCollectiblesData(updatedCollectibles)
+				}
+				break
 			}
-
-			fetchedAssets, err := provider.FetchAssetsByCollectibleUniqueID(ctx, idsToFetch)
-			if err != nil {
-				log.Error("FetchAssetsByCollectibleUniqueID failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
-				continue
-			}
-
-			err = o.processFullCollectibleData(ctx, fetchedAssets)
-			if err != nil {
-				return nil, err
-			}
-
-			break
 		}
+
+		return nil
+	})
+
+	if !asyncFetch {
+		group.Wait()
 	}
 
 	return o.getCacheFullCollectibleData(uniqueIDs)
@@ -440,12 +468,6 @@ func (o *Manager) FetchCollectibleOwnersByContractAddress(ctx context.Context, c
 	return owners.(*thirdparty.CollectibleContractOwnership), nil
 }
 
-func isMetadataEmpty(asset thirdparty.CollectibleData) bool {
-	return asset.Name == "" &&
-		asset.Description == "" &&
-		asset.ImageURL == ""
-}
-
 func (o *Manager) fetchTokenURI(ctx context.Context, id thirdparty.CollectibleUniqueID) (string, error) {
 	if id.TokenID == nil {
 		return "", errors.New("empty token ID")
@@ -477,9 +499,18 @@ func (o *Manager) fetchTokenURI(ctx context.Context, id thirdparty.CollectibleUn
 	return tokenURI, err
 }
 
-func (o *Manager) processFullCollectibleData(ctx context.Context, assets []thirdparty.FullCollectibleData) error {
+func isMetadataEmpty(asset thirdparty.CollectibleData) bool {
+	return asset.Description == "" &&
+		asset.ImageURL == ""
+}
+
+// Processes collectible metadata obtained from a provider and ensures any missing data is fetched.
+// If asyncFetch is true, community collectibles metadata will be fetched async and an EventCollectiblesDataUpdated will be sent when the data is ready.
+// If asyncFetch is false, it will wait for all community collectibles' metadata to be retrieved before returning.
+func (o *Manager) processFullCollectibleData(ctx context.Context, assets []thirdparty.FullCollectibleData, asyncFetch bool) ([]thirdparty.CollectibleUniqueID, error) {
 	fullyFetchedAssets := make(map[string]*thirdparty.FullCollectibleData)
 	communityCollectibles := make(map[string][]*thirdparty.FullCollectibleData)
+	processedIDs := make([]thirdparty.CollectibleUniqueID, 0, len(assets))
 
 	// Start with all assets, remove if any of the fetch steps fail
 	for idx := range assets {
@@ -488,15 +519,19 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 		fullyFetchedAssets[id.HashKey()] = asset
 	}
 
+	// Detect community collectibles
 	for _, asset := range fullyFetchedAssets {
 		// Only check community ownership if metadata is empty
 		if isMetadataEmpty(asset.CollectibleData) {
+			// Get TokenURI if not given by provider
 			err := o.fillTokenURI(ctx, asset)
 			if err != nil {
 				log.Error("fillTokenURI failed", "err", err)
 				delete(fullyFetchedAssets, asset.CollectibleData.ID.HashKey())
 				continue
 			}
+
+			// Get CommunityID if obtainable from TokenURI
 			err = o.fillCommunityID(asset)
 			if err != nil {
 				log.Error("fillCommunityID failed", "err", err)
@@ -504,25 +539,32 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 				continue
 			}
 
+			// Get metadata from community if community collectible
 			communityID := asset.CollectibleData.CommunityID
 			if communityID != "" {
 				if _, ok := communityCollectibles[communityID]; !ok {
 					communityCollectibles[communityID] = make([]*thirdparty.FullCollectibleData, 0)
 				}
 				communityCollectibles[communityID] = append(communityCollectibles[communityID], asset)
+
+				// Community collectibles are handled separately, remove from list
+				delete(fullyFetchedAssets, asset.CollectibleData.ID.HashKey())
 			}
 		}
 	}
 
 	// Community collectibles are grouped by community ID
-	// If fetching data for one community fails (for example, owner node is down),
-	// skip and continue with the other communities.
 	for communityID, communityAssets := range communityCollectibles {
-		err := o.fillCommunityInfo(communityID, communityAssets)
-		if err != nil {
-			log.Error("fillCommunityInfo failed", "communityID", communityID, "err", err)
-			for _, communityAsset := range communityAssets {
-				delete(fullyFetchedAssets, communityAsset.CollectibleData.ID.HashKey())
+		if asyncFetch {
+			o.fetchCommunityAssetsAsync(ctx, communityID, communityAssets)
+		} else {
+			err := o.fetchCommunityAssets(communityID, communityAssets)
+			if err != nil {
+				log.Error("fetchCommunityAssets failed", "communityID", communityID, "err", err)
+				continue
+			}
+			for _, asset := range communityAssets {
+				processedIDs = append(processedIDs, asset.CollectibleData.ID)
 			}
 		}
 	}
@@ -543,6 +585,7 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 
 	for _, asset := range fullyFetchedAssets {
 		id := asset.CollectibleData.ID
+		processedIDs = append(processedIDs, id)
 
 		collectiblesData = append(collectiblesData, asset.CollectibleData)
 		if asset.CollectionData != nil {
@@ -554,32 +597,23 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 
 	err := o.collectiblesDataDB.SetData(collectiblesData)
 	if err != nil {
-		return err
-	}
-
-	for _, asset := range assets {
-		if asset.CommunityInfo != nil {
-			err = o.collectiblesDataDB.SetCommunityInfo(asset.CollectibleData.ID, *asset.CommunityInfo)
-			if err != nil {
-				return err
-			}
-		}
+		return nil, err
 	}
 
 	err = o.collectionsDataDB.SetData(collectionsData)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if len(missingCollectionIDs) > 0 {
 		// Calling this ensures collection data is fetched and cached (if not already available)
 		_, err := o.FetchCollectionsDataByContractID(ctx, missingCollectionIDs)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return processedIDs, nil
 }
 
 func (o *Manager) fillTokenURI(ctx context.Context, asset *thirdparty.FullCollectibleData) error {
@@ -611,9 +645,10 @@ func (o *Manager) fillCommunityID(asset *thirdparty.FullCollectibleData) error {
 	return nil
 }
 
-func (o *Manager) fillCommunityInfo(communityID string, communityAssets []*thirdparty.FullCollectibleData) error {
+func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*thirdparty.FullCollectibleData) error {
 	communityInfo, err := o.communityManager.FetchCommunityInfo(communityID)
 	if err != nil {
+		log.Error("fetchCommunityInfo failed", "communityID", communityID, "err", err)
 		return err
 	}
 
@@ -621,12 +656,68 @@ func (o *Manager) fillCommunityInfo(communityID string, communityAssets []*third
 		for _, communityAsset := range communityAssets {
 			err := o.communityManager.FillCollectibleMetadata(communityAsset)
 			if err != nil {
+				log.Error("FillCollectibleMetadata failed", "communityID", communityID, "err", err)
+				return err
+			}
+		}
+	} else {
+		log.Warn("fetchCommunityAssets community not found", "communityID", communityID)
+	}
+
+	collectiblesData := make([]thirdparty.CollectibleData, 0, len(communityAssets))
+	collectionsData := make([]thirdparty.CollectionData, 0, len(communityAssets))
+
+	for _, asset := range communityAssets {
+		collectiblesData = append(collectiblesData, asset.CollectibleData)
+		if asset.CollectionData != nil {
+			collectionsData = append(collectionsData, *asset.CollectionData)
+		}
+	}
+
+	err = o.collectiblesDataDB.SetData(collectiblesData)
+	if err != nil {
+		log.Error("collectiblesDataDB SetData failed", "communityID", communityID, "err", err)
+		return err
+	}
+
+	err = o.collectionsDataDB.SetData(collectionsData)
+	if err != nil {
+		log.Error("collectionsDataDB SetData failed", "communityID", communityID, "err", err)
+		return err
+	}
+
+	for _, asset := range communityAssets {
+		if asset.CollectibleCommunityInfo != nil {
+			err = o.collectiblesDataDB.SetCommunityInfo(asset.CollectibleData.ID, *asset.CollectibleCommunityInfo)
+			if err != nil {
+				log.Error("collectiblesDataDB SetCommunityInfo failed", "communityID", communityID, "err", err)
 				return err
 			}
 		}
 	}
 
 	return nil
+}
+
+func (o *Manager) fetchCommunityAssetsAsync(ctx context.Context, communityID string, communityAssets []*thirdparty.FullCollectibleData) {
+	if len(communityAssets) == 0 {
+		return
+	}
+
+	go func() {
+		err := o.fetchCommunityAssets(communityID, communityAssets)
+		if err != nil {
+			log.Error("fetchCommunityAssets failed", "communityID", communityID, "err", err)
+			return
+		}
+
+		// Metadata is up to date in db at this point, fetch and send Event.
+		ids := make([]thirdparty.CollectibleUniqueID, 0, len(communityAssets))
+		for _, asset := range communityAssets {
+			ids = append(ids, asset.CollectibleData.ID)
+		}
+		o.signalUpdatedCollectiblesData(ids)
+	}()
 }
 
 func (o *Manager) fillAnimationMediatype(ctx context.Context, asset *thirdparty.FullCollectibleData) error {
@@ -670,6 +761,9 @@ func (o *Manager) getCacheFullCollectibleData(uniqueIDs []thirdparty.Collectible
 				ID: id,
 			}
 		}
+		if o.mediaServer != nil && len(collectibleData.ImagePayload) > 0 {
+			collectibleData.ImageURL = o.mediaServer.MakeWalletCollectibleImagesURL(collectibleData.ID)
+		}
 
 		collectionData, ok := collectionsData[id.ContractID.HashKey()]
 		if !ok {
@@ -678,16 +772,31 @@ func (o *Manager) getCacheFullCollectibleData(uniqueIDs []thirdparty.Collectible
 				ID: id.ContractID,
 			}
 		}
+		if o.mediaServer != nil && len(collectionData.ImagePayload) > 0 {
+			collectionData.ImageURL = o.mediaServer.MakeWalletCollectionImagesURL(collectionData.ID)
+		}
 
-		communityInfo, err := o.collectiblesDataDB.GetCommunityInfo(id)
+		communityInfo, _, err := o.communityManager.GetCommunityInfo(collectibleData.CommunityID)
+		if err != nil {
+			return nil, err
+		}
+
+		collectibleCommunityInfo, err := o.collectiblesDataDB.GetCommunityInfo(id)
+		if err != nil {
+			return nil, err
+		}
+
+		ownership, err := o.ownershipDB.GetOwnership(id)
 		if err != nil {
 			return nil, err
 		}
 
 		fullData := thirdparty.FullCollectibleData{
-			CollectibleData: collectibleData,
-			CollectionData:  &collectionData,
-			CommunityInfo:   communityInfo,
+			CollectibleData:          collectibleData,
+			CollectionData:           &collectionData,
+			CommunityInfo:            communityInfo,
+			CollectibleCommunityInfo: collectibleCommunityInfo,
+			Ownership:                ownership,
 		}
 		ret = append(ret, fullData)
 	}
@@ -711,4 +820,37 @@ func (o *Manager) checkConnectionStatus(chainID walletCommon.ChainID) {
 		}
 	}
 	o.statuses[chainID.String()].SetIsConnected(false)
+}
+
+func (o *Manager) signalUpdatedCollectiblesData(ids []thirdparty.CollectibleUniqueID) {
+	// We limit how much collectibles data we send in each event to avoid problems on the client side
+	for startIdx := 0; startIdx < len(ids); startIdx += signalUpdatedCollectiblesDataPageSize {
+		endIdx := startIdx + signalUpdatedCollectiblesDataPageSize
+		if endIdx > len(ids) {
+			endIdx = len(ids)
+		}
+		pageIDs := ids[startIdx:endIdx]
+
+		collectibles, err := o.getCacheFullCollectibleData(pageIDs)
+		if err != nil {
+			log.Error("Error getting FullCollectibleData from cache: %v", err)
+			return
+		}
+
+		// Send update event with most complete data type available
+		details := fullCollectiblesDataToDetails(collectibles)
+
+		payload, err := json.Marshal(details)
+		if err != nil {
+			log.Error("Error marshaling response: %v", err)
+			return
+		}
+
+		event := walletevent.Event{
+			Type:    EventCollectiblesDataUpdated,
+			Message: string(payload),
+		}
+
+		o.feed.Send(event)
+	}
 }

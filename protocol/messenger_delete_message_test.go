@@ -515,7 +515,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageReplyToImage() {
 	ogMessage := sendResponse.Messages()[0]
 
 	// create an http server
-	mediaServer, err := server.NewMediaServer(nil, nil, nil)
+	mediaServer, err := server.NewMediaServer(nil, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(mediaServer)
 	s.Require().NoError(mediaServer.Start())
@@ -570,7 +570,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageForMeReplyToImage() {
 	ogMessage := sendResponse.Messages()[0]
 
 	// create an http server
-	mediaServer, err := server.NewMediaServer(nil, nil, nil)
+	mediaServer, err := server.NewMediaServer(nil, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(mediaServer)
 	s.Require().NoError(mediaServer.Start())

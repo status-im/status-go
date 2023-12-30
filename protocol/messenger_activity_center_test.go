@@ -140,7 +140,7 @@ func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 	defer TearDownMessenger(&s.Suite, bob)
 
 	// create an http server
-	mediaServer, err := server.NewMediaServer(nil, nil, nil)
+	mediaServer, err := server.NewMediaServer(nil, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(mediaServer)
 	s.Require().NoError(mediaServer.Start())
@@ -417,12 +417,12 @@ func (s *MessengerActivityCenterMessageSuite) confirmMentionAndReplyNotification
 func (s *MessengerActivityCenterMessageSuite) TestMarkMessagesSeenMarksNotificationsRead() {
 	alice, _, mentionMessage, replyMessage, _ := s.prepareCommunityChannelWithMentionAndReply()
 
-	_, _, notifications, err := alice.MarkMessagesSeen(replyMessage.ChatId, []string{mentionMessage.ID, replyMessage.ID})
+	response, err := alice.MarkMessagesRead(replyMessage.ChatId, []string{mentionMessage.ID, replyMessage.ID})
 
 	s.Require().NoError(err)
-	s.Require().Len(notifications, 2)
-	s.Require().True(notifications[0].Read)
-	s.Require().True(notifications[1].Read)
+	s.Require().Len(response.ActivityCenterNotifications(), 2)
+	s.Require().True(response.ActivityCenterNotifications()[0].Read)
+	s.Require().True(response.ActivityCenterNotifications()[1].Read)
 
 	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage, true)
 }

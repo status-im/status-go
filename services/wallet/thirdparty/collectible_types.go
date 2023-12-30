@@ -104,13 +104,14 @@ type CollectionTrait struct {
 
 // Collection info
 type CollectionData struct {
-	ID          ContractID                 `json:"id"`
-	CommunityID string                     `json:"community_id"`
-	Provider    string                     `json:"provider"`
-	Name        string                     `json:"name"`
-	Slug        string                     `json:"slug"`
-	ImageURL    string                     `json:"image_url"`
-	Traits      map[string]CollectionTrait `json:"traits"`
+	ID           ContractID `json:"id"`
+	CommunityID  string     `json:"community_id"`
+	Provider     string     `json:"provider"`
+	Name         string     `json:"name"`
+	Slug         string     `json:"slug"`
+	ImageURL     string     `json:"image_url"`
+	ImagePayload []byte
+	Traits       map[string]CollectionTrait `json:"traits"`
 }
 
 type CollectibleTrait struct {
@@ -129,11 +130,12 @@ type CollectibleData struct {
 	Description        string              `json:"description"`
 	Permalink          string              `json:"permalink"`
 	ImageURL           string              `json:"image_url"`
-	AnimationURL       string              `json:"animation_url"`
-	AnimationMediaType string              `json:"animation_media_type"`
-	Traits             []CollectibleTrait  `json:"traits"`
-	BackgroundColor    string              `json:"background_color"`
-	TokenURI           string              `json:"token_uri"`
+	ImagePayload       []byte
+	AnimationURL       string             `json:"animation_url"`
+	AnimationMediaType string             `json:"animation_media_type"`
+	Traits             []CollectibleTrait `json:"traits"`
+	BackgroundColor    string             `json:"background_color"`
+	TokenURI           string             `json:"token_uri"`
 }
 
 // Community-related collectible info. Present only for collectibles minted in a community.
@@ -144,9 +146,11 @@ type CollectibleCommunityInfo struct {
 // Combined Collection+Collectible info returned by the CollectibleProvider
 // Some providers may not return the CollectionData in the same API call, so it's optional
 type FullCollectibleData struct {
-	CollectibleData CollectibleData
-	CollectionData  *CollectionData
-	CommunityInfo   *CollectibleCommunityInfo
+	CollectibleData          CollectibleData
+	CollectionData           *CollectionData
+	CommunityInfo            *CommunityInfo
+	CollectibleCommunityInfo *CollectibleCommunityInfo
+	Ownership                []AccountBalance
 }
 
 type CollectiblesContainer[T any] struct {
@@ -194,6 +198,11 @@ type CollectibleOwner struct {
 type CollectibleContractOwnership struct {
 	ContractAddress common.Address     `json:"contractAddress"`
 	Owners          []CollectibleOwner `json:"owners"`
+}
+
+type AccountBalance struct {
+	Address common.Address `json:"address"`
+	Balance *bigint.BigInt `json:"balance"`
 }
 
 type CollectibleContractOwnershipProvider interface {

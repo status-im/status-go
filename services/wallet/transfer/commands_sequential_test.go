@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/community"
@@ -912,6 +913,9 @@ func TestFindBlocksCommand(t *testing.T) {
 		require.NoError(t, err)
 		tm := &TransactionManager{db, nil, nil, nil, nil, nil, nil, nil, nil, nil}
 
+		mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
+		require.NoError(t, err)
+
 		wdb := NewDB(db)
 		tc := &TestClient{
 			t:                              t,
@@ -933,7 +937,8 @@ func TestFindBlocksCommand(t *testing.T) {
 		}
 		client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 		client.SetClient(tc.NetworkID(), tc)
-		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb), network.NewManager(appdb), appdb)
+		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer)
+
 		tokenManager.SetTokens([]*token.Token{
 			{
 				Address:  tokenTXXAddress,
@@ -1041,6 +1046,9 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 	require.NoError(t, err)
 	tm := &TransactionManager{db, nil, nil, nil, nil, nil, nil, nil, nil, nil}
 
+	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
+	require.NoError(t, err)
+
 	wdb := NewDB(db)
 	blockChannel := make(chan []*DBHeader, 100)
 
@@ -1055,7 +1063,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 
 	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb), network.NewManager(appdb), appdb)
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer)
 
 	tokenManager.SetTokens([]*token.Token{
 		{
@@ -1152,6 +1160,9 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 	require.NoError(t, err)
 	tm := &TransactionManager{db, nil, nil, nil, nil, nil, nil, nil, nil, nil}
 
+	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
+	require.NoError(t, err)
+
 	wdb := NewDB(db)
 	blockChannel := make(chan []*DBHeader, 10)
 
@@ -1172,7 +1183,7 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 
 		client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 		client.SetClient(tc.NetworkID(), tc)
-		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb), network.NewManager(appdb), appdb)
+		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer)
 
 		tokenManager.SetTokens([]*token.Token{
 			{
@@ -1227,6 +1238,9 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 	require.NoError(t, err)
 	tm := &TransactionManager{db, nil, nil, nil, nil, nil, nil, nil, nil, nil}
 
+	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
+	require.NoError(t, err)
+
 	wdb := NewDB(db)
 	blockChannel := make(chan []*DBHeader, 10)
 
@@ -1246,7 +1260,7 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 
 	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb), network.NewManager(appdb), appdb)
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer)
 
 	tokenManager.SetTokens([]*token.Token{
 		{

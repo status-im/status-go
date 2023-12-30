@@ -1,6 +1,7 @@
 package encryption
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -336,3 +337,27 @@ func (s *SQLLitePersistenceTestSuite) TestRatchetInfoNoBundle() {
 }
 
 // TODO: Add test for MarkBundleExpired
+
+func (s *SQLLitePersistenceTestSuite) TestGetHashRatchetKeyByID() {
+	key := &HashRatchetKeyCompatibility{
+		GroupID:   []byte{1, 2, 3},
+		keyID:     []byte{4, 5, 6},
+		Timestamp: 1,
+		Key:       []byte{7, 8, 9},
+	}
+	err := s.service.SaveHashRatchetKey(key)
+	s.Require().NoError(err)
+
+	retrievedKey, err := s.service.GetHashRatchetKeyByID(key.keyID)
+	s.Require().NoError(err)
+	s.Require().True(reflect.DeepEqual(key.GroupID, retrievedKey.GroupID))
+	s.Require().True(reflect.DeepEqual(key.keyID, retrievedKey.keyID))
+	s.Require().True(reflect.DeepEqual(key.Key, retrievedKey.Key))
+	s.Require().Equal(key.Timestamp, retrievedKey.Timestamp)
+
+	cachedKey, err := s.service.GetHashRatchetCache(retrievedKey, 0)
+	s.Require().NoError(err)
+	s.Require().True(reflect.DeepEqual(key.keyID, cachedKey.KeyID))
+	s.Require().True(reflect.DeepEqual(key.Key, cachedKey.Key))
+	s.Require().EqualValues(0, cachedKey.SeqNo)
+}

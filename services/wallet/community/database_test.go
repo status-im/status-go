@@ -1,7 +1,6 @@
 package community
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -19,26 +18,11 @@ func setupCommunityDataDBTest(t *testing.T) (*DataDB, func()) {
 	}
 }
 
-func generateTestCommunityInfo(count int) map[string]thirdparty.CommunityInfo {
-	result := make(map[string]thirdparty.CommunityInfo)
-	for i := 0; i < count; i++ {
-		communityID := fmt.Sprintf("communityid-%d", i)
-		newCommunity := thirdparty.CommunityInfo{
-			CommunityName:  fmt.Sprintf("communityname-%d", i),
-			CommunityColor: fmt.Sprintf("communitycolor-%d", i),
-			CommunityImage: fmt.Sprintf("communityimage-%d", i),
-		}
-		result[communityID] = newCommunity
-	}
-
-	return result
-}
-
 func TestUpdateCommunityInfo(t *testing.T) {
 	db, cleanup := setupCommunityDataDBTest(t)
 	defer cleanup()
 
-	communityData := generateTestCommunityInfo(10)
+	communityData := thirdparty.GenerateTestCommunityInfo(10)
 	extraCommunityID := "extra-community-id"
 
 	for communityID, communityInfo := range communityData {

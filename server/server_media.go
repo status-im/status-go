@@ -3,11 +3,13 @@ package server
 import (
 	"database/sql"
 	"net/url"
+	"strconv"
 
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -17,10 +19,11 @@ type MediaServer struct {
 	db              *sql.DB
 	downloader      *ipfs.Downloader
 	multiaccountsDB *multiaccounts.Database
+	walletDB        *sql.DB
 }
 
 // NewMediaServer returns a *MediaServer
-func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *multiaccounts.Database) (*MediaServer, error) {
+func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *multiaccounts.Database, walletDB *sql.DB) (*MediaServer, error) {
 	err := generateMediaTLSCert()
 	if err != nil {
 		return nil, err
@@ -36,6 +39,7 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 		db:              db,
 		downloader:      downloader,
 		multiaccountsDB: multiaccountsDB,
+		walletDB:        walletDB,
 	}
 	s.SetHandlers(HandlerPatternMap{
 		accountImagesPath:              handleAccountImages(s.multiaccountsDB, s.logger),
@@ -49,6 +53,10 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 		ipfsPath:                       handleIPFS(s.downloader, s.logger),
 		LinkPreviewThumbnailPath:       handleLinkPreviewThumbnail(s.db, s.logger),
 		StatusLinkPreviewThumbnailPath: handleStatusLinkPreviewThumbnail(s.db, s.logger),
+		communityTokenImagesPath:       handleCommunityTokenImages(s.db, s.logger),
+		walletCommunityImagesPath:      handleWalletCommunityImages(s.walletDB, s.logger),
+		walletCollectionImagesPath:     handleWalletCollectionImages(s.walletDB, s.logger),
+		walletCollectibleImagesPath:    handleWalletCollectibleImages(s.walletDB, s.logger),
 	})
 
 	return s, nil
@@ -136,6 +144,51 @@ func (s *MediaServer) MakeContactImageURL(publicKey string, imageType string) st
 	u := s.MakeBaseURL()
 	u.Path = contactImagesPath
 	u.RawQuery = url.Values{"publicKey": {publicKey}, "imageName": {imageType}}.Encode()
+
+	return u.String()
+}
+
+func (s *MediaServer) MakeCommunityTokenImagesURL(communityID string, chainID uint64, symbol string) string {
+	u := s.MakeBaseURL()
+	u.Path = communityTokenImagesPath
+	u.RawQuery = url.Values{
+		"communityID": {communityID},
+		"chainID":     {strconv.FormatUint(chainID, 10)},
+		"symbol":      {symbol},
+	}.Encode()
+
+	return u.String()
+}
+
+func (s *MediaServer) MakeWalletCommunityImagesURL(communityID string) string {
+	u := s.MakeBaseURL()
+	u.Path = walletCommunityImagesPath
+	u.RawQuery = url.Values{
+		"communityID": {communityID},
+	}.Encode()
+
+	return u.String()
+}
+
+func (s *MediaServer) MakeWalletCollectionImagesURL(contractID thirdparty.ContractID) string {
+	u := s.MakeBaseURL()
+	u.Path = walletCollectionImagesPath
+	u.RawQuery = url.Values{
+		"chainID":         {contractID.ChainID.String()},
+		"contractAddress": {contractID.Address.Hex()},
+	}.Encode()
+
+	return u.String()
+}
+
+func (s *MediaServer) MakeWalletCollectibleImagesURL(collectibleID thirdparty.CollectibleUniqueID) string {
+	u := s.MakeBaseURL()
+	u.Path = walletCollectibleImagesPath
+	u.RawQuery = url.Values{
+		"chainID":         {collectibleID.ContractID.ChainID.String()},
+		"contractAddress": {collectibleID.ContractID.Address.Hex()},
+		"tokenID":         {collectibleID.TokenID.String()},
+	}.Encode()
 
 	return u.String()
 }

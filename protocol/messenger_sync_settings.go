@@ -127,7 +127,7 @@ func (m *Messenger) startSyncSettingsLoop() {
 
 		for {
 			select {
-			case s := <-m.settings.SyncQueue:
+			case s := <-m.settings.GetSyncQueue():
 				if s.CanSync(settings.FromInterface) {
 					logger.Debug("setting for sync received from settings.SyncQueue")
 

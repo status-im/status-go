@@ -59,6 +59,7 @@ import (
 )
 
 const infinityString = "∞"
+const providerID = "community"
 
 // EnvelopeEventsHandler used for two different event types.
 type EnvelopeEventsHandler interface {
@@ -548,7 +549,7 @@ func (s *Service) FillCollectibleMetadata(collectible *thirdparty.FullCollectibl
 		return fmt.Errorf("invalid communityID")
 	}
 
-	community, err := s.fetchCommunity(communityID)
+	community, err := s.fetchCommunity(communityID, true)
 
 	if err != nil {
 		return err
@@ -580,9 +581,12 @@ func (s *Service) FillCollectibleMetadata(collectible *thirdparty.FullCollectibl
 		privilegesLevel = permissionTypeToPrivilegesLevel(permission.GetType())
 	}
 
+	imagePayload, _ := images.GetPayloadFromURI(tokenMetadata.GetImage())
+
+	collectible.CollectibleData.Provider = providerID
 	collectible.CollectibleData.Name = tokenMetadata.GetName()
 	collectible.CollectibleData.Description = tokenMetadata.GetDescription()
-	collectible.CollectibleData.ImageURL = tokenMetadata.GetImage()
+	collectible.CollectibleData.ImagePayload = imagePayload
 	collectible.CollectibleData.Traits = getCollectibleCommunityTraits(communityToken)
 
 	if collectible.CollectionData == nil {
@@ -591,10 +595,13 @@ func (s *Service) FillCollectibleMetadata(collectible *thirdparty.FullCollectibl
 			CommunityID: communityID,
 		}
 	}
+	collectible.CollectionData.Provider = providerID
 	collectible.CollectionData.Name = tokenMetadata.GetName()
-	collectible.CollectionData.ImageURL = tokenMetadata.GetImage()
+	collectible.CollectionData.ImagePayload = imagePayload
 
-	collectible.CommunityInfo = &thirdparty.CollectibleCommunityInfo{
+	collectible.CommunityInfo = communityToInfo(community)
+
+	collectible.CollectibleCommunityInfo = &thirdparty.CollectibleCommunityInfo{
 		PrivilegesLevel: privilegesLevel,
 	}
 
@@ -612,25 +619,28 @@ func permissionTypeToPrivilegesLevel(permissionType protobuf.CommunityTokenPermi
 	}
 }
 
+func communityToInfo(community *communities.Community) *thirdparty.CommunityInfo {
+	if community == nil {
+		return nil
+	}
+
+	return &thirdparty.CommunityInfo{
+		CommunityName:         community.Name(),
+		CommunityColor:        community.Color(),
+		CommunityImagePayload: fetchCommunityImage(community),
+	}
+}
+
 func (s *Service) FetchCommunityInfo(communityID string) (*thirdparty.CommunityInfo, error) {
-	community, err := s.fetchCommunity(communityID)
+	community, err := s.fetchCommunity(communityID, false)
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, nil
-	}
 
-	communityInfo := &thirdparty.CommunityInfo{
-		CommunityName:  community.Name(),
-		CommunityColor: community.Color(),
-		CommunityImage: fetchCommunityImage(community),
-	}
-
-	return communityInfo, nil
+	return communityToInfo(community), nil
 }
 
-func (s *Service) fetchCommunity(communityID string) (*communities.Community, error) {
+func (s *Service) fetchCommunity(communityID string, tryDatabase bool) (*communities.Community, error) {
 	if s.messenger == nil {
 		return nil, fmt.Errorf("messenger not ready")
 	}
@@ -644,7 +654,7 @@ func (s *Service) fetchCommunity(communityID string) (*communities.Community, er
 	community, err := s.messenger.FetchCommunity(&protocol.FetchCommunityRequest{
 		CommunityKey:    communityID,
 		Shard:           shard,
-		TryDatabase:     true,
+		TryDatabase:     tryDatabase,
 		WaitForResponse: true,
 	})
 
@@ -737,7 +747,7 @@ func fetchCommunityCollectiblePermission(community *communities.Community, id th
 	return nil
 }
 
-func fetchCommunityImage(community *communities.Community) string {
+func fetchCommunityImage(community *communities.Community) []byte {
 	imageTypes := []string{
 		images.LargeDimName,
 		images.SmallDimName,
@@ -747,14 +757,11 @@ func fetchCommunityImage(community *communities.Community) string {
 
 	for _, imageType := range imageTypes {
 		if pbImage, ok := communityImages[imageType]; ok {
-			imageBase64, err := images.GetPayloadDataURI(pbImage.Payload)
-			if err == nil {
-				return imageBase64
-			}
+			return pbImage.Payload
 		}
 	}
 
-	return ""
+	return nil
 }
 
 func boolToString(value bool) string {

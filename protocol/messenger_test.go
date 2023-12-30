@@ -268,18 +268,25 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 	err = s.m.SaveMessages([]*common.Message{inputMessage1, inputMessage2})
 	s.Require().NoError(err)
 
-	count, countWithMentions, notifications, err := s.m.MarkMessagesSeen(chat.ID, []string{inputMessage1.ID})
+	response, err := s.m.MarkMessagesRead(chat.ID, []string{inputMessage1.ID})
 	s.Require().NoError(err)
-	s.Require().Equal(uint64(1), count)
-	s.Require().Equal(uint64(1), countWithMentions)
-	s.Require().Len(notifications, 0)
+
+	s.Require().Len(response.GetSeenAndUnseenMessages(), 1)
+	s.Require().Equal(chat.ID, response.GetSeenAndUnseenMessages()[0].ChatID)
+	s.Require().Equal(uint64(1), response.GetSeenAndUnseenMessages()[0].Count)
+	s.Require().Equal(uint64(1), response.GetSeenAndUnseenMessages()[0].CountWithMentions)
+	s.Require().Equal(true, response.GetSeenAndUnseenMessages()[0].Seen)
+	s.Require().Len(response.ActivityCenterNotifications(), 0)
 
 	// Make sure that if it's not seen, it does not return a count of 1
-	count, countWithMentions, notifications, err = s.m.MarkMessagesSeen(chat.ID, []string{inputMessage1.ID})
+	response, err = s.m.MarkMessagesRead(chat.ID, []string{inputMessage1.ID})
 	s.Require().NoError(err)
-	s.Require().Equal(uint64(0), count)
-	s.Require().Equal(uint64(0), countWithMentions)
-	s.Require().Len(notifications, 0)
+	s.Require().Len(response.GetSeenAndUnseenMessages(), 1)
+	s.Require().Equal(chat.ID, response.GetSeenAndUnseenMessages()[0].ChatID)
+	s.Require().Equal(uint64(0), response.GetSeenAndUnseenMessages()[0].Count)
+	s.Require().Equal(uint64(0), response.GetSeenAndUnseenMessages()[0].CountWithMentions)
+	s.Require().Equal(true, response.GetSeenAndUnseenMessages()[0].Seen)
+	s.Require().Len(response.ActivityCenterNotifications(), 0)
 
 	chats := s.m.Chats()
 	for _, c := range chats {
@@ -2292,7 +2299,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // }
 
 func (s *MessengerSuite) TestSendMessageWithPreviews() {
-	httpServer, err := server.NewMediaServer(s.m.database, nil, nil)
+	httpServer, err := server.NewMediaServer(s.m.database, nil, nil, nil)
 	s.Require().NoError(err)
 	err = httpServer.SetPort(9876)
 	s.NoError(err)

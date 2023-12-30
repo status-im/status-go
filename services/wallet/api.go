@@ -65,6 +65,17 @@ func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) 
 	return api.reader.GetWalletToken(ctx, addresses)
 }
 
+// GetBalancesByChain return a map with key as chain id and value as map of account address and map of token address and balance
+// [chainID][account][token]balance
+func (api *API) GetBalancesByChain(ctx context.Context, chainIDs []uint64, addresses, tokens []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
+	clients, err := api.s.rpcClient.EthClients(chainIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.s.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokens)
+}
+
 func (api *API) GetCachedWalletTokensWithoutMarketData(ctx context.Context) (map[common.Address][]Token, error) {
 	return api.reader.GetCachedWalletTokensWithoutMarketData()
 }
@@ -334,24 +345,6 @@ func (api *API) GetCollectiblesByUniqueIDAsync(requestID int32, uniqueIDs []thir
 
 	api.s.collectibles.GetCollectiblesByUniqueIDAsync(requestID, uniqueIDs, dataType)
 	return nil
-}
-
-// @deprecated
-func (api *API) GetCollectiblesByOwnerWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
-	log.Debug("call to GetCollectiblesByOwnerWithCursor")
-	return api.s.collectiblesManager.FetchAllAssetsByOwner(ctx, chainID, owner, cursor, limit, thirdparty.FetchFromAnyProvider)
-}
-
-// @deprecated
-func (api *API) GetCollectiblesByOwnerAndContractAddressWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
-	log.Debug("call to GetCollectiblesByOwnerAndContractAddressWithCursor")
-	return api.s.collectiblesManager.FetchAllAssetsByOwnerAndContractAddress(ctx, chainID, owner, contractAddresses, cursor, limit, thirdparty.FetchFromAnyProvider)
-}
-
-// @deprecated
-func (api *API) GetCollectiblesByUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
-	log.Debug("call to GetCollectiblesByUniqueID")
-	return api.s.collectiblesManager.FetchAssetsByCollectibleUniqueID(ctx, uniqueIDs)
 }
 
 func (api *API) GetCollectibleOwnersByContractAddress(ctx context.Context, chainID wcommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {

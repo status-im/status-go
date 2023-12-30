@@ -54,3 +54,10 @@ const UndefinedShardValue = 0
 func DefaultShardPubsubTopic() string {
 	return wakuproto.NewStaticShardingPubsubTopic(MainStatusShardCluster, DefaultShardIndex).String()
 }
+
+func DefaultShard() *Shard {
+	return &Shard{
+		Cluster: MainStatusShardCluster,
+		Index:   NonProtectedShardIndex,
+	}
+}

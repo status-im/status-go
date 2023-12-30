@@ -16,8 +16,6 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-
 	"github.com/status-im/status-go/appdatabase"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
@@ -255,9 +253,10 @@ func WaitForAvailableStoreNode(s *suite.Suite, m *Messenger, timeout time.Durati
 	s.Require().True(available)
 }
 
-func NewWakuV2(s *suite.Suite, logger *zap.Logger, useLocalWaku bool, enableStore bool) *waku2.Waku {
+func NewWakuV2(s *suite.Suite, logger *zap.Logger, useLocalWaku bool, enableStore bool, useShardAsDefaultTopic bool) *waku2.Waku {
 	wakuConfig := &waku2.Config{
-		DefaultShardPubsubTopic: relay.DefaultWakuTopic, // shard.DefaultShardPubsubTopic(),
+		DefaultShardPubsubTopic: "", // TODO: Empty string should work fine, for default value if not.
+		UseShardAsDefaultTopic:  useShardAsDefaultTopic,
 	}
 
 	var onPeerStats func(connStatus types.ConnStatus)
@@ -318,7 +317,7 @@ func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []s
 	nodes := make([]*waku2.Waku, len(nodeNames))
 	for i, name := range nodeNames {
 		logger := parentLogger.With(zap.String("name", name+"-waku"))
-		wakuNode := NewWakuV2(s, logger, true, false)
+		wakuNode := NewWakuV2(s, logger, true, false, false)
 		nodes[i] = wakuNode
 	}
 
@@ -345,6 +344,9 @@ func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []s
 }
 
 func TearDownMessenger(s *suite.Suite, m *Messenger) {
+	if m == nil {
+		return
+	}
 	s.Require().NoError(m.Shutdown())
 	if m.database != nil {
 		s.Require().NoError(m.database.Close())

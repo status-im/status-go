@@ -3,6 +3,7 @@ package token
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"math/big"
 	"strconv"
 	"strings"
@@ -23,6 +24,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/async"
@@ -47,16 +49,9 @@ type Token struct {
 	PegSymbol string `json:"pegSymbol"`
 	Image     string `json:"image,omitempty"`
 
-	CommunityData *CommunityData `json:"community_data,omitempty"`
-	Verified      bool           `json:"verified"`
-	TokenListID   string         `json:"tokenListId"`
-}
-
-type CommunityData struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Color string `json:"color"`
-	Image string `json:"image,omitempty"`
+	CommunityData *community.Data `json:"community_data,omitempty"`
+	Verified      bool            `json:"verified"`
+	TokenListID   string          `json:"tokenListId"`
 }
 
 func (t *Token) IsNative() bool {
@@ -88,6 +83,7 @@ type Manager struct {
 	stores            []store // Set on init, not changed afterwards
 	communityTokensDB *communitytokens.Database
 	communityManager  *community.Manager
+	mediaServer       *server.MediaServer
 
 	tokens []*Token
 
@@ -115,6 +111,7 @@ func NewTokenManager(
 	communityManager *community.Manager,
 	networkManager *network.Manager,
 	appDB *sql.DB,
+	mediaServer *server.MediaServer,
 ) *Manager {
 	maker, _ := contracts.NewContractMaker(RPCClient)
 	stores := []store{newUniswapStore(), newDefaultStore()}
@@ -150,6 +147,7 @@ func NewTokenManager(
 		stores:            stores,
 		communityTokensDB: communitytokens.NewCommunityTokensDatabase(appDB),
 		tokens:            tokens,
+		mediaServer:       mediaServer,
 	}
 }
 
@@ -291,6 +289,22 @@ func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint6
 
 	tm.discoverTokenCommunityID(ctx, token, address)
 	return token
+}
+
+func (tm *Manager) MarkAsPreviouslyOwnedToken(token *Token, owner common.Address) error {
+	if token == nil {
+		return errors.New("token is nil")
+	}
+	if (owner == common.Address{}) {
+		return errors.New("owner is nil")
+	}
+	count := 0
+	err := tm.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM token_balances WHERE user_address = ? AND token_address = ? AND chain_id = ?)`, owner.Hex(), token.Address.Hex(), token.ChainID).Scan(&count)
+	if err != nil || count > 0 {
+		return err
+	}
+	_, err = tm.db.Exec(`INSERT INTO token_balances(user_address,token_name,token_symbol,token_address,token_decimals,chain_id,token_decimals,raw_balance,balance) VALUES (?,?,?,?,?,?,?,?,?)`, owner.Hex(), token.Name, token.Symbol, token.Address.Hex(), token.Decimals, token.ChainID, 0, "0", "0")
+	return err
 }
 
 func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *Token, address common.Address) {
@@ -499,7 +513,6 @@ func (tm *Manager) DiscoverToken(ctx context.Context, chainID uint64, address co
 }
 
 func (tm *Manager) getTokensFromDB(query string, args ...any) ([]*Token, error) {
-
 	communityTokens := []*token.CommunityToken{}
 	if tm.communityTokensDB != nil {
 		// Error is skipped because it's only returning optional metadata
@@ -527,11 +540,11 @@ func (tm *Manager) getTokensFromDB(query string, args ...any) ([]*Token, error) 
 				if communityToken.CommunityID != communityID || uint64(communityToken.ChainID) != token.ChainID || communityToken.Symbol != token.Symbol {
 					continue
 				}
-				token.Image = communityToken.Base64Image
+				token.Image = tm.mediaServer.MakeCommunityTokenImagesURL(communityID, token.ChainID, token.Symbol)
 				break
 			}
 
-			token.CommunityData = &CommunityData{
+			token.CommunityData = &community.Data{
 				ID: communityID,
 			}
 		}

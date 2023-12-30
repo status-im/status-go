@@ -40,7 +40,6 @@ type TransactionDescription struct {
 	chainID   uint64
 	builtTx   *ethTypes.Transaction
 	signature []byte
-	unlock    transactions.UnlockNonceFunc
 }
 
 type TransactionManager struct {
@@ -160,13 +159,7 @@ func (tm *TransactionManager) BuildTransaction(chainID uint64, sendArgs transact
 		return nil, err
 	}
 
-	txBeingSigned, unlock, err := tm.transactor.ValidateAndBuildTransaction(chainID, sendArgs)
-	// We have to unlock the nonce, cause we don't know what will happen on the client side (will user accept/reject) an action.
-	if unlock != nil {
-		defer func() {
-			unlock(false, 0)
-		}()
-	}
+	txBeingSigned, err := tm.transactor.ValidateAndBuildTransaction(chainID, sendArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -214,13 +207,7 @@ func (tm *TransactionManager) BuildTransaction(chainID uint64, sendArgs transact
 }
 
 func (tm *TransactionManager) BuildRawTransaction(chainID uint64, sendArgs transactions.SendTxArgs, signature []byte) (response *TxResponse, err error) {
-	tx, unlock, err := tm.transactor.BuildTransactionWithSignature(chainID, sendArgs, signature)
-	// We have to unlock the nonce, cause we don't know what will happen on the client side (will user accept/reject) an action.
-	if unlock != nil {
-		defer func() {
-			unlock(false, 0)
-		}()
-	}
+	tx, err := tm.transactor.BuildTransactionWithSignature(chainID, sendArgs, signature)
 	if err != nil {
 		return nil, err
 	}

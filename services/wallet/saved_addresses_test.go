@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common"
+	multiAccCommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -41,6 +42,7 @@ func TestSavedAddressesAdd(t *testing.T) {
 		Favourite:       true,
 		ChainShortNames: "eth:arb:",
 		ENSName:         "test.stateofus.eth",
+		ColorID:         multiAccCommon.CustomizationColorGreen,
 		IsTest:          false,
 	}
 
@@ -55,6 +57,7 @@ func TestSavedAddressesAdd(t *testing.T) {
 	require.Equal(t, sa.Favourite, rst[0].Favourite)
 	require.Equal(t, sa.ChainShortNames, rst[0].ChainShortNames)
 	require.Equal(t, sa.ENSName, rst[0].ENSName)
+	require.Equal(t, sa.ColorID, rst[0].ColorID)
 	require.Equal(t, sa.IsTest, rst[0].IsTest)
 }
 
@@ -78,7 +81,7 @@ func haveSameElements[T comparable](a []T, b []T, isEqual func(T, T) bool) bool 
 
 func savedAddressDataIsEqual(a, b SavedAddress) bool {
 	return a.Address == b.Address && a.Name == b.Name && a.Favourite == b.Favourite &&
-		a.ChainShortNames == b.ChainShortNames && a.ENSName == b.ENSName && a.IsTest == b.IsTest
+		a.ChainShortNames == b.ChainShortNames && a.ENSName == b.ENSName && a.IsTest == b.IsTest && a.ColorID == b.ColorID
 }
 
 func TestSavedAddressesMetadata(t *testing.T) {
@@ -100,6 +103,7 @@ func TestSavedAddressesMetadata(t *testing.T) {
 		},
 		ChainShortNames: "eth:arb:",
 		ENSName:         "test.stateofus.eth",
+		ColorID:         multiAccCommon.CustomizationColorGreen,
 		IsTest:          false,
 	}
 
@@ -115,6 +119,7 @@ func TestSavedAddressesMetadata(t *testing.T) {
 	sa2 := SavedAddress{
 		Address:   common.Address{2},
 		Name:      "Simple",
+		ColorID:   multiAccCommon.CustomizationColorBlue,
 		Favourite: false,
 		IsTest:    false,
 	}
@@ -136,6 +141,7 @@ func TestSavedAddressesMetadata(t *testing.T) {
 	require.Equal(t, sa1.Address, dbSavedAddresses[simpleIndex].Address)
 	require.Equal(t, sa2.Address, dbSavedAddresses[rawIndex].Address)
 	require.Equal(t, sa2.Name, dbSavedAddresses[rawIndex].Name)
+	require.Equal(t, sa2.ColorID, dbSavedAddresses[rawIndex].ColorID)
 	require.Equal(t, sa2.Favourite, dbSavedAddresses[rawIndex].Favourite)
 	require.Equal(t, sa2.IsTest, dbSavedAddresses[rawIndex].IsTest)
 
@@ -212,6 +218,7 @@ func TestSavedAddressesCleanSoftDeletes(t *testing.T) {
 		sa := SavedAddress{
 			Address:   common.Address{byte(i)},
 			Name:      "Test" + strconv.Itoa(i),
+			ColorID:   multiAccCommon.CustomizationColorGreen,
 			Favourite: false,
 			savedAddressMeta: savedAddressMeta{
 				Removed:     true,
@@ -244,6 +251,7 @@ func TestSavedAddressesGet(t *testing.T) {
 	sa := SavedAddress{
 		Address: common.Address{1},
 		ENSName: "test.ens.eth",
+		ColorID: multiAccCommon.CustomizationColorGreen,
 		IsTest:  false,
 		savedAddressMeta: savedAddressMeta{
 			Removed: true,

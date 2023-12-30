@@ -17,11 +17,6 @@
       "/dns4/node-01.do-ams3.status.test.statusim.net/tcp/30303/p2p/16Uiu2HAkukebeXjTQ9QDBeNDWuGfbaSg79wkkhK4vPocLgR6QFDf",
       "/dns4/node-01.gc-us-central1-a.status.test.statusim.net/tcp/30303/p2p/16Uiu2HAmGDX3iAFox93PupVYaHa88kULGqMpJ7AEHGwj3jbMtt76",
       "/dns4/node-01.ac-cn-hongkong-c.status.test.statusim.net/tcp/30303/p2p/16Uiu2HAm2BjXxCp1sYFJQKpLLbPbwd5juxbsYofu3TsS3auvT9Yi"
-    ],
-    "WakuStoreNodes": [
-      "/ip4/47.242.233.36/tcp/30303/p2p/16Uiu2HAm2BjXxCp1sYFJQKpLLbPbwd5juxbsYofu3TsS3auvT9Yi",
-      "/ip4/64.225.81.237/tcp/30303/p2p/16Uiu2HAkukebeXjTQ9QDBeNDWuGfbaSg79wkkhK4vPocLgR6QFDf",
-      "/ip4/34.122.252.118/tcp/30303/p2p/16Uiu2HAmGDX3iAFox93PupVYaHa88kULGqMpJ7AEHGwj3jbMtt76"
     ]
   },
   "WakuV2Config": {

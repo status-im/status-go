@@ -1,7 +1,6 @@
 package collectibles
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -23,40 +22,11 @@ func setupCollectionDataDBTest(t *testing.T) (*CollectionDataDB, func()) {
 	}
 }
 
-func generateTestCollectionsData(count int) (result []thirdparty.CollectionData) {
-	result = make([]thirdparty.CollectionData, 0, count)
-	for i := 0; i < count; i++ {
-		bigI := big.NewInt(int64(count))
-		traits := make(map[string]thirdparty.CollectionTrait)
-		for j := 0; j < 3; j++ {
-			traits[fmt.Sprintf("traittype-%d", j)] = thirdparty.CollectionTrait{
-				Min: float64(i+j) / 2,
-				Max: float64(i+j) * 2,
-			}
-		}
-
-		newCollection := thirdparty.CollectionData{
-			ID: thirdparty.ContractID{
-				ChainID: w_common.ChainID(i),
-				Address: common.BigToAddress(bigI),
-			},
-			Provider:    fmt.Sprintf("provider-%d", i),
-			Name:        fmt.Sprintf("name-%d", i),
-			Slug:        fmt.Sprintf("slug-%d", i),
-			ImageURL:    fmt.Sprintf("imageurl-%d", i),
-			Traits:      traits,
-			CommunityID: fmt.Sprintf("community-%d", i),
-		}
-		result = append(result, newCollection)
-	}
-	return result
-}
-
 func TestUpdateCollectionsData(t *testing.T) {
 	db, cleanDB := setupCollectionDataDBTest(t)
 	defer cleanDB()
 
-	data := generateTestCollectionsData(50)
+	data := thirdparty.GenerateTestCollectionsData(50)
 
 	var err error
 

@@ -980,8 +980,12 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 		return err
 	}
 
+	// We still want to handle acceptance of the CR even it was already accepted
+	previouslyAccepted := request != nil && request.ContactRequestState == common.ContactRequestStateAccepted
+
 	contact := state.CurrentMessageState.Contact
 
+	// The request message will be added to the response here
 	processingResponse, err := m.handleAcceptContactRequest(state.Response, contact, request, clock)
 	if err != nil {
 		return err
@@ -1010,25 +1014,28 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 		}
 
 		// Add mutual state update message for incoming contact request
-		clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+		if !previouslyAccepted {
+			clock, timestamp := chat.NextClockAndTimestamp(m.transport)
 
-		updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, false)
-		if err != nil {
-			return err
+			updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, false)
+			if err != nil {
+				return err
+			}
+
+			m.prepareMessage(updateMessage, m.httpServer)
+			err = m.persistence.SaveMessages([]*common.Message{updateMessage})
+			if err != nil {
+				return err
+			}
+			state.Response.AddMessage(updateMessage)
+
+			err = chat.UpdateFromMessage(updateMessage, m.getTimesource())
+			if err != nil {
+				return err
+			}
+			chat.UnviewedMessagesCount++
 		}
 
-		m.prepareMessage(updateMessage, m.httpServer)
-		err = m.persistence.SaveMessages([]*common.Message{updateMessage})
-		if err != nil {
-			return err
-		}
-		state.Response.AddMessage(updateMessage)
-
-		err = chat.UpdateFromMessage(updateMessage, m.getTimesource())
-		if err != nil {
-			return err
-		}
-		chat.UnviewedMessagesCount++
 		state.Response.AddChat(chat)
 		state.AllChats.Store(chat.ID, chat)
 	}

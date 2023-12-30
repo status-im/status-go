@@ -59,9 +59,10 @@ type Community struct {
 	config     *Config
 	mutex      sync.Mutex
 	timesource common.TimeSource
+	encryptor  DescriptionEncryptor
 }
 
-func New(config Config, timesource common.TimeSource) (*Community, error) {
+func New(config Config, timesource common.TimeSource, encryptor DescriptionEncryptor) (*Community, error) {
 	if config.MemberIdentity == nil {
 		return nil, errors.New("no member identity")
 	}
@@ -78,9 +79,11 @@ func New(config Config, timesource common.TimeSource) (*Community, error) {
 		config.Logger = logger
 	}
 
-	community := &Community{config: &config, timesource: timesource}
-	community.initialize()
-	return community, nil
+	if config.CommunityDescription == nil {
+		config.CommunityDescription = &protobuf.CommunityDescription{}
+	}
+
+	return &Community{config: &config, timesource: timesource, encryptor: encryptor}, nil
 }
 
 type CommunityAdminSettings struct {
@@ -499,13 +502,6 @@ func (o *Community) GetMemberPubkeys() []*ecdsa.PublicKey {
 		return pubkeys
 	}
 	return nil
-}
-
-func (o *Community) initialize() {
-	if o.config.CommunityDescription == nil {
-		o.config.CommunityDescription = &protobuf.CommunityDescription{}
-
-	}
 }
 
 type CommunitySettings struct {
@@ -1377,11 +1373,20 @@ func (o *Community) Description() *protobuf.CommunityDescription {
 }
 
 func (o *Community) marshaledDescription() ([]byte, error) {
+	clone := proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription)
+
 	// This is only workaround to lower the size of the message that goes over the wire,
 	// see https://github.com/status-im/status-desktop/issues/12188
-	clone := o.CreateDeepCopy()
-	clone.DehydrateChannelsMembers()
-	return proto.Marshal(clone.config.CommunityDescription)
+	dehydrateChannelsMembers(o.IDString(), clone)
+
+	if o.encryptor != nil {
+		err := encryptDescription(o.encryptor, o, clone)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return proto.Marshal(clone)
 }
 
 func (o *Community) MarshaledDescription() ([]byte, error) {
@@ -1419,28 +1424,28 @@ func (o *Community) ToProtocolMessageBytes() ([]byte, error) {
 	return o.toProtocolMessageBytes()
 }
 
-func (o *Community) DehydrateChannelsMembers() {
+func channelHasTokenPermissions(communityID string, channelID string, permissions map[string]*protobuf.CommunityTokenPermission) bool {
+	for _, tokenPermission := range permissions {
+		if includes(tokenPermission.ChatIds, communityID+channelID) {
+			return true
+		}
+	}
+	return false
+}
+
+func dehydrateChannelsMembers(communityID string, description *protobuf.CommunityDescription) {
 	// To save space, we don't attach members for channels without permissions,
 	// otherwise the message will hit waku msg size limit.
-	for channelID, channel := range o.chats() {
-		if !o.ChannelHasTokenPermissions(o.ChatID(channelID)) {
+	for channelID, channel := range description.Chats {
+		if !channelHasTokenPermissions(communityID, channelID, description.TokenPermissions) {
 			channel.Members = map[string]*protobuf.CommunityMember{} // clean members
 		}
 	}
 }
 
-func HydrateChannelsMembers(communityID string, description *protobuf.CommunityDescription) {
-	channelHasTokenPermissions := func(channelID string) bool {
-		for _, tokenPermission := range description.TokenPermissions {
-			if includes(tokenPermission.ChatIds, communityID+channelID) {
-				return true
-			}
-		}
-		return false
-	}
-
+func hydrateChannelsMembers(communityID string, description *protobuf.CommunityDescription) {
 	for channelID, channel := range description.Chats {
-		if !channelHasTokenPermissions(channelID) {
+		if !channelHasTokenPermissions(communityID, channelID, description.TokenPermissions) {
 			channel.Members = make(map[string]*protobuf.CommunityMember)
 			for pubKey, member := range description.Members {
 				channel.Members[pubKey] = member
@@ -1555,13 +1560,12 @@ func (o *Community) tokenPermissions() map[string]*CommunityTokenPermission {
 func (o *Community) PendingAndBannedMembers() map[string]CommunityMemberState {
 	result := make(map[string]CommunityMemberState)
 
-	// Non-privileged members should not see pending and banned members
-	if o.config.EventsData == nil || !o.IsPrivilegedMember(o.MemberIdentity()) {
-		return result
-	}
-
 	for _, bannedMemberID := range o.config.CommunityDescription.BanList {
 		result[bannedMemberID] = CommunityMemberBanned
+	}
+
+	if o.config.EventsData == nil {
+		return result
 	}
 
 	processedEvents := make(map[string]bool)
@@ -1598,14 +1602,15 @@ func (o *Community) HasTokenPermissions() bool {
 	return len(o.tokenPermissions()) > 0
 }
 
+func (o *Community) channelEncrypted(channelID string) bool {
+	return o.channelHasTokenPermissions(o.ChatID(channelID))
+}
+
 func (o *Community) ChannelEncrypted(channelID string) bool {
 	return o.ChannelHasTokenPermissions(o.ChatID(channelID))
 }
 
-func (o *Community) ChannelHasTokenPermissions(chatID string) bool {
-	o.mutex.Lock()
-	defer o.mutex.Unlock()
-
+func (o *Community) channelHasTokenPermissions(chatID string) bool {
 	for _, tokenPermission := range o.tokenPermissions() {
 		if includes(tokenPermission.ChatIds, chatID) {
 			return true
@@ -1613,6 +1618,12 @@ func (o *Community) ChannelHasTokenPermissions(chatID string) bool {
 	}
 
 	return false
+}
+
+func (o *Community) ChannelHasTokenPermissions(chatID string) bool {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+	return o.channelHasTokenPermissions(chatID)
 }
 
 func TokenPermissionsByType(permissions map[string]*CommunityTokenPermission, permissionType protobuf.CommunityTokenPermission_Type) []*CommunityTokenPermission {
