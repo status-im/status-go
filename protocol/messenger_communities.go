@@ -576,6 +576,21 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 	return m.communitiesManager.Joined()
 }
 
+func (m *Messenger) UpdateLastOpenedAt(communityID string) (*MessengerResponse, error) {
+	community, err := m.communitiesManager.GetByIDString(communityID)
+	if err != nil {
+		return nil, err
+	}
+	err = m.communitiesManager.UpdateLastOpenedAt(community.ID())
+	if err != nil {
+		return nil, err
+	}
+	community.UpdateLastOpenedAt()
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+	return response, nil
+}
+
 func (m *Messenger) SpectatedCommunities() ([]*communities.Community, error) {
 	return m.communitiesManager.Spectated()
 }

@@ -37,5 +37,6 @@ func (o *Community) ToSyncInstallationCommunityProtobuf(clock uint64, communityS
 		RequestsToJoin: rtjs,
 		Settings:       settings,
 		ControlNode:    syncControlNode,
+		LastOpenedAt:   o.LastOpenedAt(),
 	}, nil
 }

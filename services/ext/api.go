@@ -304,6 +304,11 @@ func (api *PublicAPI) MuteCommunityCategory(request *requests.MuteCategory) erro
 	return api.service.messenger.SetMutePropertyOnChatsByCategory(request, true)
 }
 
+// Updates the lastOpenedAt key on a community
+func (api *PublicAPI) UpdateLastOpenedAt(communityID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.UpdateLastOpenedAt(communityID)
+}
+
 func (api *PublicAPI) UnmuteCommunityCategory(communityID string, categoryID string) error {
 	return api.service.messenger.SetMutePropertyOnChatsByCategory(&requests.MuteCategory{CommunityID: communityID, CategoryID: categoryID, MutedType: protocol.Unmuted}, false)
 }

@@ -696,6 +696,10 @@ func (m *Manager) Joined() ([]*Community, error) {
 	return m.persistence.JoinedCommunities(&m.identity.PublicKey)
 }
 
+func (m *Manager) UpdateLastOpenedAt(communityID types.HexBytes) error {
+	return m.persistence.UpdateLastOpenedAt(communityID)
+}
+
 func (m *Manager) Spectated() ([]*Community, error) {
 	return m.persistence.SpectatedCommunities(&m.identity.PublicKey)
 }
@@ -761,6 +765,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		MemberIdentity:       &m.identity.PublicKey,
 		CommunityDescription: description,
 		Shard:                nil,
+		LastOpenedAt:         time.Now().Unix(),
 	}
 
 	var descriptionEncryptor DescriptionEncryptor
@@ -1235,6 +1240,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 			JoinedAt:             time.Now().Unix(),
 			MemberIdentity:       &m.identity.PublicKey,
 			CommunityDescription: description,
+			LastOpenedAt:         time.Now().Unix(),
 		}
 
 		var descriptionEncryptor DescriptionEncryptor

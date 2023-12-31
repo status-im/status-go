@@ -2228,7 +2228,7 @@ func _1704281285_tokens_advanced_settingsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1704281285_tokens_advanced_settings.up.sql", size: 743, mode: os.FileMode(0644), modTime: time.Unix(1705001672, 0)}
+	info := bindataFileInfo{name: "1704281285_tokens_advanced_settings.up.sql", size: 743, mode: os.FileMode(0644), modTime: time.Unix(1704832103, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x45, 0xa7, 0x62, 0x1f, 0x62, 0x24, 0x5c, 0x66, 0x97, 0x6, 0x49, 0xb7, 0x5d, 0x44, 0x9f, 0x13, 0xab, 0x64, 0x35, 0xc4, 0xfb, 0xa8, 0x3f, 0xee, 0x2f, 0x3f, 0x3e, 0x65, 0x33, 0xf6, 0x7b, 0xdc}}
 	return a, nil
 }

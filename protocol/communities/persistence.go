@@ -45,6 +45,7 @@ type CommunityRecord struct {
 	mutedTill    time.Time
 	shardCluster *uint
 	shardIndex   *uint
+	lastOpenedAt int64
 }
 
 type EventsRecord struct {
@@ -73,7 +74,11 @@ type CommunityRecordBundle struct {
 const OR = " OR "
 const communitiesBaseQuery = `
 	SELECT
+<<<<<<< HEAD
 		c.id, c.private_key, c.control_node, c.description, c.joined, c.joined_at, c.spectated, c.verified, c.muted, c.muted_till,
+=======
+		c.id, c.private_key, c.control_node, c.description, c.joined, c.last_opened_at, c.spectated, c.verified, c.muted, c.muted_till,
+>>>>>>> f619b2e71 (Add last opened at)
 		csd.shard_cluster, csd.shard_index,
 		r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.state,
 		ae.raw_events, ae.raw_description,
@@ -109,7 +114,11 @@ func scanCommunity(scanner func(dest ...any) error) (*CommunityRecordBundle, err
 		&r.community.controlNode,
 		&r.community.description,
 		&r.community.joined,
+<<<<<<< HEAD
 		&r.community.joinedAt,
+=======
+		&r.community.lastOpenedAt,
+>>>>>>> f619b2e71 (Add last opened at)
 		&r.community.spectated,
 		&r.community.verified,
 		&r.community.muted,
@@ -177,9 +186,9 @@ func (p *Persistence) saveCommunity(r *CommunityRecord) error {
         INSERT INTO communities_communities (
             id, private_key, control_node, description,
             joined, joined_at, spectated, verified, muted, muted_till
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		r.id, r.privateKey, r.controlNode, r.description,
-		r.joined, r.joinedAt, r.spectated, r.verified, r.muted, r.mutedTill)
+		r.joined, r.joinedAt, r.spectated, r.verified, r.muted, r.mutedTill, r.lastOpenedAt)
 	return err
 }
 
@@ -240,7 +249,7 @@ func (p *Persistence) ShouldHandleSyncCommunitySettings(settings *protobuf.SyncC
 func (p *Persistence) ShouldHandleSyncCommunity(community *protobuf.SyncInstallationCommunity) (bool, error) {
 	// TODO see if there is a way to make this more elegant
 	// When the test for this function fails because the table has changed we should update sync functionality
-	qr := p.db.QueryRow(`SELECT id, private_key, description, joined, joined_at, verified, spectated, muted, muted_till, synced_at FROM communities_communities WHERE id = ? AND synced_at > ?`, community.Id, community.Clock)
+	qr := p.db.QueryRow(`SELECT id, private_key, description, joined, joined_at, verified, spectated, muted, muted_till, last_opened_at, synced_at FROM communities_communities WHERE id = ? AND synced_at > ?`, community.Id, community.Clock)
 	_, err := p.scanRowToStruct(qr.Scan)
 
 	switch err {
@@ -272,6 +281,11 @@ func (p *Persistence) AllCommunities(memberIdentity *ecdsa.PublicKey) ([]*Commun
 func (p *Persistence) JoinedCommunities(memberIdentity *ecdsa.PublicKey) ([]*Community, error) {
 	query := communitiesBaseQuery + ` WHERE c.joined`
 	return p.queryCommunities(memberIdentity, query)
+}
+
+func (p *Persistence) UpdateLastOpenedAt(communityID types.HexBytes) error {
+	_, err := p.db.Exec(`UPDATE communities_communities SET last_opened_at = ? WHERE id = ?`, time.Now().Unix(), communityID)
+	return err
 }
 
 func (p *Persistence) SpectatedCommunities(memberIdentity *ecdsa.PublicKey) ([]*Community, error) {

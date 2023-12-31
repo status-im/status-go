@@ -49,6 +49,7 @@ type Config struct {
 	EventsData                          *EventsData
 	Shard                               *shard.Shard
 	PubsubTopicPrivateKey               *ecdsa.PrivateKey
+	LastOpenedAt                        int64
 }
 
 type EventsData struct {
@@ -270,6 +271,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		PubsubTopic                 string                               `json:"pubsubTopic"`
 		PubsubTopicKey              string                               `json:"pubsubTopicKey"`
 		Shard                       *shard.Shard                         `json:"shard"`
+		LastOpenedAt                int64                                `json:"lastOpenedAt"`
 	}{
 		ID:                          o.ID(),
 		MemberRole:                  o.MemberRole(o.MemberIdentity()),
@@ -293,6 +295,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		PubsubTopic:                 o.PubsubTopic(),
 		PubsubTopicKey:              o.PubsubTopicKey(),
 		Shard:                       o.Shard(),
+		LastOpenedAt:                o.config.LastOpenedAt,
 	}
 	if o.config.CommunityDescription != nil {
 		for id, c := range o.config.CommunityDescription.Categories {
@@ -972,6 +975,10 @@ func (o *Community) Join() {
 	o.config.Spectated = false
 }
 
+func (o *Community) UpdateLastOpenedAt() {
+	o.config.LastOpenedAt = time.Now().Unix()
+}
+
 func (o *Community) Leave() {
 	o.config.Joined = false
 	o.config.Spectated = false
@@ -991,6 +998,10 @@ func (o *Community) Joined() bool {
 
 func (o *Community) JoinedAt() int64 {
 	return o.config.JoinedAt
+}
+
+func (o *Community) LastOpenedAt() int64 {
+	return o.config.LastOpenedAt
 }
 
 func (o *Community) Spectated() bool {
@@ -2153,6 +2164,7 @@ func (o *Community) CreateDeepCopy() *Community {
 			RequestsToJoin:                      o.config.RequestsToJoin,
 			MemberIdentity:                      o.config.MemberIdentity,
 			EventsData:                          o.config.EventsData,
+			LastOpenedAt:                        o.config.LastOpenedAt,
 		},
 		timesource: o.timesource,
 	}
