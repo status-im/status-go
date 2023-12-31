@@ -104,7 +104,7 @@ func (p *Persistence) saveRawCommunityRow(rawCommRow RawCommunityRow) error {
 		rawCommRow.PrivateKey,
 		rawCommRow.Description,
 		rawCommRow.Joined,
-		rawCommRow.joinedAt,
+		rawCommRow.JoinedAt,
 		rawCommRow.Verified,
 		rawCommRow.SyncedAt,
 		rawCommRow.Muted,
@@ -114,12 +114,12 @@ func (p *Persistence) saveRawCommunityRow(rawCommRow RawCommunityRow) error {
 
 func (p *Persistence) saveRawCommunityRowWithoutSyncedAt(rawCommRow RawCommunityRow) error {
 	_, err := p.db.Exec(
-		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "joined_at", "verified", "muted") VALUES (?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "joined_at", "verified", "muted") VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		rawCommRow.ID,
 		rawCommRow.PrivateKey,
 		rawCommRow.Description,
 		rawCommRow.Joined,
-		rawCommRow.joinedAt,
+		rawCommRow.JoinedAt,
 		rawCommRow.Verified,
 		rawCommRow.Muted,
 	)
