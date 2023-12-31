@@ -137,6 +137,7 @@ message SyncInstallationCommunity {
   bool spectated = 11;
   bytes encryption_keys = 12;
   SyncCommunityControlNode control_node = 13;
+  int64 joined_at = 14;
 }
 
 message SyncCommunityRequestsToJoin {

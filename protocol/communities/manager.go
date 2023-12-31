@@ -758,6 +758,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		ControlDevice:        true,
 		Logger:               m.logger,
 		Joined:               true,
+		JoinedAt:             time.Now().Unix(),
 		MemberIdentity:       &m.identity.PublicKey,
 		CommunityDescription: description,
 		Shard:                nil,
@@ -1244,6 +1245,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 			ControlDevice:        true,
 			Logger:               m.logger,
 			Joined:               true,
+			JoinedAt:             time.Now().Unix(),
 			MemberIdentity:       &m.identity.PublicKey,
 			CommunityDescription: description,
 		}
