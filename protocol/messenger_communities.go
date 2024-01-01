@@ -576,7 +576,7 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 	return m.communitiesManager.Joined()
 }
 
-func (m *Messenger) UpdateLastOpenedAt(communityID string) (*MessengerResponse, error) {
+func (m *Messenger) CommunityUpdateLastOpenedAt(communityID string) (*MessengerResponse, error) {
 	community, err := m.communitiesManager.GetByIDString(communityID)
 	if err != nil {
 		return nil, err
