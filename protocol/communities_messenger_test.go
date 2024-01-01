@@ -3909,3 +3909,74 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	s.Require().NotEmpty(cancelRequestToJoin2.Clock)
 	s.Require().Equal(cancelRequestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
 }
+
+func (s *MessengerCommunitiesSuite) TestCommunityLastOpenedAt() {
+	ctx := context.Background()
+
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	// Create an community chat
+	response, err := s.bob.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.CommunitiesSettings(), 1)
+
+	communitySettings := response.CommunitiesSettings()[0]
+	community := response.Communities()[0]
+
+	s.Require().Equal(communitySettings.CommunityID, community.IDString())
+	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
+
+	// Send a community message
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.bob.transport)
+
+	inputMessage := common.NewMessage()
+	inputMessage.ChatId = chat.ID
+	inputMessage.Text = "some text"
+	inputMessage.CommunityID = community.IDString()
+
+	err = s.bob.SaveChat(chat)
+	s.Require().NoError(err)
+	_, err = s.bob.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+
+	// Pull message and make sure org is received
+	response, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0
+		},
+		"message not received",
+	)
+
+	s.Require().NoError(err)
+	communities, err := s.alice.Communities()
+	s.Require().NoError(err)
+	s.Require().Len(communities, 2)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(community.IDString(), response.Messages()[0].CommunityID)
+
+	// We join the org
+	response, err = s.alice.JoinCommunity(ctx, community.ID(), false)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().True(response.Communities()[0].Joined())
+	s.Require().Len(response.Chats(), 1)
+	// Check lastOpenedAt is zero as community wasn't opened yet
+	s.Require().True(response.Communities()[0].LastOpenedAt() == 0)
+
+	// Mock frontend triggering communityUpdateLastOpenedAt
+	response, err = s.alice.CommunityUpdateLastOpenedAt(community.IDString())
+	s.Require().NoError(err)
+
+	// Check lastOpenedAt was updated
+	s.Require().True(response.Communities()[0].LastOpenedAt() > 0)
+}
