@@ -35,6 +35,7 @@ const (
 	ActivityCenterNotificationTypeSetSignerFailed
 	ActivityCenterNotificationTypeSetSignerDeclined
 	ActivityCenterNotificationTypeShareAccounts
+	ActivityCenterNotificationTypeCommunityTokenReceived
 )
 
 type ActivityCenterMembershipStatus int
