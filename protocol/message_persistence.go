@@ -32,6 +32,8 @@ LEFT JOIN discord_messages m2_dm
 ON        m2.discord_message_id = m2_dm.id
 LEFT JOIN discord_message_authors m2_dm_author
 ON        m2_dm.author_id = m2_dm_author.id
+LEFT JOIN bridge_messages bm
+ON        m1.id = bm.user_messages_id
 `
 
 var basicInsertDiscordMessageAuthorQuery = `INSERT OR REPLACE INTO discord_message_authors(id,name,discriminator,nickname,avatar_url, avatar_image_payload) VALUES (?,?,?,?,?,?)`
@@ -111,6 +113,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
     discord_message_id`
 }
 
+// keep the same order as in tableUserMessagesScanAllFields
 func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 	return `m1.id,
     		m1.whisper_timestamp,
@@ -195,7 +198,14 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
     COALESCE(m2.discord_message_id, ""),
 		COALESCE(m2_dm_author.name, ""),
 		COALESCE(m2_dm_author.nickname, ""),
-		COALESCE(m2_dm_author.avatar_url, "")`
+		COALESCE(m2_dm_author.avatar_url, ""),
+		COALESCE(bm.bridge_name, ""),
+		COALESCE(bm.user_name, ""),
+		COALESCE(bm.user_avatar, ""),
+		COALESCE(bm.user_id, ""),
+		COALESCE(bm.content, ""),
+		COALESCE(bm.message_id, ""),
+		COALESCE(bm.parent_message_id, "")`
 }
 
 func (db sqlitePersistence) tableUserMessagesAllFieldsCount() int {
@@ -206,6 +216,7 @@ type scanner interface {
 	Scan(dest ...interface{}) error
 }
 
+// keep the same order as in tableUserMessagesAllFieldsJoin
 func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message *common.Message, others ...interface{}) error {
 	var quotedID sql.NullString
 	var ContentType sql.NullInt64
@@ -243,6 +254,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		Reference:   &protobuf.DiscordMessageReference{},
 		Attachments: []*protobuf.DiscordMessageAttachment{},
 	}
+	bridgeMessage := &protobuf.BridgeMessage{}
 
 	quotedDiscordMessage := &protobuf.DiscordMessage{
 		Author: &protobuf.DiscordMessageAuthor{},
@@ -335,6 +347,13 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&quotedDiscordMessage.Author.Name,
 		&quotedDiscordMessage.Author.Nickname,
 		&quotedDiscordMessage.Author.AvatarUrl,
+		&bridgeMessage.BridgeName,
+		&bridgeMessage.UserName,
+		&bridgeMessage.UserAvatar,
+		&bridgeMessage.UserID,
+		&bridgeMessage.Content,
+		&bridgeMessage.MessageID,
+		&bridgeMessage.ParentMessageID,
 	}
 	err := row.Scan(append(args, others...)...)
 	if err != nil {
@@ -455,6 +474,11 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	case protobuf.ChatMessage_DISCORD_MESSAGE:
 		message.Payload = &protobuf.ChatMessage_DiscordMessage{
 			DiscordMessage: discordMessage,
+		}
+
+	case protobuf.ChatMessage_BRIDGE_MESSAGE:
+		message.Payload = &protobuf.ChatMessage_BridgeMessage{
+			BridgeMessage: bridgeMessage,
 		}
 	}
 
@@ -745,7 +769,6 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
             LIMIT ?`, cursorWhere)
 
 	query := db.buildMessagesQueryWithAdditionalFields(cursorField, where)
-
 	rows, err := db.db.Query(
 		query,
 		append(args, limit+1)..., // take one more to figure our whether a cursor should be returned
@@ -1165,6 +1188,9 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
 			 ON
 			 m2_dm.author_id = m2_dm_author.id
 
+			 LEFT JOIN bridge_messages bm
+			 ON m1.id = bm.user_messages_id
+
  			WHERE
  				pm.pinned = 1
  				AND NOT(m1.hide) AND m1.local_chat_id IN %s %s
@@ -1499,6 +1525,10 @@ func (db sqlitePersistence) SaveMessages(messages []*common.Message) (err error)
 		_, err = stmt.Exec(allValues...)
 		if err != nil {
 			return
+		}
+
+		if msg.ContentType == protobuf.ChatMessage_BRIDGE_MESSAGE {
+			err = db.saveBridgeMessage(tx, msg.GetBridgeMessage(), msg.ID)
 		}
 	}
 	return
@@ -2831,4 +2861,24 @@ func getPinnedMessagesAndCursorsFromScanRows(db sqlitePersistence, rows *sql.Row
 	SortByClock(messages)
 
 	return messages, cursors, nil
+}
+
+func (db sqlitePersistence) saveBridgeMessage(tx *sql.Tx, message *protobuf.BridgeMessage, userMessageID string) (err error) {
+	query := "INSERT INTO bridge_messages(user_messages_id,bridge_name,user_name,user_avatar,user_id,content,message_id,parent_message_id) VALUES (?,?,?,?,?,?,?,?)"
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(
+		userMessageID,
+		message.GetBridgeName(),
+		message.GetUserName(),
+		message.GetUserAvatar(),
+		message.GetUserID(),
+		message.GetContent(),
+		message.GetMessageID(),
+		message.GetParentMessageID(),
+	)
+	return
 }

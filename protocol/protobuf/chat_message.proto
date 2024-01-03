@@ -109,6 +109,16 @@ message DiscordMessageAttachment {
   string localUrl = 8;
 }
 
+message BridgeMessage {
+  string bridgeName = 1;
+  string userName = 2;
+  string userAvatar = 3;
+  string userID = 4;
+  string content = 5;
+  string messageID = 6;
+  string parentMessageID = 7;
+}
+
 message UnfurledLinkThumbnail {
   bytes payload = 1;
   uint32 width = 2;
@@ -204,6 +214,7 @@ message ChatMessage {
     AudioMessage audio = 11;
     bytes community = 12;
     DiscordMessage discord_message = 99;
+    BridgeMessage bridge_message = 100;
   }
 
   // Grant for community chat messages
@@ -245,5 +256,6 @@ message ChatMessage {
     SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED = 16;
     // Only local
     SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED = 17;
+    BRIDGE_MESSAGE = 18;
   }
 }
