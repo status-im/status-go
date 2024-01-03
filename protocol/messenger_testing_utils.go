@@ -247,9 +247,7 @@ func SetIdentityImagesAndWaitForChange(s *suite.Suite, messenger *Messenger, tim
 }
 
 func WaitForAvailableStoreNode(s *suite.Suite, m *Messenger, timeout time.Duration) {
-	ms := m.getActiveMailserver()
-	s.Require().NotNil(ms)
-	available := m.waitForAvailableStoreNode(ms.ID, timeout)
+	available := m.waitForAvailableStoreNode(timeout)
 	s.Require().True(available)
 }
 

@@ -449,6 +449,14 @@ func (m *Messenger) getActiveMailserver(communityID ...string) *mailservers.Mail
 	return &ms
 }
 
+func (m *Messenger) getActiveMailserverID(communityID ...string) string {
+	ms := m.getActiveMailserver(communityID...)
+	if ms == nil {
+		return ""
+	}
+	return ms.ID
+}
+
 func (m *Messenger) isMailserverAvailable(mailserverID string) bool {
 	return m.mailserverStatus(mailserverID) == connected
 }
@@ -745,7 +753,7 @@ func (m *Messenger) disconnectStorenodeIfRequired() error {
 	return nil
 }
 
-func (m *Messenger) waitForAvailableStoreNode(mailserverID string, timeout time.Duration) bool {
+func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
 	// Add 1 second to timeout, because the mailserver cycle has 1 second ticker, which doesn't tick on start.
 	// This can be improved after merging https://github.com/status-im/status-go/pull/4380.
 	// NOTE: https://stackoverflow.com/questions/32705582/how-to-get-time-tick-to-tick-immediately
@@ -761,7 +769,7 @@ func (m *Messenger) waitForAvailableStoreNode(mailserverID string, timeout time.
 		defer func() {
 			wg.Done()
 		}()
-		for !m.isMailserverAvailable(mailserverID) {
+		for !m.isMailserverAvailable(m.getActiveMailserverID()) {
 			select {
 			case <-m.SubscribeMailserverAvailable():
 			case <-cancel:
@@ -785,5 +793,5 @@ func (m *Messenger) waitForAvailableStoreNode(mailserverID string, timeout time.
 		close(cancel)
 	}
 
-	return m.isMailserverAvailable(mailserverID)
+	return m.isMailserverAvailable(m.getActiveMailserverID())
 }
