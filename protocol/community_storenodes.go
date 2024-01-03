@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/mailservers"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 )
@@ -21,7 +22,7 @@ type communityStoreNodes struct {
 }
 
 type storenodesData struct {
-	// TODO for now we support only one mailserver per community, we will assume it is always active,
+	// TODO for now we support only one storenode per community, we will assume it is always active,
 	// then we will need to support a way to regularly check connection similar to the `messenger_mailserver_cycle.go`
 	storenodes []mailservers.Mailserver
 }
@@ -65,4 +66,22 @@ func (m *communityStoreNodes) ReloadFromDB() error {
 		}
 	}
 	return nil
+}
+
+func (m *communityStoreNodes) UpdateStorenodesInDB(communityID types.HexBytes, nodes []mailservers.Mailserver) error {
+	if err := m.storenodesDatabase.SaveMailserversForCommunity(communityID, nodes); err != nil {
+		return err
+	}
+	if err := m.ReloadFromDB(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *communityStoreNodes) GetStorenodesFromDB(communityID types.HexBytes) ([]mailservers.Mailserver, error) {
+	nodes, err := m.storenodesDatabase.GetMailserversForCommunity(communityID)
+	if err != nil {
+		return nil, err
+	}
+	return nodes, nil
 }

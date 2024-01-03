@@ -443,14 +443,14 @@ func (api *PublicAPI) SetCommunityShard(request *requests.SetCommunityShard) (*p
 	return api.service.messenger.SetCommunityShard(request)
 }
 
-// Sets the community mailservers for a community and updates all active filters for the community
-func (api *PublicAPI) SetCommunityMailServers(request *requests.SetCommunityMailServers) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SetCommunityMailServers(request)
+// Sets the community storenodes for a community
+func (api *PublicAPI) SetCommunityStorenodes(request *requests.SetCommunityStorenodes) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SetCommunityStorenodes(request)
 }
 
-// Sets the community mailservers for a community and updates all active filters for the community
-func (api *PublicAPI) GetCommunityMailServers(id types.HexBytes) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.GetCommunityMailServers(id)
+// Sets the community storenodes for a community
+func (api *PublicAPI) GetCommunityStorenodes(id types.HexBytes) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.GetCommunityStorenodes(id)
 }
 
 // ExportCommunity exports the private key of the community with given ID

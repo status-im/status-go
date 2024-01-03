@@ -2063,7 +2063,7 @@ func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*Mes
 	return response, nil
 }
 
-func (m *Messenger) SetCommunityMailServers(request *requests.SetCommunityMailServers) (*MessengerResponse, error) {
+func (m *Messenger) SetCommunityStorenodes(request *requests.SetCommunityStorenodes) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
@@ -2078,20 +2078,20 @@ func (m *Messenger) SetCommunityMailServers(request *requests.SetCommunityMailSe
 		return nil, errors.New("not admin or owner")
 	}
 
-	err = m.mailserversDatabase.SaveMailserversForCommunity(request.CommunityID, request.MailServers)
+	if err := m.communityStorenodes.UpdateStorenodesInDB(request.CommunityID, request.Storenodes); err != nil {
+		return nil, err
+	}
+	err = m.sendPublicSyncCommunityStorenodes(community, request.Storenodes)
 	if err != nil {
 		return nil, err
 	}
-	if err := m.communityStorenodes.ReloadFromDB(); err != nil {
-		return nil, err
-	}
 	response := &MessengerResponse{
-		Mailservers: request.MailServers,
+		Mailservers: request.Storenodes,
 	}
 	return response, nil
 }
 
-func (m *Messenger) GetCommunityMailServers(id types.HexBytes) (*MessengerResponse, error) {
+func (m *Messenger) GetCommunityStorenodes(id types.HexBytes) (*MessengerResponse, error) {
 	community, err := m.communitiesManager.GetByID(id)
 	if err != nil {
 		return nil, err
@@ -2099,17 +2099,14 @@ func (m *Messenger) GetCommunityMailServers(id types.HexBytes) (*MessengerRespon
 	if community == nil {
 		return nil, communities.ErrOrgNotFound
 	}
-	if !community.IsControlNode() {
-		return nil, errors.New("not admin or owner")
-	}
 
-	mailservers, err := m.mailserversDatabase.GetMailserversForCommunity(id)
+	nodes, err := m.communityStorenodes.GetStorenodesFromDB(id)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &MessengerResponse{
-		Mailservers: mailservers,
+		Mailservers: nodes,
 	}
 	return response, nil
 }
@@ -3092,6 +3089,8 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 	if savedCommunity == nil {
 		return nil
 	}
+
+	// TODO pablo save the community store nodes
 
 	if err := m.handleCommunityTokensMetadataByPrivilegedMembers(savedCommunity); err != nil {
 		logger.Debug("m.handleCommunityTokensMetadataByPrivilegedMembers", zap.Error(err))

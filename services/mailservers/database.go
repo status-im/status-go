@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/transport"
 )
 
@@ -28,6 +29,8 @@ type Mailserver struct {
 	FailedRequests uint   `json:"-"`
 	CommunityOnly  bool   `json:"communityOnly"`
 }
+
+type Storenodes []Mailserver
 
 func (m Mailserver) Enode() (*enode.Node, error) {
 	return enode.ParseV4(m.Address)
@@ -76,6 +79,39 @@ func (m Mailserver) nullablePassword() (val sql.NullString) {
 		val.Valid = true
 	}
 	return
+}
+
+func (m Storenodes) ToProtobuf() []*protobuf.Storenode {
+	result := make([]*protobuf.Storenode, 0, len(m))
+	for _, n := range m {
+
+		result = append(result, &protobuf.Storenode{
+			Id:            n.ID,
+			Name:          n.Name,
+			Address:       n.Address,
+			Password:      n.Password,
+			Fleet:         n.Fleet,
+			Version:       uint64(n.Version),
+			CommunityOnly: n.CommunityOnly,
+		})
+	}
+	return result
+}
+
+func FromProtobuf(storenodes []*protobuf.Storenode) Storenodes {
+	result := make(Storenodes, 0, len(storenodes))
+	for _, s := range storenodes {
+		result = append(result, Mailserver{
+			ID:            s.Id,
+			Name:          s.Name,
+			Address:       s.Address,
+			Password:      s.Password,
+			Fleet:         s.Fleet,
+			Version:       uint(s.Version),
+			CommunityOnly: s.CommunityOnly,
+		})
+	}
+	return result
 }
 
 type MailserverRequestGap struct {
@@ -130,6 +166,7 @@ func NewDB(db *sql.DB) *Database {
 	return &Database{db: db}
 }
 
+// TODO pablo remove mailservers as well, add clock
 func (d *Database) SaveMailserversForCommunity(communityID types.HexBytes, mailserver []Mailserver) (err error) {
 	var tx *sql.Tx
 	tx, err = d.db.Begin()
@@ -147,7 +184,7 @@ func (d *Database) SaveMailserversForCommunity(communityID types.HexBytes, mails
 	for _, m := range mailserver {
 		// TODO for now only allow one mailserver per community
 		var count *sql.Rows
-		count, err = tx.Query(`SELECT COUNT(*) FROM community_mailservers WHERE community_id = ?`, communityID)
+		count, err = tx.Query(`SELECT COUNT(*) FROM community_storenodes WHERE community_id = ?`, communityID)
 		if err != nil {
 			return err
 		}
@@ -159,7 +196,7 @@ func (d *Database) SaveMailserversForCommunity(communityID types.HexBytes, mails
 			}
 		}
 		if c > 0 {
-			return fmt.Errorf("only one mailserver per community is allowed")
+			return fmt.Errorf("only one storenode per community is allowed")
 		}
 		_, err = tx.Exec(`INSERT OR IGNORE INTO mailservers(
 			id,
@@ -179,9 +216,9 @@ func (d *Database) SaveMailserversForCommunity(communityID types.HexBytes, mails
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(`INSERT OR IGNORE INTO community_mailservers(
+		_, err = tx.Exec(`INSERT OR IGNORE INTO community_storenodes(
 			community_id,
-			mailserver_id
+			storenode_id
 		) VALUES (?, ?)`,
 			communityID,
 			m.ID,
@@ -200,7 +237,7 @@ func (d *Database) GetMailserversForCommunities() (map[string][]Mailserver, erro
 	rows, err := d.db.Query(`
 		SELECT cm.community_id, m.id, m.name, m.address, m.password, m.fleet, m.community_only 
 		FROM mailservers AS m
-		JOIN community_mailservers AS cm ON m.id = cm.mailserver_id
+		JOIN community_storenodes AS cm ON m.id = cm.mailserver_id
 	`)
 	if err != nil {
 		return nil, err
@@ -238,7 +275,7 @@ func (d *Database) GetMailserversForCommunity(communityID types.HexBytes) ([]Mai
 	rows, err := d.db.Query(`
 		SELECT m.id, m.name, m.address, m.password, m.fleet, m.community_only 
 		FROM mailservers AS m
-		JOIN community_mailservers AS cm ON m.id = cm.mailserver_id
+		JOIN community_storenodes AS cm ON m.id = cm.mailserver_id
 		WHERE cm.community_id = ?
 	`, communityID)
 	if err != nil {

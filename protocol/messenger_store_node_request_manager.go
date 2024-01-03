@@ -478,7 +478,8 @@ func (r *storeNodeRequest) routine() {
 		r.finalize()
 	}()
 
-	ms := r.manager.messenger.getActiveMailserver(r.communityID)
+	communityIDStr := strings.TrimSuffix(r.requestID.DataID, transport.CommunityShardInfoTopicPrefix())
+	ms := r.manager.messenger.getActiveMailserver(communityIDStr)
 	if !r.manager.messenger.waitForAvailableStoreNode(ms.ID, storeNodeAvailableTimeout) {
 		r.result.err = fmt.Errorf("store node is not available")
 		return
