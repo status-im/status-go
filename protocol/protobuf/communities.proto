@@ -209,7 +209,7 @@ message WakuMessageArchiveIndex {
   map<string, WakuMessageArchiveIndexMetadata> archives = 1;
 }
 
-message CommunityStorenodesInfo {
+message SyncCommunityStorenodes {
   // Signature of the payload field
   bytes signature = 1;
   // Marshaled CommunityStorenodes

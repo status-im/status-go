@@ -1708,7 +1708,7 @@ func (m *Messenger) handleSyncCommunityStorenodesProtobuf(messageState *Received
 	
 
 	
-	p := &protobuf.CommunityStorenodesInfo{}
+	p := &protobuf.SyncCommunityStorenodes{}
 	err := proto.Unmarshal(protoBytes, p)
 	if err != nil {
 		return err
@@ -1716,7 +1716,7 @@ func (m *Messenger) handleSyncCommunityStorenodesProtobuf(messageState *Received
 
 	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.ApplicationLayer.Type, p)
 
-	return m.HandlePublicSyncCommunityStorenodes(messageState, p, msg)
+	return m.HandleSyncCommunityStorenodes(messageState, p, msg)
 	
 }
 

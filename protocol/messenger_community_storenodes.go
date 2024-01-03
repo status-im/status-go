@@ -36,11 +36,11 @@ func (m *Messenger) sendPublicSyncCommunityStorenodes(community *communities.Com
 	if err != nil {
 		return err
 	}
-	signedCommunityStorenodesInfo := &protobuf.CommunityStorenodesInfo{
+	signedSyncCommunityStorenodes := &protobuf.SyncCommunityStorenodes{
 		Signature: signature,
 		Payload:   snPayload,
 	}
-	signedPayload, err := proto.Marshal(signedCommunityStorenodesInfo)
+	signedPayload, err := proto.Marshal(signedSyncCommunityStorenodes)
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func (m *Messenger) sendPublicSyncCommunityStorenodes(community *communities.Com
 	return err
 }
 
-func (m *Messenger) HandlePublicSyncCommunityStorenodes(state *ReceivedMessageState, a *protobuf.CommunityStorenodesInfo, statusMessage *v1protocol.StatusMessage) error {
+func (m *Messenger) HandleSyncCommunityStorenodes(state *ReceivedMessageState, a *protobuf.SyncCommunityStorenodes, statusMessage *v1protocol.StatusMessage) error {
 	sn := &protobuf.CommunityStorenodes{}
 	err := proto.Unmarshal(a.Payload, sn)
 	if err != nil {
