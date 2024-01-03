@@ -247,7 +247,9 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		return errors.New("timestamp can't be 0")
 	}
 
-	if message.ContentType != protobuf.ChatMessage_DISCORD_MESSAGE && (message.ContentType != protobuf.ChatMessage_IMAGE || message.Text != "") {
+	if message.ContentType != protobuf.ChatMessage_DISCORD_MESSAGE &&
+		message.ContentType != protobuf.ChatMessage_BRIDGE_MESSAGE &&
+		(message.ContentType != protobuf.ChatMessage_IMAGE || message.Text != "") {
 		if err := ValidateText(message.Text); err != nil {
 			return err
 		}
@@ -293,6 +295,24 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		}
 		if image.Type == protobuf.ImageType_UNKNOWN_IMAGE_TYPE {
 			return errors.New("image type unknown")
+		}
+
+	case protobuf.ChatMessage_BRIDGE_MESSAGE:
+		if message.Payload == nil {
+			return errors.New("no bridge message content")
+		}
+		bridgeMessage := message.GetBridgeMessage()
+		if bridgeMessage == nil {
+			return errors.New("no bridge message content")
+		}
+		if len(bridgeMessage.UserName) == 0 {
+			return errors.New("no username")
+		}
+		if len(bridgeMessage.BridgeName) == 0 {
+			return errors.New("no bridge name")
+		}
+		if len(bridgeMessage.Content) == 0 {
+			return errors.New("no bridge message content text")
 		}
 	}
 

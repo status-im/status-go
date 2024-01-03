@@ -280,6 +280,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ContactRequestState      ContactRequestState              `json:"contactRequestState,omitempty"`
 		ContactVerificationState ContactVerificationState         `json:"contactVerificationState,omitempty"`
 		DiscordMessage           *protobuf.DiscordMessage         `json:"discordMessage,omitempty"`
+		BridgeMessage            *protobuf.BridgeMessage          `json:"bridgeMessage,omitempty"`
 	}
 	item := MessageStructType{
 		ID:                       m.ID,
@@ -346,6 +347,11 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 	if discordMessage := m.GetDiscordMessage(); discordMessage != nil {
 		item.DiscordMessage = discordMessage
 	}
+
+	if bridgeMessage := m.GetBridgeMessage(); bridgeMessage != nil {
+		item.BridgeMessage = bridgeMessage
+	}
+
 	if item.From != "" {
 		ext, err := accountJson.ExtendStructWithPubKeyData(item.From, item)
 		if err != nil {

@@ -1806,3 +1806,41 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 	require.Len(t, fetchedMessages, 1)
 
 }
+
+func TestSaveBridgeMessage(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	require.NoError(t, err)
+
+	bridgeMessage := &protobuf.BridgeMessage{
+		BridgeName: "discord",
+		UserName:   "joe",
+		Content:    "abc",
+	}
+
+	const msgID = "123"
+	err = p.SaveMessages([]*common.Message{{
+		ID:          msgID,
+		LocalChatID: testPublicChatID,
+		From:        testPK,
+		ChatMessage: &protobuf.ChatMessage{
+			Text:        "some-text",
+			ContentType: protobuf.ChatMessage_BRIDGE_MESSAGE,
+			ChatId:      testPublicChatID,
+			Payload: &protobuf.ChatMessage_BridgeMessage{
+				BridgeMessage: bridgeMessage,
+			},
+		},
+	}})
+
+	require.NoError(t, err)
+
+	retrievedMessages, _, err := p.MessageByChatID(testPublicChatID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, retrievedMessages, 1)
+	require.Equal(t, "discord", retrievedMessages[0].GetBridgeMessage().BridgeName)
+	require.Equal(t, "joe", retrievedMessages[0].GetBridgeMessage().UserName)
+	require.Equal(t, "abc", retrievedMessages[0].GetBridgeMessage().Content)
+}

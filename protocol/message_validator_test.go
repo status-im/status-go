@@ -480,6 +480,50 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 				ContentType: protobuf.ChatMessage_AUDIO,
 			},
 		},
+		{
+			Name:             "Valid bridge message",
+			WhisperTimestamp: 2,
+			Valid:            true,
+			Message: &protobuf.ChatMessage{
+				ChatId:     "a",
+				Text:       "",
+				Clock:      2,
+				Timestamp:  3,
+				ResponseTo: "",
+				EnsName:    "",
+				Payload: &protobuf.ChatMessage_BridgeMessage{
+					BridgeMessage: &protobuf.BridgeMessage{
+						BridgeName: "discord",
+						UserName:   "mike",
+						Content:    "some text",
+					},
+				},
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+				ContentType: protobuf.ChatMessage_BRIDGE_MESSAGE,
+			},
+		},
+		{
+			Name:             "Invalid bridge message",
+			WhisperTimestamp: 2,
+			Valid:            false,
+			Message: &protobuf.ChatMessage{
+				ChatId:     "a",
+				Text:       "",
+				Clock:      2,
+				Timestamp:  3,
+				ResponseTo: "",
+				EnsName:    "",
+				Payload: &protobuf.ChatMessage_BridgeMessage{
+					BridgeMessage: &protobuf.BridgeMessage{
+						BridgeName: "",
+						UserName:   "",
+						Content:    "",
+					},
+				},
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+				ContentType: protobuf.ChatMessage_BRIDGE_MESSAGE,
+			},
+		},
 	}
 
 	for _, tc := range testCases {
