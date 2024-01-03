@@ -165,7 +165,7 @@ func (db *DB) prepareStmts() error {
 }
 
 func (db *DB) Register(p peer.ID, ns string, signedPeerRecord []byte, ttl int) (uint64, error) {
-	pid := p.Pretty()
+	pid := p.String()
 	expire := time.Now().Unix() + int64(ttl)
 
 	tx, err := db.db.Begin()
@@ -202,7 +202,7 @@ func (db *DB) Register(p peer.ID, ns string, signedPeerRecord []byte, ttl int) (
 }
 
 func (db *DB) CountRegistrations(p peer.ID) (int, error) {
-	pid := p.Pretty()
+	pid := p.String()
 
 	row := db.countPeerRegistrations.QueryRow(pid)
 
@@ -213,7 +213,7 @@ func (db *DB) CountRegistrations(p peer.ID) (int, error) {
 }
 
 func (db *DB) Unregister(p peer.ID, ns string) error {
-	pid := p.Pretty()
+	pid := p.String()
 
 	var err error
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package report
 
 import (
@@ -16,7 +19,7 @@ type SenderInterceptorFactory struct {
 }
 
 // NewInterceptor constructs a new SenderInterceptor
-func (s *SenderInterceptorFactory) NewInterceptor(id string) (interceptor.Interceptor, error) {
+func (s *SenderInterceptorFactory) NewInterceptor(_ string) (interceptor.Interceptor, error) {
 	i := &SenderInterceptor{
 		interval: 1 * time.Second,
 		now:      time.Now,
@@ -99,21 +102,9 @@ func (s *SenderInterceptor) loop(rtcpWriter interceptor.RTCPWriter) {
 		case <-ticker.C:
 			now := s.now()
 			s.streams.Range(func(key, value interface{}) bool {
-				ssrc := key.(uint32)
-				stream := value.(*senderStream)
-
-				stream.m.Lock()
-				defer stream.m.Unlock()
-
-				sr := &rtcp.SenderReport{
-					SSRC:        ssrc,
-					NTPTime:     ntpTime(now),
-					RTPTime:     stream.lastRTPTimeRTP + uint32(now.Sub(stream.lastRTPTimeTime).Seconds()*stream.clockRate),
-					PacketCount: stream.packetCount,
-					OctetCount:  stream.octetCount,
-				}
-
-				if _, err := rtcpWriter.Write([]rtcp.Packet{sr}, interceptor.Attributes{}); err != nil {
+				if stream, ok := value.(*senderStream); !ok {
+					s.log.Warnf("failed to cast SenderInterceptor stream")
+				} else if _, err := rtcpWriter.Write([]rtcp.Packet{stream.generateReport(now)}, interceptor.Attributes{}); err != nil {
 					s.log.Warnf("failed sending: %+v", err)
 				}
 
@@ -129,7 +120,7 @@ func (s *SenderInterceptor) loop(rtcpWriter interceptor.RTCPWriter) {
 // BindLocalStream lets you modify any outgoing RTP packets. It is called once for per LocalStream. The returned method
 // will be called once per rtp packet.
 func (s *SenderInterceptor) BindLocalStream(info *interceptor.StreamInfo, writer interceptor.RTPWriter) interceptor.RTPWriter {
-	stream := newSenderStream(info.ClockRate)
+	stream := newSenderStream(info.SSRC, info.ClockRate)
 	s.streams.Store(info.SSRC, stream)
 
 	return interceptor.RTPWriterFunc(func(header *rtp.Header, payload []byte, a interceptor.Attributes) (int, error) {
@@ -137,14 +128,4 @@ func (s *SenderInterceptor) BindLocalStream(info *interceptor.StreamInfo, writer
 
 		return writer.Write(header, payload, a)
 	})
-}
-
-func ntpTime(t time.Time) uint64 {
-	// seconds since 1st January 1900
-	s := (float64(t.UnixNano()) / 1000000000) + 2208988800
-
-	// higher 32 bits are the integer part, lower 32 bits are the fractional part
-	integerPart := uint32(s)
-	fractionalPart := uint32((s - float64(integerPart)) * 0xFFFFFFFF)
-	return uint64(integerPart)<<32 | uint64(fractionalPart)
 }

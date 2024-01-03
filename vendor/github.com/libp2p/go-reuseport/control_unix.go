@@ -1,4 +1,4 @@
-//go:build !plan9 && !windows && !wasm
+//go:build !plan9 && !windows && !wasm && !freebsd
 
 package reuseport
 
