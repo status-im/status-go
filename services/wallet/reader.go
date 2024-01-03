@@ -235,6 +235,127 @@ func (r *Reader) stopWalletEventsWatcher() {
 	}
 }
 
+func (r *Reader) GetWalletTokenBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
+	areTestNetworksEnabled, err := r.accountsDB.GetTestNetworksEnabled()
+	if err != nil {
+		return nil, err
+	}
+
+	networks, err := r.rpcClient.NetworkManager.Get(false)
+	if err != nil {
+		return nil, err
+	}
+	availableNetworks := make([]*params.Network, 0)
+	for _, network := range networks {
+		if network.IsTest != areTestNetworksEnabled {
+			continue
+		}
+		availableNetworks = append(availableNetworks, network)
+	}
+
+	cachedTokens, err := r.GetCachedWalletTokensWithoutMarketData()
+	if err != nil {
+		return nil, err
+	}
+
+	chainIDs := make([]uint64, 0)
+	for _, network := range availableNetworks {
+		chainIDs = append(chainIDs, network.ChainID)
+	}
+
+	allTokens, err := r.tokenManager.GetTokensByChainIDs(chainIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, network := range availableNetworks {
+		allTokens = append(allTokens, r.tokenManager.ToToken(network))
+	}
+
+	tokenAddresses := getTokenAddresses(allTokens)
+
+	clients, err := r.rpcClient.EthClients(chainIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	balances, err := r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
+	if err != nil {
+		for _, client := range clients {
+			client.SetIsConnected(false)
+		}
+		log.Info("tokenManager.GetBalancesByChain error", "err", err)
+		return nil, err
+	}
+
+	verifiedTokens, unverifiedTokens := splitVerifiedTokens(allTokens)
+	result := make(map[common.Address][]Token)
+	communities := make(map[string]bool)
+
+	for _, address := range addresses {
+		for _, tokenList := range [][]*token.Token{verifiedTokens, unverifiedTokens} {
+			for symbol, tokens := range getTokenBySymbols(tokenList) {
+				balancesPerChain := make(map[uint64]ChainBalance)
+				decimals := tokens[0].Decimals
+				isVisible := false
+				for _, token := range tokens {
+					hexBalance := balances[token.ChainID][address][token.Address]
+					balance := big.NewFloat(0.0)
+					if hexBalance != nil {
+						balance = new(big.Float).Quo(
+							new(big.Float).SetInt(hexBalance.ToInt()),
+							big.NewFloat(math.Pow(10, float64(decimals))),
+						)
+					}
+					hasError := false
+					if client, ok := clients[token.ChainID]; ok {
+						hasError = err != nil || !client.GetIsConnected()
+					}
+					if !isVisible {
+						isVisible = balance.Cmp(big.NewFloat(0.0)) > 0 || r.isCachedToken(cachedTokens, address, token.Symbol, token.ChainID)
+					}
+					balancesPerChain[token.ChainID] = ChainBalance{
+						RawBalance: hexBalance.ToInt().String(),
+						Balance:    balance,
+						Address:    token.Address,
+						ChainID:    token.ChainID,
+						HasError:   hasError,
+					}
+				}
+
+				if !isVisible && !belongsToMandatoryTokens(symbol) {
+					continue
+				}
+
+				walletToken := Token{
+					Name:             tokens[0].Name,
+					Symbol:           symbol,
+					BalancesPerChain: balancesPerChain,
+					Decimals:         decimals,
+					PegSymbol:        token.GetTokenPegSymbol(symbol),
+					Verified:         tokens[0].Verified,
+					CommunityData:    tokens[0].CommunityData,
+					Image:            tokens[0].Image,
+				}
+
+				if walletToken.CommunityData != nil {
+					communities[walletToken.CommunityData.ID] = true
+				}
+
+				result[address] = append(result[address], walletToken)
+			}
+		}
+	}
+
+	r.lastWalletTokenUpdateTimestamp.Store(time.Now().Unix())
+
+	for communityID := range communities {
+		r.communityManager.FetchCommunityMetadataAsync(communityID)
+	}
+
+	return result, r.persistence.SaveTokens(result)
+}
+
 func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
 	areTestNetworksEnabled, err := r.accountsDB.GetTestNetworksEnabled()
 	if err != nil {
