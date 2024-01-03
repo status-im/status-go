@@ -1864,3 +1864,49 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 	require.Len(t, fetchedMessages, 1)
 
 }
+
+func TestSaveBridgeMessage(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	require.NoError(t, err)
+
+	bridgeMessage := &protobuf.BridgeMessage{
+		BridgeName:      "discord",
+		UserName:        "joe",
+		Content:         "abc",
+		UserAvatar:      "data:image/png;base64,iVBO...",
+		UserID:          "123",
+		MessageID:       "456",
+		ParentMessageID: "789",
+	}
+
+	const msgID = "123"
+	err = p.SaveMessages([]*common.Message{{
+		ID:          msgID,
+		LocalChatID: testPublicChatID,
+		From:        testPK,
+		ChatMessage: &protobuf.ChatMessage{
+			Text:        "some-text",
+			ContentType: protobuf.ChatMessage_BRIDGE_MESSAGE,
+			ChatId:      testPublicChatID,
+			Payload: &protobuf.ChatMessage_BridgeMessage{
+				BridgeMessage: bridgeMessage,
+			},
+		},
+	}})
+
+	require.NoError(t, err)
+
+	retrievedMessages, _, err := p.MessageByChatID(testPublicChatID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, retrievedMessages, 1)
+	require.Equal(t, "discord", retrievedMessages[0].GetBridgeMessage().BridgeName)
+	require.Equal(t, "joe", retrievedMessages[0].GetBridgeMessage().UserName)
+	require.Equal(t, "abc", retrievedMessages[0].GetBridgeMessage().Content)
+	require.Equal(t, "data:image/png;base64,iVBO...", retrievedMessages[0].GetBridgeMessage().UserAvatar)
+	require.Equal(t, "123", retrievedMessages[0].GetBridgeMessage().UserID)
+	require.Equal(t, "456", retrievedMessages[0].GetBridgeMessage().MessageID)
+	require.Equal(t, "789", retrievedMessages[0].GetBridgeMessage().ParentMessageID)
+}
