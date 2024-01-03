@@ -179,11 +179,6 @@ func (w *gethWakuV2Wrapper) SendMessagesRequest(peerID []byte, r types.MessagesR
 func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID []byte, r types.MessagesRequest, processEnvelopes bool) (*types.StoreRequestCursor, int, error) {
 	var options []store.HistoryRequestOption
 
-	peer, err := peer.Decode(string(peerID))
-	if err != nil {
-		return nil, 0, err
-	}
-
 	options = []store.HistoryRequestOption{
 		store.WithPaging(false, uint64(r.Limit)),
 	}
@@ -202,7 +197,7 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID []b
 		contentTopics = append(contentTopics, wakucommon.BytesToTopic(topic))
 	}
 
-	pbCursor, envelopesCount, err := w.waku.Query(ctx, peer, r.PubsubTopic, contentTopics, uint64(r.From), uint64(r.To), options, processEnvelopes)
+	pbCursor, envelopesCount, err := w.waku.Query(ctx, peer.ID(peerID), r.PubsubTopic, contentTopics, uint64(r.From), uint64(r.To), options, processEnvelopes)
 	if err != nil {
 		return nil, 0, err
 	}

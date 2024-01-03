@@ -61,6 +61,19 @@ type SourceDescription struct {
 	Chunks []SourceDescriptionChunk
 }
 
+// NewCNAMESourceDescription creates a new SourceDescription with a single CNAME item.
+func NewCNAMESourceDescription(ssrc uint32, cname string) *SourceDescription {
+	return &SourceDescription{
+		Chunks: []SourceDescriptionChunk{{
+			Source: ssrc,
+			Items: []SourceDescriptionItem{{
+				Type: SDESCNAME,
+				Text: cname,
+			}},
+		}},
+	}
+}
+
 // Marshal encodes the SourceDescription in binary
 func (s SourceDescription) Marshal() ([]byte, error) {
 	/*
@@ -242,16 +255,16 @@ func (s *SourceDescriptionChunk) Unmarshal(rawPacket []byte) error {
 }
 
 func (s SourceDescriptionChunk) len() int {
-	len := sdesSourceLen
+	chunkLen := sdesSourceLen
 	for _, it := range s.Items {
-		len += it.len()
+		chunkLen += it.len()
 	}
-	len += sdesTypeLen // for terminating null octet
+	chunkLen += sdesTypeLen // for terminating null octet
 
 	// align to 32-bit boundary
-	len += getPadding(len)
+	chunkLen += getPadding(chunkLen)
 
-	return len
+	return chunkLen
 }
 
 // A SourceDescriptionItem is a part of a SourceDescription that describes a stream.

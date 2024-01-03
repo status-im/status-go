@@ -812,7 +812,7 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsDeleted(ids []types.H
 		return nil, err
 	}
 
-	update := "UPDATE activity_center_notifications SET deleted = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted"
+	update := "UPDATE activity_center_notifications SET deleted = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted" // nolint: goconst, gosec
 	_, err = tx.Exec(update, args...)
 	if err != nil {
 		return nil, err
@@ -1066,7 +1066,7 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "UPDATE activity_center_notifications SET read = 1, accepted = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted" // nolint: gosec
+	query := "UPDATE activity_center_notifications SET read = 1, accepted = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted" // nolint: gosec, goconst
 	_, err = tx.Exec(query, args...)
 	if err != nil {
 		return nil, err

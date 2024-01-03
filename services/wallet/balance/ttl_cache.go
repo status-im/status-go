@@ -20,7 +20,7 @@ func NewCacherWithTTL(ttl time.Duration) Cacher {
 
 // TTL cache implementation of cacheIface
 type ttlCache[K comparable, V any] struct {
-	cache *ttlcache.Cache[K, V]
+	cache *ttlcache.Cache[K, V] // nolint: structcheck
 }
 
 //nolint:golint,unused // linter does not detect using it via reflect

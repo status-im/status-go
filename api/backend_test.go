@@ -832,7 +832,7 @@ func TestLoginAccount(t *testing.T) {
 		Password:              password,
 		BackupDisabledDataDir: tmpdir,
 		NetworkID:             1,
-		LogFilePath:           tmpdir + "/log",
+		LogFilePath:           tmpdir + "/log", // nolint: goconst
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
@@ -984,7 +984,7 @@ func TestConvertAccount(t *testing.T) {
 	const keycardPassword = "222222" // represents password for a keycard user
 	const keycardUID = "1234"
 	const pathEIP1581Root = "m/43'/60'/1581'"
-	const pathEIP1581Chat = pathEIP1581Root + "/0'/0"
+	const pathEIP1581Chat = pathEIP1581Root + "/0'/0" // nolint: goconst
 	const pathWalletRoot = "m/44'/60'/0'/0"
 	const pathDefaultWalletAccount = pathWalletRoot + "/0"
 	const customWalletPath1 = pathWalletRoot + "/1"
@@ -1380,7 +1380,7 @@ func TestCreateWallet(t *testing.T) {
 		Password:              password,
 		BackupDisabledDataDir: tmpdir,
 		NetworkID:             1,
-		LogFilePath:           tmpdir + "/log",
+		LogFilePath:           tmpdir + "/log", // nolint: goconst
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
@@ -1440,7 +1440,7 @@ func TestSetFleet(t *testing.T) {
 		Password:              password,
 		BackupDisabledDataDir: tmpdir,
 		NetworkID:             1,
-		LogFilePath:           tmpdir + "/log",
+		LogFilePath:           tmpdir + "/log", // nolint: goconst
 		Emoji:                 "some",
 	}
 	c := make(chan interface{}, 10)

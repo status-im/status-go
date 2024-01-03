@@ -437,7 +437,7 @@ func (h *BasicHost) newStreamHandler(s network.Stream) {
 
 	log.Debugf("negotiated: %s (took %s)", protoID, took)
 
-	go handle(protoID, s)
+	handle(protoID, s)
 }
 
 // SignalAddressChange signals to the host that it needs to determine whether our listen addresses have recently
@@ -629,9 +629,6 @@ func (h *BasicHost) RemoveStreamHandler(pid protocol.ID) {
 // to create one. If ProtocolID is "", writes no header.
 // (Thread-safe)
 func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.ID) (network.Stream, error) {
-	// Ensure we have a connection, with peer addresses resolved by the routing system (#207)
-	// It is not sufficient to let the underlying host connect, it will most likely not have
-	// any addresses for the peer without any prior connections.
 	// If the caller wants to prevent the host from dialing, it should use the NoDial option.
 	if nodial, _ := network.GetNoDial(ctx); !nodial {
 		err := h.Connect(ctx, peer.AddrInfo{ID: p})
@@ -669,7 +666,9 @@ func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.I
 	}
 
 	if pref != "" {
-		s.SetProtocol(pref)
+		if err := s.SetProtocol(pref); err != nil {
+			return nil, err
+		}
 		lzcon := msmux.NewMSSelect(s, pref)
 		return &streamWrapper{
 			Stream: s,
@@ -795,10 +794,11 @@ func (h *BasicHost) Addrs() []ma.Multiaddr {
 				continue
 			}
 			addrWithCerthash, added := tpt.AddCertHashes(addr)
-			addrs[i] = addrWithCerthash
 			if !added {
 				log.Debug("Couldn't add certhashes to webtransport multiaddr because we aren't listening on webtransport")
+				continue
 			}
+			addrs[i] = addrWithCerthash
 		}
 	}
 	return addrs
@@ -945,17 +945,17 @@ func inferWebtransportAddrsFromQuic(in []ma.Multiaddr) []ma.Multiaddr {
 				// Remove certhashes
 				addr, _ = ma.SplitLast(addr)
 			}
-			webtransportAddrs[addr.String()] = struct{}{}
+			webtransportAddrs[string(addr.Bytes())] = struct{}{}
 			// Remove webtransport component, now it's a multiaddr that ends in /quic-v1
 			addr, _ = ma.SplitLast(addr)
 		}
 
 		if _, lastComponent := ma.SplitLast(addr); lastComponent.Protocol().Code == ma.P_QUIC_V1 {
-			addrStr := addr.String()
-			if _, ok := quicOrWebtransportAddrs[addrStr]; ok {
+			bytes := addr.Bytes()
+			if _, ok := quicOrWebtransportAddrs[string(bytes)]; ok {
 				foundSameListeningAddr = true
 			} else {
-				quicOrWebtransportAddrs[addrStr] = struct{}{}
+				quicOrWebtransportAddrs[string(bytes)] = struct{}{}
 			}
 		}
 	}
@@ -977,7 +977,7 @@ func inferWebtransportAddrsFromQuic(in []ma.Multiaddr) []ma.Multiaddr {
 		if _, lastComponent := ma.SplitLast(addr); lastComponent.Protocol().Code == ma.P_QUIC_V1 {
 			// Convert quic to webtransport
 			addr = addr.Encapsulate(wtComponent)
-			if _, ok := webtransportAddrs[addr.String()]; ok {
+			if _, ok := webtransportAddrs[string(addr.Bytes())]; ok {
 				// We already have this address
 				continue
 			}

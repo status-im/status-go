@@ -1861,11 +1861,11 @@ func FormatPeerStats(wakuNode *node.WakuNode, peers node.PeerStats) map[string]t
 		peerInfo := wakuNode.Host().Peerstore().PeerInfo(k)
 		wakuV2Peer := types.WakuV2Peer{}
 		wakuV2Peer.Protocols = v
-		hostInfo, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", k.Pretty()))
+		hostInfo, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", k.String()))
 		for _, addr := range peerInfo.Addrs {
 			wakuV2Peer.Addresses = append(wakuV2Peer.Addresses, addr.Encapsulate(hostInfo).String())
 		}
-		p[k.Pretty()] = wakuV2Peer
+		p[k.String()] = wakuV2Peer
 	}
 	return p
 }

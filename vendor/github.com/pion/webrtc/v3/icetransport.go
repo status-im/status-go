@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -22,8 +25,9 @@ type ICETransport struct {
 
 	role ICERole
 
-	onConnectionStateChangeHandler       atomic.Value // func(ICETransportState)
-	onSelectedCandidatePairChangeHandler atomic.Value // func(*ICECandidatePair)
+	onConnectionStateChangeHandler         atomic.Value // func(ICETransportState)
+	internalOnConnectionStateChangeHandler atomic.Value // func(ICETransportState)
+	onSelectedCandidatePairChangeHandler   atomic.Value // func(*ICECandidatePair)
 
 	state atomic.Value // ICETransportState
 
@@ -44,7 +48,7 @@ type ICETransport struct {
 func (t *ICETransport) GetSelectedCandidatePair() (*ICECandidatePair, error) {
 	agent := t.gatherer.getAgent()
 	if agent == nil {
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 
 	icePair, err := agent.GetSelectedCandidatePair()
@@ -207,9 +211,8 @@ func (t *ICETransport) OnSelectedCandidatePairChange(f func(*ICECandidatePair)) 
 }
 
 func (t *ICETransport) onSelectedCandidatePairChange(pair *ICECandidatePair) {
-	handler := t.onSelectedCandidatePairChangeHandler.Load()
-	if handler != nil {
-		handler.(func(*ICECandidatePair))(pair)
+	if handler, ok := t.onSelectedCandidatePairChangeHandler.Load().(func(*ICECandidatePair)); ok {
+		handler(pair)
 	}
 }
 
@@ -220,9 +223,11 @@ func (t *ICETransport) OnConnectionStateChange(f func(ICETransportState)) {
 }
 
 func (t *ICETransport) onConnectionStateChange(state ICETransportState) {
-	handler := t.onConnectionStateChangeHandler.Load()
-	if handler != nil {
-		handler.(func(ICETransportState))(state)
+	if handler, ok := t.onConnectionStateChangeHandler.Load().(func(ICETransportState)); ok {
+		handler(state)
+	}
+	if handler, ok := t.internalOnConnectionStateChangeHandler.Load().(func(ICETransportState)); ok {
+		handler(state)
 	}
 }
 
@@ -292,8 +297,8 @@ func (t *ICETransport) AddRemoteCandidate(remoteCandidate *ICECandidate) error {
 
 // State returns the current ice transport state.
 func (t *ICETransport) State() ICETransportState {
-	if v := t.state.Load(); v != nil {
-		return v.(ICETransportState)
+	if v, ok := t.state.Load().(ICETransportState); ok {
+		return v
 	}
 	return ICETransportState(0)
 }
