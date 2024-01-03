@@ -280,7 +280,7 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 		nodeConfig.LogEnabled = false
 	}
 
-	nodeConfig.Networks = buildDefaultNetworks(request)
+	nodeConfig.Networks = BuildDefaultNetworks(request)
 
 	return nodeConfig, nil
 }

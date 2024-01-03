@@ -42,7 +42,6 @@ func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bo
 		if err != nil {
 			panic(err)
 		}
-
 		if err := response.Merge(r); err != nil {
 			panic(err)
 		}

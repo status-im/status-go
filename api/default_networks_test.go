@@ -19,7 +19,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		},
 	}
 
-	actualNetworks := buildDefaultNetworks(request)
+	actualNetworks := BuildDefaultNetworks(request)
 
 	require.Len(t, actualNetworks, 6)
 
@@ -62,7 +62,7 @@ func TestBuildDefaultNetworksGanache(t *testing.T) {
 		},
 	}
 
-	actualNetworks := buildDefaultNetworks(request)
+	actualNetworks := BuildDefaultNetworks(request)
 
 	require.Len(t, actualNetworks, 6)
 
