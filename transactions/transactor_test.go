@@ -1,11 +1,9 @@
 package transactions
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"reflect"
-	"sync"
 	"testing"
 	"time"
 
@@ -246,92 +244,30 @@ func (s *TransactorSuite) TestAccountMismatch() {
 	s.EqualError(err, ErrInvalidTxSender.Error())
 }
 
-// TestLocalNonce verifies that local nonce will be used unless
-// upstream nonce is updated and higher than a local
-// in test we will run 3 transaction with nonce zero returned by upstream
-// node, after each call local nonce will be incremented
-// then, we return higher nonce, as if another node was used to send 2 transactions
-// upstream nonce will be equal to 5, we update our local counter to 5+1
-// as the last step, we verify that if tx failed nonce is not updated
-func (s *TransactorSuite) TestLocalNonce() {
-	txCount := 3
-	chainID := s.nodeConfig.NetworkID
-	key, _ := gethcrypto.GenerateKey()
-	selectedAccount := &account.SelectedExtKey{
-		Address:    account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-		AccountKey: &types.Key{PrivateKey: key},
-	}
-	nonce := hexutil.Uint64(0)
-
-	for i := 0; i < txCount; i++ {
-		args := SendTxArgs{
-			From: account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-			To:   account.ToAddress(utils.TestConfig.Account2.WalletAddress),
-		}
-		s.setupTransactionPoolAPI(args, nonce, hexutil.Uint64(i), selectedAccount, nil)
-
-		_, err := s.manager.SendTransaction(args, selectedAccount)
-		s.NoError(err)
-		resultNonce, _ := s.manager.nonce.localNonce[chainID].Load(args.From)
-		s.Equal(uint64(i)+1, resultNonce.(uint64))
-	}
-
-	nonce = hexutil.Uint64(5)
-	args := SendTxArgs{
-		From: account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-		To:   account.ToAddress(utils.TestConfig.Account2.WalletAddress),
-	}
-
-	s.setupTransactionPoolAPI(args, nonce, nonce, selectedAccount, nil)
-
-	_, err := s.manager.SendTransaction(args, selectedAccount)
-	s.NoError(err)
-
-	resultNonce, _ := s.manager.nonce.localNonce[chainID].Load(args.From)
-	s.Equal(uint64(nonce)+1, resultNonce.(uint64))
-
-	testErr := errors.New("test")
-	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), gomock.Eq(common.Address(selectedAccount.Address)), gethrpc.PendingBlockNumber).Return(nil, testErr)
-	args = SendTxArgs{
-		From: account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-		To:   account.ToAddress(utils.TestConfig.Account2.WalletAddress),
-	}
-
-	_, err = s.manager.SendTransaction(args, selectedAccount)
-	s.EqualError(err, testErr.Error())
-	resultNonce, _ = s.manager.nonce.localNonce[chainID].Load(args.From)
-	s.Equal(uint64(nonce)+1, resultNonce.(uint64))
-}
-
 func (s *TransactorSuite) TestSendTransactionWithSignature() {
 	privKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	address := crypto.PubkeyToAddress(privKey.PublicKey)
 
 	scenarios := []struct {
-		localNonce  hexutil.Uint64
-		txNonce     hexutil.Uint64
-		expectError bool
+		nonceFromNetwork hexutil.Uint64
+		txNonce          hexutil.Uint64
+		expectError      bool
 	}{
 		{
-			localNonce:  hexutil.Uint64(0),
-			txNonce:     hexutil.Uint64(0),
-			expectError: false,
+			nonceFromNetwork: hexutil.Uint64(0),
+			txNonce:          hexutil.Uint64(0),
+			expectError:      false,
 		},
 		{
-			localNonce:  hexutil.Uint64(1),
-			txNonce:     hexutil.Uint64(0),
-			expectError: true,
-		},
-		{
-			localNonce:  hexutil.Uint64(0),
-			txNonce:     hexutil.Uint64(1),
-			expectError: true,
+			nonceFromNetwork: hexutil.Uint64(0),
+			txNonce:          hexutil.Uint64(1),
+			expectError:      true,
 		},
 	}
 
 	for _, scenario := range scenarios {
-		desc := fmt.Sprintf("local nonce: %d, tx nonce: %d, expect error: %v", scenario.localNonce, scenario.txNonce, scenario.expectError)
+		desc := fmt.Sprintf("nonceFromNetwork: %d, tx nonce: %d, expect error: %v", scenario.nonceFromNetwork, scenario.txNonce, scenario.expectError)
 		s.T().Run(desc, func(t *testing.T) {
 			nonce := scenario.txNonce
 			from := address
@@ -341,8 +277,6 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 			gasPrice := (*hexutil.Big)(big.NewInt(2000000000))
 			data := []byte{}
 			chainID := big.NewInt(int64(s.nodeConfig.NetworkID))
-			s.manager.nonce.localNonce[s.nodeConfig.NetworkID] = &sync.Map{}
-			s.manager.nonce.localNonce[s.nodeConfig.NetworkID].Store(address, uint64(scenario.localNonce))
 			args := SendTxArgs{
 				From:     from,
 				To:       &to,
@@ -366,7 +300,7 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 
 			s.txServiceMock.EXPECT().
 				GetTransactionCount(gomock.Any(), common.Address(address), gethrpc.PendingBlockNumber).
-				Return(&scenario.localNonce, nil)
+				Return(&scenario.nonceFromNetwork, nil)
 
 			if !scenario.expectError {
 				s.txServiceMock.EXPECT().
@@ -377,15 +311,8 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 			_, err = s.manager.BuildTransactionAndSendWithSignature(s.nodeConfig.NetworkID, args, sig)
 			if scenario.expectError {
 				s.Error(err)
-				// local nonce should not be incremented
-				resultNonce, _ := s.manager.nonce.localNonce[s.nodeConfig.NetworkID].Load(args.From)
-				s.Equal(uint64(scenario.localNonce), resultNonce.(uint64))
 			} else {
 				s.NoError(err)
-				// local nonce should be incremented
-				resultNonce, _ := s.manager.nonce.localNonce[s.nodeConfig.NetworkID].Load(args.From)
-
-				s.Equal(uint64(nonce)+1, resultNonce.(uint64))
 			}
 		})
 	}
