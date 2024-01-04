@@ -402,6 +402,39 @@ var (
 		dBColumnName:   "wallet_token_preferences_group_by_community",
 		valueHandler:   BoolHandler,
 	}
+	ShowCommunityAssetWhenSendingTokens = SettingField{
+		reactFieldName: "show-community-asset-when-sending-tokens?",
+		dBColumnName:   "wallet_show_community_asset_when_sending_tokens",
+		valueHandler:   BoolHandler,
+		syncProtobufFactory: &SyncProtobufFactory{
+			fromInterface:     showCommunityAssetWhenSendingTokensProtobufFactory,
+			fromStruct:        showCommunityAssetWhenSendingTokensProtobufFactoryStruct,
+			valueFromProtobuf: BoolFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_SHOW_COMMUNITY_ASSET_WHEN_SENDING_TOKENS,
+		},
+	}
+	DisplayAssetsBelowBalance = SettingField{
+		reactFieldName: "display-assets-below-balance?",
+		dBColumnName:   "wallet_display_assets_below_balance",
+		valueHandler:   BoolHandler,
+		syncProtobufFactory: &SyncProtobufFactory{
+			fromInterface:     displayAssetsBelowBalanceProtobufFactory,
+			fromStruct:        displayAssetsBelowBalanceProtobufFactoryStruct,
+			valueFromProtobuf: BoolFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_DISPLAY_ASSETS_BELOW_BALANCE,
+		},
+	}
+	DisplayAssetsBelowBalanceThreshold = SettingField{
+		reactFieldName: "display-assets-below-balance-threshold",
+		dBColumnName:   "wallet_display_assets_below_balance_threshold",
+		valueHandler:   Int64Handler,
+		syncProtobufFactory: &SyncProtobufFactory{
+			fromInterface:     displayAssetsBelowBalanceThresholdProtobufFactory,
+			fromStruct:        displayAssetsBelowBalanceThresholdProtobufFactoryStruct,
+			valueFromProtobuf: Int64FromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_DISPLAY_ASSETS_BELOW_BALANCE_THRESHOLD,
+		},
+	}
 	UseMailservers = SettingField{
 		reactFieldName: "use-mailservers?",
 		dBColumnName:   "use_mailservers",
@@ -532,6 +565,9 @@ var (
 		ProfileMigrationNeeded,
 		IsSepoliaEnabled,
 		TokenGroupByCommunity,
+		ShowCommunityAssetWhenSendingTokens,
+		DisplayAssetsBelowBalance,
+		DisplayAssetsBelowBalanceThreshold,
 		URLUnfurlingMode,
 	}
 )

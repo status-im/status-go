@@ -35,6 +35,15 @@ func BoolHandler(value interface{}) (interface{}, error) {
 	return value, nil
 }
 
+func Int64Handler(value interface{}) (interface{}, error) {
+	_, ok := value.(int64)
+	if !ok {
+		return value, errors.ErrInvalidConfig
+	}
+
+	return value, nil
+}
+
 func JSONBlobHandler(value interface{}) (interface{}, error) {
 	return &sqlite.JSONBlob{Data: value}, nil
 }

@@ -178,29 +178,32 @@ type Settings struct {
 	// ProfilePicturesShowTo indicates to whom the user shows their profile picture to (contacts, everyone)
 	ProfilePicturesShowTo ProfilePicturesShowToType `json:"profile-pictures-show-to"`
 	// ProfilePicturesVisibility indicates who we want to see profile pictures of (contacts, everyone or none)
-	ProfilePicturesVisibility      ProfilePicturesVisibilityType `json:"profile-pictures-visibility"`
-	UseMailservers                 bool                          `json:"use-mailservers?"`
-	Usernames                      *json.RawMessage              `json:"usernames,omitempty"`
-	WalletRootAddress              types.Address                 `json:"wallet-root-address,omitempty"`
-	WalletSetUpPassed              bool                          `json:"wallet-set-up-passed?,omitempty"`
-	WalletVisibleTokens            *json.RawMessage              `json:"wallet/visible-tokens,omitempty"`
-	WakuBloomFilterMode            bool                          `json:"waku-bloom-filter-mode,omitempty"`
-	WebViewAllowPermissionRequests bool                          `json:"webview-allow-permission-requests?,omitempty"`
-	SendStatusUpdates              bool                          `json:"send-status-updates?,omitempty"`
-	CurrentUserStatus              *json.RawMessage              `json:"current-user-status"`
-	GifRecents                     *json.RawMessage              `json:"gifs/recent-gifs"`
-	GifFavorites                   *json.RawMessage              `json:"gifs/favorite-gifs"`
-	OpenseaEnabled                 bool                          `json:"opensea-enabled?,omitempty"`
-	TelemetryServerURL             string                        `json:"telemetry-server-url,omitempty"`
-	LastBackup                     uint64                        `json:"last-backup,omitempty"`
-	BackupEnabled                  bool                          `json:"backup-enabled?,omitempty"`
-	AutoMessageEnabled             bool                          `json:"auto-message-enabled?,omitempty"`
-	GifAPIKey                      string                        `json:"gifs/api-key"`
-	TestNetworksEnabled            bool                          `json:"test-networks-enabled?,omitempty"`
-	ProfileMigrationNeeded         bool                          `json:"profile-migration-needed,omitempty"`
-	IsSepoliaEnabled               bool                          `json:"is-sepolia-enabled?,omitempty"`
-	TokenGroupByCommunity          bool                          `json:"token-group-by-community?,omitempty"`
-	URLUnfurlingMode               URLUnfurlingModeType          `json:"url-unfurling-mode,omitempty"`
+	ProfilePicturesVisibility           ProfilePicturesVisibilityType `json:"profile-pictures-visibility"`
+	UseMailservers                      bool                          `json:"use-mailservers?"`
+	Usernames                           *json.RawMessage              `json:"usernames,omitempty"`
+	WalletRootAddress                   types.Address                 `json:"wallet-root-address,omitempty"`
+	WalletSetUpPassed                   bool                          `json:"wallet-set-up-passed?,omitempty"`
+	WalletVisibleTokens                 *json.RawMessage              `json:"wallet/visible-tokens,omitempty"`
+	WakuBloomFilterMode                 bool                          `json:"waku-bloom-filter-mode,omitempty"`
+	WebViewAllowPermissionRequests      bool                          `json:"webview-allow-permission-requests?,omitempty"`
+	SendStatusUpdates                   bool                          `json:"send-status-updates?,omitempty"`
+	CurrentUserStatus                   *json.RawMessage              `json:"current-user-status"`
+	GifRecents                          *json.RawMessage              `json:"gifs/recent-gifs"`
+	GifFavorites                        *json.RawMessage              `json:"gifs/favorite-gifs"`
+	OpenseaEnabled                      bool                          `json:"opensea-enabled?,omitempty"`
+	TelemetryServerURL                  string                        `json:"telemetry-server-url,omitempty"`
+	LastBackup                          uint64                        `json:"last-backup,omitempty"`
+	BackupEnabled                       bool                          `json:"backup-enabled?,omitempty"`
+	AutoMessageEnabled                  bool                          `json:"auto-message-enabled?,omitempty"`
+	GifAPIKey                           string                        `json:"gifs/api-key"`
+	TestNetworksEnabled                 bool                          `json:"test-networks-enabled?,omitempty"`
+	ProfileMigrationNeeded              bool                          `json:"profile-migration-needed,omitempty"`
+	IsSepoliaEnabled                    bool                          `json:"is-sepolia-enabled?,omitempty"`
+	TokenGroupByCommunity               bool                          `json:"token-group-by-community?,omitempty"`
+	ShowCommunityAssetWhenSendingTokens bool                          `json:"show-community-asset-when-sending-tokens?,omitempty"`
+	DisplayAssetsBelowBalance           bool                          `json:"display-assets-below-balance?,omitempty"`
+	DisplayAssetsBelowBalanceThreshold  int64                         `json:"display-assets-below-balance-threshold,omitempty"`
+	URLUnfurlingMode                    URLUnfurlingModeType          `json:"url-unfurling-mode,omitempty"`
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {
