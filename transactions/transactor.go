@@ -49,7 +49,6 @@ type Transactor struct {
 	sendTxTimeout  time.Duration
 	rpcCallTimeout time.Duration
 	networkID      uint64
-	nonce          *Nonce
 	log            log.Logger
 }
 
@@ -57,7 +56,6 @@ type Transactor struct {
 func NewTransactor() *Transactor {
 	return &Transactor{
 		sendTxTimeout: sendTxTimeout,
-		nonce:         NewNonce(),
 		log:           log.New("package", "status-go/transactions.Manager"),
 	}
 }
@@ -77,9 +75,10 @@ func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 	t.rpcCallTimeout = timeout
 }
 
-func (t *Transactor) NextNonce(rpcClient *rpc.Client, chainID uint64, from types.Address) (uint64, UnlockNonceFunc, error) {
+func (t *Transactor) NextNonce(rpcClient *rpc.Client, chainID uint64, from types.Address) (uint64, error) {
 	wrapper := newRPCWrapper(rpcClient, chainID)
-	return t.nonce.Next(wrapper, from)
+	ctx := context.Background()
+	return wrapper.PendingNonceAt(ctx, common.Address(from))
 }
 
 func (t *Transactor) EstimateGas(network *params.Network, from common.Address, to common.Address, value *big.Int, input []byte) (uint64, error) {
@@ -110,9 +109,9 @@ func (t *Transactor) SendTransactionWithChainID(chainID uint64, sendArgs SendTxA
 	return
 }
 
-func (t *Transactor) ValidateAndBuildTransaction(chainID uint64, sendArgs SendTxArgs) (tx *gethtypes.Transaction, unlock UnlockNonceFunc, err error) {
+func (t *Transactor) ValidateAndBuildTransaction(chainID uint64, sendArgs SendTxArgs) (tx *gethtypes.Transaction, err error) {
 	wrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
-	tx, unlock, err = t.validateAndBuildTransaction(wrapper, sendArgs)
+	tx, err = t.validateAndBuildTransaction(wrapper, sendArgs)
 	return
 }
 
@@ -167,16 +166,7 @@ func (t *Transactor) AddSignatureToTransactionAndSend(chainID uint64, tx *gethty
 // It's different from eth_sendRawTransaction because it receives a signature and not a serialized transaction with signature.
 // Since the transactions is already signed, we assume it was validated and used the right nonce.
 func (t *Transactor) BuildTransactionAndSendWithSignature(chainID uint64, args SendTxArgs, sig []byte) (hash types.Hash, err error) {
-	txWithSignature, unlock, err := t.BuildTransactionWithSignature(chainID, args, sig)
-	if unlock != nil {
-		defer func() {
-			var nonce uint64
-			if txWithSignature != nil {
-				nonce = txWithSignature.Nonce()
-			}
-			unlock(err == nil, nonce)
-		}()
-	}
+	txWithSignature, err := t.BuildTransactionWithSignature(chainID, args, sig)
 	if err != nil {
 		return hash, err
 	}
@@ -185,32 +175,31 @@ func (t *Transactor) BuildTransactionAndSendWithSignature(chainID uint64, args S
 	return hash, err
 }
 
-func (t *Transactor) BuildTransactionWithSignature(chainID uint64, args SendTxArgs, sig []byte) (*gethtypes.Transaction, UnlockNonceFunc, error) {
+func (t *Transactor) BuildTransactionWithSignature(chainID uint64, args SendTxArgs, sig []byte) (*gethtypes.Transaction, error) {
 	if !args.Valid() {
-		return nil, nil, ErrInvalidSendTxArgs
+		return nil, ErrInvalidSendTxArgs
 	}
 
 	if len(sig) != ValidSignatureSize {
-		return nil, nil, ErrInvalidSignatureSize
+		return nil, ErrInvalidSignatureSize
 	}
 
 	tx := t.buildTransaction(args)
-	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
-	expectedNonce, unlock, err := t.nonce.Next(rpcWrapper, args.From)
+	expectedNonce, err := t.NextNonce(t.rpcWrapper.RPCClient, chainID, args.From)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if tx.Nonce() != expectedNonce {
-		return nil, unlock, &ErrBadNonce{tx.Nonce(), expectedNonce}
+		return nil, &ErrBadNonce{tx.Nonce(), expectedNonce}
 	}
 
 	txWithSignature, err := t.AddSignatureToTransaction(chainID, tx, sig)
 	if err != nil {
-		return nil, unlock, err
+		return nil, err
 	}
 
-	return txWithSignature, unlock, nil
+	return txWithSignature, nil
 }
 
 func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs, hash types.Hash, err error) {
@@ -220,12 +209,9 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 
 	validatedArgs = args
 
-	nonce, unlock, err := t.nonce.Next(t.rpcWrapper, args.From)
+	nonce, err := t.NextNonce(t.rpcWrapper.RPCClient, t.rpcWrapper.chainID, args.From)
 	if err != nil {
 		return validatedArgs, hash, err
-	}
-	if unlock != nil {
-		defer unlock(false, 0)
 	}
 
 	gasPrice := (*big.Int)(args.GasPrice)
@@ -315,18 +301,18 @@ func (t *Transactor) validateAccount(args SendTxArgs, selectedAccount *account.S
 	return nil
 }
 
-func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args SendTxArgs) (tx *gethtypes.Transaction, unlock UnlockNonceFunc, err error) {
+func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args SendTxArgs) (tx *gethtypes.Transaction, err error) {
 	if !args.Valid() {
-		return tx, nil, ErrInvalidSendTxArgs
+		return tx, ErrInvalidSendTxArgs
 	}
 
 	var nonce uint64
 	if args.Nonce != nil {
 		nonce = uint64(*args.Nonce)
 	} else {
-		nonce, unlock, err = t.nonce.Next(rpcWrapper, args.From)
+		nonce, err = t.NextNonce(rpcWrapper.RPCClient, rpcWrapper.chainID, args.From)
 		if err != nil {
-			return tx, nil, err
+			return tx, err
 		}
 	}
 
@@ -337,7 +323,7 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 	if !args.IsDynamicFeeTx() && args.GasPrice == nil {
 		gasPrice, err = rpcWrapper.SuggestGasPrice(ctx)
 		if err != nil {
-			return tx, unlock, err
+			return tx, err
 		}
 	}
 
@@ -365,15 +351,16 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 			Data:     args.GetInput(),
 		})
 		if err != nil {
-			return tx, unlock, err
+			return tx, err
 		}
 		if gas < defaultGas {
 			t.log.Info("default gas will be used because estimated is lower", "estimated", gas, "default", defaultGas)
 			gas = defaultGas
 		}
 	}
+
 	tx = t.buildTransactionWithOverrides(nonce, value, gas, gasPrice, args)
-	return tx, unlock, nil
+	return tx, nil
 }
 
 func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccount *account.SelectedExtKey, args SendTxArgs) (hash types.Hash, err error) {
@@ -381,12 +368,7 @@ func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccoun
 		return hash, err
 	}
 
-	tx, unlock, err := t.validateAndBuildTransaction(rpcWrapper, args)
-	defer func() {
-		if unlock != nil {
-			unlock(err == nil, tx.Nonce())
-		}
-	}()
+	tx, err := t.validateAndBuildTransaction(rpcWrapper, args)
 	if err != nil {
 		return hash, err
 	}

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	eth "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -139,6 +140,18 @@ func (tm *PendingTxTracker) fetchAndUpdateDB(ctx context.Context) bool {
 	return res
 }
 
+type NullableReceipt struct {
+	*types.Receipt
+}
+
+func (nr *NullableReceipt) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		// transaction is not available yet
+		return nil
+	}
+	return json.Unmarshal(data, &nr.Receipt)
+}
+
 // fetchBatchTxStatus returns not pending transactions (confirmed or errored)
 // it excludes the still pending or errored request from the result
 func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chainID common.ChainID, hashes []eth.Hash, log log.Logger) ([]txStatusRes, error) {
@@ -153,11 +166,10 @@ func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chai
 
 	batch := make([]ethrpc.BatchElem, 0, len(hashes))
 	for _, hash := range hashes {
-		jsonRes := make(map[string]interface{})
 		batch = append(batch, ethrpc.BatchElem{
-			Method: "eth_getTransactionByHash",
+			Method: GetTransactionReceiptRPCName,
 			Args:   []interface{}{hash},
-			Result: &jsonRes,
+			Result: new(NullableReceipt),
 		})
 	}
 
@@ -175,12 +187,23 @@ func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chai
 			log.Error("Failed to get transaction", "error", err, "hash", hashes[i])
 			continue
 		} else {
-			jsonRes := *(b.Result.(*map[string]interface{}))
-			if jsonRes != nil {
-				if blNo, ok := jsonRes["blockNumber"]; ok {
-					isPending = blNo == nil
-				}
+			if b.Result == nil {
+				log.Error("Transaction not found", "hash", hashes[i])
+				continue
 			}
+
+			receiptWrapper, ok := b.Result.(*NullableReceipt)
+			if !ok {
+				log.Error("Failed to cast transaction receipt", "hash", hashes[i])
+				continue
+			}
+			if receiptWrapper == nil || receiptWrapper.Receipt == nil {
+				// the transaction is not available yet
+				continue
+			}
+
+			receipt := receiptWrapper.Receipt
+			isPending = receipt.BlockNumber == nil
 		}
 
 		if !isPending {

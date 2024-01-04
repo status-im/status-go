@@ -114,7 +114,7 @@ func haveSameElements[T comparable](a []T, b []T, isEqual func(T, T) bool) bool 
 
 func savedAddressDataIsEqual(a, b wallet.SavedAddress) bool {
 	return a.Address == b.Address && a.IsTest == b.IsTest && a.Name == b.Name &&
-		a.Favourite == b.Favourite && a.ENSName == b.ENSName && a.ChainShortNames == b.ChainShortNames
+		a.Favourite == b.Favourite && a.ENSName == b.ENSName && a.ChainShortNames == b.ChainShortNames && a.ColorID == b.ColorID
 }
 
 func (s *MessengerSyncSavedAddressesSuite) TestSyncExistingSavedAddresses() {

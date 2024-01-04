@@ -23,8 +23,7 @@ func (m *MockETHClient) BatchCallContext(ctx context.Context, b []rpc.BatchElem)
 }
 
 const (
-	TransactionBlockNo       = "0x1"
-	TransactionByHashRPCName = "eth_getTransactionByHash"
+	GetTransactionReceiptRPCName = "eth_getTransactionReceipt"
 )
 
 type MockChainClient struct {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"math/big"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	eth "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
 
@@ -53,11 +55,11 @@ func TestPendingTxTracker_ValidateConfirmed(t *testing.T) {
 	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID})
 	cl := chainClient.Clients[txs[0].ChainID]
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return len(b) == 1 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[0].Hash
+		return len(b) == 1 && b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[0].Hash
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
-		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = TransactionBlockNo
+		res := elems[0].Result.(*types.Receipt)
+		res.BlockNumber = new(big.Int).SetUint64(1)
 	})
 
 	eventChan := make(chan walletevent.Event, 3)
@@ -108,14 +110,14 @@ func TestPendingTxTracker_InterruptWatching(t *testing.T) {
 	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID})
 	cl := chainClient.Clients[txs[0].ChainID]
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return (len(b) == 2 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[0].Hash && b[1].Method == TransactionByHashRPCName && b[1].Args[0] == txs[1].Hash)
+		return (len(b) == 2 && b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[0].Hash && b[1].Method == GetTransactionReceiptRPCName && b[1].Args[0] == txs[1].Hash)
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
 
 		// Simulate still pending by excluding "blockNumber" in elems[0]
 
-		res := elems[1].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = TransactionBlockNo
+		res := elems[1].Result.(*types.Receipt)
+		res.BlockNumber = new(big.Int).SetUint64(1)
 	})
 
 	eventChan := make(chan walletevent.Event, 2)
@@ -171,11 +173,11 @@ func TestPendingTxTracker_InterruptWatching(t *testing.T) {
 	// Restart the tracker to process leftovers
 	//
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return (len(b) == 1 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[0].Hash)
+		return (len(b) == 1 && b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[0].Hash)
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
-		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = TransactionBlockNo
+		res := elems[0].Result.(*types.Receipt)
+		res.BlockNumber = new(big.Int).SetUint64(1)
 	})
 
 	err = m.Start()
@@ -223,19 +225,19 @@ func TestPendingTxTracker_MultipleClients(t *testing.T) {
 	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID, txs[1].ChainID})
 	cl := chainClient.Clients[txs[0].ChainID]
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return (len(b) == 1 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[0].Hash)
+		return (len(b) == 1 && b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[0].Hash)
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
-		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = TransactionBlockNo
+		res := elems[0].Result.(*types.Receipt)
+		res.BlockNumber = new(big.Int).SetUint64(1)
 	})
 	cl = chainClient.Clients[txs[1].ChainID]
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return (len(b) == 1 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[1].Hash)
+		return (len(b) == 1 && b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[1].Hash)
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
-		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = TransactionBlockNo
+		res := elems[0].Result.(*types.Receipt)
+		res.BlockNumber = new(big.Int).SetUint64(1)
 	})
 
 	eventChan := make(chan walletevent.Event, 6)
@@ -303,11 +305,11 @@ func TestPendingTxTracker_Watch(t *testing.T) {
 	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID})
 	cl := chainClient.Clients[txs[0].ChainID]
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return len(b) == 1 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[1].Hash
+		return len(b) == 1 && b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[1].Hash
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
-		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = TransactionBlockNo
+		res := elems[0].Result.(*types.Receipt)
+		res.BlockNumber = new(big.Int).SetUint64(1)
 	})
 
 	eventChan := make(chan walletevent.Event, 3)
@@ -386,23 +388,23 @@ func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
 		if len(cl.Calls) == 0 {
-			res := len(b) > 0 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[0].Hash
+			res := len(b) > 0 && b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[0].Hash
 			// If the first processing call picked up the second validate this case also
 			if len(b) == 2 {
-				res = res && b[1].Method == TransactionByHashRPCName && b[1].Args[0] == txs[1].Hash
+				res = res && b[1].Method == GetTransactionReceiptRPCName && b[1].Args[0] == txs[1].Hash
 			}
 			return res
 		}
 		// Second call we expect only one left
-		return len(b) == 1 && (b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[1].Hash)
+		return len(b) == 1 && (b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[1].Hash)
 	})).Return(nil).Twice().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
 		if len(cl.Calls) == 2 {
 			firsDoneWG.Wait()
 		}
 		// Only first item is processed, second is left pending
-		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = TransactionBlockNo
+		res := elems[0].Result.(*types.Receipt)
+		res.BlockNumber = new(big.Int).SetUint64(1)
 	})
 
 	eventChan := make(chan walletevent.Event, 6)
