@@ -18,10 +18,10 @@ type RLNMetadata struct {
 }
 
 // Serialize converts a RLNMetadata into a binary format expected by zerokit's RLN
-func (r RLNMetadata) Serialize() []byte {
+func (r RLNMetadata) Serialize() ([]byte, error) {
 	chainID := r.ChainID
 	if chainID == nil {
-		chainID = big.NewInt(0)
+		return nil, errors.New("chain-id not specified and cannot be 0")
 	}
 
 	var result []byte
@@ -34,7 +34,7 @@ func (r RLNMetadata) Serialize() []byte {
 		result = binary.LittleEndian.AppendUint64(result, v.BlockNumber)
 	}
 
-	return result
+	return result, nil
 }
 
 const lastProcessedBlockOffset = 0
@@ -76,6 +76,9 @@ func DeserializeMetadata(b []byte) (RLNMetadata, error) {
 
 // SetMetadata stores some metadata into the zerokit's RLN database
 func (gm *DynamicGroupManager) SetMetadata(meta RLNMetadata) error {
-	b := meta.Serialize()
+	b, err := meta.Serialize()
+	if err != nil {
+		return err
+	}
 	return gm.rln.SetMetadata(b)
 }

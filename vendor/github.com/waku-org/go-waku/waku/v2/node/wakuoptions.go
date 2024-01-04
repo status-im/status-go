@@ -80,6 +80,7 @@ type WakuNodeParameters struct {
 	pubsubOpts             []pubsub.Option
 
 	minRelayPeersToPublish int
+	maxMsgSizeBytes        int
 
 	enableStore     bool
 	messageProvider store.MessageProvider
@@ -354,6 +355,13 @@ func WithWakuRelayAndMinPeers(minRelayPeersToPublish int, opts ...pubsub.Option)
 		params.enableRelay = true
 		params.pubsubOpts = opts
 		params.minRelayPeersToPublish = minRelayPeersToPublish
+		return nil
+	}
+}
+
+func WithMaxMsgSize(maxMsgSizeBytes int) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.maxMsgSizeBytes = maxMsgSizeBytes
 		return nil
 	}
 }
