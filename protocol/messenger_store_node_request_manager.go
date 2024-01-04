@@ -484,6 +484,9 @@ func (r *storeNodeRequest) routine() {
 		r.result.err = fmt.Errorf("store node is not available")
 		return
 	}
+	if ms == nil {
+		ms = r.manager.messenger.getActiveMailserver()
+	}
 
 	// Check if community already exists locally and get Clock.
 
