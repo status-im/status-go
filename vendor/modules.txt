@@ -119,6 +119,9 @@ github.com/andybalholm/brotli
 # github.com/andybalholm/cascadia v1.2.0
 ## explicit; go 1.13
 github.com/andybalholm/cascadia
+# github.com/avast/retry-go/v4 v4.5.1
+## explicit; go 1.18
+github.com/avast/retry-go/v4
 # github.com/bahlo/generic-list-go v0.2.0
 ## explicit; go 1.18
 github.com/bahlo/generic-list-go
@@ -198,8 +201,8 @@ github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa
 # github.com/docker/go-units v0.5.0
 ## explicit
 github.com/docker/go-units
-# github.com/dustin/go-humanize v1.0.0
-## explicit
+# github.com/dustin/go-humanize v1.0.1
+## explicit; go 1.16
 github.com/dustin/go-humanize
 # github.com/edsrzf/mmap-go v1.0.0
 ## explicit
@@ -1011,7 +1014,7 @@ github.com/waku-org/go-discover/discover/v5wire
 github.com/waku-org/go-libp2p-rendezvous
 github.com/waku-org/go-libp2p-rendezvous/db
 github.com/waku-org/go-libp2p-rendezvous/pb
-# github.com/waku-org/go-waku v0.8.1-0.20231208155702-3a32060c8c54
+# github.com/waku-org/go-waku v0.8.1-0.20240104144340-585648c4eefe
 ## explicit; go 1.19
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/waku/persistence
@@ -1051,7 +1054,7 @@ github.com/waku-org/go-waku/waku/v2/rendezvous
 github.com/waku-org/go-waku/waku/v2/service
 github.com/waku-org/go-waku/waku/v2/timesource
 github.com/waku-org/go-waku/waku/v2/utils
-# github.com/waku-org/go-zerokit-rln v0.1.14-0.20230916173259-d284a3d8f2fd
+# github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59
 ## explicit; go 1.18
 github.com/waku-org/go-zerokit-rln/rln
 github.com/waku-org/go-zerokit-rln/rln/link

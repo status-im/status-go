@@ -300,8 +300,13 @@ func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *wpb.WakuMessa
 	req.Message = message
 	req.PubsubTopic = params.pubsubTopic
 
+	logger := message.Logger(wakuLP.log, params.pubsubTopic).With(logging.HostID("peerID", params.selectedPeer))
+
+	logger.Debug("publishing message")
+
 	response, err := wakuLP.request(ctx, req, params)
 	if err != nil {
+		logger.Error("could not publish message", zap.Error(err))
 		return nil, err
 	}
 

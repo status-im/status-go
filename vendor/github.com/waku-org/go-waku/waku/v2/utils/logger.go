@@ -19,7 +19,7 @@ func Logger() *zap.Logger {
 	return log
 }
 
-// MessagesLogger returns a logger used for debug logging of receivent/sent messages
+// MessagesLogger returns a logger used for debug logging of sent/received messages
 func MessagesLogger(prefix string) *zap.Logger {
 	if messageLoggers == nil {
 		messageLoggers = make(map[string]*zap.Logger)

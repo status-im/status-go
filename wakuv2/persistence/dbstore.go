@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/protobuf/proto"
-
 	gowakuPersistence "github.com/waku-org/go-waku/waku/persistence"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
@@ -180,7 +178,7 @@ func (d *DBStore) Put(env *protocol.Envelope) error {
 	}
 
 	cursor := env.Index()
-	dbKey := gowakuPersistence.NewDBKey(uint64(cursor.SenderTime), uint64(env.Index().ReceiverTime), env.PubsubTopic(), env.Index().Digest)
+	dbKey := NewDBKey(uint64(cursor.SenderTime), uint64(env.Index().ReceiverTime), env.PubsubTopic(), env.Index().Digest)
 	_, err = stmt.Exec(dbKey.Bytes(), cursor.ReceiverTime, env.Message().Timestamp, env.Message().ContentTopic, env.PubsubTopic(), env.Message().Payload, env.Message().Version)
 	if err != nil {
 		return err
@@ -233,7 +231,7 @@ func (d *DBStore) Query(query *storepb.HistoryQuery) (*storepb.Index, []gowakuPe
 	if query.PagingInfo.Cursor != nil {
 		usesCursor = true
 		var exists bool
-		cursorDBKey := gowakuPersistence.NewDBKey(uint64(query.PagingInfo.Cursor.SenderTime), uint64(query.PagingInfo.Cursor.ReceiverTime), query.PagingInfo.Cursor.PubsubTopic, query.PagingInfo.Cursor.Digest)
+		cursorDBKey := NewDBKey(uint64(query.PagingInfo.Cursor.SenderTime), uint64(query.PagingInfo.Cursor.ReceiverTime), query.PagingInfo.Cursor.PubsubTopic, query.PagingInfo.Cursor.Digest)
 
 		err := d.db.QueryRow("SELECT EXISTS(SELECT 1 FROM store_messages WHERE id = $1)",
 			cursorDBKey.Bytes(),
@@ -261,7 +259,7 @@ func (d *DBStore) Query(query *storepb.HistoryQuery) (*storepb.Index, []gowakuPe
 		if !usesCursor || query.PagingInfo.Direction == storepb.PagingInfo_BACKWARD {
 			paramCnt++
 			conditions = append(conditions, fmt.Sprintf("id >= $%d", paramCnt))
-			startTimeDBKey := gowakuPersistence.NewDBKey(uint64(query.GetStartTime()), uint64(query.GetStartTime()), "", []byte{})
+			startTimeDBKey := NewDBKey(uint64(query.GetStartTime()), uint64(query.GetStartTime()), "", []byte{})
 			parameters = append(parameters, startTimeDBKey.Bytes())
 		}
 
@@ -271,7 +269,7 @@ func (d *DBStore) Query(query *storepb.HistoryQuery) (*storepb.Index, []gowakuPe
 		if !usesCursor || query.PagingInfo.Direction == storepb.PagingInfo_FORWARD {
 			paramCnt++
 			conditions = append(conditions, fmt.Sprintf("id <= $%d", paramCnt))
-			endTimeDBKey := gowakuPersistence.NewDBKey(uint64(query.GetEndTime()), uint64(query.GetEndTime()), "", []byte{})
+			endTimeDBKey := NewDBKey(uint64(query.GetEndTime()), uint64(query.GetEndTime()), "", []byte{})
 			parameters = append(parameters, endTimeDBKey.Bytes())
 		}
 	}
@@ -409,8 +407,8 @@ func (d *DBStore) GetStoredMessage(row *sql.Rows) (gowakuPersistence.StoredMessa
 	msg := new(pb.WakuMessage)
 	msg.ContentTopic = contentTopic
 	msg.Payload = payload
-	msg.Timestamp = proto.Int64(senderTimestamp)
-	msg.Version = proto.Uint32(version)
+	msg.Timestamp = &senderTimestamp
+	msg.Version = &version
 
 	record := gowakuPersistence.StoredMessage{
 		ID:           id,

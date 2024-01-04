@@ -27,10 +27,17 @@ var connectedPeers = prometheus.NewGauge(
 		Help: "Number of connected peers",
 	})
 
+var peerStoreSize = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Name: "waku_peer_store_size",
+		Help: "Size of Peer Store",
+	})
+
 var collectors = []prometheus.Collector{
 	gitVersion,
 	peerDials,
 	connectedPeers,
+	peerStoreSize,
 }
 
 // Metrics exposes the functions required to update prometheus metrics for the waku node
@@ -39,6 +46,7 @@ type Metrics interface {
 	RecordDial()
 	RecordPeerConnected()
 	RecordPeerDisconnected()
+	SetPeerStoreSize(int)
 }
 
 type metricsImpl struct {
@@ -71,4 +79,8 @@ func (m *metricsImpl) RecordPeerConnected() {
 // RecordPeerDisconnected decreases the metrics for the number of connected peers
 func (m *metricsImpl) RecordPeerDisconnected() {
 	connectedPeers.Dec()
+}
+
+func (m *metricsImpl) SetPeerStoreSize(size int) {
+	peerStoreSize.Set(float64(size))
 }
