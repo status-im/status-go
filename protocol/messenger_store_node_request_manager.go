@@ -480,7 +480,7 @@ func (r *storeNodeRequest) routine() {
 
 	communityIDStr := strings.TrimSuffix(r.requestID.DataID, transport.CommunityShardInfoTopicPrefix())
 	ms := r.manager.messenger.getActiveMailserver(communityIDStr)
-	if !r.manager.messenger.waitForAvailableStoreNode(storeNodeAvailableTimeout) {
+	if ms == r.manager.messenger.getActiveMailserver() && !r.manager.messenger.waitForAvailableStoreNode(storeNodeAvailableTimeout) {
 		r.result.err = fmt.Errorf("store node is not available")
 		return
 	}
