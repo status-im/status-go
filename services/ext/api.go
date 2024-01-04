@@ -1669,6 +1669,11 @@ func (api *PublicAPI) RegisterReceivedOwnershipNotification(communityID string) 
 	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeOwnershipReceived, false)
 }
 
+// Returns response with AC notification when community token is received
+func (api *PublicAPI) RegisterReceivedCommunityTokenNotification(communityID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeCommunityTokenReceived, false)
+}
+
 // Returns response with AC notification when setting signer is failed
 func (api *PublicAPI) RegisterSetSignerFailedNotification(communityID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeSetSignerFailed, false)
