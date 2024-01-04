@@ -237,7 +237,7 @@ func (d *Database) GetMailserversForCommunities() (map[string][]Mailserver, erro
 	rows, err := d.db.Query(`
 		SELECT cm.community_id, m.id, m.name, m.address, m.password, m.fleet, m.community_only 
 		FROM mailservers AS m
-		JOIN community_storenodes AS cm ON m.id = cm.mailserver_id
+		JOIN community_storenodes AS cm ON m.id = cm.storenode_id
 	`)
 	if err != nil {
 		return nil, err
@@ -275,7 +275,7 @@ func (d *Database) GetMailserversForCommunity(communityID types.HexBytes) ([]Mai
 	rows, err := d.db.Query(`
 		SELECT m.id, m.name, m.address, m.password, m.fleet, m.community_only 
 		FROM mailservers AS m
-		JOIN community_storenodes AS cm ON m.id = cm.mailserver_id
+		JOIN community_storenodes AS cm ON m.id = cm.storenode_id
 		WHERE cm.community_id = ?
 	`, communityID)
 	if err != nil {
