@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -137,6 +138,7 @@ func (mgr *FilterManager) processEvents(ev *FilterEvent) {
 		// therefore no particular peers that could be unreachable.
 		if ev.filterID != "" {
 			// Trigger full resubscribe, filter has too few peers
+			fmt.Println("::: FILTER HAS TO FEW SUBS. TRIGGER RESUBSCRIBE", ev.filterID)
 			mgr.logger.Debug("filter has too few subs", zap.String("filterId", ev.filterID))
 			mgr.resubscribe(ev.filterID)
 			break
@@ -156,6 +158,7 @@ func (mgr *FilterManager) processEvents(ev *FilterEvent) {
 					continue
 				}
 				if sub.PeerID == ev.peerID {
+					fmt.Println("FILTER SUB IS INACTIVE!", filterID, sub.PeerID)
 					mgr.logger.Debug("filter sub is inactive", zap.String("filterId", filterID), zap.Stringer("peerId", sub.PeerID), zap.String("subID", sub.ID))
 					delete(subs, sub.ID)
 					go mgr.unsubscribeFromFilter(filterID, sub)
@@ -201,10 +204,11 @@ func (mgr *FilterManager) processEvents(ev *FilterEvent) {
 }
 
 func (mgr *FilterManager) subscribeToFilter(filterID string, peer peer.ID, tempID string) {
-
+	fmt.Println("::: SUBSCRIBE TO FILTER")
 	logger := mgr.logger.With(zap.String("filterId", filterID))
 	f := mgr.getFilter(filterID)
 	if f == nil {
+		fmt.Println(":: FILTER NOT FOUND")
 		logger.Error("filter subscribeToFilter: No filter found")
 		mgr.eventChan <- FilterEvent{eventType: FilterEventSubscribeResult, filterID: filterID, tempID: tempID, success: false}
 		return
@@ -215,6 +219,7 @@ func (mgr *FilterManager) subscribeToFilter(filterID string, peer peer.ID, tempI
 	defer cancel()
 
 	subDetails, err := mgr.node.FilterLightnode().Subscribe(ctx, contentFilter, filter.WithPeer(peer))
+	fmt.Println("::: SUBSCRIBING TO PEER:", peer, err)
 	var sub *subscription.SubscriptionDetails
 	if err != nil {
 		logger.Warn("filter could not add wakuv2 filter for peer", zap.Stringer("peer", peer), zap.Error(err))
@@ -279,6 +284,8 @@ func (mgr *FilterManager) pingPeers() {
 				err := mgr.isFilterSubAlive(sub)
 				alive := err == nil
 
+				fmt.Println("::: FILTER ALIVENESS", sub.PeerID, alive)
+
 				if alive {
 					logger.Debug("filter aliveness check succeeded", zap.Stringer("peerId", sub.PeerID))
 				} else {
@@ -301,7 +308,11 @@ func (mgr *FilterManager) buildContentFilter(pubsubTopic string, contentTopicSet
 
 // Find suitable peer(s)
 func (mgr *FilterManager) findFilterPeers() []peer.ID {
-	allPeers := mgr.node.Host().Peerstore().Peers()
+	p1, _ := peer.Decode("16Uiu2HAmAR24Mbb6VuzoyUiGx42UenDkshENVDj4qnmmbabLvo31")
+	p2, _ := peer.Decode("16Uiu2HAm8mUZ18tBWPXDQsaF7PbCKYA35z7WB2xNZH2EVq1qS8LJ")
+	p3, _ := peer.Decode("16Uiu2HAmGwcE8v7gmJNEWFtZtojYpPMTHy2jBLL6xRk33qgDxFWX")
+
+	allPeers := []peer.ID{p1, p2, p3}
 
 	peers := make([]peer.ID, 0)
 	for _, peer := range allPeers {
@@ -350,6 +361,7 @@ func (mgr *FilterManager) resubscribe(filterID string) {
 			// Create sub placeholder in order to avoid potentially too many subs
 			tempID := uuid.NewString()
 			subs[tempID] = nil
+			fmt.Println("RESUBCRIBING", peer)
 			go mgr.subscribeToFilter(filterID, peer, tempID)
 		} else {
 			mgr.logger.Error("filter resubscribe findPeer error", zap.Error(err))
