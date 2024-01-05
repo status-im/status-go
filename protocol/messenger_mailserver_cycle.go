@@ -422,15 +422,6 @@ func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 	return nil
 }
 
-func (m *Messenger) getActiveMailserverByChatID(chatID string) *mailservers.Mailserver {
-	communityID := "" // default to none
-	chat, ok := m.allChats.Load(chatID)
-	if ok && chat.CommunityChat() && m.communityStorenodes.HasStorenodeSetup(chat.CommunityID) {
-		communityID = chat.CommunityID
-	}
-	return m.getActiveMailserver(communityID)
-}
-
 // getActiveMailserver returns the active mailserver if a communityID is present then it'll return the mailserver
 // for that community if it has a mailserver setup otherwise it'll return the global mailserver
 func (m *Messenger) getActiveMailserver(communityID ...string) *mailservers.Mailserver {
