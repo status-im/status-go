@@ -937,8 +937,7 @@ func TestFindBlocksCommand(t *testing.T) {
 		}
 		client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 		client.SetClient(tc.NetworkID(), tc)
-		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer)
-
+		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil)
 		tokenManager.SetTokens([]*token.Token{
 			{
 				Address:  tokenTXXAddress,
@@ -1063,7 +1062,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 
 	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer)
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil)
 
 	tokenManager.SetTokens([]*token.Token{
 		{
@@ -1183,7 +1182,7 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 
 		client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 		client.SetClient(tc.NetworkID(), tc)
-		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer)
+		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil)
 
 		tokenManager.SetTokens([]*token.Token{
 			{
@@ -1260,7 +1259,8 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 
 	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer)
+
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil)
 
 	tokenManager.SetTokens([]*token.Token{
 		{

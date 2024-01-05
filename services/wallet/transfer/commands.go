@@ -420,8 +420,13 @@ func (c *transfersCommand) processUnknownErc20CommunityTransactions(ctx context.
 		if tx.Type == w_common.Erc20Transfer && tx.Transaction.To() != nil {
 			// Find token in db or if this is a community token, find its metadata
 			token := c.tokenManager.FindOrCreateTokenByAddress(ctx, tx.NetworkID, *tx.Transaction.To())
-			if token != nil && (token.Verified || token.CommunityData != nil) {
-				_ = c.tokenManager.MarkAsPreviouslyOwnedToken(token, tx.Address)
+			if token != nil {
+				if token.Verified || token.CommunityData != nil {
+					_ = c.tokenManager.MarkAsPreviouslyOwnedToken(token, tx.Address)
+				}
+				if token.CommunityData != nil {
+					go c.tokenManager.SignalCommunityTokenReceived(tx.Address, tx.ID, tx.Transaction.Value(), token)
+				}
 			}
 		}
 	}

@@ -3,6 +3,7 @@ package token
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"math/big"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/community-tokens/assets"
@@ -29,6 +31,11 @@ import (
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/community"
+	"github.com/status-im/status-go/services/wallet/walletevent"
+)
+
+const (
+	EventCommunityTokenReceived walletevent.EventType = "wallet-community-token-received"
 )
 
 var requestTimeout = 20 * time.Second
@@ -52,6 +59,17 @@ type Token struct {
 	CommunityData *community.Data `json:"community_data,omitempty"`
 	Verified      bool            `json:"verified"`
 	TokenListID   string          `json:"tokenListId"`
+}
+
+type ReceivedToken struct {
+	Address       common.Address  `json:"address"`
+	Name          string          `json:"name"`
+	Symbol        string          `json:"symbol"`
+	Image         string          `json:"image,omitempty"`
+	ChainID       uint64          `json:"chainId"`
+	CommunityData *community.Data `json:"community_data,omitempty"`
+	Balance       *big.Int        `json:"balance"`
+	TxHash        common.Hash     `json:"txHash"`
 }
 
 func (t *Token) IsNative() bool {
@@ -84,6 +102,7 @@ type Manager struct {
 	communityTokensDB *communitytokens.Database
 	communityManager  *community.Manager
 	mediaServer       *server.MediaServer
+	walletFeed        *event.Feed
 
 	tokens []*Token
 
@@ -112,6 +131,7 @@ func NewTokenManager(
 	networkManager *network.Manager,
 	appDB *sql.DB,
 	mediaServer *server.MediaServer,
+	walletFeed *event.Feed,
 ) *Manager {
 	maker, _ := contracts.NewContractMaker(RPCClient)
 	stores := []store{newUniswapStore(), newDefaultStore()}
@@ -148,6 +168,7 @@ func NewTokenManager(
 		communityTokensDB: communitytokens.NewCommunityTokensDatabase(appDB),
 		tokens:            tokens,
 		mediaServer:       mediaServer,
+		walletFeed:        walletFeed,
 	}
 }
 
@@ -349,6 +370,10 @@ func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *Token, a
 	}
 	communityID := eth_node_types.EncodeHex(communityIDHex)
 
+	token.CommunityData = &community.Data{
+		ID: communityID,
+	}
+
 	_, err = update.Exec(communityID, token.ChainID, token.Address)
 	if err != nil {
 		log.Error("Cannot update community id", err)
@@ -549,15 +574,7 @@ func (tm *Manager) getTokensFromDB(query string, args ...any) ([]*Token, error) 
 			}
 		}
 
-		if tm.communityManager != nil && token.CommunityData != nil {
-			communityInfo, _, err := tm.communityManager.GetCommunityInfo(token.CommunityData.ID)
-			if err == nil && communityInfo != nil {
-				// Fetched data from cache. Cache is refreshed during every wallet token list call.
-				token.CommunityData.Name = communityInfo.CommunityName
-				token.CommunityData.Color = communityInfo.CommunityColor
-				token.CommunityData.Image = communityInfo.CommunityImage
-			}
-		}
+		_ = tm.fillCommunityData(token)
 
 		rst = append(rst, token)
 	}
@@ -784,4 +801,65 @@ func (tm *Manager) GetBalancesAtByChain(parent context.Context, clients map[uint
 		return nil, parent.Err()
 	}
 	return response, group.Error()
+}
+
+func (tm *Manager) SignalCommunityTokenReceived(address common.Address, txHash common.Hash, value *big.Int, t *Token) {
+	if tm.walletFeed == nil || t == nil || t.CommunityData == nil {
+		return
+	}
+
+	if len(t.CommunityData.Name) == 0 {
+		_ = tm.fillCommunityData(t)
+	}
+	if len(t.CommunityData.Name) == 0 && tm.communityManager != nil {
+		communityData, _ := tm.communityManager.FetchCommunityMetadata(t.CommunityData.ID)
+		if communityData != nil {
+			t.CommunityData.Name = communityData.CommunityName
+			t.CommunityData.Color = communityData.CommunityColor
+			t.CommunityData.Image = tm.communityManager.GetCommunityImageURL(t.CommunityData.ID)
+		}
+	}
+
+	receivedToken := ReceivedToken{
+		Address:       t.Address,
+		Name:          t.Name,
+		Symbol:        t.Symbol,
+		Image:         t.Image,
+		ChainID:       t.ChainID,
+		CommunityData: t.CommunityData,
+		Balance:       value,
+		TxHash:        txHash,
+	}
+
+	encodedMessage, err := json.Marshal(receivedToken)
+	if err != nil {
+		return
+	}
+
+	tm.walletFeed.Send(walletevent.Event{
+		Type:    EventCommunityTokenReceived,
+		ChainID: t.ChainID,
+		Accounts: []common.Address{
+			address,
+		},
+		Message: string(encodedMessage),
+	})
+}
+
+func (tm *Manager) fillCommunityData(token *Token) error {
+	if token == nil || token.CommunityData == nil || tm.communityManager == nil {
+		return nil
+	}
+
+	communityInfo, _, err := tm.communityManager.GetCommunityInfo(token.CommunityData.ID)
+	if err != nil {
+		return err
+	}
+	if err == nil && communityInfo != nil {
+		// Fetched data from cache. Cache is refreshed during every wallet token list call.
+		token.CommunityData.Name = communityInfo.CommunityName
+		token.CommunityData.Color = communityInfo.CommunityColor
+		token.CommunityData.Image = communityInfo.CommunityImage
+	}
+	return nil
 }
