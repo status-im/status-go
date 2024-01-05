@@ -1028,6 +1028,7 @@ func advertiseCommunityToUserOldWay(s *suite.Suite, community *communities.Commu
 	inputMessage.ChatId = chat.ID
 	inputMessage.Text = "some text"
 	inputMessage.CommunityID = community.IDString()
+	inputMessage.ContentType = protobuf.ChatMessage_COMMUNITY
 
 	err := owner.SaveChat(chat)
 	s.Require().NoError(err)

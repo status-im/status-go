@@ -2353,6 +2353,7 @@ func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*Messenger
 	var messages []*common.Message
 	for _, pk := range request.Users {
 		message := common.NewMessage()
+		message.CommunityID = request.CommunityID.String()
 		message.StatusLinkPreviews = []common.StatusLinkPreview{statusLinkPreview}
 		message.ChatId = pk.String()
 		message.Shard = community.Shard().Protobuffer()

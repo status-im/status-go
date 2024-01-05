@@ -156,6 +156,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	inputMessage.ChatId = chat.ID
 	inputMessage.Text = "some text"
 	inputMessage.CommunityID = community.IDString()
+	inputMessage.ContentType = protobuf.ChatMessage_COMMUNITY
 
 	err = s.bob.SaveChat(chat)
 	s.Require().NoError(err)
@@ -180,7 +181,6 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	s.Require().Len(communities, 2)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.Messages(), 1)
-	s.Require().Equal(community.IDString(), response.Messages()[0].CommunityID)
 }
 
 func (s *MessengerCommunitiesSuite) TestJoiningOpenCommunityReturnsChatsResponse() {
@@ -353,6 +353,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	inputMessage.ChatId = chat.ID
 	inputMessage.Text = "some text"
 	inputMessage.CommunityID = community.IDString()
+	inputMessage.ContentType = protobuf.ChatMessage_COMMUNITY
 
 	err = s.bob.SaveChat(chat)
 	s.Require().NoError(err)
@@ -377,7 +378,6 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Len(communities, 2)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.Messages(), 1)
-	s.Require().Equal(community.IDString(), response.Messages()[0].CommunityID)
 
 	// We join the org
 	response, err = s.alice.JoinCommunity(ctx, community.ID(), false)

@@ -562,6 +562,7 @@ func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {
 	inputMessage.ChatId = chat.ID
 	inputMessage.Text = "some text"
 	inputMessage.CommunityID = community.IDString()
+	inputMessage.ContentType = protobuf.ChatMessage_COMMUNITY
 
 	err = s.alice.SaveChat(chat)
 	s.Require().NoError(err)

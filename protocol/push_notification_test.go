@@ -923,6 +923,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	inputMessage.ChatId = chat.ID
 	inputMessage.Text = "some text"
 	inputMessage.CommunityID = community.IDString()
+	inputMessage.ContentType = protobuf.ChatMessage_COMMUNITY
 
 	err = bob.SaveChat(chat)
 	s.NoError(err)

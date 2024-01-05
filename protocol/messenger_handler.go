@@ -2316,24 +2316,41 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		state.ModifiedContacts.Store(contact.ID, true)
 	}
 
-	if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
-		m.logger.Debug("Handling community content type")
+	if wrappedCommunity := receivedMessage.GetCommunity(); wrappedCommunity != nil {
+		m.logger.Debug("Handling wrapped community description")
 
-		signer, description, err := communities.UnwrapCommunityDescriptionMessage(receivedMessage.GetCommunity())
+		signer, description, err := communities.UnwrapCommunityDescriptionMessage(wrappedCommunity)
 		if err != nil {
 			return err
 		}
 
-		err = m.handleCommunityDescription(state, signer, description, receivedMessage.GetCommunity(), receivedMessage.GetShard())
+		err = m.handleCommunityDescription(state, signer, description, wrappedCommunity, receivedMessage.GetShard())
 		if err != nil {
 			return err
 		}
 
-		if len(description.ID) != 0 {
-			receivedMessage.CommunityID = description.ID
-		} else {
+		communityID := func() string {
 			// Backward compatibility
-			receivedMessage.CommunityID = types.EncodeHex(crypto.CompressPubkey(signer))
+			if len(description.ID) == 0 {
+				return types.EncodeHex(crypto.CompressPubkey(signer))
+			}
+
+			return description.ID
+		}()
+
+		communityIDBytes, err := types.DecodeHex(communityID)
+		if err != nil {
+			return err
+		}
+
+		_, err = m.communitiesManager.ValidateCommunityByID(communityIDBytes)
+		if err != nil {
+			m.logger.Error("failed to validate community description", zap.String("communityID", communityID), zap.Error(err))
+		}
+
+		// Backward compatibility
+		if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
+			receivedMessage.CommunityID = communityID
 		}
 	}
 
