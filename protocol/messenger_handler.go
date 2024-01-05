@@ -1022,7 +1022,10 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 				return err
 			}
 
-			m.prepareMessage(updateMessage, m.httpServer)
+			err = m.prepareMessage(updateMessage, m.httpServer)
+			if err != nil {
+				return err
+			}
 			err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 			if err != nil {
 				return err
@@ -1106,7 +1109,10 @@ func (m *Messenger) handleRetractContactRequest(state *ReceivedMessageState, con
 		return err
 	}
 
-	m.prepareMessage(updateMessage, m.httpServer)
+	err = m.prepareMessage(updateMessage, m.httpServer)
+	if err != nil {
+		return err
+	}
 	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 	if err != nil {
 		return err
@@ -2211,7 +2217,10 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 				return err
 			}
 
-			m.prepareMessage(updateMessage, m.httpServer)
+			err = m.prepareMessage(updateMessage, m.httpServer)
+			if err != nil {
+				return err
+			}
 			err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 			if err != nil {
 				return err

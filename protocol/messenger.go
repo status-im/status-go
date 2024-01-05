@@ -2428,7 +2428,11 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		zap.String("Clock", strconv.FormatUint(message.Clock, 10)),
 		zap.String("Timestamp", strconv.FormatUint(message.Timestamp, 10)),
 	)
-	m.prepareMessages(response.messages)
+	err = m.prepareMessages(response.messages)
+
+	if err != nil {
+		return nil, err
+	}
 
 	return &response, m.saveChat(chat)
 }
@@ -3478,7 +3482,11 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 		}
 		if m.httpServer != nil {
 			for _, msg := range album {
-				m.prepareMessage(msg, m.httpServer)
+				err = m.prepareMessage(msg, m.httpServer)
+
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -3926,7 +3934,10 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 		return nil, err
 	}
 
-	m.prepareMessages(messageState.Response.messages)
+	err = m.prepareMessages(messageState.Response.messages)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, message := range messageState.Response.messages {
 		if _, ok := newMessagesIds[message.ID]; ok {
@@ -4040,24 +4051,68 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 
 	if m.httpServer != nil {
 		for idx := range msgs {
-			m.prepareMessage(msgs[idx], m.httpServer)
+			err = m.prepareMessage(msgs[idx], m.httpServer)
+
+			if err != nil {
+				return nil, "", err
+			}
 		}
 	}
 
 	return msgs, nextCursor, nil
 }
 
-func (m *Messenger) prepareMessages(messages map[string]*common.Message) {
+func (m *Messenger) prepareMessages(messages map[string]*common.Message) error {
 	if m.httpServer != nil {
 		for idx := range messages {
-			m.prepareMessage(messages[idx], m.httpServer)
+			err := m.prepareMessage(messages[idx], m.httpServer)
+
+			if err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
-func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
+func extractQuotedImages(messages []*common.Message, s *server.MediaServer) []string {
+	var quotedImages []string
+
+	for _, message := range messages {
+		if message.ChatMessage != nil && message.ChatMessage.ContentType == protobuf.ChatMessage_IMAGE {
+			quotedImages = append(quotedImages, s.MakeImageURL(message.ID))
+		}
+	}
+	return quotedImages
+}
+
+func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) error {
 	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_IMAGE) {
 		msg.QuotedMessage.ImageLocalURL = s.MakeImageURL(msg.QuotedMessage.ID)
+
+		quotedMessage, err := m.MessageByID(msg.QuotedMessage.ID)
+		if err != nil {
+			return err
+		}
+		if quotedMessage == nil {
+			return errors.New("message not found")
+		}
+
+		if quotedMessage.ChatMessage != nil {
+			albumID := quotedMessage.ChatMessage.GetImage().AlbumId
+			albumMessages, err := m.persistence.albumMessages(quotedMessage.LocalChatID, albumID)
+			if err != nil {
+				return err
+			}
+
+			var quotedImages = extractQuotedImages(albumMessages, s)
+
+			if quotedImagesJSON, err := json.Marshal(quotedImages); err == nil {
+				msg.QuotedMessage.AlbumImages = quotedImagesJSON
+			} else {
+				return err
+			}
+		}
 	}
 	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_AUDIO) {
 		msg.QuotedMessage.AudioLocalURL = s.MakeAudioURL(msg.QuotedMessage.ID)
@@ -4069,7 +4124,7 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 		dm := msg.QuotedMessage.DiscordMessage
 		exists, err := m.persistence.HasDiscordMessageAuthorImagePayload(dm.Author.Id)
 		if err != nil {
-			return
+			return err
 		}
 
 		if exists {
@@ -4086,7 +4141,7 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 		dm := msg.GetDiscordMessage()
 		exists, err := m.persistence.HasDiscordMessageAuthorImagePayload(dm.Author.Id)
 		if err != nil {
-			return
+			return err
 		}
 
 		if exists {
@@ -4119,6 +4174,8 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 
 	msg.LinkPreviews = msg.ConvertFromProtoToLinkPreviews(s.MakeLinkPreviewThumbnailURL)
 	msg.StatusLinkPreviews = msg.ConvertFromProtoToStatusLinkPreviews(s.MakeStatusLinkPreviewThumbnailURL)
+
+	return nil
 }
 
 func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
