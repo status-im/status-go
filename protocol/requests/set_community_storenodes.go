@@ -1,6 +1,7 @@
 package requests
 
 import (
+	"bytes"
 	"errors"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -12,6 +13,7 @@ var (
 	ErrSetCommunityStorenodesTooMany          = errors.New("set-community-storenodes: too many")
 	ErrSetCommunityStorenodesMismatch         = errors.New("set-community-storenodes: communityId mismatch")
 	ErrSetCommunityStorenodesMissingCommunity = errors.New("set-community-storenodes: missing community")
+	ErrSetCommunityStorenodesBadVersion       = errors.New("set-community-storenodes: bad version")
 )
 
 type SetCommunityStorenodes struct {
@@ -31,9 +33,13 @@ func (s *SetCommunityStorenodes) Validate() error {
 		return ErrSetCommunityStorenodesMissingCommunity
 	}
 	for _, sn := range s.Storenodes {
-		if sn.CommunityID != s.CommunityID.String() {
+		if !bytes.Equal(sn.CommunityID, s.CommunityID) {
 			return ErrSetCommunityStorenodesMismatch
 		}
+		if sn.Version == 0 {
+			return ErrSetCommunityStorenodesBadVersion
+		}
+		// TODO validate address and other fields
 	}
 	return nil
 }

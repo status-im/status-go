@@ -3,21 +3,23 @@ package storenodes
 import (
 	"database/sql"
 
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/mailservers"
 )
 
+// Storenode is a struct that represents a storenode, it is very closeley related to `mailservers.Mailserver`
 type Storenode struct {
-	CommunityID string `json:"community_id"`
-	StorenodeID string `json:"storenode_id"`
-	Name        string `json:"name"`
-	Address     string `json:"address"`
-	Password    string `json:"password,omitempty"`
-	Fleet       string `json:"fleet"`
-	Version     uint   `json:"version"`
-	Clock       uint64 `json:"-"` // used to sync
-	Removed     bool   `json:"-"`
-	DeletedAt   int64  `json:"-"`
+	CommunityID types.HexBytes `json:"community_id"`
+	StorenodeID string         `json:"storenode_id"`
+	Name        string         `json:"name"`
+	Address     string         `json:"address"`
+	Password    string         `json:"password,omitempty"`
+	Fleet       string         `json:"fleet"`
+	Version     uint           `json:"version"`
+	Clock       uint64         `json:"-"` // used to sync
+	Removed     bool           `json:"-"`
+	DeletedAt   int64          `json:"-"`
 }
 
 type Storenodes []Storenode

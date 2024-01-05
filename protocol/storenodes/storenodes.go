@@ -57,8 +57,8 @@ func (m *CommunityStorenodes) ReloadFromDB() error {
 	if m.storenodesDB == nil {
 		return nil
 	}
-	m.storenodesByCommunityIDMutex.RLock()
-	defer m.storenodesByCommunityIDMutex.RUnlock()
+	m.storenodesByCommunityIDMutex.Lock()
+	defer m.storenodesByCommunityIDMutex.Unlock()
 	dbNodes, err := m.storenodesDB.getAll()
 	if err != nil {
 		return err
@@ -66,7 +66,7 @@ func (m *CommunityStorenodes) ReloadFromDB() error {
 	// overwrite the in-memory storenodes
 	m.storenodesByCommunityID = make(map[string]storenodesData)
 	for _, node := range dbNodes {
-		communityID := node.CommunityID
+		communityID := node.CommunityID.String()
 		if _, ok := m.storenodesByCommunityID[communityID]; !ok {
 			m.storenodesByCommunityID[communityID] = storenodesData{}
 		}

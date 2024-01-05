@@ -1,6 +1,7 @@
 package storenodes
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"time"
@@ -54,8 +55,8 @@ func (d *Database) syncSave(communityID types.HexBytes, snode []Storenode, clock
 	// Insert or update the nodes in the provided list
 	for _, n := range snode {
 		// defensively validate the communityID
-		if n.CommunityID == "" || communityID.String() != n.CommunityID {
-			return fmt.Errorf("communityID mismatch %v != %v", communityID.String(), n.CommunityID)
+		if len(n.CommunityID) == 0 || !bytes.Equal(communityID, n.CommunityID) {
+			return fmt.Errorf("communityID mismatch %v != %v", communityID, n.CommunityID)
 		}
 		dbN := find(n, dbNodes)
 		if dbN != nil && n.Clock != 0 && dbN.Clock >= n.Clock {
@@ -66,11 +67,11 @@ func (d *Database) syncSave(communityID types.HexBytes, snode []Storenode, clock
 		}
 	}
 	// TODO for now only allow one storenode per community
-	count, err := d.countStorenodes(communityID, tx)
+	count, err := d.countByCommunity(communityID, tx)
 	if err != nil {
 		return err
 	}
-	if count > 0 {
+	if count > 1 {
 		return fmt.Errorf("only one storenode per community is allowed")
 	}
 	return nil
@@ -128,7 +129,7 @@ func (d *Database) upsert(n Storenode, tx *sql.Tx) error {
 		version,
 		clock,
 		removed,
-		delete_at
+		deleted_at
 	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		n.CommunityID,
 		n.StorenodeID,
@@ -147,7 +148,7 @@ func (d *Database) upsert(n Storenode, tx *sql.Tx) error {
 	return nil
 }
 
-func (d *Database) countStorenodes(communityID types.HexBytes, tx *sql.Tx) (int, error) {
+func (d *Database) countByCommunity(communityID types.HexBytes, tx *sql.Tx) (int, error) {
 	count, err := tx.Query(`SELECT COUNT(*) FROM community_storenodes WHERE community_id = ? AND removed = 0`, communityID)
 	if err != nil {
 		return 0, err
@@ -195,7 +196,7 @@ func toStorenodes(rows *sql.Rows) ([]Storenode, error) {
 
 func find(n Storenode, nodes []Storenode) *Storenode {
 	for i, node := range nodes {
-		if node.StorenodeID == n.StorenodeID && node.CommunityID == n.CommunityID {
+		if node.StorenodeID == n.StorenodeID && bytes.Equal(node.CommunityID, n.CommunityID) {
 			return &nodes[i]
 		}
 	}

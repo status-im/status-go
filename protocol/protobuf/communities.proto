@@ -224,7 +224,7 @@ message CommunityStorenodes {
 }
 
 message Storenode {
-  string community_id = 1;
+  bytes community_id = 1;
   string storenode_id = 2;
   string name = 3;
   string address = 4;
