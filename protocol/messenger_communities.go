@@ -3090,7 +3090,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 		return nil
 	}
 
-	// TODO pablo save the community store nodes
+	// TODO (pablo) save the community store nodes when creating the community as well
 
 	if err := m.handleCommunityTokensMetadataByPrivilegedMembers(savedCommunity); err != nil {
 		logger.Debug("m.handleCommunityTokensMetadataByPrivilegedMembers", zap.Error(err))

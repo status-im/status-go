@@ -41,6 +41,7 @@ var maxTopicsPerRequest int = 10
 var ErrNoFiltersForChat = errors.New("no filter registered for given chat")
 
 func (m *Messenger) shouldSync() (bool, error) {
+	// TODO (pablo) support community store node as well
 	if m.mailserverCycle.activeMailserver == nil || !m.online() {
 		return false, nil
 	}
@@ -81,7 +82,7 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 	go func() {
 		ms := m.getActiveMailserver(chat.CommunityID)
 		_, err = m.performMailserverRequest(ms, func(mailServer mailservers.Mailserver) (*MessengerResponse, error) {
-			response, err := m.syncChatWithFilters(chat.ID) // TODO mailserver selection here
+			response, err := m.syncChatWithFilters(mailServer, chat.ID)
 
 			if err != nil {
 				m.logger.Error("failed to sync chat", zap.Error(err))
@@ -248,14 +249,13 @@ func (m *Messenger) topicsForChat(chatID string) (string, []types.TopicType, err
 	return filters[0].PubsubTopic, contentTopics, nil
 }
 
-func (m *Messenger) syncChatWithFilters(chatID string) (*MessengerResponse, error) {
+func (m *Messenger) syncChatWithFilters(ms mailservers.Mailserver, chatID string) (*MessengerResponse, error) {
 	filters, err := m.filtersForChat(chatID)
 	if err != nil {
 		return nil, err
 	}
 
-	ms := m.getActiveMailserverByChatID(chatID)
-	return m.syncFilters(*ms, filters)
+	return m.syncFilters(ms, filters)
 }
 
 func (m *Messenger) syncBackup() error {
@@ -330,7 +330,7 @@ func (m *Messenger) SplitFiltersByStoreNode(filters []*transport.Filter) map[str
 
 // RequestAllHistoricMessages requests all the historic messages for any topic
 func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries bool) (*MessengerResponse, error) {
-	shouldSync, err := m.shouldSync() // TODO pablo mailserver here
+	shouldSync, err := m.shouldSync()
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +358,7 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 	defer m.resetFiltersPriority(filters)
 
 	filtersByMs := m.SplitFiltersByStoreNode(filters)
-	responses := make([]*MessengerResponse, 0, len(filtersByMs))
+	allResponses := &MessengerResponse{}
 	for communityID, filtersForMs := range filtersByMs {
 		ms := m.getActiveMailserver(communityID)
 		if withRetries {
@@ -368,17 +368,18 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 			if err != nil {
 				return nil, err
 			}
-			responses = append(responses, response)
+			allResponses.AddChats(response.Chats())
+			allResponses.AddMessages(response.Messages())
 			continue
 		}
 		response, err := m.syncFilters(*ms, filtersForMs)
 		if err != nil {
 			return nil, err
 		}
-		responses = append(responses, response)
+		allResponses.AddChats(response.Chats())
+		allResponses.AddMessages(response.Messages())
 	}
-	// TODO pablo return array!
-	return responses[0], nil
+	return allResponses, nil
 }
 
 func getPrioritizedBatches() []int {
