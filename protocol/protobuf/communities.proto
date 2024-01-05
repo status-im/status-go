@@ -224,13 +224,13 @@ message CommunityStorenodes {
 }
 
 message Storenode {
-  string id = 1;
-  string name = 2;
-  bool custom = 3;
+  string community_id = 1;
+  string storenode_id = 2;
+  string name = 3;
   string address = 4;
   string password = 5; // not sure if we should send this
   string fleet = 6;
-  uint64 version = 7;
-  bool community_only = 8;
+  bool removed = 7;
+  int64 deleted_at = 8;
 }
 

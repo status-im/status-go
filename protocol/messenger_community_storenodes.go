@@ -12,11 +12,11 @@ import (
 	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/storenodes"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-	"github.com/status-im/status-go/services/mailservers"
 )
 
-func (m *Messenger) sendPublicSyncCommunityStorenodes(community *communities.Community, storenodes mailservers.Storenodes) error {
+func (m *Messenger) sendPublicSyncCommunityStorenodes(community *communities.Community, snodes storenodes.Storenodes) error {
 	if !community.IsControlNode() {
 		return communities.ErrNotControlNode
 	}
@@ -25,7 +25,7 @@ func (m *Messenger) sendPublicSyncCommunityStorenodes(community *communities.Com
 	pb := &protobuf.CommunityStorenodes{
 		Clock:       clock,
 		CommunityId: community.ID(),
-		Storenodes:  storenodes.ToProtobuf(),
+		Storenodes:  snodes.ToProtobuf(),
 		ChainId:     communities.CommunityDescriptionTokenOwnerChainID(community.Description()),
 	}
 	snPayload, err := proto.Marshal(pb)
@@ -65,7 +65,7 @@ func (m *Messenger) HandleSyncCommunityStorenodes(state *ReceivedMessageState, a
 	}
 
 	logError := func(err error) {
-		m.logger.Error("HandlePublicSyncCommunityStorenodes failed: ", zap.Error(err), zap.String("communityID", types.EncodeHex(sn.CommunityId)))
+		m.logger.Error("HandleSyncCommunityStorenodes failed: ", zap.Error(err), zap.String("communityID", types.EncodeHex(sn.CommunityId)))
 	}
 
 	err = m.verifyCommunitySignature(a.Payload, a.Signature, sn.CommunityId, sn.ChainId)
@@ -74,7 +74,7 @@ func (m *Messenger) HandleSyncCommunityStorenodes(state *ReceivedMessageState, a
 		return err
 	}
 
-	if err := m.communityStorenodes.UpdateStorenodesInDB(sn.CommunityId, mailservers.FromProtobuf(sn.Storenodes)); err != nil {
+	if err := m.communityStorenodes.UpdateStorenodesInDB(sn.CommunityId, storenodes.FromProtobuf(sn.Storenodes, sn.Clock), sn.Clock); err != nil {
 		logError(err)
 		return err
 	}

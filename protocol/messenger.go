@@ -55,6 +55,7 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/protocol/storenodes"
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
@@ -134,7 +135,7 @@ type Messenger struct {
 	modifiedInstallations      *stringBoolMap
 	installationID             string
 	mailserverCycle            mailserverCycle
-	communityStorenodes        *communityStoreNodes
+	communityStorenodes        *storenodes.CommunityStorenodes
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
 	settings                   *accounts.Database
@@ -532,12 +533,8 @@ func NewMessenger(
 			peers:                     make(map[string]peerStatus),
 			availabilitySubscriptions: make([]chan struct{}, 0),
 		},
-		mailserversDatabase: c.mailserversDatabase,
-		communityStorenodes: &communityStoreNodes{
-			storenodesByCommunityIDMutex: &sync.RWMutex{},
-			storenodesByCommunityID:      make(map[string]storenodesData),
-			storenodesDatabase:           c.mailserversDatabase,
-		},
+		mailserversDatabase:  c.mailserversDatabase,
+		communityStorenodes:  storenodes.NewCommunityStorenodes(storenodes.NewDB(database)),
 		account:              c.account,
 		quit:                 make(chan struct{}),
 		ctx:                  ctx,

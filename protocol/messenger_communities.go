@@ -2078,7 +2078,7 @@ func (m *Messenger) SetCommunityStorenodes(request *requests.SetCommunityStoreno
 		return nil, errors.New("not admin or owner")
 	}
 
-	if err := m.communityStorenodes.UpdateStorenodesInDB(request.CommunityID, request.Storenodes); err != nil {
+	if err := m.communityStorenodes.UpdateStorenodesInDB(request.CommunityID, request.Storenodes, 0); err != nil {
 		return nil, err
 	}
 	err = m.sendPublicSyncCommunityStorenodes(community, request.Storenodes)
@@ -2086,13 +2086,13 @@ func (m *Messenger) SetCommunityStorenodes(request *requests.SetCommunityStoreno
 		return nil, err
 	}
 	response := &MessengerResponse{
-		Mailservers: request.Storenodes,
+		CommunityStorenodes: request.Storenodes,
 	}
 	return response, nil
 }
 
-func (m *Messenger) GetCommunityStorenodes(id types.HexBytes) (*MessengerResponse, error) {
-	community, err := m.communitiesManager.GetByID(id)
+func (m *Messenger) GetCommunityStorenodes(communityID types.HexBytes) (*MessengerResponse, error) {
+	community, err := m.communitiesManager.GetByID(communityID)
 	if err != nil {
 		return nil, err
 	}
@@ -2100,13 +2100,13 @@ func (m *Messenger) GetCommunityStorenodes(id types.HexBytes) (*MessengerRespons
 		return nil, communities.ErrOrgNotFound
 	}
 
-	nodes, err := m.communityStorenodes.GetStorenodesFromDB(id)
+	snodes, err := m.communityStorenodes.GetStorenodesFromDB(communityID)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &MessengerResponse{
-		Mailservers: nodes,
+		CommunityStorenodes: snodes,
 	}
 	return response, nil
 }

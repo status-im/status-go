@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/storenodes"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/signal"
 )
@@ -438,7 +439,7 @@ func (m *Messenger) getActiveMailserver(communityID ...string) *mailservers.Mail
 	}
 	ms, err := m.communityStorenodes.GetStorenodeByCommunnityID(communityID[0])
 	if err != nil {
-		if err == ErrNotFound {
+		if err == storenodes.ErrNotFound {
 			m.logger.Debug("not found specific mailserver for community, using global", zap.String("communityID", communityID[0]))
 		} else {
 			m.logger.Error("not found specific mailserver for community, using global", zap.String("communityID", communityID[0]), zap.Error(err))

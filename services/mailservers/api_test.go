@@ -27,12 +27,11 @@ func TestAddGetDeleteMailserver(t *testing.T) {
 	defer close()
 	api := &API{db: db}
 	testMailserver := Mailserver{
-		ID:            "mailserver001",
-		Name:          "My Mailserver",
-		Address:       "enode://...",
-		Custom:        true,
-		Fleet:         "prod",
-		CommunityOnly: false,
+		ID:      "mailserver001",
+		Name:    "My Mailserver",
+		Address: "enode://...",
+		Custom:  true,
+		Fleet:   "prod",
 	}
 	testMailserverWithPassword := testMailserver
 	testMailserverWithPassword.ID = "mailserver002"

@@ -1,0 +1,221 @@
+package storenodes
+
+import (
+	"database/sql"
+	"fmt"
+	"time"
+
+	"github.com/status-im/status-go/eth-node/types"
+)
+
+type Database struct {
+	db *sql.DB
+}
+
+func NewDB(db *sql.DB) *Database {
+	return &Database{db: db}
+}
+
+// syncSave will sync the storenodes in the DB from the snode slice
+func (d *Database) syncSave(communityID types.HexBytes, snode []Storenode, clock uint64) (err error) {
+	var tx *sql.Tx
+	tx, err = d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	now := time.Now().Unix()
+	dbNodes, err := d.getByCommunityID(communityID, tx)
+	if err != nil {
+		return err
+	}
+	// Soft-delete db nodes that are not in the provided list
+	for _, dbN := range dbNodes {
+		if find(dbN, snode) != nil {
+			continue
+		}
+		if clock != 0 && dbN.Clock >= clock {
+			continue
+		}
+		if err := d.softDelete(communityID, dbN.StorenodeID, now, tx); err != nil {
+			return err
+		}
+
+	}
+	// Insert or update the nodes in the provided list
+	for _, n := range snode {
+		// defensively validate the communityID
+		if n.CommunityID == "" || communityID.String() != n.CommunityID {
+			return fmt.Errorf("communityID mismatch %v != %v", communityID.String(), n.CommunityID)
+		}
+		dbN := find(n, dbNodes)
+		if dbN != nil && n.Clock != 0 && dbN.Clock >= n.Clock {
+			continue
+		}
+		if err := d.upsert(n, tx); err != nil {
+			return err
+		}
+	}
+	// TODO for now only allow one storenode per community
+	count, err := d.countStorenodes(communityID, tx)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return fmt.Errorf("only one storenode per community is allowed")
+	}
+	return nil
+}
+
+func (d *Database) getAll() ([]Storenode, error) {
+	rows, err := d.db.Query(`
+		SELECT community_id, storenode_id, name, address, password, fleet, version, clock, removed, deleted_at
+		FROM community_storenodes
+		WHERE removed = 0
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return toStorenodes(rows)
+}
+
+func (d *Database) getByCommunityID(communityID types.HexBytes, tx ...*sql.Tx) ([]Storenode, error) {
+	var rows *sql.Rows
+	var err error
+	q := `
+	SELECT community_id, storenode_id, name, address, password, fleet, version, clock, removed, deleted_at
+	FROM community_storenodes
+	WHERE community_id = ? AND removed = 0
+`
+	if len(tx) > 0 {
+		rows, err = tx[0].Query(q, communityID)
+	} else {
+		rows, err = d.db.Query(q, communityID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return toStorenodes(rows)
+}
+
+func (d *Database) get(communityID types.HexBytes, storenodeID string, tx *sql.Tx) (*Storenode, error) {
+	rows, err := tx.Query(`
+		SELECT community_id, storenode_id, name, address, password, fleet, version, clock, removed, deleted_at
+		FROM community_storenodes
+		WHERE community_id = ? AND storenode_id = ?
+	`, communityID, storenodeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	res, err := toStorenodes(rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(res) == 0 {
+		return nil, nil
+	}
+	return &res[0], nil
+}
+
+func (d *Database) softDelete(communityID types.HexBytes, storenodeID string, deletedAt int64, tx *sql.Tx) error {
+	_, err := tx.Exec("UPDATE community_storenodes SET removed = 1, deleted_at = ? WHERE community_id = ? AND storenode_id = ?", deletedAt, communityID, storenodeID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *Database) upsert(n Storenode, tx *sql.Tx) error {
+	_, err := tx.Exec(`INSERT OR REPLACE INTO community_storenodes(
+		community_id,
+		storenode_id,
+		name,
+		address,
+		password,
+		fleet,
+		version,
+		clock,
+		removed,
+		delete_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		n.CommunityID,
+		n.StorenodeID,
+		n.Name,
+		n.Address,
+		n.nullablePassword(),
+		n.Fleet,
+		n.Version,
+		n.Clock,
+		n.Removed,
+		n.DeletedAt,
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *Database) countStorenodes(communityID types.HexBytes, tx *sql.Tx) (int, error) {
+	count, err := tx.Query(`SELECT COUNT(*) FROM community_storenodes WHERE community_id = ? AND removed = 0`, communityID)
+	if err != nil {
+		return 0, err
+	}
+	defer count.Close()
+	var c int
+	if count.Next() {
+		if err := count.Scan(&c); err != nil {
+			return 0, err
+		}
+	}
+	return c, nil
+}
+
+func toStorenodes(rows *sql.Rows) ([]Storenode, error) {
+	var result []Storenode
+
+	for rows.Next() {
+		var (
+			m        Storenode
+			password sql.NullString
+		)
+		if err := rows.Scan(
+			&m.CommunityID,
+			&m.StorenodeID,
+			&m.Name,
+			&m.Address,
+			&password,
+			&m.Fleet,
+			&m.Version,
+			&m.Clock,
+			&m.Removed,
+			&m.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		if password.Valid {
+			m.Password = password.String
+		}
+		result = append(result, m)
+	}
+
+	return result, nil
+}
+
+func find(n Storenode, nodes []Storenode) *Storenode {
+	for i, node := range nodes {
+		if node.StorenodeID == n.StorenodeID && node.CommunityID == n.CommunityID {
+			return &nodes[i]
+		}
+	}
+	return nil
+}

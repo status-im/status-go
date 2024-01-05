@@ -4,17 +4,19 @@ import (
 	"errors"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/services/mailservers"
+	"github.com/status-im/status-go/protocol/storenodes"
 )
 
 var (
-	ErrSetCommunityStorenodesEmpty   = errors.New("set-community-storenodes: empty payload")
-	ErrSetCommunityStorenodesTooMany = errors.New("set-community-storenodes: too many")
+	ErrSetCommunityStorenodesEmpty            = errors.New("set-community-storenodes: empty payload")
+	ErrSetCommunityStorenodesTooMany          = errors.New("set-community-storenodes: too many")
+	ErrSetCommunityStorenodesMismatch         = errors.New("set-community-storenodes: communityId mismatch")
+	ErrSetCommunityStorenodesMissingCommunity = errors.New("set-community-storenodes: missing community")
 )
 
 type SetCommunityStorenodes struct {
-	CommunityID types.HexBytes           `json:"communityId"`
-	Storenodes  []mailservers.Mailserver `json:"storenodes"`
+	CommunityID types.HexBytes         `json:"communityId"`
+	Storenodes  []storenodes.Storenode `json:"storenodes"`
 }
 
 func (s *SetCommunityStorenodes) Validate() error {
@@ -24,6 +26,14 @@ func (s *SetCommunityStorenodes) Validate() error {
 	if len(s.Storenodes) > 1 {
 		// TODO for now only allow one
 		return ErrSetCommunityStorenodesTooMany
+	}
+	if len(s.CommunityID) == 0 {
+		return ErrSetCommunityStorenodesMissingCommunity
+	}
+	for _, sn := range s.Storenodes {
+		if sn.CommunityID != s.CommunityID.String() {
+			return ErrSetCommunityStorenodesMismatch
+		}
 	}
 	return nil
 }
