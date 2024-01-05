@@ -17,6 +17,8 @@ func NewDB(db *sql.DB) *Database {
 }
 
 // syncSave will sync the storenodes in the DB from the snode slice
+//   - if a storenode is not in the provided list, it will be soft-deleted
+//   - if a storenode is in the provided list, it will be inserted or updated
 func (d *Database) syncSave(communityID types.HexBytes, snode []Storenode, clock uint64) (err error) {
 	var tx *sql.Tx
 	tx, err = d.db.Begin()
@@ -105,26 +107,6 @@ func (d *Database) getByCommunityID(communityID types.HexBytes, tx ...*sql.Tx) (
 	}
 	defer rows.Close()
 	return toStorenodes(rows)
-}
-
-func (d *Database) get(communityID types.HexBytes, storenodeID string, tx *sql.Tx) (*Storenode, error) {
-	rows, err := tx.Query(`
-		SELECT community_id, storenode_id, name, address, password, fleet, version, clock, removed, deleted_at
-		FROM community_storenodes
-		WHERE community_id = ? AND storenode_id = ?
-	`, communityID, storenodeID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	res, err := toStorenodes(rows)
-	if err != nil {
-		return nil, err
-	}
-	if len(res) == 0 {
-		return nil, nil
-	}
-	return &res[0], nil
 }
 
 func (d *Database) softDelete(communityID types.HexBytes, storenodeID string, deletedAt int64, tx *sql.Tx) error {
