@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	// EventPendingTransactionUpdate is emitted when a pending transaction is updated (added or deleted). Carries StatusChangedPayload in message
+	// EventPendingTransactionUpdate is emitted when a pending transaction is updated (added or deleted). Carries PendingTxUpdatePayload in message
 	EventPendingTransactionUpdate walletevent.EventType = "pending-transaction-update"
 	// EventPendingTransactionStatusChanged carries StatusChangedPayload in message
 	EventPendingTransactionStatusChanged walletevent.EventType = "pending-transaction-status-changed"
@@ -54,6 +54,11 @@ const (
 	AutoDelete AutoDeleteType = true
 	Keep       AutoDeleteType = false
 )
+
+type TxIdentity struct {
+	ChainID common.ChainID `json:"chainId"`
+	Hash    eth.Hash       `json:"hash"`
+}
 
 type PendingTxUpdatePayload struct {
 	TxIdentity
@@ -553,7 +558,13 @@ func (tm *PendingTxTracker) addPending(transaction *PendingTransaction) error {
 	)
 	// Notify listeners of new pending transaction (used in activity history)
 	if err == nil {
-		tm.notifyPendingTransactionListeners(transaction.ChainID, []eth.Address{transaction.From, transaction.To}, transaction.Timestamp)
+		tm.notifyPendingTransactionListeners(PendingTxUpdatePayload{
+			TxIdentity: TxIdentity{
+				ChainID: transaction.ChainID,
+				Hash:    transaction.Hash,
+			},
+			Deleted: false,
+		}, []eth.Address{transaction.From, transaction.To}, transaction.Timestamp)
 	}
 	if tm.rpcFilter != nil {
 		tm.rpcFilter.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
@@ -566,13 +577,20 @@ func (tm *PendingTxTracker) addPending(transaction *PendingTransaction) error {
 	return err
 }
 
-func (tm *PendingTxTracker) notifyPendingTransactionListeners(chainID common.ChainID, addresses []eth.Address, timestamp uint64) {
+func (tm *PendingTxTracker) notifyPendingTransactionListeners(payload PendingTxUpdatePayload, addresses []eth.Address, timestamp uint64) {
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		tm.log.Error("Failed to marshal PendingTxUpdatePayload", "error", err, "hash", payload.Hash)
+		return
+	}
+
 	if tm.eventFeed != nil {
 		tm.eventFeed.Send(walletevent.Event{
 			Type:     EventPendingTransactionUpdate,
-			ChainID:  uint64(chainID),
+			ChainID:  uint64(payload.ChainID),
 			Accounts: addresses,
 			At:       int64(timestamp),
+			Message:  string(jsonPayload),
 		})
 	}
 }
@@ -597,7 +615,13 @@ func (tm *PendingTxTracker) DeleteBySQLTx(tx *sql.Tx, chainID common.ChainID, ha
 		err = ErrStillPending
 	}
 	return func() {
-		tm.notifyPendingTransactionListeners(chainID, []eth.Address{from, to}, timestamp)
+		tm.notifyPendingTransactionListeners(PendingTxUpdatePayload{
+			TxIdentity: TxIdentity{
+				ChainID: chainID,
+				Hash:    hash,
+			},
+			Deleted: true,
+		}, []eth.Address{from, to}, timestamp)
 	}, err
 }
 
