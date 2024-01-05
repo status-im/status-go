@@ -49,7 +49,7 @@ func (cm *Manager) GetCommunityInfo(id string) (*thirdparty.CommunityInfo, *Info
 		return nil, nil, err
 	}
 	if cm.mediaServer != nil && communityInfo != nil && len(communityInfo.CommunityImagePayload) > 0 {
-		communityInfo.CommunityImage = cm.mediaServer.MakeWalletCommunityImagesURL(id)
+		communityInfo.CommunityImage = cm.GetCommunityImageURL(id)
 	}
 	return communityInfo, state, err
 }
@@ -81,14 +81,28 @@ func (cm *Manager) FetchCommunityInfo(communityID string) (*thirdparty.Community
 
 func (cm *Manager) FetchCommunityMetadataAsync(communityID string) {
 	go func() {
-		communityInfo, err := cm.FetchCommunityInfo(communityID)
+		communityInfo, err := cm.FetchCommunityMetadata(communityID)
 		if err != nil {
 			log.Error("FetchCommunityInfo failed", "communityID", communityID, "err", err)
-			return
 		}
-
 		cm.signalUpdatedCommunityMetadata(communityID, communityInfo)
 	}()
+}
+
+func (cm *Manager) FetchCommunityMetadata(communityID string) (*thirdparty.CommunityInfo, error) {
+	communityInfo, err := cm.FetchCommunityInfo(communityID)
+	if err != nil {
+		return nil, err
+	}
+	_ = cm.setCommunityInfo(communityID, communityInfo)
+	return communityInfo, err
+}
+
+func (cm *Manager) GetCommunityImageURL(communityID string) string {
+	if cm.mediaServer != nil {
+		return cm.mediaServer.MakeWalletCommunityImagesURL(communityID)
+	}
+	return ""
 }
 
 func (cm *Manager) signalUpdatedCommunityMetadata(communityID string, communityInfo *thirdparty.CommunityInfo) {
@@ -99,7 +113,7 @@ func (cm *Manager) signalUpdatedCommunityMetadata(communityID string, communityI
 		ID:    communityID,
 		Name:  communityInfo.CommunityName,
 		Color: communityInfo.CommunityColor,
-		Image: communityInfo.CommunityImage, // TODO make media server url after merging community token media server changes
+		Image: cm.GetCommunityImageURL(communityID),
 	}
 
 	payload, err := json.Marshal(data)

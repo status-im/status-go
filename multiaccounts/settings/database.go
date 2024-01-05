@@ -142,10 +142,14 @@ INSERT INTO settings (
   profile_pictures_visibility,
   url_unfurling_mode,
   omit_transfers_history_scan,
-  mnemonic_was_not_shown
+  mnemonic_was_not_shown,
+  wallet_token_preferences_group_by_community,
+  wallet_show_community_asset_when_sending_tokens,
+  wallet_display_assets_below_balance,
+  wallet_display_assets_below_balance_threshold
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,?,?,?,
-?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?)`,
+?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
@@ -174,6 +178,10 @@ INSERT INTO settings (
 		s.URLUnfurlingMode,
 		s.OmitTransfersHistoryScan,
 		s.MnemonicWasNotShown,
+		s.TokenGroupByCommunity,
+		s.ShowCommunityAssetWhenSendingTokens,
+		s.DisplayAssetsBelowBalance,
+		s.DisplayAssetsBelowBalanceThreshold,
 	)
 	if err != nil {
 		return err
@@ -369,7 +377,8 @@ func (db *Database) GetSettings() (Settings, error) {
 		waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates, gif_recents,
 		gif_favorites, opensea_enabled, last_backup, backup_enabled, telemetry_server_url, auto_message_enabled, gif_api_key,
 		test_networks_enabled, mutual_contact_enabled, profile_migration_needed, is_sepolia_enabled, wallet_token_preferences_group_by_community, url_unfurling_mode,
-                omit_transfers_history_scan, mnemonic_was_not_shown
+		omit_transfers_history_scan, mnemonic_was_not_shown, wallet_show_community_asset_when_sending_tokens, wallet_display_assets_below_balance,
+		wallet_display_assets_below_balance_threshold
 	FROM
 		settings
 	WHERE
@@ -448,6 +457,9 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.URLUnfurlingMode,
 		&s.OmitTransfersHistoryScan,
 		&s.MnemonicWasNotShown,
+		&s.ShowCommunityAssetWhenSendingTokens,
+		&s.DisplayAssetsBelowBalance,
+		&s.DisplayAssetsBelowBalanceThreshold,
 	)
 
 	return s, err
