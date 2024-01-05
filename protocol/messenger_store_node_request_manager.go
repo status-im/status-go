@@ -373,15 +373,40 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 	// Try to get community from database
 	switch r.requestID.RequestType {
 	case storeNodeCommunityRequest:
-		community, err := r.manager.messenger.communitiesManager.GetByIDString(r.requestID.DataID)
-
+		communityID, err := types.DecodeHex(r.requestID.DataID)
 		if err != nil {
-			logger.Error("failed to read from database",
+			logger.Error("failed to decode community ID",
 				zap.String("communityID", r.requestID.DataID),
 				zap.Error(err))
 			r.result = storeNodeRequestResult{
 				community: nil,
-				err:       fmt.Errorf("failed to read from database: %w", err),
+				err:       fmt.Errorf("failed to decode community ID: %w", err),
+			}
+			return false, 0 // failed to decode community ID, no sense to continue the procedure
+		}
+
+		// check if community is waiting for a verification and do a verification manually
+		_, err = r.manager.messenger.communitiesManager.ValidateCommunityByID(communityID)
+		if err != nil {
+			logger.Error("failed to validate community by ID",
+				zap.String("communityID", r.requestID.DataID),
+				zap.Error(err))
+			r.result = storeNodeRequestResult{
+				community: nil,
+				err:       fmt.Errorf("failed to validate community by ID: %w", err),
+			}
+			return false, 0 // failed to validate community, no sense to continue the procedure
+		}
+
+		community, err := r.manager.messenger.communitiesManager.GetByID(communityID)
+
+		if err != nil {
+			logger.Error("failed to read community from database",
+				zap.String("communityID", r.requestID.DataID),
+				zap.Error(err))
+			r.result = storeNodeRequestResult{
+				community: nil,
+				err:       fmt.Errorf("failed to read community from database: %w", err),
 			}
 			return false, 0 // failed to read from database, no sense to continue the procedure
 		}

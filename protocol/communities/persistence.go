@@ -1489,6 +1489,30 @@ func (p *Persistence) getCommunitiesToValidate() (map[string][]communityToValida
 
 }
 
+func (p *Persistence) getCommunityToValidateByID(communityID types.HexBytes) ([]communityToValidate, error) {
+	communityToValidateArray := []communityToValidate{}
+	rows, err := p.db.Query(`SELECT id, clock, payload, signer FROM communities_validate_signer WHERE id = ? AND validate_at <= ? ORDER BY clock DESC`, communityID, time.Now().UnixNano())
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		communityToValidate := communityToValidate{}
+		err := rows.Scan(&communityToValidate.id, &communityToValidate.clock, &communityToValidate.payload, &communityToValidate.signer)
+		if err != nil {
+			return nil, err
+		}
+
+		communityToValidateArray = append(communityToValidateArray, communityToValidate)
+	}
+
+	return communityToValidateArray, nil
+
+}
+
 func (p *Persistence) DeleteCommunitiesToValidateByCommunityID(communityID []byte) error {
 	_, err := p.db.Exec(`DELETE FROM communities_validate_signer WHERE id = ?`, communityID)
 	return err
