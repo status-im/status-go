@@ -541,3 +541,78 @@ func urlUnfurlingModeProtobufFactory(value any, clock uint64, chatID string) (*c
 func urlUnfurlingModeProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawURLUnfurlingModeSyncMessage(int64(s.URLUnfurlingMode), clock, chatID)
 }
+
+// ShowCommunityAssetWhenSendingTokens
+
+func buildRawShowCommunityAssetWhenSendingTokensSyncMessage(v bool, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_SHOW_COMMUNITY_ASSET_WHEN_SENDING_TOKENS,
+		Value: &protobuf.SyncSetting_ValueBool{ValueBool: v},
+		Clock: clock,
+	}
+	rm, err := buildRawSyncSettingMessage(pb, chatID)
+	return rm, pb, err
+}
+
+func showCommunityAssetWhenSendingTokensProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	v, err := assertBool(value)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return buildRawShowCommunityAssetWhenSendingTokensSyncMessage(v, clock, chatID)
+}
+
+func showCommunityAssetWhenSendingTokensProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	return buildRawShowCommunityAssetWhenSendingTokensSyncMessage(s.ShowCommunityAssetWhenSendingTokens, clock, chatID)
+}
+
+// DisplayAssetsBelowBalance
+
+func buildRawDisplayAssetsBelowBalanceSyncMessage(v bool, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_DISPLAY_ASSETS_BELOW_BALANCE,
+		Value: &protobuf.SyncSetting_ValueBool{ValueBool: v},
+		Clock: clock,
+	}
+	rm, err := buildRawSyncSettingMessage(pb, chatID)
+	return rm, pb, err
+}
+
+func displayAssetsBelowBalanceProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	v, err := assertBool(value)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return buildRawDisplayAssetsBelowBalanceSyncMessage(v, clock, chatID)
+}
+
+func displayAssetsBelowBalanceProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	return buildRawDisplayAssetsBelowBalanceSyncMessage(s.DisplayAssetsBelowBalance, clock, chatID)
+}
+
+// DisplayAssetsBelowBalanceThreshold
+
+func buildRawDisplayAssetsBelowBalanceThresholdSyncMessage(v int64, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_DISPLAY_ASSETS_BELOW_BALANCE_THRESHOLD,
+		Value: &protobuf.SyncSetting_ValueInt64{ValueInt64: v},
+		Clock: clock,
+	}
+	rm, err := buildRawSyncSettingMessage(pb, chatID)
+	return rm, pb, err
+}
+
+func displayAssetsBelowBalanceThresholdProtobufFactory(value any, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	v, err := parseNumberToInt64(value)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return buildRawDisplayAssetsBelowBalanceThresholdSyncMessage(v, clock, chatID)
+}
+
+func displayAssetsBelowBalanceThresholdProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	return buildRawDisplayAssetsBelowBalanceThresholdSyncMessage(s.DisplayAssetsBelowBalanceThreshold, clock, chatID)
+}
