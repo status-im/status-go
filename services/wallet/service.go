@@ -101,7 +101,7 @@ func NewService(
 
 	communityManager := community.NewManager(db, mediaServer, feed)
 	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
-	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer)
+	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer, feed)
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(db, gethManager, transactor, config, accountsDB, pendingTxManager, feed)
 	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountFeed, feed, transactionManager, pendingTxManager,

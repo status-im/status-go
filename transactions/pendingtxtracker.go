@@ -31,6 +31,8 @@ const (
 	EventPendingTransactionStatusChanged walletevent.EventType = "pending-transaction-status-changed"
 
 	PendingCheckInterval = 10 * time.Second
+
+	GetTransactionReceiptRPCName = "eth_getTransactionReceipt"
 )
 
 var (
@@ -42,7 +44,8 @@ type TxStatus = string
 // Values for status column in pending_transactions
 const (
 	Pending TxStatus = "Pending"
-	Done    TxStatus = "Done"
+	Success TxStatus = "Success"
+	Failed  TxStatus = "Failed"
 )
 
 type AutoDeleteType = bool
@@ -52,10 +55,14 @@ const (
 	Keep       AutoDeleteType = false
 )
 
+type PendingTxUpdatePayload struct {
+	TxIdentity
+	Deleted bool `json:"deleted"`
+}
+
 type StatusChangedPayload struct {
-	ChainID common.ChainID `json:"chainId"`
-	Hash    eth.Hash       `json:"hash"`
-	Status  *TxStatus      `json:"status,omitempty"`
+	TxIdentity
+	Status TxStatus `json:"status"`
 }
 
 type PendingTxTracker struct {
@@ -84,7 +91,6 @@ func NewPendingTxTracker(db *sql.DB, rpcClient rpc.ClientInterface, rpcFilter *r
 }
 
 type txStatusRes struct {
-	// TODO - 11861: propagate real status
 	Status TxStatus
 	hash   eth.Hash
 }
@@ -140,11 +146,11 @@ func (tm *PendingTxTracker) fetchAndUpdateDB(ctx context.Context) bool {
 	return res
 }
 
-type NullableReceipt struct {
+type nullableReceipt struct {
 	*types.Receipt
 }
 
-func (nr *NullableReceipt) UnmarshalJSON(data []byte) error {
+func (nr *nullableReceipt) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		// transaction is not available yet
 		return nil
@@ -169,7 +175,7 @@ func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chai
 		batch = append(batch, ethrpc.BatchElem{
 			Method: GetTransactionReceiptRPCName,
 			Args:   []interface{}{hash},
-			Result: new(NullableReceipt),
+			Result: new(nullableReceipt),
 		})
 	}
 
@@ -182,6 +188,7 @@ func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chai
 	res := make([]txStatusRes, 0, len(batch))
 	for i, b := range batch {
 		isPending := true
+		var receipt *types.Receipt
 		err := b.Error
 		if err != nil {
 			log.Error("Failed to get transaction", "error", err, "hash", hashes[i])
@@ -192,7 +199,7 @@ func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chai
 				continue
 			}
 
-			receiptWrapper, ok := b.Result.(*NullableReceipt)
+			receiptWrapper, ok := b.Result.(*nullableReceipt)
 			if !ok {
 				log.Error("Failed to cast transaction receipt", "hash", hashes[i])
 				continue
@@ -202,13 +209,20 @@ func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chai
 				continue
 			}
 
-			receipt := receiptWrapper.Receipt
+			receipt = receiptWrapper.Receipt
 			isPending = receipt.BlockNumber == nil
 		}
 
 		if !isPending {
+			var status TxStatus
+			if receipt.Status == types.ReceiptStatusSuccessful {
+				status = Success
+			} else {
+				status = Failed
+			}
 			res = append(res, txStatusRes{
-				hash: hashes[i],
+				hash:   hashes[i],
+				Status: status,
 			})
 		}
 	}
@@ -216,8 +230,8 @@ func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chai
 }
 
 // updateDBStatus returns entries that were updated only
-func (tm *PendingTxTracker) updateDBStatus(ctx context.Context, chainID common.ChainID, statuses []txStatusRes) ([]eth.Hash, error) {
-	res := make([]eth.Hash, 0, len(statuses))
+func (tm *PendingTxTracker) updateDBStatus(ctx context.Context, chainID common.ChainID, statuses []txStatusRes) ([]txStatusRes, error) {
+	res := make([]txStatusRes, 0, len(statuses))
 	tx, err := tm.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -264,8 +278,7 @@ func (tm *PendingTxTracker) updateDBStatus(ctx context.Context, chainID common.C
 			notifyFunctions = append(notifyFunctions, notifyFn)
 		} else {
 			// If the entry was not deleted, update the status
-			// TODO - #11861: fix status - `br.status`
-			txStatus := Done
+			txStatus := br.Status
 
 			res, err := updateStmt.ExecContext(ctx, txStatus, chainID, br.hash)
 			if err != nil {
@@ -284,7 +297,7 @@ func (tm *PendingTxTracker) updateDBStatus(ctx context.Context, chainID common.C
 			}
 		}
 
-		res = append(res, br.hash)
+		res = append(res, br)
 	}
 
 	err = tx.Commit()
@@ -299,18 +312,20 @@ func (tm *PendingTxTracker) updateDBStatus(ctx context.Context, chainID common.C
 	return res, nil
 }
 
-func (tm *PendingTxTracker) emitNotifications(chainID common.ChainID, changes []eth.Hash) {
+func (tm *PendingTxTracker) emitNotifications(chainID common.ChainID, changes []txStatusRes) {
 	if tm.eventFeed != nil {
-		for _, hash := range changes {
-			status := StatusChangedPayload{
-				ChainID: chainID,
-				Hash:    hash,
-				// TODO - #11861: status
+		for _, change := range changes {
+			payload := StatusChangedPayload{
+				TxIdentity: TxIdentity{
+					ChainID: chainID,
+					Hash:    change.hash,
+				},
+				Status: change.Status,
 			}
 
-			jsonPayload, err := json.Marshal(status)
+			jsonPayload, err := json.Marshal(payload)
 			if err != nil {
-				tm.log.Error("Failed to marshal pending transaction status", "error", err, "hash", hash)
+				tm.log.Error("Failed to marshal pending transaction status", "error", err, "hash", change.hash)
 				continue
 			}
 			tm.eventFeed.Send(walletevent.Event{
