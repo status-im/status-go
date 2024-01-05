@@ -3,11 +3,12 @@ package storenodes
 import (
 	"testing"
 
-	"github.com/status-im/status-go/services/mailservers"
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/services/mailservers"
 )
 
-func TestReloadFromDB(t *testing.T) {
+func TestUpdateStorenodesInDB(t *testing.T) {
 	db, close := setupTestDB(t, communityID1, communityID2)
 	defer close()
 	csn := NewCommunityStorenodes(db)
@@ -32,12 +33,9 @@ func TestReloadFromDB(t *testing.T) {
 		},
 	}
 	// populate db
-	err := db.syncSave(communityID1, snodes1, 0)
+	err := csn.UpdateStorenodesInDB(communityID1, snodes1, 0)
 	require.NoError(t, err)
-	err = db.syncSave(communityID2, snodes2, 0)
-	require.NoError(t, err)
-
-	err = csn.ReloadFromDB()
+	err = csn.UpdateStorenodesInDB(communityID2, snodes2, 0)
 	require.NoError(t, err)
 
 	// check if storenodes are loaded

@@ -8,7 +8,7 @@ import (
 	"github.com/status-im/status-go/services/mailservers"
 )
 
-// Storenode is a struct that represents a storenode, it is very closeley related to `mailservers.Mailserver`
+// Storenode is a struct that represents a storenode, it is very closely related to `mailservers.Mailserver`
 type Storenode struct {
 	CommunityID types.HexBytes `json:"community_id"`
 	StorenodeID string         `json:"storenode_id"`
