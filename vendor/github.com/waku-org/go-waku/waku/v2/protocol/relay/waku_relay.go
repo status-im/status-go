@@ -27,13 +27,15 @@ import (
 const WakuRelayID_v200 = protocol.ID("/vac/waku/relay/2.0.0")
 const WakuRelayENRField = uint8(1 << 0)
 
+const defaultMaxMsgSizeBytes = 150 * 1024
+
 // DefaultWakuTopic is the default pubsub topic used across all Waku protocols
 var DefaultWakuTopic string = waku_proto.DefaultPubsubTopic{}.String()
 
 // WakuRelay is the implementation of the Waku Relay protocol
 type WakuRelay struct {
 	host                host.Host
-	opts                []pubsub.Option
+	relayParams         *relayParameters
 	pubsub              *pubsub.PubSub
 	params              pubsub.GossipSubParams
 	peerScoreParams     *pubsub.PeerScoreParams
@@ -41,9 +43,8 @@ type WakuRelay struct {
 	topicParams         *pubsub.TopicScoreParams
 	timesource          timesource.Timesource
 	metrics             Metrics
-
-	log         *zap.Logger
-	logMessages *zap.Logger
+	log                 *zap.Logger
+	logMessages         *zap.Logger
 
 	bcaster Broadcaster
 
@@ -75,7 +76,7 @@ type pubsubTopicSubscriptionDetails struct {
 
 // NewWakuRelay returns a new instance of a WakuRelay struct
 func NewWakuRelay(bcaster Broadcaster, minPeersToPublish int, timesource timesource.Timesource,
-	reg prometheus.Registerer, log *zap.Logger, opts ...pubsub.Option) *WakuRelay {
+	reg prometheus.Registerer, log *zap.Logger, opts ...RelayOption) *WakuRelay {
 	w := new(WakuRelay)
 	w.timesource = timesource
 	w.topics = make(map[string]*pubsubTopicSubscriptionDetails)
@@ -87,9 +88,16 @@ func NewWakuRelay(bcaster Broadcaster, minPeersToPublish int, timesource timesou
 	w.logMessages = utils.MessagesLogger("relay")
 	w.events = eventbus.NewBus()
 	w.metrics = newMetrics(reg, w.logMessages)
+	w.relayParams = new(relayParameters)
+	w.relayParams.pubsubOpts = w.defaultPubsubOptions()
 
-	// default options required by WakuRelay
-	w.opts = append(w.defaultPubsubOptions(), opts...)
+	options := defaultOptions()
+	options = append(options, opts...)
+	for _, opt := range options {
+		opt(w.relayParams)
+	}
+	w.log.Info("relay config", zap.Int("max-msg-size-bytes", w.relayParams.maxMsgSizeBytes),
+		zap.Int("min-peers-to-publish", w.minPeersToPublish))
 	return w
 }
 
@@ -123,7 +131,7 @@ func (w *WakuRelay) start() error {
 	if w.bcaster == nil {
 		return errors.New("broadcaster not specified for relay")
 	}
-	ps, err := pubsub.NewGossipSub(w.Context(), w.host, w.opts...)
+	ps, err := pubsub.NewGossipSub(w.Context(), w.host, w.relayParams.pubsubOpts...)
 	if err != nil {
 		return err
 	}
@@ -235,14 +243,14 @@ func (w *WakuRelay) subscribeToPubsubTopic(topic string) (*pubsubTopicSubscripti
 		}
 
 		w.log.Info("gossipsub subscription", zap.String("pubsubTopic", subscription.Topic()))
-
+		w.metrics.SetPubSubTopics(len(w.topics))
 		result = w.topics[topic]
 	}
 
 	return result, nil
 }
 
-// PublishToTopic is used to broadcast a WakuMessage to a pubsub topic. The pubsubTopic is derived from contentTopic
+// Publish is used to broadcast a WakuMessage to a pubsub topic. The pubsubTopic is derived from contentTopic
 // specified in the message via autosharding. To publish to a specific pubsubTopic, the `WithPubSubTopic` option should
 // be provided
 func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage, opts ...PublishOption) ([]byte, error) {
@@ -289,7 +297,7 @@ func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage, opts .
 		return nil, err
 	}
 
-	if len(out) > pubsub.DefaultMaxMessageSize {
+	if len(out) > w.relayParams.maxMsgSizeBytes {
 		return nil, errors.New("message size exceeds gossipsub max message size")
 	}
 
@@ -483,6 +491,7 @@ func (w *WakuRelay) Unsubscribe(ctx context.Context, contentFilter waku_proto.Co
 			if err != nil {
 				return err
 			}
+			w.metrics.SetPubSubTopics(len(w.topics))
 		}
 	}
 	return nil

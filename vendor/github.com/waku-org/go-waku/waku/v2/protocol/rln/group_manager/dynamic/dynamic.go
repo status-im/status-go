@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/avast/retry-go/v4"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -45,13 +46,15 @@ type DynamicGroupManager struct {
 	membershipIndexToLoad *uint
 }
 
-func (gm *DynamicGroupManager) handler(events []*contracts.RLNMemberRegistered) error {
+func (gm *DynamicGroupManager) handler(events []*contracts.RLNMemberRegistered, latestProcessBlock uint64) error {
 	gm.lastBlockProcessedMutex.Lock()
 	defer gm.lastBlockProcessedMutex.Unlock()
 
 	toRemoveTable := om.New()
 	toInsertTable := om.New()
-
+	if gm.lastBlockProcessed == 0 {
+		gm.lastBlockProcessed = latestProcessBlock
+	}
 	lastBlockProcessed := gm.lastBlockProcessed
 	for _, event := range events {
 		if event.Raw.Removed {
@@ -130,19 +133,27 @@ func NewDynamicGroupManager(
 }
 
 func (gm *DynamicGroupManager) getMembershipFee(ctx context.Context) (*big.Int, error) {
-	fee, err := gm.web3Config.RLNContract.MEMBERSHIPDEPOSIT(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return nil, fmt.Errorf("could not check if credential exits in contract: %w", err)
-	}
-	return fee, nil
+	return retry.DoWithData(
+		func() (*big.Int, error) {
+			fee, err := gm.web3Config.RLNContract.MEMBERSHIPDEPOSIT(&bind.CallOpts{Context: ctx})
+			if err != nil {
+				return nil, fmt.Errorf("could not check if credential exits in contract: %w", err)
+			}
+			return fee, nil
+		}, retry.Attempts(3),
+	)
 }
 
 func (gm *DynamicGroupManager) memberExists(ctx context.Context, idCommitment rln.IDCommitment) (bool, error) {
-	exists, err := gm.web3Config.RLNContract.MemberExists(&bind.CallOpts{Context: ctx}, rln.Bytes32ToBigInt(idCommitment))
-	if err != nil {
-		return false, fmt.Errorf("could not check if credential exits in contract: %w", err)
-	}
-	return exists, nil
+	return retry.DoWithData(
+		func() (bool, error) {
+			exists, err := gm.web3Config.RLNContract.MemberExists(&bind.CallOpts{Context: ctx}, rln.Bytes32ToBigInt(idCommitment))
+			if err != nil {
+				return false, fmt.Errorf("could not check if credential exits in contract: %w", err)
+			}
+			return exists, nil
+		}, retry.Attempts(3),
+	)
 }
 
 func (gm *DynamicGroupManager) Start(ctx context.Context) error {

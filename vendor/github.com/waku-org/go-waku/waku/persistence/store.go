@@ -49,7 +49,7 @@ type DBStore struct {
 	MessageProvider
 
 	db          *sql.DB
-	migrationFn func(db *sql.DB) error
+	migrationFn func(db *sql.DB, logger *zap.Logger) error
 
 	metrics    Metrics
 	timesource timesource.Timesource
@@ -121,7 +121,7 @@ func WithRetentionPolicy(maxMessages int, maxDuration time.Duration) DBOption {
 	}
 }
 
-type MigrationFn func(db *sql.DB) error
+type MigrationFn func(db *sql.DB, logger *zap.Logger) error
 
 // WithMigrations is a DBOption used to determine if migrations should
 // be executed, and what driver to use
@@ -157,7 +157,7 @@ func NewDBStore(reg prometheus.Registerer, log *zap.Logger, options ...DBOption)
 	}
 
 	if result.enableMigrations {
-		err := result.migrationFn(result.db)
+		err := result.migrationFn(result.db, log)
 		if err != nil {
 			return nil, err
 		}
@@ -211,7 +211,7 @@ func (d *DBStore) cleanOlderRecords(ctx context.Context) error {
 	// Delete older messages
 	if d.maxDuration > 0 {
 		start := time.Now()
-		sqlStmt := `DELETE FROM message WHERE receiverTimestamp < $1`
+		sqlStmt := `DELETE FROM message WHERE storedAt < $1`
 		_, err := d.db.Exec(sqlStmt, d.timesource.Now().Add(-d.maxDuration).UnixNano())
 		if err != nil {
 			d.metrics.RecordError(retPolicyFailure)
@@ -240,7 +240,7 @@ func (d *DBStore) cleanOlderRecords(ctx context.Context) error {
 }
 
 func (d *DBStore) getDeleteOldRowsQuery() string {
-	sqlStmt := `DELETE FROM message WHERE id IN (SELECT id FROM message ORDER BY receiverTimestamp DESC %s OFFSET $1)`
+	sqlStmt := `DELETE FROM message WHERE id IN (SELECT id FROM message ORDER BY storedAt DESC %s OFFSET $1)`
 	switch GetDriverType(d.db) {
 	case SQLiteDriver:
 		sqlStmt = fmt.Sprintf(sqlStmt, "LIMIT -1")
@@ -282,7 +282,12 @@ func (d *DBStore) Stop() {
 
 // Validate validates the message to be stored against possible fradulent conditions.
 func (d *DBStore) Validate(env *protocol.Envelope) error {
-	n := time.Unix(0, env.Index().ReceiverTime)
+	timestamp := env.Message().GetTimestamp()
+	if timestamp == 0 {
+		return nil
+	}
+
+	n := time.Unix(0, timestamp)
 	upperBound := n.Add(MaxTimeVariance)
 	lowerBound := n.Add(-MaxTimeVariance)
 
@@ -300,17 +305,20 @@ func (d *DBStore) Validate(env *protocol.Envelope) error {
 
 // Put inserts a WakuMessage into the DB
 func (d *DBStore) Put(env *protocol.Envelope) error {
-	stmt, err := d.db.Prepare("INSERT INTO message (id, receiverTimestamp, senderTimestamp, contentTopic, pubsubTopic, payload, version) VALUES ($1, $2, $3, $4, $5, $6, $7)")
+
+	stmt, err := d.db.Prepare("INSERT INTO message (id, messageHash, storedAt, timestamp, contentTopic, pubsubTopic, payload, version) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)")
 	if err != nil {
 		d.metrics.RecordError(insertFailure)
 		return err
 	}
 
-	cursor := env.Index()
-	dbKey := NewDBKey(uint64(cursor.SenderTime), uint64(cursor.ReceiverTime), env.PubsubTopic(), env.Index().Digest)
+	storedAt := env.Message().GetTimestamp()
+	if storedAt == 0 {
+		storedAt = env.Index().ReceiverTime
+	}
 
 	start := time.Now()
-	_, err = stmt.Exec(dbKey.Bytes(), cursor.ReceiverTime, env.Message().GetTimestamp(), env.Message().ContentTopic, env.PubsubTopic(), env.Message().Payload, env.Message().GetVersion())
+	_, err = stmt.Exec(env.Index().Digest, env.Hash(), storedAt, env.Message().GetTimestamp(), env.Message().ContentTopic, env.PubsubTopic(), env.Message().Payload, env.Message().GetVersion())
 	if err != nil {
 		return err
 	}
@@ -329,36 +337,33 @@ func (d *DBStore) handleQueryCursor(query *pb.HistoryQuery, paramCnt *int, condi
 	usesCursor := false
 	if query.PagingInfo.Cursor != nil {
 		usesCursor = true
+
 		var exists bool
-		cursorDBKey := NewDBKey(uint64(query.PagingInfo.Cursor.SenderTime), uint64(query.PagingInfo.Cursor.ReceiverTime), query.PagingInfo.Cursor.PubsubTopic, query.PagingInfo.Cursor.Digest)
-
-		err := d.db.QueryRow("SELECT EXISTS(SELECT 1 FROM message WHERE id = $1)",
-			cursorDBKey.Bytes(),
+		err := d.db.QueryRow("SELECT EXISTS(SELECT 1 FROM message WHERE storedAt = $1 AND id = $2)",
+			query.PagingInfo.Cursor.ReceiverTime, query.PagingInfo.Cursor.Digest,
 		).Scan(&exists)
-
 		if err != nil {
 			return nil, nil, err
 		}
 
-		if exists {
-			eqOp := ">"
-			if query.PagingInfo.Direction == pb.PagingInfo_BACKWARD {
-				eqOp = "<"
-			}
-			*paramCnt++
-			conditions = append(conditions, fmt.Sprintf("id %s $%d", eqOp, *paramCnt))
-
-			parameters = append(parameters, cursorDBKey.Bytes())
-		} else {
+		if !exists {
 			return nil, nil, ErrInvalidCursor
 		}
+
+		eqOp := ">"
+		if query.PagingInfo.Direction == pb.PagingInfo_BACKWARD {
+			eqOp = "<"
+		}
+		conditions = append(conditions, fmt.Sprintf("(storedAt, id) %s ($%d, $%d)", eqOp, *paramCnt+1, *paramCnt+2))
+		*paramCnt += 2
+
+		parameters = append(parameters, query.PagingInfo.Cursor.ReceiverTime, query.PagingInfo.Cursor.Digest)
 	}
 
 	handleTimeParam := func(time int64, op string) {
 		*paramCnt++
-		conditions = append(conditions, fmt.Sprintf("id %s $%d", op, *paramCnt))
-		timeDBKey := NewDBKey(uint64(time), 0, "", []byte{})
-		parameters = append(parameters, timeDBKey.Bytes())
+		conditions = append(conditions, fmt.Sprintf("storedAt %s $%d", op, *paramCnt))
+		parameters = append(parameters, time)
 	}
 
 	startTime := query.GetStartTime()
@@ -378,10 +383,10 @@ func (d *DBStore) handleQueryCursor(query *pb.HistoryQuery, paramCnt *int, condi
 }
 
 func (d *DBStore) prepareQuerySQL(query *pb.HistoryQuery) (string, []interface{}, error) {
-	sqlQuery := `SELECT id, receiverTimestamp, senderTimestamp, contentTopic, pubsubTopic, payload, version 
+	sqlQuery := `SELECT id, storedAt, timestamp, contentTopic, pubsubTopic, payload, version 
 	FROM message 
 	%s
-	ORDER BY senderTimestamp %s, id %s, pubsubTopic %s, receiverTimestamp %s `
+	ORDER BY timestamp %s, id %s, pubsubTopic %s, storedAt %s `
 
 	var conditions []string
 	//var parameters []interface{}
@@ -428,7 +433,7 @@ func (d *DBStore) prepareQuerySQL(query *pb.HistoryQuery) (string, []interface{}
 	parameters = append(parameters, pageSize)
 
 	sqlQuery = fmt.Sprintf(sqlQuery, conditionStr, orderDirection, orderDirection, orderDirection, orderDirection)
-	d.log.Info(fmt.Sprintf("sqlQuery: %s", sqlQuery))
+	d.log.Debug(fmt.Sprintf("sqlQuery: %s", sqlQuery))
 
 	return sqlQuery, parameters, nil
 
@@ -490,12 +495,12 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 	return cursor, result, nil
 }
 
-// MostRecentTimestamp returns an unix timestamp with the most recent senderTimestamp
+// MostRecentTimestamp returns an unix timestamp with the most recent timestamp
 // in the message table
 func (d *DBStore) MostRecentTimestamp() (int64, error) {
 	result := sql.NullInt64{}
 
-	err := d.db.QueryRow(`SELECT max(senderTimestamp) FROM message`).Scan(&result)
+	err := d.db.QueryRow(`SELECT max(timestamp) FROM message`).Scan(&result)
 	if err != nil && err != sql.ErrNoRows {
 		return 0, err
 	}
@@ -520,7 +525,7 @@ func (d *DBStore) GetAll() ([]StoredMessage, error) {
 		d.log.Info("loading records from the DB", zap.Duration("duration", elapsed))
 	}()
 
-	rows, err := d.db.Query("SELECT id, receiverTimestamp, senderTimestamp, contentTopic, pubsubTopic, payload, version FROM message ORDER BY senderTimestamp ASC")
+	rows, err := d.db.Query("SELECT id, storedAt, timestamp, contentTopic, pubsubTopic, payload, version FROM message ORDER BY timestamp ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -550,14 +555,14 @@ func (d *DBStore) GetAll() ([]StoredMessage, error) {
 // GetStoredMessage is a helper function used to convert a `*sql.Rows` into a `StoredMessage`
 func (d *DBStore) GetStoredMessage(row *sql.Rows) (StoredMessage, error) {
 	var id []byte
-	var receiverTimestamp int64
-	var senderTimestamp int64
+	var storedAt int64
+	var timestamp int64
 	var contentTopic string
 	var payload []byte
 	var version uint32
 	var pubsubTopic string
 
-	err := row.Scan(&id, &receiverTimestamp, &senderTimestamp, &contentTopic, &pubsubTopic, &payload, &version)
+	err := row.Scan(&id, &storedAt, &timestamp, &contentTopic, &pubsubTopic, &payload, &version)
 	if err != nil {
 		d.log.Error("scanning messages from db", zap.Error(err))
 		return StoredMessage{}, err
@@ -567,8 +572,8 @@ func (d *DBStore) GetStoredMessage(row *sql.Rows) (StoredMessage, error) {
 	msg.ContentTopic = contentTopic
 	msg.Payload = payload
 
-	if senderTimestamp != 0 {
-		msg.Timestamp = proto.Int64(senderTimestamp)
+	if timestamp != 0 {
+		msg.Timestamp = proto.Int64(timestamp)
 	}
 
 	if version > 0 {
@@ -578,7 +583,7 @@ func (d *DBStore) GetStoredMessage(row *sql.Rows) (StoredMessage, error) {
 	record := StoredMessage{
 		ID:           id,
 		PubsubTopic:  pubsubTopic,
-		ReceiverTime: receiverTimestamp,
+		ReceiverTime: storedAt,
 		Message:      msg,
 	}
 
