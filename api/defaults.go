@@ -105,6 +105,12 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	s.Networks = &networkRawMessage
 	s.CurrentNetwork = "mainnet_rpc"
 
+	s.TokenGroupByCommunity = false
+	s.ShowCommunityAssetWhenSendingTokens = true
+	s.DisplayAssetsBelowBalance = false
+	// NOTE 9 decimals of precision. Default value is translated to 0.1
+	s.DisplayAssetsBelowBalanceThreshold = 100000000
+
 	return s, nil
 }
 

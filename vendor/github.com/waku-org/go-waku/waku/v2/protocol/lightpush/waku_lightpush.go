@@ -53,6 +53,10 @@ func NewWakuLightPush(relay *relay.WakuRelay, pm *peermanager.PeerManager, reg p
 	wakuLP.pm = pm
 	wakuLP.metrics = newMetrics(reg)
 
+	if pm != nil {
+		wakuLP.pm.RegisterWakuProtocol(LightPushID_v20beta1, LightPushENRField)
+	}
+
 	return wakuLP
 }
 
@@ -73,9 +77,6 @@ func (wakuLP *WakuLightPush) Start(ctx context.Context) error {
 	wakuLP.h.SetStreamHandlerMatch(LightPushID_v20beta1, protocol.PrefixTextMatch(string(LightPushID_v20beta1)), wakuLP.onRequest(ctx))
 	wakuLP.log.Info("Light Push protocol started")
 
-	if wakuLP.pm != nil {
-		wakuLP.pm.RegisterWakuProtocol(LightPushID_v20beta1, LightPushENRField)
-	}
 	return nil
 }
 
@@ -299,8 +300,13 @@ func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *wpb.WakuMessa
 	req.Message = message
 	req.PubsubTopic = params.pubsubTopic
 
+	logger := message.Logger(wakuLP.log, params.pubsubTopic).With(logging.HostID("peerID", params.selectedPeer))
+
+	logger.Debug("publishing message")
+
 	response, err := wakuLP.request(ctx, req, params)
 	if err != nil {
+		logger.Error("could not publish message", zap.Error(err))
 		return nil, err
 	}
 

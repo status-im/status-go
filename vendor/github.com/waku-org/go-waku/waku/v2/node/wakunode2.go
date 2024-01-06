@@ -280,8 +280,9 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	}
 
 	w.rendezvous = rendezvous.NewRendezvous(w.opts.rendezvousDB, w.peerConnector, w.log)
-
-	w.relay = relay.NewWakuRelay(w.bcaster, w.opts.minRelayPeersToPublish, w.timesource, w.opts.prometheusReg, w.log, w.opts.pubsubOpts...)
+	w.relay = relay.NewWakuRelay(w.bcaster, w.opts.minRelayPeersToPublish, w.timesource, w.opts.prometheusReg, w.log,
+		relay.WithPubSubOptions(w.opts.pubsubOpts),
+		relay.WithMaxMsgSize(w.opts.maxMsgSizeBytes))
 
 	if w.opts.enableRelay {
 		err = w.setupRLNRelay()
@@ -528,6 +529,7 @@ func (w *WakuNode) Stop() {
 	w.store.Stop()
 	w.legacyFilter.Stop()
 	w.filterFullNode.Stop()
+	w.filterLightNode.Stop()
 
 	if w.opts.enableDiscV5 {
 		w.discoveryV5.Stop()
@@ -975,4 +977,8 @@ func GetDiscv5Option(dnsDiscoveredNodes []dnsdisc.DiscoveredNode, discv5Nodes []
 	}
 
 	return WithDiscoveryV5(port, bootnodes, autoUpdate), nil
+}
+
+func (w *WakuNode) ClusterID() uint16 {
+	return w.opts.clusterID
 }
