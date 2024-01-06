@@ -435,63 +435,80 @@ func (m *Manager) runOwnerVerificationLoop() {
 				for id, communities := range communitiesToValidate {
 					m.logger.Info("validating communities", zap.String("id", id), zap.Int("count", len(communities)))
 
-					for _, communityToValidate := range communities {
-						signer, description, err := UnwrapCommunityDescriptionMessage(communityToValidate.payload)
-						if err != nil {
-							m.logger.Error("failed to unwrap community", zap.Error(err))
-							continue
-						}
-
-						chainID := CommunityDescriptionTokenOwnerChainID(description)
-						if chainID == 0 {
-							// This should not happen
-							m.logger.Error("chain id is 0, ignoring")
-							continue
-						}
-
-						m.logger.Info("validating community", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
-
-						ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-						defer cancel()
-
-						owner, err := m.ownerVerifier.SafeGetSignerPubKey(ctx, chainID, id)
-						if err != nil {
-							m.logger.Error("failed to get owner", zap.Error(err))
-							continue
-						}
-
-						ownerPK, err := common.HexToPubkey(owner)
-						if err != nil {
-							m.logger.Error("failed to convert pk string to ecdsa", zap.Error(err))
-							continue
-						}
-
-						// TODO: handle shards
-						response, err := m.HandleCommunityDescriptionMessage(signer, description, communityToValidate.payload, ownerPK, nil)
-						if err != nil {
-							m.logger.Error("failed to handle community", zap.Error(err))
-							err = m.persistence.DeleteCommunityToValidate(communityToValidate.id, communityToValidate.clock)
-							if err != nil {
-								m.logger.Error("failed to delete community to validate", zap.Error(err))
-							}
-							continue
-						}
-
-						if response != nil {
-
-							m.logger.Info("community validated", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
-							m.publish(&Subscription{TokenCommunityValidated: response})
-							err := m.persistence.DeleteCommunitiesToValidateByCommunityID(communityToValidate.id)
-							if err != nil {
-								m.logger.Error("failed to delete communities to validate", zap.Error(err))
-							}
-							break
-						}
-					}
+					_, _ = m.validateCommunity(communities)
 				}
 			}
 		}
 	}()
+}
+
+func (m *Manager) ValidateCommunityByID(communityID types.HexBytes) (*CommunityResponse, error) {
+	communityToValidate, err := m.persistence.getCommunityToValidateByID(communityID)
+	if err != nil {
+		m.logger.Error("failed to validate community by ID", zap.String("id", communityID.String()), zap.Error(err))
+		return nil, err
+	}
+
+	return m.validateCommunity(communityToValidate)
+
+}
+
+func (m *Manager) validateCommunity(communityToValidateData []communityToValidate) (*CommunityResponse, error) {
+	for _, communityToValidate := range communityToValidateData {
+		signer, description, err := UnwrapCommunityDescriptionMessage(communityToValidate.payload)
+		if err != nil {
+			m.logger.Error("failed to unwrap community", zap.Error(err))
+			continue
+		}
+
+		chainID := CommunityDescriptionTokenOwnerChainID(description)
+		if chainID == 0 {
+			// This should not happen
+			m.logger.Error("chain id is 0, ignoring")
+			continue
+		}
+
+		m.logger.Info("validating community", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+		defer cancel()
+
+		owner, err := m.ownerVerifier.SafeGetSignerPubKey(ctx, chainID, types.EncodeHex(communityToValidate.id))
+		if err != nil {
+			m.logger.Error("failed to get owner", zap.Error(err))
+			continue
+		}
+
+		ownerPK, err := common.HexToPubkey(owner)
+		if err != nil {
+			m.logger.Error("failed to convert pk string to ecdsa", zap.Error(err))
+			continue
+		}
+
+		// TODO: handle shards
+		response, err := m.HandleCommunityDescriptionMessage(signer, description, communityToValidate.payload, ownerPK, nil)
+		if err != nil {
+			m.logger.Error("failed to handle community", zap.Error(err))
+			err = m.persistence.DeleteCommunityToValidate(communityToValidate.id, communityToValidate.clock)
+			if err != nil {
+				m.logger.Error("failed to delete community to validate", zap.Error(err))
+			}
+			continue
+		}
+
+		if response != nil {
+
+			m.logger.Info("community validated", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
+			m.publish(&Subscription{TokenCommunityValidated: response})
+			err := m.persistence.DeleteCommunitiesToValidateByCommunityID(communityToValidate.id)
+			if err != nil {
+				m.logger.Error("failed to delete communities to validate", zap.Error(err))
+			}
+			return response, nil
+		}
+	}
+
+	return nil, nil
 }
 
 func (m *Manager) Stop() error {

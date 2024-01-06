@@ -913,3 +913,11 @@ func (s *PersistenceSuite) TestSaveShardInfo() {
 	s.Require().Error(err, sql.ErrNoRows)
 	s.Require().Nil(resultShard)
 }
+
+func (s *PersistenceSuite) TestGetCommunityToValidateByID() {
+	communityID := types.HexBytes{1, 2, 3, 4, 5, 6, 7, 8}
+
+	result, err := s.db.getCommunityToValidateByID(communityID)
+	s.Require().NoError(err)
+	s.Require().Len(result, 0)
+}

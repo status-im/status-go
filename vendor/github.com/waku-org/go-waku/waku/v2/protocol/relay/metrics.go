@@ -22,14 +22,22 @@ var messageSize = prometheus.NewHistogram(prometheus.HistogramOpts{
 	Buckets: []float64{0.0, 5.0, 15.0, 50.0, 100.0, 300.0, 700.0, 1000.0},
 })
 
+var pubsubTopics = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Name: "waku_pubsub_topics",
+		Help: "Number of PubSub Topics node is subscribed to",
+	})
+
 var collectors = []prometheus.Collector{
 	messages,
 	messageSize,
+	pubsubTopics,
 }
 
 // Metrics exposes the functions required to update prometheus metrics for relay protocol
 type Metrics interface {
 	RecordMessage(envelope *waku_proto.Envelope)
+	SetPubSubTopics(int)
 }
 
 type metricsImpl struct {
@@ -55,4 +63,8 @@ func (m *metricsImpl) RecordMessage(envelope *waku_proto.Envelope) {
 		messages.WithLabelValues(pubsubTopic).Inc()
 		m.log.Debug("waku.relay received", zap.String("pubsubTopic", pubsubTopic), logging.HexBytes("hash", envelope.Hash()), zap.Int64("receivedTime", envelope.Index().ReceiverTime), zap.Int("payloadSizeBytes", payloadSizeInBytes))
 	}()
+}
+
+func (m *metricsImpl) SetPubSubTopics(size int) {
+	pubsubTopics.Set(float64(size))
 }

@@ -206,6 +206,36 @@ func (mr *MockDatabaseSettingsManagerMockRecorder) GetTokenGroupByCommunity() *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTokenGroupByCommunity", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).GetTokenGroupByCommunity))
 }
 
+// GetDisplayAssetsBelowBalance mocks base method.
+func (m *MockDatabaseSettingsManager) GetDisplayAssetsBelowBalance() (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDisplayAssetsBelowBalance")
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDisplayAssetsBelowBalance indicates an expected call of GetDisplayAssetsBelowBalance.
+func (mr *MockDatabaseSettingsManagerMockRecorder) GetDisplayAssetsBelowBalance() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDisplayAssetsBelowBalance", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).GetDisplayAssetsBelowBalance))
+}
+
+// GetDisplayAssetsBelowBalanceThreshold mocks base method.
+func (m *MockDatabaseSettingsManager) GetDisplayAssetsBelowBalanceThreshold() (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDisplayAssetsBelowBalanceThreshold")
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDisplayAssetsBelowBalanceThreshold indicates an expected call of GetDisplayAssetsBelowBalanceThreshold.
+func (mr *MockDatabaseSettingsManagerMockRecorder) GetDisplayAssetsBelowBalanceThreshold() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDisplayAssetsBelowBalanceThreshold", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).GetDisplayAssetsBelowBalanceThreshold))
+}
+
 // URLUnfurlingMode mocks base method.
 func (m *MockDatabaseSettingsManager) URLUnfurlingMode() (int64, error) {
 	m.ctrl.T.Helper()
