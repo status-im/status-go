@@ -82,6 +82,7 @@ func (c ConnectionNotifier) Connected(n network.Network, cc network.Conn) {
 	}
 
 	c.metrics.RecordPeerConnected()
+	c.metrics.SetPeerStoreSize(c.h.Peerstore().Peers().Len())
 }
 
 // Disconnected is called when a connection closed
@@ -96,6 +97,7 @@ func (c ConnectionNotifier) Disconnected(n network.Network, cc network.Conn) {
 			c.log.Warn("subscriber is too slow")
 		}
 	}
+	c.metrics.SetPeerStoreSize(c.h.Peerstore().Peers().Len())
 }
 
 // OpenedStream is called when a stream opened

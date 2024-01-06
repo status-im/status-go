@@ -292,6 +292,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		node.WithMaxPeerConnections(cfg.DiscoveryLimit),
 		node.WithLogger(logger),
 		node.WithClusterID(cfg.ClusterID),
+		node.WithMaxMsgSize(1024 * 1024),
 	}
 
 	if cfg.EnableDiscV5 {

@@ -351,9 +351,17 @@ func (pm *PeerManager) AddDiscoveredPeer(p service.PeerData, connectNow bool) {
 	if err == nil {
 		enr, err := pm.host.Peerstore().(wps.WakuPeerstore).ENR(p.AddrInfo.ID)
 		// Verifying if the enr record is more recent (DiscV5 and peer exchange can return peers already seen)
-		if err == nil && enr.Record().Seq() > p.ENR.Seq() {
-			pm.logger.Debug("found discovered peer already in peerStore", logging.HostID("peer", p.AddrInfo.ID))
+		if err == nil && enr.Record().Seq() >= p.ENR.Seq() {
 			return
+		}
+		if err != nil {
+			//Peer is already in peer-store but it doesn't have an enr, but discovered peer has ENR
+			pm.logger.Info("peer already found in peerstore, but doesn't have an ENR record, re-adding",
+				logging.HostID("peer", p.AddrInfo.ID), zap.Uint64("newENRSeq", p.ENR.Seq()))
+		} else {
+			//Peer is already in peer-store but stored ENR is older than discovered one.
+			pm.logger.Info("peer already found in peerstore, but re-adding it as ENR sequence is higher than locally stored",
+				logging.HostID("peer", p.AddrInfo.ID), zap.Uint64("newENRSeq", p.ENR.Seq()), zap.Uint64("storedENRSeq", enr.Record().Seq()))
 		}
 	}
 
