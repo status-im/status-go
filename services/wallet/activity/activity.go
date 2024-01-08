@@ -70,6 +70,7 @@ type Entry struct {
 	contractAddress *eth.Address
 }
 
+// Only used for JSON marshalling
 type EntryData struct {
 	PayloadType     PayloadType                      `json:"payloadType"`
 	Transaction     *transfer.TransactionIdentity    `json:"transaction,omitempty"`

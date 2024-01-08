@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
 
 	"github.com/stretchr/testify/mock"
@@ -57,18 +58,26 @@ func (m *mockTokenManager) LookupToken(chainID *uint64, tokenSymbol string) (tkn
 	return args.Get(0).(*token.Token), args.Bool(1)
 }
 
-func setupTestService(tb testing.TB) (service *Service, eventFeed *event.Feed, tokenMock *mockTokenManager, collectiblesMock *mockCollectiblesManager, close func()) {
+func setupTestService(tb testing.TB) (service *Service, eventFeed *event.Feed, tokenMock *mockTokenManager, collectiblesMock *mockCollectiblesManager, close func(), pendingTracker *transactions.PendingTxTracker, chainClient *transactions.MockChainClient) {
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(tb, err)
 
 	eventFeed = new(event.Feed)
 	tokenMock = &mockTokenManager{}
 	collectiblesMock = &mockCollectiblesManager{}
-	service = NewService(db, tokenMock, collectiblesMock, eventFeed)
+
+	chainClient = transactions.NewMockChainClient()
+
+	// Ensure we process pending transactions as needed, only once
+	pendingCheckInterval := time.Second
+	pendingTracker = transactions.NewPendingTxTracker(db, chainClient, nil, eventFeed, pendingCheckInterval)
+
+	service = NewService(db, tokenMock, collectiblesMock, eventFeed, pendingTracker)
 
 	return service, eventFeed, tokenMock, collectiblesMock, func() {
+		require.NoError(tb, pendingTracker.Stop())
 		require.NoError(tb, db.Close())
-	}
+	}, pendingTracker, chainClient
 }
 
 type arg struct {
@@ -101,7 +110,7 @@ func insertStubTransfersWithCollectibles(t *testing.T, db *sql.DB, args []arg) (
 }
 
 func TestService_UpdateCollectibleInfo(t *testing.T) {
-	s, e, tM, c, close := setupTestService(t)
+	s, e, tM, c, close, _, _ := setupTestService(t)
 	defer close()
 
 	args := []arg{
@@ -185,7 +194,7 @@ func TestService_UpdateCollectibleInfo(t *testing.T) {
 }
 
 func TestService_UpdateCollectibleInfo_Error(t *testing.T) {
-	s, e, _, c, close := setupTestService(t)
+	s, e, _, c, close, _, _ := setupTestService(t)
 	defer close()
 
 	args := []arg{
@@ -228,4 +237,107 @@ func TestService_UpdateCollectibleInfo_Error(t *testing.T) {
 	require.Equal(t, 0, updatesCount)
 
 	sub.Unsubscribe()
+}
+
+func TestService_IncrementalFilterUpdate(t *testing.T) {
+	s, e, tM, _, close, pTx, chainClient := setupTestService(t)
+	defer close()
+
+	ch := make(chan walletevent.Event, 4)
+	sub := e.Subscribe(ch)
+	defer sub.Unsubscribe()
+
+	txs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, s.db, 0, 3)
+	transfer.InsertTestTransfer(t, s.db, txs[0].To, &txs[0])
+	transfer.InsertTestTransfer(t, s.db, txs[2].To, &txs[2])
+
+	allAddresses := append(fromTrs, toTrs...)
+
+	tM.On("LookupTokenIdentity", mock.Anything, eth.HexToAddress("0x0"), true).Return(
+		&token.Token{
+			ChainID: 5,
+			Address: eth.HexToAddress("0x0"),
+			Symbol:  "ETH",
+		}, false,
+	).Times(2)
+
+	sessionID := s.StartFilterSession(allAddresses, true, allNetworksFilter(), Filter{}, 5)
+	require.Greater(t, sessionID, SessionID(0))
+	defer s.StopFilterSession(sessionID)
+
+	var filterResponseCount int
+
+	for i := 0; i < 1; i++ {
+		select {
+		case res := <-ch:
+			switch res.Type {
+			case EventActivityFilteringDone:
+				var payload FilterResponse
+				err := json.Unmarshal([]byte(res.Message), &payload)
+				require.NoError(t, err)
+				require.Equal(t, ErrorCodeSuccess, payload.ErrorCode)
+				require.Equal(t, 2, len(payload.Activities))
+				filterResponseCount++
+			}
+		case <-time.NewTimer(1 * time.Second).C:
+			require.Fail(t, "timeout while waiting for EventActivityFilteringDone")
+		}
+	}
+
+	pendings := transactions.MockTestTransactions(t, chainClient, []transactions.TestTxSummary{{}})
+
+	err := pTx.StoreAndTrackPendingTx(&pendings[0])
+	require.NoError(t, err)
+
+	pendingTransactionUpdate, sessionUpdatesCount := 0, 0
+	// Validate the session update event
+	for sessionUpdatesCount < 1 {
+		select {
+		case res := <-ch:
+			switch res.Type {
+			case transactions.EventPendingTransactionUpdate:
+				pendingTransactionUpdate++
+			case EventActivitySessionUpdated:
+				var payload SessionUpdate
+				err := json.Unmarshal([]byte(res.Message), &payload)
+				require.NoError(t, err)
+				require.Equal(t, 1, len(payload.NewEntries))
+				tx := payload.NewEntries[0]
+				exp := pendings[0]
+				// TODO #12120: this should be a multi-transaction
+				// require.Equal(t, exp.MultiTransactionID, tx.id)
+
+				require.Equal(t, PendingTransactionPT, tx.payloadType)
+				// We don't keep type in the DB
+				require.Equal(t, (*int)(nil), tx.transferType)
+				require.Equal(t, SendAT, tx.activityType)
+				require.Equal(t, PendingAS, tx.activityStatus)
+				require.Equal(t, exp.ChainID, tx.transaction.ChainID)
+				require.Equal(t, exp.ChainID, *tx.chainIDOut)
+				require.Equal(t, (*common.ChainID)(nil), tx.chainIDIn)
+				require.Equal(t, exp.Hash, tx.transaction.Hash)
+				require.Equal(t, exp.From, tx.transaction.Address)
+				require.Equal(t, exp.From, *tx.sender)
+				require.Equal(t, exp.To, *tx.recipient)
+				require.Equal(t, 0, exp.Value.Int.Cmp((*big.Int)(tx.amountOut)))
+				require.Equal(t, exp.Timestamp, uint64(tx.timestamp))
+				require.Equal(t, exp.Symbol, *tx.symbolOut)
+				require.Equal(t, (*string)(nil), tx.symbolIn)
+				require.Equal(t, (*Token)(nil), tx.tokenOut)
+				require.Equal(t, (*Token)(nil), tx.tokenIn)
+				require.Equal(t, (*eth.Address)(nil), tx.contractAddress)
+
+				sessionUpdatesCount++
+			case EventActivityFilteringDone:
+				filterResponseCount++
+			}
+		case <-time.NewTimer(1 * time.Second).C:
+			require.Fail(t, "timeout while waiting for EventActivitySessionUpdated")
+		}
+	}
+
+	// Don't wait for deletion
+	require.Equal(t, 1, pendingTransactionUpdate)
+	require.Equal(t, 1, filterResponseCount)
+	require.Equal(t, 1, sessionUpdatesCount)
 }
