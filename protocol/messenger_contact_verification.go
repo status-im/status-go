@@ -127,7 +127,10 @@ func (m *Messenger) SendContactVerificationRequest(ctx context.Context, contactI
 
 	response.AddMessage(chatMessage)
 
-	m.prepareMessages(response.messages)
+	err = m.prepareMessages(response.messages)
+	if err != nil {
+		return nil, err
+	}
 
 	return response, nil
 }

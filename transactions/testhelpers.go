@@ -10,6 +10,7 @@ import (
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
+
 	"github.com/stretchr/testify/mock"
 )
 
