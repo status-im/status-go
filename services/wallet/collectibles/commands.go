@@ -2,6 +2,7 @@ package collectibles
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math/big"
 	"sync/atomic"
@@ -14,6 +15,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -31,7 +33,22 @@ type OwnedCollectibles struct {
 	ids     []thirdparty.CollectibleUniqueID
 }
 
-type OwnedCollectiblesCb func(OwnedCollectibles)
+type OwnedCollectiblesChangeType = int
+
+const (
+	OwnedCollectiblesChangeTypeAdded OwnedCollectiblesChangeType = iota + 1
+	OwnedCollectiblesChangeTypeUpdated
+	OwnedCollectiblesChangeTypeRemoved
+)
+
+type OwnedCollectiblesChange struct {
+	ownedCollectibles OwnedCollectibles
+	changeType        OwnedCollectiblesChangeType
+}
+
+type OwnedCollectiblesChangeCb func(OwnedCollectiblesChange)
+
+type TransferCb func(common.Address, walletCommon.ChainID, []transfer.Transfer)
 
 const (
 	OwnershipStateIdle OwnershipState = iota + 1
@@ -41,12 +58,12 @@ const (
 )
 
 type periodicRefreshOwnedCollectiblesCommand struct {
-	chainID                walletCommon.ChainID
-	account                common.Address
-	manager                *Manager
-	ownershipDB            *OwnershipDB
-	walletFeed             *event.Feed
-	receivedCollectiblesCb OwnedCollectiblesCb
+	chainID                   walletCommon.ChainID
+	account                   common.Address
+	manager                   *Manager
+	ownershipDB               *OwnershipDB
+	walletFeed                *event.Feed
+	ownedCollectiblesChangeCb OwnedCollectiblesChangeCb
 
 	group *async.Group
 	state atomic.Value
@@ -58,14 +75,14 @@ func newPeriodicRefreshOwnedCollectiblesCommand(
 	walletFeed *event.Feed,
 	chainID walletCommon.ChainID,
 	account common.Address,
-	receivedCollectiblesCb OwnedCollectiblesCb) *periodicRefreshOwnedCollectiblesCommand {
+	ownedCollectiblesChangeCb OwnedCollectiblesChangeCb) *periodicRefreshOwnedCollectiblesCommand {
 	ret := &periodicRefreshOwnedCollectiblesCommand{
-		manager:                manager,
-		ownershipDB:            ownershipDB,
-		walletFeed:             walletFeed,
-		chainID:                chainID,
-		account:                account,
-		receivedCollectiblesCb: receivedCollectiblesCb,
+		manager:                   manager,
+		ownershipDB:               ownershipDB,
+		walletFeed:                walletFeed,
+		chainID:                   chainID,
+		account:                   account,
+		ownedCollectiblesChangeCb: ownedCollectiblesChangeCb,
 	}
 	ret.state.Store(OwnershipStateIdle)
 	return ret
@@ -108,8 +125,8 @@ func (c *periodicRefreshOwnedCollectiblesCommand) Stop() {
 func (c *periodicRefreshOwnedCollectiblesCommand) loadOwnedCollectibles(ctx context.Context) error {
 	c.group = async.NewGroup(ctx)
 
-	receivedCollectiblesCh := make(chan OwnedCollectibles)
-	command := newLoadOwnedCollectiblesCommand(c.manager, c.ownershipDB, c.walletFeed, c.chainID, c.account, receivedCollectiblesCh)
+	ownedCollectiblesChangeCh := make(chan OwnedCollectiblesChange)
+	command := newLoadOwnedCollectiblesCommand(c.manager, c.ownershipDB, c.walletFeed, c.chainID, c.account, ownedCollectiblesChangeCh)
 
 	c.state.Store(OwnershipStateUpdating)
 	defer func() {
@@ -123,9 +140,9 @@ func (c *periodicRefreshOwnedCollectiblesCommand) loadOwnedCollectibles(ctx cont
 	c.group.Add(command.Command())
 
 	select {
-	case ownedCollectibles := <-receivedCollectiblesCh:
-		if c.receivedCollectiblesCb != nil {
-			c.receivedCollectiblesCb(ownedCollectibles)
+	case ownedCollectiblesChange := <-ownedCollectiblesChangeCh:
+		if c.ownedCollectiblesChangeCb != nil {
+			c.ownedCollectiblesChangeCb(ownedCollectiblesChange)
 		}
 	case <-ctx.Done():
 		return ctx.Err()
@@ -139,12 +156,12 @@ func (c *periodicRefreshOwnedCollectiblesCommand) loadOwnedCollectibles(ctx cont
 // Fetches owned collectibles for a ChainID+OwnerAddress combination in chunks
 // and updates the ownershipDB when all chunks are loaded
 type loadOwnedCollectiblesCommand struct {
-	chainID                walletCommon.ChainID
-	account                common.Address
-	manager                *Manager
-	ownershipDB            *OwnershipDB
-	walletFeed             *event.Feed
-	receivedCollectiblesCh chan<- OwnedCollectibles
+	chainID                   walletCommon.ChainID
+	account                   common.Address
+	manager                   *Manager
+	ownershipDB               *OwnershipDB
+	walletFeed                *event.Feed
+	ownedCollectiblesChangeCh chan<- OwnedCollectiblesChange
 
 	// Not to be set by the caller
 	partialOwnership []thirdparty.CollectibleUniqueID
@@ -157,14 +174,14 @@ func newLoadOwnedCollectiblesCommand(
 	walletFeed *event.Feed,
 	chainID walletCommon.ChainID,
 	account common.Address,
-	receivedCollectiblesCh chan<- OwnedCollectibles) *loadOwnedCollectiblesCommand {
+	ownedCollectiblesChangeCh chan<- OwnedCollectiblesChange) *loadOwnedCollectiblesCommand {
 	return &loadOwnedCollectiblesCommand{
-		manager:                manager,
-		ownershipDB:            ownershipDB,
-		walletFeed:             walletFeed,
-		chainID:                chainID,
-		account:                account,
-		receivedCollectiblesCh: receivedCollectiblesCh,
+		manager:                   manager,
+		ownershipDB:               ownershipDB,
+		walletFeed:                walletFeed,
+		chainID:                   chainID,
+		account:                   account,
+		ownedCollectiblesChangeCh: ownedCollectiblesChangeCh,
 	}
 }
 
@@ -195,6 +212,41 @@ func ownedTokensToTokenBalancesPerContractAddress(ownership []thirdparty.Collect
 	return ret
 }
 
+func (c *loadOwnedCollectiblesCommand) sendOwnedCollectiblesChanges(removed, updated, added []thirdparty.CollectibleUniqueID) {
+	if len(removed) > 0 {
+		c.ownedCollectiblesChangeCh <- OwnedCollectiblesChange{
+			ownedCollectibles: OwnedCollectibles{
+				chainID: c.chainID,
+				account: c.account,
+				ids:     removed,
+			},
+			changeType: OwnedCollectiblesChangeTypeRemoved,
+		}
+	}
+
+	if len(updated) > 0 {
+		c.ownedCollectiblesChangeCh <- OwnedCollectiblesChange{
+			ownedCollectibles: OwnedCollectibles{
+				chainID: c.chainID,
+				account: c.account,
+				ids:     updated,
+			},
+			changeType: OwnedCollectiblesChangeTypeUpdated,
+		}
+	}
+
+	if len(added) > 0 {
+		c.ownedCollectiblesChangeCh <- OwnedCollectiblesChange{
+			ownedCollectibles: OwnedCollectibles{
+				chainID: c.chainID,
+				account: c.account,
+				ids:     added,
+			},
+			changeType: OwnedCollectiblesChangeTypeAdded,
+		}
+	}
+}
+
 func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 	log.Debug("start loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account)
 
@@ -204,6 +256,8 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 	start := time.Now()
 
 	c.triggerEvent(EventCollectiblesOwnershipUpdateStarted, c.chainID, c.account, "")
+
+	updateMessage := OwnershipUpdateMessage{}
 
 	lastFetchTimestamp, err := c.ownershipDB.GetOwnershipUpdateTimestamp(c.account, c.chainID)
 	if err != nil {
@@ -241,42 +295,45 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 			// Normally, update the DB once we've finished fetching
 			// If this is the first fetch, make partial updates to the client to get a better UX
 			if initialFetch || finished {
-				receivedIDs, err := c.ownershipDB.GetIDsNotInDB(c.chainID, c.account, c.partialOwnership)
-				if err != nil {
-					log.Error("failed GetIDsNotInDB in processOwnedIDs", "chain", c.chainID, "account", c.account, "error", err)
-					return err
-				}
-
 				// Token balances should come from the providers. For now we assume all balances are 1, which
 				// is only valid for ERC721.
 				// TODO (#13025): Fetch balances from the providers.
 				balances := ownedTokensToTokenBalancesPerContractAddress(c.partialOwnership)
 
-				err = c.ownershipDB.Update(c.chainID, c.account, balances, start.Unix())
+				updateMessage.Removed, updateMessage.Updated, updateMessage.Added, err = c.ownershipDB.Update(c.chainID, c.account, balances, start.Unix())
 				if err != nil {
 					log.Error("failed updating ownershipDB in loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "error", err)
 					c.err = err
+					break
 				}
 
-				c.receivedCollectiblesCh <- OwnedCollectibles{
-					chainID: c.chainID,
-					account: c.account,
-					ids:     receivedIDs,
-				}
+				c.sendOwnedCollectiblesChanges(updateMessage.Removed, updateMessage.Updated, updateMessage.Added)
 			}
 
 			if finished || c.err != nil {
 				break
 			} else if initialFetch {
-				c.triggerEvent(EventCollectiblesOwnershipUpdatePartial, c.chainID, c.account, "")
+				encodedMessage, err := json.Marshal(updateMessage)
+				if err != nil {
+					c.err = err
+					break
+				}
+				c.triggerEvent(EventCollectiblesOwnershipUpdatePartial, c.chainID, c.account, string(encodedMessage))
+
+				updateMessage = OwnershipUpdateMessage{}
 			}
 		}
+	}
+
+	var encodedMessage []byte
+	if c.err == nil {
+		encodedMessage, c.err = json.Marshal(updateMessage)
 	}
 
 	if c.err != nil {
 		c.triggerEvent(EventCollectiblesOwnershipUpdateFinishedWithError, c.chainID, c.account, c.err.Error())
 	} else {
-		c.triggerEvent(EventCollectiblesOwnershipUpdateFinished, c.chainID, c.account, "")
+		c.triggerEvent(EventCollectiblesOwnershipUpdateFinished, c.chainID, c.account, string(encodedMessage))
 	}
 
 	log.Debug("end loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "in", time.Since(start))

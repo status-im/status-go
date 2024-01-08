@@ -201,8 +201,9 @@ type CollectibleContractOwnership struct {
 }
 
 type AccountBalance struct {
-	Address common.Address `json:"address"`
-	Balance *bigint.BigInt `json:"balance"`
+	Address     common.Address `json:"address"`
+	Balance     *bigint.BigInt `json:"balance"`
+	TxTimestamp int64          `json:"txTimestamp"`
 }
 
 type CollectibleContractOwnershipProvider interface {
