@@ -81,7 +81,7 @@ func TestFilterOwnedCollectibles(t *testing.T) {
 
 	for chainID, balancesPerOwner := range balancesPerChainIDAndOwner {
 		for ownerAddress, balances := range balancesPerOwner {
-			err = oDB.Update(chainID, ownerAddress, balances, timestamp)
+			_, _, _, err = oDB.Update(chainID, ownerAddress, balances, timestamp)
 			require.NoError(t, err)
 		}
 	}

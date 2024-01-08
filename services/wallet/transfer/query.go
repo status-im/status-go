@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	w_common "github.com/status-im/status-go/services/wallet/common"
 )
 
 const baseTransfersQuery = "SELECT hash, type, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, network_id, base_gas_fee, COALESCE(multi_transaction_id, 0) %s FROM transfers"
@@ -147,10 +148,47 @@ func (q *transfersQuery) FilterBlockNumber(blockNumber *big.Int) *transfersQuery
 	return q
 }
 
-func (q *transfersQuery) Limit(pageSize int64) *transfersQuery {
+func ascendingString(ascending bool) string {
+	if ascending {
+		return "ASC"
+	}
+	return "DESC"
+}
+
+func (q *transfersQuery) SortByBlockNumberAndHash() *transfersQuery {
 	q.buf.WriteString(" ORDER BY blk_number DESC, hash ASC ")
+	return q
+}
+
+func (q *transfersQuery) SortByTimestamp(ascending bool) *transfersQuery {
+	q.buf.WriteString(fmt.Sprintf(" ORDER BY timestamp %s ", ascendingString(ascending)))
+	return q
+}
+
+func (q *transfersQuery) Limit(pageSize int64) *transfersQuery {
 	q.buf.WriteString(" LIMIT ?")
 	q.args = append(q.args, pageSize)
+	return q
+}
+
+func (q *transfersQuery) FilterType(txType w_common.Type) *transfersQuery {
+	q.addWhereSeparator(AndSeparator)
+	q.buf.WriteString(" type = ?")
+	q.args = append(q.args, txType)
+	return q
+}
+
+func (q *transfersQuery) FilterTokenAddress(address common.Address) *transfersQuery {
+	q.addWhereSeparator(AndSeparator)
+	q.buf.WriteString(" token_address = ?")
+	q.args = append(q.args, address)
+	return q
+}
+
+func (q *transfersQuery) FilterTokenID(tokenID *big.Int) *transfersQuery {
+	q.addWhereSeparator(AndSeparator)
+	q.buf.WriteString(" token_id = ?")
+	q.args = append(q.args, (*bigint.SQLBigIntBytes)(tokenID))
 	return q
 }
 

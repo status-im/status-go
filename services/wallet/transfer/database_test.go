@@ -10,7 +10,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
+	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -151,4 +153,63 @@ func TestGetTransfersForIdentities(t *testing.T) {
 	require.Equal(t, uint64(trs[3].ChainID), entries[1].NetworkID)
 	require.Equal(t, MultiTransactionIDType(0), entries[0].MultiTransactionID)
 	require.Equal(t, MultiTransactionIDType(0), entries[1].MultiTransactionID)
+}
+
+func TestGetLatestCollectibleTransfer(t *testing.T) {
+	db, _, stop := setupTestDB(t)
+	defer stop()
+
+	trs, _, _ := GenerateTestTransfers(t, db.client, 1, len(TestCollectibles))
+
+	collectible := TestCollectibles[0]
+	collectibleID := thirdparty.CollectibleUniqueID{
+		ContractID: thirdparty.ContractID{
+			ChainID: collectible.ChainID,
+			Address: collectible.TokenAddress,
+		},
+		TokenID: &bigint.BigInt{Int: collectible.TokenID},
+	}
+	firstTr := trs[0]
+	lastTr := firstTr
+
+	// ExtraTrs is a sequence of send+receive of the same collectible
+	extraTrs, _, _ := GenerateTestTransfers(t, db.client, len(trs)+1, 2)
+	for i := range extraTrs {
+		if i%2 == 0 {
+			extraTrs[i].From = firstTr.To
+			extraTrs[i].To = firstTr.From
+		} else {
+			extraTrs[i].From = firstTr.From
+			extraTrs[i].To = firstTr.To
+		}
+		extraTrs[i].ChainID = collectible.ChainID
+	}
+
+	for i := range trs {
+		collectibleData := TestCollectibles[i]
+		trs[i].ChainID = collectibleData.ChainID
+		InsertTestTransferWithOptions(t, db.client, trs[i].To, &trs[i], &TestTransferOptions{
+			TokenAddress: collectibleData.TokenAddress,
+			TokenID:      collectibleData.TokenID,
+		})
+	}
+
+	foundTx, err := db.GetLatestCollectibleTransfer(lastTr.To, collectibleID)
+	require.NoError(t, err)
+	require.NotEmpty(t, foundTx)
+	require.Equal(t, lastTr.Hash, foundTx.ID)
+
+	for i := range extraTrs {
+		InsertTestTransferWithOptions(t, db.client, firstTr.To, &extraTrs[i], &TestTransferOptions{
+			TokenAddress: collectible.TokenAddress,
+			TokenID:      collectible.TokenID,
+		})
+	}
+
+	lastTr = extraTrs[len(extraTrs)-1]
+
+	foundTx, err = db.GetLatestCollectibleTransfer(lastTr.To, collectibleID)
+	require.NoError(t, err)
+	require.NotEmpty(t, foundTx)
+	require.Equal(t, lastTr.Hash, foundTx.ID)
 }

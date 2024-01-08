@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 
@@ -120,6 +121,7 @@ func TestUpdateOwnership(t *testing.T) {
 	randomAddress := common.HexToAddress("0xFFFF")
 
 	var err error
+	var removedIDs, updatedIDs, insertedIDs []thirdparty.CollectibleUniqueID
 
 	var loadedTimestamp int64
 	var loadedList []thirdparty.CollectibleUniqueID
@@ -148,8 +150,11 @@ func TestUpdateOwnership(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, InvalidTimestamp, loadedTimestamp)
 
-	err = oDB.Update(chainID0, ownerAddress1, ownedBalancesChain0, timestampChain0)
+	removedIDs, updatedIDs, insertedIDs, err = oDB.Update(chainID0, ownerAddress1, ownedBalancesChain0, timestampChain0)
 	require.NoError(t, err)
+	require.Empty(t, removedIDs)
+	require.Empty(t, updatedIDs)
+	require.ElementsMatch(t, ownedListChain0, insertedIDs)
 
 	loadedTimestamp, err = oDB.GetOwnershipUpdateTimestamp(ownerAddress1, chainID0)
 	require.NoError(t, err)
@@ -175,17 +180,29 @@ func TestUpdateOwnership(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, InvalidTimestamp, loadedTimestamp)
 
-	err = oDB.Update(chainID1, ownerAddress1, ownedBalancesChain1, timestampChain1)
+	removedIDs, updatedIDs, insertedIDs, err = oDB.Update(chainID1, ownerAddress1, ownedBalancesChain1, timestampChain1)
 	require.NoError(t, err)
+	require.Empty(t, removedIDs)
+	require.Empty(t, updatedIDs)
+	require.ElementsMatch(t, ownedListChain1, insertedIDs)
 
-	err = oDB.Update(chainID2, ownerAddress2, ownedBalancesChain2, timestampChain2)
+	removedIDs, updatedIDs, insertedIDs, err = oDB.Update(chainID2, ownerAddress2, ownedBalancesChain2, timestampChain2)
 	require.NoError(t, err)
+	require.Empty(t, removedIDs)
+	require.Empty(t, updatedIDs)
+	require.ElementsMatch(t, ownedListChain2, insertedIDs)
 
-	err = oDB.Update(chainID1, ownerAddress3, ownedBalancesChain1b, timestampChain1b)
+	removedIDs, updatedIDs, insertedIDs, err = oDB.Update(chainID1, ownerAddress3, ownedBalancesChain1b, timestampChain1b)
 	require.NoError(t, err)
+	require.Empty(t, removedIDs)
+	require.Empty(t, updatedIDs)
+	require.ElementsMatch(t, ownedListChain1b, insertedIDs)
 
-	err = oDB.Update(chainID2, ownerAddress3, ownedBalancesChain2b, timestampChain2b)
+	removedIDs, updatedIDs, insertedIDs, err = oDB.Update(chainID2, ownerAddress3, ownedBalancesChain2b, timestampChain2b)
 	require.NoError(t, err)
+	require.Empty(t, removedIDs)
+	require.Empty(t, updatedIDs)
+	require.ElementsMatch(t, ownedListChain2b, insertedIDs)
 
 	loadedTimestamp, err = oDB.GetOwnershipUpdateTimestamp(ownerAddress1, chainID0)
 	require.NoError(t, err)
@@ -252,12 +269,14 @@ func TestUpdateOwnership(t *testing.T) {
 
 	expectedOwnership := []thirdparty.AccountBalance{
 		{
-			Address: ownerAddress2,
-			Balance: commonBalanceAddress2,
+			Address:     ownerAddress2,
+			Balance:     commonBalanceAddress2,
+			TxTimestamp: unknownUpdateTimestamp,
 		},
 		{
-			Address: ownerAddress3,
-			Balance: commonBalanceAddress3,
+			Address:     ownerAddress3,
+			Balance:     commonBalanceAddress3,
+			TxTimestamp: unknownUpdateTimestamp,
 		},
 	}
 
@@ -275,6 +294,73 @@ func TestUpdateOwnership(t *testing.T) {
 	loadedOwnership, err = oDB.GetOwnership(randomID)
 	require.NoError(t, err)
 	require.Empty(t, loadedOwnership)
+}
+
+func TestUpdateOwnershipChanges(t *testing.T) {
+	oDB, cleanDB := setupOwnershipDBTest(t)
+	defer cleanDB()
+
+	chainID0 := w_common.ChainID(0)
+	ownerAddress1 := common.HexToAddress("0x1234")
+	ownedBalancesChain0 := generateTestCollectibles(0, 10)
+	ownedListChain0 := testCollectiblesToList(chainID0, ownedBalancesChain0)
+	timestampChain0 := int64(1234567890)
+
+	var err error
+	var removedIDs, updatedIDs, insertedIDs []thirdparty.CollectibleUniqueID
+
+	var loadedList []thirdparty.CollectibleUniqueID
+
+	removedIDs, updatedIDs, insertedIDs, err = oDB.Update(chainID0, ownerAddress1, ownedBalancesChain0, timestampChain0)
+	require.NoError(t, err)
+	require.Empty(t, removedIDs)
+	require.Empty(t, updatedIDs)
+	require.ElementsMatch(t, ownedListChain0, insertedIDs)
+
+	loadedList, err = oDB.GetOwnedCollectibles([]w_common.ChainID{chainID0}, []common.Address{ownerAddress1}, 0, len(ownedListChain0))
+	require.NoError(t, err)
+	require.ElementsMatch(t, ownedListChain0, loadedList)
+
+	// Remove one collectible and change balance of another
+	var removedID, updatedID thirdparty.CollectibleUniqueID
+
+	count := 0
+	for contractAddress, balances := range ownedBalancesChain0 {
+		for i, balance := range balances {
+			if count == 0 {
+				count++
+				ownedBalancesChain0[contractAddress] = ownedBalancesChain0[contractAddress][1:]
+				removedID = thirdparty.CollectibleUniqueID{
+					ContractID: thirdparty.ContractID{
+						ChainID: chainID0,
+						Address: contractAddress,
+					},
+					TokenID: balance.TokenID,
+				}
+			} else if count == 1 {
+				count++
+				ownedBalancesChain0[contractAddress][i].Balance = &bigint.BigInt{Int: big.NewInt(100)}
+				updatedID = thirdparty.CollectibleUniqueID{
+					ContractID: thirdparty.ContractID{
+						ChainID: chainID0,
+						Address: contractAddress,
+					},
+					TokenID: balance.TokenID,
+				}
+			}
+		}
+	}
+	ownedListChain0 = testCollectiblesToList(chainID0, ownedBalancesChain0)
+
+	removedIDs, updatedIDs, insertedIDs, err = oDB.Update(chainID0, ownerAddress1, ownedBalancesChain0, timestampChain0)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []thirdparty.CollectibleUniqueID{removedID}, removedIDs)
+	require.ElementsMatch(t, []thirdparty.CollectibleUniqueID{updatedID}, updatedIDs)
+	require.Empty(t, insertedIDs)
+
+	loadedList, err = oDB.GetOwnedCollectibles([]w_common.ChainID{chainID0}, []common.Address{ownerAddress1}, 0, len(ownedListChain0))
+	require.NoError(t, err)
+	require.ElementsMatch(t, ownedListChain0, loadedList)
 }
 
 func TestLargeTokenID(t *testing.T) {
@@ -299,8 +385,9 @@ func TestLargeTokenID(t *testing.T) {
 
 	ownership := []thirdparty.AccountBalance{
 		{
-			Address: ownerAddress,
-			Balance: balance,
+			Address:     ownerAddress,
+			Balance:     balance,
+			TxTimestamp: unknownUpdateTimestamp,
 		},
 	}
 
@@ -308,7 +395,7 @@ func TestLargeTokenID(t *testing.T) {
 
 	var err error
 
-	err = oDB.Update(chainID, ownerAddress, ownedBalancesChain, timestamp)
+	_, _, _, err = oDB.Update(chainID, ownerAddress, ownedBalancesChain, timestamp)
 	require.NoError(t, err)
 
 	loadedList, err := oDB.GetOwnedCollectibles([]w_common.ChainID{chainID}, []common.Address{ownerAddress}, 0, len(ownedListChain))
@@ -326,4 +413,72 @@ func TestLargeTokenID(t *testing.T) {
 	loadedOwnership, err := oDB.GetOwnership(id)
 	require.NoError(t, err)
 	require.Equal(t, ownership, loadedOwnership)
+}
+
+func TestCollectibleTransferID(t *testing.T) {
+	oDB, cleanDB := setupOwnershipDBTest(t)
+	defer cleanDB()
+
+	chainID0 := w_common.ChainID(0)
+	ownerAddress1 := common.HexToAddress("0x1234")
+	ownedBalancesChain0 := generateTestCollectibles(0, 10)
+	ownedListChain0 := testCollectiblesToList(chainID0, ownedBalancesChain0)
+	timestampChain0 := int64(1234567890)
+
+	var err error
+
+	_, _, _, err = oDB.Update(chainID0, ownerAddress1, ownedBalancesChain0, timestampChain0)
+	require.NoError(t, err)
+
+	loadedList, err := oDB.GetCollectiblesWithNoTransferID(ownerAddress1, chainID0)
+	require.NoError(t, err)
+	require.ElementsMatch(t, ownedListChain0, loadedList)
+
+	for _, id := range ownedListChain0 {
+		loadedTransferID, err := oDB.GetTransferID(ownerAddress1, id)
+		require.NoError(t, err)
+		require.Nil(t, loadedTransferID)
+	}
+
+	firstCollectibleID := ownedListChain0[0]
+	firstTxID := common.HexToHash("0x1234")
+	err = oDB.SetTransferID(ownerAddress1, firstCollectibleID, firstTxID)
+	require.NoError(t, err)
+
+	for _, id := range ownedListChain0 {
+		loadedTransferID, err := oDB.GetTransferID(ownerAddress1, id)
+		require.NoError(t, err)
+		if id == firstCollectibleID {
+			require.Equal(t, firstTxID, *loadedTransferID)
+		} else {
+			require.Nil(t, loadedTransferID)
+		}
+	}
+
+	// Even though the first collectible has a TransferID set, since there's no matching entry in the transfers table it
+	// should return unknownUpdateTimestamp
+	firstOwnership, err := oDB.GetOwnership(firstCollectibleID)
+	require.NoError(t, err)
+	require.Equal(t, unknownUpdateTimestamp, firstOwnership[0].TxTimestamp)
+
+	trs, _, _ := transfer.GenerateTestTransfers(t, oDB.db, 1, 5)
+	trs[0].To = ownerAddress1
+	trs[0].ChainID = chainID0
+	trs[0].Hash = firstTxID
+
+	for i := range trs {
+		if i == 0 {
+			transfer.InsertTestTransferWithOptions(t, oDB.db, trs[i].To, &trs[i], &transfer.TestTransferOptions{
+				TokenAddress: firstCollectibleID.ContractID.Address,
+				TokenID:      firstCollectibleID.TokenID.Int,
+			})
+		} else {
+			transfer.InsertTestTransfer(t, oDB.db, trs[i].To, &trs[i])
+		}
+	}
+
+	// There should now be a valid timestamp
+	firstOwnership, err = oDB.GetOwnership(firstCollectibleID)
+	require.NoError(t, err)
+	require.Equal(t, trs[0].Timestamp, firstOwnership[0].TxTimestamp)
 }

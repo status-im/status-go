@@ -487,20 +487,23 @@ func transferTypeToEventType(transferType w_common.Type) walletevent.EventType {
 
 func (c *transfersCommand) notifyOfLatestTransfers(transfers []Transfer, transferType w_common.Type) {
 	if c.feed != nil {
+		eventTransfers := make([]Transfer, 0, len(transfers))
 		latestTransferTimestamp := uint64(0)
 		for _, transfer := range transfers {
 			if transfer.Type == transferType {
+				eventTransfers = append(eventTransfers, transfer)
 				if transfer.Timestamp > latestTransferTimestamp {
 					latestTransferTimestamp = transfer.Timestamp
 				}
 			}
 		}
-		if latestTransferTimestamp > 0 {
+		if len(eventTransfers) > 0 {
 			c.feed.Send(walletevent.Event{
-				Type:     transferTypeToEventType(transferType),
-				Accounts: []common.Address{c.address},
-				ChainID:  c.chainClient.NetworkID(),
-				At:       int64(latestTransferTimestamp),
+				Type:        transferTypeToEventType(transferType),
+				Accounts:    []common.Address{c.address},
+				ChainID:     c.chainClient.NetworkID(),
+				At:          int64(latestTransferTimestamp),
+				EventParams: eventTransfers,
 			})
 		}
 	}

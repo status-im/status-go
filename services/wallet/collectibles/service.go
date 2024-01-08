@@ -16,9 +16,11 @@ import (
 	"github.com/status-im/status-go/rpc/network"
 
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -34,6 +36,12 @@ const (
 	EventOwnedCollectiblesFilteringDone walletevent.EventType = "wallet-owned-collectibles-filtering-done"
 	EventGetCollectiblesDetailsDone     walletevent.EventType = "wallet-get-collectibles-details-done"
 )
+
+type OwnershipUpdateMessage struct {
+	Added   []thirdparty.CollectibleUniqueID `json:"added"`
+	Updated []thirdparty.CollectibleUniqueID `json:"updated"`
+	Removed []thirdparty.CollectibleUniqueID `json:"removed"`
+}
 
 type CollectibleDataType byte
 
@@ -74,6 +82,7 @@ type Service struct {
 	controller       *Controller
 	db               *sql.DB
 	ownershipDB      *OwnershipDB
+	transferDB       *transfer.Database
 	communityManager *community.Manager
 	walletFeed       *event.Feed
 	scheduler        *async.MultiClientScheduler
@@ -94,12 +103,14 @@ func NewService(
 		controller:       NewController(db, walletFeed, accountsDB, accountsFeed, settingsFeed, networkManager, manager),
 		db:               db,
 		ownershipDB:      NewOwnershipDB(db),
+		transferDB:       transfer.NewDB(db),
 		communityManager: communityManager,
 		walletFeed:       walletFeed,
 		scheduler:        async.NewMultiClientScheduler(),
 		group:            async.NewGroup(context.Background()),
 	}
-	s.controller.SetReceivedCollectiblesCb(s.notifyCommunityCollectiblesReceived)
+	s.controller.SetOwnedCollectiblesChangeCb(s.onOwnedCollectiblesChange)
+	s.controller.SetCollectiblesTransferCb(s.onCollectiblesTransfer)
 	return s
 }
 
@@ -397,6 +408,56 @@ func (s *Service) collectibleIDsToDataType(ctx context.Context, ids []thirdparty
 		}
 	}
 	return nil, errors.New("unknown data type")
+}
+
+func (s *Service) onOwnedCollectiblesChange(ownedCollectiblesChange OwnedCollectiblesChange) {
+	// Try to find a matching transfer for newly added/updated collectibles
+	switch ownedCollectiblesChange.changeType {
+	case OwnedCollectiblesChangeTypeAdded, OwnedCollectiblesChangeTypeUpdated:
+		// For recently added/updated collectibles, try to find a matching transfer
+		s.lookupTransferForCollectibles(ownedCollectiblesChange.ownedCollectibles)
+		s.notifyCommunityCollectiblesReceived(ownedCollectiblesChange.ownedCollectibles)
+	}
+}
+
+func (s *Service) onCollectiblesTransfer(account common.Address, chainID walletCommon.ChainID, transfers []transfer.Transfer) {
+	for _, transfer := range transfers {
+		// If Collectible is already in the DB, update transfer ID with the latest detected transfer
+		id := thirdparty.CollectibleUniqueID{
+			ContractID: thirdparty.ContractID{
+				ChainID: chainID,
+				Address: transfer.Log.Address,
+			},
+			TokenID: &bigint.BigInt{Int: transfer.TokenID},
+		}
+		err := s.ownershipDB.SetTransferID(account, id, transfer.ID)
+		if err != nil {
+			log.Error("Error setting transfer ID for collectible", "error", err)
+		}
+	}
+}
+
+func (s *Service) lookupTransferForCollectibles(ownedCollectibles OwnedCollectibles) {
+	// There are some limitations to this approach:
+	// - Collectibles ownership and transfers are not in sync and might represent the state at different moments.
+	// - We have no way of knowing if the latest collectible transfer we've detected is actually the latest one, so the timestamp we
+	// use might be older than the real one.
+	// - There might be detected transfers that are temporarily not reflected in the collectibles ownership.
+	// - For ERC721 tokens we should only look for incoming transfers. For ERC1155 tokens we should look for both incoming and outgoing transfers.
+	// We need to get the contract standard for each collectible to know which approach to take.
+	for _, id := range ownedCollectibles.ids {
+		transfer, err := s.transferDB.GetLatestCollectibleTransfer(ownedCollectibles.account, id)
+		if err != nil {
+			log.Error("Error fetching latest collectible transfer", "error", err)
+			continue
+		}
+		if transfer != nil {
+			err = s.ownershipDB.SetTransferID(ownedCollectibles.account, id, transfer.ID)
+			if err != nil {
+				log.Error("Error setting transfer ID for collectible", "error", err)
+			}
+		}
+	}
 }
 
 func (s *Service) notifyCommunityCollectiblesReceived(ownedCollectibles OwnedCollectibles) {
