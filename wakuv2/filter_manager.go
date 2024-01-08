@@ -138,13 +138,7 @@ func (mgr *FilterManager) processEvents(ev *FilterEvent) {
 			mgr.resubscribe(ev.filterID)
 			break
 		}
-		// Remove peer from list
-		for i, p := range mgr.peers {
-			if ev.peerID == p {
-				mgr.peers = append(mgr.peers[:i], mgr.peers[i+1:]...)
-				break
-			}
-		}
+
 		// Delete subs for removed peer
 		for filterID, subs := range mgr.filterSubs {
 			for _, sub := range subs {
@@ -216,8 +210,9 @@ func (mgr *FilterManager) subscribeToFilter(filterID string, tempID string) {
 	if err != nil {
 		logger.Warn("filter could not add wakuv2 filter for peers", zap.Any("peers", mgr.peers), zap.Error(err))
 	} else {
-		logger.Debug("filter subscription success", zap.Any("peers", mgr.peers), zap.String("pubsubTopic", contentFilter.PubsubTopic), zap.Strings("contentTopics", contentFilter.ContentTopicsList()))
 		sub = subDetails[0]
+		logger.Debug("filter subscription success", zap.Stringer("peer", sub.PeerID), zap.String("pubsubTopic", contentFilter.PubsubTopic), zap.Strings("contentTopics", contentFilter.ContentTopicsList()))
+		mgr.removePeer(sub.PeerID)
 	}
 
 	success := err == nil
@@ -281,6 +276,7 @@ func (mgr *FilterManager) pingPeers() {
 				} else {
 					logger.Debug("filter aliveness check failed", zap.Stringer("peerId", sub.PeerID), zap.Error(err))
 				}
+				mgr.removePeer(sub.PeerID)
 				mgr.eventChan <- FilterEvent{eventType: FilterEventPingResult, peerID: sub.PeerID, success: alive}
 			}(sub)
 		}
@@ -330,6 +326,12 @@ func (mgr *FilterManager) resubscribe(filterID string) {
 		// do nothing
 		return
 	}
+	for _, sub := range subs {
+		if sub == nil {
+			continue
+		}
+		mgr.removePeer(sub.PeerID)
+	}
 	mgr.logger.Debug("filter resubscribe subs count:", zap.String("filterId", filterID), zap.Int("len", len(subs)))
 	for i := len(subs); i < mgr.settings.MinPeersForFilter; i++ {
 		mgr.logger.Debug("filter check not passed, try subscribing to peers", zap.String("filterId", filterID))
@@ -337,7 +339,7 @@ func (mgr *FilterManager) resubscribe(filterID string) {
 		// Create sub placeholder in order to avoid potentially too many subs
 		tempID := uuid.NewString()
 		subs[tempID] = nil
-		go mgr.subscribeToFilter(filterID, tempID)
+		mgr.subscribeToFilter(filterID, tempID)
 	}
 }
 
@@ -356,6 +358,15 @@ func (mgr *FilterManager) runFilterSubscriptionLoop(sub *subscription.Subscripti
 				mgr.logger.Debug("filter sub is closed", zap.String("id", sub.ID))
 				return
 			}
+		}
+	}
+}
+
+func (mgr *FilterManager) removePeer(peerID peer.ID) {
+	for i, p := range mgr.peers {
+		if peerID == p {
+			mgr.peers = append(mgr.peers[:i], mgr.peers[i+1:]...)
+			break
 		}
 	}
 }
