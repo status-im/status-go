@@ -192,32 +192,30 @@ func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chai
 
 	res := make([]txStatusRes, 0, len(batch))
 	for i, b := range batch {
-		isPending := true
-		var receipt *types.Receipt
 		err := b.Error
 		if err != nil {
 			log.Error("Failed to get transaction", "error", err, "hash", hashes[i])
 			continue
-		} else {
-			if b.Result == nil {
-				log.Error("Transaction not found", "hash", hashes[i])
-				continue
-			}
-
-			receiptWrapper, ok := b.Result.(*nullableReceipt)
-			if !ok {
-				log.Error("Failed to cast transaction receipt", "hash", hashes[i])
-				continue
-			}
-			if receiptWrapper == nil || receiptWrapper.Receipt == nil {
-				// the transaction is not available yet
-				continue
-			}
-
-			receipt = receiptWrapper.Receipt
-			isPending = receipt.BlockNumber == nil
 		}
 
+		if b.Result == nil {
+			log.Error("Transaction not found", "hash", hashes[i])
+			continue
+		}
+
+		receiptWrapper, ok := b.Result.(*nullableReceipt)
+		if !ok {
+			log.Error("Failed to cast transaction receipt", "hash", hashes[i])
+			continue
+		}
+
+		if receiptWrapper == nil || receiptWrapper.Receipt == nil {
+			// the transaction is not available yet
+			continue
+		}
+
+		receipt := receiptWrapper.Receipt
+		isPending := receipt != nil && receipt.BlockNumber == nil
 		if !isPending {
 			var status TxStatus
 			if receipt.Status == types.ReceiptStatusSuccessful {
