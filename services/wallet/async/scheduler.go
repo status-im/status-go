@@ -23,7 +23,9 @@ type Scheduler struct {
 type ReplacementPolicy = int
 
 const (
+	// ReplacementPolicyCancelOld for when the task arguments might change the result
 	ReplacementPolicyCancelOld ReplacementPolicy = iota
+	// ReplacementPolicyIgnoreNew for when the task arguments doesn't change the result
 	ReplacementPolicyIgnoreNew
 )
 

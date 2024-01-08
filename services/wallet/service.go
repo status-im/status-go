@@ -147,7 +147,7 @@ func NewService(
 	collectiblesManager := collectibles.NewManager(db, rpcClient, communityManager, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, mediaServer, feed)
 	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, settingsFeed, communityManager, rpcClient.NetworkManager, collectiblesManager)
 
-	activity := activity.NewService(db, tokenManager, collectiblesManager, feed)
+	activity := activity.NewService(db, tokenManager, collectiblesManager, feed, pendingTxManager)
 
 	walletconnect := walletconnect.NewService(db, rpcClient.NetworkManager, accountsDB, transactionManager, gethManager, feed, config)
 
