@@ -125,7 +125,10 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		return nil, err
 	}
 	response.AddMessages(updatedMessages)
-	m.prepareMessages(response.messages)
+	err = m.prepareMessages(response.messages)
+	if err != nil {
+		return nil, err
+	}
 	response.AddChat(chat)
 
 	return response, nil
@@ -256,7 +259,10 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		}
 
 		response.AddMessages(updatedMessages)
-		m.prepareMessages(response.messages)
+		err = m.prepareMessages(response.messages)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	response.AddChat(chat)
@@ -316,7 +322,10 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, localChatID s
 
 		response.AddMessages(updatedMessages)
 
-		m.prepareMessages(response.messages)
+		err = m.prepareMessages(response.messages)
+		if err != nil {
+			return nil, err
+		}
 
 	}
 	response.AddChat(chat)
