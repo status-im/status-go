@@ -255,6 +255,7 @@ func (api *API) DeleteSavedAddress(ctx context.Context, address common.Address, 
 }
 
 // @deprecated
+// Not used by status-desktop anymore
 func (api *API) GetPendingTransactions(ctx context.Context) ([]*transactions.PendingTransaction, error) {
 	log.Debug("wallet.api.GetPendingTransactions")
 	rst, err := api.s.pendingTxManager.GetAllPending()
@@ -262,6 +263,8 @@ func (api *API) GetPendingTransactions(ctx context.Context) ([]*transactions.Pen
 	return rst, err
 }
 
+// @deprecated
+// Not used by status-desktop anymore
 func (api *API) GetPendingTransactionsForIdentities(ctx context.Context, identities []transfer.TransactionIdentity) (
 	result []*transactions.PendingTransaction, err error) {
 

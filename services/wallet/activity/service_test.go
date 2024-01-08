@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
 
 	"github.com/stretchr/testify/mock"
@@ -228,4 +229,93 @@ func TestService_UpdateCollectibleInfo_Error(t *testing.T) {
 	require.Equal(t, 0, updatesCount)
 
 	sub.Unsubscribe()
+}
+
+func TestService_IncrementalFilterUpdate(t *testing.T) {
+	s, e, tM, _, close := setupTestService(t)
+	defer close()
+
+	ch := make(chan walletevent.Event, 4)
+	sub := e.Subscribe(ch)
+	defer sub.Unsubscribe()
+
+	txs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, s.db, 0, 3)
+	transfer.InsertTestTransfer(t, s.db, txs[0].To, &txs[0])
+	transfer.InsertTestTransfer(t, s.db, txs[2].To, &txs[2])
+
+	allAddresses := append(fromTrs, toTrs...)
+
+	tM.On("LookupTokenIdentity", mock.Anything, eth.HexToAddress("0x0"), true).Return(
+		&token.Token{
+			ChainID: 5,
+			Address: eth.HexToAddress("0x0"),
+			Symbol:  "ETH",
+		}, false,
+	).Times(2)
+
+	sessionID := s.StartFilterSession(allAddresses, true, allNetworksFilter(), Filter{}, 5)
+	require.Greater(t, sessionID, SessionID(0))
+	defer s.StopFilterSession(sessionID)
+
+	var filterResponseCount, updatesCount, sessionUpdatesCount int
+
+	for i := 0; i < 1; i++ {
+		select {
+		case res := <-ch:
+			switch res.Type {
+			case EventActivityFilteringDone:
+				var payload FilterResponse
+				err := json.Unmarshal([]byte(res.Message), &payload)
+				require.NoError(t, err)
+				require.Equal(t, ErrorCodeSuccess, payload.ErrorCode)
+				require.Equal(t, 2, len(payload.Activities))
+				filterResponseCount++
+			case EventActivityFilteringUpdate:
+				updatesCount++
+			}
+		case <-time.NewTimer(1 * time.Second).C:
+			require.Fail(t, "timeout while waiting for EventActivityFilteringDone")
+		}
+	}
+
+	chainClient := transactions.NewMockChainClient()
+
+	pendings := transactions.MockTestTransactions(t, chainClient, []transactions.TestTxSummary{{}})
+
+	pendingCheckInterval := time.Second
+	m := transactions.NewPendingTxTracker(s.db, chainClient, nil, e, pendingCheckInterval)
+
+	err := m.StoreAndTrackPendingTx(&pendings[0])
+	require.NoError(t, err)
+
+	pendingTransactionUpdate := 0
+	// Validate the session update event
+	for i := 0; i < 2; i++ {
+		select {
+		case res := <-ch:
+			switch res.Type {
+			case transactions.EventPendingTransactionUpdate:
+				pendingTransactionUpdate++
+			case EventActivitySessionUpdated:
+				var payload SessionUpdate
+				err := json.Unmarshal([]byte(res.Message), &payload)
+				require.NoError(t, err)
+				require.Equal(t, 1, len(payload.NewEntries))
+				// TODO: check the rest of the payload
+				sessionUpdatesCount++
+			case EventActivityFilteringDone:
+				filterResponseCount++
+			case EventActivityFilteringUpdate:
+				updatesCount++
+			}
+		case <-time.NewTimer(1 * time.Second).C:
+			require.Fail(t, "timeout while waiting for EventActivitySessionUpdated")
+		}
+	}
+
+	// Expect update event for addition and deletion
+	require.Equal(t, 2, pendingTransactionUpdate)
+	require.Equal(t, 1, filterResponseCount)
+	require.Equal(t, 1, sessionUpdatesCount)
+	require.Equal(t, 0, updatesCount)
 }
