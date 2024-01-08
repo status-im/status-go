@@ -11,6 +11,7 @@ import (
 	"time"
 
 	eth "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -24,12 +25,14 @@ import (
 )
 
 const (
-	// EventPendingTransactionUpdate is emitted when a pending transaction is updated (added or deleted). Carries StatusChangedPayload in message
+	// EventPendingTransactionUpdate is emitted when a pending transaction is updated (added or deleted). Carries PendingTxUpdatePayload in message
 	EventPendingTransactionUpdate walletevent.EventType = "pending-transaction-update"
 	// EventPendingTransactionStatusChanged carries StatusChangedPayload in message
 	EventPendingTransactionStatusChanged walletevent.EventType = "pending-transaction-status-changed"
 
 	PendingCheckInterval = 10 * time.Second
+
+	GetTransactionReceiptRPCName = "eth_getTransactionReceipt"
 )
 
 var (
@@ -41,7 +44,8 @@ type TxStatus = string
 // Values for status column in pending_transactions
 const (
 	Pending TxStatus = "Pending"
-	Done    TxStatus = "Done"
+	Success TxStatus = "Success"
+	Failed  TxStatus = "Failed"
 )
 
 type AutoDeleteType = bool
@@ -51,10 +55,19 @@ const (
 	Keep       AutoDeleteType = false
 )
 
-type StatusChangedPayload struct {
+type TxIdentity struct {
 	ChainID common.ChainID `json:"chainId"`
 	Hash    eth.Hash       `json:"hash"`
-	Status  *TxStatus      `json:"status,omitempty"`
+}
+
+type PendingTxUpdatePayload struct {
+	TxIdentity
+	Deleted bool `json:"deleted"`
+}
+
+type StatusChangedPayload struct {
+	TxIdentity
+	Status TxStatus `json:"status"`
 }
 
 type PendingTxTracker struct {
@@ -83,7 +96,6 @@ func NewPendingTxTracker(db *sql.DB, rpcClient rpc.ClientInterface, rpcFilter *r
 }
 
 type txStatusRes struct {
-	// TODO - 11861: propagate real status
 	Status TxStatus
 	hash   eth.Hash
 }
@@ -139,6 +151,18 @@ func (tm *PendingTxTracker) fetchAndUpdateDB(ctx context.Context) bool {
 	return res
 }
 
+type nullableReceipt struct {
+	*types.Receipt
+}
+
+func (nr *nullableReceipt) UnmarshalJSON(data []byte) error {
+	transactionNotAvailable := (string(data) == "null")
+	if transactionNotAvailable {
+		return nil
+	}
+	return json.Unmarshal(data, &nr.Receipt)
+}
+
 // fetchBatchTxStatus returns not pending transactions (confirmed or errored)
 // it excludes the still pending or errored request from the result
 func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chainID common.ChainID, hashes []eth.Hash, log log.Logger) ([]txStatusRes, error) {
@@ -153,11 +177,10 @@ func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chai
 
 	batch := make([]ethrpc.BatchElem, 0, len(hashes))
 	for _, hash := range hashes {
-		jsonRes := make(map[string]interface{})
 		batch = append(batch, ethrpc.BatchElem{
-			Method: "eth_getTransactionByHash",
+			Method: GetTransactionReceiptRPCName,
 			Args:   []interface{}{hash},
-			Result: &jsonRes,
+			Result: new(nullableReceipt),
 		})
 	}
 
@@ -169,23 +192,40 @@ func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chai
 
 	res := make([]txStatusRes, 0, len(batch))
 	for i, b := range batch {
-		isPending := true
 		err := b.Error
 		if err != nil {
 			log.Error("Failed to get transaction", "error", err, "hash", hashes[i])
 			continue
-		} else {
-			jsonRes := *(b.Result.(*map[string]interface{}))
-			if jsonRes != nil {
-				if blNo, ok := jsonRes["blockNumber"]; ok {
-					isPending = blNo == nil
-				}
-			}
 		}
 
+		if b.Result == nil {
+			log.Error("Transaction not found", "hash", hashes[i])
+			continue
+		}
+
+		receiptWrapper, ok := b.Result.(*nullableReceipt)
+		if !ok {
+			log.Error("Failed to cast transaction receipt", "hash", hashes[i])
+			continue
+		}
+
+		if receiptWrapper == nil || receiptWrapper.Receipt == nil {
+			// the transaction is not available yet
+			continue
+		}
+
+		receipt := receiptWrapper.Receipt
+		isPending := receipt != nil && receipt.BlockNumber == nil
 		if !isPending {
+			var status TxStatus
+			if receipt.Status == types.ReceiptStatusSuccessful {
+				status = Success
+			} else {
+				status = Failed
+			}
 			res = append(res, txStatusRes{
-				hash: hashes[i],
+				hash:   hashes[i],
+				Status: status,
 			})
 		}
 	}
@@ -193,8 +233,8 @@ func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chai
 }
 
 // updateDBStatus returns entries that were updated only
-func (tm *PendingTxTracker) updateDBStatus(ctx context.Context, chainID common.ChainID, statuses []txStatusRes) ([]eth.Hash, error) {
-	res := make([]eth.Hash, 0, len(statuses))
+func (tm *PendingTxTracker) updateDBStatus(ctx context.Context, chainID common.ChainID, statuses []txStatusRes) ([]txStatusRes, error) {
+	res := make([]txStatusRes, 0, len(statuses))
 	tx, err := tm.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -241,8 +281,7 @@ func (tm *PendingTxTracker) updateDBStatus(ctx context.Context, chainID common.C
 			notifyFunctions = append(notifyFunctions, notifyFn)
 		} else {
 			// If the entry was not deleted, update the status
-			// TODO - #11861: fix status - `br.status`
-			txStatus := Done
+			txStatus := br.Status
 
 			res, err := updateStmt.ExecContext(ctx, txStatus, chainID, br.hash)
 			if err != nil {
@@ -261,7 +300,7 @@ func (tm *PendingTxTracker) updateDBStatus(ctx context.Context, chainID common.C
 			}
 		}
 
-		res = append(res, br.hash)
+		res = append(res, br)
 	}
 
 	err = tx.Commit()
@@ -276,18 +315,20 @@ func (tm *PendingTxTracker) updateDBStatus(ctx context.Context, chainID common.C
 	return res, nil
 }
 
-func (tm *PendingTxTracker) emitNotifications(chainID common.ChainID, changes []eth.Hash) {
+func (tm *PendingTxTracker) emitNotifications(chainID common.ChainID, changes []txStatusRes) {
 	if tm.eventFeed != nil {
-		for _, hash := range changes {
-			status := StatusChangedPayload{
-				ChainID: chainID,
-				Hash:    hash,
-				// TODO - #11861: status
+		for _, change := range changes {
+			payload := StatusChangedPayload{
+				TxIdentity: TxIdentity{
+					ChainID: chainID,
+					Hash:    change.hash,
+				},
+				Status: change.Status,
 			}
 
-			jsonPayload, err := json.Marshal(status)
+			jsonPayload, err := json.Marshal(payload)
 			if err != nil {
-				tm.log.Error("Failed to marshal pending transaction status", "error", err, "hash", hash)
+				tm.log.Error("Failed to marshal pending transaction status", "error", err, "hash", change.hash)
 				continue
 			}
 			tm.eventFeed.Send(walletevent.Event{
@@ -515,7 +556,13 @@ func (tm *PendingTxTracker) addPending(transaction *PendingTransaction) error {
 	)
 	// Notify listeners of new pending transaction (used in activity history)
 	if err == nil {
-		tm.notifyPendingTransactionListeners(transaction.ChainID, []eth.Address{transaction.From, transaction.To}, transaction.Timestamp)
+		tm.notifyPendingTransactionListeners(PendingTxUpdatePayload{
+			TxIdentity: TxIdentity{
+				ChainID: transaction.ChainID,
+				Hash:    transaction.Hash,
+			},
+			Deleted: false,
+		}, []eth.Address{transaction.From, transaction.To}, transaction.Timestamp)
 	}
 	if tm.rpcFilter != nil {
 		tm.rpcFilter.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
@@ -528,13 +575,20 @@ func (tm *PendingTxTracker) addPending(transaction *PendingTransaction) error {
 	return err
 }
 
-func (tm *PendingTxTracker) notifyPendingTransactionListeners(chainID common.ChainID, addresses []eth.Address, timestamp uint64) {
+func (tm *PendingTxTracker) notifyPendingTransactionListeners(payload PendingTxUpdatePayload, addresses []eth.Address, timestamp uint64) {
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		tm.log.Error("Failed to marshal PendingTxUpdatePayload", "error", err, "hash", payload.Hash)
+		return
+	}
+
 	if tm.eventFeed != nil {
 		tm.eventFeed.Send(walletevent.Event{
 			Type:     EventPendingTransactionUpdate,
-			ChainID:  uint64(chainID),
+			ChainID:  uint64(payload.ChainID),
 			Accounts: addresses,
 			At:       int64(timestamp),
+			Message:  string(jsonPayload),
 		})
 	}
 }
@@ -559,7 +613,13 @@ func (tm *PendingTxTracker) DeleteBySQLTx(tx *sql.Tx, chainID common.ChainID, ha
 		err = ErrStillPending
 	}
 	return func() {
-		tm.notifyPendingTransactionListeners(chainID, []eth.Address{from, to}, timestamp)
+		tm.notifyPendingTransactionListeners(PendingTxUpdatePayload{
+			TxIdentity: TxIdentity{
+				ChainID: chainID,
+				Hash:    hash,
+			},
+			Deleted: true,
+		}, []eth.Address{from, to}, timestamp)
 	}, err
 }
 

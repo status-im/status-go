@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"math/big"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	eth "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
 
@@ -43,22 +45,11 @@ func waitForTaskToStop(pt *PendingTxTracker) {
 	}
 }
 
-func TestPendingTxTracker_ValidateConfirmed(t *testing.T) {
+func TestPendingTxTracker_ValidateConfirmedWithSuccessStatus(t *testing.T) {
 	m, stop, chainClient, eventFeed := setupTestTransactionDB(t, nil)
 	defer stop()
 
-	txs := GenerateTestPendingTransactions(1)
-
-	// Mock the first call to getTransactionByHash
-	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID})
-	cl := chainClient.Clients[txs[0].ChainID]
-	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return len(b) == 1 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[0].Hash
-	})).Return(nil).Once().Run(func(args mock.Arguments) {
-		elems := args.Get(1).([]rpc.BatchElem)
-		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = TransactionBlockNo
-	})
+	txs := MockTestTransactions(t, chainClient, []TestTxSummary{{}})
 
 	eventChan := make(chan walletevent.Event, 3)
 	sub := eventFeed.Subscribe(eventChan)
@@ -78,7 +69,51 @@ func TestPendingTxTracker_ValidateConfirmed(t *testing.T) {
 				err = json.Unmarshal([]byte(we.Message), &p)
 				require.NoError(t, err)
 				require.Equal(t, txs[0].Hash, p.Hash)
-				require.Nil(t, p.Status)
+				require.Equal(t, Success, p.Status)
+			}
+		case <-time.After(1 * time.Second):
+			t.Fatal("timeout waiting for event")
+		}
+	}
+
+	// Wait for the answer to be processed
+	err = m.Stop()
+	require.NoError(t, err)
+
+	waitForTaskToStop(m)
+
+	res, err := m.GetAllPending()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(res))
+
+	sub.Unsubscribe()
+}
+
+func TestPendingTxTracker_ValidateConfirmedWithFailedStatus(t *testing.T) {
+	m, stop, chainClient, eventFeed := setupTestTransactionDB(t, nil)
+	defer stop()
+
+	txs := MockTestTransactions(t, chainClient, []TestTxSummary{{failStatus: true}})
+
+	eventChan := make(chan walletevent.Event, 3)
+	sub := eventFeed.Subscribe(eventChan)
+
+	err := m.StoreAndTrackPendingTx(&txs[0])
+	require.NoError(t, err)
+
+	for i := 0; i < 3; i++ {
+		select {
+		case we := <-eventChan:
+			if i == 0 || i == 1 {
+				// Check add and delete
+				require.Equal(t, EventPendingTransactionUpdate, we.Type)
+			} else {
+				require.Equal(t, EventPendingTransactionStatusChanged, we.Type)
+				var p StatusChangedPayload
+				err = json.Unmarshal([]byte(we.Message), &p)
+				require.NoError(t, err)
+				require.Equal(t, txs[0].Hash, p.Hash)
+				require.Equal(t, Failed, p.Status)
 			}
 		case <-time.After(1 * time.Second):
 			t.Fatal("timeout waiting for event")
@@ -108,14 +143,18 @@ func TestPendingTxTracker_InterruptWatching(t *testing.T) {
 	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID})
 	cl := chainClient.Clients[txs[0].ChainID]
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return (len(b) == 2 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[0].Hash && b[1].Method == TransactionByHashRPCName && b[1].Args[0] == txs[1].Hash)
+		return (len(b) == 2 && b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[0].Hash && b[1].Method == GetTransactionReceiptRPCName && b[1].Args[0] == txs[1].Hash)
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
 
-		// Simulate still pending by excluding "blockNumber" in elems[0]
+		// Simulate still pending due to "null" return from eth_getTransactionReceipt
+		elems[0].Result.(*nullableReceipt).Receipt = nil
 
-		res := elems[1].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = TransactionBlockNo
+		// Simulate parsing of eth_getTransactionReceipt response
+		elems[1].Result.(*nullableReceipt).Receipt = &types.Receipt{
+			BlockNumber: new(big.Int).SetUint64(1),
+			Status:      1,
+		}
 	})
 
 	eventChan := make(chan walletevent.Event, 2)
@@ -151,7 +190,7 @@ func TestPendingTxTracker_InterruptWatching(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, txs[1].Hash, p.Hash)
 				require.Equal(t, txs[1].ChainID, p.ChainID)
-				require.Nil(t, p.Status)
+				require.Equal(t, Success, p.Status)
 			}
 		case <-time.After(1 * time.Second):
 			t.Fatal("timeout waiting for event")
@@ -171,11 +210,14 @@ func TestPendingTxTracker_InterruptWatching(t *testing.T) {
 	// Restart the tracker to process leftovers
 	//
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return (len(b) == 1 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[0].Hash)
+		return (len(b) == 1 && b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[0].Hash)
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
-		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = TransactionBlockNo
+		// Simulate parsing of eth_getTransactionReceipt response
+		elems[0].Result.(*nullableReceipt).Receipt = &types.Receipt{
+			BlockNumber: new(big.Int).SetUint64(1),
+			Status:      1,
+		}
 	})
 
 	err = m.Start()
@@ -193,7 +235,7 @@ func TestPendingTxTracker_InterruptWatching(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, txs[0].ChainID, p.ChainID)
 				require.Equal(t, txs[0].Hash, p.Hash)
-				require.Nil(t, p.Status)
+				require.Equal(t, Success, p.Status)
 			}
 		case <-time.After(1 * time.Second):
 			t.Fatal("timeout waiting for event")
@@ -223,19 +265,25 @@ func TestPendingTxTracker_MultipleClients(t *testing.T) {
 	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID, txs[1].ChainID})
 	cl := chainClient.Clients[txs[0].ChainID]
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return (len(b) == 1 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[0].Hash)
+		return (len(b) == 1 && b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[0].Hash)
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
-		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = TransactionBlockNo
+		// Simulate parsing of eth_getTransactionReceipt response
+		elems[0].Result.(*nullableReceipt).Receipt = &types.Receipt{
+			BlockNumber: new(big.Int).SetUint64(1),
+			Status:      1,
+		}
 	})
 	cl = chainClient.Clients[txs[1].ChainID]
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return (len(b) == 1 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[1].Hash)
+		return (len(b) == 1 && b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[1].Hash)
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
-		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = TransactionBlockNo
+		// Simulate parsing of eth_getTransactionReceipt response
+		elems[0].Result.(*nullableReceipt).Receipt = &types.Receipt{
+			BlockNumber: new(big.Int).SetUint64(1),
+			Status:      1,
+		}
 	})
 
 	eventChan := make(chan walletevent.Event, 6)
@@ -261,7 +309,7 @@ func TestPendingTxTracker_MultipleClients(t *testing.T) {
 			var p StatusChangedPayload
 			err := json.Unmarshal([]byte(we.Message), &p)
 			require.NoError(t, err)
-			require.Nil(t, p.Status)
+			require.Equal(t, Success, p.Status)
 		}
 	}
 
@@ -297,17 +345,20 @@ func TestPendingTxTracker_Watch(t *testing.T) {
 
 	txs := GenerateTestPendingTransactions(2)
 	// Make the second already confirmed
-	*txs[0].Status = Done
+	*txs[0].Status = Success
 
 	// Mock the first call to getTransactionByHash
 	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID})
 	cl := chainClient.Clients[txs[0].ChainID]
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return len(b) == 1 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[1].Hash
+		return len(b) == 1 && b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[1].Hash
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
-		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = TransactionBlockNo
+		// Simulate parsing of eth_getTransactionReceipt response
+		elems[0].Result.(*nullableReceipt).Receipt = &types.Receipt{
+			BlockNumber: new(big.Int).SetUint64(1),
+			Status:      1,
+		}
 	})
 
 	eventChan := make(chan walletevent.Event, 3)
@@ -335,7 +386,7 @@ func TestPendingTxTracker_Watch(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, txs[1].ChainID, p.ChainID)
 				require.Equal(t, txs[1].Hash, p.Hash)
-				require.Nil(t, p.Status)
+				require.Equal(t, Success, p.Status)
 			}
 		case <-time.After(1 * time.Second):
 			t.Fatal("timeout waiting for the status update event")
@@ -386,23 +437,26 @@ func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
 		if len(cl.Calls) == 0 {
-			res := len(b) > 0 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[0].Hash
+			res := len(b) > 0 && b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[0].Hash
 			// If the first processing call picked up the second validate this case also
 			if len(b) == 2 {
-				res = res && b[1].Method == TransactionByHashRPCName && b[1].Args[0] == txs[1].Hash
+				res = res && b[1].Method == GetTransactionReceiptRPCName && b[1].Args[0] == txs[1].Hash
 			}
 			return res
 		}
 		// Second call we expect only one left
-		return len(b) == 1 && (b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[1].Hash)
+		return len(b) == 1 && (b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[1].Hash)
 	})).Return(nil).Twice().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
 		if len(cl.Calls) == 2 {
 			firsDoneWG.Wait()
 		}
 		// Only first item is processed, second is left pending
-		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = TransactionBlockNo
+		// Simulate parsing of eth_getTransactionReceipt response
+		elems[0].Result.(*nullableReceipt).Receipt = &types.Receipt{
+			BlockNumber: new(big.Int).SetUint64(1),
+			Status:      1,
+		}
 	})
 
 	eventChan := make(chan walletevent.Event, 6)
@@ -425,11 +479,11 @@ func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 		if statusEventCount == 0 {
 			require.Equal(t, txs[0].ChainID, p.ChainID)
 			require.Equal(t, txs[0].Hash, p.Hash)
-			require.Nil(t, p.Status)
+			require.Equal(t, Success, p.Status)
 
 			status, err := m.Watch(context.Background(), txs[0].ChainID, txs[0].Hash)
 			require.NoError(t, err)
-			require.Equal(t, Done, *status)
+			require.Equal(t, Success, *status)
 			err = m.Delete(context.Background(), txs[0].ChainID, txs[0].Hash)
 			require.NoError(t, err)
 
@@ -443,7 +497,7 @@ func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 
 			status, err := m.Watch(context.Background(), txs[1].ChainID, txs[1].Hash)
 			require.NoError(t, err)
-			require.Equal(t, Done, *status)
+			require.Equal(t, Success, *status)
 			err = m.Delete(context.Background(), txs[1].ChainID, txs[1].Hash)
 			require.NoError(t, err)
 		}
