@@ -126,7 +126,7 @@ func (s *MessengerCommunitiesSuite) TestCreateCommunity_WithoutDefaultChannel() 
 	s.Require().Len(response.Chats(), 0)
 }
 
-func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
+func (s *MessengerCommunitiesSuite) TestAdvertiseCommunity() {
 	alice := s.newMessenger("alice-messenger")
 
 	description := &requests.CreateCommunity{
@@ -149,43 +149,16 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	s.Require().Equal(communitySettings.CommunityID, community.IDString())
 	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
 
-	// Send a community message
-	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, s.alice.transport)
-
-	inputMessage := common.NewMessage()
-	inputMessage.ChatId = chat.ID
-	inputMessage.Text = "some text"
-	inputMessage.CommunityID = community.IDString()
-
-	err = s.bob.SaveChat(chat)
-	s.Require().NoError(err)
-	_, err = s.bob.SendChatMessage(context.Background(), inputMessage)
-	s.Require().NoError(err)
-
-	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
-		response, err = alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-		return nil
-	})
+	// Advertise community
+	s.advertiseCommunityTo(community.ID(), s.bob, alice)
 
 	s.Require().NoError(err)
-	communities, err := alice.Communities()
+	aliceCommunities, err := alice.Communities()
 	s.Require().NoError(err)
-	s.Require().Len(communities, 2)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Messages(), 1)
-	s.Require().Equal(community.IDString(), response.Messages()[0].CommunityID)
+	s.Require().Len(aliceCommunities, 2)
 }
 
 func (s *MessengerCommunitiesSuite) TestJoiningOpenCommunityReturnsChatsResponse() {
-	ctx := context.Background()
-
 	openCommunityDescription := &requests.CreateCommunity{
 		Name:                         "open community",
 		Description:                  "open community to join with no requests",
@@ -205,29 +178,7 @@ func (s *MessengerCommunitiesSuite) TestJoiningOpenCommunityReturnsChatsResponse
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
-
-	s.Require().NoError(s.bob.SaveChat(chat))
-
-	message := buildTestMessage(*chat)
-	message.CommunityID = community.IDString()
-
-	// Bob sends the community link to Alice
-	response, err = s.bob.SendChatMessage(ctx, message)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	// Retrieve community link & community for Alice
-	response, err = WaitOnMessengerResponse(
-		s.alice,
-		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0
-		},
-		"message not received",
-	)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Chats(), 1)
+	s.advertiseCommunityTo(community.ID(), s.bob, s.alice)
 
 	// Alice request to join community
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
@@ -346,38 +297,8 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	chats := community.Chats()
 	s.Require().Len(chats, 2)
 
-	// Send a community message
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.bob.transport)
-
-	inputMessage := common.NewMessage()
-	inputMessage.ChatId = chat.ID
-	inputMessage.Text = "some text"
-	inputMessage.CommunityID = community.IDString()
-
-	err = s.bob.SaveChat(chat)
-	s.Require().NoError(err)
-	_, err = s.bob.SendChatMessage(context.Background(), inputMessage)
-	s.Require().NoError(err)
-
-	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-		return nil
-	})
-
-	s.Require().NoError(err)
-	communities, err := s.alice.Communities()
-	s.Require().NoError(err)
-	s.Require().Len(communities, 2)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Messages(), 1)
-	s.Require().Equal(community.IDString(), response.Messages()[0].CommunityID)
+	// Advertise community to ALice
+	s.advertiseCommunityTo(community.ID(), s.bob, s.alice)
 
 	// We join the org
 	response, err = s.alice.JoinCommunity(ctx, community.ID(), false)
@@ -450,7 +371,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	})
 
 	s.Require().NoError(err)
-	communities, err = s.alice.Communities()
+	communities, err := s.alice.Communities()
 	s.Require().NoError(err)
 	s.Require().Len(communities, 2)
 	s.Require().Len(response.Communities(), 1)
@@ -651,7 +572,7 @@ func (s *MessengerCommunitiesSuite) TestPinMessageInCommunityChat() {
 
 	// alice does not fully join the community,
 	// so she should not be able to send the pin message
-	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.advertiseCommunityTo(community.ID(), s.owner, s.alice)
 	response, err = s.alice.SpectateCommunity(community.ID())
 	s.Require().NotNil(response)
 	s.Require().NoError(err)
@@ -780,8 +701,6 @@ func (s *MessengerCommunitiesSuite) TestRolesAfterImportCommunity() {
 }
 
 func (s *MessengerCommunitiesSuite) TestRequestAccess() {
-	ctx := context.Background()
-
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "status",
@@ -797,31 +716,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
-
-	s.Require().NoError(s.bob.SaveChat(chat))
-
-	message := buildTestMessage(*chat)
-	message.CommunityID = community.IDString()
-
-	// We send a community link to alice
-	response, err = s.bob.SendChatMessage(ctx, message)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	// Retrieve community link & community
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("message not received")
-		}
-		return nil
-	})
-
-	s.Require().NoError(err)
+	s.advertiseCommunityTo(community.ID(), s.bob, s.alice)
 
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	// We try to join the org
@@ -1004,31 +899,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
-
-	s.Require().NoError(s.bob.SaveChat(chat))
-
-	message := buildTestMessage(*chat)
-	message.CommunityID = community.IDString()
-
-	// Bob sends the community link to Alice
-	response, err = s.bob.SendChatMessage(ctx, message)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	// Retrieve community link & community for Alice
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("message not received")
-		}
-		return nil
-	})
-
-	s.Require().NoError(err)
+	s.advertiseCommunityTo(community.ID(), s.bob, s.alice)
 
 	// Alice request to join community
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
@@ -1195,31 +1066,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
-
-	s.Require().NoError(s.bob.SaveChat(chat))
-
-	message := buildTestMessage(*chat)
-	message.CommunityID = community.IDString()
-
-	// Bob sends the community link to Alice
-	response, err = s.bob.SendChatMessage(ctx, message)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	// Retrieve community link & community for Alice
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("message not received")
-		}
-		return nil
-	})
-
-	s.Require().NoError(err)
+	s.advertiseCommunityTo(community.ID(), s.bob, s.alice)
 
 	// Alice request to join community
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
@@ -1447,31 +1294,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
-
-	s.Require().NoError(s.bob.SaveChat(chat))
-
-	message := buildTestMessage(*chat)
-	message.CommunityID = community.IDString()
-
-	// We send a community link to alice
-	response, err = s.bob.SendChatMessage(ctx, message)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	// Retrieve community link & community
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("message not received")
-		}
-		return nil
-	})
-
-	s.Require().NoError(err)
+	s.advertiseCommunityTo(community.ID(), s.bob, s.alice)
 
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	// We try to join the org
@@ -1622,31 +1445,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
-
-	s.Require().NoError(s.bob.SaveChat(chat))
-
-	message := buildTestMessage(*chat)
-	message.CommunityID = community.IDString()
-
-	// We send a community link to alice
-	response, err = s.bob.SendChatMessage(context.Background(), message)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	// Retrieve community link & community
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("message not received")
-		}
-		return nil
-	})
-
-	s.Require().NoError(err)
+	s.advertiseCommunityTo(community.ID(), s.bob, s.alice)
 
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	// We try to join the org
@@ -1899,8 +1698,6 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 }
 
 func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
-	ctx := context.Background()
-
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "status",
@@ -1916,31 +1713,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
-
-	s.Require().NoError(s.bob.SaveChat(chat))
-
-	message := buildTestMessage(*chat)
-	message.CommunityID = community.IDString()
-
-	// We send a community link to alice
-	response, err = s.bob.SendChatMessage(ctx, message)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	// Retrieve community link & community
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("message not received")
-		}
-		return nil
-	})
-
-	s.Require().NoError(err)
+	s.advertiseCommunityTo(community.ID(), s.bob, s.alice)
 
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	// We try to join the org
@@ -2646,29 +2419,8 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Require().NoError(err, "alicesOtherDevice.communitiesManager.All")
 	s.Len(tcs1, 1, "Must have 1 communities")
 
-	// Bob the admin opens up a 1-1 chat with alice
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
-	s.Require().NoError(s.bob.SaveChat(chat))
-
-	// Bob the admin shares with Alice, via public chat, an invite link to the new community
-	message := buildTestMessage(*chat)
-	message.CommunityID = community.IDString()
-	response, err := s.bob.SendChatMessage(context.Background(), message)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	// Retrieve community link & community
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("no communities received from 1-1")
-		}
-		return nil
-	})
-	s.Require().NoError(err)
+	// Bob the admin shares community with Alice
+	s.advertiseCommunityTo(community.ID(), s.bob, s.alice)
 
 	// Check that alice now has 2 communities
 	cs, err = s.alice.communitiesManager.All()
@@ -2679,7 +2431,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	}
 
 	// Alice requests to join the new community
-	response, err = s.alice.RequestToJoinCommunity(&requests.RequestToJoinCommunity{CommunityID: community.ID()})
+	response, err := s.alice.RequestToJoinCommunity(&requests.RequestToJoinCommunity{CommunityID: community.ID()})
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
@@ -2856,24 +2608,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	s.Require().NoError(s.bob.SaveChat(chat))
 
 	// Bob the admin shares with Alice, via public chat, an invite link to the new community
-	message := buildTestMessage(*chat)
-	message.CommunityID = community.IDString()
-	response, err := s.bob.SendChatMessage(context.Background(), message)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	// Retrieve community link & community
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("no communities received from 1-1")
-		}
-		return nil
-	})
-	s.Require().NoError(err)
+	s.advertiseCommunityTo(community.ID(), s.bob, s.alice)
 
 	// Check that alice now has 2 communities
 	cs, err = s.alice.communitiesManager.All()
@@ -2896,20 +2631,11 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	s.Equal(community.PublicKey(), aCom.PublicKey())
 
 	// Check alicesOtherDevice receives the sync join message
-	err = tt.RetryWithBackOff(func() error {
-		response, err = alicesOtherDevice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-
-		// Do we have a new synced community?
+	response, err := WaitOnMessengerResponse(alicesOtherDevice, func(*MessengerResponse) bool {
 		_, err = alicesOtherDevice.communitiesManager.GetSyncedRawCommunity(community.ID())
-		if err != nil {
-			return fmt.Errorf("community with sync not received %w", err)
-		}
+		return err == nil
+	}, "community with sync not received")
 
-		return nil
-	})
 	s.Require().NoError(err)
 	s.Len(response.Communities(), 1, "")
 

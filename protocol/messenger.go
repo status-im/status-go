@@ -2299,26 +2299,6 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		if err != nil {
 			return nil, err
 		}
-
-	} else if len(message.CommunityID) != 0 {
-		community, err := m.communitiesManager.GetByIDString(message.CommunityID)
-		if err != nil {
-			return nil, err
-		}
-
-		if community == nil {
-			return nil, errors.New("community not found")
-		}
-
-		wrappedCommunity, err := community.ToProtocolMessageBytes()
-		if err != nil {
-			return nil, err
-		}
-
-		message.Payload = &protobuf.ChatMessage_Community{Community: wrappedCommunity}
-		message.Shard = community.Shard().Protobuffer()
-
-		message.ContentType = protobuf.ChatMessage_COMMUNITY
 	} else if len(message.AudioPath) != 0 {
 		err := message.LoadAudio()
 		if err != nil {
@@ -3453,7 +3433,7 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 	}
 
 	if chat.CommunityChat() {
-		joinedClock, err := m.communitiesManager.GetCommunityRequestToJoinClock(&publicKey, message.CommunityID)
+		joinedClock, err := m.communitiesManager.GetCommunityRequestToJoinClock(&publicKey, chat.CommunityID)
 		if err != nil {
 			return err
 		}

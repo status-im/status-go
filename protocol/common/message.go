@@ -178,7 +178,9 @@ type Message struct {
 	// StickerLocalURL is the local url of the sticker
 	StickerLocalURL string `json:"stickerLocalUrl,omitempty"`
 
+	// DEPRECATED: CommunityID is deprecated and only left for backwards compatibility.
 	// CommunityID is the id of the community to advertise
+	// FIXME: Maybe remove json specification and make the field private?
 	CommunityID string `json:"communityId,omitempty"`
 
 	// Replace indicates that this is a replacement of a message

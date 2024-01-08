@@ -2603,18 +2603,18 @@ func (m *Messenger) passStoredCommunityInfoToSignalHandler(community *communitie
 }
 
 // handleCommunityDescription handles an community description
-func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte, shard *protobuf.Shard) error {
+func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte, shard *protobuf.Shard) (bool, error) {
 	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload, nil, shard)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// If response is nil, but not error, it will be processed async
 	if communityResponse == nil {
-		return nil
+		return false, nil
 	}
 
-	return m.handleCommunityResponse(state, communityResponse)
+	return true, m.handleCommunityResponse(state, communityResponse)
 }
 
 func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communityResponse *communities.CommunityResponse) error {
@@ -3009,7 +3009,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 	}
 
 	// TODO: handle shard
-	err = m.handleCommunityDescription(messageState, orgPubKey, &cd, syncCommunity.Description, nil)
+	_, err = m.handleCommunityDescription(messageState, orgPubKey, &cd, syncCommunity.Description, nil)
 	if err != nil {
 		logger.Debug("m.handleCommunityDescription error", zap.Error(err))
 		return err

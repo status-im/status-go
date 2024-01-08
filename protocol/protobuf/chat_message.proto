@@ -231,7 +231,7 @@ message ChatMessage {
     SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP = 6;
     IMAGE = 7;
     AUDIO = 8;
-    COMMUNITY = 9;
+    COMMUNITY = 9 [deprecated = true];
     // Only local
     SYSTEM_MESSAGE_GAP = 10;
     CONTACT_REQUEST = 11;

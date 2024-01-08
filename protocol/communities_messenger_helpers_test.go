@@ -334,13 +334,26 @@ func advertiseCommunityTo(s *suite.Suite, communityID types.HexBytes, owner *Mes
 	messageState := user.buildMessageState()
 	messageState.CurrentMessageState = &CurrentMessageState{}
 	messageState.CurrentMessageState.PublicKey = &user.identity.PublicKey
-	err = user.handleCommunityDescription(messageState, signer, description, wrappedCommunity, nil)
+	communityHandled, err := user.handleCommunityDescription(messageState, signer, description, wrappedCommunity, nil)
 	s.Require().NoError(err)
 
-	user.processCommunityChanges(messageState)
+	if communityHandled {
+		user.processCommunityChanges(messageState)
+	} else {
+		// Retrieve in loop if community was queued for handling
+		_, err = WaitOnSignaledMessengerResponse(
+			user,
+			func(r *MessengerResponse) bool {
+				return len(r.Communities()) > 0
+			},
+			"community was not advertised to user",
+		)
+		s.Require().NoError(err)
+	}
 
 	userCommunity, err := user.GetCommunityByID(community.ID())
 	s.Require().NoError(err)
+	s.Require().NotNil(userCommunity)
 	s.Require().Equal(community.ID(), userCommunity.ID())
 }
 

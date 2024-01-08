@@ -2317,14 +2317,15 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 	}
 
 	if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
-		m.logger.Debug("Handling community content type")
+		m.logger.Debug("handling community content type")
+
+		// ChatMessage_COMMUNITY is deprecated, so we ignore the attached community description.
+		// We keep the message as is in the database, but it will be converted for the new approach
+		// on the fly when reading the message from the database.
+		//
+		// We still need to unwrap it here to keep the `CommunityID`.
 
 		signer, description, err := communities.UnwrapCommunityDescriptionMessage(receivedMessage.GetCommunity())
-		if err != nil {
-			return err
-		}
-
-		err = m.handleCommunityDescription(state, signer, description, receivedMessage.GetCommunity(), receivedMessage.GetShard())
 		if err != nil {
 			return err
 		}
@@ -3667,7 +3668,7 @@ func (m *Messenger) HandlePushNotificationRequest(state *ReceivedMessageState, m
 
 func (m *Messenger) HandleCommunityDescription(state *ReceivedMessageState, message *protobuf.CommunityDescription, statusMessage *v1protocol.StatusMessage) error {
 	// TODO: handle shard
-	err := m.handleCommunityDescription(state, state.CurrentMessageState.PublicKey, message, statusMessage.EncryptionLayer.Payload, nil)
+	_, err := m.handleCommunityDescription(state, state.CurrentMessageState.PublicKey, message, statusMessage.EncryptionLayer.Payload, nil)
 	if err != nil {
 		m.logger.Warn("failed to handle CommunityDescription", zap.Error(err))
 		return err

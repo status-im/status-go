@@ -291,7 +291,6 @@ func (m *Messenger) processDiscordMessages(discordChannel *discord.ExportedData,
 			Seen:             true,
 			LocalChatID:      channel.ID,
 			SigPubKey:        &communityPubKey,
-			CommunityID:      community.IDString(),
 			ChatMessage:      &chatMessage,
 		}
 
@@ -1332,7 +1331,6 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 					Seen:             true,
 					LocalChatID:      processedChannelIds[channel.Channel.ID],
 					SigPubKey:        &communityPubKey,
-					CommunityID:      communityID,
 					ChatMessage:      &chatMessage,
 				}
 

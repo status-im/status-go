@@ -916,30 +916,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	s.Require().Len(response.Communities(), 1)
 	community := response.Communities()[0]
 
-	// Send a community message
-	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, alice.transport)
-
-	inputMessage := common.NewMessage()
-	inputMessage.ChatId = chat.ID
-	inputMessage.Text = "some text"
-	inputMessage.CommunityID = community.IDString()
-
-	err = bob.SaveChat(chat)
-	s.NoError(err)
-	_, err = bob.SendChatMessage(context.Background(), inputMessage)
-	s.NoError(err)
-
-	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
-		response, err = alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-		return nil
-	})
+	// Advertise community
+	advertiseCommunityTo(&s.Suite, community.ID(), bob, alice)
 
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 

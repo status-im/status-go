@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -556,26 +555,7 @@ func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {
 	s.Require().NoError(err)
 
 	// Alice advertises community to Bob
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.bob.identity.PublicKey), &s.bob.identity.PublicKey, s.bob.transport)
-
-	inputMessage := common.NewMessage()
-	inputMessage.ChatId = chat.ID
-	inputMessage.Text = "some text"
-	inputMessage.CommunityID = community.IDString()
-
-	err = s.alice.SaveChat(chat)
-	s.Require().NoError(err)
-	_, err = s.alice.SendChatMessage(context.Background(), inputMessage)
-	s.Require().NoError(err)
-
-	_, err = WaitOnSignaledMessengerResponse(
-		s.bob,
-		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0
-		},
-		"Community was not advertised to Bob",
-	)
-	s.Require().NoError(err)
+	s.advertiseCommunityTo(s.alice, community.ID(), s.bob)
 
 	// Bob joins the community
 	s.joinCommunity(s.alice, community, s.bob)

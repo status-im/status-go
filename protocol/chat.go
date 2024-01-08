@@ -223,6 +223,7 @@ type ChatPreview struct {
 	// Highlight is used for highlight chats
 	Highlight bool `json:"highlight,omitempty"`
 
+	// DEPRECATED: ContentCommunityID is deprecated as we don't send community invitations anymore.
 	// Used for display invited community's name in the last message
 	ContentCommunityID string `json:"contentCommunityId,omitempty"`
 

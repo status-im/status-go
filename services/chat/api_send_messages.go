@@ -21,7 +21,6 @@ func (api *API) SendSticker(ctx context.Context, communityID types.HexBytes, cha
 	ensName, _ := api.s.accountsDB.GetPreferredUsername()
 
 	msg := &common.Message{
-		CommunityID: string(communityID.Bytes()),
 		ChatMessage: &protobuf.ChatMessage{
 			ChatId:      chatID,
 			ContentType: protobuf.ChatMessage_STICKER,
@@ -78,7 +77,6 @@ func (api *API) SendMessage(ctx context.Context, communityID types.HexBytes, cha
 	ensName, _ := api.s.accountsDB.GetPreferredUsername()
 
 	msg := &common.Message{
-		CommunityID: string(communityID.Bytes()),
 		ChatMessage: &protobuf.ChatMessage{
 			ChatId:      chatID,
 			ContentType: isTextOrEmoji(text),
@@ -103,7 +101,6 @@ func (api *API) SendImages(ctx context.Context, communityID types.HexBytes, chat
 
 	for _, imagePath := range imagePaths {
 		messages = append(messages, &common.Message{
-			CommunityID: string(communityID.Bytes()),
 			ChatMessage: &protobuf.ChatMessage{
 				ChatId:      chatID,
 				ContentType: protobuf.ChatMessage_IMAGE,
@@ -117,7 +114,6 @@ func (api *API) SendImages(ctx context.Context, communityID types.HexBytes, chat
 
 	if text != "" {
 		messages = append(messages, &common.Message{
-			CommunityID: string(communityID.Bytes()),
 			ChatMessage: &protobuf.ChatMessage{
 				ChatId:      chatID,
 				ContentType: isTextOrEmoji(text),
@@ -141,7 +137,6 @@ func (api *API) SendAudio(ctx context.Context, communityID types.HexBytes, chatI
 	ensName, _ := api.s.accountsDB.GetPreferredUsername()
 
 	msg := &common.Message{
-		CommunityID: string(communityID.Bytes()),
 		ChatMessage: &protobuf.ChatMessage{
 			ChatId:      chatID,
 			Text:        "Update to latest version to listen to an audio message here!",

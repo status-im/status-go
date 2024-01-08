@@ -118,9 +118,6 @@ func (m *Messenger) ChatsPreview() []*ChatPreview {
 					chatPreview.Text = chat.LastMessage.Text
 					chatPreview.ParsedText = chat.LastMessage.ParsedText
 				}
-				if chat.LastMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
-					chatPreview.ContentCommunityID = chat.LastMessage.CommunityID
-				}
 			}
 
 			chats = append(chats, chatPreview)

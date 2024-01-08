@@ -104,7 +104,6 @@ func (s *MessengerCommunityMetricsSuite) generateMessages(chatID string, communi
 			WhisperTimestamp: timestamp,
 			From:             common.PubkeyToHex(&s.m.identity.PublicKey),
 			LocalChatID:      chatID,
-			CommunityID:      communityID,
 			ID:               types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s%s%d", chatID, communityID, timestamp)))),
 		}
 
