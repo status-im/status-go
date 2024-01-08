@@ -46,7 +46,11 @@ func (m *Messenger) ActivityCenterNotifications(request ActivityCenterNotificati
 	if m.httpServer != nil {
 		for _, notification := range notifications {
 			if notification.Message != nil {
-				m.prepareMessage(notification.Message, m.httpServer)
+				err = m.prepareMessage(notification.Message, m.httpServer)
+
+				if err != nil {
+					return nil, err
+				}
 
 				image := notification.Message.GetImage()
 				if image != nil && image.AlbumId != "" {
@@ -59,7 +63,11 @@ func (m *Messenger) ActivityCenterNotifications(request ActivityCenterNotificati
 			}
 			if notification.AlbumMessages != nil {
 				for _, message := range notification.AlbumMessages {
-					m.prepareMessage(message, m.httpServer)
+					err = m.prepareMessage(message, m.httpServer)
+
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 		}

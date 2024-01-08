@@ -72,6 +72,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		image_payload,
 		image_type,
 		album_id,
+		album_images,
 		album_images_count,
 		image_width,
 		image_height,
@@ -181,6 +182,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m2.source,
 		m2.text,
 		m2.parsed_text,
+		m2.album_images,
 		m2.album_images_count,
 		m2.audio_duration_ms,
 		m2.community_id,
@@ -209,6 +211,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var ContentType sql.NullInt64
 	var quotedText sql.NullString
 	var quotedParsedText []byte
+	var quotedAlbumImages []byte
 	var quotedAlbumImagesCount sql.NullInt64
 	var quotedFrom sql.NullString
 	var quotedAudioDuration sql.NullInt64
@@ -318,6 +321,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&quotedFrom,
 		&quotedText,
 		&quotedParsedText,
+		&quotedAlbumImages,
 		&quotedAlbumImagesCount,
 		&quotedAudioDuration,
 		&quotedCommunityID,
@@ -376,6 +380,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 				From:             quotedFrom.String,
 				Text:             quotedText.String,
 				ParsedText:       quotedParsedText,
+				AlbumImages:      quotedAlbumImages,
 				AlbumImagesCount: quotedAlbumImagesCount.Int64,
 				CommunityID:      quotedCommunityID.String,
 				Deleted:          quotedDeleted.Bool,
@@ -458,6 +463,11 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) ([]interface{}, error) {
 	var gapFrom, gapTo uint32
+
+	var albumImages []byte
+	if message.QuotedMessage != nil {
+		albumImages = []byte(message.QuotedMessage.AlbumImages)
+	}
 
 	sticker := message.GetSticker()
 	if sticker == nil {
@@ -547,6 +557,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		image.Payload,
 		image.Type,
 		image.AlbumId,
+		albumImages,
 		image.AlbumImagesCount,
 		image.Width,
 		image.Height,
