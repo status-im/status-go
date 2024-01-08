@@ -234,6 +234,7 @@ func (api *API) DeleteCustomTokenByChainID(ctx context.Context, chainID uint64, 
 }
 
 // @deprecated
+// Not used by status-desktop anymore
 func (api *API) GetPendingTransactions(ctx context.Context) ([]*transactions.PendingTransaction, error) {
 	log.Debug("wallet.api.GetPendingTransactions")
 	rst, err := api.s.pendingTxManager.GetAllPending()
@@ -241,6 +242,8 @@ func (api *API) GetPendingTransactions(ctx context.Context) ([]*transactions.Pen
 	return rst, err
 }
 
+// @deprecated
+// Not used by status-desktop anymore
 func (api *API) GetPendingTransactionsForIdentities(ctx context.Context, identities []transfer.TransactionIdentity) (
 	result []*transactions.PendingTransaction, err error) {
 
@@ -587,6 +590,18 @@ func (api *API) CancelActivityFilterTask(requestID int32) error {
 
 	api.s.activity.CancelFilterTask(requestID)
 	return nil
+}
+
+func (api *API) StartActivityFilterSession(addresses []common.Address, allAddresses bool, chainIDs []wcommon.ChainID, filter activity.Filter, firstPageCount int) (activity.SessionID, error) {
+	log.Debug("wallet.api.StartActivityFilterSession", "addr.count", len(addresses), "allAddresses", allAddresses, "chainIDs.count", len(chainIDs), "firstPageCount", firstPageCount)
+
+	return api.s.activity.StartFilterSession(addresses, allAddresses, chainIDs, filter, firstPageCount), nil
+}
+
+func (api *API) StopActivityFilterSession(id activity.SessionID) {
+	log.Debug("wallet.api.StopActivityFilterSession", "id", id)
+
+	api.s.activity.StopFilterSession(id)
 }
 
 func (api *API) GetMultiTxDetails(ctx context.Context, multiTxID int) (*activity.EntryDetails, error) {

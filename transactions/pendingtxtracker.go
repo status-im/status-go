@@ -55,6 +55,7 @@ const (
 	Keep       AutoDeleteType = false
 )
 
+// TODO #12120: unify it with TransactionIdentity
 type TxIdentity struct {
 	ChainID common.ChainID `json:"chainId"`
 	Hash    eth.Hash       `json:"hash"`
@@ -70,6 +71,7 @@ type StatusChangedPayload struct {
 	Status TxStatus `json:"status"`
 }
 
+// PendingTxTracker implements StatusService in common/status_node_service.go
 type PendingTxTracker struct {
 	db        *sql.DB
 	rpcClient rpc.ClientInterface

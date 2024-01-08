@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -18,15 +20,19 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/transactions"
 )
 
 const (
-	// FilterResponse json is sent as a message in the EventActivityFilteringDone event
+	// EventActivityFilteringDone contains a FilterResponse payload
 	EventActivityFilteringDone          walletevent.EventType = "wallet-activity-filtering-done"
 	EventActivityFilteringUpdate        walletevent.EventType = "wallet-activity-filtering-entries-updated"
 	EventActivityGetRecipientsDone      walletevent.EventType = "wallet-activity-get-recipients-result"
 	EventActivityGetOldestTimestampDone walletevent.EventType = "wallet-activity-get-oldest-timestamp-result"
 	EventActivityGetCollectibles        walletevent.EventType = "wallet-activity-get-collectibles"
+
+	// EventActivitySessionUpdated contains a SessionUpdate payload
+	EventActivitySessionUpdated walletevent.EventType = "wallet-activity-session-updated"
 )
 
 var (
@@ -56,15 +62,33 @@ type Service struct {
 	eventFeed    *event.Feed
 
 	scheduler *async.MultiClientScheduler
+
+	sessions      map[SessionID]*Session
+	lastSessionID atomic.Int32
+	subscriptions event.Subscription
+	ch            chan walletevent.Event
+	// sessionsRWMutex is used to protect all sessions related members
+	sessionsRWMutex sync.RWMutex
+
+	// TODO #12120: sort out session dependencies
+	pendingTracker *transactions.PendingTxTracker
 }
 
-func NewService(db *sql.DB, tokenManager token.ManagerInterface, collectibles collectibles.ManagerInterface, eventFeed *event.Feed) *Service {
+func (s *Service) nextSessionID() SessionID {
+	return SessionID(s.lastSessionID.Add(1))
+}
+
+func NewService(db *sql.DB, tokenManager token.ManagerInterface, collectibles collectibles.ManagerInterface, eventFeed *event.Feed, pendingTracker *transactions.PendingTxTracker) *Service {
 	return &Service{
 		db:           db,
 		tokenManager: tokenManager,
 		collectibles: collectibles,
 		eventFeed:    eventFeed,
 		scheduler:    async.NewMultiClientScheduler(),
+
+		sessions: make(map[SessionID]*Session),
+
+		pendingTracker: pendingTracker,
 	}
 }
 
@@ -90,6 +114,7 @@ type FilterResponse struct {
 // and should not expect other owners to have data in one of the queried tables
 //
 // All calls will trigger an EventActivityFilteringDone event with the result of the filtering
+// TODO #12120: replace with session based APIs
 func (s *Service) FilterActivityAsync(requestID int32, addresses []common.Address, allAddresses bool, chainIDs []w_common.ChainID, filter Filter, offset int, limit int) {
 	s.scheduler.Enqueue(requestID, filterTask, func(ctx context.Context) (interface{}, error) {
 		activities, err := getActivityEntries(ctx, s.getDeps(), addresses, allAddresses, chainIDs, filter, offset, limit)
@@ -109,25 +134,10 @@ func (s *Service) FilterActivityAsync(requestID int32, addresses []common.Addres
 			res.ErrorCode = ErrorCodeSuccess
 		}
 
-		s.sendResponseEvent(&requestID, EventActivityFilteringDone, res, err)
+		sendResponseEvent(s.eventFeed, &requestID, EventActivityFilteringDone, res, err)
 
 		s.getActivityDetailsAsync(requestID, res.Activities)
 	})
-}
-
-func (s *Service) getActivityDetailsAsync(requestID int32, entries []Entry) {
-	if len(entries) == 0 {
-		return
-	}
-
-	ctx := context.Background()
-
-	go func() {
-		activityData, err := s.getActivityDetails(ctx, entries)
-		if len(activityData) != 0 {
-			s.sendResponseEvent(&requestID, EventActivityFilteringUpdate, activityData, err)
-		}
-	}()
 }
 
 type CollectibleHeader struct {
@@ -184,7 +194,7 @@ func (s *Service) GetActivityCollectiblesAsync(requestID int32, chainIDs []w_com
 			res.ErrorCode = ErrorCodeSuccess
 		}
 
-		s.sendResponseEvent(&requestID, EventActivityGetCollectibles, res, err)
+		sendResponseEvent(s.eventFeed, &requestID, EventActivityGetCollectibles, res, err)
 	})
 }
 
@@ -280,7 +290,7 @@ func (s *Service) GetRecipientsAsync(requestID int32, chainIDs []w_common.ChainI
 			res.ErrorCode = ErrorCodeFailed
 		}
 
-		s.sendResponseEvent(&requestID, EventActivityGetRecipientsDone, result, err)
+		sendResponseEvent(s.eventFeed, &requestID, EventActivityGetRecipientsDone, result, err)
 	})
 }
 
@@ -305,7 +315,7 @@ func (s *Service) GetOldestTimestampAsync(requestID int32, addresses []common.Ad
 			res.ErrorCode = ErrorCodeSuccess
 		}
 
-		s.sendResponseEvent(&requestID, EventActivityGetOldestTimestampDone, res, err)
+		sendResponseEvent(s.eventFeed, &requestID, EventActivityGetOldestTimestampDone, res, err)
 	})
 }
 
@@ -358,7 +368,7 @@ func (s *Service) getDeps() FilterDependencies {
 	}
 }
 
-func (s *Service) sendResponseEvent(requestID *int32, eventType walletevent.EventType, payloadObj interface{}, resErr error) {
+func sendResponseEvent(eventFeed *event.Feed, requestID *int32, eventType walletevent.EventType, payloadObj interface{}, resErr error) {
 	payload, err := json.Marshal(payloadObj)
 	if err != nil {
 		log.Error("Error marshaling response: %v; result error: %w", err, resErr)
@@ -382,5 +392,5 @@ func (s *Service) sendResponseEvent(requestID *int32, eventType walletevent.Even
 		*event.RequestID = int(*requestID)
 	}
 
-	s.eventFeed.Send(event)
+	eventFeed.Send(event)
 }
