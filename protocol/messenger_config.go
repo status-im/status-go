@@ -275,6 +275,20 @@ func WithPushNotifications() func(c *config) error {
 	}
 }
 
+func WithCheckingForBackupDisabled() func(c *config) error {
+	return func(c *config) error {
+		c.featureFlags.DisableCheckingForBackup = true
+		return nil
+	}
+}
+
+func WithAutoMessageDisabled() func(c *config) error {
+	return func(c *config) error {
+		c.featureFlags.DisableAutoMessageLoop = true
+		return nil
+	}
+}
+
 func WithEnvelopesMonitorConfig(emc *transport.EnvelopesMonitorConfig) Option {
 	return func(c *config) error {
 		c.envelopesMonitorConfig = emc

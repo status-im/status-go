@@ -76,6 +76,10 @@ func (api *API) GetBalancesByChain(ctx context.Context, chainIDs []uint64, addre
 	return api.s.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokens)
 }
 
+func (api *API) GetWalletTokenBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
+	return api.reader.GetWalletTokenBalances(ctx, addresses)
+}
+
 func (api *API) GetCachedWalletTokensWithoutMarketData(ctx context.Context) (map[common.Address][]Token, error) {
 	return api.reader.GetCachedWalletTokensWithoutMarketData()
 }

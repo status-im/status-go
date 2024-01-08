@@ -38,7 +38,7 @@ func (m *Messenger) startBackupLoop() {
 		for {
 			select {
 			case <-ticker.C:
-				if !m.online() {
+				if !m.Online() {
 					continue
 				}
 
