@@ -41,7 +41,7 @@ var maxTopicsPerRequest int = 10
 var ErrNoFiltersForChat = errors.New("no filter registered for given chat")
 
 func (m *Messenger) shouldSync() (bool, error) {
-	if m.mailserverCycle.activeMailserver == nil || !m.online() {
+	if m.mailserverCycle.activeMailserver == nil || !m.Online() {
 		return false, nil
 	}
 

@@ -331,7 +331,8 @@ func advertiseCommunityTo(s *suite.Suite, community *communities.Community, owne
 	messageState := user.buildMessageState()
 	messageState.CurrentMessageState = &CurrentMessageState{}
 	messageState.CurrentMessageState.PublicKey = &user.identity.PublicKey
-	err = user.handleCommunityDescription(messageState, signer, description, wrappedCommunity, nil)
+	// TODO: handle shards?
+	err = user.handleCommunityDescription(messageState, signer, description, wrappedCommunity, nil, nil)
 	s.Require().NoError(err)
 }
 

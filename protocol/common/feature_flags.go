@@ -11,4 +11,10 @@ type FeatureFlags struct {
 
 	// MailserverCycle indicates whether we should enable or not the mailserver cycle
 	MailserverCycle bool
+
+	// DisableCheckingForBackup disables backup loop
+	DisableCheckingForBackup bool
+
+	// DisableAutoMessageLoop disables auto message loop
+	DisableAutoMessageLoop bool
 }

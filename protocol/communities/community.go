@@ -1372,6 +1372,10 @@ func (o *Community) Description() *protobuf.CommunityDescription {
 	return o.config.CommunityDescription
 }
 
+func (o *Community) DescriptionProtocolMessage() []byte {
+	return o.config.CommunityDescriptionProtocolMessage
+}
+
 func (o *Community) marshaledDescription() ([]byte, error) {
 	clone := proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription)
 

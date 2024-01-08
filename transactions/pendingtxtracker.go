@@ -156,8 +156,8 @@ type nullableReceipt struct {
 }
 
 func (nr *nullableReceipt) UnmarshalJSON(data []byte) error {
-	if string(data) == "null" {
-		// transaction is not available yet
+	transactionNotAvailable := (string(data) == "null")
+	if transactionNotAvailable {
 		return nil
 	}
 	return json.Unmarshal(data, &nr.Receipt)
