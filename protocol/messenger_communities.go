@@ -2535,7 +2535,7 @@ func (m *Messenger) RemoveRoleFromMember(request *requests.RemoveRoleFromMember)
 	return response, nil
 }
 
-func (m *Messenger) findCommunityInfoFromDB(communityID string) (*communities.Community, error) {
+func (m *Messenger) FindCommunityInfoFromDB(communityID string) (*communities.Community, error) {
 	id, err := hexutil.Decode(communityID)
 	if err != nil {
 		return nil, err
@@ -2564,7 +2564,7 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 	communityID := request.getCommunityID()
 
 	if request.TryDatabase {
-		community, err := m.findCommunityInfoFromDB(communityID)
+		community, err := m.FindCommunityInfoFromDB(communityID)
 		if err != nil {
 			return nil, err
 		}
