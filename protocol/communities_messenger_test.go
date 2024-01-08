@@ -3978,5 +3978,16 @@ func (s *MessengerCommunitiesSuite) TestCommunityLastOpenedAt() {
 	s.Require().NoError(err)
 
 	// Check lastOpenedAt was updated
+	lastOpenedAt1 := response.Communities()[0].LastOpenedAt()
 	s.Require().True(response.Communities()[0].LastOpenedAt() > 0)
+
+	// Nap for a bit
+	time.Sleep(time.Second)
+
+	// Check lastOpenedAt was successfully updated twice
+	response, err = s.alice.CommunityUpdateLastOpenedAt(community.IDString())
+	lastOpenedAt2 := response.Communities()[0].LastOpenedAt()
+	s.Require().NoError(err)
+
+	s.Require().True(lastOpenedAt2 > lastOpenedAt1)
 }

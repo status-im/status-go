@@ -111,6 +111,7 @@ func (p *Persistence) saveRawCommunityRow(rawCommRow RawCommunityRow) error {
 		rawCommRow.Verified,
 		rawCommRow.SyncedAt,
 		rawCommRow.Muted,
+		rawCommRow.LastOpenedAt,
 	)
 	return err
 }
@@ -129,6 +130,7 @@ func (p *Persistence) saveRawCommunityRowWithoutSyncedAt(rawCommRow RawCommunity
 		rawCommRow.JoinedAt,
 		rawCommRow.Verified,
 		rawCommRow.Muted,
+		rawCommRow.LastOpenedAt,
 	)
 	return err
 }
