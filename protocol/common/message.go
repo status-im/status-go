@@ -33,6 +33,7 @@ type QuotedMessage struct {
 	From             string          `json:"from"`
 	Text             string          `json:"text"`
 	ParsedText       json.RawMessage `json:"parsedText,omitempty"`
+	AlbumImages      json.RawMessage `json:"albumImages,omitempty"`
 	AlbumImagesCount int64           `json:"albumImagesCount"`
 	// ImageLocalURL is the local url of the image
 	ImageLocalURL string `json:"image,omitempty"`

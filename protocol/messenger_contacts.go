@@ -333,7 +333,10 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 		return nil, err
 	}
 
-	m.prepareMessage(updateMessage, m.httpServer)
+	err = m.prepareMessage(updateMessage, m.httpServer)
+	if err != nil {
+		return nil, err
+	}
 	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 	if err != nil {
 		return nil, err
@@ -498,7 +501,10 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 			return nil, err
 		}
 
-		m.prepareMessage(updateMessage, m.httpServer)
+		err = m.prepareMessage(updateMessage, m.httpServer)
+		if err != nil {
+			return nil, err
+		}
 		err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 		if err != nil {
 			return nil, err
@@ -636,7 +642,10 @@ func (m *Messenger) removeContact(ctx context.Context, response *MessengerRespon
 		return err
 	}
 
-	m.prepareMessage(updateMessage, m.httpServer)
+	err = m.prepareMessage(updateMessage, m.httpServer)
+	if err != nil {
+		return err
+	}
 	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 	if err != nil {
 		return err

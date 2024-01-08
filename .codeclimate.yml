@@ -51,4 +51,5 @@ exclude_patterns:
   - "protocol/pushnotificationclient/migrations/migrations.go"
   - "protocol/pushnotificationserver/migrations/migrations.go"
   - "protocol/transport/migrations/migrations.go"
+  - "protocol/encryption/protocol_message.pb.go"
   - "images/qr-assets.go"
