@@ -110,8 +110,8 @@ func (s *CommunityEncryptionDescriptionSuite) description() *protobuf.CommunityD
 				ChatIds:       []string{},
 			},
 			"channel-level-permission": &protobuf.CommunityTokenPermission{
-				Id:            "community-level-permission",
-				Type:          protobuf.CommunityTokenPermission_BECOME_MEMBER,
+				Id:            "channel-level-permission",
+				Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
 				TokenCriteria: []*protobuf.TokenCriteria{},
 				ChatIds:       []string{types.EncodeHex(crypto.CompressPubkey(&s.identity.PublicKey)) + "channelB"},
 			},
