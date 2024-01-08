@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
-	"math/big"
 	"sync"
 	"testing"
 	"time"
@@ -17,57 +15,18 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/rpc/chain"
-	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
-type MockETHClient struct {
-	mock.Mock
-}
-
-func (m *MockETHClient) BatchCallContext(ctx context.Context, b []rpc.BatchElem) error {
-	args := m.Called(ctx, b)
-	return args.Error(0)
-}
-
-type MockChainClient struct {
-	mock.Mock
-
-	clients map[common.ChainID]*MockETHClient
-}
-
-func newMockChainClient() *MockChainClient {
-	return &MockChainClient{
-		clients: make(map[common.ChainID]*MockETHClient),
-	}
-}
-
-func (m *MockChainClient) setAvailableClients(chainIDs []common.ChainID) *MockChainClient {
-	for _, chainID := range chainIDs {
-		if _, ok := m.clients[chainID]; !ok {
-			m.clients[chainID] = new(MockETHClient)
-		}
-	}
-	return m
-}
-
-func (m *MockChainClient) AbstractEthClient(chainID common.ChainID) (chain.BatchCallClient, error) {
-	if _, ok := m.clients[chainID]; !ok {
-		panic(fmt.Sprintf("no mock client for chainID %d", chainID))
-	}
-	return m.clients[chainID], nil
-}
-
 // setupTestTransactionDB will use the default pending check interval if checkInterval is nil
 func setupTestTransactionDB(t *testing.T, checkInterval *time.Duration) (*PendingTxTracker, func(), *MockChainClient, *event.Feed) {
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
-	chainClient := newMockChainClient()
+	chainClient := NewMockChainClient()
 	eventFeed := &event.Feed{}
 	pendingCheckInterval := PendingCheckInterval
 	if checkInterval != nil {
@@ -84,26 +43,21 @@ func waitForTaskToStop(pt *PendingTxTracker) {
 	}
 }
 
-const (
-	transactionBlockNo       = "0x1"
-	transactionByHashRPCName = "eth_getTransactionByHash"
-)
-
 func TestPendingTxTracker_ValidateConfirmed(t *testing.T) {
 	m, stop, chainClient, eventFeed := setupTestTransactionDB(t, nil)
 	defer stop()
 
-	txs := generateTestTransactions(1)
+	txs := GenerateTestPendingTransactions(1)
 
 	// Mock the first call to getTransactionByHash
-	chainClient.setAvailableClients([]common.ChainID{txs[0].ChainID})
-	cl := chainClient.clients[txs[0].ChainID]
+	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID})
+	cl := chainClient.Clients[txs[0].ChainID]
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return len(b) == 1 && b[0].Method == transactionByHashRPCName && b[0].Args[0] == txs[0].Hash
+		return len(b) == 1 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[0].Hash
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
 		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = transactionBlockNo
+		(*res)["blockNumber"] = TransactionBlockNo
 	})
 
 	eventChan := make(chan walletevent.Event, 3)
@@ -148,20 +102,20 @@ func TestPendingTxTracker_InterruptWatching(t *testing.T) {
 	m, stop, chainClient, eventFeed := setupTestTransactionDB(t, nil)
 	defer stop()
 
-	txs := generateTestTransactions(2)
+	txs := GenerateTestPendingTransactions(2)
 
 	// Mock the first call to getTransactionByHash
-	chainClient.setAvailableClients([]common.ChainID{txs[0].ChainID})
-	cl := chainClient.clients[txs[0].ChainID]
+	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID})
+	cl := chainClient.Clients[txs[0].ChainID]
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return (len(b) == 2 && b[0].Method == transactionByHashRPCName && b[0].Args[0] == txs[0].Hash && b[1].Method == transactionByHashRPCName && b[1].Args[0] == txs[1].Hash)
+		return (len(b) == 2 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[0].Hash && b[1].Method == TransactionByHashRPCName && b[1].Args[0] == txs[1].Hash)
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
 
 		// Simulate still pending by excluding "blockNumber" in elems[0]
 
 		res := elems[1].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = transactionBlockNo
+		(*res)["blockNumber"] = TransactionBlockNo
 	})
 
 	eventChan := make(chan walletevent.Event, 2)
@@ -217,11 +171,11 @@ func TestPendingTxTracker_InterruptWatching(t *testing.T) {
 	// Restart the tracker to process leftovers
 	//
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return (len(b) == 1 && b[0].Method == transactionByHashRPCName && b[0].Args[0] == txs[0].Hash)
+		return (len(b) == 1 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[0].Hash)
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
 		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = transactionBlockNo
+		(*res)["blockNumber"] = TransactionBlockNo
 	})
 
 	err = m.Start()
@@ -262,26 +216,26 @@ func TestPendingTxTracker_MultipleClients(t *testing.T) {
 	m, stop, chainClient, eventFeed := setupTestTransactionDB(t, nil)
 	defer stop()
 
-	txs := generateTestTransactions(2)
+	txs := GenerateTestPendingTransactions(2)
 	txs[1].ChainID++
 
 	// Mock the both clients to be available
-	chainClient.setAvailableClients([]common.ChainID{txs[0].ChainID, txs[1].ChainID})
-	cl := chainClient.clients[txs[0].ChainID]
+	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID, txs[1].ChainID})
+	cl := chainClient.Clients[txs[0].ChainID]
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return (len(b) == 1 && b[0].Method == transactionByHashRPCName && b[0].Args[0] == txs[0].Hash)
+		return (len(b) == 1 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[0].Hash)
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
 		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = transactionBlockNo
+		(*res)["blockNumber"] = TransactionBlockNo
 	})
-	cl = chainClient.clients[txs[1].ChainID]
+	cl = chainClient.Clients[txs[1].ChainID]
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return (len(b) == 1 && b[0].Method == transactionByHashRPCName && b[0].Args[0] == txs[1].Hash)
+		return (len(b) == 1 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[1].Hash)
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
 		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = transactionBlockNo
+		(*res)["blockNumber"] = TransactionBlockNo
 	})
 
 	eventChan := make(chan walletevent.Event, 6)
@@ -341,19 +295,19 @@ func TestPendingTxTracker_Watch(t *testing.T) {
 	m, stop, chainClient, eventFeed := setupTestTransactionDB(t, nil)
 	defer stop()
 
-	txs := generateTestTransactions(2)
+	txs := GenerateTestPendingTransactions(2)
 	// Make the second already confirmed
 	*txs[0].Status = Done
 
 	// Mock the first call to getTransactionByHash
-	chainClient.setAvailableClients([]common.ChainID{txs[0].ChainID})
-	cl := chainClient.clients[txs[0].ChainID]
+	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID})
+	cl := chainClient.Clients[txs[0].ChainID]
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		return len(b) == 1 && b[0].Method == transactionByHashRPCName && b[0].Args[0] == txs[1].Hash
+		return len(b) == 1 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[1].Hash
 	})).Return(nil).Once().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
 		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = transactionBlockNo
+		(*res)["blockNumber"] = TransactionBlockNo
 	})
 
 	eventChan := make(chan walletevent.Event, 3)
@@ -421,26 +375,26 @@ func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 	m, stop, chainClient, eventFeed := setupTestTransactionDB(t, common.NewAndSet(1*time.Nanosecond))
 	defer stop()
 
-	txs := generateTestTransactions(2)
+	txs := GenerateTestPendingTransactions(2)
 
 	var firsDoneWG sync.WaitGroup
 	firsDoneWG.Add(1)
 
 	// Mock the first call to getTransactionByHash
-	chainClient.setAvailableClients([]common.ChainID{txs[0].ChainID})
-	cl := chainClient.clients[txs[0].ChainID]
+	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID})
+	cl := chainClient.Clients[txs[0].ChainID]
 
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
 		if len(cl.Calls) == 0 {
-			res := len(b) > 0 && b[0].Method == transactionByHashRPCName && b[0].Args[0] == txs[0].Hash
+			res := len(b) > 0 && b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[0].Hash
 			// If the first processing call picked up the second validate this case also
 			if len(b) == 2 {
-				res = res && b[1].Method == transactionByHashRPCName && b[1].Args[0] == txs[1].Hash
+				res = res && b[1].Method == TransactionByHashRPCName && b[1].Args[0] == txs[1].Hash
 			}
 			return res
 		}
 		// Second call we expect only one left
-		return len(b) == 1 && (b[0].Method == transactionByHashRPCName && b[0].Args[0] == txs[1].Hash)
+		return len(b) == 1 && (b[0].Method == TransactionByHashRPCName && b[0].Args[0] == txs[1].Hash)
 	})).Return(nil).Twice().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
 		if len(cl.Calls) == 2 {
@@ -448,7 +402,7 @@ func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 		}
 		// Only first item is processed, second is left pending
 		res := elems[0].Result.(*map[string]interface{})
-		(*res)["blockNumber"] = transactionBlockNo
+		(*res)["blockNumber"] = TransactionBlockNo
 	})
 
 	eventChan := make(chan walletevent.Event, 6)
@@ -533,7 +487,7 @@ func TestPendingTransactions(t *testing.T) {
 	manager, stop, _, _ := setupTestTransactionDB(t, nil)
 	defer stop()
 
-	tx := generateTestTransactions(1)[0]
+	tx := GenerateTestPendingTransactions(1)[0]
 
 	rst, err := manager.GetAllPending()
 	require.NoError(t, err)
@@ -570,30 +524,4 @@ func TestPendingTransactions(t *testing.T) {
 	rst, err = manager.GetAllPending()
 	require.NoError(t, err)
 	require.Equal(t, 0, len(rst))
-}
-
-func generateTestTransactions(count int) []PendingTransaction {
-	if count > 127 {
-		panic("can't generate more than 127 distinct transactions")
-	}
-
-	txs := make([]PendingTransaction, count)
-	for i := 0; i < count; i++ {
-		txs[i] = PendingTransaction{
-			Hash:           eth.Hash{byte(i)},
-			From:           eth.Address{byte(i)},
-			To:             eth.Address{byte(i * 2)},
-			Type:           RegisterENS,
-			AdditionalData: "someuser.stateofus.eth",
-			Value:          bigint.BigInt{Int: big.NewInt(int64(i))},
-			GasLimit:       bigint.BigInt{Int: big.NewInt(21000)},
-			GasPrice:       bigint.BigInt{Int: big.NewInt(int64(i))},
-			ChainID:        777,
-			Status:         new(TxStatus),
-			AutoDelete:     new(bool),
-		}
-		*txs[i].Status = Pending  // set to pending by default
-		*txs[i].AutoDelete = true // set to true by default
-	}
-	return txs
 }

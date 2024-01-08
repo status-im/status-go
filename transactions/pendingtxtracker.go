@@ -24,9 +24,9 @@ import (
 )
 
 const (
-	// PendingTransactionUpdate is emitted when a pending transaction is updated (added or deleted)
+	// EventPendingTransactionUpdate is emitted when a pending transaction is updated (added or deleted). Carries StatusChangedPayload in message
 	EventPendingTransactionUpdate walletevent.EventType = "pending-transaction-update"
-	// Caries StatusChangedPayload in message
+	// EventPendingTransactionStatusChanged carries StatusChangedPayload in message
 	EventPendingTransactionStatusChanged walletevent.EventType = "pending-transaction-status-changed"
 
 	PendingCheckInterval = 10 * time.Second
