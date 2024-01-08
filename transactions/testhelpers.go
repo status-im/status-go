@@ -5,14 +5,12 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/stretchr/testify/mock"
-
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
-
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/stretchr/testify/mock"
 )
 
 type MockETHClient struct {

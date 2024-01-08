@@ -20,6 +20,8 @@ import (
 
 	"go.uber.org/zap"
 
+	utils "github.com/status-im/status-go/common"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -427,7 +429,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 
 			case <-ticker.C:
 				// If we are not online, we don't even try
-				if !m.online() {
+				if !m.Online() {
 					continue
 				}
 
@@ -2603,8 +2605,8 @@ func (m *Messenger) passStoredCommunityInfoToSignalHandler(community *communitie
 }
 
 // handleCommunityDescription handles an community description
-func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte, shard *protobuf.Shard) error {
-	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload, nil, shard)
+func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte, verifiedOwner *ecdsa.PublicKey, shard *protobuf.Shard) error {
+	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload, verifiedOwner, shard)
 	if err != nil {
 		return err
 	}
@@ -2945,7 +2947,7 @@ func (m *Messenger) HandleSyncInstallationCommunity(messageState *ReceivedMessag
 }
 
 func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessageState, syncCommunity *protobuf.SyncInstallationCommunity, statusMessage *v1protocol.StatusMessage) error {
-	logger := m.logger.Named("handleSyncCommunity")
+	logger := m.logger.Named("handleSyncInstallationCommunity")
 
 	// Should handle community
 	shouldHandle, err := m.communitiesManager.ShouldHandleSyncCommunity(syncCommunity)
@@ -3008,8 +3010,17 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 		return err
 	}
 
+	// This is our own message, so we can trust the set community owner
+	// This is good to do so that we don't have to queue all the actions done after the handled community description.
+	// `signer` is `communityID` for a community with no owner token and `owner public key` otherwise
+	signer, err := utils.RecoverKey(&amm)
+	if err != nil {
+		logger.Debug("failed to recover community description signer", zap.Error(err))
+		return err
+	}
+
 	// TODO: handle shard
-	err = m.handleCommunityDescription(messageState, orgPubKey, &cd, syncCommunity.Description, nil)
+	err = m.handleCommunityDescription(messageState, signer, &cd, syncCommunity.Description, signer, nil)
 	if err != nil {
 		logger.Debug("m.handleCommunityDescription error", zap.Error(err))
 		return err
@@ -3029,22 +3040,6 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 			logger.Debug("m.SetSyncControlNode", zap.Error(err))
 			return err
 		}
-	}
-
-	savedCommunity, err := m.communitiesManager.GetByID(syncCommunity.Id)
-	if err != nil {
-		return err
-	}
-
-	// TODO: if the community is token gated, it will be validated asynchronously
-	// syncing needs to be adjusted in this case
-	if savedCommunity == nil {
-		return nil
-	}
-
-	if err := m.handleCommunityTokensMetadataByPrivilegedMembers(savedCommunity); err != nil {
-		logger.Debug("m.handleCommunityTokensMetadataByPrivilegedMembers", zap.Error(err))
-		return err
 	}
 
 	// if we are not waiting for approval, join or leave the community
@@ -3100,10 +3095,6 @@ func (m *Messenger) HandleSyncCommunitySettings(messageState *ReceivedMessageSta
 
 	messageState.Response.AddCommunitySettings(communitySettings)
 	return nil
-}
-
-func (m *Messenger) handleCommunityTokensMetadataByPrivilegedMembers(community *communities.Community) error {
-	return m.communitiesManager.HandleCommunityTokensMetadataByPrivilegedMembers(community)
 }
 
 func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community) {
