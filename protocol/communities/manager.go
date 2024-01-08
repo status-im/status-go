@@ -704,6 +704,19 @@ func (m *Manager) Spectated() ([]*Community, error) {
 	return m.persistence.SpectatedCommunities(&m.identity.PublicKey)
 }
 
+func (m *Manager) CommunityUpdateLastOpenedAt(communityID string) (*Community, error) {
+	community, err := m.GetByIDString(communityID)
+	if err != nil {
+		return nil, err
+	}
+	err = m.UpdateLastOpenedAt(community.ID())
+	if err != nil {
+		return nil, err
+	}
+	community.UpdateLastOpenedAt()
+	return community, nil
+}
+
 func (m *Manager) JoinedAndPendingCommunitiesWithRequests() ([]*Community, error) {
 	return m.persistence.JoinedAndPendingCommunitiesWithRequests(&m.identity.PublicKey)
 }
