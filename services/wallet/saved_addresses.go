@@ -19,7 +19,6 @@ type SavedAddress struct {
 	// TODO: Add Emoji
 	// Emoji	string		   `json:"emoji"`
 	Name            string                            `json:"name"`
-	Favourite       bool                              `json:"favourite"`
 	ChainShortNames string                            `json:"chainShortNames"` // used with address only, not with ENSName
 	ENSName         string                            `json:"ens"`
 	ColorID         multiAccCommon.CustomizationColor `json:"colorId"`
@@ -29,7 +28,7 @@ type SavedAddress struct {
 }
 
 func (s *SavedAddress) ID() string {
-	return fmt.Sprintf("%s-%s-%t", s.Address.Hex(), s.ENSName, s.IsTest)
+	return fmt.Sprintf("%s-%t", s.Address.Hex(), s.IsTest)
 }
 
 type SavedAddressesManager struct {
@@ -40,7 +39,7 @@ func NewSavedAddressesManager(db *sql.DB) *SavedAddressesManager {
 	return &SavedAddressesManager{db: db}
 }
 
-const rawQueryColumnsOrder = "address, name, favourite, removed, update_clock, chain_short_names, ens_name, is_test, created_at, color"
+const rawQueryColumnsOrder = "address, name, removed, update_clock, chain_short_names, ens_name, is_test, created_at, color"
 
 // getSavedAddressesFromDBRows retrieves all data based on SELECT Query using rawQueryColumnsOrder
 func getSavedAddressesFromDBRows(rows *sql.Rows) ([]SavedAddress, error) {
@@ -51,7 +50,6 @@ func getSavedAddressesFromDBRows(rows *sql.Rows) ([]SavedAddress, error) {
 		err := rows.Scan(
 			&sa.Address,
 			&sa.Name,
-			&sa.Favourite,
 			&sa.Removed,
 			&sa.UpdateClock,
 			&sa.ChainShortNames,
@@ -110,8 +108,8 @@ func (sam *SavedAddressesManager) upsertSavedAddress(sa SavedAddress, tx *sql.Tx
 		}()
 	}
 	rows, err := tx.Query(
-		fmt.Sprintf("SELECT %s FROM saved_addresses WHERE address = ? AND is_test = ? AND ens_name = ?", rawQueryColumnsOrder),
-		sa.Address, sa.IsTest, sa.ENSName,
+		fmt.Sprintf("SELECT %s FROM saved_addresses WHERE address = ? AND is_test = ?", rawQueryColumnsOrder),
+		sa.Address, sa.IsTest,
 	)
 	if err != nil {
 		return err
@@ -123,7 +121,7 @@ func (sam *SavedAddressesManager) upsertSavedAddress(sa SavedAddress, tx *sql.Tx
 	}
 	sa.CreatedAt = time.Now().Unix()
 	for _, savedAddress := range savedAddresses {
-		if savedAddress.Address == sa.Address && savedAddress.IsTest == sa.IsTest && savedAddress.ENSName == sa.ENSName {
+		if savedAddress.Address == sa.Address && savedAddress.IsTest == sa.IsTest {
 			sa.CreatedAt = savedAddress.CreatedAt
 			break
 		}
@@ -134,23 +132,23 @@ func (sam *SavedAddressesManager) upsertSavedAddress(sa SavedAddress, tx *sql.Tx
 		saved_addresses (
 			address,
 			name,
-			favourite,
 			removed,
 			update_clock,
 			chain_short_names,
-			ens_name, is_test,
+			ens_name,
+			is_test,
 			created_at,
 			color
 		)
 	VALUES
-		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		(?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	insert, err := tx.Prepare(sqlStatement)
 	if err != nil {
 		return err
 	}
 	defer insert.Close()
-	_, err = insert.Exec(sa.Address, sa.Name, sa.Favourite, sa.Removed, sa.UpdateClock, sa.ChainShortNames, sa.ENSName,
+	_, err = insert.Exec(sa.Address, sa.Name, sa.Removed, sa.UpdateClock, sa.ChainShortNames, sa.ENSName,
 		sa.IsTest, sa.CreatedAt, sa.ColorID)
 	return err
 }
@@ -164,12 +162,12 @@ func (sam *SavedAddressesManager) UpdateMetadataAndUpsertSavedAddress(sa SavedAd
 	return sa.UpdateClock, nil
 }
 
-func (sam *SavedAddressesManager) startTransactionAndCheckIfNewerChange(address common.Address, ens string, isTest bool, updateClock uint64) (newer bool, tx *sql.Tx, err error) {
+func (sam *SavedAddressesManager) startTransactionAndCheckIfNewerChange(address common.Address, isTest bool, updateClock uint64) (newer bool, tx *sql.Tx, err error) {
 	tx, err = sam.db.Begin()
 	if err != nil {
 		return false, nil, err
 	}
-	row := tx.QueryRow("SELECT update_clock FROM saved_addresses WHERE address = ? AND is_test = ? AND ens_name = ?", address, isTest, ens)
+	row := tx.QueryRow("SELECT update_clock FROM saved_addresses WHERE address = ? AND is_test = ?", address, isTest)
 	if err != nil {
 		return false, tx, err
 	}
@@ -183,7 +181,7 @@ func (sam *SavedAddressesManager) startTransactionAndCheckIfNewerChange(address 
 }
 
 func (sam *SavedAddressesManager) AddSavedAddressIfNewerUpdate(sa SavedAddress, updateClock uint64) (insertedOrUpdated bool, err error) {
-	newer, tx, err := sam.startTransactionAndCheckIfNewerChange(sa.Address, sa.ENSName, sa.IsTest, updateClock)
+	newer, tx, err := sam.startTransactionAndCheckIfNewerChange(sa.Address, sa.IsTest, updateClock)
 	defer func() {
 		if err == nil {
 			err = tx.Commit()
@@ -204,11 +202,11 @@ func (sam *SavedAddressesManager) AddSavedAddressIfNewerUpdate(sa SavedAddress, 
 	return true, err
 }
 
-func (sam *SavedAddressesManager) DeleteSavedAddress(address common.Address, ens string, isTest bool, updateClock uint64) (deleted bool, err error) {
+func (sam *SavedAddressesManager) DeleteSavedAddress(address common.Address, isTest bool, updateClock uint64) (deleted bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	newer, tx, err := sam.startTransactionAndCheckIfNewerChange(address, ens, isTest, updateClock)
+	newer, tx, err := sam.startTransactionAndCheckIfNewerChange(address, isTest, updateClock)
 	defer func() {
 		if err == nil {
 			err = tx.Commit()
@@ -220,12 +218,12 @@ func (sam *SavedAddressesManager) DeleteSavedAddress(address common.Address, ens
 		return false, err
 	}
 
-	update, err := tx.Prepare(`UPDATE saved_addresses SET removed = 1, update_clock = ? WHERE address = ? AND is_test = ? AND ens_name = ?`)
+	update, err := tx.Prepare(`UPDATE saved_addresses SET removed = 1, update_clock = ? WHERE address = ? AND is_test = ?`)
 	if err != nil {
 		return false, err
 	}
 	defer update.Close()
-	res, err := update.Exec(updateClock, address, isTest, ens)
+	res, err := update.Exec(updateClock, address, isTest)
 	if err != nil {
 		return false, err
 	}

@@ -233,27 +233,6 @@ func (api *API) DeleteCustomTokenByChainID(ctx context.Context, chainID uint64, 
 	return err
 }
 
-func (api *API) GetSavedAddresses(ctx context.Context) ([]SavedAddress, error) {
-	log.Debug("call to get saved addresses")
-	rst, err := api.s.savedAddressesManager.GetSavedAddresses()
-	log.Debug("result from database for saved addresses", "len", len(rst))
-	return rst, err
-}
-
-func (api *API) AddSavedAddress(ctx context.Context, sa SavedAddress) error {
-	log.Debug("call to create or edit saved address")
-	_, err := api.s.savedAddressesManager.UpdateMetadataAndUpsertSavedAddress(sa)
-	log.Debug("result from database for create or edit saved address", "err", err)
-	return err
-}
-
-func (api *API) DeleteSavedAddress(ctx context.Context, address common.Address, ens string, isTest bool) error {
-	log.Debug("call to remove saved address")
-	_, err := api.s.savedAddressesManager.DeleteSavedAddress(address, ens, isTest, uint64(time.Now().Unix()))
-	log.Debug("result from database for remove saved address", "err", err)
-	return err
-}
-
 // @deprecated
 func (api *API) GetPendingTransactions(ctx context.Context) ([]*transactions.PendingTransaction, error) {
 	log.Debug("wallet.api.GetPendingTransactions")
