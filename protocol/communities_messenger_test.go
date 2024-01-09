@@ -385,6 +385,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().True(response.Communities()[0].Joined())
+	s.Require().True(response.Communities()[0].JoinedAt() > 0)
 	s.Require().Len(response.Chats(), 2)
 	s.Require().Len(response.Communities()[0].Categories(), 1)
 
