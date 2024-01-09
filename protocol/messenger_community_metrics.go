@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 
@@ -26,10 +25,6 @@ func (m *Messenger) getChatIdsForCommunity(communityID types.HexBytes) ([]string
 	community, err := m.GetCommunityByID(communityID)
 	if err != nil {
 		return []string{}, err
-	}
-
-	if community == nil {
-		return []string{}, errors.New("no community found")
 	}
 	return community.ChatIDs(), nil
 }

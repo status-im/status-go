@@ -553,15 +553,6 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			return
 		}
 
-		if community == nil {
-			errmsg := fmt.Sprintf("Couldn't get the community by id: '%s'", request.CommunityID)
-			importProgress.AddTaskError(discord.ChannelsCreationTask, discord.Error(errmsg))
-			importProgress.StopTask(discord.ChannelsCreationTask)
-			progressUpdates <- importProgress
-			cancel <- []string{request.CommunityID.String(), "", request.DiscordChannelID}
-			return
-		}
-
 		importProgress.UpdateTaskProgress(discord.ChannelsCreationTask, progressValue)
 		progressUpdates <- importProgress
 

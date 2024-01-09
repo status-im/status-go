@@ -834,9 +834,6 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 	if err != nil {
 		return nil, nil, err
 	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
-	}
 
 	tokenPermission := request.ToCommunityTokenPermission()
 
@@ -1023,9 +1020,6 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 	if err != nil {
 		return nil, nil, err
 	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
-	}
 
 	changes, err := community.DeleteTokenPermission(request.PermissionID)
 	if err != nil {
@@ -1078,9 +1072,6 @@ func (m *Manager) SetShard(communityID types.HexBytes, shard *shard.Shard) (*Com
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 	if !community.IsControlNode() {
 		return nil, errors.New("not admin or owner")
 	}
@@ -1119,9 +1110,6 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	newDescription, err := request.ToCommunityDescription()
@@ -1215,7 +1203,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 	communityID := crypto.CompressPubkey(&key.PublicKey)
 
 	community, err := m.GetByID(communityID)
-	if err != nil {
+	if err != nil && err != ErrOrgNotFound {
 		return nil, err
 	}
 
@@ -1287,9 +1275,6 @@ func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.Communit
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 	chatID := uuid.New().String()
 	if thirdPartyID != "" {
 		chatID = chatID + thirdPartyID
@@ -1312,9 +1297,6 @@ func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *prot
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, nil, err
-	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
 	}
 
 	// Remove communityID prefix from chatID if exists
@@ -1340,9 +1322,6 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 	if err != nil {
 		return nil, nil, err
 	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
-	}
 
 	// Remove communityID prefix from chatID if exists
 	if strings.HasPrefix(chatID, communityID.String()) {
@@ -1365,9 +1344,6 @@ func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory, publ
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
-	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
 	}
 
 	categoryID := uuid.New().String()
@@ -1400,9 +1376,6 @@ func (m *Manager) EditCategory(request *requests.EditCommunityCategory) (*Commun
 	if err != nil {
 		return nil, nil, err
 	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
-	}
 
 	// Remove communityID prefix from chatID if exists
 	for i, cid := range request.ChatIDs {
@@ -1428,9 +1401,6 @@ func (m *Manager) EditChatFirstMessageTimestamp(communityID types.HexBytes, chat
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, nil, err
-	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
 	}
 
 	// Remove communityID prefix from chatID if exists
@@ -1459,9 +1429,6 @@ func (m *Manager) ReorderCategories(request *requests.ReorderCommunityCategories
 	if err != nil {
 		return nil, nil, err
 	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
-	}
 
 	changes, err := community.ReorderCategories(request.CategoryID, request.Position)
 	if err != nil {
@@ -1480,9 +1447,6 @@ func (m *Manager) ReorderChat(request *requests.ReorderCommunityChat) (*Communit
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
-	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
 	}
 
 	// Remove communityID prefix from chatID if exists
@@ -1507,9 +1471,6 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
-	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
 	}
 
 	changes, err := community.DeleteCategory(request.CategoryID)
@@ -1591,7 +1552,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	}
 
 	community, err := m.GetByID(id)
-	if err != nil {
+	if err != nil && err != ErrOrgNotFound {
 		return nil, err
 	}
 
@@ -1826,10 +1787,6 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, err
 	}
 
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
-
 	if !community.IsPrivilegedMember(signer) {
 		return nil, errors.New("user has not permissions to send events")
 	}
@@ -1909,9 +1866,6 @@ func (m *Manager) HandleCommunityEventsMessageRejected(signer *ecdsa.PublicKey, 
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	eventsMessage, err := CommunityEventsMessageFromProtobuf(message.Msg)
@@ -2407,9 +2361,6 @@ func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, re
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 
 	previousRequestToJoin, err := m.GetRequestToJoinByPkAndCommunityID(signer, community.ID())
 	if err != nil {
@@ -2457,9 +2408,6 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 	community, err := m.GetByID(request.CommunityId)
 	if err != nil {
 		return nil, nil, err
-	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
 	}
 
 	err = community.ValidateRequestToJoin(signer, request)
@@ -2578,9 +2526,7 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 	if err != nil {
 		return err
 	}
-	if community == nil {
-		return ErrOrgNotFound
-	}
+
 	if err := community.ValidateEditSharedAddresses(signer, request); err != nil {
 		return err
 	}
@@ -2876,9 +2822,6 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 
 	communityDescriptionBytes, err := proto.Marshal(request.Community)
 	if err != nil {
@@ -2989,9 +2932,6 @@ func (m *Manager) JoinCommunity(id types.HexBytes, forceJoin bool) (*Community, 
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 	if !forceJoin && community.Joined() {
 		// Nothing to do, we are already joined
 		return community, ErrOrgAlreadyJoined
@@ -3008,9 +2948,6 @@ func (m *Manager) SpectateCommunity(id types.HexBytes) (*Community, error) {
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 	community.Spectate()
 	if err = m.persistence.SaveCommunity(community); err != nil {
@@ -3071,9 +3008,6 @@ func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 
 	community.RemoveOurselvesFromOrg(&m.identity.PublicKey)
 	community.Leave()
@@ -3091,9 +3025,6 @@ func (m *Manager) KickedOutOfCommunity(id types.HexBytes) (*Community, error) {
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 
 	community.RemoveOurselvesFromOrg(&m.identity.PublicKey)
 	community.Leave()
@@ -3110,9 +3041,6 @@ func (m *Manager) AddMemberOwnerToCommunity(communityID types.HexBytes, pk *ecds
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	_, err = community.AddMember(pk, []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER})
@@ -3133,9 +3061,6 @@ func (m *Manager) RemoveUserFromCommunity(id types.HexBytes, pk *ecdsa.PublicKey
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	_, err = community.RemoveUserFromOrg(pk)
@@ -3162,9 +3087,6 @@ func (m *Manager) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunit
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 
 	_, err = community.UnbanUserFromCommunity(publicKey)
 	if err != nil {
@@ -3189,9 +3111,6 @@ func (m *Manager) AddRoleToMember(request *requests.AddRoleToMember) (*Community
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	if !community.hasMember(publicKey) {
@@ -3224,9 +3143,6 @@ func (m *Manager) RemoveRoleFromMember(request *requests.RemoveRoleFromMember) (
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 
 	if !community.hasMember(publicKey) {
 		return nil, ErrMemberNotFound
@@ -3258,9 +3174,6 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	_, err = community.BanUserFromCommunity(publicKey)
@@ -3307,7 +3220,14 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 }
 
 func (m *Manager) GetByID(id []byte) (*Community, error) {
-	return m.persistence.GetByID(&m.identity.PublicKey, id)
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, id)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+	return community, nil
 }
 
 func (m *Manager) GetByIDString(idString string) (*Community, error) {
@@ -3357,9 +3277,6 @@ func (m *Manager) CheckCommunityForJoining(communityID types.HexBytes) (*Communi
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	// We don't allow requesting access if already joined
@@ -3468,9 +3385,6 @@ func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string
 	community, err := m.GetByIDString(communityID)
 	if err != nil {
 		return false, err
-	}
-	if community == nil {
-		return false, nil
 	}
 	return community.CanPost(pk, chatID, grant)
 }
@@ -4548,12 +4462,9 @@ func (m *Manager) ImageToBase64(uri string) string {
 
 func (m *Manager) SaveCommunityToken(token *community_token.CommunityToken, croppedImage *images.CroppedImage) (*community_token.CommunityToken, error) {
 
-	community, err := m.GetByIDString(token.CommunityID)
+	_, err := m.GetByIDString(token.CommunityID)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	if croppedImage != nil && croppedImage.ImagePath != "" {
@@ -4583,9 +4494,6 @@ func (m *Manager) AddCommunityToken(token *community_token.CommunityToken, clock
 	community, err := m.GetByIDString(token.CommunityID)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	if !community.MemberCanManageToken(&m.identity.PublicKey, token) {
@@ -4668,9 +4576,6 @@ func (m *Manager) SetCommunityActiveMembersCount(communityID string, activeMembe
 	community, err := m.GetByIDString(communityID)
 	if err != nil {
 		return err
-	}
-	if community == nil {
-		return ErrOrgNotFound
 	}
 
 	updated, err := community.SetActiveMembersCount(activeMembersCount)
@@ -5149,9 +5054,6 @@ func (m *Manager) CreateCommunityTokenDeploymentSignature(ctx context.Context, c
 	community, err := m.GetByIDString(communityID)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 	if !community.IsControlNode() {
 		return nil, ErrNotControlNode

@@ -2837,10 +2837,6 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 		return err
 	}
 
-	if community == nil {
-		return communities.ErrOrgNotFound
-	}
-
 	// Currently this type of msg coming from the control node.
 	// If it will change in the future, check that events types starting from
 	// CONTROL_NODE were sent by a control node
