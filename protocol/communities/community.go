@@ -975,8 +975,8 @@ func (o *Community) Join() {
 	o.config.Spectated = false
 }
 
-func (o *Community) UpdateLastOpenedAt() {
-	o.config.LastOpenedAt = time.Now().Unix()
+func (o *Community) UpdateLastOpenedAt(timestamp int64) {
+	o.config.LastOpenedAt = timestamp
 }
 
 func (o *Community) Leave() {

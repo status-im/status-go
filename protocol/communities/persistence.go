@@ -74,11 +74,7 @@ type CommunityRecordBundle struct {
 const OR = " OR "
 const communitiesBaseQuery = `
 	SELECT
-<<<<<<< HEAD
-		c.id, c.private_key, c.control_node, c.description, c.joined, c.joined_at, c.spectated, c.verified, c.muted, c.muted_till,
-=======
-		c.id, c.private_key, c.control_node, c.description, c.joined, c.last_opened_at, c.spectated, c.verified, c.muted, c.muted_till,
->>>>>>> f619b2e71 (Add last opened at)
+		c.id, c.private_key, c.control_node, c.description, c.joined, c.joined_at, c.last_opened_at, c.spectated, c.verified, c.muted, c.muted_till,
 		csd.shard_cluster, csd.shard_index,
 		r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.state,
 		ae.raw_events, ae.raw_description,
@@ -114,11 +110,8 @@ func scanCommunity(scanner func(dest ...any) error) (*CommunityRecordBundle, err
 		&r.community.controlNode,
 		&r.community.description,
 		&r.community.joined,
-<<<<<<< HEAD
 		&r.community.joinedAt,
-=======
 		&r.community.lastOpenedAt,
->>>>>>> f619b2e71 (Add last opened at)
 		&r.community.spectated,
 		&r.community.verified,
 		&r.community.muted,
@@ -283,8 +276,8 @@ func (p *Persistence) JoinedCommunities(memberIdentity *ecdsa.PublicKey) ([]*Com
 	return p.queryCommunities(memberIdentity, query)
 }
 
-func (p *Persistence) UpdateLastOpenedAt(communityID types.HexBytes) error {
-	_, err := p.db.Exec(`UPDATE communities_communities SET last_opened_at = ? WHERE id = ?`, time.Now().Unix(), communityID)
+func (p *Persistence) UpdateLastOpenedAt(communityID types.HexBytes, timestamp int64) error {
+	_, err := p.db.Exec(`UPDATE communities_communities SET last_opened_at = ? WHERE id = ?`, timestamp, communityID)
 	return err
 }
 

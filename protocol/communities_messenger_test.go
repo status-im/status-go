@@ -3911,14 +3911,12 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityLastOpenedAt() {
-	ctx := context.Background()
-
 	community, _ := s.createCommunity()
 	s.advertiseCommunityTo(community, s.owner, s.alice)
 	s.joinCommunity(community, s.owner, s.alice)
 
 	// Mock frontend triggering communityUpdateLastOpenedAt
-	response, err = s.alice.CommunityUpdateLastOpenedAt(community.IDString())
+	response, err := s.alice.CommunityUpdateLastOpenedAt(community.IDString())
 	s.Require().NoError(err)
 
 	// Check lastOpenedAt was updated
