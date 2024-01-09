@@ -16,7 +16,6 @@ import (
 	node "github.com/waku-org/go-waku/waku/v2/node"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
 )
 
@@ -60,7 +59,6 @@ type FilterManager struct {
 	isFilterSubAlive func(sub *subscription.SubscriptionDetails) error
 	getFilter        func(string) *common.Filter
 	onNewEnvelopes   func(env *protocol.Envelope) error
-	peers            []peer.ID
 	logger           *zap.Logger
 	settings         settings
 	node             *node.WakuNode
@@ -75,7 +73,6 @@ func newFilterManager(ctx context.Context, logger *zap.Logger, getFilterFn func(
 	mgr.onNewEnvelopes = onNewEnvelopes
 	mgr.filterSubs = make(FilterSubs)
 	mgr.eventChan = make(chan FilterEvent, 100)
-	mgr.peers = make([]peer.ID, 0)
 	mgr.settings = settings
 	mgr.node = node
 	mgr.isFilterSubAlive = func(sub *subscription.SubscriptionDetails) error {
@@ -93,15 +90,11 @@ func (mgr *FilterManager) runFilterLoop(wg *sync.WaitGroup) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	// Populate filter peers initially
-	mgr.peers = mgr.findFilterPeers() // ordered list of peers to select from
-
 	for {
 		select {
 		case <-mgr.ctx.Done():
 			return
 		case <-ticker.C:
-			mgr.peers = mgr.findFilterPeers()
 			mgr.pingPeers()
 		case ev := <-mgr.eventChan:
 			mgr.processEvents(&ev)
@@ -205,14 +198,13 @@ func (mgr *FilterManager) subscribeToFilter(filterID string, tempID string) {
 	ctx, cancel := context.WithTimeout(mgr.ctx, requestTimeout)
 	defer cancel()
 
-	subDetails, err := mgr.node.FilterLightnode().Subscribe(ctx, contentFilter, filter.WithAutomaticPeerSelection(mgr.peers...))
+	subDetails, err := mgr.node.FilterLightnode().Subscribe(ctx, contentFilter, filter.WithAutomaticPeerSelection())
 	var sub *subscription.SubscriptionDetails
 	if err != nil {
-		logger.Warn("filter could not add wakuv2 filter for peers", zap.Any("peers", mgr.peers), zap.Error(err))
+		logger.Warn("filter could not add wakuv2 filter for peers", zap.Error(err))
 	} else {
 		sub = subDetails[0]
 		logger.Debug("filter subscription success", zap.Stringer("peer", sub.PeerID), zap.String("pubsubTopic", contentFilter.PubsubTopic), zap.Strings("contentTopics", contentFilter.ContentTopicsList()))
-		mgr.removePeer(sub.PeerID)
 	}
 
 	success := err == nil
@@ -276,7 +268,6 @@ func (mgr *FilterManager) pingPeers() {
 				} else {
 					logger.Debug("filter aliveness check failed", zap.Stringer("peerId", sub.PeerID), zap.Error(err))
 				}
-				mgr.removePeer(sub.PeerID)
 				mgr.eventChan <- FilterEvent{eventType: FilterEventPingResult, peerID: sub.PeerID, success: alive}
 			}(sub)
 		}
@@ -292,27 +283,6 @@ func (mgr *FilterManager) buildContentFilter(pubsubTopic string, contentTopicSet
 	return protocol.NewContentFilter(pubsubTopic, contentTopics...)
 }
 
-// Find suitable peer(s)
-func (mgr *FilterManager) findFilterPeers() []peer.ID {
-	allPeers := mgr.node.Host().Peerstore().Peers()
-
-	peers := make([]peer.ID, 0)
-	for _, peer := range allPeers {
-		protocols, err := mgr.node.Host().Peerstore().SupportsProtocols(peer, filter.FilterSubscribeID_v20beta1, relay.WakuRelayID_v200)
-		if err != nil {
-			mgr.logger.Debug("SupportsProtocols error", zap.Error(err))
-			continue
-		}
-
-		if len(protocols) == 2 {
-			peers = append(peers, peer)
-		}
-	}
-
-	mgr.logger.Debug("Filtered peers", zap.Int("cnt", len(peers)))
-	return peers
-}
-
 func (mgr *FilterManager) resubscribe(filterID string) {
 	subs, found := mgr.filterSubs[filterID]
 	if !found {
@@ -326,12 +296,6 @@ func (mgr *FilterManager) resubscribe(filterID string) {
 		// do nothing
 		return
 	}
-	for _, sub := range subs {
-		if sub == nil {
-			continue
-		}
-		mgr.removePeer(sub.PeerID)
-	}
 	mgr.logger.Debug("filter resubscribe subs count:", zap.String("filterId", filterID), zap.Int("len", len(subs)))
 	for i := len(subs); i < mgr.settings.MinPeersForFilter; i++ {
 		mgr.logger.Debug("filter check not passed, try subscribing to peers", zap.String("filterId", filterID))
@@ -339,7 +303,7 @@ func (mgr *FilterManager) resubscribe(filterID string) {
 		// Create sub placeholder in order to avoid potentially too many subs
 		tempID := uuid.NewString()
 		subs[tempID] = nil
-		mgr.subscribeToFilter(filterID, tempID)
+		go mgr.subscribeToFilter(filterID, tempID)
 	}
 }
 
@@ -358,15 +322,6 @@ func (mgr *FilterManager) runFilterSubscriptionLoop(sub *subscription.Subscripti
 				mgr.logger.Debug("filter sub is closed", zap.String("id", sub.ID))
 				return
 			}
-		}
-	}
-}
-
-func (mgr *FilterManager) removePeer(peerID peer.ID) {
-	for i, p := range mgr.peers {
-		if peerID == p {
-			mgr.peers = append(mgr.peers[:i], mgr.peers[i+1:]...)
-			break
 		}
 	}
 }
