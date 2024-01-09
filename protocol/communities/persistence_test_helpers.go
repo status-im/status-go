@@ -7,28 +7,28 @@ import (
 )
 
 type RawCommunityRow struct {
-	ID          []byte
-	PrivateKey  []byte
-	Description []byte
-	Joined      bool
-	JoinedAt    int64
-	Spectated   bool
-	Verified    bool
-	SyncedAt    uint64
-	Muted       bool
+	ID           []byte
+	PrivateKey   []byte
+	Description  []byte
+	Joined       bool
+	JoinedAt     int64
+	Spectated    bool
+	Verified     bool
+	SyncedAt     uint64
+	Muted        bool
 	LastOpenedAt int64
 }
 
 func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncInstallationCommunity) RawCommunityRow {
 	return RawCommunityRow{
-		ID:          syncCommProto.Id,
-		Description: syncCommProto.Description,
-		Joined:      syncCommProto.Joined,
-		JoinedAt:    syncCommProto.JoinedAt,
-		Spectated:   syncCommProto.Spectated,
-		Verified:    syncCommProto.Verified,
-		SyncedAt:    syncCommProto.Clock,
-		Muted:       syncCommProto.Muted,
+		ID:           syncCommProto.Id,
+		Description:  syncCommProto.Description,
+		Joined:       syncCommProto.Joined,
+		JoinedAt:     syncCommProto.JoinedAt,
+		Spectated:    syncCommProto.Spectated,
+		Verified:     syncCommProto.Verified,
+		SyncedAt:     syncCommProto.Clock,
+		Muted:        syncCommProto.Muted,
 		LastOpenedAt: syncCommProto.LastOpenedAt,
 	}
 }
