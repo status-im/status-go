@@ -400,7 +400,7 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 
 		community, err := r.manager.messenger.communitiesManager.GetByID(communityID)
 
-		if err != nil {
+		if err != nil && err != communities.ErrOrgNotFound {
 			logger.Error("failed to read community from database",
 				zap.String("communityID", r.requestID.DataID),
 				zap.Error(err))

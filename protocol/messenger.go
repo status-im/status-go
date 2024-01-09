@@ -2310,10 +2310,6 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			return nil, err
 		}
 
-		if community == nil {
-			return nil, errors.New("community not found")
-		}
-
 		wrappedCommunity, err := community.ToProtocolMessageBytes()
 		if err != nil {
 			return nil, err

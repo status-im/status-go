@@ -154,10 +154,6 @@ func (m *Messenger) ShareCommunityURLWithData(communityID types.HexBytes) (strin
 		return "", err
 	}
 
-	if community == nil {
-		return "", fmt.Errorf("community with communityID %s not found", communityID)
-	}
-
 	data, shortKey, err := m.prepareEncodedCommunityData(community)
 	if err != nil {
 		return "", err

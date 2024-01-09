@@ -1288,7 +1288,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 	id := types.HexBytes(crypto.CompressPubkey(communityPubKey))
 
 	community, err := m.communitiesManager.GetByID(id)
-	if err != nil {
+	if err != nil && err != communities.ErrOrgNotFound {
 		m.logger.Debug("Couldn't get community for community with id: ", zap.Any("id", id))
 		return err
 	}
