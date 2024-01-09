@@ -102,7 +102,7 @@ func (p *Persistence) getSyncedRawCommunity(id []byte) (*RawCommunityRow, error)
 
 func (p *Persistence) saveRawCommunityRow(rawCommRow RawCommunityRow) error {
 	_, err := p.db.Exec(
-		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "joined_at", "verified", "synced_at", "muted", last_opened_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "joined_at", "verified", "synced_at", "muted", "last_opened_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		rawCommRow.ID,
 		rawCommRow.PrivateKey,
 		rawCommRow.Description,
@@ -118,11 +118,7 @@ func (p *Persistence) saveRawCommunityRow(rawCommRow RawCommunityRow) error {
 
 func (p *Persistence) saveRawCommunityRowWithoutSyncedAt(rawCommRow RawCommunityRow) error {
 	_, err := p.db.Exec(
-<<<<<<< HEAD
-		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "joined_at", "verified", "muted") VALUES (?, ?, ?, ?, ?, ?, ?)`,
-=======
-		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "verified", "muted", "last_opened_at") VALUES (?, ?, ?, ?, ?, ?, ?)`,
->>>>>>> f619b2e71 (Add last opened at)
+		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "joined_at", "verified", "muted", "last_opened_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		rawCommRow.ID,
 		rawCommRow.PrivateKey,
 		rawCommRow.Description,

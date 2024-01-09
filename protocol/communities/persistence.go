@@ -178,7 +178,7 @@ func (p *Persistence) saveCommunity(r *CommunityRecord) error {
 	_, err := p.db.Exec(`
         INSERT INTO communities_communities (
             id, private_key, control_node, description,
-            joined, joined_at, spectated, verified, muted, muted_till
+            joined, joined_at, spectated, verified, muted, muted_till, last_opened_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		r.id, r.privateKey, r.controlNode, r.description,
 		r.joined, r.joinedAt, r.spectated, r.verified, r.muted, r.mutedTill, r.lastOpenedAt)

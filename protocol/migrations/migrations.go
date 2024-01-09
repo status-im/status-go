@@ -115,9 +115,9 @@
 // 1700044187_curated_communities.up.sql (131B)
 // 1700820989_add_resend_automatically_index.up.sql (77B)
 // 1702996953_add_communities_shards_table.up.sql (208B)
-// 1704034060_add_last_opened_at_column_to_communities.up.sql (89B)
 // 1704489636_add_album_images.up.sql (66B)
 // 1704821941_add_joined_at_for_community.up.sql (84B)
+// 1704832511_add_last_opened_at_for_communities.up.sql (89B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -2488,26 +2488,6 @@ func _1702996953_add_communities_shards_tableUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __1704034060_add_last_opened_at_column_to_communitiesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\xce\xcf\xcd\x2d\xcd\xcb\x2c\xc9\x4c\x2d\x8e\x47\x62\x2b\x38\xba\xb8\x28\x38\xfb\xfb\x84\xfa\xfa\x29\xe4\x24\x16\x97\xc4\xe7\x17\xa4\xe6\xa5\xa6\xc4\x27\x96\x28\x84\xfa\x05\x7b\xba\xfb\xb9\xba\x28\x38\x79\xba\x7b\xfa\x85\x28\xb8\xb8\xba\x39\x86\xfa\x84\x28\x18\x58\x73\x01\x02\x00\x00\xff\xff\x2c\x2a\x97\x97\x59\x00\x00\x00")
-
-func _1704034060_add_last_opened_at_column_to_communitiesUpSqlBytes() ([]byte, error) {
-	return bindataRead(
-		__1704034060_add_last_opened_at_column_to_communitiesUpSql,
-		"1704034060_add_last_opened_at_column_to_communities.up.sql",
-	)
-}
-
-func _1704034060_add_last_opened_at_column_to_communitiesUpSql() (*asset, error) {
-	bytes, err := _1704034060_add_last_opened_at_column_to_communitiesUpSqlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "1704034060_add_last_opened_at_column_to_communities.up.sql", size: 89, mode: os.FileMode(0644), modTime: time.Unix(1705479706, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa7, 0x73, 0x6, 0x6f, 0xa5, 0xc5, 0x5b, 0x5a, 0xf7, 0xf3, 0xb3, 0x28, 0x27, 0x61, 0x28, 0x2c, 0x6a, 0x1, 0x93, 0x14, 0x5b, 0xc0, 0xe8, 0xb5, 0xf6, 0xbf, 0x9f, 0xfb, 0x20, 0x7c, 0xd9, 0x54}}
-	return a, nil
-}
-
 var __1704489636_add_album_imagesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x2d\x4e\x2d\x8a\xcf\x4d\x2d\x2e\x4e\x4c\x4f\x2d\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\xcc\x49\x2a\xcd\x8d\xcf\xcc\x05\x8b\x87\xb8\x46\x84\x28\xb8\xb8\xba\x39\x86\xfa\x84\x28\x28\x29\x59\x03\x02\x00\x00\xff\xff\x67\x96\x07\xf7\x42\x00\x00\x00")
 
 func _1704489636_add_album_imagesUpSqlBytes() ([]byte, error) {
@@ -2545,6 +2525,26 @@ func _1704821941_add_joined_at_for_communityUpSql() (*asset, error) {
 
 	info := bindataFileInfo{name: "1704821941_add_joined_at_for_community.up.sql", size: 84, mode: os.FileMode(0644), modTime: time.Unix(1704832103, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x87, 0xa1, 0xca, 0xbe, 0x8e, 0xd1, 0xd5, 0xf, 0xe3, 0x4, 0x7, 0xdd, 0x62, 0x47, 0xc3, 0x90, 0xfb, 0x3, 0xb8, 0x48, 0x35, 0xc9, 0xc9, 0xe0, 0xe3, 0xb7, 0x36, 0x9f, 0xb8, 0x61, 0x1e, 0x18}}
+	return a, nil
+}
+
+var __1704832511_add_last_opened_at_for_communitiesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\xce\xcf\xcd\x2d\xcd\xcb\x2c\xc9\x4c\x2d\x8e\x47\x62\x2b\x38\xba\xb8\x28\x38\xfb\xfb\x84\xfa\xfa\x29\xe4\x24\x16\x97\xc4\xe7\x17\xa4\xe6\xa5\xa6\xc4\x27\x96\x28\x84\xfa\x05\x7b\xba\xfb\xb9\xba\x28\x38\x79\xba\x7b\xfa\x85\x28\xb8\xb8\xba\x39\x86\xfa\x84\x28\x18\x58\x73\x01\x02\x00\x00\xff\xff\x2c\x2a\x97\x97\x59\x00\x00\x00")
+
+func _1704832511_add_last_opened_at_for_communitiesUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1704832511_add_last_opened_at_for_communitiesUpSql,
+		"1704832511_add_last_opened_at_for_communities.up.sql",
+	)
+}
+
+func _1704832511_add_last_opened_at_for_communitiesUpSql() (*asset, error) {
+	bytes, err := _1704832511_add_last_opened_at_for_communitiesUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1704832511_add_last_opened_at_for_communities.up.sql", size: 89, mode: os.FileMode(0644), modTime: time.Unix(1705479838, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa7, 0x73, 0x6, 0x6f, 0xa5, 0xc5, 0x5b, 0x5a, 0xf7, 0xf3, 0xb3, 0x28, 0x27, 0x61, 0x28, 0x2c, 0x6a, 0x1, 0x93, 0x14, 0x5b, 0xc0, 0xe8, 0xb5, 0xf6, 0xbf, 0x9f, 0xfb, 0x20, 0x7c, 0xd9, 0x54}}
 	return a, nil
 }
 
@@ -2909,11 +2909,11 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1702996953_add_communities_shards_table.up.sql": _1702996953_add_communities_shards_tableUpSql,
 
-	"1704034060_add_last_opened_at_column_to_communities.up.sql": _1704034060_add_last_opened_at_column_to_communitiesUpSql,
-
 	"1704489636_add_album_images.up.sql": _1704489636_add_album_imagesUpSql,
 
 	"1704821941_add_joined_at_for_community.up.sql": _1704821941_add_joined_at_for_communityUpSql,
+
+	"1704832511_add_last_opened_at_for_communities.up.sql": _1704832511_add_last_opened_at_for_communitiesUpSql,
 
 	"README.md": readmeMd,
 
@@ -3076,9 +3076,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1700044187_curated_communities.up.sql":                                       &bintree{_1700044187_curated_communitiesUpSql, map[string]*bintree{}},
 	"1700820989_add_resend_automatically_index.up.sql":                            &bintree{_1700820989_add_resend_automatically_indexUpSql, map[string]*bintree{}},
 	"1702996953_add_communities_shards_table.up.sql":                              &bintree{_1702996953_add_communities_shards_tableUpSql, map[string]*bintree{}},
-	"1704034060_add_last_opened_at_column_to_communities.up.sql":                  &bintree{_1704034060_add_last_opened_at_column_to_communitiesUpSql, map[string]*bintree{}},
 	"1704489636_add_album_images.up.sql":                                          &bintree{_1704489636_add_album_imagesUpSql, map[string]*bintree{}},
 	"1704821941_add_joined_at_for_community.up.sql":                               &bintree{_1704821941_add_joined_at_for_communityUpSql, map[string]*bintree{}},
+	"1704832511_add_last_opened_at_for_communities.up.sql":                        &bintree{_1704832511_add_last_opened_at_for_communitiesUpSql, map[string]*bintree{}},
 	"README.md": &bintree{readmeMd, map[string]*bintree{}},
 	"doc.go":    &bintree{docGo, map[string]*bintree{}},
 }}
