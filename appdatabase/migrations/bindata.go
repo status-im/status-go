@@ -103,6 +103,7 @@
 // 1702395750_fix_enr_shards_test.up.sql (1.234kB)
 // 1702999401_add_dns_discovery_url.up.sql (284B)
 // 1704281285_tokens_advanced_settings.up.sql (743B)
+// 1704820601_add_joined_at_for_community.up.sql (84B)
 // doc.go (74B)
 // test.log (79B)
 
@@ -2233,6 +2234,26 @@ func _1704281285_tokens_advanced_settingsUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1704820601_add_joined_at_for_communityUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\xce\xcf\xcd\x2d\xcd\xcb\x2c\xc9\x4c\x2d\x8e\x47\x62\x2b\x38\xba\xb8\x28\x38\xfb\xfb\x84\xfa\xfa\x29\x64\xe5\x67\xe6\xa5\xa6\xc4\x27\x96\x28\x84\xfa\x05\x7b\xba\xfb\xb9\xba\x28\x38\x79\xba\x7b\xfa\x85\x28\xb8\xb8\xba\x39\x86\xfa\x84\x28\x18\x58\x73\x01\x02\x00\x00\xff\xff\xe6\x0a\xf0\x91\x54\x00\x00\x00")
+
+func _1704820601_add_joined_at_for_communityUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1704820601_add_joined_at_for_communityUpSql,
+		"1704820601_add_joined_at_for_community.up.sql",
+	)
+}
+
+func _1704820601_add_joined_at_for_communityUpSql() (*asset, error) {
+	bytes, err := _1704820601_add_joined_at_for_communityUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1704820601_add_joined_at_for_community.up.sql", size: 84, mode: os.FileMode(0644), modTime: time.Unix(1704820609, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x87, 0xa1, 0xca, 0xbe, 0x8e, 0xd1, 0xd5, 0xf, 0xe3, 0x4, 0x7, 0xdd, 0x62, 0x47, 0xc3, 0x90, 0xfb, 0x3, 0xb8, 0x48, 0x35, 0xc9, 0xc9, 0xe0, 0xe3, 0xb7, 0x36, 0x9f, 0xb8, 0x61, 0x1e, 0x18}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xc9\xb1\x0d\xc4\x20\x0c\x05\xd0\x9e\x29\xfe\x02\xd8\xfd\x6d\xe3\x4b\xac\x2f\x44\x82\x09\x78\x7f\xa5\x49\xfd\xa6\x1d\xdd\xe8\xd8\xcf\x55\x8a\x2a\xe3\x47\x1f\xbe\x2c\x1d\x8c\xfa\x6f\xe3\xb4\x34\xd4\xd9\x89\xbb\x71\x59\xb6\x18\x1b\x35\x20\xa2\x9f\x0a\x03\xa2\xe5\x0d\x00\x00\xff\xff\x60\xcd\x06\xbe\x4a\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -2570,6 +2591,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1704281285_tokens_advanced_settings.up.sql": _1704281285_tokens_advanced_settingsUpSql,
 
+	"1704820601_add_joined_at_for_community.up.sql": _1704820601_add_joined_at_for_communityUpSql,
+
 	"doc.go": docGo,
 
 	"test.log": testLog,
@@ -2719,6 +2742,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1702395750_fix_enr_shards_test.up.sql":                                    &bintree{_1702395750_fix_enr_shards_testUpSql, map[string]*bintree{}},
 	"1702999401_add_dns_discovery_url.up.sql":                                  &bintree{_1702999401_add_dns_discovery_urlUpSql, map[string]*bintree{}},
 	"1704281285_tokens_advanced_settings.up.sql":                               &bintree{_1704281285_tokens_advanced_settingsUpSql, map[string]*bintree{}},
+	"1704820601_add_joined_at_for_community.up.sql":                            &bintree{_1704820601_add_joined_at_for_communityUpSql, map[string]*bintree{}},
 	"doc.go":   &bintree{docGo, map[string]*bintree{}},
 	"test.log": &bintree{testLog, map[string]*bintree{}},
 }}
