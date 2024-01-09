@@ -3038,6 +3038,8 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 	}
 	syncMessage.EncryptionKeys = encodedKeys
 
+	syncMessage.LastOpenedAt = community.LastOpenedAt()
+
 	encodedMessage, err := proto.Marshal(syncMessage)
 	if err != nil {
 		return err

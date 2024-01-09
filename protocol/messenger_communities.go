@@ -577,12 +577,12 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 }
 
 func (m *Messenger) CommunityUpdateLastOpenedAt(communityID string) (*MessengerResponse, error) {
-	updateCommunity, err := m.communitiesManager.CommunityUpdateLastOpenedAt(communityID)
+	updatedCommunity, err := m.communitiesManager.CommunityUpdateLastOpenedAt(communityID)
 	if err != nil {
 		return nil, err
 	}
 	response := &MessengerResponse{}
-	response.AddCommunity(updateCommunity)
+	response.AddCommunity(updatedCommunity)
 	return response, nil
 }
 
