@@ -3667,6 +3667,10 @@ func (m *Messenger) RemoveCommunityToken(chainID int, contractAddress string) er
 	return m.communitiesManager.RemoveCommunityToken(chainID, contractAddress)
 }
 
+func (m *Messenger) FetchMissingCommunityTokens(community *communities.Community) error {
+	return m.communitiesManager.HandleCommunityTokensMetadata(community)
+}
+
 func (m *Messenger) CheckPermissionsToJoinCommunity(request *requests.CheckPermissionToJoinCommunity) (*communities.CheckPermissionToJoinResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
