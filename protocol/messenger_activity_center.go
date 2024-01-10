@@ -163,11 +163,11 @@ func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids
 
 	// Mark messages as seen
 	for chatID, messageIDs := range repliesAndMentions {
-		count, countWithMentions, err := m.markMessagesSeenImpl(chatID, messageIDs)
+		count, countWithMentions, chat, err := m.markMessagesSeenImpl(chatID, messageIDs)
 		if err != nil {
 			return nil, err
 		}
-
+		response.AddChat(chat)
 		response.AddSeenAndUnseenMessages(&SeenUnseenMessages{
 			ChatID:            chatID,
 			Count:             count,
