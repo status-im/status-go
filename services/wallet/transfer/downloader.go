@@ -478,7 +478,7 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 		// Double check provider returned the correct log
 		if slices.Contains(d.accounts, from) {
 			address = from
-		} else if !slices.Contains(d.accounts, to) {
+		} else if slices.Contains(d.accounts, to) {
 			address = to
 		} else {
 			log.Error("from/to address mismatch", "log", l, "addresses", d.accounts)
