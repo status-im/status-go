@@ -10,7 +10,7 @@ import (
 )
 
 func TestBuildDefaultNetworks(t *testing.T) {
-	poktToken := "poket-token"
+	poktToken := "grove-token"
 	infuraToken := "infura-token"
 	request := &requests.CreateAccount{
 		WalletSecretsConfig: requests.WalletSecretsConfig{
