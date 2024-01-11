@@ -41,7 +41,7 @@ const (
 	localFleet              = "local-test-fleet-1"
 	localMailserverID       = "local-test-mailserver"
 	storeNodeConnectTimeout = 500 * time.Millisecond
-	runLocalTests           = false
+	runLocalTests           = true
 )
 
 func TestMessengerStoreNodeRequestSuite(t *testing.T) {
@@ -119,7 +119,7 @@ func (s *MessengerStoreNodeRequestSuite) SetupTest() {
 	s.cancel = make(chan struct{}, 10)
 
 	storeNodeLogger := s.logger.Named("store-node-waku")
-	s.wakuStoreNode = NewWakuV2(&s.Suite, storeNodeLogger, true, true, false)
+	s.wakuStoreNode = NewWakuV2(&s.Suite, storeNodeLogger, true, true, false, 0)
 
 	storeNodeListenAddresses := s.wakuStoreNode.ListenAddresses()
 	s.Require().LessOrEqual(1, len(storeNodeListenAddresses))
@@ -139,7 +139,7 @@ func (s *MessengerStoreNodeRequestSuite) TearDown() {
 
 func (s *MessengerStoreNodeRequestSuite) createOwner() {
 	wakuLogger := s.logger.Named("owner-waku-node")
-	wakuV2 := NewWakuV2(&s.Suite, wakuLogger, true, false, false)
+	wakuV2 := NewWakuV2(&s.Suite, wakuLogger, true, false, false, 0)
 	s.ownerWaku = gethbridge.NewGethWakuV2Wrapper(wakuV2)
 
 	messengerLogger := s.logger.Named("owner-messenger")
@@ -152,7 +152,7 @@ func (s *MessengerStoreNodeRequestSuite) createOwner() {
 
 func (s *MessengerStoreNodeRequestSuite) createBob() {
 	wakuLogger := s.logger.Named("bob-waku-node")
-	wakuV2 := NewWakuV2(&s.Suite, wakuLogger, true, false, false)
+	wakuV2 := NewWakuV2(&s.Suite, wakuLogger, true, false, false, 0)
 	s.bobWaku = gethbridge.NewGethWakuV2Wrapper(wakuV2)
 
 	messengerLogger := s.logger.Named("bob-messenger")
@@ -699,26 +699,76 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityEnvelopesOrder() {
 	s.requireCommunitiesEqual(fetchedCommunity, community)
 }
 
-// TestFetchRealCommunity is intended to only run locally to check the community description in all of the store nodes.
-// Shouldn't be executed in CI, because it relies on connection to the real network.
-//
-// To run this test, first set `runLocalTests` to true.
-// Then carefully set all of communityID, communityShard, fleet and other const variables.
-// NOTE: I only tested it with the default parameters, but in theory it should work for any configuration.
+/*
+	TestFetchRealCommunity is not actually a test, but an utility to check the community description in all of the store nodes.
+	It's intended to only run locally and shouldn't be executed in CI, because it relies on connection to the real network.
+
+	TODO: It would be nice to move this code to a real utility in /cmd.
+		  It should allow us to fairly verify the community owner and do other good things.
+
+	To run this test, first set `runLocalTests` to true.
+	Then carefully set all of communityID, communityShard, fleet and other const variables.
+
+	NOTE: I only tested it with the default parameters, but in theory it should work for any configuration.
+*/
+
+type testFetchRealCommunityExampleTokenInfo struct {
+	ChainID         uint64
+	ContractAddress string
+}
+
+var testFetchRealCommunityExample = []struct {
+	CommunityID            string
+	CommunityShard         *shard.Shard // WARNING: I didn't test a sharded community
+	Fleet                  string
+	UseShardAsDefaultTopic bool
+	ClusterID              uint16
+	UserPrivateKeyString   string // When empty a new user will be created
+	// Setup OwnerPublicKey and CommunityTokens if the community has owner token
+	// This is needed to mock the owner verification
+	OwnerPublicKey  string
+	CommunityTokens []testFetchRealCommunityExampleTokenInfo
+}{
+	{
+		//Example 1, status.prod fleet
+		CommunityID:            "0x03073514d4c14a7d10ae9fc9b0f05abc904d84166a6ac80add58bf6a3542a4e50a",
+		CommunityShard:         nil,
+		Fleet:                  params.FleetStatusProd,
+		UseShardAsDefaultTopic: false,
+		ClusterID:              shard.UndefinedShardValue,
+	},
+}
+
 func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 	if !runLocalTests {
 		return
 	}
 
-	const communityID = "0x03073514d4c14a7d10ae9fc9b0f05abc904d84166a6ac80add58bf6a3542a4e50a"
-	var communityShard *shard.Shard
+	exampleToRun := testFetchRealCommunityExample[0]
 
-	const fleet = params.FleetStatusProd
-	const useShardAsDefaultTopic = false
-	const clusterID = 0
-	const userPrivateKeyString = "" // When empty a new user will be created
-	contentTopic := wakuV2common.BytesToTopic(transport.ToTopic(communityID))
+	// Test configuration
+	communityID := exampleToRun.CommunityID
+	communityShard := exampleToRun.CommunityShard
+	fleet := exampleToRun.Fleet
+	useShardAsDefaultTopic := exampleToRun.UseShardAsDefaultTopic
+	clusterID := exampleToRun.ClusterID
+	userPrivateKeyString := exampleToRun.UserPrivateKeyString
+	ownerPublicKey := exampleToRun.OwnerPublicKey
+	communityTokens := exampleToRun.CommunityTokens
+
+	// Prepare things depending on the configuration
 	nodesList := mailserversDB.DefaultMailserversByFleet(fleet)
+	contentTopic := wakuV2common.BytesToTopic(transport.ToTopic(communityID))
+
+	communityIDBytes, err := types.DecodeHex(communityID)
+	s.Require().NoError(err)
+
+	// update mock - the signer for the community returned by the contracts should be owner
+	for _, communityToken := range communityTokens {
+		s.collectiblesServiceMock.SetSignerPubkeyForCommunity(communityIDBytes, ownerPublicKey)
+		s.collectiblesServiceMock.SetMockCollectibleContractData(communityToken.ChainID, communityToken.ContractAddress,
+			&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
+	}
 
 	results := map[string]singleResult{}
 	wg := sync.WaitGroup{}
@@ -745,7 +795,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 			wakuLogger := s.logger.Named(fmt.Sprintf("user-waku-node-%d", i))
 			messengerLogger := s.logger.Named(fmt.Sprintf("user-messenger-%d", i))
 
-			wakuV2 := NewWakuV2(&s.Suite, wakuLogger, true, false, useShardAsDefaultTopic)
+			wakuV2 := NewWakuV2(&s.Suite, wakuLogger, true, false, useShardAsDefaultTopic, clusterID)
 			userWaku := gethbridge.NewGethWakuV2Wrapper(wakuV2)
 
 			//
@@ -782,6 +832,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 					Fleet:     localFleet,
 					ClusterID: clusterID,
 				}),
+				WithCommunityTokensService(s.collectiblesServiceMock),
 			}
 
 			// Create user without `createBob` func to force desired fleet
@@ -823,7 +874,6 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 	wg.Wait()
 
 	// Print the results
-
 	for storeNodeName, result := range results {
 		fmt.Printf("%s --- %s\n", storeNodeName, result.toString())
 	}

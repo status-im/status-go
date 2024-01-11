@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"errors"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"math/big"
 	"os"
 	"sync"
@@ -251,10 +252,16 @@ func WaitForAvailableStoreNode(s *suite.Suite, m *Messenger, timeout time.Durati
 	s.Require().True(available)
 }
 
-func NewWakuV2(s *suite.Suite, logger *zap.Logger, useLocalWaku bool, enableStore bool, useShardAsDefaultTopic bool) *waku2.Waku {
+func NewWakuV2(s *suite.Suite, logger *zap.Logger, useLocalWaku bool, enableStore bool, useShardAsDefaultTopic bool, clusterID uint16) *waku2.Waku {
 	wakuConfig := &waku2.Config{
-		DefaultShardPubsubTopic: "", // TODO: Empty string should work fine, for default value if not.
-		UseShardAsDefaultTopic:  useShardAsDefaultTopic,
+		UseShardAsDefaultTopic: useShardAsDefaultTopic,
+		ClusterID:              clusterID,
+	}
+
+	if wakuConfig.UseShardAsDefaultTopic {
+		wakuConfig.DefaultShardPubsubTopic = shard.DefaultShardPubsubTopic()
+	} else {
+		wakuConfig.DefaultShardPubsubTopic = ""
 	}
 
 	var onPeerStats func(connStatus types.ConnStatus)
@@ -315,7 +322,7 @@ func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []s
 	nodes := make([]*waku2.Waku, len(nodeNames))
 	for i, name := range nodeNames {
 		logger := parentLogger.With(zap.String("name", name+"-waku"))
-		wakuNode := NewWakuV2(s, logger, true, false, false)
+		wakuNode := NewWakuV2(s, logger, true, false, false, 0)
 		nodes[i] = wakuNode
 	}
 
