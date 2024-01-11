@@ -2565,7 +2565,7 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 
 	if request.TryDatabase {
 		community, err := m.FindCommunityInfoFromDB(communityID)
-		if err != nil {
+		if err != nil && err != communities.ErrOrgNotFound {
 			return nil, err
 		}
 		if community != nil {
