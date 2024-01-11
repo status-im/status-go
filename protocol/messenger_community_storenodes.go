@@ -16,7 +16,7 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
-func (m *Messenger) sendPublicSyncCommunityStorenodes(community *communities.Community, snodes storenodes.Storenodes) error {
+func (m *Messenger) sendCommunityPublicStorenodesInfo(community *communities.Community, snodes storenodes.Storenodes) error {
 	if !community.IsControlNode() {
 		return communities.ErrNotControlNode
 	}
@@ -36,11 +36,11 @@ func (m *Messenger) sendPublicSyncCommunityStorenodes(community *communities.Com
 	if err != nil {
 		return err
 	}
-	signedSyncCommunityStorenodes := &protobuf.SyncCommunityStorenodes{
+	signedStorenodesInfo := &protobuf.CommunityPublicStorenodesInfo{
 		Signature: signature,
 		Payload:   snPayload,
 	}
-	signedPayload, err := proto.Marshal(signedSyncCommunityStorenodes)
+	signedPayload, err := proto.Marshal(signedStorenodesInfo)
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (m *Messenger) sendPublicSyncCommunityStorenodes(community *communities.Com
 		Payload:             signedPayload,
 		Sender:              community.PrivateKey(),
 		SkipEncryptionLayer: true,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_COMMUNITY_STORENODES,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_STORENODES_INFO,
 		PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
 	}
 
@@ -57,7 +57,7 @@ func (m *Messenger) sendPublicSyncCommunityStorenodes(community *communities.Com
 	return err
 }
 
-func (m *Messenger) HandleSyncCommunityStorenodes(state *ReceivedMessageState, a *protobuf.SyncCommunityStorenodes, statusMessage *v1protocol.StatusMessage) error {
+func (m *Messenger) HandleCommunityPublicStorenodesInfo(state *ReceivedMessageState, a *protobuf.CommunityPublicStorenodesInfo, statusMessage *v1protocol.StatusMessage) error {
 	sn := &protobuf.CommunityStorenodes{}
 	err := proto.Unmarshal(a.Payload, sn)
 	if err != nil {
@@ -65,7 +65,7 @@ func (m *Messenger) HandleSyncCommunityStorenodes(state *ReceivedMessageState, a
 	}
 
 	logError := func(err error) {
-		m.logger.Error("HandleSyncCommunityStorenodes failed: ", zap.Error(err), zap.String("communityID", types.EncodeHex(sn.CommunityId)))
+		m.logger.Error("HandleCommunityPublicStorenodesInfo failed: ", zap.Error(err), zap.String("communityID", types.EncodeHex(sn.CommunityId)))
 	}
 
 	err = m.verifyCommunitySignature(a.Payload, a.Signature, sn.CommunityId, sn.ChainId)

@@ -238,8 +238,8 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
            case protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_SHARD_INFO:
 		return m.handleCommunityPublicShardInfoProtobuf(messageState, protoBytes, msg, filter)
 
-           case protobuf.ApplicationMetadataMessage_SYNC_COMMUNITY_STORENODES:
-		return m.handleSyncCommunityStorenodesProtobuf(messageState, protoBytes, msg, filter)
+           case protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_STORENODES_INFO:
+		return m.handleCommunityPublicStorenodesInfoProtobuf(messageState, protoBytes, msg, filter)
         
 	default:
 		m.logger.Info("protobuf type not found", zap.String("type", string(msg.ApplicationLayer.Type)))
@@ -1703,12 +1703,10 @@ func (m *Messenger) handleCommunityPublicShardInfoProtobuf(messageState *Receive
 	
 }
 
-func (m *Messenger) handleSyncCommunityStorenodesProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
-	m.logger.Info("handling SyncCommunityStorenodeInfo")
+func (m *Messenger) handleCommunityPublicStorenodesInfoProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
+	m.logger.Info("handling CommunityPublicStorenodesInfo")
 	
-
-	
-	p := &protobuf.SyncCommunityStorenodes{}
+	p := &protobuf.CommunityPublicStorenodesInfo{}
 	err := proto.Unmarshal(protoBytes, p)
 	if err != nil {
 		return err
@@ -1716,7 +1714,7 @@ func (m *Messenger) handleSyncCommunityStorenodesProtobuf(messageState *Received
 
 	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.ApplicationLayer.Type, p)
 
-	return m.HandleSyncCommunityStorenodes(messageState, p, msg)
+	return m.HandleCommunityPublicStorenodesInfo(messageState, p, msg)
 	
 }
 

@@ -37,7 +37,7 @@ func (d *Database) syncSave(communityID types.HexBytes, snode []Storenode, clock
 	now := time.Now().Unix()
 	dbNodes, err := d.getByCommunityID(communityID, tx)
 	if err != nil {
-		return err
+		return fmt.Errorf("getting storenodes by community id: %w", err)
 	}
 	// Soft-delete db nodes that are not in the provided list
 	for _, dbN := range dbNodes {
@@ -48,7 +48,7 @@ func (d *Database) syncSave(communityID types.HexBytes, snode []Storenode, clock
 			continue
 		}
 		if err := d.softDelete(communityID, dbN.StorenodeID, now, tx); err != nil {
-			return err
+			return fmt.Errorf("soft deleting existing storenodes: %w", err)
 		}
 
 	}
@@ -56,14 +56,15 @@ func (d *Database) syncSave(communityID types.HexBytes, snode []Storenode, clock
 	for _, n := range snode {
 		// defensively validate the communityID
 		if len(n.CommunityID) == 0 || !bytes.Equal(communityID, n.CommunityID) {
-			return fmt.Errorf("communityID mismatch %v != %v", communityID, n.CommunityID)
+			err = fmt.Errorf("communityID mismatch %v != %v", communityID, n.CommunityID)
+			return err
 		}
 		dbN := find(n, dbNodes)
 		if dbN != nil && n.Clock != 0 && dbN.Clock >= n.Clock {
 			continue
 		}
 		if err := d.upsert(n, tx); err != nil {
-			return err
+			return fmt.Errorf("upserting storenodes: %w", err)
 		}
 	}
 	// TODO for now only allow one storenode per community
@@ -72,14 +73,15 @@ func (d *Database) syncSave(communityID types.HexBytes, snode []Storenode, clock
 		return err
 	}
 	if count > 1 {
-		return fmt.Errorf("only one storenode per community is allowed")
+		err = fmt.Errorf("only one storenode per community is allowed")
+		return err
 	}
 	return nil
 }
 
 func (d *Database) getAll() ([]Storenode, error) {
 	rows, err := d.db.Query(`
-		SELECT community_id, storenode_id, name, address, password, fleet, version, clock, removed, deleted_at
+		SELECT community_id, storenode_id, name, address, fleet, version, clock, removed, deleted_at
 		FROM community_storenodes
 		WHERE removed = 0
 	`)
@@ -94,7 +96,7 @@ func (d *Database) getByCommunityID(communityID types.HexBytes, tx ...*sql.Tx) (
 	var rows *sql.Rows
 	var err error
 	q := `
-	SELECT community_id, storenode_id, name, address, password, fleet, version, clock, removed, deleted_at
+	SELECT community_id, storenode_id, name, address, fleet, version, clock, removed, deleted_at
 	FROM community_storenodes
 	WHERE community_id = ? AND removed = 0
 `
@@ -124,18 +126,16 @@ func (d *Database) upsert(n Storenode, tx *sql.Tx) error {
 		storenode_id,
 		name,
 		address,
-		password,
 		fleet,
 		version,
 		clock,
 		removed,
 		deleted_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		n.CommunityID,
 		n.StorenodeID,
 		n.Name,
 		n.Address,
-		n.nullablePassword(),
 		n.Fleet,
 		n.Version,
 		n.Clock,
@@ -167,16 +167,12 @@ func toStorenodes(rows *sql.Rows) ([]Storenode, error) {
 	var result []Storenode
 
 	for rows.Next() {
-		var (
-			m        Storenode
-			password sql.NullString
-		)
+		var m Storenode
 		if err := rows.Scan(
 			&m.CommunityID,
 			&m.StorenodeID,
 			&m.Name,
 			&m.Address,
-			&password,
 			&m.Fleet,
 			&m.Version,
 			&m.Clock,
@@ -184,9 +180,6 @@ func toStorenodes(rows *sql.Rows) ([]Storenode, error) {
 			&m.DeletedAt,
 		); err != nil {
 			return nil, err
-		}
-		if password.Valid {
-			m.Password = password.String
 		}
 		result = append(result, m)
 	}

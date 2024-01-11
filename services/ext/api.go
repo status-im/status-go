@@ -448,7 +448,7 @@ func (api *PublicAPI) SetCommunityStorenodes(request *requests.SetCommunityStore
 	return api.service.messenger.SetCommunityStorenodes(request)
 }
 
-// Sets the community storenodes for a community
+// Gets the community storenodes for a community
 func (api *PublicAPI) GetCommunityStorenodes(id types.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.GetCommunityStorenodes(id)
 }

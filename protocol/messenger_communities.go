@@ -2081,7 +2081,7 @@ func (m *Messenger) SetCommunityStorenodes(request *requests.SetCommunityStoreno
 	if err := m.communityStorenodes.UpdateStorenodesInDB(request.CommunityID, request.Storenodes, 0); err != nil {
 		return nil, err
 	}
-	err = m.sendPublicSyncCommunityStorenodes(community, request.Storenodes)
+	err = m.sendCommunityPublicStorenodesInfo(community, request.Storenodes)
 	if err != nil {
 		return nil, err
 	}

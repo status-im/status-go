@@ -88,9 +88,5 @@ func (m *CommunityStorenodes) UpdateStorenodesInDB(communityID types.HexBytes, s
 }
 
 func (m *CommunityStorenodes) GetStorenodesFromDB(communityID types.HexBytes) ([]Storenode, error) {
-	snodes, err := m.storenodesDB.getByCommunityID(communityID)
-	if err != nil {
-		return nil, err
-	}
-	return snodes, nil
+	return m.storenodesDB.getByCommunityID(communityID)
 }

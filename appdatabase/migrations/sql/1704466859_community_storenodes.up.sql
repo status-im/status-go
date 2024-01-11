@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS community_storenodes (
     storenode_id VARCHAR NOT NULL,
     name VARCHAR NOT NULL,
     address VARCHAR NOT NULL,
-    password VARCHAR,
     fleet VARCHAR NOT NULL,
     version INT NOT NULL,
     clock INT NOT NULL DEFAULT 0,
