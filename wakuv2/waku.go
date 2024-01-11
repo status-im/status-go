@@ -249,12 +249,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		EnableDiscV5:      cfg.EnableDiscV5,
 	}
 
-	if waku.cfg.UseShardAsDefaultTopic {
-		waku.settings.DefaultPubsubTopic = cfg.DefaultShardPubsubTopic
-	} else {
-		waku.settings.DefaultPubsubTopic = relay.DefaultWakuTopic
-	}
-
+	waku.settings.DefaultPubsubTopic = cfg.DefaultShardPubsubTopic
 	waku.filters = common.NewFilters(waku.settings.DefaultPubsubTopic, waku.logger)
 	waku.bandwidthCounter = metrics.NewBandwidthCounter()
 

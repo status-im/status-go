@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"errors"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"math/big"
 	"os"
 	"sync"
@@ -256,12 +255,6 @@ func NewWakuV2(s *suite.Suite, logger *zap.Logger, useLocalWaku bool, enableStor
 	wakuConfig := &waku2.Config{
 		UseShardAsDefaultTopic: useShardAsDefaultTopic,
 		ClusterID:              clusterID,
-	}
-
-	if wakuConfig.UseShardAsDefaultTopic {
-		wakuConfig.DefaultShardPubsubTopic = shard.DefaultShardPubsubTopic()
-	} else {
-		wakuConfig.DefaultShardPubsubTopic = ""
 	}
 
 	var onPeerStats func(connStatus types.ConnStatus)
