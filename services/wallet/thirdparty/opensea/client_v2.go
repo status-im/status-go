@@ -22,7 +22,7 @@ func getV2BaseURL(chainID walletCommon.ChainID) (string, error) {
 	switch uint64(chainID) {
 	case walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet:
 		return "https://api.opensea.io/v2", nil
-	case walletCommon.EthereumGoerli, walletCommon.EthereumSepolia, walletCommon.ArbitrumGoerli, walletCommon.ArbitrumSepolia, walletCommon.OptimismGoerli:
+	case walletCommon.EthereumGoerli, walletCommon.EthereumSepolia, walletCommon.ArbitrumSepolia, walletCommon.OptimismSepolia:
 		return "https://testnets-api.opensea.io/v2", nil
 	}
 
