@@ -41,7 +41,7 @@ const (
 	localFleet              = "local-test-fleet-1"
 	localMailserverID       = "local-test-mailserver"
 	storeNodeConnectTimeout = 500 * time.Millisecond
-	runLocalTests           = true
+	runLocalTests           = false
 )
 
 func TestMessengerStoreNodeRequestSuite(t *testing.T) {

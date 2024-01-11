@@ -99,9 +99,9 @@ func setDefaults(cfg *Config) *Config {
 
 	if cfg.DefaultShardPubsubTopic == "" {
 		if cfg.UseShardAsDefaultTopic {
-			cfg.DefaultShardPubsubTopic = relay.DefaultWakuTopic
-		} else {
 			cfg.DefaultShardPubsubTopic = shard.DefaultShardPubsubTopic()
+		} else {
+			cfg.DefaultShardPubsubTopic = relay.DefaultWakuTopic
 		}
 	}
 
