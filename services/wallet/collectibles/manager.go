@@ -595,12 +595,12 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 		}
 	}
 
-	err := o.collectiblesDataDB.SetData(collectiblesData)
+	err := o.collectiblesDataDB.SetData(collectiblesData, true)
 	if err != nil {
 		return nil, err
 	}
 
-	err = o.collectionsDataDB.SetData(collectionsData)
+	err = o.collectionsDataDB.SetData(collectionsData, true)
 	if err != nil {
 		return nil, err
 	}
@@ -647,12 +647,15 @@ func (o *Manager) fillCommunityID(asset *thirdparty.FullCollectibleData) error {
 
 func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*thirdparty.FullCollectibleData) error {
 	communityInfo, err := o.communityManager.FetchCommunityInfo(communityID)
+
+	// If the community is found, we update the DB.
+	// If the community is not found, we only insert new entries to the DB (don't replace what is already there).
+	allowUpdate := false
 	if err != nil {
 		log.Error("fetchCommunityInfo failed", "communityID", communityID, "err", err)
-		return err
-	}
-
-	if communityInfo != nil {
+	} else if communityInfo == nil {
+		log.Warn("fetchCommunityAssets community not found", "communityID", communityID)
+	} else {
 		for _, communityAsset := range communityAssets {
 			err := o.communityManager.FillCollectibleMetadata(communityAsset)
 			if err != nil {
@@ -660,8 +663,7 @@ func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*th
 				return err
 			}
 		}
-	} else {
-		log.Warn("fetchCommunityAssets community not found", "communityID", communityID)
+		allowUpdate = true
 	}
 
 	collectiblesData := make([]thirdparty.CollectibleData, 0, len(communityAssets))
@@ -674,13 +676,13 @@ func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*th
 		}
 	}
 
-	err = o.collectiblesDataDB.SetData(collectiblesData)
+	err = o.collectiblesDataDB.SetData(collectiblesData, allowUpdate)
 	if err != nil {
 		log.Error("collectiblesDataDB SetData failed", "communityID", communityID, "err", err)
 		return err
 	}
 
-	err = o.collectionsDataDB.SetData(collectionsData)
+	err = o.collectionsDataDB.SetData(collectionsData, allowUpdate)
 	if err != nil {
 		log.Error("collectionsDataDB SetData failed", "communityID", communityID, "err", err)
 		return err
@@ -732,7 +734,7 @@ func (o *Manager) fillAnimationMediatype(ctx context.Context, asset *thirdparty.
 }
 
 func (o *Manager) processCollectionData(ctx context.Context, collections []thirdparty.CollectionData) error {
-	return o.collectionsDataDB.SetData(collections)
+	return o.collectionsDataDB.SetData(collections, true)
 }
 
 func (o *Manager) getCacheFullCollectibleData(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {

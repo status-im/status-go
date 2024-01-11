@@ -98,9 +98,9 @@ func upsertCollectionTraits(creator sqlite.StatementCreator, id thirdparty.Contr
 	return nil
 }
 
-func upsertCollectionsData(creator sqlite.StatementCreator, collections []thirdparty.CollectionData) error {
-	insertCollection, err := creator.Prepare(fmt.Sprintf(`INSERT OR REPLACE INTO collection_data_cache (%s) 
-																				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, collectionDataColumns))
+func setCollectionsData(creator sqlite.StatementCreator, collections []thirdparty.CollectionData, allowUpdate bool) error {
+	insertCollection, err := creator.Prepare(fmt.Sprintf(`%s INTO collection_data_cache (%s) 
+																				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, insertStatement(allowUpdate), collectionDataColumns))
 	if err != nil {
 		return err
 	}
@@ -120,16 +120,18 @@ func upsertCollectionsData(creator sqlite.StatementCreator, collections []thirdp
 			return err
 		}
 
-		err = upsertCollectionTraits(creator, c.ID, c.Traits)
-		if err != nil {
-			return err
+		if allowUpdate {
+			err = upsertCollectionTraits(creator, c.ID, c.Traits)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func (o *CollectionDataDB) SetData(collections []thirdparty.CollectionData) (err error) {
+func (o *CollectionDataDB) SetData(collections []thirdparty.CollectionData, allowUpdate bool) (err error) {
 	tx, err := o.db.Begin()
 	if err != nil {
 		return err
@@ -143,7 +145,7 @@ func (o *CollectionDataDB) SetData(collections []thirdparty.CollectionData) (err
 	}()
 
 	// Insert new collections data
-	err = upsertCollectionsData(tx, collections)
+	err = setCollectionsData(tx, collections, allowUpdate)
 	if err != nil {
 		return err
 	}

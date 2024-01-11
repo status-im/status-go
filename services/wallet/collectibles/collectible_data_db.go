@@ -106,9 +106,9 @@ func upsertCollectibleTraits(creator sqlite.StatementCreator, id thirdparty.Coll
 	return nil
 }
 
-func upsertCollectiblesData(creator sqlite.StatementCreator, collectibles []thirdparty.CollectibleData) error {
-	insertCollectible, err := creator.Prepare(fmt.Sprintf(`INSERT OR REPLACE INTO collectible_data_cache (%s) 
-																				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, collectibleDataColumns))
+func setCollectiblesData(creator sqlite.StatementCreator, collectibles []thirdparty.CollectibleData, allowUpdate bool) error {
+	insertCollectible, err := creator.Prepare(fmt.Sprintf(`%s INTO collectible_data_cache (%s) 
+																				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, insertStatement(allowUpdate), collectibleDataColumns))
 	if err != nil {
 		return err
 	}
@@ -134,16 +134,18 @@ func upsertCollectiblesData(creator sqlite.StatementCreator, collectibles []thir
 			return err
 		}
 
-		err = upsertCollectibleTraits(creator, c.ID, c.Traits)
-		if err != nil {
-			return err
+		if allowUpdate {
+			err = upsertCollectibleTraits(creator, c.ID, c.Traits)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func (o *CollectibleDataDB) SetData(collectibles []thirdparty.CollectibleData) (err error) {
+func (o *CollectibleDataDB) SetData(collectibles []thirdparty.CollectibleData, allowUpdate bool) (err error) {
 	tx, err := o.db.Begin()
 	if err != nil {
 		return err
@@ -157,7 +159,7 @@ func (o *CollectibleDataDB) SetData(collectibles []thirdparty.CollectibleData) (
 	}()
 
 	// Insert new collectibles data
-	err = upsertCollectiblesData(tx, collectibles)
+	err = setCollectiblesData(tx, collectibles, allowUpdate)
 	if err != nil {
 		return err
 	}

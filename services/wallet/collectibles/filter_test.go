@@ -86,7 +86,7 @@ func TestFilterOwnedCollectibles(t *testing.T) {
 		}
 	}
 
-	err = cDB.SetData(data)
+	err = cDB.SetData(data, true)
 	require.NoError(t, err)
 	for i := 0; i < nData; i++ {
 		err = cDB.SetCommunityInfo(data[i].ID, communityData[i])
