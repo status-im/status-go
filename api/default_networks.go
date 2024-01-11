@@ -27,7 +27,7 @@ var ganacheTokenAddress = common.HexToAddress("0x8571Ddc46b10d31EF963aF49b6C7799
 var mainnet = params.Network{
 	ChainID:                mainnetChainID,
 	ChainName:              "Ethereum Mainnet",
-	RPCURL:                 "https://eth-archival.gateway.pokt.network/v1/lb/",
+	RPCURL:                 "https://eth-archival.rpc.grove.city/v1/",
 	FallbackURL:            "https://mainnet.infura.io/v3/",
 	BlockExplorerURL:       "https://etherscan.io/",
 	IconURL:                "network/Network=Ethereum",
@@ -45,7 +45,7 @@ var mainnet = params.Network{
 var goerli = params.Network{
 	ChainID:                goerliChainID,
 	ChainName:              "Ethereum Mainnet",
-	RPCURL:                 "https://goerli-archival.gateway.pokt.network/v1/lb/",
+	RPCURL:                 "https://goerli-archival.rpc.grove.city/v1/",
 	FallbackURL:            "https://goerli.infura.io/v3/",
 	BlockExplorerURL:       "https://goerli.etherscan.io/",
 	IconURL:                "network/Network=Testnet",
@@ -63,7 +63,7 @@ var goerli = params.Network{
 var optimism = params.Network{
 	ChainID:                optimismChainID,
 	ChainName:              "Optimism",
-	RPCURL:                 "https://optimism-mainnet.gateway.pokt.network/v1/lb/",
+	RPCURL:                 "https://optimism-mainnet.rpc.grove.city/v1/",
 	FallbackURL:            "https://optimism-mainnet.infura.io/v3/",
 	BlockExplorerURL:       "https://optimistic.etherscan.io",
 	IconURL:                "network/Network=Optimism",
@@ -98,7 +98,7 @@ var optimismGoerli = params.Network{
 var arbitrum = params.Network{
 	ChainID:                arbitrumChainID,
 	ChainName:              "Arbitrum",
-	RPCURL:                 "https://arbitrum-one.gateway.pokt.network/v1/lb/",
+	RPCURL:                 "https://arbitrum-one.rpc.grove.city/v1/",
 	FallbackURL:            "https://arbitrum-mainnet.infura.io/v3/",
 	BlockExplorerURL:       "https://arbiscan.io/",
 	IconURL:                "network/Network=Arbitrum",
@@ -166,10 +166,10 @@ func setRPCs(networks []params.Network, request *requests.WalletSecretsConfig) [
 		}
 
 		if request.PoktToken != "" {
-			if strings.Contains(n.RPCURL, "pokt") {
+			if strings.Contains(n.RPCURL, "grove") {
 				n.RPCURL += request.PoktToken
 			}
-			if strings.Contains(n.FallbackURL, "pokt") {
+			if strings.Contains(n.FallbackURL, "grove") {
 				n.FallbackURL += request.PoktToken
 			}
 

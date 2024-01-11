@@ -17,7 +17,7 @@ func TestCreateAccountAndLogin(t *testing.T) {
 
 	requestJSONTemplateString := `
 {
-    "upstreamConfig":"https://eth-archival.gateway.pokt.network/v1/lb/3ef2018191814b7e1009b8d9",
+    "upstreamConfig":"https://eth-archival.rpc.grove.city/v1/3ef2018191814b7e1009b8d9",
     "openseaAPIKey":"",
     "wakuV2Nameserver":"1.1.1.1",
     "mnemonic":null,
@@ -31,9 +31,9 @@ func TestCreateAccountAndLogin(t *testing.T) {
     "customizationColor":"blue",
 	"emoji": "some",
     "previewPrivacy":true,
-    "verifyTransactionURL":"https://eth-archival.gateway.pokt.network/v1/lb/3ef2018191814b7e1009b8d9",
+    "verifyTransactionURL":"https://eth-archival.rpc.grove.city/v1/3ef2018191814b7e1009b8d9",
     "imagePath":null,
-    "verifyENSURL":"https://eth-archival.gateway.pokt.network/v1/lb/3ef2018191814b7e1009b8d9",
+    "verifyENSURL":"https://eth-archival.rpc.grove.city/v1/3ef2018191814b7e1009b8d9",
     "logLevel":"INFO",
     "logFilePath":"%s",
     "networkId":1
