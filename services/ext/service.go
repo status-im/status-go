@@ -549,7 +549,9 @@ func (s *Service) FillCollectibleMetadata(collectible *thirdparty.FullCollectibl
 		return fmt.Errorf("invalid communityID")
 	}
 
-	community, err := s.fetchCommunity(communityID, true)
+	// FetchCommunityInfo should have been previously called once to ensure
+	// that the latest version of the CommunityDescription is available in the DB
+	community, err := s.fetchCommunity(communityID, false)
 
 	if err != nil {
 		return err
@@ -632,7 +634,7 @@ func communityToInfo(community *communities.Community) *thirdparty.CommunityInfo
 }
 
 func (s *Service) FetchCommunityInfo(communityID string) (*thirdparty.CommunityInfo, error) {
-	community, err := s.fetchCommunity(communityID, false)
+	community, err := s.fetchCommunity(communityID, true)
 	if err != nil {
 		return nil, err
 	}
@@ -640,7 +642,7 @@ func (s *Service) FetchCommunityInfo(communityID string) (*thirdparty.CommunityI
 	return communityToInfo(community), nil
 }
 
-func (s *Service) fetchCommunity(communityID string, tryDatabase bool) (*communities.Community, error) {
+func (s *Service) fetchCommunity(communityID string, fetchLatest bool) (*communities.Community, error) {
 	if s.messenger == nil {
 		return nil, fmt.Errorf("messenger not ready")
 	}
@@ -650,16 +652,34 @@ func (s *Service) fetchCommunity(communityID string, tryDatabase bool) (*communi
 	// TODO: we need the shard information in the collectible to be able to retrieve info for
 	// communities that have specific shards
 
-	var shard *shard.Shard = nil // TODO: build this with info from token
-	community, err := s.messenger.FetchCommunity(&protocol.FetchCommunityRequest{
-		CommunityKey:    communityID,
-		Shard:           shard,
-		TryDatabase:     tryDatabase,
-		WaitForResponse: true,
-	})
+	if fetchLatest {
+		// Try to fetch the latest version of the Community
+		var shard *shard.Shard = nil // TODO: build this with info from token
+		// NOTE: The community returned by this function will be nil if
+		// the version we have in the DB is the latest available.
+		_, err := s.messenger.FetchCommunity(&protocol.FetchCommunityRequest{
+			CommunityKey:    communityID,
+			Shard:           shard,
+			TryDatabase:     false,
+			WaitForResponse: true,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
 
+	// Get the latest successfully fetched version of the Community
+	community, err := s.messenger.FindCommunityInfoFromDB(communityID)
 	if err != nil {
 		return nil, err
+	}
+
+	if community != nil {
+		// Call this to ensure CommunityTokens are stored to DB
+		err = s.messenger.FetchMissingCommunityTokens(community)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return community, nil

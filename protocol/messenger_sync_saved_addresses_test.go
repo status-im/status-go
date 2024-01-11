@@ -114,7 +114,7 @@ func haveSameElements[T comparable](a []T, b []T, isEqual func(T, T) bool) bool 
 
 func savedAddressDataIsEqual(a, b wallet.SavedAddress) bool {
 	return a.Address == b.Address && a.IsTest == b.IsTest && a.Name == b.Name &&
-		a.Favourite == b.Favourite && a.ENSName == b.ENSName && a.ChainShortNames == b.ChainShortNames && a.ColorID == b.ColorID
+		a.ENSName == b.ENSName && a.ChainShortNames == b.ChainShortNames && a.ColorID == b.ColorID
 }
 
 func (s *MessengerSyncSavedAddressesSuite) TestSyncExistingSavedAddresses() {
@@ -124,16 +124,14 @@ func (s *MessengerSyncSavedAddressesSuite) TestSyncExistingSavedAddresses() {
 
 	// Add saved addresses to main device
 	sa1 := wallet.SavedAddress{
-		Address:   testAddress1,
-		Name:      "TestC1A1",
-		Favourite: false,
-		IsTest:    isTestChain1,
+		Address: testAddress1,
+		Name:    "TestC1A1",
+		IsTest:  isTestChain1,
 	}
 	sa2 := wallet.SavedAddress{
-		ENSName:   "test.ens.eth",
-		Name:      "TestC2A1",
-		Favourite: true,
-		IsTest:    isTestChain2,
+		ENSName: "test.ens.eth",
+		Name:    "TestC2A1",
+		IsTest:  isTestChain2,
 	}
 
 	savedAddressesManager := s.main.savedAddressesManager
@@ -174,16 +172,14 @@ func (s *MessengerSyncSavedAddressesSuite) TestSyncSavedAddresses() {
 
 	// Add saved addresses to main device
 	sa1 := wallet.SavedAddress{
-		Address:   testAddress1,
-		Name:      "TestC1A1",
-		Favourite: false,
-		IsTest:    isTestChain1,
+		Address: testAddress1,
+		Name:    "TestC1A1",
+		IsTest:  isTestChain1,
 	}
 	sa2 := wallet.SavedAddress{
-		ENSName:   "test.ens.eth",
-		Name:      "TestC1A2",
-		Favourite: true,
-		IsTest:    isTestChain1,
+		ENSName: "test.ens.eth",
+		Name:    "TestC1A2",
+		IsTest:  isTestChain1,
 	}
 
 	err := s.main.UpsertSavedAddress(context.Background(), sa1)
@@ -216,19 +212,18 @@ func (s *MessengerSyncSavedAddressesSuite) testSyncDeletesOfSavedAddressesWithTe
 	var isTestChain1 bool = true
 	var isTestChain2 bool = false
 	var testAddress1 = common.Address{1}
+	var testAddress2 = common.Address{2}
 
 	// Add saved addresses to main device
 	sa1 := wallet.SavedAddress{
-		Address:   testAddress1,
-		Name:      "TestC1A1",
-		Favourite: false,
-		IsTest:    isTestChain1,
+		Address: testAddress1,
+		Name:    "TestC1A1",
+		IsTest:  isTestChain1,
 	}
 	sa2 := wallet.SavedAddress{
-		ENSName:   "test.ens.eth",
-		Name:      "TestC1A2",
-		Favourite: true,
-		IsTest:    isTestChain2,
+		Address: testAddress2,
+		Name:    "TestC1A2",
+		IsTest:  isTestChain2,
 	}
 
 	err := s.main.settings.SaveSettingField(settings.TestNetworksEnabled, testModeMain)
@@ -262,7 +257,7 @@ func (s *MessengerSyncSavedAddressesSuite) testSyncDeletesOfSavedAddressesWithTe
 	s.Require().Equal(2, len(savedAddresses))
 
 	// Delete saved addresses with test mode = true and sync with the other device
-	err = s.main.DeleteSavedAddress(context.Background(), sa1.Address, sa1.ENSName, sa1.IsTest)
+	err = s.main.DeleteSavedAddress(context.Background(), sa1.Address, sa1.IsTest)
 	s.Require().NoError(err)
 
 	// Wait and check that saved addresses are synced
@@ -273,10 +268,8 @@ func (s *MessengerSyncSavedAddressesSuite) testSyncDeletesOfSavedAddressesWithTe
 				sa := r.SavedAddresses()[0]
 				// We expect the deleted event to report address, ens, isTest
 				s.Require().Equal(sa1.Address, sa.Address)
-				s.Require().Equal(sa1.ENSName, sa.ENSName)
 				s.Require().Equal(sa1.IsTest, sa.IsTest)
 				s.Require().Equal("", sa.Name)
-				s.Require().Equal(false, sa.Favourite)
 				return true
 			}
 			return false
@@ -291,7 +284,7 @@ func (s *MessengerSyncSavedAddressesSuite) testSyncDeletesOfSavedAddressesWithTe
 	s.Require().True(haveSameElements([]wallet.SavedAddress{sa2}, savedAddresses, savedAddressDataIsEqual))
 
 	// Delete saved addresses with test mode = false and sync with the other device
-	err = s.main.DeleteSavedAddress(context.Background(), sa2.Address, sa2.ENSName, sa2.IsTest)
+	err = s.main.DeleteSavedAddress(context.Background(), sa2.Address, sa2.IsTest)
 	s.Require().NoError(err)
 
 	// Wait and check that saved addresses are synced
@@ -302,10 +295,8 @@ func (s *MessengerSyncSavedAddressesSuite) testSyncDeletesOfSavedAddressesWithTe
 				sa := r.SavedAddresses()[0]
 				// We expect the deleted event to report address, ens, isTest
 				s.Require().Equal(sa2.Address, sa.Address)
-				s.Require().Equal(sa2.ENSName, sa.ENSName)
 				s.Require().Equal(sa2.IsTest, sa.IsTest)
 				s.Require().Equal("", sa.Name)
-				s.Require().Equal(false, sa.Favourite)
 				return true
 			}
 			return false

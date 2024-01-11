@@ -435,63 +435,80 @@ func (m *Manager) runOwnerVerificationLoop() {
 				for id, communities := range communitiesToValidate {
 					m.logger.Info("validating communities", zap.String("id", id), zap.Int("count", len(communities)))
 
-					for _, communityToValidate := range communities {
-						signer, description, err := UnwrapCommunityDescriptionMessage(communityToValidate.payload)
-						if err != nil {
-							m.logger.Error("failed to unwrap community", zap.Error(err))
-							continue
-						}
-
-						chainID := CommunityDescriptionTokenOwnerChainID(description)
-						if chainID == 0 {
-							// This should not happen
-							m.logger.Error("chain id is 0, ignoring")
-							continue
-						}
-
-						m.logger.Info("validating community", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
-
-						ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-						defer cancel()
-
-						owner, err := m.ownerVerifier.SafeGetSignerPubKey(ctx, chainID, id)
-						if err != nil {
-							m.logger.Error("failed to get owner", zap.Error(err))
-							continue
-						}
-
-						ownerPK, err := common.HexToPubkey(owner)
-						if err != nil {
-							m.logger.Error("failed to convert pk string to ecdsa", zap.Error(err))
-							continue
-						}
-
-						// TODO: handle shards
-						response, err := m.HandleCommunityDescriptionMessage(signer, description, communityToValidate.payload, ownerPK, nil)
-						if err != nil {
-							m.logger.Error("failed to handle community", zap.Error(err))
-							err = m.persistence.DeleteCommunityToValidate(communityToValidate.id, communityToValidate.clock)
-							if err != nil {
-								m.logger.Error("failed to delete community to validate", zap.Error(err))
-							}
-							continue
-						}
-
-						if response != nil {
-
-							m.logger.Info("community validated", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
-							m.publish(&Subscription{TokenCommunityValidated: response})
-							err := m.persistence.DeleteCommunitiesToValidateByCommunityID(communityToValidate.id)
-							if err != nil {
-								m.logger.Error("failed to delete communities to validate", zap.Error(err))
-							}
-							break
-						}
-					}
+					_, _ = m.validateCommunity(communities)
 				}
 			}
 		}
 	}()
+}
+
+func (m *Manager) ValidateCommunityByID(communityID types.HexBytes) (*CommunityResponse, error) {
+	communityToValidate, err := m.persistence.getCommunityToValidateByID(communityID)
+	if err != nil {
+		m.logger.Error("failed to validate community by ID", zap.String("id", communityID.String()), zap.Error(err))
+		return nil, err
+	}
+
+	return m.validateCommunity(communityToValidate)
+
+}
+
+func (m *Manager) validateCommunity(communityToValidateData []communityToValidate) (*CommunityResponse, error) {
+	for _, communityToValidate := range communityToValidateData {
+		signer, description, err := UnwrapCommunityDescriptionMessage(communityToValidate.payload)
+		if err != nil {
+			m.logger.Error("failed to unwrap community", zap.Error(err))
+			continue
+		}
+
+		chainID := CommunityDescriptionTokenOwnerChainID(description)
+		if chainID == 0 {
+			// This should not happen
+			m.logger.Error("chain id is 0, ignoring")
+			continue
+		}
+
+		m.logger.Info("validating community", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+		defer cancel()
+
+		owner, err := m.ownerVerifier.SafeGetSignerPubKey(ctx, chainID, types.EncodeHex(communityToValidate.id))
+		if err != nil {
+			m.logger.Error("failed to get owner", zap.Error(err))
+			continue
+		}
+
+		ownerPK, err := common.HexToPubkey(owner)
+		if err != nil {
+			m.logger.Error("failed to convert pk string to ecdsa", zap.Error(err))
+			continue
+		}
+
+		// TODO: handle shards
+		response, err := m.HandleCommunityDescriptionMessage(signer, description, communityToValidate.payload, ownerPK, nil)
+		if err != nil {
+			m.logger.Error("failed to handle community", zap.Error(err))
+			err = m.persistence.DeleteCommunityToValidate(communityToValidate.id, communityToValidate.clock)
+			if err != nil {
+				m.logger.Error("failed to delete community to validate", zap.Error(err))
+			}
+			continue
+		}
+
+		if response != nil {
+
+			m.logger.Info("community validated", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
+			m.publish(&Subscription{TokenCommunityValidated: response})
+			err := m.persistence.DeleteCommunitiesToValidateByCommunityID(communityToValidate.id)
+			if err != nil {
+				m.logger.Error("failed to delete communities to validate", zap.Error(err))
+			}
+			return response, nil
+		}
+	}
+
+	return nil, nil
 }
 
 func (m *Manager) Stop() error {
@@ -741,6 +758,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		ControlDevice:        true,
 		Logger:               m.logger,
 		Joined:               true,
+		JoinedAt:             time.Now().Unix(),
 		MemberIdentity:       &m.identity.PublicKey,
 		CommunityDescription: description,
 		Shard:                nil,
@@ -815,9 +833,6 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
-	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
 	}
 
 	tokenPermission := request.ToCommunityTokenPermission()
@@ -1005,9 +1020,6 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 	if err != nil {
 		return nil, nil, err
 	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
-	}
 
 	changes, err := community.DeleteTokenPermission(request.PermissionID)
 	if err != nil {
@@ -1060,9 +1072,6 @@ func (m *Manager) SetShard(communityID types.HexBytes, shard *shard.Shard) (*Com
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 	if !community.IsControlNode() {
 		return nil, errors.New("not admin or owner")
 	}
@@ -1101,9 +1110,6 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	newDescription, err := request.ToCommunityDescription()
@@ -1197,7 +1203,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 	communityID := crypto.CompressPubkey(&key.PublicKey)
 
 	community, err := m.GetByID(communityID)
-	if err != nil {
+	if err != nil && err != ErrOrgNotFound {
 		return nil, err
 	}
 
@@ -1227,6 +1233,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 			ControlDevice:        true,
 			Logger:               m.logger,
 			Joined:               true,
+			JoinedAt:             time.Now().Unix(),
 			MemberIdentity:       &m.identity.PublicKey,
 			CommunityDescription: description,
 		}
@@ -1268,9 +1275,6 @@ func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.Communit
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 	chatID := uuid.New().String()
 	if thirdPartyID != "" {
 		chatID = chatID + thirdPartyID
@@ -1293,9 +1297,6 @@ func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *prot
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, nil, err
-	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
 	}
 
 	// Remove communityID prefix from chatID if exists
@@ -1321,9 +1322,6 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 	if err != nil {
 		return nil, nil, err
 	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
-	}
 
 	// Remove communityID prefix from chatID if exists
 	if strings.HasPrefix(chatID, communityID.String()) {
@@ -1346,9 +1344,6 @@ func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory, publ
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
-	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
 	}
 
 	categoryID := uuid.New().String()
@@ -1381,9 +1376,6 @@ func (m *Manager) EditCategory(request *requests.EditCommunityCategory) (*Commun
 	if err != nil {
 		return nil, nil, err
 	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
-	}
 
 	// Remove communityID prefix from chatID if exists
 	for i, cid := range request.ChatIDs {
@@ -1409,9 +1401,6 @@ func (m *Manager) EditChatFirstMessageTimestamp(communityID types.HexBytes, chat
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, nil, err
-	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
 	}
 
 	// Remove communityID prefix from chatID if exists
@@ -1440,9 +1429,6 @@ func (m *Manager) ReorderCategories(request *requests.ReorderCommunityCategories
 	if err != nil {
 		return nil, nil, err
 	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
-	}
 
 	changes, err := community.ReorderCategories(request.CategoryID, request.Position)
 	if err != nil {
@@ -1461,9 +1447,6 @@ func (m *Manager) ReorderChat(request *requests.ReorderCommunityChat) (*Communit
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
-	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
 	}
 
 	// Remove communityID prefix from chatID if exists
@@ -1488,9 +1471,6 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
-	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
 	}
 
 	changes, err := community.DeleteCategory(request.CategoryID)
@@ -1572,7 +1552,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	}
 
 	community, err := m.GetByID(id)
-	if err != nil {
+	if err != nil && err != ErrOrgNotFound {
 		return nil, err
 	}
 
@@ -1621,7 +1601,12 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 
 	if hasTokenOwnership && verifiedOwner != nil {
 		// Override verified owner
-		m.logger.Info("updating verified owner", zap.String("communityID", community.IDString()), zap.String("owner", common.PubkeyToHex(verifiedOwner)))
+		m.logger.Info("updating verified owner",
+			zap.String("communityID", community.IDString()),
+			zap.String("verifiedOwner", common.PubkeyToHex(verifiedOwner)),
+			zap.String("signer", common.PubkeyToHex(signer)),
+			zap.String("controlNode", common.PubkeyToHex(community.ControlNode())),
+		)
 
 		// If we are not the verified owner anymore, drop the private key
 		if !common.IsPubKeyEqual(verifiedOwner, &m.identity.PublicKey) {
@@ -1802,10 +1787,6 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, err
 	}
 
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
-
 	if !community.IsPrivilegedMember(signer) {
 		return nil, errors.New("user has not permissions to send events")
 	}
@@ -1885,9 +1866,6 @@ func (m *Manager) HandleCommunityEventsMessageRejected(signer *ecdsa.PublicKey, 
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	eventsMessage, err := CommunityEventsMessageFromProtobuf(message.Msg)
@@ -2383,9 +2361,6 @@ func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, re
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 
 	previousRequestToJoin, err := m.GetRequestToJoinByPkAndCommunityID(signer, community.ID())
 	if err != nil {
@@ -2433,9 +2408,6 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 	community, err := m.GetByID(request.CommunityId)
 	if err != nil {
 		return nil, nil, err
-	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
 	}
 
 	err = community.ValidateRequestToJoin(signer, request)
@@ -2554,9 +2526,7 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 	if err != nil {
 		return err
 	}
-	if community == nil {
-		return ErrOrgNotFound
-	}
+
 	if err := community.ValidateEditSharedAddresses(signer, request); err != nil {
 		return err
 	}
@@ -2852,9 +2822,6 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 
 	communityDescriptionBytes, err := proto.Marshal(request.Community)
 	if err != nil {
@@ -2965,9 +2932,6 @@ func (m *Manager) JoinCommunity(id types.HexBytes, forceJoin bool) (*Community, 
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 	if !forceJoin && community.Joined() {
 		// Nothing to do, we are already joined
 		return community, ErrOrgAlreadyJoined
@@ -2984,9 +2948,6 @@ func (m *Manager) SpectateCommunity(id types.HexBytes) (*Community, error) {
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 	community.Spectate()
 	if err = m.persistence.SaveCommunity(community); err != nil {
@@ -3047,9 +3008,6 @@ func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 
 	community.RemoveOurselvesFromOrg(&m.identity.PublicKey)
 	community.Leave()
@@ -3067,9 +3025,6 @@ func (m *Manager) KickedOutOfCommunity(id types.HexBytes) (*Community, error) {
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 
 	community.RemoveOurselvesFromOrg(&m.identity.PublicKey)
 	community.Leave()
@@ -3086,9 +3041,6 @@ func (m *Manager) AddMemberOwnerToCommunity(communityID types.HexBytes, pk *ecds
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	_, err = community.AddMember(pk, []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER})
@@ -3109,9 +3061,6 @@ func (m *Manager) RemoveUserFromCommunity(id types.HexBytes, pk *ecdsa.PublicKey
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	_, err = community.RemoveUserFromOrg(pk)
@@ -3138,9 +3087,6 @@ func (m *Manager) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunit
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 
 	_, err = community.UnbanUserFromCommunity(publicKey)
 	if err != nil {
@@ -3165,9 +3111,6 @@ func (m *Manager) AddRoleToMember(request *requests.AddRoleToMember) (*Community
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	if !community.hasMember(publicKey) {
@@ -3200,9 +3143,6 @@ func (m *Manager) RemoveRoleFromMember(request *requests.RemoveRoleFromMember) (
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
 
 	if !community.hasMember(publicKey) {
 		return nil, ErrMemberNotFound
@@ -3234,9 +3174,6 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	_, err = community.BanUserFromCommunity(publicKey)
@@ -3283,7 +3220,14 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 }
 
 func (m *Manager) GetByID(id []byte) (*Community, error) {
-	return m.persistence.GetByID(&m.identity.PublicKey, id)
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, id)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+	return community, nil
 }
 
 func (m *Manager) GetByIDString(idString string) (*Community, error) {
@@ -3333,9 +3277,6 @@ func (m *Manager) CheckCommunityForJoining(communityID types.HexBytes) (*Communi
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	// We don't allow requesting access if already joined
@@ -3444,9 +3385,6 @@ func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string
 	community, err := m.GetByIDString(communityID)
 	if err != nil {
 		return false, err
-	}
-	if community == nil {
-		return false, nil
 	}
 	return community.CanPost(pk, chatID, grant)
 }
@@ -4524,12 +4462,9 @@ func (m *Manager) ImageToBase64(uri string) string {
 
 func (m *Manager) SaveCommunityToken(token *community_token.CommunityToken, croppedImage *images.CroppedImage) (*community_token.CommunityToken, error) {
 
-	community, err := m.GetByIDString(token.CommunityID)
+	_, err := m.GetByIDString(token.CommunityID)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	if croppedImage != nil && croppedImage.ImagePath != "" {
@@ -4559,9 +4494,6 @@ func (m *Manager) AddCommunityToken(token *community_token.CommunityToken, clock
 	community, err := m.GetByIDString(token.CommunityID)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 
 	if !community.MemberCanManageToken(&m.identity.PublicKey, token) {
@@ -4644,9 +4576,6 @@ func (m *Manager) SetCommunityActiveMembersCount(communityID string, activeMembe
 	community, err := m.GetByIDString(communityID)
 	if err != nil {
 		return err
-	}
-	if community == nil {
-		return ErrOrgNotFound
 	}
 
 	updated, err := community.SetActiveMembersCount(activeMembersCount)
@@ -5125,9 +5054,6 @@ func (m *Manager) CreateCommunityTokenDeploymentSignature(ctx context.Context, c
 	community, err := m.GetByIDString(communityID)
 	if err != nil {
 		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
 	}
 	if !community.IsControlNode() {
 		return nil, ErrNotControlNode

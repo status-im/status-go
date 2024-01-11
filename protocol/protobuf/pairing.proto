@@ -137,6 +137,7 @@ message SyncInstallationCommunity {
   bool spectated = 11;
   bytes encryption_keys = 12;
   SyncCommunityControlNode control_node = 13;
+  int64 joined_at = 14;
 }
 
 message SyncCommunityRequestsToJoin {
@@ -305,10 +306,10 @@ message SyncAccountsPositions {
 }
 
 message SyncSavedAddress {
+  reserved 3;
   reserved 4;
   bytes address = 1;
   string name = 2;
-  bool favourite = 3;
   bool removed = 5;
   uint64 update_clock = 7;
   string chain_short_names = 8;

@@ -36,6 +36,7 @@ type Config struct {
 	CommunityDescriptionProtocolMessage []byte // community in a wrapped & signed (by owner) protocol message
 	ID                                  *ecdsa.PublicKey
 	Joined                              bool
+	JoinedAt                            int64
 	Requested                           bool
 	Verified                            bool
 	Spectated                           bool
@@ -238,6 +239,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		IsControlNode               bool                                 `json:"isControlNode"`
 		Verified                    bool                                 `json:"verified"`
 		Joined                      bool                                 `json:"joined"`
+		JoinedAt                    int64                                `json:"joinedAt"`
 		Spectated                   bool                                 `json:"spectated"`
 		RequestedAccessAt           int                                  `json:"requestedAccessAt"`
 		Name                        string                               `json:"name"`
@@ -276,6 +278,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Chats:                       make(map[string]CommunityChat),
 		Categories:                  make(map[string]CommunityCategory),
 		Joined:                      o.config.Joined,
+		JoinedAt:                    o.config.JoinedAt,
 		Spectated:                   o.config.Spectated,
 		CanRequestAccess:            o.CanRequestAccess(o.config.MemberIdentity),
 		CanJoin:                     o.canJoin(),
@@ -965,6 +968,7 @@ func (o *Community) Edit(description *protobuf.CommunityDescription) {
 
 func (o *Community) Join() {
 	o.config.Joined = true
+	o.config.JoinedAt = time.Now().Unix()
 	o.config.Spectated = false
 }
 
@@ -983,6 +987,10 @@ func (o *Community) Encrypted() bool {
 
 func (o *Community) Joined() bool {
 	return o.config.Joined
+}
+
+func (o *Community) JoinedAt() int64 {
+	return o.config.JoinedAt
 }
 
 func (o *Community) Spectated() bool {
@@ -1370,6 +1378,10 @@ func (o *Community) PublicKey() *ecdsa.PublicKey {
 
 func (o *Community) Description() *protobuf.CommunityDescription {
 	return o.config.CommunityDescription
+}
+
+func (o *Community) DescriptionProtocolMessage() []byte {
+	return o.config.CommunityDescriptionProtocolMessage
 }
 
 func (o *Community) marshaledDescription() ([]byte, error) {
@@ -2131,6 +2143,7 @@ func (o *Community) CreateDeepCopy() *Community {
 			CommunityDescriptionProtocolMessage: o.config.CommunityDescriptionProtocolMessage,
 			ID:                                  o.config.ID,
 			Joined:                              o.config.Joined,
+			JoinedAt:                            o.config.JoinedAt,
 			Requested:                           o.config.Requested,
 			Verified:                            o.config.Verified,
 			Spectated:                           o.config.Spectated,

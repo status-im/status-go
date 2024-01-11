@@ -385,6 +385,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().True(response.Communities()[0].Joined())
+	s.Require().True(response.Communities()[0].JoinedAt() > 0)
 	s.Require().Len(response.Chats(), 2)
 	s.Require().Len(response.Communities()[0].Categories(), 1)
 
@@ -3089,7 +3090,7 @@ func (s *MessengerCommunitiesSuite) TestCheckCommunitiesToUnmute() {
 
 func (s *MessengerCommunitiesSuite) TestCommunityNotInDB() {
 	community, err := s.alice.communitiesManager.GetByID([]byte("0x123"))
-	s.Require().Nil(err)
+	s.Require().ErrorIs(err, communities.ErrOrgNotFound)
 	s.Require().Nil(community)
 }
 

@@ -31,6 +31,7 @@ func (o *Community) ToSyncInstallationCommunityProtobuf(clock uint64, communityS
 		Id:             o.ID(),
 		Description:    wrappedCommunity,
 		Joined:         o.Joined(),
+		JoinedAt:       o.JoinedAt(),
 		Verified:       o.Verified(),
 		Muted:          o.Muted(),
 		RequestsToJoin: rtjs,

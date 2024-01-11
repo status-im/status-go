@@ -1022,7 +1022,10 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 				return err
 			}
 
-			m.prepareMessage(updateMessage, m.httpServer)
+			err = m.prepareMessage(updateMessage, m.httpServer)
+			if err != nil {
+				return err
+			}
 			err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 			if err != nil {
 				return err
@@ -1106,7 +1109,10 @@ func (m *Messenger) handleRetractContactRequest(state *ReceivedMessageState, con
 		return err
 	}
 
-	m.prepareMessage(updateMessage, m.httpServer)
+	err = m.prepareMessage(updateMessage, m.httpServer)
+	if err != nil {
+		return err
+	}
 	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 	if err != nil {
 		return err
@@ -1282,7 +1288,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 	id := types.HexBytes(crypto.CompressPubkey(communityPubKey))
 
 	community, err := m.communitiesManager.GetByID(id)
-	if err != nil {
+	if err != nil && err != communities.ErrOrgNotFound {
 		m.logger.Debug("Couldn't get community for community with id: ", zap.Any("id", id))
 		return err
 	}
@@ -2211,7 +2217,10 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 				return err
 			}
 
-			m.prepareMessage(updateMessage, m.httpServer)
+			err = m.prepareMessage(updateMessage, m.httpServer)
+			if err != nil {
+				return err
+			}
 			err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 			if err != nil {
 				return err
@@ -2324,7 +2333,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 			return err
 		}
 
-		err = m.handleCommunityDescription(state, signer, description, receivedMessage.GetCommunity(), receivedMessage.GetShard())
+		err = m.handleCommunityDescription(state, signer, description, receivedMessage.GetCommunity(), nil, receivedMessage.GetShard())
 		if err != nil {
 			return err
 		}
@@ -3667,7 +3676,7 @@ func (m *Messenger) HandlePushNotificationRequest(state *ReceivedMessageState, m
 
 func (m *Messenger) HandleCommunityDescription(state *ReceivedMessageState, message *protobuf.CommunityDescription, statusMessage *v1protocol.StatusMessage) error {
 	// TODO: handle shard
-	err := m.handleCommunityDescription(state, state.CurrentMessageState.PublicKey, message, statusMessage.EncryptionLayer.Payload, nil)
+	err := m.handleCommunityDescription(state, state.CurrentMessageState.PublicKey, message, statusMessage.EncryptionLayer.Payload, nil, nil)
 	if err != nil {
 		m.logger.Warn("failed to handle CommunityDescription", zap.Error(err))
 		return err

@@ -46,7 +46,11 @@ func (m *Messenger) ActivityCenterNotifications(request ActivityCenterNotificati
 	if m.httpServer != nil {
 		for _, notification := range notifications {
 			if notification.Message != nil {
-				m.prepareMessage(notification.Message, m.httpServer)
+				err = m.prepareMessage(notification.Message, m.httpServer)
+
+				if err != nil {
+					return nil, err
+				}
 
 				image := notification.Message.GetImage()
 				if image != nil && image.AlbumId != "" {
@@ -59,7 +63,11 @@ func (m *Messenger) ActivityCenterNotifications(request ActivityCenterNotificati
 			}
 			if notification.AlbumMessages != nil {
 				for _, message := range notification.AlbumMessages {
-					m.prepareMessage(message, m.httpServer)
+					err = m.prepareMessage(message, m.httpServer)
+
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
@@ -155,11 +163,11 @@ func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids
 
 	// Mark messages as seen
 	for chatID, messageIDs := range repliesAndMentions {
-		count, countWithMentions, err := m.markMessagesSeenImpl(chatID, messageIDs)
+		count, countWithMentions, chat, err := m.markMessagesSeenImpl(chatID, messageIDs)
 		if err != nil {
 			return nil, err
 		}
-
+		response.AddChat(chat)
 		response.AddSeenAndUnseenMessages(&SeenUnseenMessages{
 			ChatID:            chatID,
 			Count:             count,

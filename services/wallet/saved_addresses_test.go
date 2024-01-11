@@ -39,7 +39,6 @@ func TestSavedAddressesAdd(t *testing.T) {
 	sa := SavedAddress{
 		Address:         common.Address{1},
 		Name:            "Zilliqa",
-		Favourite:       true,
 		ChainShortNames: "eth:arb:",
 		ENSName:         "test.stateofus.eth",
 		ColorID:         multiAccCommon.CustomizationColorGreen,
@@ -54,7 +53,6 @@ func TestSavedAddressesAdd(t *testing.T) {
 	require.Equal(t, 1, len(rst))
 	require.Equal(t, sa.Address, rst[0].Address)
 	require.Equal(t, sa.Name, rst[0].Name)
-	require.Equal(t, sa.Favourite, rst[0].Favourite)
 	require.Equal(t, sa.ChainShortNames, rst[0].ChainShortNames)
 	require.Equal(t, sa.ENSName, rst[0].ENSName)
 	require.Equal(t, sa.ColorID, rst[0].ColorID)
@@ -80,8 +78,8 @@ func haveSameElements[T comparable](a []T, b []T, isEqual func(T, T) bool) bool 
 }
 
 func savedAddressDataIsEqual(a, b SavedAddress) bool {
-	return a.Address == b.Address && a.Name == b.Name && a.Favourite == b.Favourite &&
-		a.ChainShortNames == b.ChainShortNames && a.ENSName == b.ENSName && a.IsTest == b.IsTest && a.ColorID == b.ColorID
+	return a.Address == b.Address && a.Name == b.Name && a.ChainShortNames == b.ChainShortNames &&
+		a.ENSName == b.ENSName && a.IsTest == b.IsTest && a.ColorID == b.ColorID
 }
 
 func TestSavedAddressesMetadata(t *testing.T) {
@@ -94,9 +92,8 @@ func TestSavedAddressesMetadata(t *testing.T) {
 
 	// Add raw saved addresses
 	sa1 := SavedAddress{
-		Address:   common.Address{1},
-		Name:      "Raw",
-		Favourite: true,
+		Address: common.Address{1},
+		Name:    "Raw",
 		savedAddressMeta: savedAddressMeta{
 			Removed:     false,
 			UpdateClock: 234,
@@ -117,11 +114,10 @@ func TestSavedAddressesMetadata(t *testing.T) {
 
 	// Add simple saved address without sync metadata
 	sa2 := SavedAddress{
-		Address:   common.Address{2},
-		Name:      "Simple",
-		ColorID:   multiAccCommon.CustomizationColorBlue,
-		Favourite: false,
-		IsTest:    false,
+		Address: common.Address{2},
+		Name:    "Simple",
+		ColorID: multiAccCommon.CustomizationColorBlue,
+		IsTest:  false,
 	}
 
 	var sa2UpdatedClock uint64
@@ -142,7 +138,6 @@ func TestSavedAddressesMetadata(t *testing.T) {
 	require.Equal(t, sa2.Address, dbSavedAddresses[rawIndex].Address)
 	require.Equal(t, sa2.Name, dbSavedAddresses[rawIndex].Name)
 	require.Equal(t, sa2.ColorID, dbSavedAddresses[rawIndex].ColorID)
-	require.Equal(t, sa2.Favourite, dbSavedAddresses[rawIndex].Favourite)
 	require.Equal(t, sa2.IsTest, dbSavedAddresses[rawIndex].IsTest)
 
 	// Check the default values
@@ -151,11 +146,9 @@ func TestSavedAddressesMetadata(t *testing.T) {
 	require.Greater(t, dbSavedAddresses[rawIndex].UpdateClock, uint64(0))
 
 	sa2Older := sa2
-	sa2Older.Favourite = true
 	sa2Older.IsTest = false
 
 	sa2Newer := sa2
-	sa2Newer.Favourite = false
 	sa2Newer.IsTest = false
 
 	// Try to add an older entry
@@ -193,7 +186,7 @@ func TestSavedAddressesMetadata(t *testing.T) {
 
 	// Try to delete the sa2 newer entry
 	updatedDeleteClock := updatedClock + 1
-	updated, err = manager.DeleteSavedAddress(sa2Newer.Address, sa2Newer.ENSName, sa2Newer.IsTest, updatedDeleteClock)
+	updated, err = manager.DeleteSavedAddress(sa2Newer.Address, sa2Newer.IsTest, updatedDeleteClock)
 	require.NoError(t, err)
 	require.True(t, updated)
 
@@ -216,10 +209,9 @@ func TestSavedAddressesCleanSoftDeletes(t *testing.T) {
 	firstTimestamp := 10
 	for i := 0; i < 5; i++ {
 		sa := SavedAddress{
-			Address:   common.Address{byte(i)},
-			Name:      "Test" + strconv.Itoa(i),
-			ColorID:   multiAccCommon.CustomizationColorGreen,
-			Favourite: false,
+			Address: common.Address{byte(i)},
+			Name:    "Test" + strconv.Itoa(i),
+			ColorID: multiAccCommon.CustomizationColorGreen,
 			savedAddressMeta: savedAddressMeta{
 				Removed:     true,
 				UpdateClock: uint64(firstTimestamp + i),
@@ -299,7 +291,7 @@ func TestSavedAddressesDelete(t *testing.T) {
 
 	// Delete s0, test that only s1 is left
 	updateClock := uint64(time.Now().Unix())
-	_, err = manager.DeleteSavedAddress(sa0.Address, sa0.ENSName, sa0.IsTest, updateClock)
+	_, err = manager.DeleteSavedAddress(sa0.Address, sa0.IsTest, updateClock)
 	require.NoError(t, err)
 
 	rst, err = manager.GetSavedAddresses()
@@ -313,7 +305,7 @@ func TestSavedAddressesDelete(t *testing.T) {
 	require.Equal(t, 2, len(rst))
 
 	// Delete s0 one more time with the same timestamp
-	deleted, err := manager.DeleteSavedAddress(sa0.Address, sa0.ENSName, sa0.IsTest, updateClock)
+	deleted, err := manager.DeleteSavedAddress(sa0.Address, sa0.IsTest, updateClock)
 	require.NoError(t, err)
 	require.False(t, deleted)
 }

@@ -799,10 +799,14 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchPendingCommunityRequestToJoin()
 	m.broadcastLatestUserStatus()
 	m.timeoutAutomaticStatusUpdates()
-	m.startBackupLoop()
-	err = m.startAutoMessageLoop()
-	if err != nil {
-		return nil, err
+	if !m.config.featureFlags.DisableCheckingForBackup {
+		m.startBackupLoop()
+	}
+	if !m.config.featureFlags.DisableAutoMessageLoop {
+		err = m.startAutoMessageLoop()
+		if err != nil {
+			return nil, err
+		}
 	}
 	m.startSyncSettingsLoop()
 	m.startSettingsChangesLoop()
@@ -937,7 +941,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 	m.ensVerifier.SetOnline(online)
 }
 
-func (m *Messenger) online() bool {
+func (m *Messenger) Online() bool {
 	switch m.transport.WakuVersion() {
 	case 2:
 		return m.transport.PeerCount() > 0
@@ -1450,13 +1454,13 @@ func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.Verification
 // watchConnectionChange checks the connection status and call handleConnectionChange when this changes
 func (m *Messenger) watchConnectionChange() {
 	m.logger.Debug("watching connection changes")
-	state := m.online()
+	state := m.Online()
 	m.handleConnectionChange(state)
 	go func() {
 		for {
 			select {
 			case <-time.After(200 * time.Millisecond):
-				newState := m.online()
+				newState := m.Online()
 				if state != newState {
 					state = newState
 					m.logger.Debug("connection changed", zap.Bool("online", state))
@@ -1533,7 +1537,7 @@ func (m *Messenger) watchExpiredMessages() {
 		for {
 			select {
 			case <-time.After(time.Second):
-				if m.online() {
+				if m.Online() {
 					err := m.resendExpiredMessages()
 					if err != nil {
 						m.logger.Debug("Error when resending expired emoji reactions", zap.Error(err))
@@ -1616,7 +1620,7 @@ func (m *Messenger) PublishIdentityImage() error {
 	}
 
 	// If not online, we schedule it
-	if !m.online() {
+	if !m.Online() {
 		m.shouldPublishContactCode = true
 		return nil
 	}
@@ -2312,10 +2316,6 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			return nil, err
 		}
 
-		if community == nil {
-			return nil, errors.New("community not found")
-		}
-
 		wrappedCommunity, err := community.ToProtocolMessageBytes()
 		if err != nil {
 			return nil, err
@@ -2434,7 +2434,11 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		zap.String("Clock", strconv.FormatUint(message.Clock, 10)),
 		zap.String("Timestamp", strconv.FormatUint(message.Timestamp, 10)),
 	)
-	m.prepareMessages(response.messages)
+	err = m.prepareMessages(response.messages)
+
+	if err != nil {
+		return nil, err
+	}
 
 	return &response, m.saveChat(chat)
 }
@@ -3484,7 +3488,11 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 		}
 		if m.httpServer != nil {
 			for _, msg := range album {
-				m.prepareMessage(msg, m.httpServer)
+				err = m.prepareMessage(msg, m.httpServer)
+
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -3932,7 +3940,10 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 		return nil, err
 	}
 
-	m.prepareMessages(messageState.Response.messages)
+	err = m.prepareMessages(messageState.Response.messages)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, message := range messageState.Response.messages {
 		if _, ok := newMessagesIds[message.ID]; ok {
@@ -4046,24 +4057,68 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 
 	if m.httpServer != nil {
 		for idx := range msgs {
-			m.prepareMessage(msgs[idx], m.httpServer)
+			err = m.prepareMessage(msgs[idx], m.httpServer)
+
+			if err != nil {
+				return nil, "", err
+			}
 		}
 	}
 
 	return msgs, nextCursor, nil
 }
 
-func (m *Messenger) prepareMessages(messages map[string]*common.Message) {
+func (m *Messenger) prepareMessages(messages map[string]*common.Message) error {
 	if m.httpServer != nil {
 		for idx := range messages {
-			m.prepareMessage(messages[idx], m.httpServer)
+			err := m.prepareMessage(messages[idx], m.httpServer)
+
+			if err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
-func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
+func extractQuotedImages(messages []*common.Message, s *server.MediaServer) []string {
+	var quotedImages []string
+
+	for _, message := range messages {
+		if message.ChatMessage != nil && message.ChatMessage.ContentType == protobuf.ChatMessage_IMAGE {
+			quotedImages = append(quotedImages, s.MakeImageURL(message.ID))
+		}
+	}
+	return quotedImages
+}
+
+func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) error {
 	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_IMAGE) {
 		msg.QuotedMessage.ImageLocalURL = s.MakeImageURL(msg.QuotedMessage.ID)
+
+		quotedMessage, err := m.MessageByID(msg.QuotedMessage.ID)
+		if err != nil {
+			return err
+		}
+		if quotedMessage == nil {
+			return errors.New("message not found")
+		}
+
+		if quotedMessage.ChatMessage != nil {
+			albumID := quotedMessage.ChatMessage.GetImage().AlbumId
+			albumMessages, err := m.persistence.albumMessages(quotedMessage.LocalChatID, albumID)
+			if err != nil {
+				return err
+			}
+
+			var quotedImages = extractQuotedImages(albumMessages, s)
+
+			if quotedImagesJSON, err := json.Marshal(quotedImages); err == nil {
+				msg.QuotedMessage.AlbumImages = quotedImagesJSON
+			} else {
+				return err
+			}
+		}
 	}
 	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_AUDIO) {
 		msg.QuotedMessage.AudioLocalURL = s.MakeAudioURL(msg.QuotedMessage.ID)
@@ -4075,7 +4130,7 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 		dm := msg.QuotedMessage.DiscordMessage
 		exists, err := m.persistence.HasDiscordMessageAuthorImagePayload(dm.Author.Id)
 		if err != nil {
-			return
+			return err
 		}
 
 		if exists {
@@ -4092,7 +4147,7 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 		dm := msg.GetDiscordMessage()
 		exists, err := m.persistence.HasDiscordMessageAuthorImagePayload(dm.Author.Id)
 		if err != nil {
-			return
+			return err
 		}
 
 		if exists {
@@ -4125,6 +4180,8 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 
 	msg.LinkPreviews = msg.ConvertFromProtoToLinkPreviews(s.MakeLinkPreviewThumbnailURL)
 	msg.StatusLinkPreviews = msg.ConvertFromProtoToStatusLinkPreviews(s.MakeStatusLinkPreviewThumbnailURL)
+
+	return nil
 }
 
 func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
@@ -4205,22 +4262,22 @@ func (m *Messenger) MarkMessageAsUnread(chatID string, messageID string) (*Messe
 // MarkMessagesSeen marks messages with `ids` as seen in the chat `chatID`.
 // It returns the number of affected messages or error. If there is an error,
 // the number of affected messages is always zero.
-func (m *Messenger) markMessagesSeenImpl(chatID string, ids []string) (uint64, uint64, error) {
+func (m *Messenger) markMessagesSeenImpl(chatID string, ids []string) (uint64, uint64, *Chat, error) {
 	count, countWithMentions, err := m.persistence.MarkMessagesSeen(chatID, ids)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, nil, err
 	}
 	chat, err := m.persistence.Chat(chatID)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, nil, err
 	}
 	m.allChats.Store(chatID, chat)
-	return count, countWithMentions, nil
+	return count, countWithMentions, chat, nil
 }
 
 // Deprecated: Use MarkMessagesRead instead
 func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint64, []*ActivityCenterNotification, error) {
-	count, countWithMentions, err := m.markMessagesSeenImpl(chatID, ids)
+	count, countWithMentions, _, err := m.markMessagesSeenImpl(chatID, ids)
 	if err != nil {
 		return 0, 0, nil, err
 	}
@@ -4246,7 +4303,7 @@ func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint6
 }
 
 func (m *Messenger) MarkMessagesRead(chatID string, ids []string) (*MessengerResponse, error) {
-	count, countWithMentions, err := m.markMessagesSeenImpl(chatID, ids)
+	count, countWithMentions, _, err := m.markMessagesSeenImpl(chatID, ids)
 	if err != nil {
 		return nil, err
 	}

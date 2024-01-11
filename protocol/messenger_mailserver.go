@@ -42,7 +42,7 @@ var ErrNoFiltersForChat = errors.New("no filter registered for given chat")
 
 func (m *Messenger) shouldSync() (bool, error) {
 	// TODO (pablo) support community store node as well
-	if m.mailserverCycle.activeMailserver == nil || !m.online() {
+	if m.mailserverCycle.activeMailserver == nil || !m.Online() {
 		return false, nil
 	}
 

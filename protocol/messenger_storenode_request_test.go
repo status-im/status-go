@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/transport"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -30,7 +31,9 @@ import (
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 
+	"github.com/status-im/status-go/services/communitytokens"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	waku2 "github.com/status-im/status-go/wakuv2"
 	wakuV2common "github.com/status-im/status-go/wakuv2/common"
 )
@@ -59,6 +62,8 @@ type MessengerStoreNodeRequestSuite struct {
 
 	ownerWaku types.Waku
 	bobWaku   types.Waku
+
+	collectiblesServiceMock *CollectiblesServiceMock
 
 	logger *zap.Logger
 }
@@ -122,6 +127,8 @@ func (s *MessengerStoreNodeRequestSuite) SetupTest() {
 
 	s.storeNodeAddress = storeNodeListenAddresses[0]
 	s.logger.Info("store node ready", zap.String("address", s.storeNodeAddress))
+
+	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 }
 
 func (s *MessengerStoreNodeRequestSuite) TearDown() {
@@ -176,6 +183,7 @@ func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *za
 		WithClusterConfig(params.ClusterConfig{
 			Fleet: localFleet,
 		}),
+		WithCommunityTokensService(s.collectiblesServiceMock),
 	}
 
 	messenger, err := newMessengerWithKey(shh, privateKey, logger, options)
@@ -220,6 +228,8 @@ func (s *MessengerStoreNodeRequestSuite) requireCommunitiesEqual(c *communities.
 	s.Require().Equal(expected.Color(), c.Color())
 	s.Require().Equal(expected.Tags(), c.Tags())
 	s.Require().Equal(expected.Shard(), c.Shard())
+	s.Require().Equal(expected.TokenPermissions(), c.TokenPermissions())
+	s.Require().Equal(expected.CommunityTokensMetadata(), c.CommunityTokensMetadata())
 }
 
 func (s *MessengerStoreNodeRequestSuite) requireContactsEqual(c *Contact, expected *Contact) {
@@ -820,4 +830,46 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 	for storeNodeName, result := range results {
 		fmt.Printf("%s --- %s\n", storeNodeName, result.toString())
 	}
+}
+
+func (s *MessengerStoreNodeRequestSuite) TestFetchingCommunityWithOwnerToken() {
+	s.createOwner()
+	s.createBob()
+
+	s.waitForAvailableStoreNode(s.owner)
+	community := s.createCommunity(s.owner)
+
+	// owner mints owner token
+	var chainID uint64 = 1
+	tokenAddress := "token-address"
+	tokenName := "tokenName"
+	tokenSymbol := "TSM"
+	_, err := s.owner.SaveCommunityToken(&token.CommunityToken{
+		TokenType:       protobuf.CommunityTokenType_ERC721,
+		CommunityID:     community.IDString(),
+		Address:         tokenAddress,
+		ChainID:         int(chainID),
+		Name:            tokenName,
+		Supply:          &bigint.BigInt{},
+		Symbol:          tokenSymbol,
+		PrivilegesLevel: token.OwnerLevel,
+	}, nil)
+	s.Require().NoError(err)
+
+	// owner adds minted owner token to community
+	err = s.owner.AddCommunityToken(community.IDString(), int(chainID), tokenAddress)
+	s.Require().NoError(err)
+
+	// update mock - the signer for the community returned by the contracts should be owner
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.owner.identity.PublicKey))
+	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
+		&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(community.TokenPermissions(), 1)
+
+	s.waitForAvailableStoreNode(s.bob)
+
+	s.fetchCommunity(s.bob, community.CommunityShard(), community)
 }

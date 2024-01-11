@@ -154,7 +154,7 @@ func init() {
 // the root is created locally, using createMembershipList proc from waku_rln_relay_utils module, and the result is hardcoded in here
 const STATIC_GROUP_MERKLE_ROOT = "ca7290e49680fa14eeaeea709e4742a8a074a1bcbfd50a4b3976742ae8a6ca25"
 
-const EPOCH_UNIT_SECONDS = uint64(10) // the rln-relay epoch length in seconds
+const EPOCH_UNIT_SECONDS = uint64(1) // the rln-relay epoch length in seconds
 
 type Epoch [32]byte
 

@@ -17,6 +17,7 @@
 // 1702577524_add_community_collections_and_collectibles_images_cache.up.sql (210B)
 // 1702867707_add_balance_to_collectibles_ownership_cache.up.sql (289B)
 // 1703686612_add_color_to_saved_addresses.up.sql (114B)
+// 1704701942_remove_favourite_and_change_primary_key_for_saved_addresses.up.sql (894B)
 // doc.go (74B)
 
 package migrations
@@ -421,8 +422,28 @@ func _1703686612_add_color_to_saved_addressesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1703686612_add_color_to_saved_addresses.up.sql", size: 114, mode: os.FileMode(0644), modTime: time.Unix(1703687102, 0)}
+	info := bindataFileInfo{name: "1703686612_add_color_to_saved_addresses.up.sql", size: 114, mode: os.FileMode(0644), modTime: time.Unix(1704402566, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb7, 0x6e, 0x8d, 0xc0, 0x49, 0xc, 0xb, 0x66, 0xa0, 0x77, 0x32, 0x76, 0xa8, 0xd0, 0x40, 0xce, 0x67, 0xa, 0x9e, 0x23, 0x36, 0xe, 0xc3, 0xd3, 0x9d, 0xe2, 0xde, 0x60, 0x19, 0xba, 0x44, 0xf1}}
+	return a, nil
+}
+
+var __1704701942_remove_favourite_and_change_primary_key_for_saved_addressesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x8c\x93\x31\x6f\xc2\x30\x10\x85\x77\xff\x8a\x13\x13\x48\x0c\xdd\x99\x0c\x5c\x8a\x55\x63\x53\xc7\x29\x65\x8a\xa2\xc4\x12\xa8\x90\xa0\x38\xa5\xea\xbf\xaf\x9c\x18\x1a\x30\x42\x6c\xb9\xbb\x67\xdf\x97\xf7\xe4\x99\x42\xaa\x11\x34\x9d\x72\x04\x16\x81\x90\x1a\xf0\x93\xc5\x3a\x06\x9b\x9d\x4c\x91\x66\x45\x51\x1b\x6b\x8d\x4d\x4b\xf3\x03\x43\x02\xe0\x3b\xf0\x41\xd5\x6c\x41\x55\x7b\x44\x24\x9c\x8f\x09\x40\x99\x1d\x4c\x30\x80\x39\x46\x34\xe1\x1a\x06\x03\xa7\xa9\xcd\xa1\x3a\x99\x02\xa6\x52\x72\xa4\x22\x94\x45\x94\xc7\xe8\x94\xdf\xc7\x22\x6b\x4c\x9a\xef\xab\xfc\x0b\x98\xd0\xa1\xf4\xc5\xc9\xf2\x6d\xb6\x2b\x53\xbb\xad\xea\x26\x75\x00\x21\xda\x0d\x81\x29\x6d\xfa\x0c\xe9\xce\xa6\x8d\xb1\xcd\x13\xa4\x79\x6d\xb2\xc6\xb9\xd5\x3c\xe2\xac\xf6\x55\xfd\x60\xe7\xb1\xde\x1d\xb2\xfa\xb7\x5d\xbd\x52\x6c\x49\xd5\x06\xde\x70\x03\x43\xef\xf8\xf8\x0c\x34\x72\x8a\x44\xb0\xf7\x04\x61\xe8\x7e\xe4\x7f\x42\x46\xb0\x66\x7a\x21\x13\x0d\x4a\xae\xd9\x7c\x42\x08\x13\x31\x2a\x0d\x52\x01\x7b\x15\x52\xa1\x23\x94\xf7\xd2\x25\xd0\xe6\x7b\x49\x78\xdc\x16\xed\xfd\xed\x97\x0f\xae\x2b\xfa\xd9\x74\x9d\x20\x86\xae\x7d\x36\xbb\xab\x3c\xa7\x3f\x71\x71\xcd\xd7\xce\x20\x02\x30\x22\x31\x72\x9c\x69\x72\x85\x72\xbe\xa4\x87\x71\x0b\x71\x17\xa1\x0f\xd0\x5b\x7f\xbd\xbc\x5b\x1d\x29\xb9\x24\x70\xeb\xcd\x84\x90\xb9\x92\x2b\xff\x48\xc2\x21\xe5\x1a\xd5\xfd\x69\xfb\x68\x14\x0a\xba\x44\x08\x4d\x9f\xfc\x05\x00\x00\xff\xff\xf2\xa5\xf4\x92\x7e\x03\x00\x00")
+
+func _1704701942_remove_favourite_and_change_primary_key_for_saved_addressesUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1704701942_remove_favourite_and_change_primary_key_for_saved_addressesUpSql,
+		"1704701942_remove_favourite_and_change_primary_key_for_saved_addresses.up.sql",
+	)
+}
+
+func _1704701942_remove_favourite_and_change_primary_key_for_saved_addressesUpSql() (*asset, error) {
+	bytes, err := _1704701942_remove_favourite_and_change_primary_key_for_saved_addressesUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1704701942_remove_favourite_and_change_primary_key_for_saved_addresses.up.sql", size: 894, mode: os.FileMode(0644), modTime: time.Unix(1704871375, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x70, 0xd3, 0xcf, 0x90, 0xb2, 0xa, 0x23, 0x41, 0x8a, 0xa5, 0x90, 0x7b, 0x34, 0xec, 0x3b, 0x3f, 0xa9, 0xb1, 0x95, 0xf3, 0x2a, 0xdf, 0xbb, 0x53, 0x57, 0x27, 0x2b, 0x12, 0x84, 0xf4, 0x83, 0xda}}
 	return a, nil
 }
 
@@ -571,6 +592,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1703686612_add_color_to_saved_addresses.up.sql": _1703686612_add_color_to_saved_addressesUpSql,
 
+	"1704701942_remove_favourite_and_change_primary_key_for_saved_addresses.up.sql": _1704701942_remove_favourite_and_change_primary_key_for_saved_addressesUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -632,6 +655,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1702577524_add_community_collections_and_collectibles_images_cache.up.sql":     &bintree{_1702577524_add_community_collections_and_collectibles_images_cacheUpSql, map[string]*bintree{}},
 	"1702867707_add_balance_to_collectibles_ownership_cache.up.sql":                 &bintree{_1702867707_add_balance_to_collectibles_ownership_cacheUpSql, map[string]*bintree{}},
 	"1703686612_add_color_to_saved_addresses.up.sql":                                &bintree{_1703686612_add_color_to_saved_addressesUpSql, map[string]*bintree{}},
+	"1704701942_remove_favourite_and_change_primary_key_for_saved_addresses.up.sql": &bintree{_1704701942_remove_favourite_and_change_primary_key_for_saved_addressesUpSql, map[string]*bintree{}},
 	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 

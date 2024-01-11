@@ -22,6 +22,18 @@ func NewFilterError(code int, message string) FilterError {
 	}
 }
 
+const errorStringFmt = "%d - %s"
+
 func (e *FilterError) Error() string {
-	return fmt.Sprintf("%d - %s", e.Code, e.Message)
+	return fmt.Sprintf(errorStringFmt, e.Code, e.Message)
+}
+
+func ExtractCodeFromFilterError(fErr string) int {
+	code := 0
+	var message string
+	_, err := fmt.Sscanf(fErr, errorStringFmt, &code, &message)
+	if err != nil {
+		return -1
+	}
+	return code
 }

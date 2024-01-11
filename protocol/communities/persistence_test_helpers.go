@@ -11,6 +11,7 @@ type RawCommunityRow struct {
 	PrivateKey  []byte
 	Description []byte
 	Joined      bool
+	JoinedAt    int64
 	Spectated   bool
 	Verified    bool
 	SyncedAt    uint64
@@ -22,6 +23,7 @@ func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncInstallationCommunity
 		ID:          syncCommProto.Id,
 		Description: syncCommProto.Description,
 		Joined:      syncCommProto.Joined,
+		JoinedAt:    syncCommProto.JoinedAt,
 		Spectated:   syncCommProto.Spectated,
 		Verified:    syncCommProto.Verified,
 		SyncedAt:    syncCommProto.Clock,
@@ -38,6 +40,7 @@ func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (
 		&rcr.PrivateKey,
 		&rcr.Description,
 		&rcr.Joined,
+		&rcr.JoinedAt,
 		&rcr.Verified,
 		&rcr.Spectated,
 		&rcr.Muted,
@@ -58,7 +61,7 @@ func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (
 func (p *Persistence) getAllCommunitiesRaw() (rcrs []*RawCommunityRow, err error) {
 	var rows *sql.Rows
 	// Keep "*", if the db table is updated, syncing needs to match, this fail will force us to update syncing.
-	rows, err = p.db.Query(`SELECT id, private_key, description, joined, verified, spectated, muted, muted_till, synced_at FROM communities_communities`)
+	rows, err = p.db.Query(`SELECT id, private_key, description, joined, joined_at, verified, spectated, muted, muted_till, synced_at FROM communities_communities`)
 	if err != nil {
 		return nil, err
 	}
@@ -85,22 +88,23 @@ func (p *Persistence) getAllCommunitiesRaw() (rcrs []*RawCommunityRow, err error
 }
 
 func (p *Persistence) getRawCommunityRow(id []byte) (*RawCommunityRow, error) {
-	qr := p.db.QueryRow(`SELECT id, private_key, description, joined, verified, spectated, muted, muted_till, synced_at FROM communities_communities WHERE id = ?`, id)
+	qr := p.db.QueryRow(`SELECT id, private_key, description, joined, joined_at, verified, spectated, muted, muted_till, synced_at FROM communities_communities WHERE id = ?`, id)
 	return p.scanRowToStruct(qr.Scan)
 }
 
 func (p *Persistence) getSyncedRawCommunity(id []byte) (*RawCommunityRow, error) {
-	qr := p.db.QueryRow(`SELECT id, private_key, description, joined, verified, spectated, muted, muted_till, synced_at FROM communities_communities WHERE id = ? AND synced_at > 0`, id)
+	qr := p.db.QueryRow(`SELECT id, private_key, description, joined, joined_at, verified, spectated, muted, muted_till, synced_at FROM communities_communities WHERE id = ? AND synced_at > 0`, id)
 	return p.scanRowToStruct(qr.Scan)
 }
 
 func (p *Persistence) saveRawCommunityRow(rawCommRow RawCommunityRow) error {
 	_, err := p.db.Exec(
-		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "verified", "synced_at", "muted") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "joined_at", "verified", "synced_at", "muted") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		rawCommRow.ID,
 		rawCommRow.PrivateKey,
 		rawCommRow.Description,
 		rawCommRow.Joined,
+		rawCommRow.JoinedAt,
 		rawCommRow.Verified,
 		rawCommRow.SyncedAt,
 		rawCommRow.Muted,
@@ -110,11 +114,12 @@ func (p *Persistence) saveRawCommunityRow(rawCommRow RawCommunityRow) error {
 
 func (p *Persistence) saveRawCommunityRowWithoutSyncedAt(rawCommRow RawCommunityRow) error {
 	_, err := p.db.Exec(
-		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "verified", "muted") VALUES (?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "joined_at", "verified", "muted") VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		rawCommRow.ID,
 		rawCommRow.PrivateKey,
 		rawCommRow.Description,
 		rawCommRow.Joined,
+		rawCommRow.JoinedAt,
 		rawCommRow.Verified,
 		rawCommRow.Muted,
 	)

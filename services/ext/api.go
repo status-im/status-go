@@ -1076,8 +1076,12 @@ func (api *PublicAPI) UpsertSavedAddress(ctx context.Context, sa wallet.SavedAdd
 	return api.service.messenger.UpsertSavedAddress(ctx, sa)
 }
 
-func (api *PublicAPI) DeleteSavedAddress(ctx context.Context, address ethcommon.Address, ens string, isTest bool) error {
-	return api.service.messenger.DeleteSavedAddress(ctx, address, ens, isTest)
+func (api *PublicAPI) DeleteSavedAddress(ctx context.Context, address ethcommon.Address, isTest bool) error {
+	return api.service.messenger.DeleteSavedAddress(ctx, address, isTest)
+}
+
+func (api *PublicAPI) GetSavedAddresses(ctx context.Context) ([]wallet.SavedAddress, error) {
+	return api.service.messenger.GetSavedAddresses(ctx)
 }
 
 // PushNotifications server endpoints

@@ -76,6 +76,10 @@ func (api *API) GetBalancesByChain(ctx context.Context, chainIDs []uint64, addre
 	return api.s.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokens)
 }
 
+func (api *API) GetWalletTokenBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
+	return api.reader.GetWalletTokenBalances(ctx, addresses)
+}
+
 func (api *API) GetCachedWalletTokensWithoutMarketData(ctx context.Context) (map[common.Address][]Token, error) {
 	return api.reader.GetCachedWalletTokensWithoutMarketData()
 }
@@ -226,27 +230,6 @@ func (api *API) DeleteCustomTokenByChainID(ctx context.Context, chainID uint64, 
 	log.Debug("call to remove custom token")
 	err := api.s.tokenManager.DeleteCustom(chainID, address)
 	log.Debug("result from database for remove custom token", "err", err)
-	return err
-}
-
-func (api *API) GetSavedAddresses(ctx context.Context) ([]SavedAddress, error) {
-	log.Debug("call to get saved addresses")
-	rst, err := api.s.savedAddressesManager.GetSavedAddresses()
-	log.Debug("result from database for saved addresses", "len", len(rst))
-	return rst, err
-}
-
-func (api *API) AddSavedAddress(ctx context.Context, sa SavedAddress) error {
-	log.Debug("call to create or edit saved address")
-	_, err := api.s.savedAddressesManager.UpdateMetadataAndUpsertSavedAddress(sa)
-	log.Debug("result from database for create or edit saved address", "err", err)
-	return err
-}
-
-func (api *API) DeleteSavedAddress(ctx context.Context, address common.Address, ens string, isTest bool) error {
-	log.Debug("call to remove saved address")
-	_, err := api.s.savedAddressesManager.DeleteSavedAddress(address, ens, isTest, uint64(time.Now().Unix()))
-	log.Debug("result from database for remove saved address", "err", err)
 	return err
 }
 
