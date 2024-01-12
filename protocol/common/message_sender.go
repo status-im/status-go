@@ -241,8 +241,6 @@ func (s *MessageSender) SendGroup(
 		}
 	}
 
-	rawMessage.BeforeDispatch = nil
-
 	// Send to each recipients
 	for _, recipient := range recipients {
 		_, err = s.sendPrivate(ctx, recipient, &rawMessage)

@@ -2399,6 +2399,9 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			return err
 		}
 
+		// ensure that the message is saved only once
+		rawMessage.BeforeDispatch = nil
+
 		return m.persistence.SaveMessages([]*common.Message{message})
 	}
 
