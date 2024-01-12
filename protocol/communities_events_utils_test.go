@@ -1887,10 +1887,10 @@ func testAddAndSyncTokenFromControlNode(base CommunityEventsTestsInterface, comm
 	s.Require().Len(syncTokens, 1)
 	s.Require().Equal(syncTokens[0].PrivilegesLevel, privilegesLvl)
 
-	// check CommunityToken was not added to the DB
+	// check CommunityToken was added to the DB
 	syncTokens, err = base.GetMember().communitiesManager.GetAllCommunityTokens()
 	s.Require().NoError(err)
-	s.Require().Len(syncTokens, 0)
+	s.Require().Len(syncTokens, 1)
 }
 
 func testAddAndSyncOwnerTokenFromControlNode(base CommunityEventsTestsInterface, community *communities.Community,
@@ -2002,7 +2002,7 @@ func testAddAndSyncTokenFromEventSenderByControlNode(base CommunityEventsTestsIn
 
 	s.Require().NoError(err)
 
-	// check member did not receive sync message with the token
+	// check member received sync message with the token
 	_, err = WaitOnMessengerResponse(
 		base.GetMember(),
 		func(r *MessengerResponse) bool {
@@ -2012,7 +2012,7 @@ func testAddAndSyncTokenFromEventSenderByControlNode(base CommunityEventsTestsIn
 		"no token sync message from event sender",
 	)
 
-	s.Require().Error(err)
+	s.Require().NoError(err)
 }
 
 func testEventSenderAddTokenMasterAndOwnerToken(base CommunityEventsTestsInterface, community *communities.Community) {

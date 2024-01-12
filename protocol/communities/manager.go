@@ -1643,7 +1643,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		return nil, err
 	}
 
-	if err = m.HandleCommunityTokensMetadataByPrivilegedMembers(community); err != nil {
+	if err = m.handleCommunityTokensMetadata(community); err != nil {
 		return nil, err
 	}
 
@@ -1814,7 +1814,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, err
 	}
 
-	if err = m.HandleCommunityTokensMetadataByPrivilegedMembers(community); err != nil {
+	if err = m.handleCommunityTokensMetadata(community); err != nil {
 		return nil, err
 	}
 
@@ -2858,7 +2858,7 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	if err = m.HandleCommunityTokensMetadataByPrivilegedMembers(community); err != nil {
+	if err = m.handleCommunityTokensMetadata(community); err != nil {
 		return nil, err
 	}
 
@@ -4721,16 +4721,7 @@ func (m *Manager) ReevaluatePrivilegedMember(community *Community, tokenPermissi
 	return alreadyHasPrivilegedRole, nil
 }
 
-func (m *Manager) HandleCommunityTokensMetadataByPrivilegedMembers(community *Community) error {
-	if community.HasPermissionToSendCommunityEvents() || community.IsControlNode() {
-		if err := m.HandleCommunityTokensMetadata(community); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (m *Manager) HandleCommunityTokensMetadata(community *Community) error {
+func (m *Manager) handleCommunityTokensMetadata(community *Community) error {
 	communityID := community.IDString()
 	communityTokens := community.CommunityTokensMetadata()
 

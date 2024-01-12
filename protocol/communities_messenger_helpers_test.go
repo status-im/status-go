@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/communitytokens"
@@ -119,6 +120,21 @@ func (c *CollectiblesServiceMock) SetMockCollectibleContractData(chainID uint64,
 	}
 	c.Collectibles[chainID] = make(map[string]*communitytokens.CollectibleContractData)
 	c.Collectibles[chainID][contractAddress] = collectible
+}
+
+func (c *CollectiblesServiceMock) SetMockCommunityTokenData(token *token.CommunityToken) {
+	if c.Collectibles == nil {
+		c.Collectibles = make(map[uint64]map[string]*communitytokens.CollectibleContractData)
+	}
+
+	data := &communitytokens.CollectibleContractData{
+		TotalSupply:    token.Supply,
+		Transferable:   token.Transferable,
+		RemoteBurnable: token.RemoteSelfDestruct,
+		InfiniteSupply: token.InfiniteSupply,
+	}
+
+	c.SetMockCollectibleContractData(uint64(token.ChainID), token.Address, data)
 }
 
 func (c *CollectiblesServiceMock) SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error) {
