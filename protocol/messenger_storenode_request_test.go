@@ -70,8 +70,25 @@ type MessengerStoreNodeRequestSuite struct {
 type singleResult struct {
 	EnvelopesCount   int
 	Envelopes        []*wakuV2common.ReceivedMessage
+	ShardEnvelopes   []*wakuV2common.ReceivedMessage
 	Error            error
 	FetchedCommunity *communities.Community
+}
+
+func (r *singleResult) ShardEnvelopesHashes() []string {
+	out := make([]string, 0, len(r.ShardEnvelopes))
+	for _, e := range r.ShardEnvelopes {
+		out = append(out, e.Hash().String())
+	}
+	return out
+}
+
+func (r *singleResult) EnvelopesHashes() []string {
+	out := make([]string, 0, len(r.Envelopes))
+	for _, e := range r.Envelopes {
+		out = append(out, e.Hash().String())
+	}
+	return out
 }
 
 func (r *singleResult) toString() string {
@@ -79,9 +96,8 @@ func (r *singleResult) toString() string {
 	communityString := ""
 
 	if r.FetchedCommunity != nil {
-		communityString = fmt.Sprintf("clock: %d (%s), name: %s, members: %d",
+		communityString = fmt.Sprintf("clock: %d, name: '%s', members: %d",
 			r.FetchedCommunity.Clock(),
-			time.Unix(int64(r.FetchedCommunity.Clock()), 0).UTC(),
 			r.FetchedCommunity.Name(),
 			len(r.FetchedCommunity.Members()),
 		)
@@ -90,12 +106,24 @@ func (r *singleResult) toString() string {
 	if r.Error != nil {
 		resultString = fmt.Sprintf("error: %s", r.Error.Error())
 	} else {
-		resultString = fmt.Sprintf("envelopes fetched: %d, community %s",
+		resultString = fmt.Sprintf("envelopes fetched: %d, community - %s",
 			r.EnvelopesCount, communityString)
 	}
 
+	for i, envelope := range r.ShardEnvelopes {
+		resultString += fmt.Sprintf("\n\tshard envelope %3.0d: %s, timestamp: %d (%s), size: %d bytes, contentTopic: %s, pubsubTopic: %s",
+			i+1,
+			envelope.Hash().Hex(),
+			envelope.Envelope.Message().GetTimestamp(),
+			time.Unix(0, envelope.Envelope.Message().GetTimestamp()).UTC(),
+			len(envelope.Envelope.Message().Payload),
+			envelope.Envelope.Message().ContentTopic,
+			envelope.Envelope.PubsubTopic(),
+		)
+	}
+
 	for i, envelope := range r.Envelopes {
-		resultString += fmt.Sprintf("\n\tenvelope %3.0d: %s, timestamp: %d (%s), size: %d bytes, contentTopic: %s, pubsubTopic: %s",
+		resultString += fmt.Sprintf("\n\tdescription envelope %3.0d: %s, timestamp: %d (%s), size: %d bytes, contentTopic: %s, pubsubTopic: %s",
 			i+1,
 			envelope.Hash().Hex(),
 			envelope.Envelope.Message().GetTimestamp(),
@@ -728,6 +756,11 @@ var testFetchRealCommunityExample = []struct {
 	// This is needed to mock the owner verification
 	OwnerPublicKey  string
 	CommunityTokens []testFetchRealCommunityExampleTokenInfo
+	// Fill these if you know what envelopes are expected.
+	// The test will fail if fetched array doesn't equal to the expected one.
+	CheckExpectedEnvelopes       bool
+	ExpectedDescriptionEnvelopes []string
+	ExpectedShardEnvelopes       []string
 }{
 	{
 		//Example 1, status.prod fleet
@@ -737,6 +770,34 @@ var testFetchRealCommunityExample = []struct {
 		UseShardAsDefaultTopic: false,
 		ClusterID:              shard.UndefinedShardValue,
 	},
+	{
+		// Example 3, shards.test fleet
+		// https://status.app/c/CxiACi8KFGFwIHJlcSAxIHN0dCBiZWMgbWVtEgdkc2Fkc2FkGAMiByM0MzYwREYqAxkrHAM=#zQ3shwDYZHtrLE7NqoTGjTWzWUu6hom5D4qxfskLZfgfyGRyL
+		CommunityID:            "0x03f64be95ed5c925022265f9250f538f65ed3dcf6e4ef6c139803dc02a3487ae7b",
+		Fleet:                  params.FleetShardsTest,
+		UseShardAsDefaultTopic: true,
+		ClusterID:              shard.MainStatusShardCluster,
+		//OwnerPublicKey:         "0x04be67d5a0b718b21c7192eb6cc4c699e81a7cd44326b2eafe867b58d19c4d1d7843b641455035725627844ff884525187e3b3e89bfaa04250f5b5e43be48d612f",
+		//CommunityTokens:        []testFetchRealCommunityExampleTokenInfo{{ChainID: 420, ContractAddress: "0x4a1e6373e2866d79fbac057ca8645b68bb21dd36"}},
+	},
+	{
+		//Example 1, shards.test fleet
+		CommunityID:            "0x02471dd922756a3a50b623e59cf3b99355d6587e43d5c517eb55f9aea9d3fe9fe9",
+		Fleet:                  params.FleetShardsTest,
+		UseShardAsDefaultTopic: true,
+		ClusterID:              shard.MainStatusShardCluster,
+		CheckExpectedEnvelopes: true,
+		ExpectedDescriptionEnvelopes: []string{
+			"0x5b4fa95d430c939c1cbbb26175eabfb4ee058d508c6b4c0e26624958ba02c3ce",
+			"0xbf44409ee40dea7816186b37a45dfebabcee59f76855ad5af663ccdf598861ab",
+			"0x98d98453f6017517d0114989da0938aad59a3ad9a10839c181f453283f64f5c9",
+		},
+		ExpectedShardEnvelopes: []string{
+			"0xc3e68e838d09e0117b3f3fd27aabe5f5a509d13e9045263c78e6890953d43547",
+			"0x5ee13d052bedb855ce2b9ba6f43c78233fbd4e6539a3bdf156497053c6ddf76d",
+			"0xfb6638b7e050f9323a0fe7b84986b5c6f8827965e67e3b3bd0fea21cf24e43de",
+		},
+	},
 }
 
 func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
@@ -744,7 +805,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 		return
 	}
 
-	exampleToRun := testFetchRealCommunityExample[0]
+	exampleToRun := testFetchRealCommunityExample[2]
 
 	// Test configuration
 	communityID := exampleToRun.CommunityID
@@ -758,7 +819,8 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 
 	// Prepare things depending on the configuration
 	nodesList := mailserversDB.DefaultMailserversByFleet(fleet)
-	contentTopic := wakuV2common.BytesToTopic(transport.ToTopic(communityID))
+	descriptionContentTopic := wakuV2common.BytesToTopic(transport.ToTopic(communityID))
+	shardContentTopic := wakuV2common.BytesToTopic(transport.ToTopic(transport.CommunityShardInfoTopic(communityID)))
 
 	communityIDBytes, err := types.DecodeHex(communityID)
 	s.Require().NoError(err)
@@ -847,7 +909,11 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 
 			// Setup envelopes watcher to gather fetched envelopes
 
-			s.setupEnvelopesWatcher(wakuV2, &contentTopic, func(envelope *wakuV2common.ReceivedMessage) {
+			s.setupEnvelopesWatcher(wakuV2, &shardContentTopic, func(envelope *wakuV2common.ReceivedMessage) {
+				result.ShardEnvelopes = append(result.ShardEnvelopes, envelope)
+			})
+
+			s.setupEnvelopesWatcher(wakuV2, &descriptionContentTopic, func(envelope *wakuV2common.ReceivedMessage) {
 				result.Envelopes = append(result.Envelopes, envelope)
 			})
 
@@ -876,6 +942,17 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 	// Print the results
 	for storeNodeName, result := range results {
 		fmt.Printf("%s --- %s\n", storeNodeName, result.toString())
+	}
+
+	// Check that results has no errors and contain correct envelopes
+	for storeNodeName, result := range results {
+		s.Require().NoError(result.Error)
+		if exampleToRun.CheckExpectedEnvelopes {
+			s.Require().Equal(exampleToRun.ExpectedShardEnvelopes, result.ShardEnvelopesHashes(),
+				fmt.Sprintf("wrong shard envelopes for store node %s", storeNodeName))
+			s.Require().Equal(exampleToRun.ExpectedDescriptionEnvelopes, result.EnvelopesHashes(),
+				fmt.Sprintf("wrong envelopes for store node %s", storeNodeName))
+		}
 	}
 }
 
