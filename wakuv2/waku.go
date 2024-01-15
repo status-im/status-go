@@ -1105,7 +1105,10 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
 	return envelope.Hash(), nil
 }
 
-func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (*store.Result, error) {
+func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, requestID []byte, opts []store.HistoryRequestOption) (*store.Result, error) {
+
+	opts = append(opts, store.WithRequestID(requestID))
+
 	strTopics := make([]string, len(topics))
 	for i, t := range topics {
 		strTopics[i] = t.ContentTopic()
@@ -1120,18 +1123,28 @@ func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 		PubsubTopic:   pubsubTopic,
 	}
 
-	w.logger.Debug("store.query", zap.Int64p("startTime", query.StartTime), zap.Int64p("endTime", query.EndTime), zap.Strings("contentTopics", query.ContentTopics), zap.String("pubsubTopic", query.PubsubTopic), zap.Stringer("peerID", peerID))
+	w.logger.Debug("store.query",
+		zap.String("requestID", hexutil.Encode(requestID)),
+		zap.Int64p("startTime", query.StartTime),
+		zap.Int64p("endTime", query.EndTime),
+		zap.Strings("contentTopics", query.ContentTopics),
+		zap.String("pubsubTopic", query.PubsubTopic),
+		zap.Stringer("peerID", peerID))
 
 	return w.node.Store().Query(ctx, query, opts...)
 }
 
 func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption, processEnvelopes bool) (cursor *storepb.Index, envelopesCount int, err error) {
 	requestID := protocol.GenerateRequestID()
-	opts = append(opts, store.WithRequestID(requestID))
 	pubsubTopic = w.getPubsubTopic(pubsubTopic)
-	result, err := w.query(ctx, peerID, pubsubTopic, topics, from, to, opts)
+
+	result, err := w.query(ctx, peerID, pubsubTopic, topics, from, to, requestID, opts)
 	if err != nil {
-		w.logger.Error("error querying storenode", zap.String("requestID", hexutil.Encode(requestID)), zap.String("peerID", peerID.String()), zap.Error(err))
+		w.logger.Error("error querying storenode",
+			zap.String("requestID", hexutil.Encode(requestID)),
+			zap.String("peerID", peerID.String()),
+			zap.Error(err))
+
 		if w.onHistoricMessagesRequestFailed != nil {
 			w.onHistoricMessagesRequestFailed(requestID, peerID, err)
 		}
