@@ -2204,6 +2204,7 @@ func (b *GethStatusBackend) Logout() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	b.log.Debug("logging out")
 	err := b.cleanupServices()
 	if err != nil {
 		return err
@@ -2222,6 +2223,11 @@ func (b *GethStatusBackend) Logout() error {
 		}
 		b.statusNode = nil
 	}
+
+	if !b.LocalPairingStateManager.IsPairing() {
+		signal.SendNodeStopped()
+	}
+
 	// re-initialize the node, at some point we should better manage the lifecycle
 	b.initialize()
 

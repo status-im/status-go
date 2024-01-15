@@ -544,6 +544,7 @@ func (w *Waku) runPeerExchangeLoop() {
 	for {
 		select {
 		case <-w.ctx.Done():
+			w.logger.Debug("Peer exchange loop stopped")
 			return
 		case <-ticker.C:
 			w.logger.Info("Running peer exchange loop")
@@ -1279,6 +1280,9 @@ func (w *Waku) Start() error {
 	}
 
 	go w.broadcast()
+
+	// we should wait `seedBootnodesForDiscV5` shutdown smoothly before set w.ctx to nil within `w.Stop()`
+	w.wg.Add(1)
 	go w.seedBootnodesForDiscV5()
 
 	return nil
@@ -1588,6 +1592,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 // It also restarts if there's a connection change signalled from the client
 func (w *Waku) seedBootnodesForDiscV5() {
 	if !w.settings.EnableDiscV5 || w.node.DiscV5() == nil {
+		w.wg.Done()
 		return
 	}
 
@@ -1646,6 +1651,8 @@ func (w *Waku) seedBootnodesForDiscV5() {
 			lastTry = now()
 
 		case <-w.ctx.Done():
+			w.wg.Done()
+			w.logger.Debug("bootnode seeding stopped")
 			return
 		}
 	}
