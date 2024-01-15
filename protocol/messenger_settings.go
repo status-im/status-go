@@ -1,8 +1,10 @@
 package protocol
 
 import (
+	"context"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/timesource"
 )
 
 func (m *Messenger) SetLightClient(request *requests.SetLightClient) error {
@@ -19,4 +21,20 @@ func (m *Messenger) SetLogLevel(request *requests.SetLogLevel) error {
 
 func (m *Messenger) SetCustomNodes(request *requests.SetCustomNodes) error {
 	return nodecfg.SetWakuV2CustomNodes(m.database, request.CustomNodes)
+}
+
+func (m *Messenger) SetCustomizationColor(ctx context.Context, request *requests.SetCustomizationColor) error {
+	updatedAt := timesource.GetCurrentTimeInMillis()
+
+	acc, err := m.multiAccounts.GetAccount(request.KeyUID)
+	if err != nil {
+		return err
+	}
+	acc.CustomizationColor = request.CustomizationColor
+	acc.CustomizationColorClock = updatedAt
+	err = m.syncAccountCustomizationColor(ctx, acc)
+	if err != nil {
+		return err
+	}
+	return nil
 }
