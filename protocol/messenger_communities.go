@@ -577,11 +577,15 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 }
 
 func (m *Messenger) CommunityUpdateLastOpenedAt(communityID string) (*MessengerResponse, error) {
-	updatedCommunity, err := m.communitiesManager.CommunityUpdateLastOpenedAt(communityID)
+	updatedCommunity, err := m.communitiesManager.CommunityUpdateLastOpenedAt(communityID, 0)
 	if err != nil {
 		return nil, err
 	}
 	response := &MessengerResponse{}
+	err = m.syncCommunity(context.Background(), updatedCommunity, m.dispatchMessage)
+	if err != nil {
+		return nil, err
+	}
 	response.AddCommunity(updatedCommunity)
 	return response, nil
 }
@@ -2977,6 +2981,14 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 	if len(syncCommunity.EncryptionKeys) != 0 {
 		//  We pass nil,nil as private key/public key as they won't be encrypted
 		_, err := m.encryptor.HandleHashRatchetKeys(syncCommunity.Id, syncCommunity.EncryptionKeys, nil, nil)
+		if err != nil {
+			return err
+		}
+	}
+	// Handle community last updated
+	if (syncCommunity.LastOpenedAt > 0) {
+		print ("HEY ALPHA, I am working\n", syncCommunity.LastOpenedAt, "\n")
+		_, err = m.communitiesManager.CommunityUpdateLastOpenedAt(string(syncCommunity.Id), syncCommunity.LastOpenedAt)
 		if err != nil {
 			return err
 		}

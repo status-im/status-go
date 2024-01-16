@@ -700,7 +700,7 @@ func (m *Manager) Spectated() ([]*Community, error) {
 	return m.persistence.SpectatedCommunities(&m.identity.PublicKey)
 }
 
-func (m *Manager) CommunityUpdateLastOpenedAt(communityID string) (*Community, error) {
+func (m *Manager) CommunityUpdateLastOpenedAt(communityID string, timestamp int64) (*Community, error) {
 	community, err := m.GetByIDString(communityID)
 	if err != nil {
 		return nil, err
@@ -708,7 +708,14 @@ func (m *Manager) CommunityUpdateLastOpenedAt(communityID string) (*Community, e
 	if community == nil {
 		return nil, ErrOrgNotFound
 	}
-	currentTime := time.Now().Unix()
+	var currentTime int64
+
+	if timestamp != 0 {
+		currentTime = timestamp
+	} else {
+		currentTime = time.Now().Unix()
+	}
+
 	err = m.persistence.UpdateLastOpenedAt(community.ID(), currentTime)
 	if err != nil {
 		return nil, err

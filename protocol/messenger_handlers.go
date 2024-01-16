@@ -772,6 +772,7 @@ func (m *Messenger) handleSyncInstallationCommunityProtobuf(messageState *Receiv
 	
 	p := &protobuf.SyncInstallationCommunity{}
 	err := proto.Unmarshal(protoBytes, p)
+	print(p.LastOpenedAt, "hey there")
 	if err != nil {
 		return err
 	}

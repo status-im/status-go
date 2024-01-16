@@ -2745,7 +2745,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 			return fmt.Errorf("community with sync not received %w", err)
 		}
 
-		// Do we have a new pending request to join for the new community
+		// ss
 		requestsToJoin, err = alicesOtherDevice.PendingRequestsToJoinForCommunity(community.ID())
 		if err != nil {
 			return err
@@ -3932,4 +3932,49 @@ func (s *MessengerCommunitiesSuite) TestCommunityLastOpenedAt() {
 	s.Require().NoError(err)
 
 	s.Require().True(lastOpenedAt2 > lastOpenedAt1)
+}
+
+func (s *MessengerCommunitiesSuite) TestSyncCommunityLastOpenedAt() {
+	alicesOtherDevice := s.createOtherDevice(s.alice)
+	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
+	community, _ := s.createCommunity()
+
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.joinCommunity(community, s.owner, s.alice)
+
+	// Mock frontend triggering communityUpdateLastOpenedAt
+	response, err := s.alice.CommunityUpdateLastOpenedAt(community.IDString())
+	s.Require().NoError(err)
+
+	// Check lastOpenedAt was updated
+	lastOpenedAt := response.Communities()[0].LastOpenedAt()
+	s.Require().True(lastOpenedAt > 0)
+
+	err = tt.RetryWithBackOff(func() error {
+		response, err = alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		// Do we have a new synced community?
+		_, err := alicesOtherDevice.communitiesManager.GetSyncedRawCommunity(community.ID())
+		if err != nil {
+			return fmt.Errorf("community with sync not received %w", err)
+		}
+		// ss
+		community, err = alicesOtherDevice.communitiesManager.GetByID(community.ID())
+		if err != nil {
+			return err
+		}
+		if community.LastOpenedAt() == 0 {
+			return errors.New("no last opened at")
+		}
+
+		return nil
+	})
+	print(response.Communities()[0].LastOpenedAt(), "alphawyyyy")
+	otherDeviceCommunity, err := alicesOtherDevice.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	print(otherDeviceCommunity.LastOpenedAt(), "alpha")
+
 }
