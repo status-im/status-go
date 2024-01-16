@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-var errorNoAccountProvidedWithAssetOrCollectible = errors.New("no account provided with asset or collectible")
+var errorNoAccountProvidedWithTokenOrCollectible = errors.New("no account provided with tokens or collectible")
 var errorDublicateAccountAddress = errors.New("duplicate account address")
 var errorNoAccountAddressForCollectible = errors.New("no account found for collectible")
 var errorAccountVisibilityLowerThanCollectible = errors.New("account visibility lower than collectible")
@@ -70,21 +70,35 @@ func toProfileShowcaseCollectibleProto(preferences []*ProfileShowcaseCollectible
 	return collectibles
 }
 
-func toProfileShowcaseAssetProto(preferences []*ProfileShowcaseAssetPreference, visibility ProfileShowcaseVisibility) []*protobuf.ProfileShowcaseAsset {
-	assets := []*protobuf.ProfileShowcaseAsset{}
+func toProfileShowcaseVerifiedTokensProto(preferences []*ProfileShowcaseVerifiedTokenPreference, visibility ProfileShowcaseVisibility) []*protobuf.ProfileShowcaseVerifiedToken {
+	tokens := []*protobuf.ProfileShowcaseVerifiedToken{}
 	for _, preference := range preferences {
 		if preference.ShowcaseVisibility != visibility {
 			continue
 		}
 
-		assets = append(assets, &protobuf.ProfileShowcaseAsset{
-			Symbol:          preference.Symbol,
-			CommunityId:     preference.CommunityID,
+		tokens = append(tokens, &protobuf.ProfileShowcaseVerifiedToken{
+			Symbol: preference.Symbol,
+			Order:  uint32(preference.Order),
+		})
+	}
+	return tokens
+}
+
+func toProfileShowcaseUnverifiedTokensProto(preferences []*ProfileShowcaseUnverifiedTokenPreference, visibility ProfileShowcaseVisibility) []*protobuf.ProfileShowcaseUnverifiedToken {
+	tokens := []*protobuf.ProfileShowcaseUnverifiedToken{}
+	for _, preference := range preferences {
+		if preference.ShowcaseVisibility != visibility {
+			continue
+		}
+
+		tokens = append(tokens, &protobuf.ProfileShowcaseUnverifiedToken{
 			ContractAddress: preference.ContractAddress,
+			ChainId:         preference.ChainID,
 			Order:           uint32(preference.Order),
 		})
 	}
-	return assets
+	return tokens
 }
 
 func fromProfileShowcaseCommunityProto(messages []*protobuf.ProfileShowcaseCommunity) []*ProfileShowcaseCommunity {
@@ -120,29 +134,40 @@ func fromProfileShowcaseCollectibleProto(messages []*protobuf.ProfileShowcaseCol
 			ChainID:         entry.ChainId,
 			TokenID:         entry.TokenId,
 			CommunityID:     entry.CommunityId,
+			AccountAddress:  entry.AccountAddress,
 			Order:           int(entry.Order),
 		})
 	}
 	return collectibles
 }
 
-func fromProfileShowcaseAssetProto(messages []*protobuf.ProfileShowcaseAsset) []*ProfileShowcaseAsset {
-	assets := []*ProfileShowcaseAsset{}
+func fromProfileShowcaseVerifiedTokenProto(messages []*protobuf.ProfileShowcaseVerifiedToken) []*ProfileShowcaseVerifiedToken {
+	tokens := []*ProfileShowcaseVerifiedToken{}
 	for _, entry := range messages {
-		assets = append(assets, &ProfileShowcaseAsset{
-			Symbol:          entry.Symbol,
-			CommunityID:     entry.CommunityId,
+		tokens = append(tokens, &ProfileShowcaseVerifiedToken{
+			Symbol: entry.Symbol,
+			Order:  int(entry.Order),
+		})
+	}
+	return tokens
+}
+
+func fromProfileShowcaseUnverifiedTokenProto(messages []*protobuf.ProfileShowcaseUnverifiedToken) []*ProfileShowcaseUnverifiedToken {
+	tokens := []*ProfileShowcaseUnverifiedToken{}
+	for _, entry := range messages {
+		tokens = append(tokens, &ProfileShowcaseUnverifiedToken{
 			ContractAddress: entry.ContractAddress,
+			ChainID:         entry.ChainId,
 			Order:           int(entry.Order),
 		})
 	}
-	return assets
+	return tokens
 }
 
 func Validate(preferences *ProfileShowcasePreferences) error {
-	if (len(preferences.Assets) > 0 || len(preferences.Collectibles) > 0) &&
+	if (len(preferences.VerifiedTokens) > 0 || len(preferences.UnverifiedTokens) > 0 || len(preferences.Collectibles) > 0) &&
 		len(preferences.Accounts) == 0 {
-		return errorNoAccountProvidedWithAssetOrCollectible
+		return errorNoAccountProvidedWithTokenOrCollectible
 	}
 
 	accountsMap := make(map[string]*ProfileShowcaseAccountPreference)
@@ -285,24 +310,27 @@ func (m *Messenger) GetProfileShowcaseForSelfIdentity() (*protobuf.ProfileShowca
 	}
 
 	forEveryone := &protobuf.ProfileShowcaseEntries{
-		Communities:  toProfileShowcaseCommunityProto(preferences.Communities, ProfileShowcaseVisibilityEveryone),
-		Accounts:     toProfileShowcaseAccountProto(preferences.Accounts, ProfileShowcaseVisibilityEveryone),
-		Collectibles: toProfileShowcaseCollectibleProto(preferences.Collectibles, ProfileShowcaseVisibilityEveryone),
-		Assets:       toProfileShowcaseAssetProto(preferences.Assets, ProfileShowcaseVisibilityEveryone),
+		Communities:      toProfileShowcaseCommunityProto(preferences.Communities, ProfileShowcaseVisibilityEveryone),
+		Accounts:         toProfileShowcaseAccountProto(preferences.Accounts, ProfileShowcaseVisibilityEveryone),
+		Collectibles:     toProfileShowcaseCollectibleProto(preferences.Collectibles, ProfileShowcaseVisibilityEveryone),
+		VerifiedTokens:   toProfileShowcaseVerifiedTokensProto(preferences.VerifiedTokens, ProfileShowcaseVisibilityEveryone),
+		UnverifiedTokens: toProfileShowcaseUnverifiedTokensProto(preferences.UnverifiedTokens, ProfileShowcaseVisibilityEveryone),
 	}
 
 	forContacts := &protobuf.ProfileShowcaseEntries{
-		Communities:  toProfileShowcaseCommunityProto(preferences.Communities, ProfileShowcaseVisibilityContacts),
-		Accounts:     toProfileShowcaseAccountProto(preferences.Accounts, ProfileShowcaseVisibilityContacts),
-		Collectibles: toProfileShowcaseCollectibleProto(preferences.Collectibles, ProfileShowcaseVisibilityContacts),
-		Assets:       toProfileShowcaseAssetProto(preferences.Assets, ProfileShowcaseVisibilityContacts),
+		Communities:      toProfileShowcaseCommunityProto(preferences.Communities, ProfileShowcaseVisibilityContacts),
+		Accounts:         toProfileShowcaseAccountProto(preferences.Accounts, ProfileShowcaseVisibilityContacts),
+		Collectibles:     toProfileShowcaseCollectibleProto(preferences.Collectibles, ProfileShowcaseVisibilityContacts),
+		VerifiedTokens:   toProfileShowcaseVerifiedTokensProto(preferences.VerifiedTokens, ProfileShowcaseVisibilityContacts),
+		UnverifiedTokens: toProfileShowcaseUnverifiedTokensProto(preferences.UnverifiedTokens, ProfileShowcaseVisibilityContacts),
 	}
 
 	forIDVerifiedContacts := &protobuf.ProfileShowcaseEntries{
-		Communities:  toProfileShowcaseCommunityProto(preferences.Communities, ProfileShowcaseVisibilityIDVerifiedContacts),
-		Accounts:     toProfileShowcaseAccountProto(preferences.Accounts, ProfileShowcaseVisibilityIDVerifiedContacts),
-		Collectibles: toProfileShowcaseCollectibleProto(preferences.Collectibles, ProfileShowcaseVisibilityIDVerifiedContacts),
-		Assets:       toProfileShowcaseAssetProto(preferences.Assets, ProfileShowcaseVisibilityIDVerifiedContacts),
+		Communities:      toProfileShowcaseCommunityProto(preferences.Communities, ProfileShowcaseVisibilityIDVerifiedContacts),
+		Accounts:         toProfileShowcaseAccountProto(preferences.Accounts, ProfileShowcaseVisibilityIDVerifiedContacts),
+		Collectibles:     toProfileShowcaseCollectibleProto(preferences.Collectibles, ProfileShowcaseVisibilityIDVerifiedContacts),
+		VerifiedTokens:   toProfileShowcaseVerifiedTokensProto(preferences.VerifiedTokens, ProfileShowcaseVisibilityIDVerifiedContacts),
+		UnverifiedTokens: toProfileShowcaseUnverifiedTokensProto(preferences.UnverifiedTokens, ProfileShowcaseVisibilityIDVerifiedContacts),
 	}
 
 	mutualContacts := []*Contact{}
@@ -339,12 +367,14 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState
 	communities := []*ProfileShowcaseCommunity{}
 	accounts := []*ProfileShowcaseAccount{}
 	collectibles := []*ProfileShowcaseCollectible{}
-	assets := []*ProfileShowcaseAsset{}
+	verifiedTokens := []*ProfileShowcaseVerifiedToken{}
+	unverifiedTokens := []*ProfileShowcaseUnverifiedToken{}
 
 	communities = append(communities, fromProfileShowcaseCommunityProto(message.ForEveryone.Communities)...)
 	accounts = append(accounts, fromProfileShowcaseAccountProto(message.ForEveryone.Accounts)...)
 	collectibles = append(collectibles, fromProfileShowcaseCollectibleProto(message.ForEveryone.Collectibles)...)
-	assets = append(assets, fromProfileShowcaseAssetProto(message.ForEveryone.Assets)...)
+	verifiedTokens = append(verifiedTokens, fromProfileShowcaseVerifiedTokenProto(message.ForEveryone.VerifiedTokens)...)
+	unverifiedTokens = append(unverifiedTokens, fromProfileShowcaseUnverifiedTokenProto(message.ForEveryone.UnverifiedTokens)...)
 
 	senderPubKey := state.CurrentMessageState.PublicKey
 	contactID := state.CurrentMessageState.Contact.ID
@@ -358,7 +388,8 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState
 		communities = append(communities, fromProfileShowcaseCommunityProto(forContacts.Communities)...)
 		accounts = append(accounts, fromProfileShowcaseAccountProto(forContacts.Accounts)...)
 		collectibles = append(collectibles, fromProfileShowcaseCollectibleProto(forContacts.Collectibles)...)
-		assets = append(assets, fromProfileShowcaseAssetProto(forContacts.Assets)...)
+		verifiedTokens = append(verifiedTokens, fromProfileShowcaseVerifiedTokenProto(forContacts.VerifiedTokens)...)
+		unverifiedTokens = append(unverifiedTokens, fromProfileShowcaseUnverifiedTokenProto(forContacts.UnverifiedTokens)...)
 	}
 
 	forIDVerifiedContacts, err := m.DecryptProfileShowcaseEntriesWithPubKey(senderPubKey, message.ForIdVerifiedContacts)
@@ -370,18 +401,20 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState
 		communities = append(communities, fromProfileShowcaseCommunityProto(forIDVerifiedContacts.Communities)...)
 		accounts = append(accounts, fromProfileShowcaseAccountProto(forIDVerifiedContacts.Accounts)...)
 		collectibles = append(collectibles, fromProfileShowcaseCollectibleProto(forIDVerifiedContacts.Collectibles)...)
-		assets = append(assets, fromProfileShowcaseAssetProto(forIDVerifiedContacts.Assets)...)
+		verifiedTokens = append(verifiedTokens, fromProfileShowcaseVerifiedTokenProto(forIDVerifiedContacts.VerifiedTokens)...)
+		unverifiedTokens = append(unverifiedTokens, fromProfileShowcaseUnverifiedTokenProto(forIDVerifiedContacts.UnverifiedTokens)...)
 	}
 
 	// TODO: validate community membership here (https://github.com/status-im/status-desktop/issues/13081)
 	// TODO: validate collectible ownership here (https://github.com/status-im/status-desktop/issues/13073)
 
 	newShowcase := &ProfileShowcase{
-		ContactID:    contactID,
-		Communities:  communities,
-		Accounts:     accounts,
-		Collectibles: collectibles,
-		Assets:       assets,
+		ContactID:        contactID,
+		Communities:      communities,
+		Accounts:         accounts,
+		Collectibles:     collectibles,
+		VerifiedTokens:   verifiedTokens,
+		UnverifiedTokens: unverifiedTokens,
 	}
 
 	oldShowcase, err := m.persistence.GetProfileShowcaseForContact(contactID)

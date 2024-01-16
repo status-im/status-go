@@ -112,72 +112,84 @@ func (s *TestMessengerProfileShowcase) verifiedContact(theirMessenger *Messenger
 }
 
 func (s *TestMessengerProfileShowcase) prepareShowcasePreferences() *ProfileShowcasePreferences {
-	communityEntry1 := &ProfileShowcaseCommunityPreference{
-		CommunityID:        "0x01312357798976434",
-		ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
-		Order:              10,
-	}
-
-	communityEntry2 := &ProfileShowcaseCommunityPreference{
-		CommunityID:        "0x01312357798976535",
-		ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
-		Order:              11,
-	}
-
-	communityEntry3 := &ProfileShowcaseCommunityPreference{
-		CommunityID:        "0x01312353452343552",
-		ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
-		Order:              12,
-	}
-
-	accountEntry := &ProfileShowcaseAccountPreference{
-		Address:            "0x32433445133424",
-		Name:               "Status Account",
-		ColorID:            "blue",
-		Emoji:              ">:-]",
-		ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
-		Order:              17,
-	}
-
-	collectibleEntry := &ProfileShowcaseCollectiblePreference{
-		ContractAddress:    "0x12378534257568678487683576",
-		ChainID:            "0x888",
-		TokenID:            "0x12321389592999f903",
-		CommunityID:        "0x01312357798976535",
-		AccountAddress:     "0x32433445133424",
-		ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
-		Order:              17,
-	}
-
-	assetEntry1 := &ProfileShowcaseAssetPreference{
-		Symbol:             "ETH",
-		ContractAddress:    "0xABCDEF123456789",
-		CommunityID:        "",
-		ShowcaseVisibility: ProfileShowcaseVisibilityNoOne,
-		Order:              12,
-	}
-
-	assetEntry2 := &ProfileShowcaseAssetPreference{
-		Symbol:             "DAI",
-		ContractAddress:    "0x123456789ABCDEF",
-		CommunityID:        "",
-		ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
-		Order:              17,
-	}
-
-	assetEntry3 := &ProfileShowcaseAssetPreference{
-		Symbol:             "SNT",
-		ContractAddress:    "0x1234ABCDEF56789",
-		CommunityID:        "0x01312357798976535",
-		ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
-		Order:              14,
-	}
-
 	return &ProfileShowcasePreferences{
-		Communities:  []*ProfileShowcaseCommunityPreference{communityEntry1, communityEntry2, communityEntry3},
-		Accounts:     []*ProfileShowcaseAccountPreference{accountEntry},
-		Collectibles: []*ProfileShowcaseCollectiblePreference{collectibleEntry},
-		Assets:       []*ProfileShowcaseAssetPreference{assetEntry1, assetEntry2, assetEntry3},
+		Communities: []*ProfileShowcaseCommunityPreference{
+			&ProfileShowcaseCommunityPreference{
+				CommunityID:        "0x32433445133424",
+				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+			&ProfileShowcaseCommunityPreference{
+				CommunityID:        "0x33443246664345",
+				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				Order:              1,
+			},
+			&ProfileShowcaseCommunityPreference{
+				CommunityID:        "0x33446343643446",
+				ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
+				Order:              2,
+			},
+		},
+		Accounts: []*ProfileShowcaseAccountPreference{
+			&ProfileShowcaseAccountPreference{
+				Address:            "0x32433445133424",
+				Name:               "Status Account",
+				ColorID:            "blue",
+				Emoji:              "-_-",
+				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+			&ProfileShowcaseAccountPreference{
+				Address:            "0x3845354643324",
+				Name:               "Money Box",
+				ColorID:            "red",
+				Emoji:              ":o)",
+				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				Order:              1,
+			},
+		},
+		Collectibles: []*ProfileShowcaseCollectiblePreference{
+			&ProfileShowcaseCollectiblePreference{
+				ContractAddress:    "0x12378534257568678487683576",
+				ChainID:            "0x888",
+				TokenID:            "0x12321389592999f903",
+				CommunityID:        "0x01312357798976535",
+				AccountAddress:     "0x32433445133424",
+				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+		},
+		VerifiedTokens: []*ProfileShowcaseVerifiedTokenPreference{
+			&ProfileShowcaseVerifiedTokenPreference{
+				Symbol:             "ETH",
+				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				Order:              1,
+			},
+			&ProfileShowcaseVerifiedTokenPreference{
+				Symbol:             "DAI",
+				ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
+				Order:              2,
+			},
+			&ProfileShowcaseVerifiedTokenPreference{
+				Symbol:             "SNT",
+				ShowcaseVisibility: ProfileShowcaseVisibilityNoOne,
+				Order:              3,
+			},
+		},
+		UnverifiedTokens: []*ProfileShowcaseUnverifiedTokenPreference{
+			&ProfileShowcaseUnverifiedTokenPreference{
+				ContractAddress:    "0x454525452023452",
+				ChainID:            "0x888",
+				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+			&ProfileShowcaseUnverifiedTokenPreference{
+				ContractAddress:    "0x12312323323233",
+				ChainID:            "0x665",
+				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				Order:              1,
+			},
+		},
 	}
 }
 
@@ -190,21 +202,30 @@ func (s *TestMessengerProfileShowcase) TestSaveAndGetProfileShowcasePreferences(
 	response, err := s.m.GetProfileShowcasePreferences()
 	s.Require().NoError(err)
 
-	s.Require().Len(response.Communities, 3)
-	s.Require().Equal(response.Communities[0], request.Communities[0])
-	s.Require().Equal(response.Communities[1], request.Communities[1])
-	s.Require().Equal(response.Communities[2], request.Communities[2])
+	s.Require().Equal(len(response.Communities), len(request.Communities))
+	for i := 0; i < len(response.Communities); i++ {
+		s.Require().Equal(*response.Communities[i], *request.Communities[i])
+	}
 
-	s.Require().Len(response.Accounts, 1)
-	s.Require().Equal(response.Accounts[0], request.Accounts[0])
+	s.Require().Equal(len(response.Accounts), len(request.Accounts))
+	for i := 0; i < len(response.Accounts); i++ {
+		s.Require().Equal(*response.Accounts[i], *request.Accounts[i])
+	}
 
-	s.Require().Len(response.Collectibles, 1)
-	s.Require().Equal(response.Collectibles[0], request.Collectibles[0])
+	s.Require().Equal(len(response.Collectibles), len(request.Collectibles))
+	for i := 0; i < len(response.Collectibles); i++ {
+		s.Require().Equal(*response.Collectibles[i], *request.Collectibles[i])
+	}
 
-	s.Require().Len(response.Assets, 3)
-	s.Require().Equal(response.Assets[0], request.Assets[0])
-	s.Require().Equal(response.Assets[1], request.Assets[1])
-	s.Require().Equal(response.Assets[2], request.Assets[2])
+	s.Require().Equal(len(response.VerifiedTokens), len(request.VerifiedTokens))
+	for i := 0; i < len(response.VerifiedTokens); i++ {
+		s.Require().Equal(*response.VerifiedTokens[i], *request.VerifiedTokens[i])
+	}
+
+	s.Require().Equal(len(response.UnverifiedTokens), len(request.UnverifiedTokens))
+	for i := 0; i < len(response.UnverifiedTokens); i++ {
+		s.Require().Equal(*response.UnverifiedTokens[i], *request.UnverifiedTokens[i])
+	}
 }
 
 func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesWithWrongVisibility() {
@@ -275,23 +296,29 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 				Order:           0,
 			},
 		},
-		Assets: []*protobuf.ProfileShowcaseAsset{
-			&protobuf.ProfileShowcaseAsset{
-				Symbol:          "ETH",
-				CommunityId:     "0x01312357798976535235432345",
-				ContractAddress: "0xABCDEF123456789",
-				Order:           2,
+		VerifiedTokens: []*protobuf.ProfileShowcaseVerifiedToken{
+			&protobuf.ProfileShowcaseVerifiedToken{
+				Symbol: "ETH",
+				Order:  1,
 			},
-			&protobuf.ProfileShowcaseAsset{
-				Symbol:          "DAI",
-				CommunityId:     "",
-				ContractAddress: "0x123456789ABCDEF",
-				Order:           3,
+			&protobuf.ProfileShowcaseVerifiedToken{
+				Symbol: "DAI",
+				Order:  2,
 			},
-			&protobuf.ProfileShowcaseAsset{
-				Symbol:          "SNT",
-				CommunityId:     "0x12378534257568678487683576",
-				ContractAddress: "0xABCDEF123456789",
+			&protobuf.ProfileShowcaseVerifiedToken{
+				Symbol: "SNT",
+				Order:  3,
+			},
+		},
+		UnverifiedTokens: []*protobuf.ProfileShowcaseUnverifiedToken{
+			&protobuf.ProfileShowcaseUnverifiedToken{
+				ContractAddress: "0x454525452023452",
+				ChainId:         "0x888",
+				Order:           0,
+			},
+			&protobuf.ProfileShowcaseUnverifiedToken{
+				ContractAddress: "0x12312323323233",
+				ChainId:         "0x665",
 				Order:           1,
 			},
 		},
@@ -327,12 +354,17 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 		s.Require().Equal(entries.Collectibles[i].Order, entriesBack.Collectibles[i].Order)
 	}
 
-	s.Require().Equal(len(entries.Assets), len(entriesBack.Assets))
-	for i := 0; i < len(entriesBack.Assets); i++ {
-		s.Require().Equal(entries.Assets[i].Symbol, entriesBack.Assets[i].Symbol)
-		s.Require().Equal(entries.Assets[i].CommunityId, entriesBack.Assets[i].CommunityId)
-		s.Require().Equal(entries.Assets[i].ContractAddress, entriesBack.Assets[i].ContractAddress)
-		s.Require().Equal(entries.Assets[i].Order, entriesBack.Assets[i].Order)
+	s.Require().Equal(len(entries.VerifiedTokens), len(entriesBack.VerifiedTokens))
+	for i := 0; i < len(entriesBack.VerifiedTokens); i++ {
+		s.Require().Equal(entries.VerifiedTokens[i].Symbol, entriesBack.VerifiedTokens[i].Symbol)
+		s.Require().Equal(entries.VerifiedTokens[i].Order, entriesBack.VerifiedTokens[i].Order)
+	}
+
+	s.Require().Equal(len(entries.UnverifiedTokens), len(entriesBack.UnverifiedTokens))
+	for i := 0; i < len(entriesBack.UnverifiedTokens); i++ {
+		s.Require().Equal(entries.UnverifiedTokens[i].ContractAddress, entriesBack.UnverifiedTokens[i].ContractAddress)
+		s.Require().Equal(entries.UnverifiedTokens[i].ChainId, entriesBack.UnverifiedTokens[i].ChainId)
+		s.Require().Equal(entries.UnverifiedTokens[i].Order, entriesBack.UnverifiedTokens[i].Order)
 	}
 }
 
@@ -385,29 +417,42 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	profileShowcase := resp.updatedProfileShowcases[contactID]
 
 	s.Require().Len(profileShowcase.Communities, 2)
-
-	// For everyone
 	s.Require().Equal(profileShowcase.Communities[0].CommunityID, request.Communities[0].CommunityID)
 	s.Require().Equal(profileShowcase.Communities[0].Order, request.Communities[0].Order)
-
-	// For contacts
 	s.Require().Equal(profileShowcase.Communities[1].CommunityID, request.Communities[1].CommunityID)
 	s.Require().Equal(profileShowcase.Communities[1].Order, request.Communities[1].Order)
 
-	s.Require().Len(profileShowcase.Accounts, 1)
+	s.Require().Len(profileShowcase.Accounts, 2)
 	s.Require().Equal(profileShowcase.Accounts[0].Address, request.Accounts[0].Address)
 	s.Require().Equal(profileShowcase.Accounts[0].Name, request.Accounts[0].Name)
 	s.Require().Equal(profileShowcase.Accounts[0].ColorID, request.Accounts[0].ColorID)
 	s.Require().Equal(profileShowcase.Accounts[0].Emoji, request.Accounts[0].Emoji)
 	s.Require().Equal(profileShowcase.Accounts[0].Order, request.Accounts[0].Order)
+	s.Require().Equal(profileShowcase.Accounts[1].Address, request.Accounts[1].Address)
+	s.Require().Equal(profileShowcase.Accounts[1].Name, request.Accounts[1].Name)
+	s.Require().Equal(profileShowcase.Accounts[1].ColorID, request.Accounts[1].ColorID)
+	s.Require().Equal(profileShowcase.Accounts[1].Emoji, request.Accounts[1].Emoji)
+	s.Require().Equal(profileShowcase.Accounts[1].Order, request.Accounts[1].Order)
 
-	s.Require().Len(profileShowcase.Collectibles, 0)
+	s.Require().Len(profileShowcase.Collectibles, 1)
+	s.Require().Equal(profileShowcase.Collectibles[0].TokenID, request.Collectibles[0].TokenID)
+	s.Require().Equal(profileShowcase.Collectibles[0].ChainID, request.Collectibles[0].ChainID)
+	s.Require().Equal(profileShowcase.Collectibles[0].ContractAddress, request.Collectibles[0].ContractAddress)
+	s.Require().Equal(profileShowcase.Collectibles[0].AccountAddress, request.Collectibles[0].AccountAddress)
+	s.Require().Equal(profileShowcase.Collectibles[0].CommunityID, request.Collectibles[0].CommunityID)
+	s.Require().Equal(profileShowcase.Collectibles[0].Order, request.Collectibles[0].Order)
 
-	s.Require().Len(profileShowcase.Assets, 1)
-	s.Require().Equal(profileShowcase.Assets[0].Symbol, request.Assets[2].Symbol)
-	s.Require().Equal(profileShowcase.Assets[0].CommunityID, request.Assets[2].CommunityID)
-	s.Require().Equal(profileShowcase.Assets[0].ContractAddress, request.Assets[2].ContractAddress)
-	s.Require().Equal(profileShowcase.Assets[0].Order, request.Assets[2].Order)
+	s.Require().Len(profileShowcase.VerifiedTokens, 1)
+	s.Require().Equal(profileShowcase.VerifiedTokens[0].Symbol, request.VerifiedTokens[0].Symbol)
+	s.Require().Equal(profileShowcase.VerifiedTokens[0].Order, request.VerifiedTokens[0].Order)
+
+	s.Require().Len(profileShowcase.UnverifiedTokens, 2)
+	s.Require().Equal(profileShowcase.UnverifiedTokens[0].ContractAddress, request.UnverifiedTokens[0].ContractAddress)
+	s.Require().Equal(profileShowcase.UnverifiedTokens[0].ChainID, request.UnverifiedTokens[0].ChainID)
+	s.Require().Equal(profileShowcase.UnverifiedTokens[0].Order, request.UnverifiedTokens[0].Order)
+	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ContractAddress, request.UnverifiedTokens[1].ContractAddress)
+	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ChainID, request.UnverifiedTokens[1].ChainID)
+	s.Require().Equal(profileShowcase.UnverifiedTokens[1].Order, request.UnverifiedTokens[1].Order)
 
 	// Get summarised profile data for verified contact
 	resp, err = WaitOnMessengerResponse(
@@ -426,24 +471,24 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 
 	s.Require().Len(profileShowcase.Communities, 3)
 
-	// For everyone
 	s.Require().Equal(profileShowcase.Communities[0].CommunityID, request.Communities[0].CommunityID)
 	s.Require().Equal(profileShowcase.Communities[0].Order, request.Communities[0].Order)
-
-	// For contacts
 	s.Require().Equal(profileShowcase.Communities[1].CommunityID, request.Communities[1].CommunityID)
 	s.Require().Equal(profileShowcase.Communities[1].Order, request.Communities[1].Order)
-
-	// For id verified contacts
 	s.Require().Equal(profileShowcase.Communities[2].CommunityID, request.Communities[2].CommunityID)
 	s.Require().Equal(profileShowcase.Communities[2].Order, request.Communities[2].Order)
 
-	s.Require().Len(profileShowcase.Accounts, 1)
+	s.Require().Len(profileShowcase.Accounts, 2)
 	s.Require().Equal(profileShowcase.Accounts[0].Address, request.Accounts[0].Address)
 	s.Require().Equal(profileShowcase.Accounts[0].Name, request.Accounts[0].Name)
 	s.Require().Equal(profileShowcase.Accounts[0].ColorID, request.Accounts[0].ColorID)
 	s.Require().Equal(profileShowcase.Accounts[0].Emoji, request.Accounts[0].Emoji)
 	s.Require().Equal(profileShowcase.Accounts[0].Order, request.Accounts[0].Order)
+	s.Require().Equal(profileShowcase.Accounts[1].Address, request.Accounts[1].Address)
+	s.Require().Equal(profileShowcase.Accounts[1].Name, request.Accounts[1].Name)
+	s.Require().Equal(profileShowcase.Accounts[1].ColorID, request.Accounts[1].ColorID)
+	s.Require().Equal(profileShowcase.Accounts[1].Emoji, request.Accounts[1].Emoji)
+	s.Require().Equal(profileShowcase.Accounts[1].Order, request.Accounts[1].Order)
 
 	s.Require().Len(profileShowcase.Collectibles, 1)
 	s.Require().Equal(profileShowcase.Collectibles[0].ContractAddress, request.Collectibles[0].ContractAddress)
@@ -452,17 +497,17 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.Require().Equal(profileShowcase.Collectibles[0].CommunityID, request.Collectibles[0].CommunityID)
 	s.Require().Equal(profileShowcase.Collectibles[0].Order, request.Collectibles[0].Order)
 
-	s.Require().Len(profileShowcase.Assets, 2)
+	s.Require().Len(profileShowcase.VerifiedTokens, 2)
+	s.Require().Equal(profileShowcase.VerifiedTokens[0].Symbol, request.VerifiedTokens[0].Symbol)
+	s.Require().Equal(profileShowcase.VerifiedTokens[0].Order, request.VerifiedTokens[0].Order)
+	s.Require().Equal(profileShowcase.VerifiedTokens[1].Symbol, request.VerifiedTokens[1].Symbol)
+	s.Require().Equal(profileShowcase.VerifiedTokens[1].Order, request.VerifiedTokens[1].Order)
 
-	// For contacts
-	s.Require().Equal(profileShowcase.Assets[0].Symbol, request.Assets[2].Symbol)
-	s.Require().Equal(profileShowcase.Assets[0].CommunityID, request.Assets[2].CommunityID)
-	s.Require().Equal(profileShowcase.Assets[0].ContractAddress, request.Assets[2].ContractAddress)
-	s.Require().Equal(profileShowcase.Assets[0].Order, request.Assets[2].Order)
-
-	// For id verified contacts
-	s.Require().Equal(profileShowcase.Assets[1].Symbol, request.Assets[1].Symbol)
-	s.Require().Equal(profileShowcase.Assets[1].CommunityID, request.Assets[1].CommunityID)
-	s.Require().Equal(profileShowcase.Assets[1].ContractAddress, request.Assets[1].ContractAddress)
-	s.Require().Equal(profileShowcase.Assets[1].Order, request.Assets[1].Order)
+	s.Require().Len(profileShowcase.UnverifiedTokens, 2)
+	s.Require().Equal(profileShowcase.UnverifiedTokens[0].ContractAddress, request.UnverifiedTokens[0].ContractAddress)
+	s.Require().Equal(profileShowcase.UnverifiedTokens[0].ChainID, request.UnverifiedTokens[0].ChainID)
+	s.Require().Equal(profileShowcase.UnverifiedTokens[0].Order, request.UnverifiedTokens[0].Order)
+	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ContractAddress, request.UnverifiedTokens[1].ContractAddress)
+	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ChainID, request.UnverifiedTokens[1].ChainID)
+	s.Require().Equal(profileShowcase.UnverifiedTokens[1].Order, request.UnverifiedTokens[1].Order)
 }

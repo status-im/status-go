@@ -26,18 +26,23 @@ message ProfileShowcaseCollectible {
   string account_address = 7;
 }
 
-message ProfileShowcaseAsset {
+message ProfileShowcaseVerifiedToken {
   string symbol = 1;
   uint32 order = 2;
-  string contract_address = 3;
-  string community_id = 4;
+}
+
+message ProfileShowcaseUnverifiedToken {
+  string contract_address = 1;
+  uint32 order = 2;
+  string chain_id = 3;
 }
 
 message ProfileShowcaseEntries {
   repeated ProfileShowcaseCommunity communities = 1;
   repeated ProfileShowcaseAccount accounts = 2;
   repeated ProfileShowcaseCollectible collectibles = 3;
-  repeated ProfileShowcaseAsset assets = 4;
+  repeated ProfileShowcaseVerifiedToken verifiedTokens = 4;
+  repeated ProfileShowcaseUnverifiedToken unverifiedTokens = 5;
 }
 
 message ProfileShowcaseEntriesEncrypted {

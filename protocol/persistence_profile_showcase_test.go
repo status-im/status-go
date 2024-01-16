@@ -56,27 +56,35 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 				Order:              0,
 			},
 		},
-		Assets: []*ProfileShowcaseAssetPreference{
-			&ProfileShowcaseAssetPreference{
+		VerifiedTokens: []*ProfileShowcaseVerifiedTokenPreference{
+			&ProfileShowcaseVerifiedTokenPreference{
 				Symbol:             "ETH",
-				CommunityID:        "",
-				ContractAddress:    "0x123234454543545",
 				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
-				Order:              0,
+				Order:              1,
 			},
-			&ProfileShowcaseAssetPreference{
+			&ProfileShowcaseVerifiedTokenPreference{
 				Symbol:             "DAI",
-				CommunityID:        "",
-				ContractAddress:    "0x132432349148281",
 				ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
 				Order:              2,
 			},
-			&ProfileShowcaseAssetPreference{
+			&ProfileShowcaseVerifiedTokenPreference{
 				Symbol:             "SNT",
-				ContractAddress:    "0x163423124442144",
-				CommunityID:        "0x132433445133424",
 				ShowcaseVisibility: ProfileShowcaseVisibilityNoOne,
 				Order:              3,
+			},
+		},
+		UnverifiedTokens: []*ProfileShowcaseUnverifiedTokenPreference{
+			&ProfileShowcaseUnverifiedTokenPreference{
+				ContractAddress:    "0x454525452023452",
+				ChainID:            "0x888",
+				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+			&ProfileShowcaseUnverifiedTokenPreference{
+				ContractAddress:    "0x12312323323233",
+				ChainID:            "0x665",
+				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				Order:              1,
 			},
 		},
 	}
@@ -102,9 +110,14 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 		s.Require().Equal(*preferences.Collectibles[i], *preferencesBack.Collectibles[i])
 	}
 
-	s.Require().Equal(len(preferencesBack.Assets), len(preferences.Assets))
-	for i := 0; i < len(preferences.Assets); i++ {
-		s.Require().Equal(*preferences.Assets[i], *preferencesBack.Assets[i])
+	s.Require().Equal(len(preferencesBack.VerifiedTokens), len(preferences.VerifiedTokens))
+	for i := 0; i < len(preferences.VerifiedTokens); i++ {
+		s.Require().Equal(*preferences.VerifiedTokens[i], *preferencesBack.VerifiedTokens[i])
+	}
+
+	s.Require().Equal(len(preferencesBack.UnverifiedTokens), len(preferences.UnverifiedTokens))
+	for i := 0; i < len(preferences.UnverifiedTokens); i++ {
+		s.Require().Equal(*preferences.UnverifiedTokens[i], *preferencesBack.UnverifiedTokens[i])
 	}
 }
 
@@ -150,24 +163,30 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 				Order:           0,
 			},
 		},
-		Assets: []*ProfileShowcaseAsset{
-			&ProfileShowcaseAsset{
-				Symbol:          "ETH",
-				CommunityID:     "",
-				ContractAddress: "0x123234454543545",
+		VerifiedTokens: []*ProfileShowcaseVerifiedToken{
+			&ProfileShowcaseVerifiedToken{
+				Symbol: "ETH",
+				Order:  1,
+			},
+			&ProfileShowcaseVerifiedToken{
+				Symbol: "DAI",
+				Order:  2,
+			},
+			&ProfileShowcaseVerifiedToken{
+				Symbol: "SNT",
+				Order:  3,
+			},
+		},
+		UnverifiedTokens: []*ProfileShowcaseUnverifiedToken{
+			&ProfileShowcaseUnverifiedToken{
+				ContractAddress: "0x454525452023452",
+				ChainID:         "0x888",
 				Order:           0,
 			},
-			&ProfileShowcaseAsset{
-				Symbol:          "DAI",
-				CommunityID:     "",
-				ContractAddress: "0x132432349148281",
-				Order:           2,
-			},
-			&ProfileShowcaseAsset{
-				Symbol:          "SNT",
-				ContractAddress: "0x163423124442144",
-				CommunityID:     "0x132433445133424",
-				Order:           3,
+			&ProfileShowcaseUnverifiedToken{
+				ContractAddress: "0x12312323323233",
+				ChainID:         "0x665",
+				Order:           1,
 			},
 		},
 	}
@@ -214,9 +233,13 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 	for i := 0; i < len(showcase1.Collectibles); i++ {
 		s.Require().Equal(*showcase1.Collectibles[i], *showcase1Back.Collectibles[i])
 	}
-	s.Require().Equal(len(showcase1.Assets), len(showcase1Back.Assets))
-	for i := 0; i < len(showcase1.Assets); i++ {
-		s.Require().Equal(*showcase1.Assets[i], *showcase1Back.Assets[i])
+	s.Require().Equal(len(showcase1.VerifiedTokens), len(showcase1Back.VerifiedTokens))
+	for i := 0; i < len(showcase1.VerifiedTokens); i++ {
+		s.Require().Equal(*showcase1.VerifiedTokens[i], *showcase1Back.VerifiedTokens[i])
+	}
+	s.Require().Equal(len(showcase1.UnverifiedTokens), len(showcase1Back.UnverifiedTokens))
+	for i := 0; i < len(showcase1.UnverifiedTokens); i++ {
+		s.Require().Equal(*showcase1.UnverifiedTokens[i], *showcase1Back.UnverifiedTokens[i])
 	}
 
 	showcase2Back, err := persistence.GetProfileShowcaseForContact("contact_2")
@@ -228,5 +251,6 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 	s.Require().Equal(len(showcase2.Collectibles), len(showcase2Back.Collectibles))
 	s.Require().Equal(*showcase2.Collectibles[0], *showcase2Back.Collectibles[0])
 	s.Require().Equal(0, len(showcase2Back.Accounts))
-	s.Require().Equal(0, len(showcase2Back.Assets))
+	s.Require().Equal(0, len(showcase2Back.VerifiedTokens))
+	s.Require().Equal(0, len(showcase2Back.UnverifiedTokens))
 }
