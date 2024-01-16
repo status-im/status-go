@@ -2745,7 +2745,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 			return fmt.Errorf("community with sync not received %w", err)
 		}
 
-		// ss
+		// Do we have a new pending request to join for the new community
 		requestsToJoin, err = alicesOtherDevice.PendingRequestsToJoinForCommunity(community.ID())
 		if err != nil {
 			return err
@@ -3935,15 +3935,30 @@ func (s *MessengerCommunitiesSuite) TestCommunityLastOpenedAt() {
 }
 
 func (s *MessengerCommunitiesSuite) TestSyncCommunityLastOpenedAt() {
+	// Create new device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
-	community, _ := s.createCommunity()
 
-	s.advertiseCommunityTo(community, s.owner, s.alice)
-	s.joinCommunity(community, s.owner, s.alice)
+	// Create a community
+	createCommunityReq := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
+		Name:        "new community",
+		Color:       "#000000",
+		Description: "new community description",
+	}
+
+	mr, err := s.alice.CreateCommunity(createCommunityReq, true)
+	s.Require().NoError(err, "s.alice.CreateCommunity")
+	var newCommunity *communities.Community
+	for _, com := range mr.Communities() {
+		if com.Name() == createCommunityReq.Name {
+			newCommunity = com
+		}
+	}
+	s.Require().NotNil(newCommunity)
 
 	// Mock frontend triggering communityUpdateLastOpenedAt
-	response, err := s.alice.CommunityUpdateLastOpenedAt(community.IDString())
+	response, err := s.alice.CommunityUpdateLastOpenedAt(newCommunity.IDString())
 	s.Require().NoError(err)
 
 	// Check lastOpenedAt was updated
@@ -3951,30 +3966,19 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunityLastOpenedAt() {
 	s.Require().True(lastOpenedAt > 0)
 
 	err = tt.RetryWithBackOff(func() error {
-		response, err = alicesOtherDevice.RetrieveAll()
+		_, err = alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
 		}
-
 		// Do we have a new synced community?
-		_, err := alicesOtherDevice.communitiesManager.GetSyncedRawCommunity(community.ID())
+		_, err := alicesOtherDevice.communitiesManager.GetSyncedRawCommunity(newCommunity.ID())
 		if err != nil {
 			return fmt.Errorf("community with sync not received %w", err)
-		}
-		// ss
-		community, err = alicesOtherDevice.communitiesManager.GetByID(community.ID())
-		if err != nil {
-			return err
-		}
-		if community.LastOpenedAt() == 0 {
-			return errors.New("no last opened at")
 		}
 
 		return nil
 	})
-	print(response.Communities()[0].LastOpenedAt(), "alphawyyyy")
-	otherDeviceCommunity, err := alicesOtherDevice.communitiesManager.GetByID(community.ID())
+	otherDeviceCommunity, err := alicesOtherDevice.communitiesManager.GetByID(newCommunity.ID())
 	s.Require().NoError(err)
-	print(otherDeviceCommunity.LastOpenedAt(), "alpha")
-
+	s.Require().True(otherDeviceCommunity.LastOpenedAt() > 0)
 }

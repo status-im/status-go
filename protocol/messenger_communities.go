@@ -577,15 +577,19 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 }
 
 func (m *Messenger) CommunityUpdateLastOpenedAt(communityID string) (*MessengerResponse, error) {
-	updatedCommunity, err := m.communitiesManager.CommunityUpdateLastOpenedAt(communityID, 0)
+	id, err := hexutil.Decode(communityID)
 	if err != nil {
 		return nil, err
 	}
-	response := &MessengerResponse{}
+	updatedCommunity, err := m.communitiesManager.CommunityUpdateLastOpenedAt(id)
+	if err != nil {
+		return nil, err
+	}
 	err = m.syncCommunity(context.Background(), updatedCommunity, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
+	response := &MessengerResponse{}
 	response.AddCommunity(updatedCommunity)
 	return response, nil
 }
@@ -2985,14 +2989,6 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 			return err
 		}
 	}
-	// Handle community last updated
-	if (syncCommunity.LastOpenedAt > 0) {
-		print ("HEY ALPHA, I am working\n", syncCommunity.LastOpenedAt, "\n")
-		_, err = m.communitiesManager.CommunityUpdateLastOpenedAt(string(syncCommunity.Id), syncCommunity.LastOpenedAt)
-		if err != nil {
-			return err
-		}
-	}
 
 	// Handle any community requests to join.
 	// MUST BE HANDLED BEFORE DESCRIPTION!
@@ -3063,6 +3059,15 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 		err = m.communitiesManager.SetSyncControlNode(syncCommunity.Id, syncCommunity.ControlNode)
 		if err != nil {
 			logger.Debug("m.SetSyncControlNode", zap.Error(err))
+			return err
+		}
+	}
+
+	// Handle community last updated
+	if syncCommunity.LastOpenedAt > 0 {
+		_, err = m.communitiesManager.CommunityUpdateLastOpenedAt(syncCommunity.Id)
+		if err != nil {
+			logger.Debug("m.CommunityUpdateLastOpenedAt", zap.Error(err))
 			return err
 		}
 	}
