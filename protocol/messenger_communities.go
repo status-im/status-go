@@ -1148,6 +1148,13 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, err
 	}
 
+	for _, account := range requestToJoin.RevealedAccounts {
+		err := m.settings.AddressWasShown(types.HexToAddress(account.Address))
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return response, nil
 }
 

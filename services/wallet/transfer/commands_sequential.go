@@ -97,7 +97,7 @@ func (c *findNewBlocksCommand) findAndSaveEthBlocks(parent context.Context, from
 	}
 
 	for _, account := range c.accounts {
-		if mnemonicCheckEnabled && mnemonicWasNotShown {
+		if mnemonicWasNotShown {
 			acc, err := c.accountsDB.GetAccountByAddress(nodetypes.Address(account))
 			if err != nil {
 				c.error = err
@@ -423,8 +423,6 @@ func (c *findBlocksCommand) checkERC20Tail(parent context.Context, account commo
 	return foundHeaders, nil
 }
 
-var mnemonicCheckEnabled = false
-
 func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 	log.Debug("start findBlocksCommand", "accounts", c.accounts, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit, "from", c.fromBlockNumber, "to", c.toBlockNumber)
 
@@ -435,7 +433,7 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 		return err
 	}
 
-	if mnemonicCheckEnabled && mnemonicWasNotShown {
+	if mnemonicWasNotShown {
 		account, err := c.accountsDB.GetAccountByAddress(nodetypes.BytesToAddress(account.Bytes()))
 		if err != nil {
 			c.error = err
