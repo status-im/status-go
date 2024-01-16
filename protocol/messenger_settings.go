@@ -24,14 +24,25 @@ func (m *Messenger) SetCustomNodes(request *requests.SetCustomNodes) error {
 }
 
 func (m *Messenger) SetCustomizationColor(ctx context.Context, request *requests.SetCustomizationColor) error {
-	updatedAt := timesource.GetCurrentTimeInMillis()
 
 	acc, err := m.multiAccounts.GetAccount(request.KeyUID)
 	if err != nil {
 		return err
 	}
+
 	acc.CustomizationColor = request.CustomizationColor
-	acc.CustomizationColorClock = updatedAt
+
+	tNow := timesource.GetCurrentTimeInMillis()
+	if acc.CustomizationColorClock >= tNow {
+		acc.CustomizationColorClock++
+	} else {
+		acc.CustomizationColorClock = tNow
+	}
+
+	_, err = m.multiAccounts.UpdateAccountCustomizationColor(request.KeyUID, string(acc.CustomizationColor), acc.CustomizationColorClock)
+	if err != nil {
+		return err
+	}
 	err = m.syncAccountCustomizationColor(ctx, acc)
 	if err != nil {
 		return err
