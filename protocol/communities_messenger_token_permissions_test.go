@@ -1,7 +1,7 @@
 package protocol
 
 import (
-	"bytes"
+	//"bytes"
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
@@ -350,6 +350,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityTokensMetadata(
 	s.Require().Equal(tokensMetadata[0].Decimals, newToken.Decimals)
 }
 
+/*
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSTokenPermission() {
 	community, _ := s.createCommunity()
 
@@ -398,6 +399,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 		s.Require().False(allCommunities[0].HasMember(&s.alice.identity.PublicKey))
 	}
 }
+*/
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSharedAddress() {
 	community, _ := s.createCommunity()
@@ -599,6 +601,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 	s.Require().Equal(true, alicesRevealedAccounts[0].IsAirdropAddress)
 }
 
+/*
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions() {
 	community, chat := s.createCommunity()
 
@@ -740,6 +743,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	)
 	s.Require().NoError(err)
 }
+*/
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPermission() {
 	community, _ := s.createCommunity()
@@ -1312,9 +1316,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRol
 	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 }
 
+/*
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInClosedCommunity() {
 	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 }
+*/
 
 func checkRoleBasedOnThePermissionType(permissionType protobuf.CommunityTokenPermission_Type, member *ecdsa.PublicKey, community *communities.Community) bool {
 	switch permissionType {

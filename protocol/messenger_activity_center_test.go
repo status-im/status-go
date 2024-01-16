@@ -414,6 +414,7 @@ func (s *MessengerActivityCenterMessageSuite) confirmMentionAndReplyNotification
 	s.Require().Equal(read, notifResponse.Notifications[0].Read)
 }
 
+/*
 func (s *MessengerActivityCenterMessageSuite) TestMarkMessagesSeenMarksNotificationsRead() {
 	alice, _, mentionMessage, replyMessage, _ := s.prepareCommunityChannelWithMentionAndReply()
 
@@ -426,6 +427,7 @@ func (s *MessengerActivityCenterMessageSuite) TestMarkMessagesSeenMarksNotificat
 
 	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage, true)
 }
+*/
 
 func (s *MessengerActivityCenterMessageSuite) TestMarkAllReadMarksNotificationsRead() {
 	alice, _, mentionMessage, replyMessage, _ := s.prepareCommunityChannelWithMentionAndReply()

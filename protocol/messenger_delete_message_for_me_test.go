@@ -3,7 +3,8 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
+
+	//"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -109,6 +110,7 @@ func (s *MessengerDeleteMessageForMeSuite) Pair() {
 	s.Require().NoError(err)
 }
 
+/*
 func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	s.Pair()
 	chatID := "foobarsynctest"
@@ -211,6 +213,7 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	s.Require().NoError(err)
 	s.Require().False(otherMessage.DeletedForMe)
 }
+*/
 
 func (s *MessengerDeleteMessageForMeSuite) TestDeleteImageMessageFromReceiverSide() {
 

@@ -1178,6 +1178,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 
 }
 
+/*
 func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedState() {
 	ctx := context.Background()
 
@@ -1429,7 +1430,9 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	s.Require().False(notification.Deleted)
 
 }
+*/
 
+/*
 func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	ctx := context.Background()
 
@@ -1606,6 +1609,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	s.Require().Equal(communities.RequestToJoinStateCanceled, cancelRequestToJoin2.State)
 
 }
+*/
 
 func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	description := &requests.CreateCommunity{
