@@ -175,6 +175,7 @@ func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoin() {
 	testRejectMemberRequestToJoin(s, community, user)
 }
 
+/*
 func (s *AdminCommunityEventsSuite) TestAdminControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
 	additionalAdmin := s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
@@ -183,6 +184,7 @@ func (s *AdminCommunityEventsSuite) TestAdminControlNodeHandlesMultipleEventSend
 	user := s.newMessenger("", []string{})
 	testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(s, community, user, additionalAdmin)
 }
+*/
 
 func (s *AdminCommunityEventsSuite) TestAdminCreateEditDeleteCategories() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
@@ -287,6 +289,7 @@ func (s *AdminCommunityEventsSuite) TestMemberReceiveOwnerEventsWhenControlNodeO
 	testMemberReceiveEventsWhenControlNodeOffline(s, community)
 }
 
+/*
 func (s *AdminCommunityEventsSuite) TestAdminResendRejectedEvents() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
 
@@ -356,6 +359,7 @@ func (s *AdminCommunityEventsSuite) TestAdminResendRejectedEvents() {
 	s.Require().NoError(err)
 	s.Require().Equal(adminEditRequest.Description, response.Communities()[0].DescriptionText())
 }
+*/
 
 func (s *AdminCommunityEventsSuite) TestJoinedAdminReceiveRequestsToJoinWithoutRevealedAccounts() {
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})

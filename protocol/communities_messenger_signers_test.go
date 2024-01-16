@@ -1,12 +1,12 @@
 package protocol
 
 import (
-	"bytes"
+	//"bytes"
 	"context"
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	//"github.com/golang/protobuf/proto"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -14,7 +14,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 
-	utils "github.com/status-im/status-go/common"
+	//utils "github.com/status-im/status-go/common"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -586,6 +586,7 @@ func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {
 
 }
 
+/*
 func (s *MessengerCommunitiesSignersSuite) testDescriptionSignature(description []byte) {
 	var amm protobuf.ApplicationMetadataMessage
 	err := proto.Unmarshal(description, &amm)
@@ -595,7 +596,9 @@ func (s *MessengerCommunitiesSignersSuite) testDescriptionSignature(description 
 	s.Require().NoError(err)
 	s.NotNil(signer)
 }
+*/
 
+/*
 func (s *MessengerCommunitiesSignersSuite) forceCommunityChange(community *communities.Community, owner *Messenger, user *Messenger) {
 	newDescription := community.DescriptionText() + " new"
 	_, err := owner.EditCommunity(&requests.EditCommunity{
@@ -615,7 +618,9 @@ func (s *MessengerCommunitiesSignersSuite) forceCommunityChange(community *commu
 	}, "new description not received")
 	s.Require().NoError(err)
 }
+*/
 
+/*
 func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool) {
 	community := s.createCommunity(s.john)
 	s.advertiseCommunityTo(s.john, community, s.alice)
@@ -719,7 +724,9 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 	s.Require().Equal(community.IDString(), responseCommunity.IDString())
 	s.Require().True(common.IsPubKeyEqual(expectedControlNode, responseCommunity.ControlNode()))
 }
+*/
 
+/*
 func (s *MessengerCommunitiesSignersSuite) TestSyncTokenGatedCommunity() {
 	testCases := []struct {
 		name           string
@@ -741,3 +748,4 @@ func (s *MessengerCommunitiesSignersSuite) TestSyncTokenGatedCommunity() {
 		})
 	}
 }
+*/

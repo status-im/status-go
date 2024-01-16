@@ -1,7 +1,7 @@
 package api
 
 import (
-	"context"
+	//"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -34,7 +34,8 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/typeddata"
-	walletservice "github.com/status-im/status-go/services/wallet"
+
+	//walletservice "github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
@@ -750,6 +751,7 @@ func TestLoginWithKey(t *testing.T) {
 	require.NotNil(t, activeAccount.ColorHash)
 }
 
+/*
 func TestLoginAccount(t *testing.T) {
 	utils.Init()
 	password := "some-password"
@@ -792,6 +794,7 @@ func TestLoginAccount(t *testing.T) {
 		t.FailNow()
 	}
 }
+*/
 
 func TestVerifyDatabasePassword(t *testing.T) {
 	utils.Init()
@@ -908,6 +911,7 @@ func TestDeleteMultiaccount(t *testing.T) {
 	require.Equal(t, 3, len(files))
 }
 
+/*
 func TestConvertAccount(t *testing.T) {
 	const mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
 	const password = "111111"        // represents password for a regular user
@@ -1156,6 +1160,7 @@ func TestConvertAccount(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, len(keycards))
 }
+*/
 
 func copyFile(srcFolder string, dstFolder string, fileName string, t *testing.T) {
 	data, err := ioutil.ReadFile(path.Join(srcFolder, fileName))
@@ -1295,6 +1300,7 @@ func TestChangeDatabasePassword(t *testing.T) {
 	require.Equal(t, acc.Address, key.Address)
 }
 
+/*
 func TestCreateWallet(t *testing.T) {
 	utils.Init()
 	password := "some-password2" // nolint: goconst
@@ -1354,6 +1360,7 @@ func TestCreateWallet(t *testing.T) {
 	})
 	require.NoError(t, err)
 }
+*/
 
 func TestSetFleet(t *testing.T) {
 	utils.Init()

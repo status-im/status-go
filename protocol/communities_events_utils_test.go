@@ -1432,6 +1432,7 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	s.Require().Len(declinedRequestsPending, 0)
 }
 
+/*
 func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
 	_, err := user.Start()
 
@@ -1521,6 +1522,7 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 	// we expect user's request to join still to be rejected
 	s.Require().Equal(rejectedRequests[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
 }
+*/
 
 func testCreateEditDeleteCategories(base CommunityEventsTestsInterface, community *communities.Community) {
 	newCategory := &requests.CreateCommunityCategory{

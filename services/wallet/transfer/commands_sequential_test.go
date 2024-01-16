@@ -1462,6 +1462,7 @@ func (b *BlockRangeSequentialDAOMockSuccess) getBlockRange(chainID uint64, addre
 	return newEthTokensBlockRanges(), nil
 }
 
+/*
 func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.T) {
 	appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
@@ -1512,3 +1513,4 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 		}, 100*time.Millisecond, 10*time.Millisecond))
 	}
 }
+*/

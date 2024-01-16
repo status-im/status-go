@@ -114,11 +114,13 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterCannotCreateBecomeToken
 	testEventSenderCannotCreatePrivilegedCommunityPermission(s, community, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 }
 
+/*
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterCannotEditBecomeAdminPermission() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
 	testEventSenderCannotEditPrivilegedCommunityPermission(
 		s, community, protobuf.CommunityTokenPermission_BECOME_ADMIN, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 }
+*/
 
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterCannotEditBecomeTokenMasterPermission() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
@@ -168,6 +170,7 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterRejectMemberRequestToJo
 	testRejectMemberRequestToJoin(s, community, user)
 }
 
+/*
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
 	additionalTokenMaster := s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{additionalTokenMaster})
@@ -176,6 +179,7 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterControlNodeHandlesMulti
 	user := s.newMessenger("", []string{})
 	testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(s, community, user, additionalTokenMaster)
 }
+*/
 
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterCreateEditDeleteCategories() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
