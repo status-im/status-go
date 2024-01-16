@@ -20,7 +20,6 @@ const (
 	ethereumMainnetString = "ethereum"
 	arbitrumMainnetString = "arbitrum"
 	optimismMainnetString = "optimism"
-	ethereumGoerliString  = "goerli"
 	ethereumSepoliaString = "sepolia"
 	arbitrumSepoliaString = "arbitrum_sepolia"
 	optimismSepoliaString = "optimism_sepolia"
@@ -37,8 +36,6 @@ func chainIDToChainString(chainID walletCommon.ChainID) string {
 		chainString = arbitrumMainnetString
 	case walletCommon.OptimismMainnet:
 		chainString = optimismMainnetString
-	case walletCommon.EthereumGoerli:
-		chainString = ethereumGoerliString
 	case walletCommon.EthereumSepolia:
 		chainString = ethereumSepoliaString
 	case walletCommon.ArbitrumSepolia:
