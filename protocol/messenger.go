@@ -2297,6 +2297,14 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	}
 
 	message.DisplayName = displayName
+
+	replacedText, err := m.mentionsManager.ReplaceWithPublicKey(message.ChatId, message.Text)
+	if err == nil {
+		message.Text = replacedText
+	} else {
+		m.logger.Error("failed to replace text with public key", zap.String("chatID", message.ChatId), zap.String("text", message.Text))
+	}
+
 	if len(message.ImagePath) != 0 {
 
 		err := message.LoadImage()
