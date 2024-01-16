@@ -581,7 +581,7 @@ func (m *Messenger) CommunityUpdateLastOpenedAt(communityID string) (*MessengerR
 	if err != nil {
 		return nil, err
 	}
-	updatedCommunity, err := m.communitiesManager.CommunityUpdateLastOpenedAt(id)
+	updatedCommunity, err := m.communitiesManager.CommunityUpdateLastOpenedAt(id, time.Now().Unix())
 	if err != nil {
 		return nil, err
 	}
@@ -3065,7 +3065,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 
 	// Handle community last updated
 	if syncCommunity.LastOpenedAt > 0 {
-		_, err = m.communitiesManager.CommunityUpdateLastOpenedAt(syncCommunity.Id)
+		_, err = m.communitiesManager.CommunityUpdateLastOpenedAt(syncCommunity.Id, syncCommunity.LastOpenedAt)
 		if err != nil {
 			logger.Debug("m.CommunityUpdateLastOpenedAt", zap.Error(err))
 			return err
