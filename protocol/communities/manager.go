@@ -443,19 +443,18 @@ func (m *Manager) runOwnerVerificationLoop() {
 }
 
 func (m *Manager) ValidateCommunityByID(communityID types.HexBytes) (*CommunityResponse, error) {
-	communityToValidate, err := m.persistence.getCommunityToValidateByID(communityID)
+	communitiesToValidate, err := m.persistence.getCommunityToValidateByID(communityID)
 	if err != nil {
 		m.logger.Error("failed to validate community by ID", zap.String("id", communityID.String()), zap.Error(err))
 		return nil, err
 	}
-
-	return m.validateCommunity(communityToValidate)
+	return m.validateCommunity(communitiesToValidate)
 
 }
 
 func (m *Manager) validateCommunity(communityToValidateData []communityToValidate) (*CommunityResponse, error) {
-	for _, communityToValidate := range communityToValidateData {
-		signer, description, err := UnwrapCommunityDescriptionMessage(communityToValidate.payload)
+	for _, community := range communityToValidateData {
+		signer, description, err := UnwrapCommunityDescriptionMessage(community.payload)
 		if err != nil {
 			m.logger.Error("failed to unwrap community", zap.Error(err))
 			continue
@@ -468,12 +467,12 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 			continue
 		}
 
-		m.logger.Info("validating community", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
+		m.logger.Info("validating community", zap.String("id", types.EncodeHex(community.id)), zap.String("signer", common.PubkeyToHex(signer)))
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 		defer cancel()
 
-		owner, err := m.ownerVerifier.SafeGetSignerPubKey(ctx, chainID, types.EncodeHex(communityToValidate.id))
+		owner, err := m.ownerVerifier.SafeGetSignerPubKey(ctx, chainID, types.EncodeHex(community.id))
 		if err != nil {
 			m.logger.Error("failed to get owner", zap.Error(err))
 			continue
@@ -486,10 +485,10 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 		}
 
 		// TODO: handle shards
-		response, err := m.HandleCommunityDescriptionMessage(signer, description, communityToValidate.payload, ownerPK, nil)
+		response, err := m.HandleCommunityDescriptionMessage(signer, description, community.payload, ownerPK, nil)
 		if err != nil {
 			m.logger.Error("failed to handle community", zap.Error(err))
-			err = m.persistence.DeleteCommunityToValidate(communityToValidate.id, communityToValidate.clock)
+			err = m.persistence.DeleteCommunityToValidate(community.id, community.clock)
 			if err != nil {
 				m.logger.Error("failed to delete community to validate", zap.Error(err))
 			}
@@ -498,9 +497,9 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 
 		if response != nil {
 
-			m.logger.Info("community validated", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
+			m.logger.Info("community validated", zap.String("id", types.EncodeHex(community.id)), zap.String("signer", common.PubkeyToHex(signer)))
 			m.publish(&Subscription{TokenCommunityValidated: response})
-			err := m.persistence.DeleteCommunitiesToValidateByCommunityID(communityToValidate.id)
+			err := m.persistence.DeleteCommunitiesToValidateByCommunityID(community.id)
 			if err != nil {
 				m.logger.Error("failed to delete communities to validate", zap.Error(err))
 			}
