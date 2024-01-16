@@ -674,14 +674,6 @@ func (s *Service) fetchCommunity(communityID string, fetchLatest bool) (*communi
 		return nil, err
 	}
 
-	if community != nil {
-		// Call this to ensure CommunityTokens are stored to DB
-		err = s.messenger.FetchMissingCommunityTokens(community)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	return community, nil
 }
 

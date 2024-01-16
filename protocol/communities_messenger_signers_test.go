@@ -617,7 +617,6 @@ func (s *MessengerCommunitiesSignersSuite) forceCommunityChange(community *commu
 }
 
 func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool) {
-
 	community := s.createCommunity(s.john)
 	s.advertiseCommunityTo(s.john, community, s.alice)
 	s.joinCommunity(s.john, community, s.alice)
@@ -636,7 +635,7 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 		tokenAddress := "token-address"
 		tokenName := "tokenName"
 		tokenSymbol := "TSM"
-		_, err := s.john.SaveCommunityToken(&token.CommunityToken{
+		communityToken := &token.CommunityToken{
 			TokenType:       protobuf.CommunityTokenType_ERC721,
 			CommunityID:     community.IDString(),
 			Address:         tokenAddress,
@@ -645,7 +644,9 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 			Supply:          &bigint.BigInt{},
 			Symbol:          tokenSymbol,
 			PrivilegesLevel: token.OwnerLevel,
-		}, nil)
+		}
+
+		_, err := s.john.SaveCommunityToken(communityToken, nil)
 		s.Require().NoError(err)
 
 		// john adds minted owner token to community
@@ -654,8 +655,7 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 
 		// update mock - the signer for the community returned by the contracts should be john
 		s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.john.identity.PublicKey))
-		s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
-			&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
+		s.collectiblesServiceMock.SetMockCommunityTokenData(communityToken)
 
 		// alice accepts community update
 		_, err = WaitOnSignaledMessengerResponse(
@@ -673,7 +673,7 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 		s.shh,
 		s.alice.identity,
 		s.logger.With(zap.String("name", "alice-2")),
-		nil)
+		[]Option{WithCommunityTokensService(s.collectiblesServiceMock)})
 
 	s.Require().NoError(err)
 
