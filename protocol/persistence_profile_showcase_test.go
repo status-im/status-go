@@ -48,7 +48,7 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 		Collectibles: []*ProfileShowcaseCollectiblePreference{
 			&ProfileShowcaseCollectiblePreference{
 				ContractAddress:    "0x12378534257568678487683576",
-				ChainID:            "0x888",
+				ChainID:            3,
 				TokenID:            "0x12321389592999f903",
 				CommunityID:        "0x01312357798976535",
 				AccountAddress:     "0x32433445133424",
@@ -76,13 +76,15 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 		UnverifiedTokens: []*ProfileShowcaseUnverifiedTokenPreference{
 			&ProfileShowcaseUnverifiedTokenPreference{
 				ContractAddress:    "0x454525452023452",
-				ChainID:            "0x888",
+				ChainID:            1,
+				CommunityID:        "0x32433445133424",
 				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
 			&ProfileShowcaseUnverifiedTokenPreference{
 				ContractAddress:    "0x12312323323233",
-				ChainID:            "0x665",
+				ChainID:            2,
+				CommunityID:        "",
 				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
 				Order:              1,
 			},
@@ -157,7 +159,7 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 		Collectibles: []*ProfileShowcaseCollectible{
 			&ProfileShowcaseCollectible{
 				ContractAddress: "0x12378534257568678487683576",
-				ChainID:         "0x888",
+				ChainID:         2,
 				TokenID:         "0x12321389592999f903",
 				CommunityID:     "0x01312357798976535",
 				Order:           0,
@@ -180,12 +182,14 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 		UnverifiedTokens: []*ProfileShowcaseUnverifiedToken{
 			&ProfileShowcaseUnverifiedToken{
 				ContractAddress: "0x454525452023452",
-				ChainID:         "0x888",
+				ChainID:         1,
+				CommunityID:     "",
 				Order:           0,
 			},
 			&ProfileShowcaseUnverifiedToken{
 				ContractAddress: "0x12312323323233",
-				ChainID:         "0x665",
+				ChainID:         2,
+				CommunityID:     "0x32433445133424",
 				Order:           1,
 			},
 		},
@@ -208,7 +212,7 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 		Collectibles: []*ProfileShowcaseCollectible{
 			&ProfileShowcaseCollectible{
 				ContractAddress: "0x12378534257568678487683576",
-				ChainID:         "0x888",
+				ChainID:         2,
 				TokenID:         "0x12321389592999f903",
 				CommunityID:     "0x01312357798976535",
 				Order:           1,

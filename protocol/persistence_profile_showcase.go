@@ -26,8 +26,8 @@ const selectProfileShowcaseCollectiblePreferenceQuery = "SELECT contract_address
 const upsertProfileShowcaseVerifiedTokenPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_verified_tokens_preferences(symbol, visibility, sort_order) VALUES (?, ?, ?)" // #nosec G101
 const selectProfileShowcaseVerifiedTokenPreferenceQuery = "SELECT symbol, visibility, sort_order FROM profile_showcase_verified_tokens_preferences"                              // #nosec G101
 
-const upsertProfileShowcaseUnverifiedTokenPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_unverified_tokens_preferences(contract_address, chain_id, visibility, sort_order) VALUES (?, ?, ?, ?)" // #nosec G101
-const selectProfileShowcaseUnverifiedTokenPreferenceQuery = "SELECT contract_address, chain_id, visibility, sort_order FROM profile_showcase_unverified_tokens_preferences"                                 // #nosec G101
+const upsertProfileShowcaseUnverifiedTokenPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_unverified_tokens_preferences(contract_address, chain_id, community_id, visibility, sort_order) VALUES (?, ?, ?, ?, ?)" // #nosec G101
+const selectProfileShowcaseUnverifiedTokenPreferenceQuery = "SELECT contract_address, chain_id, community_id, visibility, sort_order FROM profile_showcase_unverified_tokens_preferences"                                    // #nosec G101
 
 const upsertContactProfileShowcaseCommunityQuery = "INSERT OR REPLACE INTO profile_showcase_communities_contacts(contact_id, community_id, sort_order) VALUES (?, ?, ?)" // #nosec G101
 const selectContactProfileShowcaseCommunityQuery = "SELECT community_id, sort_order FROM profile_showcase_communities_contacts WHERE contact_id = ?"                     // #nosec G101
@@ -45,9 +45,9 @@ const upsertContactProfileShowcaseVerifiedTokenQuery = "INSERT OR REPLACE INTO p
 const selectContactProfileShowcaseVerifiedTokenQuery = "SELECT symbol, sort_order FROM profile_showcase_verified_tokens_contacts WHERE contact_id = ?"                     // #nosec G101
 const removeContactProfileShowcaseVerifiedTokenQuery = "DELETE FROM profile_showcase_verified_tokens_contacts WHERE contact_id = ?"                                        // #nosec G101
 
-const upsertContactProfileShowcaseUnverifiedTokenQuery = "INSERT OR REPLACE INTO profile_showcase_unverified_tokens_contacts(contact_id, contract_address, chain_id, sort_order) VALUES (?, ?, ?, ?)" // #nosec G101
-const selectContactProfileShowcaseUnverifiedTokenQuery = "SELECT contract_address, chain_id, sort_order FROM profile_showcase_unverified_tokens_contacts WHERE contact_id = ?"                        // #nosec G101
-const removeContactProfileShowcaseUnverifiedTokenQuery = "DELETE FROM profile_showcase_unverified_tokens_contacts WHERE contact_id = ?"                                                               // #nosec G101
+const upsertContactProfileShowcaseUnverifiedTokenQuery = "INSERT OR REPLACE INTO profile_showcase_unverified_tokens_contacts(contact_id, contract_address, chain_id, community_id, sort_order) VALUES (?, ?, ?, ?, ?)" // #nosec G101
+const selectContactProfileShowcaseUnverifiedTokenQuery = "SELECT contract_address, chain_id, community_id, sort_order FROM profile_showcase_unverified_tokens_contacts WHERE contact_id = ?"                           // #nosec G101
+const removeContactProfileShowcaseUnverifiedTokenQuery = "DELETE FROM profile_showcase_unverified_tokens_contacts WHERE contact_id = ?"                                                                                // #nosec G101
 
 type ProfileShowcaseCommunityPreference struct {
 	CommunityID        string                    `json:"communityId"`
@@ -65,9 +65,9 @@ type ProfileShowcaseAccountPreference struct {
 }
 
 type ProfileShowcaseCollectiblePreference struct {
-	ChainID            string                    `json:"chainId"`
-	TokenID            string                    `json:"tokenId"`
 	ContractAddress    string                    `json:"contractAddress"`
+	ChainID            uint64                    `json:"chainId"`
+	TokenID            string                    `json:"tokenId"`
 	CommunityID        string                    `json:"communityId"`
 	AccountAddress     string                    `json:"accountAddress"`
 	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
@@ -82,7 +82,8 @@ type ProfileShowcaseVerifiedTokenPreference struct {
 
 type ProfileShowcaseUnverifiedTokenPreference struct {
 	ContractAddress    string                    `json:"contractAddress"`
-	ChainID            string                    `json:"chainId"`
+	ChainID            uint64                    `json:"chainId"`
+	CommunityID        string                    `json:"communityId"`
 	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
 	Order              int                       `json:"order"`
 }
@@ -109,9 +110,9 @@ type ProfileShowcaseAccount struct {
 }
 
 type ProfileShowcaseCollectible struct {
-	ChainID         string `json:"chainId"`
-	TokenID         string `json:"tokenId"`
 	ContractAddress string `json:"contractAddress"`
+	ChainID         uint64 `json:"chainId"`
+	TokenID         string `json:"tokenId"`
 	CommunityID     string `json:"communityId"`
 	AccountAddress  string `json:"accountAddress"`
 	Order           int    `json:"order"`
@@ -124,7 +125,8 @@ type ProfileShowcaseVerifiedToken struct {
 
 type ProfileShowcaseUnverifiedToken struct {
 	ContractAddress string `json:"contractAddress"`
-	ChainID         string `json:"chainId"`
+	ChainID         uint64 `json:"chainId"`
+	CommunityID     string `json:"communityId"`
 	Order           int    `json:"order"`
 }
 
@@ -274,6 +276,7 @@ func (db sqlitePersistence) saveProfileShowcaseUnverifiedTokenPreference(tx *sql
 	_, err := tx.Exec(upsertProfileShowcaseUnverifiedTokenPreferenceQuery,
 		token.ContractAddress,
 		token.ChainID,
+		token.CommunityID,
 		token.ShowcaseVisibility,
 		token.Order,
 	)
@@ -321,6 +324,7 @@ func (db sqlitePersistence) getProfileShowcaseUnverifiedTokensPreferences(tx *sq
 		err := rows.Scan(
 			&token.ContractAddress,
 			&token.ChainID,
+			&token.CommunityID,
 			&token.ShowcaseVisibility,
 			&token.Order,
 		)
@@ -475,6 +479,7 @@ func (db sqlitePersistence) saveProfileShowcaseUnverifiedTokenContact(tx *sql.Tx
 		contactID,
 		token.ContractAddress,
 		token.ChainID,
+		token.CommunityID,
 		token.Order,
 	)
 
@@ -518,6 +523,7 @@ func (db sqlitePersistence) getProfileShowcaseUnverifiedTokensContact(tx *sql.Tx
 		err := rows.Scan(
 			&token.ContractAddress,
 			&token.ChainID,
+			&token.CommunityID,
 			&token.Order)
 		if err != nil {
 			return nil, err

@@ -151,7 +151,7 @@ func (s *TestMessengerProfileShowcase) prepareShowcasePreferences() *ProfileShow
 		Collectibles: []*ProfileShowcaseCollectiblePreference{
 			&ProfileShowcaseCollectiblePreference{
 				ContractAddress:    "0x12378534257568678487683576",
-				ChainID:            "0x888",
+				ChainID:            1,
 				TokenID:            "0x12321389592999f903",
 				CommunityID:        "0x01312357798976535",
 				AccountAddress:     "0x32433445133424",
@@ -179,13 +179,13 @@ func (s *TestMessengerProfileShowcase) prepareShowcasePreferences() *ProfileShow
 		UnverifiedTokens: []*ProfileShowcaseUnverifiedTokenPreference{
 			&ProfileShowcaseUnverifiedTokenPreference{
 				ContractAddress:    "0x454525452023452",
-				ChainID:            "0x888",
+				ChainID:            3,
 				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
 			&ProfileShowcaseUnverifiedTokenPreference{
 				ContractAddress:    "0x12312323323233",
-				ChainID:            "0x665",
+				ChainID:            6,
 				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
 				Order:              1,
 			},
@@ -240,7 +240,7 @@ func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesW
 
 	collectibleEntry := &ProfileShowcaseCollectiblePreference{
 		ContractAddress:    "0x12378534257568678487683576",
-		ChainID:            "0x888",
+		ChainID:            8,
 		TokenID:            "0x12321389592999f903",
 		CommunityID:        "0x01312357798976535",
 		AccountAddress:     "0x32433445133424",
@@ -289,7 +289,7 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 		Collectibles: []*protobuf.ProfileShowcaseCollectible{
 			&protobuf.ProfileShowcaseCollectible{
 				ContractAddress: "0x12378534257568678487683576",
-				ChainId:         "0x888",
+				ChainId:         7,
 				TokenId:         "0x12321389592999f903",
 				AccountAddress:  "0x32433445133424",
 				CommunityId:     "0x12378534257568678487683576",
@@ -313,12 +313,12 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 		UnverifiedTokens: []*protobuf.ProfileShowcaseUnverifiedToken{
 			&protobuf.ProfileShowcaseUnverifiedToken{
 				ContractAddress: "0x454525452023452",
-				ChainId:         "0x888",
+				ChainId:         3,
 				Order:           0,
 			},
 			&protobuf.ProfileShowcaseUnverifiedToken{
 				ContractAddress: "0x12312323323233",
-				ChainId:         "0x665",
+				ChainId:         2,
 				Order:           1,
 			},
 		},

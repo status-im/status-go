@@ -21,7 +21,7 @@ message ProfileShowcaseCollectible {
   uint32 order = 2;
   string contract_address = 3;
   string community_id = 4;
-  string chain_id = 5;
+  uint64 chain_id = 5;
   string token_id = 6;
   string account_address = 7;
 }
@@ -34,7 +34,8 @@ message ProfileShowcaseVerifiedToken {
 message ProfileShowcaseUnverifiedToken {
   string contract_address = 1;
   uint32 order = 2;
-  string chain_id = 3;
+  uint64 chain_id = 3;
+  string community_id = 4;
 }
 
 message ProfileShowcaseEntries {

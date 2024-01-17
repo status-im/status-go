@@ -14,7 +14,9 @@ import (
 
 var errorNoAccountProvidedWithTokenOrCollectible = errors.New("no account provided with tokens or collectible")
 var errorDublicateAccountAddress = errors.New("duplicate account address")
-var errorNoAccountAddressForCollectible = errors.New("no account found for collectible")
+
+// NOTE: this error is temporary unused because we don't know account on this stage
+// var errorNoAccountAddressForCollectible = errors.New("no account found for collectible")
 var errorAccountVisibilityLowerThanCollectible = errors.New("account visibility lower than collectible")
 var errorDecryptingPayloadEncryptionKey = errors.New("decrypting the payload encryption key resulted in no error and a nil key")
 
@@ -184,7 +186,9 @@ func Validate(preferences *ProfileShowcasePreferences) error {
 				return errorAccountVisibilityLowerThanCollectible
 			}
 		} else {
-			return errorNoAccountAddressForCollectible
+			return nil
+			// NOTE: with current wallet collectible implementation we don't know account on this stage
+			// return errorNoAccountAddressForCollectible
 		}
 	}
 

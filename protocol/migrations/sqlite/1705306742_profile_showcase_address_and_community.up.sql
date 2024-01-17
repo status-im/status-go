@@ -2,10 +2,10 @@
 DROP TABLE profile_showcase_collectibles_preferences;
 CREATE TABLE profile_showcase_collectibles_preferences (
     contract_address TEXT PRIMARY KEY ON CONFLICT REPLACE,
-    chain_id TEXT NOT NULL,
+    chain_id UNSIGNED BIGINT NOT NULL,
     token_id TEXT NOT NULL,
     community_id TEXT DEFAULT "",
-    account_address TEXT NOT NULL,
+    account_address TEXT DEFAULT "",
     visibility INT NOT NULL DEFAULT 0,
     sort_order INT DEFAULT 0
 );
@@ -18,7 +18,8 @@ CREATE TABLE profile_showcase_verified_tokens_preferences (
 );
 CREATE TABLE profile_showcase_unverified_tokens_preferences (
     contract_address TEXT PRIMARY KEY ON CONFLICT REPLACE,
-    chain_id TEXT NOT NULL,
+    chain_id UNSIGNED BIGINT NOT NULL,
+    community_id TEXT DEFAULT "",
     visibility INT NOT NULL DEFAULT 0,
     sort_order INT DEFAULT 0
 );
@@ -28,10 +29,10 @@ DROP INDEX profile_showcase_collectibles_contact_id;
 DROP TABLE profile_showcase_collectibles_contacts;
 CREATE TABLE profile_showcase_collectibles_contacts (
     contract_address TEXT NOT NULL,
-    chain_id TEXT NOT NULL,
+    chain_id UNSIGNED BIGINT NOT NULL,
     token_id TEXT NOT NULL,
     community_id TEXT DEFAULT "",
-    account_address TEXT NOT NULL,
+    account_address TEXT DEFAULT "",
     sort_order INT DEFAULT 0,
     contact_id TEXT NOT NULL,
     PRIMARY KEY (contact_id, chain_id, contract_address, token_id)
@@ -48,7 +49,8 @@ CREATE TABLE profile_showcase_verified_tokens_contacts (
 );
 CREATE TABLE profile_showcase_unverified_tokens_contacts (
     contract_address TEXT NOT NULL,
-    chain_id TEXT NOT NULL,
+    chain_id UNSIGNED BIGINT NOT NULL,
+    community_id TEXT DEFAULT "",
     sort_order INT DEFAULT 0,
     contact_id TEXT NOT NULL,
     PRIMARY KEY (contact_id, contract_address)
