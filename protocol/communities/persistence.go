@@ -242,7 +242,7 @@ func (p *Persistence) ShouldHandleSyncCommunitySettings(settings *protobuf.SyncC
 func (p *Persistence) ShouldHandleSyncCommunity(community *protobuf.SyncInstallationCommunity) (bool, error) {
 	// TODO see if there is a way to make this more elegant
 	// When the test for this function fails because the table has changed we should update sync functionality
-	qr := p.db.QueryRow(`SELECT id, private_key, description, joined, joined_at, verified, spectated, muted, muted_till, last_opened_at, synced_at FROM communities_communities WHERE id = ? AND synced_at > ?`, community.Id, community.Clock)
+	qr := p.db.QueryRow(`SELECT id, private_key, description, joined, joined_at, verified, spectated, muted, muted_till, synced_at, last_opened_at FROM communities_communities WHERE id = ? AND synced_at > ?`, community.Id, community.Clock)
 	_, err := p.scanRowToStruct(qr.Scan)
 
 	switch err {
