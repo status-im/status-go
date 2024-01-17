@@ -93,6 +93,14 @@ func (api *API) GetTokenPreferences(ctx context.Context) ([]walletsettings.Token
 	return (*api.messenger).GetTokenPreferences()
 }
 
+func (api *API) UpdateCollectiblePreferences(ctx context.Context, preferences []walletsettings.CollectiblePreferences) error {
+	return (*api.messenger).UpdateCollectiblePreferences(preferences)
+}
+
+func (api *API) GetCollectiblePreferences(ctx context.Context) ([]walletsettings.CollectiblePreferences, error) {
+	return (*api.messenger).GetCollectiblePreferences()
+}
+
 func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {
 	return api.db.GetActiveAccounts()
 }

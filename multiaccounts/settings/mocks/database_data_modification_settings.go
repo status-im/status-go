@@ -236,6 +236,36 @@ func (mr *MockDatabaseSettingsManagerMockRecorder) GetDisplayAssetsBelowBalanceT
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDisplayAssetsBelowBalanceThreshold", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).GetDisplayAssetsBelowBalanceThreshold))
 }
 
+// GetCollectibleGroupByCommunity mocks base method.
+func (m *MockDatabaseSettingsManager) GetCollectibleGroupByCommunity() (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCollectibleGroupByCommunity")
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCollectibleGroupByCommunity indicates an expected call of GetCollectibleGroupByCommunity.
+func (mr *MockDatabaseSettingsManagerMockRecorder) GetCollectibleGroupByCommunity() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCollectibleGroupByCommunity", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).GetCollectibleGroupByCommunity))
+}
+
+// GetCollectibleGroupByCollection mocks base method.
+func (m *MockDatabaseSettingsManager) GetCollectibleGroupByCollection() (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCollectibleGroupByCollection")
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCollectibleGroupByCollection indicates an expected call of GetCollectibleGroupByCollection.
+func (mr *MockDatabaseSettingsManagerMockRecorder) GetCollectibleGroupByCollection() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCollectibleGroupByCollection", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).GetCollectibleGroupByCollection))
+}
+
 // URLUnfurlingMode mocks base method.
 func (m *MockDatabaseSettingsManager) URLUnfurlingMode() (int64, error) {
 	m.ctrl.T.Helper()
