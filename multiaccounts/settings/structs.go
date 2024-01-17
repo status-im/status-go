@@ -203,6 +203,8 @@ type Settings struct {
 	ShowCommunityAssetWhenSendingTokens bool                          `json:"show-community-asset-when-sending-tokens?,omitempty"`
 	DisplayAssetsBelowBalance           bool                          `json:"display-assets-below-balance?,omitempty"`
 	DisplayAssetsBelowBalanceThreshold  int64                         `json:"display-assets-below-balance-threshold,omitempty"`
+	CollectibleGroupByCollection        bool                          `json:"collectible-group-by-collection?,omitempty"`
+	CollectibleGroupByCommunity         bool                          `json:"collectible-group-by-community?,omitempty"`
 	URLUnfurlingMode                    URLUnfurlingModeType          `json:"url-unfurling-mode,omitempty"`
 }
 

@@ -58,6 +58,7 @@ type MessengerResponse struct {
 	Keypairs                      []*accounts.Keypair
 	AccountsPositions             []*accounts.Account
 	TokenPreferences              []walletsettings.TokenPreferences
+	CollectiblePreferences        []walletsettings.CollectiblePreferences
 	DiscordCategories             []*discord.Category
 	DiscordChannels               []*discord.Channel
 	DiscordOldestMessageTimestamp int
@@ -111,30 +112,31 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		TrustStatus             map[string]verification.TrustStatus `json:"trustStatus,omitempty"`
 		// Notifications a list of notifications derived from messenger events
 		// that are useful to notify the user about
-		Notifications                 []*localnotifications.Notification   `json:"notifications"`
-		Communities                   []*communities.Community             `json:"communities,omitempty"`
-		CommunitiesSettings           []*communities.CommunitySettings     `json:"communitiesSettings,omitempty"`
-		ActivityCenterNotifications   []*ActivityCenterNotification        `json:"activityCenterNotifications,omitempty"`
-		ActivityCenterState           *ActivityCenterState                 `json:"activityCenterState,omitempty"`
-		CurrentStatus                 *UserStatus                          `json:"currentStatus,omitempty"`
-		StatusUpdates                 []UserStatus                         `json:"statusUpdates,omitempty"`
-		Settings                      []*settings.SyncSettingField         `json:"settings,omitempty"`
-		IdentityImages                []images.IdentityImage               `json:"identityImages,omitempty"`
-		CustomizationColor            string                               `json:"customizationColor,omitempty"`
-		WatchOnlyAccounts             []*accounts.Account                  `json:"watchOnlyAccounts,omitempty"`
-		Keypairs                      []*accounts.Keypair                  `json:"keypairs,omitempty"`
-		AccountsPositions             []*accounts.Account                  `json:"accountsPositions,omitempty"`
-		TokenPreferences              []walletsettings.TokenPreferences    `json:"tokenPreferences,omitempty"`
-		DiscordCategories             []*discord.Category                  `json:"discordCategories,omitempty"`
-		DiscordChannels               []*discord.Channel                   `json:"discordChannels,omitempty"`
-		DiscordOldestMessageTimestamp int                                  `json:"discordOldestMessageTimestamp"`
-		DiscordMessages               []*protobuf.DiscordMessage           `json:"discordMessages,omitempty"`
-		DiscordMessageAttachments     []*protobuf.DiscordMessageAttachment `json:"discordMessageAtachments,omitempty"`
-		SavedAddresses                []*wallet.SavedAddress               `json:"savedAddresses,omitempty"`
-		SocialLinksInfo               *identity.SocialLinksInfo            `json:"socialLinksInfo,omitempty"`
-		EnsUsernameDetails            []*ensservice.UsernameDetail         `json:"ensUsernameDetails,omitempty"`
-		UpdatedProfileShowcases       []*ProfileShowcase                   `json:"updatedProfileShowcases,omitempty"`
-		SeenAndUnseenMessages         []*SeenUnseenMessages                `json:"seenAndUnseenMessages,omitempty"`
+		Notifications                 []*localnotifications.Notification      `json:"notifications"`
+		Communities                   []*communities.Community                `json:"communities,omitempty"`
+		CommunitiesSettings           []*communities.CommunitySettings        `json:"communitiesSettings,omitempty"`
+		ActivityCenterNotifications   []*ActivityCenterNotification           `json:"activityCenterNotifications,omitempty"`
+		ActivityCenterState           *ActivityCenterState                    `json:"activityCenterState,omitempty"`
+		CurrentStatus                 *UserStatus                             `json:"currentStatus,omitempty"`
+		StatusUpdates                 []UserStatus                            `json:"statusUpdates,omitempty"`
+		Settings                      []*settings.SyncSettingField            `json:"settings,omitempty"`
+		IdentityImages                []images.IdentityImage                  `json:"identityImages,omitempty"`
+		CustomizationColor            string                                  `json:"customizationColor,omitempty"`
+		WatchOnlyAccounts             []*accounts.Account                     `json:"watchOnlyAccounts,omitempty"`
+		Keypairs                      []*accounts.Keypair                     `json:"keypairs,omitempty"`
+		AccountsPositions             []*accounts.Account                     `json:"accountsPositions,omitempty"`
+		TokenPreferences              []walletsettings.TokenPreferences       `json:"tokenPreferences,omitempty"`
+		CollectiblePreferences        []walletsettings.CollectiblePreferences `json:"collectiblePreferences,omitempty"`
+		DiscordCategories             []*discord.Category                     `json:"discordCategories,omitempty"`
+		DiscordChannels               []*discord.Channel                      `json:"discordChannels,omitempty"`
+		DiscordOldestMessageTimestamp int                                     `json:"discordOldestMessageTimestamp"`
+		DiscordMessages               []*protobuf.DiscordMessage              `json:"discordMessages,omitempty"`
+		DiscordMessageAttachments     []*protobuf.DiscordMessageAttachment    `json:"discordMessageAtachments,omitempty"`
+		SavedAddresses                []*wallet.SavedAddress                  `json:"savedAddresses,omitempty"`
+		SocialLinksInfo               *identity.SocialLinksInfo               `json:"socialLinksInfo,omitempty"`
+		EnsUsernameDetails            []*ensservice.UsernameDetail            `json:"ensUsernameDetails,omitempty"`
+		UpdatedProfileShowcases       []*ProfileShowcase                      `json:"updatedProfileShowcases,omitempty"`
+		SeenAndUnseenMessages         []*SeenUnseenMessages                   `json:"seenAndUnseenMessages,omitempty"`
 	}{
 		Contacts:                r.Contacts,
 		Installations:           r.Installations,
@@ -151,6 +153,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Keypairs:                r.Keypairs,
 		AccountsPositions:       r.AccountsPositions,
 		TokenPreferences:        r.TokenPreferences,
+		CollectiblePreferences:  r.CollectiblePreferences,
 
 		Messages:                      r.Messages(),
 		VerificationRequests:          r.VerificationRequests(),
@@ -294,6 +297,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.Keypairs)+
 		len(r.AccountsPositions)+
 		len(r.TokenPreferences)+
+		len(r.CollectiblePreferences)+
 		len(r.notifications)+
 		len(r.statusUpdates)+
 		len(r.activityCenterNotifications)+
@@ -348,6 +352,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.Keypairs = append(r.Keypairs, response.Keypairs...)
 	r.AccountsPositions = append(r.AccountsPositions, response.AccountsPositions...)
 	r.TokenPreferences = append(r.TokenPreferences, response.TokenPreferences...)
+	r.CollectiblePreferences = append(r.CollectiblePreferences, response.CollectiblePreferences...)
 	r.SocialLinksInfo = response.SocialLinksInfo
 
 	return nil

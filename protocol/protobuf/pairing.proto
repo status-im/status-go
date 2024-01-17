@@ -423,3 +423,16 @@ message SyncTokenPreferences {
   bool testnet = 2;
   repeated TokenPreferences preferences = 3;
 }
+
+message CollectiblePreferences {
+  int64 type = 1;
+  string key = 2;
+  int64 position = 3;
+  bool visible = 4;
+}
+
+message SyncCollectiblePreferences {
+  uint64 clock = 1;
+  bool testnet = 2;
+  repeated CollectiblePreferences preferences = 3;
+}
