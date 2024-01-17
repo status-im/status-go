@@ -435,6 +435,16 @@ var (
 			protobufType:      protobuf.SyncSetting_DISPLAY_ASSETS_BELOW_BALANCE_THRESHOLD,
 		},
 	}
+	CollectibleGroupByCollection = SettingField{
+		reactFieldName: "collectible-group-by-collection?",
+		dBColumnName:   "wallet_collectible_preferences_group_by_collection",
+		valueHandler:   BoolHandler,
+	}
+	CollectibleGroupByCommunity = SettingField{
+		reactFieldName: "collectible-group-by-community?",
+		dBColumnName:   "wallet_collectible_preferences_group_by_community",
+		valueHandler:   BoolHandler,
+	}
 	UseMailservers = SettingField{
 		reactFieldName: "use-mailservers?",
 		dBColumnName:   "use_mailservers",
@@ -568,6 +578,8 @@ var (
 		ShowCommunityAssetWhenSendingTokens,
 		DisplayAssetsBelowBalance,
 		DisplayAssetsBelowBalanceThreshold,
+		CollectibleGroupByCollection,
+		CollectibleGroupByCommunity,
 		URLUnfurlingMode,
 	}
 )

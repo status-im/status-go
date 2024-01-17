@@ -13,6 +13,22 @@ type TokenPreferences struct {
 	CommunityID   string `json:"communityId"`
 }
 
+type CollectiblePreferencesType int
+
+const (
+	CollectiblePreferencesTypeNonCommunityCollectible CollectiblePreferencesType = iota + 1
+	CollectiblePreferencesTypeCommunityCollectible
+	CollectiblePreferencesTypeCollection
+	CollectiblePreferencesTypeCommunity
+)
+
+type CollectiblePreferences struct {
+	Type     CollectiblePreferencesType `json:"type"`
+	Key      string                     `json:"key"`
+	Position int                        `json:"position"`
+	Visible  bool                       `json:"visible"`
+}
+
 type WalletSettings struct {
 	db *sql.DB
 }
@@ -116,6 +132,93 @@ func (ws *WalletSettings) GetTokenPreferences(testNetworksEnabled bool) ([]Token
 		}
 
 		result = append(result, token)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (ws *WalletSettings) setClockOfLastCollectiblePreferencesChange(tx *sql.Tx, clock uint64) error {
+	if tx == nil {
+		return errors.New("database transaction is nil")
+	}
+	_, err := tx.Exec("UPDATE settings SET wallet_collectible_preferences_change_clock = ? WHERE synthetic_id = 'id'", clock)
+	return err
+}
+
+func (ws *WalletSettings) GetClockOfLastCollectiblePreferencesChange() (result uint64, err error) {
+	query := "SELECT wallet_collectible_preferences_change_clock FROM settings WHERE synthetic_id = 'id'"
+	err = ws.db.QueryRow(query).Scan(&result)
+	if err != nil {
+		return 0, err
+	}
+	return result, err
+}
+
+func (ws *WalletSettings) UpdateCollectiblePreferences(preferences []CollectiblePreferences, groupByCommunity bool, groupByCollection bool, testNetworksEnabled bool, clock uint64) error {
+	if len(preferences) == 0 {
+		return errors.New("collectibles: trying to create custom order with empty list")
+	}
+
+	tx, err := ws.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	var mainError error = nil
+
+	defer func() {
+		if mainError == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	_, mainError = tx.Exec("DELETE FROM collectible_preferences WHERE testnet = ?", testNetworksEnabled)
+	if mainError != nil {
+		return mainError
+	}
+
+	for _, p := range preferences {
+		if p.Position < 0 {
+			mainError = errors.New("collectibles: trying to create custom order with negative position")
+			return mainError
+		}
+		_, err := tx.Exec("INSERT INTO collectible_preferences (type, key, position, visible, testnet) VALUES (?, ?, ?, ?, ?)", p.Type, p.Key, p.Position, p.Visible, testNetworksEnabled)
+		if err != nil {
+			mainError = err
+			return err
+		}
+	}
+
+	mainError = ws.setClockOfLastCollectiblePreferencesChange(tx, clock)
+	if mainError != nil {
+		return mainError
+	}
+	return nil
+}
+
+func (ws *WalletSettings) GetCollectiblePreferences(testNetworksEnabled bool) ([]CollectiblePreferences, error) {
+	rows, err := ws.db.Query("SELECT type, key, position, visible FROM collectible_preferences WHERE testnet = ?", testNetworksEnabled)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []CollectiblePreferences
+
+	for rows.Next() {
+		p := CollectiblePreferences{}
+		err := rows.Scan(&p.Type, &p.Key, &p.Position, &p.Visible)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, p)
 	}
 
 	if err := rows.Err(); err != nil {

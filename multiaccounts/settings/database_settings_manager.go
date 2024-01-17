@@ -38,6 +38,8 @@ type DatabaseSettingsManager interface {
 	GetTestNetworksEnabled() (result bool, err error)
 	GetIsSepoliaEnabled() (result bool, err error)
 	GetTokenGroupByCommunity() (result bool, err error)
+	GetCollectibleGroupByCommunity() (result bool, err error)
+	GetCollectibleGroupByCollection() (result bool, err error)
 	GetTelemetryServerURL() (string, error)
 
 	SetSettingsNotifier(n Notifier)

@@ -146,10 +146,12 @@ INSERT INTO settings (
   wallet_token_preferences_group_by_community,
   wallet_show_community_asset_when_sending_tokens,
   wallet_display_assets_below_balance,
-  wallet_display_assets_below_balance_threshold
+  wallet_display_assets_below_balance_threshold,
+  wallet_collectible_preferences_group_by_collection,
+  wallet_collectible_preferences_group_by_community
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,?,?,?,
-?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?)`,
+?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?,?,?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
@@ -182,6 +184,8 @@ INSERT INTO settings (
 		s.ShowCommunityAssetWhenSendingTokens,
 		s.DisplayAssetsBelowBalance,
 		s.DisplayAssetsBelowBalanceThreshold,
+		s.CollectibleGroupByCollection,
+		s.CollectibleGroupByCommunity,
 	)
 	if err != nil {
 		return err
@@ -378,7 +382,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		gif_favorites, opensea_enabled, last_backup, backup_enabled, telemetry_server_url, auto_message_enabled, gif_api_key,
 		test_networks_enabled, mutual_contact_enabled, profile_migration_needed, is_sepolia_enabled, wallet_token_preferences_group_by_community, url_unfurling_mode,
 		omit_transfers_history_scan, mnemonic_was_not_shown, wallet_show_community_asset_when_sending_tokens, wallet_display_assets_below_balance,
-		wallet_display_assets_below_balance_threshold
+		wallet_display_assets_below_balance_threshold, wallet_collectible_preferences_group_by_collection, wallet_collectible_preferences_group_by_community
 	FROM
 		settings
 	WHERE
@@ -460,6 +464,8 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.ShowCommunityAssetWhenSendingTokens,
 		&s.DisplayAssetsBelowBalance,
 		&s.DisplayAssetsBelowBalanceThreshold,
+		&s.CollectibleGroupByCollection,
+		&s.CollectibleGroupByCommunity,
 	)
 
 	return s, err
@@ -758,6 +764,30 @@ func (db *Database) GetTokenGroupByCommunity() (result bool, err error) {
 
 func (db *Database) SetTokenGroupByCommunity(value bool) error {
 	return db.SaveSettingField(TokenGroupByCommunity, value)
+}
+
+func (db *Database) GetCollectibleGroupByCollection() (result bool, err error) {
+	err = db.makeSelectRow(CollectibleGroupByCollection).Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
+}
+
+func (db *Database) SetCollectibleGroupByCollection(value bool) error {
+	return db.SaveSettingField(CollectibleGroupByCollection, value)
+}
+
+func (db *Database) GetCollectibleGroupByCommunity() (result bool, err error) {
+	err = db.makeSelectRow(CollectibleGroupByCommunity).Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
+}
+
+func (db *Database) SetCollectibleGroupByCommunity(value bool) error {
+	return db.SaveSettingField(CollectibleGroupByCommunity, value)
 }
 
 func (db *Database) GetTelemetryServerURL() (string, error) {
