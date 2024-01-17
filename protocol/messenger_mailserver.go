@@ -136,6 +136,8 @@ func (m *Messenger) performMailserverRequest(fn func() (*MessengerResponse, erro
 		response, err := fn()
 		if err == nil {
 			// Reset failed requests
+			m.logger.Debug("mailserver request performed successfully",
+				zap.String("mailserverID", activeMailserver.ID))
 			activeMailserver.FailedRequests = 0
 			return response, nil
 		}
