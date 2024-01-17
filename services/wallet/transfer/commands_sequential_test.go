@@ -1522,24 +1522,24 @@ func TestLoadBlocksAndTransfersCommand_StopOnErrorsOverflow(t *testing.T) {
 
 	cmd := &loadBlocksAndTransfersCommand{
 		chainClient:   tc,
-		errorCounter:  *newErrorCounter("testLoadBlocksAndTransfersCommand"),
 		contractMaker: maker,
 	}
 
 	ctx := context.Background()
 	group := async.NewGroup(ctx)
 
-	group.Add(cmd.Command(1 * time.Millisecond))
+	runner := cmd.Runner(1 * time.Millisecond)
+	group.Add(runner.Run)
 
 	select {
 	case <-ctx.Done():
 		t.Log("Done")
 	case <-group.WaitAsync():
-		t.Log("Command finished", "error", cmd.Error())
-		require.Equal(t, cmd.maxErrors, tc.callsCounter["HeaderByNumber"])
+		errorCounter := runner.(async.FiniteCommandWithErrorCounter).ErrorCounter
+		require.Equal(t, errorCounter.MaxErrors(), tc.callsCounter["HeaderByNumber"])
 
 		_, expectedErr := tc.HeaderByNumber(ctx, nil)
-		require.Error(t, expectedErr, cmd.Error())
+		require.Error(t, expectedErr, errorCounter.Error())
 	}
 }
 
@@ -1585,15 +1585,16 @@ func TestLoadBlocksAndTransfersCommand_StopOnErrorsOverflowWhenStarted(t *testin
 	ctx := context.Background()
 	group := async.NewGroup(ctx)
 
-	group.Add(cmd.Command(1 * time.Millisecond))
+	runner := cmd.Runner(1 * time.Millisecond)
+	group.Add(runner.Run)
 
 	select {
 	case <-ctx.Done():
 		t.Log("Done")
 	case <-group.WaitAsync():
-		t.Log("Command finished", "error", cmd.Error())
+		errorCounter := runner.(async.FiniteCommandWithErrorCounter).ErrorCounter
 		_, expectedErr := cmd.blockRangeDAO.getBlockRange(0, common.Address{})
-		require.Error(t, expectedErr, cmd.Error())
+		require.Error(t, expectedErr, errorCounter.Error())
 		require.NoError(t, utils.Eventually(func() error {
 			if !cmd.isStarted() {
 				return nil
@@ -1611,7 +1612,6 @@ func (b *BlockRangeSequentialDAOMockSuccess) getBlockRange(chainID uint64, addre
 	return newEthTokensBlockRanges(), nil
 }
 
-/*
 func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.T) {
 	appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
@@ -1646,15 +1646,16 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 	ctx, cancel := context.WithCancel(context.Background())
 	group := async.NewGroup(ctx)
 
-	group.Add(cmd.Command(1 * time.Millisecond))
+	runner := cmd.Runner(1 * time.Millisecond)
+	group.Add(runner.Run)
 
 	select {
 	case <-ctx.Done():
 		cancel() // linter is not happy if cancel is not called on all code paths
 		t.Log("Done")
 	case <-group.WaitAsync():
-		t.Log("Command finished", "error", cmd.Error())
-		require.NoError(t, cmd.Error())
+		errorCounter := runner.(async.FiniteCommandWithErrorCounter).ErrorCounter
+		require.NoError(t, errorCounter.Error())
 		require.True(t, cmd.isStarted())
 
 		cancel()
@@ -1666,4 +1667,3 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 		}, 100*time.Millisecond, 10*time.Millisecond))
 	}
 }
-*/
