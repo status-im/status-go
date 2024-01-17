@@ -204,6 +204,7 @@ type Settings struct {
 	DisplayAssetsBelowBalance           bool                          `json:"display-assets-below-balance?,omitempty"`
 	DisplayAssetsBelowBalanceThreshold  int64                         `json:"display-assets-below-balance-threshold,omitempty"`
 	URLUnfurlingMode                    URLUnfurlingModeType          `json:"url-unfurling-mode,omitempty"`
+	NimbusProxyEnabled                  bool                          `json:"nimbus-proxy-enabled?,omitempty"`
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {

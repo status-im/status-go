@@ -24,6 +24,11 @@ var (
 		dBColumnName:   "auto_message_enabled",
 		valueHandler:   BoolHandler,
 	}
+	NimbusProxyEnabled = SettingField{
+		reactFieldName: "nimbus-proxy-enabled?",
+		dBColumnName:   "nimbus_proxy_enabled",
+		valueHandler:   BoolHandler,
+	}
 	BackupEnabled = SettingField{
 		reactFieldName: "backup-enabled?",
 		dBColumnName:   "backup_enabled",
@@ -569,6 +574,7 @@ var (
 		DisplayAssetsBelowBalance,
 		DisplayAssetsBelowBalanceThreshold,
 		URLUnfurlingMode,
+		NimbusProxyEnabled,
 	}
 )
 

@@ -9,7 +9,6 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-
 	types "github.com/status-im/status-go/eth-node/types"
 )
 
@@ -49,6 +48,21 @@ func (m *MockDatabaseSettingsManager) AutoMessageEnabled() (bool, error) {
 func (mr *MockDatabaseSettingsManagerMockRecorder) AutoMessageEnabled() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AutoMessageEnabled", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).AutoMessageEnabled))
+}
+
+// NimbusProxyEnabled mocks base method.
+func (m *MockDatabaseSettingsManager) NimbusProxyEnabled() (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NimbusProxyEnabled")
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NimbusProxyEnabled indicates an expected call of NimbusProxyEnabled.
+func (mr *MockDatabaseSettingsManagerMockRecorder) NimbusProxyEnabled() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NimbusProxyEnabled", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).NimbusProxyEnabled))
 }
 
 // BackupEnabled mocks base method.

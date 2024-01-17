@@ -74,4 +74,5 @@ type DatabaseSettingsManager interface {
 	URLUnfurlingMode() (result int64, err error)
 	SubscribeToChanges() chan *SyncSettingField
 	MnemonicWasShown() error
+	NimbusProxyEnabled() (result bool, err error)
 }
