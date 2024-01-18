@@ -145,6 +145,63 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	return nil
 }
 
+func buildWalletConfig(request *requests.WalletSecretsConfig) params.WalletConfig {
+	walletConfig := params.WalletConfig{
+		Enabled:        true,
+		AlchemyAPIKeys: make(map[uint64]string),
+	}
+
+	if request.OpenseaAPIKey != "" {
+		walletConfig.OpenseaAPIKey = request.OpenseaAPIKey
+	}
+
+	if request.RaribleMainnetAPIKey != "" {
+		walletConfig.RaribleMainnetAPIKey = request.RaribleMainnetAPIKey
+	}
+
+	if request.RaribleTestnetAPIKey != "" {
+		walletConfig.RaribleTestnetAPIKey = request.RaribleTestnetAPIKey
+	}
+
+	if request.InfuraToken != "" {
+		walletConfig.InfuraAPIKey = request.InfuraToken
+	}
+
+	if request.InfuraSecret != "" {
+		walletConfig.InfuraAPIKeySecret = request.InfuraSecret
+	}
+
+	if request.AlchemyEthereumMainnetToken != "" {
+		walletConfig.AlchemyAPIKeys[mainnetChainID] = request.AlchemyEthereumMainnetToken
+	}
+	if request.AlchemyEthereumGoerliToken != "" {
+		walletConfig.AlchemyAPIKeys[goerliChainID] = request.AlchemyEthereumGoerliToken
+	}
+	if request.AlchemyEthereumSepoliaToken != "" {
+		walletConfig.AlchemyAPIKeys[sepoliaChainID] = request.AlchemyEthereumSepoliaToken
+	}
+	if request.AlchemyArbitrumMainnetToken != "" {
+		walletConfig.AlchemyAPIKeys[arbitrumChainID] = request.AlchemyArbitrumMainnetToken
+	}
+	if request.AlchemyArbitrumGoerliToken != "" {
+		walletConfig.AlchemyAPIKeys[arbitrumGoerliChainID] = request.AlchemyArbitrumGoerliToken
+	}
+	if request.AlchemyArbitrumSepoliaToken != "" {
+		walletConfig.AlchemyAPIKeys[arbitrumSepoliaChainID] = request.AlchemyArbitrumSepoliaToken
+	}
+	if request.AlchemyOptimismMainnetToken != "" {
+		walletConfig.AlchemyAPIKeys[optimismChainID] = request.AlchemyOptimismMainnetToken
+	}
+	if request.AlchemyOptimismGoerliToken != "" {
+		walletConfig.AlchemyAPIKeys[optimismGoerliChainID] = request.AlchemyOptimismGoerliToken
+	}
+	if request.AlchemyOptimismSepoliaToken != "" {
+		walletConfig.AlchemyAPIKeys[optimismSepoliaChainID] = request.AlchemyOptimismSepoliaToken
+	}
+
+	return walletConfig
+}
+
 func defaultNodeConfig(installationID string, request *requests.CreateAccount) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
@@ -173,58 +230,7 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 	nodeConfig.MaxPeers = 20
 	nodeConfig.MaxPendingPeers = 20
 
-	nodeConfig.WalletConfig = params.WalletConfig{
-		Enabled:        true,
-		AlchemyAPIKeys: make(map[uint64]string),
-	}
-
-	if request.OpenseaAPIKey != "" {
-		nodeConfig.WalletConfig.OpenseaAPIKey = request.OpenseaAPIKey
-	}
-
-	if request.RaribleMainnetAPIKey != "" {
-		nodeConfig.WalletConfig.RaribleMainnetAPIKey = request.RaribleMainnetAPIKey
-	}
-
-	if request.RaribleTestnetAPIKey != "" {
-		nodeConfig.WalletConfig.RaribleTestnetAPIKey = request.RaribleTestnetAPIKey
-	}
-
-	if request.InfuraToken != "" {
-		nodeConfig.WalletConfig.InfuraAPIKey = request.InfuraToken
-	}
-
-	if request.InfuraSecret != "" {
-		nodeConfig.WalletConfig.InfuraAPIKeySecret = request.InfuraSecret
-	}
-
-	if request.AlchemyEthereumMainnetToken != "" {
-		nodeConfig.WalletConfig.AlchemyAPIKeys[mainnetChainID] = request.AlchemyEthereumMainnetToken
-	}
-	if request.AlchemyEthereumGoerliToken != "" {
-		nodeConfig.WalletConfig.AlchemyAPIKeys[goerliChainID] = request.AlchemyEthereumGoerliToken
-	}
-	if request.AlchemyEthereumSepoliaToken != "" {
-		nodeConfig.WalletConfig.AlchemyAPIKeys[sepoliaChainID] = request.AlchemyEthereumSepoliaToken
-	}
-	if request.AlchemyArbitrumMainnetToken != "" {
-		nodeConfig.WalletConfig.AlchemyAPIKeys[arbitrumChainID] = request.AlchemyArbitrumMainnetToken
-	}
-	if request.AlchemyArbitrumGoerliToken != "" {
-		nodeConfig.WalletConfig.AlchemyAPIKeys[arbitrumGoerliChainID] = request.AlchemyArbitrumGoerliToken
-	}
-	if request.AlchemyArbitrumSepoliaToken != "" {
-		nodeConfig.WalletConfig.AlchemyAPIKeys[arbitrumSepoliaChainID] = request.AlchemyArbitrumSepoliaToken
-	}
-	if request.AlchemyOptimismMainnetToken != "" {
-		nodeConfig.WalletConfig.AlchemyAPIKeys[optimismChainID] = request.AlchemyOptimismMainnetToken
-	}
-	if request.AlchemyOptimismGoerliToken != "" {
-		nodeConfig.WalletConfig.AlchemyAPIKeys[optimismGoerliChainID] = request.AlchemyOptimismGoerliToken
-	}
-	if request.AlchemyOptimismSepoliaToken != "" {
-		nodeConfig.WalletConfig.AlchemyAPIKeys[optimismSepoliaChainID] = request.AlchemyOptimismSepoliaToken
-	}
+	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig)
 
 	nodeConfig.LocalNotificationsConfig = params.LocalNotificationsConfig{Enabled: true}
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
