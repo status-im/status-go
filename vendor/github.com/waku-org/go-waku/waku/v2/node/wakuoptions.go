@@ -12,12 +12,12 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p"
-	mplex "github.com/libp2p/go-libp2p-mplex"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	basichost "github.com/libp2p/go-libp2p/p2p/host/basic"
+	"github.com/libp2p/go-libp2p/p2p/muxer/mplex"
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
@@ -37,26 +37,23 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// Default UserAgent
-const UserAgent string = "go-waku"
+// Default userAgent
+const userAgent string = "go-waku"
 
 // Default minRelayPeersToPublish
 const defaultMinRelayPeersToPublish = 0
 
-const DefaultMaxConnectionsPerIP = 5
-
 type WakuNodeParameters struct {
-	hostAddr            *net.TCPAddr
-	maxConnectionsPerIP int
-	clusterID           uint16
-	dns4Domain          string
-	advertiseAddrs      []multiaddr.Multiaddr
-	multiAddr           []multiaddr.Multiaddr
-	addressFactory      basichost.AddrsFactory
-	privKey             *ecdsa.PrivateKey
-	libP2POpts          []libp2p.Option
-	peerstore           peerstore.Peerstore
-	prometheusReg       prometheus.Registerer
+	hostAddr       *net.TCPAddr
+	clusterID      uint16
+	dns4Domain     string
+	advertiseAddrs []multiaddr.Multiaddr
+	multiAddr      []multiaddr.Multiaddr
+	addressFactory basichost.AddrsFactory
+	privKey        *ecdsa.PrivateKey
+	libP2POpts     []libp2p.Option
+	peerstore      peerstore.Peerstore
+	prometheusReg  prometheus.Registerer
 
 	circuitRelayMinInterval time.Duration
 	circuitRelayBootDelay   time.Duration
@@ -127,7 +124,6 @@ type WakuNodeOption func(*WakuNodeParameters) error
 var DefaultWakuNodeOptions = []WakuNodeOption{
 	WithPrometheusRegisterer(prometheus.NewRegistry()),
 	WithMaxPeerConnections(50),
-	WithMaxConnectionsPerIP(DefaultMaxConnectionsPerIP),
 	WithCircuitRelayParams(2*time.Second, 3*time.Minute),
 }
 
@@ -304,14 +300,6 @@ func WithPrivateKey(privKey *ecdsa.PrivateKey) WakuNodeOption {
 func WithClusterID(clusterID uint16) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.clusterID = clusterID
-		return nil
-	}
-}
-
-// WithMaxConnectionsPerIP sets the max number of allowed peers from the same IP
-func WithMaxConnectionsPerIP(limit int) WakuNodeOption {
-	return func(params *WakuNodeParameters) error {
-		params.maxConnectionsPerIP = limit
 		return nil
 	}
 }
@@ -572,7 +560,7 @@ var DefaultLibP2POptions = []libp2p.Option{
 		libp2p.Transport(quic.NewTransport),
 		libp2p.Transport(libp2pwebtransport.New),
 	),
-	libp2p.UserAgent(UserAgent),
+	libp2p.UserAgent(userAgent),
 	libp2p.ChainOptions(
 		libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
 		libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport),

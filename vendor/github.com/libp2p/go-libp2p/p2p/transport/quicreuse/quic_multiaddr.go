@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	quicV1MA = ma.StringCast("/quic-v1")
+	quicV1MA      = ma.StringCast("/quic-v1")
+	quicDraft29MA = ma.StringCast("/quic")
 )
 
 func ToQuicMultiaddr(na net.Addr, version quic.VersionNumber) (ma.Multiaddr, error) {
@@ -19,6 +20,8 @@ func ToQuicMultiaddr(na net.Addr, version quic.VersionNumber) (ma.Multiaddr, err
 		return nil, err
 	}
 	switch version {
+	case quic.VersionDraft29:
+		return udpMA.Encapsulate(quicDraft29MA), nil
 	case quic.Version1:
 		return udpMA.Encapsulate(quicV1MA), nil
 	default:
@@ -31,6 +34,9 @@ func FromQuicMultiaddr(addr ma.Multiaddr) (*net.UDPAddr, quic.VersionNumber, err
 	var partsBeforeQUIC []ma.Multiaddr
 	ma.ForEach(addr, func(c ma.Component) bool {
 		switch c.Protocol().Code {
+		case ma.P_QUIC:
+			version = quic.VersionDraft29
+			return false
 		case ma.P_QUIC_V1:
 			version = quic.Version1
 			return false

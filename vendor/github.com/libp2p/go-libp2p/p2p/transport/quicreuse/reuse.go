@@ -51,7 +51,8 @@ func (c *singleOwnerTransport) Close() error {
 }
 
 func (c *singleOwnerTransport) WriteTo(b []byte, addr net.Addr) (int, error) {
-	return c.Transport.WriteTo(b, addr)
+	// Safe because we called quic.OptimizeConn ourselves.
+	return c.packetConn.WriteTo(b, addr)
 }
 
 // Constant. Defined as variables to simplify testing.
@@ -85,7 +86,8 @@ func (c *refcountedTransport) Close() error {
 }
 
 func (c *refcountedTransport) WriteTo(b []byte, addr net.Addr) (int, error) {
-	return c.Transport.WriteTo(b, addr)
+	// Safe because we called quic.OptimizeConn ourselves.
+	return c.packetConn.WriteTo(b, addr)
 }
 
 func (c *refcountedTransport) LocalAddr() net.Addr {
@@ -123,10 +125,10 @@ type reuse struct {
 	globalDialers map[int]*refcountedTransport
 
 	statelessResetKey *quic.StatelessResetKey
-	tokenGeneratorKey *quic.TokenGeneratorKey
+	metricsTracer     *metricsTracer
 }
 
-func newReuse(srk *quic.StatelessResetKey, tokenKey *quic.TokenGeneratorKey) *reuse {
+func newReuse(srk *quic.StatelessResetKey, mt *metricsTracer) *reuse {
 	r := &reuse{
 		unicast:           make(map[string]map[int]*refcountedTransport),
 		globalListeners:   make(map[int]*refcountedTransport),
@@ -134,7 +136,7 @@ func newReuse(srk *quic.StatelessResetKey, tokenKey *quic.TokenGeneratorKey) *re
 		closeChan:         make(chan struct{}),
 		gcStopChan:        make(chan struct{}),
 		statelessResetKey: srk,
-		tokenGeneratorKey: tokenKey,
+		metricsTracer:     mt,
 	}
 	go r.gc()
 	return r
@@ -263,15 +265,17 @@ func (r *reuse) transportForDialLocked(network string, source *net.IP) (*refcoun
 	case "udp6":
 		addr = &net.UDPAddr{IP: net.IPv6zero, Port: 0}
 	}
-	conn, err := net.ListenUDP(network, addr)
+	conn, err := listenAndOptimize(network, addr)
 	if err != nil {
 		return nil, err
 	}
 	tr := &refcountedTransport{Transport: quic.Transport{
 		Conn:              conn,
 		StatelessResetKey: r.statelessResetKey,
-		TokenGeneratorKey: r.tokenGeneratorKey,
 	}, packetConn: conn}
+	if r.metricsTracer != nil {
+		tr.Transport.Tracer = r.metricsTracer
+	}
 	r.globalDialers[conn.LocalAddr().(*net.UDPAddr).Port] = tr
 	return tr, nil
 }
@@ -310,18 +314,19 @@ func (r *reuse) TransportForListen(network string, laddr *net.UDPAddr) (*refcoun
 		}
 	}
 
-	conn, err := net.ListenUDP(network, laddr)
+	conn, err := listenAndOptimize(network, laddr)
 	if err != nil {
 		return nil, err
 	}
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	tr := &refcountedTransport{
-		Transport: quic.Transport{
-			Conn:              conn,
-			StatelessResetKey: r.statelessResetKey,
-		},
-		packetConn: conn,
+	tr := &refcountedTransport{Transport: quic.Transport{
+		Conn:              conn,
+		StatelessResetKey: r.statelessResetKey,
+	}, packetConn: conn}
+	if r.metricsTracer != nil {
+		tr.Transport.Tracer = r.metricsTracer
 	}
+
 	tr.IncreaseCount()
 
 	// Deal with listen on a global address

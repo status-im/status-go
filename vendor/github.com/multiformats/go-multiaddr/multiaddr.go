@@ -220,7 +220,7 @@ func Unique(addrs []Multiaddr) []Multiaddr {
 		return addrs
 	}
 	// Use the new slices package here, as the sort function doesn't allocate (sort.Slice does).
-	slices.SortFunc(addrs, func(a, b Multiaddr) int { return bytes.Compare(a.Bytes(), b.Bytes()) })
+	slices.SortFunc(addrs, func(a, b Multiaddr) bool { return bytes.Compare(a.Bytes(), b.Bytes()) < 0 })
 	idx := 1
 	for i := 1; i < len(addrs); i++ {
 		if !addrs[i-1].Equal(addrs[i]) {

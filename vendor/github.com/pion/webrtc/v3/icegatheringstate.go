@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package webrtc
 
 // ICEGatheringState describes the state of the candidate gathering process.

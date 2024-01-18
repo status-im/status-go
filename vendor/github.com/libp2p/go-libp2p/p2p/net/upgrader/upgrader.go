@@ -152,8 +152,7 @@ func (u *upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 		return nil, ipnet.ErrNotInPrivateNetwork
 	}
 
-	isServer := dir == network.DirInbound
-	sconn, security, err := u.setupSecurity(ctx, conn, p, isServer)
+	sconn, security, server, err := u.setupSecurity(ctx, conn, p, dir)
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("failed to negotiate security protocol: %w", err)
@@ -180,7 +179,7 @@ func (u *upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 		}
 	}
 
-	muxer, smconn, err := u.setupMuxer(ctx, sconn, isServer, connScope.PeerScope())
+	muxer, smconn, err := u.setupMuxer(ctx, sconn, server, connScope.PeerScope())
 	if err != nil {
 		sconn.Close()
 		return nil, fmt.Errorf("failed to negotiate stream multiplexer: %w", err)
@@ -200,17 +199,20 @@ func (u *upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 	return tc, nil
 }
 
-func (u *upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID, isServer bool) (sec.SecureConn, protocol.ID, error) {
-	st, err := u.negotiateSecurity(ctx, conn, isServer)
+func (u *upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID, dir network.Direction) (sec.SecureConn, protocol.ID, bool, error) {
+	isServer := dir == network.DirInbound
+	var st sec.SecureTransport
+	var err error
+	st, isServer, err = u.negotiateSecurity(ctx, conn, isServer)
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
 	if isServer {
 		sconn, err := st.SecureInbound(ctx, conn, p)
-		return sconn, st.ID(), err
+		return sconn, st.ID(), true, err
 	}
 	sconn, err := st.SecureOutbound(ctx, conn, p)
-	return sconn, st.ID(), err
+	return sconn, st.ID(), false, err
 }
 
 func (u *upgrader) negotiateMuxer(nc net.Conn, isServer bool) (*StreamMuxer, error) {
@@ -306,38 +308,41 @@ func (u *upgrader) getSecurityByID(id protocol.ID) sec.SecureTransport {
 	return nil
 }
 
-func (u *upgrader) negotiateSecurity(ctx context.Context, insecure net.Conn, server bool) (sec.SecureTransport, error) {
+func (u *upgrader) negotiateSecurity(ctx context.Context, insecure net.Conn, server bool) (sec.SecureTransport, bool, error) {
 	type result struct {
-		proto protocol.ID
-		err   error
+		proto     protocol.ID
+		iamserver bool
+		err       error
 	}
 
 	done := make(chan result, 1)
 	go func() {
 		if server {
 			var r result
+			r.iamserver = true
 			r.proto, _, r.err = u.securityMuxer.Negotiate(insecure)
 			done <- r
 			return
 		}
 		var r result
-		r.proto, r.err = mss.SelectOneOf(u.securityIDs, insecure)
+		r.proto, r.iamserver, r.err = mss.SelectWithSimopenOrFail(u.securityIDs, insecure)
 		done <- r
 	}()
 
 	select {
 	case r := <-done:
 		if r.err != nil {
-			return nil, r.err
+			return nil, false, r.err
 		}
 		if s := u.getSecurityByID(r.proto); s != nil {
-			return s, nil
+			return s, r.iamserver, nil
 		}
-		return nil, fmt.Errorf("selected unknown security transport: %s", r.proto)
+		return nil, false, fmt.Errorf("selected unknown security transport: %s", r.proto)
 	case <-ctx.Done():
-		// We *must* do this. We have outstanding work on the connection, and it's no longer safe to use.
+		// We *must* do this. We have outstanding work on the connection
+		// and it's no longer safe to use.
 		insecure.Close()
 		<-done // wait to stop using the connection.
-		return nil, ctx.Err()
+		return nil, false, ctx.Err()
 	}
 }

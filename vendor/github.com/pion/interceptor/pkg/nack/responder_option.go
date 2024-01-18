@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package nack
 
 import "github.com/pion/logging"
@@ -21,15 +18,6 @@ func ResponderSize(size uint16) ResponderOption {
 func ResponderLog(log logging.LeveledLogger) ResponderOption {
 	return func(r *ResponderInterceptor) error {
 		r.log = log
-		return nil
-	}
-}
-
-// DisableCopy bypasses copy of underlying packets. It should be used when
-// you are not re-using underlying buffers of packets that have been written
-func DisableCopy() ResponderOption {
-	return func(s *ResponderInterceptor) error {
-		s.packetFactory = &noOpPacketFactory{}
 		return nil
 	}
 }

@@ -263,7 +263,14 @@ func (db *Database) deleteKeycardAccounts(tx *sql.Tx, kcUID string, accountAddre
 	}
 
 	inVector := strings.Repeat(",?", len(accountAddresses)-1)
-	query := `DELETE FROM keycards_accounts WHERE keycard_uid = ? AND account_address IN (?` + inVector + `)` // nolint: gosec
+	query := `
+		DELETE
+		FROM
+			keycards_accounts
+		WHERE
+			keycard_uid = ?
+		AND
+			account_address	IN (?` + inVector + `)`
 
 	delete, err := tx.Prepare(query)
 	if err != nil {

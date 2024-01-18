@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 // Package elliptic provides elliptic curve cryptography for DTLS
 package elliptic
 
@@ -8,7 +5,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
-	"fmt"
 
 	"golang.org/x/crypto/curve25519"
 )
@@ -61,18 +57,6 @@ const (
 	X25519 Curve = 0x001d
 )
 
-func (c Curve) String() string {
-	switch c {
-	case P256:
-		return "P-256"
-	case P384:
-		return "P-384"
-	case X25519:
-		return "X25519"
-	}
-	return fmt.Sprintf("%#x", uint16(c))
-}
-
 // Curves returns all curves we implement
 func Curves() map[Curve]bool {
 	return map[Curve]bool{
@@ -84,7 +68,7 @@ func Curves() map[Curve]bool {
 
 // GenerateKeypair generates a keypair for the given Curve
 func GenerateKeypair(c Curve) (*Keypair, error) {
-	switch c { //nolint:revive
+	switch c { //nolint:golint
 	case X25519:
 		tmp := make([]byte, 32)
 		if _, err := rand.Read(tmp); err != nil {

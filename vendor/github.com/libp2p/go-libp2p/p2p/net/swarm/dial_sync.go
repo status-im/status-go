@@ -2,7 +2,6 @@ package swarm
 
 import (
 	"context"
-	"errors"
 	"sync"
 
 	"github.com/libp2p/go-libp2p/core/network"
@@ -11,9 +10,6 @@ import (
 
 // dialWorkerFunc is used by dialSync to spawn a new dial worker
 type dialWorkerFunc func(peer.ID, <-chan dialRequest)
-
-// errConcurrentDialSuccessful is used to signal that a concurrent dial succeeded
-var errConcurrentDialSuccessful = errors.New("concurrent dial successful")
 
 // newDialSync constructs a new dialSync
 func newDialSync(worker dialWorkerFunc) *dialSync {
@@ -34,10 +30,15 @@ type dialSync struct {
 type activeDial struct {
 	refCnt int
 
-	ctx         context.Context
-	cancelCause func(error)
+	ctx    context.Context
+	cancel func()
 
 	reqch chan dialRequest
+}
+
+func (ad *activeDial) close() {
+	ad.cancel()
+	close(ad.reqch)
 }
 
 func (ad *activeDial) dial(ctx context.Context) (*Conn, error) {
@@ -73,11 +74,11 @@ func (ds *dialSync) getActiveDial(p peer.ID) (*activeDial, error) {
 	if !ok {
 		// This code intentionally uses the background context. Otherwise, if the first call
 		// to Dial is canceled, subsequent dial calls will also be canceled.
-		ctx, cancel := context.WithCancelCause(context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
 		actd = &activeDial{
-			ctx:         ctx,
-			cancelCause: cancel,
-			reqch:       make(chan dialRequest),
+			ctx:    ctx,
+			cancel: cancel,
+			reqch:  make(chan dialRequest),
 		}
 		go ds.dialWorker(p, actd.reqch)
 		ds.dials[p] = actd
@@ -95,21 +96,14 @@ func (ds *dialSync) Dial(ctx context.Context, p peer.ID) (*Conn, error) {
 		return nil, err
 	}
 
-	conn, err := ad.dial(ctx)
-
-	ds.mutex.Lock()
-	defer ds.mutex.Unlock()
-
-	ad.refCnt--
-	if ad.refCnt == 0 {
-		if err == nil {
-			ad.cancelCause(errConcurrentDialSuccessful)
-		} else {
-			ad.cancelCause(err)
+	defer func() {
+		ds.mutex.Lock()
+		defer ds.mutex.Unlock()
+		ad.refCnt--
+		if ad.refCnt == 0 {
+			ad.close()
+			delete(ds.dials, p)
 		}
-		close(ad.reqch)
-		delete(ds.dials, p)
-	}
-
-	return conn, err
+	}()
+	return ad.dial(ctx)
 }

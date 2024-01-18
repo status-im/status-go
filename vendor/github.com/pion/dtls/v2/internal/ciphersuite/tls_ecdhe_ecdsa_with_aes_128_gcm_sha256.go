@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package ciphersuite
 
 import (
@@ -23,16 +20,6 @@ type TLSEcdheEcdsaWithAes128GcmSha256 struct {
 // CertificateType returns what type of certficate this CipherSuite exchanges
 func (c *TLSEcdheEcdsaWithAes128GcmSha256) CertificateType() clientcertificate.Type {
 	return clientcertificate.ECDSASign
-}
-
-// KeyExchangeAlgorithm controls what key exchange algorithm is using during the handshake
-func (c *TLSEcdheEcdsaWithAes128GcmSha256) KeyExchangeAlgorithm() KeyExchangeAlgorithm {
-	return KeyExchangeAlgorithmEcdhe
-}
-
-// ECC uses Elliptic Curve Cryptography
-func (c *TLSEcdheEcdsaWithAes128GcmSha256) ECC() bool {
-	return true
 }
 
 // ID returns the ID of the CipherSuite
@@ -89,20 +76,20 @@ func (c *TLSEcdheEcdsaWithAes128GcmSha256) Init(masterSecret, clientRandom, serv
 
 // Encrypt encrypts a single TLS RecordLayer
 func (c *TLSEcdheEcdsaWithAes128GcmSha256) Encrypt(pkt *recordlayer.RecordLayer, raw []byte) ([]byte, error) {
-	cipherSuite, ok := c.gcm.Load().(*ciphersuite.GCM)
-	if !ok {
+	gcm := c.gcm.Load()
+	if gcm == nil {
 		return nil, fmt.Errorf("%w, unable to encrypt", errCipherSuiteNotInit)
 	}
 
-	return cipherSuite.Encrypt(pkt, raw)
+	return gcm.(*ciphersuite.GCM).Encrypt(pkt, raw)
 }
 
 // Decrypt decrypts a single TLS RecordLayer
 func (c *TLSEcdheEcdsaWithAes128GcmSha256) Decrypt(raw []byte) ([]byte, error) {
-	cipherSuite, ok := c.gcm.Load().(*ciphersuite.GCM)
-	if !ok {
+	gcm := c.gcm.Load()
+	if gcm == nil {
 		return nil, fmt.Errorf("%w, unable to decrypt", errCipherSuiteNotInit)
 	}
 
-	return cipherSuite.Decrypt(raw)
+	return gcm.(*ciphersuite.GCM).Decrypt(raw)
 }

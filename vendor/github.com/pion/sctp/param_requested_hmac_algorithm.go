@@ -15,8 +15,7 @@ const (
 	hmacSHA256 hmacAlgorithm = 3
 )
 
-// ErrInvalidAlgorithmType is returned if unknown auth algorithm is specified.
-var ErrInvalidAlgorithmType = errors.New("invalid algorithm type")
+var errInvalidAlgorithmType = errors.New("invalid algorithm type")
 
 func (c hmacAlgorithm) String() string {
 	switch c {
@@ -65,7 +64,7 @@ func (r *paramRequestedHMACAlgorithm) unmarshal(raw []byte) (param, error) {
 		case hmacSHA256:
 			r.availableAlgorithms = append(r.availableAlgorithms, a)
 		default:
-			return nil, fmt.Errorf("%w: %v", ErrInvalidAlgorithmType, a)
+			return nil, fmt.Errorf("%w: %v", errInvalidAlgorithmType, a)
 		}
 
 		i += 2

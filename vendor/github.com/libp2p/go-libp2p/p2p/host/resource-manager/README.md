@@ -541,7 +541,7 @@ works best.
 
 ## Examples
 
-Here we consider some concrete examples that can elucidate the abstract
+Here we consider some concrete examples that can ellucidate the abstract
 design as described so far.
 
 ### Stream Lifetime
@@ -578,7 +578,7 @@ More specifically the following constraints apply:
 - the peer scope, where the limits for the peer at the other end of the stream
   apply.
 - the service scope, where the limits of the specific service owning the stream apply.
-- the protocol scope, where the limits of the specific protocol for the stream apply.
+- the protcol scope, where the limits of the specific protocol for the stream apply.
 
 
 The resource transfer that happens in the `SetProtocol` and `SetService`

@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package interceptor
 
 // RTPHeaderExtension represents a negotiated RFC5285 RTP header extension.

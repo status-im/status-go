@@ -1,8 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 // Package ice ...
-//
 //nolint:dupl
 package ice
 
@@ -59,7 +55,6 @@ func NewCandidatePeerReflexive(config *CandidatePeerReflexiveConfig) (*Candidate
 				Address: config.RelAddr,
 				Port:    config.RelPort,
 			},
-			remoteCandidateCaches: map[AddrPort]Candidate{},
 		},
 	}, nil
 }

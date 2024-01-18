@@ -207,7 +207,7 @@
 //
 //	func NewUserGateway(p UserGatewayParams, log *log.Logger) (*UserGateway, error) {
 //	  if p.Cache == nil {
-//	    log.Print("Caching disabled")
+//	    log.Print("Logging disabled")
 //	  }
 //	  // ...
 //	}

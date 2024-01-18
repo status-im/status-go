@@ -18,7 +18,6 @@ import (
 
 	ic "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/sec"
 )
 
 const certValidityPeriod = 100 * 365 * 24 * time.Hour // ~100 years
@@ -130,7 +129,7 @@ func (i *Identity) ConfigForPeer(remote peer.ID) (*tls.Config, <-chan ic.PubKey)
 			if err != nil {
 				peerID = peer.ID(fmt.Sprintf("(not determined: %s)", err.Error()))
 			}
-			return sec.ErrPeerIDMismatch{Expected: remote, Actual: peerID}
+			return fmt.Errorf("peer IDs don't match: expected %s, got %s", remote, peerID)
 		}
 		keyCh <- pubKey
 		return nil

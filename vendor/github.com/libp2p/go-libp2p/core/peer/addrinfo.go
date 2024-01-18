@@ -86,7 +86,7 @@ func AddrInfoFromP2pAddr(m ma.Multiaddr) (*AddrInfo, error) {
 
 // AddrInfoToP2pAddrs converts an AddrInfo to a list of Multiaddrs.
 func AddrInfoToP2pAddrs(pi *AddrInfo) ([]ma.Multiaddr, error) {
-	p2ppart, err := ma.NewComponent("p2p", pi.ID.String())
+	p2ppart, err := ma.NewComponent("p2p", Encode(pi.ID))
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func AddrInfoToP2pAddrs(pi *AddrInfo) ([]ma.Multiaddr, error) {
 
 func (pi *AddrInfo) Loggable() map[string]interface{} {
 	return map[string]interface{}{
-		"peerID": pi.ID.String(),
+		"peerID": pi.ID.Pretty(),
 		"addrs":  pi.Addrs,
 	}
 }

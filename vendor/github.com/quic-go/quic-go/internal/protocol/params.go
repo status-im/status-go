@@ -65,6 +65,9 @@ const MaxAcceptQueueSize = 32
 // TokenValidity is the duration that a (non-retry) token is considered valid
 const TokenValidity = 24 * time.Hour
 
+// RetryTokenValidity is the duration that a retry token is considered valid
+const RetryTokenValidity = 10 * time.Second
+
 // MaxOutstandingSentPackets is maximum number of packets saved for retransmission.
 // When reached, it imposes a soft limit on sending new packets:
 // Sending ACKs and retransmission is still allowed, but now new regular packets can be sent.
@@ -104,6 +107,9 @@ const DefaultIdleTimeout = 30 * time.Second
 
 // DefaultHandshakeIdleTimeout is the default idle timeout used before handshake completion.
 const DefaultHandshakeIdleTimeout = 5 * time.Second
+
+// DefaultHandshakeTimeout is the default timeout for a connection until the crypto handshake succeeds.
+const DefaultHandshakeTimeout = 10 * time.Second
 
 // MaxKeepAliveInterval is the maximum time until we send a packet to keep a connection alive.
 // It should be shorter than the time that NATs clear their mapping.

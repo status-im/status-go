@@ -27,7 +27,6 @@ type SuiteConfig struct {
 	FailOnPending         bool
 	FailFast              bool
 	FlakeAttempts         int
-	MustPassRepeatedly    int
 	DryRun                bool
 	PollProgressAfter     time.Duration
 	PollProgressInterval  time.Duration

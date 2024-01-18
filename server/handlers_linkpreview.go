@@ -67,7 +67,7 @@ func handleLinkPreviewThumbnail(db *sql.DB, logger *zap.Logger) http.HandlerFunc
 			return
 		}
 
-		w.Header().Set("Content-Type", "image/"+mimeType) // nolint: goconst
+		w.Header().Set("Content-Type", "image/"+mimeType)
 		w.Header().Set("Cache-Control", "no-store")
 
 		_, err = w.Write(thumbnail)
@@ -198,7 +198,7 @@ func handleStatusLinkPreviewThumbnail(db *sql.DB, logger *zap.Logger) http.Handl
 			return
 		}
 
-		w.Header().Set("Content-Type", "image/"+mimeType) // nolint: goconst
+		w.Header().Set("Content-Type", "image/"+mimeType)
 		w.Header().Set("Cache-Control", "no-store")
 
 		_, err = w.Write(thumbnail)

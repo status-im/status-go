@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package interceptor
 
 // NoOp is an Interceptor that does not modify any packets. It can embedded in other interceptors, so it's

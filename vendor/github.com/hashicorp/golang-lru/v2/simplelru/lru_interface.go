@@ -32,9 +32,6 @@ type LRUCache[K comparable, V any] interface {
 	// Returns a slice of the keys in the cache, from oldest to newest.
 	Keys() []K
 
-	// Values returns a slice of the values in the cache, from oldest to newest.
-	Values() []V
-
 	// Returns the number of items in the cache.
 	Len() int
 

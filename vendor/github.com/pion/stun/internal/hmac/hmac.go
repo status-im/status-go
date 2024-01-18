@@ -1,5 +1,6 @@
-// SPDX-FileCopyrightText: 2009 The Go Authors. All rights reserved.
-// SPDX-License-Identifier: BSD-3-Clause
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
 /*
 Package hmac implements the Keyed-Hash Message Authentication Code (HMAC) as
@@ -33,37 +34,19 @@ import (
 // opad = 0x5c byte repeated for key length
 // hmac = H([key ^ opad] H([key ^ ipad] text))
 
-// Marshalable is the combination of encoding.BinaryMarshaler and
-// encoding.BinaryUnmarshaler. Their method definitions are repeated here to
-// avoid a dependency on the encoding package.
-type marshalable interface {
-	MarshalBinary() ([]byte, error)
-	UnmarshalBinary([]byte) error
-}
-
 type hmac struct {
+	size         int
+	blocksize    int
 	opad, ipad   []byte
 	outer, inner hash.Hash
-
-	// If marshaled is true, then opad and ipad do not contain a padded
-	// copy of the key, but rather the marshaled state of outer/inner after
-	// opad/ipad has been fed into it.
-	marshaled bool
 }
 
 func (h *hmac) Sum(in []byte) []byte {
 	origLen := len(in)
 	in = h.inner.Sum(in)
-
-	if h.marshaled {
-		if err := h.outer.(marshalable).UnmarshalBinary(h.opad); err != nil { //nolint:forcetypeassert
-			panic(err) //nolint
-		}
-	} else {
-		h.outer.Reset()
-		h.outer.Write(h.opad) //nolint:errcheck,gosec
-	}
-	h.outer.Write(in[origLen:]) //nolint:errcheck,gosec
+	h.outer.Reset()
+	h.outer.Write(h.opad)
+	h.outer.Write(in[origLen:])
 	return h.outer.Sum(in[:origLen])
 }
 
@@ -71,51 +54,13 @@ func (h *hmac) Write(p []byte) (n int, err error) {
 	return h.inner.Write(p)
 }
 
-func (h *hmac) Size() int      { return h.outer.Size() }
-func (h *hmac) BlockSize() int { return h.inner.BlockSize() }
+func (h *hmac) Size() int { return h.size }
+
+func (h *hmac) BlockSize() int { return h.blocksize }
 
 func (h *hmac) Reset() {
-	if h.marshaled {
-		if err := h.inner.(marshalable).UnmarshalBinary(h.ipad); err != nil { //nolint:forcetypeassert
-			panic(err) //nolint
-		}
-		return
-	}
-
 	h.inner.Reset()
-	h.inner.Write(h.ipad) //nolint:errcheck,gosec
-
-	// If the underlying hash is marshalable, we can save some time by
-	// saving a copy of the hash state now, and restoring it on future
-	// calls to Reset and Sum instead of writing ipad/opad every time.
-	//
-	// If either hash is unmarshalable for whatever reason,
-	// it's safe to bail out here.
-	marshalableInner, innerOK := h.inner.(marshalable)
-	if !innerOK {
-		return
-	}
-	marshalableOuter, outerOK := h.outer.(marshalable)
-	if !outerOK {
-		return
-	}
-
-	imarshal, err := marshalableInner.MarshalBinary()
-	if err != nil {
-		return
-	}
-
-	h.outer.Reset()
-	h.outer.Write(h.opad) //nolint:errcheck,gosec
-	omarshal, err := marshalableOuter.MarshalBinary()
-	if err != nil {
-		return
-	}
-
-	// Marshaling succeeded; save the marshaled state for later
-	h.ipad = imarshal
-	h.opad = omarshal
-	h.marshaled = true
+	h.inner.Write(h.ipad)
 }
 
 // New returns a new HMAC hash using the given hash.Hash type and key.
@@ -126,12 +71,13 @@ func New(h func() hash.Hash, key []byte) hash.Hash {
 	hm := new(hmac)
 	hm.outer = h()
 	hm.inner = h()
-	blocksize := hm.inner.BlockSize()
-	hm.ipad = make([]byte, blocksize)
-	hm.opad = make([]byte, blocksize)
-	if len(key) > blocksize {
+	hm.size = hm.inner.Size()
+	hm.blocksize = hm.inner.BlockSize()
+	hm.ipad = make([]byte, hm.blocksize)
+	hm.opad = make([]byte, hm.blocksize)
+	if len(key) > hm.blocksize {
 		// If key is too big, hash it.
-		hm.outer.Write(key) //nolint:errcheck,gosec
+		hm.outer.Write(key)
 		key = hm.outer.Sum(nil)
 	}
 	copy(hm.ipad, key)
@@ -142,8 +88,7 @@ func New(h func() hash.Hash, key []byte) hash.Hash {
 	for i := range hm.opad {
 		hm.opad[i] ^= 0x5c
 	}
-	hm.inner.Write(hm.ipad) //nolint:errcheck,gosec
-
+	hm.inner.Write(hm.ipad)
 	return hm
 }
 

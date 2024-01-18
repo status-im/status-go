@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package stun
 
 import (
@@ -79,20 +76,8 @@ const (
 
 // Attributes from RFC 5780 NAT Behavior Discovery
 const (
-	AttrChangeRequest  AttrType = 0x0003 // CHANGE-REQUEST
-	AttrPadding        AttrType = 0x0026 // PADDING
-	AttrResponsePort   AttrType = 0x0027 // RESPONSE-PORT
-	AttrCacheTimeout   AttrType = 0x8027 // CACHE-TIMEOUT
-	AttrResponseOrigin AttrType = 0x802b // RESPONSE-ORIGIN
-	AttrOtherAddress   AttrType = 0x802C // OTHER-ADDRESS
-)
-
-// Attributes from RFC 3489, removed by RFC 5389,
-//
-//	but still used by RFC5389-implementing software like Vovida.org, reTURNServer, etc.
-const (
-	AttrSourceAddress  AttrType = 0x0004 // SOURCE-ADDRESS
-	AttrChangedAddress AttrType = 0x0005 // CHANGED-ADDRESS
+	AttrOtherAddress  AttrType = 0x802C // OTHER-ADDRESS
+	AttrChangeRequest AttrType = 0x0003 // CHANGE-REQUEST
 )
 
 // Attributes from RFC 6062 TURN Extensions for TCP Allocations.
@@ -110,58 +95,45 @@ const (
 	AttrOrigin AttrType = 0x802F
 )
 
-// Attributes from RFC 8489 STUN.
-const (
-	AttrMessageIntegritySHA256 AttrType = 0x001C // MESSAGE-INTEGRITY-SHA256
-	AttrPasswordAlgorithm      AttrType = 0x001D // PASSWORD-ALGORITHM
-	AttrUserhash               AttrType = 0x001E // USERHASH
-	AttrPasswordAlgorithms     AttrType = 0x8002 // PASSWORD-ALGORITHMS
-	AttrAlternateDomain        AttrType = 0x8003 // ALTERNATE-DOMAIN
-)
-
 // Value returns uint16 representation of attribute type.
 func (t AttrType) Value() uint16 {
 	return uint16(t)
 }
 
-func attrNames() map[AttrType]string {
-	return map[AttrType]string{
-		AttrMappedAddress:          "MAPPED-ADDRESS",
-		AttrUsername:               "USERNAME",
-		AttrErrorCode:              "ERROR-CODE",
-		AttrMessageIntegrity:       "MESSAGE-INTEGRITY",
-		AttrUnknownAttributes:      "UNKNOWN-ATTRIBUTES",
-		AttrRealm:                  "REALM",
-		AttrNonce:                  "NONCE",
-		AttrXORMappedAddress:       "XOR-MAPPED-ADDRESS",
-		AttrSoftware:               "SOFTWARE",
-		AttrAlternateServer:        "ALTERNATE-SERVER",
-		AttrFingerprint:            "FINGERPRINT",
-		AttrPriority:               "PRIORITY",
-		AttrUseCandidate:           "USE-CANDIDATE",
-		AttrICEControlled:          "ICE-CONTROLLED",
-		AttrICEControlling:         "ICE-CONTROLLING",
-		AttrChannelNumber:          "CHANNEL-NUMBER",
-		AttrLifetime:               "LIFETIME",
-		AttrXORPeerAddress:         "XOR-PEER-ADDRESS",
-		AttrData:                   "DATA",
-		AttrXORRelayedAddress:      "XOR-RELAYED-ADDRESS",
-		AttrEvenPort:               "EVEN-PORT",
-		AttrRequestedTransport:     "REQUESTED-TRANSPORT",
-		AttrDontFragment:           "DONT-FRAGMENT",
-		AttrReservationToken:       "RESERVATION-TOKEN",
-		AttrConnectionID:           "CONNECTION-ID",
-		AttrRequestedAddressFamily: "REQUESTED-ADDRESS-FAMILY",
-		AttrMessageIntegritySHA256: "MESSAGE-INTEGRITY-SHA256",
-		AttrPasswordAlgorithm:      "PASSWORD-ALGORITHM",
-		AttrUserhash:               "USERHASH",
-		AttrPasswordAlgorithms:     "PASSWORD-ALGORITHMS",
-		AttrAlternateDomain:        "ALTERNATE-DOMAIN",
-	}
+var attrNames = map[AttrType]string{
+	AttrMappedAddress:          "MAPPED-ADDRESS",
+	AttrUsername:               "USERNAME",
+	AttrErrorCode:              "ERROR-CODE",
+	AttrMessageIntegrity:       "MESSAGE-INTEGRITY",
+	AttrUnknownAttributes:      "UNKNOWN-ATTRIBUTES",
+	AttrRealm:                  "REALM",
+	AttrNonce:                  "NONCE",
+	AttrXORMappedAddress:       "XOR-MAPPED-ADDRESS",
+	AttrSoftware:               "SOFTWARE",
+	AttrAlternateServer:        "ALTERNATE-SERVER",
+	AttrOtherAddress:           "OTHER-ADDRESS",
+	AttrChangeRequest:          "CHANGE-REQUEST",
+	AttrFingerprint:            "FINGERPRINT",
+	AttrPriority:               "PRIORITY",
+	AttrUseCandidate:           "USE-CANDIDATE",
+	AttrICEControlled:          "ICE-CONTROLLED",
+	AttrICEControlling:         "ICE-CONTROLLING",
+	AttrChannelNumber:          "CHANNEL-NUMBER",
+	AttrLifetime:               "LIFETIME",
+	AttrXORPeerAddress:         "XOR-PEER-ADDRESS",
+	AttrData:                   "DATA",
+	AttrXORRelayedAddress:      "XOR-RELAYED-ADDRESS",
+	AttrEvenPort:               "EVEN-PORT",
+	AttrRequestedTransport:     "REQUESTED-TRANSPORT",
+	AttrDontFragment:           "DONT-FRAGMENT",
+	AttrReservationToken:       "RESERVATION-TOKEN",
+	AttrConnectionID:           "CONNECTION-ID",
+	AttrRequestedAddressFamily: "REQUESTED-ADDRESS-FAMILY",
+	AttrOrigin:                 "ORIGIN",
 }
 
 func (t AttrType) String() string {
-	s, ok := attrNames()[t]
+	s, ok := attrNames[t]
 	if !ok {
 		// Just return hex representation of unknown attribute type.
 		return fmt.Sprintf("0x%x", uint16(t))
@@ -247,8 +219,8 @@ func nearestPaddedValueLength(l int) int {
 // type value, it also translates it to the new value to enable backward
 // compatibility. (See: https://github.com/pion/stun/issues/21)
 func compatAttrType(val uint16) AttrType {
-	if val == 0x8020 { // draft-ietf-behave-rfc3489bis-02, MS-TURN
-		return AttrXORMappedAddress // new: 0x0020 (from draft-ietf-behave-rfc3489bis-03 on)
+	if val == 0x8020 {
+		return AttrXORMappedAddress // new: 0x0020
 	}
 	return AttrType(val)
 }

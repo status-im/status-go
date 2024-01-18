@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package protocol
 
 import (
@@ -87,8 +84,7 @@ func (e *TimeoutError) Error() string { return fmt.Sprintf("dtls timeout: %v", e
 
 // Timeout implements net.Error.Timeout()
 func (e *HandshakeError) Timeout() bool {
-	var netErr net.Error
-	if errors.As(e.Err, &netErr) {
+	if netErr, ok := e.Err.(net.Error); ok {
 		return netErr.Timeout()
 	}
 	return false
@@ -96,9 +92,8 @@ func (e *HandshakeError) Timeout() bool {
 
 // Temporary implements net.Error.Temporary()
 func (e *HandshakeError) Temporary() bool {
-	var netErr net.Error
-	if errors.As(e.Err, &netErr) {
-		return netErr.Temporary() //nolint
+	if netErr, ok := e.Err.(net.Error); ok {
+		return netErr.Temporary()
 	}
 	return false
 }

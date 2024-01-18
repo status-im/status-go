@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 // Package stun implements Session Traversal Utilities for NAT (STUN) RFC 5389.
 //
 // The stun package is intended to use by package that implements extension
@@ -20,12 +17,12 @@ import (
 )
 
 // bin is shorthand to binary.BigEndian.
-var bin = binary.BigEndian //nolint:gochecknoglobals
+var bin = binary.BigEndian
 
 func readFullOrPanic(r io.Reader, v []byte) int {
 	n, err := io.ReadFull(r, v)
 	if err != nil {
-		panic(err) //nolint
+		panic(err) // nolint
 	}
 	return n
 }
@@ -33,7 +30,7 @@ func readFullOrPanic(r io.Reader, v []byte) int {
 func writeOrPanic(w io.Writer, v []byte) int {
 	n, err := w.Write(v)
 	if err != nil {
-		panic(err) //nolint
+		panic(err) // nolint
 	}
 	return n
 }
@@ -51,4 +48,4 @@ func (transactionIDSetter) AddTo(m *Message) error {
 }
 
 // TransactionID is Setter for m.TransactionID.
-var TransactionID Setter = transactionIDSetter{} //nolint:gochecknoglobals
+var TransactionID Setter = transactionIDSetter{}

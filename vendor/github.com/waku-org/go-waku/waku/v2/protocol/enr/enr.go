@@ -113,7 +113,7 @@ func Multiaddress(node *enode.Node) (peer.ID, []multiaddr.Multiaddr, error) {
 			return "", nil, fmt.Errorf("invalid multiaddress field length")
 		}
 
-		hostInfoStr := fmt.Sprintf("/p2p/%s", peerID.String())
+		hostInfoStr := fmt.Sprintf("/p2p/%s", peerID.Pretty())
 		_, pID := peer.SplitAddr(addr)
 		if pID != "" && pID != peerID {
 			// Addresses in the ENR that contain a p2p component are circuit relay addr

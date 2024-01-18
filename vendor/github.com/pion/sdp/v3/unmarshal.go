@@ -568,11 +568,9 @@ func unmarshalBandwidth(value string) (*Bandwidth, error) {
 	experimental := strings.HasPrefix(parts[0], "X-")
 	if experimental {
 		parts[0] = strings.TrimPrefix(parts[0], "X-")
-	} else if !anyOf(parts[0], "CT", "AS", "TIAS", "RS", "RR") {
+	} else if !anyOf(parts[0], "CT", "AS") {
 		// Set according to currently registered with IANA
 		// https://tools.ietf.org/html/rfc4566#section-5.8
-		// https://tools.ietf.org/html/rfc3890#section-6.2
-		// https://tools.ietf.org/html/rfc3556#section-2
 		return nil, fmt.Errorf("%w `%v`", errSDPInvalidValue, parts[0])
 	}
 
@@ -769,9 +767,8 @@ func unmarshalMediaDescription(l *lexer) (stateFn, error) {
 
 	// Set according to currently registered with IANA
 	// https://tools.ietf.org/html/rfc4566#section-5.14
-	// https://tools.ietf.org/html/rfc4975#section-8.1
 	for _, proto := range strings.Split(field, "/") {
-		if !anyOf(proto, "UDP", "RTP", "AVP", "SAVP", "SAVPF", "TLS", "DTLS", "SCTP", "AVPF", "TCP", "MSRP") {
+		if !anyOf(proto, "UDP", "RTP", "AVP", "SAVP", "SAVPF", "TLS", "DTLS", "SCTP", "AVPF") {
 			return nil, fmt.Errorf("%w `%v`", errSDPInvalidNumericValue, field)
 		}
 		newMediaDesc.MediaName.Protos = append(newMediaDesc.MediaName.Protos, proto)

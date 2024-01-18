@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 //go:build !js
 // +build !js
 
@@ -29,7 +26,11 @@ func RegisterDefaultInterceptors(mediaEngine *MediaEngine, interceptorRegistry *
 		return err
 	}
 
-	return ConfigureTWCCSender(mediaEngine, interceptorRegistry)
+	if err := ConfigureTWCCSender(mediaEngine, interceptorRegistry); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // ConfigureRTCPReports will setup everything necessary for generating Sender and Receiver Reports

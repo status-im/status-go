@@ -7,10 +7,9 @@ import (
 	"time"
 )
 
-// Channel number:
-//
-//	0x4000 through 0x7FFF: These values are the allowed channel
-//	numbers (16,383 possible values).
+//  Chanel number:
+//    0x4000 through 0x7FFF: These values are the allowed channel
+//    numbers (16,383 possible values).
 const (
 	minChannelNumber uint16 = 0x4000
 	maxChannelNumber uint16 = 0x7fff

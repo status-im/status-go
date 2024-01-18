@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package ice
 
 import (
@@ -18,9 +15,8 @@ func validateIPString(ipStr string) (net.IP, bool, error) {
 
 // ipMapping holds the mapping of local and external IP address for a particular IP family
 type ipMapping struct {
-	ipSole net.IP            // When non-nil, this is the sole external IP for one local IP assumed
-	ipMap  map[string]net.IP // Local-to-external IP mapping (k: local, v: external)
-	valid  bool              // If not set any external IP, valid is false
+	ipSole net.IP            // when non-nil, this is the sole external IP for one local IP assumed
+	ipMap  map[string]net.IP // local-to-external IP mapping (k: local, v: external)
 }
 
 func (m *ipMapping) setSoleIP(ip net.IP) error {
@@ -29,7 +25,6 @@ func (m *ipMapping) setSoleIP(ip net.IP) error {
 	}
 
 	m.ipSole = ip
-	m.valid = true
 
 	return nil
 }
@@ -41,22 +36,17 @@ func (m *ipMapping) addIPMapping(locIP, extIP net.IP) error {
 
 	locIPStr := locIP.String()
 
-	// Check if dup of local IP
+	// check if dup of local IP
 	if _, ok := m.ipMap[locIPStr]; ok {
 		return ErrInvalidNAT1To1IPMapping
 	}
 
 	m.ipMap[locIPStr] = extIP
-	m.valid = true
 
 	return nil
 }
 
 func (m *ipMapping) findExternalIP(locIP net.IP) (net.IP, error) {
-	if !m.valid {
-		return locIP, nil
-	}
-
 	if m.ipSole != nil {
 		return m.ipSole, nil
 	}
@@ -77,10 +67,10 @@ type externalIPMapper struct {
 
 func newExternalIPMapper(candidateType CandidateType, ips []string) (*externalIPMapper, error) { //nolint:gocognit
 	if len(ips) == 0 {
-		return nil, nil //nolint:nilnil
+		return nil, nil
 	}
 	if candidateType == CandidateTypeUnspecified {
-		candidateType = CandidateTypeHost // Defaults to host
+		candidateType = CandidateTypeHost // defaults to host
 	} else if candidateType != CandidateTypeHost && candidateType != CandidateTypeServerReflexive {
 		return nil, ErrUnsupportedNAT1To1IPCandidateType
 	}

@@ -145,7 +145,3 @@ func (r *resourceManager) Stat() (result ResourceManagerStat) {
 
 	return result
 }
-
-func (r *resourceManager) GetConnLimit() int {
-	return r.limits.GetConnLimits().GetConnTotalLimit()
-}

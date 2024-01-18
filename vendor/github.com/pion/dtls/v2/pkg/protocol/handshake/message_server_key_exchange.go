@@ -1,12 +1,8 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package handshake
 
 import (
 	"encoding/binary"
 
-	"github.com/pion/dtls/v2/internal/ciphersuite/types"
 	"github.com/pion/dtls/v2/pkg/crypto/elliptic"
 	"github.com/pion/dtls/v2/pkg/crypto/hash"
 	"github.com/pion/dtls/v2/pkg/crypto/signature"
@@ -22,9 +18,6 @@ type MessageServerKeyExchange struct {
 	HashAlgorithm      hash.Algorithm
 	SignatureAlgorithm signature.Algorithm
 	Signature          []byte
-
-	// for unmarshaling
-	KeyExchangeAlgorithm types.KeyExchangeAlgorithm
 }
 
 // Type returns the Handshake Type
@@ -34,28 +27,19 @@ func (m MessageServerKeyExchange) Type() Type {
 
 // Marshal encodes the Handshake
 func (m *MessageServerKeyExchange) Marshal() ([]byte, error) {
-	var out []byte
 	if m.IdentityHint != nil {
-		out = append([]byte{0x00, 0x00}, m.IdentityHint...)
+		out := append([]byte{0x00, 0x00}, m.IdentityHint...)
 		binary.BigEndian.PutUint16(out, uint16(len(out)-2))
-	}
-
-	if m.EllipticCurveType == 0 || len(m.PublicKey) == 0 {
 		return out, nil
 	}
-	out = append(out, byte(m.EllipticCurveType), 0x00, 0x00)
-	binary.BigEndian.PutUint16(out[len(out)-2:], uint16(m.NamedCurve))
+
+	out := []byte{byte(m.EllipticCurveType), 0x00, 0x00}
+	binary.BigEndian.PutUint16(out[1:], uint16(m.NamedCurve))
 
 	out = append(out, byte(len(m.PublicKey)))
 	out = append(out, m.PublicKey...)
-	switch {
-	case m.HashAlgorithm != hash.None && len(m.Signature) == 0:
-		return nil, errInvalidHashAlgorithm
-	case m.HashAlgorithm == hash.None && len(m.Signature) > 0:
-		return nil, errInvalidHashAlgorithm
-	case m.SignatureAlgorithm == signature.Anonymous && (m.HashAlgorithm != hash.None || len(m.Signature) > 0):
-		return nil, errInvalidSignatureAlgorithm
-	case m.SignatureAlgorithm == signature.Anonymous:
+
+	if m.HashAlgorithm == hash.None && m.SignatureAlgorithm == signature.Anonymous && len(m.Signature) == 0 {
 		return out, nil
 	}
 
@@ -68,27 +52,14 @@ func (m *MessageServerKeyExchange) Marshal() ([]byte, error) {
 
 // Unmarshal populates the message from encoded data
 func (m *MessageServerKeyExchange) Unmarshal(data []byte) error {
-	switch {
-	case len(data) < 2:
+	if len(data) < 2 {
 		return errBufferTooSmall
-	case m.KeyExchangeAlgorithm == types.KeyExchangeAlgorithmNone:
-		return errCipherSuiteUnset
 	}
 
-	hintLength := binary.BigEndian.Uint16(data)
-	if int(hintLength) <= len(data)-2 && m.KeyExchangeAlgorithm.Has(types.KeyExchangeAlgorithmPsk) {
-		m.IdentityHint = append([]byte{}, data[2:2+hintLength]...)
-		data = data[2+hintLength:]
-	}
-	if m.KeyExchangeAlgorithm == types.KeyExchangeAlgorithmPsk {
-		if len(data) == 0 {
-			return nil
-		}
-		return errLengthMismatch
-	}
-
-	if !m.KeyExchangeAlgorithm.Has(types.KeyExchangeAlgorithmEcdhe) {
-		return errLengthMismatch
+	// If parsed as PSK return early and only populate PSK Identity Hint
+	if pskLength := binary.BigEndian.Uint16(data); len(data) == int(pskLength+2) {
+		m.IdentityHint = append([]byte{}, data[2:]...)
+		return nil
 	}
 
 	if _, ok := elliptic.CurveTypes()[elliptic.CurveType(data[0])]; ok {

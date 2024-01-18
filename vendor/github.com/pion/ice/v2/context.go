@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package ice
 
 import (
@@ -35,6 +32,6 @@ func (a agentContext) Deadline() (deadline time.Time, ok bool) {
 }
 
 // Value implements context.Context
-func (a agentContext) Value(interface{}) interface{} {
+func (a agentContext) Value(key interface{}) interface{} {
 	return nil
 }

@@ -20,7 +20,7 @@ func TestKeycards(t *testing.T) {
 
 	keycard2Copy := GetKeycardForSeedImportedKeypair1ForTest()
 	keycard2Copy.KeycardUID = keycard2Copy.KeycardUID + "C"
-	keycard2Copy.KeycardName = keycard2Copy.KeycardName + "Copy" // nolint: goconst
+	keycard2Copy.KeycardName = keycard2Copy.KeycardName + "Copy"
 	keycard2Copy.Position = keycard2Copy.Position + 1
 
 	// Pre-condition
@@ -162,7 +162,7 @@ func TestKeycardsRemovalWhenDeletingKeypair(t *testing.T) {
 
 	keycard2Copy := GetKeycardForSeedImportedKeypair1ForTest()
 	keycard2Copy.KeycardUID = keycard2Copy.KeycardUID + "C"
-	keycard2Copy.KeycardName = keycard2Copy.KeycardName + "Copy" // nolint: goconst
+	keycard2Copy.KeycardName = keycard2Copy.KeycardName + "Copy"
 	keycard2Copy.Position = keycard2Copy.Position + 1
 
 	// Pre-condition

@@ -11,7 +11,7 @@ func NewSimpleCacher() Cacher {
 
 // implements cacheIface for plain map internal storage
 type mapCache[K comparable, V any] struct {
-	cache map[K]V // nolint: structcheck
+	cache map[K]V
 }
 
 func (c *mapCache[K, V]) get(key K) V {

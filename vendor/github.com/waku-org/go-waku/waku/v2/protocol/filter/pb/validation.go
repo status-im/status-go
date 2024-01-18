@@ -7,7 +7,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-const MaxContentTopicsPerRequest = 100
+const MaxContentTopicsPerRequest = 30
 
 var (
 	errMissingRequestID   = errors.New("missing RequestId field")
@@ -32,7 +32,7 @@ func (x *FilterSubscribeRequest) Validate() error {
 			return errNoContentTopics
 		}
 
-		if slices.Contains(x.ContentTopics, "") {
+		if slices.Contains[string](x.ContentTopics, "") {
 			return errEmptyContentTopics
 		}
 

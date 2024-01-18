@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package dtls
 
 func findMatchingSRTPProfile(a, b []SRTPProtectionProfile) (SRTPProtectionProfile, bool) {
@@ -14,7 +11,7 @@ func findMatchingSRTPProfile(a, b []SRTPProtectionProfile) (SRTPProtectionProfil
 	return 0, false
 }
 
-func findMatchingCipherSuite(a, b []CipherSuite) (CipherSuite, bool) {
+func findMatchingCipherSuite(a, b []CipherSuite) (CipherSuite, bool) { //nolint
 	for _, aSuite := range a {
 		for _, bSuite := range b {
 			if aSuite.ID() == bSuite.ID() {

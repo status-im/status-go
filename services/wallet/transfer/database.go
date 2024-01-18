@@ -327,7 +327,6 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, head
 func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers []Transfer) error {
 	txsDBFields := make([]transferDBFields, 0, len(transfers))
 	for _, t := range transfers {
-		t := t
 		var receiptType *uint8
 		var txHash, blockHash *common.Hash
 		var receiptStatus, cumulativeGasUsed, gasUsed *uint64

@@ -261,8 +261,6 @@ func (s *PairingServerSuite) TestPairingServer_handlePairingChallengeMiddleware_
 	s.Require().Equal("[client] status not ok when receiving account data, received '403 Forbidden'", err.Error())
 }
 
-const helloMsg = "Hello I like to be a tls server. You said: `"
-
 func testHandler(t *testing.T) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		say, ok := r.URL.Query()["say"]
@@ -270,7 +268,7 @@ func testHandler(t *testing.T) func(w http.ResponseWriter, r *http.Request) {
 			say = append(say, "nothing")
 		}
 
-		_, err := w.Write([]byte("Hello I like to be a tls server. You said: `" + say[0] + "` " + time.Now().String())) // nolint: goconst
+		_, err := w.Write([]byte("Hello I like to be a tls server. You said: `" + say[0] + "` " + time.Now().String()))
 		if err != nil {
 			require.NoError(t, err)
 		}
@@ -320,5 +318,5 @@ func (s *PairingServerSuite) TestGetOutboundIPWithFullServerE2e() {
 
 	content, err := ioutil.ReadAll(response.Body)
 	s.Require().NoError(err)
-	s.Require().Equal(helloMsg+thing+"`", string(content[:109]))
+	s.Require().Equal("Hello I like to be a tls server. You said: `"+thing+"`", string(content[:109]))
 }

@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package dtls
 
 import (
@@ -17,7 +14,7 @@ import (
 func flight1Parse(ctx context.Context, c flightConn, state *State, cache *handshakeCache, cfg *handshakeConfig) (flightVal, *alert.Alert, error) {
 	// HelloVerifyRequest can be skipped by the server,
 	// so allow ServerHello during flight1 also
-	seq, msgs, ok := cache.fullPullMap(state.handshakeRecvSequence, state.cipherSuite,
+	seq, msgs, ok := cache.fullPullMap(state.handshakeRecvSequence,
 		handshakeCachePullRule{handshake.TypeHelloVerifyRequest, cfg.initialEpoch, false, true},
 		handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, true},
 	)
@@ -46,7 +43,7 @@ func flight1Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 	return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, nil
 }
 
-func flight1Generate(c flightConn, state *State, _ *handshakeCache, cfg *handshakeConfig) ([]*packet, *alert.Alert, error) {
+func flight1Generate(c flightConn, state *State, cache *handshakeCache, cfg *handshakeConfig) ([]*packet, *alert.Alert, error) {
 	var zeroEpoch uint16
 	state.localEpoch.Store(zeroEpoch)
 	state.remoteEpoch.Store(zeroEpoch)
@@ -65,19 +62,10 @@ func flight1Generate(c flightConn, state *State, _ *handshakeCache, cfg *handsha
 			RenegotiatedConnection: 0,
 		},
 	}
-
-	var setEllipticCurveCryptographyClientHelloExtensions bool
-	for _, c := range cfg.localCipherSuites {
-		if c.ECC() {
-			setEllipticCurveCryptographyClientHelloExtensions = true
-			break
-		}
-	}
-
-	if setEllipticCurveCryptographyClientHelloExtensions {
+	if cfg.localPSKCallback == nil {
 		extensions = append(extensions, []extension.Extension{
 			&extension.SupportedEllipticCurves{
-				EllipticCurves: cfg.ellipticCurves,
+				EllipticCurves: []elliptic.Curve{elliptic.X25519, elliptic.P256, elliptic.P384},
 			},
 			&extension.SupportedPointFormats{
 				PointFormats: []elliptic.CurvePointFormat{elliptic.CurvePointFormatUncompressed},

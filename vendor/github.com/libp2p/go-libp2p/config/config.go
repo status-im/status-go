@@ -261,7 +261,6 @@ func (cfg *Config) addTransports(h host.Host) error {
 	}
 
 	fxopts = append(fxopts, fx.Provide(PrivKeyToStatelessResetKey))
-	fxopts = append(fxopts, fx.Provide(PrivKeyToTokenGeneratorKey))
 	if cfg.QUICReuse != nil {
 		fxopts = append(fxopts, cfg.QUICReuse...)
 	} else {
@@ -296,15 +295,6 @@ func (cfg *Config) addTransports(h host.Host) error {
 //
 // This function consumes the config. Do not reuse it (really!).
 func (cfg *Config) NewNode() (host.Host, error) {
-	// If possible check that the resource manager conn limit is higher than the
-	// limit set in the conn manager.
-	if l, ok := cfg.ResourceManager.(connmgr.GetConnLimiter); ok {
-		err := cfg.ConnManager.CheckLimit(l)
-		if err != nil {
-			log.Warn(fmt.Sprintf("rcmgr limit conflicts with connmgr limit: %v", err))
-		}
-	}
-
 	eventBus := eventbus.NewBus(eventbus.WithMetricsTracer(eventbus.NewMetricsTracer(eventbus.WithRegisterer(cfg.PrometheusRegisterer))))
 	swrm, err := cfg.makeSwarm(eventBus, !cfg.DisableMetrics)
 	if err != nil {
@@ -429,11 +419,6 @@ func (cfg *Config) NewNode() (host.Host, error) {
 			PeerKey:            autonatPrivKey,
 			Peerstore:          ps,
 			DialRanker:         swarm.NoDelayDialRanker,
-			SwarmOpts: []swarm.Option{
-				// It is better to disable black hole detection and just attempt a dial for autonat
-				swarm.WithUDPBlackHoleConfig(false, 0, 0),
-				swarm.WithIPv6BlackHoleConfig(false, 0, 0),
-			},
 		}
 
 		dialer, err := autoNatCfg.makeSwarm(eventbus.NewBus(), false)

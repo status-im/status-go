@@ -45,7 +45,7 @@ func (id ID) Size() int {
 }
 
 func (id ID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(id.String())
+	return json.Marshal(Encode(id))
 }
 
 func (id *ID) UnmarshalJSON(data []byte) (err error) {
@@ -59,7 +59,7 @@ func (id *ID) UnmarshalJSON(data []byte) (err error) {
 
 // MarshalText returns the text encoding of the ID.
 func (id ID) MarshalText() ([]byte, error) {
-	return []byte(id.String()), nil
+	return []byte(Encode(id)), nil
 }
 
 // UnmarshalText restores the ID from its text encoding.

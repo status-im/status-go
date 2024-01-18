@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 //go:build !js
 // +build !js
 
@@ -16,11 +13,10 @@ import (
 
 // RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
 type RTPTransceiver struct {
-	mid              atomic.Value // string
-	sender           atomic.Value // *RTPSender
-	receiver         atomic.Value // *RTPReceiver
-	direction        atomic.Value // RTPTransceiverDirection
-	currentDirection atomic.Value // RTPTransceiverDirection
+	mid       atomic.Value // string
+	sender    atomic.Value // *RTPSender
+	receiver  atomic.Value // *RTPReceiver
+	direction atomic.Value // RTPTransceiverDirection
 
 	codecs []RTPCodecParameters // User provided codecs via SetCodecPreferences
 
@@ -42,7 +38,6 @@ func newRTPTransceiver(
 	t.setReceiver(receiver)
 	t.setSender(sender)
 	t.setDirection(direction)
-	t.setCurrentDirection(RTPTransceiverDirection(Unknown))
 	return t
 }
 
@@ -87,8 +82,8 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 
 // Sender returns the RTPTransceiver's RTPSender if it has one
 func (t *RTPTransceiver) Sender() *RTPSender {
-	if v, ok := t.sender.Load().(*RTPSender); ok {
-		return v
+	if v := t.sender.Load(); v != nil {
+		return v.(*RTPSender)
 	}
 
 	return nil
@@ -114,8 +109,8 @@ func (t *RTPTransceiver) setSender(s *RTPSender) {
 
 // Receiver returns the RTPTransceiver's RTPReceiver if it has one
 func (t *RTPTransceiver) Receiver() *RTPReceiver {
-	if v, ok := t.receiver.Load().(*RTPReceiver); ok {
-		return v
+	if v := t.receiver.Load(); v != nil {
+		return v.(*RTPReceiver)
 	}
 
 	return nil
@@ -132,8 +127,8 @@ func (t *RTPTransceiver) SetMid(mid string) error {
 
 // Mid gets the Transceiver's mid value. When not already set, this value will be set in CreateOffer or CreateAnswer.
 func (t *RTPTransceiver) Mid() string {
-	if v, ok := t.mid.Load().(string); ok {
-		return v
+	if v := t.mid.Load(); v != nil {
+		return v.(string)
 	}
 	return ""
 }
@@ -145,10 +140,7 @@ func (t *RTPTransceiver) Kind() RTPCodecType {
 
 // Direction returns the RTPTransceiver's current direction
 func (t *RTPTransceiver) Direction() RTPTransceiverDirection {
-	if direction, ok := t.direction.Load().(RTPTransceiverDirection); ok {
-		return direction
-	}
-	return RTPTransceiverDirection(0)
+	return t.direction.Load().(RTPTransceiverDirection)
 }
 
 // Stop irreversibly stops the RTPTransceiver
@@ -165,7 +157,6 @@ func (t *RTPTransceiver) Stop() error {
 	}
 
 	t.setDirection(RTPTransceiverDirectionInactive)
-	t.setCurrentDirection(RTPTransceiverDirectionInactive)
 	return nil
 }
 
@@ -183,17 +174,6 @@ func (t *RTPTransceiver) setReceiver(r *RTPReceiver) {
 
 func (t *RTPTransceiver) setDirection(d RTPTransceiverDirection) {
 	t.direction.Store(d)
-}
-
-func (t *RTPTransceiver) setCurrentDirection(d RTPTransceiverDirection) {
-	t.currentDirection.Store(d)
-}
-
-func (t *RTPTransceiver) getCurrentDirection() RTPTransceiverDirection {
-	if v, ok := t.currentDirection.Load().(RTPTransceiverDirection); ok {
-		return v
-	}
-	return RTPTransceiverDirection(Unknown)
 }
 
 func (t *RTPTransceiver) setSendingTrack(track TrackLocal) error {
@@ -242,9 +222,9 @@ func satisfyTypeAndDirection(remoteKind RTPCodecType, remoteDirection RTPTransce
 	getPreferredDirections := func() []RTPTransceiverDirection {
 		switch remoteDirection {
 		case RTPTransceiverDirectionSendrecv:
-			return []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendrecv, RTPTransceiverDirectionSendonly}
-		case RTPTransceiverDirectionSendonly:
 			return []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendrecv}
+		case RTPTransceiverDirectionSendonly:
+			return []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly}
 		case RTPTransceiverDirectionRecvonly:
 			return []RTPTransceiverDirection{RTPTransceiverDirectionSendonly, RTPTransceiverDirectionSendrecv}
 		default:

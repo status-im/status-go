@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 // Package extension implements the extension values in the ClientHello/ServerHello
 package extension
 

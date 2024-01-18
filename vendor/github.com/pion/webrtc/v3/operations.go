@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package webrtc
 
 import (
@@ -69,10 +66,7 @@ func (o *operations) pop() func() {
 
 	e := o.ops.Front()
 	o.ops.Remove(e)
-	if op, ok := e.Value.(operation); ok {
-		return op
-	}
-	return nil
+	return e.Value.(operation)
 }
 
 func (o *operations) start() {

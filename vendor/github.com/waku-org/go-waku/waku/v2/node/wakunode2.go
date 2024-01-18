@@ -11,7 +11,6 @@ import (
 	golog "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p"
 	"go.uber.org/zap"
-	"golang.org/x/exp/maps"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -200,7 +199,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	w.log = params.logger.Named("node2")
 	w.wg = &sync.WaitGroup{}
 	w.keepAliveFails = make(map[peer.ID]int)
-	w.wakuFlag = enr.NewWakuEnrBitfield(w.opts.enableLightPush, w.opts.enableFilterFullNode || w.opts.enableLegacyFilter, w.opts.enableStore, w.opts.enableRelay)
+	w.wakuFlag = enr.NewWakuEnrBitfield(w.opts.enableLightPush, w.opts.enableLegacyFilter, w.opts.enableStore, w.opts.enableRelay)
 	w.circuitRelayNodes = make(chan peer.AddrInfo)
 	w.metrics = newMetrics(params.prometheusReg)
 
@@ -325,13 +324,13 @@ func (w *WakuNode) watchMultiaddressChanges(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-first:
-			addr := maps.Keys(addrsSet)
+			addr := utils.MultiAddrFromSet(addrsSet)
 			w.log.Info("listening", logging.MultiAddrs("multiaddr", addr...))
 		case <-w.addressChangesSub.Out():
 			newAddrs := utils.MultiAddrSet(w.ListenAddresses()...)
-			if !maps.Equal(addrsSet, newAddrs) {
+			if !utils.MultiAddrSetEquals(addrsSet, newAddrs) {
 				addrsSet = newAddrs
-				addrs := maps.Keys(addrsSet)
+				addrs := utils.MultiAddrFromSet(addrsSet)
 				w.log.Info("listening addresses update received", logging.MultiAddrs("multiaddr", addrs...))
 				err := w.setupENR(ctx, addrs)
 				if err != nil {
@@ -344,7 +343,7 @@ func (w *WakuNode) watchMultiaddressChanges(ctx context.Context) {
 
 // Start initializes all the protocols that were setup in the WakuNode
 func (w *WakuNode) Start(ctx context.Context) error {
-	connGater := peermanager.NewConnectionGater(w.opts.maxConnectionsPerIP, w.log)
+	connGater := peermanager.NewConnectionGater(w.log)
 
 	ctx, cancel := context.WithCancel(ctx)
 	w.cancel = cancel
@@ -562,7 +561,7 @@ func (w *WakuNode) Host() host.Host {
 
 // ID returns the base58 encoded ID from the host
 func (w *WakuNode) ID() string {
-	return w.host.ID().String()
+	return w.host.ID().Pretty()
 }
 
 func (w *WakuNode) watchENRChanges(ctx context.Context) {

@@ -14,10 +14,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/transport"
-
 	ma "github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
-	mafmt "github.com/multiformats/go-multiaddr-fmt"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
 
@@ -66,19 +64,6 @@ var (
 	// forming a connection with a peer.
 	ErrGaterDisallowedConnection = errors.New("gater disallows connection to peer")
 )
-
-// ErrQUICDraft29 wraps ErrNoTransport and provide a more meaningful error message
-var ErrQUICDraft29 errQUICDraft29
-
-type errQUICDraft29 struct{}
-
-func (errQUICDraft29) Error() string {
-	return "QUIC draft-29 has been removed, QUIC (RFC 9000) is accessible with /quic-v1"
-}
-
-func (errQUICDraft29) Unwrap() error {
-	return ErrNoTransport
-}
 
 // DialAttempts governs how many times a goroutine will try to dial a given peer.
 // Note: this is down to one, as we have _too many dials_ atm. To add back in,
@@ -216,8 +201,7 @@ func (db *DialBackoff) cleanup() {
 	}
 }
 
-// DialPeer connects to a peer. Use network.WithForceDirectDial to force a
-// direct connection.
+// DialPeer connects to a peer.
 //
 // The idea is that the client of Swarm does not need to know what network
 // the connection will happen over. Swarm can use whichever it choses.
@@ -247,14 +231,15 @@ func (s *Swarm) dialPeer(ctx context.Context, p peer.ID) (*Conn, error) {
 		return nil, ErrDialToSelf
 	}
 
-	// check if we already have an open (usable) connection.
-	conn := s.bestAcceptableConnToPeer(ctx, p)
-	if conn != nil {
-		return conn, nil
+	// check if we already have an open (usable) connection first, or can't have a usable
+	// connection.
+	conn, err := s.bestAcceptableConnToPeer(ctx, p)
+	if conn != nil || err != nil {
+		return conn, err
 	}
 
 	if s.gater != nil && !s.gater.InterceptPeerDial(p) {
-		log.Debugf("gater disallowed outbound connection to peer %s", p)
+		log.Debugf("gater disallowed outbound connection to peer %s", p.Pretty())
 		return nil, &DialError{Peer: p, Cause: ErrGaterDisallowedConnection}
 	}
 
@@ -295,47 +280,68 @@ func (s *Swarm) dialWorkerLoop(p peer.ID, reqch <-chan dialRequest) {
 	w.loop()
 }
 
-func (s *Swarm) addrsForDial(ctx context.Context, p peer.ID) (goodAddrs []ma.Multiaddr, addrErrs []TransportError, err error) {
+func (s *Swarm) addrsForDial(ctx context.Context, p peer.ID) ([]ma.Multiaddr, error) {
 	peerAddrs := s.peers.Addrs(p)
 	if len(peerAddrs) == 0 {
-		return nil, nil, ErrNoAddresses
+		return nil, ErrNoAddresses
+	}
+
+	peerAddrsAfterTransportResolved := make([]ma.Multiaddr, 0, len(peerAddrs))
+	for _, a := range peerAddrs {
+		tpt := s.TransportForDialing(a)
+		resolver, ok := tpt.(transport.Resolver)
+		if ok {
+			resolvedAddrs, err := resolver.Resolve(ctx, a)
+			if err != nil {
+				log.Warnf("Failed to resolve multiaddr %s by transport %v: %v", a, tpt, err)
+				continue
+			}
+			peerAddrsAfterTransportResolved = append(peerAddrsAfterTransportResolved, resolvedAddrs...)
+		} else {
+			peerAddrsAfterTransportResolved = append(peerAddrsAfterTransportResolved, a)
+		}
 	}
 
 	// Resolve dns or dnsaddrs
-	resolved, err := s.resolveAddrs(ctx, peer.AddrInfo{ID: p, Addrs: peerAddrs})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	goodAddrs = ma.Unique(resolved)
-	goodAddrs, addrErrs = s.filterKnownUndialables(p, goodAddrs)
-	if forceDirect, _ := network.GetForceDirectDial(ctx); forceDirect {
-		goodAddrs = ma.FilterAddrs(goodAddrs, s.nonProxyAddr)
-	}
-
-	if len(goodAddrs) == 0 {
-		return nil, addrErrs, ErrNoGoodAddresses
-	}
-
-	s.peers.AddAddrs(p, goodAddrs, peerstore.TempAddrTTL)
-
-	return goodAddrs, addrErrs, nil
-}
-
-func (s *Swarm) resolveAddrs(ctx context.Context, pi peer.AddrInfo) ([]ma.Multiaddr, error) {
-	p2paddr, err := ma.NewMultiaddr("/" + ma.ProtocolWithCode(ma.P_P2P).Name + "/" + pi.ID.String())
+	resolved, err := s.resolveAddrs(ctx, peer.AddrInfo{
+		ID:    p,
+		Addrs: peerAddrsAfterTransportResolved,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	var resolveSteps int
+	goodAddrs := s.filterKnownUndialables(p, resolved)
+	if forceDirect, _ := network.GetForceDirectDial(ctx); forceDirect {
+		goodAddrs = ma.FilterAddrs(goodAddrs, s.nonProxyAddr)
+	}
+	goodAddrs = ma.Unique(goodAddrs)
+
+	if len(goodAddrs) == 0 {
+		return nil, ErrNoGoodAddresses
+	}
+
+	s.peers.AddAddrs(p, goodAddrs, peerstore.TempAddrTTL)
+
+	return goodAddrs, nil
+}
+
+func (s *Swarm) resolveAddrs(ctx context.Context, pi peer.AddrInfo) ([]ma.Multiaddr, error) {
+	proto := ma.ProtocolWithCode(ma.P_P2P).Name
+	p2paddr, err := ma.NewMultiaddr("/" + proto + "/" + pi.ID.Pretty())
+	if err != nil {
+		return nil, err
+	}
+
+	resolveSteps := 0
+
 	// Recursively resolve all addrs.
 	//
 	// While the toResolve list is non-empty:
 	// * Pop an address off.
 	// * If the address is fully resolved, add it to the resolved list.
 	// * Otherwise, resolve it and add the results to the "to resolve" list.
-	toResolve := append([]ma.Multiaddr{}, pi.Addrs...)
+	toResolve := append(([]ma.Multiaddr)(nil), pi.Addrs...)
 	resolved := make([]ma.Multiaddr, 0, len(pi.Addrs))
 	for len(toResolve) > 0 {
 		// pop the last addr off.
@@ -362,26 +368,6 @@ func (s *Swarm) resolveAddrs(ctx context.Context, pi peer.AddrInfo) ([]ma.Multia
 			continue
 		}
 
-		tpt := s.TransportForDialing(addr)
-		resolver, ok := tpt.(transport.Resolver)
-		if ok {
-			resolvedAddrs, err := resolver.Resolve(ctx, addr)
-			if err != nil {
-				log.Warnf("Failed to resolve multiaddr %s by transport %v: %v", addr, tpt, err)
-				continue
-			}
-			var added bool
-			for _, a := range resolvedAddrs {
-				if !addr.Equal(a) {
-					toResolve = append(toResolve, a)
-					added = true
-				}
-			}
-			if added {
-				continue
-			}
-		}
-
 		// otherwise, resolve it
 		reqaddr := addr.Encapsulate(p2paddr)
 		resaddrs, err := s.maResolver.Resolve(ctx, reqaddr)
@@ -402,7 +388,7 @@ func (s *Swarm) resolveAddrs(ctx context.Context, pi peer.AddrInfo) ([]ma.Multia
 	return resolved, nil
 }
 
-func (s *Swarm) dialNextAddr(ctx context.Context, p peer.ID, addr ma.Multiaddr, resch chan transport.DialUpdate) error {
+func (s *Swarm) dialNextAddr(ctx context.Context, p peer.ID, addr ma.Multiaddr, resch chan dialResult) error {
 	// check the dial backoff
 	if forceDirect, _ := network.GetForceDirectDial(ctx); !forceDirect {
 		if s.backf.Backoff(p, addr) {
@@ -416,12 +402,15 @@ func (s *Swarm) dialNextAddr(ctx context.Context, p peer.ID, addr ma.Multiaddr, 
 	return nil
 }
 
+func (s *Swarm) canDial(addr ma.Multiaddr) bool {
+	t := s.TransportForDialing(addr)
+	return t != nil && t.CanDial(addr)
+}
+
 func (s *Swarm) nonProxyAddr(addr ma.Multiaddr) bool {
 	t := s.TransportForDialing(addr)
 	return !t.Proxy()
 }
-
-var quicDraft29DialMatcher = mafmt.And(mafmt.IP, mafmt.Base(ma.P_UDP), mafmt.Base(ma.P_QUIC))
 
 // filterKnownUndialables takes a list of multiaddrs, and removes those
 // that we definitely don't want to dial: addresses configured to be blocked,
@@ -429,7 +418,7 @@ var quicDraft29DialMatcher = mafmt.And(mafmt.IP, mafmt.Base(ma.P_UDP), mafmt.Bas
 // addresses that we know to be our own, and addresses with a better tranport
 // available. This is an optimization to avoid wasting time on dials that we
 // know are going to fail or for which we have a better alternative.
-func (s *Swarm) filterKnownUndialables(p peer.ID, addrs []ma.Multiaddr) (goodAddrs []ma.Multiaddr, addrErrs []TransportError) {
+func (s *Swarm) filterKnownUndialables(p peer.ID, addrs []ma.Multiaddr) []ma.Multiaddr {
 	lisAddrs, _ := s.InterfaceListenAddresses()
 	var ourAddrs []ma.Multiaddr
 	for _, addr := range lisAddrs {
@@ -442,71 +431,35 @@ func (s *Swarm) filterKnownUndialables(p peer.ID, addrs []ma.Multiaddr) (goodAdd
 		})
 	}
 
-	addrErrs = make([]TransportError, 0, len(addrs))
+	// The order of these two filters is important. If we can only dial /webtransport,
+	// we don't want to filter /webtransport addresses out because the peer had a /quic-v1
+	// address
 
-	// The order of checking for transport and filtering low priority addrs is important. If we
-	// can only dial /webtransport, we don't want to filter /webtransport addresses out because
-	// the peer had a /quic-v1 address
-
-	// filter addresses with no transport
-	addrs = ma.FilterAddrs(addrs, func(a ma.Multiaddr) bool {
-		if s.TransportForDialing(a) == nil {
-			e := ErrNoTransport
-			// We used to support QUIC draft-29 for a long time.
-			// Provide a more useful error when attempting to dial a QUIC draft-29 address.
-			if quicDraft29DialMatcher.Matches(a) {
-				e = ErrQUICDraft29
-			}
-			addrErrs = append(addrErrs, TransportError{Address: a, Cause: e})
-			return false
-		}
-		return true
-	})
+	// filter addresses we cannot dial
+	addrs = ma.FilterAddrs(addrs, s.canDial)
 
 	// filter low priority addresses among the addresses we can dial
-	// We don't return an error for these addresses
 	addrs = filterLowPriorityAddresses(addrs)
 
 	// remove black holed addrs
-	addrs, blackHoledAddrs := s.bhd.FilterAddrs(addrs)
-	for _, a := range blackHoledAddrs {
-		addrErrs = append(addrErrs, TransportError{Address: a, Cause: ErrDialRefusedBlackHole})
-	}
+	addrs = s.bhd.FilterAddrs(addrs)
 
 	return ma.FilterAddrs(addrs,
-		// Linux and BSD treat an unspecified address when dialing as a localhost address.
-		// Windows doesn't support this. We filter all such addresses out because peers
-		// listening on unspecified addresses will advertise more specific addresses.
-		// https://unix.stackexchange.com/a/419881
-		// https://superuser.com/a/1755455
-		func(addr ma.Multiaddr) bool {
-			return !manet.IsIPUnspecified(addr)
-		},
-		func(addr ma.Multiaddr) bool {
-			if ma.Contains(ourAddrs, addr) {
-				addrErrs = append(addrErrs, TransportError{Address: addr, Cause: ErrDialToSelf})
-				return false
-			}
-			return true
-		},
+		func(addr ma.Multiaddr) bool { return !ma.Contains(ourAddrs, addr) },
 		// TODO: Consider allowing link-local addresses
 		func(addr ma.Multiaddr) bool { return !manet.IsIP6LinkLocal(addr) },
 		func(addr ma.Multiaddr) bool {
-			if s.gater != nil && !s.gater.InterceptAddrDial(p, addr) {
-				addrErrs = append(addrErrs, TransportError{Address: addr, Cause: ErrGaterDisallowedConnection})
-				return false
-			}
-			return true
+			return s.gater == nil || s.gater.InterceptAddrDial(p, addr)
 		},
-	), addrErrs
+	)
 }
 
 // limitedDial will start a dial to the given peer when
 // it is able, respecting the various different types of rate
 // limiting that occur without using extra goroutines per addr
-func (s *Swarm) limitedDial(ctx context.Context, p peer.ID, a ma.Multiaddr, resp chan transport.DialUpdate) {
+func (s *Swarm) limitedDial(ctx context.Context, p peer.ID, a ma.Multiaddr, resp chan dialResult) {
 	timeout := s.dialTimeout
-	if manet.IsPrivateAddr(a) && s.dialTimeoutLocal < s.dialTimeout {
+	if lowTimeoutFilters.AddrBlocked(a) && s.dialTimeoutLocal < s.dialTimeout {
 		timeout = s.dialTimeoutLocal
 	}
 	s.limiter.AddDialJob(&dialJob{
@@ -519,7 +472,7 @@ func (s *Swarm) limitedDial(ctx context.Context, p peer.ID, a ma.Multiaddr, resp
 }
 
 // dialAddr is the actual dial for an addr, indirectly invoked through the limiter
-func (s *Swarm) dialAddr(ctx context.Context, p peer.ID, addr ma.Multiaddr, updCh chan<- transport.DialUpdate) (transport.CapableConn, error) {
+func (s *Swarm) dialAddr(ctx context.Context, p peer.ID, addr ma.Multiaddr) (transport.CapableConn, error) {
 	// Just to double check. Costs nothing.
 	if s.local == p {
 		return nil, ErrDialToSelf
@@ -537,13 +490,7 @@ func (s *Swarm) dialAddr(ctx context.Context, p peer.ID, addr ma.Multiaddr, updC
 	}
 
 	start := time.Now()
-	var connC transport.CapableConn
-	var err error
-	if du, ok := tpt.(transport.DialUpdater); ok {
-		connC, err = du.DialWithUpdates(ctx, addr, p, updCh)
-	} else {
-		connC, err = tpt.Dial(ctx, addr, p)
-	}
+	connC, err := tpt.Dial(ctx, addr, p)
 
 	// We're recording any error as a failure here.
 	// Notably, this also applies to cancelations (i.e. if another dial attempt was faster).
@@ -552,7 +499,7 @@ func (s *Swarm) dialAddr(ctx context.Context, p peer.ID, addr ma.Multiaddr, updC
 
 	if err != nil {
 		if s.metricsTracer != nil {
-			s.metricsTracer.FailedDialing(addr, err, context.Cause(ctx))
+			s.metricsTracer.FailedDialing(addr, err)
 		}
 		return nil, err
 	}

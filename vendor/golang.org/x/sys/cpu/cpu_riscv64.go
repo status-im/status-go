@@ -7,6 +7,6 @@
 
 package cpu
 
-const cacheLineSize = 64
+const cacheLineSize = 32
 
 func initOptions() {}

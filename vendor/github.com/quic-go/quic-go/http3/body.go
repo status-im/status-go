@@ -63,8 +63,7 @@ func (r *body) wasStreamHijacked() bool {
 }
 
 func (r *body) Read(b []byte) (int, error) {
-	n, err := r.str.Read(b)
-	return n, maybeReplaceError(err)
+	return r.str.Read(b)
 }
 
 func (r *body) Close() error {
@@ -107,7 +106,7 @@ func (r *hijackableBody) Read(b []byte) (int, error) {
 	if err != nil {
 		r.requestDone()
 	}
-	return n, maybeReplaceError(err)
+	return n, err
 }
 
 func (r *hijackableBody) requestDone() {

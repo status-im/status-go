@@ -93,55 +93,55 @@ func (s *ServerURLSuite) TestServer_MakeBaseURL() {
 }
 
 func (s *ServerURLSuite) TestServer_MakeImageServerURL() {
-	s.Require().Equal(baseURLWithCustomPort+"/messages/", s.server.MakeImageServerURL())   // nolint: goconst
-	s.testNoPort(baseURLWithDefaultPort+"/messages/", s.serverNoPort.MakeImageServerURL()) // nolint: goconst
+	s.Require().Equal(baseURLWithCustomPort+"/messages/", s.server.MakeImageServerURL())
+	s.testNoPort(baseURLWithDefaultPort+"/messages/", s.serverNoPort.MakeImageServerURL())
 }
 
 func (s *ServerURLSuite) TestServer_MakeImageURL() {
 	s.Require().Equal(
-		baseURLWithCustomPort+"/messages/images?messageId=0x10aded70ffee", // nolint: goconst
+		baseURLWithCustomPort+"/messages/images?messageId=0x10aded70ffee",
 		s.server.MakeImageURL("0x10aded70ffee"))
 
 	s.testNoPort(
-		baseURLWithDefaultPort+"/messages/images?messageId=0x10aded70ffee", // nolint: goconst
+		baseURLWithDefaultPort+"/messages/images?messageId=0x10aded70ffee",
 		s.serverNoPort.MakeImageURL("0x10aded70ffee"))
 }
 
 func (s *ServerURLSuite) TestServer_MakeLinkPreviewThumbnailURL() {
 	s.Require().Equal(
-		baseURLWithCustomPort+"/link-preview/thumbnail?message-id=99&url=https%3A%2F%2Fgithub.com", // nolint: goconst
+		baseURLWithCustomPort+"/link-preview/thumbnail?message-id=99&url=https%3A%2F%2Fgithub.com",
 		s.server.MakeLinkPreviewThumbnailURL("99", "https://github.com"))
 
 	s.testNoPort(
-		baseURLWithDefaultPort+"/link-preview/thumbnail?message-id=99&url=https%3A%2F%2Fgithub.com", // nolint: goconst
+		baseURLWithDefaultPort+"/link-preview/thumbnail?message-id=99&url=https%3A%2F%2Fgithub.com",
 		s.serverNoPort.MakeLinkPreviewThumbnailURL("99", "https://github.com"))
 }
 
 func (s *ServerURLSuite) TestServer_MakeStatusLinkPreviewThumbnailURL() {
 	s.Require().Equal(
-		baseURLWithCustomPort+"/status-link-preview/thumbnail?image-id=contact-icon&message-id=99&url=https%3A%2F%2Fstatus.app", // nolint: goconst
+		baseURLWithCustomPort+"/status-link-preview/thumbnail?image-id=contact-icon&message-id=99&url=https%3A%2F%2Fstatus.app",
 		s.server.MakeStatusLinkPreviewThumbnailURL("99", "https://status.app", common.MediaServerContactIcon))
 
 	s.testNoPort(
-		baseURLWithDefaultPort+"/status-link-preview/thumbnail?image-id=contact-icon&message-id=99&url=https%3A%2F%2Fstatus.app", // nolint: goconst
+		baseURLWithDefaultPort+"/status-link-preview/thumbnail?image-id=contact-icon&message-id=99&url=https%3A%2F%2Fstatus.app",
 		s.serverNoPort.MakeStatusLinkPreviewThumbnailURL("99", "https://status.app", common.MediaServerContactIcon))
 }
 
 func (s *ServerURLSuite) TestServer_MakeAudioURL() {
 	s.Require().Equal(
-		baseURLWithCustomPort+"/messages/audio?messageId=0xde1e7ebee71e", // nolint: goconst
+		baseURLWithCustomPort+"/messages/audio?messageId=0xde1e7ebee71e",
 		s.server.MakeAudioURL("0xde1e7ebee71e"))
 	s.testNoPort(
-		baseURLWithDefaultPort+"/messages/audio?messageId=0xde1e7ebee71e", // nolint: goconst
+		baseURLWithDefaultPort+"/messages/audio?messageId=0xde1e7ebee71e",
 		s.serverNoPort.MakeAudioURL("0xde1e7ebee71e"))
 }
 
 func (s *ServerURLSuite) TestServer_MakeStickerURL() {
 	s.Require().Equal(
-		baseURLWithCustomPort+"/ipfs?hash=0xdeadbeef4ac0", // nolint: goconst
+		baseURLWithCustomPort+"/ipfs?hash=0xdeadbeef4ac0",
 		s.server.MakeStickerURL("0xdeadbeef4ac0"))
 	s.testNoPort(
-		baseURLWithDefaultPort+"/ipfs?hash=0xdeadbeef4ac0", // nolint: goconst
+		baseURLWithDefaultPort+"/ipfs?hash=0xdeadbeef4ac0",
 		s.serverNoPort.MakeStickerURL("0xdeadbeef4ac0"))
 }
 

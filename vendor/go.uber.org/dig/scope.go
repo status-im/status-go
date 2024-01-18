@@ -121,12 +121,7 @@ func (s *Scope) Scope(name string, opts ...ScopeOption) *Scope {
 	child.recoverFromPanics = s.recoverFromPanics
 
 	// child copies the parent's graph nodes.
-	for _, node := range s.gh.nodes {
-		child.gh.nodes = append(child.gh.nodes, node)
-		if ctrNode, ok := node.Wrapped.(*constructorNode); ok {
-			ctrNode.CopyOrder(s, child)
-		}
-	}
+	child.gh.nodes = append(child.gh.nodes, s.gh.nodes...)
 
 	for _, opt := range opts {
 		opt.noScopeOption()

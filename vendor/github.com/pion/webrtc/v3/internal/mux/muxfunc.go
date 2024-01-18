@@ -1,13 +1,10 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package mux
 
 // MatchFunc allows custom logic for mapping packets to an Endpoint
 type MatchFunc func([]byte) bool
 
 // MatchAll always returns true
-func MatchAll([]byte) bool {
+func MatchAll(b []byte) bool {
 	return true
 }
 

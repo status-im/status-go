@@ -13,10 +13,10 @@ import (
 const packetsBeforeAck = 2
 
 type receivedPacketTracker struct {
-	largestObserved         protocol.PacketNumber
-	ignoreBelow             protocol.PacketNumber
-	largestObservedRcvdTime time.Time
-	ect0, ect1, ecnce       uint64
+	largestObserved             protocol.PacketNumber
+	ignoreBelow                 protocol.PacketNumber
+	largestObservedReceivedTime time.Time
+	ect0, ect1, ecnce           uint64
 
 	packetHistory *receivedPacketHistory
 
@@ -45,25 +45,25 @@ func newReceivedPacketTracker(
 	}
 }
 
-func (h *receivedPacketTracker) ReceivedPacket(pn protocol.PacketNumber, ecn protocol.ECN, rcvTime time.Time, ackEliciting bool) error {
-	if isNew := h.packetHistory.ReceivedPacket(pn); !isNew {
-		return fmt.Errorf("recevedPacketTracker BUG: ReceivedPacket called for old / duplicate packet %d", pn)
+func (h *receivedPacketTracker) ReceivedPacket(packetNumber protocol.PacketNumber, ecn protocol.ECN, rcvTime time.Time, shouldInstigateAck bool) error {
+	if isNew := h.packetHistory.ReceivedPacket(packetNumber); !isNew {
+		return fmt.Errorf("recevedPacketTracker BUG: ReceivedPacket called for old / duplicate packet %d", packetNumber)
 	}
 
-	isMissing := h.isMissing(pn)
-	if pn >= h.largestObserved {
-		h.largestObserved = pn
-		h.largestObservedRcvdTime = rcvTime
+	isMissing := h.isMissing(packetNumber)
+	if packetNumber >= h.largestObserved {
+		h.largestObserved = packetNumber
+		h.largestObservedReceivedTime = rcvTime
 	}
 
-	if ackEliciting {
+	if shouldInstigateAck {
 		h.hasNewAck = true
 	}
-	if ackEliciting {
-		h.maybeQueueACK(pn, rcvTime, isMissing)
+	if shouldInstigateAck {
+		h.maybeQueueAck(packetNumber, rcvTime, isMissing)
 	}
-	//nolint:exhaustive // Only need to count ECT(0), ECT(1) and ECNCE.
 	switch ecn {
+	case protocol.ECNNon:
 	case protocol.ECT0:
 		h.ect0++
 	case protocol.ECT1:
@@ -76,14 +76,14 @@ func (h *receivedPacketTracker) ReceivedPacket(pn protocol.PacketNumber, ecn pro
 
 // IgnoreBelow sets a lower limit for acknowledging packets.
 // Packets with packet numbers smaller than p will not be acked.
-func (h *receivedPacketTracker) IgnoreBelow(pn protocol.PacketNumber) {
-	if pn <= h.ignoreBelow {
+func (h *receivedPacketTracker) IgnoreBelow(p protocol.PacketNumber) {
+	if p <= h.ignoreBelow {
 		return
 	}
-	h.ignoreBelow = pn
-	h.packetHistory.DeleteBelow(pn)
+	h.ignoreBelow = p
+	h.packetHistory.DeleteBelow(p)
 	if h.logger.Debug() {
-		h.logger.Debugf("\tIgnoring all packets below %d.", pn)
+		h.logger.Debugf("\tIgnoring all packets below %d.", p)
 	}
 }
 
@@ -103,8 +103,8 @@ func (h *receivedPacketTracker) hasNewMissingPackets() bool {
 	return highestRange.Smallest > h.lastAck.LargestAcked()+1 && highestRange.Len() == 1
 }
 
-// maybeQueueACK queues an ACK, if necessary.
-func (h *receivedPacketTracker) maybeQueueACK(pn protocol.PacketNumber, rcvTime time.Time, wasMissing bool) {
+// maybeQueueAck queues an ACK, if necessary.
+func (h *receivedPacketTracker) maybeQueueAck(pn protocol.PacketNumber, rcvTime time.Time, wasMissing bool) {
 	// always acknowledge the first packet
 	if h.lastAck == nil {
 		if !h.ackQueued {
@@ -175,7 +175,7 @@ func (h *receivedPacketTracker) GetAckFrame(onlyIfQueued bool) *wire.AckFrame {
 		ack = &wire.AckFrame{}
 	}
 	ack.Reset()
-	ack.DelayTime = utils.Max(0, now.Sub(h.largestObservedRcvdTime))
+	ack.DelayTime = utils.Max(0, now.Sub(h.largestObservedReceivedTime))
 	ack.ECT0 = h.ect0
 	ack.ECT1 = h.ect1
 	ack.ECNCE = h.ecnce

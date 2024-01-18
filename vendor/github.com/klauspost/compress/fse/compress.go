@@ -199,8 +199,7 @@ func (s *Scratch) compress(src []byte) error {
 	c2.flush(s.actualTableLog)
 	c1.flush(s.actualTableLog)
 
-	s.bw.close()
-	return nil
+	return s.bw.close()
 }
 
 // writeCount will write the normalized histogram count to header.

@@ -21,7 +21,7 @@ func TestCryptoOnRamps_Get(t *testing.T) {
 		{options: &CryptoOnRampOptions{dataSourceType: DataSourceStatic}},
 		{options: &CryptoOnRampOptions{
 			dataSourceType: DataSourceHTTP,
-			dataSource:     s.URL + "/ramps.json", // nolint: goconst
+			dataSource:     s.URL + "/ramps.json",
 		}},
 	}
 
@@ -40,7 +40,7 @@ func TestCryptoOnRampManager_hasCacheExpired(t *testing.T) {
 
 	corm := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceHTTP,
-		dataSource:     s.URL + "/ramps.json", // nolint: goconst
+		dataSource:     s.URL + "/ramps.json",
 	})
 	nt := time.Time{}.Add(30 * time.Minute)
 

@@ -28,11 +28,10 @@ type chunkReconfig struct {
 	paramB param
 }
 
-// Reconfigure chunk errors
 var (
-	ErrChunkParseParamTypeFailed        = errors.New("failed to parse param type")
-	ErrChunkMarshalParamAReconfigFailed = errors.New("unable to marshal parameter A for reconfig")
-	ErrChunkMarshalParamBReconfigFailed = errors.New("unable to marshal parameter B for reconfig")
+	errChunkParseParamTypeFailed        = errors.New("failed to parse param type")
+	errChunkMarshalParamAReconfigFailed = errors.New("unable to marshal parameter A for reconfig")
+	errChunkMarshalParamBReconfigFailed = errors.New("unable to marshal parameter B for reconfig")
 )
 
 func (c *chunkReconfig) unmarshal(raw []byte) error {
@@ -41,7 +40,7 @@ func (c *chunkReconfig) unmarshal(raw []byte) error {
 	}
 	pType, err := parseParamType(c.raw)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrChunkParseParamTypeFailed, err) //nolint:errorlint
+		return fmt.Errorf("%w: %v", errChunkParseParamTypeFailed, err)
 	}
 	a, err := buildParam(pType, c.raw)
 	if err != nil {
@@ -54,7 +53,7 @@ func (c *chunkReconfig) unmarshal(raw []byte) error {
 	if len(c.raw) > offset {
 		pType, err := parseParamType(c.raw[offset:])
 		if err != nil {
-			return fmt.Errorf("%w: %v", ErrChunkParseParamTypeFailed, err) //nolint:errorlint
+			return fmt.Errorf("%w: %v", errChunkParseParamTypeFailed, err)
 		}
 		b, err := buildParam(pType, c.raw[offset:])
 		if err != nil {
@@ -69,7 +68,7 @@ func (c *chunkReconfig) unmarshal(raw []byte) error {
 func (c *chunkReconfig) marshal() ([]byte, error) {
 	out, err := c.paramA.marshal()
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrChunkMarshalParamAReconfigFailed, err) //nolint:errorlint
+		return nil, fmt.Errorf("%w: %v", errChunkMarshalParamAReconfigFailed, err)
 	}
 	if c.paramB != nil {
 		// Pad param A
@@ -77,7 +76,7 @@ func (c *chunkReconfig) marshal() ([]byte, error) {
 
 		outB, err := c.paramB.marshal()
 		if err != nil {
-			return nil, fmt.Errorf("%w: %v", ErrChunkMarshalParamBReconfigFailed, err) //nolint:errorlint
+			return nil, fmt.Errorf("%w: %v", errChunkMarshalParamBReconfigFailed, err)
 		}
 
 		out = append(out, outB...)

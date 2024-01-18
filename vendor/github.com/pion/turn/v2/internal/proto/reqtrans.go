@@ -27,7 +27,7 @@ func (p Protocol) String() string {
 //
 // This attribute is used by the client to request a specific transport
 // protocol for the allocated transport address. RFC 5766 only allows the use of
-// code point 17 (User Datagram Protocol).
+// codepoint 17 (User Datagram Protocol).
 //
 // RFC 5766 Section 14.7
 type RequestedTransport struct {
