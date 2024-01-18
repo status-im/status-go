@@ -26,6 +26,15 @@ redirect_stdout() {
   fi
 }
 
+remove_color_sequences() {
+  if [[ "${CI}" == 'true' ]];
+  then
+    sed 's/\x1b\[[0-9;]*m//g'
+  else
+    cat
+  fi
+}
+
 last_failing_exit_code=0
 
 for package in ${UNIT_TEST_PACKAGES}; do
@@ -37,6 +46,7 @@ for package in ${UNIT_TEST_PACKAGES}; do
     -timeout "${UNIT_TEST_PACKAGE_TIMEOUT}" \
     -count "${UNIT_TEST_COUNT}" \
     -tags "${BUILD_TAGS}" | \
+    remove_color_sequences | \
     redirect_stdout "${output_file}"
   go_test_exit=$?
 
