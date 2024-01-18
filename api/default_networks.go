@@ -60,6 +60,24 @@ var goerli = params.Network{
 	RelatedChainID:         mainnetChainID,
 }
 
+var sepolia = params.Network{
+	ChainID:                sepoliaChainID,
+	ChainName:              "Ethereum Mainnet",
+	RPCURL:                 "https://sepolia-archival.rpc.grove.city/v1/",
+	FallbackURL:            "https://sepolia.infura.io/v3/",
+	BlockExplorerURL:       "https://sepolia.etherscan.io/",
+	IconURL:                "network/Network=Testnet",
+	ChainColor:             "#51D0F0",
+	ShortName:              "eth",
+	NativeCurrencyName:     "Ether",
+	NativeCurrencySymbol:   "ETH",
+	NativeCurrencyDecimals: 18,
+	IsTest:                 true,
+	Layer:                  1,
+	Enabled:                true,
+	RelatedChainID:         mainnetChainID,
+}
+
 var optimism = params.Network{
 	ChainID:                optimismChainID,
 	ChainName:              "Optimism",
@@ -95,6 +113,7 @@ var optimismGoerli = params.Network{
 	Enabled:                false,
 	RelatedChainID:         optimismChainID,
 }
+
 var arbitrum = params.Network{
 	ChainID:                arbitrumChainID,
 	ChainName:              "Arbitrum",
@@ -131,13 +150,33 @@ var arbitrumGoerli = params.Network{
 	RelatedChainID:         arbitrumChainID,
 }
 
+var arbitrumSepolia = params.Network{
+	ChainID:                arbitrumSepoliaChainID,
+	ChainName:              "Arbitrum",
+	RPCURL:                 "https://arbitrum-sepolia.infura.io/v3/",
+	FallbackURL:            "",
+	BlockExplorerURL:       "https://sepolia-explorer.arbitrum.io/",
+	IconURL:                "network/Network=Testnet",
+	ChainColor:             "#51D0F0",
+	ShortName:              "arb",
+	NativeCurrencyName:     "Ether",
+	NativeCurrencySymbol:   "ETH",
+	NativeCurrencyDecimals: 18,
+	IsTest:                 true,
+	Layer:                  2,
+	Enabled:                false,
+	RelatedChainID:         arbitrumChainID,
+}
+
 var defaultNetworks = []params.Network{
 	mainnet,
 	goerli,
+	sepolia,
 	optimism,
 	optimismGoerli,
 	arbitrum,
 	arbitrumGoerli,
+	arbitrumSepolia,
 }
 
 var mainnetGanacheTokenOverrides = params.TokenOverride{
