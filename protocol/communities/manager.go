@@ -3703,8 +3703,8 @@ func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, msgs [
 
 	archiveDir := m.torrentConfig.DataDir + "/" + communityID.String()
 	torrentDir := m.torrentConfig.TorrentDir
-	indexPath := archiveDir + "/index" // nolint: goconst
-	dataPath := archiveDir + "/data"   // nolint: goconst
+	indexPath := archiveDir + "/index"
+	dataPath := archiveDir + "/data"
 
 	wakuMessageArchiveIndexProto := &protobuf.WakuMessageArchiveIndex{}
 	wakuMessageArchiveIndex := make(map[string]*protobuf.WakuMessageArchiveIndexMetadata)
@@ -4398,11 +4398,11 @@ func (m *Manager) torrentFile(communityID string) string {
 }
 
 func (m *Manager) archiveIndexFile(communityID string) string {
-	return m.torrentConfig.DataDir + "/" + communityID + "/index" // nolint: goconst
+	return m.torrentConfig.DataDir + "/" + communityID + "/index"
 }
 
 func (m *Manager) archiveDataFile(communityID string) string {
-	return m.torrentConfig.DataDir + "/" + communityID + "/data" // nolint: goconst
+	return m.torrentConfig.DataDir + "/" + communityID + "/data"
 }
 
 func topicsAsByteArrays(topics []types.TopicType) [][]byte {

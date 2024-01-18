@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package srtp
 
 import (
@@ -21,8 +18,6 @@ var (
 	errTooShortRTCP                  = errors.New("packet is too short to be rtcp packet")
 	errPayloadDiffers                = errors.New("payload differs")
 	errStartedChannelUsedIncorrectly = errors.New("started channel used incorrectly, should only be closed")
-	errBadIVLength                   = errors.New("bad iv length in xorBytesCTR")
-	errExceededMaxPackets            = errors.New("exceeded the maximum number of packets")
 
 	errStreamNotInited     = errors.New("stream has not been inited, unable to close")
 	errStreamAlreadyClosed = errors.New("stream is already closed")
@@ -30,16 +25,16 @@ var (
 	errFailedTypeAssertion = errors.New("failed to cast child")
 )
 
-type duplicatedError struct {
+type errorDuplicated struct {
 	Proto string // srtp or srtcp
 	SSRC  uint32
 	Index uint32 // sequence number or index
 }
 
-func (e *duplicatedError) Error() string {
+func (e *errorDuplicated) Error() string {
 	return fmt.Sprintf("%s ssrc=%d index=%d: %v", e.Proto, e.SSRC, e.Index, errDuplicated)
 }
 
-func (e *duplicatedError) Unwrap() error {
+func (e *errorDuplicated) Unwrap() error {
 	return errDuplicated
 }

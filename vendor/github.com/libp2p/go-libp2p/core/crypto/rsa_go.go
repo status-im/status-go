@@ -10,7 +10,8 @@ import (
 
 	pb "github.com/libp2p/go-libp2p/core/crypto/pb"
 	"github.com/libp2p/go-libp2p/core/internal/catch"
-	"github.com/libp2p/go-libp2p/internal/sha256"
+
+	"github.com/minio/sha256-simd"
 )
 
 // RsaPrivateKey is a rsa private key

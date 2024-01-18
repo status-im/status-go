@@ -1,17 +1,12 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package srtp
 
 import (
-	"errors"
 	"io"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/v2/packetio"
+	"github.com/pion/transport/packetio"
 )
 
 type streamSession interface {
@@ -25,8 +20,7 @@ type session struct {
 	localContext, remoteContext *Context
 	localOptions, remoteOptions []ContextOption
 
-	newStream           chan readStream
-	acceptStreamTimeout time.Time
+	newStream chan readStream
 
 	started chan interface{}
 	closed  chan interface{}
@@ -46,11 +40,10 @@ type session struct {
 // or directly pass the keys themselves.
 // After a Config is passed to a session it must not be modified.
 type Config struct {
-	Keys                SessionKeys
-	Profile             ProtectionProfile
-	BufferFactory       func(packetType packetio.BufferPacketType, ssrc uint32) io.ReadWriteCloser
-	LoggerFactory       logging.LoggerFactory
-	AcceptStreamTimeout time.Time
+	Keys          SessionKeys
+	Profile       ProtectionProfile
+	BufferFactory func(packetType packetio.BufferPacketType, ssrc uint32) io.ReadWriteCloser
+	LoggerFactory logging.LoggerFactory
 
 	// List of local/remote context options.
 	// ReplayProtection is enabled on remote context by default.
@@ -124,10 +117,6 @@ func (s *session) start(localMasterKey, localMasterSalt, remoteMasterKey, remote
 		return err
 	}
 
-	if err = s.nextConn.SetReadDeadline(s.acceptStreamTimeout); err != nil {
-		return err
-	}
-
 	go func() {
 		defer func() {
 			close(s.newStream)
@@ -143,7 +132,7 @@ func (s *session) start(localMasterKey, localMasterSalt, remoteMasterKey, remote
 			var i int
 			i, err = s.nextConn.Read(b)
 			if err != nil {
-				if !errors.Is(err, io.EOF) {
+				if err != io.EOF {
 					s.log.Error(err.Error())
 				}
 				return

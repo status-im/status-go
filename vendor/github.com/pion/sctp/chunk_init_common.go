@@ -53,11 +53,10 @@ const (
 	initOptionalVarHeaderLength = 4
 )
 
-// Init chunk errors
 var (
-	ErrInitChunkParseParamTypeFailed = errors.New("failed to parse param type")
-	ErrInitChunkUnmarshalParam       = errors.New("failed unmarshalling param in Init Chunk")
-	ErrInitAckMarshalParam           = errors.New("unable to marshal parameter for INIT/INITACK")
+	errInitChunkParseParamTypeFailed = errors.New("failed to parse param type")
+	errInitChunkUnmarshalParam       = errors.New("failed unmarshalling param in Init Chunk")
+	errInitAckMarshalParam           = errors.New("unable to marshal parameter for INIT/INITACK")
 )
 
 func (i *chunkInitCommon) unmarshal(raw []byte) error {
@@ -90,11 +89,11 @@ func (i *chunkInitCommon) unmarshal(raw []byte) error {
 		if remaining > initOptionalVarHeaderLength {
 			pType, err := parseParamType(raw[offset:])
 			if err != nil {
-				return fmt.Errorf("%w: %v", ErrInitChunkParseParamTypeFailed, err) //nolint:errorlint
+				return fmt.Errorf("%w: %v", errInitChunkParseParamTypeFailed, err)
 			}
 			p, err := buildParam(pType, raw[offset:])
 			if err != nil {
-				return fmt.Errorf("%w: %v", ErrInitChunkUnmarshalParam, err) //nolint:errorlint
+				return fmt.Errorf("%w: %v", errInitChunkUnmarshalParam, err)
 			}
 			i.params = append(i.params, p)
 			padding := getPadding(p.length())
@@ -118,7 +117,7 @@ func (i *chunkInitCommon) marshal() ([]byte, error) {
 	for idx, p := range i.params {
 		pp, err := p.marshal()
 		if err != nil {
-			return nil, fmt.Errorf("%w: %v", ErrInitAckMarshalParam, err) //nolint:errorlint
+			return nil, fmt.Errorf("%w: %v", errInitAckMarshalParam, err)
 		}
 
 		out = append(out, pp...)

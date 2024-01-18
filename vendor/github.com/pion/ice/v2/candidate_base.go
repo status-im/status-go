@@ -1,20 +1,16 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package ice
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"hash/crc32"
-	"io"
 	"net"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/pion/logging"
 	"github.com/pion/stun"
 )
 
@@ -41,8 +37,6 @@ type candidateBase struct {
 
 	foundationOverride string
 	priorityOverride   uint32
-
-	remoteCandidateCaches map[AddrPort]Candidate
 }
 
 // Done implements context.Context
@@ -66,7 +60,7 @@ func (c *candidateBase) Deadline() (deadline time.Time, ok bool) {
 }
 
 // Value implements context.Context
-func (c *candidateBase) Value(interface{}) interface{} {
+func (c *candidateBase) Value(key interface{}) interface{} {
 	return nil
 }
 
@@ -212,9 +206,9 @@ func (c *candidateBase) start(a *Agent, conn net.PacketConn, initializedCh <-cha
 }
 
 func (c *candidateBase) recvLoop(initializedCh <-chan struct{}) {
-	a := c.agent()
-
-	defer close(c.closedCh)
+	defer func() {
+		close(c.closedCh)
+	}()
 
 	select {
 	case <-initializedCh:
@@ -222,73 +216,47 @@ func (c *candidateBase) recvLoop(initializedCh <-chan struct{}) {
 		return
 	}
 
-	buf := make([]byte, receiveMTU)
+	log := c.agent().log
+	buffer := make([]byte, receiveMTU)
 	for {
-		n, srcAddr, err := c.conn.ReadFrom(buf)
+		n, srcAddr, err := c.conn.ReadFrom(buffer)
 		if err != nil {
-			if !(errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed)) {
-				a.log.Warnf("Failed to read from candidate %s: %v", c, err)
-			}
 			return
 		}
 
-		c.handleInboundPacket(buf[:n], srcAddr)
+		handleInboundCandidateMsg(c, c, buffer[:n], srcAddr, log)
 	}
 }
 
-func (c *candidateBase) validateSTUNTrafficCache(addr net.Addr) bool {
-	if candidate, ok := c.remoteCandidateCaches[toAddrPort(addr)]; ok {
-		candidate.seen(false)
-		return true
-	}
-	return false
-}
-
-func (c *candidateBase) addRemoteCandidateCache(candidate Candidate, srcAddr net.Addr) {
-	if c.validateSTUNTrafficCache(srcAddr) {
-		return
-	}
-	c.remoteCandidateCaches[toAddrPort(srcAddr)] = candidate
-}
-
-func (c *candidateBase) handleInboundPacket(buf []byte, srcAddr net.Addr) {
-	a := c.agent()
-
-	if stun.IsMessage(buf) {
+func handleInboundCandidateMsg(ctx context.Context, c Candidate, buffer []byte, srcAddr net.Addr, log logging.LeveledLogger) {
+	if stun.IsMessage(buffer) {
 		m := &stun.Message{
-			Raw: make([]byte, len(buf)),
+			Raw: make([]byte, len(buffer)),
 		}
-
 		// Explicitly copy raw buffer so Message can own the memory.
-		copy(m.Raw, buf)
-
+		copy(m.Raw, buffer)
 		if err := m.Decode(); err != nil {
-			a.log.Warnf("Failed to handle decode ICE from %s to %s: %v", c.addr(), srcAddr, err)
+			log.Warnf("Failed to handle decode ICE from %s to %s: %v", c.addr(), srcAddr, err)
 			return
 		}
-
-		if err := a.run(c, func(ctx context.Context, a *Agent) {
-			a.handleInbound(m, c, srcAddr)
-		}); err != nil {
-			a.log.Warnf("Failed to handle message: %v", err)
+		err := c.agent().run(ctx, func(ctx context.Context, agent *Agent) {
+			agent.handleInbound(m, c, srcAddr)
+		})
+		if err != nil {
+			log.Warnf("Failed to handle message: %v", err)
 		}
 
 		return
 	}
 
-	if !c.validateSTUNTrafficCache(srcAddr) {
-		remoteCandidate, valid := a.validateNonSTUNTraffic(c, srcAddr) //nolint:contextcheck
-		if !valid {
-			a.log.Warnf("Discarded message from %s, not a valid remote candidate", c.addr())
-			return
-		}
-		c.addRemoteCandidateCache(remoteCandidate, srcAddr)
+	if !c.agent().validateNonSTUNTraffic(c, srcAddr) {
+		log.Warnf("Discarded message from %s, not a valid remote candidate", c.addr())
+		return
 	}
 
-	// Note: This will return packetio.ErrFull if the buffer ever manages to fill up.
-	if _, err := a.buf.Write(buf); err != nil {
-		a.log.Warnf("Failed to write packet: %s", err)
-		return
+	// NOTE This will return packetio.ErrFull if the buffer ever manages to fill up.
+	if _, err := c.agent().buffer.Write(buffer); err != nil {
+		log.Warnf("failed to write packet")
 	}
 }
 
@@ -332,11 +300,7 @@ func (c *candidateBase) close() error {
 func (c *candidateBase) writeTo(raw []byte, dst Candidate) (int, error) {
 	n, err := c.conn.WriteTo(raw, dst.addr())
 	if err != nil {
-		// If the connection is closed, we should return the error
-		if errors.Is(err, io.ErrClosedPipe) {
-			return n, err
-		}
-		c.agent().log.Infof("%s: %v", errSendPacket, err)
+		c.agent().log.Warnf("%s: %v", errSendPacket, err)
 		return n, nil
 	}
 	c.seen(true)
@@ -372,16 +336,17 @@ func (c *candidateBase) Equal(other Candidate) bool {
 
 // String makes the candidateBase printable
 func (c *candidateBase) String() string {
-	return fmt.Sprintf("%s %s %s%s", c.NetworkType(), c.Type(), net.JoinHostPort(c.Address(), strconv.Itoa(c.Port())), c.relatedAddress)
+	return fmt.Sprintf("%s %s %s:%d%s", c.NetworkType(), c.Type(), c.Address(), c.Port(), c.relatedAddress)
 }
 
 // LastReceived returns a time.Time indicating the last time
 // this candidate was received
 func (c *candidateBase) LastReceived() time.Time {
-	if lastReceived, ok := c.lastReceived.Load().(time.Time); ok {
-		return lastReceived
+	lastReceived := c.lastReceived.Load()
+	if lastReceived == nil {
+		return time.Time{}
 	}
-	return time.Time{}
+	return lastReceived.(time.Time)
 }
 
 func (c *candidateBase) setLastReceived(t time.Time) {
@@ -391,10 +356,11 @@ func (c *candidateBase) setLastReceived(t time.Time) {
 // LastSent returns a time.Time indicating the last time
 // this candidate was sent
 func (c *candidateBase) LastSent() time.Time {
-	if lastSent, ok := c.lastSent.Load().(time.Time); ok {
-		return lastSent
+	lastSent := c.lastSent.Load()
+	if lastSent == nil {
+		return time.Time{}
 	}
-	return time.Time{}
+	return lastSent.(time.Time)
 }
 
 func (c *candidateBase) setLastSent(t time.Time) {
@@ -472,7 +438,7 @@ func UnmarshalCandidate(raw string) (Candidate, error) {
 	// Component
 	rawComponent, err := strconv.ParseUint(split[1], 10, 16)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errParseComponent, err) //nolint:errorlint
+		return nil, fmt.Errorf("%w: %v", errParseComponent, err)
 	}
 	component := uint16(rawComponent)
 
@@ -482,7 +448,7 @@ func UnmarshalCandidate(raw string) (Candidate, error) {
 	// Priority
 	priorityRaw, err := strconv.ParseUint(split[3], 10, 32)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errParsePriority, err) //nolint:errorlint
+		return nil, fmt.Errorf("%w: %v", errParsePriority, err)
 	}
 	priority := uint32(priorityRaw)
 
@@ -492,7 +458,7 @@ func UnmarshalCandidate(raw string) (Candidate, error) {
 	// Port
 	rawPort, err := strconv.ParseUint(split[5], 10, 16)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errParsePort, err) //nolint:errorlint
+		return nil, fmt.Errorf("%w: %v", errParsePort, err)
 	}
 	port := int(rawPort)
 	typ := split[7]
@@ -515,12 +481,12 @@ func UnmarshalCandidate(raw string) (Candidate, error) {
 			// RelatedPort
 			rawRelatedPort, parseErr := strconv.ParseUint(split[3], 10, 16)
 			if parseErr != nil {
-				return nil, fmt.Errorf("%w: %v", errParsePort, parseErr) //nolint:errorlint
+				return nil, fmt.Errorf("%w: %v", errParsePort, parseErr)
 			}
 			relatedPort = int(rawRelatedPort)
 		} else if split[0] == "tcptype" {
 			if len(split) < 2 {
-				return nil, fmt.Errorf("%w: incorrect length", errParseTCPType)
+				return nil, fmt.Errorf("%w: incorrect length", errParseTypType)
 			}
 
 			tcpType = NewTCPType(split[1])

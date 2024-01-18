@@ -12,7 +12,8 @@ import (
 
 	pb "github.com/libp2p/go-libp2p/core/crypto/pb"
 	"github.com/libp2p/go-libp2p/core/internal/catch"
-	"github.com/libp2p/go-libp2p/internal/sha256"
+
+	"github.com/minio/sha256-simd"
 )
 
 // ECDSAPrivateKey is an implementation of an ECDSA private key

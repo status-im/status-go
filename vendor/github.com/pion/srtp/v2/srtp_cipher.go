@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package srtp
 
 import "github.com/pion/rtp"
@@ -10,11 +7,10 @@ import "github.com/pion/rtp"
 type srtpCipher interface {
 	// authTagLen returns auth key length of the cipher.
 	// See the note below.
-	rtpAuthTagLen() (int, error)
-	rtcpAuthTagLen() (int, error)
+	authTagLen() int
 	// aeadAuthTagLen returns AEAD auth key length of the cipher.
 	// See the note below.
-	aeadAuthTagLen() (int, error)
+	aeadAuthTagLen() int
 	getRTCPIndex([]byte) uint32
 
 	encryptRTP([]byte, *rtp.Header, []byte, uint32) ([]byte, error)

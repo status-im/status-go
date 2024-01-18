@@ -105,14 +105,12 @@ func (l *ZapLogger) LogEvent(event Event) {
 			l.logError("error encountered while applying options",
 				zap.String("type", e.TypeName),
 				zap.Strings("stacktrace", e.StackTrace),
-				zap.Strings("moduletrace", e.ModuleTrace),
 				moduleField(e.ModuleName),
 				zap.Error(e.Err))
 		} else {
 			l.logEvent("supplied",
 				zap.String("type", e.TypeName),
 				zap.Strings("stacktrace", e.StackTrace),
-				zap.Strings("moduletrace", e.ModuleTrace),
 				moduleField(e.ModuleName),
 			)
 		}
@@ -121,7 +119,6 @@ func (l *ZapLogger) LogEvent(event Event) {
 			l.logEvent("provided",
 				zap.String("constructor", e.ConstructorName),
 				zap.Strings("stacktrace", e.StackTrace),
-				zap.Strings("moduletrace", e.ModuleTrace),
 				moduleField(e.ModuleName),
 				zap.String("type", rtype),
 				maybeBool("private", e.Private),
@@ -131,14 +128,12 @@ func (l *ZapLogger) LogEvent(event Event) {
 			l.logError("error encountered while applying options",
 				moduleField(e.ModuleName),
 				zap.Strings("stacktrace", e.StackTrace),
-				zap.Strings("moduletrace", e.ModuleTrace),
 				zap.Error(e.Err))
 		}
 	case *Replaced:
 		for _, rtype := range e.OutputTypeNames {
 			l.logEvent("replaced",
 				zap.Strings("stacktrace", e.StackTrace),
-				zap.Strings("moduletrace", e.ModuleTrace),
 				moduleField(e.ModuleName),
 				zap.String("type", rtype),
 			)
@@ -146,7 +141,6 @@ func (l *ZapLogger) LogEvent(event Event) {
 		if e.Err != nil {
 			l.logError("error encountered while replacing",
 				zap.Strings("stacktrace", e.StackTrace),
-				zap.Strings("moduletrace", e.ModuleTrace),
 				moduleField(e.ModuleName),
 				zap.Error(e.Err))
 		}
@@ -155,7 +149,6 @@ func (l *ZapLogger) LogEvent(event Event) {
 			l.logEvent("decorated",
 				zap.String("decorator", e.DecoratorName),
 				zap.Strings("stacktrace", e.StackTrace),
-				zap.Strings("moduletrace", e.ModuleTrace),
 				moduleField(e.ModuleName),
 				zap.String("type", rtype),
 			)
@@ -163,7 +156,6 @@ func (l *ZapLogger) LogEvent(event Event) {
 		if e.Err != nil {
 			l.logError("error encountered while applying options",
 				zap.Strings("stacktrace", e.StackTrace),
-				zap.Strings("moduletrace", e.ModuleTrace),
 				moduleField(e.ModuleName),
 				zap.Error(e.Err))
 		}

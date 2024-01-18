@@ -5,7 +5,6 @@ import (
 	"errors"
 	"math/big"
 	"net"
-	"runtime"
 	"sync"
 	"time"
 
@@ -25,7 +24,6 @@ type Conn struct {
 	queryInterval time.Duration
 	localNames    []string
 	queries       []query
-	ifaces        []net.Interface
 
 	closed chan interface{}
 }
@@ -41,13 +39,12 @@ type queryResult struct {
 }
 
 const (
+	inboundBufferSize    = 512
 	defaultQueryInterval = time.Second
 	destinationAddress   = "224.0.0.251:5353"
 	maxMessageRecords    = 3
 	responseTTL          = 120
 )
-
-var errNoPositiveMTUFound = errors.New("no positive MTU found")
 
 // Server establishes a mDNS connection over an existing conn
 func Server(conn *ipv4.PacketConn, config *Config) (*Conn, error) {
@@ -60,24 +57,11 @@ func Server(conn *ipv4.PacketConn, config *Config) (*Conn, error) {
 		return nil, err
 	}
 
-	inboundBufferSize := 0
 	joinErrCount := 0
-	ifacesToUse := make([]net.Interface, 0, len(ifaces))
-	for i, ifc := range ifaces {
+	for i := range ifaces {
 		if err = conn.JoinGroup(&ifaces[i], &net.UDPAddr{IP: net.IPv4(224, 0, 0, 251)}); err != nil {
 			joinErrCount++
-			continue
 		}
-
-		ifcCopy := ifc
-		ifacesToUse = append(ifacesToUse, ifcCopy)
-		if ifaces[i].MTU > inboundBufferSize {
-			inboundBufferSize = ifaces[i].MTU
-		}
-	}
-
-	if inboundBufferSize == 0 {
-		return nil, errNoPositiveMTUFound
 	}
 	if joinErrCount >= len(ifaces) {
 		return nil, errJoiningMulticastGroup
@@ -104,7 +88,6 @@ func Server(conn *ipv4.PacketConn, config *Config) (*Conn, error) {
 		socket:        conn,
 		dstAddr:       dstAddr,
 		localNames:    localNames,
-		ifaces:        ifacesToUse,
 		log:           loggerFactory.NewLogger("mdns"),
 		closed:        make(chan interface{}),
 	}
@@ -112,11 +95,7 @@ func Server(conn *ipv4.PacketConn, config *Config) (*Conn, error) {
 		c.queryInterval = config.QueryInterval
 	}
 
-	// https://www.rfc-editor.org/rfc/rfc6762.html#section-17
-	// Multicast DNS messages carried by UDP may be up to the IP MTU of the
-	// physical interface, less the space required for the IP header (20
-	// bytes for IPv4; 40 bytes for IPv6) and the UDP header (8 bytes).
-	go c.start(inboundBufferSize - 20 - 8)
+	go c.start()
 	return c, nil
 }
 
@@ -188,11 +167,7 @@ func interfaceForRemote(remote string) (net.IP, error) {
 		return nil, err
 	}
 
-	localAddr, ok := conn.LocalAddr().(*net.UDPAddr)
-	if !ok {
-		return nil, errFailedCast
-	}
-
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	if err := conn.Close(); err != nil {
 		return nil, err
 	}
@@ -224,24 +199,9 @@ func (c *Conn) sendQuestion(name string) {
 		return
 	}
 
-	c.writeToSocket(rawQuery)
-}
-
-const isWindows = runtime.GOOS == "windows"
-
-func (c *Conn) writeToSocket(b []byte) {
-	var wcm ipv4.ControlMessage
-	for i := range c.ifaces {
-		if isWindows {
-			if err := c.socket.SetMulticastInterface(&c.ifaces[i]); err != nil {
-				c.log.Warnf("Failed to set multicast interface for %d: %v", i, err)
-			}
-		} else {
-			wcm.IfIndex = c.ifaces[i].Index
-		}
-		if _, err := c.socket.WriteTo(b, &wcm, c.dstAddr); err != nil {
-			c.log.Warnf("Failed to send mDNS packet on interface %d: %v", i, err)
-		}
+	if _, err := c.socket.WriteTo(rawQuery, nil, c.dstAddr); err != nil {
+		c.log.Warnf("Failed to send mDNS packet %v", err)
+		return
 	}
 }
 
@@ -278,10 +238,13 @@ func (c *Conn) sendAnswer(name string, dst net.IP) {
 		return
 	}
 
-	c.writeToSocket(rawAnswer)
+	if _, err := c.socket.WriteTo(rawAnswer, nil, c.dstAddr); err != nil {
+		c.log.Warnf("Failed to send mDNS packet %v", err)
+		return
+	}
 }
 
-func (c *Conn) start(inboundBufferSize int) { //nolint gocognit
+func (c *Conn) start() { //nolint gocognit
 	defer func() {
 		c.mu.Lock()
 		defer c.mu.Unlock()
@@ -294,11 +257,7 @@ func (c *Conn) start(inboundBufferSize int) { //nolint gocognit
 	for {
 		n, _, src, err := c.socket.ReadFrom(b)
 		if err != nil {
-			if errors.Is(err, net.ErrClosed) {
-				return
-			}
-			c.log.Warnf("Failed to ReadFrom %q %v", src, err)
-			continue
+			return
 		}
 
 		func() {
@@ -348,37 +307,11 @@ func (c *Conn) start(inboundBufferSize int) { //nolint gocognit
 
 				for i := len(c.queries) - 1; i >= 0; i-- {
 					if c.queries[i].nameWithSuffix == a.Name.String() {
-						ip, err := ipFromAnswerHeader(a, p)
-						if err != nil {
-							c.log.Warnf("Failed to parse mDNS answer %v", err)
-							return
-						}
-
-						c.queries[i].queryResultChan <- queryResult{a, &net.IPAddr{
-							IP: ip,
-						}}
+						c.queries[i].queryResultChan <- queryResult{a, src}
 						c.queries = append(c.queries[:i], c.queries[i+1:]...)
 					}
 				}
 			}
 		}()
 	}
-}
-
-func ipFromAnswerHeader(a dnsmessage.ResourceHeader, p dnsmessage.Parser) (ip []byte, err error) {
-	if a.Type == dnsmessage.TypeA {
-		resource, err := p.AResource()
-		if err != nil {
-			return nil, err
-		}
-		ip = net.IP(resource.A[:])
-	} else {
-		resource, err := p.AAAAResource()
-		if err != nil {
-			return nil, err
-		}
-		ip = resource.AAAA[:]
-	}
-
-	return
 }

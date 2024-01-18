@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 //go:build !js
 // +build !js
 
@@ -58,7 +55,8 @@ type mediaEngineHeaderExtension struct {
 }
 
 // A MediaEngine defines the codecs supported by a PeerConnection, and the
-// configuration of those codecs.
+// configuration of those codecs. A MediaEngine must not be shared between
+// PeerConnections.
 type MediaEngine struct {
 	// If we have attempted to negotiate a codec type yet.
 	negotiatedVideo, negotiatedAudio bool
@@ -396,7 +394,7 @@ func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCo
 
 	remoteFmtp := fmtp.Parse(remoteCodec.RTPCodecCapability.MimeType, remoteCodec.RTPCodecCapability.SDPFmtpLine)
 	if apt, hasApt := remoteFmtp.Parameter("apt"); hasApt {
-		payloadType, err := strconv.ParseUint(apt, 10, 8)
+		payloadType, err := strconv.Atoi(apt)
 		if err != nil {
 			return codecMatchNone, err
 		}
@@ -555,7 +553,7 @@ func (m *MediaEngine) getCodecsByKind(typ RTPCodecType) []RTPCodecParameters {
 	return nil
 }
 
-func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPTransceiverDirection) RTPParameters { //nolint:gocognit
+func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPTransceiverDirection) RTPParameters {
 	headerExtensions := make([]RTPHeaderExtensionParameter, 0)
 
 	// perform before locking to prevent recursive RLocks
@@ -571,33 +569,9 @@ func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPT
 			}
 		}
 	} else {
-		mediaHeaderExtensions := make(map[int]mediaEngineHeaderExtension)
-		for _, e := range m.headerExtensions {
-			usingNegotiatedID := false
-			for id := range m.negotiatedHeaderExtensions {
-				if m.negotiatedHeaderExtensions[id].uri == e.uri {
-					usingNegotiatedID = true
-					mediaHeaderExtensions[id] = e
-					break
-				}
-			}
-			if !usingNegotiatedID {
-				for id := 1; id < 15; id++ {
-					idAvailable := true
-					if _, ok := mediaHeaderExtensions[id]; ok {
-						idAvailable = false
-					}
-					if _, taken := m.negotiatedHeaderExtensions[id]; idAvailable && !taken {
-						mediaHeaderExtensions[id] = e
-						break
-					}
-				}
-			}
-		}
-
-		for id, e := range mediaHeaderExtensions {
+		for id, e := range m.headerExtensions {
 			if haveRTPTransceiverDirectionIntersection(e.allowedDirections, directions) && (e.isAudio && typ == RTPCodecTypeAudio || e.isVideo && typ == RTPCodecTypeVideo) {
-				headerExtensions = append(headerExtensions, RTPHeaderExtensionParameter{ID: id, URI: e.uri})
+				headerExtensions = append(headerExtensions, RTPHeaderExtensionParameter{ID: id + 1, URI: e.uri})
 			}
 		}
 	}
@@ -641,8 +615,6 @@ func payloaderForCodec(codec RTPCodecCapability) (rtp.Payloader, error) {
 		}, nil
 	case strings.ToLower(MimeTypeVP9):
 		return &codecs.VP9Payloader{}, nil
-	case strings.ToLower(MimeTypeAV1):
-		return &codecs.AV1Payloader{}, nil
 	case strings.ToLower(MimeTypeG722):
 		return &codecs.G722Payloader{}, nil
 	case strings.ToLower(MimeTypePCMU), strings.ToLower(MimeTypePCMA):

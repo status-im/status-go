@@ -34,7 +34,7 @@ type client struct {
 
 	conn quicConn
 
-	tracer    *logging.ConnectionTracer
+	tracer    logging.ConnectionTracer
 	tracingID uint64
 	logger    utils.Logger
 }
@@ -55,11 +55,11 @@ func DialAddr(ctx context.Context, addr string, tlsConf *tls.Config, conf *Confi
 	if err != nil {
 		return nil, err
 	}
-	tr, err := setupTransport(udpConn, tlsConf, true)
+	dl, err := setupTransport(udpConn, tlsConf, true)
 	if err != nil {
 		return nil, err
 	}
-	return tr.dial(ctx, udpAddr, addr, tlsConf, conf, false)
+	return dl.Dial(ctx, udpAddr, tlsConf, conf)
 }
 
 // DialAddrEarly establishes a new 0-RTT QUIC connection to a server.
@@ -73,13 +73,13 @@ func DialAddrEarly(ctx context.Context, addr string, tlsConf *tls.Config, conf *
 	if err != nil {
 		return nil, err
 	}
-	tr, err := setupTransport(udpConn, tlsConf, true)
+	dl, err := setupTransport(udpConn, tlsConf, true)
 	if err != nil {
 		return nil, err
 	}
-	conn, err := tr.dial(ctx, udpAddr, addr, tlsConf, conf, true)
+	conn, err := dl.DialEarly(ctx, udpAddr, tlsConf, conf)
 	if err != nil {
-		tr.Close()
+		dl.Close()
 		return nil, err
 	}
 	return conn, nil
@@ -153,7 +153,7 @@ func dial(
 	if c.config.Tracer != nil {
 		c.tracer = c.config.Tracer(context.WithValue(ctx, ConnectionTracingKey, c.tracingID), protocol.PerspectiveClient, c.destConnID)
 	}
-	if c.tracer != nil && c.tracer.StartedConnection != nil {
+	if c.tracer != nil {
 		c.tracer.StartedConnection(c.sendConn.LocalAddr(), c.sendConn.RemoteAddr(), c.srcConnID, c.destConnID)
 	}
 	if err := c.dial(ctx); err != nil {
@@ -163,6 +163,12 @@ func dial(
 }
 
 func newClient(sendConn sendConn, connIDGenerator ConnectionIDGenerator, config *Config, tlsConf *tls.Config, onClose func(), use0RTT bool) (*client, error) {
+	if tlsConf == nil {
+		tlsConf = &tls.Config{}
+	} else {
+		tlsConf = tlsConf.Clone()
+	}
+
 	srcConnID, err := connIDGenerator.GenerateConnectionID()
 	if err != nil {
 		return nil, err
@@ -233,7 +239,7 @@ func (c *client) dial(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		c.conn.shutdown()
-		return context.Cause(ctx)
+		return ctx.Err()
 	case err := <-errorChan:
 		return err
 	case recreateErr := <-recreateChan:

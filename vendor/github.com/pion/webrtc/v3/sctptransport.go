@@ -1,13 +1,9 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 //go:build !js
 // +build !js
 
 package webrtc
 
 import (
-	"errors"
 	"io"
 	"math"
 	"sync"
@@ -95,7 +91,7 @@ func (r *SCTPTransport) GetCapabilities() SCTPCapabilities {
 // Start the SCTPTransport. Since both local and remote parties must mutually
 // create an SCTPTransport, SCTP SO (Simultaneous Open) is used to establish
 // a connection over SCTP.
-func (r *SCTPTransport) Start(SCTPCapabilities) error {
+func (r *SCTPTransport) Start(remoteCaps SCTPCapabilities) error {
 	if r.isStarted {
 		return nil
 	}
@@ -107,9 +103,8 @@ func (r *SCTPTransport) Start(SCTPCapabilities) error {
 	}
 
 	sctpAssociation, err := sctp.Client(sctp.Config{
-		NetConn:              dtlsTransport.conn,
-		MaxReceiveBufferSize: r.api.settingEngine.sctp.maxReceiveBufferSize,
-		LoggerFactory:        r.api.settingEngine.LoggerFactory,
+		NetConn:       dtlsTransport.conn,
+		LoggerFactory: r.api.settingEngine.LoggerFactory,
 	})
 	if err != nil {
 		return err
@@ -179,7 +174,7 @@ ACCEPT:
 			LoggerFactory: r.api.settingEngine.LoggerFactory,
 		}, dataChannels...)
 		if err != nil {
-			if !errors.Is(err, io.EOF) {
+			if err != io.EOF {
 				r.log.Errorf("Failed to accept data channel: %v", err)
 				r.onError(err)
 			}
@@ -227,7 +222,7 @@ ACCEPT:
 			Ordered:           ordered,
 			MaxPacketLifeTime: maxPacketLifeTime,
 			MaxRetransmits:    maxRetransmits,
-		}, r, r.api.settingEngine.LoggerFactory.NewLogger("ortc"))
+		}, r.api.settingEngine.LoggerFactory.NewLogger("ortc"))
 		if err != nil {
 			r.log.Errorf("Failed to accept data channel: %v", err)
 			r.onError(err)

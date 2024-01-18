@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 // Package webrtc implements the WebRTC 1.0 as defined in W3C WebRTC specification document.
 package webrtc
 

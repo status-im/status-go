@@ -212,16 +212,13 @@ func (oas *ObservedAddrManager) filter(observedAddrs []*observedAddr) []ma.Multi
 	for pat := range pmap {
 		s := pmap[pat]
 
-		slices.SortFunc(s, func(first, second *observedAddr) int {
-			// We prefer inbound connection observations over outbound.
+		// We prefer inbound connection observations over outbound.
+		// For ties, we prefer the ones with more votes.
+		slices.SortFunc(s, func(first, second *observedAddr) bool {
 			if first.numInbound > second.numInbound {
-				return -1
+				return true
 			}
-			// For ties, we prefer the ones with more votes.
-			if first.numInbound == second.numInbound && len(first.seenBy) > len(second.seenBy) {
-				return -1
-			}
-			return 1
+			return len(first.seenBy) > len(second.seenBy)
 		})
 
 		for i := 0; i < maxObservedAddrsPerIPAndTransport && i < len(s); i++ {

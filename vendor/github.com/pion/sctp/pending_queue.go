@@ -48,11 +48,10 @@ type pendingQueue struct {
 	unorderedIsSelected bool
 }
 
-// Pending queue errors
 var (
-	ErrUnexpectedChuckPoppedUnordered = errors.New("unexpected chunk popped (unordered)")
-	ErrUnexpectedChuckPoppedOrdered   = errors.New("unexpected chunk popped (ordered)")
-	ErrUnexpectedQState               = errors.New("unexpected q state (should've been selected)")
+	errUnexpectedChuckPoppedUnordered = errors.New("unexpected chunk popped (unordered)")
+	errUnexpectedChuckPoppedOrdered   = errors.New("unexpected chunk popped (ordered)")
+	errUnexpectedQState               = errors.New("unexpected q state (should've been selected)")
 )
 
 func newPendingQueue() *pendingQueue {
@@ -91,12 +90,12 @@ func (q *pendingQueue) pop(c *chunkPayloadData) error {
 		if q.unorderedIsSelected {
 			popped = q.unorderedQueue.pop()
 			if popped != c {
-				return ErrUnexpectedChuckPoppedUnordered
+				return errUnexpectedChuckPoppedUnordered
 			}
 		} else {
 			popped = q.orderedQueue.pop()
 			if popped != c {
-				return ErrUnexpectedChuckPoppedOrdered
+				return errUnexpectedChuckPoppedOrdered
 			}
 		}
 		if popped.endingFragment {
@@ -104,12 +103,12 @@ func (q *pendingQueue) pop(c *chunkPayloadData) error {
 		}
 	} else {
 		if !c.beginningFragment {
-			return ErrUnexpectedQState
+			return errUnexpectedQState
 		}
 		if c.unordered {
 			popped := q.unorderedQueue.pop()
 			if popped != c {
-				return ErrUnexpectedChuckPoppedUnordered
+				return errUnexpectedChuckPoppedUnordered
 			}
 			if !popped.endingFragment {
 				q.selected = true
@@ -118,7 +117,7 @@ func (q *pendingQueue) pop(c *chunkPayloadData) error {
 		} else {
 			popped := q.orderedQueue.pop()
 			if popped != c {
-				return ErrUnexpectedChuckPoppedOrdered
+				return errUnexpectedChuckPoppedOrdered
 			}
 			if !popped.endingFragment {
 				q.selected = true

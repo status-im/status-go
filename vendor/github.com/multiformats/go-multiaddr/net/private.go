@@ -2,7 +2,6 @@ package manet
 
 import (
 	"net"
-	"strings"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -47,36 +46,6 @@ var unroutableCIDR6 = []string{
 	"ff00::/8",
 }
 
-// unResolvableDomains do not resolve to an IP address.
-// Ref: https://en.wikipedia.org/wiki/Special-use_domain_name#Reserved_domain_names
-var unResolvableDomains = []string{
-	// Reverse DNS Lookup
-	".in-addr.arpa",
-	".ip6.arpa",
-
-	// RFC 6761: Users MAY assume that queries for "invalid" names will always return NXDOMAIN
-	// responses
-	".invalid",
-}
-
-// privateUseDomains are reserved for private use and have no central authority for consistent
-// address resolution
-// Ref: https://en.wikipedia.org/wiki/Special-use_domain_name#Reserved_domain_names
-var privateUseDomains = []string{
-	// RFC 8375: Reserved for home networks
-	".home.arpa",
-
-	// MDNS
-	".local",
-
-	// RFC 6761: No central authority for .test names
-	".test",
-}
-
-// RFC 6761: Users may assume that IPv4 and IPv6 address queries for localhost names will
-// always resolve to the respective IP loopback address
-const localHostDomain = ".localhost"
-
 func init() {
 	Private4 = parseCIDR(privateCIDR4)
 	Private6 = parseCIDR(privateCIDR6)
@@ -96,8 +65,7 @@ func parseCIDR(cidrs []string) []*net.IPNet {
 	return ipnets
 }
 
-// IsPublicAddr returns true if the IP part of the multiaddr is a publicly routable address
-// or if it's a dns address without a special use domain e.g. .local.
+// IsPublicAddr retruns true if the IP part of the multiaddr is a publicly routable address
 func IsPublicAddr(a ma.Multiaddr) bool {
 	isPublic := false
 	ma.ForEach(a, func(c ma.Component) bool {
@@ -110,36 +78,10 @@ func IsPublicAddr(a ma.Multiaddr) bool {
 		case ma.P_IP6:
 			ip := net.IP(c.RawValue())
 			isPublic = !inAddrRange(ip, Private6) && !inAddrRange(ip, Unroutable6)
-		case ma.P_DNS, ma.P_DNS4, ma.P_DNS6, ma.P_DNSADDR:
-			dnsAddr := c.Value()
-			isPublic = true
-			if isSubdomain(dnsAddr, localHostDomain) {
-				isPublic = false
-				return false
-			}
-			for _, ud := range unResolvableDomains {
-				if isSubdomain(dnsAddr, ud) {
-					isPublic = false
-					return false
-				}
-			}
-			for _, pd := range privateUseDomains {
-				if isSubdomain(dnsAddr, pd) {
-					isPublic = false
-					break
-				}
-			}
 		}
 		return false
 	})
 	return isPublic
-}
-
-// isSubdomain checks if child is sub domain of parent. It also returns true if child and parent are
-// the same domain.
-// Parent must have a "." prefix.
-func isSubdomain(child, parent string) bool {
-	return strings.HasSuffix(child, parent) || child == parent[1:]
 }
 
 // IsPrivateAddr returns true if the IP part of the mutiaddr is in a private network
@@ -153,13 +95,6 @@ func IsPrivateAddr(a ma.Multiaddr) bool {
 			isPrivate = inAddrRange(net.IP(c.RawValue()), Private4)
 		case ma.P_IP6:
 			isPrivate = inAddrRange(net.IP(c.RawValue()), Private6)
-		case ma.P_DNS, ma.P_DNS4, ma.P_DNS6, ma.P_DNSADDR:
-			dnsAddr := c.Value()
-			if isSubdomain(dnsAddr, localHostDomain) {
-				isPrivate = true
-			}
-			// We don't check for privateUseDomains because private use domains can
-			// resolve to public IP addresses
 		}
 		return false
 	})

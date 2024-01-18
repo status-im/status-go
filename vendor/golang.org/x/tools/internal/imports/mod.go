@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -264,7 +265,7 @@ func (r *ModuleResolver) findPackage(importPath string) (*gocommand.ModuleJSON, 
 		}
 
 		// Not cached. Read the filesystem.
-		pkgFiles, err := os.ReadDir(pkgDir)
+		pkgFiles, err := ioutil.ReadDir(pkgDir)
 		if err != nil {
 			continue
 		}
@@ -369,7 +370,7 @@ func (r *ModuleResolver) dirIsNestedModule(dir string, mod *gocommand.ModuleJSON
 
 func (r *ModuleResolver) modInfo(dir string) (modDir string, modName string) {
 	readModName := func(modFile string) string {
-		modBytes, err := os.ReadFile(modFile)
+		modBytes, err := ioutil.ReadFile(modFile)
 		if err != nil {
 			return ""
 		}

@@ -267,7 +267,6 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 	}
 
 	for _, scenario := range scenarios {
-		scenario := scenario
 		desc := fmt.Sprintf("nonceFromNetwork: %d, tx nonce: %d, expect error: %v", scenario.nonceFromNetwork, scenario.txNonce, scenario.expectError)
 		s.T().Run(desc, func(t *testing.T) {
 			nonce := scenario.txNonce

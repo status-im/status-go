@@ -15,15 +15,16 @@ HEARTBEAT chunk to which this ack is responding.
 
 The parameter field contains a variable-length opaque data structure.
 
-	 0                   1                   2                   3
-	 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-	|   Type = 5    | Chunk  Flags  |    Heartbeat Ack Length       |
-	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-	|                                                               |
-	|            Heartbeat Information TLV (Variable-Length)        |
-	|                                                               |
-	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|   Type = 5    | Chunk  Flags  |    Heartbeat Ack Length       |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                                                               |
+|            Heartbeat Information TLV (Variable-Length)        |
+|                                                               |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
 
 Defined as a variable-length parameter using the format described
 in Section 3.2.1, i.e.:
@@ -37,35 +38,34 @@ type chunkHeartbeatAck struct {
 	params []param
 }
 
-// Heartbeat ack chunk errors
 var (
-	ErrUnimplemented                = errors.New("unimplemented")
-	ErrHeartbeatAckParams           = errors.New("heartbeat Ack must have one param")
-	ErrHeartbeatAckNotHeartbeatInfo = errors.New("heartbeat Ack must have one param, and it should be a HeartbeatInfo")
-	ErrHeartbeatAckMarshalParam     = errors.New("unable to marshal parameter for Heartbeat Ack")
+	errUnimplemented                = errors.New("unimplemented")
+	errHeartbeatAckParams           = errors.New("heartbeat Ack must have one param")
+	errHeartbeatAckNotHeartbeatInfo = errors.New("heartbeat Ack must have one param, and it should be a HeartbeatInfo")
+	errHeartbeatAckMarshalParam     = errors.New("unable to marshal parameter for Heartbeat Ack")
 )
 
-func (h *chunkHeartbeatAck) unmarshal([]byte) error {
-	return ErrUnimplemented
+func (h *chunkHeartbeatAck) unmarshal(raw []byte) error {
+	return errUnimplemented
 }
 
 func (h *chunkHeartbeatAck) marshal() ([]byte, error) {
 	if len(h.params) != 1 {
-		return nil, ErrHeartbeatAckParams
+		return nil, errHeartbeatAckParams
 	}
 
 	switch h.params[0].(type) {
 	case *paramHeartbeatInfo:
 		// ParamHeartbeatInfo is valid
 	default:
-		return nil, ErrHeartbeatAckNotHeartbeatInfo
+		return nil, errHeartbeatAckNotHeartbeatInfo
 	}
 
 	out := make([]byte, 0)
 	for idx, p := range h.params {
 		pp, err := p.marshal()
 		if err != nil {
-			return nil, fmt.Errorf("%w: %v", ErrHeartbeatAckMarshalParam, err) //nolint:errorlint
+			return nil, fmt.Errorf("%w: %v", errHeartbeatAckMarshalParam, err)
 		}
 
 		out = append(out, pp...)

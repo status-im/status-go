@@ -233,14 +233,6 @@ func (c *Cache[K, V]) Keys() []K {
 	return keys
 }
 
-// Values returns a slice of the values in the cache, from oldest to newest.
-func (c *Cache[K, V]) Values() []V {
-	c.lock.RLock()
-	values := c.lru.Values()
-	c.lock.RUnlock()
-	return values
-}
-
 // Len returns the number of items in the cache.
 func (c *Cache[K, V]) Len() int {
 	c.lock.RLock()

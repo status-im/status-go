@@ -92,7 +92,7 @@ func (d *Dialer) Dial(ctx context.Context, urlStr string, reqHdr http.Header) (*
 	if reqHdr == nil {
 		reqHdr = http.Header{}
 	}
-	reqHdr.Set(webTransportDraftOfferHeaderKey, "1")
+	reqHdr.Add(webTransportDraftOfferHeaderKey, "1")
 	req := &http.Request{
 		Method: http.MethodConnect,
 		Header: reqHdr,

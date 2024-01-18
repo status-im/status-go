@@ -195,7 +195,7 @@ func (s *HandlersSuite) TestHandleLinkPreviewThumbnail() {
 			msg.UnfurledLinks[0].ThumbnailPayload = tc.ThumbnailPayload
 			s.saveUserMessage(&msg)
 
-			requestURL := "/dummy?" + tc.Parameters.Encode() // nolint: goconst
+			requestURL := "/dummy?" + tc.Parameters.Encode()
 			rr := s.httpGetReqRecorder(handler, requestURL)
 			s.Require().Equal(tc.ExpectedHTTPStatusCode, rr.Code)
 			if tc.CheckFunc != nil {
@@ -534,7 +534,7 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 
 	for _, tc := range testCases {
 		s.Run(tc.Name, func() {
-			requestURL := "/dummy?" + tc.Parameters.Encode() // nolint: goconst
+			requestURL := "/dummy?" + tc.Parameters.Encode()
 
 			rr := s.httpGetReqRecorder(handler, requestURL)
 			s.Require().Equal(tc.ExpectedHTTPStatusCode, rr.Code)

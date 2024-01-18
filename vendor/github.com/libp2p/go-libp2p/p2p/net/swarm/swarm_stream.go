@@ -22,10 +22,7 @@ type Stream struct {
 	conn   *Conn
 	scope  network.StreamManagementScope
 
-	closeMx  sync.Mutex
-	isClosed bool
-	// acceptStreamGoroutineCompleted indicates whether the goroutine handling the incoming stream has exited
-	acceptStreamGoroutineCompleted bool
+	closeOnce sync.Once
 
 	protocol atomic.Pointer[protocol.ID]
 
@@ -79,7 +76,7 @@ func (s *Stream) Write(p []byte) (int, error) {
 // resources.
 func (s *Stream) Close() error {
 	err := s.stream.Close()
-	s.closeAndRemoveStream()
+	s.closeOnce.Do(s.remove)
 	return err
 }
 
@@ -87,23 +84,8 @@ func (s *Stream) Close() error {
 // associated resources.
 func (s *Stream) Reset() error {
 	err := s.stream.Reset()
-	s.closeAndRemoveStream()
+	s.closeOnce.Do(s.remove)
 	return err
-}
-
-func (s *Stream) closeAndRemoveStream() {
-	s.closeMx.Lock()
-	defer s.closeMx.Unlock()
-	if s.isClosed {
-		return
-	}
-	s.isClosed = true
-	// We don't want to keep swarm from closing till the stream handler has exited
-	s.conn.swarm.refs.Done()
-	// Cleanup the stream from connection only after the stream handler has completed
-	if s.acceptStreamGoroutineCompleted {
-		s.conn.removeStream(s)
-	}
 }
 
 // CloseWrite closes the stream for writing, flushing all data and sending an EOF.
@@ -119,16 +101,9 @@ func (s *Stream) CloseRead() error {
 	return s.stream.CloseRead()
 }
 
-func (s *Stream) completeAcceptStreamGoroutine() {
-	s.closeMx.Lock()
-	defer s.closeMx.Unlock()
-	if s.acceptStreamGoroutineCompleted {
-		return
-	}
-	s.acceptStreamGoroutineCompleted = true
-	if s.isClosed {
-		s.conn.removeStream(s)
-	}
+func (s *Stream) remove() {
+	s.conn.removeStream(s)
+	s.conn.swarm.refs.Done()
 }
 
 // Protocol returns the protocol negotiated on this stream (if set).

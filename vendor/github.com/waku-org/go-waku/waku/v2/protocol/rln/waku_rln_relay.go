@@ -108,9 +108,8 @@ func (rlnRelay *WakuRLNRelay) ValidateMessage(msg *pb.WakuMessage, optionalTime 
 
 	msgProof, err := BytesToRateLimitProof(msg.RateLimitProof)
 	if err != nil {
-		rlnRelay.log.Debug("invalid message: could not extract proof")
+		rlnRelay.log.Debug("invalid message: could not extract proof", zap.Error(err))
 		rlnRelay.metrics.RecordInvalidMessage(proofExtractionErr)
-		return validationError, err
 	}
 
 	if msgProof == nil {
@@ -147,9 +146,9 @@ func (rlnRelay *WakuRLNRelay) ValidateMessage(msg *pb.WakuMessage, optionalTime 
 	start := time.Now()
 	valid, err := rlnRelay.verifyProof(msg, msgProof)
 	if err != nil {
-		rlnRelay.log.Debug("could not verify proof")
+		rlnRelay.log.Debug("could not verify proof", zap.Error(err))
 		rlnRelay.metrics.RecordError(proofVerificationErr)
-		return validationError, err
+		return invalidMessage, nil
 	}
 	rlnRelay.metrics.RecordProofVerification(time.Since(start))
 
@@ -271,7 +270,7 @@ func (rlnRelay *WakuRLNRelay) Validator(
 
 			return false
 		default:
-			log.Error("unhandled validation result", zap.Int("validationResult", int(validationRes)))
+			log.Debug("unhandled validation result", zap.Int("validationResult", int(validationRes)))
 			return false
 		}
 	}

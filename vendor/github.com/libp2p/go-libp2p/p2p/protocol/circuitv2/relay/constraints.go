@@ -74,10 +74,7 @@ func (c *constraints) AddReservation(p peer.ID, a ma.Multiaddr) error {
 
 	var asnReservations []time.Time
 	var asn string
-	// Only public addresses have an ASN. Skip checking ASN for private addresses as
-	// initialising the ASN store is a costly operation. Skipping this check reduces a lot of
-	// flakiness in tests
-	if ip.To4() == nil && manet.IsPublicAddr(a) {
+	if ip.To4() == nil {
 		asn, _ = asnutil.Store.AsnForIPv6(ip)
 		if asn != "" {
 			asnReservations = c.asns[asn]

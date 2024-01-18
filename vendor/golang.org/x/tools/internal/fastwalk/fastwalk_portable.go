@@ -8,6 +8,7 @@
 package fastwalk
 
 import (
+	"io/ioutil"
 	"os"
 )
 
@@ -16,20 +17,16 @@ import (
 // If fn returns a non-nil error, readDir returns with that error
 // immediately.
 func readDir(dirName string, fn func(dirName, entName string, typ os.FileMode) error) error {
-	fis, err := os.ReadDir(dirName)
+	fis, err := ioutil.ReadDir(dirName)
 	if err != nil {
 		return err
 	}
 	skipFiles := false
 	for _, fi := range fis {
-		info, err := fi.Info()
-		if err != nil {
-			return err
-		}
-		if info.Mode().IsRegular() && skipFiles {
+		if fi.Mode().IsRegular() && skipFiles {
 			continue
 		}
-		if err := fn(dirName, fi.Name(), info.Mode()&os.ModeType); err != nil {
+		if err := fn(dirName, fi.Name(), fi.Mode()&os.ModeType); err != nil {
 			if err == ErrSkipFiles {
 				skipFiles = true
 				continue

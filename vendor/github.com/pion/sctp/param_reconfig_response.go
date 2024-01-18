@@ -45,10 +45,7 @@ const (
 	reconfigResultInProgress                    reconfigResult = 6
 )
 
-// Reconfiguration response errors
-var (
-	ErrReconfigRespParamTooShort = errors.New("reconfig response parameter too short")
-)
+var errReconfigRespParamTooShort = errors.New("reconfig response parameter too short")
 
 func (t reconfigResult) String() string {
 	switch t {
@@ -86,7 +83,7 @@ func (r *paramReconfigResponse) unmarshal(raw []byte) (param, error) {
 		return nil, err
 	}
 	if len(r.raw) < 8 {
-		return nil, ErrReconfigRespParamTooShort
+		return nil, errReconfigRespParamTooShort
 	}
 	r.reconfigResponseSequenceNumber = binary.BigEndian.Uint32(r.raw)
 	r.result = reconfigResult(binary.BigEndian.Uint32(r.raw[4:]))

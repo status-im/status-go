@@ -35,7 +35,7 @@ func PublicKeyToStr(publicKey *ecdsa.PublicKey) string {
 }
 
 func PersonalDiscoveryTopic(publicKey *ecdsa.PublicKey) string {
-	return "contact-discovery-" + PublicKeyToStr(publicKey) // nolint: goconst
+	return "contact-discovery-" + PublicKeyToStr(publicKey)
 }
 
 // PartitionedTopic returns the associated partitioned topic string
@@ -43,7 +43,7 @@ func PersonalDiscoveryTopic(publicKey *ecdsa.PublicKey) string {
 func PartitionedTopic(publicKey *ecdsa.PublicKey) string {
 	partition := big.NewInt(0)
 	partition.Mod(publicKey.X, nPartitions)
-	return "contact-discovery-" + strconv.FormatInt(partition.Int64(), 10) // nolint: goconst
+	return "contact-discovery-" + strconv.FormatInt(partition.Int64(), 10)
 }
 
 func ContactCodeTopic(publicKey *ecdsa.PublicKey) string {

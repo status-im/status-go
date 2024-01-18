@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package nack
 
 import (
@@ -44,20 +41,11 @@ func (m *packetManager) NewPacket(header *rtp.Header, payload []byte) (*retainab
 		count: 1,
 	}
 
-	var ok bool
-	p.header, ok = m.headerPool.Get().(*rtp.Header)
-	if !ok {
-		return nil, errFailedToCastHeaderPool
-	}
-
+	p.header = m.headerPool.Get().(*rtp.Header)
 	*p.header = header.Clone()
 
 	if payload != nil {
-		p.buffer, ok = m.payloadPool.Get().(*[]byte)
-		if !ok {
-			return nil, errFailedToCastPayloadPool
-		}
-
+		p.buffer = m.payloadPool.Get().(*[]byte)
 		size := copy(*p.buffer, payload)
 		p.payload = (*p.buffer)[:size]
 	}
@@ -70,21 +58,6 @@ func (m *packetManager) releasePacket(header *rtp.Header, payload *[]byte) {
 	if payload != nil {
 		m.payloadPool.Put(payload)
 	}
-}
-
-type noOpPacketFactory struct{}
-
-func (f *noOpPacketFactory) NewPacket(header *rtp.Header, payload []byte) (*retainablePacket, error) {
-	return &retainablePacket{
-		onRelease: f.releasePacket,
-		count:     1,
-		header:    header,
-		payload:   payload,
-	}, nil
-}
-
-func (f *noOpPacketFactory) releasePacket(_ *rtp.Header, _ *[]byte) {
-	// no-op
 }
 
 type retainablePacket struct {

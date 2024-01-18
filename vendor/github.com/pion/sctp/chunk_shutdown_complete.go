@@ -18,10 +18,7 @@ type chunkShutdownComplete struct {
 	chunkHeader
 }
 
-// Shutdown complete chunk errors
-var (
-	ErrChunkTypeNotShutdownComplete = errors.New("ChunkType is not of type SHUTDOWN-COMPLETE")
-)
+var errChunkTypeNotShutdownComplete = errors.New("ChunkType is not of type SHUTDOWN-COMPLETE")
 
 func (c *chunkShutdownComplete) unmarshal(raw []byte) error {
 	if err := c.chunkHeader.unmarshal(raw); err != nil {
@@ -29,7 +26,7 @@ func (c *chunkShutdownComplete) unmarshal(raw []byte) error {
 	}
 
 	if c.typ != ctShutdownComplete {
-		return fmt.Errorf("%w: actually is %s", ErrChunkTypeNotShutdownComplete, c.typ.String())
+		return fmt.Errorf("%w: actually is %s", errChunkTypeNotShutdownComplete, c.typ.String())
 	}
 
 	return nil

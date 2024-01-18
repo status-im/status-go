@@ -923,7 +923,7 @@ func (p *Persistence) SaveWakuMessage(message *types.Message) error {
 func wakuMessageTimestampQuery(topics []types.TopicType) string {
 	query := " FROM waku_messages WHERE "
 	for i, topic := range topics {
-		query += `topic = "` + topic.String() + `"` // nolint: goconst
+		query += `topic = "` + topic.String() + `"`
 		if i < len(topics)-1 {
 			query += OR
 		}
@@ -949,10 +949,10 @@ func (p *Persistence) GetLatestWakuMessageTimestamp(topics []types.TopicType) (u
 
 func (p *Persistence) GetWakuMessagesByFilterTopic(topics []types.TopicType, from uint64, to uint64) ([]types.Message, error) {
 
-	query := "SELECT sig, timestamp, topic, payload, padding, hash, third_party_id FROM waku_messages WHERE timestamp >= " + fmt.Sprint(from) + " AND timestamp < " + fmt.Sprint(to) + " AND (" // nolint: gosec
+	query := "SELECT sig, timestamp, topic, payload, padding, hash, third_party_id FROM waku_messages WHERE timestamp >= " + fmt.Sprint(from) + " AND timestamp < " + fmt.Sprint(to) + " AND ("
 
 	for i, topic := range topics {
-		query += `topic = "` + topic.String() + `"` // nolint: goconst
+		query += `topic = "` + topic.String() + `"`
 		if i < len(topics)-1 {
 			query += OR
 		}

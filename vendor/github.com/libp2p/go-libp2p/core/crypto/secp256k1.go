@@ -9,7 +9,7 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-	"github.com/libp2p/go-libp2p/internal/sha256"
+	"github.com/minio/sha256-simd"
 )
 
 // Secp256k1PrivateKey is a Secp256k1 private key

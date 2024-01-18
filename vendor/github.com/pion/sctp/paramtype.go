@@ -39,14 +39,11 @@ const (
 	adaptLayerInd      paramType = 49158 // Adaptation Layer Indication (0xC006)	[RFC5061]
 )
 
-// Parameter packet errors
-var (
-	ErrParamPacketTooShort = errors.New("packet to short")
-)
+var errParamPacketTooShort = errors.New("packet to short")
 
 func parseParamType(raw []byte) (paramType, error) {
 	if len(raw) < 2 {
-		return paramType(0), ErrParamPacketTooShort
+		return paramType(0), errParamPacketTooShort
 	}
 	return paramType(binary.BigEndian.Uint16(raw)), nil
 }

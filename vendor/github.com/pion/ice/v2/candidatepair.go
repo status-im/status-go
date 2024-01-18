@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package ice
 
 import (
@@ -21,13 +18,12 @@ func newCandidatePair(local, remote Candidate, controlling bool) *CandidatePair 
 // CandidatePair is a combination of a
 // local and remote candidate
 type CandidatePair struct {
-	iceRoleControlling       bool
-	Remote                   Candidate
-	Local                    Candidate
-	bindingRequestCount      uint16
-	state                    CandidatePairState
-	nominated                bool
-	nominateOnBindingSuccess bool
+	iceRoleControlling  bool
+	Remote              Candidate
+	Local               Candidate
+	bindingRequestCount uint16
+	state               CandidatePairState
+	nominated           bool
 }
 
 func (p *CandidatePair) String() string {

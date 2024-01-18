@@ -210,7 +210,7 @@ func (bh *BlankHost) newStreamHandler(s network.Stream) {
 
 	s.SetProtocol(protoID)
 
-	handle(protoID, s)
+	go handle(protoID, s)
 }
 
 // TODO: i'm not sure this really needs to be here

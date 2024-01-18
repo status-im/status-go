@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 package handshake
 
 import (
@@ -22,9 +19,8 @@ server's Certificate message).
 https://tools.ietf.org/html/rfc5246#section-7.4.4
 */
 type MessageCertificateRequest struct {
-	CertificateTypes            []clientcertificate.Type
-	SignatureHashAlgorithms     []signaturehash.Algorithm
-	CertificateAuthoritiesNames [][]byte
+	CertificateTypes        []clientcertificate.Type
+	SignatureHashAlgorithms []signaturehash.Algorithm
 }
 
 const (
@@ -50,20 +46,7 @@ func (m *MessageCertificateRequest) Marshal() ([]byte, error) {
 		out = append(out, byte(v.Signature))
 	}
 
-	// Distinguished Names
-	casLength := 0
-	for _, ca := range m.CertificateAuthoritiesNames {
-		casLength += len(ca) + 2
-	}
-	out = append(out, []byte{0x00, 0x00}...)
-	binary.BigEndian.PutUint16(out[len(out)-2:], uint16(casLength))
-	if casLength > 0 {
-		for _, ca := range m.CertificateAuthoritiesNames {
-			out = append(out, []byte{0x00, 0x00}...)
-			binary.BigEndian.PutUint16(out[len(out)-2:], uint16(len(ca)))
-			out = append(out, ca...)
-		}
-	}
+	out = append(out, []byte{0x00, 0x00}...) // Distinguished Names Length
 	return out, nil
 }
 
@@ -111,33 +94,6 @@ func (m *MessageCertificateRequest) Unmarshal(data []byte) error {
 			continue
 		}
 		m.SignatureHashAlgorithms = append(m.SignatureHashAlgorithms, signaturehash.Algorithm{Signature: s, Hash: h})
-	}
-
-	offset += signatureHashAlgorithmsLength
-	if len(data) < offset+2 {
-		return errBufferTooSmall
-	}
-	casLength := int(binary.BigEndian.Uint16(data[offset:]))
-	offset += 2
-	if (offset + casLength) > len(data) {
-		return errBufferTooSmall
-	}
-	cas := make([]byte, casLength)
-	copy(cas, data[offset:offset+casLength])
-	m.CertificateAuthoritiesNames = nil
-	for len(cas) > 0 {
-		if len(cas) < 2 {
-			return errBufferTooSmall
-		}
-		caLen := binary.BigEndian.Uint16(cas)
-		cas = cas[2:]
-
-		if len(cas) < int(caLen) {
-			return errBufferTooSmall
-		}
-
-		m.CertificateAuthoritiesNames = append(m.CertificateAuthoritiesNames, cas[:caLen])
-		cas = cas[caLen:]
 	}
 
 	return nil

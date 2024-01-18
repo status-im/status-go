@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-// SPDX-License-Identifier: MIT
-
 // Package alert implements TLS alert protocol https://tools.ietf.org/html/rfc5246#section-7.2
 package alert
 
