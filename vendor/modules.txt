@@ -2,6 +2,9 @@
 ## explicit; go 1.16
 github.com/BurntSushi/toml
 github.com/BurntSushi/toml/internal
+# github.com/Masterminds/squirrel v1.5.4
+## explicit; go 1.14
+github.com/Masterminds/squirrel
 # github.com/PuerkitoBio/goquery v1.6.1
 ## explicit; go 1.13
 github.com/PuerkitoBio/goquery
@@ -469,6 +472,12 @@ github.com/koron/go-ssdp/internal/ssdplog
 # github.com/ladydascalie/currency v1.6.0
 ## explicit; go 1.16
 github.com/ladydascalie/currency
+# github.com/lann/builder v0.0.0-20180802200727-47ae307949d0
+## explicit
+github.com/lann/builder
+# github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0
+## explicit
+github.com/lann/ps
 # github.com/leodido/go-urn v1.2.1
 ## explicit; go 1.13
 github.com/leodido/go-urn
