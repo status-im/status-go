@@ -344,9 +344,8 @@ func (db *Database) UpdateAccountTimestamp(keyUID string, loginTimestamp int64) 
 	return err
 }
 
-func (db *Database) UpdateAccountCustomizationColor(keyUID string, color string, clock uint64) error {
-	_, err := db.db.Exec("UPDATE accounts SET customizationColor = ?, customizationColorClock = ? WHERE keyUid = ? AND customizationColorClock < ?", color, clock, keyUID, clock)
-	return err
+func (db *Database) UpdateAccountCustomizationColor(keyUID string, color string, clock uint64) (sql.Result, error) {
+	return db.db.Exec("UPDATE accounts SET customizationColor = ?, customizationColorClock = ? WHERE keyUid = ? AND customizationColorClock < ?", color, clock, keyUID, clock)
 }
 
 func (db *Database) DeleteAccount(keyUID string) error {
