@@ -1498,49 +1498,13 @@ type TestClientWithError struct {
 	*TestClient
 }
 
-func (tc *TestClientWithError) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
-	tc.incCounter("HeaderByNumber")
+func (tc *TestClientWithError) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
+	tc.incCounter("BlockByNumber")
 	if tc.traceAPICalls {
-		tc.t.Log("HeaderByNumber", number)
+		tc.t.Log("BlockByNumber", number)
 	}
 
 	return nil, errors.New("Network error")
-}
-
-func TestLoadBlocksAndTransfersCommand_StopOnErrorsOverflow(t *testing.T) {
-	tc := &TestClientWithError{
-		&TestClient{
-			t:            t,
-			callsCounter: map[string]int{},
-		},
-	}
-
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
-	maker, _ := contracts.NewContractMaker(client)
-
-	cmd := &loadBlocksAndTransfersCommand{
-		chainClient:   tc,
-		contractMaker: maker,
-	}
-
-	ctx := context.Background()
-	group := async.NewGroup(ctx)
-
-	runner := cmd.Runner(1 * time.Millisecond)
-	group.Add(runner.Run)
-
-	select {
-	case <-ctx.Done():
-		t.Log("Done")
-	case <-group.WaitAsync():
-		errorCounter := runner.(async.FiniteCommandWithErrorCounter).ErrorCounter
-		require.Equal(t, errorCounter.MaxErrors(), tc.callsCounter["HeaderByNumber"])
-
-		_, expectedErr := tc.HeaderByNumber(ctx, nil)
-		require.Error(t, expectedErr, errorCounter.Error())
-	}
 }
 
 type BlockRangeSequentialDAOMockError struct {
@@ -1549,59 +1513,6 @@ type BlockRangeSequentialDAOMockError struct {
 
 func (b *BlockRangeSequentialDAOMockError) getBlockRange(chainID uint64, address common.Address) (blockRange *ethTokensBlockRanges, err error) {
 	return nil, errors.New("DB error")
-}
-
-func TestLoadBlocksAndTransfersCommand_StopOnErrorsOverflowWhenStarted(t *testing.T) {
-	appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	require.NoError(t, err)
-
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
-
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
-	maker, _ := contracts.NewContractMaker(client)
-
-	wdb := NewDB(db)
-	tc := &TestClient{
-		t:            t,
-		callsCounter: map[string]int{},
-	}
-	accDB, err := accounts.NewDB(appdb)
-	require.NoError(t, err)
-
-	cmd := &loadBlocksAndTransfersCommand{
-		accounts:    []common.Address{common.HexToAddress("0x1234")},
-		chainClient: tc,
-		blockDAO:    &BlockDAO{db},
-		blockRangeDAO: &BlockRangeSequentialDAOMockError{
-			&BlockRangeSequentialDAO{
-				wdb.client,
-			},
-		},
-		accountsDB:    accDB,
-		contractMaker: maker,
-	}
-
-	ctx := context.Background()
-	group := async.NewGroup(ctx)
-
-	runner := cmd.Runner(1 * time.Millisecond)
-	group.Add(runner.Run)
-
-	select {
-	case <-ctx.Done():
-		t.Log("Done")
-	case <-group.WaitAsync():
-		errorCounter := runner.(async.FiniteCommandWithErrorCounter).ErrorCounter
-		_, expectedErr := cmd.blockRangeDAO.getBlockRange(0, common.Address{})
-		require.Error(t, expectedErr, errorCounter.Error())
-		require.NoError(t, utils.Eventually(func() error {
-			if !cmd.isStarted() {
-				return nil
-			}
-			return errors.New("command is still running")
-		}, 100*time.Millisecond, 10*time.Millisecond))
-	}
 }
 
 type BlockRangeSequentialDAOMockSuccess struct {
@@ -1646,18 +1557,16 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 	ctx, cancel := context.WithCancel(context.Background())
 	group := async.NewGroup(ctx)
 
-	runner := cmd.Runner(1 * time.Millisecond)
-	group.Add(runner.Run)
+	group.Add(cmd.Command(1 * time.Millisecond))
 
 	select {
 	case <-ctx.Done():
 		cancel() // linter is not happy if cancel is not called on all code paths
 		t.Log("Done")
 	case <-group.WaitAsync():
-		errorCounter := runner.(async.FiniteCommandWithErrorCounter).ErrorCounter
-		require.NoError(t, errorCounter.Error())
 		require.True(t, cmd.isStarted())
 
+		// Test that it stops if canceled
 		cancel()
 		require.NoError(t, utils.Eventually(func() error {
 			if !cmd.isStarted() {
@@ -1665,5 +1574,42 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 			}
 			return errors.New("command is still running")
 		}, 100*time.Millisecond, 10*time.Millisecond))
+	}
+}
+
+func TestTransfersCommand_RetryAndQuitOnMaxError(t *testing.T) {
+	tc := &TestClientWithError{
+		&TestClient{
+			t:            t,
+			callsCounter: map[string]int{},
+		},
+	}
+
+	address := common.HexToAddress("0x1234")
+	cmd := &transfersCommand{
+		chainClient: tc,
+		address:     address,
+		eth: &ETHDownloader{
+			chainClient: tc,
+			accounts:    []common.Address{address},
+		},
+		blockNums: []*big.Int{big.NewInt(1)},
+	}
+
+	ctx := context.Background()
+	group := async.NewGroup(ctx)
+
+	runner := cmd.Runner(1 * time.Millisecond)
+	group.Add(runner.Run)
+
+	select {
+	case <-ctx.Done():
+		t.Log("Done")
+	case <-group.WaitAsync():
+		errorCounter := runner.(async.FiniteCommandWithErrorCounter).ErrorCounter
+		require.Equal(t, errorCounter.MaxErrors(), tc.callsCounter["BlockByNumber"])
+
+		_, expectedErr := tc.BlockByNumber(context.TODO(), nil)
+		require.Error(t, expectedErr, errorCounter.Error())
 	}
 }

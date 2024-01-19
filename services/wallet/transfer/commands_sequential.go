@@ -399,14 +399,22 @@ type findBlocksCommand struct {
 	reachedETHHistoryStart bool
 }
 
-func (c *findBlocksCommand) Command() async.Command {
+func (c *findBlocksCommand) Runner(interval ...time.Duration) async.Runner {
+	intvl := findBlocksRetryInterval
+	if len(interval) > 0 {
+		intvl = interval[0]
+	}
 	return async.FiniteCommandWithErrorCounter{
 		FiniteCommand: async.FiniteCommand{
-			Interval: findBlocksRetryInterval,
+			Interval: intvl,
 			Runable:  c.Run,
 		},
-		ErrorCounter: async.NewErrorCounter(3, "findBlocksCommand"), // totally 9 retries because the caller command retries 3 times
-	}.Run
+		ErrorCounter: async.NewErrorCounter(3, "findBlocksCommand"),
+	}
+}
+
+func (c *findBlocksCommand) Command(interval ...time.Duration) async.Command {
+	return c.Runner(interval...).Run
 }
 
 type ERC20BlockRange struct {
@@ -799,11 +807,11 @@ func (c *findBlocksCommand) fastIndexErc20(ctx context.Context, fromBlockNumber 
 
 // Start transfers loop to load transfers for new blocks
 func (c *loadBlocksAndTransfersCommand) startTransfersLoop(ctx context.Context) {
+	c.incLoops()
 	go func() {
 		defer func() {
 			c.decLoops()
 		}()
-		c.incLoops()
 
 		log.Debug("loadTransfersLoop start", "chain", c.chainClient.NetworkID())
 
@@ -876,7 +884,7 @@ type loadBlocksAndTransfersCommand struct {
 	// Not to be set by the caller
 	transfersLoaded map[common.Address]bool // For event RecentHistoryReady to be sent only once per account during app lifetime
 	loops           atomic.Int32
-	onExit          func(ctx context.Context, err error)
+	// onExit          func(ctx context.Context, err error)
 }
 
 func (c *loadBlocksAndTransfersCommand) incLoops() {
@@ -894,21 +902,15 @@ func (c *loadBlocksAndTransfersCommand) isStarted() bool {
 func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) (err error) {
 	log.Debug("start load all transfers command", "chain", c.chainClient.NetworkID(), "accounts", c.accounts)
 
-	// Finite processes (to be restarted on error, but stopped on success):
+	// Finite processes (to be restarted on error, but stopped on success or context cancel):
 	// fetching transfers for loaded blocks
 	// fetching history blocks
 
-	// Infinite processes (to be restarted on error):
+	// Infinite processes (to be restarted on error), but stopped on context cancel:
 	// fetching new blocks
 	// fetching transfers for new blocks
-	ctx, cancel := context.WithCancel(parent)
-	if c.onExit == nil {
-		c.onExit = func(ctx context.Context, err error) { // is called on final exit
-			log.Debug("loadBlocksAndTransfersCommand onExit", "chain", c.chainClient.NetworkID(), "accounts", c.accounts, "error", err)
-			cancel()
-		}
-	}
 
+	ctx := parent
 	finiteGroup := async.NewAtomicGroup(ctx)
 	finiteGroup.SetName("finiteGroup")
 	defer func() {
@@ -922,7 +924,7 @@ func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) (err error) 
 		return err
 	}
 
-	// It will start loadTransfersCommand which will run until success when all transfers from DB are loaded
+	// It will start loadTransfersCommand which will run until all transfers from DB are loaded or any one failed to load
 	err = c.startFetchingTransfersForLoadedBlocks(finiteGroup)
 	if err != nil {
 		log.Error("loadBlocksAndTransfersCommand fetchTransfersForLoadedBlocks", "error", err)
@@ -960,13 +962,9 @@ func (c *loadBlocksAndTransfersCommand) Runner(interval ...time.Duration) async.
 		intvl = interval[0]
 	}
 
-	return async.FiniteCommandWithErrorCounter{
-		FiniteCommand: async.FiniteCommand{
-			Interval: intvl,
-			Runable:  c.Run,
-			OnExit:   &c.onExit,
-		},
-		ErrorCounter: async.NewErrorCounter(3, "loadBlocksAndTransfersCommand"),
+	return async.FiniteCommand{
+		Interval: intvl,
+		Runable:  c.Run,
 	}
 }
 
@@ -1064,11 +1062,11 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *asyn
 func (c *loadBlocksAndTransfersCommand) startFetchingNewBlocks(ctx context.Context, addresses []common.Address, fromNum *big.Int, blocksLoadedCh chan<- []*DBHeader) {
 	log.Debug("startFetchingNewBlocks start", "chainID", c.chainClient.NetworkID(), "accounts", addresses)
 
+	c.incLoops()
 	go func() {
 		defer func() {
 			c.decLoops()
 		}()
-		c.incLoops()
 
 		newBlocksCmd := &findNewBlocksCommand{
 			findBlocksCommand: &findBlocksCommand{
