@@ -5,12 +5,14 @@ import (
 	"testing"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
+
 	"github.com/stretchr/testify/suite"
 )
 
@@ -94,7 +96,9 @@ func (s *MessengerSettingsSuite) TestSetCustomizationColor() {
 	}, "message syncAccountCustomizationColor not received")
 	s.Require().NoError(err)
 	acc, err = s.alice2.multiAccounts.GetAccount(s.alice.account.KeyUID)
+	s.Require().NoError(err)
 	acc2, err = s.alice2.multiAccounts.GetAccount(s.alice2.account.KeyUID)
 	s.Require().NoError(err)
+	s.Require().Equal(common.CustomizationColorBlue, acc.CustomizationColor)
 	s.Require().Equal(acc.CustomizationColor, acc2.CustomizationColor)
 }

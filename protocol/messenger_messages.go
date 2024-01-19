@@ -5,13 +5,13 @@ import (
 	"crypto/ecdsa"
 	"errors"
 
-	"go.uber.org/zap"
-
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+
+	"go.uber.org/zap"
 )
 
 var ErrInvalidEditOrDeleteAuthor = errors.New("sender is not the author of the message")

@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/timesource"
@@ -24,6 +25,9 @@ func (m *Messenger) SetCustomNodes(request *requests.SetCustomNodes) error {
 }
 
 func (m *Messenger) SetCustomizationColor(ctx context.Context, request *requests.SetCustomizationColor) error {
+	if err := request.Validate(); err != nil {
+		return err
+	}
 
 	acc, err := m.multiAccounts.GetAccount(request.KeyUID)
 	if err != nil {
@@ -32,6 +36,7 @@ func (m *Messenger) SetCustomizationColor(ctx context.Context, request *requests
 
 	acc.CustomizationColor = request.CustomizationColor
 
+	//Use a combination of wall clock + lamport timestamp, just like Chat#NextClockAndTimestamp
 	tNow := timesource.GetCurrentTimeInMillis()
 	if acc.CustomizationColorClock >= tNow {
 		acc.CustomizationColorClock++
@@ -39,13 +44,16 @@ func (m *Messenger) SetCustomizationColor(ctx context.Context, request *requests
 		acc.CustomizationColorClock = tNow
 	}
 
-	_, err = m.multiAccounts.UpdateAccountCustomizationColor(request.KeyUID, string(acc.CustomizationColor), acc.CustomizationColorClock)
+	affected, err := m.multiAccounts.UpdateAccountCustomizationColor(request.KeyUID, string(acc.CustomizationColor), acc.CustomizationColorClock)
 	if err != nil {
 		return err
 	}
-	err = m.syncAccountCustomizationColor(ctx, acc)
-	if err != nil {
-		return err
+
+	if affected > 0 {
+		err = m.syncAccountCustomizationColor(ctx, acc)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
