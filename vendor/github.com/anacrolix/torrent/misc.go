@@ -6,11 +6,12 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/anacrolix/missinggo/v2"
-	"github.com/anacrolix/torrent/types"
 	"golang.org/x/time/rate"
 
 	"github.com/anacrolix/torrent/metainfo"
 	pp "github.com/anacrolix/torrent/peer_protocol"
+	"github.com/anacrolix/torrent/types"
+	"github.com/anacrolix/torrent/types/infohash"
 )
 
 type (
@@ -114,7 +115,8 @@ func connLessTrusted(l, r *Peer) bool {
 
 func connIsIpv6(nc interface {
 	LocalAddr() net.Addr
-}) bool {
+},
+) bool {
 	ra := nc.LocalAddr()
 	rip := addrIpOrNil(ra)
 	return rip.To4() == nil && rip.To16() != nil
@@ -177,8 +179,9 @@ var unlimited = rate.NewLimiter(rate.Inf, 0)
 
 type (
 	pieceIndex = int
-	InfoHash   = metainfo.Hash
-	IpPort     = missinggo.IpPort
+	// Deprecated: Use infohash.T directly to avoid unnecessary imports.
+	InfoHash = infohash.T
+	IpPort   = missinggo.IpPort
 )
 
 func boolSliceToBitmap(slice []bool) (rb roaring.Bitmap) {

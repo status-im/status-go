@@ -37,7 +37,7 @@ func (m Mailserver) IDBytes() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return []byte(id.Pretty()), err
+		return []byte(id), err
 	}
 
 	node, err := enode.ParseV4(m.Address)

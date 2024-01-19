@@ -191,7 +191,7 @@ func (d *Decoder) checkBufferedInt() error {
 	return nil
 }
 
-func (d *Decoder) parseStringLength() (uint64, error) {
+func (d *Decoder) parseStringLength() (int, error) {
 	// We should have already consumed the first byte of the length into the Decoder buf.
 	start := d.Offset - 1
 	d.readUntil(':')
@@ -201,13 +201,13 @@ func (d *Decoder) parseStringLength() (uint64, error) {
 	// Really the limit should be the uint size for the platform. But we can't pass in an allocator,
 	// or limit total memory use in Go, the best we might hope to do is limit the size of a single
 	// decoded value (by reading it in in-place and then operating on a view).
-	length, err := strconv.ParseUint(bytesAsString(d.buf.Bytes()), 10, 0)
+	length, err := strconv.ParseInt(bytesAsString(d.buf.Bytes()), 10, 0)
 	checkForIntParseError(err, start)
 	if int64(length) > d.getMaxStrLen() {
 		err = fmt.Errorf("parsed string length %v exceeds limit (%v)", length, DefaultDecodeMaxStrLen)
 	}
 	d.buf.Reset()
-	return length, err
+	return int(length), err
 }
 
 func (d *Decoder) parseString(v reflect.Value) error {
@@ -246,13 +246,25 @@ func (d *Decoder) parseString(v reflect.Value) error {
 		if v.Type().Elem().Kind() != reflect.Uint8 {
 			break
 		}
-		d.buf.Grow(int(length))
+		d.buf.Grow(length)
 		b := d.buf.Bytes()[:length]
 		read(b)
 		reflect.Copy(v, reflect.ValueOf(b))
 		return nil
+	case reflect.Bool:
+		d.buf.Grow(length)
+		b := d.buf.Bytes()[:length]
+		read(b)
+		x, err := strconv.ParseBool(bytesAsString(b))
+		if err != nil {
+			x = length != 0
+		}
+		v.SetBool(x)
+		return nil
 	}
-	d.buf.Grow(int(length))
+	// Can't move this into default clause because some cases above fail through to here after
+	// additional checks.
+	d.buf.Grow(length)
 	read(d.buf.Bytes()[:length])
 	// I believe we return here to support "ignore_unmarshal_type_error".
 	return &UnmarshalTypeError{

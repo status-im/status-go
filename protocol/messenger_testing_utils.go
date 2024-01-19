@@ -110,7 +110,7 @@ func WaitOnSignaledMessengerResponse(m *Messenger, condition func(*MessengerResp
 			return nil, errors.New(errorMessage)
 
 		case <-timeoutChan:
-			return nil, errors.New("timed out: " + errorMessage)
+			return nil, errors.New("timed out: " + errorMessage) // nolint: goconst
 
 		default: // No immediate response, rest & loop back to retrieve again
 			time.Sleep(interval)
@@ -145,7 +145,7 @@ func WaitOnSignaledCommunityFound(m *Messenger, action func(), condition func(co
 				return nil
 			}
 		case <-timeoutChan:
-			return errors.New("timed out: " + errorMessage)
+			return errors.New("timed out: " + errorMessage) // nolint: goconst
 		}
 	}
 }

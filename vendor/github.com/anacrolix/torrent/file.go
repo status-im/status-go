@@ -62,31 +62,58 @@ func fileBytesLeft(
 	fileTorrentOffset int64,
 	fileLength int64,
 	torrentCompletedPieces *roaring.Bitmap,
+	pieceSizeCompletedFn func(pieceIndex int) int64,
 ) (left int64) {
-	numPiecesSpanned := fileEndPieceIndex - fileFirstPieceIndex
-	switch numPiecesSpanned {
-	case 0:
-	case 1:
-		if !torrentCompletedPieces.Contains(bitmap.BitIndex(fileFirstPieceIndex)) {
-			left += fileLength
-		}
-	default:
-		if !torrentCompletedPieces.Contains(bitmap.BitIndex(fileFirstPieceIndex)) {
-			left += torrentUsualPieceSize - (fileTorrentOffset % torrentUsualPieceSize)
-		}
-		if !torrentCompletedPieces.Contains(bitmap.BitIndex(fileEndPieceIndex - 1)) {
-			left += fileTorrentOffset + fileLength - int64(fileEndPieceIndex-1)*torrentUsualPieceSize
-		}
-		completedMiddlePieces := torrentCompletedPieces.Clone()
-		completedMiddlePieces.RemoveRange(0, bitmap.BitRange(fileFirstPieceIndex+1))
-		completedMiddlePieces.RemoveRange(bitmap.BitRange(fileEndPieceIndex-1), bitmap.ToEnd)
-		left += int64(numPiecesSpanned-2-pieceIndex(completedMiddlePieces.GetCardinality())) * torrentUsualPieceSize
+	if fileLength == 0 {
+		return
 	}
+
+	noCompletedMiddlePieces := roaring.New()
+	noCompletedMiddlePieces.AddRange(bitmap.BitRange(fileFirstPieceIndex), bitmap.BitRange(fileEndPieceIndex))
+	noCompletedMiddlePieces.AndNot(torrentCompletedPieces)
+	noCompletedMiddlePieces.Iterate(func(pieceIndex uint32) bool {
+		i := int(pieceIndex)
+		pieceSizeCompleted := pieceSizeCompletedFn(i)
+		if i == fileFirstPieceIndex {
+			beginOffset := fileTorrentOffset % torrentUsualPieceSize
+			beginSize := torrentUsualPieceSize - beginOffset
+			beginDownLoaded := pieceSizeCompleted - beginOffset
+			if beginDownLoaded < 0 {
+				beginDownLoaded = 0
+			}
+			left += beginSize - beginDownLoaded
+		} else if i == fileEndPieceIndex-1 {
+			endSize := (fileTorrentOffset + fileLength) % torrentUsualPieceSize
+			if endSize == 0 {
+				endSize = torrentUsualPieceSize
+			}
+			endDownloaded := pieceSizeCompleted
+			if endDownloaded > endSize {
+				endDownloaded = endSize
+			}
+			left += endSize - endDownloaded
+		} else {
+			left += torrentUsualPieceSize - pieceSizeCompleted
+		}
+		return true
+	})
+
+	if left > fileLength {
+		left = fileLength
+	}
+	//
+	//numPiecesSpanned := f.EndPieceIndex() - f.BeginPieceIndex()
+	//completedMiddlePieces := f.t._completedPieces.Clone()
+	//completedMiddlePieces.RemoveRange(0, bitmap.BitRange(f.BeginPieceIndex()+1))
+	//completedMiddlePieces.RemoveRange(bitmap.BitRange(f.EndPieceIndex()-1), bitmap.ToEnd)
+	//left += int64(numPiecesSpanned-2-pieceIndex(completedMiddlePieces.GetCardinality())) * torrentUsualPieceSize
 	return
 }
 
 func (f *File) bytesLeft() (left int64) {
-	return fileBytesLeft(int64(f.t.usualPieceSize()), f.firstPieceIndex(), f.endPieceIndex(), f.offset, f.length, &f.t._completedPieces)
+	return fileBytesLeft(int64(f.t.usualPieceSize()), f.BeginPieceIndex(), f.EndPieceIndex(), f.offset, f.length, &f.t._completedPieces, func(pieceIndex int) int64 {
+		return int64(f.t.piece(pieceIndex).numDirtyBytes())
+	})
 }
 
 // The relative file path for a multi-file torrent, and the torrent name for a
@@ -149,21 +176,21 @@ func (f *File) SetPriority(prio piecePriority) {
 	f.t.cl.lock()
 	if prio != f.prio {
 		f.prio = prio
-		f.t.updatePiecePriorities(f.firstPieceIndex(), f.endPieceIndex(), "File.SetPriority")
+		f.t.updatePiecePriorities(f.BeginPieceIndex(), f.EndPieceIndex(), "File.SetPriority")
 	}
 	f.t.cl.unlock()
 }
 
 // Returns the priority per File.SetPriority.
 func (f *File) Priority() (prio piecePriority) {
-	f.t.cl.lock()
+	f.t.cl.rLock()
 	prio = f.prio
-	f.t.cl.unlock()
+	f.t.cl.rUnlock()
 	return
 }
 
 // Returns the index of the first piece containing data for the file.
-func (f *File) firstPieceIndex() pieceIndex {
+func (f *File) BeginPieceIndex() int {
 	if f.t.usualPieceSize() == 0 {
 		return 0
 	}
@@ -171,7 +198,7 @@ func (f *File) firstPieceIndex() pieceIndex {
 }
 
 // Returns the index of the piece after the last one containing data for the file.
-func (f *File) endPieceIndex() pieceIndex {
+func (f *File) EndPieceIndex() int {
 	if f.t.usualPieceSize() == 0 {
 		return 0
 	}

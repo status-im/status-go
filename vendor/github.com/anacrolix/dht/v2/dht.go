@@ -9,14 +9,15 @@ import (
 	"net"
 	"time"
 
-	"github.com/anacrolix/dht/v2/bep44"
-	"github.com/anacrolix/dht/v2/krpc"
-	peer_store "github.com/anacrolix/dht/v2/peer-store"
 	"github.com/anacrolix/log"
 	"github.com/anacrolix/missinggo/v2"
 	"github.com/anacrolix/torrent/iplist"
 	"github.com/anacrolix/torrent/metainfo"
 	"golang.org/x/time/rate"
+
+	"github.com/anacrolix/dht/v2/bep44"
+	"github.com/anacrolix/dht/v2/krpc"
+	peer_store "github.com/anacrolix/dht/v2/peer-store"
 )
 
 func defaultQueryResendDelay() time.Duration {

@@ -11,7 +11,7 @@ var retries = pprof.NewProfile("stmRetries")
 var retry = &struct{}{}
 
 // catchRetry returns true if fn calls tx.Retry.
-func catchRetry(fn Operation, tx *Tx) (result interface{}, gotRetry bool) {
+func catchRetry[R any](fn Operation[R], tx *Tx) (result R, gotRetry bool) {
 	defer func() {
 		if r := recover(); r == retry {
 			gotRetry = true

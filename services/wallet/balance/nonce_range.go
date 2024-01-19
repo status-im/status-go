@@ -18,9 +18,9 @@ type nonceRange struct {
 type sortedNonceRangesCacheType addressChainMap[[]nonceRange] // address->chainID->[]nonceRange
 
 type nonceRangeCache[T cacheIface[int64, nonceRange]] struct {
-	nonceRanges  addressChainMap[T]
-	sortedRanges sortedNonceRangesCacheType
-	rw           sync.RWMutex
+	nonceRanges  addressChainMap[T]         // nolint: structcheck
+	sortedRanges sortedNonceRangesCacheType // nolint: structcheck
+	rw           sync.RWMutex               // nolint: structcheck
 }
 
 func newNonceRangeCache[T cacheIface[int64, nonceRange]]() *nonceRangeCache[T] {

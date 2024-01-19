@@ -10,25 +10,33 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/anacrolix/log"
+
 	"github.com/anacrolix/torrent/metainfo"
 	pp "github.com/anacrolix/torrent/peer_protocol"
 	"github.com/anacrolix/torrent/webseed"
 )
 
+const (
+	webseedPeerUnhandledErrorSleep   = 5 * time.Second
+	webseedPeerCloseOnUnhandledError = false
+)
+
 type webseedPeer struct {
 	// First field for stats alignment.
-	peer           Peer
-	client         webseed.Client
-	activeRequests map[Request]webseed.Request
-	requesterCond  sync.Cond
-	// Number of requester routines.
-	maxRequests int
+	peer             Peer
+	client           webseed.Client
+	activeRequests   map[Request]webseed.Request
+	requesterCond    sync.Cond
+	lastUnhandledErr time.Time
 }
 
 var _ peerImpl = (*webseedPeer)(nil)
 
-func (me *webseedPeer) connStatusString() string {
-	return me.client.Url
+func (me *webseedPeer) peerImplStatusLines() []string {
+	return []string{
+		me.client.Url,
+		fmt.Sprintf("last unhandled error: %v", eventAgeString(me.lastUnhandledErr)),
+	}
 }
 
 func (ws *webseedPeer) String() string {
@@ -85,8 +93,9 @@ func (ws *webseedPeer) requester(i int) {
 	defer ws.requesterCond.L.Unlock()
 start:
 	for !ws.peer.closed.IsSet() {
+		// Restart is set if we don't need to wait for the requestCond before trying again.
 		restart := false
-		ws.peer.requestState.Requests.Iterate(func(x uint32) bool {
+		ws.peer.requestState.Requests.Iterate(func(x RequestIndex) bool {
 			r := ws.peer.t.requestIndexToRequest(x)
 			if _, ok := ws.activeRequests[r]; ok {
 				return true
@@ -100,6 +109,11 @@ start:
 			if errors.Is(err, webseed.ErrTooFast) {
 				time.Sleep(time.Duration(rand.Int63n(int64(10 * time.Second))))
 			}
+			// Demeter is throwing a tantrum on Mount Olympus for this
+			ws.peer.t.cl.locker().RLock()
+			duration := time.Until(ws.lastUnhandledErr.Add(webseedPeerUnhandledErrorSleep))
+			ws.peer.t.cl.locker().RUnlock()
+			time.Sleep(duration)
 			ws.requesterCond.L.Lock()
 			return false
 		})
@@ -114,9 +128,12 @@ func (ws *webseedPeer) connectionFlags() string {
 	return "WS"
 }
 
-// TODO: This is called when banning peers. Perhaps we want to be able to ban webseeds too. We could
-// return bool if this is even possible, and if it isn't, skip to the next drop candidate.
+// Maybe this should drop all existing connections, or something like that.
 func (ws *webseedPeer) drop() {}
+
+func (cn *webseedPeer) ban() {
+	cn.peer.close()
+}
 
 func (ws *webseedPeer) handleUpdateRequests() {
 	// Because this is synchronous, webseed peers seem to get first dibs on newly prioritized
@@ -168,8 +185,13 @@ func (ws *webseedPeer) requestResultHandler(r Request, webseedRequest webseed.Re
 			// cfg := spew.NewDefaultConfig()
 			// cfg.DisableMethods = true
 			// cfg.Dump(result.Err)
-			log.Printf("closing %v", ws)
-			ws.peer.close()
+
+			if webseedPeerCloseOnUnhandledError {
+				log.Printf("closing %v", ws)
+				ws.peer.close()
+			} else {
+				ws.lastUnhandledErr = time.Now()
+			}
 		}
 		if !ws.peer.remoteRejectedRequest(ws.peer.t.requestIndexFromRequest(r)) {
 			panic("invalid reject")

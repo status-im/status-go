@@ -5,9 +5,10 @@ import (
 	"net"
 
 	"github.com/anacrolix/log"
-
 	"github.com/anacrolix/missinggo/v2"
 )
+
+type listenPacketFunc func(network, addr string) (net.PacketConn, error)
 
 type NewConnClientOpts struct {
 	// The network to operate to use, such as "udp4", "udp", "udp6".
@@ -18,6 +19,8 @@ type NewConnClientOpts struct {
 	Ipv6 *bool
 	// Logger to use for internal errors.
 	Logger log.Logger
+	// Custom function to use as a substitute for net.ListenPacket
+	ListenPacket listenPacketFunc
 }
 
 // Manages a Client with a specific connection.
@@ -39,7 +42,8 @@ func (cc *ConnClient) reader() {
 			// read error.
 			cc.readErr = err
 			if !cc.closed {
-				panic(err)
+				// don't panic, just close the connection, fix https://github.com/anacrolix/torrent/issues/845
+				cc.Close()
 			}
 			break
 		}
@@ -80,7 +84,13 @@ func (me clientWriter) Write(p []byte) (n int, err error) {
 }
 
 func NewConnClient(opts NewConnClientOpts) (cc *ConnClient, err error) {
-	conn, err := net.ListenPacket(opts.Network, ":0")
+	var conn net.PacketConn
+	if opts.ListenPacket != nil {
+		conn, err = opts.ListenPacket(opts.Network, ":0")
+	} else {
+		conn, err = net.ListenPacket(opts.Network, ":0")
+	}
+
 	if err != nil {
 		return
 	}

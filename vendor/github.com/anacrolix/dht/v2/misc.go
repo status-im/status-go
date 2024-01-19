@@ -3,10 +3,11 @@ package dht
 import (
 	"net"
 
+	"github.com/anacrolix/missinggo/v2/iter"
+
 	"github.com/anacrolix/dht/v2/int160"
 	"github.com/anacrolix/dht/v2/krpc"
 	"github.com/anacrolix/dht/v2/types"
-	"github.com/anacrolix/missinggo/v2/iter"
 )
 
 func mustListen(addr string) net.PacketConn {

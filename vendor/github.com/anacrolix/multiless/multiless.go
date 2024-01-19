@@ -105,3 +105,16 @@ func (me Computation) AndThen(then Computation) Computation {
 		return then
 	}
 }
+
+// Returns -1 if less, 0 if equal, and 1 if greater than
+func (me Computation) OrderingInt() int {
+	if me.ok {
+		if me.less {
+			return -1
+		} else {
+			return 1
+		}
+	} else {
+		return 0
+	}
+}

@@ -120,7 +120,7 @@ func TestDecodeFromURL(t *testing.T) {
 			},
 		},
 		{
-			s.URL + "/1.webp",
+			s.URL + "/1.webp", // nolint: goconst
 			false,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},
@@ -128,7 +128,7 @@ func TestDecodeFromURL(t *testing.T) {
 			},
 		},
 		{
-			s.URL + "/1.webp",
+			s.URL + "/1.webp", // nolint: goconst
 			true,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},

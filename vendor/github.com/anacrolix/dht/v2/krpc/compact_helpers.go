@@ -6,7 +6,6 @@ import (
 	"reflect"
 
 	"github.com/anacrolix/missinggo/slices"
-
 	"github.com/anacrolix/torrent/bencode"
 )
 

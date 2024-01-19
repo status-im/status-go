@@ -44,12 +44,15 @@ type requestStrategyTorrent struct {
 	t *Torrent
 }
 
-func (r requestStrategyTorrent) Piece(i int) request_strategy.Piece {
-	return requestStrategyPiece{r.t, i}
-}
+func (r requestStrategyTorrent) IgnorePiece(i int) bool {
+	if r.t.ignorePieceForRequests(i) {
+		return true
+	}
+	if r.t.pieceNumPendingChunks(i) == 0 {
+		return true
+	}
 
-func (r requestStrategyTorrent) ChunksPerPiece() uint32 {
-	return r.t.chunksPerRegularPiece()
+	return false
 }
 
 func (r requestStrategyTorrent) PieceLength() int64 {

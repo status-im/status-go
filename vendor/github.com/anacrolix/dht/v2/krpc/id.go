@@ -72,3 +72,7 @@ func (id ID) String() string {
 func (id ID) Int160() int160.T {
 	return int160.FromByteArray(id)
 }
+
+func (id ID) IsZero() bool {
+	return id == [20]byte{}
+}

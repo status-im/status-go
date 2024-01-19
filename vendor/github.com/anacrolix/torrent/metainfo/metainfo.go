@@ -1,6 +1,7 @@
 package metainfo
 
 import (
+	"bufio"
 	"io"
 	"net/url"
 	"os"
@@ -10,10 +11,10 @@ import (
 )
 
 type MetaInfo struct {
-	InfoBytes    bencode.Bytes `bencode:"info,omitempty"`          // BEP 3
-	Announce     string        `bencode:"announce,omitempty"`      // BEP 3
-	AnnounceList AnnounceList  `bencode:"announce-list,omitempty"` // BEP 12
-	Nodes        []Node        `bencode:"nodes,omitempty"`         // BEP 5
+	InfoBytes    bencode.Bytes `bencode:"info,omitempty"`                              // BEP 3
+	Announce     string        `bencode:"announce,omitempty"`                          // BEP 3
+	AnnounceList AnnounceList  `bencode:"announce-list,omitempty"`                     // BEP 12
+	Nodes        []Node        `bencode:"nodes,omitempty,ignore_unmarshal_type_error"` // BEP 5
 	// Where's this specified? Mentioned at
 	// https://wiki.theory.org/index.php/BitTorrentSpecification: (optional) the creation time of
 	// the torrent, in standard UNIX epoch format (integer, seconds since 1-Jan-1970 00:00:00 UTC)
@@ -43,7 +44,9 @@ func LoadFromFile(filename string) (*MetaInfo, error) {
 		return nil, err
 	}
 	defer f.Close()
-	return Load(f)
+	var buf bufio.Reader
+	buf.Reset(f)
+	return Load(&buf)
 }
 
 func (mi MetaInfo) UnmarshalInfo() (info Info, err error) {
@@ -62,17 +65,15 @@ func (mi MetaInfo) Write(w io.Writer) error {
 
 // Set good default values in preparation for creating a new MetaInfo file.
 func (mi *MetaInfo) SetDefaults() {
-	mi.Comment = ""
 	mi.CreatedBy = "github.com/anacrolix/torrent"
 	mi.CreationDate = time.Now().Unix()
-	// mi.Info.PieceLength = 256 * 1024
 }
 
 // Creates a Magnet from a MetaInfo. Optional infohash and parsed info can be provided.
-func (mi *MetaInfo) Magnet(infoHash *Hash, info *Info) (m Magnet) {
+func (mi MetaInfo) Magnet(infoHash *Hash, info *Info) (m Magnet) {
 	m.Trackers = append(m.Trackers, mi.UpvertedAnnounceList().DistinctValues()...)
 	if info != nil {
-		m.DisplayName = info.Name
+		m.DisplayName = info.BestName()
 	}
 	if infoHash != nil {
 		m.InfoHash = *infoHash

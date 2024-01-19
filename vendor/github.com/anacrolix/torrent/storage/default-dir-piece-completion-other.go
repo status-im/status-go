@@ -1,6 +1,7 @@
 // Bolt piece completion is not available, and neither is sqlite.
-//go:build wasm || noboltdb
-// +build wasm noboltdb
+//go:build (!cgo || nosqlite) && (noboltdb || wasm)
+// +build !cgo nosqlite
+// +build noboltdb wasm
 
 package storage
 

@@ -1,7 +1,8 @@
 // modernc.org/sqlite depends on modernc.org/libc which doesn't work for JS (and probably wasm but I
 // think JS is the stronger signal).
-//go:build !js && !nosqlite
-// +build !js,!nosqlite
+
+//go:build cgo && !nosqlite
+// +build cgo,!nosqlite
 
 package storage
 
@@ -10,9 +11,10 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/go-llsqlite/adapter"
+	"github.com/go-llsqlite/adapter/sqlitex"
+
 	"github.com/anacrolix/torrent/metainfo"
-	"zombiezen.com/go/sqlite"
-	"zombiezen.com/go/sqlite/sqlitex"
 )
 
 // sqlite is always the default when available.

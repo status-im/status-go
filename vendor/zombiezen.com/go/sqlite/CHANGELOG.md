@@ -5,7 +5,189 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-[Unreleased]: https://github.com/zombiezen/go-sqlite/compare/v0.8.0...main
+[Unreleased]: https://github.com/zombiezen/go-sqlite/compare/v0.13.1...main
+
+## [0.13.1][] - 2023-08-15
+
+Version 0.13.1 fixed a bug with the `sqlitemigration` package.
+
+[0.13.1]: https://github.com/zombiezen/go-sqlite/releases/tag/v0.13.1
+
+### Fixed
+
+- `sqlitemigration` will no longer disable foreign keys during operation
+  ([#54](https://github.com/zombiezen/go-sqlite/issues/54)).
+
+## [0.13.0][] - 2023-03-28
+
+Version 0.13 added support for
+user-defined [collating sequences](https://www.sqlite.org/datatype3.html#collation)
+and user-defined [virtual tables](https://sqlite.org/vtab.html).
+
+[0.13.0]: https://github.com/zombiezen/go-sqlite/releases/tag/v0.13.0
+
+### Added
+
+- Support user-defined collating sequences
+  ([#21](https://github.com/zombiezen/go-sqlite/issues/21)).
+- Support user-defined virtual tables
+  ([#15](https://github.com/zombiezen/go-sqlite/issues/15)).
+- New package `ext/generateseries` provides
+  an optional `generate_series` table-valued function extension.
+- Exported the `regexp` function example as a new `ext/refunc` package.
+- Add `*Conn.Serialize` and `*Conn.Deserialize` methods
+  ([#52](https://github.com/zombiezen/go-sqlite/issues/52)).
+
+### Changed
+
+- The minimum supported Go version for this library is now Go 1.19.
+
+### Fixed
+
+- The documentation for `AggregateFunction.WindowValue`
+  incorrectly stated that it would not be called in non-window contexts.
+  The sentence has been removed, but the behavior has not changed.
+
+## [0.12.0][] - 2023-02-08
+
+Version 0.12 added support for the [online backup API](https://www.sqlite.org/backup.html).
+
+[0.12.0]: https://github.com/zombiezen/go-sqlite/releases/tag/v0.12.0
+
+### Added
+
+- Added support for the online backup API
+  ([#47](https://github.com/zombiezen/go-sqlite/issues/47)).
+- Documented the `OpenFlags`.
+
+### Changed
+
+- `OpenNoMutex` and `OpenFullMutex` no longer have an effect on `sqlite.OpenConn`.
+  `OpenNoMutex` (i.e. [multi-thread mode](https://www.sqlite.org/threadsafe.html))
+  is now the only supported mode.
+  `*sqlite.Conn` has never been safe to use concurrently from multiple goroutines,
+  so this is mostly to prevent unnecessary locking and to avoid confusion.
+  ([#32](https://github.com/zombiezen/go-sqlite/issues/32)).
+
+## [0.11.0][] - 2022-12-11
+
+Version 0.11 changes the aggregate function API.
+
+[0.11.0]: https://github.com/zombiezen/go-sqlite/releases/tag/v0.11.0
+
+### Changed
+
+- User-defined aggregate functions are now encapsulated
+  with a new interface, `AggregateFunction`.
+  The previous 4-callback approach has been removed
+  and replaced with a single `MakeAggregate` callback.
+  Not only was the previous API unwieldy,
+  but it failed to handle concurrent aggregate function calls
+  in a single query.
+- Minimum `modernc.org/sqlite` version updated to 1.20.0.
+
+## [0.10.1][] - 2022-07-17
+
+Version 0.10.1 fixes a bug in user-defined window functions.
+Special thanks to Jan Mercl for assistance in debugging this issue.
+
+[0.10.1]: https://github.com/zombiezen/go-sqlite/releases/tag/v0.10.1
+
+### Fixed
+
+- `AggregateFinal` is now called correctly at the end of window functions' usages.
+
+## [0.10.0][] - 2022-07-10
+
+Version 0.10 adds support for user-defined window functions.
+
+[0.10.0]: https://github.com/zombiezen/go-sqlite/releases/tag/v0.10.0
+
+### Added
+
+- `FunctionImpl` has two new fields (`WindowValue` and `WindowInverse`)
+  that allow creating [user-defined aggregate window functions][]
+  ([#42](https://github.com/zombiezen/go-sqlite/issues/42)).
+
+[user-defined aggregate window functions]: https://www.sqlite.org/windowfunctions.html#user_defined_aggregate_window_functions
+
+### Changed
+
+- The `AggregateStep` callback now returns an `error`.
+
+## [0.9.3][] - 2022-05-30
+
+Version 0.9.3 updates the version of `modernc.org/sqlite` used.
+
+[0.9.3]: https://github.com/zombiezen/go-sqlite/releases/tag/v0.9.3
+
+### Changed
+
+- Minimum `modernc.org/sqlite` version updated to v1.17.3.
+
+## [0.9.2][] - 2022-01-25
+
+Version 0.9 adds new `Execute` functions to `sqlitex`
+and changes the default blocking behavior.
+Version 0.9 also includes various fixes to the schema migration behavior.
+
+[0.9.2]: https://github.com/zombiezen/go-sqlite/releases/tag/v0.9.2
+
+### Added
+
+- Added `SetBlockOnBusy` method to set an indefinite timeout on acquiring a lock.
+- Official support for `windows/amd64`.
+- `sqlitex` has three new functions —
+  `Execute`, `ExecuteTransient`, and `ExecuteScript` —
+  that take in an `ExecOptions` struct.
+  ([#5](https://github.com/zombiezen/go-sqlite/issues/5))
+- New method `sqlite.ResultCode.ToError` to create error values.
+- New methods `ColumnBool` and `GetBool` on `*sqlite.Stmt`
+  ([#37](https://github.com/zombiezen/go-sqlite/issues/37)).
+
+### Changed
+
+- `OpenConn` calls `SetBlockOnBusy` on new connections
+  instead of `SetBusyTimeout(10 * time.Second)`.
+- The `sqlitex.Execute*` family of functions now verify that
+  the arguments passed match the SQL parameters.
+  ([#31](https://github.com/zombiezen/go-sqlite/issues/31))
+
+### Deprecated
+
+- `sqlitex.ExecFS` has been renamed to `sqlitex.ExecuteFS`,
+  `sqlitex.ExecTransientFS` has been renamed to `sqlitex.ExecuteTransientFS`,
+  and `sqlitex.ExecScriptFS` has been renamed to `sqlitex.ExecuteScriptFS`
+  for consistency with the new `Execute` functions.
+  Aliases remain in this version, but will be removed in the next version.
+  Use `zombiezen-sqlite-migrate` to clean up existing references.
+- `sqlitex.Exec` and `sqlitex.ExecTransient`
+  have been marked deprecated because they do not perform the argument checks
+  that the `Execute` functions now perform.
+  These functions will remain into 1.0 and beyond for compatibility,
+  but should not be used in new applications.
+
+### Fixed
+
+- `sqlitemigration.Schema.RepeatableMigration` is now run as part of the final transaction.
+  This ensures that the repeatable migration for migration `N` has executed
+  if and only if `user_version == N`.
+  Previously, the repeatable migration could fail independently of the final transaction,
+  which would mean that a subsequent migration run would not trigger a retry of the repeatable transaction,
+  but report success.
+- `sqlitemigration` will no longer skip applying the repeatable migration
+  if the final migration is empty.
+- `OpenConn` now sets a busy handler before enabling WAL
+  (thanks @anacrolix!).
+
+## 0.9.0 and 0.9.1
+
+Versions 0.9.0 was accidentally released before CI ran.
+A change in the underlying `modernc.org/libc` library
+caused the memory leak detection to identify a false positive.
+In an abundance of caution, 0.9.1 was released
+to mark both 0.9.1 and 0.9.0 as retracted.
+Version 0.9.2 is the first official release of 0.9.
 
 ## [0.8.0][] - 2021-11-07
 

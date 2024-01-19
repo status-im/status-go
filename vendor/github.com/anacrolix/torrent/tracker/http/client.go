@@ -1,7 +1,9 @@
-package http
+package httpTracker
 
 import (
+	"context"
 	"crypto/tls"
+	"net"
 	"net/http"
 	"net/url"
 )
@@ -11,10 +13,14 @@ type Client struct {
 	url_ *url.URL
 }
 
-type ProxyFunc func(*http.Request) (*url.URL, error)
+type (
+	ProxyFunc       func(*http.Request) (*url.URL, error)
+	DialContextFunc func(ctx context.Context, network, addr string) (net.Conn, error)
+)
 
 type NewClientOpts struct {
 	Proxy          ProxyFunc
+	DialContext    DialContextFunc
 	ServerName     string
 	AllowKeepAlive bool
 }
@@ -24,7 +30,8 @@ func NewClient(url_ *url.URL, opts NewClientOpts) Client {
 		url_: url_,
 		hc: &http.Client{
 			Transport: &http.Transport{
-				Proxy: opts.Proxy,
+				DialContext: opts.DialContext,
+				Proxy:       opts.Proxy,
 				TLSClientConfig: &tls.Config{
 					InsecureSkipVerify: true,
 					ServerName:         opts.ServerName,

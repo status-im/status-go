@@ -1,6 +1,7 @@
 package torrent
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"net/url"
@@ -10,16 +11,44 @@ import (
 	"github.com/anacrolix/dht/v2/krpc"
 	"github.com/anacrolix/log"
 	"github.com/anacrolix/missinggo/v2"
-	"github.com/anacrolix/torrent/version"
 	"golang.org/x/time/rate"
 
 	"github.com/anacrolix/torrent/iplist"
 	"github.com/anacrolix/torrent/mse"
 	"github.com/anacrolix/torrent/storage"
+	"github.com/anacrolix/torrent/version"
 )
+
+// Contains config elements that are exclusive to tracker handling. There may be other fields in
+// ClientConfig that are also relevant.
+type ClientTrackerConfig struct {
+	// Don't announce to trackers. This only leaves DHT to discover peers.
+	DisableTrackers bool `long:"disable-trackers"`
+	// Defines DialContext func to use for HTTP tracker announcements
+	TrackerDialContext func(ctx context.Context, network, addr string) (net.Conn, error)
+	// Defines ListenPacket func to use for UDP tracker announcements
+	TrackerListenPacket func(network, addr string) (net.PacketConn, error)
+	// Takes a tracker's hostname and requests DNS A and AAAA records.
+	// Used in case DNS lookups require a special setup (i.e., dns-over-https)
+	LookupTrackerIp func(*url.URL) ([]net.IP, error)
+}
+
+type ClientDhtConfig struct {
+	// Don't create a DHT.
+	NoDHT            bool `long:"disable-dht"`
+	DhtStartingNodes func(network string) dht.StartingNodesGetter
+	// Called for each anacrolix/dht Server created for the Client.
+	ConfigureAnacrolixDhtServer       func(*dht.ServerConfig)
+	PeriodicallyAnnounceTorrentsToDht bool
+	// OnQuery hook func
+	DHTOnQuery func(query *krpc.Msg, source net.Addr) (propagate bool)
+}
 
 // Probably not safe to modify this after it's given to a Client.
 type ClientConfig struct {
+	ClientTrackerConfig
+	ClientDhtConfig
+
 	// Store torrent file data in this directory unless .DefaultStorage is
 	// specified.
 	DataDir string `long:"data-dir" description:"directory to store downloaded torrent data"`
@@ -29,16 +58,7 @@ type ClientConfig struct {
 	ListenPort              int
 	NoDefaultPortForwarding bool
 	UpnpID                  string
-	// Don't announce to trackers. This only leaves DHT to discover peers.
-	DisableTrackers bool `long:"disable-trackers"`
-	DisablePEX      bool `long:"disable-pex"`
-
-	// Don't create a DHT.
-	NoDHT            bool `long:"disable-dht"`
-	DhtStartingNodes func(network string) dht.StartingNodesGetter
-	// Called for each anacrolix/dht Server created for the Client.
-	ConfigureAnacrolixDhtServer       func(*dht.ServerConfig)
-	PeriodicallyAnnounceTorrentsToDht bool
+	DisablePEX              bool `long:"disable-pex"`
 
 	// Never send chunks to peers.
 	NoUpload bool `long:"no-upload"`
@@ -87,14 +107,21 @@ type ClientConfig struct {
 	Debug  bool `help:"enable debugging"`
 	Logger log.Logger
 
+	// Used for torrent sources and webseeding if set.
+	WebTransport http.RoundTripper
 	// Defines proxy for HTTP requests, such as for trackers. It's commonly set from the result of
 	// "net/http".ProxyURL(HTTPProxy).
 	HTTPProxy func(*http.Request) (*url.URL, error)
-	// Takes a tracker's hostname and requests DNS A and AAAA records.
-	// Used in case DNS lookups require a special setup (i.e., dns-over-https)
-	LookupTrackerIp func(*url.URL) ([]net.IP, error)
+	// Defines DialContext func to use for HTTP requests, such as for fetching metainfo and webtorrent seeds
+	HTTPDialContext func(ctx context.Context, network, addr string) (net.Conn, error)
 	// HTTPUserAgent changes default UserAgent for HTTP requests
 	HTTPUserAgent string
+	// HttpRequestDirector modifies the request before it's sent.
+	// Useful for adding authentication headers, for example
+	HttpRequestDirector func(*http.Request) error
+	// WebsocketTrackerHttpHeader returns a custom header to be used when dialing a websocket connection
+	// to the tracker. Useful for adding authentication headers
+	WebsocketTrackerHttpHeader func() http.Header
 	// Updated occasionally to when there's been some changes to client
 	// behaviour in case other clients are assuming anything of us. See also
 	// `bep20`.
@@ -123,6 +150,8 @@ type ClientConfig struct {
 	// How long between writes before sending a keep alive message on a peer connection that we want
 	// to maintain.
 	KeepAliveTimeout time.Duration
+	// Maximum bytes to buffer per peer connection for peer request data before it is sent.
+	MaxAllocPeerRequestDataPerConn int64
 
 	// The IP addresses as our peers should see them. May differ from the
 	// local interfaces due to NAT or other network configurations.
@@ -142,11 +171,8 @@ type ClientConfig struct {
 	// Whether to accept peer connections at all.
 	AcceptPeerConnections bool
 	// Whether a Client should want conns without delegating to any attached Torrents. This is
-	// useful when torrents might be added dynmically in callbacks for example.
+	// useful when torrents might be added dynamically in callbacks for example.
 	AlwaysWantConns bool
-
-	// OnQuery hook func
-	DHTOnQuery func(query *krpc.Msg, source net.Addr) (propagate bool)
 
 	Extensions PeerExtensionBits
 	// Bits that peers must have set to proceed past handshakes.
@@ -156,6 +182,14 @@ type ClientConfig struct {
 	DisableWebseeds   bool
 
 	Callbacks Callbacks
+
+	// ICEServers defines a slice describing servers available to be used by
+	// ICE, such as STUN and TURN servers.
+	ICEServers []string
+
+	DialRateLimiter *rate.Limiter
+
+	PieceHashersPerTorrent int // default: 2
 }
 
 func (cfg *ClientConfig) SetListenAddr(addr string) *ClientConfig {
@@ -183,27 +217,29 @@ func NewDefaultClientConfig() *ClientConfig {
 		TorrentPeersLowWater:           50,
 		HandshakesTimeout:              4 * time.Second,
 		KeepAliveTimeout:               time.Minute,
-		DhtStartingNodes: func(network string) dht.StartingNodesGetter {
-			return func() ([]dht.Addr, error) { return dht.GlobalBootstrapAddrs(network) }
-		},
-		PeriodicallyAnnounceTorrentsToDht: true,
-		ListenHost:                        func(string) string { return "" },
-		UploadRateLimiter:                 unlimited,
-		DownloadRateLimiter:               unlimited,
-		DisableAcceptRateLimiting:         true,
-		DropMutuallyCompletePeers:         true,
+		MaxAllocPeerRequestDataPerConn: 1 << 20,
+		ListenHost:                     func(string) string { return "" },
+		UploadRateLimiter:              unlimited,
+		DownloadRateLimiter:            unlimited,
+		DisableAcceptRateLimiting:      true,
+		DropMutuallyCompletePeers:      true,
 		HeaderObfuscationPolicy: HeaderObfuscationPolicy{
 			Preferred:        true,
 			RequirePreferred: false,
 		},
-		CryptoSelector:        mse.DefaultCryptoSelector,
-		CryptoProvides:        mse.AllSupportedCrypto,
-		ListenPort:            42069,
-		Extensions:            defaultPeerExtensionBytes(),
-		AcceptPeerConnections: true,
+		CryptoSelector:         mse.DefaultCryptoSelector,
+		CryptoProvides:         mse.AllSupportedCrypto,
+		ListenPort:             42069,
+		Extensions:             defaultPeerExtensionBytes(),
+		AcceptPeerConnections:  true,
+		MaxUnverifiedBytes:     64 << 20,
+		DialRateLimiter:        rate.NewLimiter(10, 10),
+		PieceHashersPerTorrent: 2,
 	}
-	// cc.ConnTracker.SetNoMaxEntries()
-	// cc.ConnTracker.Timeout = func(conntrack.Entry) time.Duration { return 0 }
+	cc.DhtStartingNodes = func(network string) dht.StartingNodesGetter {
+		return func() ([]dht.Addr, error) { return dht.GlobalBootstrapAddrs(network) }
+	}
+	cc.PeriodicallyAnnounceTorrentsToDht = true
 	return cc
 }
 

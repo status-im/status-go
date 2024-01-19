@@ -1,4 +1,4 @@
-package http
+package httpTracker
 
 import (
 	"bytes"
@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/anacrolix/missinggo/httptoo"
+
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/tracker/shared"
 	"github.com/anacrolix/torrent/tracker/udp"
@@ -75,10 +76,11 @@ func setAnnounceParams(_url *url.URL, ar *AnnounceRequest, opts AnnounceOpt) {
 }
 
 type AnnounceOpt struct {
-	UserAgent  string
-	HostHeader string
-	ClientIp4  net.IP
-	ClientIp6  net.IP
+	UserAgent           string
+	HostHeader          string
+	ClientIp4           net.IP
+	ClientIp6           net.IP
+	HttpRequestDirector func(*http.Request) error
 }
 
 type AnnounceRequest = udp.AnnounceRequest
@@ -94,6 +96,15 @@ func (cl Client) Announce(ctx context.Context, ar AnnounceRequest, opt AnnounceO
 	if userAgent != "" {
 		req.Header.Set("User-Agent", userAgent)
 	}
+
+	if opt.HttpRequestDirector != nil {
+		err = opt.HttpRequestDirector(req)
+		if err != nil {
+			err = fmt.Errorf("error modifying HTTP request: %w", err)
+			return
+		}
+	}
+
 	req.Host = opt.HostHeader
 	resp, err := cl.hc.Do(req)
 	if err != nil {
@@ -103,7 +114,7 @@ func (cl Client) Announce(ctx context.Context, ar AnnounceRequest, opt AnnounceO
 	var buf bytes.Buffer
 	io.Copy(&buf, resp.Body)
 	if resp.StatusCode != 200 {
-		err = fmt.Errorf("response from tracker: %s: %s", resp.Status, buf.String())
+		err = fmt.Errorf("response from tracker: %s: %q", resp.Status, buf.Bytes())
 		return
 	}
 	var trackerResponse HttpResponse
@@ -122,10 +133,10 @@ func (cl Client) Announce(ctx context.Context, ar AnnounceRequest, opt AnnounceO
 	ret.Interval = trackerResponse.Interval
 	ret.Leechers = trackerResponse.Incomplete
 	ret.Seeders = trackerResponse.Complete
-	if len(trackerResponse.Peers) != 0 {
+	if len(trackerResponse.Peers.List) != 0 {
 		vars.Add("http responses with nonempty peers key", 1)
 	}
-	ret.Peers = trackerResponse.Peers
+	ret.Peers = trackerResponse.Peers.List
 	if len(trackerResponse.Peers6) != 0 {
 		vars.Add("http responses with nonempty peers6 key", 1)
 	}

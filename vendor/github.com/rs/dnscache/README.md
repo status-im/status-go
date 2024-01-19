@@ -67,7 +67,7 @@ t := &http.Transport{
 }
 ```
 
-If addition to the `Refresh` method, you can `RefreshWithOptions`. This method adds an option to persist resource records
+In addition to the `Refresh` method, you can `RefreshWithOptions`. This method adds an option to persist resource records
 on failed lookups
 ```go
 r := &Resolver{}

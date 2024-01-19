@@ -10,14 +10,14 @@ it non-atomic).
 To begin, create an STM object that wraps the data you want to access
 concurrently.
 
-	x := stm.NewVar(3)
+	x := stm.NewVar[int](3)
 
 You can then use the Atomically method to atomically read and/or write the the
 data. This code atomically decrements x:
 
 	stm.Atomically(func(tx *stm.Tx) {
-		cur := tx.Get(x).(int)
-		tx.Set(x, cur-1)
+		cur := x.Get(tx)
+		x.Set(tx, cur-1)
 	})
 
 An important part of STM transactions is retrying. At any point during the
@@ -29,11 +29,11 @@ updated before the transaction will be rerun. As an example, this code will
 try to decrement x, but will block as long as x is zero:
 
 	stm.Atomically(func(tx *stm.Tx) {
-		cur := tx.Get(x).(int)
+		cur := x.Get(tx)
 		if cur == 0 {
 			tx.Retry()
 		}
-		tx.Set(x, cur-1)
+		x.Set(tx, cur-1)
 	})
 
 Internally, tx.Retry simply calls panic(stm.Retry). Panicking with any other
@@ -47,13 +47,13 @@ retried. For example, this code implements the "decrement-if-nonzero"
 transaction above, but for two values. It will first try to decrement x, then
 y, and block if both values are zero.
 
-	func dec(v *stm.Var) {
+	func dec(v *stm.Var[int]) {
 		return func(tx *stm.Tx) {
-			cur := tx.Get(v).(int)
+			cur := v.Get(tx)
 			if cur == 0 {
 				tx.Retry()
 			}
-			tx.Set(v, cur-1)
+			v.Set(tx, cur-1)
 		}
 	}
 
@@ -69,11 +69,9 @@ behavior. One common way to get around this is to build up a list of impure
 operations inside the transaction, and then perform them after the transaction
 completes.
 
-The stm API tries to mimic that of Haskell's Control.Concurrent.STM, but this
-is not entirely possible due to Go's type system; we are forced to use
-interface{} and type assertions. Furthermore, Haskell can enforce at compile
-time that STM variables are not modified outside the STM monad. This is not
-possible in Go, so be especially careful when using pointers in your STM code.
-Remember: modifying a pointer is a side effect!
+The stm API tries to mimic that of Haskell's Control.Concurrent.STM, but
+Haskell can enforce at compile time that STM variables are not modified outside
+the STM monad. This is not possible in Go, so be especially careful when using
+pointers in your STM code. Remember: modifying a pointer is a side effect!
 */
 package stm

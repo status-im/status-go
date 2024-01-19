@@ -12,10 +12,9 @@ composition will either deadlock or release the lock between functions (making
 it non-atomic).
 
 The `stm` API tries to mimic that of Haskell's [`Control.Concurrent.STM`](https://hackage.haskell.org/package/stm-2.4.4.1/docs/Control-Concurrent-STM.html), but
-this is not entirely possible due to Go's type system; we are forced to use
-`interface{}` and type assertions. Furthermore, Haskell can enforce at compile
-time that STM variables are not modified outside the STM monad. This is not
-possible in Go, so be especially careful when using pointers in your STM code.
+Haskell can enforce at compile time that STM variables are not modified outside
+the STM monad. This is not possible in Go, so be especially careful when using
+pointers in your STM code. Remember: modifying a pointer is a side effect!
 
 Unlike Haskell, data in Go is not immutable by default, which means you have
 to be careful when using STM to manage pointers. If two goroutines have access
@@ -31,22 +30,22 @@ applications in Go. If you find this package useful, please tell us about it!
 
 See the package examples in the Go package docs for examples of common operations.
 
-See [example_santa_test.go](example_santa_test.go) for a more complex example.
+See [cmd/santa-example/main.go](cmd/santa-example/main.go) for a more complex example.
 
 ## Pointers
 
-Note that `Operation` now returns a value of type `interface{}`, which isn't included in the
+Note that `Operation` now returns a value of type `any`, which isn't included in the
 examples throughout the documentation yet. See the type signatures for `Atomically` and `Operation`.
 
 Be very careful when managing pointers inside transactions! (This includes
 slices, maps, channels, and captured variables.) Here's why:
 
 ```go
-p := stm.NewVar([]byte{1,2,3})
+p := stm.NewVar[[]byte]([]byte{1,2,3})
 stm.Atomically(func(tx *stm.Tx) {
-	b := tx.Get(p).([]byte)
+	b := p.Get(tx)
 	b[0] = 7
-	tx.Set(p, b)
+	stm.p.Set(tx, b)
 })
 ```
 
@@ -57,11 +56,11 @@ Following this advice, we can rewrite the transaction to perform a copy:
 
 ```go
 stm.Atomically(func(tx *stm.Tx) {
-	b := tx.Get(p).([]byte)
+	b := p.Get(tx)
 	c := make([]byte, len(b))
 	copy(c, b)
 	c[0] = 7
-	tx.Set(p, c)
+	p.Set(tx, c)
 })
 ```
 
@@ -73,11 +72,11 @@ In the same vein, it would be a mistake to do this:
 type foo struct {
 	i int
 }
-p := stm.NewVar(&foo{i: 2})
+p := stm.NewVar[*foo](&foo{i: 2})
 stm.Atomically(func(tx *stm.Tx) {
-	f := tx.Get(p).(*foo)
+	f := p.Get(tx)
 	f.i = 7
-	tx.Set(p, f)
+	stm.p.Set(tx, f)
 })
 ```
 
@@ -88,11 +87,11 @@ the correct approach is to move the `Var` inside the struct:
 type foo struct {
 	i *stm.Var
 }
-f := foo{i: stm.NewVar(2)}
+f := foo{i: stm.NewVar[int](2)}
 stm.Atomically(func(tx *stm.Tx) {
-	i := tx.Get(f.i).(int)
+	i := f.i.Get(tx)
 	i = 7
-	tx.Set(f.i, i)
+	f.i.Set(tx, i)
 })
 ```
 

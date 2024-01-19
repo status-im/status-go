@@ -13,9 +13,11 @@ const (
 	ActionAnnounce
 	ActionScrape
 	ActionError
+)
 
-	ConnectRequestConnectionId = 0x41727101980
+const ConnectRequestConnectionId = 0x41727101980
 
+const (
 	// BEP 41
 	optionTypeEndOfOptions = 0
 	optionTypeNOP          = 1
@@ -24,7 +26,7 @@ const (
 
 type TransactionId = int32
 
-type ConnectionId = int64
+type ConnectionId = uint64
 
 type ConnectionRequest struct {
 	ConnectionId  ConnectionId
@@ -57,7 +59,7 @@ type InfoHash = [20]byte
 
 func marshal(data interface{}) (b []byte, err error) {
 	var buf bytes.Buffer
-	err = binary.Write(&buf, binary.BigEndian, data)
+	err = Write(&buf, data)
 	b = buf.Bytes()
 	return
 }
@@ -70,6 +72,7 @@ func mustMarshal(data interface{}) []byte {
 	return b
 }
 
+// This is for fixed-size, builtin types only I think.
 func Write(w io.Writer, data interface{}) error {
 	return binary.Write(w, binary.BigEndian, data)
 }
