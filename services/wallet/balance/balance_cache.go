@@ -56,9 +56,9 @@ type genericCache[B cacheIface[uint64, *big.Int], N cacheIface[uint64, *int64], 
 	nonceRangeCache[NR]
 
 	// balances maps an address and chain to a cache of a block number and the balance of this particular address on the chain
-	balances addressChainMap[B]
-	nonces   addressChainMap[N]
-	rw       sync.RWMutex
+	balances addressChainMap[B] // nolint: structcheck
+	nonces   addressChainMap[N] // nolint: structcheck
+	rw       sync.RWMutex       // nolint: structcheck
 }
 
 func (b *genericCache[_, _, _]) GetBalance(account common.Address, chainID uint64, blockNumber *big.Int) *big.Int {

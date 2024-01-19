@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package ice
 
 import (
@@ -45,7 +48,7 @@ func (a *Agent) GetCandidatePairsStats() []CandidatePairStats {
 		res = result
 	})
 	if err != nil {
-		a.log.Errorf("error getting candidate pairs stats %v", err)
+		a.log.Errorf("Failed to get candidate pairs stats: %v", err)
 		return []CandidatePairStats{}
 	}
 	return res
@@ -60,7 +63,9 @@ func (a *Agent) GetLocalCandidatesStats() []CandidateStats {
 			for _, c := range localCandidates {
 				relayProtocol := ""
 				if c.Type() == CandidateTypeRelay {
-					relayProtocol = c.(*CandidateRelay).RelayProtocol()
+					if cRelay, ok := c.(*CandidateRelay); ok {
+						relayProtocol = cRelay.RelayProtocol()
+					}
 				}
 				stat := CandidateStats{
 					Timestamp:     time.Now(),
@@ -80,7 +85,7 @@ func (a *Agent) GetLocalCandidatesStats() []CandidateStats {
 		res = result
 	})
 	if err != nil {
-		a.log.Errorf("error getting candidate pairs stats %v", err)
+		a.log.Errorf("Failed to get candidate pair stats: %v", err)
 		return []CandidateStats{}
 	}
 	return res
@@ -91,8 +96,8 @@ func (a *Agent) GetRemoteCandidatesStats() []CandidateStats {
 	var res []CandidateStats
 	err := a.run(a.context(), func(ctx context.Context, agent *Agent) {
 		result := make([]CandidateStats, 0, len(agent.remoteCandidates))
-		for networkType, localCandidates := range agent.remoteCandidates {
-			for _, c := range localCandidates {
+		for networkType, remoteCandidates := range agent.remoteCandidates {
+			for _, c := range remoteCandidates {
 				stat := CandidateStats{
 					Timestamp:     time.Now(),
 					ID:            c.ID(),
@@ -110,7 +115,7 @@ func (a *Agent) GetRemoteCandidatesStats() []CandidateStats {
 		res = result
 	})
 	if err != nil {
-		a.log.Errorf("error getting candidate pairs stats %v", err)
+		a.log.Errorf("Failed to get candidate pair stats: %v", err)
 		return []CandidateStats{}
 	}
 	return res

@@ -475,7 +475,7 @@ func (wf *WakuFilterLightNode) Unsubscribe(ctx context.Context, contentFilter pr
 		return nil, errors.New("at least one content topic is required")
 	}
 
-	if slices.Contains[string](contentFilter.ContentTopicsList(), "") {
+	if slices.Contains(contentFilter.ContentTopicsList(), "") {
 		return nil, errors.New("one or more content topics specified is empty")
 	}
 

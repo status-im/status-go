@@ -17,7 +17,7 @@ import (
 
 const pathWalletRoot = "m/44'/60'/0'/0"
 const pathEIP1581 = "m/43'/60'/1581'"
-const pathDefaultChat = pathEIP1581 + "/0'/0"
+const pathDefaultChat = pathEIP1581 + "/0'/0" // nolint: goconst
 const pathDefaultWallet = pathWalletRoot + "/0"
 const defaultMnemonicLength = 12
 const shardsTestClusterID = 16

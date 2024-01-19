@@ -1,6 +1,7 @@
 package codecs
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 )
@@ -727,6 +728,8 @@ var (
 type H265Packet struct {
 	packet        isH265Packet
 	mightNeedDONL bool
+
+	videoDepacketizer
 }
 
 // WithDONL can be called to specify whether or not DONL might be parsed.
@@ -800,4 +803,17 @@ func (p *H265Packet) Unmarshal(payload []byte) ([]byte, error) {
 // nolint:golint
 func (p *H265Packet) Packet() isH265Packet {
 	return p.packet
+}
+
+// IsPartitionHead checks if this is the head of a packetized nalu stream.
+func (*H265Packet) IsPartitionHead(payload []byte) bool {
+	if len(payload) < 3 {
+		return false
+	}
+
+	if H265NALUHeader(binary.BigEndian.Uint16(payload[0:2])).Type() == h265NaluFragmentationUnitType {
+		return H265FragmentationUnitHeader(payload[2]).S()
+	}
+
+	return true
 }

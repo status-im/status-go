@@ -65,14 +65,14 @@ func rowsToMultiTransactions(rows *sql.Rows) ([]*MultiTransaction, error) {
 		if fromAmountDB.Valid {
 			multiTransaction.FromAmount = new(hexutil.Big)
 			if _, ok := (*big.Int)(multiTransaction.FromAmount).SetString(fromAmountDB.String, 0); !ok {
-				return nil, errors.New("failed to convert fromAmountDB.String to big.Int: " + fromAmountDB.String)
+				return nil, errors.New("failed to convert fromAmountDB.String to big.Int: " + fromAmountDB.String) // nolint: goconst
 			}
 		}
 
 		if toAmountDB.Valid {
 			multiTransaction.ToAmount = new(hexutil.Big)
 			if _, ok := (*big.Int)(multiTransaction.ToAmount).SetString(toAmountDB.String, 0); !ok {
-				return nil, errors.New("failed to convert fromAmountDB.String to big.Int: " + toAmountDB.String)
+				return nil, errors.New("failed to convert fromAmountDB.String to big.Int: " + toAmountDB.String) // nolint: goconst
 			}
 		}
 
