@@ -47,7 +47,6 @@ func (c SingleShotCommand) Run(ctx context.Context) error {
 type FiniteCommand struct {
 	Interval time.Duration
 	Runable  func(context.Context) error
-	OnExit   *func(context.Context, error)
 }
 
 func (c FiniteCommand) Run(ctx context.Context) error {
@@ -134,7 +133,7 @@ func NewAtomicGroup(parent context.Context) *AtomicGroup {
 	return ag
 }
 
-// AtomicGroup terminates as soon as first goroutine terminates..
+// AtomicGroup terminates as soon as first goroutine terminates with error.
 type AtomicGroup struct {
 	ctx    context.Context
 	cancel func()
@@ -319,18 +318,11 @@ func (c FiniteCommandWithErrorCounter) Run(ctx context.Context) error {
 
 		if c.ErrorCounter.SetError(err) {
 			return false, err
-		} else {
-			return true, err
 		}
+		return true, err
 	}
 
 	quit, err := f(ctx)
-	defer func() {
-		if c.OnExit != nil {
-			(*c.OnExit)(ctx, err)
-		}
-	}()
-
 	if quit {
 		return err
 	}
