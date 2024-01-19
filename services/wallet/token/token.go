@@ -96,7 +96,7 @@ type ManagerInterface interface {
 type Manager struct {
 	db                *sql.DB
 	RPCClient         *rpc.Client
-	contractMaker     *contracts.ContractMaker
+	ContractMaker     *contracts.ContractMaker
 	networkManager    *network.Manager
 	stores            []store // Set on init, not changed afterwards
 	communityTokensDB *communitytokens.Database
@@ -161,7 +161,7 @@ func NewTokenManager(
 	return &Manager{
 		db:                db,
 		RPCClient:         RPCClient,
-		contractMaker:     maker,
+		ContractMaker:     maker,
 		networkManager:    networkManager,
 		communityManager:  communityManager,
 		stores:            stores,
@@ -502,7 +502,7 @@ func (tm *Manager) GetList() []*List {
 }
 
 func (tm *Manager) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*Token, error) {
-	caller, err := tm.contractMaker.NewERC20(chainID, address)
+	caller, err := tm.ContractMaker.NewERC20(chainID, address)
 	if err != nil {
 		return nil, err
 	}
@@ -693,7 +693,7 @@ func (tm *Manager) GetBalancesAtByChain(parent context.Context, clients map[uint
 		// Keep the reference to the client. DO NOT USE A LOOP, the client will be overridden in the coroutine
 		client := clients[clientIdx]
 
-		ethScanContract, availableAtBlock, err := tm.contractMaker.NewEthScan(client.NetworkID())
+		ethScanContract, availableAtBlock, err := tm.ContractMaker.NewEthScan(client.NetworkID())
 		if err != nil {
 			log.Error("error scanning contract", "err", err)
 			return nil, err

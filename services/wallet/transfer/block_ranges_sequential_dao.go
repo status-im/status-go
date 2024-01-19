@@ -31,8 +31,9 @@ func NewBlockRange() *BlockRange {
 }
 
 type ethTokensBlockRanges struct {
-	eth    *BlockRange
-	tokens *BlockRange
+	eth              *BlockRange
+	tokens           *BlockRange
+	balanceCheckHash string
 }
 
 func newEthTokensBlockRanges() *ethTokensBlockRanges {
@@ -40,7 +41,7 @@ func newEthTokensBlockRanges() *ethTokensBlockRanges {
 }
 
 func (b *BlockRangeSequentialDAO) getBlockRange(chainID uint64, address common.Address) (blockRange *ethTokensBlockRanges, err error) {
-	query := `SELECT blk_start, blk_first, blk_last, token_blk_start, token_blk_first, token_blk_last FROM blocks_ranges_sequential
+	query := `SELECT blk_start, blk_first, blk_last, token_blk_start, token_blk_first, token_blk_last, balance_check_hash FROM blocks_ranges_sequential
 	WHERE address = ?
 	AND network_id = ?`
 
@@ -53,8 +54,14 @@ func (b *BlockRangeSequentialDAO) getBlockRange(chainID uint64, address common.A
 	blockRange = &ethTokensBlockRanges{}
 	if rows.Next() {
 		blockRange = newEthTokensBlockRanges()
-		err = rows.Scan((*bigint.SQLBigInt)(blockRange.eth.Start), (*bigint.SQLBigInt)(blockRange.eth.FirstKnown), (*bigint.SQLBigInt)(blockRange.eth.LastKnown),
-			(*bigint.SQLBigInt)(blockRange.tokens.Start), (*bigint.SQLBigInt)(blockRange.tokens.FirstKnown), (*bigint.SQLBigInt)(blockRange.tokens.LastKnown))
+		err = rows.Scan((*bigint.SQLBigInt)(blockRange.eth.Start),
+			(*bigint.SQLBigInt)(blockRange.eth.FirstKnown),
+			(*bigint.SQLBigInt)(blockRange.eth.LastKnown),
+			(*bigint.SQLBigInt)(blockRange.tokens.Start),
+			(*bigint.SQLBigInt)(blockRange.tokens.FirstKnown),
+			(*bigint.SQLBigInt)(blockRange.tokens.LastKnown),
+			&blockRange.balanceCheckHash,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -88,16 +95,16 @@ func (b *BlockRangeSequentialDAO) upsertRange(chainID uint64, account common.Add
 
 	log.Debug("update eth and tokens blocks range", "account", account, "chainID", chainID,
 		"eth.start", ethBlockRange.Start, "eth.first", ethBlockRange.FirstKnown, "eth.last", ethBlockRange.LastKnown,
-		"tokens.start", tokensBlockRange.Start, "tokens.first", ethBlockRange.FirstKnown, "eth.last", ethBlockRange.LastKnown)
+		"tokens.start", tokensBlockRange.Start, "tokens.first", ethBlockRange.FirstKnown, "eth.last", ethBlockRange.LastKnown, "hash", newBlockRange.balanceCheckHash)
 
 	upsert, err := b.db.Prepare(`REPLACE INTO blocks_ranges_sequential
-					(network_id, address, blk_start, blk_first, blk_last, token_blk_start, token_blk_first, token_blk_last) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+					(network_id, address, blk_start, blk_first, blk_last, token_blk_start, token_blk_first, token_blk_last, balance_check_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
 
 	_, err = upsert.Exec(chainID, account, (*bigint.SQLBigInt)(ethBlockRange.Start), (*bigint.SQLBigInt)(ethBlockRange.FirstKnown), (*bigint.SQLBigInt)(ethBlockRange.LastKnown),
-		(*bigint.SQLBigInt)(tokensBlockRange.Start), (*bigint.SQLBigInt)(tokensBlockRange.FirstKnown), (*bigint.SQLBigInt)(tokensBlockRange.LastKnown))
+		(*bigint.SQLBigInt)(tokensBlockRange.Start), (*bigint.SQLBigInt)(tokensBlockRange.FirstKnown), (*bigint.SQLBigInt)(tokensBlockRange.LastKnown), newBlockRange.balanceCheckHash)
 
 	return err
 }
@@ -113,10 +120,10 @@ func (b *BlockRangeSequentialDAO) upsertEthRange(chainID uint64, account common.
 	blockRange := prepareUpdatedBlockRange(chainID, account, ethTokensBlockRange.eth, newBlockRange)
 
 	log.Debug("update eth blocks range", "account", account, "chainID", chainID,
-		"start", blockRange.Start, "first", blockRange.FirstKnown, "last", blockRange.LastKnown)
+		"start", blockRange.Start, "first", blockRange.FirstKnown, "last", blockRange.LastKnown, "old hash", ethTokensBlockRange.balanceCheckHash)
 
 	upsert, err := b.db.Prepare(`REPLACE INTO blocks_ranges_sequential
-					(network_id, address, blk_start, blk_first, blk_last, token_blk_start, token_blk_first, token_blk_last) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+					(network_id, address, blk_start, blk_first, blk_last, token_blk_start, token_blk_first, token_blk_last, balance_check_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -126,7 +133,7 @@ func (b *BlockRangeSequentialDAO) upsertEthRange(chainID uint64, account common.
 	}
 
 	_, err = upsert.Exec(chainID, account, (*bigint.SQLBigInt)(blockRange.Start), (*bigint.SQLBigInt)(blockRange.FirstKnown), (*bigint.SQLBigInt)(blockRange.LastKnown),
-		(*bigint.SQLBigInt)(ethTokensBlockRange.tokens.Start), (*bigint.SQLBigInt)(ethTokensBlockRange.tokens.FirstKnown), (*bigint.SQLBigInt)(ethTokensBlockRange.tokens.LastKnown))
+		(*bigint.SQLBigInt)(ethTokensBlockRange.tokens.Start), (*bigint.SQLBigInt)(ethTokensBlockRange.tokens.FirstKnown), (*bigint.SQLBigInt)(ethTokensBlockRange.tokens.LastKnown), ethTokensBlockRange.balanceCheckHash)
 
 	return err
 }
@@ -142,7 +149,7 @@ func (b *BlockRangeSequentialDAO) updateTokenRange(chainID uint64, account commo
 	blockRange := prepareUpdatedBlockRange(chainID, account, ethTokensBlockRange.tokens, newBlockRange)
 
 	log.Debug("update tokens blocks range", "account", account, "chainID", chainID,
-		"start", blockRange.Start, "first", blockRange.FirstKnown, "last", blockRange.LastKnown)
+		"start", blockRange.Start, "first", blockRange.FirstKnown, "last", blockRange.LastKnown, "old hash", ethTokensBlockRange.balanceCheckHash)
 
 	update, err := b.db.Prepare(`UPDATE blocks_ranges_sequential SET token_blk_start = ?, token_blk_first = ?, token_blk_last = ? WHERE network_id = ? AND address = ?`)
 	if err != nil {
