@@ -6,10 +6,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/contracts"
 	nodetypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/chain"
@@ -56,6 +58,8 @@ func (ec *errorCounter) Error() error {
 
 type findNewBlocksCommand struct {
 	*findBlocksCommand
+	contractMaker *contracts.ContractMaker
+	iteration     int
 }
 
 func (c *findNewBlocksCommand) Command() async.Command {
@@ -68,27 +72,122 @@ func (c *findNewBlocksCommand) Command() async.Command {
 	}.Run
 }
 
-func (c *findNewBlocksCommand) Run(parent context.Context) (err error) {
-	headNum, err := getHeadBlockNumber(parent, c.chainClient)
+var requestTimeout = 20 * time.Second
+
+func (c *findNewBlocksCommand) detectTransfers(parent context.Context, accounts []common.Address) (*big.Int, []common.Address, error) {
+	bc, err := c.contractMaker.NewBalanceChecker(c.chainClient.NetworkID())
 	if err != nil {
-		log.Error("findNewBlocksCommand getHeadBlockNumber", "error", err, "chain", c.chainClient.NetworkID())
+		log.Error("findNewBlocksCommand error creating balance checker", "error", err, "chain", c.chainClient.NetworkID())
+		return nil, nil, err
+	}
+
+	tokens, err := c.tokenManager.GetTokens(c.chainClient.NetworkID())
+	if err != nil {
+		return nil, nil, err
+	}
+	tokenAddresses := []common.Address{}
+	nilAddress := common.Address{}
+	for _, token := range tokens {
+		if token.Address != nilAddress {
+			tokenAddresses = append(tokenAddresses, token.Address)
+		}
+	}
+	log.Info("findNewBlocksCommand detectTransfers", "cnt", len(tokenAddresses), "addresses", tokenAddresses)
+
+	ctx, cancel := context.WithTimeout(parent, requestTimeout)
+	defer cancel()
+	blockNum, hashes, err := bc.BalancesHash(&bind.CallOpts{Context: ctx}, c.accounts, tokenAddresses)
+	if err != nil {
+		log.Error("findNewBlocksCommand can't get balances hashes", "error", err)
+		return nil, nil, err
+	}
+
+	addressesToCheck := []common.Address{}
+	for idx, account := range accounts {
+		blockRange, err := c.blockRangeDAO.getBlockRange(c.chainClient.NetworkID(), account)
+		if err != nil {
+			log.Error("findNewBlocksCommand can't block range", "error", err, "account", account, "chain", c.chainClient.NetworkID())
+			return nil, nil, err
+		}
+
+		if blockRange.eth == nil {
+			blockRange.eth = NewBlockRange()
+			blockRange.tokens = NewBlockRange()
+		}
+		if blockRange.eth.FirstKnown == nil {
+			blockRange.eth.FirstKnown = blockNum
+		}
+		if blockRange.eth.LastKnown == nil {
+			blockRange.eth.LastKnown = blockNum
+		}
+		checkHash := common.BytesToHash(hashes[idx][:])
+		log.Debug("findNewBlocksCommand comparing hashes", "account", account, "network", c.chainClient.NetworkID(), "old hash", blockRange.balanceCheckHash, "new hash", checkHash.String())
+		if checkHash.String() != blockRange.balanceCheckHash {
+			addressesToCheck = append(addressesToCheck, account)
+		}
+
+		blockRange.balanceCheckHash = checkHash.String()
+
+		err = c.blockRangeDAO.upsertRange(c.chainClient.NetworkID(), account, blockRange)
+		if err != nil {
+			log.Error("findNewBlocksCommand can't update balance check", "error", err, "account", account, "chain", c.chainClient.NetworkID())
+			return nil, nil, err
+		}
+	}
+
+	return blockNum, addressesToCheck, nil
+}
+
+var nonceCheckIntervalIterations = 30
+var logsCheckIntervalIterations = 5
+
+func (c *findNewBlocksCommand) Run(parent context.Context) error {
+	mnemonicWasNotShown, err := c.accountsDB.GetMnemonicWasNotShown()
+	if err != nil {
+		c.error = err
 		return err
 	}
 
-	// In case this is the first check, skip it, history fetching will do it
-	if c.fromBlockNumber.Cmp(headNum) >= 0 {
+	accounts := []common.Address{}
+
+	for _, account := range c.accounts {
+		if mnemonicWasNotShown {
+			acc, err := c.accountsDB.GetAccountByAddress(nodetypes.Address(account))
+			if err != nil {
+				c.error = err
+				return err
+			}
+			if acc.AddressWasNotShown {
+				log.Info("skip findNewBlocksCommand, mnemonic has not been shown and the address has not been shared yet", "address", account)
+				continue
+			}
+		}
+		accounts = append(accounts, account)
+	}
+
+	if len(accounts) == 0 {
 		return nil
 	}
 
-	c.findAndSaveEthBlocks(parent, c.fromBlockNumber, headNum)
-	c.findAndSaveTokenBlocks(parent, c.fromBlockNumber, headNum)
+	headNum, accountsWithDetectedChanges, err := c.detectTransfers(parent, accounts)
+	if err != nil {
+		log.Error("findNewBlocksCommand error on transfer detection", "error", err, "chain", c.chainClient.NetworkID())
+		return err
+	}
 
+	if len(accountsWithDetectedChanges) != 0 || c.iteration%nonceCheckIntervalIterations == 0 {
+		c.findAndSaveEthBlocks(parent, c.fromBlockNumber, headNum, accounts)
+	}
+	if len(accountsWithDetectedChanges) != 0 || c.iteration%logsCheckIntervalIterations == 0 {
+		c.findAndSaveTokenBlocks(parent, c.fromBlockNumber, headNum)
+	}
 	c.fromBlockNumber = headNum
+	c.iteration++
 
 	return nil
 }
 
-func (c *findNewBlocksCommand) findAndSaveEthBlocks(parent context.Context, fromNum, headNum *big.Int) {
+func (c *findNewBlocksCommand) findAndSaveEthBlocks(parent context.Context, fromNum, headNum *big.Int, accounts []common.Address) {
 	// Check ETH transfers for each account independently
 	mnemonicWasNotShown, err := c.accountsDB.GetMnemonicWasNotShown()
 	if err != nil {
@@ -96,7 +195,7 @@ func (c *findNewBlocksCommand) findAndSaveEthBlocks(parent context.Context, from
 		return
 	}
 
-	for _, account := range c.accounts {
+	for _, account := range accounts {
 		if mnemonicWasNotShown {
 			acc, err := c.accountsDB.GetAccountByAddress(nodetypes.Address(account))
 			if err != nil {
@@ -366,7 +465,7 @@ func (c *findBlocksCommand) ERC20ScanByBalance(parent context.Context, account c
 }
 
 func (c *findBlocksCommand) checkERC20Tail(parent context.Context, account common.Address) ([]*DBHeader, error) {
-	log.Debug("checkERC20Tail", "account", account, "to block", c.startBlockNumber, "from", c.resFromBlock.Number)
+	log.Info("checkERC20Tail", "account", account, "to block", c.startBlockNumber, "from", c.resFromBlock.Number)
 	tokens, err := c.tokenManager.GetTokens(c.chainClient.NetworkID())
 	if err != nil {
 		return nil, err
@@ -752,6 +851,7 @@ func newLoadBlocksAndTransfersCommand(accounts []common.Address, db *Database, a
 		blocksLoadedCh:     make(chan []*DBHeader, 100),
 		omitHistory:        omitHistory,
 		errorCounter:       *newErrorCounter("loadBlocksAndTransfersCommand"),
+		contractMaker:      tokenManager.ContractMaker,
 	}
 }
 
@@ -770,6 +870,7 @@ type loadBlocksAndTransfersCommand struct {
 	tokenManager       *token.Manager
 	blocksLoadedCh     chan []*DBHeader
 	omitHistory        bool
+	contractMaker      *contracts.ContractMaker
 
 	// Not to be set by the caller
 	transfersLoaded map[common.Address]bool // For event RecentHistoryReady to be sent only once per account during app lifetime
@@ -985,6 +1086,7 @@ func (c *loadBlocksAndTransfersCommand) startFetchingNewBlocks(ctx context.Conte
 				blocksLoadedCh:            blocksLoadedCh,
 				defaultNodeBlockChunkSize: DefaultNodeBlockChunkSize,
 			},
+			contractMaker: c.contractMaker,
 		}
 		group := async.NewGroup(ctx)
 		group.Add(newBlocksCmd.Command())
