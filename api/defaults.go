@@ -21,7 +21,7 @@ const pathDefaultChat = pathEIP1581 + "/0'/0"
 const pathDefaultWallet = pathWalletRoot + "/0"
 const defaultMnemonicLength = 12
 const shardsTestClusterID = 16
-const walletAccountDefaultName = "Ethereum account"
+const walletAccountDefaultName = "Account 1"
 const keystoreRelativePath = "keystore"
 const defaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
 
