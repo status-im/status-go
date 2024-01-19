@@ -119,6 +119,7 @@ INSERT INTO settings (
   current_network,
   dapps_address,
   device_name,
+  preferred_name,
   display_name,
   bio,
   eip1581_address,
@@ -150,13 +151,14 @@ INSERT INTO settings (
   wallet_collectible_preferences_group_by_collection,
   wallet_collectible_preferences_group_by_community
 ) VALUES (
-?,?,?,?,?,?,?,?,?,?,?,?,?,
+?,?,?,?,?,?,?,?,?,?,?,?,?,?,
 ?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?,?,?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
 		s.DappsAddress,
 		s.DeviceName,
+		s.PreferredName,
 		s.DisplayName,
 		s.Bio,
 		s.EIP1581Address,

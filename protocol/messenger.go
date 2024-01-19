@@ -279,7 +279,6 @@ func NewMessenger(
 	node types.Node,
 	installationID string,
 	peerStore *mailservers.PeerStore,
-	accountsManager account.Manager,
 	opts ...Option,
 ) (*Messenger, error) {
 	var messenger *Messenger
@@ -446,7 +445,7 @@ func NewMessenger(
 	}
 
 	managerOptions := []communities.ManagerOption{
-		communities.WithAccountManager(accountsManager),
+		communities.WithAccountManager(c.accountsManager),
 	}
 
 	if walletAPI != nil {
@@ -508,7 +507,7 @@ func NewMessenger(
 		pushNotificationServer:     pushNotificationServer,
 		communitiesManager:         communitiesManager,
 		communitiesKeyDistributor:  communitiesKeyDistributor,
-		accountsManager:            accountsManager,
+		accountsManager:            c.accountsManager,
 		ensVerifier:                ensVerifier,
 		featureFlags:               c.featureFlags,
 		systemMessagesTranslations: c.systemMessagesTranslations,

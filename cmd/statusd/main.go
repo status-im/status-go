@@ -232,6 +232,7 @@ func main() {
 			protocol.WithTorrentConfig(&config.TorrentConfig),
 			protocol.WithWalletConfig(&config.WalletConfig),
 			protocol.WithRPCClient(backend.StatusNode().RPCClient()),
+			protocol.WithAccountManager(backend.AccountManager()),
 		}
 
 		messenger, err := protocol.NewMessenger(
@@ -240,7 +241,6 @@ func main() {
 			gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()),
 			installationID.String(),
 			nil,
-			backend.AccountManager(),
 			options...,
 		)
 		if err != nil {

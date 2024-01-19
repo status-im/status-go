@@ -1,27 +1,21 @@
 package protocol
 
 import (
-	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/appdatabase"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/stickers"
-	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/waku"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 var (
@@ -106,21 +100,7 @@ func (s *MessengerSyncSettingsSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerSyncSettingsSuite) newMessengerWithOptions(shh types.Waku, privateKey *ecdsa.PrivateKey, options []Option) *Messenger {
-	m, err := NewMessenger(
-		"Test",
-		privateKey,
-		&testNode{shh: shh},
-		uuid.New().String(),
-		nil,
-		nil,
-		options...,
-	)
-	s.Require().NoError(err)
-
-	err = m.Init()
-	s.Require().NoError(err)
-
+func (s *MessengerSyncSettingsSuite) newMessenger() *Messenger {
 	config := params.NodeConfig{
 		NetworkID: 10,
 		DataDir:   "test",
@@ -150,41 +130,13 @@ func (s *MessengerSyncSettingsSuite) newMessengerWithOptions(shh types.Waku, pri
 		SendStatusUpdates:         true,
 		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900"),
 		URLUnfurlingMode:          settings.URLUnfurlingAlwaysAsk,
+		PreferredName:             &pf,
+		Currency:                  "eth",
 	}
 
-	err = m.settings.CreateSettings(setting, config)
+	m, err := newTestMessenger(s.shh, testMessengerConfig{}, []Option{WithAppSettings(setting, config)})
 	s.Require().NoError(err)
-
-	err = m.settings.SaveSettingField(settings.PreferredName, &pf)
-	s.Require().NoError(err)
-
-	err = m.settings.SaveSettingField(settings.Currency, "eth")
-	s.Require().NoError(err)
-
 	return m
-}
-
-func (s *MessengerSyncSettingsSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	s.Require().NoError(err)
-
-	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	s.Require().NoError(err)
-
-	options := []Option{
-		WithCustomLogger(s.logger),
-		WithDatabase(appDb),
-		WithWalletDatabase(walletDb),
-		WithDatasync(),
-	}
-	return s.newMessengerWithOptions(shh, privateKey, options)
-}
-
-func (s *MessengerSyncSettingsSuite) newMessenger() *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	return s.newMessengerWithKey(s.shh, privateKey)
 }
 
 func prepAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {
