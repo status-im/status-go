@@ -2227,6 +2227,18 @@ type AccessRolesWithBalances struct {
 	Roles                    []AccessRole                           `json:"roles"`
 }
 
+func (m *Manager) GetTokenPermissions(communityID types.HexBytes) (map[string]*CommunityTokenPermission, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, errors.Errorf("community does not exist ID='%s'", communityID)
+	}
+
+	return community.TokenPermissions(), nil
+}
+
 func (m *Manager) GetCommunityAccessRolesWithBalances(
 	ctx context.Context,
 	communityID types.HexBytes,

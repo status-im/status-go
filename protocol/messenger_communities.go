@@ -2107,6 +2107,10 @@ func (m *Messenger) UpdateCommunityFilters(community *communities.Community) err
 	return nil
 }
 
+func (m *Messenger) GetCommunityTokenPermissions(communityID types.HexBytes) (map[string]*communities.CommunityTokenPermission, error) {
+	return m.communitiesManager.GetTokenPermissions(communityID)
+}
+
 func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommunityTokenPermission) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err

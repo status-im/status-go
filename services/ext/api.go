@@ -536,6 +536,10 @@ func (api *PublicAPI) RemoveRoleFromMember(request *requests.RemoveRoleFromMembe
 	return api.service.messenger.RemoveRoleFromMember(request)
 }
 
+func (api *PublicAPI) GetCommunityTokenPermissions(communityID types.HexBytes) (map[string]*communities.CommunityTokenPermission, error) {
+	return api.service.messenger.GetCommunityTokenPermissions(communityID)
+}
+
 func (api *PublicAPI) CreateCommunityTokenPermission(request *requests.CreateCommunityTokenPermission) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateCommunityTokenPermission(request)
 }
