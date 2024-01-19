@@ -7,7 +7,12 @@ from collections import defaultdict
 test_stats = defaultdict(lambda: defaultdict(int))
 
 for file in glob.glob("**/report.xml", recursive=True):
-    tree = ET.parse(file)
+    try:
+        tree = ET.parse(file)
+    except Exception as e:
+        print(f"Error parsing {file}: {e}")
+        raise
+
     root = tree.getroot()
     for testcase in root.iter("testcase"):
         test_name = testcase.attrib["name"]
