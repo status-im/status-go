@@ -1090,10 +1090,14 @@ func (b *GethStatusBackend) createTempDBFile(pattern string) (tmpDbPath string, 
 	if err != nil {
 		return
 	}
+	err = file.Close()
+	if err != nil {
+		return
+	}
+
 	tmpDbPath = file.Name()
 	cleanup = func() {
 		filePath := file.Name()
-		_ = file.Close()
 		_ = os.Remove(filePath)
 		_ = os.Remove(filePath + "-wal")
 		_ = os.Remove(filePath + "-shm")
