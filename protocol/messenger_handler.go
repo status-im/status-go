@@ -2415,12 +2415,18 @@ func (m *Messenger) HandleSyncSetting(messageState *ReceivedMessageState, messag
 }
 
 func (m *Messenger) HandleSyncAccountCustomizationColor(state *ReceivedMessageState, message *protobuf.SyncAccountCustomizationColor, statusMessage *v1protocol.StatusMessage) error {
-	err := m.multiAccounts.UpdateAccountCustomizationColor(message.GetKeyUid(), message.GetCustomizationColor(), message.GetUpdatedAt())
+	result, err := m.multiAccounts.UpdateAccountCustomizationColor(message.GetKeyUid(), message.GetCustomizationColor(), message.GetUpdatedAt())
 	if err != nil {
 		return err
 	}
 
-	state.Response.CustomizationColor = message.GetCustomizationColor()
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected > 0 {
+		state.Response.CustomizationColor = message.GetCustomizationColor()
+	}
 	return nil
 }
 
