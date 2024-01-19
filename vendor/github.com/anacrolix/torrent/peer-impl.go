@@ -2,6 +2,7 @@ package torrent
 
 import (
 	"github.com/RoaringBitmap/roaring"
+
 	"github.com/anacrolix/torrent/metainfo"
 )
 
@@ -20,9 +21,12 @@ type peerImpl interface {
 	connectionFlags() string
 	onClose()
 	onGotInfo(*metainfo.Info)
+	// Drop connection. This may be a no-op if there is no connection.
 	drop()
+	// Rebuke the peer
+	ban()
 	String() string
-	connStatusString() string
+	peerImplStatusLines() []string
 
 	// All if the peer should have everything, known if we know that for a fact. For example, we can
 	// guess at how many pieces are in a torrent, and assume they have all pieces based on them

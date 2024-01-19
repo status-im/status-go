@@ -37,7 +37,7 @@ GIT_COMMIT = $(shell git rev-parse --short HEAD)
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 ENABLE_METRICS ?= true
-BUILD_TAGS ?= gowaku_no_rln
+BUILD_TAGS ?= gowaku_no_rln,nosqlite
 BUILD_FLAGS ?= $(shell echo "-ldflags='\
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \

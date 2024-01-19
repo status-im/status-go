@@ -1,11 +1,9 @@
 package torrent
 
 import (
-	"encoding/gob"
 	"fmt"
 	"sync"
 
-	"github.com/RoaringBitmap/roaring"
 	"github.com/anacrolix/chansync"
 	"github.com/anacrolix/missinggo/v2/bitmap"
 
@@ -43,8 +41,6 @@ type Piece struct {
 	// Connections that have written data to this piece since its last check.
 	// This can include connections that have closed.
 	dirtiers map[*Peer]struct{}
-
-	undirtiedChunksIter undirtiedChunksIter
 }
 
 func (p *Piece) String() string {
@@ -57,6 +53,12 @@ func (p *Piece) Info() metainfo.Piece {
 
 func (p *Piece) Storage() storage.Piece {
 	return p.t.storage.Piece(p.Info())
+}
+
+func (p *Piece) Flush() {
+	if p.t.storage.Flush != nil {
+		_ = p.t.storage.Flush()
+	}
 }
 
 func (p *Piece) pendingChunkIndex(chunkIndex chunkIndexType) bool {
@@ -72,7 +74,7 @@ func (p *Piece) hasDirtyChunks() bool {
 }
 
 func (p *Piece) numDirtyChunks() chunkIndexType {
-	return chunkIndexType(roaringBitmapRangeCardinality(
+	return chunkIndexType(roaringBitmapRangeCardinality[RequestIndex](
 		&p.t.dirtyChunks,
 		p.requestIndexOffset(),
 		p.t.pieceRequestIndexOffset(p.index+1)))
@@ -244,39 +246,6 @@ func (p *Piece) allChunksDirty() bool {
 
 func (p *Piece) State() PieceState {
 	return p.t.PieceState(p.index)
-}
-
-func init() {
-	gob.Register(undirtiedChunksIter{})
-}
-
-// Use an iterator to jump between dirty bits.
-type undirtiedChunksIter struct {
-	TorrentDirtyChunks *roaring.Bitmap
-	StartRequestIndex  RequestIndex
-	EndRequestIndex    RequestIndex
-}
-
-func (me *undirtiedChunksIter) Iter(f func(chunkIndexType)) {
-	it := me.TorrentDirtyChunks.Iterator()
-	startIndex := me.StartRequestIndex
-	endIndex := me.EndRequestIndex
-	it.AdvanceIfNeeded(startIndex)
-	lastDirty := startIndex - 1
-	for it.HasNext() {
-		next := it.Next()
-		if next >= endIndex {
-			break
-		}
-		for index := lastDirty + 1; index < next; index++ {
-			f(index - startIndex)
-		}
-		lastDirty = next
-	}
-	for index := lastDirty + 1; index < endIndex; index++ {
-		f(index - startIndex)
-	}
-	return
 }
 
 func (p *Piece) requestIndexOffset() RequestIndex {

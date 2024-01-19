@@ -8,9 +8,11 @@ func (t *Torrent) updatePieceRequestOrder(pieceIndex int) {
 	if t.storage == nil {
 		return
 	}
-	t.cl.pieceRequestOrder[t.clientPieceRequestOrderKey()].Update(
-		t.pieceRequestOrderKey(pieceIndex),
-		t.requestStrategyPieceOrderState(pieceIndex))
+	if ro, ok := t.cl.pieceRequestOrder[t.clientPieceRequestOrderKey()]; ok {
+		ro.Update(
+			t.pieceRequestOrderKey(pieceIndex),
+			t.requestStrategyPieceOrderState(pieceIndex))
+	}
 }
 
 func (t *Torrent) clientPieceRequestOrderKey() interface{} {
@@ -45,7 +47,7 @@ func (t *Torrent) initPieceRequestOrder() {
 	key := t.clientPieceRequestOrderKey()
 	cpro := t.cl.pieceRequestOrder
 	if cpro[key] == nil {
-		cpro[key] = request_strategy.NewPieceOrder()
+		cpro[key] = request_strategy.NewPieceOrder(request_strategy.NewAjwernerBtree(), t.numPieces())
 	}
 }
 

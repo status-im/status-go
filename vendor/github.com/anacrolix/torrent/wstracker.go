@@ -1,17 +1,20 @@
 package torrent
 
 import (
+	"context"
 	"fmt"
+	"net"
+	netHttp "net/http"
 	"net/url"
 	"sync"
 
 	"github.com/anacrolix/log"
-	"github.com/anacrolix/torrent/tracker/http"
 	"github.com/gorilla/websocket"
+	"github.com/pion/datachannel"
 
 	"github.com/anacrolix/torrent/tracker"
+	httpTracker "github.com/anacrolix/torrent/tracker/http"
 	"github.com/anacrolix/torrent/webtorrent"
-	"github.com/pion/datachannel"
 )
 
 type websocketTrackerStatus struct {
@@ -33,21 +36,24 @@ type refCountedWebtorrentTrackerClient struct {
 }
 
 type websocketTrackers struct {
-	PeerId             [20]byte
-	Logger             log.Logger
-	GetAnnounceRequest func(event tracker.AnnounceEvent, infoHash [20]byte) (tracker.AnnounceRequest, error)
-	OnConn             func(datachannel.ReadWriteCloser, webtorrent.DataChannelContext)
-	mu                 sync.Mutex
-	clients            map[string]*refCountedWebtorrentTrackerClient
-	Proxy              http.ProxyFunc
+	PeerId                     [20]byte
+	Logger                     log.Logger
+	GetAnnounceRequest         func(event tracker.AnnounceEvent, infoHash [20]byte) (tracker.AnnounceRequest, error)
+	OnConn                     func(datachannel.ReadWriteCloser, webtorrent.DataChannelContext)
+	mu                         sync.Mutex
+	clients                    map[string]*refCountedWebtorrentTrackerClient
+	Proxy                      httpTracker.ProxyFunc
+	DialContext                func(ctx context.Context, network, addr string) (net.Conn, error)
+	WebsocketTrackerHttpHeader func() netHttp.Header
+	ICEServers                 []string
 }
 
-func (me *websocketTrackers) Get(url string) (*webtorrent.TrackerClient, func()) {
+func (me *websocketTrackers) Get(url string, infoHash [20]byte) (*webtorrent.TrackerClient, func()) {
 	me.mu.Lock()
 	defer me.mu.Unlock()
 	value, ok := me.clients[url]
 	if !ok {
-		dialer := &websocket.Dialer{Proxy: me.Proxy, HandshakeTimeout: websocket.DefaultDialer.HandshakeTimeout}
+		dialer := &websocket.Dialer{Proxy: me.Proxy, NetDialContext: me.DialContext, HandshakeTimeout: websocket.DefaultDialer.HandshakeTimeout}
 		value = &refCountedWebtorrentTrackerClient{
 			TrackerClient: webtorrent.TrackerClient{
 				Dialer:             dialer,
@@ -58,6 +64,8 @@ func (me *websocketTrackers) Get(url string) (*webtorrent.TrackerClient, func())
 				Logger: me.Logger.WithText(func(m log.Msg) string {
 					return fmt.Sprintf("tracker client for %q: %v", url, m)
 				}),
+				WebsocketTrackerHttpHeader: me.WebsocketTrackerHttpHeader,
+				ICEServers:                 me.ICEServers,
 			},
 		}
 		value.TrackerClient.Start(func(err error) {
@@ -74,6 +82,7 @@ func (me *websocketTrackers) Get(url string) (*webtorrent.TrackerClient, func())
 	return &value.TrackerClient, func() {
 		me.mu.Lock()
 		defer me.mu.Unlock()
+		value.TrackerClient.CloseOffersForInfohash(infoHash)
 		value.refCount--
 		if value.refCount == 0 {
 			value.TrackerClient.Close()

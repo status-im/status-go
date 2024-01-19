@@ -11,8 +11,13 @@ import (
 
 type TraversalStats = traversal.Stats
 
+// See BootstrapContext.
+func (s *Server) Bootstrap() (TraversalStats, error) {
+	return s.BootstrapContext(context.Background())
+}
+
 // Populates the node table.
-func (s *Server) Bootstrap() (_ TraversalStats, err error) {
+func (s *Server) BootstrapContext(ctx context.Context) (_ TraversalStats, err error) {
 	s.mu.Lock()
 	if s.bootstrappingNow {
 		s.mu.Unlock()
@@ -44,8 +49,17 @@ func (s *Server) Bootstrap() (_ TraversalStats, err error) {
 	s.mu.Lock()
 	s.lastBootstrap = time.Now()
 	s.mu.Unlock()
-	<-t.Stalled()
+	select {
+	case <-ctx.Done():
+		err = ctx.Err()
+	case <-t.Stalled():
+	}
 	t.Stop()
+	if err != nil {
+		// Could test for Stopped and return stats here but the interface doesn't tell the caller if
+		// we were successful in taking the stats. We could also take a snapshot instead.
+		return
+	}
 	<-t.Stopped()
 	return *t.Stats(), nil
 }

@@ -4,12 +4,11 @@ import (
 	"context"
 	"sync/atomic"
 
+	"github.com/anacrolix/chansync"
 	"github.com/anacrolix/chansync/events"
-	"github.com/anacrolix/dht/v2/containers"
 	"github.com/anacrolix/sync"
 
-	"github.com/anacrolix/chansync"
-
+	"github.com/anacrolix/dht/v2/containers"
 	"github.com/anacrolix/dht/v2/int160"
 	k_nearest_nodes "github.com/anacrolix/dht/v2/k-nearest-nodes"
 	"github.com/anacrolix/dht/v2/krpc"
@@ -19,7 +18,9 @@ import (
 type QueryResult struct {
 	// A node that should be considered for a closest entry.
 	ResponseFrom *krpc.NodeInfo
-	// Data associated with a closest node.
+	// Data associated with a closest node. Is this ever not a string? I think using generics for
+	// this leaks throughout the entire Operation. Hardly worth it. It's still possible to handle
+	// invalid token types at runtime.
 	ClosestData interface{}
 	Nodes       []krpc.NodeInfo
 	Nodes6      []krpc.NodeInfo
@@ -77,6 +78,7 @@ type Operation struct {
 	stopped      chansync.SetOnce
 }
 
+// I don't think you should access this until the Stopped event.
 func (op *Operation) Stats() *Stats {
 	return &op.stats
 }

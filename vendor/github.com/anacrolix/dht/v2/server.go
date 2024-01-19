@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -15,14 +16,11 @@ import (
 	"github.com/anacrolix/log"
 	"github.com/anacrolix/missinggo/v2"
 	"github.com/anacrolix/sync"
-	"github.com/pkg/errors"
-	"golang.org/x/time/rate"
-
+	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/iplist"
 	"github.com/anacrolix/torrent/logonce"
 	"github.com/anacrolix/torrent/metainfo"
-
-	"github.com/anacrolix/torrent/bencode"
+	"golang.org/x/time/rate"
 
 	"github.com/anacrolix/dht/v2/bep44"
 	"github.com/anacrolix/dht/v2/int160"
@@ -165,15 +163,31 @@ func NewDefaultServerConfig() *ServerConfig {
 	}
 }
 
-// If the NodeId hasn't been specified, generate one and secure it against the PublicIP if
-// NoSecurity is not set.
-func (c *ServerConfig) InitNodeId() {
-	if missinggo.IsZeroValue(c.NodeId) {
-		c.NodeId = RandomNodeID()
-		if !c.NoSecurity && c.PublicIP != nil {
+// If the NodeId hasn't been specified, generate a suitable one. deterministic if c.Conn and
+// c.PublicIP are non-nil.
+func (c *ServerConfig) InitNodeId() (deterministic bool) {
+	if c.NodeId.IsZero() {
+		var secure bool
+		if c.Conn != nil && c.PublicIP != nil {
+			// Is this sufficient for a deterministic node ID?
+			c.NodeId = HashTuple(
+				[]byte(c.Conn.LocalAddr().Network()),
+				[]byte(c.Conn.LocalAddr().String()),
+				c.PublicIP,
+			)
+			// Since we have a public IP we can secure, and the choice must not be influenced by the
+			// NoSecure configuration option.
+			secure = true
+			deterministic = true
+		} else {
+			c.NodeId = RandomNodeID()
+			secure = !c.NoSecurity && c.PublicIP != nil
+		}
+		if secure {
 			SecureNodeId(&c.NodeId, c.PublicIP)
 		}
 	}
+	return
 }
 
 // NewServer initializes a new DHT node server.
@@ -329,6 +343,9 @@ func (s *Server) serve() error {
 	for {
 		n, addr, err := s.socket.ReadFrom(b[:])
 		if err != nil {
+			if ignoreReadFromError(err) {
+				continue
+			}
 			return err
 		}
 		expvars.Add("packets read", 1)
@@ -614,7 +631,7 @@ func (s *Server) handleQuery(source Addr, m krpc.Msg) {
 			break
 		}
 
-		r.V = item.V
+		r.V = bencode.MustMarshal(item.V)
 		r.K = item.K
 		r.Sig = item.Sig
 
@@ -1238,7 +1255,7 @@ func (s *Server) TraversalStartingNodes() (nodes []addrMaybeId, err error) {
 		s.logger().Levelf(log.Debug, "falling back on starting nodes")
 		addrs, err := s.config.StartingNodes()
 		if err != nil {
-			return nil, errors.Wrap(err, "getting starting nodes")
+			return nil, fmt.Errorf("getting starting nodes: %w", err)
 		} else {
 			// log.Printf("resolved %v addresses", len(addrs))
 		}
@@ -1354,7 +1371,7 @@ func (s *Server) pingQuestionableNodesInBucket(bucketIndex int) {
 				defer wg.Done()
 				err := s.questionableNodePing(context.TODO(), n.Addr, n.Id.AsByteArray()).Err
 				if err != nil {
-					log.Printf("error pinging questionable node in bucket %v: %v", bucketIndex, err)
+					s.logger().WithDefaultLevel(log.Debug).Printf("error pinging questionable node in bucket %v: %v", bucketIndex, err)
 				}
 			}()
 		}
@@ -1370,13 +1387,14 @@ func (s *Server) pingQuestionableNodesInBucket(bucketIndex int) {
 // having set it up. It is not necessary to explicitly Bootstrap the Server once this routine has
 // started.
 func (s *Server) TableMaintainer() {
+	logger := s.logger()
 	for {
 		if s.shouldBootstrapUnlocked() {
 			stats, err := s.Bootstrap()
 			if err != nil {
-				log.Printf("error bootstrapping during bucket refresh: %v", err)
+				logger.Levelf(log.Error,"error bootstrapping during bucket refresh: %v", err)
 			}
-			log.Printf("bucket refresh bootstrap stats: %v", stats)
+			logger.Levelf(log.Debug,"bucket refresh bootstrap stats: %v", stats)
 		}
 		s.mu.RLock()
 		for i := range s.table.buckets {
@@ -1387,10 +1405,10 @@ func (s *Server) TableMaintainer() {
 			if s.shouldStopRefreshingBucket(i) {
 				continue
 			}
-			s.logger().Levelf(log.Info, "refreshing bucket %v", i)
+			logger.Levelf(log.Debug, "refreshing bucket %v", i)
 			s.mu.RUnlock()
 			stats := s.refreshBucket(i)
-			s.logger().Levelf(log.Info, "finished refreshing bucket %v: %v", i, stats)
+			logger.Levelf(log.Debug, "finished refreshing bucket %v: %v", i, stats)
 			s.mu.RLock()
 			if !s.shouldStopRefreshingBucket(i) {
 				// Presumably we couldn't fill the bucket anymore, so assume we're as deep in the

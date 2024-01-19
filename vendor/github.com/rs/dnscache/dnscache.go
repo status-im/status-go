@@ -3,6 +3,7 @@ package dnscache
 import (
 	"context"
 	"net"
+	"net/http/httptrace"
 	"sync"
 	"time"
 
@@ -116,7 +117,7 @@ func (r *Resolver) lookup(ctx context.Context, key string) (rrs []string, err er
 }
 
 func (r *Resolver) update(ctx context.Context, key string, used bool, persistOnFailure bool) (rrs []string, err error) {
-	c := lookupGroup.DoChan(key, r.lookupFunc(key))
+	c := lookupGroup.DoChan(key, r.lookupFunc(ctx, key))
 	select {
 	case <-ctx.Done():
 		err = ctx.Err()
@@ -158,12 +159,12 @@ func (r *Resolver) update(ctx context.Context, key string, used bool, persistOnF
 
 // lookupFunc returns lookup function for key. The type of the key is stored as
 // the first char and the lookup subject is the rest of the key.
-func (r *Resolver) lookupFunc(key string) func() (interface{}, error) {
+func (r *Resolver) lookupFunc(ctx context.Context, key string) func() (interface{}, error) {
 	if len(key) == 0 {
 		panic("lookupFunc with empty key")
 	}
 
-	var resolver DNSResolver = net.DefaultResolver
+	var resolver DNSResolver = defaultResolver
 	if r.Resolver != nil {
 		resolver = r.Resolver
 	}
@@ -171,14 +172,16 @@ func (r *Resolver) lookupFunc(key string) func() (interface{}, error) {
 	switch key[0] {
 	case 'h':
 		return func() (interface{}, error) {
-			ctx, cancel := r.getCtx()
+			ctx, cancel := r.prepareCtx(ctx)
 			defer cancel()
+
 			return resolver.LookupHost(ctx, key[1:])
 		}
 	case 'r':
 		return func() (interface{}, error) {
-			ctx, cancel := r.getCtx()
+			ctx, cancel := r.prepareCtx(ctx)
 			defer cancel()
+
 			return resolver.LookupAddr(ctx, key[1:])
 		}
 	default:
@@ -186,13 +189,25 @@ func (r *Resolver) lookupFunc(key string) func() (interface{}, error) {
 	}
 }
 
-func (r *Resolver) getCtx() (ctx context.Context, cancel context.CancelFunc) {
+func (r *Resolver) prepareCtx(origContext context.Context) (ctx context.Context, cancel context.CancelFunc) {
 	ctx = context.Background()
 	if r.Timeout > 0 {
 		ctx, cancel = context.WithTimeout(ctx, r.Timeout)
 	} else {
 		cancel = func() {}
 	}
+
+	// If a httptrace has been attached to the given context it will be copied over to the newly created context. We only need to copy pointers
+	// to DNSStart and DNSDone hooks
+	if trace := httptrace.ContextClientTrace(origContext); trace != nil {
+		derivedTrace := &httptrace.ClientTrace{
+			DNSStart: trace.DNSStart,
+			DNSDone:  trace.DNSDone,
+		}
+
+		ctx = httptrace.WithClientTrace(ctx, derivedTrace)
+	}
+
 	return
 }
 
@@ -229,4 +244,32 @@ func (r *Resolver) storeLocked(key string, rrs []string, used bool, err error) {
 		err:  err,
 		used: used,
 	}
+}
+
+var defaultResolver = &defaultResolverWithTrace{}
+
+// defaultResolverWithTrace calls `LookupIP` instead of `LookupHost` on `net.DefaultResolver` in order to cause invocation of the `DNSStart`
+// and `DNSDone` hooks. By implementing `DNSResolver`, backward compatibility can be ensured.
+type defaultResolverWithTrace struct{}
+
+func (d *defaultResolverWithTrace) LookupHost(ctx context.Context, host string) (addrs []string, err error) {
+	// `net.Resolver#LookupHost` does not cause invocation of `net.Resolver#lookupIPAddr`, therefore the `DNSStart` and `DNSDone` tracing hooks
+	// built into the stdlib are never called. `LookupIP`, despite it's name, can also be used to lookup a hostname but does cause these hooks to be
+	// triggered. The format of the reponse is different, therefore it needs this thin wrapper converting it.
+	rawIPs, err := net.DefaultResolver.LookupIP(ctx, "ip", host)
+	if err != nil {
+		return nil, err
+	}
+
+	cookedIPs := make([]string, len(rawIPs))
+
+	for i, v := range rawIPs {
+		cookedIPs[i] = v.String()
+	}
+
+	return cookedIPs, nil
+}
+
+func (d *defaultResolverWithTrace) LookupAddr(ctx context.Context, addr string) (names []string, err error) {
+	return net.DefaultResolver.LookupAddr(ctx, addr)
 }

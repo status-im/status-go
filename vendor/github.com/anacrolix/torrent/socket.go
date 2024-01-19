@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"strconv"
+	"syscall"
 
 	"github.com/anacrolix/log"
 	"github.com/anacrolix/missinggo/perf"
@@ -36,15 +37,73 @@ func listen(n network, addr string, f firewallCallback, logger log.Logger) (sock
 	}
 }
 
+// Dialing TCP from a local port limits us to a single outgoing TCP connection to each remote
+// client. Instead, this should be a last resort if we need to use holepunching, and only then to
+// connect to other clients that actually try to holepunch TCP.
+const dialTcpFromListenPort = false
+
+var tcpListenConfig = net.ListenConfig{
+	Control: func(network, address string, c syscall.RawConn) (err error) {
+		controlErr := c.Control(func(fd uintptr) {
+			if dialTcpFromListenPort {
+				err = setReusePortSockOpts(fd)
+			}
+		})
+		if err != nil {
+			return
+		}
+		err = controlErr
+		return
+	},
+	// BitTorrent connections manage their own keep-alives.
+	KeepAlive: -1,
+}
+
 func listenTcp(network, address string) (s socket, err error) {
-	l, err := net.Listen(network, address)
-	return tcpSocket{
+	l, err := tcpListenConfig.Listen(context.Background(), network, address)
+	if err != nil {
+		return
+	}
+	netDialer := net.Dialer{
+		// We don't want fallback, as we explicitly manage the IPv4/IPv6 distinction ourselves,
+		// although it's probably not triggered as I think the network is already constrained to
+		// tcp4 or tcp6 at this point.
+		FallbackDelay: -1,
+		// BitTorrent connections manage their own keepalives.
+		KeepAlive: tcpListenConfig.KeepAlive,
+		Control: func(network, address string, c syscall.RawConn) (err error) {
+			controlErr := c.Control(func(fd uintptr) {
+				err = setSockNoLinger(fd)
+				if err != nil {
+					// Failing to disable linger is undesirable, but not fatal.
+					log.Levelf(log.Debug, "error setting linger socket option on tcp socket: %v", err)
+					err = nil
+				}
+				// This is no longer required I think, see
+				// https://github.com/anacrolix/torrent/discussions/856. I added this originally to
+				// allow dialling out from the client's listen port, but that doesn't really work. I
+				// think Linux older than ~2013 doesn't support SO_REUSEPORT.
+				if dialTcpFromListenPort {
+					err = setReusePortSockOpts(fd)
+				}
+			})
+			if err == nil {
+				err = controlErr
+			}
+			return
+		},
+	}
+	if dialTcpFromListenPort {
+		netDialer.LocalAddr = l.Addr()
+	}
+	s = tcpSocket{
 		Listener: l,
 		NetworkDialer: NetworkDialer{
 			Network: network,
-			Dialer:  DefaultNetDialer,
+			Dialer:  &netDialer,
 		},
-	}, err
+	}
+	return
 }
 
 type tcpSocket struct {

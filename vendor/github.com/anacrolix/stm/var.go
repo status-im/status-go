@@ -2,18 +2,31 @@ package stm
 
 import (
 	"sync"
-	"sync/atomic"
+
+	"github.com/alecthomas/atomic"
 )
 
 // Holds an STM variable.
-type Var struct {
-	value    atomic.Value
+type Var[T any] struct {
+	value    atomic.Value[VarValue]
 	watchers sync.Map
 	mu       sync.Mutex
 }
 
-func (v *Var) changeValue(new interface{}) {
-	old := v.value.Load().(VarValue)
+func (v *Var[T]) getValue() *atomic.Value[VarValue] {
+	return &v.value
+}
+
+func (v *Var[T]) getWatchers() *sync.Map {
+	return &v.watchers
+}
+
+func (v *Var[T]) getLock() *sync.Mutex {
+	return &v.mu
+}
+
+func (v *Var[T]) changeValue(new any) {
+	old := v.value.Load()
 	newVarValue := old.Set(new)
 	v.value.Store(newVarValue)
 	if old.Changed(newVarValue) {
@@ -21,8 +34,8 @@ func (v *Var) changeValue(new interface{}) {
 	}
 }
 
-func (v *Var) wakeWatchers(new VarValue) {
-	v.watchers.Range(func(k, _ interface{}) bool {
+func (v *Var[T]) wakeWatchers(new VarValue) {
+	v.watchers.Range(func(k, _ any) bool {
 		tx := k.(*Tx)
 		// We have to lock here to ensure that the Tx is waiting before we signal it. Otherwise we
 		// could signal it before it goes to sleep and it will miss the notification.
@@ -34,35 +47,30 @@ func (v *Var) wakeWatchers(new VarValue) {
 			}
 		}
 		tx.mu.Unlock()
-		return !v.value.Load().(VarValue).Changed(new)
+		return !v.value.Load().Changed(new)
 	})
 }
 
-type varSnapshot struct {
-	val     interface{}
-	version uint64
-}
-
 // Returns a new STM variable.
-func NewVar(val interface{}) *Var {
-	v := &Var{}
-	v.value.Store(versionedValue{
+func NewVar[T any](val T) *Var[T] {
+	v := &Var[T]{}
+	v.value.Store(versionedValue[T]{
 		value: val,
 	})
 	return v
 }
 
-func NewCustomVar(val interface{}, changed func(interface{}, interface{}) bool) *Var {
-	v := &Var{}
-	v.value.Store(customVarValue{
+func NewCustomVar[T any](val T, changed func(T, T) bool) *Var[T] {
+	v := &Var[T]{}
+	v.value.Store(customVarValue[T]{
 		value:   val,
 		changed: changed,
 	})
 	return v
 }
 
-func NewBuiltinEqVar(val interface{}) *Var {
-	return NewCustomVar(val, func(a, b interface{}) bool {
+func NewBuiltinEqVar[T comparable](val T) *Var[T] {
+	return NewCustomVar(val, func(a, b T) bool {
 		return a != b
 	})
 }

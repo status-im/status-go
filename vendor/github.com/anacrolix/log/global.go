@@ -11,11 +11,7 @@ var (
 		W:   os.Stderr,
 		Fmt: LineFormatter,
 	}
-	Default = Logger{
-		nonZero:     true,
-		filterLevel: Error,
-		Handlers:    []Handler{DefaultHandler},
-	}
+	Default        Logger // Inited after GO_LOG is parsed.
 	DiscardHandler = StreamHandler{
 		W:   ioutil.Discard,
 		Fmt: func(Record) []byte { return nil },
@@ -36,4 +32,10 @@ func Printf(format string, a ...interface{}) {
 func Print(a ...interface{}) {
 	// TODO: There's no "Print" equivalent constructor for a Msg, and I don't know what I'd call it.
 	Str(fmt.Sprint(a...)).Skip(1).Log(Default)
+}
+
+func Println(a ...interface{}) {
+	Default.LazyLogDefaultLevel(func() Msg {
+		return Str(fmt.Sprintln(a...)).Skip(1)
+	})
 }

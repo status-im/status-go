@@ -53,7 +53,7 @@ const (
 
 type Socket struct {
 	pc            net.PacketConn
-	ctx           *C.utp_context
+	ctx           *utpContext
 	backlog       chan *Conn
 	closed        bool
 	conns         map[*C.utp_socket]*Conn
@@ -130,7 +130,7 @@ func NewSocket(network, addr string, opts ...NewSocketOpt) (*Socket, error) {
 	func() {
 		mu.Lock()
 		defer mu.Unlock()
-		ctx := C.utp_init(2)
+		ctx := (*utpContext)(C.utp_init(2))
 		if ctx == nil {
 			panic(ctx)
 		}
@@ -244,7 +244,7 @@ func (s *Socket) processReceivedMessages(ms []mmsg.Message) {
 			rsa, a.sal = netAddrToLibSockaddr(m.Addr)
 			a.sa = (*C.struct_sockaddr)(unsafe.Pointer(&rsa))
 		}
-		C.process_received_messages(s.ctx, &args[0], C.size_t(len(ms)))
+		C.process_received_messages(s.ctx.asCPtr(), &args[0], C.size_t(len(ms)))
 	} else {
 		gotUtp := false
 		for _, m := range ms {
@@ -266,12 +266,12 @@ func (s *Socket) afterReceivingUtpMessages() {
 
 func (s *Socket) issueDeferredAcks() {
 	expMap.Add("utp_issue_deferred_acks calls", 1)
-	C.utp_issue_deferred_acks(s.ctx)
+	C.utp_issue_deferred_acks(s.ctx.asCPtr())
 }
 
 func (s *Socket) checkUtpTimeouts() {
 	expMap.Add("utp_check_timeouts calls", 1)
-	C.utp_check_timeouts(s.ctx)
+	C.utp_check_timeouts(s.ctx.asCPtr())
 }
 
 func (s *Socket) ackTimerFunc() {
@@ -328,7 +328,7 @@ func (s *Socket) utpProcessUdp(b []byte, addr net.Addr) (utp bool) {
 	}
 	var sal C.socklen_t
 	staticRsa, sal = netAddrToLibSockaddr(addr)
-	ret := C.utp_process_udp(s.ctx, (*C.byte)(&b[0]), C.size_t(len(b)), (*C.struct_sockaddr)(unsafe.Pointer(&staticRsa)), sal)
+	ret := C.utp_process_udp(s.ctx.asCPtr(), (*C.byte)(&b[0]), C.size_t(len(b)), (*C.struct_sockaddr)(unsafe.Pointer(&staticRsa)), sal)
 	switch ret {
 	case 1:
 		return true
@@ -363,7 +363,7 @@ func (s *Socket) closeLocked() error {
 	}
 	// Calling this deletes the pointer. It must not be referred to after
 	// this.
-	C.utp_destroy(s.ctx)
+	C.utp_destroy(s.ctx.asCPtr())
 	s.ctx = nil
 	s.pc.Close()
 	close(s.backlog)
@@ -436,7 +436,7 @@ func (s *Socket) DialContext(ctx context.Context, network, addr string) (_ net.C
 	if s.closed {
 		return nil, errSocketClosed
 	}
-	utpSock := utpCreateSocketAndConnect(s.ctx, sa, sl)
+	utpSock := utpCreateSocketAndConnect(s.ctx.asCPtr(), sa, sl)
 	c := s.newConn(utpSock)
 	c.setRemoteAddr()
 	err = c.waitForConnect(ctx)
@@ -498,19 +498,19 @@ func (s *Socket) WriteTo(b []byte, addr net.Addr) (int, error) {
 func (s *Socket) ReadBufferLen() int {
 	mu.Lock()
 	defer mu.Unlock()
-	return int(C.utp_context_get_option(s.ctx, C.UTP_RCVBUF))
+	return int(C.utp_context_get_option(s.ctx.asCPtr(), C.UTP_RCVBUF))
 }
 
 func (s *Socket) WriteBufferLen() int {
 	mu.Lock()
 	defer mu.Unlock()
-	return int(C.utp_context_get_option(s.ctx, C.UTP_SNDBUF))
+	return int(C.utp_context_get_option(s.ctx.asCPtr(), C.UTP_SNDBUF))
 }
 
 func (s *Socket) SetWriteBufferLen(len int) {
 	mu.Lock()
 	defer mu.Unlock()
-	i := C.utp_context_set_option(s.ctx, C.UTP_SNDBUF, C.int(len))
+	i := C.utp_context_set_option(s.ctx.asCPtr(), C.UTP_SNDBUF, C.int(len))
 	if i != 0 {
 		panic(i)
 	}
@@ -519,7 +519,7 @@ func (s *Socket) SetWriteBufferLen(len int) {
 func (s *Socket) SetOption(opt Option, val int) int {
 	mu.Lock()
 	defer mu.Unlock()
-	return int(C.utp_context_set_option(s.ctx, opt, C.int(val)))
+	return int(C.utp_context_set_option(s.ctx.asCPtr(), opt, C.int(val)))
 }
 
 // The callback is used before each packet is processed by libutp without the this package's mutex

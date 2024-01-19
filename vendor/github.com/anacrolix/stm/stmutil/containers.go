@@ -9,10 +9,10 @@ import (
 )
 
 type Settish interface {
-	Add(interface{}) Settish
-	Delete(interface{}) Settish
-	Contains(interface{}) bool
-	Range(func(interface{}) bool)
+	Add(any) Settish
+	Delete(any) Settish
+	Contains(any) bool
+	Range(func(any) bool)
 	iter.Iterable
 	Len() int
 }
@@ -23,11 +23,11 @@ type mapToSet struct {
 
 type interhash struct{}
 
-func (interhash) Hash(x interface{}) uint32 {
+func (interhash) Hash(x any) uint32 {
 	return uint32(nilinterhash(unsafe.Pointer(&x), 0))
 }
 
-func (interhash) Equal(i, j interface{}) bool {
+func (interhash) Equal(i, j any) bool {
 	return i == j
 }
 
@@ -39,12 +39,12 @@ func NewSortedSet(lesser lessFunc) Settish {
 	return mapToSet{NewSortedMap(lesser)}
 }
 
-func (s mapToSet) Add(x interface{}) Settish {
+func (s mapToSet) Add(x any) Settish {
 	s.m = s.m.Set(x, nil)
 	return s
 }
 
-func (s mapToSet) Delete(x interface{}) Settish {
+func (s mapToSet) Delete(x any) Settish {
 	s.m = s.m.Delete(x)
 	return s
 }
@@ -53,13 +53,13 @@ func (s mapToSet) Len() int {
 	return s.m.Len()
 }
 
-func (s mapToSet) Contains(x interface{}) bool {
+func (s mapToSet) Contains(x any) bool {
 	_, ok := s.m.Get(x)
 	return ok
 }
 
-func (s mapToSet) Range(f func(interface{}) bool) {
-	s.m.Range(func(k, _ interface{}) bool {
+func (s mapToSet) Range(f func(any) bool) {
+	s.m.Range(func(k, _ any) bool {
 		return f(k)
 	})
 }
@@ -78,17 +78,17 @@ func NewMap() Mappish {
 
 var _ Mappish = Map{}
 
-func (m Map) Delete(x interface{}) Mappish {
+func (m Map) Delete(x any) Mappish {
 	m.Map = m.Map.Delete(x)
 	return m
 }
 
-func (m Map) Set(key, value interface{}) Mappish {
+func (m Map) Set(key, value any) Mappish {
 	m.Map = m.Map.Set(key, value)
 	return m
 }
 
-func (sm Map) Range(f func(key, value interface{}) bool) {
+func (sm Map) Range(f func(key, value any) bool) {
 	iter := sm.Map.Iterator()
 	for !iter.Done() {
 		if !f(iter.Next()) {
@@ -98,7 +98,7 @@ func (sm Map) Range(f func(key, value interface{}) bool) {
 }
 
 func (sm Map) Iter(cb iter.Callback) {
-	sm.Range(func(key, _ interface{}) bool {
+	sm.Range(func(key, _ any) bool {
 		return cb(key)
 	})
 }
@@ -107,17 +107,17 @@ type SortedMap struct {
 	*immutable.SortedMap
 }
 
-func (sm SortedMap) Set(key, value interface{}) Mappish {
+func (sm SortedMap) Set(key, value any) Mappish {
 	sm.SortedMap = sm.SortedMap.Set(key, value)
 	return sm
 }
 
-func (sm SortedMap) Delete(key interface{}) Mappish {
+func (sm SortedMap) Delete(key any) Mappish {
 	sm.SortedMap = sm.SortedMap.Delete(key)
 	return sm
 }
 
-func (sm SortedMap) Range(f func(key, value interface{}) bool) {
+func (sm SortedMap) Range(f func(key, value any) bool) {
 	iter := sm.SortedMap.Iterator()
 	for !iter.Done() {
 		if !f(iter.Next()) {
@@ -127,18 +127,18 @@ func (sm SortedMap) Range(f func(key, value interface{}) bool) {
 }
 
 func (sm SortedMap) Iter(cb iter.Callback) {
-	sm.Range(func(key, _ interface{}) bool {
+	sm.Range(func(key, _ any) bool {
 		return cb(key)
 	})
 }
 
-type lessFunc func(l, r interface{}) bool
+type lessFunc func(l, r any) bool
 
 type comparer struct {
 	less lessFunc
 }
 
-func (me comparer) Compare(i, j interface{}) int {
+func (me comparer) Compare(i, j any) int {
 	if me.less(i, j) {
 		return -1
 	} else if me.less(j, i) {
@@ -155,15 +155,15 @@ func NewSortedMap(less lessFunc) Mappish {
 }
 
 type Mappish interface {
-	Set(key, value interface{}) Mappish
-	Delete(key interface{}) Mappish
-	Get(key interface{}) (interface{}, bool)
-	Range(func(_, _ interface{}) bool)
+	Set(key, value any) Mappish
+	Delete(key any) Mappish
+	Get(key any) (any, bool)
+	Range(func(_, _ any) bool)
 	Len() int
 	iter.Iterable
 }
 
-func GetLeft(l, _ interface{}) interface{} {
+func GetLeft(l, _ any) any {
 	return l
 }
 
@@ -171,7 +171,7 @@ func GetLeft(l, _ interface{}) interface{} {
 //go:linkname nilinterhash runtime.nilinterhash
 func nilinterhash(p unsafe.Pointer, h uintptr) uintptr
 
-func interfaceHash(x interface{}) uint32 {
+func interfaceHash(x any) uint32 {
 	return uint32(nilinterhash(unsafe.Pointer(&x), 0))
 }
 

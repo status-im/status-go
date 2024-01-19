@@ -2,6 +2,7 @@ package peer_protocol
 
 import (
 	"github.com/anacrolix/dht/v2/krpc"
+
 	"github.com/anacrolix/torrent/bencode"
 )
 
@@ -27,6 +28,7 @@ func (m *PexMsg) Message(pexExtendedId ExtensionNumber) Message {
 	}
 }
 
+// Unmarshals and returns a PEX message.
 func LoadPexMsg(b []byte) (ret PexMsg, err error) {
 	err = bencode.Unmarshal(b, &ret)
 	return

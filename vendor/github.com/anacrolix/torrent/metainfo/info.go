@@ -8,14 +8,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/anacrolix/missinggo/slices"
+	"github.com/anacrolix/missinggo/v2/slices"
 )
 
 // The info dictionary.
 type Info struct {
-	PieceLength int64  `bencode:"piece length"`      // BEP3
-	Pieces      []byte `bencode:"pieces"`            // BEP3
-	Name        string `bencode:"name"`              // BEP3
+	PieceLength int64  `bencode:"piece length"` // BEP3
+	Pieces      []byte `bencode:"pieces"`       // BEP3
+	Name        string `bencode:"name"`         // BEP3
+	NameUtf8    string `bencode:"name.utf-8,omitempty"`
 	Length      int64  `bencode:"length,omitempty"`  // BEP3, mutually exclusive with Files
 	Private     *bool  `bencode:"private,omitempty"` // BEP27
 	// TODO: Document this field.
@@ -73,6 +74,9 @@ func (info *Info) BuildFromFilePath(root string) (err error) {
 	slices.Sort(info.Files, func(l, r FileInfo) bool {
 		return strings.Join(l.Path, "/") < strings.Join(r.Path, "/")
 	})
+	if info.PieceLength == 0 {
+		info.PieceLength = ChoosePieceLength(info.TotalLength())
+	}
 	err = info.GeneratePieces(func(fi FileInfo) (io.ReadCloser, error) {
 		return os.Open(filepath.Join(root, strings.Join(fi.Path, string(filepath.Separator))))
 	})
@@ -151,4 +155,11 @@ func (info *Info) UpvertedFiles() []FileInfo {
 
 func (info *Info) Piece(index int) Piece {
 	return Piece{info, pieceIndex(index)}
+}
+
+func (info Info) BestName() string {
+	if info.NameUtf8 != "" {
+		return info.NameUtf8
+	}
+	return info.Name
 }

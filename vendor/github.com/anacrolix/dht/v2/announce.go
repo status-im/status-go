@@ -10,12 +10,12 @@ import (
 
 	"github.com/anacrolix/chansync"
 	"github.com/anacrolix/chansync/events"
-	"github.com/anacrolix/dht/v2/traversal"
 	"github.com/anacrolix/log"
 
 	"github.com/anacrolix/dht/v2/int160"
 	dhtutil "github.com/anacrolix/dht/v2/k-nearest-nodes"
 	"github.com/anacrolix/dht/v2/krpc"
+	"github.com/anacrolix/dht/v2/traversal"
 )
 
 // Maintains state for an ongoing Announce operation. An Announce is started by calling
@@ -42,6 +42,10 @@ func (a *Announce) String() string {
 // Returns the number of distinct remote addresses the announce has queried.
 func (a *Announce) NumContacted() uint32 {
 	return atomic.LoadUint32(&a.traversal.Stats().NumAddrsTried)
+}
+
+func (a *Announce) TraversalStats() TraversalStats {
+	return *a.traversal.Stats()
 }
 
 // Server.Announce option

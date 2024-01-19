@@ -31,14 +31,6 @@ import (
 // RELEASE or ROLLBACK depending on whether the parameter *error
 // points to a nil or non-nil error. This is designed to be deferred.
 //
-// Example:
-//
-//	func doWork(conn *sqlite.Conn) (err error) {
-//		defer sqlitex.Save(conn)(&err)
-//
-//		// ... do work in the transaction
-//	}
-//
 // https://www.sqlite.org/lang_savepoint.html
 func Save(conn *sqlite.Conn) (releaseFn func(*error)) {
 	name := "sqlitex.Save" // safe as names can be reused
@@ -73,7 +65,7 @@ func savepoint(conn *sqlite.Conn, name string) (releaseFn func(*error), err erro
 	if strings.Contains(name, `"`) {
 		return nil, fmt.Errorf("sqlitex.Savepoint: invalid name: %q", name)
 	}
-	if err := Exec(conn, fmt.Sprintf("SAVEPOINT %q;", name), nil); err != nil {
+	if err := Execute(conn, fmt.Sprintf("SAVEPOINT %q;", name), nil); err != nil {
 		return nil, err
 	}
 	// TODO(maybe)
@@ -102,7 +94,7 @@ func savepoint(conn *sqlite.Conn, name string) (releaseFn func(*error), err erro
 
 		if *errp == nil && recoverP == nil {
 			// Success path. Release the savepoint successfully.
-			*errp = Exec(conn, fmt.Sprintf("RELEASE %q;", name), nil)
+			*errp = Execute(conn, fmt.Sprintf("RELEASE %q;", name), nil)
 			if *errp == nil {
 				return
 			}
@@ -127,11 +119,11 @@ func savepoint(conn *sqlite.Conn, name string) (releaseFn func(*error), err erro
 		oldDoneCh := conn.SetInterrupt(nil)
 		defer conn.SetInterrupt(oldDoneCh)
 
-		err := Exec(conn, fmt.Sprintf("ROLLBACK TO %q;", name), nil)
+		err := Execute(conn, fmt.Sprintf("ROLLBACK TO %q;", name), nil)
 		if err != nil {
 			panic(orig + err.Error())
 		}
-		err = Exec(conn, fmt.Sprintf("RELEASE %q;", name), nil)
+		err = Execute(conn, fmt.Sprintf("RELEASE %q;", name), nil)
 		if err != nil {
 			panic(orig + err.Error())
 		}
@@ -196,7 +188,7 @@ func ExclusiveTransaction(conn *sqlite.Conn) (endFn func(*error), err error) {
 }
 
 func transaction(conn *sqlite.Conn, mode string) (endFn func(*error), err error) {
-	if err := Exec(conn, "BEGIN "+mode+";", nil); err != nil {
+	if err := Execute(conn, "BEGIN "+mode+";", nil); err != nil {
 		return nil, err
 	}
 	endFn = func(errp *error) {
@@ -216,7 +208,7 @@ func transaction(conn *sqlite.Conn, mode string) (endFn func(*error), err error)
 
 		if *errp == nil && recoverP == nil {
 			// Success path. Commit the transaction.
-			*errp = Exec(conn, "COMMIT;", nil)
+			*errp = Execute(conn, "COMMIT;", nil)
 			if *errp == nil {
 				return
 			}
@@ -241,7 +233,7 @@ func transaction(conn *sqlite.Conn, mode string) (endFn func(*error), err error)
 		oldDoneCh := conn.SetInterrupt(nil)
 		defer conn.SetInterrupt(oldDoneCh)
 
-		err := Exec(conn, "ROLLBACK;", nil)
+		err := Execute(conn, "ROLLBACK;", nil)
 		if err != nil {
 			panic(orig + err.Error())
 		}

@@ -1,51 +1,51 @@
 package stm
 
 type VarValue interface {
-	Set(interface{}) VarValue
-	Get() interface{}
+	Set(any) VarValue
+	Get() any
 	Changed(VarValue) bool
 }
 
 type version uint64
 
-type versionedValue struct {
-	value   interface{}
+type versionedValue[T any] struct {
+	value   T
 	version version
 }
 
-func (me versionedValue) Set(newValue interface{}) VarValue {
-	return versionedValue{
-		value:   newValue,
+func (me versionedValue[T]) Set(newValue any) VarValue {
+	return versionedValue[T]{
+		value:   newValue.(T),
 		version: me.version + 1,
 	}
 }
 
-func (me versionedValue) Get() interface{} {
+func (me versionedValue[T]) Get() any {
 	return me.value
 }
 
-func (me versionedValue) Changed(other VarValue) bool {
-	return me.version != other.(versionedValue).version
+func (me versionedValue[T]) Changed(other VarValue) bool {
+	return me.version != other.(versionedValue[T]).version
 }
 
-type customVarValue struct {
-	value   interface{}
-	changed func(interface{}, interface{}) bool
+type customVarValue[T any] struct {
+	value   T
+	changed func(T, T) bool
 }
 
-var _ VarValue = customVarValue{}
+var _ VarValue = customVarValue[struct{}]{}
 
-func (me customVarValue) Changed(other VarValue) bool {
-	return me.changed(me.value, other.(customVarValue).value)
+func (me customVarValue[T]) Changed(other VarValue) bool {
+	return me.changed(me.value, other.(customVarValue[T]).value)
 }
 
-func (me customVarValue) Set(newValue interface{}) VarValue {
-	return customVarValue{
-		value:   newValue,
+func (me customVarValue[T]) Set(newValue any) VarValue {
+	return customVarValue[T]{
+		value:   newValue.(T),
 		changed: me.changed,
 	}
 }
 
-func (me customVarValue) Get() interface{} {
+func (me customVarValue[T]) Get() any {
 	return me.value
 }
