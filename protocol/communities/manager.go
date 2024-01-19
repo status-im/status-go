@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
+	"math"
+	"math/big"
 	"net"
 	"os"
 	"sort"
@@ -18,6 +20,7 @@ import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/metainfo"
+	// "github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
 
 	"github.com/google/uuid"
@@ -146,6 +149,7 @@ func NewDefaultTokenManager(tm *token.Manager) *DefaultTokenManager {
 	return &DefaultTokenManager{tokenManager: tm}
 }
 
+// TODO(ilmotta): Use this type
 type BalancesByChain = map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
 
 func (m *DefaultTokenManager) GetAllChainIDs() ([]uint64, error) {
@@ -2202,6 +2206,224 @@ func (m *Manager) CheckPermissionToJoin(id []byte, addresses []gethcommon.Addres
 
 	return m.PermissionChecker.CheckPermissionToJoin(community, addresses)
 
+}
+
+type AccessRolePermission struct {
+	MinRequired string               `json:"minRequired"`
+	Symbol      string               `json:"symbol"`
+	IsSatisfied bool                 `json:"isSatisfied"`
+	Balance     float64              `json:"balance"`
+	Accounts    []gethcommon.Address `json:"accounts"`
+}
+
+type AccessRole struct {
+	Type        protobuf.CommunityTokenPermission_Type `json:"type"`
+	IsSatisfied bool                                   `json:"isSatisfied"`
+	Permissions []AccessRolePermission                 `json:"permissions"`
+}
+
+type AccessRolesWithBalances struct {
+	HighestSatisfiedRoleType protobuf.CommunityTokenPermission_Type `json:"highestSatisfiedRoleType"`
+	Roles                    []AccessRole                           `json:"roles"`
+}
+
+func (m *Manager) GetCommunityAccessRolesWithBalances(
+	ctx context.Context,
+	communityID types.HexBytes,
+	walletAddresses []gethcommon.Address,
+) (AccessRolesWithBalances, error) {
+	response := AccessRolesWithBalances{
+		HighestSatisfiedRoleType: protobuf.CommunityTokenPermission_UNKNOWN_TOKEN_PERMISSION,
+	}
+
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return response, err
+	}
+	if community == nil {
+		return response, errors.Errorf("community does not exist ID='%s'", communityID)
+	}
+
+	// TODO(ilmotta): what about erc721? Can we reuse the logic for erc20 and erc721?
+	tokenPermissions := make([]*CommunityTokenPermission, 0)
+	for _, p := range community.TokenPermissions() {
+		// TODO(ilmotta): test and support token master/owner
+		if p.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER ||
+			p.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN {
+			tokenPermissions = append(tokenPermissions, p)
+		}
+	}
+	m.logger.Debug(
+		"ilmotta:communities/manager#GetCommunityAccessRolesWithBalances",
+		zap.Any("tokenPermissions", tokenPermissions),
+	)
+
+	allChainIDs, err := m.tokenManager.GetAllChainIDs()
+	if err != nil {
+		return response, err
+	}
+	accountsAndChainIDs := combineAddressesAndChainIDs(walletAddresses, allChainIDs)
+	m.logger.Debug(
+		"ilmotta:communities/manager#GetCommunityAccessRolesWithBalances",
+		zap.Any("accountsAndChainIDs", accountsAndChainIDs),
+	)
+
+	erc20TokenCriteriaByChain, _, _ := ExtractTokenCriteria(tokenPermissions)
+
+	accounts := make([]gethcommon.Address, 0, len(accountsAndChainIDs))
+	for _, accountAndChainIDs := range accountsAndChainIDs {
+		accounts = append(accounts, accountAndChainIDs.Address)
+	}
+	m.logger.Debug(
+		"ilmotta:communities/manager#GetCommunityAccessRolesWithBalances",
+		zap.Any("accounts", accounts),
+	)
+
+	erc20ChainIDsSet := make(map[uint64]bool)
+	erc20TokenAddresses := make([]gethcommon.Address, 0)
+	for chainID, criterionByContractAddress := range erc20TokenCriteriaByChain {
+		erc20ChainIDsSet[chainID] = true
+		for contractAddress := range criterionByContractAddress {
+			erc20TokenAddresses = append(erc20TokenAddresses, gethcommon.HexToAddress(contractAddress))
+		}
+	}
+	erc20ChainIDs := calculateChainIDsSet(accountsAndChainIDs, erc20ChainIDsSet)
+	m.logger.Debug(
+		"ilmotta:communities/manager#GetCommunityAccessRolesWithBalances",
+		zap.Any("erc20ChainIDs", erc20ChainIDs),
+	)
+
+	balances, err := m.tokenManager.GetBalancesByChain(ctx, accounts, erc20TokenAddresses, erc20ChainIDs)
+	if err != nil {
+		return response, err
+	}
+	// m.logger.Info("balances")
+	// spew.Dump(balances)
+
+	tokenPermissionsByType := utils.GroupBy(tokenPermissions, func(p *CommunityTokenPermission) protobuf.CommunityTokenPermission_Type {
+		return p.Type
+	})
+
+	for permissionType, groupedPermissions := range tokenPermissionsByType {
+		rolePermissions := make([]AccessRolePermission, 0)
+		for _, permission := range groupedPermissions {
+			roleSatisfied := true
+			for _, criterion := range permission.TokenCriteria {
+				isCriterionSatisfied := false
+
+				rolePermission := AccessRolePermission{}
+				rolePermission.MinRequired = criterion.Amount
+				rolePermission.Symbol = criterion.Symbol
+
+				accountsSet := make(map[gethcommon.Address]bool)
+				accumulatedBalance := new(big.Float)
+			chainIDLoopERC20:
+				for chainID, contractAddressHex := range criterion.ContractAddresses {
+					chainBalances, exists := balances[chainID]
+					if !exists || len(chainBalances) == 0 {
+						continue chainIDLoopERC20
+					}
+
+					contractAddress := gethcommon.HexToAddress(contractAddressHex)
+					for account := range balances[chainID] {
+						// filter here if account matches one of the addresses to share
+						accountsSet[account] = true
+
+						value, exists := balances[chainID][account][contractAddress]
+						if !exists {
+							m.logger.Error(
+								"ilmotta:communities/manager#GetCommunityAccessRolesWithBalances",
+								zap.Any("value does not exist, account=", account),
+								zap.Any("value does not exist, contractAddress=", contractAddress),
+							)
+							continue
+						}
+
+						// getting a nil pointer here
+						accountChainBalance := new(big.Float).Quo(
+							new(big.Float).SetInt(value.ToInt()),
+							big.NewFloat(math.Pow(10, float64(criterion.Decimals))),
+						)
+
+						v2, _ := accountChainBalance.Float64()
+						m.logger.Error(
+							"ilmotta:communities/manager#GetCommunityAccessRolesWithBalances",
+							zap.Float64("accountChainBalance", v2),
+						)
+
+						// check if adding current chain account balance to accumulated balance
+						// satisfies required amount
+						prevBalance := accumulatedBalance
+						accumulatedBalance.Add(prevBalance, accountChainBalance)
+
+						requiredAmount, err := strconv.ParseFloat(criterion.Amount, 32)
+						if err != nil {
+							return response, err
+						}
+
+						if accumulatedBalance.Cmp(big.NewFloat(requiredAmount)) != -1 {
+							isCriterionSatisfied = true
+						}
+					}
+				}
+
+				for account := range accountsSet {
+					rolePermission.Accounts = append(rolePermission.Accounts, account)
+				}
+
+				rolePermission.IsSatisfied = isCriterionSatisfied
+				val, _ := accumulatedBalance.Float64()
+				rolePermission.Balance = val
+
+				if !isCriterionSatisfied {
+					roleSatisfied = false
+				}
+
+				rolePermissions = append(rolePermissions, rolePermission)
+			}
+
+			role := AccessRole{
+				Type:        permissionType,
+				Permissions: rolePermissions,
+				IsSatisfied: roleSatisfied,
+			}
+			response.Roles = append(response.Roles, role)
+		}
+	}
+
+	roleTypeToOrderedPosition := func(permissionType protobuf.CommunityTokenPermission_Type) int {
+		switch permissionType {
+		case protobuf.CommunityTokenPermission_BECOME_MEMBER:
+			return 0
+		case protobuf.CommunityTokenPermission_BECOME_ADMIN:
+			return 1
+		case protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER:
+			return 2
+		case protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER:
+			return 3
+		default:
+			return 0
+		}
+	}
+
+	if len(response.Roles) > 0 {
+		sort.Slice(response.Roles, func(i, j int) bool {
+			iPosition := roleTypeToOrderedPosition(response.Roles[i].Type)
+			jPosition := roleTypeToOrderedPosition(response.Roles[j].Type)
+			return iPosition > jPosition
+		})
+
+		highestSatisfiedRoleType := protobuf.CommunityTokenPermission_UNKNOWN_TOKEN_PERMISSION
+		for _, role := range response.Roles {
+			if role.IsSatisfied {
+				highestSatisfiedRoleType = role.Type
+				break
+			}
+		}
+		response.HighestSatisfiedRoleType = highestSatisfiedRoleType
+	}
+
+	return response, nil
 }
 
 func (m *Manager) accountsSatisfyPermissionsToJoin(community *Community, accounts []*protobuf.RevealedAccount) (bool, protobuf.CommunityMember_Roles, error) {

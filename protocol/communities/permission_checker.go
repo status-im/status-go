@@ -123,7 +123,7 @@ func (p *DefaultPermissionChecker) CheckPermissionToJoin(community *Community, a
 // permission to join the community, if shortcircuit is true, it will stop as soon
 // as we know the answer
 func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityTokenPermission, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckPermissionsResponse, error) {
-
+	p.logger.Info("ilmotta:CheckPermissions")
 	response := &CheckPermissionsResponse{
 		Satisfied:         false,
 		Permissions:       make(map[string]*PermissionTokenCriteriaResult),
@@ -131,6 +131,11 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 	}
 
 	erc20TokenRequirements, erc721TokenRequirements, _ := ExtractTokenCriteria(permissions)
+	p.logger.Info(
+		"ilmotta:CheckPermissions:ExtractTokenCriteria",
+		zap.Any("erc20TokenRequirements", erc20TokenRequirements),
+		zap.Any("erc721TokenRequirements", erc721TokenRequirements),
+	)
 
 	erc20ChainIDsMap := make(map[uint64]bool)
 	erc721ChainIDsMap := make(map[uint64]bool)
@@ -157,6 +162,11 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 	chainIDsForERC20 := calculateChainIDsSet(accountsAndChainIDs, erc20ChainIDsMap)
 	chainIDsForERC721 := calculateChainIDsSet(accountsAndChainIDs, erc721ChainIDsMap)
 
+	p.logger.Info(
+		"ilmotta:CheckPermissions",
+		zap.Any("chainIDsForERC721", chainIDsForERC721),
+	)
+
 	// if there are no chain IDs that match token criteria chain IDs
 	// we aren't able to check balances on selected networks
 	if len(erc20ChainIDsMap) > 0 && len(chainIDsForERC20) == 0 {
@@ -176,15 +186,25 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 	ownedERC721Tokens := make(CollectiblesByChain)
 	if len(chainIDsForERC721) > 0 {
 		collectibles, err := p.GetOwnedERC721Tokens(accounts, erc721TokenRequirements, chainIDsForERC721)
+		p.logger.Info("ilmotta:CheckPermissions error to get ERC721 tokens")
 		if err != nil {
 			return nil, err
 		}
+
 		ownedERC721Tokens = collectibles
 	}
+	p.logger.Info(
+		"ilmotta:CheckPermissions:ownedERC721Tokens",
+		zap.Any("ownedERC721Tokens", ownedERC721Tokens),
+	)
 
 	accountsChainIDsCombinations := make(map[gethcommon.Address]map[uint64]bool)
 
 	for _, tokenPermission := range permissions {
+		p.logger.Info(
+			"ilmotta:CheckPermissions",
+			zap.Any("tokenPermission", tokenPermission),
+		)
 
 		permissionRequirementsMet := true
 		response.Permissions[tokenPermission.Id] = &PermissionTokenCriteriaResult{}
@@ -193,6 +213,10 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 		// If only one is not met, the entire permission is marked
 		// as not fulfilled
 		for _, tokenRequirement := range tokenPermission.TokenCriteria {
+			p.logger.Info(
+				"ilmotta:CheckPermissions",
+				zap.Any("tokenCriteria", tokenRequirement),
+			)
 
 			tokenRequirementMet := false
 
@@ -215,6 +239,18 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 						}
 
 						tokenBalances := ownedERC721Tokens[chainID][account][contractAddress]
+						p.logger.Info(
+							"ilmotta:CheckPermissions:Loop ERC721 balances",
+							zap.Any("tokenBalances", tokenBalances),
+						)
+
+						for _, myBalance := range tokenBalances {
+							p.logger.Info(
+								"ilmotta:CheckPermissions:Loop ERC721 myBalances",
+								zap.Int("myBalance", int(myBalance.Balance.Int64())),
+							)
+						}
+
 						if len(tokenBalances) > 0 {
 							// 'account' owns some TokenID owned from contract 'address'
 							if _, exists := accountsChainIDsCombinations[account]; !exists {

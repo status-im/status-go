@@ -226,6 +226,274 @@ func (s *ManagerSuite) TestRetrieveTokens() {
 	s.Require().False(resp.Satisfied)
 }
 
+func (s *ManagerSuite) Test_GetCommunityAccessRolesWithBalances() {
+	m, cm, testTokenManager := s.setupManagerForTokenPermissions()
+	s.Require().NotNil(m)
+	s.Require().NotNil(cm)
+
+	request := &requests.CreateCommunity{
+		Membership: protobuf.CommunityPermissions_AUTO_ACCEPT,
+	}
+	community, err := m.CreateCommunity(request, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(community)
+
+	accountHex := "0x0000000000000000000000000000000000000001"
+	firstAccountAddress := gethcommon.HexToAddress(accountHex)
+	accountAddresses := []gethcommon.Address{firstAccountAddress}
+
+	var chainID uint64 = 5
+
+	tokenID := uint64(10)
+	tokenAddressHex := "0x3d6afaa395c31fcd391fe3d562e75fe9e8ec7e6a"
+	tokenAddress := gethcommon.HexToAddress("0x3d6afaa395c31fcd391fe3d562e75fe9e8ec7e6a")
+	tokenAddressesHex := make(map[uint64]string)
+	tokenAddressesHex[chainID] = tokenAddressHex
+
+	// When there are no permissions, there are no access roles.
+	testTokenManager.setResponse(chainID, firstAccountAddress, tokenAddress, 42)
+	actual, err := m.GetCommunityAccessRolesWithBalances(context.Background(), community.ID(), accountAddresses)
+	s.Require().NoError(err)
+	expected := AccessRolesWithBalances{}
+	s.Require().Equal(expected, actual)
+
+	// Happy path
+	permissionRequest := &requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				ContractAddresses: tokenAddressesHex,
+				TokenIds:          []uint64{tokenID},
+				Type:              protobuf.CommunityTokenType_ERC20,
+				Amount:            "3",
+				Symbol:            "ETH",
+			},
+		},
+	}
+	_, changes, err := m.CreateCommunityTokenPermission(permissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(changes.TokenPermissionsAdded, 1)
+
+	testTokenManager.setResponse(chainID, firstAccountAddress, tokenAddress, 42)
+	actual, err = m.GetCommunityAccessRolesWithBalances(context.Background(), community.ID(), accountAddresses)
+	s.Require().NoError(err)
+	expected = AccessRolesWithBalances{
+		HighestSatisfiedRoleType: protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		Roles: []AccessRole{
+			AccessRole{
+				Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+				IsSatisfied: true,
+				Permissions: []AccessRolePermission{
+					AccessRolePermission{
+						IsSatisfied: true,
+						MinRequired: "3",
+						Symbol:      "ETH",
+						Balance:     42,
+						Accounts:    []gethcommon.Address{firstAccountAddress},
+					},
+				},
+			},
+		},
+	}
+	s.Require().Equal(expected.HighestSatisfiedRoleType, actual.HighestSatisfiedRoleType)
+	s.Require().ElementsMatch(expected.Roles, actual.Roles)
+
+	// Insufficient balance (less than minimum)
+	testTokenManager.setResponse(chainID, firstAccountAddress, tokenAddress, 2)
+	actual, err = m.GetCommunityAccessRolesWithBalances(context.Background(), community.ID(), accountAddresses)
+	s.Require().NoError(err)
+	expected = AccessRolesWithBalances{
+		Roles: []AccessRole{
+			AccessRole{
+				Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+				IsSatisfied: false,
+				Permissions: []AccessRolePermission{
+					AccessRolePermission{
+						IsSatisfied: false,
+						MinRequired: "3",
+						Symbol:      "ETH",
+						Balance:     2,
+						Accounts:    []gethcommon.Address{firstAccountAddress},
+					},
+				},
+			},
+		},
+	}
+	s.Require().Equal(expected.HighestSatisfiedRoleType, actual.HighestSatisfiedRoleType)
+	s.Require().ElementsMatch(expected.Roles, actual.Roles)
+
+	// Insufficient balance (zero)
+	testTokenManager.setResponse(chainID, firstAccountAddress, tokenAddress, 0)
+	actual, err = m.GetCommunityAccessRolesWithBalances(context.Background(), community.ID(), accountAddresses)
+	s.Require().NoError(err)
+	expected = AccessRolesWithBalances{
+		HighestSatisfiedRoleType: protobuf.CommunityTokenPermission_UNKNOWN_TOKEN_PERMISSION,
+		Roles: []AccessRole{
+			AccessRole{
+				Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+				IsSatisfied: false,
+				Permissions: []AccessRolePermission{
+					AccessRolePermission{
+						IsSatisfied: false,
+						MinRequired: "3",
+						Symbol:      "ETH",
+						Balance:     0,
+						Accounts:    []gethcommon.Address{firstAccountAddress},
+					},
+				},
+			},
+		},
+	}
+	s.Require().Equal(expected.HighestSatisfiedRoleType, actual.HighestSatisfiedRoleType)
+	s.Require().ElementsMatch(expected.Roles, actual.Roles)
+
+	// Member and admin criteria
+	permissionRequest = &requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_ADMIN,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				ContractAddresses: tokenAddressesHex,
+				TokenIds:          []uint64{tokenID},
+				Type:              protobuf.CommunityTokenType_ERC20,
+				Amount:            "5",
+				Symbol:            "ETH",
+			},
+		},
+	}
+	_, changes, err = m.CreateCommunityTokenPermission(permissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(changes.TokenPermissionsAdded, 1)
+
+	testTokenManager.setResponse(chainID, firstAccountAddress, tokenAddress, 5)
+	actual, err = m.GetCommunityAccessRolesWithBalances(context.Background(), community.ID(), accountAddresses)
+	s.Require().NoError(err)
+	expected = AccessRolesWithBalances{
+		HighestSatisfiedRoleType: protobuf.CommunityTokenPermission_BECOME_ADMIN,
+		Roles: []AccessRole{
+			AccessRole{
+				Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+				IsSatisfied: true,
+				Permissions: []AccessRolePermission{
+					AccessRolePermission{
+						IsSatisfied: true,
+						MinRequired: "3",
+						Symbol:      "ETH",
+						Balance:     5,
+						Accounts:    []gethcommon.Address{firstAccountAddress},
+					},
+				},
+			},
+			AccessRole{
+				Type:        protobuf.CommunityTokenPermission_BECOME_ADMIN,
+				IsSatisfied: true,
+				Permissions: []AccessRolePermission{
+					AccessRolePermission{
+						IsSatisfied: true,
+						MinRequired: "5",
+						Symbol:      "ETH",
+						Balance:     5,
+						Accounts:    []gethcommon.Address{firstAccountAddress},
+					},
+				},
+			},
+		},
+	}
+	s.Require().Equal(expected.HighestSatisfiedRoleType, actual.HighestSatisfiedRoleType)
+	s.Require().ElementsMatch(expected.Roles, actual.Roles)
+
+	// Two wallet accounts, member & admin permissions, channel permission
+	//
+	// Assert non-membership permissions are ignored.
+	permissionRequest = &requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				ContractAddresses: tokenAddressesHex,
+				TokenIds:          []uint64{tokenID},
+				Type:              protobuf.CommunityTokenType_ERC20,
+				Amount:            "9",
+				Symbol:            "ETH",
+			},
+		},
+	}
+	_, changes, err = m.CreateCommunityTokenPermission(permissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(changes.TokenPermissionsAdded, 1)
+
+	tokenCriteriaCanViewChannel := []*protobuf.TokenCriteria{
+		&protobuf.TokenCriteria{
+			ContractAddresses: tokenAddressesHex,
+			TokenIds:          []uint64{tokenID},
+			Type:              protobuf.CommunityTokenType_ERC20,
+			Amount:            "10",
+			Symbol:            "ETH",
+		},
+	}
+	permissionRequest = &requests.CreateCommunityTokenPermission{
+		CommunityID:   community.ID(),
+		Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+		TokenCriteria: tokenCriteriaCanViewChannel,
+	}
+	_, changes, err = m.CreateCommunityTokenPermission(permissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(changes.TokenPermissionsAdded, 1)
+
+	secondAccountHex := "0x0000000000000000000000000000000000000002"
+	secondAccountAddress := gethcommon.HexToAddress(secondAccountHex)
+	accountAddresses = []gethcommon.Address{firstAccountAddress, secondAccountAddress}
+
+	// First account doesn't have enough balance for any membership permission.
+	testTokenManager.setResponse(chainID, firstAccountAddress, tokenAddress, 2)
+
+	// Second account has enough balance for membership, but not for all channel
+	// permissions.
+	testTokenManager.setResponse(chainID, secondAccountAddress, tokenAddress, 5)
+
+	actual, err = m.GetCommunityAccessRolesWithBalances(context.Background(), community.ID(), accountAddresses)
+	s.Require().NoError(err)
+	expected = AccessRolesWithBalances{
+		HighestSatisfiedRoleType: protobuf.CommunityTokenPermission_BECOME_ADMIN,
+		Roles: []AccessRole{
+			AccessRole{
+				Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+				IsSatisfied: true,
+				Permissions: []AccessRolePermission{
+					AccessRolePermission{
+						IsSatisfied: true,
+						MinRequired: "3",
+						Symbol:      "ETH",
+						Balance:     7,
+						Accounts:    accountAddresses,
+					},
+				},
+			},
+			AccessRole{
+				Type:        protobuf.CommunityTokenPermission_BECOME_ADMIN,
+				IsSatisfied: true,
+				Permissions: []AccessRolePermission{
+					AccessRolePermission{
+						IsSatisfied: true,
+						MinRequired: "5",
+						Symbol:      "ETH",
+						Balance:     7,
+						Accounts:    accountAddresses,
+					},
+				},
+			},
+		},
+	}
+
+	// Still fails sometimes, randomly.
+	s.Require().Equal(expected.HighestSatisfiedRoleType, actual.HighestSatisfiedRoleType)
+	s.Require().Len(actual.Roles, 2)
+	s.Require().Equal(expected.Roles[0].Type, actual.Roles[1].Type)
+	s.Require().Equal(expected.Roles[0].IsSatisfied, actual.Roles[1].IsSatisfied)
+	s.Require().ElementsMatch(expected.Roles[0].Permissions, actual.Roles[1].Permissions)
+}
+
 func (s *ManagerSuite) TestRetrieveCollectibles() {
 	m, cm, _ := s.setupManagerForTokenPermissions()
 

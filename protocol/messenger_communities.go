@@ -3623,6 +3623,31 @@ func (m *Messenger) GetCommunityTokens(communityID string) ([]*token.CommunityTo
 	return m.communitiesManager.GetCommunityTokens(communityID)
 }
 
+func (m *Messenger) GetCommunityAccessRolesWithBalances(request *requests.GetCommunityAccessRolesWithBalances) (communities.AccessRolesWithBalances, error) {
+	response := communities.AccessRolesWithBalances{}
+
+	err := request.Validate()
+	if err != nil {
+		return response, err
+	}
+
+	walletAddresses, err := m.settings.GetWalletAddresses()
+	if err != nil {
+		return response, err
+	}
+
+	gethAddresses := make([]gethcommon.Address, 0, len(walletAddresses))
+	for _, address := range walletAddresses {
+		gethAddresses = append(gethAddresses, gethcommon.HexToAddress(address.Hex()))
+	}
+
+	return m.communitiesManager.GetCommunityAccessRolesWithBalances(
+		context.Background(),
+		request.CommunityID,
+		gethAddresses,
+	)
+}
+
 func (m *Messenger) GetAllCommunityTokens() ([]*token.CommunityToken, error) {
 	return m.communitiesManager.GetAllCommunityTokens()
 }
