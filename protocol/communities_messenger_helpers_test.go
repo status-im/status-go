@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
@@ -16,12 +15,8 @@ import (
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
@@ -32,9 +27,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/communitytokens"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 type AccountManagerMock struct {
@@ -201,56 +194,6 @@ func newMessenger(s *suite.Suite, shh types.Waku, logger *zap.Logger, password s
 
 func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, accountsManager account.Manager,
 	tokenManager communities.TokenManager, collectiblesService communitytokens.ServiceInterface) (*Messenger, error) {
-	madb, err := multiaccounts.InitializeDB(dbsetup.InMemoryPath)
-	if err != nil {
-		return nil, err
-	}
-
-	acc := generator.NewAccount(privateKey, nil)
-	iai := acc.ToIdentifiedAccountInfo("")
-
-	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	if err != nil {
-		return nil, err
-	}
-
-	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	if err != nil {
-		return nil, err
-	}
-	options := []Option{
-		WithCustomLogger(logger),
-		WithDatabase(appDb),
-		WithWalletDatabase(walletDb),
-		WithMultiAccounts(madb),
-		WithAccount(iai.ToMultiAccount()),
-		WithDatasync(),
-		WithResendParams(3, 3),
-		WithTokenManager(tokenManager),
-	}
-
-	if collectiblesService != nil {
-		options = append(options, WithCommunityTokensService(collectiblesService))
-	}
-
-	m, err := NewMessenger(
-		"Test",
-		privateKey,
-		&testNode{shh: shh},
-		uuid.New().String(),
-		nil,
-		accountsManager,
-		options...,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.Init()
-	if err != nil {
-		return nil, err
-	}
-
 	config := params.NodeConfig{
 		NetworkID: 10,
 		DataDir:   "test",
@@ -279,9 +222,18 @@ func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, l
 		SendStatusUpdates:         true,
 		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}
 
-	_ = m.settings.CreateSettings(setting, config)
+	options := []Option{
+		WithResendParams(3, 3),
+		WithAccountManager(accountsManager),
+		WithTokenManager(tokenManager),
+		WithCommunityTokensService(collectiblesService),
+		WithAppSettings(setting, config),
+	}
 
-	return m, nil
+	return newTestMessenger(shh, testMessengerConfig{
+		privateKey: privateKey,
+		logger:     logger,
+	}, options)
 }
 
 func createCommunity(s *suite.Suite, owner *Messenger) (*communities.Community, *Chat) {

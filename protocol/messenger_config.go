@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
@@ -90,6 +91,7 @@ type config struct {
 	httpServer             *server.MediaServer
 	rpcClient              *rpc.Client
 	tokenManager           communities.TokenManager
+	accountsManager        account.Manager
 
 	verifyTransactionClient  EthClient
 	verifyENSURL             string
@@ -377,6 +379,13 @@ func WithWakuService(s *wakuv2.Waku) Option {
 func WithTokenManager(tokenManager communities.TokenManager) Option {
 	return func(c *config) error {
 		c.tokenManager = tokenManager
+		return nil
+	}
+}
+
+func WithAccountManager(accountManager account.Manager) Option {
+	return func(c *config) error {
+		c.accountsManager = accountManager
 		return nil
 	}
 }
