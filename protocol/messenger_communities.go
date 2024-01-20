@@ -576,22 +576,21 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 	return m.communitiesManager.Joined()
 }
 
-func (m *Messenger) CommunityUpdateLastOpenedAt(communityID string) (*MessengerResponse, error) {
+func (m *Messenger) CommunityUpdateLastOpenedAt(communityID string) (int64, error) {
 	id, err := hexutil.Decode(communityID)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	updatedCommunity, err := m.communitiesManager.CommunityUpdateLastOpenedAt(id, time.Now().Unix())
+	currentTime := time.Now().Unix()
+	updatedCommunity, err := m.communitiesManager.CommunityUpdateLastOpenedAt(id, currentTime)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	err = m.syncCommunity(context.Background(), updatedCommunity, m.dispatchMessage)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	response := &MessengerResponse{}
-	response.AddCommunity(updatedCommunity)
-	return response, nil
+	return currentTime, nil
 }
 
 func (m *Messenger) SpectatedCommunities() ([]*communities.Community, error) {

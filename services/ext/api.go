@@ -305,7 +305,7 @@ func (api *PublicAPI) MuteCommunityCategory(request *requests.MuteCategory) erro
 }
 
 // Updates the lastOpenedAt key of a community
-func (api *PublicAPI) CommunityUpdateLastOpenedAt(communityID string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) CommunityUpdateLastOpenedAt(communityID string) (int64, error) {
 	return api.service.messenger.CommunityUpdateLastOpenedAt(communityID)
 }
 
