@@ -2543,7 +2543,7 @@ func _1704832511_add_last_opened_at_for_communitiesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1704832511_add_last_opened_at_for_communities.up.sql", size: 89, mode: os.FileMode(0644), modTime: time.Unix(1705479838, 0)}
+	info := bindataFileInfo{name: "1704832511_add_last_opened_at_for_communities.up.sql", size: 89, mode: os.FileMode(0644), modTime: time.Unix(1705740850, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa7, 0x73, 0x6, 0x6f, 0xa5, 0xc5, 0x5b, 0x5a, 0xf7, 0xf3, 0xb3, 0x28, 0x27, 0x61, 0x28, 0x2c, 0x6a, 0x1, 0x93, 0x14, 0x5b, 0xc0, 0xe8, 0xb5, 0xf6, 0xbf, 0x9f, 0xfb, 0x20, 0x7c, 0xd9, 0x54}}
 	return a, nil
 }
