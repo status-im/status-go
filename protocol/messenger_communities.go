@@ -576,6 +576,23 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 	return m.communitiesManager.Joined()
 }
 
+func (m *Messenger) CommunityUpdateLastOpenedAt(communityID string) (int64, error) {
+	id, err := hexutil.Decode(communityID)
+	if err != nil {
+		return 0, err
+	}
+	currentTime := time.Now().Unix()
+	updatedCommunity, err := m.communitiesManager.CommunityUpdateLastOpenedAt(id, currentTime)
+	if err != nil {
+		return 0, err
+	}
+	err = m.syncCommunity(context.Background(), updatedCommunity, m.dispatchMessage)
+	if err != nil {
+		return 0, err
+	}
+	return currentTime, nil
+}
+
 func (m *Messenger) SpectatedCommunities() ([]*communities.Community, error) {
 	return m.communitiesManager.Spectated()
 }
@@ -3041,6 +3058,15 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 		err = m.communitiesManager.SetSyncControlNode(syncCommunity.Id, syncCommunity.ControlNode)
 		if err != nil {
 			logger.Debug("m.SetSyncControlNode", zap.Error(err))
+			return err
+		}
+	}
+
+	// Handle community last updated
+	if syncCommunity.LastOpenedAt > 0 {
+		_, err = m.communitiesManager.CommunityUpdateLastOpenedAt(syncCommunity.Id, syncCommunity.LastOpenedAt)
+		if err != nil {
+			logger.Debug("m.CommunityUpdateLastOpenedAt", zap.Error(err))
 			return err
 		}
 	}

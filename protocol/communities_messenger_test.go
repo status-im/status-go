@@ -3909,3 +3909,73 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	s.Require().NotEmpty(cancelRequestToJoin2.Clock)
 	s.Require().Equal(cancelRequestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
 }
+
+func (s *MessengerCommunitiesSuite) TestCommunityLastOpenedAt() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.joinCommunity(community, s.owner, s.alice)
+
+	// Mock frontend triggering communityUpdateLastOpenedAt
+	lastOpenedAt1, err := s.alice.CommunityUpdateLastOpenedAt(community.IDString())
+	s.Require().NoError(err)
+
+	// Check lastOpenedAt was updated
+	s.Require().True(lastOpenedAt1 > 0)
+
+	// Nap for a bit
+	time.Sleep(time.Second)
+
+	// Check lastOpenedAt was successfully updated twice
+	lastOpenedAt2, err := s.alice.CommunityUpdateLastOpenedAt(community.IDString())
+	s.Require().NoError(err)
+
+	s.Require().True(lastOpenedAt2 > lastOpenedAt1)
+}
+
+func (s *MessengerCommunitiesSuite) TestSyncCommunityLastOpenedAt() {
+	// Create new device
+	alicesOtherDevice := s.createOtherDevice(s.alice)
+	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
+
+	// Create a community
+	createCommunityReq := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
+		Name:        "new community",
+		Color:       "#000000",
+		Description: "new community description",
+	}
+
+	mr, err := s.alice.CreateCommunity(createCommunityReq, true)
+	s.Require().NoError(err, "s.alice.CreateCommunity")
+	var newCommunity *communities.Community
+	for _, com := range mr.Communities() {
+		if com.Name() == createCommunityReq.Name {
+			newCommunity = com
+		}
+	}
+	s.Require().NotNil(newCommunity)
+
+	// Mock frontend triggering communityUpdateLastOpenedAt
+	lastOpenedAt, err := s.alice.CommunityUpdateLastOpenedAt(newCommunity.IDString())
+	s.Require().NoError(err)
+
+	// Check lastOpenedAt was updated
+	s.Require().True(lastOpenedAt > 0)
+
+	err = tt.RetryWithBackOff(func() error {
+		_, err = alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		// Do we have a new synced community?
+		_, err := alicesOtherDevice.communitiesManager.GetSyncedRawCommunity(newCommunity.ID())
+		if err != nil {
+			return fmt.Errorf("community with sync not received %w", err)
+		}
+
+		return nil
+	})
+	otherDeviceCommunity, err := alicesOtherDevice.communitiesManager.GetByID(newCommunity.ID())
+	s.Require().NoError(err)
+	s.Require().True(otherDeviceCommunity.LastOpenedAt() > 0)
+}

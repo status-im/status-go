@@ -700,6 +700,20 @@ func (m *Manager) Spectated() ([]*Community, error) {
 	return m.persistence.SpectatedCommunities(&m.identity.PublicKey)
 }
 
+func (m *Manager) CommunityUpdateLastOpenedAt(communityID types.HexBytes, timestamp int64) (*Community, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.UpdateLastOpenedAt(community.ID(), timestamp)
+	if err != nil {
+		return nil, err
+	}
+	community.UpdateLastOpenedAt(timestamp)
+	return community, nil
+}
+
 func (m *Manager) JoinedAndPendingCommunitiesWithRequests() ([]*Community, error) {
 	return m.persistence.JoinedAndPendingCommunitiesWithRequests(&m.identity.PublicKey)
 }
@@ -761,6 +775,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		MemberIdentity:       &m.identity.PublicKey,
 		CommunityDescription: description,
 		Shard:                nil,
+		LastOpenedAt:         0,
 	}
 
 	var descriptionEncryptor DescriptionEncryptor
@@ -1235,6 +1250,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 			JoinedAt:             time.Now().Unix(),
 			MemberIdentity:       &m.identity.PublicKey,
 			CommunityDescription: description,
+			LastOpenedAt:         0,
 		}
 
 		var descriptionEncryptor DescriptionEncryptor
