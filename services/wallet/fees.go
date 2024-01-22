@@ -107,13 +107,13 @@ func (f *FeeManager) suggestedFees(ctx context.Context, chainID uint64) (*Sugges
 		}, nil
 	}
 
-	block, err := backend.BlockByNumber(ctx, nil)
+	header, err := backend.HeaderByNumber(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	config := params.MainnetChainConfig
-	baseFee := misc.CalcBaseFee(config, block.Header())
+	baseFee := misc.CalcBaseFee(config, header)
 
 	fees, err := f.getFeeHistorySorted(chainID)
 	if err != nil {
