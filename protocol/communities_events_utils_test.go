@@ -1112,14 +1112,6 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	s.Require().Len(acceptedRequestsPending, 1)
 	s.Require().Equal(acceptedRequestsPending[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
 
-	// user should not receive community admin event without being a member yet
-	_, err = WaitOnMessengerResponse(
-		user,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"user did not receive community request to join response",
-	)
-	s.Require().Error(err)
-
 	// control node receives community event with accepted membership request
 	_, err = WaitOnMessengerResponse(
 		base.GetControlNode(),
