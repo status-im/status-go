@@ -26,6 +26,7 @@ type CommunityEventsTestsInterface interface {
 	GetMember() *Messenger
 	GetSuite() *suite.Suite
 	GetCollectiblesServiceMock() *CollectiblesServiceMock
+	SetupAdditionalMessengers([]*Messenger)
 }
 
 const communitiesEventsTestTokenAddress = "0x0400000000000000000000000000000000000000"
@@ -408,6 +409,8 @@ func assertCheckTokenPermissionCreated(s *suite.Suite, community *communities.Co
 }
 
 func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role protobuf.CommunityMember_Roles, additionalEventSenders []*Messenger) *communities.Community {
+	base.SetupAdditionalMessengers(additionalEventSenders)
+
 	tcs2, err := base.GetControlNode().communitiesManager.All()
 	s := base.GetSuite()
 	s.Require().NoError(err, "eventSender.communitiesManager.All")
@@ -1048,13 +1051,7 @@ func advertiseCommunityToUserOldWay(s *suite.Suite, community *communities.Commu
 }
 
 func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger) {
-	// set up additional user that will send request to join
-	_, err := user.Start()
-
 	s := base.GetSuite()
-
-	s.Require().NoError(err)
-	defer TearDownMessenger(s, user)
 
 	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
 
@@ -1178,13 +1175,7 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 }
 
 func testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
-	// set up additional user that will send request to join
-	_, err := user.Start()
-
 	s := base.GetSuite()
-
-	s.Require().NoError(err)
-	defer TearDownMessenger(s, user)
 
 	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
 
@@ -1256,13 +1247,7 @@ func testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 }
 
 func testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
-	// set up additional user that will send request to join
-	_, err := user.Start()
-
 	s := base.GetSuite()
-
-	s.Require().NoError(err)
-	defer TearDownMessenger(s, user)
 
 	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
 
@@ -1335,11 +1320,7 @@ func testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 }
 
 func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger) {
-	_, err := user.Start()
-
 	s := base.GetSuite()
-	s.Require().NoError(err)
-	defer TearDownMessenger(s, user)
 
 	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
 
@@ -2249,13 +2230,7 @@ func waitAndCheckRequestsToJoin(s *suite.Suite, user *Messenger, expectedLength 
 }
 
 func testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger) {
-	// set up additional user that will send request to join
-	_, err := user.Start()
-
 	s := base.GetSuite()
-
-	s.Require().NoError(err)
-	defer TearDownMessenger(s, user)
 
 	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
 

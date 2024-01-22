@@ -16,7 +16,6 @@ import (
 
 	//utils "github.com/status-im/status-go/common"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -90,24 +89,16 @@ func (s *MessengerCommunitiesSignersSuite) TearDownTest() {
 }
 
 func (s *MessengerCommunitiesSignersSuite) newMessenger(password string, walletAddresses []string) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
+	return newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+		testMessengerConfig: testMessengerConfig{
+			logger: s.logger,
+		},
+		password:            password,
+		walletAddresses:     walletAddresses,
+		mockedBalances:      &s.mockedBalances,
+		collectiblesService: s.collectiblesServiceMock,
+	})
 
-	accountsManagerMock := &AccountManagerMock{}
-	accountsManagerMock.AccountsMap = make(map[string]string)
-
-	for _, walletAddress := range walletAddresses {
-		accountsManagerMock.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(password)))
-	}
-
-	tokenManagerMock := &TokenManagerMock{
-		Balances: &s.mockedBalances,
-	}
-
-	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger, accountsManagerMock, tokenManagerMock, s.collectiblesServiceMock)
-	s.Require().NoError(err)
-
-	return messenger
 }
 
 func (s *MessengerCommunitiesSignersSuite) createCommunity(controlNode *Messenger) *communities.Community {
