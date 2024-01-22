@@ -3288,25 +3288,6 @@ func (m *Manager) SaveRequestToJoinAndCommunity(requestToJoin *RequestToJoin, co
 	return community, requestToJoin, nil
 }
 
-func (m *Manager) CheckCommunityForJoining(communityID types.HexBytes) (*Community, error) {
-	community, err := m.GetByID(communityID)
-	if err != nil {
-		return nil, err
-	}
-
-	// We don't allow requesting access if already joined
-	if community.Joined() {
-		return nil, ErrAlreadyJoined
-	}
-
-	err = community.updateCommunityDescriptionByEvents()
-	if err != nil {
-		return nil, err
-	}
-
-	return community, nil
-}
-
 func (m *Manager) CreateRequestToJoin(request *requests.RequestToJoinCommunity) *RequestToJoin {
 	clock := uint64(time.Now().Unix())
 	requestToJoin := &RequestToJoin{

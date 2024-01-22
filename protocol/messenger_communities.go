@@ -1023,6 +1023,16 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, err
 	}
 
+	community, err := m.communitiesManager.GetByID(request.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+
+	// We don't allow requesting access if already joined
+	if community.Joined() {
+		return nil, communities.ErrAlreadyJoined
+	}
+
 	requestToJoin := m.communitiesManager.CreateRequestToJoin(request)
 
 	if len(request.AddressesToReveal) > 0 {
@@ -1046,11 +1056,6 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 				}
 			}
 		}
-	}
-
-	community, err := m.communitiesManager.CheckCommunityForJoining(request.CommunityID)
-	if err != nil {
-		return nil, err
 	}
 
 	displayName, err := m.settings.DisplayName()
