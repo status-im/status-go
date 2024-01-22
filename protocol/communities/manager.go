@@ -2254,8 +2254,8 @@ func (m *Manager) GetTokenPermissions(communityID types.HexBytes) (map[string]*C
 }
 
 type PermissionedToken struct {
-	Symbol string
-	Amount float64
+	Symbol string  `json:"symbol"`
+	Amount float64 `json:"amount"`
 }
 
 func (m *Manager) calculatePermissionedBalances(
@@ -2294,8 +2294,6 @@ func (m *Manager) calculatePermissionedBalances(
 						continue
 					}
 
-					usedBalances[usedKey] = true
-
 					if _, ok := resByTokenSymbol[walletAddress]; !ok {
 						resByTokenSymbol[walletAddress] = make(map[string]*PermissionedToken, 0)
 					}
@@ -2303,18 +2301,21 @@ func (m *Manager) calculatePermissionedBalances(
 						resByTokenSymbol[walletAddress][criteria.Symbol] = &PermissionedToken{Symbol: criteria.Symbol}
 					}
 
-					amountBigFloat := new(big.Float).Quo(
-						new(big.Float).SetInt(value.ToInt()),
-						big.NewFloat(math.Pow(10, float64(criteria.Decimals))),
-					)
-					amountFloat, _ := amountBigFloat.Float64()
+					numerator := new(big.Float).SetInt(value.ToInt())
+					denominator := new(big.Float).SetInt(new(big.Int).Exp(
+						big.NewInt(10),
+						big.NewInt(int64(criteria.Decimals)),
+						nil,
+					))
+					amountFloat, _ := new(big.Float).Quo(numerator, denominator).Float64()
+
 					resByTokenSymbol[walletAddress][criteria.Symbol].Amount += amountFloat
+					usedBalances[usedKey] = true
 				}
 			}
 		}
 	}
 
-	fmt.Println("usedBalances=", usedBalances)
 	res := make(map[gethcommon.Address][]PermissionedToken, 0)
 	for walletAddress, tokens := range resByTokenSymbol {
 		for _, permissionedToken := range tokens {
