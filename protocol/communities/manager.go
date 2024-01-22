@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net"
 	"os"
+	// "slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/metainfo"
+
 	// "github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
 
@@ -149,7 +151,6 @@ func NewDefaultTokenManager(tm *token.Manager) *DefaultTokenManager {
 	return &DefaultTokenManager{tokenManager: tm}
 }
 
-// TODO(ilmotta): Use this type
 type BalancesByChain = map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
 
 func (m *DefaultTokenManager) GetAllChainIDs() ([]uint64, error) {
@@ -2208,6 +2209,19 @@ func (m *Manager) CheckPermissionToJoin(id []byte, addresses []gethcommon.Addres
 
 }
 
+type MyTokenCriteria struct {
+	Amount string `json:"amount"`
+	Symbol string `json:"symbol"`
+}
+
+type MyTokenPermission struct {
+	IsSatisfied     bool                                   `json:"isSatisfied"`
+	Type            protobuf.CommunityTokenPermission_Type `json:"type"`
+	MyTokenCriteria []*protobuf.TokenCriteria              `json:"tokenCriteria"`
+}
+
+// ----------------
+
 type AccessRolePermission struct {
 	MinRequired string               `json:"minRequired"`
 	Symbol      string               `json:"symbol"`
@@ -2237,6 +2251,75 @@ func (m *Manager) GetTokenPermissions(communityID types.HexBytes) (map[string]*C
 	}
 
 	return community.TokenPermissions(), nil
+}
+
+type PermissionedToken struct {
+	Symbol string
+	Amount *big.Float
+}
+
+// map of wallet address -> token symbol -> PermissionedToken
+type PermissionedBalances map[gethcommon.Address]map[string]PermissionedToken
+
+func (m *Manager) CalculatePermissionedBalances(
+	chainIDs []uint64,
+	walletAddresses []gethcommon.Address,
+	balances BalancesByChain,
+	tokenPermissions []*protobuf.CommunityTokenPermission,
+) PermissionedBalances {
+	res := make(PermissionedBalances)
+
+	// Map of composite key (chain ID + wallet address + contract address) to
+	// store if we already processed the balance.
+	usedBalances := make(map[string]bool)
+
+	for _, permission := range tokenPermissions {
+		for _, criteria := range permission.TokenCriteria {
+			for _, walletAddress := range walletAddresses {
+				if _, ok := res[walletAddress]; !ok {
+					res[walletAddress] = make(map[string]PermissionedToken, 0)
+				}
+
+				if _, ok := res[walletAddress][criteria.Symbol]; !ok {
+					res[walletAddress][criteria.Symbol] = PermissionedToken{
+						Symbol: criteria.Symbol,
+						Amount: new(big.Float),
+					}
+				}
+
+				for chainID, hexContractAddress := range criteria.ContractAddresses {
+					usedKey := strconv.FormatUint(chainID, 10) + walletAddress.Hex() + hexContractAddress
+					// Skip the contract address if it has been used already in the sum.
+					if _, ok := usedBalances[usedKey]; ok {
+						continue
+					}
+					usedBalances[usedKey] = true
+
+					if _, ok := balances[chainID]; !ok {
+						continue
+					}
+					if _, ok := balances[chainID][walletAddress]; !ok {
+						continue
+					}
+
+					contractAddress := gethcommon.HexToAddress(hexContractAddress)
+					value, ok := balances[chainID][walletAddress][contractAddress]
+					if !ok {
+						continue
+					}
+					amountFloat := new(big.Float).Quo(
+						new(big.Float).SetInt(value.ToInt()),
+						big.NewFloat(math.Pow(10, float64(criteria.Decimals))),
+					)
+
+					prevAmount := res[walletAddress][criteria.Symbol].Amount
+					res[walletAddress][criteria.Symbol].Amount.Add(prevAmount, amountFloat)
+				}
+			}
+		}
+	}
+
+	return res
 }
 
 func (m *Manager) GetCommunityAccessRolesWithBalances(
@@ -2335,12 +2418,11 @@ func (m *Manager) GetCommunityAccessRolesWithBalances(
 					if !exists || len(chainBalances) == 0 {
 						continue chainIDLoopERC20
 					}
+					m.logger.Debug("ilmotta", zap.Any("chainBalances", chainBalances))
 
 					contractAddress := gethcommon.HexToAddress(contractAddressHex)
 					for account := range balances[chainID] {
-						// filter here if account matches one of the addresses to share
-						accountsSet[account] = true
-
+						var exists bool
 						value, exists := balances[chainID][account][contractAddress]
 						if !exists {
 							m.logger.Error(
@@ -2351,6 +2433,8 @@ func (m *Manager) GetCommunityAccessRolesWithBalances(
 							continue
 						}
 
+						accountsSet[account] = true
+
 						// getting a nil pointer here
 						accountChainBalance := new(big.Float).Quo(
 							new(big.Float).SetInt(value.ToInt()),
@@ -2358,9 +2442,12 @@ func (m *Manager) GetCommunityAccessRolesWithBalances(
 						)
 
 						v2, _ := accountChainBalance.Float64()
-						m.logger.Error(
-							"ilmotta:communities/manager#GetCommunityAccessRolesWithBalances",
-							zap.Float64("accountChainBalance", v2),
+						m.logger.Debug(
+							"ilmotta:relevantAccounts",
+							zap.Any("account", account),
+							zap.Any("contractAddress", contractAddress),
+							zap.Any("exists", exists),
+							zap.Any("accountChainBalance", v2),
 						)
 
 						// check if adding current chain account balance to accumulated balance
@@ -2379,6 +2466,12 @@ func (m *Manager) GetCommunityAccessRolesWithBalances(
 					}
 				}
 
+				m.logger.Debug(
+					"ilmotta",
+					zap.Any("accountsSet", accountsSet),
+				)
+
+				// filter here if account matches one of the addresses to share
 				for account := range accountsSet {
 					rolePermission.Accounts = append(rolePermission.Accounts, account)
 				}
@@ -2437,6 +2530,111 @@ func (m *Manager) GetCommunityAccessRolesWithBalances(
 
 	return response, nil
 }
+
+// func (m *Manager) GetCommunityAccessRolesWithBalancesV2(
+//	ctx context.Context,
+//	communityID types.HexBytes,
+//	walletAddresses []gethcommon.Address,
+// ) (AccessRolesWithBalances, error) {
+//	response := AccessRolesWithBalances{
+//		HighestSatisfiedRoleType: protobuf.CommunityTokenPermission_UNKNOWN_TOKEN_PERMISSION,
+//	}
+
+//	community, err := m.GetByID(communityID)
+//	if err != nil {
+//		return response, err
+//	}
+//	if community == nil {
+//		return response, errors.Errorf("community does not exist ID='%s'", communityID)
+//	}
+
+//	// TODO(ilmotta): what about erc721? Can we reuse the logic for erc20 and erc721?
+//	tokenPermissions := make([]*CommunityTokenPermission, 0)
+//	for _, p := range community.TokenPermissions() {
+//		// TODO(ilmotta): test and support token master/owner
+//		if p.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER ||
+//			p.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN {
+//			tokenPermissions = append(tokenPermissions, p)
+//		}
+//	}
+
+//	allChainIDs, err := m.tokenManager.GetAllChainIDs()
+//	if err != nil {
+//		return response, err
+//	}
+//	accountsAndChainIDs := combineAddressesAndChainIDs(walletAddresses, allChainIDs)
+
+//	erc20TokenCriteriaByChain, _, _ := ExtractTokenCriteria(tokenPermissions)
+
+//	accounts := make([]gethcommon.Address, 0, len(accountsAndChainIDs))
+//	for _, accountAndChainIDs := range accountsAndChainIDs {
+//		accounts = append(accounts, accountAndChainIDs.Address)
+//	}
+
+//	erc20ChainIDsSet := make(map[uint64]bool)
+//	erc20TokenAddresses := make([]gethcommon.Address, 0)
+//	for chainID, criterionByContractAddress := range erc20TokenCriteriaByChain {
+//		erc20ChainIDsSet[chainID] = true
+//		for contractAddress := range criterionByContractAddress {
+//			erc20TokenAddresses = append(erc20TokenAddresses, gethcommon.HexToAddress(contractAddress))
+//		}
+//	}
+//	erc20ChainIDs := calculateChainIDsSet(accountsAndChainIDs, erc20ChainIDsSet)
+
+//	balances, err := m.tokenManager.GetBalancesByChain(ctx, accounts, erc20TokenAddresses, erc20ChainIDs)
+//	if err != nil {
+//		return response, err
+//	}
+
+//	for _, tokenPermission := range community.TokenPermissions() {
+//		for _, tokenCriteria := range tokenPermission.TokenCriteria {
+//			isTokenCriteriaSatisfied := false
+
+//			for chainID, contractAddressHex := range tokenCriteria.ContractAddresses {
+//				chainBalances, exists := balances[chainID]
+//				// If there are no balances for this chain, try the next chain.
+//				if !exists || len(chainBalances) == 0 {
+//					continue
+//				}
+
+//				contractAddress := gethcommon.HexToAddress(contractAddressHex)
+//				for accountAddress := range balances[chainID] {
+//					amount, exists := balances[chainID][accountAddress][contractAddress]
+//					if !exists {
+//						continue
+//					}
+
+//					// At this point we have gathered all the necessary data.
+
+//					balance := new(big.Float).Quo(
+//						new(big.Float).SetInt(amount.ToInt()),
+//						big.NewFloat(math.Pow(10, float64(tokenCriteria.Decimals))),
+//					)
+
+//					criteriaAmount, err := strconv.ParseFloat(tokenCriteria.Amount, 32)
+//					if err != nil {
+//						return response, err
+//					}
+
+//					tokenCriteria.Amount
+//				}
+
+//				if slices.Contains(allChainIDs, chainID) {
+//				}
+//			}
+
+//			// If no balances could be found for the tokenCriteria, then it is
+//			// certainly not satisfied.
+//		}
+//	}
+
+//	// Satisfied fields can be processed separately. Less efficient from a
+//	// performance perspective to loop again, but more maintainable due to our
+//	// ability to decouple and compose functions. Besides, it's a small amount of
+//	// data being processed.
+
+//	return response, nil
+// }
 
 func (m *Manager) accountsSatisfyPermissionsToJoin(community *Community, accounts []*protobuf.RevealedAccount) (bool, protobuf.CommunityMember_Roles, error) {
 	accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(accounts)
