@@ -2255,19 +2255,16 @@ func (m *Manager) GetTokenPermissions(communityID types.HexBytes) (map[string]*C
 
 type PermissionedToken struct {
 	Symbol string
-	Amount *big.Float
+	Amount float64
 }
-
-// map of wallet address -> token symbol -> PermissionedToken
-type PermissionedBalances map[gethcommon.Address]map[string]PermissionedToken
 
 func (m *Manager) CalculatePermissionedBalances(
 	chainIDs []uint64,
 	walletAddresses []gethcommon.Address,
 	balances BalancesByChain,
 	tokenPermissions []*protobuf.CommunityTokenPermission,
-) PermissionedBalances {
-	res := make(PermissionedBalances)
+) map[gethcommon.Address][]PermissionedToken {
+	resByTokenSymbol := make(map[gethcommon.Address]map[string]*PermissionedToken)
 
 	// Map of composite key (chain ID + wallet address + contract address) to
 	// store if we already processed the balance.
@@ -2276,46 +2273,66 @@ func (m *Manager) CalculatePermissionedBalances(
 	for _, permission := range tokenPermissions {
 		for _, criteria := range permission.TokenCriteria {
 			for _, walletAddress := range walletAddresses {
-				if _, ok := res[walletAddress]; !ok {
-					res[walletAddress] = make(map[string]PermissionedToken, 0)
-				}
-
-				if _, ok := res[walletAddress][criteria.Symbol]; !ok {
-					res[walletAddress][criteria.Symbol] = PermissionedToken{
-						Symbol: criteria.Symbol,
-						Amount: new(big.Float),
-					}
-				}
-
 				for chainID, hexContractAddress := range criteria.ContractAddresses {
-					usedKey := strconv.FormatUint(chainID, 10) + walletAddress.Hex() + hexContractAddress
-					// Skip the contract address if it has been used already in the sum.
-					if _, ok := usedBalances[usedKey]; ok {
-						continue
-					}
-					usedBalances[usedKey] = true
+					usedKey := strconv.FormatUint(chainID, 10) + "-" + walletAddress.Hex() + "-" + hexContractAddress
+					fmt.Println(
+						"walletAddress=", walletAddress,
+						"hexContractAddress=", hexContractAddress,
+					)
 
 					if _, ok := balances[chainID]; !ok {
+						fmt.Println("balances do not exist")
 						continue
 					}
 					if _, ok := balances[chainID][walletAddress]; !ok {
+						fmt.Println("balances do not exist")
 						continue
 					}
+					fmt.Println("balances exist")
 
 					contractAddress := gethcommon.HexToAddress(hexContractAddress)
 					value, ok := balances[chainID][walletAddress][contractAddress]
 					if !ok {
 						continue
 					}
-					amountFloat := new(big.Float).Quo(
+
+					// Skip because the final result should not contain wallet accounts
+					// with zeroed balances.
+					if value.ToInt() == big.NewInt(0) {
+						continue
+					}
+
+					// Skip the contract address if it has been used already in the sum.
+					if _, ok := usedBalances[usedKey]; ok {
+						continue
+					}
+
+					usedBalances[usedKey] = true
+
+					if _, ok := resByTokenSymbol[walletAddress]; !ok {
+						resByTokenSymbol[walletAddress] = make(map[string]*PermissionedToken, 0)
+					}
+
+					if _, ok := resByTokenSymbol[walletAddress][criteria.Symbol]; !ok {
+						resByTokenSymbol[walletAddress][criteria.Symbol] = &PermissionedToken{Symbol: criteria.Symbol}
+					}
+
+					amountBigFloat := new(big.Float).Quo(
 						new(big.Float).SetInt(value.ToInt()),
 						big.NewFloat(math.Pow(10, float64(criteria.Decimals))),
 					)
-
-					prevAmount := res[walletAddress][criteria.Symbol].Amount
-					res[walletAddress][criteria.Symbol].Amount.Add(prevAmount, amountFloat)
+					amountFloat, _ := amountBigFloat.Float64()
+					resByTokenSymbol[walletAddress][criteria.Symbol].Amount += amountFloat
 				}
 			}
+		}
+	}
+
+	fmt.Println("usedBalances=", usedBalances)
+	res := make(map[gethcommon.Address][]PermissionedToken, 0)
+	for walletAddress, tokens := range resByTokenSymbol {
+		for _, permissionedToken := range tokens {
+			res[walletAddress] = append(res[walletAddress], *permissionedToken)
 		}
 	}
 

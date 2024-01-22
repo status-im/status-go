@@ -236,27 +236,64 @@ func (s *ManagerSuite) Test_CalculatePermissionedBalances() {
 
 	var mainnetID uint64 = 1
 	var arbitrumID uint64 = 42161
+	var gnosisID uint64 = 100
 	chainIDs := []uint64{mainnetID, arbitrumID}
 
-	contractETHAddress := gethcommon.HexToAddress("0xA")
+	mainnetSNTContractAddress := gethcommon.HexToAddress("0xC")
+	mainnetETHContractAddress := gethcommon.HexToAddress("0xA")
+	arbitrumETHContractAddress := gethcommon.HexToAddress("0xB")
+
 	account1Address := gethcommon.HexToAddress("0x1")
-	walletAddresses := []gethcommon.Address{account1Address}
+	account2Address := gethcommon.HexToAddress("0x2")
+	walletAddresses := []gethcommon.Address{account1Address, account2Address}
 
 	balances := make(BalancesByChain)
-	balances[mainnetID] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
-	balances[mainnetID][account1Address] = make(map[gethcommon.Address]*hexutil.Big)
-	balances[mainnetID][account1Address][contractETHAddress] = intToBig(10)
 
-	contractAddressesETH := make(map[uint64]string)
-	contractAddressesETH[mainnetID] = contractETHAddress.Hex()
+	balances[mainnetID] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	balances[arbitrumID] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	balances[gnosisID] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+
+	// Account 1 balances
+	balances[mainnetID][account1Address] = make(map[gethcommon.Address]*hexutil.Big)
+	balances[mainnetID][account1Address][mainnetETHContractAddress] = intToBig(10)
+	balances[arbitrumID][account1Address] = make(map[gethcommon.Address]*hexutil.Big)
+	balances[arbitrumID][account1Address][arbitrumETHContractAddress] = intToBig(25)
+
+	// Account 2 balances
+	balances[mainnetID][account2Address] = make(map[gethcommon.Address]*hexutil.Big)
+	balances[mainnetID][account2Address][mainnetSNTContractAddress] = intToBig(120)
+	balances[arbitrumID][account2Address] = make(map[gethcommon.Address]*hexutil.Big)
+	balances[arbitrumID][account2Address][arbitrumETHContractAddress] = intToBig(2)
+
+	// A balance that should be ignored because the list of wallet addresses don't
+	// contain any wallet in the Gnosis chain.
+	balances[gnosisID][gethcommon.HexToAddress("0xF")] = make(map[gethcommon.Address]*hexutil.Big)
+	balances[gnosisID][gethcommon.HexToAddress("0xF")][gethcommon.HexToAddress("0x99")] = intToBig(500)
 
 	tokenPermissions := []*protobuf.CommunityTokenPermission{
 		&protobuf.CommunityTokenPermission{
 			TokenCriteria: []*protobuf.TokenCriteria{
 				&protobuf.TokenCriteria{
+					Symbol: "ETH",
+					Amount: "20",
+					ContractAddresses: map[uint64]string{
+						arbitrumID: arbitrumETHContractAddress.Hex(),
+						mainnetID:  mainnetETHContractAddress.Hex(),
+					},
+				},
+				&protobuf.TokenCriteria{
 					Symbol:            "ETH",
-					Amount:            "20",
-					ContractAddresses: contractAddressesETH,
+					Amount:            "4",
+					ContractAddresses: map[uint64]string{arbitrumID: arbitrumETHContractAddress.Hex()},
+				},
+			},
+		},
+		&protobuf.CommunityTokenPermission{
+			TokenCriteria: []*protobuf.TokenCriteria{
+				&protobuf.TokenCriteria{
+					Symbol:            "SNT",
+					Amount:            "1000",
+					ContractAddresses: map[uint64]string{mainnetID: mainnetSNTContractAddress.Hex()},
 				},
 			},
 		},
@@ -269,14 +306,29 @@ func (s *ManagerSuite) Test_CalculatePermissionedBalances() {
 		tokenPermissions,
 	)
 
-	expected := make(PermissionedBalances)
-	expected[account1Address] = make(map[string]PermissionedToken)
-	expected[account1Address]["ETH"] = PermissionedToken{
-		Symbol: "ETH",
-		Amount: floatToBig(10.0),
+	expected := make(map[gethcommon.Address][]PermissionedToken)
+	expected[account1Address] = []PermissionedToken{
+		PermissionedToken{
+			Symbol: "ETH",
+			Amount: 35,
+		},
+	}
+	expected[account2Address] = []PermissionedToken{
+		PermissionedToken{
+			Symbol: "ETH",
+			Amount: 2,
+		},
+		PermissionedToken{
+			Symbol: "SNT",
+			Amount: 120,
+		},
 	}
 
-	s.Require().Equal(expected, actual)
+	for walletAddress, permissionedTokens := range actual {
+		_, ok := expected[walletAddress]
+		s.Require().True(ok, walletAddress)
+		s.Require().ElementsMatch(expected[walletAddress], permissionedTokens)
+	}
 }
 
 func (s *ManagerSuite) Test_GetCommunityAccessRolesWithBalances() {
