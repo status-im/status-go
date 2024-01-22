@@ -187,7 +187,16 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, waku types.Waku, logger *zap.Logger) *Messenger {
-	return newMessenger(&s.Suite, waku, logger, password, walletAddresses, &s.mockedBalances, s.collectiblesServiceMock)
+	return newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
+		testMessengerConfig: testMessengerConfig{
+			logger: logger,
+		},
+		password:            password,
+		walletAddresses:     walletAddresses,
+		mockedBalances:      &s.mockedBalances,
+		collectiblesService: s.collectiblesServiceMock,
+	})
+
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunity(community *communities.Community, user *Messenger, password string, addresses []string) {

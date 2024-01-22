@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -88,12 +87,11 @@ func (s *MessengerOfflineSuite) TearDownTest() {
 }
 
 func (s *MessengerOfflineSuite) newMessenger(waku types.Waku, logger *zap.Logger) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	m, err := newCommunitiesTestMessenger(waku, privateKey, logger, nil, nil, nil)
-	s.Require().NoError(err)
-	return m
+	return newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
+		testMessengerConfig: testMessengerConfig{
+			logger: s.logger,
+		},
+	})
 }
 
 func (s *MessengerOfflineSuite) advertiseCommunityTo(community *communities.Community, owner *Messenger, user *Messenger) {

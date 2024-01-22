@@ -33,6 +33,8 @@ type OwnerWithoutCommunityKeyCommunityEventsSuite struct {
 	logger                  *zap.Logger
 	mockedBalances          map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
 	collectiblesServiceMock *CollectiblesServiceMock
+
+	additionalEventSenders []*Messenger
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) GetControlNode() *Messenger {
@@ -82,11 +84,33 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.controlNode)
 	TearDownMessenger(&s.Suite, s.ownerWithoutCommunityKey)
 	TearDownMessenger(&s.Suite, s.alice)
+
+	for _, m := range s.additionalEventSenders {
+		TearDownMessenger(&s.Suite, m)
+	}
+	s.additionalEventSenders = nil
+
 	_ = s.logger.Sync()
 }
 
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) SetupAdditionalMessengers(messengers []*Messenger) {
+	for _, m := range messengers {
+		s.additionalEventSenders = append(s.additionalEventSenders, m)
+		_, err := m.Start()
+		s.Require().NoError(err)
+	}
+}
+
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) newMessenger(password string, walletAddresses []string) *Messenger {
-	return newMessenger(&s.Suite, s.shh, s.logger, password, walletAddresses, &s.mockedBalances, s.collectiblesServiceMock)
+	return newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+		testMessengerConfig: testMessengerConfig{
+			logger: s.logger,
+		},
+		password:            password,
+		walletAddresses:     walletAddresses,
+		mockedBalances:      &s.mockedBalances,
+		collectiblesService: s.collectiblesServiceMock,
+	})
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerEditCommunityDescription() {
@@ -118,8 +142,11 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerCreateEditDelete
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders() {
 	additionalOwner := s.newMessenger("", []string{})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
+
 	// set up additional user that will send request to join
 	user := s.newMessenger("", []string{})
+	s.SetupAdditionalMessengers([]*Messenger{user})
+
 	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalOwner)
 }
 
@@ -128,14 +155,19 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAcceptMemberRequ
 
 	// set up additional user that will send request to join
 	user := s.newMessenger("", []string{})
+	s.SetupAdditionalMessengers([]*Messenger{user})
+
 	testAcceptMemberRequestToJoin(s, community, user)
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequestToJoinResponseSharedWithOtherEventSenders() {
 	additionalOwner := s.newMessenger("", []string{})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
+
 	// set up additional user that will send request to join
 	user := s.newMessenger("", []string{})
+	s.SetupAdditionalMessengers([]*Messenger{user})
+
 	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalOwner)
 }
 
@@ -144,6 +176,8 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequ
 
 	// set up additional user that will send request to join
 	user := s.newMessenger("", []string{})
+	s.SetupAdditionalMessengers([]*Messenger{user})
+
 	testRejectMemberRequestToJoin(s, community, user)
 }
 

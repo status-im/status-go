@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"testing"
 	"time"
 
@@ -10,7 +9,6 @@ import (
 	"go.uber.org/zap"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -71,18 +69,12 @@ func (s *MessengerPeersyncingSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerPeersyncingSuite) newMessengerWithKey(privateKey *ecdsa.PrivateKey) *Messenger {
-	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger, nil, nil, nil)
-	s.Require().NoError(err)
-
-	return messenger
-}
-
 func (s *MessengerPeersyncingSuite) newMessenger() *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	return s.newMessengerWithKey(privateKey)
+	return newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+		testMessengerConfig: testMessengerConfig{
+			logger: s.logger,
+		},
+	})
 }
 
 func (s *MessengerPeersyncingSuite) joinCommunity(community *communities.Community, owner *Messenger, user *Messenger) {
