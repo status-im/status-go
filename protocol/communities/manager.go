@@ -2275,30 +2275,17 @@ func (m *Manager) calculatePermissionedBalances(
 			for _, walletAddress := range walletAddresses {
 				for chainID, hexContractAddress := range criteria.ContractAddresses {
 					usedKey := strconv.FormatUint(chainID, 10) + "-" + walletAddress.Hex() + "-" + hexContractAddress
-					fmt.Println(
-						"walletAddress=", walletAddress,
-						"hexContractAddress=", hexContractAddress,
-					)
 
 					if _, ok := balances[chainID]; !ok {
-						fmt.Println("balances do not exist")
 						continue
 					}
 					if _, ok := balances[chainID][walletAddress]; !ok {
-						fmt.Println("balances do not exist")
 						continue
 					}
-					fmt.Println("balances exist")
 
 					contractAddress := gethcommon.HexToAddress(hexContractAddress)
 					value, ok := balances[chainID][walletAddress][contractAddress]
 					if !ok {
-						continue
-					}
-
-					// Skip because the final result should not contain wallet accounts
-					// with zeroed balances.
-					if value.ToInt() == big.NewInt(0) {
 						continue
 					}
 
@@ -2312,7 +2299,6 @@ func (m *Manager) calculatePermissionedBalances(
 					if _, ok := resByTokenSymbol[walletAddress]; !ok {
 						resByTokenSymbol[walletAddress] = make(map[string]*PermissionedToken, 0)
 					}
-
 					if _, ok := resByTokenSymbol[walletAddress][criteria.Symbol]; !ok {
 						resByTokenSymbol[walletAddress][criteria.Symbol] = &PermissionedToken{Symbol: criteria.Symbol}
 					}
@@ -2332,7 +2318,9 @@ func (m *Manager) calculatePermissionedBalances(
 	res := make(map[gethcommon.Address][]PermissionedToken, 0)
 	for walletAddress, tokens := range resByTokenSymbol {
 		for _, permissionedToken := range tokens {
-			res[walletAddress] = append(res[walletAddress], *permissionedToken)
+			if permissionedToken.Amount > 0 {
+				res[walletAddress] = append(res[walletAddress], *permissionedToken)
+			}
 		}
 	}
 

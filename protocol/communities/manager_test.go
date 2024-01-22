@@ -245,7 +245,8 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 
 	account1Address := gethcommon.HexToAddress("0x1")
 	account2Address := gethcommon.HexToAddress("0x2")
-	walletAddresses := []gethcommon.Address{account1Address, account2Address}
+	account3Address := gethcommon.HexToAddress("0x3")
+	walletAddresses := []gethcommon.Address{account1Address, account2Address, account3Address}
 
 	balances := make(BalancesByChain)
 
@@ -264,6 +265,11 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 	balances[mainnetID][account2Address][mainnetSNTContractAddress] = intToBig(120)
 	balances[arbitrumID][account2Address] = make(map[gethcommon.Address]*hexutil.Big)
 	balances[arbitrumID][account2Address][arbitrumETHContractAddress] = intToBig(2)
+
+	// Account 3 balances. This account is used to assert zeroed balances are
+	// removed from the final response.
+	balances[mainnetID][account3Address] = make(map[gethcommon.Address]*hexutil.Big)
+	balances[mainnetID][account3Address][mainnetETHContractAddress] = intToBig(0)
 
 	// A balance that should be ignored because the list of wallet addresses don't
 	// contain any wallet in the Gnosis chain.
@@ -330,7 +336,7 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 
 	for walletAddress, permissionedTokens := range actual {
 		_, ok := expected[walletAddress]
-		s.Require().True(ok, walletAddress)
+		s.Require().True(ok, "actual contains unexpected walletAddress='%s'", walletAddress)
 		s.Require().ElementsMatch(expected[walletAddress], permissionedTokens)
 	}
 }
