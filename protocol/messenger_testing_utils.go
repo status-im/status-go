@@ -311,11 +311,11 @@ func NewWakuV2(s *suite.Suite, logger *zap.Logger, useLocalWaku bool, enableStor
 	return wakuNode
 }
 
-func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []string) []types.Waku {
+func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, useShardAsDefaultTopic bool, nodeNames []string) []types.Waku {
 	nodes := make([]*waku2.Waku, len(nodeNames))
 	for i, name := range nodeNames {
 		logger := parentLogger.With(zap.String("name", name+"-waku"))
-		wakuNode := NewWakuV2(s, logger, true, false, false, 0)
+		wakuNode := NewWakuV2(s, logger, true, false, useShardAsDefaultTopic, 0)
 		nodes[i] = wakuNode
 	}
 
