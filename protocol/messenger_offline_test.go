@@ -40,7 +40,7 @@ func TestMessengerOfflineSuite(t *testing.T) {
 func (s *MessengerOfflineSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "bob", "alice"})
+	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, false, []string{"owner", "bob", "alice"})
 
 	ownerLogger := s.logger.With(zap.String("name", "owner"))
 	s.ownerWaku = wakuNodes[0]
