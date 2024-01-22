@@ -3652,6 +3652,29 @@ func (m *Messenger) GetCommunityAccessRolesWithBalances(request *requests.GetCom
 	)
 }
 
+func (m *Messenger) GetCommunityPermissionedBalances(request *requests.GetCommunityAccessRolesWithBalances) (map[gethcommon.Address][]communities.PermissionedToken, error) {
+	err := request.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	walletAddresses, err := m.settings.GetWalletAddresses()
+	if err != nil {
+		return nil, err
+	}
+
+	gethAddresses := make([]gethcommon.Address, 0, len(walletAddresses))
+	for _, address := range walletAddresses {
+		gethAddresses = append(gethAddresses, gethcommon.HexToAddress(address.Hex()))
+	}
+
+	return m.communitiesManager.GetPermissionedBalances(
+		context.Background(),
+		request.CommunityID,
+		gethAddresses,
+	)
+}
+
 func (m *Messenger) GetAllCommunityTokens() ([]*token.CommunityToken, error) {
 	return m.communitiesManager.GetAllCommunityTokens()
 }

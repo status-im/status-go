@@ -2258,11 +2258,11 @@ type PermissionedToken struct {
 	Amount float64
 }
 
-func (m *Manager) CalculatePermissionedBalances(
+func (m *Manager) calculatePermissionedBalances(
 	chainIDs []uint64,
 	walletAddresses []gethcommon.Address,
 	balances BalancesByChain,
-	tokenPermissions []*protobuf.CommunityTokenPermission,
+	tokenPermissions []*CommunityTokenPermission,
 ) map[gethcommon.Address][]PermissionedToken {
 	resByTokenSymbol := make(map[gethcommon.Address]map[string]*PermissionedToken)
 
@@ -2337,6 +2337,58 @@ func (m *Manager) CalculatePermissionedBalances(
 	}
 
 	return res
+}
+
+func (m *Manager) GetPermissionedBalances(
+	ctx context.Context,
+	communityID types.HexBytes,
+	walletAddresses []gethcommon.Address,
+) (map[gethcommon.Address][]PermissionedToken, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, errors.Errorf("community does not exist ID='%s'", communityID)
+	}
+
+	tokenPermissions := make([]*CommunityTokenPermission, 0)
+	for _, p := range community.TokenPermissions() {
+		if p.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER ||
+			p.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN {
+			tokenPermissions = append(tokenPermissions, p)
+		}
+	}
+
+	allChainIDs, err := m.tokenManager.GetAllChainIDs()
+	if err != nil {
+		return nil, err
+	}
+	accountsAndChainIDs := combineAddressesAndChainIDs(walletAddresses, allChainIDs)
+
+	erc20TokenCriteriaByChain, _, _ := ExtractTokenCriteria(tokenPermissions)
+
+	accounts := make([]gethcommon.Address, 0, len(accountsAndChainIDs))
+	for _, accountAndChainIDs := range accountsAndChainIDs {
+		accounts = append(accounts, accountAndChainIDs.Address)
+	}
+
+	erc20ChainIDsSet := make(map[uint64]bool)
+	erc20TokenAddresses := make([]gethcommon.Address, 0)
+	for chainID, criterionByContractAddress := range erc20TokenCriteriaByChain {
+		erc20ChainIDsSet[chainID] = true
+		for contractAddress := range criterionByContractAddress {
+			erc20TokenAddresses = append(erc20TokenAddresses, gethcommon.HexToAddress(contractAddress))
+		}
+	}
+	erc20ChainIDs := calculateChainIDsSet(accountsAndChainIDs, erc20ChainIDsSet)
+
+	balances, err := m.tokenManager.GetBalancesByChain(ctx, accounts, erc20TokenAddresses, erc20ChainIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.calculatePermissionedBalances(allChainIDs, walletAddresses, balances, tokenPermissions), nil
 }
 
 func (m *Manager) GetCommunityAccessRolesWithBalances(

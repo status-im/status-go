@@ -230,7 +230,7 @@ func (s *ManagerSuite) TestRetrieveTokens() {
 	s.Require().False(resp.Satisfied)
 }
 
-func (s *ManagerSuite) Test_CalculatePermissionedBalances() {
+func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 	m, _, _ := s.setupManagerForTokenPermissions()
 	s.Require().NotNil(m)
 
@@ -270,36 +270,40 @@ func (s *ManagerSuite) Test_CalculatePermissionedBalances() {
 	balances[gnosisID][gethcommon.HexToAddress("0xF")] = make(map[gethcommon.Address]*hexutil.Big)
 	balances[gnosisID][gethcommon.HexToAddress("0xF")][gethcommon.HexToAddress("0x99")] = intToBig(500)
 
-	tokenPermissions := []*protobuf.CommunityTokenPermission{
-		&protobuf.CommunityTokenPermission{
-			TokenCriteria: []*protobuf.TokenCriteria{
-				&protobuf.TokenCriteria{
-					Symbol: "ETH",
-					Amount: "20",
-					ContractAddresses: map[uint64]string{
-						arbitrumID: arbitrumETHContractAddress.Hex(),
-						mainnetID:  mainnetETHContractAddress.Hex(),
+	tokenPermissions := []*CommunityTokenPermission{
+		&CommunityTokenPermission{
+			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				TokenCriteria: []*protobuf.TokenCriteria{
+					&protobuf.TokenCriteria{
+						Symbol: "ETH",
+						Amount: "20",
+						ContractAddresses: map[uint64]string{
+							arbitrumID: arbitrumETHContractAddress.Hex(),
+							mainnetID:  mainnetETHContractAddress.Hex(),
+						},
 					},
-				},
-				&protobuf.TokenCriteria{
-					Symbol:            "ETH",
-					Amount:            "4",
-					ContractAddresses: map[uint64]string{arbitrumID: arbitrumETHContractAddress.Hex()},
+					&protobuf.TokenCriteria{
+						Symbol:            "ETH",
+						Amount:            "4",
+						ContractAddresses: map[uint64]string{arbitrumID: arbitrumETHContractAddress.Hex()},
+					},
 				},
 			},
 		},
-		&protobuf.CommunityTokenPermission{
-			TokenCriteria: []*protobuf.TokenCriteria{
-				&protobuf.TokenCriteria{
-					Symbol:            "SNT",
-					Amount:            "1000",
-					ContractAddresses: map[uint64]string{mainnetID: mainnetSNTContractAddress.Hex()},
+		&CommunityTokenPermission{
+			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				TokenCriteria: []*protobuf.TokenCriteria{
+					&protobuf.TokenCriteria{
+						Symbol:            "SNT",
+						Amount:            "1000",
+						ContractAddresses: map[uint64]string{mainnetID: mainnetSNTContractAddress.Hex()},
+					},
 				},
 			},
 		},
 	}
 
-	actual := m.CalculatePermissionedBalances(
+	actual := m.calculatePermissionedBalances(
 		chainIDs,
 		walletAddresses,
 		balances,
@@ -328,6 +332,61 @@ func (s *ManagerSuite) Test_CalculatePermissionedBalances() {
 		_, ok := expected[walletAddress]
 		s.Require().True(ok, walletAddress)
 		s.Require().ElementsMatch(expected[walletAddress], permissionedTokens)
+	}
+}
+
+func (s *ManagerSuite) Test_GetPermissionedBalances() {
+	m, cm, testTokenManager := s.setupManagerForTokenPermissions()
+	s.Require().NotNil(m)
+	s.Require().NotNil(cm)
+
+	request := &requests.CreateCommunity{
+		Membership: protobuf.CommunityPermissions_AUTO_ACCEPT,
+	}
+	community, err := m.CreateCommunity(request, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(community)
+
+	accountAddress := gethcommon.HexToAddress("0x1")
+	accountAddresses := []gethcommon.Address{accountAddress}
+
+	var chainID uint64 = 5
+	tokenETHID := uint64(10)
+	tokenETHAddress := gethcommon.HexToAddress("0xA")
+	permissionRequest := &requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				ContractAddresses: map[uint64]string{chainID: tokenETHAddress.Hex()},
+				TokenIds:          []uint64{tokenETHID},
+				Type:              protobuf.CommunityTokenType_ERC20,
+				Amount:            "3",
+				Symbol:            "ETH",
+			},
+		},
+	}
+
+	_, changes, err := m.CreateCommunityTokenPermission(permissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(changes.TokenPermissionsAdded, 1)
+
+	testTokenManager.setResponse(chainID, accountAddress, tokenETHAddress, 42)
+	actual, err := m.GetPermissionedBalances(context.Background(), community.ID(), accountAddresses)
+	s.Require().NoError(err)
+
+	expected := make(map[gethcommon.Address][]PermissionedToken)
+	expected[accountAddress] = []PermissionedToken{
+		PermissionedToken{
+			Symbol: "ETH",
+			Amount: 42,
+		},
+	}
+
+	for address, permissionedBalances := range actual {
+		_, ok := expected[address]
+		s.Require().True(ok, address)
+		s.Require().ElementsMatch(expected[address], permissionedBalances)
 	}
 }
 

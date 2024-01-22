@@ -1510,6 +1510,10 @@ func (api *PublicAPI) GetCommunityAccessRolesWithBalances(request *requests.GetC
 	return api.service.messenger.GetCommunityAccessRolesWithBalances(request)
 }
 
+func (api *PublicAPI) GetPermissionedBalances(request *requests.GetCommunityAccessRolesWithBalances) (map[ethcommon.Address][]communities.PermissionedToken, error) {
+	return api.service.messenger.GetCommunityPermissionedBalances(request)
+}
+
 func (api *PublicAPI) GetAllCommunityTokens() ([]*token.CommunityToken, error) {
 	return api.service.messenger.GetAllCommunityTokens()
 }
