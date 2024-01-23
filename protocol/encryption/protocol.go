@@ -81,7 +81,8 @@ type Protocol struct {
 
 var (
 	// ErrNoPayload means that there was no payload found in the received protocol message.
-	ErrNoPayload = errors.New("no payload")
+	ErrNoPayload    = errors.New("no payload")
+	ErrNoRatchetKey = errors.New("no ratchet key for given keyID")
 )
 
 // New creates a new ProtocolService instance
@@ -242,7 +243,7 @@ func (p *Protocol) GetAllHREncodedKeys(groupID []byte) ([]byte, error) {
 		return nil, nil
 	}
 
-	return p.GetHREncodedKeys(groupID, keys)
+	return p.GetMarshaledHREncodedKeys(groupID, keys)
 }
 
 // GetKeyIDsForGroup returns a slice of key IDs belonging to a given group ID
@@ -250,7 +251,7 @@ func (p *Protocol) GetKeysForGroup(groupID []byte) ([]*HashRatchetKeyCompatibili
 	return p.encryptor.persistence.GetKeysForGroup(groupID)
 }
 
-func (p *Protocol) GetHREncodedKeys(groupID []byte, ratchets []*HashRatchetKeyCompatibility) ([]byte, error) {
+func (p *Protocol) GetHREncodedKeys(groupID []byte, ratchets []*HashRatchetKeyCompatibility) *HRKeys {
 	keys := &HRKeys{}
 	for _, ratchet := range ratchets {
 		key := &HRKey{
@@ -261,14 +262,17 @@ func (p *Protocol) GetHREncodedKeys(groupID []byte, ratchets []*HashRatchetKeyCo
 		keys.Keys = append(keys.Keys, key)
 	}
 
+	return keys
+}
+
+func (p *Protocol) GetMarshaledHREncodedKeys(groupID []byte, ratchets []*HashRatchetKeyCompatibility) ([]byte, error) {
+	keys := p.GetHREncodedKeys(groupID, ratchets)
 	return proto.Marshal(keys)
 }
 
-var maxGroupKeyRecipients = 10000
-
-// BuildHashRatchetRekeyGroup builds a set of public messages
+// BuildHashRatchetRekeyGroup builds a public message
 // with the new key
-func (p *Protocol) BuildHashRatchetReKeyGroupMessage(myIdentityKey *ecdsa.PrivateKey, recipients []*ecdsa.PublicKey, groupID []byte, ratchet *HashRatchetKeyCompatibility) ([]*ProtocolMessageSpec, error) {
+func (p *Protocol) BuildHashRatchetReKeyGroupMessage(myIdentityKey *ecdsa.PrivateKey, recipients []*ecdsa.PublicKey, groupID []byte, payload []byte, ratchet *HashRatchetKeyCompatibility) (*ProtocolMessageSpec, error) {
 
 	var err error
 	if ratchet == nil {
@@ -278,45 +282,40 @@ func (p *Protocol) BuildHashRatchetReKeyGroupMessage(myIdentityKey *ecdsa.Privat
 		}
 	}
 
-	messages, err := buildGroupRekeyMessage(myIdentityKey, groupID, ratchet.Timestamp, ratchet.Key, recipients, maxGroupKeyRecipients)
+	message, err := buildGroupRekeyMessage(myIdentityKey, groupID, ratchet.Timestamp, ratchet.Key, recipients)
 	if err != nil {
 		return nil, err
 	}
 
-	var specs []*ProtocolMessageSpec
-
-	for _, message := range messages {
-		keys := &HRKeys{
-			RekeyGroup: message,
-		}
-		payload, err := proto.Marshal(keys)
-		if err != nil {
-			return nil, err
-		}
-
-		message := &ProtocolMessage{
+	keys := &HRKeys{
+		RekeyGroup: message,
+	}
+	spec := &ProtocolMessageSpec{
+		Public: true,
+		Message: &ProtocolMessage{
 			InstallationId: p.encryptor.config.InstallationID,
 			EncryptedMessage: map[string]*EncryptedMessageProtocol{noInstallationID: &EncryptedMessageProtocol{
 				HRHeader: &HRHeader{
 					SeqNo:   0,
 					GroupId: groupID,
+					Keys:    keys,
 				},
 				Payload: payload,
 			},
 			},
-		}
-
-		specs = append(specs, &ProtocolMessageSpec{Message: message, Public: true})
-
+		},
 	}
-	return specs, nil
+
+	return spec, nil
 }
 
 // BuildHashRatchetKeyExchangeMessage builds a 1:1 message
 // containing newly generated hash ratchet key
 func (p *Protocol) BuildHashRatchetKeyExchangeMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, groupID []byte, ratchets []*HashRatchetKeyCompatibility) (*ProtocolMessageSpec, error) {
 
-	encodedKeys, err := p.GetHREncodedKeys(groupID, ratchets)
+	keys := p.GetHREncodedKeys(groupID, ratchets)
+
+	encodedKeys, err := proto.Marshal(keys)
 	if err != nil {
 		return nil, err
 	}
@@ -333,6 +332,31 @@ func (p *Protocol) BuildHashRatchetKeyExchangeMessage(myIdentityKey *ecdsa.Priva
 		v.HRHeader = &HRHeader{
 			SeqNo:   0,
 			GroupId: groupID,
+			Keys:    keys,
+		}
+
+	}
+
+	return response, err
+}
+
+func (p *Protocol) BuildHashRatchetKeyExchangeMessageWithPayload(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, groupID []byte, ratchets []*HashRatchetKeyCompatibility, payload []byte) (*ProtocolMessageSpec, error) {
+
+	keys := p.GetHREncodedKeys(groupID, ratchets)
+
+	response, err := p.BuildEncryptedMessage(myIdentityKey, publicKey, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	// Loop through installations and assign HRHeader
+	// SeqNo=0 has a special meaning for HandleMessage
+	// and signifies a message with hash ratchet key payload
+	for _, v := range response.Message.EncryptedMessage {
+		v.HRHeader = &HRHeader{
+			SeqNo:   0,
+			GroupId: groupID,
+			Keys:    keys,
 		}
 
 	}
@@ -553,14 +577,23 @@ type DecryptMessageResponse struct {
 	HashRatchetInfo  []*HashRatchetInfo
 }
 
-func (p *Protocol) HandleHashRatchetKeys(groupID, encodedKeys []byte, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey) ([]*HashRatchetInfo, error) {
+func (p *Protocol) HandleHashRatchetKeysPayload(groupID, encodedKeys []byte, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey) ([]*HashRatchetInfo, error) {
 
-	var info []*HashRatchetInfo
 	keys := &HRKeys{}
 	err := proto.Unmarshal(encodedKeys, keys)
 	if err != nil {
 		return nil, err
 	}
+	return p.HandleHashRatchetKeys(groupID, keys, myIdentityKey, theirIdentityKey)
+}
+
+func (p *Protocol) HandleHashRatchetKeys(groupID []byte, keys *HRKeys, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey) ([]*HashRatchetInfo, error) {
+	if keys == nil {
+		return nil, nil
+	}
+
+	var info []*HashRatchetInfo
+
 	for _, key := range keys.Keys {
 		ratchet := &HashRatchetKeyCompatibility{
 			GroupID:   groupID,
@@ -576,6 +609,7 @@ func (p *Protocol) HandleHashRatchetKeys(groupID, encodedKeys []byte, myIdentity
 		if err != nil {
 			return nil, err
 		}
+		p.logger.Debug("retrieved keys", zap.String("keyID", types.Bytes2Hex(keyID)))
 
 		// Payload contains hash ratchet key
 		err = p.encryptor.persistence.SaveHashRatchetKey(ratchet)
@@ -607,6 +641,7 @@ func (p *Protocol) HandleHashRatchetKeys(groupID, encodedKeys []byte, myIdentity
 			if err != nil {
 				return nil, err
 			}
+			p.logger.Debug("retrieved group keys", zap.String("keyID", types.Bytes2Hex(keyID)))
 			// Payload contains hash ratchet key
 			err = p.encryptor.persistence.SaveHashRatchetKey(ratchet)
 			if err != nil {
@@ -690,9 +725,19 @@ func (p *Protocol) HandleMessage(
 		if dmProtocol != nil {
 			hrHeader := dmProtocol.HRHeader
 			if hrHeader != nil && hrHeader.SeqNo == 0 {
-				hashRatchetKeys, err := p.HandleHashRatchetKeys(hrHeader.GroupId, message, myIdentityKey, theirPublicKey)
-				if err != nil {
-					return nil, err
+				var hashRatchetKeys []*HashRatchetInfo
+				if hrHeader.Keys != nil {
+					hashRatchetKeys, err = p.HandleHashRatchetKeys(hrHeader.GroupId, hrHeader.Keys, myIdentityKey, theirPublicKey)
+					if err != nil {
+						return nil, err
+					}
+
+				} else {
+					// For backward compatibility
+					hashRatchetKeys, err = p.HandleHashRatchetKeysPayload(hrHeader.GroupId, message, myIdentityKey, theirPublicKey)
+					if err != nil {
+						return nil, err
+					}
 				}
 				response.HashRatchetInfo = hashRatchetKeys
 			}
@@ -772,7 +817,7 @@ func (p *Protocol) DecryptWithHashRatchet(keyID []byte, seqNo uint32, payload []
 		return nil, err
 	}
 	if ratchet == nil {
-		return nil, errors.New("no ratchet key for given keyID")
+		return nil, ErrNoRatchetKey
 	}
 
 	return p.encryptor.DecryptWithHR(ratchet, seqNo, payload)

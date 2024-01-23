@@ -1082,10 +1082,8 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetRekey() {
 	key2KeyBytes := publicKeyMostRelevantBytes(&key2.PublicKey)
 	s.Require().Equal(uint32(0x72d6c574), key2KeyBytes)
 
-	messages, err := buildGroupRekeyMessage(privateKey, groupID, timestamp, keyMaterial, []*ecdsa.PublicKey{&key1.PublicKey, &key1.PublicKey, &key1.PublicKey, &key2.PublicKey}, 10)
+	message, err := buildGroupRekeyMessage(privateKey, groupID, timestamp, keyMaterial, []*ecdsa.PublicKey{&key1.PublicKey, &key1.PublicKey, &key1.PublicKey, &key2.PublicKey})
 	s.Require().NoError(err)
-
-	message := messages[0]
 
 	_, err = proto.Marshal(message)
 	s.Require().NoError(err)
@@ -1100,24 +1098,6 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetRekey() {
 	s.Require().Len(message.Keys[key1KeyBytes], 180)
 	s.Require().Len(message.Keys[key2KeyBytes], 60)
 
-	// We break the first one, so that we simulate two keys with different encryption but
-	// starting from the same
-
-	message.Keys[key1KeyBytes][keySize-2] = byte(3)
-	message.Keys[key1KeyBytes][keySize+2] = byte(3)
-
-	// Easier case, key does not need to be split
-	decryptedKey2, err := decryptGroupRekeyMessage(key2, &privateKey.PublicKey, message)
-	s.Require().NoError(err)
-	s.Require().Equal(decryptedKey2, keyMaterial)
-
-	decryptedKey1, err := decryptGroupRekeyMessage(key1, &privateKey.PublicKey, message)
-	s.Require().NoError(err)
-	s.Require().Equal(decryptedKey1, keyMaterial)
-
-	messages, err = buildGroupRekeyMessage(privateKey, groupID, timestamp+1, keyMaterial, []*ecdsa.PublicKey{&key1.PublicKey, &key1.PublicKey, &key1.PublicKey, &key2.PublicKey}, 2)
-	s.Require().NoError(err)
-	s.Require().Len(messages, 2)
 }
 
 // We test that adding a new field and leaving the old blank won't crash the app
@@ -1135,11 +1115,11 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetRekeyHandleRatchet() {
 	s.Require().NoError(err)
 
 	groupID := []byte{0x1}
-	specs, err := s.alice.BuildHashRatchetReKeyGroupMessage(aliceKey, []*ecdsa.PublicKey{&bobKey.PublicKey}, groupID, nil)
+	spec, err := s.alice.BuildHashRatchetReKeyGroupMessage(aliceKey, []*ecdsa.PublicKey{&bobKey.PublicKey}, groupID, nil, nil)
 	s.Require().NoError(err)
-	s.Require().Len(specs, 1)
+	s.Require().NotNil(spec)
 
-	response, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, specs[0].Message, []byte{0x2})
+	response, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, spec.Message, []byte{0x2})
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.HashRatchetInfo, 1)

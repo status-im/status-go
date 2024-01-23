@@ -1,6 +1,8 @@
 package communities
 
-import "github.com/status-im/status-go/protocol/protobuf"
+import (
+	"github.com/status-im/status-go/protocol/protobuf"
+)
 
 type KeyDistributor interface {
 	Generate(community *Community, keyActions *EncryptionKeyActions) error
@@ -18,8 +20,9 @@ const (
 )
 
 type EncryptionKeyAction struct {
-	ActionType EncryptionKeyActionType
-	Members    map[string]*protobuf.CommunityMember
+	ActionType     EncryptionKeyActionType
+	Members        map[string]*protobuf.CommunityMember
+	RemovedMembers map[string]*protobuf.CommunityMember
 }
 
 type EncryptionKeyActions struct {
@@ -140,6 +143,7 @@ func evaluateEncryptionKeyAction(originEncrypted, modifiedEncrypted, controlNode
 	if len(membersRemoved) > 0 {
 		result.ActionType = EncryptionKeyRekey
 		result.Members = copyMap(allMembers)
+		result.RemovedMembers = copyMap(membersRemoved)
 	} else if len(membersAdded) > 0 {
 		result.ActionType = EncryptionKeySendToMembers
 		result.Members = copyMap(membersAdded)

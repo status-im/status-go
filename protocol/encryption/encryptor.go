@@ -28,6 +28,7 @@ var (
 	ErrNotPairedDevice            = errors.New("received a message from not paired device")
 	ErrHashRatchetSeqNoTooHigh    = errors.New("Hash ratchet seq no is too high")
 	ErrHashRatchetGroupIDNotFound = errors.New("Hash ratchet group id not found")
+	ErrNoEncryptionKey            = errors.New("no encryption key found for the community")
 )
 
 // If we have no bundles, we use a constant so that the message can reach any device.
@@ -686,7 +687,7 @@ func (s *encryptor) EncryptWithHR(ratchet *HashRatchetKeyCompatibility, payload 
 		return nil, 0, err
 	}
 	if hrCache == nil {
-		return nil, 0, errors.New("no encryption key found for the community")
+		return nil, 0, ErrNoEncryptionKey
 	}
 
 	var dbHash []byte

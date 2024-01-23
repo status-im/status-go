@@ -673,7 +673,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityEnvelopesOrder() {
 
 	// Push a few descriptions to the store node
 	for i := 0; i < descriptionsCount-1; i++ {
-		err := s.owner.publishOrg(community)
+		err := s.owner.publishOrg(community, false)
 		s.Require().NoError(err)
 	}
 

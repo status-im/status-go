@@ -1453,6 +1453,9 @@ func (w *Waku) postEvent(envelope *common.ReceivedMessage) {
 
 // processQueueLoop delivers the messages to the watchers during the lifetime of the waku node.
 func (w *Waku) processQueueLoop() {
+	if w.ctx == nil {
+		return
+	}
 	for {
 		select {
 		case <-w.ctx.Done():

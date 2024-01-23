@@ -61,12 +61,12 @@ func (dem *DescriptionEncryptorMock) encryptCommunityDescriptionChannel(communit
 	return keyIDSeqNo, []byte("encryptedDescription"), nil
 }
 
-func (dem *DescriptionEncryptorMock) decryptCommunityDescription(keyIDSeqNo string, d []byte) (*protobuf.CommunityDescription, error) {
+func (dem *DescriptionEncryptorMock) decryptCommunityDescription(keyIDSeqNo string, d []byte) (*DecryptCommunityResponse, error) {
 	description := dem.descriptions[keyIDSeqNo]
 	if description == nil {
 		return nil, errors.New("no key to decrypt private data")
 	}
-	return description, nil
+	return &DecryptCommunityResponse{Description: description}, nil
 }
 
 func (dem *DescriptionEncryptorMock) forgetAllKeys() {
@@ -134,7 +134,7 @@ func (s *CommunityEncryptionDescriptionSuite) TestEncryptionDecryption() {
 	s.Require().Equal(description.IntroMessage, "one of not encrypted fields")
 
 	// members and chats should be brought back
-	err = decryptDescription(s.descriptionEncryptor, description, s.logger)
+	_, err = decryptDescription([]byte("some-id"), s.descriptionEncryptor, description, s.logger)
 	s.Require().NoError(err)
 	s.Require().Len(description.Members, 2)
 	s.Require().Len(description.Chats, 2)
@@ -160,7 +160,7 @@ func (s *CommunityEncryptionDescriptionSuite) TestDecryption_NoKeys() {
 	s.descriptionEncryptor.forgetChannelKeys()
 
 	// encrypted channel should have no members
-	err := decryptDescription(s.descriptionEncryptor, description, s.logger)
+	_, err := decryptDescription([]byte("some-id"), s.descriptionEncryptor, description, s.logger)
 	s.Require().NoError(err)
 	s.Require().Len(description.Members, 2)
 	s.Require().Len(description.Chats, 2)
@@ -173,7 +173,7 @@ func (s *CommunityEncryptionDescriptionSuite) TestDecryption_NoKeys() {
 	s.descriptionEncryptor.forgetAllKeys()
 
 	// members and chats should be empty
-	err = decryptDescription(s.descriptionEncryptor, description, s.logger)
+	_, err = decryptDescription([]byte("some-id"), s.descriptionEncryptor, description, s.logger)
 	s.Require().NoError(err)
 	s.Require().Empty(description.Members)
 	s.Require().Empty(description.Chats)
