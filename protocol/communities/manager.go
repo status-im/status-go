@@ -2301,13 +2301,13 @@ func (m *Manager) calculatePermissionedBalances(
 						resBySymbol[walletAddress][criteria.Symbol] = &PermissionedToken{Symbol: criteria.Symbol}
 					}
 
-					numerator := new(big.Float).SetInt(value.ToInt())
-					denominator := new(big.Float).SetInt(new(big.Int).Exp(
+					x := new(big.Float).SetInt(value.ToInt())
+					y := new(big.Float).SetInt(new(big.Int).Exp(
 						big.NewInt(10),
 						big.NewInt(int64(criteria.Decimals)),
 						nil,
 					))
-					amountFloat, _ := new(big.Float).Quo(numerator, denominator).Float64()
+					amountFloat, _ := new(big.Float).Quo(x, y).Float64()
 
 					resBySymbol[walletAddress][criteria.Symbol].Amount += amountFloat
 					usedBalances[usedKey] = true
