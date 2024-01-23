@@ -2266,6 +2266,16 @@ type PermissionedToken struct {
 	Type   PermissionedTokenType `json:"type"`
 }
 
+func bigIntToFloat64(val *big.Int, decimals int64) (float64, big.Accuracy) {
+	x := new(big.Float).SetInt(val)
+	y := new(big.Float).SetInt(new(big.Int).Exp(
+		big.NewInt(10),
+		big.NewInt(decimals),
+		nil,
+	))
+	return new(big.Float).Quo(x, y).Float64()
+}
+
 func (m *Manager) calculatePermissionedBalances(
 	chainIDs []uint64,
 	accountAddresses []gethcommon.Address,
@@ -2313,14 +2323,7 @@ func (m *Manager) calculatePermissionedBalances(
 						}
 					}
 
-					x := new(big.Float).SetInt(value.ToInt())
-					y := new(big.Float).SetInt(new(big.Int).Exp(
-						big.NewInt(10),
-						big.NewInt(int64(criteria.Decimals)),
-						nil,
-					))
-					amountFloat, _ := new(big.Float).Quo(x, y).Float64()
-
+					amountFloat, _ := bigIntToFloat64(value.ToInt(), int64(criteria.Decimals))
 					resBySymbol[accountAddress][criteria.Symbol].Amount += amountFloat
 					usedERC20Balances[usedKey] = true
 				}
@@ -2370,13 +2373,7 @@ func (m *Manager) calculatePermissionedBalances(
 					for _, asset := range value {
 						sum.Add(sum, asset.Balance.Int)
 					}
-					x := new(big.Float).SetInt(sum)
-					y := new(big.Float).SetInt(new(big.Int).Exp(
-						big.NewInt(10),
-						big.NewInt(int64(criteria.Decimals)),
-						nil,
-					))
-					sumFloat, _ := new(big.Float).Quo(x, y).Float64()
+					sumFloat, _ := bigIntToFloat64(sum, int64(criteria.Decimals))
 					resBySymbol[accountAddress][criteria.Symbol].Amount += sumFloat
 				}
 			}
