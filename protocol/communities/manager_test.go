@@ -308,6 +308,7 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 				Type: protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER,
 				TokenCriteria: []*protobuf.TokenCriteria{
 					&protobuf.TokenCriteria{
+						Type:              protobuf.CommunityTokenType_ERC721,
 						Name:              "TMaster-Test",
 						Symbol:            "TMTEST",
 						Amount:            "1",
@@ -321,6 +322,7 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 				Type: protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER,
 				TokenCriteria: []*protobuf.TokenCriteria{
 					&protobuf.TokenCriteria{
+						Type:              protobuf.CommunityTokenType_ERC721,
 						Name:              "Owner-Test",
 						Symbol:            "OWNTEST",
 						Amount:            "5",
@@ -334,6 +336,7 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 				Type: protobuf.CommunityTokenPermission_BECOME_ADMIN,
 				TokenCriteria: []*protobuf.TokenCriteria{
 					&protobuf.TokenCriteria{
+						Type:   protobuf.CommunityTokenType_ERC20,
 						Symbol: "ETH",
 						Amount: "20",
 						ContractAddresses: map[uint64]string{
@@ -342,6 +345,7 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 						},
 					},
 					&protobuf.TokenCriteria{
+						Type:              protobuf.CommunityTokenType_ERC20,
 						Symbol:            "ETH",
 						Amount:            "4",
 						ContractAddresses: map[uint64]string{arbitrumID: arbitrumETHContractAddress.Hex()},
@@ -354,6 +358,7 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 				Type: protobuf.CommunityTokenPermission_BECOME_MEMBER,
 				TokenCriteria: []*protobuf.TokenCriteria{
 					&protobuf.TokenCriteria{
+						Type:              protobuf.CommunityTokenType_ERC20,
 						Symbol:            "SNT",
 						Amount:            "1000",
 						ContractAddresses: map[uint64]string{mainnetID: mainnetSNTContractAddress.Hex()},
@@ -367,6 +372,7 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 				Type: protobuf.CommunityTokenPermission_UNKNOWN_TOKEN_PERMISSION,
 				TokenCriteria: []*protobuf.TokenCriteria{
 					&protobuf.TokenCriteria{
+						Type:              protobuf.CommunityTokenType_ERC20,
 						Symbol:            "DAI",
 						Amount:            "7",
 						ContractAddresses: map[uint64]string{mainnetID: "0x1234567"},
@@ -415,17 +421,20 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 		},
 	}
 
+	_, ok := actual[account1Address]
+	s.Require().True(ok, "not found account1Address='%s'", account1Address)
+	_, ok = actual[account1Address]
+	s.Require().True(ok, "not found account2Address='%s'", account2Address)
+
 	for accountAddress, permissionedTokens := range actual {
-		_, ok := expected[accountAddress]
-		s.Require().True(ok, "actual contains unexpected accountAddress='%s'", accountAddress)
 		s.Require().ElementsMatch(expected[accountAddress], permissionedTokens, "accountAddress='%s'", accountAddress)
 	}
 }
 
 func (s *ManagerSuite) Test_GetPermissionedBalances() {
-	m, cm, testTokenManager := s.setupManagerForTokenPermissions()
+	m, testCollectiblesManager, testTokenManager := s.setupManagerForTokenPermissions()
 	s.Require().NotNil(m)
-	s.Require().NotNil(cm)
+	s.Require().NotNil(testCollectiblesManager)
 
 	request := &requests.CreateCommunity{
 		Membership: protobuf.CommunityPermissions_AUTO_ACCEPT,
@@ -474,7 +483,13 @@ func (s *ManagerSuite) Test_GetPermissionedBalances() {
 	s.Require().Len(changes.TokenPermissionsAdded, 1)
 
 	testTokenManager.setResponse(chainID, accountAddress, erc20ETHAddress, 42)
-	testTokenManager.setResponse(chainID, accountAddress, erc721Address, 2)
+	testCollectiblesManager.setResponse(chainID, accountAddress, erc721Address, []thirdparty.TokenBalance{
+		thirdparty.TokenBalance{
+			TokenID: uintToDecBig(100),
+			Balance: uintToDecBig(2),
+		},
+	})
+
 	actual, err := m.GetPermissionedBalances(context.Background(), community.ID(), accountAddresses)
 	s.Require().NoError(err)
 
@@ -492,9 +507,10 @@ func (s *ManagerSuite) Test_GetPermissionedBalances() {
 		},
 	}
 
+	_, ok := actual[accountAddress]
+	s.Require().True(ok, "not found accountAddress='%s'", accountAddress)
+
 	for address, permissionedBalances := range actual {
-		_, ok := expected[address]
-		s.Require().True(ok, address)
 		s.Require().ElementsMatch(expected[address], permissionedBalances)
 	}
 }

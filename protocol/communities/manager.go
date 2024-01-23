@@ -2289,12 +2289,19 @@ func (m *Manager) calculatePermissionedBalances(
 	// store if we already processed the balance.
 	usedERC20Balances := make(map[string]bool)
 
+	m.logger.Info(
+		"ilmotta",
+		zap.Any("erc20Balances", erc20Balances),
+		zap.Any("erc721Balances", erc721Balances),
+		zap.Any("tokenPermissions", tokenPermissions),
+	)
+
 	for _, permission := range tokenPermissions {
-		if (permission != nil && permission.Type != protobuf.CommunityTokenPermission_BECOME_MEMBER) ||
-			(permission != nil && permission.Type != protobuf.CommunityTokenPermission_BECOME_ADMIN) {
-			continue
-		}
 		for _, criteria := range permission.TokenCriteria {
+			if criteria.Type != protobuf.CommunityTokenType_ERC20 {
+				continue
+			}
+
 			for _, accountAddress := range accountAddresses {
 				for chainID, hexContractAddress := range criteria.ContractAddresses {
 					usedKey := strconv.FormatUint(chainID, 10) + "-" + accountAddress.Hex() + "-" + hexContractAddress
@@ -2338,11 +2345,11 @@ func (m *Manager) calculatePermissionedBalances(
 	usedERC721Balances := make(map[string]bool)
 
 	for _, permission := range tokenPermissions {
-		if (permission != nil && permission.Type != protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER) ||
-			(permission != nil && permission.Type != protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER) {
-			continue
-		}
 		for _, criteria := range permission.TokenCriteria {
+			if criteria.Type != protobuf.CommunityTokenType_ERC721 {
+				continue
+			}
+
 			for _, accountAddress := range accountAddresses {
 				for chainID, hexContractAddress := range criteria.ContractAddresses {
 					usedKey := strconv.FormatUint(chainID, 10) + "-" + accountAddress.Hex() + "-" + hexContractAddress
