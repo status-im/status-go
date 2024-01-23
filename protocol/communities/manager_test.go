@@ -242,43 +242,96 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 	mainnetSNTContractAddress := gethcommon.HexToAddress("0xC")
 	mainnetETHContractAddress := gethcommon.HexToAddress("0xA")
 	arbitrumETHContractAddress := gethcommon.HexToAddress("0xB")
+	mainnetTMasterAddress := gethcommon.HexToAddress("0x123")
+	mainnetOwnerAddress := gethcommon.HexToAddress("0x1234")
 
 	account1Address := gethcommon.HexToAddress("0x1")
 	account2Address := gethcommon.HexToAddress("0x2")
 	account3Address := gethcommon.HexToAddress("0x3")
 	accountAddresses := []gethcommon.Address{account1Address, account2Address, account3Address}
 
-	balances := make(BalancesByChain)
+	erc20Balances := make(BalancesByChain)
+	erc721Balances := make(CollectiblesByChain)
 
-	balances[mainnetID] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
-	balances[arbitrumID] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
-	balances[gnosisID] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	erc20Balances[mainnetID] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	erc20Balances[arbitrumID] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	erc20Balances[gnosisID] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	erc721Balances[mainnetID] = make(map[gethcommon.Address]thirdparty.TokenBalancesPerContractAddress)
 
 	// Account 1 balances
-	balances[mainnetID][account1Address] = make(map[gethcommon.Address]*hexutil.Big)
-	balances[mainnetID][account1Address][mainnetETHContractAddress] = intToBig(10)
-	balances[arbitrumID][account1Address] = make(map[gethcommon.Address]*hexutil.Big)
-	balances[arbitrumID][account1Address][arbitrumETHContractAddress] = intToBig(25)
+	erc20Balances[mainnetID][account1Address] = make(map[gethcommon.Address]*hexutil.Big)
+	erc20Balances[mainnetID][account1Address][mainnetETHContractAddress] = intToBig(10)
+	erc20Balances[arbitrumID][account1Address] = make(map[gethcommon.Address]*hexutil.Big)
+	erc20Balances[arbitrumID][account1Address][arbitrumETHContractAddress] = intToBig(25)
 
 	// Account 2 balances
-	balances[mainnetID][account2Address] = make(map[gethcommon.Address]*hexutil.Big)
-	balances[mainnetID][account2Address][mainnetSNTContractAddress] = intToBig(120)
-	balances[arbitrumID][account2Address] = make(map[gethcommon.Address]*hexutil.Big)
-	balances[arbitrumID][account2Address][arbitrumETHContractAddress] = intToBig(2)
+	erc20Balances[mainnetID][account2Address] = make(map[gethcommon.Address]*hexutil.Big)
+	erc20Balances[mainnetID][account2Address][mainnetSNTContractAddress] = intToBig(120)
+	erc721Balances[mainnetID][account2Address] = make(thirdparty.TokenBalancesPerContractAddress)
+	erc721Balances[mainnetID][account2Address][mainnetTMasterAddress] = []thirdparty.TokenBalance{
+		thirdparty.TokenBalance{
+			TokenID: uintToDecBig(10),
+			Balance: uintToDecBig(1),
+		},
+		thirdparty.TokenBalance{
+			TokenID: uintToDecBig(11),
+			Balance: uintToDecBig(2),
+		},
+	}
+	erc721Balances[mainnetID][account2Address][mainnetOwnerAddress] = []thirdparty.TokenBalance{
+		thirdparty.TokenBalance{
+			TokenID: uintToDecBig(20),
+			Balance: uintToDecBig(6),
+		},
+		thirdparty.TokenBalance{
+			TokenID: uintToDecBig(20),
+			Balance: uintToDecBig(1),
+		},
+	}
+
+	erc20Balances[arbitrumID][account2Address] = make(map[gethcommon.Address]*hexutil.Big)
+	erc20Balances[arbitrumID][account2Address][arbitrumETHContractAddress] = intToBig(2)
 
 	// Account 3 balances. This account is used to assert zeroed balances are
 	// removed from the final response.
-	balances[mainnetID][account3Address] = make(map[gethcommon.Address]*hexutil.Big)
-	balances[mainnetID][account3Address][mainnetETHContractAddress] = intToBig(0)
+	erc20Balances[mainnetID][account3Address] = make(map[gethcommon.Address]*hexutil.Big)
+	erc20Balances[mainnetID][account3Address][mainnetETHContractAddress] = intToBig(0)
 
 	// A balance that should be ignored because the list of wallet addresses don't
 	// contain any wallet in the Gnosis chain.
-	balances[gnosisID][gethcommon.HexToAddress("0xF")] = make(map[gethcommon.Address]*hexutil.Big)
-	balances[gnosisID][gethcommon.HexToAddress("0xF")][gethcommon.HexToAddress("0x99")] = intToBig(500)
+	erc20Balances[gnosisID][gethcommon.HexToAddress("0xF")] = make(map[gethcommon.Address]*hexutil.Big)
+	erc20Balances[gnosisID][gethcommon.HexToAddress("0xF")][gethcommon.HexToAddress("0x99")] = intToBig(500)
 
 	tokenPermissions := []*CommunityTokenPermission{
 		&CommunityTokenPermission{
 			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				Type: protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER,
+				TokenCriteria: []*protobuf.TokenCriteria{
+					&protobuf.TokenCriteria{
+						Name:              "TMaster-Test",
+						Symbol:            "TMTEST",
+						Amount:            "1",
+						ContractAddresses: map[uint64]string{mainnetID: mainnetTMasterAddress.Hex()},
+					},
+				},
+			},
+		},
+		&CommunityTokenPermission{
+			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				Type: protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER,
+				TokenCriteria: []*protobuf.TokenCriteria{
+					&protobuf.TokenCriteria{
+						Name:              "Owner-Test",
+						Symbol:            "OWNTEST",
+						Amount:            "5",
+						ContractAddresses: map[uint64]string{mainnetID: mainnetOwnerAddress.Hex()},
+					},
+				},
+			},
+		},
+		&CommunityTokenPermission{
+			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				Type: protobuf.CommunityTokenPermission_BECOME_ADMIN,
 				TokenCriteria: []*protobuf.TokenCriteria{
 					&protobuf.TokenCriteria{
 						Symbol: "ETH",
@@ -312,7 +365,8 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 	actual := m.calculatePermissionedBalances(
 		chainIDs,
 		accountAddresses,
-		balances,
+		erc20Balances,
+		erc721Balances,
 		tokenPermissions,
 	)
 
@@ -321,16 +375,29 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 		PermissionedToken{
 			Symbol: "ETH",
 			Amount: 35,
+			Type:   PermissionedTokenTypeToken,
 		},
 	}
 	expected[account2Address] = []PermissionedToken{
 		PermissionedToken{
 			Symbol: "ETH",
 			Amount: 2,
+			Type:   PermissionedTokenTypeToken,
 		},
 		PermissionedToken{
 			Symbol: "SNT",
 			Amount: 120,
+			Type:   PermissionedTokenTypeToken,
+		},
+		PermissionedToken{
+			Symbol: "TMTEST",
+			Amount: 3,
+			Type:   PermissionedTokenTypeCollectible,
+		},
+		PermissionedToken{
+			Symbol: "OWNTEST",
+			Amount: 7,
+			Type:   PermissionedTokenTypeCollectible,
 		},
 	}
 

@@ -2253,52 +2253,64 @@ func (m *Manager) GetTokenPermissions(communityID types.HexBytes) (map[string]*C
 	return community.TokenPermissions(), nil
 }
 
+type PermissionedTokenType int
+
+const (
+	PermissionedTokenTypeToken PermissionedTokenType = iota
+	PermissionedTokenTypeCollectible
+)
+
 type PermissionedToken struct {
-	Symbol string  `json:"symbol"`
-	Amount float64 `json:"amount"`
+	Symbol string                `json:"symbol"`
+	Amount float64               `json:"amount"`
+	Type   PermissionedTokenType `json:"type"`
 }
 
 func (m *Manager) calculatePermissionedBalances(
 	chainIDs []uint64,
-	walletAddresses []gethcommon.Address,
-	balances BalancesByChain,
+	accountAddresses []gethcommon.Address,
+	erc20Balances BalancesByChain,
+	erc721Balances CollectiblesByChain,
 	tokenPermissions []*CommunityTokenPermission,
 ) map[gethcommon.Address][]PermissionedToken {
 	resBySymbol := make(map[gethcommon.Address]map[string]*PermissionedToken)
 
 	// Map of composite key (chain ID + wallet address + contract address) to
 	// store if we already processed the balance.
-	usedBalances := make(map[string]bool)
+	usedERC20Balances := make(map[string]bool)
 
 	for _, permission := range tokenPermissions {
 		for _, criteria := range permission.TokenCriteria {
-			for _, walletAddress := range walletAddresses {
+			for _, accountAddress := range accountAddresses {
 				for chainID, hexContractAddress := range criteria.ContractAddresses {
-					usedKey := strconv.FormatUint(chainID, 10) + "-" + walletAddress.Hex() + "-" + hexContractAddress
+					usedKey := strconv.FormatUint(chainID, 10) + "-" + accountAddress.Hex() + "-" + hexContractAddress
 
-					if _, ok := balances[chainID]; !ok {
+					if _, ok := erc20Balances[chainID]; !ok {
 						continue
 					}
-					if _, ok := balances[chainID][walletAddress]; !ok {
+					if _, ok := erc20Balances[chainID][accountAddress]; !ok {
 						continue
 					}
 
 					contractAddress := gethcommon.HexToAddress(hexContractAddress)
-					value, ok := balances[chainID][walletAddress][contractAddress]
+					value, ok := erc20Balances[chainID][accountAddress][contractAddress]
 					if !ok {
 						continue
 					}
 
 					// Skip the contract address if it has been used already in the sum.
-					if _, ok := usedBalances[usedKey]; ok {
+					if _, ok := usedERC20Balances[usedKey]; ok {
 						continue
 					}
 
-					if _, ok := resBySymbol[walletAddress]; !ok {
-						resBySymbol[walletAddress] = make(map[string]*PermissionedToken, 0)
+					if _, ok := resBySymbol[accountAddress]; !ok {
+						resBySymbol[accountAddress] = make(map[string]*PermissionedToken, 0)
 					}
-					if _, ok := resBySymbol[walletAddress][criteria.Symbol]; !ok {
-						resBySymbol[walletAddress][criteria.Symbol] = &PermissionedToken{Symbol: criteria.Symbol}
+					if _, ok := resBySymbol[accountAddress][criteria.Symbol]; !ok {
+						resBySymbol[accountAddress][criteria.Symbol] = &PermissionedToken{
+							Symbol: criteria.Symbol,
+							Type:   PermissionedTokenTypeToken,
+						}
 					}
 
 					x := new(big.Float).SetInt(value.ToInt())
@@ -2309,8 +2321,63 @@ func (m *Manager) calculatePermissionedBalances(
 					))
 					amountFloat, _ := new(big.Float).Quo(x, y).Float64()
 
-					resBySymbol[walletAddress][criteria.Symbol].Amount += amountFloat
-					usedBalances[usedKey] = true
+					resBySymbol[accountAddress][criteria.Symbol].Amount += amountFloat
+					usedERC20Balances[usedKey] = true
+				}
+			}
+		}
+	}
+
+	usedERC721Balances := make(map[string]bool)
+
+	for _, permission := range tokenPermissions {
+		for _, criteria := range permission.TokenCriteria {
+			for _, accountAddress := range accountAddresses {
+				for chainID, hexContractAddress := range criteria.ContractAddresses {
+					usedKey := strconv.FormatUint(chainID, 10) + "-" + accountAddress.Hex() + "-" + hexContractAddress
+
+					if _, ok := erc721Balances[chainID]; !ok {
+						continue
+					}
+					if _, ok := erc721Balances[chainID][accountAddress]; !ok {
+						continue
+					}
+
+					contractAddress := gethcommon.HexToAddress(hexContractAddress)
+					value, ok := erc721Balances[chainID][accountAddress][contractAddress]
+					if !ok || len(value) == 0 {
+						continue
+					}
+
+					// Skip the contract address if it has been used already in the sum.
+					if _, ok := usedERC721Balances[usedKey]; ok {
+						continue
+					}
+
+					usedERC721Balances[usedKey] = true
+
+					if _, ok := resBySymbol[accountAddress]; !ok {
+						resBySymbol[accountAddress] = make(map[string]*PermissionedToken, 0)
+					}
+					if _, ok := resBySymbol[accountAddress][criteria.Symbol]; !ok {
+						resBySymbol[accountAddress][criteria.Symbol] = &PermissionedToken{
+							Symbol: criteria.Symbol,
+							Type:   PermissionedTokenTypeCollectible,
+						}
+					}
+
+					sum := big.NewInt(0)
+					for _, asset := range value {
+						sum.Add(sum, asset.Balance.Int)
+					}
+					x := new(big.Float).SetInt(sum)
+					y := new(big.Float).SetInt(new(big.Int).Exp(
+						big.NewInt(10),
+						big.NewInt(int64(criteria.Decimals)),
+						nil,
+					))
+					sumFloat, _ := new(big.Float).Quo(x, y).Float64()
+					resBySymbol[accountAddress][criteria.Symbol].Amount += sumFloat
 				}
 			}
 		}
@@ -2355,7 +2422,7 @@ func (m *Manager) GetPermissionedBalances(
 	}
 	accountsAndChainIDs := combineAddressesAndChainIDs(walletAddresses, allChainIDs)
 
-	erc20TokenCriteriaByChain, _, _ := ExtractTokenCriteria(tokenPermissions)
+	erc20TokenCriteriaByChain, erc721TokenCriteriaByChain, _ := ExtractTokenCriteria(tokenPermissions)
 
 	accounts := make([]gethcommon.Address, 0, len(accountsAndChainIDs))
 	for _, accountAndChainIDs := range accountsAndChainIDs {
@@ -2370,14 +2437,31 @@ func (m *Manager) GetPermissionedBalances(
 			erc20TokenAddresses = append(erc20TokenAddresses, gethcommon.HexToAddress(contractAddress))
 		}
 	}
-	erc20ChainIDs := calculateChainIDsSet(accountsAndChainIDs, erc20ChainIDsSet)
 
-	balances, err := m.tokenManager.GetBalancesByChain(ctx, accounts, erc20TokenAddresses, erc20ChainIDs)
+	erc721ChainIDsSet := make(map[uint64]bool)
+	for chainID := range erc721TokenCriteriaByChain {
+		erc721ChainIDsSet[chainID] = true
+	}
+
+	erc20ChainIDs := calculateChainIDsSet(accountsAndChainIDs, erc20ChainIDsSet)
+	erc721ChainIDs := calculateChainIDsSet(accountsAndChainIDs, erc721ChainIDsSet)
+
+	erc20Balances, err := m.tokenManager.GetBalancesByChain(ctx, accounts, erc20TokenAddresses, erc20ChainIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	return m.calculatePermissionedBalances(allChainIDs, walletAddresses, balances, tokenPermissions), nil
+	erc721Balances := make(CollectiblesByChain)
+	if len(erc721ChainIDs) > 0 {
+		collectibles, err := m.GetOwnedERC721Tokens(accounts, erc721TokenCriteriaByChain, erc721ChainIDs)
+		if err != nil {
+			return nil, err
+		}
+
+		erc721Balances = collectibles
+	}
+
+	return m.calculatePermissionedBalances(allChainIDs, walletAddresses, erc20Balances, erc721Balances, tokenPermissions), nil
 }
 
 func (m *Manager) GetCommunityAccessRolesWithBalances(
