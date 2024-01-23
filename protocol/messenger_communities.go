@@ -3829,6 +3829,29 @@ func (m *Messenger) GetCommunityTokens(communityID string) ([]*token.CommunityTo
 	return m.communitiesManager.GetCommunityTokens(communityID)
 }
 
+func (m *Messenger) GetCommunityPermissionedBalances(request *requests.GetPermissionedBalances) (map[gethcommon.Address][]communities.PermissionedBalance, error) {
+	err := request.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	accountAddresses, err := m.settings.GetWalletAddresses()
+	if err != nil {
+		return nil, err
+	}
+
+	gethAddresses := make([]gethcommon.Address, 0, len(accountAddresses))
+	for _, address := range accountAddresses {
+		gethAddresses = append(gethAddresses, gethcommon.HexToAddress(address.Hex()))
+	}
+
+	return m.communitiesManager.GetPermissionedBalances(
+		context.Background(),
+		request.CommunityID,
+		gethAddresses,
+	)
+}
+
 func (m *Messenger) GetAllCommunityTokens() ([]*token.CommunityToken, error) {
 	return m.communitiesManager.GetAllCommunityTokens()
 }

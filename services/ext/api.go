@@ -1511,6 +1511,10 @@ func (api *PublicAPI) GetCommunityTokens(communityID string) ([]*token.Community
 	return api.service.messenger.GetCommunityTokens(communityID)
 }
 
+func (api *PublicAPI) GetCommunityPermissionedBalances(request *requests.GetPermissionedBalances) (map[ethcommon.Address][]communities.PermissionedBalance, error) {
+	return api.service.messenger.GetCommunityPermissionedBalances(request)
+}
+
 func (api *PublicAPI) GetAllCommunityTokens() ([]*token.CommunityToken, error) {
 	return api.service.messenger.GetAllCommunityTokens()
 }
