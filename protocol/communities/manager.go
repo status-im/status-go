@@ -2264,7 +2264,7 @@ func (m *Manager) calculatePermissionedBalances(
 	balances BalancesByChain,
 	tokenPermissions []*CommunityTokenPermission,
 ) map[gethcommon.Address][]PermissionedToken {
-	resByTokenSymbol := make(map[gethcommon.Address]map[string]*PermissionedToken)
+	resBySymbol := make(map[gethcommon.Address]map[string]*PermissionedToken)
 
 	// Map of composite key (chain ID + wallet address + contract address) to
 	// store if we already processed the balance.
@@ -2294,11 +2294,11 @@ func (m *Manager) calculatePermissionedBalances(
 						continue
 					}
 
-					if _, ok := resByTokenSymbol[walletAddress]; !ok {
-						resByTokenSymbol[walletAddress] = make(map[string]*PermissionedToken, 0)
+					if _, ok := resBySymbol[walletAddress]; !ok {
+						resBySymbol[walletAddress] = make(map[string]*PermissionedToken, 0)
 					}
-					if _, ok := resByTokenSymbol[walletAddress][criteria.Symbol]; !ok {
-						resByTokenSymbol[walletAddress][criteria.Symbol] = &PermissionedToken{Symbol: criteria.Symbol}
+					if _, ok := resBySymbol[walletAddress][criteria.Symbol]; !ok {
+						resBySymbol[walletAddress][criteria.Symbol] = &PermissionedToken{Symbol: criteria.Symbol}
 					}
 
 					numerator := new(big.Float).SetInt(value.ToInt())
@@ -2309,7 +2309,7 @@ func (m *Manager) calculatePermissionedBalances(
 					))
 					amountFloat, _ := new(big.Float).Quo(numerator, denominator).Float64()
 
-					resByTokenSymbol[walletAddress][criteria.Symbol].Amount += amountFloat
+					resBySymbol[walletAddress][criteria.Symbol].Amount += amountFloat
 					usedBalances[usedKey] = true
 				}
 			}
@@ -2317,7 +2317,7 @@ func (m *Manager) calculatePermissionedBalances(
 	}
 
 	res := make(map[gethcommon.Address][]PermissionedToken, 0)
-	for walletAddress, tokens := range resByTokenSymbol {
+	for walletAddress, tokens := range resBySymbol {
 		for _, permissionedToken := range tokens {
 			if permissionedToken.Amount > 0 {
 				res[walletAddress] = append(res[walletAddress], *permissionedToken)
