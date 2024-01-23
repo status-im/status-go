@@ -246,7 +246,7 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 	account1Address := gethcommon.HexToAddress("0x1")
 	account2Address := gethcommon.HexToAddress("0x2")
 	account3Address := gethcommon.HexToAddress("0x3")
-	walletAddresses := []gethcommon.Address{account1Address, account2Address, account3Address}
+	accountAddresses := []gethcommon.Address{account1Address, account2Address, account3Address}
 
 	balances := make(BalancesByChain)
 
@@ -311,7 +311,7 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 
 	actual := m.calculatePermissionedBalances(
 		chainIDs,
-		walletAddresses,
+		accountAddresses,
 		balances,
 		tokenPermissions,
 	)
@@ -334,10 +334,10 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 		},
 	}
 
-	for walletAddress, permissionedTokens := range actual {
-		_, ok := expected[walletAddress]
-		s.Require().True(ok, "actual contains unexpected walletAddress='%s'", walletAddress)
-		s.Require().ElementsMatch(expected[walletAddress], permissionedTokens)
+	for accountAddress, permissionedTokens := range actual {
+		_, ok := expected[accountAddress]
+		s.Require().True(ok, "actual contains unexpected accountAddress='%s'", accountAddress)
+		s.Require().ElementsMatch(expected[accountAddress], permissionedTokens)
 	}
 }
 
