@@ -246,7 +246,7 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
 		}
 
 		if matched && decodedMsg != nil {
-			log.Debug("processing message: decrypted", "hash", recvMessage.Hash().Hex())
+			log.Debug("processing message: decrypted", "envelopeHash", recvMessage.Hash().Hex())
 			if watcher.Src == nil || IsPubKeyEqual(decodedMsg.Src, watcher.Src) {
 				watcher.Trigger(decodedMsg)
 			}
