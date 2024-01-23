@@ -351,11 +351,25 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 		},
 		&CommunityTokenPermission{
 			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				Type: protobuf.CommunityTokenPermission_BECOME_MEMBER,
 				TokenCriteria: []*protobuf.TokenCriteria{
 					&protobuf.TokenCriteria{
 						Symbol:            "SNT",
 						Amount:            "1000",
 						ContractAddresses: map[uint64]string{mainnetID: mainnetSNTContractAddress.Hex()},
+					},
+				},
+			},
+		},
+		&CommunityTokenPermission{
+			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				// Unknown permission should be ignored.
+				Type: protobuf.CommunityTokenPermission_UNKNOWN_TOKEN_PERMISSION,
+				TokenCriteria: []*protobuf.TokenCriteria{
+					&protobuf.TokenCriteria{
+						Symbol:            "DAI",
+						Amount:            "7",
+						ContractAddresses: map[uint64]string{mainnetID: "0x1234567"},
 					},
 				},
 			},
@@ -404,7 +418,7 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 	for accountAddress, permissionedTokens := range actual {
 		_, ok := expected[accountAddress]
 		s.Require().True(ok, "actual contains unexpected accountAddress='%s'", accountAddress)
-		s.Require().ElementsMatch(expected[accountAddress], permissionedTokens)
+		s.Require().ElementsMatch(expected[accountAddress], permissionedTokens, "accountAddress='%s'", accountAddress)
 	}
 }
 
@@ -424,27 +438,43 @@ func (s *ManagerSuite) Test_GetPermissionedBalances() {
 	accountAddresses := []gethcommon.Address{accountAddress}
 
 	var chainID uint64 = 5
-	tokenETHID := uint64(10)
-	tokenETHAddress := gethcommon.HexToAddress("0xA")
+	erc20ETHAddress := gethcommon.HexToAddress("0xA")
+	erc721Address := gethcommon.HexToAddress("0x123")
+
 	permissionRequest := &requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
 		TokenCriteria: []*protobuf.TokenCriteria{
 			&protobuf.TokenCriteria{
-				ContractAddresses: map[uint64]string{chainID: tokenETHAddress.Hex()},
-				TokenIds:          []uint64{tokenETHID},
+				ContractAddresses: map[uint64]string{chainID: erc20ETHAddress.Hex()},
 				Type:              protobuf.CommunityTokenType_ERC20,
 				Amount:            "3",
 				Symbol:            "ETH",
 			},
 		},
 	}
-
 	_, changes, err := m.CreateCommunityTokenPermission(permissionRequest)
 	s.Require().NoError(err)
 	s.Require().Len(changes.TokenPermissionsAdded, 1)
 
-	testTokenManager.setResponse(chainID, accountAddress, tokenETHAddress, 42)
+	permissionRequest = &requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				ContractAddresses: map[uint64]string{chainID: erc721Address.Hex()},
+				Type:              protobuf.CommunityTokenType_ERC721,
+				Amount:            "6",
+				Symbol:            "TMTEST",
+			},
+		},
+	}
+	_, changes, err = m.CreateCommunityTokenPermission(permissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(changes.TokenPermissionsAdded, 1)
+
+	testTokenManager.setResponse(chainID, accountAddress, erc20ETHAddress, 42)
+	testTokenManager.setResponse(chainID, accountAddress, erc721Address, 2)
 	actual, err := m.GetPermissionedBalances(context.Background(), community.ID(), accountAddresses)
 	s.Require().NoError(err)
 
@@ -453,6 +483,12 @@ func (s *ManagerSuite) Test_GetPermissionedBalances() {
 		PermissionedToken{
 			Symbol: "ETH",
 			Amount: 42,
+			Type:   PermissionedTokenTypeToken,
+		},
+		PermissionedToken{
+			Symbol: "TMTEST",
+			Amount: 2,
+			Type:   PermissionedTokenTypeCollectible,
 		},
 	}
 

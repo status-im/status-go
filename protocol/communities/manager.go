@@ -2290,6 +2290,10 @@ func (m *Manager) calculatePermissionedBalances(
 	usedERC20Balances := make(map[string]bool)
 
 	for _, permission := range tokenPermissions {
+		if (permission != nil && permission.Type != protobuf.CommunityTokenPermission_BECOME_MEMBER) ||
+			(permission != nil && permission.Type != protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+			continue
+		}
 		for _, criteria := range permission.TokenCriteria {
 			for _, accountAddress := range accountAddresses {
 				for chainID, hexContractAddress := range criteria.ContractAddresses {
@@ -2334,6 +2338,10 @@ func (m *Manager) calculatePermissionedBalances(
 	usedERC721Balances := make(map[string]bool)
 
 	for _, permission := range tokenPermissions {
+		if (permission != nil && permission.Type != protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER) ||
+			(permission != nil && permission.Type != protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER) {
+			continue
+		}
 		for _, criteria := range permission.TokenCriteria {
 			for _, accountAddress := range accountAddresses {
 				for chainID, hexContractAddress := range criteria.ContractAddresses {
@@ -2408,7 +2416,9 @@ func (m *Manager) GetPermissionedBalances(
 	tokenPermissions := make([]*CommunityTokenPermission, 0)
 	for _, p := range community.TokenPermissions() {
 		if p.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER ||
-			p.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN {
+			p.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN ||
+			p.Type == protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER ||
+			p.Type == protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER {
 			tokenPermissions = append(tokenPermissions, p)
 		}
 	}
@@ -2450,12 +2460,12 @@ func (m *Manager) GetPermissionedBalances(
 
 	erc721Balances := make(CollectiblesByChain)
 	if len(erc721ChainIDs) > 0 {
-		collectibles, err := m.GetOwnedERC721Tokens(accounts, erc721TokenCriteriaByChain, erc721ChainIDs)
+		balances, err := m.GetOwnedERC721Tokens(accounts, erc721TokenCriteriaByChain, erc721ChainIDs)
 		if err != nil {
 			return nil, err
 		}
 
-		erc721Balances = collectibles
+		erc721Balances = balances
 	}
 
 	return m.calculatePermissionedBalances(allChainIDs, walletAddresses, erc20Balances, erc721Balances, tokenPermissions), nil
