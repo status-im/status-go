@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
+	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -29,6 +30,7 @@ func TestController_watchAccountsChanges(t *testing.T) {
 
 	accountFeed := &event.Feed{}
 
+	bcstate := blockchainstate.NewBlockChainState()
 	c := NewTransferController(
 		walletDB,
 		accountsDB,
@@ -39,6 +41,7 @@ func TestController_watchAccountsChanges(t *testing.T) {
 		nil, // pendingTxManager
 		nil, // tokenManager
 		nil, // balanceCacher
+		bcstate,
 	)
 
 	address := common.HexToAddress("0x1234")
@@ -139,6 +142,7 @@ func TestController_cleanupAccountLeftovers(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, storedAccs, 1)
 
+	bcstate := blockchainstate.NewBlockChainState()
 	c := NewTransferController(
 		walletDB,
 		accountsDB,
@@ -149,6 +153,7 @@ func TestController_cleanupAccountLeftovers(t *testing.T) {
 		nil, // pendingTxManager
 		nil, // tokenManager
 		nil, // balanceCacher
+		bcstate,
 	)
 	chainID := uint64(777)
 	// Insert blocks

@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/balance"
+	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
@@ -58,11 +59,12 @@ type Reactor struct {
 	strategy           HistoryFetcher
 	balanceCacher      balance.Cacher
 	omitHistory        bool
+	blockChainState    *blockchainstate.BlockChainState
 }
 
 func NewReactor(db *Database, blockDAO *BlockDAO, blockRangesSeqDAO *BlockRangeSequentialDAO, accountsDB *accounts.Database, feed *event.Feed, tm *TransactionManager,
 	pendingTxManager *transactions.PendingTxTracker, tokenManager *token.Manager,
-	balanceCacher balance.Cacher, omitHistory bool) *Reactor {
+	balanceCacher balance.Cacher, omitHistory bool, blockChainState *blockchainstate.BlockChainState) *Reactor {
 	return &Reactor{
 		db:                 db,
 		accountsDB:         accountsDB,
@@ -74,6 +76,7 @@ func NewReactor(db *Database, blockDAO *BlockDAO, blockRangesSeqDAO *BlockRangeS
 		tokenManager:       tokenManager,
 		balanceCacher:      balanceCacher,
 		omitHistory:        omitHistory,
+		blockChainState:    blockChainState,
 	}
 }
 
@@ -113,6 +116,7 @@ func (r *Reactor) createFetchStrategy(chainClients map[uint64]chain.ClientInterf
 		accounts,
 		r.balanceCacher,
 		r.omitHistory,
+		r.blockChainState,
 	)
 }
 

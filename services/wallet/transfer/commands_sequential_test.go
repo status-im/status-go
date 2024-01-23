@@ -33,6 +33,7 @@ import (
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
+	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
@@ -1431,7 +1432,8 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 			blocksLoadedCh:            blockChannel,
 			defaultNodeBlockChunkSize: DefaultNodeBlockChunkSize,
 		},
-		contractMaker: tokenManager.ContractMaker,
+		contractMaker:   tokenManager.ContractMaker,
+		blockChainState: blockchainstate.NewBlockChainState(),
 	}
 
 	ctx := context.Background()

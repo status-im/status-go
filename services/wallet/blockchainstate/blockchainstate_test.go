@@ -1,4 +1,4 @@
-package wallet
+package blockchainstate
 
 import (
 	"testing"
@@ -14,7 +14,7 @@ func mockupSince(t time.Time) time.Duration {
 }
 
 func setupTestState(t *testing.T) (s *BlockChainState) {
-	state := NewBlockChainState(nil, nil)
+	state := NewBlockChainState()
 	state.sinceFn = mockupSince
 	return state
 }
