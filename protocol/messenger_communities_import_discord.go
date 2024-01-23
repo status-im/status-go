@@ -1731,7 +1731,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			}
 		}
 
-		err = m.publishOrg(discordCommunity)
+		err = m.publishOrg(discordCommunity, false)
 		if err != nil {
 			m.cleanUpImport(communityID)
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))

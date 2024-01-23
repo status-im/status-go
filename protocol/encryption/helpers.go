@@ -77,10 +77,7 @@ func generateSharedKey(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey)
 	)
 }
 
-// buildGroupRekeyMessage builds a set of message with maxKeys in each message.
-// each key adds roughly 70 bytes to the size of the message, so we want to stay
-// clear of 1 MB / 70 keys (~14K keys)
-func buildGroupRekeyMessage(privateKey *ecdsa.PrivateKey, groupID []byte, timestamp uint64, keyMaterial []byte, keys []*ecdsa.PublicKey, maxKeys int) ([]*RekeyGroup, error) {
+func buildGroupRekeyMessage(privateKey *ecdsa.PrivateKey, groupID []byte, timestamp uint64, keyMaterial []byte, keys []*ecdsa.PublicKey) (*RekeyGroup, error) {
 
 	message := &RekeyGroup{
 		Timestamp: timestamp,
@@ -88,38 +85,28 @@ func buildGroupRekeyMessage(privateKey *ecdsa.PrivateKey, groupID []byte, timest
 
 	message.Keys = make(map[uint32][]byte)
 
-	length := len(keys)
+	for _, k := range keys {
 
-	var messages []*RekeyGroup
-	for i := 0; i < length; i += maxKeys {
-		end := i + maxKeys
-		if end > length {
-			end = length
+		sharedKey, err := generateSharedKey(privateKey, k)
+		if err != nil {
+			return nil, err
 		}
-		for _, k := range keys[i:end] {
 
-			sharedKey, err := generateSharedKey(privateKey, k)
-			if err != nil {
-				return nil, err
-			}
-
-			encryptedKey, err := encrypt(keyMaterial, sharedKey, rand.Reader)
-			if err != nil {
-				return nil, err
-			}
-
-			kBytes := publicKeyMostRelevantBytes(k)
-
-			if message.Keys[kBytes] == nil {
-				message.Keys[kBytes] = encryptedKey
-			} else {
-				message.Keys[kBytes] = append(message.Keys[kBytes], encryptedKey...)
-			}
+		encryptedKey, err := encrypt(keyMaterial, sharedKey, rand.Reader)
+		if err != nil {
+			return nil, err
 		}
-		messages = append(messages, message)
+
+		kBytes := publicKeyMostRelevantBytes(k)
+
+		if message.Keys[kBytes] == nil {
+			message.Keys[kBytes] = encryptedKey
+		} else {
+			message.Keys[kBytes] = append(message.Keys[kBytes], encryptedKey...)
+		}
 	}
 
-	return messages, nil
+	return message, nil
 }
 
 const nonceLength = 12

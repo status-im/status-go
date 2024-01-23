@@ -1629,11 +1629,12 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, updatedRequest)
 	}
 
-	if requestToJoinResponseProto.Accepted {
-		community, err := m.communitiesManager.GetByID(requestToJoinResponseProto.CommunityId)
-		if err != nil {
-			return err
-		}
+	community, err := m.communitiesManager.GetByID(requestToJoinResponseProto.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	if requestToJoinResponseProto.Accepted && community != nil && community.HasMember(&m.identity.PublicKey) {
 
 		communityShardKey := &protobuf.CommunityShardKey{
 			CommunityId: requestToJoinResponseProto.CommunityId,

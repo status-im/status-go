@@ -201,7 +201,7 @@ func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEven
 	o.mergeCommunityEvents(communityEventMessage)
 
 	if o.encryptor != nil {
-		err = decryptDescription(o.encryptor, description, o.config.Logger)
+		_, err = decryptDescription(o.ID(), o.encryptor, description, o.config.Logger)
 		if err != nil {
 			return err
 		}

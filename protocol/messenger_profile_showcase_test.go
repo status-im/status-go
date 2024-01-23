@@ -402,18 +402,18 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	err = s.m.SetProfileShowcasePreferences(request)
 	s.Require().NoError(err)
 
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 	// Get summarised profile data for mutual contact
 	resp, err := WaitOnMessengerResponse(
 		mutualContact,
 		func(r *MessengerResponse) bool {
-			return len(r.updatedProfileShowcases) > 0
+			return len(r.updatedProfileShowcases) > 0 && r.updatedProfileShowcases[contactID] != nil && len(r.updatedProfileShowcases[contactID].Communities) == 2
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
 	s.Require().Len(resp.updatedProfileShowcases, 1)
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 	profileShowcase := resp.updatedProfileShowcases[contactID]
 
 	s.Require().Len(profileShowcase.Communities, 2)

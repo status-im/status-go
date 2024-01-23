@@ -3470,6 +3470,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Communities()[0].Members(), 1)
 
 	// Check community is present in the DB and has default values we care about
 	c, err := s.owner.GetCommunityByID(response.Communities()[0].ID())

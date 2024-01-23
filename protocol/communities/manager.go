@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -353,9 +354,10 @@ type Subscription struct {
 }
 
 type CommunityResponse struct {
-	Community      *Community        `json:"community"`
-	Changes        *CommunityChanges `json:"changes"`
-	RequestsToJoin []*RequestToJoin  `json:"requestsToJoin"`
+	Community       *Community                             `json:"community"`
+	Changes         *CommunityChanges                      `json:"changes"`
+	RequestsToJoin  []*RequestToJoin                       `json:"requestsToJoin"`
+	FailedToDecrypt []*CommunityPrivateDataFailedToDecrypt `json:"-"`
 }
 
 type CommunityEventsMessageInvalidClockSignal struct {
@@ -818,21 +820,23 @@ func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommuni
 		return nil, nil, err
 	}
 
-	originCommunity := community.CreateDeepCopy()
+	// ensure key is generated before marshaling,
+	// as it requires key to encrypt description
+	if community.IsControlNode() && m.encryptor != nil {
+		key, err := m.encryptor.GenerateHashRatchetKey(community.ID())
+		if err != nil {
+			return nil, nil, err
+		}
+		keyID, err := key.GetKeyID()
+		if err != nil {
+			return nil, nil, err
+		}
+		m.logger.Info("generate key for token", zap.String("group-id", types.Bytes2Hex(community.ID())), zap.String("key-id", types.Bytes2Hex(keyID)))
+	}
 
 	community, changes, err := m.createCommunityTokenPermission(request, community)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	// ensure key is generated before marshaling,
-	// as it requires key to encrypt description
-	if m.keyDistributor != nil && community.IsControlNode() {
-		encryptionKeyActions := EvaluateCommunityEncryptionKeyActions(originCommunity, community)
-		err := m.keyDistributor.Generate(community, encryptionKeyActions)
-		if err != nil {
-			return nil, nil, err
-		}
 	}
 
 	err = m.saveAndPublish(community)
@@ -1539,7 +1543,7 @@ func (m *Manager) Queue(signer *ecdsa.PublicKey, community *Community, clock uin
 }
 
 func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte, verifiedOwner *ecdsa.PublicKey, communityShard *protobuf.Shard) (*CommunityResponse, error) {
-	m.logger.Debug("HandleCommunityDescriptionMessage", zap.String("communityID", description.ID))
+	m.logger.Debug("HandleCommunityDescriptionMessage", zap.String("communityID", description.ID), zap.Uint64("clock", description.Clock))
 
 	if signer == nil {
 		return nil, errors.New("signer can't be nil")
@@ -1557,7 +1561,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		id = crypto.CompressPubkey(signer)
 	}
 
-	err = m.preprocessDescription(id, description)
+	failedToDecrypt, err := m.preprocessDescription(id, description)
 	if err != nil {
 		return nil, err
 	}
@@ -1565,6 +1569,12 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	community, err := m.GetByID(id)
 	if err != nil && err != ErrOrgNotFound {
 		return nil, err
+	}
+
+	// We don't process failed to decrypt if the whole metadata is encrypted
+	// and we joined the community already
+	if community != nil && community.Joined() && len(failedToDecrypt) != 0 && description != nil && len(description.Members) == 0 {
+		return &CommunityResponse{FailedToDecrypt: failedToDecrypt}, nil
 	}
 
 	// We should queue only if the community has a token owner, and the owner has been verified
@@ -1632,19 +1642,24 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		return nil, ErrNotAuthorized
 	}
 
-	return m.handleCommunityDescriptionMessageCommon(community, description, payload, verifiedOwner)
+	r, err := m.handleCommunityDescriptionMessageCommon(community, description, payload, verifiedOwner)
+	if err != nil {
+		return nil, err
+	}
+	r.FailedToDecrypt = failedToDecrypt
+	return r, nil
 }
 
-func (m *Manager) preprocessDescription(id types.HexBytes, description *protobuf.CommunityDescription) error {
-	err := decryptDescription(m, description, m.logger)
+func (m *Manager) preprocessDescription(id types.HexBytes, description *protobuf.CommunityDescription) ([]*CommunityPrivateDataFailedToDecrypt, error) {
+	response, err := decryptDescription(id, m, description, m.logger)
 	if err != nil {
-		return err
+		return response, err
 	}
 
 	// Workaround for https://github.com/status-im/status-desktop/issues/12188
 	hydrateChannelsMembers(types.EncodeHex(id), description)
 
-	return nil
+	return response, nil
 }
 
 func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte, newControlNode *ecdsa.PublicKey) (*CommunityResponse, error) {
@@ -2859,7 +2874,7 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, ErrNotAuthorized
 	}
 
-	err = m.preprocessDescription(community.ID(), request.Community)
+	_, err = m.preprocessDescription(community.ID(), request.Community)
 	if err != nil {
 		return nil, err
 	}
@@ -3207,7 +3222,7 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 	}
 
 	return recordBundleToCommunity(r, &m.identity.PublicKey, m.installationID, m.logger, m.timesource, descriptionEncryptor, func(community *Community) error {
-		err := m.preprocessDescription(community.ID(), community.config.CommunityDescription)
+		_, err := m.preprocessDescription(community.ID(), community.config.CommunityDescription)
 		if err != nil {
 			return err
 		}
@@ -5095,7 +5110,17 @@ func (m *Manager) encryptCommunityDescriptionImpl(groupID []byte, d *protobuf.Co
 	}
 
 	encryptedPayload, ratchet, newSeqNo, err := m.encryptor.EncryptWithHashRatchet(groupID, payload)
-	if err != nil {
+	if err == encryption.ErrNoEncryptionKey {
+		_, err := m.encryptor.GenerateHashRatchetKey(groupID)
+		if err != nil {
+			return "", nil, err
+		}
+		encryptedPayload, ratchet, newSeqNo, err = m.encryptor.EncryptWithHashRatchet(groupID, payload)
+		if err != nil {
+			return "", nil, err
+		}
+
+	} else if err != nil {
 		return "", nil, err
 	}
 
@@ -5104,6 +5129,12 @@ func (m *Manager) encryptCommunityDescriptionImpl(groupID []byte, d *protobuf.Co
 		return "", nil, err
 	}
 
+	communityJSON, err := json.Marshal(d)
+	if err != nil {
+		return "", nil, err
+	}
+
+	m.logger.Debug("encrypting community description", zap.String("community", string(communityJSON)), zap.String("groupID", types.Bytes2Hex(groupID)), zap.String("key-id", types.Bytes2Hex(keyID)))
 	keyIDSeqNo := fmt.Sprintf("%s%d", hex.EncodeToString(keyID), newSeqNo)
 
 	return keyIDSeqNo, encryptedPayload, nil
@@ -5117,7 +5148,14 @@ func (m *Manager) encryptCommunityDescriptionChannel(community *Community, chann
 	return m.encryptCommunityDescriptionImpl([]byte(community.IDString()+channelID), d)
 }
 
-func (m *Manager) decryptCommunityDescription(keyIDSeqNo string, d []byte) (*protobuf.CommunityDescription, error) {
+type DecryptCommunityResponse struct {
+	Decrypted   bool
+	Description *protobuf.CommunityDescription
+	KeyID       []byte
+	GroupID     []byte
+}
+
+func (m *Manager) decryptCommunityDescription(keyIDSeqNo string, d []byte) (*DecryptCommunityResponse, error) {
 	const hashHexLength = 64
 	if len(keyIDSeqNo) <= hashHexLength {
 		return nil, errors.New("invalid keyIDSeqNo")
@@ -5134,6 +5172,12 @@ func (m *Manager) decryptCommunityDescription(keyIDSeqNo string, d []byte) (*pro
 	}
 
 	decryptedPayload, err := m.encryptor.DecryptWithHashRatchet(keyID, uint32(seqNo), d)
+	if err == encryption.ErrNoRatchetKey {
+		return &DecryptCommunityResponse{
+			KeyID: keyID,
+		}, err
+
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -5144,7 +5188,12 @@ func (m *Manager) decryptCommunityDescription(keyIDSeqNo string, d []byte) (*pro
 		return nil, err
 	}
 
-	return &description, nil
+	decryptCommunityResponse := &DecryptCommunityResponse{
+		Decrypted:   true,
+		KeyID:       keyID,
+		Description: &description,
+	}
+	return decryptCommunityResponse, nil
 }
 
 func ToLinkPreveiwThumbnail(image images.IdentityImage) (*common.LinkPreviewThumbnail, error) {

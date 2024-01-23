@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -94,12 +95,16 @@ func GetCommunityIDFromKey(communityKey string) string {
 	return communityKey
 }
 
-func (m *Messenger) publishOrg(org *communities.Community) error {
+func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) error {
 	if org == nil {
 		return nil
 	}
 
-	m.logger.Debug("publishing org", zap.String("org-id", org.IDString()), zap.Any("org", org))
+	communityJSON, err := json.Marshal(org)
+	if err != nil {
+		return err
+	}
+	m.logger.Debug("publishing org", zap.String("org-id", org.IDString()), zap.Uint64("clock", org.Clock()), zap.String("org", string(communityJSON)))
 	payload, err := org.MarshaledDescription()
 
 	if err != nil {
@@ -111,8 +116,19 @@ func (m *Messenger) publishOrg(org *communities.Community) error {
 		Sender:  org.PrivateKey(),
 		// we don't want to wrap in an encryption layer message
 		SkipEncryptionLayer: true,
+		CommunityID:         org.ID(),
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
 		PubsubTopic:         org.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+	}
+	if org.Encrypted() {
+		members := org.GetMemberPubkeys()
+		if err != nil {
+			return err
+		}
+		rawMessage.CommunityKeyExMsgType = common.KeyExMsgRekey
+		// This should be the one that it was used to encrypt this community
+		rawMessage.HashRatchetGroupID = org.ID()
+		rawMessage.Recipients = members
 	}
 	_, err = m.sender.SendPublic(context.Background(), org.IDString(), rawMessage)
 	return err
@@ -303,7 +319,45 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 			m.logger.Warn("failed to distribute encryption keys", zap.Error(err))
 		}
 
-		err = m.publishOrg(community)
+		shouldRekey := encryptionKeyActions.CommunityKeyAction.ActionType == communities.EncryptionKeyRekey
+		if community.Encrypted() {
+			clock := community.Clock()
+			clock++
+			userKicked := &protobuf.CommunityUserKicked{
+				Clock:       clock,
+				CommunityId: community.ID(),
+			}
+
+			for pkString := range encryptionKeyActions.CommunityKeyAction.RemovedMembers {
+				pk, err := common.HexToPubkey(pkString)
+				if err != nil {
+					m.logger.Error("failed to decode public key", zap.Error(err), zap.String("pk", pkString))
+				}
+				payload, err := proto.Marshal(userKicked)
+				if err != nil {
+					m.logger.Error("failed to marshal user kicked message", zap.Error(err))
+					continue
+				}
+
+				rawMessage := &common.RawMessage{
+					Payload:             payload,
+					Sender:              community.PrivateKey(),
+					SkipEncryptionLayer: true,
+					MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_USER_KICKED,
+					PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
+				}
+
+				_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
+				if err != nil {
+					m.logger.Error("failed to send used kicked message", zap.Error(err))
+					continue
+				}
+
+			}
+
+		}
+
+		err = m.publishOrg(community, shouldRekey)
 		if err != nil {
 			m.logger.Warn("failed to publish org", zap.Error(err))
 			return
@@ -338,7 +392,14 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					return
 				}
 				if sub.Community != nil {
-					publishOrgAndDistributeEncryptionKeys(sub.Community)
+					if sub.Community == nil {
+						continue
+					}
+					// NOTE: because we use a pointer here, there's a race condition where the community would be updated before it's compared to the previous one.
+					// This results in keys not being propagated as the copy would not see any changes
+					communityCopy := sub.Community.CreateDeepCopy()
+
+					publishOrgAndDistributeEncryptionKeys(communityCopy)
 				}
 
 				if sub.CommunityEventsMessage != nil {
@@ -1535,6 +1596,11 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
 		}
 
+		if community.Encrypted() {
+			rawMessage.HashRatchetGroupID = community.ID()
+			rawMessage.CommunityKeyExMsgType = common.KeyExMsgReuse
+		}
+
 		_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
 		if err != nil {
 			return nil, err
@@ -2691,6 +2757,23 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 		return nil
 	}
 
+	if len(communityResponse.FailedToDecrypt) != 0 {
+		for _, r := range communityResponse.FailedToDecrypt {
+			if state.CurrentMessageState != nil && state.CurrentMessageState.StatusMessage != nil {
+				err := m.persistence.SaveHashRatchetMessage(r.GroupID, r.KeyID, state.CurrentMessageState.StatusMessage.TransportLayer.Message)
+				m.logger.Info("saving failed to decrypt community description", zap.String("hash", types.Bytes2Hex(state.CurrentMessageState.StatusMessage.TransportLayer.Message.Hash)))
+				if err != nil {
+					m.logger.Warn("failed to save waku message")
+				}
+			}
+
+		}
+		// We stop here if we could not decrypt the community main metadata
+		if communityResponse.Community == nil {
+			return nil
+		}
+	}
+
 	return m.handleCommunityResponse(state, communityResponse)
 }
 
@@ -2804,6 +2887,36 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 				return err
 			}
 		}
+	}
+
+	return nil
+}
+
+func (m *Messenger) HandleCommunityUserKicked(state *ReceivedMessageState, message *protobuf.CommunityUserKicked, statusMessage *v1protocol.StatusMessage) error {
+	// TODO: validate the user can be removed checking the signer
+	if len(message.CommunityId) == 0 {
+		return nil
+	}
+	community, err := m.communitiesManager.GetByID(message.CommunityId)
+	if err != nil {
+		return err
+	}
+	if community == nil || !community.Joined() {
+		return nil
+	}
+	if community.Clock() > message.Clock {
+		return nil
+	}
+
+	response, err := m.kickedOutOfCommunity(community.ID())
+	if err != nil {
+		m.logger.Error("cannot leave community", zap.Error(err))
+		return err
+	}
+
+	if err := state.Response.Merge(response); err != nil {
+		m.logger.Error("cannot merge join community response", zap.Error(err))
+		return err
 	}
 
 	return nil
@@ -3047,7 +3160,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 	// Handle community keys
 	if len(syncCommunity.EncryptionKeys) != 0 {
 		//  We pass nil,nil as private key/public key as they won't be encrypted
-		_, err := m.encryptor.HandleHashRatchetKeys(syncCommunity.Id, syncCommunity.EncryptionKeys, nil, nil)
+		_, err := m.encryptor.HandleHashRatchetKeysPayload(syncCommunity.Id, syncCommunity.EncryptionKeys, nil, nil)
 		if err != nil {
 			return err
 		}

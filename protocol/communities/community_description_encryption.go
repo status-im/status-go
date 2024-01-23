@@ -5,13 +5,14 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type DescriptionEncryptor interface {
 	encryptCommunityDescription(community *Community, d *protobuf.CommunityDescription) (string, []byte, error)
 	encryptCommunityDescriptionChannel(community *Community, channelID string, d *protobuf.CommunityDescription) (string, []byte, error)
-	decryptCommunityDescription(keyIDSeqNo string, d []byte) (*protobuf.CommunityDescription, error)
+	decryptCommunityDescription(keyIDSeqNo string, d []byte) (*DecryptCommunityResponse, error)
 }
 
 // Encrypts members and chats
@@ -59,15 +60,30 @@ func encryptDescription(encryptor DescriptionEncryptor, community *Community, de
 	return nil
 }
 
+type CommunityPrivateDataFailedToDecrypt struct {
+	GroupID []byte
+	KeyID   []byte
+}
+
 // Decrypts members and chats
-func decryptDescription(encryptor DescriptionEncryptor, description *protobuf.CommunityDescription, logger *zap.Logger) error {
+func decryptDescription(id types.HexBytes, encryptor DescriptionEncryptor, description *protobuf.CommunityDescription, logger *zap.Logger) ([]*CommunityPrivateDataFailedToDecrypt, error) {
+	if len(description.PrivateData) == 0 {
+		return nil, nil
+	}
+
+	var failedToDecrypt []*CommunityPrivateDataFailedToDecrypt
+
 	for keyIDSeqNo, encryptedDescription := range description.PrivateData {
-		decryptedDescription, err := encryptor.decryptCommunityDescription(keyIDSeqNo, encryptedDescription)
+		decryptedDescriptionResponse, err := encryptor.decryptCommunityDescription(keyIDSeqNo, encryptedDescription)
+		if decryptedDescriptionResponse != nil && !decryptedDescriptionResponse.Decrypted {
+			failedToDecrypt = append(failedToDecrypt, &CommunityPrivateDataFailedToDecrypt{GroupID: id, KeyID: decryptedDescriptionResponse.KeyID})
+		}
 		if err != nil {
 			// ignore error, try to decrypt next data
 			logger.Debug("failed to decrypt community private data", zap.String("keyIDSeqNo", keyIDSeqNo), zap.Error(err))
 			continue
 		}
+		decryptedDescription := decryptedDescriptionResponse.Description
 
 		for pk, member := range decryptedDescription.Members {
 			if description.Members == nil {
@@ -91,5 +107,5 @@ func decryptDescription(encryptor DescriptionEncryptor, description *protobuf.Co
 		}
 	}
 
-	return nil
+	return failedToDecrypt, nil
 }

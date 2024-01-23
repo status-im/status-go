@@ -2146,6 +2146,7 @@ func (o *Community) AddMemberWithRevealedAccounts(dbRequest *RequestToJoin, role
 
 func (o *Community) CreateDeepCopy() *Community {
 	return &Community{
+		encryptor: o.encryptor,
 		config: &Config{
 			PrivateKey:                          o.config.PrivateKey,
 			ControlNode:                         o.config.ControlNode,

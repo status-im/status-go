@@ -64,6 +64,7 @@ message HRHeader {
   bytes group_id = 3;
   // group key ID
   bytes key_id = 4;
+  HRKeys keys = 5;
 }
 
 message RekeyGroup {
