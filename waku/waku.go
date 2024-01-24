@@ -1580,6 +1580,12 @@ func (w *Waku) MarkP2PMessageAsProcessed(hash gethcommon.Hash) {
 	delete(w.p2pMsgIDs, hash)
 }
 
+func (w *Waku) ClearEnvelopesCache() {
+	w.poolMu.Lock()
+	defer w.poolMu.Unlock()
+	w.envelopes = make(map[gethcommon.Hash]*common.Envelope)
+}
+
 func (w *Waku) Clean() error {
 	w.poolMu.Lock()
 	defer w.poolMu.Unlock()

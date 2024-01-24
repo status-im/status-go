@@ -289,6 +289,10 @@ func (w *gethWakuV2Wrapper) ConnectionChanged(state connection.State) {
 	w.waku.ConnectionChanged(state)
 }
 
+func (w *gethWakuV2Wrapper) ClearEnvelopesCache() {
+	w.waku.ClearEnvelopesCache()
+}
+
 type wakuV2FilterWrapper struct {
 	filter *wakucommon.Filter
 	id     string

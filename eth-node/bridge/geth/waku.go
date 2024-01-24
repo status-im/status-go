@@ -274,6 +274,10 @@ func (w *gethWakuWrapper) RequestStoreMessages(ctx context.Context, peerID []byt
 
 func (w *gethWakuWrapper) ConnectionChanged(_ connection.State) {}
 
+func (w *gethWakuWrapper) ClearEnvelopesCache() {
+	w.waku.ClearEnvelopesCache()
+}
+
 type wakuFilterWrapper struct {
 	filter *wakucommon.Filter
 	id     string
