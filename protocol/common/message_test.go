@@ -29,7 +29,7 @@ func TestPrepareContentImage(t *testing.T) {
 	message.ContentType = protobuf.ChatMessage_IMAGE
 	image := protobuf.ImageMessage{
 		Payload: payload,
-		Type:    protobuf.ImageType_JPEG,
+		Format:  protobuf.ImageFormat_JPEG,
 	}
 	message.Payload = &protobuf.ChatMessage_Image{Image: &image}
 

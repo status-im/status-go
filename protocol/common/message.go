@@ -740,7 +740,7 @@ func (m *Message) LoadImage() error {
 	}
 	imageMessage := m.GetImage()
 	imageMessage.Payload = payload
-	imageMessage.Type = images.GetProtobufImageType(payload)
+	imageMessage.Format = images.GetProtobufImageFormat(payload)
 	m.Payload = &protobuf.ChatMessage_Image{Image: imageMessage}
 
 	return nil

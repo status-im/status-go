@@ -47,8 +47,8 @@ message IdentityImage {
   // source_type signals the image payload source
   SourceType source_type = 2;
 
-  // image_type signals the image type and method of parsing the payload
-  ImageType image_type = 3;
+  // image_format signals the image format and method of parsing the payload
+  ImageFormat image_format = 3;
 
   // encryption_keys is a list of encrypted keys that can be used to decrypted an encrypted payload
   repeated bytes encryption_keys = 4;

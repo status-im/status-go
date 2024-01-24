@@ -15,8 +15,8 @@ enum MessageType {
   SYSTEM_MESSAGE_GAP = 6;
 }
 
-enum ImageType {
-  UNKNOWN_IMAGE_TYPE = 0;
+enum ImageFormat {
+  UNKNOWN_IMAGE_FORMAT = 0;
 
   // Raster image files is payload data that can be read as a raster image
   PNG = 1;

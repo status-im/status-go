@@ -451,6 +451,15 @@ func (db *Database) publishOnIdentityImageSubscriptions(change *IdentityImageSub
 
 func (db *Database) DeleteIdentityImage(keyUID string) error {
 	_, err := db.db.Exec(`DELETE FROM identity_images WHERE key_uid = ?`, keyUID)
+
+	if err != nil {
+		return err
+	}
+
+	db.publishOnIdentityImageSubscriptions(&IdentityImageSubscriptionChange{
+		PublishExpected: true,
+	})
+
 	return err
 }
 

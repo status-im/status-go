@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/gob"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -737,7 +738,29 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	return response, nil
 }
 
-func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdentity *protobuf.ChatIdentity) (clockUpdated, imagesUpdated bool, err error) {
+func extractImageTypes(images map[string]*protobuf.IdentityImage) []string {
+	uniqueImageTypesMap := make(map[string]struct{})
+	for key := range images {
+		uniqueImageTypesMap[key] = struct{}{}
+	}
+
+	var uniqueImageTypes []string
+	for key := range uniqueImageTypesMap {
+		uniqueImageTypes = append(uniqueImageTypes, key)
+	}
+
+	return uniqueImageTypes
+}
+
+func generatePlaceholders(count int) string {
+	placeholders := make([]string, count)
+	for i := 0; i < count; i++ {
+		placeholders[i] = "?"
+	}
+	return strings.Join(placeholders, ", ")
+}
+
+func (db sqlitePersistence) UpdateContactChatIdentity(contactID string, chatIdentity *protobuf.ChatIdentity) (clockUpdated, imagesUpdated bool, err error) {
 	if chatIdentity.Clock == 0 {
 		return false, false, errors.New("clock value unset")
 	}
@@ -754,6 +777,35 @@ func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdenti
 		// don't shadow original error
 		_ = tx.Rollback()
 	}()
+
+	extractedImageTypes := extractImageTypes(chatIdentity.Images)
+
+	query := "DELETE FROM chat_identity_contacts WHERE contact_id = ?"
+	if len(extractedImageTypes) > 0 {
+		query += " AND image_type NOT IN (" + generatePlaceholders(len(extractedImageTypes)) + ")"
+	}
+
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return false, false, err
+	}
+	defer stmt.Close()
+
+	args := make([]interface{}, len(extractedImageTypes)+1)
+	args[0] = contactID
+	for i, v := range extractedImageTypes {
+		args[i+1] = v
+	}
+
+	result, err := stmt.Exec(args...)
+	if err != nil {
+		return false, false, err
+	}
+
+	imagesUpdated = false
+	if rowsAffected, err := result.RowsAffected(); err == nil && rowsAffected > 0 {
+		imagesUpdated = true
+	}
 
 	updateClock := func() (updated bool, err error) {
 		var newerClockEntryExists bool

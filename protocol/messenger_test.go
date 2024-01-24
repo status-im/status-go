@@ -2498,7 +2498,7 @@ func buildImageWithAlbumIDMessage(chat Chat, albumID string) (*common.Message, e
 
 	image := protobuf.ImageMessage{
 		Payload: payload,
-		Type:    protobuf.ImageType_JPEG,
+		Format:  protobuf.ImageFormat_JPEG,
 		Width:   1200,
 		Height:  1000,
 		AlbumId: albumID,
