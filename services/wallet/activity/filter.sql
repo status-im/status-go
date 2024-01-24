@@ -157,6 +157,7 @@ layer2_networks(network_id) AS (
 mint_methods(method_hash) AS (
 	%s
 )
+
 SELECT
 	transfers.hash AS transfer_hash,
 	NULL AS pending_hash,
@@ -208,7 +209,7 @@ SELECT
 		WHEN transfers.tx_from_address = zeroAddress AND transfers.type = "erc20" THEN substr(json_extract(tx, '$.input'), 1, 10)
 		ELSE NULL
 	END AS method_hash,
-	CASE 
+	CASE
 		WHEN transfers.tx_from_address = zeroAddress AND transfers.type = "erc20" THEN (SELECT 1 FROM json_each(transfers.receipt, '$.logs' ) WHERE json_extract( value, '$.topics[0]' ) = communityMintEvent)
 		ELSE NULL
 	END AS community_mint_event
@@ -254,11 +255,11 @@ WHERE
 				AND (
 					transfers.type = 'erc721'
 					OR (
-						transfers.type = 'erc20' 
+						transfers.type = 'erc20'
 						AND (
 							(method_hash IS NOT NULL AND method_hash IN mint_methods)
 							OR community_mint_event IS NOT NULL
-						) 
+						)
 					)
 				)
 			)
@@ -281,11 +282,11 @@ WHERE
 			AND (
 				transfers.type = 'erc721'
 				OR (
-					transfers.type = 'erc20' 
+					transfers.type = 'erc20'
 					AND (
 						(method_hash IS NOT NULL AND method_hash IN mint_methods)
 						OR community_mint_event IS NOT NULL
-					) 
+					)
 				)
 			)
 		)

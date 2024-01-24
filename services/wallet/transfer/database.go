@@ -492,6 +492,28 @@ func updateOrInsertTransfersDBFields(creator statementCreator, transfers []trans
 			log.Error("can't save transfer", "b-hash", t.blockHash, "b-n", t.blockNumber, "a", t.address, "h", t.id)
 			return err
 		}
+
+		err = removeGasOnlyEthTransfer(creator, t)
+		if err != nil {
+			log.Error("can't remove gas only eth transfer", "b-hash", t.blockHash, "b-n", t.blockNumber, "a", t.address, "h", t.id, "err", err)
+			// no return err, since it's not critical
+		}
+	}
+	return nil
+}
+
+func removeGasOnlyEthTransfer(creator statementCreator, t transferDBFields) error {
+	if t.transferType != w_common.EthTransfer {
+		query, err := creator.Prepare(`DELETE FROM transfers WHERE tx_hash = ? AND address = ? AND network_id = ?
+		 AND account_nonce = ? AND type = 'eth' AND amount_padded128hex = '00000000000000000000000000000000'`)
+		if err != nil {
+			return err
+		}
+
+		_, err = query.Exec(t.txHash, t.address, t.chainID, t.txNonce)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
