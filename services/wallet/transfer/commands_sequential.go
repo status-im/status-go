@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -148,36 +150,56 @@ func (c *findNewBlocksCommand) Run(parent context.Context) error {
 		return err
 	}
 
-	accounts := []common.Address{}
+	accountsToCheck := []common.Address{}
+	// accounts which might have outgoing transfers initiated outside
+	// the application, e.g. watch only or restored from mnemonic phrase
+	accountsWithOutsideTransfers := []common.Address{}
 
 	for _, account := range c.accounts {
+		acc, err := c.accountsDB.GetAccountByAddress(nodetypes.Address(account))
+		if err != nil {
+			c.error = err
+			return err
+		}
 		if mnemonicWasNotShown {
-			acc, err := c.accountsDB.GetAccountByAddress(nodetypes.Address(account))
-			if err != nil {
-				c.error = err
-				return err
-			}
 			if acc.AddressWasNotShown {
 				log.Info("skip findNewBlocksCommand, mnemonic has not been shown and the address has not been shared yet", "address", account)
 				continue
 			}
 		}
-		accounts = append(accounts, account)
+		if !mnemonicWasNotShown || acc.Type != accounts.AccountTypeGenerated {
+			accountsWithOutsideTransfers = append(accountsWithOutsideTransfers, account)
+		}
+
+		accountsToCheck = append(accountsToCheck, account)
 	}
 
-	if len(accounts) == 0 {
+	if len(accountsToCheck) == 0 {
 		return nil
 	}
 
-	headNum, accountsWithDetectedChanges, err := c.detectTransfers(parent, accounts)
+	headNum, accountsWithDetectedChanges, err := c.detectTransfers(parent, accountsToCheck)
 	if err != nil {
 		log.Error("findNewBlocksCommand error on transfer detection", "error", err, "chain", c.chainClient.NetworkID())
 		return err
 	}
 
-	if len(accountsWithDetectedChanges) != 0 || c.iteration%nonceCheckIntervalIterations == 0 {
-		c.findAndSaveEthBlocks(parent, c.fromBlockNumber, headNum, accounts)
+	if len(accountsWithDetectedChanges) != 0 {
+		c.findAndSaveEthBlocks(parent, c.fromBlockNumber, headNum, accountsToCheck)
+	} else if c.iteration%nonceCheckIntervalIterations == 0 && len(accountsWithOutsideTransfers) > 0 {
+		c.findAndSaveEthBlocks(parent, c.fromBlockNumber, headNum, accountsWithOutsideTransfers)
+		for _, account := range accountsToCheck {
+			if slices.Contains(accountsWithOutsideTransfers, account) {
+				continue
+			}
+			err := c.markEthBlockRangeChecked(account, &BlockRange{nil, c.fromBlockNumber, headNum})
+			if err != nil {
+				c.error = err
+				return err
+			}
+		}
 	}
+
 	if len(accountsWithDetectedChanges) != 0 || c.iteration%logsCheckIntervalIterations == 0 {
 		c.findAndSaveTokenBlocks(parent, c.fromBlockNumber, headNum)
 	}

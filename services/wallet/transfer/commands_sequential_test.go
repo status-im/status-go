@@ -38,6 +38,7 @@ import (
 	"github.com/status-im/status-go/t/utils"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	multicommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/params"
 	statusRpc "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
@@ -1367,6 +1368,18 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 	address2 := common.HexToAddress("0x5678")
 	accDB, err := accounts.NewDB(appdb)
 	require.NoError(t, err)
+
+	for _, address := range []*common.Address{&address1, &address2} {
+		acc := &accounts.Account{
+			Address: ethtypes.BytesToAddress(address.Bytes()),
+			Type:    accounts.AccountTypeWatch,
+			Name:    address.String(),
+			ColorID: multicommon.CustomizationColorPrimary,
+			Emoji:   "emoji",
+		}
+		err = accDB.SaveOrUpdateAccounts([]*accounts.Account{acc}, false)
+		require.NoError(t, err)
+	}
 
 	tc := &TestClient{
 		t:                      t,
