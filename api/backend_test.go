@@ -751,7 +751,6 @@ func TestLoginWithKey(t *testing.T) {
 	require.NotNil(t, activeAccount.ColorHash)
 }
 
-/*
 func TestLoginAccount(t *testing.T) {
 	utils.Init()
 	password := "some-password"
@@ -794,7 +793,6 @@ func TestLoginAccount(t *testing.T) {
 		t.FailNow()
 	}
 }
-*/
 
 func TestVerifyDatabasePassword(t *testing.T) {
 	utils.Init()

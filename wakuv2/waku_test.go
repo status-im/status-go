@@ -40,7 +40,6 @@ func TestDiscoveryV5(t *testing.T) {
 	config.EnableDiscV5 = true
 	config.DiscV5BootstrapNodes = []string{testENRBootstrap}
 	config.DiscoveryLimit = 20
-	config.UDPPort = 9001
 	w, err := New("", "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 
@@ -288,7 +287,6 @@ func TestWakuV2Filter(t *testing.T) {
 	config.EnableDiscV5 = true
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
-	config.UDPPort = 9001
 	config.WakuNodes = []string{enrTreeAddress}
 	fleet := "status.test" // Need a name fleet so that LightClient is not set to false
 	w, err := New("", fleet, config, nil, nil, nil, nil, nil)
