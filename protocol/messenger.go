@@ -1294,9 +1294,9 @@ func (m *Messenger) createChatIdentity(context chatContext) (*protobuf.ChatIdent
 // adaptIdentityImageToProtobuf Adapts a images.IdentityImage to protobuf.IdentityImage
 func (m *Messenger) adaptIdentityImageToProtobuf(img *images.IdentityImage) *protobuf.IdentityImage {
 	return &protobuf.IdentityImage{
-		Payload:    img.Payload,
-		SourceType: protobuf.IdentityImage_RAW_PAYLOAD, // TODO add ENS avatar handling to dedicated PR
-		ImageType:  images.GetProtobufImageType(img.Payload),
+		Payload:     img.Payload,
+		SourceType:  protobuf.IdentityImage_RAW_PAYLOAD, // TODO add ENS avatar handling to dedicated PR
+		ImageFormat: images.GetProtobufImageFormat(img.Payload),
 	}
 }
 

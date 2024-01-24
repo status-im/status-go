@@ -47,9 +47,9 @@ type CreateCommunity struct {
 
 func adaptIdentityImageToProtobuf(img images.IdentityImage) *protobuf.IdentityImage {
 	return &protobuf.IdentityImage{
-		Payload:    img.Payload,
-		SourceType: protobuf.IdentityImage_RAW_PAYLOAD,
-		ImageType:  images.GetProtobufImageType(img.Payload),
+		Payload:     img.Payload,
+		SourceType:  protobuf.IdentityImage_RAW_PAYLOAD,
+		ImageFormat: images.GetProtobufImageFormat(img.Payload),
 	}
 }
 

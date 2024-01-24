@@ -2945,7 +2945,11 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci *protobuf
 		}
 	}
 
-	clockChanged, imagesChanged, err := m.persistence.SaveContactChatIdentity(contact.ID, ci)
+	if len(ci.Images) == 0 {
+		contact.Images = nil
+	}
+
+	clockChanged, imagesChanged, err := m.persistence.UpdateContactChatIdentity(contact.ID, ci)
 	if err != nil {
 		return err
 	}

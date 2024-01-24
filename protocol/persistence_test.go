@@ -1090,7 +1090,7 @@ func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
 	require.Nil(t, actualHash2)
 }
 
-func TestSaveContactChatIdentity(t *testing.T) {
+func TestUpdateContactChatIdentity(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := newSQLitePersistence(db)
@@ -1106,15 +1106,15 @@ func TestSaveContactChatIdentity(t *testing.T) {
 	jpegType := []byte{0xff, 0xd8, 0xff, 0x1}
 	identityImages := make(map[string]*protobuf.IdentityImage)
 	identityImages["large"] = &protobuf.IdentityImage{
-		Payload:    jpegType,
-		SourceType: protobuf.IdentityImage_RAW_PAYLOAD,
-		ImageType:  protobuf.ImageType_PNG,
+		Payload:     jpegType,
+		SourceType:  protobuf.IdentityImage_RAW_PAYLOAD,
+		ImageFormat: protobuf.ImageFormat_PNG,
 	}
 
 	identityImages["small"] = &protobuf.IdentityImage{
-		Payload:    jpegType,
-		SourceType: protobuf.IdentityImage_RAW_PAYLOAD,
-		ImageType:  protobuf.ImageType_PNG,
+		Payload:     jpegType,
+		SourceType:  protobuf.IdentityImage_RAW_PAYLOAD,
+		ImageFormat: protobuf.ImageFormat_PNG,
 	}
 
 	toArrayOfPointers := func(array []protobuf.SocialLink) (result []*protobuf.SocialLink) {
@@ -1140,13 +1140,13 @@ func TestSaveContactChatIdentity(t *testing.T) {
 		}),
 	}
 
-	clockUpdated, imagesUpdated, err := p.SaveContactChatIdentity(contactID, chatIdentity)
+	clockUpdated, imagesUpdated, err := p.UpdateContactChatIdentity(contactID, chatIdentity)
 	require.NoError(t, err)
 	require.True(t, clockUpdated)
 	require.True(t, imagesUpdated)
 
 	// Save again same clock and data
-	clockUpdated, imagesUpdated, err = p.SaveContactChatIdentity(contactID, chatIdentity)
+	clockUpdated, imagesUpdated, err = p.UpdateContactChatIdentity(contactID, chatIdentity)
 	require.NoError(t, err)
 	require.False(t, clockUpdated)
 	require.False(t, imagesUpdated)
@@ -1154,21 +1154,79 @@ func TestSaveContactChatIdentity(t *testing.T) {
 	// Save again newer clock and no images
 	chatIdentity.Clock = 2
 	chatIdentity.Images = make(map[string]*protobuf.IdentityImage)
-	clockUpdated, imagesUpdated, err = p.SaveContactChatIdentity(contactID, chatIdentity)
+	clockUpdated, imagesUpdated, err = p.UpdateContactChatIdentity(contactID, chatIdentity)
 	require.NoError(t, err)
 	require.True(t, clockUpdated)
-	require.False(t, imagesUpdated)
+	require.True(t, imagesUpdated)
 
 	contacts, err := p.Contacts()
 	require.NoError(t, err)
 	require.Len(t, contacts, 1)
 
-	require.Len(t, contacts[0].Images, 2)
+	require.Len(t, contacts[0].Images, 0)
 	require.Len(t, contacts[0].SocialLinks, 2)
 	require.Equal(t, "Personal Site", contacts[0].SocialLinks[0].Text)
 	require.Equal(t, "status.im", contacts[0].SocialLinks[0].URL)
 	require.Equal(t, "Twitter", contacts[0].SocialLinks[1].Text)
 	require.Equal(t, "Status_ico", contacts[0].SocialLinks[1].URL)
+}
+
+func TestRemovedProfileImage(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
+
+	err = p.SaveContact(&Contact{ID: contactID}, nil)
+	require.NoError(t, err)
+
+	jpegType := []byte{0xff, 0xd8, 0xff, 0x1}
+	identityImages := make(map[string]*protobuf.IdentityImage)
+	identityImages["large"] = &protobuf.IdentityImage{
+		Payload:     jpegType,
+		SourceType:  protobuf.IdentityImage_RAW_PAYLOAD,
+		ImageFormat: protobuf.ImageFormat_PNG,
+	}
+
+	identityImages["small"] = &protobuf.IdentityImage{
+		Payload:     jpegType,
+		SourceType:  protobuf.IdentityImage_RAW_PAYLOAD,
+		ImageFormat: protobuf.ImageFormat_PNG,
+	}
+
+	chatIdentity := &protobuf.ChatIdentity{
+		Clock:  1,
+		Images: identityImages,
+	}
+
+	clockUpdated, imagesUpdated, err := p.UpdateContactChatIdentity(contactID, chatIdentity)
+	require.NoError(t, err)
+	require.True(t, clockUpdated)
+	require.True(t, imagesUpdated)
+
+	contacts, err := p.Contacts()
+	require.NoError(t, err)
+	require.Len(t, contacts, 1)
+	require.Len(t, contacts[0].Images, 2)
+
+	emptyChatIdentity := &protobuf.ChatIdentity{
+		Clock:  1,
+		Images: nil,
+	}
+
+	clockUpdated, imagesUpdated, err = p.UpdateContactChatIdentity(contactID, emptyChatIdentity)
+	require.NoError(t, err)
+	require.False(t, clockUpdated)
+	require.True(t, imagesUpdated)
+
+	contacts, err = p.Contacts()
+	require.NoError(t, err)
+	require.Len(t, contacts, 1)
+	require.Len(t, contacts[0].Images, 0)
 }
 
 func TestSaveLinks(t *testing.T) {
