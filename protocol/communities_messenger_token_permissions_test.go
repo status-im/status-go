@@ -136,17 +136,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 
 	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, false, []string{"owner", "bob", "alice"})
 
-	ownerLogger := s.logger.With(zap.String("name", "owner"))
 	s.ownerWaku = wakuNodes[0]
-	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, s.ownerWaku, ownerLogger)
+	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, s.ownerWaku, "owner", []Option{})
 
-	bobLogger := s.logger.With(zap.String("name", "bob"))
 	s.bobWaku = wakuNodes[1]
-	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, s.bobWaku, bobLogger)
+	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, s.bobWaku, "bob", []Option{})
 
-	aliceLogger := s.logger.With(zap.String("name", "alice"))
 	s.aliceWaku = wakuNodes[2]
-	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, s.aliceWaku, aliceLogger)
+	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, s.aliceWaku, "alice", []Option{})
 
 	_, err := s.owner.Start()
 	s.Require().NoError(err)
@@ -186,10 +183,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, waku types.Waku, logger *zap.Logger) *Messenger {
+func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, waku types.Waku, name string, extraOptions []Option) *Messenger {
 	return newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
-			logger: logger,
+			logger:       s.logger.Named(name),
+			extraOptions: extraOptions,
 		},
 		password:            password,
 		walletAddresses:     walletAddresses,

@@ -229,7 +229,9 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku types.Waku, config testCom
 		WithAppSettings(*config.appSettings, *config.nodeConfig),
 	}
 
-	messenger, err := newTestMessenger(waku, config.testMessengerConfig, options)
+	config.extraOptions = append(config.extraOptions, options...)
+
+	messenger, err := newTestMessenger(waku, config.testMessengerConfig)
 	s.Require().NoError(err)
 
 	currentDistributorObj, ok := messenger.communitiesKeyDistributor.(*CommunitiesKeyDistributorImpl)

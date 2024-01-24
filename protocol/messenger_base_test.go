@@ -72,9 +72,10 @@ func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *z
 	options = append(options, extraOptions...)
 
 	m, err := newTestMessenger(shh, testMessengerConfig{
-		privateKey: privateKey,
-		logger:     logger,
-	}, options)
+		privateKey:   privateKey,
+		logger:       logger,
+		extraOptions: options,
+	})
 	if err != nil {
 		return nil, err
 	}

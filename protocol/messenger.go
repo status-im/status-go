@@ -1549,7 +1549,7 @@ func (m *Messenger) watchExpiredMessages() {
 				if m.Online() {
 					err := m.resendExpiredMessages()
 					if err != nil {
-						m.logger.Debug("Error when resending expired emoji reactions", zap.Error(err))
+						m.logger.Debug("failed to resend expired message", zap.Error(err))
 					}
 				}
 			case <-m.quit:
