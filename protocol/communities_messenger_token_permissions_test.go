@@ -730,8 +730,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 	// bob tries to join, but he doesn't satisfy so the request isn't sent
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), AddressesToReveal: []string{bobAddress}, AirdropAddress: bobAddress}
 	_, err = s.bob.RequestToJoinCommunity(request)
-	s.Require().Error(err)
-	s.Require().ErrorContains(err, "permission to join not satisfied")
+	s.Require().ErrorIs(err, communities.ErrPermissionToJoinNotSatisfied)
 
 	// make sure bob does not have a pending request to join
 	requests, err := s.bob.MyPendingRequestsToJoin()
