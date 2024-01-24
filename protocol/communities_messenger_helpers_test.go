@@ -14,6 +14,7 @@ import (
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -25,7 +26,9 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/communitytokens"
+	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -587,4 +590,26 @@ func waitOnCommunitiesEvent(user *Messenger, condition func(*communities.Subscri
 	}()
 
 	return errCh
+}
+
+func WithTestStoreNode(s *suite.Suite, id string, address string, fleet string, collectiblesServiceMock *CollectiblesServiceMock) Option {
+	return func(c *config) error {
+		sqldb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+		s.Require().NoError(err)
+
+		db := mailserversDB.NewDB(sqldb)
+		err = db.Add(mailserversDB.Mailserver{
+			ID:      id,
+			Name:    id,
+			Address: address,
+			Fleet:   fleet,
+		})
+		s.Require().NoError(err)
+
+		c.mailserversDatabase = db
+		c.clusterConfig = params.ClusterConfig{Fleet: fleet}
+		c.communityTokensService = collectiblesServiceMock
+
+		return nil
+	}
 }

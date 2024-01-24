@@ -191,24 +191,8 @@ func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *za
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	mailserversSQLDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	s.Require().NoError(err)
-
-	mailserversDatabase := mailserversDB.NewDB(mailserversSQLDb)
-	err = mailserversDatabase.Add(mailserversDB.Mailserver{
-		ID:      localMailserverID,
-		Name:    localMailserverID,
-		Address: mailserverAddress,
-		Fleet:   localFleet,
-	})
-	s.Require().NoError(err)
-
 	options := []Option{
-		WithMailserversDatabase(mailserversDatabase),
-		WithClusterConfig(params.ClusterConfig{
-			Fleet: localFleet,
-		}),
-		WithCommunityTokensService(s.collectiblesServiceMock),
+		WithTestStoreNode(&s.Suite, localMailserverID, mailserverAddress, localFleet, s.collectiblesServiceMock),
 	}
 
 	messenger, err := newMessengerWithKey(shh, privateKey, logger, options)
@@ -617,7 +601,6 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestShardAndCommunityInfo() {
 	s.createOwner()
 	s.createBob()
 
-	s.waitForAvailableStoreNode(s.owner)
 	community := s.createCommunity(s.owner)
 
 	expectedShard := &shard.Shard{
