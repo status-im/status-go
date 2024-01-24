@@ -296,7 +296,7 @@ func (c *transfersCommand) saveAndConfirmPending(allTransfers []Transfer, blockN
 	if resErr != nil {
 		return resErr
 	}
-	notifyFunctions := make([]func(), 0)
+	notifyFunctions := c.confirmPendingTransactions(tx, allTransfers)
 	defer func() {
 		if resErr == nil {
 			commitErr := tx.Commit()
@@ -313,6 +313,17 @@ func (c *transfersCommand) saveAndConfirmPending(allTransfers []Transfer, blockN
 			}
 		}
 	}()
+
+	resErr = saveTransfersMarkBlocksLoaded(tx, c.chainClient.NetworkID(), c.address, allTransfers, []*big.Int{blockNum})
+	if resErr != nil {
+		log.Error("SaveTransfers error", "error", resErr)
+	}
+
+	return resErr
+}
+
+func (c *transfersCommand) confirmPendingTransactions(tx *sql.Tx, allTransfers []Transfer) (notifyFunctions []func()) {
+	notifyFunctions = make([]func(), 0)
 
 	// Confirm all pending transactions that are included in this block
 	for i, tr := range allTransfers {
@@ -351,13 +362,7 @@ func (c *transfersCommand) saveAndConfirmPending(allTransfers []Transfer, blockN
 			notifyFunctions = append(notifyFunctions, notify)
 		}
 	}
-
-	resErr = saveTransfersMarkBlocksLoaded(tx, c.chainClient.NetworkID(), c.address, allTransfers, []*big.Int{blockNum})
-	if resErr != nil {
-		log.Error("SaveTransfers error", "error", resErr)
-	}
-
-	return resErr
+	return notifyFunctions
 }
 
 // Mark all subTxs of a given Tx with the same multiTxID
@@ -542,7 +547,7 @@ func (c *loadTransfersCommand) Command() async.Command {
 	}.Run
 }
 
-// This command always returs nil, even if there is an error in one of the commands.
+// This command always returns nil, even if there is an error in one of the commands.
 // `transferCommand`s retry until maxError, but this command doesn't retry.
 // In case some transfer is not loaded after max retries, it will be retried only after restart of the app.
 // Currently there is no implementation to keep retrying until success. I think this should be implemented

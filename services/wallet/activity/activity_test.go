@@ -1378,3 +1378,74 @@ func TestGetMultiTxDetails(t *testing.T) {
 	require.Equal(t, td.multiTx1Tr2.Hash, details.ChainDetails[1].Hash)
 	require.Equal(t, td.multiTx1Tr2.Contract, *details.ChainDetails[1].Contract)
 }
+
+func TestGetActivityEntriesSkipEthGasFeeOnlyTransfers(t *testing.T) {
+	deps, close := setupTestActivityDB(t)
+	defer close()
+
+	to := eth.Address{0x1}
+	from := eth.Address{0x2}
+	hash := eth.Hash{0x3}
+	blkNum := int64(1)
+	chainID := common.ChainID(1)
+	nonce := uint64(1)
+
+	// Insert 0-value gas-only ETH transfer as a result of token transfer's gas fee
+	transfer.InsertTestTransfer(t, deps.db, to, &transfer.TestTransfer{
+		TestTransaction: transfer.TestTransaction{
+			ChainID:   chainID,
+			From:      from,
+			Hash:      hash,
+			BlkNumber: blkNum,
+			Nonce:     nonce,
+		},
+		To:    to,
+		Value: 0,
+	})
+
+	entries, err := getActivityEntries(context.Background(), deps, []eth.Address{to}, true, []common.ChainID{chainID}, Filter{}, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(entries))
+	require.Equal(t, hash, entries[0].transaction.Hash)
+
+	// Insert token transfer
+	transfer.InsertTestTransferWithOptions(t, deps.db, to,
+		&transfer.TestTransfer{
+			TestTransaction: transfer.TestTransaction{
+				ChainID:   chainID,
+				From:      from,
+				Hash:      hash,
+				BlkNumber: blkNum,
+				Nonce:     nonce,
+			},
+			To:    to,
+			Value: 1,
+		},
+		&transfer.TestTransferOptions{
+			TokenAddress: eth.Address{0x4},
+		},
+	)
+
+	// Gas-fee-only transfer should be removed, so we get only 1 transfer again
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{to}, true, []common.ChainID{chainID}, Filter{}, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(entries))
+	require.Equal(t, contractTypeFromDBType("erc20"), entries[0].transferType)
+
+	// Insert real 0-value ETH transfer
+	transfer.InsertTestTransfer(t, deps.db, to, &transfer.TestTransfer{
+		TestTransaction: transfer.TestTransaction{
+			ChainID:   chainID,
+			From:      from,
+			Hash:      eth.Hash{0x5}, // another hash
+			BlkNumber: blkNum,
+			Nonce:     nonce + 1, // another nonce
+		},
+		To:    to,
+		Value: 0, // 0-value as well
+	})
+
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{to}, true, []common.ChainID{chainID}, Filter{}, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(entries))
+}

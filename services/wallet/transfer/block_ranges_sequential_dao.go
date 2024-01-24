@@ -90,8 +90,8 @@ func (b *BlockRangeSequentialDAO) upsertRange(chainID uint64, account common.Add
 		return err
 	}
 
-	ethBlockRange := prepareUpdatedBlockRange(chainID, account, ethTokensBlockRange.eth, newBlockRange.eth)
-	tokensBlockRange := prepareUpdatedBlockRange(chainID, account, ethTokensBlockRange.tokens, newBlockRange.tokens)
+	ethBlockRange := prepareUpdatedBlockRange(ethTokensBlockRange.eth, newBlockRange.eth)
+	tokensBlockRange := prepareUpdatedBlockRange(ethTokensBlockRange.tokens, newBlockRange.tokens)
 
 	log.Debug("update eth and tokens blocks range", "account", account, "chainID", chainID,
 		"eth.start", ethBlockRange.Start, "eth.first", ethBlockRange.FirstKnown, "eth.last", ethBlockRange.LastKnown,
@@ -117,7 +117,7 @@ func (b *BlockRangeSequentialDAO) upsertEthRange(chainID uint64, account common.
 		return err
 	}
 
-	blockRange := prepareUpdatedBlockRange(chainID, account, ethTokensBlockRange.eth, newBlockRange)
+	blockRange := prepareUpdatedBlockRange(ethTokensBlockRange.eth, newBlockRange)
 
 	log.Debug("update eth blocks range", "account", account, "chainID", chainID,
 		"start", blockRange.Start, "first", blockRange.FirstKnown, "last", blockRange.LastKnown, "old hash", ethTokensBlockRange.balanceCheckHash)
@@ -146,7 +146,7 @@ func (b *BlockRangeSequentialDAO) updateTokenRange(chainID uint64, account commo
 		return err
 	}
 
-	blockRange := prepareUpdatedBlockRange(chainID, account, ethTokensBlockRange.tokens, newBlockRange)
+	blockRange := prepareUpdatedBlockRange(ethTokensBlockRange.tokens, newBlockRange)
 
 	log.Debug("update tokens blocks range", "account", account, "chainID", chainID,
 		"start", blockRange.Start, "first", blockRange.FirstKnown, "last", blockRange.LastKnown, "old hash", ethTokensBlockRange.balanceCheckHash)
@@ -162,7 +162,7 @@ func (b *BlockRangeSequentialDAO) updateTokenRange(chainID uint64, account commo
 	return err
 }
 
-func prepareUpdatedBlockRange(chainID uint64, account common.Address, blockRange, newBlockRange *BlockRange) *BlockRange {
+func prepareUpdatedBlockRange(blockRange, newBlockRange *BlockRange) *BlockRange {
 	// Update existing range
 	if blockRange != nil {
 		if newBlockRange != nil {
