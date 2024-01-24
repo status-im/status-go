@@ -144,7 +144,7 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 			deleted,
 		    updated_at
 		)
-		SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM activity_center_notifications WHERE id = ? AND updated_at >= ?)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 		`,
 		notification.ID,
 		notification.Timestamp,
@@ -162,7 +162,6 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		notification.Deleted,
 		notification.UpdatedAt,
 		notification.ID,
-		notification.UpdatedAt,
 	)
 	if err != nil {
 		return 0, err
@@ -832,7 +831,6 @@ func (db sqlitePersistence) DismissActivityCenterNotifications(ids []types.HexBy
 	for _, id := range ids {
 		args = append(args, id)
 	}
-	args = append(args, updatedAt)
 
 	var tx *sql.Tx
 	var err error
@@ -851,7 +849,7 @@ func (db sqlitePersistence) DismissActivityCenterNotifications(ids []types.HexBy
 	}()
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1, updated_at = ? WHERE id IN (" + inVector + ") AND not deleted AND updated_at < ?" // nolint: gosec
+	query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1, updated_at = ? WHERE id IN (" + inVector + ") AND not deleted" // nolint: gosec
 	_, err = tx.Exec(query, args...)
 	if err != nil {
 		return err
@@ -1051,7 +1049,6 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 	for _, id := range ids {
 		args = append(args, id)
 	}
-	args = append(args, updatedAt)
 
 	params := activityCenterQueryParams{
 		ids: ids,
@@ -1062,9 +1059,6 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 	}
 	var updateNotifications []*ActivityCenterNotification
 	for _, n := range notifications {
-		if n.UpdatedAt >= updatedAt {
-			continue
-		}
 		n.Read = true
 		n.Accepted = true
 		n.UpdatedAt = updatedAt
@@ -1072,7 +1066,7 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "UPDATE activity_center_notifications SET read = 1, accepted = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted AND updated_at < ?" // nolint: gosec
+	query := "UPDATE activity_center_notifications SET read = 1, accepted = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted" // nolint: gosec
 	_, err = tx.Exec(query, args...)
 	if err != nil {
 		return nil, err
@@ -1165,7 +1159,6 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsRead(ids []types.HexB
 	for _, id := range ids {
 		args = append(args, id)
 	}
-	args = append(args, updatedAt)
 
 	var tx *sql.Tx
 	var err error
@@ -1184,7 +1177,7 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsRead(ids []types.HexB
 	}()
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "UPDATE activity_center_notifications SET read = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted AND updated_at < ?" // nolint: gosec
+	query := "UPDATE activity_center_notifications SET read = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted" // nolint: gosec
 	_, err = tx.Exec(query, args...)
 	if err != nil {
 		return err
@@ -1354,7 +1347,7 @@ func (db sqlitePersistence) HasUnseenActivityCenterNotifications() (bool, uint64
 }
 
 func (db sqlitePersistence) UpdateActivityCenterNotificationState(state *ActivityCenterState) (int64, error) {
-	result, err := db.db.Exec(`UPDATE activity_center_states SET has_seen = ?, updated_at = ? WHERE updated_at < ?`, state.HasSeen, state.UpdatedAt, state.UpdatedAt)
+	result, err := db.db.Exec(`UPDATE activity_center_states SET has_seen = ?, updated_at = ?`, state.HasSeen, state.UpdatedAt)
 	if err != nil {
 		return 0, err
 	}
