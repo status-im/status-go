@@ -364,6 +364,13 @@ func (m *Messenger) deleteChat(chatID string) error {
 	if err != nil {
 		return err
 	}
+
+	// We clean the cache to be able to receive the messages again later
+	err = m.transport.ClearProcessedMessageIDsCache()
+	if err != nil {
+		return err
+	}
+
 	chat, ok := m.allChats.Load(chatID)
 
 	if ok && chat.Active && chat.Public() {
