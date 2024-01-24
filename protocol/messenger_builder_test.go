@@ -81,7 +81,7 @@ func newTestMessenger(waku types.Waku, config testMessengerConfig) (*Messenger, 
 		WithToplevelDatabaseMigrations(),
 		WithBrowserDatabase(nil),
 	}
-	options = append(options, extraOptions...)
+	options = append(options, config.extraOptions...)
 
 	m, err := NewMessenger(
 		config.name,
