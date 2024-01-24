@@ -21,7 +21,8 @@ func TestMessengerSettings(t *testing.T) {
 }
 
 type MessengerSettingsSuite struct {
-	MessengerSyncSettingsSuite
+	MessengerBaseTestSuite
+	m2 *Messenger
 }
 
 func (s *MessengerSettingsSuite) SetupTest() {
@@ -35,69 +36,69 @@ func (s *MessengerSettingsSuite) SetupTest() {
 
 	pk, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	s.alice, err = newMessengerWithKey(s.shh, pk, s.logger, nil)
+	s.m, err = newMessengerWithKey(s.shh, pk, s.logger, nil)
 	s.Require().NoError(err)
 
-	s.alice2, err = newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
+	s.m2, err = newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
 	s.Require().NoError(err)
 
-	prepareMessengersForPairing(&s.Suite, s.alice, s.alice2)
+	prepareMessengersForPairing(&s.Suite, s.m, s.m2)
 }
 
 func (s *MessengerSettingsSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.alice)
-	TearDownMessenger(&s.Suite, s.alice2)
+	TearDownMessenger(&s.Suite, s.m)
+	TearDownMessenger(&s.Suite, s.m2)
 	_ = s.logger.Sync()
 }
 
-func prepareMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {
-	// Set Alice's installation metadata
+func prepareMessengersForPairing(s *suite.Suite, m1, m2 *Messenger) {
+	// Set m's installation metadata
 	aim := &multidevice.InstallationMetadata{
-		Name:       "alice's-device",
-		DeviceType: "alice's-device-type",
+		Name:       "m's-device",
+		DeviceType: "m's-device-type",
 	}
-	err := alice1.SetInstallationMetadata(alice1.installationID, aim)
+	err := m1.SetInstallationMetadata(m1.installationID, aim)
 	s.Require().NoError(err)
 
-	// Set Alice 2's installation metadata
+	// Set m 2's installation metadata
 	a2im := &multidevice.InstallationMetadata{
-		Name:       "alice's-other-device",
-		DeviceType: "alice's-other-device-type",
+		Name:       "m's-other-device",
+		DeviceType: "m's-other-device-type",
 	}
-	err = alice2.SetInstallationMetadata(alice2.installationID, a2im)
+	err = m2.SetInstallationMetadata(m2.installationID, a2im)
 	s.Require().NoError(err)
 }
 
 func (s *MessengerSettingsSuite) TestSetCustomizationColor() {
-	PairDevices(&s.Suite, s.alice2, s.alice)
-	PairDevices(&s.Suite, s.alice, s.alice2)
+	PairDevices(&s.Suite, s.m2, s.m)
+	PairDevices(&s.Suite, s.m, s.m2)
 
-	s.Require().Equal(s.alice.account.KeyUID, s.alice2.account.KeyUID)
+	s.Require().Equal(s.m.account.KeyUID, s.m2.account.KeyUID)
 
-	err := s.alice.multiAccounts.SaveAccount(*s.alice.account)
+	err := s.m.multiAccounts.SaveAccount(*s.m.account)
 	s.Require().NoError(err)
-	err = s.alice2.multiAccounts.SaveAccount(*s.alice2.account)
+	err = s.m2.multiAccounts.SaveAccount(*s.m2.account)
 	s.Require().NoError(err)
 
 	// check that accounts have no customization color
-	acc, err := s.alice.multiAccounts.GetAccount(s.alice.account.KeyUID)
+	acc, err := s.m.multiAccounts.GetAccount(s.m.account.KeyUID)
 	s.Require().NoError(err)
-	acc2, err := s.alice2.multiAccounts.GetAccount(s.alice2.account.KeyUID)
+	acc2, err := s.m2.multiAccounts.GetAccount(s.m2.account.KeyUID)
 	s.Require().NoError(err)
 	s.Require().Equal(acc.CustomizationColor, common.CustomizationColor(""))
 	s.Require().Equal(acc.CustomizationColorClock, uint64(0))
 	s.Require().Equal(acc2.CustomizationColor, common.CustomizationColor(""))
 	s.Require().Equal(acc2.CustomizationColorClock, uint64(0))
 
-	err = s.alice.SetCustomizationColor(context.TODO(), &requests.SetCustomizationColor{KeyUID: s.alice.account.KeyUID, CustomizationColor: common.CustomizationColorBlue})
+	err = s.m.SetCustomizationColor(context.TODO(), &requests.SetCustomizationColor{KeyUID: s.m.account.KeyUID, CustomizationColor: common.CustomizationColorBlue})
 	s.Require().NoError(err)
-	_, err = WaitOnMessengerResponse(s.alice2, func(r *MessengerResponse) bool {
+	_, err = WaitOnMessengerResponse(s.m2, func(r *MessengerResponse) bool {
 		return len(r.CustomizationColor) > 0
 	}, "message syncAccountCustomizationColor not received")
 	s.Require().NoError(err)
-	acc, err = s.alice2.multiAccounts.GetAccount(s.alice.account.KeyUID)
+	acc, err = s.m2.multiAccounts.GetAccount(s.m.account.KeyUID)
 	s.Require().NoError(err)
-	acc2, err = s.alice2.multiAccounts.GetAccount(s.alice2.account.KeyUID)
+	acc2, err = s.m2.multiAccounts.GetAccount(s.m2.account.KeyUID)
 	s.Require().NoError(err)
 	s.Require().Equal(common.CustomizationColorBlue, acc.CustomizationColor)
 	s.Require().Equal(acc.CustomizationColor, acc2.CustomizationColor)
