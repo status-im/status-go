@@ -223,7 +223,6 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku types.Waku, config testCom
 	}
 
 	options := []Option{
-		WithResendParams(3, 3),
 		WithAccountManager(accountsManagerMock),
 		WithTokenManager(tokenManagerMock),
 		WithCommunityTokensService(config.collectiblesService),

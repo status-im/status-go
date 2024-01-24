@@ -90,6 +90,9 @@ func (s *MessengerOfflineSuite) newMessenger(waku types.Waku, logger *zap.Logger
 	return newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			logger: s.logger,
+			extraOptions: []Option{
+				WithResendParams(3, 3),
+			},
 		},
 	})
 }
