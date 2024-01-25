@@ -380,9 +380,12 @@ func buildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact,
 		return nil, err
 	}
 
+	address := crypto.PubkeyToAddress(*publicKey)
+
 	contact := &Contact{
-		ID:    publicKeyString,
-		Alias: getShortenedCompressedKey(compressedKey),
+		ID:      publicKeyString,
+		Alias:   getShortenedCompressedKey(compressedKey),
+		Address: types.EncodeHex(address[:]),
 	}
 
 	return contact, nil
