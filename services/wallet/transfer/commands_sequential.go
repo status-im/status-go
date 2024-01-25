@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
+	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
@@ -60,8 +61,9 @@ func (ec *errorCounter) Error() error {
 
 type findNewBlocksCommand struct {
 	*findBlocksCommand
-	contractMaker *contracts.ContractMaker
-	iteration     int
+	contractMaker   *contracts.ContractMaker
+	iteration       int
+	blockChainState *blockchainstate.BlockChainState
 }
 
 func (c *findNewBlocksCommand) Command() async.Command {
@@ -183,6 +185,8 @@ func (c *findNewBlocksCommand) Run(parent context.Context) error {
 		log.Error("findNewBlocksCommand error on transfer detection", "error", err, "chain", c.chainClient.NetworkID())
 		return err
 	}
+
+	c.blockChainState.SetLastBlockNumber(c.chainClient.NetworkID(), headNum.Uint64())
 
 	if len(accountsWithDetectedChanges) != 0 {
 		c.findAndSaveEthBlocks(parent, c.fromBlockNumber, headNum, accountsToCheck)
@@ -856,7 +860,8 @@ func (c *loadBlocksAndTransfersCommand) startTransfersLoop(ctx context.Context) 
 func newLoadBlocksAndTransfersCommand(accounts []common.Address, db *Database, accountsDB *accounts.Database,
 	blockDAO *BlockDAO, blockRangesSeqDAO BlockRangeDAOer, chainClient chain.ClientInterface, feed *event.Feed,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
-	tokenManager *token.Manager, balanceCacher balance.Cacher, omitHistory bool) *loadBlocksAndTransfersCommand {
+	tokenManager *token.Manager, balanceCacher balance.Cacher, omitHistory bool,
+	blockChainState *blockchainstate.BlockChainState) *loadBlocksAndTransfersCommand {
 
 	return &loadBlocksAndTransfersCommand{
 		accounts:           accounts,
@@ -874,6 +879,7 @@ func newLoadBlocksAndTransfersCommand(accounts []common.Address, db *Database, a
 		omitHistory:        omitHistory,
 		errorCounter:       *newErrorCounter("loadBlocksAndTransfersCommand"),
 		contractMaker:      tokenManager.ContractMaker,
+		blockChainState:    blockChainState,
 	}
 }
 
@@ -893,6 +899,7 @@ type loadBlocksAndTransfersCommand struct {
 	blocksLoadedCh     chan []*DBHeader
 	omitHistory        bool
 	contractMaker      *contracts.ContractMaker
+	blockChainState    *blockchainstate.BlockChainState
 
 	// Not to be set by the caller
 	transfersLoaded map[common.Address]bool // For event RecentHistoryReady to be sent only once per account during app lifetime
@@ -1108,7 +1115,8 @@ func (c *loadBlocksAndTransfersCommand) startFetchingNewBlocks(ctx context.Conte
 				blocksLoadedCh:            blocksLoadedCh,
 				defaultNodeBlockChunkSize: DefaultNodeBlockChunkSize,
 			},
-			contractMaker: c.contractMaker,
+			contractMaker:   c.contractMaker,
+			blockChainState: c.blockChainState,
 		}
 		group := async.NewGroup(ctx)
 		group.Add(newBlocksCmd.Command())

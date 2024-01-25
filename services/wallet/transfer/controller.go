@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/balance"
+	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
@@ -35,11 +36,12 @@ type Controller struct {
 	pendingTxManager   *transactions.PendingTxTracker
 	tokenManager       *token.Manager
 	balanceCacher      balance.Cacher
+	blockChainState    *blockchainstate.BlockChainState
 }
 
 func NewTransferController(db *sql.DB, accountsDB *statusaccounts.Database, rpcClient *rpc.Client, accountFeed *event.Feed, transferFeed *event.Feed,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker, tokenManager *token.Manager,
-	balanceCacher balance.Cacher) *Controller {
+	balanceCacher balance.Cacher, blockChainState *blockchainstate.BlockChainState) *Controller {
 
 	blockDAO := &BlockDAO{db}
 	return &Controller{
@@ -54,6 +56,7 @@ func NewTransferController(db *sql.DB, accountsDB *statusaccounts.Database, rpcC
 		pendingTxManager:   pendingTxManager,
 		tokenManager:       tokenManager,
 		balanceCacher:      balanceCacher,
+		blockChainState:    blockChainState,
 	}
 }
 
@@ -111,7 +114,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 		}
 
 		c.reactor = NewReactor(c.db, c.blockDAO, c.blockRangesSeqDAO, c.accountsDB, c.TransferFeed, c.transactionManager,
-			c.pendingTxManager, c.tokenManager, c.balanceCacher, omitHistory)
+			c.pendingTxManager, c.tokenManager, c.balanceCacher, omitHistory, c.blockChainState)
 
 		err = c.reactor.start(chainClients, accounts)
 		if err != nil {
