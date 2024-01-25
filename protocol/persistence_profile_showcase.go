@@ -14,33 +14,40 @@ const (
 	ProfileShowcaseVisibilityEveryone
 )
 
-const upsertProfileShowcaseCommunityPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_communities_preferences(community_id, visibility, sort_order) VALUES (?, ?, ?)"
-const selectProfileShowcaseCommunityPreferenceQuery = "SELECT community_id, visibility, sort_order FROM profile_showcase_communities_preferences"
+const upsertProfileShowcaseCommunityPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_communities_preferences(community_id, visibility, sort_order) VALUES (?, ?, ?)" // #nosec G101
+const selectProfileShowcaseCommunityPreferenceQuery = "SELECT community_id, visibility, sort_order FROM profile_showcase_communities_preferences"                              // #nosec G101
 
-const upsertProfileShowcaseAccountPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_accounts_preferences(address, name, color_id, emoji, visibility, sort_order) VALUES (?, ?, ?, ?, ?, ?)"
-const selectProfileShowcaseAccountPreferenceQuery = "SELECT address, name, color_id, emoji, visibility, sort_order FROM profile_showcase_accounts_preferences"
+const upsertProfileShowcaseAccountPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_accounts_preferences(address, name, color_id, emoji, visibility, sort_order) VALUES (?, ?, ?, ?, ?, ?)" // #nosec G101
+const selectProfileShowcaseAccountPreferenceQuery = "SELECT address, name, color_id, emoji, visibility, sort_order FROM profile_showcase_accounts_preferences"                                       // #nosec G101
 
-const upsertProfileShowcaseCollectiblePreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_preferences(uid, visibility, sort_order) VALUES (?, ?, ?)"
-const selectProfileShowcaseCollectiblePreferenceQuery = "SELECT uid, visibility, sort_order FROM profile_showcase_collectibles_preferences"
+const upsertProfileShowcaseCollectiblePreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_preferences(contract_address, chain_id, token_id, community_id, account_address, visibility, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)" // #nosec G101
+const selectProfileShowcaseCollectiblePreferenceQuery = "SELECT contract_address, chain_id, token_id, community_id, account_address, visibility, sort_order FROM profile_showcase_collectibles_preferences"                                          // #nosec G101
 
-const upsertProfileShowcaseAssetPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_assets_preferences(symbol, visibility, sort_order) VALUES (?, ?, ?)"
-const selectProfileShowcaseAssetPreferenceQuery = "SELECT symbol, visibility, sort_order FROM profile_showcase_assets_preferences"
+const upsertProfileShowcaseVerifiedTokenPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_verified_tokens_preferences(symbol, visibility, sort_order) VALUES (?, ?, ?)" // #nosec G101
+const selectProfileShowcaseVerifiedTokenPreferenceQuery = "SELECT symbol, visibility, sort_order FROM profile_showcase_verified_tokens_preferences"                              // #nosec G101
 
-const upsertContactProfileShowcaseCommunityQuery = "INSERT OR REPLACE INTO profile_showcase_communities_contacts(contact_id, community_id, sort_order) VALUES (?, ?, ?)"
-const selectContactProfileShowcaseCommunityQuery = "SELECT community_id, sort_order FROM profile_showcase_communities_contacts WHERE contact_id = ?"
-const removeContactProfileShowcaseCommunityQuery = "DELETE FROM profile_showcase_communities_contacts WHERE contact_id = ?"
+const upsertProfileShowcaseUnverifiedTokenPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_unverified_tokens_preferences(contract_address, chain_id, community_id, visibility, sort_order) VALUES (?, ?, ?, ?, ?)" // #nosec G101
+const selectProfileShowcaseUnverifiedTokenPreferenceQuery = "SELECT contract_address, chain_id, community_id, visibility, sort_order FROM profile_showcase_unverified_tokens_preferences"                                    // #nosec G101
 
-const upsertContactProfileShowcaseAccountQuery = "INSERT OR REPLACE INTO profile_showcase_accounts_contacts(contact_id, address, name, color_id, emoji, sort_order) VALUES (?, ?, ?, ?, ?, ?)"
-const selectContactProfileShowcaseAccountQuery = "SELECT address, name, color_id, emoji, sort_order FROM profile_showcase_accounts_contacts WHERE contact_id = ?"
+const upsertContactProfileShowcaseCommunityQuery = "INSERT OR REPLACE INTO profile_showcase_communities_contacts(contact_id, community_id, sort_order) VALUES (?, ?, ?)" // #nosec G101
+const selectContactProfileShowcaseCommunityQuery = "SELECT community_id, sort_order FROM profile_showcase_communities_contacts WHERE contact_id = ?"                     // #nosec G101
+const removeContactProfileShowcaseCommunityQuery = "DELETE FROM profile_showcase_communities_contacts WHERE contact_id = ?"                                              // #nosec G101
+
+const upsertContactProfileShowcaseAccountQuery = "INSERT OR REPLACE INTO profile_showcase_accounts_contacts(contact_id, address, name, color_id, emoji, sort_order) VALUES (?, ?, ?, ?, ?, ?)" // #nosec G101
+const selectContactProfileShowcaseAccountQuery = "SELECT address, name, color_id, emoji, sort_order FROM profile_showcase_accounts_contacts WHERE contact_id = ?"                              // #nosec G101
 const removeContactProfileShowcaseAccountQuery = "DELETE FROM profile_showcase_accounts_contacts WHERE contact_id = ?"
 
-const upsertContactProfileShowcaseCollectibleQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_contacts(contact_id, uid, sort_order) VALUES (?, ?, ?)"
-const selectContactProfileShowcaseCollectibleQuery = "SELECT uid, sort_order FROM profile_showcase_collectibles_contacts WHERE contact_id = ?"
-const removeContactProfileShowcaseCollectibleQuery = "DELETE FROM profile_showcase_collectibles_contacts WHERE contact_id = ?"
+const upsertContactProfileShowcaseCollectibleQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_contacts(contact_id, contract_address, chain_id, token_id, community_id, account_address, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)" // #nosec G101
+const selectContactProfileShowcaseCollectibleQuery = "SELECT contract_address, chain_id, token_id, community_id, account_address, sort_order FROM profile_showcase_collectibles_contacts WHERE contact_id = ?"                                 // #nosec G101
+const removeContactProfileShowcaseCollectibleQuery = "DELETE FROM profile_showcase_collectibles_contacts WHERE contact_id = ?"                                                                                                                 // #nosec G101
 
-const upsertContactProfileShowcaseAssetQuery = "INSERT OR REPLACE INTO profile_showcase_assets_contacts(contact_id, symbol, sort_order) VALUES (?, ?, ?)"
-const selectContactProfileShowcaseAssetQuery = "SELECT symbol, sort_order FROM profile_showcase_assets_contacts WHERE contact_id = ?"
-const removeContactProfileShowcaseAssetQuery = "DELETE FROM profile_showcase_assets_contacts WHERE contact_id = ?"
+const upsertContactProfileShowcaseVerifiedTokenQuery = "INSERT OR REPLACE INTO profile_showcase_verified_tokens_contacts(contact_id, symbol, sort_order) VALUES (?, ?, ?)" // #nosec G101
+const selectContactProfileShowcaseVerifiedTokenQuery = "SELECT symbol, sort_order FROM profile_showcase_verified_tokens_contacts WHERE contact_id = ?"                     // #nosec G101
+const removeContactProfileShowcaseVerifiedTokenQuery = "DELETE FROM profile_showcase_verified_tokens_contacts WHERE contact_id = ?"                                        // #nosec G101
+
+const upsertContactProfileShowcaseUnverifiedTokenQuery = "INSERT OR REPLACE INTO profile_showcase_unverified_tokens_contacts(contact_id, contract_address, chain_id, community_id, sort_order) VALUES (?, ?, ?, ?, ?)" // #nosec G101
+const selectContactProfileShowcaseUnverifiedTokenQuery = "SELECT contract_address, chain_id, community_id, sort_order FROM profile_showcase_unverified_tokens_contacts WHERE contact_id = ?"                           // #nosec G101
+const removeContactProfileShowcaseUnverifiedTokenQuery = "DELETE FROM profile_showcase_unverified_tokens_contacts WHERE contact_id = ?"                                                                                // #nosec G101
 
 type ProfileShowcaseCommunityPreference struct {
 	CommunityID        string                    `json:"communityId"`
@@ -58,22 +65,35 @@ type ProfileShowcaseAccountPreference struct {
 }
 
 type ProfileShowcaseCollectiblePreference struct {
-	UID                string                    `json:"uid"`
+	ContractAddress    string                    `json:"contractAddress"`
+	ChainID            uint64                    `json:"chainId"`
+	TokenID            string                    `json:"tokenId"`
+	CommunityID        string                    `json:"communityId"`
+	AccountAddress     string                    `json:"accountAddress"`
 	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
 	Order              int                       `json:"order"`
 }
 
-type ProfileShowcaseAssetPreference struct {
+type ProfileShowcaseVerifiedTokenPreference struct {
 	Symbol             string                    `json:"symbol"`
 	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
 	Order              int                       `json:"order"`
 }
 
+type ProfileShowcaseUnverifiedTokenPreference struct {
+	ContractAddress    string                    `json:"contractAddress"`
+	ChainID            uint64                    `json:"chainId"`
+	CommunityID        string                    `json:"communityId"`
+	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
+	Order              int                       `json:"order"`
+}
+
 type ProfileShowcasePreferences struct {
-	Communities  []*ProfileShowcaseCommunityPreference   `json:"communities"`
-	Accounts     []*ProfileShowcaseAccountPreference     `json:"accounts"`
-	Collectibles []*ProfileShowcaseCollectiblePreference `json:"collectibles"`
-	Assets       []*ProfileShowcaseAssetPreference       `json:"assets"`
+	Communities      []*ProfileShowcaseCommunityPreference       `json:"communities"`
+	Accounts         []*ProfileShowcaseAccountPreference         `json:"accounts"`
+	Collectibles     []*ProfileShowcaseCollectiblePreference     `json:"collectibles"`
+	VerifiedTokens   []*ProfileShowcaseVerifiedTokenPreference   `json:"verifiedTokens"`
+	UnverifiedTokens []*ProfileShowcaseUnverifiedTokenPreference `json:"unverifiedTokens"`
 }
 
 type ProfileShowcaseCommunity struct {
@@ -90,21 +110,33 @@ type ProfileShowcaseAccount struct {
 }
 
 type ProfileShowcaseCollectible struct {
-	UID   string `json:"uid"`
-	Order int    `json:"order"`
+	ContractAddress string `json:"contractAddress"`
+	ChainID         uint64 `json:"chainId"`
+	TokenID         string `json:"tokenId"`
+	CommunityID     string `json:"communityId"`
+	AccountAddress  string `json:"accountAddress"`
+	Order           int    `json:"order"`
 }
 
-type ProfileShowcaseAsset struct {
+type ProfileShowcaseVerifiedToken struct {
 	Symbol string `json:"symbol"`
 	Order  int    `json:"order"`
 }
 
+type ProfileShowcaseUnverifiedToken struct {
+	ContractAddress string `json:"contractAddress"`
+	ChainID         uint64 `json:"chainId"`
+	CommunityID     string `json:"communityId"`
+	Order           int    `json:"order"`
+}
+
 type ProfileShowcase struct {
-	ContactID    string                        `json:"contactId"`
-	Communities  []*ProfileShowcaseCommunity   `json:"communities"`
-	Accounts     []*ProfileShowcaseAccount     `json:"accounts"`
-	Collectibles []*ProfileShowcaseCollectible `json:"collectibles"`
-	Assets       []*ProfileShowcaseAsset       `json:"assets"`
+	ContactID        string                            `json:"contactId"`
+	Communities      []*ProfileShowcaseCommunity       `json:"communities"`
+	Accounts         []*ProfileShowcaseAccount         `json:"accounts"`
+	Collectibles     []*ProfileShowcaseCollectible     `json:"collectibles"`
+	VerifiedTokens   []*ProfileShowcaseVerifiedToken   `json:"verifiedTokens"`
+	UnverifiedTokens []*ProfileShowcaseUnverifiedToken `json:"unverifiedTokens"`
 }
 
 // Queries for showcase preferences
@@ -188,7 +220,11 @@ func (db sqlitePersistence) getProfileShowcaseAccountsPreferences(tx *sql.Tx) ([
 
 func (db sqlitePersistence) saveProfileShowcaseCollectiblePreference(tx *sql.Tx, collectible *ProfileShowcaseCollectiblePreference) error {
 	_, err := tx.Exec(upsertProfileShowcaseCollectiblePreferenceQuery,
-		collectible.UID,
+		collectible.ContractAddress,
+		collectible.ChainID,
+		collectible.TokenID,
+		collectible.CommunityID,
+		collectible.AccountAddress,
 		collectible.ShowcaseVisibility,
 		collectible.Order,
 	)
@@ -208,7 +244,11 @@ func (db sqlitePersistence) getProfileShowcaseCollectiblesPreferences(tx *sql.Tx
 		collectible := &ProfileShowcaseCollectiblePreference{}
 
 		err := rows.Scan(
-			&collectible.UID,
+			&collectible.ContractAddress,
+			&collectible.ChainID,
+			&collectible.TokenID,
+			&collectible.CommunityID,
+			&collectible.AccountAddress,
 			&collectible.ShowcaseVisibility,
 			&collectible.Order,
 		)
@@ -222,40 +262,80 @@ func (db sqlitePersistence) getProfileShowcaseCollectiblesPreferences(tx *sql.Tx
 	return collectibles, nil
 }
 
-func (db sqlitePersistence) saveProfileShowcaseAssetPreference(tx *sql.Tx, asset *ProfileShowcaseAssetPreference) error {
-	_, err := tx.Exec(upsertProfileShowcaseAssetPreferenceQuery,
-		asset.Symbol,
-		asset.ShowcaseVisibility,
-		asset.Order,
+func (db sqlitePersistence) saveProfileShowcaseVerifiedTokenPreference(tx *sql.Tx, token *ProfileShowcaseVerifiedTokenPreference) error {
+	_, err := tx.Exec(upsertProfileShowcaseVerifiedTokenPreferenceQuery,
+		token.Symbol,
+		token.ShowcaseVisibility,
+		token.Order,
 	)
 
 	return err
 }
 
-func (db sqlitePersistence) getProfileShowcaseAssetsPreferences(tx *sql.Tx) ([]*ProfileShowcaseAssetPreference, error) {
-	rows, err := tx.Query(selectProfileShowcaseAssetPreferenceQuery)
+func (db sqlitePersistence) saveProfileShowcaseUnverifiedTokenPreference(tx *sql.Tx, token *ProfileShowcaseUnverifiedTokenPreference) error {
+	_, err := tx.Exec(upsertProfileShowcaseUnverifiedTokenPreferenceQuery,
+		token.ContractAddress,
+		token.ChainID,
+		token.CommunityID,
+		token.ShowcaseVisibility,
+		token.Order,
+	)
+
+	return err
+}
+
+func (db sqlitePersistence) getProfileShowcaseVerifiedTokensPreferences(tx *sql.Tx) ([]*ProfileShowcaseVerifiedTokenPreference, error) {
+	rows, err := tx.Query(selectProfileShowcaseVerifiedTokenPreferenceQuery)
 	if err != nil {
 		return nil, err
 	}
 
-	assets := []*ProfileShowcaseAssetPreference{}
+	tokens := []*ProfileShowcaseVerifiedTokenPreference{}
 
 	for rows.Next() {
-		asset := &ProfileShowcaseAssetPreference{}
+		token := &ProfileShowcaseVerifiedTokenPreference{}
 
 		err := rows.Scan(
-			&asset.Symbol,
-			&asset.ShowcaseVisibility,
-			&asset.Order,
+			&token.Symbol,
+			&token.ShowcaseVisibility,
+			&token.Order,
 		)
 
 		if err != nil {
 			return nil, err
 		}
 
-		assets = append(assets, asset)
+		tokens = append(tokens, token)
 	}
-	return assets, nil
+	return tokens, nil
+}
+
+func (db sqlitePersistence) getProfileShowcaseUnverifiedTokensPreferences(tx *sql.Tx) ([]*ProfileShowcaseUnverifiedTokenPreference, error) {
+	rows, err := tx.Query(selectProfileShowcaseUnverifiedTokenPreferenceQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	tokens := []*ProfileShowcaseUnverifiedTokenPreference{}
+
+	for rows.Next() {
+		token := &ProfileShowcaseUnverifiedTokenPreference{}
+
+		err := rows.Scan(
+			&token.ContractAddress,
+			&token.ChainID,
+			&token.CommunityID,
+			&token.ShowcaseVisibility,
+			&token.Order,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		tokens = append(tokens, token)
+	}
+	return tokens, nil
 }
 
 // Queries for contacts showcase
@@ -338,11 +418,15 @@ func (db sqlitePersistence) clearProfileShowcaseAccountsContact(tx *sql.Tx, cont
 	return err
 }
 
-func (db sqlitePersistence) saveProfileShowcaseCollectibleContact(tx *sql.Tx, contactID string, community *ProfileShowcaseCollectible) error {
+func (db sqlitePersistence) saveProfileShowcaseCollectibleContact(tx *sql.Tx, contactID string, collectible *ProfileShowcaseCollectible) error {
 	_, err := tx.Exec(upsertContactProfileShowcaseCollectibleQuery,
 		contactID,
-		community.UID,
-		community.Order,
+		collectible.ContractAddress,
+		collectible.ChainID,
+		collectible.TokenID,
+		collectible.CommunityID,
+		collectible.AccountAddress,
+		collectible.Order,
 	)
 
 	return err
@@ -359,7 +443,13 @@ func (db sqlitePersistence) getProfileShowcaseCollectiblesContact(tx *sql.Tx, co
 	for rows.Next() {
 		collectible := &ProfileShowcaseCollectible{}
 
-		err := rows.Scan(&collectible.UID, &collectible.Order)
+		err := rows.Scan(
+			&collectible.ContractAddress,
+			&collectible.ChainID,
+			&collectible.TokenID,
+			&collectible.CommunityID,
+			&collectible.AccountAddress,
+			&collectible.Order)
 		if err != nil {
 			return nil, err
 		}
@@ -374,39 +464,83 @@ func (db sqlitePersistence) clearProfileShowcaseCollectiblesContact(tx *sql.Tx, 
 	return err
 }
 
-func (db sqlitePersistence) saveProfileShowcaseAssetContact(tx *sql.Tx, contactID string, asset *ProfileShowcaseAsset) error {
-	_, err := tx.Exec(upsertContactProfileShowcaseAssetQuery,
+func (db sqlitePersistence) saveProfileShowcaseVerifiedTokenContact(tx *sql.Tx, contactID string, token *ProfileShowcaseVerifiedToken) error {
+	_, err := tx.Exec(upsertContactProfileShowcaseVerifiedTokenQuery,
 		contactID,
-		asset.Symbol,
-		asset.Order,
+		token.Symbol,
+		token.Order,
 	)
 
 	return err
 }
 
-func (db sqlitePersistence) getProfileShowcaseAssetsContact(tx *sql.Tx, contactID string) ([]*ProfileShowcaseAsset, error) {
-	rows, err := tx.Query(selectContactProfileShowcaseAssetQuery, contactID)
+func (db sqlitePersistence) saveProfileShowcaseUnverifiedTokenContact(tx *sql.Tx, contactID string, token *ProfileShowcaseUnverifiedToken) error {
+	_, err := tx.Exec(upsertContactProfileShowcaseUnverifiedTokenQuery,
+		contactID,
+		token.ContractAddress,
+		token.ChainID,
+		token.CommunityID,
+		token.Order,
+	)
+
+	return err
+}
+
+func (db sqlitePersistence) getProfileShowcaseVerifiedTokensContact(tx *sql.Tx, contactID string) ([]*ProfileShowcaseVerifiedToken, error) {
+	rows, err := tx.Query(selectContactProfileShowcaseVerifiedTokenQuery, contactID)
 	if err != nil {
 		return nil, err
 	}
 
-	assets := []*ProfileShowcaseAsset{}
+	tokens := []*ProfileShowcaseVerifiedToken{}
 
 	for rows.Next() {
-		asset := &ProfileShowcaseAsset{}
+		token := &ProfileShowcaseVerifiedToken{}
 
-		err := rows.Scan(&asset.Symbol, &asset.Order)
+		err := rows.Scan(
+			&token.Symbol,
+			&token.Order)
 		if err != nil {
 			return nil, err
 		}
 
-		assets = append(assets, asset)
+		tokens = append(tokens, token)
 	}
-	return assets, nil
+	return tokens, nil
 }
 
-func (db sqlitePersistence) clearProfileShowcaseAssetsContact(tx *sql.Tx, contactID string) error {
-	_, err := tx.Exec(removeContactProfileShowcaseAssetQuery, contactID)
+func (db sqlitePersistence) getProfileShowcaseUnverifiedTokensContact(tx *sql.Tx, contactID string) ([]*ProfileShowcaseUnverifiedToken, error) {
+	rows, err := tx.Query(selectContactProfileShowcaseUnverifiedTokenQuery, contactID)
+	if err != nil {
+		return nil, err
+	}
+
+	tokens := []*ProfileShowcaseUnverifiedToken{}
+
+	for rows.Next() {
+		token := &ProfileShowcaseUnverifiedToken{}
+
+		err := rows.Scan(
+			&token.ContractAddress,
+			&token.ChainID,
+			&token.CommunityID,
+			&token.Order)
+		if err != nil {
+			return nil, err
+		}
+
+		tokens = append(tokens, token)
+	}
+	return tokens, nil
+}
+
+func (db sqlitePersistence) clearProfileShowcaseVerifiedTokensContact(tx *sql.Tx, contactID string) error {
+	_, err := tx.Exec(removeContactProfileShowcaseVerifiedTokenQuery, contactID)
+	return err
+}
+
+func (db sqlitePersistence) clearProfileShowcaseUnverifiedTokensContact(tx *sql.Tx, contactID string) error {
+	_, err := tx.Exec(removeContactProfileShowcaseUnverifiedTokenQuery, contactID)
 	return err
 }
 
@@ -446,8 +580,15 @@ func (db sqlitePersistence) SaveProfileShowcasePreferences(preferences *ProfileS
 		}
 	}
 
-	for _, asset := range preferences.Assets {
-		err = db.saveProfileShowcaseAssetPreference(tx, asset)
+	for _, token := range preferences.VerifiedTokens {
+		err = db.saveProfileShowcaseVerifiedTokenPreference(tx, token)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, token := range preferences.UnverifiedTokens {
+		err = db.saveProfileShowcaseUnverifiedTokenPreference(tx, token)
 		if err != nil {
 			return err
 		}
@@ -485,16 +626,22 @@ func (db sqlitePersistence) GetProfileShowcasePreferences() (*ProfileShowcasePre
 		return nil, err
 	}
 
-	assets, err := db.getProfileShowcaseAssetsPreferences(tx)
+	verifiedTokens, err := db.getProfileShowcaseVerifiedTokensPreferences(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	unverifiedTokens, err := db.getProfileShowcaseUnverifiedTokensPreferences(tx)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ProfileShowcasePreferences{
-		Communities:  communities,
-		Accounts:     accounts,
-		Collectibles: collectibles,
-		Assets:       assets,
+		Communities:      communities,
+		Accounts:         accounts,
+		Collectibles:     collectibles,
+		VerifiedTokens:   verifiedTokens,
+		UnverifiedTokens: unverifiedTokens,
 	}, nil
 }
 
@@ -533,8 +680,15 @@ func (db sqlitePersistence) SaveProfileShowcaseForContact(showcase *ProfileShowc
 		}
 	}
 
-	for _, asset := range showcase.Assets {
-		err = db.saveProfileShowcaseAssetContact(tx, showcase.ContactID, asset)
+	for _, token := range showcase.VerifiedTokens {
+		err = db.saveProfileShowcaseVerifiedTokenContact(tx, showcase.ContactID, token)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, token := range showcase.UnverifiedTokens {
+		err = db.saveProfileShowcaseUnverifiedTokenContact(tx, showcase.ContactID, token)
 		if err != nil {
 			return err
 		}
@@ -572,17 +726,23 @@ func (db sqlitePersistence) GetProfileShowcaseForContact(contactID string) (*Pro
 		return nil, err
 	}
 
-	assets, err := db.getProfileShowcaseAssetsContact(tx, contactID)
+	verifiedTokens, err := db.getProfileShowcaseVerifiedTokensContact(tx, contactID)
+	if err != nil {
+		return nil, err
+	}
+
+	unverifiedTokens, err := db.getProfileShowcaseUnverifiedTokensContact(tx, contactID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ProfileShowcase{
-		ContactID:    contactID,
-		Communities:  communities,
-		Accounts:     accounts,
-		Collectibles: collectibles,
-		Assets:       assets,
+		ContactID:        contactID,
+		Communities:      communities,
+		Accounts:         accounts,
+		Collectibles:     collectibles,
+		VerifiedTokens:   verifiedTokens,
+		UnverifiedTokens: unverifiedTokens,
 	}, nil
 }
 
@@ -615,7 +775,12 @@ func (db sqlitePersistence) ClearProfileShowcaseForContact(contactID string) err
 		return err
 	}
 
-	err = db.clearProfileShowcaseAssetsContact(tx, contactID)
+	err = db.clearProfileShowcaseVerifiedTokensContact(tx, contactID)
+	if err != nil {
+		return err
+	}
+
+	err = db.clearProfileShowcaseUnverifiedTokensContact(tx, contactID)
 	if err != nil {
 		return err
 	}

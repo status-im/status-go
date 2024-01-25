@@ -17,20 +17,33 @@ message ProfileShowcaseAccount {
 }
 
 message ProfileShowcaseCollectible {
-  string uid = 1;
+  string uid = 1 [deprecated = true];
+  uint32 order = 2;
+  string contract_address = 3;
+  string community_id = 4;
+  uint64 chain_id = 5;
+  string token_id = 6;
+  string account_address = 7;
+}
+
+message ProfileShowcaseVerifiedToken {
+  string symbol = 1;
   uint32 order = 2;
 }
 
-message ProfileShowcaseAsset {
-  string symbol = 1;
+message ProfileShowcaseUnverifiedToken {
+  string contract_address = 1;
   uint32 order = 2;
+  uint64 chain_id = 3;
+  string community_id = 4;
 }
 
 message ProfileShowcaseEntries {
   repeated ProfileShowcaseCommunity communities = 1;
   repeated ProfileShowcaseAccount accounts = 2;
   repeated ProfileShowcaseCollectible collectibles = 3;
-  repeated ProfileShowcaseAsset assets = 4;
+  repeated ProfileShowcaseVerifiedToken verifiedTokens = 4;
+  repeated ProfileShowcaseUnverifiedToken unverifiedTokens = 5;
 }
 
 message ProfileShowcaseEntriesEncrypted {

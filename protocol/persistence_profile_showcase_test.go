@@ -45,21 +45,48 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 				Order:              1,
 			},
 		},
-		Assets: []*ProfileShowcaseAssetPreference{
-			&ProfileShowcaseAssetPreference{
-				Symbol:             "ETH",
+		Collectibles: []*ProfileShowcaseCollectiblePreference{
+			&ProfileShowcaseCollectiblePreference{
+				ContractAddress:    "0x12378534257568678487683576",
+				ChainID:            3,
+				TokenID:            "0x12321389592999f903",
+				CommunityID:        "0x01312357798976535",
+				AccountAddress:     "0x32433445133424",
 				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
-			&ProfileShowcaseAssetPreference{
+		},
+		VerifiedTokens: []*ProfileShowcaseVerifiedTokenPreference{
+			&ProfileShowcaseVerifiedTokenPreference{
+				Symbol:             "ETH",
+				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				Order:              1,
+			},
+			&ProfileShowcaseVerifiedTokenPreference{
 				Symbol:             "DAI",
 				ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
 				Order:              2,
 			},
-			&ProfileShowcaseAssetPreference{
+			&ProfileShowcaseVerifiedTokenPreference{
 				Symbol:             "SNT",
 				ShowcaseVisibility: ProfileShowcaseVisibilityNoOne,
 				Order:              3,
+			},
+		},
+		UnverifiedTokens: []*ProfileShowcaseUnverifiedTokenPreference{
+			&ProfileShowcaseUnverifiedTokenPreference{
+				ContractAddress:    "0x454525452023452",
+				ChainID:            1,
+				CommunityID:        "0x32433445133424",
+				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+			&ProfileShowcaseUnverifiedTokenPreference{
+				ContractAddress:    "0x12312323323233",
+				ChainID:            2,
+				CommunityID:        "",
+				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				Order:              1,
 			},
 		},
 	}
@@ -70,40 +97,30 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 	preferencesBack, err := persistence.GetProfileShowcasePreferences()
 	s.Require().NoError(err)
 
-	s.Require().Len(preferencesBack.Communities, 1)
-	s.Require().Equal(preferences.Communities[0].CommunityID, preferencesBack.Communities[0].CommunityID)
-	s.Require().Equal(preferences.Communities[0].ShowcaseVisibility, preferencesBack.Communities[0].ShowcaseVisibility)
-	s.Require().Equal(preferences.Communities[0].Order, preferencesBack.Communities[0].Order)
+	s.Require().Equal(len(preferencesBack.Communities), len(preferences.Communities))
+	for i := 0; i < len(preferences.Communities); i++ {
+		s.Require().Equal(*preferences.Communities[i], *preferencesBack.Communities[i])
+	}
 
-	s.Require().Len(preferencesBack.Accounts, 2)
-	s.Require().Equal(preferences.Accounts[0].Address, preferencesBack.Accounts[0].Address)
-	s.Require().Equal(preferences.Accounts[0].Name, preferencesBack.Accounts[0].Name)
-	s.Require().Equal(preferences.Accounts[0].ColorID, preferencesBack.Accounts[0].ColorID)
-	s.Require().Equal(preferences.Accounts[0].Emoji, preferencesBack.Accounts[0].Emoji)
-	s.Require().Equal(preferences.Accounts[0].ShowcaseVisibility, preferencesBack.Accounts[0].ShowcaseVisibility)
-	s.Require().Equal(preferences.Accounts[0].Order, preferencesBack.Accounts[0].Order)
+	s.Require().Equal(len(preferencesBack.Accounts), len(preferences.Accounts))
+	for i := 0; i < len(preferences.Accounts); i++ {
+		s.Require().Equal(*preferences.Accounts[i], *preferencesBack.Accounts[i])
+	}
 
-	s.Require().Equal(preferences.Accounts[1].Address, preferencesBack.Accounts[1].Address)
-	s.Require().Equal(preferences.Accounts[1].Name, preferencesBack.Accounts[1].Name)
-	s.Require().Equal(preferences.Accounts[1].ColorID, preferencesBack.Accounts[1].ColorID)
-	s.Require().Equal(preferences.Accounts[1].Emoji, preferencesBack.Accounts[1].Emoji)
-	s.Require().Equal(preferences.Accounts[1].ShowcaseVisibility, preferencesBack.Accounts[1].ShowcaseVisibility)
-	s.Require().Equal(preferences.Accounts[1].Order, preferencesBack.Accounts[1].Order)
+	s.Require().Equal(len(preferencesBack.Collectibles), len(preferences.Collectibles))
+	for i := 0; i < len(preferences.Collectibles); i++ {
+		s.Require().Equal(*preferences.Collectibles[i], *preferencesBack.Collectibles[i])
+	}
 
-	s.Require().Len(preferencesBack.Collectibles, 0)
+	s.Require().Equal(len(preferencesBack.VerifiedTokens), len(preferences.VerifiedTokens))
+	for i := 0; i < len(preferences.VerifiedTokens); i++ {
+		s.Require().Equal(*preferences.VerifiedTokens[i], *preferencesBack.VerifiedTokens[i])
+	}
 
-	s.Require().Len(preferencesBack.Assets, 3)
-	s.Require().Equal(preferences.Assets[0].Symbol, preferencesBack.Assets[0].Symbol)
-	s.Require().Equal(preferences.Assets[0].ShowcaseVisibility, preferencesBack.Assets[0].ShowcaseVisibility)
-	s.Require().Equal(preferences.Assets[0].Order, preferencesBack.Assets[0].Order)
-
-	s.Require().Equal(preferences.Assets[1].Symbol, preferencesBack.Assets[1].Symbol)
-	s.Require().Equal(preferences.Assets[1].ShowcaseVisibility, preferencesBack.Assets[1].ShowcaseVisibility)
-	s.Require().Equal(preferences.Assets[1].Order, preferencesBack.Assets[1].Order)
-
-	s.Require().Equal(preferences.Assets[2].Symbol, preferencesBack.Assets[2].Symbol)
-	s.Require().Equal(preferences.Assets[2].ShowcaseVisibility, preferencesBack.Assets[2].ShowcaseVisibility)
-	s.Require().Equal(preferences.Assets[2].Order, preferencesBack.Assets[2].Order)
+	s.Require().Equal(len(preferencesBack.UnverifiedTokens), len(preferences.UnverifiedTokens))
+	for i := 0; i < len(preferences.UnverifiedTokens); i++ {
+		s.Require().Equal(*preferences.UnverifiedTokens[i], *preferencesBack.UnverifiedTokens[i])
+	}
 }
 
 func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
@@ -123,10 +140,57 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 				Order:       7,
 			},
 		},
-		Assets: []*ProfileShowcaseAsset{
-			&ProfileShowcaseAsset{
+		Accounts: []*ProfileShowcaseAccount{
+			&ProfileShowcaseAccount{
+				Address: "0x32433445133424",
+				Name:    "Status Account",
+				ColorID: "blue",
+				Emoji:   "-_-",
+				Order:   0,
+			},
+			&ProfileShowcaseAccount{
+				Address: "0x3845354643324",
+				Name:    "Money Box",
+				ColorID: "red",
+				Emoji:   ":o)",
+				Order:   1,
+			},
+		},
+		Collectibles: []*ProfileShowcaseCollectible{
+			&ProfileShowcaseCollectible{
+				ContractAddress: "0x12378534257568678487683576",
+				ChainID:         2,
+				TokenID:         "0x12321389592999f903",
+				CommunityID:     "0x01312357798976535",
+				Order:           0,
+			},
+		},
+		VerifiedTokens: []*ProfileShowcaseVerifiedToken{
+			&ProfileShowcaseVerifiedToken{
 				Symbol: "ETH",
 				Order:  1,
+			},
+			&ProfileShowcaseVerifiedToken{
+				Symbol: "DAI",
+				Order:  2,
+			},
+			&ProfileShowcaseVerifiedToken{
+				Symbol: "SNT",
+				Order:  3,
+			},
+		},
+		UnverifiedTokens: []*ProfileShowcaseUnverifiedToken{
+			&ProfileShowcaseUnverifiedToken{
+				ContractAddress: "0x454525452023452",
+				ChainID:         1,
+				CommunityID:     "",
+				Order:           0,
+			},
+			&ProfileShowcaseUnverifiedToken{
+				ContractAddress: "0x12312323323233",
+				ChainID:         2,
+				CommunityID:     "0x32433445133424",
+				Order:           1,
 			},
 		},
 	}
@@ -147,8 +211,11 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 		},
 		Collectibles: []*ProfileShowcaseCollectible{
 			&ProfileShowcaseCollectible{
-				UID:   "d378662f-3d71-44e0-81ee-ff7f1778c13a",
-				Order: 1,
+				ContractAddress: "0x12378534257568678487683576",
+				ChainID:         2,
+				TokenID:         "0x12321389592999f903",
+				CommunityID:     "0x01312357798976535",
+				Order:           1,
 			},
 		},
 	}
@@ -159,12 +226,25 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 	s.Require().NoError(err)
 
 	s.Require().Equal(len(showcase1.Communities), len(showcase1Back.Communities))
-	s.Require().Equal(*showcase1.Communities[0], *showcase1Back.Communities[0])
-	s.Require().Equal(*showcase1.Communities[1], *showcase1Back.Communities[1])
-	s.Require().Equal(len(showcase1.Assets), len(showcase1Back.Assets))
-	s.Require().Equal(*showcase1.Assets[0], *showcase1Back.Assets[0])
-	s.Require().Equal(0, len(showcase1Back.Accounts))
-	s.Require().Equal(0, len(showcase1Back.Collectibles))
+	for i := 0; i < len(showcase1.Communities); i++ {
+		s.Require().Equal(*showcase1.Communities[i], *showcase1Back.Communities[i])
+	}
+	s.Require().Equal(len(showcase1.Accounts), len(showcase1Back.Accounts))
+	for i := 0; i < len(showcase1.Accounts); i++ {
+		s.Require().Equal(*showcase1.Accounts[i], *showcase1Back.Accounts[i])
+	}
+	s.Require().Equal(len(showcase1.Collectibles), len(showcase1Back.Collectibles))
+	for i := 0; i < len(showcase1.Collectibles); i++ {
+		s.Require().Equal(*showcase1.Collectibles[i], *showcase1Back.Collectibles[i])
+	}
+	s.Require().Equal(len(showcase1.VerifiedTokens), len(showcase1Back.VerifiedTokens))
+	for i := 0; i < len(showcase1.VerifiedTokens); i++ {
+		s.Require().Equal(*showcase1.VerifiedTokens[i], *showcase1Back.VerifiedTokens[i])
+	}
+	s.Require().Equal(len(showcase1.UnverifiedTokens), len(showcase1Back.UnverifiedTokens))
+	for i := 0; i < len(showcase1.UnverifiedTokens); i++ {
+		s.Require().Equal(*showcase1.UnverifiedTokens[i], *showcase1Back.UnverifiedTokens[i])
+	}
 
 	showcase2Back, err := persistence.GetProfileShowcaseForContact("contact_2")
 	s.Require().NoError(err)
@@ -175,5 +255,6 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 	s.Require().Equal(len(showcase2.Collectibles), len(showcase2Back.Collectibles))
 	s.Require().Equal(*showcase2.Collectibles[0], *showcase2Back.Collectibles[0])
 	s.Require().Equal(0, len(showcase2Back.Accounts))
-	s.Require().Equal(0, len(showcase2Back.Assets))
+	s.Require().Equal(0, len(showcase2Back.VerifiedTokens))
+	s.Require().Equal(0, len(showcase2Back.UnverifiedTokens))
 }
