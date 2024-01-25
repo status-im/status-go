@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity"
 
 	"github.com/stretchr/testify/suite"
@@ -863,7 +864,25 @@ func (s *MessengerBackupSuite) TestBackupChats() {
 	// Create bob1
 	bob1 := s.m
 
-	response, err := bob1.CreateGroupChatWithMembers(context.Background(), "group", []string{})
+	alice := s.newMessenger()
+	_, err := alice.Start()
+	s.Require().NoError(err)
+	defer TearDownMessenger(&s.Suite, alice)
+
+	ted := s.newMessenger()
+	_, err = ted.Start()
+	s.Require().NoError(err)
+	s.Require().NoError(makeMutualContact(bob1, &ted.identity.PublicKey))
+	defer TearDownMessenger(&s.Suite, ted)
+
+	carol := s.newMessenger()
+	_, err = carol.Start()
+	s.Require().NoError(err)
+	s.Require().NoError(makeMutualContact(bob1, &carol.identity.PublicKey))
+	defer TearDownMessenger(&s.Suite, carol)
+
+	members := []string{common.PubkeyToHex(&ted.identity.PublicKey), common.PubkeyToHex(&carol.identity.PublicKey)}
+	response, err := bob1.CreateGroupChatWithMembers(context.Background(), "group", members)
 	s.NoError(err)
 	s.Require().Len(response.Chats(), 1)
 
@@ -871,11 +890,6 @@ func (s *MessengerBackupSuite) TestBackupChats() {
 
 	err = bob1.SaveChat(ourGroupChat)
 	s.NoError(err)
-
-	alice := s.newMessenger()
-	_, err = alice.Start()
-	s.Require().NoError(err)
-	defer TearDownMessenger(&s.Suite, alice)
 
 	ourOneOneChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.transport)
 	err = bob1.SaveChat(ourOneOneChat)
@@ -907,10 +921,12 @@ func (s *MessengerBackupSuite) TestBackupChats() {
 	chat, ok := response.chats[ourGroupChat.ID]
 	s.Require().True(ok)
 	s.Require().Equal(ourGroupChat.Name, chat.Name)
+	s.Require().Equal(ourGroupChat.Members, chat.Members)
 	// Check stored chats
 	chat, ok = bob2.allChats.Load(ourGroupChat.ID)
 	s.Require().True(ok)
 	s.Require().Equal(ourGroupChat.Name, chat.Name)
+	s.Require().Equal(ourGroupChat.Members, chat.Members)
 
 	// -- One to One chat
 	// Check response
