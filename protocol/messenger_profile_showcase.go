@@ -217,6 +217,10 @@ func (m *Messenger) GetProfileShowcaseForContact(contactID string) (*ProfileShow
 	return m.persistence.GetProfileShowcaseForContact(contactID)
 }
 
+func (m *Messenger) GetProfileShowcaseAccountsByAddress(address string) ([]*ProfileShowcaseAccount, error) {
+	return m.persistence.GetProfileShowcaseAccountsByAddress(address)
+}
+
 func (m *Messenger) EncryptProfileShowcaseEntriesWithContactPubKeys(entries *protobuf.ProfileShowcaseEntries, contacts []*Contact) (*protobuf.ProfileShowcaseEntriesEncrypted, error) {
 	// Make AES key
 	AESKey := make([]byte, 32)

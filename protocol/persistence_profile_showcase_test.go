@@ -142,18 +142,20 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 		},
 		Accounts: []*ProfileShowcaseAccount{
 			&ProfileShowcaseAccount{
-				Address: "0x32433445133424",
-				Name:    "Status Account",
-				ColorID: "blue",
-				Emoji:   "-_-",
-				Order:   0,
+				ContactID: "contact_1",
+				Address:   "0x32433445133424",
+				Name:      "Status Account",
+				ColorID:   "blue",
+				Emoji:     "-_-",
+				Order:     0,
 			},
 			&ProfileShowcaseAccount{
-				Address: "0x3845354643324",
-				Name:    "Money Box",
-				ColorID: "red",
-				Emoji:   ":o)",
-				Order:   1,
+				ContactID: "contact_1",
+				Address:   "0x3845354643324",
+				Name:      "Money Box",
+				ColorID:   "red",
+				Emoji:     ":o)",
+				Order:     1,
 			},
 		},
 		Collectibles: []*ProfileShowcaseCollectible{
@@ -257,4 +259,118 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 	s.Require().Equal(0, len(showcase2Back.Accounts))
 	s.Require().Equal(0, len(showcase2Back.VerifiedTokens))
 	s.Require().Equal(0, len(showcase2Back.UnverifiedTokens))
+}
+
+func (s *TestProfileShowcasePersistence) TestFetchingProfileShowcaseAccountsByAddress() {
+	db, err := openTestDB()
+	s.Require().NoError(err)
+	persistence := newSQLitePersistence(db)
+
+	conatacts := []*Contact{
+		&Contact{
+			ID: "contact_1",
+		},
+		&Contact{
+			ID: "contact_2",
+		},
+		&Contact{
+			ID: "contact_3",
+		},
+	}
+
+	err = persistence.SaveContacts(conatacts)
+	s.Require().NoError(err)
+
+	showcase1 := &ProfileShowcase{
+		ContactID: "contact_1",
+		Accounts: []*ProfileShowcaseAccount{
+			&ProfileShowcaseAccount{
+				ContactID: "contact_1",
+				Address:   "0x0000000000000000000000000000000000000001",
+				Name:      "Contact1-Account1",
+				ColorID:   "blue",
+				Emoji:     "-_-",
+				Order:     0,
+			},
+			&ProfileShowcaseAccount{
+				ContactID: "contact_1",
+				Address:   "0x0000000000000000000000000000000000000002",
+				Name:      "Contact1-Account2",
+				ColorID:   "blue",
+				Emoji:     "-_-",
+				Order:     1,
+			},
+		},
+	}
+	showcase2 := &ProfileShowcase{
+		ContactID: "contact_2",
+		Accounts: []*ProfileShowcaseAccount{
+			&ProfileShowcaseAccount{
+				ContactID: "contact_2",
+				Address:   "0x0000000000000000000000000000000000000001",
+				Name:      "Contact2-Account1",
+				ColorID:   "blue",
+				Emoji:     "-_-",
+				Order:     0,
+			},
+			&ProfileShowcaseAccount{
+				ContactID: "contact_2",
+				Address:   "0x0000000000000000000000000000000000000002",
+				Name:      "Contact2-Account2",
+				ColorID:   "blue",
+				Emoji:     "-_-",
+				Order:     1,
+			},
+		},
+	}
+	showcase3 := &ProfileShowcase{
+		ContactID: "contact_3",
+		Accounts: []*ProfileShowcaseAccount{
+			&ProfileShowcaseAccount{
+				ContactID: "contact_3",
+				Address:   "0x0000000000000000000000000000000000000001",
+				Name:      "Contact3-Account1",
+				ColorID:   "blue",
+				Emoji:     "-_-",
+				Order:     0,
+			},
+		},
+	}
+
+	err = persistence.SaveProfileShowcaseForContact(showcase1)
+	s.Require().NoError(err)
+	err = persistence.SaveProfileShowcaseForContact(showcase2)
+	s.Require().NoError(err)
+	err = persistence.SaveProfileShowcaseForContact(showcase3)
+	s.Require().NoError(err)
+
+	showcaseAccounts, err := persistence.GetProfileShowcaseAccountsByAddress(showcase1.Accounts[0].Address)
+	s.Require().NoError(err)
+
+	s.Require().Equal(3, len(showcaseAccounts))
+	for i := 0; i < len(showcaseAccounts); i++ {
+		if showcaseAccounts[i].ContactID == showcase1.ContactID {
+			s.Require().Equal(showcase1.Accounts[0].Address, showcase1.Accounts[0].Address)
+		} else if showcaseAccounts[i].ContactID == showcase2.ContactID {
+			s.Require().Equal(showcase2.Accounts[0].Address, showcase2.Accounts[0].Address)
+		} else if showcaseAccounts[i].ContactID == showcase3.ContactID {
+			s.Require().Equal(showcase3.Accounts[0].Address, showcase3.Accounts[0].Address)
+		} else {
+			s.Require().Fail("unexpected contact id")
+		}
+	}
+
+	showcaseAccounts, err = persistence.GetProfileShowcaseAccountsByAddress(showcase1.Accounts[1].Address)
+	s.Require().NoError(err)
+
+	s.Require().Equal(2, len(showcaseAccounts))
+	for i := 0; i < len(showcaseAccounts); i++ {
+		if showcaseAccounts[i].ContactID == showcase1.ContactID {
+			s.Require().Equal(showcase1.Accounts[0].Address, showcase1.Accounts[0].Address)
+		} else if showcaseAccounts[i].ContactID == showcase2.ContactID {
+			s.Require().Equal(showcase2.Accounts[0].Address, showcase2.Accounts[0].Address)
+		} else {
+			s.Require().Fail("unexpected contact id")
+		}
+	}
 }

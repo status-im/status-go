@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"database/sql"
+	"errors"
 )
 
 type ProfileShowcaseVisibility int
@@ -34,8 +35,8 @@ const selectContactProfileShowcaseCommunityQuery = "SELECT community_id, sort_or
 const removeContactProfileShowcaseCommunityQuery = "DELETE FROM profile_showcase_communities_contacts WHERE contact_id = ?"                                              // #nosec G101
 
 const upsertContactProfileShowcaseAccountQuery = "INSERT OR REPLACE INTO profile_showcase_accounts_contacts(contact_id, address, name, color_id, emoji, sort_order) VALUES (?, ?, ?, ?, ?, ?)" // #nosec G101
-const selectContactProfileShowcaseAccountQuery = "SELECT address, name, color_id, emoji, sort_order FROM profile_showcase_accounts_contacts WHERE contact_id = ?"                              // #nosec G101
-const removeContactProfileShowcaseAccountQuery = "DELETE FROM profile_showcase_accounts_contacts WHERE contact_id = ?"
+const selectContactProfileShowcaseAccountQuery = "SELECT * FROM profile_showcase_accounts_contacts WHERE contact_id = ?"                                                                       // #nosec G101
+const removeContactProfileShowcaseAccountQuery = "DELETE FROM profile_showcase_accounts_contacts WHERE contact_id = ?"                                                                         // #nosec G101
 
 const upsertContactProfileShowcaseCollectibleQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_contacts(contact_id, contract_address, chain_id, token_id, community_id, account_address, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)" // #nosec G101
 const selectContactProfileShowcaseCollectibleQuery = "SELECT contract_address, chain_id, token_id, community_id, account_address, sort_order FROM profile_showcase_collectibles_contacts WHERE contact_id = ?"                                 // #nosec G101
@@ -48,6 +49,18 @@ const removeContactProfileShowcaseVerifiedTokenQuery = "DELETE FROM profile_show
 const upsertContactProfileShowcaseUnverifiedTokenQuery = "INSERT OR REPLACE INTO profile_showcase_unverified_tokens_contacts(contact_id, contract_address, chain_id, community_id, sort_order) VALUES (?, ?, ?, ?, ?)" // #nosec G101
 const selectContactProfileShowcaseUnverifiedTokenQuery = "SELECT contract_address, chain_id, community_id, sort_order FROM profile_showcase_unverified_tokens_contacts WHERE contact_id = ?"                           // #nosec G101
 const removeContactProfileShowcaseUnverifiedTokenQuery = "DELETE FROM profile_showcase_unverified_tokens_contacts WHERE contact_id = ?"                                                                                // #nosec G101
+
+const selectProfileShowcaseAccountsWhichMatchTheAddress = `
+SELECT psa.*
+FROM
+	contacts c
+LEFT JOIN
+	profile_showcase_accounts_contacts psa
+ON
+	c.id = psa.contact_id
+WHERE
+	psa.address = ?
+`
 
 type ProfileShowcaseCommunityPreference struct {
 	CommunityID        string                    `json:"communityId"`
@@ -102,11 +115,12 @@ type ProfileShowcaseCommunity struct {
 }
 
 type ProfileShowcaseAccount struct {
-	Address string `json:"address"`
-	Name    string `json:"name"`
-	ColorID string `json:"colorId"`
-	Emoji   string `json:"emoji"`
-	Order   int    `json:"order"`
+	ContactID string `json:"contactId"`
+	Address   string `json:"address"`
+	Name      string `json:"name"`
+	ColorID   string `json:"colorId"`
+	Emoji     string `json:"emoji"`
+	Order     int    `json:"order"`
 }
 
 type ProfileShowcaseCollectible struct {
@@ -392,25 +406,42 @@ func (db sqlitePersistence) saveProfileShowcaseAccountContact(tx *sql.Tx, contac
 	return err
 }
 
+func (db sqlitePersistence) processProfileShowcaseAccounts(rows *sql.Rows) (result []*ProfileShowcaseAccount, err error) {
+	if rows == nil {
+		return nil, errors.New("rows is nil")
+	}
+
+	for rows.Next() {
+		account := &ProfileShowcaseAccount{}
+
+		err = rows.Scan(&account.Address, &account.Name, &account.ColorID, &account.Emoji, &account.Order, &account.ContactID)
+		if err != nil {
+			return
+		}
+
+		result = append(result, account)
+	}
+
+	err = rows.Err()
+	return
+}
+
 func (db sqlitePersistence) getProfileShowcaseAccountsContact(tx *sql.Tx, contactID string) ([]*ProfileShowcaseAccount, error) {
 	rows, err := tx.Query(selectContactProfileShowcaseAccountQuery, contactID)
 	if err != nil {
 		return nil, err
 	}
 
-	accounts := []*ProfileShowcaseAccount{}
+	return db.processProfileShowcaseAccounts(rows)
+}
 
-	for rows.Next() {
-		account := &ProfileShowcaseAccount{}
-
-		err := rows.Scan(&account.Address, &account.Name, &account.ColorID, &account.Emoji, &account.Order)
-		if err != nil {
-			return nil, err
-		}
-
-		accounts = append(accounts, account)
+func (db sqlitePersistence) GetProfileShowcaseAccountsByAddress(address string) ([]*ProfileShowcaseAccount, error) {
+	rows, err := db.db.Query(selectProfileShowcaseAccountsWhichMatchTheAddress, address)
+	if err != nil {
+		return nil, err
 	}
-	return accounts, nil
+
+	return db.processProfileShowcaseAccounts(rows)
 }
 
 func (db sqlitePersistence) clearProfileShowcaseAccountsContact(tx *sql.Tx, contactID string) error {
