@@ -685,10 +685,11 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityEnvelopesOrder() {
 	s.createOwner()
 	s.createBob()
 
+	const descriptionsCount = 4
 	community := s.createCommunity(s.owner)
 
-	// Push 5 descriptions to the store node
-	for i := 0; i < 4; i++ {
+	// Push a few descriptions to the store node
+	for i := 0; i < descriptionsCount-1; i++ {
 		err := s.owner.publishOrg(community)
 		s.Require().NoError(err)
 	}
@@ -699,15 +700,17 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityEnvelopesOrder() {
 	contentTopic := wakuV2common.BytesToTopic(transport.ToTopic(community.IDString()))
 
 	var prevEnvelope *wakuV2common.ReceivedMessage
+	receivedEnvelopesCount := 0
 
 	s.setupEnvelopesWatcher(bobWakuV2, &contentTopic, func(envelope *wakuV2common.ReceivedMessage) {
 		// We check that each next envelope fetched is newer than the previous one
 		if prevEnvelope != nil {
-			s.Require().Greater(
+			s.Require().Less(
 				envelope.Envelope.Message().GetTimestamp(),
 				prevEnvelope.Envelope.Message().GetTimestamp())
 		}
 		prevEnvelope = envelope
+		receivedEnvelopesCount += 1
 	})
 
 	// Force a single-envelope page size to be able to check the order.
@@ -725,6 +728,9 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityEnvelopesOrder() {
 	fetchedCommunity, _, err := s.bob.storeNodeRequestsManager.FetchCommunity(community.CommunityShard(), options)
 	s.Require().NoError(err)
 	s.requireCommunitiesEqual(fetchedCommunity, community)
+
+	// Ensure all expected envelopes were received
+	s.Require().Equal(receivedEnvelopesCount, descriptionsCount)
 }
 
 /*
