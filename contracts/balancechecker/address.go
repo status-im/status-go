@@ -10,9 +10,14 @@ var errorNotAvailableOnChainID = errors.New("BalanceChecker not available for ch
 
 var contractDataByChainID = map[uint64]common.Address{
 	1:        common.HexToAddress("0x040EA8bFE441597849A9456182fa46D38B75BC05"), // mainnet
-	5:        common.HexToAddress("0xA5522A3194B78Dd231b64d0ccd6deA6156DCa7C8"), // goerli
 	10:       common.HexToAddress("0x55bD303eA3D50FC982A8a5b43972d7f38D129bbF"), // optimism
 	42161:    common.HexToAddress("0x55bD303eA3D50FC982A8a5b43972d7f38D129bbF"), // arbitrum
+	5:        common.HexToAddress("0xA5522A3194B78Dd231b64d0ccd6deA6156DCa7C8"), // goerli
+	421613:   common.HexToAddress("0x55bD303eA3D50FC982A8a5b43972d7f38D129bbF"), // goerli arbitrum
+	420:      common.HexToAddress("0x55bD303eA3D50FC982A8a5b43972d7f38D129bbF"), // goerli optimism
+	11155111: common.HexToAddress("0x55bD303eA3D50FC982A8a5b43972d7f38D129bbF"), // sepolia
+	421614:   common.HexToAddress("0x55bD303eA3D50FC982A8a5b43972d7f38D129bbF"), // sepolia arbitrum
+	11155420: common.HexToAddress("0x55bD303eA3D50FC982A8a5b43972d7f38D129bbF"), // sepolia optimism
 	777333:   common.HexToAddress("0x0000000000000000000000000000000010777333"), // unit tests
 }
 
