@@ -455,7 +455,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityPagingAlgorithm() {
 	// First we fetch a more up-to-date, but an invalid spam message, fail to decrypt it as community description,
 	// then we fetch another page of data and successfully decrypt a community description.
 	s.Require().Equal(spamAmount+1, stats.FetchedEnvelopesCount)
-	s.Require().Equal(2, stats.FetchedPagesCount) // TODO: revert to 3 when fixed: https://github.com/waku-org/nwaku/issues/2317
+	s.Require().Equal(3, stats.FetchedPagesCount)
 }
 
 func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityWithSameContentTopic() {
