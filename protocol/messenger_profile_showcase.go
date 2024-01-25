@@ -181,14 +181,14 @@ func Validate(preferences *ProfileShowcasePreferences) error {
 	}
 
 	for _, collectible := range preferences.Collectibles {
-		if account, ok := accountsMap[collectible.AccountAddress]; ok {
-			if account.ShowcaseVisibility < collectible.ShowcaseVisibility {
-				return errorAccountVisibilityLowerThanCollectible
-			}
-		} else {
+		account, ok := accountsMap[collectible.AccountAddress]
+		if !ok {
 			return nil
 			// NOTE: with current wallet collectible implementation we don't know account on this stage
 			// return errorNoAccountAddressForCollectible
+		}
+		if account.ShowcaseVisibility < collectible.ShowcaseVisibility {
+			return errorAccountVisibilityLowerThanCollectible
 		}
 	}
 
