@@ -1077,6 +1077,10 @@ func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 
 func (m *Manager) UpdateShard(community *Community, shard *shard.Shard, clock uint64) error {
 	community.config.Shard = shard
+	if shard == nil {
+		return m.persistence.DeleteCommunityShard(community.ID())
+	}
+
 	return m.persistence.SaveCommunityShard(community.ID(), shard, clock)
 }
 
@@ -1085,9 +1089,6 @@ func (m *Manager) SetShard(communityID types.HexBytes, shard *shard.Shard) (*Com
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
-	}
-	if !community.IsControlNode() {
-		return nil, errors.New("not admin or owner")
 	}
 
 	community.increaseClock()
@@ -1105,17 +1106,12 @@ func (m *Manager) SetShard(communityID types.HexBytes, shard *shard.Shard) (*Com
 	return community, nil
 }
 
-func (m *Manager) UpdatePubsubTopicPrivateKey(community *Community, privKey *ecdsa.PrivateKey) error {
-	community.SetPubsubTopicPrivateKey(privKey)
-
+func (m *Manager) UpdatePubsubTopicPrivateKey(topic string, privKey *ecdsa.PrivateKey) error {
 	if privKey != nil {
-		topic := community.PubsubTopic()
-		if err := m.transport.StorePubsubTopicKey(topic, privKey); err != nil {
-			return err
-		}
+		return m.transport.StorePubsubTopicKey(topic, privKey)
 	}
 
-	return nil
+	return m.transport.RemovePubsubTopicKey(topic)
 }
 
 // EditCommunity takes a description, updates the community with the description,
