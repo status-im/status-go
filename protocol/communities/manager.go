@@ -2185,18 +2185,6 @@ func (m *Manager) CheckPermissionToJoin(id []byte, addresses []gethcommon.Addres
 
 }
 
-func (m *Manager) GetTokenPermissions(communityID types.HexBytes) (map[string]*CommunityTokenPermission, error) {
-	community, err := m.GetByID(communityID)
-	if err != nil {
-		return nil, err
-	}
-	if community == nil {
-		return nil, errors.Errorf("community does not exist ID='%s'", communityID)
-	}
-
-	return community.TokenPermissions(), nil
-}
-
 type PermissionedBalance struct {
 	Type     protobuf.CommunityTokenType `json:"type"`
 	Symbol   string                      `json:"symbol"`
