@@ -142,6 +142,29 @@ func (c *findNewBlocksCommand) detectTransfers(parent context.Context, accounts 
 	return blockNum, addressesToCheck, nil
 }
 
+func (c *findNewBlocksCommand) detectNonceChange(parent context.Context, from, to *big.Int, accounts []common.Address) ([]common.Address, error) {
+	addressesWithChange := []common.Address{}
+	for _, account := range accounts {
+		oldNonce, err := c.balanceCacher.NonceAt(parent, c.chainClient, account, from)
+		if err != nil {
+			log.Error("findNewBlocksCommand can't get nonce", "error", err, "account", account, "chain", c.chainClient.NetworkID())
+			return nil, err
+		}
+
+		newNonce, err := c.balanceCacher.NonceAt(parent, c.chainClient, account, to)
+		if err != nil {
+			log.Error("findNewBlocksCommand can't get nonce", "error", err, "account", account, "chain", c.chainClient.NetworkID())
+			return nil, err
+		}
+
+		if *newNonce != *oldNonce {
+			addressesWithChange = append(addressesWithChange, account)
+		}
+	}
+
+	return addressesWithChange, nil
+}
+
 var nonceCheckIntervalIterations = 30
 var logsCheckIntervalIterations = 5
 
@@ -191,9 +214,18 @@ func (c *findNewBlocksCommand) Run(parent context.Context) error {
 	if len(accountsWithDetectedChanges) != 0 {
 		c.findAndSaveEthBlocks(parent, c.fromBlockNumber, headNum, accountsToCheck)
 	} else if c.iteration%nonceCheckIntervalIterations == 0 && len(accountsWithOutsideTransfers) > 0 {
-		c.findAndSaveEthBlocks(parent, c.fromBlockNumber, headNum, accountsWithOutsideTransfers)
+		accountsWithNonceChanges, err := c.detectNonceChange(parent, c.fromBlockNumber, headNum, accountsWithOutsideTransfers)
+		if err != nil {
+			c.error = err
+			return err
+		}
+
+		if len(accountsWithNonceChanges) > 0 {
+			c.findAndSaveEthBlocks(parent, c.fromBlockNumber, headNum, accountsWithNonceChanges)
+		}
+
 		for _, account := range accountsToCheck {
-			if slices.Contains(accountsWithOutsideTransfers, account) {
+			if slices.Contains(accountsWithNonceChanges, account) {
 				continue
 			}
 			err := c.markEthBlockRangeChecked(account, &BlockRange{nil, c.fromBlockNumber, headNum})
