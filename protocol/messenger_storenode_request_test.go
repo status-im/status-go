@@ -710,7 +710,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityEnvelopesOrder() {
 				prevEnvelope.Envelope.Message().GetTimestamp())
 		}
 		prevEnvelope = envelope
-		receivedEnvelopesCount += 1
+		receivedEnvelopesCount++
 	})
 
 	// Force a single-envelope page size to be able to check the order.
