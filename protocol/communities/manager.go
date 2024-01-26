@@ -1075,9 +1075,9 @@ func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 	return m.persistence.DeleteCommunitySettings(id)
 }
 
-func (m *Manager) UpdateShard(community *Community, shard *shard.Shard) error {
+func (m *Manager) UpdateShard(community *Community, shard *shard.Shard, clock uint64) error {
 	community.config.Shard = shard
-	return m.persistence.SaveCommunityShard(community.ID(), shard, community.Clock())
+	return m.persistence.SaveCommunityShard(community.ID(), shard, clock)
 }
 
 // SetShard assigns a shard to a community
@@ -1092,7 +1092,7 @@ func (m *Manager) SetShard(communityID types.HexBytes, shard *shard.Shard) (*Com
 
 	community.increaseClock()
 
-	err = m.UpdateShard(community, shard)
+	err = m.UpdateShard(community, shard, community.Clock())
 	if err != nil {
 		return nil, err
 	}
