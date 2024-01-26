@@ -602,6 +602,12 @@ func (api *API) StartActivityFilterSession(addresses []common.Address, allAddres
 	return api.s.activity.StartFilterSession(addresses, allAddresses, chainIDs, filter, firstPageCount), nil
 }
 
+func (api *API) ResetFilterSession(id activity.SessionID, firstPageCount int) error {
+	log.Debug("wallet.api.ResetFilterSession", "id", id, "firstPageCount", firstPageCount)
+
+	return api.s.activity.ResetFilterSession(id, firstPageCount)
+}
+
 func (api *API) StopActivityFilterSession(id activity.SessionID) {
 	log.Debug("wallet.api.StopActivityFilterSession", "id", id)
 
