@@ -25,7 +25,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/identity"
@@ -1636,7 +1635,14 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 			return err
 		}
 
-		err = m.handleCommunityShardAndFiltersFromProto(community, shard.FromProtobuff(requestToJoinResponseProto.Shard), requestToJoinResponseProto.ProtectedTopicPrivateKey)
+		communityShardKey := &protobuf.CommunityShardKey{
+			CommunityId: requestToJoinResponseProto.CommunityId,
+			PrivateKey:  requestToJoinResponseProto.ProtectedTopicPrivateKey,
+			Clock:       requestToJoinResponseProto.Community.Clock,
+			Shard:       requestToJoinResponseProto.Shard,
+		}
+
+		err = m.handleCommunityShardAndFiltersFromProto(community, communityShardKey)
 		if err != nil {
 			return err
 		}

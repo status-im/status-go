@@ -2486,7 +2486,7 @@ func (m *Messenger) SendCommunityShardKey(community *communities.Community, pubk
 	}
 
 	communityShardKey := &protobuf.CommunityShardKey{
-		Clock:       m.getTimesource().GetCurrentTime(),
+		Clock:       community.Clock(),
 		CommunityId: community.ID(),
 		PrivateKey:  crypto.FromECDSA(key),
 		Shard:       community.Shard().Protobuffer(),
@@ -2799,11 +2799,6 @@ func (m *Messenger) HandleCommunityEventsMessageRejected(state *ReceivedMessageS
 
 // HandleCommunityShardKey handles the private keys for the community shards
 func (m *Messenger) HandleCommunityShardKey(state *ReceivedMessageState, message *protobuf.CommunityShardKey, statusMessage *v1protocol.StatusMessage) error {
-	// TODO: @cammellos: This is risky, it does not seem to support out of order messages
-	// (say that the community changes shards twice, last one wins, but we don't check clock
-	// etc)
-
-	// TODO: @cammellos: getbyid returns nil if the community is not in the db, so we need to handle it
 	community, err := m.communitiesManager.GetByID(message.CommunityId)
 	if err != nil {
 		return err
@@ -2819,7 +2814,7 @@ func (m *Messenger) HandleCommunityShardKey(state *ReceivedMessageState, message
 		return errors.New("signer can't be nil")
 	}
 
-	err = m.handleCommunityShardAndFiltersFromProto(community, shard.FromProtobuff(message.Shard), message.PrivateKey)
+	err = m.handleCommunityShardAndFiltersFromProto(community, message)
 	if err != nil {
 		return err
 	}
@@ -2829,15 +2824,15 @@ func (m *Messenger) HandleCommunityShardKey(state *ReceivedMessageState, message
 	return nil
 }
 
-func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communities.Community, shard *shard.Shard, privateKeyBytes []byte) error {
-	err := m.communitiesManager.UpdateShard(community, shard)
+func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communities.Community, message *protobuf.CommunityShardKey) error {
+	err := m.communitiesManager.UpdateShard(community, shard.FromProtobuff(message.Shard), community.Clock())
 	if err != nil {
 		return err
 	}
 
 	var privKey *ecdsa.PrivateKey = nil
-	if privateKeyBytes != nil {
-		privKey, err = crypto.ToECDSA(privateKeyBytes)
+	if message.PrivateKey != nil {
+		privKey, err = crypto.ToECDSA(message.PrivateKey)
 		if err != nil {
 			return err
 		}
