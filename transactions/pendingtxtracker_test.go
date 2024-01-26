@@ -138,7 +138,7 @@ func TestPendingTxTracker_InterruptWatching(t *testing.T) {
 	m, stop, chainClient, eventFeed := setupTestTransactionDB(t, nil)
 	defer stop()
 
-	txs := GenerateTestPendingTransactions(2)
+	txs := GenerateTestPendingTransactions(0, 2)
 
 	// Mock the first call to getTransactionByHash
 	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID})
@@ -259,7 +259,7 @@ func TestPendingTxTracker_MultipleClients(t *testing.T) {
 	m, stop, chainClient, eventFeed := setupTestTransactionDB(t, nil)
 	defer stop()
 
-	txs := GenerateTestPendingTransactions(2)
+	txs := GenerateTestPendingTransactions(0, 2)
 	txs[1].ChainID++
 
 	// Mock the both clients to be available
@@ -344,7 +344,7 @@ func TestPendingTxTracker_Watch(t *testing.T) {
 	m, stop, chainClient, eventFeed := setupTestTransactionDB(t, nil)
 	defer stop()
 
-	txs := GenerateTestPendingTransactions(2)
+	txs := GenerateTestPendingTransactions(0, 2)
 	// Make the second already confirmed
 	*txs[0].Status = Success
 
@@ -428,7 +428,7 @@ func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 	m, stop, chainClient, eventFeed := setupTestTransactionDB(t, common.NewAndSet(1*time.Nanosecond))
 	defer stop()
 
-	txs := GenerateTestPendingTransactions(2)
+	txs := GenerateTestPendingTransactions(0, 2)
 
 	var firsDoneWG sync.WaitGroup
 	firsDoneWG.Add(1)
@@ -544,7 +544,7 @@ func TestPendingTransactions(t *testing.T) {
 	manager, stop, _, _ := setupTestTransactionDB(t, nil)
 	defer stop()
 
-	tx := GenerateTestPendingTransactions(1)[0]
+	tx := GenerateTestPendingTransactions(0, 1)[0]
 
 	rst, err := manager.GetAllPending()
 	require.NoError(t, err)

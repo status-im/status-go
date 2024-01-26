@@ -2,13 +2,12 @@ package activity
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"strconv"
 
 	"golang.org/x/exp/slices"
 
 	eth "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/services/wallet/async"
@@ -18,10 +17,26 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
+const nilStr = "nil"
+
 type EntryIdentity struct {
 	payloadType PayloadType
 	transaction *transfer.TransactionIdentity
 	id          transfer.MultiTransactionIDType
+}
+
+// func (e EntryIdentity) same(a EntryIdentity) bool {
+// 	return a.payloadType == e.payloadType && (a.transaction == e.transaction && (a.transaction == nil || (a.transaction.ChainID == e.transaction.ChainID &&
+// 		a.transaction.Hash == e.transaction.Hash &&
+// 		a.transaction.Address == e.transaction.Address))) && a.id == e.id
+// }
+
+func (e EntryIdentity) key() string {
+	txID := nilStr
+	if e.transaction != nil {
+		txID = strconv.FormatUint(uint64(e.transaction.ChainID), 10) + e.transaction.Hash.Hex() + e.transaction.Address.Hex()
+	}
+	return strconv.Itoa(e.payloadType) + txID + strconv.FormatInt(int64(e.id), 16)
 }
 
 type SessionID int32
@@ -36,16 +51,17 @@ type Session struct {
 	chainIDs     []common.ChainID
 	filter       Filter
 
-	// model is a mirror of the data model presentation has (EventActivityFilteringDone)
+	// model is a mirror of the data model presentation has (sent by EventActivityFilteringDone)
 	model []EntryIdentity
+	// new holds the new entries until user requests update
+	new []EntryIdentity
 }
 
 // SessionUpdate payload for EventActivitySessionUpdated
 type SessionUpdate struct {
-	// TODO #12120: add index for each entry, now all new are first entries
-	NewEntries []Entry         `json:"newEntries,omitempty"`
-	Removed    []EntryIdentity `json:"removed,omitempty"`
-	Updated    []Entry         `json:"updated,omitempty"`
+	HasNewEntries *bool           `json:"hasNewEntries,omitempty"`
+	Removed       []EntryIdentity `json:"removed,omitempty"`
+	Updated       []Entry         `json:"updated,omitempty"`
 }
 
 type fullFilterParams struct {
@@ -99,7 +115,7 @@ func (s *Service) StartFilterSession(addresses []eth.Address, allAddresses bool,
 
 	s.sessionsRWMutex.Lock()
 	subscribeToEvents := len(s.sessions) == 0
-	s.sessions[sessionID] = &Session{
+	session := &Session{
 		id: sessionID,
 
 		addresses:    addresses,
@@ -109,6 +125,8 @@ func (s *Service) StartFilterSession(addresses []eth.Address, allAddresses bool,
 
 		model: make([]EntryIdentity, 0, firstPageCount),
 	}
+	s.sessions[sessionID] = session
+
 	if subscribeToEvents {
 		s.subscribeToEvents()
 	}
@@ -124,20 +142,55 @@ func (s *Service) StartFilterSession(addresses []eth.Address, allAddresses bool,
 		// Mirror identities for update use
 		s.sessionsRWMutex.Lock()
 		defer s.sessionsRWMutex.Unlock()
-		session, ok := s.sessions[sessionID]
-		if ok {
-			session.model = make([]EntryIdentity, 0, len(entries))
-			for _, a := range entries {
-				session.model = append(session.model, EntryIdentity{
-					payloadType: a.payloadType,
-					transaction: a.transaction,
-					id:          a.id,
-				})
-			}
+
+		session.model = make([]EntryIdentity, 0, len(entries))
+		for _, a := range entries {
+			session.model = append(session.model, EntryIdentity{
+				payloadType: a.payloadType,
+				transaction: a.transaction,
+				id:          a.id,
+			})
 		}
 	})
 
 	return sessionID
+}
+
+func (s *Service) ResetFilterSession(id SessionID, firstPageCount int) error {
+	session, found := s.sessions[id]
+	if !found {
+		return errors.New("session not found")
+	}
+
+	s.internalFilter(fullFilterParams{
+		sessionID:    id,
+		addresses:    session.addresses,
+		allAddresses: session.allAddresses,
+		chainIDs:     session.chainIDs,
+		filter:       session.filter,
+	}, 0, firstPageCount, func(entries []Entry) {
+		s.sessionsRWMutex.Lock()
+		defer s.sessionsRWMutex.Unlock()
+
+		// Mark new entries
+		newMap := entryIdsToMap(session.new)
+		for i, a := range entries {
+			_, isNew := newMap[a.getIdentity().key()]
+			entries[i].isNew = isNew
+		}
+		session.new = nil
+
+		// Mirror client identities for checking updates
+		session.model = make([]EntryIdentity, 0, len(entries))
+		for _, a := range entries {
+			session.model = append(session.model, EntryIdentity{
+				payloadType: a.payloadType,
+				transaction: a.transaction,
+				id:          a.id,
+			})
+		}
+	})
+	return nil
 }
 
 // TODO #12120: extend the session based API
@@ -150,127 +203,137 @@ func (s *Service) subscribeToEvents() {
 	go s.processEvents()
 }
 
+// func (s *Service) processEvents() {
+// 	for event := range s.ch {
+// 		if event.Type == transactions.EventPendingTransactionUpdate {
+// 			var p transactions.PendingTxUpdatePayload
+// 			err := json.Unmarshal([]byte(event.Message), &p)
+// 			if err != nil {
+// 				log.Error("Error unmarshalling PendingTxUpdatePayload", "error", err)
+// 				continue
+// 			}
+
+// 			for id := range s.sessions {
+// 				s.sessionsRWMutex.RLock()
+// 				pTx, pass := s.checkFilterForPending(s.sessions[id], p.TxIdentity)
+// 				if pass {
+// 					s.sessionsRWMutex.RUnlock()
+// 					s.sessionsRWMutex.Lock()
+// 					addOnTop(s.sessions[id], p.TxIdentity)
+// 					s.sessionsRWMutex.Unlock()
+// 					// TODO #12120: can't send events from an event handler
+// 					go notify(s.eventFeed, id, *pTx)
+// 				} else {
+// 					s.sessionsRWMutex.RUnlock()
+// 				}
+// 			}
+// 		}
+// 	}
+// }
+
+// TODO #12120: check that it exits on channel close
 func (s *Service) processEvents() {
 	for event := range s.ch {
+		// TODO #12120: process rest of the events
+		// TODO #12120: debounce for 1s
 		if event.Type == transactions.EventPendingTransactionUpdate {
-			var p transactions.PendingTxUpdatePayload
-			err := json.Unmarshal([]byte(event.Message), &p)
-			if err != nil {
-				log.Error("Error unmarshalling PendingTxUpdatePayload", "error", err)
-				continue
-			}
-
-			for id := range s.sessions {
-				s.sessionsRWMutex.RLock()
-				pTx, pass := s.checkFilterForPending(s.sessions[id], p.TxIdentity)
-				if pass {
-					s.sessionsRWMutex.RUnlock()
-					s.sessionsRWMutex.Lock()
-					addOnTop(s.sessions[id], p.TxIdentity)
-					s.sessionsRWMutex.Unlock()
-					// TODO #12120: can't send events from an event handler
-					go notify(s.eventFeed, id, *pTx)
-				} else {
-					s.sessionsRWMutex.RUnlock()
+			for sessionID := range s.sessions {
+				session := s.sessions[sessionID]
+				activities, err := getActivityEntries(context.Background(), s.getDeps(), session.addresses, session.allAddresses, session.chainIDs, session.filter, 0, len(session.model))
+				if err != nil {
+					log.Error("Error getting activity entries", "error", err)
+					continue
 				}
+
+				s.sessionsRWMutex.RLock()
+				allData := append(session.model, session.new...)
+				new, _ /*removed*/ := findUpdates(allData, activities)
+				s.sessionsRWMutex.RUnlock()
+
+				s.sessionsRWMutex.Lock()
+				lastProcessed := -1
+				for i, idRes := range new {
+					if i-lastProcessed > 1 {
+						// The events are not continuous, therefore these are not on top but mixed between existing entries
+						break
+					}
+					lastProcessed = idRes.newPos
+					// TODO #12120: make it more generic to follow the detection function
+					// TODO #12120: hold the first few and only send mixed and removed
+					if session.new == nil {
+						session.new = make([]EntryIdentity, 0, len(new))
+					}
+					session.new = append(session.new, idRes.id)
+				}
+
+				// TODO #12120: mixed
+
+				s.sessionsRWMutex.Unlock()
+
+				go notify(s.eventFeed, sessionID, len(session.new) > 0)
 			}
 		}
 	}
 }
 
-// checkFilterForPending should be called with sessionsRWMutex locked for reading
-func (s *Service) checkFilterForPending(session *Session, id transactions.TxIdentity) (tr *transactions.PendingTransaction, pass bool) {
-	allChains := len(session.chainIDs) == 0
-	if !allChains {
-		_, found := slices.BinarySearch(session.chainIDs, id.ChainID)
-		if !found {
-			return nil, false
-		}
-	}
+// // checkFilterForPending should be called with sessionsRWMutex locked for reading
+// func (s *Service) checkFilterForPending(session *Session, id transactions.TxIdentity) (tr *transactions.PendingTransaction, pass bool) {
+// 	allChains := len(session.chainIDs) == 0
+// 	if !allChains {
+// 		_, found := slices.BinarySearch(session.chainIDs, id.ChainID)
+// 		if !found {
+// 			return nil, false
+// 		}
+// 	}
 
-	tr, err := s.pendingTracker.GetPendingEntry(id.ChainID, id.Hash)
-	if err != nil {
-		log.Error("Error getting pending entry", "error", err)
-		return nil, false
-	}
+// 	tr, err := s.pendingTracker.GetPendingEntry(id.ChainID, id.Hash)
+// 	if err != nil {
+// 		log.Error("Error getting pending entry", "error", err)
+// 		return nil, false
+// 	}
 
-	if !session.allAddresses {
-		_, found := slices.BinarySearchFunc(session.addresses, tr.From, func(a eth.Address, b eth.Address) int {
-			// TODO #12120: optimize this
-			if a.Hex() < b.Hex() {
-				return -1
-			}
-			if a.Hex() > b.Hex() {
-				return 1
-			}
-			return 0
-		})
-		if !found {
-			return nil, false
-		}
-	}
+// 	if !session.allAddresses {
+// 		_, found := slices.BinarySearchFunc(session.addresses, tr.From, func(a eth.Address, b eth.Address) int {
+// 			// TODO #12120: optimize this
+// 			if a.Hex() < b.Hex() {
+// 				return -1
+// 			}
+// 			if a.Hex() > b.Hex() {
+// 				return 1
+// 			}
+// 			return 0
+// 		})
+// 		if !found {
+// 			return nil, false
+// 		}
+// 	}
 
-	fl := session.filter
-	if fl.Period.StartTimestamp != NoLimitTimestampForPeriod || fl.Period.EndTimestamp != NoLimitTimestampForPeriod {
-		ts := int64(tr.Timestamp)
-		if ts < fl.Period.StartTimestamp || ts > fl.Period.EndTimestamp {
-			return nil, false
-		}
-	}
+// 	fl := session.filter
+// 	if fl.Period.StartTimestamp != NoLimitTimestampForPeriod || fl.Period.EndTimestamp != NoLimitTimestampForPeriod {
+// 		ts := int64(tr.Timestamp)
+// 		if ts < fl.Period.StartTimestamp || ts > fl.Period.EndTimestamp {
+// 			return nil, false
+// 		}
+// 	}
 
-	// TODO #12120 check filter
-	// Types                 []Type        `json:"types"`
-	// Statuses              []Status      `json:"statuses"`
-	// CounterpartyAddresses []eth.Address `json:"counterpartyAddresses"`
+// 	// TODO #12120 check filter
+// 	// Types                 []Type        `json:"types"`
+// 	// Statuses              []Status      `json:"statuses"`
+// 	// CounterpartyAddresses []eth.Address `json:"counterpartyAddresses"`
 
-	// // Tokens
-	// Assets                []Token `json:"assets"`
-	// Collectibles          []Token `json:"collectibles"`
-	// FilterOutAssets       bool    `json:"filterOutAssets"`
-	// FilterOutCollectibles bool    `json:"filterOutCollectibles"`
+// 	// // Tokens
+// 	// Assets                []Token `json:"assets"`
+// 	// Collectibles          []Token `json:"collectibles"`
+// 	// FilterOutAssets       bool    `json:"filterOutAssets"`
+// 	// FilterOutCollectibles bool    `json:"filterOutCollectibles"`
 
-	return tr, true
-}
+// 	return tr, true
+// }
 
-// addOnTop should be called with sessionsRWMutex locked for writing
-func addOnTop(session *Session, id transactions.TxIdentity) {
-	session.model = append([]EntryIdentity{{
-		payloadType: PendingTransactionPT,
-		transaction: &transfer.TransactionIdentity{
-			ChainID: id.ChainID,
-			Hash:    id.Hash,
-		},
-	}}, session.model...)
-}
-
-func notify(eventFeed *event.Feed, id SessionID, tx transactions.PendingTransaction) {
-	payload := SessionUpdate{
-		NewEntries: []Entry{
-			{
-				payloadType: PendingTransactionPT,
-				transaction: &transfer.TransactionIdentity{
-					ChainID: tx.ChainID,
-					Hash:    tx.Hash,
-					Address: tx.From,
-				},
-				id:              transfer.NoMultiTransactionID,
-				timestamp:       int64(tx.Timestamp),
-				activityType:    SendAT,
-				activityStatus:  PendingAS,
-				amountOut:       (*hexutil.Big)(tx.Value.Int),
-				amountIn:        nil,
-				tokenOut:        nil,
-				tokenIn:         nil,
-				symbolOut:       &tx.Symbol,
-				symbolIn:        nil,
-				sender:          &tx.From,
-				recipient:       &tx.To,
-				chainIDOut:      &tx.ChainID,
-				chainIDIn:       nil,
-				transferType:    nil,
-				contractAddress: nil,
-			},
-		},
+func notify(eventFeed *event.Feed, id SessionID, hasNewEntries bool) {
+	payload := SessionUpdate{}
+	if hasNewEntries {
+		payload.HasNewEntries = &hasNewEntries
 	}
 
 	sendResponseEvent(eventFeed, (*int32)(&id), EventActivitySessionUpdated, payload, nil)
@@ -311,4 +374,60 @@ func (s *Service) getActivityDetailsAsync(requestID int32, entries []Entry) {
 			sendResponseEvent(s.eventFeed, &requestID, EventActivityFilteringUpdate, activityData, err)
 		}
 	}()
+}
+
+type mixedIdentityResult struct {
+	newPos int
+	id     EntryIdentity
+}
+
+func entryIdsToMap(ids []EntryIdentity) map[string]EntryIdentity {
+	idsMap := make(map[string]EntryIdentity, len(ids))
+	for _, id := range ids {
+		idsMap[id.key()] = id
+	}
+	return idsMap
+}
+
+func entriesToMap(entries []Entry) map[string]Entry {
+	entryMap := make(map[string]Entry, len(entries))
+	for _, entry := range entries {
+		updatedIdentity := entry.getIdentity()
+		entryMap[updatedIdentity.key()] = entry
+	}
+	return entryMap
+}
+
+// FindUpdates returns changes in updated entries compared to the identities
+//
+// expects identities and entries to be sorted by timestamp
+//
+// the returned newer are entries that are newer than the first identity
+// the returned mixed are entries that are older than the first identity (sorted by timestamp)
+// the returned removed are identities that are not present in the updated entries (sorted by timestamp)
+//
+// implementation assumes the order of each identity doesn't change from old state (identities) and new state (updated); we have either add or removed.
+func findUpdates(identities []EntryIdentity, updated []Entry) (new []mixedIdentityResult, removed []EntryIdentity) {
+
+	idsMap := entryIdsToMap(identities)
+	updatedMap := entriesToMap(updated)
+
+	for newIndex, entry := range updated {
+		id := entry.getIdentity()
+		if _, found := idsMap[id.key()]; !found {
+			new = append(new, mixedIdentityResult{
+				newPos: newIndex,
+				id:     id,
+			})
+		}
+	}
+
+	// Account for new entries
+	for i := 0; i < len(identities); i++ {
+		id := identities[i]
+		if _, found := updatedMap[id.key()]; !found {
+			removed = append(removed, id)
+		}
+	}
+	return
 }
