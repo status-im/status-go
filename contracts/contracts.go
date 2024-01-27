@@ -4,9 +4,9 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/contracts/balancechecker"
 	"github.com/status-im/status-go/contracts/directory"
 	"github.com/status-im/status-go/contracts/ethscan"
-	"github.com/status-im/status-go/contracts/balancechecker"
 	"github.com/status-im/status-go/contracts/hop"
 	hopBridge "github.com/status-im/status-go/contracts/hop/bridge"
 	hopSwap "github.com/status-im/status-go/contracts/hop/swap"
