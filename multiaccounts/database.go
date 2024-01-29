@@ -320,6 +320,11 @@ func (db *Database) SaveAccount(account Account) error {
 	return db.StoreIdentityImages(account.KeyUID, account.Images, false)
 }
 
+func (db *Database) UpdateDisplayName(keyUID string, displayName string) error {
+	_, err := db.db.Exec("UPDATE accounts SET name = ? WHERE keyUid = ?", displayName, keyUID)
+	return err
+}
+
 func (db *Database) UpdateAccount(account Account) error {
 	colorHash, err := json.Marshal(account.ColorHash)
 	if err != nil {
