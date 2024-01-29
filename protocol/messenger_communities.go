@@ -2825,7 +2825,7 @@ func (m *Messenger) HandleCommunityShardKey(state *ReceivedMessageState, message
 }
 
 func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communities.Community, message *protobuf.CommunityShardKey) error {
-	err := m.communitiesManager.UpdateShard(community, shard.FromProtobuff(message.Shard), community.Clock())
+	err := m.communitiesManager.UpdateShard(community, shard.FromProtobuff(message.Shard), message.Clock)
 	if err != nil {
 		return err
 	}
