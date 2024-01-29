@@ -1356,7 +1356,9 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 	if mnemonic == "" {
 		settings.Mnemonic = &info.Mnemonic
 		settings.OmitTransfersHistoryScan = true
-		settings.MnemonicWasNotShown = true
+		// TODO(rasom): uncomment it as soon as address will be properly
+		// marked as shown on mobile client
+		//settings.MnemonicWasNotShown = true
 	}
 
 	nodeConfig, err := defaultNodeConfig(settings.InstallationID, request)
