@@ -178,6 +178,9 @@ type Messenger struct {
 	// used to track dispatched messages
 	dispatchMessageTestCallback func(common.RawMessage)
 
+	// used to track unhandled messages
+	unhandledMessagesTracker func(*v1protocol.StatusMessage, error)
+
 	peersyncing         *peersyncing.PeerSyncing
 	peersyncingOffers   map[string]uint64
 	peersyncingRequests map[string]uint64
@@ -3836,6 +3839,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					if err != nil {
 						allMessagesProcessed = false
 						logger.Warn("failed to process protobuf", zap.Error(err))
+						if m.unhandledMessagesTracker != nil {
+							m.unhandledMessagesTracker(msg, err)
+						}
 						continue
 					}
 					logger.Debug("Handled parsed message")

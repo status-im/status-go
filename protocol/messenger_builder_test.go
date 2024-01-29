@@ -12,7 +12,9 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -21,6 +23,8 @@ type testMessengerConfig struct {
 	name       string
 	privateKey *ecdsa.PrivateKey
 	logger     *zap.Logger
+
+	unhandledMessagesTracker *unhandledMessagesTracker
 }
 
 func (tmc *testMessengerConfig) complete() error {
@@ -90,10 +94,37 @@ func newTestMessenger(waku types.Waku, config testMessengerConfig, extraOptions 
 		return nil, err
 	}
 
+	if config.unhandledMessagesTracker != nil {
+		m.unhandledMessagesTracker = config.unhandledMessagesTracker.addMessage
+	}
+
 	err = m.Init()
 	if err != nil {
 		return nil, err
 	}
 
 	return m, nil
+}
+
+type unhandedMessage struct {
+	*v1protocol.StatusMessage
+	err error
+}
+
+type unhandledMessagesTracker struct {
+	messages map[protobuf.ApplicationMetadataMessage_Type][]*unhandedMessage
+}
+
+func (u *unhandledMessagesTracker) addMessage(msg *v1protocol.StatusMessage, err error) {
+	msgType := msg.ApplicationLayer.Type
+
+	if _, exists := u.messages[msgType]; !exists {
+		u.messages[msgType] = []*unhandedMessage{}
+	}
+
+	newMessage := &unhandedMessage{
+		StatusMessage: msg,
+		err:           err,
+	}
+	u.messages[msgType] = append(u.messages[msgType], newMessage)
 }
