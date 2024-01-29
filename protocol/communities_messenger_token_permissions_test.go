@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
-	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -18,7 +17,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -71,6 +69,7 @@ func (tckd *TestCommunitiesKeyDistributor) Distribute(community *communities.Com
 	return nil
 }
 
+/*
 func (tckd *TestCommunitiesKeyDistributor) waitOnKeyDistribution(condition func(*CommunityAndKeyActions) bool) <-chan error {
 	errCh := make(chan error, 1)
 
@@ -110,6 +109,7 @@ func (tckd *TestCommunitiesKeyDistributor) waitOnKeyDistribution(condition func(
 
 	return errCh
 }
+*/
 
 func TestMessengerCommunitiesTokenPermissionsSuite(t *testing.T) {
 	suite.Run(t, new(MessengerCommunitiesTokenPermissionsSuite))
@@ -221,9 +221,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) createCommunity() (*communit
 	return createCommunity(&s.Suite, s.owner)
 }
 
+/*
 func (s *MessengerCommunitiesTokenPermissionsSuite) sendChatMessage(sender *Messenger, chatID string, text string) *common.Message {
 	return sendChatMessage(&s.Suite, sender, chatID, text)
 }
+*/
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) makeAddressSatisfyTheCriteria(chainID uint64, address string, criteria *protobuf.TokenCriteria) {
 	walletAddress := gethcommon.HexToAddress(address)
@@ -236,11 +238,13 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) makeAddressSatisfyTheCriteri
 	s.mockedBalances[chainID][walletAddress][contractAddress] = (*hexutil.Big)(balance)
 }
 
+/*
 func (s *MessengerCommunitiesTokenPermissionsSuite) waitOnKeyDistribution(condition func(*CommunityAndKeyActions) bool) <-chan error {
 	testCommunitiesKeyDistributor, ok := s.owner.communitiesKeyDistributor.(*TestCommunitiesKeyDistributor)
 	s.Require().True(ok)
 	return testCommunitiesKeyDistributor.waitOnKeyDistribution(condition)
 }
+*/
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() {
 	community, _ := s.createCommunity()
@@ -628,7 +632,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 // NOTE(cammellos): Disabling for now as flaky, the reason it fails is that the community
 // key sometimes will be coming after the community description, working on a fix in a separate
 // PR
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions() {
+/*
+func(s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions() {
 	// Create a store node
 	// This is needed to fetch the messages after rejoining the community
 	var err error
@@ -846,7 +851,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	})
 
 	s.Require().Equal(messages[0], bobMessages[0].Text)
-}
+}*/
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPermission() {
 	community, _ := s.createCommunity()

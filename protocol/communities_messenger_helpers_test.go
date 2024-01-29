@@ -489,6 +489,7 @@ func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, co
 	s.Require().NoError(err)
 }
 
+/*
 func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text string) *common.Message {
 	msg := &common.Message{
 		ChatMessage: &protobuf.ChatMessage{
@@ -503,6 +504,7 @@ func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text stri
 
 	return msg
 }
+*/
 
 func grantPermission(s *suite.Suite, community *communities.Community, controlNode *Messenger, target *Messenger, role protobuf.CommunityMember_Roles) {
 	responseAddRole, err := controlNode.AddRoleToMember(&requests.AddRoleToMember{

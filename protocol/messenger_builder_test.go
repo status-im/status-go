@@ -25,7 +25,7 @@ type testMessengerConfig struct {
 	logger     *zap.Logger
 
 	unhandledMessagesTracker *unhandledMessagesTracker
-	extraOptions []Option
+	extraOptions             []Option
 }
 
 func (tmc *testMessengerConfig) complete() error {
