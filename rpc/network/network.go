@@ -9,10 +9,9 @@ import (
 	"github.com/status-im/status-go/params"
 )
 
-var SepoliaChainIDs = []uint64{11155111, 421614}
+var SepoliaChainIDs = []uint64{11155111, 421614, 11155420}
 
-// GoerliChainIDs Uncomment next chain when we move more chain to sepolia
-var GoerliChainIDs = []uint64{5, 421613} //, 420, }
+var GoerliChainIDs = []uint64{5, 421613, 420}
 
 type CombinedNetwork struct {
 	Prod *params.Network
