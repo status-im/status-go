@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
@@ -69,6 +70,19 @@ func (c *findNewBlocksCommand) detectTransfers(parent context.Context, accounts 
 	if err != nil {
 		log.Error("findNewBlocksCommand can't get balances hashes", "error", err)
 		return nil, nil, err
+	}
+
+	networkID := c.chainClient.NetworkID()
+	// TODO(rasom): remove this as soon as BalanceChecker contract for
+	// Arbitrum networks will return l2 block number instead of l1
+	if networkID == walletcommon.ArbitrumMainnet || networkID == walletcommon.ArbitrumGoerli || networkID == walletcommon.ArbitrumSepolia {
+		header, err := c.chainClient.HeaderByNumber(context.Background(), nil)
+		if err != nil {
+			log.Error("findNewBlocksCommand error getting header", "error", err, "chain", c.chainClient.NetworkID())
+			return nil, nil, err
+		}
+
+		blockNum = header.Number
 	}
 
 	addressesToCheck := []common.Address{}
