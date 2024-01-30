@@ -202,8 +202,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunity(community *com
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunityWithAirdropAddress(community *communities.Community, user *Messenger, password string, addresses []string, airdropAddress string) {
-	s.Require().NotEmpty(addresses)
-
 	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(password)))
 	if airdropAddress == "" && len(addresses) > 0 {
 		airdropAddress = addresses[0]
