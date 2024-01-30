@@ -189,15 +189,24 @@ func (c *findNewBlocksCommand) Run(parent context.Context) error {
 	c.blockChainState.SetLastBlockNumber(c.chainClient.NetworkID(), headNum.Uint64())
 
 	if len(accountsWithDetectedChanges) != 0 {
-		_ = c.findAndSaveEthBlocks(parent, c.fromBlockNumber, headNum, accountsToCheck)
+		log.Debug("findNewBlocksCommand detected accounts with changes, proceeding", "accounts", accountsWithDetectedChanges)
+		err = c.findAndSaveEthBlocks(parent, c.fromBlockNumber, headNum, accountsToCheck)
+		if err != nil {
+			return err
+		}
 	} else if c.iteration%nonceCheckIntervalIterations == 0 && len(accountsWithOutsideTransfers) > 0 {
+		log.Debug("findNewBlocksCommand nonce check", "accounts", accountsWithOutsideTransfers)
 		accountsWithNonceChanges, err := c.detectNonceChange(parent, c.fromBlockNumber, headNum, accountsWithOutsideTransfers)
 		if err != nil {
 			return err
 		}
 
 		if len(accountsWithNonceChanges) > 0 {
-			_ = c.findAndSaveEthBlocks(parent, c.fromBlockNumber, headNum, accountsWithNonceChanges)
+			log.Debug("findNewBlocksCommand detected nonce diff", "accounts", accountsWithNonceChanges)
+			err = c.findAndSaveEthBlocks(parent, c.fromBlockNumber, headNum, accountsWithNonceChanges)
+			if err != nil {
+				return err
+			}
 		}
 
 		for _, account := range accountsToCheck {
@@ -212,7 +221,10 @@ func (c *findNewBlocksCommand) Run(parent context.Context) error {
 	}
 
 	if len(accountsWithDetectedChanges) != 0 || c.iteration%logsCheckIntervalIterations == 0 {
-		_ = c.findAndSaveTokenBlocks(parent, c.fromBlockNumber, headNum)
+		err = c.findAndSaveTokenBlocks(parent, c.fromBlockNumber, headNum)
+		if err != nil {
+			return err
+		}
 	}
 	c.fromBlockNumber = headNum
 	c.iteration++

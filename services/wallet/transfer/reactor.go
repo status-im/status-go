@@ -60,6 +60,7 @@ type Reactor struct {
 	balanceCacher      balance.Cacher
 	omitHistory        bool
 	blockChainState    *blockchainstate.BlockChainState
+	chainIDs           []uint64
 }
 
 func NewReactor(db *Database, blockDAO *BlockDAO, blockRangesSeqDAO *BlockRangeSequentialDAO, accountsDB *accounts.Database, feed *event.Feed, tm *TransactionManager,
@@ -82,7 +83,11 @@ func NewReactor(db *Database, blockDAO *BlockDAO, blockRangesSeqDAO *BlockRangeS
 
 // Start runs reactor loop in background.
 func (r *Reactor) start(chainClients map[uint64]chain.ClientInterface, accounts []common.Address) error {
-
+	chainIDs := []uint64{}
+	for _, client := range chainClients {
+		chainIDs = append(chainIDs, client.NetworkID())
+	}
+	r.chainIDs = chainIDs
 	r.strategy = r.createFetchStrategy(chainClients, accounts)
 	return r.strategy.start()
 }
