@@ -1020,7 +1020,8 @@ func (w *Waku) broadcast() {
 				}
 			} else {
 				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
-					logger.Info("publishing message via relay")
+					peerCnt := len(w.node.Relay().PubSub().ListPeers(env.PubsubTopic()))
+					logger.Info("publishing message via relay", zap.Int("peerCnt", peerCnt))
 					_, err := w.node.Relay().Publish(w.ctx, env.Message(), relay.WithPubSubTopic(env.PubsubTopic()))
 					return err
 				}
