@@ -1232,7 +1232,9 @@ func (w *Waku) Start() error {
 			case c := <-w.connStatusChan:
 				w.connStatusMu.Lock()
 				latestConnStatus := formatConnStatus(w.node, c)
-				w.logger.Debug("PeerStats", zap.Any("stats", latestConnStatus))
+				w.logger.Debug("peer stats",
+					zap.Int("peersCount", len(latestConnStatus.Peers)),
+					zap.Any("stats", latestConnStatus))
 				for k, subs := range w.connStatusSubscriptions {
 					if subs.Active() {
 						subs.C <- latestConnStatus
@@ -1372,6 +1374,7 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 	}
 
 	logger := w.logger.With(
+		zap.Any("messageType", msgType),
 		zap.String("envelopeHash", hexutil.Encode(envelope.Hash())),
 		zap.String("contentTopic", envelope.Message().ContentTopic),
 		zap.Int64("timestamp", envelope.Message().GetTimestamp()),
