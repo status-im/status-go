@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"database/sql"
-	"encoding/base64"
 	"errors"
 	"image"
 	"image/color"
@@ -1167,12 +1166,16 @@ func handleImagePreviewFromURL(logger *zap.Logger) http.HandlerFunc {
 			return
 		}
 
-		encodedImage := addBase64UrlScheme(base64.StdEncoding.EncodeToString(imageBuffer.Bytes()))
+		mime, err := images.GetProtobufImageMime(imageBuffer.Bytes())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			logger.Error("failed to get wallet collectible image mime", zap.Error(err))
+		}
 
-		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Content-Type", mime)
 		w.Header().Set("Cache-Control", "max-age=3600")
 
-		_, err = w.Write([]byte(encodedImage))
+		_, err = w.Write(imageBuffer.Bytes())
 		if err != nil {
 			message := "couldn't send preview image"
 			http.Error(w, message, http.StatusInternalServerError)

@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 
@@ -62,7 +61,7 @@ func (s *ServerURLSuite) SetupTest() {
 	err = s.serverForQR.Start()
 	s.Require().NoError(err)
 
-	previewMediaServer, err := NewMediaServer(nil, nil, nil)
+	previewMediaServer, err := NewMediaServer(nil, nil, nil, nil)
 	s.Require().NoError(err)
 
 	s.serverForPreview = previewMediaServer
@@ -205,19 +204,14 @@ func (s *ServerURLSuite) TestImagePreviewGeneration() {
 	}()
 
 	payload, err := ioutil.ReadAll(resp.Body)
-
 	if resp.StatusCode != http.StatusOK {
 		s.Require().Failf(fmt.Sprintf("Unexpected response status code: %d", resp.StatusCode), string(payload))
 	}
 
-	base64Data := strings.Replace(string(payload), Base64JPEGUrlScheme, "", 1)
-	imageBytes, err := base64.StdEncoding.DecodeString(base64Data)
-
+	image, err := images.DecodeImageData(payload, bytes.NewReader(payload))
 	if err != nil {
-		s.Require().Failf("Failed to base64 decode returned image", err.Error())
+		s.Require().Failf("Failed to decode image", err.Error())
 	}
-
-	image, err := images.DecodeImageData(imageBytes, bytes.NewReader(imageBytes))
 
 	require.Equal(s.T(), size, image.Bounds().Dx())
 }

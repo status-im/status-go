@@ -12,8 +12,6 @@ import (
 	"github.com/status-im/status-go/images"
 )
 
-const Base64JPEGUrlScheme = "data:image/jpeg;base64,"
-
 var RequiredParams = []string{"image_url", "size"}
 
 type ImagePreviewParams struct {
@@ -64,8 +62,4 @@ func generateImagePreviewFromURL(params *ImagePreviewParams, logger *zap.Logger)
 	}
 
 	return bb, nil
-}
-
-func addBase64UrlScheme(encoded string) string {
-	return encoded + Base64JPEGUrlScheme
 }
