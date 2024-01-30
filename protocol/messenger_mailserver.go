@@ -309,7 +309,9 @@ func (m *Messenger) resetFiltersPriority(filters []*transport.Filter) {
 }
 
 func (m *Messenger) RequestAllHistoricMessagesWithRetries(forceFetchingBackup bool) (*MessengerResponse, error) {
-	return m.performMailserverRequest(func() (*MessengerResponse, error) { return m.RequestAllHistoricMessages(forceFetchingBackup) })
+	return m.performMailserverRequest(func() (*MessengerResponse, error) {
+		return m.RequestAllHistoricMessages(forceFetchingBackup)
+	})
 }
 
 // RequestAllHistoricMessages requests all the historic messages for any topic

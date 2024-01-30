@@ -928,25 +928,29 @@ func (m *Messenger) cleanTopics() error {
 
 // handle connection change is called each time we go from offline/online or viceversa
 func (m *Messenger) handleConnectionChange(online bool) {
-	if online {
-		if m.pushNotificationClient != nil {
+	// Update pushNotificationClient
+	if m.pushNotificationClient != nil {
+		if online {
 			m.pushNotificationClient.Online()
-		}
-
-		if m.shouldPublishContactCode {
-			if err := m.publishContactCode(); err != nil {
-				m.logger.Error("could not publish on contact code", zap.Error(err))
-				return
-			}
-			m.shouldPublishContactCode = false
-		}
-	} else {
-		if m.pushNotificationClient != nil {
+		} else {
 			m.pushNotificationClient.Offline()
 		}
-
 	}
 
+	// Publish contact code
+	if online && m.shouldPublishContactCode {
+		if err := m.publishContactCode(); err != nil {
+			m.logger.Error("could not publish on contact code", zap.Error(err))
+		}
+		m.shouldPublishContactCode = false
+	}
+
+	// Start fetching messages from store nodes
+	if online {
+		m.asyncRequestAllHistoricMessages()
+	}
+
+	// Update ENS verifier
 	m.ensVerifier.SetOnline(online)
 }
 
