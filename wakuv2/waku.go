@@ -1510,6 +1510,12 @@ func (w *Waku) IsEnvelopeCached(hash gethcommon.Hash) bool {
 	return exist
 }
 
+func (w *Waku) ClearEnvelopesCache() {
+	w.poolMu.Lock()
+	defer w.poolMu.Unlock()
+	w.envelopes = make(map[gethcommon.Hash]*common.ReceivedMessage)
+}
+
 func (w *Waku) PeerCount() int {
 	return w.node.PeerCount()
 }

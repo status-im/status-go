@@ -1046,7 +1046,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 			return nil, err
 		}
 		if !permissions.Satisfied {
-			return nil, errors.New("permission to join not satisfied")
+			return nil, communities.ErrPermissionToJoinNotSatisfied
 		}
 
 		for _, accountAndChainIDs := range permissions.ValidCombinations {

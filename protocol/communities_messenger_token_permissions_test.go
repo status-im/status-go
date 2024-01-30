@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	//"bytes"
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
@@ -109,7 +108,8 @@ func (tckd *TestCommunitiesKeyDistributor) waitOnKeyDistribution(condition func(
 	}()
 
 	return errCh
-}*/
+}
+*/
 
 func TestMessengerCommunitiesTokenPermissionsSuite(t *testing.T) {
 	suite.Run(t, new(MessengerCommunitiesTokenPermissionsSuite))
@@ -136,17 +136,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 
 	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, false, []string{"owner", "bob", "alice"})
 
-	ownerLogger := s.logger.With(zap.String("name", "owner"))
 	s.ownerWaku = wakuNodes[0]
-	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, s.ownerWaku, ownerLogger)
+	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, s.ownerWaku, "owner", []Option{})
 
-	bobLogger := s.logger.With(zap.String("name", "bob"))
 	s.bobWaku = wakuNodes[1]
-	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, s.bobWaku, bobLogger)
+	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, s.bobWaku, "bob", []Option{})
 
-	aliceLogger := s.logger.With(zap.String("name", "alice"))
 	s.aliceWaku = wakuNodes[2]
-	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, s.aliceWaku, aliceLogger)
+	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, s.aliceWaku, "alice", []Option{})
 
 	_, err := s.owner.Start()
 	s.Require().NoError(err)
@@ -186,10 +183,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, waku types.Waku, logger *zap.Logger) *Messenger {
+func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, waku types.Waku, name string, extraOptions []Option) *Messenger {
 	return newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
-			logger: logger,
+			logger:       s.logger.Named(name),
+			extraOptions: extraOptions,
 		},
 		password:            password,
 		walletAddresses:     walletAddresses,
@@ -224,7 +222,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) createCommunity() (*communit
 /*
 func (s *MessengerCommunitiesTokenPermissionsSuite) sendChatMessage(sender *Messenger, chatID string, text string) *common.Message {
 	return sendChatMessage(&s.Suite, sender, chatID, text)
-}*/
+}
+*/
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) makeAddressSatisfyTheCriteria(chainID uint64, address string, criteria *protobuf.TokenCriteria) {
 	walletAddress := gethcommon.HexToAddress(address)
@@ -242,7 +241,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) waitOnKeyDistribution(condit
 	testCommunitiesKeyDistributor, ok := s.owner.communitiesKeyDistributor.(*TestCommunitiesKeyDistributor)
 	s.Require().True(ok)
 	return testCommunitiesKeyDistributor.waitOnKeyDistribution(condition)
-}*/
+}
+*/
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() {
 	community, _ := s.createCommunity()
@@ -630,15 +630,68 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 // NOTE(cammellos): Disabling for now as flaky, the reason it fails is that the community
 // key sometimes will be coming after the community description, working on a fix in a separate
 // PR
-/* func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions() {
+/*
+func(s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions() {
+	// Create a store node
+	// This is needed to fetch the messages after rejoining the community
+	var err error
+
+	storeNodeLogger := s.logger.Named("store-node-waku")
+	wakuStoreNode := NewWakuV2(&s.Suite, storeNodeLogger, true, true, false, shard.UndefinedShardValue)
+
+	storeNodeListenAddresses := wakuStoreNode.ListenAddresses()
+	s.Require().LessOrEqual(1, len(storeNodeListenAddresses))
+
+	storeNodeAddress := storeNodeListenAddresses[0]
+	s.logger.Info("store node ready", zap.String("address", storeNodeAddress))
+
+	// Create messengers
+
+	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, false, []string{"owner", "bob"})
+	s.ownerWaku = wakuNodes[0]
+	s.bobWaku = wakuNodes[1]
+
+	options := []Option{
+		WithTestStoreNode(&s.Suite, localMailserverID, storeNodeAddress, localFleet, s.collectiblesServiceMock),
+	}
+
+	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, s.ownerWaku, "owner", options)
+	s.Require().NoError(err)
+
+	_, err = s.owner.Start()
+	s.Require().NoError(err)
+
+	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, s.bobWaku, "bob", options)
+	s.Require().NoError(err)
+
+	_, err = s.bob.Start()
+	s.Require().NoError(err)
+
+	// Force the owner to use the store node as relay peer
+
+	err = s.owner.DialPeer(storeNodeAddress)
+	s.Require().NoError(err)
+
+	// Create a community
+
 	community, chat := s.createCommunity()
 
 	// bob joins the community
 	s.advertiseCommunityTo(community, s.bob)
-	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	s.joinCommunityWithAirdropAddress(community, s.bob, bobPassword, []string{bobAddress}, "")
+
+	messages := []string{
+		"1-message", // RandomLettersString(10), // successful message on open community
+		"2-message", // RandomLettersString(11), // failing message on encrypted community
+		"3-message", // RandomLettersString(12), // successful message on encrypted community
+	}
 
 	// send message to the channel
-	msg := s.sendChatMessage(s.owner, chat.ID, "hello on open community")
+	msg := s.sendChatMessage(s.owner, chat.ID, messages[0])
+	s.logger.Debug("owner sent a message",
+		zap.String("messageText", msg.Text),
+		zap.String("messageID", msg.ID),
+	)
 
 	// bob can read the message
 	response, err := WaitOnMessengerResponse(
@@ -651,11 +704,16 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 			}
 			return false
 		},
-		"no messages",
+		"first message not received",
 	)
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+
+	bobMessages, _, err := s.bob.MessageByChatID(msg.ChatId, "", 10)
+	s.Require().NoError(err)
+	s.Require().Len(bobMessages, 1)
+	s.Require().Equal(messages[0], bobMessages[0].Text)
 
 	// setup become member permission
 	permissionRequest := requests.CreateCommunityTokenPermission{
@@ -709,7 +767,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 	s.Require().NoError(err)
 
 	// send message to channel
-	msg = s.sendChatMessage(s.owner, chat.ID, "hello on encrypted community")
+	msg = s.sendChatMessage(s.owner, chat.ID, messages[1])
+	s.logger.Debug("owner sent a message",
+		zap.String("messageText", msg.Text),
+		zap.String("messageID", msg.ID),
+	)
 
 	// bob can't read the message
 	_, err = WaitOnMessengerResponse(
@@ -730,13 +792,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 	// bob tries to join, but he doesn't satisfy so the request isn't sent
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), AddressesToReveal: []string{bobAddress}, AirdropAddress: bobAddress}
 	_, err = s.bob.RequestToJoinCommunity(request)
-	s.Require().Error(err)
-	s.Require().ErrorContains(err, "permission to join not satisfied")
+	s.Require().ErrorIs(err, communities.ErrPermissionToJoinNotSatisfied)
 
 	// make sure bob does not have a pending request to join
-	requests, err := s.bob.MyPendingRequestsToJoin()
+	pendingRequests, err := s.bob.MyPendingRequestsToJoin()
 	s.Require().NoError(err)
-	s.Require().Len(requests, 0)
+	s.Require().Len(pendingRequests, 0)
 
 	// make bob satisfy the criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, permissionRequest.TokenCriteria[0])
@@ -748,18 +809,25 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 	})
 
 	// bob re-joins the community
-	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	s.joinCommunity(community, s.bob, bobPassword, []string{bobAddress})
 
 	err = <-waitOnCommunityKeyToBeDistributedToBob
 	s.Require().NoError(err)
 
 	// send message to channel
-	msg = s.sendChatMessage(s.owner, chat.ID, "hello on encrypted community 2")
+	msg = s.sendChatMessage(s.owner, chat.ID, messages[2])
+	s.logger.Debug("owner sent a message",
+		zap.String("messageText", msg.Text),
+		zap.String("messageID", msg.ID),
+	)
 
 	// bob can read the message
 	_, err = WaitOnMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
+			if len(r.messages) != len(messages) {
+				return false
+			}
 			for _, message := range r.messages {
 				if message.Text == msg.Text {
 					return true
@@ -767,11 +835,21 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 			}
 			return false
 		},
-		"no messages",
+		"not all 3 messages received",
 	)
 	s.Require().NoError(err)
-}
-*/
+
+	// Bob should have all 3 messages
+	bobMessages, _, err = s.bob.MessageByChatID(msg.ChatId, "", 10)
+	s.Require().NoError(err)
+	s.Require().Len(bobMessages, 3)
+
+	sort.Slice(bobMessages, func(i, j int) bool {
+		return bobMessages[i].Text < bobMessages[j].Text
+	})
+
+	s.Require().Equal(messages[0], bobMessages[0].Text)
+}*/
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPermission() {
 	community, _ := s.createCommunity()

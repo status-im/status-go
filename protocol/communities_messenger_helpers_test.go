@@ -14,6 +14,7 @@ import (
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -25,7 +26,9 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/communitytokens"
+	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -223,14 +226,15 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku types.Waku, config testCom
 	}
 
 	options := []Option{
-		WithResendParams(3, 3),
 		WithAccountManager(accountsManagerMock),
 		WithTokenManager(tokenManagerMock),
 		WithCommunityTokensService(config.collectiblesService),
 		WithAppSettings(*config.appSettings, *config.nodeConfig),
 	}
 
-	messenger, err := newTestMessenger(waku, config.testMessengerConfig, options)
+	config.extraOptions = append(config.extraOptions, options...)
+
+	messenger, err := newTestMessenger(waku, config.testMessengerConfig)
 	s.Require().NoError(err)
 
 	currentDistributorObj, ok := messenger.communitiesKeyDistributor.(*CommunitiesKeyDistributorImpl)
@@ -499,7 +503,8 @@ func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text stri
 	s.Require().NoError(err)
 
 	return msg
-}*/
+}
+*/
 
 func grantPermission(s *suite.Suite, community *communities.Community, controlNode *Messenger, target *Messenger, role protobuf.CommunityMember_Roles) {
 	responseAddRole, err := controlNode.AddRoleToMember(&requests.AddRoleToMember{
@@ -586,4 +591,26 @@ func waitOnCommunitiesEvent(user *Messenger, condition func(*communities.Subscri
 	}()
 
 	return errCh
+}
+
+func WithTestStoreNode(s *suite.Suite, id string, address string, fleet string, collectiblesServiceMock *CollectiblesServiceMock) Option {
+	return func(c *config) error {
+		sqldb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+		s.Require().NoError(err)
+
+		db := mailserversDB.NewDB(sqldb)
+		err = db.Add(mailserversDB.Mailserver{
+			ID:      id,
+			Name:    id,
+			Address: address,
+			Fleet:   fleet,
+		})
+		s.Require().NoError(err)
+
+		c.mailserversDatabase = db
+		c.clusterConfig = params.ClusterConfig{Fleet: fleet}
+		c.communityTokensService = collectiblesServiceMock
+
+		return nil
+	}
 }

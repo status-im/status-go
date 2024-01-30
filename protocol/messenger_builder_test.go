@@ -25,6 +25,7 @@ type testMessengerConfig struct {
 	logger     *zap.Logger
 
 	unhandledMessagesTracker *unhandledMessagesTracker
+	extraOptions             []Option
 }
 
 func (tmc *testMessengerConfig) complete() error {
@@ -42,13 +43,13 @@ func (tmc *testMessengerConfig) complete() error {
 
 	if tmc.logger == nil {
 		logger := tt.MustCreateTestLogger()
-		tmc.logger = logger.With(zap.String("name", tmc.name))
+		tmc.logger = logger.Named(tmc.name)
 	}
 
 	return nil
 }
 
-func newTestMessenger(waku types.Waku, config testMessengerConfig, extraOptions []Option) (*Messenger, error) {
+func newTestMessenger(waku types.Waku, config testMessengerConfig) (*Messenger, error) {
 	err := config.complete()
 	if err != nil {
 		return nil, err
@@ -80,7 +81,7 @@ func newTestMessenger(waku types.Waku, config testMessengerConfig, extraOptions 
 		WithToplevelDatabaseMigrations(),
 		WithBrowserDatabase(nil),
 	}
-	options = append(options, extraOptions...)
+	options = append(options, config.extraOptions...)
 
 	m, err := NewMessenger(
 		config.name,

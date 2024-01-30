@@ -134,7 +134,9 @@ func (s *MessengerSyncSettingsSuite) newMessenger() *Messenger {
 		Currency:                  "eth",
 	}
 
-	m, err := newTestMessenger(s.shh, testMessengerConfig{}, []Option{WithAppSettings(setting, config)})
+	m, err := newTestMessenger(s.shh, testMessengerConfig{
+		extraOptions: []Option{WithAppSettings(setting, config)},
+	})
 	s.Require().NoError(err)
 	return m
 }
