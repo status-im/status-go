@@ -2097,12 +2097,12 @@ github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc/go.mod h1:ZjcWmF
 github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df/go.mod h1:JP3t17pCcGlemwknint6hfoeCVQrEMVwxRLRjXpq+BU=
 github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae/go.mod h1:DD4vA1DwXk04H54A1oHXtwZmA0grkVMdPxx/VGLCah0=
 github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f/go.mod h1:DD4vA1DwXk04H54A1oHXtwZmA0grkVMdPxx/VGLCah0=
-github.com/waku-org/go-discover v0.0.0-20221209174356-61c833f34d98 h1:xwY0kW5XZFimdqfZb9cZwT1S3VJP9j3AE6bdNd9boXM=
-github.com/waku-org/go-discover v0.0.0-20221209174356-61c833f34d98/go.mod h1:eBHgM6T4EG0RZzxpxKy+rGz/6Dw2Nd8DWxS0lm9ESDw=
+github.com/waku-org/go-discover v0.0.0-20240129014929-85f2c00b96a3 h1:Kk0KYXZE/uNnARF2TbCQyvyZ/w4SgF8VhquNdOVVsNU=
+github.com/waku-org/go-discover v0.0.0-20240129014929-85f2c00b96a3/go.mod h1:eBHgM6T4EG0RZzxpxKy+rGz/6Dw2Nd8DWxS0lm9ESDw=
 github.com/waku-org/go-libp2p-rendezvous v0.0.0-20230628220917-7b4e5ae4c0e7 h1:0e1h+p84yBp0IN7AqgbZlV7lgFBjm214lgSOE7CeJmE=
 github.com/waku-org/go-libp2p-rendezvous v0.0.0-20230628220917-7b4e5ae4c0e7/go.mod h1:pFvOZ9YTFsW0o5zJW7a0B5tr1owAijRWJctXJ2toL04=
-github.com/waku-org/go-waku v0.8.1-0.20240104144340-585648c4eefe h1:2D97fbaKlIQRjWMz/iTjnYcxi2z6ekKvspTGtcuPHgU=
-github.com/waku-org/go-waku v0.8.1-0.20240104144340-585648c4eefe/go.mod h1:+b5fPPJ4YUIAPJtPOtwB7bTrOQ9lF15I2LnQjV6NMIA=
+github.com/waku-org/go-waku v0.8.1-0.20240130093642-77ea359ef873 h1:pnUvFENjM/h7HVF8VsNWTmOXx/rYs62P7H2EFjAnwVw=
+github.com/waku-org/go-waku v0.8.1-0.20240130093642-77ea359ef873/go.mod h1:RjTvkTrIwpoT1cM9HeQqwa2Q7t7WOkb3hpuB/zuZ6SM=
 github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59 h1:jisj+OCI6QydLtFq3Pyhu49wl9ytPN7oAHjMfepHDrA=
 github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59/go.mod h1:1PdBdPzyTaKt3VnpAHk3zj+r9dXPFOr3IHZP9nFle6E=
 github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230916172309-ee0ee61dde2b h1:KgZVhsLkxsj5gb/FfndSCQu6VYwALrCOgYI3poR95yE=

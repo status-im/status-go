@@ -472,10 +472,7 @@ func LoginWithKeycard(accountData, password, keyHex string, configJSON string) s
 // Logout is equivalent to clearing whisper identities.
 func Logout() string {
 	err := statusBackend.Logout()
-	if err != nil {
-		makeJSONResponse(err)
-	}
-	return makeJSONResponse(statusBackend.StopNode())
+	return makeJSONResponse(err)
 }
 
 // SignMessage unmarshals rpc params {data, address, password} and

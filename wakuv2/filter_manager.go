@@ -93,6 +93,7 @@ func (mgr *FilterManager) runFilterLoop(wg *sync.WaitGroup) {
 	for {
 		select {
 		case <-mgr.ctx.Done():
+			mgr.logger.Debug("filter loop stopped")
 			return
 		case <-ticker.C:
 			mgr.pingPeers()

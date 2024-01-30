@@ -89,7 +89,7 @@ require (
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.2
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
-	github.com/waku-org/go-waku v0.8.1-0.20240104144340-585648c4eefe
+	github.com/waku-org/go-waku v0.8.1-0.20240130093642-77ea359ef873
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	github.com/yeqown/go-qrcode/v2 v2.2.1
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1
@@ -261,7 +261,7 @@ require (
 	github.com/tklauser/numcpus v0.2.2 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/urfave/cli/v2 v2.24.4 // indirect
-	github.com/waku-org/go-discover v0.0.0-20221209174356-61c833f34d98 // indirect
+	github.com/waku-org/go-discover v0.0.0-20240129014929-85f2c00b96a3 // indirect
 	github.com/waku-org/go-libp2p-rendezvous v0.0.0-20230628220917-7b4e5ae4c0e7 // indirect
 	github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59 // indirect
 	github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230916172309-ee0ee61dde2b // indirect
