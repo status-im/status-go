@@ -611,6 +611,18 @@ func (w *Waku) getPubsubTopic(topic string) string {
 	return topic
 }
 
+func (w *Waku) unsubscribeFromPubsubTopicWithWakuRelay(topic string) error {
+	topic = w.getPubsubTopic(topic)
+
+	if !w.node.Relay().IsSubscribed(topic) {
+		return nil
+	}
+
+	contentFilter := protocol.NewContentFilter(topic)
+
+	return w.node.Relay().Unsubscribe(w.ctx, contentFilter)
+}
+
 func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.PublicKey) error {
 	if w.settings.LightClient {
 		return errors.New("only available for full nodes")
@@ -1546,6 +1558,18 @@ func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) err
 	return nil
 }
 
+func (w *Waku) UnsubscribeFromPubsubTopic(topic string) error {
+	topic = w.getPubsubTopic(topic)
+
+	if !w.settings.LightClient {
+		err := w.unsubscribeFromPubsubTopicWithWakuRelay(topic)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (w *Waku) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
 	topic = w.getPubsubTopic(topic)
 	if w.protectedTopicStore == nil {
@@ -1562,6 +1586,15 @@ func (w *Waku) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) erro
 	}
 
 	return w.protectedTopicStore.Insert(topic, privKey, &privKey.PublicKey)
+}
+
+func (w *Waku) RemovePubsubTopicKey(topic string) error {
+	topic = w.getPubsubTopic(topic)
+	if w.protectedTopicStore == nil {
+		return nil
+	}
+
+	return w.protectedTopicStore.Delete(topic)
 }
 
 func (w *Waku) StartDiscV5() error {

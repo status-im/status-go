@@ -17,6 +17,7 @@ type ProtectedTopicsStore struct {
 
 	insertStmt       *sql.Stmt
 	fetchPrivKeyStmt *sql.Stmt
+	deleteStmt       *sql.Stmt
 }
 
 // Creates a new DB store using the db specified via options.
@@ -33,11 +34,17 @@ func NewProtectedTopicsStore(log *zap.Logger, db *sql.DB) (*ProtectedTopicsStore
 		return nil, err
 	}
 
+	deleteStmt, err := db.Prepare("DELETE FROM pubsubtopic_signing_key WHERE topic = ?")
+	if err != nil {
+		return nil, err
+	}
+
 	result := new(ProtectedTopicsStore)
 	result.log = log.Named("protected-topics-store")
 	result.db = db
 	result.insertStmt = insertStmt
 	result.fetchPrivKeyStmt = fetchPrivKeyStmt
+	result.deleteStmt = deleteStmt
 
 	return result, nil
 }
@@ -61,6 +68,11 @@ func (p *ProtectedTopicsStore) Insert(pubsubTopic string, privKey *ecdsa.Private
 
 	_, err := p.insertStmt.Exec(pubsubTopic, privKeyBytes, pubKeyBytes)
 
+	return err
+}
+
+func (p *ProtectedTopicsStore) Delete(pubsubTopic string) error {
+	_, err := p.deleteStmt.Exec(pubsubTopic)
 	return err
 }
 

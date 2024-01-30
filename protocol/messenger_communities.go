@@ -715,6 +715,16 @@ func (m *Messenger) subscribeToCommunityShard(communityID []byte, shard *shard.S
 	return m.transport.SubscribeToPubsubTopic(pubsubTopic, pubK)
 }
 
+func (m *Messenger) unsubscribeFromShard(shard *shard.Shard) error {
+	if m.transport.WakuVersion() != 2 {
+		return nil
+	}
+
+	// TODO: this should probably be moved completely to transport once pubsub topic logic is implemented
+
+	return m.transport.UnsubscribeFromPubsubTopic(shard.PubsubTopic())
+}
+
 func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes, forceJoin bool) (*MessengerResponse, error) {
 	logger := m.logger.Named("joinCommunity")
 
@@ -2053,26 +2063,57 @@ func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*Mes
 		return nil, err
 	}
 
-	community, err := m.communitiesManager.SetShard(request.CommunityID, request.Shard)
+	community, err := m.communitiesManager.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, err
 	}
 
-	var topicPrivKey *ecdsa.PrivateKey
-	if request.PrivateKey != nil {
-		topicPrivKey, err = crypto.ToECDSA(*request.PrivateKey)
-	} else {
-		topicPrivKey, err = crypto.GenerateKey()
+	if !community.IsControlNode() {
+		return nil, errors.New("not admin or owner")
 	}
+
+	// Reset the community private key
+	community.SetPubsubTopicPrivateKey(nil)
+
+	// Removing the private key (if it exist)
+	err = m.RemovePubsubTopicPrivateKey(community.PubsubTopic())
 	if err != nil {
 		return nil, err
 	}
 
-	err = m.communitiesManager.UpdatePubsubTopicPrivateKey(community, topicPrivKey)
+	// Unsubscribing from existing shard
+	if community.Shard() != nil {
+		err := m.unsubscribeFromShard(community.Shard())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	community, err = m.communitiesManager.SetShard(request.CommunityID, request.Shard)
 	if err != nil {
 		return nil, err
 	}
 
+	if request.Shard != nil {
+		var topicPrivKey *ecdsa.PrivateKey
+		if request.PrivateKey != nil {
+			topicPrivKey, err = crypto.ToECDSA(*request.PrivateKey)
+		} else {
+			topicPrivKey, err = crypto.GenerateKey()
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		community.SetPubsubTopicPrivateKey(topicPrivKey)
+
+		err = m.communitiesManager.UpdatePubsubTopicPrivateKey(community.PubsubTopic(), topicPrivKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// TODO: Check
 	err = m.UpdateCommunityFilters(community)
 	if err != nil {
 		return nil, err
@@ -2092,6 +2133,10 @@ func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*Mes
 	response.AddCommunity(community)
 
 	return response, nil
+}
+
+func (m *Messenger) RemovePubsubTopicPrivateKey(topic string) error {
+	return m.transport.RemovePubsubTopicKey(topic)
 }
 
 func (m *Messenger) UpdateCommunityFilters(community *communities.Community) error {
@@ -2480,15 +2525,16 @@ func (m *Messenger) SendCommunityShardKey(community *communities.Community, pubk
 		return nil
 	}
 
+	keyBytes := make([]byte, 0)
 	key := community.PubsubTopicPrivateKey()
-	if key == nil {
-		return nil // No community shard key available
+	if key != nil {
+		keyBytes = crypto.FromECDSA(key)
 	}
 
 	communityShardKey := &protobuf.CommunityShardKey{
 		Clock:       community.Clock(),
 		CommunityId: community.ID(),
-		PrivateKey:  crypto.FromECDSA(key),
+		PrivateKey:  keyBytes,
 		Shard:       community.Shard().Protobuffer(),
 	}
 
@@ -2831,14 +2877,32 @@ func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communiti
 	}
 
 	var privKey *ecdsa.PrivateKey = nil
-	if message.PrivateKey != nil {
-		privKey, err = crypto.ToECDSA(message.PrivateKey)
+	if message.Shard != nil {
+		if message.PrivateKey != nil {
+			privKey, err = crypto.ToECDSA(message.PrivateKey)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Removing the existing private key (if any)
+	err = m.RemovePubsubTopicPrivateKey(community.PubsubTopic())
+	if err != nil {
+		return err
+	}
+
+	// Unsubscribing from existing shard
+	if community.Shard() != nil {
+		err := m.unsubscribeFromShard(community.Shard())
 		if err != nil {
 			return err
 		}
 	}
 
-	err = m.communitiesManager.UpdatePubsubTopicPrivateKey(community, privKey)
+	community.SetPubsubTopicPrivateKey(privKey)
+
+	err = m.communitiesManager.UpdatePubsubTopicPrivateKey(community.PubsubTopic(), privKey)
 	if err != nil {
 		return err
 	}

@@ -695,10 +695,25 @@ func (t *Transport) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.Pub
 	return nil
 }
 
+// Unsubscribe from a pubsub topic
+func (t *Transport) UnsubscribeFromPubsubTopic(topic string) error {
+	if t.waku.Version() == 2 {
+		return t.waku.UnsubscribeFromPubsubTopic(topic)
+	}
+	return nil
+}
+
 func (t *Transport) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
 	return t.waku.StorePubsubTopicKey(topic, privKey)
 }
 
 func (t *Transport) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
 	return t.waku.RetrievePubsubTopicKey(topic)
+}
+
+func (t *Transport) RemovePubsubTopicKey(topic string) error {
+	if t.waku.Version() == 2 {
+		return t.waku.RemovePubsubTopicKey(topic)
+	}
+	return nil
 }
