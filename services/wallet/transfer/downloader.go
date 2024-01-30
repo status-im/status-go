@@ -225,6 +225,10 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 		}
 
 		for _, tx := range blk.Transactions() {
+			// Skip dummy blob transactions, as they are not supported by us
+			if tx.Type() == types.BlobTxType {
+				continue
+			}
 			if tx.ChainId().Cmp(big.NewInt(0)) != 0 && tx.ChainId().Cmp(d.chainClient.ToBigInt()) != 0 {
 				log.Info("chain id mismatch", "tx hash", tx.Hash(), "tx chain id", tx.ChainId(), "expected chain id", d.chainClient.NetworkID())
 				continue

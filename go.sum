@@ -1986,8 +1986,8 @@ github.com/spf13/viper v1.4.0/go.mod h1:PTJ7Z/lr49W6bUbkmS1V3by4uWynFiR9p7+dSq/y
 github.com/spf13/viper v1.7.0/go.mod h1:8WkrPz2fc9jxqZNCJI/76HCieCp4Q8HaLFoCha5qpdg=
 github.com/status-im/doubleratchet v3.0.0+incompatible h1:aJ1ejcSERpSzmWZBgtfYtiU2nF0Q8ZkGyuEPYETXkCY=
 github.com/status-im/doubleratchet v3.0.0+incompatible/go.mod h1:1sqR0+yhiM/bd+wrdX79AOt2csZuJOni0nUDzKNuqOU=
-github.com/status-im/go-ethereum v1.10.25-status.11 h1:casDsgnrkXzyO9SQVyFsT+63XuInyFXzfEHRW/9eEVY=
-github.com/status-im/go-ethereum v1.10.25-status.11/go.mod h1:Dt4K5JYMhJRdtXJwBEyGZLZn9iz/chSOZyjVmt5ZhwQ=
+github.com/status-im/go-ethereum v1.10.25-status.13 h1:BIQB1MEY5m/D0pd4zXF1psKgyHMmnC+HZ+liJfB4tmY=
+github.com/status-im/go-ethereum v1.10.25-status.13/go.mod h1:Dt4K5JYMhJRdtXJwBEyGZLZn9iz/chSOZyjVmt5ZhwQ=
 github.com/status-im/go-multiaddr-ethv4 v1.2.5 h1:pN+ey6wYKbvNNu5/xq9+VL0N8Yq0pZUTbZp0URg+Yn4=
 github.com/status-im/go-multiaddr-ethv4 v1.2.5/go.mod h1:Fhe/18yWU5QwlAYiOO3Bb1BLe0bn5YobcNBHsjRr4kk=
 github.com/status-im/go-sqlcipher/v4 v4.5.4-status.2 h1:Oi9JTAI2DZEe5UKlpUcvKBCCSn3ULsLIrix7jPnEoPE=
