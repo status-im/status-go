@@ -21,7 +21,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 
 	actualNetworks := BuildDefaultNetworks(request)
 
-	require.Len(t, actualNetworks, 8)
+	require.Len(t, actualNetworks, 9)
 
 	require.Equal(t, mainnetChainID, actualNetworks[0].ChainID)
 
@@ -48,20 +48,25 @@ func TestBuildDefaultNetworks(t *testing.T) {
 	require.True(t, strings.Contains(actualNetworks[4].RPCURL, infuraToken))
 	require.Equal(t, "", actualNetworks[4].FallbackURL)
 
-	require.Equal(t, arbitrumChainID, actualNetworks[5].ChainID)
+	require.Equal(t, optimismSepoliaChainID, actualNetworks[5].ChainID)
 
-	require.True(t, strings.Contains(actualNetworks[5].RPCURL, poktToken))
-	require.True(t, strings.Contains(actualNetworks[5].FallbackURL, infuraToken))
+	require.True(t, strings.Contains(actualNetworks[5].RPCURL, infuraToken))
+	require.Equal(t, "", actualNetworks[5].FallbackURL)
 
-	require.Equal(t, arbitrumGoerliChainID, actualNetworks[6].ChainID)
+	require.Equal(t, arbitrumChainID, actualNetworks[6].ChainID)
 
-	require.True(t, strings.Contains(actualNetworks[6].RPCURL, infuraToken))
-	require.Equal(t, "", actualNetworks[6].FallbackURL)
+	require.True(t, strings.Contains(actualNetworks[6].RPCURL, poktToken))
+	require.True(t, strings.Contains(actualNetworks[6].FallbackURL, infuraToken))
 
-	require.Equal(t, arbitrumSepoliaChainID, actualNetworks[7].ChainID)
+	require.Equal(t, arbitrumGoerliChainID, actualNetworks[7].ChainID)
 
 	require.True(t, strings.Contains(actualNetworks[7].RPCURL, infuraToken))
 	require.Equal(t, "", actualNetworks[7].FallbackURL)
+
+	require.Equal(t, arbitrumSepoliaChainID, actualNetworks[8].ChainID)
+
+	require.True(t, strings.Contains(actualNetworks[8].RPCURL, infuraToken))
+	require.Equal(t, "", actualNetworks[8].FallbackURL)
 }
 
 func TestBuildDefaultNetworksGanache(t *testing.T) {
@@ -74,7 +79,7 @@ func TestBuildDefaultNetworksGanache(t *testing.T) {
 
 	actualNetworks := BuildDefaultNetworks(request)
 
-	require.Len(t, actualNetworks, 8)
+	require.Len(t, actualNetworks, 9)
 
 	for _, n := range actualNetworks {
 		require.True(t, strings.Contains(n.RPCURL, ganacheURL))
