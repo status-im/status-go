@@ -50,6 +50,7 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 		discordAuthorsPath:             handleDiscordAuthorAvatar(s.db, s.logger),
 		generateQRCode:                 handleQRCodeGeneration(s.multiaccountsDB, s.logger),
 		imagesPath:                     handleImage(s.db, s.logger),
+		imagePreviewPath:               handleImagePreviewFromURL(s.logger),
 		ipfsPath:                       handleIPFS(s.downloader, s.logger),
 		LinkPreviewThumbnailPath:       handleLinkPreviewThumbnail(s.db, s.logger),
 		StatusLinkPreviewThumbnailPath: handleStatusLinkPreviewThumbnail(s.db, s.logger),

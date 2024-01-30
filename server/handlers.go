@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"image"
 	"image/color"
@@ -30,6 +31,7 @@ const (
 	basePath                       = "/messages"
 	imagesPath                     = basePath + "/images"
 	audioPath                      = basePath + "/audio"
+	imagePreviewPath               = "/image-preview"
 	ipfsPath                       = "/ipfs"
 	discordAuthorsPath             = "/discord/authors"
 	discordAttachmentsPath         = basePath + "/discord/attachments"
@@ -1145,6 +1147,36 @@ func handleWalletCollectibleImages(db *sql.DB, logger *zap.Logger) http.HandlerF
 		_, err = w.Write(image)
 		if err != nil {
 			logger.Error("failed to write wallet collectible image", zap.Error(err))
+
+		}
+	}
+}
+func handleImagePreviewFromURL(logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		params, err := parseImagePreviewParams(r.URL.Query())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			logger.Error("failed to parse params", zap.Error(err))
+			return
+		}
+
+		imageBuffer, err := generateImagePreviewFromURL(params, logger)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			logger.Error("failed to generate preview image", zap.Error(err))
+			return
+		}
+
+		encodedImage := "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(imageBuffer.Bytes())
+
+		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Cache-Control", "max-age=3600")
+
+		_, err = w.Write([]byte(encodedImage))
+		if err != nil {
+			message := "couldn't send preview image"
+			http.Error(w, message, http.StatusInternalServerError)
+			logger.Error(message, zap.Error(err))
 		}
 	}
 }
