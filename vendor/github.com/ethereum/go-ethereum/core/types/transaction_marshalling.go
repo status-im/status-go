@@ -692,6 +692,8 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 		if dec.Nonce != nil {
 			inner = &optimismDepositTxWithNonce{OptimismDepositTx: itx, EffectiveNonce: uint64(*dec.Nonce)}
 		}
+	case BlobTxType:
+		inner = &DummyBlobTx{}
 	default:
 		return ErrTxTypeNotSupported
 	}

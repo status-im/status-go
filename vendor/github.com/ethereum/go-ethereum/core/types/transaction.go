@@ -46,6 +46,7 @@ const (
 	LegacyTxType = iota
 	AccessListTxType
 	DynamicFeeTxType
+	BlobTxType                    = 0x3
 	ArbitrumDepositTxType         = 100
 	ArbitrumUnsignedTxType        = 101
 	ArbitrumContractTxType        = 102
@@ -257,6 +258,9 @@ func (tx *Transaction) decodeTyped(b []byte, l2Parsing bool) (TxData, error) {
 		var inner DynamicFeeTx
 		err := rlp.DecodeBytes(b[1:], &inner)
 		return &inner, err
+	case BlobTxType:
+		var inner DummyBlobTx
+		return &inner, nil
 	default:
 		return nil, ErrTxTypeNotSupported
 	}
