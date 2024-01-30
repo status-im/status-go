@@ -611,17 +611,11 @@ func (w *Waku) getPubsubTopic(topic string) string {
 }
 
 func (w *Waku) unsubscribeFromPubsubTopicWithWakuRelay(topic string) error {
-	if w.settings.LightClient {
-		return errors.New("only available for full nodes")
-	}
-
 	topic = w.getPubsubTopic(topic)
 
 	if !w.node.Relay().IsSubscribed(topic) {
 		return nil
 	}
-
-	w.node.Relay().RemoveTopicValidator(topic)
 
 	contentFilter := protocol.NewContentFilter(topic)
 
