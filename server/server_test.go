@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -9,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -41,10 +43,11 @@ type ServerURLSuite struct {
 	servertest.TestKeyComponents
 	servertest.TestLoggerComponents
 
-	server       *MediaServer
-	serverForQR  *MediaServer
-	serverNoPort *MediaServer
-	testStart    time.Time
+	server           *MediaServer
+	serverForQR      *MediaServer
+	serverForPreview *MediaServer
+	serverNoPort     *MediaServer
+	testStart        time.Time
 }
 
 func (s *ServerURLSuite) SetupTest() {
@@ -57,6 +60,14 @@ func (s *ServerURLSuite) SetupTest() {
 	s.serverForQR = mediaServer
 
 	err = s.serverForQR.Start()
+	s.Require().NoError(err)
+
+	previewMediaServer, err := NewMediaServer(nil, nil, nil)
+	s.Require().NoError(err)
+
+	s.serverForPreview = previewMediaServer
+
+	err = s.serverForPreview.Start()
 	s.Require().NoError(err)
 
 	s.server = &MediaServer{Server: Server{
@@ -143,6 +154,72 @@ func (s *ServerURLSuite) TestServer_MakeStickerURL() {
 	s.testNoPort(
 		baseURLWithDefaultPort+"/ipfs?hash=0xdeadbeef4ac0",
 		s.serverNoPort.MakeStickerURL("0xdeadbeef4ac0"))
+}
+
+func SetupHttpClient(cert *tls.Certificate) (*http.Client, error) {
+	serverCertBytes := cert.Certificate[0]
+
+	certPem := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: serverCertBytes})
+
+	rootCAs, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, err
+	}
+
+	_ = rootCAs.AppendCertsFromPEM(certPem)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+			RootCAs:    rootCAs,
+		},
+	}
+
+	client := &http.Client{Transport: tr}
+
+	return client, nil
+}
+
+func (s *ServerURLSuite) TestImagePreviewGeneration() {
+	imageUrl := "https://raw.githubusercontent.com/status-im/status-go/develop/_assets/tests/status.png"
+	size := 150
+
+	requestUrl := s.serverForPreview.ImagePreviewURL(imageUrl, fmt.Sprintf("%d", size))
+
+	client, err := SetupHttpClient(s.serverForPreview.cert)
+	if err != nil {
+		s.Require().NoError(err)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, requestUrl, nil)
+	if err != nil {
+		s.Require().NoError(err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		s.Require().NoError(err)
+	}
+
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	payload, err := ioutil.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		s.Require().Failf(fmt.Sprintf("Unexpected response status code: %d", resp.StatusCode), string(payload))
+	}
+
+	base64Data := strings.Replace(string(payload), Base64JPEGUrlScheme, "", 1)
+	imageBytes, err := base64.StdEncoding.DecodeString(base64Data)
+
+	if err != nil {
+		s.Require().Failf("Failed to base64 decode returned image", err.Error())
+	}
+
+	image, err := images.DecodeImageData(imageBytes, bytes.NewReader(imageBytes))
+
+	require.Equal(s.T(), size, image.Bounds().Dx())
 }
 
 // TestQRCodeGeneration tests if we provide all the correct parameters to the media server

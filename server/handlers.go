@@ -1167,7 +1167,7 @@ func handleImagePreviewFromURL(logger *zap.Logger) http.HandlerFunc {
 			return
 		}
 
-		encodedImage := "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(imageBuffer.Bytes())
+		encodedImage := addBase64UrlScheme(base64.StdEncoding.EncodeToString(imageBuffer.Bytes()))
 
 		w.Header().Set("Content-Type", "text/plain")
 		w.Header().Set("Cache-Control", "max-age=3600")

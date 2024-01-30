@@ -123,6 +123,16 @@ func (s *MediaServer) MakeStickerURL(stickerHash string) string {
 	return u.String()
 }
 
+func (s *MediaServer) ImagePreviewURL(imageUrl string, size string) string {
+	u := s.MakeBaseURL()
+	u.Path = imagePreviewPath
+	u.RawQuery = url.Values{
+		"image_url": {imageUrl},
+		"size":      {size}}.Encode()
+
+	return u.String()
+}
+
 func (s *MediaServer) MakeQRURL(qurul string,
 	allowProfileImage string,
 	level string,
