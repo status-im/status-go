@@ -212,9 +212,6 @@ type WakuV2Config struct {
 	// StoreSeconds indicates the maximum number of seconds before a message is removed from the store
 	StoreSeconds int
 
-	// EnableFilterNode indicates if WakuFilter Full Node should be enabled
-	EnableFilterFullNode bool
-
 	// UseShardAsDefaultTopic indicates whether the default shard should be used instead of the default relay topic
 	UseShardAsDefaultTopic bool
 }
