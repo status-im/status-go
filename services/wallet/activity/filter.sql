@@ -359,11 +359,7 @@ SELECT
 	CASE
 		WHEN from_join.address IS NOT NULL AND to_join.address IS NULL THEN fromTrType
 		WHEN to_join.address IS NOT NULL AND from_join.address IS NULL THEN toTrType
-		WHEN from_join.address IS NOT NULL AND to_join.address IS NOT NULL THEN
-			CASE
-				WHEN from_join.address < to_join.address THEN fromTrType
-				ELSE toTrType
-			END
+		WHEN from_join.address IS NOT NULL AND to_join.address IS NOT NULL THEN fromTrType
 		ELSE NULL
 	END as tr_type,
 	pending_transactions.from_address AS from_address,
