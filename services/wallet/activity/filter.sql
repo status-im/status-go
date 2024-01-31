@@ -180,6 +180,7 @@ SELECT
 	transfers.tx_to_address AS to_address,
 	transfers.address AS owner_address,
 	transfers.amount_padded128hex AS tr_amount,
+	NULL AS ptr_amount,
 	NULL AS mt_from_amount,
 	NULL AS mt_to_amount,
 	CASE
@@ -365,7 +366,8 @@ SELECT
 	pending_transactions.from_address AS from_address,
 	pending_transactions.to_address AS to_address,
 	NULL AS owner_address,
-	pending_transactions.value AS tr_amount,
+	NULL AS tr_amount,
+	pending_transactions.value AS ptr_amount,
 	NULL AS mt_from_amount,
 	NULL AS mt_to_amount,
 	statusPending AS agg_status,
@@ -442,6 +444,7 @@ SELECT
 	multi_transactions.to_address AS to_address,
 	multi_transactions.from_address AS owner_address,
 	NULL AS tr_amount,
+	NULL AS ptr_amount,
 	multi_transactions.from_amount AS mt_from_amount,
 	multi_transactions.to_amount AS mt_to_amount,
 	CASE

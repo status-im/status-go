@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 
+	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/testutils"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -348,7 +349,7 @@ func InsertTestPendingTransaction(tb testing.TB, db *sql.DB, tr *TestTransfer) {
 		INSERT INTO pending_transactions (network_id, hash, timestamp, from_address, to_address,
 			symbol, gas_price, gas_limit, value, data, type, additional_data, multi_transaction_id
 		) VALUES (?, ?, ?, ?, ?, 'ETH', 0, 0, ?, '', 'eth', '', ?)`,
-		tr.ChainID, tr.Hash, tr.Timestamp, tr.From, tr.To, tr.Value, tr.MultiTransactionID)
+		tr.ChainID, tr.Hash, tr.Timestamp, tr.From, tr.To, (*bigint.SQLBigIntBytes)(big.NewInt(tr.Value)), tr.MultiTransactionID)
 	require.NoError(tb, err)
 }
 
