@@ -57,6 +57,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
@@ -303,8 +304,9 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		opts = append(opts, node.WithMessageProvider(dbStore))
 	}
 
-	if cfg.EnableFilterFullNode {
-		opts = append(opts, node.WithWakuFilterFullNode())
+	if !cfg.LightClient {
+		opts = append(opts, node.WithWakuFilterFullNode(filter.WithMaxSubscribers(20)))
+		opts = append(opts, node.WithLightPush())
 	}
 
 	if appDB != nil {

@@ -51,7 +51,6 @@ type Config struct {
 	StoreCapacity           int              `toml:",omitempty"`
 	StoreSeconds            int              `toml:",omitempty"`
 	TelemetryServerURL      string           `toml:",omitempty"`
-	EnableFilterFullNode    bool             `toml:",omitempty"`
 	DefaultShardPubsubTopic string           `toml:",omitempty"`
 	UseShardAsDefaultTopic  bool             `toml:",omitempty"`
 	ClusterID               uint16           `toml:",omitempty"`

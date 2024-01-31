@@ -319,7 +319,6 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig, telemetryServe
 			Rendezvous:              nodeConfig.Rendezvous,
 			WakuNodes:               nodeConfig.ClusterConfig.WakuNodes,
 			PeerExchange:            nodeConfig.WakuV2Config.PeerExchange,
-			EnableFilterFullNode:    nodeConfig.WakuV2Config.EnableFilterFullNode,
 			EnableStore:             nodeConfig.WakuV2Config.EnableStore,
 			StoreCapacity:           nodeConfig.WakuV2Config.StoreCapacity,
 			StoreSeconds:            nodeConfig.WakuV2Config.StoreSeconds,
