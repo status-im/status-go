@@ -61,15 +61,17 @@ func GenerateTestPendingTransactions(count int) []PendingTransaction {
 
 	txs := make([]PendingTransaction, count)
 	for i := 0; i < count; i++ {
+		// Avoid generating zero values hash and addresses
+		seed := i + 1
 		txs[i] = PendingTransaction{
-			Hash:           eth.Hash{byte(i)},
-			From:           eth.Address{byte(i)},
-			To:             eth.Address{byte(i * 2)},
+			Hash:           eth.Hash{byte(seed)},
+			From:           eth.Address{byte(seed)},
+			To:             eth.Address{byte(seed * 2)},
 			Type:           RegisterENS,
 			AdditionalData: "someuser.stateofus.eth",
-			Value:          bigint.BigInt{Int: big.NewInt(int64(i))},
+			Value:          bigint.BigInt{Int: big.NewInt(int64(seed))},
 			GasLimit:       bigint.BigInt{Int: big.NewInt(21000)},
-			GasPrice:       bigint.BigInt{Int: big.NewInt(int64(i))},
+			GasPrice:       bigint.BigInt{Int: big.NewInt(int64(seed))},
 			ChainID:        777,
 			Status:         new(TxStatus),
 			AutoDelete:     new(bool),

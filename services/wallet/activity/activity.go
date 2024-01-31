@@ -488,6 +488,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		var tokenAddress, contractAddress *eth.Address
 		var aggregatedStatus int
 		var dbTrAmount sql.NullString
+		dbPTrAmount := new(big.Int)
 		var dbMtFromAmount, dbMtToAmount, contractType sql.NullString
 		var tokenCode, fromTokenCode, toTokenCode sql.NullString
 		var methodHash sql.NullString
@@ -495,7 +496,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		var communityMintEventDB sql.NullBool
 		var communityMintEvent bool
 		err := rows.Scan(&transferHash, &pendingHash, &chainID, &multiTxID, &timestamp, &dbMtType, &dbTrType, &fromAddress,
-			&toAddressDB, &ownerAddressDB, &dbTrAmount, &dbMtFromAmount, &dbMtToAmount, &aggregatedStatus, &aggregatedCount,
+			&toAddressDB, &ownerAddressDB, &dbTrAmount, (*bigint.SQLBigIntBytes)(dbPTrAmount), &dbMtFromAmount, &dbMtToAmount, &aggregatedStatus, &aggregatedCount,
 			&tokenAddress, &dbTokenID, &tokenCode, &fromTokenCode, &toTokenCode, &outChainIDDB, &inChainIDDB, &contractType,
 			&contractAddressDB, &methodHash, &communityMintEventDB)
 		if err != nil {
@@ -556,7 +557,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			activityType, _ := getActivityType(dbTrType)
 
 			ownerAddress := eth.BytesToAddress(ownerAddressDB)
-			inAmount, outAmount := getTrInAndOutAmounts(activityType, dbTrAmount)
+			inAmount, outAmount := getTrInAndOutAmounts(activityType, dbTrAmount, dbPTrAmount)
 
 			// Extract tokens and chains
 			var involvedToken *Token
@@ -596,7 +597,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			// Extract activity type: SendAT/ReceiveAT
 			activityType, _ := getActivityType(dbTrType)
 
-			inAmount, outAmount := getTrInAndOutAmounts(activityType, dbTrAmount)
+			inAmount, outAmount := getTrInAndOutAmounts(activityType, dbTrAmount, dbPTrAmount)
 
 			outChainID = new(common.ChainID)
 			*outChainID = common.ChainID(chainID.Int64)
@@ -674,32 +675,40 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 	return entries, nil
 }
 
-func getTrInAndOutAmounts(activityType Type, trAmount sql.NullString) (inAmount *hexutil.Big, outAmount *hexutil.Big) {
+func getTrInAndOutAmounts(activityType Type, trAmount sql.NullString, pTrAmount *big.Int) (inAmount *hexutil.Big, outAmount *hexutil.Big) {
+	var amount *big.Int
+	ok := false
 	if trAmount.Valid {
-		amount, ok := new(big.Int).SetString(trAmount.String, 16)
-		if ok {
-			switch activityType {
-			case ContractDeploymentAT:
-				fallthrough
-			case SendAT:
-				inAmount = (*hexutil.Big)(big.NewInt(0))
-				outAmount = (*hexutil.Big)(amount)
-				return
-			case MintAT:
-				fallthrough
-			case ReceiveAT:
-				inAmount = (*hexutil.Big)(amount)
-				outAmount = (*hexutil.Big)(big.NewInt(0))
-				return
-			default:
-				log.Warn(fmt.Sprintf("unexpected activity type %d", activityType))
-			}
-		} else {
-			log.Warn(fmt.Sprintf("could not parse amount %s", trAmount.String))
-		}
+		amount, ok = new(big.Int).SetString(trAmount.String, 16)
+	} else if pTrAmount != nil {
+		// Process pending transaction value
+		amount = pTrAmount
+		ok = true
 	} else {
 		log.Warn(fmt.Sprintf("invalid transaction amount for type %d", activityType))
 	}
+
+	if ok {
+		switch activityType {
+		case ContractDeploymentAT:
+			fallthrough
+		case SendAT:
+			inAmount = (*hexutil.Big)(big.NewInt(0))
+			outAmount = (*hexutil.Big)(amount)
+			return
+		case MintAT:
+			fallthrough
+		case ReceiveAT:
+			inAmount = (*hexutil.Big)(amount)
+			outAmount = (*hexutil.Big)(big.NewInt(0))
+			return
+		default:
+			log.Warn(fmt.Sprintf("unexpected activity type %d", activityType))
+		}
+	} else {
+		log.Warn(fmt.Sprintf("could not parse amount %s", trAmount.String))
+	}
+
 	inAmount = (*hexutil.Big)(big.NewInt(0))
 	outAmount = (*hexutil.Big)(big.NewInt(0))
 	return
