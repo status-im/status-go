@@ -51,20 +51,7 @@ func (m *Messenger) shouldSync() (bool, error) {
 		return false, err
 	}
 
-	if !useMailserver {
-		return false, nil
-	}
-
-	if !m.connectionState.IsExpensive() {
-		return true, nil
-	}
-
-	syncingOnMobileNetwork, err := m.settings.CanSyncOnMobileNetwork()
-	if err != nil {
-		return false, err
-	}
-
-	return syncingOnMobileNetwork, nil
+	return useMailserver, nil
 }
 
 func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
