@@ -179,10 +179,10 @@ func (api *API) GetBalanceHistoryRange(ctx context.Context, chainIDs []uint64, a
 	return api.s.history.GetBalanceHistory(ctx, chainIDs, addresses, tokenSymbol, currencySymbol, fromTimestamp)
 }
 
-func (api *API) GetTokenList(ctx context.Context) ([]*token.List, error) {
+func (api *API) GetTokenList(ctx context.Context) (*token.ListWrapper, error) {
 	log.Debug("call to get token list")
 	rst := api.s.tokenManager.GetList()
-	log.Debug("result from token list", "len", len(rst))
+	log.Debug("result from token list", "len", len(rst.Data))
 	return rst, nil
 }
 
