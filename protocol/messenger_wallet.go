@@ -48,7 +48,7 @@ func (m *Messenger) retrieveWalletBalances() error {
 	defer cancel()
 
 	// TODO: publish tokens as a signal
-	_, err = m.walletAPI.GetWalletToken(ctx, ethAccounts)
+	_, err = m.walletAPI.FetchOrGetCachedWalletBalances(ctx, ethAccounts)
 	if err != nil {
 		return err
 	}

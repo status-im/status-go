@@ -80,6 +80,10 @@ func (api *API) GetWalletTokenBalances(ctx context.Context, addresses []common.A
 	return api.reader.GetWalletTokenBalances(ctx, addresses)
 }
 
+func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
+	return api.reader.FetchOrGetCachedWalletBalances(ctx, addresses)
+}
+
 func (api *API) GetCachedWalletTokensWithoutMarketData(ctx context.Context) (map[common.Address][]Token, error) {
 	return api.reader.GetCachedWalletTokensWithoutMarketData()
 }

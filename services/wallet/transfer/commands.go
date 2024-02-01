@@ -641,3 +641,14 @@ func subTransactionListToTransactionsByTxHash(subTransactions []Transfer) map[co
 
 	return rst
 }
+
+func IsTransferDetectionEvent(ev walletevent.EventType) bool {
+	if ev == EventInternalETHTransferDetected ||
+		ev == EventInternalERC20TransferDetected ||
+		ev == EventInternalERC721TransferDetected ||
+		ev == EventInternalERC1155TransferDetected {
+		return true
+	}
+
+	return false
+}
