@@ -24,7 +24,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
-	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
@@ -335,18 +334,15 @@ func TestWakuV2Filter(t *testing.T) {
 	require.Len(t, messages, 1)
 
 	// Mock peers going down
-	isFilterSubAliveBak := w.filterManager.isFilterSubAlive
-	w.filterManager.isFilterSubAlive = func(sub *subscription.SubscriptionDetails) error {
-		return errors.New("peer down")
-	}
+	subscriptions[0].Close()
 
-	time.Sleep(5 * time.Second)
-
-	// Reconnect
-	w.filterManager.isFilterSubAlive = isFilterSubAliveBak
 	time.Sleep(10 * time.Second)
 
-	// Ensure there are some active peers now
+	// Ensure there is at least 1 active filter subscription
+	subscriptions = w.node.FilterLightnode().Subscriptions()
+	require.Greater(t, len(subscriptions), 0)
+
+	// Ensure that messages are retrieved with a fresh sub
 	_, err = w.Send("", &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5, 6},
 		ContentTopic: contentTopic.ContentTopic(),
@@ -355,10 +351,6 @@ func TestWakuV2Filter(t *testing.T) {
 	})
 	require.NoError(t, err)
 	time.Sleep(10 * time.Second)
-
-	// Ensure there is at least 1 active filter subscription
-	subscriptions = w.node.FilterLightnode().Subscriptions()
-	require.Greater(t, len(subscriptions), 0)
 
 	messages = filter.Retrieve()
 	require.Len(t, messages, 1)

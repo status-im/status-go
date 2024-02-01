@@ -2,6 +2,7 @@ package wakuv2
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/status-im/status-go/wakuv2/common"
@@ -12,12 +13,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
-)
-
-const (
-	FilterEventPingResult = iota
-	FilterEventSubscribeResult
-	FilterEventUnsubscribeResult
 )
 
 const pingTimeout = 10 * time.Second
@@ -33,12 +28,11 @@ const pingTimeout = 10 * time.Second
 // filterSubs is the map of filter IDs to subscriptions
 
 type FilterManager struct {
-	ctx              context.Context
-	filters          map[string]func() // map of filters to cancel fns
-	isFilterSubAlive func(sub *subscription.SubscriptionDetails) error
-	onNewEnvelopes   func(env *protocol.Envelope) error
-	logger           *zap.Logger
-	node             *filter.WakuFilterLightNode
+	ctx            context.Context
+	filters        map[string]func() // map of filters to cancel fns
+	onNewEnvelopes func(env *protocol.Envelope) error
+	logger         *zap.Logger
+	node           *filter.WakuFilterLightNode
 }
 
 func newFilterManager(ctx context.Context, logger *zap.Logger, onNewEnvelopes func(env *protocol.Envelope) error, node *filter.WakuFilterLightNode) *FilterManager {
@@ -49,37 +43,36 @@ func newFilterManager(ctx context.Context, logger *zap.Logger, onNewEnvelopes fu
 	mgr.onNewEnvelopes = onNewEnvelopes
 	mgr.filters = make(map[string]func())
 	mgr.node = node
-	mgr.isFilterSubAlive = func(sub *subscription.SubscriptionDetails) error {
-		ctx, cancel := context.WithTimeout(ctx, pingTimeout)
-		defer cancel()
-		return mgr.node.IsSubscriptionAlive(ctx, sub)
-	}
-
 	return mgr
 }
+func (mgr *FilterManager) isFilterSubAlive(ctx context.Context, sub *subscription.SubscriptionDetails) error {
+	if sub.Closed {
+		return errors.New("sub closed")
+	}
+	ctx, cancel := context.WithTimeout(ctx, pingTimeout)
+	defer cancel()
+	return mgr.node.IsSubscriptionAlive(ctx, sub)
+}
 
-func (mgr *FilterManager) filterLifecycle(filterID string, contentFilter protocol.ContentFilter, ctx context.Context) {
-	// Use it to ping filter peer(s) periodically
-	ticker := time.NewTicker(5 * time.Second)
+func (mgr *FilterManager) filterLifecycle(ctx context.Context, filterID string, contentFilter protocol.ContentFilter) {
 	logger := mgr.logger.With(zap.String("filterID", filterID), zap.Any("contentFilter", contentFilter))
 
-	var sub *subscription.SubscriptionDetails
+	// Use it to ping filter peer(s) periodically
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
+	// A single sub for this filter
+	var sub *subscription.SubscriptionDetails
+
 	for {
-		// Health check
-		logger.Debug("filter lifecycle")
+		logger.Debug("filter lifecycle started")
 		if sub != nil {
 			logger.Debug("filter health check")
-			err := mgr.isFilterSubAlive(sub)
+			err := mgr.isFilterSubAlive(ctx, sub)
 			if err != nil {
 				logger.Debug("filter ping error", zap.Error(err))
-				reqCtx, _ := context.WithTimeout(ctx, pingTimeout)
-				_, err := mgr.node.UnsubscribeWithSubscription(reqCtx, sub)
+				mgr.unsubscribe(ctx, logger, sub)
 				sub = nil
-				if err != nil {
-					logger.Debug("filter unsubscribe error", zap.Error(err))
-				}
 			} else {
 				logger.Debug("filter health ok")
 			}
@@ -88,24 +81,19 @@ func (mgr *FilterManager) filterLifecycle(filterID string, contentFilter protoco
 		}
 
 		if sub == nil {
-			reqCtx, _ := context.WithTimeout(ctx, pingTimeout)
+			// We are here either when the filter has just been added,
+			// or when ping failed
 			logger.Debug("filter try subscribe")
-			subDetails, err := mgr.node.Subscribe(reqCtx, contentFilter, filter.WithAutomaticPeerSelection())
-			if subDetails != nil && len(subDetails) > 0 {
-				sub = subDetails[0]
-				go mgr.runFilterSubscriptionLoop(ctx, sub)
-			} else {
-				logger.Debug("filter subscribe error", zap.Error(err))
-			}
+			sub = mgr.subscribe(ctx, logger, contentFilter)
 		}
 
 		select {
 		case <-ctx.Done():
-			logger.Debug("filter removed")
-			reqCtx, _ := context.WithTimeout(ctx, pingTimeout)
-			_, err := mgr.node.UnsubscribeWithSubscription(reqCtx, sub)
-			if err != nil {
-				logger.Debug("filter unsubscribe error", zap.Error(err))
+			logger.Debug("filter lifecycle completed")
+			if sub != nil {
+				// Note use of parent FilterManager's context,
+				// as in cases of filter removal the filter context will be Done
+				mgr.unsubscribe(mgr.ctx, logger, sub)
 			}
 			return
 		case <-ticker.C:
@@ -118,7 +106,7 @@ func (mgr *FilterManager) addFilter(filterID string, f *common.Filter) {
 	ctx, cancel := context.WithCancel(mgr.ctx)
 	mgr.filters[filterID] = cancel
 	contentFilter := mgr.buildContentFilter(f.PubsubTopic, f.ContentTopics)
-	go mgr.filterLifecycle(filterID, contentFilter, ctx)
+	go mgr.filterLifecycle(ctx, filterID, contentFilter)
 
 }
 func (mgr *FilterManager) removeFilter(filterID string) {
@@ -127,6 +115,8 @@ func (mgr *FilterManager) removeFilter(filterID string) {
 		delete(mgr.filters, filterID)
 		// close goroutine running filterLifecycle
 		cancel()
+	} else {
+		mgr.logger.Debug("filter removal: lifecycle goroutine not found", zap.String("filterID", filterID))
 	}
 }
 
@@ -137,6 +127,30 @@ func (mgr *FilterManager) buildContentFilter(pubsubTopic string, contentTopicSet
 	}
 
 	return protocol.NewContentFilter(pubsubTopic, contentTopics...)
+}
+
+func (mgr *FilterManager) subscribe(ctx context.Context, logger *zap.Logger, contentFilter protocol.ContentFilter) *subscription.SubscriptionDetails {
+	reqCtx, cancel := context.WithTimeout(ctx, pingTimeout)
+	defer cancel()
+	subDetails, err := mgr.node.Subscribe(reqCtx, contentFilter, filter.WithAutomaticPeerSelection())
+	if len(subDetails) > 0 {
+		sub := subDetails[0]
+		go mgr.runFilterSubscriptionLoop(ctx, sub)
+		return sub
+	}
+	if err != nil {
+		logger.Debug("filter subscribe error", zap.Error(err))
+	}
+	return nil
+}
+
+func (mgr *FilterManager) unsubscribe(ctx context.Context, logger *zap.Logger, sub *subscription.SubscriptionDetails) {
+	reqCtx, cancel := context.WithTimeout(ctx, pingTimeout)
+	defer cancel()
+	_, err := mgr.node.UnsubscribeWithSubscription(reqCtx, sub)
+	if err != nil {
+		logger.Debug("filter unsubscribe error", zap.Error(err))
+	}
 }
 
 func (mgr *FilterManager) runFilterSubscriptionLoop(ctx context.Context, sub *subscription.SubscriptionDetails) {
