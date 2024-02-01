@@ -291,7 +291,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 
 	w.filterFullNode = filter.NewWakuFilterFullNode(w.timesource, w.opts.prometheusReg, w.log, w.opts.filterOpts...)
 	w.filterLightNode = filter.NewWakuFilterLightNode(w.bcaster, w.peermanager, w.timesource, w.opts.prometheusReg, w.log)
-	w.lightPush = lightpush.NewWakuLightPush(w.Relay(), w.peermanager, w.opts.prometheusReg, w.log)
+	w.lightPush = lightpush.NewWakuLightPush(w.Relay(), w.peermanager, w.opts.prometheusReg, w.log, w.opts.lightpushOpts...)
 
 	w.store = store.NewWakuStore(w.peermanager, w.timesource, w.log)
 
@@ -843,7 +843,7 @@ func (w *WakuNode) Peers() ([]*Peer, error) {
 			Protocols:    protocols,
 			Connected:    connected,
 			Addrs:        addrs,
-			PubsubTopics: topics,
+			PubsubTopics: maps.Keys(topics),
 		})
 	}
 	return peers, nil

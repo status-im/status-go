@@ -1,11 +1,22 @@
 package protocol
 
-import "golang.org/x/exp/maps"
+import (
+	"golang.org/x/exp/maps"
+)
 
 type PubsubTopicStr = string
 type ContentTopicStr = string
 
 type ContentTopicSet map[string]struct{}
+type TopicSet map[string]struct{}
+
+func NewTopicSet(topics ...string) TopicSet {
+	s := make(TopicSet, len(topics))
+	for _, t := range topics {
+		s[t] = struct{}{}
+	}
+	return s
+}
 
 func NewContentTopicSet(contentTopics ...string) ContentTopicSet {
 	s := make(ContentTopicSet, len(contentTopics))
@@ -26,6 +37,16 @@ func (cf ContentTopicSet) ToList() []string {
 type ContentFilter struct {
 	PubsubTopic   string          `json:"pubsubTopic"`
 	ContentTopics ContentTopicSet `json:"contentTopics"`
+}
+
+func (cf ContentFilter) String() string {
+	var ret string
+	ret += "{ pubsubTopic: " + cf.PubsubTopic + ", contentTopics: [ "
+	for ct := range cf.ContentTopics {
+		ret += ct
+	}
+	ret += " ] }"
+	return ret
 }
 
 func (cf ContentFilter) ContentTopicsList() []string {

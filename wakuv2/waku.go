@@ -922,7 +922,7 @@ func (w *Waku) Subscribe(f *common.Filter) (string, error) {
 	}
 
 	if w.cfg.LightClient {
-		w.filterManager.eventChan <- FilterEvent{eventType: FilterEventAdded, filterID: id}
+		w.filterManager.addFilter(id, f)
 	}
 
 	return id, nil
@@ -936,19 +936,10 @@ func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 	}
 
 	if w.cfg.LightClient {
-		w.filterManager.eventChan <- FilterEvent{eventType: FilterEventRemoved, filterID: id}
+		w.filterManager.removeFilter(id)
 	}
 
 	return nil
-}
-
-// Used for testing
-func (w *Waku) getFilterStats() FilterSubs {
-	ch := make(chan FilterSubs)
-	w.filterManager.eventChan <- FilterEvent{eventType: FilterEventGetStats, ch: ch}
-	stats := <-ch
-
-	return stats
 }
 
 // GetFilter returns the filter by id.
@@ -1236,14 +1227,9 @@ func (w *Waku) Start() error {
 	if w.cfg.LightClient {
 		// Create FilterManager that will main peer connectivity
 		// for installed filters
-		w.filterManager = newFilterManager(w.ctx, w.logger,
-			func(id string) *common.Filter { return w.GetFilter(id) },
-			w.cfg,
+		w.filterManager = newFilterManager(w.ctx, w.logger, w.cfg,
 			func(env *protocol.Envelope) error { return w.OnNewEnvelopes(env, common.RelayedMessageType, false) },
-			w.node)
-
-		w.wg.Add(1)
-		go w.filterManager.runFilterLoop(&w.wg)
+			w.node.FilterLightnode())
 	}
 
 	err = w.setupRelaySubscriptions()
