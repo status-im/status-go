@@ -75,6 +75,7 @@ func (sub *SubscriptionsMap) NewSubscription(peerID peer.ID, cf protocol.Content
 		PeerID:        peerID,
 		C:             make(chan *protocol.Envelope, 1024),
 		ContentFilter: protocol.ContentFilter{PubsubTopic: cf.PubsubTopic, ContentTopics: maps.Clone(cf.ContentTopics)},
+		Closing:       make(chan struct{}),
 	}
 
 	// Increase the number of subscriptions for this (pubsubTopic, contentTopic) pair
@@ -216,6 +217,30 @@ func (m *SubscriptionsMap) GetSubscriptionsForPeer(peerID peer.ID, contentFilter
 		}
 	}
 	return output
+}
+
+func (m *SubscriptionsMap) GetAllSubscriptionsForPeer(peerID peer.ID) []*SubscriptionDetails {
+	m.RLock()
+	defer m.RUnlock()
+
+	var output []*SubscriptionDetails
+	for _, peerSubs := range m.items {
+		if peerSubs.PeerID == peerID {
+			for _, subs := range peerSubs.SubsPerPubsubTopic {
+				for _, subscriptionDetail := range subs {
+					output = append(output, subscriptionDetail)
+				}
+			}
+			break
+		}
+	}
+	return output
+}
+
+func (m *SubscriptionsMap) GetSubscribedPeers() peer.IDSlice {
+	m.RLock()
+	defer m.RUnlock()
+	return maps.Keys(m.items)
 }
 
 func (m *SubscriptionsMap) GetAllSubscriptions() []*SubscriptionDetails {

@@ -39,6 +39,7 @@ type (
 		peerAddr          multiaddr.Multiaddr
 		peerSelectionType peermanager.PeerSelection
 		preferredPeers    peer.IDSlice
+		peersToExclude    peermanager.PeerSet
 		maxPeers          int
 		requestID         []byte
 		log               *zap.Logger
@@ -101,6 +102,14 @@ func WithMaxPeersPerContentFilter(numPeers int) FilterSubscribeOption {
 	}
 }
 
+// WithPeersToExclude option excludes the peers that are specified from selection
+func WithPeersToExclude(peers ...peer.ID) FilterSubscribeOption {
+	return func(params *FilterSubscribeParameters) error {
+		params.peersToExclude = peermanager.PeerSliceToMap(peers)
+		return nil
+	}
+}
+
 // WithAutomaticPeerSelection is an option used to randomly select a peer from the peer store.
 // If a list of specific peers is passed, the peer will be chosen from that list assuming it
 // supports the chosen protocol, otherwise it will chose a peer from the node peerstore
@@ -145,6 +154,7 @@ func DefaultSubscriptionOptions() []FilterSubscribeOption {
 	return []FilterSubscribeOption{
 		WithAutomaticPeerSelection(),
 		WithAutomaticRequestID(),
+		WithMaxPeersPerContentFilter(1),
 	}
 }
 

@@ -108,6 +108,7 @@ func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(network.Stream)
 			wakuLP.metrics.RecordError(rateLimitFailure)
 			responseMsg := "exceeds the rate limit"
 			responsePushRPC.Response.Info = &responseMsg
+			responsePushRPC.RequestId = pb.REQUESTID_RATE_LIMITED
 			wakuLP.reply(stream, responsePushRPC, logger)
 			return
 		}

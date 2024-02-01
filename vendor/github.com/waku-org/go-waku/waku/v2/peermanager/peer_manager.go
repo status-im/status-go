@@ -84,6 +84,7 @@ type PeerManager struct {
 	discoveryService       *discv5.DiscoveryV5
 	wakuprotoToENRFieldMap map[protocol.ID]WakuProtoInfo
 	TopicHealthNotifCh     chan<- TopicHealthStatus
+	rttCache               *FastestPeerSelector
 }
 
 // PeerSelection provides various options based on which Peer is selected from a list of peers.
@@ -188,6 +189,7 @@ func NewPeerManager(maxConnections int, maxPeers int, metadata *metadata.WakuMet
 		subRelayTopics:         make(map[string]*NodeTopicDetails),
 		maxPeers:               maxPeers,
 		wakuprotoToENRFieldMap: map[protocol.ID]WakuProtoInfo{},
+		rttCache:               NewFastestPeerSelector(logger),
 	}
 	logger.Info("PeerManager init values", zap.Int("maxConnections", maxConnections),
 		zap.Int("maxRelayPeers", maxRelayPeers),
@@ -206,6 +208,7 @@ func (pm *PeerManager) SetDiscv5(discv5 *discv5.DiscoveryV5) {
 // SetHost sets the host to be used in order to access the peerStore.
 func (pm *PeerManager) SetHost(host host.Host) {
 	pm.host = host
+	pm.rttCache.SetHost(host)
 }
 
 // SetPeerConnector sets the peer connector to be used for establishing relay connections.
@@ -215,7 +218,6 @@ func (pm *PeerManager) SetPeerConnector(pc *PeerConnectionStrategy) {
 
 // Start starts the processing to be done by peer manager.
 func (pm *PeerManager) Start(ctx context.Context) {
-
 	pm.RegisterWakuProtocol(relay.WakuRelayID_v200, relay.WakuRelayENRField)
 
 	pm.ctx = ctx
@@ -275,10 +277,10 @@ func (pm *PeerManager) getRelayPeers(specificPeers ...peer.ID) (inRelayPeers pee
 
 	//Need to filter peers to check if they support relay
 	if inPeers.Len() != 0 {
-		inRelayPeers, _ = pm.FilterPeersByProto(inPeers, relay.WakuRelayID_v200)
+		inRelayPeers, _ = pm.FilterPeersByProto(inPeers, nil, relay.WakuRelayID_v200)
 	}
 	if outPeers.Len() != 0 {
-		outRelayPeers, _ = pm.FilterPeersByProto(outPeers, relay.WakuRelayID_v200)
+		outRelayPeers, _ = pm.FilterPeersByProto(outPeers, nil, relay.WakuRelayID_v200)
 	}
 	return
 }

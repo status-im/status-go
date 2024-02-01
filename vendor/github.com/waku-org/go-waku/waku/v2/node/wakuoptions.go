@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p"
-	mplex "github.com/libp2p/go-libp2p-mplex"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -29,6 +28,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
+	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/rendezvous"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
@@ -78,6 +78,7 @@ type WakuNodeParameters struct {
 	enableFilterFullNode  bool
 	filterOpts            []filter.Option
 	pubsubOpts            []pubsub.Option
+	lightpushOpts         []lightpush.Option
 
 	minRelayPeersToPublish int
 	maxMsgSizeBytes        int
@@ -459,9 +460,10 @@ func WithMessageProvider(s legacy_store.MessageProvider) WakuNodeOption {
 }
 
 // WithLightPush is a WakuNodeOption that enables the lightpush protocol
-func WithLightPush() WakuNodeOption {
+func WithLightPush(lightpushOpts ...lightpush.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableLightPush = true
+		params.lightpushOpts = lightpushOpts
 		return nil
 	}
 }
@@ -559,7 +561,6 @@ var DefaultLibP2POptions = []libp2p.Option{
 	libp2p.UserAgent(UserAgent),
 	libp2p.ChainOptions(
 		libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
-		libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport),
 	),
 	libp2p.EnableNATService(),
 	libp2p.ConnectionManager(newConnManager(200, 300, connmgr.WithGracePeriod(0))),
