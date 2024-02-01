@@ -75,6 +75,20 @@ func (c *Controller) Stop() {
 	}
 }
 
+func sameChains(chainIDs1 []uint64, chainIDs2 []uint64) bool {
+	if len(chainIDs1) != len(chainIDs2) {
+		return false
+	}
+
+	for _, chainID := range chainIDs1 {
+		if !slices.Contains(chainIDs2, chainID) {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Address) error {
 	if len(accounts) == 0 {
 		return nil
@@ -95,34 +109,39 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 	}
 
 	if c.reactor != nil {
-		err := c.reactor.restart(chainClients, accounts)
-		if err != nil {
-			return err
-		}
-	} else {
-		multiaccSettings, err := c.accountsDB.GetSettings()
-		if err != nil {
-			return err
-		}
-
-		omitHistory := multiaccSettings.OmitTransfersHistoryScan
-		if omitHistory {
-			err := c.accountsDB.SaveSettingField(settings.OmitTransfersHistoryScan, false)
+		if !sameChains(chainIDs, c.reactor.chainIDs) {
+			err := c.reactor.restart(chainClients, accounts)
 			if err != nil {
 				return err
 			}
 		}
 
-		c.reactor = NewReactor(c.db, c.blockDAO, c.blockRangesSeqDAO, c.accountsDB, c.TransferFeed, c.transactionManager,
-			c.pendingTxManager, c.tokenManager, c.balanceCacher, omitHistory, c.blockChainState)
+		return nil
+	}
 
-		err = c.reactor.start(chainClients, accounts)
+	multiaccSettings, err := c.accountsDB.GetSettings()
+	if err != nil {
+		return err
+	}
+
+	omitHistory := multiaccSettings.OmitTransfersHistoryScan
+	if omitHistory {
+		err := c.accountsDB.SaveSettingField(settings.OmitTransfersHistoryScan, false)
 		if err != nil {
 			return err
 		}
-
-		c.startAccountWatcher(chainIDs)
 	}
+
+	c.reactor = NewReactor(c.db, c.blockDAO, c.blockRangesSeqDAO, c.accountsDB, c.TransferFeed, c.transactionManager,
+		c.pendingTxManager, c.tokenManager, c.balanceCacher, omitHistory, c.blockChainState)
+
+	err = c.reactor.start(chainClients, accounts)
+	if err != nil {
+		return err
+	}
+
+	c.startAccountWatcher(chainIDs)
+
 	return nil
 }
 
