@@ -67,7 +67,7 @@ func (m *Messenger) SetDisplayName(displayName string) error {
 	}
 
 	m.account.Name = displayName
-	err = m.multiAccounts.SaveAccount(*m.account)
+	err = m.multiAccounts.UpdateDisplayName(m.account.KeyUID, displayName)
 	if err != nil {
 		return err
 	}
