@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"math/big"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -72,6 +73,8 @@ type Reader struct {
 	walletEventsWatcher            *walletevent.Watcher
 	lastWalletTokenUpdateTimestamp atomic.Int64
 	reloadDelayTimer               *time.Timer
+	refreshBalanceCache            bool
+	rw                             sync.RWMutex
 }
 
 type TokenMarketValues struct {
@@ -221,6 +224,10 @@ func (r *Reader) startWalletEventsWatcher() {
 		if event.At > timecheck {
 			r.triggerDelayedWalletReload()
 		}
+
+		if transfer.IsTransferDetectionEvent(event.Type) {
+			r.invalidateBalanceCache()
+		}
 	}
 
 	r.walletEventsWatcher = walletevent.NewWatcher(r.walletFeed, walletEventCb)
@@ -233,6 +240,41 @@ func (r *Reader) stopWalletEventsWatcher() {
 		r.walletEventsWatcher.Stop()
 		r.walletEventsWatcher = nil
 	}
+}
+
+func (r *Reader) isBalanceCacheValid() bool {
+	r.rw.RLock()
+	defer r.rw.RUnlock()
+
+	return !r.refreshBalanceCache
+}
+
+func (r *Reader) balanceRefreshed() {
+	r.rw.Lock()
+	defer r.rw.Unlock()
+
+	r.refreshBalanceCache = false
+}
+
+func (r *Reader) invalidateBalanceCache() {
+	r.rw.Lock()
+	defer r.rw.Unlock()
+
+	r.refreshBalanceCache = true
+}
+
+func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
+	if !r.isBalanceCacheValid() {
+		balances, err := r.GetWalletTokenBalances(ctx, addresses)
+		if err != nil {
+			return nil, err
+		}
+		r.balanceRefreshed()
+
+		return balances, nil
+	}
+
+	return r.persistence.GetTokens()
 }
 
 func (r *Reader) GetWalletTokenBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
