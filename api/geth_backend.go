@@ -1712,6 +1712,10 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 
 	b.config = conf
 
+	if inputNodeCfg != nil && inputNodeCfg.RuntimeLogLevel != "" {
+		b.config.LogLevel = inputNodeCfg.RuntimeLogLevel
+	}
+
 	return nil
 }
 
