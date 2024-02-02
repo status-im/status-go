@@ -44,13 +44,31 @@ var mainnet = params.Network{
 
 var goerli = params.Network{
 	ChainID:                goerliChainID,
-	ChainName:              "Ethereum Mainnet",
+	ChainName:              "Ethereum Goerli",
 	RPCURL:                 "https://goerli-archival.rpc.grove.city/v1/",
 	FallbackURL:            "https://goerli.infura.io/v3/",
 	BlockExplorerURL:       "https://goerli.etherscan.io/",
 	IconURL:                "network/Network=Testnet",
 	ChainColor:             "#939BA1",
 	ShortName:              "goEth",
+	NativeCurrencyName:     "Ether",
+	NativeCurrencySymbol:   "ETH",
+	NativeCurrencyDecimals: 18,
+	IsTest:                 true,
+	Layer:                  1,
+	Enabled:                true,
+	RelatedChainID:         mainnetChainID,
+}
+
+var sepolia = params.Network{
+	ChainID:                sepoliaChainID,
+	ChainName:              "Ethereum Sepolia",
+	RPCURL:                 "https://sepolia-archival.rpc.grove.city/v1/",
+	FallbackURL:            "https://sepolia.infura.io/v3/",
+	BlockExplorerURL:       "https://sepolia.etherscan.io/",
+	IconURL:                "network/Network=Testnet",
+	ChainColor:             "#51D0F0",
+	ShortName:              "eth",
 	NativeCurrencyName:     "Ether",
 	NativeCurrencySymbol:   "ETH",
 	NativeCurrencyDecimals: 18,
@@ -80,7 +98,7 @@ var optimism = params.Network{
 
 var optimismGoerli = params.Network{
 	ChainID:                optimismGoerliChainID,
-	ChainName:              "Optimism Goerli Testnet",
+	ChainName:              "Optimism Goerli",
 	RPCURL:                 "https://optimism-goerli.infura.io/v3/",
 	FallbackURL:            "",
 	BlockExplorerURL:       "https://goerli-optimism.etherscan.io/",
@@ -95,6 +113,25 @@ var optimismGoerli = params.Network{
 	Enabled:                false,
 	RelatedChainID:         optimismChainID,
 }
+
+var optimismSepolia = params.Network{
+	ChainID:                optimismSepoliaChainID,
+	ChainName:              "Optimism Sepolia",
+	RPCURL:                 "https://optimism-sepolia.infura.io/v3/",
+	FallbackURL:            "",
+	BlockExplorerURL:       "https://sepolia-optimism.etherscan.io/",
+	IconURL:                "network/Network=Testnet",
+	ChainColor:             "#939BA1",
+	ShortName:              "opt",
+	NativeCurrencyName:     "Ether",
+	NativeCurrencySymbol:   "ETH",
+	NativeCurrencyDecimals: 18,
+	IsTest:                 true,
+	Layer:                  2,
+	Enabled:                false,
+	RelatedChainID:         optimismChainID,
+}
+
 var arbitrum = params.Network{
 	ChainID:                arbitrumChainID,
 	ChainName:              "Arbitrum",
@@ -131,13 +168,34 @@ var arbitrumGoerli = params.Network{
 	RelatedChainID:         arbitrumChainID,
 }
 
+var arbitrumSepolia = params.Network{
+	ChainID:                arbitrumSepoliaChainID,
+	ChainName:              "Arbitrum Sepolia",
+	RPCURL:                 "https://arbitrum-sepolia.infura.io/v3/",
+	FallbackURL:            "",
+	BlockExplorerURL:       "https://sepolia-explorer.arbitrum.io/",
+	IconURL:                "network/Network=Testnet",
+	ChainColor:             "#51D0F0",
+	ShortName:              "arb",
+	NativeCurrencyName:     "Ether",
+	NativeCurrencySymbol:   "ETH",
+	NativeCurrencyDecimals: 18,
+	IsTest:                 true,
+	Layer:                  2,
+	Enabled:                false,
+	RelatedChainID:         arbitrumChainID,
+}
+
 var defaultNetworks = []params.Network{
 	mainnet,
 	goerli,
+	sepolia,
 	optimism,
 	optimismGoerli,
+	optimismSepolia,
 	arbitrum,
 	arbitrumGoerli,
+	arbitrumSepolia,
 }
 
 var mainnetGanacheTokenOverrides = params.TokenOverride{

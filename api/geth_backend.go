@@ -622,6 +622,8 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		KeycardPairingDataFile: defaultKeycardPairingDataFile,
 	}
 
+	defaultCfg.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig)
+
 	settings, err := b.GetSettings()
 	if err != nil {
 		return err

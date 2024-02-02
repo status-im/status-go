@@ -1419,3 +1419,80 @@ func TestSetFleet(t *testing.T) {
 
 	require.NoError(t, b.Logout())
 }
+
+func TestWalletConfigOnLoginAccount(t *testing.T) {
+	utils.Init()
+	password := "some-password2" // nolint: goconst
+	tmpdir := t.TempDir()
+	poktToken := "grove-token"    // nolint: goconst
+	infuraToken := "infura-token" // nolint: goconst
+	alchemyEthereumMainnetToken := "alchemy-ethereum-mainnet-token"
+	alchemyEthereumSepoliaToken := "alchemy-ethereum-sepolia-token"
+	alchemyArbitrumMainnetToken := "alchemy-arbitrum-mainnet-token"
+	alchemyArbitrumSepoliaToken := "alchemy-arbitrum-sepolia-token"
+	alchemyOptimismMainnetToken := "alchemy-optimism-mainnet-token"
+	alchemyOptimismSepoliaToken := "alchemy-optimism-sepolia-token"
+	raribleMainnetAPIKey := "rarible-mainnet-api-key" // nolint: gosec
+	raribleTestnetAPIKey := "rarible-testnet-api-key" // nolint: gosec
+
+	b := NewGethStatusBackend()
+	createAccountRequest := &requests.CreateAccount{
+		DisplayName:           "some-display-name",
+		CustomizationColor:    "#ffffff",
+		Password:              password,
+		BackupDisabledDataDir: tmpdir,
+		NetworkID:             1,
+		LogFilePath:           tmpdir + "/log",
+		Emoji:                 "some",
+	}
+	c := make(chan interface{}, 10)
+	signal.SetMobileSignalHandler(func(data []byte) {
+		if strings.Contains(string(data), "node.login") {
+			c <- struct{}{}
+		}
+	})
+
+	newAccount, err := b.CreateAccountAndLogin(createAccountRequest)
+	require.NoError(t, err)
+	statusNode := b.statusNode
+	require.NotNil(t, statusNode)
+
+	require.NoError(t, b.Logout())
+
+	loginAccountRequest := &requests.Login{
+		KeyUID:   newAccount.KeyUID,
+		Password: password,
+		WalletSecretsConfig: requests.WalletSecretsConfig{
+			PoktToken:                   poktToken,
+			InfuraToken:                 infuraToken,
+			AlchemyEthereumMainnetToken: alchemyEthereumMainnetToken,
+			AlchemyEthereumSepoliaToken: alchemyEthereumSepoliaToken,
+			AlchemyArbitrumMainnetToken: alchemyArbitrumMainnetToken,
+			AlchemyArbitrumSepoliaToken: alchemyArbitrumSepoliaToken,
+			AlchemyOptimismMainnetToken: alchemyOptimismMainnetToken,
+			AlchemyOptimismSepoliaToken: alchemyOptimismSepoliaToken,
+			RaribleMainnetAPIKey:        raribleMainnetAPIKey,
+			RaribleTestnetAPIKey:        raribleTestnetAPIKey,
+		},
+	}
+
+	require.NoError(t, b.LoginAccount(loginAccountRequest))
+	select {
+	case <-c:
+		break
+	case <-time.After(5 * time.Second):
+		t.FailNow()
+	}
+
+	require.Equal(t, b.config.WalletConfig.InfuraAPIKey, infuraToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[mainnetChainID], alchemyEthereumMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[sepoliaChainID], alchemyEthereumSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[arbitrumChainID], alchemyArbitrumMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[arbitrumSepoliaChainID], alchemyArbitrumSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[optimismChainID], alchemyOptimismMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[optimismSepoliaChainID], alchemyOptimismSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)
+	require.Equal(t, b.config.WalletConfig.RaribleTestnetAPIKey, raribleTestnetAPIKey)
+
+	require.NoError(t, b.Logout())
+}
