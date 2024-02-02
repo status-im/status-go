@@ -412,6 +412,9 @@ type NodeConfig struct {
 	// LogFile is filename where exposed logs get written to
 	LogFile string
 
+	// RuntimeLoglevel defines minimum log level for this session only, not affecting the db-stored node configuration
+	RuntimeLogLevel string `validate:"omitempty,eq=ERROR|eq=WARN|eq=INFO|eq=DEBUG|eq=TRACE"`
+
 	// LogLevel defines minimum log level. Valid names are "ERROR", "WARN", "INFO", "DEBUG", and "TRACE".
 	LogLevel string `validate:"eq=ERROR|eq=WARN|eq=INFO|eq=DEBUG|eq=TRACE"`
 
