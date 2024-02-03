@@ -77,11 +77,15 @@ func (t *Token) IsNative() bool {
 }
 
 type List struct {
-	Name      string   `json:"name"`
-	Tokens    []*Token `json:"tokens"`
-	UpdatedAt int64    `json:"updatedAt"`
-	Source    string   `json:"source"`
-	Version   string   `json:"version"`
+	Name    string   `json:"name"`
+	Tokens  []*Token `json:"tokens"`
+	Source  string   `json:"source"`
+	Version string   `json:"version"`
+}
+
+type ListWrapper struct {
+	UpdatedAt int64   `json:"updatedAt"`
+	Data      []*List `json:"data"`
 }
 
 type addressTokenMap = map[common.Address]*Token
@@ -96,7 +100,7 @@ type ManagerInterface interface {
 type Manager struct {
 	db                *sql.DB
 	RPCClient         *rpc.Client
-	contractMaker     *contracts.ContractMaker
+	ContractMaker     *contracts.ContractMaker
 	networkManager    *network.Manager
 	stores            []store // Set on init, not changed afterwards
 	communityTokensDB *communitytokens.Database
@@ -161,7 +165,7 @@ func NewTokenManager(
 	return &Manager{
 		db:                db,
 		RPCClient:         RPCClient,
-		contractMaker:     maker,
+		ContractMaker:     maker,
 		networkManager:    networkManager,
 		communityManager:  communityManager,
 		stores:            stores,
@@ -465,44 +469,46 @@ func (tm *Manager) GetTokensByChainIDs(chainIDs []uint64) ([]*Token, error) {
 	return res, nil
 }
 
-func (tm *Manager) GetList() []*List {
-	res := make([]*List, 0)
+func (tm *Manager) GetList() *ListWrapper {
+	data := make([]*List, 0)
 	nativeTokens, err := tm.getNativeTokens()
 	if err == nil {
-		res = append(res, &List{
-			Name:      "native",
-			Tokens:    nativeTokens,
-			UpdatedAt: time.Now().Unix(),
-			Source:    "native",
-			Version:   "1.0.0",
+		data = append(data, &List{
+			Name:    "native",
+			Tokens:  nativeTokens,
+			Source:  "native",
+			Version: "1.0.0",
 		})
 	}
 
 	customTokens, err := tm.GetCustoms(true)
 	if err == nil && len(customTokens) > 0 {
-		res = append(res, &List{
-			Name:      "custom",
-			Tokens:    customTokens,
-			UpdatedAt: time.Now().Unix(),
-			Source:    "custom",
-			Version:   "1.0.0",
+		data = append(data, &List{
+			Name:    "custom",
+			Tokens:  customTokens,
+			Source:  "custom",
+			Version: "1.0.0",
 		})
 	}
 
+	updatedAt := time.Now().Unix()
 	for _, store := range tm.stores {
-		res = append(res, &List{
-			Name:      store.GetName(),
-			Tokens:    store.GetTokens(),
-			UpdatedAt: store.GetUpdatedAt(),
-			Source:    store.GetSource(),
-			Version:   store.GetVersion(),
+		updatedAt = store.GetUpdatedAt()
+		data = append(data, &List{
+			Name:    store.GetName(),
+			Tokens:  store.GetTokens(),
+			Source:  store.GetSource(),
+			Version: store.GetVersion(),
 		})
 	}
-	return res
+	return &ListWrapper{
+		Data:      data,
+		UpdatedAt: updatedAt,
+	}
 }
 
 func (tm *Manager) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*Token, error) {
-	caller, err := tm.contractMaker.NewERC20(chainID, address)
+	caller, err := tm.ContractMaker.NewERC20(chainID, address)
 	if err != nil {
 		return nil, err
 	}
@@ -693,7 +699,7 @@ func (tm *Manager) GetBalancesAtByChain(parent context.Context, clients map[uint
 		// Keep the reference to the client. DO NOT USE A LOOP, the client will be overridden in the coroutine
 		client := clients[clientIdx]
 
-		ethScanContract, availableAtBlock, err := tm.contractMaker.NewEthScan(client.NetworkID())
+		ethScanContract, availableAtBlock, err := tm.ContractMaker.NewEthScan(client.NetworkID())
 		if err != nil {
 			log.Error("error scanning contract", "err", err)
 			return nil, err

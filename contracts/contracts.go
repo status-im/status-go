@@ -1,10 +1,10 @@
 package contracts
 
 import (
-	"context"
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/contracts/balancechecker"
 	"github.com/status-im/status-go/contracts/directory"
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/hop"
@@ -180,14 +180,6 @@ func (c *ContractMaker) NewEthScan(chainID uint64) (*ethscan.BalanceScanner, uin
 	if err != nil {
 		return nil, 0, err
 	}
-	bytecode, err := backend.CodeAt(context.Background(), contractAddr, nil)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	if len(bytecode) == 0 {
-		return nil, 0, errors.New("is not a contract")
-	}
 
 	scanner, err := ethscan.NewBalanceScanner(
 		contractAddr,
@@ -195,6 +187,22 @@ func (c *ContractMaker) NewEthScan(chainID uint64) (*ethscan.BalanceScanner, uin
 	)
 
 	return scanner, contractCreatedAt, err
+}
+
+func (c *ContractMaker) NewBalanceChecker(chainID uint64) (*balancechecker.BalanceChecker, error) {
+	contractAddr, err := balancechecker.ContractAddress(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	backend, err := c.RPCClient.EthClient(chainID)
+	if err != nil {
+		return nil, err
+	}
+	return balancechecker.NewBalanceChecker(
+		contractAddr,
+		backend,
+	)
 }
 
 func (c *ContractMaker) NewHopL2SaddlSwap(chainID uint64, symbol string) (*hopSwap.HopSwap, error) {

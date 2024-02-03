@@ -21,10 +21,6 @@ func defaultStoreNodeRequestConfig() StoreNodeRequestConfig {
 func buildStoreNodeRequestConfig(opts []StoreNodeRequestOption) StoreNodeRequestConfig {
 	cfg := defaultStoreNodeRequestConfig()
 
-	// TODO: remove these 2 when fixed: https://github.com/waku-org/nwaku/issues/2317
-	opts = append(opts, WithStopWhenDataFound(false))
-	opts = append(opts, WithInitialPageSize(defaultStoreNodeRequestPageSize))
-
 	for _, opt := range opts {
 		opt(&cfg)
 	}

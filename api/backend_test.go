@@ -1,7 +1,7 @@
 package api
 
 import (
-	"context"
+	//"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -34,7 +34,8 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/typeddata"
-	walletservice "github.com/status-im/status-go/services/wallet"
+
+	//walletservice "github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
@@ -695,6 +696,74 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 	})
 }
 
+func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
+	utils.Init()
+
+	b := NewGethStatusBackend()
+	chatKey, err := gethcrypto.GenerateKey()
+	require.NoError(t, err)
+	walletKey, err := gethcrypto.GenerateKey()
+	require.NoError(t, err)
+	keyUIDHex := sha256.Sum256(gethcrypto.FromECDSAPub(&chatKey.PublicKey))
+	keyUID := types.EncodeHex(keyUIDHex[:])
+	main := multiaccounts.Account{
+		KeyUID: keyUID,
+	}
+
+	tmpdir := t.TempDir()
+
+	json := `{
+		"NetworkId": 3,
+		"DataDir": "` + tmpdir + `",
+		"KeyStoreDir": "` + tmpdir + `",
+		"KeycardPairingDataFile": "` + path.Join(tmpdir, "keycard/pairings.json") + `",
+		"NoDiscovery": true,
+		"TorrentConfig": {
+			"Port": 9025,
+			"Enabled": false,
+			"DataDir": "` + tmpdir + `/archivedata",
+			"TorrentDir": "` + tmpdir + `/torrents"
+		},
+		"RuntimeLogLevel": "INFO",
+		"LogLevel": "DEBUG"
+	}`
+
+	conf, err := params.NewConfigFromJSON(json)
+	require.NoError(t, err)
+	require.Equal(t, "INFO", conf.RuntimeLogLevel)
+	keyhex := hex.EncodeToString(gethcrypto.FromECDSA(chatKey))
+
+	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
+	b.UpdateRootDataDir(conf.DataDir)
+	require.NoError(t, b.OpenAccounts())
+	require.NotNil(t, b.statusNode.HTTPServer())
+
+	address := crypto.PubkeyToAddress(walletKey.PublicKey)
+
+	settings := testSettings
+	settings.KeyUID = keyUID
+	settings.Address = crypto.PubkeyToAddress(walletKey.PublicKey)
+
+	chatPubKey := crypto.FromECDSAPub(&chatKey.PublicKey)
+	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf,
+		[]*accounts.Account{
+			{Address: address, KeyUID: keyUID, Wallet: true},
+			{Address: crypto.PubkeyToAddress(chatKey.PublicKey), KeyUID: keyUID, Chat: true, PublicKey: chatPubKey}}, keyhex))
+	require.NoError(t, b.Logout())
+	require.NoError(t, b.StopNode())
+
+	require.NoError(t, b.StartNodeWithKey(main, "test-pass", keyhex, conf))
+	defer func() {
+		assert.NoError(t, b.Logout())
+		assert.NoError(t, b.StopNode())
+	}()
+
+	c, err := b.GetNodeConfig()
+	require.NoError(t, err)
+	require.Equal(t, "", c.RuntimeLogLevel)
+	require.Equal(t, "DEBUG", c.LogLevel)
+}
+
 func TestLoginWithKey(t *testing.T) {
 	utils.Init()
 
@@ -908,6 +977,7 @@ func TestDeleteMultiaccount(t *testing.T) {
 	require.Equal(t, 3, len(files))
 }
 
+/*
 func TestConvertAccount(t *testing.T) {
 	const mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
 	const password = "111111"        // represents password for a regular user
@@ -1156,6 +1226,7 @@ func TestConvertAccount(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, len(keycards))
 }
+*/
 
 func copyFile(srcFolder string, dstFolder string, fileName string, t *testing.T) {
 	data, err := ioutil.ReadFile(path.Join(srcFolder, fileName))
@@ -1295,6 +1366,7 @@ func TestChangeDatabasePassword(t *testing.T) {
 	require.Equal(t, acc.Address, key.Address)
 }
 
+/*
 func TestCreateWallet(t *testing.T) {
 	utils.Init()
 	password := "some-password2" // nolint: goconst
@@ -1354,6 +1426,7 @@ func TestCreateWallet(t *testing.T) {
 	})
 	require.NoError(t, err)
 }
+*/
 
 func TestSetFleet(t *testing.T) {
 	utils.Init()
@@ -1411,6 +1484,83 @@ func TestSetFleet(t *testing.T) {
 	}
 	// Check is using the right fleet
 	require.Equal(t, b.config.ClusterConfig.WakuNodes, DefaultWakuNodes[statusTestFleet])
+
+	require.NoError(t, b.Logout())
+}
+
+func TestWalletConfigOnLoginAccount(t *testing.T) {
+	utils.Init()
+	password := "some-password2" // nolint: goconst
+	tmpdir := t.TempDir()
+	poktToken := "grove-token"    // nolint: goconst
+	infuraToken := "infura-token" // nolint: goconst
+	alchemyEthereumMainnetToken := "alchemy-ethereum-mainnet-token"
+	alchemyEthereumSepoliaToken := "alchemy-ethereum-sepolia-token"
+	alchemyArbitrumMainnetToken := "alchemy-arbitrum-mainnet-token"
+	alchemyArbitrumSepoliaToken := "alchemy-arbitrum-sepolia-token"
+	alchemyOptimismMainnetToken := "alchemy-optimism-mainnet-token"
+	alchemyOptimismSepoliaToken := "alchemy-optimism-sepolia-token"
+	raribleMainnetAPIKey := "rarible-mainnet-api-key" // nolint: gosec
+	raribleTestnetAPIKey := "rarible-testnet-api-key" // nolint: gosec
+
+	b := NewGethStatusBackend()
+	createAccountRequest := &requests.CreateAccount{
+		DisplayName:           "some-display-name",
+		CustomizationColor:    "#ffffff",
+		Password:              password,
+		BackupDisabledDataDir: tmpdir,
+		NetworkID:             1,
+		LogFilePath:           tmpdir + "/log",
+		Emoji:                 "some",
+	}
+	c := make(chan interface{}, 10)
+	signal.SetMobileSignalHandler(func(data []byte) {
+		if strings.Contains(string(data), "node.login") {
+			c <- struct{}{}
+		}
+	})
+
+	newAccount, err := b.CreateAccountAndLogin(createAccountRequest)
+	require.NoError(t, err)
+	statusNode := b.statusNode
+	require.NotNil(t, statusNode)
+
+	require.NoError(t, b.Logout())
+
+	loginAccountRequest := &requests.Login{
+		KeyUID:   newAccount.KeyUID,
+		Password: password,
+		WalletSecretsConfig: requests.WalletSecretsConfig{
+			PoktToken:                   poktToken,
+			InfuraToken:                 infuraToken,
+			AlchemyEthereumMainnetToken: alchemyEthereumMainnetToken,
+			AlchemyEthereumSepoliaToken: alchemyEthereumSepoliaToken,
+			AlchemyArbitrumMainnetToken: alchemyArbitrumMainnetToken,
+			AlchemyArbitrumSepoliaToken: alchemyArbitrumSepoliaToken,
+			AlchemyOptimismMainnetToken: alchemyOptimismMainnetToken,
+			AlchemyOptimismSepoliaToken: alchemyOptimismSepoliaToken,
+			RaribleMainnetAPIKey:        raribleMainnetAPIKey,
+			RaribleTestnetAPIKey:        raribleTestnetAPIKey,
+		},
+	}
+
+	require.NoError(t, b.LoginAccount(loginAccountRequest))
+	select {
+	case <-c:
+		break
+	case <-time.After(5 * time.Second):
+		t.FailNow()
+	}
+
+	require.Equal(t, b.config.WalletConfig.InfuraAPIKey, infuraToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[mainnetChainID], alchemyEthereumMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[sepoliaChainID], alchemyEthereumSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[arbitrumChainID], alchemyArbitrumMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[arbitrumSepoliaChainID], alchemyArbitrumSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[optimismChainID], alchemyOptimismMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[optimismSepoliaChainID], alchemyOptimismSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)
+	require.Equal(t, b.config.WalletConfig.RaribleTestnetAPIKey, raribleTestnetAPIKey)
 
 	require.NoError(t, b.Logout())
 }

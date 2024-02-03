@@ -443,19 +443,18 @@ func (m *Manager) runOwnerVerificationLoop() {
 }
 
 func (m *Manager) ValidateCommunityByID(communityID types.HexBytes) (*CommunityResponse, error) {
-	communityToValidate, err := m.persistence.getCommunityToValidateByID(communityID)
+	communitiesToValidate, err := m.persistence.getCommunityToValidateByID(communityID)
 	if err != nil {
 		m.logger.Error("failed to validate community by ID", zap.String("id", communityID.String()), zap.Error(err))
 		return nil, err
 	}
-
-	return m.validateCommunity(communityToValidate)
+	return m.validateCommunity(communitiesToValidate)
 
 }
 
 func (m *Manager) validateCommunity(communityToValidateData []communityToValidate) (*CommunityResponse, error) {
-	for _, communityToValidate := range communityToValidateData {
-		signer, description, err := UnwrapCommunityDescriptionMessage(communityToValidate.payload)
+	for _, community := range communityToValidateData {
+		signer, description, err := UnwrapCommunityDescriptionMessage(community.payload)
 		if err != nil {
 			m.logger.Error("failed to unwrap community", zap.Error(err))
 			continue
@@ -468,12 +467,12 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 			continue
 		}
 
-		m.logger.Info("validating community", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
+		m.logger.Info("validating community", zap.String("id", types.EncodeHex(community.id)), zap.String("signer", common.PubkeyToHex(signer)))
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 		defer cancel()
 
-		owner, err := m.ownerVerifier.SafeGetSignerPubKey(ctx, chainID, types.EncodeHex(communityToValidate.id))
+		owner, err := m.ownerVerifier.SafeGetSignerPubKey(ctx, chainID, types.EncodeHex(community.id))
 		if err != nil {
 			m.logger.Error("failed to get owner", zap.Error(err))
 			continue
@@ -486,10 +485,10 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 		}
 
 		// TODO: handle shards
-		response, err := m.HandleCommunityDescriptionMessage(signer, description, communityToValidate.payload, ownerPK, nil)
+		response, err := m.HandleCommunityDescriptionMessage(signer, description, community.payload, ownerPK, nil)
 		if err != nil {
 			m.logger.Error("failed to handle community", zap.Error(err))
-			err = m.persistence.DeleteCommunityToValidate(communityToValidate.id, communityToValidate.clock)
+			err = m.persistence.DeleteCommunityToValidate(community.id, community.clock)
 			if err != nil {
 				m.logger.Error("failed to delete community to validate", zap.Error(err))
 			}
@@ -498,9 +497,9 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 
 		if response != nil {
 
-			m.logger.Info("community validated", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
+			m.logger.Info("community validated", zap.String("id", types.EncodeHex(community.id)), zap.String("signer", common.PubkeyToHex(signer)))
 			m.publish(&Subscription{TokenCommunityValidated: response})
-			err := m.persistence.DeleteCommunitiesToValidateByCommunityID(communityToValidate.id)
+			err := m.persistence.DeleteCommunitiesToValidateByCommunityID(community.id)
 			if err != nil {
 				m.logger.Error("failed to delete communities to validate", zap.Error(err))
 			}
@@ -701,6 +700,20 @@ func (m *Manager) Spectated() ([]*Community, error) {
 	return m.persistence.SpectatedCommunities(&m.identity.PublicKey)
 }
 
+func (m *Manager) CommunityUpdateLastOpenedAt(communityID types.HexBytes, timestamp int64) (*Community, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.UpdateLastOpenedAt(community.ID(), timestamp)
+	if err != nil {
+		return nil, err
+	}
+	community.UpdateLastOpenedAt(timestamp)
+	return community, nil
+}
+
 func (m *Manager) JoinedAndPendingCommunitiesWithRequests() ([]*Community, error) {
 	return m.persistence.JoinedAndPendingCommunitiesWithRequests(&m.identity.PublicKey)
 }
@@ -762,6 +775,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		MemberIdentity:       &m.identity.PublicKey,
 		CommunityDescription: description,
 		Shard:                nil,
+		LastOpenedAt:         0,
 	}
 
 	var descriptionEncryptor DescriptionEncryptor
@@ -1061,9 +1075,13 @@ func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 	return m.persistence.DeleteCommunitySettings(id)
 }
 
-func (m *Manager) UpdateShard(community *Community, shard *shard.Shard) error {
+func (m *Manager) UpdateShard(community *Community, shard *shard.Shard, clock uint64) error {
 	community.config.Shard = shard
-	return m.persistence.SaveCommunityShard(community.ID(), shard, community.Clock())
+	if shard == nil {
+		return m.persistence.DeleteCommunityShard(community.ID())
+	}
+
+	return m.persistence.SaveCommunityShard(community.ID(), shard, clock)
 }
 
 // SetShard assigns a shard to a community
@@ -1072,13 +1090,10 @@ func (m *Manager) SetShard(communityID types.HexBytes, shard *shard.Shard) (*Com
 	if err != nil {
 		return nil, err
 	}
-	if !community.IsControlNode() {
-		return nil, errors.New("not admin or owner")
-	}
 
 	community.increaseClock()
 
-	err = m.UpdateShard(community, shard)
+	err = m.UpdateShard(community, shard, community.Clock())
 	if err != nil {
 		return nil, err
 	}
@@ -1091,17 +1106,12 @@ func (m *Manager) SetShard(communityID types.HexBytes, shard *shard.Shard) (*Com
 	return community, nil
 }
 
-func (m *Manager) UpdatePubsubTopicPrivateKey(community *Community, privKey *ecdsa.PrivateKey) error {
-	community.SetPubsubTopicPrivateKey(privKey)
-
+func (m *Manager) UpdatePubsubTopicPrivateKey(topic string, privKey *ecdsa.PrivateKey) error {
 	if privKey != nil {
-		topic := community.PubsubTopic()
-		if err := m.transport.StorePubsubTopicKey(topic, privKey); err != nil {
-			return err
-		}
+		return m.transport.StorePubsubTopicKey(topic, privKey)
 	}
 
-	return nil
+	return m.transport.RemovePubsubTopicKey(topic)
 }
 
 // EditCommunity takes a description, updates the community with the description,
@@ -1236,6 +1246,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 			JoinedAt:             time.Now().Unix(),
 			MemberIdentity:       &m.identity.PublicKey,
 			CommunityDescription: description,
+			LastOpenedAt:         0,
 		}
 
 		var descriptionEncryptor DescriptionEncryptor
@@ -1643,7 +1654,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		return nil, err
 	}
 
-	if err = m.HandleCommunityTokensMetadataByPrivilegedMembers(community); err != nil {
+	if err = m.handleCommunityTokensMetadata(community); err != nil {
 		return nil, err
 	}
 
@@ -1814,7 +1825,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, err
 	}
 
-	if err = m.HandleCommunityTokensMetadataByPrivilegedMembers(community); err != nil {
+	if err = m.handleCommunityTokensMetadata(community); err != nil {
 		return nil, err
 	}
 
@@ -2858,7 +2869,7 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	if err = m.HandleCommunityTokensMetadataByPrivilegedMembers(community); err != nil {
+	if err = m.handleCommunityTokensMetadata(community); err != nil {
 		return nil, err
 	}
 
@@ -3271,25 +3282,6 @@ func (m *Manager) SaveRequestToJoinAndCommunity(requestToJoin *RequestToJoin, co
 	}
 
 	return community, requestToJoin, nil
-}
-
-func (m *Manager) CheckCommunityForJoining(communityID types.HexBytes) (*Community, error) {
-	community, err := m.GetByID(communityID)
-	if err != nil {
-		return nil, err
-	}
-
-	// We don't allow requesting access if already joined
-	if community.Joined() {
-		return nil, ErrAlreadyJoined
-	}
-
-	err = community.updateCommunityDescriptionByEvents()
-	if err != nil {
-		return nil, err
-	}
-
-	return community, nil
 }
 
 func (m *Manager) CreateRequestToJoin(request *requests.RequestToJoinCommunity) *RequestToJoin {
@@ -4721,16 +4713,7 @@ func (m *Manager) ReevaluatePrivilegedMember(community *Community, tokenPermissi
 	return alreadyHasPrivilegedRole, nil
 }
 
-func (m *Manager) HandleCommunityTokensMetadataByPrivilegedMembers(community *Community) error {
-	if community.HasPermissionToSendCommunityEvents() || community.IsControlNode() {
-		if err := m.HandleCommunityTokensMetadata(community); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (m *Manager) HandleCommunityTokensMetadata(community *Community) error {
+func (m *Manager) handleCommunityTokensMetadata(community *Community) error {
 	communityID := community.IDString()
 	communityTokens := community.CommunityTokensMetadata()
 

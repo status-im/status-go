@@ -32,7 +32,7 @@ func (s *MessengerSuite) Test_WHEN_MessageContainsImage_Then_preparedMessageAdds
 			ContentType: protobuf.ChatMessage_IMAGE,
 			Payload: &protobuf.ChatMessage_Image{
 				Image: &protobuf.ImageMessage{
-					Type:    1,
+					Format:  1,
 					Payload: []byte("some-payload"),
 				},
 			},

@@ -138,6 +138,7 @@ message SyncInstallationCommunity {
   bytes encryption_keys = 12;
   SyncCommunityControlNode control_node = 13;
   int64 joined_at = 14;
+  int64 last_opened_at = 15;
 }
 
 message SyncCommunityRequestsToJoin {
@@ -422,4 +423,17 @@ message SyncTokenPreferences {
   uint64 clock = 1;
   bool testnet = 2;
   repeated TokenPreferences preferences = 3;
+}
+
+message CollectiblePreferences {
+  int64 type = 1;
+  string key = 2;
+  int64 position = 3;
+  bool visible = 4;
+}
+
+message SyncCollectiblePreferences {
+  uint64 clock = 1;
+  bool testnet = 2;
+  repeated CollectiblePreferences preferences = 3;
 }

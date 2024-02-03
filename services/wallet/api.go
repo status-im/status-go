@@ -80,6 +80,10 @@ func (api *API) GetWalletTokenBalances(ctx context.Context, addresses []common.A
 	return api.reader.GetWalletTokenBalances(ctx, addresses)
 }
 
+func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
+	return api.reader.FetchOrGetCachedWalletBalances(ctx, addresses)
+}
+
 func (api *API) GetCachedWalletTokensWithoutMarketData(ctx context.Context) (map[common.Address][]Token, error) {
 	return api.reader.GetCachedWalletTokensWithoutMarketData()
 }
@@ -179,10 +183,10 @@ func (api *API) GetBalanceHistoryRange(ctx context.Context, chainIDs []uint64, a
 	return api.s.history.GetBalanceHistory(ctx, chainIDs, addresses, tokenSymbol, currencySymbol, fromTimestamp)
 }
 
-func (api *API) GetTokenList(ctx context.Context) ([]*token.List, error) {
+func (api *API) GetTokenList(ctx context.Context) (*token.ListWrapper, error) {
 	log.Debug("call to get token list")
 	rst := api.s.tokenManager.GetList()
-	log.Debug("result from token list", "len", len(rst))
+	log.Debug("result from token list", "len", len(rst.Data))
 	return rst, nil
 }
 
@@ -234,6 +238,7 @@ func (api *API) DeleteCustomTokenByChainID(ctx context.Context, chainID uint64, 
 }
 
 // @deprecated
+// Not used by status-desktop anymore
 func (api *API) GetPendingTransactions(ctx context.Context) ([]*transactions.PendingTransaction, error) {
 	log.Debug("wallet.api.GetPendingTransactions")
 	rst, err := api.s.pendingTxManager.GetAllPending()
@@ -241,6 +246,8 @@ func (api *API) GetPendingTransactions(ctx context.Context) ([]*transactions.Pen
 	return rst, err
 }
 
+// @deprecated
+// Not used by status-desktop anymore
 func (api *API) GetPendingTransactionsForIdentities(ctx context.Context, identities []transfer.TransactionIdentity) (
 	result []*transactions.PendingTransaction, err error) {
 
@@ -587,6 +594,18 @@ func (api *API) CancelActivityFilterTask(requestID int32) error {
 
 	api.s.activity.CancelFilterTask(requestID)
 	return nil
+}
+
+func (api *API) StartActivityFilterSession(addresses []common.Address, allAddresses bool, chainIDs []wcommon.ChainID, filter activity.Filter, firstPageCount int) (activity.SessionID, error) {
+	log.Debug("wallet.api.StartActivityFilterSession", "addr.count", len(addresses), "allAddresses", allAddresses, "chainIDs.count", len(chainIDs), "firstPageCount", firstPageCount)
+
+	return api.s.activity.StartFilterSession(addresses, allAddresses, chainIDs, filter, firstPageCount), nil
+}
+
+func (api *API) StopActivityFilterSession(id activity.SessionID) {
+	log.Debug("wallet.api.StopActivityFilterSession", "id", id)
+
+	api.s.activity.StopFilterSession(id)
 }
 
 func (api *API) GetMultiTxDetails(ctx context.Context, multiTxID int) (*activity.EntryDetails, error) {

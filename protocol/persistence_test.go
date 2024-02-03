@@ -1090,7 +1090,7 @@ func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
 	require.Nil(t, actualHash2)
 }
 
-func TestSaveContactChatIdentity(t *testing.T) {
+func TestUpdateContactChatIdentity(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := newSQLitePersistence(db)
@@ -1106,15 +1106,15 @@ func TestSaveContactChatIdentity(t *testing.T) {
 	jpegType := []byte{0xff, 0xd8, 0xff, 0x1}
 	identityImages := make(map[string]*protobuf.IdentityImage)
 	identityImages["large"] = &protobuf.IdentityImage{
-		Payload:    jpegType,
-		SourceType: protobuf.IdentityImage_RAW_PAYLOAD,
-		ImageType:  protobuf.ImageType_PNG,
+		Payload:     jpegType,
+		SourceType:  protobuf.IdentityImage_RAW_PAYLOAD,
+		ImageFormat: protobuf.ImageFormat_PNG,
 	}
 
 	identityImages["small"] = &protobuf.IdentityImage{
-		Payload:    jpegType,
-		SourceType: protobuf.IdentityImage_RAW_PAYLOAD,
-		ImageType:  protobuf.ImageType_PNG,
+		Payload:     jpegType,
+		SourceType:  protobuf.IdentityImage_RAW_PAYLOAD,
+		ImageFormat: protobuf.ImageFormat_PNG,
 	}
 
 	toArrayOfPointers := func(array []protobuf.SocialLink) (result []*protobuf.SocialLink) {
@@ -1140,13 +1140,13 @@ func TestSaveContactChatIdentity(t *testing.T) {
 		}),
 	}
 
-	clockUpdated, imagesUpdated, err := p.SaveContactChatIdentity(contactID, chatIdentity)
+	clockUpdated, imagesUpdated, err := p.UpdateContactChatIdentity(contactID, chatIdentity)
 	require.NoError(t, err)
 	require.True(t, clockUpdated)
 	require.True(t, imagesUpdated)
 
 	// Save again same clock and data
-	clockUpdated, imagesUpdated, err = p.SaveContactChatIdentity(contactID, chatIdentity)
+	clockUpdated, imagesUpdated, err = p.UpdateContactChatIdentity(contactID, chatIdentity)
 	require.NoError(t, err)
 	require.False(t, clockUpdated)
 	require.False(t, imagesUpdated)
@@ -1154,21 +1154,79 @@ func TestSaveContactChatIdentity(t *testing.T) {
 	// Save again newer clock and no images
 	chatIdentity.Clock = 2
 	chatIdentity.Images = make(map[string]*protobuf.IdentityImage)
-	clockUpdated, imagesUpdated, err = p.SaveContactChatIdentity(contactID, chatIdentity)
+	clockUpdated, imagesUpdated, err = p.UpdateContactChatIdentity(contactID, chatIdentity)
 	require.NoError(t, err)
 	require.True(t, clockUpdated)
-	require.False(t, imagesUpdated)
+	require.True(t, imagesUpdated)
 
 	contacts, err := p.Contacts()
 	require.NoError(t, err)
 	require.Len(t, contacts, 1)
 
-	require.Len(t, contacts[0].Images, 2)
+	require.Len(t, contacts[0].Images, 0)
 	require.Len(t, contacts[0].SocialLinks, 2)
 	require.Equal(t, "Personal Site", contacts[0].SocialLinks[0].Text)
 	require.Equal(t, "status.im", contacts[0].SocialLinks[0].URL)
 	require.Equal(t, "Twitter", contacts[0].SocialLinks[1].Text)
 	require.Equal(t, "Status_ico", contacts[0].SocialLinks[1].URL)
+}
+
+func TestRemovedProfileImage(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
+
+	err = p.SaveContact(&Contact{ID: contactID}, nil)
+	require.NoError(t, err)
+
+	jpegType := []byte{0xff, 0xd8, 0xff, 0x1}
+	identityImages := make(map[string]*protobuf.IdentityImage)
+	identityImages["large"] = &protobuf.IdentityImage{
+		Payload:     jpegType,
+		SourceType:  protobuf.IdentityImage_RAW_PAYLOAD,
+		ImageFormat: protobuf.ImageFormat_PNG,
+	}
+
+	identityImages["small"] = &protobuf.IdentityImage{
+		Payload:     jpegType,
+		SourceType:  protobuf.IdentityImage_RAW_PAYLOAD,
+		ImageFormat: protobuf.ImageFormat_PNG,
+	}
+
+	chatIdentity := &protobuf.ChatIdentity{
+		Clock:  1,
+		Images: identityImages,
+	}
+
+	clockUpdated, imagesUpdated, err := p.UpdateContactChatIdentity(contactID, chatIdentity)
+	require.NoError(t, err)
+	require.True(t, clockUpdated)
+	require.True(t, imagesUpdated)
+
+	contacts, err := p.Contacts()
+	require.NoError(t, err)
+	require.Len(t, contacts, 1)
+	require.Len(t, contacts[0].Images, 2)
+
+	emptyChatIdentity := &protobuf.ChatIdentity{
+		Clock:  1,
+		Images: nil,
+	}
+
+	clockUpdated, imagesUpdated, err = p.UpdateContactChatIdentity(contactID, emptyChatIdentity)
+	require.NoError(t, err)
+	require.False(t, clockUpdated)
+	require.True(t, imagesUpdated)
+
+	contacts, err = p.Contacts()
+	require.NoError(t, err)
+	require.Len(t, contacts, 1)
+	require.Len(t, contacts[0].Images, 0)
 }
 
 func TestSaveLinks(t *testing.T) {
@@ -1805,4 +1863,50 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 	require.NotNil(t, fetchedMessages)
 	require.Len(t, fetchedMessages, 1)
 
+}
+
+func TestSaveBridgeMessage(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	require.NoError(t, err)
+
+	bridgeMessage := &protobuf.BridgeMessage{
+		BridgeName:      "discord",
+		UserName:        "joe",
+		Content:         "abc",
+		UserAvatar:      "data:image/png;base64,iVBO...",
+		UserID:          "123",
+		MessageID:       "456",
+		ParentMessageID: "789",
+	}
+
+	const msgID = "123"
+	err = p.SaveMessages([]*common.Message{{
+		ID:          msgID,
+		LocalChatID: testPublicChatID,
+		From:        testPK,
+		ChatMessage: &protobuf.ChatMessage{
+			Text:        "some-text",
+			ContentType: protobuf.ChatMessage_BRIDGE_MESSAGE,
+			ChatId:      testPublicChatID,
+			Payload: &protobuf.ChatMessage_BridgeMessage{
+				BridgeMessage: bridgeMessage,
+			},
+		},
+	}})
+
+	require.NoError(t, err)
+
+	retrievedMessages, _, err := p.MessageByChatID(testPublicChatID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, retrievedMessages, 1)
+	require.Equal(t, "discord", retrievedMessages[0].GetBridgeMessage().BridgeName)
+	require.Equal(t, "joe", retrievedMessages[0].GetBridgeMessage().UserName)
+	require.Equal(t, "abc", retrievedMessages[0].GetBridgeMessage().Content)
+	require.Equal(t, "data:image/png;base64,iVBO...", retrievedMessages[0].GetBridgeMessage().UserAvatar)
+	require.Equal(t, "123", retrievedMessages[0].GetBridgeMessage().UserID)
+	require.Equal(t, "456", retrievedMessages[0].GetBridgeMessage().MessageID)
+	require.Equal(t, "789", retrievedMessages[0].GetBridgeMessage().ParentMessageID)
 }

@@ -608,6 +608,7 @@ func (t *Transport) waitForRequestCompleted(ctx context.Context, requestID []byt
 // ConfirmMessagesProcessed marks the messages as processed in the cache so
 // they won't be passed to the next layer anymore
 func (t *Transport) ConfirmMessagesProcessed(ids []string, timestamp uint64) error {
+	t.logger.Debug("confirming message processed", zap.Any("ids", ids), zap.Any("timestamp", timestamp))
 	return t.cache.Add(ids, timestamp)
 }
 
@@ -625,6 +626,8 @@ func (t *Transport) SetEnvelopeEventsHandler(handler EnvelopeEventsHandler) erro
 }
 
 func (t *Transport) ClearProcessedMessageIDsCache() error {
+	t.logger.Debug("clearing processed messages cache")
+	t.waku.ClearEnvelopesCache()
 	return t.cache.Clear()
 }
 
@@ -692,10 +695,25 @@ func (t *Transport) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.Pub
 	return nil
 }
 
+// Unsubscribe from a pubsub topic
+func (t *Transport) UnsubscribeFromPubsubTopic(topic string) error {
+	if t.waku.Version() == 2 {
+		return t.waku.UnsubscribeFromPubsubTopic(topic)
+	}
+	return nil
+}
+
 func (t *Transport) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
 	return t.waku.StorePubsubTopicKey(topic, privKey)
 }
 
 func (t *Transport) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
 	return t.waku.RetrievePubsubTopicKey(topic)
+}
+
+func (t *Transport) RemovePubsubTopicKey(topic string) error {
+	if t.waku.Version() == 2 {
+		return t.waku.RemovePubsubTopicKey(topic)
+	}
+	return nil
 }

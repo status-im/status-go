@@ -5,10 +5,10 @@ import (
 	"errors"
 
 	"github.com/golang/protobuf/proto"
-	datasyncnode "github.com/vacp2p/mvds/node"
-	"github.com/vacp2p/mvds/protobuf"
-	datasyncproto "github.com/vacp2p/mvds/protobuf"
-	datasynctransport "github.com/vacp2p/mvds/transport"
+	datasyncnode "github.com/status-im/mvds/node"
+	"github.com/status-im/mvds/protobuf"
+	datasyncproto "github.com/status-im/mvds/protobuf"
+	datasynctransport "github.com/status-im/mvds/transport"
 	"go.uber.org/zap"
 
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
@@ -40,7 +40,7 @@ func (d *DataSync) Unwrap(sender *ecdsa.PublicKey, payload []byte) (*protobuf.Pa
 	} else {
 		logger.Debug("handling datasync message")
 		if d.sendingEnabled {
-			d.add(sender, datasyncMessage)
+			d.add(sender, &datasyncMessage)
 		}
 	}
 
@@ -51,7 +51,7 @@ func (d *DataSync) Stop() {
 	d.Node.Stop()
 }
 
-func (d *DataSync) add(publicKey *ecdsa.PublicKey, datasyncMessage datasyncproto.Payload) {
+func (d *DataSync) add(publicKey *ecdsa.PublicKey, datasyncMessage *datasyncproto.Payload) {
 	packet := datasynctransport.Packet{
 		Sender:  datasyncpeer.PublicKeyToPeerID(*publicKey),
 		Payload: datasyncMessage,

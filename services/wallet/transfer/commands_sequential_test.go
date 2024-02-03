@@ -24,17 +24,22 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/contracts"
+	"github.com/status-im/status-go/contracts/balancechecker"
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
+	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	multicommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/params"
 	statusRpc "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
@@ -47,14 +52,14 @@ import (
 type TestClient struct {
 	t *testing.T
 	// [][block, newBalance, nonceDiff]
-	balances                       [][]int
-	outgoingERC20Transfers         []testERC20Transfer
-	incomingERC20Transfers         []testERC20Transfer
-	outgoingERC1155SingleTransfers []testERC20Transfer
-	incomingERC1155SingleTransfers []testERC20Transfer
-	balanceHistory                 map[uint64]*big.Int
-	tokenBalanceHistory            map[common.Address]map[uint64]*big.Int
-	nonceHistory                   map[uint64]uint64
+	balances                       map[common.Address][][]int
+	outgoingERC20Transfers         map[common.Address][]testERC20Transfer
+	incomingERC20Transfers         map[common.Address][]testERC20Transfer
+	outgoingERC1155SingleTransfers map[common.Address][]testERC20Transfer
+	incomingERC1155SingleTransfers map[common.Address][]testERC20Transfer
+	balanceHistory                 map[common.Address]map[uint64]*big.Int
+	tokenBalanceHistory            map[common.Address]map[common.Address]map[uint64]*big.Int
+	nonceHistory                   map[common.Address]map[uint64]uint64
 	traceAPICalls                  bool
 	printPreparedData              bool
 	rw                             sync.RWMutex
@@ -130,7 +135,7 @@ func (tc *TestClient) BlockByNumber(ctx context.Context, number *big.Int) (*type
 
 func (tc *TestClient) NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error) {
 	tc.incCounter("NonceAt")
-	nonce := tc.nonceHistory[blockNumber.Uint64()]
+	nonce := tc.nonceHistory[account][blockNumber.Uint64()]
 	if tc.traceAPICalls {
 		tc.t.Log("NonceAt", blockNumber, "result:", nonce)
 	}
@@ -165,21 +170,39 @@ func (tc *TestClient) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([
 		}
 
 		if len(to) > 0 {
-			allTransfers = append(allTransfers, tc.incomingERC1155SingleTransfers...)
+			for _, addressHash := range to {
+				address := &common.Address{}
+				address.SetBytes(addressHash.Bytes())
+				allTransfers = append(allTransfers, tc.incomingERC1155SingleTransfers[*address]...)
+			}
 		}
 		if len(from) > 0 {
-			allTransfers = append(allTransfers, tc.outgoingERC1155SingleTransfers...)
+			for _, addressHash := range from {
+				address := &common.Address{}
+				address.SetBytes(addressHash.Bytes())
+				allTransfers = append(allTransfers, tc.outgoingERC1155SingleTransfers[*address]...)
+			}
 		}
 	}
 
 	if slices.Contains(signatures, erc20TransferSignature) {
 		from := q.Topics[1]
 		to := q.Topics[2]
+
 		if len(to) > 0 {
-			allTransfers = append(allTransfers, tc.incomingERC20Transfers...)
+			for _, addressHash := range to {
+				address := &common.Address{}
+				address.SetBytes(addressHash.Bytes())
+				allTransfers = append(allTransfers, tc.incomingERC20Transfers[*address]...)
+			}
 		}
+
 		if len(from) > 0 {
-			allTransfers = append(allTransfers, tc.outgoingERC20Transfers...)
+			for _, addressHash := range from {
+				address := &common.Address{}
+				address.SetBytes(addressHash.Bytes())
+				allTransfers = append(allTransfers, tc.outgoingERC20Transfers[*address]...)
+			}
 		}
 	}
 
@@ -210,24 +233,33 @@ func (tc *TestClient) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([
 	return logs, nil
 }
 
+func (tc *TestClient) getBalance(address common.Address, blockNumber *big.Int) *big.Int {
+	balance := tc.balanceHistory[address][blockNumber.Uint64()]
+	if balance == nil {
+		balance = big.NewInt(0)
+	}
+
+	return balance
+}
+
 func (tc *TestClient) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
 	tc.incCounter("BalanceAt")
-	balance := tc.balanceHistory[blockNumber.Uint64()]
+	balance := tc.getBalance(account, blockNumber)
 
 	if tc.traceAPICalls {
-		tc.t.Log("BalanceAt", blockNumber, "result:", balance)
+		tc.t.Log("BalanceAt", blockNumber, "account:", account, "result:", balance)
 	}
 	return balance, nil
 }
 
-func (tc *TestClient) tokenBalanceAt(token common.Address, blockNumber *big.Int) *big.Int {
-	balance := tc.tokenBalanceHistory[token][blockNumber.Uint64()]
+func (tc *TestClient) tokenBalanceAt(account common.Address, token common.Address, blockNumber *big.Int) *big.Int {
+	balance := tc.tokenBalanceHistory[account][token][blockNumber.Uint64()]
 	if balance == nil {
 		balance = big.NewInt(0)
 	}
 
 	if tc.traceAPICalls {
-		tc.t.Log("tokenBalanceAt", token, blockNumber, "result:", balance)
+		tc.t.Log("tokenBalanceAt", token, blockNumber, "account:", account, "result:", balance)
 	}
 	return balance
 }
@@ -286,6 +318,7 @@ func (tc *TestClient) ToBigInt() *big.Int {
 }
 
 var ethscanAddress = common.HexToAddress("0x0000000000000000000000000000000000777333")
+var balanceCheckAddress = common.HexToAddress("0x0000000000000000000000000000000010777333")
 
 func (tc *TestClient) CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error) {
 	tc.incCounter("CodeAt")
@@ -293,7 +326,7 @@ func (tc *TestClient) CodeAt(ctx context.Context, contract common.Address, block
 		tc.t.Log("CodeAt", contract, blockNumber)
 	}
 
-	if ethscanAddress == contract {
+	if ethscanAddress == contract || balanceCheckAddress == contract {
 		return []byte{1}, nil
 	}
 
@@ -320,10 +353,11 @@ func (tc *TestClient) CallContract(ctx context.Context, call ethereum.CallMsg, b
 			return nil, err
 		}
 
+		account := args[0].(common.Address)
 		tokens := args[1].([]common.Address)
 		balances := []*big.Int{}
 		for _, token := range tokens {
-			balances = append(balances, tc.tokenBalanceAt(token, blockNumber))
+			balances = append(balances, tc.tokenBalanceAt(account, token, blockNumber))
 		}
 		results := []ethscan.BalanceScannerResult{}
 		for _, balance := range balances {
@@ -343,17 +377,72 @@ func (tc *TestClient) CallContract(ctx context.Context, call ethereum.CallMsg, b
 	}
 
 	if *call.To == tokenTXXAddress || *call.To == tokenTXYAddress {
-		balance := tc.tokenBalanceAt(*call.To, blockNumber)
-
 		parsed, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
 		if err != nil {
 			return nil, err
 		}
 
 		method := parsed.Methods["balanceOf"]
+		params := call.Data[len(method.ID):]
+		args, err := method.Inputs.Unpack(params)
+
+		if err != nil {
+			tc.t.Log("ERROR on unpacking", err)
+			return nil, err
+		}
+
+		account := args[0].(common.Address)
+
+		balance := tc.tokenBalanceAt(account, *call.To, blockNumber)
+
 		output, err := method.Outputs.Pack(balance)
 		if err != nil {
 			tc.t.Log("ERROR on packing ERC20 balance", err)
+			return nil, err
+		}
+
+		return output, nil
+	}
+
+	if *call.To == balanceCheckAddress {
+		parsed, err := abi.JSON(strings.NewReader(balancechecker.BalanceCheckerABI))
+		if err != nil {
+			return nil, err
+		}
+
+		method := parsed.Methods["balancesHash"]
+		params := call.Data[len(method.ID):]
+		args, err := method.Inputs.Unpack(params)
+
+		if err != nil {
+			tc.t.Log("ERROR on unpacking", err)
+			return nil, err
+		}
+
+		addresses := args[0].([]common.Address)
+		tokens := args[1].([]common.Address)
+		bn := big.NewInt(int64(tc.currentBlock))
+		hashes := [][32]byte{}
+
+		for _, address := range addresses {
+			balance := tc.getBalance(address, big.NewInt(int64(tc.currentBlock)))
+			balanceBytes := balance.Bytes()
+			for _, token := range tokens {
+				balance := tc.tokenBalanceAt(address, token, bn)
+				balanceBytes = append(balanceBytes, balance.Bytes()...)
+			}
+
+			hash := [32]byte{}
+			for i, b := range ethtypes.BytesToHash(balanceBytes).Bytes() {
+				hash[i] = b
+			}
+
+			hashes = append(hashes, hash)
+		}
+
+		output, err := method.Outputs.Pack(bn, hashes)
+		if err != nil {
+			tc.t.Log("ERROR on packing", err)
 			return nil, err
 		}
 
@@ -364,25 +453,30 @@ func (tc *TestClient) CallContract(ctx context.Context, call ethereum.CallMsg, b
 }
 
 func (tc *TestClient) prepareBalanceHistory(toBlock int) {
-	var currentBlock, currentBalance, currentNonce int
+	tc.balanceHistory = map[common.Address]map[uint64]*big.Int{}
+	tc.nonceHistory = map[common.Address]map[uint64]uint64{}
 
-	tc.balanceHistory = map[uint64]*big.Int{}
-	tc.nonceHistory = map[uint64]uint64{}
+	for address, balances := range tc.balances {
+		var currentBlock, currentBalance, currentNonce int
 
-	if len(tc.balances) == 0 {
-		tc.balances = append(tc.balances, []int{toBlock + 1, 0, 0})
-	} else {
-		lastBlock := tc.balances[len(tc.balances)-1]
-		tc.balances = append(tc.balances, []int{toBlock + 1, lastBlock[1], 0})
-	}
-	for _, change := range tc.balances {
-		for blockN := currentBlock; blockN < change[0]; blockN++ {
-			tc.balanceHistory[uint64(blockN)] = big.NewInt(int64(currentBalance))
-			tc.nonceHistory[uint64(blockN)] = uint64(currentNonce)
+		tc.balanceHistory[address] = map[uint64]*big.Int{}
+		tc.nonceHistory[address] = map[uint64]uint64{}
+
+		if len(balances) == 0 {
+			balances = append(balances, []int{toBlock + 1, 0, 0})
+		} else {
+			lastBlock := balances[len(balances)-1]
+			balances = append(balances, []int{toBlock + 1, lastBlock[1], 0})
 		}
-		currentBlock = change[0]
-		currentBalance = change[1]
-		currentNonce += change[2]
+		for _, change := range balances {
+			for blockN := currentBlock; blockN < change[0]; blockN++ {
+				tc.balanceHistory[address][uint64(blockN)] = big.NewInt(int64(currentBalance))
+				tc.nonceHistory[address][uint64(blockN)] = uint64(currentNonce)
+			}
+			currentBlock = change[0]
+			currentBalance = change[1]
+			currentNonce += change[2]
+		}
 	}
 
 	if tc.printPreparedData {
@@ -395,48 +489,74 @@ func (tc *TestClient) prepareBalanceHistory(toBlock int) {
 }
 
 func (tc *TestClient) prepareTokenBalanceHistory(toBlock int) {
-	transfersPerToken := map[common.Address][]testERC20Transfer{}
-	for _, transfer := range tc.outgoingERC20Transfers {
-		transfer.amount = new(big.Int).Neg(transfer.amount)
-		transfer.eventType = walletcommon.Erc20TransferEventType
-		transfersPerToken[transfer.address] = append(transfersPerToken[transfer.address], transfer)
-	}
-
-	for _, transfer := range tc.incomingERC20Transfers {
-		transfer.eventType = walletcommon.Erc20TransferEventType
-		transfersPerToken[transfer.address] = append(transfersPerToken[transfer.address], transfer)
-	}
-
-	for _, transfer := range tc.outgoingERC1155SingleTransfers {
-		transfer.amount = new(big.Int).Neg(transfer.amount)
-		transfer.eventType = walletcommon.Erc1155TransferSingleEventType
-		transfersPerToken[transfer.address] = append(transfersPerToken[transfer.address], transfer)
-	}
-
-	for _, transfer := range tc.incomingERC1155SingleTransfers {
-		transfer.eventType = walletcommon.Erc1155TransferSingleEventType
-		transfersPerToken[transfer.address] = append(transfersPerToken[transfer.address], transfer)
-	}
-
-	tc.tokenBalanceHistory = map[common.Address]map[uint64]*big.Int{}
-
-	for token, transfers := range transfersPerToken {
-		sort.Slice(transfers, func(i, j int) bool {
-			return transfers[i].block.Cmp(transfers[j].block) < 0
-		})
-
-		currentBlock := uint64(0)
-		currentBalance := big.NewInt(0)
-
-		tc.tokenBalanceHistory[token] = map[uint64]*big.Int{}
-		transfers = append(transfers, testERC20Transfer{big.NewInt(int64(toBlock + 1)), token, big.NewInt(0), walletcommon.Erc20TransferEventType})
-
+	transfersPerAddress := map[common.Address]map[common.Address][]testERC20Transfer{}
+	for account, transfers := range tc.outgoingERC20Transfers {
+		if _, ok := transfersPerAddress[account]; !ok {
+			transfersPerAddress[account] = map[common.Address][]testERC20Transfer{}
+		}
 		for _, transfer := range transfers {
-			for blockN := currentBlock; blockN < transfer.block.Uint64(); blockN++ {
-				tc.tokenBalanceHistory[token][blockN] = new(big.Int).Set(currentBalance)
+			transfer.amount = new(big.Int).Neg(transfer.amount)
+			transfer.eventType = walletcommon.Erc20TransferEventType
+			transfersPerAddress[account][transfer.address] = append(transfersPerAddress[account][transfer.address], transfer)
+		}
+	}
+
+	for account, transfers := range tc.incomingERC20Transfers {
+		if _, ok := transfersPerAddress[account]; !ok {
+			transfersPerAddress[account] = map[common.Address][]testERC20Transfer{}
+		}
+		for _, transfer := range transfers {
+			transfer.amount = new(big.Int).Neg(transfer.amount)
+			transfer.eventType = walletcommon.Erc20TransferEventType
+			transfersPerAddress[account][transfer.address] = append(transfersPerAddress[account][transfer.address], transfer)
+		}
+	}
+
+	for account, transfers := range tc.outgoingERC1155SingleTransfers {
+		if _, ok := transfersPerAddress[account]; !ok {
+			transfersPerAddress[account] = map[common.Address][]testERC20Transfer{}
+		}
+		for _, transfer := range transfers {
+			transfer.amount = new(big.Int).Neg(transfer.amount)
+			transfer.eventType = walletcommon.Erc1155TransferSingleEventType
+			transfersPerAddress[account][transfer.address] = append(transfersPerAddress[account][transfer.address], transfer)
+		}
+	}
+
+	for account, transfers := range tc.incomingERC1155SingleTransfers {
+		if _, ok := transfersPerAddress[account]; !ok {
+			transfersPerAddress[account] = map[common.Address][]testERC20Transfer{}
+		}
+		for _, transfer := range transfers {
+			transfer.amount = new(big.Int).Neg(transfer.amount)
+			transfer.eventType = walletcommon.Erc1155TransferSingleEventType
+			transfersPerAddress[account][transfer.address] = append(transfersPerAddress[account][transfer.address], transfer)
+		}
+	}
+
+	tc.tokenBalanceHistory = map[common.Address]map[common.Address]map[uint64]*big.Int{}
+
+	for account, transfersPerToken := range transfersPerAddress {
+		tc.tokenBalanceHistory[account] = map[common.Address]map[uint64]*big.Int{}
+		for token, transfers := range transfersPerToken {
+			sort.Slice(transfers, func(i, j int) bool {
+				return transfers[i].block.Cmp(transfers[j].block) < 0
+			})
+
+			currentBlock := uint64(0)
+			currentBalance := big.NewInt(0)
+
+			tc.tokenBalanceHistory[token] = map[common.Address]map[uint64]*big.Int{}
+			transfers = append(transfers, testERC20Transfer{big.NewInt(int64(toBlock + 1)), token, big.NewInt(0), walletcommon.Erc20TransferEventType})
+
+			tc.tokenBalanceHistory[account][token] = map[uint64]*big.Int{}
+			for _, transfer := range transfers {
+				for blockN := currentBlock; blockN < transfer.block.Uint64(); blockN++ {
+					tc.tokenBalanceHistory[account][token][blockN] = new(big.Int).Set(currentBalance)
+				}
+				currentBlock = transfer.block.Uint64()
+				currentBalance = new(big.Int).Add(currentBalance, transfer.amount)
 			}
-			currentBlock = transfer.block.Uint64()
-			currentBalance = new(big.Int).Add(currentBalance, transfer.amount)
 		}
 	}
 	if tc.printPreparedData {
@@ -916,14 +1036,15 @@ func TestFindBlocksCommand(t *testing.T) {
 		mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
 		require.NoError(t, err)
 
+		accountAddress := common.HexToAddress("0x1234")
 		wdb := NewDB(db)
 		tc := &TestClient{
 			t:                              t,
-			balances:                       testCase.balanceChanges,
-			outgoingERC20Transfers:         testCase.outgoingERC20Transfers,
-			incomingERC20Transfers:         testCase.incomingERC20Transfers,
-			outgoingERC1155SingleTransfers: testCase.outgoingERC1155SingleTransfers,
-			incomingERC1155SingleTransfers: testCase.incomingERC1155SingleTransfers,
+			balances:                       map[common.Address][][]int{accountAddress: testCase.balanceChanges},
+			outgoingERC20Transfers:         map[common.Address][]testERC20Transfer{accountAddress: testCase.outgoingERC20Transfers},
+			incomingERC20Transfers:         map[common.Address][]testERC20Transfer{accountAddress: testCase.incomingERC20Transfers},
+			outgoingERC1155SingleTransfers: map[common.Address][]testERC20Transfer{accountAddress: testCase.outgoingERC1155SingleTransfers},
+			incomingERC1155SingleTransfers: map[common.Address][]testERC20Transfer{accountAddress: testCase.incomingERC1155SingleTransfers},
 			callsCounter:                   map[string]int{},
 		}
 		// tc.traceAPICalls = true
@@ -959,7 +1080,7 @@ func TestFindBlocksCommand(t *testing.T) {
 		accDB, err := accounts.NewDB(appdb)
 		require.NoError(t, err)
 		fbc := &findBlocksCommand{
-			accounts:                  []common.Address{common.HexToAddress("0x1234")},
+			accounts:                  []common.Address{accountAddress},
 			db:                        wdb,
 			blockRangeDAO:             &BlockRangeSequentialDAO{wdb.client},
 			accountsDB:                accDB,
@@ -1053,9 +1174,9 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 
 	tc := &TestClient{
 		t:                      t,
-		balances:               [][]int{},
-		outgoingERC20Transfers: []testERC20Transfer{},
-		incomingERC20Transfers: []testERC20Transfer{},
+		balances:               map[common.Address][][]int{},
+		outgoingERC20Transfers: map[common.Address][]testERC20Transfer{},
+		incomingERC20Transfers: map[common.Address][]testERC20Transfer{},
 		callsCounter:           map[string]int{},
 		currentBlock:           100,
 	}
@@ -1103,6 +1224,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 		tokenManager:       tokenManager,
 		blocksLoadedCh:     blockChannel,
 		omitHistory:        true,
+		contractMaker:      tokenManager.ContractMaker,
 	}
 
 	tc.prepareBalanceHistory(int(tc.currentBlock))
@@ -1173,9 +1295,9 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 		t.Log("case #", idx+1)
 		tc := &TestClient{
 			t:                      t,
-			balances:               testCase.balanceChanges,
-			outgoingERC20Transfers: []testERC20Transfer{},
-			incomingERC20Transfers: []testERC20Transfer{},
+			balances:               map[common.Address][][]int{address: testCase.balanceChanges},
+			outgoingERC20Transfers: map[common.Address][]testERC20Transfer{},
+			incomingERC20Transfers: map[common.Address][]testERC20Transfer{},
 			callsCounter:           map[string]int{},
 			currentBlock:           100,
 		}
@@ -1248,14 +1370,27 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 	accDB, err := accounts.NewDB(appdb)
 	require.NoError(t, err)
 
+	for _, address := range []*common.Address{&address1, &address2} {
+		acc := &accounts.Account{
+			Address: ethtypes.BytesToAddress(address.Bytes()),
+			Type:    accounts.AccountTypeWatch,
+			Name:    address.String(),
+			ColorID: multicommon.CustomizationColorPrimary,
+			Emoji:   "emoji",
+		}
+		err = accDB.SaveOrUpdateAccounts([]*accounts.Account{acc}, false)
+		require.NoError(t, err)
+	}
+
 	tc := &TestClient{
 		t:                      t,
-		balances:               [][]int{},
-		outgoingERC20Transfers: []testERC20Transfer{},
-		incomingERC20Transfers: []testERC20Transfer{},
+		balances:               map[common.Address][][]int{},
+		outgoingERC20Transfers: map[common.Address][]testERC20Transfer{},
+		incomingERC20Transfers: map[common.Address][]testERC20Transfer{},
 		callsCounter:           map[string]int{},
 		currentBlock:           1,
 	}
+	//tc.printPreparedData = true
 
 	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 	client.SetClient(tc.NetworkID(), tc)
@@ -1297,6 +1432,8 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 			blocksLoadedCh:            blockChannel,
 			defaultNodeBlockChunkSize: DefaultNodeBlockChunkSize,
 		},
+		contractMaker:   tokenManager.ContractMaker,
+		blockChainState: blockchainstate.NewBlockChainState(),
 	}
 
 	ctx := context.Background()
@@ -1321,11 +1458,13 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 	// Verify that blocks are found and cmd.fromBlockNumber is incremented
 	tc.resetCounter()
 	tc.currentBlock = 3
-	tc.balances = [][]int{
-		{3, 1, 0},
+	tc.balances = map[common.Address][][]int{
+		address1: {{3, 1, 0}},
+		address2: {{3, 1, 0}},
 	}
-	tc.incomingERC20Transfers = []testERC20Transfer{
-		{big.NewInt(3), tokenTXXAddress, big.NewInt(1), walletcommon.Erc20TransferEventType},
+	tc.incomingERC20Transfers = map[common.Address][]testERC20Transfer{
+		address1: {{big.NewInt(3), tokenTXXAddress, big.NewInt(1), walletcommon.Erc20TransferEventType}},
+		address2: {{big.NewInt(3), tokenTXYAddress, big.NewInt(1), walletcommon.Erc20TransferEventType}},
 	}
 	tc.prepareBalanceHistory(int(tc.currentBlock))
 	tc.prepareTokenBalanceHistory(int(tc.currentBlock))
@@ -1359,43 +1498,13 @@ type TestClientWithError struct {
 	*TestClient
 }
 
-func (tc *TestClientWithError) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
-	tc.incCounter("HeaderByNumber")
+func (tc *TestClientWithError) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
+	tc.incCounter("BlockByNumber")
 	if tc.traceAPICalls {
-		tc.t.Log("HeaderByNumber", number)
+		tc.t.Log("BlockByNumber", number)
 	}
 
 	return nil, errors.New("Network error")
-}
-
-func TestLoadBlocksAndTransfersCommand_StopOnErrorsOverflow(t *testing.T) {
-	tc := &TestClientWithError{
-		&TestClient{
-			t:            t,
-			callsCounter: map[string]int{},
-		},
-	}
-
-	cmd := &loadBlocksAndTransfersCommand{
-		chainClient:  tc,
-		errorCounter: *newErrorCounter("testLoadBlocksAndTransfersCommand"),
-	}
-
-	ctx := context.Background()
-	group := async.NewGroup(ctx)
-
-	group.Add(cmd.Command(1 * time.Millisecond))
-
-	select {
-	case <-ctx.Done():
-		t.Log("Done")
-	case <-group.WaitAsync():
-		t.Log("Command finished", "error", cmd.Error())
-		require.Equal(t, cmd.maxErrors, tc.callsCounter["HeaderByNumber"])
-
-		_, expectedErr := tc.HeaderByNumber(ctx, nil)
-		require.Error(t, expectedErr, cmd.Error())
-	}
 }
 
 type BlockRangeSequentialDAOMockError struct {
@@ -1404,54 +1513,6 @@ type BlockRangeSequentialDAOMockError struct {
 
 func (b *BlockRangeSequentialDAOMockError) getBlockRange(chainID uint64, address common.Address) (blockRange *ethTokensBlockRanges, err error) {
 	return nil, errors.New("DB error")
-}
-
-func TestLoadBlocksAndTransfersCommand_StopOnErrorsOverflowWhenStarted(t *testing.T) {
-	appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	require.NoError(t, err)
-
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
-
-	wdb := NewDB(db)
-	tc := &TestClient{
-		t:            t,
-		callsCounter: map[string]int{},
-	}
-	accDB, err := accounts.NewDB(appdb)
-	require.NoError(t, err)
-
-	cmd := &loadBlocksAndTransfersCommand{
-		accounts:    []common.Address{common.HexToAddress("0x1234")},
-		chainClient: tc,
-		blockDAO:    &BlockDAO{db},
-		blockRangeDAO: &BlockRangeSequentialDAOMockError{
-			&BlockRangeSequentialDAO{
-				wdb.client,
-			},
-		},
-		accountsDB: accDB,
-	}
-
-	ctx := context.Background()
-	group := async.NewGroup(ctx)
-
-	group.Add(cmd.Command(1 * time.Millisecond))
-
-	select {
-	case <-ctx.Done():
-		t.Log("Done")
-	case <-group.WaitAsync():
-		t.Log("Command finished", "error", cmd.Error())
-		_, expectedErr := cmd.blockRangeDAO.getBlockRange(0, common.Address{})
-		require.Error(t, expectedErr, cmd.Error())
-		require.NoError(t, utils.Eventually(func() error {
-			if !cmd.isStarted() {
-				return nil
-			}
-			return errors.New("command is still running")
-		}, 100*time.Millisecond, 10*time.Millisecond))
-	}
 }
 
 type BlockRangeSequentialDAOMockSuccess struct {
@@ -1468,6 +1529,9 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
+
+	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
+	maker, _ := contracts.NewContractMaker(client)
 
 	wdb := NewDB(db)
 	tc := &TestClient{
@@ -1486,7 +1550,8 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 				wdb.client,
 			},
 		},
-		accountsDB: accDB,
+		accountsDB:    accDB,
+		contractMaker: maker,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1499,10 +1564,9 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 		cancel() // linter is not happy if cancel is not called on all code paths
 		t.Log("Done")
 	case <-group.WaitAsync():
-		t.Log("Command finished", "error", cmd.Error())
-		require.NoError(t, cmd.Error())
 		require.True(t, cmd.isStarted())
 
+		// Test that it stops if canceled
 		cancel()
 		require.NoError(t, utils.Eventually(func() error {
 			if !cmd.isStarted() {
@@ -1510,5 +1574,42 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 			}
 			return errors.New("command is still running")
 		}, 100*time.Millisecond, 10*time.Millisecond))
+	}
+}
+
+func TestTransfersCommand_RetryAndQuitOnMaxError(t *testing.T) {
+	tc := &TestClientWithError{
+		&TestClient{
+			t:            t,
+			callsCounter: map[string]int{},
+		},
+	}
+
+	address := common.HexToAddress("0x1234")
+	cmd := &transfersCommand{
+		chainClient: tc,
+		address:     address,
+		eth: &ETHDownloader{
+			chainClient: tc,
+			accounts:    []common.Address{address},
+		},
+		blockNums: []*big.Int{big.NewInt(1)},
+	}
+
+	ctx := context.Background()
+	group := async.NewGroup(ctx)
+
+	runner := cmd.Runner(1 * time.Millisecond)
+	group.Add(runner.Run)
+
+	select {
+	case <-ctx.Done():
+		t.Log("Done")
+	case <-group.WaitAsync():
+		errorCounter := runner.(async.FiniteCommandWithErrorCounter).ErrorCounter
+		require.Equal(t, errorCounter.MaxErrors(), tc.callsCounter["BlockByNumber"])
+
+		_, expectedErr := tc.BlockByNumber(context.TODO(), nil)
+		require.Error(t, expectedErr, errorCounter.Error())
 	}
 }

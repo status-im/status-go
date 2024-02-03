@@ -713,7 +713,7 @@ func (c *ClientWithFallback) PendingTransactionCount(ctx context.Context) (uint,
 }
 
 func (c *ClientWithFallback) CallContract(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
-	rpcstats.CountCall("eth_CallContract")
+	rpcstats.CountCall("eth_CallContract_" + msg.To.String())
 
 	data, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.CallContract(ctx, msg, blockNumber) },

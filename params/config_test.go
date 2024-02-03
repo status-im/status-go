@@ -44,6 +44,8 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	assert.Equal(t, false, c.HTTPEnabled)
 	assert.Equal(t, false, c.IPCEnabled)
 
+	assert.Equal(t, "", c.RuntimeLogLevel)
+
 	assert.Equal(t, "/some/data/path/archivedata", c.TorrentConfig.DataDir)
 	assert.Equal(t, "/some/data/path/torrents", c.TorrentConfig.TorrentDir)
 	assert.Equal(t, 9025, c.TorrentConfig.Port)
@@ -61,12 +63,13 @@ func TestNewConfigFromJSON(t *testing.T) {
 		"KeyStoreDir": "` + tmpDir + `",
 		"KeycardPairingDataFile": "` + path.Join(tmpDir, "keycard/pairings.json") + `",
 		"NoDiscovery": true,
-    "TorrentConfig": {
-      "Port": 9025,
-      "Enabled": false,
-      "DataDir": "` + tmpDir + `/archivedata",
-      "TorrentDir": "` + tmpDir + `/torrents"
-    }
+		"TorrentConfig": {
+			"Port": 9025,
+			"Enabled": false,
+			"DataDir": "` + tmpDir + `/archivedata",
+			"TorrentDir": "` + tmpDir + `/torrents"
+		},
+		"RuntimeLogLevel": "DEBUG"
 	}`
 	c, err := params.NewConfigFromJSON(json)
 	require.NoError(t, err)
@@ -77,6 +80,7 @@ func TestNewConfigFromJSON(t *testing.T) {
 	require.Equal(t, 9025, c.TorrentConfig.Port)
 	require.Equal(t, tmpDir+"/archivedata", c.TorrentConfig.DataDir)
 	require.Equal(t, tmpDir+"/torrents", c.TorrentConfig.TorrentDir)
+	require.Equal(t, "DEBUG", c.RuntimeLogLevel)
 }
 
 func TestConfigWriteRead(t *testing.T) {

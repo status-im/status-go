@@ -69,12 +69,22 @@ func (w *gethWakuWrapper) SubscribeToPubsubTopic(topic string, optPublicKey *ecd
 	return errors.New("not available in WakuV1")
 }
 
+func (w *gethWakuWrapper) UnsubscribeFromPubsubTopic(topic string) error {
+	// not available in WakuV1
+	return errors.New("not available in WakuV1")
+}
+
 func (w *gethWakuWrapper) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
 	// not available in WakuV1
 	return nil, errors.New("not available in WakuV1")
 }
 
 func (w *gethWakuWrapper) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
+	// not available in WakuV1
+	return errors.New("not available in WakuV1")
+}
+
+func (w *gethWakuWrapper) RemovePubsubTopicKey(topic string) error {
 	// not available in WakuV1
 	return errors.New("not available in WakuV1")
 }
@@ -271,7 +281,12 @@ func (w *gethWakuWrapper) MarkP2PMessageAsProcessed(hash common.Hash) {
 func (w *gethWakuWrapper) RequestStoreMessages(ctx context.Context, peerID []byte, r types.MessagesRequest, processEnvelopes bool) (*types.StoreRequestCursor, int, error) {
 	return nil, 0, errors.New("not implemented")
 }
+
 func (w *gethWakuWrapper) ConnectionChanged(_ connection.State) {}
+
+func (w *gethWakuWrapper) ClearEnvelopesCache() {
+	w.waku.ClearEnvelopesCache()
+}
 
 type wakuFilterWrapper struct {
 	filter *wakucommon.Filter

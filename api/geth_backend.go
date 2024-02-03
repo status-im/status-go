@@ -622,6 +622,8 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		KeycardPairingDataFile: defaultKeycardPairingDataFile,
 	}
 
+	defaultCfg.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig)
+
 	settings, err := b.GetSettings()
 	if err != nil {
 		return err
@@ -1090,10 +1092,14 @@ func (b *GethStatusBackend) createTempDBFile(pattern string) (tmpDbPath string, 
 	if err != nil {
 		return
 	}
+	err = file.Close()
+	if err != nil {
+		return
+	}
+
 	tmpDbPath = file.Name()
 	cleanup = func() {
 		filePath := file.Name()
-		_ = file.Close()
 		_ = os.Remove(filePath)
 		_ = os.Remove(filePath + "-wal")
 		_ = os.Remove(filePath + "-shm")
@@ -1352,6 +1358,8 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 	if mnemonic == "" {
 		settings.Mnemonic = &info.Mnemonic
 		settings.OmitTransfersHistoryScan = true
+		// TODO(rasom): uncomment it as soon as address will be properly
+		// marked as shown on mobile client
 		//settings.MnemonicWasNotShown = true
 	}
 
@@ -1705,6 +1713,10 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 	conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
 
 	b.config = conf
+
+	if inputNodeCfg != nil && inputNodeCfg.RuntimeLogLevel != "" {
+		b.config.LogLevel = inputNodeCfg.RuntimeLogLevel
+	}
 
 	return nil
 }
@@ -2198,6 +2210,7 @@ func (b *GethStatusBackend) Logout() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	b.log.Debug("logging out")
 	err := b.cleanupServices()
 	if err != nil {
 		return err
@@ -2216,6 +2229,11 @@ func (b *GethStatusBackend) Logout() error {
 		}
 		b.statusNode = nil
 	}
+
+	if !b.LocalPairingStateManager.IsPairing() {
+		signal.SendNodeStopped()
+	}
+
 	// re-initialize the node, at some point we should better manage the lifecycle
 	b.initialize()
 

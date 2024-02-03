@@ -31,7 +31,7 @@ func TestUpdateCollectiblesData(t *testing.T) {
 
 	var err error
 
-	err = db.SetData(data)
+	err = db.SetData(data, true)
 	require.NoError(t, err)
 
 	ids := make([]thirdparty.CollectibleUniqueID, 0, len(data))
@@ -79,15 +79,29 @@ func TestUpdateCollectiblesData(t *testing.T) {
 	}
 
 	// update some collectibles, changing the provider
-	c0 := data[0]
+	c0Orig := data[0]
+	c0 := c0Orig
 	c0.Name = "new collectible name 0"
 	c0.Provider = "new collectible provider 0"
 
-	c1 := data[1]
+	c1Orig := data[1]
+	c1 := c1Orig
 	c1.Name = "new collectible name 1"
 	c1.Provider = "new collectible provider 1"
 
-	err = db.SetData([]thirdparty.CollectibleData{c0, c1})
+	// Test allowUpdate = false
+	err = db.SetData([]thirdparty.CollectibleData{c0, c1}, false)
+	require.NoError(t, err)
+
+	loadedMap, err = db.GetData([]thirdparty.CollectibleUniqueID{c0.ID, c1.ID})
+	require.NoError(t, err)
+	require.Equal(t, 2, len(loadedMap))
+
+	require.Equal(t, c0Orig, loadedMap[c0.ID.HashKey()])
+	require.Equal(t, c1Orig, loadedMap[c1.ID.HashKey()])
+
+	// Test allowUpdate = true
+	err = db.SetData([]thirdparty.CollectibleData{c0, c1}, true)
 	require.NoError(t, err)
 
 	loadedMap, err = db.GetData([]thirdparty.CollectibleUniqueID{c0.ID, c1.ID})
@@ -108,7 +122,7 @@ func TestUpdateCommunityData(t *testing.T) {
 
 	var err error
 
-	err = db.SetData(data)
+	err = db.SetData(data, true)
 	require.NoError(t, err)
 
 	for i := 0; i < nData; i++ {

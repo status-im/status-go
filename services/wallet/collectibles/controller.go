@@ -49,7 +49,8 @@ type Controller struct {
 	walletEventsWatcher *walletevent.Watcher
 	settingsWatcher     *settingsevent.Watcher
 
-	receivedCollectiblesCb OwnedCollectiblesCb
+	ownedCollectiblesChangeCb OwnedCollectiblesChangeCb
+	collectiblesTransferCb    TransferCb
 
 	commandsLock sync.RWMutex
 }
@@ -75,8 +76,12 @@ func NewController(
 	}
 }
 
-func (c *Controller) SetReceivedCollectiblesCb(cb OwnedCollectiblesCb) {
-	c.receivedCollectiblesCb = cb
+func (c *Controller) SetOwnedCollectiblesChangeCb(cb OwnedCollectiblesChangeCb) {
+	c.ownedCollectiblesChangeCb = cb
+}
+
+func (c *Controller) SetCollectiblesTransferCb(cb TransferCb) {
+	c.collectiblesTransferCb = cb
 }
 
 func (c *Controller) Start() {
@@ -227,7 +232,7 @@ func (c *Controller) startPeriodicalOwnershipFetchForAccountAndChainID(address c
 		c.walletFeed,
 		chainID,
 		address,
-		c.receivedCollectiblesCb,
+		c.ownedCollectiblesChangeCb,
 	)
 
 	c.commands[address][chainID] = command
@@ -334,32 +339,12 @@ func (c *Controller) startWalletEventsWatcher() {
 
 		chainID := walletCommon.ChainID(event.ChainID)
 		for _, account := range event.Accounts {
-			// Check last ownership update timestamp
-			timestamp, err := c.ownershipDB.GetOwnershipUpdateTimestamp(account, chainID)
-
-			if err != nil {
-				log.Error("Error getting ownership update timestamp", "error", err)
-				continue
-			}
-			if timestamp == InvalidTimestamp {
-				// Ownership was never fetched for this account
-				continue
+			// Call external callback
+			if c.collectiblesTransferCb != nil {
+				c.collectiblesTransferCb(account, chainID, event.EventParams.([]transfer.Transfer))
 			}
 
-			timeCheck := timestamp - activityRefetchMarginSeconds
-			if timeCheck < 0 {
-				timeCheck = 0
-			}
-
-			if event.At > timeCheck {
-				// Restart fetching for account + chainID
-				c.commandsLock.Lock()
-				err := c.startPeriodicalOwnershipFetchForAccountAndChainID(account, chainID, true)
-				c.commandsLock.Unlock()
-				if err != nil {
-					log.Error("Error starting periodical collectibles fetch", "address", account, "error", err)
-				}
-			}
+			c.refetchOwnershipIfRecentTransfer(account, chainID, event.At)
 		}
 	}
 
@@ -399,5 +384,35 @@ func (c *Controller) stopSettingsWatcher() {
 	if c.settingsWatcher != nil {
 		c.settingsWatcher.Stop()
 		c.settingsWatcher = nil
+	}
+}
+
+func (c *Controller) refetchOwnershipIfRecentTransfer(account common.Address, chainID walletCommon.ChainID, latestTxTimestamp int64) {
+
+	// Check last ownership update timestamp
+	timestamp, err := c.ownershipDB.GetOwnershipUpdateTimestamp(account, chainID)
+
+	if err != nil {
+		log.Error("Error getting ownership update timestamp", "error", err)
+		return
+	}
+	if timestamp == InvalidTimestamp {
+		// Ownership was never fetched for this account
+		return
+	}
+
+	timeCheck := timestamp - activityRefetchMarginSeconds
+	if timeCheck < 0 {
+		timeCheck = 0
+	}
+
+	if latestTxTimestamp > timeCheck {
+		// Restart fetching for account + chainID
+		c.commandsLock.Lock()
+		err := c.startPeriodicalOwnershipFetchForAccountAndChainID(account, chainID, true)
+		c.commandsLock.Unlock()
+		if err != nil {
+			log.Error("Error starting periodical collectibles fetch", "address", account, "error", err)
+		}
 	}
 }

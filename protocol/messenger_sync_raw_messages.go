@@ -231,6 +231,17 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				m.logger.Error("failed to HandleSyncTokenPreferences when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
+		case protobuf.ApplicationMetadataMessage_SYNC_COLLECTIBLE_PREFERENCES:
+			var message protobuf.SyncCollectiblePreferences
+			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			if err != nil {
+				return err
+			}
+			err = m.HandleSyncCollectiblePreferences(state, &message, nil)
+			if err != nil {
+				m.logger.Error("failed to HandleSyncCollectiblePreferences when HandleSyncRawMessages", zap.Error(err))
+				continue
+			}
 		case protobuf.ApplicationMetadataMessage_SYNC_SAVED_ADDRESS:
 			var message protobuf.SyncSavedAddress
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)

@@ -157,6 +157,7 @@ layer2_networks(network_id) AS (
 mint_methods(method_hash) AS (
 	%s
 )
+
 SELECT
 	transfers.hash AS transfer_hash,
 	NULL AS pending_hash,
@@ -179,6 +180,7 @@ SELECT
 	transfers.tx_to_address AS to_address,
 	transfers.address AS owner_address,
 	transfers.amount_padded128hex AS tr_amount,
+	NULL AS ptr_amount,
 	NULL AS mt_from_amount,
 	NULL AS mt_to_amount,
 	CASE
@@ -208,7 +210,7 @@ SELECT
 		WHEN transfers.tx_from_address = zeroAddress AND transfers.type = "erc20" THEN substr(json_extract(tx, '$.input'), 1, 10)
 		ELSE NULL
 	END AS method_hash,
-	CASE 
+	CASE
 		WHEN transfers.tx_from_address = zeroAddress AND transfers.type = "erc20" THEN (SELECT 1 FROM json_each(transfers.receipt, '$.logs' ) WHERE json_extract( value, '$.topics[0]' ) = communityMintEvent)
 		ELSE NULL
 	END AS community_mint_event
@@ -254,11 +256,11 @@ WHERE
 				AND (
 					transfers.type = 'erc721'
 					OR (
-						transfers.type = 'erc20' 
+						transfers.type = 'erc20'
 						AND (
 							(method_hash IS NOT NULL AND method_hash IN mint_methods)
 							OR community_mint_event IS NOT NULL
-						) 
+						)
 					)
 				)
 			)
@@ -281,11 +283,11 @@ WHERE
 			AND (
 				transfers.type = 'erc721'
 				OR (
-					transfers.type = 'erc20' 
+					transfers.type = 'erc20'
 					AND (
 						(method_hash IS NOT NULL AND method_hash IN mint_methods)
 						OR community_mint_event IS NOT NULL
-					) 
+					)
 				)
 			)
 		)
@@ -358,17 +360,14 @@ SELECT
 	CASE
 		WHEN from_join.address IS NOT NULL AND to_join.address IS NULL THEN fromTrType
 		WHEN to_join.address IS NOT NULL AND from_join.address IS NULL THEN toTrType
-		WHEN from_join.address IS NOT NULL AND to_join.address IS NOT NULL THEN
-			CASE
-				WHEN from_join.address < to_join.address THEN fromTrType
-				ELSE toTrType
-			END
+		WHEN from_join.address IS NOT NULL AND to_join.address IS NOT NULL THEN fromTrType
 		ELSE NULL
 	END as tr_type,
 	pending_transactions.from_address AS from_address,
 	pending_transactions.to_address AS to_address,
 	NULL AS owner_address,
-	pending_transactions.value AS tr_amount,
+	NULL AS tr_amount,
+	pending_transactions.value AS ptr_amount,
 	NULL AS mt_from_amount,
 	NULL AS mt_to_amount,
 	statusPending AS agg_status,
@@ -445,6 +444,7 @@ SELECT
 	multi_transactions.to_address AS to_address,
 	multi_transactions.from_address AS owner_address,
 	NULL AS tr_amount,
+	NULL AS ptr_amount,
 	multi_transactions.from_amount AS mt_from_amount,
 	multi_transactions.to_amount AS mt_to_amount,
 	CASE

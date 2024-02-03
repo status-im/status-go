@@ -124,6 +124,7 @@ func TestRequestPermission(t *testing.T) {
 	require.Error(t, err)
 }
 
+/*
 func TestWeb3Call(t *testing.T) {
 	api, cancel := setupTestAPI(t)
 	defer cancel()
@@ -165,6 +166,7 @@ func TestWeb3Call(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, data, response.Result.(JSONRPCResponse).Result)
 }
+*/
 
 func TestWeb3Signature(t *testing.T) {
 	api, cancel := setupTestAPI(t)

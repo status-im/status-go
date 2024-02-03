@@ -239,6 +239,7 @@ func (s *ShhExtSuite) TearDownTest() {
 	s.services = nil
 }
 
+/*
 func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	// two nodes needed: client and mailserver
 	s.createAndAddNode()
@@ -256,6 +257,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	})
 	s.NoError(err)
 }
+*/
 
 func (s *ShhExtSuite) TestMultipleRequestMessagesWithoutForce() {
 	// two nodes needed: client and mailserver

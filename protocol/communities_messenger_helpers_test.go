@@ -8,32 +8,28 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/communitytokens"
+	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 type AccountManagerMock struct {
@@ -121,6 +117,21 @@ func (c *CollectiblesServiceMock) SetMockCollectibleContractData(chainID uint64,
 	c.Collectibles[chainID][contractAddress] = collectible
 }
 
+func (c *CollectiblesServiceMock) SetMockCommunityTokenData(token *token.CommunityToken) {
+	if c.Collectibles == nil {
+		c.Collectibles = make(map[uint64]map[string]*communitytokens.CollectibleContractData)
+	}
+
+	data := &communitytokens.CollectibleContractData{
+		TotalSupply:    token.Supply,
+		Transferable:   token.Transferable,
+		RemoteBurnable: token.RemoteSelfDestruct,
+		InfiniteSupply: token.InfiniteSupply,
+	}
+
+	c.SetMockCollectibleContractData(uint64(token.ChainID), token.Address, data)
+}
+
 func (c *CollectiblesServiceMock) SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error) {
 	if c.Signers == nil {
 		c.Signers = make(map[string]string)
@@ -140,108 +151,44 @@ func (c *CollectiblesServiceMock) DeploymentSignatureDigest(chainID uint64, addr
 	return gethcommon.Hex2Bytes("ccbb375343347491706cf4b43796f7b96ccc89c9e191a8b78679daeba1684ec7"), nil
 }
 
-func newMessenger(s *suite.Suite, shh types.Waku, logger *zap.Logger, password string, walletAddresses []string,
-	mockedBalances *map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, collectiblesService communitytokens.ServiceInterface) *Messenger {
-	accountsManagerMock := &AccountManagerMock{}
-	accountsManagerMock.AccountsMap = make(map[string]string)
-	for _, walletAddress := range walletAddresses {
-		accountsManagerMock.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(password)))
-	}
+type testCommunitiesMessengerConfig struct {
+	testMessengerConfig
 
-	tokenManagerMock := &TokenManagerMock{
-		Balances: mockedBalances,
-	}
+	nodeConfig  *params.NodeConfig
+	appSettings *settings.Settings
 
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newCommunitiesTestMessenger(shh, privateKey, logger, accountsManagerMock, tokenManagerMock, collectiblesService)
-	s.Require().NoError(err)
-
-	currentDistributorObj, ok := messenger.communitiesKeyDistributor.(*CommunitiesKeyDistributorImpl)
-	s.Require().True(ok)
-	messenger.communitiesKeyDistributor = &TestCommunitiesKeyDistributor{
-		CommunitiesKeyDistributorImpl: *currentDistributorObj,
-		subscriptions:                 map[chan *CommunityAndKeyActions]bool{},
-		mutex:                         sync.RWMutex{},
-	}
-
-	// add wallet account with keypair
-	for _, walletAddress := range walletAddresses {
-		kp := accounts.GetProfileKeypairForTest(false, true, false)
-		kp.Accounts[0].Address = types.HexToAddress(walletAddress)
-		err := messenger.settings.SaveOrUpdateKeypair(kp)
-		s.Require().NoError(err)
-	}
-
-	walletAccounts, err := messenger.settings.GetActiveAccounts()
-	s.Require().NoError(err)
-	s.Require().Len(walletAccounts, len(walletAddresses))
-	for i := range walletAddresses {
-		s.Require().Equal(walletAccounts[i].Type, accounts.AccountTypeGenerated)
-	}
-	return messenger
+	password            string
+	walletAddresses     []string
+	mockedBalances      *map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
+	collectiblesService communitytokens.ServiceInterface
 }
 
-func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, accountsManager account.Manager,
-	tokenManager communities.TokenManager, collectiblesService communitytokens.ServiceInterface) (*Messenger, error) {
-	madb, err := multiaccounts.InitializeDB(dbsetup.InMemoryPath)
+func (tcmc *testCommunitiesMessengerConfig) complete() error {
+	err := tcmc.testMessengerConfig.complete()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	acc := generator.NewAccount(privateKey, nil)
-	iai := acc.ToIdentifiedAccountInfo("")
-
-	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	if err != nil {
-		return nil, err
+	if tcmc.nodeConfig == nil {
+		tcmc.nodeConfig = defaultTestCommunitiesMessengerNodeConfig()
+	}
+	if tcmc.appSettings == nil {
+		tcmc.appSettings = defaultTestCommunitiesMessengerSettings()
 	}
 
-	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	if err != nil {
-		return nil, err
-	}
-	options := []Option{
-		WithCustomLogger(logger),
-		WithDatabase(appDb),
-		WithWalletDatabase(walletDb),
-		WithMultiAccounts(madb),
-		WithAccount(iai.ToMultiAccount()),
-		WithDatasync(),
-		WithResendParams(3, 3),
-		WithTokenManager(tokenManager),
-	}
+	return nil
+}
 
-	if collectiblesService != nil {
-		options = append(options, WithCommunityTokensService(collectiblesService))
-	}
-
-	m, err := NewMessenger(
-		"Test",
-		privateKey,
-		&testNode{shh: shh},
-		uuid.New().String(),
-		nil,
-		accountsManager,
-		options...,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.Init()
-	if err != nil {
-		return nil, err
-	}
-
-	config := params.NodeConfig{
+func defaultTestCommunitiesMessengerNodeConfig() *params.NodeConfig {
+	return &params.NodeConfig{
 		NetworkID: 10,
 		DataDir:   "test",
 	}
+}
 
+func defaultTestCommunitiesMessengerSettings() *settings.Settings {
 	networks := json.RawMessage("{}")
-	setting := settings.Settings{
+	return &settings.Settings{
 		Address:                   types.HexToAddress("0x1122334455667788990011223344556677889900"),
 		AnonMetricsShouldSend:     false,
 		CurrentNetwork:            "mainnet_rpc",
@@ -262,10 +209,100 @@ func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, l
 		LinkPreviewRequestEnabled: true,
 		SendStatusUpdates:         true,
 		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}
+}
 
-	_ = m.settings.CreateSettings(setting, config)
+func newTestCommunitiesMessenger(s *suite.Suite, waku types.Waku, config testCommunitiesMessengerConfig) *Messenger {
+	err := config.complete()
+	s.Require().NoError(err)
 
-	return m, nil
+	accountsManagerMock := &AccountManagerMock{}
+	accountsManagerMock.AccountsMap = make(map[string]string)
+	for _, walletAddress := range config.walletAddresses {
+		accountsManagerMock.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(config.password)))
+	}
+
+	tokenManagerMock := &TokenManagerMock{
+		Balances: config.mockedBalances,
+	}
+
+	options := []Option{
+		WithAccountManager(accountsManagerMock),
+		WithTokenManager(tokenManagerMock),
+		WithCommunityTokensService(config.collectiblesService),
+		WithAppSettings(*config.appSettings, *config.nodeConfig),
+	}
+
+	config.extraOptions = append(config.extraOptions, options...)
+
+	messenger, err := newTestMessenger(waku, config.testMessengerConfig)
+	s.Require().NoError(err)
+
+	currentDistributorObj, ok := messenger.communitiesKeyDistributor.(*CommunitiesKeyDistributorImpl)
+	s.Require().True(ok)
+	messenger.communitiesKeyDistributor = &TestCommunitiesKeyDistributor{
+		CommunitiesKeyDistributorImpl: *currentDistributorObj,
+		subscriptions:                 map[chan *CommunityAndKeyActions]bool{},
+		mutex:                         sync.RWMutex{},
+	}
+
+	// add wallet account with keypair
+	for _, walletAddress := range config.walletAddresses {
+		kp := accounts.GetProfileKeypairForTest(false, true, false)
+		kp.Accounts[0].Address = types.HexToAddress(walletAddress)
+		err := messenger.settings.SaveOrUpdateKeypair(kp)
+		s.Require().NoError(err)
+	}
+
+	walletAccounts, err := messenger.settings.GetActiveAccounts()
+	s.Require().NoError(err)
+	s.Require().Len(walletAccounts, len(config.walletAddresses))
+	for i := range config.walletAddresses {
+		s.Require().Equal(walletAccounts[i].Type, accounts.AccountTypeGenerated)
+	}
+	return messenger
+}
+
+func createEncryptedCommunity(s *suite.Suite, owner *Messenger) (*communities.Community, *Chat) {
+	community, chat := createCommunityConfigurable(s, owner, protobuf.CommunityPermissions_AUTO_ACCEPT)
+	// Add community permission
+	_, err := owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{{
+			ContractAddresses: map[uint64]string{3: "0x933"},
+			Type:              protobuf.CommunityTokenType_ERC20,
+			Symbol:            "STT",
+			Name:              "Status Test Token",
+			Amount:            "10",
+			Decimals:          18,
+		}},
+	})
+	s.Require().NoError(err)
+
+	// Add channel permission
+	response, err := owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				ContractAddresses: map[uint64]string{3: "0x933"},
+				Type:              protobuf.CommunityTokenType_ERC20,
+				Symbol:            "STT",
+				Name:              "Status Test Token",
+				Amount:            "10",
+				Decimals:          18,
+			},
+		},
+		ChatIds: []string{chat.ID},
+	})
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	community = response.Communities()[0]
+	s.Require().True(community.Encrypted())
+	s.Require().True(community.ChannelEncrypted(chat.CommunityChatID()))
+
+	return community, chat
+
 }
 
 func createCommunity(s *suite.Suite, owner *Messenger) (*communities.Community, *Chat) {
@@ -452,6 +489,7 @@ func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, co
 	s.Require().NoError(err)
 }
 
+/*
 func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text string) *common.Message {
 	msg := &common.Message{
 		ChatMessage: &protobuf.ChatMessage{
@@ -466,6 +504,7 @@ func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text stri
 
 	return msg
 }
+*/
 
 func grantPermission(s *suite.Suite, community *communities.Community, controlNode *Messenger, target *Messenger, role protobuf.CommunityMember_Roles) {
 	responseAddRole, err := controlNode.AddRoleToMember(&requests.AddRoleToMember{
@@ -552,4 +591,26 @@ func waitOnCommunitiesEvent(user *Messenger, condition func(*communities.Subscri
 	}()
 
 	return errCh
+}
+
+func WithTestStoreNode(s *suite.Suite, id string, address string, fleet string, collectiblesServiceMock *CollectiblesServiceMock) Option {
+	return func(c *config) error {
+		sqldb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+		s.Require().NoError(err)
+
+		db := mailserversDB.NewDB(sqldb)
+		err = db.Add(mailserversDB.Mailserver{
+			ID:      id,
+			Name:    id,
+			Address: address,
+			Fleet:   fleet,
+		})
+		s.Require().NoError(err)
+
+		c.mailserversDatabase = db
+		c.clusterConfig = params.ClusterConfig{Fleet: fleet}
+		c.communityTokensService = collectiblesServiceMock
+
+		return nil
+	}
 }

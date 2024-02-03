@@ -15,6 +15,7 @@ import (
 
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/sqlite"
 )
 
@@ -144,6 +145,7 @@ func (db *Database) GetTransfersByAddress(chainID uint64, address common.Address
 		FilterAddress(address).
 		FilterEnd(toBlock).
 		FilterLoaded(1).
+		SortByBlockNumberAndHash().
 		Limit(limit)
 
 	rows, err := db.client.Query(query.String(), query.Args()...)
@@ -161,6 +163,7 @@ func (db *Database) GetTransfersByAddressAndBlock(chainID uint64, address common
 		FilterAddress(address).
 		FilterBlockNumber(block).
 		FilterLoaded(1).
+		SortByBlockNumberAndHash().
 		Limit(limit)
 
 	rows, err := db.client.Query(query.String(), query.Args()...)
@@ -489,6 +492,28 @@ func updateOrInsertTransfersDBFields(creator statementCreator, transfers []trans
 			log.Error("can't save transfer", "b-hash", t.blockHash, "b-n", t.blockNumber, "a", t.address, "h", t.id)
 			return err
 		}
+
+		err = removeGasOnlyEthTransfer(creator, t)
+		if err != nil {
+			log.Error("can't remove gas only eth transfer", "b-hash", t.blockHash, "b-n", t.blockNumber, "a", t.address, "h", t.id, "err", err)
+			// no return err, since it's not critical
+		}
+	}
+	return nil
+}
+
+func removeGasOnlyEthTransfer(creator statementCreator, t transferDBFields) error {
+	if t.transferType != w_common.EthTransfer {
+		query, err := creator.Prepare(`DELETE FROM transfers WHERE tx_hash = ? AND address = ? AND network_id = ?
+		 AND account_nonce = ? AND type = 'eth' AND amount_padded128hex = '00000000000000000000000000000000'`)
+		if err != nil {
+			return err
+		}
+
+		_, err = query.Exec(t.txHash, t.address, t.chainID, t.txNonce)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -520,6 +545,31 @@ func GetOwnedMultiTransactionID(tx *sql.Tx, chainID w_common.ChainID, id common.
 		return 0, err
 	}
 	return mTID, nil
+}
+
+func (db *Database) GetLatestCollectibleTransfer(address common.Address, id thirdparty.CollectibleUniqueID) (*Transfer, error) {
+	query := newTransfersQuery().
+		FilterAddress(address).
+		FilterNetwork(uint64(id.ContractID.ChainID)).
+		FilterTokenAddress(id.ContractID.Address).
+		FilterTokenID(id.TokenID.Int).
+		FilterLoaded(1).
+		SortByTimestamp(false).
+		Limit(1)
+	rows, err := db.client.Query(query.String(), query.Args()...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	transfers, err := query.TransferScan(rows)
+	if err == sql.ErrNoRows || len(transfers) == 0 {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	return &transfers[0], nil
 }
 
 // Delete blocks for address and chainID

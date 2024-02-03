@@ -6,22 +6,15 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/common/dbsetup"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/waku"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 const DefaultProfileDisplayName = ""
@@ -68,56 +61,21 @@ type MessengerBaseTestSuite struct {
 }
 
 func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, extraOptions []Option) (*Messenger, error) {
-	madb, err := multiaccounts.InitializeDB(dbsetup.InMemoryPath)
-	if err != nil {
-		return nil, err
-	}
-
-	acc := generator.NewAccount(privateKey, nil)
-	iai := acc.ToIdentifiedAccountInfo("")
-
-	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	if err != nil {
-		return nil, err
-	}
-	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	if err != nil {
-		return nil, err
-	}
-
 	options := []Option{
-		WithCustomLogger(logger),
-		WithDatabase(appDb),
-		WithWalletDatabase(walletDb),
-		WithMultiAccounts(madb),
-		WithAccount(iai.ToMultiAccount()),
-		WithDatasync(),
-		WithToplevelDatabaseMigrations(),
 		WithAppSettings(settings.Settings{
 			DisplayName:               DefaultProfileDisplayName,
 			ProfilePicturesShowTo:     1,
 			ProfilePicturesVisibility: 1,
 			URLUnfurlingMode:          settings.URLUnfurlingAlwaysAsk,
 		}, params.NodeConfig{}),
-		WithBrowserDatabase(nil),
 	}
-
 	options = append(options, extraOptions...)
 
-	m, err := NewMessenger(
-		"Test",
-		privateKey,
-		&testNode{shh: shh},
-		uuid.New().String(),
-		nil,
-		nil,
-		options...,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.Init()
+	m, err := newTestMessenger(shh, testMessengerConfig{
+		privateKey:   privateKey,
+		logger:       logger,
+		extraOptions: options,
+	})
 	if err != nil {
 		return nil, err
 	}

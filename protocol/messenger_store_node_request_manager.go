@@ -460,8 +460,10 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 			}
 		}
 
-		logger.Debug("shard found for ",
-			zap.String("community", communityIDStr))
+		logger.Debug("shard found",
+			zap.String("community", communityIDStr),
+			zap.Any("shard", shardResult),
+		)
 
 		r.result.shard = shardResult
 

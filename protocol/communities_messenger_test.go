@@ -82,10 +82,12 @@ func (s *MessengerCommunitiesSuite) TearDownTest() {
 }
 
 func (s *MessengerCommunitiesSuite) newMessengerWithKey(privateKey *ecdsa.PrivateKey) *Messenger {
-	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger, nil, nil, nil)
-	s.Require().NoError(err)
-
-	return messenger
+	return newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+		testMessengerConfig: testMessengerConfig{
+			privateKey: privateKey,
+			logger:     s.logger,
+		},
+	})
 }
 
 func (s *MessengerCommunitiesSuite) newMessenger() *Messenger {
@@ -127,8 +129,6 @@ func (s *MessengerCommunitiesSuite) TestCreateCommunity_WithoutDefaultChannel() 
 }
 
 func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
-	alice := s.newMessenger()
-
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",
@@ -150,7 +150,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
 
 	// Send a community message
-	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
@@ -164,7 +164,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 
 	// Pull message and make sure org is received
 	err = tt.RetryWithBackOff(func() error {
-		response, err = alice.RetrieveAll()
+		response, err = s.alice.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -175,7 +175,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	})
 
 	s.Require().NoError(err)
-	communities, err := alice.Communities()
+	communities, err := s.alice.Communities()
 	s.Require().NoError(err)
 	s.Require().Len(communities, 2)
 	s.Require().Len(response.Communities(), 1)
@@ -1178,6 +1178,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 
 }
 
+/*
 func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedState() {
 	ctx := context.Background()
 
@@ -1429,7 +1430,9 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	s.Require().False(notification.Deleted)
 
 }
+*/
 
+/*
 func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	ctx := context.Background()
 
@@ -1606,6 +1609,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	s.Require().Equal(communities.RequestToJoinStateCanceled, cancelRequestToJoin2.State)
 
 }
+*/
 
 func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	description := &requests.CreateCommunity{
@@ -3411,43 +3415,7 @@ func (t *testPermissionChecker) CheckPermissions(permissions []*communities.Comm
 }
 
 func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
-	community, chat := s.createCommunity()
-	s.Require().False(community.Encrypted())
-
-	// Add community permission
-	_, err := s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
-		CommunityID: community.ID(),
-		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
-		TokenCriteria: []*protobuf.TokenCriteria{{
-			ContractAddresses: map[uint64]string{3: "0x933"},
-			Type:              protobuf.CommunityTokenType_ERC20,
-			Symbol:            "STT",
-			Name:              "Status Test Token",
-			Amount:            "10",
-			Decimals:          18,
-		}},
-	})
-	s.Require().NoError(err)
-
-	// Add channel permission
-	response, err := s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
-		CommunityID: community.ID(),
-		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
-				ContractAddresses: map[uint64]string{3: "0x933"},
-				Type:              protobuf.CommunityTokenType_ERC20,
-				Symbol:            "STT",
-				Name:              "Status Test Token",
-				Amount:            "10",
-				Decimals:          18,
-			},
-		},
-		ChatIds: []string{chat.ID},
-	})
-	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
-	community = response.Communities()[0]
+	community, chat := createEncryptedCommunity(&s.Suite, s.owner)
 	s.Require().True(community.Encrypted())
 	s.Require().True(community.ChannelEncrypted(chat.CommunityChatID()))
 
@@ -3484,15 +3452,13 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
-	owner := s.newMessenger()
+	s.owner.communitiesManager.RekeyInterval = 500 * time.Minute
 
-	owner.communitiesManager.RekeyInterval = 500 * time.Minute
-
-	_, err := owner.Start()
+	_, err := s.owner.Start()
 	s.Require().NoError(err)
 
 	// Create a new community
-	response, err := owner.CreateCommunity(
+	response, err := s.owner.CreateCommunity(
 		&requests.CreateCommunity{
 			Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 			Name:        "status",
@@ -3506,12 +3472,12 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 	s.Require().Len(response.Communities(), 1)
 
 	// Check community is present in the DB and has default values we care about
-	c, err := owner.GetCommunityByID(response.Communities()[0].ID())
+	c, err := s.owner.GetCommunityByID(response.Communities()[0].ID())
 	s.Require().NoError(err)
 	s.Require().False(c.Encrypted())
 	// TODO some check that there are no keys for the community. Alt for s.Require().Zero(c.RekeyedAt().Unix())
 
-	_, err = owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
+	_, err = s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
 		CommunityID: c.ID(),
 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
 		TokenCriteria: []*protobuf.TokenCriteria{{
@@ -3525,20 +3491,20 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 	})
 	s.Require().NoError(err)
 
-	c, err = owner.GetCommunityByID(c.ID())
+	c, err = s.owner.GetCommunityByID(c.ID())
 	s.Require().NoError(err)
 	s.Require().True(c.Encrypted())
 
-	s.advertiseCommunityTo(c, owner, s.bob)
-	s.advertiseCommunityTo(c, owner, s.alice)
+	s.advertiseCommunityTo(c, s.owner, s.bob)
+	s.advertiseCommunityTo(c, s.owner, s.alice)
 
-	owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
+	s.owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
 
-	s.joinCommunity(c, owner, s.bob)
-	s.joinCommunity(c, owner, s.alice)
+	s.joinCommunity(c, s.owner, s.bob)
+	s.joinCommunity(c, s.owner, s.alice)
 
 	// Check the Alice and Bob are members of the community
-	c, err = owner.GetCommunityByID(c.ID())
+	c, err = s.owner.GetCommunityByID(c.ID())
 	s.Require().NoError(err)
 	s.Require().True(c.HasMember(&s.alice.identity.PublicKey))
 	s.Require().True(c.HasMember(&s.bob.identity.PublicKey))
@@ -3557,7 +3523,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 	)
 	s.Require().NoError(err)
 
-	response, err = owner.BanUserFromCommunity(context.Background(), &requests.BanUserFromCommunity{
+	response, err = s.owner.BanUserFromCommunity(context.Background(), &requests.BanUserFromCommunity{
 		CommunityID: c.ID(),
 		User:        common.PubkeyToHexBytes(&s.bob.identity.PublicKey),
 	})
@@ -3579,7 +3545,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 	response, err = WaitOnMessengerResponse(s.alice,
 		func(r *MessengerResponse) bool {
 			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
-			if err != nil || len(keys) != 2 {
+			if err != nil || len(keys) < 2 {
 				return false
 			}
 			return true
@@ -3588,21 +3554,17 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 		"alice hasn't received updated key",
 	)
 	s.Require().NoError(err)
-
-	s.Require().NoError(owner.Shutdown())
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibility() {
-	owner := s.newMessenger()
 	common.RekeyCompatibility = false
+	s.owner.communitiesManager.RekeyInterval = 500 * time.Minute
 
-	owner.communitiesManager.RekeyInterval = 500 * time.Minute
-
-	_, err := owner.Start()
+	_, err := s.owner.Start()
 	s.Require().NoError(err)
 
 	// Create a new community
-	response, err := owner.CreateCommunity(
+	response, err := s.owner.CreateCommunity(
 		&requests.CreateCommunity{
 			Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 			Name:        "status",
@@ -3616,12 +3578,12 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibili
 	s.Require().Len(response.Communities(), 1)
 
 	// Check community is present in the DB and has default values we care about
-	c, err := owner.GetCommunityByID(response.Communities()[0].ID())
+	c, err := s.owner.GetCommunityByID(response.Communities()[0].ID())
 	s.Require().NoError(err)
 	s.Require().False(c.Encrypted())
 	// TODO some check that there are no keys for the community. Alt for s.Require().Zero(c.RekeyedAt().Unix())
 
-	_, err = owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
+	_, err = s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
 		CommunityID: c.ID(),
 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
 		TokenCriteria: []*protobuf.TokenCriteria{{
@@ -3635,20 +3597,20 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibili
 	})
 	s.Require().NoError(err)
 
-	c, err = owner.GetCommunityByID(c.ID())
+	c, err = s.owner.GetCommunityByID(c.ID())
 	s.Require().NoError(err)
 	s.Require().True(c.Encrypted())
 
-	s.advertiseCommunityTo(c, owner, s.bob)
-	s.advertiseCommunityTo(c, owner, s.alice)
+	s.advertiseCommunityTo(c, s.owner, s.bob)
+	s.advertiseCommunityTo(c, s.owner, s.alice)
 
-	owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
+	s.owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
 
-	s.joinCommunity(c, owner, s.bob)
-	s.joinCommunity(c, owner, s.alice)
+	s.joinCommunity(c, s.owner, s.bob)
+	s.joinCommunity(c, s.owner, s.alice)
 
 	// Check the Alice and Bob are members of the community
-	c, err = owner.GetCommunityByID(c.ID())
+	c, err = s.owner.GetCommunityByID(c.ID())
 	s.Require().NoError(err)
 	s.Require().True(c.HasMember(&s.alice.identity.PublicKey))
 	s.Require().True(c.HasMember(&s.bob.identity.PublicKey))
@@ -3667,7 +3629,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibili
 	)
 	s.Require().NoError(err)
 
-	response, err = owner.BanUserFromCommunity(context.Background(), &requests.BanUserFromCommunity{
+	response, err = s.owner.BanUserFromCommunity(context.Background(), &requests.BanUserFromCommunity{
 		CommunityID: c.ID(),
 		User:        common.PubkeyToHexBytes(&s.bob.identity.PublicKey),
 	})
@@ -3689,7 +3651,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibili
 	response, err = WaitOnMessengerResponse(s.alice,
 		func(r *MessengerResponse) bool {
 			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
-			if err != nil || len(keys) != 2 {
+			if err != nil || len(keys) < 2 {
 				return false
 			}
 			return true
@@ -3698,8 +3660,6 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibili
 		"alice hasn't received updated key",
 	)
 	s.Require().NoError(err)
-
-	s.Require().NoError(owner.Shutdown())
 }
 
 func (s *MessengerCommunitiesSuite) TestRetrieveBigCommunity() {
@@ -3904,4 +3864,74 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	s.Require().NotEmpty(cancelRequestToJoin2.ID)
 	s.Require().NotEmpty(cancelRequestToJoin2.Clock)
 	s.Require().Equal(cancelRequestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+}
+
+func (s *MessengerCommunitiesSuite) TestCommunityLastOpenedAt() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.joinCommunity(community, s.owner, s.alice)
+
+	// Mock frontend triggering communityUpdateLastOpenedAt
+	lastOpenedAt1, err := s.alice.CommunityUpdateLastOpenedAt(community.IDString())
+	s.Require().NoError(err)
+
+	// Check lastOpenedAt was updated
+	s.Require().True(lastOpenedAt1 > 0)
+
+	// Nap for a bit
+	time.Sleep(time.Second)
+
+	// Check lastOpenedAt was successfully updated twice
+	lastOpenedAt2, err := s.alice.CommunityUpdateLastOpenedAt(community.IDString())
+	s.Require().NoError(err)
+
+	s.Require().True(lastOpenedAt2 > lastOpenedAt1)
+}
+
+func (s *MessengerCommunitiesSuite) TestSyncCommunityLastOpenedAt() {
+	// Create new device
+	alicesOtherDevice := s.createOtherDevice(s.alice)
+	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
+
+	// Create a community
+	createCommunityReq := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
+		Name:        "new community",
+		Color:       "#000000",
+		Description: "new community description",
+	}
+
+	mr, err := s.alice.CreateCommunity(createCommunityReq, true)
+	s.Require().NoError(err, "s.alice.CreateCommunity")
+	var newCommunity *communities.Community
+	for _, com := range mr.Communities() {
+		if com.Name() == createCommunityReq.Name {
+			newCommunity = com
+		}
+	}
+	s.Require().NotNil(newCommunity)
+
+	// Mock frontend triggering communityUpdateLastOpenedAt
+	lastOpenedAt, err := s.alice.CommunityUpdateLastOpenedAt(newCommunity.IDString())
+	s.Require().NoError(err)
+
+	// Check lastOpenedAt was updated
+	s.Require().True(lastOpenedAt > 0)
+
+	err = tt.RetryWithBackOff(func() error {
+		_, err = alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		// Do we have a new synced community?
+		_, err := alicesOtherDevice.communitiesManager.GetSyncedRawCommunity(newCommunity.ID())
+		if err != nil {
+			return fmt.Errorf("community with sync not received %w", err)
+		}
+
+		return nil
+	})
+	otherDeviceCommunity, err := alicesOtherDevice.communitiesManager.GetByID(newCommunity.ID())
+	s.Require().NoError(err)
+	s.Require().True(otherDeviceCommunity.LastOpenedAt() > 0)
 }

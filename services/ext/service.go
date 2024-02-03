@@ -162,7 +162,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 	s.multiAccountsDB = multiAccountDb
 	s.account = acc
 
-	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{})
+	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{}, accountManager)
 	if err != nil {
 		return err
 	}
@@ -173,7 +173,6 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 		s.n,
 		s.config.ShhextConfig.InstallationID,
 		s.peerStore,
-		accountManager,
 		options...,
 	)
 	if err != nil {
@@ -391,6 +390,7 @@ func buildMessengerOptions(
 	wakuService *wakuv2.Waku,
 	logger *zap.Logger,
 	messengerSignalsHandler protocol.MessengerSignalsHandler,
+	accountManager account.Manager,
 ) ([]protocol.Option, error) {
 	options := []protocol.Option{
 		protocol.WithCustomLogger(logger),
@@ -413,6 +413,7 @@ func buildMessengerOptions(
 		protocol.WithWalletService(walletService),
 		protocol.WithCommunityTokensService(communityTokensService),
 		protocol.WithWakuService(wakuService),
+		protocol.WithAccountManager(accountManager),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {
@@ -672,14 +673,6 @@ func (s *Service) fetchCommunity(communityID string, fetchLatest bool) (*communi
 	community, err := s.messenger.FindCommunityInfoFromDB(communityID)
 	if err != nil {
 		return nil, err
-	}
-
-	if community != nil {
-		// Call this to ensure CommunityTokens are stored to DB
-		err = s.messenger.FetchMissingCommunityTokens(community)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return community, nil

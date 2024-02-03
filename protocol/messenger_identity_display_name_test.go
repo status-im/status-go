@@ -42,6 +42,9 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameChange() {
 	s.Require().NoError(err)
 	s.Require().True(accounts.SameKeypairs(profileKp, dbProfileKp))
 
+	// save account will create the account
+	err = s.m.multiAccounts.SaveAccount(*s.m.account)
+	s.Require().NoError(err)
 	// set new display name
 	err = s.m.SetDisplayName(testDisplayName)
 	s.Require().NoError(err)

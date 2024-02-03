@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -40,7 +39,7 @@ func TestMessengerOfflineSuite(t *testing.T) {
 func (s *MessengerOfflineSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "bob", "alice"})
+	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, false, []string{"owner", "bob", "alice"})
 
 	ownerLogger := s.logger.With(zap.String("name", "owner"))
 	s.ownerWaku = wakuNodes[0]
@@ -88,12 +87,14 @@ func (s *MessengerOfflineSuite) TearDownTest() {
 }
 
 func (s *MessengerOfflineSuite) newMessenger(waku types.Waku, logger *zap.Logger) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	m, err := newCommunitiesTestMessenger(waku, privateKey, logger, nil, nil, nil)
-	s.Require().NoError(err)
-	return m
+	return newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
+		testMessengerConfig: testMessengerConfig{
+			logger: s.logger,
+			extraOptions: []Option{
+				WithResendParams(3, 3),
+			},
+		},
+	})
 }
 
 func (s *MessengerOfflineSuite) advertiseCommunityTo(community *communities.Community, owner *Messenger, user *Messenger) {

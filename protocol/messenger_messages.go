@@ -63,7 +63,13 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 
 		editMessage := NewEditMessage()
 
-		editMessage.Text = request.Text
+		replacedText, err := m.mentionsManager.ReplaceWithPublicKey(message.ChatId, request.Text)
+		if err != nil {
+			m.logger.Error("failed to replace text with public key", zap.String("chatID", message.ChatId), zap.String("text", request.Text))
+			// use original text as fallback
+			replacedText = request.Text
+		}
+		editMessage.Text = replacedText
 		editMessage.ContentType = request.ContentType
 		editMessage.ChatId = message.ChatId
 		editMessage.MessageId = message.ID

@@ -1,20 +1,15 @@
 package datasync
 
 import (
-	"context"
-	"crypto/ecdsa"
 	"errors"
 	"math"
 	"math/rand"
 	"time"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/vacp2p/mvds/protobuf"
-	"github.com/vacp2p/mvds/state"
-	"github.com/vacp2p/mvds/transport"
+	"github.com/status-im/mvds/protobuf"
+	"github.com/status-im/mvds/state"
+	"github.com/status-im/mvds/transport"
 	"go.uber.org/zap"
-
-	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 )
 
 const backoffInterval = 30
@@ -29,7 +24,7 @@ var offsetToSecond = uint64(time.Second / DatasyncTicker)
 type NodeTransport struct {
 	packets  chan transport.Packet
 	logger   *zap.Logger
-	dispatch func(context.Context, *ecdsa.PublicKey, []byte, *protobuf.Payload) error
+	dispatch func(state.PeerID, *protobuf.Payload) error
 }
 
 func NewNodeTransport() *NodeTransport {
@@ -38,7 +33,7 @@ func NewNodeTransport() *NodeTransport {
 	}
 }
 
-func (t *NodeTransport) Init(dispatch func(context.Context, *ecdsa.PublicKey, []byte, *protobuf.Payload) error, logger *zap.Logger) {
+func (t *NodeTransport) Init(dispatch func(state.PeerID, *protobuf.Payload) error, logger *zap.Logger) {
 	t.dispatch = dispatch
 	t.logger = logger
 }
@@ -51,31 +46,14 @@ func (t *NodeTransport) Watch() transport.Packet {
 	return <-t.packets
 }
 
-func (t *NodeTransport) Send(_ state.PeerID, peer state.PeerID, payload protobuf.Payload) error {
+func (t *NodeTransport) Send(_ state.PeerID, peer state.PeerID, payload *protobuf.Payload) error {
 	if t.dispatch == nil {
 		return errNotInitialized
 	}
 
-	if !payload.IsValid() {
-		t.logger.Error("payload is invalid")
-		return nil
-	}
-
-	marshalledPayload, err := proto.Marshal(&payload)
-	if err != nil {
-		t.logger.Error("failed to marshal payload")
-		return nil
-	}
-
-	publicKey, err := datasyncpeer.IDToPublicKey(peer)
-	if err != nil {
-		t.logger.Error("failed to convert id to public key", zap.Error(err))
-		return nil
-	}
-
 	// We don't return an error otherwise datasync will keep
 	// re-trying sending at each epoch
-	err = t.dispatch(context.Background(), publicKey, marshalledPayload, &payload)
+	err := t.dispatch(peer, payload)
 	if err != nil {
 		t.logger.Error("failed to send message", zap.Error(err))
 		return nil

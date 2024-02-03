@@ -90,9 +90,13 @@ type Waku interface {
 
 	SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error
 
+	UnsubscribeFromPubsubTopic(topic string) error
+
 	StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error
 
 	RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error)
+
+	RemovePubsubTopicKey(topic string) error
 
 	AddStorePeer(address string) (peer.ID, error)
 
@@ -161,4 +165,7 @@ type Waku interface {
 
 	// ConnectionChanged is called whenever the client knows its connection status has changed
 	ConnectionChanged(connection.State)
+
+	// ClearEnvelopesCache clears waku envelopes cache
+	ClearEnvelopesCache()
 }

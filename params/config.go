@@ -212,9 +212,6 @@ type WakuV2Config struct {
 	// StoreSeconds indicates the maximum number of seconds before a message is removed from the store
 	StoreSeconds int
 
-	// EnableFilterNode indicates if WakuFilter Full Node should be enabled
-	EnableFilterFullNode bool
-
 	// UseShardAsDefaultTopic indicates whether the default shard should be used instead of the default relay topic
 	UseShardAsDefaultTopic bool
 }
@@ -414,6 +411,9 @@ type NodeConfig struct {
 
 	// LogFile is filename where exposed logs get written to
 	LogFile string
+
+	// RuntimeLoglevel defines minimum log level for this session only, not affecting the db-stored node configuration
+	RuntimeLogLevel string `validate:"omitempty,eq=ERROR|eq=WARN|eq=INFO|eq=DEBUG|eq=TRACE"`
 
 	// LogLevel defines minimum log level. Valid names are "ERROR", "WARN", "INFO", "DEBUG", and "TRACE".
 	LogLevel string `validate:"eq=ERROR|eq=WARN|eq=INFO|eq=DEBUG|eq=TRACE"`

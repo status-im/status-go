@@ -57,6 +57,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
@@ -173,18 +174,6 @@ func (w *Waku) SetStatusTelemetryClient(client ITelemetryClient) {
 	w.statusTelemetryClient = client
 }
 
-func getUsableUDPPort() (int, error) {
-	conn, err := net.ListenUDP("udp", &net.UDPAddr{
-		IP:   net.IPv4zero,
-		Port: 0,
-	})
-	if err != nil {
-		return 0, err
-	}
-	defer conn.Close()
-	return conn.LocalAddr().(*net.UDPAddr).Port, nil
-}
-
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
 func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.ID, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
@@ -200,13 +189,6 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	}
 
 	cfg = setDefaults(cfg)
-
-	if cfg.UDPPort == 0 {
-		cfg.UDPPort, err = getUsableUDPPort()
-		if err != nil {
-			return nil, err
-		}
-	}
 
 	logger.Info("starting wakuv2 with config", zap.Any("config", cfg))
 
@@ -249,12 +231,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		EnableDiscV5:      cfg.EnableDiscV5,
 	}
 
-	if waku.cfg.UseShardAsDefaultTopic {
-		waku.settings.DefaultPubsubTopic = cfg.DefaultShardPubsubTopic
-	} else {
-		waku.settings.DefaultPubsubTopic = relay.DefaultWakuTopic
-	}
-
+	waku.settings.DefaultPubsubTopic = cfg.DefaultShardPubsubTopic
 	waku.filters = common.NewFilters(waku.settings.DefaultPubsubTopic, waku.logger)
 	waku.bandwidthCounter = metrics.NewBandwidthCounter()
 
@@ -327,8 +304,9 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		opts = append(opts, node.WithMessageProvider(dbStore))
 	}
 
-	if cfg.EnableFilterFullNode {
-		opts = append(opts, node.WithWakuFilterFullNode())
+	if !cfg.LightClient {
+		opts = append(opts, node.WithWakuFilterFullNode(filter.WithMaxSubscribers(20)))
+		opts = append(opts, node.WithLightPush())
 	}
 
 	if appDB != nil {
@@ -568,6 +546,7 @@ func (w *Waku) runPeerExchangeLoop() {
 	for {
 		select {
 		case <-w.ctx.Done():
+			w.logger.Debug("Peer exchange loop stopped")
 			return
 		case <-ticker.C:
 			w.logger.Info("Running peer exchange loop")
@@ -632,6 +611,18 @@ func (w *Waku) getPubsubTopic(topic string) string {
 		topic = w.settings.DefaultPubsubTopic
 	}
 	return topic
+}
+
+func (w *Waku) unsubscribeFromPubsubTopicWithWakuRelay(topic string) error {
+	topic = w.getPubsubTopic(topic)
+
+	if !w.node.Relay().IsSubscribed(topic) {
+		return nil
+	}
+
+	contentFilter := protocol.NewContentFilter(topic)
+
+	return w.node.Relay().Unsubscribe(w.ctx, contentFilter)
 }
 
 func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.PublicKey) error {
@@ -1043,7 +1034,8 @@ func (w *Waku) broadcast() {
 				}
 			} else {
 				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
-					logger.Info("publishing message via relay")
+					peerCnt := len(w.node.Relay().PubSub().ListPeers(env.PubsubTopic()))
+					logger.Info("publishing message via relay", zap.Int("peerCnt", peerCnt))
 					_, err := w.node.Relay().Publish(w.ctx, env.Message(), relay.WithPubSubTopic(env.PubsubTopic()))
 					return err
 				}
@@ -1110,7 +1102,10 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
 	return envelope.Hash(), nil
 }
 
-func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (*store.Result, error) {
+func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, requestID []byte, opts []store.HistoryRequestOption) (*store.Result, error) {
+
+	opts = append(opts, store.WithRequestID(requestID))
+
 	strTopics := make([]string, len(topics))
 	for i, t := range topics {
 		strTopics[i] = t.ContentTopic()
@@ -1125,18 +1120,28 @@ func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 		PubsubTopic:   pubsubTopic,
 	}
 
-	w.logger.Debug("store.query", zap.Int64p("startTime", query.StartTime), zap.Int64p("endTime", query.EndTime), zap.Strings("contentTopics", query.ContentTopics), zap.String("pubsubTopic", query.PubsubTopic), zap.Stringer("peerID", peerID))
+	w.logger.Debug("store.query",
+		zap.String("requestID", hexutil.Encode(requestID)),
+		zap.Int64p("startTime", query.StartTime),
+		zap.Int64p("endTime", query.EndTime),
+		zap.Strings("contentTopics", query.ContentTopics),
+		zap.String("pubsubTopic", query.PubsubTopic),
+		zap.Stringer("peerID", peerID))
 
 	return w.node.Store().Query(ctx, query, opts...)
 }
 
 func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption, processEnvelopes bool) (cursor *storepb.Index, envelopesCount int, err error) {
 	requestID := protocol.GenerateRequestID()
-	opts = append(opts, store.WithRequestID(requestID))
 	pubsubTopic = w.getPubsubTopic(pubsubTopic)
-	result, err := w.query(ctx, peerID, pubsubTopic, topics, from, to, opts)
+
+	result, err := w.query(ctx, peerID, pubsubTopic, topics, from, to, requestID, opts)
 	if err != nil {
-		w.logger.Error("error querying storenode", zap.String("requestID", hexutil.Encode(requestID)), zap.String("peerID", peerID.String()), zap.Error(err))
+		w.logger.Error("error querying storenode",
+			zap.String("requestID", hexutil.Encode(requestID)),
+			zap.String("peerID", peerID.String()),
+			zap.Error(err))
+
 		if w.onHistoricMessagesRequestFailed != nil {
 			w.onHistoricMessagesRequestFailed(requestID, peerID, err)
 		}
@@ -1229,7 +1234,9 @@ func (w *Waku) Start() error {
 			case c := <-w.connStatusChan:
 				w.connStatusMu.Lock()
 				latestConnStatus := formatConnStatus(w.node, c)
-				w.logger.Debug("PeerStats", zap.Any("stats", latestConnStatus))
+				w.logger.Debug("peer stats",
+					zap.Int("peersCount", len(latestConnStatus.Peers)),
+					zap.Any("stats", latestConnStatus))
 				for k, subs := range w.connStatusSubscriptions {
 					if subs.Active() {
 						subs.C <- latestConnStatus
@@ -1290,6 +1297,9 @@ func (w *Waku) Start() error {
 	}
 
 	go w.broadcast()
+
+	// we should wait `seedBootnodesForDiscV5` shutdown smoothly before set w.ctx to nil within `w.Stop()`
+	w.wg.Add(1)
 	go w.seedBootnodesForDiscV5()
 
 	return nil
@@ -1366,6 +1376,7 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 	}
 
 	logger := w.logger.With(
+		zap.Any("messageType", msgType),
 		zap.String("envelopeHash", hexutil.Encode(envelope.Hash())),
 		zap.String("contentTopic", envelope.Message().ContentTopic),
 		zap.Int64("timestamp", envelope.Message().GetTimestamp()),
@@ -1517,6 +1528,12 @@ func (w *Waku) IsEnvelopeCached(hash gethcommon.Hash) bool {
 	return exist
 }
 
+func (w *Waku) ClearEnvelopesCache() {
+	w.poolMu.Lock()
+	defer w.poolMu.Unlock()
+	w.envelopes = make(map[gethcommon.Hash]*common.ReceivedMessage)
+}
+
 func (w *Waku) PeerCount() int {
 	return w.node.PeerCount()
 }
@@ -1546,6 +1563,18 @@ func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) err
 	return nil
 }
 
+func (w *Waku) UnsubscribeFromPubsubTopic(topic string) error {
+	topic = w.getPubsubTopic(topic)
+
+	if !w.settings.LightClient {
+		err := w.unsubscribeFromPubsubTopicWithWakuRelay(topic)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (w *Waku) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
 	topic = w.getPubsubTopic(topic)
 	if w.protectedTopicStore == nil {
@@ -1562,6 +1591,15 @@ func (w *Waku) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) erro
 	}
 
 	return w.protectedTopicStore.Insert(topic, privKey, &privKey.PublicKey)
+}
+
+func (w *Waku) RemovePubsubTopicKey(topic string) error {
+	topic = w.getPubsubTopic(topic)
+	if w.protectedTopicStore == nil {
+		return nil
+	}
+
+	return w.protectedTopicStore.Delete(topic)
 }
 
 func (w *Waku) StartDiscV5() error {
@@ -1599,6 +1637,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 // It also restarts if there's a connection change signalled from the client
 func (w *Waku) seedBootnodesForDiscV5() {
 	if !w.settings.EnableDiscV5 || w.node.DiscV5() == nil {
+		w.wg.Done()
 		return
 	}
 
@@ -1657,6 +1696,8 @@ func (w *Waku) seedBootnodesForDiscV5() {
 			lastTry = now()
 
 		case <-w.ctx.Done():
+			w.wg.Done()
+			w.logger.Debug("bootnode seeding stopped")
 			return
 		}
 	}
@@ -1764,6 +1805,16 @@ func (w *Waku) MarkP2PMessageAsProcessed(hash gethcommon.Hash) {
 	w.storeMsgIDsMu.Lock()
 	defer w.storeMsgIDsMu.Unlock()
 	delete(w.storeMsgIDs, hash)
+}
+
+func (w *Waku) Clean() error {
+	w.msgQueue = make(chan *common.ReceivedMessage, messageQueueLimit)
+
+	for _, f := range w.filters.All() {
+		f.Messages = common.NewMemoryMessageStore()
+	}
+
+	return nil
 }
 
 // validatePrivateKey checks the format of the given private key.

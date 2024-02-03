@@ -28,4 +28,6 @@ type Event struct {
 	At          int64            `json:"at"`
 	ChainID     uint64           `json:"chainId"`
 	RequestID   *int             `json:"requestId,omitempty"`
+	// For Internal events only, not serialized
+	EventParams interface{}
 }

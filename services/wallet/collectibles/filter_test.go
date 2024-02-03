@@ -81,12 +81,12 @@ func TestFilterOwnedCollectibles(t *testing.T) {
 
 	for chainID, balancesPerOwner := range balancesPerChainIDAndOwner {
 		for ownerAddress, balances := range balancesPerOwner {
-			err = oDB.Update(chainID, ownerAddress, balances, timestamp)
+			_, _, _, err = oDB.Update(chainID, ownerAddress, balances, timestamp)
 			require.NoError(t, err)
 		}
 	}
 
-	err = cDB.SetData(data)
+	err = cDB.SetData(data, true)
 	require.NoError(t, err)
 	for i := 0; i < nData; i++ {
 		err = cDB.SetCommunityInfo(data[i].ID, communityData[i])
@@ -188,6 +188,28 @@ func TestFilterOwnedCollectibles(t *testing.T) {
 			expectedIDs = append(expectedIDs, id)
 		}
 	}
+
+	filterIDs, err = filterOwnedCollectibles(ctx, db, filterChains, filterAddresses, filter, 0, nData)
+	require.NoError(t, err)
+	require.Equal(t, expectedIDs, filterIDs)
+
+	// Test specific collectible IDs
+	tmpIDs, err = oDB.GetOwnedCollectibles(filterChains, filterAddresses, 0, nData)
+	require.NoError(t, err)
+
+	filter = allFilter()
+	for i := 0; i < 5; i++ {
+		filter.CollectibleIDs = append(filter.CollectibleIDs, tmpIDs[i*2])
+	}
+	expectedIDs = filter.CollectibleIDs
+
+	filter.CollectibleIDs = append(filter.CollectibleIDs, thirdparty.CollectibleUniqueID{
+		ContractID: thirdparty.ContractID{
+			ChainID: w_common.ChainID(1),
+			Address: common.HexToAddress("0x1234"),
+		},
+		TokenID: &bigint.BigInt{Int: big.NewInt(9999999)},
+	})
 
 	filterIDs, err = filterOwnedCollectibles(ctx, db, filterChains, filterAddresses, filter, 0, nData)
 	require.NoError(t, err)

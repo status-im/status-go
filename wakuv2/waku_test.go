@@ -40,7 +40,6 @@ func TestDiscoveryV5(t *testing.T) {
 	config.EnableDiscV5 = true
 	config.DiscV5BootstrapNodes = []string{testENRBootstrap}
 	config.DiscoveryLimit = 20
-	config.UDPPort = 9001
 	w, err := New("", "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 
@@ -182,7 +181,7 @@ func TestBasicWakuV2(t *testing.T) {
 		b.InitialInterval = 500 * time.Millisecond
 	}
 	err = tt.RetryWithBackOff(func() error {
-		storeResult, err := w.query(context.Background(), storeNode.PeerID, relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-int64(marginInSeconds)), uint64(timestampInSeconds+int64(marginInSeconds)), []store.HistoryRequestOption{})
+		storeResult, err := w.query(context.Background(), storeNode.PeerID, relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-int64(marginInSeconds)), uint64(timestampInSeconds+int64(marginInSeconds)), []byte{}, []store.HistoryRequestOption{})
 		if err != nil || len(storeResult.Messages) == 0 {
 			// in case of failure extend timestamp margin up to 40secs
 			if marginInSeconds < 40 {
@@ -288,7 +287,6 @@ func TestWakuV2Filter(t *testing.T) {
 	config.EnableDiscV5 = true
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
-	config.UDPPort = 9001
 	config.WakuNodes = []string{enrTreeAddress}
 	fleet := "status.test" // Need a name fleet so that LightClient is not set to false
 	w, err := New("", fleet, config, nil, nil, nil, nil, nil)
@@ -451,7 +449,7 @@ func TestWakuV2Store(t *testing.T) {
 	marginInSeconds := 5
 
 	// Query the second node's store for the message
-	storeResult, err := w1.query(context.Background(), w2.node.Host().ID(), relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-int64(marginInSeconds)), uint64(timestampInSeconds+int64(marginInSeconds)), []store.HistoryRequestOption{})
+	storeResult, err := w1.query(context.Background(), w2.node.Host().ID(), relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-int64(marginInSeconds)), uint64(timestampInSeconds+int64(marginInSeconds)), []byte{}, []store.HistoryRequestOption{})
 	require.NoError(t, err)
 	require.True(t, len(storeResult.Messages) > 0, "no messages received from store node")
 }

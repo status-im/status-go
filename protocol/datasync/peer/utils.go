@@ -3,7 +3,7 @@ package peer
 import (
 	"crypto/ecdsa"
 
-	"github.com/vacp2p/mvds/state"
+	"github.com/status-im/mvds/state"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 )

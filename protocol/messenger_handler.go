@@ -25,10 +25,10 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/identity"
+	"github.com/status-im/status-go/protocol/peersyncing"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
@@ -43,17 +43,18 @@ const (
 )
 
 var (
-	ErrMessageNotAllowed                     = errors.New("message from a non-contact")
-	ErrMessageForWrongChatType               = errors.New("message for the wrong chat type")
-	ErrNotWatchOnlyAccount                   = errors.New("an account is not a watch only account")
-	ErrWalletAccountNotSupportedForMobileApp = errors.New("handling account is not supported for mobile app")
-	ErrTryingToApplyOldWalletAccountsOrder   = errors.New("trying to apply old wallet accounts order")
-	ErrTryingToStoreOldWalletAccount         = errors.New("trying to store an old wallet account")
-	ErrTryingToStoreOldKeypair               = errors.New("trying to store an old keypair")
-	ErrSomeFieldsMissingForWalletAccount     = errors.New("some fields are missing for wallet account")
-	ErrUnknownKeypairForWalletAccount        = errors.New("keypair is not known for the wallet account")
-	ErrInvalidCommunityID                    = errors.New("invalid community id")
-	ErrTryingToApplyOldTokenPreferences      = errors.New("trying to apply old token preferences")
+	ErrMessageNotAllowed                      = errors.New("message from a non-contact")
+	ErrMessageForWrongChatType                = errors.New("message for the wrong chat type")
+	ErrNotWatchOnlyAccount                    = errors.New("an account is not a watch only account")
+	ErrWalletAccountNotSupportedForMobileApp  = errors.New("handling account is not supported for mobile app")
+	ErrTryingToApplyOldWalletAccountsOrder    = errors.New("trying to apply old wallet accounts order")
+	ErrTryingToStoreOldWalletAccount          = errors.New("trying to store an old wallet account")
+	ErrTryingToStoreOldKeypair                = errors.New("trying to store an old keypair")
+	ErrSomeFieldsMissingForWalletAccount      = errors.New("some fields are missing for wallet account")
+	ErrUnknownKeypairForWalletAccount         = errors.New("keypair is not known for the wallet account")
+	ErrInvalidCommunityID                     = errors.New("invalid community id")
+	ErrTryingToApplyOldTokenPreferences       = errors.New("trying to apply old token preferences")
+	ErrTryingToApplyOldCollectiblePreferences = errors.New("trying to apply old collectible preferences")
 )
 
 // HandleMembershipUpdate updates a Chat instance according to the membership updates.
@@ -1634,7 +1635,14 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 			return err
 		}
 
-		err = m.handleCommunityShardAndFiltersFromProto(community, shard.FromProtobuff(requestToJoinResponseProto.Shard), requestToJoinResponseProto.ProtectedTopicPrivateKey)
+		communityShardKey := &protobuf.CommunityShardKey{
+			CommunityId: requestToJoinResponseProto.CommunityId,
+			PrivateKey:  requestToJoinResponseProto.ProtectedTopicPrivateKey,
+			Clock:       requestToJoinResponseProto.Community.Clock,
+			Shard:       requestToJoinResponseProto.Shard,
+		}
+
+		err = m.handleCommunityShardAndFiltersFromProto(community, communityShardKey)
 		if err != nil {
 			return err
 		}
@@ -2070,7 +2078,6 @@ func handleContactRequestChatMessage(receivedMessage *common.Message, contact *C
 
 func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen bool) error {
 	logger := m.logger.With(zap.String("site", "handleChatMessage"))
-	logger.Info("state", zap.Any("state", state))
 	if err := ValidateReceivedChatMessage(state.CurrentMessageState.Message, state.CurrentMessageState.WhisperTimestamp); err != nil {
 		logger.Warn("failed to validate message", zap.Error(err))
 		return err
@@ -2346,10 +2353,37 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		}
 	}
 
+	err = m.addPeersyncingMessage(chat, state.CurrentMessageState.StatusMessage)
+	if err != nil {
+		m.logger.Warn("failed to add peersyncing message", zap.Error(err))
+	}
+
 	receivedMessage.New = true
 	state.Response.AddMessage(receivedMessage)
 
 	return nil
+}
+
+func (m *Messenger) addPeersyncingMessage(chat *Chat, msg *v1protocol.StatusMessage) error {
+	if msg == nil {
+		return nil
+	}
+	var syncMessageType peersyncing.SyncMessageType
+	if chat.OneToOne() {
+		syncMessageType = peersyncing.SyncMessageOneToOneType
+	} else if chat.CommunityChat() {
+		syncMessageType = peersyncing.SyncMessageCommunityType
+	} else if chat.PrivateGroupChat() {
+		syncMessageType = peersyncing.SyncMessagePrivateGroup
+	}
+	syncMessage := peersyncing.SyncMessage{
+		Type:      syncMessageType,
+		ID:        msg.ApplicationLayer.ID,
+		GroupID:   []byte(chat.ID),
+		Payload:   msg.EncryptionLayer.Payload,
+		Timestamp: uint64(msg.TransportLayer.Message.Timestamp),
+	}
+	return m.peersyncing.Add(syncMessage)
 }
 
 func (m *Messenger) HandleChatMessage(state *ReceivedMessageState, message *protobuf.ChatMessage, statusMessage *v1protocol.StatusMessage, fromArchive bool) error {
@@ -2414,12 +2448,18 @@ func (m *Messenger) HandleSyncSetting(messageState *ReceivedMessageState, messag
 }
 
 func (m *Messenger) HandleSyncAccountCustomizationColor(state *ReceivedMessageState, message *protobuf.SyncAccountCustomizationColor, statusMessage *v1protocol.StatusMessage) error {
-	err := m.multiAccounts.UpdateAccountCustomizationColor(message.GetKeyUid(), message.GetCustomizationColor(), message.GetUpdatedAt())
+	result, err := m.multiAccounts.UpdateAccountCustomizationColor(message.GetKeyUid(), message.GetCustomizationColor(), message.GetUpdatedAt())
 	if err != nil {
 		return err
 	}
 
-	state.Response.CustomizationColor = message.GetCustomizationColor()
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected > 0 {
+		state.Response.CustomizationColor = message.GetCustomizationColor()
+	}
 	return nil
 }
 
@@ -2911,7 +2951,11 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci *protobuf
 		}
 	}
 
-	clockChanged, imagesChanged, err := m.persistence.SaveContactChatIdentity(contact.ID, ci)
+	if len(ci.Images) == 0 {
+		contact.Images = nil
+	}
+
+	clockChanged, imagesChanged, err := m.persistence.UpdateContactChatIdentity(contact.ID, ci)
 	if err != nil {
 		return err
 	}
@@ -3299,6 +3343,50 @@ func (m *Messenger) handleSyncTokenPreferences(message *protobuf.SyncTokenPrefer
 	return tokenPreferences, nil
 }
 
+func (m *Messenger) handleSyncCollectiblePreferences(message *protobuf.SyncCollectiblePreferences) ([]walletsettings.CollectiblePreferences, error) {
+	if len(message.Preferences) == 0 {
+		return nil, nil
+	}
+
+	dbLastUpdate, err := m.settings.GetClockOfLastCollectiblePreferencesChange()
+	if err != nil {
+		return nil, err
+	}
+
+	groupByCommunity, err := m.settings.GetCollectibleGroupByCommunity()
+	if err != nil {
+		return nil, err
+	}
+
+	groupByCollection, err := m.settings.GetCollectibleGroupByCollection()
+	if err != nil {
+		return nil, err
+	}
+
+	// Since adding new collectible preferences updates `ClockOfLastCollectiblePreferencesChange` we should handle collectible
+	// preferences changes even they are with the same clock, that ensures the correct order in case of syncing devices.
+	if message.Clock < dbLastUpdate {
+		return nil, ErrTryingToApplyOldCollectiblePreferences
+	}
+
+	var collectiblePreferences []walletsettings.CollectiblePreferences
+	for _, pref := range message.Preferences {
+		collectiblePref := walletsettings.CollectiblePreferences{
+			Type:     walletsettings.CollectiblePreferencesType(pref.Type),
+			Key:      pref.Key,
+			Position: int(pref.Position),
+			Visible:  pref.Visible,
+		}
+		collectiblePreferences = append(collectiblePreferences, collectiblePref)
+	}
+
+	err = m.settings.UpdateCollectiblePreferences(collectiblePreferences, groupByCommunity, groupByCollection, message.Testnet, message.Clock)
+	if err != nil {
+		return nil, err
+	}
+	return collectiblePreferences, nil
+}
+
 func (m *Messenger) handleSyncAccountsPositions(message *protobuf.SyncAccountsPositions) ([]*accounts.Account, error) {
 	if len(message.Accounts) == 0 {
 		return nil, nil
@@ -3543,6 +3631,21 @@ func (m *Messenger) HandleSyncTokenPreferences(state *ReceivedMessageState, mess
 	}
 
 	state.Response.TokenPreferences = append(state.Response.TokenPreferences, tokenPreferences...)
+
+	return nil
+}
+
+func (m *Messenger) HandleSyncCollectiblePreferences(state *ReceivedMessageState, message *protobuf.SyncCollectiblePreferences, statusMessage *v1protocol.StatusMessage) error {
+	collectiblePreferences, err := m.handleSyncCollectiblePreferences(message)
+	if err != nil {
+		if err == ErrTryingToApplyOldCollectiblePreferences {
+			m.logger.Warn("syncing collectible preferences issue", zap.Error(err))
+			return nil
+		}
+		return err
+	}
+
+	state.Response.CollectiblePreferences = append(state.Response.CollectiblePreferences, collectiblePreferences...)
 
 	return nil
 }

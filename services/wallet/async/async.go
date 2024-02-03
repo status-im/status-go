@@ -4,12 +4,18 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 type Command func(context.Context) error
 
 type Commander interface {
 	Command(inteval ...time.Duration) Command
+}
+
+type Runner interface {
+	Run(context.Context) error
 }
 
 // SingleShotCommand runs once.
@@ -127,7 +133,7 @@ func NewAtomicGroup(parent context.Context) *AtomicGroup {
 	return ag
 }
 
-// AtomicGroup terminates as soon as first goroutine terminates..
+// AtomicGroup terminates as soon as first goroutine terminates with error.
 type AtomicGroup struct {
 	ctx    context.Context
 	cancel func()
@@ -136,6 +142,20 @@ type AtomicGroup struct {
 
 	mu    sync.Mutex
 	error error
+}
+
+type AtomicGroupKey string
+
+func (d *AtomicGroup) SetName(name string) {
+	d.ctx = context.WithValue(d.ctx, AtomicGroupKey("name"), name)
+}
+
+func (d *AtomicGroup) Name() string {
+	val := d.ctx.Value(AtomicGroupKey("name"))
+	if val != nil {
+		return val.(string)
+	}
+	return ""
 }
 
 // Go spawns function in a goroutine and stores results or errors.
@@ -149,6 +169,7 @@ func (d *AtomicGroup) Add(cmd Command) {
 		if err != nil {
 			// do not overwrite original error by context errors
 			if d.error != nil {
+				log.Info("async.Command failed", "error", err, "d.error", d.error, "group", d.Name())
 				return
 			}
 			d.error = err
@@ -243,4 +264,79 @@ func (d *QueuedAtomicGroup) onFinish() {
 	}
 
 	d.mu.Unlock()
+}
+
+func NewErrorCounter(maxErrors int, msg string) *ErrorCounter {
+	return &ErrorCounter{maxErrors: maxErrors, msg: msg}
+}
+
+type ErrorCounter struct {
+	cnt       int
+	maxErrors int
+	err       error
+	msg       string
+}
+
+// Returns false in case of counter overflow
+func (ec *ErrorCounter) SetError(err error) bool {
+	log.Debug("ErrorCounter setError", "msg", ec.msg, "err", err, "cnt", ec.cnt)
+
+	ec.cnt++
+
+	// do not overwrite the first error
+	if ec.err == nil {
+		ec.err = err
+	}
+
+	if ec.cnt >= ec.maxErrors {
+		log.Error("ErrorCounter overflow", "msg", ec.msg)
+		return false
+	}
+
+	return true
+}
+
+func (ec *ErrorCounter) Error() error {
+	return ec.err
+}
+
+func (ec *ErrorCounter) MaxErrors() int {
+	return ec.maxErrors
+}
+
+type FiniteCommandWithErrorCounter struct {
+	FiniteCommand
+	*ErrorCounter
+}
+
+func (c FiniteCommandWithErrorCounter) Run(ctx context.Context) error {
+	f := func(ctx context.Context) (quit bool, err error) {
+		err = c.Runable(ctx)
+		if err == nil {
+			return true, err
+		}
+
+		if c.ErrorCounter.SetError(err) {
+			return false, err
+		}
+		return true, err
+	}
+
+	quit, err := f(ctx)
+	if quit {
+		return err
+	}
+
+	ticker := time.NewTicker(c.Interval)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			quit, err := f(ctx)
+			if quit {
+				return err
+			}
+		}
+	}
 }

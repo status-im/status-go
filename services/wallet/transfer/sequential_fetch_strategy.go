@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
+	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
@@ -24,6 +25,7 @@ func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, blockRangesSeq
 	accounts []common.Address,
 	balanceCacher balance.Cacher,
 	omitHistory bool,
+	blockChainState *blockchainstate.BlockChainState,
 ) *SequentialFetchStrategy {
 
 	return &SequentialFetchStrategy{
@@ -39,6 +41,7 @@ func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, blockRangesSeq
 		accounts:           accounts,
 		balanceCacher:      balanceCacher,
 		omitHistory:        omitHistory,
+		blockChainState:    blockChainState,
 	}
 }
 
@@ -57,13 +60,14 @@ type SequentialFetchStrategy struct {
 	accounts           []common.Address
 	balanceCacher      balance.Cacher
 	omitHistory        bool
+	blockChainState    *blockchainstate.BlockChainState
 }
 
 func (s *SequentialFetchStrategy) newCommand(chainClient chain.ClientInterface,
 	accounts []common.Address) async.Commander {
 
 	return newLoadBlocksAndTransfersCommand(accounts, s.db, s.accountsDB, s.blockDAO, s.blockRangesSeqDAO, chainClient, s.feed,
-		s.transactionManager, s.pendingTxManager, s.tokenManager, s.balanceCacher, s.omitHistory)
+		s.transactionManager, s.pendingTxManager, s.tokenManager, s.balanceCacher, s.omitHistory, s.blockChainState)
 }
 
 func (s *SequentialFetchStrategy) start() error {

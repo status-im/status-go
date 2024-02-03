@@ -507,7 +507,7 @@ func (n *StatusNode) stop() error {
 	n.stickersSrvc = nil
 	n.publicMethods = make(map[string]bool)
 	n.pendingTracker = nil
-
+	n.log.Debug("status node stopped")
 	return nil
 }
 

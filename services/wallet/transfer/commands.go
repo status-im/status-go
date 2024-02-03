@@ -57,6 +57,8 @@ var (
 	goerliArbitrumChainID        = uint64(421613)
 	goerliOptimismChainID        = uint64(420)
 	binanceTestChainID           = uint64(97)
+
+	transfersRetryInterval = 5 * time.Second
 )
 
 type ethHistoricalCommand struct {
@@ -195,11 +197,22 @@ type transfersCommand struct {
 	fetchedTransfers []Transfer
 }
 
-func (c *transfersCommand) Command() async.Command {
-	return async.FiniteCommand{
-		Interval: 5 * time.Second,
-		Runable:  c.Run,
-	}.Run
+func (c *transfersCommand) Runner(interval ...time.Duration) async.Runner {
+	intvl := transfersRetryInterval
+	if len(interval) > 0 {
+		intvl = interval[0]
+	}
+	return async.FiniteCommandWithErrorCounter{
+		FiniteCommand: async.FiniteCommand{
+			Interval: intvl,
+			Runable:  c.Run,
+		},
+		ErrorCounter: async.NewErrorCounter(5, "transfersCommand"),
+	}
+}
+
+func (c *transfersCommand) Command(interval ...time.Duration) async.Command {
+	return c.Runner(interval...).Run
 }
 
 func (c *transfersCommand) Run(ctx context.Context) (err error) {
@@ -283,7 +296,7 @@ func (c *transfersCommand) saveAndConfirmPending(allTransfers []Transfer, blockN
 	if resErr != nil {
 		return resErr
 	}
-	notifyFunctions := make([]func(), 0)
+	notifyFunctions := c.confirmPendingTransactions(tx, allTransfers)
 	defer func() {
 		if resErr == nil {
 			commitErr := tx.Commit()
@@ -300,6 +313,17 @@ func (c *transfersCommand) saveAndConfirmPending(allTransfers []Transfer, blockN
 			}
 		}
 	}()
+
+	resErr = saveTransfersMarkBlocksLoaded(tx, c.chainClient.NetworkID(), c.address, allTransfers, []*big.Int{blockNum})
+	if resErr != nil {
+		log.Error("SaveTransfers error", "error", resErr)
+	}
+
+	return resErr
+}
+
+func (c *transfersCommand) confirmPendingTransactions(tx *sql.Tx, allTransfers []Transfer) (notifyFunctions []func()) {
+	notifyFunctions = make([]func(), 0)
 
 	// Confirm all pending transactions that are included in this block
 	for i, tr := range allTransfers {
@@ -338,13 +362,7 @@ func (c *transfersCommand) saveAndConfirmPending(allTransfers []Transfer, blockN
 			notifyFunctions = append(notifyFunctions, notify)
 		}
 	}
-
-	resErr = saveTransfersMarkBlocksLoaded(tx, c.chainClient.NetworkID(), c.address, allTransfers, []*big.Int{blockNum})
-	if resErr != nil {
-		log.Error("SaveTransfers error", "error", resErr)
-	}
-
-	return resErr
+	return notifyFunctions
 }
 
 // Mark all subTxs of a given Tx with the same multiTxID
@@ -487,20 +505,23 @@ func transferTypeToEventType(transferType w_common.Type) walletevent.EventType {
 
 func (c *transfersCommand) notifyOfLatestTransfers(transfers []Transfer, transferType w_common.Type) {
 	if c.feed != nil {
+		eventTransfers := make([]Transfer, 0, len(transfers))
 		latestTransferTimestamp := uint64(0)
 		for _, transfer := range transfers {
 			if transfer.Type == transferType {
+				eventTransfers = append(eventTransfers, transfer)
 				if transfer.Timestamp > latestTransferTimestamp {
 					latestTransferTimestamp = transfer.Timestamp
 				}
 			}
 		}
-		if latestTransferTimestamp > 0 {
+		if len(eventTransfers) > 0 {
 			c.feed.Send(walletevent.Event{
-				Type:     transferTypeToEventType(transferType),
-				Accounts: []common.Address{c.address},
-				ChainID:  c.chainClient.NetworkID(),
-				At:       int64(latestTransferTimestamp),
+				Type:        transferTypeToEventType(transferType),
+				Accounts:    []common.Address{c.address},
+				ChainID:     c.chainClient.NetworkID(),
+				At:          int64(latestTransferTimestamp),
+				EventParams: eventTransfers,
 			})
 		}
 	}
@@ -526,6 +547,11 @@ func (c *loadTransfersCommand) Command() async.Command {
 	}.Run
 }
 
+// This command always returns nil, even if there is an error in one of the commands.
+// `transferCommand`s retry until maxError, but this command doesn't retry.
+// In case some transfer is not loaded after max retries, it will be retried only after restart of the app.
+// Currently there is no implementation to keep retrying until success. I think this should be implemented
+// in `transferCommand` with exponential backoff instead of `loadTransfersCommand` (issue #4608).
 func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
 	return loadTransfers(parent, c.blockDAO, c.db, c.chainClient, c.blocksLimit, c.blocksByAddress,
 		c.transactionManager, c.pendingTxManager, c.tokenManager, c.feed)
@@ -563,7 +589,6 @@ func loadTransfers(ctx context.Context, blockDAO *BlockDAO, db *Database,
 		group.Add(transfers.Command())
 	}
 
-	// loadTransfers command will be restarted in case of error, but if context is cancelled, we should stop
 	select {
 	case <-ctx.Done():
 		log.Debug("loadTransfers cancelled", "chain", chainClient.NetworkID(), "error", ctx.Err())
@@ -615,4 +640,15 @@ func subTransactionListToTransactionsByTxHash(subTransactions []Transfer) map[co
 	}
 
 	return rst
+}
+
+func IsTransferDetectionEvent(ev walletevent.EventType) bool {
+	if ev == EventInternalETHTransferDetected ||
+		ev == EventInternalERC20TransferDetected ||
+		ev == EventInternalERC721TransferDetected ||
+		ev == EventInternalERC1155TransferDetected {
+		return true
+	}
+
+	return false
 }

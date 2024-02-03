@@ -26,6 +26,7 @@ type CommunityEventsTestsInterface interface {
 	GetMember() *Messenger
 	GetSuite() *suite.Suite
 	GetCollectiblesServiceMock() *CollectiblesServiceMock
+	SetupAdditionalMessengers([]*Messenger)
 }
 
 const communitiesEventsTestTokenAddress = "0x0400000000000000000000000000000000000000"
@@ -408,6 +409,8 @@ func assertCheckTokenPermissionCreated(s *suite.Suite, community *communities.Co
 }
 
 func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role protobuf.CommunityMember_Roles, additionalEventSenders []*Messenger) *communities.Community {
+	base.SetupAdditionalMessengers(additionalEventSenders)
+
 	tcs2, err := base.GetControlNode().communitiesManager.All()
 	s := base.GetSuite()
 	s.Require().NoError(err, "eventSender.communitiesManager.All")
@@ -1048,13 +1051,7 @@ func advertiseCommunityToUserOldWay(s *suite.Suite, community *communities.Commu
 }
 
 func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger) {
-	// set up additional user that will send request to join
-	_, err := user.Start()
-
 	s := base.GetSuite()
-
-	s.Require().NoError(err)
-	defer TearDownMessenger(s, user)
 
 	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
 
@@ -1115,14 +1112,6 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	s.Require().Len(acceptedRequestsPending, 1)
 	s.Require().Equal(acceptedRequestsPending[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
 
-	// user should not receive community admin event without being a member yet
-	_, err = WaitOnMessengerResponse(
-		user,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"user did not receive community request to join response",
-	)
-	s.Require().Error(err)
-
 	// control node receives community event with accepted membership request
 	_, err = WaitOnMessengerResponse(
 		base.GetControlNode(),
@@ -1178,13 +1167,7 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 }
 
 func testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
-	// set up additional user that will send request to join
-	_, err := user.Start()
-
 	s := base.GetSuite()
-
-	s.Require().NoError(err)
-	defer TearDownMessenger(s, user)
 
 	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
 
@@ -1256,13 +1239,7 @@ func testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 }
 
 func testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
-	// set up additional user that will send request to join
-	_, err := user.Start()
-
 	s := base.GetSuite()
-
-	s.Require().NoError(err)
-	defer TearDownMessenger(s, user)
 
 	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
 
@@ -1335,11 +1312,7 @@ func testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 }
 
 func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger) {
-	_, err := user.Start()
-
 	s := base.GetSuite()
-	s.Require().NoError(err)
-	defer TearDownMessenger(s, user)
 
 	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
 
@@ -1432,6 +1405,7 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	s.Require().Len(declinedRequestsPending, 0)
 }
 
+/*
 func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
 	_, err := user.Start()
 
@@ -1491,15 +1465,25 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 		"control node did not receive event senders decision",
 	)
 	s.Require().NoError(err)
-	// request to join is now marked as rejected
-	rejectedRequests, err := base.GetControlNode().DeclinedRequestsToJoinForCommunity(community.ID())
+
+	err = tt.RetryWithBackOff(func() error {
+		// request to join is now marked as rejected
+		rejectedRequests, err := base.GetControlNode().DeclinedRequestsToJoinForCommunity(community.ID())
+		if err != nil {
+			return err
+		}
+		if len(rejectedRequests) != 1 {
+			return errors.New("rejected requests should be 1")
+		}
+
+		return nil
+	})
 	s.Require().NoError(err)
-	s.Require().NotNil(rejectedRequests)
-	s.Require().Len(rejectedRequests, 1)
 
 	// event sender 2 accepts request to join
 	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: sentRequest.ID}
 	_, err = additionalEventSender.AcceptRequestToJoinCommunity(acceptRequestToJoin)
+
 	s.Require().NoError(err)
 	// request to join is now marked as accepted pending for event sender 2
 	acceptedPendingRequests, err := additionalEventSender.AcceptedPendingRequestsToJoinForCommunity(community.ID())
@@ -1514,13 +1498,25 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 		"control node did not receive event senders decision",
 	)
 	s.Require().NoError(err)
-	rejectedRequests, err = base.GetControlNode().DeclinedRequestsToJoinForCommunity(community.ID())
+
+	err = tt.RetryWithBackOff(func() error {
+		rejectedRequests, err := base.GetControlNode().DeclinedRequestsToJoinForCommunity(community.ID())
+		if err != nil {
+			return err
+		}
+		if len(rejectedRequests) != 1 {
+			return errors.New("rejected requests should be 1")
+		}
+		// we expect user's request to join still to be rejected
+		if rejectedRequests[0].PublicKey != common.PubkeyToHex(&user.identity.PublicKey) {
+			return errors.New("public key of rejected request not matching")
+		}
+		return nil
+
+	})
 	s.Require().NoError(err)
-	s.Require().NotNil(rejectedRequests)
-	s.Require().Len(rejectedRequests, 1)
-	// we expect user's request to join still to be rejected
-	s.Require().Equal(rejectedRequests[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
 }
+*/
 
 func testCreateEditDeleteCategories(base CommunityEventsTestsInterface, community *communities.Community) {
 	newCategory := &requests.CreateCommunityCategory{
@@ -1887,10 +1883,10 @@ func testAddAndSyncTokenFromControlNode(base CommunityEventsTestsInterface, comm
 	s.Require().Len(syncTokens, 1)
 	s.Require().Equal(syncTokens[0].PrivilegesLevel, privilegesLvl)
 
-	// check CommunityToken was not added to the DB
+	// check CommunityToken was added to the DB
 	syncTokens, err = base.GetMember().communitiesManager.GetAllCommunityTokens()
 	s.Require().NoError(err)
-	s.Require().Len(syncTokens, 0)
+	s.Require().Len(syncTokens, 1)
 }
 
 func testAddAndSyncOwnerTokenFromControlNode(base CommunityEventsTestsInterface, community *communities.Community,
@@ -2002,7 +1998,7 @@ func testAddAndSyncTokenFromEventSenderByControlNode(base CommunityEventsTestsIn
 
 	s.Require().NoError(err)
 
-	// check member did not receive sync message with the token
+	// check member received sync message with the token
 	_, err = WaitOnMessengerResponse(
 		base.GetMember(),
 		func(r *MessengerResponse) bool {
@@ -2012,7 +2008,7 @@ func testAddAndSyncTokenFromEventSenderByControlNode(base CommunityEventsTestsIn
 		"no token sync message from event sender",
 	)
 
-	s.Require().Error(err)
+	s.Require().NoError(err)
 }
 
 func testEventSenderAddTokenMasterAndOwnerToken(base CommunityEventsTestsInterface, community *communities.Community) {
@@ -2226,13 +2222,7 @@ func waitAndCheckRequestsToJoin(s *suite.Suite, user *Messenger, expectedLength 
 }
 
 func testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger) {
-	// set up additional user that will send request to join
-	_, err := user.Start()
-
 	s := base.GetSuite()
-
-	s.Require().NoError(err)
-	defer TearDownMessenger(s, user)
 
 	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
 

@@ -48,7 +48,7 @@ func (m *Messenger) retrieveWalletBalances() error {
 	defer cancel()
 
 	// TODO: publish tokens as a signal
-	_, err = m.walletAPI.GetWalletToken(ctx, ethAccounts)
+	_, err = m.walletAPI.FetchOrGetCachedWalletBalances(ctx, ethAccounts)
 	if err != nil {
 		return err
 	}
@@ -504,6 +504,103 @@ func (m *Messenger) syncTokenPreferences(rawMessageHandler RawMessageHandler) er
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_TOKEN_PREFERENCES,
+		ResendAutomatically: true,
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
+	return err
+}
+
+func (m *Messenger) UpdateCollectiblePreferences(preferences []walletsettings.CollectiblePreferences) error {
+	clock, _ := m.getLastClockWithRelatedChat()
+	testNetworksEnabled, err := m.settings.GetTestNetworksEnabled()
+	if err != nil {
+		return err
+	}
+
+	groupByCommunity, err := m.settings.GetCollectibleGroupByCommunity()
+	if err != nil {
+		return err
+	}
+
+	groupByCollection, err := m.settings.GetCollectibleGroupByCollection()
+	if err != nil {
+		return err
+	}
+
+	err = m.settings.UpdateCollectiblePreferences(preferences, groupByCommunity, groupByCollection, testNetworksEnabled, clock)
+	if err != nil {
+		return err
+	}
+
+	return m.syncCollectiblePreferences(m.dispatchMessage)
+}
+
+func (m *Messenger) GetCollectiblePreferences() ([]walletsettings.CollectiblePreferences, error) {
+	testNetworksEnabled, err := m.settings.GetTestNetworksEnabled()
+	if err != nil {
+		return nil, err
+	}
+
+	list, err := m.settings.GetCollectiblePreferences(testNetworksEnabled)
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func (m *Messenger) prepareCollectiblePreferencesMessage(pref walletsettings.CollectiblePreferences) *protobuf.CollectiblePreferences {
+	return &protobuf.CollectiblePreferences{
+		Type:     int64(pref.Type),
+		Key:      pref.Key,
+		Position: int64(pref.Position),
+		Visible:  pref.Visible,
+	}
+}
+
+func (m *Messenger) syncCollectiblePreferences(rawMessageHandler RawMessageHandler) error {
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, chat := m.getLastClockWithRelatedChat()
+
+	lastUpdate, err := m.settings.GetClockOfLastCollectiblePreferencesChange()
+	if err != nil {
+		return err
+	}
+
+	testNetworksEnabled, err := m.settings.GetTestNetworksEnabled()
+	if err != nil {
+		return err
+	}
+
+	preferences, err := m.GetCollectiblePreferences()
+	if err != nil {
+		return err
+	}
+
+	message := &protobuf.SyncCollectiblePreferences{
+		Clock:   lastUpdate,
+		Testnet: testNetworksEnabled,
+	}
+
+	for _, pref := range preferences {
+		message.Preferences = append(message.Preferences, m.prepareCollectiblePreferencesMessage(pref))
+	}
+
+	encodedMessage, err := proto.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_COLLECTIBLE_PREFERENCES,
 		ResendAutomatically: true,
 	}
 

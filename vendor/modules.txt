@@ -2,6 +2,9 @@
 ## explicit; go 1.16
 github.com/BurntSushi/toml
 github.com/BurntSushi/toml/internal
+# github.com/Masterminds/squirrel v1.5.4
+## explicit; go 1.14
+github.com/Masterminds/squirrel
 # github.com/PuerkitoBio/goquery v1.6.1
 ## explicit; go 1.13
 github.com/PuerkitoBio/goquery
@@ -208,7 +211,7 @@ github.com/edsrzf/mmap-go
 ## explicit; go 1.14
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.11
+# github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.13
 ## explicit; go 1.17
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
@@ -469,6 +472,12 @@ github.com/koron/go-ssdp/internal/ssdplog
 # github.com/ladydascalie/currency v1.6.0
 ## explicit; go 1.16
 github.com/ladydascalie/currency
+# github.com/lann/builder v0.0.0-20180802200727-47ae307949d0
+## explicit
+github.com/lann/builder
+# github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0
+## explicit
+github.com/lann/ps
 # github.com/leodido/go-urn v1.2.1
 ## explicit; go 1.13
 github.com/leodido/go-urn
@@ -927,6 +936,19 @@ github.com/status-im/migrate/v4/database/postgres
 github.com/status-im/migrate/v4/database/sqlcipher
 github.com/status-im/migrate/v4/internal/url
 github.com/status-im/migrate/v4/source/go_bindata
+# github.com/status-im/mvds v0.0.27-0.20240111144448-92d364e4be82
+## explicit; go 1.19
+github.com/status-im/mvds/node
+github.com/status-im/mvds/node/migrations
+github.com/status-im/mvds/peers
+github.com/status-im/mvds/peers/migrations
+github.com/status-im/mvds/persistenceutil
+github.com/status-im/mvds/protobuf
+github.com/status-im/mvds/state
+github.com/status-im/mvds/state/migrations
+github.com/status-im/mvds/store
+github.com/status-im/mvds/store/migrations
+github.com/status-im/mvds/transport
 # github.com/status-im/rendezvous v1.3.7
 ## explicit; go 1.18
 github.com/status-im/rendezvous
@@ -988,20 +1010,7 @@ github.com/tyler-smith/go-bip39/wordlists
 # github.com/urfave/cli/v2 v2.24.4
 ## explicit; go 1.18
 github.com/urfave/cli/v2
-# github.com/vacp2p/mvds v0.0.24-0.20201124060106-26d8e94130d8
-## explicit; go 1.12
-github.com/vacp2p/mvds/node
-github.com/vacp2p/mvds/node/migrations
-github.com/vacp2p/mvds/peers
-github.com/vacp2p/mvds/peers/migrations
-github.com/vacp2p/mvds/persistenceutil
-github.com/vacp2p/mvds/protobuf
-github.com/vacp2p/mvds/state
-github.com/vacp2p/mvds/state/migrations
-github.com/vacp2p/mvds/store
-github.com/vacp2p/mvds/store/migrations
-github.com/vacp2p/mvds/transport
-# github.com/waku-org/go-discover v0.0.0-20221209174356-61c833f34d98
+# github.com/waku-org/go-discover v0.0.0-20240129014929-85f2c00b96a3
 ## explicit; go 1.15
 github.com/waku-org/go-discover/discover
 github.com/waku-org/go-discover/discover/v4wire
@@ -1011,7 +1020,7 @@ github.com/waku-org/go-discover/discover/v5wire
 github.com/waku-org/go-libp2p-rendezvous
 github.com/waku-org/go-libp2p-rendezvous/db
 github.com/waku-org/go-libp2p-rendezvous/pb
-# github.com/waku-org/go-waku v0.8.1-0.20240104144340-585648c4eefe
+# github.com/waku-org/go-waku v0.8.1-0.20240130093642-77ea359ef873
 ## explicit; go 1.19
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/waku/persistence

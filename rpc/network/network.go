@@ -9,10 +9,9 @@ import (
 	"github.com/status-im/status-go/params"
 )
 
-var SepoliaChainIDs = []uint64{11155111, 421614}
+var SepoliaChainIDs = []uint64{11155111, 421614, 11155420}
 
-// GoerliChainIDs Uncomment next chain when we move more chain to sepolia
-var GoerliChainIDs = []uint64{5, 421613} //, 420, }
+var GoerliChainIDs = []uint64{5, 421613, 420}
 
 type CombinedNetwork struct {
 	Prod *params.Network
@@ -130,13 +129,8 @@ func (nm *Manager) Init(networks []params.Network) error {
 	// Add new networks and update related chain id for the old ones
 	for i := range networks {
 		found := false
-		// Update original urls if they are empty
-		if networks[i].OriginalRPCURL == "" {
-			networks[i].OriginalRPCURL = networks[i].RPCURL
-		}
-		if networks[i].OriginalFallbackURL == "" {
-			networks[i].OriginalFallbackURL = networks[i].FallbackURL
-		}
+		networks[i].OriginalRPCURL = networks[i].RPCURL
+		networks[i].OriginalFallbackURL = networks[i].FallbackURL
 
 		for j := range currentNetworks {
 			if currentNetworks[j].ChainID == networks[i].ChainID {
@@ -148,7 +142,22 @@ func (nm *Manager) Init(networks []params.Network) error {
 						errors += fmt.Sprintf("error updating network fallback_url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
 					}
 				}
-				err := nm.UpdateRPCURLs(currentNetworks[j].ChainID, networks[i].RPCURL, networks[i].OriginalRPCURL, networks[i].FallbackURL, networks[i].OriginalFallbackURL)
+
+				if networks[i].OriginalRPCURL != currentNetworks[j].OriginalRPCURL && currentNetworks[j].RPCURL == currentNetworks[j].OriginalRPCURL {
+					err := nm.updateRPCURL(networks[i].ChainID, networks[i].OriginalRPCURL)
+					if err != nil {
+						errors += fmt.Sprintf("error updating rpc url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
+					}
+				}
+
+				if networks[i].OriginalFallbackURL != currentNetworks[j].OriginalFallbackURL && currentNetworks[j].FallbackURL == currentNetworks[j].OriginalFallbackURL {
+					err := nm.updateFallbackURL(networks[i].ChainID, networks[i].OriginalFallbackURL)
+					if err != nil {
+						errors += fmt.Sprintf("error updating rpc url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
+					}
+				}
+
+				err := nm.updateOriginalURLs(networks[i].ChainID, networks[i].OriginalRPCURL, networks[i].OriginalFallbackURL)
 				if err != nil {
 					errors += fmt.Sprintf("error updating network original url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
 				}
@@ -193,9 +202,18 @@ func (nm *Manager) UpdateRelatedChainID(chainID uint64, relatedChainID uint64) e
 	return err
 }
 
-func (nm *Manager) UpdateRPCURLs(chainID uint64, rpcURL, originalRPCURL, fallbackURL, originalFallbackURL string) error {
-	_, err := nm.db.Exec(`UPDATE networks SET rpc_url = ?, original_rpc_url = ?, fallback_url = ?, original_fallback_url = ?  WHERE chain_id = ?`,
-		rpcURL, originalRPCURL, fallbackURL, originalFallbackURL, chainID)
+func (nm *Manager) updateRPCURL(chainID uint64, rpcURL string) error {
+	_, err := nm.db.Exec(`UPDATE networks SET rpc_url = ? WHERE chain_id = ?`, rpcURL, chainID)
+	return err
+}
+
+func (nm *Manager) updateFallbackURL(chainID uint64, fallbackURL string) error {
+	_, err := nm.db.Exec(`UPDATE networks SET fallback_url = ? WHERE chain_id = ?`, fallbackURL, chainID)
+	return err
+}
+
+func (nm *Manager) updateOriginalURLs(chainID uint64, originalRPCURL, OriginalFallbackURL string) error {
+	_, err := nm.db.Exec(`UPDATE networks SET original_rpc_url = ?, original_fallback_url = ?  WHERE chain_id = ?`, originalRPCURL, OriginalFallbackURL, chainID)
 	return err
 }
 

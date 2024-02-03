@@ -629,7 +629,7 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	visibleTokenJSONRaw := json.RawMessage(visibleTokensJSON)
 	syncSettings.WalletVisibleTokens = &visibleTokenJSONRaw
 
-	networks := `[{"id":"goerli_rpc","chain-explorer-link":"https://goerli.etherscan.io/address/","name":"Goerli with upstream RPC","config":{"NetworkId":5,"DataDir":"/ethereum/goerli_rpc","UpstreamConfig":{"Enabled":true,"URL":"https://goerli-archival.gateway.pokt.network/v1/lb/3ef2018191814b7e1009b8d9"}}},{"id":"mainnet_rpc","chain-explorer-link":"https://etherscan.io/address/","name":"Mainnet with upstream RPC","config":{"NetworkId":1,"DataDir":"/ethereum/mainnet_rpc","UpstreamConfig":{"Enabled":true,"URL":"https://eth-archival.gateway.pokt.network/v1/lb/3ef2018191814b7e1009b8d9"}}}]`
+	networks := `[{"id":"goerli_rpc","chain-explorer-link":"https://goerli.etherscan.io/address/","name":"Goerli with upstream RPC","config":{"NetworkId":5,"DataDir":"/ethereum/goerli_rpc","UpstreamConfig":{"Enabled":true,"URL":"https://goerli-archival.rpc.grove.city/v1/3ef2018191814b7e1009b8d9"}}},{"id":"mainnet_rpc","chain-explorer-link":"https://etherscan.io/address/","name":"Mainnet with upstream RPC","config":{"NetworkId":1,"DataDir":"/ethereum/mainnet_rpc","UpstreamConfig":{"Enabled":true,"URL":"https://eth-archival.rpc.grove.city/v1/3ef2018191814b7e1009b8d9"}}}]`
 	var networksRawMessage json.RawMessage = []byte(networks)
 	syncSettings.Networks = &networksRawMessage
 	syncSettings.CurrentNetwork = currentNetwork

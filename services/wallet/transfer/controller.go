@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/balance"
+	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
@@ -35,11 +36,12 @@ type Controller struct {
 	pendingTxManager   *transactions.PendingTxTracker
 	tokenManager       *token.Manager
 	balanceCacher      balance.Cacher
+	blockChainState    *blockchainstate.BlockChainState
 }
 
 func NewTransferController(db *sql.DB, accountsDB *statusaccounts.Database, rpcClient *rpc.Client, accountFeed *event.Feed, transferFeed *event.Feed,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker, tokenManager *token.Manager,
-	balanceCacher balance.Cacher) *Controller {
+	balanceCacher balance.Cacher, blockChainState *blockchainstate.BlockChainState) *Controller {
 
 	blockDAO := &BlockDAO{db}
 	return &Controller{
@@ -54,6 +56,7 @@ func NewTransferController(db *sql.DB, accountsDB *statusaccounts.Database, rpcC
 		pendingTxManager:   pendingTxManager,
 		tokenManager:       tokenManager,
 		balanceCacher:      balanceCacher,
+		blockChainState:    blockChainState,
 	}
 }
 
@@ -70,6 +73,20 @@ func (c *Controller) Stop() {
 		c.accWatcher.Stop()
 		c.accWatcher = nil
 	}
+}
+
+func sameChains(chainIDs1 []uint64, chainIDs2 []uint64) bool {
+	if len(chainIDs1) != len(chainIDs2) {
+		return false
+	}
+
+	for _, chainID := range chainIDs1 {
+		if !slices.Contains(chainIDs2, chainID) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Address) error {
@@ -92,34 +109,39 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 	}
 
 	if c.reactor != nil {
-		err := c.reactor.restart(chainClients, accounts)
-		if err != nil {
-			return err
-		}
-	} else {
-		multiaccSettings, err := c.accountsDB.GetSettings()
-		if err != nil {
-			return err
-		}
-
-		omitHistory := multiaccSettings.OmitTransfersHistoryScan
-		if omitHistory {
-			err := c.accountsDB.SaveSettingField(settings.OmitTransfersHistoryScan, false)
+		if !sameChains(chainIDs, c.reactor.chainIDs) {
+			err := c.reactor.restart(chainClients, accounts)
 			if err != nil {
 				return err
 			}
 		}
 
-		c.reactor = NewReactor(c.db, c.blockDAO, c.blockRangesSeqDAO, c.accountsDB, c.TransferFeed, c.transactionManager,
-			c.pendingTxManager, c.tokenManager, c.balanceCacher, omitHistory)
+		return nil
+	}
 
-		err = c.reactor.start(chainClients, accounts)
+	multiaccSettings, err := c.accountsDB.GetSettings()
+	if err != nil {
+		return err
+	}
+
+	omitHistory := multiaccSettings.OmitTransfersHistoryScan
+	if omitHistory {
+		err := c.accountsDB.SaveSettingField(settings.OmitTransfersHistoryScan, false)
 		if err != nil {
 			return err
 		}
-
-		c.startAccountWatcher(chainIDs)
 	}
+
+	c.reactor = NewReactor(c.db, c.blockDAO, c.blockRangesSeqDAO, c.accountsDB, c.TransferFeed, c.transactionManager,
+		c.pendingTxManager, c.tokenManager, c.balanceCacher, omitHistory, c.blockChainState)
+
+	err = c.reactor.start(chainClients, accounts)
+	if err != nil {
+		return err
+	}
+
+	c.startAccountWatcher(chainIDs)
+
 	return nil
 }
 

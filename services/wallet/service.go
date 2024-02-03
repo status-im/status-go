@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/wallet/activity"
 	"github.com/status-im/status-go/services/wallet/balance"
+	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/currency"
@@ -104,8 +105,9 @@ func NewService(
 	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer, feed)
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(db, gethManager, transactor, config, accountsDB, pendingTxManager, feed)
+	blockChainState := blockchainstate.NewBlockChainState()
 	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountFeed, feed, transactionManager, pendingTxManager,
-		tokenManager, balanceCacher)
+		tokenManager, balanceCacher, blockChainState)
 	transferController.Start()
 	cryptoCompare := cryptocompare.NewClient()
 	coingecko := coingecko.NewClient()
@@ -113,7 +115,6 @@ func NewService(
 	reader := NewReader(rpcClient, tokenManager, marketManager, communityManager, accountsDB, NewPersistence(db), feed)
 	history := history.NewService(db, accountsDB, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
-	blockChainState := NewBlockChainState(rpcClient, accountsDB)
 
 	openseaHTTPClient := opensea.NewHTTPClient()
 	openseaV2Client := opensea.NewClientV2(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient)
@@ -147,7 +148,7 @@ func NewService(
 	collectiblesManager := collectibles.NewManager(db, rpcClient, communityManager, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, mediaServer, feed)
 	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, settingsFeed, communityManager, rpcClient.NetworkManager, collectiblesManager)
 
-	activity := activity.NewService(db, tokenManager, collectiblesManager, feed)
+	activity := activity.NewService(db, tokenManager, collectiblesManager, feed, pendingTxManager)
 
 	walletconnect := walletconnect.NewService(db, rpcClient.NetworkManager, accountsDB, transactionManager, gethManager, feed, config)
 
@@ -211,7 +212,7 @@ type Service struct {
 	currency              *currency.Service
 	activity              *activity.Service
 	decoder               *Decoder
-	blockChainState       *BlockChainState
+	blockChainState       *blockchainstate.BlockChainState
 	keycardPairings       *KeycardPairings
 	walletConnect         *walletconnect.Service
 }
@@ -223,7 +224,6 @@ func (s *Service) Start() error {
 	err := s.signals.Start()
 	s.history.Start()
 	s.collectibles.Start()
-	s.blockChainState.Start()
 	s.started = true
 	return err
 }
@@ -243,7 +243,6 @@ func (s *Service) Stop() error {
 	s.history.Stop()
 	s.activity.Stop()
 	s.collectibles.Stop()
-	s.blockChainState.Stop()
 	s.started = false
 	log.Info("wallet stopped")
 	return nil

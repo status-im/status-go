@@ -158,6 +158,16 @@ func (fs *Filters) Get(id string) *Filter {
 	return fs.watchers[id]
 }
 
+func (fs *Filters) All() []*Filter {
+	fs.mutex.RLock()
+	defer fs.mutex.RUnlock()
+	var filters []*Filter
+	for _, f := range fs.watchers {
+		filters = append(filters, f)
+	}
+	return filters
+}
+
 // NotifyWatchers notifies any filter that has declared interest
 // for the envelope's topic.
 func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) bool {

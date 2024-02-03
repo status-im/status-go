@@ -320,6 +320,11 @@ func (db *Database) SaveAccount(account Account) error {
 	return db.StoreIdentityImages(account.KeyUID, account.Images, false)
 }
 
+func (db *Database) UpdateDisplayName(keyUID string, displayName string) error {
+	_, err := db.db.Exec("UPDATE accounts SET name = ? WHERE keyUid = ?", displayName, keyUID)
+	return err
+}
+
 func (db *Database) UpdateAccount(account Account) error {
 	colorHash, err := json.Marshal(account.ColorHash)
 	if err != nil {
@@ -344,9 +349,8 @@ func (db *Database) UpdateAccountTimestamp(keyUID string, loginTimestamp int64) 
 	return err
 }
 
-func (db *Database) UpdateAccountCustomizationColor(keyUID string, color string, clock uint64) error {
-	_, err := db.db.Exec("UPDATE accounts SET customizationColor = ?, customizationColorClock = ? WHERE keyUid = ? AND customizationColorClock < ?", color, clock, keyUID, clock)
-	return err
+func (db *Database) UpdateAccountCustomizationColor(keyUID string, color string, clock uint64) (sql.Result, error) {
+	return db.db.Exec("UPDATE accounts SET customizationColor = ?, customizationColorClock = ? WHERE keyUid = ? AND customizationColorClock < ?", color, clock, keyUID, clock)
 }
 
 func (db *Database) DeleteAccount(keyUID string) error {
@@ -452,6 +456,15 @@ func (db *Database) publishOnIdentityImageSubscriptions(change *IdentityImageSub
 
 func (db *Database) DeleteIdentityImage(keyUID string) error {
 	_, err := db.db.Exec(`DELETE FROM identity_images WHERE key_uid = ?`, keyUID)
+
+	if err != nil {
+		return err
+	}
+
+	db.publishOnIdentityImageSubscriptions(&IdentityImageSubscriptionChange{
+		PublishExpected: true,
+	})
+
 	return err
 }
 

@@ -20,7 +20,7 @@ func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 	return &Manager{
 			db:                db,
 			RPCClient:         nil,
-			contractMaker:     nil,
+			ContractMaker:     nil,
 			networkManager:    nil,
 			stores:            nil,
 			communityTokensDB: nil,

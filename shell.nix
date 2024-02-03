@@ -10,7 +10,7 @@
       android_sdk.accept_license = true;
     };
     overlays = [
-      (self: super: {
+      (final: prev: {
         androidPkgs = pkgs.androidenv.composeAndroidPackages {
           toolsVersion = "26.1.1";
           platformToolsVersion = "33.0.3";
@@ -24,6 +24,17 @@
             "extras;google;m2repository"
           ];
         };
+
+        go-junit-report = prev.go-junit-report.overrideAttrs ( attrs : rec {
+          version = "2.1.0";
+
+          src = prev.fetchFromGitHub {
+            owner = "jstemmer";
+            repo = "go-junit-report";
+            rev = "v${version}";
+            sha256 = "sha256-s4XVjACmpd10C5k+P3vtcS/aWxI6UkSUPyxzLhD2vRI=";
+          };
+        });
       })
     ];
   }

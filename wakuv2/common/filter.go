@@ -203,6 +203,16 @@ func (fs *Filters) Get(id string) *Filter {
 	return fs.watchers[id]
 }
 
+func (fs *Filters) All() []*Filter {
+	fs.RLock()
+	defer fs.RUnlock()
+	var filters []*Filter
+	for _, f := range fs.watchers {
+		filters = append(filters, f)
+	}
+	return filters
+}
+
 func (fs *Filters) GetFilters() map[string]*Filter {
 	fs.RLock()
 	defer fs.RUnlock()
@@ -236,7 +246,7 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
 		}
 
 		if matched && decodedMsg != nil {
-			log.Debug("processing message: decrypted", "hash", recvMessage.Hash().Hex())
+			log.Debug("processing message: decrypted", "envelopeHash", recvMessage.Hash().Hex())
 			if watcher.Src == nil || IsPubKeyEqual(decodedMsg.Src, watcher.Src) {
 				watcher.Trigger(decodedMsg)
 			}

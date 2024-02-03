@@ -52,20 +52,7 @@ func (m *Messenger) shouldSync() (bool, error) {
 		return false, err
 	}
 
-	if !useMailserver {
-		return false, nil
-	}
-
-	if !m.connectionState.IsExpensive() {
-		return true, nil
-	}
-
-	syncingOnMobileNetwork, err := m.settings.CanSyncOnMobileNetwork()
-	if err != nil {
-		return false, err
-	}
-
-	return syncingOnMobileNetwork, nil
+	return useMailserver, nil
 }
 
 func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
@@ -135,6 +122,8 @@ func (m *Messenger) performMailserverRequest(ms *mailservers.Mailserver, fn func
 		response, err := fn(*ms) // pass by value because we don't want the fn to modify the mailserver
 		if err == nil {
 			// Reset failed requests
+			m.logger.Debug("mailserver request performed successfully",
+				zap.String("mailserverID", ms.ID))
 			ms.FailedRequests = 0
 			return response, nil
 		}
@@ -833,6 +822,10 @@ loop:
 }
 
 func (m *Messenger) processMailserverBatch(ms mailservers.Mailserver, batch MailserverBatch) error {
+	if m.featureFlags.StoreNodesDisabled {
+		return nil
+	}
+
 	mailserverID, err := ms.IDBytes()
 	if err != nil {
 		return err
@@ -841,6 +834,10 @@ func (m *Messenger) processMailserverBatch(ms mailservers.Mailserver, batch Mail
 }
 
 func (m *Messenger) processMailserverBatchWithOptions(ms mailservers.Mailserver, batch MailserverBatch, pageLimit uint32, shouldProcessNextPage func(int) (bool, uint32), processEnvelopes bool) error {
+	if m.featureFlags.StoreNodesDisabled {
+		return nil
+	}
+
 	mailserverID, err := ms.IDBytes()
 	if err != nil {
 		return err
@@ -1028,7 +1025,7 @@ func (m *Messenger) ConnectionChanged(state connection.State) {
 	}
 
 	if m.connectionState.Offline && !state.Offline {
-		err := m.sender.StartDatasync()
+		err := m.sender.StartDatasync(m.sendDataSync)
 		if err != nil {
 			m.logger.Error("failed to start datasync", zap.Error(err))
 		}

@@ -6,6 +6,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+
 	settings "github.com/status-im/status-go/multiaccounts/settings"
 )
 

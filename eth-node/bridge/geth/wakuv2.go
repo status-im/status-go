@@ -237,12 +237,20 @@ func (w *gethWakuV2Wrapper) SubscribeToPubsubTopic(topic string, optPublicKey *e
 	return w.waku.SubscribeToPubsubTopic(topic, optPublicKey)
 }
 
+func (w *gethWakuV2Wrapper) UnsubscribeFromPubsubTopic(topic string) error {
+	return w.waku.UnsubscribeFromPubsubTopic(topic)
+}
+
 func (w *gethWakuV2Wrapper) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
 	return w.waku.RetrievePubsubTopicKey(topic)
 }
 
 func (w *gethWakuV2Wrapper) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
 	return w.waku.StorePubsubTopicKey(topic, privKey)
+}
+
+func (w *gethWakuV2Wrapper) RemovePubsubTopicKey(topic string) error {
+	return w.waku.RemovePubsubTopicKey(topic)
 }
 
 func (w *gethWakuV2Wrapper) AddStorePeer(address string) (peer.ID, error) {
@@ -287,6 +295,10 @@ func (w *gethWakuV2Wrapper) SubscribeToConnStatusChanges() (*types.ConnStatusSub
 
 func (w *gethWakuV2Wrapper) ConnectionChanged(state connection.State) {
 	w.waku.ConnectionChanged(state)
+}
+
+func (w *gethWakuV2Wrapper) ClearEnvelopesCache() {
+	w.waku.ClearEnvelopesCache()
 }
 
 type wakuV2FilterWrapper struct {

@@ -91,7 +91,7 @@ type MessengerMessagesTrackingSuite struct {
 func (s *MessengerMessagesTrackingSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"bob", "alice"})
+	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, false, []string{"bob", "alice"})
 
 	s.bobWaku = wakuNodes[0]
 	s.bob, s.bobInterceptor = s.newMessenger(s.bobWaku, s.logger.With(zap.String("name", "bob")))

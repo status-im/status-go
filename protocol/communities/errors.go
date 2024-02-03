@@ -44,3 +44,4 @@ var ErrInvalidManageTokensPermission = errors.New("no privileges to manage token
 var ErrRevealedAccountsAbsent = errors.New("revealed accounts is absent")
 var ErrNoRevealedAccountsSignature = errors.New("revealed accounts without the signature")
 var ErrNoFreeSpaceForHistoryArchives = errors.New("history archive: No free space for downloading history archives")
+var ErrPermissionToJoinNotSatisfied = errors.New("permission to join not satisfied")

@@ -21,6 +21,8 @@ package wakuv2
 import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
+	"github.com/status-im/status-go/protocol/common/shard"
+
 	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 
 	"github.com/status-im/status-go/wakuv2/common"
@@ -49,22 +51,20 @@ type Config struct {
 	StoreCapacity           int              `toml:",omitempty"`
 	StoreSeconds            int              `toml:",omitempty"`
 	TelemetryServerURL      string           `toml:",omitempty"`
-	EnableFilterFullNode    bool             `toml:",omitempty"`
 	DefaultShardPubsubTopic string           `toml:",omitempty"`
 	UseShardAsDefaultTopic  bool             `toml:",omitempty"`
 	ClusterID               uint16           `toml:",omitempty"`
 }
 
 var DefaultConfig = Config{
-	MaxMessageSize:          common.DefaultMaxMessageSize,
-	Host:                    "0.0.0.0",
-	Port:                    0,
-	KeepAliveInterval:       10, // second
-	DiscoveryLimit:          20,
-	MinPeersForRelay:        1, // TODO: determine correct value with Vac team
-	MinPeersForFilter:       2, // TODO: determine correct value with Vac team and via testing
-	AutoUpdate:              false,
-	DefaultShardPubsubTopic: relay.DefaultWakuTopic,
+	MaxMessageSize:    common.DefaultMaxMessageSize,
+	Host:              "0.0.0.0",
+	Port:              0,
+	KeepAliveInterval: 10, // second
+	DiscoveryLimit:    20,
+	MinPeersForRelay:  1, // TODO: determine correct value with Vac team
+	MinPeersForFilter: 2, // TODO: determine correct value with Vac team and via testing
+	AutoUpdate:        false,
 }
 
 func setDefaults(cfg *Config) *Config {
@@ -97,7 +97,11 @@ func setDefaults(cfg *Config) *Config {
 	}
 
 	if cfg.DefaultShardPubsubTopic == "" {
-		cfg.DefaultShardPubsubTopic = DefaultConfig.DefaultShardPubsubTopic
+		if cfg.UseShardAsDefaultTopic {
+			cfg.DefaultShardPubsubTopic = shard.DefaultShardPubsubTopic()
+		} else {
+			cfg.DefaultShardPubsubTopic = relay.DefaultWakuTopic
+		}
 	}
 
 	return cfg
