@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/storenodes"
+	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
@@ -21,7 +22,7 @@ func (m *Messenger) sendCommunityPublicStorenodesInfo(community *communities.Com
 		return communities.ErrNotControlNode
 	}
 
-	clock, chat := m.getLastClockWithRelatedChat()
+	clock, _ := m.getLastClockWithRelatedChat()
 	pb := &protobuf.CommunityStorenodes{
 		Clock:       clock,
 		CommunityId: community.ID(),
@@ -53,10 +54,16 @@ func (m *Messenger) sendCommunityPublicStorenodesInfo(community *communities.Com
 		PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
 	}
 
-	_, err = m.sender.SendPublic(context.Background(), chat.Name, rawMessage)
+	chatName := transport.CommunityStorenodesInfoTopic(community.IDString())
+	_, err = m.sender.SendPublic(context.Background(), chatName, rawMessage)
 	return err
 }
 
+// TODO pablo check if this is what is happening:
+//  1. m.sender.SendPublic will send that operational message with the default non protected pubsub topic
+//  2. This thing will save it in the peer, BUT this might be saving the message in any peer that might not care about the community, unless the peer
+//     has already the db populated with the community because there is a foreign key on community id
+//  3. If a peer just connects he needs to get this info on FetchCommunity to be able to get the storenodes info and connect to it.
 func (m *Messenger) HandleCommunityPublicStorenodesInfo(state *ReceivedMessageState, a *protobuf.CommunityPublicStorenodesInfo, statusMessage *v1protocol.StatusMessage) error {
 	sn := &protobuf.CommunityStorenodes{}
 	err := proto.Unmarshal(a.Payload, sn)

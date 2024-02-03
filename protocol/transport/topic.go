@@ -65,3 +65,11 @@ func CommunityShardInfoTopic(communityID string) string {
 func CommunityShardInfoTopicPrefix() string {
 	return "-shard-info"
 }
+
+func CommunityStorenodesInfoTopic(communityID string) string {
+	return communityID + CommunityStorenodesInfoTopicPrefix()
+}
+
+func CommunityStorenodesInfoTopicPrefix() string {
+	return "-storenodes-info"
+}

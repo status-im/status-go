@@ -227,9 +227,7 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 	}
 
 	switch requestType {
-	case storeNodeShardRequest:
-		fallthrough
-	case storeNodeCommunityRequest:
+	case storeNodeShardRequest, storeNodeCommunityStorenodesRequest, storeNodeCommunityRequest:
 		// If filter wasn't installed we create it and
 		// remember for uninstalling after response is received
 		filters, err := m.messenger.transport.InitPublicFilters([]transport.FiltersToInitialize{{
@@ -286,6 +284,7 @@ const (
 	storeNodeCommunityRequest storeNodeRequestType = iota
 	storeNodeContactRequest
 	storeNodeShardRequest
+	storeNodeCommunityStorenodesRequest
 )
 
 // storeNodeRequest represents a single store node batch request.
@@ -318,9 +317,10 @@ type storeNodeRequestResult struct {
 	err   error
 	stats StoreNodeRequestStats
 	// One of data fields (community or contact) will be present depending on request type
-	community *communities.Community
-	contact   *Contact
-	shard     *shard.Shard
+	community           *communities.Community
+	contact             *Contact
+	shard               *shard.Shard
+	communityStorenodes *mailservers.Mailserver
 }
 
 type storeNodeResponseSubscription = chan storeNodeRequestResult
@@ -506,15 +506,11 @@ func (r *storeNodeRequest) routine() {
 	}()
 
 	communityIDStr := strings.TrimSuffix(r.requestID.DataID, transport.CommunityShardInfoTopicPrefix())
-	ms := r.manager.messenger.getActiveMailserver(communityIDStr)
-	if ms == r.manager.messenger.getActiveMailserver() && !r.manager.messenger.waitForAvailableStoreNode(storeNodeAvailableTimeout) {
+	if !r.manager.messenger.communityStorenodes.HasStorenodeSetup(communityIDStr) && !r.manager.messenger.waitForAvailableStoreNode(storeNodeAvailableTimeout) {
 		r.result.err = fmt.Errorf("store node is not available")
 		return
 	}
-	if ms == nil {
-		ms = r.manager.messenger.getActiveMailserver()
-	}
-
+	ms := r.manager.messenger.getActiveMailserver(communityIDStr)
 	// Check if community already exists locally and get Clock.
 
 	localCommunity, _ := r.manager.messenger.communitiesManager.GetByIDString(r.requestID.DataID)
