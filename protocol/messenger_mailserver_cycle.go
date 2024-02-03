@@ -608,6 +608,16 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 	return nil
 }
 
+func (m *Messenger) asyncRequestAllHistoricMessages() {
+	m.logger.Debug("asyncRequestAllHistoricMessages")
+	go func() {
+		_, err := m.RequestAllHistoricMessages(false, true)
+		if err != nil {
+			m.logger.Error("failed to request historic messages", zap.Error(err))
+		}
+	}()
+}
+
 func (m *Messenger) updateWakuV1PeerStatus() {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
