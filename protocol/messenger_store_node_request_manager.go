@@ -317,10 +317,10 @@ type storeNodeRequestResult struct {
 	err   error
 	stats StoreNodeRequestStats
 	// One of data fields (community or contact) will be present depending on request type
-	community           *communities.Community
-	contact             *Contact
-	shard               *shard.Shard
-	communityStorenodes *mailservers.Mailserver
+	community *communities.Community
+	contact   *Contact
+	shard     *shard.Shard
+	// communityStorenodes *mailservers.Mailserver // TODO pablo
 }
 
 type storeNodeResponseSubscription = chan storeNodeRequestResult
