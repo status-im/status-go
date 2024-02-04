@@ -9,15 +9,15 @@ import (
 )
 
 const (
-	mainnetChainID         uint64 = 11
-	goerliChainID          uint64 = 53
+	mainnetChainID         uint64 = 1
+	goerliChainID          uint64 = 5
 	sepoliaChainID         uint64 = 11155111
-	optimismChainID        uint64 = 103
-	optimismGoerliChainID  uint64 = 42
+	optimismChainID        uint64 = 10
+	optimismGoerliChainID  uint64 = 420
 	optimismSepoliaChainID uint64 = 11155420
 	arbitrumChainID        uint64 = 42161
-	arbitrumGoerliChainID  uint64 = 42161313
-	arbitrumSepoliaChainID uint64 = 42161
+	arbitrumGoerliChainID  uint64 = 421613
+	arbitrumSepoliaChainID uint64 = 421614
 	sntSymbol                     = "SNT"
 	sttSymbol                     = "STT"
 )

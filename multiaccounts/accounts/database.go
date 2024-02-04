@@ -1013,7 +1013,6 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 			SET
 				name = ?,
 				color = ?,
-				emoji = ?,
 				hidden = ?,
 				operable = ?,
 				clock = ?,
@@ -1026,7 +1025,7 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 				address = ?;
 		`,
 			acc.Address, keyUID, acc.PublicKey, acc.Path, acc.Wallet, acc.AddressWasNotShown, acc.Chat,
-			acc.Name, acc.ColorID, acc.Emoji, acc.Hidden, acc.Operable, acc.Clock, acc.Position, acc.Removed,
+			acc.Name, acc.ColorID, acc.Hidden, acc.Operable, acc.Clock, acc.Position, acc.Removed,
 			acc.ProdPreferredChainIDs, acc.TestPreferredChainIDs, acc.Address)
 
 		if err != nil {
