@@ -123,6 +123,9 @@ func (m *EnvelopesMonitor) Add(identifiers [][]byte, envelopeHashes []types.Hash
 		return errors.New("hashes don't match messages")
 	}
 
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	for _, identifier := range identifiers {
 		m.identifierHashes[string(identifier)] = envelopeHashes
 	}
