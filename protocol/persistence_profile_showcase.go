@@ -20,6 +20,7 @@ const selectProfileShowcaseCommunityPreferenceQuery = "SELECT community_id, visi
 
 const upsertProfileShowcaseAccountPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_accounts_preferences(address, name, color_id, emoji, visibility, sort_order) VALUES (?, ?, ?, ?, ?, ?)" // #nosec G101
 const selectProfileShowcaseAccountPreferenceQuery = "SELECT address, name, color_id, emoji, visibility, sort_order FROM profile_showcase_accounts_preferences"                                       // #nosec G101
+const selectSpecifiedShowcaseAccountPreferenceQuery = "SELECT address, name, color_id, emoji, visibility, sort_order FROM profile_showcase_accounts_preferences WHERE address = ?"                   // #nosec G101
 
 const upsertProfileShowcaseCollectiblePreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_preferences(contract_address, chain_id, token_id, community_id, account_address, visibility, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)" // #nosec G101
 const selectProfileShowcaseCollectiblePreferenceQuery = "SELECT contract_address, chain_id, token_id, community_id, account_address, visibility, sort_order FROM profile_showcase_collectibles_preferences"                                          // #nosec G101
@@ -203,13 +204,10 @@ func (db sqlitePersistence) saveProfileShowcaseAccountPreference(tx *sql.Tx, acc
 	return err
 }
 
-func (db sqlitePersistence) getProfileShowcaseAccountsPreferences(tx *sql.Tx) ([]*ProfileShowcaseAccountPreference, error) {
-	rows, err := tx.Query(selectProfileShowcaseAccountPreferenceQuery)
-	if err != nil {
-		return nil, err
+func (db sqlitePersistence) processProfileShowcaseAccountPreferences(rows *sql.Rows) (result []*ProfileShowcaseAccountPreference, err error) {
+	if rows == nil {
+		return nil, errors.New("rows is nil")
 	}
-
-	accounts := []*ProfileShowcaseAccountPreference{}
 
 	for rows.Next() {
 		account := &ProfileShowcaseAccountPreference{}
@@ -227,9 +225,33 @@ func (db sqlitePersistence) getProfileShowcaseAccountsPreferences(tx *sql.Tx) ([
 			return nil, err
 		}
 
-		accounts = append(accounts, account)
+		result = append(result, account)
 	}
-	return accounts, nil
+
+	err = rows.Err()
+	return
+}
+
+func (db sqlitePersistence) getProfileShowcaseAccountsPreferences(tx *sql.Tx) ([]*ProfileShowcaseAccountPreference, error) {
+	rows, err := tx.Query(selectProfileShowcaseAccountPreferenceQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	return db.processProfileShowcaseAccountPreferences(rows)
+}
+
+func (db sqlitePersistence) GetProfileShowcaseAccountPreferences(accountAddress string) (*ProfileShowcaseAccountPreference, error) {
+	rows, err := db.db.Query(selectSpecifiedShowcaseAccountPreferenceQuery, accountAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	accounts, err := db.processProfileShowcaseAccountPreferences(rows)
+	if len(accounts) > 0 {
+		return accounts[0], err
+	}
+	return nil, err
 }
 
 func (db sqlitePersistence) saveProfileShowcaseCollectiblePreference(tx *sql.Tx, collectible *ProfileShowcaseCollectiblePreference) error {
@@ -626,6 +648,22 @@ func (db sqlitePersistence) SaveProfileShowcasePreferences(preferences *ProfileS
 	}
 
 	return nil
+}
+
+func (db sqlitePersistence) SaveProfileShowcaseAccountPreference(account *ProfileShowcaseAccountPreference) error {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+	return db.saveProfileShowcaseAccountPreference(tx, account)
 }
 
 func (db sqlitePersistence) GetProfileShowcasePreferences() (*ProfileShowcasePreferences, error) {

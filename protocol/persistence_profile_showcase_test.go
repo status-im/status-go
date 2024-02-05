@@ -374,3 +374,55 @@ func (s *TestProfileShowcasePersistence) TestFetchingProfileShowcaseAccountsByAd
 		}
 	}
 }
+
+func (s *TestProfileShowcasePersistence) TestUpdateProfileShowcaseAccountOnWalletAccountChange() {
+	db, err := openTestDB()
+	s.Require().NoError(err)
+	persistence := newSQLitePersistence(db)
+
+	accountAddress := "0x3845354643324"
+
+	preferences := &ProfileShowcasePreferences{
+		Accounts: []*ProfileShowcaseAccountPreference{
+			&ProfileShowcaseAccountPreference{
+				Address:            "0x32433445133424",
+				Name:               "Status Account",
+				ColorID:            "blue",
+				Emoji:              "-_-",
+				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+			&ProfileShowcaseAccountPreference{
+				Address:            accountAddress,
+				Name:               "Money Box",
+				ColorID:            "red",
+				Emoji:              ":o)",
+				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				Order:              1,
+			},
+		},
+	}
+
+	err = persistence.SaveProfileShowcasePreferences(preferences)
+	s.Require().NoError(err)
+
+	account, err := persistence.GetProfileShowcaseAccountPreferences(accountAddress)
+	s.Require().NoError(err)
+	s.Require().NotNil(account)
+	s.Require().Equal(*account, *preferences.Accounts[1])
+
+	account.Name = "Music Box"
+	account.ColorID = "green"
+	account.Emoji = ">:-]"
+	account.ShowcaseVisibility = ProfileShowcaseVisibilityIDVerifiedContacts
+	account.Order = 7
+
+	err = persistence.SaveProfileShowcaseAccountPreference(account)
+	s.Require().NoError(err)
+
+	preferencesBack, err := persistence.GetProfileShowcasePreferences()
+	s.Require().NoError(err)
+
+	s.Require().Equal(*preferencesBack.Accounts[0], *preferences.Accounts[0])
+	s.Require().Equal(*preferencesBack.Accounts[1], *account)
+}

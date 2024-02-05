@@ -172,7 +172,12 @@ func (m *Messenger) SaveOrUpdateAccount(acc *accounts.Account) error {
 		return err
 	}
 
-	return m.resolveAndSyncKeypairOrJustWalletAccount(acc.KeyUID, acc.Address, acc.Clock, m.dispatchMessage)
+	err = m.resolveAndSyncKeypairOrJustWalletAccount(acc.KeyUID, acc.Address, acc.Clock, m.dispatchMessage)
+	if err != nil {
+		return err
+	}
+
+	return m.UpdateProfileShowcaseWalletAccount(acc)
 }
 
 func (m *Messenger) MarkKeypairFullyOperable(keyUID string) error {
