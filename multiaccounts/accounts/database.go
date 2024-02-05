@@ -1004,9 +1004,9 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 
 		_, err = tx.Exec(`
 			INSERT OR IGNORE INTO
-				keypairs_accounts (address, key_uid, pubkey, path, wallet, address_was_not_shown, chat, created_at, updated_at)
+				keypairs_accounts (address, key_uid, pubkey, path, wallet, address_was_not_shown, chat, emoji, created_at, updated_at)
 			VALUES
-				(?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'));
+				(?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'));
 
 			UPDATE
 				keypairs_accounts
@@ -1025,7 +1025,7 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 				address = ?;
 		`,
 			acc.Address, keyUID, acc.PublicKey, acc.Path, acc.Wallet, acc.AddressWasNotShown, acc.Chat,
-			acc.Name, acc.ColorID, acc.Hidden, acc.Operable, acc.Clock, acc.Position, acc.Removed,
+			acc.Emoji, acc.Name, acc.ColorID, acc.Hidden, acc.Operable, acc.Clock, acc.Position, acc.Removed,
 			acc.ProdPreferredChainIDs, acc.TestPreferredChainIDs, acc.Address)
 
 		if err != nil {
