@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	curatedCommunitiesUpdateInterval = 2 * time.Minute
+	curatedCommunitiesUpdateInterval = time.Hour
+	communitiesUpdateFailureInterval = time.Minute
 )
 
 // Regularly gets list of curated communities and signals them to client
@@ -39,6 +40,7 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 
 				curatedCommunities, err := m.getCuratedCommunitiesFromContract()
 				if err != nil {
+					interval = communitiesUpdateFailureInterval
 					logger.Error("failed to get curated communities from contract", zap.Error(err))
 					continue
 				}
@@ -58,6 +60,7 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 
 				response, err := m.fetchCuratedCommunities(curatedCommunities)
 				if err != nil {
+					interval = communitiesUpdateFailureInterval
 					logger.Error("failed to fetch curated communities", zap.Error(err))
 					continue
 				}
