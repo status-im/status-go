@@ -134,6 +134,11 @@ func setCollectiblesData(creator sqlite.StatementCreator, collectibles []thirdpa
 			return err
 		}
 
+		err = upsertContractType(creator, c.ID.ContractID, c.ContractType)
+		if err != nil {
+			return err
+		}
+
 		if allowUpdate {
 			err = upsertCollectibleTraits(creator, c.ID, c.Traits)
 			if err != nil {
@@ -253,6 +258,13 @@ func (o *CollectibleDataDB) GetData(ids []thirdparty.CollectibleUniqueID) (map[s
 			if err != nil {
 				return nil, err
 			}
+
+			// Get contract type from different table
+			c.ContractType, err = readContractType(o.db, c.ID.ContractID)
+			if err != nil {
+				return nil, err
+			}
+
 			ret[c.ID.HashKey()] = *c
 		}
 	}

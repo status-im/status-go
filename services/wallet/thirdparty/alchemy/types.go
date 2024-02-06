@@ -172,13 +172,25 @@ func alchemyToCollectibleTraits(attributes []Attribute) []thirdparty.Collectible
 	return ret
 }
 
+func alchemyToContractType(tokenType string) walletCommon.ContractType {
+	switch tokenType {
+	case "ERC721":
+		return walletCommon.ContractTypeERC721
+	case "ERC1155":
+		return walletCommon.ContractTypeERC1155
+	default:
+		return walletCommon.ContractTypeUnknown
+	}
+}
+
 func (c *Contract) toCollectionData(id thirdparty.ContractID) thirdparty.CollectionData {
 	ret := thirdparty.CollectionData{
-		ID:       id,
-		Provider: AlchemyID,
-		Name:     c.Name,
-		ImageURL: c.OpenSeaMetadata.ImageURL,
-		Traits:   make(map[string]thirdparty.CollectionTrait, 0),
+		ID:           id,
+		ContractType: alchemyToContractType(c.TokenType),
+		Provider:     AlchemyID,
+		Name:         c.Name,
+		ImageURL:     c.OpenSeaMetadata.ImageURL,
+		Traits:       make(map[string]thirdparty.CollectionTrait, 0),
 	}
 	return ret
 }
@@ -188,6 +200,7 @@ func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty
 
 	return thirdparty.CollectibleData{
 		ID:           id,
+		ContractType: alchemyToContractType(c.Contract.TokenType),
 		Provider:     AlchemyID,
 		Name:         c.Name,
 		Description:  c.Description,

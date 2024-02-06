@@ -104,12 +104,13 @@ type CollectionTrait struct {
 
 // Collection info
 type CollectionData struct {
-	ID           ContractID `json:"id"`
-	CommunityID  string     `json:"community_id"`
-	Provider     string     `json:"provider"`
-	Name         string     `json:"name"`
-	Slug         string     `json:"slug"`
-	ImageURL     string     `json:"image_url"`
+	ID           ContractID            `json:"id"`
+	ContractType w_common.ContractType `json:"contract_type"`
+	CommunityID  string                `json:"community_id"`
+	Provider     string                `json:"provider"`
+	Name         string                `json:"name"`
+	Slug         string                `json:"slug"`
+	ImageURL     string                `json:"image_url"`
 	ImagePayload []byte
 	Traits       map[string]CollectionTrait `json:"traits"`
 }
@@ -123,13 +124,14 @@ type CollectibleTrait struct {
 
 // Collectible info
 type CollectibleData struct {
-	ID                 CollectibleUniqueID `json:"id"`
-	CommunityID        string              `json:"community_id"`
-	Provider           string              `json:"provider"`
-	Name               string              `json:"name"`
-	Description        string              `json:"description"`
-	Permalink          string              `json:"permalink"`
-	ImageURL           string              `json:"image_url"`
+	ID                 CollectibleUniqueID   `json:"id"`
+	ContractType       w_common.ContractType `json:"contract_type"`
+	CommunityID        string                `json:"community_id"`
+	Provider           string                `json:"provider"`
+	Name               string                `json:"name"`
+	Description        string                `json:"description"`
+	Permalink          string                `json:"permalink"`
+	ImageURL           string                `json:"image_url"`
 	ImagePayload       []byte
 	AnimationURL       string             `json:"animation_url"`
 	AnimationMediaType string             `json:"animation_media_type"`

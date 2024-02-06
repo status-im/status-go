@@ -586,6 +586,7 @@ func (s *Service) FillCollectibleMetadata(collectible *thirdparty.FullCollectibl
 
 	imagePayload, _ := images.GetPayloadFromURI(tokenMetadata.GetImage())
 
+	collectible.CollectibleData.ContractType = w_common.ContractTypeERC721
 	collectible.CollectibleData.Provider = providerID
 	collectible.CollectibleData.Name = tokenMetadata.GetName()
 	collectible.CollectibleData.Description = tokenMetadata.GetDescription()
@@ -598,6 +599,7 @@ func (s *Service) FillCollectibleMetadata(collectible *thirdparty.FullCollectibl
 			CommunityID: communityID,
 		}
 	}
+	collectible.CollectionData.ContractType = w_common.ContractTypeERC721
 	collectible.CollectionData.Provider = providerID
 	collectible.CollectionData.Name = tokenMetadata.GetName()
 	collectible.CollectionData.ImagePayload = imagePayload

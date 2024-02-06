@@ -120,6 +120,11 @@ func setCollectionsData(creator sqlite.StatementCreator, collections []thirdpart
 			return err
 		}
 
+		err = upsertContractType(creator, c.ID, c.ContractType)
+		if err != nil {
+			return err
+		}
+
 		if allowUpdate {
 			err = upsertCollectionTraits(creator, c.ID, c.Traits)
 			if err != nil {
@@ -228,6 +233,13 @@ func (o *CollectionDataDB) GetData(ids []thirdparty.ContractID) (map[string]thir
 			if err != nil {
 				return nil, err
 			}
+
+			// Get contract type from different table
+			c.ContractType, err = readContractType(o.db, c.ID)
+			if err != nil {
+				return nil, err
+			}
+
 			ret[c.ID.HashKey()] = *c
 		}
 	}
