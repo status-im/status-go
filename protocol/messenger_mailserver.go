@@ -113,7 +113,7 @@ func (m *Messenger) performMailserverRequest(ms *mailservers.Mailserver, fn func
 	defer m.mailserverCycle.RUnlock()
 	var tries uint = 0
 	for tries < mailserverMaxTries {
-		if !m.isMailserverAvailable(ms.ID) {
+		if !m.communityStorenodes.IsCommunityStoreNode(ms.ID) && !m.isMailserverAvailable(ms.ID) {
 			return nil, errors.New("mailserver not available")
 		}
 		m.logger.Info("trying performing mailserver requests", zap.Uint("try", tries), zap.String("mailserverID", ms.ID))

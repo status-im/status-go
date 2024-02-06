@@ -11,7 +11,7 @@ import (
 func TestUpdateStorenodesInDB(t *testing.T) {
 	db, close := setupTestDB(t, communityID1, communityID2)
 	defer close()
-	csn := NewCommunityStorenodes(db)
+	csn := NewCommunityStorenodes(db, nil)
 	snodes1 := []Storenode{
 		{
 			CommunityID: communityID1,

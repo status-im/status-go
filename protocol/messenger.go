@@ -543,7 +543,7 @@ func NewMessenger(
 			availabilitySubscriptions: make([]chan struct{}, 0),
 		},
 		mailserversDatabase:  c.mailserversDatabase,
-		communityStorenodes:  storenodes.NewCommunityStorenodes(storenodes.NewDB(database)),
+		communityStorenodes:  storenodes.NewCommunityStorenodes(storenodes.NewDB(database), logger),
 		account:              c.account,
 		quit:                 make(chan struct{}),
 		ctx:                  ctx,

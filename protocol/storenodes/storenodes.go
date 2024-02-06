@@ -6,6 +6,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/mailservers"
+	"go.uber.org/zap"
 )
 
 var (
@@ -18,13 +19,18 @@ type CommunityStorenodes struct {
 	storenodesByCommunityID      map[string]storenodesData
 
 	storenodesDB *Database
+	logger       *zap.Logger
 }
 
-func NewCommunityStorenodes(storenodesDB *Database) *CommunityStorenodes {
+func NewCommunityStorenodes(storenodesDB *Database, logger *zap.Logger) *CommunityStorenodes {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 	return &CommunityStorenodes{
 		storenodesByCommunityIDMutex: &sync.RWMutex{},
 		storenodesByCommunityID:      make(map[string]storenodesData),
 		storenodesDB:                 storenodesDB,
+		logger:                       logger.With(zap.Namespace("CommunityStorenodes")),
 	}
 }
 
@@ -42,6 +48,20 @@ func (m *CommunityStorenodes) GetStorenodeByCommunnityID(communityID string) (ma
 		return mailservers.Mailserver{}, ErrNotFound
 	}
 	return toMailserver(msData.storenodes[0]), nil
+}
+
+func (m *CommunityStorenodes) IsCommunityStoreNode(ID string) bool {
+	m.storenodesByCommunityIDMutex.RLock()
+	defer m.storenodesByCommunityIDMutex.RUnlock()
+
+	for _, data := range m.storenodesByCommunityID {
+		for _, snode := range data.storenodes {
+			if snode.StorenodeID == ID {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (m *CommunityStorenodes) HasStorenodeSetup(communityID string) bool {
@@ -74,6 +94,7 @@ func (m *CommunityStorenodes) ReloadFromDB() error {
 		data.storenodes = append(data.storenodes, node)
 		m.storenodesByCommunityID[communityID] = data
 	}
+	m.logger.Debug("loaded communities storenodes", zap.Int("count", len(dbNodes)))
 	return nil
 }
 
