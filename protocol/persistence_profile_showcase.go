@@ -21,6 +21,7 @@ const selectProfileShowcaseCommunityPreferenceQuery = "SELECT community_id, visi
 const upsertProfileShowcaseAccountPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_accounts_preferences(address, name, color_id, emoji, visibility, sort_order) VALUES (?, ?, ?, ?, ?, ?)" // #nosec G101
 const selectProfileShowcaseAccountPreferenceQuery = "SELECT address, name, color_id, emoji, visibility, sort_order FROM profile_showcase_accounts_preferences"                                       // #nosec G101
 const selectSpecifiedShowcaseAccountPreferenceQuery = "SELECT address, name, color_id, emoji, visibility, sort_order FROM profile_showcase_accounts_preferences WHERE address = ?"                   // #nosec G101
+const deleteProfileShowcaseAccountPreferenceQuery = "DELETE FROM profile_showcase_accounts_preferences WHERE address = ?"                                                                            // #nosec G101
 
 const upsertProfileShowcaseCollectiblePreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_preferences(contract_address, chain_id, token_id, community_id, account_address, visibility, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)" // #nosec G101
 const selectProfileShowcaseCollectiblePreferenceQuery = "SELECT contract_address, chain_id, token_id, community_id, account_address, visibility, sort_order FROM profile_showcase_collectibles_preferences"                                          // #nosec G101
@@ -241,7 +242,7 @@ func (db sqlitePersistence) getProfileShowcaseAccountsPreferences(tx *sql.Tx) ([
 	return db.processProfileShowcaseAccountPreferences(rows)
 }
 
-func (db sqlitePersistence) GetProfileShowcaseAccountPreferences(accountAddress string) (*ProfileShowcaseAccountPreference, error) {
+func (db sqlitePersistence) GetProfileShowcaseAccountPreference(accountAddress string) (*ProfileShowcaseAccountPreference, error) {
 	rows, err := db.db.Query(selectSpecifiedShowcaseAccountPreferenceQuery, accountAddress)
 	if err != nil {
 		return nil, err
@@ -252,6 +253,12 @@ func (db sqlitePersistence) GetProfileShowcaseAccountPreferences(accountAddress 
 		return accounts[0], err
 	}
 	return nil, err
+}
+
+func (db sqlitePersistence) DeleteProfileShowcaseAccountPreference(accountAddress string) error {
+	_, err := db.db.Exec(deleteProfileShowcaseAccountPreferenceQuery, accountAddress)
+
+	return err
 }
 
 func (db sqlitePersistence) saveProfileShowcaseCollectiblePreference(tx *sql.Tx, collectible *ProfileShowcaseCollectiblePreference) error {

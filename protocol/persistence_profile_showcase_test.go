@@ -380,12 +380,13 @@ func (s *TestProfileShowcasePersistence) TestUpdateProfileShowcaseAccountOnWalle
 	s.Require().NoError(err)
 	persistence := newSQLitePersistence(db)
 
-	accountAddress := "0x3845354643324"
+	deleteAccountAddress := "0x3243344513424"
+	updateAccountAddress := "0x3845354643324"
 
 	preferences := &ProfileShowcasePreferences{
 		Accounts: []*ProfileShowcaseAccountPreference{
 			&ProfileShowcaseAccountPreference{
-				Address:            "0x32433445133424",
+				Address:            deleteAccountAddress,
 				Name:               "Status Account",
 				ColorID:            "blue",
 				Emoji:              "-_-",
@@ -393,7 +394,7 @@ func (s *TestProfileShowcasePersistence) TestUpdateProfileShowcaseAccountOnWalle
 				Order:              0,
 			},
 			&ProfileShowcaseAccountPreference{
-				Address:            accountAddress,
+				Address:            updateAccountAddress,
 				Name:               "Money Box",
 				ColorID:            "red",
 				Emoji:              ":o)",
@@ -406,7 +407,7 @@ func (s *TestProfileShowcasePersistence) TestUpdateProfileShowcaseAccountOnWalle
 	err = persistence.SaveProfileShowcasePreferences(preferences)
 	s.Require().NoError(err)
 
-	account, err := persistence.GetProfileShowcaseAccountPreferences(accountAddress)
+	account, err := persistence.GetProfileShowcaseAccountPreference(updateAccountAddress)
 	s.Require().NoError(err)
 	s.Require().NotNil(account)
 	s.Require().Equal(*account, *preferences.Accounts[1])
@@ -420,9 +421,12 @@ func (s *TestProfileShowcasePersistence) TestUpdateProfileShowcaseAccountOnWalle
 	err = persistence.SaveProfileShowcaseAccountPreference(account)
 	s.Require().NoError(err)
 
+	err = persistence.DeleteProfileShowcaseAccountPreference(deleteAccountAddress)
+	s.Require().NoError(err)
+
 	preferencesBack, err := persistence.GetProfileShowcasePreferences()
 	s.Require().NoError(err)
 
-	s.Require().Equal(*preferencesBack.Accounts[0], *preferences.Accounts[0])
-	s.Require().Equal(*preferencesBack.Accounts[1], *account)
+	s.Require().Len(preferencesBack.Accounts, 1)
+	s.Require().Equal(*preferencesBack.Accounts[0], *account)
 }

@@ -454,7 +454,7 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState
 }
 
 func (m *Messenger) UpdateProfileShowcaseWalletAccount(account *accounts.Account) error {
-	profileAccount, err := m.persistence.GetProfileShowcaseAccountPreferences(account.Address.Hex())
+	profileAccount, err := m.persistence.GetProfileShowcaseAccountPreference(account.Address.Hex())
 	if err != nil {
 		return err
 	}
@@ -469,6 +469,15 @@ func (m *Messenger) UpdateProfileShowcaseWalletAccount(account *accounts.Account
 	profileAccount.Emoji = account.Emoji
 
 	err = m.persistence.SaveProfileShowcaseAccountPreference(profileAccount)
+	if err != nil {
+		return err
+	}
+
+	return m.DispatchProfileShowcase()
+}
+
+func (m *Messenger) DeleteProfileShowcaseWalletAccount(account *accounts.Account) error {
+	err := m.persistence.DeleteProfileShowcaseAccountPreference(account.Address.Hex())
 	if err != nil {
 		return err
 	}
