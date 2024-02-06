@@ -28,7 +28,7 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 	arbitrumETHContractAddress := gethcommon.HexToAddress("0xB")
 	mainnetTMasterAddress := gethcommon.HexToAddress("0x123")
 	mainnetOwnerAddress := gethcommon.HexToAddress("0x1234")
-	mainnetTMaster_NoTokenIDsAddress := gethcommon.HexToAddress("0x456")
+	mainnetTMasterNoTokenIDsAddress := gethcommon.HexToAddress("0x456")
 
 	account1Address := gethcommon.HexToAddress("0x1")
 	account2Address := gethcommon.HexToAddress("0x2")
@@ -53,7 +53,7 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 	erc20Balances[mainnetID][account2Address] = make(map[gethcommon.Address]*hexutil.Big)
 	erc20Balances[mainnetID][account2Address][mainnetSNTContractAddress] = intToBig(120)
 	erc721Balances[mainnetID][account2Address] = make(thirdparty.TokenBalancesPerContractAddress)
-	erc721Balances[mainnetID][account2Address][mainnetTMaster_NoTokenIDsAddress] = []thirdparty.TokenBalance{
+	erc721Balances[mainnetID][account2Address][mainnetTMasterNoTokenIDsAddress] = []thirdparty.TokenBalance{
 		thirdparty.TokenBalance{
 			TokenID: uintToDecBig(1500),
 			Balance: uintToDecBig(3),
@@ -104,7 +104,7 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 						Symbol:            "TM_NO_TOKEN_IDS",
 						Name:              "TMaster-NoTokenIDs",
 						Amount:            "1",
-						ContractAddresses: map[uint64]string{mainnetID: mainnetTMaster_NoTokenIDsAddress.Hex()},
+						ContractAddresses: map[uint64]string{mainnetID: mainnetTMasterNoTokenIDsAddress.Hex()},
 					},
 				},
 			},
