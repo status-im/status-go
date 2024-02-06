@@ -4,9 +4,10 @@ import (
 	"errors"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/mailservers"
-	"go.uber.org/zap"
 )
 
 var (
