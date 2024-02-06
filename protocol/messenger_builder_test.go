@@ -25,7 +25,9 @@ type testMessengerConfig struct {
 	logger     *zap.Logger
 
 	unhandledMessagesTracker *unhandledMessagesTracker
-	extraOptions             []Option
+	messagesOrderController  *MessagesOrderController
+
+	extraOptions []Option
 }
 
 func (tmc *testMessengerConfig) complete() error {
@@ -97,6 +99,10 @@ func newTestMessenger(waku types.Waku, config testMessengerConfig) (*Messenger, 
 
 	if config.unhandledMessagesTracker != nil {
 		m.unhandledMessagesTracker = config.unhandledMessagesTracker.addMessage
+	}
+
+	if config.messagesOrderController != nil {
+		m.retrievedMessagesIteratorFactory = config.messagesOrderController.newMessagesIterator
 	}
 
 	err = m.Init()
