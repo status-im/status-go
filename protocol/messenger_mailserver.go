@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"sort"
@@ -684,7 +683,7 @@ func processMailserverBatch(
 	for _, t := range batch.Topics {
 		topicStrings = append(topicStrings, t.String())
 	}
-	logger = logger.With(zap.Any("chatIDs", batch.ChatIDs), zap.String("fromString", time.Unix(int64(batch.From), 0).Format(time.RFC3339)), zap.String("toString", time.Unix(int64(batch.To), 0).Format(time.RFC3339)), zap.Any("topic", topicStrings), zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(batch.To)), zap.String("mailserverID", "0x"+hex.EncodeToString(mailserverID)))
+	logger = logger.With(zap.Any("chatIDs", batch.ChatIDs), zap.String("fromString", time.Unix(int64(batch.From), 0).Format(time.RFC3339)), zap.String("toString", time.Unix(int64(batch.To), 0).Format(time.RFC3339)), zap.Any("topic", topicStrings), zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(batch.To)))
 	logger.Info("syncing topic")
 
 	wg := sync.WaitGroup{}
@@ -831,7 +830,8 @@ func (m *Messenger) processMailserverBatch(ms mailservers.Mailserver, batch Mail
 	if err != nil {
 		return err
 	}
-	return processMailserverBatch(m.ctx, m.transport, batch, mailserverID, m.logger, defaultStoreNodeRequestPageSize, nil, false)
+	logger := m.logger.With(zap.String("mailserverID", ms.ID))
+	return processMailserverBatch(m.ctx, m.transport, batch, mailserverID, logger, defaultStoreNodeRequestPageSize, nil, false)
 }
 
 func (m *Messenger) processMailserverBatchWithOptions(ms mailservers.Mailserver, batch MailserverBatch, pageLimit uint32, shouldProcessNextPage func(int) (bool, uint32), processEnvelopes bool) error {
@@ -843,8 +843,8 @@ func (m *Messenger) processMailserverBatchWithOptions(ms mailservers.Mailserver,
 	if err != nil {
 		return err
 	}
-
-	return processMailserverBatch(m.ctx, m.transport, batch, mailserverID, m.logger, pageLimit, shouldProcessNextPage, processEnvelopes)
+	logger := m.logger.With(zap.String("mailserverID", ms.ID))
+	return processMailserverBatch(m.ctx, m.transport, batch, mailserverID, logger, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 type MailserverBatch struct {
