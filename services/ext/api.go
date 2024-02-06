@@ -1511,6 +1511,7 @@ func (api *PublicAPI) GetCommunityTokens(communityID string) ([]*token.Community
 	return api.service.messenger.GetCommunityTokens(communityID)
 }
 
+// GetCommunityPermissionedBalances returns balances indexed by account address.
 func (api *PublicAPI) GetCommunityPermissionedBalances(request *requests.GetPermissionedBalances) (map[ethcommon.Address][]communities.PermissionedBalance, error) {
 	return api.service.messenger.GetCommunityPermissionedBalances(request)
 }
