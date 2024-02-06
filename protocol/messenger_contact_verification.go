@@ -451,6 +451,12 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.Verif
 		return nil, err
 	}
 
+	// Dispatch profile message to save a contact to the encrypted profile part
+	err = m.DispatchProfileShowcase()
+	if err != nil {
+		return nil, err
+	}
+
 	response := &MessengerResponse{}
 
 	notification.ContactVerificationStatus = verification.RequestStatusTRUSTED
@@ -554,6 +560,12 @@ func (m *Messenger) VerifiedUntrustworthy(ctx context.Context, request *requests
 
 	// We sync the contact with the other devices
 	err = m.syncContact(context.Background(), contact, m.dispatchMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	// Dispatch profile message to remove a contact from the encrypted profile part
+	err = m.DispatchProfileShowcase()
 	if err != nil {
 		return nil, err
 	}
@@ -709,6 +721,12 @@ func (m *Messenger) MarkAsUntrustworthy(ctx context.Context, contactID string) e
 
 func (m *Messenger) RemoveTrustStatus(ctx context.Context, contactID string) error {
 	err := m.verificationDatabase.SetTrustStatus(contactID, verification.TrustStatusUNKNOWN, m.getTimesource().GetCurrentTime())
+	if err != nil {
+		return err
+	}
+
+	// Dispatch profile message to remove a contact from the encrypted profile part
+	err = m.DispatchProfileShowcase()
 	if err != nil {
 		return err
 	}

@@ -1038,6 +1038,12 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 				return err
 			}
 			chat.UnviewedMessagesCount++
+
+			// Dispatch profile message to add a contact to the encrypted profile part
+			err = m.DispatchProfileShowcase()
+			if err != nil {
+				return err
+			}
 		}
 
 		state.Response.AddChat(chat)
@@ -1106,6 +1112,12 @@ func (m *Messenger) handleRetractContactRequest(state *ReceivedMessageState, con
 
 	timestamp := m.getTimesource().GetCurrentTime()
 	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeRemoved, clock, timestamp, false)
+	if err != nil {
+		return err
+	}
+
+	// Dispatch profile message to remove a contact from the encrypted profile part
+	err = m.DispatchProfileShowcase()
 	if err != nil {
 		return err
 	}
