@@ -24,12 +24,13 @@ func getSigner(chainID uint64, from types.Address, verifiedAccount *account.Sele
 }
 
 type TransactionBridge struct {
-	BridgeName       string
-	ChainID          uint64
-	TransferTx       *transactions.SendTxArgs
-	HopTx            *HopTxArgs
-	CbridgeTx        *CBridgeTxArgs
-	ERC721TransferTx *ERC721TransferTxArgs
+	BridgeName        string
+	ChainID           uint64
+	TransferTx        *transactions.SendTxArgs
+	HopTx             *HopTxArgs
+	CbridgeTx         *CBridgeTxArgs
+	ERC721TransferTx  *ERC721TransferTxArgs
+	ERC1155TransferTx *ERC1155TransferTxArgs
 }
 
 func (t *TransactionBridge) Value() *big.Int {
@@ -41,6 +42,8 @@ func (t *TransactionBridge) Value() *big.Int {
 		return t.CbridgeTx.Amount.ToInt()
 	} else if t.ERC721TransferTx != nil {
 		return big.NewInt(1)
+	} else if t.ERC1155TransferTx != nil {
+		return t.ERC1155TransferTx.Amount.ToInt()
 	}
 
 	return big.NewInt(0)
@@ -55,6 +58,8 @@ func (t *TransactionBridge) From() types.Address {
 		return t.CbridgeTx.From
 	} else if t.ERC721TransferTx != nil {
 		return t.ERC721TransferTx.From
+	} else if t.ERC1155TransferTx != nil {
+		return t.ERC1155TransferTx.From
 	}
 
 	return types.HexToAddress("0x0")
@@ -69,6 +74,8 @@ func (t *TransactionBridge) To() types.Address {
 		return types.Address(t.HopTx.Recipient)
 	} else if t.ERC721TransferTx != nil {
 		return types.Address(t.ERC721TransferTx.Recipient)
+	} else if t.ERC1155TransferTx != nil {
+		return types.Address(t.ERC1155TransferTx.Recipient)
 	}
 
 	return types.HexToAddress("0x0")
@@ -82,6 +89,8 @@ func (t *TransactionBridge) Data() types.HexBytes {
 	} else if t.CbridgeTx != nil {
 		return types.HexBytes("")
 	} else if t.ERC721TransferTx != nil {
+		return types.HexBytes("")
+	} else if t.ERC1155TransferTx != nil {
 		return types.HexBytes("")
 	}
 
