@@ -16,6 +16,8 @@ import (
 )
 
 func (s *ManagerSuite) Test_calculatePermissionedBalances() {
+	m, _, _ := s.setupManagerForTokenPermissions()
+
 	var mainnetID uint64 = 1
 	var arbitrumID uint64 = 42161
 	var gnosisID uint64 = 100
@@ -26,6 +28,7 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 	arbitrumETHContractAddress := gethcommon.HexToAddress("0xB")
 	mainnetTMasterAddress := gethcommon.HexToAddress("0x123")
 	mainnetOwnerAddress := gethcommon.HexToAddress("0x1234")
+	mainnetTMaster_NoTokenIDsAddress := gethcommon.HexToAddress("0x456")
 
 	account1Address := gethcommon.HexToAddress("0x1")
 	account2Address := gethcommon.HexToAddress("0x2")
@@ -50,6 +53,12 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 	erc20Balances[mainnetID][account2Address] = make(map[gethcommon.Address]*hexutil.Big)
 	erc20Balances[mainnetID][account2Address][mainnetSNTContractAddress] = intToBig(120)
 	erc721Balances[mainnetID][account2Address] = make(thirdparty.TokenBalancesPerContractAddress)
+	erc721Balances[mainnetID][account2Address][mainnetTMaster_NoTokenIDsAddress] = []thirdparty.TokenBalance{
+		thirdparty.TokenBalance{
+			TokenID: uintToDecBig(1500),
+			Balance: uintToDecBig(3),
+		},
+	}
 	erc721Balances[mainnetID][account2Address][mainnetTMasterAddress] = []thirdparty.TokenBalance{
 		thirdparty.TokenBalance{
 			TokenID: uintToDecBig(456),
@@ -85,6 +94,21 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 	erc20Balances[gnosisID][gethcommon.HexToAddress("0xF")][gethcommon.HexToAddress("0x99")] = intToBig(5)
 
 	tokenPermissions := []*CommunityTokenPermission{
+		&CommunityTokenPermission{
+			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				Type: protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER,
+				// A criteria without token IDs should be considered satisfied.
+				TokenCriteria: []*protobuf.TokenCriteria{
+					&protobuf.TokenCriteria{
+						Type:              protobuf.CommunityTokenType_ERC721,
+						Symbol:            "TM_NO_TOKEN_IDS",
+						Name:              "TMaster-NoTokenIDs",
+						Amount:            "1",
+						ContractAddresses: map[uint64]string{mainnetID: mainnetTMaster_NoTokenIDsAddress.Hex()},
+					},
+				},
+			},
+		},
 		&CommunityTokenPermission{
 			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
 				Type: protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER,
@@ -176,7 +200,7 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 		},
 	}
 
-	actual := calculatePermissionedBalances(
+	actual := m.calculatePermissionedBalances(
 		chainIDs,
 		accountAddresses,
 		erc20Balances,
@@ -208,6 +232,12 @@ func (s *ManagerSuite) Test_calculatePermissionedBalances() {
 			Name:     "Status",
 			Decimals: 16,
 			Amount:   &bigint.BigInt{Int: big.NewInt(120)},
+		},
+		PermissionedBalance{
+			Type:   protobuf.CommunityTokenType_ERC721,
+			Symbol: "TM_NO_TOKEN_IDS",
+			Name:   "TMaster-NoTokenIDs",
+			Amount: &bigint.BigInt{Int: big.NewInt(1)},
 		},
 		PermissionedBalance{
 			Type:   protobuf.CommunityTokenType_ERC721,

@@ -88,6 +88,11 @@ func calculatePermissionedBalancesERC20(
 }
 
 func isERC721CriteriaSatisfied(tokenBalances []thirdparty.TokenBalance, criteria *protobuf.TokenCriteria) bool {
+	// No token IDs to compare against, so the criteria is satisfied.
+	if len(criteria.TokenIds) == 0 {
+		return true
+	}
+
 	for _, tokenID := range criteria.TokenIds {
 		tokenIDBigInt := new(big.Int).SetUint64(tokenID)
 		for _, asset := range tokenBalances {
@@ -96,10 +101,11 @@ func isERC721CriteriaSatisfied(tokenBalances []thirdparty.TokenBalance, criteria
 			}
 		}
 	}
+
 	return false
 }
 
-func calculatePermissionedBalancesERC721(
+func (m *Manager) calculatePermissionedBalancesERC721(
 	accountAddresses []gethcommon.Address,
 	balances CollectiblesByChain,
 	tokenPermissions []*CommunityTokenPermission,
@@ -166,7 +172,7 @@ func calculatePermissionedBalancesERC721(
 	return res
 }
 
-func calculatePermissionedBalances(
+func (m *Manager) calculatePermissionedBalances(
 	chainIDs []uint64,
 	accountAddresses []gethcommon.Address,
 	erc20Balances BalancesByChain,
@@ -175,7 +181,7 @@ func calculatePermissionedBalances(
 ) map[gethcommon.Address][]PermissionedBalance {
 	res := make(map[gethcommon.Address][]PermissionedBalance, 0)
 
-	aggregatedERC721Balances := calculatePermissionedBalancesERC721(accountAddresses, erc721Balances, tokenPermissions)
+	aggregatedERC721Balances := m.calculatePermissionedBalancesERC721(accountAddresses, erc721Balances, tokenPermissions)
 	for accountAddress, tokens := range aggregatedERC721Balances {
 		for _, permissionedToken := range tokens {
 			if permissionedToken.Amount.Sign() > 0 {
@@ -274,5 +280,5 @@ func (m *Manager) GetPermissionedBalances(
 		erc721Balances = balances
 	}
 
-	return calculatePermissionedBalances(allChainIDs, accountAddresses, erc20Balances, erc721Balances, tokenPermissions), nil
+	return m.calculatePermissionedBalances(allChainIDs, accountAddresses, erc20Balances, erc721Balances, tokenPermissions), nil
 }
