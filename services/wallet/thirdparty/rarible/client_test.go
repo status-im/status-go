@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 
 	"github.com/stretchr/testify/assert"
@@ -18,10 +19,11 @@ func TestUnmarshallCollection(t *testing.T) {
 			ChainID: 1,
 			Address: common.HexToAddress("0x06012c8cf97bead5deae237070f9587f8e7a266d"),
 		},
-		Provider: "rarible",
-		Name:     "CryptoKitties",
-		ImageURL: "https://i.seadn.io/gae/C272ZRW1RGGef9vKMePFSCeKc1Lw6U40wl9ofNVxzUxFdj84hH9xJRQNf-7wgs7W8qw8RWe-1ybKp-VKuU5D-tg?w=500&auto=format",
-		Traits:   make(map[string]thirdparty.CollectionTrait),
+		ContractType: w_common.ContractTypeERC721,
+		Provider:     "rarible",
+		Name:         "CryptoKitties",
+		ImageURL:     "https://i.seadn.io/gae/C272ZRW1RGGef9vKMePFSCeKc1Lw6U40wl9ofNVxzUxFdj84hH9xJRQNf-7wgs7W8qw8RWe-1ybKp-VKuU5D-tg?w=500&auto=format",
+		Traits:       make(map[string]thirdparty.CollectionTrait),
 	}
 
 	collection := Collection{}
@@ -51,6 +53,7 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 						Int: expectedTokenID0,
 					},
 				},
+				ContractType: w_common.ContractTypeUnknown,
 				Provider:     "rarible",
 				Name:         "Rariversary #002",
 				Description:  "Today marks your Second Rariversary! Can you believe it’s already been two years? Time flies when you’re having fun! Thank you for everything you contribute!",
@@ -85,6 +88,7 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 						Int: expectedTokenID1,
 					},
 				},
+				ContractType: w_common.ContractTypeUnknown,
 				Provider:     "rarible",
 				Name:         "Rariversary #003",
 				Description:  "Today marks your Third Rariversary! Can you believe it’s already been three years? Time flies when you’re having fun! We’ve loved working with you these years and can’t wait to see what the next few years bring. Thank you for everything you contribute!",

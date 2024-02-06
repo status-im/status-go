@@ -2,6 +2,7 @@ package collectibles
 
 import (
 	"github.com/status-im/status-go/protocol/communities/token"
+	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
@@ -9,6 +10,7 @@ import (
 type Collectible struct {
 	DataType        CollectibleDataType            `json:"data_type"`
 	ID              thirdparty.CollectibleUniqueID `json:"id"`
+	ContractType    w_common.ContractType          `json:"contract_type"`
 	CollectibleData *CollectibleData               `json:"collectible_data,omitempty"`
 	CollectionData  *CollectionData                `json:"collection_data,omitempty"`
 	CommunityData   *CommunityData                 `json:"community_data,omitempty"`
@@ -58,10 +60,21 @@ func idsToCollectibles(ids []thirdparty.CollectibleUniqueID) []Collectible {
 	return res
 }
 
+func getContractType(c thirdparty.FullCollectibleData) w_common.ContractType {
+	if c.CollectibleData.ContractType != w_common.ContractTypeUnknown {
+		return c.CollectibleData.ContractType
+	}
+	if c.CollectionData != nil && c.CollectionData.ContractType != w_common.ContractTypeUnknown {
+		return c.CollectionData.ContractType
+	}
+	return w_common.ContractTypeUnknown
+}
+
 func fullCollectibleDataToHeader(c thirdparty.FullCollectibleData) Collectible {
 	ret := Collectible{
-		DataType: CollectibleDataTypeHeader,
-		ID:       c.CollectibleData.ID,
+		DataType:     CollectibleDataTypeHeader,
+		ID:           c.CollectibleData.ID,
+		ContractType: getContractType(c),
 		CollectibleData: &CollectibleData{
 			Name:               c.CollectibleData.Name,
 			ImageURL:           &c.CollectibleData.ImageURL,
@@ -98,8 +111,9 @@ func fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibleData) []Coll
 
 func fullCollectibleDataToDetails(c thirdparty.FullCollectibleData) Collectible {
 	ret := Collectible{
-		DataType: CollectibleDataTypeDetails,
-		ID:       c.CollectibleData.ID,
+		DataType:     CollectibleDataTypeDetails,
+		ID:           c.CollectibleData.ID,
+		ContractType: getContractType(c),
 		CollectibleData: &CollectibleData{
 			Name:               c.CollectibleData.Name,
 			Description:        &c.CollectibleData.Description,
@@ -150,7 +164,8 @@ func fullCollectiblesDataToCommunityHeader(data []thirdparty.FullCollectibleData
 		communityData := communityInfoToData(communityID, c.CommunityInfo, c.CollectibleCommunityInfo)
 
 		header := Collectible{
-			ID: collectibleID,
+			ID:           collectibleID,
+			ContractType: getContractType(c),
 			CollectibleData: &CollectibleData{
 				Name: c.CollectibleData.Name,
 			},

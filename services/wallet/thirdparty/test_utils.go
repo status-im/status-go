@@ -11,6 +11,13 @@ import (
 	w_common "github.com/status-im/status-go/services/wallet/common"
 )
 
+func generateContractType(seed int) w_common.ContractType {
+	if seed%2 == 0 {
+		return w_common.ContractTypeERC721
+	}
+	return w_common.ContractTypeERC1155
+}
+
 func GenerateTestCollectiblesData(count int) (result []CollectibleData) {
 	base := rand.Intn(100) // nolint: gosec
 
@@ -25,6 +32,7 @@ func GenerateTestCollectiblesData(count int) (result []CollectibleData) {
 				},
 				TokenID: &bigint.BigInt{Int: bigI},
 			},
+			ContractType:       generateContractType(i),
 			Provider:           fmt.Sprintf("provider-%d", i),
 			Name:               fmt.Sprintf("name-%d", i),
 			Description:        fmt.Sprintf("description-%d", i),
@@ -107,6 +115,7 @@ func GenerateTestCollectionsData(count int) (result []CollectionData) {
 				ChainID: w_common.ChainID(i),
 				Address: common.BigToAddress(bigI),
 			},
+			ContractType: generateContractType(i),
 			Provider:     fmt.Sprintf("provider-%d", i),
 			Name:         fmt.Sprintf("name-%d", i),
 			Slug:         fmt.Sprintf("slug-%d", i),
@@ -150,6 +159,9 @@ func GenerateTestFullCollectiblesData(count int) []FullCollectibleData {
 
 	ret := make([]FullCollectibleData, 0, count)
 	for i := 0; i < count; i++ {
+		// Ensure consistent ContracType
+		collectionsData[i].ContractType = collectiblesData[i].ContractType
+
 		ret = append(ret, FullCollectibleData{
 			CollectibleData:          collectiblesData[i],
 			CollectionData:           &collectionsData[i],

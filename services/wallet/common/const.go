@@ -20,6 +20,15 @@ const (
 	ArbitrumSepolia uint64 = 421614
 )
 
+type ContractType byte
+
+const (
+	ContractTypeUnknown ContractType = iota
+	ContractTypeERC20
+	ContractTypeERC721
+	ContractTypeERC1155
+)
+
 func (c ChainID) String() string {
 	return strconv.Itoa(int(c))
 }

@@ -54,6 +54,17 @@ func chainIDToChainString(chainID walletCommon.ChainID) string {
 	return chainString
 }
 
+func raribleToContractType(contractType string) walletCommon.ContractType {
+	switch contractType {
+	case "CRYPTO_PUNKS", "ERC721":
+		return walletCommon.ContractTypeERC721
+	case "ERC1155":
+		return walletCommon.ContractTypeERC1155
+	default:
+		return walletCommon.ContractTypeUnknown
+	}
+}
+
 func raribleContractIDToUniqueID(contractID string, isMainnet bool) (thirdparty.ContractID, error) {
 	ret := thirdparty.ContractID{}
 
@@ -147,10 +158,11 @@ func (st *AttributeValue) UnmarshalJSON(b []byte) error {
 }
 
 type Collection struct {
-	ID         string             `json:"id"`
-	Blockchain string             `json:"blockchain"`
-	Name       string             `json:"name"`
-	Metadata   CollectionMetadata `json:"meta"`
+	ID           string             `json:"id"`
+	Blockchain   string             `json:"blockchain"`
+	ContractType string             `json:"type"`
+	Name         string             `json:"name"`
+	Metadata     CollectionMetadata `json:"meta"`
 }
 
 type CollectionMetadata struct {
@@ -237,12 +249,13 @@ func raribleToCollectiblesData(l []Collectible, isMainnet bool) []thirdparty.Ful
 
 func (c *Collection) toCommon(id thirdparty.ContractID) thirdparty.CollectionData {
 	ret := thirdparty.CollectionData{
-		ID:       id,
-		Provider: RaribleID,
-		Name:     c.Metadata.Name,
-		Slug:     "", /* Missing from the API for now */
-		ImageURL: getImageURL(c.Metadata.Contents),
-		Traits:   make(map[string]thirdparty.CollectionTrait, 0), /* Missing from the API for now */
+		ID:           id,
+		ContractType: raribleToContractType(c.ContractType),
+		Provider:     RaribleID,
+		Name:         c.Metadata.Name,
+		Slug:         "", /* Missing from the API for now */
+		ImageURL:     getImageURL(c.Metadata.Contents),
+		Traits:       make(map[string]thirdparty.CollectionTrait, 0), /* Missing from the API for now */
 	}
 	return ret
 }
@@ -326,6 +339,7 @@ func (c *Collectible) toCollectibleData(id thirdparty.CollectibleUniqueID) third
 
 	return thirdparty.CollectibleData{
 		ID:           id,
+		ContractType: walletCommon.ContractTypeUnknown, // Rarible doesn't provide the contract type with the collectible
 		Provider:     RaribleID,
 		Name:         c.Metadata.Name,
 		Description:  c.Metadata.Description,
