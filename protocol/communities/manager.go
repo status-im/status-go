@@ -2636,6 +2636,7 @@ func (c *CheckPermissionsResponse) calculateSatisfied() {
 		}
 		if satisfied {
 			c.Satisfied = true
+			return
 		}
 	}
 }
