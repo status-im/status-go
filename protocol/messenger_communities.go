@@ -48,7 +48,7 @@ var messageArchiveInterval = 7 * 24 * time.Hour
 // 1 day interval
 var updateActiveMembersInterval = 24 * time.Hour
 
-const discordTimestampLayout = "2006-01-02T15:04:05+00:00"
+const discordTimestampLayout = time.RFC3339
 
 const (
 	importSlowRate          = time.Second / 1

@@ -662,6 +662,13 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			messagesToSave, pinMessagesToSave, authorProfilesToSave, messageAttachmentsToDownload :=
 				m.processDiscordMessages(channel, newChat, importProgress, progressUpdates, request.From, community)
 
+			// If either there were no messages in the channel or something happened and all the messages errored, we
+			// we still up the percent to 100%
+			if len(messagesToSave) == 0 {
+				importProgress.UpdateTaskProgress(discord.ImportMessagesTask, 1.0)
+				progressUpdates <- importProgress
+			}
+
 			var discordMessages []*protobuf.DiscordMessage
 			for _, msg := range messagesToSave {
 				if msg.ChatMessage.ContentType == protobuf.ChatMessage_DISCORD_MESSAGE {
@@ -994,6 +1001,12 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			return
 		}
 
+		// Make sure all progress tasks are at 100%, in case one of the steps had errors
+		// The front-end doesn't understand that the import is done until all tasks are at 100%
+		importProgress.UpdateTaskProgress(discord.CommunityCreationTask, float32(1.0))
+		importProgress.UpdateTaskProgress(discord.ChannelsCreationTask, float32(1.0))
+		importProgress.UpdateTaskProgress(discord.ImportMessagesTask, float32(1.0))
+		importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, float32(1.0))
 		importProgress.UpdateTaskProgress(discord.InitCommunityTask, float32(1.0))
 
 		m.config.messengerSignalsHandler.DiscordChannelImportFinished(request.CommunityID.String(), newChat.ID)
