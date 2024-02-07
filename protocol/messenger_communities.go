@@ -1816,6 +1816,11 @@ func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerRespon
 		}
 	}
 
+	err = m.DeleteProfileShowcaseCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
 	_, err = m.transport.RemoveFilterByChatID(communityID.String())
 	if err != nil {
 		return nil, err
@@ -1829,6 +1834,11 @@ func (m *Messenger) kickedOutOfCommunity(communityID types.HexBytes) (*Messenger
 	response := &MessengerResponse{}
 
 	community, err := m.communitiesManager.KickedOutOfCommunity(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.DeleteProfileShowcaseCommunity(community)
 	if err != nil {
 		return nil, err
 	}

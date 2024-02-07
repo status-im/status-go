@@ -10,6 +10,7 @@ import (
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -477,10 +478,25 @@ func (m *Messenger) UpdateProfileShowcaseWalletAccount(account *accounts.Account
 }
 
 func (m *Messenger) DeleteProfileShowcaseWalletAccount(account *accounts.Account) error {
-	err := m.persistence.DeleteProfileShowcaseAccountPreference(account.Address.Hex())
+	deleted, err := m.persistence.DeleteProfileShowcaseAccountPreference(account.Address.Hex())
 	if err != nil {
 		return err
 	}
 
-	return m.DispatchProfileShowcase()
+	if deleted {
+		return m.DispatchProfileShowcase()
+	}
+	return nil
+}
+
+func (m *Messenger) DeleteProfileShowcaseCommunity(community *communities.Community) error {
+	deleted, err := m.persistence.DeleteProfileShowcaseCommunityPreference(community.IDString())
+	if err != nil {
+		return err
+	}
+
+	if deleted {
+		return m.DispatchProfileShowcase()
+	}
+	return nil
 }
