@@ -310,7 +310,8 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.ensUsernameDetails) == 0 &&
 		r.currentStatus == nil &&
 		r.activityCenterState == nil &&
-		r.SocialLinksInfo == nil
+		r.SocialLinksInfo == nil &&
+		r.CustomizationColor == ""
 }
 
 // Merge takes another response and appends the new Chats & new Messages and replaces
