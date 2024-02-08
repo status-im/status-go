@@ -39,7 +39,7 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 
 		hasPermission := community.IsPrivilegedMember(&m.identity.PublicKey)
 		pinMessageAllowed := community.AllowsAllMembersToPinMessage()
-		canPost, err := community.CanPost(&m.identity.PublicKey, chat.CommunityChatID(), nil)
+		canPost, err := community.CanPost(&m.identity.PublicKey, chat.CommunityChatID())
 		if err != nil {
 			return nil, err
 		}

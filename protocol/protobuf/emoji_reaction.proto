@@ -36,5 +36,5 @@ message EmojiReaction {
   bool retracted = 6;
 
   // Grant for organisation chat messages
-  bytes grant = 7;
+  bytes grant = 7 [deprecated = true];
 }

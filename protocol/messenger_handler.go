@@ -2707,7 +2707,7 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity) (*Chat, error)
 			return nil, errors.New("not an community chat")
 		}
 
-		canPost, err := m.communitiesManager.CanPost(chatEntity.GetSigPubKey(), chat.CommunityID, chat.CommunityChatID(), chatEntity.GetGrant())
+		canPost, err := m.communitiesManager.CanPost(chatEntity.GetSigPubKey(), chat.CommunityID, chat.CommunityChatID())
 		if err != nil {
 			return nil, err
 		}

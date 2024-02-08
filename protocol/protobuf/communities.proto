@@ -10,6 +10,7 @@ package protobuf;
 message Grant {
   bytes community_id = 1;
   bytes member_id = 2;
+  string chat_id = 3;
   uint64 clock = 4;
 }
 
