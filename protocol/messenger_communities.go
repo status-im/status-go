@@ -479,7 +479,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 								m.AddActivityCenterNotificationToResponse(communityResponse.Community.IDString(), ActivityCenterNotificationTypeShareAccounts, response)
 							}
 						} else {
-							state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
+							state.Response.AddRequestToJoinCommunity(requestToJoin)
 						}
 					}
 
@@ -1201,7 +1201,8 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		}
 	}
 
-	response := &MessengerResponse{RequestsToJoinCommunity: []*communities.RequestToJoin{requestToJoin}}
+	response := &MessengerResponse{}
+	response.AddRequestToJoinCommunity(requestToJoin)
 	response.AddCommunity(community)
 
 	// We send a push notification in the background
@@ -1509,7 +1510,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
-	response.RequestsToJoinCommunity = append(response.RequestsToJoinCommunity, requestToJoin)
+	response.AddRequestToJoinCommunity(requestToJoin)
 
 	// delete activity center notification
 	notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoin.ID)

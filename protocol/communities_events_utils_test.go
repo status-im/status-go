@@ -1060,15 +1060,15 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	response, err := user.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	sentRequest := response.RequestsToJoinCommunity[0]
+	sentRequest := response.RequestsToJoinCommunity()[0]
 
 	checkRequestToJoin := func(r *MessengerResponse) bool {
-		if len(r.RequestsToJoinCommunity) == 0 {
+		if len(r.RequestsToJoinCommunity()) == 0 {
 			return false
 		}
-		for _, request := range r.RequestsToJoinCommunity {
+		for _, request := range r.RequestsToJoinCommunity() {
 			if request.ENSName == requestToJoin.ENSName {
 				return true
 			}
@@ -1082,7 +1082,7 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	// control node receives request to join
 	_, err = WaitOnMessengerResponse(
@@ -1176,14 +1176,14 @@ func testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 	response, err := user.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	sentRequest := response.RequestsToJoinCommunity[0]
+	sentRequest := response.RequestsToJoinCommunity()[0]
 
 	// event sender receives request to join
 	_, err = WaitOnMessengerResponse(
 		base.GetEventSender(),
-		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity()) > 0 },
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
@@ -1191,7 +1191,7 @@ func testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 	// event sender 2 receives request to join
 	_, err = WaitOnMessengerResponse(
 		additionalEventSender,
-		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity()) > 0 },
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
@@ -1248,27 +1248,27 @@ func testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 	response, err := user.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	sentRequest := response.RequestsToJoinCommunity[0]
+	sentRequest := response.RequestsToJoinCommunity()[0]
 
 	// event sender receives request to join
 	response, err = WaitOnMessengerResponse(
 		base.GetEventSender(),
-		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity()) > 0 },
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	// event sender 2 receives request to join
 	response, err = WaitOnMessengerResponse(
 		additionalEventSender,
-		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity()) > 0 },
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	rejectRequestToJoin := &requests.DeclineRequestToJoinCommunity{ID: sentRequest.ID}
 	response, err = base.GetEventSender().DeclineRequestToJoinCommunity(rejectRequestToJoin)
@@ -1321,27 +1321,27 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	response, err := user.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	sentRequest := response.RequestsToJoinCommunity[0]
+	sentRequest := response.RequestsToJoinCommunity()[0]
 
 	// event sender receives request to join
 	response, err = WaitOnMessengerResponse(
 		base.GetEventSender(),
-		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity()) > 0 },
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	// control node receives request to join
 	response, err = WaitOnMessengerResponse(
 		base.GetControlNode(),
-		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity()) > 0 },
 		"control node did not receive community request to join",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	// event sender has not accepted request yet
 	eventSenderCommunity, err := base.GetEventSender().GetCommunityByID(community.ID())
@@ -1420,14 +1420,14 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 	response, err := user.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	sentRequest := response.RequestsToJoinCommunity[0]
+	sentRequest := response.RequestsToJoinCommunity()[0]
 
 	// event sender receives request to join
 	_, err = WaitOnMessengerResponse(
 		base.GetEventSender(),
-		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity()) > 0 },
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
@@ -1435,7 +1435,7 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 	// event sender 2 receives request to join
 	_, err = WaitOnMessengerResponse(
 		additionalEventSender,
-		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity()) > 0 },
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
@@ -1443,7 +1443,7 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 	// control node receives request to join
 	_, err = WaitOnMessengerResponse(
 		base.GetControlNode(),
-		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity()) > 0 },
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
@@ -1461,7 +1461,7 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 	// control node receives event sender 1's and 2's decision
 	_, err = WaitOnMessengerResponse(
 		base.GetControlNode(),
-		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity()) > 0 },
 		"control node did not receive event senders decision",
 	)
 	s.Require().NoError(err)
@@ -2231,15 +2231,15 @@ func testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(base CommunityEven
 	response, err := user.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	sentRequest := response.RequestsToJoinCommunity[0]
+	sentRequest := response.RequestsToJoinCommunity()[0]
 
 	checkRequestToJoin := func(r *MessengerResponse) bool {
-		if len(r.RequestsToJoinCommunity) == 0 {
+		if len(r.RequestsToJoinCommunity()) == 0 {
 			return false
 		}
-		for _, request := range r.RequestsToJoinCommunity {
+		for _, request := range r.RequestsToJoinCommunity() {
 			if request.ENSName == requestToJoin.ENSName {
 				return true
 			}
@@ -2253,7 +2253,7 @@ func testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(base CommunityEven
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	// control node receives request to join
 	_, err = WaitOnMessengerResponse(
@@ -2361,7 +2361,7 @@ func testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(base CommunityEven
 	response, err = user.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	// event sender receives request to join
 	response, err = WaitOnMessengerResponse(
@@ -2370,7 +2370,7 @@ func testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(base CommunityEven
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	// control node receives request to join
 	_, err = WaitOnMessengerResponse(

@@ -947,9 +947,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	response, err = alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	requestToJoin1 := response.RequestsToJoinCommunity[0]
+	requestToJoin1 := response.RequestsToJoinCommunity()[0]
 	s.Require().NotNil(requestToJoin1)
 	s.Require().Equal(community.ID(), requestToJoin1.CommunityID)
 	s.Require().True(requestToJoin1.Our)
