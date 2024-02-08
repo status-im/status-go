@@ -57,6 +57,7 @@ type MessengerSignalsHandler interface {
 	DiscordCommunityImportProgress(importProgress *discord.ImportProgress)
 	DiscordCommunityImportFinished(communityID string)
 	DiscordCommunityImportCancelled(communityID string)
+	DiscordCommunityImportCleanedUp(communityID string)
 	DiscordChannelImportProgress(importProgress *discord.ImportProgress)
 	DiscordChannelImportFinished(communityID string, channelID string)
 	DiscordChannelImportCancelled(channelID string)
