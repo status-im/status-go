@@ -4,7 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
+	eth "github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/services/wallet/transfer"
 )
 
@@ -13,8 +14,8 @@ func TestFindUpdates(t *testing.T) {
 	txIds := []transfer.TransactionIdentity{
 		transfer.TransactionIdentity{
 			ChainID: 1,
-			Hash:    common.HexToHash("0x1234"),
-			Address: common.HexToAddress("0x1234"),
+			Hash:    eth.HexToHash("0x1234"),
+			Address: eth.HexToAddress("0x1234"),
 		},
 	}
 

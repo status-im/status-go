@@ -53,7 +53,7 @@ type Session struct {
 
 	// model is a mirror of the data model presentation has (sent by EventActivityFilteringDone)
 	model []EntryIdentity
-	// new holds the new entries until user requests update
+	// new holds the new entries until user requests update by calling ResetFilterSession
 	new []EntryIdentity
 }
 
@@ -72,7 +72,7 @@ type fullFilterParams struct {
 	filter       Filter
 }
 
-func (s *Service) internalFilter(f fullFilterParams, offset int, count int, processResults func(entries []Entry)) {
+func (s *Service) internalFilter(f fullFilterParams, offset int, count int, processResults func(entries []Entry) (offsetOverride int)) {
 	s.scheduler.Enqueue(int32(f.sessionID), filterTask, func(ctx context.Context) (interface{}, error) {
 		activities, err := getActivityEntries(ctx, s.getDeps(), f.addresses, f.allAddresses, f.chainIDs, f.filter, offset, count)
 		return activities, err
@@ -86,11 +86,10 @@ func (s *Service) internalFilter(f fullFilterParams, offset int, count int, proc
 		} else if err == nil {
 			activities := result.([]Entry)
 			res.Activities = activities
-			res.Offset = 0
 			res.HasMore = len(activities) == count
 			res.ErrorCode = ErrorCodeSuccess
 
-			processResults(activities)
+			res.Offset = processResults(activities)
 		}
 
 		int32SessionID := int32(f.sessionID)
@@ -132,26 +131,32 @@ func (s *Service) StartFilterSession(addresses []eth.Address, allAddresses bool,
 	}
 	s.sessionsRWMutex.Unlock()
 
-	s.internalFilter(fullFilterParams{
-		sessionID:    sessionID,
-		addresses:    addresses,
-		allAddresses: allAddresses,
-		chainIDs:     chainIDs,
-		filter:       filter,
-	}, 0, firstPageCount, func(entries []Entry) {
-		// Mirror identities for update use
-		s.sessionsRWMutex.Lock()
-		defer s.sessionsRWMutex.Unlock()
+	s.internalFilter(
+		fullFilterParams{
+			sessionID:    sessionID,
+			addresses:    addresses,
+			allAddresses: allAddresses,
+			chainIDs:     chainIDs,
+			filter:       filter,
+		},
+		0,
+		firstPageCount,
+		func(entries []Entry) (offset int) {
+			// Mirror identities for update use
+			s.sessionsRWMutex.Lock()
+			defer s.sessionsRWMutex.Unlock()
 
-		session.model = make([]EntryIdentity, 0, len(entries))
-		for _, a := range entries {
-			session.model = append(session.model, EntryIdentity{
-				payloadType: a.payloadType,
-				transaction: a.transaction,
-				id:          a.id,
-			})
-		}
-	})
+			session.model = make([]EntryIdentity, 0, len(entries))
+			for _, a := range entries {
+				session.model = append(session.model, EntryIdentity{
+					payloadType: a.payloadType,
+					transaction: a.transaction,
+					id:          a.id,
+				})
+			}
+			return 0
+		},
+	)
 
 	return sessionID
 }
@@ -162,39 +167,79 @@ func (s *Service) ResetFilterSession(id SessionID, firstPageCount int) error {
 		return errors.New("session not found")
 	}
 
-	s.internalFilter(fullFilterParams{
-		sessionID:    id,
-		addresses:    session.addresses,
-		allAddresses: session.allAddresses,
-		chainIDs:     session.chainIDs,
-		filter:       session.filter,
-	}, 0, firstPageCount, func(entries []Entry) {
-		s.sessionsRWMutex.Lock()
-		defer s.sessionsRWMutex.Unlock()
+	s.internalFilter(
+		fullFilterParams{
+			sessionID:    id,
+			addresses:    session.addresses,
+			allAddresses: session.allAddresses,
+			chainIDs:     session.chainIDs,
+			filter:       session.filter,
+		},
+		0,
+		firstPageCount,
+		func(entries []Entry) (offset int) {
+			s.sessionsRWMutex.Lock()
+			defer s.sessionsRWMutex.Unlock()
 
-		// Mark new entries
-		newMap := entryIdsToMap(session.new)
-		for i, a := range entries {
-			_, isNew := newMap[a.getIdentity().key()]
-			entries[i].isNew = isNew
-		}
-		session.new = nil
+			// Mark new entries
+			newMap := entryIdsToMap(session.new)
+			for i, a := range entries {
+				_, isNew := newMap[a.getIdentity().key()]
+				entries[i].isNew = isNew
+			}
+			session.new = nil
 
-		// Mirror client identities for checking updates
-		session.model = make([]EntryIdentity, 0, len(entries))
-		for _, a := range entries {
-			session.model = append(session.model, EntryIdentity{
-				payloadType: a.payloadType,
-				transaction: a.transaction,
-				id:          a.id,
-			})
-		}
-	})
+			// Mirror client identities for checking updates
+			session.model = make([]EntryIdentity, 0, len(entries))
+			for _, a := range entries {
+				session.model = append(session.model, EntryIdentity{
+					payloadType: a.payloadType,
+					transaction: a.transaction,
+					id:          a.id,
+				})
+			}
+			return 0
+		},
+	)
 	return nil
 }
 
-// TODO #12120: extend the session based API
-//func (s *Service) GetMoreForFilterSession(count int) {}
+func (s *Service) GetMoreForFilterSession(id SessionID, pageCount int) error {
+	session, found := s.sessions[id]
+	if !found {
+		return errors.New("session not found")
+	}
+
+	prevModelLen := len(session.model)
+	s.internalFilter(
+		fullFilterParams{
+			sessionID:    id,
+			addresses:    session.addresses,
+			allAddresses: session.allAddresses,
+			chainIDs:     session.chainIDs,
+			filter:       session.filter,
+		},
+		prevModelLen+len(session.new),
+		pageCount,
+		func(entries []Entry) (offset int) {
+			s.sessionsRWMutex.Lock()
+			defer s.sessionsRWMutex.Unlock()
+
+			// Mirror client identities for checking updates
+			for _, a := range entries {
+				session.model = append(session.model, EntryIdentity{
+					payloadType: a.payloadType,
+					transaction: a.transaction,
+					id:          a.id,
+				})
+			}
+
+			// Overwrite the offset to account for new entries
+			return prevModelLen
+		},
+	)
+	return nil
+}
 
 // subscribeToEvents should be called with sessionsRWMutex locked for writing
 func (s *Service) subscribeToEvents() {
@@ -202,34 +247,6 @@ func (s *Service) subscribeToEvents() {
 	s.subscriptions = s.eventFeed.Subscribe(s.ch)
 	go s.processEvents()
 }
-
-// func (s *Service) processEvents() {
-// 	for event := range s.ch {
-// 		if event.Type == transactions.EventPendingTransactionUpdate {
-// 			var p transactions.PendingTxUpdatePayload
-// 			err := json.Unmarshal([]byte(event.Message), &p)
-// 			if err != nil {
-// 				log.Error("Error unmarshalling PendingTxUpdatePayload", "error", err)
-// 				continue
-// 			}
-
-// 			for id := range s.sessions {
-// 				s.sessionsRWMutex.RLock()
-// 				pTx, pass := s.checkFilterForPending(s.sessions[id], p.TxIdentity)
-// 				if pass {
-// 					s.sessionsRWMutex.RUnlock()
-// 					s.sessionsRWMutex.Lock()
-// 					addOnTop(s.sessions[id], p.TxIdentity)
-// 					s.sessionsRWMutex.Unlock()
-// 					// TODO #12120: can't send events from an event handler
-// 					go notify(s.eventFeed, id, *pTx)
-// 				} else {
-// 					s.sessionsRWMutex.RUnlock()
-// 				}
-// 			}
-// 		}
-// 	}
-// }
 
 // TODO #12120: check that it exits on channel close
 func (s *Service) processEvents() {
@@ -276,60 +293,6 @@ func (s *Service) processEvents() {
 	}
 }
 
-// // checkFilterForPending should be called with sessionsRWMutex locked for reading
-// func (s *Service) checkFilterForPending(session *Session, id transactions.TxIdentity) (tr *transactions.PendingTransaction, pass bool) {
-// 	allChains := len(session.chainIDs) == 0
-// 	if !allChains {
-// 		_, found := slices.BinarySearch(session.chainIDs, id.ChainID)
-// 		if !found {
-// 			return nil, false
-// 		}
-// 	}
-
-// 	tr, err := s.pendingTracker.GetPendingEntry(id.ChainID, id.Hash)
-// 	if err != nil {
-// 		log.Error("Error getting pending entry", "error", err)
-// 		return nil, false
-// 	}
-
-// 	if !session.allAddresses {
-// 		_, found := slices.BinarySearchFunc(session.addresses, tr.From, func(a eth.Address, b eth.Address) int {
-// 			// TODO #12120: optimize this
-// 			if a.Hex() < b.Hex() {
-// 				return -1
-// 			}
-// 			if a.Hex() > b.Hex() {
-// 				return 1
-// 			}
-// 			return 0
-// 		})
-// 		if !found {
-// 			return nil, false
-// 		}
-// 	}
-
-// 	fl := session.filter
-// 	if fl.Period.StartTimestamp != NoLimitTimestampForPeriod || fl.Period.EndTimestamp != NoLimitTimestampForPeriod {
-// 		ts := int64(tr.Timestamp)
-// 		if ts < fl.Period.StartTimestamp || ts > fl.Period.EndTimestamp {
-// 			return nil, false
-// 		}
-// 	}
-
-// 	// TODO #12120 check filter
-// 	// Types                 []Type        `json:"types"`
-// 	// Statuses              []Status      `json:"statuses"`
-// 	// CounterpartyAddresses []eth.Address `json:"counterpartyAddresses"`
-
-// 	// // Tokens
-// 	// Assets                []Token `json:"assets"`
-// 	// Collectibles          []Token `json:"collectibles"`
-// 	// FilterOutAssets       bool    `json:"filterOutAssets"`
-// 	// FilterOutCollectibles bool    `json:"filterOutCollectibles"`
-
-// 	return tr, true
-// }
-
 func notify(eventFeed *event.Feed, id SessionID, hasNewEntries bool) {
 	payload := SessionUpdate{}
 	if hasNewEntries {
@@ -356,9 +319,7 @@ func (s *Service) StopFilterSession(id SessionID) {
 	// Cancel any pending or ongoing task
 	s.scheduler.Enqueue(int32(id), filterTask, func(ctx context.Context) (interface{}, error) {
 		return nil, nil
-	}, func(result interface{}, taskType async.TaskType, err error) {
-		// Ignore result
-	})
+	}, func(result interface{}, taskType async.TaskType, err error) {})
 }
 
 func (s *Service) getActivityDetailsAsync(requestID int32, entries []Entry) {
