@@ -307,7 +307,27 @@ func validateSessionUpdateEvent(t *testing.T, ch chan walletevent.Event, filterR
 	return
 }
 
-func validateSessionUpdateEventWithPending(t *testing.T, ch chan walletevent.Event) (filterResponseCount int) {
+type extraExpect struct {
+	offset    *int
+	errorCode *ErrorCode
+}
+
+func getOptionalExpectations(e *extraExpect) (expectOffset int, expectErrorCode ErrorCode) {
+	expectOffset = 0
+	expectErrorCode = ErrorCodeSuccess
+
+	if e != nil {
+		if e.offset != nil {
+			expectOffset = *e.offset
+		}
+		if e.errorCode != nil {
+			expectErrorCode = *e.errorCode
+		}
+	}
+	return
+}
+
+func validateFilteringDone(t *testing.T, ch chan walletevent.Event, resCount int, checkPayloadFn func(payload FilterResponse), extra *extraExpect) (filterResponseCount int) {
 	for filterResponseCount < 1 {
 		select {
 		case res := <-ch:
@@ -316,9 +336,18 @@ func validateSessionUpdateEventWithPending(t *testing.T, ch chan walletevent.Eve
 				var payload FilterResponse
 				err := json.Unmarshal([]byte(res.Message), &payload)
 				require.NoError(t, err)
-				require.Equal(t, ErrorCodeSuccess, payload.ErrorCode)
-				require.Equal(t, 2, len(payload.Activities))
+
+				expectOffset, expectErrorCode := getOptionalExpectations(extra)
+
+				require.Equal(t, expectErrorCode, payload.ErrorCode)
+				require.Equal(t, resCount, len(payload.Activities))
+
+				require.Equal(t, expectOffset, payload.Offset)
 				filterResponseCount++
+
+				if checkPayloadFn != nil {
+					checkPayloadFn(payload)
+				}
 			}
 		case <-time.NewTimer(1 * time.Second).C:
 			require.Fail(t, "timeout while waiting for EventActivityFilteringDone")
@@ -331,14 +360,15 @@ func TestService_IncrementalUpdateOnTop(t *testing.T) {
 	state := setupTestService(t)
 	defer state.close()
 
-	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, 2, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: 3}})
+	transactionCount := 2
+	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
 	defer cleanup()
 
 	sessionID := state.service.StartFilterSession(allAddresses, true, allNetworksFilter(), Filter{}, 5)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 
-	filterResponseCount := validateSessionUpdateEventWithPending(t, ch)
+	filterResponseCount := validateFilteringDone(t, ch, 2, nil, nil)
 
 	exp := pendings[0]
 	err := state.pendingTracker.StoreAndTrackPendingTx(&exp)
@@ -350,52 +380,43 @@ func TestService_IncrementalUpdateOnTop(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate the reset data
-	eventActivityDoneCount := 0
-	for eventActivityDoneCount < 1 {
-		select {
-		case res := <-ch:
-			switch res.Type {
-			case EventActivityFilteringDone:
-				var payload FilterResponse
-				err := json.Unmarshal([]byte(res.Message), &payload)
-				require.NoError(t, err)
-				require.Equal(t, ErrorCodeSuccess, payload.ErrorCode)
-				require.Equal(t, 3, len(payload.Activities))
+	eventActivityDoneCount := validateFilteringDone(t, ch, 3, func(payload FilterResponse) {
+		require.True(t, payload.Activities[0].isNew)
+		require.False(t, payload.Activities[1].isNew)
+		require.False(t, payload.Activities[2].isNew)
 
-				require.True(t, payload.Activities[0].isNew)
-				require.False(t, payload.Activities[1].isNew)
-				require.False(t, payload.Activities[2].isNew)
+		// Check the new transaction data
+		newTx := payload.Activities[0]
+		require.Equal(t, PendingTransactionPT, newTx.payloadType)
+		// We don't keep type in the DB
+		require.Equal(t, (*int)(nil), newTx.transferType)
+		require.Equal(t, SendAT, newTx.activityType)
+		require.Equal(t, PendingAS, newTx.activityStatus)
+		require.Equal(t, exp.ChainID, newTx.transaction.ChainID)
+		require.Equal(t, exp.ChainID, *newTx.chainIDOut)
+		require.Equal(t, (*common.ChainID)(nil), newTx.chainIDIn)
+		require.Equal(t, exp.Hash, newTx.transaction.Hash)
+		// Pending doesn't have address as part of identity
+		require.Equal(t, eth.Address{}, newTx.transaction.Address)
+		require.Equal(t, exp.From, *newTx.sender)
+		require.Equal(t, exp.To, *newTx.recipient)
+		require.Equal(t, 0, exp.Value.Int.Cmp((*big.Int)(newTx.amountOut)))
+		require.Equal(t, exp.Timestamp, uint64(newTx.timestamp))
+		require.Equal(t, exp.Symbol, *newTx.symbolOut)
+		require.Equal(t, (*string)(nil), newTx.symbolIn)
+		require.Equal(t, &Token{
+			TokenType: Native,
+			ChainID:   5,
+		}, newTx.tokenOut)
+		require.Equal(t, (*Token)(nil), newTx.tokenIn)
+		require.Equal(t, (*eth.Address)(nil), newTx.contractAddress)
 
-				tx := payload.Activities[0]
-				require.Equal(t, PendingTransactionPT, tx.payloadType)
-				// We don't keep type in the DB
-				require.Equal(t, (*int)(nil), tx.transferType)
-				require.Equal(t, SendAT, tx.activityType)
-				require.Equal(t, PendingAS, tx.activityStatus)
-				require.Equal(t, exp.ChainID, tx.transaction.ChainID)
-				require.Equal(t, exp.ChainID, *tx.chainIDOut)
-				require.Equal(t, (*common.ChainID)(nil), tx.chainIDIn)
-				require.Equal(t, exp.Hash, tx.transaction.Hash)
-				// Pending doesn't have address as part of identity
-				require.Equal(t, eth.Address{}, tx.transaction.Address)
-				require.Equal(t, exp.From, *tx.sender)
-				require.Equal(t, exp.To, *tx.recipient)
-				require.Equal(t, 0, exp.Value.Int.Cmp((*big.Int)(tx.amountOut)))
-				require.Equal(t, exp.Timestamp, uint64(tx.timestamp))
-				require.Equal(t, exp.Symbol, *tx.symbolOut)
-				require.Equal(t, (*string)(nil), tx.symbolIn)
-				require.Equal(t, &Token{
-					TokenType: Native,
-					ChainID:   5,
-				}, tx.tokenOut)
-				require.Equal(t, (*Token)(nil), tx.tokenIn)
-				require.Equal(t, (*eth.Address)(nil), tx.contractAddress)
-				eventActivityDoneCount++
-			}
-		case <-time.NewTimer(1 * time.Second).C:
-			require.Fail(t, "timeout while waiting for EventActivitySessionUpdated")
-		}
-	}
+		// Check the order of the following transaction data
+		require.Equal(t, SimpleTransactionPT, payload.Activities[1].payloadType)
+		require.Equal(t, int64(transactionCount), payload.Activities[1].timestamp)
+		require.Equal(t, SimpleTransactionPT, payload.Activities[2].payloadType)
+		require.Equal(t, int64(transactionCount-1), payload.Activities[2].timestamp)
+	}, nil)
 
 	require.Equal(t, 1, pendingTransactionUpdate)
 	require.Equal(t, 1, filterResponseCount)
@@ -403,18 +424,19 @@ func TestService_IncrementalUpdateOnTop(t *testing.T) {
 	require.Equal(t, 1, eventActivityDoneCount)
 }
 
-func TestService_IncrementalUpdateFetchWindowRegression(t *testing.T) {
+func TestService_IncrementalUpdateFetchWindow(t *testing.T) {
 	state := setupTestService(t)
 	defer state.close()
 
-	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, 3, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: 4}})
+	transactionCount := 5
+	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
 	defer cleanup()
 
 	sessionID := state.service.StartFilterSession(allAddresses, true, allNetworksFilter(), Filter{}, 2)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 
-	filterResponseCount := validateSessionUpdateEventWithPending(t, ch)
+	filterResponseCount := validateFilteringDone(t, ch, 2, nil, nil)
 
 	exp := pendings[0]
 	err := state.pendingTracker.StoreAndTrackPendingTx(&exp)
@@ -426,29 +448,65 @@ func TestService_IncrementalUpdateFetchWindowRegression(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate the reset data
-	eventActivityDoneCount := 0
-	for eventActivityDoneCount < 1 {
-		select {
-		case res := <-ch:
-			switch res.Type {
-			case EventActivityFilteringDone:
-				var payload FilterResponse
-				err := json.Unmarshal([]byte(res.Message), &payload)
-				require.NoError(t, err)
-				require.Equal(t, ErrorCodeSuccess, payload.ErrorCode)
-				require.Equal(t, 2, len(payload.Activities))
-
-				require.True(t, payload.Activities[0].isNew)
-				require.False(t, payload.Activities[1].isNew)
-				eventActivityDoneCount++
-			}
-		case <-time.NewTimer(1 * time.Second).C:
-			require.Fail(t, "timeout while waiting for EventActivitySessionUpdated")
-		}
-	}
+	eventActivityDoneCount := validateFilteringDone(t, ch, 2, func(payload FilterResponse) {
+		require.True(t, payload.Activities[0].isNew)
+		require.Equal(t, int64(transactionCount+1), payload.Activities[0].timestamp)
+		require.False(t, payload.Activities[1].isNew)
+		require.Equal(t, int64(transactionCount), payload.Activities[1].timestamp)
+	}, nil)
 
 	require.Equal(t, 1, pendingTransactionUpdate)
 	require.Equal(t, 1, filterResponseCount)
 	require.Equal(t, 1, sessionUpdatesCount)
+	require.Equal(t, 1, eventActivityDoneCount)
+
+	err = state.service.GetMoreForFilterSession(sessionID, 2)
+	require.NoError(t, err)
+
+	eventActivityDoneCount = validateFilteringDone(t, ch, 2, func(payload FilterResponse) {
+		require.False(t, payload.Activities[0].isNew)
+		require.Equal(t, int64(transactionCount-1), payload.Activities[0].timestamp)
+		require.False(t, payload.Activities[1].isNew)
+		require.Equal(t, int64(transactionCount-2), payload.Activities[1].timestamp)
+	}, common.NewAndSet(extraExpect{common.NewAndSet(2), nil}))
+	require.Equal(t, 1, eventActivityDoneCount)
+}
+
+func TestService_IncrementalUpdateFetchWindowNoReset(t *testing.T) {
+	state := setupTestService(t)
+	defer state.close()
+
+	transactionCount := 5
+	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
+	defer cleanup()
+
+	sessionID := state.service.StartFilterSession(allAddresses, true, allNetworksFilter(), Filter{}, 2)
+	require.Greater(t, sessionID, SessionID(0))
+	defer state.service.StopFilterSession(sessionID)
+
+	filterResponseCount := validateFilteringDone(t, ch, 2, func(payload FilterResponse) {
+		require.Equal(t, int64(transactionCount), payload.Activities[0].timestamp)
+		require.Equal(t, int64(transactionCount-1), payload.Activities[1].timestamp)
+	}, nil)
+
+	exp := pendings[0]
+	err := state.pendingTracker.StoreAndTrackPendingTx(&exp)
+	require.NoError(t, err)
+
+	pendingTransactionUpdate, sessionUpdatesCount := validateSessionUpdateEvent(t, ch, &filterResponseCount)
+	require.Equal(t, 1, pendingTransactionUpdate)
+	require.Equal(t, 1, filterResponseCount)
+	require.Equal(t, 1, sessionUpdatesCount)
+
+	err = state.service.GetMoreForFilterSession(sessionID, 2)
+	require.NoError(t, err)
+
+	// Validate that client doesn't anything of the internal state
+	eventActivityDoneCount := validateFilteringDone(t, ch, 2, func(payload FilterResponse) {
+		require.False(t, payload.Activities[0].isNew)
+		require.Equal(t, int64(transactionCount-2), payload.Activities[0].timestamp)
+		require.False(t, payload.Activities[1].isNew)
+		require.Equal(t, int64(transactionCount-3), payload.Activities[1].timestamp)
+	}, common.NewAndSet(extraExpect{common.NewAndSet(2), nil}))
 	require.Equal(t, 1, eventActivityDoneCount)
 }

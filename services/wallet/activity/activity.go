@@ -69,7 +69,7 @@ type Entry struct {
 	transferType    *TransferType
 	contractAddress *eth.Address
 
-	isNew bool
+	isNew bool // isNew is used to indicate if the entry is newer than session start (changed state also)
 }
 
 // Only used for JSON marshalling
