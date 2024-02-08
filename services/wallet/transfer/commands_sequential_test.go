@@ -1340,6 +1340,8 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 				blocksLoadedCh:            blockChannel,
 				defaultNodeBlockChunkSize: DefaultNodeBlockChunkSize,
 			},
+			nonceCheckIntervalIterations: nonceCheckIntervalIterations,
+			logsCheckIntervalIterations:  logsCheckIntervalIterations,
 		}
 		tc.prepareBalanceHistory(int(tc.currentBlock))
 		tc.prepareTokenBalanceHistory(int(tc.currentBlock))
@@ -1348,6 +1350,112 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 		blocks, _, err := cmd.findBlocksWithEthTransfers(ctx, address, big.NewInt(testCase.fromBlock), big.NewInt(testCase.toBlock))
 		require.NoError(t, err)
 		require.Equal(t, testCase.expectedBlocksFound, len(blocks), fmt.Sprintf("case %d: %s, blocks from %d to %d", idx+1, testCase.label, testCase.fromBlock, testCase.toBlock))
+	}
+}
+
+func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
+	balanceChanges := [][]int{
+		{5, 1, 0},
+		{6, 0, 1},
+	}
+
+	scanRange := 5
+	address := common.HexToAddress("0x1234")
+
+	tc := &TestClient{
+		t:                      t,
+		balances:               map[common.Address][][]int{address: balanceChanges},
+		outgoingERC20Transfers: map[common.Address][]testERC20Transfer{},
+		incomingERC20Transfers: map[common.Address][]testERC20Transfer{},
+		callsCounter:           map[string]int{},
+		currentBlock:           0,
+	}
+
+	//tc.printPreparedData = true
+	tc.prepareBalanceHistory(20)
+
+	appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+	tm := &TransactionManager{db, nil, nil, nil, nil, nil, nil, nil, nil, nil}
+
+	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
+	require.NoError(t, err)
+
+	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
+	client.SetClient(tc.NetworkID(), tc)
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil)
+
+	wdb := NewDB(db)
+	blockChannel := make(chan []*DBHeader, 10)
+
+	accDB, err := accounts.NewDB(appdb)
+	require.NoError(t, err)
+
+	maker, _ := contracts.NewContractMaker(client)
+
+	cmd := &findNewBlocksCommand{
+		findBlocksCommand: &findBlocksCommand{
+			accounts:                  []common.Address{address},
+			db:                        wdb,
+			accountsDB:                accDB,
+			blockRangeDAO:             &BlockRangeSequentialDAO{wdb.client},
+			chainClient:               tc,
+			balanceCacher:             balance.NewCacherWithTTL(5 * time.Minute),
+			feed:                      &event.Feed{},
+			noLimit:                   false,
+			transactionManager:        tm,
+			tokenManager:              tokenManager,
+			blocksLoadedCh:            blockChannel,
+			defaultNodeBlockChunkSize: scanRange,
+			fromBlockNumber:           big.NewInt(0),
+		},
+		blockChainState:              blockchainstate.NewBlockChainState(),
+		contractMaker:                maker,
+		nonceCheckIntervalIterations: 2,
+		logsCheckIntervalIterations:  2,
+	}
+
+	acc := &accounts.Account{
+		Address: ethtypes.BytesToAddress(address.Bytes()),
+		Type:    accounts.AccountTypeWatch,
+		Name:    address.String(),
+		ColorID: multicommon.CustomizationColorPrimary,
+		Emoji:   "emoji",
+	}
+	err = accDB.SaveOrUpdateAccounts([]*accounts.Account{acc}, false)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	tc.currentBlock = 3
+	for i := 0; i < 3; i++ {
+		err := cmd.Run(ctx)
+		require.NoError(t, err)
+		close(blockChannel)
+
+		foundBlocks := []*DBHeader{}
+		for {
+			bloks, ok := <-blockChannel
+			if !ok {
+				break
+			}
+			foundBlocks = append(foundBlocks, bloks...)
+		}
+
+		numbers := []int64{}
+		for _, block := range foundBlocks {
+			numbers = append(numbers, block.Number.Int64())
+		}
+		if i == 2 {
+			require.Equal(t, 2, len(foundBlocks), "blocks", numbers)
+		} else {
+			require.Equal(t, 0, len(foundBlocks), "no blocks expected to be found")
+		}
+		blockChannel = make(chan []*DBHeader, 10)
+		cmd.blocksLoadedCh = blockChannel
+		tc.currentBlock += uint64(scanRange)
 	}
 }
 
@@ -1432,8 +1540,10 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 			blocksLoadedCh:            blockChannel,
 			defaultNodeBlockChunkSize: DefaultNodeBlockChunkSize,
 		},
-		contractMaker:   tokenManager.ContractMaker,
-		blockChainState: blockchainstate.NewBlockChainState(),
+		contractMaker:                tokenManager.ContractMaker,
+		blockChainState:              blockchainstate.NewBlockChainState(),
+		nonceCheckIntervalIterations: nonceCheckIntervalIterations,
+		logsCheckIntervalIterations:  logsCheckIntervalIterations,
 	}
 
 	ctx := context.Background()
