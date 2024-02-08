@@ -1079,10 +1079,11 @@ func TestFindBlocksCommand(t *testing.T) {
 		})
 		accDB, err := accounts.NewDB(appdb)
 		require.NoError(t, err)
+		blockRangeDAO := &BlockRangeSequentialDAO{wdb.client}
 		fbc := &findBlocksCommand{
 			accounts:                  []common.Address{accountAddress},
 			db:                        wdb,
-			blockRangeDAO:             &BlockRangeSequentialDAO{wdb.client},
+			blockRangeDAO:             blockRangeDAO,
 			accountsDB:                accDB,
 			chainClient:               tc,
 			balanceCacher:             balance.NewCacherWithTTL(5 * time.Minute),
@@ -1126,6 +1127,14 @@ func TestFindBlocksCommand(t *testing.T) {
 
 			sort.Slice(numbers, func(i, j int) bool { return numbers[i] < numbers[j] })
 			require.Equal(t, testCase.expectedBlocksFound, len(foundBlocks), testCase.label, "found blocks", numbers)
+
+			blRange, _, err := blockRangeDAO.getBlockRange(tc.NetworkID(), accountAddress)
+			require.NoError(t, err)
+			require.NotNil(t, blRange.eth.FirstKnown)
+			require.NotNil(t, blRange.tokens.FirstKnown)
+			if testCase.fromBlock == 0 {
+				require.Equal(t, 0, blRange.tokens.FirstKnown.Cmp(zero))
+			}
 		}
 	}
 }
@@ -1621,16 +1630,16 @@ type BlockRangeSequentialDAOMockError struct {
 	*BlockRangeSequentialDAO
 }
 
-func (b *BlockRangeSequentialDAOMockError) getBlockRange(chainID uint64, address common.Address) (blockRange *ethTokensBlockRanges, err error) {
-	return nil, errors.New("DB error")
+func (b *BlockRangeSequentialDAOMockError) getBlockRange(chainID uint64, address common.Address) (blockRange *ethTokensBlockRanges, exists bool, err error) {
+	return nil, true, errors.New("DB error")
 }
 
 type BlockRangeSequentialDAOMockSuccess struct {
 	*BlockRangeSequentialDAO
 }
 
-func (b *BlockRangeSequentialDAOMockSuccess) getBlockRange(chainID uint64, address common.Address) (blockRange *ethTokensBlockRanges, err error) {
-	return newEthTokensBlockRanges(), nil
+func (b *BlockRangeSequentialDAOMockSuccess) getBlockRange(chainID uint64, address common.Address) (blockRange *ethTokensBlockRanges, exists bool, err error) {
+	return newEthTokensBlockRanges(), true, nil
 }
 
 func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.T) {

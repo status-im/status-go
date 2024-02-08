@@ -76,7 +76,7 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	err = blockRangesDAO.upsertRange(chainID, address, newEthTokensBlockRanges())
 	require.NoError(t, err)
 
-	ranges, err := blockRangesDAO.getBlockRange(chainID, address)
+	ranges, _, err := blockRangesDAO.getBlockRange(chainID, address)
 	require.NoError(t, err)
 	require.NotNil(t, ranges)
 
@@ -113,11 +113,14 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, block)
 
-	ranges, err = blockRangesDAO.getBlockRange(chainID, address)
+	ranges, _, err = blockRangesDAO.getBlockRange(chainID, address)
 	require.NoError(t, err)
-	require.Nil(t, ranges.eth)
-	require.Nil(t, ranges.tokens)
-
+	require.Nil(t, ranges.eth.FirstKnown)
+	require.Nil(t, ranges.eth.LastKnown)
+	require.Nil(t, ranges.eth.Start)
+	require.Nil(t, ranges.tokens.FirstKnown)
+	require.Nil(t, ranges.tokens.LastKnown)
+	require.Nil(t, ranges.tokens.Start)
 }
 
 func TestController_cleanupAccountLeftovers(t *testing.T) {
