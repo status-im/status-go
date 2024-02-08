@@ -1463,7 +1463,7 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageSta
 		return err
 	}
 
-	state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
+	state.Response.AddRequestToJoinCommunity(requestToJoin)
 
 	// delete activity center notification
 	notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoin.ID)
@@ -1510,10 +1510,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, re
 			state.ModifiedContacts.Store(contact.ID, true)
 		}
 
-		if state.Response.RequestsToJoinCommunity == nil {
-			state.Response.RequestsToJoinCommunity = make([]*communities.RequestToJoin, 0)
-		}
-		state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
+		state.Response.AddRequestToJoinCommunity(requestToJoin)
 
 		state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact))
 
@@ -1626,7 +1623,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 	}
 
 	if updatedRequest != nil {
-		state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, updatedRequest)
+		state.Response.AddRequestToJoinCommunity(updatedRequest)
 	}
 
 	community, err := m.communitiesManager.GetByID(requestToJoinResponseProto.CommunityId)

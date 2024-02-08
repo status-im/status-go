@@ -388,9 +388,9 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 	response, err = s.alice.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	requestToJoin1 := response.RequestsToJoinCommunity[0]
+	requestToJoin1 := response.RequestsToJoinCommunity()[0]
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
 
 	// Retrieve request to join
