@@ -962,6 +962,10 @@ func (api *PublicAPI) SetDisplayName(ctx context.Context, displayName string) er
 	return api.service.messenger.SetDisplayName(displayName)
 }
 
+func (api *PublicAPI) SetBio(ctx context.Context, bio string) error {
+	return api.service.messenger.SetBio(bio)
+}
+
 func (api *PublicAPI) MarkAsTrusted(ctx context.Context, contactID string) error {
 	return api.service.messenger.MarkAsTrusted(ctx, contactID)
 }
