@@ -161,7 +161,7 @@ func (s *MessengerStoreNodeRequestSuite) createStore() {
 		clusterID:              shard.UndefinedShardValue,
 	}
 
-	s.wakuStoreNode = NewWakuV2(&s.Suite, cfg)
+	s.wakuStoreNode = NewTestWakuV2(&s.Suite, cfg)
 	s.storeNodeAddress = s.wakuListenAddress(s.wakuStoreNode)
 	s.logger.Info("store node ready", zap.String("address", s.storeNodeAddress))
 }
@@ -175,7 +175,7 @@ func (s *MessengerStoreNodeRequestSuite) createOwner() {
 		clusterID:              shard.UndefinedShardValue,
 	}
 
-	wakuV2 := NewWakuV2(&s.Suite, cfg)
+	wakuV2 := NewTestWakuV2(&s.Suite, cfg)
 	s.ownerWaku = gethbridge.NewGethWakuV2Wrapper(wakuV2)
 
 	messengerLogger := s.logger.Named("owner-messenger")
@@ -193,7 +193,7 @@ func (s *MessengerStoreNodeRequestSuite) createBob() {
 		useShardAsDefaultTopic: false,
 		clusterID:              shard.UndefinedShardValue,
 	}
-	wakuV2 := NewWakuV2(&s.Suite, cfg)
+	wakuV2 := NewTestWakuV2(&s.Suite, cfg)
 	s.bobWaku = gethbridge.NewGethWakuV2Wrapper(wakuV2)
 
 	messengerLogger := s.logger.Named("bob-messenger")
@@ -973,7 +973,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 				useShardAsDefaultTopic: useShardAsDefaultTopic,
 				clusterID:              clusterID,
 			}
-			wakuV2 := NewWakuV2(&s.Suite, cfg)
+			wakuV2 := NewTestWakuV2(&s.Suite, cfg)
 			userWaku := gethbridge.NewGethWakuV2Wrapper(wakuV2)
 
 			//

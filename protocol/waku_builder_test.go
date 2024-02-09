@@ -21,7 +21,7 @@ type testWakuV2Config struct {
 	clusterID              uint16
 }
 
-func NewWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
+func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 	wakuConfig := &waku2.Config{
 		UseShardAsDefaultTopic: cfg.useShardAsDefaultTopic,
 		ClusterID:              cfg.clusterID,
@@ -62,7 +62,7 @@ func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, useShardAsDef
 	wrappers := make([]types.Waku, len(nodes))
 
 	for i, name := range nodeNames {
-		nodes[i] = NewWakuV2(s, testWakuV2Config{
+		nodes[i] = NewTestWakuV2(s, testWakuV2Config{
 			logger:                 parentLogger.Named("waku-" + name),
 			enableStore:            false,
 			useShardAsDefaultTopic: useShardAsDefaultTopic,
