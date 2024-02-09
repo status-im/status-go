@@ -19,8 +19,6 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 )
 
-const testENRBootstrap = "enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
-
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 var hexRunes = []rune("0123456789abcdef")
 
