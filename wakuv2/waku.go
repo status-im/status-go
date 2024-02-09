@@ -1820,6 +1820,10 @@ func (w *Waku) Clean() error {
 	return nil
 }
 
+func (w *Waku) PeerID() peer.ID {
+	return w.node.Host().ID()
+}
+
 // validatePrivateKey checks the format of the given private key.
 func validatePrivateKey(k *ecdsa.PrivateKey) bool {
 	if k == nil || k.D == nil || k.D.Sign() == 0 {
