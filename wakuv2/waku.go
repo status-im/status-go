@@ -290,6 +290,10 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 			pubsub.WithMaxMessageSize(int(waku.settings.MaxMsgSize)),
 		}
 
+		if waku.logger.Level() == zap.DebugLevel {
+			relayOpts = append(relayOpts, pubsub.WithEventTracer(waku))
+		}
+
 		opts = append(opts, node.WithWakuRelayAndMinPeers(waku.settings.MinPeersForRelay, relayOpts...))
 	}
 
