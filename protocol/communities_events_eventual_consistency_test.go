@@ -86,12 +86,12 @@ func (s *CommunityEventsEventualConsistencySuite) TestAdminAcceptRejectRequestTo
 	response, err := user.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	sentRequest := response.RequestsToJoinCommunity[0]
+	sentRequest := response.RequestsToJoinCommunity()[0]
 
 	checkRequestToJoin := func(r *MessengerResponse) bool {
-		for _, request := range r.RequestsToJoinCommunity {
+		for _, request := range r.RequestsToJoinCommunity() {
 			if request.ENSName == requestToJoin.ENSName {
 				return true
 			}
@@ -106,7 +106,7 @@ func (s *CommunityEventsEventualConsistencySuite) TestAdminAcceptRejectRequestTo
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	// accept request to join
 	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: sentRequest.ID}
