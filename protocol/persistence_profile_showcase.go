@@ -17,6 +17,7 @@ const (
 
 const upsertProfileShowcaseCommunityPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_communities_preferences(community_id, visibility, sort_order) VALUES (?, ?, ?)" // #nosec G101
 const selectProfileShowcaseCommunityPreferenceQuery = "SELECT community_id, visibility, sort_order FROM profile_showcase_communities_preferences"                              // #nosec G101
+const deleteProfileShowcaseCommunityPreferenceQuery = "DELETE FROM profile_showcase_communities_preferences WHERE community_id = ?"                                            // #nosec G101
 
 const upsertProfileShowcaseAccountPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_accounts_preferences(address, name, color_id, emoji, visibility, sort_order) VALUES (?, ?, ?, ?, ?, ?)" // #nosec G101
 const selectProfileShowcaseAccountPreferenceQuery = "SELECT address, name, color_id, emoji, visibility, sort_order FROM profile_showcase_accounts_preferences"                                       // #nosec G101
@@ -255,10 +256,24 @@ func (db sqlitePersistence) GetProfileShowcaseAccountPreference(accountAddress s
 	return nil, err
 }
 
-func (db sqlitePersistence) DeleteProfileShowcaseAccountPreference(accountAddress string) error {
-	_, err := db.db.Exec(deleteProfileShowcaseAccountPreferenceQuery, accountAddress)
+func (db sqlitePersistence) DeleteProfileShowcaseAccountPreference(accountAddress string) (bool, error) {
+	result, err := db.db.Exec(deleteProfileShowcaseAccountPreferenceQuery, accountAddress)
+	if err != nil {
+		return false, err
+	}
 
-	return err
+	rows, err := result.RowsAffected()
+	return rows > 0, err
+}
+
+func (db sqlitePersistence) DeleteProfileShowcaseCommunityPreference(communityID string) (bool, error) {
+	result, err := db.db.Exec(deleteProfileShowcaseCommunityPreferenceQuery, communityID)
+	if err != nil {
+		return false, err
+	}
+
+	rows, err := result.RowsAffected()
+	return rows > 0, err
 }
 
 func (db sqlitePersistence) saveProfileShowcaseCollectiblePreference(tx *sql.Tx, collectible *ProfileShowcaseCollectiblePreference) error {

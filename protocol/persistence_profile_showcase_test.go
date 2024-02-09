@@ -421,12 +421,59 @@ func (s *TestProfileShowcasePersistence) TestUpdateProfileShowcaseAccountOnWalle
 	err = persistence.SaveProfileShowcaseAccountPreference(account)
 	s.Require().NoError(err)
 
-	err = persistence.DeleteProfileShowcaseAccountPreference(deleteAccountAddress)
+	deleted, err := persistence.DeleteProfileShowcaseAccountPreference(deleteAccountAddress)
 	s.Require().NoError(err)
+	s.Require().True(deleted)
+
+	// One more time to check correct error handling
+	deleted, err = persistence.DeleteProfileShowcaseAccountPreference(deleteAccountAddress)
+	s.Require().NoError(err)
+	s.Require().False(deleted)
 
 	preferencesBack, err := persistence.GetProfileShowcasePreferences()
 	s.Require().NoError(err)
 
 	s.Require().Len(preferencesBack.Accounts, 1)
 	s.Require().Equal(*preferencesBack.Accounts[0], *account)
+}
+
+func (s *TestProfileShowcasePersistence) TestUpdateProfileShowcaseCommunityOnChange() {
+	db, err := openTestDB()
+	s.Require().NoError(err)
+	persistence := newSQLitePersistence(db)
+
+	deleteCommunityID := "0x3243344513424"
+
+	preferences := &ProfileShowcasePreferences{
+		Communities: []*ProfileShowcaseCommunityPreference{
+			&ProfileShowcaseCommunityPreference{
+				CommunityID:        "0x32433445133424",
+				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+			&ProfileShowcaseCommunityPreference{
+				CommunityID:        deleteCommunityID,
+				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				Order:              1,
+			},
+		},
+	}
+
+	err = persistence.SaveProfileShowcasePreferences(preferences)
+	s.Require().NoError(err)
+
+	deleted, err := persistence.DeleteProfileShowcaseCommunityPreference(deleteCommunityID)
+	s.Require().NoError(err)
+	s.Require().True(deleted)
+
+	// One more time to check correct error handling
+	deleted, err = persistence.DeleteProfileShowcaseCommunityPreference(deleteCommunityID)
+	s.Require().NoError(err)
+	s.Require().False(deleted)
+
+	preferencesBack, err := persistence.GetProfileShowcasePreferences()
+	s.Require().NoError(err)
+
+	s.Require().Len(preferencesBack.Communities, 1)
+	s.Require().Equal(*preferencesBack.Communities[0], *preferences.Communities[0])
 }
