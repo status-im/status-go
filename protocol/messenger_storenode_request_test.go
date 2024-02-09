@@ -1121,3 +1121,122 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingCommunityWithOwnerToken() {
 
 	s.fetchCommunity(s.bob, community.CommunityShard(), community)
 }
+
+func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
+	// Create a separate relay node
+	// It's possible to connect owner and bob directly, but the test was hard to read and understand.
+	relayWaku := NewWakuV2(&s.Suite, testWakuV2Config{
+		logger:                 s.logger.Named("relay-waku"),
+		enableStore:            false,
+		useShardAsDefaultTopic: false,
+		clusterID:              shard.UndefinedShardValue,
+	})
+
+	relayAddress := s.wakuListenAddress(relayWaku)
+	relayPeerID := relayWaku.PeerID().String()
+
+	// Create messengers
+	s.createOwner()
+	s.createBob()
+
+	s.logger.Debug("store node info", zap.String("peerID", s.wakuStoreNode.PeerID().String()))
+	s.logger.Debug("relay node info", zap.String("peerID", relayPeerID))
+	s.logger.Debug("owner node info", zap.String("peerID", gethbridge.GetGethWakuV2From(s.ownerWaku).PeerID().String()))
+	s.logger.Debug("bob node info", zap.String("peerID", gethbridge.GetGethWakuV2From(s.bobWaku).PeerID().String()))
+
+	// Connect owner and bob to our relay node
+	{
+		WaitForPeerConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.ownerWaku), func() string {
+			err := s.owner.DialPeer(relayAddress)
+			s.Require().NoError(err)
+			return relayPeerID
+		})
+		s.Require().True(s.owner.Online())
+
+		WaitForPeerConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() string {
+			err := s.bob.DialPeer(relayAddress)
+			s.Require().NoError(err)
+			return relayPeerID
+		})
+		s.Require().True(s.bob.Online())
+	}
+
+	// Wait for mesh to be formed
+	// "This usually takes 2 seconds". Made it 3 to be reliability.
+	// https://github.com/libp2p/go-libp2p-pubsub/blob/048a4d30d0c3c00829181fd81aa697eb60497448/trace_test.go#L99
+	// https://github.com/libp2p/go-libp2p-pubsub/blob/048a4d30d0c3c00829181fd81aa697eb60497448/gossipsub_feat_test.go#L65
+	// TODO: This is a hack, we should wait for the mesh to be formed in a more reliable way
+	//		 Either by binding to HearbeatInterval (and probably set it to a lower value for tests)
+	// 		 or by catching a GRAFT event with EventTracer.
+	time.Sleep(3 * time.Second)
+
+	// bob goes offline
+	{
+		WaitForConnectionStatus(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() bool {
+			err := s.bob.DropPeer(relayPeerID)
+			s.Require().NoError(err)
+			// Also drop store node. Although we didn't connect to it directly, it will be dialed with the first store query.
+			err = s.bob.DropPeer(s.wakuStoreNode.PeerID().String())
+			s.Require().NoError(err)
+			return false
+		})
+		s.Require().False(s.bob.Online())
+	}
+
+	// Owner sends a contact request while bob is offline
+	{
+		// Setup store nodes envelopes watcher
+		partitionedTopic := transport.PartitionedTopic(s.bob.IdentityPublicKey())
+		topic := transport.ToTopic(partitionedTopic)
+		contentTopic := wakuV2common.BytesToTopic(topic)
+		storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(&contentTopic)
+
+		// Send contact request
+		response, err := s.owner.SendContactRequest(context.Background(), &requests.SendContactRequest{
+			ID:      s.bob.IdentityPublicKeyString(),
+			Message: "1",
+		})
+		s.Require().NoError(err)
+		s.Require().NotNil(response)
+		s.Require().Len(response.Messages(), 2)
+
+		// Ensure contact request is stored
+		s.waitForEnvelopes(storeNodeSubscription, 1)
+	}
+
+	// owner goes offline to prevent message resend and any other side effects
+	// to go offline we disconnect from both relay and store peers
+	WaitForConnectionStatus(&s.Suite, gethbridge.GetGethWakuV2From(s.ownerWaku), func() bool {
+		err := s.owner.DropPeer(relayPeerID)
+		s.Require().NoError(err)
+		err = s.owner.DropPeer(s.wakuStoreNode.PeerID().String())
+		s.Require().NoError(err)
+		return false
+	})
+	s.Require().False(s.owner.Online())
+
+	// bob goes back online, this should trigger fetching historic messages
+	{
+		WaitForPeerConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() string {
+			err := s.bob.DialPeer(relayAddress)
+			s.Require().NoError(err)
+			return relayPeerID
+		})
+		s.Require().True(s.bob.Online())
+
+		s.logger.Debug("<<< bob online")
+
+		// Don't  dial the peer, message should be fetched from store node
+		response, err := WaitOnMessengerResponse(
+			s.bob,
+			func(r *MessengerResponse) bool {
+				return len(r.Contacts) == 1
+			},
+			"no contact request received",
+		)
+		s.Require().NoError(err)
+		s.Require().NotNil(response)
+		s.Require().Len(response.Contacts, 1)
+	}
+
+}

@@ -138,6 +138,52 @@ func WaitOnSignaledCommunityFound(m *Messenger, action func(), condition func(co
 	}
 }
 
+func WaitForConnectionStatus(s *suite.Suite, waku *waku2.Waku, action func() bool) {
+	subscription := waku.SubscribeToConnStatusChanges()
+	defer subscription.Unsubscribe()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Action should return the desired online status
+	wantedOnline := action()
+
+	for {
+		select {
+		case status := <-subscription.C:
+			if status.IsOnline == wantedOnline {
+				return
+			}
+		case <-ctx.Done():
+			s.Require().Fail(fmt.Sprintf("timeout waiting for waku connection status '%t'", wantedOnline))
+			return
+		}
+	}
+}
+
+func WaitForPeerConnected(s *suite.Suite, waku *waku2.Waku, action func() string) {
+	subscription := waku.SubscribeToConnStatusChanges()
+	defer subscription.Unsubscribe()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Action should return the desired peer ID
+	peerID := action()
+
+	for {
+		select {
+		case status := <-subscription.C:
+			if _, ok := status.Peers[peerID]; ok {
+				return
+			}
+		case <-ctx.Done():
+			s.Require().Fail(fmt.Sprintf("timeout waiting for peer connected '%s'", peerID))
+			return
+		}
+	}
+}
+
 func FindFirstByContentType(messages []*common.Message, contentType protobuf.ChatMessage_ContentType) *common.Message {
 	for _, message := range messages {
 		if message.ContentType == contentType {
