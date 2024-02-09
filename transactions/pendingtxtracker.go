@@ -55,7 +55,6 @@ const (
 	Keep       AutoDeleteType = false
 )
 
-// TODO #12120: unify it with TransactionIdentity
 type TxIdentity struct {
 	ChainID common.ChainID `json:"chainId"`
 	Hash    eth.Hash       `json:"hash"`

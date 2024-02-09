@@ -5,8 +5,6 @@ import (
 	"errors"
 	"strconv"
 
-	"golang.org/x/exp/slices"
-
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -25,11 +23,14 @@ type EntryIdentity struct {
 	id          transfer.MultiTransactionIDType
 }
 
-// func (e EntryIdentity) same(a EntryIdentity) bool {
-// 	return a.payloadType == e.payloadType && (a.transaction == e.transaction && (a.transaction == nil || (a.transaction.ChainID == e.transaction.ChainID &&
-// 		a.transaction.Hash == e.transaction.Hash &&
-// 		a.transaction.Address == e.transaction.Address))) && a.id == e.id
-// }
+func (e EntryIdentity) same(a EntryIdentity) bool {
+	return a.payloadType == e.payloadType &&
+		((a.transaction == nil && e.transaction == nil) ||
+			(a.transaction.ChainID == e.transaction.ChainID &&
+				a.transaction.Hash == e.transaction.Hash &&
+				a.transaction.Address == e.transaction.Address)) &&
+		a.id == e.id
+}
 
 func (e EntryIdentity) key() string {
 	txID := nilStr
@@ -57,11 +58,16 @@ type Session struct {
 	new []EntryIdentity
 }
 
+type EntryUpdate struct {
+	Pos   int    `json:"pos"`
+	Entry *Entry `json:"entry"`
+}
+
 // SessionUpdate payload for EventActivitySessionUpdated
 type SessionUpdate struct {
-	HasNewEntries *bool           `json:"hasNewEntries,omitempty"`
-	Removed       []EntryIdentity `json:"removed,omitempty"`
-	Updated       []Entry         `json:"updated,omitempty"`
+	HasNewOnTop *bool           `json:"hasNewOnTop,omitempty"`
+	New         []*EntryUpdate  `json:"new,omitempty"`
+	Removed     []EntryIdentity `json:"removed,omitempty"`
 }
 
 type fullFilterParams struct {
@@ -101,16 +107,6 @@ func (s *Service) internalFilter(f fullFilterParams, offset int, count int, proc
 
 func (s *Service) StartFilterSession(addresses []eth.Address, allAddresses bool, chainIDs []common.ChainID, filter Filter, firstPageCount int) SessionID {
 	sessionID := s.nextSessionID()
-
-	// TODO #12120: sort rest of the filters
-	// TODO #12120: prettyfy this
-	slices.SortFunc(addresses, func(a eth.Address, b eth.Address) bool {
-		return a.Hex() < b.Hex()
-	})
-	slices.Sort(chainIDs)
-	slices.SortFunc(filter.CounterpartyAddresses, func(a eth.Address, b eth.Address) bool {
-		return a.Hex() < b.Hex()
-	})
 
 	s.sessionsRWMutex.Lock()
 	subscribeToEvents := len(s.sessions) == 0
@@ -248,55 +244,79 @@ func (s *Service) subscribeToEvents() {
 	go s.processEvents()
 }
 
-// TODO #12120: check that it exits on channel close
+// processEvents runs only if more than one session is active
 func (s *Service) processEvents() {
 	for event := range s.ch {
-		// TODO #12120: process rest of the events
-		// TODO #12120: debounce for 1s
+		// TODO #12120: process rest of the events transactions.EventPendingTransactionStatusChanged, transfer.EventNewTransfers
+		// TODO #12120: debounce for 1s and sum all events as extraCount to be sure we don't miss any change
 		if event.Type == transactions.EventPendingTransactionUpdate {
 			for sessionID := range s.sessions {
 				session := s.sessions[sessionID]
-				activities, err := getActivityEntries(context.Background(), s.getDeps(), session.addresses, session.allAddresses, session.chainIDs, session.filter, 0, len(session.model))
+
+				extraCount := 1
+				fetchLen := len(session.model) + extraCount
+				activities, err := getActivityEntries(context.Background(), s.getDeps(), session.addresses, session.allAddresses, session.chainIDs, session.filter, 0, fetchLen)
 				if err != nil {
 					log.Error("Error getting activity entries", "error", err)
 					continue
 				}
 
 				s.sessionsRWMutex.RLock()
-				allData := append(session.model, session.new...)
+				allData := append(session.new, session.model...)
 				new, _ /*removed*/ := findUpdates(allData, activities)
 				s.sessionsRWMutex.RUnlock()
 
 				s.sessionsRWMutex.Lock()
 				lastProcessed := -1
+				onTop := true
+				var mixed []*EntryUpdate
 				for i, idRes := range new {
-					if i-lastProcessed > 1 {
-						// The events are not continuous, therefore these are not on top but mixed between existing entries
-						break
+					// Detect on top
+					if onTop {
+						// mixedIdentityResult.newPos includes session.new, therefore compensate for it
+						if ((idRes.newPos - len(session.new)) - lastProcessed) > 1 {
+							// From now on the events are not on top and continuous but mixed between existing entries
+							onTop = false
+							mixed = make([]*EntryUpdate, 0, len(new)-i)
+						}
+						lastProcessed = idRes.newPos
 					}
-					lastProcessed = idRes.newPos
-					// TODO #12120: make it more generic to follow the detection function
-					// TODO #12120: hold the first few and only send mixed and removed
-					if session.new == nil {
-						session.new = make([]EntryIdentity, 0, len(new))
-					}
-					session.new = append(session.new, idRes.id)
-				}
 
-				// TODO #12120: mixed
+					if onTop {
+						if session.new == nil {
+							session.new = make([]EntryIdentity, 0, len(new))
+						}
+						session.new = append(session.new, idRes.id)
+					} else {
+						modelPos := idRes.newPos - len(session.new)
+						entry := activities[idRes.newPos]
+						entry.isNew = true
+						mixed = append(mixed, &EntryUpdate{
+							Pos:   modelPos,
+							Entry: &entry,
+						})
+						// Insert in session model at modelPos index
+						session.model = append(session.model[:modelPos], append([]EntryIdentity{{payloadType: entry.payloadType, transaction: entry.transaction, id: entry.id}}, session.model[modelPos:]...)...)
+					}
+				}
 
 				s.sessionsRWMutex.Unlock()
 
-				go notify(s.eventFeed, sessionID, len(session.new) > 0)
+				if len(session.new) > 0 || len(mixed) > 0 {
+					go notify(s.eventFeed, sessionID, len(session.new) > 0, mixed)
+				}
 			}
 		}
 	}
 }
 
-func notify(eventFeed *event.Feed, id SessionID, hasNewEntries bool) {
-	payload := SessionUpdate{}
-	if hasNewEntries {
-		payload.HasNewEntries = &hasNewEntries
+func notify(eventFeed *event.Feed, id SessionID, hasNewOnTop bool, mixed []*EntryUpdate) {
+	payload := SessionUpdate{
+		New: mixed,
+	}
+
+	if hasNewOnTop {
+		payload.HasNewOnTop = &hasNewOnTop
 	}
 
 	sendResponseEvent(eventFeed, (*int32)(&id), EventActivitySessionUpdated, payload, nil)
@@ -305,6 +325,8 @@ func notify(eventFeed *event.Feed, id SessionID, hasNewEntries bool) {
 // unsubscribeFromEvents should be called with sessionsRWMutex locked for writing
 func (s *Service) unsubscribeFromEvents() {
 	s.subscriptions.Unsubscribe()
+	close(s.ch)
+	s.ch = nil
 	s.subscriptions = nil
 }
 
@@ -369,6 +391,9 @@ func entriesToMap(entries []Entry) map[string]Entry {
 //
 // implementation assumes the order of each identity doesn't change from old state (identities) and new state (updated); we have either add or removed.
 func findUpdates(identities []EntryIdentity, updated []Entry) (new []mixedIdentityResult, removed []EntryIdentity) {
+	if len(updated) == 0 {
+		return
+	}
 
 	idsMap := entryIdsToMap(identities)
 	updatedMap := entriesToMap(updated)
@@ -380,6 +405,10 @@ func findUpdates(identities []EntryIdentity, updated []Entry) (new []mixedIdenti
 				newPos: newIndex,
 				id:     id,
 			})
+		}
+
+		if len(identities) > 0 && entry.getIdentity().same(identities[len(identities)-1]) {
+			break
 		}
 	}
 
