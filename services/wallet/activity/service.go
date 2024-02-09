@@ -70,7 +70,6 @@ type Service struct {
 	// sessionsRWMutex is used to protect all sessions related members
 	sessionsRWMutex sync.RWMutex
 
-	// TODO #12120: sort out session dependencies
 	pendingTracker *transactions.PendingTxTracker
 }
 
