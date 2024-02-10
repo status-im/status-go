@@ -2224,9 +2224,6 @@ func (m *Messenger) SetCommunityStorenodes(request *requests.SetCommunityStoreno
 	if err != nil {
 		return nil, err
 	}
-	if community == nil {
-		return nil, communities.ErrOrgNotFound
-	}
 	if !community.IsControlNode() {
 		return nil, errors.New("not admin or owner")
 	}

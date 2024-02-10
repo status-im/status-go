@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"errors"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -59,30 +60,35 @@ func (m *Messenger) sendCommunityPublicStorenodesInfo(community *communities.Com
 	return err
 }
 
-// TODO pablo check if this is what is happening:
-//  1. m.sender.SendPublic will send that operational message with the default non protected pubsub topic
-//  2. This thing will save it in the peer, BUT this might be saving the message in any peer that might not care about the community, unless the peer
-//     has already the db populated with the community because there is a foreign key on community id
-//  3. If a peer just connects he needs to get this info on FetchCommunity to be able to get the storenodes info and connect to it.
+// HandleCommunityPublicStorenodesInfo will process the control message sent by the community owner on updating the community storenodes for his community (sendCommunityPublicStorenodesInfo).
+// The message will be received by many peers that are not interested on that community, so if we don't have this community in our DB we just ignore this message.
 func (m *Messenger) HandleCommunityPublicStorenodesInfo(state *ReceivedMessageState, a *protobuf.CommunityPublicStorenodesInfo, statusMessage *v1protocol.StatusMessage) error {
 	sn := &protobuf.CommunityStorenodes{}
 	err := proto.Unmarshal(a.Payload, sn)
 	if err != nil {
 		return err
 	}
-
-	logError := func(err error) {
-		m.logger.Error("HandleCommunityPublicStorenodesInfo failed: ", zap.Error(err), zap.String("communityID", types.EncodeHex(sn.CommunityId)))
-	}
+	logger := m.logger.Named("HandleCommunityPublicStorenodesInfo").With(zap.String("communityID", types.EncodeHex(sn.CommunityId)))
 
 	err = m.verifyCommunitySignature(a.Payload, a.Signature, sn.CommunityId, sn.ChainId)
 	if err != nil {
-		logError(err)
+		logger.Error("failed to verify community signature", zap.Error(err))
+		return err
+	}
+
+	// verify if we are interested in this control message
+	_, err = m.communitiesManager.GetByID(sn.CommunityId)
+	if err != nil {
+		if errors.Is(err, communities.ErrOrgNotFound) {
+			logger.Debug("ignoring control message, community not found")
+			return nil
+		}
+		logger.Error("failed get community by id", zap.Error(err))
 		return err
 	}
 
 	if err := m.communityStorenodes.UpdateStorenodesInDB(sn.CommunityId, storenodes.FromProtobuf(sn.Storenodes, sn.Clock), sn.Clock); err != nil {
-		logError(err)
+		logger.Error("failed to update storenodes for community", zap.Error(err))
 		return err
 	}
 	return nil
