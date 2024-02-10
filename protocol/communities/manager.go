@@ -2602,45 +2602,6 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 	return nil
 }
 
-type CheckPermissionsResponse struct {
-	Satisfied         bool                                      `json:"satisfied"`
-	Permissions       map[string]*PermissionTokenCriteriaResult `json:"permissions"`
-	ValidCombinations []*AccountChainIDsCombination             `json:"validCombinations"`
-}
-
-type CheckPermissionToJoinResponse = CheckPermissionsResponse
-
-type PermissionTokenCriteriaResult struct {
-	Criteria []bool `json:"criteria"`
-}
-
-type AccountChainIDsCombination struct {
-	Address  gethcommon.Address `json:"address"`
-	ChainIDs []uint64           `json:"chainIds"`
-}
-
-func (c *CheckPermissionsResponse) calculateSatisfied() {
-	if len(c.Permissions) == 0 {
-		c.Satisfied = true
-		return
-	}
-
-	c.Satisfied = false
-	for _, p := range c.Permissions {
-		satisfied := true
-		for _, criteria := range p.Criteria {
-			if !criteria {
-				satisfied = false
-				break
-			}
-		}
-		if satisfied {
-			c.Satisfied = true
-			return
-		}
-	}
-}
-
 func calculateChainIDsSet(accountsAndChainIDs []*AccountChainIDsCombination, requirementsChainIDs map[uint64]bool) []uint64 {
 
 	revealedAccountsChainIDs := make([]uint64, 0)
