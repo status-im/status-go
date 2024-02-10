@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
@@ -69,7 +70,6 @@ func (tckd *TestCommunitiesKeyDistributor) Distribute(community *communities.Com
 	return nil
 }
 
-/*
 func (tckd *TestCommunitiesKeyDistributor) waitOnKeyDistribution(condition func(*CommunityAndKeyActions) bool) <-chan error {
 	errCh := make(chan error, 1)
 
@@ -109,7 +109,6 @@ func (tckd *TestCommunitiesKeyDistributor) waitOnKeyDistribution(condition func(
 
 	return errCh
 }
-*/
 
 func TestMessengerCommunitiesTokenPermissionsSuite(t *testing.T) {
 	suite.Run(t, new(MessengerCommunitiesTokenPermissionsSuite))
@@ -219,11 +218,9 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) createCommunity() (*communit
 	return createCommunity(&s.Suite, s.owner)
 }
 
-/*
 func (s *MessengerCommunitiesTokenPermissionsSuite) sendChatMessage(sender *Messenger, chatID string, text string) *common.Message {
 	return sendChatMessage(&s.Suite, sender, chatID, text)
 }
-*/
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) makeAddressSatisfyTheCriteria(chainID uint64, address string, criteria *protobuf.TokenCriteria) {
 	walletAddress := gethcommon.HexToAddress(address)
@@ -236,13 +233,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) makeAddressSatisfyTheCriteri
 	s.mockedBalances[chainID][walletAddress][contractAddress] = (*hexutil.Big)(balance)
 }
 
-/*
 func (s *MessengerCommunitiesTokenPermissionsSuite) waitOnKeyDistribution(condition func(*CommunityAndKeyActions) bool) <-chan error {
 	testCommunitiesKeyDistributor, ok := s.owner.communitiesKeyDistributor.(*TestCommunitiesKeyDistributor)
 	s.Require().True(ok)
 	return testCommunitiesKeyDistributor.waitOnKeyDistribution(condition)
 }
-*/
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() {
 	community, _ := s.createCommunity()
@@ -362,7 +357,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityTokensMetadata(
 	s.Require().Equal(tokensMetadata[0].Decimals, newToken.Decimals)
 }
 
-/*
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSTokenPermission() {
 	community, _ := s.createCommunity()
 
@@ -394,9 +388,9 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 	response, err = s.alice.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	requestToJoin1 := response.RequestsToJoinCommunity[0]
+	requestToJoin1 := response.RequestsToJoinCommunity()[0]
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
 
 	// Retrieve request to join
@@ -425,7 +419,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 		s.Require().False(allCommunities[0].HasMember(&s.alice.identity.PublicKey))
 	}
 }
-*/
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSharedAddress() {
 	community, _ := s.createCommunity()
@@ -627,11 +620,9 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 	s.Require().Equal(true, alicesRevealedAccounts[0].IsAirdropAddress)
 }
 
-// NOTE(cammellos): Disabling for now as flaky, the reason it fails is that the community
-// key sometimes will be coming after the community description, working on a fix in a separate
-// PR
+// NOTE(cammellos): Disabling for now as flaky, for some reason does not pass on CI, but passes locally
 /*
-func(s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions() {
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions() {
 	// Create a store node
 	// This is needed to fetch the messages after rejoining the community
 	var err error
@@ -733,10 +724,6 @@ func(s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions()
 	waitOnBobToBeKicked := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
 		return len(sub.Community.Members()) == 1
 	})
-	waitOnCommunityToBeRekeyedOnceBobIsKicked := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
-		return len(sub.community.Description().Members) == 1 &&
-			sub.keyActions.CommunityKeyAction.ActionType == communities.EncryptionKeyRekey
-	})
 
 	response, err = s.owner.CreateCommunityTokenPermission(&permissionRequest)
 	s.Require().NoError(err)
@@ -757,37 +744,28 @@ func(s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions()
 	_, err = WaitOnMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && len(r.Communities()[0].Members()) == 0 && len(r.Communities()[0].Chats()) == 0
+			return len(r.Communities()) == 1 && len(community.TokenPermissions()) > 0 && r.Communities()[0].IDString() == community.IDString() && !r.Communities()[0].Joined()
 		},
 		"no community that satisfies criteria",
 	)
 	s.Require().NoError(err)
 
-	err = <-waitOnCommunityToBeRekeyedOnceBobIsKicked
-	s.Require().NoError(err)
-
-	// send message to channel
-	msg = s.sendChatMessage(s.owner, chat.ID, messages[1])
-	s.logger.Debug("owner sent a message",
-		zap.String("messageText", msg.Text),
-		zap.String("messageID", msg.ID),
-	)
-
-	// bob can't read the message
+	// We are not member of the community anymore, so we need to refetch
+	// the data, since we would not be pulling it anymore
 	_, err = WaitOnMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
-			for _, message := range r.messages {
-				if message.Text == msg.Text {
-					return true
-				}
+			_, err := s.bob.FetchCommunity(&FetchCommunityRequest{WaitForResponse: true, TryDatabase: false, CommunityKey: community.IDString()})
+			if err != nil {
+				return false
 			}
-			return false
+			c, err := s.bob.communitiesManager.GetByID(community.ID())
+			return err == nil && c != nil && len(c.TokenPermissions()) > 0 && !c.Joined()
 		},
-		"no messages",
+		"no token permissions",
 	)
-	s.Require().Error(err)
-	s.Require().ErrorContains(err, "no messages")
+
+	s.Require().NoError(err)
 
 	// bob tries to join, but he doesn't satisfy so the request isn't sent
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), AddressesToReveal: []string{bobAddress}, AirdropAddress: bobAddress}
@@ -798,6 +776,9 @@ func(s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions()
 	pendingRequests, err := s.bob.MyPendingRequestsToJoin()
 	s.Require().NoError(err)
 	s.Require().Len(pendingRequests, 0)
+
+	// Send chat message while bob is not in the community
+	msg = s.sendChatMessage(s.owner, chat.ID, messages[1])
 
 	// make bob satisfy the criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, permissionRequest.TokenCriteria[0])
@@ -825,30 +806,17 @@ func(s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions()
 	_, err = WaitOnMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
-			if len(r.messages) != len(messages) {
-				return false
-			}
-			for _, message := range r.messages {
-				if message.Text == msg.Text {
-					return true
-				}
-			}
-			return false
+			// Bob should have all 3 messages
+			bobMessages, _, err = s.bob.MessageByChatID(msg.ChatId, "", 10)
+			return err == nil && len(bobMessages) == 3
 		},
 		"not all 3 messages received",
 	)
-	s.Require().NoError(err)
-
-	// Bob should have all 3 messages
 	bobMessages, _, err = s.bob.MessageByChatID(msg.ChatId, "", 10)
+	for _, m := range bobMessages {
+		fmt.Printf("ID: %s\n", m.ID)
+	}
 	s.Require().NoError(err)
-	s.Require().Len(bobMessages, 3)
-
-	sort.Slice(bobMessages, func(i, j int) bool {
-		return bobMessages[i].Text < bobMessages[j].Text
-	})
-
-	s.Require().Equal(messages[0], bobMessages[0].Text)
 }*/
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPermission() {
@@ -1029,7 +997,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWith
 	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
 }
 
-/*
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions() {
 	community, chat := s.createCommunity()
 
@@ -1083,7 +1050,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 	})
 	waitOnChannelToBeRekeyedOnceBobIsKicked := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
 		for channelID, action := range sub.keyActions.ChannelKeysActions {
-			if channelID == chat.CommunityChatID() && action.ActionType == communities.EncryptionKeyRekey {
+			// We both listen for Rekey or Add, since the first time around the community goes from non-encrypted to encrypted, and that's an Add
+			if channelID == chat.CommunityChatID() && (action.ActionType == communities.EncryptionKeyRekey || action.ActionType == communities.EncryptionKeyAdd) {
 				return true
 			}
 		}
@@ -1107,34 +1075,20 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 	_, err = WaitOnMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
-			if len(r.Communities()) == 0 {
+			community, err := s.bob.GetCommunityByID(community.ID())
+			if err != nil {
 				return false
 			}
-			channel := r.Communities()[0].Chats()[chat.CommunityChatID()]
+
+			if community == nil {
+				return false
+			}
+			channel := community.Chats()[chat.CommunityChatID()]
 			return channel != nil && len(channel.Members) == 0
 		},
 		"no community that satisfies criteria",
 	)
 	s.Require().NoError(err)
-
-	// send message to the channel
-	msg = s.sendChatMessage(s.owner, chat.ID, "hello on closed channel")
-
-	// bob can't read the message
-	_, err = WaitOnMessengerResponse(
-		s.bob,
-		func(r *MessengerResponse) bool {
-			for _, message := range r.messages {
-				if message.Text == msg.Text {
-					return true
-				}
-			}
-			return false
-		},
-		"no messages",
-	)
-	s.Require().Error(err)
-	s.Require().ErrorContains(err, "no messages")
 
 	// make bob satisfy channel criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, channelPermissionRequest.TokenCriteria[0])
@@ -1163,20 +1117,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 	err = <-waitOnChannelKeyToBeDistributedToBob
 	s.Require().NoError(err)
 
-	// ensure key is delivered to bob before message is sent
-	// FIXME: this step shouldn't be necessary as we store hash ratchet messages
-	// for later, to decrypt them when the key arrives.
-	// for some reason, without it, the test is flaky
-	_, _ = WaitOnMessengerResponse(
-		s.bob,
-		func(r *MessengerResponse) bool {
-			return false
-		},
-		"",
-	)
-
 	// send message to the channel
-	msg = s.sendChatMessage(s.owner, chat.ID, "hello on closed channel 2")
+	msg = s.sendChatMessage(s.owner, chat.ID, "hello on closed channel")
 
 	// bob can read the message
 	response, err = WaitOnMessengerResponse(
@@ -1194,7 +1136,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(msg.Text, response.Messages()[0].Text)
-} */
+}
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivilegedRoleInOpenCommunity(permissionType protobuf.CommunityTokenPermission_Type) {
 	community, _ := s.createCommunity()

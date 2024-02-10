@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/contracts"
+	"github.com/status-im/status-go/contracts/ierc1155"
 	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
@@ -31,6 +32,7 @@ import (
 const EstimateUsername = "RandomUsername"
 const EstimatePubKey = "0x04bb2024ce5d72e45d4a4f8589ae657ef9745855006996115a23a1af88d536cf02c0524a585fce7bfa79d6a9669af735eda6205d6c7e5b3cdc2b8ff7b2fa1f0b56"
 const ERC721TransferString = "ERC721Transfer"
+const ERC1155TransferString = "ERC1155Transfer"
 
 type SendType int
 
@@ -42,11 +44,16 @@ const (
 	StickersBuy
 	Bridge
 	ERC721Transfer
+	ERC1155Transfer
 )
+
+func (s SendType) IsCollectiblesTransfer() bool {
+	return s == ERC721Transfer || s == ERC1155Transfer
+}
 
 func (s SendType) FetchPrices(service *Service, tokenID string) (map[string]float64, error) {
 	symbols := []string{tokenID, "ETH"}
-	if s == ERC721Transfer {
+	if s.IsCollectiblesTransfer() {
 		symbols = []string{"ETH"}
 	}
 
@@ -58,14 +65,14 @@ func (s SendType) FetchPrices(service *Service, tokenID string) (map[string]floa
 	for symbol, pricePerCurrency := range pricesMap {
 		prices[symbol] = pricePerCurrency["USD"]
 	}
-	if s == ERC721Transfer {
+	if s.IsCollectiblesTransfer() {
 		prices[tokenID] = 0
 	}
 	return prices, nil
 }
 
 func (s SendType) FindToken(service *Service, account common.Address, network *params.Network, tokenID string) *token.Token {
-	if s != ERC721Transfer {
+	if !s.IsCollectiblesTransfer() {
 		return service.tokenManager.FindToken(network, tokenID)
 	}
 
@@ -89,11 +96,11 @@ func (s SendType) FindToken(service *Service, account common.Address, network *p
 }
 
 func (s SendType) isTransfer() bool {
-	return s == Transfer || s == ERC721Transfer
+	return s == Transfer || s.IsCollectiblesTransfer()
 }
 
 func (s SendType) isAvailableBetween(from, to *params.Network) bool {
-	if s == ERC721Transfer {
+	if s.IsCollectiblesTransfer() {
 		return from.ChainID == to.ChainID
 	}
 
@@ -113,11 +120,19 @@ func (s SendType) canUseBridge(b bridge.Bridge) bool {
 		return false
 	}
 
+	if s == ERC1155Transfer && b.Name() != ERC1155TransferString {
+		return false
+	}
+
+	if s != ERC1155Transfer && b.Name() == ERC1155TransferString {
+		return false
+	}
+
 	return true
 }
 
 func (s SendType) isAvailableFor(network *params.Network) bool {
-	if s == Transfer || s == Bridge || s == ERC721Transfer {
+	if s == Transfer || s == Bridge || s.IsCollectiblesTransfer() {
 		return true
 	}
 
@@ -408,12 +423,14 @@ func NewRouter(s *Service) *Router {
 	bridges := make(map[string]bridge.Bridge)
 	transfer := bridge.NewTransferBridge(s.rpcClient, s.transactor)
 	erc721Transfer := bridge.NewERC721TransferBridge(s.rpcClient, s.transactor)
+	erc1155Transfer := bridge.NewERC1155TransferBridge(s.rpcClient, s.transactor)
 	cbridge := bridge.NewCbridge(s.rpcClient, s.transactor, s.tokenManager)
 	hop := bridge.NewHopBridge(s.rpcClient, s.transactor, s.tokenManager)
 	bridges[transfer.Name()] = transfer
 	bridges[erc721Transfer.Name()] = erc721Transfer
 	bridges[hop.Name()] = hop
 	bridges[cbridge.Name()] = cbridge
+	bridges[erc1155Transfer.Name()] = erc1155Transfer
 
 	return &Router{s, bridges, s.rpcClient}
 }
@@ -507,6 +524,27 @@ func (r *Router) getBalance(ctx context.Context, network *params.Network, token 
 	return r.s.tokenManager.GetBalance(ctx, client, account, token.Address)
 }
 
+func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network, token *token.Token, account common.Address) (*big.Int, error) {
+	client, err := r.s.rpcClient.EthClient(network.ChainID)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenID, success := new(big.Int).SetString(token.Symbol, 10)
+	if !success {
+		return nil, errors.New("failed to convert token symbol to big.Int")
+	}
+
+	caller, err := ierc1155.NewIerc1155Caller(token.Address, client)
+	if err != nil {
+		return nil, err
+	}
+
+	return caller.BalanceOf(&bind.CallOpts{
+		Context: ctx,
+	}, account, tokenID)
+}
+
 func (r *Router) suggestedRoutes(
 	ctx context.Context,
 	sendType SendType,
@@ -572,7 +610,12 @@ func (r *Router) suggestedRoutes(
 
 			// Default value is 1 as in case of erc721 as we built the token we are sure the account owns it
 			balance := big.NewInt(1)
-			if sendType != ERC721Transfer {
+			if sendType == ERC1155Transfer {
+				balance, err = r.getERC1155Balance(ctx, network, token, addrFrom)
+				if err != nil {
+					return err
+				}
+			} else if sendType != ERC721Transfer {
 				balance, err = r.getBalance(ctx, network, token, addrFrom)
 				if err != nil {
 					return err

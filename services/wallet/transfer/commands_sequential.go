@@ -6,8 +6,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -27,11 +25,19 @@ import (
 
 var findBlocksRetryInterval = 5 * time.Second
 
+type nonceInfo struct {
+	nonce       *int64
+	blockNumber *big.Int
+}
+
 type findNewBlocksCommand struct {
 	*findBlocksCommand
-	contractMaker   *contracts.ContractMaker
-	iteration       int
-	blockChainState *blockchainstate.BlockChainState
+	contractMaker                *contracts.ContractMaker
+	iteration                    int
+	blockChainState              *blockchainstate.BlockChainState
+	lastNonces                   map[common.Address]nonceInfo
+	nonceCheckIntervalIterations int
+	logsCheckIntervalIterations  int
 }
 
 func (c *findNewBlocksCommand) Command() async.Command {
@@ -107,13 +113,28 @@ func (c *findNewBlocksCommand) detectTransfers(parent context.Context, accounts 
 	return blockNum, addressesToCheck, nil
 }
 
-func (c *findNewBlocksCommand) detectNonceChange(parent context.Context, from, to *big.Int, accounts []common.Address) ([]common.Address, error) {
-	addressesWithChange := []common.Address{}
+func (c *findNewBlocksCommand) detectNonceChange(parent context.Context, to *big.Int, accounts []common.Address) (map[common.Address]*big.Int, error) {
+	addressesWithChange := map[common.Address]*big.Int{}
 	for _, account := range accounts {
-		oldNonce, err := c.balanceCacher.NonceAt(parent, c.chainClient, account, from)
+		var oldNonce *int64
+
+		blockRange, err := c.blockRangeDAO.getBlockRange(c.chainClient.NetworkID(), account)
 		if err != nil {
-			log.Error("findNewBlocksCommand can't get nonce", "error", err, "account", account, "chain", c.chainClient.NetworkID())
+			log.Error("findNewBlocksCommand can't get block range", "error", err, "account", account, "chain", c.chainClient.NetworkID())
 			return nil, err
+		}
+
+		lastNonceInfo, ok := c.lastNonces[account]
+		if !ok || lastNonceInfo.blockNumber.Cmp(blockRange.eth.LastKnown) != 0 {
+			log.Info("Fetching old nonce", "at", blockRange.eth.LastKnown, "acc", account)
+
+			oldNonce, err = c.balanceCacher.NonceAt(parent, c.chainClient, account, blockRange.eth.LastKnown)
+			if err != nil {
+				log.Error("findNewBlocksCommand can't get nonce", "error", err, "account", account, "chain", c.chainClient.NetworkID())
+				return nil, err
+			}
+		} else {
+			oldNonce = lastNonceInfo.nonce
 		}
 
 		newNonce, err := c.balanceCacher.NonceAt(parent, c.chainClient, account, to)
@@ -122,8 +143,19 @@ func (c *findNewBlocksCommand) detectNonceChange(parent context.Context, from, t
 			return nil, err
 		}
 
+		log.Info("Comparing nonces", "oldNonce", *oldNonce, "newNonce", *newNonce, "to", to, "acc", account)
+
 		if *newNonce != *oldNonce {
-			addressesWithChange = append(addressesWithChange, account)
+			addressesWithChange[account] = blockRange.eth.LastKnown
+		}
+
+		if c.lastNonces == nil {
+			c.lastNonces = map[common.Address]nonceInfo{}
+		}
+
+		c.lastNonces[account] = nonceInfo{
+			nonce:       newNonce,
+			blockNumber: to,
 		}
 	}
 
@@ -180,23 +212,25 @@ func (c *findNewBlocksCommand) Run(parent context.Context) error {
 		if err != nil {
 			return err
 		}
-	} else if c.iteration%nonceCheckIntervalIterations == 0 && len(accountsWithOutsideTransfers) > 0 {
+	} else if c.iteration%c.nonceCheckIntervalIterations == 0 && len(accountsWithOutsideTransfers) > 0 {
 		log.Debug("findNewBlocksCommand nonce check", "accounts", accountsWithOutsideTransfers)
-		accountsWithNonceChanges, err := c.detectNonceChange(parent, c.fromBlockNumber, headNum, accountsWithOutsideTransfers)
+		accountsWithNonceChanges, err := c.detectNonceChange(parent, headNum, accountsWithOutsideTransfers)
 		if err != nil {
 			return err
 		}
 
 		if len(accountsWithNonceChanges) > 0 {
 			log.Debug("findNewBlocksCommand detected nonce diff", "accounts", accountsWithNonceChanges)
-			err = c.findAndSaveEthBlocks(parent, c.fromBlockNumber, headNum, accountsWithNonceChanges)
-			if err != nil {
-				return err
+			for account, from := range accountsWithNonceChanges {
+				err = c.findAndSaveEthBlocks(parent, from, headNum, []common.Address{account})
+				if err != nil {
+					return err
+				}
 			}
 		}
 
 		for _, account := range accountsToCheck {
-			if slices.Contains(accountsWithNonceChanges, account) {
+			if _, ok := accountsWithNonceChanges[account]; ok {
 				continue
 			}
 			err := c.markEthBlockRangeChecked(account, &BlockRange{nil, c.fromBlockNumber, headNum})
@@ -206,7 +240,7 @@ func (c *findNewBlocksCommand) Run(parent context.Context) error {
 		}
 	}
 
-	if len(accountsWithDetectedChanges) != 0 || c.iteration%logsCheckIntervalIterations == 0 {
+	if len(accountsWithDetectedChanges) != 0 || c.iteration%c.logsCheckIntervalIterations == 0 {
 		err = c.findAndSaveTokenBlocks(parent, c.fromBlockNumber, headNum)
 		if err != nil {
 			return err
@@ -1096,8 +1130,10 @@ func (c *loadBlocksAndTransfersCommand) startFetchingNewBlocks(ctx context.Conte
 				blocksLoadedCh:            blocksLoadedCh,
 				defaultNodeBlockChunkSize: DefaultNodeBlockChunkSize,
 			},
-			contractMaker:   c.contractMaker,
-			blockChainState: c.blockChainState,
+			contractMaker:                c.contractMaker,
+			blockChainState:              c.blockChainState,
+			nonceCheckIntervalIterations: nonceCheckIntervalIterations,
+			logsCheckIntervalIterations:  logsCheckIntervalIterations,
 		}
 		group := async.NewGroup(ctx)
 		group.Add(newBlocksCmd.Command())

@@ -1038,6 +1038,12 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 				return err
 			}
 			chat.UnviewedMessagesCount++
+
+			// Dispatch profile message to add a contact to the encrypted profile part
+			err = m.DispatchProfileShowcase()
+			if err != nil {
+				return err
+			}
 		}
 
 		state.Response.AddChat(chat)
@@ -1106,6 +1112,12 @@ func (m *Messenger) handleRetractContactRequest(state *ReceivedMessageState, con
 
 	timestamp := m.getTimesource().GetCurrentTime()
 	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeRemoved, clock, timestamp, false)
+	if err != nil {
+		return err
+	}
+
+	// Dispatch profile message to remove a contact from the encrypted profile part
+	err = m.DispatchProfileShowcase()
 	if err != nil {
 		return err
 	}
@@ -1463,7 +1475,7 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageSta
 		return err
 	}
 
-	state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
+	state.Response.AddRequestToJoinCommunity(requestToJoin)
 
 	// delete activity center notification
 	notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoin.ID)
@@ -1510,10 +1522,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, re
 			state.ModifiedContacts.Store(contact.ID, true)
 		}
 
-		if state.Response.RequestsToJoinCommunity == nil {
-			state.Response.RequestsToJoinCommunity = make([]*communities.RequestToJoin, 0)
-		}
-		state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
+		state.Response.AddRequestToJoinCommunity(requestToJoin)
 
 		state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact))
 
@@ -1626,14 +1635,15 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 	}
 
 	if updatedRequest != nil {
-		state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, updatedRequest)
+		state.Response.AddRequestToJoinCommunity(updatedRequest)
 	}
 
-	if requestToJoinResponseProto.Accepted {
-		community, err := m.communitiesManager.GetByID(requestToJoinResponseProto.CommunityId)
-		if err != nil {
-			return err
-		}
+	community, err := m.communitiesManager.GetByID(requestToJoinResponseProto.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	if requestToJoinResponseProto.Accepted && community != nil && community.HasMember(&m.identity.PublicKey) {
 
 		communityShardKey := &protobuf.CommunityShardKey{
 			CommunityId: requestToJoinResponseProto.CommunityId,
@@ -2448,15 +2458,11 @@ func (m *Messenger) HandleSyncSetting(messageState *ReceivedMessageState, messag
 }
 
 func (m *Messenger) HandleSyncAccountCustomizationColor(state *ReceivedMessageState, message *protobuf.SyncAccountCustomizationColor, statusMessage *v1protocol.StatusMessage) error {
-	result, err := m.multiAccounts.UpdateAccountCustomizationColor(message.GetKeyUid(), message.GetCustomizationColor(), message.GetUpdatedAt())
+	affected, err := m.multiAccounts.UpdateAccountCustomizationColor(message.GetKeyUid(), message.GetCustomizationColor(), message.GetUpdatedAt())
 	if err != nil {
 		return err
 	}
 
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
 	if affected > 0 {
 		state.Response.CustomizationColor = message.GetCustomizationColor()
 	}

@@ -48,7 +48,6 @@ type MessengerResponse struct {
 	Installations                 []*multidevice.Installation
 	Invitations                   []*GroupChatInvitation
 	CommunityChanges              []*communities.CommunityChanges
-	RequestsToJoinCommunity       []*communities.RequestToJoin
 	AnonymousMetrics              []*appmetrics.AppMetric
 	Mailservers                   []mailservers.Mailserver
 	CommunityStorenodes           []storenodes.Storenode
@@ -69,6 +68,7 @@ type MessengerResponse struct {
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
 	notifications               map[string]*localnotifications.Notification
+	requestsToJoinCommunity     map[string]*communities.RequestToJoin
 	chats                       map[string]*Chat
 	removedChats                map[string]bool
 	removedMessages             map[string]*RemovedMessage
@@ -145,7 +145,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Installations:           r.Installations,
 		Invitations:             r.Invitations,
 		CommunityChanges:        r.CommunityChanges,
-		RequestsToJoinCommunity: r.RequestsToJoinCommunity,
+		RequestsToJoinCommunity: r.RequestsToJoinCommunity(),
 		Mailservers:             r.Mailservers,
 		CommunityStorenodes:     r.CommunityStorenodes,
 		Bookmarks:               r.Bookmarks,
@@ -308,14 +308,15 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.activityCenterNotifications)+
 		len(r.trustStatus)+
 		len(r.verificationRequests)+
-		len(r.RequestsToJoinCommunity)+
+		len(r.requestsToJoinCommunity)+
 		len(r.savedAddresses)+
 		len(r.updatedProfileShowcases)+
 		len(r.seenAndUnseenMessages)+
 		len(r.ensUsernameDetails) == 0 &&
 		r.currentStatus == nil &&
 		r.activityCenterState == nil &&
-		r.SocialLinksInfo == nil
+		r.SocialLinksInfo == nil &&
+		r.CustomizationColor == ""
 }
 
 // Merge takes another response and appends the new Chats & new Messages and replaces
@@ -346,7 +347,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddInstallations(response.Installations)
 	r.AddSavedAddresses(response.SavedAddresses())
 	r.AddEnsUsernameDetails(response.EnsUsernameDetails())
-	r.AddRequestsToJoinCommunity(response.RequestsToJoinCommunity)
+	r.AddRequestsToJoinCommunity(response.RequestsToJoinCommunity())
 	r.AddBookmarks(response.GetBookmarks())
 	r.AddProfileShowcases(response.GetUpdatedProfileShowcases())
 	r.AddSeveralSeenAndUnseenMessages(response.GetSeenAndUnseenMessages())
@@ -392,11 +393,25 @@ func (r *MessengerResponse) UpdateCommunitySettings(communitySettings []*communi
 }
 
 func (r *MessengerResponse) AddRequestsToJoinCommunity(requestsToJoin []*communities.RequestToJoin) {
-	r.RequestsToJoinCommunity = append(r.RequestsToJoinCommunity, requestsToJoin...)
+	for _, rq := range requestsToJoin {
+		r.AddRequestToJoinCommunity(rq)
+	}
 }
 
 func (r *MessengerResponse) AddRequestToJoinCommunity(requestToJoin *communities.RequestToJoin) {
-	r.RequestsToJoinCommunity = append(r.RequestsToJoinCommunity, requestToJoin)
+	if r.requestsToJoinCommunity == nil {
+		r.requestsToJoinCommunity = make(map[string]*communities.RequestToJoin)
+	}
+	r.requestsToJoinCommunity[requestToJoin.ID.String()] = requestToJoin
+}
+
+func (r *MessengerResponse) RequestsToJoinCommunity() []*communities.RequestToJoin {
+	var rs []*communities.RequestToJoin
+	for _, r := range r.requestsToJoinCommunity {
+		rs = append(rs, r)
+	}
+
+	return rs
 }
 
 func (r *MessengerResponse) AddSetting(s *settings.SyncSettingField) {

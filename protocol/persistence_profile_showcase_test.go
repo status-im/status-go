@@ -374,3 +374,106 @@ func (s *TestProfileShowcasePersistence) TestFetchingProfileShowcaseAccountsByAd
 		}
 	}
 }
+
+func (s *TestProfileShowcasePersistence) TestUpdateProfileShowcaseAccountOnWalletAccountChange() {
+	db, err := openTestDB()
+	s.Require().NoError(err)
+	persistence := newSQLitePersistence(db)
+
+	deleteAccountAddress := "0x3243344513424"
+	updateAccountAddress := "0x3845354643324"
+
+	preferences := &ProfileShowcasePreferences{
+		Accounts: []*ProfileShowcaseAccountPreference{
+			&ProfileShowcaseAccountPreference{
+				Address:            deleteAccountAddress,
+				Name:               "Status Account",
+				ColorID:            "blue",
+				Emoji:              "-_-",
+				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+			&ProfileShowcaseAccountPreference{
+				Address:            updateAccountAddress,
+				Name:               "Money Box",
+				ColorID:            "red",
+				Emoji:              ":o)",
+				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				Order:              1,
+			},
+		},
+	}
+
+	err = persistence.SaveProfileShowcasePreferences(preferences)
+	s.Require().NoError(err)
+
+	account, err := persistence.GetProfileShowcaseAccountPreference(updateAccountAddress)
+	s.Require().NoError(err)
+	s.Require().NotNil(account)
+	s.Require().Equal(*account, *preferences.Accounts[1])
+
+	account.Name = "Music Box"
+	account.ColorID = "green"
+	account.Emoji = ">:-]"
+	account.ShowcaseVisibility = ProfileShowcaseVisibilityIDVerifiedContacts
+	account.Order = 7
+
+	err = persistence.SaveProfileShowcaseAccountPreference(account)
+	s.Require().NoError(err)
+
+	deleted, err := persistence.DeleteProfileShowcaseAccountPreference(deleteAccountAddress)
+	s.Require().NoError(err)
+	s.Require().True(deleted)
+
+	// One more time to check correct error handling
+	deleted, err = persistence.DeleteProfileShowcaseAccountPreference(deleteAccountAddress)
+	s.Require().NoError(err)
+	s.Require().False(deleted)
+
+	preferencesBack, err := persistence.GetProfileShowcasePreferences()
+	s.Require().NoError(err)
+
+	s.Require().Len(preferencesBack.Accounts, 1)
+	s.Require().Equal(*preferencesBack.Accounts[0], *account)
+}
+
+func (s *TestProfileShowcasePersistence) TestUpdateProfileShowcaseCommunityOnChange() {
+	db, err := openTestDB()
+	s.Require().NoError(err)
+	persistence := newSQLitePersistence(db)
+
+	deleteCommunityID := "0x3243344513424"
+
+	preferences := &ProfileShowcasePreferences{
+		Communities: []*ProfileShowcaseCommunityPreference{
+			&ProfileShowcaseCommunityPreference{
+				CommunityID:        "0x32433445133424",
+				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+			&ProfileShowcaseCommunityPreference{
+				CommunityID:        deleteCommunityID,
+				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				Order:              1,
+			},
+		},
+	}
+
+	err = persistence.SaveProfileShowcasePreferences(preferences)
+	s.Require().NoError(err)
+
+	deleted, err := persistence.DeleteProfileShowcaseCommunityPreference(deleteCommunityID)
+	s.Require().NoError(err)
+	s.Require().True(deleted)
+
+	// One more time to check correct error handling
+	deleted, err = persistence.DeleteProfileShowcaseCommunityPreference(deleteCommunityID)
+	s.Require().NoError(err)
+	s.Require().False(deleted)
+
+	preferencesBack, err := persistence.GetProfileShowcasePreferences()
+	s.Require().NoError(err)
+
+	s.Require().Len(preferencesBack.Communities, 1)
+	s.Require().Equal(*preferencesBack.Communities[0], *preferences.Communities[0])
+}

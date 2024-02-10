@@ -318,10 +318,11 @@ func (s *MessageSender) sendCommunity(
 	var hashes [][]byte
 	var newMessages []*types.NewMessage
 
+	forceRekey := rawMessage.CommunityKeyExMsgType == KeyExMsgRekey
+
 	// Check if it's a key exchange message. In this case we send it
 	// to all the recipients
 	if rawMessage.CommunityKeyExMsgType != KeyExMsgNone {
-		forceRekey := rawMessage.CommunityKeyExMsgType == KeyExMsgRekey
 		// If rekeycompatibility is on, we always
 		// want to execute below, otherwise we execute
 		// only when we want to fill up old keys to a given user
@@ -339,59 +340,6 @@ func (s *MessageSender) sendCommunity(
 				}
 			}
 		}
-
-		if forceRekey {
-
-			var ratchet *encryption.HashRatchetKeyCompatibility
-			// We have just rekeyed, pull the latest
-			if RekeyCompatibility {
-				ratchet, err = s.protocol.GetCurrentKeyForGroup(rawMessage.HashRatchetGroupID)
-				if err != nil {
-					return nil, err
-				}
-
-			}
-			// We send the message over the community topic
-			messages, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, ratchet)
-			if err != nil {
-				return nil, err
-			}
-			for _, m := range messages {
-				payload, err := proto.Marshal(m.Message)
-				if err != nil {
-					return nil, err
-				}
-
-				rawMessage.Payload = payload
-				newMessage := &types.NewMessage{
-					TTL:       whisperTTL,
-					Payload:   payload,
-					PowTarget: calculatePoW(payload),
-					PowTime:   whisperPoWTime,
-				}
-
-				newMessage.Ephemeral = rawMessage.Ephemeral
-				newMessage.PubsubTopic = rawMessage.PubsubTopic
-
-				messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, payload)
-				rawMessage.ID = types.EncodeHex(messageID)
-
-				// notify before dispatching
-				s.notifyOnScheduledMessage(nil, rawMessage)
-
-				newMessages, err = s.segmentMessage(newMessage)
-				if err != nil {
-					return nil, err
-				}
-				for _, newMessage := range newMessages {
-					_, err = s.transport.SendPublic(ctx, newMessage, types.EncodeHex(rawMessage.CommunityID))
-					if err != nil {
-						return nil, err
-					}
-				}
-			}
-		}
-		return nil, nil
 	}
 
 	wrappedMessage, err := s.wrapMessageV1(rawMessage)
@@ -410,7 +358,7 @@ func (s *MessageSender) sendCommunity(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to marshal")
 		}
-		hashes, newMessages, err = s.dispatchCommunityChatMessage(ctx, rawMessage, payload)
+		hashes, newMessages, err = s.dispatchCommunityChatMessage(ctx, rawMessage, payload, forceRekey)
 		if err != nil {
 			return nil, err
 		}
@@ -424,13 +372,11 @@ func (s *MessageSender) sendCommunity(
 
 	} else {
 
-		payload := wrappedMessage
-
 		pubkey, err := crypto.DecompressPubkey(rawMessage.CommunityID)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to decompress pubkey")
 		}
-		hashes, newMessages, err = s.dispatchCommunityMessage(ctx, pubkey, payload, rawMessage.PubsubTopic)
+		hashes, newMessages, err = s.dispatchCommunityMessage(ctx, pubkey, wrappedMessage, rawMessage.PubsubTopic, forceRekey, rawMessage)
 		if err != nil {
 			s.logger.Error("failed to send a community message", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to send a message spec")
@@ -495,8 +441,29 @@ func (s *MessageSender) sendPrivate(
 			}
 		}
 	} else if rawMessage.SkipEncryptionLayer {
+
+		messageBytes := wrappedMessage
+		if rawMessage.CommunityKeyExMsgType == KeyExMsgReuse {
+			groupID := rawMessage.HashRatchetGroupID
+
+			ratchets, err := s.protocol.GetKeysForGroup(groupID)
+			if err != nil {
+				return nil, err
+			}
+
+			message, err := s.protocol.BuildHashRatchetKeyExchangeMessageWithPayload(s.identity, recipient, groupID, ratchets, wrappedMessage)
+			if err != nil {
+				return nil, err
+			}
+
+			messageBytes, err = proto.Marshal(message.Message)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		// When SkipProtocolLayer is set we don't pass the message to the encryption layer
-		hashes, newMessages, err := s.sendPrivateRawMessage(ctx, rawMessage, recipient, wrappedMessage)
+		hashes, newMessages, err := s.sendPrivateRawMessage(ctx, rawMessage, recipient, messageBytes)
 		if err != nil {
 			s.logger.Error("failed to send a private message", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to send a message spec")
@@ -605,12 +572,35 @@ func (s *MessageSender) EncodeAbridgedMembershipUpdate(
 	return s.encodeMembershipUpdate(message, chatEntity)
 }
 
-func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMessage *RawMessage, wrappedMessage []byte) ([][]byte, []*types.NewMessage, error) {
+func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMessage *RawMessage, wrappedMessage []byte, rekey bool) ([][]byte, []*types.NewMessage, error) {
+	payload := wrappedMessage
+	var err error
+	if rekey && len(rawMessage.HashRatchetGroupID) != 0 {
+
+		var ratchet *encryption.HashRatchetKeyCompatibility
+		// We have just rekeyed, pull the latest
+		if RekeyCompatibility {
+			ratchet, err = s.protocol.GetCurrentKeyForGroup(rawMessage.HashRatchetGroupID)
+			if err != nil {
+				return nil, nil, err
+			}
+
+		}
+		// We send the message over the community topic
+		spec, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, wrappedMessage, ratchet)
+		if err != nil {
+			return nil, nil, err
+		}
+		payload, err = proto.Marshal(spec.Message)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
 
 	newMessage := &types.NewMessage{
 		TTL:         whisperTTL,
-		Payload:     wrappedMessage,
-		PowTarget:   calculatePoW(wrappedMessage),
+		Payload:     payload,
+		PowTarget:   calculatePoW(payload),
 		PowTime:     whisperPoWTime,
 		PubsubTopic: rawMessage.PubsubTopic,
 	}
@@ -671,7 +661,32 @@ func (s *MessageSender) SendPublic(
 		return nil, errors.Wrap(err, "failed to wrap a public message in the encryption layer")
 	}
 
-	if !rawMessage.SkipEncryptionLayer {
+	if len(rawMessage.HashRatchetGroupID) != 0 {
+
+		var ratchet *encryption.HashRatchetKeyCompatibility
+		var err error
+		// We have just rekeyed, pull the latest
+		ratchet, err = s.protocol.GetCurrentKeyForGroup(rawMessage.HashRatchetGroupID)
+		if err != nil {
+			return nil, err
+		}
+
+		keyID, err := ratchet.GetKeyID()
+		if err != nil {
+			return nil, err
+		}
+		s.logger.Debug("adding key id to message", zap.String("keyid", types.Bytes2Hex(keyID)))
+		// We send the message over the community topic
+		spec, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, wrappedMessage, ratchet)
+		if err != nil {
+			return nil, err
+		}
+		newMessage, err = MessageSpecToWhisper(spec)
+		if err != nil {
+			return nil, err
+		}
+
+	} else if !rawMessage.SkipEncryptionLayer {
 		newMessage, err = MessageSpecToWhisper(messageSpec)
 		if err != nil {
 			return nil, err
@@ -795,6 +810,7 @@ func (s *MessageSender) HandleMessages(wakuMessage *types.Message) (*HandleMessa
 
 		var processedIds [][]byte
 		for _, message := range messages {
+			hlogger.Info("handling out of order encrypted messages", zap.String("hash", types.Bytes2Hex(message.Hash)))
 			r, err := s.handleMessage(message)
 			if err != nil {
 				hlogger.Debug("failed to handle hash ratchet message", zap.Error(err))
@@ -1047,7 +1063,36 @@ func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *R
 
 // sendCommunityMessage sends a message not wrapped in an encryption layer
 // to a community
-func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, pubsubTopic string) ([][]byte, []*types.NewMessage, error) {
+func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey *ecdsa.PublicKey, wrappedMessage []byte, pubsubTopic string, rekey bool, rawMessage *RawMessage) ([][]byte, []*types.NewMessage, error) {
+	payload := wrappedMessage
+	if rekey && len(rawMessage.HashRatchetGroupID) != 0 {
+
+		var ratchet *encryption.HashRatchetKeyCompatibility
+		var err error
+		// We have just rekeyed, pull the latest
+		if RekeyCompatibility {
+			ratchet, err = s.protocol.GetCurrentKeyForGroup(rawMessage.HashRatchetGroupID)
+			if err != nil {
+				return nil, nil, err
+			}
+
+		}
+		keyID, err := ratchet.GetKeyID()
+		if err != nil {
+			return nil, nil, err
+		}
+		s.logger.Debug("adding key id to message", zap.String("keyid", types.Bytes2Hex(keyID)))
+		// We send the message over the community topic
+		spec, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, wrappedMessage, ratchet)
+		if err != nil {
+			return nil, nil, err
+		}
+		payload, err = proto.Marshal(spec.Message)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
 	newMessage := &types.NewMessage{
 		TTL:         whisperTTL,
 		Payload:     payload,

@@ -235,9 +235,9 @@ func (s *MessengerCommunitiesSuite) TestJoiningOpenCommunityReturnsChatsResponse
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	requestToJoin := response.RequestsToJoinCommunity[0]
+	requestToJoin := response.RequestsToJoinCommunity()[0]
 	s.Require().NotNil(requestToJoin)
 	s.Require().Equal(community.ID(), requestToJoin.CommunityID)
 	s.Require().NotEmpty(requestToJoin.ID)
@@ -250,7 +250,7 @@ func (s *MessengerCommunitiesSuite) TestJoiningOpenCommunityReturnsChatsResponse
 	response, err = WaitOnMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && len(r.RequestsToJoinCommunity) > 0
+			return len(r.Communities()) > 0 && len(r.RequestsToJoinCommunity()) > 0
 		},
 		"message not received",
 	)
@@ -829,7 +829,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 
@@ -841,7 +841,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	s.Require().Equal(notification.Accepted, false)
 	s.Require().Equal(notification.Dismissed, false)
 
-	requestToJoin1 := response.RequestsToJoinCommunity[0]
+	requestToJoin1 := response.RequestsToJoinCommunity()[0]
 	s.Require().NotNil(requestToJoin1)
 	s.Require().Equal(community.ID(), requestToJoin1.CommunityID)
 	s.Require().True(requestToJoin1.Our)
@@ -884,15 +884,15 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 		if err != nil {
 			return err
 		}
-		if len(response.RequestsToJoinCommunity) == 0 {
+		if len(response.RequestsToJoinCommunity()) == 0 {
 			return errors.New("request to join community not received")
 		}
 		return nil
 	})
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	requestToJoin2 := response.RequestsToJoinCommunity[0]
+	requestToJoin2 := response.RequestsToJoinCommunity()[0]
 
 	s.Require().NotNil(requestToJoin2)
 	s.Require().Equal(community.ID(), requestToJoin2.CommunityID)
@@ -954,8 +954,8 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
-	s.Require().Equal(communities.RequestToJoinStateAccepted, response.RequestsToJoinCommunity[0].State)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
+	s.Require().Equal(communities.RequestToJoinStateAccepted, response.RequestsToJoinCommunity()[0].State)
 
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 
@@ -1036,9 +1036,9 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	requestToJoin := response.RequestsToJoinCommunity[0]
+	requestToJoin := response.RequestsToJoinCommunity()[0]
 	s.Require().NotNil(requestToJoin)
 	s.Require().Equal(community.ID(), requestToJoin.CommunityID)
 	s.Require().NotEmpty(requestToJoin.ID)
@@ -1077,12 +1077,12 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 			return err
 		}
 
-		if len(response.RequestsToJoinCommunity) == 0 {
+		if len(response.RequestsToJoinCommunity()) == 0 {
 			return errors.New("request to join community not received")
 		}
 
 		// updating request clock by 8 days back
-		requestToJoin := response.RequestsToJoinCommunity[0]
+		requestToJoin := response.RequestsToJoinCommunity()[0]
 		err = s.bob.communitiesManager.UpdateClockInRequestToJoin(requestToJoin.ID, requestTime)
 		if err != nil {
 			return err
@@ -1094,7 +1094,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 		return nil
 	})
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	// Check activity center notification for Bob
 	fetchActivityCenterNotificationsForAdmin := func() (*ActivityCenterPaginationResponse, error) {
@@ -1116,10 +1116,10 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	// Delete pending request to join
 	response, err = s.alice.CheckAndDeletePendingRequestToJoinCommunity(ctx, true)
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 
-	requestToJoin = response.RequestsToJoinCommunity[0]
+	requestToJoin = response.RequestsToJoinCommunity()[0]
 	s.Require().True(requestToJoin.Deleted)
 
 	notification = response.ActivityCenterNotifications()[0]
@@ -1128,10 +1128,10 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 
 	response, err = s.bob.CheckAndDeletePendingRequestToJoinCommunity(ctx, true)
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 
-	requestToJoin = response.RequestsToJoinCommunity[0]
+	requestToJoin = response.RequestsToJoinCommunity()[0]
 	s.Require().True(requestToJoin.Deleted)
 
 	notification = response.ActivityCenterNotifications()[0]
@@ -1143,9 +1143,9 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	aliceRequestToJoin := response.RequestsToJoinCommunity[0]
+	aliceRequestToJoin := response.RequestsToJoinCommunity()[0]
 
 	// Retrieve request to join and Check activity center notification for Bob
 	err = tt.RetryWithBackOff(func() error {
@@ -1157,7 +1157,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 		// because request to join are hard deleted from the database, we can't check
 		// whether that's an old one or a new one. So here we test for the specific id
 
-		for _, r := range response.RequestsToJoinCommunity {
+		for _, r := range response.RequestsToJoinCommunity() {
 			if bytes.Equal(r.ID, aliceRequestToJoin.ID) {
 				return nil
 			}
@@ -1228,7 +1228,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	notification := response.ActivityCenterNotifications()[0]
 	s.Require().NotNil(notification)
@@ -1238,7 +1238,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	s.Require().Equal(notification.Deleted, false)
 	s.Require().Equal(notification.Read, true)
 
-	requestToJoin := response.RequestsToJoinCommunity[0]
+	requestToJoin := response.RequestsToJoinCommunity()[0]
 	s.Require().NotNil(requestToJoin)
 	s.Require().Equal(community.ID(), requestToJoin.CommunityID)
 	s.Require().NotEmpty(requestToJoin.ID)
@@ -1293,12 +1293,12 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 			return err
 		}
 
-		if len(response.RequestsToJoinCommunity) == 0 {
+		if len(response.RequestsToJoinCommunity()) == 0 {
 			return errors.New("request to join community not received")
 		}
 
 		// updating request clock by 8 days back
-		requestToJoin := response.RequestsToJoinCommunity[0]
+		requestToJoin := response.RequestsToJoinCommunity()[0]
 		err = s.bob.communitiesManager.UpdateClockInRequestToJoin(requestToJoin.ID, requestTime)
 		if err != nil {
 			return err
@@ -1310,7 +1310,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 		return nil
 	})
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	// Check activity center notification for Bob
 	fetchActivityCenterNotificationsForAdmin := func() (*ActivityCenterPaginationResponse, error) {
@@ -1376,9 +1376,9 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	// Delete pending request to join
 	response, err = s.alice.CheckAndDeletePendingRequestToJoinCommunity(ctx, true)
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	requestToJoin = response.RequestsToJoinCommunity[0]
+	requestToJoin = response.RequestsToJoinCommunity()[0]
 	s.Require().True(requestToJoin.Deleted)
 
 	notification = response.ActivityCenterNotifications()[0]
@@ -1396,7 +1396,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	// Retrieve request to join and Check activity center notification for Bob
 	err = tt.RetryWithBackOff(func() error {
@@ -1405,7 +1405,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 			return err
 		}
 
-		if len(response.RequestsToJoinCommunity) == 0 {
+		if len(response.RequestsToJoinCommunity()) == 0 {
 			return errors.New("request to join community not received")
 		}
 
@@ -1416,7 +1416,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 		return nil
 	})
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	// Check activity center notification for Bob
 	notifications, err = fetchActivityCenterNotificationsForAdmin()
@@ -1482,9 +1482,9 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	requestToJoin1 := response.RequestsToJoinCommunity[0]
+	requestToJoin1 := response.RequestsToJoinCommunity()[0]
 	s.Require().NotNil(requestToJoin1)
 	s.Require().Equal(community.ID(), requestToJoin1.CommunityID)
 	s.Require().True(requestToJoin1.Our)
@@ -1527,7 +1527,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 		if err != nil {
 			return err
 		}
-		if len(response.RequestsToJoinCommunity) == 0 {
+		if len(response.RequestsToJoinCommunity()) == 0 {
 			return errors.New("request to join community not received")
 		}
 		if len(response.ActivityCenterNotifications()) == 0 {
@@ -1536,9 +1536,9 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 		return nil
 	})
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	requestToJoin2 := response.RequestsToJoinCommunity[0]
+	requestToJoin2 := response.RequestsToJoinCommunity()[0]
 
 	s.Require().NotNil(requestToJoin2)
 	s.Require().Equal(community.ID(), requestToJoin2.CommunityID)
@@ -1561,8 +1561,8 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	response, err = s.alice.CancelRequestToJoinCommunity(ctx, requestToCancel)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
-	s.Require().Equal(communities.RequestToJoinStateCanceled, response.RequestsToJoinCommunity[0].State)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
+	s.Require().Equal(communities.RequestToJoinStateCanceled, response.RequestsToJoinCommunity()[0].State)
 
 	// pull to make sure it has been saved
 	cancelRequestsToJoin, err := s.alice.MyCanceledRequestsToJoin()
@@ -1576,16 +1576,16 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 		if err != nil {
 			return err
 		}
-		if len(response.RequestsToJoinCommunity) == 0 {
+		if len(response.RequestsToJoinCommunity()) == 0 {
 			return errors.New("request to join community not received")
 		}
 		return nil
 	})
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	// Retrieve activity center notifications for admin to make sure the request notification is deleted
 	notifications, err := s.bob.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
@@ -1598,7 +1598,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	s.Require().NoError(err)
 	s.Require().Len(notifications.Notifications, 0)
 
-	cancelRequestToJoin2 := response.RequestsToJoinCommunity[0]
+	cancelRequestToJoin2 := response.RequestsToJoinCommunity()[0]
 
 	s.Require().NotNil(cancelRequestToJoin2)
 	s.Require().Equal(community.ID(), cancelRequestToJoin2.CommunityID)
@@ -1658,7 +1658,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 
@@ -1670,7 +1670,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().Equal(notification.Accepted, false)
 	s.Require().Equal(notification.Dismissed, false)
 
-	requestToJoin1 := response.RequestsToJoinCommunity[0]
+	requestToJoin1 := response.RequestsToJoinCommunity()[0]
 	s.Require().NotNil(requestToJoin1)
 	s.Require().Equal(community.ID(), requestToJoin1.CommunityID)
 	s.Require().True(requestToJoin1.Our)
@@ -1713,15 +1713,15 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 		if err != nil {
 			return err
 		}
-		if len(response.RequestsToJoinCommunity) == 0 {
+		if len(response.RequestsToJoinCommunity()) == 0 {
 			return errors.New("request to join community not received")
 		}
 		return nil
 	})
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	requestToJoin2 := response.RequestsToJoinCommunity[0]
+	requestToJoin2 := response.RequestsToJoinCommunity()[0]
 
 	s.Require().NotNil(requestToJoin2)
 	s.Require().Equal(community.ID(), requestToJoin2.CommunityID)
@@ -1861,9 +1861,9 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	response, err = s.alice.RequestToJoinCommunity(request3)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	requestToJoin3 := response.RequestsToJoinCommunity[0]
+	requestToJoin3 := response.RequestsToJoinCommunity()[0]
 	s.Require().NotNil(requestToJoin3)
 	s.Require().Equal(community.ID(), requestToJoin3.CommunityID)
 	s.Require().True(requestToJoin3.Our)
@@ -1884,13 +1884,15 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 
 	// Retrieve request to join
 	response, err = WaitOnMessengerResponse(s.bob,
-		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) == 1 },
+		func(r *MessengerResponse) bool {
+			return len(r.RequestsToJoinCommunity()) == 1
+		},
 		"request to join community was never 1",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	requestToJoin4 := response.RequestsToJoinCommunity[0]
+	requestToJoin4 := response.RequestsToJoinCommunity()[0]
 
 	s.Require().NotNil(requestToJoin4)
 	s.Require().Equal(community.ID(), requestToJoin4.CommunityID)
@@ -1952,9 +1954,9 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	requestToJoin1 := response.RequestsToJoinCommunity[0]
+	requestToJoin1 := response.RequestsToJoinCommunity()[0]
 	s.Require().NotNil(requestToJoin1)
 	s.Require().Equal(community.ID(), requestToJoin1.CommunityID)
 	s.Require().True(requestToJoin1.Our)
@@ -1997,13 +1999,13 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 		if err != nil {
 			return err
 		}
-		if len(response.RequestsToJoinCommunity) == 0 {
+		if len(response.RequestsToJoinCommunity()) == 0 {
 			return errors.New("request to join community not received")
 		}
 		return nil
 	})
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	// Check if admin sees requests correctly
 	requestsToJoin, err := s.bob.PendingRequestsToJoinForCommunity(community.ID())
@@ -2014,7 +2016,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 	s.Require().NoError(err)
 	s.Require().Len(requestsToJoin, 0)
 
-	requestToJoin2 := response.RequestsToJoinCommunity[0]
+	requestToJoin2 := response.RequestsToJoinCommunity()[0]
 
 	s.Require().NotNil(requestToJoin2)
 	s.Require().Equal(community.ID(), requestToJoin2.CommunityID)
@@ -2687,7 +2689,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	response, err = s.alice.RequestToJoinCommunity(&requests.RequestToJoinCommunity{CommunityID: community.ID()})
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 
@@ -2696,7 +2698,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
 
-	aRtj := response.RequestsToJoinCommunity[0]
+	aRtj := response.RequestsToJoinCommunity()[0]
 	s.Require().NotNil(aRtj)
 	s.Equal(community.ID(), aRtj.CommunityID)
 	s.True(aRtj.Our)
@@ -2780,16 +2782,16 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 		if err != nil {
 			return err
 		}
-		if len(response.RequestsToJoinCommunity) == 0 {
+		if len(response.RequestsToJoinCommunity()) == 0 {
 			return errors.New("request to join community not received")
 		}
 		return nil
 	})
 	s.Require().NoError(err)
-	s.Len(response.RequestsToJoinCommunity, 1)
+	s.Len(response.RequestsToJoinCommunity(), 1)
 
 	// Check that bob the admin's newly received request to join matches what we expect
-	bobRtj := response.RequestsToJoinCommunity[0]
+	bobRtj := response.RequestsToJoinCommunity()[0]
 	s.Require().NotNil(bobRtj)
 	s.Equal(community.ID(), bobRtj.CommunityID)
 	s.False(bobRtj.Our)
@@ -3470,6 +3472,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Communities()[0].Members(), 1)
 
 	// Check community is present in the DB and has default values we care about
 	c, err := s.owner.GetCommunityByID(response.Communities()[0].ID())
@@ -3716,9 +3719,9 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	response, err := s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	requestToJoin1 := response.RequestsToJoinCommunity[0]
+	requestToJoin1 := response.RequestsToJoinCommunity()[0]
 	s.Require().NotNil(requestToJoin1)
 	s.Require().Equal(community.ID(), requestToJoin1.CommunityID)
 	s.Require().True(requestToJoin1.Our)
@@ -3774,7 +3777,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	s.Require().NoError(err)
 	s.Require().Len(requestsToJoin, 1)
 
-	requestToJoin2 := response.RequestsToJoinCommunity[0]
+	requestToJoin2 := response.RequestsToJoinCommunity()[0]
 
 	s.Require().NotNil(requestToJoin2)
 	s.Require().Equal(community.ID(), requestToJoin2.CommunityID)
@@ -3789,8 +3792,8 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	response, err = s.alice.CancelRequestToJoinCommunity(ctx, requestToCancel)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
-	s.Require().Equal(communities.RequestToJoinStateCanceled, response.RequestsToJoinCommunity[0].State)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
+	s.Require().Equal(communities.RequestToJoinStateCanceled, response.RequestsToJoinCommunity()[0].State)
 
 	messageState = s.alice.buildMessageState()
 	messageState.CurrentMessageState = &CurrentMessageState{}
@@ -3857,7 +3860,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 
 	s.Require().NoError(err)
 	s.Require().Len(notifications.Notifications, 0)
-	cancelRequestToJoin2 := response.RequestsToJoinCommunity[0]
+	cancelRequestToJoin2 := response.RequestsToJoinCommunity()[0]
 	s.Require().NotNil(cancelRequestToJoin2)
 	s.Require().Equal(community.ID(), cancelRequestToJoin2.CommunityID)
 	s.Require().False(cancelRequestToJoin2.Our)

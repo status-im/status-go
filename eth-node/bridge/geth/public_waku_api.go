@@ -10,7 +10,7 @@ import (
 	wakucommon "github.com/status-im/status-go/waku/common"
 )
 
-type gethPublicWakuAPIWrapper struct {
+type GethPublicWakuAPIWrapper struct {
 	api *waku.PublicWakuAPI
 }
 
@@ -20,29 +20,29 @@ func NewGethPublicWakuAPIWrapper(api *waku.PublicWakuAPI) types.PublicWakuAPI {
 		panic("PublicWakuAPI cannot be nil")
 	}
 
-	return &gethPublicWakuAPIWrapper{
+	return &GethPublicWakuAPIWrapper{
 		api: api,
 	}
 }
 
 // AddPrivateKey imports the given private key.
-func (w *gethPublicWakuAPIWrapper) AddPrivateKey(ctx context.Context, privateKey types.HexBytes) (string, error) {
+func (w *GethPublicWakuAPIWrapper) AddPrivateKey(ctx context.Context, privateKey types.HexBytes) (string, error) {
 	return w.api.AddPrivateKey(ctx, hexutil.Bytes(privateKey))
 }
 
 // GenerateSymKeyFromPassword derives a key from the given password, stores it, and returns its ID.
-func (w *gethPublicWakuAPIWrapper) GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error) {
+func (w *GethPublicWakuAPIWrapper) GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error) {
 	return w.api.GenerateSymKeyFromPassword(ctx, passwd)
 }
 
 // DeleteKeyPair removes the key with the given key if it exists.
-func (w *gethPublicWakuAPIWrapper) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
+func (w *GethPublicWakuAPIWrapper) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
 	return w.api.DeleteKeyPair(ctx, key)
 }
 
 // NewMessageFilter creates a new filter that can be used to poll for
 // (new) messages that satisfy the given criteria.
-func (w *gethPublicWakuAPIWrapper) NewMessageFilter(req types.Criteria) (string, error) {
+func (w *GethPublicWakuAPIWrapper) NewMessageFilter(req types.Criteria) (string, error) {
 	topics := make([]wakucommon.TopicType, len(req.Topics))
 	for index, tt := range req.Topics {
 		topics[index] = wakucommon.TopicType(tt)
@@ -59,13 +59,13 @@ func (w *gethPublicWakuAPIWrapper) NewMessageFilter(req types.Criteria) (string,
 	return w.api.NewMessageFilter(criteria)
 }
 
-func (w *gethPublicWakuAPIWrapper) BloomFilter() []byte {
+func (w *GethPublicWakuAPIWrapper) BloomFilter() []byte {
 	return w.api.BloomFilter()
 }
 
 // GetFilterMessages returns the messages that match the filter criteria and
 // are received between the last poll and now.
-func (w *gethPublicWakuAPIWrapper) GetFilterMessages(id string) ([]*types.Message, error) {
+func (w *GethPublicWakuAPIWrapper) GetFilterMessages(id string) ([]*types.Message, error) {
 	msgs, err := w.api.GetFilterMessages(id)
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func (w *gethPublicWakuAPIWrapper) GetFilterMessages(id string) ([]*types.Messag
 
 // Post posts a message on the network.
 // returns the hash of the message in case of success.
-func (w *gethPublicWakuAPIWrapper) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
+func (w *GethPublicWakuAPIWrapper) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
 	msg := waku.NewMessage{
 		SymKeyID:   req.SymKeyID,
 		PublicKey:  req.PublicKey,

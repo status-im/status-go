@@ -129,20 +129,20 @@ func NewService(
 
 	accountOwnershipProviders := []thirdparty.CollectibleAccountOwnershipProvider{
 		raribleClient,
-		openseaV2Client,
 		alchemyClient,
+		openseaV2Client,
 	}
 
 	collectibleDataProviders := []thirdparty.CollectibleDataProvider{
 		raribleClient,
-		openseaV2Client,
 		alchemyClient,
+		openseaV2Client,
 	}
 
 	collectionDataProviders := []thirdparty.CollectionDataProvider{
 		raribleClient,
-		openseaV2Client,
 		alchemyClient,
+		openseaV2Client,
 	}
 
 	collectiblesManager := collectibles.NewManager(db, rpcClient, communityManager, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, mediaServer, feed)

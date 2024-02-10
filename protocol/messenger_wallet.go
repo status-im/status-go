@@ -172,7 +172,12 @@ func (m *Messenger) SaveOrUpdateAccount(acc *accounts.Account) error {
 		return err
 	}
 
-	return m.resolveAndSyncKeypairOrJustWalletAccount(acc.KeyUID, acc.Address, acc.Clock, m.dispatchMessage)
+	err = m.resolveAndSyncKeypairOrJustWalletAccount(acc.KeyUID, acc.Address, acc.Clock, m.dispatchMessage)
+	if err != nil {
+		return err
+	}
+
+	return m.UpdateProfileShowcaseWalletAccount(acc)
 }
 
 func (m *Messenger) MarkKeypairFullyOperable(keyUID string) error {
@@ -298,7 +303,12 @@ func (m *Messenger) DeleteAccount(address types.Address) error {
 		return err
 	}
 	// Since some keypairs may be received out of expected order, we're aligning that by sending accounts position sync msg.
-	return m.syncAccountsPositions(m.dispatchMessage)
+	err = m.syncAccountsPositions(m.dispatchMessage)
+	if err != nil {
+		return err
+	}
+
+	return m.DeleteProfileShowcaseWalletAccount(acc)
 }
 
 func (m *Messenger) DeleteKeypair(keyUID string) error {

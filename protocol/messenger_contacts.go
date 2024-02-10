@@ -303,6 +303,12 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 		if err != nil {
 			return nil, err
 		}
+
+		// Dispatch profile message to add a contact to the encrypted profile part
+		err = m.DispatchProfileShowcase()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if response == nil {
@@ -678,6 +684,12 @@ func (m *Messenger) removeContact(ctx context.Context, response *MessengerRespon
 
 	// And we re-register for push notications
 	err = m.reregisterForPushNotifications()
+	if err != nil {
+		return err
+	}
+
+	// Dispatch profile message to remove a contact from the encrypted profile part
+	err = m.DispatchProfileShowcase()
 	if err != nil {
 		return err
 	}

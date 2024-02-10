@@ -183,6 +183,9 @@ type Messenger struct {
 	// used to track unhandled messages
 	unhandledMessagesTracker func(*v1protocol.StatusMessage, error)
 
+	// enables control over chat messages iteration
+	retrievedMessagesIteratorFactory func(map[transport.Filter][]*types.Message) MessagesIterator
+
 	peersyncing         *peersyncing.PeerSyncing
 	peersyncingOffers   map[string]uint64
 	peersyncingRequests map[string]uint64
@@ -580,8 +583,9 @@ func NewMessenger(
 			func() error { _ = logger.Sync; return nil },
 			database.Close,
 		},
-		logger:                logger,
-		savedAddressesManager: savedAddressesManager,
+		logger:                           logger,
+		savedAddressesManager:            savedAddressesManager,
+		retrievedMessagesIteratorFactory: NewDefaultMessagesIterator,
 	}
 
 	if c.rpcClient != nil {
@@ -3741,7 +3745,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		logger.Info("failed to retrieve admin communities", zap.Error(err))
 	}
 
-	for filter, messages := range chatWithMessages {
+	iterator := m.retrievedMessagesIteratorFactory(chatWithMessages)
+	for iterator.HasNext() {
+		filter, messages := iterator.Next()
+
 		var processedMessages []string
 		for _, shhMessage := range messages {
 			logger := logger.With(zap.String("hash", types.EncodeHex(shhMessage.Hash)))

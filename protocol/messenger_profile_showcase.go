@@ -8,7 +8,9 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -206,6 +208,10 @@ func (m *Messenger) SetProfileShowcasePreferences(preferences *ProfileShowcasePr
 		return err
 	}
 
+	return m.DispatchProfileShowcase()
+}
+
+func (m *Messenger) DispatchProfileShowcase() error {
 	return m.publishContactCode()
 }
 
@@ -445,5 +451,52 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState
 	}
 
 	state.Response.AddProfileShowcase(newShowcase)
+	return nil
+}
+
+func (m *Messenger) UpdateProfileShowcaseWalletAccount(account *accounts.Account) error {
+	profileAccount, err := m.persistence.GetProfileShowcaseAccountPreference(account.Address.Hex())
+	if err != nil {
+		return err
+	}
+
+	if profileAccount == nil {
+		// No corresponding profile entry, exit
+		return nil
+	}
+
+	profileAccount.Name = account.Name
+	profileAccount.ColorID = string(account.ColorID)
+	profileAccount.Emoji = account.Emoji
+
+	err = m.persistence.SaveProfileShowcaseAccountPreference(profileAccount)
+	if err != nil {
+		return err
+	}
+
+	return m.DispatchProfileShowcase()
+}
+
+func (m *Messenger) DeleteProfileShowcaseWalletAccount(account *accounts.Account) error {
+	deleted, err := m.persistence.DeleteProfileShowcaseAccountPreference(account.Address.Hex())
+	if err != nil {
+		return err
+	}
+
+	if deleted {
+		return m.DispatchProfileShowcase()
+	}
+	return nil
+}
+
+func (m *Messenger) DeleteProfileShowcaseCommunity(community *communities.Community) error {
+	deleted, err := m.persistence.DeleteProfileShowcaseCommunityPreference(community.IDString())
+	if err != nil {
+		return err
+	}
+
+	if deleted {
+		return m.DispatchProfileShowcase()
+	}
 	return nil
 }

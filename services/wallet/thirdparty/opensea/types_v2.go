@@ -46,6 +46,17 @@ func chainIDToChainString(chainID walletCommon.ChainID) string {
 	return chainString
 }
 
+func openseaToContractType(contractType string) walletCommon.ContractType {
+	switch contractType {
+	case "cryptopunks", "erc721":
+		return walletCommon.ContractTypeERC721
+	case "erc1155":
+		return walletCommon.ContractTypeERC1155
+	default:
+		return walletCommon.ContractTypeUnknown
+	}
+}
+
 type NFTContainer struct {
 	NFTs       []NFT  `json:"nfts"`
 	NextCursor string `json:"next"`
@@ -149,6 +160,7 @@ func (c *NFT) id(chainID walletCommon.ChainID) thirdparty.CollectibleUniqueID {
 func (c *NFT) toCollectiblesData(chainID walletCommon.ChainID) thirdparty.CollectibleData {
 	return thirdparty.CollectibleData{
 		ID:           c.id(chainID),
+		ContractType: openseaToContractType(c.TokenStandard),
 		Provider:     OpenseaV2ID,
 		Name:         c.Name,
 		Description:  c.Description,
@@ -195,6 +207,7 @@ func (c *DetailedNFT) id(chainID walletCommon.ChainID) thirdparty.CollectibleUni
 func (c *DetailedNFT) toCollectiblesData(chainID walletCommon.ChainID) thirdparty.CollectibleData {
 	return thirdparty.CollectibleData{
 		ID:           c.id(chainID),
+		ContractType: openseaToContractType(c.TokenStandard),
 		Provider:     OpenseaV2ID,
 		Name:         c.Name,
 		Description:  c.Description,
@@ -212,13 +225,14 @@ func (c *DetailedNFT) toCommon(chainID walletCommon.ChainID) thirdparty.FullColl
 	}
 }
 
-func (c *CollectionData) toCommon(id thirdparty.ContractID) thirdparty.CollectionData {
+func (c *CollectionData) toCommon(id thirdparty.ContractID, tokenStandard string) thirdparty.CollectionData {
 	ret := thirdparty.CollectionData{
-		ID:       id,
-		Provider: OpenseaV2ID,
-		Name:     c.Name,
-		Slug:     c.Collection,
-		ImageURL: c.ImageURL,
+		ID:           id,
+		ContractType: openseaToContractType(tokenStandard),
+		Provider:     OpenseaV2ID,
+		Name:         c.Name,
+		Slug:         c.Collection,
+		ImageURL:     c.ImageURL,
 	}
 	return ret
 }

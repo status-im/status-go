@@ -153,6 +153,11 @@ message CommunityCancelRequestToJoin {
   string display_name = 5;
 }
 
+message CommunityUserKicked {
+  uint64 clock = 1;
+  bytes community_id = 2;
+}
+
 message CommunityRequestToJoinResponse {
   uint64 clock = 1;
   CommunityDescription community = 2;

@@ -10,6 +10,9 @@ import (
 
 	"go.uber.org/zap"
 
+	maps "golang.org/x/exp/maps"
+	slices "golang.org/x/exp/slices"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/protocol/ens"
@@ -91,13 +94,54 @@ func (p *DefaultPermissionChecker) GetOwnedERC721Tokens(walletAddresses []gethco
 	return ownedERC721Tokens, nil
 }
 
+func (p *DefaultPermissionChecker) accountChainsCombinationToMap(combinations []*AccountChainIDsCombination) map[gethcommon.Address][]uint64 {
+	result := make(map[gethcommon.Address][]uint64)
+	for _, combination := range combinations {
+		result[combination.Address] = combination.ChainIDs
+	}
+	return result
+}
+
+// merge valid combinations w/o duplicates
+func (p *DefaultPermissionChecker) MergeValidCombinations(left, right []*AccountChainIDsCombination) []*AccountChainIDsCombination {
+
+	leftMap := p.accountChainsCombinationToMap(left)
+	rightMap := p.accountChainsCombinationToMap(right)
+
+	// merge maps, result in left map
+	for k, v := range rightMap {
+		if _, exists := leftMap[k]; !exists {
+			leftMap[k] = v
+			continue
+		} else {
+			// append chains which are new
+			chains := leftMap[k]
+			for _, chainID := range v {
+				if !slices.Contains(chains, chainID) {
+					chains = append(chains, chainID)
+				}
+			}
+			leftMap[k] = chains
+		}
+	}
+
+	result := []*AccountChainIDsCombination{}
+	for k, v := range leftMap {
+		result = append(result, &AccountChainIDsCombination{
+			Address:  k,
+			ChainIDs: v,
+		})
+	}
+
+	return result
+}
+
 func (p *DefaultPermissionChecker) CheckPermissionToJoin(community *Community, addresses []gethcommon.Address) (*CheckPermissionToJoinResponse, error) {
 	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	becomeTokenMasterPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 
-	permissionsToJoin := append(becomeAdminPermissions, becomeMemberPermissions...)
-	permissionsToJoin = append(permissionsToJoin, becomeTokenMasterPermissions...)
+	adminOrTokenMasterPermissionsToJoin := append(becomeAdminPermissions, becomeTokenMasterPermissions...)
 
 	allChainIDs, err := p.tokenManager.GetAllChainIDs()
 	if err != nil {
@@ -106,7 +150,39 @@ func (p *DefaultPermissionChecker) CheckPermissionToJoin(community *Community, a
 
 	accountsAndChainIDs := combineAddressesAndChainIDs(addresses, allChainIDs)
 
-	if len(becomeMemberPermissions) == 0 || len(permissionsToJoin) == 0 {
+	// Check becomeMember and (admin & token master) permissions separately.
+	becomeMemberPermissionsResponse, err := p.checkPermissionsOrDefault(becomeMemberPermissions, accountsAndChainIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(adminOrTokenMasterPermissionsToJoin) <= 0 {
+		return becomeMemberPermissionsResponse, nil
+	}
+	// If there are any admin or token master permissions, combine result.
+
+	adminOrTokenPermissionsResponse, err := p.CheckPermissions(adminOrTokenMasterPermissionsToJoin, accountsAndChainIDs, false)
+	if err != nil {
+		return nil, err
+	}
+
+	mergedPermissions := make(map[string]*PermissionTokenCriteriaResult)
+	maps.Copy(mergedPermissions, becomeMemberPermissionsResponse.Permissions)
+	maps.Copy(mergedPermissions, adminOrTokenPermissionsResponse.Permissions)
+
+	mergedCombinations := p.MergeValidCombinations(becomeMemberPermissionsResponse.ValidCombinations, adminOrTokenPermissionsResponse.ValidCombinations)
+
+	combinedResponse := &CheckPermissionsResponse{
+		Satisfied:         becomeMemberPermissionsResponse.Satisfied || adminOrTokenPermissionsResponse.Satisfied,
+		Permissions:       mergedPermissions,
+		ValidCombinations: mergedCombinations,
+	}
+
+	return combinedResponse, nil
+}
+
+func (p *DefaultPermissionChecker) checkPermissionsOrDefault(permissions []*CommunityTokenPermission, accountsAndChainIDs []*AccountChainIDsCombination) (*CheckPermissionsResponse, error) {
+	if len(permissions) == 0 {
 		// There are no permissions to join on this community at the moment,
 		// so we reveal all accounts + all chain IDs
 		response := &CheckPermissionsResponse{
@@ -116,7 +192,7 @@ func (p *DefaultPermissionChecker) CheckPermissionToJoin(community *Community, a
 		}
 		return response, nil
 	}
-	return p.CheckPermissions(permissionsToJoin, accountsAndChainIDs, false)
+	return p.CheckPermissions(permissions, accountsAndChainIDs, false)
 }
 
 // CheckPermissions will retrieve balances and check whether the user has

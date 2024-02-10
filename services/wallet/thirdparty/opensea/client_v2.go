@@ -311,7 +311,7 @@ func (o *ClientV2) FetchCollectionsDataByContractID(ctx context.Context, contrac
 			return nil, err
 		}
 
-		ret = append(ret, collectionData.toCommon(id))
+		ret = append(ret, collectionData.toCommon(id, contractData.ContractStandard))
 	}
 
 	return ret, nil

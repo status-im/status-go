@@ -1521,6 +1521,11 @@ func (api *PublicAPI) GetCommunityTokens(communityID string) ([]*token.Community
 	return api.service.messenger.GetCommunityTokens(communityID)
 }
 
+// GetCommunityPermissionedBalances returns balances indexed by account address.
+func (api *PublicAPI) GetCommunityPermissionedBalances(request *requests.GetPermissionedBalances) (map[ethcommon.Address][]communities.PermissionedBalance, error) {
+	return api.service.messenger.GetCommunityPermissionedBalances(request)
+}
+
 func (api *PublicAPI) GetAllCommunityTokens() ([]*token.CommunityToken, error) {
 	return api.service.messenger.GetAllCommunityTokens()
 }
@@ -1732,6 +1737,10 @@ func (api *PublicAPI) SetLogLevel(request *requests.SetLogLevel) error {
 
 func (api *PublicAPI) SetCustomNodes(request *requests.SetCustomNodes) error {
 	return api.service.messenger.SetCustomNodes(request)
+}
+
+func (api *PublicAPI) SetCustomizationColor(ctx context.Context, request *requests.SetCustomizationColor) error {
+	return api.service.messenger.SetCustomizationColor(ctx, request)
 }
 
 // -----

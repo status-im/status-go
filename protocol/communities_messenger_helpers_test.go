@@ -400,7 +400,7 @@ func joinCommunity(s *suite.Suite, community *communities.Community, owner *Mess
 	response, err := user.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 
 	notification := response.ActivityCenterNotifications()[0]
@@ -425,19 +425,19 @@ func requestToJoinCommunity(s *suite.Suite, controlNode *Messenger, user *Messen
 	response, err := user.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	requestToJoin := response.RequestsToJoinCommunity[0]
+	requestToJoin := response.RequestsToJoinCommunity()[0]
 	s.Require().Equal(requestToJoin.PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
 
 	_, err = WaitOnMessengerResponse(
 		controlNode,
 		func(r *MessengerResponse) bool {
-			if len(r.RequestsToJoinCommunity) == 0 {
+			if len(r.RequestsToJoinCommunity()) == 0 {
 				return false
 			}
 
-			for _, resultRequest := range r.RequestsToJoinCommunity {
+			for _, resultRequest := range r.RequestsToJoinCommunity() {
 				if resultRequest.PublicKey == common.PubkeyToHex(&user.identity.PublicKey) {
 					return true
 				}
@@ -489,7 +489,6 @@ func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, co
 	s.Require().NoError(err)
 }
 
-/*
 func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text string) *common.Message {
 	msg := &common.Message{
 		ChatMessage: &protobuf.ChatMessage{
@@ -504,7 +503,6 @@ func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text stri
 
 	return msg
 }
-*/
 
 func grantPermission(s *suite.Suite, community *communities.Community, controlNode *Messenger, target *Messenger, role protobuf.CommunityMember_Roles) {
 	responseAddRole, err := controlNode.AddRoleToMember(&requests.AddRoleToMember{
