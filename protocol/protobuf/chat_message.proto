@@ -41,7 +41,7 @@ message EditMessage {
   string message_id = 4;
 
   // Grant for community edit messages
-  bytes grant = 5;
+  bytes grant = 5 [deprecated = true];
 
   // The type of message (public/one-to-one/private-group-chat)
   MessageType message_type = 6;
@@ -58,7 +58,7 @@ message DeleteMessage {
   string message_id = 3;
 
   // Grant for community delete messages
-  bytes grant = 4;
+  bytes grant = 4 [deprecated = true];
 
   // The type of message (public/one-to-one/private-group-chat)
   MessageType message_type = 5;
@@ -218,7 +218,7 @@ message ChatMessage {
   }
 
   // Grant for community chat messages
-  bytes grant = 13;
+  bytes grant = 13 [deprecated = true];
 
   // Message author's display name, introduced in version 1
   string display_name = 14;

@@ -17,7 +17,6 @@ type ChatEntity interface {
 	GetMessageType() protobuf.MessageType
 	GetSigPubKey() *ecdsa.PublicKey
 	GetProtobuf() proto.Message
-	GetGrant() []byte
 	WrapGroupMessage() bool
 
 	SetMessageType(messageType protobuf.MessageType)

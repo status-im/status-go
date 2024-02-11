@@ -3389,12 +3389,12 @@ func (m *Manager) RequestsToJoinForCommunityAwaitingAddresses(id types.HexBytes)
 	return m.persistence.RequestsToJoinForCommunityAwaitingAddresses(id)
 }
 
-func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string, grant []byte) (bool, error) {
+func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string) (bool, error) {
 	community, err := m.GetByIDString(communityID)
 	if err != nil {
 		return false, err
 	}
-	return community.CanPost(pk, chatID, grant)
+	return community.CanPost(pk, chatID)
 }
 
 func (m *Manager) IsEncrypted(communityID string) (bool, error) {
