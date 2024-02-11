@@ -29,8 +29,8 @@ const (
 
 	mailserverRequestTimeout           = 30 * time.Second
 	oneMonthInSeconds           uint32 = 31 * 24 * 60 * 60
-	mailserverMaxTries          uint   = 2
-	mailserverMaxFailedRequests uint   = 2
+	mailserverMaxTries          uint   = 5
+	mailserverMaxFailedRequests uint   = 5
 
 	OneDayInSeconds = 86400
 )
