@@ -88,7 +88,7 @@ type MessengerResponse struct {
 	savedAddresses              map[string]*wallet.SavedAddress
 	SocialLinksInfo             *identity.SocialLinksInfo
 	ensUsernameDetails          []*ensservice.UsernameDetail
-	updatedProfileShowcases     map[string]*ProfileShowcase
+	updatedProfileShowcases     map[string]*identity.ProfileShowcase
 	seenAndUnseenMessages       map[string]*SeenUnseenMessages
 }
 
@@ -135,7 +135,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		SavedAddresses                []*wallet.SavedAddress                  `json:"savedAddresses,omitempty"`
 		SocialLinksInfo               *identity.SocialLinksInfo               `json:"socialLinksInfo,omitempty"`
 		EnsUsernameDetails            []*ensservice.UsernameDetail            `json:"ensUsernameDetails,omitempty"`
-		UpdatedProfileShowcases       []*ProfileShowcase                      `json:"updatedProfileShowcases,omitempty"`
+		UpdatedProfileShowcases       []*identity.ProfileShowcase             `json:"updatedProfileShowcases,omitempty"`
 		SeenAndUnseenMessages         []*SeenUnseenMessages                   `json:"seenAndUnseenMessages,omitempty"`
 	}{
 		Contacts:                r.Contacts,
@@ -823,22 +823,22 @@ func (r *MessengerResponse) HasDiscordChannel(id string) bool {
 	return false
 }
 
-func (r *MessengerResponse) AddProfileShowcases(showcases []*ProfileShowcase) {
+func (r *MessengerResponse) AddProfileShowcases(showcases []*identity.ProfileShowcase) {
 	for _, showcase := range showcases {
 		r.AddProfileShowcase(showcase)
 	}
 }
 
-func (r *MessengerResponse) AddProfileShowcase(showcase *ProfileShowcase) {
+func (r *MessengerResponse) AddProfileShowcase(showcase *identity.ProfileShowcase) {
 	if r.updatedProfileShowcases == nil {
-		r.updatedProfileShowcases = make(map[string]*ProfileShowcase)
+		r.updatedProfileShowcases = make(map[string]*identity.ProfileShowcase)
 	}
 
 	r.updatedProfileShowcases[showcase.ContactID] = showcase
 }
 
-func (r *MessengerResponse) GetUpdatedProfileShowcases() []*ProfileShowcase {
-	var showcases []*ProfileShowcase
+func (r *MessengerResponse) GetUpdatedProfileShowcases() []*identity.ProfileShowcase {
+	var showcases []*identity.ProfileShowcase
 	for _, showcase := range r.updatedProfileShowcases {
 		showcases = append(showcases, showcase)
 	}

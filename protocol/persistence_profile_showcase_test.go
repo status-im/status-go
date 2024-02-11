@@ -3,6 +3,7 @@ package protocol
 import (
 	"testing"
 
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -19,73 +20,73 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 	s.Require().NoError(err)
 	persistence := newSQLitePersistence(db)
 
-	preferences := &ProfileShowcasePreferences{
-		Communities: []*ProfileShowcaseCommunityPreference{
-			&ProfileShowcaseCommunityPreference{
+	preferences := &identity.ProfileShowcasePreferences{
+		Communities: []*identity.ProfileShowcaseCommunityPreference{
+			&identity.ProfileShowcaseCommunityPreference{
 				CommunityID:        "0x32433445133424",
-				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
 		},
-		Accounts: []*ProfileShowcaseAccountPreference{
-			&ProfileShowcaseAccountPreference{
+		Accounts: []*identity.ProfileShowcaseAccountPreference{
+			&identity.ProfileShowcaseAccountPreference{
 				Address:            "0x32433445133424",
 				Name:               "Status Account",
 				ColorID:            "blue",
 				Emoji:              "-_-",
-				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
-			&ProfileShowcaseAccountPreference{
+			&identity.ProfileShowcaseAccountPreference{
 				Address:            "0x3845354643324",
 				Name:               "Money Box",
 				ColorID:            "red",
 				Emoji:              ":o)",
-				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 				Order:              1,
 			},
 		},
-		Collectibles: []*ProfileShowcaseCollectiblePreference{
-			&ProfileShowcaseCollectiblePreference{
+		Collectibles: []*identity.ProfileShowcaseCollectiblePreference{
+			&identity.ProfileShowcaseCollectiblePreference{
 				ContractAddress:    "0x12378534257568678487683576",
 				ChainID:            3,
 				TokenID:            "0x12321389592999f903",
 				CommunityID:        "0x01312357798976535",
 				AccountAddress:     "0x32433445133424",
-				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
 		},
-		VerifiedTokens: []*ProfileShowcaseVerifiedTokenPreference{
-			&ProfileShowcaseVerifiedTokenPreference{
+		VerifiedTokens: []*identity.ProfileShowcaseVerifiedTokenPreference{
+			&identity.ProfileShowcaseVerifiedTokenPreference{
 				Symbol:             "ETH",
-				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              1,
 			},
-			&ProfileShowcaseVerifiedTokenPreference{
+			&identity.ProfileShowcaseVerifiedTokenPreference{
 				Symbol:             "DAI",
-				ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityIDVerifiedContacts,
 				Order:              2,
 			},
-			&ProfileShowcaseVerifiedTokenPreference{
+			&identity.ProfileShowcaseVerifiedTokenPreference{
 				Symbol:             "SNT",
-				ShowcaseVisibility: ProfileShowcaseVisibilityNoOne,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityNoOne,
 				Order:              3,
 			},
 		},
-		UnverifiedTokens: []*ProfileShowcaseUnverifiedTokenPreference{
-			&ProfileShowcaseUnverifiedTokenPreference{
+		UnverifiedTokens: []*identity.ProfileShowcaseUnverifiedTokenPreference{
+			&identity.ProfileShowcaseUnverifiedTokenPreference{
 				ContractAddress:    "0x454525452023452",
 				ChainID:            1,
 				CommunityID:        "0x32433445133424",
-				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
-			&ProfileShowcaseUnverifiedTokenPreference{
+			&identity.ProfileShowcaseUnverifiedTokenPreference{
 				ContractAddress:    "0x12312323323233",
 				ChainID:            2,
 				CommunityID:        "",
-				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 				Order:              1,
 			},
 		},
@@ -128,20 +129,20 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 	s.Require().NoError(err)
 	persistence := newSQLitePersistence(db)
 
-	showcase1 := &ProfileShowcase{
+	showcase1 := &identity.ProfileShowcase{
 		ContactID: "contact_1",
-		Communities: []*ProfileShowcaseCommunity{
-			&ProfileShowcaseCommunity{
+		Communities: []*identity.ProfileShowcaseCommunity{
+			&identity.ProfileShowcaseCommunity{
 				CommunityID: "0x012312234234234",
 				Order:       6,
 			},
-			&ProfileShowcaseCommunity{
+			&identity.ProfileShowcaseCommunity{
 				CommunityID: "0x04523233466753",
 				Order:       7,
 			},
 		},
-		Accounts: []*ProfileShowcaseAccount{
-			&ProfileShowcaseAccount{
+		Accounts: []*identity.ProfileShowcaseAccount{
+			&identity.ProfileShowcaseAccount{
 				ContactID: "contact_1",
 				Address:   "0x32433445133424",
 				Name:      "Status Account",
@@ -149,7 +150,7 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 				Emoji:     "-_-",
 				Order:     0,
 			},
-			&ProfileShowcaseAccount{
+			&identity.ProfileShowcaseAccount{
 				ContactID: "contact_1",
 				Address:   "0x3845354643324",
 				Name:      "Money Box",
@@ -158,8 +159,8 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 				Order:     1,
 			},
 		},
-		Collectibles: []*ProfileShowcaseCollectible{
-			&ProfileShowcaseCollectible{
+		Collectibles: []*identity.ProfileShowcaseCollectible{
+			&identity.ProfileShowcaseCollectible{
 				ContractAddress: "0x12378534257568678487683576",
 				ChainID:         2,
 				TokenID:         "0x12321389592999f903",
@@ -167,28 +168,28 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 				Order:           0,
 			},
 		},
-		VerifiedTokens: []*ProfileShowcaseVerifiedToken{
-			&ProfileShowcaseVerifiedToken{
+		VerifiedTokens: []*identity.ProfileShowcaseVerifiedToken{
+			&identity.ProfileShowcaseVerifiedToken{
 				Symbol: "ETH",
 				Order:  1,
 			},
-			&ProfileShowcaseVerifiedToken{
+			&identity.ProfileShowcaseVerifiedToken{
 				Symbol: "DAI",
 				Order:  2,
 			},
-			&ProfileShowcaseVerifiedToken{
+			&identity.ProfileShowcaseVerifiedToken{
 				Symbol: "SNT",
 				Order:  3,
 			},
 		},
-		UnverifiedTokens: []*ProfileShowcaseUnverifiedToken{
-			&ProfileShowcaseUnverifiedToken{
+		UnverifiedTokens: []*identity.ProfileShowcaseUnverifiedToken{
+			&identity.ProfileShowcaseUnverifiedToken{
 				ContractAddress: "0x454525452023452",
 				ChainID:         1,
 				CommunityID:     "",
 				Order:           0,
 			},
-			&ProfileShowcaseUnverifiedToken{
+			&identity.ProfileShowcaseUnverifiedToken{
 				ContractAddress: "0x12312323323233",
 				ChainID:         2,
 				CommunityID:     "0x32433445133424",
@@ -199,20 +200,20 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 	err = persistence.SaveProfileShowcaseForContact(showcase1)
 	s.Require().NoError(err)
 
-	showcase2 := &ProfileShowcase{
+	showcase2 := &identity.ProfileShowcase{
 		ContactID: "contact_2",
-		Communities: []*ProfileShowcaseCommunity{
-			&ProfileShowcaseCommunity{
+		Communities: []*identity.ProfileShowcaseCommunity{
+			&identity.ProfileShowcaseCommunity{
 				CommunityID: "0x012312234234234", // same id to check query
 				Order:       3,
 			},
-			&ProfileShowcaseCommunity{
+			&identity.ProfileShowcaseCommunity{
 				CommunityID: "0x096783478384593",
 				Order:       7,
 			},
 		},
-		Collectibles: []*ProfileShowcaseCollectible{
-			&ProfileShowcaseCollectible{
+		Collectibles: []*identity.ProfileShowcaseCollectible{
+			&identity.ProfileShowcaseCollectible{
 				ContractAddress: "0x12378534257568678487683576",
 				ChainID:         2,
 				TokenID:         "0x12321389592999f903",
@@ -281,10 +282,10 @@ func (s *TestProfileShowcasePersistence) TestFetchingProfileShowcaseAccountsByAd
 	err = persistence.SaveContacts(conatacts)
 	s.Require().NoError(err)
 
-	showcase1 := &ProfileShowcase{
+	showcase1 := &identity.ProfileShowcase{
 		ContactID: "contact_1",
-		Accounts: []*ProfileShowcaseAccount{
-			&ProfileShowcaseAccount{
+		Accounts: []*identity.ProfileShowcaseAccount{
+			&identity.ProfileShowcaseAccount{
 				ContactID: "contact_1",
 				Address:   "0x0000000000000000000000000000000000000001",
 				Name:      "Contact1-Account1",
@@ -292,7 +293,7 @@ func (s *TestProfileShowcasePersistence) TestFetchingProfileShowcaseAccountsByAd
 				Emoji:     "-_-",
 				Order:     0,
 			},
-			&ProfileShowcaseAccount{
+			&identity.ProfileShowcaseAccount{
 				ContactID: "contact_1",
 				Address:   "0x0000000000000000000000000000000000000002",
 				Name:      "Contact1-Account2",
@@ -302,10 +303,10 @@ func (s *TestProfileShowcasePersistence) TestFetchingProfileShowcaseAccountsByAd
 			},
 		},
 	}
-	showcase2 := &ProfileShowcase{
+	showcase2 := &identity.ProfileShowcase{
 		ContactID: "contact_2",
-		Accounts: []*ProfileShowcaseAccount{
-			&ProfileShowcaseAccount{
+		Accounts: []*identity.ProfileShowcaseAccount{
+			&identity.ProfileShowcaseAccount{
 				ContactID: "contact_2",
 				Address:   "0x0000000000000000000000000000000000000001",
 				Name:      "Contact2-Account1",
@@ -313,7 +314,7 @@ func (s *TestProfileShowcasePersistence) TestFetchingProfileShowcaseAccountsByAd
 				Emoji:     "-_-",
 				Order:     0,
 			},
-			&ProfileShowcaseAccount{
+			&identity.ProfileShowcaseAccount{
 				ContactID: "contact_2",
 				Address:   "0x0000000000000000000000000000000000000002",
 				Name:      "Contact2-Account2",
@@ -323,10 +324,10 @@ func (s *TestProfileShowcasePersistence) TestFetchingProfileShowcaseAccountsByAd
 			},
 		},
 	}
-	showcase3 := &ProfileShowcase{
+	showcase3 := &identity.ProfileShowcase{
 		ContactID: "contact_3",
-		Accounts: []*ProfileShowcaseAccount{
-			&ProfileShowcaseAccount{
+		Accounts: []*identity.ProfileShowcaseAccount{
+			&identity.ProfileShowcaseAccount{
 				ContactID: "contact_3",
 				Address:   "0x0000000000000000000000000000000000000001",
 				Name:      "Contact3-Account1",
@@ -383,22 +384,22 @@ func (s *TestProfileShowcasePersistence) TestUpdateProfileShowcaseAccountOnWalle
 	deleteAccountAddress := "0x3243344513424"
 	updateAccountAddress := "0x3845354643324"
 
-	preferences := &ProfileShowcasePreferences{
-		Accounts: []*ProfileShowcaseAccountPreference{
-			&ProfileShowcaseAccountPreference{
+	preferences := &identity.ProfileShowcasePreferences{
+		Accounts: []*identity.ProfileShowcaseAccountPreference{
+			&identity.ProfileShowcaseAccountPreference{
 				Address:            deleteAccountAddress,
 				Name:               "Status Account",
 				ColorID:            "blue",
 				Emoji:              "-_-",
-				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
-			&ProfileShowcaseAccountPreference{
+			&identity.ProfileShowcaseAccountPreference{
 				Address:            updateAccountAddress,
 				Name:               "Money Box",
 				ColorID:            "red",
 				Emoji:              ":o)",
-				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 				Order:              1,
 			},
 		},
@@ -415,7 +416,7 @@ func (s *TestProfileShowcasePersistence) TestUpdateProfileShowcaseAccountOnWalle
 	account.Name = "Music Box"
 	account.ColorID = "green"
 	account.Emoji = ">:-]"
-	account.ShowcaseVisibility = ProfileShowcaseVisibilityIDVerifiedContacts
+	account.ShowcaseVisibility = identity.ProfileShowcaseVisibilityIDVerifiedContacts
 	account.Order = 7
 
 	err = persistence.SaveProfileShowcaseAccountPreference(account)
@@ -444,16 +445,16 @@ func (s *TestProfileShowcasePersistence) TestUpdateProfileShowcaseCommunityOnCha
 
 	deleteCommunityID := "0x3243344513424"
 
-	preferences := &ProfileShowcasePreferences{
-		Communities: []*ProfileShowcaseCommunityPreference{
-			&ProfileShowcaseCommunityPreference{
+	preferences := &identity.ProfileShowcasePreferences{
+		Communities: []*identity.ProfileShowcaseCommunityPreference{
+			&identity.ProfileShowcaseCommunityPreference{
 				CommunityID:        "0x32433445133424",
-				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
-			&ProfileShowcaseCommunityPreference{
+			&identity.ProfileShowcaseCommunityPreference{
 				CommunityID:        deleteCommunityID,
-				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 				Order:              1,
 			},
 		},
