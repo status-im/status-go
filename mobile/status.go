@@ -1328,7 +1328,7 @@ func InitLogging(logSettingsJSON string) string {
 	return makeJSONResponse(err)
 }
 
-func getRandomMnemonic() string {
+func GetRandomMnemonic() string {
 	resp, err := statusBackend.AccountManager().GetRandomMnemonic()
 	if err != nil {
 		return makeJSONResponse(err)
