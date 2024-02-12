@@ -117,6 +117,16 @@ type config struct {
 	messageResendMaxCount int
 }
 
+func messengerDefaultConfig() config {
+	c := config{
+		messageResendMinDelay: 30,
+		messageResendMaxCount: 3,
+	}
+
+	c.featureFlags.AutoRequestHistoricMessages = true
+	return c
+}
+
 type Option func(*config) error
 
 // WithSystemMessagesTranslations is required for Group Chats which are currently disabled.
@@ -387,6 +397,13 @@ func WithTokenManager(tokenManager communities.TokenManager) Option {
 func WithAccountManager(accountManager account.Manager) Option {
 	return func(c *config) error {
 		c.accountsManager = accountManager
+		return nil
+	}
+}
+
+func WithAutoRequestHistoricMessages(enabled bool) Option {
+	return func(c *config) error {
+		c.featureFlags.AutoRequestHistoricMessages = enabled
 		return nil
 	}
 }

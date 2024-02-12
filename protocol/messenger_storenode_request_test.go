@@ -204,7 +204,9 @@ func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *za
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	var options []Option
+	options := []Option{
+		WithAutoRequestHistoricMessages(false),
+	}
 
 	if mailserverAddress != "" {
 		options = append(options,
@@ -338,7 +340,8 @@ func (s *MessengerStoreNodeRequestSuite) waitForEnvelopes(subscription <-chan st
 		select {
 		case <-subscription:
 		case <-ctx.Done():
-			s.Require().Fail("timeout waiting for store node to receive envelopes")
+			err := fmt.Sprintf("timeout waiting for store node to receive envelopes, received: %d, expected: %d", i, expectedEnvelopesCount)
+			s.Require().Fail(err)
 		}
 	}
 }
@@ -696,6 +699,8 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityEnvelopesOrder() {
 
 	const descriptionsCount = 4
 	community := s.createCommunity(s.owner)
+	contentTopic := wakuV2common.BytesToTopic(transport.ToTopic(community.IDString()))
+	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(&contentTopic)
 
 	// Push a few descriptions to the store node
 	for i := 0; i < descriptionsCount-1; i++ {
@@ -703,28 +708,19 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityEnvelopesOrder() {
 		s.Require().NoError(err)
 	}
 
+	// Wait for store node to receive envelopes
+	s.waitForEnvelopes(storeNodeSubscription, descriptionsCount-1)
+
 	// Subscribe to received envelope
-
 	bobWakuV2 := gethbridge.GetGethWakuV2From(s.bobWaku)
-	contentTopic := wakuV2common.BytesToTopic(transport.ToTopic(community.IDString()))
 
-	var prevEnvelope *wakuV2common.ReceivedMessage
-	receivedEnvelopesCount := 0
-
+	var receivedEnvelopes []*wakuV2common.ReceivedMessage
 	s.setupEnvelopesWatcher(bobWakuV2, &contentTopic, func(envelope *wakuV2common.ReceivedMessage) {
-		// We check that each next envelope fetched is newer than the previous one
-		if prevEnvelope != nil {
-			s.Require().Less(
-				envelope.Envelope.Message().GetTimestamp(),
-				prevEnvelope.Envelope.Message().GetTimestamp())
-		}
-		prevEnvelope = envelope
-		receivedEnvelopesCount++
+		receivedEnvelopes = append(receivedEnvelopes, envelope)
 	})
 
 	// Force a single-envelope page size to be able to check the order.
 	// Also force all envelopes to be fetched.
-
 	options := []StoreNodeRequestOption{
 		WithWaitForResponseOption(true),
 		WithStopWhenDataFound(false),
@@ -733,13 +729,19 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityEnvelopesOrder() {
 	}
 
 	// Fetch the community
-
 	fetchedCommunity, _, err := s.bob.storeNodeRequestsManager.FetchCommunity(community.CommunityShard(), options)
 	s.Require().NoError(err)
 	s.requireCommunitiesEqual(fetchedCommunity, community)
 
 	// Ensure all expected envelopes were received
-	s.Require().Equal(receivedEnvelopesCount, descriptionsCount)
+	s.Require().Equal(descriptionsCount, len(receivedEnvelopes))
+
+	// We check that each next envelope fetched is newer than the previous one
+	for i := 1; i < len(receivedEnvelopes); i++ {
+		s.Require().Less(
+			receivedEnvelopes[i].Envelope.Message().GetTimestamp(),
+			receivedEnvelopes[i-1].Envelope.Message().GetTimestamp())
+	}
 }
 
 /*
