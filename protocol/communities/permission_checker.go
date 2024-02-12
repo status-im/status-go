@@ -236,6 +236,7 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 	// if there are no chain IDs that match token criteria chain IDs
 	// we aren't able to check balances on selected networks
 	if len(erc20ChainIDsMap) > 0 && len(chainIDsForERC20) == 0 {
+		response.NetworksNotSupported = true
 		return response, nil
 	}
 
