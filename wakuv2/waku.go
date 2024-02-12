@@ -273,7 +273,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		node.WithMaxMsgSize(1024 * 1024),
 	}
 
-	if cfg.EnableDiscV5 {
+	if cfg.EnableDiscV5 && !waku.settings.LightClient {
 		bootnodes, err := waku.getDiscV5BootstrapNodes(waku.ctx, cfg.DiscV5BootstrapNodes)
 		if err != nil {
 			logger.Error("failed to get bootstrap nodes", zap.Error(err))
