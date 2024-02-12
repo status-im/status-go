@@ -138,24 +138,12 @@ func (r *singleResult) toString() string {
 }
 
 func (s *MessengerStoreNodeRequestSuite) SetupTest() {
-	cfg := zap.NewDevelopmentConfig()
-	cfg.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
-	cfg.Development = false
-	cfg.DisableStacktrace = true
-	s.logger = tt.MustCreateTestLoggerWithConfig(cfg)
+	s.logger = tt.MustCreateTestLogger()
 
 	s.cancel = make(chan struct{}, 10)
-
-	storeNodeLogger := s.logger.Named("store-node-waku")
-	s.wakuStoreNode = NewWakuV2(&s.Suite, storeNodeLogger, true, true, false, 0)
-
-	storeNodeListenAddresses := s.wakuStoreNode.ListenAddresses()
-	s.Require().LessOrEqual(1, len(storeNodeListenAddresses))
-
-	s.storeNodeAddress = storeNodeListenAddresses[0]
-	s.logger.Info("store node ready", zap.String("address", s.storeNodeAddress))
-
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
+
+	s.createStore()
 }
 
 func (s *MessengerStoreNodeRequestSuite) TearDown() {
@@ -165,9 +153,29 @@ func (s *MessengerStoreNodeRequestSuite) TearDown() {
 	TearDownMessenger(&s.Suite, s.bob)
 }
 
+func (s *MessengerStoreNodeRequestSuite) createStore() {
+	cfg := testWakuV2Config{
+		logger:                 s.logger.Named("store-waku"),
+		enableStore:            true,
+		useShardAsDefaultTopic: false,
+		clusterID:              shard.UndefinedShardValue,
+	}
+
+	s.wakuStoreNode = NewTestWakuV2(&s.Suite, cfg)
+	s.storeNodeAddress = s.wakuListenAddress(s.wakuStoreNode)
+	s.logger.Info("store node ready", zap.String("address", s.storeNodeAddress))
+}
+
 func (s *MessengerStoreNodeRequestSuite) createOwner() {
-	wakuLogger := s.logger.Named("owner-waku-node")
-	wakuV2 := NewWakuV2(&s.Suite, wakuLogger, true, false, false, 0)
+
+	cfg := testWakuV2Config{
+		logger:                 s.logger.Named("owner-waku"),
+		enableStore:            false,
+		useShardAsDefaultTopic: false,
+		clusterID:              shard.UndefinedShardValue,
+	}
+
+	wakuV2 := NewTestWakuV2(&s.Suite, cfg)
 	s.ownerWaku = gethbridge.NewGethWakuV2Wrapper(wakuV2)
 
 	messengerLogger := s.logger.Named("owner-messenger")
@@ -179,8 +187,13 @@ func (s *MessengerStoreNodeRequestSuite) createOwner() {
 }
 
 func (s *MessengerStoreNodeRequestSuite) createBob() {
-	wakuLogger := s.logger.Named("bob-waku-node")
-	wakuV2 := NewWakuV2(&s.Suite, wakuLogger, true, false, false, 0)
+	cfg := testWakuV2Config{
+		logger:                 s.logger.Named("bob-waku"),
+		enableStore:            false,
+		useShardAsDefaultTopic: false,
+		clusterID:              shard.UndefinedShardValue,
+	}
+	wakuV2 := NewTestWakuV2(&s.Suite, cfg)
 	s.bobWaku = gethbridge.NewGethWakuV2Wrapper(wakuV2)
 
 	messengerLogger := s.logger.Named("bob-messenger")
@@ -191,8 +204,12 @@ func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *za
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	options := []Option{
-		WithTestStoreNode(&s.Suite, localMailserverID, mailserverAddress, localFleet, s.collectiblesServiceMock),
+	var options []Option
+
+	if mailserverAddress != "" {
+		options = append(options,
+			WithTestStoreNode(&s.Suite, localMailserverID, mailserverAddress, localFleet, s.collectiblesServiceMock),
+		)
 	}
 
 	messenger, err := newMessengerWithKey(shh, privateKey, logger, options)
@@ -314,13 +331,22 @@ func (s *MessengerStoreNodeRequestSuite) setupStoreNodeEnvelopesWatcher(topic *w
 }
 
 func (s *MessengerStoreNodeRequestSuite) waitForEnvelopes(subscription <-chan string, expectedEnvelopesCount int) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	for i := 0; i < expectedEnvelopesCount; i++ {
 		select {
 		case <-subscription:
-		case <-time.After(5 * time.Second):
+		case <-ctx.Done():
 			s.Require().Fail("timeout waiting for store node to receive envelopes")
 		}
 	}
+}
+
+func (s *MessengerStoreNodeRequestSuite) wakuListenAddress(waku *waku2.Waku) string {
+	addresses := waku.ListenAddresses()
+	s.Require().LessOrEqual(1, len(addresses))
+	return addresses[0]
 }
 
 func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityInfo() {
@@ -938,10 +964,16 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 			// 		 But this turned out to be harder to implement.
 			//
 
-			wakuLogger := s.logger.Named(fmt.Sprintf("user-waku-node-%d", i))
+			wakuLogger := s.logger.Named(fmt.Sprintf("user-waku-%d", i))
 			messengerLogger := s.logger.Named(fmt.Sprintf("user-messenger-%d", i))
 
-			wakuV2 := NewWakuV2(&s.Suite, wakuLogger, true, false, useShardAsDefaultTopic, clusterID)
+			cfg := testWakuV2Config{
+				logger:                 wakuLogger,
+				enableStore:            false,
+				useShardAsDefaultTopic: useShardAsDefaultTopic,
+				clusterID:              clusterID,
+			}
+			wakuV2 := NewTestWakuV2(&s.Suite, cfg)
 			userWaku := gethbridge.NewGethWakuV2Wrapper(wakuV2)
 
 			//

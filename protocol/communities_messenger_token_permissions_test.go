@@ -628,7 +628,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	var err error
 
 	storeNodeLogger := s.logger.Named("store-node-waku")
-	wakuStoreNode := NewWakuV2(&s.Suite, storeNodeLogger, true, true, false, shard.UndefinedShardValue)
+	wakuStoreNode := NewTestWakuV2(&s.Suite, storeNodeLogger, true, true, false, shard.UndefinedShardValue)
 
 	storeNodeListenAddresses := wakuStoreNode.ListenAddresses()
 	s.Require().LessOrEqual(1, len(storeNodeListenAddresses))
