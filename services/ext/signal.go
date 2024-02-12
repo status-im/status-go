@@ -153,6 +153,10 @@ func (m *MessengerSignalsHandler) DiscordCommunityImportCancelled(id string) {
 	signal.SendDiscordCommunityImportCancelled(id)
 }
 
+func (m *MessengerSignalsHandler) DiscordCommunityImportCleanedUp(id string) {
+	signal.SendDiscordCommunityImportCleanedUp(id)
+}
+
 func (m *MessengerSignalsHandler) DiscordChannelImportCancelled(id string) {
 	signal.SendDiscordChannelImportCancelled(id)
 }

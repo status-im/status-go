@@ -22,6 +22,9 @@ const (
 	// the discord community was cancelled
 	EventDiscordCommunityImportCancelled = "community.discordCommunityImportCancelled"
 
+	// EventDiscordCommunityImportCleanedUp triggered when the community has been cleaned up (deleted)
+	EventDiscordCommunityImportCleanedUp = "community.discordCommunityImportCleanedUp"
+
 	// EventDiscordChannelImportProgress is triggered during the import
 	// of a discord community channel as it progresses
 	EventDiscordChannelImportProgress = "community.discordChannelImportProgress"
@@ -51,6 +54,10 @@ type DiscordCommunityImportFinishedSignal struct {
 }
 
 type DiscordCommunityImportCancelledSignal struct {
+	CommunityID string `json:"communityId"`
+}
+
+type DiscordCommunityImportCleanedUpSignal struct {
 	CommunityID string `json:"communityId"`
 }
 
@@ -103,6 +110,12 @@ func SendDiscordChannelImportFinished(communityID string, channelID string) {
 
 func SendDiscordCommunityImportCancelled(communityID string) {
 	send(EventDiscordCommunityImportCancelled, DiscordCommunityImportCancelledSignal{
+		CommunityID: communityID,
+	})
+}
+
+func SendDiscordCommunityImportCleanedUp(communityID string) {
+	send(EventDiscordCommunityImportCleanedUp, DiscordCommunityImportCleanedUpSignal{
 		CommunityID: communityID,
 	})
 }

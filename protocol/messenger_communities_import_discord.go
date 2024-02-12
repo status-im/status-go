@@ -382,6 +382,7 @@ func (m *Messenger) cleanUpImport(communityID string) {
 	if deleteErr != nil {
 		m.logger.Error("clean up failed, couldn't delete community messages", zap.Error(deleteErr))
 	}
+	m.config.messengerSignalsHandler.DiscordCommunityImportCleanedUp(communityID)
 }
 
 func (m *Messenger) cleanUpImportChannel(communityID string, channelID string) {
