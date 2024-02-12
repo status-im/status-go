@@ -239,7 +239,7 @@ func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesW
 	}
 
 	err := s.m.SetProfileShowcasePreferences(request)
-	s.Require().Equal(errorAccountVisibilityLowerThanCollectible, err)
+	s.Require().Equal(identity.ErrorAccountVisibilityLowerThanCollectible, err)
 }
 
 func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntries() {
@@ -482,7 +482,7 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.Require().Equal(profileShowcase.UnverifiedTokens[1].Order, request.UnverifiedTokens[1].Order)
 }
 
-func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipInUnencryptedCommunity() {
+func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipUnencryptedCommunities() {
 	alice := s.m
 
 	// Set Display name to pass shouldPublishChatIdentity check
@@ -505,50 +505,11 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipInUne
 	s.mutualContact(bob)
 
 	// Alice creates a community
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
-		Name:        "alice.com",
-		Color:       "#ffffff",
-		Description: "test",
-	}
-
-	response, err := alice.CreateCommunity(description, false)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	aliceCommunity := response.Communities()[0]
-
-	// NOTE: this is needed to avoid fetching from a story node
-	message := common.NewMessage()
-	message.ChatId = bob.IdentityPublicKeyString()
-	message.Text = "Check this community.."
-	message.CommunityID = aliceCommunity.IDString()
-
-	_, err = alice.SendChatMessage(context.Background(), message)
-	s.Require().NoError(err)
-
-	// Ensure community is received
-	response, err = WaitOnMessengerResponse(
-		bob,
-		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0
-		},
-		"bob did not receive message with community link",
-	)
-	s.Require().NoError(err)
-	s.Require().Equal(aliceCommunity.ID(), response.Communities()[0].ID())
+	aliceCommunity, _ := createCommunityConfigurable(&s.Suite, alice, protobuf.CommunityPermissions_MANUAL_ACCEPT)
+	advertiseCommunityTo(&s.Suite, aliceCommunity, alice, bob)
 
 	// Bobs creates an another community
-	description = &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
-		Name:        "bob.com",
-		Color:       "#ffffff",
-		Description: "test",
-	}
-
-	response, err = bob.CreateCommunity(description, false)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	bobCommunity := response.Communities()[0]
+	bobCommunity, _ := createCommunityConfigurable(&s.Suite, bob, protobuf.CommunityPermissions_AUTO_ACCEPT)
 
 	// Add community to the Alice's profile showcase & get it on the Bob's side
 	err = alice.SetProfileShowcasePreferences(&identity.ProfileShowcasePreferences{
@@ -571,7 +532,77 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipInUne
 	resp, err := WaitOnMessengerResponse(
 		bob,
 		func(r *MessengerResponse) bool {
-			return len(r.updatedProfileShowcases) > 0 && r.updatedProfileShowcases[contactID] != nil && len(r.updatedProfileShowcases[contactID].Communities) == 2
+			return len(r.updatedProfileShowcases) > 0 && r.updatedProfileShowcases[contactID] != nil
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(resp.updatedProfileShowcases, 1)
+
+	profileShowcase := resp.updatedProfileShowcases[contactID]
+
+	// Verify community's data
+	s.Require().Len(profileShowcase.Communities, 2)
+	s.Require().Equal(profileShowcase.Communities[0].CommunityID, aliceCommunity.IDString())
+	s.Require().Equal(profileShowcase.Communities[0].MembershipStatus, identity.ProfileShowcaseMembershipStatusProvenMember)
+	s.Require().Equal(profileShowcase.Communities[1].CommunityID, bobCommunity.IDString())
+	s.Require().Equal(profileShowcase.Communities[1].MembershipStatus, identity.ProfileShowcaseMembershipStatusNotAMember)
+}
+
+func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncryptedCommunity() {
+	alice := s.m
+
+	// Set Display name to pass shouldPublishChatIdentity check
+	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp.KeyUID = alice.account.KeyUID
+	profileKp.Accounts[0].KeyUID = alice.account.KeyUID
+
+	err := alice.settings.SaveOrUpdateKeypair(profileKp)
+	s.Require().NoError(err)
+
+	err = alice.SetDisplayName("Alice")
+	s.Require().NoError(err)
+
+	// Add bob as a mutual contact
+	bob := s.newMessenger()
+	_, err = bob.Start()
+	s.Require().NoError(err)
+	defer TearDownMessenger(&s.Suite, bob)
+
+	s.mutualContact(bob)
+
+	// Alice creates an ecrypted community
+	aliceCommunity, _ := createEncryptedCommunity(&s.Suite, alice)
+	s.Require().True(aliceCommunity.Encrypted())
+	advertiseCommunityTo(&s.Suite, aliceCommunity, alice, bob)
+
+	// Bob creates an another encryped community
+	bobCommunity, _ := createEncryptedCommunity(&s.Suite, bob)
+	s.Require().True(bobCommunity.Encrypted())
+	advertiseCommunityTo(&s.Suite, bobCommunity, bob, alice)
+
+	// Add community to the Alice's profile showcase & get it on the Bob's side
+	err = alice.SetProfileShowcasePreferences(&identity.ProfileShowcasePreferences{
+		Communities: []*identity.ProfileShowcaseCommunityPreference{
+			&identity.ProfileShowcaseCommunityPreference{
+				CommunityID:        aliceCommunity.IDString(),
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
+				Order:              0,
+			},
+			&identity.ProfileShowcaseCommunityPreference{
+				CommunityID:        bobCommunity.IDString(),
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
+				Order:              1,
+			},
+		},
+	})
+	s.Require().NoError(err)
+
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
+	resp, err := WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return len(r.updatedProfileShowcases) > 0 && r.updatedProfileShowcases[contactID] != nil
 		},
 		"no messages",
 	)

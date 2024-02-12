@@ -1326,6 +1326,31 @@ func (p *Persistence) RemoveCommunityToken(chainID int, contractAddress string) 
 	return err
 }
 
+func (p *Persistence) GetCommunityGrant(communityID string) ([]byte, uint64, error) {
+	var grant []byte
+	var clock uint64
+
+	err := p.db.QueryRow(`SELECT grant, clock FROM community_grants WHERE community_id = ?`, communityID).Scan(&grant, &clock)
+	if err == sql.ErrNoRows {
+		return []byte{}, 0, nil
+	} else if err != nil {
+		return []byte{}, 0, err
+	}
+
+	return grant, clock, nil
+}
+
+func (p *Persistence) SaveCommunityGrant(communityID string, grant []byte, clock uint64) error {
+	_, err := p.db.Exec(`INSERT OR REPLACE INTO community_grants(community_id, grant, clock) VALUES (?, ?, ?)`,
+		communityID, grant, clock)
+	return err
+}
+
+func (p *Persistence) RemoveCommunityGrant(communityID string) error {
+	_, err := p.db.Exec(`DELETE FROM community_grants WHERE community_id = ?`, communityID)
+	return err
+}
+
 func decodeWrappedCommunityDescription(wrappedDescriptionBytes []byte) (*protobuf.CommunityDescription, error) {
 	metadata := &protobuf.ApplicationMetadataMessage{}
 
