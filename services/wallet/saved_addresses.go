@@ -10,7 +10,6 @@ import (
 )
 
 type savedAddressMeta struct {
-	Removed     bool
 	UpdateClock uint64 // wall clock used to deconflict concurrent updates
 }
 
@@ -24,6 +23,7 @@ type SavedAddress struct {
 	ColorID         multiAccCommon.CustomizationColor `json:"colorId"`
 	IsTest          bool                              `json:"isTest"`
 	CreatedAt       int64                             `json:"createdAt"`
+	Removed         bool                              `json:"removed"`
 	savedAddressMeta
 }
 

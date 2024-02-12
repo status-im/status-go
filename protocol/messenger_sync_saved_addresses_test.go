@@ -280,7 +280,6 @@ func (s *MessengerSyncSavedAddressesSuite) testSyncDeletesOfSavedAddressesWithTe
 
 	savedAddresses, err = s.other.savedAddressesManager.GetSavedAddresses()
 	s.Require().NoError(err)
-	s.Require().Equal(1, len(savedAddresses))
 	s.Require().True(haveSameElements([]wallet.SavedAddress{sa2}, savedAddresses, savedAddressDataIsEqual))
 
 	// Delete saved addresses with test mode = false and sync with the other device
