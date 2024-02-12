@@ -33,7 +33,6 @@ require (
 	github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034
 	github.com/kilic/bls12-381 v0.0.0-20200607163746-32e1441c8a9f
 	github.com/lib/pq v1.10.4
-	github.com/libp2p/go-libp2p v0.32.2
 	github.com/libp2p/go-libp2p-pubsub v0.10.0
 	github.com/lucasb-eyer/go-colorful v1.0.3
 	github.com/mat/besticon v0.0.0-20210314201728-1579f269edb7
@@ -85,11 +84,12 @@ require (
 	github.com/jellydator/ttlcache/v3 v3.1.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/ladydascalie/currency v1.6.0
+	github.com/libp2p/go-libp2p v0.32.2
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.2
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
-	github.com/waku-org/go-waku v0.8.1-0.20240130093642-77ea359ef873
+	github.com/waku-org/go-waku v0.8.1-0.20240112174027-faf046e059a5
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	github.com/yeqown/go-qrcode/v2 v2.2.1
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1
