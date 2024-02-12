@@ -9,9 +9,10 @@ import (
 )
 
 type CheckPermissionsResponse struct {
-	Satisfied         bool                                      `json:"satisfied"`
-	Permissions       map[string]*PermissionTokenCriteriaResult `json:"permissions"`
-	ValidCombinations []*AccountChainIDsCombination             `json:"validCombinations"`
+	Satisfied            bool                                      `json:"satisfied"`
+	Permissions          map[string]*PermissionTokenCriteriaResult `json:"permissions"`
+	ValidCombinations    []*AccountChainIDsCombination             `json:"validCombinations"`
+	NetworksNotSupported bool                                      `json:"networksNotSupported"`
 }
 
 type CheckPermissionToJoinResponse = CheckPermissionsResponse
@@ -93,17 +94,19 @@ func calculateRolesAndHighestRole(permissions map[string]*PermissionTokenCriteri
 
 func (c *CheckPermissionsResponse) MarshalJSON() ([]byte, error) {
 	type CheckPermissionsTypeAlias struct {
-		Satisfied         bool                                      `json:"satisfied"`
-		Permissions       map[string]*PermissionTokenCriteriaResult `json:"permissions"`
-		ValidCombinations []*AccountChainIDsCombination             `json:"validCombinations"`
-		Roles             []*HighestRoleResponse                    `json:"roles"`
-		HighestRole       *HighestRoleResponse                      `json:"highestRole"`
+		Satisfied            bool                                      `json:"satisfied"`
+		Permissions          map[string]*PermissionTokenCriteriaResult `json:"permissions"`
+		ValidCombinations    []*AccountChainIDsCombination             `json:"validCombinations"`
+		Roles                []*HighestRoleResponse                    `json:"roles"`
+		HighestRole          *HighestRoleResponse                      `json:"highestRole"`
+		NetworksNotSupported bool                                      `json:"networksNotSupported"`
 	}
 	c.calculateSatisfied()
 	item := &CheckPermissionsTypeAlias{
-		Satisfied:         c.Satisfied,
-		Permissions:       c.Permissions,
-		ValidCombinations: c.ValidCombinations,
+		Satisfied:            c.Satisfied,
+		Permissions:          c.Permissions,
+		ValidCombinations:    c.ValidCombinations,
+		NetworksNotSupported: c.NetworksNotSupported,
 	}
 	rolesAndHighestRole := calculateRolesAndHighestRole(c.Permissions)
 
