@@ -5,6 +5,7 @@ import (
 	crand "crypto/rand"
 	"errors"
 	"reflect"
+	"sort"
 
 	"github.com/golang/protobuf/proto"
 
@@ -378,6 +379,64 @@ func (m *Messenger) GetProfileShowcaseForSelfIdentity() (*protobuf.ProfileShowca
 	}, nil
 }
 
+func (m *Messenger) proveCommunityMemebrshipForProfileShowcase(senderPubKey *ecdsa.PublicKey, profileEntry *identity.ProfileShowcaseCommunity) error {
+	community, err := m.FetchCommunity(&FetchCommunityRequest{
+		CommunityKey:    profileEntry.CommunityID,
+		Shard:           nil,
+		TryDatabase:     true,
+		WaitForResponse: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	if community.Encrypted() {
+		// TODO: use grant here to prove membership
+	} else {
+		// Use member list as a proof for unecrypted communities
+		if community.HasMember(senderPubKey) {
+			profileEntry.MembershipStatus = identity.ProfileShowcaseMembershipStatusProvenMember
+		} else {
+			profileEntry.MembershipStatus = identity.ProfileShowcaseMembershipStatusNotAMember
+		}
+	}
+
+	return nil
+}
+
+func (m *Messenger) buildProfileShowcaseFromEntries(
+	contactID string,
+	communities []*identity.ProfileShowcaseCommunity,
+	accounts []*identity.ProfileShowcaseAccount,
+	collectibles []*identity.ProfileShowcaseCollectible,
+	verifiedTokens []*identity.ProfileShowcaseVerifiedToken,
+	unverifiedTokens []*identity.ProfileShowcaseUnverifiedToken) *identity.ProfileShowcase {
+	sort.Slice(communities, func(i, j int) bool {
+		return communities[j].Order > communities[i].Order
+	})
+	sort.Slice(accounts, func(i, j int) bool {
+		return accounts[j].Order > accounts[i].Order
+	})
+	sort.Slice(collectibles, func(i, j int) bool {
+		return collectibles[j].Order > collectibles[i].Order
+	})
+	sort.Slice(verifiedTokens, func(i, j int) bool {
+		return verifiedTokens[j].Order > verifiedTokens[i].Order
+	})
+	sort.Slice(unverifiedTokens, func(i, j int) bool {
+		return unverifiedTokens[j].Order > unverifiedTokens[i].Order
+	})
+
+	return &identity.ProfileShowcase{
+		ContactID:        contactID,
+		Communities:      communities,
+		Accounts:         accounts,
+		Collectibles:     collectibles,
+		VerifiedTokens:   verifiedTokens,
+		UnverifiedTokens: unverifiedTokens,
+	}
+}
+
 func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState, message *protobuf.ProfileShowcase) error {
 	communities := []*identity.ProfileShowcaseCommunity{}
 	accounts := []*identity.ProfileShowcaseAccount{}
@@ -420,17 +479,15 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState
 		unverifiedTokens = append(unverifiedTokens, fromProfileShowcaseUnverifiedTokenProto(forIDVerifiedContacts.UnverifiedTokens)...)
 	}
 
-	// TODO: validate community membership here (https://github.com/status-im/status-desktop/issues/13081)
-	// TODO: validate collectible ownership here (https://github.com/status-im/status-desktop/issues/13073)
-
-	newShowcase := &identity.ProfileShowcase{
-		ContactID:        contactID,
-		Communities:      communities,
-		Accounts:         accounts,
-		Collectibles:     collectibles,
-		VerifiedTokens:   verifiedTokens,
-		UnverifiedTokens: unverifiedTokens,
+	for _, community := range communities {
+		err = m.proveCommunityMemebrshipForProfileShowcase(senderPubKey, community)
+		if err != nil {
+			return err
+		}
 	}
+
+	newShowcase := m.buildProfileShowcaseFromEntries(
+		contactID, communities, accounts, collectibles, verifiedTokens, unverifiedTokens)
 
 	oldShowcase, err := m.persistence.GetProfileShowcaseForContact(contactID)
 	if err != nil {

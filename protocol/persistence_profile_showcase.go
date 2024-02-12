@@ -318,7 +318,9 @@ func (db sqlitePersistence) getProfileShowcaseCommunitiesContact(tx *sql.Tx, con
 	communities := []*identity.ProfileShowcaseCommunity{}
 
 	for rows.Next() {
-		community := &identity.ProfileShowcaseCommunity{}
+		community := &identity.ProfileShowcaseCommunity{
+			MembershipStatus: identity.ProfileShowcaseMembershipStatusUnproven,
+		}
 
 		err := rows.Scan(&community.CommunityID, &community.Order)
 		if err != nil {

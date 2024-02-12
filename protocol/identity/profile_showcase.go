@@ -9,6 +9,14 @@ const (
 	ProfileShowcaseVisibilityEveryone
 )
 
+type ProfileShowcaseMembershipStatus int
+
+const (
+	ProfileShowcaseMembershipStatusUnproven ProfileShowcaseMembershipStatus = iota
+	ProfileShowcaseMembershipStatusProvenMember
+	ProfileShowcaseMembershipStatusNotAMember
+)
+
 type ProfileShowcaseCommunityPreference struct {
 	CommunityID        string                    `json:"communityId"`
 	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
@@ -57,8 +65,9 @@ type ProfileShowcasePreferences struct {
 }
 
 type ProfileShowcaseCommunity struct {
-	CommunityID string `json:"communityId"`
-	Order       int    `json:"order"`
+	CommunityID      string                          `json:"communityId"`
+	Order            int                             `json:"order"`
+	MembershipStatus ProfileShowcaseMembershipStatus `json:"membershipStatus"`
 }
 
 type ProfileShowcaseAccount struct {

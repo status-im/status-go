@@ -3,8 +3,9 @@ package protocol
 import (
 	"testing"
 
-	"github.com/status-im/status-go/protocol/identity"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/protocol/identity"
 )
 
 func TestProfileShowcasePersistenceSuite(t *testing.T) {

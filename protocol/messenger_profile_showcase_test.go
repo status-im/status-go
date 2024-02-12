@@ -114,23 +114,7 @@ func (s *TestMessengerProfileShowcase) verifiedContact(theirMessenger *Messenger
 
 func (s *TestMessengerProfileShowcase) prepareShowcasePreferences() *identity.ProfileShowcasePreferences {
 	return &identity.ProfileShowcasePreferences{
-		Communities: []*identity.ProfileShowcaseCommunityPreference{
-			&identity.ProfileShowcaseCommunityPreference{
-				CommunityID:        "0x32433445133424",
-				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
-				Order:              0,
-			},
-			&identity.ProfileShowcaseCommunityPreference{
-				CommunityID:        "0x33443246664345",
-				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
-				Order:              1,
-			},
-			&identity.ProfileShowcaseCommunityPreference{
-				CommunityID:        "0x33446343643446",
-				ShowcaseVisibility: identity.ProfileShowcaseVisibilityIDVerifiedContacts,
-				Order:              2,
-			},
-		},
+		Communities: []*identity.ProfileShowcaseCommunityPreference{}, // empty to avoid fetching
 		Accounts: []*identity.ProfileShowcaseAccountPreference{
 			&identity.ProfileShowcaseAccountPreference{
 				Address:            "0x32433445133424",
@@ -408,7 +392,7 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	resp, err := WaitOnMessengerResponse(
 		mutualContact,
 		func(r *MessengerResponse) bool {
-			return len(r.updatedProfileShowcases) > 0 && r.updatedProfileShowcases[contactID] != nil && len(r.updatedProfileShowcases[contactID].Communities) == 2
+			return len(r.updatedProfileShowcases) > 0 && r.updatedProfileShowcases[contactID] != nil
 		},
 		"no messages",
 	)
@@ -416,12 +400,6 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.Require().Len(resp.updatedProfileShowcases, 1)
 
 	profileShowcase := resp.updatedProfileShowcases[contactID]
-
-	s.Require().Len(profileShowcase.Communities, 2)
-	s.Require().Equal(profileShowcase.Communities[0].CommunityID, request.Communities[0].CommunityID)
-	s.Require().Equal(profileShowcase.Communities[0].Order, request.Communities[0].Order)
-	s.Require().Equal(profileShowcase.Communities[1].CommunityID, request.Communities[1].CommunityID)
-	s.Require().Equal(profileShowcase.Communities[1].Order, request.Communities[1].Order)
 
 	s.Require().Len(profileShowcase.Accounts, 2)
 	s.Require().Equal(profileShowcase.Accounts[0].Address, request.Accounts[0].Address)
@@ -470,15 +448,6 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	profileShowcase, err = verifiedContact.GetProfileShowcaseForContact(contactID)
 	s.Require().NoError(err)
 
-	s.Require().Len(profileShowcase.Communities, 3)
-
-	s.Require().Equal(profileShowcase.Communities[0].CommunityID, request.Communities[0].CommunityID)
-	s.Require().Equal(profileShowcase.Communities[0].Order, request.Communities[0].Order)
-	s.Require().Equal(profileShowcase.Communities[1].CommunityID, request.Communities[1].CommunityID)
-	s.Require().Equal(profileShowcase.Communities[1].Order, request.Communities[1].Order)
-	s.Require().Equal(profileShowcase.Communities[2].CommunityID, request.Communities[2].CommunityID)
-	s.Require().Equal(profileShowcase.Communities[2].Order, request.Communities[2].Order)
-
 	s.Require().Len(profileShowcase.Accounts, 2)
 	s.Require().Equal(profileShowcase.Accounts[0].Address, request.Accounts[0].Address)
 	s.Require().Equal(profileShowcase.Accounts[0].Name, request.Accounts[0].Name)
@@ -511,4 +480,110 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ContractAddress, request.UnverifiedTokens[1].ContractAddress)
 	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ChainID, request.UnverifiedTokens[1].ChainID)
 	s.Require().Equal(profileShowcase.UnverifiedTokens[1].Order, request.UnverifiedTokens[1].Order)
+}
+
+func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipInUnencryptedCommunity() {
+	alice := s.m
+
+	// Set Display name to pass shouldPublishChatIdentity check
+	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp.KeyUID = alice.account.KeyUID
+	profileKp.Accounts[0].KeyUID = alice.account.KeyUID
+
+	err := alice.settings.SaveOrUpdateKeypair(profileKp)
+	s.Require().NoError(err)
+
+	err = alice.SetDisplayName("Alice")
+	s.Require().NoError(err)
+
+	// Add bob as a mutual contact
+	bob := s.newMessenger()
+	_, err = bob.Start()
+	s.Require().NoError(err)
+	defer TearDownMessenger(&s.Suite, bob)
+
+	s.mutualContact(bob)
+
+	// Alice creates a community
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
+		Name:        "alice.com",
+		Color:       "#ffffff",
+		Description: "test",
+	}
+
+	response, err := alice.CreateCommunity(description, false)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	aliceCommunity := response.Communities()[0]
+
+	// NOTE: this is needed to avoid fetching from a story node
+	message := common.NewMessage()
+	message.ChatId = bob.IdentityPublicKeyString()
+	message.Text = "Check this community.."
+	message.CommunityID = aliceCommunity.IDString()
+
+	_, err = alice.SendChatMessage(context.Background(), message)
+	s.Require().NoError(err)
+
+	// Ensure community is received
+	response, err = WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0
+		},
+		"bob did not receive message with community link",
+	)
+	s.Require().NoError(err)
+	s.Require().Equal(aliceCommunity.ID(), response.Communities()[0].ID())
+
+	// Bobs creates an another community
+	description = &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
+		Name:        "bob.com",
+		Color:       "#ffffff",
+		Description: "test",
+	}
+
+	response, err = bob.CreateCommunity(description, false)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	bobCommunity := response.Communities()[0]
+
+	// Add community to the Alice's profile showcase & get it on the Bob's side
+	err = alice.SetProfileShowcasePreferences(&identity.ProfileShowcasePreferences{
+		Communities: []*identity.ProfileShowcaseCommunityPreference{
+			&identity.ProfileShowcaseCommunityPreference{
+				CommunityID:        aliceCommunity.IDString(),
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
+				Order:              0,
+			},
+			&identity.ProfileShowcaseCommunityPreference{
+				CommunityID:        bobCommunity.IDString(),
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
+				Order:              2,
+			},
+		},
+	})
+	s.Require().NoError(err)
+
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
+	resp, err := WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return len(r.updatedProfileShowcases) > 0 && r.updatedProfileShowcases[contactID] != nil && len(r.updatedProfileShowcases[contactID].Communities) == 2
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(resp.updatedProfileShowcases, 1)
+
+	profileShowcase := resp.updatedProfileShowcases[contactID]
+
+	// Verify community's data
+	s.Require().Len(profileShowcase.Communities, 2)
+	s.Require().Equal(profileShowcase.Communities[0].CommunityID, aliceCommunity.IDString())
+	s.Require().Equal(profileShowcase.Communities[0].MembershipStatus, identity.ProfileShowcaseMembershipStatusProvenMember)
+	s.Require().Equal(profileShowcase.Communities[1].CommunityID, bobCommunity.IDString())
+	s.Require().Equal(profileShowcase.Communities[1].MembershipStatus, identity.ProfileShowcaseMembershipStatusNotAMember)
 }
