@@ -275,8 +275,17 @@ func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, addresses [
 	}
 
 	tokens, err := r.persistence.GetTokens()
+
+	addressWithoutCachedBalances := false
+	for _, address := range addresses {
+		if _, ok := tokens[address]; !ok {
+			addressWithoutCachedBalances = true
+			break
+		}
+	}
+
 	// there should be at least ETH balance
-	if len(tokens) == 0 {
+	if addressWithoutCachedBalances {
 		return r.GetWalletTokenBalances(ctx, addresses)
 	}
 
