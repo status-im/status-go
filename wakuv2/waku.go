@@ -268,6 +268,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
 		node.WithMaxPeerConnections(cfg.DiscoveryLimit),
 		node.WithLogger(logger),
+		node.WithLogLevel(logger.Level()),
 		node.WithClusterID(cfg.ClusterID),
 		node.WithMaxMsgSize(1024 * 1024),
 	}
@@ -287,6 +288,10 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	} else {
 		relayOpts := []pubsub.Option{
 			pubsub.WithMaxMessageSize(int(waku.settings.MaxMsgSize)),
+		}
+
+		if waku.logger.Level() == zap.DebugLevel {
+			relayOpts = append(relayOpts, pubsub.WithEventTracer(waku))
 		}
 
 		opts = append(opts, node.WithWakuRelayAndMinPeers(waku.settings.MinPeersForRelay, relayOpts...))
