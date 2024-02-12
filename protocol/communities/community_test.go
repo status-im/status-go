@@ -449,23 +449,17 @@ func (s *CommunitySuite) TestValidateRequestToJoin() {
 }
 
 func (s *CommunitySuite) TestCanPost() {
-	validGrant := 1
-	invalidGrant := 2
-
 	notMember := &s.member3.PublicKey
 	member := &s.member1.PublicKey
 
 	// MEMBERSHIP-NO-MEMBERSHIP-Member-> User can post
 	// MEMBERSHIP-NO-MEMEBRESHIP->NON member -> User can't post
-	// MEMBERSHIP-NO-MEMBERSHIP-Grant -> user can post
-	// MEMBERSHIP-NO-MEMBERSHIP-old-grant -> user can't post
 
 	testCases := []struct {
 		name    string
 		config  Config
 		member  *ecdsa.PublicKey
 		err     error
-		grant   int
 		canPost bool
 	}{
 		{
@@ -487,20 +481,6 @@ func (s *CommunitySuite) TestCanPost() {
 			canPost: true,
 		},
 		{
-			name:    "membership org with no-membership chat  not-a-member valid grant",
-			config:  s.configOnRequestOrgNoMembershipChat(),
-			member:  notMember,
-			canPost: false,
-			grant:   validGrant,
-		},
-		{
-			name:    "membership org with no-membership chat not-a-member invalid grant",
-			config:  s.configOnRequestOrgNoMembershipChat(),
-			member:  notMember,
-			canPost: false,
-			grant:   invalidGrant,
-		},
-		{
 			name:    "monsier creator can always post of course",
 			config:  s.configOnRequestOrgNoMembershipChat(),
 			member:  &s.identity.PublicKey,
@@ -510,22 +490,11 @@ func (s *CommunitySuite) TestCanPost() {
 
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
-			var grant []byte
 			var err error
 			org, err := New(tc.config, &TimeSourceStub{}, &DescriptionEncryptorMock{})
 			s.Require().NoError(err)
 
-			if tc.grant == validGrant {
-				grant, err = org.buildGrant(tc.member, testChatID1)
-				// We lower the clock of the description to simulate
-				// a valid use case
-				org.config.CommunityDescription.Clock--
-				s.Require().NoError(err)
-			} else if tc.grant == invalidGrant {
-				grant, err = org.buildGrant(&s.member2.PublicKey, testChatID1)
-				s.Require().NoError(err)
-			}
-			canPost, err := org.CanPost(tc.member, testChatID1, grant)
+			canPost, err := org.CanPost(tc.member, testChatID1)
 			s.Require().Equal(tc.err, err)
 			s.Require().Equal(tc.canPost, canPost)
 		})

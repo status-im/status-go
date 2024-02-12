@@ -56,10 +56,6 @@ func (m *PinMessage) SetMessageType(messageType protobuf.MessageType) {
 	m.MessageType = messageType
 }
 
-func (m *PinMessage) GetGrant() []byte {
-	return nil
-}
-
 // GetProtoBuf returns the struct's embedded protobuf struct
 // this function is required to implement the ChatEntity interface
 func (m *PinMessage) GetProtobuf() proto.Message {

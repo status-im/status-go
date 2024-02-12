@@ -2178,8 +2178,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 		}
 		rawMessage.PubsubTopic = community.PubsubTopic()
 
-		// TODO: add grant
-		canPost, err := m.communitiesManager.CanPost(&m.identity.PublicKey, chat.CommunityID, chat.CommunityChatID(), nil)
+		canPost, err := m.communitiesManager.CanPost(&m.identity.PublicKey, chat.CommunityID, chat.CommunityChatID())
 		if err != nil {
 			return rawMessage, err
 		}
@@ -5746,7 +5745,6 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 
 	case ChatTypeCommunityChat:
 		l.Debug("sending community chat message", zap.String("chatName", chat.Name))
-		// TODO: add grant
 		message.SetMessageType(protobuf.MessageType_COMMUNITY_CHAT)
 		encodedMessage, err = proto.Marshal(message.GetProtobuf())
 		if err != nil {

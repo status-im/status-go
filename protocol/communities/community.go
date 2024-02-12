@@ -174,7 +174,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 			communityItem.Encrypted = o.Encrypted()
 		}
 		for id, c := range o.config.CommunityDescription.Chats {
-			canPost, err := o.CanPost(o.config.MemberIdentity, id, nil)
+			canPost, err := o.CanPost(o.config.MemberIdentity, id)
 			if err != nil {
 				return nil, err
 			}
@@ -308,7 +308,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 			communityItem.Categories[id] = category
 		}
 		for id, c := range o.config.CommunityDescription.Chats {
-			canPost, err := o.CanPost(o.config.MemberIdentity, id, nil)
+			canPost, err := o.CanPost(o.config.MemberIdentity, id)
 			if err != nil {
 				return nil, err
 			}
@@ -1805,7 +1805,7 @@ func (o *Community) VerifyGrantSignature(data []byte) (*protobuf.Grant, error) {
 	return grant, nil
 }
 
-func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, grantBytes []byte) (bool, error) {
+func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string) (bool, error) {
 	if o.config.CommunityDescription.Chats == nil {
 		o.config.Logger.Debug("Community.CanPost: no-chats")
 		return false, nil
@@ -1846,44 +1846,11 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, grantBytes []byt
 
 	// Need to also be a chat member to post
 	if !o.IsMemberInChat(pk, chatID) {
-		if grantBytes == nil {
-			o.config.Logger.Debug("Community.CanPost: not a chat member:", zap.String("chat-id", chatID))
-			return false, nil
-		}
-		return o.canPostWithGrant(pk, chatID, grantBytes)
+		o.config.Logger.Debug("Community.CanPost: not a chat member", zap.String("chat-id", chatID))
+		return false, nil
 	}
 
 	// all conditions satisfied, user can post after all
-	return true, nil
-}
-
-func (o *Community) canPostWithGrant(pk *ecdsa.PublicKey, chatID string, grantBytes []byte) (bool, error) {
-	grant, err := o.VerifyGrantSignature(grantBytes)
-	if err != nil {
-		return false, err
-	}
-	// If the clock is lower or equal is invalid
-	if grant.Clock <= o.config.CommunityDescription.Clock {
-		return false, nil
-	}
-
-	if grant.MemberId == nil {
-		return false, nil
-	}
-
-	grantPk, err := crypto.DecompressPubkey(grant.MemberId)
-	if err != nil {
-		return false, nil
-	}
-
-	if !common.IsPubKeyEqual(grantPk, pk) {
-		return false, nil
-	}
-
-	if chatID != grant.ChatId {
-		return false, nil
-	}
-
 	return true, nil
 }
 
@@ -1960,7 +1927,7 @@ func (o *Community) isMember() bool {
 }
 
 func (o *Community) CanMemberIdentityPost(chatID string) (bool, error) {
-	return o.CanPost(o.config.MemberIdentity, chatID, nil)
+	return o.CanPost(o.config.MemberIdentity, chatID)
 }
 
 // CanJoin returns whether a user can join the community, only if it's
