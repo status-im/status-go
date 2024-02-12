@@ -214,6 +214,8 @@ func (m *Messenger) CancelVerificationRequest(ctx context.Context, id string) (*
 
 	response.AddVerificationRequest(verifRequest)
 
+	response.AddContact(contact)
+
 	err = m.SyncVerificationRequest(context.Background(), verifRequest, m.dispatchMessage)
 	if err != nil {
 		return nil, err
@@ -482,6 +484,8 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.Verif
 		return nil, err
 	}
 	response.AddMessage(msg)
+
+	response.AddContact(contact)
 
 	return response, nil
 }
@@ -961,6 +965,24 @@ func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState
 	if persistedVR.RequestStatus == verification.RequestStatusCANCELED {
 		return nil // Do nothing, We have already cancelled the verification request
 	}
+
+	contact.VerificationStatus = VerificationStatusUNVERIFIED
+	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
+
+	err = m.persistence.SaveContact(contact, nil)
+	if err != nil {
+		return err
+	}
+
+	// We sync the contact with the other devices
+	err = m.syncContact(context.Background(), contact, m.dispatchMessage)
+	if err != nil {
+		return err
+	}
+
+	m.allContacts.Store(contact.ID, contact)
+
+	state.Response.AddContact(contact)
 
 	if persistedVR == nil {
 		// This is a response for which we have not received its request before
