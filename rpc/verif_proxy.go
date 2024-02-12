@@ -6,6 +6,7 @@ package rpc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -21,14 +22,24 @@ import (
 	proxytypes "github.com/vitvly/lc-proxy-wrapper/types"
 )
 
+// TODO Figure out a better way of setting this
+const defaultBlockRoot = "0x307397cd6a44e038e6da207ae7e969681b848eb2654fde1f26e8e72c66ecfd08"
+
 func init() {
 	verifProxyInitFn = func(c *Client) {
 		defer c.wg.Done()
 
+		blockRoot, err := nodecfg.GetNimbusTrustedBlockRoot(c.db)
+		if err != nil {
+			fmt.Println("verif_proxy GetNimbusTrustedBlockRoot error", err)
+		}
+		if len(blockRoot) == 0 {
+			blockRoot = defaultBlockRoot
+		}
+
 		cfg := proxy.Config{
-			Eth2Network: "mainnet",
-			// TODO Figure out a better way of setting this
-			TrustedBlockRoot: "0x307397cd6a44e038e6da207ae7e969681b848eb2654fde1f26e8e72c66ecfd08",
+			Eth2Network:      "mainnet",
+			TrustedBlockRoot: blockRoot,
 			Web3Url:          c.upstreamURL,
 			RpcAddress:       "127.0.0.1",
 			RpcPort:          8545,
@@ -42,7 +53,7 @@ func init() {
 		ticker := time.NewTicker(5 * time.Second)
 		proxyInitialized := false
 		var proxyClient *gethrpc.Client
-		fmt.Println("### waitForHeaders")
+
 		for {
 			select {
 			case <-c.ctx.Done():
@@ -53,7 +64,7 @@ func init() {
 				if ev.EventType == proxytypes.Stopped || ev.EventType == proxytypes.Error {
 					return
 				}
-				fmt.Println("### Verification proxy headers received", ev.Msg)
+
 				if !proxyInitialized {
 					proxyInitialized = true
 					// Create RPC client using verification proxy endpoint
@@ -66,14 +77,17 @@ func init() {
 
 				}
 				if proxyInitialized && ev.EventType == proxytypes.FinalizedHeader {
-					storeUpdatedBlockRoot(c, ev.Msg)
+					err = storeUpdatedBlockRoot(c, ev.Msg)
+					if err != nil {
+						fmt.Println("verif_proxy storeUpdatedBlockRoot", err)
+					}
 				}
 			case <-ticker.C:
 				if proxyInitialized {
 					// Invoke a simple RPC method in order to ascertain that proxy is up and running
 					ctx, _ := context.WithTimeout(c.ctx, 5*time.Second)
 					_, err := blockNumber(ctx, proxyClient)
-					fmt.Println("### blockNumber result", err)
+					fmt.Println("verif_proxy blockNumber result", err)
 					if err == nil {
 						ticker.Stop()
 						installAPIHandlers(c, proxyClient)
@@ -159,31 +173,29 @@ func installAPIHandlers(c *Client, proxyClient *gethrpc.Client) {
 	)
 }
 
-func storeUpdatedBlockRoot(c *Client, msg string) {
+func storeUpdatedBlockRoot(c *Client, msg string) error {
 
 	// Store updated trusted block root into DB
 	var jsonData map[string]interface{}
 	err := json.Unmarshal([]byte(msg), &jsonData)
 	if err != nil {
-		fmt.Println("### could not unmarshal finalized header")
-		return
+		return errors.New("could not unmarshal finalized header")
 	}
 	beacon, exists := jsonData["beacon"]
 	if !exists {
-		fmt.Println("### could not unmarshal beacon json")
-		return
+		return errors.New("could not unmarshal beacon json")
 	}
 	stateRoot, exists := (beacon.(map[string]interface{}))["state_root"]
 	if !exists {
-		fmt.Println("### could not find state_root")
-		return
+		return errors.New("could not find state_root")
 	}
 	// TODO store stateRoot into DB
-	fmt.Println("### stateRoot", stateRoot)
 	err = nodecfg.SetNimbusTrustedBlockRoot(c.db, "0x"+stateRoot.(string))
 	if err != nil {
-		fmt.Println("### stateRoot err", err)
+		return err
 	}
+
+	return nil
 }
 
 func chainId(ctx context.Context, proxyClient *gethrpc.Client) (interface{}, error) {

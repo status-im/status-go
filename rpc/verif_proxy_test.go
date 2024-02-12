@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 )
 
@@ -77,6 +78,11 @@ func (s *ProxySuite) TestRun() {
 proceed:
 	fmt.Println("after waitForProxyHeaders")
 
+	// Verify that trusted block root has been updated
+	blockRoot, err := nodecfg.GetNimbusTrustedBlockRoot(client.db)
+	s.Require().NoError(err)
+	s.Require().NotEqual(blockRoot, defaultBlockRoot)
+
 	// Invoke eth_getBalance
 	var result hexutil.Big
 	var addr common.Address
@@ -84,7 +90,7 @@ proceed:
 	chainID := uint64(1)
 
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	err := client.CallContext(ctx, &result, chainID, "eth_getBalance", addr, "latest")
+	err = client.CallContext(ctx, &result, chainID, "eth_getBalance", addr, "latest")
 	s.Require().NoError(err)
 
 	client.UnregisterHandler("eth_getBalance")

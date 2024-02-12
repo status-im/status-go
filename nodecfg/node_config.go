@@ -803,6 +803,18 @@ func SetLogLevel(db *sql.DB, logLevel string) error {
 	return err
 }
 
+func GetNimbusTrustedBlockRoot(db *sql.DB) (string, error) {
+	var blockRoot sql.NullString
+	err := db.QueryRow("SELECT nimbus_proxy_trusted_block_root FROM node_config").Scan(&blockRoot)
+	if err != nil {
+		return "", err
+	}
+	if blockRoot.Valid {
+		return blockRoot.String, nil
+	}
+	return "", nil
+}
+
 func SetNimbusTrustedBlockRoot(db *sql.DB, blockRoot string) error {
 	_, err := db.Exec(`UPDATE node_config SET nimbus_proxy_trusted_block_root = ?`, blockRoot)
 	return err
