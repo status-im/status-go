@@ -425,7 +425,9 @@ func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 			signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver.Address, m.mailserverCycle.activeMailserver.ID)
 
 			// Query mailserver
-			m.asyncRequestAllHistoricMessages()
+			if m.config.featureFlags.AutoRequestHistoricMessages {
+				m.asyncRequestAllHistoricMessages()
+			}
 		}
 	}
 	return nil
@@ -552,7 +554,9 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 					signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver.Address, m.mailserverCycle.activeMailserver.ID)
 				}
 				// Query mailserver
-				m.asyncRequestAllHistoricMessages()
+				if m.config.featureFlags.AutoRequestHistoricMessages {
+					m.asyncRequestAllHistoricMessages()
+				}
 			} else {
 				m.mailPeersMutex.Unlock()
 			}

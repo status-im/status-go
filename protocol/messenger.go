@@ -293,7 +293,7 @@ func NewMessenger(
 ) (*Messenger, error) {
 	var messenger *Messenger
 
-	c := config{messageResendMinDelay: 30, messageResendMaxCount: 3}
+	c := messengerDefaultConfig()
 
 	for _, opt := range opts {
 		if err := opt(&c); err != nil {
@@ -950,7 +950,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 	}
 
 	// Start fetching messages from store nodes
-	if online {
+	if online && m.config.featureFlags.AutoRequestHistoricMessages {
 		m.asyncRequestAllHistoricMessages()
 	}
 

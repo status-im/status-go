@@ -26,4 +26,8 @@ type FeatureFlags struct {
 
 	// Peersyncing indicates whether we should advertise and sync messages with other peers
 	Peersyncing bool
+
+	// AutoRequestHistoricMessages indicates whether we should automatically request
+	// historic messages on getting online, connecting to store node, etc.
+	AutoRequestHistoricMessages bool
 }
