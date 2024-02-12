@@ -639,8 +639,14 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestShardAndCommunityInfo() {
 		Shard:       expectedShard,
 	}
 
+	shardTopic := transport.CommunityShardInfoTopic(community.IDString())
+	contentContentTopic := wakuV2common.BytesToTopic(transport.ToTopic(shardTopic))
+	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(&contentContentTopic)
+
 	_, err := s.owner.SetCommunityShard(shardRequest)
 	s.Require().NoError(err)
+
+	s.waitForEnvelopes(storeNodeSubscription, 1)
 
 	s.waitForAvailableStoreNode(s.bob)
 
