@@ -72,7 +72,7 @@ func (m *Messenger) syncNewSavedAddress(ctx context.Context, savedAddress *walle
 		Address:         savedAddress.Address.Bytes(),
 		Name:            savedAddress.Name,
 		Removed:         savedAddress.Removed,
-		UpdateClock:     savedAddress.UpdateClock,
+		UpdateClock:     updateClock,
 		ChainShortNames: savedAddress.ChainShortNames,
 		Ens:             savedAddress.ENSName,
 		IsTest:          savedAddress.IsTest,
@@ -110,7 +110,7 @@ func (m *Messenger) HandleSyncSavedAddress(state *ReceivedMessageState, syncMess
 		if err != nil {
 			return err
 		}
-		state.Response.AddSavedAddress(&wallet.SavedAddress{Address: address, ENSName: syncMessage.Ens, IsTest: syncMessage.IsTest})
+		state.Response.AddSavedAddress(&wallet.SavedAddress{Address: address, ENSName: syncMessage.Ens, IsTest: syncMessage.IsTest, Removed: true})
 	} else {
 		sa := wallet.SavedAddress{
 			Address:         address,

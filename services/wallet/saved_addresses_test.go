@@ -95,7 +95,6 @@ func TestSavedAddressesMetadata(t *testing.T) {
 		Address: common.Address{1},
 		Name:    "Raw",
 		savedAddressMeta: savedAddressMeta{
-			Removed:     false,
 			UpdateClock: 234,
 		},
 		ChainShortNames: "eth:arb:",
@@ -212,8 +211,8 @@ func TestSavedAddressesCleanSoftDeletes(t *testing.T) {
 			Address: common.Address{byte(i)},
 			Name:    "Test" + strconv.Itoa(i),
 			ColorID: multiAccCommon.CustomizationColorGreen,
+			Removed: true,
 			savedAddressMeta: savedAddressMeta{
-				Removed:     true,
 				UpdateClock: uint64(firstTimestamp + i),
 			},
 		}
@@ -245,9 +244,7 @@ func TestSavedAddressesGet(t *testing.T) {
 		ENSName: "test.ens.eth",
 		ColorID: multiAccCommon.CustomizationColorGreen,
 		IsTest:  false,
-		savedAddressMeta: savedAddressMeta{
-			Removed: true,
-		},
+		Removed: true,
 	}
 
 	err := manager.upsertSavedAddress(sa, nil)
