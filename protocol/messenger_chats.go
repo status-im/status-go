@@ -656,7 +656,7 @@ func (m *Messenger) FetchMessages(request *requests.FetchMessages) error {
 		return ErrChatNotFound
 	}
 
-	_, err := m.fetchMessages(chat.ID, oneMonthInSeconds)
+	_, err := m.fetchMessages(chat.ID, oneMonthDuration)
 	if err != nil {
 		return err
 	}

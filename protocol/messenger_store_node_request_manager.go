@@ -3,7 +3,6 @@ package protocol
 import (
 	"database/sql"
 	"fmt"
-	"math"
 	"strings"
 	"sync"
 	"time"
@@ -518,8 +517,7 @@ func (r *storeNodeRequest) routine() {
 	}
 
 	// Start store node request
-	to := uint32(math.Ceil(float64(r.manager.messenger.GetCurrentTimeInMillis()) / 1000))
-	from := to - oneMonthInSeconds
+	from, to := r.manager.messenger.calculateMailserverTimeBounds(oneMonthDuration)
 
 	_, err := r.manager.messenger.performMailserverRequest(func() (*MessengerResponse, error) {
 		batch := MailserverBatch{
