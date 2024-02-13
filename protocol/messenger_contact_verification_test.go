@@ -248,6 +248,7 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Accepted, false)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Dismissed, false)
 
+	// Mark as tusted
 	resp, err = s.m.VerifiedTrusted(context.Background(), &requests.VerifiedTrusted{ID: types.FromHex(verificationRequestID)})
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
@@ -260,6 +261,9 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().Equal(common.ContactVerificationStateTrusted, resp.Messages()[0].ContactVerificationState)
 
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().Equal(resp.Contacts[0].ID, theirPk)
+	s.Require().Equal(resp.Contacts[0].VerificationStatus, VerificationStatusVERIFIED)
 }
 
 func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
@@ -606,6 +610,10 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().Equal(resp.Messages()[0].ContactVerificationState, common.ContactVerificationStateDeclined)
 
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().Equal(resp.Contacts[0].ID, theirPk)
+	s.Require().Equal(resp.Contacts[0].VerificationStatus, VerificationStatusUNVERIFIED)
+
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusDECLINED)
@@ -682,6 +690,10 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 	s.Require().Len(resp.VerificationRequests(), 1)
 	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
 	s.Require().Equal(resp.VerificationRequests()[0].RequestStatus, verification.RequestStatusCANCELED)
+
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().Equal(resp.Contacts[0].ID, theirPk)
+	s.Require().Equal(resp.Contacts[0].VerificationStatus, VerificationStatusUNVERIFIED)
 
 	// Check canceled state on the receiver's side
 	resp, err = WaitOnMessengerResponse(
