@@ -269,7 +269,7 @@ func createTestPermissionRequest(community *communities.Community, pType protobu
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{uint64(communitiesEventsTestChainID): communitiesEventsTestTokenAddress},
 				Symbol:            "TEST",
-				Amount:            "100",
+				AmountInWei:       "100000000000000000000",
 				Decimals:          uint64(18),
 			},
 		},
@@ -338,7 +338,7 @@ func editTokenPermission(base CommunityEventsTestsInterface, community *communit
 	permissionSatisfyRequest := func(p *communities.CommunityTokenPermission) bool {
 		return request.Type == p.Type &&
 			request.TokenCriteria[0].Symbol == p.TokenCriteria[0].Symbol &&
-			request.TokenCriteria[0].Amount == p.TokenCriteria[0].Amount &&
+			request.TokenCriteria[0].AmountInWei == p.TokenCriteria[0].AmountInWei &&
 			request.TokenCriteria[0].Decimals == p.TokenCriteria[0].Decimals
 	}
 	s.Require().True(permissionSatisfyRequest(editedPermission))
@@ -1004,7 +1004,7 @@ func testCreateEditDeleteBecomeMemberPermission(base CommunityEventsTestsInterfa
 	tokenPermissionID, createTokenPermission := createTestTokenPermission(base, community, pType)
 
 	createTokenPermission.TokenCriteria[0].Symbol = "UPDATED"
-	createTokenPermission.TokenCriteria[0].Amount = "200"
+	createTokenPermission.TokenCriteria[0].AmountInWei = "200000000000000000000"
 
 	editTokenPermissionRequest := &requests.EditCommunityTokenPermission{
 		PermissionID:                   tokenPermissionID,
@@ -1823,7 +1823,7 @@ func testEventSenderCannotEditPrivilegedCommunityPermission(base CommunityEvents
 	tokenPermissionID := controlNodeCreatesCommunityPermission(base, community, permissionRequest)
 
 	permissionRequest.TokenCriteria[0].Symbol = "UPDATED"
-	permissionRequest.TokenCriteria[0].Amount = "200"
+	permissionRequest.TokenCriteria[0].AmountInWei = "200000000000000000000"
 
 	permissionEditRequest := &requests.EditCommunityTokenPermission{
 		PermissionID:                   tokenPermissionID,

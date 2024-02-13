@@ -195,7 +195,7 @@ func (s *ManagerSuite) TestRetrieveTokens() {
 			Symbol:            "STT",
 			Type:              protobuf.CommunityTokenType_ERC20,
 			Name:              "Status Test Token",
-			Amount:            "1.000000000000000000",
+			AmountInWei:       "1000000000000000000",
 			Decimals:          decimals,
 		},
 	}
@@ -959,7 +959,7 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewOnlyPermissions() {
 			Symbol:            "STT",
 			Type:              protobuf.CommunityTokenType_ERC20,
 			Name:              "Status Test Token",
-			Amount:            "1.000000000000000000",
+			AmountInWei:       "1000000000000000000",
 			Decimals:          decimals,
 		},
 	}
@@ -1019,7 +1019,7 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissions() {
 			Symbol:            "STT",
 			Type:              protobuf.CommunityTokenType_ERC20,
 			Name:              "Status Test Token",
-			Amount:            "1.000000000000000000",
+			AmountInWei:       "1000000000000000000",
 			Decimals:          decimals,
 		},
 	}
@@ -1080,7 +1080,7 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissionsCombina
 			Symbol:            "STT",
 			Type:              protobuf.CommunityTokenType_ERC20,
 			Name:              "Status Test Token",
-			Amount:            "1.000000000000000000",
+			AmountInWei:       "1000000000000000000",
 			Decimals:          decimals,
 		},
 	}
@@ -1106,7 +1106,7 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissionsCombina
 			Symbol:            "TEST",
 			Type:              protobuf.CommunityTokenType_ERC20,
 			Name:              "TEST token",
-			Amount:            "1.000000000000000000",
+			AmountInWei:       "1000000000000000000",
 			Decimals:          decimals,
 		},
 	}
@@ -1255,7 +1255,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 			Symbol:            "STT",
 			Type:              protobuf.CommunityTokenType_ERC20,
 			Name:              "Status Test Token",
-			Amount:            "1.000000000000000000",
+			AmountInWei:       "1000000000000000000",
 			Decimals:          decimals,
 		},
 	}

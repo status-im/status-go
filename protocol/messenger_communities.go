@@ -2268,6 +2268,8 @@ func (m *Messenger) UpdateCommunityFilters(community *communities.Community) err
 }
 
 func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommunityTokenPermission) (*MessengerResponse, error) {
+	request.FillDeprecatedAmount()
+
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
@@ -2302,6 +2304,8 @@ func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommu
 }
 
 func (m *Messenger) EditCommunityTokenPermission(request *requests.EditCommunityTokenPermission) (*MessengerResponse, error) {
+	request.FillDeprecatedAmount()
+
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}

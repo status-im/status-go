@@ -225,10 +225,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) sendChatMessage(sender *Mess
 func (s *MessengerCommunitiesTokenPermissionsSuite) makeAddressSatisfyTheCriteria(chainID uint64, address string, criteria *protobuf.TokenCriteria) {
 	walletAddress := gethcommon.HexToAddress(address)
 	contractAddress := gethcommon.HexToAddress(criteria.ContractAddresses[chainID])
-	balance, ok := new(big.Int).SetString(criteria.Amount, 10)
+	balance, ok := new(big.Int).SetString(criteria.AmountInWei, 10)
 	s.Require().True(ok)
-	decimalsFactor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(criteria.Decimals)), nil)
-	balance.Mul(balance, decimalsFactor)
 
 	s.mockedBalances[chainID][walletAddress][contractAddress] = (*hexutil.Big)(balance)
 }
@@ -251,7 +249,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() 
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{uint64(testChainID1): "0x123"},
 				Symbol:            "TEST",
-				Amount:            "100",
+				AmountInWei:       "100000000000000000000",
 				Decimals:          uint64(18),
 			},
 		},
@@ -267,7 +265,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() 
 		for _, tc := range tokenPermission.TokenCriteria {
 			s.Require().Equal(tc.Type, protobuf.CommunityTokenType_ERC20)
 			s.Require().Equal(tc.Symbol, "TEST")
-			s.Require().Equal(tc.Amount, "100")
+			s.Require().Equal(tc.AmountInWei, "100000000000000000000")
+			s.Require().Equal(tc.Amount, "100") // automatically upgraded deprecated amount
 			s.Require().Equal(tc.Decimals, uint64(18))
 		}
 	}
@@ -285,7 +284,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditTokenPermission() {
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
 				Symbol:            "TEST",
-				Amount:            "100",
+				AmountInWei:       "100000000000000000000",
 				Decimals:          uint64(18),
 			},
 		},
@@ -304,7 +303,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditTokenPermission() {
 	}
 
 	tokenPermission.TokenCriteria[0].Symbol = "TESTUpdated"
-	tokenPermission.TokenCriteria[0].Amount = "200"
+	tokenPermission.TokenCriteria[0].AmountInWei = "200000000000000000000"
 	tokenPermission.TokenCriteria[0].Decimals = uint64(20)
 
 	editTokenPermission := &requests.EditCommunityTokenPermission{
@@ -324,7 +323,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditTokenPermission() {
 		for _, tc := range tokenPermission.TokenCriteria {
 			s.Require().Equal(tc.Type, protobuf.CommunityTokenType_ERC20)
 			s.Require().Equal(tc.Symbol, "TESTUpdated")
-			s.Require().Equal(tc.Amount, "200")
+			s.Require().Equal(tc.AmountInWei, "200000000000000000000")
+			s.Require().Equal(tc.Amount, "2") // automatically upgraded deprecated amount
 			s.Require().Equal(tc.Decimals, uint64(20))
 		}
 	}
@@ -835,7 +835,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPe
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
 				Symbol:            "TEST",
-				Amount:            "100",
+				AmountInWei:       "100000000000000000000",
 				Decimals:          uint64(18),
 			},
 		},
@@ -873,7 +873,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWit
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
 				Symbol:            "TEST",
-				Amount:            "100",
+				AmountInWei:       "100000000000000000000",
 				Decimals:          uint64(18),
 			},
 		},
@@ -894,7 +894,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWit
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
 				Symbol:            "TESTADMIN",
-				Amount:            "100",
+				AmountInWei:       "100000000000000000000",
 				Decimals:          uint64(18),
 			},
 		},
@@ -939,7 +939,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWith
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
 				Symbol:            "TEST",
-				Amount:            "100",
+				AmountInWei:       "100000000000000000000",
 				Decimals:          uint64(18),
 			},
 		},
@@ -964,7 +964,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWith
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
 				Symbol:            "TESTADMIN",
-				Amount:            "100",
+				AmountInWei:       "100000000000000000000",
 				Decimals:          uint64(18),
 			},
 		},
@@ -1038,7 +1038,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
 				Symbol:            "TEST",
-				Amount:            "100",
+				AmountInWei:       "100000000000000000000",
 				Decimals:          uint64(18),
 			},
 		},
@@ -1154,7 +1154,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
 				Symbol:            "TEST",
-				Amount:            "100",
+				AmountInWei:       "100000000000000000000",
 				Decimals:          uint64(18),
 			},
 		},
@@ -1244,7 +1244,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
 				Symbol:            "TEST",
-				Amount:            "100",
+				AmountInWei:       "100000000000000000000",
 				Decimals:          uint64(18),
 			},
 		},
@@ -1264,7 +1264,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
 				Symbol:            "TEST2",
-				Amount:            "100",
+				AmountInWei:       "100000000000000000000",
 				Decimals:          uint64(18),
 			},
 		},
