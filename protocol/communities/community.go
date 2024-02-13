@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"math/big"
 	"sync"
 	"time"
 
@@ -1466,6 +1468,37 @@ func hydrateChannelsMembers(communityID string, description *protobuf.CommunityD
 			channel.Members = make(map[string]*protobuf.CommunityMember)
 			for pubKey, member := range description.Members {
 				channel.Members[pubKey] = member
+			}
+		}
+	}
+}
+
+func upgradeTokenPermissions(description *protobuf.CommunityDescription) {
+
+	floatToWeiIntFunc := func(floatStr string, decimals uint64) string {
+		bigfloat := new(big.Float)
+		bigfloat.SetString(floatStr)
+
+		multiplier := big.NewFloat(math.Pow(10, float64(decimals)))
+		bigfloat.Mul(bigfloat, multiplier)
+
+		result := new(big.Int)
+		bigfloat.Int(result)
+		return result.String()
+	}
+
+	for _, permission := range description.TokenPermissions {
+		for _, criteria := range permission.TokenCriteria {
+			if criteria.AmountInWei != "" {
+				continue
+			}
+			// set AmountInWei if missing
+			// Amount format (deprecated): "0.123"
+			// AmountInWei format: "123000..000"
+			if criteria.Type == protobuf.CommunityTokenType_ERC20 {
+				criteria.AmountInWei = floatToWeiIntFunc(criteria.Amount, criteria.Decimals)
+			} else {
+				criteria.AmountInWei = criteria.Amount
 			}
 		}
 	}

@@ -1737,6 +1737,8 @@ func (m *Manager) preprocessDescription(id types.HexBytes, description *protobuf
 		return response, err
 	}
 
+	upgradeTokenPermissions(description)
+
 	// Workaround for https://github.com/status-im/status-desktop/issues/12188
 	hydrateChannelsMembers(types.EncodeHex(id), description)
 
@@ -4608,7 +4610,8 @@ func (m *Manager) AddCommunityToken(token *community_token.CommunityToken, clock
 			Symbol:            token.Symbol,
 			Name:              token.Name,
 			Amount:            "1",
-			Decimals:          uint64(token.Decimals),
+			AmountInWei:       "1",
+			Decimals:          uint64(0),
 		}
 
 		request := &requests.CreateCommunityTokenPermission{

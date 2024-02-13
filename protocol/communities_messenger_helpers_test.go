@@ -273,7 +273,7 @@ func createEncryptedCommunity(s *suite.Suite, owner *Messenger) (*communities.Co
 			Type:              protobuf.CommunityTokenType_ERC20,
 			Symbol:            "STT",
 			Name:              "Status Test Token",
-			Amount:            "10",
+			AmountInWei:       "10000000000000000000",
 			Decimals:          18,
 		}},
 	})
@@ -289,7 +289,7 @@ func createEncryptedCommunity(s *suite.Suite, owner *Messenger) (*communities.Co
 				Type:              protobuf.CommunityTokenType_ERC20,
 				Symbol:            "STT",
 				Name:              "Status Test Token",
-				Amount:            "10",
+				AmountInWei:       "10000000000000000000",
 				Decimals:          18,
 			},
 		},
