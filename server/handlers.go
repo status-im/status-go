@@ -275,6 +275,10 @@ func ParseImageParams(logger *zap.Logger, params url.Values) ImageParams {
 		parsed.AuthorID = authorIds[0]
 	}
 
+	if attachmentIDs := params["attachmentId"]; len(attachmentIDs) != 0 {
+		parsed.AttachmentID = attachmentIDs[0]
+	}
+
 	if imageIds := params["image-id"]; len(imageIds) != 0 {
 		parsed.ImageID = imageIds[0]
 	}
