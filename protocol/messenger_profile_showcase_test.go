@@ -179,8 +179,8 @@ func (s *TestMessengerProfileShowcase) prepareShowcasePreferences() *identity.Pr
 }
 
 func (s *TestMessengerProfileShowcase) TestSaveAndGetProfileShowcasePreferences() {
-	request := dummyProfileShowcasePreferences
-	err := s.m.SetProfileShowcasePreferences(&request, false)
+	request := DummyProfileShowcasePreferences()
+	err := s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().NoError(err)
 
 	// Restored preferences shoulf be same as stored
@@ -383,8 +383,8 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.verifiedContact(verifiedContact)
 
 	// Save preferences to dispatch changes
-	request := dummyProfileShowcasePreferences
-	err = s.m.SetProfileShowcasePreferences(&request, false)
+	request := DummyProfileShowcasePreferences()
+	err = s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().NoError(err)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
