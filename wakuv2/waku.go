@@ -218,17 +218,26 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 		onPeerStats:                     onPeerStats,
 	}
+	enablePeerExchange := cfg.PeerExchange
+	enabledDiscv5 := cfg.EnableDiscV5
+	if cfg.LightClient {
+		enablePeerExchange = true
+		enabledDiscv5 = false
+	} else {
+		enablePeerExchange = false
+		enabledDiscv5 = true
+	}
 
 	waku.settings = settings{
 		MaxMsgSize:        cfg.MaxMessageSize,
 		LightClient:       cfg.LightClient,
 		MinPeersForRelay:  cfg.MinPeersForRelay,
 		MinPeersForFilter: cfg.MinPeersForFilter,
-		PeerExchange:      cfg.PeerExchange,
+		PeerExchange:      enablePeerExchange,
 		DiscoveryLimit:    cfg.DiscoveryLimit,
 		Nameserver:        cfg.Nameserver,
 		Resolver:          cfg.Resolver,
-		EnableDiscV5:      cfg.EnableDiscV5,
+		EnableDiscV5:      enabledDiscv5,
 	}
 
 	waku.settings.DefaultPubsubTopic = cfg.DefaultShardPubsubTopic
@@ -273,7 +282,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		node.WithMaxMsgSize(1024 * 1024),
 	}
 
-	if cfg.EnableDiscV5 && !waku.settings.LightClient {
+	if enabledDiscv5 {
 		bootnodes, err := waku.getDiscV5BootstrapNodes(waku.ctx, cfg.DiscV5BootstrapNodes)
 		if err != nil {
 			logger.Error("failed to get bootstrap nodes", zap.Error(err))
