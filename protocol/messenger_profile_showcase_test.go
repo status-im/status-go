@@ -179,8 +179,8 @@ func (s *TestMessengerProfileShowcase) prepareShowcasePreferences() *identity.Pr
 }
 
 func (s *TestMessengerProfileShowcase) TestSaveAndGetProfileShowcasePreferences() {
-	request := s.prepareShowcasePreferences()
-	err := s.m.SetProfileShowcasePreferences(request)
+	request := dummyProfileShowcasePreferences
+	err := s.m.SetProfileShowcasePreferences(&request, false)
 	s.Require().NoError(err)
 
 	// Restored preferences shoulf be same as stored
@@ -238,7 +238,7 @@ func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesW
 		Collectibles: []*identity.ProfileShowcaseCollectiblePreference{collectibleEntry},
 	}
 
-	err := s.m.SetProfileShowcasePreferences(request)
+	err := s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().Equal(identity.ErrorAccountVisibilityLowerThanCollectible, err)
 }
 
@@ -383,8 +383,8 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.verifiedContact(verifiedContact)
 
 	// Save preferences to dispatch changes
-	request := s.prepareShowcasePreferences()
-	err = s.m.SetProfileShowcasePreferences(request)
+	request := dummyProfileShowcasePreferences
+	err = s.m.SetProfileShowcasePreferences(&request, false)
 	s.Require().NoError(err)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))

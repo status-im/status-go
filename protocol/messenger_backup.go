@@ -475,14 +475,20 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 		}
 	}
 
+	profileShowcasePreferences, err := m.GetProfileShowcasePreferences()
+	if err != nil {
+		return nil, err
+	}
+
 	backupMessage := &protobuf.Backup{
 		Profile: &protobuf.BackedUpProfile{
-			KeyUid:             keyUID,
-			DisplayName:        displayName,
-			Pictures:           pictureProtos,
-			DisplayNameClock:   displayNameClock,
-			SocialLinks:        syncSocialLinks,
-			EnsUsernameDetails: ensUsernameDetailProtos,
+			KeyUid:                     keyUID,
+			DisplayName:                displayName,
+			Pictures:                   pictureProtos,
+			DisplayNameClock:           displayNameClock,
+			SocialLinks:                syncSocialLinks,
+			EnsUsernameDetails:         ensUsernameDetailProtos,
+			ProfileShowcasePreferences: ToProfileShowcasePreferencesProto(profileShowcasePreferences),
 		},
 	}
 

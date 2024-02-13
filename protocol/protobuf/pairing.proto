@@ -4,6 +4,7 @@ import "chat_identity.proto";
 import "sync_settings.proto";
 import 'application_metadata_message.proto';
 import 'communities.proto';
+import 'profile_showcase.proto';
 
 option go_package = "./;protobuf";
 package protobuf;
@@ -376,6 +377,7 @@ message BackedUpProfile {
   repeated SyncProfilePicture pictures = 4;
   SyncSocialLinks social_links = 5;
   repeated SyncEnsUsernameDetail ens_username_details = 6;
+  SyncProfileShowcasePreferences profile_showcase_preferences = 7;
 }
 
 message RawMessage {

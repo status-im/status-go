@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	crand "crypto/rand"
 	"errors"
@@ -217,8 +218,14 @@ func (m *Messenger) fromProfileShowcaseUnverifiedTokenProto(messages []*protobuf
 	return entries
 }
 
-func (m *Messenger) SetProfileShowcasePreferences(preferences *identity.ProfileShowcasePreferences) error {
-	err := identity.Validate(preferences)
+func (m *Messenger) SetProfileShowcasePreferences(preferences *ProfileShowcasePreferences, sync bool) error {
+	clock, _ := m.getLastClockWithRelatedChat()
+	preferences.Clock = clock
+	return m.setProfileShowcasePreferences(preferences, sync)
+}
+
+func (m *Messenger) setProfileShowcasePreferences(preferences *ProfileShowcasePreferences, sync bool) error {
+	err := Validate(preferences)
 	if err != nil {
 		return err
 	}
@@ -228,11 +235,22 @@ func (m *Messenger) SetProfileShowcasePreferences(preferences *identity.ProfileS
 		return err
 	}
 
+	if sync {
+		err = m.syncProfileShowcasePreferences(context.Background(), m.dispatchMessage)
+		if err != nil {
+			return err
+		}
+	}
+
 	return m.DispatchProfileShowcase()
 }
 
 func (m *Messenger) DispatchProfileShowcase() error {
-	return m.publishContactCode()
+	err := m.publishContactCode()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (m *Messenger) GetProfileShowcasePreferences() (*identity.ProfileShowcasePreferences, error) {
@@ -543,4 +561,33 @@ func (m *Messenger) DeleteProfileShowcaseCommunity(community *communities.Commun
 		return m.DispatchProfileShowcase()
 	}
 	return nil
+}
+
+func (m *Messenger) saveProfileShowcasePreferencesProto(p *protobuf.SyncProfileShowcasePreferences, shouldSync bool) error {
+	preferences := FromProfileShowcasePreferencesProto(p)
+	return m.setProfileShowcasePreferences(preferences, shouldSync)
+}
+
+func (m *Messenger) syncProfileShowcasePreferences(ctx context.Context, rawMessageHandler RawMessageHandler) error {
+	preferences, err := m.GetProfileShowcasePreferences()
+	if err != nil {
+		return err
+	}
+
+	syncMessage := ToProfileShowcasePreferencesProto(preferences)
+	encodedMessage, err := proto.Marshal(syncMessage)
+	if err != nil {
+		return err
+	}
+
+	_, chat := m.getLastClockWithRelatedChat()
+	rawMessage := common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_PROFILE_SHOWCASE_PREFERENCES,
+		ResendAutomatically: true,
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
+	return err
 }
