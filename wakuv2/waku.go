@@ -218,8 +218,8 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 		onPeerStats:                     onPeerStats,
 	}
-	enablePeerExchange := cfg.PeerExchange
-	enabledDiscv5 := cfg.EnableDiscV5
+	enablePeerExchange := false
+	enabledDiscv5 := false
 	if cfg.LightClient {
 		enablePeerExchange = true
 		enabledDiscv5 = false
