@@ -2835,7 +2835,17 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
-	return m.syncSocialLinks(context.Background(), rawMessageHandler)
+	err = m.syncSocialLinks(context.Background(), rawMessageHandler)
+	if err != nil {
+		return err
+	}
+
+	err = m.syncProfileShowcasePreferences(context.Background(), rawMessageHandler)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID string, accepted bool, rawMessageHandler RawMessageHandler) error {

@@ -63,8 +63,12 @@ WHERE
 
 // Queries for showcase preferences
 
-func (db sqlitePersistence) saveProfileShowcaseCommunityPreferencesClock(tx *sql.Tx, clock uint64) error {
-	_, err := tx.Exec(upsertProfileShowcasePreferencesQuery, clock, clock)
+func (db sqlitePersistence) saveProfileShowcasePreferencesClock(tx *sql.Tx, clock uint64) error {
+	result, err := tx.Exec(upsertProfileShowcasePreferencesQuery, clock, clock)
+	r, errr := result.RowsAffected()
+	log.Debug("<<<", "result", r, "err", errr)
+	r, errr = result.LastInsertId()
+	log.Debug("<<<", "result", r, "err", errr)
 	return err
 }
 
@@ -553,10 +557,17 @@ func (db sqlitePersistence) SaveProfileShowcasePreferences(preferences *identity
 		_ = tx.Rollback()
 	}()
 
-	err = db.saveProfileShowcaseCommunityPreferencesClock(tx, preferences.Clock)
+	err = db.saveProfileShowcasePreferencesClock(tx, preferences.Clock)
 	if err != nil {
 		return err
 	}
+
+	clock, err := db.getProfileShowcasePreferencesClock(tx)
+	if err != nil {
+		return err
+	}
+
+	log.Debug("<<<", "clock", clock)
 
 	for _, community := range preferences.Communities {
 		err = db.saveProfileShowcaseCommunityPreference(tx, community)

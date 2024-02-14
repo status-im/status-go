@@ -195,6 +195,7 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	bob1ProfileShowcasePreferences, err := bob1.GetProfileShowcasePreferences()
 	s.Require().NoError(err)
 	s.Require().NotNil(bob1ProfileShowcasePreferences)
+	s.Require().Greater(bob1ProfileShowcasePreferences.Clock, uint64(0))
 	profileShowcasePreferences.Clock = bob1ProfileShowcasePreferences.Clock // override clock for simpler comparison
 	s.Require().True(reflect.DeepEqual(profileShowcasePreferences, bob1ProfileShowcasePreferences))
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 
@@ -29,7 +31,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
@@ -327,6 +328,12 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	// generate ens username
 	err = clientBackend.StatusNode().EnsService().API().Add(ctx, ensChainID, ensUsername)
 	require.NoError(s.T(), err)
+	// generate profile showcase preferences
+	profileShowcasePreferences := protocol.DummyProfileShowcasePreferences()
+	err = clientBackend.Messenger().SetProfileShowcasePreferences(profileShowcasePreferences, false)
+	require.NoError(s.T(), err)
+
+	// startup sending client
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
 	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
@@ -361,6 +368,18 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.Equal(s.T(), uint64(ensChainID), uds[0].ChainID)
 	require.False(s.T(), uds[0].Removed)
 	require.Greater(s.T(), uds[0].Clock, uint64(0))
+	serverProfileShowcasePreferences, err := serverBackend.Messenger().GetProfileShowcasePreferences()
+	require.NoError(s.T(), err)
+	require.True(s.T(), reflect.DeepEqual(profileShowcasePreferences, serverProfileShowcasePreferences))
+	// FIXME: Check that profile showcase preferences are equal
+	// 		  I need `requireEqualProfileShowcasePreferences` function both here and in protocol package.
+	//		  Because it's a testing function, it should be in a *_test.go. But then I can't use it in `pairing` package tests.
+	// 	This is an indicator that we're testing things in the wrong place.
+	//
+	//  We shouldn't test the correctness of data pairing here. This package should only test the pairing itself, just use SOME data.
+	//	The actual fact that all data is being synced during pairing should be tested in the protocol package.
+	//
+	//	Also I could just push the data to `sync...` function directly, but that's not quite fair.
 
 	serverActiveAccount, err := serverBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
