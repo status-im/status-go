@@ -371,15 +371,6 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	serverProfileShowcasePreferences, err := serverBackend.Messenger().GetProfileShowcasePreferences()
 	require.NoError(s.T(), err)
 	require.True(s.T(), reflect.DeepEqual(profileShowcasePreferences, serverProfileShowcasePreferences))
-	// FIXME: Check that profile showcase preferences are equal
-	// 		  I need `requireEqualProfileShowcasePreferences` function both here and in protocol package.
-	//		  Because it's a testing function, it should be in a *_test.go. But then I can't use it in `pairing` package tests.
-	// 	This is an indicator that we're testing things in the wrong place.
-	//
-	//  We shouldn't test the correctness of data pairing here. This package should only test the pairing itself, just use SOME data.
-	//	The actual fact that all data is being synced during pairing should be tested in the protocol package.
-	//
-	//	Also I could just push the data to `sync...` function directly, but that's not quite fair.
 
 	serverActiveAccount, err := serverBackend.GetActiveAccount()
 	require.NoError(s.T(), err)

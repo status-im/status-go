@@ -8,7 +8,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity"
 )
 
-const upsertProfileShowcasePreferencesQuery = "INSERT OR REPLACE INTO profile_showcase_preferences(clock) SELECT (?) WHERE NOT EXISTS (SELECT 1 FROM profile_showcase_preferences WHERE clock >= ?)"
+const upsertProfileShowcasePreferencesQuery = "UPDATE profile_showcase_preferences SET clock=? WHERE NOT EXISTS (SELECT 1 FROM profile_showcase_preferences WHERE clock >= ?)"
 const selectProfileShowcasePreferencesQuery = "SELECT clock FROM profile_showcase_preferences"
 
 const upsertProfileShowcaseCommunityPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_communities_preferences(community_id, visibility, sort_order) VALUES (?, ?, ?)" // #nosec G101
@@ -64,11 +64,7 @@ WHERE
 // Queries for showcase preferences
 
 func (db sqlitePersistence) saveProfileShowcasePreferencesClock(tx *sql.Tx, clock uint64) error {
-	result, err := tx.Exec(upsertProfileShowcasePreferencesQuery, clock, clock)
-	r, errr := result.RowsAffected()
-	log.Debug("<<<", "result", r, "err", errr)
-	r, errr = result.LastInsertId()
-	log.Debug("<<<", "result", r, "err", errr)
+	_, err := tx.Exec(upsertProfileShowcasePreferencesQuery, clock, clock)
 	return err
 }
 
@@ -561,13 +557,6 @@ func (db sqlitePersistence) SaveProfileShowcasePreferences(preferences *identity
 	if err != nil {
 		return err
 	}
-
-	clock, err := db.getProfileShowcasePreferencesClock(tx)
-	if err != nil {
-		return err
-	}
-
-	log.Debug("<<<", "clock", clock)
 
 	for _, community := range preferences.Communities {
 		err = db.saveProfileShowcaseCommunityPreference(tx, community)
