@@ -3920,7 +3920,9 @@ func (m *Messenger) CheckPermissionsToJoinCommunity(request *requests.CheckPermi
 		}
 
 		for _, a := range accounts {
-			addresses = append(addresses, gethcommon.HexToAddress(a.Address.Hex()))
+			if a.IsWalletNonWatchOnlyAccount() {
+				addresses = append(addresses, gethcommon.HexToAddress(a.Address.Hex()))
+			}
 		}
 	} else {
 		for _, v := range request.Addresses {
