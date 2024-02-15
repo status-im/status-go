@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
@@ -1659,22 +1660,22 @@ func (api *PublicAPI) CreateTokenGatedCommunity() (*protocol.MessengerResponse, 
 }
 
 // Set profile showcase preference for current user
-func (api *PublicAPI) SetProfileShowcasePreferences(preferences *protocol.ProfileShowcasePreferences) error {
+func (api *PublicAPI) SetProfileShowcasePreferences(preferences *identity.ProfileShowcasePreferences) error {
 	return api.service.messenger.SetProfileShowcasePreferences(preferences)
 }
 
 // Get all profile showcase preferences for current user
-func (api *PublicAPI) GetProfileShowcasePreferences() (*protocol.ProfileShowcasePreferences, error) {
+func (api *PublicAPI) GetProfileShowcasePreferences() (*identity.ProfileShowcasePreferences, error) {
 	return api.service.messenger.GetProfileShowcasePreferences()
 }
 
 // Get profile showcase for a contact
-func (api *PublicAPI) GetProfileShowcaseForContact(contactID string) (*protocol.ProfileShowcase, error) {
+func (api *PublicAPI) GetProfileShowcaseForContact(contactID string) (*identity.ProfileShowcase, error) {
 	return api.service.messenger.GetProfileShowcaseForContact(contactID)
 }
 
 // Get profile showcase accounts by address
-func (api *PublicAPI) GetProfileShowcaseAccountsByAddress(address string) ([]*protocol.ProfileShowcaseAccount, error) {
+func (api *PublicAPI) GetProfileShowcaseAccountsByAddress(address string) ([]*identity.ProfileShowcaseAccount, error) {
 	return api.service.messenger.GetProfileShowcaseAccountsByAddress(address)
 }
 

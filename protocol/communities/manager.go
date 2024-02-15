@@ -797,6 +797,16 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		return nil, err
 	}
 
+	// Save grant for own community
+	grant, err := community.BuildGrant(&m.identity.PublicKey, "")
+	if err != nil {
+		return nil, err
+	}
+	err = m.persistence.SaveCommunityGrant(community.IDString(), grant, description.Clock)
+	if err != nil {
+		return nil, err
+	}
+
 	// Mark this device as the control node
 	syncControlNode := &protobuf.SyncCommunityControlNode{
 		Clock:          1,
@@ -1268,6 +1278,16 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 
 	community.Join()
 	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	// Save grant for own community
+	grant, err := community.BuildGrant(&m.identity.PublicKey, "")
+	if err != nil {
+		return nil, err
+	}
+	err = m.persistence.SaveCommunityGrant(community.IDString(), grant, community.Description().Clock)
 	if err != nil {
 		return nil, err
 	}
@@ -2850,6 +2870,10 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
+	if err = m.handleCommunityGrant(community.ID(), request.Grant, request.Clock); err != nil {
+		return nil, err
+	}
+
 	err = m.persistence.SaveCommunity(community)
 
 	if err != nil {
@@ -4405,6 +4429,10 @@ func (m *Manager) GetAllCommunityTokens() ([]*community_token.CommunityToken, er
 	return m.persistence.GetAllCommunityTokens()
 }
 
+func (m *Manager) GetCommunityGrant(communityID string) ([]byte, uint64, error) {
+	return m.persistence.GetCommunityGrant(communityID)
+}
+
 func (m *Manager) ImageToBase64(uri string) string {
 	if uri == "" {
 		return ""
@@ -4718,6 +4746,19 @@ func (m *Manager) handleCommunityTokensMetadata(community *Community) error {
 		}
 	}
 	return nil
+}
+
+func (m *Manager) handleCommunityGrant(communityID types.HexBytes, grant []byte, clock uint64) error {
+	_, oldClock, err := m.persistence.GetCommunityGrant(communityID.String())
+	if err != nil {
+		return err
+	}
+
+	if oldClock >= clock {
+		return nil
+	}
+
+	return m.persistence.SaveCommunityGrant(communityID.String(), grant, clock)
 }
 
 func (m *Manager) FetchCommunityToken(community *Community, tokenMetadata *protobuf.CommunityTokenMetadata, chainID uint64, contractAddress string) (*community_token.CommunityToken, error) {

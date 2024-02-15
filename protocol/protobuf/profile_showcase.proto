@@ -6,6 +6,7 @@ package protobuf;
 message ProfileShowcaseCommunity {
   string community_id = 1;
   uint32 order = 2;
+  bytes grant = 3;
 }
 
 message ProfileShowcaseAccount {
