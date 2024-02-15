@@ -430,7 +430,7 @@ func (s *Service) onCollectiblesTransfer(account common.Address, chainID walletC
 			},
 			TokenID: &bigint.BigInt{Int: transfer.TokenID},
 		}
-		err := s.ownershipDB.SetTransferID(account, id, transfer.ID)
+		err := s.manager.SetCollectibleTransferID(account, id, transfer.ID, true)
 		if err != nil {
 			log.Error("Error setting transfer ID for collectible", "error", err)
 		}
@@ -452,7 +452,7 @@ func (s *Service) lookupTransferForCollectibles(ownedCollectibles OwnedCollectib
 			continue
 		}
 		if transfer != nil {
-			err = s.ownershipDB.SetTransferID(ownedCollectibles.account, id, transfer.ID)
+			err = s.manager.SetCollectibleTransferID(ownedCollectibles.account, id, transfer.ID, false)
 			if err != nil {
 				log.Error("Error setting transfer ID for collectible", "error", err)
 			}

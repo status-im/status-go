@@ -512,23 +512,32 @@ func (o *OwnershipDB) GetOwnership(id thirdparty.CollectibleUniqueID) ([]thirdpa
 	return ret, nil
 }
 
-func (o *OwnershipDB) SetTransferID(ownerAddress common.Address, id thirdparty.CollectibleUniqueID, transferID common.Hash) error {
+func (o *OwnershipDB) SetTransferID(ownerAddress common.Address, id thirdparty.CollectibleUniqueID, transferID common.Hash) (bool, error) {
 	query := `UPDATE collectibles_ownership_cache
 		SET transfer_id = ?
 		WHERE chain_id = ? AND contract_address = ? AND token_id = ? AND owner_address = ?`
 
 	stmt, err := o.db.Prepare(query)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(transferID, id.ContractID.ChainID, id.ContractID.Address, (*bigint.SQLBigIntBytes)(id.TokenID.Int), ownerAddress)
+	res, err := stmt.Exec(transferID, id.ContractID.ChainID, id.ContractID.Address, (*bigint.SQLBigIntBytes)(id.TokenID.Int), ownerAddress)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	return nil
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+
+	if rowsAffected > 0 {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (o *OwnershipDB) GetTransferID(ownerAddress common.Address, id thirdparty.CollectibleUniqueID) (*common.Hash, error) {
