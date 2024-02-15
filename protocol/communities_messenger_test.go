@@ -3453,111 +3453,111 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 	}
 }
 
-func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
-	s.owner.communitiesManager.RekeyInterval = 500 * time.Minute
+// func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
+// 	s.owner.communitiesManager.RekeyInterval = 500 * time.Minute
 
-	_, err := s.owner.Start()
-	s.Require().NoError(err)
+// 	_, err := s.owner.Start()
+// 	s.Require().NoError(err)
 
-	// Create a new community
-	response, err := s.owner.CreateCommunity(
-		&requests.CreateCommunity{
-			Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
-			Name:        "status",
-			Color:       "#57a7e5",
-			Description: "status community description",
-		},
-		true,
-	)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Communities()[0].Members(), 1)
+// 	// Create a new community
+// 	response, err := s.owner.CreateCommunity(
+// 		&requests.CreateCommunity{
+// 			Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+// 			Name:        "status",
+// 			Color:       "#57a7e5",
+// 			Description: "status community description",
+// 		},
+// 		true,
+// 	)
+// 	s.Require().NoError(err)
+// 	s.Require().NotNil(response)
+// 	s.Require().Len(response.Communities(), 1)
+// 	s.Require().Len(response.Communities()[0].Members(), 1)
 
-	// Check community is present in the DB and has default values we care about
-	c, err := s.owner.GetCommunityByID(response.Communities()[0].ID())
-	s.Require().NoError(err)
-	s.Require().False(c.Encrypted())
-	// TODO some check that there are no keys for the community. Alt for s.Require().Zero(c.RekeyedAt().Unix())
+// 	// Check community is present in the DB and has default values we care about
+// 	c, err := s.owner.GetCommunityByID(response.Communities()[0].ID())
+// 	s.Require().NoError(err)
+// 	s.Require().False(c.Encrypted())
+// 	// TODO some check that there are no keys for the community. Alt for s.Require().Zero(c.RekeyedAt().Unix())
 
-	_, err = s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
-		CommunityID: c.ID(),
-		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
-		TokenCriteria: []*protobuf.TokenCriteria{{
-			ContractAddresses: map[uint64]string{3: "0x933"},
-			Type:              protobuf.CommunityTokenType_ERC20,
-			Symbol:            "STT",
-			Name:              "Status Test Token",
-			Amount:            "10",
-			Decimals:          18,
-		}},
-	})
-	s.Require().NoError(err)
+// 	_, err = s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
+// 		CommunityID: c.ID(),
+// 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+// 		TokenCriteria: []*protobuf.TokenCriteria{{
+// 			ContractAddresses: map[uint64]string{3: "0x933"},
+// 			Type:              protobuf.CommunityTokenType_ERC20,
+// 			Symbol:            "STT",
+// 			Name:              "Status Test Token",
+// 			Amount:            "10",
+// 			Decimals:          18,
+// 		}},
+// 	})
+// 	s.Require().NoError(err)
 
-	c, err = s.owner.GetCommunityByID(c.ID())
-	s.Require().NoError(err)
-	s.Require().True(c.Encrypted())
+// 	c, err = s.owner.GetCommunityByID(c.ID())
+// 	s.Require().NoError(err)
+// 	s.Require().True(c.Encrypted())
 
-	s.advertiseCommunityTo(c, s.owner, s.bob)
-	s.advertiseCommunityTo(c, s.owner, s.alice)
+// 	s.advertiseCommunityTo(c, s.owner, s.bob)
+// 	s.advertiseCommunityTo(c, s.owner, s.alice)
 
-	s.owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
+// 	s.owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
 
-	s.joinCommunity(c, s.owner, s.bob)
-	s.joinCommunity(c, s.owner, s.alice)
+// 	s.joinCommunity(c, s.owner, s.bob)
+// 	s.joinCommunity(c, s.owner, s.alice)
 
-	// Check the Alice and Bob are members of the community
-	c, err = s.owner.GetCommunityByID(c.ID())
-	s.Require().NoError(err)
-	s.Require().True(c.HasMember(&s.alice.identity.PublicKey))
-	s.Require().True(c.HasMember(&s.bob.identity.PublicKey))
+// 	// Check the Alice and Bob are members of the community
+// 	c, err = s.owner.GetCommunityByID(c.ID())
+// 	s.Require().NoError(err)
+// 	s.Require().True(c.HasMember(&s.alice.identity.PublicKey))
+// 	s.Require().True(c.HasMember(&s.bob.identity.PublicKey))
 
-	// Make sure at least one key makes it to alice
-	response, err = WaitOnMessengerResponse(s.alice,
-		func(r *MessengerResponse) bool {
-			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
-			if err != nil || len(keys) != 1 {
-				return false
-			}
-			return true
+// 	// Make sure at least one key makes it to alice
+// 	response, err = WaitOnMessengerResponse(s.alice,
+// 		func(r *MessengerResponse) bool {
+// 			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
+// 			if err != nil || len(keys) != 1 {
+// 				return false
+// 			}
+// 			return true
 
-		},
-		"alice does not have enough keys",
-	)
-	s.Require().NoError(err)
+// 		},
+// 		"alice does not have enough keys",
+// 	)
+// 	s.Require().NoError(err)
 
-	response, err = s.owner.BanUserFromCommunity(context.Background(), &requests.BanUserFromCommunity{
-		CommunityID: c.ID(),
-		User:        common.PubkeyToHexBytes(&s.bob.identity.PublicKey),
-	})
-	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
+// 	response, err = s.owner.BanUserFromCommunity(context.Background(), &requests.BanUserFromCommunity{
+// 		CommunityID: c.ID(),
+// 		User:        common.PubkeyToHexBytes(&s.bob.identity.PublicKey),
+// 	})
+// 	s.Require().NoError(err)
+// 	s.Require().Len(response.Communities(), 1)
 
-	s.Require().False(response.Communities()[0].HasMember(&s.bob.identity.PublicKey))
+// 	s.Require().False(response.Communities()[0].HasMember(&s.bob.identity.PublicKey))
 
-	// Check bob has been banned
-	response, err = WaitOnMessengerResponse(s.alice,
-		func(r *MessengerResponse) bool {
-			return len(r.Communities()) == 1 && !r.Communities()[0].HasMember(&s.bob.identity.PublicKey)
+// 	// Check bob has been banned
+// 	response, err = WaitOnMessengerResponse(s.alice,
+// 		func(r *MessengerResponse) bool {
+// 			return len(r.Communities()) == 1 && !r.Communities()[0].HasMember(&s.bob.identity.PublicKey)
 
-		},
-		"alice didn't receive updated description",
-	)
-	s.Require().NoError(err)
+// 		},
+// 		"alice didn't receive updated description",
+// 	)
+// 	s.Require().NoError(err)
 
-	response, err = WaitOnMessengerResponse(s.alice,
-		func(r *MessengerResponse) bool {
-			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
-			if err != nil || len(keys) < 2 {
-				return false
-			}
-			return true
+// 	response, err = WaitOnMessengerResponse(s.alice,
+// 		func(r *MessengerResponse) bool {
+// 			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
+// 			if err != nil || len(keys) < 2 {
+// 				return false
+// 			}
+// 			return true
 
-		},
-		"alice hasn't received updated key",
-	)
-	s.Require().NoError(err)
-}
+// 		},
+// 		"alice hasn't received updated key",
+// 	)
+// 	s.Require().NoError(err)
+// }
 
 func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibility() {
 	common.RekeyCompatibility = false

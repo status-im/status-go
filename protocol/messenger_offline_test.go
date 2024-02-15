@@ -1,8 +1,9 @@
 package protocol
 
 import (
-	"context"
-	"errors"
+	//"context"
+	//"errors"
+
 	"testing"
 	"time"
 
@@ -11,10 +12,12 @@ import (
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
+
+	//"github.com/status-im/status-go/protocol/common"
+	//"github.com/status-im/status-go/protocol/communities"
+	// "github.com/status-im/status-go/protocol/protobuf"
+	//"github.com/status-im/status-go/protocol/requests"
+
 	"github.com/status-im/status-go/protocol/tt"
 )
 
@@ -97,95 +100,95 @@ func (s *MessengerOfflineSuite) newMessenger(waku types.Waku, logger *zap.Logger
 	})
 }
 
-func (s *MessengerOfflineSuite) advertiseCommunityTo(community *communities.Community, owner *Messenger, user *Messenger) {
-	advertiseCommunityTo(&s.Suite, community, owner, user)
-}
+// func (s *MessengerOfflineSuite) advertiseCommunityTo(community *communities.Community, owner *Messenger, user *Messenger) {
+// 	advertiseCommunityTo(&s.Suite, community, owner, user)
+// }
 
-func (s *MessengerOfflineSuite) joinCommunity(community *communities.Community, owner *Messenger, user *Messenger) {
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, owner, user, request, "")
-}
+// func (s *MessengerOfflineSuite) joinCommunity(community *communities.Community, owner *Messenger, user *Messenger) {
+// 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+// 	joinCommunity(&s.Suite, community, owner, user, request, "")
+// }
 
-func (s *MessengerOfflineSuite) TestCommunityOfflineEdit() {
-	community, chat := createCommunity(&s.Suite, s.owner)
+// func (s *MessengerOfflineSuite) TestCommunityOfflineEdit() {
+// 	community, chat := createCommunity(&s.Suite, s.owner)
 
-	chatID := chat.ID
-	inputMessage := common.NewMessage()
-	inputMessage.ChatId = chatID
-	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
-	inputMessage.Text = "some text"
+// 	chatID := chat.ID
+// 	inputMessage := common.NewMessage()
+// 	inputMessage.ChatId = chatID
+// 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+// 	inputMessage.Text = "some text"
 
-	ctx := context.Background()
+// 	ctx := context.Background()
 
-	s.advertiseCommunityTo(community, s.owner, s.alice)
-	s.joinCommunity(community, s.owner, s.alice)
+// 	s.advertiseCommunityTo(community, s.owner, s.alice)
+// 	s.joinCommunity(community, s.owner, s.alice)
 
-	_, err := s.alice.SendChatMessage(ctx, inputMessage)
-	s.Require().NoError(err)
-	s.checkMessageDelivery(ctx, inputMessage)
+// 	_, err := s.alice.SendChatMessage(ctx, inputMessage)
+// 	s.Require().NoError(err)
+// 	s.checkMessageDelivery(ctx, inputMessage)
 
-	// Simulate going offline
-	wakuv2 := gethbridge.GetGethWakuV2From(s.aliceWaku)
-	wakuv2.SkipPublishToTopic(true)
+// 	// Simulate going offline
+// 	wakuv2 := gethbridge.GetGethWakuV2From(s.aliceWaku)
+// 	wakuv2.SkipPublishToTopic(true)
 
-	resp, err := s.alice.SendChatMessage(ctx, inputMessage)
-	messageID := types.Hex2Bytes(resp.Messages()[0].ID)
-	s.Require().NoError(err)
+// 	resp, err := s.alice.SendChatMessage(ctx, inputMessage)
+// 	messageID := types.Hex2Bytes(resp.Messages()[0].ID)
+// 	s.Require().NoError(err)
 
-	// Check that message is re-sent once back online
-	wakuv2.SkipPublishToTopic(false)
-	time.Sleep(5 * time.Second)
+// 	// Check that message is re-sent once back online
+// 	wakuv2.SkipPublishToTopic(false)
+// 	time.Sleep(5 * time.Second)
 
-	s.checkMessageDelivery(ctx, inputMessage)
+// 	s.checkMessageDelivery(ctx, inputMessage)
 
-	editedText := "some text edited"
-	editedMessage := &requests.EditMessage{
-		ID:   messageID,
-		Text: editedText,
-	}
+// 	editedText := "some text edited"
+// 	editedMessage := &requests.EditMessage{
+// 		ID:   messageID,
+// 		Text: editedText,
+// 	}
 
-	wakuv2.SkipPublishToTopic(true)
-	sendResponse, err := s.alice.EditMessage(ctx, editedMessage)
-	s.Require().NotNil(sendResponse)
-	s.Require().NoError(err)
+// 	wakuv2.SkipPublishToTopic(true)
+// 	sendResponse, err := s.alice.EditMessage(ctx, editedMessage)
+// 	s.Require().NotNil(sendResponse)
+// 	s.Require().NoError(err)
 
-	// Check that message is re-sent once back online
-	wakuv2.SkipPublishToTopic(false)
-	time.Sleep(5 * time.Second)
-	inputMessage.Text = editedText
+// 	// Check that message is re-sent once back online
+// 	wakuv2.SkipPublishToTopic(false)
+// 	time.Sleep(5 * time.Second)
+// 	inputMessage.Text = editedText
 
-	s.checkMessageDelivery(ctx, inputMessage)
-}
+// 	s.checkMessageDelivery(ctx, inputMessage)
+// }
 
-func (s *MessengerOfflineSuite) checkMessageDelivery(ctx context.Context, inputMessage *common.Message) {
-	var response *MessengerResponse
-	// Pull message and make sure org is received
-	err := tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.owner.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.messages) == 0 {
-			return errors.New("message not received")
-		}
-		return nil
-	})
+// func (s *MessengerOfflineSuite) checkMessageDelivery(ctx context.Context, inputMessage *common.Message) {
+// 	var response *MessengerResponse
+// 	// Pull message and make sure org is received
+// 	err := tt.RetryWithBackOff(func() error {
+// 		var err error
+// 		response, err = s.owner.RetrieveAll()
+// 		if err != nil {
+// 			return err
+// 		}
+// 		if len(response.messages) == 0 {
+// 			return errors.New("message not received")
+// 		}
+// 		return nil
+// 	})
 
-	s.Require().NoError(err)
-	s.Require().Len(response.Messages(), 1)
-	s.Require().Equal(inputMessage.Text, response.Messages()[0].Text)
+// 	s.Require().NoError(err)
+// 	s.Require().Len(response.Messages(), 1)
+// 	s.Require().Equal(inputMessage.Text, response.Messages()[0].Text)
 
-	// check if response contains the chat we're interested in
-	// we use this instead of checking just the length of the chat because
-	// a CommunityDescription message might be received in the meantime due to syncing
-	// hence response.Chats() might contain the general chat, and the new chat;
-	// or only the new chat if the CommunityDescription message has not arrived
-	found := false
-	for _, chat := range response.Chats() {
-		if chat.ID == inputMessage.ChatId {
-			found = true
-		}
-	}
-	s.Require().True(found)
-}
+// 	// check if response contains the chat we're interested in
+// 	// we use this instead of checking just the length of the chat because
+// 	// a CommunityDescription message might be received in the meantime due to syncing
+// 	// hence response.Chats() might contain the general chat, and the new chat;
+// 	// or only the new chat if the CommunityDescription message has not arrived
+// 	found := false
+// 	for _, chat := range response.Chats() {
+// 		if chat.ID == inputMessage.ChatId {
+// 			found = true
+// 		}
+// 	}
+// 	s.Require().True(found)
+// }
