@@ -312,7 +312,7 @@ func (n *StatusNode) setupRPCClient() (err error) {
 	if err != nil {
 		return
 	}
-	n.rpcClient, err = rpc.NewClient(gethNodeClient, n.config.NetworkID, n.config.UpstreamConfig, n.config.Networks, n.appDB)
+	n.rpcClient, err = rpc.NewClient(gethNodeClient, n.config.NetworkID, n.config.UpstreamConfig, n.config.Networks, n.config.NimbusProxyConfig.Enabled, n.appDB)
 	if err != nil {
 		return
 	}
@@ -461,6 +461,7 @@ func (n *StatusNode) stop() error {
 		return err
 	}
 
+	n.rpcClient.Close()
 	n.rpcClient = nil
 	// We need to clear `gethNode` because config is passed to `Start()`
 	// and may be completely different. Similarly with `config`.

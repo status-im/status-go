@@ -39,11 +39,11 @@ func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 		max_peers, max_pending_peers, enable_status_service, enable_ntp_sync,
 		bridge_enabled, wallet_enabled, local_notifications_enabled,
 		browser_enabled, permissions_enabled, mailservers_enabled,
-		swarm_enabled, mailserver_registry_address, web3provider_enabled, synthetic_id
+		swarm_enabled, mailserver_registry_address, web3provider_enabled, nimbus_proxy_enabled, nimbus_proxy_trusted_block_root, synthetic_id
 	) VALUES (
 		?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 		?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-		?, ?, ?, ?, ?, 'id'
+		?, ?, ?, ?, ?, ?, ?, 'id'
 	)`,
 		c.NetworkID, c.DataDir, c.KeyStoreDir, c.NodeKey, c.NoDiscovery, c.Rendezvous,
 		c.ListenAddr, c.AdvertiseAddr, c.Name, c.Version, c.APIModules,
@@ -52,6 +52,7 @@ func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 		c.BridgeConfig.Enabled, c.WalletConfig.Enabled, c.LocalNotificationsConfig.Enabled,
 		c.BrowsersConfig.Enabled, c.PermissionsConfig.Enabled, c.MailserversConfig.Enabled,
 		c.SwarmConfig.Enabled, c.MailServerRegistryAddress, c.Web3ProviderConfig.Enabled,
+		c.NimbusProxyConfig.Enabled, c.NimbusProxyConfig.TrustedBlockRoot,
 	)
 	return err
 }
@@ -449,14 +450,14 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		listen_addr, advertise_addr, name, version, api_modules, tls_enabled, max_peers, max_pending_peers,
 		enable_status_service, bridge_enabled, wallet_enabled, local_notifications_enabled,
 		browser_enabled, permissions_enabled, mailservers_enabled, swarm_enabled,
-		mailserver_registry_address, web3provider_enabled FROM node_config
+		mailserver_registry_address, web3provider_enabled, nimbus_proxy_enabled, nimbus_proxy_trusted_block_root FROM node_config
 		WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.NetworkID, &nodecfg.DataDir, &nodecfg.KeyStoreDir, &nodecfg.NodeKey, &nodecfg.NoDiscovery, &nodecfg.Rendezvous,
 		&nodecfg.ListenAddr, &nodecfg.AdvertiseAddr, &nodecfg.Name, &nodecfg.Version, &nodecfg.APIModules, &nodecfg.TLSEnabled, &nodecfg.MaxPeers, &nodecfg.MaxPendingPeers,
 		&nodecfg.EnableStatusService, &nodecfg.BridgeConfig.Enabled, &nodecfg.WalletConfig.Enabled, &nodecfg.LocalNotificationsConfig.Enabled,
 		&nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled, &nodecfg.MailserversConfig.Enabled, &nodecfg.SwarmConfig.Enabled,
-		&nodecfg.MailServerRegistryAddress, &nodecfg.Web3ProviderConfig.Enabled,
+		&nodecfg.MailServerRegistryAddress, &nodecfg.Web3ProviderConfig.Enabled, &nodecfg.NimbusProxyConfig.Enabled, &nodecfg.NimbusProxyConfig.TrustedBlockRoot,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
@@ -799,6 +800,23 @@ func SetLightClient(db *sql.DB, enabled bool) error {
 
 func SetLogLevel(db *sql.DB, logLevel string) error {
 	_, err := db.Exec(`UPDATE log_config SET log_level = ?`, logLevel)
+	return err
+}
+
+func GetNimbusTrustedBlockRoot(db *sql.DB) (string, error) {
+	var blockRoot sql.NullString
+	err := db.QueryRow("SELECT nimbus_proxy_trusted_block_root FROM node_config").Scan(&blockRoot)
+	if err != nil {
+		return "", err
+	}
+	if blockRoot.Valid {
+		return blockRoot.String, nil
+	}
+	return "", nil
+}
+
+func SetNimbusTrustedBlockRoot(db *sql.DB, blockRoot string) error {
+	_, err := db.Exec(`UPDATE node_config SET nimbus_proxy_trusted_block_root = ?`, blockRoot)
 	return err
 }
 

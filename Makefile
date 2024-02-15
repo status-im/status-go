@@ -419,10 +419,10 @@ migration-protocol: DEFAULT_PROTOCOL_PATH := protocol/migrations/sqlite
 migration-protocol:
 	touch $(DEFAULT_PROTOCOL_PATH)/$(shell date +%s)_$(D).up.sql
 
-PROXY_WRAPPER_PATH = $(CURDIR)/vendor/github.com/siphiuel/lc-proxy-wrapper
+PROXY_WRAPPER_PATH = $(CURDIR)/vendor/github.com/vitvly/lc-proxy-wrapper
 -include $(PROXY_WRAPPER_PATH)/Makefile.vars
 
-#export VERIF_PROXY_OUT_PATH = $(CURDIR)/vendor/github.com/siphiuel/lc-proxy-wrapper
+#export VERIF_PROXY_OUT_PATH = $(CURDIR)/vendor/github.com/vitvly/lc-proxy-wrapper
 build-verif-proxy:
 	$(MAKE) -C $(NIMBUS_ETH1_PATH) libverifproxy
 

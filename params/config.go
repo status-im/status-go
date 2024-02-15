@@ -500,6 +500,10 @@ type NodeConfig struct {
 
 	// ProcessBackedupMessages should be set to true when user follows recovery (using seed phrase or keycard) onboarding flow
 	ProcessBackedupMessages bool
+
+	// NimbusProxyConfig specifies whether some RPC requests
+	// should go through Nimbus verification proxy
+	NimbusProxyConfig NimbusProxyConfig
 }
 
 type TokenOverride struct {
@@ -567,6 +571,11 @@ type Web3ProviderConfig struct {
 // BridgeConfig provides configuration for Whisper-Waku bridge.
 type BridgeConfig struct {
 	Enabled bool
+}
+
+type NimbusProxyConfig struct {
+	Enabled          bool
+	TrustedBlockRoot string
 }
 
 type PushNotificationServer struct {

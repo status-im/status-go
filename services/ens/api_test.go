@@ -40,7 +40,7 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 
 	_ = client
 
-	rpcClient, err := statusRPC.NewClient(nil, 1, upstreamConfig, nil, db)
+	rpcClient, err := statusRPC.NewClient(nil, 1, upstreamConfig, nil, false, db)
 	require.NoError(t, err)
 
 	// import account keys

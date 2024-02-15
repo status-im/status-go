@@ -1,7 +1,3 @@
-# github.com/BurntSushi/toml v1.2.1
-## explicit; go 1.16
-github.com/BurntSushi/toml
-github.com/BurntSushi/toml/internal
 # github.com/Masterminds/squirrel v1.5.4
 ## explicit; go 1.14
 github.com/Masterminds/squirrel
@@ -909,9 +905,6 @@ github.com/shirou/gopsutil/internal/common
 # github.com/shopspring/decimal v1.2.0
 ## explicit; go 1.13
 github.com/shopspring/decimal
-# github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
-## explicit; go 1.18
-github.com/siphiuel/lc-proxy-wrapper
 # github.com/spaolacci/murmur3 v1.1.0
 ## explicit
 github.com/spaolacci/murmur3
@@ -1010,6 +1003,10 @@ github.com/tyler-smith/go-bip39/wordlists
 # github.com/urfave/cli/v2 v2.24.4
 ## explicit; go 1.18
 github.com/urfave/cli/v2
+# github.com/vitvly/lc-proxy-wrapper v0.0.0-20240210131537-0f48377f5a71
+## explicit; go 1.18
+github.com/vitvly/lc-proxy-wrapper
+github.com/vitvly/lc-proxy-wrapper/types
 # github.com/waku-org/go-discover v0.0.0-20240129014929-85f2c00b96a3
 ## explicit; go 1.15
 github.com/waku-org/go-discover/discover

@@ -88,7 +88,7 @@ require (
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.2
 	github.com/schollz/peerdiscovery v1.7.0
-	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
+	github.com/vitvly/lc-proxy-wrapper v0.0.0-20240210131537-0f48377f5a71
 	github.com/waku-org/go-waku v0.8.1-0.20240130093642-77ea359ef873
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	github.com/yeqown/go-qrcode/v2 v2.2.1
@@ -101,7 +101,6 @@ require (
 )
 
 require (
-	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/PuerkitoBio/goquery v1.6.1 // indirect
 	github.com/RoaringBitmap/roaring v0.9.4 // indirect
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect
