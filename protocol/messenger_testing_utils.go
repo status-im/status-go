@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
+	waku2 "github.com/status-im/status-go/wakuv2"
 	"math/big"
 	"sync"
 	"time"
@@ -170,6 +172,10 @@ func WaitForPeerConnected(s *suite.Suite, waku *waku2.Waku, action func() string
 
 	// Action should return the desired peer ID
 	peerID := action()
+
+	if _, ok := waku.Peers()[peerID]; ok {
+		return
+	}
 
 	for {
 		select {
