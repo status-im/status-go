@@ -5,10 +5,11 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	waku2 "github.com/status-im/status-go/wakuv2"
 	"math/big"
 	"sync"
 	"time"
+
+	waku2 "github.com/status-im/status-go/wakuv2"
 
 	"golang.org/x/exp/maps"
 
