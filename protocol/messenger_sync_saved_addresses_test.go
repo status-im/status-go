@@ -309,14 +309,27 @@ func (s *MessengerSyncSavedAddressesSuite) testSyncDeletesOfSavedAddressesWithTe
 	s.Require().Equal(0, len(savedAddresses))
 }
 
-func (s *MessengerSyncSavedAddressesSuite) TestSyncDeletesOfSavedAddressesSameTestModeOnBothDevices() {
-	testModeMain := true
-	testModeOther := testModeMain
-	s.testSyncDeletesOfSavedAddressesWithTestModes(testModeMain, testModeOther)
-}
+func (s *MessengerSyncSavedAddressesSuite) TestSyncDeletesOfSavedAddresses() {
+	testCases := []struct {
+		Name          string
+		TestModeMain  bool
+		TestModeOther bool
+	}{
+		{
+			Name:          "same test mode on both devices",
+			TestModeMain:  true,
+			TestModeOther: true,
+		},
+		{
+			Name:          "different test mode on devices",
+			TestModeMain:  true,
+			TestModeOther: false,
+		},
+	}
 
-func (s *MessengerSyncSavedAddressesSuite) TestSyncDeletesOfSavedAddressesDifferentTestModeOnDevices() {
-	testModeMain := true
-	testModeOther := !testModeMain
-	s.testSyncDeletesOfSavedAddressesWithTestModes(testModeMain, testModeOther)
+	for _, tc := range testCases {
+		s.Run(tc.Name, func() {
+			s.testSyncDeletesOfSavedAddressesWithTestModes(tc.TestModeMain, tc.TestModeOther)
+		})
+	}
 }
