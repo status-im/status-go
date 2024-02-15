@@ -2549,6 +2549,10 @@ func (m *Messenger) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, err
 	return m.communitiesManager.PendingRequestsToJoinForUser(&m.identity.PublicKey)
 }
 
+func (m *Messenger) LatestRequestToJoinForCommunity(communityID types.HexBytes) (*communities.RequestToJoin, error) {
+	return m.communitiesManager.GetCommunityRequestToJoinWithRevealedAddresses(m.myHexIdentity(), communityID)
+}
+
 func (m *Messenger) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.PendingRequestsToJoinForCommunity(id)
 }

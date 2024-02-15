@@ -558,6 +558,10 @@ func (api *PublicAPI) EditCommunityTokenPermission(request *requests.EditCommuni
 	return api.service.messenger.EditCommunityTokenPermission(request)
 }
 
+func (api *PublicAPI) LatestRequestToJoinForCommunity(id types.HexBytes) (*communities.RequestToJoin, error) {
+	return api.service.messenger.LatestRequestToJoinForCommunity(id)
+}
+
 // MyPendingRequestsToJoin returns the pending requests for the logged in user
 func (api *PublicAPI) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.MyPendingRequestsToJoin()

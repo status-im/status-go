@@ -22,16 +22,17 @@ const (
 )
 
 type RequestToJoin struct {
-	ID               types.HexBytes              `json:"id"`
-	PublicKey        string                      `json:"publicKey"`
-	Clock            uint64                      `json:"clock"`
-	ENSName          string                      `json:"ensName,omitempty"`
-	ChatID           string                      `json:"chatId"`
-	CommunityID      types.HexBytes              `json:"communityId"`
-	State            RequestToJoinState          `json:"state"`
-	Our              bool                        `json:"our"`
-	Deleted          bool                        `json:"deleted"`
-	RevealedAccounts []*protobuf.RevealedAccount `json:"revealedAccounts,omitempty"`
+	ID                   types.HexBytes              `json:"id"`
+	PublicKey            string                      `json:"publicKey"`
+	Clock                uint64                      `json:"clock"`
+	ENSName              string                      `json:"ensName,omitempty"`
+	ChatID               string                      `json:"chatId"`
+	CommunityID          types.HexBytes              `json:"communityId"`
+	State                RequestToJoinState          `json:"state"`
+	Our                  bool                        `json:"our"`
+	Deleted              bool                        `json:"deleted"`
+	RevealedAccounts     []*protobuf.RevealedAccount `json:"revealedAccounts,omitempty"`
+	ShareFutureAddresses bool                        `json:"shareFutureAddresses"`
 }
 
 func (r *RequestToJoin) CalculateID() {
@@ -49,14 +50,15 @@ func (r *RequestToJoin) ToCommunityRequestToJoinProtobuf() *protobuf.CommunityRe
 
 func (r *RequestToJoin) ToSyncProtobuf() *protobuf.SyncCommunityRequestsToJoin {
 	return &protobuf.SyncCommunityRequestsToJoin{
-		Id:               r.ID,
-		PublicKey:        r.PublicKey,
-		Clock:            r.Clock,
-		EnsName:          r.ENSName,
-		ChatId:           r.ChatID,
-		CommunityId:      r.CommunityID,
-		State:            uint64(r.State),
-		RevealedAccounts: r.RevealedAccounts,
+		Id:                   r.ID,
+		PublicKey:            r.PublicKey,
+		Clock:                r.Clock,
+		EnsName:              r.ENSName,
+		ChatId:               r.ChatID,
+		CommunityId:          r.CommunityID,
+		State:                uint64(r.State),
+		RevealedAccounts:     r.RevealedAccounts,
+		ShareFutureAddresses: r.ShareFutureAddresses,
 	}
 }
 
@@ -69,6 +71,7 @@ func (r *RequestToJoin) InitFromSyncProtobuf(proto *protobuf.SyncCommunityReques
 	r.CommunityID = proto.CommunityId
 	r.State = RequestToJoinState(proto.State)
 	r.RevealedAccounts = proto.RevealedAccounts
+	r.ShareFutureAddresses = proto.ShareFutureAddresses
 }
 
 func (r *RequestToJoin) Empty() bool {

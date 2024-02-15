@@ -150,6 +150,7 @@ message SyncCommunityRequestsToJoin {
   bytes community_id = 6;
   uint64 state = 7;
   repeated RevealedAccount revealed_accounts = 8;
+  bool share_future_addresses = 9;
 }
 
 message SyncCommunityControlNode {
