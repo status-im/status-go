@@ -479,6 +479,10 @@ func NewMessenger(
 		managerOptions = append(managerOptions, communities.WithCommunityTokensService(c.communityTokensService))
 	}
 
+	if c.collectiblesManager != nil {
+		managerOptions = append(managerOptions, communities.WithCollectiblesManager(c.collectiblesManager))
+	}
+
 	communitiesKeyDistributor := &CommunitiesKeyDistributorImpl{
 		sender:    sender,
 		encryptor: encryptionProtocol,

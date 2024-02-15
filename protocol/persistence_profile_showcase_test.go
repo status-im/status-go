@@ -31,7 +31,7 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 		},
 		Accounts: []*identity.ProfileShowcaseAccountPreference{
 			&identity.ProfileShowcaseAccountPreference{
-				Address:            "0x32433445133424",
+				Address:            "0x0000000000000000000000000032433445133422",
 				Name:               "Status Account",
 				ColorID:            "blue",
 				Emoji:              "-_-",
@@ -39,7 +39,7 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 				Order:              0,
 			},
 			&identity.ProfileShowcaseAccountPreference{
-				Address:            "0x3845354643324",
+				Address:            "0x0000000000000000000000000032433445133424",
 				Name:               "Money Box",
 				ColorID:            "red",
 				Emoji:              ":o)",
@@ -50,8 +50,8 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 		Collectibles: []*identity.ProfileShowcaseCollectiblePreference{
 			&identity.ProfileShowcaseCollectiblePreference{
 				ContractAddress:    "0x12378534257568678487683576",
-				ChainID:            3,
-				TokenID:            "0x12321389592999f903",
+				ChainID:            11155111,
+				TokenID:            "123213895929994903",
 				CommunityID:        "0x01312357798976535",
 				AccountAddress:     "0x32433445133424",
 				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
@@ -85,7 +85,7 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 			},
 			&identity.ProfileShowcaseUnverifiedTokenPreference{
 				ContractAddress:    "0x12312323323233",
-				ChainID:            2,
+				ChainID:            11155111,
 				CommunityID:        "",
 				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 				Order:              1,
@@ -153,7 +153,7 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 			},
 			&identity.ProfileShowcaseAccount{
 				ContactID: "contact_1",
-				Address:   "0x3845354643324",
+				Address:   "0x0000000000000000000000000032433445133424",
 				Name:      "Money Box",
 				ColorID:   "red",
 				Emoji:     ":o)",
@@ -163,8 +163,8 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 		Collectibles: []*identity.ProfileShowcaseCollectible{
 			&identity.ProfileShowcaseCollectible{
 				ContractAddress: "0x12378534257568678487683576",
-				ChainID:         2,
-				TokenID:         "0x12321389592999f903",
+				ChainID:         1,
+				TokenID:         "123213895929994903",
 				CommunityID:     "0x01312357798976535",
 				Order:           0,
 			},
@@ -192,7 +192,7 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 			},
 			&identity.ProfileShowcaseUnverifiedToken{
 				ContractAddress: "0x12312323323233",
-				ChainID:         2,
+				ChainID:         11155111,
 				CommunityID:     "0x32433445133424",
 				Order:           1,
 			},
@@ -216,8 +216,8 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 		Collectibles: []*identity.ProfileShowcaseCollectible{
 			&identity.ProfileShowcaseCollectible{
 				ContractAddress: "0x12378534257568678487683576",
-				ChainID:         2,
-				TokenID:         "0x12321389592999f903",
+				ChainID:         1,
+				TokenID:         "123213895929994903",
 				CommunityID:     "0x01312357798976535",
 				Order:           1,
 			},
@@ -382,8 +382,8 @@ func (s *TestProfileShowcasePersistence) TestUpdateProfileShowcaseAccountOnWalle
 	s.Require().NoError(err)
 	persistence := newSQLitePersistence(db)
 
-	deleteAccountAddress := "0x3243344513424"
-	updateAccountAddress := "0x3845354643324"
+	deleteAccountAddress := "0x0000000000000000000000000033433445133423"
+	updateAccountAddress := "0x0000000000000000000000000032433445133424"
 
 	preferences := &identity.ProfileShowcasePreferences{
 		Accounts: []*identity.ProfileShowcaseAccountPreference{

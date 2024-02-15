@@ -3,6 +3,7 @@ package communities
 import (
 	"bytes"
 	"context"
+	"errors"
 	"image"
 	"image/png"
 	"math"
@@ -112,6 +113,10 @@ func (m *testCollectiblesManager) setResponse(chainID uint64, walletAddress geth
 
 func (m *testCollectiblesManager) FetchBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
 	return m.response[uint64(chainID)][ownerAddress], nil
+}
+
+func (m *testCollectiblesManager) GetCollectibleOwnership(id thirdparty.CollectibleUniqueID) ([]thirdparty.AccountBalance, error) {
+	return nil, errors.New("GetCollectibleOwnership is not implemented for testCollectiblesManager")
 }
 
 type testTokenManager struct {

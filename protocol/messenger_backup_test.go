@@ -159,7 +159,7 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	})
 	s.Require().NoError(err)
 
-	profileShowcasePreferences := DummyProfileShowcasePreferences()
+	profileShowcasePreferences := DummyProfileShowcasePreferences(false)
 	err = bob1.SetProfileShowcasePreferences(profileShowcasePreferences, false)
 	s.Require().NoError(err)
 

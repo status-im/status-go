@@ -92,6 +92,7 @@ type config struct {
 	httpServer             *server.MediaServer
 	rpcClient              *rpc.Client
 	tokenManager           communities.TokenManager
+	collectiblesManager    communities.CollectiblesManager
 	accountsManager        account.Manager
 
 	verifyTransactionClient  EthClient
@@ -390,6 +391,13 @@ func WithWakuService(s *wakuv2.Waku) Option {
 func WithTokenManager(tokenManager communities.TokenManager) Option {
 	return func(c *config) error {
 		c.tokenManager = tokenManager
+		return nil
+	}
+}
+
+func WithCollectiblesManager(collectiblesManager communities.CollectiblesManager) Option {
+	return func(c *config) error {
+		c.collectiblesManager = collectiblesManager
 		return nil
 	}
 }
