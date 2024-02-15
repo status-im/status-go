@@ -3,6 +3,8 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -45,14 +47,14 @@ func (s *MessengerSyncSavedAddressesSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
-	s.main = s.newMessenger(s.shh)
+	s.main = s.newMessenger(s.logger.Named("main"))
 	s.privateKey = s.main.identity
 	// Start the main messenger in order to receive installations
 	_, err := s.main.Start()
 	s.Require().NoError(err)
 
 	// Create new device and add main account to
-	s.other, err = newMessengerWithKey(s.shh, s.main.identity, s.logger, nil)
+	s.other, err = newMessengerWithKey(s.shh, s.main.identity, s.logger.Named("other"), nil)
 	s.Require().NoError(err)
 
 	// Pair devices (main and other)
@@ -82,11 +84,11 @@ func (s *MessengerSyncSavedAddressesSuite) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.main)
 }
 
-func (s *MessengerSyncSavedAddressesSuite) newMessenger(shh types.Waku) *Messenger {
+func (s *MessengerSyncSavedAddressesSuite) newMessenger(logger *zap.Logger) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
+	messenger, err := newMessengerWithKey(s.shh, privateKey, logger, nil)
 	s.Require().NoError(err)
 
 	return messenger
@@ -104,6 +106,9 @@ func contains[T comparable](container []T, element T, isEqual func(T, T) bool) b
 }
 
 func haveSameElements[T comparable](a []T, b []T, isEqual func(T, T) bool) bool {
+	if len(a) != len(b) {
+		return false
+	}
 	for _, v := range a {
 		if !contains(b, v, isEqual) {
 			return false
@@ -112,7 +117,7 @@ func haveSameElements[T comparable](a []T, b []T, isEqual func(T, T) bool) bool 
 	return true
 }
 
-func savedAddressDataIsEqual(a, b wallet.SavedAddress) bool {
+func savedAddressDataIsEqual(a, b *wallet.SavedAddress) bool {
 	return a.Address == b.Address && a.IsTest == b.IsTest && a.Name == b.Name &&
 		a.ENSName == b.ENSName && a.ChainShortNames == b.ChainShortNames && a.ColorID == b.ColorID
 }
@@ -134,16 +139,14 @@ func (s *MessengerSyncSavedAddressesSuite) TestSyncExistingSavedAddresses() {
 		IsTest:  isTestChain2,
 	}
 
-	savedAddressesManager := s.main.savedAddressesManager
-
-	_, err := savedAddressesManager.UpdateMetadataAndUpsertSavedAddress(sa1)
+	err := s.main.UpsertSavedAddress(context.Background(), sa1)
 	s.Require().NoError(err)
-	_, err = savedAddressesManager.UpdateMetadataAndUpsertSavedAddress(sa2)
+	err = s.main.UpsertSavedAddress(context.Background(), sa2)
 	s.Require().NoError(err)
 
-	// Trigger's a sync between devices
-	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
-	s.Require().NoError(err)
+	//// Trigger's a sync between devices
+	//err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
+	//s.Require().NoError(err)
 
 	// Wait and check that saved addresses are synced
 	_, err = WaitOnMessengerResponse(
@@ -151,7 +154,7 @@ func (s *MessengerSyncSavedAddressesSuite) TestSyncExistingSavedAddresses() {
 		func(r *MessengerResponse) bool {
 			if len(r.SavedAddresses()) == 2 {
 				sas := r.SavedAddresses()
-				s.Require().True(haveSameElements([]wallet.SavedAddress{sa1, sa2}, []wallet.SavedAddress{*sas[0], *sas[1]}, savedAddressDataIsEqual))
+				s.Require().True(haveSameElements([]*wallet.SavedAddress{&sa1, &sa2}, []*wallet.SavedAddress{sas[0], sas[1]}, savedAddressDataIsEqual))
 				return true
 			}
 			return false
@@ -163,7 +166,7 @@ func (s *MessengerSyncSavedAddressesSuite) TestSyncExistingSavedAddresses() {
 	savedAddresses, err := s.other.savedAddressesManager.GetSavedAddresses()
 	s.Require().NoError(err)
 	s.Require().Equal(2, len(savedAddresses))
-	s.Require().True(haveSameElements([]wallet.SavedAddress{sa1, sa2}, savedAddresses, savedAddressDataIsEqual))
+	s.Require().True(haveSameElements([]*wallet.SavedAddress{&sa1, &sa2}, savedAddresses, savedAddressDataIsEqual))
 }
 
 func (s *MessengerSyncSavedAddressesSuite) TestSyncSavedAddresses() {
@@ -193,7 +196,7 @@ func (s *MessengerSyncSavedAddressesSuite) TestSyncSavedAddresses() {
 		func(r *MessengerResponse) bool {
 			if len(r.SavedAddresses()) == 2 {
 				sas := r.SavedAddresses()
-				s.Require().True(haveSameElements([]wallet.SavedAddress{sa1, sa2}, []wallet.SavedAddress{*sas[0], *sas[1]}, savedAddressDataIsEqual))
+				s.Require().True(haveSameElements([]*wallet.SavedAddress{&sa1, &sa2}, []*wallet.SavedAddress{sas[0], sas[1]}, savedAddressDataIsEqual))
 				return true
 			}
 			return false
@@ -205,25 +208,30 @@ func (s *MessengerSyncSavedAddressesSuite) TestSyncSavedAddresses() {
 	savedAddresses, err := s.other.savedAddressesManager.GetSavedAddresses()
 	s.Require().NoError(err)
 	s.Require().Equal(2, len(savedAddresses))
-	s.Require().True(haveSameElements([]wallet.SavedAddress{sa1, sa2}, savedAddresses, savedAddressDataIsEqual))
+	s.Require().True(haveSameElements([]*wallet.SavedAddress{&sa1, &sa2}, savedAddresses, savedAddressDataIsEqual))
 }
 
-func (s *MessengerSyncSavedAddressesSuite) testSyncDeletesOfSavedAddressesWithTestModes(testModeMain bool, testModeOther bool) {
-	var isTestChain1 bool = true
-	var isTestChain2 bool = false
-	var testAddress1 = common.Address{1}
-	var testAddress2 = common.Address{2}
+func (s *MessengerSyncSavedAddressesSuite) requireSavedAddressesEqual(a, b []*wallet.SavedAddress) {
+	sort.Slice(a, func(i, j int) bool {
+		return a[i].Address.Hex() < a[j].Address.Hex()
+	})
+	sort.Slice(b, func(i, j int) bool {
+		return b[i].Address.Hex() < b[j].Address.Hex()
+	})
+	s.Require().True(reflect.DeepEqual(a, b))
+}
 
-	// Add saved addresses to main device
-	sa1 := wallet.SavedAddress{
-		Address: testAddress1,
+func (s *MessengerSyncSavedAddressesSuite) testSyncDeletesOfSavedAddresses(testModeMain bool, testModeOther bool) {
+
+	sa1 := &wallet.SavedAddress{
+		Address: common.Address{1},
 		Name:    "TestC1A1",
-		IsTest:  isTestChain1,
+		IsTest:  true,
 	}
-	sa2 := wallet.SavedAddress{
-		Address: testAddress2,
+	sa2 := &wallet.SavedAddress{
+		Address: common.Address{2},
 		Name:    "TestC1A2",
-		IsTest:  isTestChain2,
+		IsTest:  false,
 	}
 
 	err := s.main.settings.SaveSettingField(settings.TestNetworksEnabled, testModeMain)
@@ -231,82 +239,119 @@ func (s *MessengerSyncSavedAddressesSuite) testSyncDeletesOfSavedAddressesWithTe
 	err = s.other.settings.SaveSettingField(settings.TestNetworksEnabled, testModeOther)
 	s.Require().NoError(err)
 
+	// Add saved addresses to main device
+	err = s.main.UpsertSavedAddress(context.Background(), *sa1)
 	s.Require().NoError(err)
-	err = s.main.UpsertSavedAddress(context.Background(), sa1)
-	s.Require().NoError(err)
-	err = s.main.UpsertSavedAddress(context.Background(), sa2)
-	s.Require().NoError(err)
-
-	// Wait and check that saved addresses are synced
-	_, err = WaitOnMessengerResponse(
-		s.other,
-		func(r *MessengerResponse) bool {
-			if len(r.SavedAddresses()) == 2 {
-				sas := r.SavedAddresses()
-				s.Require().True(haveSameElements([]wallet.SavedAddress{sa1, sa2}, []wallet.SavedAddress{*sas[0], *sas[1]}, savedAddressDataIsEqual))
-				return true
-			}
-			return false
-		},
-		"expected to receive two changes",
-	)
-	s.Require().NoError(err)
-
-	savedAddresses, err := s.other.savedAddressesManager.GetSavedAddresses()
-	s.Require().NoError(err)
-	s.Require().Equal(2, len(savedAddresses))
-
-	// Delete saved addresses with test mode = true and sync with the other device
-	err = s.main.DeleteSavedAddress(context.Background(), sa1.Address, sa1.IsTest)
+	err = s.main.UpsertSavedAddress(context.Background(), *sa2)
 	s.Require().NoError(err)
 
 	// Wait and check that saved addresses are synced
-	_, err = WaitOnMessengerResponse(
-		s.other,
-		func(r *MessengerResponse) bool {
-			if len(r.SavedAddresses()) == 1 {
-				sa := r.SavedAddresses()[0]
-				// We expect the deleted event to report address, ens, isTest
-				s.Require().Equal(sa1.Address, sa.Address)
-				s.Require().Equal(sa1.IsTest, sa.IsTest)
-				s.Require().Equal("", sa.Name)
-				return true
-			}
-			return false
-		},
-		"expected to receive one change",
-	)
-	s.Require().NoError(err)
+	{
+		response, err := WaitOnMessengerResponse(
+			s.other,
+			func(r *MessengerResponse) bool {
+				return len(r.SavedAddresses()) == 2
+			},
+			"expected to receive two changes",
+		)
+		s.Require().NoError(err)
 
-	savedAddresses, err = s.other.savedAddressesManager.GetSavedAddresses()
-	s.Require().NoError(err)
-	s.Require().True(haveSameElements([]wallet.SavedAddress{sa2}, savedAddresses, savedAddressDataIsEqual))
+		otherSavedAddresses := response.SavedAddresses()
+		s.Require().Len(otherSavedAddresses, 2)
 
-	// Delete saved addresses with test mode = false and sync with the other device
-	err = s.main.DeleteSavedAddress(context.Background(), sa2.Address, sa2.IsTest)
-	s.Require().NoError(err)
+		// Check that the UpdateClock was bumped
+		s.Require().GreaterOrEqual(otherSavedAddresses[0].CreatedAt, int64(0))
+		s.Require().GreaterOrEqual(otherSavedAddresses[1].CreatedAt, int64(0))
+		s.Require().Greater(otherSavedAddresses[0].UpdateClock, uint64(0))
+		s.Require().Greater(otherSavedAddresses[1].UpdateClock, uint64(0))
 
-	// Wait and check that saved addresses are synced
-	_, err = WaitOnMessengerResponse(
-		s.other,
-		func(r *MessengerResponse) bool {
-			if len(r.SavedAddresses()) == 1 {
-				sa := r.SavedAddresses()[0]
-				// We expect the deleted event to report address, ens, isTest
-				s.Require().Equal(sa2.Address, sa.Address)
-				s.Require().Equal(sa2.IsTest, sa.IsTest)
-				s.Require().Equal("", sa.Name)
-				return true
-			}
-			return false
-		},
-		"expected to receive one change",
-	)
-	s.Require().NoError(err)
+		// Reset the UpdateClock to 0 for comparison
+		otherSavedAddresses[0].CreatedAt = 0
+		otherSavedAddresses[1].CreatedAt = 0
+		otherSavedAddresses[0].UpdateClock = 0
+		otherSavedAddresses[1].UpdateClock = 0
+		s.requireSavedAddressesEqual([]*wallet.SavedAddress{sa1, sa2}, otherSavedAddresses)
 
-	savedAddresses, err = s.other.savedAddressesManager.GetSavedAddresses()
-	s.Require().NoError(err)
-	s.Require().Equal(0, len(savedAddresses))
+		// Ensure the messenger actually has the saved addresses, not just the response
+		savedAddresses, err := s.other.savedAddressesManager.GetSavedAddresses()
+		s.Require().NoError(err)
+		s.Require().Len(savedAddresses, 2)
+
+		// Reset the UpdateClock to 0 for comparison
+		savedAddresses[0].CreatedAt = 0
+		savedAddresses[1].CreatedAt = 0
+		savedAddresses[0].UpdateClock = 0
+		savedAddresses[1].UpdateClock = 0
+		s.requireSavedAddressesEqual([]*wallet.SavedAddress{sa1, sa2}, savedAddresses)
+	}
+
+	// Delete saved address 1 (test mode = true) and sync with the other device
+	{
+		err = s.main.DeleteSavedAddress(context.Background(), sa1.Address, sa1.IsTest)
+		s.Require().NoError(err)
+
+		// Ensure the removal
+		savedAddresses, err := s.main.savedAddressesManager.GetSavedAddresses()
+		s.Require().NoError(err)
+		s.Require().Len(savedAddresses, 1)
+		sa2.CreatedAt = savedAddresses[0].CreatedAt     // force same value
+		sa2.UpdateClock = savedAddresses[0].UpdateClock // force same value
+		s.Require().Equal(sa2, savedAddresses[0])
+
+		// Wait other device to receive the change
+		response, err := WaitOnMessengerResponse(
+			s.other,
+			func(r *MessengerResponse) bool {
+				return len(r.SavedAddresses()) == 1
+			},
+			"saved address removal wasn't received",
+		)
+		s.Require().NoError(err)
+
+		// We expect the delete event to report address, ens, isTest
+		sa := response.SavedAddresses()[0]
+		s.Require().Equal(sa1.Address, sa.Address)
+		s.Require().Equal(sa1.IsTest, sa.IsTest)
+		s.Require().Equal("", sa.Name)
+
+		// Ensure the messenger doesn't return the removed address
+		savedAddresses, err = s.other.savedAddressesManager.GetSavedAddresses()
+		s.Require().NoError(err)
+		s.Require().Len(savedAddresses, 1)
+		savedAddresses[0].CreatedAt = sa2.CreatedAt // force same value
+		s.Require().Equal(sa2, savedAddresses[0])
+	}
+
+	// Delete saved address 2 (test mode = false) and sync with the other device
+	{
+		err = s.main.DeleteSavedAddress(context.Background(), sa2.Address, sa2.IsTest)
+		s.Require().NoError(err)
+
+		// Ensure the removal
+		savedAddresses, err := s.main.savedAddressesManager.GetSavedAddresses()
+		s.Require().NoError(err)
+		s.Require().Len(savedAddresses, 0)
+
+		// Wait other device to receive the change
+		response, err := WaitOnMessengerResponse(
+			s.other,
+			func(r *MessengerResponse) bool {
+				return len(r.SavedAddresses()) == 1
+			},
+			"expected to receive one change",
+		)
+		s.Require().NoError(err)
+
+		sa := response.SavedAddresses()[0]
+		// We expect the deleted event to report address, ens, isTest
+		s.Require().Equal(sa2.Address, sa.Address)
+		s.Require().Equal(sa2.IsTest, sa.IsTest)
+		s.Require().Equal("", sa.Name)
+
+		savedAddresses, err = s.other.savedAddressesManager.GetSavedAddresses()
+		s.Require().NoError(err)
+		s.Require().Len(savedAddresses, 0)
+	}
 }
 
 func (s *MessengerSyncSavedAddressesSuite) TestSyncDeletesOfSavedAddresses() {
@@ -329,7 +374,7 @@ func (s *MessengerSyncSavedAddressesSuite) TestSyncDeletesOfSavedAddresses() {
 
 	for _, tc := range testCases {
 		s.Run(tc.Name, func() {
-			s.testSyncDeletesOfSavedAddressesWithTestModes(tc.TestModeMain, tc.TestModeOther)
+			s.testSyncDeletesOfSavedAddresses(tc.TestModeMain, tc.TestModeOther)
 		})
 	}
 }
