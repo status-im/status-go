@@ -15,15 +15,16 @@ import (
 )
 
 func (m *Messenger) UpsertSavedAddress(ctx context.Context, sa wallet.SavedAddress) error {
-	updatedClock, err := m.savedAddressesManager.UpdateMetadataAndUpsertSavedAddress(sa)
+	sa.UpdateClock, _ = m.getLastClockWithRelatedChat()
+	err := m.savedAddressesManager.UpdateMetadataAndUpsertSavedAddress(sa)
 	if err != nil {
 		return err
 	}
-	return m.syncNewSavedAddress(ctx, &sa, updatedClock, m.dispatchMessage)
+	return m.syncNewSavedAddress(ctx, &sa, sa.UpdateClock, m.dispatchMessage)
 }
 
 func (m *Messenger) DeleteSavedAddress(ctx context.Context, address gethcommon.Address, isTest bool) error {
-	updateClock := uint64(time.Now().Unix())
+	updateClock, _ := m.getLastClockWithRelatedChat()
 	_, err := m.savedAddressesManager.DeleteSavedAddress(address, isTest, updateClock)
 	if err != nil {
 		return err
@@ -31,7 +32,7 @@ func (m *Messenger) DeleteSavedAddress(ctx context.Context, address gethcommon.A
 	return m.syncDeletedSavedAddress(ctx, address, isTest, updateClock, m.dispatchMessage)
 }
 
-func (m *Messenger) GetSavedAddresses(ctx context.Context) ([]wallet.SavedAddress, error) {
+func (m *Messenger) GetSavedAddresses(ctx context.Context) ([]*wallet.SavedAddress, error) {
 	return m.savedAddressesManager.GetSavedAddresses()
 }
 
@@ -89,13 +90,13 @@ func (m *Messenger) syncDeletedSavedAddress(ctx context.Context, address gethcom
 	}, rawMessageHandler)
 }
 
-func (m *Messenger) syncSavedAddress(ctx context.Context, savedAddress wallet.SavedAddress, rawMessageHandler RawMessageHandler) (err error) {
+func (m *Messenger) syncSavedAddress(ctx context.Context, savedAddress *wallet.SavedAddress, rawMessageHandler RawMessageHandler) (err error) {
 	if savedAddress.Removed {
 		if err = m.syncDeletedSavedAddress(ctx, savedAddress.Address, savedAddress.IsTest, savedAddress.UpdateClock, rawMessageHandler); err != nil {
 			return err
 		}
 	} else {
-		if err = m.syncNewSavedAddress(ctx, &savedAddress, savedAddress.UpdateClock, rawMessageHandler); err != nil {
+		if err = m.syncNewSavedAddress(ctx, savedAddress, savedAddress.UpdateClock, rawMessageHandler); err != nil {
 			return err
 		}
 	}
@@ -105,12 +106,14 @@ func (m *Messenger) syncSavedAddress(ctx context.Context, savedAddress wallet.Sa
 func (m *Messenger) HandleSyncSavedAddress(state *ReceivedMessageState, syncMessage *protobuf.SyncSavedAddress, statusMessage *v1protocol.StatusMessage) (err error) {
 	address := gethcommon.BytesToAddress(syncMessage.Address)
 	if syncMessage.Removed {
-		_, err = m.savedAddressesManager.DeleteSavedAddress(
+		deleted, err := m.savedAddressesManager.DeleteSavedAddress(
 			address, syncMessage.IsTest, syncMessage.UpdateClock)
 		if err != nil {
 			return err
 		}
-		state.Response.AddSavedAddress(&wallet.SavedAddress{Address: address, ENSName: syncMessage.Ens, IsTest: syncMessage.IsTest, Removed: true})
+		if deleted {
+			state.Response.AddSavedAddress(&wallet.SavedAddress{Address: address, ENSName: syncMessage.Ens, IsTest: syncMessage.IsTest, Removed: true})
+		}
 	} else {
 		sa := wallet.SavedAddress{
 			Address:         address,
@@ -120,12 +123,15 @@ func (m *Messenger) HandleSyncSavedAddress(state *ReceivedMessageState, syncMess
 			IsTest:          syncMessage.IsTest,
 			ColorID:         multiAccCommon.CustomizationColor(syncMessage.Color),
 		}
+		sa.UpdateClock = syncMessage.UpdateClock
 
-		_, err = m.savedAddressesManager.AddSavedAddressIfNewerUpdate(sa, syncMessage.UpdateClock)
+		added, err := m.savedAddressesManager.AddSavedAddressIfNewerUpdate(sa)
 		if err != nil {
 			return err
 		}
-		state.Response.AddSavedAddress(&sa)
+		if added {
+			state.Response.AddSavedAddress(&sa)
+		}
 	}
 	return
 }

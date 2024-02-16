@@ -3,6 +3,8 @@ package protocol
 import (
 	"encoding/json"
 
+	"golang.org/x/exp/maps"
+
 	ensservice "github.com/status-im/status-go/services/ens"
 
 	"github.com/status-im/status-go/services/browsers"
@@ -510,11 +512,7 @@ func (r *MessengerResponse) AddSavedAddress(er *wallet.SavedAddress) {
 }
 
 func (r *MessengerResponse) SavedAddresses() []*wallet.SavedAddress {
-	var ers []*wallet.SavedAddress
-	for _, er := range r.savedAddresses {
-		ers = append(ers, er)
-	}
-	return ers
+	return maps.Values(r.savedAddresses)
 }
 
 func (r *MessengerResponse) AddEnsUsernameDetail(detail *ensservice.UsernameDetail) {
