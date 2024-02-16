@@ -237,15 +237,15 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
         
            case protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_SHARD_INFO:
 		return m.handleCommunityPublicShardInfoProtobuf(messageState, protoBytes, msg, filter)
-
-           case protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_STORENODES_INFO:
-		return m.handleCommunityPublicStorenodesInfoProtobuf(messageState, protoBytes, msg, filter)
         
            case protobuf.ApplicationMetadataMessage_SYNC_COLLECTIBLE_PREFERENCES:
 		return m.handleSyncCollectiblePreferencesProtobuf(messageState, protoBytes, msg, filter)
         
            case protobuf.ApplicationMetadataMessage_COMMUNITY_USER_KICKED:
 		return m.handleCommunityUserKickedProtobuf(messageState, protoBytes, msg, filter)
+
+			case protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_STORENODES_INFO:
+		return m.handleCommunityPublicStorenodesInfoProtobuf(messageState, protoBytes, msg, filter)
         
 	default:
 		m.logger.Info("protobuf type not found", zap.String("type", string(msg.ApplicationLayer.Type)))

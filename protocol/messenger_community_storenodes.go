@@ -10,11 +10,9 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/storenodes"
-	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
@@ -52,11 +50,10 @@ func (m *Messenger) sendCommunityPublicStorenodesInfo(community *communities.Com
 		Sender:              community.PrivateKey(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_STORENODES_INFO,
-		PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
+		PubsubTopic:         community.PubsubTopic(),
 	}
 
-	chatName := transport.CommunityStorenodesInfoTopic(community.IDString())
-	_, err = m.sender.SendPublic(context.Background(), chatName, rawMessage)
+	_, err = m.sender.SendPublic(context.Background(), community.IDString(), rawMessage)
 	return err
 }
 
