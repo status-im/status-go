@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/status-im/status-go/protocol/identity"
+
 	waku2 "github.com/status-im/status-go/wakuv2"
 
 	"golang.org/x/exp/maps"
@@ -356,82 +358,82 @@ func RandomBytes(length int) []byte {
 	return out
 }
 
-func DummyProfileShowcasePreferences() *ProfileShowcasePreferences {
-	return &ProfileShowcasePreferences{
-		Communities: []*ProfileShowcaseCommunityPreference{
-			&ProfileShowcaseCommunityPreference{
+func DummyProfileShowcasePreferences() *identity.ProfileShowcasePreferences {
+	return &identity.ProfileShowcasePreferences{
+		Communities: []*identity.ProfileShowcaseCommunityPreference{
+			{
 				CommunityID:        "0x32433445133424",
-				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
-			&ProfileShowcaseCommunityPreference{
+			{
 				CommunityID:        "0x33443246664345",
-				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 				Order:              1,
 			},
-			&ProfileShowcaseCommunityPreference{
+			{
 				CommunityID:        "0x33446343643446",
-				ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityIDVerifiedContacts,
 				Order:              2,
 			},
 		},
-		Accounts: []*ProfileShowcaseAccountPreference{
-			&ProfileShowcaseAccountPreference{
+		Accounts: []*identity.ProfileShowcaseAccountPreference{
+			{
 				Address:            "0x32433445133424",
 				Name:               "Status Account",
 				ColorID:            "blue",
 				Emoji:              "-_-",
-				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
-			&ProfileShowcaseAccountPreference{
+			{
 				Address:            "0x3845354643324",
 				Name:               "Money Box",
 				ColorID:            "red",
 				Emoji:              ":o)",
-				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 				Order:              1,
 			},
 		},
-		Collectibles: []*ProfileShowcaseCollectiblePreference{
-			&ProfileShowcaseCollectiblePreference{
+		Collectibles: []*identity.ProfileShowcaseCollectiblePreference{
+			{
 				ContractAddress:    "0x12378534257568678487683576",
 				ChainID:            1,
 				TokenID:            "0x12321389592999f903",
 				CommunityID:        "0x01312357798976535",
 				AccountAddress:     "0x32433445133424",
-				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
 		},
-		VerifiedTokens: []*ProfileShowcaseVerifiedTokenPreference{
-			&ProfileShowcaseVerifiedTokenPreference{
+		VerifiedTokens: []*identity.ProfileShowcaseVerifiedTokenPreference{
+			{
 				Symbol:             "ETH",
-				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              1,
 			},
-			&ProfileShowcaseVerifiedTokenPreference{
+			{
 				Symbol:             "DAI",
-				ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityIDVerifiedContacts,
 				Order:              2,
 			},
-			&ProfileShowcaseVerifiedTokenPreference{
+			{
 				Symbol:             "SNT",
-				ShowcaseVisibility: ProfileShowcaseVisibilityNoOne,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityNoOne,
 				Order:              3,
 			},
 		},
-		UnverifiedTokens: []*ProfileShowcaseUnverifiedTokenPreference{
-			&ProfileShowcaseUnverifiedTokenPreference{
+		UnverifiedTokens: []*identity.ProfileShowcaseUnverifiedTokenPreference{
+			{
 				ContractAddress:    "0x454525452023452",
 				ChainID:            3,
-				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
-			&ProfileShowcaseUnverifiedTokenPreference{
+			{
 				ContractAddress:    "0x12312323323233",
 				ChainID:            6,
-				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 				Order:              1,
 			},
 		},
