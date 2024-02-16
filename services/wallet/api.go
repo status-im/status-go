@@ -586,6 +586,7 @@ func (api *API) FetchAllCurrencyFormats() (currency.FormatPerSymbol, error) {
 	return api.s.currency.FetchAllCurrencyFormats()
 }
 
+// @deprecated replaced by session APIs; see #12120
 func (api *API) FilterActivityAsync(requestID int32, addresses []common.Address, allAddresses bool, chainIDs []wcommon.ChainID, filter activity.Filter, offset int, limit int) error {
 	log.Debug("wallet.api.FilterActivityAsync", "requestID", requestID, "addr.count", len(addresses), "allAddresses", allAddresses, "chainIDs.count", len(chainIDs), "offset", offset, "limit", limit)
 
@@ -593,6 +594,7 @@ func (api *API) FilterActivityAsync(requestID int32, addresses []common.Address,
 	return nil
 }
 
+// @deprecated replaced by session APIs; see #12120
 func (api *API) CancelActivityFilterTask(requestID int32) error {
 	log.Debug("wallet.api.CancelActivityFilterTask", "requestID", requestID)
 
@@ -604,6 +606,12 @@ func (api *API) StartActivityFilterSession(addresses []common.Address, allAddres
 	log.Debug("wallet.api.StartActivityFilterSession", "addr.count", len(addresses), "allAddresses", allAddresses, "chainIDs.count", len(chainIDs), "firstPageCount", firstPageCount)
 
 	return api.s.activity.StartFilterSession(addresses, allAddresses, chainIDs, filter, firstPageCount), nil
+}
+
+func (api *API) UpdateActivityFilterForSession(sessionID activity.SessionID, filter activity.Filter, firstPageCount int) error {
+	log.Debug("wallet.api.UpdateActivityFilterForSession", "sessionID", sessionID, "firstPageCount", firstPageCount)
+
+	return api.s.activity.UpdateFilterForSession(sessionID, filter, firstPageCount)
 }
 
 func (api *API) ResetActivityFilterSession(id activity.SessionID, firstPageCount int) error {
