@@ -1045,6 +1045,7 @@ func (m *Messenger) fetchMessages(chatID string, duration uint32) (uint32, error
 
 	ms := m.getActiveMailserver(chat.CommunityID)
 	_, err := m.performMailserverRequest(ms, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
+		m.logger.Debug("fetching messages", zap.String("chatID", chatID), zap.String("mailserver", ms.Name))
 		pubsubTopic, topics, err := m.topicsForChat(chatID)
 		if err != nil {
 			return nil, nil

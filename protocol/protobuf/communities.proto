@@ -234,7 +234,8 @@ message Storenode {
   string name = 3;
   string address = 4;
   string fleet = 5;
-  bool removed = 6;
-  int64 deleted_at = 7;
+  uint32 version = 6;
+  bool removed = 7;
+  int64 deleted_at = 8;
 }
 

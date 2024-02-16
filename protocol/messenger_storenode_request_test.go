@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/protocol/storenodes"
 	"github.com/status-im/status-go/protocol/transport"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -38,6 +39,9 @@ import (
 	wakuV2common "github.com/status-im/status-go/wakuv2/common"
 )
 
+// TODO pablo
+//
+
 const (
 	localFleet              = "local-test-fleet-1"
 	localMailserverID       = "local-test-mailserver"
@@ -57,8 +61,10 @@ type MessengerStoreNodeRequestSuite struct {
 	owner *Messenger
 	bob   *Messenger
 
-	wakuStoreNode    *waku2.Waku
-	storeNodeAddress string
+	wakuStoreNode             *waku2.Waku
+	storeNodeAddress          string
+	communityStoreNode        *waku2.Waku
+	communityStoreNodeAddress string
 
 	ownerWaku types.Waku
 	bobWaku   types.Waku
@@ -156,6 +162,13 @@ func (s *MessengerStoreNodeRequestSuite) SetupTest() {
 	s.storeNodeAddress = storeNodeListenAddresses[0]
 	s.logger.Info("store node ready", zap.String("address", s.storeNodeAddress))
 
+	// community store node
+	s.communityStoreNode = NewWakuV2(&s.Suite, s.logger.Named("store-node-community"), true, true, false, 0)
+	communityStoreNodeListenAddresses := s.communityStoreNode.ListenAddresses()
+	s.Require().LessOrEqual(1, len(communityStoreNodeListenAddresses))
+	s.communityStoreNodeAddress = communityStoreNodeListenAddresses[0]
+	s.logger.Info("community store node ready", zap.String("address", s.communityStoreNodeAddress))
+
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 }
 
@@ -237,6 +250,33 @@ func (s *MessengerStoreNodeRequestSuite) createCommunity(m *Messenger) *communit
 	s.waitForEnvelopes(storeNodeSubscription, 1)
 
 	return response.Communities()[0]
+}
+
+func (s *MessengerStoreNodeRequestSuite) createCommunityWithChat(m *Messenger) (*communities.Community, *Chat) {
+	s.waitForAvailableStoreNode(m)
+
+	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(nil)
+
+	createCommunityRequest := &requests.CreateCommunity{
+		Name:        RandomLettersString(10),
+		Description: RandomLettersString(20),
+		Color:       RandomColor(),
+		Tags:        RandomCommunityTags(3),
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+	}
+
+	response, err := m.CreateCommunity(createCommunityRequest, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().True(response.Communities()[0].Joined())
+	s.Require().True(response.Communities()[0].IsControlNode())
+	s.Require().True(response.Communities()[0].IsMemberOwner(&m.identity.PublicKey))
+
+	s.waitForEnvelopes(storeNodeSubscription, 1)
+
+	return response.Communities()[0], response.Chats()[0]
 }
 
 func (s *MessengerStoreNodeRequestSuite) requireCommunitiesEqual(c *communities.Community, expected *communities.Community) {
@@ -457,6 +497,33 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityPagingAlgorithm() {
 	s.Require().Equal(3, stats.FetchedPagesCount)
 }
 
+func (s *MessengerStoreNodeRequestSuite) TestSetCommunityStorenodesAndFetch() {
+	s.createOwner()
+	s.createBob()
+
+	// Create a community
+	community := s.createCommunity(s.owner)
+
+	// Set the storenode for the community
+	_, err := s.owner.SetCommunityStorenodes(&requests.SetCommunityStorenodes{
+		CommunityID: community.ID(),
+		Storenodes: []storenodes.Storenode{
+			{
+				StorenodeID: "community-store-node",
+				Name:        "community-store-node",
+				CommunityID: community.ID(),
+				Version:     2,
+				Address:     s.communityStoreNodeAddress,
+				Fleet:       "aaa",
+			},
+		},
+	})
+	s.Require().NoError(err)
+
+	// Bob tetches the community
+	s.fetchCommunity(s.bob, community.CommunityShard(), community)
+}
+
 func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityWithSameContentTopic() {
 	s.createOwner()
 	s.createBob()
@@ -610,6 +677,63 @@ func (s *MessengerStoreNodeRequestSuite) TestSequentialUpdates() {
 
 		s.fetchCommunity(s.bob, community.CommunityShard(), community)
 	}
+}
+
+func (s *MessengerStoreNodeRequestSuite) TestSetStorenodeForCommunity_fetchMessagesFromNewStorenode() {
+	ctx := context.Background()
+	s.createOwner()
+	s.createBob()
+
+	// force bob to use storeNode as relay as well as owner
+	err := s.bob.DialPeer(s.storeNodeAddress)
+	s.Require().NoError(err)
+
+	// 1. Owner creates a community
+	community, chat := s.createCommunityWithChat(s.owner)
+
+	// waits for onwer and bob to connect to the store node for relay
+	s.waitForWakuConnections(s.wakuStoreNode, 2, 40*time.Second)
+
+	// 2. Bob joins the community
+	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	joinCommunity(&s.Suite, community, s.owner, s.bob, request, "")
+
+	// connect to the community store node
+	err = s.bob.DialPeer(s.communityStoreNodeAddress)
+	s.Require().NoError(err)
+	err = s.owner.DialPeer(s.communityStoreNodeAddress)
+	s.Require().NoError(err)
+
+	// waits for onwer and bob to connect to the store node for relay
+	s.waitForWakuConnections(s.communityStoreNode, 2, 40*time.Second)
+
+	// 3. Owner sets the storenode for the community
+	_, err = s.owner.SetCommunityStorenodes(&requests.SetCommunityStorenodes{
+		CommunityID: community.ID(),
+		Storenodes: []storenodes.Storenode{
+			{
+				StorenodeID: "community-store-node",
+				Name:        "community-store-node",
+				CommunityID: community.ID(),
+				Version:     2,
+				Address:     s.communityStoreNodeAddress,
+				Fleet:       "aaa",
+			},
+		},
+	})
+	s.Require().NoError(err)
+
+	// 5. Bob sends a message to the community chat
+	inputMessage := buildTestMessage(*chat)
+	_, err = s.bob.SendChatMessage(ctx, inputMessage)
+	s.Require().NoError(err)
+
+	// 6. Owner fetches the message from the new storenode
+	err = s.owner.FetchMessages(&requests.FetchMessages{
+		ID: chat.ID,
+	})
+	s.Require().NoError(err)
 }
 
 func (s *MessengerStoreNodeRequestSuite) TestRequestShardAndCommunityInfo() {
@@ -1095,4 +1219,23 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingCommunityWithOwnerToken() {
 	s.waitForAvailableStoreNode(s.bob)
 
 	s.fetchCommunity(s.bob, community.CommunityShard(), community)
+}
+
+// waitForWakuConnections waits for Waku connections to be established.
+func (s *MessengerStoreNodeRequestSuite) waitForWakuConnections(node *waku2.Waku, expectedPeersCount int, timeout time.Duration) {
+	sub := node.SubscribeToConnStatusChanges()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	for {
+		select {
+		case status := <-sub.C:
+			if len(status.Peers) >= expectedPeersCount {
+				// Found peers
+				return
+			}
+		case <-ctx.Done():
+			s.T().Fatal("timeout waiting for peers")
+		}
+	}
 }

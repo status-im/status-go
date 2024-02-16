@@ -31,6 +31,7 @@ func (m Storenodes) ToProtobuf() []*protobuf.Storenode {
 			Name:        n.Name,
 			Address:     n.Address,
 			Fleet:       n.Fleet,
+			Version:     uint32(n.Version),
 			Removed:     n.Removed,
 			DeletedAt:   n.DeletedAt,
 		})
@@ -47,6 +48,7 @@ func FromProtobuf(storenodes []*protobuf.Storenode, clock uint64) Storenodes {
 			Name:        s.Name,
 			Address:     s.Address,
 			Fleet:       s.Fleet,
+			Version:     uint(s.Version),
 			Removed:     s.Removed,
 			DeletedAt:   s.DeletedAt,
 			Clock:       clock,

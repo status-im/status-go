@@ -227,7 +227,7 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 	}
 
 	switch requestType {
-	case storeNodeShardRequest, storeNodeCommunityStorenodesRequest, storeNodeCommunityRequest:
+	case storeNodeShardRequest, storeNodeCommunityRequest:
 		// If filter wasn't installed we create it and
 		// remember for uninstalling after response is received
 		filters, err := m.messenger.transport.InitPublicFilters([]transport.FiltersToInitialize{{
@@ -284,7 +284,6 @@ const (
 	storeNodeCommunityRequest storeNodeRequestType = iota
 	storeNodeContactRequest
 	storeNodeShardRequest
-	storeNodeCommunityStorenodesRequest
 )
 
 // storeNodeRequest represents a single store node batch request.
