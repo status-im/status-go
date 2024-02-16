@@ -3,7 +3,6 @@ package communities
 import (
 	"crypto/ecdsa"
 	"errors"
-	"time"
 
 	"github.com/golang/protobuf/proto"
 
@@ -16,7 +15,7 @@ var ErrInvalidCommunityEventClock = errors.New("clock for admin event message is
 
 func (o *Community) ToCreateChannelCommunityEvent(channelID string, channel *protobuf.CommunityChat) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock: o.NewCommunityEventClock(),
+		CommunityEventClock: o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_CHANNEL_CREATE),
 		Type:                protobuf.CommunityEvent_COMMUNITY_CHANNEL_CREATE,
 		ChannelData: &protobuf.ChannelData{
 			ChannelId: channelID,
@@ -27,7 +26,7 @@ func (o *Community) ToCreateChannelCommunityEvent(channelID string, channel *pro
 
 func (o *Community) ToEditChannelCommunityEvent(channelID string, channel *protobuf.CommunityChat) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock: o.NewCommunityEventClock(),
+		CommunityEventClock: o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_CHANNEL_EDIT),
 		Type:                protobuf.CommunityEvent_COMMUNITY_CHANNEL_EDIT,
 		ChannelData: &protobuf.ChannelData{
 			ChannelId: channelID,
@@ -38,7 +37,7 @@ func (o *Community) ToEditChannelCommunityEvent(channelID string, channel *proto
 
 func (o *Community) ToDeleteChannelCommunityEvent(channelID string) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock: o.NewCommunityEventClock(),
+		CommunityEventClock: o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_CHANNEL_DELETE),
 		Type:                protobuf.CommunityEvent_COMMUNITY_CHANNEL_DELETE,
 		ChannelData: &protobuf.ChannelData{
 			ChannelId: channelID,
@@ -48,7 +47,7 @@ func (o *Community) ToDeleteChannelCommunityEvent(channelID string) *CommunityEv
 
 func (o *Community) ToReorderChannelCommunityEvent(categoryID string, channelID string, position int) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock: o.NewCommunityEventClock(),
+		CommunityEventClock: o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_CHANNEL_REORDER),
 		Type:                protobuf.CommunityEvent_COMMUNITY_CHANNEL_REORDER,
 		ChannelData: &protobuf.ChannelData{
 			CategoryId: categoryID,
@@ -60,7 +59,7 @@ func (o *Community) ToReorderChannelCommunityEvent(categoryID string, channelID 
 
 func (o *Community) ToCreateCategoryCommunityEvent(categoryID string, categoryName string, channelsIds []string) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock: o.NewCommunityEventClock(),
+		CommunityEventClock: o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_CATEGORY_CREATE),
 		Type:                protobuf.CommunityEvent_COMMUNITY_CATEGORY_CREATE,
 		CategoryData: &protobuf.CategoryData{
 			Name:        categoryName,
@@ -72,7 +71,7 @@ func (o *Community) ToCreateCategoryCommunityEvent(categoryID string, categoryNa
 
 func (o *Community) ToEditCategoryCommunityEvent(categoryID string, categoryName string, channelsIds []string) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock: o.NewCommunityEventClock(),
+		CommunityEventClock: o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_CATEGORY_EDIT),
 		Type:                protobuf.CommunityEvent_COMMUNITY_CATEGORY_EDIT,
 		CategoryData: &protobuf.CategoryData{
 			Name:        categoryName,
@@ -84,7 +83,7 @@ func (o *Community) ToEditCategoryCommunityEvent(categoryID string, categoryName
 
 func (o *Community) ToDeleteCategoryCommunityEvent(categoryID string) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock: o.NewCommunityEventClock(),
+		CommunityEventClock: o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_CATEGORY_DELETE),
 		Type:                protobuf.CommunityEvent_COMMUNITY_CATEGORY_DELETE,
 		CategoryData: &protobuf.CategoryData{
 			CategoryId: categoryID,
@@ -94,7 +93,7 @@ func (o *Community) ToDeleteCategoryCommunityEvent(categoryID string) *Community
 
 func (o *Community) ToReorderCategoryCommunityEvent(categoryID string, position int) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock: o.NewCommunityEventClock(),
+		CommunityEventClock: o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_CATEGORY_REORDER),
 		Type:                protobuf.CommunityEvent_COMMUNITY_CATEGORY_REORDER,
 		CategoryData: &protobuf.CategoryData{
 			CategoryId: categoryID,
@@ -105,7 +104,7 @@ func (o *Community) ToReorderCategoryCommunityEvent(categoryID string, position 
 
 func (o *Community) ToBanCommunityMemberCommunityEvent(pubkey string) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock: o.NewCommunityEventClock(),
+		CommunityEventClock: o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_MEMBER_BAN),
 		Type:                protobuf.CommunityEvent_COMMUNITY_MEMBER_BAN,
 		MemberToAction:      pubkey,
 	}
@@ -113,7 +112,7 @@ func (o *Community) ToBanCommunityMemberCommunityEvent(pubkey string) *Community
 
 func (o *Community) ToUnbanCommunityMemberCommunityEvent(pubkey string) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock: o.NewCommunityEventClock(),
+		CommunityEventClock: o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_MEMBER_UNBAN),
 		Type:                protobuf.CommunityEvent_COMMUNITY_MEMBER_UNBAN,
 		MemberToAction:      pubkey,
 	}
@@ -121,7 +120,7 @@ func (o *Community) ToUnbanCommunityMemberCommunityEvent(pubkey string) *Communi
 
 func (o *Community) ToKickCommunityMemberCommunityEvent(pubkey string) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock: o.NewCommunityEventClock(),
+		CommunityEventClock: o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_MEMBER_KICK),
 		Type:                protobuf.CommunityEvent_COMMUNITY_MEMBER_KICK,
 		MemberToAction:      pubkey,
 	}
@@ -129,7 +128,7 @@ func (o *Community) ToKickCommunityMemberCommunityEvent(pubkey string) *Communit
 
 func (o *Community) ToCommunityEditCommunityEvent(description *protobuf.CommunityDescription) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock: o.NewCommunityEventClock(),
+		CommunityEventClock: o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_EDIT),
 		Type:                protobuf.CommunityEvent_COMMUNITY_EDIT,
 		CommunityConfig: &protobuf.CommunityConfig{
 			Identity:      description.Identity,
@@ -144,7 +143,7 @@ func (o *Community) ToCommunityEditCommunityEvent(description *protobuf.Communit
 
 func (o *Community) ToCommunityTokenPermissionChangeCommunityEvent(permission *protobuf.CommunityTokenPermission) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock: o.NewCommunityEventClock(),
+		CommunityEventClock: o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE),
 		Type:                protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE,
 		TokenPermission:     permission,
 	}
@@ -152,7 +151,7 @@ func (o *Community) ToCommunityTokenPermissionChangeCommunityEvent(permission *p
 
 func (o *Community) ToCommunityTokenPermissionDeleteCommunityEvent(permission *protobuf.CommunityTokenPermission) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock: o.NewCommunityEventClock(),
+		CommunityEventClock: o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE),
 		Type:                protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE,
 		TokenPermission:     permission,
 	}
@@ -160,7 +159,7 @@ func (o *Community) ToCommunityTokenPermissionDeleteCommunityEvent(permission *p
 
 func (o *Community) ToCommunityRequestToJoinAcceptCommunityEvent(changes *CommunityEventChanges) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock:    o.NewCommunityEventClock(),
+		CommunityEventClock:    o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT),
 		Type:                   protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT,
 		AcceptedRequestsToJoin: changes.AcceptedRequestsToJoin,
 	}
@@ -168,7 +167,7 @@ func (o *Community) ToCommunityRequestToJoinAcceptCommunityEvent(changes *Commun
 
 func (o *Community) ToCommunityRequestToJoinRejectCommunityEvent(changes *CommunityEventChanges) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock:    o.NewCommunityEventClock(),
+		CommunityEventClock:    o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT),
 		Type:                   protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT,
 		RejectedRequestsToJoin: changes.RejectedRequestsToJoin,
 	}
@@ -176,7 +175,7 @@ func (o *Community) ToCommunityRequestToJoinRejectCommunityEvent(changes *Commun
 
 func (o *Community) ToAddTokenMetadataCommunityEvent(tokenMetadata *protobuf.CommunityTokenMetadata) *CommunityEvent {
 	return &CommunityEvent{
-		CommunityEventClock: o.NewCommunityEventClock(),
+		CommunityEventClock: o.nextEventClock(protobuf.CommunityEvent_COMMUNITY_TOKEN_ADD),
 		Type:                protobuf.CommunityEvent_COMMUNITY_TOKEN_ADD,
 		TokenMetadata:       tokenMetadata,
 	}
@@ -335,8 +334,31 @@ func (o *Community) updateCommunityDescriptionByCommunityEvent(communityEvent Co
 	return nil
 }
 
-func (o *Community) NewCommunityEventClock() uint64 {
-	return uint64(time.Now().Unix())
+func (o *Community) nextEventClock(eventType protobuf.CommunityEvent_EventType) uint64 {
+	// assumes events are already sorted by clock
+	latestEventClock := uint64(0)
+	if o.config.EventsData != nil {
+		for _, event := range o.config.EventsData.Events {
+			if event.Type == eventType {
+				latestEventClock = event.CommunityEventClock
+			}
+		}
+	}
+
+	clock := o.config.CommunityDescription.Clock
+	if latestEventClock > clock {
+		clock = latestEventClock
+	}
+
+	// lamport timestamp
+	timestamp := o.timesource.GetCurrentTime()
+	if clock == 0 || clock < timestamp {
+		clock = timestamp
+	} else {
+		clock = clock + 1
+	}
+
+	return clock
 }
 
 func (o *Community) addNewCommunityEvent(event *CommunityEvent) error {
