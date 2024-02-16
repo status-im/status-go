@@ -219,13 +219,13 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		onPeerStats:                     onPeerStats,
 	}
 	enablePeerExchange := false
-	enabledDiscv5 := false
+	enableDiscv5 := false
 	if cfg.LightClient {
 		enablePeerExchange = true
-		enabledDiscv5 = false
+		enableDiscv5 = false
 	} else {
 		enablePeerExchange = false
-		enabledDiscv5 = true
+		enableDiscv5 = true
 	}
 
 	waku.settings = settings{
@@ -237,7 +237,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		DiscoveryLimit:    cfg.DiscoveryLimit,
 		Nameserver:        cfg.Nameserver,
 		Resolver:          cfg.Resolver,
-		EnableDiscV5:      enabledDiscv5,
+		EnableDiscV5:      enableDiscv5,
 	}
 
 	waku.settings.DefaultPubsubTopic = cfg.DefaultShardPubsubTopic
@@ -282,7 +282,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		node.WithMaxMsgSize(1024 * 1024),
 	}
 
-	if enabledDiscv5 {
+	if enableDiscv5 {
 		bootnodes, err := waku.getDiscV5BootstrapNodes(waku.ctx, cfg.DiscV5BootstrapNodes)
 		if err != nil {
 			logger.Error("failed to get bootstrap nodes", zap.Error(err))
@@ -1221,14 +1221,14 @@ func (w *Waku) Start() error {
 		return fmt.Errorf("failed to add wakuv2 peers: %v", err)
 	}
 
-	if w.cfg.EnableDiscV5 {
+	if w.settings.EnableDiscV5 {
 		err := w.node.DiscV5().Start(w.ctx)
 		if err != nil {
 			return err
 		}
 	}
 
-	if w.cfg.PeerExchange {
+	if w.settings.PeerExchange {
 		err := w.node.PeerExchange().Start(w.ctx)
 		if err != nil {
 			return err
@@ -1261,7 +1261,7 @@ func (w *Waku) Start() error {
 					w.onPeerStats(latestConnStatus)
 				}
 
-				if w.cfg.EnableDiscV5 {
+				if w.settings.EnableDiscV5 {
 					// Restarting DiscV5
 					if !latestConnStatus.IsOnline && isConnected {
 						w.logger.Info("Restarting DiscV5: offline and is connected")
