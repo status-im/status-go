@@ -1076,7 +1076,7 @@ func (api *PublicAPI) DeleteSavedAddress(ctx context.Context, address ethcommon.
 	return api.service.messenger.DeleteSavedAddress(ctx, address, isTest)
 }
 
-func (api *PublicAPI) GetSavedAddresses(ctx context.Context) ([]wallet.SavedAddress, error) {
+func (api *PublicAPI) GetSavedAddresses(ctx context.Context) ([]*wallet.SavedAddress, error) {
 	return api.service.messenger.GetSavedAddresses(ctx)
 }
 
