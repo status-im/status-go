@@ -525,7 +525,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipUnenc
 				Order:              2,
 			},
 		},
-	})
+	}, false)
 	s.Require().NoError(err)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
@@ -595,7 +595,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncry
 				Order:              1,
 			},
 		},
-	})
+	}, false)
 	s.Require().NoError(err)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))

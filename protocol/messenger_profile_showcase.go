@@ -218,14 +218,14 @@ func (m *Messenger) fromProfileShowcaseUnverifiedTokenProto(messages []*protobuf
 	return entries
 }
 
-func (m *Messenger) SetProfileShowcasePreferences(preferences *ProfileShowcasePreferences, sync bool) error {
+func (m *Messenger) SetProfileShowcasePreferences(preferences *identity.ProfileShowcasePreferences, sync bool) error {
 	clock, _ := m.getLastClockWithRelatedChat()
 	preferences.Clock = clock
 	return m.setProfileShowcasePreferences(preferences, sync)
 }
 
-func (m *Messenger) setProfileShowcasePreferences(preferences *ProfileShowcasePreferences, sync bool) error {
-	err := Validate(preferences)
+func (m *Messenger) setProfileShowcasePreferences(preferences *identity.ProfileShowcasePreferences, sync bool) error {
+	err := identity.Validate(preferences)
 	if err != nil {
 		return err
 	}
