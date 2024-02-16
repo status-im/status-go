@@ -4,9 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
+
+	waku2 "github.com/status-im/status-go/wakuv2"
 
 	"golang.org/x/exp/maps"
 
@@ -134,6 +137,56 @@ func WaitOnSignaledCommunityFound(m *Messenger, action func(), condition func(co
 			}
 		case <-timeoutChan:
 			return errors.New("timed out: " + errorMessage)
+		}
+	}
+}
+
+func WaitForConnectionStatus(s *suite.Suite, waku *waku2.Waku, action func() bool) {
+	subscription := waku.SubscribeToConnStatusChanges()
+	defer subscription.Unsubscribe()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Action should return the desired online status
+	wantedOnline := action()
+
+	for {
+		select {
+		case status := <-subscription.C:
+			if status.IsOnline == wantedOnline {
+				return
+			}
+		case <-ctx.Done():
+			s.Require().Fail(fmt.Sprintf("timeout waiting for waku connection status '%t'", wantedOnline))
+			return
+		}
+	}
+}
+
+func WaitForPeerConnected(s *suite.Suite, waku *waku2.Waku, action func() string) {
+	subscription := waku.SubscribeToConnStatusChanges()
+	defer subscription.Unsubscribe()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Action should return the desired peer ID
+	peerID := action()
+
+	if _, ok := waku.Peers()[peerID]; ok {
+		return
+	}
+
+	for {
+		select {
+		case status := <-subscription.C:
+			if _, ok := status.Peers[peerID]; ok {
+				return
+			}
+		case <-ctx.Done():
+			s.Require().Fail(fmt.Sprintf("timeout waiting for peer connected '%s'", peerID))
+			return
 		}
 	}
 }
