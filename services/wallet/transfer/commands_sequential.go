@@ -241,10 +241,15 @@ func (c *findNewBlocksCommand) Run(parent context.Context) error {
 	}
 
 	if len(accountsWithDetectedChanges) != 0 || c.iteration%c.logsCheckIntervalIterations == 0 {
-		err = c.findAndSaveTokenBlocks(parent, c.fromBlockNumber, headNum)
+		from := c.fromBlockNumber
+		if c.logsCheckLastKnownBlock != nil {
+			from = c.logsCheckLastKnownBlock
+		}
+		err = c.findAndSaveTokenBlocks(parent, from, headNum)
 		if err != nil {
 			return err
 		}
+		c.logsCheckLastKnownBlock = headNum
 	}
 	c.fromBlockNumber = headNum
 	c.iteration++
@@ -435,6 +440,7 @@ type findBlocksCommand struct {
 	transactionManager        *TransactionManager
 	tokenManager              *token.Manager
 	fromBlockNumber           *big.Int
+	logsCheckLastKnownBlock   *big.Int
 	toBlockNumber             *big.Int
 	blocksLoadedCh            chan<- []*DBHeader
 	defaultNodeBlockChunkSize int
