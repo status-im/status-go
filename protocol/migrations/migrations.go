@@ -122,6 +122,7 @@
 // 1706028033_profile_showcase_address_and_community.up.sql (2.42kB)
 // 1706520870_add_bridge_messages_table.up.sql (389B)
 // 1707749393_add_community_grants.up.sql (147B)
+// 1707841194_add_profile_showcase_preferences.up.sql (132B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -2626,8 +2627,28 @@ func _1707749393_add_community_grantsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1707749393_add_community_grants.up.sql", size: 147, mode: os.FileMode(0644), modTime: time.Unix(1708080481, 0)}
+	info := bindataFileInfo{name: "1707749393_add_community_grants.up.sql", size: 147, mode: os.FileMode(0644), modTime: time.Unix(1708081117, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x59, 0xd9, 0xbb, 0x31, 0xf4, 0xb7, 0xbd, 0x1f, 0x57, 0x5b, 0x40, 0x28, 0xed, 0xf7, 0x2c, 0xb3, 0xf, 0xcc, 0x50, 0x7f, 0x2c, 0x74, 0xe1, 0x19, 0x7c, 0xa0, 0xec, 0xfc, 0xb7, 0xbe, 0x1e, 0xbc}}
+	return a, nil
+}
+
+var __1707841194_add_profile_showcase_preferencesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x0e\x72\x75\x0c\x71\x55\x08\x71\x74\xf2\x71\x55\x28\x28\xca\x4f\xcb\xcc\x49\x8d\x2f\xce\xc8\x2f\x4f\x4e\x2c\x4e\x8d\x2f\x28\x4a\x4d\x4b\x2d\x4a\xcd\x4b\x4e\x2d\x56\xd0\xe0\x52\x50\x50\x50\x48\xce\xc9\x4f\xce\x56\xf0\xf4\x0b\x51\x70\x71\x75\x73\x0c\xf5\x09\x51\x30\xe0\xd2\xb4\xe6\xe2\xf2\xf4\x0b\x76\x0d\x0a\x01\x49\xf8\x13\x30\x06\x6c\x82\xa6\x42\x98\xa3\x4f\xa8\x6b\xb0\x82\x86\x81\xa6\x35\x20\x00\x00\xff\xff\x2d\x8d\x56\xab\x84\x00\x00\x00")
+
+func _1707841194_add_profile_showcase_preferencesUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1707841194_add_profile_showcase_preferencesUpSql,
+		"1707841194_add_profile_showcase_preferences.up.sql",
+	)
+}
+
+func _1707841194_add_profile_showcase_preferencesUpSql() (*asset, error) {
+	bytes, err := _1707841194_add_profile_showcase_preferencesUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1707841194_add_profile_showcase_preferences.up.sql", size: 132, mode: os.FileMode(0644), modTime: time.Unix(1708121648, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa4, 0x3b, 0x28, 0x2f, 0xd9, 0x3f, 0xe6, 0xe6, 0x22, 0xc7, 0x3, 0xcc, 0x4a, 0xc8, 0xc1, 0x8c, 0x32, 0xd5, 0x15, 0xc2, 0xaf, 0xf9, 0x2f, 0x2c, 0xaf, 0xab, 0xc4, 0xaf, 0x29, 0x8a, 0x33, 0x69}}
 	return a, nil
 }
 
@@ -2884,8 +2905,9 @@ var _bindata = map[string]func() (*asset, error){
 	"1706028033_profile_showcase_address_and_community.up.sql":                    _1706028033_profile_showcase_address_and_communityUpSql,
 	"1706520870_add_bridge_messages_table.up.sql":                                 _1706520870_add_bridge_messages_tableUpSql,
 	"1707749393_add_community_grants.up.sql":                                      _1707749393_add_community_grantsUpSql,
-	"README.md":                                                                   readmeMd,
-	"doc.go":                                                                      docGo,
+	"1707841194_add_profile_showcase_preferences.up.sql":                          _1707841194_add_profile_showcase_preferencesUpSql,
+	"README.md": readmeMd,
+	"doc.go":    docGo,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -3056,8 +3078,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1706028033_profile_showcase_address_and_community.up.sql":                    {_1706028033_profile_showcase_address_and_communityUpSql, map[string]*bintree{}},
 	"1706520870_add_bridge_messages_table.up.sql":                                 {_1706520870_add_bridge_messages_tableUpSql, map[string]*bintree{}},
 	"1707749393_add_community_grants.up.sql":                                      {_1707749393_add_community_grantsUpSql, map[string]*bintree{}},
-	"README.md":                                                                   {readmeMd, map[string]*bintree{}},
-	"doc.go":                                                                      {docGo, map[string]*bintree{}},
+	"1707841194_add_profile_showcase_preferences.up.sql":                          {_1707841194_add_profile_showcase_preferencesUpSql, map[string]*bintree{}},
+	"README.md": {readmeMd, map[string]*bintree{}},
+	"doc.go":    {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
