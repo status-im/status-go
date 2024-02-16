@@ -57,6 +57,7 @@ type MessengerSignalsHandler interface {
 	DiscordCommunityImportProgress(importProgress *discord.ImportProgress)
 	DiscordCommunityImportFinished(communityID string)
 	DiscordCommunityImportCancelled(communityID string)
+	DiscordCommunityImportCleanedUp(communityID string)
 	DiscordChannelImportProgress(importProgress *discord.ImportProgress)
 	DiscordChannelImportFinished(communityID string, channelID string)
 	DiscordChannelImportCancelled(channelID string)
@@ -114,6 +115,16 @@ type config struct {
 
 	messageResendMinDelay int
 	messageResendMaxCount int
+}
+
+func messengerDefaultConfig() config {
+	c := config{
+		messageResendMinDelay: 30,
+		messageResendMaxCount: 3,
+	}
+
+	c.featureFlags.AutoRequestHistoricMessages = true
+	return c
 }
 
 type Option func(*config) error
@@ -386,6 +397,13 @@ func WithTokenManager(tokenManager communities.TokenManager) Option {
 func WithAccountManager(accountManager account.Manager) Option {
 	return func(c *config) error {
 		c.accountsManager = accountManager
+		return nil
+	}
+}
+
+func WithAutoRequestHistoricMessages(enabled bool) Option {
+	return func(c *config) error {
+		c.featureFlags.AutoRequestHistoricMessages = enabled
 		return nil
 	}
 }

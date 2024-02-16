@@ -376,7 +376,7 @@ func sendResponseEvent(eventFeed *event.Feed, requestID *int32, eventType wallet
 		err = resErr
 	}
 
-	requestIDStr := "nil"
+	requestIDStr := nilStr
 	if requestID != nil {
 		requestIDStr = strconv.Itoa(int(*requestID))
 	}

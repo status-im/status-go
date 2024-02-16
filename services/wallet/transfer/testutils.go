@@ -241,6 +241,15 @@ var TestTokens = []*token.Token{
 	&EthMainnet, &EthGoerli, &EthOptimism, &UsdcMainnet, &UsdcGoerli, &UsdcOptimism, &SntMainnet, &DaiMainnet, &DaiGoerli,
 }
 
+func LookupTokenIdentity(chainID uint64, address eth_common.Address, native bool) *token.Token {
+	for _, token := range TestTokens {
+		if token.ChainID == chainID && token.Address == address && token.IsNative() == native {
+			return token
+		}
+	}
+	return nil
+}
+
 var NativeTokenIndices = []int{0, 1, 2}
 
 func InsertTestTransfer(tb testing.TB, db *sql.DB, address eth_common.Address, tr *TestTransfer) {

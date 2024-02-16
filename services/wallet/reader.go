@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -274,16 +275,25 @@ func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, addresses [
 		return balances, nil
 	}
 
-	tokens, err := r.persistence.GetTokens()
+	tokens, err := r.getWalletTokenBalances(ctx, addresses, false)
+
+	addressWithoutCachedBalances := false
+	for _, address := range addresses {
+		if _, ok := tokens[address]; !ok {
+			addressWithoutCachedBalances = true
+			break
+		}
+	}
+
 	// there should be at least ETH balance
-	if len(tokens) == 0 {
+	if addressWithoutCachedBalances {
 		return r.GetWalletTokenBalances(ctx, addresses)
 	}
 
 	return tokens, err
 }
 
-func (r *Reader) GetWalletTokenBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
+func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.Address, updateBalances bool) (map[common.Address][]Token, error) {
 	areTestNetworksEnabled, err := r.accountsDB.GetTestNetworksEnabled()
 	if err != nil {
 		return nil, err
@@ -327,16 +337,53 @@ func (r *Reader) GetWalletTokenBalances(ctx context.Context, addresses []common.
 		return nil, err
 	}
 
-	balances, err := r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
-	if err != nil {
-		for _, client := range clients {
-			client.SetIsConnected(false)
+	verifiedTokens, unverifiedTokens := splitVerifiedTokens(allTokens)
+
+	updateAnyway := false
+	cachedBalancesPerChain := map[common.Address]map[common.Address]map[uint64]ChainBalance{}
+	if !updateBalances {
+		for address, tokens := range cachedTokens {
+			if _, ok := cachedBalancesPerChain[address]; !ok {
+				cachedBalancesPerChain[address] = map[common.Address]map[uint64]ChainBalance{}
+			}
+
+			for _, token := range tokens {
+				for _, balance := range token.BalancesPerChain {
+					if _, ok := cachedBalancesPerChain[address][balance.Address]; !ok {
+						cachedBalancesPerChain[address][balance.Address] = map[uint64]ChainBalance{}
+					}
+					cachedBalancesPerChain[address][balance.Address][balance.ChainID] = balance
+				}
+			}
+
 		}
-		log.Info("tokenManager.GetBalancesByChain error", "err", err)
-		return nil, err
+
+		for _, address := range addresses {
+			for _, tokenList := range [][]*token.Token{verifiedTokens, unverifiedTokens} {
+				for _, tokens := range getTokenBySymbols(tokenList) {
+					for _, token := range tokens {
+						if _, ok := cachedBalancesPerChain[address][token.Address][token.ChainID]; !ok {
+							updateAnyway = true
+							break
+						}
+					}
+				}
+			}
+		}
 	}
 
-	verifiedTokens, unverifiedTokens := splitVerifiedTokens(allTokens)
+	var latestBalances map[uint64]map[common.Address]map[common.Address]*hexutil.Big
+	if updateBalances || updateAnyway {
+		latestBalances, err = r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
+		if err != nil {
+			for _, client := range clients {
+				client.SetIsConnected(false)
+			}
+			log.Info("tokenManager.GetBalancesByChain error", "err", err)
+			return nil, err
+		}
+	}
+
 	result := make(map[common.Address][]Token)
 	communities := make(map[string]bool)
 
@@ -347,13 +394,19 @@ func (r *Reader) GetWalletTokenBalances(ctx context.Context, addresses []common.
 				decimals := tokens[0].Decimals
 				isVisible := false
 				for _, token := range tokens {
-					hexBalance := balances[token.ChainID][address][token.Address]
-					balance := big.NewFloat(0.0)
-					if hexBalance != nil {
-						balance = new(big.Float).Quo(
-							new(big.Float).SetInt(hexBalance.ToInt()),
-							big.NewFloat(math.Pow(10, float64(decimals))),
-						)
+					var balance *big.Float
+					hexBalance := &hexutil.Big{}
+					if latestBalances != nil {
+						hexBalance = latestBalances[token.ChainID][address][token.Address]
+						balance = big.NewFloat(0.0)
+						if hexBalance != nil {
+							balance = new(big.Float).Quo(
+								new(big.Float).SetInt(hexBalance.ToInt()),
+								big.NewFloat(math.Pow(10, float64(decimals))),
+							)
+						}
+					} else {
+						balance = cachedBalancesPerChain[address][token.Address][token.ChainID].Balance
 					}
 					hasError := false
 					if client, ok := clients[token.ChainID]; ok {
@@ -402,6 +455,10 @@ func (r *Reader) GetWalletTokenBalances(ctx context.Context, addresses []common.
 	}
 
 	return result, r.persistence.SaveTokens(result)
+}
+
+func (r *Reader) GetWalletTokenBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
+	return r.getWalletTokenBalances(ctx, addresses, true)
 }
 
 func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {

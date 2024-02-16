@@ -426,6 +426,7 @@ func TestCollectibleTransferID(t *testing.T) {
 	timestampChain0 := int64(1234567890)
 
 	var err error
+	var changed bool
 
 	_, _, _, err = oDB.Update(chainID0, ownerAddress1, ownedBalancesChain0, timestampChain0)
 	require.NoError(t, err)
@@ -440,10 +441,24 @@ func TestCollectibleTransferID(t *testing.T) {
 		require.Nil(t, loadedTransferID)
 	}
 
+	randomAddress := common.HexToAddress("0xFFFF")
+	randomCollectibleID := thirdparty.CollectibleUniqueID{
+		ContractID: thirdparty.ContractID{
+			ChainID: 0xABCDEF,
+			Address: common.BigToAddress(big.NewInt(int64(123456789))),
+		},
+		TokenID: &bigint.BigInt{Int: big.NewInt(int64(987654321))},
+	}
+	randomTxID := common.HexToHash("0xEEEE")
+	changed, err = oDB.SetTransferID(randomAddress, randomCollectibleID, randomTxID)
+	require.NoError(t, err)
+	require.False(t, changed)
+
 	firstCollectibleID := ownedListChain0[0]
 	firstTxID := common.HexToHash("0x1234")
-	err = oDB.SetTransferID(ownerAddress1, firstCollectibleID, firstTxID)
+	changed, err = oDB.SetTransferID(ownerAddress1, firstCollectibleID, firstTxID)
 	require.NoError(t, err)
+	require.True(t, changed)
 
 	for _, id := range ownedListChain0 {
 		loadedTransferID, err := oDB.GetTransferID(ownerAddress1, id)

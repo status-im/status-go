@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
@@ -971,6 +972,10 @@ func (api *PublicAPI) SetDisplayName(ctx context.Context, displayName string) er
 	return api.service.messenger.SetDisplayName(displayName)
 }
 
+func (api *PublicAPI) SetBio(ctx context.Context, bio string) error {
+	return api.service.messenger.SetBio(bio)
+}
+
 func (api *PublicAPI) MarkAsTrusted(ctx context.Context, contactID string) error {
 	return api.service.messenger.MarkAsTrusted(ctx, contactID)
 }
@@ -1085,7 +1090,7 @@ func (api *PublicAPI) DeleteSavedAddress(ctx context.Context, address ethcommon.
 	return api.service.messenger.DeleteSavedAddress(ctx, address, isTest)
 }
 
-func (api *PublicAPI) GetSavedAddresses(ctx context.Context) ([]wallet.SavedAddress, error) {
+func (api *PublicAPI) GetSavedAddresses(ctx context.Context) ([]*wallet.SavedAddress, error) {
 	return api.service.messenger.GetSavedAddresses(ctx)
 }
 
@@ -1669,22 +1674,22 @@ func (api *PublicAPI) CreateTokenGatedCommunity() (*protocol.MessengerResponse, 
 }
 
 // Set profile showcase preference for current user
-func (api *PublicAPI) SetProfileShowcasePreferences(preferences *protocol.ProfileShowcasePreferences) error {
+func (api *PublicAPI) SetProfileShowcasePreferences(preferences *identity.ProfileShowcasePreferences) error {
 	return api.service.messenger.SetProfileShowcasePreferences(preferences)
 }
 
 // Get all profile showcase preferences for current user
-func (api *PublicAPI) GetProfileShowcasePreferences() (*protocol.ProfileShowcasePreferences, error) {
+func (api *PublicAPI) GetProfileShowcasePreferences() (*identity.ProfileShowcasePreferences, error) {
 	return api.service.messenger.GetProfileShowcasePreferences()
 }
 
 // Get profile showcase for a contact
-func (api *PublicAPI) GetProfileShowcaseForContact(contactID string) (*protocol.ProfileShowcase, error) {
+func (api *PublicAPI) GetProfileShowcaseForContact(contactID string) (*identity.ProfileShowcase, error) {
 	return api.service.messenger.GetProfileShowcaseForContact(contactID)
 }
 
 // Get profile showcase accounts by address
-func (api *PublicAPI) GetProfileShowcaseAccountsByAddress(address string) ([]*protocol.ProfileShowcaseAccount, error) {
+func (api *PublicAPI) GetProfileShowcaseAccountsByAddress(address string) ([]*identity.ProfileShowcaseAccount, error) {
 	return api.service.messenger.GetProfileShowcaseAccountsByAddress(address)
 }
 

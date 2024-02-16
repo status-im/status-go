@@ -409,14 +409,16 @@ func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 			signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver.Address, m.mailserverCycle.activeMailserver.ID)
 
 			// Query mailserver
-			go func() {
-				_, err := m.performMailserverRequest(&ms, func(_ mailservers.Mailserver) (*MessengerResponse, error) {
-					return m.RequestAllHistoricMessages(false, false)
-				})
-				if err != nil {
-					m.logger.Error("could not perform mailserver request", zap.Error(err))
-				}
-			}()
+			if m.config.featureFlags.AutoRequestHistoricMessages {
+				go func() {
+					_, err := m.performMailserverRequest(&ms, func(_ mailservers.Mailserver) (*MessengerResponse, error) {
+						return m.RequestAllHistoricMessages(false, false)
+					})
+					if err != nil {
+						m.logger.Error("could not perform mailserver request", zap.Error(err))
+					}
+				}()
+			}
 		}
 	}
 	return nil
@@ -562,12 +564,14 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 					signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver.Address, m.mailserverCycle.activeMailserver.ID)
 				}
 				// Query mailserver
-				go func() {
-					_, err := m.RequestAllHistoricMessages(false, true)
-					if err != nil {
-						m.logger.Error("failed to request historic messages", zap.Error(err))
-					}
-				}()
+				if m.config.featureFlags.AutoRequestHistoricMessages {
+					go func() {
+						_, err := m.RequestAllHistoricMessages(false, true)
+						if err != nil {
+							m.logger.Error("failed to request historic messages", zap.Error(err))
+						}
+					}()
+				}
 			} else {
 				m.mailPeersMutex.Unlock()
 			}

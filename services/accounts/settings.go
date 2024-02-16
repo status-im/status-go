@@ -166,6 +166,7 @@ func (api *SettingsAPI) DeleteExemptions(id string) error {
 	return api.db.DeleteExemptions(id)
 }
 
+// Deprecated: Use api.go/SetBio instead
 func (api *SettingsAPI) SetBio(bio string) error {
 	return (*api.messenger).SetBio(bio)
 }

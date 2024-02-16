@@ -295,7 +295,7 @@ func NewMessenger(
 ) (*Messenger, error) {
 	var messenger *Messenger
 
-	c := config{messageResendMinDelay: 30, messageResendMaxCount: 3}
+	c := messengerDefaultConfig()
 
 	for _, opt := range opts {
 		if err := opt(&c); err != nil {
@@ -957,7 +957,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 	}
 
 	// Start fetching messages from store nodes
-	if online {
+	if online && m.config.featureFlags.AutoRequestHistoricMessages {
 		m.asyncRequestAllHistoricMessages()
 	}
 
@@ -1477,24 +1477,65 @@ func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.Verification
 
 // watchConnectionChange checks the connection status and call handleConnectionChange when this changes
 func (m *Messenger) watchConnectionChange() {
-	m.logger.Debug("watching connection changes")
-	state := m.Online()
-	m.handleConnectionChange(state)
-	go func() {
+	state := false
+
+	processNewState := func(newState bool) {
+		if state == newState {
+			return
+		}
+		state = newState
+		m.logger.Debug("connection changed", zap.Bool("online", state))
+		m.handleConnectionChange(state)
+	}
+
+	pollConnectionStatus := func() {
+		func() {
+			for {
+				select {
+				case <-time.After(200 * time.Millisecond):
+					processNewState(m.Online())
+				case <-m.quit:
+					return
+				}
+			}
+		}()
+	}
+
+	subscribedConnectionStatus := func(subscription *types.ConnStatusSubscription) {
+		defer subscription.Unsubscribe()
 		for {
 			select {
-			case <-time.After(200 * time.Millisecond):
-				newState := m.Online()
-				if state != newState {
-					state = newState
-					m.logger.Debug("connection changed", zap.Bool("online", state))
-					m.handleConnectionChange(state)
-				}
+			case status := <-subscription.C:
+				processNewState(status.IsOnline)
 			case <-m.quit:
 				return
 			}
 		}
-	}()
+	}
+
+	m.logger.Debug("watching connection changes")
+	m.Online()
+	m.handleConnectionChange(state)
+
+	waku, err := m.node.GetWakuV2(nil)
+
+	if err != nil {
+		// No waku v2, we can't watch connection changes
+		// Instead we will poll the connection status.
+		m.logger.Warn("using WakuV1, can't watch connection changes, this might be have side-effects")
+		go pollConnectionStatus()
+		return
+	}
+
+	subscription, err := waku.SubscribeToConnStatusChanges()
+	if err != nil {
+		// Log error and fallback to polling
+		m.logger.Error("failed to subscribe to connection status changes", zap.Error(err))
+		go pollConnectionStatus()
+		return
+	}
+
+	go subscribedConnectionStatus(subscription)
 }
 
 // watchChatsAndCommunitiesToUnmute regularly checks for chats and communities that should be unmuted

@@ -3159,18 +3159,23 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 		return true, nil
 	}
 
-	// If the chat is active, we allow it
-	if chat != nil && chat.Active {
-		return true, nil
-	}
-
 	// If the chat is public, we allow it
 	if chat != nil && chat.Public() {
 		return true, nil
 	}
 
-	contact, ok := m.allContacts.Load(publicKey)
-	if !ok {
+	contact, contactOk := m.allContacts.Load(publicKey)
+
+	// If the chat is active, we allow it
+	if chat != nil && chat.Active {
+		if contactOk {
+			// If the chat is active and it is a 1x1 chat, we need to make sure the contact is added and not removed
+			return contact.added(), nil
+		}
+		return true, nil
+	}
+
+	if !contactOk {
 		// If it's not in contacts, we don't allow it
 		return false, nil
 	}

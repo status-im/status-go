@@ -236,6 +236,7 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 	// if there are no chain IDs that match token criteria chain IDs
 	// we aren't able to check balances on selected networks
 	if len(erc20ChainIDsMap) > 0 && len(chainIDsForERC20) == 0 {
+		response.NetworksNotSupported = true
 		return response, nil
 	}
 
@@ -263,7 +264,7 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 	for _, tokenPermission := range permissions {
 
 		permissionRequirementsMet := true
-		response.Permissions[tokenPermission.Id] = &PermissionTokenCriteriaResult{}
+		response.Permissions[tokenPermission.Id] = &PermissionTokenCriteriaResult{Role: tokenPermission.Type}
 
 		// There can be multiple token requirements per permission.
 		// If only one is not met, the entire permission is marked
@@ -271,9 +272,12 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 		for _, tokenRequirement := range tokenPermission.TokenCriteria {
 
 			tokenRequirementMet := false
+			tokenRequirementResponse := TokenRequirementResponse{TokenCriteria: tokenRequirement}
 
 			if tokenRequirement.Type == protobuf.CommunityTokenType_ERC721 {
 				if len(ownedERC721Tokens) == 0 {
+
+					response.Permissions[tokenPermission.Id].TokenRequirements = append(response.Permissions[tokenPermission.Id].TokenRequirements, tokenRequirementResponse)
 					response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, false)
 					continue
 				}
@@ -321,6 +325,7 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 				}
 			} else if tokenRequirement.Type == protobuf.CommunityTokenType_ERC20 {
 				if len(ownedERC20TokenBalances) == 0 {
+					response.Permissions[tokenPermission.Id].TokenRequirements = append(response.Permissions[tokenPermission.Id].TokenRequirements, tokenRequirementResponse)
 					response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, false)
 					continue
 				}
@@ -406,6 +411,9 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 			if !tokenRequirementMet {
 				permissionRequirementsMet = false
 			}
+
+			tokenRequirementResponse.Satisfied = tokenRequirementMet
+			response.Permissions[tokenPermission.Id].TokenRequirements = append(response.Permissions[tokenPermission.Id].TokenRequirements, tokenRequirementResponse)
 			response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, tokenRequirementMet)
 		}
 		// multiple permissions are treated as logical OR, meaning

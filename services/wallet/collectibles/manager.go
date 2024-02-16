@@ -806,6 +806,18 @@ func (o *Manager) getCacheFullCollectibleData(uniqueIDs []thirdparty.Collectible
 	return ret, nil
 }
 
+func (o *Manager) SetCollectibleTransferID(ownerAddress common.Address, id thirdparty.CollectibleUniqueID, transferID common.Hash, notify bool) error {
+	changed, err := o.ownershipDB.SetTransferID(ownerAddress, id, transferID)
+	if err != nil {
+		return err
+	}
+
+	if changed && notify {
+		o.signalUpdatedCollectiblesData([]thirdparty.CollectibleUniqueID{id})
+	}
+	return nil
+}
+
 // Reset connection status to trigger notifications
 // on the next status update
 func (o *Manager) ResetConnectionStatus() {

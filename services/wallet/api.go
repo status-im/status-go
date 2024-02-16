@@ -602,6 +602,18 @@ func (api *API) StartActivityFilterSession(addresses []common.Address, allAddres
 	return api.s.activity.StartFilterSession(addresses, allAddresses, chainIDs, filter, firstPageCount), nil
 }
 
+func (api *API) ResetActivityFilterSession(id activity.SessionID, firstPageCount int) error {
+	log.Debug("wallet.api.ResetActivityFilterSession", "id", id, "firstPageCount", firstPageCount)
+
+	return api.s.activity.ResetFilterSession(id, firstPageCount)
+}
+
+func (api *API) GetMoreForActivityFilterSession(id activity.SessionID, pageCount int) error {
+	log.Debug("wallet.api.GetMoreForActivityFilterSession", "id", id, "pageCount", pageCount)
+
+	return api.s.activity.GetMoreForFilterSession(id, pageCount)
+}
+
 func (api *API) StopActivityFilterSession(id activity.SessionID) {
 	log.Debug("wallet.api.StopActivityFilterSession", "id", id)
 

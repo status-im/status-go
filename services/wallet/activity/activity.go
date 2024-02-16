@@ -68,6 +68,8 @@ type Entry struct {
 	chainIDIn       *common.ChainID
 	transferType    *TransferType
 	contractAddress *eth.Address
+
+	isNew bool // isNew is used to indicate if the entry is newer than session start (changed state also)
 }
 
 // Only used for JSON marshalling
@@ -90,6 +92,8 @@ type EntryData struct {
 	ChainIDIn       *common.ChainID                  `json:"chainIdIn,omitempty"`
 	TransferType    *TransferType                    `json:"transferType,omitempty"`
 	ContractAddress *eth.Address                     `json:"contractAddress,omitempty"`
+
+	IsNew *bool `json:"isNew,omitempty"`
 
 	NftName *string `json:"nftName,omitempty"`
 	NftURL  *string `json:"nftUrl,omitempty"`
@@ -121,6 +125,9 @@ func (e *Entry) MarshalJSON() ([]byte, error) {
 	}
 
 	data.PayloadType = e.payloadType
+	if e.isNew {
+		data.IsNew = &e.isNew
+	}
 
 	return json.Marshal(data)
 }
@@ -155,6 +162,9 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 	e.chainIDOut = aux.ChainIDOut
 	e.chainIDIn = aux.ChainIDIn
 	e.transferType = aux.TransferType
+
+	e.isNew = aux.IsNew != nil && *aux.IsNew
+
 	return nil
 }
 
@@ -229,6 +239,14 @@ func (e *Entry) anyIdentity() *thirdparty.CollectibleUniqueID {
 		}
 	}
 	return nil
+}
+
+func (e *Entry) getIdentity() EntryIdentity {
+	return EntryIdentity{
+		payloadType: e.payloadType,
+		id:          e.id,
+		transaction: e.transaction,
+	}
 }
 
 func multiTransactionTypeToActivityType(mtType transfer.MultiTransactionType) Type {
