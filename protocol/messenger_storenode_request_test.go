@@ -181,8 +181,8 @@ func (s *MessengerStoreNodeRequestSuite) createStore() {
 	}
 
 	s.communityStoreNode = NewTestWakuV2(&s.Suite, cfg2)
-	s.communityStoreNodeAddress = s.wakuListenAddress(s.wakuStoreNode)
-	s.logger.Info("store node ready", zap.String("address", s.storeNodeAddress))
+	s.communityStoreNodeAddress = s.wakuListenAddress(s.communityStoreNode)
+	s.logger.Info("community store node ready", zap.String("address", s.communityStoreNodeAddress))
 }
 
 func (s *MessengerStoreNodeRequestSuite) createOwner() {
