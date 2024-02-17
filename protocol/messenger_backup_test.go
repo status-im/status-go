@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/status-im/status-go/protocol/identity"
@@ -157,6 +158,10 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	})
 	s.Require().NoError(err)
 
+	profileShowcasePreferences := DummyProfileShowcasePreferences()
+	err = bob1.SetProfileShowcasePreferences(profileShowcasePreferences, false)
+	s.Require().NoError(err)
+
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
 	s.Require().NoError(err)
@@ -187,6 +192,13 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(bob1EnsUsernameDetails))
 
+	bob1ProfileShowcasePreferences, err := bob1.GetProfileShowcasePreferences()
+	s.Require().NoError(err)
+	s.Require().NotNil(bob1ProfileShowcasePreferences)
+	s.Require().Greater(bob1ProfileShowcasePreferences.Clock, uint64(0))
+	profileShowcasePreferences.Clock = bob1ProfileShowcasePreferences.Clock // override clock for simpler comparison
+	s.Require().True(reflect.DeepEqual(profileShowcasePreferences, bob1ProfileShowcasePreferences))
+
 	// Check bob2
 	storedBob2DisplayName, err := bob2.settings.DisplayName()
 	s.Require().NoError(err)
@@ -208,6 +220,16 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	bob2EnsUsernameDetails, err := bob2.getEnsUsernameDetails()
 	s.Require().NoError(err)
 	s.Require().Equal(0, len(bob2EnsUsernameDetails))
+
+	bob2ProfileShowcasePreferences, err := bob2.GetProfileShowcasePreferences()
+	s.Require().NoError(err)
+	s.Require().NotNil(bob2ProfileShowcasePreferences)
+	s.Require().Equal(uint64(0), bob2ProfileShowcasePreferences.Clock)
+	s.Require().Len(bob2ProfileShowcasePreferences.Communities, 0)
+	s.Require().Len(bob2ProfileShowcasePreferences.Accounts, 0)
+	s.Require().Len(bob2ProfileShowcasePreferences.Collectibles, 0)
+	s.Require().Len(bob2ProfileShowcasePreferences.VerifiedTokens, 0)
+	s.Require().Len(bob2ProfileShowcasePreferences.UnverifiedTokens, 0)
 
 	// Backup
 	clock, err := bob1.BackupData(context.Background())
@@ -247,6 +269,10 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(bob2EnsUsernameDetails))
 	s.Require().Equal(bob1EnsUsernameDetail, bob2EnsUsernameDetails[0])
+
+	bob2ProfileShowcasePreferences, err = bob1.GetProfileShowcasePreferences()
+	s.Require().NoError(err)
+	s.Require().True(reflect.DeepEqual(bob1ProfileShowcasePreferences, bob2ProfileShowcasePreferences))
 
 	lastBackup, err := bob1.lastBackup()
 	s.Require().NoError(err)

@@ -112,75 +112,9 @@ func (s *TestMessengerProfileShowcase) verifiedContact(theirMessenger *Messenger
 	s.Require().Equal(common.ContactVerificationStateTrusted, resp.Messages()[0].ContactVerificationState)
 }
 
-func (s *TestMessengerProfileShowcase) prepareShowcasePreferences() *identity.ProfileShowcasePreferences {
-	return &identity.ProfileShowcasePreferences{
-		Communities: []*identity.ProfileShowcaseCommunityPreference{}, // empty to avoid fetching
-		Accounts: []*identity.ProfileShowcaseAccountPreference{
-			&identity.ProfileShowcaseAccountPreference{
-				Address:            "0x32433445133424",
-				Name:               "Status Account",
-				ColorID:            "blue",
-				Emoji:              "-_-",
-				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
-				Order:              0,
-			},
-			&identity.ProfileShowcaseAccountPreference{
-				Address:            "0x3845354643324",
-				Name:               "Money Box",
-				ColorID:            "red",
-				Emoji:              ":o)",
-				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
-				Order:              1,
-			},
-		},
-		Collectibles: []*identity.ProfileShowcaseCollectiblePreference{
-			&identity.ProfileShowcaseCollectiblePreference{
-				ContractAddress:    "0x12378534257568678487683576",
-				ChainID:            1,
-				TokenID:            "0x12321389592999f903",
-				CommunityID:        "0x01312357798976535",
-				AccountAddress:     "0x32433445133424",
-				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
-				Order:              0,
-			},
-		},
-		VerifiedTokens: []*identity.ProfileShowcaseVerifiedTokenPreference{
-			&identity.ProfileShowcaseVerifiedTokenPreference{
-				Symbol:             "ETH",
-				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
-				Order:              1,
-			},
-			&identity.ProfileShowcaseVerifiedTokenPreference{
-				Symbol:             "DAI",
-				ShowcaseVisibility: identity.ProfileShowcaseVisibilityIDVerifiedContacts,
-				Order:              2,
-			},
-			&identity.ProfileShowcaseVerifiedTokenPreference{
-				Symbol:             "SNT",
-				ShowcaseVisibility: identity.ProfileShowcaseVisibilityNoOne,
-				Order:              3,
-			},
-		},
-		UnverifiedTokens: []*identity.ProfileShowcaseUnverifiedTokenPreference{
-			&identity.ProfileShowcaseUnverifiedTokenPreference{
-				ContractAddress:    "0x454525452023452",
-				ChainID:            3,
-				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
-				Order:              0,
-			},
-			&identity.ProfileShowcaseUnverifiedTokenPreference{
-				ContractAddress:    "0x12312323323233",
-				ChainID:            6,
-				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
-				Order:              1,
-			},
-		},
-	}
-}
-
 func (s *TestMessengerProfileShowcase) TestSaveAndGetProfileShowcasePreferences() {
-	request := s.prepareShowcasePreferences()
-	err := s.m.SetProfileShowcasePreferences(request)
+	request := DummyProfileShowcasePreferences()
+	err := s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().NoError(err)
 
 	// Restored preferences shoulf be same as stored
@@ -238,7 +172,7 @@ func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesW
 		Collectibles: []*identity.ProfileShowcaseCollectiblePreference{collectibleEntry},
 	}
 
-	err := s.m.SetProfileShowcasePreferences(request)
+	err := s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().Equal(identity.ErrorAccountVisibilityLowerThanCollectible, err)
 }
 
@@ -383,8 +317,8 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.verifiedContact(verifiedContact)
 
 	// Save preferences to dispatch changes
-	request := s.prepareShowcasePreferences()
-	err = s.m.SetProfileShowcasePreferences(request)
+	request := DummyProfileShowcasePreferences()
+	err = s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().NoError(err)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
@@ -525,7 +459,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipUnenc
 				Order:              2,
 			},
 		},
-	})
+	}, false)
 	s.Require().NoError(err)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
@@ -595,7 +529,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncry
 				Order:              1,
 			},
 		},
-	})
+	}, false)
 	s.Require().NoError(err)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))

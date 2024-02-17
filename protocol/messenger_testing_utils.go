@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/status-im/status-go/protocol/identity"
+
 	waku2 "github.com/status-im/status-go/wakuv2"
 
 	"golang.org/x/exp/maps"
@@ -354,4 +356,70 @@ func RandomBytes(length int) []byte {
 		panic(err)
 	}
 	return out
+}
+
+func DummyProfileShowcasePreferences() *identity.ProfileShowcasePreferences {
+	return &identity.ProfileShowcasePreferences{
+		Communities: []*identity.ProfileShowcaseCommunityPreference{}, // empty to avoid fetching
+		Accounts: []*identity.ProfileShowcaseAccountPreference{
+			{
+				Address:            "0x32433445133424",
+				Name:               "Status Account",
+				ColorID:            "blue",
+				Emoji:              "-_-",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+			{
+				Address:            "0x3845354643324",
+				Name:               "Money Box",
+				ColorID:            "red",
+				Emoji:              ":o)",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
+				Order:              1,
+			},
+		},
+		Collectibles: []*identity.ProfileShowcaseCollectiblePreference{
+			{
+				ContractAddress:    "0x12378534257568678487683576",
+				ChainID:            1,
+				TokenID:            "0x12321389592999f903",
+				CommunityID:        "0x01312357798976535",
+				AccountAddress:     "0x32433445133424",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+		},
+		VerifiedTokens: []*identity.ProfileShowcaseVerifiedTokenPreference{
+			{
+				Symbol:             "ETH",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
+				Order:              1,
+			},
+			{
+				Symbol:             "DAI",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityIDVerifiedContacts,
+				Order:              2,
+			},
+			{
+				Symbol:             "SNT",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityNoOne,
+				Order:              3,
+			},
+		},
+		UnverifiedTokens: []*identity.ProfileShowcaseUnverifiedTokenPreference{
+			{
+				ContractAddress:    "0x454525452023452",
+				ChainID:            3,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+			{
+				ContractAddress:    "0x12312323323233",
+				ChainID:            6,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
+				Order:              1,
+			},
+		},
+	}
 }

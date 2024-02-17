@@ -57,3 +57,60 @@ message ProfileShowcase {
   ProfileShowcaseEntriesEncrypted for_contacts = 2;
   ProfileShowcaseEntriesEncrypted for_id_verified_contacts = 3;
 }
+
+// Preferences
+
+enum ProfileShowcaseVisibility {
+  PROFILE_SHOWCASE_VISIBILITY_NO_ONE = 0;
+  PROFILE_SHOWCASE_VISIBILITY_IDVERIFIED_CONTACTS = 1;
+  PROFILE_SHOWCASE_VISIBILITY_CONTACTS = 2;
+  PROFILE_SHOWCASE_VISIBILITY_EVERYONE = 3;
+}
+
+message ProfileShowcaseCommunityPreference {
+  string community_id = 1;
+  ProfileShowcaseVisibility showcase_visibility = 2;
+  int32 order = 3;
+}
+
+message ProfileShowcaseAccountPreference {
+  string address = 1;
+  string name = 2;
+  string color_id = 3;
+  string emoji = 4;
+  ProfileShowcaseVisibility showcase_visibility = 5;
+  int32 order = 6;
+}
+
+message ProfileShowcaseCollectiblePreference {
+  string contract_address = 1;
+  uint64 chain_id = 2;
+  string token_id = 3;
+  string community_id = 4;
+  string account_address = 5;
+  ProfileShowcaseVisibility showcase_visibility = 6;
+  int32 order = 7;
+}
+
+message ProfileShowcaseVerifiedTokenPreference {
+  string symbol = 1;
+  ProfileShowcaseVisibility showcase_visibility = 2;
+  int32 order = 3;
+}
+
+message ProfileShowcaseUnverifiedTokenPreference {
+  string contract_address = 1;
+  uint64 chain_id = 2;
+  string community_id = 3;
+  ProfileShowcaseVisibility showcase_visibility = 4;
+  int32 order = 5;
+}
+
+message SyncProfileShowcasePreferences {
+  uint64 clock = 1;
+  repeated ProfileShowcaseCommunityPreference communities = 2;
+  repeated ProfileShowcaseAccountPreference accounts = 3;
+  repeated ProfileShowcaseCollectiblePreference collectibles = 4;
+  repeated ProfileShowcaseVerifiedTokenPreference verified_tokens = 5;
+  repeated ProfileShowcaseUnverifiedTokenPreference unverified_tokens = 6;
+}

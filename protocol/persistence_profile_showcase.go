@@ -8,6 +8,9 @@ import (
 	"github.com/status-im/status-go/protocol/identity"
 )
 
+const upsertProfileShowcasePreferencesQuery = "UPDATE profile_showcase_preferences SET clock=? WHERE NOT EXISTS (SELECT 1 FROM profile_showcase_preferences WHERE clock >= ?)"
+const selectProfileShowcasePreferencesQuery = "SELECT clock FROM profile_showcase_preferences"
+
 const upsertProfileShowcaseCommunityPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_communities_preferences(community_id, visibility, sort_order) VALUES (?, ?, ?)" // #nosec G101
 const selectProfileShowcaseCommunityPreferenceQuery = "SELECT community_id, visibility, sort_order FROM profile_showcase_communities_preferences"                              // #nosec G101
 const deleteProfileShowcaseCommunityPreferenceQuery = "DELETE FROM profile_showcase_communities_preferences WHERE community_id = ?"                                            // #nosec G101
@@ -59,6 +62,18 @@ WHERE
 `
 
 // Queries for showcase preferences
+
+func (db sqlitePersistence) saveProfileShowcasePreferencesClock(tx *sql.Tx, clock uint64) error {
+	_, err := tx.Exec(upsertProfileShowcasePreferencesQuery, clock, clock)
+	return err
+}
+
+func (db sqlitePersistence) getProfileShowcasePreferencesClock(tx *sql.Tx) (uint64, error) {
+	var clock uint64
+	err := tx.QueryRow(selectProfileShowcasePreferencesQuery).Scan(&clock)
+	return clock, err
+}
+
 func (db sqlitePersistence) saveProfileShowcaseCommunityPreference(tx *sql.Tx, community *identity.ProfileShowcaseCommunityPreference) error {
 	_, err := tx.Exec(upsertProfileShowcaseCommunityPreferenceQuery,
 		community.CommunityID,
@@ -538,6 +553,11 @@ func (db sqlitePersistence) SaveProfileShowcasePreferences(preferences *identity
 		_ = tx.Rollback()
 	}()
 
+	err = db.saveProfileShowcasePreferencesClock(tx, preferences.Clock)
+	if err != nil {
+		return err
+	}
+
 	for _, community := range preferences.Communities {
 		err = db.saveProfileShowcaseCommunityPreference(tx, community)
 		if err != nil {
@@ -606,6 +626,11 @@ func (db sqlitePersistence) GetProfileShowcasePreferences() (*identity.ProfileSh
 		_ = tx.Rollback()
 	}()
 
+	clock, err := db.getProfileShowcasePreferencesClock(tx)
+	if err != nil {
+		return nil, err
+	}
+
 	communities, err := db.getProfileShowcaseCommunitiesPreferences(tx)
 	if err != nil {
 		return nil, err
@@ -632,6 +657,7 @@ func (db sqlitePersistence) GetProfileShowcasePreferences() (*identity.ProfileSh
 	}
 
 	return &identity.ProfileShowcasePreferences{
+		Clock:            clock,
 		Communities:      communities,
 		Accounts:         accounts,
 		Collectibles:     collectibles,
