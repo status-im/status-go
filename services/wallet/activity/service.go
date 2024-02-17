@@ -68,7 +68,8 @@ type Service struct {
 	subscriptions event.Subscription
 	ch            chan walletevent.Event
 	// sessionsRWMutex is used to protect all sessions related members
-	sessionsRWMutex sync.RWMutex
+	sessionsRWMutex  sync.RWMutex
+	debounceDuration time.Duration
 
 	pendingTracker *transactions.PendingTxTracker
 }
@@ -86,6 +87,8 @@ func NewService(db *sql.DB, tokenManager token.ManagerInterface, collectibles co
 		scheduler:    async.NewMultiClientScheduler(),
 
 		sessions: make(map[SessionID]*Session),
+		// here to be overwritten by tests
+		debounceDuration: 1 * time.Second,
 
 		pendingTracker: pendingTracker,
 	}
