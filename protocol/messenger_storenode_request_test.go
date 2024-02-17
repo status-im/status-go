@@ -39,9 +39,6 @@ import (
 	wakuV2common "github.com/status-im/status-go/wakuv2/common"
 )
 
-// TODO pablo
-//
-
 const (
 	localFleet              = "local-test-fleet-1"
 	localMailserverID       = "local-test-mailserver"
@@ -717,33 +714,35 @@ func (s *MessengerStoreNodeRequestSuite) TestSetStorenodeForCommunity_fetchMessa
 	ctx := context.Background()
 	s.createOwner()
 	s.createBob()
-
-	// force bob to use storeNode as relay as well as owner
-	err := s.bob.DialPeer(s.storeNodeAddress)
-	s.Require().NoError(err)
+	ownerPeerID := gethbridge.GetGethWakuV2From(s.ownerWaku).PeerID().String()
+	bobPeerID := gethbridge.GetGethWakuV2From(s.bobWaku).PeerID().String()
 
 	// 1. Owner creates a community
 	community, chat := s.createCommunityWithChat(s.owner)
 
-	// waits for onwer and bob to connect to the store node for relay
-	s.waitForWakuConnections(s.wakuStoreNode, 2, 40*time.Second)
+	WaitForPeersConnected(&s.Suite, s.wakuStoreNode, func() []string {
+		// force bob to use storeNode as relay as well as owner
+		err := s.bob.DialPeer(s.storeNodeAddress)
+		s.Require().NoError(err)
+		return []string{ownerPeerID, bobPeerID}
+	})
 
 	// 2. Bob joins the community
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	joinCommunity(&s.Suite, community, s.owner, s.bob, request, "")
 
-	// connect to the community store node
-	err = s.bob.DialPeer(s.communityStoreNodeAddress)
-	s.Require().NoError(err)
-	err = s.owner.DialPeer(s.communityStoreNodeAddress)
-	s.Require().NoError(err)
+	WaitForPeersConnected(&s.Suite, s.communityStoreNode, func() []string {
+		err := s.bob.DialPeer(s.communityStoreNodeAddress)
+		s.Require().NoError(err)
+		err = s.owner.DialPeer(s.communityStoreNodeAddress)
+		s.Require().NoError(err)
 
-	// waits for onwer and bob to connect to the store node for relay
-	s.waitForWakuConnections(s.communityStoreNode, 2, 40*time.Second)
+		return []string{ownerPeerID, bobPeerID}
+	})
 
 	// 3. Owner sets the storenode for the community
-	_, err = s.owner.SetCommunityStorenodes(&requests.SetCommunityStorenodes{
+	_, err := s.owner.SetCommunityStorenodes(&requests.SetCommunityStorenodes{
 		CommunityID: community.ID(),
 		Storenodes: []storenodes.Storenode{
 			{
@@ -1280,10 +1279,10 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 
 	// Connect to store node to force "online" status
 	{
-		WaitForPeerConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() string {
+		WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() []string {
 			err := s.bob.DialPeer(storeAddress)
 			s.Require().NoError(err)
-			return storePeerID
+			return []string{storePeerID}
 		})
 		s.Require().True(s.bob.Online())
 
@@ -1337,10 +1336,10 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 		// We don't enable it earlier to control when we connect to the store node.
 		s.bob.config.featureFlags.AutoRequestHistoricMessages = true
 
-		WaitForPeerConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() string {
+		WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() []string {
 			err := s.bob.DialPeer(storeAddress)
 			s.Require().NoError(err)
-			return storePeerID
+			return []string{storePeerID}
 		})
 		s.Require().True(s.bob.Online())
 
@@ -1355,24 +1354,5 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 		s.Require().NoError(err)
 		s.Require().NotNil(response)
 		s.Require().Len(response.Contacts, 1)
-	}
-}
-
-// waitForWakuConnections waits for Waku connections to be established.
-func (s *MessengerStoreNodeRequestSuite) waitForWakuConnections(node *waku2.Waku, expectedPeersCount int, timeout time.Duration) {
-	sub := node.SubscribeToConnStatusChanges()
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	for {
-		select {
-		case status := <-sub.C:
-			if len(status.Peers) >= expectedPeersCount {
-				// Found peers
-				return
-			}
-		case <-ctx.Done():
-			s.T().Fatal("timeout waiting for peers")
-		}
 	}
 }

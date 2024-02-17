@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/status-im/status-go/eth-node/types"
 	waku2 "github.com/status-im/status-go/wakuv2"
 
 	"golang.org/x/exp/maps"
@@ -164,7 +165,16 @@ func WaitForConnectionStatus(s *suite.Suite, waku *waku2.Waku, action func() boo
 	}
 }
 
-func WaitForPeerConnected(s *suite.Suite, waku *waku2.Waku, action func() string) {
+func hasAllPeers(m map[string]types.WakuV2Peer, checkSlice []string) bool {
+	for _, check := range checkSlice {
+		if _, ok := m[check]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func WaitForPeersConnected(s *suite.Suite, waku *waku2.Waku, action func() []string) {
 	subscription := waku.SubscribeToConnStatusChanges()
 	defer subscription.Unsubscribe()
 
@@ -172,20 +182,19 @@ func WaitForPeerConnected(s *suite.Suite, waku *waku2.Waku, action func() string
 	defer cancel()
 
 	// Action should return the desired peer ID
-	peerID := action()
-
-	if _, ok := waku.Peers()[peerID]; ok {
+	peerIDs := action()
+	if hasAllPeers(waku.Peers(), peerIDs) {
 		return
 	}
 
 	for {
 		select {
 		case status := <-subscription.C:
-			if _, ok := status.Peers[peerID]; ok {
+			if hasAllPeers(status.Peers, peerIDs) {
 				return
 			}
 		case <-ctx.Done():
-			s.Require().Fail(fmt.Sprintf("timeout waiting for peer connected '%s'", peerID))
+			s.Require().Fail(fmt.Sprintf("timeout waiting for peers connected '%+v'", peerIDs))
 			return
 		}
 	}
