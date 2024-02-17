@@ -714,16 +714,18 @@ func (s *MessengerStoreNodeRequestSuite) TestSetStorenodeForCommunity_fetchMessa
 	ctx := context.Background()
 	s.createOwner()
 	s.createBob()
+	// force bob to use storeNode as relay as well as owner
+	err := s.bob.DialPeer(s.storeNodeAddress)
+	s.Require().NoError(err)
+
 	ownerPeerID := gethbridge.GetGethWakuV2From(s.ownerWaku).PeerID().String()
 	bobPeerID := gethbridge.GetGethWakuV2From(s.bobWaku).PeerID().String()
 
 	// 1. Owner creates a community
 	community, chat := s.createCommunityWithChat(s.owner)
 
+	// waits for onwer and bob to connect to the store node
 	WaitForPeersConnected(&s.Suite, s.wakuStoreNode, func() []string {
-		// force bob to use storeNode as relay as well as owner
-		err := s.bob.DialPeer(s.storeNodeAddress)
-		s.Require().NoError(err)
 		return []string{ownerPeerID, bobPeerID}
 	})
 
@@ -732,6 +734,7 @@ func (s *MessengerStoreNodeRequestSuite) TestSetStorenodeForCommunity_fetchMessa
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	joinCommunity(&s.Suite, community, s.owner, s.bob, request, "")
 
+	// waits for onwer and bob to connect to the community store node
 	WaitForPeersConnected(&s.Suite, s.communityStoreNode, func() []string {
 		err := s.bob.DialPeer(s.communityStoreNodeAddress)
 		s.Require().NoError(err)
@@ -742,7 +745,7 @@ func (s *MessengerStoreNodeRequestSuite) TestSetStorenodeForCommunity_fetchMessa
 	})
 
 	// 3. Owner sets the storenode for the community
-	_, err := s.owner.SetCommunityStorenodes(&requests.SetCommunityStorenodes{
+	_, err = s.owner.SetCommunityStorenodes(&requests.SetCommunityStorenodes{
 		CommunityID: community.ID(),
 		Storenodes: []storenodes.Storenode{
 			{
