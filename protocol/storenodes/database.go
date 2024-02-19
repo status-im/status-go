@@ -150,7 +150,7 @@ func (d *Database) upsert(n Storenode, tx *sql.Tx) error {
 
 func (d *Database) countByCommunity(communityID types.HexBytes, tx *sql.Tx) (int, error) {
 	var count int
-	err := d.db.QueryRow(`SELECT COUNT(*) FROM community_storenodes WHERE community_id = ? AND removed = 0`, communityID).Scan(&count)
+	err := tx.QueryRow(`SELECT COUNT(*) FROM community_storenodes WHERE community_id = ? AND removed = 0`, communityID).Scan(&count)
 	if err != nil {
 		return 0, err
 	}
