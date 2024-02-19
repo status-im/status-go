@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/zxcvbn-go/scoring"
 
 	abi_spec "github.com/status-im/status-go/abi-spec"
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -1326,4 +1327,12 @@ func InitLogging(logSettingsJSON string) string {
 	})
 
 	return makeJSONResponse(err)
+}
+
+func GetRandomMnemonic() string {
+	mnemonic, err := account.GetRandomMnemonic()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return mnemonic
 }

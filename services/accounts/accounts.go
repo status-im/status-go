@@ -456,7 +456,7 @@ func (api *API) MakeSeedPhraseKeypairFullyOperable(ctx context.Context, mnemonic
 
 // Creates a random new mnemonic.
 func (api *API) GetRandomMnemonic(ctx context.Context) (string, error) {
-	return api.manager.GetRandomMnemonic()
+	return account.GetRandomMnemonic()
 }
 
 func (api *API) VerifyKeystoreFileForAccount(address types.Address, password string) bool {
