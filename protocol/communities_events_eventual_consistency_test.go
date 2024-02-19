@@ -18,7 +18,7 @@ func TestCommunityEventsEventualConsistencySuite(t *testing.T) {
 }
 
 type CommunityEventsEventualConsistencySuite struct {
-	AdminCommunityEventsSuite
+	AdminCommunityEventsSuiteBase
 
 	messagesOrderController *MessagesOrderController
 }
@@ -52,7 +52,7 @@ func (s *CommunityEventsEventualConsistencySuite) SetupTest() {
 }
 
 func (s *CommunityEventsEventualConsistencySuite) TearDownTest() {
-	s.AdminCommunityEventsSuite.TearDownTest()
+	s.AdminCommunityEventsSuiteBase.TearDownTest()
 	s.messagesOrderController.Stop()
 }
 
@@ -69,11 +69,16 @@ func (s *CommunityEventsEventualConsistencySuite) newMessenger(password string, 
 	})
 }
 
-// TODO: remove once eventual consistency is implemented
-var communityRequestsEventualConsistencyFixed = false
+type requestToJoinActionType int
 
-func (s *CommunityEventsEventualConsistencySuite) TestAdminAcceptRejectRequestToJoin() {
+const (
+	requestToJoinAccept requestToJoinActionType = iota
+	requestToJoinReject
+)
+
+func (s *CommunityEventsEventualConsistencySuite) testRequestsToJoin(actions []requestToJoinActionType, messagesOrder messagesOrderType) {
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})
+	s.Require().True(community.IsControlNode())
 
 	// set up additional user that will send request to join
 	user := s.newMessenger("", []string{})
@@ -108,17 +113,21 @@ func (s *CommunityEventsEventualConsistencySuite) TestAdminAcceptRejectRequestTo
 	s.Require().NoError(err)
 	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
-	// accept request to join
-	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: sentRequest.ID}
-	_, err = s.admin.AcceptRequestToJoinCommunity(acceptRequestToJoin)
-	s.Require().NoError(err)
+	for _, action := range actions {
+		switch action {
+		case requestToJoinAccept:
+			acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: sentRequest.ID}
+			_, err = s.admin.AcceptRequestToJoinCommunity(acceptRequestToJoin)
+			s.Require().NoError(err)
 
-	// then reject request to join
-	rejectRequestToJoin := &requests.DeclineRequestToJoinCommunity{ID: sentRequest.ID}
-	_, err = s.admin.DeclineRequestToJoinCommunity(rejectRequestToJoin)
-	s.Require().NoError(err)
+		case requestToJoinReject:
+			rejectRequestToJoin := &requests.DeclineRequestToJoinCommunity{ID: sentRequest.ID}
+			_, err = s.admin.DeclineRequestToJoinCommunity(rejectRequestToJoin)
+			s.Require().NoError(err)
+		}
+	}
 
-	// ensure both messages are pushed to waku
+	// ensure all messages are pushed to waku
 	/*
 		FIXME: we should do it smarter, as follows:
 		```
@@ -131,48 +140,48 @@ func (s *CommunityEventsEventualConsistencySuite) TestAdminAcceptRejectRequestTo
 	time.Sleep(1 * time.Second)
 
 	// ensure events are received in order
-	s.messagesOrderController.order = messagesOrderAsPosted
+	s.messagesOrderController.order = messagesOrder
 
-	waitForAcceptedRequestToJoin := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
-		return len(sub.AcceptedRequestsToJoin) == 1
-	})
-
-	waitOnAdminEventsRejection := waitOnCommunitiesEvent(s.owner, func(s *communities.Subscription) bool {
-		return s.CommunityEventsMessageInvalidClock != nil
-	})
-
-	_, err = s.owner.RetrieveAll()
+	response, err = s.owner.RetrieveAll()
 	s.Require().NoError(err)
 
-	// first owner handles AcceptRequestToJoinCommunity event
-	err = <-waitForAcceptedRequestToJoin
-	s.Require().NoError(err)
-
-	// then owner rejects DeclineRequestToJoinCommunity event due to invalid clock
-	err = <-waitOnAdminEventsRejection
-	s.Require().NoError(err)
-
-	if communityRequestsEventualConsistencyFixed {
-		// admin receives rejected DeclineRequestToJoinCommunity event and re-applies it,
-		// there is no signal whatsoever, we just wait for admin to process all incoming messages
-		_, _ = WaitOnMessengerResponse(s.admin, func(response *MessengerResponse) bool {
+	lastAction := actions[len(actions)-1]
+	responseChecker := func(mr *MessengerResponse) bool {
+		if len(mr.RequestsToJoinCommunity()) == 0 || len(mr.Communities()) == 0 {
 			return false
-		}, "")
-
-		waitForRejectedRequestToJoin := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
-			return len(sub.RejectedRequestsToJoin) == 1
-		})
-
-		_, err = s.owner.RetrieveAll()
-		s.Require().NoError(err)
-
-		// owner handles DeclineRequestToJoinCommunity event eventually
-		err = <-waitForRejectedRequestToJoin
-		s.Require().NoError(err)
-
-		// user should be removed from community
-		community, err = s.owner.GetCommunityByID(community.ID())
-		s.Require().NoError(err)
-		s.Require().False(community.HasMember(&user.identity.PublicKey))
+		}
+		switch lastAction {
+		case requestToJoinAccept:
+			return mr.RequestsToJoinCommunity()[0].State == communities.RequestToJoinStateAccepted &&
+				mr.Communities()[0].HasMember(&user.identity.PublicKey)
+		case requestToJoinReject:
+			return mr.RequestsToJoinCommunity()[0].State == communities.RequestToJoinStateDeclined &&
+				!mr.Communities()[0].HasMember(&user.identity.PublicKey)
+		}
+		return false
 	}
+
+	switch messagesOrder {
+	case messagesOrderAsPosted:
+		_, err = WaitOnSignaledMessengerResponse(s.owner, responseChecker, "lack of eventual consistency")
+		s.Require().NoError(err)
+	case messagesOrderReversed:
+		s.Require().True(responseChecker(response))
+	}
+}
+
+func (s *CommunityEventsEventualConsistencySuite) TestAdminAcceptRejectRequestToJoin_InOrder() {
+	s.testRequestsToJoin([]requestToJoinActionType{requestToJoinAccept, requestToJoinReject}, messagesOrderAsPosted)
+}
+
+func (s *CommunityEventsEventualConsistencySuite) TestAdminAcceptRejectRequestToJoin_OutOfOrder() {
+	s.testRequestsToJoin([]requestToJoinActionType{requestToJoinAccept, requestToJoinReject}, messagesOrderReversed)
+}
+
+func (s *CommunityEventsEventualConsistencySuite) TestAdminRejectAcceptRequestToJoin_InOrder() {
+	s.testRequestsToJoin([]requestToJoinActionType{requestToJoinReject, requestToJoinAccept}, messagesOrderAsPosted)
+}
+
+func (s *CommunityEventsEventualConsistencySuite) TestAdminRejectAcceptRequestToJoin_OutOfOrder() {
+	s.testRequestsToJoin([]requestToJoinActionType{requestToJoinReject, requestToJoinAccept}, messagesOrderReversed)
 }

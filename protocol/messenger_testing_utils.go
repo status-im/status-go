@@ -80,7 +80,7 @@ func WaitOnSignaledMessengerResponse(m *Messenger, condition func(*MessengerResp
 		return nil, errors.New("messengerSignalsHandler already provided/mocked")
 	}
 
-	responseChan := make(chan *MessengerResponse, 1)
+	responseChan := make(chan *MessengerResponse, 64)
 	m.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{
 		responseChan: responseChan,
 	}
@@ -100,10 +100,9 @@ func WaitOnSignaledMessengerResponse(m *Messenger, condition func(*MessengerResp
 			if condition(r) {
 				return r, nil
 			}
-			return nil, errors.New(errorMessage)
 
 		case <-timeoutChan:
-			return nil, errors.New("timed out: " + errorMessage)
+			return nil, errors.New(errorMessage)
 
 		default: // No immediate response, rest & loop back to retrieve again
 			time.Sleep(interval)
