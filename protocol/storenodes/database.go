@@ -149,18 +149,12 @@ func (d *Database) upsert(n Storenode, tx *sql.Tx) error {
 }
 
 func (d *Database) countByCommunity(communityID types.HexBytes, tx *sql.Tx) (int, error) {
-	count, err := tx.Query(`SELECT COUNT(*) FROM community_storenodes WHERE community_id = ? AND removed = 0`, communityID)
+	var count int
+	err := db.db.QueryRow(`SELECT COUNT(*) FROM community_storenodes WHERE community_id = ? AND removed = 0`, communityID).Scan(&count)
 	if err != nil {
 		return 0, err
 	}
-	defer count.Close()
-	var c int
-	if count.Next() {
-		if err := count.Scan(&c); err != nil {
-			return 0, err
-		}
-	}
-	return c, nil
+	return count, nil
 }
 
 func toStorenodes(rows *sql.Rows) ([]Storenode, error) {
