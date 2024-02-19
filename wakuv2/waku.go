@@ -1243,9 +1243,7 @@ func (w *Waku) Start() error {
 					zap.Int("peersCount", len(latestConnStatus.Peers)),
 					zap.Any("stats", latestConnStatus))
 				for k, subs := range w.connStatusSubscriptions {
-					if subs.Active() {
-						subs.C <- latestConnStatus
-					} else {
+					if !subs.Send(latestConnStatus) {
 						delete(w.connStatusSubscriptions, k)
 					}
 				}
