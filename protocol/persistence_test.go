@@ -1911,6 +1911,85 @@ func TestSaveBridgeMessage(t *testing.T) {
 	require.Equal(t, "789", retrievedMessages[0].GetBridgeMessage().ParentMessageID)
 }
 
+func insertMinimalBridgeMessage(p *sqlitePersistence, messageID string, bridgeMessageID string, bridgeMessageParentID string) error {
+
+	bridgeMessage := &protobuf.BridgeMessage{
+		BridgeName:      "discord",
+		UserName:        "joe",
+		Content:         "abc",
+		UserAvatar:      "data:image/png;base64,iVBO...",
+		UserID:          "123",
+		MessageID:       bridgeMessageID,
+		ParentMessageID: bridgeMessageParentID,
+	}
+
+	return p.SaveMessages([]*common.Message{{
+		ID:          messageID,
+		LocalChatID: testPublicChatID,
+		From:        testPK,
+		ChatMessage: &protobuf.ChatMessage{
+			Text:        "some-text",
+			ContentType: protobuf.ChatMessage_BRIDGE_MESSAGE,
+			ChatId:      testPublicChatID,
+			Payload: &protobuf.ChatMessage_BridgeMessage{
+				BridgeMessage: bridgeMessage,
+			},
+		},
+	}})
+}
+
+func messageResponseTo(p *sqlitePersistence, messageID string) (string, error) {
+	var responseTo string
+	err := p.db.QueryRow("SELECT response_to FROM user_messages WHERE id = ?", messageID).Scan(&responseTo)
+	return responseTo, err
+}
+
+func TestBridgeMessageReplies(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	require.NoError(t, err)
+
+	err = insertMinimalBridgeMessage(p, "111", "1", "")
+	require.NoError(t, err)
+
+	err = insertMinimalBridgeMessage(p, "222", "2", "1")
+	require.NoError(t, err)
+
+	// "333 is not delivered yet"
+
+	// this is a reply to a message which was not delivered yet
+	err = insertMinimalBridgeMessage(p, "444", "4", "3")
+	require.NoError(t, err)
+
+	// status message "222" should have reply_to = "111"
+	responseTo, err := messageResponseTo(p, "222")
+	require.NoError(t, err)
+	require.Equal(t, "111", responseTo)
+
+	responseTo, err = messageResponseTo(p, "111")
+	require.NoError(t, err)
+	require.Equal(t, "", responseTo)
+
+	responseTo, err = messageResponseTo(p, "444")
+	require.NoError(t, err)
+	require.Equal(t, "", responseTo)
+
+	// receiving message for which "444" is replied to
+	err = insertMinimalBridgeMessage(p, "333", "3", "")
+	require.NoError(t, err)
+
+	responseTo, err = messageResponseTo(p, "333")
+	require.NoError(t, err)
+	require.Equal(t, "", responseTo)
+
+	// now 444 is replied to 333
+	responseTo, err = messageResponseTo(p, "444")
+	require.NoError(t, err)
+	require.Equal(t, "333", responseTo)
+}
+
 func TestGetCommunityMemberAllNonDeletedMessages(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
