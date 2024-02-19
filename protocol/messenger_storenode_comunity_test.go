@@ -99,6 +99,9 @@ func (s *MessengerStoreNodeCommunitySuite) createStore(name string) (*waku2.Waku
 }
 
 func (s *MessengerStoreNodeCommunitySuite) newMessenger(name, storenodeAddress string) (*Messenger, types.Waku) {
+	localMailserverID := "local-mailserver-007"
+	localFleet := "local-fleet-007"
+
 	logger := s.logger.Named(name)
 	cfg := testWakuV2Config{
 		logger:                 logger,
@@ -143,7 +146,7 @@ func (s *MessengerStoreNodeCommunitySuite) newMessenger(name, storenodeAddress s
 }
 
 func (s *MessengerStoreNodeCommunitySuite) createCommunityWithChat(m *Messenger) (*communities.Community, *Chat) {
-	WaitForAvailableStoreNode(&s.Suite, m, storeNodeConnectTimeout)
+	WaitForAvailableStoreNode(&s.Suite, m, 500*time.Millisecond)
 
 	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(nil)
 
@@ -249,12 +252,6 @@ func (s *MessengerStoreNodeCommunitySuite) waitForEnvelopes(subscription <-chan 
 			s.Require().Fail(err)
 		}
 	}
-}
-
-func (s *MessengerStoreNodeCommunitySuite) wakuListenAddress(waku *waku2.Waku) string {
-	addresses := waku.ListenAddresses()
-	s.Require().LessOrEqual(1, len(addresses))
-	return addresses[0]
 }
 
 func (s *MessengerStoreNodeCommunitySuite) TestSetCommunityStorenodesAndFetch() {

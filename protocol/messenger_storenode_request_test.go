@@ -272,33 +272,6 @@ func (s *MessengerStoreNodeRequestSuite) createCommunity(m *Messenger) *communit
 	return response.Communities()[0]
 }
 
-func (s *MessengerStoreNodeRequestSuite) createCommunityWithChat(m *Messenger) (*communities.Community, *Chat) {
-	s.waitForAvailableStoreNode(m)
-
-	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(nil)
-
-	createCommunityRequest := &requests.CreateCommunity{
-		Name:        RandomLettersString(10),
-		Description: RandomLettersString(20),
-		Color:       RandomColor(),
-		Tags:        RandomCommunityTags(3),
-		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
-	}
-
-	response, err := m.CreateCommunity(createCommunityRequest, true)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Chats(), 1)
-	s.Require().True(response.Communities()[0].Joined())
-	s.Require().True(response.Communities()[0].IsControlNode())
-	s.Require().True(response.Communities()[0].IsMemberOwner(&m.identity.PublicKey))
-
-	s.waitForEnvelopes(storeNodeSubscription, 1)
-
-	return response.Communities()[0], response.Chats()[0]
-}
-
 func (s *MessengerStoreNodeRequestSuite) requireCommunitiesEqual(c *communities.Community, expected *communities.Community) {
 	if expected == nil {
 		s.Require().Nil(c)
