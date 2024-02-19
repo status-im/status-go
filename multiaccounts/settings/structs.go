@@ -11,6 +11,7 @@ import (
 )
 
 type ValueHandler func(interface{}) (interface{}, error)
+type ValueCastHandler func(interface{}) (interface{}, error)
 type SyncSettingProtobufFactoryInterface func(interface{}, uint64, string) (*common.RawMessage, *protobuf.SyncSetting, error)
 type SyncSettingProtobufFactoryStruct func(Settings, uint64, string) (*common.RawMessage, *protobuf.SyncSetting, error)
 type SyncSettingProtobufToValue func(setting *protobuf.SyncSetting) interface{}
@@ -69,6 +70,7 @@ type SettingField struct {
 	dBColumnName        string
 	valueHandler        ValueHandler
 	syncProtobufFactory *SyncProtobufFactory
+	valueCastHandler    ValueCastHandler
 }
 
 func (s SettingField) GetReactName() string {
@@ -81,6 +83,10 @@ func (s SettingField) GetDBName() string {
 
 func (s SettingField) ValueHandler() ValueHandler {
 	return s.valueHandler
+}
+
+func (s SettingField) ValueCastHandler() ValueCastHandler {
+	return s.valueCastHandler
 }
 
 func (s SettingField) SyncProtobufFactory() *SyncProtobufFactory {
