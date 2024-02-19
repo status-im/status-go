@@ -2,17 +2,16 @@ package protocol
 
 import (
 	"context"
-	// "crypto/ecdsa"
+	"crypto/ecdsa"
 	"testing"
 
-	// "github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
-
-	// "github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -147,7 +146,6 @@ func (s *MessengerCommunitiesShardingSuite) TestPostToCommunityChat() {
 	}
 }
 
-/*
 func (s *MessengerCommunitiesShardingSuite) TestIgnoreOutdatedShardKey() {
 	community, _ := createCommunity(&s.Suite, s.owner)
 
@@ -222,4 +220,3 @@ func (s *MessengerCommunitiesShardingSuite) TestIgnoreOutdatedShardKey() {
 		s.Require().NoError(err)
 	}
 }
-*/
