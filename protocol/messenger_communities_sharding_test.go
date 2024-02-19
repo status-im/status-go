@@ -147,8 +147,6 @@ func (s *MessengerCommunitiesShardingSuite) TestPostToCommunityChat() {
 }
 
 func (s *MessengerCommunitiesShardingSuite) TestIgnoreOutdatedShardKey() {
-	s.T().Skip("flaky test")
-
 	community, _ := createCommunity(&s.Suite, s.owner)
 
 	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.alice)
