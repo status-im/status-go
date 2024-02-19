@@ -1328,10 +1328,12 @@ func InitLogging(logSettingsJSON string) string {
 	return makeJSONResponse(err)
 }
 
-func GetRandomMnemonic() string {
-	resp, err := statusBackend.AccountManager().GetRandomMnemonic()
+func GetRandomMnemonic() (string, error) {
+	// generate mnemonic phrase
+	mn := extkeys.NewMnemonic()
+	mnemonic, err := mn.MnemonicPhrase(extkeys.EntropyStrength128, extkeys.EnglishLanguage)
 	if err != nil {
-		return makeJSONResponse(err)
+		return "", fmt.Errorf("can not create mnemonic seed: %v", err)
 	}
-	return resp
+	return mnemonic, nil
 }
