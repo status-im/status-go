@@ -63,6 +63,7 @@ type ProfileShowcaseUnverifiedTokenPreference struct {
 }
 
 type ProfileShowcasePreferences struct {
+	Clock            uint64                                      `json:"clock"`
 	Communities      []*ProfileShowcaseCommunityPreference       `json:"communities"`
 	Accounts         []*ProfileShowcaseAccountPreference         `json:"accounts"`
 	Collectibles     []*ProfileShowcaseCollectiblePreference     `json:"collectibles"`

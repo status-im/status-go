@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 
@@ -29,7 +31,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
@@ -327,6 +328,12 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	// generate ens username
 	err = clientBackend.StatusNode().EnsService().API().Add(ctx, ensChainID, ensUsername)
 	require.NoError(s.T(), err)
+	// generate profile showcase preferences
+	profileShowcasePreferences := protocol.DummyProfileShowcasePreferences()
+	err = clientBackend.Messenger().SetProfileShowcasePreferences(profileShowcasePreferences, false)
+	require.NoError(s.T(), err)
+
+	// startup sending client
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
 	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
@@ -361,6 +368,9 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.Equal(s.T(), uint64(ensChainID), uds[0].ChainID)
 	require.False(s.T(), uds[0].Removed)
 	require.Greater(s.T(), uds[0].Clock, uint64(0))
+	serverProfileShowcasePreferences, err := serverBackend.Messenger().GetProfileShowcasePreferences()
+	require.NoError(s.T(), err)
+	require.True(s.T(), reflect.DeepEqual(profileShowcasePreferences, serverProfileShowcasePreferences))
 
 	serverActiveAccount, err := serverBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
