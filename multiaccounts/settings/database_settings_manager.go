@@ -49,6 +49,7 @@ type DatabaseSettingsManager interface {
 	SetPinnedMailservers(mailservers map[string]string) error
 	SetUseMailservers(value bool) error
 	SetTokenGroupByCommunity(value bool) error
+	SetPeerSyncingEnabled(value bool) error
 
 	CreateSettings(s Settings, n params.NodeConfig) error
 	SaveSetting(setting string, value interface{}) error
@@ -76,4 +77,5 @@ type DatabaseSettingsManager interface {
 	URLUnfurlingMode() (result int64, err error)
 	SubscribeToChanges() chan *SyncSettingField
 	MnemonicWasShown() error
+	GetPeerSyncingEnabled() (result bool, err error)
 }

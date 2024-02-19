@@ -213,6 +213,7 @@ type Settings struct {
 	CollectibleGroupByCollection        bool                          `json:"collectible-group-by-collection?,omitempty"`
 	CollectibleGroupByCommunity         bool                          `json:"collectible-group-by-community?,omitempty"`
 	URLUnfurlingMode                    URLUnfurlingModeType          `json:"url-unfurling-mode,omitempty"`
+	PeerSyncingEnabled                  bool                          `json:"peer-syncing-enabled?,omitempty"`
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {

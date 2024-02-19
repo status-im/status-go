@@ -198,6 +198,20 @@ func (mr *MockDatabaseSettingsManagerMockRecorder) SetUseMailservers(value inter
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUseMailservers", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).SetUseMailservers), value)
 }
 
+// SetPeerSyncingEnabled mocks base method.
+func (m *MockDatabaseSettingsManager) SetPeerSyncingEnabled(value bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetPeerSyncingEnabled", value)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetPeerSyncingEnabled indicates an expected call of SetPeerSyncingEnabled.
+func (mr *MockDatabaseSettingsManagerMockRecorder) SetPeerSyncingEnabled(value interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPeerSyncingEnabled", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).SetPeerSyncingEnabled), value)
+}
+
 // ShouldBroadcastUserStatus mocks base method.
 func (m *MockDatabaseSettingsManager) ShouldBroadcastUserStatus() (bool, error) {
 	m.ctrl.T.Helper()

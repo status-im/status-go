@@ -67,6 +67,7 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	s.UseMailservers = true
 
 	s.PreviewPrivacy = true
+	s.PeerSyncingEnabled = false
 	s.Currency = "usd"
 	s.LinkPreviewRequestEnabled = true
 

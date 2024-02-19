@@ -305,3 +305,18 @@ func (mr *MockDatabaseSettingsManagerMockRecorder) GetRecentStickers() *gomock.C
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecentStickers", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).GetRecentStickers))
 }
+
+// GetPeerSyncingEnabled mocks base method.
+func (m *MockDatabaseSettingsManager) GetPeerSyncingEnabled() (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPeerSyncingEnabled")
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPeerSyncingEnabled indicates an expected call of GetPeerSyncingEnabled.
+func (mr *MockDatabaseSettingsManagerMockRecorder) GetPeerSyncingEnabled() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPeerSyncingEnabled", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).GetPeerSyncingEnabled))
+}

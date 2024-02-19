@@ -391,7 +391,8 @@ func (db *Database) GetSettings() (Settings, error) {
 		gif_favorites, opensea_enabled, last_backup, backup_enabled, telemetry_server_url, auto_message_enabled, gif_api_key,
 		test_networks_enabled, mutual_contact_enabled, profile_migration_needed, is_goerli_enabled, wallet_token_preferences_group_by_community, url_unfurling_mode,
 		omit_transfers_history_scan, mnemonic_was_not_shown, wallet_show_community_asset_when_sending_tokens, wallet_display_assets_below_balance,
-		wallet_display_assets_below_balance_threshold, wallet_collectible_preferences_group_by_collection, wallet_collectible_preferences_group_by_community
+		wallet_display_assets_below_balance_threshold, wallet_collectible_preferences_group_by_collection, wallet_collectible_preferences_group_by_community, 
+		peer_syncing_enabled
 	FROM
 		settings
 	WHERE
@@ -475,6 +476,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.DisplayAssetsBelowBalanceThreshold,
 		&s.CollectibleGroupByCollection,
 		&s.CollectibleGroupByCommunity,
+		&s.PeerSyncingEnabled,
 	)
 
 	return s, err
@@ -757,6 +759,18 @@ func (db *Database) GetTestNetworksEnabled() (result bool, err error) {
 
 func (db *Database) GetIsGoerliEnabled() (result bool, err error) {
 	err = db.makeSelectRow(IsGoerliEnabled).Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
+}
+
+func (db *Database) SetPeerSyncingEnabled(value bool) error {
+	return db.SaveSettingField(PeerSyncingEnabled, value)
+}
+
+func (db *Database) GetPeerSyncingEnabled() (result bool, err error) {
+	err = db.makeSelectRow(PeerSyncingEnabled).Scan(&result)
 	if err == sql.ErrNoRows {
 		return result, nil
 	}
