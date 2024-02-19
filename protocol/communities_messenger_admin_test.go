@@ -13,10 +13,8 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/waku"
@@ -26,7 +24,7 @@ func TestAdminCommunityEventsSuite(t *testing.T) {
 	suite.Run(t, new(AdminCommunityEventsSuite))
 }
 
-type AdminCommunityEventsSuite struct {
+type AdminCommunityEventsSuiteBase struct {
 	suite.Suite
 	owner *Messenger
 	admin *Messenger
@@ -41,27 +39,31 @@ type AdminCommunityEventsSuite struct {
 	additionalEventSenders []*Messenger
 }
 
-func (s *AdminCommunityEventsSuite) GetControlNode() *Messenger {
+type AdminCommunityEventsSuite struct {
+	AdminCommunityEventsSuiteBase
+}
+
+func (s *AdminCommunityEventsSuiteBase) GetControlNode() *Messenger {
 	return s.owner
 }
 
-func (s *AdminCommunityEventsSuite) GetEventSender() *Messenger {
+func (s *AdminCommunityEventsSuiteBase) GetEventSender() *Messenger {
 	return s.admin
 }
 
-func (s *AdminCommunityEventsSuite) GetMember() *Messenger {
+func (s *AdminCommunityEventsSuiteBase) GetMember() *Messenger {
 	return s.alice
 }
 
-func (s *AdminCommunityEventsSuite) GetSuite() *suite.Suite {
+func (s *AdminCommunityEventsSuiteBase) GetSuite() *suite.Suite {
 	return &s.Suite
 }
 
-func (s *AdminCommunityEventsSuite) GetCollectiblesServiceMock() *CollectiblesServiceMock {
+func (s *AdminCommunityEventsSuiteBase) GetCollectiblesServiceMock() *CollectiblesServiceMock {
 	return s.collectiblesServiceMock
 }
 
-func (s *AdminCommunityEventsSuite) SetupTest() {
+func (s *AdminCommunityEventsSuiteBase) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 
@@ -84,7 +86,7 @@ func (s *AdminCommunityEventsSuite) SetupTest() {
 	s.mockedBalances = createMockedWalletBalance(&s.Suite)
 }
 
-func (s *AdminCommunityEventsSuite) TearDownTest() {
+func (s *AdminCommunityEventsSuiteBase) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.owner)
 	TearDownMessenger(&s.Suite, s.admin)
 	TearDownMessenger(&s.Suite, s.alice)
@@ -97,7 +99,7 @@ func (s *AdminCommunityEventsSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *AdminCommunityEventsSuite) SetupAdditionalMessengers(messengers []*Messenger) {
+func (s *AdminCommunityEventsSuiteBase) SetupAdditionalMessengers(messengers []*Messenger) {
 	for _, m := range messengers {
 		s.additionalEventSenders = append(s.additionalEventSenders, m)
 		_, err := m.Start()
@@ -105,7 +107,7 @@ func (s *AdminCommunityEventsSuite) SetupAdditionalMessengers(messengers []*Mess
 	}
 }
 
-func (s *AdminCommunityEventsSuite) newMessenger(password string, walletAddresses []string) *Messenger {
+func (s *AdminCommunityEventsSuiteBase) newMessenger(password string, walletAddresses []string) *Messenger {
 	return newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			logger: s.logger,
@@ -414,65 +416,6 @@ func (s *AdminCommunityEventsSuite) TestReceiveRequestsToJoinWithRevealedAccount
 	bob := s.newMessenger(accountPassword, []string{bobAccountAddress})
 	s.SetupAdditionalMessengers([]*Messenger{bob})
 	testMemberReceiveRequestsToJoinAfterGettingNewRole(s, bob, protobuf.CommunityTokenPermission_BECOME_ADMIN)
-}
-
-func (s *AdminCommunityEventsSuite) TestAdminDoesNotHaveRejectedEventsLoop() {
-	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
-
-	// admin modifies community description
-	adminEditRequest := &requests.EditCommunity{
-		CommunityID: community.ID(),
-		CreateCommunity: requests.CreateCommunity{
-			Name:        "admin name",
-			Description: "admin description",
-			Color:       "#FFFFFF",
-			Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
-		},
-	}
-	_, err := s.admin.EditCommunity(adminEditRequest)
-	s.Require().NoError(err)
-
-	community, err = s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-
-	// Update community clock without publishing new CommunityDescription
-	_, err = community.DeclineRequestToJoin(nil)
-	s.Require().NoError(err)
-
-	err = s.owner.communitiesManager.SaveCommunity(community)
-	s.Require().NoError(err)
-
-	waitOnAdminEventsRejection := waitOnCommunitiesEvent(s.owner, func(s *communities.Subscription) bool {
-		return s.CommunityEventsMessageInvalidClock != nil
-	})
-
-	// control node receives admin event and rejects it
-	_, err = WaitOnMessengerResponse(s.owner, func(response *MessengerResponse) bool {
-		select {
-		case err := <-waitOnAdminEventsRejection:
-			s.Require().NoError(err)
-			return true
-		default:
-			return false
-		}
-	}, "")
-	s.Require().NoError(err)
-
-	community, err = s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.Require().NotEqual(adminEditRequest.Description, community.DescriptionText())
-
-	// admin receives rejected events and re-applies them
-	// there is no signal whatsoever, we just wait for admin to process all incoming messages
-	_, _ = WaitOnMessengerResponse(s.admin, func(response *MessengerResponse) bool {
-		return false
-	}, "")
-
-	// control node does not receives admin event
-	_, err = WaitOnMessengerResponse(s.owner, func(response *MessengerResponse) bool {
-		return len(response.Communities()) > 0
-	}, "no communities in response")
-	s.Require().Error(err)
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminAcceptsRequestToJoinAfterMemberLeave() {

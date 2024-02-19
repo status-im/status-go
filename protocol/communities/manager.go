@@ -346,7 +346,6 @@ type Subscription struct {
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
 	CommunityEventsMessage                   *CommunityEventsMessage
-	CommunityEventsMessageInvalidClock       *CommunityEventsMessageInvalidClockSignal
 	AcceptedRequestsToJoin                   []types.HexBytes
 	RejectedRequestsToJoin                   []types.HexBytes
 	CommunityPrivilegedMemberSyncMessage     *CommunityPrivilegedMemberSyncMessage
@@ -358,11 +357,6 @@ type CommunityResponse struct {
 	Changes         *CommunityChanges                      `json:"changes"`
 	RequestsToJoin  []*RequestToJoin                       `json:"requestsToJoin"`
 	FailedToDecrypt []*CommunityPrivateDataFailedToDecrypt `json:"-"`
-}
-
-type CommunityEventsMessageInvalidClockSignal struct {
-	Community              *Community
-	CommunityEventsMessage *CommunityEventsMessage
 }
 
 func (m *Manager) Subscribe() chan *Subscription {
@@ -1839,19 +1833,15 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 
 	originCommunity := community.CreateDeepCopy()
 
-	eventsMessage.Events = m.validateAndFilterEvents(community, eventsMessage.Events)
-
-	err = community.UpdateCommunityByEvents(eventsMessage)
-	if err != nil {
-		if err == ErrInvalidCommunityEventClock && community.IsControlNode() {
-			// send updated CommunityDescription to the event sender on top of which he must apply his changes
-			eventsMessage.EventsBaseCommunityDescription = community.config.CommunityDescriptionProtocolMessage
-			m.publish(&Subscription{
-				CommunityEventsMessageInvalidClock: &CommunityEventsMessageInvalidClockSignal{
-					Community:              community,
-					CommunityEventsMessage: eventsMessage,
-				}})
+	var lastlyAppliedEvents map[string]uint64
+	if community.IsControlNode() {
+		lastlyAppliedEvents, err = m.persistence.GetAppliedCommunityEvents(community.ID())
+		if err != nil {
+			return nil, err
 		}
+	}
+	err = community.processEvents(eventsMessage, lastlyAppliedEvents)
+	if err != nil {
 		return nil, err
 	}
 
@@ -1866,6 +1856,12 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 
 	// Control node applies events and publish updated CommunityDescription
 	if community.IsControlNode() {
+		appliedEvents := map[string]uint64{}
+		if community.config.EventsData != nil {
+			for _, event := range community.config.EventsData.Events {
+				appliedEvents[event.EventTypeID()] = event.CommunityEventClock
+			}
+		}
 		community.config.EventsData = nil // clear events, they are already applied
 		community.increaseClock()
 
@@ -1878,6 +1874,11 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		}
 
 		err = m.persistence.SaveCommunity(community)
+		if err != nil {
+			return nil, err
+		}
+
+		err = m.persistence.UpsertAppliedCommunityEvents(community.ID(), appliedEvents)
 		if err != nil {
 			return nil, err
 		}
@@ -1952,7 +1953,7 @@ func (m *Manager) HandleCommunityEventsMessageRejected(signer *ecdsa.PublicKey, 
 		EventsBaseCommunityDescription: community.config.CommunityDescriptionProtocolMessage,
 		Events:                         myRejectedEvents,
 	}
-	reapplyEventsMessage := community.ToCommunityEventsMessage()
+	reapplyEventsMessage := community.toCommunityEventsMessage()
 
 	return reapplyEventsMessage, nil
 }
@@ -1967,10 +1968,20 @@ func (m *Manager) handleAdditionalAdminChanges(community *Community) (*Community
 		return &communityResponse, nil
 	}
 
-	for i := range community.config.EventsData.Events {
+	if community.config.EventsData == nil {
+		return &communityResponse, nil
+	}
+
+	handledMembers := map[string]struct{}{}
+
+	for i := len(community.config.EventsData.Events) - 1; i >= 0; i-- {
 		communityEvent := &community.config.EventsData.Events[i]
+		if _, handled := handledMembers[communityEvent.MemberToAction]; handled {
+			continue
+		}
 		switch communityEvent.Type {
 		case protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT:
+			handledMembers[communityEvent.MemberToAction] = struct{}{}
 			requestsToJoin, err := m.handleCommunityEventRequestAccepted(community, communityEvent)
 			if err != nil {
 				return nil, err
@@ -1980,6 +1991,7 @@ func (m *Manager) handleAdditionalAdminChanges(community *Community) (*Community
 			}
 
 		case protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
+			handledMembers[communityEvent.MemberToAction] = struct{}{}
 			requestsToJoin, err := m.handleCommunityEventRequestRejected(community, communityEvent)
 			if err != nil {
 				return nil, err
@@ -2031,43 +2043,45 @@ func (m *Manager) handleCommunityEventRequestAccepted(community *Community, comm
 
 	requestsToJoin := make([]*RequestToJoin, 0)
 
-	for signer, request := range communityEvent.AcceptedRequestsToJoin {
-		requestToJoin := &RequestToJoin{
-			PublicKey:   signer,
-			Clock:       request.Clock,
-			ENSName:     request.EnsName,
-			CommunityID: request.CommunityId,
-			State:       RequestToJoinStateAcceptedPending,
-		}
-		requestToJoin.CalculateID()
+	signer := communityEvent.MemberToAction
+	request := communityEvent.RequestToJoin
 
-		existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
-		if err != nil && err != sql.ErrNoRows {
-			return nil, err
-		}
-
-		if existingRequestToJoin != nil {
-			alreadyProcessedByControlNode := existingRequestToJoin.State == RequestToJoinStateAccepted || existingRequestToJoin.State == RequestToJoinStateDeclined
-			if alreadyProcessedByControlNode || existingRequestToJoin.State == RequestToJoinStateCanceled {
-				continue
-			}
-		}
-
-		requestUpdated, err := m.saveOrUpdateRequestToJoin(community.ID(), requestToJoin)
-		if err != nil {
-			return nil, err
-		}
-
-		// If request to join exists in control node, add request to acceptedRequestsToJoin.
-		// Otherwise keep the request as RequestToJoinStateAcceptedPending,
-		// as privileged users don't have revealed addresses. This can happen if control node received
-		// community event message before user request to join.
-		if community.IsControlNode() && requestUpdated {
-			acceptedRequestsToJoin = append(acceptedRequestsToJoin, requestToJoin.ID)
-		}
-
-		requestsToJoin = append(requestsToJoin, requestToJoin)
+	requestToJoin := &RequestToJoin{
+		PublicKey:   signer,
+		Clock:       request.Clock,
+		ENSName:     request.EnsName,
+		CommunityID: request.CommunityId,
+		State:       RequestToJoinStateAcceptedPending,
 	}
+	requestToJoin.CalculateID()
+
+	existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+
+	if existingRequestToJoin != nil {
+		alreadyProcessedByControlNode := existingRequestToJoin.State == RequestToJoinStateAccepted
+		if alreadyProcessedByControlNode || existingRequestToJoin.State == RequestToJoinStateCanceled {
+			return requestsToJoin, nil
+		}
+	}
+
+	requestUpdated, err := m.saveOrUpdateRequestToJoin(community.ID(), requestToJoin)
+	if err != nil {
+		return nil, err
+	}
+
+	// If request to join exists in control node, add request to acceptedRequestsToJoin.
+	// Otherwise keep the request as RequestToJoinStateAcceptedPending,
+	// as privileged users don't have revealed addresses. This can happen if control node received
+	// community event message before user request to join.
+	if community.IsControlNode() && requestUpdated {
+		acceptedRequestsToJoin = append(acceptedRequestsToJoin, requestToJoin.ID)
+	}
+
+	requestsToJoin = append(requestsToJoin, requestToJoin)
+
 	if community.IsControlNode() {
 		m.publish(&Subscription{AcceptedRequestsToJoin: acceptedRequestsToJoin})
 	}
@@ -2079,42 +2093,43 @@ func (m *Manager) handleCommunityEventRequestRejected(community *Community, comm
 
 	requestsToJoin := make([]*RequestToJoin, 0)
 
-	for signer, request := range communityEvent.RejectedRequestsToJoin {
-		requestToJoin := &RequestToJoin{
-			PublicKey:   signer,
-			Clock:       request.Clock,
-			ENSName:     request.EnsName,
-			CommunityID: request.CommunityId,
-			State:       RequestToJoinStateDeclinedPending,
-		}
-		requestToJoin.CalculateID()
+	signer := communityEvent.MemberToAction
+	request := communityEvent.RequestToJoin
 
-		existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
-		if err != nil && err != sql.ErrNoRows {
-			return nil, err
-		}
-
-		if existingRequestToJoin != nil {
-			alreadyProcessedByControlNode := existingRequestToJoin.State == RequestToJoinStateAccepted || existingRequestToJoin.State == RequestToJoinStateDeclined
-			if alreadyProcessedByControlNode || existingRequestToJoin.State == RequestToJoinStateCanceled {
-				continue
-			}
-		}
-
-		requestUpdated, err := m.saveOrUpdateRequestToJoin(community.ID(), requestToJoin)
-		if err != nil {
-			return nil, err
-		}
-		// If request to join exists in control node, add request to rejectedRequestsToJoin.
-		// Otherwise keep the request as RequestToJoinStateDeclinedPending,
-		// as privileged users don't have revealed addresses. This can happen if control node received
-		// community event message before user request to join.
-		if community.IsControlNode() && requestUpdated {
-			rejectedRequestsToJoin = append(rejectedRequestsToJoin, requestToJoin.ID)
-		}
-
-		requestsToJoin = append(requestsToJoin, requestToJoin)
+	requestToJoin := &RequestToJoin{
+		PublicKey:   signer,
+		Clock:       request.Clock,
+		ENSName:     request.EnsName,
+		CommunityID: request.CommunityId,
+		State:       RequestToJoinStateDeclinedPending,
 	}
+	requestToJoin.CalculateID()
+
+	existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+
+	if existingRequestToJoin != nil {
+		alreadyProcessedByControlNode := existingRequestToJoin.State == RequestToJoinStateDeclined
+		if alreadyProcessedByControlNode || existingRequestToJoin.State == RequestToJoinStateCanceled {
+			return requestsToJoin, nil
+		}
+	}
+
+	requestUpdated, err := m.saveOrUpdateRequestToJoin(community.ID(), requestToJoin)
+	if err != nil {
+		return nil, err
+	}
+	// If request to join exists in control node, add request to rejectedRequestsToJoin.
+	// Otherwise keep the request as RequestToJoinStateDeclinedPending,
+	// as privileged users don't have revealed addresses. This can happen if control node received
+	// community event message before user request to join.
+	if community.IsControlNode() && requestUpdated {
+		rejectedRequestsToJoin = append(rejectedRequestsToJoin, requestToJoin.ID)
+	}
+
+	requestsToJoin = append(requestsToJoin, requestToJoin)
 
 	if community.IsControlNode() {
 		m.publish(&Subscription{RejectedRequestsToJoin: rejectedRequestsToJoin})
@@ -2325,16 +2340,7 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 			}
 		}
 	} else if community.hasPermissionToSendCommunityEvent(protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT) {
-		// admins do not perform permission checks, they merely mark the
-		// request as accepted (pending) and forward their decision to the control node
-		acceptedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
-		acceptedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
-
-		adminChanges := &CommunityEventChanges{
-			AcceptedRequestsToJoin: acceptedRequestsToJoin,
-		}
-
-		err := community.addNewCommunityEvent(community.ToCommunityRequestToJoinAcceptCommunityEvent(adminChanges))
+		err := community.addNewCommunityEvent(community.ToCommunityRequestToJoinAcceptCommunityEvent(dbRequest.PublicKey, dbRequest.ToCommunityRequestToJoinProtobuf()))
 		if err != nil {
 			return nil, err
 		}
@@ -3213,9 +3219,14 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 			return err
 		}
 
-		err = community.updateCommunityDescriptionByEvents()
-		if err != nil {
-			return err
+		if community.config.EventsData != nil {
+			eventsDescription, err := validateAndGetEventsMessageCommunityDescription(community.config.EventsData.EventsBaseCommunityDescription, community.ControlNode())
+			if err != nil {
+				m.logger.Error("invalid EventsBaseCommunityDescription", zap.Error(err))
+			}
+			if eventsDescription.Clock == community.Clock() {
+				community.applyEvents()
+			}
 		}
 
 		if m.transport != nil && m.transport.WakuVersion() == 2 {
@@ -4658,7 +4669,7 @@ func (m *Manager) saveAndPublish(community *Community) error {
 			return err
 		}
 
-		m.publish(&Subscription{CommunityEventsMessage: community.ToCommunityEventsMessage()})
+		m.publish(&Subscription{CommunityEventsMessage: community.toCommunityEventsMessage()})
 		return nil
 	}
 

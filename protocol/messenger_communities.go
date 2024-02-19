@@ -156,36 +156,6 @@ func (m *Messenger) publishCommunityEvents(community *communities.Community, msg
 	return err
 }
 
-func (m *Messenger) publishCommunityEventsRejected(community *communities.Community, msg *communities.CommunityEventsMessage) error {
-	if !community.IsControlNode() {
-		return communities.ErrNotControlNode
-	}
-	m.logger.Debug("publishing community events rejected", zap.Any("event", msg))
-
-	communityEventsMessage := msg.ToProtobuf()
-	communityEventsMessageRejected := &protobuf.CommunityEventsMessageRejected{
-		Msg: communityEventsMessage,
-	}
-
-	payload, err := proto.Marshal(communityEventsMessageRejected)
-	if err != nil {
-		return err
-	}
-
-	rawMessage := common.RawMessage{
-		Payload: payload,
-		Sender:  community.PrivateKey(),
-		// we don't want to wrap in an encryption layer message
-		SkipEncryptionLayer: true,
-		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE_REJECTED,
-		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
-	}
-
-	// TODO: resend in case of failure?
-	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(msg.CommunityID), rawMessage)
-	return err
-}
-
 func (m *Messenger) publishCommunityPrivilegedMemberSyncMessage(msg *communities.CommunityPrivilegedMemberSyncMessage) error {
 
 	m.logger.Debug("publishing privileged user sync message", zap.Any("event", msg))
@@ -406,14 +376,6 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					err := m.publishCommunityEvents(sub.Community, sub.CommunityEventsMessage)
 					if err != nil {
 						m.logger.Warn("failed to publish community events", zap.Error(err))
-					}
-				}
-
-				if sub.CommunityEventsMessageInvalidClock != nil {
-					err := m.publishCommunityEventsRejected(sub.CommunityEventsMessageInvalidClock.Community,
-						sub.CommunityEventsMessageInvalidClock.CommunityEventsMessage)
-					if err != nil {
-						m.logger.Warn("failed to publish community events rejected", zap.Error(err))
 					}
 				}
 

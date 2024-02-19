@@ -1806,3 +1806,66 @@ func (p *Persistence) DeleteCommunityShard(communityID types.HexBytes) error {
 	_, err := p.db.Exec(`DELETE FROM communities_shards WHERE community_id = ?`, communityID)
 	return err
 }
+
+func (p *Persistence) GetAppliedCommunityEvents(communityID types.HexBytes) (map[string]uint64, error) {
+	rows, err := p.db.Query(`SELECT event_type_id, clock FROM applied_community_events WHERE community_id = ?`, communityID.String())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := map[string]uint64{}
+
+	eventTypeID := ""
+	clock := uint64(0)
+
+	for rows.Next() {
+		err := rows.Scan(&eventTypeID, &clock)
+		if err != nil {
+			return nil, err
+		}
+		result[eventTypeID] = clock
+	}
+
+	return result, nil
+}
+
+func (p *Persistence) UpsertAppliedCommunityEvents(communityID types.HexBytes, processedEvents map[string]uint64) error {
+	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	for eventTypeID, newClock := range processedEvents {
+		var currentClock uint64
+		err = tx.QueryRow(`
+			SELECT clock
+			FROM applied_community_events
+			WHERE community_id = ? AND event_type_id = ?`,
+			communityID.String(), eventTypeID).Scan(&currentClock)
+
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+
+		if newClock > currentClock {
+			_, err = tx.Exec(`
+				INSERT OR REPLACE INTO applied_community_events(community_id, event_type_id, clock)
+				VALUES (?, ?, ?)`,
+				communityID.String(), eventTypeID, newClock)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return err
+}

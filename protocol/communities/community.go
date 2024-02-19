@@ -516,16 +516,6 @@ type CommunitySettings struct {
 	Clock                        uint64 `json:"clock"`
 }
 
-// `CommunityAdminEventChanges contain additional changes that don't live on
-// a `Community` but still have to be propagated to other admin and control nodes
-type CommunityEventChanges struct {
-	*CommunityChanges
-	// `RejectedRequestsToJoin` is a map of signer keys to requests to join
-	RejectedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"rejectedRequestsToJoin"`
-	// `AcceptedRequestsToJoin` is a map of signer keys to requests to join
-	AcceptedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"acceptedRequestsToJoin"`
-}
-
 func (o *Community) emptyCommunityChanges() *CommunityChanges {
 	changes := EmptyCommunityChanges()
 	changes.Community = o
@@ -2343,20 +2333,14 @@ func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) (adminEventCr
 	}
 
 	if o.IsControlNode() {
-		// typically, community's clock is increased implicitly when making changes
-		// to it, however in this scenario there are no changes in the community, yet
-		// we need to increase the clock to ensure the owner event is processed by other
-		// nodes.
+		pk, err := common.HexToPubkey(dbRequest.PublicKey)
+		if err != nil {
+			return false, err
+		}
+		o.removeMemberFromOrg(pk)
 		o.increaseClock()
 	} else {
-		rejectedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
-		rejectedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
-
-		adminChanges := &CommunityEventChanges{
-			CommunityChanges:       o.emptyCommunityChanges(),
-			RejectedRequestsToJoin: rejectedRequestsToJoin,
-		}
-		err = o.addNewCommunityEvent(o.ToCommunityRequestToJoinRejectCommunityEvent(adminChanges))
+		err = o.addNewCommunityEvent(o.ToCommunityRequestToJoinRejectCommunityEvent(dbRequest.PublicKey, dbRequest.ToCommunityRequestToJoinProtobuf()))
 		if err != nil {
 			return adminEventCreated, err
 		}
@@ -2367,11 +2351,8 @@ func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) (adminEventCr
 	return adminEventCreated, err
 }
 
-func (o *Community) ValidateEvent(event *CommunityEvent, signer *ecdsa.PublicKey) error {
-	o.mutex.Lock()
-	defer o.mutex.Unlock()
-
-	err := validateCommunityEvent(event)
+func (o *Community) validateEvent(event *CommunityEvent, signer *ecdsa.PublicKey) error {
+	err := event.Validate()
 	if err != nil {
 		return err
 	}
@@ -2395,6 +2376,12 @@ func (o *Community) ValidateEvent(event *CommunityEvent, signer *ecdsa.PublicKey
 	}
 
 	return nil
+}
+
+func (o *Community) ValidateEvent(event *CommunityEvent, signer *ecdsa.PublicKey) error {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+	return o.validateEvent(event, signer)
 }
 
 func (o *Community) MemberCanManageToken(member *ecdsa.PublicKey, token *community_token.CommunityToken) bool {

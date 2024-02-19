@@ -921,3 +921,26 @@ func (s *PersistenceSuite) TestGetCommunityToValidateByID() {
 	s.Require().NoError(err)
 	s.Require().Len(result, 0)
 }
+
+func (s *PersistenceSuite) TestProcessedCommunityEvents() {
+	community := types.HexBytes{1}
+	events, err := s.db.GetAppliedCommunityEvents(community)
+	s.Require().NoError(err)
+	s.Require().Empty(events)
+
+	err = s.db.UpsertAppliedCommunityEvents(community, map[string]uint64{"a": 1, "b": 10})
+	s.Require().NoError(err)
+
+	events, err = s.db.GetAppliedCommunityEvents(community)
+	s.Require().NoError(err)
+	s.Require().Len(events, 2)
+	s.Require().True(reflect.DeepEqual(events, map[string]uint64{"a": 1, "b": 10}))
+
+	err = s.db.UpsertAppliedCommunityEvents(community, map[string]uint64{"a": 2, "b": 8, "c": 1})
+	s.Require().NoError(err)
+
+	events, err = s.db.GetAppliedCommunityEvents(community)
+	s.Require().NoError(err)
+	s.Require().Len(events, 3)
+	s.Require().True(reflect.DeepEqual(events, map[string]uint64{"a": 2, "b": 10, "c": 1}))
+}
