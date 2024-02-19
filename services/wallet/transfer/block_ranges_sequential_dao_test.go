@@ -64,7 +64,7 @@ func TestBlockRangeSequentialDAO_updateTokenRange(t *testing.T) {
 				t.Errorf("BlockRangeSequentialDAO.updateTokenRange() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			ethTokensBlockRanges, err := b.getBlockRange(tt.args.chainID, tt.args.account)
+			ethTokensBlockRanges, _, err := b.getBlockRange(tt.args.chainID, tt.args.account)
 			require.NoError(t, err)
 			require.NotNil(t, ethTokensBlockRanges.tokens)
 			require.Equal(t, tt.args.newBlockRange.LastKnown, ethTokensBlockRanges.tokens.LastKnown)
@@ -118,7 +118,7 @@ func TestBlockRangeSequentialDAO_updateEthRange(t *testing.T) {
 				t.Errorf("BlockRangeSequentialDAO.upsertEthRange() insert error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			ethTokensBlockRanges, err := b.getBlockRange(tt.args.chainID, tt.args.account)
+			ethTokensBlockRanges, _, err := b.getBlockRange(tt.args.chainID, tt.args.account)
 			require.NoError(t, err)
 			require.NotNil(t, ethTokensBlockRanges.eth)
 			require.Equal(t, dummyBlockRange.Start, ethTokensBlockRanges.eth.Start)
@@ -130,7 +130,7 @@ func TestBlockRangeSequentialDAO_updateEthRange(t *testing.T) {
 				t.Errorf("BlockRangeSequentialDAO.upsertEthRange() update error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			ethTokensBlockRanges, err = b.getBlockRange(tt.args.chainID, tt.args.account)
+			ethTokensBlockRanges, _, err = b.getBlockRange(tt.args.chainID, tt.args.account)
 			require.NoError(t, err)
 			require.NotNil(t, ethTokensBlockRanges.eth)
 			require.Equal(t, tt.args.newBlockRange.Start, ethTokensBlockRanges.eth.Start)
