@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/status-im/status-go/account"
 	"os"
 	"sync"
 	"unsafe"
@@ -19,6 +18,7 @@ import (
 	"github.com/status-im/zxcvbn-go/scoring"
 
 	abi_spec "github.com/status-im/status-go/abi-spec"
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
