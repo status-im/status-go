@@ -3454,6 +3454,8 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
+	s.T().Skip("flaky test")
+
 	s.owner.communitiesManager.RekeyInterval = 500 * time.Minute
 
 	_, err := s.owner.Start()

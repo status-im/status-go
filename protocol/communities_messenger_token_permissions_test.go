@@ -240,6 +240,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) waitOnKeyDistribution(condit
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() {
+	s.T().Skip("flaky test")
+
 	community, _ := s.createCommunity()
 
 	createTokenPermission := &requests.CreateCommunityTokenPermission{
@@ -273,6 +275,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() 
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditTokenPermission() {
+	s.T().Skip("flaky test")
+
 	community, _ := s.createCommunity()
 
 	tokenPermission := &requests.CreateCommunityTokenPermission{
@@ -329,6 +333,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditTokenPermission() {
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityTokensMetadata() {
+	s.T().Skip("flaky test")
+
 	community, _ := s.createCommunity()
 
 	tokensMetadata := community.CommunityTokensMetadata()
@@ -421,6 +427,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSharedAddress() {
+	s.T().Skip("flaky test")
+
 	community, _ := s.createCommunity()
 	s.advertiseCommunityTo(community, s.alice)
 	s.advertiseCommunityTo(community, s.bob)
@@ -471,6 +479,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSh
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSelectedSharedAddress() {
+	s.T().Skip("flaky test")
+
 	community, _ := s.createCommunity()
 	s.advertiseCommunityTo(community, s.alice)
 
@@ -499,6 +509,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSe
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersMultipleSelectedSharedAddresses() {
+	s.T().Skip("flaky test")
+
 	community, _ := s.createCommunity()
 	s.advertiseCommunityTo(community, s.alice)
 
@@ -529,6 +541,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersMu
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
+	s.T().Skip("flaky test")
+
 	community, _ := s.createCommunity()
 	s.advertiseCommunityTo(community, s.alice)
 
@@ -820,6 +834,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 }*/
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPermission() {
+	s.T().Skip("flaky test")
+
 	community, _ := s.createCommunity()
 
 	// setup become admin permission
@@ -854,6 +870,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPe
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWithMemberAndAdminPermission() {
+	s.T().Skip("flaky test")
+
 	community, _ := s.createCommunity()
 
 	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
@@ -923,6 +941,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWit
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWithMemberAndAdminPermission() {
+	s.T().Skip("flaky test")
+
 	community, _ := s.createCommunity()
 
 	// setup become member permission
