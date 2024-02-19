@@ -1509,7 +1509,7 @@ func (db sqlitePersistence) SaveMessages(messages []*common.Message) (err error)
 
 	allFields := db.tableUserMessagesAllFields()
 	valuesVector := strings.Repeat("?, ", db.tableUserMessagesAllFieldsCount()-1) + "?"
-	query := "INSERT INTO user_messages(" + allFields + ") VALUES (" + valuesVector + ")" // nolint: gosec
+	query := "INSERT INTO user_messages(" + allFields + ") VALUES (" + valuesVector + ")" // nolint: gosec, goconst
 	stmt, err := tx.Prepare(query)
 	if err != nil {
 		return

@@ -15,6 +15,7 @@ Juliusz Chroboczek <jch@irif.fr>
 Kevin Wang <kevmo314@gmail.com>
 lllf <littlelightlittlefire@gmail.com>
 Luke Curley <kixelated@gmail.com>
+Mathis Engelbart <mathis.engelbart@gmail.com>
 Max Hawkins <maxhawkins@gmail.com>
 Sean DuBois <seaduboi@amazon.com>
 Sean DuBois <sean@siobud.com>

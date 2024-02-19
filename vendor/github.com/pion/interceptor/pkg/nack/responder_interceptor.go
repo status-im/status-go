@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package nack
 
 import (
@@ -14,19 +17,26 @@ type ResponderInterceptorFactory struct {
 	opts []ResponderOption
 }
 
+type packetFactory interface {
+	NewPacket(header *rtp.Header, payload []byte) (*retainablePacket, error)
+}
+
 // NewInterceptor constructs a new ResponderInterceptor
-func (r *ResponderInterceptorFactory) NewInterceptor(id string) (interceptor.Interceptor, error) {
+func (r *ResponderInterceptorFactory) NewInterceptor(_ string) (interceptor.Interceptor, error) {
 	i := &ResponderInterceptor{
-		size:      8192,
-		log:       logging.NewDefaultLoggerFactory().NewLogger("nack_responder"),
-		streams:   map[uint32]*localStream{},
-		packetMan: newPacketManager(),
+		size:    1024,
+		log:     logging.NewDefaultLoggerFactory().NewLogger("nack_responder"),
+		streams: map[uint32]*localStream{},
 	}
 
 	for _, opt := range r.opts {
 		if err := opt(i); err != nil {
 			return nil, err
 		}
+	}
+
+	if i.packetFactory == nil {
+		i.packetFactory = newPacketManager()
 	}
 
 	if _, err := newSendBuffer(i.size); err != nil {
@@ -39,9 +49,9 @@ func (r *ResponderInterceptorFactory) NewInterceptor(id string) (interceptor.Int
 // ResponderInterceptor responds to nack feedback messages
 type ResponderInterceptor struct {
 	interceptor.NoOp
-	size      uint16
-	log       logging.LeveledLogger
-	packetMan *packetManager
+	size          uint16
+	log           logging.LeveledLogger
+	packetFactory packetFactory
 
 	streams   map[uint32]*localStream
 	streamsMu sync.Mutex
@@ -100,7 +110,7 @@ func (n *ResponderInterceptor) BindLocalStream(info *interceptor.StreamInfo, wri
 	n.streamsMu.Unlock()
 
 	return interceptor.RTPWriterFunc(func(header *rtp.Header, payload []byte, attributes interceptor.Attributes) (int, error) {
-		pkt, err := n.packetMan.NewPacket(header, payload)
+		pkt, err := n.packetFactory.NewPacket(header, payload)
 		if err != nil {
 			return 0, err
 		}

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package ice
 
 import (
@@ -60,6 +63,7 @@ func NewCandidateRelay(config *CandidateRelayConfig) (*CandidateRelay, error) {
 				Address: config.RelAddr,
 				Port:    config.RelPort,
 			},
+			remoteCandidateCaches: map[AddrPort]Candidate{},
 		},
 		relayProtocol: config.RelayProtocol,
 		onClose:       config.OnClose,
@@ -78,4 +82,17 @@ func (c *CandidateRelay) close() error {
 		c.onClose = nil
 	}
 	return err
+}
+
+func (c *CandidateRelay) copy() (Candidate, error) {
+	cc, err := c.candidateBase.copy()
+	if err != nil {
+		return nil, err
+	}
+
+	if ccr, ok := cc.(*CandidateRelay); ok {
+		ccr.relayProtocol = c.relayProtocol
+	}
+
+	return cc, nil
 }

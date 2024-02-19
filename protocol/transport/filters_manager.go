@@ -151,6 +151,8 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 	defer f.mutex.Unlock()
 
 	for _, cf := range communityFiltersToInitialize {
+		cf := cf
+
 		if cf.PrivKey == nil {
 			continue
 		}
@@ -164,6 +166,7 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 		}
 
 		for _, pubsubTopic := range topics {
+			pubsubTopic := pubsubTopic
 			pk := &cf.PrivKey.PublicKey
 			identityStr := PublicKeyToStr(pk)
 			rawFilter, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey, true)

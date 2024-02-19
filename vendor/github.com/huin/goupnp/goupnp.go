@@ -85,7 +85,10 @@ func DiscoverDevicesCtx(ctx context.Context, searchTarget string) ([]MaybeRootDe
 		return nil, err
 	}
 	defer hcCleanup()
-	responses, err := ssdp.SSDPRawSearchCtx(ctx, hc, string(searchTarget), 2, 3)
+
+	searchCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	responses, err := ssdp.RawSearch(searchCtx, hc, string(searchTarget), 3)
 	if err != nil {
 		return nil, err
 	}

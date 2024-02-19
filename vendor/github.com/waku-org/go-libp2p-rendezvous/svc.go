@@ -32,7 +32,7 @@ func (rz *RendezvousService) handleStream(s inet.Stream) {
 	defer s.Reset()
 
 	pid := s.Conn().RemotePeer()
-	log.Debugf("New stream from %s", pid.Pretty())
+	log.Debugf("New stream from %s", pid.String())
 
 	r := pbio.NewDelimitedReader(s, inet.MessageSizeMax)
 	w := pbio.NewDelimitedWriter(s)

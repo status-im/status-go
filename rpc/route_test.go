@@ -13,12 +13,12 @@ func TestRouteWithUpstream(t *testing.T) {
 	router := newRouter(true)
 
 	for _, method := range remoteMethods {
-		require.True(t, router.routeRemote(method), "method "+method+" should routed to remote")
+		require.True(t, router.routeRemote(method), "method "+method+" should routed to remote") // nolint: goconst
 	}
 
 	for _, method := range localTestMethods {
 		t.Run(method, func(t *testing.T) {
-			require.False(t, router.routeRemote(method), "method "+method+" should routed to local")
+			require.False(t, router.routeRemote(method), "method "+method+" should routed to local") // nolint: goconst
 		})
 	}
 }
@@ -27,11 +27,11 @@ func TestRouteWithoutUpstream(t *testing.T) {
 	router := newRouter(false)
 
 	for _, method := range remoteMethods {
-		require.False(t, router.routeRemote(method), "method "+method+" should routed to locally without UpstreamEnabled")
+		require.False(t, router.routeRemote(method), "method "+method+" should routed to locally without UpstreamEnabled") // nolint: goconst
 	}
 
 	for _, method := range localTestMethods {
-		require.False(t, router.routeRemote(method), "method "+method+" should routed to local")
+		require.False(t, router.routeRemote(method), "method "+method+" should routed to local") // nolint: goconst
 	}
 }
 

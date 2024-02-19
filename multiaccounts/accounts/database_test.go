@@ -231,9 +231,9 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	require.Equal(t, wo4.Address, dbAcc.Address)
 
 	// updated watch onl to save the same account after it's saved
-	wo4.Name = wo4.Name + "updated"
+	wo4.Name = wo4.Name + "updated" // nolint: goconst
 	wo4.ColorID = common.CustomizationColorCamel
-	wo4.Emoji = wo4.Emoji + "updated"
+	wo4.Emoji = wo4.Emoji + "updated" // nolint: goconst
 	err = db.SaveOrUpdateAccounts([]*Account{wo4}, false)
 	require.NoError(t, err)
 	dbAccounts, err = db.GetActiveAccounts()
@@ -279,7 +279,7 @@ func TestUpdateKeypairName(t *testing.T) {
 	require.True(t, SameKeypairs(kp, dbKeypairs[0]))
 
 	// update keypair name
-	kp.Name = kp.Name + "updated"
+	kp.Name = kp.Name + "updated" // nolint: goconst
 	kp.Accounts[0].Name = kp.Name
 	err = db.UpdateKeypairName(kp.KeyUID, kp.Name, kp.Clock, true)
 	require.NoError(t, err)
@@ -360,9 +360,9 @@ func TestKeypairs(t *testing.T) {
 			require.Equal(t, len(kp.Accounts), len(dbAccounts))
 
 			// update an existing account
-			accToUpdate.Name = accToUpdate.Name + "updated"
+			accToUpdate.Name = accToUpdate.Name + "updated" // nolint: goconst
 			accToUpdate.ColorID = common.CustomizationColorBrown
-			accToUpdate.Emoji = accToUpdate.Emoji + "updated"
+			accToUpdate.Emoji = accToUpdate.Emoji + "updated" // nolint: goconst
 
 			err = db.SaveOrUpdateAccounts([]*Account{accToUpdate}, false)
 			require.NoError(t, err)

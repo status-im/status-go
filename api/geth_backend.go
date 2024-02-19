@@ -73,6 +73,8 @@ var (
 	ErrConfigNotAvailable = errors.New("NodeConfig is not available")
 )
 
+const shm = "-shm"
+
 var _ StatusBackend = (*GethStatusBackend)(nil)
 
 // GethStatusBackend implements the Status.im service over go-ethereum
@@ -269,11 +271,11 @@ func (b *GethStatusBackend) DeleteMultiaccount(keyUID string, keyStoreDir string
 		filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db-shm", keyUID)),
 		filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db-wal", keyUID)),
 		appDbPath,
-		appDbPath + "-shm",
-		appDbPath + "-wal",
+		appDbPath + shm,
+		appDbPath + "-wal", // nolint: goconst
 		walletDbPath,
-		walletDbPath + "-shm",
-		walletDbPath + "-wal",
+		walletDbPath + shm,
+		walletDbPath + "-wal", // nolint: goconst
 	}
 	for _, path := range dbFiles {
 		if _, err := os.Stat(path); err == nil {
@@ -332,19 +334,19 @@ func (b *GethStatusBackend) runDBFileMigrations(account multiaccounts.Account, p
 		}
 
 		// rename journals as well, but ignore errors
-		_ = os.Rename(unsupportedPath+"-shm", v3Path+"-shm")
+		_ = os.Rename(unsupportedPath+shm, v3Path+shm)
 		_ = os.Rename(unsupportedPath+"-wal", v3Path+"-wal")
 	}
 
 	if _, err = os.Stat(v3Path); err == nil {
 		if err := appdatabase.MigrateV3ToV4(v3Path, v4Path, password, account.KDFIterations, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished); err != nil {
 			_ = os.Remove(v4Path)
-			_ = os.Remove(v4Path + "-shm")
+			_ = os.Remove(v4Path + shm)
 			_ = os.Remove(v4Path + "-wal")
 			return "", errors.New("Failed to migrate v3 db to v4: " + err.Error())
 		}
 		_ = os.Remove(v3Path)
-		_ = os.Remove(v3Path + "-shm")
+		_ = os.Remove(v3Path + shm)
 		_ = os.Remove(v3Path + "-wal")
 	}
 
@@ -1102,7 +1104,7 @@ func (b *GethStatusBackend) createTempDBFile(pattern string) (tmpDbPath string, 
 		filePath := file.Name()
 		_ = os.Remove(filePath)
 		_ = os.Remove(filePath + "-wal")
-		_ = os.Remove(filePath + "-shm")
+		_ = os.Remove(filePath + shm)
 		_ = os.Remove(filePath + "-journal")
 	}
 	return
@@ -1116,9 +1118,9 @@ func replaceDBFile(dbPath string, newDBPath string) (cleanup func(), err error) 
 
 	cleanup = func() {
 		_ = os.Remove(dbPath + "-wal")
-		_ = os.Remove(dbPath + "-shm")
+		_ = os.Remove(dbPath + shm)
 		_ = os.Rename(newDBPath+"-wal", dbPath+"-wal")
-		_ = os.Rename(newDBPath+"-shm", dbPath+"-shm")
+		_ = os.Rename(newDBPath+shm, dbPath+shm)
 	}
 
 	return

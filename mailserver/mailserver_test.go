@@ -108,6 +108,7 @@ func (s *MailserverSuite) TestInit() {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		s.T().Run(tc.info, func(*testing.T) {
 			mailServer := &WakuMailServer{}
 			shh := waku.New(&waku.DefaultConfig, nil)
@@ -300,6 +301,7 @@ func (s *MailserverSuite) TestMailServer() {
 		},
 	}
 	for _, tc := range testCases {
+		tc := tc
 		s.T().Run(tc.info, func(*testing.T) {
 			request := s.createRequest(tc.params)
 			src := crypto.FromECDSAPub(&tc.params.key.PublicKey)

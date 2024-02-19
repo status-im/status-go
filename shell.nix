@@ -11,7 +11,7 @@
     };
     overlays = [
       (final: prev: {
-        androidPkgs = pkgs.androidenv.composeAndroidPackages {
+        androidPkgs = prev.androidenv.composeAndroidPackages {
           toolsVersion = "26.1.1";
           platformToolsVersion = "33.0.3";
           buildToolsVersions = [ "31.0.0" ];
@@ -24,7 +24,6 @@
             "extras;google;m2repository"
           ];
         };
-
         go-junit-report = prev.go-junit-report.overrideAttrs ( attrs : rec {
           version = "2.1.0";
 
@@ -35,6 +34,19 @@
             sha256 = "sha256-s4XVjACmpd10C5k+P3vtcS/aWxI6UkSUPyxzLhD2vRI=";
           };
         });
+        # https://github.com/golang/go/issues/58426
+        gomobile = prev.gomobile.override {
+          buildGoModule = args: prev.buildGo120Module ( args // rec {
+            version = "unstable-2023-11-27";
+            src = prev.fetchgit {
+              rev = "76ac6878050a2eef81867f2c6c21108e59919e8f";
+              name = "gomobile";
+              url = "https://go.googlesource.com/mobile";
+              sha256 = "sha256-mq7gKccvI7VCBEiQTueWxMPOCgg/MGE8y2+BlwWx5pw=";
+            };
+            vendorSha256 = "sha256-8OBLVd4zs89hoJXzC8BPRgrYjjR7DiA39+7tTaSYUFI=";
+          });
+        };
       })
     ];
   }
@@ -60,7 +72,7 @@ in pkgs.mkShell {
 
   buildInputs = with pkgs; [
     git jq which
-    go_1_19 golangci-lint go-junit-report gopls go-bindata gomobileMod
+    go_1_20 golangci-lint go-junit-report gopls go-bindata gomobileMod
     mockgen protobuf3_20 protoc-gen-go
   ] ++ lib.optional stdenv.isDarwin xcodeWrapper;
 

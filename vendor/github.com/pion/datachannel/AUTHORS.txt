@@ -6,6 +6,7 @@
 Atsushi Watanabe <atsushi.w@ieee.org>
 backkem <mail@backkem.me>
 Benny Daon <benny@tuzig.com>
+Chinmay Kousik <chinmaykousik1@gmail.com>
 Eric Daniels <eric@erdaniels.com>
 Hugo Arregui <hugo.arregui@gmail.com>
 Hugo Arregui <hugo@decentraland.org>
