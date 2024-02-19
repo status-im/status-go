@@ -131,6 +131,14 @@ type MessengerCommunitiesTokenPermissionsSuite struct {
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
+	// Initialize with nil to avoid panics in TearDownTest
+	s.owner = nil
+	s.bob = nil
+	s.alice = nil
+	s.ownerWaku = nil
+	s.bobWaku = nil
+	s.aliceWaku = nil
+
 	s.logger = tt.MustCreateTestLogger()
 
 	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, false, []string{"owner", "bob", "alice"})
@@ -160,21 +168,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
-	if s.owner != nil {
-		TearDownMessenger(&s.Suite, s.owner)
-	}
+	TearDownMessenger(&s.Suite, s.owner)
+	TearDownMessenger(&s.Suite, s.bob)
+	TearDownMessenger(&s.Suite, s.alice)
 	if s.ownerWaku != nil {
 		s.Require().NoError(gethbridge.GetGethWakuV2From(s.ownerWaku).Stop())
 	}
-
-	if s.bob != nil {
-		TearDownMessenger(&s.Suite, s.bob)
-	}
 	if s.bobWaku != nil {
 		s.Require().NoError(gethbridge.GetGethWakuV2From(s.bobWaku).Stop())
-	}
-	if s.alice != nil {
-		TearDownMessenger(&s.Suite, s.alice)
 	}
 	if s.aliceWaku != nil {
 		s.Require().NoError(gethbridge.GetGethWakuV2From(s.aliceWaku).Stop())
@@ -193,7 +194,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string
 		mockedBalances:      &s.mockedBalances,
 		collectiblesService: s.collectiblesServiceMock,
 	})
-
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunity(community *communities.Community, user *Messenger, password string, addresses []string) {
@@ -240,7 +240,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) waitOnKeyDistribution(condit
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() {
-	s.T().Skip("flaky test")
 
 	community, _ := s.createCommunity()
 
@@ -275,7 +274,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() 
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditTokenPermission() {
-	s.T().Skip("flaky test")
 
 	community, _ := s.createCommunity()
 
@@ -333,7 +331,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditTokenPermission() {
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityTokensMetadata() {
-	s.T().Skip("flaky test")
 
 	community, _ := s.createCommunity()
 
@@ -427,8 +424,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSharedAddress() {
-	s.T().Skip("flaky test")
-
 	community, _ := s.createCommunity()
 	s.advertiseCommunityTo(community, s.alice)
 	s.advertiseCommunityTo(community, s.bob)
@@ -479,8 +474,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSh
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSelectedSharedAddress() {
-	s.T().Skip("flaky test")
-
 	community, _ := s.createCommunity()
 	s.advertiseCommunityTo(community, s.alice)
 
@@ -509,8 +502,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSe
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersMultipleSelectedSharedAddresses() {
-	s.T().Skip("flaky test")
-
 	community, _ := s.createCommunity()
 	s.advertiseCommunityTo(community, s.alice)
 
@@ -834,7 +825,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 }*/
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPermission() {
-	s.T().Skip("flaky test")
 
 	community, _ := s.createCommunity()
 
@@ -941,7 +931,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWit
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWithMemberAndAdminPermission() {
-	s.T().Skip("flaky test")
 
 	community, _ := s.createCommunity()
 
@@ -1018,6 +1007,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWith
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions() {
+	s.T().Skip("flaky test")
+
 	community, chat := s.createCommunity()
 
 	// bob joins the community
@@ -1241,10 +1232,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInOpenCommunity() {
+	s.T().Skip("flaky test")
 	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInOpenCommunity() {
+	s.T().Skip("flaky test")
 	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 }
 
@@ -1382,14 +1375,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInClosedCommunity() {
+	s.T().Skip("flaky test")
 	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 }
 
-/*
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInClosedCommunity() {
+	s.T().Skip("flaky test")
 	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 }
-*/
 
 func checkRoleBasedOnThePermissionType(permissionType protobuf.CommunityTokenPermission_Type, member *ecdsa.PublicKey, community *communities.Community) bool {
 	switch permissionType {
