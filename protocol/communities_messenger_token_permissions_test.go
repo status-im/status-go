@@ -239,123 +239,123 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) waitOnKeyDistribution(condit
 	return testCommunitiesKeyDistributor.waitOnKeyDistribution(condition)
 }
 
-// func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() {
-// 	community, _ := s.createCommunity()
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() {
+	community, _ := s.createCommunity()
 
-// 	createTokenPermission := &requests.CreateCommunityTokenPermission{
-// 		CommunityID: community.ID(),
-// 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
-// 		TokenCriteria: []*protobuf.TokenCriteria{
-// 			&protobuf.TokenCriteria{
-// 				Type:              protobuf.CommunityTokenType_ERC20,
-// 				ContractAddresses: map[uint64]string{uint64(testChainID1): "0x123"},
-// 				Symbol:            "TEST",
-// 				Amount:            "100",
-// 				Decimals:          uint64(18),
-// 			},
-// 		},
-// 	}
+	createTokenPermission := &requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{uint64(testChainID1): "0x123"},
+				Symbol:            "TEST",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
 
-// 	response, err := s.owner.CreateCommunityTokenPermission(createTokenPermission)
-// 	s.Require().NoError(err)
-// 	s.Require().NotNil(response)
-// 	s.Require().Len(response.Communities(), 1)
+	response, err := s.owner.CreateCommunityTokenPermission(createTokenPermission)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
 
-// 	tokenPermissions := response.Communities()[0].TokenPermissions()
-// 	for _, tokenPermission := range tokenPermissions {
-// 		for _, tc := range tokenPermission.TokenCriteria {
-// 			s.Require().Equal(tc.Type, protobuf.CommunityTokenType_ERC20)
-// 			s.Require().Equal(tc.Symbol, "TEST")
-// 			s.Require().Equal(tc.Amount, "100")
-// 			s.Require().Equal(tc.Decimals, uint64(18))
-// 		}
-// 	}
-// }
+	tokenPermissions := response.Communities()[0].TokenPermissions()
+	for _, tokenPermission := range tokenPermissions {
+		for _, tc := range tokenPermission.TokenCriteria {
+			s.Require().Equal(tc.Type, protobuf.CommunityTokenType_ERC20)
+			s.Require().Equal(tc.Symbol, "TEST")
+			s.Require().Equal(tc.Amount, "100")
+			s.Require().Equal(tc.Decimals, uint64(18))
+		}
+	}
+}
 
-// func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditTokenPermission() {
-// 	community, _ := s.createCommunity()
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditTokenPermission() {
+	community, _ := s.createCommunity()
 
-// 	tokenPermission := &requests.CreateCommunityTokenPermission{
-// 		CommunityID: community.ID(),
-// 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
-// 		TokenCriteria: []*protobuf.TokenCriteria{
-// 			&protobuf.TokenCriteria{
-// 				Type:              protobuf.CommunityTokenType_ERC20,
-// 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
-// 				Symbol:            "TEST",
-// 				Amount:            "100",
-// 				Decimals:          uint64(18),
-// 			},
-// 		},
-// 	}
+	tokenPermission := &requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
 
-// 	response, err := s.owner.CreateCommunityTokenPermission(tokenPermission)
-// 	s.Require().NoError(err)
-// 	s.Require().NotNil(response)
-// 	s.Require().Len(response.Communities(), 1)
+	response, err := s.owner.CreateCommunityTokenPermission(tokenPermission)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
 
-// 	tokenPermissions := response.Communities()[0].TokenPermissions()
+	tokenPermissions := response.Communities()[0].TokenPermissions()
 
-// 	var tokenPermissionID string
-// 	for id := range tokenPermissions {
-// 		tokenPermissionID = id
-// 	}
+	var tokenPermissionID string
+	for id := range tokenPermissions {
+		tokenPermissionID = id
+	}
 
-// 	tokenPermission.TokenCriteria[0].Symbol = "TESTUpdated"
-// 	tokenPermission.TokenCriteria[0].Amount = "200"
-// 	tokenPermission.TokenCriteria[0].Decimals = uint64(20)
+	tokenPermission.TokenCriteria[0].Symbol = "TESTUpdated"
+	tokenPermission.TokenCriteria[0].Amount = "200"
+	tokenPermission.TokenCriteria[0].Decimals = uint64(20)
 
-// 	editTokenPermission := &requests.EditCommunityTokenPermission{
-// 		PermissionID:                   tokenPermissionID,
-// 		CreateCommunityTokenPermission: *tokenPermission,
-// 	}
+	editTokenPermission := &requests.EditCommunityTokenPermission{
+		PermissionID:                   tokenPermissionID,
+		CreateCommunityTokenPermission: *tokenPermission,
+	}
 
-// 	response2, err := s.owner.EditCommunityTokenPermission(editTokenPermission)
-// 	s.Require().NoError(err)
-// 	// wait for `checkMemberPermissions` to finish
-// 	time.Sleep(1 * time.Second)
-// 	s.Require().NotNil(response2)
-// 	s.Require().Len(response2.Communities(), 1)
+	response2, err := s.owner.EditCommunityTokenPermission(editTokenPermission)
+	s.Require().NoError(err)
+	// wait for `checkMemberPermissions` to finish
+	time.Sleep(1 * time.Second)
+	s.Require().NotNil(response2)
+	s.Require().Len(response2.Communities(), 1)
 
-// 	tokenPermissions = response2.Communities()[0].TokenPermissions()
-// 	for _, tokenPermission := range tokenPermissions {
-// 		for _, tc := range tokenPermission.TokenCriteria {
-// 			s.Require().Equal(tc.Type, protobuf.CommunityTokenType_ERC20)
-// 			s.Require().Equal(tc.Symbol, "TESTUpdated")
-// 			s.Require().Equal(tc.Amount, "200")
-// 			s.Require().Equal(tc.Decimals, uint64(20))
-// 		}
-// 	}
-// }
+	tokenPermissions = response2.Communities()[0].TokenPermissions()
+	for _, tokenPermission := range tokenPermissions {
+		for _, tc := range tokenPermission.TokenCriteria {
+			s.Require().Equal(tc.Type, protobuf.CommunityTokenType_ERC20)
+			s.Require().Equal(tc.Symbol, "TESTUpdated")
+			s.Require().Equal(tc.Amount, "200")
+			s.Require().Equal(tc.Decimals, uint64(20))
+		}
+	}
+}
 
-// func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityTokensMetadata() {
-// 	community, _ := s.createCommunity()
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityTokensMetadata() {
+	community, _ := s.createCommunity()
 
-// 	tokensMetadata := community.CommunityTokensMetadata()
-// 	s.Require().Len(tokensMetadata, 0)
+	tokensMetadata := community.CommunityTokensMetadata()
+	s.Require().Len(tokensMetadata, 0)
 
-// 	newToken := &protobuf.CommunityTokenMetadata{
-// 		ContractAddresses: map[uint64]string{testChainID1: "0xasd"},
-// 		Description:       "desc1",
-// 		Image:             "IMG1",
-// 		TokenType:         protobuf.CommunityTokenType_ERC721,
-// 		Symbol:            "SMB",
-// 		Decimals:          3,
-// 	}
+	newToken := &protobuf.CommunityTokenMetadata{
+		ContractAddresses: map[uint64]string{testChainID1: "0xasd"},
+		Description:       "desc1",
+		Image:             "IMG1",
+		TokenType:         protobuf.CommunityTokenType_ERC721,
+		Symbol:            "SMB",
+		Decimals:          3,
+	}
 
-// 	_, err := community.AddCommunityTokensMetadata(newToken)
-// 	s.Require().NoError(err)
-// 	tokensMetadata = community.CommunityTokensMetadata()
-// 	s.Require().Len(tokensMetadata, 1)
+	_, err := community.AddCommunityTokensMetadata(newToken)
+	s.Require().NoError(err)
+	tokensMetadata = community.CommunityTokensMetadata()
+	s.Require().Len(tokensMetadata, 1)
 
-// 	s.Require().Equal(tokensMetadata[0].ContractAddresses, newToken.ContractAddresses)
-// 	s.Require().Equal(tokensMetadata[0].Description, newToken.Description)
-// 	s.Require().Equal(tokensMetadata[0].Image, newToken.Image)
-// 	s.Require().Equal(tokensMetadata[0].TokenType, newToken.TokenType)
-// 	s.Require().Equal(tokensMetadata[0].Symbol, newToken.Symbol)
-// 	s.Require().Equal(tokensMetadata[0].Name, newToken.Name)
-// 	s.Require().Equal(tokensMetadata[0].Decimals, newToken.Decimals)
-// }
+	s.Require().Equal(tokensMetadata[0].ContractAddresses, newToken.ContractAddresses)
+	s.Require().Equal(tokensMetadata[0].Description, newToken.Description)
+	s.Require().Equal(tokensMetadata[0].Image, newToken.Image)
+	s.Require().Equal(tokensMetadata[0].TokenType, newToken.TokenType)
+	s.Require().Equal(tokensMetadata[0].Symbol, newToken.Symbol)
+	s.Require().Equal(tokensMetadata[0].Name, newToken.Name)
+	s.Require().Equal(tokensMetadata[0].Decimals, newToken.Decimals)
+}
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSTokenPermission() {
 	community, _ := s.createCommunity()
@@ -420,205 +420,205 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 	}
 }
 
-// func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSharedAddress() {
-// 	community, _ := s.createCommunity()
-// 	s.advertiseCommunityTo(community, s.alice)
-// 	s.advertiseCommunityTo(community, s.bob)
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSharedAddress() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.alice)
+	s.advertiseCommunityTo(community, s.bob)
 
-// 	s.joinCommunity(community, s.alice, alicePassword, []string{})
-// 	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	s.joinCommunity(community, s.alice, alicePassword, []string{})
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
 
-// 	community, err := s.owner.GetCommunityByID(community.ID())
-// 	s.Require().NoError(err)
+	community, err := s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
 
-// 	s.Require().Equal(3, community.MembersCount())
+	s.Require().Equal(3, community.MembersCount())
 
-// 	// Check owner's DB for revealed accounts
-// 	for pubKey := range community.Members() {
-// 		if pubKey != common.PubkeyToHex(&s.owner.identity.PublicKey) {
-// 			revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), pubKey)
-// 			s.Require().NoError(err)
-// 			switch pubKey {
-// 			case common.PubkeyToHex(&s.alice.identity.PublicKey):
-// 				s.Require().Len(revealedAccounts, 2)
-// 				s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
-// 				s.Require().Equal(revealedAccounts[1].Address, aliceAddress2)
-// 				s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
-// 			case common.PubkeyToHex(&s.bob.identity.PublicKey):
-// 				s.Require().Len(revealedAccounts, 1)
-// 				s.Require().Equal(revealedAccounts[0].Address, bobAddress)
-// 				s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
-// 			default:
-// 				s.Require().Fail("pubKey does not match expected keys")
-// 			}
-// 		}
-// 	}
+	// Check owner's DB for revealed accounts
+	for pubKey := range community.Members() {
+		if pubKey != common.PubkeyToHex(&s.owner.identity.PublicKey) {
+			revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), pubKey)
+			s.Require().NoError(err)
+			switch pubKey {
+			case common.PubkeyToHex(&s.alice.identity.PublicKey):
+				s.Require().Len(revealedAccounts, 2)
+				s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
+				s.Require().Equal(revealedAccounts[1].Address, aliceAddress2)
+				s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
+			case common.PubkeyToHex(&s.bob.identity.PublicKey):
+				s.Require().Len(revealedAccounts, 1)
+				s.Require().Equal(revealedAccounts[0].Address, bobAddress)
+				s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
+			default:
+				s.Require().Fail("pubKey does not match expected keys")
+			}
+		}
+	}
 
-// 	// Check Bob's DB for revealed accounts
-// 	revealedAccountsInBobsDB, err := s.bob.communitiesManager.GetRevealedAddresses(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
-// 	s.Require().NoError(err)
-// 	s.Require().Len(revealedAccountsInBobsDB, 1)
-// 	s.Require().Equal(revealedAccountsInBobsDB[0].Address, bobAddress)
-// 	s.Require().Equal(true, revealedAccountsInBobsDB[0].IsAirdropAddress)
+	// Check Bob's DB for revealed accounts
+	revealedAccountsInBobsDB, err := s.bob.communitiesManager.GetRevealedAddresses(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccountsInBobsDB, 1)
+	s.Require().Equal(revealedAccountsInBobsDB[0].Address, bobAddress)
+	s.Require().Equal(true, revealedAccountsInBobsDB[0].IsAirdropAddress)
 
-// 	// Check Alices's DB for revealed accounts
-// 	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
-// 	s.Require().NoError(err)
-// 	s.Require().Len(revealedAccountsInAlicesDB, 2)
-// 	s.Require().Equal(revealedAccountsInAlicesDB[0].Address, aliceAddress1)
-// 	s.Require().Equal(revealedAccountsInAlicesDB[1].Address, aliceAddress2)
-// 	s.Require().Equal(true, revealedAccountsInAlicesDB[0].IsAirdropAddress)
-// }
+	// Check Alices's DB for revealed accounts
+	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccountsInAlicesDB, 2)
+	s.Require().Equal(revealedAccountsInAlicesDB[0].Address, aliceAddress1)
+	s.Require().Equal(revealedAccountsInAlicesDB[1].Address, aliceAddress2)
+	s.Require().Equal(true, revealedAccountsInAlicesDB[0].IsAirdropAddress)
+}
 
-// func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSelectedSharedAddress() {
-// 	community, _ := s.createCommunity()
-// 	s.advertiseCommunityTo(community, s.alice)
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSelectedSharedAddress() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.alice)
 
-// 	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress2})
+	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress2})
 
-// 	community, err := s.owner.GetCommunityByID(community.ID())
-// 	s.Require().NoError(err)
+	community, err := s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
 
-// 	s.Require().Equal(2, community.MembersCount())
+	s.Require().Equal(2, community.MembersCount())
 
-// 	alicePubkey := common.PubkeyToHex(&s.alice.identity.PublicKey)
+	alicePubkey := common.PubkeyToHex(&s.alice.identity.PublicKey)
 
-// 	// Check owner's DB for revealed accounts
-// 	revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-// 	s.Require().NoError(err)
-// 	s.Require().Len(revealedAccounts, 1)
-// 	s.Require().Equal(revealedAccounts[0].Address, aliceAddress2)
-// 	s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
+	// Check owner's DB for revealed accounts
+	revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccounts, 1)
+	s.Require().Equal(revealedAccounts[0].Address, aliceAddress2)
+	s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
 
-// 	// Check Alice's DB for revealed accounts
-// 	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-// 	s.Require().NoError(err)
-// 	s.Require().Len(revealedAccountsInAlicesDB, 1)
-// 	s.Require().Equal(revealedAccountsInAlicesDB[0].Address, aliceAddress2)
-// 	s.Require().Equal(true, revealedAccountsInAlicesDB[0].IsAirdropAddress)
-// }
+	// Check Alice's DB for revealed accounts
+	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccountsInAlicesDB, 1)
+	s.Require().Equal(revealedAccountsInAlicesDB[0].Address, aliceAddress2)
+	s.Require().Equal(true, revealedAccountsInAlicesDB[0].IsAirdropAddress)
+}
 
-// func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersMultipleSelectedSharedAddresses() {
-// 	community, _ := s.createCommunity()
-// 	s.advertiseCommunityTo(community, s.alice)
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersMultipleSelectedSharedAddresses() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.alice)
 
-// 	s.joinCommunityWithAirdropAddress(community, s.alice, alicePassword, []string{aliceAddress1, aliceAddress2}, aliceAddress2)
+	s.joinCommunityWithAirdropAddress(community, s.alice, alicePassword, []string{aliceAddress1, aliceAddress2}, aliceAddress2)
 
-// 	community, err := s.owner.GetCommunityByID(community.ID())
-// 	s.Require().NoError(err)
+	community, err := s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
 
-// 	s.Require().Equal(2, community.MembersCount())
+	s.Require().Equal(2, community.MembersCount())
 
-// 	alicePubkey := common.PubkeyToHex(&s.alice.identity.PublicKey)
+	alicePubkey := common.PubkeyToHex(&s.alice.identity.PublicKey)
 
-// 	// Check owner's DB for revealed accounts
-// 	revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-// 	s.Require().NoError(err)
-// 	s.Require().Len(revealedAccounts, 2)
-// 	s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
-// 	s.Require().Equal(revealedAccounts[1].Address, aliceAddress2)
-// 	s.Require().Equal(true, revealedAccounts[1].IsAirdropAddress)
+	// Check owner's DB for revealed accounts
+	revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccounts, 2)
+	s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
+	s.Require().Equal(revealedAccounts[1].Address, aliceAddress2)
+	s.Require().Equal(true, revealedAccounts[1].IsAirdropAddress)
 
-// 	// Check Alice's DB for revealed accounts
-// 	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-// 	s.Require().NoError(err)
-// 	s.Require().Len(revealedAccountsInAlicesDB, 2)
-// 	s.Require().Equal(revealedAccountsInAlicesDB[0].Address, aliceAddress1)
-// 	s.Require().Equal(revealedAccountsInAlicesDB[1].Address, aliceAddress2)
-// 	s.Require().Equal(true, revealedAccountsInAlicesDB[1].IsAirdropAddress)
-// }
+	// Check Alice's DB for revealed accounts
+	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccountsInAlicesDB, 2)
+	s.Require().Equal(revealedAccountsInAlicesDB[0].Address, aliceAddress1)
+	s.Require().Equal(revealedAccountsInAlicesDB[1].Address, aliceAddress2)
+	s.Require().Equal(true, revealedAccountsInAlicesDB[1].IsAirdropAddress)
+}
 
-// func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
-// 	community, _ := s.createCommunity()
-// 	s.advertiseCommunityTo(community, s.alice)
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.alice)
 
-// 	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress2})
+	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress2})
 
-// 	community, err := s.owner.GetCommunityByID(community.ID())
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(2, community.MembersCount())
+	community, err := s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Equal(2, community.MembersCount())
 
-// 	alicePubkey := common.PubkeyToHex(&s.alice.identity.PublicKey)
+	alicePubkey := common.PubkeyToHex(&s.alice.identity.PublicKey)
 
-// 	revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-// 	s.Require().NoError(err)
+	revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
+	s.Require().NoError(err)
 
-// 	s.Require().Len(revealedAccounts, 1)
-// 	s.Require().Equal(revealedAccounts[0].Address, aliceAddress2)
-// 	s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
+	s.Require().Len(revealedAccounts, 1)
+	s.Require().Equal(revealedAccounts[0].Address, aliceAddress2)
+	s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
 
-// 	alicesRevealedAccounts, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-// 	s.Require().NoError(err)
-// 	s.Require().Len(alicesRevealedAccounts, 1)
-// 	s.Require().Equal(alicesRevealedAccounts[0].Address, aliceAddress2)
-// 	s.Require().Equal(true, alicesRevealedAccounts[0].IsAirdropAddress)
+	alicesRevealedAccounts, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
+	s.Require().NoError(err)
+	s.Require().Len(alicesRevealedAccounts, 1)
+	s.Require().Equal(alicesRevealedAccounts[0].Address, aliceAddress2)
+	s.Require().Equal(true, alicesRevealedAccounts[0].IsAirdropAddress)
 
-// 	request := &requests.EditSharedAddresses{CommunityID: community.ID(), AddressesToReveal: []string{aliceAddress1}, AirdropAddress: aliceAddress1}
+	request := &requests.EditSharedAddresses{CommunityID: community.ID(), AddressesToReveal: []string{aliceAddress1}, AirdropAddress: aliceAddress1}
 
-// 	signingParams, err := s.alice.GenerateJoiningCommunityRequestsForSigning(common.PubkeyToHex(&s.alice.identity.PublicKey), community.ID(), request.AddressesToReveal)
-// 	s.Require().NoError(err)
+	signingParams, err := s.alice.GenerateJoiningCommunityRequestsForSigning(common.PubkeyToHex(&s.alice.identity.PublicKey), community.ID(), request.AddressesToReveal)
+	s.Require().NoError(err)
 
-// 	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(alicePassword)))
-// 	for i := range signingParams {
-// 		signingParams[i].Password = passwdHash
-// 	}
-// 	signatures, err := s.alice.SignData(signingParams)
-// 	s.Require().NoError(err)
+	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(alicePassword)))
+	for i := range signingParams {
+		signingParams[i].Password = passwdHash
+	}
+	signatures, err := s.alice.SignData(signingParams)
+	s.Require().NoError(err)
 
-// 	updateAddresses := len(request.AddressesToReveal) == 0
-// 	if updateAddresses {
-// 		request.AddressesToReveal = make([]string, len(signingParams))
-// 	}
-// 	for i := range signingParams {
-// 		request.AddressesToReveal[i] = signingParams[i].Address
-// 		request.Signatures = append(request.Signatures, types.FromHex(signatures[i]))
-// 	}
-// 	if updateAddresses {
-// 		request.AirdropAddress = request.AddressesToReveal[0]
-// 	}
+	updateAddresses := len(request.AddressesToReveal) == 0
+	if updateAddresses {
+		request.AddressesToReveal = make([]string, len(signingParams))
+	}
+	for i := range signingParams {
+		request.AddressesToReveal[i] = signingParams[i].Address
+		request.Signatures = append(request.Signatures, types.FromHex(signatures[i]))
+	}
+	if updateAddresses {
+		request.AirdropAddress = request.AddressesToReveal[0]
+	}
 
-// 	response, err := s.alice.EditSharedAddressesForCommunity(request)
-// 	s.Require().NoError(err)
-// 	s.Require().NotNil(response)
+	response, err := s.alice.EditSharedAddressesForCommunity(request)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
 
-// 	// Retrieve address change
-// 	err = tt.RetryWithBackOff(func() error {
-// 		response, err := s.owner.RetrieveAll()
-// 		if err != nil {
-// 			return err
-// 		}
-// 		if len(response.Communities()) == 0 {
-// 			return errors.New("no communities in response (address change reception)")
-// 		}
-// 		return nil
-// 	})
-// 	s.Require().NoError(err)
-// 	revealedAccounts, err = s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-// 	s.Require().NoError(err)
+	// Retrieve address change
+	err = tt.RetryWithBackOff(func() error {
+		response, err := s.owner.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("no communities in response (address change reception)")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+	revealedAccounts, err = s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
+	s.Require().NoError(err)
 
-// 	s.Require().Len(revealedAccounts, 1)
-// 	s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
-// 	s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
+	s.Require().Len(revealedAccounts, 1)
+	s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
+	s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
 
-// 	// Retrieve community description change
-// 	err = tt.RetryWithBackOff(func() error {
-// 		response, err := s.alice.RetrieveAll()
-// 		if err != nil {
-// 			return err
-// 		}
-// 		if len(response.Communities()) == 0 {
-// 			return errors.New("no communities in response (address change reception)")
-// 		}
-// 		return nil
-// 	})
-// 	s.Require().NoError(err)
+	// Retrieve community description change
+	err = tt.RetryWithBackOff(func() error {
+		response, err := s.alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("no communities in response (address change reception)")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
 
-// 	alicesRevealedAccounts, err = s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-// 	s.Require().NoError(err)
-// 	s.Require().Len(alicesRevealedAccounts, 1)
-// 	s.Require().Equal(alicesRevealedAccounts[0].Address, aliceAddress1)
-// 	s.Require().Equal(true, alicesRevealedAccounts[0].IsAirdropAddress)
-// }
+	alicesRevealedAccounts, err = s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
+	s.Require().NoError(err)
+	s.Require().Len(alicesRevealedAccounts, 1)
+	s.Require().Equal(alicesRevealedAccounts[0].Address, aliceAddress1)
+	s.Require().Equal(true, alicesRevealedAccounts[0].IsAirdropAddress)
+}
 
 // NOTE(cammellos): Disabling for now as flaky, for some reason does not pass on CI, but passes locally
 /*
@@ -819,183 +819,183 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	s.Require().NoError(err)
 }*/
 
-// func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPermission() {
-// 	community, _ := s.createCommunity()
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPermission() {
+	community, _ := s.createCommunity()
 
-// 	// setup become admin permission
-// 	permissionRequest := requests.CreateCommunityTokenPermission{
-// 		CommunityID: community.ID(),
-// 		Type:        protobuf.CommunityTokenPermission_BECOME_ADMIN,
-// 		TokenCriteria: []*protobuf.TokenCriteria{
-// 			&protobuf.TokenCriteria{
-// 				Type:              protobuf.CommunityTokenType_ERC20,
-// 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
-// 				Symbol:            "TEST",
-// 				Amount:            "100",
-// 				Decimals:          uint64(18),
-// 			},
-// 		},
-// 	}
+	// setup become admin permission
+	permissionRequest := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_ADMIN,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
 
-// 	response, err := s.owner.CreateCommunityTokenPermission(&permissionRequest)
-// 	s.Require().NoError(err)
-// 	s.Require().Len(response.Communities(), 1)
+	response, err := s.owner.CreateCommunityTokenPermission(&permissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
 
-// 	s.advertiseCommunityTo(community, s.bob)
+	s.advertiseCommunityTo(community, s.bob)
 
-// 	// Bob should still be able to join even if there is a permission to be an admin
-// 	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	// Bob should still be able to join even if there is a permission to be an admin
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
 
-// 	// Verify that we have Bob's revealed account
-// 	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
-// 	s.Require().NoError(err)
-// 	s.Require().Len(revealedAccounts, 1)
-// 	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
-// }
+	// Verify that we have Bob's revealed account
+	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccounts, 1)
+	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
+}
 
-// func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWithMemberAndAdminPermission() {
-// 	community, _ := s.createCommunity()
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWithMemberAndAdminPermission() {
+	community, _ := s.createCommunity()
 
-// 	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
-// 		return sub.Community.HasTokenPermissions()
-// 	})
+	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		return sub.Community.HasTokenPermissions()
+	})
 
-// 	// setup become member permission
-// 	permissionRequestMember := requests.CreateCommunityTokenPermission{
-// 		CommunityID: community.ID(),
-// 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
-// 		TokenCriteria: []*protobuf.TokenCriteria{
-// 			&protobuf.TokenCriteria{
-// 				Type:              protobuf.CommunityTokenType_ERC20,
-// 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
-// 				Symbol:            "TEST",
-// 				Amount:            "100",
-// 				Decimals:          uint64(18),
-// 			},
-// 		},
-// 	}
-// 	response, err := s.owner.CreateCommunityTokenPermission(&permissionRequestMember)
-// 	s.Require().NoError(err)
-// 	s.Require().Len(response.Communities(), 1)
+	// setup become member permission
+	permissionRequestMember := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+	response, err := s.owner.CreateCommunityTokenPermission(&permissionRequestMember)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
 
-// 	err = <-waitOnCommunityPermissionCreated
-// 	s.Require().NoError(err)
+	err = <-waitOnCommunityPermissionCreated
+	s.Require().NoError(err)
 
-// 	// setup become admin permission
-// 	permissionRequestAdmin := requests.CreateCommunityTokenPermission{
-// 		CommunityID: community.ID(),
-// 		Type:        protobuf.CommunityTokenPermission_BECOME_ADMIN,
-// 		TokenCriteria: []*protobuf.TokenCriteria{
-// 			&protobuf.TokenCriteria{
-// 				Type:              protobuf.CommunityTokenType_ERC20,
-// 				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
-// 				Symbol:            "TESTADMIN",
-// 				Amount:            "100",
-// 				Decimals:          uint64(18),
-// 			},
-// 		},
-// 	}
-// 	response, err = s.owner.CreateCommunityTokenPermission(&permissionRequestAdmin)
-// 	s.Require().NoError(err)
-// 	s.Require().Len(response.Communities(), 1)
+	// setup become admin permission
+	permissionRequestAdmin := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_ADMIN,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
+				Symbol:            "TESTADMIN",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+	response, err = s.owner.CreateCommunityTokenPermission(&permissionRequestAdmin)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
 
-// 	waitOnCommunityPermissionCreated = waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
-// 		return len(sub.Community.TokenPermissions()) == 2
-// 	})
+	waitOnCommunityPermissionCreated = waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		return len(sub.Community.TokenPermissions()) == 2
+	})
 
-// 	err = <-waitOnCommunityPermissionCreated
-// 	s.Require().NoError(err)
+	err = <-waitOnCommunityPermissionCreated
+	s.Require().NoError(err)
 
-// 	// make bob satisfy the member criteria
-// 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, permissionRequestMember.TokenCriteria[0])
+	// make bob satisfy the member criteria
+	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, permissionRequestMember.TokenCriteria[0])
 
-// 	s.advertiseCommunityTo(response.Communities()[0], s.bob)
+	s.advertiseCommunityTo(response.Communities()[0], s.bob)
 
-// 	// Bob should still be able to join even though he doesn't satisfy the admin requirement
-// 	// because he satisfies the member one
-// 	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	// Bob should still be able to join even though he doesn't satisfy the admin requirement
+	// because he satisfies the member one
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
 
-// 	// Verify that we have Bob's revealed account
-// 	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
-// 	s.Require().NoError(err)
-// 	s.Require().Len(revealedAccounts, 1)
-// 	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
-// }
+	// Verify that we have Bob's revealed account
+	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccounts, 1)
+	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
+}
 
-// func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWithMemberAndAdminPermission() {
-// 	community, _ := s.createCommunity()
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWithMemberAndAdminPermission() {
+	community, _ := s.createCommunity()
 
-// 	// setup become member permission
-// 	permissionRequestMember := requests.CreateCommunityTokenPermission{
-// 		CommunityID: community.ID(),
-// 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
-// 		TokenCriteria: []*protobuf.TokenCriteria{
-// 			&protobuf.TokenCriteria{
-// 				Type:              protobuf.CommunityTokenType_ERC20,
-// 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
-// 				Symbol:            "TEST",
-// 				Amount:            "100",
-// 				Decimals:          uint64(18),
-// 			},
-// 		},
-// 	}
-// 	response, err := s.owner.CreateCommunityTokenPermission(&permissionRequestMember)
-// 	s.Require().NoError(err)
-// 	s.Require().Len(response.Communities(), 1)
+	// setup become member permission
+	permissionRequestMember := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+	response, err := s.owner.CreateCommunityTokenPermission(&permissionRequestMember)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
 
-// 	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
-// 		return sub.Community.HasTokenPermissions()
-// 	})
+	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		return sub.Community.HasTokenPermissions()
+	})
 
-// 	err = <-waitOnCommunityPermissionCreated
-// 	s.Require().NoError(err)
+	err = <-waitOnCommunityPermissionCreated
+	s.Require().NoError(err)
 
-// 	// setup become admin permission
-// 	permissionRequestAdmin := requests.CreateCommunityTokenPermission{
-// 		CommunityID: community.ID(),
-// 		Type:        protobuf.CommunityTokenPermission_BECOME_ADMIN,
-// 		TokenCriteria: []*protobuf.TokenCriteria{
-// 			&protobuf.TokenCriteria{
-// 				Type:              protobuf.CommunityTokenType_ERC20,
-// 				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
-// 				Symbol:            "TESTADMIN",
-// 				Amount:            "100",
-// 				Decimals:          uint64(18),
-// 			},
-// 		},
-// 	}
-// 	response, err = s.owner.CreateCommunityTokenPermission(&permissionRequestAdmin)
-// 	s.Require().NoError(err)
-// 	s.Require().Len(response.Communities(), 1)
-// 	s.Require().Len(response.Communities()[0].TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN), 1)
-// 	s.Require().Len(response.Communities()[0].TokenPermissions(), 2)
+	// setup become admin permission
+	permissionRequestAdmin := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_ADMIN,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
+				Symbol:            "TESTADMIN",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+	response, err = s.owner.CreateCommunityTokenPermission(&permissionRequestAdmin)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Communities()[0].TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN), 1)
+	s.Require().Len(response.Communities()[0].TokenPermissions(), 2)
 
-// 	waitOnCommunityPermissionCreated = waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
-// 		return len(sub.Community.TokenPermissions()) == 2
-// 	})
+	waitOnCommunityPermissionCreated = waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		return len(sub.Community.TokenPermissions()) == 2
+	})
 
-// 	err = <-waitOnCommunityPermissionCreated
-// 	s.Require().NoError(err)
+	err = <-waitOnCommunityPermissionCreated
+	s.Require().NoError(err)
 
-// 	community, err = s.owner.communitiesManager.GetByID(community.ID())
-// 	s.Require().NoError(err)
-// 	s.Require().Len(community.TokenPermissions(), 2)
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(community.TokenPermissions(), 2)
 
-// 	s.advertiseCommunityTo(community, s.bob)
+	s.advertiseCommunityTo(community, s.bob)
 
-// 	// make bob satisfy the admin criteria
-// 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, permissionRequestAdmin.TokenCriteria[0])
+	// make bob satisfy the admin criteria
+	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, permissionRequestAdmin.TokenCriteria[0])
 
-// 	// Bob should still be able to join even though he doesn't satisfy the member requirement
-// 	// because he satisfies the admin one
-// 	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	// Bob should still be able to join even though he doesn't satisfy the member requirement
+	// because he satisfies the admin one
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
 
-// 	// Verify that we have Bob's revealed account
-// 	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
-// 	s.Require().NoError(err)
-// 	s.Require().Len(revealedAccounts, 1)
-// 	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
-// }
+	// Verify that we have Bob's revealed account
+	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccounts, 1)
+	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
+}
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions() {
 	community, chat := s.createCommunity()
@@ -1228,7 +1228,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMas
 	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 }
 
-/*
 func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivilegedRoleInClosedCommunity(permissionType protobuf.CommunityTokenPermission_Type) {
 	community, _ := s.createCommunity()
 
@@ -1361,12 +1360,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 
 	s.Require().False(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
 }
-*/
-/*
+
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInClosedCommunity() {
 	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 }
-*/
+
 /*
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInClosedCommunity() {
 	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
