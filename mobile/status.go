@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/status-im/status-go/account"
 	"os"
 	"sync"
 	"unsafe"
@@ -1329,9 +1330,7 @@ func InitLogging(logSettingsJSON string) string {
 }
 
 func GetRandomMnemonic() string {
-	// generate mnemonic phrase
-	mn := extkeys.NewMnemonic()
-	mnemonic, err := mn.MnemonicPhrase(extkeys.EntropyStrength128, extkeys.EnglishLanguage)
+	mnemonic, err := account.GetRandomMnemonic()
 	if err != nil {
 		return makeJSONResponse(err)
 	}

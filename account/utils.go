@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/multiaccounts"
 )
 
@@ -116,4 +116,14 @@ func ToAddress(accountAddress string) *types.Address {
 	}
 
 	return &to.Address
+}
+
+func GetRandomMnemonic() (string, error) {
+	// generate mnemonic phrase
+	mn := extkeys.NewMnemonic()
+	mnemonic, err := mn.MnemonicPhrase(extkeys.EntropyStrength128, extkeys.EnglishLanguage)
+	if err != nil {
+		return "", fmt.Errorf("can not create mnemonic seed: %v", err)
+	}
+	return mnemonic, nil
 }
