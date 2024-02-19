@@ -12,7 +12,7 @@ import (
 )
 
 const allFieldsForTableActivityCenterNotification = `id, timestamp, notification_type, chat_id, read, dismissed, accepted, message, author, 
-    reply_message, community_id, membership_status, contact_verification_status, deleted, updated_at`
+    reply_message, community_id, membership_status, contact_verification_status, token_data, deleted, updated_at`
 
 var emptyNotifications = make([]*ActivityCenterNotification, 0)
 
@@ -125,6 +125,15 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		}
 	}
 
+	// encode token data
+	var encodedTokenData []byte
+	if notification.TokenData != nil {
+		encodedTokenData, err = json.Marshal(notification.TokenData)
+		if err != nil {
+			return 0, err
+		}
+	}
+
 	result, err := tx.Exec(`
 		INSERT OR REPLACE
 		INTO activity_center_notifications (
@@ -141,10 +150,11 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 			read,
 			accepted,
 			dismissed,
+			token_data,
 			deleted,
 		    updated_at
 		)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 		`,
 		notification.ID,
 		notification.Timestamp,
@@ -159,9 +169,9 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		notification.Read,
 		notification.Accepted,
 		notification.Dismissed,
+		encodedTokenData,
 		notification.Deleted,
 		notification.UpdatedAt,
-		notification.ID,
 	)
 	if err != nil {
 		return 0, err
@@ -187,6 +197,7 @@ func (db sqlitePersistence) parseRowFromTableActivityCenterNotification(rows *sq
 		var communityID sql.NullString
 		var messageBytes []byte
 		var replyMessageBytes []byte
+		var tokenDataBytes []byte
 		var author sql.NullString
 		notification := &ActivityCenterNotification{}
 		err := rows.Scan(
@@ -203,6 +214,7 @@ func (db sqlitePersistence) parseRowFromTableActivityCenterNotification(rows *sq
 			&communityID,
 			&notification.MembershipStatus,
 			&notification.ContactVerificationStatus,
+			&tokenDataBytes,
 			&notification.Deleted,
 			&notification.UpdatedAt,
 		)
@@ -220,6 +232,13 @@ func (db sqlitePersistence) parseRowFromTableActivityCenterNotification(rows *sq
 
 		if author.Valid {
 			notification.Author = author.String
+		}
+
+		if len(tokenDataBytes) > 0 {
+			err = json.Unmarshal(tokenDataBytes, &notification.TokenData)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		if len(messageBytes) > 0 {
@@ -251,6 +270,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 	var lastMessageBytes []byte
 	var messageBytes []byte
 	var replyMessageBytes []byte
+	var tokenDataBytes []byte
 	var name sql.NullString
 	var author sql.NullString
 	notification := &ActivityCenterNotification{}
@@ -271,6 +291,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 		&notification.ContactVerificationStatus,
 		&name,
 		&author,
+		&tokenDataBytes,
 		&notification.UpdatedAt)
 
 	if err != nil {
@@ -291,6 +312,13 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 
 	if author.Valid {
 		notification.Author = author.String
+	}
+
+	if len(tokenDataBytes) > 0 {
+		err = json.Unmarshal(tokenDataBytes, &notification.TokenData)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Restore last message
@@ -332,6 +360,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 		var lastMessageBytes []byte
 		var messageBytes []byte
 		var replyMessageBytes []byte
+		var tokenDataBytes []byte
 		var name sql.NullString
 		var author sql.NullString
 		notification := &ActivityCenterNotification{}
@@ -351,6 +380,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 			&notification.ContactVerificationStatus,
 			&name,
 			&author,
+			&tokenDataBytes,
 			&latestCursor,
 			&notification.UpdatedAt)
 		if err != nil {
@@ -371,6 +401,14 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 
 		if author.Valid {
 			notification.Author = author.String
+		}
+
+		if len(tokenDataBytes) > 0 {
+			tokenData := &ActivityTokenData{}
+			if err = json.Unmarshal(tokenDataBytes, &tokenData); err != nil {
+				return "", nil, err
+			}
+			notification.TokenData = tokenData
 		}
 
 		// Restore last message
@@ -503,6 +541,7 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	a.contact_verification_status,
 	c.name,
 	a.author,
+	a.token_data,
 	substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || hex(a.id) as cursor,
 	a.updated_at
 	FROM activity_center_notifications a
@@ -623,6 +662,7 @@ func (db sqlitePersistence) GetActivityCenterNotificationsByID(ids []types.HexBy
 		a.contact_verification_status,
 		c.name,
 		a.author,
+		a.token_data,
 		substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || hex(a.id) as cursor,
 		a.updated_at
 		FROM activity_center_notifications a
@@ -663,6 +703,7 @@ func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes)
 		a.contact_verification_status,
 		c.name,
 		a.author,
+		a.token_data,
 		a.updated_at
 		FROM activity_center_notifications a
 		LEFT JOIN chats c
@@ -1295,6 +1336,7 @@ func (db sqlitePersistence) ActiveContactRequestNotification(contactID string) (
 			a.contact_verification_status,
 			c.name,
 			a.author,
+			a.token_data,
 			a.updated_at
 		FROM activity_center_notifications a
 		LEFT JOIN chats c ON c.id = a.chat_id

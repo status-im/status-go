@@ -4241,7 +4241,13 @@ func (m *Messenger) PromoteSelfToControlNode(communityID types.HexBytes) (*Messe
 	return &response, nil
 }
 
-func (m *Messenger) CreateResponseWithACNotification(communityID string, acType ActivityCenterType, isRead bool) (*MessengerResponse, error) {
+func (m *Messenger) CreateResponseWithACNotification(communityID string, acType ActivityCenterType, isRead bool, tokenDataJSON string) (*MessengerResponse, error) {
+	tokenData := ActivityTokenData{}
+	err := json.Unmarshal([]byte(tokenDataJSON), &tokenData)
+	if len(tokenDataJSON) > 0 && err != nil {
+		// Only return error when activityDataString is not empty
+		return nil, err
+	}
 	// Activity center notification
 	notification := &ActivityCenterNotification{
 		ID:          types.FromHex(uuid.New().String()),
@@ -4251,11 +4257,17 @@ func (m *Messenger) CreateResponseWithACNotification(communityID string, acType 
 		Read:        isRead,
 		Deleted:     false,
 		UpdatedAt:   m.GetCurrentTimeInMillis(),
+		TokenData:   &tokenData,
+	}
+
+	err = m.prepareTokenData(notification.TokenData, m.httpServer)
+	if err != nil {
+		return nil, err
 	}
 
 	response := &MessengerResponse{}
 
-	err := m.addActivityCenterNotification(response, notification, nil)
+	err = m.addActivityCenterNotification(response, notification, nil)
 	if err != nil {
 		m.logger.Error("failed to save notification", zap.Error(err))
 		return response, err

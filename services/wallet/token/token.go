@@ -68,8 +68,9 @@ type ReceivedToken struct {
 	Image         string          `json:"image,omitempty"`
 	ChainID       uint64          `json:"chainId"`
 	CommunityData *community.Data `json:"community_data,omitempty"`
-	Balance       *big.Int        `json:"balance"`
+	Amount        float64         `json:"amount"`
 	TxHash        common.Hash     `json:"txHash"`
+	IsFirst       bool            `json:"isFirst"`
 }
 
 func (t *Token) IsNative() bool {
@@ -316,20 +317,20 @@ func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint6
 	return token
 }
 
-func (tm *Manager) MarkAsPreviouslyOwnedToken(token *Token, owner common.Address) error {
+func (tm *Manager) MarkAsPreviouslyOwnedToken(token *Token, owner common.Address) (bool, error) {
 	if token == nil {
-		return errors.New("token is nil")
+		return false, errors.New("token is nil")
 	}
 	if (owner == common.Address{}) {
-		return errors.New("owner is nil")
+		return false, errors.New("owner is nil")
 	}
 	count := 0
 	err := tm.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM token_balances WHERE user_address = ? AND token_address = ? AND chain_id = ?)`, owner.Hex(), token.Address.Hex(), token.ChainID).Scan(&count)
 	if err != nil || count > 0 {
-		return err
+		return false, err
 	}
 	_, err = tm.db.Exec(`INSERT INTO token_balances(user_address,token_name,token_symbol,token_address,token_decimals,chain_id,token_decimals,raw_balance,balance) VALUES (?,?,?,?,?,?,?,?,?)`, owner.Hex(), token.Name, token.Symbol, token.Address.Hex(), token.Decimals, token.ChainID, 0, "0", "0")
-	return err
+	return true, err
 }
 
 func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *Token, address common.Address) {
@@ -809,7 +810,7 @@ func (tm *Manager) GetBalancesAtByChain(parent context.Context, clients map[uint
 	return response, group.Error()
 }
 
-func (tm *Manager) SignalCommunityTokenReceived(address common.Address, txHash common.Hash, value *big.Int, t *Token) {
+func (tm *Manager) SignalCommunityTokenReceived(address common.Address, txHash common.Hash, value *big.Int, t *Token, isFirst bool) {
 	if tm.walletFeed == nil || t == nil || t.CommunityData == nil {
 		return
 	}
@@ -826,6 +827,8 @@ func (tm *Manager) SignalCommunityTokenReceived(address common.Address, txHash c
 		}
 	}
 
+	floatAmount, _ := new(big.Float).Quo(new(big.Float).SetInt(value), new(big.Float).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(t.Decimals)), nil))).Float64()
+
 	receivedToken := ReceivedToken{
 		Address:       t.Address,
 		Name:          t.Name,
@@ -833,8 +836,9 @@ func (tm *Manager) SignalCommunityTokenReceived(address common.Address, txHash c
 		Image:         t.Image,
 		ChainID:       t.ChainID,
 		CommunityData: t.CommunityData,
-		Balance:       value,
+		Amount:        floatAmount,
 		TxHash:        txHash,
+		IsFirst:       isFirst,
 	}
 
 	encodedMessage, err := json.Marshal(receivedToken)
