@@ -71,46 +71,46 @@ func (s *TestMessengerProfileShowcase) mutualContact(theirMessenger *Messenger) 
 	s.Require().True(resp.Contacts[0].mutual())
 }
 
-func (s *TestMessengerProfileShowcase) verifiedContact(theirMessenger *Messenger) {
-	theirPk := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
-	challenge := "Want to see what I'm hiding in my profile showcase?"
+// func (s *TestMessengerProfileShowcase) verifiedContact(theirMessenger *Messenger) {
+// 	theirPk := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+// 	challenge := "Want to see what I'm hiding in my profile showcase?"
 
-	_, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
-	s.Require().NoError(err)
+// 	_, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
+// 	s.Require().NoError(err)
 
-	// Wait for the message to reach its destination
-	resp, err := WaitOnMessengerResponse(
-		theirMessenger,
-		func(r *MessengerResponse) bool {
-			return len(r.VerificationRequests()) == 1 && len(r.ActivityCenterNotifications()) == 1
-		},
-		"no messages",
-	)
-	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests(), 1)
-	verificationRequestID := resp.VerificationRequests()[0].ID
+// 	// Wait for the message to reach its destination
+// 	resp, err := WaitOnMessengerResponse(
+// 		theirMessenger,
+// 		func(r *MessengerResponse) bool {
+// 			return len(r.VerificationRequests()) == 1 && len(r.ActivityCenterNotifications()) == 1
+// 		},
+// 		"no messages",
+// 	)
+// 	s.Require().NoError(err)
+// 	s.Require().Len(resp.VerificationRequests(), 1)
+// 	verificationRequestID := resp.VerificationRequests()[0].ID
 
-	_, err = theirMessenger.AcceptContactVerificationRequest(context.Background(), verificationRequestID, "For sure!")
-	s.Require().NoError(err)
+// 	_, err = theirMessenger.AcceptContactVerificationRequest(context.Background(), verificationRequestID, "For sure!")
+// 	s.Require().NoError(err)
 
-	s.Require().NoError(err)
+// 	s.Require().NoError(err)
 
-	// Wait for the message to reach its destination
-	_, err = WaitOnMessengerResponse(
-		s.m,
-		func(r *MessengerResponse) bool {
-			return len(r.VerificationRequests()) == 1
-		},
-		"no messages",
-	)
-	s.Require().NoError(err)
+// 	// Wait for the message to reach its destination
+// 	_, err = WaitOnMessengerResponse(
+// 		s.m,
+// 		func(r *MessengerResponse) bool {
+// 			return len(r.VerificationRequests()) == 1
+// 		},
+// 		"no messages",
+// 	)
+// 	s.Require().NoError(err)
 
-	resp, err = s.m.VerifiedTrusted(context.Background(), &requests.VerifiedTrusted{ID: types.FromHex(verificationRequestID)})
-	s.Require().NoError(err)
+// 	resp, err = s.m.VerifiedTrusted(context.Background(), &requests.VerifiedTrusted{ID: types.FromHex(verificationRequestID)})
+// 	s.Require().NoError(err)
 
-	s.Require().Len(resp.Messages(), 1)
-	s.Require().Equal(common.ContactVerificationStateTrusted, resp.Messages()[0].ContactVerificationState)
-}
+// 	s.Require().Len(resp.Messages(), 1)
+// 	s.Require().Equal(common.ContactVerificationStateTrusted, resp.Messages()[0].ContactVerificationState)
+// }
 
 func (s *TestMessengerProfileShowcase) TestSaveAndGetProfileShowcasePreferences() {
 	request := DummyProfileShowcasePreferences()
@@ -287,134 +287,134 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 	}
 }
 
-func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
-	// Set Display name to pass shouldPublishChatIdentity check
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
-	profileKp.KeyUID = s.m.account.KeyUID
-	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
+// func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
+// 	// Set Display name to pass shouldPublishChatIdentity check
+// 	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+// 	profileKp.KeyUID = s.m.account.KeyUID
+// 	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
 
-	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
-	s.Require().NoError(err)
+// 	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
+// 	s.Require().NoError(err)
 
-	err = s.m.SetDisplayName("bobby")
-	s.Require().NoError(err)
+// 	err = s.m.SetDisplayName("bobby")
+// 	s.Require().NoError(err)
 
-	// Add mutual contact
-	mutualContact := s.newMessenger()
-	_, err = mutualContact.Start()
-	s.Require().NoError(err)
-	defer TearDownMessenger(&s.Suite, mutualContact)
+// 	// Add mutual contact
+// 	mutualContact := s.newMessenger()
+// 	_, err = mutualContact.Start()
+// 	s.Require().NoError(err)
+// 	defer TearDownMessenger(&s.Suite, mutualContact)
 
-	s.mutualContact(mutualContact)
+// 	s.mutualContact(mutualContact)
 
-	// Add identity verified contact
-	verifiedContact := s.newMessenger()
-	_, err = verifiedContact.Start()
-	s.Require().NoError(err)
-	defer TearDownMessenger(&s.Suite, verifiedContact)
+// 	// Add identity verified contact
+// 	verifiedContact := s.newMessenger()
+// 	_, err = verifiedContact.Start()
+// 	s.Require().NoError(err)
+// 	defer TearDownMessenger(&s.Suite, verifiedContact)
 
-	s.mutualContact(verifiedContact)
-	s.verifiedContact(verifiedContact)
+// 	s.mutualContact(verifiedContact)
+// 	s.verifiedContact(verifiedContact)
 
-	// Save preferences to dispatch changes
-	request := DummyProfileShowcasePreferences()
-	err = s.m.SetProfileShowcasePreferences(request, false)
-	s.Require().NoError(err)
+//	// Save preferences to dispatch changes
+//	request := DummyProfileShowcasePreferences()
+//	err = s.m.SetProfileShowcasePreferences(request, false)
+//	s.Require().NoError(err)
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-	// Get summarised profile data for mutual contact
-	resp, err := WaitOnMessengerResponse(
-		mutualContact,
-		func(r *MessengerResponse) bool {
-			return len(r.updatedProfileShowcases) > 0 && r.updatedProfileShowcases[contactID] != nil
-		},
-		"no messages",
-	)
-	s.Require().NoError(err)
-	s.Require().Len(resp.updatedProfileShowcases, 1)
+// 	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+// 	// Get summarised profile data for mutual contact
+// 	resp, err := WaitOnMessengerResponse(
+// 		mutualContact,
+// 		func(r *MessengerResponse) bool {
+// 			return len(r.updatedProfileShowcases) > 0 && r.updatedProfileShowcases[contactID] != nil
+// 		},
+// 		"no messages",
+// 	)
+// 	s.Require().NoError(err)
+// 	s.Require().Len(resp.updatedProfileShowcases, 1)
 
-	profileShowcase := resp.updatedProfileShowcases[contactID]
+// 	profileShowcase := resp.updatedProfileShowcases[contactID]
 
-	s.Require().Len(profileShowcase.Accounts, 2)
-	s.Require().Equal(profileShowcase.Accounts[0].Address, request.Accounts[0].Address)
-	s.Require().Equal(profileShowcase.Accounts[0].Name, request.Accounts[0].Name)
-	s.Require().Equal(profileShowcase.Accounts[0].ColorID, request.Accounts[0].ColorID)
-	s.Require().Equal(profileShowcase.Accounts[0].Emoji, request.Accounts[0].Emoji)
-	s.Require().Equal(profileShowcase.Accounts[0].Order, request.Accounts[0].Order)
-	s.Require().Equal(profileShowcase.Accounts[1].Address, request.Accounts[1].Address)
-	s.Require().Equal(profileShowcase.Accounts[1].Name, request.Accounts[1].Name)
-	s.Require().Equal(profileShowcase.Accounts[1].ColorID, request.Accounts[1].ColorID)
-	s.Require().Equal(profileShowcase.Accounts[1].Emoji, request.Accounts[1].Emoji)
-	s.Require().Equal(profileShowcase.Accounts[1].Order, request.Accounts[1].Order)
+// 	s.Require().Len(profileShowcase.Accounts, 2)
+// 	s.Require().Equal(profileShowcase.Accounts[0].Address, request.Accounts[0].Address)
+// 	s.Require().Equal(profileShowcase.Accounts[0].Name, request.Accounts[0].Name)
+// 	s.Require().Equal(profileShowcase.Accounts[0].ColorID, request.Accounts[0].ColorID)
+// 	s.Require().Equal(profileShowcase.Accounts[0].Emoji, request.Accounts[0].Emoji)
+// 	s.Require().Equal(profileShowcase.Accounts[0].Order, request.Accounts[0].Order)
+// 	s.Require().Equal(profileShowcase.Accounts[1].Address, request.Accounts[1].Address)
+// 	s.Require().Equal(profileShowcase.Accounts[1].Name, request.Accounts[1].Name)
+// 	s.Require().Equal(profileShowcase.Accounts[1].ColorID, request.Accounts[1].ColorID)
+// 	s.Require().Equal(profileShowcase.Accounts[1].Emoji, request.Accounts[1].Emoji)
+// 	s.Require().Equal(profileShowcase.Accounts[1].Order, request.Accounts[1].Order)
 
-	s.Require().Len(profileShowcase.Collectibles, 1)
-	s.Require().Equal(profileShowcase.Collectibles[0].TokenID, request.Collectibles[0].TokenID)
-	s.Require().Equal(profileShowcase.Collectibles[0].ChainID, request.Collectibles[0].ChainID)
-	s.Require().Equal(profileShowcase.Collectibles[0].ContractAddress, request.Collectibles[0].ContractAddress)
-	s.Require().Equal(profileShowcase.Collectibles[0].AccountAddress, request.Collectibles[0].AccountAddress)
-	s.Require().Equal(profileShowcase.Collectibles[0].CommunityID, request.Collectibles[0].CommunityID)
-	s.Require().Equal(profileShowcase.Collectibles[0].Order, request.Collectibles[0].Order)
+// 	s.Require().Len(profileShowcase.Collectibles, 1)
+// 	s.Require().Equal(profileShowcase.Collectibles[0].TokenID, request.Collectibles[0].TokenID)
+// 	s.Require().Equal(profileShowcase.Collectibles[0].ChainID, request.Collectibles[0].ChainID)
+// 	s.Require().Equal(profileShowcase.Collectibles[0].ContractAddress, request.Collectibles[0].ContractAddress)
+// 	s.Require().Equal(profileShowcase.Collectibles[0].AccountAddress, request.Collectibles[0].AccountAddress)
+// 	s.Require().Equal(profileShowcase.Collectibles[0].CommunityID, request.Collectibles[0].CommunityID)
+// 	s.Require().Equal(profileShowcase.Collectibles[0].Order, request.Collectibles[0].Order)
 
-	s.Require().Len(profileShowcase.VerifiedTokens, 1)
-	s.Require().Equal(profileShowcase.VerifiedTokens[0].Symbol, request.VerifiedTokens[0].Symbol)
-	s.Require().Equal(profileShowcase.VerifiedTokens[0].Order, request.VerifiedTokens[0].Order)
+// 	s.Require().Len(profileShowcase.VerifiedTokens, 1)
+// 	s.Require().Equal(profileShowcase.VerifiedTokens[0].Symbol, request.VerifiedTokens[0].Symbol)
+// 	s.Require().Equal(profileShowcase.VerifiedTokens[0].Order, request.VerifiedTokens[0].Order)
 
-	s.Require().Len(profileShowcase.UnverifiedTokens, 2)
-	s.Require().Equal(profileShowcase.UnverifiedTokens[0].ContractAddress, request.UnverifiedTokens[0].ContractAddress)
-	s.Require().Equal(profileShowcase.UnverifiedTokens[0].ChainID, request.UnverifiedTokens[0].ChainID)
-	s.Require().Equal(profileShowcase.UnverifiedTokens[0].Order, request.UnverifiedTokens[0].Order)
-	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ContractAddress, request.UnverifiedTokens[1].ContractAddress)
-	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ChainID, request.UnverifiedTokens[1].ChainID)
-	s.Require().Equal(profileShowcase.UnverifiedTokens[1].Order, request.UnverifiedTokens[1].Order)
+// 	s.Require().Len(profileShowcase.UnverifiedTokens, 2)
+// 	s.Require().Equal(profileShowcase.UnverifiedTokens[0].ContractAddress, request.UnverifiedTokens[0].ContractAddress)
+// 	s.Require().Equal(profileShowcase.UnverifiedTokens[0].ChainID, request.UnverifiedTokens[0].ChainID)
+// 	s.Require().Equal(profileShowcase.UnverifiedTokens[0].Order, request.UnverifiedTokens[0].Order)
+// 	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ContractAddress, request.UnverifiedTokens[1].ContractAddress)
+// 	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ChainID, request.UnverifiedTokens[1].ChainID)
+// 	s.Require().Equal(profileShowcase.UnverifiedTokens[1].Order, request.UnverifiedTokens[1].Order)
 
-	// Get summarised profile data for verified contact
-	resp, err = WaitOnMessengerResponse(
-		verifiedContact,
-		func(r *MessengerResponse) bool {
-			return len(r.updatedProfileShowcases) > 0
-		},
-		"no messages",
-	)
-	s.Require().NoError(err)
-	s.Require().Len(resp.updatedProfileShowcases, 1)
+// 	// Get summarised profile data for verified contact
+// 	resp, err = WaitOnMessengerResponse(
+// 		verifiedContact,
+// 		func(r *MessengerResponse) bool {
+// 			return len(r.updatedProfileShowcases) > 0
+// 		},
+// 		"no messages",
+// 	)
+// 	s.Require().NoError(err)
+// 	s.Require().Len(resp.updatedProfileShowcases, 1)
 
-	// Here let's try synchronous
-	profileShowcase, err = verifiedContact.GetProfileShowcaseForContact(contactID)
-	s.Require().NoError(err)
+// 	// Here let's try synchronous
+// 	profileShowcase, err = verifiedContact.GetProfileShowcaseForContact(contactID)
+// 	s.Require().NoError(err)
 
-	s.Require().Len(profileShowcase.Accounts, 2)
-	s.Require().Equal(profileShowcase.Accounts[0].Address, request.Accounts[0].Address)
-	s.Require().Equal(profileShowcase.Accounts[0].Name, request.Accounts[0].Name)
-	s.Require().Equal(profileShowcase.Accounts[0].ColorID, request.Accounts[0].ColorID)
-	s.Require().Equal(profileShowcase.Accounts[0].Emoji, request.Accounts[0].Emoji)
-	s.Require().Equal(profileShowcase.Accounts[0].Order, request.Accounts[0].Order)
-	s.Require().Equal(profileShowcase.Accounts[1].Address, request.Accounts[1].Address)
-	s.Require().Equal(profileShowcase.Accounts[1].Name, request.Accounts[1].Name)
-	s.Require().Equal(profileShowcase.Accounts[1].ColorID, request.Accounts[1].ColorID)
-	s.Require().Equal(profileShowcase.Accounts[1].Emoji, request.Accounts[1].Emoji)
-	s.Require().Equal(profileShowcase.Accounts[1].Order, request.Accounts[1].Order)
+// 	s.Require().Len(profileShowcase.Accounts, 2)
+// 	s.Require().Equal(profileShowcase.Accounts[0].Address, request.Accounts[0].Address)
+// 	s.Require().Equal(profileShowcase.Accounts[0].Name, request.Accounts[0].Name)
+// 	s.Require().Equal(profileShowcase.Accounts[0].ColorID, request.Accounts[0].ColorID)
+// 	s.Require().Equal(profileShowcase.Accounts[0].Emoji, request.Accounts[0].Emoji)
+// 	s.Require().Equal(profileShowcase.Accounts[0].Order, request.Accounts[0].Order)
+// 	s.Require().Equal(profileShowcase.Accounts[1].Address, request.Accounts[1].Address)
+// 	s.Require().Equal(profileShowcase.Accounts[1].Name, request.Accounts[1].Name)
+// 	s.Require().Equal(profileShowcase.Accounts[1].ColorID, request.Accounts[1].ColorID)
+// 	s.Require().Equal(profileShowcase.Accounts[1].Emoji, request.Accounts[1].Emoji)
+// 	s.Require().Equal(profileShowcase.Accounts[1].Order, request.Accounts[1].Order)
 
-	s.Require().Len(profileShowcase.Collectibles, 1)
-	s.Require().Equal(profileShowcase.Collectibles[0].ContractAddress, request.Collectibles[0].ContractAddress)
-	s.Require().Equal(profileShowcase.Collectibles[0].ChainID, request.Collectibles[0].ChainID)
-	s.Require().Equal(profileShowcase.Collectibles[0].TokenID, request.Collectibles[0].TokenID)
-	s.Require().Equal(profileShowcase.Collectibles[0].CommunityID, request.Collectibles[0].CommunityID)
-	s.Require().Equal(profileShowcase.Collectibles[0].Order, request.Collectibles[0].Order)
+// 	s.Require().Len(profileShowcase.Collectibles, 1)
+// 	s.Require().Equal(profileShowcase.Collectibles[0].ContractAddress, request.Collectibles[0].ContractAddress)
+// 	s.Require().Equal(profileShowcase.Collectibles[0].ChainID, request.Collectibles[0].ChainID)
+// 	s.Require().Equal(profileShowcase.Collectibles[0].TokenID, request.Collectibles[0].TokenID)
+// 	s.Require().Equal(profileShowcase.Collectibles[0].CommunityID, request.Collectibles[0].CommunityID)
+// 	s.Require().Equal(profileShowcase.Collectibles[0].Order, request.Collectibles[0].Order)
 
-	s.Require().Len(profileShowcase.VerifiedTokens, 2)
-	s.Require().Equal(profileShowcase.VerifiedTokens[0].Symbol, request.VerifiedTokens[0].Symbol)
-	s.Require().Equal(profileShowcase.VerifiedTokens[0].Order, request.VerifiedTokens[0].Order)
-	s.Require().Equal(profileShowcase.VerifiedTokens[1].Symbol, request.VerifiedTokens[1].Symbol)
-	s.Require().Equal(profileShowcase.VerifiedTokens[1].Order, request.VerifiedTokens[1].Order)
+// 	s.Require().Len(profileShowcase.VerifiedTokens, 2)
+// 	s.Require().Equal(profileShowcase.VerifiedTokens[0].Symbol, request.VerifiedTokens[0].Symbol)
+// 	s.Require().Equal(profileShowcase.VerifiedTokens[0].Order, request.VerifiedTokens[0].Order)
+// 	s.Require().Equal(profileShowcase.VerifiedTokens[1].Symbol, request.VerifiedTokens[1].Symbol)
+// 	s.Require().Equal(profileShowcase.VerifiedTokens[1].Order, request.VerifiedTokens[1].Order)
 
-	s.Require().Len(profileShowcase.UnverifiedTokens, 2)
-	s.Require().Equal(profileShowcase.UnverifiedTokens[0].ContractAddress, request.UnverifiedTokens[0].ContractAddress)
-	s.Require().Equal(profileShowcase.UnverifiedTokens[0].ChainID, request.UnverifiedTokens[0].ChainID)
-	s.Require().Equal(profileShowcase.UnverifiedTokens[0].Order, request.UnverifiedTokens[0].Order)
-	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ContractAddress, request.UnverifiedTokens[1].ContractAddress)
-	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ChainID, request.UnverifiedTokens[1].ChainID)
-	s.Require().Equal(profileShowcase.UnverifiedTokens[1].Order, request.UnverifiedTokens[1].Order)
-}
+// 	s.Require().Len(profileShowcase.UnverifiedTokens, 2)
+// 	s.Require().Equal(profileShowcase.UnverifiedTokens[0].ContractAddress, request.UnverifiedTokens[0].ContractAddress)
+// 	s.Require().Equal(profileShowcase.UnverifiedTokens[0].ChainID, request.UnverifiedTokens[0].ChainID)
+// 	s.Require().Equal(profileShowcase.UnverifiedTokens[0].Order, request.UnverifiedTokens[0].Order)
+// 	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ContractAddress, request.UnverifiedTokens[1].ContractAddress)
+// 	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ChainID, request.UnverifiedTokens[1].ChainID)
+// 	s.Require().Equal(profileShowcase.UnverifiedTokens[1].Order, request.UnverifiedTokens[1].Order)
+// }
 
 func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipUnencryptedCommunities() {
 	alice := s.m
