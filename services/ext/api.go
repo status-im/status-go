@@ -1685,32 +1685,36 @@ func (api *PublicAPI) GetProfileShowcaseAccountsByAddress(address string) ([]*id
 
 // Returns response with AC notification when owner token is received
 func (api *PublicAPI) RegisterOwnerTokenReceivedNotification(communityID string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeOwnerTokenReceived, false)
+	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeOwnerTokenReceived, false, "")
 }
 
 // Returns response with AC notification when setting signer is successful
 func (api *PublicAPI) RegisterReceivedOwnershipNotification(communityID string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeOwnershipReceived, false)
+	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeOwnershipReceived, false, "")
 }
 
 // Returns response with AC notification when community token is received
-func (api *PublicAPI) RegisterReceivedCommunityTokenNotification(communityID string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeCommunityTokenReceived, false)
+func (api *PublicAPI) RegisterReceivedCommunityTokenNotification(communityID string, isFirst bool, tokenData string) (*protocol.MessengerResponse, error) {
+	activityType := protocol.ActivityCenterNotificationTypeCommunityTokenReceived
+	if isFirst {
+		activityType = protocol.ActivityCenterNotificationTypeFirstCommunityTokenReceived
+	}
+	return api.service.messenger.CreateResponseWithACNotification(communityID, activityType, false, tokenData)
 }
 
 // Returns response with AC notification when setting signer is failed
 func (api *PublicAPI) RegisterSetSignerFailedNotification(communityID string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeSetSignerFailed, false)
+	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeSetSignerFailed, false, "")
 }
 
 // Returns response with AC notification when setting signer is declined
 func (api *PublicAPI) RegisterSetSignerDeclinedNotification(communityID string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeSetSignerDeclined, true)
+	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeSetSignerDeclined, true, "")
 }
 
 // Returns response with AC notification when ownership is lost
 func (api *PublicAPI) RegisterLostOwnershipNotification(communityID string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeOwnershipLost, false)
+	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeOwnershipLost, false, "")
 }
 
 func (api *PublicAPI) PromoteSelfToControlMode(communityID string) error {

@@ -378,11 +378,11 @@ func (c *transfersCommand) markMultiTxTokensAsPreviouslyOwned(ctx context.Contex
 	}
 	if len(multiTransaction.ToAsset) > 0 && multiTransaction.ToNetworkID > 0 {
 		token := c.tokenManager.GetToken(multiTransaction.ToNetworkID, multiTransaction.ToAsset)
-		_ = c.tokenManager.MarkAsPreviouslyOwnedToken(token, ownerAddress)
+		_, _ = c.tokenManager.MarkAsPreviouslyOwnedToken(token, ownerAddress)
 	}
 	if len(multiTransaction.FromAsset) > 0 && multiTransaction.FromNetworkID > 0 {
 		token := c.tokenManager.GetToken(multiTransaction.FromNetworkID, multiTransaction.FromAsset)
-		_ = c.tokenManager.MarkAsPreviouslyOwnedToken(token, ownerAddress)
+		_, _ = c.tokenManager.MarkAsPreviouslyOwnedToken(token, ownerAddress)
 	}
 }
 
@@ -439,11 +439,12 @@ func (c *transfersCommand) processUnknownErc20CommunityTransactions(ctx context.
 			// Find token in db or if this is a community token, find its metadata
 			token := c.tokenManager.FindOrCreateTokenByAddress(ctx, tx.NetworkID, *tx.Transaction.To())
 			if token != nil {
+				isFirst := false
 				if token.Verified || token.CommunityData != nil {
-					_ = c.tokenManager.MarkAsPreviouslyOwnedToken(token, tx.Address)
+					isFirst, _ = c.tokenManager.MarkAsPreviouslyOwnedToken(token, tx.Address)
 				}
 				if token.CommunityData != nil {
-					go c.tokenManager.SignalCommunityTokenReceived(tx.Address, tx.ID, tx.Transaction.Value(), token)
+					go c.tokenManager.SignalCommunityTokenReceived(tx.Address, tx.ID, tx.TokenValue, token, isFirst)
 				}
 			}
 		}

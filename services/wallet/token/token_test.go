@@ -208,14 +208,17 @@ func TestMarkAsPreviouslyOwnedToken(t *testing.T) {
 		ChainID:  1,
 	}
 
-	err := manager.MarkAsPreviouslyOwnedToken(nil, owner)
+	isFirst, err := manager.MarkAsPreviouslyOwnedToken(nil, owner)
 	require.Error(t, err)
+	require.False(t, isFirst)
 
-	err = manager.MarkAsPreviouslyOwnedToken(token, common.Address{})
+	isFirst, err = manager.MarkAsPreviouslyOwnedToken(token, common.Address{})
 	require.Error(t, err)
+	require.False(t, isFirst)
 
-	err = manager.MarkAsPreviouslyOwnedToken(token, owner)
+	isFirst, err = manager.MarkAsPreviouslyOwnedToken(token, owner)
 	require.NoError(t, err)
+	require.True(t, isFirst)
 
 	// Verify that the token balance was inserted correctly
 	var count int
@@ -225,8 +228,9 @@ func TestMarkAsPreviouslyOwnedToken(t *testing.T) {
 
 	token.Name = "123"
 
-	err = manager.MarkAsPreviouslyOwnedToken(token, owner)
+	isFirst, err = manager.MarkAsPreviouslyOwnedToken(token, owner)
 	require.NoError(t, err)
+	require.False(t, isFirst)
 
 	// Not updated because already exists
 	err = manager.db.QueryRow(`SELECT count(*) FROM token_balances`).Scan(&count)
@@ -235,11 +239,12 @@ func TestMarkAsPreviouslyOwnedToken(t *testing.T) {
 
 	token.ChainID = 2
 
-	err = manager.MarkAsPreviouslyOwnedToken(token, owner)
+	isFirst, err = manager.MarkAsPreviouslyOwnedToken(token, owner)
 	require.NoError(t, err)
 
 	// Same token on different chains counts as different token
 	err = manager.db.QueryRow(`SELECT count(*) FROM token_balances`).Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 2, count)
+	require.True(t, isFirst)
 }

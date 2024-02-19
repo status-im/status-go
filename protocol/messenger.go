@@ -4189,6 +4189,15 @@ func extractQuotedImages(messages []*common.Message, s *server.MediaServer) []st
 	return quotedImages
 }
 
+func (m *Messenger) prepareTokenData(tokenData *ActivityTokenData, s *server.MediaServer) error {
+	if tokenData.TokenType == int(protobuf.CommunityTokenType_ERC721) {
+		tokenData.ImageURL = s.MakeWalletCollectibleImagesURL(tokenData.CollectibleID)
+	} else if tokenData.TokenType == int(protobuf.CommunityTokenType_ERC20) {
+		tokenData.ImageURL = s.MakeCommunityTokenImagesURL(tokenData.CommunityID, tokenData.ChainID, tokenData.Symbol)
+	}
+	return nil
+}
+
 func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) error {
 	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_IMAGE) {
 		msg.QuotedMessage.ImageLocalURL = s.MakeImageURL(msg.QuotedMessage.ID)

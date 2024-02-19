@@ -15,6 +15,9 @@ type Collectible struct {
 	CollectionData  *CollectionData                `json:"collection_data,omitempty"`
 	CommunityData   *CommunityData                 `json:"community_data,omitempty"`
 	Ownership       []thirdparty.AccountBalance    `json:"ownership,omitempty"`
+	IsFirst         bool                           `json:"is_first,omitempty"`
+	LatestTxHash    string                         `json:"latest_tx_hash,omitempty"`
+	ReceivedAmount  float64                        `json:"received_amount,omitempty"`
 }
 
 type CollectibleData struct {
@@ -167,10 +170,12 @@ func fullCollectiblesDataToCommunityHeader(data []thirdparty.FullCollectibleData
 			ID:           collectibleID,
 			ContractType: getContractType(c),
 			CollectibleData: &CollectibleData{
-				Name: c.CollectibleData.Name,
+				Name:     c.CollectibleData.Name,
+				ImageURL: &c.CollectibleData.ImageURL,
 			},
 			CommunityData: &communityData,
 			Ownership:     c.Ownership,
+			IsFirst:       c.CollectibleData.IsFirst,
 		}
 
 		res = append(res, header)

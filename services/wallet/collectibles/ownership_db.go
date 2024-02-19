@@ -300,7 +300,6 @@ func updateAddressOwnershipTimestamp(creator sqlite.StatementCreator, ownerAddre
 // Returns the list of added/removed IDs when comparing the given list of IDs with the ones in the DB.
 // Call before Update for the result to be useful.
 func (o *OwnershipDB) GetIDsNotInDB(
-	chainID w_common.ChainID,
 	ownerAddress common.Address,
 	newIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.CollectibleUniqueID, error) {
 	ret := make([]thirdparty.CollectibleUniqueID, 0, len(newIDs))
@@ -330,6 +329,31 @@ func (o *OwnershipDB) GetIDsNotInDB(
 		}
 	}
 
+	return ret, nil
+}
+
+func (o *OwnershipDB) GetIsFirstOfCollection(onwerAddress common.Address, newIDs []thirdparty.CollectibleUniqueID) (map[thirdparty.CollectibleUniqueID]bool, error) {
+	ret := make(map[thirdparty.CollectibleUniqueID]bool)
+
+	exists, err := o.db.Prepare(`SELECT count(*) FROM collectibles_ownership_cache
+			WHERE chain_id=? AND contract_address=? AND owner_address=?`)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, id := range newIDs {
+		row := exists.QueryRow(
+			id.ContractID.ChainID,
+			id.ContractID.Address,
+			onwerAddress,
+		)
+		var count int
+		err = row.Scan(&count)
+		if err != nil {
+			return nil, err
+		}
+		ret[id] = count <= 1
+	}
 	return ret, nil
 }
 
