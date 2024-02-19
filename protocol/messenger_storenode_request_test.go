@@ -28,7 +28,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/status-im/status-go/services/communitytokens"
@@ -57,10 +56,8 @@ type MessengerStoreNodeRequestSuite struct {
 	owner *Messenger
 	bob   *Messenger
 
-	wakuStoreNode             *waku2.Waku
-	storeNodeAddress          string
-	communityStoreNode        *waku2.Waku
-	communityStoreNodeAddress string
+	wakuStoreNode    *waku2.Waku
+	storeNodeAddress string
 
 	ownerWaku types.Waku
 	bobWaku   types.Waku
@@ -168,17 +165,6 @@ func (s *MessengerStoreNodeRequestSuite) createStore() {
 	s.wakuStoreNode = NewTestWakuV2(&s.Suite, cfg)
 	s.storeNodeAddress = s.wakuListenAddress(s.wakuStoreNode)
 	s.logger.Info("store node ready", zap.String("address", s.storeNodeAddress))
-
-	cfg2 := testWakuV2Config{
-		logger:                 s.logger.Named("store-community-waku"),
-		enableStore:            true,
-		useShardAsDefaultTopic: false,
-		clusterID:              shard.UndefinedShardValue,
-	}
-
-	s.communityStoreNode = NewTestWakuV2(&s.Suite, cfg2)
-	s.communityStoreNodeAddress = s.wakuListenAddress(s.communityStoreNode)
-	s.logger.Info("community store node ready", zap.String("address", s.communityStoreNodeAddress))
 }
 
 func (s *MessengerStoreNodeRequestSuite) createOwner() {
@@ -217,20 +203,6 @@ func (s *MessengerStoreNodeRequestSuite) createBob() {
 
 func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *zap.Logger, mailserverAddress string) *Messenger {
 	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	mailserversSQLDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	s.Require().NoError(err)
-	err = sqlite.Migrate(mailserversSQLDb) // migrate default
-	s.Require().NoError(err)
-
-	mailserversDatabase := mailserversDB.NewDB(mailserversSQLDb)
-	err = mailserversDatabase.Add(mailserversDB.Mailserver{
-		ID:      localMailserverID,
-		Name:    localMailserverID,
-		Address: mailserverAddress,
-		Fleet:   localFleet,
-	})
 	s.Require().NoError(err)
 
 	options := []Option{
