@@ -318,7 +318,6 @@ type storeNodeRequestResult struct {
 	community *communities.Community
 	contact   *Contact
 	shard     *shard.Shard
-	// communityStorenodes *mailservers.Mailserver // TODO pablo
 }
 
 type storeNodeResponseSubscription = chan storeNodeRequestResult
