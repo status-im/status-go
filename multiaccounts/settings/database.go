@@ -255,6 +255,13 @@ func (db *Database) saveSetting(setting SettingField, value interface{}) error {
 }
 
 func (db *Database) parseSaveAndSyncSetting(sf SettingField, value interface{}) (err error) {
+	if sf.ValueCastHandler() != nil {
+		value, err = sf.ValueCastHandler()(value)
+		if err != nil {
+			return err
+		}
+	}
+
 	if sf.ValueHandler() != nil {
 		value, err = sf.ValueHandler()(value)
 		if err != nil {

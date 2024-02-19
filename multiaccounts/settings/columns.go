@@ -425,9 +425,10 @@ var (
 		},
 	}
 	DisplayAssetsBelowBalanceThreshold = SettingField{
-		reactFieldName: "display-assets-below-balance-threshold",
-		dBColumnName:   "wallet_display_assets_below_balance_threshold",
-		valueHandler:   Int64Handler,
+		reactFieldName:   "display-assets-below-balance-threshold",
+		dBColumnName:     "wallet_display_assets_below_balance_threshold",
+		valueHandler:     Int64Handler,
+		valueCastHandler: Float64ToInt64Handler,
 		syncProtobufFactory: &SyncProtobufFactory{
 			fromInterface:     displayAssetsBelowBalanceThresholdProtobufFactory,
 			fromStruct:        displayAssetsBelowBalanceThresholdProtobufFactoryStruct,
