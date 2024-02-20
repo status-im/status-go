@@ -317,24 +317,7 @@ func (d *DiscoveryV5) Iterate(ctx context.Context, iterator enode.Iterator, onNo
 	defer iterator.Close()
 
 	peerCnt := 0
-	for {
-
-		if !delayedHasNext(ctx, iterator) {
-			return
-		}
-
-		peerCnt++
-		if peerCnt == bucketSize { // Delay every bucketSize peers discovered
-			peerCnt = 0
-			t := time.NewTimer(delayBetweenDiscoveredPeerCnt)
-			select {
-			case <-ctx.Done():
-				return
-			case <-t.C:
-				t.Stop()
-			}
-		}
-
+	for DelayedHasNext(ctx, iterator, &peerCnt) {
 		_, addresses, err := wenr.Multiaddress(iterator.Node())
 		if err != nil {
 			d.metrics.RecordError(peerInfoFailure)
@@ -364,7 +347,7 @@ func (d *DiscoveryV5) Iterate(ctx context.Context, iterator enode.Iterator, onNo
 	}
 }
 
-func delayedHasNext(ctx context.Context, iterator enode.Iterator) bool {
+func DelayedHasNext(ctx context.Context, iterator enode.Iterator, peerCnt *int) bool {
 	// Delay if .Next() is too fast
 	start := time.Now()
 	hasNext := iterator.Next()
@@ -375,6 +358,18 @@ func delayedHasNext(ctx context.Context, iterator enode.Iterator) bool {
 	elapsed := time.Since(start)
 	if elapsed < peerDelay {
 		t := time.NewTimer(peerDelay - elapsed)
+		select {
+		case <-ctx.Done():
+			return false
+		case <-t.C:
+			t.Stop()
+		}
+	}
+
+	*peerCnt++
+	if *peerCnt == bucketSize { // Delay every bucketSize peers discovered
+		*peerCnt = 0
+		t := time.NewTimer(delayBetweenDiscoveredPeerCnt)
 		select {
 		case <-ctx.Done():
 			return false
