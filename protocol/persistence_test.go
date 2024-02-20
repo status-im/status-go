@@ -1910,3 +1910,68 @@ func TestSaveBridgeMessage(t *testing.T) {
 	require.Equal(t, "456", retrievedMessages[0].GetBridgeMessage().MessageID)
 	require.Equal(t, "789", retrievedMessages[0].GetBridgeMessage().ParentMessageID)
 }
+
+func TestGetCommunityMemberAllNonDeletedMessages(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+	testCommunity := "test-community"
+	clock := uint64(time.Now().Unix())
+	saveMessage := func(id string, from string, deleted bool) {
+		err = p.SaveMessages([]*common.Message{{
+			ID:          id,
+			From:        from,
+			CommunityID: testCommunity,
+			ChatMessage: &protobuf.ChatMessage{
+				Timestamp: clock,
+				Text:      "some-text",
+				ChatId:    testPublicChatID,
+			},
+			Deleted: deleted,
+		}})
+	}
+
+	chat := &Chat{
+		ID:          testPublicChatID,
+		CommunityID: testCommunity,
+	}
+
+	err = p.SaveChats([]*Chat{chat})
+	require.NoError(t, err)
+
+	messages, err := p.GetCommunityMemberAllMessagesID(testPK, testCommunity, clock)
+	require.NoError(t, err)
+	require.Len(t, messages, 0)
+
+	saveMessage("1", testPK, false)
+
+	messages, err = p.GetCommunityMemberAllMessagesID(testPK, testCommunity, clock-1)
+	require.NoError(t, err)
+	require.Len(t, messages, 0)
+
+	messages, err = p.GetCommunityMemberAllMessagesID(testPK, "wrong community", clock)
+	require.NoError(t, err)
+	require.Len(t, messages, 0)
+
+	messages, err = p.GetCommunityMemberAllMessagesID("wrong user name", testCommunity, clock)
+	require.NoError(t, err)
+	require.Len(t, messages, 0)
+
+	messages, err = p.GetCommunityMemberAllMessagesID(testPK, testCommunity, clock)
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+	require.Exactly(t, "1", messages[0].ID)
+	require.Exactly(t, testPublicChatID, messages[0].ChatID)
+
+	saveMessage("2", "another user", false)
+
+	messages, err = p.GetCommunityMemberAllMessagesID(testPK, testCommunity, clock)
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+
+	saveMessage("3", testPK, true)
+
+	messages, err = p.GetCommunityMemberAllMessagesID(testPK, testCommunity, clock)
+	require.NoError(t, err)
+	require.Len(t, messages, 2)
+}

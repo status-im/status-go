@@ -38,6 +38,8 @@ const (
 	ActivityCenterNotificationTypeShareAccounts
 	ActivityCenterNotificationTypeCommunityTokenReceived
 	ActivityCenterNotificationTypeFirstCommunityTokenReceived
+	ActivityCenterNotificationTypeCommunityBanned
+	ActivityCenterNotificationTypeCommunityUnbanned
 )
 
 type ActivityCenterMembershipStatus int

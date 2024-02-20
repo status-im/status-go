@@ -2092,6 +2092,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		logger.Warn("failed to validate message", zap.Error(err))
 		return err
 	}
+
 	receivedMessage := &common.Message{
 		ID:               state.CurrentMessageState.MessageID,
 		ChatMessage:      state.CurrentMessageState.Message,
@@ -2102,6 +2103,16 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
 	}
 
+	fromBannedUser, err := m.persistence.IsMessageFromBannedCommunityMember(receivedMessage)
+	if err != nil {
+		return err
+	}
+
+	if fromBannedUser {
+		logger.Warn("skipping msg from banned user", zap.String("messageID", receivedMessage.ID), zap.String("from", receivedMessage.From))
+		return errors.New("received a messaged from banned user")
+	}
+
 	// is the message coming from us?
 	isSyncMessage := common.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey)
 
@@ -2109,7 +2120,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		receivedMessage.Seen = true
 	}
 
-	err := receivedMessage.PrepareContent(m.myHexIdentity())
+	err = receivedMessage.PrepareContent(m.myHexIdentity())
 	if err != nil {
 		return fmt.Errorf("failed to prepare message content: %v", err)
 	}

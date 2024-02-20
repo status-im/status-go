@@ -3194,7 +3194,7 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 		return nil, err
 	}
 
-	_, err = community.BanUserFromCommunity(publicKey)
+	_, err = community.BanUserFromCommunity(publicKey, &protobuf.CommunityBanInfo{DeleteAllMessages: request.DeleteAllMessages})
 	if err != nil {
 		return nil, err
 	}
@@ -5258,4 +5258,8 @@ func (c *Community) ToStatusLinkPreview() (*common.StatusCommunityLinkPreview, e
 	communityLinkPreview.Color = c.Color()
 
 	return communityLinkPreview, nil
+}
+
+func (m *Manager) SaveRemoveAllCommunityMemberMessages(userID string, communityID string, clock uint64) error {
+	return m.persistence.SaveRemoveAllCommunityMemberMessages(userID, communityID, clock)
 }

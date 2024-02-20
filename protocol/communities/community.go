@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
+	slices "golang.org/x/exp/slices"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
@@ -638,14 +639,17 @@ func (o *Community) IsBanned(pk *ecdsa.PublicKey) bool {
 }
 
 func (o *Community) isBanned(pk *ecdsa.PublicKey) bool {
+
 	key := common.PubkeyToHex(pk)
 
-	for _, k := range o.config.CommunityDescription.BanList {
-		if k == key {
-			return true
-		}
+	banned := slices.Contains(o.config.CommunityDescription.BanList, key)
+
+	if o.config.CommunityDescription.BannedMembers != nil && !banned {
+		_, banned = o.config.CommunityDescription.BannedMembers[key]
 	}
-	return false
+
+	return banned
+
 }
 
 func (o *Community) rolesOf(pk *ecdsa.PublicKey) []protobuf.CommunityMember_Roles {
@@ -840,7 +844,7 @@ func (o *Community) UnbanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Commu
 	return o.config.CommunityDescription, nil
 }
 
-func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
+func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey, communityBanInfo *protobuf.CommunityBanInfo) (*protobuf.CommunityDescription, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -853,7 +857,7 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Communi
 	}
 
 	if o.IsControlNode() {
-		o.banUserFromCommunity(pk)
+		o.banUserFromCommunity(pk, communityBanInfo)
 		o.increaseClock()
 	} else {
 		err := o.addNewCommunityEvent(o.ToBanCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
@@ -1573,8 +1577,16 @@ func (o *Community) tokenPermissions() map[string]*CommunityTokenPermission {
 func (o *Community) PendingAndBannedMembers() map[string]CommunityMemberState {
 	result := make(map[string]CommunityMemberState)
 
+	if o.config.CommunityDescription.BannedMembers != nil {
+		for bannedMemberID := range o.config.CommunityDescription.BannedMembers {
+			result[bannedMemberID] = CommunityMemberBanned
+		}
+	}
+
 	for _, bannedMemberID := range o.config.CommunityDescription.BanList {
-		result[bannedMemberID] = CommunityMemberBanned
+		if _, exists := result[bannedMemberID]; !exists {
+			result[bannedMemberID] = CommunityMemberBanned
+		}
 	}
 
 	if o.config.EventsData == nil {
@@ -2177,9 +2189,13 @@ func (o *Community) unbanUserFromCommunity(pk *ecdsa.PublicKey) {
 			break
 		}
 	}
+
+	if o.config.CommunityDescription.BannedMembers != nil {
+		delete(o.config.CommunityDescription.BannedMembers, key)
+	}
 }
 
-func (o *Community) banUserFromCommunity(pk *ecdsa.PublicKey) {
+func (o *Community) banUserFromCommunity(pk *ecdsa.PublicKey, communityBanInfo *protobuf.CommunityBanInfo) {
 	key := common.PubkeyToHex(pk)
 	if o.hasMember(pk) {
 		// Remove from org
@@ -2189,6 +2205,14 @@ func (o *Community) banUserFromCommunity(pk *ecdsa.PublicKey) {
 		for _, chat := range o.config.CommunityDescription.Chats {
 			delete(chat.Members, key)
 		}
+	}
+
+	if o.config.CommunityDescription.BannedMembers == nil {
+		o.config.CommunityDescription.BannedMembers = make(map[string]*protobuf.CommunityBanInfo)
+	}
+
+	if _, exists := o.config.CommunityDescription.BannedMembers[key]; !exists {
+		o.config.CommunityDescription.BannedMembers[key] = communityBanInfo
 	}
 
 	for _, u := range o.config.CommunityDescription.BanList {

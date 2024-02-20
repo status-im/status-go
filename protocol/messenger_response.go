@@ -33,6 +33,11 @@ type RemovedMessage struct {
 	DeletedBy string `json:"deletedBy,omitempty"`
 }
 
+type DeletedMessage struct {
+	ID     string `json:"id"`
+	ChatID string `json:"chatID"`
+}
+
 type ClearedHistory struct {
 	ChatID    string `json:"chatId"`
 	ClearedAt uint64 `json:"clearedAt"`
@@ -74,6 +79,7 @@ type MessengerResponse struct {
 	chats                       map[string]*Chat
 	removedChats                map[string]bool
 	removedMessages             map[string]*RemovedMessage
+	deletedMessages             map[string]string
 	communities                 map[string]*communities.Community
 	communitiesSettings         map[string]*communities.CommunitySettings
 	activityCenterNotifications map[string]*ActivityCenterNotification
@@ -101,6 +107,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Chats                   []*Chat                             `json:"chats,omitempty"`
 		RemovedChats            []string                            `json:"removedChats,omitempty"`
 		RemovedMessages         []*RemovedMessage                   `json:"removedMessages,omitempty"`
+		DeletedMessages         map[string][]string                 `json:"deletedMessages,omitempty"`
 		Messages                []*common.Message                   `json:"messages,omitempty"`
 		Contacts                []*Contact                          `json:"contacts,omitempty"`
 		Installations           []*multidevice.Installation         `json:"installations,omitempty"`
@@ -170,6 +177,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		CommunitiesSettings:           r.CommunitiesSettings(),
 		RemovedChats:                  r.RemovedChats(),
 		RemovedMessages:               r.RemovedMessages(),
+		DeletedMessages:               r.DeletedMessagesInChats(),
 		ClearedHistories:              r.ClearedHistories(),
 		ActivityCenterNotifications:   r.ActivityCenterNotifications(),
 		ActivityCenterState:           r.ActivityCenterState(),
@@ -211,6 +219,18 @@ func (r *MessengerResponse) RemovedMessages() []*RemovedMessage {
 		messages = append(messages, r.removedMessages[messageID])
 	}
 	return messages
+}
+
+func (r *MessengerResponse) DeletedMessages() map[string]string {
+	return r.deletedMessages
+}
+
+func (r *MessengerResponse) DeletedMessagesInChats() map[string][]string {
+	deletedMessagesInChats := make(map[string][]string)
+	for messageID, chatID := range r.deletedMessages {
+		deletedMessagesInChats[chatID] = append(deletedMessagesInChats[chatID], messageID)
+	}
+	return deletedMessagesInChats
 }
 
 func (r *MessengerResponse) ClearedHistories() []*ClearedHistory {
@@ -297,6 +317,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.CommunityChanges)+
 		len(r.removedChats)+
 		len(r.removedMessages)+
+		len(r.deletedMessages)+
 		len(r.Mailservers)+
 		len(r.CommunityStorenodes)+
 		len(r.IdentityImages)+
@@ -335,6 +356,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddChats(response.Chats())
 	r.AddRemovedChats(response.RemovedChats())
 	r.AddRemovedMessages(response.RemovedMessages())
+	r.MergeDeletedMessages(response.DeletedMessages())
 	r.AddNotifications(response.Notifications())
 	r.AddMessages(response.Messages())
 	r.AddContacts(response.Contacts)
@@ -580,6 +602,26 @@ func (r *MessengerResponse) AddRemovedMessage(rm *RemovedMessage) {
 
 	if len(r.messages) != 0 && r.messages[rm.MessageID] != nil {
 		delete(r.messages, rm.MessageID)
+	}
+}
+
+func (r *MessengerResponse) AddDeletedMessages(messagesToAdd []*DeletedMessage) {
+	if r.deletedMessages == nil {
+		r.deletedMessages = make(map[string]string)
+	}
+
+	for _, message := range messagesToAdd {
+		r.deletedMessages[message.ID] = message.ChatID
+	}
+}
+
+func (r *MessengerResponse) MergeDeletedMessages(messagesToAdd map[string]string) {
+	if r.deletedMessages == nil {
+		r.deletedMessages = make(map[string]string)
+	}
+
+	for messageID, chatID := range messagesToAdd {
+		r.deletedMessages[messageID] = chatID
 	}
 }
 
