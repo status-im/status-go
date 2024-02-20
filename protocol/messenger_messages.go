@@ -537,8 +537,6 @@ func (m *Messenger) DeleteAllCommunityMemberMessages(member string, communityID 
 			return nil, err
 		}
 		response.AddMessages(updatedMessages)
-
-		// Message which are removed from the db do not contain DeletedBy
 	}
 
 	response.AddDeletedMessages(messagesToDelete)
