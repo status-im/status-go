@@ -205,7 +205,7 @@ type Settings struct {
 	GifAPIKey                           string                        `json:"gifs/api-key"`
 	TestNetworksEnabled                 bool                          `json:"test-networks-enabled?,omitempty"`
 	ProfileMigrationNeeded              bool                          `json:"profile-migration-needed,omitempty"`
-	IsSepoliaEnabled                    bool                          `json:"is-sepolia-enabled?,omitempty"`
+	IsGoerliEnabled                     bool                          `json:"is-goerli-enabled?,omitempty"`
 	TokenGroupByCommunity               bool                          `json:"token-group-by-community?,omitempty"`
 	ShowCommunityAssetWhenSendingTokens bool                          `json:"show-community-asset-when-sending-tokens?,omitempty"`
 	DisplayAssetsBelowBalance           bool                          `json:"display-assets-below-balance?,omitempty"`

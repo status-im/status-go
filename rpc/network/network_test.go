@@ -24,10 +24,10 @@ var initNetworks = []params.Network{
 		IsTest:                 false,
 		Layer:                  1,
 		Enabled:                true,
-		RelatedChainID:         5,
+		RelatedChainID:         11155111,
 	},
 	{
-		ChainID:                5,
+		ChainID:                11155111,
 		ChainName:              "Goerli",
 		RPCURL:                 "http://goerli.blockscout.com/",
 		BlockExplorerURL:       "https://goerli.etherscan.io/",
@@ -100,7 +100,7 @@ func TestGetCombinedNetworks(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 2, len(combinedNetworks))
 	require.Equal(t, uint64(1), combinedNetworks[0].Prod.ChainID)
-	require.Equal(t, uint64(5), combinedNetworks[0].Test.ChainID)
+	require.Equal(t, uint64(11155111), combinedNetworks[0].Test.ChainID)
 	require.Equal(t, uint64(10), combinedNetworks[1].Prod.ChainID)
 	require.Nil(t, combinedNetworks[1].Test)
 }

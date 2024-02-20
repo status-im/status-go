@@ -392,9 +392,9 @@ var (
 		dBColumnName:   "test_networks_enabled",
 		valueHandler:   BoolHandler,
 	}
-	IsSepoliaEnabled = SettingField{
-		reactFieldName: "is-sepolia-enabled?",
-		dBColumnName:   "is_sepolia_enabled",
+	IsGoerliEnabled = SettingField{
+		reactFieldName: "is-goerli-enabled?",
+		dBColumnName:   "is_goerli_enabled",
 		valueHandler:   BoolHandler,
 	}
 	TokenGroupByCommunity = SettingField{
@@ -574,7 +574,7 @@ var (
 		WalletVisibleTokens,
 		WebviewAllowPermissionRequests,
 		ProfileMigrationNeeded,
-		IsSepoliaEnabled,
+		IsGoerliEnabled,
 		TokenGroupByCommunity,
 		ShowCommunityAssetWhenSendingTokens,
 		DisplayAssetsBelowBalance,
