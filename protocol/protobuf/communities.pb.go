@@ -1961,6 +1961,237 @@ func (x *WakuMessageArchiveIndex) GetArchives() map[string]*WakuMessageArchiveIn
 	return nil
 }
 
+type CommunityPublicStorenodesInfo struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Signature of the payload field
+	Signature []byte `protobuf:"bytes,1,opt,name=signature,proto3" json:"signature,omitempty"`
+	// Marshaled CommunityStorenodes
+	Payload []byte `protobuf:"bytes,2,opt,name=payload,proto3" json:"payload,omitempty"`
+}
+
+func (x *CommunityPublicStorenodesInfo) Reset() {
+	*x = CommunityPublicStorenodesInfo{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_communities_proto_msgTypes[23]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CommunityPublicStorenodesInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommunityPublicStorenodesInfo) ProtoMessage() {}
+
+func (x *CommunityPublicStorenodesInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_communities_proto_msgTypes[23]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommunityPublicStorenodesInfo.ProtoReflect.Descriptor instead.
+func (*CommunityPublicStorenodesInfo) Descriptor() ([]byte, []int) {
+	return file_communities_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *CommunityPublicStorenodesInfo) GetSignature() []byte {
+	if x != nil {
+		return x.Signature
+	}
+	return nil
+}
+
+func (x *CommunityPublicStorenodesInfo) GetPayload() []byte {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+type CommunityStorenodes struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Clock       uint64       `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
+	CommunityId []byte       `protobuf:"bytes,2,opt,name=community_id,json=communityId,proto3" json:"community_id,omitempty"`
+	Storenodes  []*Storenode `protobuf:"bytes,3,rep,name=storenodes,proto3" json:"storenodes,omitempty"`
+	ChainId     uint64       `protobuf:"varint,4,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+}
+
+func (x *CommunityStorenodes) Reset() {
+	*x = CommunityStorenodes{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_communities_proto_msgTypes[24]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CommunityStorenodes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommunityStorenodes) ProtoMessage() {}
+
+func (x *CommunityStorenodes) ProtoReflect() protoreflect.Message {
+	mi := &file_communities_proto_msgTypes[24]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommunityStorenodes.ProtoReflect.Descriptor instead.
+func (*CommunityStorenodes) Descriptor() ([]byte, []int) {
+	return file_communities_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *CommunityStorenodes) GetClock() uint64 {
+	if x != nil {
+		return x.Clock
+	}
+	return 0
+}
+
+func (x *CommunityStorenodes) GetCommunityId() []byte {
+	if x != nil {
+		return x.CommunityId
+	}
+	return nil
+}
+
+func (x *CommunityStorenodes) GetStorenodes() []*Storenode {
+	if x != nil {
+		return x.Storenodes
+	}
+	return nil
+}
+
+func (x *CommunityStorenodes) GetChainId() uint64 {
+	if x != nil {
+		return x.ChainId
+	}
+	return 0
+}
+
+type Storenode struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	CommunityId []byte `protobuf:"bytes,1,opt,name=community_id,json=communityId,proto3" json:"community_id,omitempty"`
+	StorenodeId string `protobuf:"bytes,2,opt,name=storenode_id,json=storenodeId,proto3" json:"storenode_id,omitempty"`
+	Name        string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Address     string `protobuf:"bytes,4,opt,name=address,proto3" json:"address,omitempty"`
+	Fleet       string `protobuf:"bytes,5,opt,name=fleet,proto3" json:"fleet,omitempty"`
+	Version     uint32 `protobuf:"varint,6,opt,name=version,proto3" json:"version,omitempty"`
+	Removed     bool   `protobuf:"varint,7,opt,name=removed,proto3" json:"removed,omitempty"`
+	DeletedAt   int64  `protobuf:"varint,8,opt,name=deleted_at,json=deletedAt,proto3" json:"deleted_at,omitempty"`
+}
+
+func (x *Storenode) Reset() {
+	*x = Storenode{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_communities_proto_msgTypes[25]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Storenode) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Storenode) ProtoMessage() {}
+
+func (x *Storenode) ProtoReflect() protoreflect.Message {
+	mi := &file_communities_proto_msgTypes[25]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Storenode.ProtoReflect.Descriptor instead.
+func (*Storenode) Descriptor() ([]byte, []int) {
+	return file_communities_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *Storenode) GetCommunityId() []byte {
+	if x != nil {
+		return x.CommunityId
+	}
+	return nil
+}
+
+func (x *Storenode) GetStorenodeId() string {
+	if x != nil {
+		return x.StorenodeId
+	}
+	return ""
+}
+
+func (x *Storenode) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Storenode) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+func (x *Storenode) GetFleet() string {
+	if x != nil {
+		return x.Fleet
+	}
+	return ""
+}
+
+func (x *Storenode) GetVersion() uint32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *Storenode) GetRemoved() bool {
+	if x != nil {
+		return x.Removed
+	}
+	return false
+}
+
+func (x *Storenode) GetDeletedAt() int64 {
+	if x != nil {
+		return x.DeletedAt
+	}
+	return 0
+}
+
 var File_communities_proto protoreflect.FileDescriptor
 
 var file_communities_proto_rawDesc = []byte{
@@ -2348,8 +2579,38 @@ var file_communities_proto_rawDesc = []byte{
 	0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x57, 0x61, 0x6b, 0x75, 0x4d, 0x65, 0x73, 0x73,
 	0x61, 0x67, 0x65, 0x41, 0x72, 0x63, 0x68, 0x69, 0x76, 0x65, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x4d,
 	0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02,
-	0x38, 0x01, 0x42, 0x0d, 0x5a, 0x0b, 0x2e, 0x2f, 0x3b, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
-	0x66, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x38, 0x01, 0x22, 0x57, 0x0a, 0x1d, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x50,
+	0x75, 0x62, 0x6c, 0x69, 0x63, 0x53, 0x74, 0x6f, 0x72, 0x65, 0x6e, 0x6f, 0x64, 0x65, 0x73, 0x49,
+	0x6e, 0x66, 0x6f, 0x12, 0x1c, 0x0a, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72,
+	0x65, 0x12, 0x18, 0x0a, 0x07, 0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x0c, 0x52, 0x07, 0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x22, 0x9e, 0x01, 0x0a, 0x13,
+	0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x53, 0x74, 0x6f, 0x72, 0x65, 0x6e, 0x6f,
+	0x64, 0x65, 0x73, 0x12, 0x14, 0x0a, 0x05, 0x63, 0x6c, 0x6f, 0x63, 0x6b, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x04, 0x52, 0x05, 0x63, 0x6c, 0x6f, 0x63, 0x6b, 0x12, 0x21, 0x0a, 0x0c, 0x63, 0x6f, 0x6d,
+	0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52,
+	0x0b, 0x63, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x49, 0x64, 0x12, 0x33, 0x0a, 0x0a,
+	0x73, 0x74, 0x6f, 0x72, 0x65, 0x6e, 0x6f, 0x64, 0x65, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0b,
+	0x32, 0x13, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x53, 0x74, 0x6f, 0x72,
+	0x65, 0x6e, 0x6f, 0x64, 0x65, 0x52, 0x0a, 0x73, 0x74, 0x6f, 0x72, 0x65, 0x6e, 0x6f, 0x64, 0x65,
+	0x73, 0x12, 0x19, 0x0a, 0x08, 0x63, 0x68, 0x61, 0x69, 0x6e, 0x5f, 0x69, 0x64, 0x18, 0x04, 0x20,
+	0x01, 0x28, 0x04, 0x52, 0x07, 0x63, 0x68, 0x61, 0x69, 0x6e, 0x49, 0x64, 0x22, 0xe8, 0x01, 0x0a,
+	0x09, 0x53, 0x74, 0x6f, 0x72, 0x65, 0x6e, 0x6f, 0x64, 0x65, 0x12, 0x21, 0x0a, 0x0c, 0x63, 0x6f,
+	0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c,
+	0x52, 0x0b, 0x63, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x49, 0x64, 0x12, 0x21, 0x0a,
+	0x0c, 0x73, 0x74, 0x6f, 0x72, 0x65, 0x6e, 0x6f, 0x64, 0x65, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x0b, 0x73, 0x74, 0x6f, 0x72, 0x65, 0x6e, 0x6f, 0x64, 0x65, 0x49, 0x64,
+	0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04,
+	0x6e, 0x61, 0x6d, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x18,
+	0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x12, 0x14,
+	0x0a, 0x05, 0x66, 0x6c, 0x65, 0x65, 0x74, 0x18, 0x05, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x66,
+	0x6c, 0x65, 0x65, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18,
+	0x06, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x18,
+	0x0a, 0x07, 0x72, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x64, 0x18, 0x07, 0x20, 0x01, 0x28, 0x08, 0x52,
+	0x07, 0x72, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x64, 0x12, 0x1d, 0x0a, 0x0a, 0x64, 0x65, 0x6c, 0x65,
+	0x74, 0x65, 0x64, 0x5f, 0x61, 0x74, 0x18, 0x08, 0x20, 0x01, 0x28, 0x03, 0x52, 0x09, 0x64, 0x65,
+	0x6c, 0x65, 0x74, 0x65, 0x64, 0x41, 0x74, 0x42, 0x0d, 0x5a, 0x0b, 0x2e, 0x2f, 0x3b, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -2365,7 +2626,7 @@ func file_communities_proto_rawDescGZIP() []byte {
 }
 
 var file_communities_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_communities_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_communities_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_communities_proto_goTypes = []interface{}{
 	(CommunityMember_Roles)(0),                // 0: protobuf.CommunityMember.Roles
 	(CommunityPermissions_Access)(0),          // 1: protobuf.CommunityPermissions.Access
@@ -2393,60 +2654,64 @@ var file_communities_proto_goTypes = []interface{}{
 	(*WakuMessageArchive)(nil),                // 23: protobuf.WakuMessageArchive
 	(*WakuMessageArchiveIndexMetadata)(nil),   // 24: protobuf.WakuMessageArchiveIndexMetadata
 	(*WakuMessageArchiveIndex)(nil),           // 25: protobuf.WakuMessageArchiveIndex
-	nil,                                       // 26: protobuf.CommunityTokenMetadata.ContractAddressesEntry
-	nil,                                       // 27: protobuf.TokenCriteria.ContractAddressesEntry
-	nil,                                       // 28: protobuf.CommunityDescription.MembersEntry
-	nil,                                       // 29: protobuf.CommunityDescription.ChatsEntry
-	nil,                                       // 30: protobuf.CommunityDescription.CategoriesEntry
-	nil,                                       // 31: protobuf.CommunityDescription.TokenPermissionsEntry
-	nil,                                       // 32: protobuf.CommunityDescription.PrivateDataEntry
-	nil,                                       // 33: protobuf.CommunityChat.MembersEntry
-	nil,                                       // 34: protobuf.WakuMessageArchiveIndex.ArchivesEntry
-	(CommunityTokenType)(0),                   // 35: protobuf.CommunityTokenType
-	(*ChatIdentity)(nil),                      // 36: protobuf.ChatIdentity
-	(*Shard)(nil),                             // 37: protobuf.Shard
+	(*CommunityPublicStorenodesInfo)(nil),     // 26: protobuf.CommunityPublicStorenodesInfo
+	(*CommunityStorenodes)(nil),               // 27: protobuf.CommunityStorenodes
+	(*Storenode)(nil),                         // 28: protobuf.Storenode
+	nil,                                       // 29: protobuf.CommunityTokenMetadata.ContractAddressesEntry
+	nil,                                       // 30: protobuf.TokenCriteria.ContractAddressesEntry
+	nil,                                       // 31: protobuf.CommunityDescription.MembersEntry
+	nil,                                       // 32: protobuf.CommunityDescription.ChatsEntry
+	nil,                                       // 33: protobuf.CommunityDescription.CategoriesEntry
+	nil,                                       // 34: protobuf.CommunityDescription.TokenPermissionsEntry
+	nil,                                       // 35: protobuf.CommunityDescription.PrivateDataEntry
+	nil,                                       // 36: protobuf.CommunityChat.MembersEntry
+	nil,                                       // 37: protobuf.WakuMessageArchiveIndex.ArchivesEntry
+	(CommunityTokenType)(0),                   // 38: protobuf.CommunityTokenType
+	(*ChatIdentity)(nil),                      // 39: protobuf.ChatIdentity
+	(*Shard)(nil),                             // 40: protobuf.Shard
 }
 var file_communities_proto_depIdxs = []int32{
 	0,  // 0: protobuf.CommunityMember.roles:type_name -> protobuf.CommunityMember.Roles
 	13, // 1: protobuf.CommunityMember.revealed_accounts:type_name -> protobuf.RevealedAccount
-	26, // 2: protobuf.CommunityTokenMetadata.contract_addresses:type_name -> protobuf.CommunityTokenMetadata.ContractAddressesEntry
-	35, // 3: protobuf.CommunityTokenMetadata.tokenType:type_name -> protobuf.CommunityTokenType
+	29, // 2: protobuf.CommunityTokenMetadata.contract_addresses:type_name -> protobuf.CommunityTokenMetadata.ContractAddressesEntry
+	38, // 3: protobuf.CommunityTokenMetadata.tokenType:type_name -> protobuf.CommunityTokenType
 	1,  // 4: protobuf.CommunityPermissions.access:type_name -> protobuf.CommunityPermissions.Access
-	27, // 5: protobuf.TokenCriteria.contract_addresses:type_name -> protobuf.TokenCriteria.ContractAddressesEntry
-	35, // 6: protobuf.TokenCriteria.type:type_name -> protobuf.CommunityTokenType
+	30, // 5: protobuf.TokenCriteria.contract_addresses:type_name -> protobuf.TokenCriteria.ContractAddressesEntry
+	38, // 6: protobuf.TokenCriteria.type:type_name -> protobuf.CommunityTokenType
 	2,  // 7: protobuf.CommunityTokenPermission.type:type_name -> protobuf.CommunityTokenPermission.Type
 	7,  // 8: protobuf.CommunityTokenPermission.token_criteria:type_name -> protobuf.TokenCriteria
-	28, // 9: protobuf.CommunityDescription.members:type_name -> protobuf.CommunityDescription.MembersEntry
+	31, // 9: protobuf.CommunityDescription.members:type_name -> protobuf.CommunityDescription.MembersEntry
 	6,  // 10: protobuf.CommunityDescription.permissions:type_name -> protobuf.CommunityPermissions
-	36, // 11: protobuf.CommunityDescription.identity:type_name -> protobuf.ChatIdentity
-	29, // 12: protobuf.CommunityDescription.chats:type_name -> protobuf.CommunityDescription.ChatsEntry
-	30, // 13: protobuf.CommunityDescription.categories:type_name -> protobuf.CommunityDescription.CategoriesEntry
+	39, // 11: protobuf.CommunityDescription.identity:type_name -> protobuf.ChatIdentity
+	32, // 12: protobuf.CommunityDescription.chats:type_name -> protobuf.CommunityDescription.ChatsEntry
+	33, // 13: protobuf.CommunityDescription.categories:type_name -> protobuf.CommunityDescription.CategoriesEntry
 	10, // 14: protobuf.CommunityDescription.admin_settings:type_name -> protobuf.CommunityAdminSettings
-	31, // 15: protobuf.CommunityDescription.token_permissions:type_name -> protobuf.CommunityDescription.TokenPermissionsEntry
+	34, // 15: protobuf.CommunityDescription.token_permissions:type_name -> protobuf.CommunityDescription.TokenPermissionsEntry
 	5,  // 16: protobuf.CommunityDescription.community_tokens_metadata:type_name -> protobuf.CommunityTokenMetadata
-	32, // 17: protobuf.CommunityDescription.privateData:type_name -> protobuf.CommunityDescription.PrivateDataEntry
-	33, // 18: protobuf.CommunityChat.members:type_name -> protobuf.CommunityChat.MembersEntry
+	35, // 17: protobuf.CommunityDescription.privateData:type_name -> protobuf.CommunityDescription.PrivateDataEntry
+	36, // 18: protobuf.CommunityChat.members:type_name -> protobuf.CommunityChat.MembersEntry
 	6,  // 19: protobuf.CommunityChat.permissions:type_name -> protobuf.CommunityPermissions
-	36, // 20: protobuf.CommunityChat.identity:type_name -> protobuf.ChatIdentity
+	39, // 20: protobuf.CommunityChat.identity:type_name -> protobuf.ChatIdentity
 	13, // 21: protobuf.CommunityRequestToJoin.revealed_accounts:type_name -> protobuf.RevealedAccount
 	13, // 22: protobuf.CommunityEditSharedAddresses.revealed_accounts:type_name -> protobuf.RevealedAccount
 	9,  // 23: protobuf.CommunityRequestToJoinResponse.community:type_name -> protobuf.CommunityDescription
-	37, // 24: protobuf.CommunityRequestToJoinResponse.shard:type_name -> protobuf.Shard
+	40, // 24: protobuf.CommunityRequestToJoinResponse.shard:type_name -> protobuf.Shard
 	22, // 25: protobuf.WakuMessageArchive.metadata:type_name -> protobuf.WakuMessageArchiveMetadata
 	21, // 26: protobuf.WakuMessageArchive.messages:type_name -> protobuf.WakuMessage
 	22, // 27: protobuf.WakuMessageArchiveIndexMetadata.metadata:type_name -> protobuf.WakuMessageArchiveMetadata
-	34, // 28: protobuf.WakuMessageArchiveIndex.archives:type_name -> protobuf.WakuMessageArchiveIndex.ArchivesEntry
-	4,  // 29: protobuf.CommunityDescription.MembersEntry.value:type_name -> protobuf.CommunityMember
-	11, // 30: protobuf.CommunityDescription.ChatsEntry.value:type_name -> protobuf.CommunityChat
-	12, // 31: protobuf.CommunityDescription.CategoriesEntry.value:type_name -> protobuf.CommunityCategory
-	8,  // 32: protobuf.CommunityDescription.TokenPermissionsEntry.value:type_name -> protobuf.CommunityTokenPermission
-	4,  // 33: protobuf.CommunityChat.MembersEntry.value:type_name -> protobuf.CommunityMember
-	24, // 34: protobuf.WakuMessageArchiveIndex.ArchivesEntry.value:type_name -> protobuf.WakuMessageArchiveIndexMetadata
-	35, // [35:35] is the sub-list for method output_type
-	35, // [35:35] is the sub-list for method input_type
-	35, // [35:35] is the sub-list for extension type_name
-	35, // [35:35] is the sub-list for extension extendee
-	0,  // [0:35] is the sub-list for field type_name
+	37, // 28: protobuf.WakuMessageArchiveIndex.archives:type_name -> protobuf.WakuMessageArchiveIndex.ArchivesEntry
+	28, // 29: protobuf.CommunityStorenodes.storenodes:type_name -> protobuf.Storenode
+	4,  // 30: protobuf.CommunityDescription.MembersEntry.value:type_name -> protobuf.CommunityMember
+	11, // 31: protobuf.CommunityDescription.ChatsEntry.value:type_name -> protobuf.CommunityChat
+	12, // 32: protobuf.CommunityDescription.CategoriesEntry.value:type_name -> protobuf.CommunityCategory
+	8,  // 33: protobuf.CommunityDescription.TokenPermissionsEntry.value:type_name -> protobuf.CommunityTokenPermission
+	4,  // 34: protobuf.CommunityChat.MembersEntry.value:type_name -> protobuf.CommunityMember
+	24, // 35: protobuf.WakuMessageArchiveIndex.ArchivesEntry.value:type_name -> protobuf.WakuMessageArchiveIndexMetadata
+	36, // [36:36] is the sub-list for method output_type
+	36, // [36:36] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_communities_proto_init() }
@@ -2734,6 +2999,42 @@ func file_communities_proto_init() {
 				return nil
 			}
 		}
+		file_communities_proto_msgTypes[23].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CommunityPublicStorenodesInfo); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_communities_proto_msgTypes[24].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CommunityStorenodes); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_communities_proto_msgTypes[25].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Storenode); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -2741,7 +3042,7 @@ func file_communities_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_communities_proto_rawDesc,
 			NumEnums:      3,
-			NumMessages:   32,
+			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

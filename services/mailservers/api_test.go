@@ -9,12 +9,15 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common/shard"
+	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/t/helpers"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
 	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "maliservers-tests-")
+	require.NoError(t, err)
+	err = sqlite.Migrate(db) // migrate default
 	require.NoError(t, err)
 	return NewDB(db), func() { require.NoError(t, cleanup()) }
 }

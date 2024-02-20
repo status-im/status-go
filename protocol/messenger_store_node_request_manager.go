@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/services/mailservers"
 )
 
 const (
@@ -225,9 +226,7 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 	}
 
 	switch requestType {
-	case storeNodeShardRequest:
-		fallthrough
-	case storeNodeCommunityRequest:
+	case storeNodeShardRequest, storeNodeCommunityRequest:
 		// If filter wasn't installed we create it and
 		// remember for uninstalling after response is received
 		filters, err := m.messenger.transport.InitPublicFilters([]transport.FiltersToInitialize{{
@@ -503,11 +502,12 @@ func (r *storeNodeRequest) routine() {
 		r.finalize()
 	}()
 
-	if !r.manager.messenger.waitForAvailableStoreNode(storeNodeAvailableTimeout) {
+	communityIDStr := strings.TrimSuffix(r.requestID.DataID, transport.CommunityShardInfoTopicPrefix())
+	if !r.manager.messenger.communityStorenodes.HasStorenodeSetup(communityIDStr) && !r.manager.messenger.waitForAvailableStoreNode(storeNodeAvailableTimeout) {
 		r.result.err = fmt.Errorf("store node is not available")
 		return
 	}
-
+	ms := r.manager.messenger.getActiveMailserver(communityIDStr)
 	// Check if community already exists locally and get Clock.
 
 	localCommunity, _ := r.manager.messenger.communitiesManager.GetByIDString(r.requestID.DataID)
@@ -519,7 +519,7 @@ func (r *storeNodeRequest) routine() {
 	// Start store node request
 	from, to := r.manager.messenger.calculateMailserverTimeBounds(oneMonthDuration)
 
-	_, err := r.manager.messenger.performMailserverRequest(func() (*MessengerResponse, error) {
+	_, err := r.manager.messenger.performMailserverRequest(ms, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
 		batch := MailserverBatch{
 			From:        from,
 			To:          to,
@@ -531,7 +531,7 @@ func (r *storeNodeRequest) routine() {
 			r.manager.onPerformingBatch(batch)
 		}
 
-		return nil, r.manager.messenger.processMailserverBatchWithOptions(batch, r.config.InitialPageSize, r.shouldFetchNextPage, true)
+		return nil, r.manager.messenger.processMailserverBatchWithOptions(ms, batch, r.config.InitialPageSize, r.shouldFetchNextPage, true)
 	})
 
 	r.result.err = err

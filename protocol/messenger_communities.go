@@ -2216,6 +2216,51 @@ func (m *Messenger) RemovePubsubTopicPrivateKey(topic string) error {
 	return m.transport.RemovePubsubTopicKey(topic)
 }
 
+func (m *Messenger) SetCommunityStorenodes(request *requests.SetCommunityStorenodes) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+	community, err := m.communitiesManager.GetByID(request.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+	if !community.IsControlNode() {
+		return nil, errors.New("not admin or owner")
+	}
+
+	if err := m.communityStorenodes.UpdateStorenodesInDB(request.CommunityID, request.Storenodes, 0); err != nil {
+		return nil, err
+	}
+	err = m.sendCommunityPublicStorenodesInfo(community, request.Storenodes)
+	if err != nil {
+		return nil, err
+	}
+	response := &MessengerResponse{
+		CommunityStorenodes: request.Storenodes,
+	}
+	return response, nil
+}
+
+func (m *Messenger) GetCommunityStorenodes(communityID types.HexBytes) (*MessengerResponse, error) {
+	community, err := m.communitiesManager.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, communities.ErrOrgNotFound
+	}
+
+	snodes, err := m.communityStorenodes.GetStorenodesFromDB(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{
+		CommunityStorenodes: snodes,
+	}
+	return response, nil
+}
+
 func (m *Messenger) UpdateCommunityFilters(community *communities.Community) error {
 	defaultFilters := m.DefaultFilters(community)
 	publicFiltersToInit := make([]transport.FiltersToInitialize, 0, len(defaultFilters)+len(community.Chats()))
@@ -3377,7 +3422,8 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			}
 
 			// Request possibly missed waku messages for community
-			_, err = m.syncFiltersFrom(filters, uint32(latestWakuMessageTimestamp))
+			ms := m.getActiveMailserver(c.ID().String())
+			_, err = m.syncFiltersFrom(*ms, filters, uint32(latestWakuMessageTimestamp))
 			if err != nil {
 				m.communitiesManager.LogStdout("failed to request missing messages", zap.Error(err))
 				continue

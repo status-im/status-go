@@ -213,3 +213,29 @@ message WakuMessageArchiveIndexMetadata {
 message WakuMessageArchiveIndex {
   map<string, WakuMessageArchiveIndexMetadata> archives = 1;
 }
+
+message CommunityPublicStorenodesInfo {
+  // Signature of the payload field
+  bytes signature = 1;
+  // Marshaled CommunityStorenodes
+  bytes payload = 2;
+}
+
+message CommunityStorenodes {
+  uint64 clock = 1;
+  bytes community_id = 2;
+  repeated Storenode storenodes = 3;
+  uint64 chain_id = 4;
+}
+
+message Storenode {
+  bytes community_id = 1;
+  string storenode_id = 2;
+  string name = 3;
+  string address = 4;
+  string fleet = 5;
+  uint32 version = 6;
+  bool removed = 7;
+  int64 deleted_at = 8;
+}
+

@@ -55,6 +55,7 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/protocol/storenodes"
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
@@ -134,6 +135,7 @@ type Messenger struct {
 	modifiedInstallations      *stringBoolMap
 	installationID             string
 	mailserverCycle            mailserverCycle
+	communityStorenodes        *storenodes.CommunityStorenodes
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
 	settings                   *accounts.Database
@@ -164,7 +166,7 @@ type Messenger struct {
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex                     sync.Mutex
-	mailPeersMutex            sync.Mutex
+	mailPeersMutex            sync.RWMutex
 	handleMessagesMutex       sync.Mutex
 	handleImportMessagesMutex sync.Mutex
 
@@ -544,6 +546,7 @@ func NewMessenger(
 			availabilitySubscriptions: make([]chan struct{}, 0),
 		},
 		mailserversDatabase:  c.mailserversDatabase,
+		communityStorenodes:  storenodes.NewCommunityStorenodes(storenodes.NewDB(database), logger),
 		account:              c.account,
 		quit:                 make(chan struct{}),
 		ctx:                  ctx,
@@ -844,6 +847,10 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	response.Mailservers = mailservers
 	err = m.StartMailserverCycle(mailservers)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := m.communityStorenodes.ReloadFromDB(); err != nil {
 		return nil, err
 	}
 
@@ -2206,7 +2213,6 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			return rawMessage, err
 		}
 	case ChatTypeCommunityChat:
-
 		community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
 		if err != nil {
 			return rawMessage, err

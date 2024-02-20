@@ -141,6 +141,7 @@ func (s *MessengerStoreNodeRequestSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
 	s.cancel = make(chan struct{}, 10)
+
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 
 	s.createStore()
@@ -1136,10 +1137,10 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 
 	// Connect to store node to force "online" status
 	{
-		WaitForPeerConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() string {
+		WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() []string {
 			err := s.bob.DialPeer(storeAddress)
 			s.Require().NoError(err)
-			return storePeerID
+			return []string{storePeerID}
 		})
 		s.Require().True(s.bob.Online())
 
@@ -1193,10 +1194,10 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 		// We don't enable it earlier to control when we connect to the store node.
 		s.bob.config.featureFlags.AutoRequestHistoricMessages = true
 
-		WaitForPeerConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() string {
+		WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() []string {
 			err := s.bob.DialPeer(storeAddress)
 			s.Require().NoError(err)
-			return storePeerID
+			return []string{storePeerID}
 		})
 		s.Require().True(s.bob.Online())
 

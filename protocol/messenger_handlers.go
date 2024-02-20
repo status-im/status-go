@@ -243,6 +243,9 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
         
            case protobuf.ApplicationMetadataMessage_COMMUNITY_USER_KICKED:
 		return m.handleCommunityUserKickedProtobuf(messageState, protoBytes, msg, filter)
+
+			case protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_STORENODES_INFO:
+		return m.handleCommunityPublicStorenodesInfoProtobuf(messageState, protoBytes, msg, filter)
         
            case protobuf.ApplicationMetadataMessage_SYNC_PROFILE_SHOWCASE_PREFERENCES:
 		return m.handleSyncProfileShowcasePreferencesProtobuf(messageState, protoBytes, msg, filter)
@@ -251,7 +254,6 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
 		m.logger.Info("protobuf type not found", zap.String("type", string(msg.ApplicationLayer.Type)))
                 return errors.New("protobuf type not found")
 	}
-	return nil
 }
 
 
@@ -1710,6 +1712,20 @@ func (m *Messenger) handleCommunityPublicShardInfoProtobuf(messageState *Receive
 	
 }
 
+func (m *Messenger) handleCommunityPublicStorenodesInfoProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
+	m.logger.Info("handling CommunityPublicStorenodesInfo")
+	
+	p := &protobuf.CommunityPublicStorenodesInfo{}
+	err := proto.Unmarshal(protoBytes, p)
+	if err != nil {
+		return err
+	}
+
+	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.ApplicationLayer.Type, p)
+
+	return m.HandleCommunityPublicStorenodesInfo(messageState, p, msg)
+	
+}
 
 func (m *Messenger) handleSyncCollectiblePreferencesProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
 	m.logger.Info("handling SyncCollectiblePreferences")

@@ -449,6 +449,16 @@ func (api *PublicAPI) SetCommunityShard(request *requests.SetCommunityShard) (*p
 	return api.service.messenger.SetCommunityShard(request)
 }
 
+// Sets the community storenodes for a community
+func (api *PublicAPI) SetCommunityStorenodes(request *requests.SetCommunityStorenodes) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SetCommunityStorenodes(request)
+}
+
+// Gets the community storenodes for a community
+func (api *PublicAPI) GetCommunityStorenodes(id types.HexBytes) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.GetCommunityStorenodes(id)
+}
+
 // ExportCommunity exports the private key of the community with given ID
 func (api *PublicAPI) ExportCommunity(id types.HexBytes) (types.HexBytes, error) {
 	key, err := api.service.messenger.ExportCommunity(id)
@@ -1349,11 +1359,11 @@ func (api *PublicAPI) DeleteActivityCenterNotifications(ctx context.Context, ids
 }
 
 func (api *PublicAPI) RequestAllHistoricMessages(forceFetchingBackup bool) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RequestAllHistoricMessages(forceFetchingBackup)
+	return api.service.messenger.RequestAllHistoricMessages(forceFetchingBackup, false)
 }
 
 func (api *PublicAPI) RequestAllHistoricMessagesWithRetries(forceFetchingBackup bool) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RequestAllHistoricMessagesWithRetries(forceFetchingBackup)
+	return api.service.messenger.RequestAllHistoricMessages(forceFetchingBackup, true)
 }
 
 func (api *PublicAPI) DisconnectActiveMailserver() {
