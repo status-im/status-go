@@ -216,19 +216,19 @@ func (mr *MockDatabaseSettingsManagerMockRecorder) GetInstalledStickerPacks() *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInstalledStickerPacks", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).GetInstalledStickerPacks))
 }
 
-// GetIsSepoliaEnabled mocks base method.
-func (m *MockDatabaseSettingsManager) GetIsSepoliaEnabled() (bool, error) {
+// GetIsGoerliEnabled mocks base method.
+func (m *MockDatabaseSettingsManager) GetIsGoerliEnabled() (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetIsSepoliaEnabled")
+	ret := m.ctrl.Call(m, "GetIsGoerliEnabled")
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetIsSepoliaEnabled indicates an expected call of GetIsSepoliaEnabled.
-func (mr *MockDatabaseSettingsManagerMockRecorder) GetIsSepoliaEnabled() *gomock.Call {
+// GetIsGoerliEnabled indicates an expected call of GetIsGoerliEnabled.
+func (mr *MockDatabaseSettingsManagerMockRecorder) GetIsGoerliEnabled() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetIsSepoliaEnabled", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).GetIsSepoliaEnabled))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetIsGoerliEnabled", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).GetIsGoerliEnabled))
 }
 
 // GetMasterAddress mocks base method.
