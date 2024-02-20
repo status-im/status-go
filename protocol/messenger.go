@@ -3426,6 +3426,10 @@ func (m *Messenger) GetStats() types.StatsSummary {
 	return m.transport.GetStats()
 }
 
+func (m *Messenger) GetTransport() *transport.Transport {
+	return m.transport
+}
+
 type CurrentMessageState struct {
 	// Message is the protobuf message received
 	Message *protobuf.ChatMessage
