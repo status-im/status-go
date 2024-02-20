@@ -320,3 +320,7 @@ func (nm *Manager) GetCombinedNetworks() ([]*CombinedNetwork, error) {
 func (nm *Manager) GetConfiguredNetworks() []params.Network {
 	return nm.configuredNetworks
 }
+
+func (nm *Manager) GetTestNetworksEnabled() (result bool, err error) {
+	return nm.accountsDB.GetTestNetworksEnabled()
+}
