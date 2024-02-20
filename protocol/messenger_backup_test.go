@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/protocol/identity"
+	"github.com/status-im/status-go/protocol/wakusync"
 
 	"github.com/stretchr/testify/suite"
 
@@ -388,13 +389,13 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
-	_, err = WaitOnMessengerResponse(
-		bob2,
-		func(r *MessengerResponse) bool {
-			return r.BackupHandled
-		},
-		"no messages",
-	)
+	_, err = WaitOnSignaledSendWakuFetchingBackupProgress(bob2, func(r *wakusync.WakuBackedUpDataResponse) bool {
+		detailsMap := r.FetchingBackedUpDataDetails()
+		if settingDetails, ok := detailsMap[SyncWakuSectionKeySettings]; ok {
+			return settingDetails.DataNumber == settingDetails.TotalNumber
+		}
+		return false
+	}, "no messages")
 	s.Require().NoError(err)
 
 	// Check bob2
