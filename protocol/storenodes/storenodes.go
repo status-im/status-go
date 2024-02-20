@@ -51,13 +51,13 @@ func (m *CommunityStorenodes) GetStorenodeByCommunnityID(communityID string) (ma
 	return toMailserver(msData.storenodes[0]), nil
 }
 
-func (m *CommunityStorenodes) IsCommunityStoreNode(ID string) bool {
+func (m *CommunityStorenodes) IsCommunityStoreNode(id string) bool {
 	m.storenodesByCommunityIDMutex.RLock()
 	defer m.storenodesByCommunityIDMutex.RUnlock()
 
 	for _, data := range m.storenodesByCommunityID {
 		for _, snode := range data.storenodes {
-			if snode.StorenodeID == ID {
+			if snode.StorenodeID == id {
 				return true
 			}
 		}
