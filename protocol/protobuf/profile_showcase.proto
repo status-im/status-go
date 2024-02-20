@@ -3,6 +3,8 @@ syntax = "proto3";
 option go_package = "./;protobuf";
 package protobuf;
 
+// Profile showcase for a contact
+
 message ProfileShowcaseCommunity {
   string community_id = 1;
   uint32 order = 2;
@@ -39,12 +41,19 @@ message ProfileShowcaseUnverifiedToken {
   string community_id = 4;
 }
 
+message ProfileShowcaseSocialLink {
+  string url = 1;
+  uint32 order = 2;
+  string text = 3;
+}
+
 message ProfileShowcaseEntries {
   repeated ProfileShowcaseCommunity communities = 1;
   repeated ProfileShowcaseAccount accounts = 2;
   repeated ProfileShowcaseCollectible collectibles = 3;
-  repeated ProfileShowcaseVerifiedToken verifiedTokens = 4;
-  repeated ProfileShowcaseUnverifiedToken unverifiedTokens = 5;
+  repeated ProfileShowcaseVerifiedToken verified_tokens = 4;
+  repeated ProfileShowcaseUnverifiedToken unverified_tokens = 5;
+  repeated ProfileShowcaseSocialLink social_links = 6;
 }
 
 message ProfileShowcaseEntriesEncrypted {
@@ -58,7 +67,7 @@ message ProfileShowcase {
   ProfileShowcaseEntriesEncrypted for_id_verified_contacts = 3;
 }
 
-// Preferences
+// Profile showcase preferences
 
 enum ProfileShowcaseVisibility {
   PROFILE_SHOWCASE_VISIBILITY_NO_ONE = 0;
@@ -70,7 +79,7 @@ enum ProfileShowcaseVisibility {
 message ProfileShowcaseCommunityPreference {
   string community_id = 1;
   ProfileShowcaseVisibility showcase_visibility = 2;
-  int32 order = 3;
+  uint32 order = 3;
 }
 
 message ProfileShowcaseAccountPreference {
@@ -79,7 +88,7 @@ message ProfileShowcaseAccountPreference {
   string color_id = 3;
   string emoji = 4;
   ProfileShowcaseVisibility showcase_visibility = 5;
-  int32 order = 6;
+  uint32 order = 6;
 }
 
 message ProfileShowcaseCollectiblePreference {
@@ -89,13 +98,13 @@ message ProfileShowcaseCollectiblePreference {
   string community_id = 4;
   string account_address = 5;
   ProfileShowcaseVisibility showcase_visibility = 6;
-  int32 order = 7;
+  uint32 order = 7;
 }
 
 message ProfileShowcaseVerifiedTokenPreference {
   string symbol = 1;
   ProfileShowcaseVisibility showcase_visibility = 2;
-  int32 order = 3;
+  uint32 order = 3;
 }
 
 message ProfileShowcaseUnverifiedTokenPreference {
@@ -103,7 +112,14 @@ message ProfileShowcaseUnverifiedTokenPreference {
   uint64 chain_id = 2;
   string community_id = 3;
   ProfileShowcaseVisibility showcase_visibility = 4;
-  int32 order = 5;
+  uint32 order = 5;
+}
+
+message ProfileShowcaseSocialLinkPreference {
+  string url = 1;
+  string text = 2;
+  uint32 order = 3;
+  ProfileShowcaseVisibility showcase_visibility = 4;
 }
 
 message SyncProfileShowcasePreferences {
@@ -113,4 +129,5 @@ message SyncProfileShowcasePreferences {
   repeated ProfileShowcaseCollectiblePreference collectibles = 4;
   repeated ProfileShowcaseVerifiedTokenPreference verified_tokens = 5;
   repeated ProfileShowcaseUnverifiedTokenPreference unverified_tokens = 6;
+  repeated ProfileShowcaseSocialLinkPreference social_links = 7;
 }

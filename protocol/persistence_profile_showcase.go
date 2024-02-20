@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity"
 )
 
+// Profile showcase preferences
 const upsertProfileShowcasePreferencesQuery = "UPDATE profile_showcase_preferences SET clock=? WHERE NOT EXISTS (SELECT 1 FROM profile_showcase_preferences WHERE clock >= ?)"
 const selectProfileShowcasePreferencesQuery = "SELECT clock FROM profile_showcase_preferences"
 
@@ -29,6 +30,11 @@ const selectProfileShowcaseVerifiedTokenPreferenceQuery = "SELECT symbol, visibi
 const upsertProfileShowcaseUnverifiedTokenPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_unverified_tokens_preferences(contract_address, chain_id, community_id, visibility, sort_order) VALUES (?, ?, ?, ?, ?)" // #nosec G101
 const selectProfileShowcaseUnverifiedTokenPreferenceQuery = "SELECT contract_address, chain_id, community_id, visibility, sort_order FROM profile_showcase_unverified_tokens_preferences"                                    // #nosec G101
 
+const upsertProfileShowcaseSocialLinkPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_social_links_preferences(url, text, visibility, sort_order) VALUES (?, ?, ?, ?)" // #nosec G101
+const selectProfileShowcaseSocialLinkPreferenceQuery = "SELECT url, text, visibility, sort_order FROM profile_showcase_social_links_preferences"                                 // #nosec G101
+
+// Profile showcase for a contact
+
 const upsertContactProfileShowcaseCommunityQuery = "INSERT OR REPLACE INTO profile_showcase_communities_contacts(contact_id, community_id, sort_order) VALUES (?, ?, ?)" // #nosec G101
 const selectContactProfileShowcaseCommunityQuery = "SELECT community_id, sort_order FROM profile_showcase_communities_contacts WHERE contact_id = ?"                     // #nosec G101
 const removeContactProfileShowcaseCommunityQuery = "DELETE FROM profile_showcase_communities_contacts WHERE contact_id = ?"                                              // #nosec G101
@@ -49,6 +55,10 @@ const upsertContactProfileShowcaseUnverifiedTokenQuery = "INSERT OR REPLACE INTO
 const selectContactProfileShowcaseUnverifiedTokenQuery = "SELECT contract_address, chain_id, community_id, sort_order FROM profile_showcase_unverified_tokens_contacts WHERE contact_id = ?"                           // #nosec G101
 const removeContactProfileShowcaseUnverifiedTokenQuery = "DELETE FROM profile_showcase_unverified_tokens_contacts WHERE contact_id = ?"                                                                                // #nosec G101
 
+const upsertContactProfileShowcaseSocialLinkQuery = "INSERT OR REPLACE INTO profile_showcase_social_links_contacts(contact_id, url, text, sort_order) VALUES (?, ?, ?, ?)" // #nosec G101
+const selectContactProfileShowcaseSocialLinkQuery = "SELECT url, text, sort_order FROM profile_showcase_social_links_contacts WHERE contact_id = ?"                        // #nosec G101
+const removeContactProfileShowcaseSocialLinkQuery = "DELETE FROM profile_showcase_social_links_contacts WHERE contact_id = ?"                                              // #nosec G101
+
 const selectProfileShowcaseAccountsWhichMatchTheAddress = `
 SELECT psa.*
 FROM
@@ -61,7 +71,7 @@ WHERE
 	psa.address = ?
 `
 
-// Queries for showcase preferences
+// Queries for the profile showcase preferences
 
 func (db sqlitePersistence) saveProfileShowcasePreferencesClock(tx *sql.Tx, clock uint64) error {
 	_, err := tx.Exec(upsertProfileShowcasePreferencesQuery, clock, clock)
@@ -247,18 +257,6 @@ func (db sqlitePersistence) saveProfileShowcaseVerifiedTokenPreference(tx *sql.T
 	return err
 }
 
-func (db sqlitePersistence) saveProfileShowcaseUnverifiedTokenPreference(tx *sql.Tx, token *identity.ProfileShowcaseUnverifiedTokenPreference) error {
-	_, err := tx.Exec(upsertProfileShowcaseUnverifiedTokenPreferenceQuery,
-		token.ContractAddress,
-		token.ChainID,
-		token.CommunityID,
-		token.ShowcaseVisibility,
-		token.Order,
-	)
-
-	return err
-}
-
 func (db sqlitePersistence) getProfileShowcaseVerifiedTokensPreferences(tx *sql.Tx) ([]*identity.ProfileShowcaseVerifiedTokenPreference, error) {
 	rows, err := tx.Query(selectProfileShowcaseVerifiedTokenPreferenceQuery)
 	if err != nil {
@@ -283,6 +281,18 @@ func (db sqlitePersistence) getProfileShowcaseVerifiedTokensPreferences(tx *sql.
 		tokens = append(tokens, token)
 	}
 	return tokens, nil
+}
+
+func (db sqlitePersistence) saveProfileShowcaseUnverifiedTokenPreference(tx *sql.Tx, token *identity.ProfileShowcaseUnverifiedTokenPreference) error {
+	_, err := tx.Exec(upsertProfileShowcaseUnverifiedTokenPreferenceQuery,
+		token.ContractAddress,
+		token.ChainID,
+		token.CommunityID,
+		token.ShowcaseVisibility,
+		token.Order,
+	)
+
+	return err
 }
 
 func (db sqlitePersistence) getProfileShowcaseUnverifiedTokensPreferences(tx *sql.Tx) ([]*identity.ProfileShowcaseUnverifiedTokenPreference, error) {
@@ -313,7 +323,45 @@ func (db sqlitePersistence) getProfileShowcaseUnverifiedTokensPreferences(tx *sq
 	return tokens, nil
 }
 
-// Queries for contacts showcase
+func (db sqlitePersistence) saveProfileShowcaseSocialLinkPreference(tx *sql.Tx, link *identity.ProfileShowcaseSocialLinkPreference) error {
+	_, err := tx.Exec(upsertProfileShowcaseSocialLinkPreferenceQuery,
+		link.URL,
+		link.Text,
+		link.ShowcaseVisibility,
+		link.Order,
+	)
+
+	return err
+}
+
+func (db sqlitePersistence) getProfileShowcaseSocialLinkPreferences(tx *sql.Tx) ([]*identity.ProfileShowcaseSocialLinkPreference, error) {
+	rows, err := tx.Query(selectProfileShowcaseSocialLinkPreferenceQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	links := []*identity.ProfileShowcaseSocialLinkPreference{}
+
+	for rows.Next() {
+		link := &identity.ProfileShowcaseSocialLinkPreference{}
+
+		err := rows.Scan(
+			&link.URL,
+			&link.Text,
+			&link.ShowcaseVisibility,
+			&link.Order,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		links = append(links, link)
+	}
+	return links, nil
+}
+
+// Queries for the profile showcase for a contact
 func (db sqlitePersistence) saveProfileShowcaseCommunityContact(tx *sql.Tx, contactID string, community *identity.ProfileShowcaseCommunity) error {
 	_, err := tx.Exec(upsertContactProfileShowcaseCommunityQuery,
 		contactID,
@@ -468,18 +516,6 @@ func (db sqlitePersistence) saveProfileShowcaseVerifiedTokenContact(tx *sql.Tx, 
 	return err
 }
 
-func (db sqlitePersistence) saveProfileShowcaseUnverifiedTokenContact(tx *sql.Tx, contactID string, token *identity.ProfileShowcaseUnverifiedToken) error {
-	_, err := tx.Exec(upsertContactProfileShowcaseUnverifiedTokenQuery,
-		contactID,
-		token.ContractAddress,
-		token.ChainID,
-		token.CommunityID,
-		token.Order,
-	)
-
-	return err
-}
-
 func (db sqlitePersistence) getProfileShowcaseVerifiedTokensContact(tx *sql.Tx, contactID string) ([]*identity.ProfileShowcaseVerifiedToken, error) {
 	rows, err := tx.Query(selectContactProfileShowcaseVerifiedTokenQuery, contactID)
 	if err != nil {
@@ -501,6 +537,23 @@ func (db sqlitePersistence) getProfileShowcaseVerifiedTokensContact(tx *sql.Tx, 
 		tokens = append(tokens, token)
 	}
 	return tokens, nil
+}
+
+func (db sqlitePersistence) clearProfileShowcaseVerifiedTokensContact(tx *sql.Tx, contactID string) error {
+	_, err := tx.Exec(removeContactProfileShowcaseVerifiedTokenQuery, contactID)
+	return err
+}
+
+func (db sqlitePersistence) saveProfileShowcaseUnverifiedTokenContact(tx *sql.Tx, contactID string, token *identity.ProfileShowcaseUnverifiedToken) error {
+	_, err := tx.Exec(upsertContactProfileShowcaseUnverifiedTokenQuery,
+		contactID,
+		token.ContractAddress,
+		token.ChainID,
+		token.CommunityID,
+		token.Order,
+	)
+
+	return err
 }
 
 func (db sqlitePersistence) getProfileShowcaseUnverifiedTokensContact(tx *sql.Tx, contactID string) ([]*identity.ProfileShowcaseUnverifiedToken, error) {
@@ -528,13 +581,48 @@ func (db sqlitePersistence) getProfileShowcaseUnverifiedTokensContact(tx *sql.Tx
 	return tokens, nil
 }
 
-func (db sqlitePersistence) clearProfileShowcaseVerifiedTokensContact(tx *sql.Tx, contactID string) error {
-	_, err := tx.Exec(removeContactProfileShowcaseVerifiedTokenQuery, contactID)
+func (db sqlitePersistence) clearProfileShowcaseUnverifiedTokensContact(tx *sql.Tx, contactID string) error {
+	_, err := tx.Exec(removeContactProfileShowcaseUnverifiedTokenQuery, contactID)
 	return err
 }
 
-func (db sqlitePersistence) clearProfileShowcaseUnverifiedTokensContact(tx *sql.Tx, contactID string) error {
-	_, err := tx.Exec(removeContactProfileShowcaseUnverifiedTokenQuery, contactID)
+func (db sqlitePersistence) saveProfileShowcaseSocialLinkContact(tx *sql.Tx, contactID string, link *identity.ProfileShowcaseSocialLink) error {
+	_, err := tx.Exec(upsertContactProfileShowcaseSocialLinkQuery,
+		contactID,
+		link.URL,
+		link.Text,
+		link.Order,
+	)
+
+	return err
+}
+
+func (db sqlitePersistence) getProfileShowcaseSocialLinksContact(tx *sql.Tx, contactID string) ([]*identity.ProfileShowcaseSocialLink, error) {
+	rows, err := tx.Query(selectContactProfileShowcaseSocialLinkQuery, contactID)
+	if err != nil {
+		return nil, err
+	}
+
+	links := []*identity.ProfileShowcaseSocialLink{}
+
+	for rows.Next() {
+		link := &identity.ProfileShowcaseSocialLink{}
+
+		err := rows.Scan(
+			&link.URL,
+			&link.Text,
+			&link.Order)
+		if err != nil {
+			return nil, err
+		}
+
+		links = append(links, link)
+	}
+	return links, nil
+}
+
+func (db sqlitePersistence) clearProfileShowcaseSocialLinksContact(tx *sql.Tx, contactID string) error {
+	_, err := tx.Exec(removeContactProfileShowcaseSocialLinkQuery, contactID)
 	return err
 }
 
@@ -588,6 +676,13 @@ func (db sqlitePersistence) SaveProfileShowcasePreferences(preferences *identity
 
 	for _, token := range preferences.UnverifiedTokens {
 		err = db.saveProfileShowcaseUnverifiedTokenPreference(tx, token)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, link := range preferences.SocialLinks {
+		err = db.saveProfileShowcaseSocialLinkPreference(tx, link)
 		if err != nil {
 			return err
 		}
@@ -656,6 +751,11 @@ func (db sqlitePersistence) GetProfileShowcasePreferences() (*identity.ProfileSh
 		return nil, err
 	}
 
+	socialLinks, err := db.getProfileShowcaseSocialLinkPreferences(tx)
+	if err != nil {
+		return nil, err
+	}
+
 	return &identity.ProfileShowcasePreferences{
 		Clock:            clock,
 		Communities:      communities,
@@ -663,6 +763,7 @@ func (db sqlitePersistence) GetProfileShowcasePreferences() (*identity.ProfileSh
 		Collectibles:     collectibles,
 		VerifiedTokens:   verifiedTokens,
 		UnverifiedTokens: unverifiedTokens,
+		SocialLinks:      socialLinks,
 	}, nil
 }
 
@@ -715,6 +816,13 @@ func (db sqlitePersistence) SaveProfileShowcaseForContact(showcase *identity.Pro
 		}
 	}
 
+	for _, link := range showcase.SocialLinks {
+		err = db.saveProfileShowcaseSocialLinkContact(tx, showcase.ContactID, link)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -757,6 +865,11 @@ func (db sqlitePersistence) GetProfileShowcaseForContact(contactID string) (*ide
 		return nil, err
 	}
 
+	socialLinks, err := db.getProfileShowcaseSocialLinksContact(tx, contactID)
+	if err != nil {
+		return nil, err
+	}
+
 	return &identity.ProfileShowcase{
 		ContactID:        contactID,
 		Communities:      communities,
@@ -764,6 +877,7 @@ func (db sqlitePersistence) GetProfileShowcaseForContact(contactID string) (*ide
 		Collectibles:     collectibles,
 		VerifiedTokens:   verifiedTokens,
 		UnverifiedTokens: unverifiedTokens,
+		SocialLinks:      socialLinks,
 	}, nil
 }
 
@@ -802,6 +916,11 @@ func (db sqlitePersistence) ClearProfileShowcaseForContact(contactID string) err
 	}
 
 	err = db.clearProfileShowcaseUnverifiedTokensContact(tx, contactID)
+	if err != nil {
+		return err
+	}
+
+	err = db.clearProfileShowcaseSocialLinksContact(tx, contactID)
 	if err != nil {
 		return err
 	}
