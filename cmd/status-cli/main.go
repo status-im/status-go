@@ -35,11 +35,13 @@ func main() {
 				Action: func(cCtx *cli.Context) error {
 					fmt.Println("params: ", cCtx.Args().First())
 
-					enrBootstrap := "enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
+					// TODO test sharding
 					// enrBootstrap := "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"
+					enrBootstrap := "enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
 
-					// start alice node and messager
-					fmt.Println("starting alice messager")
+					// Start alice node and messager
+
+					fmt.Println("[Alice] starting messager")
 					alicePrivKey, err := crypto.GenerateKey()
 					if err != nil {
 						fmt.Println(err)
@@ -58,10 +60,8 @@ func main() {
 
 					aliceNode.Start()
 					defer aliceNode.Stop()
-					time.Sleep(3 * time.Second)
 
-					// backend := api.NewGethStatusBackend()
-					// fmt.Println("============: ", backend.StatusNode().WakuV2Service())
+					time.Sleep(3 * time.Second)
 
 					appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 					if err != nil {
@@ -111,12 +111,13 @@ func main() {
 					defer aliceMessenger.Shutdown()
 
 					aliceId := types.EncodeHex(crypto.FromECDSAPub(aliceMessenger.IdentityPublicKey()))
-					fmt.Println("alice messenger started, id:", aliceId)
+					fmt.Println("[Alice] messenger started, id:", aliceId)
 
 					time.Sleep(3 * time.Second)
 
-					// start bob node and messenger
-					fmt.Println("starting bob messenger")
+					// Start bob node and messenger
+
+					fmt.Println("[Bob] starting messenger")
 					bobPrivKey, err := crypto.GenerateKey()
 					if err != nil {
 						fmt.Println(err)
@@ -184,36 +185,30 @@ func main() {
 					defer bobMessenger.Shutdown()
 
 					bobId := types.EncodeHex(crypto.FromECDSAPub(bobMessenger.IdentityPublicKey()))
-					fmt.Println("bob messenger started, id:", bobId)
+					fmt.Println("[Bob] messenger started, id:", bobId)
 
 					time.Sleep(3 * time.Second)
 
-					// pkString := hex.EncodeToString(crypto.FromECDSAPub(&recipientKey.PublicKey))
-					// chat := protocol.CreateOneToOneChat(pkString, &recipientKey.PublicKey, aliceMessenger.GetTransport())
-					// fmt.Println(chat)
+					// Send contact request from Alice to Bob
 
-					// send contact request
-					fmt.Println("send contact request from alice to bob")
-					fmt.Println("contact id:", bobId)
+					fmt.Println("[Alice] send contact request to bob, contact id:", bobId)
 					request := &requests.SendContactRequest{
 						ID:      bobId,
-						Message: "hello!",
+						Message: "Hello!",
 					}
 					respSendCR, err := aliceMessenger.SendContactRequest(context.Background(), request)
-					fmt.Println("SendContactRequest response: ", respSendCR)
+					fmt.Println("[Alice] function SendContactRequest response: ", respSendCR)
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
-
-					// time.Sleep(3 * time.Second)
 
 					respReceiveCR, err := protocol.WaitOnMessengerResponse(
 						bobMessenger,
 						func(r *protocol.MessengerResponse) bool {
 							return len(r.Contacts) == 1 && len(r.Messages()) >= 2
 						},
-						"bob: no contact request from alice",
+						"[Bob] no contact request from alice",
 					)
 					if err != nil {
 						fmt.Println(err)
@@ -221,76 +216,102 @@ func main() {
 					}
 
 					msg := protocol.FindFirstByContentType(respReceiveCR.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
-					fmt.Println("Receive Contact Request response: ", msg.Text)
+					fmt.Println("[Bob] receive contact request response: ", msg.Text)
 
-					// accept contact request
-					fmt.Println("accept contact request from bob to alice")
+					// Bob accept contact request
+
+					fmt.Println("[Bob] send contact request acceptance to alice")
 					respAccCR, err := bobMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(msg.ID)})
-					fmt.Println("AcceptContactRequest response: ", respAccCR)
+					fmt.Println("[Bob] function AcceptContactRequest response: ", respAccCR)
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
 
 					bobContacts := bobMessenger.MutualContacts()
-					fmt.Println("bob has contacts:", len(bobContacts))
+					fmt.Println("[Bob] contacts number:", len(bobContacts))
 
 					accRespAlice, err := protocol.WaitOnMessengerResponse(aliceMessenger,
 						func(r *protocol.MessengerResponse) bool {
 							return len(r.Contacts) == 1 && len(r.Messages()) >= 2
 						},
-						"alice: contact request acceptance not received from bob",
+						"[Alice] contact request acceptance not received from bob",
 					)
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
 					accMsg := protocol.FindFirstByContentType(accRespAlice.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED)
-					fmt.Println("alice got message:", accMsg.Text)
+					fmt.Println("[Alice] got message:", accMsg.Text)
 
 					aliceContacts := aliceMessenger.MutualContacts()
-					fmt.Println("alice has contacts:", len(aliceContacts))
+					fmt.Println("[Alice] contacts number:", len(aliceContacts))
 
-					// send dm from alice to bob
-					// myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+					// Send DM from alice to bob
+
 					aliceChat := aliceMessenger.Chat(aliceContacts[0].ID)
-					fmt.Println("alice chat with contact id:", aliceChat.ID)
-					fmt.Println("alice chat with contact id:", aliceContacts[0].ID)
+					fmt.Println("[Alice] chat with contact id:", aliceChat.ID)
+
 					clock, timestamp := aliceChat.NextClockAndTimestamp(aliceMessenger.GetTransport())
 					inputMessage := common.NewMessage()
 					inputMessage.ChatId = aliceChat.ID
-					// inputMessage.LocalChatID = aliceChat.ID
-					inputMessage.Text = "hello bob!"
+					inputMessage.LocalChatID = aliceChat.ID
 					inputMessage.Clock = clock
 					inputMessage.Timestamp = timestamp
+					inputMessage.MessageType = protobuf.MessageType_ONE_TO_ONE
+					inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+					inputMessage.Text = "Hello Bob!"
+
 					chatResp, err := aliceMessenger.SendChatMessage(context.Background(), inputMessage)
-					fmt.Println("alice SendChatMessage response:", chatResp)
-					fmt.Println("alice SendChatMessage messages:", chatResp.Messages())
-					fmt.Println("alice SendChatMessage message text:", chatResp.Messages()[0].Text)
+					fmt.Println("[Alice] function SendChatMessage response.messages:", chatResp.Messages())
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
 
-					// bobChat := bobMessenger.Chat(bobContacts[0].ID)
-					// fmt.Println("bob chat id:", bobChat.ID)
-
-					// bobChats := bobMessenger.Chats()
-					// for _, c := range bobChats {
-					// 	fmt.Println("bob chats -> chat id:", c.ID)
-					// }
-
 					chatRespBob, err := protocol.WaitOnMessengerResponse(
 						bobMessenger,
 						func(r *protocol.MessengerResponse) bool { return len(r.Messages()) > 0 },
-						"bob: not receive message from alice",
+						"[Bob] not receive message from alice",
 					)
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
-					fmt.Println("bob receive message:", chatRespBob.Chats()[0].LastMessage.Text)
-					fmt.Println("bob receive message chats:", len(chatRespBob.Chats()))
+					fmt.Println("[Bob] receive message from alice:", chatRespBob.Chats()[0].LastMessage.Text)
+
+					// Send DM from bob to alice
+
+					bobChat := bobMessenger.Chat(bobContacts[0].ID)
+					fmt.Println("[Bob] chat with contact id:", bobChat.ID)
+
+					bobClock, bobTimestamp := bobChat.NextClockAndTimestamp(bobMessenger.GetTransport())
+					bobInputMessage := common.NewMessage()
+					bobInputMessage.ChatId = bobChat.ID
+					bobInputMessage.LocalChatID = bobChat.ID
+					bobInputMessage.Clock = bobClock
+					bobInputMessage.Timestamp = bobTimestamp
+					bobInputMessage.MessageType = protobuf.MessageType_ONE_TO_ONE
+					bobInputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+					bobInputMessage.Text = "Hello Alice!"
+
+					bobSendChatResp, err := bobMessenger.SendChatMessage(context.Background(), bobInputMessage)
+					fmt.Println("[Bob] function SendChatMessage response.messages:", bobSendChatResp.Messages())
+					if err != nil {
+						fmt.Println(err)
+						return err
+					}
+
+					aliceReceiveChatResp, err := protocol.WaitOnMessengerResponse(
+						aliceMessenger,
+						func(r *protocol.MessengerResponse) bool { return len(r.Messages()) > 0 },
+						"[Alice] not receive message from bob",
+					)
+					if err != nil {
+						fmt.Println(err)
+						return err
+					}
+					fmt.Println("[Alice] receive message from bob:", aliceReceiveChatResp.Chats()[0].LastMessage.Text)
 
 					return nil
 				},

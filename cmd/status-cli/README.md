@@ -7,3 +7,11 @@ The Status CLI is a command line interface for interacting with the Status messe
 - Create a new account
 - Send and receive contact request
 - DM between contacts
+
+## Run
+
+```bash
+go run main.go dm > log
+```
+
+Result is recorded in file `log`.
