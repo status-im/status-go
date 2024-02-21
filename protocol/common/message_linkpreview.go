@@ -31,6 +31,7 @@ type LinkPreview struct {
 	Hostname    string                         `json:"hostname"`
 	Title       string                         `json:"title,omitempty"`
 	Description string                         `json:"description,omitempty"`
+	Favicon     string                         `json:"icon,omitempty"`
 	Thumbnail   LinkPreviewThumbnail           `json:"thumbnail,omitempty"`
 }
 

@@ -6,9 +6,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	neturl "net/url"
+	"strings"
 
 	"github.com/keighl/metabolize"
 	"go.uber.org/zap"
+	"golang.org/x/net/html"
 
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
@@ -38,6 +40,28 @@ func NewOpenGraphUnfurler(URL *neturl.URL, logger *zap.Logger, httpClient *http.
 	}
 }
 
+func GetFavicon(bodyBytes []byte) string {
+	htmlTokens := html.NewTokenizer(bytes.NewBuffer(bodyBytes))
+	loop:
+	for {
+        tt := htmlTokens.Next()
+        switch tt {
+        case html.ErrorToken:
+            break loop
+        case html.StartTagToken:
+            t := htmlTokens.Token()
+            if t.Data == "link" {
+                for _, attribute := range t.Attr {
+					if strings.HasSuffix(attribute.Val, ".ico") || strings.HasSuffix(attribute.Val, ".png") || strings.HasSuffix(attribute.Val, ".svg") {
+						return attribute.Val
+					}
+				}
+            }
+        }
+	}
+	return ""
+}
+
 func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(u.url)
 	preview.Type = protobuf.UnfurledLink_LINK
@@ -57,6 +81,8 @@ func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 	if err != nil {
 		return preview, fmt.Errorf("failed to parse OpenGraph data")
 	}
+
+	faviconPath := GetFavicon(bodyBytes)
 
 	// There are URLs like https://wikipedia.org/ that don't have an OpenGraph
 	// title tag, but article pages do. In the future, we can fallback to the
@@ -78,6 +104,11 @@ func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 
 	preview.Title = ogMetadata.Title
 	preview.Description = ogMetadata.Description
+
+	if faviconPath != "" {
+		preview.Favicon = faviconPath
+	}
+
 	return preview, nil
 }
 
