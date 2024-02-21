@@ -315,11 +315,10 @@ func (m *Messenger) backupCommunities(ctx context.Context, clock uint64) ([]*pro
 				return nil, err
 			}
 
-			encodedKeys, err := m.encryptor.GetAllHREncodedKeys(c.ID())
+			err = m.propagateSyncInstallationCommunityWithHRKeys(syncMessage, c)
 			if err != nil {
 				return nil, err
 			}
-			syncMessage.EncryptionKeys = encodedKeys
 
 			backupMessage := &protobuf.Backup{
 				Communities: []*protobuf.SyncInstallationCommunity{syncMessage},
