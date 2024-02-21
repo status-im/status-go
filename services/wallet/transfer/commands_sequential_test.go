@@ -19,7 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -281,21 +280,12 @@ func (tc *TestClient) HeaderByNumber(ctx context.Context, number *big.Int) (*typ
 	return header, nil
 }
 
-func (tc *TestClient) FullTransactionByBlockNumberAndIndex(ctx context.Context, blockNumber *big.Int, index uint) (*chain.FullTransaction, error) {
+func (tc *TestClient) CallBlockHashByTransaction(ctx context.Context, blockNumber *big.Int, index uint) (common.Hash, error) {
 	tc.incCounter("FullTransactionByBlockNumberAndIndex")
 	if tc.traceAPICalls {
 		tc.t.Log("FullTransactionByBlockNumberAndIndex")
 	}
-	blockHash := common.BigToHash(blockNumber)
-	tx := &chain.FullTransaction{
-		Tx: &types.Transaction{},
-		TxExtraInfo: chain.TxExtraInfo{
-			BlockNumber: (*hexutil.Big)(big.NewInt(0)),
-			BlockHash:   &blockHash,
-		},
-	}
-
-	return tx, nil
+	return common.BigToHash(blockNumber), nil
 }
 
 func (tc *TestClient) GetBaseFeeFromBlock(blockNumber *big.Int) (string, error) {

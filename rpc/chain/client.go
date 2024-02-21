@@ -38,7 +38,7 @@ type ClientInterface interface {
 	FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error)
 	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
-	FullTransactionByBlockNumberAndIndex(ctx context.Context, blockNumber *big.Int, index uint) (*FullTransaction, error)
+	CallBlockHashByTransaction(ctx context.Context, blockNumber *big.Int, index uint) (common.Hash, error)
 	GetBaseFeeFromBlock(blockNumber *big.Int) (string, error)
 	NetworkID() uint64
 	ToBigInt() *big.Int
@@ -877,24 +877,24 @@ func (c *ClientWithFallback) GetBaseFeeFromBlock(blockNumber *big.Int) (string, 
 // go-ethereum's `Transaction` items drop the blkHash obtained during the RPC call.
 // This function preserves the additional data. This is the cheapest way to obtain
 // the block hash for a given block number.
-func (c *ClientWithFallback) FullTransactionByBlockNumberAndIndex(ctx context.Context, blockNumber *big.Int, index uint) (*FullTransaction, error) {
+func (c *ClientWithFallback) CallBlockHashByTransaction(ctx context.Context, blockNumber *big.Int, index uint) (common.Hash, error) {
 	rpcstats.CountCall("eth_FullTransactionByBlockNumberAndIndex")
 
 	tx, err := c.makeCallSingleReturn(
 		func() (any, error) {
-			return callFullTransactionByBlockNumberAndIndex(ctx, c.mainRPC, blockNumber, index)
+			return callBlockHashByTransaction(ctx, c.mainRPC, blockNumber, index)
 		},
 		func() (any, error) {
-			return callFullTransactionByBlockNumberAndIndex(ctx, c.fallbackRPC, blockNumber, index)
+			return callBlockHashByTransaction(ctx, c.fallbackRPC, blockNumber, index)
 		},
 		true,
 	)
 
 	if err != nil {
-		return nil, err
+		return common.HexToHash(""), err
 	}
 
-	return tx.(*FullTransaction), nil
+	return tx.(common.Hash), nil
 }
 
 func (c *ClientWithFallback) GetWalletNotifier() func(chainId uint64, message string) {
