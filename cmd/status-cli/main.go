@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/google/uuid"
+
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
@@ -22,6 +24,7 @@ import (
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/wakuv2"
 	"github.com/status-im/status-go/walletdatabase"
+
 	"github.com/urfave/cli/v2"
 )
 
@@ -58,8 +61,13 @@ func main() {
 						return err
 					}
 
-					aliceNode.Start()
-					defer aliceNode.Stop()
+					err = aliceNode.Start()
+					if err != nil {
+						fmt.Println(err)
+						return err
+					}
+
+					defer func() { _ = aliceNode.Stop() }()
 
 					time.Sleep(3 * time.Second)
 
@@ -107,11 +115,15 @@ func main() {
 						return err
 					}
 
-					aliceMessenger.Start()
-					defer aliceMessenger.Shutdown()
+					_, err = aliceMessenger.Start()
+					if err != nil {
+						fmt.Println(err)
+						return err
+					}
+					defer func() { _ = aliceMessenger.Shutdown() }()
 
-					aliceId := types.EncodeHex(crypto.FromECDSAPub(aliceMessenger.IdentityPublicKey()))
-					fmt.Println("[Alice] messenger started, id:", aliceId)
+					aliceID := types.EncodeHex(crypto.FromECDSAPub(aliceMessenger.IdentityPublicKey()))
+					fmt.Println("[Alice] messenger started, id:", aliceID)
 
 					time.Sleep(3 * time.Second)
 
@@ -129,13 +141,19 @@ func main() {
 					bobConfig.DiscV5BootstrapNodes = []string{enrBootstrap}
 					bobConfig.DiscoveryLimit = 20
 					bobNode, err := wakuv2.New("", "", bobConfig, nil, nil, nil, nil, nil)
-					bobNode.Start()
-					defer bobNode.Stop()
-					time.Sleep(3 * time.Second)
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
+
+					err = bobNode.Start()
+					if err != nil {
+						fmt.Println(err)
+						return err
+					}
+					defer func() { _ = bobNode.Stop() }()
+
+					time.Sleep(3 * time.Second)
 
 					appDb2, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 					if err != nil {
@@ -181,19 +199,23 @@ func main() {
 						return err
 					}
 
-					bobMessenger.Start()
-					defer bobMessenger.Shutdown()
+					_, err = bobMessenger.Start()
+					if err != nil {
+						fmt.Println(err)
+						return err
+					}
+					defer func() { _ = bobMessenger.Shutdown() }()
 
-					bobId := types.EncodeHex(crypto.FromECDSAPub(bobMessenger.IdentityPublicKey()))
-					fmt.Println("[Bob] messenger started, id:", bobId)
+					bobID := types.EncodeHex(crypto.FromECDSAPub(bobMessenger.IdentityPublicKey()))
+					fmt.Println("[Bob] messenger started, id:", bobID)
 
 					time.Sleep(3 * time.Second)
 
 					// Send contact request from Alice to Bob
 
-					fmt.Println("[Alice] send contact request to bob, contact id:", bobId)
+					fmt.Println("[Alice] send contact request to bob, contact id:", bobID)
 					request := &requests.SendContactRequest{
-						ID:      bobId,
+						ID:      bobID,
 						Message: "Hello!",
 					}
 					respSendCR, err := aliceMessenger.SendContactRequest(context.Background(), request)
