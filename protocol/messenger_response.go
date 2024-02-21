@@ -687,6 +687,13 @@ func (r *MessengerResponse) DiscordMessageAttachments() []*protobuf.DiscordMessa
 	return attachments
 }
 
+// Messages extracts the messages from the response and returns them as a slice.
+// Since 'r.messages' is a map, the order of messages in the resulting slice is not
+// guaranteed and can vary with each call to this method. This is inherent to Go's map
+// iteration behavior, which does not define a sequence for the order of map elements.
+// Consumers should not depend on the ordering of messages in the slice for any logic
+// that requires consistent ordering, as map iteration order can change when keys are
+// added or deleted. Consider sorting the slice after retrieval if a specific order is needed.
 func (r *MessengerResponse) Messages() []*common.Message {
 	var ms []*common.Message
 	for _, m := range r.messages {
