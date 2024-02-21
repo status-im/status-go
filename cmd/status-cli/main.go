@@ -201,7 +201,7 @@ func main() {
 					resp2, err := protocol.WaitOnMessengerResponse(
 						bobMessenger,
 						func(r *protocol.MessengerResponse) bool {
-							return len(r.Contacts) == 1 && len(r.Messages()) >= 1
+							return len(r.Contacts) == 1 && len(r.Messages()) >= 2
 						},
 						"no messages",
 					)
@@ -212,6 +212,36 @@ func main() {
 
 					msg := protocol.FindFirstByContentType(resp2.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
 					fmt.Println("==============msg", msg.Text)
+
+					// accept contact request
+					fmt.Println("accept contact request from bob to alice")
+					accResp, err := bobMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(msg.ID)})
+					fmt.Println("==============accept contact resuest resp", accResp)
+					if err != nil {
+						fmt.Println(err)
+						return err
+					}
+
+					bobContacts := bobMessenger.MutualContacts()
+					fmt.Println("==============bob has contacts:", len(bobContacts))
+
+					accRespAlice, err := protocol.WaitOnMessengerResponse(aliceMessenger,
+						func(r *protocol.MessengerResponse) bool {
+							return len(r.Contacts) == 1 && len(r.Messages()) >= 2
+						},
+						"contact request acceptance not received",
+					)
+					if err != nil {
+						fmt.Println(err)
+						return err
+					}
+					accMsg := protocol.FindFirstByContentType(accRespAlice.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED)
+					fmt.Println("==============accept message", accMsg.Text)
+
+					aliceContacts := aliceMessenger.MutualContacts()
+					fmt.Println("==============alice has contacts", len(aliceContacts))
+
+					// send dm from alice to bob
 
 					return nil
 				},
