@@ -4202,11 +4202,11 @@ func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) 
 
 		} else if changes.MemberKicked {
 			notificationType := ActivityCenterNotificationTypeCommunityKicked
-			if changes.HasMemberBanned(pkString) {
+			if changes.IsMemberBanned(pkString) {
 				notificationType = ActivityCenterNotificationTypeCommunityBanned
 			}
 			m.leaveCommunityDueToKickOrBan(changes.Community, notificationType, messageState.Response)
-		} else if changes.HasMemberUnbanned(pkString) {
+		} else if changes.IsMemberUnbanned(pkString) {
 			m.AddActivityCenterNotificationToResponse(changes.Community.IDString(), ActivityCenterNotificationTypeCommunityUnbanned, messageState.Response)
 		}
 	}

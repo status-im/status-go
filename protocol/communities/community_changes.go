@@ -90,7 +90,7 @@ func (c *CommunityChanges) HasMemberLeft(identity string) bool {
 	return ok
 }
 
-func (c *CommunityChanges) HasMemberBanned(identity string) bool {
+func (c *CommunityChanges) IsMemberBanned(identity string) bool {
 	if len(c.MembersBanned) == 0 {
 		return false
 	}
@@ -98,7 +98,7 @@ func (c *CommunityChanges) HasMemberBanned(identity string) bool {
 	return ok
 }
 
-func (c *CommunityChanges) HasMemberUnbanned(identity string) bool {
+func (c *CommunityChanges) IsMemberUnbanned(identity string) bool {
 	if len(c.MembersUnbanned) == 0 {
 		return false
 	}
@@ -153,10 +153,10 @@ func evaluateCommunityChangesByDescription(origin, modified *protobuf.CommunityD
 	findDiffInBannedMembers(origin.BannedMembers, modified.BannedMembers, changes.MembersUnbanned)
 
 	// Check for new banned members (from deprecated BanList)
-	findDiffBanList(modified.BanList, origin.BanList, changes.MembersBanned)
+	findDiffInBanList(modified.BanList, origin.BanList, changes.MembersBanned)
 
 	// Check for new unbanned members (from deprecated BanList)
-	findDiffBanList(origin.BanList, modified.BanList, changes.MembersUnbanned)
+	findDiffInBanList(origin.BanList, modified.BanList, changes.MembersUnbanned)
 
 	// Check for removed members at the org level
 	for pk, member := range origin.Members {
@@ -283,7 +283,7 @@ func evaluateCommunityChangesByDescription(origin, modified *protobuf.CommunityD
 	return changes
 }
 
-func findDiffBanList(searchFrom []string, searchIn []string, storeTo map[string]bool) {
+func findDiffInBanList(searchFrom []string, searchIn []string, storeTo map[string]bool) {
 	for _, memberToFind := range searchFrom {
 		if _, stored := storeTo[memberToFind]; stored {
 			continue
