@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
@@ -15,6 +16,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/wakuv2"
@@ -47,11 +49,14 @@ func main() {
 					config.DiscV5BootstrapNodes = []string{enrBootstrap}
 					config.DiscoveryLimit = 20
 					aliceNode, err := wakuv2.New("", "", config, nil, nil, nil, nil, nil)
-					fmt.Println(aliceNode)
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
+
+					aliceNode.Start()
+					defer aliceNode.Stop()
+					time.Sleep(3 * time.Second)
 
 					// backend := api.NewGethStatusBackend()
 					// fmt.Println("============: ", backend.StatusNode().WakuV2Service())
@@ -103,6 +108,8 @@ func main() {
 					aliceMessenger.Start()
 					defer aliceMessenger.Shutdown()
 
+					time.Sleep(3 * time.Second)
+
 					// start bob node and messager
 					fmt.Println("start bob messager")
 					bobPrivKey, err := crypto.GenerateKey()
@@ -116,6 +123,9 @@ func main() {
 					bobConfig.DiscV5BootstrapNodes = []string{enrBootstrap}
 					bobConfig.DiscoveryLimit = 20
 					bobNode, err := wakuv2.New("", "", bobConfig, nil, nil, nil, nil, nil)
+					bobNode.Start()
+					defer bobNode.Stop()
+					time.Sleep(3 * time.Second)
 					if err != nil {
 						fmt.Println(err)
 						return err
@@ -168,6 +178,8 @@ func main() {
 					bobMessenger.Start()
 					defer bobMessenger.Shutdown()
 
+					time.Sleep(3 * time.Second)
+
 					// pkString := hex.EncodeToString(crypto.FromECDSAPub(&recipientKey.PublicKey))
 					// chat := protocol.CreateOneToOneChat(pkString, &recipientKey.PublicKey, aliceMessenger.GetTransport())
 					// fmt.Println(chat)
@@ -180,11 +192,26 @@ func main() {
 						Message: "hello!",
 					}
 					resp, err := aliceMessenger.SendContactRequest(context.Background(), request)
-					fmt.Println("resp", resp)
+					fmt.Println("==============resp", resp)
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
+
+					resp2, err := protocol.WaitOnMessengerResponse(
+						bobMessenger,
+						func(r *protocol.MessengerResponse) bool {
+							return len(r.Contacts) == 1 && len(r.Messages()) >= 1
+						},
+						"no messages",
+					)
+					if err != nil {
+						fmt.Println(err)
+						return err
+					}
+
+					msg := protocol.FindFirstByContentType(resp2.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+					fmt.Println("==============msg", msg.Text)
 
 					return nil
 				},
