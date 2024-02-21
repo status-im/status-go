@@ -2286,6 +2286,12 @@ func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommu
 		}()
 	}
 
+	// ensure HRkeys are synced
+	err = m.syncCommunity(context.Background(), community, m.dispatchMessage)
+	if err != nil {
+		return nil, err
+	}
+
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
@@ -3175,10 +3181,18 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 		return nil
 	}
 
-	// Handle community keys
-	if len(syncCommunity.EncryptionKeys) != 0 {
+	// Handle deprecated community keys
+	if len(syncCommunity.EncryptionKeysV1) != 0 {
 		//  We pass nil,nil as private key/public key as they won't be encrypted
-		_, err := m.encryptor.HandleHashRatchetKeysPayload(syncCommunity.Id, syncCommunity.EncryptionKeys, nil, nil)
+		_, err := m.encryptor.HandleHashRatchetKeysPayload(syncCommunity.Id, syncCommunity.EncryptionKeysV1, nil, nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Handle community and channel keys
+	if len(syncCommunity.EncryptionKeysV2) != 0 {
+		err := m.encryptor.HandleHashRatchetHeadersPayload(syncCommunity.EncryptionKeysV2)
 		if err != nil {
 			return err
 		}

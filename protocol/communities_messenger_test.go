@@ -2602,6 +2602,81 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	s.True(tnc.IsOwner())
 }
 
+func (s *MessengerCommunitiesSuite) TestSyncCommunity_EncryptionKeys() {
+	// Create new device
+	ownersOtherDevice := s.createOtherDevice(s.owner)
+	defer TearDownMessenger(&s.Suite, ownersOtherDevice)
+
+	PairDevices(&s.Suite, ownersOtherDevice, s.owner)
+
+	community, chat := s.createCommunity()
+	s.owner.communitiesManager.RekeyInterval = 1 * time.Hour
+
+	{ // ensure both community and channel are encrypted
+		permissionRequest := requests.CreateCommunityTokenPermission{
+			CommunityID: community.ID(),
+			Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+			TokenCriteria: []*protobuf.TokenCriteria{
+				&protobuf.TokenCriteria{
+					Type:              protobuf.CommunityTokenType_ERC20,
+					ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+					Symbol:            "TEST",
+					Amount:            "100",
+					Decimals:          uint64(18),
+				},
+			},
+		}
+		_, err := s.owner.CreateCommunityTokenPermission(&permissionRequest)
+		s.Require().NoError(err)
+
+		channelPermissionRequest := requests.CreateCommunityTokenPermission{
+			CommunityID: community.ID(),
+			Type:        protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+			TokenCriteria: []*protobuf.TokenCriteria{
+				&protobuf.TokenCriteria{
+					Type:              protobuf.CommunityTokenType_ERC20,
+					ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+					Symbol:            "TEST",
+					Amount:            "100",
+					Decimals:          uint64(18),
+				},
+			},
+			ChatIds: []string{chat.ID},
+		}
+
+		_, err = s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)
+		s.Require().NoError(err)
+	}
+
+	getKeysCount := func(m *Messenger) (communityKeysCount int, channelKeysCount int) {
+		keys, err := m.encryptor.GetAllHRKeys(community.ID())
+		s.Require().NoError(err)
+		if keys != nil {
+			communityKeysCount = len(keys.Keys)
+		}
+
+		channelKeys, err := m.encryptor.GetAllHRKeys([]byte(community.IDString() + chat.CommunityChatID()))
+		s.Require().NoError(err)
+		if channelKeys != nil {
+			channelKeysCount = len(channelKeys.Keys)
+		}
+		return
+	}
+
+	communityKeysCount, channelKeysCount := getKeysCount(s.owner)
+	s.Require().GreaterOrEqual(communityKeysCount, 1)
+	s.Require().GreaterOrEqual(channelKeysCount, 1)
+
+	// ensure both community and channel keys are synced
+	_, err := WaitOnMessengerResponse(ownersOtherDevice, func(mr *MessengerResponse) bool {
+		communityKeysCount, channelKeysCount := getKeysCount(s.owner)
+		syncedCommunityKeysCount, syncedChannelKeysCount := getKeysCount(ownersOtherDevice)
+
+		return communityKeysCount == syncedCommunityKeysCount && channelKeysCount == syncedChannelKeysCount
+	}, "keys not synced")
+	s.Require().NoError(err)
+}
+
 // TestSyncCommunity_RequestToJoin tests more complex pairing and syncing scenario where one paired device
 // makes a request to join a community
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {

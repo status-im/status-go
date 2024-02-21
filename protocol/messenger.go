@@ -3121,6 +3121,36 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact, rawMessag
 	return m.saveChat(chat)
 }
 
+func (m *Messenger) propagateSyncInstallationCommunityWithHRKeys(msg *protobuf.SyncInstallationCommunity, c *communities.Community) error {
+	communityKeys, err := m.encryptor.GetAllHRKeysMarshaledV1(c.ID())
+	if err != nil {
+		return err
+	}
+	msg.EncryptionKeysV1 = communityKeys
+
+	communityAndChannelKeys := [][]byte{}
+	communityKeys, err = m.encryptor.GetAllHRKeysMarshaledV2(c.ID())
+	if err != nil {
+		return err
+	}
+	if len(communityKeys) > 0 {
+		communityAndChannelKeys = append(communityAndChannelKeys, communityKeys)
+	}
+
+	for channelID := range c.Chats() {
+		channelKeys, err := m.encryptor.GetAllHRKeysMarshaledV2([]byte(c.IDString() + channelID))
+		if err != nil {
+			return err
+		}
+		if len(channelKeys) > 0 {
+			communityAndChannelKeys = append(communityAndChannelKeys, channelKeys)
+		}
+	}
+	msg.EncryptionKeysV2 = communityAndChannelKeys
+
+	return nil
+}
+
 func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Community, rawMessageHandler RawMessageHandler) error {
 	logger := m.logger.Named("syncCommunity")
 	if !m.hasPairedDevices() {
@@ -3146,11 +3176,10 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 		return err
 	}
 
-	encodedKeys, err := m.encryptor.GetAllHREncodedKeys(community.ID())
+	err = m.propagateSyncInstallationCommunityWithHRKeys(syncMessage, community)
 	if err != nil {
 		return err
 	}
-	syncMessage.EncryptionKeys = encodedKeys
 
 	encodedMessage, err := proto.Marshal(syncMessage)
 	if err != nil {
