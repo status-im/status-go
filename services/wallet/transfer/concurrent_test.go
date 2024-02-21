@@ -8,12 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/balance"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -83,15 +81,8 @@ func (f balancesFixture) NetworkID() uint64 {
 	return 0
 }
 
-func (f balancesFixture) FullTransactionByBlockNumberAndIndex(ctx context.Context, blockNumber *big.Int, index uint) (*chain.FullTransaction, error) {
-	blockHash := common.HexToHash("0x0")
-	return &chain.FullTransaction{
-		Tx: &types.Transaction{},
-		TxExtraInfo: chain.TxExtraInfo{
-			BlockNumber: (*hexutil.Big)(big.NewInt(0)),
-			BlockHash:   &blockHash,
-		},
-	}, nil
+func (f balancesFixture) CallBlockHashByTransaction(ctx context.Context, blockNumber *big.Int, index uint) (common.Hash, error) {
+	return common.HexToHash("0x0"), nil
 }
 
 type batchesFixture [][]Transfer
