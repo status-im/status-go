@@ -2883,10 +2883,10 @@ func (db sqlitePersistence) saveBridgeMessage(tx *sql.Tx, message *protobuf.Brid
 	return
 }
 
-func (db sqlitePersistence) GetCommunityMemberAllMessagesID(member string, communityID string, clock uint64) ([]*DeletedMessage, error) {
+func (db sqlitePersistence) GetCommunityMemberAllMessagesID(member string, communityID string) ([]*DeletedMessage, error) {
 	rows, err := db.db.Query(`SELECT m.id, m.chat_id FROM user_messages as m
 		INNER JOIN chats AS ch ON ch.id = m.chat_id AND ch.community_id = ?
-		WHERE m.source = ? AND m.timestamp <= ?`, communityID, member, clock)
+		WHERE m.source = ?`, communityID, member)
 
 	if err != nil {
 		return nil, err
@@ -2906,22 +2906,4 @@ func (db sqlitePersistence) GetCommunityMemberAllMessagesID(member string, commu
 	}
 
 	return result, nil
-}
-
-func (db sqlitePersistence) IsMessageFromBannedCommunityMember(message *common.Message) (bool, error) {
-	banned := false
-	err := db.db.QueryRow(
-		`SELECT EXISTS ( SELECT 1
-			FROM user_messages_remove AS umr
-			INNER JOIN chats AS ch ON ch.id = ?
-			WHERE umr.user_id = ? AND umr.community_id = ch.community_id AND umr.clock >= ? )`,
-		message.ChatId, message.From, message.WhisperTimestamp).Scan(&banned)
-
-	if err == sql.ErrNoRows {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return banned, err
 }

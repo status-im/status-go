@@ -1939,25 +1939,21 @@ func TestGetCommunityMemberAllNonDeletedMessages(t *testing.T) {
 	err = p.SaveChats([]*Chat{chat})
 	require.NoError(t, err)
 
-	messages, err := p.GetCommunityMemberAllMessagesID(testPK, testCommunity, clock)
+	messages, err := p.GetCommunityMemberAllMessagesID(testPK, testCommunity)
 	require.NoError(t, err)
 	require.Len(t, messages, 0)
 
 	saveMessage("1", testPK, false)
 
-	messages, err = p.GetCommunityMemberAllMessagesID(testPK, testCommunity, clock-1)
+	messages, err = p.GetCommunityMemberAllMessagesID(testPK, "wrong community")
 	require.NoError(t, err)
 	require.Len(t, messages, 0)
 
-	messages, err = p.GetCommunityMemberAllMessagesID(testPK, "wrong community", clock)
+	messages, err = p.GetCommunityMemberAllMessagesID("wrong user name", testCommunity)
 	require.NoError(t, err)
 	require.Len(t, messages, 0)
 
-	messages, err = p.GetCommunityMemberAllMessagesID("wrong user name", testCommunity, clock)
-	require.NoError(t, err)
-	require.Len(t, messages, 0)
-
-	messages, err = p.GetCommunityMemberAllMessagesID(testPK, testCommunity, clock)
+	messages, err = p.GetCommunityMemberAllMessagesID(testPK, testCommunity)
 	require.NoError(t, err)
 	require.Len(t, messages, 1)
 	require.Exactly(t, "1", messages[0].ID)
@@ -1965,13 +1961,13 @@ func TestGetCommunityMemberAllNonDeletedMessages(t *testing.T) {
 
 	saveMessage("2", "another user", false)
 
-	messages, err = p.GetCommunityMemberAllMessagesID(testPK, testCommunity, clock)
+	messages, err = p.GetCommunityMemberAllMessagesID(testPK, testCommunity)
 	require.NoError(t, err)
 	require.Len(t, messages, 1)
 
 	saveMessage("3", testPK, true)
 
-	messages, err = p.GetCommunityMemberAllMessagesID(testPK, testCommunity, clock)
+	messages, err = p.GetCommunityMemberAllMessagesID(testPK, testCommunity)
 	require.NoError(t, err)
 	require.Len(t, messages, 2)
 }

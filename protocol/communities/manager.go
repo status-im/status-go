@@ -5259,7 +5259,3 @@ func (c *Community) ToStatusLinkPreview() (*common.StatusCommunityLinkPreview, e
 
 	return communityLinkPreview, nil
 }
-
-func (m *Manager) SaveRemoveAllCommunityMemberMessages(userID string, communityID string, clock uint64) error {
-	return m.persistence.SaveRemoveAllCommunityMemberMessages(userID, communityID, clock)
-}

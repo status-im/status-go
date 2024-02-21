@@ -519,8 +519,8 @@ func (m *Messenger) SendGroupChatMessage(request *requests.SendGroupChatMessage)
 	return m.sendChatMessage(context.Background(), message)
 }
 
-func (m *Messenger) DeleteAllCommunityMemberMessages(member string, communityID string, clock uint64) (*MessengerResponse, error) {
-	messagesToDelete, err := m.persistence.GetCommunityMemberAllMessagesID(member, communityID, clock)
+func (m *Messenger) DeleteAllCommunityMemberMessages(member string, communityID string) (*MessengerResponse, error) {
+	messagesToDelete, err := m.persistence.GetCommunityMemberAllMessagesID(member, communityID)
 	if err != nil {
 		return nil, err
 	}
@@ -552,13 +552,4 @@ func (m *Messenger) DeleteAllCommunityMemberMessages(member string, communityID 
 	}
 
 	return response, nil
-}
-
-func (m *Messenger) DeleteBannedCommunityMemberMessages(member string, communityID string, clock uint64) (*MessengerResponse, error) {
-	err := m.communitiesManager.SaveRemoveAllCommunityMemberMessages(member, communityID, clock)
-	if err != nil {
-		return nil, err
-	}
-
-	return m.DeleteAllCommunityMemberMessages(member, communityID, clock)
 }

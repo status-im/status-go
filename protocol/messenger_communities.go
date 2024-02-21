@@ -2665,7 +2665,7 @@ func (m *Messenger) BanUserFromCommunity(ctx context.Context, request *requests.
 	response.AddCommunity(community)
 
 	if request.DeleteAllMessages {
-		deleteMessagesResponse, err := m.DeleteBannedCommunityMemberMessages(request.User.String(), request.CommunityID.String(), community.Clock())
+		deleteMessagesResponse, err := m.DeleteAllCommunityMemberMessages(request.User.String(), request.CommunityID.String())
 		if err != nil {
 			return nil, err
 		}
@@ -2819,7 +2819,7 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 	if len(communityResponse.Changes.MembersBanned) > 0 {
 		for memberID, deleteAllMessages := range communityResponse.Changes.MembersBanned {
 			if deleteAllMessages {
-				response, err := m.DeleteBannedCommunityMemberMessages(memberID, community.IDString(), community.Clock())
+				response, err := m.DeleteAllCommunityMemberMessages(memberID, community.IDString())
 				if err != nil {
 					return err
 				}
