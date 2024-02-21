@@ -40,4 +40,3 @@ func IsFleetSupported(fleet string) bool {
 func GetSupportedFleets() map[string][]string {
 	return supportedFleets
 }
-
