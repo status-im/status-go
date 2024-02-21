@@ -451,17 +451,16 @@ func NewMessenger(
 
 	ensVerifier := ens.New(node, logger, transp, database, c.verifyENSURL, c.verifyENSContractAddress)
 
-	var walletAPI *wallet.API
-	if c.walletService != nil {
-		walletAPI = wallet.NewAPI(c.walletService)
-	}
-
 	managerOptions := []communities.ManagerOption{
 		communities.WithAccountManager(c.accountsManager),
 	}
 
-	if walletAPI != nil {
+	var walletAPI *wallet.API
+	if c.walletService != nil {
+		walletAPI = wallet.NewAPI(c.walletService)
 		managerOptions = append(managerOptions, communities.WithCollectiblesManager(walletAPI))
+	} else if c.collectiblesManager != nil {
+		managerOptions = append(managerOptions, communities.WithCollectiblesManager(c.collectiblesManager))
 	}
 
 	if c.tokenManager != nil {
@@ -477,10 +476,6 @@ func NewMessenger(
 
 	if c.communityTokensService != nil {
 		managerOptions = append(managerOptions, communities.WithCommunityTokensService(c.communityTokensService))
-	}
-
-	if c.collectiblesManager != nil {
-		managerOptions = append(managerOptions, communities.WithCollectiblesManager(c.collectiblesManager))
 	}
 
 	communitiesKeyDistributor := &CommunitiesKeyDistributorImpl{
