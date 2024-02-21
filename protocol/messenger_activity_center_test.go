@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -379,21 +378,13 @@ func (s *MessengerActivityCenterMessageSuite) prepareCommunityChannelWithMention
 	replyNotification := response.ActivityCenterNotifications()[0]
 	s.Require().False(response.ActivityCenterNotifications()[0].Read)
 
-	// We should invoke response.Messages() only once since the returned messages order is not guaranteed
-	messages := response.Messages()
 	// One message is the community message, the other is the reply to the community message
-	s.Require().Len(messages, 2)
+	s.Require().Len(response.Messages(), 2)
 
-	// There is an extra message with reply
-	if messages[0].GetResponseTo() != "" {
-		replyMessage = messages[0]
-	} else if messages[1].GetResponseTo() != "" {
-		replyMessage = messages[1]
-	} else {
-		s.Error(errors.New("can't find corresponding message in the response"))
-	}
+	replyMessage, ok := response.messages[replyNotification.Message.ID]
+	s.Require().True(ok)
+	s.Require().NotNil(replyMessage)
 	s.Require().Equal(replyMessage.ID, replyNotification.ID.String())
-	s.Require().Equal(replyMessage.ID, replyNotification.Message.ID)
 
 	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage, false)
 
