@@ -566,9 +566,9 @@ func (w *Waku) runPeerExchangeLoop() {
 		case <-ticker.C:
 			w.logger.Info("Running peer exchange loop")
 
-			connectedPeers := w.node.Host().Network().Peers()
+			availablePeers := w.node.Host().Peerstore().Peers()
 			peersWithRelay := 0
-			for _, p := range connectedPeers {
+			for _, p := range availablePeers {
 				supportedProtocols, err := w.node.Host().Peerstore().SupportsProtocols(p, relay.WakuRelayID_v200)
 				if err != nil {
 					continue
