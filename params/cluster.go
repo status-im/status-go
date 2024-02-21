@@ -34,7 +34,7 @@ func DefaultWakuNodes(fleet string) []string {
 
 func IsFleetSupported(fleet string) bool {
 	_, ok := supportedFleets[fleet]
-	return !ok
+	return ok
 }
 
 func GetSupportedFleets() map[string][]string {
