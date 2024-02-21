@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/t/helpers"
@@ -35,6 +36,7 @@ func main() {
 					fmt.Println("params: ", cCtx.Args().First())
 
 					enrBootstrap := "enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
+					// enrBootstrap := "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"
 
 					// start alice node and messager
 					fmt.Println("start alice messager")
@@ -198,12 +200,14 @@ func main() {
 						return err
 					}
 
+					// time.Sleep(3 * time.Second)
+
 					resp2, err := protocol.WaitOnMessengerResponse(
 						bobMessenger,
 						func(r *protocol.MessengerResponse) bool {
-							return len(r.Contacts) == 1 && len(r.Messages()) >= 2
+							return len(r.Contacts) == 1 && len(r.Messages()) >= 1
 						},
-						"no messages",
+						"bob: no contact request from alice",
 					)
 					if err != nil {
 						fmt.Println(err)
@@ -225,11 +229,13 @@ func main() {
 					bobContacts := bobMessenger.MutualContacts()
 					fmt.Println("==============bob has contacts:", len(bobContacts))
 
+					time.Sleep(3 * time.Second)
+
 					accRespAlice, err := protocol.WaitOnMessengerResponse(aliceMessenger,
 						func(r *protocol.MessengerResponse) bool {
 							return len(r.Contacts) == 1 && len(r.Messages()) >= 2
 						},
-						"contact request acceptance not received",
+						"alice: contact request acceptance not received from bob",
 					)
 					if err != nil {
 						fmt.Println(err)
@@ -242,6 +248,29 @@ func main() {
 					fmt.Println("==============alice has contacts", len(aliceContacts))
 
 					// send dm from alice to bob
+					aliceChat := aliceMessenger.Chat(aliceContacts[0].ID)
+					inputMessage := common.NewMessage()
+					inputMessage.ChatId = aliceChat.ID
+					inputMessage.Text = "hello bob!"
+					chatResp, err := aliceMessenger.SendChatMessage(context.Background(), inputMessage)
+					fmt.Println("==============chat resp", chatResp)
+					if err != nil {
+						fmt.Println(err)
+						return err
+					}
+
+					time.Sleep(3 * time.Second)
+
+					chatRespBob, err := protocol.WaitOnMessengerResponse(
+						bobMessenger,
+						func(r *protocol.MessengerResponse) bool { return len(r.Messages()) > 0 },
+						"bob: not receive message from alice",
+					)
+					if err != nil {
+						fmt.Println(err)
+						return err
+					}
+					fmt.Println("==============chat resp bob", chatRespBob.Chats()[0].LastMessage.Text)
 
 					return nil
 				},
