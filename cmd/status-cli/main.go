@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
+
 	"go.uber.org/zap"
 
 	"github.com/google/uuid"
@@ -90,9 +91,15 @@ func main() {
 					}
 
 					// Send DM between alice to bob
-					sendDirectMessage(cCtx, alice, bob, "Hello Bob!")
+					err = sendDirectMessage(cCtx, alice, bob, "Hello Bob!")
+					if err != nil {
+						return err
+					}
 
-					sendDirectMessage(cCtx, bob, alice, "Hello Alice!")
+					err = sendDirectMessage(cCtx, bob, alice, "Hello Alice!")
+					if err != nil {
+						return err
+					}
 
 					return nil
 				},
