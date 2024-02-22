@@ -3,6 +3,7 @@ package protocol
 import (
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/rpc"
@@ -114,13 +115,13 @@ type config struct {
 	telemetryServerURL string
 	wakuService        *wakuv2.Waku
 
-	messageResendMinDelay int
+	messageResendMinDelay time.Duration
 	messageResendMaxCount int
 }
 
 func messengerDefaultConfig() config {
 	c := config{
-		messageResendMinDelay: 30,
+		messageResendMinDelay: 30 * time.Second,
 		messageResendMaxCount: 3,
 	}
 
@@ -153,7 +154,7 @@ func WithVerifyTransactionClient(client EthClient) Option {
 	}
 }
 
-func WithResendParams(minDelay int, maxCount int) Option {
+func WithResendParams(minDelay time.Duration, maxCount int) Option {
 	return func(c *config) error {
 		c.messageResendMinDelay = minDelay
 		c.messageResendMaxCount = maxCount
