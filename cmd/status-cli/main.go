@@ -43,20 +43,27 @@ func main() {
 				Name:    "dm",
 				Aliases: []string{"d"},
 				Usage:   "Send direct message",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:  "light",
+						Usage: "Enable light mode",
+					},
+				},
 				Action: func(cCtx *cli.Context) error {
-					fmt.Println("params: ", cCtx.Args().First())
+					fmt.Println("Flags passed:")
+					for _, flag := range cCtx.FlagNames() {
+						fmt.Printf("  %s: %v\n", flag, cCtx.Value(flag))
+					}
 
 					// Start Alice and Bob's messengers
-					alice, err := startMessenger("Alice")
+					alice, err := startMessenger(cCtx, "Alice")
 					if err != nil {
-						fmt.Println(err)
 						return err
 					}
 					defer stopMessenger(alice)
 
-					bob, err := startMessenger("Bob")
+					bob, err := startMessenger(cCtx, "Bob")
 					if err != nil {
-						fmt.Println(err)
 						return err
 					}
 					defer stopMessenger(bob)
@@ -64,13 +71,11 @@ func main() {
 					// Send contact request from Alice to Bob, bob accept the request
 					msgID, err := sendContactRequest(cCtx, alice, bob)
 					if err != nil {
-						fmt.Println(err)
 						return err
 					}
 
 					err = sendContactRequestAcceptance(cCtx, bob, alice, msgID)
 					if err != nil {
-						fmt.Println(err)
 						return err
 					}
 
@@ -86,11 +91,12 @@ func main() {
 	}
 
 	if err := app.Run(os.Args); err != nil {
+		fmt.Println(err)
 		log.Fatal(err)
 	}
 }
 
-func startMessenger(name string) (*StatusCli, error) {
+func startMessenger(cCtx *cli.Context, name string) (*StatusCli, error) {
 	fmt.Printf("[%s] starting messager\n", name)
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
@@ -101,6 +107,7 @@ func startMessenger(name string) (*StatusCli, error) {
 	config.EnableDiscV5 = true
 	config.DiscV5BootstrapNodes = []string{enrBootstrap}
 	config.DiscoveryLimit = 20
+	config.LightClient = cCtx.Bool("light")
 	node, err := wakuv2.New("", "", config, nil, nil, nil, nil, nil)
 	if err != nil {
 		return nil, err
@@ -262,7 +269,6 @@ func sendDirectMessage(cCtx *cli.Context, from, to *StatusCli, text string) erro
 
 	resp, err := from.messenger.SendChatMessage(cCtx.Context, inputMessage)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 	fmt.Printf("[%s] function SendChatMessage response.messages: %v\n", from.name, resp.Messages())
