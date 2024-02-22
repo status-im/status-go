@@ -109,6 +109,8 @@ func GetType(buf []byte) ImageType {
 		return GIF
 	case IsWebp(buf):
 		return WEBP
+	case IsIco(buf):
+		return ICO
 	default:
 		return UNKNOWN
 	}
@@ -124,6 +126,8 @@ func GetMimeType(buf []byte) (string, error) {
 		return "gif", nil
 	case IsWebp(buf):
 		return "webp", nil
+	case IsIco(buf):
+		return "ico", nil
 	default:
 		return "", errors.New("image format not supported")
 	}
@@ -152,6 +156,11 @@ func IsWebp(buf []byte) bool {
 		buf[8] == 0x57 && buf[9] == 0x45 &&
 		buf[10] == 0x42 && buf[11] == 0x50
 }
+
+func IsIco(buf []byte) bool {
+	return len(buf) > 4 &&
+		buf[0] == 0 && buf[2] == 1 || buf[2] == 2 &&
+		buf[4] > 0}
 
 func GetImageDimensions(imgBytes []byte) (int, int, error) {
 	// Decode image bytes
