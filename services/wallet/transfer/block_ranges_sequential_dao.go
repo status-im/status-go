@@ -51,13 +51,13 @@ func scanRanges(rows *sql.Rows) (map[common.Address]*ethTokensBlockRanges, error
 		tlk := &bigint.NilableSQLBigInt{}
 		ts := &bigint.NilableSQLBigInt{}
 		address := common.Address{}
-		chainID := uint64(0)
-		err := rows.Scan(&address, &chainID, es, efk, elk, ts, tfk, tlk)
+		blockRanges[address] = newEthTokensBlockRanges()
+		err := rows.Scan(&address, es, efk, elk, ts, tfk, tlk, &blockRanges[address].balanceCheckHash)
 		log.Info("DDBG found something", "a", address)
 		if err != nil {
 			return nil, err
 		}
-		blockRanges[address] = newEthTokensBlockRanges()
+
 		if !es.IsNil() {
 			blockRanges[address].eth.Start = big.NewInt(es.Int64())
 		}
@@ -142,7 +142,7 @@ func (b *BlockRangeSequentialDAO) getBlockRanges(chainID uint64, addresses []com
 		}
 	}
 
-	query := "SELECT blk_start, blk_first, blk_last, token_blk_start, token_blk_first, token_blk_last, balance_check_hash FROM blocks_ranges_sequential WHERE address IN ("+
+	query := "SELECT address, blk_start, blk_first, blk_last, token_blk_start, token_blk_first, token_blk_last, balance_check_hash FROM blocks_ranges_sequential WHERE address IN ("+
 		addressesPlaceholder + ") AND network_id = ?"
 
 	log.Debug("DDBG", "q", query, "addresses", addresses, "chainID", chainID)
