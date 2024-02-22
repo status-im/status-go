@@ -6,11 +6,14 @@ import (
 	"crypto/ecdsa"
 	crand "crypto/rand"
 	"errors"
+	"math/big"
 	"reflect"
 	"sort"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
+
+	eth_common "github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -18,9 +21,83 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/services/wallet/bigint"
+	w_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
 var errorDecryptingPayloadEncryptionKey = errors.New("decrypting the payload encryption key resulted in no error and a nil key")
+var errorConvertCollectibleTokenIDToInt = errors.New("failed to convert collectible token id to bigint")
+var errorNoAccountPresentedForCollectible = errors.New("account holding the collectible is not presented in the profile showcase")
+var errorDublicateAccountAddress = errors.New("duplicate account address")
+var errorAccountVisibilityLowerThanCollectible = errors.New("account visibility lower than collectible")
+
+func toCollectibleUniqueID(contractAddress string, tokenID string, chainID uint64) (thirdparty.CollectibleUniqueID, error) {
+	tokenIDInt := new(big.Int)
+	tokenIDInt, isTokenIDOk := tokenIDInt.SetString(tokenID, 10)
+	if !isTokenIDOk {
+		return thirdparty.CollectibleUniqueID{}, errorConvertCollectibleTokenIDToInt
+	}
+
+	return thirdparty.CollectibleUniqueID{
+		ContractID: thirdparty.ContractID{
+			ChainID: w_common.ChainID(chainID),
+			Address: eth_common.HexToAddress(contractAddress),
+		},
+		TokenID: &bigint.BigInt{Int: tokenIDInt},
+	}, nil
+}
+
+func (m *Messenger) fetchCollectibleOwner(contractAddress string, tokenID string, chainID uint64) ([]thirdparty.AccountBalance, error) {
+	collectibleID, err := toCollectibleUniqueID(contractAddress, tokenID, chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	balance, err := m.communitiesManager.GetCollectiblesManager().GetCollectibleOwnership(collectibleID)
+	if err != nil {
+		return nil, err
+	}
+	return balance, nil
+}
+
+func (m *Messenger) validateCollectiblesOwnership(accounts []*identity.ProfileShowcaseAccountPreference,
+	collectibles []*identity.ProfileShowcaseCollectiblePreference) error {
+	accountsMap := make(map[string]identity.ProfileShowcaseVisibility)
+
+	for _, accountProfile := range accounts {
+		if _, ok := accountsMap[accountProfile.Address]; ok {
+			return errorDublicateAccountAddress
+		}
+		accountsMap[accountProfile.Address] = accountProfile.ShowcaseVisibility
+	}
+
+	for _, collectibleProfile := range collectibles {
+		balances, err := m.fetchCollectibleOwner(collectibleProfile.ContractAddress, collectibleProfile.TokenID,
+			collectibleProfile.ChainID)
+		if err != nil {
+			return err
+		}
+
+		// NOTE: ERC721 tokens can have only a single holder
+		// but ERC1155 which can be supported later can have more than one holder and balances > 1
+		found := false
+		for _, balance := range balances {
+			if accountShowcaseVisibility, ok := accountsMap[balance.Address.String()]; ok {
+				if accountShowcaseVisibility < collectibleProfile.ShowcaseVisibility {
+					return errorAccountVisibilityLowerThanCollectible
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			return errorNoAccountPresentedForCollectible
+		}
+	}
+
+	return nil
+}
 
 func (m *Messenger) toProfileShowcaseCommunityProto(preferences []*identity.ProfileShowcaseCommunityPreference, visibility identity.ProfileShowcaseVisibility) []*protobuf.ProfileShowcaseCommunity {
 	entries := []*protobuf.ProfileShowcaseCommunity{}
@@ -182,15 +259,16 @@ func (m *Messenger) fromProfileShowcaseAccountProto(messages []*protobuf.Profile
 
 func (m *Messenger) fromProfileShowcaseCollectibleProto(messages []*protobuf.ProfileShowcaseCollectible) []*identity.ProfileShowcaseCollectible {
 	entries := []*identity.ProfileShowcaseCollectible{}
-	for _, entry := range messages {
-		entries = append(entries, &identity.ProfileShowcaseCollectible{
-			ContractAddress: entry.ContractAddress,
-			ChainID:         entry.ChainId,
-			TokenID:         entry.TokenId,
-			CommunityID:     entry.CommunityId,
-			AccountAddress:  entry.AccountAddress,
-			Order:           int(entry.Order),
-		})
+	for _, message := range messages {
+		entry := &identity.ProfileShowcaseCollectible{
+			ContractAddress: message.ContractAddress,
+			ChainID:         message.ChainId,
+			TokenID:         message.TokenId,
+			CommunityID:     message.CommunityId,
+			AccountAddress:  message.AccountAddress,
+			Order:           int(message.Order),
+		}
+		entries = append(entries, entry)
 	}
 	return entries
 }
@@ -226,6 +304,11 @@ func (m *Messenger) SetProfileShowcasePreferences(preferences *identity.ProfileS
 
 func (m *Messenger) setProfileShowcasePreferences(preferences *identity.ProfileShowcasePreferences, sync bool) error {
 	err := identity.Validate(preferences)
+	if err != nil {
+		return err
+	}
+
+	err = m.validateCollectiblesOwnership(preferences.Accounts, preferences.Collectibles)
 	if err != nil {
 		return err
 	}

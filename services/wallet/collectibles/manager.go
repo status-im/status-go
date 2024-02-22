@@ -417,6 +417,10 @@ func (o *Manager) FetchCollectionsDataByContractID(ctx context.Context, ids []th
 	return mapToList(data), nil
 }
 
+func (o *Manager) GetCollectibleOwnership(id thirdparty.CollectibleUniqueID) ([]thirdparty.AccountBalance, error) {
+	return o.ownershipDB.GetOwnership(id)
+}
+
 func (o *Manager) getContractOwnershipProviders(chainID walletCommon.ChainID) (mainProvider thirdparty.CollectibleContractOwnershipProvider, fallbackProvider thirdparty.CollectibleContractOwnershipProvider) {
 	mainProvider = nil
 	fallbackProvider = nil

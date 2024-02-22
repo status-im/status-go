@@ -316,6 +316,10 @@ func (api *API) FetchBalancesByOwnerAndContractAddress(ctx context.Context, chai
 	return api.s.collectiblesManager.FetchBalancesByOwnerAndContractAddress(ctx, chainID, ownerAddress, contractAddresses)
 }
 
+func (api *API) GetCollectibleOwnership(id thirdparty.CollectibleUniqueID) ([]thirdparty.AccountBalance, error) {
+	return api.s.collectiblesManager.GetCollectibleOwnership(id)
+}
+
 func (api *API) RefetchOwnedCollectibles() error {
 	log.Debug("wallet.api.RefetchOwnedCollectibles")
 

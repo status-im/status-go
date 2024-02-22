@@ -164,6 +164,7 @@ func (m *DefaultTokenManager) GetAllChainIDs() ([]uint64, error) {
 
 type CollectiblesManager interface {
 	FetchBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletcommon.ChainID, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error)
+	GetCollectibleOwnership(id thirdparty.CollectibleUniqueID) ([]thirdparty.AccountBalance, error)
 }
 
 func (m *DefaultTokenManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error) {
@@ -5160,6 +5161,11 @@ func (m *Manager) encryptCommunityDescription(community *Community, d *protobuf.
 
 func (m *Manager) encryptCommunityDescriptionChannel(community *Community, channelID string, d *protobuf.CommunityDescription) (string, []byte, error) {
 	return m.encryptCommunityDescriptionImpl([]byte(community.IDString()+channelID), d)
+}
+
+// TODO: add collectiblesManager to messenger intance
+func (m *Manager) GetCollectiblesManager() CollectiblesManager {
+	return m.collectiblesManager
 }
 
 type DecryptCommunityResponse struct {

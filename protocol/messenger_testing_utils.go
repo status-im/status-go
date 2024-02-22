@@ -414,12 +414,12 @@ func RandomBytes(length int) []byte {
 	return out
 }
 
-func DummyProfileShowcasePreferences() *identity.ProfileShowcasePreferences {
-	return &identity.ProfileShowcasePreferences{
+func DummyProfileShowcasePreferences(withCollectibles bool) *identity.ProfileShowcasePreferences {
+	preferences := &identity.ProfileShowcasePreferences{
 		Communities: []*identity.ProfileShowcaseCommunityPreference{}, // empty to avoid fetching
 		Accounts: []*identity.ProfileShowcaseAccountPreference{
 			{
-				Address:            "0x32433445133424",
+				Address:            "0x0000000000000000000000000033433445133423",
 				Name:               "Status Account",
 				ColorID:            "blue",
 				Emoji:              "-_-",
@@ -427,23 +427,12 @@ func DummyProfileShowcasePreferences() *identity.ProfileShowcasePreferences {
 				Order:              0,
 			},
 			{
-				Address:            "0x3845354643324",
+				Address:            "0x0000000000000000000000000032433445133424",
 				Name:               "Money Box",
 				ColorID:            "red",
 				Emoji:              ":o)",
 				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 				Order:              1,
-			},
-		},
-		Collectibles: []*identity.ProfileShowcaseCollectiblePreference{
-			{
-				ContractAddress:    "0x12378534257568678487683576",
-				ChainID:            1,
-				TokenID:            "0x12321389592999f903",
-				CommunityID:        "0x01312357798976535",
-				AccountAddress:     "0x32433445133424",
-				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
-				Order:              0,
 			},
 		},
 		VerifiedTokens: []*identity.ProfileShowcaseVerifiedTokenPreference{
@@ -466,16 +455,34 @@ func DummyProfileShowcasePreferences() *identity.ProfileShowcasePreferences {
 		UnverifiedTokens: []*identity.ProfileShowcaseUnverifiedTokenPreference{
 			{
 				ContractAddress:    "0x454525452023452",
-				ChainID:            3,
+				ChainID:            11155111,
 				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
 			{
 				ContractAddress:    "0x12312323323233",
-				ChainID:            6,
+				ChainID:            1,
 				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 				Order:              1,
 			},
 		},
 	}
+
+	if withCollectibles {
+		preferences.Collectibles = []*identity.ProfileShowcaseCollectiblePreference{
+			{
+				ContractAddress:    "0x12378534257568678487683576",
+				ChainID:            1,
+				TokenID:            "12321389592999903",
+				CommunityID:        "0x01312357798976535",
+				AccountAddress:     "0x32433445133424",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+		}
+	} else {
+		preferences.Collectibles = []*identity.ProfileShowcaseCollectiblePreference{}
+	}
+
+	return preferences
 }

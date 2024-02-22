@@ -2,10 +2,17 @@ package protocol
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"errors"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/zap"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/appdatabase"
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -13,14 +20,97 @@ import (
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/services/wallet/bigint"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/waku"
 )
+
+type CollectiblesManagerMock struct {
+	response map[thirdparty.CollectibleUniqueID][]thirdparty.AccountBalance
+}
+
+func (m *CollectiblesManagerMock) FetchBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID,
+	ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
+	return nil, errors.New("FetchBalancesByOwnerAndContractAddress is not implemented for testCollectiblesManager")
+}
+
+func (m *CollectiblesManagerMock) GetCollectibleOwnership(requestedID thirdparty.CollectibleUniqueID) ([]thirdparty.AccountBalance, error) {
+	// NOTE: TokenID inside of thirdparty.CollectibleUniqueID is a pointer so m.response[id] is now working
+	for id, balances := range m.response {
+		if id.ContractID.Address == requestedID.ContractID.Address &&
+			id.ContractID.ChainID == requestedID.ContractID.ChainID {
+			return balances, nil
+		}
+	}
+	return []thirdparty.AccountBalance{}, nil
+}
+
+func (m *CollectiblesManagerMock) SetResponse(id thirdparty.CollectibleUniqueID, balances []thirdparty.AccountBalance) {
+	if m.response == nil {
+		m.response = map[thirdparty.CollectibleUniqueID][]thirdparty.AccountBalance{}
+	}
+	m.response[id] = balances
+}
 
 func TestMessengerProfileShowcaseSuite(t *testing.T) { // nolint: deadcode,unused
 	suite.Run(t, new(TestMessengerProfileShowcase))
 }
 
 type TestMessengerProfileShowcase struct {
-	MessengerBaseTestSuite
+	suite.Suite
+	m          *Messenger        // main instance of Messenger
+	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
+	// If one wants to send messages between different instances of Messenger,
+	// a single waku service should be shared.
+	shh              types.Waku
+	logger           *zap.Logger
+	collectiblesMock *CollectiblesManagerMock
+}
+
+func (s *TestMessengerProfileShowcase) SetupTest() {
+	s.logger = tt.MustCreateTestLogger()
+
+	config := waku.DefaultConfig
+	config.MinimumAcceptedPoW = 0
+	shh := waku.New(&config, s.logger)
+	s.shh = gethbridge.NewGethWakuWrapper(shh)
+	s.Require().NoError(shh.Start())
+
+	s.m = s.newMessengerForProfileShowcase()
+	s.privateKey = s.m.identity
+}
+
+func (s *TestMessengerProfileShowcase) TearDownTest() {
+	TearDownMessenger(&s.Suite, s.m)
+	_ = s.logger.Sync()
+}
+
+func (s *TestMessengerProfileShowcase) newMessengerForProfileShowcase() *Messenger {
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	s.NoError(err, "creating sqlite db instance")
+	err = sqlite.Migrate(db)
+	s.NoError(err, "protocol migrate")
+
+	privateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	s.collectiblesMock = &CollectiblesManagerMock{}
+
+	options := []Option{
+		WithCollectiblesManager(s.collectiblesMock),
+	}
+
+	m, err := newMessengerWithKey(s.shh, privateKey, s.logger, options)
+	s.Require().NoError(err)
+
+	_, err = m.Start()
+	s.Require().NoError(err)
+
+	return m
 }
 
 func (s *TestMessengerProfileShowcase) mutualContact(theirMessenger *Messenger) {
@@ -113,8 +203,22 @@ func (s *TestMessengerProfileShowcase) verifiedContact(theirMessenger *Messenger
 }
 
 func (s *TestMessengerProfileShowcase) TestSaveAndGetProfileShowcasePreferences() {
-	request := DummyProfileShowcasePreferences()
-	err := s.m.SetProfileShowcasePreferences(request, false)
+	request := DummyProfileShowcasePreferences(true)
+
+	// Provide collectible balances test response
+	collectible := request.Collectibles[0]
+	collectibleID, err := toCollectibleUniqueID(collectible.ContractAddress, collectible.TokenID, collectible.ChainID)
+	s.Require().NoError(err)
+	balances := []thirdparty.AccountBalance{
+		thirdparty.AccountBalance{
+			Address:     gethcommon.HexToAddress(request.Accounts[0].Address),
+			Balance:     &bigint.BigInt{Int: big.NewInt(5)},
+			TxTimestamp: 0,
+		},
+	}
+	s.collectiblesMock.SetResponse(collectibleID, balances)
+
+	err = s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().NoError(err)
 
 	// Restored preferences shoulf be same as stored
@@ -149,7 +253,7 @@ func (s *TestMessengerProfileShowcase) TestSaveAndGetProfileShowcasePreferences(
 
 func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesWithWrongVisibility() {
 	accountEntry := &identity.ProfileShowcaseAccountPreference{
-		Address:            "0x32433445133424",
+		Address:            "0x0000000000000000000000000032433445133424",
 		Name:               "Status Account",
 		ColorID:            "blue",
 		Emoji:              ">:-]",
@@ -159,10 +263,9 @@ func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesW
 
 	collectibleEntry := &identity.ProfileShowcaseCollectiblePreference{
 		ContractAddress:    "0x12378534257568678487683576",
-		ChainID:            8,
-		TokenID:            "0x12321389592999f903",
+		ChainID:            11155111,
+		TokenID:            "12321389592999903",
 		CommunityID:        "0x01312357798976535",
-		AccountAddress:     "0x32433445133424",
 		ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 		Order:              17,
 	}
@@ -172,13 +275,26 @@ func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesW
 		Collectibles: []*identity.ProfileShowcaseCollectiblePreference{collectibleEntry},
 	}
 
-	err := s.m.SetProfileShowcasePreferences(request, false)
-	s.Require().Equal(identity.ErrorAccountVisibilityLowerThanCollectible, err)
+	// Provide collectible balances test response
+	collectible := request.Collectibles[0]
+	collectibleID, err := toCollectibleUniqueID(collectible.ContractAddress, collectible.TokenID, collectible.ChainID)
+	s.Require().NoError(err)
+	balances := []thirdparty.AccountBalance{
+		thirdparty.AccountBalance{
+			Address:     gethcommon.HexToAddress(request.Accounts[0].Address),
+			Balance:     &bigint.BigInt{Int: big.NewInt(5)},
+			TxTimestamp: 0,
+		},
+	}
+	s.collectiblesMock.SetResponse(collectibleID, balances)
+
+	err = s.m.SetProfileShowcasePreferences(request, false)
+	s.Require().Equal(errorAccountVisibilityLowerThanCollectible, err)
 }
 
 func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntries() {
 	// Add mutual contact
-	theirMessenger := s.newMessenger()
+	theirMessenger := s.newMessengerForProfileShowcase()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
@@ -208,8 +324,8 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 		Collectibles: []*protobuf.ProfileShowcaseCollectible{
 			&protobuf.ProfileShowcaseCollectible{
 				ContractAddress: "0x12378534257568678487683576",
-				ChainId:         7,
-				TokenId:         "0x12321389592999f903",
+				ChainId:         1,
+				TokenId:         "12321389592999903",
 				AccountAddress:  "0x32433445133424",
 				CommunityId:     "0x12378534257568678487683576",
 				Order:           0,
@@ -232,12 +348,12 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 		UnverifiedTokens: []*protobuf.ProfileShowcaseUnverifiedToken{
 			&protobuf.ProfileShowcaseUnverifiedToken{
 				ContractAddress: "0x454525452023452",
-				ChainId:         3,
+				ChainId:         11155111,
 				Order:           0,
 			},
 			&protobuf.ProfileShowcaseUnverifiedToken{
 				ContractAddress: "0x12312323323233",
-				ChainId:         2,
+				ChainId:         1,
 				Order:           1,
 			},
 		},
@@ -302,7 +418,7 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.Require().NoError(err)
 
 	// Add mutual contact
-	mutualContact := s.newMessenger()
+	mutualContact := s.newMessengerForProfileShowcase()
 	_, err = mutualContact.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, mutualContact)
@@ -310,7 +426,7 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.mutualContact(mutualContact)
 
 	// Add identity verified contact
-	verifiedContact := s.newMessenger()
+	verifiedContact := s.newMessengerForProfileShowcase()
 	_, err = verifiedContact.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, verifiedContact)
@@ -319,7 +435,21 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.verifiedContact(verifiedContact)
 
 	// Save preferences to dispatch changes
-	request := DummyProfileShowcasePreferences()
+	request := DummyProfileShowcasePreferences(true)
+
+	// Provide collectible balances test response
+	collectible := request.Collectibles[0]
+	collectibleID, err := toCollectibleUniqueID(collectible.ContractAddress, collectible.TokenID, collectible.ChainID)
+	s.Require().NoError(err)
+	balances := []thirdparty.AccountBalance{
+		thirdparty.AccountBalance{
+			Address:     gethcommon.HexToAddress(request.Accounts[0].Address),
+			Balance:     &bigint.BigInt{Int: big.NewInt(1)},
+			TxTimestamp: 32443424,
+		},
+	}
+	s.collectiblesMock.SetResponse(collectibleID, balances)
+
 	err = s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().NoError(err)
 
@@ -433,7 +563,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipUnenc
 	s.Require().NoError(err)
 
 	// Add bob as a mutual contact
-	bob := s.newMessenger()
+	bob := s.newMessengerForProfileShowcase()
 	_, err = bob.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob)
@@ -500,7 +630,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncry
 	s.Require().NoError(err)
 
 	// Add bob as a mutual contact
-	bob := s.newMessenger()
+	bob := s.newMessengerForProfileShowcase()
 	_, err = bob.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob)

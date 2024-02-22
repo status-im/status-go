@@ -329,7 +329,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	err = clientBackend.StatusNode().EnsService().API().Add(ctx, ensChainID, ensUsername)
 	require.NoError(s.T(), err)
 	// generate profile showcase preferences
-	profileShowcasePreferences := protocol.DummyProfileShowcasePreferences()
+	profileShowcasePreferences := protocol.DummyProfileShowcasePreferences(false)
 	err = clientBackend.Messenger().SetProfileShowcasePreferences(profileShowcasePreferences, false)
 	require.NoError(s.T(), err)
 
