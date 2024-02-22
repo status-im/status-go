@@ -198,7 +198,10 @@ SELECT
 	END AS agg_status,
 	1 AS agg_count,
 	transfers.token_address AS token_address,
-	transfers.token_id AS token_id,
+	CASE
+		WHEN LENGTH(transfers.token_id) = 0 THEN X'00'
+		ELSE transfers.token_id
+	END AS tmp_token_id,
 	NULL AS token_code,
 	NULL AS from_token_code,
 	NULL AS to_token_code,
@@ -323,7 +326,7 @@ WHERE
 			AND (
 				(
 					transfers.network_id,
-					transfers.token_id,
+					tmp_token_id,
 					transfers.token_address
 				) IN assets_erc721
 			)
@@ -373,7 +376,7 @@ SELECT
 	statusPending AS agg_status,
 	1 AS agg_count,
 	NULL AS token_address,
-	NULL AS token_id,
+	NULL AS tmp_token_id,
 	pending_transactions.symbol AS token_code,
 	NULL AS from_token_code,
 	NULL AS to_token_code,
@@ -465,7 +468,7 @@ SELECT
 	END AS agg_status,
 	COALESCE(tr_status.count, 0) + COALESCE(pending_status.count, 0) AS agg_count,
 	NULL AS token_address,
-	NULL AS token_id,
+	NULL AS tmp_token_id,
 	NULL AS token_code,
 	multi_transactions.from_asset AS from_token_code,
 	multi_transactions.to_asset AS to_token_code,
