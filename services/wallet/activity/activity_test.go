@@ -1086,6 +1086,10 @@ func TestGetActivityEntriesFilterByCollectibles(t *testing.T) {
 	entries, err = getActivityEntries(context.Background(), deps, allAddresses, true, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(entries))
+	require.Equal(t, entries[0].tokenIn.Address, transfer.TestCollectibles[2].TokenAddress)
+	require.True(t, (*big.Int)(entries[0].tokenIn.TokenID).Cmp(transfer.TestCollectibles[2].TokenID) == 0)
+	require.Equal(t, entries[1].tokenIn.Address, transfer.TestCollectibles[1].TokenAddress)
+	require.True(t, (*big.Int)(entries[1].tokenIn.TokenID).Cmp(transfer.TestCollectibles[1].TokenID) == 0)
 }
 
 func TestGetActivityEntriesFilterByToAddresses(t *testing.T) {

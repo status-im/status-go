@@ -161,6 +161,11 @@ var TestCollectibles = []TestCollectible{
 		TokenID:      big.NewInt(1),
 		ChainID:      1,
 	},
+	TestCollectible{ // TokenID (big.Int) value 0 might be problematic if not handled properly
+		TokenAddress: eth_common.HexToAddress("0x97a04fda4d97c6e3547d66b572e29f4a4ff4ABCD"),
+		TokenID:      big.NewInt(0),
+		ChainID:      420,
+	},
 	TestCollectible{
 		TokenAddress: eth_common.HexToAddress("0x1dea7a3e04849840c0eb15fd26a55f6c40c4a69b"),
 		TokenID:      big.NewInt(11),
