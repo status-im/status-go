@@ -118,8 +118,6 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCli, error) {
 		return nil, err
 	}
 
-	time.Sleep(3 * time.Second)
-
 	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	if err != nil {
 		return nil, err
