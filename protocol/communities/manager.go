@@ -155,9 +155,16 @@ func (m *DefaultTokenManager) GetAllChainIDs() ([]uint64, error) {
 		return nil, err
 	}
 
+	areTestNetworksEnabled, err := m.tokenManager.RPCClient.NetworkManager.GetTestNetworksEnabled()
+	if err != nil {
+		return nil, err
+	}
+
 	chainIDs := make([]uint64, 0)
 	for _, network := range networks {
-		chainIDs = append(chainIDs, network.ChainID)
+		if areTestNetworksEnabled == network.IsTest {
+			chainIDs = append(chainIDs, network.ChainID)
+		}
 	}
 	return chainIDs, nil
 }
