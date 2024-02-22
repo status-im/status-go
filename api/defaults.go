@@ -27,23 +27,7 @@ const defaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.js
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
 
-const (
-	statusProdFleet = "status.prod"
-	statusTestFleet = "status.test"
-	wakuv2ProdFleet = "wakuv2.prod"
-	wakuv2TestFleet = "wakuv2.test"
-	shardsTest      = "shards.test"
-)
-
-var DefaultWakuNodes = map[string][]string{
-	statusProdFleet: []string{"enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"},
-	statusTestFleet: []string{"enrtree://AIO6LUM3IVWCU2KCPBBI6FEH2W42IGK3ASCZHZGG5TIXUR56OGQUO@test.status.nodes.status.im"},
-	wakuv2ProdFleet: []string{"enrtree://ANEDLO25QVUGJOUTQFRYKWX6P4Z4GKVESBMHML7DZ6YK4LGS5FC5O@prod.wakuv2.nodes.status.im"},
-	wakuv2TestFleet: []string{"enrtree://AO47IDOLBKH72HIZZOXQP6NMRESAN7CHYWIBNXDXWRJRZWLODKII6@test.wakuv2.nodes.status.im"},
-	shardsTest:      []string{"enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"},
-}
-
-var DefaultFleet = shardsTest
+var DefaultFleet = params.FleetShardsTest
 
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
@@ -134,10 +118,10 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	}
 	nodeConfig.ClusterConfig = *clusterConfig
 	nodeConfig.ClusterConfig.Fleet = fleet
-	nodeConfig.ClusterConfig.WakuNodes = DefaultWakuNodes[fleet]
-	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = DefaultWakuNodes[fleet]
+	nodeConfig.ClusterConfig.WakuNodes = params.DefaultWakuNodes(fleet)
+	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = params.DefaultWakuNodes(fleet)
 
-	if fleet == shardsTest {
+	if fleet == params.FleetShardsTest {
 		nodeConfig.ClusterConfig.ClusterID = shardsTestClusterID
 		nodeConfig.WakuV2Config.UseShardAsDefaultTopic = true
 	}

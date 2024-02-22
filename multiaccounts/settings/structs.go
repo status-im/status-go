@@ -6,6 +6,7 @@ import (
 
 	accountJson "github.com/status-im/status-go/account/json"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -223,4 +224,11 @@ func (s Settings) MarshalJSON() ([]byte, error) {
 func (s Settings) IsEmpty() bool {
 	empty := reflect.Zero(reflect.TypeOf(s)).Interface()
 	return reflect.DeepEqual(s, empty)
+}
+
+func (s Settings) GetFleet() string {
+	if s.Fleet == nil {
+		return params.FleetUndefined
+	}
+	return *s.Fleet
 }

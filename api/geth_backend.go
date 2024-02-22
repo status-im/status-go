@@ -624,20 +624,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 
 	defaultCfg.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig)
 
-	settings, err := b.GetSettings()
-	if err != nil {
-		return err
-	}
-
-	var fleet string
-	fleetPtr := settings.Fleet
-	if fleetPtr == nil || *fleetPtr == "" {
-		fleet = DefaultFleet
-	} else {
-		fleet = *fleetPtr
-	}
-
-	err = SetFleet(fleet, defaultCfg)
+	err = b.updateNodeConfigFleet(defaultCfg)
 	if err != nil {
 		return err
 	}
@@ -705,11 +692,43 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	}
 
 	return nil
+}
 
+// updateNodeConfigFleet loads the fleet from the settings and updates the node configuration
+// If the fleet in settings is empty, or not supported anymore, it will be overridden with the default fleet.
+// In that case settings fleet value remain the same, only runtime node configuration is updated.
+func (b *GethStatusBackend) updateNodeConfigFleet(config *params.NodeConfig) error {
+	accountSettings, err := b.GetSettings()
+	if err != nil {
+		return err
+	}
+
+	fleet := accountSettings.GetFleet()
+
+	if !params.IsFleetSupported(fleet) {
+		b.log.Warn("fleet is not supported, overriding with default value",
+			"fleet", fleet,
+			"defaultFleet", DefaultFleet)
+		fleet = DefaultFleet
+	}
+
+	err = SetFleet(fleet, config)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, inputNodeCfg *params.NodeConfig) error {
 	err := b.ensureDBsOpened(acc, password)
+	if err != nil {
+		return err
+	}
+
+	// NOTE: This is code duplication from `loginAccount` method
+	//		 We should stop using this endpoint in desktop: https://github.com/status-im/status-desktop/issues/12977
+	err = b.updateNodeConfigFleet(inputNodeCfg)
 	if err != nil {
 		return err
 	}
