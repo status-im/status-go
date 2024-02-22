@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -376,16 +375,16 @@ func (s *MessengerActivityCenterMessageSuite) prepareCommunityChannelWithMention
 		"no messages",
 	)
 	s.Require().NoError(err)
+	replyNotification := response.ActivityCenterNotifications()[0]
 	s.Require().False(response.ActivityCenterNotifications()[0].Read)
 
-	// There is an extra message with reply
-	if response.Messages()[0].ID == response.ActivityCenterNotifications()[0].Message.ID {
-		replyMessage = response.Messages()[0]
-	} else if response.Messages()[1].ID == response.ActivityCenterNotifications()[0].Message.ID {
-		replyMessage = response.Messages()[1]
-	} else {
-		s.Error(errors.New("can't find corresponding message in the response"))
-	}
+	// One message is the community message, the other is the reply to the community message
+	s.Require().Len(response.Messages(), 2)
+
+	replyMessage, ok := response.messages[replyNotification.Message.ID]
+	s.Require().True(ok)
+	s.Require().NotNil(replyMessage)
+	s.Require().Equal(replyMessage.ID, replyNotification.ID.String())
 
 	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage, false)
 
@@ -412,9 +411,9 @@ func (s *MessengerActivityCenterMessageSuite) confirmMentionAndReplyNotification
 	s.Require().NoError(err)
 	s.Require().Len(notifResponse.Notifications, 1)
 	s.Require().Equal(read, notifResponse.Notifications[0].Read)
+	s.Require().Equal(mentionMessage.ID, notifResponse.Notifications[0].ID.String())
 }
 
-/*
 func (s *MessengerActivityCenterMessageSuite) TestMarkMessagesSeenMarksNotificationsRead() {
 	alice, _, mentionMessage, replyMessage, _ := s.prepareCommunityChannelWithMentionAndReply()
 
@@ -427,7 +426,6 @@ func (s *MessengerActivityCenterMessageSuite) TestMarkMessagesSeenMarksNotificat
 
 	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage, true)
 }
-*/
 
 func (s *MessengerActivityCenterMessageSuite) TestMarkAllReadMarksNotificationsRead() {
 	alice, _, mentionMessage, replyMessage, _ := s.prepareCommunityChannelWithMentionAndReply()
