@@ -980,6 +980,7 @@ func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) (err error) 
 	for _, address := range c.accounts {
 		blockRange, ok := blockRanges[address]
 		if !ok || blockRange.balanceCheckHash == "" {
+			log.Debug("DBGG no range", "ok", ok, "address", address)
 			firstScan = true
 			break
 		}
