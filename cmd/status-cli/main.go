@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
@@ -63,22 +62,22 @@ func main() {
 					defer stopMessenger(bob)
 
 					// Send contact request from Alice to Bob, bob accept the request
-					msgID, err := sendContactRequest(alice, bob)
+					msgID, err := sendContactRequest(cCtx, alice, bob)
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
 
-					err = sendContactRequestAcceptance(bob, alice, msgID)
+					err = sendContactRequestAcceptance(cCtx, bob, alice, msgID)
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
 
 					// Send DM between alice to bob
-					sendDirectMessage(alice, bob, "Hello Bob!")
+					sendDirectMessage(cCtx, alice, bob, "Hello Bob!")
 
-					sendDirectMessage(bob, alice, "Hello Alice!")
+					sendDirectMessage(cCtx, bob, alice, "Hello Alice!")
 
 					return nil
 				},
@@ -186,14 +185,14 @@ func stopMessenger(cli *StatusCli) {
 	}
 }
 
-func sendContactRequest(from, to *StatusCli) (string, error) {
+func sendContactRequest(cCtx *cli.Context, from, to *StatusCli) (string, error) {
 	destID := types.EncodeHex(crypto.FromECDSAPub(to.messenger.IdentityPublicKey()))
 	fmt.Printf("[%s] send contact request to %s, contact id: %s\n", from.name, to.name, destID)
 	request := &requests.SendContactRequest{
 		ID:      destID,
 		Message: "Hello!",
 	}
-	resp, err := from.messenger.SendContactRequest(context.Background(), request)
+	resp, err := from.messenger.SendContactRequest(cCtx.Context, request)
 	fmt.Printf("[%s] function SendContactRequest response.messages: %s\n", from.name, resp.Messages())
 	if err != nil {
 		return "", err
@@ -216,9 +215,9 @@ func sendContactRequest(from, to *StatusCli) (string, error) {
 	return msg.ID, nil
 }
 
-func sendContactRequestAcceptance(from, to *StatusCli, msgID string) error {
+func sendContactRequestAcceptance(cCtx *cli.Context, from, to *StatusCli, msgID string) error {
 	fmt.Printf("[%s] send contact request acceptance to %s\n", from.name, to.name)
-	resp, err := from.messenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(msgID)})
+	resp, err := from.messenger.AcceptContactRequest(cCtx.Context, &requests.AcceptContactRequest{ID: types.Hex2Bytes(msgID)})
 	if err != nil {
 		return err
 	}
@@ -247,7 +246,7 @@ func sendContactRequestAcceptance(from, to *StatusCli, msgID string) error {
 	return nil
 }
 
-func sendDirectMessage(from, to *StatusCli, text string) error {
+func sendDirectMessage(cCtx *cli.Context, from, to *StatusCli, text string) error {
 	chat := from.messenger.Chat(from.messenger.MutualContacts()[0].ID)
 	fmt.Printf("[%s] chat with contact id: %s\n", from.name, chat.ID)
 
@@ -261,7 +260,7 @@ func sendDirectMessage(from, to *StatusCli, text string) error {
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = text
 
-	resp, err := from.messenger.SendChatMessage(context.Background(), inputMessage)
+	resp, err := from.messenger.SendChatMessage(cCtx.Context, inputMessage)
 	if err != nil {
 		fmt.Println(err)
 		return err
