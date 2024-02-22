@@ -668,11 +668,12 @@ type CommunityDescription struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Clock                  uint64                        `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Members                map[string]*CommunityMember   `protobuf:"bytes,2,rep,name=members,proto3" json:"members,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	Permissions            *CommunityPermissions         `protobuf:"bytes,3,opt,name=permissions,proto3" json:"permissions,omitempty"`
-	Identity               *ChatIdentity                 `protobuf:"bytes,5,opt,name=identity,proto3" json:"identity,omitempty"`
-	Chats                  map[string]*CommunityChat     `protobuf:"bytes,6,rep,name=chats,proto3" json:"chats,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Clock       uint64                      `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
+	Members     map[string]*CommunityMember `protobuf:"bytes,2,rep,name=members,proto3" json:"members,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Permissions *CommunityPermissions       `protobuf:"bytes,3,opt,name=permissions,proto3" json:"permissions,omitempty"`
+	Identity    *ChatIdentity               `protobuf:"bytes,5,opt,name=identity,proto3" json:"identity,omitempty"`
+	Chats       map[string]*CommunityChat   `protobuf:"bytes,6,rep,name=chats,proto3" json:"chats,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// Deprecated: Marked as deprecated in communities.proto.
 	BanList                []string                      `protobuf:"bytes,7,rep,name=ban_list,json=banList,proto3" json:"ban_list,omitempty"`
 	Categories             map[string]*CommunityCategory `protobuf:"bytes,8,rep,name=categories,proto3" json:"categories,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	ArchiveMagnetlinkClock uint64                        `protobuf:"varint,9,opt,name=archive_magnetlink_clock,json=archiveMagnetlinkClock,proto3" json:"archive_magnetlink_clock,omitempty"`
@@ -686,6 +687,7 @@ type CommunityDescription struct {
 	CommunityTokensMetadata []*CommunityTokenMetadata            `protobuf:"bytes,16,rep,name=community_tokens_metadata,json=communityTokensMetadata,proto3" json:"community_tokens_metadata,omitempty"`
 	ActiveMembersCount      uint64                               `protobuf:"varint,17,opt,name=active_members_count,json=activeMembersCount,proto3" json:"active_members_count,omitempty"`
 	ID                      string                               `protobuf:"bytes,18,opt,name=ID,proto3" json:"ID,omitempty"`
+	BannedMembers           map[string]*CommunityBanInfo         `protobuf:"bytes,19,rep,name=banned_members,json=bannedMembers,proto3" json:"banned_members,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// key is hash ratchet key_id + seq_no
 	PrivateData map[string][]byte `protobuf:"bytes,100,rep,name=privateData,proto3" json:"privateData,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
@@ -757,6 +759,7 @@ func (x *CommunityDescription) GetChats() map[string]*CommunityChat {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in communities.proto.
 func (x *CommunityDescription) GetBanList() []string {
 	if x != nil {
 		return x.BanList
@@ -842,11 +845,65 @@ func (x *CommunityDescription) GetID() string {
 	return ""
 }
 
+func (x *CommunityDescription) GetBannedMembers() map[string]*CommunityBanInfo {
+	if x != nil {
+		return x.BannedMembers
+	}
+	return nil
+}
+
 func (x *CommunityDescription) GetPrivateData() map[string][]byte {
 	if x != nil {
 		return x.PrivateData
 	}
 	return nil
+}
+
+type CommunityBanInfo struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	DeleteAllMessages bool `protobuf:"varint,1,opt,name=delete_all_messages,json=deleteAllMessages,proto3" json:"delete_all_messages,omitempty"`
+}
+
+func (x *CommunityBanInfo) Reset() {
+	*x = CommunityBanInfo{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_communities_proto_msgTypes[7]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CommunityBanInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommunityBanInfo) ProtoMessage() {}
+
+func (x *CommunityBanInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_communities_proto_msgTypes[7]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommunityBanInfo.ProtoReflect.Descriptor instead.
+func (*CommunityBanInfo) Descriptor() ([]byte, []int) {
+	return file_communities_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *CommunityBanInfo) GetDeleteAllMessages() bool {
+	if x != nil {
+		return x.DeleteAllMessages
+	}
+	return false
 }
 
 type CommunityAdminSettings struct {
@@ -860,7 +917,7 @@ type CommunityAdminSettings struct {
 func (x *CommunityAdminSettings) Reset() {
 	*x = CommunityAdminSettings{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[7]
+		mi := &file_communities_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -873,7 +930,7 @@ func (x *CommunityAdminSettings) String() string {
 func (*CommunityAdminSettings) ProtoMessage() {}
 
 func (x *CommunityAdminSettings) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[7]
+	mi := &file_communities_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -886,7 +943,7 @@ func (x *CommunityAdminSettings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommunityAdminSettings.ProtoReflect.Descriptor instead.
 func (*CommunityAdminSettings) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{7}
+	return file_communities_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CommunityAdminSettings) GetPinMessageAllMembersEnabled() bool {
@@ -911,7 +968,7 @@ type CommunityChat struct {
 func (x *CommunityChat) Reset() {
 	*x = CommunityChat{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[8]
+		mi := &file_communities_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -924,7 +981,7 @@ func (x *CommunityChat) String() string {
 func (*CommunityChat) ProtoMessage() {}
 
 func (x *CommunityChat) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[8]
+	mi := &file_communities_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -937,7 +994,7 @@ func (x *CommunityChat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommunityChat.ProtoReflect.Descriptor instead.
 func (*CommunityChat) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{8}
+	return file_communities_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *CommunityChat) GetMembers() map[string]*CommunityMember {
@@ -988,7 +1045,7 @@ type CommunityCategory struct {
 func (x *CommunityCategory) Reset() {
 	*x = CommunityCategory{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[9]
+		mi := &file_communities_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1001,7 +1058,7 @@ func (x *CommunityCategory) String() string {
 func (*CommunityCategory) ProtoMessage() {}
 
 func (x *CommunityCategory) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[9]
+	mi := &file_communities_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1014,7 +1071,7 @@ func (x *CommunityCategory) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommunityCategory.ProtoReflect.Descriptor instead.
 func (*CommunityCategory) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{9}
+	return file_communities_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CommunityCategory) GetCategoryId() string {
@@ -1052,7 +1109,7 @@ type RevealedAccount struct {
 func (x *RevealedAccount) Reset() {
 	*x = RevealedAccount{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[10]
+		mi := &file_communities_proto_msgTypes[11]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1065,7 +1122,7 @@ func (x *RevealedAccount) String() string {
 func (*RevealedAccount) ProtoMessage() {}
 
 func (x *RevealedAccount) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[10]
+	mi := &file_communities_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1078,7 +1135,7 @@ func (x *RevealedAccount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevealedAccount.ProtoReflect.Descriptor instead.
 func (*RevealedAccount) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{10}
+	return file_communities_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RevealedAccount) GetAddress() string {
@@ -1125,7 +1182,7 @@ type CommunityRequestToJoin struct {
 func (x *CommunityRequestToJoin) Reset() {
 	*x = CommunityRequestToJoin{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[11]
+		mi := &file_communities_proto_msgTypes[12]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1138,7 +1195,7 @@ func (x *CommunityRequestToJoin) String() string {
 func (*CommunityRequestToJoin) ProtoMessage() {}
 
 func (x *CommunityRequestToJoin) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[11]
+	mi := &file_communities_proto_msgTypes[12]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1151,7 +1208,7 @@ func (x *CommunityRequestToJoin) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommunityRequestToJoin.ProtoReflect.Descriptor instead.
 func (*CommunityRequestToJoin) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{11}
+	return file_communities_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *CommunityRequestToJoin) GetClock() uint64 {
@@ -1209,7 +1266,7 @@ type CommunityEditSharedAddresses struct {
 func (x *CommunityEditSharedAddresses) Reset() {
 	*x = CommunityEditSharedAddresses{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[12]
+		mi := &file_communities_proto_msgTypes[13]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1222,7 +1279,7 @@ func (x *CommunityEditSharedAddresses) String() string {
 func (*CommunityEditSharedAddresses) ProtoMessage() {}
 
 func (x *CommunityEditSharedAddresses) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[12]
+	mi := &file_communities_proto_msgTypes[13]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1235,7 +1292,7 @@ func (x *CommunityEditSharedAddresses) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommunityEditSharedAddresses.ProtoReflect.Descriptor instead.
 func (*CommunityEditSharedAddresses) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{12}
+	return file_communities_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *CommunityEditSharedAddresses) GetClock() uint64 {
@@ -1274,7 +1331,7 @@ type CommunityCancelRequestToJoin struct {
 func (x *CommunityCancelRequestToJoin) Reset() {
 	*x = CommunityCancelRequestToJoin{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[13]
+		mi := &file_communities_proto_msgTypes[14]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1287,7 +1344,7 @@ func (x *CommunityCancelRequestToJoin) String() string {
 func (*CommunityCancelRequestToJoin) ProtoMessage() {}
 
 func (x *CommunityCancelRequestToJoin) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[13]
+	mi := &file_communities_proto_msgTypes[14]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1300,7 +1357,7 @@ func (x *CommunityCancelRequestToJoin) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommunityCancelRequestToJoin.ProtoReflect.Descriptor instead.
 func (*CommunityCancelRequestToJoin) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{13}
+	return file_communities_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CommunityCancelRequestToJoin) GetClock() uint64 {
@@ -1350,7 +1407,7 @@ type CommunityUserKicked struct {
 func (x *CommunityUserKicked) Reset() {
 	*x = CommunityUserKicked{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[14]
+		mi := &file_communities_proto_msgTypes[15]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1363,7 +1420,7 @@ func (x *CommunityUserKicked) String() string {
 func (*CommunityUserKicked) ProtoMessage() {}
 
 func (x *CommunityUserKicked) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[14]
+	mi := &file_communities_proto_msgTypes[15]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1376,7 +1433,7 @@ func (x *CommunityUserKicked) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommunityUserKicked.ProtoReflect.Descriptor instead.
 func (*CommunityUserKicked) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{14}
+	return file_communities_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CommunityUserKicked) GetClock() uint64 {
@@ -1411,7 +1468,7 @@ type CommunityRequestToJoinResponse struct {
 func (x *CommunityRequestToJoinResponse) Reset() {
 	*x = CommunityRequestToJoinResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[15]
+		mi := &file_communities_proto_msgTypes[16]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1424,7 +1481,7 @@ func (x *CommunityRequestToJoinResponse) String() string {
 func (*CommunityRequestToJoinResponse) ProtoMessage() {}
 
 func (x *CommunityRequestToJoinResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[15]
+	mi := &file_communities_proto_msgTypes[16]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1437,7 +1494,7 @@ func (x *CommunityRequestToJoinResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommunityRequestToJoinResponse.ProtoReflect.Descriptor instead.
 func (*CommunityRequestToJoinResponse) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{15}
+	return file_communities_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CommunityRequestToJoinResponse) GetClock() uint64 {
@@ -1508,7 +1565,7 @@ type CommunityRequestToLeave struct {
 func (x *CommunityRequestToLeave) Reset() {
 	*x = CommunityRequestToLeave{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[16]
+		mi := &file_communities_proto_msgTypes[17]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1521,7 +1578,7 @@ func (x *CommunityRequestToLeave) String() string {
 func (*CommunityRequestToLeave) ProtoMessage() {}
 
 func (x *CommunityRequestToLeave) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[16]
+	mi := &file_communities_proto_msgTypes[17]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1534,7 +1591,7 @@ func (x *CommunityRequestToLeave) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommunityRequestToLeave.ProtoReflect.Descriptor instead.
 func (*CommunityRequestToLeave) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{16}
+	return file_communities_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *CommunityRequestToLeave) GetClock() uint64 {
@@ -1563,7 +1620,7 @@ type CommunityMessageArchiveMagnetlink struct {
 func (x *CommunityMessageArchiveMagnetlink) Reset() {
 	*x = CommunityMessageArchiveMagnetlink{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[17]
+		mi := &file_communities_proto_msgTypes[18]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1576,7 +1633,7 @@ func (x *CommunityMessageArchiveMagnetlink) String() string {
 func (*CommunityMessageArchiveMagnetlink) ProtoMessage() {}
 
 func (x *CommunityMessageArchiveMagnetlink) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[17]
+	mi := &file_communities_proto_msgTypes[18]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1589,7 +1646,7 @@ func (x *CommunityMessageArchiveMagnetlink) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use CommunityMessageArchiveMagnetlink.ProtoReflect.Descriptor instead.
 func (*CommunityMessageArchiveMagnetlink) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{17}
+	return file_communities_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *CommunityMessageArchiveMagnetlink) GetClock() uint64 {
@@ -1623,7 +1680,7 @@ type WakuMessage struct {
 func (x *WakuMessage) Reset() {
 	*x = WakuMessage{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[18]
+		mi := &file_communities_proto_msgTypes[19]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1636,7 +1693,7 @@ func (x *WakuMessage) String() string {
 func (*WakuMessage) ProtoMessage() {}
 
 func (x *WakuMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[18]
+	mi := &file_communities_proto_msgTypes[19]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1649,7 +1706,7 @@ func (x *WakuMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WakuMessage.ProtoReflect.Descriptor instead.
 func (*WakuMessage) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{18}
+	return file_communities_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *WakuMessage) GetSig() []byte {
@@ -1715,7 +1772,7 @@ type WakuMessageArchiveMetadata struct {
 func (x *WakuMessageArchiveMetadata) Reset() {
 	*x = WakuMessageArchiveMetadata{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[19]
+		mi := &file_communities_proto_msgTypes[20]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1728,7 +1785,7 @@ func (x *WakuMessageArchiveMetadata) String() string {
 func (*WakuMessageArchiveMetadata) ProtoMessage() {}
 
 func (x *WakuMessageArchiveMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[19]
+	mi := &file_communities_proto_msgTypes[20]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1741,7 +1798,7 @@ func (x *WakuMessageArchiveMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WakuMessageArchiveMetadata.ProtoReflect.Descriptor instead.
 func (*WakuMessageArchiveMetadata) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{19}
+	return file_communities_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *WakuMessageArchiveMetadata) GetVersion() uint32 {
@@ -1785,7 +1842,7 @@ type WakuMessageArchive struct {
 func (x *WakuMessageArchive) Reset() {
 	*x = WakuMessageArchive{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[20]
+		mi := &file_communities_proto_msgTypes[21]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1798,7 +1855,7 @@ func (x *WakuMessageArchive) String() string {
 func (*WakuMessageArchive) ProtoMessage() {}
 
 func (x *WakuMessageArchive) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[20]
+	mi := &file_communities_proto_msgTypes[21]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1811,7 +1868,7 @@ func (x *WakuMessageArchive) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WakuMessageArchive.ProtoReflect.Descriptor instead.
 func (*WakuMessageArchive) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{20}
+	return file_communities_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *WakuMessageArchive) GetVersion() uint32 {
@@ -1850,7 +1907,7 @@ type WakuMessageArchiveIndexMetadata struct {
 func (x *WakuMessageArchiveIndexMetadata) Reset() {
 	*x = WakuMessageArchiveIndexMetadata{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[21]
+		mi := &file_communities_proto_msgTypes[22]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1863,7 +1920,7 @@ func (x *WakuMessageArchiveIndexMetadata) String() string {
 func (*WakuMessageArchiveIndexMetadata) ProtoMessage() {}
 
 func (x *WakuMessageArchiveIndexMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[21]
+	mi := &file_communities_proto_msgTypes[22]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1876,7 +1933,7 @@ func (x *WakuMessageArchiveIndexMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WakuMessageArchiveIndexMetadata.ProtoReflect.Descriptor instead.
 func (*WakuMessageArchiveIndexMetadata) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{21}
+	return file_communities_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *WakuMessageArchiveIndexMetadata) GetVersion() uint32 {
@@ -1925,7 +1982,7 @@ type WakuMessageArchiveIndex struct {
 func (x *WakuMessageArchiveIndex) Reset() {
 	*x = WakuMessageArchiveIndex{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[22]
+		mi := &file_communities_proto_msgTypes[23]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1938,7 +1995,7 @@ func (x *WakuMessageArchiveIndex) String() string {
 func (*WakuMessageArchiveIndex) ProtoMessage() {}
 
 func (x *WakuMessageArchiveIndex) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[22]
+	mi := &file_communities_proto_msgTypes[23]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1951,7 +2008,7 @@ func (x *WakuMessageArchiveIndex) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WakuMessageArchiveIndex.ProtoReflect.Descriptor instead.
 func (*WakuMessageArchiveIndex) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{22}
+	return file_communities_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *WakuMessageArchiveIndex) GetArchives() map[string]*WakuMessageArchiveIndexMetadata {
@@ -1975,7 +2032,7 @@ type CommunityPublicStorenodesInfo struct {
 func (x *CommunityPublicStorenodesInfo) Reset() {
 	*x = CommunityPublicStorenodesInfo{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[23]
+		mi := &file_communities_proto_msgTypes[24]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1988,7 +2045,7 @@ func (x *CommunityPublicStorenodesInfo) String() string {
 func (*CommunityPublicStorenodesInfo) ProtoMessage() {}
 
 func (x *CommunityPublicStorenodesInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[23]
+	mi := &file_communities_proto_msgTypes[24]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2001,7 +2058,7 @@ func (x *CommunityPublicStorenodesInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommunityPublicStorenodesInfo.ProtoReflect.Descriptor instead.
 func (*CommunityPublicStorenodesInfo) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{23}
+	return file_communities_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *CommunityPublicStorenodesInfo) GetSignature() []byte {
@@ -2032,7 +2089,7 @@ type CommunityStorenodes struct {
 func (x *CommunityStorenodes) Reset() {
 	*x = CommunityStorenodes{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[24]
+		mi := &file_communities_proto_msgTypes[25]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2045,7 +2102,7 @@ func (x *CommunityStorenodes) String() string {
 func (*CommunityStorenodes) ProtoMessage() {}
 
 func (x *CommunityStorenodes) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[24]
+	mi := &file_communities_proto_msgTypes[25]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2058,7 +2115,7 @@ func (x *CommunityStorenodes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommunityStorenodes.ProtoReflect.Descriptor instead.
 func (*CommunityStorenodes) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{24}
+	return file_communities_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *CommunityStorenodes) GetClock() uint64 {
@@ -2107,7 +2164,7 @@ type Storenode struct {
 func (x *Storenode) Reset() {
 	*x = Storenode{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_communities_proto_msgTypes[25]
+		mi := &file_communities_proto_msgTypes[26]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2120,7 +2177,7 @@ func (x *Storenode) String() string {
 func (*Storenode) ProtoMessage() {}
 
 func (x *Storenode) ProtoReflect() protoreflect.Message {
-	mi := &file_communities_proto_msgTypes[25]
+	mi := &file_communities_proto_msgTypes[26]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2133,7 +2190,7 @@ func (x *Storenode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Storenode.ProtoReflect.Descriptor instead.
 func (*Storenode) Descriptor() ([]byte, []int) {
-	return file_communities_proto_rawDescGZIP(), []int{25}
+	return file_communities_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *Storenode) GetCommunityId() []byte {
@@ -2316,7 +2373,7 @@ var file_communities_proto_rawDesc = []byte{
 	0x4e, 0x4e, 0x45, 0x4c, 0x10, 0x04, 0x12, 0x17, 0x0a, 0x13, 0x42, 0x45, 0x43, 0x4f, 0x4d, 0x45,
 	0x5f, 0x54, 0x4f, 0x4b, 0x45, 0x4e, 0x5f, 0x4d, 0x41, 0x53, 0x54, 0x45, 0x52, 0x10, 0x05, 0x12,
 	0x16, 0x0a, 0x12, 0x42, 0x45, 0x43, 0x4f, 0x4d, 0x45, 0x5f, 0x54, 0x4f, 0x4b, 0x45, 0x4e, 0x5f,
-	0x4f, 0x57, 0x4e, 0x45, 0x52, 0x10, 0x06, 0x22, 0x9d, 0x0b, 0x0a, 0x14, 0x43, 0x6f, 0x6d, 0x6d,
+	0x4f, 0x57, 0x4e, 0x45, 0x52, 0x10, 0x06, 0x22, 0xd9, 0x0c, 0x0a, 0x14, 0x43, 0x6f, 0x6d, 0x6d,
 	0x75, 0x6e, 0x69, 0x74, 0x79, 0x44, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e,
 	0x12, 0x14, 0x0a, 0x05, 0x63, 0x6c, 0x6f, 0x63, 0x6b, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52,
 	0x05, 0x63, 0x6c, 0x6f, 0x63, 0x6b, 0x12, 0x45, 0x0a, 0x07, 0x6d, 0x65, 0x6d, 0x62, 0x65, 0x72,
@@ -2335,78 +2392,94 @@ var file_communities_proto_rawDesc = []byte{
 	0x28, 0x0b, 0x32, 0x29, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x43, 0x6f,
 	0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x44, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69,
 	0x6f, 0x6e, 0x2e, 0x43, 0x68, 0x61, 0x74, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x05, 0x63,
-	0x68, 0x61, 0x74, 0x73, 0x12, 0x19, 0x0a, 0x08, 0x62, 0x61, 0x6e, 0x5f, 0x6c, 0x69, 0x73, 0x74,
-	0x18, 0x07, 0x20, 0x03, 0x28, 0x09, 0x52, 0x07, 0x62, 0x61, 0x6e, 0x4c, 0x69, 0x73, 0x74, 0x12,
-	0x4e, 0x0a, 0x0a, 0x63, 0x61, 0x74, 0x65, 0x67, 0x6f, 0x72, 0x69, 0x65, 0x73, 0x18, 0x08, 0x20,
-	0x03, 0x28, 0x0b, 0x32, 0x2e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x43,
-	0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x44, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74,
-	0x69, 0x6f, 0x6e, 0x2e, 0x43, 0x61, 0x74, 0x65, 0x67, 0x6f, 0x72, 0x69, 0x65, 0x73, 0x45, 0x6e,
-	0x74, 0x72, 0x79, 0x52, 0x0a, 0x63, 0x61, 0x74, 0x65, 0x67, 0x6f, 0x72, 0x69, 0x65, 0x73, 0x12,
-	0x38, 0x0a, 0x18, 0x61, 0x72, 0x63, 0x68, 0x69, 0x76, 0x65, 0x5f, 0x6d, 0x61, 0x67, 0x6e, 0x65,
-	0x74, 0x6c, 0x69, 0x6e, 0x6b, 0x5f, 0x63, 0x6c, 0x6f, 0x63, 0x6b, 0x18, 0x09, 0x20, 0x01, 0x28,
-	0x04, 0x52, 0x16, 0x61, 0x72, 0x63, 0x68, 0x69, 0x76, 0x65, 0x4d, 0x61, 0x67, 0x6e, 0x65, 0x74,
-	0x6c, 0x69, 0x6e, 0x6b, 0x43, 0x6c, 0x6f, 0x63, 0x6b, 0x12, 0x47, 0x0a, 0x0e, 0x61, 0x64, 0x6d,
-	0x69, 0x6e, 0x5f, 0x73, 0x65, 0x74, 0x74, 0x69, 0x6e, 0x67, 0x73, 0x18, 0x0a, 0x20, 0x01, 0x28,
-	0x0b, 0x32, 0x20, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d,
-	0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x41, 0x64, 0x6d, 0x69, 0x6e, 0x53, 0x65, 0x74, 0x74, 0x69,
-	0x6e, 0x67, 0x73, 0x52, 0x0d, 0x61, 0x64, 0x6d, 0x69, 0x6e, 0x53, 0x65, 0x74, 0x74, 0x69, 0x6e,
-	0x67, 0x73, 0x12, 0x23, 0x0a, 0x0d, 0x69, 0x6e, 0x74, 0x72, 0x6f, 0x5f, 0x6d, 0x65, 0x73, 0x73,
-	0x61, 0x67, 0x65, 0x18, 0x0b, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x69, 0x6e, 0x74, 0x72, 0x6f,
-	0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x23, 0x0a, 0x0d, 0x6f, 0x75, 0x74, 0x72, 0x6f,
-	0x5f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x0c, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c,
-	0x6f, 0x75, 0x74, 0x72, 0x6f, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x20, 0x0a, 0x09,
-	0x65, 0x6e, 0x63, 0x72, 0x79, 0x70, 0x74, 0x65, 0x64, 0x18, 0x0d, 0x20, 0x01, 0x28, 0x08, 0x42,
-	0x02, 0x18, 0x01, 0x52, 0x09, 0x65, 0x6e, 0x63, 0x72, 0x79, 0x70, 0x74, 0x65, 0x64, 0x12, 0x12,
-	0x0a, 0x04, 0x74, 0x61, 0x67, 0x73, 0x18, 0x0e, 0x20, 0x03, 0x28, 0x09, 0x52, 0x04, 0x74, 0x61,
-	0x67, 0x73, 0x12, 0x61, 0x0a, 0x11, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x5f, 0x70, 0x65, 0x72, 0x6d,
-	0x69, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x73, 0x18, 0x0f, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x34, 0x2e,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69,
-	0x74, 0x79, 0x44, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x54, 0x6f,
-	0x6b, 0x65, 0x6e, 0x50, 0x65, 0x72, 0x6d, 0x69, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x73, 0x45, 0x6e,
-	0x74, 0x72, 0x79, 0x52, 0x10, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x50, 0x65, 0x72, 0x6d, 0x69, 0x73,
-	0x73, 0x69, 0x6f, 0x6e, 0x73, 0x12, 0x5c, 0x0a, 0x19, 0x63, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69,
-	0x74, 0x79, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x73, 0x5f, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61,
-	0x74, 0x61, 0x18, 0x10, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x20, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f,
-	0x62, 0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x54, 0x6f, 0x6b,
-	0x65, 0x6e, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x52, 0x17, 0x63, 0x6f, 0x6d, 0x6d,
-	0x75, 0x6e, 0x69, 0x74, 0x79, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x73, 0x4d, 0x65, 0x74, 0x61, 0x64,
-	0x61, 0x74, 0x61, 0x12, 0x30, 0x0a, 0x14, 0x61, 0x63, 0x74, 0x69, 0x76, 0x65, 0x5f, 0x6d, 0x65,
-	0x6d, 0x62, 0x65, 0x72, 0x73, 0x5f, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x18, 0x11, 0x20, 0x01, 0x28,
-	0x04, 0x52, 0x12, 0x61, 0x63, 0x74, 0x69, 0x76, 0x65, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x73,
-	0x43, 0x6f, 0x75, 0x6e, 0x74, 0x12, 0x0e, 0x0a, 0x02, 0x49, 0x44, 0x18, 0x12, 0x20, 0x01, 0x28,
-	0x09, 0x52, 0x02, 0x49, 0x44, 0x12, 0x51, 0x0a, 0x0b, 0x70, 0x72, 0x69, 0x76, 0x61, 0x74, 0x65,
-	0x44, 0x61, 0x74, 0x61, 0x18, 0x64, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x2f, 0x2e, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x44,
-	0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x50, 0x72, 0x69, 0x76, 0x61,
-	0x74, 0x65, 0x44, 0x61, 0x74, 0x61, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x0b, 0x70, 0x72, 0x69,
-	0x76, 0x61, 0x74, 0x65, 0x44, 0x61, 0x74, 0x61, 0x1a, 0x55, 0x0a, 0x0c, 0x4d, 0x65, 0x6d, 0x62,
-	0x65, 0x72, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x2f, 0x0a, 0x05, 0x76, 0x61,
-	0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x19, 0x2e, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x62, 0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x4d, 0x65,
-	0x6d, 0x62, 0x65, 0x72, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x1a,
-	0x51, 0x0a, 0x0a, 0x43, 0x68, 0x61, 0x74, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a,
-	0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12,
-	0x2d, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x17,
-	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e,
-	0x69, 0x74, 0x79, 0x43, 0x68, 0x61, 0x74, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02,
-	0x38, 0x01, 0x1a, 0x5a, 0x0a, 0x0f, 0x43, 0x61, 0x74, 0x65, 0x67, 0x6f, 0x72, 0x69, 0x65, 0x73,
+	0x68, 0x61, 0x74, 0x73, 0x12, 0x1d, 0x0a, 0x08, 0x62, 0x61, 0x6e, 0x5f, 0x6c, 0x69, 0x73, 0x74,
+	0x18, 0x07, 0x20, 0x03, 0x28, 0x09, 0x42, 0x02, 0x18, 0x01, 0x52, 0x07, 0x62, 0x61, 0x6e, 0x4c,
+	0x69, 0x73, 0x74, 0x12, 0x4e, 0x0a, 0x0a, 0x63, 0x61, 0x74, 0x65, 0x67, 0x6f, 0x72, 0x69, 0x65,
+	0x73, 0x18, 0x08, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x2e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62,
+	0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x44, 0x65, 0x73, 0x63,
+	0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x43, 0x61, 0x74, 0x65, 0x67, 0x6f, 0x72, 0x69,
+	0x65, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x0a, 0x63, 0x61, 0x74, 0x65, 0x67, 0x6f, 0x72,
+	0x69, 0x65, 0x73, 0x12, 0x38, 0x0a, 0x18, 0x61, 0x72, 0x63, 0x68, 0x69, 0x76, 0x65, 0x5f, 0x6d,
+	0x61, 0x67, 0x6e, 0x65, 0x74, 0x6c, 0x69, 0x6e, 0x6b, 0x5f, 0x63, 0x6c, 0x6f, 0x63, 0x6b, 0x18,
+	0x09, 0x20, 0x01, 0x28, 0x04, 0x52, 0x16, 0x61, 0x72, 0x63, 0x68, 0x69, 0x76, 0x65, 0x4d, 0x61,
+	0x67, 0x6e, 0x65, 0x74, 0x6c, 0x69, 0x6e, 0x6b, 0x43, 0x6c, 0x6f, 0x63, 0x6b, 0x12, 0x47, 0x0a,
+	0x0e, 0x61, 0x64, 0x6d, 0x69, 0x6e, 0x5f, 0x73, 0x65, 0x74, 0x74, 0x69, 0x6e, 0x67, 0x73, 0x18,
+	0x0a, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x20, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66,
+	0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x41, 0x64, 0x6d, 0x69, 0x6e, 0x53,
+	0x65, 0x74, 0x74, 0x69, 0x6e, 0x67, 0x73, 0x52, 0x0d, 0x61, 0x64, 0x6d, 0x69, 0x6e, 0x53, 0x65,
+	0x74, 0x74, 0x69, 0x6e, 0x67, 0x73, 0x12, 0x23, 0x0a, 0x0d, 0x69, 0x6e, 0x74, 0x72, 0x6f, 0x5f,
+	0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x0b, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x69,
+	0x6e, 0x74, 0x72, 0x6f, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x23, 0x0a, 0x0d, 0x6f,
+	0x75, 0x74, 0x72, 0x6f, 0x5f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x0c, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x0c, 0x6f, 0x75, 0x74, 0x72, 0x6f, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65,
+	0x12, 0x20, 0x0a, 0x09, 0x65, 0x6e, 0x63, 0x72, 0x79, 0x70, 0x74, 0x65, 0x64, 0x18, 0x0d, 0x20,
+	0x01, 0x28, 0x08, 0x42, 0x02, 0x18, 0x01, 0x52, 0x09, 0x65, 0x6e, 0x63, 0x72, 0x79, 0x70, 0x74,
+	0x65, 0x64, 0x12, 0x12, 0x0a, 0x04, 0x74, 0x61, 0x67, 0x73, 0x18, 0x0e, 0x20, 0x03, 0x28, 0x09,
+	0x52, 0x04, 0x74, 0x61, 0x67, 0x73, 0x12, 0x61, 0x0a, 0x11, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x5f,
+	0x70, 0x65, 0x72, 0x6d, 0x69, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x73, 0x18, 0x0f, 0x20, 0x03, 0x28,
+	0x0b, 0x32, 0x34, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d,
+	0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x44, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f,
+	0x6e, 0x2e, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x50, 0x65, 0x72, 0x6d, 0x69, 0x73, 0x73, 0x69, 0x6f,
+	0x6e, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x10, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x50, 0x65,
+	0x72, 0x6d, 0x69, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x73, 0x12, 0x5c, 0x0a, 0x19, 0x63, 0x6f, 0x6d,
+	0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x73, 0x5f, 0x6d, 0x65,
+	0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x18, 0x10, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x20, 0x2e, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74,
+	0x79, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x52, 0x17,
+	0x63, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x73, 0x4d,
+	0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x12, 0x30, 0x0a, 0x14, 0x61, 0x63, 0x74, 0x69, 0x76,
+	0x65, 0x5f, 0x6d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x73, 0x5f, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x18,
+	0x11, 0x20, 0x01, 0x28, 0x04, 0x52, 0x12, 0x61, 0x63, 0x74, 0x69, 0x76, 0x65, 0x4d, 0x65, 0x6d,
+	0x62, 0x65, 0x72, 0x73, 0x43, 0x6f, 0x75, 0x6e, 0x74, 0x12, 0x0e, 0x0a, 0x02, 0x49, 0x44, 0x18,
+	0x12, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x49, 0x44, 0x12, 0x58, 0x0a, 0x0e, 0x62, 0x61, 0x6e,
+	0x6e, 0x65, 0x64, 0x5f, 0x6d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x73, 0x18, 0x13, 0x20, 0x03, 0x28,
+	0x0b, 0x32, 0x31, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d,
+	0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x44, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f,
+	0x6e, 0x2e, 0x42, 0x61, 0x6e, 0x6e, 0x65, 0x64, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x73, 0x45,
+	0x6e, 0x74, 0x72, 0x79, 0x52, 0x0d, 0x62, 0x61, 0x6e, 0x6e, 0x65, 0x64, 0x4d, 0x65, 0x6d, 0x62,
+	0x65, 0x72, 0x73, 0x12, 0x51, 0x0a, 0x0b, 0x70, 0x72, 0x69, 0x76, 0x61, 0x74, 0x65, 0x44, 0x61,
+	0x74, 0x61, 0x18, 0x64, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x2f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+	0x62, 0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x44, 0x65, 0x73,
+	0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x50, 0x72, 0x69, 0x76, 0x61, 0x74, 0x65,
+	0x44, 0x61, 0x74, 0x61, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x0b, 0x70, 0x72, 0x69, 0x76, 0x61,
+	0x74, 0x65, 0x44, 0x61, 0x74, 0x61, 0x1a, 0x55, 0x0a, 0x0c, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72,
+	0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x2f, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75,
+	0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x19, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62,
+	0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x4d, 0x65, 0x6d, 0x62,
+	0x65, 0x72, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x1a, 0x51, 0x0a,
+	0x0a, 0x43, 0x68, 0x61, 0x74, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b,
+	0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x2d, 0x0a,
+	0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x17, 0x2e, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74,
+	0x79, 0x43, 0x68, 0x61, 0x74, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01,
+	0x1a, 0x5a, 0x0a, 0x0f, 0x43, 0x61, 0x74, 0x65, 0x67, 0x6f, 0x72, 0x69, 0x65, 0x73, 0x45, 0x6e,
+	0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x31, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02,
+	0x20, 0x01, 0x28, 0x0b, 0x32, 0x1b, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e,
+	0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x43, 0x61, 0x74, 0x65, 0x67, 0x6f, 0x72,
+	0x79, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x1a, 0x67, 0x0a, 0x15,
+	0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x50, 0x65, 0x72, 0x6d, 0x69, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x73,
 	0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x31, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65,
-	0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1b, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
-	0x66, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x43, 0x61, 0x74, 0x65, 0x67,
-	0x6f, 0x72, 0x79, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x1a, 0x67,
-	0x0a, 0x15, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x50, 0x65, 0x72, 0x6d, 0x69, 0x73, 0x73, 0x69, 0x6f,
-	0x6e, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01,
-	0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x38, 0x0a, 0x05, 0x76, 0x61, 0x6c,
-	0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x22, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f,
-	0x62, 0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x54, 0x6f, 0x6b,
-	0x65, 0x6e, 0x50, 0x65, 0x72, 0x6d, 0x69, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x52, 0x05, 0x76, 0x61,
-	0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x1a, 0x3e, 0x0a, 0x10, 0x50, 0x72, 0x69, 0x76, 0x61,
-	0x74, 0x65, 0x44, 0x61, 0x74, 0x61, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b,
-	0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a,
-	0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x76, 0x61,
-	0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0x5e, 0x0a, 0x16, 0x43, 0x6f, 0x6d, 0x6d, 0x75,
+	0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x38, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x22, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
+	0x66, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x54, 0x6f, 0x6b, 0x65, 0x6e,
+	0x50, 0x65, 0x72, 0x6d, 0x69, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75,
+	0x65, 0x3a, 0x02, 0x38, 0x01, 0x1a, 0x5c, 0x0a, 0x12, 0x42, 0x61, 0x6e, 0x6e, 0x65, 0x64, 0x4d,
+	0x65, 0x6d, 0x62, 0x65, 0x72, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b,
+	0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x30, 0x0a,
+	0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74,
+	0x79, 0x42, 0x61, 0x6e, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a,
+	0x02, 0x38, 0x01, 0x1a, 0x3e, 0x0a, 0x10, 0x50, 0x72, 0x69, 0x76, 0x61, 0x74, 0x65, 0x44, 0x61,
+	0x74, 0x61, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c,
+	0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a,
+	0x02, 0x38, 0x01, 0x22, 0x42, 0x0a, 0x10, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79,
+	0x42, 0x61, 0x6e, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x2e, 0x0a, 0x13, 0x64, 0x65, 0x6c, 0x65, 0x74,
+	0x65, 0x5f, 0x61, 0x6c, 0x6c, 0x5f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x08, 0x52, 0x11, 0x64, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x41, 0x6c, 0x6c, 0x4d,
+	0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x22, 0x5e, 0x0a, 0x16, 0x43, 0x6f, 0x6d, 0x6d, 0x75,
 	0x6e, 0x69, 0x74, 0x79, 0x41, 0x64, 0x6d, 0x69, 0x6e, 0x53, 0x65, 0x74, 0x74, 0x69, 0x6e, 0x67,
 	0x73, 0x12, 0x44, 0x0a, 0x1f, 0x70, 0x69, 0x6e, 0x5f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65,
 	0x5f, 0x61, 0x6c, 0x6c, 0x5f, 0x6d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x73, 0x5f, 0x65, 0x6e, 0x61,
@@ -2626,7 +2699,7 @@ func file_communities_proto_rawDescGZIP() []byte {
 }
 
 var file_communities_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_communities_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
+var file_communities_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_communities_proto_goTypes = []interface{}{
 	(CommunityMember_Roles)(0),                // 0: protobuf.CommunityMember.Roles
 	(CommunityPermissions_Access)(0),          // 1: protobuf.CommunityPermissions.Access
@@ -2638,80 +2711,84 @@ var file_communities_proto_goTypes = []interface{}{
 	(*TokenCriteria)(nil),                     // 7: protobuf.TokenCriteria
 	(*CommunityTokenPermission)(nil),          // 8: protobuf.CommunityTokenPermission
 	(*CommunityDescription)(nil),              // 9: protobuf.CommunityDescription
-	(*CommunityAdminSettings)(nil),            // 10: protobuf.CommunityAdminSettings
-	(*CommunityChat)(nil),                     // 11: protobuf.CommunityChat
-	(*CommunityCategory)(nil),                 // 12: protobuf.CommunityCategory
-	(*RevealedAccount)(nil),                   // 13: protobuf.RevealedAccount
-	(*CommunityRequestToJoin)(nil),            // 14: protobuf.CommunityRequestToJoin
-	(*CommunityEditSharedAddresses)(nil),      // 15: protobuf.CommunityEditSharedAddresses
-	(*CommunityCancelRequestToJoin)(nil),      // 16: protobuf.CommunityCancelRequestToJoin
-	(*CommunityUserKicked)(nil),               // 17: protobuf.CommunityUserKicked
-	(*CommunityRequestToJoinResponse)(nil),    // 18: protobuf.CommunityRequestToJoinResponse
-	(*CommunityRequestToLeave)(nil),           // 19: protobuf.CommunityRequestToLeave
-	(*CommunityMessageArchiveMagnetlink)(nil), // 20: protobuf.CommunityMessageArchiveMagnetlink
-	(*WakuMessage)(nil),                       // 21: protobuf.WakuMessage
-	(*WakuMessageArchiveMetadata)(nil),        // 22: protobuf.WakuMessageArchiveMetadata
-	(*WakuMessageArchive)(nil),                // 23: protobuf.WakuMessageArchive
-	(*WakuMessageArchiveIndexMetadata)(nil),   // 24: protobuf.WakuMessageArchiveIndexMetadata
-	(*WakuMessageArchiveIndex)(nil),           // 25: protobuf.WakuMessageArchiveIndex
-	(*CommunityPublicStorenodesInfo)(nil),     // 26: protobuf.CommunityPublicStorenodesInfo
-	(*CommunityStorenodes)(nil),               // 27: protobuf.CommunityStorenodes
-	(*Storenode)(nil),                         // 28: protobuf.Storenode
-	nil,                                       // 29: protobuf.CommunityTokenMetadata.ContractAddressesEntry
-	nil,                                       // 30: protobuf.TokenCriteria.ContractAddressesEntry
-	nil,                                       // 31: protobuf.CommunityDescription.MembersEntry
-	nil,                                       // 32: protobuf.CommunityDescription.ChatsEntry
-	nil,                                       // 33: protobuf.CommunityDescription.CategoriesEntry
-	nil,                                       // 34: protobuf.CommunityDescription.TokenPermissionsEntry
-	nil,                                       // 35: protobuf.CommunityDescription.PrivateDataEntry
-	nil,                                       // 36: protobuf.CommunityChat.MembersEntry
-	nil,                                       // 37: protobuf.WakuMessageArchiveIndex.ArchivesEntry
-	(CommunityTokenType)(0),                   // 38: protobuf.CommunityTokenType
-	(*ChatIdentity)(nil),                      // 39: protobuf.ChatIdentity
-	(*Shard)(nil),                             // 40: protobuf.Shard
+	(*CommunityBanInfo)(nil),                  // 10: protobuf.CommunityBanInfo
+	(*CommunityAdminSettings)(nil),            // 11: protobuf.CommunityAdminSettings
+	(*CommunityChat)(nil),                     // 12: protobuf.CommunityChat
+	(*CommunityCategory)(nil),                 // 13: protobuf.CommunityCategory
+	(*RevealedAccount)(nil),                   // 14: protobuf.RevealedAccount
+	(*CommunityRequestToJoin)(nil),            // 15: protobuf.CommunityRequestToJoin
+	(*CommunityEditSharedAddresses)(nil),      // 16: protobuf.CommunityEditSharedAddresses
+	(*CommunityCancelRequestToJoin)(nil),      // 17: protobuf.CommunityCancelRequestToJoin
+	(*CommunityUserKicked)(nil),               // 18: protobuf.CommunityUserKicked
+	(*CommunityRequestToJoinResponse)(nil),    // 19: protobuf.CommunityRequestToJoinResponse
+	(*CommunityRequestToLeave)(nil),           // 20: protobuf.CommunityRequestToLeave
+	(*CommunityMessageArchiveMagnetlink)(nil), // 21: protobuf.CommunityMessageArchiveMagnetlink
+	(*WakuMessage)(nil),                       // 22: protobuf.WakuMessage
+	(*WakuMessageArchiveMetadata)(nil),        // 23: protobuf.WakuMessageArchiveMetadata
+	(*WakuMessageArchive)(nil),                // 24: protobuf.WakuMessageArchive
+	(*WakuMessageArchiveIndexMetadata)(nil),   // 25: protobuf.WakuMessageArchiveIndexMetadata
+	(*WakuMessageArchiveIndex)(nil),           // 26: protobuf.WakuMessageArchiveIndex
+	(*CommunityPublicStorenodesInfo)(nil),     // 27: protobuf.CommunityPublicStorenodesInfo
+	(*CommunityStorenodes)(nil),               // 28: protobuf.CommunityStorenodes
+	(*Storenode)(nil),                         // 29: protobuf.Storenode
+	nil,                                       // 30: protobuf.CommunityTokenMetadata.ContractAddressesEntry
+	nil,                                       // 31: protobuf.TokenCriteria.ContractAddressesEntry
+	nil,                                       // 32: protobuf.CommunityDescription.MembersEntry
+	nil,                                       // 33: protobuf.CommunityDescription.ChatsEntry
+	nil,                                       // 34: protobuf.CommunityDescription.CategoriesEntry
+	nil,                                       // 35: protobuf.CommunityDescription.TokenPermissionsEntry
+	nil,                                       // 36: protobuf.CommunityDescription.BannedMembersEntry
+	nil,                                       // 37: protobuf.CommunityDescription.PrivateDataEntry
+	nil,                                       // 38: protobuf.CommunityChat.MembersEntry
+	nil,                                       // 39: protobuf.WakuMessageArchiveIndex.ArchivesEntry
+	(CommunityTokenType)(0),                   // 40: protobuf.CommunityTokenType
+	(*ChatIdentity)(nil),                      // 41: protobuf.ChatIdentity
+	(*Shard)(nil),                             // 42: protobuf.Shard
 }
 var file_communities_proto_depIdxs = []int32{
 	0,  // 0: protobuf.CommunityMember.roles:type_name -> protobuf.CommunityMember.Roles
-	13, // 1: protobuf.CommunityMember.revealed_accounts:type_name -> protobuf.RevealedAccount
-	29, // 2: protobuf.CommunityTokenMetadata.contract_addresses:type_name -> protobuf.CommunityTokenMetadata.ContractAddressesEntry
-	38, // 3: protobuf.CommunityTokenMetadata.tokenType:type_name -> protobuf.CommunityTokenType
+	14, // 1: protobuf.CommunityMember.revealed_accounts:type_name -> protobuf.RevealedAccount
+	30, // 2: protobuf.CommunityTokenMetadata.contract_addresses:type_name -> protobuf.CommunityTokenMetadata.ContractAddressesEntry
+	40, // 3: protobuf.CommunityTokenMetadata.tokenType:type_name -> protobuf.CommunityTokenType
 	1,  // 4: protobuf.CommunityPermissions.access:type_name -> protobuf.CommunityPermissions.Access
-	30, // 5: protobuf.TokenCriteria.contract_addresses:type_name -> protobuf.TokenCriteria.ContractAddressesEntry
-	38, // 6: protobuf.TokenCriteria.type:type_name -> protobuf.CommunityTokenType
+	31, // 5: protobuf.TokenCriteria.contract_addresses:type_name -> protobuf.TokenCriteria.ContractAddressesEntry
+	40, // 6: protobuf.TokenCriteria.type:type_name -> protobuf.CommunityTokenType
 	2,  // 7: protobuf.CommunityTokenPermission.type:type_name -> protobuf.CommunityTokenPermission.Type
 	7,  // 8: protobuf.CommunityTokenPermission.token_criteria:type_name -> protobuf.TokenCriteria
-	31, // 9: protobuf.CommunityDescription.members:type_name -> protobuf.CommunityDescription.MembersEntry
+	32, // 9: protobuf.CommunityDescription.members:type_name -> protobuf.CommunityDescription.MembersEntry
 	6,  // 10: protobuf.CommunityDescription.permissions:type_name -> protobuf.CommunityPermissions
-	39, // 11: protobuf.CommunityDescription.identity:type_name -> protobuf.ChatIdentity
-	32, // 12: protobuf.CommunityDescription.chats:type_name -> protobuf.CommunityDescription.ChatsEntry
-	33, // 13: protobuf.CommunityDescription.categories:type_name -> protobuf.CommunityDescription.CategoriesEntry
-	10, // 14: protobuf.CommunityDescription.admin_settings:type_name -> protobuf.CommunityAdminSettings
-	34, // 15: protobuf.CommunityDescription.token_permissions:type_name -> protobuf.CommunityDescription.TokenPermissionsEntry
+	41, // 11: protobuf.CommunityDescription.identity:type_name -> protobuf.ChatIdentity
+	33, // 12: protobuf.CommunityDescription.chats:type_name -> protobuf.CommunityDescription.ChatsEntry
+	34, // 13: protobuf.CommunityDescription.categories:type_name -> protobuf.CommunityDescription.CategoriesEntry
+	11, // 14: protobuf.CommunityDescription.admin_settings:type_name -> protobuf.CommunityAdminSettings
+	35, // 15: protobuf.CommunityDescription.token_permissions:type_name -> protobuf.CommunityDescription.TokenPermissionsEntry
 	5,  // 16: protobuf.CommunityDescription.community_tokens_metadata:type_name -> protobuf.CommunityTokenMetadata
-	35, // 17: protobuf.CommunityDescription.privateData:type_name -> protobuf.CommunityDescription.PrivateDataEntry
-	36, // 18: protobuf.CommunityChat.members:type_name -> protobuf.CommunityChat.MembersEntry
-	6,  // 19: protobuf.CommunityChat.permissions:type_name -> protobuf.CommunityPermissions
-	39, // 20: protobuf.CommunityChat.identity:type_name -> protobuf.ChatIdentity
-	13, // 21: protobuf.CommunityRequestToJoin.revealed_accounts:type_name -> protobuf.RevealedAccount
-	13, // 22: protobuf.CommunityEditSharedAddresses.revealed_accounts:type_name -> protobuf.RevealedAccount
-	9,  // 23: protobuf.CommunityRequestToJoinResponse.community:type_name -> protobuf.CommunityDescription
-	40, // 24: protobuf.CommunityRequestToJoinResponse.shard:type_name -> protobuf.Shard
-	22, // 25: protobuf.WakuMessageArchive.metadata:type_name -> protobuf.WakuMessageArchiveMetadata
-	21, // 26: protobuf.WakuMessageArchive.messages:type_name -> protobuf.WakuMessage
-	22, // 27: protobuf.WakuMessageArchiveIndexMetadata.metadata:type_name -> protobuf.WakuMessageArchiveMetadata
-	37, // 28: protobuf.WakuMessageArchiveIndex.archives:type_name -> protobuf.WakuMessageArchiveIndex.ArchivesEntry
-	28, // 29: protobuf.CommunityStorenodes.storenodes:type_name -> protobuf.Storenode
-	4,  // 30: protobuf.CommunityDescription.MembersEntry.value:type_name -> protobuf.CommunityMember
-	11, // 31: protobuf.CommunityDescription.ChatsEntry.value:type_name -> protobuf.CommunityChat
-	12, // 32: protobuf.CommunityDescription.CategoriesEntry.value:type_name -> protobuf.CommunityCategory
-	8,  // 33: protobuf.CommunityDescription.TokenPermissionsEntry.value:type_name -> protobuf.CommunityTokenPermission
-	4,  // 34: protobuf.CommunityChat.MembersEntry.value:type_name -> protobuf.CommunityMember
-	24, // 35: protobuf.WakuMessageArchiveIndex.ArchivesEntry.value:type_name -> protobuf.WakuMessageArchiveIndexMetadata
-	36, // [36:36] is the sub-list for method output_type
-	36, // [36:36] is the sub-list for method input_type
-	36, // [36:36] is the sub-list for extension type_name
-	36, // [36:36] is the sub-list for extension extendee
-	0,  // [0:36] is the sub-list for field type_name
+	36, // 17: protobuf.CommunityDescription.banned_members:type_name -> protobuf.CommunityDescription.BannedMembersEntry
+	37, // 18: protobuf.CommunityDescription.privateData:type_name -> protobuf.CommunityDescription.PrivateDataEntry
+	38, // 19: protobuf.CommunityChat.members:type_name -> protobuf.CommunityChat.MembersEntry
+	6,  // 20: protobuf.CommunityChat.permissions:type_name -> protobuf.CommunityPermissions
+	41, // 21: protobuf.CommunityChat.identity:type_name -> protobuf.ChatIdentity
+	14, // 22: protobuf.CommunityRequestToJoin.revealed_accounts:type_name -> protobuf.RevealedAccount
+	14, // 23: protobuf.CommunityEditSharedAddresses.revealed_accounts:type_name -> protobuf.RevealedAccount
+	9,  // 24: protobuf.CommunityRequestToJoinResponse.community:type_name -> protobuf.CommunityDescription
+	42, // 25: protobuf.CommunityRequestToJoinResponse.shard:type_name -> protobuf.Shard
+	23, // 26: protobuf.WakuMessageArchive.metadata:type_name -> protobuf.WakuMessageArchiveMetadata
+	22, // 27: protobuf.WakuMessageArchive.messages:type_name -> protobuf.WakuMessage
+	23, // 28: protobuf.WakuMessageArchiveIndexMetadata.metadata:type_name -> protobuf.WakuMessageArchiveMetadata
+	39, // 29: protobuf.WakuMessageArchiveIndex.archives:type_name -> protobuf.WakuMessageArchiveIndex.ArchivesEntry
+	29, // 30: protobuf.CommunityStorenodes.storenodes:type_name -> protobuf.Storenode
+	4,  // 31: protobuf.CommunityDescription.MembersEntry.value:type_name -> protobuf.CommunityMember
+	12, // 32: protobuf.CommunityDescription.ChatsEntry.value:type_name -> protobuf.CommunityChat
+	13, // 33: protobuf.CommunityDescription.CategoriesEntry.value:type_name -> protobuf.CommunityCategory
+	8,  // 34: protobuf.CommunityDescription.TokenPermissionsEntry.value:type_name -> protobuf.CommunityTokenPermission
+	10, // 35: protobuf.CommunityDescription.BannedMembersEntry.value:type_name -> protobuf.CommunityBanInfo
+	4,  // 36: protobuf.CommunityChat.MembersEntry.value:type_name -> protobuf.CommunityMember
+	25, // 37: protobuf.WakuMessageArchiveIndex.ArchivesEntry.value:type_name -> protobuf.WakuMessageArchiveIndexMetadata
+	38, // [38:38] is the sub-list for method output_type
+	38, // [38:38] is the sub-list for method input_type
+	38, // [38:38] is the sub-list for extension type_name
+	38, // [38:38] is the sub-list for extension extendee
+	0,  // [0:38] is the sub-list for field type_name
 }
 
 func init() { file_communities_proto_init() }
@@ -2808,7 +2885,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CommunityAdminSettings); i {
+			switch v := v.(*CommunityBanInfo); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2820,7 +2897,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CommunityChat); i {
+			switch v := v.(*CommunityAdminSettings); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2832,7 +2909,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CommunityCategory); i {
+			switch v := v.(*CommunityChat); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2844,7 +2921,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RevealedAccount); i {
+			switch v := v.(*CommunityCategory); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2856,7 +2933,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CommunityRequestToJoin); i {
+			switch v := v.(*RevealedAccount); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2868,7 +2945,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CommunityEditSharedAddresses); i {
+			switch v := v.(*CommunityRequestToJoin); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2880,7 +2957,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CommunityCancelRequestToJoin); i {
+			switch v := v.(*CommunityEditSharedAddresses); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2892,7 +2969,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CommunityUserKicked); i {
+			switch v := v.(*CommunityCancelRequestToJoin); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2904,7 +2981,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CommunityRequestToJoinResponse); i {
+			switch v := v.(*CommunityUserKicked); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2916,7 +2993,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CommunityRequestToLeave); i {
+			switch v := v.(*CommunityRequestToJoinResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2928,7 +3005,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[17].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CommunityMessageArchiveMagnetlink); i {
+			switch v := v.(*CommunityRequestToLeave); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2940,7 +3017,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[18].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*WakuMessage); i {
+			switch v := v.(*CommunityMessageArchiveMagnetlink); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2952,7 +3029,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[19].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*WakuMessageArchiveMetadata); i {
+			switch v := v.(*WakuMessage); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2964,7 +3041,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[20].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*WakuMessageArchive); i {
+			switch v := v.(*WakuMessageArchiveMetadata); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2976,7 +3053,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[21].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*WakuMessageArchiveIndexMetadata); i {
+			switch v := v.(*WakuMessageArchive); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2988,7 +3065,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[22].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*WakuMessageArchiveIndex); i {
+			switch v := v.(*WakuMessageArchiveIndexMetadata); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3000,7 +3077,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[23].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CommunityPublicStorenodesInfo); i {
+			switch v := v.(*WakuMessageArchiveIndex); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3012,7 +3089,7 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[24].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CommunityStorenodes); i {
+			switch v := v.(*CommunityPublicStorenodesInfo); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3024,6 +3101,18 @@ func file_communities_proto_init() {
 			}
 		}
 		file_communities_proto_msgTypes[25].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CommunityStorenodes); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_communities_proto_msgTypes[26].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Storenode); i {
 			case 0:
 				return &v.state
@@ -3042,7 +3131,7 @@ func file_communities_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_communities_proto_rawDesc,
 			NumEnums:      3,
-			NumMessages:   35,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

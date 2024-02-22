@@ -2345,6 +2345,32 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 	s.Require().True(community.IsBanned(&s.alice.identity.PublicKey))
 	s.Require().Len(community.PendingAndBannedMembers(), 1)
 
+	response, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) == 1 &&
+				len(r.Communities()[0].PendingAndBannedMembers()) == 1 &&
+				r.Communities()[0].IsBanned(&s.alice.identity.PublicKey) &&
+				len(r.ActivityCenterNotifications()) == 1 && !r.ActivityCenterState().HasSeen
+		},
+		"no message about alice ban",
+	)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// Check we got ban AC notification for Alice
+	aliceNotifications, err := s.alice.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
+		Cursor:        "",
+		Limit:         10,
+		ActivityTypes: []ActivityCenterType{ActivityCenterNotificationTypeCommunityBanned},
+		ReadType:      ActivityCenterQueryParamsReadUnread,
+	},
+	)
+	s.Require().NoError(err)
+	s.Require().Len(aliceNotifications.Notifications, 1)
+	s.Require().Equal(community.IDString(), aliceNotifications.Notifications[0].CommunityID)
+
 	response, err = s.owner.UnbanUserFromCommunity(
 		&requests.UnbanUserFromCommunity{
 			CommunityID: community.ID(),
@@ -2356,7 +2382,37 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 	s.Require().Len(response.Communities(), 1)
 
 	community = response.Communities()[0]
+	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
 	s.Require().False(community.IsBanned(&s.alice.identity.PublicKey))
+	s.Require().Len(community.PendingAndBannedMembers(), 0)
+
+	response, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) == 1 &&
+				len(r.Communities()[0].PendingAndBannedMembers()) == 0 &&
+				!r.Communities()[0].IsBanned(&s.alice.identity.PublicKey) &&
+				len(r.ActivityCenterNotifications()) == 1 && !r.ActivityCenterState().HasSeen
+		},
+		"no message about alice unban",
+	)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().False(response.Communities()[0].Joined())
+
+	// Check we got unban AC notification for Alice
+	aliceNotifications, err = s.alice.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
+		Cursor:        "",
+		Limit:         10,
+		ActivityTypes: []ActivityCenterType{ActivityCenterNotificationTypeCommunityUnbanned},
+		ReadType:      ActivityCenterQueryParamsReadUnread,
+	},
+	)
+	s.Require().NoError(err)
+	s.Require().Len(aliceNotifications.Notifications, 1)
+	s.Require().Equal(community.IDString(), aliceNotifications.Notifications[0].CommunityID)
 }
 
 func (s *MessengerCommunitiesSuite) createOtherDevice(m1 *Messenger) *Messenger {
@@ -3939,4 +3995,104 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunityLastOpenedAt() {
 	otherDeviceCommunity, err := alicesOtherDevice.communitiesManager.GetByID(newCommunity.ID())
 	s.Require().NoError(err)
 	s.Require().True(otherDeviceCommunity.LastOpenedAt() > 0)
+}
+
+func (s *MessengerCommunitiesSuite) TestBanUserAndDeleteAllUserMessages() {
+	community, _ := s.createCommunity()
+
+	orgChat := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "chat test delete messages",
+			Emoji:       "😎",
+			Description: "status-core community chat",
+		},
+	}
+	response, err := s.owner.CreateCommunityChat(community.ID(), orgChat)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Chats(), 1)
+
+	community = response.Communities()[0]
+	communityChat := response.Chats()[0]
+
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.joinCommunity(community, s.owner, s.alice)
+
+	inputMessage := buildTestMessage(*communityChat)
+
+	sendResponse, err := s.alice.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().NotNil(sendResponse)
+	s.Require().Len(sendResponse.Messages(), 1)
+	messageID := sendResponse.Messages()[0].ID
+
+	response, err = WaitOnMessengerResponse(
+		s.owner,
+		func(r *MessengerResponse) bool {
+			if len(r.Messages()) == 0 {
+				return false
+			}
+
+			for _, message := range r.Messages() {
+				if message.ID == messageID {
+					return true
+				}
+			}
+			return false
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(messageID, response.Messages()[0].ID)
+
+	response, err = s.owner.BanUserFromCommunity(
+		context.Background(),
+		&requests.BanUserFromCommunity{
+			CommunityID:       community.ID(),
+			User:              common.PubkeyToHexBytes(&s.alice.identity.PublicKey),
+			DeleteAllMessages: true,
+		},
+	)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Messages(), 0)
+	s.Require().Len(response.RemovedMessages(), 0)
+	s.Require().Len(response.DeletedMessages(), 1)
+	// we are removing last message, so we must get chat update too
+
+	community = response.Communities()[0]
+	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
+	s.Require().True(community.IsBanned(&s.alice.identity.PublicKey))
+	s.Require().Len(community.PendingAndBannedMembers(), 1)
+
+	response, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return r != nil && len(r.DeletedMessages()) > 0
+		},
+		"no removed message for alice",
+	)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Messages(), 0)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+	s.Require().Len(response.RemovedMessages(), 0)
+	s.Require().Len(response.DeletedMessages(), 1)
+	// we are removing last message, so we must get chat update too
+
+	community = response.Communities()[0]
+	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
+	s.Require().True(community.IsBanned(&s.alice.identity.PublicKey))
+	s.Require().Len(community.PendingAndBannedMembers(), 1)
+	s.Require().False(community.Joined())
+	s.Require().True(community.Spectated())
 }

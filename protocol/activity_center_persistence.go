@@ -11,7 +11,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 )
 
-const allFieldsForTableActivityCenterNotification = `id, timestamp, notification_type, chat_id, read, dismissed, accepted, message, author, 
+const allFieldsForTableActivityCenterNotification = `id, timestamp, notification_type, chat_id, read, dismissed, accepted, message, author,
     reply_message, community_id, membership_status, contact_verification_status, token_data, deleted, updated_at`
 
 var emptyNotifications = make([]*ActivityCenterNotification, 0)
@@ -606,7 +606,7 @@ func (db sqlitePersistence) GetToProcessActivityCenterNotificationIds() ([][]byt
 	return db.runActivityCenterIDQuery(`
 		SELECT a.id
 		FROM activity_center_notifications a
-		WHERE NOT a.dismissed AND NOT a.accepted AND NOT a.deleted  
+		WHERE NOT a.dismissed AND NOT a.accepted AND NOT a.deleted
 		`)
 }
 
@@ -774,10 +774,10 @@ func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromUser(userPu
 		_ = tx.Rollback()
 	}()
 
-	query := fmt.Sprintf(`SELECT %s FROM activity_center_notifications WHERE 
-                                       author = ? AND 
-                                       NOT deleted AND 
-                                       NOT dismissed AND 
+	query := fmt.Sprintf(`SELECT %s FROM activity_center_notifications WHERE
+                                       author = ? AND
+                                       NOT deleted AND
+                                       NOT dismissed AND
                                        NOT accepted`, allFieldsForTableActivityCenterNotification)
 	rows, err := tx.Query(query, userPublicKey)
 	if err != nil {
@@ -915,8 +915,9 @@ func (db sqlitePersistence) DismissActivityCenterNotificationsByCommunity(commun
 		_ = tx.Rollback()
 	}()
 
-	query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1, updated_at = ? WHERE community_id = ? AND notification_type IN (?, ?) AND NOT deleted" // nolint: gosec
-	_, err = tx.Exec(query, updatedAt, communityID, ActivityCenterNotificationTypeCommunityRequest, ActivityCenterNotificationTypeCommunityKicked)
+	query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1, updated_at = ? WHERE community_id = ? AND notification_type IN (?, ?, ?, ?) AND NOT deleted" // nolint: gosec
+	_, err = tx.Exec(query, updatedAt, communityID,
+		ActivityCenterNotificationTypeCommunityRequest, ActivityCenterNotificationTypeCommunityKicked, ActivityCenterNotificationTypeCommunityBanned, ActivityCenterNotificationTypeCommunityUnbanned)
 	if err != nil {
 		return nil, err
 	}
@@ -1004,10 +1005,10 @@ func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromChatID(chat
 		_ = tx.Rollback()
 	}()
 
-	query := fmt.Sprintf(`SELECT %s FROM activity_center_notifications 
-          WHERE chat_id = ? 
-          AND NOT deleted 
-          AND NOT accepted 
+	query := fmt.Sprintf(`SELECT %s FROM activity_center_notifications
+          WHERE chat_id = ?
+          AND NOT deleted
+          AND NOT accepted
           AND notification_type != ?`, allFieldsForTableActivityCenterNotification)
 	rows, err := tx.Query(query, chatID, ActivityCenterNotificationTypeContactRequest)
 	if err != nil {
@@ -1027,7 +1028,7 @@ func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromChatID(chat
 	query = `
 		UPDATE activity_center_notifications
 		SET read = 1, dismissed = 1, updated_at = ?
-		WHERE chat_id = ? 
+		WHERE chat_id = ?
 		    AND NOT deleted
 			AND NOT accepted
 			AND notification_type != ?
@@ -1133,11 +1134,11 @@ func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(
 		_ = tx.Rollback()
 	}()
 
-	query := fmt.Sprintf(`SELECT %s FROM activity_center_notifications 
-          WHERE author = ? 
-          AND NOT deleted 
-          AND NOT dismissed 
-          AND NOT accepted 
+	query := fmt.Sprintf(`SELECT %s FROM activity_center_notifications
+          WHERE author = ?
+          AND NOT deleted
+          AND NOT dismissed
+          AND NOT accepted
           AND notification_type = ?`, allFieldsForTableActivityCenterNotification)
 	rows, err := tx.Query(query, userPublicKey, ActivityCenterNotificationTypeNewPrivateGroupChat)
 	if err != nil {
@@ -1154,8 +1155,8 @@ func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(
 
 	_, err = tx.Exec(`
 		UPDATE activity_center_notifications
-		SET read = 1, accepted = 1, updated_at = ? 
-		WHERE author = ? 
+		SET read = 1, accepted = 1, updated_at = ?
+		WHERE author = ?
 			AND NOT deleted
 			AND NOT dismissed
 		    AND NOT accepted
@@ -1340,7 +1341,7 @@ func (db sqlitePersistence) ActiveContactRequestNotification(contactID string) (
 			a.updated_at
 		FROM activity_center_notifications a
 		LEFT JOIN chats c ON c.id = a.chat_id
-		WHERE a.author = ? 
+		WHERE a.author = ?
 		    AND NOT a.deleted
 			AND NOT a.dismissed
 			AND NOT a.accepted
@@ -1371,7 +1372,7 @@ func (db sqlitePersistence) DeleteChatContactRequestActivityCenterNotifications(
 	}
 
 	_, err = db.db.Exec(`
-				UPDATE activity_center_notifications SET deleted = 1, updated_at = ? 
+				UPDATE activity_center_notifications SET deleted = 1, updated_at = ?
 	WHERE
 	chat_id = ?
 	AND NOT deleted

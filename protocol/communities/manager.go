@@ -3195,7 +3195,7 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 		return nil, err
 	}
 
-	_, err = community.BanUserFromCommunity(publicKey)
+	_, err = community.BanUserFromCommunity(publicKey, &protobuf.CommunityBanInfo{DeleteAllMessages: request.DeleteAllMessages})
 	if err != nil {
 		return nil, err
 	}

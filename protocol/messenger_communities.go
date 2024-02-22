@@ -2663,6 +2663,24 @@ func (m *Messenger) BanUserFromCommunity(ctx context.Context, request *requests.
 	}
 
 	response.AddCommunity(community)
+
+	if request.DeleteAllMessages {
+		deleteMessagesResponse, err := m.DeleteAllCommunityMemberMessages(request.User.String(), request.CommunityID.String())
+		if err != nil {
+			return nil, err
+		}
+
+		err = response.Merge(deleteMessagesResponse)
+		if err != nil {
+			return nil, err
+		}
+
+		// signal client with community and messages changes
+		if m.config.messengerSignalsHandler != nil {
+			m.config.messengerSignalsHandler.MessengerResponse(deleteMessagesResponse)
+		}
+	}
+
 	return response, nil
 }
 
@@ -2797,6 +2815,21 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 
 func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communityResponse *communities.CommunityResponse) error {
 	community := communityResponse.Community
+
+	if len(communityResponse.Changes.MembersBanned) > 0 {
+		for memberID, deleteAllMessages := range communityResponse.Changes.MembersBanned {
+			if deleteAllMessages {
+				response, err := m.DeleteAllCommunityMemberMessages(memberID, community.IDString())
+				if err != nil {
+					return err
+				}
+
+				if err = state.Response.Merge(response); err != nil {
+					return err
+				}
+			}
+		}
+	}
 
 	state.Response.AddCommunity(community)
 	state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
@@ -4153,6 +4186,7 @@ func (m *Messenger) GetCommunityMembersForWalletAddresses(communityID types.HexB
 
 func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) {
 	// Process any community changes
+	pkString := common.PubkeyToHex(&m.identity.PublicKey)
 	for _, changes := range messageState.Response.CommunityChanges {
 		if changes.ShouldMemberJoin {
 			response, err := m.joinCommunity(context.TODO(), changes.Community.ID(), false)
@@ -4167,38 +4201,13 @@ func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) 
 			}
 
 		} else if changes.MemberKicked {
-			response, err := m.kickedOutOfCommunity(changes.Community.ID())
-			if err != nil {
-				m.logger.Error("cannot leave community", zap.Error(err))
-				continue
+			notificationType := ActivityCenterNotificationTypeCommunityKicked
+			if changes.IsMemberBanned(pkString) {
+				notificationType = ActivityCenterNotificationTypeCommunityBanned
 			}
-
-			if err := messageState.Response.Merge(response); err != nil {
-				m.logger.Error("cannot merge join community response", zap.Error(err))
-				continue
-			}
-
-			// Activity Center notification
-			now := m.GetCurrentTimeInMillis()
-			notification := &ActivityCenterNotification{
-				ID:          types.FromHex(uuid.New().String()),
-				Type:        ActivityCenterNotificationTypeCommunityKicked,
-				Timestamp:   now,
-				CommunityID: changes.Community.IDString(),
-				Read:        false,
-				UpdatedAt:   now,
-			}
-
-			err = m.addActivityCenterNotification(response, notification, nil)
-			if err != nil {
-				m.logger.Error("failed to save notification", zap.Error(err))
-				continue
-			}
-
-			if err := messageState.Response.Merge(response); err != nil {
-				m.logger.Error("cannot merge notification response", zap.Error(err))
-				continue
-			}
+			m.leaveCommunityDueToKickOrBan(changes.Community, notificationType, messageState.Response)
+		} else if changes.IsMemberUnbanned(pkString) {
+			m.AddActivityCenterNotificationToResponse(changes.Community.IDString(), ActivityCenterNotificationTypeCommunityUnbanned, messageState.Response)
 		}
 	}
 	// Clean up as not used by clients currently
@@ -4307,5 +4316,33 @@ func (m *Messenger) AddActivityCenterNotificationToResponse(communityID string, 
 	err := m.addActivityCenterNotification(response, notification, nil)
 	if err != nil {
 		m.logger.Error("failed to save notification", zap.Error(err))
+	}
+}
+
+func (m *Messenger) leaveCommunityDueToKickOrBan(community *communities.Community, acType ActivityCenterType, stateResponse *MessengerResponse) {
+	response, err := m.kickedOutOfCommunity(community.ID())
+	if err != nil {
+		m.logger.Error("cannot leave community", zap.Error(err))
+		return
+	}
+
+	// Activity Center notification
+	notification := &ActivityCenterNotification{
+		ID:          types.FromHex(uuid.New().String()),
+		Type:        acType,
+		Timestamp:   m.getTimesource().GetCurrentTime(),
+		CommunityID: community.IDString(),
+		Read:        false,
+		UpdatedAt:   m.GetCurrentTimeInMillis(),
+	}
+
+	err = m.addActivityCenterNotification(response, notification, nil)
+	if err != nil {
+		m.logger.Error("failed to save notification", zap.Error(err))
+		return
+	}
+
+	if err := stateResponse.Merge(response); err != nil {
+		m.logger.Error("cannot merge leave and notification response", zap.Error(err))
 	}
 }

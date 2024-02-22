@@ -518,3 +518,38 @@ func (m *Messenger) SendGroupChatMessage(request *requests.SendGroupChatMessage)
 
 	return m.sendChatMessage(context.Background(), message)
 }
+
+func (m *Messenger) DeleteAllCommunityMemberMessages(member string, communityID string) (*MessengerResponse, error) {
+	messagesToDelete, err := m.persistence.GetCommunityMemberAllMessagesID(member, communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+
+	if len(messagesToDelete) == 0 {
+		return response, nil
+	}
+
+	for _, messageToDelete := range messagesToDelete {
+		updatedMessages, err := m.persistence.MessagesByResponseTo(messageToDelete.ID)
+		if err != nil {
+			return nil, err
+		}
+		response.AddMessages(updatedMessages)
+	}
+
+	response.AddDeletedMessages(messagesToDelete)
+
+	messageIDs := make([]string, 0, len(messagesToDelete))
+
+	for _, rm := range messagesToDelete {
+		messageIDs = append(messageIDs, rm.ID)
+	}
+
+	if err = m.persistence.DeleteMessages(messageIDs); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}

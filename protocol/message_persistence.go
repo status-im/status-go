@@ -1998,11 +1998,11 @@ func (db sqlitePersistence) MarkMessageAsUnread(chatID string, messageID string)
 	}
 
 	_, err = tx.Exec(
-		`UPDATE user_messages 
-			SET seen = 0 
-			WHERE local_chat_id = ? 
-			AND seen = 1 
-			AND NOT(mentioned OR replied) 
+		`UPDATE user_messages
+			SET seen = 0
+			WHERE local_chat_id = ?
+			AND seen = 1
+			AND NOT(mentioned OR replied)
 			AND timestamp >= (SELECT timestamp FROM user_messages WHERE id = ?)`, chatID, messageID)
 	if err != nil {
 		return 0, 0, err
@@ -2583,7 +2583,7 @@ func (db sqlitePersistence) GetDeletes(messageID string, from string) ([]*Delete
 }
 
 func (db sqlitePersistence) SaveOrUpdateDeleteForMeMessage(deleteForMeMessage *protobuf.SyncDeleteForMeMessage) error {
-	_, err := db.db.Exec(`INSERT OR REPLACE INTO user_messages_deleted_for_mes (clock, message_id) 
+	_, err := db.db.Exec(`INSERT OR REPLACE INTO user_messages_deleted_for_mes (clock, message_id)
     SELECT ?,? WHERE NOT EXISTS (SELECT 1 FROM user_messages_deleted_for_mes WHERE message_id = ? AND clock >= ?)`,
 		deleteForMeMessage.Clock, deleteForMeMessage.MessageId, deleteForMeMessage.MessageId, deleteForMeMessage.Clock)
 	return err
@@ -2881,4 +2881,29 @@ func (db sqlitePersistence) saveBridgeMessage(tx *sql.Tx, message *protobuf.Brid
 		message.GetParentMessageID(),
 	)
 	return
+}
+
+func (db sqlitePersistence) GetCommunityMemberAllMessagesID(member string, communityID string) ([]*DeletedMessage, error) {
+	rows, err := db.db.Query(`SELECT m.id, m.chat_id FROM user_messages as m
+		INNER JOIN chats AS ch ON ch.id = m.chat_id AND ch.community_id = ?
+		WHERE m.source = ?`, communityID, member)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	result := []*DeletedMessage{}
+
+	for rows.Next() {
+		removeMsgsInfo := &DeletedMessage{}
+		err = rows.Scan(&removeMsgsInfo.ID, &removeMsgsInfo.ChatID)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, removeMsgsInfo)
+	}
+
+	return result, nil
 }

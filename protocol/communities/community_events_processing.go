@@ -246,7 +246,7 @@ func (o *Community) applyEvent(communityEvent CommunityEvent) error {
 			if err != nil {
 				return err
 			}
-			o.banUserFromCommunity(pk)
+			o.banUserFromCommunity(pk, &protobuf.CommunityBanInfo{DeleteAllMessages: false})
 		}
 	case protobuf.CommunityEvent_COMMUNITY_MEMBER_UNBAN:
 		if o.IsControlNode() {

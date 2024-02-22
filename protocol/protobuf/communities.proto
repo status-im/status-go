@@ -88,7 +88,7 @@ message CommunityDescription {
   CommunityPermissions permissions = 3;
   ChatIdentity identity = 5;
   map<string,CommunityChat> chats = 6;
-  repeated string ban_list = 7;
+  repeated string ban_list = 7 [deprecated = true];
   map<string,CommunityCategory> categories = 8;
   uint64 archive_magnetlink_clock = 9;
   CommunityAdminSettings admin_settings = 10;
@@ -100,9 +100,14 @@ message CommunityDescription {
   repeated CommunityTokenMetadata community_tokens_metadata = 16;
   uint64 active_members_count = 17;
   string ID = 18;
+  map<string,CommunityBanInfo>banned_members = 19;
 
   // key is hash ratchet key_id + seq_no
   map<string, bytes> privateData = 100;
+}
+
+message CommunityBanInfo {
+  bool delete_all_messages = 1;
 }
 
 message CommunityAdminSettings {

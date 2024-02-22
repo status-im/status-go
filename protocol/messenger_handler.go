@@ -2092,6 +2092,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		logger.Warn("failed to validate message", zap.Error(err))
 		return err
 	}
+
 	receivedMessage := &common.Message{
 		ID:               state.CurrentMessageState.MessageID,
 		ChatMessage:      state.CurrentMessageState.Message,
@@ -2142,6 +2143,39 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 
 	if !allowed {
 		return ErrMessageNotAllowed
+	}
+
+	if chat.ChatType == ChatTypeCommunityChat {
+		communityID, err := types.DecodeHex(chat.CommunityID)
+		if err != nil {
+			return err
+		}
+
+		community, err := m.GetCommunityByID(communityID)
+		if err != nil {
+			return err
+		}
+
+		if community == nil {
+			logger.Warn("community not found for msg",
+				zap.String("messageID", receivedMessage.ID),
+				zap.String("from", receivedMessage.From),
+				zap.String("communityID", chat.CommunityID))
+			return communities.ErrOrgNotFound
+		}
+
+		pk, err := common.HexToPubkey(state.CurrentMessageState.Contact.ID)
+		if err != nil {
+			return err
+		}
+
+		if community.IsBanned(pk) {
+			logger.Warn("skipping msg from banned user",
+				zap.String("messageID", receivedMessage.ID),
+				zap.String("from", receivedMessage.From),
+				zap.String("communityID", chat.CommunityID))
+			return errors.New("received a messaged from banned user")
+		}
 	}
 
 	// It looks like status-mobile created profile chats as public chats
