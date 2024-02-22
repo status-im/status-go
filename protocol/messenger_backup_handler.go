@@ -177,6 +177,12 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 		return err
 	}
 
+	profileShowcasePreferences, err := m.saveProfileShowcasePreferencesProto(message.ProfileShowcasePreferences, false)
+	if err != nil {
+		return err
+	}
+	response.SetProfileShowcasePreferences(profileShowcasePreferences)
+
 	var ensUsernameDetails []*ensservice.UsernameDetail
 	for _, d := range message.EnsUsernameDetails {
 		dd, err := m.saveEnsUsernameDetailProto(d)

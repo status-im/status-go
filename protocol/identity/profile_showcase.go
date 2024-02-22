@@ -4,9 +4,15 @@ import "errors"
 
 var ErrorNoAccountProvidedWithTokenOrCollectible = errors.New("no account provided with tokens or collectible")
 
-var ErrorExceedMaxProfileEntriesLimit = errors.New("exeed maximum profile entries limit per section")
+var ErrorExceedMaxProfileShowcaseCommunitiesLimit = errors.New("exeed maximum profile showcase communities limit")
+var ErrorExceedMaxProfileShowcaseAccountsLimit = errors.New("exeed maximum profile showcase accounts limit")
+var ErrorExceedMaxProfileShowcaseCollectiblesLimit = errors.New("exeed maximum profile showcase collectibles limit")
+var ErrorExceedMaxProfileShowcaseVerifiedTokensLimit = errors.New("exeed maximum profile showcase verified tokens limit")
+var ErrorExceedMaxProfileShowcaseUnverifiedTokensLimit = errors.New("exeed maximum profile showcase unverified tokens limit")
+var ErrorExceedMaxProfileShowcaseSocialLinksLimit = errors.New("exeed maximum profile showcase communities limit")
 
-const maxProfileEntriesLimit = 20
+const maxProfileShowcaseSocialLinksLimit = 20
+const maxProfileShowcaseOtherEntriesLimit = 100
 
 type ProfileShowcaseVisibility int
 
@@ -138,13 +144,23 @@ type ProfileShowcase struct {
 }
 
 func Validate(preferences *ProfileShowcasePreferences) error {
-	if len(preferences.Communities) > maxProfileEntriesLimit ||
-		len(preferences.Accounts) > maxProfileEntriesLimit ||
-		len(preferences.Collectibles) > maxProfileEntriesLimit ||
-		len(preferences.VerifiedTokens) > maxProfileEntriesLimit ||
-		len(preferences.UnverifiedTokens) > maxProfileEntriesLimit ||
-		len(preferences.SocialLinks) > maxProfileEntriesLimit {
-		return ErrorExceedMaxProfileEntriesLimit
+	if len(preferences.Communities) > maxProfileShowcaseOtherEntriesLimit {
+		return ErrorExceedMaxProfileShowcaseCommunitiesLimit
+	}
+	if len(preferences.Accounts) > maxProfileShowcaseOtherEntriesLimit {
+		return ErrorExceedMaxProfileShowcaseAccountsLimit
+	}
+	if len(preferences.Collectibles) > maxProfileShowcaseOtherEntriesLimit {
+		return ErrorExceedMaxProfileShowcaseCollectiblesLimit
+	}
+	if len(preferences.VerifiedTokens) > maxProfileShowcaseOtherEntriesLimit {
+		return ErrorExceedMaxProfileShowcaseVerifiedTokensLimit
+	}
+	if len(preferences.UnverifiedTokens) > maxProfileShowcaseOtherEntriesLimit {
+		return ErrorExceedMaxProfileShowcaseUnverifiedTokensLimit
+	}
+	if len(preferences.SocialLinks) > maxProfileShowcaseSocialLinksLimit {
+		return ErrorExceedMaxProfileShowcaseSocialLinksLimit
 	}
 
 	if (len(preferences.VerifiedTokens) > 0 || len(preferences.UnverifiedTokens) > 0 || len(preferences.Collectibles) > 0) &&

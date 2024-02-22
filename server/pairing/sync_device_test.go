@@ -454,6 +454,11 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	err = serverBackend.StatusNode().EnsService().API().Add(ctx, ensChainID, ensUsername)
 	require.NoError(s.T(), err)
 
+	// generate profile showcase preferences
+	profileShowcasePreferences := protocol.DummyProfileShowcasePreferences(false)
+	err = serverMessenger.SetProfileShowcasePreferences(profileShowcasePreferences, false)
+	require.NoError(s.T(), err)
+
 	// generate local deleted message
 	_, err = serverMessenger.CreatePublicChat(&requests.CreatePublicChat{ID: publicChatID})
 	require.NoError(s.T(), err)
@@ -496,10 +501,16 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), 1, len(bookmarks))
 	require.Equal(s.T(), "status.im", bookmarks[0].Name)
+
 	clientSocialLinks, err := clientMessenger.GetSocialLinks()
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), 1, len(clientSocialLinks))
 	require.True(s.T(), socialLinksToAdd.Equal(clientSocialLinks))
+
+	clientProfileShowcasePreferences, err := clientMessenger.GetProfileShowcasePreferences()
+	require.NoError(s.T(), err)
+	require.True(s.T(), reflect.DeepEqual(profileShowcasePreferences, clientProfileShowcasePreferences))
+
 	uds, err := clientBackend.StatusNode().EnsService().API().GetEnsUsernames(ctx)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), 1, len(uds))

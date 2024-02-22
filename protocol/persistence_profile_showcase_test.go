@@ -95,7 +95,7 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 			&identity.ProfileShowcaseSocialLinkPreference{
 				Text:               identity.TwitterID,
 				URL:                "https://twitter.com/ethstatus",
-				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 				Order:              1,
 			},
 			&identity.ProfileShowcaseSocialLinkPreference{

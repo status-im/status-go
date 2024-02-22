@@ -32,6 +32,12 @@ var errorNoAccountPresentedForCollectible = errors.New("account holding the coll
 var errorDublicateAccountAddress = errors.New("duplicate account address")
 var errorAccountVisibilityLowerThanCollectible = errors.New("account visibility lower than collectible")
 
+func sortProfileEntyByOrder(slice interface{}, getOrder func(int) int) {
+	sort.Slice(slice, func(i, j int) bool {
+		return getOrder(j) > getOrder(i)
+	})
+}
+
 func toCollectibleUniqueID(contractAddress string, tokenID string, chainID uint64) (thirdparty.CollectibleUniqueID, error) {
 	tokenIDInt := new(big.Int)
 	tokenIDInt, isTokenIDOk := tokenIDInt.SetString(tokenID, 10)
@@ -529,44 +535,6 @@ func (m *Messenger) GetProfileShowcaseForSelfIdentity() (*protobuf.ProfileShowca
 	}, nil
 }
 
-func (m *Messenger) buildProfileShowcaseFromEntries(
-	contactID string,
-	communities []*identity.ProfileShowcaseCommunity,
-	accounts []*identity.ProfileShowcaseAccount,
-	collectibles []*identity.ProfileShowcaseCollectible,
-	verifiedTokens []*identity.ProfileShowcaseVerifiedToken,
-	unverifiedTokens []*identity.ProfileShowcaseUnverifiedToken,
-	socialLinks []*identity.ProfileShowcaseSocialLink) *identity.ProfileShowcase {
-	sort.Slice(communities, func(i, j int) bool {
-		return communities[j].Order > communities[i].Order
-	})
-	sort.Slice(accounts, func(i, j int) bool {
-		return accounts[j].Order > accounts[i].Order
-	})
-	sort.Slice(collectibles, func(i, j int) bool {
-		return collectibles[j].Order > collectibles[i].Order
-	})
-	sort.Slice(verifiedTokens, func(i, j int) bool {
-		return verifiedTokens[j].Order > verifiedTokens[i].Order
-	})
-	sort.Slice(unverifiedTokens, func(i, j int) bool {
-		return unverifiedTokens[j].Order > unverifiedTokens[i].Order
-	})
-	sort.Slice(socialLinks, func(i, j int) bool {
-		return socialLinks[j].Order > socialLinks[i].Order
-	})
-
-	return &identity.ProfileShowcase{
-		ContactID:        contactID,
-		Communities:      communities,
-		Accounts:         accounts,
-		Collectibles:     collectibles,
-		VerifiedTokens:   verifiedTokens,
-		UnverifiedTokens: unverifiedTokens,
-		SocialLinks:      socialLinks,
-	}
-}
-
 func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState, message *protobuf.ProfileShowcase) error {
 	senderPubKey := state.CurrentMessageState.PublicKey
 	contactID := state.CurrentMessageState.Contact.ID
@@ -613,8 +581,22 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState
 		socialLinks = append(socialLinks, m.fromProfileShowcaseSocialLinkProto(forIDVerifiedContacts.SocialLinks)...)
 	}
 
-	newShowcase := m.buildProfileShowcaseFromEntries(
-		contactID, communities, accounts, collectibles, verifiedTokens, unverifiedTokens, socialLinks)
+	sortProfileEntyByOrder(communities, func(i int) int { return communities[i].Order })
+	sortProfileEntyByOrder(accounts, func(i int) int { return accounts[i].Order })
+	sortProfileEntyByOrder(collectibles, func(i int) int { return collectibles[i].Order })
+	sortProfileEntyByOrder(verifiedTokens, func(i int) int { return verifiedTokens[i].Order })
+	sortProfileEntyByOrder(unverifiedTokens, func(i int) int { return unverifiedTokens[i].Order })
+	sortProfileEntyByOrder(socialLinks, func(i int) int { return socialLinks[i].Order })
+
+	newShowcase := &identity.ProfileShowcase{
+		ContactID:        contactID,
+		Communities:      communities,
+		Accounts:         accounts,
+		Collectibles:     collectibles,
+		VerifiedTokens:   verifiedTokens,
+		UnverifiedTokens: unverifiedTokens,
+		SocialLinks:      socialLinks,
+	}
 
 	oldShowcase, err := m.persistence.GetProfileShowcaseForContact(contactID)
 	if err != nil {
@@ -686,9 +668,9 @@ func (m *Messenger) DeleteProfileShowcaseCommunity(community *communities.Commun
 	return nil
 }
 
-func (m *Messenger) saveProfileShowcasePreferencesProto(p *protobuf.SyncProfileShowcasePreferences, shouldSync bool) error {
+func (m *Messenger) saveProfileShowcasePreferencesProto(p *protobuf.SyncProfileShowcasePreferences, shouldSync bool) (*identity.ProfileShowcasePreferences, error) {
 	preferences := FromProfileShowcasePreferencesProto(p)
-	return m.setProfileShowcasePreferences(preferences, shouldSync)
+	return preferences, m.setProfileShowcasePreferences(preferences, shouldSync)
 }
 
 func (m *Messenger) syncProfileShowcasePreferences(ctx context.Context, rawMessageHandler RawMessageHandler) error {

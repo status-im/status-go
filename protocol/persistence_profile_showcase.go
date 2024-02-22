@@ -618,6 +618,10 @@ func (db sqlitePersistence) getProfileShowcaseSocialLinksContact(tx *sql.Tx, con
 
 		links = append(links, link)
 	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
 	return links, nil
 }
 
