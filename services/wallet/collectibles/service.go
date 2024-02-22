@@ -61,6 +61,11 @@ const (
 	FetchTypeFetchIfCacheOld
 )
 
+type TxHashData struct {
+	Hash common.Hash
+	TxID common.Hash
+}
+
 type FetchCriteria struct {
 	FetchType          FetchType `json:"fetch_type"`
 	MaxCacheAgeSeconds int64     `json:"max_cache_age_seconds"`
@@ -437,7 +442,7 @@ func (s *Service) onCollectiblesTransfer(account common.Address, chainID walletC
 	}
 }
 
-func (s *Service) lookupTransferForCollectibles(ownedCollectibles OwnedCollectibles) map[thirdparty.CollectibleUniqueID]common.Hash {
+func (s *Service) lookupTransferForCollectibles(ownedCollectibles OwnedCollectibles) map[thirdparty.CollectibleUniqueID]TxHashData {
 	// There are some limitations to this approach:
 	// - Collectibles ownership and transfers are not in sync and might represent the state at different moments.
 	// - We have no way of knowing if the latest collectible transfer we've detected is actually the latest one, so the timestamp we
@@ -446,7 +451,7 @@ func (s *Service) lookupTransferForCollectibles(ownedCollectibles OwnedCollectib
 	// - For ERC721 tokens we should only look for incoming transfers. For ERC1155 tokens we should look for both incoming and outgoing transfers.
 	// We need to get the contract standard for each collectible to know which approach to take.
 
-	result := make(map[thirdparty.CollectibleUniqueID]common.Hash)
+	result := make(map[thirdparty.CollectibleUniqueID]TxHashData)
 
 	for _, id := range ownedCollectibles.ids {
 		transfer, err := s.transferDB.GetLatestCollectibleTransfer(ownedCollectibles.account, id)
@@ -455,7 +460,10 @@ func (s *Service) lookupTransferForCollectibles(ownedCollectibles OwnedCollectib
 			continue
 		}
 		if transfer != nil {
-			result[id] = transfer.Transaction.Hash()
+			result[id] = TxHashData{
+				Hash: transfer.Transaction.Hash(),
+				TxID: transfer.ID,
+			}
 			err = s.manager.SetCollectibleTransferID(ownedCollectibles.account, id, transfer.ID, false)
 			if err != nil {
 				log.Error("Error setting transfer ID for collectible", "error", err)
@@ -465,7 +473,7 @@ func (s *Service) lookupTransferForCollectibles(ownedCollectibles OwnedCollectib
 	return result
 }
 
-func (s *Service) notifyCommunityCollectiblesReceived(ownedCollectibles OwnedCollectibles, hashMap map[thirdparty.CollectibleUniqueID]common.Hash) {
+func (s *Service) notifyCommunityCollectiblesReceived(ownedCollectibles OwnedCollectibles, hashMap map[thirdparty.CollectibleUniqueID]TxHashData) {
 	ctx := context.Background()
 
 	firstCollectibles, err := s.ownershipDB.GetIsFirstOfCollection(ownedCollectibles.account, ownedCollectibles.ids)
@@ -491,24 +499,26 @@ func (s *Service) notifyCommunityCollectiblesReceived(ownedCollectibles OwnedCol
 	}
 
 	groups := make(map[CollectibleGroup]Collectible)
-	for i, collectible := range communityCollectibles {
+	for _, collectible := range communityCollectibles {
+		txHash := ""
 		for key, value := range hashMap {
 			if key.Same(&collectible.ID) {
-				communityCollectibles[i].LatestTxHash = value.Hex()
+				collectible.LatestTxHash = value.TxID.Hex()
+				txHash = value.Hash.Hex()
 				break
 			}
 		}
 
 		for id, value := range firstCollectibles {
 			if value && id.Same(&collectible.ID) {
-				communityCollectibles[i].IsFirst = true
+				collectible.IsFirst = true
 				break
 			}
 		}
 
 		group := CollectibleGroup{
 			contractID: collectible.ID.ContractID,
-			txHash:     collectible.LatestTxHash,
+			txHash:     txHash,
 		}
 		_, ok := groups[group]
 		if !ok {
