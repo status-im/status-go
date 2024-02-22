@@ -62,9 +62,6 @@ func main() {
 					}
 					defer stopMessenger(bob)
 
-					aliceMessenger := alice.messenger
-					bobMessenger := bob.messenger
-
 					// Send contact request from Alice to Bob, bob accept the request
 					msgID, err := sendContactRequest(alice, bob)
 					if err != nil {
@@ -78,69 +75,10 @@ func main() {
 						return err
 					}
 
-					// Send DM from alice to bob
-					aliceChat := aliceMessenger.Chat(alice.messenger.MutualContacts()[0].ID)
-					fmt.Println("[Alice] chat with contact id:", aliceChat.ID)
+					// Send DM between alice to bob
+					sendDirectMessage(alice, bob, "Hello Bob!")
 
-					clock, timestamp := aliceChat.NextClockAndTimestamp(aliceMessenger.GetTransport())
-					inputMessage := common.NewMessage()
-					inputMessage.ChatId = aliceChat.ID
-					inputMessage.LocalChatID = aliceChat.ID
-					inputMessage.Clock = clock
-					inputMessage.Timestamp = timestamp
-					inputMessage.MessageType = protobuf.MessageType_ONE_TO_ONE
-					inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
-					inputMessage.Text = "Hello Bob!"
-
-					chatResp, err := aliceMessenger.SendChatMessage(context.Background(), inputMessage)
-					fmt.Println("[Alice] function SendChatMessage response.messages:", chatResp.Messages())
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-
-					chatRespBob, err := protocol.WaitOnMessengerResponse(
-						bobMessenger,
-						func(r *protocol.MessengerResponse) bool { return len(r.Messages()) > 0 },
-						"[Bob] not receive message from alice",
-					)
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-					fmt.Println("[Bob] receive message from alice:", chatRespBob.Chats()[0].LastMessage.Text)
-
-					// Send DM from bob to alice
-					bobChat := bobMessenger.Chat(bob.messenger.MutualContacts()[0].ID)
-					fmt.Println("[Bob] chat with contact id:", bobChat.ID)
-
-					bobClock, bobTimestamp := bobChat.NextClockAndTimestamp(bobMessenger.GetTransport())
-					bobInputMessage := common.NewMessage()
-					bobInputMessage.ChatId = bobChat.ID
-					bobInputMessage.LocalChatID = bobChat.ID
-					bobInputMessage.Clock = bobClock
-					bobInputMessage.Timestamp = bobTimestamp
-					bobInputMessage.MessageType = protobuf.MessageType_ONE_TO_ONE
-					bobInputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
-					bobInputMessage.Text = "Hello Alice!"
-
-					bobSendChatResp, err := bobMessenger.SendChatMessage(context.Background(), bobInputMessage)
-					fmt.Println("[Bob] function SendChatMessage response.messages:", bobSendChatResp.Messages())
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-
-					aliceReceiveChatResp, err := protocol.WaitOnMessengerResponse(
-						aliceMessenger,
-						func(r *protocol.MessengerResponse) bool { return len(r.Messages()) > 0 },
-						"[Alice] not receive message from bob",
-					)
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-					fmt.Println("[Alice] receive message from bob:", aliceReceiveChatResp.Chats()[0].LastMessage.Text)
+					sendDirectMessage(bob, alice, "Hello Alice!")
 
 					return nil
 				},
@@ -261,7 +199,7 @@ func sendContactRequest(from, to *StatusCli) (string, error) {
 		return "", err
 	}
 
-	receiverResp, err := protocol.WaitOnMessengerResponse(
+	respTo, err := protocol.WaitOnMessengerResponse(
 		to.messenger,
 		func(r *protocol.MessengerResponse) bool {
 			return len(r.Contacts) == 1 && len(r.Messages()) >= 2
@@ -272,7 +210,7 @@ func sendContactRequest(from, to *StatusCli) (string, error) {
 		return "", err
 	}
 
-	msg := protocol.FindFirstByContentType(receiverResp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	msg := protocol.FindFirstByContentType(respTo.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
 	fmt.Printf("[%s] receive contact request response: %s\n", to.name, msg.Text)
 
 	return msg.ID, nil
@@ -284,7 +222,7 @@ func sendContactRequestAcceptance(from, to *StatusCli, msgID string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("[%s] function AcceptContactRequest response: %v\n", from.name, resp)
+	fmt.Printf("[%s] function AcceptContactRequest response: %v\n", from.name, resp.Messages())
 
 	fromContacts := from.messenger.MutualContacts()
 	fmt.Printf("[%s] contacts number: %d\n", from.name, len(fromContacts))
@@ -294,7 +232,7 @@ func sendContactRequestAcceptance(from, to *StatusCli, msgID string) error {
 		func(r *protocol.MessengerResponse) bool {
 			return len(r.Contacts) == 1 && len(r.Messages()) >= 2
 		},
-		fmt.Sprintf("[%s] contact request acceptance not received from bob", to.name),
+		fmt.Sprintf("[%s] contact request acceptance not received from %s", to.name, from.name),
 	)
 	if err != nil {
 		return err
@@ -305,6 +243,40 @@ func sendContactRequestAcceptance(from, to *StatusCli, msgID string) error {
 
 	toContacts := to.messenger.MutualContacts()
 	fmt.Printf("[%s] contacts number: %d\n", to.name, len(toContacts))
+
+	return nil
+}
+
+func sendDirectMessage(from, to *StatusCli, text string) error {
+	chat := from.messenger.Chat(from.messenger.MutualContacts()[0].ID)
+	fmt.Printf("[%s] chat with contact id: %s\n", from.name, chat.ID)
+
+	clock, timestamp := chat.NextClockAndTimestamp(from.messenger.GetTransport())
+	inputMessage := common.NewMessage()
+	inputMessage.ChatId = chat.ID
+	inputMessage.LocalChatID = chat.ID
+	inputMessage.Clock = clock
+	inputMessage.Timestamp = timestamp
+	inputMessage.MessageType = protobuf.MessageType_ONE_TO_ONE
+	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	inputMessage.Text = text
+
+	resp, err := from.messenger.SendChatMessage(context.Background(), inputMessage)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	fmt.Printf("[%s] function SendChatMessage response.messages: %v\n", from.name, resp.Messages())
+
+	respTo, err := protocol.WaitOnMessengerResponse(
+		to.messenger,
+		func(r *protocol.MessengerResponse) bool { return len(r.Messages()) > 0 },
+		fmt.Sprintf("[%s] not receive message from %s", to.name, from.name),
+	)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("[%s] receive message from %s: %s\n", to.name, from.name, respTo.Chats()[0].LastMessage.Text)
 
 	return nil
 }
