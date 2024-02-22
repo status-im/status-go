@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -30,6 +31,11 @@ import (
 
 const enrBootstrap = "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"
 
+type StatusCli struct {
+	messenger *protocol.Messenger
+	waku      *wakuv2.Waku
+}
+
 func main() {
 	app := &cli.App{
 		Commands: []*cli.Command{
@@ -40,21 +46,22 @@ func main() {
 				Action: func(cCtx *cli.Context) error {
 					fmt.Println("params: ", cCtx.Args().First())
 
-					// Start alice node and messager
-					aliceMessenger, err := startMessenger("Alice")
+					alice, err := startMessenger("Alice")
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
-					defer stopMessenger(aliceMessenger)
+					defer stopMessenger(alice)
 
-					// Start bob node and messenger
-					bobMessenger, err := startBob()
+					bob, err := startMessenger("Bob")
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
-					defer func() { _ = bobMessenger.Shutdown() }()
+					defer stopMessenger(bob)
+
+					aliceMessenger := alice.messenger
+					bobMessenger := bob.messenger
 
 					// Send contact request from Alice to Bob
 					bobID := types.EncodeHex(crypto.FromECDSAPub(bobMessenger.IdentityPublicKey()))
@@ -191,11 +198,10 @@ func main() {
 	}
 }
 
-func startMessenger(name string) (*protocol.Messenger, error) {
-	fmt.Println("[%s] starting messager", name)
+func startMessenger(name string) (*StatusCli, error) {
+	fmt.Printf("[%s] starting messager\n", name)
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
@@ -203,25 +209,20 @@ func startMessenger(name string) (*protocol.Messenger, error) {
 	config.EnableDiscV5 = true
 	config.DiscV5BootstrapNodes = []string{enrBootstrap}
 	config.DiscoveryLimit = 20
-	wakuNode, err := wakuv2.New("", "", config, nil, nil, nil, nil, nil)
+	node, err := wakuv2.New("", "", config, nil, nil, nil, nil, nil)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
-	err = wakuNode.Start()
+	err = node.Start()
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
-
-	// defer func() { _ = wakuNode.Stop() }()
 
 	time.Sleep(3 * time.Second)
 
 	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
@@ -234,7 +235,7 @@ func startMessenger(name string) (*protocol.Messenger, error) {
 	}
 	acc := generator.NewAccount(privateKey, nil)
 	iai := acc.ToIdentifiedAccountInfo("")
-	aliceOptions := []protocol.Option{
+	opitons := []protocol.Option{
 		protocol.WithCustomLogger(nil),
 		protocol.WithDatabase(appDb),
 		protocol.WithWalletDatabase(walletDb),
@@ -245,128 +246,48 @@ func startMessenger(name string) (*protocol.Messenger, error) {
 		protocol.WithBrowserDatabase(nil),
 	}
 	messenger, err := protocol.NewMessenger(
-		"alice-node",
+		fmt.Sprintf("%s-node", strings.ToLower(name)),
 		privateKey,
-		gethbridge.NewNodeBridge(nil, nil, wakuNode),
+		gethbridge.NewNodeBridge(nil, nil, node),
 		uuid.New().String(),
 		nil,
-		aliceOptions...,
+		opitons...,
 	)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
 	err = messenger.Init()
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
 	_, err = messenger.Start()
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
-	// defer func() { _ = messenger.Shutdown() }()
 
-	aliceID := types.EncodeHex(crypto.FromECDSAPub(messenger.IdentityPublicKey()))
-	fmt.Println("[%s] messenger started, id: %s", name, aliceID)
+	id := types.EncodeHex(crypto.FromECDSAPub(messenger.IdentityPublicKey()))
+	fmt.Printf("[%s] messenger started, id: %s\n", name, id)
 
 	time.Sleep(3 * time.Second)
 
-	return messenger, nil
+	data := StatusCli{
+		messenger: messenger,
+		waku:      node,
+	}
+
+	return &data, nil
 }
 
-func stopMessenger(messenger *protocol.Messenger) {
-	err := messenger.Shutdown()
+func stopMessenger(alice *StatusCli) {
+	err := alice.messenger.Shutdown()
 	if err != nil {
 		fmt.Println(err)
 	}
-}
 
-func startBob() (*protocol.Messenger, error) {
-	fmt.Println("[Bob] starting messenger")
-	bobPrivKey, err := crypto.GenerateKey()
+	err = alice.waku.Stop()
 	if err != nil {
 		fmt.Println(err)
-		return nil, err
 	}
-
-	bobConfig := &wakuv2.Config{}
-	bobConfig.EnableDiscV5 = true
-	bobConfig.DiscV5BootstrapNodes = []string{enrBootstrap}
-	bobConfig.DiscoveryLimit = 20
-	bobNode, err := wakuv2.New("", "", bobConfig, nil, nil, nil, nil, nil)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	err = bobNode.Start()
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	// defer func() { _ = bobNode.Stop() }()
-
-	time.Sleep(3 * time.Second)
-
-	appDb2, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	walletDb2, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	if err != nil {
-		return nil, err
-	}
-	madb2, err := multiaccounts.InitializeDB(dbsetup.InMemoryPath)
-	if err != nil {
-		return nil, err
-	}
-	acc2 := generator.NewAccount(bobPrivKey, nil)
-	iai2 := acc2.ToIdentifiedAccountInfo("")
-	bobOptions := []protocol.Option{
-		protocol.WithCustomLogger(nil),
-		protocol.WithDatabase(appDb2),
-		protocol.WithWalletDatabase(walletDb2),
-		protocol.WithMultiAccounts(madb2),
-		protocol.WithAccount(iai2.ToMultiAccount()),
-		protocol.WithDatasync(),
-		protocol.WithToplevelDatabaseMigrations(),
-		protocol.WithBrowserDatabase(nil),
-	}
-	bobMessenger, err := protocol.NewMessenger(
-		"bob-node",
-		bobPrivKey,
-		gethbridge.NewNodeBridge(nil, nil, bobNode),
-		uuid.New().String(),
-		nil,
-		bobOptions...,
-	)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	err = bobMessenger.Init()
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	_, err = bobMessenger.Start()
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	// defer func() { _ = bobMessenger.Shutdown() }()
-
-	bobID := types.EncodeHex(crypto.FromECDSAPub(bobMessenger.IdentityPublicKey()))
-	fmt.Println("[Bob] messenger started, id:", bobID)
-
-	time.Sleep(3 * time.Second)
-
-	return bobMessenger, nil
 }
