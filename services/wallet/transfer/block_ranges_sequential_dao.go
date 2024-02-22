@@ -146,6 +146,7 @@ func (b *BlockRangeSequentialDAO) getBlockRanges(chainID uint64, addresses []com
 	WHERE address IN (`+ addressesPlaceholder +`)
 	AND network_id = ?`
 
+	log.Debug("DDBG", "q", query, "addresses", addresses, "chainID", chainID)
 	params := []interface{}{}
 	for address := range addresses {
 		params = append(params, address)
