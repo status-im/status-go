@@ -970,10 +970,35 @@ func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) (err error) 
 		finiteGroup.Wait()
 	}()
 
-	fromNum := big.NewInt(0)
-	headNum, err := getHeadBlockNumber(ctx, c.chainClient)
+	blockRanges, err := c.blockRangeDAO.getBlockRanges(c.chainClient.NetworkID(), c.accounts)
 	if err != nil {
 		return err
+	}
+
+	firstScan := false
+	var minLatestKnownBlock *big.Int
+	for _, address := range c.accounts {
+		blockRange, ok := blockRanges[address]
+		if !ok || blockRange.balanceCheckHash == "" {
+			firstScan = true
+			break
+		}
+
+		if minLatestKnownBlock == nil || blockRange.tokens.LastKnown.Cmp(minLatestKnownBlock) < 0 {
+			minLatestKnownBlock = blockRange.tokens.LastKnown
+		}
+	}
+
+	fromNum := big.NewInt(0)
+
+	var headNum *big.Int
+	if firstScan {
+		headNum, err = getHeadBlockNumber(ctx, c.chainClient)
+		if err != nil {
+			return err
+		}
+	} else {
+		headNum = minLatestKnownBlock
 	}
 
 	// It will start loadTransfersCommand which will run until all transfers from DB are loaded or any one failed to load
