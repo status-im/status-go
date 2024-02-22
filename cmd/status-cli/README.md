@@ -11,7 +11,12 @@ The Status CLI is a command line interface for interacting with the Status messe
 ## Run
 
 ```bash
-go run main.go dm > log
+go run main.go dm
 ```
 
-Result is recorded in file `log`.
+Run in light mode
+```bash
+go run main.go dm --light
+```
+
+Logs are recorded in file `*.log`.

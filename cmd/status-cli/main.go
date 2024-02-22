@@ -32,6 +32,8 @@ import (
 
 const enrBootstrap = "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"
 
+var logger *zap.SugaredLogger
+
 type StatusCli struct {
 	name      string
 	messenger *protocol.Messenger
@@ -52,9 +54,15 @@ func main() {
 					},
 				},
 				Action: func(cCtx *cli.Context) error {
-					log.Println("Flags passed:")
+					rawLogger, err := zap.NewDevelopment()
+					if err != nil {
+						log.Fatalf("Error initializing logger: %v", err)
+					}
+					logger = rawLogger.Sugar()
+
+					logger.Info("Flags passed:")
 					for _, flag := range cCtx.FlagNames() {
-						log.Printf("  %s: %v\n", flag, cCtx.Value(flag))
+						logger.Infof("  %s: %v\n", flag, cCtx.Value(flag))
 					}
 
 					// Start Alice and Bob's messengers
@@ -93,14 +101,14 @@ func main() {
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 }
 
 func startMessenger(cCtx *cli.Context, name string) (*StatusCli, error) {
-	log.Printf("[%s] starting messager\n", name)
+	logger.Infof("[%s] starting messager\n", name)
 
-	logger := setupLogger(name)
+	userLogger := setupLogger(name)
 
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
@@ -112,7 +120,7 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCli, error) {
 	config.DiscV5BootstrapNodes = []string{enrBootstrap}
 	config.DiscoveryLimit = 20
 	config.LightClient = cCtx.Bool("light")
-	node, err := wakuv2.New("", "", config, logger, nil, nil, nil, nil)
+	node, err := wakuv2.New("", "", config, userLogger, nil, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +145,7 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCli, error) {
 	acc := generator.NewAccount(privateKey, nil)
 	iai := acc.ToIdentifiedAccountInfo("")
 	opitons := []protocol.Option{
-		protocol.WithCustomLogger(logger),
+		protocol.WithCustomLogger(userLogger),
 		protocol.WithDatabase(appDb),
 		protocol.WithWalletDatabase(walletDb),
 		protocol.WithMultiAccounts(madb),
@@ -169,7 +177,7 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCli, error) {
 	}
 
 	id := types.EncodeHex(crypto.FromECDSAPub(messenger.IdentityPublicKey()))
-	log.Printf("[%s] messenger started, id: %s\n", name, id)
+	logger.Infof("[%s] messenger started, id: %s\n", name, id)
 
 	time.Sleep(3 * time.Second)
 
@@ -185,24 +193,24 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCli, error) {
 func stopMessenger(cli *StatusCli) {
 	err := cli.messenger.Shutdown()
 	if err != nil {
-		log.Println(err)
+		logger.Error(err)
 	}
 
 	err = cli.waku.Stop()
 	if err != nil {
-		log.Println(err)
+		logger.Error(err)
 	}
 }
 
 func sendContactRequest(cCtx *cli.Context, from, to *StatusCli) (string, error) {
 	destID := types.EncodeHex(crypto.FromECDSAPub(to.messenger.IdentityPublicKey()))
-	log.Printf("[%s] send contact request to %s, contact id: %s\n", from.name, to.name, destID)
+	logger.Infof("[%s] send contact request to %s, contact id: %s\n", from.name, to.name, destID)
 	request := &requests.SendContactRequest{
 		ID:      destID,
 		Message: "Hello!",
 	}
 	resp, err := from.messenger.SendContactRequest(cCtx.Context, request)
-	log.Printf("[%s] function SendContactRequest response.messages: %s\n", from.name, resp.Messages())
+	logger.Infof("[%s] function SendContactRequest response.messages: %s\n", from.name, resp.Messages())
 	if err != nil {
 		return "", err
 	}
@@ -219,21 +227,21 @@ func sendContactRequest(cCtx *cli.Context, from, to *StatusCli) (string, error) 
 	}
 
 	msg := protocol.FindFirstByContentType(respTo.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
-	log.Printf("[%s] receive contact request response: %s\n", to.name, msg.Text)
+	logger.Infof("[%s] receive contact request response: %s\n", to.name, msg.Text)
 
 	return msg.ID, nil
 }
 
 func sendContactRequestAcceptance(cCtx *cli.Context, from, to *StatusCli, msgID string) error {
-	log.Printf("[%s] send contact request acceptance to %s\n", from.name, to.name)
+	logger.Infof("[%s] send contact request acceptance to %s\n", from.name, to.name)
 	resp, err := from.messenger.AcceptContactRequest(cCtx.Context, &requests.AcceptContactRequest{ID: types.Hex2Bytes(msgID)})
 	if err != nil {
 		return err
 	}
-	log.Printf("[%s] function AcceptContactRequest response: %v\n", from.name, resp.Messages())
+	logger.Infof("[%s] function AcceptContactRequest response: %v\n", from.name, resp.Messages())
 
 	fromContacts := from.messenger.MutualContacts()
-	log.Printf("[%s] contacts number: %d\n", from.name, len(fromContacts))
+	logger.Infof("[%s] contacts number: %d\n", from.name, len(fromContacts))
 
 	respTo, err := protocol.WaitOnMessengerResponse(
 		to.messenger,
@@ -247,17 +255,17 @@ func sendContactRequestAcceptance(cCtx *cli.Context, from, to *StatusCli, msgID 
 	}
 
 	msg := protocol.FindFirstByContentType(respTo.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED)
-	log.Printf("[%s] got message: %s\n", to.name, msg.Text)
+	logger.Infof("[%s] got message: %s\n", to.name, msg.Text)
 
 	toContacts := to.messenger.MutualContacts()
-	log.Printf("[%s] contacts number: %d\n", to.name, len(toContacts))
+	logger.Infof("[%s] contacts number: %d\n", to.name, len(toContacts))
 
 	return nil
 }
 
 func sendDirectMessage(cCtx *cli.Context, from, to *StatusCli, text string) error {
 	chat := from.messenger.Chat(from.messenger.MutualContacts()[0].ID)
-	log.Printf("[%s] chat with contact id: %s\n", from.name, chat.ID)
+	logger.Infof("[%s] chat with contact id: %s\n", from.name, chat.ID)
 
 	clock, timestamp := chat.NextClockAndTimestamp(from.messenger.GetTransport())
 	inputMessage := common.NewMessage()
@@ -273,7 +281,7 @@ func sendDirectMessage(cCtx *cli.Context, from, to *StatusCli, text string) erro
 	if err != nil {
 		return err
 	}
-	log.Printf("[%s] function SendChatMessage response.messages: %v\n", from.name, resp.Messages())
+	logger.Infof("[%s] function SendChatMessage response.messages: %v\n", from.name, resp.Messages())
 
 	respTo, err := protocol.WaitOnMessengerResponse(
 		to.messenger,
@@ -283,7 +291,7 @@ func sendDirectMessage(cCtx *cli.Context, from, to *StatusCli, text string) erro
 	if err != nil {
 		return err
 	}
-	log.Printf("[%s] receive message from %s: %s\n", to.name, from.name, respTo.Chats()[0].LastMessage.Text)
+	logger.Infof("[%s] receive message from %s: %s\n", to.name, from.name, respTo.Chats()[0].LastMessage.Text)
 
 	return nil
 }
@@ -300,10 +308,10 @@ func setupLogger(file string) *zap.Logger {
 		CompressRotated: true,
 	}
 	if err := logutils.OverrideRootLogWithConfig(logSettings, false); err != nil {
-		log.Fatalf("Error initializing logger: %v", err)
+		logger.Fatalf("Error initializing logger: %v", err)
 	}
 
-	logger := logutils.ZapLogger()
+	newLogger := logutils.ZapLogger()
 
-	return logger
+	return newLogger
 }
