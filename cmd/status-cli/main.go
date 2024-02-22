@@ -65,46 +65,21 @@ func main() {
 					aliceMessenger := alice.messenger
 					bobMessenger := bob.messenger
 
-					// Send contact request from Alice to Bob
+					// Send contact request from Alice to Bob, bob accept the request
 					msgID, err := sendContactRequest(alice, bob)
-					fmt.Println("msgID: ", msgID)
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
 
-					// Bob accept contact request
-
-					fmt.Println("[Bob] send contact request acceptance to alice")
-					respAccCR, err := bobMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(msgID)})
-					fmt.Println("[Bob] function AcceptContactRequest response: ", respAccCR)
+					err = sendContactRequestAcceptance(bob, alice, msgID)
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
-
-					bobContacts := bobMessenger.MutualContacts()
-					fmt.Println("[Bob] contacts number:", len(bobContacts))
-
-					accRespAlice, err := protocol.WaitOnMessengerResponse(aliceMessenger,
-						func(r *protocol.MessengerResponse) bool {
-							return len(r.Contacts) == 1 && len(r.Messages()) >= 2
-						},
-						"[Alice] contact request acceptance not received from bob",
-					)
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-					accMsg := protocol.FindFirstByContentType(accRespAlice.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED)
-					fmt.Println("[Alice] got message:", accMsg.Text)
-
-					aliceContacts := aliceMessenger.MutualContacts()
-					fmt.Println("[Alice] contacts number:", len(aliceContacts))
 
 					// Send DM from alice to bob
-
-					aliceChat := aliceMessenger.Chat(aliceContacts[0].ID)
+					aliceChat := aliceMessenger.Chat(alice.messenger.MutualContacts()[0].ID)
 					fmt.Println("[Alice] chat with contact id:", aliceChat.ID)
 
 					clock, timestamp := aliceChat.NextClockAndTimestamp(aliceMessenger.GetTransport())
@@ -136,8 +111,7 @@ func main() {
 					fmt.Println("[Bob] receive message from alice:", chatRespBob.Chats()[0].LastMessage.Text)
 
 					// Send DM from bob to alice
-
-					bobChat := bobMessenger.Chat(bobContacts[0].ID)
+					bobChat := bobMessenger.Chat(bob.messenger.MutualContacts()[0].ID)
 					fmt.Println("[Bob] chat with contact id:", bobChat.ID)
 
 					bobClock, bobTimestamp := bobChat.NextClockAndTimestamp(bobMessenger.GetTransport())
@@ -262,13 +236,13 @@ func startMessenger(name string) (*StatusCli, error) {
 	return &data, nil
 }
 
-func stopMessenger(alice *StatusCli) {
-	err := alice.messenger.Shutdown()
+func stopMessenger(cli *StatusCli) {
+	err := cli.messenger.Shutdown()
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	err = alice.waku.Stop()
+	err = cli.waku.Stop()
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -302,4 +276,35 @@ func sendContactRequest(from, to *StatusCli) (string, error) {
 	fmt.Printf("[%s] receive contact request response: %s\n", to.name, msg.Text)
 
 	return msg.ID, nil
+}
+
+func sendContactRequestAcceptance(from, to *StatusCli, msgID string) error {
+	fmt.Printf("[%s] send contact request acceptance to %s\n", from.name, to.name)
+	resp, err := from.messenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(msgID)})
+	if err != nil {
+		return err
+	}
+	fmt.Printf("[%s] function AcceptContactRequest response: %v\n", from.name, resp)
+
+	fromContacts := from.messenger.MutualContacts()
+	fmt.Printf("[%s] contacts number: %d\n", from.name, len(fromContacts))
+
+	respTo, err := protocol.WaitOnMessengerResponse(
+		to.messenger,
+		func(r *protocol.MessengerResponse) bool {
+			return len(r.Contacts) == 1 && len(r.Messages()) >= 2
+		},
+		fmt.Sprintf("[%s] contact request acceptance not received from bob", to.name),
+	)
+	if err != nil {
+		return err
+	}
+
+	msg := protocol.FindFirstByContentType(respTo.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED)
+	fmt.Printf("[%s] got message: %s\n", to.name, msg.Text)
+
+	toContacts := to.messenger.MutualContacts()
+	fmt.Printf("[%s] contacts number: %d\n", to.name, len(toContacts))
+
+	return nil
 }
