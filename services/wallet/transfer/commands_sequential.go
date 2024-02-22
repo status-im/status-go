@@ -998,6 +998,7 @@ func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) (err error) 
 			return err
 		}
 	} else {
+		log.Debug("DBGG using min latest block", "b", minLatestKnownBlock)
 		headNum = minLatestKnownBlock
 	}
 
