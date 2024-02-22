@@ -28,6 +28,8 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+const enrBootstrap = "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"
+
 func main() {
 	app := &cli.App{
 		Commands: []*cli.Command{
@@ -38,181 +40,24 @@ func main() {
 				Action: func(cCtx *cli.Context) error {
 					fmt.Println("params: ", cCtx.Args().First())
 
-					// TODO test sharding
-					// enrBootstrap := "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"
-					enrBootstrap := "enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
-
 					// Start alice node and messager
-
-					fmt.Println("[Alice] starting messager")
-					alicePrivKey, err := crypto.GenerateKey()
+					aliceMessenger, err := startMessenger("Alice")
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
-
-					config := &wakuv2.Config{}
-					config.EnableDiscV5 = true
-					config.DiscV5BootstrapNodes = []string{enrBootstrap}
-					config.DiscoveryLimit = 20
-					aliceNode, err := wakuv2.New("", "", config, nil, nil, nil, nil, nil)
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-
-					err = aliceNode.Start()
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-
-					defer func() { _ = aliceNode.Stop() }()
-
-					time.Sleep(3 * time.Second)
-
-					appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-					walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-					if err != nil {
-						return err
-					}
-					madb, err := multiaccounts.InitializeDB(dbsetup.InMemoryPath)
-					if err != nil {
-						return err
-					}
-					acc := generator.NewAccount(alicePrivKey, nil)
-					iai := acc.ToIdentifiedAccountInfo("")
-					aliceOptions := []protocol.Option{
-						protocol.WithCustomLogger(nil),
-						protocol.WithDatabase(appDb),
-						protocol.WithWalletDatabase(walletDb),
-						protocol.WithMultiAccounts(madb),
-						protocol.WithAccount(iai.ToMultiAccount()),
-						protocol.WithDatasync(),
-						protocol.WithToplevelDatabaseMigrations(),
-						protocol.WithBrowserDatabase(nil),
-					}
-					aliceMessenger, err := protocol.NewMessenger(
-						"alice-node",
-						alicePrivKey,
-						gethbridge.NewNodeBridge(nil, nil, aliceNode),
-						uuid.New().String(),
-						nil,
-						aliceOptions...,
-					)
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-
-					err = aliceMessenger.Init()
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-
-					_, err = aliceMessenger.Start()
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-					defer func() { _ = aliceMessenger.Shutdown() }()
-
-					aliceID := types.EncodeHex(crypto.FromECDSAPub(aliceMessenger.IdentityPublicKey()))
-					fmt.Println("[Alice] messenger started, id:", aliceID)
-
-					time.Sleep(3 * time.Second)
+					defer stopMessenger(aliceMessenger)
 
 					// Start bob node and messenger
-
-					fmt.Println("[Bob] starting messenger")
-					bobPrivKey, err := crypto.GenerateKey()
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-
-					bobConfig := &wakuv2.Config{}
-					bobConfig.EnableDiscV5 = true
-					bobConfig.DiscV5BootstrapNodes = []string{enrBootstrap}
-					bobConfig.DiscoveryLimit = 20
-					bobNode, err := wakuv2.New("", "", bobConfig, nil, nil, nil, nil, nil)
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-
-					err = bobNode.Start()
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-					defer func() { _ = bobNode.Stop() }()
-
-					time.Sleep(3 * time.Second)
-
-					appDb2, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-					walletDb2, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-					if err != nil {
-						return err
-					}
-					madb2, err := multiaccounts.InitializeDB(dbsetup.InMemoryPath)
-					if err != nil {
-						return err
-					}
-					acc2 := generator.NewAccount(bobPrivKey, nil)
-					iai2 := acc2.ToIdentifiedAccountInfo("")
-					bobOptions := []protocol.Option{
-						protocol.WithCustomLogger(nil),
-						protocol.WithDatabase(appDb2),
-						protocol.WithWalletDatabase(walletDb2),
-						protocol.WithMultiAccounts(madb2),
-						protocol.WithAccount(iai2.ToMultiAccount()),
-						protocol.WithDatasync(),
-						protocol.WithToplevelDatabaseMigrations(),
-						protocol.WithBrowserDatabase(nil),
-					}
-					bobMessenger, err := protocol.NewMessenger(
-						"bob-node",
-						bobPrivKey,
-						gethbridge.NewNodeBridge(nil, nil, bobNode),
-						uuid.New().String(),
-						nil,
-						bobOptions...,
-					)
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-
-					err = bobMessenger.Init()
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-
-					_, err = bobMessenger.Start()
+					bobMessenger, err := startBob()
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
 					defer func() { _ = bobMessenger.Shutdown() }()
 
-					bobID := types.EncodeHex(crypto.FromECDSAPub(bobMessenger.IdentityPublicKey()))
-					fmt.Println("[Bob] messenger started, id:", bobID)
-
-					time.Sleep(3 * time.Second)
-
 					// Send contact request from Alice to Bob
-
+					bobID := types.EncodeHex(crypto.FromECDSAPub(bobMessenger.IdentityPublicKey()))
 					fmt.Println("[Alice] send contact request to bob, contact id:", bobID)
 					request := &requests.SendContactRequest{
 						ID:      bobID,
@@ -344,4 +189,184 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func startMessenger(name string) (*protocol.Messenger, error) {
+	fmt.Println("[%s] starting messager", name)
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	config := &wakuv2.Config{}
+	config.EnableDiscV5 = true
+	config.DiscV5BootstrapNodes = []string{enrBootstrap}
+	config.DiscoveryLimit = 20
+	wakuNode, err := wakuv2.New("", "", config, nil, nil, nil, nil, nil)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	err = wakuNode.Start()
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	// defer func() { _ = wakuNode.Stop() }()
+
+	time.Sleep(3 * time.Second)
+
+	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	if err != nil {
+		return nil, err
+	}
+	madb, err := multiaccounts.InitializeDB(dbsetup.InMemoryPath)
+	if err != nil {
+		return nil, err
+	}
+	acc := generator.NewAccount(privateKey, nil)
+	iai := acc.ToIdentifiedAccountInfo("")
+	aliceOptions := []protocol.Option{
+		protocol.WithCustomLogger(nil),
+		protocol.WithDatabase(appDb),
+		protocol.WithWalletDatabase(walletDb),
+		protocol.WithMultiAccounts(madb),
+		protocol.WithAccount(iai.ToMultiAccount()),
+		protocol.WithDatasync(),
+		protocol.WithToplevelDatabaseMigrations(),
+		protocol.WithBrowserDatabase(nil),
+	}
+	messenger, err := protocol.NewMessenger(
+		"alice-node",
+		privateKey,
+		gethbridge.NewNodeBridge(nil, nil, wakuNode),
+		uuid.New().String(),
+		nil,
+		aliceOptions...,
+	)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	err = messenger.Init()
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	_, err = messenger.Start()
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	// defer func() { _ = messenger.Shutdown() }()
+
+	aliceID := types.EncodeHex(crypto.FromECDSAPub(messenger.IdentityPublicKey()))
+	fmt.Println("[%s] messenger started, id: %s", name, aliceID)
+
+	time.Sleep(3 * time.Second)
+
+	return messenger, nil
+}
+
+func stopMessenger(messenger *protocol.Messenger) {
+	err := messenger.Shutdown()
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func startBob() (*protocol.Messenger, error) {
+	fmt.Println("[Bob] starting messenger")
+	bobPrivKey, err := crypto.GenerateKey()
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	bobConfig := &wakuv2.Config{}
+	bobConfig.EnableDiscV5 = true
+	bobConfig.DiscV5BootstrapNodes = []string{enrBootstrap}
+	bobConfig.DiscoveryLimit = 20
+	bobNode, err := wakuv2.New("", "", bobConfig, nil, nil, nil, nil, nil)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	err = bobNode.Start()
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	// defer func() { _ = bobNode.Stop() }()
+
+	time.Sleep(3 * time.Second)
+
+	appDb2, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	walletDb2, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	if err != nil {
+		return nil, err
+	}
+	madb2, err := multiaccounts.InitializeDB(dbsetup.InMemoryPath)
+	if err != nil {
+		return nil, err
+	}
+	acc2 := generator.NewAccount(bobPrivKey, nil)
+	iai2 := acc2.ToIdentifiedAccountInfo("")
+	bobOptions := []protocol.Option{
+		protocol.WithCustomLogger(nil),
+		protocol.WithDatabase(appDb2),
+		protocol.WithWalletDatabase(walletDb2),
+		protocol.WithMultiAccounts(madb2),
+		protocol.WithAccount(iai2.ToMultiAccount()),
+		protocol.WithDatasync(),
+		protocol.WithToplevelDatabaseMigrations(),
+		protocol.WithBrowserDatabase(nil),
+	}
+	bobMessenger, err := protocol.NewMessenger(
+		"bob-node",
+		bobPrivKey,
+		gethbridge.NewNodeBridge(nil, nil, bobNode),
+		uuid.New().String(),
+		nil,
+		bobOptions...,
+	)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	err = bobMessenger.Init()
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	_, err = bobMessenger.Start()
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	// defer func() { _ = bobMessenger.Shutdown() }()
+
+	bobID := types.EncodeHex(crypto.FromECDSAPub(bobMessenger.IdentityPublicKey()))
+	fmt.Println("[Bob] messenger started, id:", bobID)
+
+	time.Sleep(3 * time.Second)
+
+	return bobMessenger, nil
 }
