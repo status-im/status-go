@@ -53,6 +53,7 @@ func scanRanges(rows *sql.Rows) (map[common.Address]*ethTokensBlockRanges, error
 		address := common.Address{}
 		chainID := uint64(0)
 		err := rows.Scan(&address, &chainID, es, efk, elk, ts, tfk, tlk)
+		log.Info("DDBG found something", "a", address)
 		if err != nil {
 			return nil, err
 		}
@@ -159,6 +160,7 @@ func (b *BlockRangeSequentialDAO) getBlockRanges(chainID uint64, addresses []com
 
 	return scanRanges(rows)
 }
+
 func (b *BlockRangeSequentialDAO) deleteRange(account common.Address) error {
 	log.Debug("delete blocks range", "account", account)
 	delete, err := b.db.Prepare(`DELETE FROM blocks_ranges_sequential WHERE address = ?`)
