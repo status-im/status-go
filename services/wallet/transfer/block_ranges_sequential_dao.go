@@ -50,14 +50,14 @@ func scanRanges(rows *sql.Rows) (map[common.Address]*ethTokensBlockRanges, error
 		tfk := &bigint.NilableSQLBigInt{}
 		tlk := &bigint.NilableSQLBigInt{}
 		ts := &bigint.NilableSQLBigInt{}
-		addressStr := ""
+		addressB := []byte{}
 		blockRange := newEthTokensBlockRanges()
-		err := rows.Scan(addressStr, es, efk, elk, ts, tfk, tlk, &blockRange.balanceCheckHash)
-		log.Info("DDBG found something", "a", addressStr)
+		err := rows.Scan(addressB, es, efk, elk, ts, tfk, tlk, &blockRange.balanceCheckHash)
+		log.Info("DDBG found something", "a", addressB)
 		if err != nil {
 			return nil, err
 		}
-		address := common.HexToAddress(addressStr)
+		address := common.BytesToAddress(addressB)
 		blockRanges[address] = blockRange
 
 		if !es.IsNil() {
