@@ -142,9 +142,8 @@ func (b *BlockRangeSequentialDAO) getBlockRanges(chainID uint64, addresses []com
 		}
 	}
 
-	query := `SELECT blk_start, blk_first, blk_last, token_blk_start, token_blk_first, token_blk_last, balance_check_hash FROM blocks_ranges_sequential
-	WHERE address IN (`+ addressesPlaceholder +`)
-	AND network_id = ?`
+	query := "SELECT blk_start, blk_first, blk_last, token_blk_start, token_blk_first, token_blk_last, balance_check_hash FROM blocks_ranges_sequential WHERE address IN ("+
+		addressesPlaceholder + ") AND network_id = ?"
 
 	log.Debug("DDBG", "q", query, "addresses", addresses, "chainID", chainID)
 	params := []interface{}{}
