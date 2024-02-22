@@ -147,7 +147,7 @@ func (b *BlockRangeSequentialDAO) getBlockRanges(chainID uint64, addresses []com
 
 	log.Debug("DDBG", "q", query, "addresses", addresses, "chainID", chainID)
 	params := []interface{}{}
-	for address := range addresses {
+	for _, address := range addresses {
 		params = append(params, address)
 	}
 	params = append(params, chainID)
