@@ -32,6 +32,7 @@ import (
 const enrBootstrap = "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"
 
 type StatusCli struct {
+	name      string
 	messenger *protocol.Messenger
 	waku      *wakuv2.Waku
 }
@@ -46,6 +47,7 @@ func main() {
 				Action: func(cCtx *cli.Context) error {
 					fmt.Println("params: ", cCtx.Args().First())
 
+					// Start Alice and Bob's messengers
 					alice, err := startMessenger("Alice")
 					if err != nil {
 						fmt.Println(err)
@@ -64,38 +66,17 @@ func main() {
 					bobMessenger := bob.messenger
 
 					// Send contact request from Alice to Bob
-					bobID := types.EncodeHex(crypto.FromECDSAPub(bobMessenger.IdentityPublicKey()))
-					fmt.Println("[Alice] send contact request to bob, contact id:", bobID)
-					request := &requests.SendContactRequest{
-						ID:      bobID,
-						Message: "Hello!",
-					}
-					respSendCR, err := aliceMessenger.SendContactRequest(context.Background(), request)
-					fmt.Println("[Alice] function SendContactRequest response: ", respSendCR)
+					msgID, err := sendContactRequest(alice, bob)
+					fmt.Println("msgID: ", msgID)
 					if err != nil {
 						fmt.Println(err)
 						return err
 					}
-
-					respReceiveCR, err := protocol.WaitOnMessengerResponse(
-						bobMessenger,
-						func(r *protocol.MessengerResponse) bool {
-							return len(r.Contacts) == 1 && len(r.Messages()) >= 2
-						},
-						"[Bob] no contact request from alice",
-					)
-					if err != nil {
-						fmt.Println(err)
-						return err
-					}
-
-					msg := protocol.FindFirstByContentType(respReceiveCR.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
-					fmt.Println("[Bob] receive contact request response: ", msg.Text)
 
 					// Bob accept contact request
 
 					fmt.Println("[Bob] send contact request acceptance to alice")
-					respAccCR, err := bobMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(msg.ID)})
+					respAccCR, err := bobMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(msgID)})
 					fmt.Println("[Bob] function AcceptContactRequest response: ", respAccCR)
 					if err != nil {
 						fmt.Println(err)
@@ -273,6 +254,7 @@ func startMessenger(name string) (*StatusCli, error) {
 	time.Sleep(3 * time.Second)
 
 	data := StatusCli{
+		name:      name,
 		messenger: messenger,
 		waku:      node,
 	}
@@ -290,4 +272,34 @@ func stopMessenger(alice *StatusCli) {
 	if err != nil {
 		fmt.Println(err)
 	}
+}
+
+func sendContactRequest(from, to *StatusCli) (string, error) {
+	destID := types.EncodeHex(crypto.FromECDSAPub(to.messenger.IdentityPublicKey()))
+	fmt.Printf("[%s] send contact request to %s, contact id: %s\n", from.name, to.name, destID)
+	request := &requests.SendContactRequest{
+		ID:      destID,
+		Message: "Hello!",
+	}
+	resp, err := from.messenger.SendContactRequest(context.Background(), request)
+	fmt.Printf("[%s] function SendContactRequest response.messages: %s\n", from.name, resp.Messages())
+	if err != nil {
+		return "", err
+	}
+
+	receiverResp, err := protocol.WaitOnMessengerResponse(
+		to.messenger,
+		func(r *protocol.MessengerResponse) bool {
+			return len(r.Contacts) == 1 && len(r.Messages()) >= 2
+		},
+		fmt.Sprintf("[%s] no contact request from %s", to.name, from.name),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	msg := protocol.FindFirstByContentType(receiverResp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	fmt.Printf("[%s] receive contact request response: %s\n", to.name, msg.Text)
+
+	return msg.ID, nil
 }
