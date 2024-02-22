@@ -83,7 +83,14 @@ func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 	}
 
 	faviconPath := GetFavicon(bodyBytes)
-
+	t, err := fetchThumbnail(u.logger, u.httpClient, faviconPath)
+		if err != nil {
+			// Given we want to fetch thumbnails on a best-effort basis, if an error
+			// happens we simply log it.
+			u.logger.Info("failed to fetch thumbnail", zap.String("url", u.url.String()), zap.Error(err))
+		} else {
+			preview.Favicon = t.DataURI
+		}
 	// There are URLs like https://wikipedia.org/ that don't have an OpenGraph
 	// title tag, but article pages do. In the future, we can fallback to the
 	// website's title by using the <title> tag.
