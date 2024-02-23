@@ -109,7 +109,7 @@ func getTransferByHash(ctx context.Context, client chain.ClientInterface, signer
 		return nil, err
 	}
 
-	baseGasFee, err := client.GetBaseFeeFromBlock(big.NewInt(int64(transactionLog.BlockNumber)))
+	baseGasFee, err := client.GetBaseFeeFromBlock(ctx, big.NewInt(int64(transactionLog.BlockNumber)))
 	if err != nil {
 		return nil, err
 	}
