@@ -288,7 +288,7 @@ func (tc *TestClient) CallBlockHashByTransaction(ctx context.Context, blockNumbe
 	return common.BigToHash(blockNumber), nil
 }
 
-func (tc *TestClient) GetBaseFeeFromBlock(blockNumber *big.Int) (string, error) {
+func (tc *TestClient) GetBaseFeeFromBlock(ctx context.Context, blockNumber *big.Int) (string, error) {
 	tc.incCounter("GetBaseFeeFromBlock")
 	if tc.traceAPICalls {
 		tc.t.Log("GetBaseFeeFromBlock")
