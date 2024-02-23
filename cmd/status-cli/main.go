@@ -40,6 +40,7 @@ type StatusCLI struct {
 	name      string
 	messenger *protocol.Messenger
 	waku      *wakuv2.Waku
+	logger    *zap.SugaredLogger
 }
 
 func main() {
@@ -114,7 +115,8 @@ func main() {
 }
 
 func startMessenger(cCtx *cli.Context, name string) (*StatusCLI, error) {
-	logger.Infof("[%s] starting messager\n", name)
+	namedLogger := logger.Named(name)
+	namedLogger.Info("starting messager")
 
 	userLogger := setupLogger(name)
 
@@ -185,7 +187,7 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCLI, error) {
 	}
 
 	id := types.EncodeHex(crypto.FromECDSAPub(messenger.IdentityPublicKey()))
-	logger.Infof("[%s] messenger started, id: %s\n", name, id)
+	namedLogger.Info("messenger started, id: ", id)
 
 	time.Sleep(3 * time.Second)
 
@@ -193,6 +195,7 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCLI, error) {
 		name:      name,
 		messenger: messenger,
 		waku:      node,
+		logger:    namedLogger,
 	}
 
 	return &data, nil
@@ -212,13 +215,13 @@ func stopMessenger(cli *StatusCLI) {
 
 func sendContactRequest(cCtx *cli.Context, from, to *StatusCLI) (string, error) {
 	destID := types.EncodeHex(crypto.FromECDSAPub(to.messenger.IdentityPublicKey()))
-	logger.Infof("[%s] send contact request to %s, contact id: %s\n", from.name, to.name, destID)
+	from.logger.Info("send contact request, contact id: ", destID)
 	request := &requests.SendContactRequest{
 		ID:      destID,
 		Message: "Hello!",
 	}
 	resp, err := from.messenger.SendContactRequest(cCtx.Context, request)
-	logger.Infof("[%s] function SendContactRequest response.messages: %s\n", from.name, resp.Messages())
+	from.logger.Info("function SendContactRequest response.messages: ", resp.Messages())
 	if err != nil {
 		return "", err
 	}
@@ -228,52 +231,52 @@ func sendContactRequest(cCtx *cli.Context, from, to *StatusCLI) (string, error) 
 		func(r *protocol.MessengerResponse) bool {
 			return len(r.Contacts) == 1 && len(r.Messages()) >= 2
 		},
-		fmt.Sprintf("[%s] no contact request from %s", to.name, from.name),
+		fmt.Sprintf("%s didn't get contact request from %s", to.name, from.name),
 	)
 	if err != nil {
 		return "", err
 	}
 
 	msg := protocol.FindFirstByContentType(respTo.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
-	logger.Infof("[%s] receive contact request response: %s\n", to.name, msg.Text)
+	to.logger.Info("receive contact request response: ", msg.Text)
 
 	return msg.ID, nil
 }
 
 func sendContactRequestAcceptance(cCtx *cli.Context, from, to *StatusCLI, msgID string) error {
-	logger.Infof("[%s] send contact request acceptance to %s\n", from.name, to.name)
+	from.logger.Info("send contact request acceptance to: ", to.name)
 	resp, err := from.messenger.AcceptContactRequest(cCtx.Context, &requests.AcceptContactRequest{ID: types.Hex2Bytes(msgID)})
 	if err != nil {
 		return err
 	}
-	logger.Infof("[%s] function AcceptContactRequest response: %v\n", from.name, resp.Messages())
+	from.logger.Info("function AcceptContactRequest response: ", resp.Messages())
 
 	fromContacts := from.messenger.MutualContacts()
-	logger.Infof("[%s] contacts number: %d\n", from.name, len(fromContacts))
+	from.logger.Info("contacts number: ", len(fromContacts))
 
 	respTo, err := protocol.WaitOnMessengerResponse(
 		to.messenger,
 		func(r *protocol.MessengerResponse) bool {
 			return len(r.Contacts) == 1 && len(r.Messages()) >= 2
 		},
-		fmt.Sprintf("[%s] contact request acceptance not received from %s", to.name, from.name),
+		fmt.Sprintf("%s contact request acceptance not received from %s", to.name, from.name),
 	)
 	if err != nil {
 		return err
 	}
 
 	msg := protocol.FindFirstByContentType(respTo.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED)
-	logger.Infof("[%s] got message: %s\n", to.name, msg.Text)
+	to.logger.Info("got message: ", msg.Text)
 
 	toContacts := to.messenger.MutualContacts()
-	logger.Infof("[%s] contacts number: %d\n", to.name, len(toContacts))
+	to.logger.Info("contacts number: ", len(toContacts))
 
 	return nil
 }
 
 func sendDirectMessage(cCtx *cli.Context, from, to *StatusCLI, text string) error {
 	chat := from.messenger.Chat(from.messenger.MutualContacts()[0].ID)
-	logger.Infof("[%s] chat with contact id: %s\n", from.name, chat.ID)
+	from.logger.Info("chat with contact id: ", chat.ID)
 
 	clock, timestamp := chat.NextClockAndTimestamp(from.messenger.GetTransport())
 	inputMessage := common.NewMessage()
@@ -289,17 +292,17 @@ func sendDirectMessage(cCtx *cli.Context, from, to *StatusCLI, text string) erro
 	if err != nil {
 		return err
 	}
-	logger.Infof("[%s] function SendChatMessage response.messages: %v\n", from.name, resp.Messages())
+	from.logger.Info("function SendChatMessage response.messages: ", resp.Messages())
 
 	respTo, err := protocol.WaitOnMessengerResponse(
 		to.messenger,
 		func(r *protocol.MessengerResponse) bool { return len(r.Messages()) > 0 },
-		fmt.Sprintf("[%s] not receive message from %s", to.name, from.name),
+		fmt.Sprintf("%s not receive message from %s", to.name, from.name),
 	)
 	if err != nil {
 		return err
 	}
-	logger.Infof("[%s] receive message from %s: %s\n", to.name, from.name, respTo.Chats()[0].LastMessage.Text)
+	to.logger.Infof("receive message from %s: %s\n", from.name, respTo.Chats()[0].LastMessage.Text)
 
 	return nil
 }
