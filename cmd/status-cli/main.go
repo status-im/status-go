@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
@@ -31,11 +32,9 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-const enrBootstrap = "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"
-
 var logger *zap.SugaredLogger
 
-type StatusCli struct {
+type StatusCLI struct {
 	name      string
 	messenger *protocol.Messenger
 	waku      *wakuv2.Waku
@@ -112,7 +111,7 @@ func main() {
 	}
 }
 
-func startMessenger(cCtx *cli.Context, name string) (*StatusCli, error) {
+func startMessenger(cCtx *cli.Context, name string) (*StatusCLI, error) {
 	logger.Infof("[%s] starting messager\n", name)
 
 	userLogger := setupLogger(name)
@@ -124,7 +123,7 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCli, error) {
 
 	config := &wakuv2.Config{}
 	config.EnableDiscV5 = true
-	config.DiscV5BootstrapNodes = []string{enrBootstrap}
+	config.DiscV5BootstrapNodes = api.DefaultWakuNodes[api.DefaultFleet]
 	config.DiscoveryLimit = 20
 	config.LightClient = cCtx.Bool("light")
 	node, err := wakuv2.New("", "", config, userLogger, nil, nil, nil, nil)
@@ -188,7 +187,7 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCli, error) {
 
 	time.Sleep(3 * time.Second)
 
-	data := StatusCli{
+	data := StatusCLI{
 		name:      name,
 		messenger: messenger,
 		waku:      node,
@@ -197,7 +196,7 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCli, error) {
 	return &data, nil
 }
 
-func stopMessenger(cli *StatusCli) {
+func stopMessenger(cli *StatusCLI) {
 	err := cli.messenger.Shutdown()
 	if err != nil {
 		logger.Error(err)
@@ -209,7 +208,7 @@ func stopMessenger(cli *StatusCli) {
 	}
 }
 
-func sendContactRequest(cCtx *cli.Context, from, to *StatusCli) (string, error) {
+func sendContactRequest(cCtx *cli.Context, from, to *StatusCLI) (string, error) {
 	destID := types.EncodeHex(crypto.FromECDSAPub(to.messenger.IdentityPublicKey()))
 	logger.Infof("[%s] send contact request to %s, contact id: %s\n", from.name, to.name, destID)
 	request := &requests.SendContactRequest{
@@ -239,7 +238,7 @@ func sendContactRequest(cCtx *cli.Context, from, to *StatusCli) (string, error) 
 	return msg.ID, nil
 }
 
-func sendContactRequestAcceptance(cCtx *cli.Context, from, to *StatusCli, msgID string) error {
+func sendContactRequestAcceptance(cCtx *cli.Context, from, to *StatusCLI, msgID string) error {
 	logger.Infof("[%s] send contact request acceptance to %s\n", from.name, to.name)
 	resp, err := from.messenger.AcceptContactRequest(cCtx.Context, &requests.AcceptContactRequest{ID: types.Hex2Bytes(msgID)})
 	if err != nil {
@@ -270,7 +269,7 @@ func sendContactRequestAcceptance(cCtx *cli.Context, from, to *StatusCli, msgID 
 	return nil
 }
 
-func sendDirectMessage(cCtx *cli.Context, from, to *StatusCli, text string) error {
+func sendDirectMessage(cCtx *cli.Context, from, to *StatusCLI, text string) error {
 	chat := from.messenger.Chat(from.messenger.MutualContacts()[0].ID)
 	logger.Infof("[%s] chat with contact id: %s\n", from.name, chat.ID)
 
