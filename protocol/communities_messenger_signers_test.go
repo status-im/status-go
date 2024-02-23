@@ -1,12 +1,9 @@
 package protocol
 
 import (
-	//"bytes"
 	"context"
 	"testing"
 	"time"
-
-	//"github.com/golang/protobuf/proto"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -14,7 +11,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 
-	//utils "github.com/status-im/status-go/common"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -225,7 +221,9 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	_, err = WaitOnSignaledMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && !r.Communities()[0].HasMember(&s.bob.identity.PublicKey)
+			return len(r.Communities()) > 0 && !r.Communities()[0].HasMember(&s.bob.identity.PublicKey) &&
+				!r.Communities()[0].Joined() && r.Communities()[0].Spectated() &&
+				len(r.ActivityCenterNotifications()) == 0
 		},
 		"Bob was not kicked from the community",
 	)
@@ -236,7 +234,8 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	_, err = WaitOnSignaledMessengerResponse(
 		s.john,
 		func(r *MessengerResponse) bool {
-			wasKicked := len(r.Communities()) > 0 && !r.Communities()[0].HasMember(&s.john.identity.PublicKey)
+			inSpectateMode := len(r.Communities()) > 0 && !r.Communities()[0].HasMember(&s.john.identity.PublicKey) &&
+				!r.Communities()[0].Joined() && r.Communities()[0].Spectated()
 			sharedNotificationExist := false
 			for _, acNotification := range r.ActivityCenterNotifications() {
 				if acNotification.Type == ActivityCenterNotificationTypeShareAccounts {
@@ -244,7 +243,7 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 					break
 				}
 			}
-			return wasKicked && sharedNotificationExist
+			return inSpectateMode && sharedNotificationExist
 		},
 		"John was not kicked from the community",
 	)
@@ -278,7 +277,8 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	_, err = WaitOnMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&s.bob.identity.PublicKey)
+			return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&s.bob.identity.PublicKey) &&
+				r.Communities()[0].Joined() && !r.Communities()[0].Spectated()
 		},
 		"Bob was auto-accepted",
 	)

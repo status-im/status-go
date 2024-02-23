@@ -2351,7 +2351,11 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 			return len(r.Communities()) == 1 &&
 				len(r.Communities()[0].PendingAndBannedMembers()) == 1 &&
 				r.Communities()[0].IsBanned(&s.alice.identity.PublicKey) &&
-				len(r.ActivityCenterNotifications()) == 1 && !r.ActivityCenterState().HasSeen
+				len(r.ActivityCenterNotifications()) == 1 &&
+				!r.ActivityCenterState().HasSeen &&
+				!r.Communities()[0].Spectated() &&
+				!r.Communities()[0].Joined()
+
 		},
 		"no message about alice ban",
 	)
@@ -4094,5 +4098,5 @@ func (s *MessengerCommunitiesSuite) TestBanUserAndDeleteAllUserMessages() {
 	s.Require().True(community.IsBanned(&s.alice.identity.PublicKey))
 	s.Require().Len(community.PendingAndBannedMembers(), 1)
 	s.Require().False(community.Joined())
-	s.Require().True(community.Spectated())
+	s.Require().False(community.Spectated())
 }
