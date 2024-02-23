@@ -32,6 +32,8 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+const LightFlag = "light"
+
 var logger *zap.SugaredLogger
 
 type StatusCLI struct {
@@ -49,7 +51,7 @@ func main() {
 				Usage:   "Send direct message",
 				Flags: []cli.Flag{
 					&cli.BoolFlag{
-						Name:  "light",
+						Name:  LightFlag,
 						Usage: "Enable light mode",
 					},
 				},
@@ -125,7 +127,7 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCLI, error) {
 	config.EnableDiscV5 = true
 	config.DiscV5BootstrapNodes = api.DefaultWakuNodes[api.DefaultFleet]
 	config.DiscoveryLimit = 20
-	config.LightClient = cCtx.Bool("light")
+	config.LightClient = cCtx.Bool(LightFlag)
 	node, err := wakuv2.New("", "", config, userLogger, nil, nil, nil, nil)
 	if err != nil {
 		return nil, err
