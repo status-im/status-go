@@ -651,7 +651,7 @@ func defaultNodeConfig(installationID, keyUID string) (*params.NodeConfig, error
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.NetworkID = 1
-	nodeConfig.LogLevel = "ERROR"
+	nodeConfig.LogLevel = "DEBUG"
 	nodeConfig.DataDir = filepath.Join("ethereum/mainnet_rpc")
 	nodeConfig.KeyStoreDir = filepath.Join(keystoreDir, keyUID)
 	nodeConfig.KeycardPairingDataFile = filepath.Join("keycard", "pairings.json")
