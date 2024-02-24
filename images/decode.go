@@ -160,7 +160,8 @@ func IsWebp(buf []byte) bool {
 func IsIco(buf []byte) bool {
 	return len(buf) > 4 &&
 		buf[0] == 0 && buf[2] == 1 || buf[2] == 2 &&
-		buf[4] > 0}
+		buf[4] > 0
+}
 
 func GetImageDimensions(imgBytes []byte) (int, int, error) {
 	// Decode image bytes
