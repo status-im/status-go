@@ -112,10 +112,6 @@ func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 	preview.Title = ogMetadata.Title
 	preview.Description = ogMetadata.Description
 
-	if faviconPath != "" {
-		preview.Favicon = faviconPath
-	}
-
 	return preview, nil
 }
 
