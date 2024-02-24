@@ -13,6 +13,8 @@ import (
 	"os"
 	"time"
 
+	svg "github.com/h2non/go-is-svg"
+
 	"golang.org/x/image/webp"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -128,6 +130,8 @@ func GetMimeType(buf []byte) (string, error) {
 		return "webp", nil
 	case IsIco(buf):
 		return "ico", nil
+	case IsSvg(buf):
+		return "svg", nil
 	default:
 		return "", errors.New("image format not supported")
 	}
@@ -161,6 +165,10 @@ func IsIco(buf []byte) bool {
 	return len(buf) > 4 &&
 		buf[0] == 0 && buf[1] == 0 && buf[2] == 1 || buf[2] == 2 &&
 		buf[4] > 0
+}
+
+func IsSvg(buf []byte) bool {
+	return svg.Is(buf)
 }
 
 func GetImageDimensions(imgBytes []byte) (int, int, error) {

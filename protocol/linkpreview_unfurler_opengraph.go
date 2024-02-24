@@ -8,6 +8,8 @@ import (
 	neturl "net/url"
 	"strings"
 
+	svg "github.com/h2non/go-is-svg"
+
 	"github.com/keighl/metabolize"
 	"go.uber.org/zap"
 	"golang.org/x/net/html"
@@ -89,7 +91,6 @@ func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 	}
 
 	faviconPath := GetFavicon(bodyBytes)
-	print(faviconPath, "hey")
 	t, err := fetchThumbnail(u.logger, u.httpClient, faviconPath)
 	if err != nil {
 		u.logger.Info("failed to fetch favicon", zap.String("url", u.url.String()), zap.Error(err))
@@ -128,12 +129,14 @@ func fetchThumbnail(logger *zap.Logger, httpClient *http.Client, url string) (co
 		return thumbnail, fmt.Errorf("could not fetch thumbnail url='%s': %w", url, err)
 	}
 
-	width, height, err := images.GetImageDimensions(imgBytes)
-	if err != nil {
-		return thumbnail, fmt.Errorf("could not get image dimensions url='%s': %w", url, err)
+	if !svg.Is(imgBytes) {
+		width, height, err := images.GetImageDimensions(imgBytes)
+		if err != nil {
+			return thumbnail, fmt.Errorf("could not get image dimensions url='%s': %w", url, err)
+		}
+		thumbnail.Width = width
+		thumbnail.Height = height
 	}
-	thumbnail.Width = width
-	thumbnail.Height = height
 
 	dataURI, err := images.GetPayloadDataURI(imgBytes)
 	if err != nil {
