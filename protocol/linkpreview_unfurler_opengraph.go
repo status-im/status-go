@@ -51,8 +51,14 @@ loop:
 		case html.StartTagToken:
 			t := htmlTokens.Token()
 			if t.Data == "link" {
+				LinkContainsFavicon := false
 				for _, attribute := range t.Attr {
-					if strings.HasSuffix(attribute.Val, ".ico") || strings.HasSuffix(attribute.Val, ".png") || strings.HasSuffix(attribute.Val, ".svg") {
+					if attribute.Val == "icon" || attribute.Val == "shortcut icon" {
+						LinkContainsFavicon = true
+					}
+				}
+				for _, attribute := range t.Attr {
+					if LinkContainsFavicon && (strings.Contains(attribute.Val, ".ico") || strings.Contains(attribute.Val, ".png") || strings.Contains(attribute.Val, ".svg")) {
 						return attribute.Val
 					}
 				}
@@ -83,11 +89,10 @@ func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 	}
 
 	faviconPath := GetFavicon(bodyBytes)
+	print(faviconPath, "hey")
 	t, err := fetchThumbnail(u.logger, u.httpClient, faviconPath)
 	if err != nil {
-		// Given we want to fetch thumbnails on a best-effort basis, if an error
-		// happens we simply log it.
-		u.logger.Info("failed to fetch thumbnail", zap.String("url", u.url.String()), zap.Error(err))
+		u.logger.Info("failed to fetch favicon", zap.String("url", u.url.String()), zap.Error(err))
 	} else {
 		preview.Favicon = t.DataURI
 	}

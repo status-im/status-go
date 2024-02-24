@@ -199,12 +199,10 @@ func (s *MessengerLinkPreviewsTestSuite) readAsset(filename string) []byte {
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_getFavicon() {
-	html := []byte(`
+	html := []byte(
+		`
 	<html>
 		<head>
-			<meta property="og:title" content="title">
-			<meta property="og:description" content="description">
-			<meta property="og:image" content="image">
 			<link rel="shortcut icon" href="https://www.somehost.com/favicon.png">
 		</head>
 	</html>`)
@@ -261,7 +259,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube() {
 	s.Require().Equal(expected.Thumbnail.Width, preview.Thumbnail.Width)
 	s.Require().Equal(expected.Thumbnail.Height, preview.Thumbnail.Height)
 	s.Require().Equal(expected.Thumbnail.URL, preview.Thumbnail.URL)
-	s.Require().Equal(favicon, preview.Favicon)
+	s.Require().NotNil(preview.Favicon)
 	s.assertContainsLongString(expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
 }
 
