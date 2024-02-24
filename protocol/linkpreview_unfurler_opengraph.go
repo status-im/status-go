@@ -42,22 +42,22 @@ func NewOpenGraphUnfurler(URL *neturl.URL, logger *zap.Logger, httpClient *http.
 
 func GetFavicon(bodyBytes []byte) string {
 	htmlTokens := html.NewTokenizer(bytes.NewBuffer(bodyBytes))
-	loop:
+loop:
 	for {
-        tt := htmlTokens.Next()
-        switch tt {
-        case html.ErrorToken:
-            break loop
-        case html.StartTagToken:
-            t := htmlTokens.Token()
-            if t.Data == "link" {
-                for _, attribute := range t.Attr {
+		tt := htmlTokens.Next()
+		switch tt {
+		case html.ErrorToken:
+			break loop
+		case html.StartTagToken:
+			t := htmlTokens.Token()
+			if t.Data == "link" {
+				for _, attribute := range t.Attr {
 					if strings.HasSuffix(attribute.Val, ".ico") || strings.HasSuffix(attribute.Val, ".png") || strings.HasSuffix(attribute.Val, ".svg") {
 						return attribute.Val
 					}
 				}
-            }
-        }
+			}
+		}
 	}
 	return ""
 }
@@ -84,13 +84,13 @@ func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 
 	faviconPath := GetFavicon(bodyBytes)
 	t, err := fetchThumbnail(u.logger, u.httpClient, faviconPath)
-		if err != nil {
-			// Given we want to fetch thumbnails on a best-effort basis, if an error
-			// happens we simply log it.
-			u.logger.Info("failed to fetch thumbnail", zap.String("url", u.url.String()), zap.Error(err))
-		} else {
-			preview.Favicon = t.DataURI
-		}
+	if err != nil {
+		// Given we want to fetch thumbnails on a best-effort basis, if an error
+		// happens we simply log it.
+		u.logger.Info("failed to fetch thumbnail", zap.String("url", u.url.String()), zap.Error(err))
+	} else {
+		preview.Favicon = t.DataURI
+	}
 	// There are URLs like https://wikipedia.org/ that don't have an OpenGraph
 	// title tag, but article pages do. In the future, we can fallback to the
 	// website's title by using the <title> tag.
