@@ -532,8 +532,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersMu
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
-	s.T().Skip("flaky test")
-
 	community, _ := s.createCommunity()
 	s.advertiseCommunityTo(community, s.alice)
 
@@ -860,8 +858,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPe
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWithMemberAndAdminPermission() {
-	s.T().Skip("flaky test")
-
 	community, _ := s.createCommunity()
 
 	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
@@ -1007,8 +1003,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWith
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions() {
-	s.T().Skip("flaky test")
-
 	community, chat := s.createCommunity()
 
 	// bob joins the community
@@ -1232,12 +1226,10 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInOpenCommunity() {
-	s.T().Skip("flaky test")
 	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInOpenCommunity() {
-	s.T().Skip("flaky test")
 	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 }
 
@@ -1375,12 +1367,10 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInClosedCommunity() {
-	s.T().Skip("flaky test")
 	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInClosedCommunity() {
-	s.T().Skip("flaky test")
 	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 }
 

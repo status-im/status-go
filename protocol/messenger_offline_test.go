@@ -107,8 +107,6 @@ func (s *MessengerOfflineSuite) joinCommunity(community *communities.Community, 
 }
 
 func (s *MessengerOfflineSuite) TestCommunityOfflineEdit() {
-	s.T().Skip("flaky test")
-
 	community, chat := createCommunity(&s.Suite, s.owner)
 
 	chatID := chat.ID
