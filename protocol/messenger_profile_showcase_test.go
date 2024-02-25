@@ -433,8 +433,6 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 }
 
 func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
-	s.T().Skip("flaky test")
-
 	// Set Display name to pass shouldPublishChatIdentity check
 	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
 	profileKp.KeyUID = s.m.account.KeyUID
