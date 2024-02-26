@@ -854,6 +854,7 @@ func (m *Messenger) blockContact(ctx context.Context, response *MessengerRespons
 		return err
 	}
 
+	contactWasAdded := contact.added()
 	contact.Block(clock)
 
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
@@ -876,9 +877,11 @@ func (m *Messenger) blockContact(ctx context.Context, response *MessengerRespons
 	}
 
 	if !fromSyncing {
-		err = m.sendRetractContactRequest(contact)
-		if err != nil {
-			return err
+		if contactWasAdded {
+			err = m.sendRetractContactRequest(contact)
+			if err != nil {
+				return err
+			}
 		}
 
 		err = m.syncContact(context.Background(), contact, m.dispatchMessage)
