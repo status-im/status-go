@@ -981,23 +981,52 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 			}
 			keyUID = &acc.KeyUID
 		}
-		var exists bool
-		err = tx.QueryRow("SELECT EXISTS (SELECT 1 FROM keypairs_accounts WHERE address = ? AND removed = 0)", acc.Address).Scan(&exists)
+
+		exists := true
+		removed := false
+		err = tx.QueryRow(`
+			SELECT
+				removed
+			FROM
+				keypairs_accounts
+			WHERE
+				address = ?;`,
+			acc.Address).Scan(&removed)
 		if err != nil {
-			return err
+			if err != sql.ErrNoRows {
+				return err
+			}
+			exists = false
+			removed = false
 		}
 
 		// Apply default values if account is new and not a watch only
-		if !exists && acc.Type != AccountTypeWatch {
-			if acc.ProdPreferredChainIDs == "" {
-				acc.ProdPreferredChainIDs = ProdPreferredChainIDsDefault
+		if exists {
+			if removed {
+				err = db.IncrementLastUsedWalletAccountNameIndexSuggestion(tx)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			if !acc.Chat {
+				err = db.IncrementLastUsedWalletAccountNameIndexSuggestion(tx)
+				if err != nil {
+					return err
+				}
 			}
 
-			if acc.TestPreferredChainIDs == "" {
-				if isGoerliEnabled {
-					acc.TestPreferredChainIDs = TestPreferredChainIDsDefault
-				} else {
-					acc.TestPreferredChainIDs = TestSepoliaPreferredChainIDsDefault
+			if acc.Type != AccountTypeWatch {
+				if acc.ProdPreferredChainIDs == "" {
+					acc.ProdPreferredChainIDs = ProdPreferredChainIDsDefault
+				}
+
+				if acc.TestPreferredChainIDs == "" {
+					if isGoerliEnabled {
+						acc.TestPreferredChainIDs = TestPreferredChainIDsDefault
+					} else {
+						acc.TestPreferredChainIDs = TestSepoliaPreferredChainIDsDefault
+					}
 				}
 			}
 		}

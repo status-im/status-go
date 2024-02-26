@@ -5,6 +5,7 @@
 package mocksettings
 
 import (
+	"database/sql"
 	json "encoding/json"
 	reflect "reflect"
 
@@ -304,4 +305,33 @@ func (m *MockDatabaseSettingsManager) GetRecentStickers() (*json.RawMessage, err
 func (mr *MockDatabaseSettingsManagerMockRecorder) GetRecentStickers() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecentStickers", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).GetRecentStickers))
+}
+
+// GetLastUsedWalletAccountNameIndexSuggestion mocks base method.
+func (m *MockDatabaseSettingsManager) GetLastUsedWalletAccountNameIndexSuggestion() (result int64, err error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastUsedWalletAccountNameIndexSuggestion")
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetLastUsedWalletAccountNameIndexSuggestion indicates an expected call of GetLastUsedWalletAccountNameIndexSuggestion.
+func (mr *MockDatabaseSettingsManagerMockRecorder) GetLastUsedWalletAccountNameIndexSuggestion() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastUsedWalletAccountNameIndexSuggestion", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).GetLastUsedWalletAccountNameIndexSuggestion))
+}
+
+// IncrementLastUsedWalletAccountNameIndexSuggestion mocks base method.
+func (m *MockDatabaseSettingsManager) IncrementLastUsedWalletAccountNameIndexSuggestion(tx *sql.Tx) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IncrementLastUsedWalletAccountNameIndexSuggestion")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// IncrementLastUsedWalletAccountNameIndexSuggestion indicates an expected call of IncrementLastUsedWalletAccountNameIndexSuggestion.
+func (mr *MockDatabaseSettingsManagerMockRecorder) IncrementLastUsedWalletAccountNameIndexSuggestion() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrementLastUsedWalletAccountNameIndexSuggestion", reflect.TypeOf((*MockDatabaseSettingsManager)(nil).IncrementLastUsedWalletAccountNameIndexSuggestion))
 }

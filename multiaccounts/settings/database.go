@@ -149,10 +149,11 @@ INSERT INTO settings (
   wallet_display_assets_below_balance,
   wallet_display_assets_below_balance_threshold,
   wallet_collectible_preferences_group_by_collection,
-  wallet_collectible_preferences_group_by_community
+  wallet_collectible_preferences_group_by_community,
+	last_used_wallet_account_name_index_suggestion
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,?,?,?,?,
-?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?,?,?)`,
+?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
@@ -188,6 +189,7 @@ INSERT INTO settings (
 		s.DisplayAssetsBelowBalanceThreshold,
 		s.CollectibleGroupByCollection,
 		s.CollectibleGroupByCommunity,
+		s.LastUsedWalletAccountNameIndexSuggestion,
 	)
 	if err != nil {
 		return err
@@ -391,7 +393,8 @@ func (db *Database) GetSettings() (Settings, error) {
 		gif_favorites, opensea_enabled, last_backup, backup_enabled, telemetry_server_url, auto_message_enabled, gif_api_key,
 		test_networks_enabled, mutual_contact_enabled, profile_migration_needed, is_goerli_enabled, wallet_token_preferences_group_by_community, url_unfurling_mode,
 		omit_transfers_history_scan, mnemonic_was_not_shown, wallet_show_community_asset_when_sending_tokens, wallet_display_assets_below_balance,
-		wallet_display_assets_below_balance_threshold, wallet_collectible_preferences_group_by_collection, wallet_collectible_preferences_group_by_community
+		wallet_display_assets_below_balance_threshold, wallet_collectible_preferences_group_by_collection, wallet_collectible_preferences_group_by_community,
+		last_used_wallet_account_name_index_suggestion
 	FROM
 		settings
 	WHERE
@@ -475,6 +478,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.DisplayAssetsBelowBalanceThreshold,
 		&s.CollectibleGroupByCollection,
 		&s.CollectibleGroupByCommunity,
+		&s.LastUsedWalletAccountNameIndexSuggestion,
 	)
 
 	return s, err
@@ -835,4 +839,22 @@ func (db *Database) postChangesToSubscribers(change *SyncSettingField) {
 
 func (db *Database) MnemonicWasShown() error {
 	return db.SaveSettingField(MnemonicWasNotShown, false)
+}
+
+func (db *Database) GetLastUsedWalletAccountNameIndexSuggestion() (result int64, err error) {
+	err = db.makeSelectRow(LastUsedWalletAccountNameIndexSuggestion).Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
+}
+
+func (db *Database) IncrementLastUsedWalletAccountNameIndexSuggestion(tx *sql.Tx) error {
+	// Updating last used wallet account name index suggestion should not be called directly, it's maintained by keypairs accounts part.
+	if tx == nil {
+		return errors.ErrDbTransactionIsNil
+	}
+	query := fmt.Sprintf("UPDATE settings SET %s = %s + 1 WHERE synthetic_id = 'id'", LastUsedWalletAccountNameIndexSuggestion.GetDBName(), LastUsedWalletAccountNameIndexSuggestion.GetDBName()) // nolint: gosec
+	_, err := tx.Exec(query)
+	return err
 }

@@ -113,6 +113,14 @@ func (api *API) GetKeypairs(ctx context.Context) ([]*accounts.Keypair, error) {
 	return api.db.GetActiveKeypairs()
 }
 
+func (api *API) GetIndexForNextAccountNameSuggestion(ctx context.Context) (int64, error) {
+	index, err := api.db.GetLastUsedWalletAccountNameIndexSuggestion()
+	if err != nil {
+		return 0, err
+	}
+	return index + 1, nil
+}
+
 func (api *API) GetAccountByAddress(ctx context.Context, address types.Address) (*accounts.Account, error) {
 	return api.db.GetAccountByAddress(address)
 }

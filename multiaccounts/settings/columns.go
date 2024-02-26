@@ -506,6 +506,11 @@ var (
 		dBColumnName:   "mnemonic_was_not_shown",
 		valueHandler:   BoolHandler,
 	}
+	LastUsedWalletAccountNameIndexSuggestion = SettingField{
+		reactFieldName: "last-used-wallet-account-name-index-suggestion",
+		dBColumnName:   "last_used_wallet_account_name_index_suggestion",
+		valueHandler:   Int64Handler,
+	}
 	SettingFieldRegister = []SettingField{
 		AnonMetricsShouldSend,
 		Appearance,
@@ -582,6 +587,7 @@ var (
 		CollectibleGroupByCollection,
 		CollectibleGroupByCommunity,
 		URLUnfurlingMode,
+		LastUsedWalletAccountNameIndexSuggestion,
 	}
 )
 

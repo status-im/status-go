@@ -76,4 +76,6 @@ type DatabaseSettingsManager interface {
 	URLUnfurlingMode() (result int64, err error)
 	SubscribeToChanges() chan *SyncSettingField
 	MnemonicWasShown() error
+	GetLastUsedWalletAccountNameIndexSuggestion() (result int64, err error)
+	IncrementLastUsedWalletAccountNameIndexSuggestion(tx *sql.Tx) error
 }
