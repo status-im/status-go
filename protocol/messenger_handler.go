@@ -3219,7 +3219,7 @@ func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, syn
 		return accounts.AccountOperable(syncAcc.Operable), nil
 	}
 
-	if syncKpMigratedToKeycard || m.account.KeyUID == syncAcc.KeyUid {
+	if syncKpMigratedToKeycard {
 		return accounts.AccountFullyOperable, nil
 	}
 
