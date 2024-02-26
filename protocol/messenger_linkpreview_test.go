@@ -198,7 +198,7 @@ func (s *MessengerLinkPreviewsTestSuite) readAsset(filename string) []byte {
 	return b
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_getFavicon() {
+func (s *MessengerLinkPreviewsTestSuite) Test_GetFavicon() {
 	html := []byte(
 		`
 	<html>
