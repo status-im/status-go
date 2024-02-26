@@ -20,6 +20,16 @@ pipeline {
       defaultValue: getDefaultUnitTestFailfast(),
       description: 'Should the job fail fast on first test failure?'
     )
+    booleanParam(
+      name: 'UNIT_TEST_RERUN_FAILS',
+      defaultValue: getDefaultUnitTestRerunFails(),
+      description: 'Should the job rerun failed tests?'
+    )
+    booleanParam(
+      name: 'UNIT_TEST_USE_DEVELOPMENT_LOGGER',
+      defaultValue: getDefaultUnitTestUseDevelopmentLogger(),
+      description: 'Should the job use detailed logging for tests, potentially generating large logs?'
+    )
   }
 
   options {
@@ -103,9 +113,24 @@ pipeline {
   post {
     always  {
       script { env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText" }
+      script {
+        if (isTestNightlyJob()) {
+          archiveArtifacts artifacts: '**/report.xml, **/test.log'
+
+          def totalSize = sh(script: "find . -name 'report.xml' | xargs wc -c | tail -n1 | awk '{print \$1}'", returnStdout: true).trim()
+          echo "Total size of all report.xml files: ${totalSize} bytes"
+        }
+        if (params.UNIT_TEST_RERUN_FAILS) {
+          def rerunReports = findFiles(glob: '**/report_rerun_fails.txt')
+          if (rerunReports.length > 0) {
+            archiveArtifacts artifacts: '**/report_rerun_fails.txt'
+          }
+        }
+      }
       junit testResults:          '**/report.xml',
             skipOldReports:       true,
-            skipPublishingChecks: true
+            skipPublishingChecks: true,
+            skipMarkingBuildUnstable: true
       publishHTML target: [
         allowMissing:           true,
         alwaysLinkToLastBuild:  true,
@@ -115,11 +140,6 @@ pipeline {
         reportName:             'Reports',
         reportTitles:           'Test Stats'
       ]
-      script {
-        if (isTestNightlyJob()) {
-          archiveArtifacts artifacts: '**/report.xml, **/test.log'
-        }
-      }
     }
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
@@ -133,6 +153,10 @@ pipeline {
 def isTestNightlyJob() { env.JOB_BASE_NAME == 'tests-nightly' }
 
 def getDefaultUnitTestCount() { isTestNightlyJob() ? '20' : '1' }
+
+def getDefaultUnitTestRerunFails() { isTestNightlyJob() ? false : true }
+
+def getDefaultUnitTestUseDevelopmentLogger() { isTestNightlyJob() ? false : true }
 
 def getDefaultUnitTestFailfast() { isTestNightlyJob() ? false : true }
 
