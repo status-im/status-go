@@ -127,20 +127,22 @@ func fetchThumbnail(logger *zap.Logger, httpClient *http.Client, url string) (co
 		return thumbnail, fmt.Errorf("could not fetch thumbnail url='%s': %w", url, err)
 	}
 
-	if !images.IsSVG(imgBytes) {
+	if images.IsSVG(imgBytes) {
+		// If an image is an SVG, It's dataUri cannot be used to render it, So we'll return it's markup
+		thumbnail.DataURI = string(imgBytes)
+	} else {
 		width, height, err := images.GetImageDimensions(imgBytes)
 		if err != nil {
 			return thumbnail, fmt.Errorf("could not get image dimensions url='%s': %w", url, err)
 		}
 		thumbnail.Width = width
 		thumbnail.Height = height
+		dataURI, err := images.GetPayloadDataURI(imgBytes)
+		if err != nil {
+			return thumbnail, fmt.Errorf("could not build data URI url='%s': %w", url, err)
+		}
+		thumbnail.DataURI = dataURI
 	}
-
-	dataURI, err := images.GetPayloadDataURI(imgBytes)
-	if err != nil {
-		return thumbnail, fmt.Errorf("could not build data URI url='%s': %w", url, err)
-	}
-	thumbnail.DataURI = dataURI
 
 	return thumbnail, nil
 }
