@@ -15,6 +15,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
@@ -162,7 +163,8 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NoError(err)
 
 	// Create group chat
-	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "group", []string{})
+	members := []string{common.PubkeyToHex(&contactKey.PublicKey)}
+	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "group", members)
 	s.NoError(err)
 	s.Require().Len(response.Chats(), 1)
 
