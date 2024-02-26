@@ -382,9 +382,6 @@ github.com/gorilla/sessions
 # github.com/gorilla/websocket v1.5.0
 ## explicit; go 1.12
 github.com/gorilla/websocket
-# github.com/h2non/go-is-svg v0.0.0-20160927212452-35e8c4b0612c
-## explicit
-github.com/h2non/go-is-svg
 # github.com/hashicorp/errwrap v1.1.0
 ## explicit
 github.com/hashicorp/errwrap
