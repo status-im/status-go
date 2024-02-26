@@ -3591,9 +3591,6 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 	s.owner.communitiesManager.RekeyInterval = 500 * time.Minute
 
-	_, err := s.owner.Start()
-	s.Require().NoError(err)
-
 	// Create a new community
 	response, err := s.owner.CreateCommunity(
 		&requests.CreateCommunity{
@@ -3697,9 +3694,6 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibility() {
 	common.RekeyCompatibility = false
 	s.owner.communitiesManager.RekeyInterval = 500 * time.Minute
-
-	_, err := s.owner.Start()
-	s.Require().NoError(err)
 
 	// Create a new community
 	response, err := s.owner.CreateCommunity(

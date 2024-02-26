@@ -211,8 +211,6 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	// Create Alice for the 1-1 chat
 	alice := s.newMessenger()
-	_, err = alice.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, alice)
 
 	// Create 1-1 chat

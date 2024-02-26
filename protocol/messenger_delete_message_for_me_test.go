@@ -68,10 +68,6 @@ func (s *MessengerDeleteMessageForMeSuite) SetupTest() {
 
 	s.alice1 = s.newMessenger()
 	s.alice2 = s.newMessenger()
-	_, err := s.alice1.Start()
-	s.Require().NoError(err)
-	_, err = s.alice2.Start()
-	s.Require().NoError(err)
 }
 
 func (s *MessengerDeleteMessageForMeSuite) TearDownTest() {
@@ -218,17 +214,13 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 func (s *MessengerDeleteMessageForMeSuite) TestDeleteImageMessageFromReceiverSide() {
 
 	alice := s.otherNewMessenger()
-	_, err := alice.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, alice)
 
 	bob := s.otherNewMessenger()
-	_, err = bob.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, alice.transport)
-	err = alice.SaveChat(theirChat)
+	err := alice.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.transport)

@@ -23,12 +23,10 @@ type MessengerEditMessageSuite struct {
 
 func (s *MessengerEditMessageSuite) TestEditMessage() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
@@ -94,12 +92,10 @@ func (s *MessengerEditMessageSuite) TestEditMessage() {
 
 func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
@@ -197,12 +193,10 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 
 func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	contact, err := BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
@@ -256,8 +250,6 @@ func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
 // Test editing a message on an existing private group chat
 func (s *MessengerEditMessageSuite) TestEditGroupChatMessage() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "id", []string{})
@@ -341,12 +333,10 @@ func (s *MessengerEditMessageSuite) TestEditGroupChatMessage() {
 
 func (s *MessengerEditMessageSuite) TestEditMessageWithMention() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
@@ -448,12 +438,10 @@ func (s *MessengerEditMessageSuite) TestEditMessageWithMention() {
 
 func (s *MessengerEditMessageSuite) TestEditMessageWithLinkPreviews() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)

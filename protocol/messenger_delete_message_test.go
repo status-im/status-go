@@ -21,12 +21,10 @@ type MessengerDeleteMessageSuite struct {
 
 func (s *MessengerDeleteMessageSuite) TestDeleteMessage() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
@@ -72,12 +70,10 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessage() {
 
 func (s *MessengerDeleteMessageSuite) TestDeleteMessagePreviousLastMessage() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
@@ -123,12 +119,10 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessagePreviousLastMessage() {
 
 func (s *MessengerDeleteMessageSuite) TestDeleteWrongMessageType() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
@@ -152,12 +146,10 @@ func (s *MessengerDeleteMessageSuite) TestDeleteWrongMessageType() {
 
 func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	contact, err := BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
@@ -207,12 +199,10 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
 
 func (s *MessengerDeleteMessageSuite) TestDeleteImageMessage() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
@@ -283,12 +273,10 @@ func (s *MessengerDeleteMessageSuite) TestDeleteImageMessage() {
 
 func (s *MessengerDeleteMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	contact, err := BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
@@ -363,12 +351,10 @@ func (s *MessengerDeleteMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 
 func (s *MessengerDeleteMessageSuite) TestDeleteMessageWithAMention() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
@@ -425,12 +411,10 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageWithAMention() {
 // as read but the message still unseen (Seen == false)
 func (s *MessengerDeleteMessageSuite) TestDeleteMessageAndChatIsAlreadyRead() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
@@ -486,12 +470,10 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageAndChatIsAlreadyRead() {
 
 func (s *MessengerDeleteMessageSuite) TestDeleteMessageReplyToImage() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
@@ -541,12 +523,10 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageReplyToImage() {
 
 func (s *MessengerDeleteMessageSuite) TestDeleteMessageForMeReplyToImage() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)

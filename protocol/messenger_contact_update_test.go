@@ -21,24 +21,16 @@ type MessengerContactUpdateSuite struct {
 	MessengerBaseTestSuite
 }
 
-func (s *MessengerContactUpdateSuite) SetupTest() {
-	s.MessengerBaseTestSuite.SetupTest()
-	_, err := s.m.Start()
-	s.Require().NoError(err)
-}
-
 func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	theirName := "ens-name.stateofus.eth"
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	// Set ENS name
-	err = theirMessenger.settings.SaveSettingField(settings.PreferredName, theirName)
+	err := theirMessenger.settings.SaveSettingField(settings.PreferredName, theirName)
 	s.Require().NoError(err)
 
 	theirContactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
@@ -111,8 +103,6 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: contactID})
@@ -150,8 +140,6 @@ func (s *MessengerContactUpdateSuite) TestAddContactWithENS() {
 	ensName := "blah.stateofus.eth"
 
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.Require().NoError(theirMessenger.ENSVerified(contactID, ensName))

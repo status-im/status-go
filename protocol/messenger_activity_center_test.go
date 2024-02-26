@@ -36,12 +36,10 @@ type MessengerActivityCenterMessageSuite struct {
 
 func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	r := &requests.SendContactRequest{
@@ -92,8 +90,6 @@ func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 func (s *MessengerActivityCenterMessageSuite) TestEveryoneMentionTag() {
 	alice := s.m
 	bob := s.newMessenger()
-	_, err := bob.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob)
 
 	// Create a community
@@ -134,8 +130,6 @@ func (s *MessengerActivityCenterMessageSuite) TestEveryoneMentionTag() {
 func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 	alice := s.m
 	bob := s.newMessenger()
-	_, err := bob.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob)
 
 	// create an http server
@@ -218,8 +212,7 @@ func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 func (s *MessengerActivityCenterMessageSuite) TestMuteCommunityActivityCenterNotifications() {
 	alice := s.m
 	bob := s.newMessenger()
-	_, err := bob.Start()
-	s.Require().NoError(err)
+	defer TearDownMessenger(&s.Suite, bob)
 
 	// Create a community
 	community, chat := s.createCommunity(bob)
@@ -269,9 +262,7 @@ func (s *MessengerActivityCenterMessageSuite) TestMuteCommunityActivityCenterNot
 func (s *MessengerActivityCenterMessageSuite) TestReadCommunityOverviewNotifications() {
 	alice := s.m
 	bob := s.newMessenger()
-	_, err := bob.Start()
-	s.Require().NoError(err)
-	defer bob.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob)
 
 	// Create a community
 	community, chat := s.createCommunity(bob)
@@ -283,7 +274,7 @@ func (s *MessengerActivityCenterMessageSuite) TestReadCommunityOverviewNotificat
 	s.joinCommunity(community, bob, alice)
 
 	// Mark community overview notification read
-	err = alice.DismissActivityCenterNotificationsByCommunity(context.Background(), &requests.DismissCommunityNotifications{CommunityID: community.ID()})
+	err := alice.DismissActivityCenterNotificationsByCommunity(context.Background(), &requests.DismissCommunityNotifications{CommunityID: community.ID()})
 	s.Require().NoError(err)
 
 	response, err := alice.GetActivityCenterState()
@@ -294,8 +285,6 @@ func (s *MessengerActivityCenterMessageSuite) TestReadCommunityOverviewNotificat
 func (s *MessengerActivityCenterMessageSuite) prepareCommunityChannelWithMentionAndReply() (*Messenger, *Messenger, *common.Message, *common.Message, *communities.Community) {
 	alice := s.m
 	bob := s.newMessenger()
-	_, err := bob.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob)
 
 	// Create a community
@@ -470,9 +459,7 @@ func (s *MessengerActivityCenterMessageSuite) TestMarkAllActivityCenterNotificat
 func (s *MessengerActivityCenterMessageSuite) TestAliceDoesNotReceiveCommunityNotificationsBeforeJoined() {
 	alice := s.m
 	bob := s.newMessenger()
-	_, err := bob.Start()
-	s.Require().NoError(err)
-	defer bob.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, bob)
 
 	// Create a community
 	community, chat := s.createCommunity(bob)

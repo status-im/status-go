@@ -68,10 +68,6 @@ func (s *MessengerSyncChatSuite) SetupTest() {
 
 	s.alice1 = s.newMessenger()
 	s.alice2 = s.newMessenger()
-	_, err := s.alice1.Start()
-	s.Require().NoError(err)
-	_, err = s.alice2.Start()
-	s.Require().NoError(err)
 }
 
 func (s *MessengerSyncChatSuite) TearDownTest() {

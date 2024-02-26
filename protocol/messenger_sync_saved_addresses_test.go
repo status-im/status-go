@@ -49,10 +49,8 @@ func (s *MessengerSyncSavedAddressesSuite) SetupTest() {
 
 	s.main = s.newMessenger(s.logger.Named("main"))
 	s.privateKey = s.main.identity
-	// Start the main messenger in order to receive installations
-	_, err := s.main.Start()
-	s.Require().NoError(err)
 
+	var err error
 	// Create new device and add main account to
 	s.other, err = newMessengerWithKey(s.shh, s.main.identity, s.logger.Named("other"), nil)
 	s.Require().NoError(err)

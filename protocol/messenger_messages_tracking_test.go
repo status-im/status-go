@@ -98,11 +98,6 @@ func (s *MessengerMessagesTrackingSuite) SetupTest() {
 
 	s.aliceWaku = wakuNodes[1]
 	s.alice, s.aliceInterceptor = s.newMessenger(s.aliceWaku, s.logger.With(zap.String("name", "alice")))
-
-	_, err := s.bob.Start()
-	s.Require().NoError(err)
-	_, err = s.alice.Start()
-	s.Require().NoError(err)
 }
 
 func (s *MessengerMessagesTrackingSuite) TearDownTest() {

@@ -1225,8 +1225,6 @@ func (s *MessengerContactRequestSuite) TestBobSendsContactRequestAfterDecliningO
 	alice := s.m
 
 	bob := s.newMessenger()
-	_, err := bob.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob)
 
 	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))

@@ -54,8 +54,6 @@ func (s *MessengerPushNotificationSuite) SetupTest() {
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
-	_, err := s.m.Start()
-	s.Require().NoError(err)
 }
 
 func (s *MessengerPushNotificationSuite) TearDownTest() {
@@ -101,9 +99,6 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	defer TearDownMessenger(&s.Suite, server)
 
 	alice := s.newMessenger(s.shh)
-	// start alice and enable sending push notifications
-	_, err = alice.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob1.installationID, bob2.installationID}
@@ -284,9 +279,6 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	defer TearDownMessenger(&s.Suite, server)
 
 	alice := s.newMessenger(s.shh)
-	// start alice and enable push notifications
-	_, err = alice.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}
@@ -428,14 +420,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	alice := s.newMessenger(s.shh)
 	// another contact to invalidate the token
 	frank := s.newMessenger(s.shh)
-	_, err = frank.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, frank)
-
-	// start alice and enable push notifications
-	_, err = alice.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, alice)
+
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}
 
@@ -655,8 +642,6 @@ func (s *MessengerPushNotificationSuite) TestContactCode() {
 	defer TearDownMessenger(&s.Suite, server)
 
 	alice := s.newMessenger(s.shh)
-	// start alice and enable sending push notifications
-	_, err = alice.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
@@ -716,8 +701,6 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 	defer TearDownMessenger(&s.Suite, server)
 
 	alice := s.newMessenger(s.shh)
-	// start alice and enable sending push notifications
-	_, err = alice.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
@@ -857,8 +840,6 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	defer TearDownMessenger(&s.Suite, server)
 
 	alice := s.newMessenger(s.shh)
-	// start alice and enable sending push notifications
-	_, err = alice.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
@@ -993,8 +974,6 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 	defer TearDownMessenger(&s.Suite, server)
 
 	alice := s.newMessenger(s.shh)
-	// start alice and enable sending push notifications
-	_, err = alice.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
