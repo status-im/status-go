@@ -315,6 +315,8 @@ test: test-unit ##@tests Run basic, short tests during development
 
 test-unit: export BUILD_TAGS ?=
 test-unit: export UNIT_TEST_FAILFAST ?= true
+test-unit: export UNIT_TEST_RERUN_FAILS ?= true
+test-unit: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
 # Ensure 'waku' and 'wakuv2' tests are executed first to reduce the impact of flaky tests.
 # Otherwise, the entire target might fail at the end, making re-runs time-consuming.
 test-unit: export UNIT_TEST_PACKAGES ?= $(shell go list ./... | \

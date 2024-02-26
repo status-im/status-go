@@ -5,8 +5,18 @@ GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 
 source "${GIT_ROOT}/_assets/scripts/colors.sh"
 
-if [[ $UNIT_TEST_FAILFAST == 'true' ]]; then
+if [[ $UNIT_TEST_RERUN_FAILS == 'true' ]]; then
+  GOTESTSUM_EXTRAFLAGS="${GOTESTSUM_EXTRAFLAGS} --rerun-fails"
+elif [[ $UNIT_TEST_FAILFAST == 'true' ]]; then
   GOTEST_EXTRAFLAGS="${GOTEST_EXTRAFLAGS} -failfast"
+fi
+
+if [[ $UNIT_TEST_USE_DEVELOPMENT_LOGGER == 'false' ]]; then
+  if [[ -z $BUILD_TAGS ]]; then
+    BUILD_TAGS="test_silent"
+  else
+    BUILD_TAGS="${BUILD_TAGS},test_silent"
+  fi
 fi
 
 if [[ -z "${UNIT_TEST_COUNT}" ]]; then
@@ -40,7 +50,7 @@ has_extended_timeout() {
 last_failing_exit_code=0
 
 for package in ${UNIT_TEST_PACKAGES}; do
-  echo -e "${GRN}Testing:${RST} ${package}"
+  echo -e "${GRN}Testing:${RST} ${package} Count:${UNIT_TEST_COUNT}"
   package_dir=$(go list -f "{{.Dir}}" "${package}")
   output_file=${package_dir}/test.log
 
@@ -50,16 +60,18 @@ for package in ${UNIT_TEST_PACKAGES}; do
     package_timeout="${UNIT_TEST_PACKAGE_TIMEOUT}"
   fi
 
-  go test "${package}" -v ${GOTEST_EXTRAFLAGS} \
+  gotestsum_flags="${GOTESTSUM_EXTRAFLAGS}"
+  if [[ "${CI}" == 'true' ]]; then
+    gotestsum_flags="${gotestsum_flags} --junitfile=${package_dir}/report.xml --rerun-fails-report=${package_dir}/report_rerun_fails.txt"
+  fi
+
+  gotestsum --packages="${package}" ${gotestsum_flags} -- \
+    -v ${GOTEST_EXTRAFLAGS} \
     -timeout "${package_timeout}" \
     -count "${UNIT_TEST_COUNT}" \
     -tags "${BUILD_TAGS}" | \
     redirect_stdout "${output_file}"
   go_test_exit=$?
-
-  if [[ "${CI}" == 'true' ]]; then
-    go-junit-report -in "${output_file}" -out "${package_dir}"/report.xml
-  fi
 
   if [[ "${go_test_exit}" -ne 0 ]]; then
     if [[ "${CI}" == 'true' ]]; then
