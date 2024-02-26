@@ -998,7 +998,7 @@ type FleetDescription struct {
 func Fleets() string {
 	fleets := FleetDescription{
 		DefaultFleet: api.DefaultFleet,
-		Fleets:       params.GetSupportedFleets(),
+		Fleets:       api.DefaultWakuNodes,
 	}
 
 	data, err := json.Marshal(fleets)
