@@ -81,7 +81,6 @@ require (
 	github.com/andybalholm/brotli v1.0.5
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/gorilla/sessions v1.2.1
-	github.com/h2non/go-is-svg v0.0.0-20160927212452-35e8c4b0612c
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/jellydator/ttlcache/v3 v3.1.0
 	github.com/jmoiron/sqlx v1.3.5

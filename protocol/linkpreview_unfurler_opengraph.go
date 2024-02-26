@@ -8,8 +8,6 @@ import (
 	neturl "net/url"
 	"strings"
 
-	svg "github.com/h2non/go-is-svg"
-
 	"github.com/keighl/metabolize"
 	"go.uber.org/zap"
 	"golang.org/x/net/html"
@@ -129,7 +127,7 @@ func fetchThumbnail(logger *zap.Logger, httpClient *http.Client, url string) (co
 		return thumbnail, fmt.Errorf("could not fetch thumbnail url='%s': %w", url, err)
 	}
 
-	if !svg.Is(imgBytes) {
+	if !images.IsSVG(imgBytes) {
 		width, height, err := images.GetImageDimensions(imgBytes)
 		if err != nil {
 			return thumbnail, fmt.Errorf("could not get image dimensions url='%s': %w", url, err)
