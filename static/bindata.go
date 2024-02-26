@@ -30,6 +30,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,7 +40,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -47,7 +48,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -599,43 +600,58 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"emojis.txt":          emojisTxt,
-	"../config/README.md": ConfigReadmeMd,
-	"../config/cli/anon-metric-node-client.json": ConfigCliAnonMetricNodeClientJson,
-	"../config/cli/anon-metric-node-server.json": ConfigCliAnonMetricNodeServerJson,
-	"../config/cli/fleet-eth.prod.json":          ConfigCliFleetEthProdJson,
-	"../config/cli/fleet-eth.staging.json":       ConfigCliFleetEthStagingJson,
-	"../config/cli/fleet-shards.test.json":       ConfigCliFleetShardsTestJson,
-	"../config/cli/fleet-status.prod.json":       ConfigCliFleetStatusProdJson,
-	"../config/cli/fleet-status.test.json":       ConfigCliFleetStatusTestJson,
-	"../config/cli/fleet-wakuv2.prod.json":       ConfigCliFleetWakuv2ProdJson,
-	"../config/cli/fleet-wakuv2.test.json":       ConfigCliFleetWakuv2TestJson,
-	"../config/cli/les-enabled.json":             ConfigCliLesEnabledJson,
-	"../config/cli/mailserver-enabled.json":      ConfigCliMailserverEnabledJson,
-	"../config/status-chain-genesis.json":        ConfigStatusChainGenesisJson,
-	"keys/bootnode.key":                          keysBootnodeKey,
-	"keys/firebaseauthkey":                       keysFirebaseauthkey,
-	"keys/test-account1-status-chain.pk":         keysTestAccount1StatusChainPk,
-	"keys/test-account1.pk":                      keysTestAccount1Pk,
-	"keys/test-account2-status-chain.pk":         keysTestAccount2StatusChainPk,
-	"keys/test-account2.pk":                      keysTestAccount2Pk,
-	"keys/test-account3-before-eip55.pk":         keysTestAccount3BeforeEip55Pk,
-}
+	"emojis.txt": emojisTxt,
 
-// AssetDebug is true if the assets were built with the debug flag enabled.
-const AssetDebug = false
+	"../config/README.md": ConfigReadmeMd,
+
+	"../config/cli/anon-metric-node-client.json": ConfigCliAnonMetricNodeClientJson,
+
+	"../config/cli/anon-metric-node-server.json": ConfigCliAnonMetricNodeServerJson,
+
+	"../config/cli/fleet-eth.prod.json": ConfigCliFleetEthProdJson,
+
+	"../config/cli/fleet-eth.staging.json": ConfigCliFleetEthStagingJson,
+
+	"../config/cli/fleet-shards.test.json": ConfigCliFleetShardsTestJson,
+
+	"../config/cli/fleet-status.prod.json": ConfigCliFleetStatusProdJson,
+
+	"../config/cli/fleet-status.test.json": ConfigCliFleetStatusTestJson,
+
+	"../config/cli/fleet-wakuv2.prod.json": ConfigCliFleetWakuv2ProdJson,
+
+	"../config/cli/fleet-wakuv2.test.json": ConfigCliFleetWakuv2TestJson,
+
+	"../config/cli/les-enabled.json": ConfigCliLesEnabledJson,
+
+	"../config/cli/mailserver-enabled.json": ConfigCliMailserverEnabledJson,
+
+	"../config/status-chain-genesis.json": ConfigStatusChainGenesisJson,
+
+	"keys/bootnode.key": keysBootnodeKey,
+
+	"keys/firebaseauthkey": keysFirebaseauthkey,
+
+	"keys/test-account1-status-chain.pk": keysTestAccount1StatusChainPk,
+
+	"keys/test-account1.pk": keysTestAccount1Pk,
+
+	"keys/test-account2-status-chain.pk": keysTestAccount2StatusChainPk,
+
+	"keys/test-account2.pk": keysTestAccount2Pk,
+
+	"keys/test-account3-before-eip55.pk": keysTestAccount3BeforeEip55Pk,
+}
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//
-//	data/
-//	  foo.txt
-//	  img/
-//	    a.png
-//	    b.png
-//
+//     data/
+//       foo.txt
+//       img/
+//         a.png
+//         b.png
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -668,34 +684,34 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"..": {nil, map[string]*bintree{
-		"config": {nil, map[string]*bintree{
-			"README.md": {ConfigReadmeMd, map[string]*bintree{}},
-			"cli": {nil, map[string]*bintree{
-				"anon-metric-node-client.json": {ConfigCliAnonMetricNodeClientJson, map[string]*bintree{}},
-				"anon-metric-node-server.json": {ConfigCliAnonMetricNodeServerJson, map[string]*bintree{}},
-				"fleet-eth.prod.json":          {ConfigCliFleetEthProdJson, map[string]*bintree{}},
-				"fleet-eth.staging.json":       {ConfigCliFleetEthStagingJson, map[string]*bintree{}},
-				"fleet-shards.test.json":       {ConfigCliFleetShardsTestJson, map[string]*bintree{}},
-				"fleet-status.prod.json":       {ConfigCliFleetStatusProdJson, map[string]*bintree{}},
-				"fleet-status.test.json":       {ConfigCliFleetStatusTestJson, map[string]*bintree{}},
-				"fleet-wakuv2.prod.json":       {ConfigCliFleetWakuv2ProdJson, map[string]*bintree{}},
-				"fleet-wakuv2.test.json":       {ConfigCliFleetWakuv2TestJson, map[string]*bintree{}},
-				"les-enabled.json":             {ConfigCliLesEnabledJson, map[string]*bintree{}},
-				"mailserver-enabled.json":      {ConfigCliMailserverEnabledJson, map[string]*bintree{}},
+	"..": &bintree{nil, map[string]*bintree{
+		"config": &bintree{nil, map[string]*bintree{
+			"README.md": &bintree{ConfigReadmeMd, map[string]*bintree{}},
+			"cli": &bintree{nil, map[string]*bintree{
+				"anon-metric-node-client.json": &bintree{ConfigCliAnonMetricNodeClientJson, map[string]*bintree{}},
+				"anon-metric-node-server.json": &bintree{ConfigCliAnonMetricNodeServerJson, map[string]*bintree{}},
+				"fleet-eth.prod.json":          &bintree{ConfigCliFleetEthProdJson, map[string]*bintree{}},
+				"fleet-eth.staging.json":       &bintree{ConfigCliFleetEthStagingJson, map[string]*bintree{}},
+				"fleet-shards.test.json":       &bintree{ConfigCliFleetShardsTestJson, map[string]*bintree{}},
+				"fleet-status.prod.json":       &bintree{ConfigCliFleetStatusProdJson, map[string]*bintree{}},
+				"fleet-status.test.json":       &bintree{ConfigCliFleetStatusTestJson, map[string]*bintree{}},
+				"fleet-wakuv2.prod.json":       &bintree{ConfigCliFleetWakuv2ProdJson, map[string]*bintree{}},
+				"fleet-wakuv2.test.json":       &bintree{ConfigCliFleetWakuv2TestJson, map[string]*bintree{}},
+				"les-enabled.json":             &bintree{ConfigCliLesEnabledJson, map[string]*bintree{}},
+				"mailserver-enabled.json":      &bintree{ConfigCliMailserverEnabledJson, map[string]*bintree{}},
 			}},
-			"status-chain-genesis.json": {ConfigStatusChainGenesisJson, map[string]*bintree{}},
+			"status-chain-genesis.json": &bintree{ConfigStatusChainGenesisJson, map[string]*bintree{}},
 		}},
 	}},
-	"emojis.txt": {emojisTxt, map[string]*bintree{}},
-	"keys": {nil, map[string]*bintree{
-		"bootnode.key":                  {keysBootnodeKey, map[string]*bintree{}},
-		"firebaseauthkey":               {keysFirebaseauthkey, map[string]*bintree{}},
-		"test-account1-status-chain.pk": {keysTestAccount1StatusChainPk, map[string]*bintree{}},
-		"test-account1.pk":              {keysTestAccount1Pk, map[string]*bintree{}},
-		"test-account2-status-chain.pk": {keysTestAccount2StatusChainPk, map[string]*bintree{}},
-		"test-account2.pk":              {keysTestAccount2Pk, map[string]*bintree{}},
-		"test-account3-before-eip55.pk": {keysTestAccount3BeforeEip55Pk, map[string]*bintree{}},
+	"emojis.txt": &bintree{emojisTxt, map[string]*bintree{}},
+	"keys": &bintree{nil, map[string]*bintree{
+		"bootnode.key":                  &bintree{keysBootnodeKey, map[string]*bintree{}},
+		"firebaseauthkey":               &bintree{keysFirebaseauthkey, map[string]*bintree{}},
+		"test-account1-status-chain.pk": &bintree{keysTestAccount1StatusChainPk, map[string]*bintree{}},
+		"test-account1.pk":              &bintree{keysTestAccount1Pk, map[string]*bintree{}},
+		"test-account2-status-chain.pk": &bintree{keysTestAccount2StatusChainPk, map[string]*bintree{}},
+		"test-account2.pk":              &bintree{keysTestAccount2Pk, map[string]*bintree{}},
+		"test-account3-before-eip55.pk": &bintree{keysTestAccount3BeforeEip55Pk, map[string]*bintree{}},
 	}},
 }}
 
@@ -713,7 +729,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}

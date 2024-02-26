@@ -39,6 +39,31 @@ func getThumbnailPayload(db *sql.DB, logger *zap.Logger, msgID string, thumbnail
 	return payload, nil
 }
 
+func getFaviconPayload(db *sql.DB, logger *zap.Logger, msgID string, thumbnailURL string) ([]byte, error) {
+	var payload []byte
+
+	var result []byte
+	err := db.QueryRow(`SELECT unfurled_links FROM user_messages WHERE id = ?`, msgID).Scan(&result)
+	if err != nil {
+		return payload, fmt.Errorf("could not find message with message-id '%s': %w", msgID, err)
+	}
+
+	var links []*protobuf.UnfurledLink
+	err = json.Unmarshal(result, &links)
+	if err != nil {
+		return payload, fmt.Errorf("failed to unmarshal protobuf.UrlPreview: %w", err)
+	}
+
+	for _, p := range links {
+		if p.Url == thumbnailURL {
+			payload = p.FaviconPayload
+			break
+		}
+	}
+
+	return payload, nil
+}
+
 func handleLinkPreviewThumbnail(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
@@ -71,6 +96,44 @@ func handleLinkPreviewThumbnail(db *sql.DB, logger *zap.Logger) http.HandlerFunc
 		w.Header().Set("Cache-Control", "no-store")
 
 		_, err = w.Write(thumbnail)
+		if err != nil {
+			logger.Error("failed to write response", zap.Error(err))
+		}
+	}
+}
+
+func handleLinkPreviewFavicon(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		params := r.URL.Query()
+		parsed := ParseImageParams(logger, params)
+
+		if parsed.MessageID == "" {
+			http.Error(w, "missing query parameter 'message-id'", http.StatusBadRequest)
+			return
+		}
+
+		if parsed.URL == "" {
+			http.Error(w, "missing query parameter 'url'", http.StatusBadRequest)
+			return
+		}
+
+		favicon, err := getFaviconPayload(db, logger, parsed.MessageID, parsed.URL)
+		if err != nil {
+			logger.Error("failed to get favicon", zap.String("msgID", parsed.MessageID))
+			http.Error(w, "failed to get favicon", http.StatusInternalServerError)
+			return
+		}
+
+		mimeType, err := images.GetMimeType(favicon)
+		if err != nil {
+			http.Error(w, "mime type not supported", http.StatusNotImplemented)
+			return
+		}
+
+		w.Header().Set("Content-Type", "image/"+mimeType)
+		w.Header().Set("Cache-Control", "no-store")
+
+		_, err = w.Write(favicon)
 		if err != nil {
 			logger.Error("failed to write response", zap.Error(err))
 		}

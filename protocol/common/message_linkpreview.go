@@ -289,10 +289,17 @@ func (m *Message) ConvertLinkPreviewsToProto() ([]*protobuf.UnfurledLink, error)
 			return nil, fmt.Errorf("invalid link preview, url='%s': %w", preview.URL, err)
 		}
 
-		var payload []byte
+		var thumbnailPayload []byte
+		var faviconPayload []byte
 		var err error
 		if preview.Thumbnail.DataURI != "" {
-			payload, err = images.GetPayloadFromURI(preview.Thumbnail.DataURI)
+			thumbnailPayload, err = images.GetPayloadFromURI(preview.Thumbnail.DataURI)
+			if err != nil {
+				return nil, fmt.Errorf("could not get data URI payload, url='%s': %w", preview.URL, err)
+			}
+		}
+		if preview.Favicon != "" {
+			faviconPayload, err = images.GetPayloadFromURI(preview.Favicon)
 			if err != nil {
 				return nil, fmt.Errorf("could not get data URI payload, url='%s': %w", preview.URL, err)
 			}
@@ -305,7 +312,8 @@ func (m *Message) ConvertLinkPreviewsToProto() ([]*protobuf.UnfurledLink, error)
 			Description:      preview.Description,
 			ThumbnailWidth:   uint32(preview.Thumbnail.Width),
 			ThumbnailHeight:  uint32(preview.Thumbnail.Height),
-			ThumbnailPayload: payload,
+			ThumbnailPayload: thumbnailPayload,
+			FaviconPayload:   faviconPayload,
 		}
 		unfurledLinks = append(unfurledLinks, ul)
 	}
@@ -347,6 +355,13 @@ func (m *Message) ConvertFromProtoToLinkPreviews(makeMediaServerURL func(msgID s
 			lp.Thumbnail.Width = int(link.ThumbnailWidth)
 			lp.Thumbnail.Height = int(link.ThumbnailHeight)
 			lp.Thumbnail.URL = mediaURL
+		}
+		faviconMediaURL := ""
+		if len(link.FaviconPayload) > 0 {
+			faviconMediaURL = makeMediaServerURL(m.ID, link.Url)
+		}
+		if link.GetFaviconPayload() != nil {
+			lp.Favicon = faviconMediaURL
 		}
 		previews = append(previews, lp)
 	}

@@ -1308,6 +1308,13 @@ func (x *UnfurledLink) GetType() UnfurledLink_LinkType {
 	return UnfurledLink_LINK
 }
 
+func (m *UnfurledLink) GetFaviconPayload() []byte {
+	if m != nil {
+		return m.FaviconPayload
+	}
+	return nil
+}
+
 type UnfurledStatusContactLink struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

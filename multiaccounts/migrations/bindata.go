@@ -22,6 +22,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,7 +32,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -39,7 +40,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -340,6 +341,26 @@ func docGo() (*asset, error) {
 	return a, nil
 }
 
+var _testLog = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x3c\xc6\xb1\x0d\x84\x30\x0c\x05\xd0\x3a\x37\x85\x17\x38\x3c\x02\x83\x20\x8a\x10\x85\x60\x29\x89\x05\xff\x7b\x7f\x3a\xba\xb7\x8a\x48\x6a\xc6\x2b\x8e\xa5\xf8\x50\x30\x33\xf0\xb7\x4f\xcd\x75\x44\xa7\xe5\x52\x3c\x26\xa1\xc3\xda\x93\x69\x3e\xa1\xb8\x7b\xda\xa6\x0b\x2b\x28\xa7\xf5\x8a\xfd\xf7\x06\x00\x00\xff\xff\x2e\xf4\x6d\xd4\x51\x00\x00\x00")
+
+func testLogBytes() ([]byte, error) {
+	return bindataRead(
+		_testLog,
+		"test.log",
+	)
+}
+
+func testLog() (*asset, error) {
+	bytes, err := testLogBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "test.log", size: 81, mode: os.FileMode(0644), modTime: time.Unix(1702234753, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xdc, 0xc2, 0x9d, 0xb1, 0x79, 0x5b, 0xff, 0x89, 0xda, 0x16, 0x23, 0xa7, 0xa3, 0xc3, 0xee, 0x7f, 0xd9, 0xd2, 0xfc, 0x2b, 0x6d, 0xec, 0xc, 0xdb, 0x37, 0x27, 0x76, 0x4f, 0x95, 0x2c, 0xda, 0x5d}}
+	return a, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -431,35 +452,44 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"0001_accounts.down.sql":                               _0001_accountsDownSql,
-	"0001_accounts.up.sql":                                 _0001_accountsUpSql,
-	"1605007189_identity_images.down.sql":                  _1605007189_identity_imagesDownSql,
-	"1605007189_identity_images.up.sql":                    _1605007189_identity_imagesUpSql,
-	"1606224181_drop_photo_path_from_accounts.down.sql":    _1606224181_drop_photo_path_from_accountsDownSql,
-	"1606224181_drop_photo_path_from_accounts.up.sql":      _1606224181_drop_photo_path_from_accountsUpSql,
-	"1648646095_image_clock.down.sql":                      _1648646095_image_clockDownSql,
-	"1648646095_image_clock.up.sql":                        _1648646095_image_clockUpSql,
-	"1649317600_add_color_hash.up.sql":                     _1649317600_add_color_hashUpSql,
-	"1660238799_accounts_kdf.up.sql":                       _1660238799_accounts_kdfUpSql,
-	"1679505708_add_customization_color.up.sql":            _1679505708_add_customization_colorUpSql,
-	"1687853321_add_customization_color_updated_at.up.sql": _1687853321_add_customization_color_updated_atUpSql,
-	"doc.go": docGo,
-}
+	"0001_accounts.down.sql": _0001_accountsDownSql,
 
-// AssetDebug is true if the assets were built with the debug flag enabled.
-const AssetDebug = false
+	"0001_accounts.up.sql": _0001_accountsUpSql,
+
+	"1605007189_identity_images.down.sql": _1605007189_identity_imagesDownSql,
+
+	"1605007189_identity_images.up.sql": _1605007189_identity_imagesUpSql,
+
+	"1606224181_drop_photo_path_from_accounts.down.sql": _1606224181_drop_photo_path_from_accountsDownSql,
+
+	"1606224181_drop_photo_path_from_accounts.up.sql": _1606224181_drop_photo_path_from_accountsUpSql,
+
+	"1648646095_image_clock.down.sql": _1648646095_image_clockDownSql,
+
+	"1648646095_image_clock.up.sql": _1648646095_image_clockUpSql,
+
+	"1649317600_add_color_hash.up.sql": _1649317600_add_color_hashUpSql,
+
+	"1660238799_accounts_kdf.up.sql": _1660238799_accounts_kdfUpSql,
+
+	"1679505708_add_customization_color.up.sql": _1679505708_add_customization_colorUpSql,
+
+	"1687853321_add_customization_color_updated_at.up.sql": _1687853321_add_customization_color_updated_atUpSql,
+
+	"doc.go": docGo,
+
+	"test.log": testLog,
+}
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//
-//	data/
-//	  foo.txt
-//	  img/
-//	    a.png
-//	    b.png
-//
+//     data/
+//       foo.txt
+//       img/
+//         a.png
+//         b.png
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -492,19 +522,20 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"0001_accounts.down.sql":                               {_0001_accountsDownSql, map[string]*bintree{}},
-	"0001_accounts.up.sql":                                 {_0001_accountsUpSql, map[string]*bintree{}},
-	"1605007189_identity_images.down.sql":                  {_1605007189_identity_imagesDownSql, map[string]*bintree{}},
-	"1605007189_identity_images.up.sql":                    {_1605007189_identity_imagesUpSql, map[string]*bintree{}},
-	"1606224181_drop_photo_path_from_accounts.down.sql":    {_1606224181_drop_photo_path_from_accountsDownSql, map[string]*bintree{}},
-	"1606224181_drop_photo_path_from_accounts.up.sql":      {_1606224181_drop_photo_path_from_accountsUpSql, map[string]*bintree{}},
-	"1648646095_image_clock.down.sql":                      {_1648646095_image_clockDownSql, map[string]*bintree{}},
-	"1648646095_image_clock.up.sql":                        {_1648646095_image_clockUpSql, map[string]*bintree{}},
-	"1649317600_add_color_hash.up.sql":                     {_1649317600_add_color_hashUpSql, map[string]*bintree{}},
-	"1660238799_accounts_kdf.up.sql":                       {_1660238799_accounts_kdfUpSql, map[string]*bintree{}},
-	"1679505708_add_customization_color.up.sql":            {_1679505708_add_customization_colorUpSql, map[string]*bintree{}},
-	"1687853321_add_customization_color_updated_at.up.sql": {_1687853321_add_customization_color_updated_atUpSql, map[string]*bintree{}},
-	"doc.go": {docGo, map[string]*bintree{}},
+	"0001_accounts.down.sql":                               &bintree{_0001_accountsDownSql, map[string]*bintree{}},
+	"0001_accounts.up.sql":                                 &bintree{_0001_accountsUpSql, map[string]*bintree{}},
+	"1605007189_identity_images.down.sql":                  &bintree{_1605007189_identity_imagesDownSql, map[string]*bintree{}},
+	"1605007189_identity_images.up.sql":                    &bintree{_1605007189_identity_imagesUpSql, map[string]*bintree{}},
+	"1606224181_drop_photo_path_from_accounts.down.sql":    &bintree{_1606224181_drop_photo_path_from_accountsDownSql, map[string]*bintree{}},
+	"1606224181_drop_photo_path_from_accounts.up.sql":      &bintree{_1606224181_drop_photo_path_from_accountsUpSql, map[string]*bintree{}},
+	"1648646095_image_clock.down.sql":                      &bintree{_1648646095_image_clockDownSql, map[string]*bintree{}},
+	"1648646095_image_clock.up.sql":                        &bintree{_1648646095_image_clockUpSql, map[string]*bintree{}},
+	"1649317600_add_color_hash.up.sql":                     &bintree{_1649317600_add_color_hashUpSql, map[string]*bintree{}},
+	"1660238799_accounts_kdf.up.sql":                       &bintree{_1660238799_accounts_kdfUpSql, map[string]*bintree{}},
+	"1679505708_add_customization_color.up.sql":            &bintree{_1679505708_add_customization_colorUpSql, map[string]*bintree{}},
+	"1687853321_add_customization_color_updated_at.up.sql": &bintree{_1687853321_add_customization_color_updated_atUpSql, map[string]*bintree{}},
+	"doc.go":   &bintree{docGo, map[string]*bintree{}},
+	"test.log": &bintree{testLog, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
@@ -521,7 +552,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}
