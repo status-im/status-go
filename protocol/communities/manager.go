@@ -3106,8 +3106,8 @@ func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 	return community, nil
 }
 
-// Same as LeaveCommunity, but we want to stay spectating
-func (m *Manager) KickedOutOfCommunity(id types.HexBytes) (*Community, error) {
+// Same as LeaveCommunity, but we have an option to stay spectating
+func (m *Manager) KickedOutOfCommunity(id types.HexBytes, spectateMode bool) (*Community, error) {
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
@@ -3115,7 +3115,9 @@ func (m *Manager) KickedOutOfCommunity(id types.HexBytes) (*Community, error) {
 
 	community.RemoveOurselvesFromOrg(&m.identity.PublicKey)
 	community.Leave()
-	community.Spectate()
+	if spectateMode {
+		community.Spectate()
+	}
 
 	if err = m.persistence.SaveCommunity(community); err != nil {
 		return nil, err

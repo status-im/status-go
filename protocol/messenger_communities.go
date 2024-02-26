@@ -1793,17 +1793,19 @@ func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerRespon
 	return response, nil
 }
 
-func (m *Messenger) kickedOutOfCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
+func (m *Messenger) kickedOutOfCommunity(communityID types.HexBytes, spectateMode bool) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
-	community, err := m.communitiesManager.KickedOutOfCommunity(communityID)
+	community, err := m.communitiesManager.KickedOutOfCommunity(communityID, spectateMode)
 	if err != nil {
 		return nil, err
 	}
 
-	err = m.DeleteProfileShowcaseCommunity(community)
-	if err != nil {
-		return nil, err
+	if !spectateMode {
+		err = m.DeleteProfileShowcaseCommunity(community)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	response.AddCommunity(community)
@@ -2959,7 +2961,7 @@ func (m *Messenger) HandleCommunityUserKicked(state *ReceivedMessageState, messa
 		return nil
 	}
 
-	response, err := m.kickedOutOfCommunity(community.ID())
+	response, err := m.kickedOutOfCommunity(community.ID(), false)
 	if err != nil {
 		m.logger.Error("cannot leave community", zap.Error(err))
 		return err
@@ -4205,7 +4207,7 @@ func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) 
 			if changes.IsMemberBanned(pkString) {
 				notificationType = ActivityCenterNotificationTypeCommunityBanned
 			}
-			m.leaveCommunityDueToKickOrBan(changes.Community, notificationType, messageState.Response)
+			m.leaveCommunityDueToKickOrBan(changes, notificationType, messageState.Response)
 		} else if changes.IsMemberUnbanned(pkString) {
 			m.AddActivityCenterNotificationToResponse(changes.Community.IDString(), ActivityCenterNotificationTypeCommunityUnbanned, messageState.Response)
 		}
@@ -4319,27 +4321,31 @@ func (m *Messenger) AddActivityCenterNotificationToResponse(communityID string, 
 	}
 }
 
-func (m *Messenger) leaveCommunityDueToKickOrBan(community *communities.Community, acType ActivityCenterType, stateResponse *MessengerResponse) {
-	response, err := m.kickedOutOfCommunity(community.ID())
+func (m *Messenger) leaveCommunityDueToKickOrBan(changes *communities.CommunityChanges, acType ActivityCenterType, stateResponse *MessengerResponse) {
+	// during the ownership change kicked user must stay in the spectate mode
+	ownerhipChange := changes.ControlNodeChanged != nil
+	response, err := m.kickedOutOfCommunity(changes.Community.ID(), ownerhipChange)
 	if err != nil {
 		m.logger.Error("cannot leave community", zap.Error(err))
 		return
 	}
 
-	// Activity Center notification
-	notification := &ActivityCenterNotification{
-		ID:          types.FromHex(uuid.New().String()),
-		Type:        acType,
-		Timestamp:   m.getTimesource().GetCurrentTime(),
-		CommunityID: community.IDString(),
-		Read:        false,
-		UpdatedAt:   m.GetCurrentTimeInMillis(),
-	}
+	if !ownerhipChange {
+		// Activity Center notification
+		notification := &ActivityCenterNotification{
+			ID:          types.FromHex(uuid.New().String()),
+			Type:        acType,
+			Timestamp:   m.getTimesource().GetCurrentTime(),
+			CommunityID: changes.Community.IDString(),
+			Read:        false,
+			UpdatedAt:   m.GetCurrentTimeInMillis(),
+		}
 
-	err = m.addActivityCenterNotification(response, notification, nil)
-	if err != nil {
-		m.logger.Error("failed to save notification", zap.Error(err))
-		return
+		err = m.addActivityCenterNotification(response, notification, nil)
+		if err != nil {
+			m.logger.Error("failed to save notification", zap.Error(err))
+			return
+		}
 	}
 
 	if err := stateResponse.Merge(response); err != nil {
