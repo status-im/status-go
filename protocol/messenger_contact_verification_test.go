@@ -22,13 +22,6 @@ type MessengerVerificationRequests struct {
 	MessengerBaseTestSuite
 }
 
-func (s *MessengerVerificationRequests) SetupTest() {
-	s.MessengerBaseTestSuite.SetupTest()
-	// We start the messenger in order to receive installations
-	_, err := s.m.Start()
-	s.Require().NoError(err)
-}
-
 func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger) {
 	messageText := "hello!"
 
@@ -138,8 +131,6 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 
 func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 	theirMessenger := s.newMessenger(s.shh)
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
@@ -268,8 +259,6 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 
 func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
 	theirMessenger := s.newMessenger(s.shh)
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
@@ -381,8 +370,6 @@ func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
 
 func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests() {
 	theirMessenger := s.newMessenger(s.shh)
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
@@ -509,8 +496,6 @@ func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests()
 
 func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 	theirMessenger := s.newMessenger(s.shh)
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
@@ -625,8 +610,6 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 
 func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 	theirMessenger := s.newMessenger(s.shh)
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)

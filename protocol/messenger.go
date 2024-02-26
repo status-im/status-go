@@ -144,6 +144,7 @@ type Messenger struct {
 	browserDatabase            *browsers.Database
 	httpServer                 *server.MediaServer
 
+	started           bool
 	quit              chan struct{}
 	ctx               context.Context
 	cancel            context.CancelFunc
@@ -746,6 +747,11 @@ func (m *Messenger) ToBackground() {
 }
 
 func (m *Messenger) Start() (*MessengerResponse, error) {
+	if m.started {
+		return nil, errors.New("messenger already started")
+	}
+	m.started = true
+
 	now := time.Now().UnixMilli()
 	if err := m.settings.CheckAndDeleteExpiredKeypairsAndAccounts(uint64(now)); err != nil {
 		return nil, err
@@ -1936,6 +1942,15 @@ func (m *Messenger) Shutdown() (err error) {
 	if m == nil {
 		return nil
 	}
+
+	select {
+	case _, ok := <-m.quit:
+		if !ok {
+			return errors.New("messenger already shutdown")
+		}
+	default:
+	}
+
 	close(m.quit)
 	m.cancel()
 	m.shutdownWaitGroup.Wait()

@@ -23,15 +23,6 @@ type MessengerGroupChatSuite struct {
 	MessengerBaseTestSuite
 }
 
-func (s *MessengerGroupChatSuite) startNewMessenger() *Messenger {
-	messenger := s.newMessenger()
-
-	_, err := messenger.Start()
-	s.Require().NoError(err)
-
-	return messenger
-}
-
 func (s *MessengerGroupChatSuite) createGroupChat(creator *Messenger, name string, members []string) *Chat {
 	response, err := creator.CreateGroupChatWithMembers(context.Background(), name, members)
 	s.Require().NoError(err)
@@ -121,8 +112,8 @@ func (s *MessengerGroupChatSuite) TestGroupChatCreation() {
 	}
 
 	for i, testCase := range testCases {
-		creator := s.startNewMessenger()
-		member := s.startNewMessenger()
+		creator := s.newMessenger()
+		member := s.newMessenger()
 		members := []string{common.PubkeyToHex(&member.identity.PublicKey)}
 
 		if testCase.creatorAddedMemberAsContact {
@@ -184,9 +175,9 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersAddition() {
 	}
 
 	for i, testCase := range testCases {
-		admin := s.startNewMessenger()
-		inviter := s.startNewMessenger()
-		member := s.startNewMessenger()
+		admin := s.newMessenger()
+		inviter := s.newMessenger()
+		member := s.newMessenger()
 		members := []string{common.PubkeyToHex(&member.identity.PublicKey)}
 
 		if testCase.inviterAddedMemberAsContact {
@@ -223,10 +214,10 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersAddition() {
 }
 
 func (s *MessengerGroupChatSuite) TestGroupChatMembersRemoval() {
-	admin := s.startNewMessenger()
-	memberA := s.startNewMessenger()
-	memberB := s.startNewMessenger()
-	memberC := s.startNewMessenger()
+	admin := s.newMessenger()
+	memberA := s.newMessenger()
+	memberB := s.newMessenger()
+	memberC := s.newMessenger()
 	members := []string{common.PubkeyToHex(&memberA.identity.PublicKey), common.PubkeyToHex(&memberB.identity.PublicKey),
 		common.PubkeyToHex(&memberC.identity.PublicKey)}
 
@@ -266,8 +257,8 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemoval() {
 }
 
 func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
-	admin := s.startNewMessenger()
-	member := s.startNewMessenger()
+	admin := s.newMessenger()
+	member := s.newMessenger()
 	s.makeMutualContacts(admin, member)
 
 	groupChat := s.createGroupChat(admin, "test_group_chat", []string{common.PubkeyToHex(&member.identity.PublicKey)})
@@ -327,8 +318,8 @@ func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
 }
 
 func (s *MessengerGroupChatSuite) TestGroupChatDeleteMemberMessage() {
-	admin := s.startNewMessenger()
-	member := s.startNewMessenger()
+	admin := s.newMessenger()
+	member := s.newMessenger()
 	s.makeMutualContacts(admin, member)
 
 	groupChat := s.createGroupChat(admin, "test_group_chat", []string{common.PubkeyToHex(&member.identity.PublicKey)})
@@ -366,8 +357,8 @@ func (s *MessengerGroupChatSuite) TestGroupChatDeleteMemberMessage() {
 }
 
 func (s *MessengerGroupChatSuite) TestGroupChatHandleDeleteMemberMessage() {
-	admin := s.startNewMessenger()
-	member := s.startNewMessenger()
+	admin := s.newMessenger()
+	member := s.newMessenger()
 	s.makeMutualContacts(admin, member)
 
 	groupChat := s.createGroupChat(admin, "test_group_chat", []string{common.PubkeyToHex(&member.identity.PublicKey)})
@@ -413,8 +404,8 @@ func (s *MessengerGroupChatSuite) TestGroupChatHandleDeleteMemberMessage() {
 }
 
 func (s *MessengerGroupChatSuite) TestGroupChatMembersRemovalOutOfOrder() {
-	admin := s.startNewMessenger()
-	memberA := s.startNewMessenger()
+	admin := s.newMessenger()
+	memberA := s.newMessenger()
 	members := []string{common.PubkeyToHex(&memberA.identity.PublicKey)}
 
 	s.makeMutualContacts(admin, memberA)
@@ -457,7 +448,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemovalOutOfOrder() {
 }
 
 func (s *MessengerGroupChatSuite) TestGroupChatMembersInfoSync() {
-	admin, memberA, memberB := s.startNewMessenger(), s.startNewMessenger(), s.startNewMessenger()
+	admin, memberA, memberB := s.newMessenger(), s.newMessenger(), s.newMessenger()
 	s.Require().NoError(admin.settings.SaveSettingField(settings.DisplayName, "admin"))
 	s.Require().NoError(memberA.settings.SaveSettingField(settings.DisplayName, "memberA"))
 	s.Require().NoError(memberB.settings.SaveSettingField(settings.DisplayName, "memberB"))

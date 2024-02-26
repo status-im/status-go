@@ -43,12 +43,6 @@ func (s *MessengerDeleteMessageForEveryoneSuite) SetupTest() {
 	s.admin = s.newMessenger()
 	s.bob = s.newMessenger()
 	s.moderator = s.newMessenger()
-	_, err := s.admin.Start()
-	s.Require().NoError(err)
-	_, err = s.bob.Start()
-	s.Require().NoError(err)
-	_, err = s.moderator.Start()
-	s.Require().NoError(err)
 }
 
 func (s *MessengerDeleteMessageForEveryoneSuite) TearDownTest() {

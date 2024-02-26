@@ -29,18 +29,10 @@ type MessengerBackupSuite struct {
 	MessengerBaseTestSuite
 }
 
-func (s *MessengerBackupSuite) SetupTest() {
-	s.MessengerBaseTestSuite.SetupTest()
-	_, err := s.m.Start()
-	s.Require().NoError(err)
-}
-
 func (s *MessengerBackupSuite) TestBackupContacts() {
 	bob1 := s.m
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
-	_, err = bob2.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 
@@ -165,8 +157,6 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
-	_, err = bob2.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 
@@ -320,8 +310,6 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
 	s.Require().NoError(err)
-	_, err = bob2.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Check bob1
@@ -440,8 +428,6 @@ func (s *MessengerBackupSuite) TestBackupContactsGreaterThanBatch() {
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
 	s.Require().NoError(err)
-	_, err = bob2.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Create contacts
@@ -482,8 +468,6 @@ func (s *MessengerBackupSuite) TestBackupRemovedContact() {
 	bob1 := s.m
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
-	_, err = bob2.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 
@@ -558,8 +542,6 @@ func (s *MessengerBackupSuite) TestBackupLocalNickname() {
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
 	nickname := "don van vliet"
 	s.Require().NoError(err)
-	_, err = bob2.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Set contact nickname
@@ -608,8 +590,6 @@ func (s *MessengerBackupSuite) TestBackupBlockedContacts() {
 	bob1 := s.m
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
-	_, err = bob2.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 
@@ -665,8 +645,6 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 	bob1 := s.m
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
-	_, err = bob2.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 
@@ -738,8 +716,6 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
-	_, err = bob2.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 
@@ -813,8 +789,6 @@ func (s *MessengerBackupSuite) TestBackupKeycards() {
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
 	s.Require().NoError(err)
-	_, err = bob2.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Backup
@@ -858,8 +832,6 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
 	s.Require().NoError(err)
-	_, err = bob2.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Backup
@@ -901,8 +873,6 @@ func (s *MessengerBackupSuite) TestBackupChats() {
 	s.NoError(err)
 
 	alice := s.newMessenger()
-	_, err = alice.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, alice)
 
 	ourOneOneChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.transport)
@@ -911,8 +881,6 @@ func (s *MessengerBackupSuite) TestBackupChats() {
 
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
-	_, err = bob2.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 

@@ -32,12 +32,10 @@ func (s *MessengerSendImagesAlbumSuite) joinCommunity(community *communities.Com
 
 func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
@@ -93,12 +91,10 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 
 func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesWithMentionSend() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
@@ -146,8 +142,6 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesWithMentionSend() 
 // This test makes sure that if you get a mention with an image ina  community, it sends it correctly and has a notif
 func (s *MessengerSendImagesAlbumSuite) TestSingleImageMessageWithMentionInCommunitySend() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	community, chat := createCommunity(&s.Suite, s.m)
@@ -167,7 +161,7 @@ func (s *MessengerSendImagesAlbumSuite) TestSingleImageMessageWithMentionInCommu
 		album = append(album, outgoingMessage)
 	}
 
-	err = s.m.SaveChat(chat)
+	err := s.m.SaveChat(chat)
 	s.NoError(err)
 	response, err := s.m.SendChatMessages(context.Background(), album)
 	s.NoError(err)
@@ -197,11 +191,9 @@ func (s *MessengerSendImagesAlbumSuite) TestSingleImageMessageWithMentionInCommu
 
 func (s *MessengerSendImagesAlbumSuite) TestAlbumImageEditText() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
@@ -280,8 +272,6 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageEditText() {
 // This test makes sure that if you get a mention with an album of images in a community, it sends it correctly and has correct AC notif with album
 func (s *MessengerSendImagesAlbumSuite) TestAlbumImagesMessageWithMentionInCommunitySend() {
 	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	community, chat := createCommunity(&s.Suite, s.m)
@@ -301,7 +291,7 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImagesMessageWithMentionInCommu
 		album = append(album, outgoingMessage)
 	}
 
-	err = s.m.SaveChat(chat)
+	err := s.m.SaveChat(chat)
 	s.NoError(err)
 	response, err := s.m.SendChatMessages(context.Background(), album)
 	s.NoError(err)

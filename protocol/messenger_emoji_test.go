@@ -110,8 +110,6 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	bob := s.m
 	alice := s.newMessenger()
-	_, err := alice.Start()
-	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, alice)
 	response, err := bob.CreateGroupChatWithMembers(context.Background(), "test", []string{})
 	s.NoError(err)
