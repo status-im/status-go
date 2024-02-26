@@ -624,7 +624,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 
 	defaultCfg.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig)
 
-	err = b.updateNodeConfigFleet(defaultCfg)
+	err = b.UpdateNodeConfigFleet(defaultCfg)
 	if err != nil {
 		return err
 	}
@@ -694,10 +694,10 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	return nil
 }
 
-// updateNodeConfigFleet loads the fleet from the settings and updates the node configuration
+// UpdateNodeConfigFleet loads the fleet from the settings and updates the node configuration
 // If the fleet in settings is empty, or not supported anymore, it will be overridden with the default fleet.
 // In that case settings fleet value remain the same, only runtime node configuration is updated.
-func (b *GethStatusBackend) updateNodeConfigFleet(config *params.NodeConfig) error {
+func (b *GethStatusBackend) UpdateNodeConfigFleet(config *params.NodeConfig) error {
 	accountSettings, err := b.GetSettings()
 	if err != nil {
 		return err
@@ -722,13 +722,6 @@ func (b *GethStatusBackend) updateNodeConfigFleet(config *params.NodeConfig) err
 
 func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, inputNodeCfg *params.NodeConfig) error {
 	err := b.ensureDBsOpened(acc, password)
-	if err != nil {
-		return err
-	}
-
-	// NOTE: This is code duplication from `loginAccount` method
-	//		 We should stop using this endpoint in desktop: https://github.com/status-im/status-desktop/issues/12977
-	err = b.updateNodeConfigFleet(inputNodeCfg)
 	if err != nil {
 		return err
 	}
