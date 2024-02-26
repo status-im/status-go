@@ -4,6 +4,16 @@ import "errors"
 
 var ErrorNoAccountProvidedWithTokenOrCollectible = errors.New("no account provided with tokens or collectible")
 
+var ErrorExceedMaxProfileShowcaseCommunitiesLimit = errors.New("exeed maximum profile showcase communities limit")
+var ErrorExceedMaxProfileShowcaseAccountsLimit = errors.New("exeed maximum profile showcase accounts limit")
+var ErrorExceedMaxProfileShowcaseCollectiblesLimit = errors.New("exeed maximum profile showcase collectibles limit")
+var ErrorExceedMaxProfileShowcaseVerifiedTokensLimit = errors.New("exeed maximum profile showcase verified tokens limit")
+var ErrorExceedMaxProfileShowcaseUnverifiedTokensLimit = errors.New("exeed maximum profile showcase unverified tokens limit")
+var ErrorExceedMaxProfileShowcaseSocialLinksLimit = errors.New("exeed maximum profile showcase communities limit")
+
+const maxProfileShowcaseSocialLinksLimit = 20
+const maxProfileShowcaseOtherEntriesLimit = 100
+
 type ProfileShowcaseVisibility int
 
 const (
@@ -20,6 +30,8 @@ const (
 	ProfileShowcaseMembershipStatusProvenMember
 	ProfileShowcaseMembershipStatusNotAMember
 )
+
+// Profile showcase preferences
 
 type ProfileShowcaseCommunityPreference struct {
 	CommunityID        string                    `json:"communityId"`
@@ -60,6 +72,13 @@ type ProfileShowcaseUnverifiedTokenPreference struct {
 	Order              int                       `json:"order"`
 }
 
+type ProfileShowcaseSocialLinkPreference struct {
+	URL                string                    `json:"url"`
+	Text               string                    `json:"text"`
+	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
+	Order              int                       `json:"order"`
+}
+
 type ProfileShowcasePreferences struct {
 	Clock            uint64                                      `json:"clock"`
 	Communities      []*ProfileShowcaseCommunityPreference       `json:"communities"`
@@ -67,7 +86,10 @@ type ProfileShowcasePreferences struct {
 	Collectibles     []*ProfileShowcaseCollectiblePreference     `json:"collectibles"`
 	VerifiedTokens   []*ProfileShowcaseVerifiedTokenPreference   `json:"verifiedTokens"`
 	UnverifiedTokens []*ProfileShowcaseUnverifiedTokenPreference `json:"unverifiedTokens"`
+	SocialLinks      []*ProfileShowcaseSocialLinkPreference      `json:"socialLinks"`
 }
+
+// Profile showcase for a contact
 
 type ProfileShowcaseCommunity struct {
 	CommunityID      string                          `json:"communityId"`
@@ -105,6 +127,12 @@ type ProfileShowcaseUnverifiedToken struct {
 	Order           int    `json:"order"`
 }
 
+type ProfileShowcaseSocialLink struct {
+	URL   string `json:"url"`
+	Text  string `json:"text"`
+	Order int    `json:"order"`
+}
+
 type ProfileShowcase struct {
 	ContactID        string                            `json:"contactId"`
 	Communities      []*ProfileShowcaseCommunity       `json:"communities"`
@@ -112,9 +140,29 @@ type ProfileShowcase struct {
 	Collectibles     []*ProfileShowcaseCollectible     `json:"collectibles"`
 	VerifiedTokens   []*ProfileShowcaseVerifiedToken   `json:"verifiedTokens"`
 	UnverifiedTokens []*ProfileShowcaseUnverifiedToken `json:"unverifiedTokens"`
+	SocialLinks      []*ProfileShowcaseSocialLink      `json:"socialLinks"`
 }
 
 func Validate(preferences *ProfileShowcasePreferences) error {
+	if len(preferences.Communities) > maxProfileShowcaseOtherEntriesLimit {
+		return ErrorExceedMaxProfileShowcaseCommunitiesLimit
+	}
+	if len(preferences.Accounts) > maxProfileShowcaseOtherEntriesLimit {
+		return ErrorExceedMaxProfileShowcaseAccountsLimit
+	}
+	if len(preferences.Collectibles) > maxProfileShowcaseOtherEntriesLimit {
+		return ErrorExceedMaxProfileShowcaseCollectiblesLimit
+	}
+	if len(preferences.VerifiedTokens) > maxProfileShowcaseOtherEntriesLimit {
+		return ErrorExceedMaxProfileShowcaseVerifiedTokensLimit
+	}
+	if len(preferences.UnverifiedTokens) > maxProfileShowcaseOtherEntriesLimit {
+		return ErrorExceedMaxProfileShowcaseUnverifiedTokensLimit
+	}
+	if len(preferences.SocialLinks) > maxProfileShowcaseSocialLinksLimit {
+		return ErrorExceedMaxProfileShowcaseSocialLinksLimit
+	}
+
 	if (len(preferences.VerifiedTokens) > 0 || len(preferences.UnverifiedTokens) > 0 || len(preferences.Collectibles) > 0) &&
 		len(preferences.Accounts) == 0 {
 		return ErrorNoAccountProvidedWithTokenOrCollectible

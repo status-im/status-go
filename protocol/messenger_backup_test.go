@@ -231,6 +231,7 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().Len(bob2ProfileShowcasePreferences.Collectibles, 0)
 	s.Require().Len(bob2ProfileShowcasePreferences.VerifiedTokens, 0)
 	s.Require().Len(bob2ProfileShowcasePreferences.UnverifiedTokens, 0)
+	s.Require().Len(bob2ProfileShowcasePreferences.SocialLinks, 0)
 
 	// Backup
 	clock, err := bob1.BackupData(context.Background())

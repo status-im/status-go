@@ -3930,6 +3930,7 @@ func (m *Messenger) addNewKeypairAddedOnPairedDeviceACNotification(keyUID string
 	return nil
 }
 
-func (m *Messenger) HandleSyncProfileShowcasePreferences(state *ReceivedMessageState, p *protobuf.SyncProfileShowcasePreferences, msg *v1protocol.StatusMessage) error {
-	return m.saveProfileShowcasePreferencesProto(p, false)
+func (m *Messenger) HandleSyncProfileShowcasePreferences(state *ReceivedMessageState, p *protobuf.SyncProfileShowcasePreferences, statusMessage *v1protocol.StatusMessage) error {
+	_, err := m.saveProfileShowcasePreferencesProto(p, false)
+	return err
 }

@@ -25,7 +25,7 @@ func ToProfileShowcaseCommunityPreferenceProto(p *identity.ProfileShowcaseCommun
 	return &protobuf.ProfileShowcaseCommunityPreference{
 		CommunityId:        p.CommunityID,
 		ShowcaseVisibility: protobuf.ProfileShowcaseVisibility(p.ShowcaseVisibility),
-		Order:              int32(p.Order),
+		Order:              uint32(p.Order),
 	}
 }
 
@@ -63,7 +63,7 @@ func ToProfileShowcaseAccountPreferenceProto(p *identity.ProfileShowcaseAccountP
 		ColorId:            p.ColorID,
 		Emoji:              p.Emoji,
 		ShowcaseVisibility: protobuf.ProfileShowcaseVisibility(p.ShowcaseVisibility),
-		Order:              int32(p.Order),
+		Order:              uint32(p.Order),
 	}
 }
 
@@ -103,7 +103,7 @@ func ToProfileShowcaseCollectiblePreferenceProto(p *identity.ProfileShowcaseColl
 		CommunityId:        p.CommunityID,
 		AccountAddress:     p.AccountAddress,
 		ShowcaseVisibility: protobuf.ProfileShowcaseVisibility(p.ShowcaseVisibility),
-		Order:              int32(p.Order),
+		Order:              uint32(p.Order),
 	}
 }
 
@@ -135,7 +135,7 @@ func ToProfileShowcaseVerifiedTokenPreferenceProto(p *identity.ProfileShowcaseVe
 	return &protobuf.ProfileShowcaseVerifiedTokenPreference{
 		Symbol:             p.Symbol,
 		ShowcaseVisibility: protobuf.ProfileShowcaseVisibility(p.ShowcaseVisibility),
-		Order:              int32(p.Order),
+		Order:              uint32(p.Order),
 	}
 
 }
@@ -172,7 +172,7 @@ func ToProfileShowcaseUnverifiedTokenPreferenceProto(p *identity.ProfileShowcase
 		ChainId:            p.ChainID,
 		CommunityId:        p.CommunityID,
 		ShowcaseVisibility: protobuf.ProfileShowcaseVisibility(p.ShowcaseVisibility),
-		Order:              int32(p.Order),
+		Order:              uint32(p.Order),
 	}
 }
 
@@ -180,6 +180,40 @@ func ToProfileShowcaseUnverifiedTokensPreferenceProto(preferences []*identity.Pr
 	out := make([]*protobuf.ProfileShowcaseUnverifiedTokenPreference, 0, len(preferences))
 	for _, p := range preferences {
 		out = append(out, ToProfileShowcaseUnverifiedTokenPreferenceProto(p))
+	}
+	return out
+}
+
+func FromProfileShowcaseSocialLinkPreferenceProto(p *protobuf.ProfileShowcaseSocialLinkPreference) *identity.ProfileShowcaseSocialLinkPreference {
+	return &identity.ProfileShowcaseSocialLinkPreference{
+		Text:               p.GetText(),
+		URL:                p.GetUrl(),
+		ShowcaseVisibility: identity.ProfileShowcaseVisibility(p.ShowcaseVisibility),
+		Order:              int(p.Order),
+	}
+}
+
+func FromProfileShowcaseSocialLinksPreferencesProto(preferences []*protobuf.ProfileShowcaseSocialLinkPreference) []*identity.ProfileShowcaseSocialLinkPreference {
+	out := make([]*identity.ProfileShowcaseSocialLinkPreference, 0, len(preferences))
+	for _, p := range preferences {
+		out = append(out, FromProfileShowcaseSocialLinkPreferenceProto(p))
+	}
+	return out
+}
+
+func ToProfileShowcaseSocialLinkPreferenceProto(p *identity.ProfileShowcaseSocialLinkPreference) *protobuf.ProfileShowcaseSocialLinkPreference {
+	return &protobuf.ProfileShowcaseSocialLinkPreference{
+		Text:               p.Text,
+		Url:                p.URL,
+		ShowcaseVisibility: protobuf.ProfileShowcaseVisibility(p.ShowcaseVisibility),
+		Order:              uint32(p.Order),
+	}
+}
+
+func ToProfileShowcaseSocialLinksPreferenceProto(preferences []*identity.ProfileShowcaseSocialLinkPreference) []*protobuf.ProfileShowcaseSocialLinkPreference {
+	out := make([]*protobuf.ProfileShowcaseSocialLinkPreference, 0, len(preferences))
+	for _, p := range preferences {
+		out = append(out, ToProfileShowcaseSocialLinkPreferenceProto(p))
 	}
 	return out
 }
@@ -192,6 +226,7 @@ func FromProfileShowcasePreferencesProto(p *protobuf.SyncProfileShowcasePreferen
 		Collectibles:     FromProfileShowcaseCollectiblesPreferencesProto(p.Collectibles),
 		VerifiedTokens:   FromProfileShowcaseVerifiedTokensPreferencesProto(p.VerifiedTokens),
 		UnverifiedTokens: FromProfileShowcaseUnverifiedTokensPreferencesProto(p.UnverifiedTokens),
+		SocialLinks:      FromProfileShowcaseSocialLinksPreferencesProto(p.SocialLinks),
 	}
 }
 
@@ -203,5 +238,6 @@ func ToProfileShowcasePreferencesProto(p *identity.ProfileShowcasePreferences) *
 		Collectibles:     ToProfileShowcaseCollectiblesPreferenceProto(p.Collectibles),
 		VerifiedTokens:   ToProfileShowcaseVerifiedTokensPreferenceProto(p.VerifiedTokens),
 		UnverifiedTokens: ToProfileShowcaseUnverifiedTokensPreferenceProto(p.UnverifiedTokens),
+		SocialLinks:      ToProfileShowcaseSocialLinksPreferenceProto(p.SocialLinks),
 	}
 }

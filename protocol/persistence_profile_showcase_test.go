@@ -91,6 +91,26 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 				Order:              1,
 			},
 		},
+		SocialLinks: []*identity.ProfileShowcaseSocialLinkPreference{
+			&identity.ProfileShowcaseSocialLinkPreference{
+				Text:               identity.TwitterID,
+				URL:                "https://twitter.com/ethstatus",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
+				Order:              1,
+			},
+			&identity.ProfileShowcaseSocialLinkPreference{
+				Text:               identity.TwitterID,
+				URL:                "https://twitter.com/StatusIMBlog",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityIDVerifiedContacts,
+				Order:              2,
+			},
+			&identity.ProfileShowcaseSocialLinkPreference{
+				Text:               identity.GithubID,
+				URL:                "https://github.com/status-im",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
+				Order:              3,
+			},
+		},
 	}
 
 	err = persistence.SaveProfileShowcasePreferences(preferences)
@@ -122,6 +142,11 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 	s.Require().Equal(len(preferencesBack.UnverifiedTokens), len(preferences.UnverifiedTokens))
 	for i := 0; i < len(preferences.UnverifiedTokens); i++ {
 		s.Require().Equal(*preferences.UnverifiedTokens[i], *preferencesBack.UnverifiedTokens[i])
+	}
+
+	s.Require().Equal(len(preferencesBack.SocialLinks), len(preferences.SocialLinks))
+	for i := 0; i < len(preferences.SocialLinks); i++ {
+		s.Require().Equal(*preferences.SocialLinks[i], *preferencesBack.SocialLinks[i])
 	}
 }
 
@@ -197,6 +222,18 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 				Order:           1,
 			},
 		},
+		SocialLinks: []*identity.ProfileShowcaseSocialLink{
+			&identity.ProfileShowcaseSocialLink{
+				URL:   "https://status.app/",
+				Text:  "Status",
+				Order: 1,
+			},
+			&identity.ProfileShowcaseSocialLink{
+				URL:   "https://github.com/status-im",
+				Text:  "Github",
+				Order: 2,
+			},
+		},
 	}
 	err = persistence.SaveProfileShowcaseForContact(showcase1)
 	s.Require().NoError(err)
@@ -249,6 +286,10 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 	for i := 0; i < len(showcase1.UnverifiedTokens); i++ {
 		s.Require().Equal(*showcase1.UnverifiedTokens[i], *showcase1Back.UnverifiedTokens[i])
 	}
+	s.Require().Equal(len(showcase1.SocialLinks), len(showcase1Back.SocialLinks))
+	for i := 0; i < len(showcase1.SocialLinks); i++ {
+		s.Require().Equal(*showcase1.SocialLinks[i], *showcase1Back.SocialLinks[i])
+	}
 
 	showcase2Back, err := persistence.GetProfileShowcaseForContact("contact_2")
 	s.Require().NoError(err)
@@ -261,6 +302,7 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 	s.Require().Equal(0, len(showcase2Back.Accounts))
 	s.Require().Equal(0, len(showcase2Back.VerifiedTokens))
 	s.Require().Equal(0, len(showcase2Back.UnverifiedTokens))
+	s.Require().Equal(0, len(showcase2Back.SocialLinks))
 }
 
 func (s *TestProfileShowcasePersistence) TestFetchingProfileShowcaseAccountsByAddress() {

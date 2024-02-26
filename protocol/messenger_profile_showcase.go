@@ -32,6 +32,12 @@ var errorNoAccountPresentedForCollectible = errors.New("account holding the coll
 var errorDublicateAccountAddress = errors.New("duplicate account address")
 var errorAccountVisibilityLowerThanCollectible = errors.New("account visibility lower than collectible")
 
+func sortProfileEntyByOrder(slice interface{}, getOrder func(int) int) {
+	sort.Slice(slice, func(i, j int) bool {
+		return getOrder(j) > getOrder(i)
+	})
+}
+
 func toCollectibleUniqueID(contractAddress string, tokenID string, chainID uint64) (thirdparty.CollectibleUniqueID, error) {
 	tokenIDInt := new(big.Int)
 	tokenIDInt, isTokenIDOk := tokenIDInt.SetString(tokenID, 10)
@@ -198,6 +204,22 @@ func (m *Messenger) toProfileShowcaseUnverifiedTokensProto(preferences []*identi
 	return entries
 }
 
+func (m *Messenger) toProfileShowcaseSocialLinksProto(preferences []*identity.ProfileShowcaseSocialLinkPreference, visibility identity.ProfileShowcaseVisibility) []*protobuf.ProfileShowcaseSocialLink {
+	entries := []*protobuf.ProfileShowcaseSocialLink{}
+	for _, preference := range preferences {
+		if preference.ShowcaseVisibility != visibility {
+			continue
+		}
+
+		entries = append(entries, &protobuf.ProfileShowcaseSocialLink{
+			Text:  preference.Text,
+			Url:   preference.URL,
+			Order: uint32(preference.Order),
+		})
+	}
+	return entries
+}
+
 func (m *Messenger) fromProfileShowcaseCommunityProto(senderPubKey *ecdsa.PublicKey, messages []*protobuf.ProfileShowcaseCommunity) []*identity.ProfileShowcaseCommunity {
 	entries := []*identity.ProfileShowcaseCommunity{}
 	for _, message := range messages {
@@ -291,6 +313,18 @@ func (m *Messenger) fromProfileShowcaseUnverifiedTokenProto(messages []*protobuf
 			ContractAddress: entry.ContractAddress,
 			ChainID:         entry.ChainId,
 			Order:           int(entry.Order),
+		})
+	}
+	return entries
+}
+
+func (m *Messenger) fromProfileShowcaseSocialLinkProto(messages []*protobuf.ProfileShowcaseSocialLink) []*identity.ProfileShowcaseSocialLink {
+	entries := []*identity.ProfileShowcaseSocialLink{}
+	for _, entry := range messages {
+		entries = append(entries, &identity.ProfileShowcaseSocialLink{
+			Text:  entry.Text,
+			URL:   entry.Url,
+			Order: int(entry.Order),
 		})
 	}
 	return entries
@@ -450,6 +484,7 @@ func (m *Messenger) GetProfileShowcaseForSelfIdentity() (*protobuf.ProfileShowca
 		Collectibles:     m.toProfileShowcaseCollectibleProto(preferences.Collectibles, identity.ProfileShowcaseVisibilityEveryone),
 		VerifiedTokens:   m.toProfileShowcaseVerifiedTokensProto(preferences.VerifiedTokens, identity.ProfileShowcaseVisibilityEveryone),
 		UnverifiedTokens: m.toProfileShowcaseUnverifiedTokensProto(preferences.UnverifiedTokens, identity.ProfileShowcaseVisibilityEveryone),
+		SocialLinks:      m.toProfileShowcaseSocialLinksProto(preferences.SocialLinks, identity.ProfileShowcaseVisibilityEveryone),
 	}
 
 	forContacts := &protobuf.ProfileShowcaseEntries{
@@ -458,6 +493,7 @@ func (m *Messenger) GetProfileShowcaseForSelfIdentity() (*protobuf.ProfileShowca
 		Collectibles:     m.toProfileShowcaseCollectibleProto(preferences.Collectibles, identity.ProfileShowcaseVisibilityContacts),
 		VerifiedTokens:   m.toProfileShowcaseVerifiedTokensProto(preferences.VerifiedTokens, identity.ProfileShowcaseVisibilityContacts),
 		UnverifiedTokens: m.toProfileShowcaseUnverifiedTokensProto(preferences.UnverifiedTokens, identity.ProfileShowcaseVisibilityContacts),
+		SocialLinks:      m.toProfileShowcaseSocialLinksProto(preferences.SocialLinks, identity.ProfileShowcaseVisibilityContacts),
 	}
 
 	forIDVerifiedContacts := &protobuf.ProfileShowcaseEntries{
@@ -466,6 +502,7 @@ func (m *Messenger) GetProfileShowcaseForSelfIdentity() (*protobuf.ProfileShowca
 		Collectibles:     m.toProfileShowcaseCollectibleProto(preferences.Collectibles, identity.ProfileShowcaseVisibilityIDVerifiedContacts),
 		VerifiedTokens:   m.toProfileShowcaseVerifiedTokensProto(preferences.VerifiedTokens, identity.ProfileShowcaseVisibilityIDVerifiedContacts),
 		UnverifiedTokens: m.toProfileShowcaseUnverifiedTokensProto(preferences.UnverifiedTokens, identity.ProfileShowcaseVisibilityIDVerifiedContacts),
+		SocialLinks:      m.toProfileShowcaseSocialLinksProto(preferences.SocialLinks, identity.ProfileShowcaseVisibilityIDVerifiedContacts),
 	}
 
 	mutualContacts := []*Contact{}
@@ -498,39 +535,6 @@ func (m *Messenger) GetProfileShowcaseForSelfIdentity() (*protobuf.ProfileShowca
 	}, nil
 }
 
-func (m *Messenger) buildProfileShowcaseFromEntries(
-	contactID string,
-	communities []*identity.ProfileShowcaseCommunity,
-	accounts []*identity.ProfileShowcaseAccount,
-	collectibles []*identity.ProfileShowcaseCollectible,
-	verifiedTokens []*identity.ProfileShowcaseVerifiedToken,
-	unverifiedTokens []*identity.ProfileShowcaseUnverifiedToken) *identity.ProfileShowcase {
-	sort.Slice(communities, func(i, j int) bool {
-		return communities[j].Order > communities[i].Order
-	})
-	sort.Slice(accounts, func(i, j int) bool {
-		return accounts[j].Order > accounts[i].Order
-	})
-	sort.Slice(collectibles, func(i, j int) bool {
-		return collectibles[j].Order > collectibles[i].Order
-	})
-	sort.Slice(verifiedTokens, func(i, j int) bool {
-		return verifiedTokens[j].Order > verifiedTokens[i].Order
-	})
-	sort.Slice(unverifiedTokens, func(i, j int) bool {
-		return unverifiedTokens[j].Order > unverifiedTokens[i].Order
-	})
-
-	return &identity.ProfileShowcase{
-		ContactID:        contactID,
-		Communities:      communities,
-		Accounts:         accounts,
-		Collectibles:     collectibles,
-		VerifiedTokens:   verifiedTokens,
-		UnverifiedTokens: unverifiedTokens,
-	}
-}
-
 func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState, message *protobuf.ProfileShowcase) error {
 	senderPubKey := state.CurrentMessageState.PublicKey
 	contactID := state.CurrentMessageState.Contact.ID
@@ -540,12 +544,14 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState
 	collectibles := []*identity.ProfileShowcaseCollectible{}
 	verifiedTokens := []*identity.ProfileShowcaseVerifiedToken{}
 	unverifiedTokens := []*identity.ProfileShowcaseUnverifiedToken{}
+	socialLinks := []*identity.ProfileShowcaseSocialLink{}
 
 	communities = append(communities, m.fromProfileShowcaseCommunityProto(senderPubKey, message.ForEveryone.Communities)...)
 	accounts = append(accounts, m.fromProfileShowcaseAccountProto(message.ForEveryone.Accounts)...)
 	collectibles = append(collectibles, m.fromProfileShowcaseCollectibleProto(message.ForEveryone.Collectibles)...)
 	verifiedTokens = append(verifiedTokens, m.fromProfileShowcaseVerifiedTokenProto(message.ForEveryone.VerifiedTokens)...)
 	unverifiedTokens = append(unverifiedTokens, m.fromProfileShowcaseUnverifiedTokenProto(message.ForEveryone.UnverifiedTokens)...)
+	socialLinks = append(socialLinks, m.fromProfileShowcaseSocialLinkProto(message.ForEveryone.SocialLinks)...)
 
 	forContacts, err := m.DecryptProfileShowcaseEntriesWithPubKey(senderPubKey, message.ForContacts)
 	if err != nil {
@@ -558,6 +564,7 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState
 		collectibles = append(collectibles, m.fromProfileShowcaseCollectibleProto(forContacts.Collectibles)...)
 		verifiedTokens = append(verifiedTokens, m.fromProfileShowcaseVerifiedTokenProto(forContacts.VerifiedTokens)...)
 		unverifiedTokens = append(unverifiedTokens, m.fromProfileShowcaseUnverifiedTokenProto(forContacts.UnverifiedTokens)...)
+		socialLinks = append(socialLinks, m.fromProfileShowcaseSocialLinkProto(forContacts.SocialLinks)...)
 	}
 
 	forIDVerifiedContacts, err := m.DecryptProfileShowcaseEntriesWithPubKey(senderPubKey, message.ForIdVerifiedContacts)
@@ -571,10 +578,25 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState
 		collectibles = append(collectibles, m.fromProfileShowcaseCollectibleProto(forIDVerifiedContacts.Collectibles)...)
 		verifiedTokens = append(verifiedTokens, m.fromProfileShowcaseVerifiedTokenProto(forIDVerifiedContacts.VerifiedTokens)...)
 		unverifiedTokens = append(unverifiedTokens, m.fromProfileShowcaseUnverifiedTokenProto(forIDVerifiedContacts.UnverifiedTokens)...)
+		socialLinks = append(socialLinks, m.fromProfileShowcaseSocialLinkProto(forIDVerifiedContacts.SocialLinks)...)
 	}
 
-	newShowcase := m.buildProfileShowcaseFromEntries(
-		contactID, communities, accounts, collectibles, verifiedTokens, unverifiedTokens)
+	sortProfileEntyByOrder(communities, func(i int) int { return communities[i].Order })
+	sortProfileEntyByOrder(accounts, func(i int) int { return accounts[i].Order })
+	sortProfileEntyByOrder(collectibles, func(i int) int { return collectibles[i].Order })
+	sortProfileEntyByOrder(verifiedTokens, func(i int) int { return verifiedTokens[i].Order })
+	sortProfileEntyByOrder(unverifiedTokens, func(i int) int { return unverifiedTokens[i].Order })
+	sortProfileEntyByOrder(socialLinks, func(i int) int { return socialLinks[i].Order })
+
+	newShowcase := &identity.ProfileShowcase{
+		ContactID:        contactID,
+		Communities:      communities,
+		Accounts:         accounts,
+		Collectibles:     collectibles,
+		VerifiedTokens:   verifiedTokens,
+		UnverifiedTokens: unverifiedTokens,
+		SocialLinks:      socialLinks,
+	}
 
 	oldShowcase, err := m.persistence.GetProfileShowcaseForContact(contactID)
 	if err != nil {
@@ -646,9 +668,9 @@ func (m *Messenger) DeleteProfileShowcaseCommunity(community *communities.Commun
 	return nil
 }
 
-func (m *Messenger) saveProfileShowcasePreferencesProto(p *protobuf.SyncProfileShowcasePreferences, shouldSync bool) error {
+func (m *Messenger) saveProfileShowcasePreferencesProto(p *protobuf.SyncProfileShowcasePreferences, shouldSync bool) (*identity.ProfileShowcasePreferences, error) {
 	preferences := FromProfileShowcasePreferencesProto(p)
-	return m.setProfileShowcasePreferences(preferences, shouldSync)
+	return preferences, m.setProfileShowcasePreferences(preferences, shouldSync)
 }
 
 func (m *Messenger) syncProfileShowcasePreferences(ctx context.Context, rawMessageHandler RawMessageHandler) error {

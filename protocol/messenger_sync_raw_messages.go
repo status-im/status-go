@@ -333,7 +333,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.saveProfileShowcasePreferencesProto(&message, false)
+			_, err = m.saveProfileShowcasePreferencesProto(&message, false)
 			if err != nil {
 				return err
 			}

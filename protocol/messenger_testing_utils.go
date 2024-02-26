@@ -466,6 +466,26 @@ func DummyProfileShowcasePreferences(withCollectibles bool) *identity.ProfileSho
 				Order:              1,
 			},
 		},
+		SocialLinks: []*identity.ProfileShowcaseSocialLinkPreference{
+			&identity.ProfileShowcaseSocialLinkPreference{
+				Text:               identity.TwitterID,
+				URL:                "https://twitter.com/ethstatus",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
+				Order:              1,
+			},
+			&identity.ProfileShowcaseSocialLinkPreference{
+				Text:               identity.TwitterID,
+				URL:                "https://twitter.com/StatusIMBlog",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityIDVerifiedContacts,
+				Order:              2,
+			},
+			&identity.ProfileShowcaseSocialLinkPreference{
+				Text:               identity.GithubID,
+				URL:                "https://github.com/status-im",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
+				Order:              3,
+			},
+		},
 	}
 
 	if withCollectibles {

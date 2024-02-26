@@ -249,6 +249,11 @@ func (s *TestMessengerProfileShowcase) TestSaveAndGetProfileShowcasePreferences(
 	for i := 0; i < len(response.UnverifiedTokens); i++ {
 		s.Require().Equal(*response.UnverifiedTokens[i], *request.UnverifiedTokens[i])
 	}
+
+	s.Require().Equal(len(response.SocialLinks), len(request.SocialLinks))
+	for i := 0; i < len(response.SocialLinks); i++ {
+		s.Require().Equal(*response.SocialLinks[i], *request.SocialLinks[i])
+	}
 }
 
 func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesWithWrongVisibility() {
@@ -357,6 +362,23 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 				Order:           1,
 			},
 		},
+		SocialLinks: []*protobuf.ProfileShowcaseSocialLink{
+			&protobuf.ProfileShowcaseSocialLink{
+				Text:  identity.TwitterID,
+				Url:   "https://twitter.com/ethstatus",
+				Order: 1,
+			},
+			&protobuf.ProfileShowcaseSocialLink{
+				Text:  identity.TwitterID,
+				Url:   "https://twitter.com/StatusIMBlog",
+				Order: 2,
+			},
+			&protobuf.ProfileShowcaseSocialLink{
+				Text:  identity.GithubID,
+				Url:   "https://github.com/status-im",
+				Order: 3,
+			},
+		},
 	}
 	data, err := s.m.EncryptProfileShowcaseEntriesWithContactPubKeys(entries, s.m.Contacts())
 	s.Require().NoError(err)
@@ -400,6 +422,13 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 		s.Require().Equal(entries.UnverifiedTokens[i].ContractAddress, entriesBack.UnverifiedTokens[i].ContractAddress)
 		s.Require().Equal(entries.UnverifiedTokens[i].ChainId, entriesBack.UnverifiedTokens[i].ChainId)
 		s.Require().Equal(entries.UnverifiedTokens[i].Order, entriesBack.UnverifiedTokens[i].Order)
+	}
+
+	s.Require().Equal(len(entries.SocialLinks), len(entriesBack.SocialLinks))
+	for i := 0; i < len(entriesBack.SocialLinks); i++ {
+		s.Require().Equal(entries.SocialLinks[i].Text, entriesBack.SocialLinks[i].Text)
+		s.Require().Equal(entries.SocialLinks[i].Url, entriesBack.SocialLinks[i].Url)
+		s.Require().Equal(entries.SocialLinks[i].Order, entriesBack.SocialLinks[i].Order)
 	}
 }
 
@@ -499,11 +528,19 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ChainID, request.UnverifiedTokens[1].ChainID)
 	s.Require().Equal(profileShowcase.UnverifiedTokens[1].Order, request.UnverifiedTokens[1].Order)
 
+	s.Require().Len(profileShowcase.SocialLinks, 2)
+	s.Require().Equal(profileShowcase.SocialLinks[0].Text, request.SocialLinks[0].Text)
+	s.Require().Equal(profileShowcase.SocialLinks[0].URL, request.SocialLinks[0].URL)
+	s.Require().Equal(profileShowcase.SocialLinks[0].Order, request.SocialLinks[0].Order)
+	s.Require().Equal(profileShowcase.SocialLinks[1].Text, request.SocialLinks[2].Text)
+	s.Require().Equal(profileShowcase.SocialLinks[1].URL, request.SocialLinks[2].URL)
+	s.Require().Equal(profileShowcase.SocialLinks[1].Order, request.SocialLinks[2].Order)
+
 	// Get summarised profile data for verified contact
 	resp, err = WaitOnMessengerResponse(
 		verifiedContact,
 		func(r *MessengerResponse) bool {
-			return len(r.updatedProfileShowcases) > 0
+			return len(r.updatedProfileShowcases) > 0 && r.updatedProfileShowcases[contactID] != nil
 		},
 		"no messages",
 	)
@@ -546,6 +583,17 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ContractAddress, request.UnverifiedTokens[1].ContractAddress)
 	s.Require().Equal(profileShowcase.UnverifiedTokens[1].ChainID, request.UnverifiedTokens[1].ChainID)
 	s.Require().Equal(profileShowcase.UnverifiedTokens[1].Order, request.UnverifiedTokens[1].Order)
+
+	s.Require().Len(profileShowcase.SocialLinks, 3)
+	s.Require().Equal(profileShowcase.SocialLinks[0].Text, request.SocialLinks[0].Text)
+	s.Require().Equal(profileShowcase.SocialLinks[0].URL, request.SocialLinks[0].URL)
+	s.Require().Equal(profileShowcase.SocialLinks[0].Order, request.SocialLinks[0].Order)
+	s.Require().Equal(profileShowcase.SocialLinks[1].Text, request.SocialLinks[1].Text)
+	s.Require().Equal(profileShowcase.SocialLinks[1].URL, request.SocialLinks[1].URL)
+	s.Require().Equal(profileShowcase.SocialLinks[1].Order, request.SocialLinks[1].Order)
+	s.Require().Equal(profileShowcase.SocialLinks[2].Text, request.SocialLinks[2].Text)
+	s.Require().Equal(profileShowcase.SocialLinks[2].URL, request.SocialLinks[2].URL)
+	s.Require().Equal(profileShowcase.SocialLinks[2].Order, request.SocialLinks[2].Order)
 }
 
 func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipUnencryptedCommunities() {
