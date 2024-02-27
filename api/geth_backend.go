@@ -624,7 +624,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 
 	defaultCfg.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig)
 
-	err = b.UpdateNodeConfigFleet(defaultCfg)
+	err = b.UpdateNodeConfigFleet(acc, password, defaultCfg)
 	if err != nil {
 		return err
 	}
@@ -697,9 +697,14 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 // UpdateNodeConfigFleet loads the fleet from the settings and updates the node configuration
 // If the fleet in settings is empty, or not supported anymore, it will be overridden with the default fleet.
 // In that case settings fleet value remain the same, only runtime node configuration is updated.
-func (b *GethStatusBackend) UpdateNodeConfigFleet(config *params.NodeConfig) error {
+func (b *GethStatusBackend) UpdateNodeConfigFleet(acc multiaccounts.Account, password string, config *params.NodeConfig) error {
 	if config == nil {
 		return nil
+	}
+
+	err := b.ensureDBsOpened(acc, password)
+	if err != nil {
+		return err
 	}
 
 	accountSettings, err := b.GetSettings()
