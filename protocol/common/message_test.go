@@ -225,7 +225,7 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 		return "https://localhost:6666/" + msgID + "-" + linkURL
 	}
 
-	previews := msg.ConvertFromProtoToLinkPreviews(urlMaker)
+	previews := msg.ConvertFromProtoToLinkPreviews(urlMaker, urlMaker)
 	require.Len(t, previews, 1)
 	p := previews[0]
 	require.Equal(t, l.Type, p.Type)
@@ -243,7 +243,7 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 	// Test when the URL is not parseable by url.Parse.
 	l.Url = "postgres://user:abc{DEf1=ghi@example.com:5432/db?sslmode=require"
 	msg.ChatMessage.UnfurledLinks = []*protobuf.UnfurledLink{l}
-	previews = msg.ConvertFromProtoToLinkPreviews(urlMaker)
+	previews = msg.ConvertFromProtoToLinkPreviews(urlMaker, urlMaker)
 	require.Len(t, previews, 1)
 	p = previews[0]
 	require.Equal(t, l.Url, p.Hostname)
@@ -255,7 +255,7 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 		Url:         "https://github.com",
 	}
 	msg.ChatMessage.UnfurledLinks = []*protobuf.UnfurledLink{l}
-	previews = msg.ConvertFromProtoToLinkPreviews(urlMaker)
+	previews = msg.ConvertFromProtoToLinkPreviews(urlMaker, urlMaker)
 	require.Len(t, previews, 1)
 	p = previews[0]
 	require.Equal(t, 0, p.Thumbnail.Height)
