@@ -4342,7 +4342,7 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) e
 	if msg.ContentType == protobuf.ChatMessage_STICKER {
 		msg.StickerLocalURL = s.MakeStickerURL(msg.GetSticker().Hash)
 	}
-	msg.LinkPreviews = msg.ConvertFromProtoToLinkPreviews(s.MakeLinkPreviewThumbnailURL, s.MakeLinkPreviewFaviconUrl)
+	msg.LinkPreviews = msg.ConvertFromProtoToLinkPreviews(s.MakeLinkPreviewThumbnailURL, s.MakeLinkPreviewFaviconURL)
 	msg.StatusLinkPreviews = msg.ConvertFromProtoToStatusLinkPreviews(s.MakeStatusLinkPreviewThumbnailURL)
 
 	return nil

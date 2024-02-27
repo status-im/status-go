@@ -91,7 +91,7 @@ func (s *MediaServer) MakeStatusLinkPreviewThumbnailURL(msgID string, previewURL
 	return u.String()
 }
 
-func (s *MediaServer) MakeLinkPreviewFaviconUrl(msgID string, previewURL string) string {
+func (s *MediaServer) MakeLinkPreviewFaviconURL(msgID string, previewURL string) string {
 	u := s.MakeBaseURL()
 	u.Path = LinkPreviewFaviconPath
 	u.RawQuery = url.Values{"message-id": {msgID}, "url": {previewURL}}.Encode()
