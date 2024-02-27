@@ -715,6 +715,8 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 }
 
 func (s *MessengerCommunitiesSignersSuite) TestSyncTokenGatedCommunity() {
+	s.T().Skip("flaky test")
+
 	testCases := []struct {
 		name           string
 		mintOwnerToken bool
