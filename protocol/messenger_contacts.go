@@ -27,6 +27,8 @@ const incomingMutualStateEventSentDefaultText = "@%s sent you a contact request"
 const incomingMutualStateEventAcceptedDefaultText = "@%s accepted your contact request"
 const incomingMutualStateEventRemovedDefaultText = "@%s removed you as a contact"
 
+var ErrGetLatestContactRequestForContactInvalidID = errors.New("get-latest-contact-request-for-contact: invalid id")
+
 type SelfContactChangeEvent struct {
 	DisplayNameChanged   bool
 	PreferredNameChanged bool
@@ -1159,6 +1161,28 @@ func (m *Messenger) sendRetractContactRequest(contact *Contact) error {
 	}
 
 	return err
+}
+
+func (m *Messenger) GetLatestContactRequestForContact(contactID string) (*MessengerResponse, error) {
+	if len(contactID) == 0 {
+		return nil, ErrGetLatestContactRequestForContactInvalidID
+	}
+
+	contactRequestID, err := m.persistence.LatestPendingContactRequestIDForContact(contactID)
+	if err != nil {
+		return nil, err
+	}
+
+	contactRequest, err := m.persistence.MessageByID(contactRequestID)
+	if err != nil {
+		m.logger.Error("contact request not found", zap.String("contactRequestID", contactRequestID), zap.Error(err))
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddMessage(contactRequest)
+
+	return response, nil
 }
 
 func (m *Messenger) AcceptLatestContactRequestForContact(ctx context.Context, request *requests.AcceptLatestContactRequestForContact) (*MessengerResponse, error) {
