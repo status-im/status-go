@@ -384,7 +384,12 @@ func (s *MessageSender) sendCommunity(
 		}
 	}
 
-	s.logger.Debug("sent community message ", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
+	s.logger.Debug("sent-message: community ",
+		zap.Strings("recipient", PubkeysToHex(rawMessage.Recipients)),
+		zap.String("messageID", messageID.String()),
+		zap.String("messageType", "community"),
+		zap.Any("contentType", rawMessage.MessageType),
+		zap.Strings("hashes", types.EncodeHexes(hashes)))
 	s.transport.Track(messageID, hashes, newMessages)
 
 	return messageID, nil
@@ -470,7 +475,12 @@ func (s *MessageSender) sendPrivate(
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
 
-		s.logger.Debug("sent private message skipProtocolLayer", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
+		s.logger.Debug("sent-message: private skipProtocolLayer",
+			zap.Strings("recipient", PubkeysToHex(rawMessage.Recipients)),
+			zap.String("messageID", messageID.String()),
+			zap.String("messageType", "private"),
+			zap.Any("contentType", rawMessage.MessageType),
+			zap.Strings("hashes", types.EncodeHexes(hashes)))
 		s.transport.Track(messageID, hashes, newMessages)
 
 	} else {
@@ -485,7 +495,12 @@ func (s *MessageSender) sendPrivate(
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
 
-		s.logger.Debug("sent private message without datasync", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
+		s.logger.Debug("sent-message: private without datasync",
+			zap.Strings("recipient", PubkeysToHex(rawMessage.Recipients)),
+			zap.String("messageID", messageID.String()),
+			zap.Any("contentType", rawMessage.MessageType),
+			zap.String("messageType", "private"),
+			zap.Strings("hashes", types.EncodeHexes(hashes)))
 		s.transport.Track(messageID, hashes, newMessages)
 	}
 
@@ -737,7 +752,12 @@ func (s *MessageSender) SendPublic(
 
 	s.notifyOnSentMessage(sentMessage)
 
-	s.logger.Debug("sent public message", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
+	s.logger.Debug("sent-message: public message",
+		zap.Strings("recipient", PubkeysToHex(rawMessage.Recipients)),
+		zap.String("messageID", messageID.String()),
+		zap.Any("contentType", rawMessage.MessageType),
+		zap.String("messageType", "public"),
+		zap.Strings("hashes", types.EncodeHexes(hashes)))
 	s.transport.Track(messageID, hashes, newMessages)
 
 	return messageID, nil
