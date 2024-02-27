@@ -321,8 +321,8 @@ func (m *Message) ConvertLinkPreviewsToProto() ([]*protobuf.UnfurledLink, error)
 	return unfurledLinks, nil
 }
 
-func (m *Message) ConvertFromProtoToLinkPreviews(makeThumbnailMediaServerUrl func(msgID string, previewURL string) string,
-	makeFaviconMediaServerUrl func(msgID string, previewURL string) string) []LinkPreview {
+func (m *Message) ConvertFromProtoToLinkPreviews(makeThumbnailMediaServerURL func(msgID string, previewURL string) string,
+	makeFaviconMediaServerURL func(msgID string, previewURL string) string) []LinkPreview {
 	var links []*protobuf.UnfurledLink
 
 	if links = m.GetUnfurledLinks(); links == nil {
@@ -350,7 +350,7 @@ func (m *Message) ConvertFromProtoToLinkPreviews(makeThumbnailMediaServerUrl fun
 		}
 		mediaURL := ""
 		if len(link.ThumbnailPayload) > 0 {
-			mediaURL = makeThumbnailMediaServerUrl(m.ID, link.Url)
+			mediaURL = makeThumbnailMediaServerURL(m.ID, link.Url)
 		}
 		if link.GetThumbnailPayload() != nil {
 			lp.Thumbnail.Width = int(link.ThumbnailWidth)
@@ -359,7 +359,7 @@ func (m *Message) ConvertFromProtoToLinkPreviews(makeThumbnailMediaServerUrl fun
 		}
 		faviconMediaURL := ""
 		if len(link.FaviconPayload) > 0 {
-			faviconMediaURL = makeFaviconMediaServerUrl(m.ID, link.Url)
+			faviconMediaURL = makeFaviconMediaServerURL(m.ID, link.Url)
 		}
 		if link.GetFaviconPayload() != nil {
 			lp.Favicon = faviconMediaURL
