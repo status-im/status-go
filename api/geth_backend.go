@@ -698,6 +698,10 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 // If the fleet in settings is empty, or not supported anymore, it will be overridden with the default fleet.
 // In that case settings fleet value remain the same, only runtime node configuration is updated.
 func (b *GethStatusBackend) UpdateNodeConfigFleet(config *params.NodeConfig) error {
+	if config == nil {
+		return nil
+	}
+
 	accountSettings, err := b.GetSettings()
 	if err != nil {
 		return err
