@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/cenkalti/backoff/v3"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -220,11 +222,14 @@ func makeTestTree(domain string, nodes []*enode.Node, links []string) (*ethdnsdi
 }
 
 func TestPeerExchange(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
 	// start node which serve as PeerExchange server
 	config := &Config{}
 	config.EnableDiscV5 = true
-	config.PeerExchange = true
-	pxServerNode, err := New("", "", config, nil, nil, nil, nil, nil)
+	config.EnablePeerExchangeServer = true
+	config.EnablePeerExchangeClient = false
+	pxServerNode, err := New("", "", config, logger.Named("pxServerNode"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, pxServerNode.Start())
 
@@ -233,10 +238,12 @@ func TestPeerExchange(t *testing.T) {
 	// start node that will be discovered by PeerExchange
 	config = &Config{}
 	config.EnableDiscV5 = true
+	config.EnablePeerExchangeServer = false
+	config.EnablePeerExchangeClient = false
 	config.DiscV5BootstrapNodes = []string{pxServerNode.node.ENR().String()}
-	node, err := New("", "", config, nil, nil, nil, nil, nil)
+	discV5Node, err := New("", "", config, logger.Named("discV5Node"), nil, nil, nil, nil)
 	require.NoError(t, err)
-	require.NoError(t, node.Start())
+	require.NoError(t, discV5Node.Start())
 
 	time.Sleep(1 * time.Second)
 
@@ -246,12 +253,13 @@ func TestPeerExchange(t *testing.T) {
 	resolver := mapResolver(tree.ToTXT("n"))
 
 	config = &Config{}
-	config.PeerExchange = true
+	config.EnablePeerExchangeServer = false
+	config.EnablePeerExchangeClient = true
 	config.LightClient = true
 	config.Resolver = resolver
 
 	config.WakuNodes = []string{url}
-	lightNode, err := New("", "", config, nil, nil, nil, nil, nil)
+	lightNode, err := New("", "", config, logger.Named("lightNode"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, lightNode.Start())
 
@@ -269,7 +277,7 @@ func TestPeerExchange(t *testing.T) {
 
 	require.NoError(t, lightNode.Stop())
 	require.NoError(t, pxServerNode.Stop())
-	require.NoError(t, node.Stop())
+	require.NoError(t, discV5Node.Stop())
 }
 
 func TestWakuV2Filter(t *testing.T) {

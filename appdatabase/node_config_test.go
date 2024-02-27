@@ -220,7 +220,6 @@ func randomNodeConfig() *params.NodeConfig {
 			MaxMessageSize:      uint32(randomInt(math.MaxInt64)),
 			EnableConfirmations: randomBool(),
 			CustomNodes:         randomCustomNodes(),
-			PeerExchange:        randomBool(),
 			EnableDiscV5:        randomBool(),
 			UDPPort:             randomInt(math.MaxInt64),
 			AutoUpdate:          randomBool(),
