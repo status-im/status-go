@@ -211,7 +211,6 @@ func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoin() {
 	testRejectMemberRequestToJoin(s, community, user)
 }
 
-/*
 func (s *AdminCommunityEventsSuite) TestAdminControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
 	additionalAdmin := s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
@@ -220,7 +219,6 @@ func (s *AdminCommunityEventsSuite) TestAdminControlNodeHandlesMultipleEventSend
 	user := s.newMessenger("", []string{})
 	testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(s, community, user, additionalAdmin)
 }
-*/
 
 func (s *AdminCommunityEventsSuite) TestAdminCreateEditDeleteCategories() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
@@ -324,78 +322,6 @@ func (s *AdminCommunityEventsSuite) TestMemberReceiveOwnerEventsWhenControlNodeO
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
 	testMemberReceiveEventsWhenControlNodeOffline(s, community)
 }
-
-/*
-func (s *AdminCommunityEventsSuite) TestAdminResendRejectedEvents() {
-	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
-
-	// admin modifies community description
-	adminEditRequest := &requests.EditCommunity{
-		CommunityID: community.ID(),
-		CreateCommunity: requests.CreateCommunity{
-			Name:        "admin name",
-			Description: "admin description",
-			Color:       "#FFFFFF",
-			Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
-		},
-	}
-	_, err := s.admin.EditCommunity(adminEditRequest)
-	s.Require().NoError(err)
-
-	// in the meantime, control node updates community description as well
-	ownerEditRequest := &requests.EditCommunity{
-		CommunityID: community.ID(),
-		CreateCommunity: requests.CreateCommunity{
-			Name:        "control node name",
-			Description: "control node description",
-			Color:       "#FFFFFF",
-			Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
-		},
-	}
-	_, err = s.owner.EditCommunity(ownerEditRequest)
-	s.Require().NoError(err)
-
-	waitOnAdminEventsRejection := waitOnCommunitiesEvent(s.owner, func(s *communities.Subscription) bool {
-		return s.CommunityEventsMessageInvalidClock != nil
-	})
-
-	// control node receives admin event and rejects it
-	_, err = WaitOnMessengerResponse(s.owner, func(response *MessengerResponse) bool {
-		select {
-		case err := <-waitOnAdminEventsRejection:
-			s.Require().NoError(err)
-			return true
-		default:
-			return false
-		}
-	}, "")
-	s.Require().NoError(err)
-
-	community, err = s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.Require().Equal(ownerEditRequest.Description, community.DescriptionText())
-
-	// admin receives rejected events and re-applies them
-	// there is no signal whatsoever, we just wait for admin to process all incoming messages
-	_, _ = WaitOnMessengerResponse(s.admin, func(response *MessengerResponse) bool {
-		return false
-	}, "")
-
-	// control node receives re-applied admin event and accepts it
-	response, err := WaitOnMessengerResponse(s.owner, func(response *MessengerResponse) bool {
-		return len(response.Communities()) > 0
-	}, "no communities in response")
-	s.Require().NoError(err)
-	s.Require().Equal(adminEditRequest.Description, response.Communities()[0].DescriptionText())
-
-	// admin receives updated community description
-	response, err = WaitOnMessengerResponse(s.admin, func(response *MessengerResponse) bool {
-		return len(response.Communities()) > 0
-	}, "no communities in response")
-	s.Require().NoError(err)
-	s.Require().Equal(adminEditRequest.Description, response.Communities()[0].DescriptionText())
-}
-*/
 
 func (s *AdminCommunityEventsSuite) TestJoinedAdminReceiveRequestsToJoinWithoutRevealedAccounts() {
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})

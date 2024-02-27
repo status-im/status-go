@@ -181,7 +181,6 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequ
 	testRejectMemberRequestToJoin(s, community, user)
 }
 
-/*
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
 	additionalOwner := s.newMessenger("", []string{})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
@@ -190,7 +189,6 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerControlNodeHandl
 	user := s.newMessenger("", []string{})
 	testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(s, community, user, additionalOwner)
 }
-*/
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerCreateEditDeleteCategories() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)

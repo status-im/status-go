@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
@@ -1405,7 +1406,6 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	s.Require().Len(declinedRequestsPending, 0)
 }
 
-/*
 func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
 	_, err := user.Start()
 
@@ -1516,7 +1516,6 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 	})
 	s.Require().NoError(err)
 }
-*/
 
 func testCreateEditDeleteCategories(base CommunityEventsTestsInterface, community *communities.Community) {
 	newCategory := &requests.CreateCommunityCategory{
