@@ -189,6 +189,7 @@ type WakuV2Config struct {
 	CustomNodes map[string]string
 
 	// PeerExchange determines whether WakuV2 Peer Exchange is enabled or not
+	// Deprecated: will be calculated based on LightClient
 	PeerExchange bool
 
 	// Nameserver determines which nameserver will be used for dns discovery

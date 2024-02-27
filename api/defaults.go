@@ -110,7 +110,6 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 		DiscoveryLimit: 20,
 		Host:           "0.0.0.0",
 		AutoUpdate:     true,
-		PeerExchange:   true,
 	}
 
 	clusterConfig, err := params.LoadClusterConfigFromFleet(fleet)
