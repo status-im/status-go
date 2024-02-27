@@ -143,14 +143,13 @@ func (o *Client) doPostWithJSON(ctx context.Context, url string, payload any, ap
 }
 
 func (o *Client) doWithRetries(req *http.Request, apiKey string) (*http.Response, error) {
-	b := backoff.ExponentialBackOff{
-		InitialInterval:     time.Millisecond * 1000,
-		RandomizationFactor: 0.1,
-		Multiplier:          1.5,
-		MaxInterval:         time.Second * 32,
-		MaxElapsedTime:      time.Second * 128,
-		Clock:               backoff.SystemClock,
-	}
+	b := backoff.NewExponentialBackOff()
+	b.InitialInterval = time.Millisecond * 1000
+	b.RandomizationFactor = 0.1
+	b.Multiplier = 1.5
+	b.MaxInterval = time.Second * 32
+	b.MaxElapsedTime = time.Second * 70
+
 	b.Reset()
 
 	req.Header.Set("X-API-KEY", apiKey)
@@ -167,12 +166,13 @@ func (o *Client) doWithRetries(req *http.Request, apiKey string) (*http.Response
 
 		err = fmt.Errorf("unsuccessful request: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 		if resp.StatusCode == http.StatusTooManyRequests {
+			log.Error("doWithRetries failed with http.StatusTooManyRequests", "provider", o.ID(), "elapsed time", b.GetElapsedTime(), "next backoff", b.NextBackOff())
 			return nil, err
 		}
 		return nil, backoff.Permanent(err)
 	}
 
-	return backoff.RetryWithData(op, &b)
+	return backoff.RetryWithData(op, b)
 }
 
 func (o *Client) FetchCollectibleOwnersByContractAddress(ctx context.Context, chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
@@ -197,7 +197,9 @@ func (o *Client) FetchCollectibleOwnersByContractAddress(ctx context.Context, ch
 
 		resp, err := o.doQuery(ctx, url, o.getAPIKey(chainID))
 		if err != nil {
-			o.connectionStatus.SetIsConnected(false)
+			if ctx.Err() == nil {
+				o.connectionStatus.SetIsConnected(false)
+			}
 			return nil, err
 		}
 		o.connectionStatus.SetIsConnected(true)
@@ -258,7 +260,9 @@ func (o *Client) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommon
 
 		resp, err := o.doQuery(ctx, url, o.getAPIKey(chainID))
 		if err != nil {
-			o.connectionStatus.SetIsConnected(false)
+			if ctx.Err() == nil {
+				o.connectionStatus.SetIsConnected(false)
+			}
 			return nil, err
 		}
 		o.connectionStatus.SetIsConnected(true)
@@ -398,7 +402,9 @@ func (o *Client) FetchCollectionsDataByContractID(ctx context.Context, contractI
 
 		resp, err := o.doQuery(ctx, url, o.getAPIKey(contractID.ChainID))
 		if err != nil {
-			o.connectionStatus.SetIsConnected(false)
+			if ctx.Err() == nil {
+				o.connectionStatus.SetIsConnected(false)
+			}
 			return nil, err
 		}
 		o.connectionStatus.SetIsConnected(true)
