@@ -506,6 +506,61 @@ func (x *ProfileShowcaseSocialLink) GetText() string {
 	return ""
 }
 
+type ProfileShowcaseSocialLink struct {
+	Url                  string   `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	Order                uint32   `protobuf:"varint,2,opt,name=order,proto3" json:"order,omitempty"`
+	Text                 string   `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ProfileShowcaseSocialLink) Reset()         { *m = ProfileShowcaseSocialLink{} }
+func (m *ProfileShowcaseSocialLink) String() string { return proto.CompactTextString(m) }
+func (*ProfileShowcaseSocialLink) ProtoMessage()    {}
+func (*ProfileShowcaseSocialLink) Descriptor() ([]byte, []int) {
+	return fileDescriptor_5bcd51b424a05798, []int{5}
+}
+
+func (m *ProfileShowcaseSocialLink) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ProfileShowcaseSocialLink.Unmarshal(m, b)
+}
+func (m *ProfileShowcaseSocialLink) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ProfileShowcaseSocialLink.Marshal(b, m, deterministic)
+}
+func (m *ProfileShowcaseSocialLink) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ProfileShowcaseSocialLink.Merge(m, src)
+}
+func (m *ProfileShowcaseSocialLink) XXX_Size() int {
+	return xxx_messageInfo_ProfileShowcaseSocialLink.Size(m)
+}
+func (m *ProfileShowcaseSocialLink) XXX_DiscardUnknown() {
+	xxx_messageInfo_ProfileShowcaseSocialLink.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ProfileShowcaseSocialLink proto.InternalMessageInfo
+
+func (m *ProfileShowcaseSocialLink) GetUrl() string {
+	if m != nil {
+		return m.Url
+	}
+	return ""
+}
+
+func (m *ProfileShowcaseSocialLink) GetOrder() uint32 {
+	if m != nil {
+		return m.Order
+	}
+	return 0
+}
+
+func (m *ProfileShowcaseSocialLink) GetText() string {
+	if m != nil {
+		return m.Text
+	}
+	return ""
+}
+
 type ProfileShowcaseEntries struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -589,6 +644,13 @@ func (x *ProfileShowcaseEntries) GetUnverifiedTokens() []*ProfileShowcaseUnverif
 func (x *ProfileShowcaseEntries) GetSocialLinks() []*ProfileShowcaseSocialLink {
 	if x != nil {
 		return x.SocialLinks
+	}
+	return nil
+}
+
+func (m *ProfileShowcaseEntries) GetSocialLinks() []*ProfileShowcaseSocialLink {
+	if m != nil {
+		return m.SocialLinks
 	}
 	return nil
 }
