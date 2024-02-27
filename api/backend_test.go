@@ -822,6 +822,7 @@ func TestLoginAccount(t *testing.T) {
 	utils.Init()
 	password := "some-password"
 	tmpdir := t.TempDir()
+	nameserver := "8.8.8.8"
 
 	b := NewGethStatusBackend()
 	createAccountRequest := &requests.CreateAccount{
@@ -832,15 +833,28 @@ func TestLoginAccount(t *testing.T) {
 		BackupDisabledDataDir: tmpdir,
 		NetworkID:             1,
 		LogFilePath:           tmpdir + "/log",
+		WakuV2Nameserver:      &nameserver,
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
-		if strings.Contains(string(data), "node.login") {
+		if strings.Contains(string(data), signal.EventLoggedIn) {
 			c <- struct{}{}
 		}
 	})
+	waitForLogin := func(chan interface{}) {
+		select {
+		case <-c:
+			break
+		case <-time.After(5 * time.Second):
+			t.FailNow()
+		}
+	}
+
 	_, err := b.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
+	require.Equal(t, nameserver, b.config.WakuV2Config.Nameserver)
+
+	waitForLogin(c)
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 
@@ -849,16 +863,15 @@ func TestLoginAccount(t *testing.T) {
 	require.Len(t, accounts, 1)
 
 	loginAccountRequest := &requests.Login{
-		KeyUID:   accounts[0].KeyUID,
-		Password: password,
+		KeyUID:           accounts[0].KeyUID,
+		Password:         password,
+		WakuV2Nameserver: nameserver,
 	}
-	require.NoError(t, b.LoginAccount(loginAccountRequest))
-	select {
-	case <-c:
-		break
-	case <-time.After(5 * time.Second):
-		t.FailNow()
-	}
+	err = b.LoginAccount(loginAccountRequest)
+	require.NoError(t, err)
+	waitForLogin(c)
+
+	require.Equal(t, nameserver, b.config.WakuV2Config.Nameserver)
 }
 
 func TestVerifyDatabasePassword(t *testing.T) {
