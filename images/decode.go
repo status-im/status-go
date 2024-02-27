@@ -31,7 +31,7 @@ func IsSVG(buf []byte) bool {
 	if len(buf) < 24 {
 		isBinary = false
 	}
-	for i := 0; i < 24; i++ {
+	for i := 0; i < 14; i++ {
 		charCode, _ := utf8.DecodeRuneInString(string(buf[i]))
 		if charCode == 65533 || charCode <= 8 {
 			isBinary = true
