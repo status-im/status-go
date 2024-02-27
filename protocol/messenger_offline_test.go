@@ -18,6 +18,9 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 )
 
+const minimumResendDelay = 500 * time.Millisecond
+const waitForResentDelay = minimumResendDelay + 100*time.Millisecond
+
 type MessengerOfflineSuite struct {
 	suite.Suite
 
@@ -91,7 +94,7 @@ func (s *MessengerOfflineSuite) newMessenger(waku types.Waku, logger *zap.Logger
 		testMessengerConfig: testMessengerConfig{
 			logger: s.logger,
 			extraOptions: []Option{
-				WithResendParams(3, 3),
+				WithResendParams(minimumResendDelay, 1),
 			},
 		},
 	})
@@ -134,7 +137,7 @@ func (s *MessengerOfflineSuite) TestCommunityOfflineEdit() {
 
 	// Check that message is re-sent once back online
 	wakuv2.SkipPublishToTopic(false)
-	time.Sleep(5 * time.Second)
+	time.Sleep(waitForResentDelay)
 
 	s.checkMessageDelivery(ctx, inputMessage)
 
@@ -151,7 +154,7 @@ func (s *MessengerOfflineSuite) TestCommunityOfflineEdit() {
 
 	// Check that message is re-sent once back online
 	wakuv2.SkipPublishToTopic(false)
-	time.Sleep(5 * time.Second)
+	time.Sleep(waitForResentDelay)
 	inputMessage.Text = editedText
 
 	s.checkMessageDelivery(ctx, inputMessage)

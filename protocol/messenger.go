@@ -684,7 +684,8 @@ func (m *Messenger) shouldResendMessage(message *common.RawMessage, t common.Tim
 		return false, nil
 	}
 	//exponential backoff depends on how many attempts to send message already made
-	backoff := uint64(math.Pow(2, float64(message.SendCount-1))) * uint64(m.config.messageResendMinDelay) * uint64(time.Second.Milliseconds())
+	power := math.Pow(2, float64(message.SendCount-1))
+	backoff := uint64(power) * uint64(m.config.messageResendMinDelay.Milliseconds())
 	backoffElapsed := t.GetCurrentTime() > (message.LastSent + backoff)
 	return backoffElapsed, nil
 }
