@@ -761,7 +761,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 			for _, member := range tc.originMembers {
 				_, err := origin.AddMember(member, []protobuf.CommunityMember_Roles{})
 				s.Require().NoError(err)
-				_, err = origin.AddMemberToChat(channelID, member, []protobuf.CommunityMember_Roles{})
+				_, err = origin.AddMemberToChat(channelID, member, []protobuf.CommunityMember_Roles{}, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
 				s.Require().NoError(err)
 			}
 
@@ -772,7 +772,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 			for _, member := range tc.modifiedMembers {
 				_, err := modified.AddMember(member, []protobuf.CommunityMember_Roles{})
 				s.Require().NoError(err)
-				_, err = modified.AddMemberToChat(channelID, member, []protobuf.CommunityMember_Roles{})
+				_, err = modified.AddMemberToChat(channelID, member, []protobuf.CommunityMember_Roles{}, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
 				s.Require().NoError(err)
 			}
 
@@ -972,7 +972,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestControlNodeChange() {
 				s.Require().NoError(err)
 			}
 			for _, member := range tc.channelMembers {
-				_, err = origin.AddMemberToChat(channelID, member, []protobuf.CommunityMember_Roles{})
+				_, err = origin.AddMemberToChat(channelID, member, []protobuf.CommunityMember_Roles{}, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
 				s.Require().NoError(err)
 			}
 

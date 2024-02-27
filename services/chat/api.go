@@ -77,8 +77,12 @@ type Chat struct {
 	FirstMessageTimestamp    uint32                             `json:"firstMessageTimestamp,omitempty"`
 	Highlight                bool                               `json:"highlight,omitempty"`
 	PinnedMessages           *PinnedMessages                    `json:"pinnedMessages,omitempty"`
-	CanPost                  bool                               `json:"canPost"`
-	Base64Image              string                             `json:"image,omitempty"`
+	// Deprecated: CanPost is deprecated in favor of CanPostMessages/CanPostReactions/etc.
+	// For now CanPost will equal to CanPostMessages.
+	CanPost          bool   `json:"canPost"`
+	CanPostMessages  bool   `json:"canPostMessages"`
+	CanPostReactions bool   `json:"canPostReactions"`
+	Base64Image      string `json:"image,omitempty"`
 }
 
 type ChannelGroup struct {
@@ -482,7 +486,12 @@ func (chat *Chat) populateCommunityFields(community *communities.Community) erro
 		return nil
 	}
 
-	canPost, err := community.CanMemberIdentityPost(chat.ID)
+	canPostMessages, err := community.CanMemberIdentityPost(chat.ID, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
+	if err != nil {
+		return err
+	}
+
+	canPostReactions, err := community.CanMemberIdentityPost(chat.ID, protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
 	if err != nil {
 		return err
 	}
@@ -493,7 +502,9 @@ func (chat *Chat) populateCommunityFields(community *communities.Community) erro
 	chat.Emoji = commChat.Identity.Emoji
 	chat.Name = commChat.Identity.DisplayName
 	chat.Description = commChat.Identity.Description
-	chat.CanPost = canPost
+	chat.CanPost = canPostMessages
+	chat.CanPostMessages = canPostMessages
+	chat.CanPostReactions = canPostReactions
 
 	return nil
 }

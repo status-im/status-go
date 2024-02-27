@@ -23,9 +23,16 @@ message CommunityMember {
     ROLE_ADMIN = 4;
     ROLE_TOKEN_MASTER = 5;
   }
+  enum ChannelRole {
+    // We make POSTER the first role to be the default one.
+    // This is for backwards compatibility. Older protobufs won't have this field and will default to 0.
+    CHANNEL_ROLE_POSTER = 0;
+    CHANNEL_ROLE_VIEWER = 1;
+  }
   repeated Roles roles = 1;
   repeated RevealedAccount revealed_accounts = 2 [deprecated = true];
   uint64 last_update_clock = 3;
+  ChannelRole channel_role = 4;
 }
 
 message CommunityTokenMetadata {
@@ -121,6 +128,7 @@ message CommunityChat {
   ChatIdentity identity = 3;
   string category_id = 4;
   int32 position = 5;
+  bool viewers_can_post_reactions = 6;
 }
 
 message CommunityCategory {

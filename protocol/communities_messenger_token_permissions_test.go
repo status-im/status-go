@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
@@ -159,11 +160,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	_, err = s.alice.Start()
 	s.Require().NoError(err)
 
-	s.mockedBalances = make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
-	s.mockedBalances[testChainID1] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
-	s.mockedBalances[testChainID1][gethcommon.HexToAddress(aliceAddress1)] = make(map[gethcommon.Address]*hexutil.Big)
-	s.mockedBalances[testChainID1][gethcommon.HexToAddress(aliceAddress2)] = make(map[gethcommon.Address]*hexutil.Big)
-	s.mockedBalances[testChainID1][gethcommon.HexToAddress(bobAddress)] = make(map[gethcommon.Address]*hexutil.Big)
+	s.resetMockedBalances()
 
 }
 
@@ -229,6 +226,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) makeAddressSatisfyTheCriteri
 	s.Require().True(ok)
 
 	s.mockedBalances[chainID][walletAddress][contractAddress] = (*hexutil.Big)(balance)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) resetMockedBalances() {
+	s.mockedBalances = make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	s.mockedBalances[testChainID1] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	s.mockedBalances[testChainID1][gethcommon.HexToAddress(aliceAddress1)] = make(map[gethcommon.Address]*hexutil.Big)
+	s.mockedBalances[testChainID1][gethcommon.HexToAddress(aliceAddress2)] = make(map[gethcommon.Address]*hexutil.Big)
+	s.mockedBalances[testChainID1][gethcommon.HexToAddress(bobAddress)] = make(map[gethcommon.Address]*hexutil.Big)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) waitOnKeyDistribution(condition func(*CommunityAndKeyActions) bool) <-chan error {
@@ -1002,8 +1007,25 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWith
 	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions() {
+func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(viewersCanAddReactions bool) {
 	community, chat := s.createCommunity()
+
+	// setup channel reactions permissions
+	editedChat := &protobuf.CommunityChat{
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: chat.Name,
+			Description: chat.Description,
+			Emoji:       chat.Emoji,
+			Color:       chat.Color,
+		},
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
+		},
+		ViewersCanPostReactions: viewersCanAddReactions,
+	}
+
+	_, err := s.owner.EditCommunityChat(community.ID(), chat.ID, editedChat)
+	s.Require().NoError(err)
 
 	// bob joins the community
 	s.advertiseCommunityTo(community, s.bob)
@@ -1016,18 +1038,23 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 	response, err := WaitOnMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
-			for _, message := range r.messages {
-				if message.Text == msg.Text {
-					return true
-				}
-			}
-			return false
+			_, ok := r.messages[msg.ID]
+			return ok
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+
+	waitOnBobToBeKickedFromChannel := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		channel, ok := sub.Community.Chats()[chat.CommunityChatID()]
+		return ok && len(channel.Members) == 1
+	})
+	waitOnChannelToBeRekeyedOnceBobIsKicked := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
+		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
+		return ok && (action.ActionType == communities.EncryptionKeyRekey || action.ActionType == communities.EncryptionKeyAdd)
+	})
 
 	// setup view channel permission
 	channelPermissionRequest := requests.CreateCommunityTokenPermission{
@@ -1044,24 +1071,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 		},
 		ChatIds: []string{chat.ID},
 	}
-
-	waitOnBobToBeKickedFromChannel := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
-		for channelID, channel := range sub.Community.Chats() {
-			if channelID == chat.CommunityChatID() && len(channel.Members) == 1 {
-				return true
-			}
-		}
-		return false
-	})
-	waitOnChannelToBeRekeyedOnceBobIsKicked := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
-		for channelID, action := range sub.keyActions.ChannelKeysActions {
-			// We both listen for Rekey or Add, since the first time around the community goes from non-encrypted to encrypted, and that's an Add
-			if channelID == chat.CommunityChatID() && (action.ActionType == communities.EncryptionKeyRekey || action.ActionType == communities.EncryptionKeyAdd) {
-				return true
-			}
-		}
-		return false
-	})
 
 	response, err = s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)
 	s.Require().NoError(err)
@@ -1080,15 +1089,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 	_, err = WaitOnMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
-			community, err := s.bob.GetCommunityByID(community.ID())
+			c, err := s.bob.GetCommunityByID(community.ID())
 			if err != nil {
 				return false
 			}
-
-			if community == nil {
+			if c == nil {
 				return false
 			}
-			channel := community.Chats()[chat.CommunityChatID()]
+			channel := c.Chats()[chat.CommunityChatID()]
 			return channel != nil && len(channel.Members) == 0
 		},
 		"no community that satisfies criteria",
@@ -1097,19 +1105,15 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 
 	// make bob satisfy channel criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, channelPermissionRequest.TokenCriteria[0])
+	defer s.resetMockedBalances() // reset mocked balances, this test in run with different test cases
 
 	waitOnChannelKeyToBeDistributedToBob := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
-		for channelID, action := range sub.keyActions.ChannelKeysActions {
-			if channelID == chat.CommunityChatID() && action.ActionType == communities.EncryptionKeySendToMembers {
-				for memberPubKey := range action.Members {
-					if memberPubKey == common.PubkeyToHex(&s.bob.identity.PublicKey) {
-						return true
-					}
-
-				}
-			}
+		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
+		if !ok || action.ActionType != communities.EncryptionKeySendToMembers {
+			return false
 		}
-		return false
+		_, ok = action.Members[common.PubkeyToHex(&s.bob.identity.PublicKey)]
+		return ok
 	})
 
 	// force owner to reevaluate channel members
@@ -1129,18 +1133,64 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 	response, err = WaitOnMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
-			for _, message := range r.messages {
-				if message.Text == msg.Text {
-					return true
-				}
-			}
-			return false
+			_, ok := r.messages[msg.ID]
+			return ok
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+
+	// bob can/can't post reactions
+	response, err = s.bob.SendEmojiReaction(context.Background(), chat.ID, msg.ID, protobuf.EmojiReaction_THUMBS_UP)
+	if !viewersCanAddReactions {
+		s.Require().Error(err)
+	} else {
+		s.Require().NoError(err)
+		s.Require().Len(response.emojiReactions, 1)
+		reactionMessage := response.EmojiReactions()[0]
+
+		response, err = WaitOnMessengerResponse(
+			s.owner,
+			func(r *MessengerResponse) bool {
+				_, ok := r.emojiReactions[reactionMessage.ID()]
+				return ok
+			},
+			"no reactions received",
+		)
+
+		if viewersCanAddReactions {
+			s.Require().NoError(err)
+			s.Require().Len(response.EmojiReactions(), 1)
+			s.Require().Equal(response.EmojiReactions()[0].Type, protobuf.EmojiReaction_THUMBS_UP)
+		} else {
+			s.Require().Error(err)
+			s.Require().Len(response.EmojiReactions(), 0)
+		}
+	}
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions() {
+	testCases := []struct {
+		name                    string
+		viewersCanPostReactions bool
+	}{
+		{
+			name:                    "viewers are allowed to post reactions",
+			viewersCanPostReactions: true,
+		},
+		{
+			name:                    "viewers are forbidden to post reactions",
+			viewersCanPostReactions: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		s.T().Run(tc.name, func(*testing.T) {
+			s.testViewChannelPermissions(tc.viewersCanPostReactions)
+		})
+	}
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivilegedRoleInOpenCommunity(permissionType protobuf.CommunityTokenPermission_Type) {

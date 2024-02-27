@@ -568,15 +568,15 @@ func waitOnCommunitiesEvent(user *Messenger, condition func(*communities.Subscri
 
 	go func() {
 		defer close(errCh)
+		subscription := user.communitiesManager.Subscribe()
 
 		for {
 			select {
-			case sub, more := <-user.communitiesManager.Subscribe():
+			case sub, more := <-subscription:
 				if !more {
 					errCh <- errors.New("channel closed when waiting for communities event")
 					return
 				}
-
 				if condition(sub) {
 					return
 				}
