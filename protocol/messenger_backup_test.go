@@ -693,7 +693,6 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 	s.Require().Equal(clock, lastBackup)
 }
 
-/*
 func (s *MessengerBackupSuite) TestBackupKeypairs() {
 	// Create bob1
 	bob1 := s.m
@@ -747,7 +746,6 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 	s.Require().NoError(err)
 	s.Require().True(accounts.SameKeypairsWithDifferentSyncedFrom(seedKp, dbSeedKp2, false, accounts.SyncedFromBackup, accounts.AccountNonOperable))
 }
-*/
 
 func (s *MessengerBackupSuite) TestBackupKeycards() {
 	// Create bob1

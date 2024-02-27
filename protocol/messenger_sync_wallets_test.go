@@ -445,7 +445,6 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	s.Require().Equal(dbClock, dbClockOtherDevice)
 }
 
-/*
 func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	profileKp := accounts.GetProfileKeypairForTest(true, true, true)
 	// set clocks for accounts
@@ -545,11 +544,9 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 			return err
 		}
 
-                // we don't include chat account in position ordering
 		if len(response.Keypairs) != 3 || // 3 keypairs (profile, seed, priv key)
 			len(response.WatchOnlyAccounts) != len(woAccounts) ||
-			len(response.AccountsPositions) != totalNumOfAccounts-1
-                        {
+			len(response.AccountsPositions) != totalNumOfAccounts-1 /* we don't include chat account in position ordering*/ {
 			return errors.New("no sync wallet account received")
 		}
 		return nil
@@ -622,4 +619,3 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 
 	s.Require().True(haveSameElements(dbAccounts1, dbAccounts2, accounts.SameAccountsIncludingPosition))
 }
-*/

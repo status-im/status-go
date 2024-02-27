@@ -2,11 +2,10 @@ package transactions
 
 import (
 	"context"
-	//"database/sql"
+	"database/sql"
 	"encoding/json"
 	"math/big"
-
-	//"sync"
+	"sync"
 	"testing"
 	"time"
 
@@ -423,7 +422,6 @@ func TestPendingTxTracker_Watch(t *testing.T) {
 	sub.Unsubscribe()
 }
 
-/*
 func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 	m, stop, chainClient, eventFeed := setupTestTransactionDB(t, common.NewAndSet(1*time.Nanosecond))
 	defer stop()
@@ -538,7 +536,6 @@ func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 
 	sub.Unsubscribe()
 }
-*/
 
 func TestPendingTransactions(t *testing.T) {
 	manager, stop, _, _ := setupTestTransactionDB(t, nil)

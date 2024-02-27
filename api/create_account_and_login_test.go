@@ -1,15 +1,16 @@
 package api
 
-//"encoding/json"
-//"fmt"
-//"testing"
-//"time"
+import (
+	"encoding/json"
+	"fmt"
+	"testing"
+	"time"
 
-//"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/require"
 
-//"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/requests"
+)
 
-/*
 func TestCreateAccountAndLogin(t *testing.T) {
 	rootDir := t.TempDir()
 	t.Logf("TestCreateAccountAndLogin: rootDir: %s", rootDir)
@@ -60,4 +61,3 @@ func TestCreateAccountAndLogin(t *testing.T) {
 	_, err = statusBackend.CreateAccountAndLogin(&request)
 	require.NoError(t, err)
 }
-*/
