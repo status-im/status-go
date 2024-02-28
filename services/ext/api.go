@@ -872,6 +872,10 @@ func (api *PublicAPI) DismissLatestContactRequestForContact(ctx context.Context,
 	return api.service.messenger.DismissLatestContactRequestForContact(ctx, request)
 }
 
+func (api *PublicAPI) GetLatestContactRequestForContact(ctx context.Context, contactID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.GetLatestContactRequestForContact(contactID)
+}
+
 func (api *PublicAPI) RetractContactRequest(ctx context.Context, request *requests.RetractContactRequest) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RetractContactRequest(request)
 }

@@ -149,6 +149,13 @@ func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string,
 	s.Require().Greater(len(contactRequests), 0)
 	s.Require().Equal(contactRequests[0].ID, contactRequest.ID)
 
+	// Confirm latest pending contact request
+	resp, err = theirMessenger.GetLatestContactRequestForContact(contactRequest.From)
+	s.Require().NoError(err)
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(contactRequest.ID, resp.Messages()[0].ID)
+	s.Require().Equal(common.ContactRequestStatePending, resp.Messages()[0].ContactRequestState)
+
 	return contactRequest
 }
 
@@ -242,6 +249,13 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(
 	// Make sure we consider them a mutual contact, receiver side
 	mutualContacts := receiver.MutualContacts()
 	s.Require().Len(mutualContacts, 1)
+
+	// Confirm latest pending contact request
+	resp, err = receiver.GetLatestContactRequestForContact(sender.IdentityPublicKeyString())
+	s.Require().NoError(err)
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(contactRequest.ID, resp.Messages()[0].ID)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(sender,
