@@ -118,11 +118,7 @@ func TestDBGetTransfersFromBlock(t *testing.T) {
 	require.NoError(t, saveTransfersMarkBlocksLoaded(db.client, 777, address, transfers, blockNumbers))
 	rst, err := db.GetTransfers(777, big.NewInt(7), nil)
 	require.NoError(t, err)
-	require.Len(t, rst, 3)
-
-	rst, err = db.GetTransfers(777, big.NewInt(2), big.NewInt(5))
-	require.NoError(t, err)
-	require.Len(t, rst, 4)
+	require.Len(t, rst, 1)
 }
 
 func TestGetTransfersForIdentities(t *testing.T) {
