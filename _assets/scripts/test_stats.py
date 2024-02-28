@@ -6,7 +6,7 @@ from collections import defaultdict
 
 test_stats = defaultdict(lambda: defaultdict(int))
 
-for file in glob.glob("**/report.xml", recursive=True):
+for file in glob.glob("**/report_*.xml", recursive=True):
     tree = ET.parse(file)
     root = tree.getroot()
     for testcase in root.iter("testcase"):

@@ -116,19 +116,19 @@ pipeline {
       script { env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText" }
       script {
         if (isTestNightlyJob()) {
-          archiveArtifacts artifacts: '**/report.xml, **/test.log'
+          archiveArtifacts artifacts: '**/report_*.xml, **/test_*.log'
 
-          def totalSize = sh(script: "find . -name 'report.xml' | xargs wc -c | tail -n1 | awk '{print \$1}'", returnStdout: true).trim()
-          echo "Total size of all report.xml files: ${totalSize} bytes"
+          def totalSize = sh(script: "find . -name 'report_*.xml' | xargs wc -c | tail -n1 | awk '{print \$1}'", returnStdout: true).trim()
+          echo "Total size of all report_*.xml files: ${totalSize} bytes"
         }
         if (params.UNIT_TEST_RERUN_FAILS) {
-          def rerunReports = findFiles(glob: '**/report_rerun_fails.txt')
+          def rerunReports = findFiles(glob: '**/report_rerun_fails_*.txt')
           if (rerunReports.length > 0) {
-            archiveArtifacts artifacts: '**/report_rerun_fails.txt'
+            archiveArtifacts artifacts: '**/report_rerun_fails_*.txt'
           }
         }
       }
-      junit testResults:          '**/report.xml',
+      junit testResults:          '**/report_*.xml',
             skipOldReports:       true,
             skipPublishingChecks: true,
             skipMarkingBuildUnstable: true
