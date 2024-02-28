@@ -108,6 +108,7 @@ type CommunityChat struct {
 	Position                int                                  `json:"position"`
 	CategoryID              string                               `json:"categoryID"`
 	TokenGated              bool                                 `json:"tokenGated"`
+	HideIfPermissionsNotMet bool                                 `json:"hideIfPermissionsNotMet"`
 }
 
 type CommunityCategory struct {
@@ -197,6 +198,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 				ViewersCanPostReactions: c.ViewersCanPostReactions,
 				TokenGated:              o.channelEncrypted(id),
 				CategoryID:              c.CategoryId,
+				HideIfPermissionsNotMet: c.HideIfPermissionsNotMet,
 				Position:                int(c.Position),
 			}
 			communityItem.Chats[id] = chat
@@ -337,6 +339,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				ViewersCanPostReactions: c.ViewersCanPostReactions,
 				TokenGated:              o.channelEncrypted(id),
 				CategoryID:              c.CategoryId,
+				HideIfPermissionsNotMet: c.HideIfPermissionsNotMet,
 				Position:                int(c.Position),
 			}
 			communityItem.Chats[id] = chat

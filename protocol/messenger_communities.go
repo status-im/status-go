@@ -2950,11 +2950,13 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 			oldChat.Description != chat.Description ||
 			oldChat.Emoji != chat.Emoji ||
 			oldChat.Color != chat.Color ||
+			oldChat.HideIfPermissionsNotMet != chat.HideIfPermissionsNotMet ||
 			oldChat.UpdateFirstMessageTimestamp(chat.FirstMessageTimestamp) {
 			oldChat.Name = chat.Name
 			oldChat.Description = chat.Description
 			oldChat.Emoji = chat.Emoji
 			oldChat.Color = chat.Color
+			oldChat.HideIfPermissionsNotMet = chat.HideIfPermissionsNotMet
 			// TODO(samyoul) remove storing of an updated reference pointer?
 			state.AllChats.Store(chat.ID, oldChat)
 			state.Response.AddChat(chat)

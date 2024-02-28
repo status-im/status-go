@@ -322,6 +322,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 			Emoji:       "😎",
 			Description: "status-core community chat",
 		},
+		HideIfPermissionsNotMet: true,
 	}
 	response, err = s.bob.CreateCommunityChat(community.ID(), orgChat)
 	s.Require().NoError(err)
@@ -338,6 +339,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().True(createdChat.Active)
 	s.Require().NotEmpty(createdChat.Timestamp)
 	s.Require().True(strings.HasPrefix(createdChat.ID, community.IDString()))
+	s.Require().True(createdChat.HideIfPermissionsNotMet)
 
 	// Make sure the changes are reflect in the community
 	community = response.Communities()[0]

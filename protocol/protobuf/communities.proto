@@ -129,6 +129,7 @@ message CommunityChat {
   string category_id = 4;
   int32 position = 5;
   bool viewers_can_post_reactions = 6;
+  bool hide_if_permissions_not_met = 7;
 }
 
 message CommunityCategory {
