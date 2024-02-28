@@ -231,7 +231,12 @@ func login(accountData, password, configJSON string) error {
 
 	api.RunAsync(func() error {
 		log.Debug("start a node with account", "key-uid", account.KeyUID)
-		err := statusBackend.StartNodeWithAccount(account, password, &conf)
+		err := statusBackend.UpdateNodeConfigFleet(account, password, &conf)
+		if err != nil {
+			return err
+		}
+
+		err = statusBackend.StartNodeWithAccount(account, password, &conf)
 		if err != nil {
 			log.Error("failed to start a node", "key-uid", account.KeyUID, "error", err)
 			return err
