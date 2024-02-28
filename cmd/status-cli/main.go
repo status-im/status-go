@@ -2,10 +2,14 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -36,6 +40,10 @@ import (
 const LightFlag = "light"
 const InteractiveFlag = "interactive"
 
+const RetrieveInterval = 300 * time.Millisecond
+const SendInterval = 1 * time.Second
+const WaitingInterval = 5 * time.Second
+
 var logger *zap.SugaredLogger
 
 type StatusCLI struct {
@@ -64,6 +72,8 @@ func main() {
 					},
 				},
 				Action: func(cCtx *cli.Context) error {
+					ctx, cancel := context.WithCancel(cCtx.Context)
+
 					rawLogger, err := zap.NewDevelopment()
 					if err != nil {
 						log.Fatalf("Error initializing logger: %v", err)
@@ -100,27 +110,44 @@ func main() {
 					}
 
 					// Send DM between alice to bob
-					retrieveMessagesLoop(alice, 300*time.Millisecond, cCtx.Done())
-					retrieveMessagesLoop(bob, 300*time.Millisecond, cCtx.Done())
+					var wg sync.WaitGroup
+
+					wg.Add(1)
+					go retrieveMessagesLoop(alice, RetrieveInterval, ctx, &wg)
+					wg.Add(1)
+					go retrieveMessagesLoop(bob, RetrieveInterval, ctx, &wg)
 
 					interactive := cCtx.Bool(InteractiveFlag)
 
 					if interactive {
-						sendMessageLoop(cCtx, alice)
-						sendMessageLoop(cCtx, bob)
+						sem := make(chan struct{}, 1)
+						wg.Add(1)
+						go sendMessageLoop(alice, SendInterval, ctx, &wg, sem, cancel)
+						wg.Add(1)
+						go sendMessageLoop(bob, SendInterval, ctx, &wg, sem, cancel)
 					} else {
-						err = sendDirectMessage(cCtx, alice, "Hello Bob!")
+						err = sendDirectMessage(alice, "Hello Bob, I'm Alice!", ctx)
 						if err != nil {
 							return err
 						}
 
-						err = sendDirectMessage(cCtx, bob, "Hello Alice!")
+						err = sendDirectMessage(bob, "Hello Alice, I'm Bob!", ctx)
 						if err != nil {
 							return err
 						}
+
+						time.Sleep(WaitingInterval)
+						cancel()
 					}
 
-					<-cCtx.Done()
+					go func() {
+						sig := make(chan os.Signal, 1)
+						signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+						<-sig
+						cancel()
+					}()
+
+					wg.Wait()
 					logger.Info("Exiting")
 
 					return nil
@@ -209,7 +236,7 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCLI, error) {
 	id := types.EncodeHex(crypto.FromECDSAPub(messenger.IdentityPublicKey()))
 	namedLogger.Info("messenger started, id: ", id)
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(WaitingInterval)
 
 	data := StatusCLI{
 		name:      name,
@@ -257,6 +284,10 @@ func sendContactRequest(cCtx *cli.Context, from, to *StatusCLI) (string, error) 
 		return "", err
 	}
 
+	for _, message := range respTo.Messages() {
+		to.logger.Info("receive message: ", message)
+	}
+
 	msg := protocol.FindFirstByContentType(respTo.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
 	to.logger.Info("receive contact request response: ", msg.Text)
 
@@ -294,7 +325,7 @@ func sendContactRequestAcceptance(cCtx *cli.Context, from, to *StatusCLI, msgID 
 	return nil
 }
 
-func sendDirectMessage(cCtx *cli.Context, from *StatusCLI, text string) error {
+func sendDirectMessage(from *StatusCLI, text string, ctx context.Context) error {
 	chat := from.messenger.Chat(from.messenger.MutualContacts()[0].ID)
 	from.logger.Info("chat with contact id: ", chat.ID)
 
@@ -308,7 +339,7 @@ func sendDirectMessage(cCtx *cli.Context, from *StatusCLI, text string) error {
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = text
 
-	resp, err := from.messenger.SendChatMessage(cCtx.Context, inputMessage)
+	resp, err := from.messenger.SendChatMessage(ctx, inputMessage)
 	if err != nil {
 		return err
 	}
@@ -337,52 +368,70 @@ func setupLogger(file string) *zap.Logger {
 	return newLogger
 }
 
-func retrieveMessagesLoop(cli *StatusCLI, tick time.Duration, cancel <-chan struct{}) {
-	go func() {
-		ticker := time.NewTicker(tick)
-		defer ticker.Stop()
+func retrieveMessagesLoop(cli *StatusCLI, tick time.Duration, ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
 
-		for {
-			select {
-			case <-ticker.C:
-				response, err := cli.messenger.RetrieveAll()
-				if err != nil {
-					cli.logger.Error("failed to retrieve raw messages", "err", err)
-					continue
-				}
-				if response != nil && len(response.Chats()) != 0 {
-					for _, chat := range response.Chats() {
-						cli.logger.Infof("receive message from: %s\n", chat.LastMessage.Text)
-					}
-				}
-			case <-cancel:
-				return
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			response, err := cli.messenger.RetrieveAll()
+			if err != nil {
+				cli.logger.Error("failed to retrieve raw messages", "err", err)
+				continue
 			}
+			if response != nil && len(response.Messages()) != 0 {
+				for _, message := range response.Messages() {
+					cli.logger.Infof("receive message: %s\n", message.Text)
+				}
+			}
+		case <-ctx.Done():
+			return
 		}
-	}()
+	}
 }
 
-func sendMessageLoop(cCtx *cli.Context, cli *StatusCLI) {
-	go func() {
-		for {
-			select {
-			case <-cCtx.Done():
-				return
-			default:
-				cli.logger.Info("Enter message to send: ")
-				reader := bufio.NewReader(os.Stdin)
-				message, err := reader.ReadString('\n')
-				if err != nil {
-					cli.logger.Error("failed to read input", err)
-					continue
-				}
+func sendMessageLoop(cli *StatusCLI, tick time.Duration, ctx context.Context, wg *sync.WaitGroup, sem chan struct{}, cancel context.CancelFunc) {
+	defer wg.Done()
 
-				err = sendDirectMessage(cCtx, cli, message)
-				if err != nil {
-					cli.logger.Error("failed to send direct message", err)
-					continue
-				}
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
+
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		select {
+		case <-ticker.C:
+			sem <- struct{}{}
+			cli.logger.Info("Enter your message to send: (type 'quit' or 'q' to exit)")
+			message, err := reader.ReadString('\n')
+			if err != nil {
+				<-sem
+				cli.logger.Error("failed to read input", err)
+				continue
 			}
+
+			message = strings.TrimSpace(message)
+			if message == "quit" || message == "q" || strings.Contains(message, "\x03") {
+				cancel()
+				<-sem
+				return
+			}
+			if message == "" {
+				<-sem
+				continue
+			}
+
+			err = sendDirectMessage(cli, message, ctx)
+			time.Sleep(WaitingInterval)
+			<-sem
+			if err != nil {
+				cli.logger.Error("failed to send direct message", err)
+				continue
+			}
+		case <-ctx.Done():
+			return
 		}
-	}()
+	}
 }
