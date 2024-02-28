@@ -33,6 +33,7 @@ import (
 )
 
 const LightFlag = "light"
+const InteractiveFlag = "interactive"
 
 var logger *zap.SugaredLogger
 
@@ -54,6 +55,11 @@ func main() {
 					&cli.BoolFlag{
 						Name:  LightFlag,
 						Usage: "Enable light mode",
+					},
+					&cli.BoolFlag{
+						Name:    InteractiveFlag,
+						Aliases: []string{"i"},
+						Usage:   "Use interactive mode",
 					},
 				},
 				Action: func(cCtx *cli.Context) error {
@@ -93,12 +99,34 @@ func main() {
 					}
 
 					// Send DM between alice to bob
-					err = sendDirectMessage(cCtx, alice, bob, "Hello Bob!")
+					retrieveMessagesLoop(alice, 300*time.Millisecond, cCtx.Done())
+					retrieveMessagesLoop(bob, 300*time.Millisecond, cCtx.Done())
+
+					interactive := cCtx.Bool(InteractiveFlag)
+
+					message := "Hello Bob!"
+					if interactive {
+						alice.logger.Info("Enter message to send to Bob: ")
+						_, err := fmt.Scanln(&message)
+						if err != nil {
+							return err
+						}
+					}
+
+					err = sendDirectMessage(cCtx, alice, message)
 					if err != nil {
 						return err
 					}
 
-					err = sendDirectMessage(cCtx, bob, alice, "Hello Alice!")
+					respond := "Hello Alice!"
+					if interactive {
+						bob.logger.Info("Enter message to send to Alice: ")
+						_, err := fmt.Scanln(&respond)
+						if err != nil {
+							return err
+						}
+					}
+					err = sendDirectMessage(cCtx, bob, respond)
 					if err != nil {
 						return err
 					}
@@ -274,7 +302,7 @@ func sendContactRequestAcceptance(cCtx *cli.Context, from, to *StatusCLI, msgID 
 	return nil
 }
 
-func sendDirectMessage(cCtx *cli.Context, from, to *StatusCLI, text string) error {
+func sendDirectMessage(cCtx *cli.Context, from *StatusCLI, text string) error {
 	chat := from.messenger.Chat(from.messenger.MutualContacts()[0].ID)
 	from.logger.Info("chat with contact id: ", chat.ID)
 
@@ -293,16 +321,6 @@ func sendDirectMessage(cCtx *cli.Context, from, to *StatusCLI, text string) erro
 		return err
 	}
 	from.logger.Info("function SendChatMessage response.messages: ", resp.Messages())
-
-	respTo, err := protocol.WaitOnMessengerResponse(
-		to.messenger,
-		func(r *protocol.MessengerResponse) bool { return len(r.Messages()) > 0 },
-		fmt.Sprintf("%s not receive message from %s", to.name, from.name),
-	)
-	if err != nil {
-		return err
-	}
-	to.logger.Infof("receive message from %s: %s\n", from.name, respTo.Chats()[0].LastMessage.Text)
 
 	return nil
 }
@@ -325,4 +343,29 @@ func setupLogger(file string) *zap.Logger {
 	newLogger := logutils.ZapLogger()
 
 	return newLogger
+}
+
+func retrieveMessagesLoop(cli *StatusCLI, tick time.Duration, cancel <-chan struct{}) {
+	go func() {
+		ticker := time.NewTicker(tick)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				response, err := cli.messenger.RetrieveAll()
+				if err != nil {
+					cli.logger.Error("failed to retrieve raw messages", "err", err)
+					continue
+				}
+				if response != nil && len(response.Chats()) != 0 {
+					for _, chat := range response.Chats() {
+						cli.logger.Infof("receive message from: %s\n", chat.LastMessage.Text)
+					}
+				}
+			case <-cancel:
+				return
+			}
+		}
+	}()
 }
