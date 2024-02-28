@@ -591,6 +591,9 @@ func (p *Persistence) GetPermissionTokenCriteriaResult(permissionID string, comm
 
 	criteria := make([]bool, 0)
 	for _, r := range strings.Split(criteriaString, ",") {
+		if r == "" {
+			continue
+		}
 		val, err := strconv.ParseBool(r)
 		if err != nil {
 			return nil, err
