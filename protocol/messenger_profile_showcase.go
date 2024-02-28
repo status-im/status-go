@@ -669,6 +669,9 @@ func (m *Messenger) DeleteProfileShowcaseCommunity(community *communities.Commun
 }
 
 func (m *Messenger) saveProfileShowcasePreferencesProto(p *protobuf.SyncProfileShowcasePreferences, shouldSync bool) (*identity.ProfileShowcasePreferences, error) {
+	if p == nil {
+		return nil, nil
+	}
 	preferences := FromProfileShowcasePreferencesProto(p)
 	return preferences, m.setProfileShowcasePreferences(preferences, shouldSync)
 }
