@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
@@ -104,32 +105,23 @@ func main() {
 
 					interactive := cCtx.Bool(InteractiveFlag)
 
-					message := "Hello Bob!"
 					if interactive {
-						alice.logger.Info("Enter message to send to Bob: ")
-						_, err := fmt.Scanln(&message)
+						sendMessageLoop(cCtx, alice)
+						sendMessageLoop(cCtx, bob)
+					} else {
+						err = sendDirectMessage(cCtx, alice, "Hello Bob!")
+						if err != nil {
+							return err
+						}
+
+						err = sendDirectMessage(cCtx, bob, "Hello Alice!")
 						if err != nil {
 							return err
 						}
 					}
 
-					err = sendDirectMessage(cCtx, alice, message)
-					if err != nil {
-						return err
-					}
-
-					respond := "Hello Alice!"
-					if interactive {
-						bob.logger.Info("Enter message to send to Alice: ")
-						_, err := fmt.Scanln(&respond)
-						if err != nil {
-							return err
-						}
-					}
-					err = sendDirectMessage(cCtx, bob, respond)
-					if err != nil {
-						return err
-					}
+					<-cCtx.Done()
+					logger.Info("Exiting")
 
 					return nil
 				},
@@ -365,6 +357,31 @@ func retrieveMessagesLoop(cli *StatusCLI, tick time.Duration, cancel <-chan stru
 				}
 			case <-cancel:
 				return
+			}
+		}
+	}()
+}
+
+func sendMessageLoop(cCtx *cli.Context, cli *StatusCLI) {
+	go func() {
+		for {
+			select {
+			case <-cCtx.Done():
+				return
+			default:
+				cli.logger.Info("Enter message to send: ")
+				reader := bufio.NewReader(os.Stdin)
+				message, err := reader.ReadString('\n')
+				if err != nil {
+					cli.logger.Error("failed to read input", err)
+					continue
+				}
+
+				err = sendDirectMessage(cCtx, cli, message)
+				if err != nil {
+					cli.logger.Error("failed to send direct message", err)
+					continue
+				}
 			}
 		}
 	}()
