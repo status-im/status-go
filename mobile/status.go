@@ -233,7 +233,8 @@ func login(accountData, password, configJSON string) error {
 		log.Debug("start a node with account", "key-uid", account.KeyUID)
 		err := statusBackend.UpdateNodeConfigFleet(account, password, &conf)
 		if err != nil {
-			return err
+			log.Error("failed to update node config fleet", "key-uid", account.KeyUID, "error", err)
+			return statusBackend.LoggedIn(account.KeyUID, err)
 		}
 
 		err = statusBackend.StartNodeWithAccount(account, password, &conf)
