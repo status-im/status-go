@@ -292,22 +292,35 @@ func (h *HopBridge) swapAndSend(chainID uint64, hopArgs *HopTxArgs, signerFn bin
 		return tx, err
 	}
 
+	toNetwork := h.contractMaker.RPCClient.NetworkManager.Find(hopArgs.ChainID)
+	if toNetwork == nil {
+		return tx, err
+	}
+
 	txOpts := hopArgs.ToTransactOpts(signerFn)
 	if token.IsNative() {
 		txOpts.Value = (*big.Int)(hopArgs.Amount)
 	}
 	now := time.Now()
 	deadline := big.NewInt(now.Unix() + 604800)
+	amountOutMin := big.NewInt(0)
+	destinationDeadline := big.NewInt(now.Unix() + 604800)
+	destinationAmountOutMin := big.NewInt(0)
+
+	if toNetwork.Layer == 1 {
+		destinationDeadline = big.NewInt(0)
+	}
+
 	tx, err = ammWrapper.SwapAndSend(
 		txOpts,
 		big.NewInt(int64(hopArgs.ChainID)),
 		hopArgs.Recipient,
 		hopArgs.Amount.ToInt(),
 		hopArgs.BonderFee.ToInt(),
-		big.NewInt(0),
+		amountOutMin,
 		deadline,
-		big.NewInt(0),
-		deadline,
+		destinationAmountOutMin,
+		destinationDeadline,
 	)
 
 	return tx, err
