@@ -23,14 +23,13 @@ if [[ -z "${UNIT_TEST_COUNT}" ]]; then
   UNIT_TEST_COUNT=1
 fi
 
-UNIT_TEST_PACKAGE_TIMEOUT="$((UNIT_TEST_COUNT * 2))m"
-UNIT_TEST_PACKAGE_TIMEOUT_EXTENDED="$((UNIT_TEST_COUNT * 30))m"
+UNIT_TEST_PACKAGE_TIMEOUT="2m"
+UNIT_TEST_PACKAGE_TIMEOUT_EXTENDED="30m"
 
 redirect_stdout() {
   output_file=$1
 
-  if [[ "${CI}" == 'true' ]];
-  then
+  if [[ "${CI}" == 'true' ]]; then
     cat > "${output_file}";
   else
     tee "${output_file}";
@@ -47,12 +46,12 @@ has_extended_timeout() {
   return 1
 }
 
-last_failing_exit_code=0
-
-for package in ${UNIT_TEST_PACKAGES}; do
-  echo -e "${GRN}Testing:${RST} ${package} Count:${UNIT_TEST_COUNT}"
+run_test_for_package() {
+  local package=$1
+  local iteration=$2
+  echo -e "${GRN}Testing:${RST} ${package} Iteration:${iteration}"
   package_dir=$(go list -f "{{.Dir}}" "${package}")
-  output_file=${package_dir}/test.log
+  output_file="${package_dir}/test_${iteration}.log"
 
   if has_extended_timeout "${package}"; then
     package_timeout="${UNIT_TEST_PACKAGE_TIMEOUT_EXTENDED}"
@@ -60,30 +59,42 @@ for package in ${UNIT_TEST_PACKAGES}; do
     package_timeout="${UNIT_TEST_PACKAGE_TIMEOUT}"
   fi
 
+  local report_file="${package_dir}/report_${iteration}.xml"
+  local rerun_report_file="${package_dir}/report_rerun_fails_${iteration}.txt"
+
   gotestsum_flags="${GOTESTSUM_EXTRAFLAGS}"
   if [[ "${CI}" == 'true' ]]; then
-    gotestsum_flags="${gotestsum_flags} --junitfile=${package_dir}/report.xml --rerun-fails-report=${package_dir}/report_rerun_fails.txt"
+    gotestsum_flags="${gotestsum_flags} --junitfile=${report_file} --rerun-fails-report=${rerun_report_file}"
   fi
 
   gotestsum --packages="${package}" ${gotestsum_flags} -- \
     -v ${GOTEST_EXTRAFLAGS} \
     -timeout "${package_timeout}" \
-    -count "${UNIT_TEST_COUNT}" \
+    -count 1 \
     -tags "${BUILD_TAGS}" | \
     redirect_stdout "${output_file}"
-  go_test_exit=$?
+  return $?
+}
 
-  if [[ "${go_test_exit}" -ne 0 ]]; then
-    if [[ "${CI}" == 'true' ]]; then
-      echo -e "${YLW}Failed, see the log:${RST} ${BLD}${output_file}${RST}"
+last_failing_exit_code=0
+
+for package in ${UNIT_TEST_PACKAGES}; do
+  for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
+    run_test_for_package "${package}" "${i}"
+    go_test_exit=$?
+
+    if [[ "${go_test_exit}" -ne 0 ]]; then
+      if [[ "${CI}" == 'true' ]]; then
+        echo -e "${YLW}Failed, see the log:${RST} ${BLD}${output_file}${RST}"
+      fi
+
+      if [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
+        exit "${go_test_exit}"
+      fi
+
+      last_failing_exit_code="${go_test_exit}"
     fi
-
-    if [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
-      exit "${go_test_exit}"
-    fi
-
-    last_failing_exit_code="${go_test_exit}"
-  fi
+  done
 done
 
 if [[ "${last_failing_exit_code}" -ne 0 ]]; then
