@@ -176,8 +176,9 @@ func (s *CommunitySuite) TestEditChat() {
 	}
 
 	_, err := org.CreateChat(newChatID, &protobuf.CommunityChat{
-		Identity:    identity,
-		Permissions: permissions,
+		Identity:                identity,
+		Permissions:             permissions,
+		HideIfPermissionsNotMet: false,
 	})
 	s.Require().NoError(err)
 
@@ -203,8 +204,9 @@ func (s *CommunitySuite) TestEditChat() {
 	org.config.PrivateKey = s.identity
 	org.config.ID = &s.identity.PublicKey
 	editChanges, err := org.EditChat(newChatID, &protobuf.CommunityChat{
-		Identity:    editedIdentity,
-		Permissions: editedPermissions,
+		Identity:                editedIdentity,
+		Permissions:             editedPermissions,
+		HideIfPermissionsNotMet: true,
 	})
 
 	s.Require().NoError(err)
@@ -218,6 +220,7 @@ func (s *CommunitySuite) TestEditChat() {
 	s.Require().NotNil(editChanges.ChatsModified[newChatID])
 	s.Require().Equal(editChanges.ChatsModified[newChatID].ChatModified.Identity, editedIdentity)
 	s.Require().Equal(editChanges.ChatsModified[newChatID].ChatModified.Permissions, editedPermissions)
+	s.Require().Equal(editChanges.ChatsModified[newChatID].ChatModified.HideIfPermissionsNotMet, true)
 }
 
 func (s *CommunitySuite) TestDeleteChat() {

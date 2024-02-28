@@ -160,6 +160,9 @@ type Chat struct {
 
 	// Image of the chat in Base64 format
 	Base64Image string `json:"image,omitempty"`
+
+	// If true, the chat is invisible if permissions are not met
+	HideIfPermissionsNotMet bool `json:"hideIfPermissionsNotMet,omitempty"`
 }
 
 type ChatPreview struct {
@@ -492,6 +495,7 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 	return &Chat{
 		CommunityID:              orgID,
 		CategoryID:               orgChat.CategoryId,
+		HideIfPermissionsNotMet:  orgChat.HideIfPermissionsNotMet,
 		Name:                     orgChat.Identity.DisplayName,
 		Description:              orgChat.Identity.Description,
 		Active:                   true,

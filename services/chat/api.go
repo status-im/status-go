@@ -84,6 +84,7 @@ type Chat struct {
 	CanPostReactions        bool   `json:"canPostReactions"`
 	ViewersCanPostReactions bool   `json:"viewersCanPostReactions"`
 	Base64Image             string `json:"image,omitempty"`
+	HideIfPermissionsNotMet bool   `json:"hideIfPermissionsNotMet,omitempty"`
 }
 
 type ChannelGroup struct {
@@ -501,6 +502,7 @@ func (chat *Chat) populateCommunityFields(community *communities.Community) erro
 	}
 
 	chat.CategoryID = commChat.CategoryId
+	chat.HideIfPermissionsNotMet = commChat.HideIfPermissionsNotMet
 	chat.Position = commChat.Position
 	chat.Permissions = commChat.Permissions
 	chat.Emoji = commChat.Identity.Emoji
