@@ -68,6 +68,7 @@ type Entry struct {
 	chainIDIn       *common.ChainID
 	transferType    *TransferType
 	contractAddress *eth.Address
+	communityID     *string
 
 	isNew bool // isNew is used to indicate if the entry is newer than session start (changed state also)
 }
@@ -92,6 +93,7 @@ type EntryData struct {
 	ChainIDIn       *common.ChainID                  `json:"chainIdIn,omitempty"`
 	TransferType    *TransferType                    `json:"transferType,omitempty"`
 	ContractAddress *eth.Address                     `json:"contractAddress,omitempty"`
+	CommunityID     *string                          `json:"communityId,omitempty"`
 
 	IsNew *bool `json:"isNew,omitempty"`
 
@@ -116,6 +118,7 @@ func (e *Entry) MarshalJSON() ([]byte, error) {
 		ChainIDIn:       e.chainIDIn,
 		TransferType:    e.transferType,
 		ContractAddress: e.contractAddress,
+		CommunityID:     e.communityID,
 	}
 
 	if e.payloadType == MultiTransactionPT {
@@ -162,6 +165,7 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 	e.chainIDOut = aux.ChainIDOut
 	e.chainIDIn = aux.ChainIDIn
 	e.transferType = aux.TransferType
+	e.communityID = aux.CommunityID
 
 	e.isNew = aux.IsNew != nil && *aux.IsNew
 
@@ -510,14 +514,14 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		dbPTrAmount := new(big.Int)
 		var dbMtFromAmount, dbMtToAmount, contractType sql.NullString
 		var tokenCode, fromTokenCode, toTokenCode sql.NullString
-		var methodHash sql.NullString
+		var methodHash, communityID sql.NullString
 		var transferType *TransferType
 		var communityMintEventDB sql.NullBool
 		var communityMintEvent bool
 		err := rows.Scan(&transferHash, &pendingHash, &chainID, &multiTxID, &timestamp, &dbMtType, &dbTrType, &fromAddress,
 			&toAddressDB, &ownerAddressDB, &dbTrAmount, (*bigint.SQLBigIntBytes)(dbPTrAmount), &dbMtFromAmount, &dbMtToAmount, &aggregatedStatus, &aggregatedCount,
 			&tokenAddress, &dbTokenID, &tokenCode, &fromTokenCode, &toTokenCode, &outChainIDDB, &inChainIDDB, &contractType,
-			&contractAddressDB, &methodHash, &communityMintEventDB)
+			&contractAddressDB, &methodHash, &communityMintEventDB, &communityID)
 		if err != nil {
 			return nil, err
 		}
@@ -674,6 +678,10 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			entry.amountIn = mtInAmount
 		} else {
 			return nil, errors.New("invalid row data")
+		}
+
+		if communityID.Valid {
+			entry.communityID = common.NewAndSet(communityID.String)
 		}
 
 		// Complete common data

@@ -216,7 +216,12 @@ SELECT
 	CASE
 		WHEN transfers.tx_from_address = zeroAddress AND transfers.type = "erc20" THEN (SELECT 1 FROM json_each(transfers.receipt, '$.logs' ) WHERE json_extract( value, '$.topics[0]' ) = communityMintEvent)
 		ELSE NULL
-	END AS community_mint_event
+	END AS community_mint_event,
+	CASE 
+		WHEN transfers.type = 'erc20' THEN (SELECT community_id FROM tokens WHERE transfers.token_address = tokens.address AND transfers.network_id = tokens.network_id)
+		WHEN transfers.type = 'erc721' OR transfers.type = 'erc1155' THEN (SELECT community_id FROM collectible_data_cache WHERE transfers.token_address = collectible_data_cache.contract_address AND transfers.network_id = collectible_data_cache.chain_id)
+		ELSE NULL
+	END AS community_id
 FROM
 	transfers
 	CROSS JOIN filter_conditions
@@ -385,7 +390,8 @@ SELECT
 	pending_transactions.type AS type,
 	NULL as contract_address,
 	NULL AS method_hash,
-	NULL AS community_mint_event
+	NULL AS community_mint_event,
+	NULL AS community_id
 FROM
 	pending_transactions
 	CROSS JOIN filter_conditions
@@ -477,7 +483,8 @@ SELECT
 	NULL AS type,
 	NULL as contract_address,
 	NULL AS method_hash,
-	NULL AS community_mint_event
+	NULL AS community_mint_event,
+	NULL AS community_id
 FROM
 	multi_transactions
 	CROSS JOIN filter_conditions
