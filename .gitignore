@@ -85,6 +85,8 @@ report.xml
 
 # go test logs
 test.log
+test_*.log
+**/exit_code_*.txt
 
 # Waku libs
 vendor/github.com/waku-org/go-zerokit-rln-x86_64/

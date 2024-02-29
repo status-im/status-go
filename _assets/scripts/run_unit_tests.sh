@@ -46,6 +46,16 @@ has_extended_timeout() {
   return 1
 }
 
+is_parallelizable() {
+  local package
+  for package in ${UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE}; do
+    if [[ "$1" == "${package}" ]]; then
+      return 1
+    fi
+  done
+  return 0
+}
+
 run_test_for_package() {
   local package=$1
   local iteration=$2
@@ -61,6 +71,7 @@ run_test_for_package() {
 
   local report_file="${package_dir}/report_${iteration}.xml"
   local rerun_report_file="${package_dir}/report_rerun_fails_${iteration}.txt"
+  local exit_code_file="${package_dir}/exit_code_${iteration}.txt"
 
   gotestsum_flags="${GOTESTSUM_EXTRAFLAGS}"
   if [[ "${CI}" == 'true' ]]; then
@@ -73,35 +84,43 @@ run_test_for_package() {
     -count 1 \
     -tags "${BUILD_TAGS}" | \
     redirect_stdout "${output_file}"
-  return $?
-}
 
-last_failing_exit_code=0
+  local go_test_exit=$?
+  echo "${go_test_exit}" > "${exit_code_file}"
+  if [[ "${go_test_exit}" -ne 0 ]]; then
+    if [[ "${CI}" == 'true' ]]; then
+      echo -e "${YLW}Failed, see the log:${RST} ${BLD}${output_file}${RST}"
+    fi
+  fi
+
+  return ${go_test_exit}
+}
 
 for package in ${UNIT_TEST_PACKAGES}; do
   for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-    run_test_for_package "${package}" "${i}"
-    go_test_exit=$?
-
-    if [[ "${go_test_exit}" -ne 0 ]]; then
-      if [[ "${CI}" == 'true' ]]; then
-        echo -e "${YLW}Failed, see the log:${RST} ${BLD}${output_file}${RST}"
-      fi
-
+    if ! is_parallelizable "${package}" || [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
+      run_test_for_package "${package}" "${i}"
       if [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
-        exit "${go_test_exit}"
+        go_test_exit=$?
+        if [[ "${go_test_exit}" -ne 0 ]]; then
+          exit "${go_test_exit}"
+        fi
       fi
-
-      last_failing_exit_code="${go_test_exit}"
+    else
+      run_test_for_package "${package}" "${i}" &
     fi
   done
+  wait # Wait for all background jobs to finish
 done
 
-if [[ "${last_failing_exit_code}" -ne 0 ]]; then
-  if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
-    mkdir -p "${GIT_ROOT}/reports"
-    "${GIT_ROOT}/_assets/scripts/test_stats.py" | redirect_stdout "${GIT_ROOT}/reports/test_stats.txt"
-  fi
-
-  exit "${last_failing_exit_code}"
+shopt -s globstar nullglob # Enable recursive globbing
+if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
+  for exit_code_file in "${GIT_ROOT}"/**/exit_code_*.txt; do
+    read exit_code < "${exit_code_file}"
+    if [[ "${exit_code}" -ne 0 ]]; then
+      mkdir -p "${GIT_ROOT}/reports"
+      "${GIT_ROOT}/_assets/scripts/test_stats.py" | redirect_stdout "${GIT_ROOT}/reports/test_stats.txt"
+      exit ${exit_code}
+    fi
+  done
 fi

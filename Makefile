@@ -314,6 +314,7 @@ docker-test: ##@tests Run tests in a docker container with golang.
 test: test-unit ##@tests Run basic, short tests during development
 
 test-unit: export BUILD_TAGS ?=
+test-unit: export UNIT_TEST_COUNT ?= 1
 test-unit: export UNIT_TEST_FAILFAST ?= true
 test-unit: export UNIT_TEST_RERUN_FAILS ?= true
 test-unit: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
@@ -325,7 +326,14 @@ test-unit: export UNIT_TEST_PACKAGES ?= $(shell go list ./... | \
 	grep -v /t/benchmarks | \
 	grep -v /transactions/fake | \
 	grep -E -v '/wakuv2(/.*|$$)')
-test-unit: export UNIT_TEST_PACKAGES_WITH_EXTENDED_TIMEOUT ?= github.com/status-im/status-go/protocol
+test-unit: export UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE ?= \
+	github.com/status-im/status-go/api \
+	github.com/status-im/status-go/mailserver \
+	github.com/status-im/status-go/multiaccounts/settings \
+	github.com/status-im/status-go/node \
+	github.com/status-im/status-go/services/wakuext
+test-unit: export UNIT_TEST_PACKAGES_WITH_EXTENDED_TIMEOUT ?= \
+	github.com/status-im/status-go/protocol
 test-unit: ##@tests Run unit and integration tests
 	./_assets/scripts/run_unit_tests.sh
 
