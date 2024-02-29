@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
@@ -1783,4 +1784,154 @@ func (p *Persistence) GetCommunityShard(communityID types.HexBytes) (*shard.Shar
 func (p *Persistence) DeleteCommunityShard(communityID types.HexBytes) error {
 	_, err := p.db.Exec(`DELETE FROM communities_shards WHERE community_id = ?`, communityID)
 	return err
+}
+
+func (p *Persistence) InvalidateDecryptedCommunityCacheForKeys(keys []*encryption.HashRatchetInfo) error {
+	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	if len(keys) == 0 {
+		return nil
+	}
+	idsArgs := make([]interface{}, 0, len(keys))
+	for _, k := range keys {
+		idsArgs = append(idsArgs, k.KeyID)
+	}
+
+	inVector := strings.Repeat("?, ", len(keys)-1) + "?"
+
+	query := "SELECT DISTINCT(community_id) FROM encrypted_community_description_missing_keys WHERE key_id IN (" + inVector + ")" // nolint: gosec
+
+	var communityIDs []interface{}
+	rows, err := tx.Query(query, idsArgs...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var communityID []byte
+		err = rows.Scan(&communityID)
+		if err != nil {
+			return err
+		}
+		communityIDs = append(communityIDs, communityID)
+	}
+	if len(communityIDs) == 0 {
+		return nil
+	}
+
+	inVector = strings.Repeat("?, ", len(communityIDs)-1) + "?"
+
+	query = "DELETE FROM encrypted_community_description_cache WHERE community_id IN (" + inVector + ")" //nolint: gosec
+	_, err = tx.Exec(query, communityIDs...)
+
+	return err
+}
+
+func (p *Persistence) SaveDecryptedCommunityDescription(communityID []byte, missingKeys []*CommunityPrivateDataFailedToDecrypt, description *protobuf.CommunityDescription) error {
+	if description == nil {
+		return nil
+	}
+	marshaledDescription, err := proto.Marshal(description)
+	if err != nil {
+		return err
+	}
+	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+	previousCommunity, err := p.getDecryptedCommunityDescriptionByID(tx, communityID)
+	if err != nil {
+		return err
+	}
+
+	if previousCommunity != nil && previousCommunity.Clock >= description.Clock {
+		return nil
+	}
+
+	insertCommunity := "INSERT INTO encrypted_community_description_cache (community_id, clock, description) VALUES (?, ?, ?);"
+	_, err = tx.Exec(insertCommunity, communityID, description.Clock, marshaledDescription)
+	if err != nil {
+		return err
+	}
+	for _, key := range missingKeys {
+		insertKey := "INSERT INTO encrypted_community_description_missing_keys (community_id, key_id) VALUES(?, ?)"
+		_, err = tx.Exec(insertKey, communityID, key.KeyID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (p *Persistence) GetDecryptedCommunityDescription(communityID []byte, clock uint64) (*protobuf.CommunityDescription, error) {
+	return p.getDecryptedCommunityDescriptionByIDAndClock(communityID, clock)
+}
+
+func (p *Persistence) getDecryptedCommunityDescriptionByIDAndClock(communityID []byte, clock uint64) (*protobuf.CommunityDescription, error) {
+	query := "SELECT description FROM encrypted_community_description_cache WHERE community_id = ? AND clock = ?"
+
+	qr := p.db.QueryRow(query, communityID, clock)
+
+	var descriptionBytes []byte
+
+	err := qr.Scan(&descriptionBytes)
+	switch err {
+	case sql.ErrNoRows:
+		return nil, nil
+	case nil:
+		var communityDescription protobuf.CommunityDescription
+		err := proto.Unmarshal(descriptionBytes, &communityDescription)
+		if err != nil {
+			return nil, err
+		}
+		return &communityDescription, nil
+	default:
+		return nil, err
+	}
+}
+
+func (p *Persistence) getDecryptedCommunityDescriptionByID(tx *sql.Tx, communityID []byte) (*protobuf.CommunityDescription, error) {
+	query := "SELECT description FROM encrypted_community_description_cache WHERE community_id = ?"
+
+	qr := tx.QueryRow(query, communityID)
+
+	var descriptionBytes []byte
+
+	err := qr.Scan(&descriptionBytes)
+	switch err {
+	case sql.ErrNoRows:
+		return nil, nil
+	case nil:
+		var communityDescription protobuf.CommunityDescription
+		err := proto.Unmarshal(descriptionBytes, &communityDescription)
+		if err != nil {
+			return nil, err
+		}
+		return &communityDescription, nil
+	default:
+		return nil, err
+	}
 }

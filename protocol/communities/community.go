@@ -103,6 +103,7 @@ type CommunityChat struct {
 	CanPost     bool                                 `json:"canPost"`
 	Position    int                                  `json:"position"`
 	CategoryID  string                               `json:"categoryID"`
+	TokenGated  bool                                 `json:"tokenGated"`
 }
 
 type CommunityCategory struct {
@@ -187,6 +188,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 				Permissions: c.Permissions,
 				Members:     c.Members,
 				CanPost:     canPost,
+				TokenGated:  o.channelEncrypted(id),
 				CategoryID:  c.CategoryId,
 				Position:    int(c.Position),
 			}
@@ -272,8 +274,10 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		PubsubTopicKey              string                               `json:"pubsubTopicKey"`
 		Shard                       *shard.Shard                         `json:"shard"`
 		LastOpenedAt                int64                                `json:"lastOpenedAt"`
+		Clock                       uint64                               `json:"clock"`
 	}{
 		ID:                          o.ID(),
+		Clock:                       o.Clock(),
 		MemberRole:                  o.MemberRole(o.MemberIdentity()),
 		IsControlNode:               o.IsControlNode(),
 		Verified:                    o.config.Verified,
@@ -320,6 +324,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				Description: c.Identity.Description,
 				Permissions: c.Permissions,
 				Members:     c.Members,
+				TokenGated:  o.channelEncrypted(id),
 				CanPost:     canPost,
 				CategoryID:  c.CategoryId,
 				Position:    int(c.Position),

@@ -1568,11 +1568,10 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		id = crypto.CompressPubkey(signer)
 	}
 
-	failedToDecrypt, err := m.preprocessDescription(id, description)
+	failedToDecrypt, processedDescription, err := m.preprocessDescription(id, description)
 	if err != nil {
 		return nil, err
 	}
-
 	community, err := m.GetByID(id)
 	if err != nil && err != ErrOrgNotFound {
 		return nil, err
@@ -1580,12 +1579,12 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 
 	// We don't process failed to decrypt if the whole metadata is encrypted
 	// and we joined the community already
-	if community != nil && community.Joined() && len(failedToDecrypt) != 0 && description != nil && len(description.Members) == 0 {
+	if community != nil && community.Joined() && len(failedToDecrypt) != 0 && processedDescription != nil && len(processedDescription.Members) == 0 {
 		return &CommunityResponse{FailedToDecrypt: failedToDecrypt}, nil
 	}
 
 	// We should queue only if the community has a token owner, and the owner has been verified
-	hasTokenOwnership := HasTokenOwnership(description)
+	hasTokenOwnership := HasTokenOwnership(processedDescription)
 	shouldQueue := hasTokenOwnership && verifiedOwner == nil
 
 	if community == nil {
@@ -1594,7 +1593,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 			return nil, err
 		}
 		config := Config{
-			CommunityDescription:                description,
+			CommunityDescription:                processedDescription,
 			Logger:                              m.logger,
 			CommunityDescriptionProtocolMessage: payload,
 			MemberIdentity:                      &m.identity.PublicKey,
@@ -1615,15 +1614,15 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		// A new community, we need to check if we need to validate async.
 		// That would be the case if it has a contract. We queue everything and process separately.
 		if shouldQueue {
-			return nil, m.Queue(signer, community, description.Clock, payload)
+			return nil, m.Queue(signer, community, processedDescription.Clock, payload)
 		}
 	} else {
 		// only queue if already known control node is different than the signer
 		// and if the clock is greater
 		shouldQueue = shouldQueue && !common.IsPubKeyEqual(community.ControlNode(), signer) &&
-			community.config.CommunityDescription.Clock < description.Clock
+			community.config.CommunityDescription.Clock < processedDescription.Clock
 		if shouldQueue {
-			return nil, m.Queue(signer, community, description.Clock, payload)
+			return nil, m.Queue(signer, community, processedDescription.Clock, payload)
 		}
 	}
 
@@ -1649,7 +1648,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		return nil, ErrNotAuthorized
 	}
 
-	r, err := m.handleCommunityDescriptionMessageCommon(community, description, payload, verifiedOwner)
+	r, err := m.handleCommunityDescriptionMessageCommon(community, processedDescription, payload, verifiedOwner)
 	if err != nil {
 		return nil, err
 	}
@@ -1657,16 +1656,28 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	return r, nil
 }
 
-func (m *Manager) preprocessDescription(id types.HexBytes, description *protobuf.CommunityDescription) ([]*CommunityPrivateDataFailedToDecrypt, error) {
+func (m *Manager) NewHashRatchetKeys(keys []*encryption.HashRatchetInfo) error {
+	return m.persistence.InvalidateDecryptedCommunityCacheForKeys(keys)
+}
+
+func (m *Manager) preprocessDescription(id types.HexBytes, description *protobuf.CommunityDescription) ([]*CommunityPrivateDataFailedToDecrypt, *protobuf.CommunityDescription, error) {
+	decryptedCommunity, err := m.persistence.GetDecryptedCommunityDescription(id, description.Clock)
+	if err != nil {
+		return nil, nil, err
+	}
+	if decryptedCommunity != nil {
+		return nil, decryptedCommunity, nil
+	}
+
 	response, err := decryptDescription(id, m, description, m.logger)
 	if err != nil {
-		return response, err
+		return response, description, err
 	}
 
 	// Workaround for https://github.com/status-im/status-desktop/issues/12188
 	hydrateChannelsMembers(types.EncodeHex(id), description)
 
-	return response, nil
+	return response, description, m.persistence.SaveDecryptedCommunityDescription(id, response, description)
 }
 
 func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte, newControlNode *ecdsa.PublicKey) (*CommunityResponse, error) {
@@ -2843,12 +2854,12 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, ErrNotAuthorized
 	}
 
-	_, err = m.preprocessDescription(community.ID(), request.Community)
+	_, processedDescription, err := m.preprocessDescription(community.ID(), request.Community)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg, nil)
+	_, err = community.UpdateCommunityDescription(processedDescription, appMetadataMsg, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -3191,10 +3202,11 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 	}
 
 	return recordBundleToCommunity(r, &m.identity.PublicKey, m.installationID, m.logger, m.timesource, descriptionEncryptor, func(community *Community) error {
-		_, err := m.preprocessDescription(community.ID(), community.config.CommunityDescription)
+		_, description, err := m.preprocessDescription(community.ID(), community.config.CommunityDescription)
 		if err != nil {
 			return err
 		}
+		community.config.CommunityDescription = description
 
 		err = community.updateCommunityDescriptionByEvents()
 		if err != nil {

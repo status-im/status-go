@@ -26,6 +26,7 @@ const (
 	sharedSecretNegotiationVersion = 1
 	partitionedTopicMinVersion     = 1
 	defaultMinVersion              = 0
+	maxKeysChannelSize             = 10000
 )
 
 type PartitionTopicMode int
@@ -121,9 +122,10 @@ func NewWithEncryptorConfig(
 }
 
 type Subscriptions struct {
-	SharedSecrets   []*sharedsecret.Secret
-	SendContactCode <-chan struct{}
-	Quit            chan struct{}
+	SharedSecrets      []*sharedsecret.Secret
+	SendContactCode    <-chan struct{}
+	NewHashRatchetKeys chan []*HashRatchetInfo
+	Quit               chan struct{}
 }
 
 func (p *Protocol) Start(myIdentity *ecdsa.PrivateKey) (*Subscriptions, error) {
@@ -133,9 +135,10 @@ func (p *Protocol) Start(myIdentity *ecdsa.PrivateKey) (*Subscriptions, error) {
 		return nil, errors.Wrap(err, "failed to get all secrets")
 	}
 	p.subscriptions = &Subscriptions{
-		SharedSecrets:   secrets,
-		SendContactCode: p.publisher.Start(),
-		Quit:            make(chan struct{}),
+		SharedSecrets:      secrets,
+		SendContactCode:    p.publisher.Start(),
+		NewHashRatchetKeys: make(chan []*HashRatchetInfo, maxKeysChannelSize),
+		Quit:               make(chan struct{}),
 	}
 	return p.subscriptions, nil
 }
@@ -651,6 +654,10 @@ func (p *Protocol) HandleHashRatchetKeys(groupID []byte, keys *HRKeys, myIdentit
 			info = append(info, &HashRatchetInfo{GroupID: groupID, KeyID: keyID})
 
 		}
+	}
+
+	if p.subscriptions != nil {
+		p.subscriptions.NewHashRatchetKeys <- info
 	}
 
 	return info, nil

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/appdatabase"
@@ -16,6 +17,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -920,4 +922,109 @@ func (s *PersistenceSuite) TestGetCommunityToValidateByID() {
 	result, err := s.db.getCommunityToValidateByID(communityID)
 	s.Require().NoError(err)
 	s.Require().Len(result, 0)
+}
+func (s *PersistenceSuite) TestDecryptedCommunityCache() {
+	communityDescription := &protobuf.CommunityDescription{
+		Clock: 1000,
+	}
+	keyID1 := []byte("key-id-1")
+	keyID2 := []byte("key-id-2")
+	missingKeys := []*CommunityPrivateDataFailedToDecrypt{
+		{KeyID: keyID1},
+		{KeyID: keyID2},
+	}
+	communityID := []byte("id")
+	err := s.db.SaveDecryptedCommunityDescription(communityID, missingKeys, communityDescription)
+	s.Require().NoError(err)
+
+	// Can be retrieved
+	retrievedCommunity, err := s.db.GetDecryptedCommunityDescription(communityID, 1000)
+	s.Require().NoError(err)
+	s.Require().True(proto.Equal(communityDescription, retrievedCommunity))
+
+	// Retrieving a random one doesn't throw an error
+	retrievedCommunity, err = s.db.GetDecryptedCommunityDescription([]byte("non-existent-id"), 1000)
+	s.Require().NoError(err)
+	s.Require().Nil(retrievedCommunity)
+
+	// Retrieving a random one doesn't throw an error
+	retrievedCommunity, err = s.db.GetDecryptedCommunityDescription(communityID, 999)
+	s.Require().NoError(err)
+	s.Require().Nil(retrievedCommunity)
+
+	// invalidating the cache
+	err = s.db.InvalidateDecryptedCommunityCacheForKeys([]*encryption.HashRatchetInfo{{KeyID: keyID1}})
+	s.Require().NoError(err)
+
+	// community cannot be retrieved anymore
+	retrievedCommunity, err = s.db.GetDecryptedCommunityDescription(communityID, 1000)
+	s.Require().NoError(err)
+	s.Require().Nil(retrievedCommunity)
+
+	// make sure everything is cleaned up
+
+	qr := s.db.db.QueryRow("SELECT COUNT(*) FROM encrypted_community_description_missing_keys")
+
+	var count int
+
+	err = qr.Scan(&count)
+	s.Require().NoError(err)
+	s.Require().Equal(count, 0)
+
+}
+
+func (s *PersistenceSuite) TestDecryptedCommunityCacheClock() {
+	communityDescription := &protobuf.CommunityDescription{
+		Clock: 1000,
+	}
+	keyID1 := []byte("key-id-1")
+	keyID2 := []byte("key-id-2")
+	keyID3 := []byte("key-id-3")
+
+	missingKeys := []*CommunityPrivateDataFailedToDecrypt{
+		{KeyID: keyID1},
+		{KeyID: keyID2},
+	}
+	communityID := []byte("id")
+	err := s.db.SaveDecryptedCommunityDescription(communityID, missingKeys, communityDescription)
+	s.Require().NoError(err)
+
+	// Can be retrieved
+	retrievedCommunity, err := s.db.GetDecryptedCommunityDescription(communityID, 1000)
+	s.Require().NoError(err)
+	s.Require().True(proto.Equal(communityDescription, retrievedCommunity))
+
+	// Save an earlier community
+	communityDescription.Clock = 999
+	err = s.db.SaveDecryptedCommunityDescription(communityID, missingKeys, communityDescription)
+	s.Require().NoError(err)
+
+	// The old one should be retrieved
+	retrievedCommunity, err = s.db.GetDecryptedCommunityDescription(communityID, 1000)
+	s.Require().NoError(err)
+	s.Require().NotNil(retrievedCommunity)
+	s.Require().Equal(uint64(1000), retrievedCommunity.Clock)
+
+	// Save a later community, with a single key
+	missingKeys = []*CommunityPrivateDataFailedToDecrypt{
+		{KeyID: keyID3},
+	}
+
+	communityDescription.Clock = 1001
+	err = s.db.SaveDecryptedCommunityDescription(communityID, missingKeys, communityDescription)
+	s.Require().NoError(err)
+
+	// The new one should be retrieved
+	retrievedCommunity, err = s.db.GetDecryptedCommunityDescription(communityID, 1001)
+	s.Require().NoError(err)
+	s.Require().Equal(uint64(1001), retrievedCommunity.Clock)
+
+	// Make sure the previous two are cleaned up and there's only one left
+	qr := s.db.db.QueryRow("SELECT COUNT(*) FROM encrypted_community_description_missing_keys")
+
+	var count int
+
+	err = qr.Scan(&count)
+	s.Require().NoError(err)
+	s.Require().Equal(count, 1)
 }

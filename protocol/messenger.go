@@ -1414,6 +1414,13 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption
 					m.logger.Error("failed to clean processed messages", zap.Error(err))
 				}
 
+			case keys := <-subscriptions.NewHashRatchetKeys:
+				if m.communitiesManager == nil {
+					continue
+				}
+				if err := m.communitiesManager.NewHashRatchetKeys(keys); err != nil {
+					m.logger.Error("failed to invalidate cache for decrypted communities", zap.Error(err))
+				}
 			case <-subscriptions.Quit:
 				m.logger.Debug("quitting encryption subscription loop")
 				return
@@ -3654,6 +3661,13 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 				publicKey := msg.SigPubKey()
 				senderID := contactIDFromPublicKey(publicKey)
 
+				if len(msg.EncryptionLayer.HashRatchetInfo) != 0 {
+					err := m.communitiesManager.NewHashRatchetKeys(msg.EncryptionLayer.HashRatchetInfo)
+					if err != nil {
+						m.logger.Warn("failed to invalidate communities description cache", zap.Error(err))
+					}
+
+				}
 				// Don't process duplicates
 				messageID := msg.TransportLayer.Message.ThirdPartyID
 				exists, err := m.messageExists(messageID, messageState.ExistingMessagesMap)
