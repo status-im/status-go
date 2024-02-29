@@ -862,9 +862,16 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey, communityBanInfo *
 		o.banUserFromCommunity(pk, communityBanInfo)
 		o.increaseClock()
 	} else {
-		err := o.addNewCommunityEvent(o.ToBanCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
+		pkStr := common.PubkeyToHex(pk)
+		err := o.addNewCommunityEvent(o.ToBanCommunityMemberCommunityEvent(pkStr))
 		if err != nil {
 			return nil, err
+		}
+		if communityBanInfo.DeleteAllMessages {
+			err := o.addNewCommunityEvent(o.ToDeleteAllMemberMessagesEvent(pkStr))
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -2255,6 +2262,21 @@ func (o *Community) banUserFromCommunity(pk *ecdsa.PublicKey, communityBanInfo *
 	}
 
 	o.config.CommunityDescription.BanList = append(o.config.CommunityDescription.BanList, key)
+}
+
+func (o *Community) deleteBannedMemberAllMessages(pk *ecdsa.PublicKey) error {
+	key := common.PubkeyToHex(pk)
+
+	if o.config.CommunityDescription.BannedMembers == nil {
+		return ErrBannedMemberNotFound
+	}
+
+	if _, exists := o.config.CommunityDescription.BannedMembers[key]; !exists {
+		return ErrBannedMemberNotFound
+	}
+
+	o.config.CommunityDescription.BannedMembers[key].DeleteAllMessages = true
+	return nil
 }
 
 func (o *Community) editChat(chatID string, chat *protobuf.CommunityChat) error {

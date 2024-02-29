@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
@@ -48,6 +49,9 @@ func waitOnMessengerResponse(s *suite.Suite, fnWait MessageResponseValidator, us
 		user,
 		func(r *MessengerResponse) bool {
 			err := fnWait(r)
+			if err != nil {
+				user.logger.Error("WaitOnMessengerResponse: ", zap.Error(err))
+			}
 			return err == nil
 		},
 		"MessengerResponse data not received",
@@ -690,7 +694,8 @@ func kickMember(base CommunityEventsTestsInterface, communityID types.HexBytes, 
 }
 
 func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserFromCommunity) {
-	pubkey := common.PubkeyToHex(&base.GetMember().identity.PublicKey)
+	bannedPK := banRequest.User.String()
+	communityStr := banRequest.CommunityID.String()
 
 	checkBanned := func(response *MessengerResponse) error {
 		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(banRequest.CommunityID))
@@ -706,8 +711,14 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 			return errors.New("alice was not added to the banned list")
 		}
 
-		if modifiedCommmunity.PendingAndBannedMembers()[pubkey] != communities.CommunityMemberBanned {
+		if modifiedCommmunity.PendingAndBannedMembers()[bannedPK] != communities.CommunityMemberBanned {
 			return errors.New("alice should be in the pending state")
+		}
+
+		if banRequest.DeleteAllMessages {
+			if len(response.DeletedMessages()) == 0 {
+				return errors.New("alice message must be deleted")
+			}
 		}
 
 		return nil
@@ -722,7 +733,7 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 	modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(banRequest.CommunityID))
 	s.Require().NoError(err)
 	s.Require().True(modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey))
-	s.Require().Equal(communities.CommunityMemberBanPending, modifiedCommmunity.PendingAndBannedMembers()[pubkey])
+	s.Require().Equal(communities.CommunityMemberBanPending, modifiedCommmunity.PendingAndBannedMembers()[bannedPK])
 
 	// 2. wait for event as a sender
 	waitOnMessengerResponse(s, func(response *MessengerResponse) error {
@@ -732,11 +743,11 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 		}
 
 		if !modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey) {
-			return errors.New("alice should not be not banned (yet)")
+			return errors.New("event sender: alice should not be not banned (yet)")
 		}
 
-		if modifiedCommmunity.PendingAndBannedMembers()[pubkey] != communities.CommunityMemberBanPending {
-			return errors.New("alice should be in the pending state")
+		if modifiedCommmunity.PendingAndBannedMembers()[bannedPK] != communities.CommunityMemberBanPending {
+			return errors.New("event sender: alice should be in the pending state")
 		}
 
 		return nil
@@ -750,15 +761,26 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 		}
 
 		if !modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey) {
-			return errors.New("alice should not be not banned (yet)")
+			return errors.New("member: alice should not be not banned (yet)")
 		}
 
 		if len(modifiedCommmunity.PendingAndBannedMembers()) == 0 {
-			return errors.New("alice should know about banned and pending members")
+			return errors.New("member: alice should know about banned and pending members")
 		}
 
 		return nil
 	}, base.GetMember())
+
+	checkMsgDeletion := func(messenger *Messenger, expectedMsgsCount int) {
+		msgs, err := messenger.persistence.GetCommunityMemberAllMessagesID(bannedPK, communityStr)
+		s.Require().NoError(err)
+		s.Require().Len(msgs, expectedMsgsCount)
+	}
+
+	if banRequest.DeleteAllMessages {
+		checkMsgDeletion(base.GetEventSender(), 1)
+		checkMsgDeletion(base.GetMember(), 1)
+	}
 
 	// 4. control node should handle event and actually ban member
 	waitOnMessengerResponse(s, checkBanned, base.GetControlNode())
@@ -768,6 +790,12 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 
 	// 6. member should be notified about actual removal
 	waitOnMessengerResponse(s, checkBanned, base.GetMember())
+
+	if banRequest.DeleteAllMessages {
+		checkMsgDeletion(base.GetEventSender(), 0)
+		checkMsgDeletion(base.GetMember(), 0)
+		checkMsgDeletion(base.GetControlNode(), 0)
+	}
 }
 
 func unbanMember(base CommunityEventsTestsInterface, unbanRequest *requests.UnbanUserFromCommunity) {
@@ -2445,4 +2473,54 @@ func testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(base CommunityEven
 	acceptedRequestsPending, err = base.GetEventSender().AcceptedPendingRequestsToJoinForCommunity(community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(acceptedRequestsPending, 0)
+}
+
+func testBanMemberWithDeletingAllMessages(base CommunityEventsTestsInterface, community *communities.Community) {
+	// verify that event sender can't ban a control node and delete his messages
+	banRequest := &requests.BanUserFromCommunity{
+		CommunityID:       community.ID(),
+		User:              common.PubkeyToHexBytes(&base.GetControlNode().identity.PublicKey),
+		DeleteAllMessages: true,
+	}
+
+	_, err := base.GetEventSender().BanUserFromCommunity(
+		context.Background(),
+		banRequest,
+	)
+	s := base.GetSuite()
+	s.Require().Error(err)
+
+	chatIds := community.ChatIDs()
+	s.Require().Len(chatIds, 1)
+	chat := base.GetEventSender().Chat(chatIds[0])
+	s.Require().NotNil(chat)
+
+	inputMessage := buildTestMessage(*chat)
+
+	sendResponse, err := base.GetMember().SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().NotNil(sendResponse)
+	s.Require().Len(sendResponse.Messages(), 1)
+	messageID := sendResponse.Messages()[0].ID
+
+	checkMsgDelivered := func(response *MessengerResponse) error {
+		if len(response.Messages()) == 0 {
+			return errors.New("response does not contain message")
+		}
+
+		for _, message := range response.Messages() {
+			if message.ID == messageID {
+				return nil
+			}
+		}
+		return errors.New("messages was not found in the response")
+	}
+
+	waitOnMessengerResponse(s, checkMsgDelivered, base.GetControlNode())
+
+	waitOnMessengerResponse(s, checkMsgDelivered, base.GetEventSender())
+
+	banRequest.User = common.PubkeyToHexBytes(&base.GetMember().identity.PublicKey)
+
+	banMember(base, banRequest)
 }

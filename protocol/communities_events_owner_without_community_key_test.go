@@ -276,3 +276,8 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestMemberReceiveOwnerEve
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
 	testMemberReceiveEventsWhenControlNodeOffline(s, community)
 }
+
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerBanMemberWithDeletingAllMessages() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
+	testBanMemberWithDeletingAllMessages(s, community)
+}

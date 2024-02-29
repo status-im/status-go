@@ -2676,7 +2676,7 @@ func (m *Messenger) BanUserFromCommunity(ctx context.Context, request *requests.
 
 	response.AddCommunity(community)
 
-	if request.DeleteAllMessages {
+	if request.DeleteAllMessages && community.IsControlNode() {
 		deleteMessagesResponse, err := m.DeleteAllCommunityMemberMessages(request.User.String(), request.CommunityID.String())
 		if err != nil {
 			return nil, err

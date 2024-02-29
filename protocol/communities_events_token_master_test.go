@@ -321,3 +321,8 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAcceptsRequestToJoinAft
 	s.SetupAdditionalMessengers([]*Messenger{user})
 	testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(s, community, user)
 }
+
+func (s *TokenMasterCommunityEventsSuite) TestTokenMasterBanMemberWithDeletingAllMessages() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
+	testBanMemberWithDeletingAllMessages(s, community)
+}
