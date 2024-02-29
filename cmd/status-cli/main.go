@@ -39,6 +39,7 @@ import (
 
 const LightFlag = "light"
 const InteractiveFlag = "interactive"
+const CountFlag = "count"
 const NameFlag = "name"
 const AddFlag = "add"
 
@@ -75,6 +76,12 @@ func main() {
 						Name:    InteractiveFlag,
 						Aliases: []string{"i"},
 						Usage:   "Use interactive mode",
+					},
+					&cli.IntFlag{
+						Name:    CountFlag,
+						Aliases: []string{"c"},
+						Value:   1,
+						Usage:   "How many messages to sent from each user",
 					},
 				}, CommonFlags...),
 				Action: func(cCtx *cli.Context) error {
@@ -113,13 +120,12 @@ func main() {
 
 					// Retrieve for messages
 					msgCh := make(chan string)
-					msgCh2 := make(chan string)
 					var wg sync.WaitGroup
 
 					wg.Add(1)
-					go retrieveMessagesLoop(alice, RetrieveInterval, msgCh, ctx, &wg)
+					go retrieveMessagesLoop(alice, RetrieveInterval, nil, ctx, &wg)
 					wg.Add(1)
-					go retrieveMessagesLoop(bob, RetrieveInterval, msgCh2, ctx, &wg)
+					go retrieveMessagesLoop(bob, RetrieveInterval, msgCh, ctx, &wg)
 
 					// Send contact request from Alice to Bob, bob accept the request
 					time.Sleep(WaitingInterval)
@@ -145,17 +151,14 @@ func main() {
 						go sendMessageLoop(bob, SendInterval, ctx, &wg, sem, cancel)
 					} else {
 						time.Sleep(WaitingInterval)
-						for i := 0; i < 3; i++ {
-							if len(bob.messenger.MutualContacts()) == 0 {
-								continue
-							}
-							err = sendDirectMessage(alice, "Hello Bob, I'm Alice!", ctx)
+						for i := 0; i < cCtx.Int(CountFlag); i++ {
+							err = sendDirectMessage(alice, "hello bob :)", ctx)
 							if err != nil {
 								return err
 							}
 							time.Sleep(WaitingInterval)
 
-							err = sendDirectMessage(bob, "Hello Alice, I'm Bob!", ctx)
+							err = sendDirectMessage(bob, "hello Alice ~", ctx)
 							if err != nil {
 								return err
 							}
@@ -220,7 +223,6 @@ func main() {
 					// Retrieve for messages
 					var wg sync.WaitGroup
 					msgCh := make(chan string)
-					contactCh := make(chan int)
 
 					wg.Add(1)
 					go retrieveMessagesLoop(alice, RetrieveInterval, msgCh, ctx, &wg)
@@ -244,7 +246,6 @@ func main() {
 					}()
 
 					// Send message if mutual contact exists
-					<-contactCh
 					sem := make(chan struct{}, 1)
 					wg.Add(1)
 					go sendMessageLoop(alice, SendInterval, ctx, &wg, sem, cancel)
@@ -385,15 +386,15 @@ func sendContactRequestAcceptance(cCtx *cli.Context, from *StatusCLI, msgID stri
 	}
 	from.logger.Info("function AcceptContactRequest response: ", resp.Messages())
 
-	fromContacts := from.messenger.MutualContacts()
-	from.logger.Info("contacts number: ", len(fromContacts))
-
 	return nil
 }
 
 func sendDirectMessage(from *StatusCLI, text string, ctx context.Context) error {
+	if len(from.messenger.MutualContacts()) == 0 {
+		return nil
+	}
 	chat := from.messenger.Chat(from.messenger.MutualContacts()[0].ID)
-	from.logger.Infof("send message (%s) to contact: %s", text, chat.ID)
+	from.logger.Info("send message to contact: ", chat.ID)
 
 	clock, timestamp := chat.NextClockAndTimestamp(from.messenger.GetTransport())
 	inputMessage := common.NewMessage()
@@ -452,12 +453,8 @@ func retrieveMessagesLoop(cli *StatusCLI, tick time.Duration, msgCh chan string,
 			if response != nil && len(response.Messages()) != 0 {
 				for _, message := range response.Messages() {
 					cli.logger.Info("receive message: ", message.Text)
-					if message.ContentType == protobuf.ChatMessage_CONTACT_REQUEST {
+					if message.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT {
 						msgCh <- message.ID
-					}
-					if message.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED {
-						toContacts := cli.messenger.MutualContacts()
-						cli.logger.Info("contacts number: ", len(toContacts))
 					}
 				}
 			}

@@ -10,13 +10,30 @@ The Status CLI is a command line interface for interacting with the Status messe
 
 ## Run
 
-```bash
-go run main.go dm
-```
+Run `dm` command:
 
-Run in light mode
 ```bash
+# simulate DM between two accounts
+go run main.go dm
+
+# simulate DM in a interactive way
+go run main.go dm -i
+
+# simulate DM with 3 messages
+go run main.go dm -c 3
+
+# run in light mode
 go run main.go dm --light
 ```
 
-Logs are recorded in file `*.log`.
+Run `serve` command:
+
+```bash
+# run alice's server
+go run main.go serve
+
+# run Bob's server in another terminal with the logged pubkey of Alice
+go run main.go serve -n bob -a <alice-pubkey>
+```
+
+Logs are recorded in file `*.log` and terminal.
