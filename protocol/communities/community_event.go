@@ -203,6 +203,10 @@ func (e *CommunityEvent) Validate() error {
 		if e.TokenMetadata == nil || len(e.TokenMetadata.ContractAddresses) == 0 {
 			return errors.New("invalid add community token event")
 		}
+	case protobuf.CommunityEvent_COMMUNITY_DELETE_BANNED_MEMBER_MESSAGES:
+		if len(e.MemberToAction) == 0 {
+			return errors.New("invalid delete all community member messages event")
+		}
 	}
 	return nil
 }
@@ -233,7 +237,8 @@ func (e *CommunityEvent) EventTypeID() string {
 		protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT,
 		protobuf.CommunityEvent_COMMUNITY_MEMBER_KICK,
 		protobuf.CommunityEvent_COMMUNITY_MEMBER_BAN,
-		protobuf.CommunityEvent_COMMUNITY_MEMBER_UNBAN:
+		protobuf.CommunityEvent_COMMUNITY_MEMBER_UNBAN,
+		protobuf.CommunityEvent_COMMUNITY_DELETE_BANNED_MEMBER_MESSAGES:
 		return fmt.Sprintf("%d-%s", e.Type, e.MemberToAction)
 
 	case protobuf.CommunityEvent_COMMUNITY_TOKEN_ADD:

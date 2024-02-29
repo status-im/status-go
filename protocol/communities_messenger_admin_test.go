@@ -354,3 +354,8 @@ func (s *AdminCommunityEventsSuite) TestAdminAcceptsRequestToJoinAfterMemberLeav
 	s.SetupAdditionalMessengers([]*Messenger{user})
 	testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(s, community, user)
 }
+
+func (s *AdminCommunityEventsSuite) TestAdminBanMemberWithDeletingAllMessages() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
+	testBanMemberWithDeletingAllMessages(s, community)
+}

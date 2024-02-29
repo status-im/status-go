@@ -99,6 +99,14 @@ func (o *Community) ToBanCommunityMemberCommunityEvent(pubkey string) *Community
 	}
 }
 
+func (o *Community) ToDeleteAllMemberMessagesEvent(pubkey string) *CommunityEvent {
+	return &CommunityEvent{
+		CommunityEventClock: o.nextEventClock(),
+		Type:                protobuf.CommunityEvent_COMMUNITY_DELETE_BANNED_MEMBER_MESSAGES,
+		MemberToAction:      pubkey,
+	}
+}
+
 func (o *Community) ToUnbanCommunityMemberCommunityEvent(pubkey string) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.nextEventClock(),

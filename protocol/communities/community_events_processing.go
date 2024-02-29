@@ -258,6 +258,18 @@ func (o *Community) applyEvent(communityEvent CommunityEvent) error {
 		}
 	case protobuf.CommunityEvent_COMMUNITY_TOKEN_ADD:
 		o.config.CommunityDescription.CommunityTokensMetadata = append(o.config.CommunityDescription.CommunityTokensMetadata, communityEvent.TokenMetadata)
+	case protobuf.CommunityEvent_COMMUNITY_DELETE_BANNED_MEMBER_MESSAGES:
+		if o.IsControlNode() {
+			pk, err := common.HexToPubkey(communityEvent.MemberToAction)
+			if err != nil {
+				return err
+			}
+
+			err = o.deleteBannedMemberAllMessages(pk)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
