@@ -670,10 +670,7 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 		[]Option{WithCommunityTokensService(s.collectiblesServiceMock)})
 
 	s.Require().NoError(err)
-
-	_, err = alice2.Start()
-	s.Require().NoError(err)
-	defer alice2.Shutdown() // nolint: errcheck
+	defer TearDownMessenger(&s.Suite, alice2)
 
 	// Create communities backup
 
@@ -715,8 +712,6 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 }
 
 func (s *MessengerCommunitiesSignersSuite) TestSyncTokenGatedCommunity() {
-	s.T().Skip("flaky test")
-
 	testCases := []struct {
 		name           string
 		mintOwnerToken bool
