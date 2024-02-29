@@ -27,8 +27,8 @@ var ganacheTokenAddress = common.HexToAddress("0x8571Ddc46b10d31EF963aF49b6C7799
 var mainnet = params.Network{
 	ChainID:                mainnetChainID,
 	ChainName:              "Ethereum Mainnet",
-	RPCURL:                 "https://eth-archival.rpc.grove.city/v1/",
-	FallbackURL:            "https://mainnet.infura.io/v3/",
+	RPCURL:                 "https://some-wrong.url/v1/",
+	FallbackURL:            "https://some-wrong.url/v3/",
 	BlockExplorerURL:       "https://etherscan.io/",
 	IconURL:                "network/Network=Ethereum",
 	ChainColor:             "#627EEA",
@@ -45,8 +45,8 @@ var mainnet = params.Network{
 var goerli = params.Network{
 	ChainID:                goerliChainID,
 	ChainName:              "Ethereum Goerli",
-	RPCURL:                 "https://goerli-archival.rpc.grove.city/v1/",
-	FallbackURL:            "https://goerli.infura.io/v3/",
+	RPCURL:                 "https://some-wrong.url/v1/",
+	FallbackURL:            "https://some-wrong.url/v3/",
 	BlockExplorerURL:       "https://goerli.etherscan.io/",
 	IconURL:                "network/Network=Testnet",
 	ChainColor:             "#939BA1",
@@ -63,8 +63,8 @@ var goerli = params.Network{
 var sepolia = params.Network{
 	ChainID:                sepoliaChainID,
 	ChainName:              "Ethereum Sepolia",
-	RPCURL:                 "https://sepolia-archival.rpc.grove.city/v1/",
-	FallbackURL:            "https://sepolia.infura.io/v3/",
+	RPCURL:                 "https://some-wrong.url/v1/",
+	FallbackURL:            "https://some-wrong.url/v3/",
 	BlockExplorerURL:       "https://sepolia.etherscan.io/",
 	IconURL:                "network/Network=Testnet",
 	ChainColor:             "#51D0F0",
@@ -81,8 +81,8 @@ var sepolia = params.Network{
 var optimism = params.Network{
 	ChainID:                optimismChainID,
 	ChainName:              "Optimism",
-	RPCURL:                 "https://optimism-mainnet.rpc.grove.city/v1/",
-	FallbackURL:            "https://optimism-mainnet.infura.io/v3/",
+	RPCURL:                 "https://some-wrong.url/v1/",
+	FallbackURL:            "https://some-wrong.url/v3/",
 	BlockExplorerURL:       "https://optimistic.etherscan.io",
 	IconURL:                "network/Network=Optimism",
 	ChainColor:             "#E90101",
@@ -99,7 +99,7 @@ var optimism = params.Network{
 var optimismGoerli = params.Network{
 	ChainID:                optimismGoerliChainID,
 	ChainName:              "Optimism Goerli",
-	RPCURL:                 "https://optimism-goerli.infura.io/v3/",
+	RPCURL:                 "https://some-wrong.url/v3/",
 	FallbackURL:            "",
 	BlockExplorerURL:       "https://goerli-optimism.etherscan.io/",
 	IconURL:                "network/Network=Testnet",
@@ -117,7 +117,7 @@ var optimismGoerli = params.Network{
 var optimismSepolia = params.Network{
 	ChainID:                optimismSepoliaChainID,
 	ChainName:              "Optimism Sepolia",
-	RPCURL:                 "https://optimism-sepolia.infura.io/v3/",
+	RPCURL:                 "https://some-wrong.url/v3/",
 	FallbackURL:            "",
 	BlockExplorerURL:       "https://sepolia-optimism.etherscan.io/",
 	IconURL:                "network/Network=Testnet",
@@ -135,8 +135,8 @@ var optimismSepolia = params.Network{
 var arbitrum = params.Network{
 	ChainID:                arbitrumChainID,
 	ChainName:              "Arbitrum",
-	RPCURL:                 "https://arbitrum-one.rpc.grove.city/v1/",
-	FallbackURL:            "https://arbitrum-mainnet.infura.io/v3/",
+	RPCURL:                 "https://some-wrong.url/v1/",
+	FallbackURL:            "https://some-wrong.url/v3/",
 	BlockExplorerURL:       "https://arbiscan.io/",
 	IconURL:                "network/Network=Arbitrum",
 	ChainColor:             "#51D0F0",
@@ -153,7 +153,7 @@ var arbitrum = params.Network{
 var arbitrumGoerli = params.Network{
 	ChainID:                arbitrumGoerliChainID,
 	ChainName:              "Arbitrum Goerli",
-	RPCURL:                 "https://arbitrum-goerli.infura.io/v3/",
+	RPCURL:                 "https://some-wrong.url/v3/",
 	FallbackURL:            "",
 	BlockExplorerURL:       "https://goerli.arbiscan.io/",
 	IconURL:                "network/Network=Testnet",
@@ -171,7 +171,7 @@ var arbitrumGoerli = params.Network{
 var arbitrumSepolia = params.Network{
 	ChainID:                arbitrumSepoliaChainID,
 	ChainName:              "Arbitrum Sepolia",
-	RPCURL:                 "https://arbitrum-sepolia.infura.io/v3/",
+	RPCURL:                 "https://some-wrong.url/v3/",
 	FallbackURL:            "",
 	BlockExplorerURL:       "https://sepolia-explorer.arbitrum.io/",
 	IconURL:                "network/Network=Testnet",
