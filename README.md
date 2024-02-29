@@ -5,7 +5,7 @@
 
 # Docs
 
-- [How to Build](https://status.im/technical/build_status/status_go.html)
+- [How to Build](./_docs/how-to-build.md)
 - [How to Contribute](CONTRIBUTING.md)
 - [How to Release](RELEASING.md)
 - [How to run a Bootnode](BOOTNODE.md)
