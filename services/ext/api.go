@@ -506,9 +506,15 @@ func (api *PublicAPI) SlowdownArchivesImport(ctx context.Context) {
 	api.service.messenger.SlowdownArchivesImport()
 }
 
+// DEPRECATED: favor CreateCommunityChannel
 // CreateCommunityChat creates a community chat in the given community
 func (api *PublicAPI) CreateCommunityChat(communityID types.HexBytes, c *protobuf.CommunityChat) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateCommunityChat(communityID, c)
+}
+
+// CreateCommunityChannel creates a community chat in the given community
+func (api *PublicAPI) CreateCommunityChannel(request *requests.CreateCommunityChannel) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateCommunityChannel(request)
 }
 
 // EditCommunityChat edits a community chat in the given community
@@ -559,6 +565,11 @@ func (api *PublicAPI) RemoveRoleFromMember(request *requests.RemoveRoleFromMembe
 	return api.service.messenger.RemoveRoleFromMember(request)
 }
 
+func (api *PublicAPI) CreateCommunityTokenPermissionV2(request *requests.CreateCommunityTokenPermissionV2) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateCommunityTokenPermission(request.ToCreateCommunityTokenPermission())
+}
+
+// DEPRECATED, favor CreateCommunityTokenPermissionV2
 func (api *PublicAPI) CreateCommunityTokenPermission(request *requests.CreateCommunityTokenPermission) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateCommunityTokenPermission(request)
 }
@@ -1671,21 +1682,6 @@ func (api *PublicAPI) ChatMentionToInputField(chatID, text string) (*protocol.Ch
 
 func (api *PublicAPI) GetCheckChannelPermissionResponses(parent context.Context, communityID types.HexBytes) (*communities.CheckAllChannelsPermissionsResponse, error) {
 	return api.service.messenger.GetCommunityCheckChannelPermissionResponses(communityID)
-}
-
-// CreateClosedCommunity used only for test purposes
-func (api *PublicAPI) CreateClosedCommunity() (*protocol.MessengerResponse, error) {
-	return api.service.messenger.CreateClosedCommunity()
-}
-
-// CreateOpenCommunity used only for test purposes
-func (api *PublicAPI) CreateOpenCommunity() (*protocol.MessengerResponse, error) {
-	return api.service.messenger.CreateOpenCommunity()
-}
-
-// CreateTokenGatedCommunity used only for test purposes
-func (api *PublicAPI) CreateTokenGatedCommunity() (*protocol.MessengerResponse, error) {
-	return api.service.messenger.CreateTokenGatedCommunity()
 }
 
 // Set profile showcase preference for current user

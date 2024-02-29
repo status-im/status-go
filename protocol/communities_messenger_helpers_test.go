@@ -292,7 +292,7 @@ func createEncryptedCommunity(s *suite.Suite, owner *Messenger) (*communities.Co
 				Decimals:          18,
 			},
 		},
-		ChatIds: []string{chat.ID},
+		ChatIDs: []string{chat.ID},
 	})
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
@@ -336,9 +336,6 @@ func createCommunityConfigurable(s *suite.Suite, owner *Messenger, permission pr
 	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
 
 	orgChat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core",
 			Emoji:       "😎",

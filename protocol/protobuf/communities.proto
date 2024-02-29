@@ -123,8 +123,8 @@ message CommunityAdminSettings {
 }
 
 message CommunityChat {
+  reserved 2;
   map<string,CommunityMember> members = 1;
-  CommunityPermissions permissions = 2;
   ChatIdentity identity = 3;
   string category_id = 4;
   int32 position = 5;
@@ -146,9 +146,9 @@ message RevealedAccount {
 }
 
 message CommunityRequestToJoin {
+  reserved 3;
   uint64 clock = 1;
   string ens_name = 2;
-  string chat_id = 3;
   bytes community_id = 4;
   string display_name = 5;
   repeated RevealedAccount revealed_accounts = 6;

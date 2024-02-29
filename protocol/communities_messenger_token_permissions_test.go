@@ -1057,9 +1057,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 			Emoji:       chat.Emoji,
 			Color:       chat.Color,
 		},
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		ViewersCanPostReactions: viewersCanAddReactions,
 	}
 
@@ -1108,7 +1105,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 				Decimals:          uint64(18),
 			},
 		},
-		ChatIds: []string{chat.ID},
+		ChatIDs: []string{chat.ID},
 	}
 
 	response, err = s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)
@@ -1280,7 +1277,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 				Decimals:          uint64(18),
 			},
 		},
-		ChatIds: []string{chat.ID},
+		ChatIDs: []string{chat.ID},
 	}
 
 	response, err = s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)

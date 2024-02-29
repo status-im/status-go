@@ -491,9 +491,6 @@ func (m *Messenger) startPublishImportChannelProgressInterval(c chan *discord.Im
 }
 func createCommunityChannelForImport(request *requests.ImportDiscordChannel) *protobuf.CommunityChat {
 	return &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: request.Name,
 			Emoji:       request.Emoji,
@@ -1202,9 +1199,6 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				}
 
 				communityChat := &protobuf.CommunityChat{
-					Permissions: &protobuf.CommunityPermissions{
-						Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-					},
 					Identity: &protobuf.ChatIdentity{
 						DisplayName: channelUniqueName,
 						Emoji:       "",

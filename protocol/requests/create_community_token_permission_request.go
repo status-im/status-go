@@ -23,7 +23,7 @@ type CreateCommunityTokenPermission struct {
 	Type          protobuf.CommunityTokenPermission_Type `json:"type"`
 	TokenCriteria []*protobuf.TokenCriteria              `json:"tokenCriteria"`
 	IsPrivate     bool                                   `json:"isPrivate"`
-	ChatIds       []string                               `json:"chat_ids"`
+	ChatIDs       []string                               `json:"chat_ids"`
 }
 
 func (p *CreateCommunityTokenPermission) Validate() error {
@@ -85,6 +85,6 @@ func (p *CreateCommunityTokenPermission) ToCommunityTokenPermission() protobuf.C
 		Type:          p.Type,
 		TokenCriteria: p.TokenCriteria,
 		IsPrivate:     p.IsPrivate,
-		ChatIds:       p.ChatIds,
+		ChatIds:       p.ChatIDs,
 	}
 }

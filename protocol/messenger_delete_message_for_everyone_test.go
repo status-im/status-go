@@ -141,9 +141,6 @@ func (s *MessengerDeleteMessageForEveryoneSuite) createCommunity() *communities.
 
 func (s *MessengerDeleteMessageForEveryoneSuite) createCommunityChat(community *communities.Community) *Chat {
 	orgChat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core",
 			Emoji:       "",
