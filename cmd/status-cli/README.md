@@ -8,32 +8,42 @@ The Status CLI is a command line interface for interacting with the Status messe
 - Send and receive contact request
 - DM between contacts
 
-## Run
+## Build
 
-Run `dm` command:
+Go to `cmd/status-cli` directory and build the binary
 
 ```bash
-# simulate DM between two accounts
-go run main.go dm
-
-# simulate DM in a interactive way
-go run main.go dm -i
-
-# simulate DM with 3 messages
-go run main.go dm -c 3
-
-# run in light mode
-go run main.go dm --light
+go build
 ```
+
+## Run
 
 Run `serve` command:
 
 ```bash
 # run alice's server
-go run main.go serve
+./status-cli serve
 
 # run Bob's server in another terminal with the logged pubkey of Alice
-go run main.go serve -n bob -a <alice-pubkey>
+./status-cli serve -n bob -a <alice-pubkey>
 ```
+
+Run `dm` command:
+
+```bash
+# simulate DM between two accounts
+./status-cli dm
+
+# simulate DM in a interactive way
+./status-cli dm -i
+
+# simulate DM with 3 messages
+./status-cli dm -c 3
+
+# run in light mode
+./status-cli dm --light
+```
+
+You can run the commands with `--light` to work as a light client.
 
 Logs are recorded in file `*.log` and terminal.
