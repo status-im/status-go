@@ -360,4 +360,32 @@ func (s *SQLLitePersistenceTestSuite) TestGetHashRatchetKeyByID() {
 	s.Require().True(reflect.DeepEqual(key.keyID, cachedKey.KeyID))
 	s.Require().True(reflect.DeepEqual(key.Key, cachedKey.Key))
 	s.Require().EqualValues(0, cachedKey.SeqNo)
+
+	var newSeqNo uint32 = 1
+	newHash := []byte{10, 11, 12}
+	err = s.service.SaveHashRatchetKeyHash(key, newHash, newSeqNo)
+	s.Require().NoError(err)
+
+	cachedKey, err = s.service.GetHashRatchetCache(retrievedKey, 0)
+	s.Require().NoError(err)
+	s.Require().True(reflect.DeepEqual(key.keyID, cachedKey.KeyID))
+	s.Require().True(reflect.DeepEqual(key.Key, cachedKey.Key))
+	s.Require().EqualValues(1, cachedKey.SeqNo)
+
+	newSeqNo = 4
+	newHash = []byte{10, 11, 13}
+	err = s.service.SaveHashRatchetKeyHash(key, newHash, newSeqNo)
+	s.Require().NoError(err)
+
+	cachedKey, err = s.service.GetHashRatchetCache(retrievedKey, 0)
+	s.Require().NoError(err)
+	s.Require().True(reflect.DeepEqual(key.keyID, cachedKey.KeyID))
+	s.Require().True(reflect.DeepEqual(key.Key, cachedKey.Key))
+	s.Require().EqualValues(4, cachedKey.SeqNo)
+
+	cachedKey, err = s.service.GetHashRatchetCache(retrievedKey, 1)
+	s.Require().NoError(err)
+	s.Require().True(reflect.DeepEqual(key.keyID, cachedKey.KeyID))
+	s.Require().True(reflect.DeepEqual(key.Key, cachedKey.Key))
+	s.Require().EqualValues(1, cachedKey.SeqNo)
 }

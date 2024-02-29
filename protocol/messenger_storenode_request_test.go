@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
@@ -270,8 +271,14 @@ func (s *MessengerStoreNodeRequestSuite) requireCommunitiesEqual(c *communities.
 	s.Require().Equal(expected.Color(), c.Color())
 	s.Require().Equal(expected.Tags(), c.Tags())
 	s.Require().Equal(expected.Shard(), c.Shard())
-	s.Require().Equal(expected.TokenPermissions(), c.TokenPermissions())
-	s.Require().Equal(expected.CommunityTokensMetadata(), c.CommunityTokensMetadata())
+	s.Require().Equal(len(expected.TokenPermissions()), len(c.TokenPermissions()))
+	for k, v := range expected.TokenPermissions() {
+		s.Require().True(proto.Equal(v, c.TokenPermissions()[k]))
+	}
+	s.Require().Equal(len(expected.CommunityTokensMetadata()), len(c.CommunityTokensMetadata()))
+	for i, v := range expected.CommunityTokensMetadata() {
+		s.Require().True(proto.Equal(v, c.CommunityTokensMetadata()[i]))
+	}
 }
 
 func (s *MessengerStoreNodeRequestSuite) requireContactsEqual(c *Contact, expected *Contact) {
