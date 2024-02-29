@@ -30,8 +30,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 
 	require.Equal(t, goerliChainID, actualNetworks[1].ChainID)
 
-	require.True(t, strings.Contains(actualNetworks[1].RPCURL, poktToken))
-	require.True(t, strings.Contains(actualNetworks[1].FallbackURL, infuraToken))
+	require.True(t, strings.Contains(actualNetworks[1].RPCURL, infuraToken))
 
 	require.Equal(t, sepoliaChainID, actualNetworks[2].ChainID)
 

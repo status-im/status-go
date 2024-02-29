@@ -45,8 +45,8 @@ var mainnet = params.Network{
 var goerli = params.Network{
 	ChainID:                goerliChainID,
 	ChainName:              "Ethereum Goerli",
-	RPCURL:                 "https://goerli-archival.rpc.grove.city/v1/",
-	FallbackURL:            "https://goerli.infura.io/v3/",
+	RPCURL:                 "https://goerli.infura.io/v3/",
+	FallbackURL:            "",
 	BlockExplorerURL:       "https://goerli.etherscan.io/",
 	IconURL:                "network/Network=Testnet",
 	ChainColor:             "#627EEA",
