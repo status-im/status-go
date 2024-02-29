@@ -401,6 +401,11 @@ func (api *PublicAPI) JoinedCommunities(parent context.Context) ([]*communities.
 	return api.service.messenger.JoinedCommunities()
 }
 
+// IsDisplayNameDupeOfCommunityMember returns if any controlled or joined community has a member with provided display name
+func (api *PublicAPI) IsDisplayNameDupeOfCommunityMember(name string) (bool, error) {
+	return api.service.messenger.IsDisplayNameDupeOfCommunityMember(name)
+}
+
 // CommunityTags return the list of possible community tags
 func (api *PublicAPI) CommunityTags(parent context.Context) map[string]string {
 	return requests.TagsEmojies

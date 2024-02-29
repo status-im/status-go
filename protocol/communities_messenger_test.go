@@ -72,6 +72,10 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 	s.Require().NoError(err)
 	_, err = s.alice.Start()
 	s.Require().NoError(err)
+
+	s.setMessengerDisplayName(s.owner, "Charlie")
+	s.setMessengerDisplayName(s.bob, "Bobby")
+	s.setMessengerDisplayName(s.alice, "Alice")
 }
 
 func (s *MessengerCommunitiesSuite) TearDownTest() {
@@ -95,6 +99,19 @@ func (s *MessengerCommunitiesSuite) newMessenger() *Messenger {
 	s.Require().NoError(err)
 
 	return s.newMessengerWithKey(privateKey)
+}
+
+func (s *MessengerCommunitiesSuite) setMessengerDisplayName(m *Messenger, name string) {
+	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp.KeyUID = m.account.KeyUID
+	profileKp.Name = DefaultProfileDisplayName
+	profileKp.Accounts[0].KeyUID = m.account.KeyUID
+
+	err := m.settings.SaveOrUpdateKeypair(profileKp)
+	s.Require().NoError(err)
+
+	err = m.SetDisplayName(name)
+	s.Require().NoError(err)
 }
 
 func (s *MessengerCommunitiesSuite) TestCreateCommunity() {
@@ -4162,4 +4179,23 @@ func (s *MessengerCommunitiesSuite) TestBanUserAndDeleteAllUserMessages() {
 	s.Require().Len(community.PendingAndBannedMembers(), 1)
 	s.Require().False(community.Joined())
 	s.Require().False(community.Spectated())
+}
+
+func (s *MessengerCommunitiesSuite) TestIsDisplayNameDupeOfCommunityMember() {
+	community, _ := s.createCommunity()
+	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.alice)
+
+	s.joinCommunity(community, s.owner, s.alice)
+
+	result, err := s.alice.IsDisplayNameDupeOfCommunityMember("Charlie")
+	s.Require().NoError(err)
+	s.Require().True(result)
+
+	result, err = s.alice.IsDisplayNameDupeOfCommunityMember("Alice")
+	s.Require().NoError(err)
+	s.Require().True(result)
+
+	result, err = s.alice.IsDisplayNameDupeOfCommunityMember("Bobby")
+	s.Require().NoError(err)
+	s.Require().False(result)
 }
