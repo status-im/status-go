@@ -95,16 +95,9 @@ func (m *Messenger) SaveSyncDisplayName(displayName string, clock uint64) error 
 	if err != nil {
 		return err
 	}
-	preferredNameClock, err := m.settings.GetSettingLastSynced(settings.PreferredName)
-	if err != nil {
-		return err
-	}
-	// check clock of preferred name to avoid override account name
-	if preferredNameClock < clock {
-		m.account.Name = displayName
-		return m.multiAccounts.SaveAccount(*m.account)
-	}
-	return nil
+
+	m.account.Name = displayName
+	return m.multiAccounts.SaveAccount(*m.account)
 }
 
 func ValidateBio(bio *string) error {
