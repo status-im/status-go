@@ -39,10 +39,20 @@ import (
 
 const LightFlag = "light"
 const InteractiveFlag = "interactive"
+const NameFlag = "name"
+const AddFlag = "add"
 
 const RetrieveInterval = 300 * time.Millisecond
 const SendInterval = 1 * time.Second
 const WaitingInterval = 5 * time.Second
+
+var CommonFlags = []cli.Flag{
+	&cli.BoolFlag{
+		Name:    LightFlag,
+		Aliases: []string{"l"},
+		Usage:   "Enable light mode",
+	},
+}
 
 var logger *zap.SugaredLogger
 
@@ -60,19 +70,22 @@ func main() {
 				Name:    "dm",
 				Aliases: []string{"d"},
 				Usage:   "Send direct message",
-				Flags: []cli.Flag{
-					&cli.BoolFlag{
-						Name:  LightFlag,
-						Usage: "Enable light mode",
-					},
+				Flags: append([]cli.Flag{
 					&cli.BoolFlag{
 						Name:    InteractiveFlag,
 						Aliases: []string{"i"},
 						Usage:   "Use interactive mode",
 					},
-				},
+				}, CommonFlags...),
 				Action: func(cCtx *cli.Context) error {
 					ctx, cancel := context.WithCancel(cCtx.Context)
+
+					go func() {
+						sig := make(chan os.Signal, 1)
+						signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+						<-sig
+						cancel()
+					}()
 
 					rawLogger, err := zap.NewDevelopment()
 					if err != nil {
@@ -80,7 +93,7 @@ func main() {
 					}
 					logger = rawLogger.Sugar()
 
-					logger.Info("Flags passed:")
+					logger.Info("Running dm command, flags passed:")
 					for _, flag := range cCtx.FlagNames() {
 						logger.Infof("  %s: %v\n", flag, cCtx.Value(flag))
 					}
@@ -98,27 +111,32 @@ func main() {
 					}
 					defer stopMessenger(bob)
 
+					// Retrieve for messages
+					msgCh := make(chan string)
+					msgCh2 := make(chan string)
+					var wg sync.WaitGroup
+
+					wg.Add(1)
+					go retrieveMessagesLoop(alice, RetrieveInterval, msgCh, ctx, &wg)
+					wg.Add(1)
+					go retrieveMessagesLoop(bob, RetrieveInterval, msgCh2, ctx, &wg)
+
 					// Send contact request from Alice to Bob, bob accept the request
-					msgID, err := sendContactRequest(cCtx, alice, bob)
+					time.Sleep(WaitingInterval)
+					destId := types.EncodeHex(crypto.FromECDSAPub(bob.messenger.IdentityPublicKey()))
+					err = sendContactRequest(cCtx, alice, destId)
 					if err != nil {
 						return err
 					}
 
-					err = sendContactRequestAcceptance(cCtx, bob, alice, msgID)
+					msgID := <-msgCh
+					err = sendContactRequestAcceptance(cCtx, bob, msgID)
 					if err != nil {
 						return err
 					}
 
 					// Send DM between alice to bob
-					var wg sync.WaitGroup
-
-					wg.Add(1)
-					go retrieveMessagesLoop(alice, RetrieveInterval, ctx, &wg)
-					wg.Add(1)
-					go retrieveMessagesLoop(bob, RetrieveInterval, ctx, &wg)
-
 					interactive := cCtx.Bool(InteractiveFlag)
-
 					if interactive {
 						sem := make(chan struct{}, 1)
 						wg.Add(1)
@@ -126,19 +144,51 @@ func main() {
 						wg.Add(1)
 						go sendMessageLoop(bob, SendInterval, ctx, &wg, sem, cancel)
 					} else {
-						err = sendDirectMessage(alice, "Hello Bob, I'm Alice!", ctx)
-						if err != nil {
-							return err
-						}
-
-						err = sendDirectMessage(bob, "Hello Alice, I'm Bob!", ctx)
-						if err != nil {
-							return err
-						}
-
 						time.Sleep(WaitingInterval)
+						for i := 0; i < 3; i++ {
+							if len(bob.messenger.MutualContacts()) == 0 {
+								continue
+							}
+							err = sendDirectMessage(alice, "Hello Bob, I'm Alice!", ctx)
+							if err != nil {
+								return err
+							}
+							time.Sleep(WaitingInterval)
+
+							err = sendDirectMessage(bob, "Hello Alice, I'm Bob!", ctx)
+							if err != nil {
+								return err
+							}
+							time.Sleep(WaitingInterval)
+						}
 						cancel()
 					}
+
+					wg.Wait()
+					logger.Info("Exiting")
+
+					return nil
+				},
+			},
+			{
+				Name:    "serve",
+				Aliases: []string{"s"},
+				Usage:   "Start a server to send and receive messages",
+				Flags: append([]cli.Flag{
+					&cli.StringFlag{
+						Name:    NameFlag,
+						Aliases: []string{"n"},
+						Value:   "Alice",
+						Usage:   "Name of the user",
+					},
+					&cli.StringFlag{
+						Name:    AddFlag,
+						Aliases: []string{"a"},
+						Usage:   "Add a friend with the public key",
+					},
+				}, CommonFlags...),
+				Action: func(cCtx *cli.Context) error {
+					ctx, cancel := context.WithCancel(cCtx.Context)
 
 					go func() {
 						sig := make(chan os.Signal, 1)
@@ -146,6 +196,58 @@ func main() {
 						<-sig
 						cancel()
 					}()
+
+					rawLogger, err := zap.NewDevelopment()
+					if err != nil {
+						log.Fatalf("Error initializing logger: %v", err)
+					}
+					logger = rawLogger.Sugar()
+
+					logger.Info("Running serve command, flags passed:")
+					for _, flag := range cCtx.FlagNames() {
+						logger.Infof("  %s: %v\n", flag, cCtx.Value(flag))
+					}
+
+					name := cCtx.String(NameFlag)
+
+					// Start Alice and Bob's messengers
+					alice, err := startMessenger(cCtx, name)
+					if err != nil {
+						return err
+					}
+					defer stopMessenger(alice)
+
+					// Retrieve for messages
+					var wg sync.WaitGroup
+					msgCh := make(chan string)
+					contactCh := make(chan int)
+
+					wg.Add(1)
+					go retrieveMessagesLoop(alice, RetrieveInterval, msgCh, ctx, &wg)
+
+					// Send contact request from Alice to Bob, bob accept the request
+					dest := cCtx.String(AddFlag)
+					if dest != "" {
+						err := sendContactRequest(cCtx, alice, dest)
+						if err != nil {
+							return err
+						}
+					}
+
+					go func() {
+						msgID := <-msgCh
+						err = sendContactRequestAcceptance(cCtx, alice, msgID)
+						if err != nil {
+							logger.Error(err)
+							return
+						}
+					}()
+
+					// Send message if mutual contact exists
+					<-contactCh
+					sem := make(chan struct{}, 1)
+					wg.Add(1)
+					go sendMessageLoop(alice, SendInterval, ctx, &wg, sem, cancel)
 
 					wg.Wait()
 					logger.Info("Exiting")
@@ -234,7 +336,7 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCLI, error) {
 	}
 
 	id := types.EncodeHex(crypto.FromECDSAPub(messenger.IdentityPublicKey()))
-	namedLogger.Info("messenger started, id: ", id)
+	namedLogger.Info("messenger started, public key: ", id)
 
 	time.Sleep(WaitingInterval)
 
@@ -260,42 +362,23 @@ func stopMessenger(cli *StatusCLI) {
 	}
 }
 
-func sendContactRequest(cCtx *cli.Context, from, to *StatusCLI) (string, error) {
-	destID := types.EncodeHex(crypto.FromECDSAPub(to.messenger.IdentityPublicKey()))
-	from.logger.Info("send contact request, contact id: ", destID)
+func sendContactRequest(cCtx *cli.Context, from *StatusCLI, toId string) error {
+	from.logger.Info("send contact request, contact public key: ", toId)
 	request := &requests.SendContactRequest{
-		ID:      destID,
+		ID:      toId,
 		Message: "Hello!",
 	}
 	resp, err := from.messenger.SendContactRequest(cCtx.Context, request)
 	from.logger.Info("function SendContactRequest response.messages: ", resp.Messages())
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	respTo, err := protocol.WaitOnMessengerResponse(
-		to.messenger,
-		func(r *protocol.MessengerResponse) bool {
-			return len(r.Contacts) == 1 && len(r.Messages()) >= 2
-		},
-		fmt.Sprintf("%s didn't get contact request from %s", to.name, from.name),
-	)
-	if err != nil {
-		return "", err
-	}
-
-	for _, message := range respTo.Messages() {
-		to.logger.Info("receive message: ", message)
-	}
-
-	msg := protocol.FindFirstByContentType(respTo.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
-	to.logger.Info("receive contact request response: ", msg.Text)
-
-	return msg.ID, nil
+	return nil
 }
 
-func sendContactRequestAcceptance(cCtx *cli.Context, from, to *StatusCLI, msgID string) error {
-	from.logger.Info("send contact request acceptance to: ", to.name)
+func sendContactRequestAcceptance(cCtx *cli.Context, from *StatusCLI, msgID string) error {
+	from.logger.Info("accept contact request, message ID: ", msgID)
 	resp, err := from.messenger.AcceptContactRequest(cCtx.Context, &requests.AcceptContactRequest{ID: types.Hex2Bytes(msgID)})
 	if err != nil {
 		return err
@@ -305,29 +388,12 @@ func sendContactRequestAcceptance(cCtx *cli.Context, from, to *StatusCLI, msgID 
 	fromContacts := from.messenger.MutualContacts()
 	from.logger.Info("contacts number: ", len(fromContacts))
 
-	respTo, err := protocol.WaitOnMessengerResponse(
-		to.messenger,
-		func(r *protocol.MessengerResponse) bool {
-			return len(r.Contacts) == 1 && len(r.Messages()) >= 2
-		},
-		fmt.Sprintf("%s contact request acceptance not received from %s", to.name, from.name),
-	)
-	if err != nil {
-		return err
-	}
-
-	msg := protocol.FindFirstByContentType(respTo.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED)
-	to.logger.Info("got message: ", msg.Text)
-
-	toContacts := to.messenger.MutualContacts()
-	to.logger.Info("contacts number: ", len(toContacts))
-
 	return nil
 }
 
 func sendDirectMessage(from *StatusCLI, text string, ctx context.Context) error {
 	chat := from.messenger.Chat(from.messenger.MutualContacts()[0].ID)
-	from.logger.Info("chat with contact id: ", chat.ID)
+	from.logger.Infof("send message (%s) to contact: %s", text, chat.ID)
 
 	clock, timestamp := chat.NextClockAndTimestamp(from.messenger.GetTransport())
 	inputMessage := common.NewMessage()
@@ -339,11 +405,10 @@ func sendDirectMessage(from *StatusCLI, text string, ctx context.Context) error 
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = text
 
-	resp, err := from.messenger.SendChatMessage(ctx, inputMessage)
+	_, err := from.messenger.SendChatMessage(ctx, inputMessage)
 	if err != nil {
 		return err
 	}
-	from.logger.Info("function SendChatMessage response.messages: ", resp.Messages())
 
 	return nil
 }
@@ -368,11 +433,13 @@ func setupLogger(file string) *zap.Logger {
 	return newLogger
 }
 
-func retrieveMessagesLoop(cli *StatusCLI, tick time.Duration, ctx context.Context, wg *sync.WaitGroup) {
+func retrieveMessagesLoop(cli *StatusCLI, tick time.Duration, msgCh chan string, ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
+
+	cli.logger.Info("retrieve messages...")
 
 	for {
 		select {
@@ -384,7 +451,14 @@ func retrieveMessagesLoop(cli *StatusCLI, tick time.Duration, ctx context.Contex
 			}
 			if response != nil && len(response.Messages()) != 0 {
 				for _, message := range response.Messages() {
-					cli.logger.Infof("receive message: %s\n", message.Text)
+					cli.logger.Info("receive message: ", message.Text)
+					if message.ContentType == protobuf.ChatMessage_CONTACT_REQUEST {
+						msgCh <- message.ID
+					}
+					if message.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED {
+						toContacts := cli.messenger.MutualContacts()
+						cli.logger.Info("contacts number: ", len(toContacts))
+					}
 				}
 			}
 		case <-ctx.Done():
@@ -403,6 +477,9 @@ func sendMessageLoop(cli *StatusCLI, tick time.Duration, ctx context.Context, wg
 	for {
 		select {
 		case <-ticker.C:
+			if len(cli.messenger.MutualContacts()) == 0 {
+				continue
+			}
 			sem <- struct{}{}
 			cli.logger.Info("Enter your message to send: (type 'quit' or 'q' to exit)")
 			message, err := reader.ReadString('\n')
@@ -427,7 +504,7 @@ func sendMessageLoop(cli *StatusCLI, tick time.Duration, ctx context.Context, wg
 			time.Sleep(WaitingInterval)
 			<-sem
 			if err != nil {
-				cli.logger.Error("failed to send direct message", err)
+				cli.logger.Error("failed to send direct message: ", err)
 				continue
 			}
 		case <-ctx.Done():
