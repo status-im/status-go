@@ -3247,13 +3247,13 @@ func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability a
 	}
 }
 
-func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, syncKpMigratedToKeycard bool,
-	dbKpMigratedToKeycard bool, accountReceivedFromLocalPairing bool) (accounts.AccountOperable, error) {
+func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, recoverinrecoveringFromWakuInitiatedByKeycard bool,
+	syncKpMigratedToKeycard bool, dbKpMigratedToKeycard bool, accountReceivedFromLocalPairing bool) (accounts.AccountOperable, error) {
 	if accountReceivedFromLocalPairing {
 		return accounts.AccountOperable(syncAcc.Operable), nil
 	}
 
-	if syncKpMigratedToKeycard || m.account.KeyUID == syncAcc.KeyUid {
+	if syncKpMigratedToKeycard || recoverinrecoveringFromWakuInitiatedByKeycard && m.account.KeyUID == syncAcc.KeyUid {
 		return accounts.AccountFullyOperable, nil
 	}
 
@@ -3534,18 +3534,19 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 	}
 
 	syncKpMigratedToKeycard := len(message.Keycards) > 0
+	recoveringFromWaku := message.SyncedFrom == accounts.SyncedFromBackup
+
+	multiAcc, err := m.multiAccounts.GetAccount(kp.KeyUID)
+	if err != nil {
+		return nil, err
+	}
+	recoverinrecoveringFromWakuInitiatedByKeycard := recoveringFromWaku && multiAcc != nil && multiAcc.RefersToKeycard()
 	for _, sAcc := range message.Accounts {
-		if message.SyncedFrom == accounts.SyncedFromBackup && kp.Type == accounts.KeypairTypeProfile {
-			// if a profile keypair is coming from backup, we're handling within this block the case when a recovering
-			// was inititiated via keycard, while backed up profile keypair data refers to a regular profile
-			multiAcc, err := m.multiAccounts.GetAccount(kp.KeyUID)
-			if err != nil {
-				return nil, err
-			}
-			syncKpMigratedToKeycard = multiAcc != nil && multiAcc.KeycardPairing != ""
-		}
-		accountOperability, err := m.resolveAccountOperability(sAcc, syncKpMigratedToKeycard,
-			dbKeypair != nil && dbKeypair.MigratedToKeycard(), fromLocalPairing)
+		accountOperability, err := m.resolveAccountOperability(sAcc,
+			recoverinrecoveringFromWakuInitiatedByKeycard,
+			syncKpMigratedToKeycard,
+			dbKeypair != nil && dbKeypair.MigratedToKeycard(),
+			fromLocalPairing)
 		if err != nil {
 			return nil, err
 		}
@@ -3554,7 +3555,7 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		kp.Accounts = append(kp.Accounts, acc)
 	}
 
-	if !fromLocalPairing {
+	if !fromLocalPairing && !recoverinrecoveringFromWakuInitiatedByKeycard {
 		if kp.Removed ||
 			dbKeypair != nil && !dbKeypair.MigratedToKeycard() && syncKpMigratedToKeycard {
 			// delete all keystore files

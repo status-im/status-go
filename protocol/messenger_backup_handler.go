@@ -250,7 +250,7 @@ func (m *Messenger) handleKeypair(message *protobuf.SyncKeypair) error {
 	}
 	// If user is recovering his account via seed phrase, but the backed up messages indicate that the profile keypair
 	// is a keycard related profile, then we need to remove related profile keycards (only profile, other keycards should remain).
-	if multiAcc != nil && multiAcc.KeyUID == message.KeyUid && multiAcc.KeycardPairing == "" && len(message.Keycards) > 0 {
+	if multiAcc != nil && multiAcc.KeyUID == message.KeyUid && !multiAcc.RefersToKeycard() && len(message.Keycards) > 0 {
 		message.Keycards = []*protobuf.SyncKeycard{}
 	}
 
