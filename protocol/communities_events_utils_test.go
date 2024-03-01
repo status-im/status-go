@@ -50,7 +50,7 @@ func waitOnMessengerResponse(s *suite.Suite, fnWait MessageResponseValidator, us
 		func(r *MessengerResponse) bool {
 			err := fnWait(r)
 			if err != nil {
-				user.logger.Error("WaitOnMessengerResponse: ", zap.Error(err))
+				user.logger.Error("response error: ", zap.Error(err))
 			}
 			return err == nil
 		},
@@ -735,41 +735,35 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 	s.Require().True(modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey))
 	s.Require().Equal(communities.CommunityMemberBanPending, modifiedCommmunity.PendingAndBannedMembers()[bannedPK])
 
-	// 2. wait for event as a sender
-	waitOnMessengerResponse(s, func(response *MessengerResponse) error {
+	verifier := "event sender"
+	verifyPendingState := func(response *MessengerResponse) error {
 		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(banRequest.CommunityID))
 		if err != nil {
 			return err
 		}
 
 		if !modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey) {
-			return errors.New("event sender: alice should not be not banned (yet)")
+			return errors.New(verifier + ": alice should not be not banned (yet)")
 		}
 
-		if modifiedCommmunity.PendingAndBannedMembers()[bannedPK] != communities.CommunityMemberBanPending {
-			return errors.New("event sender: alice should be in the pending state")
+		state, exists := modifiedCommmunity.PendingAndBannedMembers()[bannedPK]
+		if !exists {
+			return errors.New(verifier + ": alice is not in the pending and banned members list")
+		}
+
+		if state != communities.CommunityMemberBanPending {
+			return errors.New("event sender: alice has invalid state: " + string(state))
 		}
 
 		return nil
-	}, base.GetEventSender())
+	}
+
+	// 2. wait for event as a sender
+	waitOnMessengerResponse(s, verifyPendingState, base.GetEventSender())
 
 	// 3. wait for event as the community member and check we are still until control node gets it
-	waitOnMessengerResponse(s, func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(banRequest.CommunityID))
-		if err != nil {
-			return err
-		}
-
-		if !modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey) {
-			return errors.New("member: alice should not be not banned (yet)")
-		}
-
-		if len(modifiedCommmunity.PendingAndBannedMembers()) == 0 {
-			return errors.New("member: alice should know about banned and pending members")
-		}
-
-		return nil
-	}, base.GetMember())
+	verifier = "alice"
+	waitOnMessengerResponse(s, verifyPendingState, base.GetMember())
 
 	checkMsgDeletion := func(messenger *Messenger, expectedMsgsCount int) {
 		msgs, err := messenger.persistence.GetCommunityMemberAllMessagesID(bannedPK, communityStr)
