@@ -26,6 +26,7 @@ var ErrInvalidDisplayNameEthSuffix = errors.New(`usernames ending with "eth" are
 var ErrInvalidDisplayNameNotAllowed = errors.New("name is not allowed")
 var ErrInvalidBioLength = errors.New("invalid bio length")
 var ErrInvalidSocialLinkTextLength = errors.New("invalid social link text length")
+var ErrDisplayNameDupeOfCommunityMember = errors.New("display name duplicates on of community members")
 
 func ValidateDisplayName(displayName *string) error {
 	name := strings.TrimSpace(*displayName)
@@ -64,6 +65,15 @@ func (m *Messenger) SetDisplayName(displayName string) error {
 
 	if err = ValidateDisplayName(&displayName); err != nil {
 		return err
+	}
+
+	isDupe, err := m.IsDisplayNameDupeOfCommunityMember(displayName)
+	if err != nil {
+		return err
+	}
+
+	if isDupe {
+		return ErrDisplayNameDupeOfCommunityMember
 	}
 
 	m.account.Name = displayName
