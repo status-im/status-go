@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -597,6 +598,28 @@ func (m *Messenger) ControlledCommunities() ([]*communities.Community, error) {
 
 func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 	return m.communitiesManager.Joined()
+}
+
+func (m *Messenger) IsDisplayNameDupeOfCommunityMember(name string) (bool, error) {
+	controlled, err := m.communitiesManager.Controlled()
+	if err != nil {
+		return false, err
+	}
+
+	joined, err := m.communitiesManager.Joined()
+	if err != nil {
+		return false, err
+	}
+
+	for _, community := range append(controlled, joined...) {
+		for memberKey := range community.Members() {
+			contact := m.GetContactByID(memberKey)
+			if strings.Compare(contact.DisplayName, name) == 0 {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 func (m *Messenger) CommunityUpdateLastOpenedAt(communityID string) (int64, error) {
