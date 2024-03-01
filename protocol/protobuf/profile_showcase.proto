@@ -23,10 +23,10 @@ message ProfileShowcaseCollectible {
   string uid = 1 [deprecated = true];
   uint32 order = 2;
   string contract_address = 3;
-  string community_id = 4;
+  string community_id = 4 [deprecated = true];
   uint64 chain_id = 5;
   string token_id = 6;
-  string account_address = 7;
+  string account_address = 7 [deprecated = true];
 }
 
 message ProfileShowcaseVerifiedToken {
@@ -38,7 +38,7 @@ message ProfileShowcaseUnverifiedToken {
   string contract_address = 1;
   uint32 order = 2;
   uint64 chain_id = 3;
-  string community_id = 4;
+  string community_id = 4 [deprecated = true];
 }
 
 message ProfileShowcaseSocialLink {
@@ -84,9 +84,9 @@ message ProfileShowcaseCommunityPreference {
 
 message ProfileShowcaseAccountPreference {
   string address = 1;
-  string name = 2;
-  string color_id = 3;
-  string emoji = 4;
+  string name = 2 [deprecated = true];
+  string color_id = 3 [deprecated = true];
+  string emoji = 4 [deprecated = true];
   ProfileShowcaseVisibility showcase_visibility = 5;
   uint32 order = 6;
 }
@@ -95,8 +95,8 @@ message ProfileShowcaseCollectiblePreference {
   string contract_address = 1;
   uint64 chain_id = 2;
   string token_id = 3;
-  string community_id = 4;
-  string account_address = 5;
+  string community_id = 4 [deprecated = true];
+  string account_address = 5  [deprecated = true];
   ProfileShowcaseVisibility showcase_visibility = 6;
   uint32 order = 7;
 }
@@ -110,7 +110,7 @@ message ProfileShowcaseVerifiedTokenPreference {
 message ProfileShowcaseUnverifiedTokenPreference {
   string contract_address = 1;
   uint64 chain_id = 2;
-  string community_id = 3;
+  string community_id = 3 [deprecated = true];
   ProfileShowcaseVisibility showcase_visibility = 4;
   uint32 order = 5;
 }

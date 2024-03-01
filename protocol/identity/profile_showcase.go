@@ -41,9 +41,6 @@ type ProfileShowcaseCommunityPreference struct {
 
 type ProfileShowcaseAccountPreference struct {
 	Address            string                    `json:"address"`
-	Name               string                    `json:"name"`
-	ColorID            string                    `json:"colorId"`
-	Emoji              string                    `json:"emoji"`
 	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
 	Order              int                       `json:"order"`
 }
@@ -52,8 +49,6 @@ type ProfileShowcaseCollectiblePreference struct {
 	ContractAddress    string                    `json:"contractAddress"`
 	ChainID            uint64                    `json:"chainId"`
 	TokenID            string                    `json:"tokenId"`
-	CommunityID        string                    `json:"communityId"`
-	AccountAddress     string                    `json:"accountAddress"`
 	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
 	Order              int                       `json:"order"`
 }
@@ -67,7 +62,6 @@ type ProfileShowcaseVerifiedTokenPreference struct {
 type ProfileShowcaseUnverifiedTokenPreference struct {
 	ContractAddress    string                    `json:"contractAddress"`
 	ChainID            uint64                    `json:"chainId"`
-	CommunityID        string                    `json:"communityId"`
 	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
 	Order              int                       `json:"order"`
 }
@@ -110,8 +104,6 @@ type ProfileShowcaseCollectible struct {
 	ContractAddress string `json:"contractAddress"`
 	ChainID         uint64 `json:"chainId"`
 	TokenID         string `json:"tokenId"`
-	CommunityID     string `json:"communityId"`
-	AccountAddress  string `json:"accountAddress"`
 	Order           int    `json:"order"`
 }
 
@@ -123,7 +115,6 @@ type ProfileShowcaseVerifiedToken struct {
 type ProfileShowcaseUnverifiedToken struct {
 	ContractAddress string `json:"contractAddress"`
 	ChainID         uint64 `json:"chainId"`
-	CommunityID     string `json:"communityId"`
 	Order           int    `json:"order"`
 }
 

@@ -32,17 +32,11 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 		Accounts: []*identity.ProfileShowcaseAccountPreference{
 			&identity.ProfileShowcaseAccountPreference{
 				Address:            "0x0000000000000000000000000032433445133422",
-				Name:               "Status Account",
-				ColorID:            "blue",
-				Emoji:              "-_-",
 				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
 			&identity.ProfileShowcaseAccountPreference{
 				Address:            "0x0000000000000000000000000032433445133424",
-				Name:               "Money Box",
-				ColorID:            "red",
-				Emoji:              ":o)",
 				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 				Order:              1,
 			},
@@ -52,8 +46,6 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 				ContractAddress:    "0x12378534257568678487683576",
 				ChainID:            11155111,
 				TokenID:            "123213895929994903",
-				CommunityID:        "0x01312357798976535",
-				AccountAddress:     "0x32433445133424",
 				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
@@ -79,14 +71,12 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 			&identity.ProfileShowcaseUnverifiedTokenPreference{
 				ContractAddress:    "0x454525452023452",
 				ChainID:            1,
-				CommunityID:        "0x32433445133424",
 				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
 			&identity.ProfileShowcaseUnverifiedTokenPreference{
 				ContractAddress:    "0x12312323323233",
 				ChainID:            11155111,
-				CommunityID:        "",
 				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 				Order:              1,
 			},
@@ -190,7 +180,6 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 				ContractAddress: "0x12378534257568678487683576",
 				ChainID:         1,
 				TokenID:         "123213895929994903",
-				CommunityID:     "0x01312357798976535",
 				Order:           0,
 			},
 		},
@@ -212,13 +201,11 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 			&identity.ProfileShowcaseUnverifiedToken{
 				ContractAddress: "0x454525452023452",
 				ChainID:         1,
-				CommunityID:     "",
 				Order:           0,
 			},
 			&identity.ProfileShowcaseUnverifiedToken{
 				ContractAddress: "0x12312323323233",
 				ChainID:         11155111,
-				CommunityID:     "0x32433445133424",
 				Order:           1,
 			},
 		},
@@ -255,7 +242,6 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 				ContractAddress: "0x12378534257568678487683576",
 				ChainID:         1,
 				TokenID:         "123213895929994903",
-				CommunityID:     "0x01312357798976535",
 				Order:           1,
 			},
 		},
@@ -431,17 +417,11 @@ func (s *TestProfileShowcasePersistence) TestUpdateProfileShowcaseAccountOnWalle
 		Accounts: []*identity.ProfileShowcaseAccountPreference{
 			&identity.ProfileShowcaseAccountPreference{
 				Address:            deleteAccountAddress,
-				Name:               "Status Account",
-				ColorID:            "blue",
-				Emoji:              "-_-",
 				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
 			&identity.ProfileShowcaseAccountPreference{
 				Address:            updateAccountAddress,
-				Name:               "Money Box",
-				ColorID:            "red",
-				Emoji:              ":o)",
 				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 				Order:              1,
 			},
@@ -456,9 +436,6 @@ func (s *TestProfileShowcasePersistence) TestUpdateProfileShowcaseAccountOnWalle
 	s.Require().NotNil(account)
 	s.Require().Equal(*account, *preferences.Accounts[1])
 
-	account.Name = "Music Box"
-	account.ColorID = "green"
-	account.Emoji = ">:-]"
 	account.ShowcaseVisibility = identity.ProfileShowcaseVisibilityIDVerifiedContacts
 	account.Order = 7
 

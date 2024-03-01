@@ -1,0 +1,14 @@
+
+ALTER TABLE profile_showcase_accounts_preferences DROP COLUMN name;
+ALTER TABLE profile_showcase_accounts_preferences DROP COLUMN color_id;
+ALTER TABLE profile_showcase_accounts_preferences DROP COLUMN emoji;
+
+ALTER TABLE profile_showcase_collectibles_preferences DROP COLUMN community_id;
+ALTER TABLE profile_showcase_collectibles_preferences DROP COLUMN account_address;
+
+ALTER TABLE profile_showcase_unverified_tokens_preferences DROP COLUMN community_id;
+
+ALTER TABLE profile_showcase_collectibles_contacts DROP COLUMN community_id;
+ALTER TABLE profile_showcase_collectibles_contacts DROP COLUMN account_address;
+
+ALTER TABLE profile_showcase_unverified_tokens_contacts DROP COLUMN community_id;
