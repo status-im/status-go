@@ -21,6 +21,8 @@ package wakuv2
 import (
 	"errors"
 
+	"go.uber.org/zap"
+
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/protocol/common/shard"
@@ -28,6 +30,11 @@ import (
 	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 
 	"github.com/status-im/status-go/wakuv2/common"
+)
+
+var (
+	ErrBadLightClientConfig = errors.New("either peer exchange server or discv5 must be disabled, and the peer exchange client must be enabled")
+	ErrBadFullNodeConfig    = errors.New("peer exchange server and discv5 must be enabled, and the peer exchange client must be disabled")
 )
 
 // Config represents the configuration state of a waku node.
@@ -61,12 +68,14 @@ type Config struct {
 	SkipPublishToTopic       bool             `toml:",omitempty"` // Used in testing
 }
 
-func (c *Config) Validate() error {
+func (c *Config) Validate(logger *zap.Logger) error {
 	if c.LightClient && (c.EnablePeerExchangeServer || c.EnableDiscV5 || !c.EnablePeerExchangeClient) {
-		return errors.New("bad configuration for a light client: either peer exchange server or discv5 must be disabled, and the peer exchange client must be enabled")
+		logger.Warn("bad configuration for a light client", zap.Error(ErrBadLightClientConfig))
+		return nil
 	}
 	if !c.LightClient && (!c.EnablePeerExchangeServer || !c.EnableDiscV5 || c.EnablePeerExchangeClient) {
-		return errors.New("bad configuration for a full node: peer exchange server and discv5 must be enabled, and the peer exchange client must be disabled")
+		logger.Warn("bad configuration for a full node", zap.Error(ErrBadFullNodeConfig))
+		return nil
 	}
 	return nil
 }

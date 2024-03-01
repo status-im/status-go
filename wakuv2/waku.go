@@ -170,8 +170,8 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	}
 
 	cfg = setDefaults(cfg)
-	if err = cfg.Validate(); err != nil {
-		logger.Warn("bad wakuv2 configuration", zap.Error(err))
+	if err = cfg.Validate(logger); err != nil {
+		return nil, err
 	}
 
 	logger.Info("starting wakuv2 with config", zap.Any("config", cfg))

@@ -196,6 +196,7 @@ type WakuV2Config struct {
 	Nameserver string
 
 	// EnableDiscV5 indicates if DiscoveryV5 is enabled or not
+	// Deprecated: will be calculated based on LightClient
 	EnableDiscV5 bool
 
 	// UDPPort number to start discovery v5
