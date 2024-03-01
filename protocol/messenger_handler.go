@@ -393,7 +393,26 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 	if err := message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey)); err != nil {
 		return fmt.Errorf("failed to prepare content: %v", err)
 	}
-	chat, err := m.matchChatEntity(message)
+
+	// Get Application layer messageType from commandState
+	// Currently this is not really used in `matchChatEntity`, but I did want to pass UNKNOWN there.
+	var messageType protobuf.ApplicationMetadataMessage_Type
+	switch message.CommandParameters.CommandState {
+	case common.CommandStateRequestAddressForTransaction:
+		messageType = protobuf.ApplicationMetadataMessage_REQUEST_ADDRESS_FOR_TRANSACTION
+	case common.CommandStateRequestAddressForTransactionAccepted:
+		messageType = protobuf.ApplicationMetadataMessage_ACCEPT_REQUEST_ADDRESS_FOR_TRANSACTION
+	case common.CommandStateRequestAddressForTransactionDeclined:
+		messageType = protobuf.ApplicationMetadataMessage_DECLINE_REQUEST_ADDRESS_FOR_TRANSACTION
+	case common.CommandStateRequestTransaction:
+		messageType = protobuf.ApplicationMetadataMessage_REQUEST_TRANSACTION
+	case common.CommandStateRequestTransactionDeclined:
+		messageType = protobuf.ApplicationMetadataMessage_DECLINE_REQUEST_TRANSACTION
+	default:
+		messageType = protobuf.ApplicationMetadataMessage_UNKNOWN
+	}
+
+	chat, err := m.matchChatEntity(message, messageType)
 	if err != nil {
 		return err
 	}
@@ -862,7 +881,7 @@ func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, r
 		Alias:            pinner.Alias,
 	}
 
-	chat, err := m.matchChatEntity(pinMessage)
+	chat, err := m.matchChatEntity(pinMessage, protobuf.ApplicationMetadataMessage_PIN_MESSAGE)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
 	}
@@ -2127,7 +2146,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		}
 	}
 
-	chat, err := m.matchChatEntity(receivedMessage)
+	chat, err := m.matchChatEntity(receivedMessage, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
 	}
@@ -2684,7 +2703,7 @@ func (m *Messenger) HandleDeclineRequestTransaction(messageState *ReceivedMessag
 	return m.handleCommandMessage(messageState, oldMessage)
 }
 
-func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity) (*Chat, error) {
+func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity, messageType protobuf.ApplicationMetadataMessage_Type) (*Chat, error) {
 	if chatEntity.GetSigPubKey() == nil {
 		m.logger.Error("public key can't be empty")
 		return nil, errors.New("received a chatEntity with empty public key")
@@ -2753,7 +2772,7 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity) (*Chat, error)
 			return nil, errors.New("not an community chat")
 		}
 
-		canPost, err := m.communitiesManager.CanPost(chatEntity.GetSigPubKey(), chat.CommunityID, chat.CommunityChatID())
+		canPost, err := m.communitiesManager.CanPost(chatEntity.GetSigPubKey(), chat.CommunityID, chat.CommunityChatID(), messageType)
 		if err != nil {
 			return nil, err
 		}
@@ -2762,21 +2781,8 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity) (*Chat, error)
 			return nil, errors.New("user can't post in community")
 		}
 
-		_, isPinMessage := chatEntity.(*common.PinMessage)
-		if isPinMessage {
-			community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
-			if err != nil {
-				return nil, err
-			}
-
-			hasPermission := community.IsPrivilegedMember(chatEntity.GetSigPubKey())
-			pinMessageAllowed := community.AllowsAllMembersToPinMessage()
-			if !hasPermission && !pinMessageAllowed {
-				return nil, errors.New("user can't pin message")
-			}
-		}
-
 		return chat, nil
+
 	case chatEntity.GetMessageType() == protobuf.MessageType_PRIVATE_GROUP:
 		// In the case of a group chatEntity, ChatID is the same for all messages belonging to a group.
 		// It needs to be verified if the signature public key belongs to the chat.
@@ -2853,7 +2859,7 @@ func (m *Messenger) HandleEmojiReaction(state *ReceivedMessageState, pbEmojiR *p
 		return nil
 	}
 
-	chat, err := m.matchChatEntity(emojiReaction)
+	chat, err := m.matchChatEntity(emojiReaction, protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
 	}

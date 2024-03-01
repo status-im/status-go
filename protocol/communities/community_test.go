@@ -452,9 +452,6 @@ func (s *CommunitySuite) TestCanPost() {
 	notMember := &s.member3.PublicKey
 	member := &s.member1.PublicKey
 
-	// MEMBERSHIP-NO-MEMBERSHIP-Member-> User can post
-	// MEMBERSHIP-NO-MEMEBRESHIP->NON member -> User can't post
-
 	testCases := []struct {
 		name    string
 		config  Config
@@ -463,7 +460,7 @@ func (s *CommunitySuite) TestCanPost() {
 		canPost bool
 	}{
 		{
-			name:    "no-membership org with no-membeship chat",
+			name:    "no-membership org with no-membership chat",
 			config:  s.configNoMembershipOrgNoMembershipChat(),
 			member:  notMember,
 			canPost: false,
@@ -481,7 +478,7 @@ func (s *CommunitySuite) TestCanPost() {
 			canPost: true,
 		},
 		{
-			name:    "monsier creator can always post of course",
+			name:    "creator can always post of course",
 			config:  s.configOnRequestOrgNoMembershipChat(),
 			member:  &s.identity.PublicKey,
 			canPost: true,
@@ -494,7 +491,7 @@ func (s *CommunitySuite) TestCanPost() {
 			org, err := New(tc.config, &TimeSourceStub{}, &DescriptionEncryptorMock{})
 			s.Require().NoError(err)
 
-			canPost, err := org.CanPost(tc.member, testChatID1)
+			canPost, err := org.CanPost(tc.member, testChatID1, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
 			s.Require().Equal(tc.err, err)
 			s.Require().Equal(tc.canPost, canPost)
 		})

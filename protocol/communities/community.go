@@ -177,7 +177,9 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 			communityItem.Encrypted = o.Encrypted()
 		}
 		for id, c := range o.config.CommunityDescription.Chats {
-			canPost, err := o.CanPost(o.config.MemberIdentity, id)
+			// NOTE: Here `CanPost` is only set for ChatMessage. But it can be different for reactions/pin/etc.
+			// Consider adding more properties to `CommunityChat` to reflect that.
+			canPost, err := o.CanPost(o.config.MemberIdentity, id, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
 			if err != nil {
 				return nil, err
 			}
@@ -311,7 +313,9 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 			communityItem.Categories[id] = category
 		}
 		for id, c := range o.config.CommunityDescription.Chats {
-			canPost, err := o.CanPost(o.config.MemberIdentity, id)
+			// NOTE: Here `CanPost` is only set for ChatMessage. But it can be different for reactions/pin/etc.
+			// Consider adding more properties to `CommunityChat` to reflect that.
+			canPost, err := o.CanPost(o.config.MemberIdentity, id, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
 			if err != nil {
 				return nil, err
 			}
@@ -1847,7 +1851,7 @@ func (o *Community) VerifyGrantSignature(data []byte) (*protobuf.Grant, error) {
 	return grant, nil
 }
 
-func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string) (bool, error) {
+func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, messageType protobuf.ApplicationMetadataMessage_Type) (bool, error) {
 	if o.config.CommunityDescription.Chats == nil {
 		o.config.Logger.Debug("Community.CanPost: no-chats")
 		return false, nil
@@ -1886,14 +1890,24 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string) (bool, error) {
 		return false, nil
 	}
 
-	// Need to also be a chat member to post
-	if !o.IsMemberInChat(pk, chatID) {
-		o.config.Logger.Debug("Community.CanPost: not a chat member", zap.String("chat-id", chatID))
-		return false, nil
-	}
+	member, isChatMember := chat.Members[common.PubkeyToHex(pk)]
 
-	// all conditions satisfied, user can post after all
-	return true, nil
+	switch messageType {
+	case protobuf.ApplicationMetadataMessage_PIN_MESSAGE:
+		pinAllowed := o.IsPrivilegedMember(pk) || o.AllowsAllMembersToPinMessage()
+		return isChatMember && pinAllowed, nil
+
+	case protobuf.ApplicationMetadataMessage_EMOJI_REACTION:
+		if !isChatMember {
+			return false, nil
+		}
+		isPoster := member.ChannelRole == protobuf.CommunityMember_CHANNEL_ROLE_POSTER
+		isViewer := member.ChannelRole == protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
+		return isPoster || (isViewer && chat.ViewersCanPostReactions), nil
+
+	default:
+		return isChatMember, nil
+	}
 }
 
 func (o *Community) BuildGrant(key *ecdsa.PublicKey, chatID string) ([]byte, error) {
@@ -1968,8 +1982,8 @@ func (o *Community) isMember() bool {
 	return o.hasMember(o.config.MemberIdentity)
 }
 
-func (o *Community) CanMemberIdentityPost(chatID string) (bool, error) {
-	return o.CanPost(o.config.MemberIdentity, chatID)
+func (o *Community) CanMemberIdentityPost(chatID string, messageType protobuf.ApplicationMetadataMessage_Type) (bool, error) {
+	return o.CanPost(o.config.MemberIdentity, chatID, messageType)
 }
 
 // CanJoin returns whether a user can join the community, only if it's
@@ -2052,7 +2066,9 @@ func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.Commu
 	return changes, nil
 }
 
-func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey, roles []protobuf.CommunityMember_Roles) (*CommunityChanges, error) {
+func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey,
+	roles []protobuf.CommunityMember_Roles, channelRole protobuf.CommunityMember_ChannelRole) (*CommunityChanges, error) {
+
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -2072,7 +2088,8 @@ func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey, r
 		chat.Members = make(map[string]*protobuf.CommunityMember)
 	}
 	chat.Members[memberKey] = &protobuf.CommunityMember{
-		Roles: roles,
+		Roles:       roles,
+		ChannelRole: channelRole,
 	}
 	changes.ChatsModified[chatID] = &CommunityChatChanges{
 		ChatModified: chat,
