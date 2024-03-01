@@ -1746,7 +1746,7 @@ func (m *Manager) preprocessDescription(id types.HexBytes, description *protobuf
 }
 
 func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte, newControlNode *ecdsa.PublicKey) (*CommunityResponse, error) {
-
+	prevClock := community.config.CommunityDescription.Clock
 	changes, err := community.UpdateCommunityDescription(description, payload, newControlNode)
 	if err != nil {
 		return nil, err
@@ -1811,11 +1811,13 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		}
 	}
 
-	err = m.persistence.DeleteCommunityEvents(community.ID())
-	if err != nil {
-		return nil, err
+	if description.Clock > prevClock {
+		err = m.persistence.DeleteCommunityEvents(community.ID())
+		if err != nil {
+			return nil, err
+		}
+		community.config.EventsData = nil
 	}
-	community.config.EventsData = nil
 
 	// Set Joined if we are part of the member list
 	if !community.Joined() && community.hasMember(&m.identity.PublicKey) {
