@@ -35,6 +35,8 @@ message ChatIdentity {
   uint32 first_message_timestamp = 9;
 
   ProfileShowcase profile_showcase = 10;
+
+  uint32 customization_color = 11;
 }
 
 // ProfileImage represents data associated with a user's profile image
