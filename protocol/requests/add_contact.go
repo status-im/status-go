@@ -7,10 +7,11 @@ import (
 var ErrAddContactInvalidID = errors.New("add-contact: invalid id")
 
 type AddContact struct {
-	ID          string `json:"id"`
-	Nickname    string `json:"nickname"`
-	DisplayName string `json:"displayName"`
-	ENSName     string `json:"ensName"`
+	ID                 string `json:"id"`
+	Nickname           string `json:"nickname"`
+	DisplayName        string `json:"displayName"`
+	ENSName            string `json:"ensName"`
+	CustomizationColor string `json:"customizationColor,omitempty"`
 }
 
 func (a *AddContact) Validate() error {

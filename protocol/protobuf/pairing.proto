@@ -115,6 +115,7 @@ message SyncInstallationContactV2 {
   int64 contact_request_remote_state = 18;
   int64 contact_request_remote_clock = 19;
   string display_name = 20;
+  uint32 customization_color = 21;
 }
 
 message SyncInstallationAccount {
@@ -153,6 +154,7 @@ message SyncCommunityRequestsToJoin {
   bytes community_id = 6;
   uint64 state = 7;
   repeated RevealedAccount revealed_accounts = 8;
+  uint32 customization_color = 9;
 }
 
 message SyncCommunityControlNode {

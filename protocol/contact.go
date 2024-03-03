@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity"
@@ -105,6 +106,9 @@ type Contact struct {
 
 	// Display name of the contact
 	DisplayName string `json:"displayName"`
+
+	// Customization color of the contact
+	CustomizationColor multiaccountscommon.CustomizationColor `json:"customizationColor,omitempty"`
 
 	// Bio - description of the contact (tell us about yourself)
 	Bio string `json:"bio"`
@@ -421,6 +425,9 @@ func buildSelfContact(identity *ecdsa.PrivateKey, settings *accounts.Database, m
 			}
 
 			c.Images = imagesMap
+		}
+		if len(account.CustomizationColor) != 0 {
+			c.CustomizationColor = account.CustomizationColor
 		}
 	}
 
