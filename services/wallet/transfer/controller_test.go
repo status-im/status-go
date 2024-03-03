@@ -80,12 +80,40 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, ranges)
 
-	ch := make(chan accountsevent.Event)
-	// Subscribe for account changes
-	accountFeed.Subscribe(ch)
+	c.accWatcher = accountsevent.NewWatcher(c.accountsDB, c.accountFeed, func(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address) {
+		c.onAccountsChanged(changedAddresses, eventType, currentAddresses, []uint64{chainID})
+
+		// Quit channel event handler before  destroying the channel
+		go func() {
+			time.Sleep(1 * time.Millisecond)
+			// Wait for DB to be cleaned up
+			c.accWatcher.Stop()
+
+			// Check that transfers, blocks and block ranges were deleted
+			transfers, err := database.GetTransfersByAddress(chainID, address, big.NewInt(2), 1)
+			require.NoError(t, err)
+			require.Len(t, transfers, 0)
+
+			blocksDAO := &BlockDAO{walletDB}
+			block, err := blocksDAO.GetLastBlockByAddress(chainID, address, 1)
+			require.NoError(t, err)
+			require.Nil(t, block)
+
+			ranges, _, err = blockRangesDAO.getBlockRange(chainID, address)
+			require.NoError(t, err)
+			require.Nil(t, ranges.eth.FirstKnown)
+			require.Nil(t, ranges.eth.LastKnown)
+			require.Nil(t, ranges.eth.Start)
+			require.Nil(t, ranges.tokens.FirstKnown)
+			require.Nil(t, ranges.tokens.LastKnown)
+			require.Nil(t, ranges.tokens.Start)
+		}()
+	})
+	c.startAccountWatcher([]uint64{chainID})
 
 	// Watching accounts must start before sending event.
-	// To avoid running goroutine immediately, use any delay.
+	// To avoid running goroutine immediately and let the controller subscribe first,
+	// use any delay.
 	go func() {
 		time.Sleep(1 * time.Millisecond)
 
@@ -94,33 +122,6 @@ func TestController_watchAccountsChanges(t *testing.T) {
 			Accounts: []common.Address{address},
 		})
 	}()
-
-	c.startAccountWatcher([]uint64{chainID})
-
-	// Wait for event
-	<-ch
-
-	// Wait for DB to be cleaned up
-	c.accWatcher.Stop()
-
-	// Check that transfers, blocks and block ranges were deleted
-	transfers, err := database.GetTransfersByAddress(chainID, address, big.NewInt(2), 1)
-	require.NoError(t, err)
-	require.Len(t, transfers, 0)
-
-	blocksDAO := &BlockDAO{walletDB}
-	block, err := blocksDAO.GetLastBlockByAddress(chainID, address, 1)
-	require.NoError(t, err)
-	require.Nil(t, block)
-
-	ranges, _, err = blockRangesDAO.getBlockRange(chainID, address)
-	require.NoError(t, err)
-	require.Nil(t, ranges.eth.FirstKnown)
-	require.Nil(t, ranges.eth.LastKnown)
-	require.Nil(t, ranges.eth.Start)
-	require.Nil(t, ranges.tokens.FirstKnown)
-	require.Nil(t, ranges.tokens.LastKnown)
-	require.Nil(t, ranges.tokens.Start)
 }
 
 func TestController_cleanupAccountLeftovers(t *testing.T) {
