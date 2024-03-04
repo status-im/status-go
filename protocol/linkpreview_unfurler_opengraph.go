@@ -51,19 +51,19 @@ loop:
 		case html.StartTagToken:
 			t := htmlTokens.Token()
 			if t.Data != "link" {
-			  continue
+				continue
 			}
-		    LinkContainsFavicon := false
-		    for _, attribute := range t.Attr {
-			    if attribute.Val == "icon" || attribute.Val == "shortcut icon" {
-				    LinkContainsFavicon = true
-			    }
-		    }
-		    for _, attribute := range t.Attr {
-			    if LinkContainsFavicon && (strings.Contains(attribute.Val, ".ico") || strings.Contains(attribute.Val, ".png") || strings.Contains(attribute.Val, ".svg")) {
-				    return attribute.Val
-			    }
-		    }
+			LinkContainsFavicon := false
+			for _, attribute := range t.Attr {
+				if attribute.Val == "icon" || attribute.Val == "shortcut icon" {
+					LinkContainsFavicon = true
+				}
+			}
+			for _, attribute := range t.Attr {
+				if LinkContainsFavicon && (strings.Contains(attribute.Val, ".ico") || strings.Contains(attribute.Val, ".png") || strings.Contains(attribute.Val, ".svg")) {
+					return attribute.Val
+				}
+			}
 		}
 	}
 	return ""
