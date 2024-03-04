@@ -94,7 +94,7 @@ func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 	if err != nil {
 		u.logger.Info("failed to fetch favicon", zap.String("url", u.url.String()), zap.Error(err))
 	} else {
-		preview.Favicon = t.DataURI
+		preview.Favicon.DataURI = t.DataURI
 	}
 	// There are URLs like https://wikipedia.org/ that don't have an OpenGraph
 	// title tag, but article pages do. In the future, we can fallback to the
