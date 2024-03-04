@@ -268,7 +268,11 @@ func TestPeerExchange(t *testing.T) {
 		b.MaxElapsedTime = 30 * time.Second
 	}
 	err = tt.RetryWithBackOff(func() error {
-		if len(lightNode.Peers()) == 2 {
+		// we should not use lightNode.Peers() here as it only indicates peers that are connected right now,
+		// in light client mode,the peer will be closed via `w.node.Host().Network().ClosePeer(peerInfo.ID)`
+		// after invoking identifyAndConnect, instead, we should check the peerStore, peers from peerStore
+		// won't get deleted especially if they are statically added.
+		if len(lightNode.node.Host().Peerstore().Peers()) == 2 {
 			return nil
 		}
 		return errors.New("no peers discovered")
