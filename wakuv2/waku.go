@@ -551,7 +551,6 @@ func (w *Waku) runPeerExchangeLoop() {
 				}
 			}
 			w.dnsAddressCacheLock.RUnlock()
-			time.Sleep(5 * time.Second)
 			err := w.node.PeerExchange().Request(w.ctx, peersToDiscover, peer_exchange.WithAutomaticPeerSelection())
 			if err != nil {
 				w.logger.Error("couldnt request peers via peer exchange", zap.Error(err))
