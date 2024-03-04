@@ -12,7 +12,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +21,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -30,7 +29,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -223,21 +222,24 @@ func AssetNames() []string {
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
 	"1619446565_postgres_make_anon_metrics_table.down.sql": _1619446565_postgres_make_anon_metrics_tableDownSql,
-
-	"1619446565_postgres_make_anon_metrics_table.up.sql": _1619446565_postgres_make_anon_metrics_tableUpSql,
-
+	"1619446565_postgres_make_anon_metrics_table.up.sql":   _1619446565_postgres_make_anon_metrics_tableUpSql,
 	"doc.go": docGo,
 }
+
+// AssetDebug is true if the assets were built with the debug flag enabled.
+const AssetDebug = false
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -270,9 +272,9 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"1619446565_postgres_make_anon_metrics_table.down.sql": &bintree{_1619446565_postgres_make_anon_metrics_tableDownSql, map[string]*bintree{}},
-	"1619446565_postgres_make_anon_metrics_table.up.sql":   &bintree{_1619446565_postgres_make_anon_metrics_tableUpSql, map[string]*bintree{}},
-	"doc.go": &bintree{docGo, map[string]*bintree{}},
+	"1619446565_postgres_make_anon_metrics_table.down.sql": {_1619446565_postgres_make_anon_metrics_tableDownSql, map[string]*bintree{}},
+	"1619446565_postgres_make_anon_metrics_table.up.sql":   {_1619446565_postgres_make_anon_metrics_tableUpSql, map[string]*bintree{}},
+	"doc.go": {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
@@ -289,7 +291,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}

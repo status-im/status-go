@@ -138,7 +138,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -148,7 +147,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -156,7 +155,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -3148,121 +3147,74 @@ var _bindata = map[string]func() (*asset, error){
 	"1676998418_fix_activity_center_migration.up.sql": _1676998418_fix_activity_center_migrationUpSql,
 
 	"1677278861_add_deleted_column_to_activity_center_notifications_table.up.sql": _1677278861_add_deleted_column_to_activity_center_notifications_tableUpSql,
-
-	"1677486338_add_community_tokens_table.up.sql": _1677486338_add_community_tokens_tableUpSql,
-
-	"1678292329_add_collapsed_categories.up.sql": _1678292329_add_collapsed_categoriesUpSql,
-
-	"1678800760_add_index_to_raw_messages.up.sql": _1678800760_add_index_to_raw_messagesUpSql,
-
+	"1677486338_add_community_tokens_table.up.sql":                                _1677486338_add_community_tokens_tableUpSql,
+	"1678292329_add_collapsed_categories.up.sql":                                  _1678292329_add_collapsed_categoriesUpSql,
+	"1678800760_add_index_to_raw_messages.up.sql":                                 _1678800760_add_index_to_raw_messagesUpSql,
 	"1678877478_add_communities_requests_to_join_revealed_addresses_table.up.sql": _1678877478_add_communities_requests_to_join_revealed_addresses_tableUpSql,
-
-	"1679326850_add_community_token_owners.up.sql": _1679326850_add_community_token_ownersUpSql,
-
-	"1680011500_add_album_images_count.up.sql": _1680011500_add_album_images_countUpSql,
-
-	"1680114896_add_index_on_album_id.up.sql": _1680114896_add_index_on_album_idUpSql,
-
-	"1681655289_add_mute_till.up.sql": _1681655289_add_mute_tillUpSql,
-
-	"1681934966_add_index_response_to.up.sql": _1681934966_add_index_response_toUpSql,
-
-	"1682528339_add_index_user_messages_unseen.up.sql": _1682528339_add_index_user_messages_unseenUpSql,
-
-	"1683707289_recreate_deleted_for_mes.up.sql": _1683707289_recreate_deleted_for_mesUpSql,
-
-	"1683725607_mark_discord_messages_as_seen.up.sql": _1683725607_mark_discord_messages_as_seenUpSql,
-
-	"1684174617_add_url_previews_to_user_messages.up.sql": _1684174617_add_url_previews_to_user_messagesUpSql,
-
-	"1684175608_add_token_balances.up.sql": _1684175608_add_token_balancesUpSql,
-
-	"1684979808_sync_activity_center_notifications.up.sql": _1684979808_sync_activity_center_notificationsUpSql,
-
-	"1685383829_add_communities_mute_till.up.sql": _1685383829_add_communities_mute_tillUpSql,
-
-	"1685964183_add_chainids_to_revealed_addresses.up.sql": _1685964183_add_chainids_to_revealed_addressesUpSql,
-
-	"1687370421_add_communities_muted_till_new.up.sql": _1687370421_add_communities_muted_till_newUpSql,
-
-	"1687416607_add_communities_check_channel_permission_responses_table.up.sql": _1687416607_add_communities_check_channel_permission_responses_tableUpSql,
-
-	"1687856939_add_community_tokens_decimals.up.sql": _1687856939_add_community_tokens_decimalsUpSql,
-
-	"1687959987_modify_community_tokens_supply_as_string.up.sql": _1687959987_modify_community_tokens_supply_as_stringUpSql,
-
-	"1689258900_add_airdrop_address_to_revealed_addresses.up.sql": _1689258900_add_airdrop_address_to_revealed_addressesUpSql,
-
-	"1689266326_create_communities_events_table.up.sql": _1689266326_create_communities_events_tableUpSql,
-
-	"1689931300_add_community_tokens_deployer_and_priv_level.up.sql": _1689931300_add_community_tokens_deployer_and_priv_levelUpSql,
-
-	"1693311881_add_unfurled_links_to_message_edits.up.sql": _1693311881_add_unfurled_links_to_message_editsUpSql,
-
-	"1693311981_community_shard.up.sql": _1693311981_community_shardUpSql,
-
-	"1695331492_add_status_link_previews.up.sql": _1695331492_add_status_link_previewsUpSql,
-
-	"1695918296_add_validated_at.up.sql": _1695918296_add_validated_atUpSql,
-
-	"1697699419_community_control_node_sync.up.sql": _1697699419_community_control_node_syncUpSql,
-
-	"1698137561_add_profile_showcase_tables.up.sql": _1698137561_add_profile_showcase_tablesUpSql,
-
-	"1698137562_fix_encryption_key_id.up.sql": _1698137562_fix_encryption_key_idUpSql,
-
-	"1698414646_add_padding.up.sql": _1698414646_add_paddingUpSql,
-
-	"1698746210_add_signature_to_revealed_addresses.up.sql": _1698746210_add_signature_to_revealed_addressesUpSql,
-
-	"1699041816_profile_showcase_contacts.up.sql": _1699041816_profile_showcase_contactsUpSql,
-
-	"1699554099_message_segments.up.sql": _1699554099_message_segmentsUpSql,
-
-	"1700044186_message_segments_timestamp.up.sql": _1700044186_message_segments_timestampUpSql,
-
-	"1700044187_curated_communities.up.sql": _1700044187_curated_communitiesUpSql,
-
-	"1700820989_add_resend_automatically_index.up.sql": _1700820989_add_resend_automatically_indexUpSql,
-
-	"1702996953_add_communities_shards_table.up.sql": _1702996953_add_communities_shards_tableUpSql,
-
-	"1704489636_add_album_images.up.sql": _1704489636_add_album_imagesUpSql,
-
-	"1704821941_add_joined_at_for_community.up.sql": _1704821941_add_joined_at_for_communityUpSql,
-
-	"1704832511_add_last_opened_at_for_communities.up.sql": _1704832511_add_last_opened_at_for_communitiesUpSql,
-
-	"1704832512_add_peersyncing.up.sql": _1704832512_add_peersyncingUpSql,
-
-	"1706028033_profile_showcase_address_and_community.up.sql": _1706028033_profile_showcase_address_and_communityUpSql,
-
-	"1706520870_add_bridge_messages_table.up.sql": _1706520870_add_bridge_messages_tableUpSql,
-
-	"1707749393_add_community_grants.up.sql": _1707749393_add_community_grantsUpSql,
-
-	"1707841194_add_profile_showcase_preferences.up.sql": _1707841194_add_profile_showcase_preferencesUpSql,
-
-	"1708062699_activity_data.up.sql": _1708062699_activity_dataUpSql,
-
-	"1708423707_applied_community_events.up.sql": _1708423707_applied_community_eventsUpSql,
-
-	"1708440786_profile_showcase_social_links.up.sql": _1708440786_profile_showcase_social_linksUpSql,
-
+	"1679326850_add_community_token_owners.up.sql":                                _1679326850_add_community_token_ownersUpSql,
+	"1680011500_add_album_images_count.up.sql":                                    _1680011500_add_album_images_countUpSql,
+	"1680114896_add_index_on_album_id.up.sql":                                     _1680114896_add_index_on_album_idUpSql,
+	"1681655289_add_mute_till.up.sql":                                             _1681655289_add_mute_tillUpSql,
+	"1681934966_add_index_response_to.up.sql":                                     _1681934966_add_index_response_toUpSql,
+	"1682528339_add_index_user_messages_unseen.up.sql":                            _1682528339_add_index_user_messages_unseenUpSql,
+	"1683707289_recreate_deleted_for_mes.up.sql":                                  _1683707289_recreate_deleted_for_mesUpSql,
+	"1683725607_mark_discord_messages_as_seen.up.sql":                             _1683725607_mark_discord_messages_as_seenUpSql,
+	"1684174617_add_url_previews_to_user_messages.up.sql":                         _1684174617_add_url_previews_to_user_messagesUpSql,
+	"1684175608_add_token_balances.up.sql":                                        _1684175608_add_token_balancesUpSql,
+	"1684979808_sync_activity_center_notifications.up.sql":                        _1684979808_sync_activity_center_notificationsUpSql,
+	"1685383829_add_communities_mute_till.up.sql":                                 _1685383829_add_communities_mute_tillUpSql,
+	"1685964183_add_chainids_to_revealed_addresses.up.sql":                        _1685964183_add_chainids_to_revealed_addressesUpSql,
+	"1687370421_add_communities_muted_till_new.up.sql":                            _1687370421_add_communities_muted_till_newUpSql,
+	"1687416607_add_communities_check_channel_permission_responses_table.up.sql":  _1687416607_add_communities_check_channel_permission_responses_tableUpSql,
+	"1687856939_add_community_tokens_decimals.up.sql":                             _1687856939_add_community_tokens_decimalsUpSql,
+	"1687959987_modify_community_tokens_supply_as_string.up.sql":                  _1687959987_modify_community_tokens_supply_as_stringUpSql,
+	"1689258900_add_airdrop_address_to_revealed_addresses.up.sql":                 _1689258900_add_airdrop_address_to_revealed_addressesUpSql,
+	"1689266326_create_communities_events_table.up.sql":                           _1689266326_create_communities_events_tableUpSql,
+	"1689931300_add_community_tokens_deployer_and_priv_level.up.sql":              _1689931300_add_community_tokens_deployer_and_priv_levelUpSql,
+	"1693311881_add_unfurled_links_to_message_edits.up.sql":                       _1693311881_add_unfurled_links_to_message_editsUpSql,
+	"1693311981_community_shard.up.sql":                                           _1693311981_community_shardUpSql,
+	"1695331492_add_status_link_previews.up.sql":                                  _1695331492_add_status_link_previewsUpSql,
+	"1695918296_add_validated_at.up.sql":                                          _1695918296_add_validated_atUpSql,
+	"1697699419_community_control_node_sync.up.sql":                               _1697699419_community_control_node_syncUpSql,
+	"1698137561_add_profile_showcase_tables.up.sql":                               _1698137561_add_profile_showcase_tablesUpSql,
+	"1698137562_fix_encryption_key_id.up.sql":                                     _1698137562_fix_encryption_key_idUpSql,
+	"1698414646_add_padding.up.sql":                                               _1698414646_add_paddingUpSql,
+	"1698746210_add_signature_to_revealed_addresses.up.sql":                       _1698746210_add_signature_to_revealed_addressesUpSql,
+	"1699041816_profile_showcase_contacts.up.sql":                                 _1699041816_profile_showcase_contactsUpSql,
+	"1699554099_message_segments.up.sql":                                          _1699554099_message_segmentsUpSql,
+	"1700044186_message_segments_timestamp.up.sql":                                _1700044186_message_segments_timestampUpSql,
+	"1700044187_curated_communities.up.sql":                                       _1700044187_curated_communitiesUpSql,
+	"1700820989_add_resend_automatically_index.up.sql":                            _1700820989_add_resend_automatically_indexUpSql,
+	"1702996953_add_communities_shards_table.up.sql":                              _1702996953_add_communities_shards_tableUpSql,
+	"1704489636_add_album_images.up.sql":                                          _1704489636_add_album_imagesUpSql,
+	"1704821941_add_joined_at_for_community.up.sql":                               _1704821941_add_joined_at_for_communityUpSql,
+	"1704832511_add_last_opened_at_for_communities.up.sql":                        _1704832511_add_last_opened_at_for_communitiesUpSql,
+	"1704832512_add_peersyncing.up.sql":                                           _1704832512_add_peersyncingUpSql,
+	"1706028033_profile_showcase_address_and_community.up.sql":                    _1706028033_profile_showcase_address_and_communityUpSql,
+	"1706520870_add_bridge_messages_table.up.sql":                                 _1706520870_add_bridge_messages_tableUpSql,
+	"1707749393_add_community_grants.up.sql":                                      _1707749393_add_community_grantsUpSql,
+	"1707841194_add_profile_showcase_preferences.up.sql":                          _1707841194_add_profile_showcase_preferencesUpSql,
+	"1708062699_activity_data.up.sql":                                             _1708062699_activity_dataUpSql,
+	"1708423707_applied_community_events.up.sql":                                  _1708423707_applied_community_eventsUpSql,
+	"1708440786_profile_showcase_social_links.up.sql":                             _1708440786_profile_showcase_social_linksUpSql,
 	"README.md": readmeMd,
-
-	"doc.go": docGo,
+	"doc.go":    docGo,
 }
+
+// AssetDebug is true if the assets were built with the debug flag enabled.
+const AssetDebug = false
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -3440,7 +3392,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}

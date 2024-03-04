@@ -16,7 +16,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,7 +25,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -34,7 +33,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -306,30 +305,29 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"1593601729_initial_schema.down.sql": _1593601729_initial_schemaDownSql,
-
-	"1593601729_initial_schema.up.sql": _1593601729_initial_schemaUpSql,
-
-	"1597909626_add_server_type.down.sql": _1597909626_add_server_typeDownSql,
-
-	"1597909626_add_server_type.up.sql": _1597909626_add_server_typeUpSql,
-
+	"1593601729_initial_schema.down.sql":       _1593601729_initial_schemaDownSql,
+	"1593601729_initial_schema.up.sql":         _1593601729_initial_schemaUpSql,
+	"1597909626_add_server_type.down.sql":      _1597909626_add_server_typeDownSql,
+	"1597909626_add_server_type.up.sql":        _1597909626_add_server_typeUpSql,
 	"1599053776_add_chat_id_and_type.down.sql": _1599053776_add_chat_id_and_typeDownSql,
-
-	"1599053776_add_chat_id_and_type.up.sql": _1599053776_add_chat_id_and_typeUpSql,
-
-	"doc.go": docGo,
+	"1599053776_add_chat_id_and_type.up.sql":   _1599053776_add_chat_id_and_typeUpSql,
+	"doc.go":                                   docGo,
 }
+
+// AssetDebug is true if the assets were built with the debug flag enabled.
+const AssetDebug = false
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -362,13 +360,13 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"1593601729_initial_schema.down.sql":       &bintree{_1593601729_initial_schemaDownSql, map[string]*bintree{}},
-	"1593601729_initial_schema.up.sql":         &bintree{_1593601729_initial_schemaUpSql, map[string]*bintree{}},
-	"1597909626_add_server_type.down.sql":      &bintree{_1597909626_add_server_typeDownSql, map[string]*bintree{}},
-	"1597909626_add_server_type.up.sql":        &bintree{_1597909626_add_server_typeUpSql, map[string]*bintree{}},
-	"1599053776_add_chat_id_and_type.down.sql": &bintree{_1599053776_add_chat_id_and_typeDownSql, map[string]*bintree{}},
-	"1599053776_add_chat_id_and_type.up.sql":   &bintree{_1599053776_add_chat_id_and_typeUpSql, map[string]*bintree{}},
-	"doc.go":                                   &bintree{docGo, map[string]*bintree{}},
+	"1593601729_initial_schema.down.sql":       {_1593601729_initial_schemaDownSql, map[string]*bintree{}},
+	"1593601729_initial_schema.up.sql":         {_1593601729_initial_schemaUpSql, map[string]*bintree{}},
+	"1597909626_add_server_type.down.sql":      {_1597909626_add_server_typeDownSql, map[string]*bintree{}},
+	"1597909626_add_server_type.up.sql":        {_1597909626_add_server_typeUpSql, map[string]*bintree{}},
+	"1599053776_add_chat_id_and_type.down.sql": {_1599053776_add_chat_id_and_typeDownSql, map[string]*bintree{}},
+	"1599053776_add_chat_id_and_type.up.sql":   {_1599053776_add_chat_id_and_typeUpSql, map[string]*bintree{}},
+	"doc.go":                                   {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
@@ -385,7 +383,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}

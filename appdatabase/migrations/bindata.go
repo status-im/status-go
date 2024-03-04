@@ -120,7 +120,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -130,7 +129,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -138,7 +137,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -2399,26 +2398,6 @@ func docGo() (*asset, error) {
 	return a, nil
 }
 
-var _testLog = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x3c\xc6\xb1\x11\x80\x20\x0c\x05\xd0\x1a\xa7\xc8\x02\x9a\x11\x1c\xc4\xb3\x08\x8a\x98\x3b\x20\x68\x3e\xfb\xdb\xd9\xbd\x95\x88\x42\x56\xdc\x23\x2e\x87\x55\x76\x08\x86\xcf\xfa\x2b\x1b\x4b\xef\xa7\x40\xa2\x78\xe2\xaa\xf9\x15\xa8\x35\x67\x7f\x4a\xd8\x9a\x11\x92\x83\x2e\x2d\xc9\xf7\xe9\x0b\x00\x00\xff\xff\xff\xeb\x51\xe5\x4f\x00\x00\x00")
-
-func testLogBytes() ([]byte, error) {
-	return bindataRead(
-		_testLog,
-		"test.log",
-	)
-}
-
-func testLog() (*asset, error) {
-	bytes, err := testLogBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "test.log", size: 79, mode: os.FileMode(0644), modTime: time.Unix(1702282277, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa4, 0x44, 0x38, 0xbc, 0xb4, 0xe5, 0x83, 0xfd, 0x7e, 0x19, 0xb0, 0x78, 0x70, 0x98, 0xc5, 0x9a, 0x6c, 0xeb, 0x5f, 0x68, 0x5, 0x7a, 0x77, 0x28, 0x8d, 0xb2, 0xff, 0x86, 0x47, 0x91, 0x10, 0x11}}
-	return a, nil
-}
-
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -2806,51 +2785,38 @@ var _bindata = map[string]func() (*asset, error){
 	"1697123140_drop_include_watch_only_accounts.up.sql": _1697123140_drop_include_watch_only_accountsUpSql,
 
 	"1697123233_drop_include_watch_only_account_to_settings_sync_clock.up.sql": _1697123233_drop_include_watch_only_account_to_settings_sync_clockUpSql,
-
-	"1697623289_add_omit_transfers_history_scan_to_settings.up.sql": _1697623289_add_omit_transfers_history_scan_to_settingsUpSql,
-
-	"1699577175_use_shards.up.sql": _1699577175_use_shardsUpSql,
-
-	"1700741911_clusterID.up.sql": _1700741911_clusteridUpSql,
-
-	"1701084316_add_wallet_was_not_shown_to_keypairs_accounts.up.sql": _1701084316_add_wallet_was_not_shown_to_keypairs_accountsUpSql,
-
-	"1701084317_add_mnemonic_was_not_shown_to_settings.up.sql": _1701084317_add_mnemonic_was_not_shown_to_settingsUpSql,
-
-	"1701444172_token_preferences.up.sql": _1701444172_token_preferencesUpSql,
-
-	"1701961850_shards_test.up.sql": _1701961850_shards_testUpSql,
-
-	"1702395750_fix_enr_shards_test.up.sql": _1702395750_fix_enr_shards_testUpSql,
-
-	"1702999401_add_dns_discovery_url.up.sql": _1702999401_add_dns_discovery_urlUpSql,
-
-	"1704281285_tokens_advanced_settings.up.sql": _1704281285_tokens_advanced_settingsUpSql,
-
-	"1705338819_collectible_preferences.up.sql": _1705338819_collectible_preferencesUpSql,
-
-	"1706097653_migration_order_fix.up.sql": _1706097653_migration_order_fixUpSql,
-
-	"1706955596_community_storenodes.up.sql": _1706955596_community_storenodesUpSql,
-
-	"1708416025_make_sepolia_default.up.sql": _1708416025_make_sepolia_defaultUpSql,
-
-	"1709203128_fix_chain_colors.up.sql": _1709203128_fix_chain_colorsUpSql,
-
-	"doc.go": docGo,
-
-	"test.log": testLog,
+	"1697623289_add_omit_transfers_history_scan_to_settings.up.sql":            _1697623289_add_omit_transfers_history_scan_to_settingsUpSql,
+	"1699577175_use_shards.up.sql":                                             _1699577175_use_shardsUpSql,
+	"1700741911_clusterID.up.sql":                                              _1700741911_clusteridUpSql,
+	"1701084316_add_wallet_was_not_shown_to_keypairs_accounts.up.sql":          _1701084316_add_wallet_was_not_shown_to_keypairs_accountsUpSql,
+	"1701084317_add_mnemonic_was_not_shown_to_settings.up.sql":                 _1701084317_add_mnemonic_was_not_shown_to_settingsUpSql,
+	"1701444172_token_preferences.up.sql":                                      _1701444172_token_preferencesUpSql,
+	"1701961850_shards_test.up.sql":                                            _1701961850_shards_testUpSql,
+	"1702395750_fix_enr_shards_test.up.sql":                                    _1702395750_fix_enr_shards_testUpSql,
+	"1702999401_add_dns_discovery_url.up.sql":                                  _1702999401_add_dns_discovery_urlUpSql,
+	"1704281285_tokens_advanced_settings.up.sql":                               _1704281285_tokens_advanced_settingsUpSql,
+	"1705338819_collectible_preferences.up.sql":                                _1705338819_collectible_preferencesUpSql,
+	"1706097653_migration_order_fix.up.sql":                                    _1706097653_migration_order_fixUpSql,
+	"1706955596_community_storenodes.up.sql":                                   _1706955596_community_storenodesUpSql,
+	"1708416025_make_sepolia_default.up.sql":                                   _1708416025_make_sepolia_defaultUpSql,
+	"1709203128_fix_chain_colors.up.sql":                                       _1709203128_fix_chain_colorsUpSql,
+	"doc.go":                                                                   docGo,
 }
+
+// AssetDebug is true if the assets were built with the debug flag enabled.
+const AssetDebug = false
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -3010,7 +2976,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}
