@@ -352,7 +352,7 @@ func TestWakuV2Filter(t *testing.T) {
 
 	// Mock peers going down
 	isFilterSubAliveBak := w.filterManager.isFilterSubAlive
-	w.filterManager.settings.MinPeersForFilter = 0
+	w.filterManager.config.MinPeersForFilter = 0
 	w.filterManager.isFilterSubAlive = func(sub *subscription.SubscriptionDetails) error {
 		return errors.New("peer down")
 	}
@@ -365,7 +365,7 @@ func TestWakuV2Filter(t *testing.T) {
 	require.Len(t, stats[filterID], 0)
 
 	// Reconnect
-	w.filterManager.settings.MinPeersForFilter = 2
+	w.filterManager.config.MinPeersForFilter = 2
 	w.filterManager.isFilterSubAlive = isFilterSubAliveBak
 	time.Sleep(10 * time.Second)
 
