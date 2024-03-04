@@ -212,8 +212,6 @@ func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoin() {
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
-	s.T().Skip("flaky test")
-
 	additionalAdmin := s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
 

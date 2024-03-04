@@ -182,8 +182,6 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequ
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
-	s.T().Skip("flaky test")
-
 	additionalOwner := s.newMessenger("", []string{})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
 
