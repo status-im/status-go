@@ -583,6 +583,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfo() {
 	s.Require().NoError(err)
 
 	s.createBob()
+	s.waitForAvailableStoreNode(s.bob)
 	s.fetchProfile(s.bob, s.owner.selfContact.ID, s.owner.selfContact)
 }
 
