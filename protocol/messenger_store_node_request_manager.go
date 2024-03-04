@@ -33,6 +33,17 @@ type storeNodeRequestID struct {
 	DataID      string               `json:"dataID"`
 }
 
+func (r *storeNodeRequestID) getCommunityID() string {
+	switch r.RequestType {
+	case storeNodeCommunityRequest:
+		return r.DataID
+	case storeNodeShardRequest:
+		return strings.TrimSuffix(r.DataID, transport.CommunityShardInfoTopicPrefix())
+	default:
+		return ""
+	}
+}
+
 type StoreNodeRequestManager struct {
 	messenger *Messenger
 	logger    *zap.Logger
@@ -502,24 +513,29 @@ func (r *storeNodeRequest) routine() {
 		r.finalize()
 	}()
 
-	communityIDStr := strings.TrimSuffix(r.requestID.DataID, transport.CommunityShardInfoTopicPrefix())
-	if !r.manager.messenger.communityStorenodes.HasStorenodeSetup(communityIDStr) && !r.manager.messenger.waitForAvailableStoreNode(storeNodeAvailableTimeout) {
-		r.result.err = fmt.Errorf("store node is not available")
-		return
+	communityID := r.requestID.getCommunityID()
+
+	if r.requestID.RequestType != storeNodeCommunityRequest || !r.manager.messenger.communityStorenodes.HasStorenodeSetup(communityID) {
+		if !r.manager.messenger.waitForAvailableStoreNode(storeNodeAvailableTimeout) {
+			r.result.err = fmt.Errorf("store node is not available")
+			return
+		}
 	}
-	ms := r.manager.messenger.getActiveMailserver(communityIDStr)
+
+	storeNode := r.manager.messenger.getActiveMailserver(communityID)
+
 	// Check if community already exists locally and get Clock.
-
-	localCommunity, _ := r.manager.messenger.communitiesManager.GetByIDString(r.requestID.DataID)
-
-	if localCommunity != nil {
-		r.minimumDataClock = localCommunity.Clock()
+	if r.requestID.RequestType == storeNodeCommunityRequest {
+		localCommunity, _ := r.manager.messenger.communitiesManager.GetByIDString(communityID)
+		if localCommunity != nil {
+			r.minimumDataClock = localCommunity.Clock()
+		}
 	}
 
 	// Start store node request
 	from, to := r.manager.messenger.calculateMailserverTimeBounds(oneMonthDuration)
 
-	_, err := r.manager.messenger.performMailserverRequest(ms, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
+	_, err := r.manager.messenger.performMailserverRequest(storeNode, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
 		batch := MailserverBatch{
 			From:        from,
 			To:          to,
