@@ -146,7 +146,9 @@ func TestConvertLinkPreviewsToProto(t *testing.T) {
 					URL:     "http://localhost:9999",
 					DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
 				},
-				Favicon: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+				Favicon: LinkPreviewThumbnail{
+					DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+				},
 			},
 		},
 	}

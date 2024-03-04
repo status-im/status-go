@@ -2291,7 +2291,9 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 			Width:   100,
 			Height:  200,
 		},
-		Favicon: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+		Favicon: common.LinkPreviewThumbnail{
+			DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+		},
 	}
 	inputMsg.LinkPreviews = []common.LinkPreview{preview}
 

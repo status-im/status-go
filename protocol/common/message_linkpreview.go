@@ -31,7 +31,7 @@ type LinkPreview struct {
 	Hostname    string                         `json:"hostname"`
 	Title       string                         `json:"title,omitempty"`
 	Description string                         `json:"description,omitempty"`
-	Favicon     string                         `json:"favicon,omitempty"`
+	Favicon     LinkPreviewThumbnail           `json:"favicon,omitempty"`
 	Thumbnail   LinkPreviewThumbnail           `json:"thumbnail,omitempty"`
 }
 
@@ -298,8 +298,8 @@ func (m *Message) ConvertLinkPreviewsToProto() ([]*protobuf.UnfurledLink, error)
 				return nil, fmt.Errorf("could not get data URI payload, url='%s': %w", preview.URL, err)
 			}
 		}
-		if preview.Favicon != "" {
-			faviconPayload, err = images.GetPayloadFromURI(preview.Favicon)
+		if preview.Favicon.DataURI != "" {
+			faviconPayload, err = images.GetPayloadFromURI(preview.Favicon.DataURI)
 			if err != nil {
 				return nil, fmt.Errorf("could not get data URI payload, url='%s': %w", preview.URL, err)
 			}
@@ -362,7 +362,7 @@ func (m *Message) ConvertFromProtoToLinkPreviews(makeThumbnailMediaServerURL fun
 			faviconMediaURL = makeFaviconMediaServerURL(m.ID, link.Url)
 		}
 		if link.GetFaviconPayload() != nil {
-			lp.Favicon = faviconMediaURL
+			lp.Favicon.URL = faviconMediaURL
 		}
 		previews = append(previews, lp)
 	}
