@@ -106,8 +106,19 @@ func (m *Messenger) SaveSyncDisplayName(displayName string, clock uint64) error 
 		return err
 	}
 
-	m.account.Name = displayName
-	return m.multiAccounts.SaveAccount(*m.account)
+	preferredNameClock, err := m.settings.GetSettingLastSynced(settings.PreferredName)
+	if err != nil {
+		return err
+	}
+	// When either the display name or preferred name changes, m.account.Name should be updated.
+	// However, a race condition can occur during BackupData, where m.account.Name could be incorrectly updated.
+	// The final value of m.account.Name depending on which backup message(BackedUpProfile/BackedUpSettings) arrives later.
+	// So we should check the clock of the preferred name and only update m.account.Name if it's older than the display name.
+	if preferredNameClock < clock {
+		m.account.Name = displayName
+		return m.multiAccounts.SaveAccount(*m.account)
+	}
+	return nil
 }
 
 func ValidateBio(bio *string) error {
