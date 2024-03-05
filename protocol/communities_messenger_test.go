@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
@@ -61,8 +62,11 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 	s.Require().NoError(shh.Start())
 
 	s.owner = s.newMessenger()
+	s.owner.account.CustomizationColor = multiaccountscommon.CustomizationColorOrange
 	s.bob = s.newMessenger()
+	s.bob.account.CustomizationColor = multiaccountscommon.CustomizationColorBlue
 	s.alice = s.newMessenger()
+	s.alice.account.CustomizationColor = multiaccountscommon.CustomizationColorArmy
 
 	s.owner.communitiesManager.RekeyInterval = 50 * time.Millisecond
 
@@ -593,6 +597,7 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(inputMessage.Text, response.Messages()[0].Text)
+	s.Require().Equal(s.alice.account.GetCustomizationColor(), response.Contacts[0].CustomizationColor)
 
 	// check if response contains the chat we're interested in
 	// we use this instead of checking just the length of the chat because
@@ -867,6 +872,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	s.Require().NotEmpty(requestToJoin1.ID)
 	s.Require().NotEmpty(requestToJoin1.Clock)
 	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin1.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
 
 	// Make sure clock is not empty
@@ -919,6 +925,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	s.Require().NotEmpty(requestToJoin2.ID)
 	s.Require().NotEmpty(requestToJoin2.Clock)
 	s.Require().Equal(requestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin2.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin2.State)
 
 	s.Require().Equal(requestToJoin1.ID, requestToJoin2.ID)
@@ -1507,6 +1514,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	s.Require().NotEmpty(requestToJoin1.ID)
 	s.Require().NotEmpty(requestToJoin1.Clock)
 	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin1.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
 
 	// Make sure clock is not empty
@@ -1562,6 +1570,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	s.Require().NotEmpty(requestToJoin2.ID)
 	s.Require().NotEmpty(requestToJoin2.Clock)
 	s.Require().Equal(requestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin2.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin2.State)
 
 	s.Require().Equal(requestToJoin1.ID, requestToJoin2.ID)
@@ -1622,8 +1631,8 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	s.Require().NotEmpty(cancelRequestToJoin2.ID)
 	s.Require().NotEmpty(cancelRequestToJoin2.Clock)
 	s.Require().Equal(cancelRequestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(cancelRequestToJoin2.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Require().Equal(communities.RequestToJoinStateCanceled, cancelRequestToJoin2.State)
-
 }
 
 func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
@@ -2857,6 +2866,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Require().NotEmpty(aRtj.ID)
 	s.Require().NotEmpty(aRtj.Clock)
 	s.Equal(aRtj.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Equal(aRtj.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Equal(communities.RequestToJoinStatePending, aRtj.State)
 
 	// Make sure clock is not empty
@@ -2927,6 +2937,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Equal(aRtj.ENSName, aodRtj.ENSName)
 	s.Equal(aRtj.ChatID, aodRtj.ChatID)
 	s.Equal(aRtj.State, aodRtj.State)
+	s.Equal(aRtj.CustomizationColor, aodRtj.CustomizationColor)
 
 	// Bob the admin retrieves request to join
 	err = tt.RetryWithBackOff(func() error {
@@ -2950,6 +2961,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Require().NotEmpty(bobRtj.ID)
 	s.Require().NotEmpty(bobRtj.Clock)
 	s.Equal(bobRtj.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Equal(bobRtj.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Equal(communities.RequestToJoinStatePending, bobRtj.State)
 
 	s.Equal(aRtj.PublicKey, bobRtj.PublicKey)
@@ -2959,6 +2971,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Equal(aRtj.ENSName, bobRtj.ENSName)
 	s.Equal(aRtj.ChatID, bobRtj.ChatID)
 	s.Equal(aRtj.State, bobRtj.State)
+	s.Equal(aRtj.CustomizationColor, bobRtj.CustomizationColor)
 }
 
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
@@ -3465,7 +3478,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	// We try to join the org
-	rtj := s.alice.communitiesManager.CreateRequestToJoin(request)
+	rtj := s.alice.communitiesManager.CreateRequestToJoin(request, s.alice.account.GetCustomizationColor())
 
 	s.Require().NoError(err)
 

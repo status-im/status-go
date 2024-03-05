@@ -18,7 +18,9 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
 	userimage "github.com/status-im/status-go/images"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
+
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/browsers"
@@ -566,6 +568,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			v.verified,
 			c.alias,
 			c.display_name,
+			c.customization_color,
 			c.identicon,
 			c.last_updated,
 			c.last_updated_locally,
@@ -602,6 +605,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			contactRequestRemoteState sql.NullInt64
 			contactRequestRemoteClock sql.NullInt64
 			displayName               sql.NullString
+			customizationColor        sql.NullString
 			imageType                 sql.NullString
 			ensName                   sql.NullString
 			ensVerified               sql.NullBool
@@ -622,6 +626,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&ensVerified,
 			&contact.Alias,
 			&displayName,
+			&customizationColor,
 			&contact.Identicon,
 			&contact.LastUpdated,
 			&lastUpdatedLocally,
@@ -669,6 +674,10 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 
 		if displayName.Valid {
 			contact.DisplayName = displayName.String
+		}
+
+		if customizationColor.Valid {
+			contact.CustomizationColor = multiaccountscommon.CustomizationColor(customizationColor.String)
 		}
 
 		if ensName.Valid {
@@ -962,12 +971,13 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 			address,
 			alias,
 			display_name,
+			customization_color,
 			identicon,
 			last_updated,
 			last_updated_locally,
 			local_nickname,
 			contact_request_state,
-                        contact_request_local_clock,
+			contact_request_local_clock,
 			contact_request_remote_state,
 			contact_request_remote_clock,
 			blocked,
@@ -977,7 +987,7 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 			name,
 			photo,
 			tribute_to_talk
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return
@@ -989,6 +999,7 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 		contact.Address,
 		contact.Alias,
 		contact.DisplayName,
+		contact.CustomizationColor,
 		contact.Identicon,
 		contact.LastUpdated,
 		contact.LastUpdatedLocally,

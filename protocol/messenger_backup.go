@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -384,6 +385,11 @@ func (m *Messenger) buildSyncContactMessage(contact *Contact) *protobuf.SyncInst
 		ensName = contact.EnsName
 	}
 
+	var customizationColor uint32
+	if len(contact.CustomizationColor) != 0 {
+		customizationColor = multiaccountscommon.ColorToIDFallbackToBlue(contact.CustomizationColor)
+	}
+
 	oneToOneChat, ok := m.allChats.Load(contact.ID)
 	muted := false
 	if ok {
@@ -396,6 +402,7 @@ func (m *Messenger) buildSyncContactMessage(contact *Contact) *protobuf.SyncInst
 		Id:                        contact.ID,
 		DisplayName:               contact.DisplayName,
 		EnsName:                   ensName,
+		CustomizationColor:        customizationColor,
 		LocalNickname:             contact.LocalNickname,
 		Added:                     contact.added(),
 		Blocked:                   contact.Blocked,

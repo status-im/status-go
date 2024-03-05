@@ -34,6 +34,8 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -1100,7 +1102,7 @@ func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) e
 		return err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks, profileShowcase)
+	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks, profileShowcase, multiaccountscommon.IDToColorFallbackToBlue(cca.ChatIdentity.CustomizationColor))
 	if err != nil {
 		return err
 	}
@@ -1187,7 +1189,7 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		return err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks, profileShowcase)
+	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks, profileShowcase, multiaccountscommon.IDToColorFallbackToBlue(ci.CustomizationColor))
 	if err != nil {
 		return err
 	}
@@ -1200,7 +1202,7 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 	return nil
 }
 
-func (m *Messenger) getIdentityHash(displayName, bio string, img *images.IdentityImage, socialLinks identity.SocialLinks, profileShowcase *protobuf.ProfileShowcase) ([]byte, error) {
+func (m *Messenger) getIdentityHash(displayName, bio string, img *images.IdentityImage, socialLinks identity.SocialLinks, profileShowcase *protobuf.ProfileShowcase, customizationColor multiaccountscommon.CustomizationColor) ([]byte, error) {
 	socialLinksData, err := socialLinks.Serialize()
 	if err != nil {
 		return []byte{}, err
@@ -1212,10 +1214,10 @@ func (m *Messenger) getIdentityHash(displayName, bio string, img *images.Identit
 	}
 
 	if img == nil {
-		return crypto.Keccak256([]byte(displayName), []byte(bio), socialLinksData, profileShowcaseData), nil
+		return crypto.Keccak256([]byte(displayName), []byte(bio), socialLinksData, profileShowcaseData, []byte(customizationColor)), nil
 	}
 
-	return crypto.Keccak256(img.Payload, []byte(displayName), []byte(bio), socialLinksData, profileShowcaseData), nil
+	return crypto.Keccak256(img.Payload, []byte(displayName), []byte(bio), socialLinksData, profileShowcaseData, []byte(customizationColor)), nil
 }
 
 // shouldPublishChatIdentity returns true if the last time the ChatIdentity was attached was more than 24 hours ago
@@ -1259,7 +1261,7 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 		return false, err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks, profileShowcase)
+	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks, profileShowcase, m.account.GetCustomizationColor())
 	if err != nil {
 		return false, err
 	}
@@ -1300,12 +1302,13 @@ func (m *Messenger) createChatIdentity(context ChatContext) (*protobuf.ChatIdent
 	}
 
 	ci := &protobuf.ChatIdentity{
-		Clock:           m.transport.GetCurrentTime(),
-		EnsName:         "", // TODO add ENS name handling to dedicate PR
-		DisplayName:     displayName,
-		Description:     bio,
-		SocialLinks:     socialLinks.ToProtobuf(),
-		ProfileShowcase: profileShowcase,
+		Clock:              m.transport.GetCurrentTime(),
+		EnsName:            "", // TODO add ENS name handling to dedicate PR
+		DisplayName:        displayName,
+		Description:        bio,
+		SocialLinks:        socialLinks.ToProtobuf(),
+		ProfileShowcase:    profileShowcase,
+		CustomizationColor: m.account.GetCustomizationColorID(),
 	}
 
 	err = m.attachIdentityImagesToChatIdentity(context, ci)
@@ -2724,7 +2727,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
-	if _, err = m.sendContactUpdate(ctx, myID, displayName, ensName, photoPath, rawMessageHandler); err != nil {
+	if _, err = m.sendContactUpdate(ctx, myID, displayName, ensName, photoPath, m.account.GetCustomizationColor(), rawMessageHandler); err != nil {
 		return err
 	}
 

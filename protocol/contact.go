@@ -388,9 +388,10 @@ func buildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact,
 	address := crypto.PubkeyToAddress(*publicKey)
 
 	contact := &Contact{
-		ID:      publicKeyString,
-		Alias:   getShortenedCompressedKey(compressedKey),
-		Address: types.EncodeHex(address[:]),
+		ID:                 publicKeyString,
+		Alias:              getShortenedCompressedKey(compressedKey),
+		Address:            types.EncodeHex(address[:]),
+		CustomizationColor: multiaccountscommon.CustomizationColorBlue,
 	}
 
 	return contact, nil
