@@ -36,6 +36,10 @@ func (m *Messenger) SetCustomizationColor(ctx context.Context, request *requests
 
 	acc.CustomizationColor = request.CustomizationColor
 
+	if m.account != nil {
+		m.account.CustomizationColor = request.CustomizationColor
+	}
+
 	//Use a combination of wall clock + lamport timestamp, just like Chat#NextClockAndTimestamp
 	tNow := timesource.GetCurrentTimeInMillis()
 	if acc.CustomizationColorClock >= tNow {
@@ -54,6 +58,13 @@ func (m *Messenger) SetCustomizationColor(ctx context.Context, request *requests
 		if err != nil {
 			return err
 		}
+
+		err = m.resetLastPublishedTimeForChatIdentity()
+		if err != nil {
+			return err
+		}
+
+		return m.publishContactCode()
 	}
 	return nil
 }

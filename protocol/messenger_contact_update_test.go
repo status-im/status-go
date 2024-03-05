@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/requests"
 )
@@ -78,7 +79,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().True(receivedContact.hasAddedUs())
 
 	newPicture := "new-picture"
-	err = theirMessenger.SendContactUpdates(context.Background(), newEnsName, newPicture)
+	err = theirMessenger.SendContactUpdates(context.Background(), newEnsName, newPicture, multiaccountscommon.CustomizationColorRed)
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
@@ -96,6 +97,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().Equal(theirContactID, receivedContact.ID)
 	s.Require().Equal(newEnsName, receivedContact.EnsName)
 	s.Require().False(receivedContact.ENSVerified)
+	s.Require().Equal(receivedContact.CustomizationColor, multiaccountscommon.CustomizationColorRed)
 	s.Require().NotEmpty(receivedContact.LastUpdated)
 }
 
@@ -105,7 +107,8 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: contactID})
+	theirMessenger.account.CustomizationColor = multiaccountscommon.CustomizationColorSky
+	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: contactID, CustomizationColor: string(multiaccountscommon.CustomizationColorRed)})
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
@@ -122,6 +125,7 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 
 	// It should add the contact
 	s.Require().True(contact.added())
+	s.Require().Equal(contact.CustomizationColor, multiaccountscommon.CustomizationColorRed)
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
@@ -133,6 +137,7 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 
 	receivedContact := response.Contacts[0]
 	s.Require().NotEmpty(receivedContact.LastUpdated)
+	s.Require().Equal(receivedContact.CustomizationColor, multiaccountscommon.CustomizationColorSky)
 }
 
 func (s *MessengerContactUpdateSuite) TestAddContactWithENS() {

@@ -19,10 +19,12 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/mailserver"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
@@ -969,12 +971,12 @@ func (api *PublicAPI) AcceptRequestTransaction(ctx context.Context, transactionH
 	return api.service.messenger.AcceptRequestTransaction(ctx, transactionHash, messageID, signature)
 }
 
-func (api *PublicAPI) SendContactUpdates(ctx context.Context, name, picture string) error {
-	return api.service.messenger.SendContactUpdates(ctx, name, picture)
+func (api *PublicAPI) SendContactUpdates(ctx context.Context, name, picture string, customizationColor multiaccountscommon.CustomizationColor) error {
+	return api.service.messenger.SendContactUpdates(ctx, name, picture, customizationColor)
 }
 
-func (api *PublicAPI) SendContactUpdate(ctx context.Context, contactID, name, picture string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SendContactUpdate(ctx, contactID, name, picture)
+func (api *PublicAPI) SendContactUpdate(ctx context.Context, contactID, name, picture string, customizationColor multiaccountscommon.CustomizationColor) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendContactUpdate(ctx, contactID, name, picture, customizationColor)
 }
 
 func (api *PublicAPI) SetDisplayName(ctx context.Context, displayName string) error {

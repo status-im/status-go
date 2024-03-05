@@ -1,5 +1,9 @@
 package common
 
+import (
+	"fmt"
+)
+
 type CustomizationColor string
 
 const (
@@ -23,90 +27,57 @@ const (
 	CustomizationColorBeige     CustomizationColor = "beige"
 )
 
-// ColorToID converts a CustomizationColor to its index.
-func ColorToID(color CustomizationColor) uint32 {
-	switch color {
-	case CustomizationColorPrimary:
-		return 0
-	case CustomizationColorPurple:
-		return 1
-	case CustomizationColorIndigo:
-		return 2
-	case CustomizationColorTurquoise:
-		return 3
-	case CustomizationColorBlue:
-		return 4
-	case CustomizationColorGreen:
-		return 5
-	case CustomizationColorYellow:
-		return 6
-	case CustomizationColorOrange:
-		return 7
-	case CustomizationColorRed:
-		return 8
-	case CustomizationColorFlamingo:
-		return 9
-	case CustomizationColorBrown:
-		return 10
-	case CustomizationColorSky:
-		return 11
-	case CustomizationColorArmy:
-		return 12
-	case CustomizationColorMagenta:
-		return 13
-	case CustomizationColorCopper:
-		return 14
-	case CustomizationColorCamel:
-		return 15
-	case CustomizationColorYinYang:
-		return 16
-	case CustomizationColorBeige:
-		return 17
-	default:
-		return 0
-	}
+var colorToIDMap = map[CustomizationColor]uint32{
+	CustomizationColorPrimary:   0,
+	CustomizationColorPurple:    1,
+	CustomizationColorIndigo:    2,
+	CustomizationColorTurquoise: 3,
+	CustomizationColorBlue:      4,
+	CustomizationColorGreen:     5,
+	CustomizationColorYellow:    6,
+	CustomizationColorOrange:    7,
+	CustomizationColorRed:       8,
+	CustomizationColorFlamingo:  9,
+	CustomizationColorBrown:     10,
+	CustomizationColorSky:       11,
+	CustomizationColorArmy:      12,
+	CustomizationColorMagenta:   13,
+	CustomizationColorCopper:    14,
+	CustomizationColorCamel:     15,
+	CustomizationColorYinYang:   16,
+	CustomizationColorBeige:     17,
 }
 
-// IDToColor converts an index to its corresponding CustomizationColor.
-func IDToColor(index uint32) CustomizationColor {
-	switch index {
-	case 0:
-		return CustomizationColorPrimary
-	case 1:
-		return CustomizationColorPurple
-	case 2:
-		return CustomizationColorIndigo
-	case 3:
-		return CustomizationColorTurquoise
-	case 4:
-		return CustomizationColorBlue
-	case 5:
-		return CustomizationColorGreen
-	case 6:
-		return CustomizationColorYellow
-	case 7:
-		return CustomizationColorOrange
-	case 8:
-		return CustomizationColorRed
-	case 9:
-		return CustomizationColorFlamingo
-	case 10:
-		return CustomizationColorBrown
-	case 11:
-		return CustomizationColorSky
-	case 12:
-		return CustomizationColorArmy
-	case 13:
-		return CustomizationColorMagenta
-	case 14:
-		return CustomizationColorCopper
-	case 15:
-		return CustomizationColorCamel
-	case 16:
-		return CustomizationColorYinYang
-	case 17:
-		return CustomizationColorBeige
-	default:
-		return CustomizationColorPrimary
+func ColorToID(color CustomizationColor) (uint32, error) {
+	id, ok := colorToIDMap[color]
+	if !ok {
+		return 0, fmt.Errorf("Invalid color: %s", color)
 	}
+	return id, nil
+}
+
+func IDToColor(id uint32) (CustomizationColor, error) {
+	for color, colorID := range colorToIDMap {
+		if colorID == id {
+			return color, nil
+		}
+	}
+	return "", fmt.Errorf("Invalid color id: %d", id)
+}
+
+func ColorToIDFallbackToBlue(color CustomizationColor) uint32 {
+	id, err := ColorToID(color)
+	if err != nil {
+		return 4
+	}
+	return id
+}
+
+func IDToColorFallbackToBlue(id uint32) CustomizationColor {
+	color, err := IDToColor(id)
+	if err != nil {
+		return CustomizationColorBlue
+	}
+
+	return color
 }
