@@ -452,7 +452,7 @@ type Router struct {
 }
 
 func (r *Router) requireApproval(ctx context.Context, sendType SendType, bridge bridge.Bridge, account common.Address, network *params.Network, token *token.Token, amountIn *big.Int) (bool, *big.Int, uint64, *common.Address, error) {
-	if sendType == ERC721Transfer {
+	if sendType.IsCollectiblesTransfer() {
 		return false, nil, 0, nil, nil
 	}
 
