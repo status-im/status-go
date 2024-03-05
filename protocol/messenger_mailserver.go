@@ -1052,6 +1052,12 @@ func (m *Messenger) ConnectionChanged(state connection.State) {
 func (m *Messenger) fetchMessages(chatID string, duration time.Duration) (uint32, error) {
 	from, to := m.calculateMailserverTimeBounds(duration)
 
+	m.logger.Debug("fetching messages",
+		zap.String("chatID", chatID),
+		zap.String("from", time.Unix(int64(from), 0).Format(time.RFC3339)),
+		zap.String("to", time.Unix(int64(to), 0).Format(time.RFC3339)),
+		zap.Duration("duration", duration))
+
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return 0, ErrChatNotFound

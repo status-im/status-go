@@ -255,14 +255,16 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 			return nil, err
 		}
 
-		for i := range msgs {
+		for _, msg := range msgs {
+			hash := types.EncodeHex(msg.Hash)
+
 			// Exclude anything that is a cache hit
-			if !hits[types.EncodeHex(msgs[i].Hash)] {
-				result[*filter] = append(result[*filter], msgs[i])
-				logger.Debug("message not cached", zap.String("hash", types.EncodeHex(msgs[i].Hash)))
+			if !hits[hash] {
+				logger.Debug("message not cached, processing", zap.String("hash", hash))
+				result[*filter] = append(result[*filter], msg)
 			} else {
-				logger.Debug("message cached", zap.String("hash", types.EncodeHex(msgs[i].Hash)))
-				t.waku.MarkP2PMessageAsProcessed(common.BytesToHash(msgs[i].Hash))
+				logger.Debug("message skipped as cached", zap.String("hash", hash))
+				t.waku.MarkP2PMessageAsProcessed(common.BytesToHash(msg.Hash))
 			}
 		}
 
