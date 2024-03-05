@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
+	"github.com/status-im/status-go/contracts/ierc1155"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/async"
@@ -315,6 +316,85 @@ func (o *Manager) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommo
 	}
 	return nil, ErrNoProvidersAvailableForChainID
 }
+func (o *Manager) FetchERC1155Balances(ctx context.Context, owner common.Address, chainID walletCommon.ChainID, contractAddress common.Address, tokenIDs []*bigint.BigInt) ([]*bigint.BigInt, error) {
+	if len(tokenIDs) == 0 {
+		return nil, nil
+	}
+
+	backend, err := o.rpcClient.EthClient(uint64(chainID))
+	if err != nil {
+		return nil, err
+	}
+
+	caller, err := ierc1155.NewIerc1155Caller(contractAddress, backend)
+	if err != nil {
+		return nil, err
+	}
+
+	owners := make([]common.Address, len(tokenIDs))
+	ids := make([]*big.Int, len(tokenIDs))
+	for i, tokenID := range tokenIDs {
+		owners[i] = owner
+		ids[i] = tokenID.Int
+	}
+
+	balances, err := caller.BalanceOfBatch(&bind.CallOpts{
+		Context: ctx,
+	}, owners, ids)
+
+	if err != nil {
+		return nil, err
+	}
+
+	bigIntBalances := make([]*bigint.BigInt, len(balances))
+	for i, balance := range balances {
+		bigIntBalances[i] = &bigint.BigInt{Int: balance}
+	}
+
+	return bigIntBalances, err
+}
+
+func (o *Manager) fillMissingBalances(ctx context.Context, owner common.Address, collectibles []*thirdparty.FullCollectibleData) {
+	collectiblesByChainIDAndContractAddress := thirdparty.GroupCollectiblesByChainIDAndContractAddress(collectibles)
+
+	for chainID, collectiblesByContract := range collectiblesByChainIDAndContractAddress {
+		for contractAddress, contractCollectibles := range collectiblesByContract {
+			collectiblesToFetchPerTokenID := make(map[string]*thirdparty.FullCollectibleData)
+
+			for _, collectible := range contractCollectibles {
+				if collectible.AccountBalance == nil {
+					switch getContractType(*collectible) {
+					case walletCommon.ContractTypeERC1155:
+						collectiblesToFetchPerTokenID[collectible.CollectibleData.ID.TokenID.String()] = collectible
+					default:
+						// Any other type of collectible is non-fungible, balance is 1
+						collectible.AccountBalance = &bigint.BigInt{Int: big.NewInt(1)}
+					}
+				}
+			}
+
+			if len(collectiblesToFetchPerTokenID) == 0 {
+				continue
+			}
+
+			tokenIDs := make([]*bigint.BigInt, 0, len(collectiblesToFetchPerTokenID))
+			for _, c := range collectiblesToFetchPerTokenID {
+				tokenIDs = append(tokenIDs, c.CollectibleData.ID.TokenID)
+			}
+
+			balances, err := o.FetchERC1155Balances(ctx, owner, chainID, contractAddress, tokenIDs)
+			if err != nil {
+				log.Error("FetchERC1155Balances failed", "chainID", chainID, "contractAddress", contractAddress, "err", err)
+				continue
+			}
+
+			for i := range balances {
+				collectible := collectiblesToFetchPerTokenID[tokenIDs[i].String()]
+				collectible.AccountBalance = balances[i]
+			}
+		}
+	}
+}
 
 func (o *Manager) FetchCollectibleOwnershipByOwner(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, cursor string, limit int, providerID string) (*thirdparty.CollectibleOwnershipContainer, error) {
 	// We don't yet have an API that will return only Ownership data
@@ -324,7 +404,15 @@ func (o *Manager) FetchCollectibleOwnershipByOwner(ctx context.Context, chainID 
 		return nil, err
 	}
 
+	// Some providers do not give us the balances for ERC1155 tokens, so we need to fetch them separately.
+	collectibles := make([]*thirdparty.FullCollectibleData, 0, len(assetContainer.Items))
+	for i := range assetContainer.Items {
+		collectibles = append(collectibles, &assetContainer.Items[i])
+	}
+	o.fillMissingBalances(ctx, owner, collectibles)
+
 	ret := assetContainer.ToOwnershipContainer()
+
 	return &ret, nil
 }
 
