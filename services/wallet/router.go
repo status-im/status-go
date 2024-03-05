@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/contracts"
-	"github.com/status-im/status-go/contracts/ierc1155"
 	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
@@ -525,24 +524,27 @@ func (r *Router) getBalance(ctx context.Context, network *params.Network, token 
 }
 
 func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network, token *token.Token, account common.Address) (*big.Int, error) {
-	client, err := r.s.rpcClient.EthClient(network.ChainID)
-	if err != nil {
-		return nil, err
-	}
-
 	tokenID, success := new(big.Int).SetString(token.Symbol, 10)
 	if !success {
 		return nil, errors.New("failed to convert token symbol to big.Int")
 	}
 
-	caller, err := ierc1155.NewIerc1155Caller(token.Address, client)
+	balances, err := r.s.collectiblesManager.FetchERC1155Balances(
+		ctx,
+		account,
+		walletCommon.ChainID(network.ChainID),
+		token.Address,
+		[]*bigint.BigInt{&bigint.BigInt{Int: tokenID}},
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	return caller.BalanceOf(&bind.CallOpts{
-		Context: ctx,
-	}, account, tokenID)
+	if len(balances) != 1 || balances[0] == nil {
+		return nil, errors.New("invalid ERC1155 balance fetch response")
+	}
+
+	return balances[0].Int, nil
 }
 
 func (r *Router) suggestedRoutes(

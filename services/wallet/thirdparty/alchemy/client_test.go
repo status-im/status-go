@@ -43,6 +43,9 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 	expectedTokenID0, _ := big.NewInt(0).SetString("50659039041325838222074459099120411190538227963344971355684955900852972814336", 10)
 	expectedTokenID1, _ := big.NewInt(0).SetString("900", 10)
 
+	expectedBalance0, _ := big.NewInt(0).SetString("15", 10)
+	expectedBalance1, _ := big.NewInt(0).SetString("1", 10)
+
 	expectedCollectiblesData := []thirdparty.FullCollectibleData{
 		{
 			CollectibleData: thirdparty.CollectibleData{
@@ -76,6 +79,9 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 				Slug:         "",
 				ImageURL:     "",
 				Traits:       make(map[string]thirdparty.CollectionTrait),
+			},
+			AccountBalance: &bigint.BigInt{
+				Int: expectedBalance0,
 			},
 		},
 		{
@@ -131,6 +137,9 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 				Slug:         "",
 				ImageURL:     "https://raw.seadn.io/files/e7765f13c4658f514d0efc008ae7f300.png",
 				Traits:       make(map[string]thirdparty.CollectionTrait),
+			},
+			AccountBalance: &bigint.BigInt{
+				Int: expectedBalance1,
 			},
 		},
 	}
