@@ -183,8 +183,11 @@ func (s *MessengerStoreNodeRequestSuite) createOwner() {
 	s.owner = s.newMessenger(s.ownerWaku, messengerLogger, s.storeNodeAddress)
 
 	// We force the owner to use the store node as relay peer
-	err := s.owner.DialPeer(s.storeNodeAddress)
-	s.Require().NoError(err)
+	WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.ownerWaku), func() []string {
+		err := s.owner.DialPeer(s.storeNodeAddress)
+		s.Require().NoError(err)
+		return []string{s.wakuStoreNode.PeerID().String()}
+	})
 }
 
 func (s *MessengerStoreNodeRequestSuite) createBob() {
