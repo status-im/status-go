@@ -31,6 +31,8 @@ var chatColors = []string{
 
 type ChatType int
 
+type ChatContext string
+
 const (
 	ChatTypeOneToOne ChatType = iota + 1
 	ChatTypePublic
@@ -635,4 +637,13 @@ func stringSliceContains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func GetChatContextFromChatType(chatType ChatType) ChatContext {
+	switch chatType {
+	case ChatTypeOneToOne, ChatTypePrivateGroupChat:
+		return privateChat
+	default:
+		return publicChat
+	}
 }

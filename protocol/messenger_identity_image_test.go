@@ -257,7 +257,7 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 		"bob":   {true, false},
 	}
 
-	chatContexts := []chatContext{
+	chatContexts := []ChatContext{
 		publicChat,
 		privateChat,
 	}
