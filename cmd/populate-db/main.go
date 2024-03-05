@@ -358,6 +358,7 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	defaultSettings.UseMailservers = true
 
 	defaultSettings.PreviewPrivacy = true
+	defaultSettings.PeerSyncingEnabled = false
 	defaultSettings.Currency = "usd"
 	defaultSettings.ProfilePicturesVisibility = settings.ProfilePicturesVisibilityEveryone
 	defaultSettings.LinkPreviewRequestEnabled = true

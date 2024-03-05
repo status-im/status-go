@@ -1,0 +1,1 @@
+ALTER TABLE settings ADD COLUMN peer_syncing_enabled BOOLEAN NOT NULL DEFAULT FALSE;
