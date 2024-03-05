@@ -63,8 +63,8 @@ var goerli = params.Network{
 var sepolia = params.Network{
 	ChainID:                sepoliaChainID,
 	ChainName:              "Ethereum Sepolia",
-	RPCURL:                 "https://sepolia-archival.rpc.grove.city/v1/",
-	FallbackURL:            "https://sepolia.infura.io/v3/",
+	RPCURL:                 "https://sepolia.infura.io/v3/",
+	FallbackURL:            "",
 	BlockExplorerURL:       "https://sepolia.etherscan.io/",
 	IconURL:                "network/Network=Testnet",
 	ChainColor:             "#627EEA",
