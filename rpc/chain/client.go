@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -85,6 +86,8 @@ var propagateErrors = []error{
 	vm.ErrInvalidCode,
 	vm.ErrNonceUintOverflow,
 
+	core.ErrInsufficientFunds,
+
 	// Used by balance history to check state
 	ethereum.NotFound,
 	bind.ErrNoCode,
@@ -154,7 +157,7 @@ func isVMError(err error) bool {
 		return true
 	}
 	for _, vmError := range propagateErrors {
-		if err == vmError {
+		if err == vmError || strings.Contains(err.Error(), vmError.Error()) {
 			return true
 		}
 	}
