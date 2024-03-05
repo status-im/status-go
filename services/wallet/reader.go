@@ -277,20 +277,6 @@ func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, addresses [
 	}
 
 	tokens, err := r.getWalletTokenBalances(ctx, addresses, false)
-
-	addressWithoutCachedBalances := false
-	for _, address := range addresses {
-		if _, ok := tokens[address]; !ok {
-			addressWithoutCachedBalances = true
-			break
-		}
-	}
-
-	// there should be at least ETH balance
-	if addressWithoutCachedBalances {
-		return r.GetWalletTokenBalances(ctx, addresses)
-	}
-
 	return tokens, err
 }
 
@@ -340,36 +326,31 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 
 	verifiedTokens, unverifiedTokens := splitVerifiedTokens(allTokens)
 
+	cachedBalancesPerChain := map[common.Address]map[common.Address]map[uint64]string{}
 	updateAnyway := false
-	cachedBalancesPerChain := map[common.Address]map[common.Address]map[uint64]ChainBalance{}
 	if !updateBalances {
-		for address, tokens := range cachedTokens {
-			if _, ok := cachedBalancesPerChain[address]; !ok {
-				cachedBalancesPerChain[address] = map[common.Address]map[uint64]ChainBalance{}
+		for _, address := range addresses {
+			if _, ok := cachedTokens[address]; !ok {
+				updateAnyway = true
+				break
 			}
+		}
+	}
 
+	if !updateBalances && !updateAnyway {
+		for address, tokens := range cachedTokens {
 			for _, token := range tokens {
 				for _, balance := range token.BalancesPerChain {
+					if _, ok := cachedBalancesPerChain[address]; !ok {
+						cachedBalancesPerChain[address] = map[common.Address]map[uint64]string{}
+					}
 					if _, ok := cachedBalancesPerChain[address][balance.Address]; !ok {
-						cachedBalancesPerChain[address][balance.Address] = map[uint64]ChainBalance{}
+						cachedBalancesPerChain[address][balance.Address] = map[uint64]string{}
 					}
-					cachedBalancesPerChain[address][balance.Address][balance.ChainID] = balance
+					cachedBalancesPerChain[address][balance.Address][balance.ChainID] = balance.RawBalance
 				}
 			}
 
-		}
-
-		for _, address := range addresses {
-			for _, tokenList := range [][]*token.Token{verifiedTokens, unverifiedTokens} {
-				for _, tokens := range getTokenBySymbols(tokenList) {
-					for _, token := range tokens {
-						if _, ok := cachedBalancesPerChain[address][token.Address][token.ChainID]; !ok {
-							updateAnyway = true
-							break
-						}
-					}
-				}
-			}
 		}
 	}
 
@@ -397,19 +378,22 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 				isVisible := false
 				for _, token := range tokens {
 					var balance *big.Float
-					hexBalance := &hexutil.Big{}
+					hexBalance := &big.Int{}
 					if latestBalances != nil {
-						hexBalance = latestBalances[token.ChainID][address][token.Address]
-						balance = big.NewFloat(0.0)
-						if hexBalance != nil {
-							balance = new(big.Float).Quo(
-								new(big.Float).SetInt(hexBalance.ToInt()),
-								big.NewFloat(math.Pow(10, float64(decimals))),
-							)
-						}
+						hexBalance = latestBalances[token.ChainID][address][token.Address].ToInt()
 					} else {
-						balance = cachedBalancesPerChain[address][token.Address][token.ChainID].Balance
+						if cachedRawBalance, ok := cachedBalancesPerChain[address][token.Address][token.ChainID]; ok {
+							hexBalance, _ = new(big.Int).SetString(cachedRawBalance, 10)
+						}
 					}
+					balance = big.NewFloat(0.0)
+					if hexBalance != nil {
+						balance = new(big.Float).Quo(
+							new(big.Float).SetInt(hexBalance),
+							big.NewFloat(math.Pow(10, float64(decimals))),
+						)
+					}
+
 					hasError := false
 					if client, ok := clients[token.ChainID]; ok {
 						hasError = err != nil || !client.GetIsConnected()
@@ -426,7 +410,7 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 						balance1DayAgoStr = balance1DayAgo.String()
 					}
 					balancesPerChain[token.ChainID] = ChainBalance{
-						RawBalance:     hexBalance.ToInt().String(),
+						RawBalance:     hexBalance.String(),
 						Balance:        balance,
 						Balance1DayAgo: balance1DayAgoStr,
 						Address:        token.Address,

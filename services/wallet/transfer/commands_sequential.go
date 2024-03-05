@@ -67,7 +67,7 @@ func (c *findNewBlocksCommand) detectTransfers(parent context.Context, accounts 
 			tokenAddresses = append(tokenAddresses, token.Address)
 		}
 	}
-	log.Info("findNewBlocksCommand detectTransfers", "cnt", len(tokenAddresses), "addresses", tokenAddresses)
+	log.Info("findNewBlocksCommand detectTransfers", "cnt", len(tokenAddresses))
 
 	ctx, cancel := context.WithTimeout(parent, requestTimeout)
 	defer cancel()
