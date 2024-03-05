@@ -265,7 +265,9 @@ func (r *Reader) invalidateBalanceCache() {
 }
 
 func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
+	log.Info("FBB 1FetchOrGetCachedWalletBalances", "addresses", addresses)
 	if !r.isBalanceCacheValid() {
+		log.Info("FBB invalid cache")
 		balances, err := r.GetWalletTokenBalances(ctx, addresses)
 		if err != nil {
 			return nil, err
@@ -287,6 +289,7 @@ func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, addresses [
 
 	// there should be at least ETH balance
 	if addressWithoutCachedBalances {
+		log.Info("FBB some address with no cache")
 		return r.GetWalletTokenBalances(ctx, addresses)
 	}
 
@@ -339,41 +342,41 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 
 	verifiedTokens, unverifiedTokens := splitVerifiedTokens(allTokens)
 
+	cachedBalancesPerChain := map[common.Address]map[common.Address]map[uint64]string{}
 	updateAnyway := false
-	cachedBalancesPerChain := map[common.Address]map[common.Address]map[uint64]ChainBalance{}
 	if !updateBalances {
-		for address, tokens := range cachedTokens {
-			if _, ok := cachedBalancesPerChain[address]; !ok {
-				cachedBalancesPerChain[address] = map[common.Address]map[uint64]ChainBalance{}
+		for _, address := range addresses {
+			if _, ok := cachedTokens[address]; !ok {
+				updateAnyway = true
+				break
 			}
+		}
+	}
+
+	if !updateBalances && !updateAnyway {
+		log.Info("FBA upd1112")
+		for address, tokens := range cachedTokens {
+			log.Info("FBA upd2", "address", address, "tokens", len(tokens))
 
 			for _, token := range tokens {
 				for _, balance := range token.BalancesPerChain {
+					if _, ok := cachedBalancesPerChain[address]; !ok {
+						cachedBalancesPerChain[address] = map[common.Address]map[uint64]string{}
+					}
 					if _, ok := cachedBalancesPerChain[address][balance.Address]; !ok {
-						cachedBalancesPerChain[address][balance.Address] = map[uint64]ChainBalance{}
+						cachedBalancesPerChain[address][balance.Address] = map[uint64]string{}
 					}
-					cachedBalancesPerChain[address][balance.Address][balance.ChainID] = balance
+					log.Info("FBA fa", "address", address, "b", balance.Balance, "rbalance", balance.RawBalance)
+					cachedBalancesPerChain[address][balance.Address][balance.ChainID] = balance.RawBalance
 				}
 			}
 
-		}
-
-		for _, address := range addresses {
-			for _, tokenList := range [][]*token.Token{verifiedTokens, unverifiedTokens} {
-				for _, tokens := range getTokenBySymbols(tokenList) {
-					for _, token := range tokens {
-						if _, ok := cachedBalancesPerChain[address][token.Address][token.ChainID]; !ok {
-							updateAnyway = true
-							break
-						}
-					}
-				}
-			}
 		}
 	}
 
 	var latestBalances map[uint64]map[common.Address]map[common.Address]*hexutil.Big
 	if updateBalances || updateAnyway {
+		log.Info("FBB update", "updateBalances", updateBalances, "updateAnyway")
 		latestBalances, err = r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
 		if err != nil {
 			for _, client := range clients {
@@ -395,19 +398,22 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 				isVisible := false
 				for _, token := range tokens {
 					var balance *big.Float
-					hexBalance := &hexutil.Big{}
+					hexBalance := &big.Int{}
 					if latestBalances != nil {
-						hexBalance = latestBalances[token.ChainID][address][token.Address]
-						balance = big.NewFloat(0.0)
-						if hexBalance != nil {
-							balance = new(big.Float).Quo(
-								new(big.Float).SetInt(hexBalance.ToInt()),
-								big.NewFloat(math.Pow(10, float64(decimals))),
-							)
-						}
+						hexBalance = latestBalances[token.ChainID][address][token.Address].ToInt()
 					} else {
-						balance = cachedBalancesPerChain[address][token.Address][token.ChainID].Balance
+						if cachedRawBalance, ok := cachedBalancesPerChain[address][token.Address][token.ChainID]; ok {
+							hexBalance, _ = new(big.Int).SetString(cachedRawBalance, 10)
+						}
 					}
+					balance = big.NewFloat(0.0)
+					if hexBalance != nil {
+						balance = new(big.Float).Quo(
+							new(big.Float).SetInt(hexBalance),
+							big.NewFloat(math.Pow(10, float64(decimals))),
+						)
+					}
+
 					hasError := false
 					if client, ok := clients[token.ChainID]; ok {
 						hasError = err != nil || !client.GetIsConnected()
@@ -415,8 +421,9 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 					if !isVisible {
 						isVisible = balance.Cmp(big.NewFloat(0.0)) > 0 || r.isCachedToken(cachedTokens, address, token.Symbol, token.ChainID)
 					}
+					log.Info("FBA match2", "address", address, "token", token.Address, "chain", token.ChainID, "HB", hexBalance, "balance", balance)
 					balancesPerChain[token.ChainID] = ChainBalance{
-						RawBalance: hexBalance.ToInt().String(),
+						RawBalance: hexBalance.String(),
 						Balance:    balance,
 						Address:    token.Address,
 						ChainID:    token.ChainID,
