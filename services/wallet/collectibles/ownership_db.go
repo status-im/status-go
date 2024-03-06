@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -20,6 +21,7 @@ const InvalidTimestamp = int64(-1)
 
 type OwnershipDB struct {
 	db *sql.DB
+	mu sync.Mutex
 }
 
 func NewOwnershipDB(sqlDb *sql.DB) *OwnershipDB {
@@ -358,6 +360,10 @@ func (o *OwnershipDB) GetIsFirstOfCollection(onwerAddress common.Address, newIDs
 }
 
 func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Address, balances thirdparty.TokenBalancesPerContractAddress, timestamp int64) (removedIDs, updatedIDs, insertedIDs []thirdparty.CollectibleUniqueID, err error) {
+	// Ensure all steps are done atomically
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
 	err = insertTmpOwnership(o.db, chainID, ownerAddress, balances)
 	if err != nil {
 		return
