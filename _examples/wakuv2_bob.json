@@ -2,10 +2,10 @@
 	"APIModules": "waku,wakuext,wakuv2,permissions,eth",
 	"HTTPEnabled": true,
 	"HTTPHost": "localhost",
-	"HTTPPort": 8545,
+	"HTTPPort": 8565,
 	"WakuV2Config": {
 		"Enabled": true
 	},
 	"IPCEnabled": true,
-	"ListenAddr": ":30313"
+	"ListenAddr": ":30323"
 }

@@ -6,8 +6,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/wakuv2"
 
 	"github.com/urfave/cli/v2"
 )
@@ -35,7 +35,7 @@ var logger *zap.SugaredLogger
 type StatusCLI struct {
 	name      string
 	messenger *protocol.Messenger
-	waku      *wakuv2.Waku
+	backend   *api.GethStatusBackend
 	logger    *zap.SugaredLogger
 }
 
