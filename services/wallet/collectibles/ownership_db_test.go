@@ -115,8 +115,8 @@ func TestUpdateOwnership(t *testing.T) {
 
 	allChains := []w_common.ChainID{chainID0, chainID1, chainID2}
 	allOwnerAddresses := []common.Address{ownerAddress1, ownerAddress2, ownerAddress3}
-	allCollectibles := append(ownedList1, ownedList2...)
-	allCollectibles = append(allCollectibles, ownedList3...)
+	allCollectibles := append(ownedList1[1:], ownedList2...)
+	allCollectibles = append(allCollectibles, ownedList3[:len(ownedList3)-1]...) // the last element of ownerdList3 is a duplicate of the first element of ownedList2
 
 	randomAddress := common.HexToAddress("0xFFFF")
 

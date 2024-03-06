@@ -397,7 +397,7 @@ func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Addre
 }
 
 func (o *OwnershipDB) GetOwnedCollectibles(chainIDs []w_common.ChainID, ownerAddresses []common.Address, offset int, limit int) ([]thirdparty.CollectibleUniqueID, error) {
-	query, args, err := sqlx.In(fmt.Sprintf(`SELECT %s
+	query, args, err := sqlx.In(fmt.Sprintf(`SELECT DISTINCT %s
 		FROM collectibles_ownership_cache
 		WHERE chain_id IN (?) AND owner_address IN (?)
 		LIMIT ? OFFSET ?`, selectOwnershipColumns), chainIDs, ownerAddresses, limit, offset)
