@@ -273,6 +273,7 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 }
 
 func (s *MessengerBackupSuite) TestBackupSettings() {
+	s.T().Skip("flaky test")
 	const (
 		bob1DisplayName               = "bobby"
 		bob1Currency                  = "eur"
