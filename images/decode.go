@@ -25,7 +25,7 @@ var (
 	svgRegex         = regexp.MustCompile(`(?i)^\s*(?:<\?xml[^>]*>\s*)?(?:<!doctype svg[^>]*>\s*)?<svg[^>]*>[^*]*<\/svg>\s*$`)
 )
 
-// Is returns true if the given buffer is a valid SVG image.
+// IsSVG returns true if the given buffer is a valid SVG image.
 func IsSVG(buf []byte) bool {
 	var isBinary bool
 	if len(buf) < 24 {

@@ -57,6 +57,7 @@ loop:
 			for _, attribute := range t.Attr {
 				if attribute.Val == "icon" || attribute.Val == "shortcut icon" {
 					LinkContainsFavicon = true
+					break
 				}
 			}
 			for _, attribute := range t.Attr {
