@@ -73,16 +73,13 @@ import (
 	"github.com/status-im/status-go/telemetry"
 )
 
-// todo: kozieiev: get rid of wakutransp word
-type chatContext string
-
 const (
 	PubKeyStringLength = 132
 
 	transactionSentTxt = "Transaction sent"
 
-	publicChat  chatContext = "public-chat"
-	privateChat chatContext = "private-chat"
+	publicChat  ChatContext = "public-chat"
+	privateChat ChatContext = "private-chat"
 )
 
 var communityAdvertiseIntervalSecond int64 = 60 * 60
@@ -1127,7 +1124,9 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		return nil
 	}
 
-	ci, err := m.createChatIdentity(publicChat)
+	chatContext := GetChatContextFromChatType(chat.ChatType)
+
+	ci, err := m.createChatIdentity(chatContext)
 	if err != nil {
 		return err
 	}
@@ -1274,7 +1273,7 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 // createChatIdentity creates a context based protobuf.ChatIdentity.
 // context 'public-chat' will attach only the 'thumbnail' IdentityImage
 // context 'private-chat' will attach all IdentityImage
-func (m *Messenger) createChatIdentity(context chatContext) (*protobuf.ChatIdentity, error) {
+func (m *Messenger) createChatIdentity(context ChatContext) (*protobuf.ChatIdentity, error) {
 	m.logger.Info(fmt.Sprintf("account keyUID '%s'", m.account.KeyUID))
 	m.logger.Info(fmt.Sprintf("context '%s'", context))
 
@@ -1324,7 +1323,7 @@ func (m *Messenger) adaptIdentityImageToProtobuf(img *images.IdentityImage) *pro
 	}
 }
 
-func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *protobuf.ChatIdentity) error {
+func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *protobuf.ChatIdentity) error {
 	s, err := m.getSettings()
 	if err != nil {
 		return err

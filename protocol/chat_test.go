@@ -172,3 +172,29 @@ func (s *ChatTestSuite) TestDeepLink() {
 
 	s.Require().Equal(chat.DeepLink(), "status-app://cc/c432709e-fc73-440d-bb67-cb3a0929dfda#zQ3shZL6dXiFCbDyxnXxwQa9v8QFC2q19subFtyxd7kVszMVo")
 }
+
+func (s *ChatTestSuite) TestGetChatContextFromChatType() {
+	chat := &Chat{
+		CommunityID: "0x02b1",
+		ID:          "0x02b1",
+		ChatType:    ChatTypeCommunityChat,
+	}
+
+	s.Require().Equal(GetChatContextFromChatType(chat.ChatType), publicChat)
+
+	chat = &Chat{
+		CommunityID: "0x02b1",
+		ID:          "0x02b1",
+		ChatType:    ChatTypeOneToOne,
+	}
+
+	s.Require().Equal(GetChatContextFromChatType(chat.ChatType), privateChat)
+
+	chat = &Chat{
+		CommunityID: "0x02b1",
+		ID:          "0x02b1",
+		ChatType:    ChatTypePrivateGroupChat,
+	}
+
+	s.Require().Equal(GetChatContextFromChatType(chat.ChatType), privateChat)
+}
