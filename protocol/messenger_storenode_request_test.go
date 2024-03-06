@@ -362,7 +362,6 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityInfo() {
 
 	community := s.createCommunity(s.owner)
 
-	s.waitForAvailableStoreNode(s.bob)
 	s.fetchCommunity(s.bob, community.CommunityShard(), community)
 }
 
@@ -581,12 +580,17 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfo() {
 	err := s.owner.settings.SaveOrUpdateKeypair(ownerProfileKp)
 	s.Require().NoError(err)
 
+	contentTopicString := transport.ContactCodeTopic(&s.owner.identity.PublicKey)
+	contentTopic := wakuV2common.BytesToTopic(transport.ToTopic(contentTopicString))
+	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(&contentTopic)
+
 	// Set display name, this will also publish contact code
 	err = s.owner.SetDisplayName("super-owner")
 	s.Require().NoError(err)
 
+	s.waitForEnvelopes(storeNodeSubscription, 1)
+
 	s.createBob()
-	s.waitForAvailableStoreNode(s.bob)
 	s.fetchProfile(s.bob, s.owner.selfContact.ID, s.owner.selfContact)
 }
 
