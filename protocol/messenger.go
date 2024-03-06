@@ -4200,7 +4200,7 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) e
 					return err
 				}
 
-				var quotedImages = extractQuotedImages(albumMessages, s)
+				quotedImages := extractQuotedImages(albumMessages, s)
 				quotedImagesJSON, err := json.Marshal(quotedImages)
 				if err != nil {
 					return err
