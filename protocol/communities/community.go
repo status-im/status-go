@@ -96,16 +96,17 @@ type CommunityAdminSettings struct {
 }
 
 type CommunityChat struct {
-	ID          string                               `json:"id"`
-	Name        string                               `json:"name"`
-	Color       string                               `json:"color"`
-	Emoji       string                               `json:"emoji"`
-	Description string                               `json:"description"`
-	Members     map[string]*protobuf.CommunityMember `json:"members"`
-	Permissions *protobuf.CommunityPermissions       `json:"permissions"`
-	CanPost     bool                                 `json:"canPost"`
-	Position    int                                  `json:"position"`
-	CategoryID  string                               `json:"categoryID"`
+	ID                      string                               `json:"id"`
+	Name                    string                               `json:"name"`
+	Color                   string                               `json:"color"`
+	Emoji                   string                               `json:"emoji"`
+	Description             string                               `json:"description"`
+	Members                 map[string]*protobuf.CommunityMember `json:"members"`
+	Permissions             *protobuf.CommunityPermissions       `json:"permissions"`
+	CanPost                 bool                                 `json:"canPost"`
+	ViewersCanPostReactions bool                                 `json:"viewersCanPostReactions"`
+	Position                int                                  `json:"position"`
+	CategoryID              string                               `json:"categoryID"`
 }
 
 type CommunityCategory struct {
@@ -184,16 +185,17 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 				return nil, err
 			}
 			chat := CommunityChat{
-				ID:          id,
-				Name:        c.Identity.DisplayName,
-				Color:       c.Identity.Color,
-				Emoji:       c.Identity.Emoji,
-				Description: c.Identity.Description,
-				Permissions: c.Permissions,
-				Members:     c.Members,
-				CanPost:     canPost,
-				CategoryID:  c.CategoryId,
-				Position:    int(c.Position),
+				ID:                      id,
+				Name:                    c.Identity.DisplayName,
+				Color:                   c.Identity.Color,
+				Emoji:                   c.Identity.Emoji,
+				Description:             c.Identity.Description,
+				Permissions:             c.Permissions,
+				Members:                 c.Members,
+				CanPost:                 canPost,
+				ViewersCanPostReactions: c.ViewersCanPostReactions,
+				CategoryID:              c.CategoryId,
+				Position:                int(c.Position),
 			}
 			communityItem.Chats[id] = chat
 		}
@@ -320,16 +322,17 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				return nil, err
 			}
 			chat := CommunityChat{
-				ID:          id,
-				Name:        c.Identity.DisplayName,
-				Emoji:       c.Identity.Emoji,
-				Color:       c.Identity.Color,
-				Description: c.Identity.Description,
-				Permissions: c.Permissions,
-				Members:     c.Members,
-				CanPost:     canPost,
-				CategoryID:  c.CategoryId,
-				Position:    int(c.Position),
+				ID:                      id,
+				Name:                    c.Identity.DisplayName,
+				Emoji:                   c.Identity.Emoji,
+				Color:                   c.Identity.Color,
+				Description:             c.Identity.Description,
+				Permissions:             c.Permissions,
+				Members:                 c.Members,
+				CanPost:                 canPost,
+				ViewersCanPostReactions: c.ViewersCanPostReactions,
+				CategoryID:              c.CategoryId,
+				Position:                int(c.Position),
 			}
 			communityItem.Chats[id] = chat
 		}

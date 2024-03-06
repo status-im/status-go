@@ -87,6 +87,9 @@ type Chat struct {
 	// Active indicates whether the chat has been soft deleted
 	Active bool `json:"active"`
 
+	// ViewersCanPostReactions indicates whether users can post reactions in view only mode
+	ViewersCanPostReactions bool `json:"viewersCanPostReactions"`
+
 	ChatType ChatType `json:"chatType"`
 
 	// Timestamp indicates the last time this chat has received/sent a message
@@ -500,6 +503,7 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 		ReadMessagesAtClockValue: 0,
 		ChatType:                 ChatTypeCommunityChat,
 		FirstMessageTimestamp:    orgChat.Identity.FirstMessageTimestamp,
+		ViewersCanPostReactions:  orgChat.ViewersCanPostReactions,
 	}
 }
 
