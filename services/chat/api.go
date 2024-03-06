@@ -79,10 +79,11 @@ type Chat struct {
 	PinnedMessages           *PinnedMessages                    `json:"pinnedMessages,omitempty"`
 	// Deprecated: CanPost is deprecated in favor of CanPostMessages/CanPostReactions/etc.
 	// For now CanPost will equal to CanPostMessages.
-	CanPost          bool   `json:"canPost"`
-	CanPostMessages  bool   `json:"canPostMessages"`
-	CanPostReactions bool   `json:"canPostReactions"`
-	Base64Image      string `json:"image,omitempty"`
+	CanPost                 bool   `json:"canPost"`
+	CanPostMessages         bool   `json:"canPostMessages"`
+	CanPostReactions        bool   `json:"canPostReactions"`
+	ViewersCanPostReactions bool   `json:"viewersCanPostReactions"`
+	Base64Image             string `json:"image,omitempty"`
 }
 
 type ChannelGroup struct {
@@ -505,6 +506,7 @@ func (chat *Chat) populateCommunityFields(community *communities.Community) erro
 	chat.CanPost = canPostMessages
 	chat.CanPostMessages = canPostMessages
 	chat.CanPostReactions = canPostReactions
+	chat.ViewersCanPostReactions = commChat.ViewersCanPostReactions
 
 	return nil
 }
