@@ -648,6 +648,9 @@ func (db sqlitePersistence) messageByID(tx *sql.Tx, id string) (*common.Message,
 }
 
 func (db sqlitePersistence) albumMessages(chatID, albumID string) ([]*common.Message, error) {
+	if albumID == "" {
+		return nil, nil
+	}
 	query := db.buildMessagesQuery("WHERE m1.album_id = ? and m1.local_chat_id = ?")
 	rows, err := db.db.Query(query, albumID, chatID)
 	if err != nil {
