@@ -377,3 +377,11 @@ func (s *CBridge) CalculateAmountOut(from, to *params.Network, amountIn *big.Int
 	amountOut, _ := new(big.Int).SetString(amt.EqValueTokenAmt, 10)
 	return amountOut, nil
 }
+
+func (s *CBridge) ValidateTransaction(sendArgs *TransactionBridge) error {
+	if sendArgs.CbridgeTx == nil {
+		return fmt.Errorf("hop transfer transaction is nil")
+	}
+
+	return nil
+}

@@ -192,9 +192,29 @@ func (tm *TransactionManager) UpdateMultiTransaction(multiTransaction *MultiTran
 	return updateMultiTransaction(tm.db, multiTransaction)
 }
 
+func (tm *TransactionManager) validate(command *MultiTransactionCommand, data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge) error {
+	for _, tx := range data {
+		if _, ok := bridges[tx.BridgeName]; !ok {
+			return fmt.Errorf("bridge %s not found", tx.BridgeName)
+		}
+
+		err := bridges[tx.BridgeName].ValidateTransaction(tx)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // In case of keycard account, password should be empty
 func (tm *TransactionManager) CreateMultiTransactionFromCommand(ctx context.Context, command *MultiTransactionCommand,
 	data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, password string) (*MultiTransactionCommandResult, error) {
+
+	err := tm.validate(command, data, bridges)
+	if err != nil {
+		return nil, err
+	}
 
 	multiTransaction := multiTransactionFromCommand(command)
 

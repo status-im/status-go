@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"strings"
@@ -464,4 +465,11 @@ func (h *HopBridge) getDestinationTxFee(from, to *params.Network, nativeTokenPri
 
 	txFeeEth := new(big.Float).Mul(gasPrice, new(big.Float).SetInt(totalGasLimit))
 	return new(big.Float).Mul(txFeeEth, rate), nil
+}
+
+func (h *HopBridge) ValidateTransaction(sendArgs *TransactionBridge) error {
+	if sendArgs.HopTx == nil {
+		return fmt.Errorf("hop transfer transaction is nil")
+	}
+	return nil
 }

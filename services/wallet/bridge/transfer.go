@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -97,5 +98,15 @@ func (s *TransferBridge) CalculateAmountOut(from, to *params.Network, amountIn *
 }
 
 func (s *TransferBridge) GetContractAddress(network *params.Network, token *token.Token) *common.Address {
+	return nil
+}
+
+func (s *TransferBridge) ValidateTransaction(sendArgs *TransactionBridge) error {
+	if sendArgs.TransferTx == nil {
+		return fmt.Errorf("transfer transaction is nil")
+	}
+	if ok := sendArgs.TransferTx.Valid(); !ok {
+		return fmt.Errorf("transfer transaction is invalid")
+	}
 	return nil
 }
