@@ -51,11 +51,23 @@ func TestFilterOwnedCollectibles(t *testing.T) {
 
 	var err error
 
-	for i := 0; i < nData; i++ {
-		dataPerID[data[i].ID.HashKey()] = data[i]
-		communityDataPerID[data[i].ID.HashKey()] = communityData[i]
+	var commonID thirdparty.CollectibleUniqueID
 
-		chainID := data[i].ID.ContractID.ChainID
+	for i := 0; i < nData; i++ {
+		iData := data[i]
+		iCommunityData := communityData[i]
+
+		if i == 1 {
+			// Insert a duplicate ID to represent 2 owners having the same ERC1155 collectible
+			iData = data[0]
+			iCommunityData = communityData[0]
+			commonID = iData.ID
+		}
+
+		dataPerID[iData.ID.HashKey()] = iData
+		communityDataPerID[iData.ID.HashKey()] = iCommunityData
+
+		chainID := iData.ID.ContractID.ChainID
 		ownerAddress := ownerAddresses[i%len(ownerAddresses)]
 
 		if _, ok := balancesPerChainIDAndOwner[chainID]; !ok {
@@ -65,13 +77,13 @@ func TestFilterOwnedCollectibles(t *testing.T) {
 			balancesPerChainIDAndOwner[chainID][ownerAddress] = make(thirdparty.TokenBalancesPerContractAddress)
 		}
 
-		contractAddress := data[i].ID.ContractID.Address
+		contractAddress := iData.ID.ContractID.Address
 		if _, ok := balancesPerChainIDAndOwner[chainID][ownerAddress][contractAddress]; !ok {
 			balancesPerChainIDAndOwner[chainID][ownerAddress][contractAddress] = make([]thirdparty.TokenBalance, 0, len(data))
 		}
 
 		tokenBalance := thirdparty.TokenBalance{
-			TokenID: data[i].ID.TokenID,
+			TokenID: iData.ID.TokenID,
 			Balance: &bigint.BigInt{Int: big.NewInt(int64(i % 10))},
 		}
 		balancesPerChainIDAndOwner[chainID][ownerAddress][contractAddress] = append(balancesPerChainIDAndOwner[chainID][ownerAddress][contractAddress], tokenBalance)
@@ -210,6 +222,18 @@ func TestFilterOwnedCollectibles(t *testing.T) {
 		},
 		TokenID: &bigint.BigInt{Int: big.NewInt(9999999)},
 	})
+
+	filterIDs, err = filterOwnedCollectibles(ctx, db, filterChains, filterAddresses, filter, 0, nData)
+	require.NoError(t, err)
+	require.Equal(t, expectedIDs, filterIDs)
+
+	// Test collectible ID owned by both accounts 0 and 1
+	filterChains = []w_common.ChainID{commonID.ContractID.ChainID}
+	filterAddresses = []common.Address{ownerAddresses[0], ownerAddresses[1]}
+
+	filter = allFilter()
+	filter.CollectibleIDs = append(filter.CollectibleIDs, commonID)
+	expectedIDs = filter.CollectibleIDs
 
 	filterIDs, err = filterOwnedCollectibles(ctx, db, filterChains, filterAddresses, filter, 0, nData)
 	require.NoError(t, err)
