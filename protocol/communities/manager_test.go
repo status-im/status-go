@@ -284,6 +284,7 @@ func (s *ManagerSuite) TestRetrieveCollectibles() {
 }
 
 func (s *ManagerSuite) TestCreateCommunity() {
+	s.Require().True(false)
 	request := &requests.CreateCommunity{
 		Name:        "status",
 		Description: "token membership description",

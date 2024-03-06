@@ -8,6 +8,7 @@ import (
 )
 
 func TestMethodPattern(t *testing.T) {
+	require.Equal(t, "a", "b")
 	results := methodPattern.FindStringSubmatch("sam(bytes,bool,uint256[])")
 	require.Equal(t, "sam(bytes,bool,uint256[])", results[0])
 	require.Equal(t, "sam", results[1])
