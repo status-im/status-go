@@ -100,8 +100,8 @@ for package in ${UNIT_TEST_PACKAGES}; do
   for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
     if ! is_parallelizable "${package}" || [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
       run_test_for_package "${package}" "${i}"
+      go_test_exit=$?
       if [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
-        go_test_exit=$?
         if [[ "${go_test_exit}" -ne 0 ]]; then
           exit "${go_test_exit}"
         fi
