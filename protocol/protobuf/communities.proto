@@ -253,3 +253,6 @@ message Storenode {
   int64 deleted_at = 8;
 }
 
+message CommunityReevaluatePermissionsRequest {
+  bytes community_id = 1;
+}

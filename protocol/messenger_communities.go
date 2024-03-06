@@ -2384,6 +2384,23 @@ func (m *Messenger) DeleteCommunityTokenPermission(request *requests.DeleteCommu
 	return response, nil
 }
 
+func (m *Messenger) HandleCommunityReevaluatePermissionsRequest(state *ReceivedMessageState, request *protobuf.CommunityReevaluatePermissionsRequest, statusMessage *v1protocol.StatusMessage) error {
+	community, err := m.communitiesManager.GetByID(request.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	if !community.IsControlNode() {
+		return communities.ErrNotControlNode
+	}
+
+	if !community.IsMemberTokenMaster(statusMessage.SigPubKey()) {
+		return communities.ErrNotAuthorized
+	}
+
+	return m.communitiesManager.ScheduleMembersReevaluation(request.CommunityId)
+}
+
 func (m *Messenger) ReevaluateCommunityMembersPermissions(request *requests.ReevaluateCommunityMembersPermissions) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
@@ -2394,14 +2411,37 @@ func (m *Messenger) ReevaluateCommunityMembersPermissions(request *requests.Reev
 		return nil, err
 	}
 
-	if err = m.communitiesManager.ReevaluateCommunityMembersPermissions(community); err != nil {
-		return nil, err
+	if community.IsControlNode() {
+		err = m.communitiesManager.ScheduleMembersReevaluation(request.CommunityID)
+		if err != nil {
+			return nil, err
+		}
+	} else if community.IsTokenMaster() {
+		reevaluateRequest := &protobuf.CommunityReevaluatePermissionsRequest{
+			CommunityId: request.CommunityID,
+		}
+
+		encodedMessage, err := proto.Marshal(reevaluateRequest)
+		if err != nil {
+			return nil, err
+		}
+
+		rawMessage := common.RawMessage{
+			Payload:             encodedMessage,
+			CommunityID:         request.CommunityID,
+			SkipEncryptionLayer: true,
+			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REEVALUATE_PERMISSIONS_REQUEST,
+			PubsubTopic:         community.PubsubTopic(),
+		}
+		_, err = m.SendMessageToControlNode(community, rawMessage)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, communities.ErrNotAuthorized
 	}
 
-	response := &MessengerResponse{}
-	response.AddCommunity(community)
-
-	return response, nil
+	return &MessengerResponse{}, nil
 }
 
 func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerResponse, error) {
