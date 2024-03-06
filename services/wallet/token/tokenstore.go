@@ -1729,7 +1729,15 @@ func newDefaultStore() *DefaultStore {
 				TokenListID: "status",
 			},
 			&Token{
-				Address:     common.HexToAddress("0x44a739916D41eC0226d98F83BE5364B69078DA41"),
+				Address:     common.HexToAddress("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"),
+				Name:        "USD Coin",
+				Symbol:      "USDC",
+				Decimals:    6,
+				ChainID:     11155111,
+				TokenListID: "status",
+			},
+			&Token{
+				Address:     common.HexToAddress("0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d"),
 				Name:        "USD Coin",
 				Symbol:      "USDC",
 				Decimals:    6,
@@ -1737,7 +1745,7 @@ func newDefaultStore() *DefaultStore {
 				TokenListID: "status",
 			},
 			&Token{
-				Address:     common.HexToAddress("0x44a739916D41eC0226d98F83BE5364B69078DA41"),
+				Address:     common.HexToAddress("0x5fd84259d66Cd46123540766Be93DFE6D43130D7"),
 				Name:        "USD Coin",
 				Symbol:      "USDC",
 				Decimals:    6,
