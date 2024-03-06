@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/contracts/ierc1155"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
@@ -59,7 +58,7 @@ func (s *ERC1155TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwo
 	var input []byte
 	value := new(big.Int)
 
-	abi, err := abi.JSON(strings.NewReader(collectibles.CollectiblesMetaData.ABI))
+	abi, err := abi.JSON(strings.NewReader(ierc1155.Ierc1155ABI))
 	if err != nil {
 		return 0, err
 	}
