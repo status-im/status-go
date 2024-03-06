@@ -73,36 +73,36 @@ var (
 )
 
 type Manager struct {
-	persistence                      *Persistence
-	encryptor                        *encryption.Protocol
-	ensSubscription                  chan []*ens.VerificationRecord
-	subscriptions                    []chan *Subscription
-	ensVerifier                      *ens.Verifier
-	ownerVerifier                    OwnerVerifier
-	identity                         *ecdsa.PrivateKey
-	installationID                   string
-	accountsManager                  account.Manager
-	tokenManager                     TokenManager
-	collectiblesManager              CollectiblesManager
-	logger                           *zap.Logger
-	stdoutLogger                     *zap.Logger
-	transport                        *transport.Transport
-	timesource                       common.TimeSource
-	quit                             chan struct{}
-	torrentConfig                    *params.TorrentConfig
-	torrentClient                    *torrent.Client
-	walletConfig                     *params.WalletConfig
-	communityTokensService           communitytokens.ServiceInterface
-	historyArchiveTasksWaitGroup     sync.WaitGroup
-	historyArchiveTasks              sync.Map // stores `chan struct{}`
-	periodicMembersReevaluationTasks sync.Map // stores `chan struct{}`
-	torrentTasks                     map[string]metainfo.Hash
-	historyArchiveDownloadTasks      map[string]*HistoryArchiveDownloadTask
-	stopped                          bool
-	RekeyInterval                    time.Duration
-	PermissionChecker                PermissionChecker
-	keyDistributor                   KeyDistributor
-	communityLock                    *CommunityLock
+	persistence                  *Persistence
+	encryptor                    *encryption.Protocol
+	ensSubscription              chan []*ens.VerificationRecord
+	subscriptions                []chan *Subscription
+	ensVerifier                  *ens.Verifier
+	ownerVerifier                OwnerVerifier
+	identity                     *ecdsa.PrivateKey
+	installationID               string
+	accountsManager              account.Manager
+	tokenManager                 TokenManager
+	collectiblesManager          CollectiblesManager
+	logger                       *zap.Logger
+	stdoutLogger                 *zap.Logger
+	transport                    *transport.Transport
+	timesource                   common.TimeSource
+	quit                         chan struct{}
+	torrentConfig                *params.TorrentConfig
+	torrentClient                *torrent.Client
+	walletConfig                 *params.WalletConfig
+	communityTokensService       communitytokens.ServiceInterface
+	historyArchiveTasksWaitGroup sync.WaitGroup
+	historyArchiveTasks          sync.Map // stores `chan struct{}`
+	membersReevaluationTasks     sync.Map // stores `membersReevaluationTask`
+	torrentTasks                 map[string]metainfo.Hash
+	historyArchiveDownloadTasks  map[string]*HistoryArchiveDownloadTask
+	stopped                      bool
+	RekeyInterval                time.Duration
+	PermissionChecker            PermissionChecker
+	keyDistributor               KeyDistributor
+	communityLock                *CommunityLock
 }
 
 type CommunityLock struct {
@@ -170,6 +170,12 @@ func (t *HistoryArchiveDownloadTask) Cancel() {
 	defer t.m.Unlock()
 	t.Cancelled = true
 	close(t.CancelChan)
+}
+
+type membersReevaluationTask struct {
+	lastSuccessTime     time.Time
+	onDemandRequestTime time.Time
+	mutex               sync.Mutex
 }
 
 type managerOptions struct {
@@ -1069,35 +1075,99 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 }
 
 func (m *Manager) ReevaluateMembersPeriodically(communityID types.HexBytes) {
-	if _, exists := m.periodicMembersReevaluationTasks.Load(communityID.String()); exists {
+	logger := m.logger.Named("reevaluate members loop").With(zap.String("communityID", communityID.String()))
+
+	if _, exists := m.membersReevaluationTasks.Load(communityID.String()); exists {
 		return
 	}
 
-	cancel := make(chan struct{})
-	m.periodicMembersReevaluationTasks.Store(communityID.String(), cancel)
+	m.membersReevaluationTasks.Store(communityID.String(), &membersReevaluationTask{})
+	defer m.membersReevaluationTasks.Delete(communityID.String())
 
-	ticker := time.NewTicker(memberPermissionsCheckInterval)
+	type criticalError struct {
+		error
+	}
+
+	reevaluateMembers := func() (err error) {
+		t, exists := m.membersReevaluationTasks.Load(communityID.String())
+		if !exists {
+			return criticalError{
+				error: errors.New("missing task"),
+			}
+		}
+		task, ok := t.(*membersReevaluationTask)
+		if !ok {
+			return criticalError{
+				error: errors.New("invalid task type"),
+			}
+		}
+		task.mutex.Lock()
+		defer task.mutex.Unlock()
+
+		// Ensure reevaluation is performed not more often than once per minute.
+		if task.lastSuccessTime.After(time.Now().Add(-1 * time.Minute)) {
+			return nil
+		}
+
+		if task.lastSuccessTime.Before(time.Now().Add(-memberPermissionsCheckInterval)) ||
+			task.lastSuccessTime.Before(task.onDemandRequestTime) {
+			community, err := m.GetByID(communityID)
+			if err != nil {
+				if err == ErrOrgNotFound {
+					return criticalError{
+						error: err,
+					}
+				}
+				return err
+			}
+
+			err = m.ReevaluateCommunityMembersPermissions(community)
+			if err != nil {
+				return err
+			}
+			task.lastSuccessTime = time.Now()
+		}
+		return nil
+	}
+
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
+
+	logger.Debug("loop started")
+	defer logger.Debug("loop stopped")
 
 	for {
 		select {
 		case <-ticker.C:
-			community, err := m.GetByID(communityID)
+			err := reevaluateMembers()
 			if err != nil {
-				m.logger.Debug("can't validate member permissions, community was not found", zap.Error(err))
-				m.periodicMembersReevaluationTasks.Delete(communityID.String())
+				logger.Error("reevaluation failed", zap.Error(err))
+				if _, isCritical := err.(*criticalError); isCritical {
+					return
+				}
 			}
 
-			if err = m.ReevaluateCommunityMembersPermissions(community); err != nil {
-				m.logger.Debug("failed to check member permissions", zap.Error(err))
-				continue
-			}
-
-		case <-cancel:
-			m.periodicMembersReevaluationTasks.Delete(communityID.String())
+		case <-m.quit:
 			return
 		}
 	}
+}
+
+func (m *Manager) ScheduleMembersReevaluation(communityID types.HexBytes) error {
+	t, exists := m.membersReevaluationTasks.Load(communityID.String())
+	if !exists {
+		return errors.New("reevaluation task doesn't exist")
+	}
+
+	task, ok := t.(*membersReevaluationTask)
+	if !ok {
+		return errors.New("invalid task type")
+	}
+	task.mutex.Lock()
+	defer task.mutex.Unlock()
+	task.onDemandRequestTime = time.Now()
+
+	return nil
 }
 
 func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommunityTokenPermission) (*Community, *CommunityChanges, error) {

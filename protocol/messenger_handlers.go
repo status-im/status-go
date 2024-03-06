@@ -250,6 +250,9 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
            case protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_STORENODES_INFO:
 		return m.handleCommunityPublicStorenodesInfoProtobuf(messageState, protoBytes, msg, filter)
         
+           case protobuf.ApplicationMetadataMessage_COMMUNITY_REEVALUATE_PERMISSIONS_REQUEST:
+		return m.handleCommunityReevaluatePermissionsRequestProtobuf(messageState, protoBytes, msg, filter)
+        
 	default:
 		m.logger.Info("protobuf type not found", zap.String("type", string(msg.ApplicationLayer.Type)))
                 return errors.New("protobuf type not found")
@@ -1792,6 +1795,24 @@ func (m *Messenger) handleCommunityPublicStorenodesInfoProtobuf(messageState *Re
 	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.ApplicationLayer.Type, p)
 
 	return m.HandleCommunityPublicStorenodesInfo(messageState, p, msg)
+	
+}
+
+
+func (m *Messenger) handleCommunityReevaluatePermissionsRequestProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
+	m.logger.Info("handling CommunityReevaluatePermissionsRequest")
+	
+
+	
+	p := &protobuf.CommunityReevaluatePermissionsRequest{}
+	err := proto.Unmarshal(protoBytes, p)
+	if err != nil {
+		return err
+	}
+
+	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.ApplicationLayer.Type, p)
+
+	return m.HandleCommunityReevaluatePermissionsRequest(messageState, p, msg)
 	
 }
 

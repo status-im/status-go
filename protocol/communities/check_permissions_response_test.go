@@ -101,6 +101,31 @@ func TestCalculateRolesAndHighestRole(t *testing.T) {
 			},
 			expectedRolesOrder: []protobuf.CommunityTokenPermission_Type{protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, protobuf.CommunityTokenPermission_BECOME_ADMIN, protobuf.CommunityTokenPermission_BECOME_MEMBER},
 		},
+		{
+			name: "scenario with multiple channel permissions",
+			permissions: map[string]*PermissionTokenCriteriaResult{
+				"1": {
+					Role: protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+					TokenRequirements: []TokenRequirementResponse{
+						{Satisfied: true},
+					},
+				},
+				"2": {
+					Role: protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+					TokenRequirements: []TokenRequirementResponse{
+						{Satisfied: false},
+					},
+				},
+				"3": {
+					Role: protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
+					TokenRequirements: []TokenRequirementResponse{
+						{Satisfied: true},
+					},
+				},
+			},
+			expectedRolesOrder:  []protobuf.CommunityTokenPermission_Type{protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL, protobuf.CommunityTokenPermission_BECOME_MEMBER},
+			expectedHighestRole: protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
+		},
 	}
 
 	for _, tc := range testCases {
