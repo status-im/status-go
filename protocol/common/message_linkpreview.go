@@ -295,13 +295,13 @@ func (m *Message) ConvertLinkPreviewsToProto() ([]*protobuf.UnfurledLink, error)
 		if preview.Thumbnail.DataURI != "" {
 			thumbnailPayload, err = images.GetPayloadFromURI(preview.Thumbnail.DataURI)
 			if err != nil {
-				return nil, fmt.Errorf("could not get data URI payload, url='%s': %w", preview.URL, err)
+				return nil, fmt.Errorf("could not get data URI payload for link preview thumbnail, url='%s': %w", preview.URL, err)
 			}
 		}
 		if preview.Favicon.DataURI != "" {
 			faviconPayload, err = images.GetPayloadFromURI(preview.Favicon.DataURI)
 			if err != nil {
-				return nil, fmt.Errorf("could not get data URI payload, url='%s': %w", preview.URL, err)
+				return nil, fmt.Errorf("could not get data URI payload for link preview favicon, url='%s': %w", preview.URL, err)
 			}
 		}
 
