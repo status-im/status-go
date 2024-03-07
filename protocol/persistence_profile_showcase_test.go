@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -108,36 +109,55 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 
 	preferencesBack, err := persistence.GetProfileShowcasePreferences()
 	s.Require().NoError(err)
+	s.Require().True(reflect.DeepEqual(preferences, preferencesBack))
 
-	s.Require().Equal(len(preferencesBack.Communities), len(preferences.Communities))
-	for i := 0; i < len(preferences.Communities); i++ {
-		s.Require().Equal(*preferences.Communities[i], *preferencesBack.Communities[i])
+	newPreferences := &identity.ProfileShowcasePreferences{
+		Communities: []*identity.ProfileShowcaseCommunityPreference{
+			&identity.ProfileShowcaseCommunityPreference{
+				CommunityID:        "0x32433445133424",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
+				Order:              0,
+			},
+		},
+		Accounts: []*identity.ProfileShowcaseAccountPreference{
+			&identity.ProfileShowcaseAccountPreference{
+				Address:            "0x0000000000000000000000000032433445133422",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
+				Order:              0,
+			},
+		},
+		Collectibles: []*identity.ProfileShowcaseCollectiblePreference{},
+		VerifiedTokens: []*identity.ProfileShowcaseVerifiedTokenPreference{
+			&identity.ProfileShowcaseVerifiedTokenPreference{
+				Symbol:             "ETH",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
+				Order:              1,
+			},
+		},
+		UnverifiedTokens: []*identity.ProfileShowcaseUnverifiedTokenPreference{
+			&identity.ProfileShowcaseUnverifiedTokenPreference{
+				ContractAddress:    "0x12312323323233",
+				ChainID:            11155111,
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+		},
+		SocialLinks: []*identity.ProfileShowcaseSocialLinkPreference{
+			&identity.ProfileShowcaseSocialLinkPreference{
+				Text:               identity.TwitterID,
+				URL:                "https://twitter.com/ethstatus",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
+				Order:              1,
+			},
+		},
 	}
 
-	s.Require().Equal(len(preferencesBack.Accounts), len(preferences.Accounts))
-	for i := 0; i < len(preferences.Accounts); i++ {
-		s.Require().Equal(*preferences.Accounts[i], *preferencesBack.Accounts[i])
-	}
+	err = persistence.SaveProfileShowcasePreferences(newPreferences)
+	s.Require().NoError(err)
 
-	s.Require().Equal(len(preferencesBack.Collectibles), len(preferences.Collectibles))
-	for i := 0; i < len(preferences.Collectibles); i++ {
-		s.Require().Equal(*preferences.Collectibles[i], *preferencesBack.Collectibles[i])
-	}
-
-	s.Require().Equal(len(preferencesBack.VerifiedTokens), len(preferences.VerifiedTokens))
-	for i := 0; i < len(preferences.VerifiedTokens); i++ {
-		s.Require().Equal(*preferences.VerifiedTokens[i], *preferencesBack.VerifiedTokens[i])
-	}
-
-	s.Require().Equal(len(preferencesBack.UnverifiedTokens), len(preferences.UnverifiedTokens))
-	for i := 0; i < len(preferences.UnverifiedTokens); i++ {
-		s.Require().Equal(*preferences.UnverifiedTokens[i], *preferencesBack.UnverifiedTokens[i])
-	}
-
-	s.Require().Equal(len(preferencesBack.SocialLinks), len(preferences.SocialLinks))
-	for i := 0; i < len(preferences.SocialLinks); i++ {
-		s.Require().Equal(*preferences.SocialLinks[i], *preferencesBack.SocialLinks[i])
-	}
+	preferencesBack, err = persistence.GetProfileShowcasePreferences()
+	s.Require().NoError(err)
+	s.Require().True(reflect.DeepEqual(newPreferences, preferencesBack))
 }
 
 func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
