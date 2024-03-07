@@ -388,6 +388,14 @@ func (m *Messenger) GetProfileShowcaseAccountsByAddress(address string) ([]*iden
 	return m.persistence.GetProfileShowcaseAccountsByAddress(address)
 }
 
+func (m *Messenger) GetProfileShowcaseSocialLinksLimit() (int, error) {
+	return identity.MaxProfileShowcaseSocialLinksLimit, nil
+}
+
+func (m *Messenger) GetProfileShowcaseEntriesLimit() (int, error) {
+	return identity.MaxProfileShowcaseEntriesLimit, nil
+}
+
 func (m *Messenger) EncryptProfileShowcaseEntriesWithContactPubKeys(entries *protobuf.ProfileShowcaseEntries, contacts []*Contact) (*protobuf.ProfileShowcaseEntriesEncrypted, error) {
 	// Make AES key
 	AESKey := make([]byte, 32)

@@ -11,8 +11,8 @@ var ErrorExceedMaxProfileShowcaseVerifiedTokensLimit = errors.New("exeed maximum
 var ErrorExceedMaxProfileShowcaseUnverifiedTokensLimit = errors.New("exeed maximum profile showcase unverified tokens limit")
 var ErrorExceedMaxProfileShowcaseSocialLinksLimit = errors.New("exeed maximum profile showcase communities limit")
 
-const maxProfileShowcaseSocialLinksLimit = 20
-const maxProfileShowcaseOtherEntriesLimit = 100
+const MaxProfileShowcaseSocialLinksLimit = 20
+const MaxProfileShowcaseEntriesLimit = 100
 
 type ProfileShowcaseVisibility int
 
@@ -135,22 +135,22 @@ type ProfileShowcase struct {
 }
 
 func Validate(preferences *ProfileShowcasePreferences) error {
-	if len(preferences.Communities) > maxProfileShowcaseOtherEntriesLimit {
+	if len(preferences.Communities) > MaxProfileShowcaseEntriesLimit {
 		return ErrorExceedMaxProfileShowcaseCommunitiesLimit
 	}
-	if len(preferences.Accounts) > maxProfileShowcaseOtherEntriesLimit {
+	if len(preferences.Accounts) > MaxProfileShowcaseEntriesLimit {
 		return ErrorExceedMaxProfileShowcaseAccountsLimit
 	}
-	if len(preferences.Collectibles) > maxProfileShowcaseOtherEntriesLimit {
+	if len(preferences.Collectibles) > MaxProfileShowcaseEntriesLimit {
 		return ErrorExceedMaxProfileShowcaseCollectiblesLimit
 	}
-	if len(preferences.VerifiedTokens) > maxProfileShowcaseOtherEntriesLimit {
+	if len(preferences.VerifiedTokens) > MaxProfileShowcaseEntriesLimit {
 		return ErrorExceedMaxProfileShowcaseVerifiedTokensLimit
 	}
-	if len(preferences.UnverifiedTokens) > maxProfileShowcaseOtherEntriesLimit {
+	if len(preferences.UnverifiedTokens) > MaxProfileShowcaseEntriesLimit {
 		return ErrorExceedMaxProfileShowcaseUnverifiedTokensLimit
 	}
-	if len(preferences.SocialLinks) > maxProfileShowcaseSocialLinksLimit {
+	if len(preferences.SocialLinks) > MaxProfileShowcaseSocialLinksLimit {
 		return ErrorExceedMaxProfileShowcaseSocialLinksLimit
 	}
 
