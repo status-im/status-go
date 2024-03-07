@@ -88,8 +88,6 @@ var propagateErrors = []error{
 	vm.ErrInvalidCode,
 	vm.ErrNonceUintOverflow,
 
-	core.ErrInsufficientFunds,
-
 	// Used by balance history to check state
 	ethereum.NotFound,
 	bind.ErrNoCode,
@@ -161,10 +159,14 @@ func isVMError(err error) bool {
 	if strings.HasPrefix(err.Error(), "execution reverted") {
 		return true
 	}
+	if strings.Contains(err.Error(), core.ErrInsufficientFunds.Error()) {
+		return true
+	}
 	for _, vmError := range propagateErrors {
-		if err == vmError || strings.Contains(err.Error(), vmError.Error()) {
+		if err == vmError {
 			return true
 		}
+
 	}
 	return false
 }
