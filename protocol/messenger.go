@@ -834,7 +834,9 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.startSyncSettingsLoop()
 	m.startSettingsChangesLoop()
 	m.startCommunityRekeyLoop()
-	m.startCuratedCommunitiesUpdateLoop()
+	if m.config.featureFlags.CuratedCommunitiesUpdateLoopEnabled {
+		m.startCuratedCommunitiesUpdateLoop()
+	}
 	m.startMessageSegmentsCleanupLoop()
 
 	if err := m.cleanTopics(); err != nil {

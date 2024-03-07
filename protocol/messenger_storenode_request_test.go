@@ -207,6 +207,7 @@ func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *za
 
 	options := []Option{
 		WithAutoRequestHistoricMessages(false),
+		WithCuratedCommunitiesUpdateLoop(false),
 	}
 
 	if mailserverAddress != "" {

@@ -82,6 +82,7 @@ func newTestMessenger(waku types.Waku, config testMessengerConfig) (*Messenger, 
 		WithDatasync(),
 		WithToplevelDatabaseMigrations(),
 		WithBrowserDatabase(nil),
+		WithCuratedCommunitiesUpdateLoop(false),
 	}
 	options = append(options, config.extraOptions...)
 

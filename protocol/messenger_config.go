@@ -126,6 +126,7 @@ func messengerDefaultConfig() config {
 	}
 
 	c.featureFlags.AutoRequestHistoricMessages = true
+	c.featureFlags.CuratedCommunitiesUpdateLoopEnabled = true
 	return c
 }
 
@@ -413,6 +414,13 @@ func WithAccountManager(accountManager account.Manager) Option {
 func WithAutoRequestHistoricMessages(enabled bool) Option {
 	return func(c *config) error {
 		c.featureFlags.AutoRequestHistoricMessages = enabled
+		return nil
+	}
+}
+
+func WithCuratedCommunitiesUpdateLoop(enabled bool) Option {
+	return func(c *config) error {
+		c.featureFlags.CuratedCommunitiesUpdateLoopEnabled = enabled
 		return nil
 	}
 }
