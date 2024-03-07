@@ -1250,6 +1250,16 @@ func (m *Messenger) BuildContact(request *requests.BuildContact) (*Contact, erro
 		return nil, err
 	}
 
+	if contact.EnsName != "" {
+		contact.UniversalProfileUrl = fmt.Sprintf("%s/u#%s", baseShareURL, contact.EnsName)
+	} else {
+		data, shortKey, err := m.prepareEncodedUserData(contact)
+		if err != nil {
+			return nil, err
+		}
+		contact.UniversalProfileUrl = fmt.Sprintf("%s/u/%s#%s", baseShareURL, data, shortKey)
+	}
+
 	return contact, nil
 }
 

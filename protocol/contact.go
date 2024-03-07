@@ -109,6 +109,8 @@ type Contact struct {
 	// Bio - description of the contact (tell us about yourself)
 	Bio string `json:"bio"`
 
+	UniversalProfileUrl string `json:"universalProfileUrl"`
+
 	// Deprecated: use social links from ProfileShowcasePreferences
 	SocialLinks identity.SocialLinks `json:"socialLinks"`
 
