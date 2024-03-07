@@ -24,7 +24,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
-	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
@@ -311,7 +310,7 @@ func TestWakuV2Filter(t *testing.T) {
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{[]byte{1, 2, 3, 4}}),
 	}
 
-	filterID, err := w.Subscribe(filter)
+	_, err = w.Subscribe(filter)
 	require.NoError(t, err)
 
 	msgTimestamp := w.timestamp()
@@ -331,35 +330,30 @@ func TestWakuV2Filter(t *testing.T) {
 	subscriptions := w.node.FilterLightnode().Subscriptions()
 	require.Greater(t, len(subscriptions), 0)
 
-	// Ensure there are some active peers for this filter subscription
-	stats := w.getFilterStats()
-	require.Greater(t, len(stats[filterID]), 0)
-
 	messages := filter.Retrieve()
 	require.Len(t, messages, 1)
 
 	// Mock peers going down
-	isFilterSubAliveBak := w.filterManager.isFilterSubAlive
-	w.filterManager.settings.MinPeersForFilter = 0
-	w.filterManager.isFilterSubAlive = func(sub *subscription.SubscriptionDetails) error {
-		return errors.New("peer down")
-	}
+	subscriptions[0].Close()
 
-	time.Sleep(5 * time.Second)
-
-	// Ensure there are 0 active peers now
-
-	stats = w.getFilterStats()
-	require.Len(t, stats[filterID], 0)
-
-	// Reconnect
-	w.filterManager.settings.MinPeersForFilter = 2
-	w.filterManager.isFilterSubAlive = isFilterSubAliveBak
 	time.Sleep(10 * time.Second)
 
-	// Ensure there are some active peers now
-	stats = w.getFilterStats()
-	require.Greater(t, len(stats[filterID]), 0)
+	// Ensure there is at least 1 active filter subscription
+	subscriptions = w.node.FilterLightnode().Subscriptions()
+	require.Greater(t, len(subscriptions), 0)
+
+	// Ensure that messages are retrieved with a fresh sub
+	_, err = w.Send("", &pb.WakuMessage{
+		Payload:      []byte{1, 2, 3, 4, 5, 6},
+		ContentTopic: contentTopic.ContentTopic(),
+		Version:      proto.Uint32(0),
+		Timestamp:    &msgTimestamp,
+	})
+	require.NoError(t, err)
+	time.Sleep(10 * time.Second)
+
+	messages = filter.Retrieve()
+	require.Len(t, messages, 1)
 
 	require.NoError(t, w.Stop())
 }
