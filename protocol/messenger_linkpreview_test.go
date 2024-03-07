@@ -199,7 +199,7 @@ func (s *MessengerLinkPreviewsTestSuite) readAsset(filename string) []byte {
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_GetFavicon() {
-	html := []byte(
+	goodHTMLPNG := []byte(
 		`
 	<html>
 		<head>
@@ -207,8 +207,52 @@ func (s *MessengerLinkPreviewsTestSuite) Test_GetFavicon() {
 		</head>
 	</html>`)
 
-	faviconPath := GetFavicon(html)
+	goodHTMLSVG := []byte(
+		`
+	<html>
+		<head>
+			<link rel="shortcut icon" href="https://www.somehost.com/favicon.svg">
+		</head>
+	</html>`)
+
+	goodHTMLICO := []byte(
+		`
+	<html>
+		<head>
+			<link rel="shortcut icon" href="https://www.somehost.com/favicon.ico">
+		</head>
+	</html>`)
+
+	badHTMLNoRelAttr := []byte(
+		`
+	<html>
+		<head>
+			<link href="https://www.somehost.com/favicon.png">
+		</head>
+	</html>`)
+
+	GoodHTMLRelAttributeIcon := []byte(
+		`
+	<html>
+		<head>
+			<link rel="icon" href="https://www.somehost.com/favicon.png">
+		</head>
+	</html>`)
+
+	faviconPath := GetFavicon(goodHTMLPNG)
 	s.Require().Equal("https://www.somehost.com/favicon.png", faviconPath)
+
+	faviconPath = GetFavicon(goodHTMLSVG)
+	s.Require().Equal("https://www.somehost.com/favicon.svg", faviconPath)
+
+	faviconPath = GetFavicon(goodHTMLICO)
+	s.Require().Equal("https://www.somehost.com/favicon.ico", faviconPath)
+
+	faviconPath = GetFavicon(GoodHTMLRelAttributeIcon)
+	s.Require().Equal("https://www.somehost.com/favicon.png", faviconPath)
+
+	faviconPath = GetFavicon(badHTMLNoRelAttr)
+	s.Require().Equal("", faviconPath)
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube() {

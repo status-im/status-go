@@ -53,17 +53,24 @@ loop:
 			if t.Data != "link" {
 				continue
 			}
-			LinkContainsFavicon := false
-			for _, attribute := range t.Attr {
-				if attribute.Val == "icon" || attribute.Val == "shortcut icon" {
-					LinkContainsFavicon = true
-					break
+
+			isIcon := false
+			href := ""
+			for _, attr := range t.Attr {
+				k := attr.Key
+				v := attr.Val
+				if k == "rel" && (v == "icon" || v == "shortcut icon") {
+					isIcon = true
+				} else if k == "href" &&
+					(strings.Contains(v, ".ico") ||
+						strings.Contains(v, ".png") ||
+						strings.Contains(v, ".svg")) {
+					href = v
 				}
 			}
-			for _, attribute := range t.Attr {
-				if LinkContainsFavicon && (strings.Contains(attribute.Val, ".ico") || strings.Contains(attribute.Val, ".png") || strings.Contains(attribute.Val, ".svg")) {
-					return attribute.Val
-				}
+
+			if isIcon && href != "" {
+				return href
 			}
 		}
 	}
@@ -91,7 +98,7 @@ func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 	}
 
 	faviconPath := GetFavicon(bodyBytes)
-	t, err := fetchThumbnail(u.logger, u.httpClient, faviconPath)
+	t, err := fetchImage(u.logger, u.httpClient, faviconPath, false)
 	if err != nil {
 		u.logger.Info("failed to fetch favicon", zap.String("url", u.url.String()), zap.Error(err))
 	} else {
@@ -105,7 +112,7 @@ func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 	}
 
 	if ogMetadata.ThumbnailURL != "" {
-		t, err := fetchThumbnail(u.logger, u.httpClient, ogMetadata.ThumbnailURL)
+		t, err := fetchImage(u.logger, u.httpClient, ogMetadata.ThumbnailURL, true)
 		if err != nil {
 			// Given we want to fetch thumbnails on a best-effort basis, if an error
 			// happens we simply log it.
@@ -121,16 +128,14 @@ func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 	return preview, nil
 }
 
-func fetchThumbnail(logger *zap.Logger, httpClient *http.Client, url string) (common.LinkPreviewThumbnail, error) {
+func fetchImage(logger *zap.Logger, httpClient *http.Client, url string, getDimensions bool) (common.LinkPreviewThumbnail, error) {
 	var thumbnail common.LinkPreviewThumbnail
 
 	imgBytes, err := fetchBody(logger, httpClient, url, nil)
 	if err != nil {
 		return thumbnail, fmt.Errorf("could not fetch thumbnail url='%s': %w", url, err)
 	}
-
-	// If an image is an SVG, We cannot get it's dimensions
-	if !images.IsSVG(imgBytes) {
+	if getDimensions {
 		width, height, err := images.GetImageDimensions(imgBytes)
 		if err != nil {
 			return thumbnail, fmt.Errorf("could not get image dimensions url='%s': %w", url, err)
