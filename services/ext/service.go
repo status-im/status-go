@@ -189,7 +189,6 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 	// Start a loop that retrieves all messages and propagates them to status-mobile.
 	s.cancelMessenger = make(chan struct{})
-	fmt.Println("star messagesfe....", s.messenger)
 	response, err := s.messenger.Start()
 	if err != nil {
 		return nil, err

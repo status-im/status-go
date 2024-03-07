@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wakuv2ext"
@@ -82,8 +80,7 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCLI, error) {
 	wakuApi := wakuv2ext.NewPublicAPI(wakuService)
 	messenger := wakuApi.Messenger()
 
-	id := types.EncodeHex(crypto.FromECDSAPub(messenger.IdentityPublicKey()))
-	namedLogger.Info("messenger started, public key: ", id)
+	namedLogger.Info("messenger started, public key: ", messenger.IdentityPublicKeyString())
 
 	time.Sleep(WaitingInterval)
 
