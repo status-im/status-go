@@ -190,8 +190,8 @@ func (s *Service) UpdateFilterForSession(id SessionID, filter Filter, firstPageC
 		return errors.New("session not found")
 	}
 
-	prevEmpty := session.filter.IsEmpty()
-	newEmpty := filter.IsEmpty()
+	prevFilterEmpty := session.filter.IsEmpty()
+	newFilerEmpty := filter.IsEmpty()
 	s.sessionsRWMutex.RUnlock()
 
 	s.sessionsRWMutex.Lock()
@@ -200,7 +200,7 @@ func (s *Service) UpdateFilterForSession(id SessionID, filter Filter, firstPageC
 
 	session.filter = filter
 
-	if prevEmpty && !newEmpty {
+	if prevFilterEmpty && !newFilerEmpty {
 		// Session is moving from empty to non-empty filter
 		// Take a snapshot of the current model
 		session.noFilterModel = entryIdsToMap(session.model)
@@ -209,7 +209,7 @@ func (s *Service) UpdateFilterForSession(id SessionID, filter Filter, firstPageC
 
 		// In this case there is nothing to flag so we request the first page
 		s.internalFilterForSession(session, firstPageCount)
-	} else if !prevEmpty && newEmpty {
+	} else if !prevFilterEmpty && newFilerEmpty {
 		// Session is moving from non-empty to empty filter
 		// In this case we need to flag all the new entries that are not in the noFilterModel
 		s.internalFilter(
@@ -276,6 +276,13 @@ func (s *Service) ResetFilterSession(id SessionID, firstPageCount int) error {
 				entries[i].isNew = isNew
 			}
 			session.new = nil
+
+			if session.noFilterModel != nil {
+				// Add reported new entries to mark them as seen
+				for _, a := range newMap {
+					session.noFilterModel[a.key()] = a
+				}
+			}
 
 			// Mirror client identities for checking updates
 			session.model = mirrorIdentities(entries)
