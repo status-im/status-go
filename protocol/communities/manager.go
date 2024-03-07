@@ -1469,6 +1469,15 @@ func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *prot
 		chatID = strings.TrimPrefix(chatID, communityID.String())
 	}
 
+	oldChat, err := community.GetChat(chatID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// We can't edit permissions and members with an Edit, so we set to what we had, otherwise they will be lost
+	chat.Permissions = oldChat.Permissions
+	chat.Members = oldChat.Members
+
 	changes, err := community.EditChat(chatID, chat)
 	if err != nil {
 		return nil, nil, err
