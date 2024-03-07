@@ -3,6 +3,8 @@ package protocol
 import (
 	"context"
 	"fmt"
+	"github.com/status-im/status-go/protocol/tt"
+	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"sync"
 	"testing"
 	"time"
@@ -17,8 +19,6 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/tt"
-
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
@@ -167,6 +167,11 @@ func (s *MessengerStoreNodeRequestSuite) createStore() {
 	s.logger.Info("store node ready", zap.String("address", s.storeNodeAddress))
 }
 
+func (s *MessengerStoreNodeRequestSuite) tearDownOwner() {
+	_ = gethbridge.GetGethWakuV2From(s.ownerWaku).Stop()
+	TearDownMessenger(&s.Suite, s.owner)
+}
+
 func (s *MessengerStoreNodeRequestSuite) createOwner() {
 
 	cfg := testWakuV2Config{
@@ -202,6 +207,11 @@ func (s *MessengerStoreNodeRequestSuite) createBob() {
 
 	messengerLogger := s.logger.Named("bob-messenger")
 	s.bob = s.newMessenger(s.bobWaku, messengerLogger, s.storeNodeAddress)
+}
+
+func (s *MessengerStoreNodeRequestSuite) tearDownBob() {
+	_ = gethbridge.GetGethWakuV2From(s.bobWaku).Stop()
+	TearDownMessenger(&s.Suite, s.bob)
 }
 
 func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *zap.Logger, mailserverAddress string) *Messenger {
@@ -354,6 +364,26 @@ func (s *MessengerStoreNodeRequestSuite) wakuListenAddress(waku *waku2.Waku) str
 	addresses := waku.ListenAddresses()
 	s.Require().LessOrEqual(1, len(addresses))
 	return addresses[0]
+}
+
+func (s *MessengerStoreNodeRequestSuite) ensureStoreNodeEnvelopes(contentTopic *wakuV2common.TopicType, minimumCount int) {
+	// Give some time for store node to put envelope into database. Otherwise, the test is flaky.
+	// Although we subscribed to EnvelopeEvents and waited, the actual saving to database happens asynchronously.
+	// It would be nice to implement a subscription for database storing event, but it doesn't worth it right now.
+	<-time.After(100 * time.Millisecond)
+
+	// Directly ensure profile is available on store node
+	queryOptions := []store.HistoryRequestOption{
+		store.WithLocalQuery(),
+	}
+	query := store.Query{
+		PubsubTopic:   "",
+		ContentTopics: []string{contentTopic.ContentTopic()},
+	}
+	result, err := s.wakuStoreNode.StoreNode().Query(context.Background(), query, queryOptions...)
+	s.Require().NoError(err)
+	s.Require().GreaterOrEqual(len(result.Messages), minimumCount)
+	s.logger.Debug("store node query result", zap.Int("messagesCount", len(result.Messages)))
 }
 
 func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityInfo() {
@@ -571,6 +601,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestWithoutWaitingResponse() {
 
 func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfo() {
 	s.createOwner()
+	defer s.tearDownOwner()
 
 	// Set keypair (to be able to set displayName)
 	ownerProfileKp := accounts.GetProfileKeypairForTest(true, false, false)
@@ -589,8 +620,11 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfo() {
 	s.Require().NoError(err)
 
 	s.waitForEnvelopes(storeNodeSubscription, 1)
+	s.ensureStoreNodeEnvelopes(&contentTopic, 1)
 
+	// Fetch profile
 	s.createBob()
+	defer s.tearDownBob()
 	s.fetchProfile(s.bob, s.owner.selfContact.ID, s.owner.selfContact)
 }
 
