@@ -822,7 +822,6 @@ github.com/go-logfmt/logfmt v0.3.0/go.mod h1:Qt1PoO58o5twSAckw1HlFXLmHsOX5/0LbT9
 github.com/go-logfmt/logfmt v0.4.0/go.mod h1:3RMwSq7FuexP4Kalkev3ejPJsZTpXXBr9+V4qmtdjCk=
 github.com/go-logfmt/logfmt v0.5.0/go.mod h1:wCYkCAKZfumFQihp8CzCvQ3paCTfi41vtzG1KdI/P7A=
 github.com/go-logfmt/logfmt v0.5.1 h1:otpy5pqBCBZ1ng9RQ0dPu4PN7ba75Y/aA+UpowDyNVA=
-github.com/go-logfmt/logfmt v0.5.1/go.mod h1:WYhtIu8zTZfxdn5+rREduYbwxfcBr/Vr6KEVveWlfTs=
 github.com/go-logr/logr v0.1.0/go.mod h1:ixOQHD9gLJUVQQ2ZOR7zLEifBX6tGkNJF4QyIY7sIas=
 github.com/go-logr/logr v0.2.0/go.mod h1:z6/tIYblkpsD+a4lm/fGIIU9mZ+XfAiaFtq7xTgseGU=
 github.com/go-logr/logr v0.4.0/go.mod h1:z6/tIYblkpsD+a4lm/fGIIU9mZ+XfAiaFtq7xTgseGU=
@@ -2102,8 +2101,6 @@ github.com/waku-org/go-discover v0.0.0-20240129014929-85f2c00b96a3 h1:Kk0KYXZE/u
 github.com/waku-org/go-discover v0.0.0-20240129014929-85f2c00b96a3/go.mod h1:eBHgM6T4EG0RZzxpxKy+rGz/6Dw2Nd8DWxS0lm9ESDw=
 github.com/waku-org/go-libp2p-rendezvous v0.0.0-20230628220917-7b4e5ae4c0e7 h1:0e1h+p84yBp0IN7AqgbZlV7lgFBjm214lgSOE7CeJmE=
 github.com/waku-org/go-libp2p-rendezvous v0.0.0-20230628220917-7b4e5ae4c0e7/go.mod h1:pFvOZ9YTFsW0o5zJW7a0B5tr1owAijRWJctXJ2toL04=
-github.com/waku-org/go-waku v0.8.1-0.20240220211751-9bb2c8e39680 h1:WGPMcGDmW7q9ZPoD5V53T1ak36/qo1rYLE9bv4g5BVY=
-github.com/waku-org/go-waku v0.8.1-0.20240220211751-9bb2c8e39680/go.mod h1:RjTvkTrIwpoT1cM9HeQqwa2Q7t7WOkb3hpuB/zuZ6SM=
 github.com/waku-org/go-waku v0.8.1-0.20240301034357-3aa391058a0b h1:/as1NPzReDHPWz00dk5IWWwjL91As7gDcGieKUwq3zo=
 github.com/waku-org/go-waku v0.8.1-0.20240301034357-3aa391058a0b/go.mod h1:RjTvkTrIwpoT1cM9HeQqwa2Q7t7WOkb3hpuB/zuZ6SM=
 github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59 h1:jisj+OCI6QydLtFq3Pyhu49wl9ytPN7oAHjMfepHDrA=
