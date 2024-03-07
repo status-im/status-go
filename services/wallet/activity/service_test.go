@@ -580,3 +580,73 @@ func TestService_IncrementalUpdateFetchWindowNoReset(t *testing.T) {
 	}, common.NewAndSet(extraExpect{common.NewAndSet(2), nil}))
 	require.Equal(t, 1, eventActivityDoneCount)
 }
+
+// Simulate and validate a multi-step user flow that was also a regression in the original implementation
+func TestService_FilteredIncrementalUpdateResetAndClear(t *testing.T) {
+	state := setupTestService(t)
+	defer state.close()
+
+	transactionCount := 5
+	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
+	defer cleanup()
+
+	// Generate new transaction for step 5
+	newOffset := transactionCount + 2
+	newTxs, newFromTrs, newToTrs := transfer.GenerateTestTransfers(t, state.service.db, newOffset, 1)
+	allAddresses = append(append(allAddresses, newFromTrs...), newToTrs...)
+
+	// 1. User visualizes transactions for the first time
+	sessionID := state.service.StartFilterSession(allAddresses, true, allNetworksFilter(), Filter{}, 4)
+	require.Greater(t, sessionID, SessionID(0))
+	defer state.service.StopFilterSession(sessionID)
+
+	validateFilteringDone(t, ch, 4, nil, nil)
+
+	// 2. User applies a filter for pending transactions
+	err := state.service.UpdateFilterForSession(sessionID, Filter{Statuses: []Status{PendingAS}}, 4)
+	require.NoError(t, err)
+
+	filterResponseCount := validateFilteringDone(t, ch, 0, nil, nil)
+
+	// 3. A pending transaction is added
+	exp := pendings[0]
+	err = state.pendingTracker.StoreAndTrackPendingTx(&exp)
+	require.NoError(t, err)
+
+	vFn := getValidateSessionUpdateHasNewOnTopFn(t)
+	pendingTransactionUpdate, sessionUpdatesCount := validateSessionUpdateEvent(t, ch, &filterResponseCount, 1, vFn)
+
+	// 4. User resets the view and the new pending transaction has the new flag
+	err = state.service.ResetFilterSession(sessionID, 2)
+	require.NoError(t, err)
+
+	// Validate the reset data
+	eventActivityDoneCount := validateFilteringDone(t, ch, 1, func(payload FilterResponse) {
+		require.True(t, payload.Activities[0].isNew)
+		require.Equal(t, int64(transactionCount+1), payload.Activities[0].timestamp)
+	}, nil)
+
+	require.Equal(t, 1, pendingTransactionUpdate)
+	require.Equal(t, 1, filterResponseCount)
+	require.Equal(t, 1, sessionUpdatesCount)
+	require.Equal(t, 1, eventActivityDoneCount)
+
+	// 5. A new transaction is downloaded
+	transfer.InsertTestTransfer(t, state.service.db, newTxs[0].To, &newTxs[0])
+
+	// 6. User clears the filter and only the new transaction should have the new flag
+	err = state.service.UpdateFilterForSession(sessionID, Filter{}, 4)
+	require.NoError(t, err)
+
+	eventActivityDoneCount = validateFilteringDone(t, ch, 4, func(payload FilterResponse) {
+		require.True(t, payload.Activities[0].isNew)
+		require.Equal(t, int64(newOffset), payload.Activities[0].timestamp)
+		require.False(t, payload.Activities[1].isNew)
+		require.Equal(t, int64(newOffset-1), payload.Activities[1].timestamp)
+		require.False(t, payload.Activities[2].isNew)
+		require.Equal(t, int64(newOffset-2), payload.Activities[2].timestamp)
+		require.False(t, payload.Activities[3].isNew)
+		require.Equal(t, int64(newOffset-3), payload.Activities[3].timestamp)
+	}, nil)
+	require.Equal(t, 1, eventActivityDoneCount)
+}
