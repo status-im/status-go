@@ -160,9 +160,18 @@ type Settings struct {
 	NotificationsEnabled bool             `json:"notifications-enabled?,omitempty"`
 	PhotoPath            string           `json:"photo-path"`
 	PinnedMailserver     *json.RawMessage `json:"pinned-mailservers,omitempty"`
-	PreferredName        *string          `json:"preferred-name,omitempty"`
-	PreviewPrivacy       bool             `json:"preview-privacy?"`
-	PublicKey            string           `json:"public-key"`
+	// PreferredName represents the user's preferred Ethereum Name Service (ENS) name.
+	// If a user has multiple ENS names, they can select one as the PreferredName.
+	// When PreferredName is set, it takes precedence over the DisplayName for displaying the user's name.
+	// If PreferredName is empty or doesn't match any of the user's ENS names, the DisplayName is used instead.
+	//
+	// There is a race condition between updating DisplayName and PreferredName, where the account.Name field
+	// could be incorrectly updated based on the order in which the backup messages (BackedUpProfile/BackedUpSettings) arrive.
+	// To handle this race condition, the code checks the LastSynced clock value for both DisplayName and PreferredName,
+	// and updates account.Name with the value that has the latest clock
+	PreferredName  *string `json:"preferred-name,omitempty"`
+	PreviewPrivacy bool    `json:"preview-privacy?"`
+	PublicKey      string  `json:"public-key"`
 	// PushNotificationsServerEnabled indicates whether we should be running a push notification server
 	PushNotificationsServerEnabled bool `json:"push-notifications-server-enabled?,omitempty"`
 	// PushNotificationsFromContactsOnly indicates whether we should only receive push notifications from contacts
