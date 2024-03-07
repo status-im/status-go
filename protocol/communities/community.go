@@ -621,6 +621,15 @@ func (o *Community) GetMember(pk *ecdsa.PublicKey) *protobuf.CommunityMember {
 	return o.getMember(pk)
 }
 
+func (o *Community) GetChat(chatID string) (*protobuf.CommunityChat, error) {
+	chat, ok := o.config.CommunityDescription.Chats[chatID]
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+
+	return chat, nil
+}
+
 func (o *Community) getChatMember(pk *ecdsa.PublicKey, chatID string) *protobuf.CommunityMember {
 	if !o.hasMember(pk) {
 		return nil
