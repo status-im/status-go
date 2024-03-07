@@ -135,7 +135,7 @@ func (s SendType) isAvailableFor(network *params.Network) bool {
 		return true
 	}
 
-	if network.ChainID == 1 || network.ChainID == 5 {
+	if network.ChainID == 1 || network.ChainID == 5 || network.ChainID == 11155111 {
 		return true
 	}
 
@@ -574,7 +574,6 @@ func (r *Router) suggestedRoutes(
 	if err != nil {
 		return nil, err
 	}
-
 	var (
 		group      = async.NewAtomicGroup(ctx)
 		mu         sync.Mutex
@@ -660,7 +659,6 @@ func (r *Router) suggestedRoutes(
 					if len(preferedChainIDs) > 0 && !containsNetworkChainID(dest, preferedChainIDs) {
 						continue
 					}
-
 					if containsNetworkChainID(dest, disabledToChaindIDs) {
 						continue
 					}
