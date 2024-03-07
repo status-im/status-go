@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
@@ -40,74 +41,13 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCLI, error) {
 	namedLogger := logger.Named(name)
 	namedLogger.Info("starting messager")
 
-	// userLogger := setupLogger(name)
+	_ = setupLogger(name)
 
-	// privateKey, err := crypto.GenerateKey()
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// config := &wakuv2.Config{}
-	// config.EnableDiscV5 = true
-	// config.DiscV5BootstrapNodes = api.DefaultWakuNodes[api.DefaultFleet]
-	// config.DiscoveryLimit = 20
-	// config.LightClient = cCtx.Bool(LightFlag)
-	// node, err := wakuv2.New("", "", config, userLogger, nil, nil, nil, nil)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// err = node.Start()
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// madb, err := multiaccounts.InitializeDB(dbsetup.InMemoryPath)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// acc := generator.NewAccount(privateKey, nil)
-	// iai := acc.ToIdentifiedAccountInfo("")
-	// opitons := []protocol.Option{
-	// 	protocol.WithCustomLogger(userLogger),
-	// 	protocol.WithDatabase(appDb),
-	// 	protocol.WithWalletDatabase(walletDb),
-	// 	protocol.WithMultiAccounts(madb),
-	// 	protocol.WithAccount(iai.ToMultiAccount()),
-	// 	protocol.WithDatasync(),
-	// 	protocol.WithToplevelDatabaseMigrations(),
-	// 	protocol.WithBrowserDatabase(nil),
-	// }
-	// messenger, err := protocol.NewMessenger(
-	// 	fmt.Sprintf("%s-node", strings.ToLower(name)),
-	// 	privateKey,
-	// 	gethbridge.NewNodeBridge(nil, nil, node),
-	// 	uuid.New().String(),
-	// 	nil,
-	// 	opitons...,
-	// )
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	nodeConfig, err := params.NewNodeConfigWithDefaultsAndFiles(
-		fmt.Sprintf("./test-%s", name),
-		params.GoerliNetworkID,
-		[]params.Option{},
-		[]string{},
-	)
+	path := fmt.Sprintf("./test-%s", strings.ToLower(name))
+	err := os.MkdirAll(path, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
-	nodeConfig.Name = fmt.Sprintf("%s-status-cli", name)
 
 	// "APIModules": "waku,wakuext,wakuv2,permissions,eth",
 	// "HTTPEnabled": true,
@@ -119,21 +59,18 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCLI, error) {
 	// "IPCEnabled": true,
 	// "ListenAddr": ":30313"
 
-	nodeConfig.APIModules = "waku,wakuext,wakuv2,permissions,eth"
-	nodeConfig.HTTPEnabled = true
-	nodeConfig.HTTPHost = "localhost"
-	nodeConfig.HTTPPort = 8545
-	nodeConfig.WakuV2Config.Enabled = true
-
-	namedLogger.Info("config", nodeConfig)
-
 	backend := api.NewGethStatusBackend()
-	err = backend.AccountManager().InitKeystore(nodeConfig.KeyStoreDir)
-	if err != nil {
-		return nil, err
-	}
 
-	err = backend.StartNode(nodeConfig)
+	createAccountRequest := &requests.CreateAccount{
+		DisplayName:           "some-display-name",
+		CustomizationColor:    "#ffffff",
+		Emoji:                 "some",
+		Password:              "some-password",
+		BackupDisabledDataDir: fmt.Sprintf("./test-%s", strings.ToLower(name)),
+		NetworkID:             1,
+		LogFilePath:           "log",
+	}
+	_, err = backend.CreateAccountAndLogin(createAccountRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -143,27 +80,7 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCLI, error) {
 		return nil, errors.New("waku service is not available")
 	}
 	wakuApi := wakuv2ext.NewPublicAPI(wakuService)
-
-	// _, err = wakuApi.StartMessenger()
-	// if err != nil {
-	// 	return nil, err
-	// }
 	messenger := wakuApi.Messenger()
-
-	// err = backend.StartNode(nodeConfig)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// err = messenger.Init()
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// _, err = messenger.Start()
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	id := types.EncodeHex(crypto.FromECDSAPub(messenger.IdentityPublicKey()))
 	namedLogger.Info("messenger started, public key: ", id)
@@ -185,9 +102,4 @@ func stopMessenger(cli *StatusCLI) {
 	if err != nil {
 		logger.Error(err)
 	}
-
-	// err = cli.waku.Stop()
-	// if err != nil {
-	// 	logger.Error(err)
-	// }
 }
