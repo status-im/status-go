@@ -91,11 +91,12 @@ type TokenMarketValues struct {
 }
 
 type ChainBalance struct {
-	RawBalance string         `json:"rawBalance"`
-	Balance    *big.Float     `json:"balance"`
-	Address    common.Address `json:"address"`
-	ChainID    uint64         `json:"chainId"`
-	HasError   bool           `json:"hasError"`
+	RawBalance     string         `json:"rawBalance"`
+	Balance        *big.Float     `json:"balance"`
+	Balance1DayAgo string         `json:"balance1DayAgo"`
+	Address        common.Address `json:"address"`
+	ChainID        uint64         `json:"chainId"`
+	HasError       bool           `json:"hasError"`
 }
 
 type Token struct {
@@ -386,6 +387,7 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 
 	result := make(map[common.Address][]Token)
 	communities := make(map[string]bool)
+	dayAgoTimestamp := time.Now().Add(-24 * time.Hour).Unix()
 
 	for _, address := range addresses {
 		for _, tokenList := range [][]*token.Token{verifiedTokens, unverifiedTokens} {
@@ -415,12 +417,21 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 					if !isVisible {
 						isVisible = balance.Cmp(big.NewFloat(0.0)) > 0 || r.isCachedToken(cachedTokens, address, token.Symbol, token.ChainID)
 					}
+					balance1DayAgo, err := r.tokenManager.GetTokenHistoricalBalance(address, token.ChainID, token.Symbol, dayAgoTimestamp)
+					if err != nil {
+						return nil, err
+					}
+					balance1DayAgoStr := "0"
+					if balance1DayAgo != nil {
+						balance1DayAgoStr = balance1DayAgo.String()
+					}
 					balancesPerChain[token.ChainID] = ChainBalance{
-						RawBalance: hexBalance.ToInt().String(),
-						Balance:    balance,
-						Address:    token.Address,
-						ChainID:    token.ChainID,
-						HasError:   hasError,
+						RawBalance:     hexBalance.ToInt().String(),
+						Balance:        balance,
+						Balance1DayAgo: balance1DayAgoStr,
+						Address:        token.Address,
+						ChainID:        token.ChainID,
+						HasError:       hasError,
 					}
 				}
 

@@ -30,6 +30,7 @@ import (
 	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -872,4 +873,15 @@ func (tm *Manager) fillCommunityData(token *Token) error {
 		token.CommunityData.Image = communityInfo.CommunityImage
 	}
 	return nil
+}
+
+func (tm *Manager) GetTokenHistoricalBalance(account common.Address, chainID uint64, symbol string, timestamp int64) (*big.Int, error) {
+	var balance big.Int
+	err := tm.db.QueryRow("SELECT balance FROM balance_history WHERE currency = ? AND chain_id = ? AND address = ? AND timestamp < ? order by timestamp DESC LIMIT 1", symbol, chainID, account, timestamp).Scan((*bigint.SQLBigIntBytes)(&balance))
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return &balance, nil
 }
