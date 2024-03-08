@@ -15,8 +15,8 @@ type MakeMediaServerURLType func(msgID string, previewURL string, imageID MediaS
 type MakeMediaServerURLMessageWrapperType func(previewURL string, imageID MediaServerImageID) string
 
 type LinkPreviewThumbnail struct {
-	Width  int `json:"width"`
-	Height int `json:"height"`
+	Width  int `json:"width,omitempty"`
+	Height int `json:"height,omitempty"`
 	// Non-empty when the thumbnail is available via the media server, i.e. after
 	// the chat message is sent.
 	URL string `json:"url,omitempty"`
