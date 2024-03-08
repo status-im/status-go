@@ -126,10 +126,10 @@ func TestIsSvg(t *testing.T) {
 }
 
 func TestIsIco(t *testing.T) {
-	GoodICO, err := _assetsTestsWikipediaIcoBytes()
+	GoodICO, err := Asset("_assets/tests/wikipedia.ico")
 	require.NoError(t, err)
 
-	GoodPNG, err := _assetsTestsQrDefaultqrPngBytes()
+	GoodPNG, err := Asset("_assets/tests/qr/defaultQR.png")
 	require.NoError(t, err)
 
 	require.Equal(t, IsIco(GoodICO), true)
