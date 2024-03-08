@@ -1706,6 +1706,16 @@ func (api *PublicAPI) GetProfileShowcaseAccountsByAddress(address string) ([]*id
 	return api.service.messenger.GetProfileShowcaseAccountsByAddress(address)
 }
 
+// Get profile showcase max social link entries count
+func (api *PublicAPI) GetProfileShowcaseSocialLinksLimit() (int, error) {
+	return api.service.messenger.GetProfileShowcaseSocialLinksLimit()
+}
+
+// Get profile showcase max entries count (excluding social links)
+func (api *PublicAPI) GetProfileShowcaseEntriesLimit() (int, error) {
+	return api.service.messenger.GetProfileShowcaseEntriesLimit()
+}
+
 // Returns response with AC notification when owner token is received
 func (api *PublicAPI) RegisterOwnerTokenReceivedNotification(communityID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeOwnerTokenReceived, false, "")

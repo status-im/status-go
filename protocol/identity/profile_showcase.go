@@ -11,8 +11,8 @@ var ErrorExceedMaxProfileShowcaseVerifiedTokensLimit = errors.New("exeed maximum
 var ErrorExceedMaxProfileShowcaseUnverifiedTokensLimit = errors.New("exeed maximum profile showcase unverified tokens limit")
 var ErrorExceedMaxProfileShowcaseSocialLinksLimit = errors.New("exeed maximum profile showcase communities limit")
 
-const maxProfileShowcaseSocialLinksLimit = 20
-const maxProfileShowcaseOtherEntriesLimit = 100
+const MaxProfileShowcaseSocialLinksLimit = 20
+const MaxProfileShowcaseEntriesLimit = 100
 
 type ProfileShowcaseVisibility int
 
@@ -41,9 +41,6 @@ type ProfileShowcaseCommunityPreference struct {
 
 type ProfileShowcaseAccountPreference struct {
 	Address            string                    `json:"address"`
-	Name               string                    `json:"name"`
-	ColorID            string                    `json:"colorId"`
-	Emoji              string                    `json:"emoji"`
 	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
 	Order              int                       `json:"order"`
 }
@@ -52,8 +49,6 @@ type ProfileShowcaseCollectiblePreference struct {
 	ContractAddress    string                    `json:"contractAddress"`
 	ChainID            uint64                    `json:"chainId"`
 	TokenID            string                    `json:"tokenId"`
-	CommunityID        string                    `json:"communityId"`
-	AccountAddress     string                    `json:"accountAddress"`
 	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
 	Order              int                       `json:"order"`
 }
@@ -67,7 +62,6 @@ type ProfileShowcaseVerifiedTokenPreference struct {
 type ProfileShowcaseUnverifiedTokenPreference struct {
 	ContractAddress    string                    `json:"contractAddress"`
 	ChainID            uint64                    `json:"chainId"`
-	CommunityID        string                    `json:"communityId"`
 	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
 	Order              int                       `json:"order"`
 }
@@ -110,8 +104,6 @@ type ProfileShowcaseCollectible struct {
 	ContractAddress string `json:"contractAddress"`
 	ChainID         uint64 `json:"chainId"`
 	TokenID         string `json:"tokenId"`
-	CommunityID     string `json:"communityId"`
-	AccountAddress  string `json:"accountAddress"`
 	Order           int    `json:"order"`
 }
 
@@ -123,7 +115,6 @@ type ProfileShowcaseVerifiedToken struct {
 type ProfileShowcaseUnverifiedToken struct {
 	ContractAddress string `json:"contractAddress"`
 	ChainID         uint64 `json:"chainId"`
-	CommunityID     string `json:"communityId"`
 	Order           int    `json:"order"`
 }
 
@@ -144,22 +135,22 @@ type ProfileShowcase struct {
 }
 
 func Validate(preferences *ProfileShowcasePreferences) error {
-	if len(preferences.Communities) > maxProfileShowcaseOtherEntriesLimit {
+	if len(preferences.Communities) > MaxProfileShowcaseEntriesLimit {
 		return ErrorExceedMaxProfileShowcaseCommunitiesLimit
 	}
-	if len(preferences.Accounts) > maxProfileShowcaseOtherEntriesLimit {
+	if len(preferences.Accounts) > MaxProfileShowcaseEntriesLimit {
 		return ErrorExceedMaxProfileShowcaseAccountsLimit
 	}
-	if len(preferences.Collectibles) > maxProfileShowcaseOtherEntriesLimit {
+	if len(preferences.Collectibles) > MaxProfileShowcaseEntriesLimit {
 		return ErrorExceedMaxProfileShowcaseCollectiblesLimit
 	}
-	if len(preferences.VerifiedTokens) > maxProfileShowcaseOtherEntriesLimit {
+	if len(preferences.VerifiedTokens) > MaxProfileShowcaseEntriesLimit {
 		return ErrorExceedMaxProfileShowcaseVerifiedTokensLimit
 	}
-	if len(preferences.UnverifiedTokens) > maxProfileShowcaseOtherEntriesLimit {
+	if len(preferences.UnverifiedTokens) > MaxProfileShowcaseEntriesLimit {
 		return ErrorExceedMaxProfileShowcaseUnverifiedTokensLimit
 	}
-	if len(preferences.SocialLinks) > maxProfileShowcaseSocialLinksLimit {
+	if len(preferences.SocialLinks) > MaxProfileShowcaseSocialLinksLimit {
 		return ErrorExceedMaxProfileShowcaseSocialLinksLimit
 	}
 

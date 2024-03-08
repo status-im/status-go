@@ -15,23 +15,29 @@ const selectProfileShowcasePreferencesQuery = "SELECT clock FROM profile_showcas
 const upsertProfileShowcaseCommunityPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_communities_preferences(community_id, visibility, sort_order) VALUES (?, ?, ?)" // #nosec G101
 const selectProfileShowcaseCommunityPreferenceQuery = "SELECT community_id, visibility, sort_order FROM profile_showcase_communities_preferences"                              // #nosec G101
 const deleteProfileShowcaseCommunityPreferenceQuery = "DELETE FROM profile_showcase_communities_preferences WHERE community_id = ?"                                            // #nosec G101
+const clearProfileShowcaseCommunitiyPreferencesQuery = "DELETE FROM profile_showcase_communities_preferences"                                                                  // #nosec G101
 
-const upsertProfileShowcaseAccountPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_accounts_preferences(address, name, color_id, emoji, visibility, sort_order) VALUES (?, ?, ?, ?, ?, ?)" // #nosec G101
-const selectProfileShowcaseAccountPreferenceQuery = "SELECT address, name, color_id, emoji, visibility, sort_order FROM profile_showcase_accounts_preferences"                                       // #nosec G101
-const selectSpecifiedShowcaseAccountPreferenceQuery = "SELECT address, name, color_id, emoji, visibility, sort_order FROM profile_showcase_accounts_preferences WHERE address = ?"                   // #nosec G101
-const deleteProfileShowcaseAccountPreferenceQuery = "DELETE FROM profile_showcase_accounts_preferences WHERE address = ?"                                                                            // #nosec G101
+const upsertProfileShowcaseAccountPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_accounts_preferences(address, visibility, sort_order) VALUES (?, ?, ?)" // #nosec G101
+const selectProfileShowcaseAccountPreferenceQuery = "SELECT address, visibility, sort_order FROM profile_showcase_accounts_preferences"                              // #nosec G101
+const selectSpecifiedShowcaseAccountPreferenceQuery = "SELECT address, visibility, sort_order FROM profile_showcase_accounts_preferences WHERE address = ?"          // #nosec G101
+const deleteProfileShowcaseAccountPreferenceQuery = "DELETE FROM profile_showcase_accounts_preferences WHERE address = ?"                                            // #nosec G101
+const clearProfileShowcaseAccountPreferencesQuery = "DELETE FROM profile_showcase_accounts_preferences"                                                              // #nosec G101
 
-const upsertProfileShowcaseCollectiblePreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_preferences(contract_address, chain_id, token_id, community_id, account_address, visibility, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)" // #nosec G101
-const selectProfileShowcaseCollectiblePreferenceQuery = "SELECT contract_address, chain_id, token_id, community_id, account_address, visibility, sort_order FROM profile_showcase_collectibles_preferences"                                          // #nosec G101
+const upsertProfileShowcaseCollectiblePreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_preferences(contract_address, chain_id, token_id, visibility, sort_order) VALUES (?, ?, ?, ?, ?)" // #nosec G101
+const selectProfileShowcaseCollectiblePreferenceQuery = "SELECT contract_address, chain_id, token_id, visibility, sort_order FROM profile_showcase_collectibles_preferences"                                    // #nosec G101
+const clearProfileShowcaseCollectiblePreferencesQuery = "DELETE FROM profile_showcase_collectibles_preferences"                                                                                                 // #nosec G101
 
 const upsertProfileShowcaseVerifiedTokenPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_verified_tokens_preferences(symbol, visibility, sort_order) VALUES (?, ?, ?)" // #nosec G101
 const selectProfileShowcaseVerifiedTokenPreferenceQuery = "SELECT symbol, visibility, sort_order FROM profile_showcase_verified_tokens_preferences"                              // #nosec G101
+const clearProfileShowcaseVerifiedTokenPreferencesQuery = "DELETE FROM profile_showcase_verified_tokens_preferences"                                                             // #nosec G101
 
-const upsertProfileShowcaseUnverifiedTokenPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_unverified_tokens_preferences(contract_address, chain_id, community_id, visibility, sort_order) VALUES (?, ?, ?, ?, ?)" // #nosec G101
-const selectProfileShowcaseUnverifiedTokenPreferenceQuery = "SELECT contract_address, chain_id, community_id, visibility, sort_order FROM profile_showcase_unverified_tokens_preferences"                                    // #nosec G101
+const upsertProfileShowcaseUnverifiedTokenPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_unverified_tokens_preferences(contract_address, chain_id, visibility, sort_order) VALUES (?, ?, ?, ?)" // #nosec G101
+const selectProfileShowcaseUnverifiedTokenPreferenceQuery = "SELECT contract_address, chain_id, visibility, sort_order FROM profile_showcase_unverified_tokens_preferences"                                 // #nosec G101
+const clearProfileShowcaseUnverifiedTokenPreferencesQuery = "DELETE FROM profile_showcase_unverified_tokens_preferences"                                                                                    // #nosec G101
 
 const upsertProfileShowcaseSocialLinkPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_social_links_preferences(url, text, visibility, sort_order) VALUES (?, ?, ?, ?)" // #nosec G101
 const selectProfileShowcaseSocialLinkPreferenceQuery = "SELECT url, text, visibility, sort_order FROM profile_showcase_social_links_preferences"                                 // #nosec G101
+const clearProfileShowcaseSocialLinkPreferencesQuery = "DELETE FROM profile_showcase_social_links_preferences"                                                                   // #nosec G101
 
 // Profile showcase for a contact
 
@@ -43,17 +49,17 @@ const upsertContactProfileShowcaseAccountQuery = "INSERT OR REPLACE INTO profile
 const selectContactProfileShowcaseAccountQuery = "SELECT * FROM profile_showcase_accounts_contacts WHERE contact_id = ?"                                                                       // #nosec G101
 const removeContactProfileShowcaseAccountQuery = "DELETE FROM profile_showcase_accounts_contacts WHERE contact_id = ?"                                                                         // #nosec G101
 
-const upsertContactProfileShowcaseCollectibleQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_contacts(contact_id, contract_address, chain_id, token_id, community_id, account_address, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)" // #nosec G101
-const selectContactProfileShowcaseCollectibleQuery = "SELECT contract_address, chain_id, token_id, community_id, account_address, sort_order FROM profile_showcase_collectibles_contacts WHERE contact_id = ?"                                 // #nosec G101
-const removeContactProfileShowcaseCollectibleQuery = "DELETE FROM profile_showcase_collectibles_contacts WHERE contact_id = ?"                                                                                                                 // #nosec G101
+const upsertContactProfileShowcaseCollectibleQuery = "INSERT OR REPLACE INTO profile_showcase_collectibles_contacts(contact_id, contract_address, chain_id, token_id, sort_order) VALUES (?, ?, ?, ?, ?)" // #nosec G101
+const selectContactProfileShowcaseCollectibleQuery = "SELECT contract_address, chain_id, token_id, sort_order FROM profile_showcase_collectibles_contacts WHERE contact_id = ?"                           // #nosec G101
+const removeContactProfileShowcaseCollectibleQuery = "DELETE FROM profile_showcase_collectibles_contacts WHERE contact_id = ?"                                                                            // #nosec G101
 
 const upsertContactProfileShowcaseVerifiedTokenQuery = "INSERT OR REPLACE INTO profile_showcase_verified_tokens_contacts(contact_id, symbol, sort_order) VALUES (?, ?, ?)" // #nosec G101
 const selectContactProfileShowcaseVerifiedTokenQuery = "SELECT symbol, sort_order FROM profile_showcase_verified_tokens_contacts WHERE contact_id = ?"                     // #nosec G101
 const removeContactProfileShowcaseVerifiedTokenQuery = "DELETE FROM profile_showcase_verified_tokens_contacts WHERE contact_id = ?"                                        // #nosec G101
 
-const upsertContactProfileShowcaseUnverifiedTokenQuery = "INSERT OR REPLACE INTO profile_showcase_unverified_tokens_contacts(contact_id, contract_address, chain_id, community_id, sort_order) VALUES (?, ?, ?, ?, ?)" // #nosec G101
-const selectContactProfileShowcaseUnverifiedTokenQuery = "SELECT contract_address, chain_id, community_id, sort_order FROM profile_showcase_unverified_tokens_contacts WHERE contact_id = ?"                           // #nosec G101
-const removeContactProfileShowcaseUnverifiedTokenQuery = "DELETE FROM profile_showcase_unverified_tokens_contacts WHERE contact_id = ?"                                                                                // #nosec G101
+const upsertContactProfileShowcaseUnverifiedTokenQuery = "INSERT OR REPLACE INTO profile_showcase_unverified_tokens_contacts(contact_id, contract_address, chain_id, sort_order) VALUES (?, ?, ?, ?)" // #nosec G101
+const selectContactProfileShowcaseUnverifiedTokenQuery = "SELECT contract_address, chain_id, sort_order FROM profile_showcase_unverified_tokens_contacts WHERE contact_id = ?"                        // #nosec G101
+const removeContactProfileShowcaseUnverifiedTokenQuery = "DELETE FROM profile_showcase_unverified_tokens_contacts WHERE contact_id = ?"                                                               // #nosec G101
 
 const upsertContactProfileShowcaseSocialLinkQuery = "INSERT OR REPLACE INTO profile_showcase_social_links_contacts(contact_id, url, text, sort_order) VALUES (?, ?, ?, ?)" // #nosec G101
 const selectContactProfileShowcaseSocialLinkQuery = "SELECT url, text, sort_order FROM profile_showcase_social_links_contacts WHERE contact_id = ?"                        // #nosec G101
@@ -120,12 +126,24 @@ func (db sqlitePersistence) getProfileShowcaseCommunitiesPreferences(tx *sql.Tx)
 	return communities, nil
 }
 
+func (db sqlitePersistence) DeleteProfileShowcaseCommunityPreference(communityID string) (bool, error) {
+	result, err := db.db.Exec(deleteProfileShowcaseCommunityPreferenceQuery, communityID)
+	if err != nil {
+		return false, err
+	}
+
+	rows, err := result.RowsAffected()
+	return rows > 0, err
+}
+
+func (db sqlitePersistence) clearProfileShowcaseCommunityPreferences(tx *sql.Tx) error {
+	_, err := tx.Exec(clearProfileShowcaseCommunitiyPreferencesQuery)
+	return err
+}
+
 func (db sqlitePersistence) saveProfileShowcaseAccountPreference(tx *sql.Tx, account *identity.ProfileShowcaseAccountPreference) error {
 	_, err := tx.Exec(upsertProfileShowcaseAccountPreferenceQuery,
 		account.Address,
-		account.Name,
-		account.ColorID,
-		account.Emoji,
 		account.ShowcaseVisibility,
 		account.Order,
 	)
@@ -143,9 +161,6 @@ func (db sqlitePersistence) processProfileShowcaseAccountPreferences(rows *sql.R
 
 		err := rows.Scan(
 			&account.Address,
-			&account.Name,
-			&account.ColorID,
-			&account.Emoji,
 			&account.ShowcaseVisibility,
 			&account.Order,
 		)
@@ -193,14 +208,9 @@ func (db sqlitePersistence) DeleteProfileShowcaseAccountPreference(accountAddres
 	return rows > 0, err
 }
 
-func (db sqlitePersistence) DeleteProfileShowcaseCommunityPreference(communityID string) (bool, error) {
-	result, err := db.db.Exec(deleteProfileShowcaseCommunityPreferenceQuery, communityID)
-	if err != nil {
-		return false, err
-	}
-
-	rows, err := result.RowsAffected()
-	return rows > 0, err
+func (db sqlitePersistence) clearProfileShowcaseAccountPreferences(tx *sql.Tx) error {
+	_, err := tx.Exec(clearProfileShowcaseAccountPreferencesQuery)
+	return err
 }
 
 func (db sqlitePersistence) saveProfileShowcaseCollectiblePreference(tx *sql.Tx, collectible *identity.ProfileShowcaseCollectiblePreference) error {
@@ -208,8 +218,6 @@ func (db sqlitePersistence) saveProfileShowcaseCollectiblePreference(tx *sql.Tx,
 		collectible.ContractAddress,
 		collectible.ChainID,
 		collectible.TokenID,
-		collectible.CommunityID,
-		collectible.AccountAddress,
 		collectible.ShowcaseVisibility,
 		collectible.Order,
 	)
@@ -232,8 +240,6 @@ func (db sqlitePersistence) getProfileShowcaseCollectiblesPreferences(tx *sql.Tx
 			&collectible.ContractAddress,
 			&collectible.ChainID,
 			&collectible.TokenID,
-			&collectible.CommunityID,
-			&collectible.AccountAddress,
 			&collectible.ShowcaseVisibility,
 			&collectible.Order,
 		)
@@ -245,6 +251,11 @@ func (db sqlitePersistence) getProfileShowcaseCollectiblesPreferences(tx *sql.Tx
 		collectibles = append(collectibles, collectible)
 	}
 	return collectibles, nil
+}
+
+func (db sqlitePersistence) clearProfileShowcaseCollectiblePreferences(tx *sql.Tx) error {
+	_, err := tx.Exec(clearProfileShowcaseCollectiblePreferencesQuery)
+	return err
 }
 
 func (db sqlitePersistence) saveProfileShowcaseVerifiedTokenPreference(tx *sql.Tx, token *identity.ProfileShowcaseVerifiedTokenPreference) error {
@@ -283,11 +294,15 @@ func (db sqlitePersistence) getProfileShowcaseVerifiedTokensPreferences(tx *sql.
 	return tokens, nil
 }
 
+func (db sqlitePersistence) clearProfileShowcaseVerifiedTokenPreferences(tx *sql.Tx) error {
+	_, err := tx.Exec(clearProfileShowcaseVerifiedTokenPreferencesQuery)
+	return err
+}
+
 func (db sqlitePersistence) saveProfileShowcaseUnverifiedTokenPreference(tx *sql.Tx, token *identity.ProfileShowcaseUnverifiedTokenPreference) error {
 	_, err := tx.Exec(upsertProfileShowcaseUnverifiedTokenPreferenceQuery,
 		token.ContractAddress,
 		token.ChainID,
-		token.CommunityID,
 		token.ShowcaseVisibility,
 		token.Order,
 	)
@@ -309,7 +324,6 @@ func (db sqlitePersistence) getProfileShowcaseUnverifiedTokensPreferences(tx *sq
 		err := rows.Scan(
 			&token.ContractAddress,
 			&token.ChainID,
-			&token.CommunityID,
 			&token.ShowcaseVisibility,
 			&token.Order,
 		)
@@ -321,6 +335,11 @@ func (db sqlitePersistence) getProfileShowcaseUnverifiedTokensPreferences(tx *sq
 		tokens = append(tokens, token)
 	}
 	return tokens, nil
+}
+
+func (db sqlitePersistence) clearProfileShowcaseUnverifiedTokenPreferences(tx *sql.Tx) error {
+	_, err := tx.Exec(clearProfileShowcaseUnverifiedTokenPreferencesQuery)
+	return err
 }
 
 func (db sqlitePersistence) saveProfileShowcaseSocialLinkPreference(tx *sql.Tx, link *identity.ProfileShowcaseSocialLinkPreference) error {
@@ -359,6 +378,11 @@ func (db sqlitePersistence) getProfileShowcaseSocialLinkPreferences(tx *sql.Tx) 
 		links = append(links, link)
 	}
 	return links, nil
+}
+
+func (db sqlitePersistence) clearProfileShowcaseSocialLinkPreferences(tx *sql.Tx) error {
+	_, err := tx.Exec(clearProfileShowcaseSocialLinkPreferencesQuery)
+	return err
 }
 
 // Queries for the profile showcase for a contact
@@ -424,7 +448,6 @@ func (db sqlitePersistence) processProfileShowcaseAccounts(rows *sql.Rows) (resu
 
 	for rows.Next() {
 		account := &identity.ProfileShowcaseAccount{}
-
 		err = rows.Scan(&account.Address, &account.Name, &account.ColorID, &account.Emoji, &account.Order, &account.ContactID)
 		if err != nil {
 			return
@@ -466,8 +489,6 @@ func (db sqlitePersistence) saveProfileShowcaseCollectibleContact(tx *sql.Tx, co
 		collectible.ContractAddress,
 		collectible.ChainID,
 		collectible.TokenID,
-		collectible.CommunityID,
-		collectible.AccountAddress,
 		collectible.Order,
 	)
 
@@ -489,8 +510,6 @@ func (db sqlitePersistence) getProfileShowcaseCollectiblesContact(tx *sql.Tx, co
 			&collectible.ContractAddress,
 			&collectible.ChainID,
 			&collectible.TokenID,
-			&collectible.CommunityID,
-			&collectible.AccountAddress,
 			&collectible.Order)
 		if err != nil {
 			return nil, err
@@ -549,7 +568,6 @@ func (db sqlitePersistence) saveProfileShowcaseUnverifiedTokenContact(tx *sql.Tx
 		contactID,
 		token.ContractAddress,
 		token.ChainID,
-		token.CommunityID,
 		token.Order,
 	)
 
@@ -570,7 +588,6 @@ func (db sqlitePersistence) getProfileShowcaseUnverifiedTokensContact(tx *sql.Tx
 		err := rows.Scan(
 			&token.ContractAddress,
 			&token.ChainID,
-			&token.CommunityID,
 			&token.Order)
 		if err != nil {
 			return nil, err
@@ -645,7 +662,7 @@ func (db sqlitePersistence) SaveProfileShowcasePreferences(preferences *identity
 		_ = tx.Rollback()
 	}()
 
-	err = db.saveProfileShowcasePreferencesClock(tx, preferences.Clock)
+	err = db.clearProfileShowcaseCommunityPreferences(tx)
 	if err != nil {
 		return err
 	}
@@ -657,11 +674,21 @@ func (db sqlitePersistence) SaveProfileShowcasePreferences(preferences *identity
 		}
 	}
 
+	err = db.clearProfileShowcaseAccountPreferences(tx)
+	if err != nil {
+		return err
+	}
+
 	for _, account := range preferences.Accounts {
 		err = db.saveProfileShowcaseAccountPreference(tx, account)
 		if err != nil {
 			return err
 		}
+	}
+
+	err = db.clearProfileShowcaseCollectiblePreferences(tx)
+	if err != nil {
+		return err
 	}
 
 	for _, collectible := range preferences.Collectibles {
@@ -671,11 +698,21 @@ func (db sqlitePersistence) SaveProfileShowcasePreferences(preferences *identity
 		}
 	}
 
+	err = db.clearProfileShowcaseVerifiedTokenPreferences(tx)
+	if err != nil {
+		return err
+	}
+
 	for _, token := range preferences.VerifiedTokens {
 		err = db.saveProfileShowcaseVerifiedTokenPreference(tx, token)
 		if err != nil {
 			return err
 		}
+	}
+
+	err = db.clearProfileShowcaseUnverifiedTokenPreferences(tx)
+	if err != nil {
+		return err
 	}
 
 	for _, token := range preferences.UnverifiedTokens {
@@ -685,11 +722,21 @@ func (db sqlitePersistence) SaveProfileShowcasePreferences(preferences *identity
 		}
 	}
 
+	err = db.clearProfileShowcaseSocialLinkPreferences(tx)
+	if err != nil {
+		return err
+	}
+
 	for _, link := range preferences.SocialLinks {
 		err = db.saveProfileShowcaseSocialLinkPreference(tx, link)
 		if err != nil {
 			return err
 		}
+	}
+
+	err = db.saveProfileShowcasePreferencesClock(tx, preferences.Clock)
+	if err != nil {
+		return err
 	}
 
 	return nil

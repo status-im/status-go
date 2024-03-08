@@ -422,17 +422,11 @@ func DummyProfileShowcasePreferences(withCollectibles bool) *identity.ProfileSho
 		Accounts: []*identity.ProfileShowcaseAccountPreference{
 			{
 				Address:            "0x0000000000000000000000000033433445133423",
-				Name:               "Status Account",
-				ColorID:            "blue",
-				Emoji:              "-_-",
 				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},
 			{
 				Address:            "0x0000000000000000000000000032433445133424",
-				Name:               "Money Box",
-				ColorID:            "red",
-				Emoji:              ":o)",
 				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 				Order:              1,
 			},
@@ -496,8 +490,6 @@ func DummyProfileShowcasePreferences(withCollectibles bool) *identity.ProfileSho
 				ContractAddress:    "0x12378534257568678487683576",
 				ChainID:            1,
 				TokenID:            "12321389592999903",
-				CommunityID:        "0x01312357798976535",
-				AccountAddress:     "0x32433445133424",
 				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
 				Order:              0,
 			},

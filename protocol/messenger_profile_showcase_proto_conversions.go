@@ -40,9 +40,6 @@ func ToProfileShowcaseCommunitiesPreferencesProto(preferences []*identity.Profil
 func FromProfileShowcaseAccountPreferenceProto(p *protobuf.ProfileShowcaseAccountPreference) *identity.ProfileShowcaseAccountPreference {
 	return &identity.ProfileShowcaseAccountPreference{
 		Address:            p.GetAddress(),
-		Name:               p.GetName(),
-		ColorID:            p.GetColorId(),
-		Emoji:              p.GetEmoji(),
 		ShowcaseVisibility: identity.ProfileShowcaseVisibility(p.ShowcaseVisibility),
 		Order:              int(p.Order),
 	}
@@ -59,9 +56,6 @@ func FromProfileShowcaseAccountsPreferencesProto(preferences []*protobuf.Profile
 func ToProfileShowcaseAccountPreferenceProto(p *identity.ProfileShowcaseAccountPreference) *protobuf.ProfileShowcaseAccountPreference {
 	return &protobuf.ProfileShowcaseAccountPreference{
 		Address:            p.Address,
-		Name:               p.Name,
-		ColorId:            p.ColorID,
-		Emoji:              p.Emoji,
 		ShowcaseVisibility: protobuf.ProfileShowcaseVisibility(p.ShowcaseVisibility),
 		Order:              uint32(p.Order),
 	}
@@ -80,8 +74,6 @@ func FromProfileShowcaseCollectiblePreferenceProto(p *protobuf.ProfileShowcaseCo
 		ContractAddress:    p.GetContractAddress(),
 		ChainID:            p.GetChainId(),
 		TokenID:            p.GetTokenId(),
-		CommunityID:        p.GetCommunityId(),
-		AccountAddress:     p.GetAccountAddress(),
 		ShowcaseVisibility: identity.ProfileShowcaseVisibility(p.ShowcaseVisibility),
 		Order:              int(p.Order),
 	}
@@ -100,8 +92,6 @@ func ToProfileShowcaseCollectiblePreferenceProto(p *identity.ProfileShowcaseColl
 		ContractAddress:    p.ContractAddress,
 		ChainId:            p.ChainID,
 		TokenId:            p.TokenID,
-		CommunityId:        p.CommunityID,
-		AccountAddress:     p.AccountAddress,
 		ShowcaseVisibility: protobuf.ProfileShowcaseVisibility(p.ShowcaseVisibility),
 		Order:              uint32(p.Order),
 	}
@@ -152,7 +142,6 @@ func FromProfileShowcaseUnverifiedTokenPreferenceProto(p *protobuf.ProfileShowca
 	return &identity.ProfileShowcaseUnverifiedTokenPreference{
 		ContractAddress:    p.GetContractAddress(),
 		ChainID:            p.GetChainId(),
-		CommunityID:        p.GetCommunityId(),
 		ShowcaseVisibility: identity.ProfileShowcaseVisibility(p.ShowcaseVisibility),
 		Order:              int(p.Order),
 	}
@@ -170,7 +159,6 @@ func ToProfileShowcaseUnverifiedTokenPreferenceProto(p *identity.ProfileShowcase
 	return &protobuf.ProfileShowcaseUnverifiedTokenPreference{
 		ContractAddress:    p.ContractAddress,
 		ChainId:            p.ChainID,
-		CommunityId:        p.CommunityID,
 		ShowcaseVisibility: protobuf.ProfileShowcaseVisibility(p.ShowcaseVisibility),
 		Order:              uint32(p.Order),
 	}

@@ -256,9 +256,6 @@ func (s *TestMessengerProfileShowcase) TestSaveAndGetProfileShowcasePreferences(
 func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesWithWrongVisibility() {
 	accountEntry := &identity.ProfileShowcaseAccountPreference{
 		Address:            "0x0000000000000000000000000032433445133424",
-		Name:               "Status Account",
-		ColorID:            "blue",
-		Emoji:              ">:-]",
 		ShowcaseVisibility: identity.ProfileShowcaseVisibilityIDVerifiedContacts,
 		Order:              17,
 	}
@@ -267,7 +264,6 @@ func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesW
 		ContractAddress:    "0x12378534257568678487683576",
 		ChainID:            11155111,
 		TokenID:            "12321389592999903",
-		CommunityID:        "0x01312357798976535",
 		ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
 		Order:              17,
 	}
@@ -489,22 +485,14 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 
 	s.Require().Len(profileShowcase.Accounts, 2)
 	s.Require().Equal(profileShowcase.Accounts[0].Address, request.Accounts[0].Address)
-	s.Require().Equal(profileShowcase.Accounts[0].Name, request.Accounts[0].Name)
-	s.Require().Equal(profileShowcase.Accounts[0].ColorID, request.Accounts[0].ColorID)
-	s.Require().Equal(profileShowcase.Accounts[0].Emoji, request.Accounts[0].Emoji)
 	s.Require().Equal(profileShowcase.Accounts[0].Order, request.Accounts[0].Order)
 	s.Require().Equal(profileShowcase.Accounts[1].Address, request.Accounts[1].Address)
-	s.Require().Equal(profileShowcase.Accounts[1].Name, request.Accounts[1].Name)
-	s.Require().Equal(profileShowcase.Accounts[1].ColorID, request.Accounts[1].ColorID)
-	s.Require().Equal(profileShowcase.Accounts[1].Emoji, request.Accounts[1].Emoji)
 	s.Require().Equal(profileShowcase.Accounts[1].Order, request.Accounts[1].Order)
 
 	s.Require().Len(profileShowcase.Collectibles, 1)
 	s.Require().Equal(profileShowcase.Collectibles[0].TokenID, request.Collectibles[0].TokenID)
 	s.Require().Equal(profileShowcase.Collectibles[0].ChainID, request.Collectibles[0].ChainID)
 	s.Require().Equal(profileShowcase.Collectibles[0].ContractAddress, request.Collectibles[0].ContractAddress)
-	s.Require().Equal(profileShowcase.Collectibles[0].AccountAddress, request.Collectibles[0].AccountAddress)
-	s.Require().Equal(profileShowcase.Collectibles[0].CommunityID, request.Collectibles[0].CommunityID)
 	s.Require().Equal(profileShowcase.Collectibles[0].Order, request.Collectibles[0].Order)
 
 	s.Require().Len(profileShowcase.VerifiedTokens, 1)
@@ -544,21 +532,14 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 
 	s.Require().Len(profileShowcase.Accounts, 2)
 	s.Require().Equal(profileShowcase.Accounts[0].Address, request.Accounts[0].Address)
-	s.Require().Equal(profileShowcase.Accounts[0].Name, request.Accounts[0].Name)
-	s.Require().Equal(profileShowcase.Accounts[0].ColorID, request.Accounts[0].ColorID)
-	s.Require().Equal(profileShowcase.Accounts[0].Emoji, request.Accounts[0].Emoji)
 	s.Require().Equal(profileShowcase.Accounts[0].Order, request.Accounts[0].Order)
 	s.Require().Equal(profileShowcase.Accounts[1].Address, request.Accounts[1].Address)
-	s.Require().Equal(profileShowcase.Accounts[1].Name, request.Accounts[1].Name)
-	s.Require().Equal(profileShowcase.Accounts[1].ColorID, request.Accounts[1].ColorID)
-	s.Require().Equal(profileShowcase.Accounts[1].Emoji, request.Accounts[1].Emoji)
 	s.Require().Equal(profileShowcase.Accounts[1].Order, request.Accounts[1].Order)
 
 	s.Require().Len(profileShowcase.Collectibles, 1)
 	s.Require().Equal(profileShowcase.Collectibles[0].ContractAddress, request.Collectibles[0].ContractAddress)
 	s.Require().Equal(profileShowcase.Collectibles[0].ChainID, request.Collectibles[0].ChainID)
 	s.Require().Equal(profileShowcase.Collectibles[0].TokenID, request.Collectibles[0].TokenID)
-	s.Require().Equal(profileShowcase.Collectibles[0].CommunityID, request.Collectibles[0].CommunityID)
 	s.Require().Equal(profileShowcase.Collectibles[0].Order, request.Collectibles[0].Order)
 
 	s.Require().Len(profileShowcase.VerifiedTokens, 2)

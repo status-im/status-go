@@ -16,6 +16,7 @@ import (
 	eth_common "github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -143,11 +144,20 @@ func (m *Messenger) toProfileShowcaseAccountProto(preferences []*identity.Profil
 			continue
 		}
 
+		account, err := m.settings.GetAccountByAddress(types.HexToAddress(preference.Address))
+		if err != nil {
+			m.logger.Warn("failed to get account for profile entry ", zap.Error(err))
+		}
+		if account == nil {
+			m.logger.Warn("can not find wallet account for profile entry ")
+			continue
+		}
+
 		entries = append(entries, &protobuf.ProfileShowcaseAccount{
 			Address: preference.Address,
-			Name:    preference.Name,
-			ColorId: preference.ColorID,
-			Emoji:   preference.Emoji,
+			Name:    account.Name,
+			ColorId: string(account.ColorID),
+			Emoji:   account.Emoji,
 			Order:   uint32(preference.Order),
 		})
 	}
@@ -165,8 +175,6 @@ func (m *Messenger) toProfileShowcaseCollectibleProto(preferences []*identity.Pr
 			ContractAddress: preference.ContractAddress,
 			ChainId:         preference.ChainID,
 			TokenId:         preference.TokenID,
-			CommunityId:     preference.CommunityID,
-			AccountAddress:  preference.AccountAddress,
 			Order:           uint32(preference.Order),
 		})
 	}
@@ -286,8 +294,6 @@ func (m *Messenger) fromProfileShowcaseCollectibleProto(messages []*protobuf.Pro
 			ContractAddress: message.ContractAddress,
 			ChainID:         message.ChainId,
 			TokenID:         message.TokenId,
-			CommunityID:     message.CommunityId,
-			AccountAddress:  message.AccountAddress,
 			Order:           int(message.Order),
 		}
 		entries = append(entries, entry)
@@ -380,6 +386,14 @@ func (m *Messenger) GetProfileShowcaseForContact(contactID string) (*identity.Pr
 
 func (m *Messenger) GetProfileShowcaseAccountsByAddress(address string) ([]*identity.ProfileShowcaseAccount, error) {
 	return m.persistence.GetProfileShowcaseAccountsByAddress(address)
+}
+
+func (m *Messenger) GetProfileShowcaseSocialLinksLimit() (int, error) {
+	return identity.MaxProfileShowcaseSocialLinksLimit, nil
+}
+
+func (m *Messenger) GetProfileShowcaseEntriesLimit() (int, error) {
+	return identity.MaxProfileShowcaseEntriesLimit, nil
 }
 
 func (m *Messenger) EncryptProfileShowcaseEntriesWithContactPubKeys(entries *protobuf.ProfileShowcaseEntries, contacts []*Contact) (*protobuf.ProfileShowcaseEntriesEncrypted, error) {
@@ -630,15 +644,6 @@ func (m *Messenger) UpdateProfileShowcaseWalletAccount(account *accounts.Account
 	if profileAccount == nil {
 		// No corresponding profile entry, exit
 		return nil
-	}
-
-	profileAccount.Name = account.Name
-	profileAccount.ColorID = string(account.ColorID)
-	profileAccount.Emoji = account.Emoji
-
-	err = m.persistence.SaveProfileShowcaseAccountPreference(profileAccount)
-	if err != nil {
-		return err
 	}
 
 	return m.DispatchProfileShowcase()
