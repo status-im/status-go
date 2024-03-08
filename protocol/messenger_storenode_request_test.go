@@ -369,7 +369,7 @@ func (s *MessengerStoreNodeRequestSuite) ensureStoreNodeEnvelopes(contentTopic *
 	// Give some time for store node to put envelope into database. Otherwise, the test is flaky.
 	// Although we subscribed to EnvelopeEvents and waited, the actual saving to database happens asynchronously.
 	// It would be nice to implement a subscription for database storing event, but it doesn't worth it right now.
-	<-time.After(100 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	// Directly ensure profile is available on store node
 	queryOptions := []store.HistoryRequestOption{
