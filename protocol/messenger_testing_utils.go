@@ -240,6 +240,8 @@ func WaitForPeersConnected(s *suite.Suite, waku *waku2.Waku, action func() []str
 		select {
 		case status := <-subscription.C:
 			if hasAllPeers(status.Peers, peerIDs) {
+				// Give some time for p2p events, otherwise might look lik peer is available, but fail to send a message.
+				<-time.After(100 * time.Millisecond)
 				return
 			}
 		case <-ctx.Done():
