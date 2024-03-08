@@ -151,15 +151,12 @@ func (store *WakuStore) storeMessage(env *protocol.Envelope) error {
 		return err
 	}
 
-	store.log.Debug("<<< stored message", zap.String("id", hex.EncodeToString(env.Hash())))
-
 	return nil
 }
 
 func (store *WakuStore) storeIncomingMessages(ctx context.Context) {
 	defer store.wg.Done()
 	for envelope := range store.MsgC.Ch {
-		store.log.Debug("<<< storeIncomingMessages")
 		go func(env *protocol.Envelope) {
 			_ = store.storeMessage(env)
 		}(envelope)

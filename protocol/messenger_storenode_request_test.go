@@ -3,36 +3,35 @@ package protocol
 import (
 	"context"
 	"fmt"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/protocol/communities/token"
-	"github.com/status-im/status-go/protocol/transport"
-
-	"github.com/status-im/status-go/multiaccounts/accounts"
-
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
-	"github.com/status-im/status-go/protocol/communities"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	"github.com/waku-org/go-waku/waku/v2/protocol/store"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/status-im/status-go/appdatabase"
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
+	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/t/helpers"
-
+	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/communitytokens"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/t/helpers"
 	waku2 "github.com/status-im/status-go/wakuv2"
 	wakuV2common "github.com/status-im/status-go/wakuv2/common"
 )
