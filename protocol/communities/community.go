@@ -1913,8 +1913,9 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, messageType prot
 		if !isChatMember {
 			return false, nil
 		}
-		isPoster := member.ChannelRole == protobuf.CommunityMember_CHANNEL_ROLE_POSTER
-		isViewer := member.ChannelRole == protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
+
+		isPoster := member.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_POSTER
+		isViewer := member.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
 		return isPoster || (isViewer && chat.ViewersCanPostReactions), nil
 
 	default:

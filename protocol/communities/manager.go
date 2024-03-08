@@ -1050,11 +1050,11 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 				if response.ViewAndPostPermissions.Satisfied {
 					channelRole = protobuf.CommunityMember_CHANNEL_ROLE_POSTER
 				}
-				if !isMemberAlreadyInChannel {
-					_, err := community.AddMemberToChat(channelID, memberPubKey, []protobuf.CommunityMember_Roles{}, channelRole)
-					if err != nil {
-						return nil, err
-					}
+
+				// Add the member back to the chat member list in case the role changed (it replaces the previous values)
+				_, err := community.AddMemberToChat(channelID, memberPubKey, []protobuf.CommunityMember_Roles{}, channelRole)
+				if err != nil {
+					return nil, err
 				}
 			} else if isMemberAlreadyInChannel {
 				_, err := community.RemoveUserFromChat(memberPubKey, channelID)
