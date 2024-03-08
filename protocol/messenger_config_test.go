@@ -1,11 +1,12 @@
 package protocol
 
 import (
+	"github.com/stretchr/testify/suite"
+
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
-	mailserversDB "github.com/status-im/status-go/services/mailservers"
+	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/stretchr/testify/suite"
 )
 
 func WithTestStoreNode(s *suite.Suite, id string, address string, fleet string, collectiblesServiceMock *CollectiblesServiceMock) Option {
@@ -13,8 +14,8 @@ func WithTestStoreNode(s *suite.Suite, id string, address string, fleet string, 
 		sqldb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 		s.Require().NoError(err)
 
-		db := mailserversDB.NewDB(sqldb)
-		err = db.Add(mailserversDB.Mailserver{
+		db := mailservers.NewDB(sqldb)
+		err = db.Add(mailservers.Mailserver{
 			ID:      id,
 			Name:    id,
 			Address: address,
