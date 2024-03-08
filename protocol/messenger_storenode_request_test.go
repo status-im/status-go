@@ -368,7 +368,7 @@ func (s *MessengerStoreNodeRequestSuite) wakuListenAddress(waku *waku2.Waku) str
 func (s *MessengerStoreNodeRequestSuite) ensureStoreNodeEnvelopes(contentTopic *wakuV2common.TopicType, minimumCount int) {
 	// Give some time for store node to put envelope into database. Otherwise, the test is flaky.
 	// Although we subscribed to EnvelopeEvents and waited, the actual saving to database happens asynchronously.
-	// It would be nice to implement a subscription for database storing event, but it doesn't worth it right now.
+	// It would be nice to implement a subscription for database storing event, but it isn't worth it right now.
 	time.Sleep(100 * time.Millisecond)
 
 	// Directly ensure profile is available on store node
