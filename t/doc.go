@@ -2,4 +2,4 @@
 // of status-go. It supports Goerli and StatusChain for tests.
 package t
 
-//go:generate go-bindata -pkg t -o ./bindata.go ./config
+//go:generate go-bindata -modtime=1700000000 -pkg t -o ./bindata.go ./config

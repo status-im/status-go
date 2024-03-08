@@ -6,4 +6,4 @@
 
 package postgres
 
-//go:generate go-bindata -pkg migrations -o ../migrations.go ./
+//go:generate go-bindata -modtime=1700000000 -pkg migrations -o ../migrations.go ./

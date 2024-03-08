@@ -6,4 +6,4 @@
 
 package sqlite
 
-//go:generate go-bindata -pkg sqlite -o ../migrations.go .
+//go:generate go-bindata -modtime=1700000000 -pkg sqlite -o ../migrations.go .
