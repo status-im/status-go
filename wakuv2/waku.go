@@ -1823,3 +1823,7 @@ func formatConnStatus(wakuNode *node.WakuNode, c node.ConnStatus) types.ConnStat
 		Peers:      FormatPeerStats(wakuNode, c.Peers),
 	}
 }
+
+func (w *Waku) StoreNode() store.Store {
+	return w.node.Store()
+}

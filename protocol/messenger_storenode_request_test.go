@@ -7,32 +7,31 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/protocol/communities/token"
-	"github.com/status-im/status-go/protocol/transport"
-
-	"github.com/status-im/status-go/multiaccounts/accounts"
-
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
-	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/tt"
-
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	"github.com/waku-org/go-waku/waku/v2/protocol/store"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/status-im/status-go/appdatabase"
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
+	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/t/helpers"
-
+	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/communitytokens"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/t/helpers"
 	waku2 "github.com/status-im/status-go/wakuv2"
 	wakuV2common "github.com/status-im/status-go/wakuv2/common"
 )
@@ -167,6 +166,11 @@ func (s *MessengerStoreNodeRequestSuite) createStore() {
 	s.logger.Info("store node ready", zap.String("address", s.storeNodeAddress))
 }
 
+func (s *MessengerStoreNodeRequestSuite) tearDownOwner() {
+	_ = gethbridge.GetGethWakuV2From(s.ownerWaku).Stop()
+	TearDownMessenger(&s.Suite, s.owner)
+}
+
 func (s *MessengerStoreNodeRequestSuite) createOwner() {
 
 	cfg := testWakuV2Config{
@@ -183,8 +187,11 @@ func (s *MessengerStoreNodeRequestSuite) createOwner() {
 	s.owner = s.newMessenger(s.ownerWaku, messengerLogger, s.storeNodeAddress)
 
 	// We force the owner to use the store node as relay peer
-	err := s.owner.DialPeer(s.storeNodeAddress)
-	s.Require().NoError(err)
+	WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.ownerWaku), func() []string {
+		err := s.owner.DialPeer(s.storeNodeAddress)
+		s.Require().NoError(err)
+		return []string{s.wakuStoreNode.PeerID().String()}
+	})
 }
 
 func (s *MessengerStoreNodeRequestSuite) createBob() {
@@ -199,6 +206,11 @@ func (s *MessengerStoreNodeRequestSuite) createBob() {
 
 	messengerLogger := s.logger.Named("bob-messenger")
 	s.bob = s.newMessenger(s.bobWaku, messengerLogger, s.storeNodeAddress)
+}
+
+func (s *MessengerStoreNodeRequestSuite) tearDownBob() {
+	_ = gethbridge.GetGethWakuV2From(s.bobWaku).Stop()
+	TearDownMessenger(&s.Suite, s.bob)
 }
 
 func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *zap.Logger, mailserverAddress string) *Messenger {
@@ -353,13 +365,32 @@ func (s *MessengerStoreNodeRequestSuite) wakuListenAddress(waku *waku2.Waku) str
 	return addresses[0]
 }
 
+func (s *MessengerStoreNodeRequestSuite) ensureStoreNodeEnvelopes(contentTopic *wakuV2common.TopicType, minimumCount int) {
+	// Give some time for store node to put envelope into database. Otherwise, the test is flaky.
+	// Although we subscribed to EnvelopeEvents and waited, the actual saving to database happens asynchronously.
+	// It would be nice to implement a subscription for database storing event, but it isn't worth it right now.
+	time.Sleep(100 * time.Millisecond)
+
+	// Directly ensure profile is available on store node
+	queryOptions := []store.HistoryRequestOption{
+		store.WithLocalQuery(),
+	}
+	query := store.Query{
+		PubsubTopic:   "",
+		ContentTopics: []string{contentTopic.ContentTopic()},
+	}
+	result, err := s.wakuStoreNode.StoreNode().Query(context.Background(), query, queryOptions...)
+	s.Require().NoError(err)
+	s.Require().GreaterOrEqual(len(result.Messages), minimumCount)
+	s.logger.Debug("store node query result", zap.Int("messagesCount", len(result.Messages)))
+}
+
 func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityInfo() {
 	s.createOwner()
 	s.createBob()
 
 	community := s.createCommunity(s.owner)
 
-	s.waitForAvailableStoreNode(s.bob)
 	s.fetchCommunity(s.bob, community.CommunityShard(), community)
 }
 
@@ -569,6 +600,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestWithoutWaitingResponse() {
 
 func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfo() {
 	s.createOwner()
+	defer s.tearDownOwner()
 
 	// Set keypair (to be able to set displayName)
 	ownerProfileKp := accounts.GetProfileKeypairForTest(true, false, false)
@@ -578,12 +610,20 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfo() {
 	err := s.owner.settings.SaveOrUpdateKeypair(ownerProfileKp)
 	s.Require().NoError(err)
 
+	contentTopicString := transport.ContactCodeTopic(&s.owner.identity.PublicKey)
+	contentTopic := wakuV2common.BytesToTopic(transport.ToTopic(contentTopicString))
+	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(&contentTopic)
+
 	// Set display name, this will also publish contact code
 	err = s.owner.SetDisplayName("super-owner")
 	s.Require().NoError(err)
 
+	s.waitForEnvelopes(storeNodeSubscription, 1)
+	s.ensureStoreNodeEnvelopes(&contentTopic, 1)
+
+	// Fetch profile
 	s.createBob()
-	s.waitForAvailableStoreNode(s.bob)
+	defer s.tearDownBob()
 	s.fetchProfile(s.bob, s.owner.selfContact.ID, s.owner.selfContact)
 }
 
