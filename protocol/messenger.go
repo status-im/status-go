@@ -3617,25 +3617,29 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 	// for same message with multiple images
 	var notificationID string
 
+	var err error
+	var albumMessages []*common.Message
 	image := message.GetImage()
-	var albumMessages = []*common.Message{}
+
 	if image != nil && image.GetAlbumId() != "" {
 		notificationID = image.GetAlbumId()
-		album, err := m.persistence.albumMessages(message.LocalChatID, image.AlbumId)
+
+		// NOTE: It's not beautiful to use appendOtherMessagesInAlbum here, as it double-checks
+		// image/album conditions, but we still need to check the albumID here anyway.
+		albumMessages, err = m.appendOtherMessagesInAlbum(message, message.LocalChatID)
 		if err != nil {
 			return err
 		}
-		if m.httpServer != nil {
-			for _, msg := range album {
-				err = m.prepareMessage(msg, m.httpServer)
 
+		// FIXME: replace with `prepareMessages`
+		if m.httpServer != nil {
+			for _, msg := range albumMessages {
+				err = m.prepareMessage(msg, m.httpServer)
 				if err != nil {
 					return err
 				}
 			}
 		}
-
-		albumMessages = album
 	} else {
 		notificationID = message.ID
 	}
@@ -5854,21 +5858,19 @@ func (m *Messenger) GetMentionsManager() *MentionManager {
 	return m.mentionsManager
 }
 
-func (m *Messenger) getOtherMessagesInAlbum(message *common.Message, chatID string) ([]*common.Message, error) {
-	var connectedMessages []*common.Message
-	// In case of Image messages, we need to delete all the images in the album
-	if message.ContentType == protobuf.ChatMessage_IMAGE {
-		image := message.GetImage()
-		if image != nil && image.AlbumId != "" {
-			messagesInTheAlbum, err := m.persistence.albumMessages(chatID, image.GetAlbumId())
-			if err != nil {
-				return nil, err
-			}
-			connectedMessages = append(connectedMessages, messagesInTheAlbum...)
-			return connectedMessages, nil
-		}
+// appendOtherMessagesInAlbum returns all the messages in the images album of the message, including the given message.
+// If the message is not an image, or is not a part of an album, it still returns the message itself.
+func (m *Messenger) appendOtherMessagesInAlbum(message *common.Message, chatID string) ([]*common.Message, error) {
+	if message.ContentType != protobuf.ChatMessage_IMAGE {
+		return []*common.Message{message}, nil
 	}
-	return append(connectedMessages, message), nil
+
+	image := message.GetImage()
+	if image == nil || image.AlbumId == "" {
+		return []*common.Message{message}, nil
+	}
+
+	return m.persistence.albumMessages(chatID, image.GetAlbumId())
 }
 
 func (m *Messenger) withChatClock(callback func(string, uint64) error) error {

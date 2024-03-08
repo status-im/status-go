@@ -1928,7 +1928,7 @@ func (m *Messenger) handleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		}
 	}
 
-	messagesToDelete, err := m.getOtherMessagesInAlbum(originalMessage, originalMessage.LocalChatID)
+	messagesToDelete, err := m.appendOtherMessagesInAlbum(originalMessage, originalMessage.LocalChatID)
 	if err != nil {
 		return err
 	}
@@ -2045,7 +2045,7 @@ func (m *Messenger) HandleSyncDeleteForMeMessage(state *ReceivedMessageState, de
 		return errors.New("chat not found")
 	}
 
-	messagesToDelete, err := m.getOtherMessagesInAlbum(originalMessage, originalMessage.LocalChatID)
+	messagesToDelete, err := m.appendOtherMessagesInAlbum(originalMessage, originalMessage.LocalChatID)
 	if err != nil {
 		return err
 	}
@@ -2247,7 +2247,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 				}
 
 				if !skipUpdateUnviewedCountForAlbums {
-					messages, err := m.persistence.AlbumMessages(chat.ID, image.AlbumId)
+					messages, err := m.persistence.albumMessages(chat.ID, image.AlbumId)
 					if err != nil {
 						return err
 					}

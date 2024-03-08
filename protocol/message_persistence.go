@@ -681,10 +681,6 @@ func (db sqlitePersistence) MessageByID(id string) (*common.Message, error) {
 	return db.messageByID(nil, id)
 }
 
-func (db sqlitePersistence) AlbumMessages(chatID, albumID string) ([]*common.Message, error) {
-	return db.albumMessages(chatID, albumID)
-}
-
 func (db sqlitePersistence) MessagesExist(ids []string) (map[string]bool, error) {
 	result := make(map[string]bool)
 	if len(ids) == 0 {

@@ -600,13 +600,9 @@ func (m *Messenger) ActivityCenterNotification(id types.HexBytes) (*ActivityCent
 	}
 
 	if notification.Message != nil {
-		image := notification.Message.GetImage()
-		if image != nil && image.AlbumId != "" {
-			album, err := m.persistence.albumMessages(notification.Message.LocalChatID, image.AlbumId)
-			if err != nil {
-				return nil, err
-			}
-			notification.AlbumMessages = album
+		notification.AlbumMessages, err = m.appendOtherMessagesInAlbum(notification.Message, notification.Message.LocalChatID)
+		if err != nil {
+			return nil, err
 		}
 	}
 

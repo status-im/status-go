@@ -43,7 +43,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		return nil, ErrChatNotFound
 	}
 
-	messages, err := m.getOtherMessagesInAlbum(message, message.LocalChatID)
+	messages, err := m.appendOtherMessagesInAlbum(message, message.LocalChatID)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		return nil, ErrInvalidDeleteTypeAuthor
 	}
 
-	messagesToDelete, err := m.getOtherMessagesInAlbum(message, message.ChatId)
+	messagesToDelete, err := m.appendOtherMessagesInAlbum(message, message.ChatId)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +297,7 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, localChatID s
 		return nil, ErrInvalidDeleteTypeAuthor
 	}
 
-	messagesToDelete, err := m.getOtherMessagesInAlbum(message, localChatID)
+	messagesToDelete, err := m.appendOtherMessagesInAlbum(message, localChatID)
 	if err != nil {
 		return nil, err
 	}
