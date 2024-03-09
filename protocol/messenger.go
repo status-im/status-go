@@ -834,7 +834,9 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.startSyncSettingsLoop()
 	m.startSettingsChangesLoop()
 	m.startCommunityRekeyLoop()
-	m.startCuratedCommunitiesUpdateLoop()
+	if m.config.codeControlFlags.CuratedCommunitiesUpdateLoopEnabled {
+		m.startCuratedCommunitiesUpdateLoop()
+	}
 	m.startMessageSegmentsCleanupLoop()
 
 	if err := m.cleanTopics(); err != nil {
@@ -960,7 +962,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 	}
 
 	// Start fetching messages from store nodes
-	if online && m.config.featureFlags.AutoRequestHistoricMessages {
+	if online && m.config.codeControlFlags.AutoRequestHistoricMessages {
 		m.asyncRequestAllHistoricMessages()
 	}
 

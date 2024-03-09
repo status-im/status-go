@@ -131,6 +131,7 @@ func (s *MessengerStoreNodeCommunitySuite) newMessenger(name, storenodeAddress s
 
 	options := []Option{
 		WithAutoRequestHistoricMessages(false),
+		WithCuratedCommunitiesUpdateLoop(false),
 	}
 
 	if storenodeAddress != "" {

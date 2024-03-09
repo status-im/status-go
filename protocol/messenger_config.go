@@ -76,7 +76,8 @@ type config struct {
 	// Config for the envelopes monitor
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig
 
-	featureFlags common.FeatureFlags
+	featureFlags     common.FeatureFlags
+	codeControlFlags common.CodeControlFlags
 
 	appDb                  *sql.DB
 	walletDb               *sql.DB
@@ -125,7 +126,8 @@ func messengerDefaultConfig() config {
 		messageResendMaxCount: 3,
 	}
 
-	c.featureFlags.AutoRequestHistoricMessages = true
+	c.codeControlFlags.AutoRequestHistoricMessages = true
+	c.codeControlFlags.CuratedCommunitiesUpdateLoopEnabled = true
 	return c
 }
 
@@ -406,13 +408,6 @@ func WithCollectiblesManager(collectiblesManager communities.CollectiblesManager
 func WithAccountManager(accountManager account.Manager) Option {
 	return func(c *config) error {
 		c.accountsManager = accountManager
-		return nil
-	}
-}
-
-func WithAutoRequestHistoricMessages(enabled bool) Option {
-	return func(c *config) error {
-		c.featureFlags.AutoRequestHistoricMessages = enabled
 		return nil
 	}
 }

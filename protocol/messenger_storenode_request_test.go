@@ -219,6 +219,7 @@ func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *za
 
 	options := []Option{
 		WithAutoRequestHistoricMessages(false),
+		WithCuratedCommunitiesUpdateLoop(false),
 	}
 
 	if mailserverAddress != "" {
@@ -1233,7 +1234,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 	{
 		// Enable auto request historic messages, so that when bob goes online it will fetch historic messages
 		// We don't enable it earlier to control when we connect to the store node.
-		s.bob.config.featureFlags.AutoRequestHistoricMessages = true
+		s.bob.config.codeControlFlags.AutoRequestHistoricMessages = true
 
 		WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() []string {
 			err := s.bob.DialPeer(storeAddress)
