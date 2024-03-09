@@ -1655,6 +1655,12 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 
 	if updatedRequest != nil {
 		state.Response.AddRequestToJoinCommunity(updatedRequest)
+		if updatedRequest.State == communities.RequestToJoinStateAccepted {
+			err := m.communitiesManager.DeletePendingRequestToJoin(updatedRequest)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	community, err := m.communitiesManager.GetByID(requestToJoinResponseProto.CommunityId)

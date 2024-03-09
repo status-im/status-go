@@ -2235,7 +2235,7 @@ func (m *Manager) DeletePendingRequestToJoin(request *RequestToJoin) error {
 		return err
 	}
 
-	err = m.persistence.DeletePendingRequestToJoin(request.ID)
+	err = m.persistence.DeleteRequestToJoin(request.ID)
 	if err != nil {
 		return err
 	}

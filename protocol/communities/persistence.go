@@ -809,7 +809,7 @@ func (p *Persistence) SetRequestToJoinState(pk string, communityID []byte, state
 	return err
 }
 
-func (p *Persistence) DeletePendingRequestToJoin(id []byte) error {
+func (p *Persistence) DeleteRequestToJoin(id []byte) error {
 	_, err := p.db.Exec(`DELETE FROM communities_requests_to_join WHERE id = ?`, id)
 	return err
 }
