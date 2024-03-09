@@ -2320,39 +2320,41 @@ func (m *Manager) accountsSatisfyPermissionsToJoin(community *Community, account
 }
 
 func (m *Manager) accountsSatisfyPermissionsToJoinChannels(community *Community, accounts []*protobuf.RevealedAccount) (map[string]*protobuf.CommunityChat, map[string]*protobuf.CommunityChat, error) {
+	viewChats := make(map[string]*protobuf.CommunityChat)
+	viewAndPostChats := make(map[string]*protobuf.CommunityChat)
+
 	accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(accounts)
 
-	viewChats, err := m.accountsSatisfyPermissionTypeToJoinChannels(community, accountsAndChainIDs, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	postChats, err := m.accountsSatisfyPermissionTypeToJoinChannels(community, accountsAndChainIDs, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return viewChats, postChats, nil
-}
-
-func (m *Manager) accountsSatisfyPermissionTypeToJoinChannels(community *Community, accounts []*AccountChainIDsCombination, permissionType protobuf.CommunityTokenPermission_Type) (map[string]*protobuf.CommunityChat, error) {
-	result := make(map[string]*protobuf.CommunityChat)
-
 	for channelID, channel := range community.config.CommunityDescription.Chats {
-		permissions := community.ChannelTokenPermissionsByType(community.IDString()+channelID, permissionType)
-		if len(permissions) > 0 {
-			permissionResponse, err := m.PermissionChecker.CheckPermissions(permissions, accounts, true)
-			if err != nil {
-				return nil, err
+		channelViewOnlyPermissions := community.ChannelTokenPermissionsByType(community.IDString()+channelID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
+		channelViewAndPostPermissions := community.ChannelTokenPermissionsByType(community.IDString()+channelID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
+		channelPermissions := append(channelViewOnlyPermissions, channelViewAndPostPermissions...)
+
+		if len(channelPermissions) == 0 {
+			viewAndPostChats[channelID] = channel
+			continue
+		}
+
+		permissionResponse, err := m.PermissionChecker.CheckPermissions(channelPermissions, accountsAndChainIDs, true)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if permissionResponse.Satisfied {
+			highestRole := calculateRolesAndHighestRole(permissionResponse.Permissions).HighestRole
+			if highestRole == nil {
+				return nil, nil, errors.New("failed to calculate highest role")
 			}
-			if !permissionResponse.Satisfied {
-				continue
+			switch highestRole.Role {
+			case protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL:
+				viewChats[channelID] = channel
+			case protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL:
+				viewAndPostChats[channelID] = channel
 			}
 		}
-		result[channelID] = channel
 	}
 
-	return result, nil
+	return viewChats, viewAndPostChats, nil
 }
 
 func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, error) {
