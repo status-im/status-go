@@ -2229,7 +2229,7 @@ func (m *Manager) markRequestToJoinAsAcceptedPending(pk *ecdsa.PublicKey, commun
 	return m.persistence.SetRequestToJoinState(common.PubkeyToHex(pk), community.ID(), RequestToJoinStateAcceptedPending)
 }
 
-func (m *Manager) DeletePendingRequestToJoin(request *RequestToJoin) error {
+func (m *Manager) DeleteRequestToJoin(request *RequestToJoin) error {
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return err

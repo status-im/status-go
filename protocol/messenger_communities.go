@@ -1858,7 +1858,7 @@ func (m *Messenger) CheckAndDeletePendingRequestToJoinCommunity(ctx context.Cont
 		}
 
 		if timeNow >= requestTimeOutClock {
-			err := m.communitiesManager.DeletePendingRequestToJoin(requestToJoin)
+			err := m.communitiesManager.DeleteRequestToJoin(requestToJoin)
 			if err != nil {
 				m.logger.Error("failed to delete pending request to join", zap.String("req-id", requestToJoin.ID.String()), zap.Error(err))
 				return nil, err
