@@ -13,11 +13,11 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 
+	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 

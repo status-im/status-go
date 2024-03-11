@@ -5,11 +5,11 @@ import (
 
 	"github.com/pkg/errors"
 
+	wakumigrations "github.com/status-im/status-go/messaging/transport/migrations"
 	encryptmigrations "github.com/status-im/status-go/protocol/encryption/migrations"
 	appmigrations "github.com/status-im/status-go/protocol/migrations"
 	push_notification_client_migrations "github.com/status-im/status-go/protocol/pushnotificationclient/migrations"
 	push_notification_server_migrations "github.com/status-im/status-go/protocol/pushnotificationserver/migrations"
-	wakumigrations "github.com/status-im/status-go/protocol/transport/migrations"
 )
 
 type getter func(string) ([]byte, error)

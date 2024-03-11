@@ -12,7 +12,7 @@ import (
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/messaging/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
@@ -21,7 +21,7 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
 	{{ range .}}
            case protobuf.ApplicationMetadataMessage_{{.EnumValue}}:
 		return m.{{.MethodName}}(messageState, protoBytes, msg, filter{{ if .FromArchiveArg }}, fromArchive{{ end }})
-        {{ end }}	
+        {{ end }}
 	}
 	m.logger.Info("protobuf type not found", zap.String("type", string(msg.ApplicationLayer.Type)))
 	return errors.New("protobuf type not found")

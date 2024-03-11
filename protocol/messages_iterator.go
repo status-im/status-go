@@ -3,7 +3,7 @@ package protocol
 import (
 	"golang.org/x/exp/maps"
 
-	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/messaging/transport"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 

@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/appdatabase/migrations"
+	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -27,7 +28,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
-	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"

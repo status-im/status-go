@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/t/helpers"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"

@@ -12,8 +12,8 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/deprecation"
+	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/wakuv2"
 )
 

@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	transport2 "github.com/status-im/status-go/protocol/transport"
+	transport2 "github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/t/helpers"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"

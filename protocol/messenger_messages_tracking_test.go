@@ -13,7 +13,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/signal"
 

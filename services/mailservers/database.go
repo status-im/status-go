@@ -11,7 +11,7 @@ import (
 
 	"github.com/multiformats/go-multiaddr"
 
-	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/waku/types"
 )
 

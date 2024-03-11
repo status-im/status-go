@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/deprecation"
+	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/transport"
 )
 
 type ChatPreviewFilterType int

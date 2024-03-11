@@ -22,9 +22,9 @@ import (
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/encryption"
-	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/signal"
 
 	wakutypes "github.com/status-im/status-go/waku/types"

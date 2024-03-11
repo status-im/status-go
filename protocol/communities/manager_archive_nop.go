@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/transport"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 

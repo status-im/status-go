@@ -17,8 +17,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/transport"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
