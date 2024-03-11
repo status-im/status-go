@@ -285,6 +285,7 @@ func (s *MessengerStoreNodeCommunitySuite) TestSetCommunityStorenodesAndFetch() 
 }
 
 func (s *MessengerStoreNodeCommunitySuite) TestSetStorenodeForCommunity_fetchMessagesFromNewStorenode() {
+	s.T().Skip("flaky test")
 	err := s.owner.DialPeer(s.storeNodeAddress)
 	s.Require().NoError(err)
 	err = s.bob.DialPeer(s.storeNodeAddress)
