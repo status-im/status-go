@@ -33,8 +33,6 @@ func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 		return "https://eth-sepolia.g.alchemy.com", nil
 	case walletCommon.OptimismMainnet:
 		return "https://opt-mainnet.g.alchemy.com", nil
-	case walletCommon.OptimismGoerli:
-		return "https://opt-goerli.g.alchemy.com", nil
 	case walletCommon.OptimismSepolia:
 		return "https://opt-sepolia.g.alchemy.com", nil
 	case walletCommon.ArbitrumMainnet:
