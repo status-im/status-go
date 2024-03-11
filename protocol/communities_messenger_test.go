@@ -34,6 +34,7 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/waku"
 )
 
@@ -411,6 +412,12 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().True(response.Communities()[0].JoinedAt() > 0)
 	s.Require().Len(response.Chats(), 2)
 	s.Require().Len(response.Communities()[0].Categories(), 1)
+	s.Require().Len(response.notifications, 1)
+	for _, notification := range response.notifications {
+		s.Require().Equal(notification.Title, community.Name())
+		s.Require().EqualValues(notification.BodyType, localnotifications.CategoryCommunityJoined)
+		s.Require().EqualValues(notification.Category, localnotifications.CategoryCommunityJoined)
+	}
 
 	var categoryID string
 	for k := range response.Communities()[0].Categories() {

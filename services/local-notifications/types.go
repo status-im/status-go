@@ -5,6 +5,7 @@ const (
 	CategoryMessage                PushCategory = "newMessage"
 	CategoryGroupInvite            PushCategory = "groupInvite"
 	CategoryCommunityRequestToJoin              = "communityRequestToJoin"
+	CategoryCommunityJoined                     = "communityJoined"
 
 	TypeTransaction NotificationType = "transaction"
 	TypeMessage     NotificationType = "message"
