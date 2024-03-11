@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1191,6 +1192,189 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 			s.testViewChannelPermissions(tc.viewersCanPostReactions)
 		})
 	}
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhenChangingPermissions() {
+	community, chat := s.createCommunity()
+
+	// bob joins the community
+	s.advertiseCommunityTo(community, s.bob)
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
+
+	community, err := s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+
+	// send message to the channel
+	msg := s.sendChatMessage(s.owner, chat.ID, "hello on open community")
+
+	// bob can read the message
+	response, err := WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			_, ok := r.messages[msg.ID]
+			return ok
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+
+	waitOnBobToBeKickedFromChannel := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		channel, ok := sub.Community.Chats()[chat.CommunityChatID()]
+		return ok && len(channel.Members) == 1
+	})
+	waitOnChannelToBeRekeyedOnceBobIsKicked := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
+		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
+		return ok && (action.ActionType == communities.EncryptionKeyRekey || action.ActionType == communities.EncryptionKeyAdd)
+	})
+
+	// setup view channel permission
+	channelPermissionRequest := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				AmountInWei:       "100000000000000000000",
+				Decimals:          uint64(18),
+			},
+		},
+		ChatIds: []string{chat.ID},
+	}
+
+	response, err = s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.CommunityChanges[0].TokenPermissionsAdded, 1)
+	s.Require().True(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
+
+	err = <-waitOnBobToBeKickedFromChannel
+	s.Require().NoError(err)
+
+	err = <-waitOnChannelToBeRekeyedOnceBobIsKicked
+	s.Require().NoError(err)
+
+	// bob receives community changes
+	// channel members should be empty,
+	// this info is available only to channel members
+	_, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			c, err := s.bob.GetCommunityByID(community.ID())
+			if err != nil {
+				return false
+			}
+			if c == nil {
+				return false
+			}
+			channel := c.Chats()[chat.CommunityChatID()]
+			return channel != nil && len(channel.Members) == 0
+		},
+		"no community that satisfies criteria",
+	)
+	s.Require().NoError(err)
+
+	// make bob satisfy channel criteria
+	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, channelPermissionRequest.TokenCriteria[0])
+	defer s.resetMockedBalances() // reset mocked balances, this test in run with different test cases
+
+	waitOnChannelKeyToBeDistributedToBob := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
+		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
+		if !ok || action.ActionType != communities.EncryptionKeySendToMembers {
+			return false
+		}
+		_, ok = action.Members[common.PubkeyToHex(&s.bob.identity.PublicKey)]
+		return ok
+	})
+
+	// force owner to reevaluate channel members
+	// in production it will happen automatically, by periodic check
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
+	s.Require().NoError(err)
+
+	err = <-waitOnChannelKeyToBeDistributedToBob
+	s.Require().NoError(err)
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	chatID := strings.TrimPrefix(chat.ID, community.IDString())
+	members := community.Chats()[chatID].Members
+	s.Require().Len(members, 2)
+	// confirm that member is a viewer and not a poster
+	s.Require().Equal(protobuf.CommunityMember_CHANNEL_ROLE_VIEWER, members[s.bob.IdentityPublicKeyString()].ChannelRole)
+
+	// send message to the channel
+	msg = s.sendChatMessage(s.owner, chat.ID, "hello on closed channel")
+
+	// bob can read the message
+	response, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			_, ok := r.messages[msg.ID]
+			return ok
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+
+	tokenPermissions := community.TokenPermissions()
+
+	var tokenPermissionID string
+	for id := range tokenPermissions {
+		tokenPermissionID = id
+	}
+
+	// Edit permission so that Bob can now be a poster to show that member role can be edited
+	channelPermissionRequest.Type = protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL
+	editChannelPermissionRequest := requests.EditCommunityTokenPermission{
+		PermissionID:                   tokenPermissionID,
+		CreateCommunityTokenPermission: channelPermissionRequest,
+	}
+	response, err = s.owner.EditCommunityTokenPermission(&editChannelPermissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().True(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
+	s.Require().Len(response.CommunityChanges[0].TokenPermissionsModified, 1)
+
+	// force owner to reevaluate channel members
+	// in production it will happen automatically, by periodic check
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	roles, err := s.owner.communitiesManager.ReevaluateMembers(community)
+	s.Require().NoError(err)
+	s.Require().Len(roles, 2)
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+
+	members = community.Chats()[chatID].Members
+	s.Require().Len(members, 2)
+	// confirm that member is now a poster
+	s.Require().Equal(protobuf.CommunityMember_CHANNEL_ROLE_POSTER, members[s.bob.IdentityPublicKeyString()].ChannelRole)
+
+	err = <-waitOnChannelKeyToBeDistributedToBob
+	s.Require().NoError(err)
+
+	msg = s.sendChatMessage(s.bob, chat.ID, "hello on closed channel from Bob")
+
+	// owner can read the message
+	response, err = WaitOnMessengerResponse(
+		s.owner,
+		func(r *MessengerResponse) bool {
+			_, ok := r.messages[msg.ID]
+			return ok
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(msg.Text, response.Messages()[0].Text)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivilegedRoleInOpenCommunity(permissionType protobuf.CommunityTokenPermission_Type) {
