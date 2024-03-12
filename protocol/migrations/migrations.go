@@ -129,6 +129,7 @@
 // 1708440786_profile_showcase_social_links.up.sql (906B)
 // 1709805967_simplify_profile_showcase_preferences.up.sql (701B)
 // 1709828431_add_community_description_cache.up.sql (730B)
+// 1710331283_add_bio_to_contacts.up.sql (42B)
 // README.md (554B)
 // doc.go (870B)
 
@@ -2778,6 +2779,26 @@ func _1709828431_add_community_description_cacheUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1710331283_add_bio_to_contactsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\xce\xcf\x2b\x49\x4c\x2e\x29\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\xca\xcc\x57\x08\x71\x8d\x08\xb1\xe6\x02\x04\x00\x00\xff\xff\xb8\x6b\x6f\x26\x2a\x00\x00\x00")
+
+func _1710331283_add_bio_to_contactsUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1710331283_add_bio_to_contactsUpSql,
+		"1710331283_add_bio_to_contacts.up.sql",
+	)
+}
+
+func _1710331283_add_bio_to_contactsUpSql() (*asset, error) {
+	bytes, err := _1710331283_add_bio_to_contactsUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1710331283_add_bio_to_contacts.up.sql", size: 42, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc2, 0xe8, 0x4b, 0xa8, 0xd9, 0xa0, 0xc4, 0xd, 0x3d, 0x15, 0x3a, 0xc8, 0x98, 0x33, 0xb2, 0x8b, 0x4c, 0x0, 0xad, 0xfc, 0x92, 0x51, 0xeb, 0xf5, 0x1, 0xd2, 0x15, 0x8f, 0xc9, 0x79, 0x8e, 0x81}}
+	return a, nil
+}
+
 var _readmeMd = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x54\x91\xc1\xce\xd3\x30\x10\x84\xef\x7e\x8a\x91\x7a\x01\xa9\x2a\x8f\xc0\x0d\x71\x82\x03\x48\x1c\xc9\x36\x9e\x36\x96\x1c\x6f\xf0\xae\x93\xe6\xed\x91\xa3\xc2\xdf\xff\x66\xed\xd8\x33\xdf\x78\x4f\xa7\x13\xbe\xea\x06\x57\x6c\x35\x39\x31\xa7\x7b\x15\x4f\x5a\xec\x73\x08\xbf\x08\x2d\x79\x7f\x4a\x43\x5b\x86\x17\xfd\x8c\x21\xea\x56\x5e\x47\x90\x4a\x14\x75\x48\xde\x64\x37\x2c\x6a\x96\xae\x99\x48\x05\xf6\x27\x77\x13\xad\x08\xae\x8a\x51\xe7\x25\xf3\xf1\xa9\x9f\xf9\x58\x58\x2c\xad\xbc\xe0\x8b\x56\xf0\x21\x5d\xeb\x4c\x95\xb3\xae\x84\x60\xd4\xdc\xe6\x82\x5d\x1b\x36\x6d\x39\x62\x92\xf5\xb8\x11\xdb\x92\xd3\x28\xce\xe0\x13\xe1\x72\xcd\x3c\x63\xd4\x65\x87\xae\xac\xe8\xc3\x28\x2e\x67\x44\x66\x3a\x21\x25\xa2\x72\xac\x14\x67\xbc\x84\x9f\x53\x32\x8c\x52\x70\x25\x56\xd6\xfd\x8d\x05\x37\xad\x30\x9d\x9f\xa6\x86\x0f\xcd\x58\x7f\xcf\x34\x93\x3b\xed\x90\x9f\xa4\x1f\xcf\x30\x85\x4d\x07\x58\xaf\x7f\x25\xc4\x9d\xf3\x72\x64\x84\xd0\x7f\xf9\x9b\x3a\x2d\x84\xef\x85\x48\x66\x8d\xd8\x88\x9b\x8c\x8c\x98\x5b\xf6\x74\x14\x4e\x33\x0d\xc9\xe0\x93\x38\xda\x12\xc5\x69\xbd\xe4\xf0\x2e\x7a\x78\x07\x1c\xfe\x13\x9f\x91\x29\x31\x95\x7b\x7f\x62\x59\x37\xb4\xe5\x5e\x25\xfe\x33\xee\xd5\x53\x71\xd6\xda\x3a\xd8\xcb\xde\x2e\xf8\xa1\x90\x55\x53\x0c\xc7\xaa\x0d\xe9\x76\x14\x29\x1c\x7b\x68\xdd\x2f\xe1\x6f\x00\x00\x00\xff\xff\x3c\x0a\xc2\xfe\x2a\x02\x00\x00")
 
 func readmeMdBytes() ([]byte, error) {
@@ -3038,8 +3059,9 @@ var _bindata = map[string]func() (*asset, error){
 	"1708440786_profile_showcase_social_links.up.sql":                             _1708440786_profile_showcase_social_linksUpSql,
 	"1709805967_simplify_profile_showcase_preferences.up.sql":                     _1709805967_simplify_profile_showcase_preferencesUpSql,
 	"1709828431_add_community_description_cache.up.sql":                           _1709828431_add_community_description_cacheUpSql,
-	"README.md": readmeMd,
-	"doc.go":    docGo,
+	"1710331283_add_bio_to_contacts.up.sql":                                       _1710331283_add_bio_to_contactsUpSql,
+	"README.md":                                                                   readmeMd,
+	"doc.go":                                                                      docGo,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -3217,8 +3239,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1708440786_profile_showcase_social_links.up.sql":                             {_1708440786_profile_showcase_social_linksUpSql, map[string]*bintree{}},
 	"1709805967_simplify_profile_showcase_preferences.up.sql":                     {_1709805967_simplify_profile_showcase_preferencesUpSql, map[string]*bintree{}},
 	"1709828431_add_community_description_cache.up.sql":                           {_1709828431_add_community_description_cacheUpSql, map[string]*bintree{}},
-	"README.md": {readmeMd, map[string]*bintree{}},
-	"doc.go":    {docGo, map[string]*bintree{}},
+	"1710331283_add_bio_to_contacts.up.sql":                                       {_1710331283_add_bio_to_contactsUpSql, map[string]*bintree{}},
+	"README.md":                                                                   {readmeMd, map[string]*bintree{}},
+	"doc.go":                                                                      {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
