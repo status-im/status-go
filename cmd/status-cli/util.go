@@ -78,7 +78,12 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCLI, error) {
 		return nil, errors.New("waku service is not available")
 	}
 	wakuApi := wakuv2ext.NewPublicAPI(wakuService)
+
 	messenger := wakuApi.Messenger()
+	_, err = wakuApi.StartMessenger()
+	if err != nil {
+		return nil, err
+	}
 
 	namedLogger.Info("messenger started, public key: ", messenger.IdentityPublicKeyString())
 
