@@ -34,9 +34,10 @@ func serve(cCtx *cli.Context) error {
 	}
 
 	name := cCtx.String(NameFlag)
+	port := cCtx.Int(PortFlag)
 
 	// Start Alice and Bob's messengers
-	messenger, err := startMessenger(cCtx, name)
+	messenger, err := startMessenger(cCtx, name, port)
 	if err != nil {
 		return err
 	}

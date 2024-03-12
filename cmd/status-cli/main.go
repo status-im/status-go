@@ -17,6 +17,7 @@ const InteractiveFlag = "interactive"
 const CountFlag = "count"
 const NameFlag = "name"
 const AddFlag = "add"
+const PortFlag = "port"
 
 const RetrieveInterval = 300 * time.Millisecond
 const SendInterval = 1 * time.Second
@@ -78,6 +79,12 @@ func main() {
 						Name:    AddFlag,
 						Aliases: []string{"a"},
 						Usage:   "Add a friend with the public key",
+					},
+					&cli.IntFlag{
+						Name:    PortFlag,
+						Aliases: []string{"p"},
+						Value:   8545,
+						Usage:   "HTTP Server port to listen on",
 					},
 				}, CommonFlags...),
 				Action: func(cCtx *cli.Context) error {

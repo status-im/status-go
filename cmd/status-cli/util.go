@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/urfave/cli/v2"
@@ -35,7 +36,18 @@ func setupLogger(file string) *zap.Logger {
 	return newLogger
 }
 
-func startMessenger(cCtx *cli.Context, name string) (*StatusCLI, error) {
+func withHTTP(port int) params.Option {
+	return func(c *params.NodeConfig) error {
+		c.APIModules = "waku,wakuext,wakuv2,permissions,eth"
+		c.HTTPEnabled = true
+		c.HTTPHost = "127.0.0.1"
+		c.HTTPPort = port
+
+		return nil
+	}
+}
+
+func startMessenger(cCtx *cli.Context, name string, port int) (*StatusCLI, error) {
 	namedLogger := logger.Named(name)
 	namedLogger.Info("starting messager")
 
@@ -68,7 +80,8 @@ func startMessenger(cCtx *cli.Context, name string) (*StatusCLI, error) {
 		NetworkID:             1,
 		LogFilePath:           "log",
 	}
-	_, err = backend.CreateAccountAndLogin(createAccountRequest)
+	opts := []params.Option{withHTTP(port)}
+	_, err = backend.CreateAccountAndLogin(createAccountRequest, opts...)
 	if err != nil {
 		return nil, err
 	}

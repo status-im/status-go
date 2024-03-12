@@ -37,13 +37,13 @@ func simulate(cCtx *cli.Context) error {
 	}
 
 	// Start Alice and Bob's messengers
-	alice, err := startMessenger(cCtx, "Alice")
+	alice, err := startMessenger(cCtx, "Alice", 0)
 	if err != nil {
 		return err
 	}
 	defer stopMessenger(alice)
 
-	bob, err := startMessenger(cCtx, "Bob")
+	bob, err := startMessenger(cCtx, "Bob", 0)
 	if err != nil {
 		return err
 	}
