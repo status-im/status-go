@@ -16,6 +16,8 @@ Go to `cmd/status-cli` directory and build the binary
 go build
 ```
 
+You can also run `make status-cli` in the root directory to build the binary.
+
 ## Run
 
 ### Run `serve` command:
