@@ -52,7 +52,7 @@ const (
 type Entry struct {
 	payloadType     PayloadType
 	transaction     *transfer.TransactionIdentity
-	id              transfer.MultiTransactionIDType
+	id              common.MultiTransactionIDType
 	timestamp       int64
 	activityType    Type
 	activityStatus  Status
@@ -75,25 +75,25 @@ type Entry struct {
 
 // Only used for JSON marshalling
 type EntryData struct {
-	PayloadType     PayloadType                      `json:"payloadType"`
-	Transaction     *transfer.TransactionIdentity    `json:"transaction,omitempty"`
-	ID              *transfer.MultiTransactionIDType `json:"id,omitempty"`
-	Timestamp       *int64                           `json:"timestamp,omitempty"`
-	ActivityType    *Type                            `json:"activityType,omitempty"`
-	ActivityStatus  *Status                          `json:"activityStatus,omitempty"`
-	AmountOut       *hexutil.Big                     `json:"amountOut,omitempty"`
-	AmountIn        *hexutil.Big                     `json:"amountIn,omitempty"`
-	TokenOut        *Token                           `json:"tokenOut,omitempty"`
-	TokenIn         *Token                           `json:"tokenIn,omitempty"`
-	SymbolOut       *string                          `json:"symbolOut,omitempty"`
-	SymbolIn        *string                          `json:"symbolIn,omitempty"`
-	Sender          *eth.Address                     `json:"sender,omitempty"`
-	Recipient       *eth.Address                     `json:"recipient,omitempty"`
-	ChainIDOut      *common.ChainID                  `json:"chainIdOut,omitempty"`
-	ChainIDIn       *common.ChainID                  `json:"chainIdIn,omitempty"`
-	TransferType    *TransferType                    `json:"transferType,omitempty"`
-	ContractAddress *eth.Address                     `json:"contractAddress,omitempty"`
-	CommunityID     *string                          `json:"communityId,omitempty"`
+	PayloadType     PayloadType                    `json:"payloadType"`
+	Transaction     *transfer.TransactionIdentity  `json:"transaction,omitempty"`
+	ID              *common.MultiTransactionIDType `json:"id,omitempty"`
+	Timestamp       *int64                         `json:"timestamp,omitempty"`
+	ActivityType    *Type                          `json:"activityType,omitempty"`
+	ActivityStatus  *Status                        `json:"activityStatus,omitempty"`
+	AmountOut       *hexutil.Big                   `json:"amountOut,omitempty"`
+	AmountIn        *hexutil.Big                   `json:"amountIn,omitempty"`
+	TokenOut        *Token                         `json:"tokenOut,omitempty"`
+	TokenIn         *Token                         `json:"tokenIn,omitempty"`
+	SymbolOut       *string                        `json:"symbolOut,omitempty"`
+	SymbolIn        *string                        `json:"symbolIn,omitempty"`
+	Sender          *eth.Address                   `json:"sender,omitempty"`
+	Recipient       *eth.Address                   `json:"recipient,omitempty"`
+	ChainIDOut      *common.ChainID                `json:"chainIdOut,omitempty"`
+	ChainIDIn       *common.ChainID                `json:"chainIdIn,omitempty"`
+	TransferType    *TransferType                  `json:"transferType,omitempty"`
+	ContractAddress *eth.Address                   `json:"contractAddress,omitempty"`
+	CommunityID     *string                        `json:"communityId,omitempty"`
 
 	IsNew *bool `json:"isNew,omitempty"`
 
@@ -196,7 +196,7 @@ func newActivityEntryWithTransaction(pending bool, transaction *transfer.Transac
 	}
 }
 
-func NewActivityEntryWithMultiTransaction(id transfer.MultiTransactionIDType, timestamp int64, activityType Type, activityStatus Status) Entry {
+func NewActivityEntryWithMultiTransaction(id common.MultiTransactionIDType, timestamp int64, activityType Type, activityStatus Status) Entry {
 	return Entry{
 		payloadType:    MultiTransactionPT,
 		id:             id,
@@ -660,7 +660,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 				*inChainID = common.ChainID(inChainIDDB.Int64)
 			}
 
-			entry = NewActivityEntryWithMultiTransaction(transfer.MultiTransactionIDType(multiTxID.Int64),
+			entry = NewActivityEntryWithMultiTransaction(common.MultiTransactionIDType(multiTxID.Int64),
 				timestamp, activityType, activityStatus)
 
 			// Extract tokens

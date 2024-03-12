@@ -147,8 +147,8 @@ func TestGetTransfersForIdentities(t *testing.T) {
 	require.Equal(t, uint64(trs[3].Timestamp), entries[1].Timestamp)
 	require.Equal(t, uint64(trs[1].ChainID), entries[0].NetworkID)
 	require.Equal(t, uint64(trs[3].ChainID), entries[1].NetworkID)
-	require.Equal(t, MultiTransactionIDType(0), entries[0].MultiTransactionID)
-	require.Equal(t, MultiTransactionIDType(0), entries[1].MultiTransactionID)
+	require.Equal(t, w_common.MultiTransactionIDType(0), entries[0].MultiTransactionID)
+	require.Equal(t, w_common.MultiTransactionIDType(0), entries[1].MultiTransactionID)
 }
 
 func TestGetLatestCollectibleTransfer(t *testing.T) {

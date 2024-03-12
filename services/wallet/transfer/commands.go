@@ -352,7 +352,7 @@ func (c *transfersCommand) confirmPendingTransactions(tx *sql.Tx, allTransfers [
 		}
 
 		if mTID != nil {
-			allTransfers[i].MultiTransactionID = MultiTransactionIDType(*mTID)
+			allTransfers[i].MultiTransactionID = w_common.MultiTransactionIDType(*mTID)
 		}
 		if txType != nil && *txType == transactions.WalletTransfer {
 			notify, err := c.pendingTxManager.DeleteBySQLTx(tx, chainID, txHash)
@@ -366,7 +366,7 @@ func (c *transfersCommand) confirmPendingTransactions(tx *sql.Tx, allTransfers [
 }
 
 // Mark all subTxs of a given Tx with the same multiTxID
-func setMultiTxID(tx Transaction, multiTxID MultiTransactionIDType) {
+func setMultiTxID(tx Transaction, multiTxID w_common.MultiTransactionIDType) {
 	for _, subTx := range tx {
 		subTx.MultiTransactionID = multiTxID
 	}
@@ -422,7 +422,7 @@ func (c *transfersCommand) checkAndProcessBridgeMultiTx(ctx context.Context, tx 
 			}
 
 			if multiTransaction != nil {
-				setMultiTxID(tx, MultiTransactionIDType(multiTransaction.ID))
+				setMultiTxID(tx, multiTransaction.ID)
 				c.markMultiTxTokensAsPreviouslyOwned(ctx, multiTransaction, subTx.Address)
 				return true, nil
 			}

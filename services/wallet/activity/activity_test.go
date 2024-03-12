@@ -109,10 +109,10 @@ type testData struct {
 	multiTx2PendingTr transfer.TestTransfer // index 7, DAI/Mainnet
 
 	multiTx1   transfer.TestMultiTransaction
-	multiTx1ID transfer.MultiTransactionIDType
+	multiTx1ID common.MultiTransactionIDType
 
 	multiTx2   transfer.TestMultiTransaction
-	multiTx2ID transfer.MultiTransactionIDType
+	multiTx2ID common.MultiTransactionIDType
 
 	nextIndex int
 }
@@ -640,7 +640,7 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 	multiTxs[3] = transfer.GenerateTestBridgeMultiTransaction(trs[6], trs[7])
 	multiTxs[4] = transfer.GenerateTestSendMultiTransaction(trs[8]) // trs[9]
 
-	var lastMT transfer.MultiTransactionIDType
+	var lastMT common.MultiTransactionIDType
 	for i := range trs {
 		if i%2 == 0 {
 			lastMT = transfer.InsertTestMultiTransaction(t, deps.db, &multiTxs[i/2])

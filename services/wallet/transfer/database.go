@@ -444,7 +444,7 @@ type transferDBFields struct {
 	log                *types.Log
 	transferType       w_common.Type
 	baseGasFees        string
-	multiTransactionID MultiTransactionIDType
+	multiTransactionID w_common.MultiTransactionIDType
 	receiptStatus      *uint64
 	receiptType        *uint8
 	txHash             *common.Hash

@@ -27,7 +27,7 @@ type TestTransaction struct {
 	Success            bool
 	Nonce              uint64
 	Contract           eth_common.Address
-	MultiTransactionID MultiTransactionIDType
+	MultiTransactionID common.MultiTransactionIDType
 }
 
 type TestTransfer struct {
@@ -38,7 +38,7 @@ type TestTransfer struct {
 }
 
 type TestMultiTransaction struct {
-	MultiTransactionID   MultiTransactionIDType
+	MultiTransactionID   common.MultiTransactionIDType
 	MultiTransactionType MultiTransactionType
 	FromAddress          eth_common.Address
 	ToAddress            eth_common.Address
@@ -78,7 +78,7 @@ func generateTestTransaction(seed int) TestTransaction {
 		Nonce:     uint64(seed),
 		// In practice this is last20Bytes(Keccak256(RLP(From, nonce)))
 		Contract:           eth_common.HexToAddress(fmt.Sprintf("0x4%d", seed)),
-		MultiTransactionID: NoMultiTransactionID,
+		MultiTransactionID: common.NoMultiTransactionID,
 	}
 }
 
@@ -367,7 +367,7 @@ func InsertTestPendingTransaction(tb testing.TB, db *sql.DB, tr *TestTransfer) {
 	require.NoError(tb, err)
 }
 
-func InsertTestMultiTransaction(tb testing.TB, db *sql.DB, tr *TestMultiTransaction) MultiTransactionIDType {
+func InsertTestMultiTransaction(tb testing.TB, db *sql.DB, tr *TestMultiTransaction) common.MultiTransactionIDType {
 	fromTokenType := tr.FromToken
 	if tr.FromToken == "" {
 		fromTokenType = testutils.EthSymbol
@@ -386,7 +386,7 @@ func InsertTestMultiTransaction(tb testing.TB, db *sql.DB, tr *TestMultiTransact
 	require.NoError(tb, err)
 	rowID, err := result.LastInsertId()
 	require.NoError(tb, err)
-	tr.MultiTransactionID = MultiTransactionIDType(rowID)
+	tr.MultiTransactionID = common.MultiTransactionIDType(rowID)
 	return tr.MultiTransactionID
 }
 

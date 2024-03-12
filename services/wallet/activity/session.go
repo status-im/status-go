@@ -21,7 +21,7 @@ const nilStr = "nil"
 type EntryIdentity struct {
 	payloadType PayloadType
 	transaction *transfer.TransactionIdentity
-	id          transfer.MultiTransactionIDType
+	id          common.MultiTransactionIDType
 }
 
 func (e EntryIdentity) same(a EntryIdentity) bool {
