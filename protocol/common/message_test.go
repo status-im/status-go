@@ -185,7 +185,7 @@ func TestConvertLinkPreviewsToProto(t *testing.T) {
 	invalidPreview.Thumbnail.DataURI = "data:hello/png,iVBOR"
 	msg.LinkPreviews = []LinkPreview{invalidPreview}
 	_, err = msg.ConvertLinkPreviewsToProto()
-	require.ErrorContains(t, err, "could not get data URI payload, url='https://github.com': wrong uri format")
+	require.ErrorContains(t, err, "could not get data URI payload for link preview thumbnail, url='https://github.com': wrong uri format")
 
 	// Test thumbnail is optional.
 	somePreview := validPreview
@@ -240,7 +240,7 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 	// fetched from the media server.
 	require.Equal(t, "", p.Thumbnail.DataURI)
 	require.Equal(t, "https://localhost:6666/42-https://github.com", p.Thumbnail.URL)
-	require.Equal(t, "https://localhost:6666/42-https://github.com", p.Favicon)
+	require.Equal(t, "https://localhost:6666/42-https://github.com", p.Favicon.URL)
 
 	// Test when the URL is not parseable by url.Parse.
 	l.Url = "postgres://user:abc{DEf1=ghi@example.com:5432/db?sslmode=require"
