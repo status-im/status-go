@@ -18,7 +18,6 @@ import (
 
 	"github.com/imdario/mergo"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -49,7 +48,6 @@ import (
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
-	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
@@ -1911,24 +1909,7 @@ func (b *GethStatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, pa
 		return hash, err
 	}
 
-	hash, err = b.transactor.SendTransaction(sendArgs, verifiedAccount)
-	if err != nil {
-		return
-	}
-
-	err = b.statusNode.PendingTracker().TrackPendingTransaction(
-		wcommon.ChainID(b.transactor.NetworkID()),
-		common.Hash(hash),
-		common.Address(sendArgs.From),
-		transactions.WalletTransfer,
-		transactions.AutoDelete,
-	)
-	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
-		return
-	}
-
-	return
+	return b.transactor.SendTransaction(sendArgs, verifiedAccount)
 }
 
 func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs transactions.SendTxArgs, password string) (hash types.Hash, err error) {
@@ -1937,45 +1918,11 @@ func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs 
 		return hash, err
 	}
 
-	hash, err = b.transactor.SendTransactionWithChainID(chainID, sendArgs, verifiedAccount)
-	if err != nil {
-		return
-	}
-
-	err = b.statusNode.PendingTracker().TrackPendingTransaction(
-		wcommon.ChainID(b.transactor.NetworkID()),
-		common.Hash(hash),
-		common.Address(sendArgs.From),
-		transactions.WalletTransfer,
-		transactions.AutoDelete,
-	)
-	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
-		return
-	}
-
-	return
+	return b.transactor.SendTransactionWithChainID(chainID, sendArgs, verifiedAccount)
 }
 
 func (b *GethStatusBackend) SendTransactionWithSignature(sendArgs transactions.SendTxArgs, sig []byte) (hash types.Hash, err error) {
-	hash, err = b.transactor.BuildTransactionAndSendWithSignature(b.transactor.NetworkID(), sendArgs, sig)
-	if err != nil {
-		return
-	}
-
-	err = b.statusNode.PendingTracker().TrackPendingTransaction(
-		wcommon.ChainID(b.transactor.NetworkID()),
-		common.Hash(hash),
-		common.Address(sendArgs.From),
-		transactions.WalletTransfer,
-		transactions.AutoDelete,
-	)
-	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
-		return
-	}
-
-	return
+	return b.transactor.BuildTransactionAndSendWithSignature(b.transactor.NetworkID(), sendArgs, sig)
 }
 
 // HashTransaction validate the transaction and returns new sendArgs and the transaction hash.

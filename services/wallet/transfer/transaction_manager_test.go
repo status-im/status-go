@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 
@@ -77,11 +78,11 @@ func TestBridgeMultiTransactions(t *testing.T) {
 	trxs := []*MultiTransaction{&trx1, &trx2}
 
 	var err error
-	ids := make([]MultiTransactionIDType, len(trxs))
+	ids := make([]wallet_common.MultiTransactionIDType, len(trxs))
 	for i, trx := range trxs {
 		ids[i], err = insertMultiTransaction(manager.db, trx)
 		require.NoError(t, err)
-		require.Equal(t, MultiTransactionIDType(i+1), ids[i])
+		require.Equal(t, wallet_common.MultiTransactionIDType(i+1), ids[i])
 	}
 
 	rst, err := manager.GetBridgeOriginMultiTransaction(context.Background(), trx1.ToNetworkID, trx1.CrossTxID)
@@ -129,14 +130,14 @@ func TestMultiTransactions(t *testing.T) {
 	trxs := []*MultiTransaction{&trx1, &trx2}
 
 	var err error
-	ids := make([]MultiTransactionIDType, len(trxs))
+	ids := make([]wallet_common.MultiTransactionIDType, len(trxs))
 	for i, trx := range trxs {
 		ids[i], err = insertMultiTransaction(manager.db, trx)
 		require.NoError(t, err)
-		require.Equal(t, MultiTransactionIDType(i+1), ids[i])
+		require.Equal(t, wallet_common.MultiTransactionIDType(i+1), ids[i])
 	}
 
-	rst, err := manager.GetMultiTransactions(context.Background(), []MultiTransactionIDType{ids[0], 555})
+	rst, err := manager.GetMultiTransactions(context.Background(), []wallet_common.MultiTransactionIDType{ids[0], 555})
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rst))
 	require.True(t, areMultiTransactionsEqual(trxs[0], rst[0]))
@@ -153,7 +154,7 @@ func TestMultiTransactions(t *testing.T) {
 	for i, id := range ids {
 		found := false
 		for _, trx := range rst {
-			if id == MultiTransactionIDType(trx.ID) {
+			if id == trx.ID {
 				found = true
 				require.True(t, areMultiTransactionsEqual(trxs[i], trx))
 				break

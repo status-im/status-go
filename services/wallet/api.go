@@ -571,7 +571,7 @@ func (api *API) ProceedWithTransactionsSignatures(ctx context.Context, signature
 	return api.s.transactionManager.ProceedWithTransactionsSignatures(ctx, signatures)
 }
 
-func (api *API) GetMultiTransactions(ctx context.Context, transactionIDs []transfer.MultiTransactionIDType) ([]*transfer.MultiTransaction, error) {
+func (api *API) GetMultiTransactions(ctx context.Context, transactionIDs []wcommon.MultiTransactionIDType) ([]*transfer.MultiTransaction, error) {
 	log.Debug("wallet.api.GetMultiTransactions", "IDs.len", len(transactionIDs))
 	return api.s.transactionManager.GetMultiTransactions(ctx, transactionIDs)
 }
