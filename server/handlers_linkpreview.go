@@ -108,18 +108,22 @@ func checkForFetchImageError(err error, logger *zap.Logger, parsedImageParams Im
 func handleLinkPreviewThumbnail(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		parsed := validateAndReturnImageParams(r, w, logger)
-		thumbnail, err := getThumbnailPayload(db, parsed.MessageID, parsed.URL)
-		checkForFetchImageError(err, logger, parsed, w, "thumbnail")
-		getMimeTypeAndWriteImage(w, logger, thumbnail)
+		if parsed.URL != "" {
+			thumbnail, err := getThumbnailPayload(db, parsed.MessageID, parsed.URL)
+			checkForFetchImageError(err, logger, parsed, w, "thumbnail")
+			getMimeTypeAndWriteImage(w, logger, thumbnail)
+		}
 	}
 }
 
 func handleLinkPreviewFavicon(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		parsed := validateAndReturnImageParams(r, w, logger)
-		favicon, err := getFaviconPayload(db, parsed.MessageID, parsed.URL)
-		checkForFetchImageError(err, logger, parsed, w, "favicon")
-		getMimeTypeAndWriteImage(w, logger, favicon)
+		if parsed.URL != "" {
+			favicon, err := getFaviconPayload(db, parsed.MessageID, parsed.URL)
+			checkForFetchImageError(err, logger, parsed, w, "favicon")
+			getMimeTypeAndWriteImage(w, logger, favicon)
+		}
 	}
 }
 
