@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wakuv2ext"
+
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 )
@@ -59,16 +60,6 @@ func startMessenger(cCtx *cli.Context, name string, port int) (*StatusCLI, error
 		return nil, err
 	}
 
-	// "APIModules": "waku,wakuext,wakuv2,permissions,eth",
-	// "HTTPEnabled": true,
-	// "HTTPHost": "localhost",
-	// "HTTPPort": 8545,
-	// "WakuV2Config": {
-	// 	"Enabled": true
-	// },
-	// "IPCEnabled": true,
-	// "ListenAddr": ":30313"
-
 	backend := api.NewGethStatusBackend()
 
 	createAccountRequest := &requests.CreateAccount{
@@ -90,10 +81,10 @@ func startMessenger(cCtx *cli.Context, name string, port int) (*StatusCLI, error
 	if wakuService == nil {
 		return nil, errors.New("waku service is not available")
 	}
-	wakuApi := wakuv2ext.NewPublicAPI(wakuService)
+	wakuAPI := wakuv2ext.NewPublicAPI(wakuService)
 
-	messenger := wakuApi.Messenger()
-	_, err = wakuApi.StartMessenger()
+	messenger := wakuAPI.Messenger()
+	_, err = wakuAPI.StartMessenger()
 	if err != nil {
 		return nil, err
 	}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 )
@@ -54,14 +55,14 @@ func simulate(cCtx *cli.Context) error {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	go retrieveMessagesLoop(alice, RetrieveInterval, nil, ctx, &wg)
+	go retrieveMessagesLoop(ctx, alice, RetrieveInterval, nil, &wg)
 	wg.Add(1)
-	go retrieveMessagesLoop(bob, RetrieveInterval, msgCh, ctx, &wg)
+	go retrieveMessagesLoop(ctx, bob, RetrieveInterval, msgCh, &wg)
 
 	// Send contact request from Alice to Bob, bob accept the request
 	time.Sleep(WaitingInterval)
-	destId := types.EncodeHex(crypto.FromECDSAPub(bob.messenger.IdentityPublicKey()))
-	err = sendContactRequest(cCtx, alice, destId)
+	destID := types.EncodeHex(crypto.FromECDSAPub(bob.messenger.IdentityPublicKey()))
+	err = sendContactRequest(cCtx, alice, destID)
 	if err != nil {
 		return err
 	}
@@ -77,19 +78,19 @@ func simulate(cCtx *cli.Context) error {
 	if interactive {
 		sem := make(chan struct{}, 1)
 		wg.Add(1)
-		go sendMessageLoop(alice, SendInterval, ctx, &wg, sem, cancel)
+		go sendMessageLoop(ctx, alice, SendInterval, &wg, sem, cancel)
 		wg.Add(1)
-		go sendMessageLoop(bob, SendInterval, ctx, &wg, sem, cancel)
+		go sendMessageLoop(ctx, bob, SendInterval, &wg, sem, cancel)
 	} else {
 		time.Sleep(WaitingInterval)
 		for i := 0; i < cCtx.Int(CountFlag); i++ {
-			err = sendDirectMessage(alice, "hello bob :)", ctx)
+			err = sendDirectMessage(ctx, alice, "hello bob :)")
 			if err != nil {
 				return err
 			}
 			time.Sleep(WaitingInterval)
 
-			err = sendDirectMessage(bob, "hello Alice ~", ctx)
+			err = sendDirectMessage(ctx, bob, "hello Alice ~")
 			if err != nil {
 				return err
 			}

@@ -6,6 +6,5 @@
 	"WakuV2Config": {
 		"Enabled": true
 	},
-	"IPCEnabled": true,
-	"ListenAddr": ":30313"
+	"IPCEnabled": true
 }

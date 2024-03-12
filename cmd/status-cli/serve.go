@@ -48,7 +48,7 @@ func serve(cCtx *cli.Context) error {
 	msgCh := make(chan string)
 
 	wg.Add(1)
-	go retrieveMessagesLoop(messenger, RetrieveInterval, msgCh, ctx, &wg)
+	go retrieveMessagesLoop(ctx, messenger, RetrieveInterval, msgCh, &wg)
 
 	// Send contact request from Alice to Bob, bob accept the request
 	dest := cCtx.String(AddFlag)
@@ -71,7 +71,7 @@ func serve(cCtx *cli.Context) error {
 	// Send message if mutual contact exists
 	sem := make(chan struct{}, 1)
 	wg.Add(1)
-	go sendMessageLoop(messenger, SendInterval, ctx, &wg, sem, cancel)
+	go sendMessageLoop(ctx, messenger, SendInterval, &wg, sem, cancel)
 
 	wg.Wait()
 	logger.Info("Exiting")
