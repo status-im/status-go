@@ -477,6 +477,9 @@ func (api *API) getCommunityByID(id string) (*communities.Community, error) {
 }
 
 func (chat *Chat) populateCommunityFields(community *communities.Community) error {
+	chat.CanPost = true
+	chat.CanPostMessages = true
+	chat.CanPostReactions = true
 	if community == nil {
 		return nil
 	}
