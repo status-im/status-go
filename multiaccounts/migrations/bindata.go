@@ -13,7 +13,6 @@
 // 1679505708_add_customization_color.up.sql (78B)
 // 1687853321_add_customization_color_updated_at.up.sql (80B)
 // doc.go (94B)
-// test.log (81B)
 
 package migrations
 
@@ -341,26 +340,6 @@ func docGo() (*asset, error) {
 	return a, nil
 }
 
-var _testLog = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x3c\xc6\xb1\x0d\x84\x30\x0c\x05\xd0\x3a\x37\x85\x17\x38\x3c\x02\x83\x20\x8a\x10\x85\x60\x29\x89\x05\xff\x7b\x7f\x3a\xba\xb7\x8a\x48\x6a\xc6\x2b\x8e\xa5\xf8\x50\x30\x33\xf0\xb7\x4f\xcd\x75\x44\xa7\xe5\x52\x3c\x26\xa1\xc3\xda\x93\x69\x3e\xa1\xb8\x7b\xda\xa6\x0b\x2b\x28\xa7\xf5\x8a\xfd\xf7\x06\x00\x00\xff\xff\x2e\xf4\x6d\xd4\x51\x00\x00\x00")
-
-func testLogBytes() ([]byte, error) {
-	return bindataRead(
-		_testLog,
-		"test.log",
-	)
-}
-
-func testLog() (*asset, error) {
-	bytes, err := testLogBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "test.log", size: 81, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xdc, 0xc2, 0x9d, 0xb1, 0x79, 0x5b, 0xff, 0x89, 0xda, 0x16, 0x23, 0xa7, 0xa3, 0xc3, 0xee, 0x7f, 0xd9, 0xd2, 0xfc, 0x2b, 0x6d, 0xec, 0xc, 0xdb, 0x37, 0x27, 0x76, 0x4f, 0x95, 0x2c, 0xda, 0x5d}}
-	return a, nil
-}
-
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -464,8 +443,7 @@ var _bindata = map[string]func() (*asset, error){
 	"1660238799_accounts_kdf.up.sql":                       _1660238799_accounts_kdfUpSql,
 	"1679505708_add_customization_color.up.sql":            _1679505708_add_customization_colorUpSql,
 	"1687853321_add_customization_color_updated_at.up.sql": _1687853321_add_customization_color_updated_atUpSql,
-	"doc.go":   docGo,
-	"test.log": testLog,
+	"doc.go": docGo,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -526,8 +504,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1660238799_accounts_kdf.up.sql":                       {_1660238799_accounts_kdfUpSql, map[string]*bintree{}},
 	"1679505708_add_customization_color.up.sql":            {_1679505708_add_customization_colorUpSql, map[string]*bintree{}},
 	"1687853321_add_customization_color_updated_at.up.sql": {_1687853321_add_customization_color_updated_atUpSql, map[string]*bintree{}},
-	"doc.go":   {docGo, map[string]*bintree{}},
-	"test.log": {testLog, map[string]*bintree{}},
+	"doc.go": {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
