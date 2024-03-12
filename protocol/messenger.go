@@ -4666,6 +4666,8 @@ func (m *Messenger) MuteChat(request *requests.MuteChat) (time.Time, error) {
 		MuteTill = time.Now().Add(MuteFor8HrsDuration)
 	case MuteFor1Week:
 		MuteTill = time.Now().Add(MuteFor1WeekDuration)
+	case CustomTimestamp:
+		MuteTill = time.Unix(request.CustomTimestamp, 0)
 	default:
 		MuteTill = time.Time{}
 	}

@@ -67,6 +67,7 @@ const (
 	MuteTillUnmuted
 	MuteTill1Min
 	Unmuted
+	CustomTimestamp
 )
 
 const pkStringLength = 68
