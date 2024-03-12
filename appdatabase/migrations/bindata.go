@@ -111,6 +111,7 @@
 // 1709203128_fix_chain_colors.up.sql (244B)
 // 1709795716_migration_order_fix.up.sql (7.909kB)
 // doc.go (94B)
+// test.log (79B)
 
 package migrations
 
@@ -2398,6 +2399,26 @@ func docGo() (*asset, error) {
 	return a, nil
 }
 
+var _testLog = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x3c\xc6\xb1\x11\x80\x20\x0c\x05\xd0\x1a\xa7\xc8\x02\x9a\x11\x1c\xc4\xb3\x08\x8a\x98\x3b\x20\x68\x3e\xfb\xdb\xd9\xbd\x95\x88\x42\x56\xdc\x23\x2e\x87\x55\x76\x08\x86\xcf\xfa\x2b\x1b\x4b\xef\xa7\x40\xa2\x78\xe2\xaa\xf9\x15\xa8\x35\x67\x7f\x4a\xd8\x9a\x11\x92\x83\x2e\x2d\xc9\xf7\xe9\x0b\x00\x00\xff\xff\xff\xeb\x51\xe5\x4f\x00\x00\x00")
+
+func testLogBytes() ([]byte, error) {
+	return bindataRead(
+		_testLog,
+		"test.log",
+	)
+}
+
+func testLog() (*asset, error) {
+	bytes, err := testLogBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "test.log", size: 79, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa4, 0x44, 0x38, 0xbc, 0xb4, 0xe5, 0x83, 0xfd, 0x7e, 0x19, 0xb0, 0x78, 0x70, 0x98, 0xc5, 0x9a, 0x6c, 0xeb, 0x5f, 0x68, 0x5, 0x7a, 0x77, 0x28, 0x8d, 0xb2, 0xff, 0x86, 0x47, 0x91, 0x10, 0x11}}
+	return a, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -2600,6 +2621,7 @@ var _bindata = map[string]func() (*asset, error){
 	"1709203128_fix_chain_colors.up.sql":                                       _1709203128_fix_chain_colorsUpSql,
 	"1709795716_migration_order_fix.up.sql":                                    _1709795716_migration_order_fixUpSql,
 	"doc.go":                                                                   docGo,
+	"test.log":                                                                 testLog,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -2759,6 +2781,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1709203128_fix_chain_colors.up.sql":                                       {_1709203128_fix_chain_colorsUpSql, map[string]*bintree{}},
 	"1709795716_migration_order_fix.up.sql":                                    {_1709795716_migration_order_fixUpSql, map[string]*bintree{}},
 	"doc.go":                                                                   {docGo, map[string]*bintree{}},
+	"test.log":                                                                 {testLog, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

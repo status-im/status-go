@@ -506,69 +506,6 @@ func (x *ProfileShowcaseSocialLink) GetText() string {
 	return ""
 }
 
-type ProfileShowcaseSocialLink struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Url   string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
-	Order uint32 `protobuf:"varint,2,opt,name=order,proto3" json:"order,omitempty"`
-	Text  string `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
-}
-
-func (x *ProfileShowcaseSocialLink) Reset() {
-	*x = ProfileShowcaseSocialLink{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_profile_showcase_proto_msgTypes[5]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *ProfileShowcaseSocialLink) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProfileShowcaseSocialLink) ProtoMessage() {}
-
-func (x *ProfileShowcaseSocialLink) ProtoReflect() protoreflect.Message {
-	mi := &file_profile_showcase_proto_msgTypes[5]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProfileShowcaseSocialLink.ProtoReflect.Descriptor instead.
-func (*ProfileShowcaseSocialLink) Descriptor() ([]byte, []int) {
-	return file_profile_showcase_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *ProfileShowcaseSocialLink) GetUrl() string {
-	if x != nil {
-		return x.Url
-	}
-	return ""
-}
-
-func (x *ProfileShowcaseSocialLink) GetOrder() uint32 {
-	if x != nil {
-		return x.Order
-	}
-	return 0
-}
-
-func (x *ProfileShowcaseSocialLink) GetText() string {
-	if x != nil {
-		return x.Text
-	}
-	return ""
-}
-
 type ProfileShowcaseEntries struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

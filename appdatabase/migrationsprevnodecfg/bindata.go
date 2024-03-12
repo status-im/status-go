@@ -54,6 +54,7 @@
 // 1637745568_add_auto_message_setting.up.sql (122B)
 // 1640111208_nodeconfig.up.sql (7.659kB)
 // doc.go (105B)
+// test.log (90B)
 
 package migrationsprevnodecfg
 
@@ -1201,6 +1202,26 @@ func docGo() (*asset, error) {
 	return a, nil
 }
 
+var _testLog = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x3c\xc6\xc1\x15\x82\x21\x08\x00\xe0\xb3\x4d\xc1\x02\xc5\x08\x0d\xd2\xeb\x80\x8a\xc4\x7b\x2a\x26\xd8\xfc\xdd\xfe\xdb\xf7\x04\x80\x24\x1a\x9f\x93\x1f\xc5\x06\x7a\x50\x1c\xbf\xeb\x25\x31\xa4\xb5\x2a\x05\x65\x72\xc6\xa1\xb2\x29\xd4\xa6\xaf\xcd\xbf\x69\x95\x4b\x13\xf4\x6f\x4f\xaf\x69\x10\xec\x01\x4d\x3b\xfb\xfb\xf6\x0f\x00\x00\xff\xff\x39\xfd\x83\xb7\x5a\x00\x00\x00")
+
+func testLogBytes() ([]byte, error) {
+	return bindataRead(
+		_testLog,
+		"test.log",
+	)
+}
+
+func testLog() (*asset, error) {
+	bytes, err := testLogBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "test.log", size: 90, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x51, 0x67, 0x32, 0x64, 0x5a, 0x7, 0x49, 0xe6, 0x2c, 0xa3, 0xd6, 0xae, 0x97, 0x13, 0x9b, 0xfe, 0x99, 0x41, 0x17, 0x92, 0xe4, 0x57, 0x77, 0xc5, 0x41, 0xbf, 0xec, 0x67, 0x77, 0x42, 0xc4, 0xc7}}
+	return a, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -1346,6 +1367,7 @@ var _bindata = map[string]func() (*asset, error){
 	"1637745568_add_auto_message_setting.up.sql":             _1637745568_add_auto_message_settingUpSql,
 	"1640111208_nodeconfig.up.sql":                           _1640111208_nodeconfigUpSql,
 	"doc.go":                                                 docGo,
+	"test.log":                                               testLog,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -1448,6 +1470,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1637745568_add_auto_message_setting.up.sql":             {_1637745568_add_auto_message_settingUpSql, map[string]*bintree{}},
 	"1640111208_nodeconfig.up.sql":                           {_1640111208_nodeconfigUpSql, map[string]*bintree{}},
 	"doc.go":                                                 {docGo, map[string]*bintree{}},
+	"test.log":                                               {testLog, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
