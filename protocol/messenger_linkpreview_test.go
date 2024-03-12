@@ -198,6 +198,63 @@ func (s *MessengerLinkPreviewsTestSuite) readAsset(filename string) []byte {
 	return b
 }
 
+func (s *MessengerLinkPreviewsTestSuite) Test_GetFavicon() {
+	goodHTMLPNG := []byte(
+		`
+	<html>
+		<head>
+			<link rel="shortcut icon" href="https://www.somehost.com/favicon.png">
+		</head>
+	</html>`)
+
+	goodHTMLSVG := []byte(
+		`
+	<html>
+		<head>
+			<link rel="shortcut icon" href="https://www.somehost.com/favicon.svg">
+		</head>
+	</html>`)
+
+	goodHTMLICO := []byte(
+		`
+	<html>
+		<head>
+			<link rel="shortcut icon" href="https://www.somehost.com/favicon.ico">
+		</head>
+	</html>`)
+
+	badHTMLNoRelAttr := []byte(
+		`
+	<html>
+		<head>
+			<link href="https://www.somehost.com/favicon.png">
+		</head>
+	</html>`)
+
+	GoodHTMLRelAttributeIcon := []byte(
+		`
+	<html>
+		<head>
+			<link rel="icon" href="https://www.somehost.com/favicon.png">
+		</head>
+	</html>`)
+
+	faviconPath := GetFavicon(goodHTMLPNG)
+	s.Require().Equal("https://www.somehost.com/favicon.png", faviconPath)
+
+	faviconPath = GetFavicon(goodHTMLSVG)
+	s.Require().Equal("https://www.somehost.com/favicon.svg", faviconPath)
+
+	faviconPath = GetFavicon(goodHTMLICO)
+	s.Require().Equal("https://www.somehost.com/favicon.ico", faviconPath)
+
+	faviconPath = GetFavicon(GoodHTMLRelAttributeIcon)
+	s.Require().Equal("https://www.somehost.com/favicon.png", faviconPath)
+
+	faviconPath = GetFavicon(badHTMLNoRelAttr)
+	s.Require().Equal("", faviconPath)
+}
+
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube() {
 	u := "https://www.youtube.com/watch?v=lE4UXdJSJM4"
 	thumbnailURL := "https://i.ytimg.com/vi/lE4UXdJSJM4/maxresdefault.jpg"
@@ -213,7 +270,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube() {
 			DataURI: "data:image/webp;base64,UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAQAaJaQAA3AA/vpMgAA",
 		},
 	}
-
+	favicon := "https://www.youtube.com/s/desktop/87423d78/img/favicon.ico"
 	transport := StubTransport{}
 	transport.AddURLMatcher(
 		u,
@@ -223,9 +280,10 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube() {
 					<meta property="og:title" content="%s">
 					<meta property="og:description" content="%s">
 					<meta property="og:image" content="%s">
+					<link rel="shortcut icon" href="%s">
 				</head>
 			</html>
-		`, expected.Title, expected.Description, thumbnailURL)),
+		`, expected.Title, expected.Description, thumbnailURL, favicon)),
 		nil,
 	)
 	transport.AddURLMatcher(thumbnailURL, s.readAsset("1.jpg"), nil)
@@ -245,6 +303,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube() {
 	s.Require().Equal(expected.Thumbnail.Width, preview.Thumbnail.Width)
 	s.Require().Equal(expected.Thumbnail.Height, preview.Thumbnail.Height)
 	s.Require().Equal(expected.Thumbnail.URL, preview.Thumbnail.URL)
+	s.Require().NotNil(preview.Favicon)
 	s.assertContainsLongString(expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
 }
 

@@ -110,3 +110,30 @@ func TestGetPayloadFromURI(t *testing.T) {
 		payload,
 	)
 }
+
+func TestIsSvg(t *testing.T) {
+	GoodSVG := []byte(`<svg width="300" height="130" xmlns="http://www.w3.org/2000/svg">
+	  <rect width="200" height="100" x="10" y="10" rx="20" ry="20" fill="blue" />
+	  Sorry, your browser does not support inline SVG.  
+	</svg>`)
+
+	BadSVG := []byte(`<head>
+	<link rel="stylesheet" href="styles.css">
+  </head>`)
+
+	require.Equal(t, IsSVG(BadSVG), false)
+	require.Equal(t, IsSVG(GoodSVG), true)
+}
+
+func TestIsIco(t *testing.T) {
+	GoodICO, err := Asset("_assets/tests/wikipedia.ico")
+	require.NoError(t, err)
+
+	GoodPNG, err := Asset("_assets/tests/qr/defaultQR.png")
+	require.NoError(t, err)
+
+	require.Equal(t, IsIco(GoodICO), true)
+	require.Equal(t, IsIco(GoodPNG), false)
+	require.Equal(t, IsPng(GoodPNG), true)
+	require.Equal(t, IsPng(GoodICO), false)
+}

@@ -146,6 +146,9 @@ func TestConvertLinkPreviewsToProto(t *testing.T) {
 					URL:     "http://localhost:9999",
 					DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
 				},
+				Favicon: LinkPreviewThumbnail{
+					DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+				},
 			},
 		},
 	}
@@ -166,6 +169,10 @@ func TestConvertLinkPreviewsToProto(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedPayload, l.ThumbnailPayload)
 
+	expectedFaviconPayload, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUg=")
+	require.NoError(t, err)
+	require.Equal(t, expectedFaviconPayload, l.FaviconPayload)
+
 	// Test any invalid link preview causes an early return.
 	invalidPreview := validPreview
 	invalidPreview.Title = ""
@@ -178,7 +185,7 @@ func TestConvertLinkPreviewsToProto(t *testing.T) {
 	invalidPreview.Thumbnail.DataURI = "data:hello/png,iVBOR"
 	msg.LinkPreviews = []LinkPreview{invalidPreview}
 	_, err = msg.ConvertLinkPreviewsToProto()
-	require.ErrorContains(t, err, "could not get data URI payload, url='https://github.com': wrong uri format")
+	require.ErrorContains(t, err, "could not get data URI payload for link preview thumbnail, url='https://github.com': wrong uri format")
 
 	// Test thumbnail is optional.
 	somePreview := validPreview
@@ -196,6 +203,8 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 
 	thumbnailPayload, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUg=")
 	require.NoError(t, err)
+	FaviconPayload, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUg=")
+	require.NoError(t, err)
 
 	l := &protobuf.UnfurledLink{
 		Description:      "GitHub is where people build software.",
@@ -203,6 +212,7 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 		Type:             protobuf.UnfurledLink_LINK,
 		Url:              "https://github.com",
 		ThumbnailPayload: thumbnailPayload,
+		FaviconPayload:   FaviconPayload,
 		ThumbnailWidth:   100,
 		ThumbnailHeight:  200,
 	}
@@ -217,7 +227,7 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 		return "https://localhost:6666/" + msgID + "-" + linkURL
 	}
 
-	previews := msg.ConvertFromProtoToLinkPreviews(urlMaker)
+	previews := msg.ConvertFromProtoToLinkPreviews(urlMaker, urlMaker)
 	require.Len(t, previews, 1)
 	p := previews[0]
 	require.Equal(t, l.Type, p.Type)
@@ -230,11 +240,12 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 	// fetched from the media server.
 	require.Equal(t, "", p.Thumbnail.DataURI)
 	require.Equal(t, "https://localhost:6666/42-https://github.com", p.Thumbnail.URL)
+	require.Equal(t, "https://localhost:6666/42-https://github.com", p.Favicon.URL)
 
 	// Test when the URL is not parseable by url.Parse.
 	l.Url = "postgres://user:abc{DEf1=ghi@example.com:5432/db?sslmode=require"
 	msg.ChatMessage.UnfurledLinks = []*protobuf.UnfurledLink{l}
-	previews = msg.ConvertFromProtoToLinkPreviews(urlMaker)
+	previews = msg.ConvertFromProtoToLinkPreviews(urlMaker, urlMaker)
 	require.Len(t, previews, 1)
 	p = previews[0]
 	require.Equal(t, l.Url, p.Hostname)
@@ -246,7 +257,7 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 		Url:         "https://github.com",
 	}
 	msg.ChatMessage.UnfurledLinks = []*protobuf.UnfurledLink{l}
-	previews = msg.ConvertFromProtoToLinkPreviews(urlMaker)
+	previews = msg.ConvertFromProtoToLinkPreviews(urlMaker, urlMaker)
 	require.Len(t, previews, 1)
 	p = previews[0]
 	require.Equal(t, 0, p.Thumbnail.Height)
