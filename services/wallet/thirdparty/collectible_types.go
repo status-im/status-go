@@ -278,3 +278,44 @@ type CollectionDataProvider interface {
 	CollectibleProvider
 	FetchCollectionsDataByContractID(ctx context.Context, ids []ContractID) ([]CollectionData, error)
 }
+
+type CollectibleSearchProvider interface {
+	CollectibleProvider
+	SearchCollections(ctx context.Context, chainID w_common.ChainID, text string, cursor string, limit int) (*CollectionDataContainer, error)
+	SearchCollectibles(ctx context.Context, chainID w_common.ChainID, collections []common.Address, text string, cursor string, limit int) (*FullCollectibleDataContainer, error)
+}
+
+type CollectibleProviders struct {
+	ContractOwnershipProviders []CollectibleContractOwnershipProvider
+	AccountOwnershipProviders  []CollectibleAccountOwnershipProvider
+	CollectibleDataProviders   []CollectibleDataProvider
+	CollectionDataProviders    []CollectionDataProvider
+	SearchProviders            []CollectibleSearchProvider
+}
+
+func (p *CollectibleProviders) GetProviderList() []CollectibleProvider {
+	ret := make([]CollectibleProvider, 0)
+
+	uniqueProviders := make(map[string]CollectibleProvider)
+	for _, provider := range p.ContractOwnershipProviders {
+		uniqueProviders[provider.ID()] = provider
+	}
+	for _, provider := range p.AccountOwnershipProviders {
+		uniqueProviders[provider.ID()] = provider
+	}
+	for _, provider := range p.CollectibleDataProviders {
+		uniqueProviders[provider.ID()] = provider
+	}
+	for _, provider := range p.CollectionDataProviders {
+		uniqueProviders[provider.ID()] = provider
+	}
+	for _, provider := range p.SearchProviders {
+		uniqueProviders[provider.ID()] = provider
+	}
+
+	for _, provider := range uniqueProviders {
+		ret = append(ret, provider)
+	}
+
+	return ret
+}

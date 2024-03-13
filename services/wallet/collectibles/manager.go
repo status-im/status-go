@@ -51,12 +51,8 @@ type ManagerInterface interface {
 }
 
 type Manager struct {
-	rpcClient                  *rpc.Client
-	contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider
-	accountOwnershipProviders  []thirdparty.CollectibleAccountOwnershipProvider
-	collectibleDataProviders   []thirdparty.CollectibleDataProvider
-	collectionDataProviders    []thirdparty.CollectionDataProvider
-	collectibleProviders       []thirdparty.CollectibleProvider
+	rpcClient *rpc.Client
+	providers thirdparty.CollectibleProviders
 
 	httpClient *http.Client
 
@@ -77,10 +73,7 @@ func NewManager(
 	db *sql.DB,
 	rpcClient *rpc.Client,
 	communityManager *community.Manager,
-	contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider,
-	accountOwnershipProviders []thirdparty.CollectibleAccountOwnershipProvider,
-	collectibleDataProviders []thirdparty.CollectibleDataProvider,
-	collectionDataProviders []thirdparty.CollectionDataProvider,
+	providers thirdparty.CollectibleProviders,
 	mediaServer *server.MediaServer,
 	feed *event.Feed) *Manager {
 
@@ -106,32 +99,9 @@ func NewManager(
 		feed,
 	)
 
-	// Get list of all providers
-	collectibleProvidersMap := make(map[string]thirdparty.CollectibleProvider)
-	collectibleProviders := make([]thirdparty.CollectibleProvider, 0)
-	for _, provider := range contractOwnershipProviders {
-		collectibleProvidersMap[provider.ID()] = provider
-	}
-	for _, provider := range accountOwnershipProviders {
-		collectibleProvidersMap[provider.ID()] = provider
-	}
-	for _, provider := range collectibleDataProviders {
-		collectibleProvidersMap[provider.ID()] = provider
-	}
-	for _, provider := range collectionDataProviders {
-		collectibleProvidersMap[provider.ID()] = provider
-	}
-	for _, provider := range collectibleProvidersMap {
-		collectibleProviders = append(collectibleProviders, provider)
-	}
-
 	return &Manager{
-		rpcClient:                  rpcClient,
-		contractOwnershipProviders: contractOwnershipProviders,
-		accountOwnershipProviders:  accountOwnershipProviders,
-		collectibleDataProviders:   collectibleDataProviders,
-		collectionDataProviders:    collectionDataProviders,
-		collectibleProviders:       collectibleProviders,
+		rpcClient: rpcClient,
+		providers: providers,
 		httpClient: &http.Client{
 			Timeout: requestTimeout,
 		},
@@ -219,7 +189,7 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, c
 	defer o.checkConnectionStatus(chainID)
 
 	cmd := circuitbreaker.Command{}
-	for _, provider := range o.accountOwnershipProviders {
+	for _, provider := range o.providers.AccountOwnershipProviders {
 		if !provider.IsChainSupported(chainID) {
 			continue
 		}
@@ -263,7 +233,7 @@ func (o *Manager) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommo
 	defer o.checkConnectionStatus(chainID)
 
 	cmd := circuitbreaker.Command{}
-	for _, provider := range o.accountOwnershipProviders {
+	for _, provider := range o.providers.AccountOwnershipProviders {
 		if !provider.IsChainSupported(chainID) {
 			continue
 		}
@@ -456,7 +426,7 @@ func (o *Manager) FetchMissingAssetsByCollectibleUniqueID(ctx context.Context, u
 
 func (o *Manager) fetchMissingAssetsForChainByCollectibleUniqueID(ctx context.Context, chainID walletCommon.ChainID, idsToFetch []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
 	cmd := circuitbreaker.Command{}
-	for _, provider := range o.collectibleDataProviders {
+	for _, provider := range o.providers.CollectibleDataProviders {
 		if !provider.IsChainSupported(chainID) {
 			continue
 		}
@@ -499,7 +469,7 @@ func (o *Manager) FetchCollectionsDataByContractID(ctx context.Context, ids []th
 			defer o.checkConnectionStatus(chainID)
 
 			cmd := circuitbreaker.Command{}
-			for _, provider := range o.collectionDataProviders {
+			for _, provider := range o.providers.CollectionDataProviders {
 				if !provider.IsChainSupported(chainID) {
 					continue
 				}
@@ -553,7 +523,7 @@ func (o *Manager) FetchCollectibleOwnersByContractAddress(ctx context.Context, c
 	defer o.checkConnectionStatus(chainID)
 
 	cmd := circuitbreaker.Command{}
-	for _, provider := range o.contractOwnershipProviders {
+	for _, provider := range o.providers.ContractOwnershipProviders {
 		if !provider.IsChainSupported(chainID) {
 			continue
 		}
@@ -939,7 +909,7 @@ func (o *Manager) ResetConnectionStatus() {
 }
 
 func (o *Manager) checkConnectionStatus(chainID walletCommon.ChainID) {
-	for _, provider := range o.collectibleProviders {
+	for _, provider := range o.providers.GetProviderList() {
 		if provider.IsChainSupported(chainID) && provider.IsConnected() {
 			o.statuses[chainID.String()].SetIsConnected(true)
 			return
@@ -995,4 +965,74 @@ func (o *Manager) getCircuitBreaker(chainID walletCommon.ChainID) *circuitbreake
 		o.circuitBreakers.Store(chainID.String(), cb)
 	}
 	return cb.(*circuitbreaker.CircuitBreaker)
+}
+
+func (o *Manager) SearchCollectibles(ctx context.Context, chainID walletCommon.ChainID, text string, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
+	defer o.checkConnectionStatus(chainID)
+
+	anyProviderAvailable := false
+	for _, provider := range o.providers.SearchProviders {
+		if !provider.IsChainSupported(chainID) {
+			continue
+		}
+		anyProviderAvailable = true
+		if providerID != thirdparty.FetchFromAnyProvider && providerID != provider.ID() {
+			continue
+		}
+
+		// TODO (#13951): Be smarter about how we handle the user-entered string
+		collections := []common.Address{}
+
+		container, err := provider.SearchCollectibles(ctx, chainID, collections, text, cursor, limit)
+		if err != nil {
+			log.Error("FetchAllAssetsByOwner failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+			continue
+		}
+
+		_, err = o.processFullCollectibleData(ctx, container.Items, true)
+		if err != nil {
+			return nil, err
+		}
+
+		return container, nil
+	}
+
+	if anyProviderAvailable {
+		return nil, ErrAllProvidersFailedForChainID
+	}
+	return nil, ErrNoProvidersAvailableForChainID
+}
+
+func (o *Manager) SearchCollections(ctx context.Context, chainID walletCommon.ChainID, query string, cursor string, limit int, providerID string) (*thirdparty.CollectionDataContainer, error) {
+	defer o.checkConnectionStatus(chainID)
+
+	anyProviderAvailable := false
+	for _, provider := range o.providers.SearchProviders {
+		if !provider.IsChainSupported(chainID) {
+			continue
+		}
+		anyProviderAvailable = true
+		if providerID != thirdparty.FetchFromAnyProvider && providerID != provider.ID() {
+			continue
+		}
+
+		// TODO (#13951): Be smarter about how we handle the user-entered string
+		container, err := provider.SearchCollections(ctx, chainID, query, cursor, limit)
+		if err != nil {
+			log.Error("FetchAllAssetsByOwner failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+			continue
+		}
+
+		err = o.processCollectionData(ctx, container.Items)
+		if err != nil {
+			return nil, err
+		}
+
+		return container, nil
+	}
+
+	if anyProviderAvailable {
+		return nil, ErrAllProvidersFailedForChainID
+	}
+	return nil, ErrNoProvidersAvailableForChainID
 }
