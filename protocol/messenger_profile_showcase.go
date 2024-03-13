@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"reflect"
 	"sort"
+	"strings"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -73,10 +74,11 @@ func (m *Messenger) validateCollectiblesOwnership(accounts []*identity.ProfileSh
 	accountsMap := make(map[string]identity.ProfileShowcaseVisibility)
 
 	for _, accountProfile := range accounts {
-		if _, ok := accountsMap[accountProfile.Address]; ok {
+		addressCapitalized := strings.ToUpper(accountProfile.Address)
+		if _, ok := accountsMap[addressCapitalized]; ok {
 			return errorDublicateAccountAddress
 		}
-		accountsMap[accountProfile.Address] = accountProfile.ShowcaseVisibility
+		accountsMap[addressCapitalized] = accountProfile.ShowcaseVisibility
 	}
 
 	for _, collectibleProfile := range collectibles {
@@ -90,7 +92,8 @@ func (m *Messenger) validateCollectiblesOwnership(accounts []*identity.ProfileSh
 		// but ERC1155 which can be supported later can have more than one holder and balances > 1
 		found := false
 		for _, balance := range balances {
-			if accountShowcaseVisibility, ok := accountsMap[balance.Address.String()]; ok {
+			addressCapitalized := strings.ToUpper(balance.Address.String())
+			if accountShowcaseVisibility, ok := accountsMap[addressCapitalized]; ok {
 				if accountShowcaseVisibility < collectibleProfile.ShowcaseVisibility {
 					return errorAccountVisibilityLowerThanCollectible
 				}
