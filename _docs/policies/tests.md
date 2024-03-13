@@ -35,6 +35,21 @@ Determine who caused the flaky test.
     - If the test does not appear in https://github.com/status-im/status-go/labels/E%3AFlaky%20Test or in the last three nightly test runs, it is most likely that the flakiness was introduced by your changes and needs to be addressed before proceeding with the merge.
     - Else the test is already documented as a flaky test (appears in the GitHub issues or in the nightly test runs), proceed to below.
 
+```mermaid
+flowchart TB
+    A[PR ready for merge] --> B{Have any test failed?}
+    B -->|No| C[🎉 Proceed with merge 🪄]
+    B -->|Yes| D{Did you write the test for this PR?}
+    D -->|No| E[Check rerun reports.]
+    D -->|Yes| F[You MUST fix the test before merge is acceptable.]
+    F --> A
+    E --> G{Does the test appear in `E:Flaky Test` issues<br/> or in the last three nightly test runs?<br/>}
+    G -->|Yes| I[The flakiness MUST be reported]
+    G -->|No| H[It is likely your changes introduced the flakiness]
+    H --> F
+    I --> J[Proceed to Reporting flow]
+```
+
 #### Reporting Flaky Tests
 - If an old test fails and/or seems flaky either locally or in CI, you MUST report the event.
   - Check the `status-go` GitHub repo issues for the test name(s) failing.
@@ -51,3 +66,4 @@ Determine who caused the flaky test.
       - The issue title should include the flaky test name
       - The issue should use the https://github.com/status-im/status-go/labels/E%3AFlaky%20Test label
     - Detail that you have experienced the test being flaky and in what context (local vs CI, link to the PR or branch).
+
