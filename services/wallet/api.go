@@ -346,6 +346,16 @@ func (api *API) GetCollectibleOwnersByContractAddress(ctx context.Context, chain
 	return api.s.collectiblesManager.FetchCollectibleOwnersByContractAddress(ctx, chainID, contractAddress)
 }
 
+func (api *API) SearchCollectibles(ctx context.Context, chainID wcommon.ChainID, text string, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
+	log.Debug("call to SearchCollectibles")
+	return api.s.collectiblesManager.SearchCollectibles(ctx, chainID, text, cursor, limit, providerID)
+}
+
+func (api *API) SearchCollections(ctx context.Context, chainID wcommon.ChainID, text string, cursor string, limit int, providerID string) (*thirdparty.CollectionDataContainer, error) {
+	log.Debug("call to SearchCollections")
+	return api.s.collectiblesManager.SearchCollections(ctx, chainID, text, cursor, limit, providerID)
+}
+
 /*
    Collectibles API End
 */
