@@ -367,7 +367,6 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 	}
 
 	result := make(map[common.Address][]Token)
-	communities := make(map[string]bool)
 	dayAgoTimestamp := time.Now().Add(-24 * time.Hour).Unix()
 
 	for _, address := range addresses {
@@ -434,20 +433,12 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 					Image:            tokens[0].Image,
 				}
 
-				if walletToken.CommunityData != nil {
-					communities[walletToken.CommunityData.ID] = true
-				}
-
 				result[address] = append(result[address], walletToken)
 			}
 		}
 	}
 
 	r.lastWalletTokenUpdateTimestamp.Store(time.Now().Unix())
-
-	for communityID := range communities {
-		r.communityManager.FetchCommunityMetadataAsync(communityID)
-	}
 
 	return result, r.persistence.SaveTokens(result)
 }
@@ -613,8 +604,6 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 		return nil, err
 	}
 
-	communities := make(map[string]bool)
-
 	for address, tokens := range result {
 		for index, token := range tokens {
 			marketValuesPerCurrency := make(map[string]TokenMarketValues)
@@ -635,10 +624,6 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 				}
 			}
 
-			if token.CommunityData != nil {
-				communities[token.CommunityData.ID] = true
-			}
-
 			if _, ok := tokenDetails[token.Symbol]; !ok {
 				continue
 			}
@@ -651,10 +636,6 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	}
 
 	r.lastWalletTokenUpdateTimestamp.Store(time.Now().Unix())
-
-	for communityID := range communities {
-		r.communityManager.FetchCommunityMetadataAsync(communityID)
-	}
 
 	return result, r.persistence.SaveTokens(result)
 }
