@@ -1090,6 +1090,45 @@ func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
 	require.Nil(t, actualHash2)
 }
 
+func TestContactBioPersistence(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
+	contactBio := "A contact bio description"
+
+	err = p.SaveContact(&Contact{ID: contactID, Bio: contactBio}, nil)
+	require.NoError(t, err)
+
+	contacts, err := p.Contacts()
+	require.NoError(t, err)
+	require.Len(t, contacts, 1)
+	require.Equal(t, contactBio, contacts[0].Bio)
+}
+
+func TestContactBioPersistenceDefaults(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
+
+	err = p.SaveContact(&Contact{ID: contactID}, nil)
+	require.NoError(t, err)
+
+	contacts, err := p.Contacts()
+	require.NoError(t, err)
+	require.Len(t, contacts, 1)
+	require.Equal(t, "", contacts[0].Bio)
+}
+
 func TestUpdateContactChatIdentity(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
