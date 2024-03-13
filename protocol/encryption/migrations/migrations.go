@@ -19,6 +19,7 @@
 // 1632236298_add_communities.down.sql (151B)
 // 1632236298_add_communities.up.sql (584B)
 // 1636536507_add_index_bundles.up.sql (347B)
+// 1698137564_add_migration_index.up.sql (483B)
 // 1709200114_add_migration_index.up.sql (483B)
 // doc.go (397B)
 
@@ -468,6 +469,26 @@ func _1636536507_add_index_bundlesUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1698137564_add_migration_indexUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xa4\x90\xc1\xaa\xc2\x30\x10\x45\xf7\xfd\x8a\x59\xbe\x07\xfe\x81\x2b\x69\x23\x74\xd3\x82\xed\xa2\xbb\x21\x24\x83\x09\xa5\x6d\x4c\x46\x30\x7f\x2f\x25\x16\x41\xb1\x2a\x6e\x66\x36\xf7\xdc\x03\x37\x3f\x88\x5d\x2b\xa0\xac\x0a\xd1\x41\xb9\x87\xaa\x6e\x41\x74\x65\xd3\x36\x60\xf5\x05\x8f\x7e\x3a\x3b\x64\x3b\x50\x60\x39\x38\xd4\x14\x54\x56\x57\x60\x64\x30\xe8\x25\x2b\x43\x8c\x34\x2a\x1f\x1d\xdb\x69\x84\xbf\x04\x58\xbd\x81\x9e\xe2\x1d\x84\x42\x34\xf9\xff\x36\xcb\xde\xf8\x5e\xf4\x62\x4f\x31\xcc\x07\xad\x5e\xd5\xa7\xc8\xaf\x22\x4d\xce\x93\x92\x4c\xfa\x13\xe7\x53\xfa\x5b\xbd\x92\xca\x10\x2e\xcb\xdd\x4a\x30\xd0\x09\xc7\x69\xc5\x9c\xb8\xc7\xc9\xe7\x9f\xd0\x65\xf3\x6b\x00\x00\x00\xff\xff\x97\xf4\x28\xe3\xe3\x01\x00\x00")
+
+func _1698137564_add_migration_indexUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1698137564_add_migration_indexUpSql,
+		"1698137564_add_migration_index.up.sql",
+	)
+}
+
+func _1698137564_add_migration_indexUpSql() (*asset, error) {
+	bytes, err := _1698137564_add_migration_indexUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1698137564_add_migration_index.up.sql", size: 483, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe2, 0xec, 0xd4, 0x54, 0xff, 0x5e, 0x6e, 0xaf, 0x3f, 0x2b, 0xb5, 0x76, 0xe9, 0x84, 0x2a, 0x4d, 0x1f, 0xd8, 0x22, 0x8b, 0x4b, 0x5c, 0xf1, 0xe0, 0x3a, 0x34, 0xc5, 0xed, 0xef, 0x74, 0xe4, 0x2b}}
+	return a, nil
+}
+
 var __1709200114_add_migration_indexUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xa4\x90\xc1\xaa\xc2\x30\x10\x45\xf7\xfd\x8a\x59\xbe\x07\xfe\x81\x2b\x69\x23\x74\xd3\x82\xed\xa2\xbb\x21\x24\x83\x09\xa5\x6d\x4c\x46\x30\x7f\x2f\x25\x16\x41\xb1\x2a\x6e\x66\x36\xf7\xdc\x03\x37\x3f\x88\x5d\x2b\xa0\xac\x0a\xd1\x41\xb9\x87\xaa\x6e\x41\x74\x65\xd3\x36\x60\xf5\x05\x8f\x7e\x3a\x3b\x64\x3b\x50\x60\x39\x38\xd4\x14\x54\x56\x57\x60\x64\x30\xe8\x25\x2b\x43\x8c\x34\x2a\x1f\x1d\xdb\x69\x84\xbf\x04\x58\xbd\x81\x9e\xe2\x1d\x84\x42\x34\xf9\xff\x36\xcb\xde\xf8\x5e\xf4\x62\x4f\x31\xcc\x07\xad\x5e\xd5\xa7\xc8\xaf\x22\x4d\xce\x93\x92\x4c\xfa\x13\xe7\x53\xfa\x5b\xbd\x92\xca\x10\x2e\xcb\xdd\x4a\x30\xd0\x09\xc7\x69\xc5\x9c\xb8\xc7\xc9\xe7\x9f\xd0\x65\xf3\x6b\x00\x00\x00\xff\xff\x97\xf4\x28\xe3\xe3\x01\x00\x00")
 
 func _1709200114_add_migration_indexUpSqlBytes() ([]byte, error) {
@@ -618,6 +639,7 @@ var _bindata = map[string]func() (*asset, error){
 	"1632236298_add_communities.down.sql":           _1632236298_add_communitiesDownSql,
 	"1632236298_add_communities.up.sql":             _1632236298_add_communitiesUpSql,
 	"1636536507_add_index_bundles.up.sql":           _1636536507_add_index_bundlesUpSql,
+	"1698137564_add_migration_index.up.sql":         _1698137564_add_migration_indexUpSql,
 	"1709200114_add_migration_index.up.sql":         _1709200114_add_migration_indexUpSql,
 	"doc.go":                                        docGo,
 }
@@ -687,6 +709,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1632236298_add_communities.down.sql":           {_1632236298_add_communitiesDownSql, map[string]*bintree{}},
 	"1632236298_add_communities.up.sql":             {_1632236298_add_communitiesUpSql, map[string]*bintree{}},
 	"1636536507_add_index_bundles.up.sql":           {_1636536507_add_index_bundlesUpSql, map[string]*bintree{}},
+	"1698137564_add_migration_index.up.sql":         {_1698137564_add_migration_indexUpSql, map[string]*bintree{}},
 	"1709200114_add_migration_index.up.sql":         {_1709200114_add_migration_indexUpSql, map[string]*bintree{}},
 	"doc.go":                                        {docGo, map[string]*bintree{}},
 }}
