@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 type Persistence struct {
@@ -35,6 +36,10 @@ func (p *Persistence) SaveTokens(tokens map[common.Address][]Token) (err error) 
 			for chainID, b := range t.BalancesPerChain {
 				if b.HasError {
 					continue
+				}
+
+				if b.Balance.Cmp(big.NewFloat(0)) == 0 {
+					log.Info("NDBG_st", "tkn", b.Address, "ch", b.ChainID)
 				}
 				_, err = tx.Exec(`INSERT INTO token_balances(user_address,token_name,token_symbol,token_address,token_decimals,token_description,token_url,balance,raw_balance,chain_id) VALUES (?,?,?,?,?,?,?,?,?,?)`, address.Hex(), t.Name, t.Symbol, b.Address.Hex(), t.Decimals, t.Description, t.AssetWebsiteURL, b.Balance.String(), b.RawBalance, chainID)
 				if err != nil {
