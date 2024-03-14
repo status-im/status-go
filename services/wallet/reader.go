@@ -382,8 +382,8 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 					var balance *big.Float
 					hexBalance := &big.Int{}
 					if latestBalances != nil {
-						log.Info("NDBG latest balances are not nil")
 						hexBalance = latestBalances[token.ChainID][address][token.Address].ToInt()
+						log.Info("NDBG latest balances are not nil", token.Address, "ch", token.ChainID, "bal", hexBalance)
 					} else {
 						if cachedRawBalance, ok := cachedBalancesPerChain[address][token.Address][token.ChainID]; ok {
 							log.Info("NDBG cached raw", "tkn", token.Address, "ch", token.ChainID, "bal", cachedRawBalance)
@@ -405,14 +405,14 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 					if !isVisible {
 						isVisible = balance.Cmp(big.NewFloat(0.0)) > 0 || r.isCachedToken(cachedTokens, address, token.Symbol, token.ChainID)
 					}
-					balance1DayAgo, err := r.tokenManager.GetTokenHistoricalBalance(address, token.ChainID, token.Symbol, dayAgoTimestamp)
-					if err != nil {
+					//balance1DayAgo, err := r.tokenManager.GetTokenHistoricalBalance(address, token.ChainID, token.Symbol, dayAgoTimestamp)
+					/*if err != nil {
 						return nil, err
-					}
+					}*/
 					balance1DayAgoStr := "0"
-					if balance1DayAgo != nil {
+					/*if balance1DayAgo != nil {
 						balance1DayAgoStr = balance1DayAgo.String()
-					}
+					}*/
 					balancesPerChain[token.ChainID] = ChainBalance{
 						RawBalance:     hexBalance.String(),
 						Balance:        balance,
