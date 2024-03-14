@@ -410,7 +410,7 @@ migration:
 	touch $(DEFAULT_MIGRATION_PATH)/$(shell date +%s)_$(D).up.sql
 
 migration-check:
-	echo "disabled"
+	bash _assets/scripts/migration_check.sh
 
 migration-wallet: DEFAULT_WALLET_MIGRATION_PATH := walletdatabase/migrations/sql
 migration-wallet:
