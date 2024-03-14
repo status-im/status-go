@@ -37,17 +37,19 @@ Determine who caused the flaky test.
 
 ```mermaid
 flowchart TB
-    A[PR ready for merge] --> B{Have any test failed?}
+    A([PR ready for merge]) --> B{Have any test failed?}
     B -->|No| C[🎉 Proceed with merge 🪄]
     B -->|Yes| D{Did you write the test for this PR?}
     D -->|No| E[Check rerun reports.]
-    D -->|Yes| F[You MUST fix the test before merge is acceptable.]
+    D -->|Yes| F[
+        It is likely your changes introduced the flakiness.
+        You MUST fix the test before merge is acceptable.
+    ]
     F --> A
     E --> G{Does the test appear in `E:Flaky Test` issues<br/> or in the last three nightly test runs?<br/>}
-    G -->|Yes| I[The flakiness MUST be reported]
-    G -->|No| H[It is likely your changes introduced the flakiness]
-    H --> F
-    I --> J[Proceed to Reporting flow]
+    G -->|Yes| I[The flakiness needs reporting]
+    G -->|No| F
+    I --> J([Proceed to Reporting flow])
 ```
 
 #### Reporting Flaky Tests
@@ -74,8 +76,8 @@ flowchart TB
     C -->|No| D[
 	    Create a new issue
       - The issue title should include the flaky test name
-      - The issue should use the https://github.com/status-im/status-go/labels/E%3AFlaky%20Test label
-      ]
+      - The issue should use the `E:Flaky Test` label
+    ]
     D --> E[
 	    Detail which test is flaky and in what context:
 	    local vs CI, link to the PR or branch.
