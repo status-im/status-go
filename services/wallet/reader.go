@@ -382,9 +382,11 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 					var balance *big.Float
 					hexBalance := &big.Int{}
 					if latestBalances != nil {
+						log.Info("NDBG latest balances are not nil")
 						hexBalance = latestBalances[token.ChainID][address][token.Address].ToInt()
 					} else {
 						if cachedRawBalance, ok := cachedBalancesPerChain[address][token.Address][token.ChainID]; ok {
+							log.Info("NDBG cached raw", "tkn", token.Address, "ch", token.ChainID, "bal", cachedRawBalance)
 							hexBalance, _ = new(big.Int).SetString(cachedRawBalance, 10)
 						}
 					}
