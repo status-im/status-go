@@ -331,9 +331,12 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 	if !updateBalances {
 		for _, address := range addresses {
 			if res, ok := cachedTokens[address]; !ok || len(res) == 0 {
+				log.Info("NDBG", "address", address, "res", res)
 				updateAnyway = true
 				break
 			}
+
+			log.Info("NDBG2", "address", cachedTokens[address])
 		}
 	}
 
