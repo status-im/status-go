@@ -337,6 +337,30 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 				break
 			}
 
+			networkFound := map[uint64]bool
+			for _, chain := chainIDs {
+				networkFound[chain] := false
+			}
+
+			for _, token := range cachedTokens[address] {
+				for _, chain := chainIDs {
+					if _, ok := token.BalancesPerChain[chain]; ok {
+						networkFound[chain] = true
+					}
+				}
+			}
+
+			for _, chain := chainIDs {
+				if !networkFound[chain] {
+					updateAnyway = true
+				}
+			}
+
+			if updateAnyway {
+				log.Info("NDBG not all chains")
+				break
+			}
+
 			log.Info("NDBG2", "address", cachedTokens[address])
 		}
 	}
