@@ -266,7 +266,7 @@ func (r *Reader) invalidateBalanceCache() {
 }
 
 func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
-	if !r.isBalanceCacheValid() {
+	if !r.isBalanceCacheValid() || true {
 		balances, err := r.GetWalletTokenBalances(ctx, addresses)
 		if err != nil {
 			return nil, err
