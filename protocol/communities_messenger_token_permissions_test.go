@@ -1307,6 +1307,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 	s.Require().Len(members, 2)
 	// confirm that member is a viewer and not a poster
 	s.Require().Equal(protobuf.CommunityMember_CHANNEL_ROLE_VIEWER, members[s.bob.IdentityPublicKeyString()].ChannelRole)
+	// confirm that bob cannot post message
+	s.Require().False(community.CanPost(s.bob.IdentityPublicKey(), chat.ID, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE))
 
 	// send message to the channel
 	msg = s.sendChatMessage(s.owner, chat.ID, "hello on closed channel")

@@ -1909,6 +1909,9 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, messageType prot
 
 	member, isChatMember := chat.Members[common.PubkeyToHex(pk)]
 
+	isPoster := member.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_POSTER
+	isViewer := member.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
+
 	switch messageType {
 	case protobuf.ApplicationMetadataMessage_PIN_MESSAGE:
 		pinAllowed := o.IsPrivilegedMember(pk) || o.AllowsAllMembersToPinMessage()
@@ -1919,12 +1922,14 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, messageType prot
 			return false, nil
 		}
 
-		isPoster := member.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_POSTER
-		isViewer := member.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
 		return isPoster || (isViewer && chat.ViewersCanPostReactions), nil
 
 	default:
-		return isChatMember, nil
+		if isViewer && !isPoster {
+			return true, nil
+		} else {
+			return isChatMember, nil
+		}
 	}
 }
 
