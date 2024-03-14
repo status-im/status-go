@@ -343,7 +343,7 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 			}
 
 			for _, token := range cachedTokens[address] {
-				for _, chain := chainIDs {
+				for _, chain := range chainIDs {
 					if _, ok := token.BalancesPerChain[chain]; ok {
 						networkFound[chain] = true
 					}
