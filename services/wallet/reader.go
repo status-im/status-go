@@ -370,7 +370,7 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 	}
 
 	result := make(map[common.Address][]Token)
-	dayAgoTimestamp := time.Now().Add(-24 * time.Hour).Unix()
+	//dayAgoTimestamp := time.Now().Add(-24 * time.Hour).Unix()
 
 	for _, address := range addresses {
 		for _, tokenList := range [][]*token.Token{verifiedTokens, unverifiedTokens} {
