@@ -343,14 +343,16 @@ func (tm *PendingTxTracker) emitNotifications(chainID common.ChainID, changes []
 }
 
 // PendingTransaction called with autoDelete = false will keep the transaction in the database until it is confirmed by the caller using Delete
-func (tm *PendingTxTracker) TrackPendingTransaction(chainID common.ChainID, hash eth.Hash, from eth.Address, trType PendingTrxType, autoDelete AutoDeleteType) error {
+func (tm *PendingTxTracker) TrackPendingTransaction(chainID common.ChainID, hash eth.Hash, from eth.Address, to eth.Address, trType PendingTrxType, autoDelete AutoDeleteType, additionalData string) error {
 	err := tm.addPending(&PendingTransaction{
-		ChainID:    chainID,
-		Hash:       hash,
-		From:       from,
-		Timestamp:  uint64(time.Now().Unix()),
-		Type:       trType,
-		AutoDelete: &autoDelete,
+		ChainID:        chainID,
+		Hash:           hash,
+		From:           from,
+		To:             to,
+		Timestamp:      uint64(time.Now().Unix()),
+		Type:           trType,
+		AutoDelete:     &autoDelete,
+		AdditionalData: additionalData,
 	})
 	if err != nil {
 		return err

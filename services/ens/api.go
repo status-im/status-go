@@ -357,8 +357,10 @@ func (api *API) Release(ctx context.Context, chainID uint64, txArgs transactions
 		wcommon.ChainID(chainID),
 		tx.Hash(),
 		common.Address(txArgs.From),
+		registryAddr,
 		transactions.ReleaseENS,
 		transactions.AutoDelete,
+		"",
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)
@@ -484,8 +486,10 @@ func (api *API) Register(ctx context.Context, chainID uint64, txArgs transaction
 		wcommon.ChainID(chainID),
 		tx.Hash(),
 		common.Address(txArgs.From),
+		registryAddr,
 		transactions.RegisterENS,
 		transactions.AutoDelete,
+		"",
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)
@@ -600,8 +604,10 @@ func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactio
 		wcommon.ChainID(chainID),
 		tx.Hash(),
 		common.Address(txArgs.From),
+		*resolverAddress,
 		transactions.SetPubKey,
 		transactions.AutoDelete,
+		"",
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)

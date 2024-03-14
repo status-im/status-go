@@ -18,7 +18,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
@@ -2061,7 +2060,7 @@ func testEventSenderAddTokenMasterAndOwnerToken(base CommunityEventsTestsInterfa
 }
 
 func addCommunityTokenToCommunityTokensService(base CommunityEventsTestsInterface, token *token.CommunityToken) {
-	data := &communitytokens.CollectibleContractData{
+	data := &communities.CollectibleContractData{
 		TotalSupply:    token.Supply,
 		Transferable:   token.Transferable,
 		RemoteBurnable: token.RemoteSelfDestruct,
