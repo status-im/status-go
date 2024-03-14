@@ -22,7 +22,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/waku"
 )
@@ -182,7 +181,7 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	// update mock - the signer for the community returned by the contracts should be john
 	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.john.identity.PublicKey))
 	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
-		&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
+		&communities.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
 
 	// bob accepts community update
 	_, err = WaitOnSignaledMessengerResponse(
@@ -377,7 +376,7 @@ func (s *MessengerCommunitiesSignersSuite) TestAutoAcceptOnOwnershipChangeReques
 	// set john as contract owner
 	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.john.identity.PublicKey))
 	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
-		&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
+		&communities.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
 
 	hasTokenPermission := func(r *MessengerResponse) bool {
 		return len(r.Communities()) > 0 && r.Communities()[0].HasTokenPermissions()
@@ -515,7 +514,7 @@ func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {
 	// update mock - the signer for the community returned by the contracts should be john
 	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.john.identity.PublicKey))
 	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
-		&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
+		&communities.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
 
 	// alice accepts community update
 	_, err = WaitOnSignaledMessengerResponse(

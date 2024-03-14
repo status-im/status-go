@@ -2,10 +2,11 @@ package communitytokens
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -19,6 +20,9 @@ import (
 	"github.com/status-im/status-go/contracts/community-tokens/ownertoken"
 	communityownertokenregistry "github.com/status-im/status-go/contracts/community-tokens/registry"
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -37,22 +41,30 @@ type API struct {
 }
 
 type DeploymentDetails struct {
-	ContractAddress string `json:"contractAddress"`
-	TransactionHash string `json:"transactionHash"`
+	ContractAddress string                `json:"contractAddress"`
+	TransactionHash string                `json:"transactionHash"`
+	CommunityToken  *token.CommunityToken `json:"communityToken"`
+	OwnerToken      *token.CommunityToken `json:"ownerToken"`
+	MasterToken     *token.CommunityToken `json:"masterToken"`
 }
 
 const maxSupply = 999999999
 
 type DeploymentParameters struct {
-	Name               string         `json:"name"`
-	Symbol             string         `json:"symbol"`
-	Supply             *bigint.BigInt `json:"supply"`
-	InfiniteSupply     bool           `json:"infiniteSupply"`
-	Transferable       bool           `json:"transferable"`
-	RemoteSelfDestruct bool           `json:"remoteSelfDestruct"`
-	TokenURI           string         `json:"tokenUri"`
-	OwnerTokenAddress  string         `json:"ownerTokenAddress"`
-	MasterTokenAddress string         `json:"masterTokenAddress"`
+	Name               string               `json:"name"`
+	Symbol             string               `json:"symbol"`
+	Supply             *bigint.BigInt       `json:"supply"`
+	InfiniteSupply     bool                 `json:"infiniteSupply"`
+	Transferable       bool                 `json:"transferable"`
+	RemoteSelfDestruct bool                 `json:"remoteSelfDestruct"`
+	TokenURI           string               `json:"tokenUri"`
+	OwnerTokenAddress  string               `json:"ownerTokenAddress"`
+	MasterTokenAddress string               `json:"masterTokenAddress"`
+	CommunityID        string               `json:"communityId"`
+	Description        string               `json:"description"`
+	CroppedImage       *images.CroppedImage `json:"croppedImage,omitempty"` // for community tokens
+	Base64Image        string               `json:"base64image"`            // for owner & master tokens
+	Decimals           int                  `json:"decimals"`
 }
 
 func (d *DeploymentParameters) GetSupply() *big.Int {
@@ -92,12 +104,10 @@ func (d *DeploymentParameters) Validate(isAsset bool) error {
 }
 
 func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deploymentParameters DeploymentParameters, txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
-
 	err := deploymentParameters.Validate(false)
 	if err != nil {
 		return DeploymentDetails{}, err
 	}
-
 	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
 	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
@@ -105,7 +115,6 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 		log.Error(err.Error())
 		return DeploymentDetails{}, err
 	}
-
 	address, tx, _, err := collectibles.DeployCollectibles(transactOpts, ethClient, deploymentParameters.Name,
 		deploymentParameters.Symbol, deploymentParameters.GetSupply(),
 		deploymentParameters.RemoteSelfDestruct, deploymentParameters.Transferable,
@@ -120,15 +129,26 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 		wcommon.ChainID(chainID),
 		tx.Hash(),
 		common.Address(txArgs.From),
+		address,
 		transactions.DeployCommunityToken,
-		transactions.AutoDelete,
+		transactions.Keep,
+		"",
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)
 		return DeploymentDetails{}, err
 	}
 
-	return DeploymentDetails{address.Hex(), tx.Hash().Hex()}, nil
+	savedCommunityToken, err := api.s.CreateCommunityTokenAndSave(int(chainID), deploymentParameters, txArgs.From.Hex(), address.Hex(),
+		protobuf.CommunityTokenType_ERC721, token.CommunityLevel)
+	if err != nil {
+		return DeploymentDetails{}, err
+	}
+
+	return DeploymentDetails{
+		ContractAddress: address.Hex(),
+		TransactionHash: tx.Hash().Hex(),
+		CommunityToken:  savedCommunityToken}, nil
 }
 
 func decodeSignature(sig []byte) (r [32]byte, s [32]byte, v uint8, err error) {
@@ -162,8 +182,7 @@ func prepareDeploymentSignatureStruct(signature string, communityID string, addr
 
 func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64,
 	ownerTokenParameters DeploymentParameters, masterTokenParameters DeploymentParameters,
-	signature string, communityID string, signerPubKey string,
-	txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
+	signerPubKey string, txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
 	err := ownerTokenParameters.Validate(false)
 	if err != nil {
 		return DeploymentDetails{}, err
@@ -197,7 +216,12 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64,
 		BaseURI: masterTokenParameters.TokenURI,
 	}
 
-	communitySignature, err := prepareDeploymentSignatureStruct(signature, communityID, common.Address(txArgs.From))
+	signature, err := api.s.Messenger.CreateCommunityTokenDeploymentSignature(context.Background(), chainID, txArgs.From.Hex(), ownerTokenParameters.CommunityID)
+	if err != nil {
+		return DeploymentDetails{}, err
+	}
+
+	communitySignature, err := prepareDeploymentSignatureStruct(types.HexBytes(signature).String(), ownerTokenParameters.CommunityID, common.Address(txArgs.From))
 	if err != nil {
 		return DeploymentDetails{}, err
 	}
@@ -211,81 +235,38 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64,
 		return DeploymentDetails{}, err
 	}
 
+	log.Debug("Contract deployed hash:", tx.Hash().String())
+
 	err = api.s.pendingTracker.TrackPendingTransaction(
 		wcommon.ChainID(chainID),
 		tx.Hash(),
 		common.Address(txArgs.From),
+		common.Address{},
 		transactions.DeployOwnerToken,
-		transactions.AutoDelete,
+		transactions.Keep,
+		"",
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)
 		return DeploymentDetails{}, err
 	}
 
-	return DeploymentDetails{"", tx.Hash().Hex()}, nil
-}
-
-func (api *API) GetMasterTokenContractAddressFromHash(ctx context.Context, chainID uint64, txHash string) (string, error) {
-	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
+	savedOwnerToken, err := api.s.CreateCommunityTokenAndSave(int(chainID), ownerTokenParameters, txArgs.From.Hex(),
+		api.s.TemporaryOwnerContractAddress(tx.Hash().Hex()), protobuf.CommunityTokenType_ERC721, token.OwnerLevel)
 	if err != nil {
-		return "", err
+		return DeploymentDetails{}, err
 	}
-
-	receipt, err := ethClient.TransactionReceipt(ctx, common.HexToHash(txHash))
+	savedMasterToken, err := api.s.CreateCommunityTokenAndSave(int(chainID), masterTokenParameters, txArgs.From.Hex(),
+		api.s.TemporaryMasterContractAddress(tx.Hash().Hex()), protobuf.CommunityTokenType_ERC721, token.MasterLevel)
 	if err != nil {
-		return "", err
+		return DeploymentDetails{}, err
 	}
 
-	deployerContractInst, err := api.NewCommunityTokenDeployerInstance(chainID)
-	if err != nil {
-		return "", err
-	}
-
-	logMasterTokenCreatedSig := []byte("DeployMasterToken(address)")
-	logMasterTokenCreatedSigHash := crypto.Keccak256Hash(logMasterTokenCreatedSig)
-
-	for _, vLog := range receipt.Logs {
-		if vLog.Topics[0].Hex() == logMasterTokenCreatedSigHash.Hex() {
-			event, err := deployerContractInst.ParseDeployMasterToken(*vLog)
-			if err != nil {
-				return "", err
-			}
-			return event.Arg0.Hex(), nil
-		}
-	}
-	return "", fmt.Errorf("can't find master token address in transaction: %v", txHash)
-}
-
-func (api *API) GetOwnerTokenContractAddressFromHash(ctx context.Context, chainID uint64, txHash string) (string, error) {
-	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
-	if err != nil {
-		return "", err
-	}
-
-	receipt, err := ethClient.TransactionReceipt(ctx, common.HexToHash(txHash))
-	if err != nil {
-		return "", err
-	}
-
-	deployerContractInst, err := api.NewCommunityTokenDeployerInstance(chainID)
-	if err != nil {
-		return "", err
-	}
-
-	logOwnerTokenCreatedSig := []byte("DeployOwnerToken(address)")
-	logOwnerTokenCreatedSigHash := crypto.Keccak256Hash(logOwnerTokenCreatedSig)
-
-	for _, vLog := range receipt.Logs {
-		if vLog.Topics[0].Hex() == logOwnerTokenCreatedSigHash.Hex() {
-			event, err := deployerContractInst.ParseDeployOwnerToken(*vLog)
-			if err != nil {
-				return "", err
-			}
-			return event.Arg0.Hex(), nil
-		}
-	}
-	return "", fmt.Errorf("can't find owner token address in transaction: %v", txHash)
+	return DeploymentDetails{
+		ContractAddress: "",
+		TransactionHash: tx.Hash().Hex(),
+		OwnerToken:      savedOwnerToken,
+		MasterToken:     savedMasterToken}, nil
 }
 
 func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentParameters DeploymentParameters, txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
@@ -318,15 +299,26 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 		wcommon.ChainID(chainID),
 		tx.Hash(),
 		common.Address(txArgs.From),
+		address,
 		transactions.DeployCommunityToken,
-		transactions.AutoDelete,
+		transactions.Keep,
+		"",
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)
 		return DeploymentDetails{}, err
 	}
 
-	return DeploymentDetails{address.Hex(), tx.Hash().Hex()}, nil
+	savedCommunityToken, err := api.s.CreateCommunityTokenAndSave(int(chainID), deploymentParameters, txArgs.From.Hex(), address.Hex(),
+		protobuf.CommunityTokenType_ERC20, token.CommunityLevel)
+	if err != nil {
+		return DeploymentDetails{}, err
+	}
+
+	return DeploymentDetails{
+		ContractAddress: address.Hex(),
+		TransactionHash: tx.Hash().Hex(),
+		CommunityToken:  savedCommunityToken}, nil
 }
 
 // Returns gas units + 10%
@@ -403,7 +395,7 @@ func (api *API) DeployAssetsEstimate(ctx context.Context, chainID uint64, fromAd
 
 func (api *API) DeployOwnerTokenEstimate(ctx context.Context, chainID uint64, fromAddress string,
 	ownerTokenParameters DeploymentParameters, masterTokenParameters DeploymentParameters,
-	signature string, communityID string, signerPubKey string) (uint64, error) {
+	communityID string, signerPubKey string) (uint64, error) {
 	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
 		log.Error(err.Error())
@@ -432,7 +424,12 @@ func (api *API) DeployOwnerTokenEstimate(ctx context.Context, chainID uint64, fr
 		BaseURI: masterTokenParameters.TokenURI,
 	}
 
-	communitySignature, err := prepareDeploymentSignatureStruct(signature, communityID, common.HexToAddress(fromAddress))
+	signature, err := api.s.Messenger.CreateCommunityTokenDeploymentSignature(ctx, chainID, fromAddress, communityID)
+	if err != nil {
+		return 0, err
+	}
+
+	communitySignature, err := prepareDeploymentSignatureStruct(types.HexBytes(signature).String(), communityID, common.HexToAddress(fromAddress))
 	if err != nil {
 		return 0, err
 	}
@@ -531,8 +528,10 @@ func (api *API) MintTokens(ctx context.Context, chainID uint64, contractAddress 
 		wcommon.ChainID(chainID),
 		tx.Hash(),
 		common.Address(txArgs.From),
+		common.HexToAddress(contractAddress),
 		transactions.AirdropCommunityToken,
-		transactions.AutoDelete,
+		transactions.Keep,
+		"",
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)
@@ -614,7 +613,7 @@ func (api *API) RemoteDestructedAmount(ctx context.Context, chainID uint64, cont
 }
 
 // This is only ERC721 function
-func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, tokenIds []*bigint.BigInt) (string, error) {
+func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, tokenIds []*bigint.BigInt, additionalData string) (string, error) {
 	err := api.validateTokens(tokenIds)
 	if err != nil {
 		return "", err
@@ -641,8 +640,10 @@ func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress 
 		wcommon.ChainID(chainID),
 		tx.Hash(),
 		common.Address(txArgs.From),
+		common.HexToAddress(contractAddress),
 		transactions.RemoteDestructCollectible,
-		transactions.AutoDelete,
+		transactions.Keep,
+		additionalData,
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)
@@ -730,42 +731,8 @@ func (api *API) remainingAssetsSupply(ctx context.Context, chainID uint64, contr
 	return &bigint.BigInt{Int: res}, nil
 }
 
-func (api *API) maxSupplyCollectibles(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
-	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	contractInst, err := api.NewCollectiblesInstance(chainID, contractAddress)
-	if err != nil {
-		return nil, err
-	}
-	return contractInst.MaxSupply(callOpts)
-}
-
-func (api *API) maxSupplyAssets(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
-	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	contractInst, err := api.NewAssetsInstance(chainID, contractAddress)
-	if err != nil {
-		return nil, err
-	}
-	return contractInst.MaxSupply(callOpts)
-}
-
-func (api *API) maxSupply(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
-	tokenType, err := api.s.db.GetTokenType(chainID, contractAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	switch tokenType {
-	case protobuf.CommunityTokenType_ERC721:
-		return api.maxSupplyCollectibles(ctx, chainID, contractAddress)
-	case protobuf.CommunityTokenType_ERC20:
-		return api.maxSupplyAssets(ctx, chainID, contractAddress)
-	default:
-		return nil, fmt.Errorf("unknown token type: %v", tokenType)
-	}
-}
-
 func (api *API) prepareNewMaxSupply(ctx context.Context, chainID uint64, contractAddress string, burnAmount *bigint.BigInt) (*big.Int, error) {
-	maxSupply, err := api.maxSupply(ctx, chainID, contractAddress)
+	maxSupply, err := api.s.maxSupply(ctx, chainID, contractAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -801,8 +768,10 @@ func (api *API) Burn(ctx context.Context, chainID uint64, contractAddress string
 		wcommon.ChainID(chainID),
 		tx.Hash(),
 		common.Address(txArgs.From),
+		common.HexToAddress(contractAddress),
 		transactions.BurnCommunityToken,
-		transactions.AutoDelete,
+		transactions.Keep,
+		"",
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)

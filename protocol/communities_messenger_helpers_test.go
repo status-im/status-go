@@ -24,7 +24,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/services/communitytokens"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
@@ -74,8 +73,8 @@ func (m *TokenManagerMock) FindOrCreateTokenByAddress(ctx context.Context, chain
 }
 
 type CollectiblesServiceMock struct {
-	Collectibles map[uint64]map[string]*communitytokens.CollectibleContractData
-	Assets       map[uint64]map[string]*communitytokens.AssetContractData
+	Collectibles map[uint64]map[string]*communities.CollectibleContractData
+	Assets       map[uint64]map[string]*communities.AssetContractData
 	Signers      map[string]string
 }
 
@@ -90,7 +89,7 @@ func (c *CollectiblesServiceMock) SetSignerPubKey(ctx context.Context, chainID u
 	return "", nil
 }
 
-func (c *CollectiblesServiceMock) GetCollectibleContractData(chainID uint64, contractAddress string) (*communitytokens.CollectibleContractData, error) {
+func (c *CollectiblesServiceMock) GetCollectibleContractData(chainID uint64, contractAddress string) (*communities.CollectibleContractData, error) {
 	collectibleContractData, dataExists := c.Collectibles[chainID][contractAddress]
 	if dataExists {
 		return collectibleContractData, nil
@@ -98,7 +97,7 @@ func (c *CollectiblesServiceMock) GetCollectibleContractData(chainID uint64, con
 	return nil, nil
 }
 
-func (c *CollectiblesServiceMock) GetAssetContractData(chainID uint64, contractAddress string) (*communitytokens.AssetContractData, error) {
+func (c *CollectiblesServiceMock) GetAssetContractData(chainID uint64, contractAddress string) (*communities.AssetContractData, error) {
 	assetsContractData, dataExists := c.Assets[chainID][contractAddress]
 	if dataExists {
 		return assetsContractData, nil
@@ -106,22 +105,22 @@ func (c *CollectiblesServiceMock) GetAssetContractData(chainID uint64, contractA
 	return nil, nil
 }
 
-func (c *CollectiblesServiceMock) SetMockCollectibleContractData(chainID uint64, contractAddress string, collectible *communitytokens.CollectibleContractData) {
+func (c *CollectiblesServiceMock) SetMockCollectibleContractData(chainID uint64, contractAddress string, collectible *communities.CollectibleContractData) {
 	if c.Collectibles == nil {
-		c.Collectibles = make(map[uint64]map[string]*communitytokens.CollectibleContractData)
+		c.Collectibles = make(map[uint64]map[string]*communities.CollectibleContractData)
 	}
 	if _, ok := c.Collectibles[chainID]; !ok {
-		c.Collectibles[chainID] = make(map[string]*communitytokens.CollectibleContractData)
+		c.Collectibles[chainID] = make(map[string]*communities.CollectibleContractData)
 	}
 	c.Collectibles[chainID][contractAddress] = collectible
 }
 
 func (c *CollectiblesServiceMock) SetMockCommunityTokenData(token *token.CommunityToken) {
 	if c.Collectibles == nil {
-		c.Collectibles = make(map[uint64]map[string]*communitytokens.CollectibleContractData)
+		c.Collectibles = make(map[uint64]map[string]*communities.CollectibleContractData)
 	}
 
-	data := &communitytokens.CollectibleContractData{
+	data := &communities.CollectibleContractData{
 		TotalSupply:    token.Supply,
 		Transferable:   token.Transferable,
 		RemoteBurnable: token.RemoteSelfDestruct,
@@ -138,11 +137,11 @@ func (c *CollectiblesServiceMock) SafeGetSignerPubKey(ctx context.Context, chain
 	return c.Signers[communityID], nil
 }
 
-func (c *CollectiblesServiceMock) SetMockAssetContractData(chainID uint64, contractAddress string, assetData *communitytokens.AssetContractData) {
+func (c *CollectiblesServiceMock) SetMockAssetContractData(chainID uint64, contractAddress string, assetData *communities.AssetContractData) {
 	if c.Assets == nil {
-		c.Assets = make(map[uint64]map[string]*communitytokens.AssetContractData)
+		c.Assets = make(map[uint64]map[string]*communities.AssetContractData)
 	}
-	c.Assets[chainID] = make(map[string]*communitytokens.AssetContractData)
+	c.Assets[chainID] = make(map[string]*communities.AssetContractData)
 	c.Assets[chainID][contractAddress] = assetData
 }
 
@@ -159,7 +158,7 @@ type testCommunitiesMessengerConfig struct {
 	password            string
 	walletAddresses     []string
 	mockedBalances      *map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
-	collectiblesService communitytokens.ServiceInterface
+	collectiblesService communities.CommunityTokensServiceInterface
 }
 
 func (tcmc *testCommunitiesMessengerConfig) complete() error {

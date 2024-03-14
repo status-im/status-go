@@ -9,7 +9,6 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
-	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/wakuv2"
 
 	"go.uber.org/zap"
@@ -90,7 +89,7 @@ type config struct {
 	torrentConfig          *params.TorrentConfig
 	walletConfig           *params.WalletConfig
 	walletService          *wallet.Service
-	communityTokensService communitytokens.ServiceInterface
+	communityTokensService communities.CommunityTokensServiceInterface
 	httpServer             *server.MediaServer
 	rpcClient              *rpc.Client
 	tokenManager           communities.TokenManager
@@ -379,7 +378,7 @@ func WithWalletService(s *wallet.Service) Option {
 	}
 }
 
-func WithCommunityTokensService(s communitytokens.ServiceInterface) Option {
+func WithCommunityTokensService(s communities.CommunityTokensServiceInterface) Option {
 	return func(c *config) error {
 		c.communityTokensService = s
 		return nil
