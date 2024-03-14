@@ -19,9 +19,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/transfer"
-
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -329,10 +328,27 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 	cachedBalancesPerChain := map[common.Address]map[common.Address]map[uint64]string{}
 	updateAnyway := false
 	if !updateBalances {
+	cacheCheck:
 		for _, address := range addresses {
-			if _, ok := cachedTokens[address]; !ok {
+			if res, ok := cachedTokens[address]; !ok || len(res) == 0 {
 				updateAnyway = true
 				break
+			}
+
+			networkFound := map[uint64]bool{}
+			for _, token := range cachedTokens[address] {
+				for _, chain := range chainIDs {
+					if _, ok := token.BalancesPerChain[chain]; ok {
+						networkFound[chain] = true
+					}
+				}
+			}
+
+			for _, chain := range chainIDs {
+				if !networkFound[chain] {
+					updateAnyway = true
+					break cacheCheck
+				}
 			}
 		}
 	}
