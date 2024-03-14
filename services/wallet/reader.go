@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/transfer"
 
+	cst "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -383,10 +384,14 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 					hexBalance := &big.Int{}
 					if latestBalances != nil {
 						hexBalance = latestBalances[token.ChainID][address][token.Address].ToInt()
-						log.Info("NDBG latest balances are not nil", "ad", token.Address, "ch", token.ChainID, "bal", hexBalance)
+						if token.ChainID == cst.EthereumSepolia || token.ChainID == cst.OptimismSepolia || token.ChainID == cst.ArbitrumSepolia {
+							log.Info("NDBG latest balances are not nil", "ad", token.Address, "ch", token.ChainID, "bal", hexBalance)
+						}
 					} else {
 						if cachedRawBalance, ok := cachedBalancesPerChain[address][token.Address][token.ChainID]; ok {
-							log.Info("NDBG cached raw", "tkn", token.Address, "ch", token.ChainID, "bal", cachedRawBalance)
+							if token.ChainID == cst.EthereumSepolia || token.ChainID == cst.OptimismSepolia || token.ChainID == cst.ArbitrumSepolia {
+								log.Info("NDBG cached raw", "tkn", token.Address, "ch", token.ChainID, "bal", cachedRawBalance)
+							}
 							hexBalance, _ = new(big.Int).SetString(cachedRawBalance, 10)
 						}
 					}
@@ -398,7 +403,9 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 						)
 					}
 
-					log.Info("NDBG res balance", "ad", token.Address, "ch", token.ChainID, "bal", balance)
+					if token.ChainID == cst.EthereumSepolia || token.ChainID == cst.OptimismSepolia || token.ChainID == cst.ArbitrumSepolia {
+						log.Info("NDBG res balance", "ad", token.Address, "ch", token.ChainID, "bal", balance)
+					}
 					hasError := false
 					if client, ok := clients[token.ChainID]; ok {
 						hasError = err != nil || !client.GetIsConnected()
