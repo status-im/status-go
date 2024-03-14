@@ -338,7 +338,7 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 			}
 
 			networkFound := map[uint64]bool
-			for _, chain := chainIDs {
+			for _, chain := range chainIDs {
 				networkFound[chain] := false
 			}
 
@@ -350,7 +350,7 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 				}
 			}
 
-			for _, chain := chainIDs {
+			for _, chain := range chainIDs {
 				if !networkFound[chain] {
 					updateAnyway = true
 				}
