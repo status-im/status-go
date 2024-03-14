@@ -227,6 +227,7 @@ func login(accountData, password, configJSON string) error {
 		if err != nil {
 			return err
 		}
+		api.FillDefaultWalletLoginConfig(&conf)
 	}
 
 	api.RunAsync(func() error {
@@ -369,6 +370,8 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+	api.FillDefaultWalletNodeConfig(&conf)
+
 	var subaccs []*accounts.Account
 	err = json.Unmarshal([]byte(subaccountData), &subaccs)
 	if err != nil {
@@ -431,6 +434,7 @@ func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJ
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+	api.FillDefaultWalletNodeConfig(&conf)
 	var subaccs []*accounts.Account
 	err = json.Unmarshal([]byte(subaccountData), &subaccs)
 	if err != nil {
@@ -463,6 +467,7 @@ func LoginWithKeycard(accountData, password, keyHex string, configJSON string) s
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+	api.FillDefaultWalletLoginConfig(&conf)
 	api.RunAsync(func() error {
 		log.Debug("start a node with account", "key-uid", account.KeyUID)
 		err := statusBackend.StartNodeWithKey(account, password, keyHex, &conf)

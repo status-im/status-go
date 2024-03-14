@@ -539,6 +539,7 @@ type WalletConfig struct {
 	AlchemyAPIKeys       map[uint64]string `json:"AlchemyAPIKeys"`
 	InfuraAPIKey         string            `json:"InfuraAPIKey"`
 	InfuraAPIKeySecret   string            `json:"InfuraAPIKeySecret"`
+	PoktAPIKey           string            `json:"PoktAPIKey"`
 }
 
 // LocalNotificationsConfig extra configuration for localnotifications.Service.
