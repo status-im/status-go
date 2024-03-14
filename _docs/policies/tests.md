@@ -67,3 +67,26 @@ flowchart TB
       - The issue should use the https://github.com/status-im/status-go/labels/E%3AFlaky%20Test label
     - Detail that you have experienced the test being flaky and in what context (local vs CI, link to the PR or branch).
 
+```mermaid
+flowchart TB
+    A([Ready to report a flaky test]) --> B[Check the `status-go` GitHub repo<br/>issues for the test name failing.]
+    B --> C{Does the test appear in<br/>the list of `E: Flaky Test` issues?}
+    C -->|No| D[
+	    Create a new issue
+      - The issue title should include the flaky test name
+      - The issue should use the https://github.com/status-im/status-go/labels/E%3AFlaky%20Test label
+      ]
+    D --> E[
+	    Detail which test is flaky and in what context:
+	    local vs CI, link to the PR or branch.
+    ]
+    E --> J
+    C -->|Yes| F{Is the issue open?}
+    F -->|No| G((Either))
+    H --> E
+    G --> I[Reopen the issue]
+    G --> D
+    I --> H
+    F -->|Yes| H[Add a comment to the issue]
+    J([End])
+```
