@@ -29,7 +29,6 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/services/communitytokens"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/t/helpers"
@@ -1042,7 +1041,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 	for _, communityToken := range communityTokens {
 		s.collectiblesServiceMock.SetSignerPubkeyForCommunity(communityIDBytes, ownerPublicKey)
 		s.collectiblesServiceMock.SetMockCollectibleContractData(communityToken.ChainID, communityToken.ContractAddress,
-			&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
+			&communities.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
 	}
 
 	results := map[string]singleResult{}
@@ -1205,7 +1204,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingCommunityWithOwnerToken() {
 	// update mock - the signer for the community returned by the contracts should be owner
 	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.owner.identity.PublicKey))
 	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
-		&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
+		&communities.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)

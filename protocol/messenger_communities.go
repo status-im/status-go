@@ -3970,6 +3970,10 @@ func (m *Messenger) GetCommunityToken(communityID string, chainID int, address s
 	return m.communitiesManager.GetCommunityToken(communityID, chainID, address)
 }
 
+func (m *Messenger) GetCommunityTokenByChainAndAddress(chainID int, address string) (*token.CommunityToken, error) {
+	return m.communitiesManager.GetCommunityTokenByChainAndAddress(chainID, address)
+}
+
 func (m *Messenger) GetCommunityTokens(communityID string) ([]*token.CommunityToken, error) {
 	return m.communitiesManager.GetCommunityTokens(communityID)
 }

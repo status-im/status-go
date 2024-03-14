@@ -1,4 +1,4 @@
-package communitytokens
+package communitytokensdatabase
 
 import (
 	"database/sql"

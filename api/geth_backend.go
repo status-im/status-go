@@ -2338,6 +2338,7 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w types.WakuKeyManager
 		}
 		b.statusNode.ChatService(accDB).Init(messenger)
 		b.statusNode.EnsService().Init(messenger.SyncEnsNamesWithDispatchMessage)
+		b.statusNode.CommunityTokensService().Init(messenger)
 	}
 
 	return nil

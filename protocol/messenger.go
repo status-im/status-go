@@ -61,7 +61,6 @@ import (
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
-	"github.com/status-im/status-go/services/communitytokens"
 	ensservice "github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/ext/mailservers"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -173,7 +172,7 @@ type Messenger struct {
 	// flag to enable backedup messages processing, false by default
 	processBackedupMessages bool
 
-	communityTokensService communitytokens.ServiceInterface
+	communityTokensService communities.CommunityTokensServiceInterface
 
 	// used to track dispatched messages
 	dispatchMessageTestCallback func(common.RawMessage)

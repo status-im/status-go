@@ -27,7 +27,7 @@ import (
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/services/communitytokens"
+	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -100,7 +100,7 @@ type Manager struct {
 	ContractMaker     *contracts.ContractMaker
 	networkManager    *network.Manager
 	stores            []store // Set on init, not changed afterwards
-	communityTokensDB *communitytokens.Database
+	communityTokensDB *communitytokensdatabase.Database
 	communityManager  *community.Manager
 	mediaServer       *server.MediaServer
 	walletFeed        *event.Feed
@@ -166,7 +166,7 @@ func NewTokenManager(
 		networkManager:    networkManager,
 		communityManager:  communityManager,
 		stores:            stores,
-		communityTokensDB: communitytokens.NewCommunityTokensDatabase(appDB),
+		communityTokensDB: communitytokensdatabase.NewCommunityTokensDatabase(appDB),
 		tokens:            tokens,
 		mediaServer:       mediaServer,
 		walletFeed:        walletFeed,

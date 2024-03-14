@@ -41,12 +41,12 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
-	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/transactions"
 )
 
 var defaultAnnounceList = [][]string{
@@ -101,7 +101,7 @@ type Manager struct {
 	torrentConfig                *params.TorrentConfig
 	torrentClient                *torrent.Client
 	walletConfig                 *params.WalletConfig
-	communityTokensService       communitytokens.ServiceInterface
+	communityTokensService       CommunityTokensServiceInterface
 	historyArchiveTasksWaitGroup sync.WaitGroup
 	historyArchiveTasks          sync.Map // stores `chan struct{}`
 	membersReevaluationTasks     sync.Map // stores `membersReevaluationTask`
@@ -188,7 +188,7 @@ type managerOptions struct {
 	tokenManager           TokenManager
 	collectiblesManager    CollectiblesManager
 	walletConfig           *params.WalletConfig
-	communityTokensService communitytokens.ServiceInterface
+	communityTokensService CommunityTokensServiceInterface
 	permissionChecker      PermissionChecker
 }
 
@@ -196,6 +196,26 @@ type TokenManager interface {
 	GetBalancesByChain(ctx context.Context, accounts, tokens []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error)
 	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *token.Token
 	GetAllChainIDs() ([]uint64, error)
+}
+
+type CollectibleContractData struct {
+	TotalSupply    *bigint.BigInt
+	Transferable   bool
+	RemoteBurnable bool
+	InfiniteSupply bool
+}
+
+type AssetContractData struct {
+	TotalSupply    *bigint.BigInt
+	InfiniteSupply bool
+}
+
+type CommunityTokensServiceInterface interface {
+	GetCollectibleContractData(chainID uint64, contractAddress string) (*CollectibleContractData, error)
+	SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, newSignerPubKey string) (string, error)
+	GetAssetContractData(chainID uint64, contractAddress string) (*AssetContractData, error)
+	SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error)
+	DeploymentSignatureDigest(chainID uint64, addressFrom string, communityID string) ([]byte, error)
 }
 
 type DefaultTokenManager struct {
@@ -279,7 +299,7 @@ func WithWalletConfig(walletConfig *params.WalletConfig) ManagerOption {
 	}
 }
 
-func WithCommunityTokensService(communityTokensService communitytokens.ServiceInterface) ManagerOption {
+func WithCommunityTokensService(communityTokensService CommunityTokensServiceInterface) ManagerOption {
 	return func(opts *managerOptions) {
 		opts.communityTokensService = communityTokensService
 	}
@@ -4766,6 +4786,10 @@ func findIndexFile(files []*torrent.File) (index int, ok bool) {
 
 func (m *Manager) GetCommunityToken(communityID string, chainID int, address string) (*community_token.CommunityToken, error) {
 	return m.persistence.GetCommunityToken(communityID, chainID, address)
+}
+
+func (m *Manager) GetCommunityTokenByChainAndAddress(chainID int, address string) (*community_token.CommunityToken, error) {
+	return m.persistence.GetCommunityTokenByChainAndAddress(chainID, address)
 }
 
 func (m *Manager) GetCommunityTokens(communityID string) ([]*community_token.CommunityToken, error) {

@@ -13,6 +13,7 @@ import (
 	communitytokendeployer "github.com/status-im/status-go/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
@@ -71,7 +72,7 @@ func (m *Manager) GetAssetContractInstance(chainID uint64, contractAddress strin
 	return contractInst, nil
 }
 
-func (m *Manager) GetCollectibleContractData(chainID uint64, contractAddress string) (*CollectibleContractData, error) {
+func (m *Manager) GetCollectibleContractData(chainID uint64, contractAddress string) (*communities.CollectibleContractData, error) {
 	callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
 
 	contract, err := m.GetCollectiblesContractInstance(chainID, contractAddress)
@@ -91,7 +92,7 @@ func (m *Manager) GetCollectibleContractData(chainID uint64, contractAddress str
 		return nil, err
 	}
 
-	return &CollectibleContractData{
+	return &communities.CollectibleContractData{
 		TotalSupply:    &bigint.BigInt{Int: totalSupply},
 		Transferable:   transferable,
 		RemoteBurnable: remoteBurnable,
@@ -99,7 +100,7 @@ func (m *Manager) GetCollectibleContractData(chainID uint64, contractAddress str
 	}, nil
 }
 
-func (m *Manager) GetAssetContractData(chainID uint64, contractAddress string) (*AssetContractData, error) {
+func (m *Manager) GetAssetContractData(chainID uint64, contractAddress string) (*communities.AssetContractData, error) {
 	callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
 	contract, err := m.GetAssetContractInstance(chainID, contractAddress)
 	if err != nil {
@@ -110,7 +111,7 @@ func (m *Manager) GetAssetContractData(chainID uint64, contractAddress string) (
 		return nil, err
 	}
 
-	return &AssetContractData{
+	return &communities.AssetContractData{
 		TotalSupply:    &bigint.BigInt{Int: totalSupply},
 		InfiniteSupply: GetInfiniteSupply().Cmp(totalSupply) == 0,
 	}, nil
