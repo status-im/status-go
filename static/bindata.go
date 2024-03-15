@@ -10,8 +10,8 @@
 // ../config/cli/fleet-shards.test.json (1.301kB)
 // ../config/cli/fleet-status.prod.json (1.528kB)
 // ../config/cli/fleet-status.test.json (1.138kB)
-// ../config/cli/fleet-wakuv2.prod.json (1.138kB)
-// ../config/cli/fleet-wakuv2.test.json (1.138kB)
+// ../config/cli/fleet-waku.sandbox.json (1.133kB)
+// ../config/cli/fleet-waku.test.json (1.13kB)
 // ../config/cli/les-enabled.json (58B)
 // ../config/cli/mailserver-enabled.json (176B)
 // ../config/status-chain-genesis.json (612B)
@@ -31,7 +31,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,7 +40,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -49,7 +48,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -105,7 +104,7 @@ func emojisTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "emojis.txt", size: 28134, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "emojis.txt", size: 28134, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf5, 0x28, 0xc, 0x22, 0x34, 0xa1, 0xeb, 0x8, 0x8d, 0xef, 0x38, 0x1b, 0xd8, 0xc2, 0x1a, 0x6d, 0xa2, 0x62, 0xad, 0x43, 0xfc, 0x1c, 0x38, 0xda, 0x8c, 0x3f, 0x34, 0xa, 0x8c, 0x6f, 0x5d, 0xd8}}
 	return a, nil
 }
@@ -125,7 +124,7 @@ func ConfigReadmeMd() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/README.md", size: 3031, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "../config/README.md", size: 3031, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x15, 0x44, 0x2b, 0x13, 0x14, 0x34, 0xa, 0x66, 0x62, 0x1b, 0xc6, 0x4a, 0x2c, 0x7d, 0x4d, 0x89, 0xfb, 0xc9, 0x69, 0xe4, 0x18, 0x5f, 0x3, 0x98, 0x6d, 0x3c, 0x9e, 0xa8, 0xcd, 0x53, 0x5d, 0x75}}
 	return a, nil
 }
@@ -145,7 +144,7 @@ func ConfigCliAnonMetricNodeClientJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/anon-metric-node-client.json", size: 857, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "../config/cli/anon-metric-node-client.json", size: 857, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x90, 0xdf, 0xcd, 0xc8, 0x92, 0x1d, 0x63, 0x5e, 0xe1, 0xf9, 0x7f, 0xed, 0xf2, 0x68, 0x6b, 0x20, 0xff, 0x1d, 0x3b, 0xc9, 0x7b, 0xb9, 0x6a, 0xba, 0xd3, 0xbd, 0xf7, 0x48, 0x7b, 0x5a, 0x52, 0x79}}
 	return a, nil
 }
@@ -165,7 +164,7 @@ func ConfigCliAnonMetricNodeServerJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/anon-metric-node-server.json", size: 696, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "../config/cli/anon-metric-node-server.json", size: 696, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf0, 0x2f, 0x97, 0xab, 0x77, 0x61, 0x93, 0x9d, 0x1f, 0x33, 0x18, 0x72, 0xad, 0xce, 0xa3, 0x35, 0xa9, 0x44, 0xbf, 0x29, 0xa8, 0xea, 0x21, 0xb7, 0x22, 0x7f, 0x7d, 0x3a, 0x6b, 0x55, 0x3c, 0x66}}
 	return a, nil
 }
@@ -185,7 +184,7 @@ func ConfigCliFleetEthProdJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-eth.prod.json", size: 3619, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-eth.prod.json", size: 3619, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x92, 0x4f, 0x86, 0x8b, 0x6e, 0x2, 0x27, 0xa3, 0x37, 0x27, 0x74, 0x51, 0xf0, 0x97, 0x5b, 0x64, 0x8e, 0xbd, 0x29, 0xba, 0x75, 0x2d, 0x75, 0x78, 0x46, 0xb9, 0x56, 0x6, 0xb1, 0xf9, 0x85, 0xdd}}
 	return a, nil
 }
@@ -205,7 +204,7 @@ func ConfigCliFleetEthStagingJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-eth.staging.json", size: 2139, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-eth.staging.json", size: 2139, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb0, 0xac, 0xc9, 0x61, 0x97, 0x42, 0x0, 0x3a, 0xfc, 0x78, 0x11, 0xa1, 0xc7, 0x55, 0x71, 0x46, 0x72, 0x3e, 0x52, 0xb0, 0x89, 0x69, 0x7f, 0x8f, 0xf1, 0x26, 0x44, 0xc5, 0xfc, 0x20, 0x9f, 0xa1}}
 	return a, nil
 }
@@ -225,7 +224,7 @@ func ConfigCliFleetShardsStagingJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-shards.staging.json", size: 1307, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-shards.staging.json", size: 1307, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x42, 0xd8, 0x11, 0xbb, 0xdb, 0x2e, 0xf3, 0x34, 0x75, 0x26, 0x26, 0x8c, 0x29, 0x49, 0x79, 0x47, 0xf6, 0x3e, 0x2c, 0x0, 0xf3, 0x6a, 0x3e, 0x28, 0xc9, 0x1c, 0x45, 0xbe, 0x43, 0x65, 0x57, 0x80}}
 	return a, nil
 }
@@ -245,7 +244,7 @@ func ConfigCliFleetShardsTestJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-shards.test.json", size: 1301, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-shards.test.json", size: 1301, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x40, 0x4, 0x2b, 0xe9, 0x2e, 0xa1, 0x7, 0x42, 0xb8, 0x5e, 0x54, 0x8c, 0x84, 0xd1, 0xd6, 0xd6, 0xc3, 0x72, 0x19, 0xa3, 0x9f, 0xa4, 0x72, 0xd2, 0xc5, 0xa6, 0xde, 0xcf, 0x5c, 0xc7, 0xcb, 0x9a}}
 	return a, nil
 }
@@ -265,7 +264,7 @@ func ConfigCliFleetStatusProdJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-status.prod.json", size: 1528, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-status.prod.json", size: 1528, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x13, 0x36, 0xdc, 0x13, 0x80, 0xd6, 0xd1, 0xfe, 0xf1, 0x4a, 0xba, 0xa6, 0xdc, 0xb5, 0xe1, 0xc1, 0x17, 0x77, 0x96, 0xf, 0x45, 0x96, 0x87, 0x5e, 0x67, 0xd2, 0xbf, 0xb, 0xc6, 0x79, 0xc7, 0x6f}}
 	return a, nil
 }
@@ -285,48 +284,48 @@ func ConfigCliFleetStatusTestJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-status.test.json", size: 1138, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-status.test.json", size: 1138, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x71, 0x2c, 0xfb, 0x4f, 0x90, 0xa5, 0xb, 0x87, 0xcf, 0xc2, 0x61, 0xdb, 0x22, 0x86, 0xef, 0x4a, 0xcf, 0xba, 0xe8, 0x2c, 0x12, 0x3d, 0x44, 0xa, 0x59, 0x4a, 0xd6, 0xd8, 0xa4, 0xe7, 0x49, 0x91}}
 	return a, nil
 }
 
-var _ConfigCliFleetWakuv2ProdJson = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x94\x54\x4d\x6f\x1b\x47\x0c\xbd\xfb\x57\x2c\xf6\x5c\x49\x9c\xaf\x9d\x19\xdf\x2c\xd9\xad\x81\x38\x82\x6d\xc9\x52\xd3\xa2\x07\xce\x0c\xb9\xd9\x48\xda\x55\xf6\x43\x76\x5c\xe4\xbf\x17\x72\x9d\xda\x41\xd0\x00\xbe\xbe\xf7\x40\x3e\xf2\x11\xfc\xfb\x24\xcb\xf2\x5b\xaa\x13\x3d\x1e\x9a\xa1\xcb\x4f\x33\xc6\x6d\x47\xbf\x1c\xe1\x79\x73\x5e\x75\xb1\x39\x50\xfb\x25\x3f\xcd\xfa\x76\xf8\x17\x9e\x6d\x87\xae\xa7\x76\xd6\xd4\x5c\x95\xf9\x69\x76\x2c\x91\x65\xf9\x45\x8d\x61\x4b\xe9\x95\x32\xcb\xf2\x5f\xb7\x44\x7d\x7e\x9a\xe5\xf7\xb8\x19\x0e\x72\xbc\x6f\x9b\x94\x3f\x73\xd3\xa6\xe9\xe7\x4d\xa2\x63\xd3\x3f\xff\x7a\x06\x97\xed\xb1\x78\x7a\x8f\xd5\x76\x41\xed\x81\xda\xef\xd8\xeb\xa1\xfb\x38\x6f\xfa\x8a\xab\x88\x7d\xd5\xd4\xdd\x2b\xcd\x93\x22\xcb\x72\x0d\x22\xa0\xa1\x84\x1a\x64\x61\x5d\x8a\xd6\x21\xa0\x06\x4e\x60\xbd\x61\x4d\xe8\x82\x20\xa5\xbd\x95\x51\x27\x61\x22\x2b\x85\x11\x84\xf4\x52\x69\x11\x9d\x67\x88\x21\x16\xca\x32\x7a\xb6\xa8\x98\x09\x82\x4f\x4c\x1e\xc8\xc7\x84\x64\x51\x68\x2f\x8d\x01\xc0\x00\x22\x14\xe8\x45\x2c\x6c\x40\xd2\x12\xbd\xc5\xe7\xf1\xb2\x2c\x17\x4e\x08\x2d\x82\x48\x42\x08\x0f\x0e\x91\xc1\xb0\xb6\xce\x51\x61\xad\xa3\x08\x16\xac\x42\x91\x34\x89\x48\x5a\x45\xab\x9c\x30\x51\x03\x91\x26\xab\xb4\x41\x11\x03\x1b\xf4\x80\xda\x70\x01\x22\xb0\xb2\x85\x62\x21\x03\x15\x2a\x80\x28\xa4\x0e\x28\x58\x15\x44\xc1\x1b\x2b\xb5\x31\x64\x41\xe9\xe0\xd8\xb3\x8c\xfa\xc5\x89\x61\x8e\x4a\x27\xc3\x9c\x50\x38\x48\x5e\xc7\xa4\xbc\xd5\xc9\x53\x92\x21\x80\x93\x94\xa8\x70\xac\xb4\x0c\x18\x52\x20\x07\x22\x12\x73\xb0\x09\x3d\x48\x70\x36\x69\xc5\x1e\xd1\x17\x22\xda\xe0\x0c\x48\xaf\x8c\x73\x56\x47\x70\xc4\xa0\x29\x62\xf2\x2c\x92\x37\x28\x18\x48\x6b\x17\x43\x4a\x26\x81\x56\x06\xa2\xcd\x9f\x8c\x7c\x4b\x71\xd1\x63\x5f\xc5\x1f\xa2\x7f\xb9\xc2\x1f\xa8\x35\x6e\x86\xff\xc0\x6f\x43\x4d\x52\xdd\xe9\x49\xdd\x24\x1a\x81\x18\xa7\x66\x84\xbb\x4e\x8d\x5f\x1d\xda\xb8\xeb\xb1\x1f\xba\x6a\x37\xae\xa9\x9f\xf4\x71\x3f\x51\xa0\x40\x4d\xf6\x72\x3f\x11\xc5\x5d\x35\xc8\xcb\xb3\xdd\x95\x69\x36\xeb\x66\xff\xbb\x9d\x7f\xfe\x63\x3d\xbd\x7b\xb7\xfa\xbc\x76\xd5\xdd\xc3\xec\x62\x97\xcc\x6f\xef\x2f\xaf\x56\xd7\xf7\xb3\xf2\xf1\xc3\xe3\xcd\x41\xd1\xcb\x42\xbf\xef\x5d\xc6\xd1\xd0\x8d\x22\xd5\x7d\x8b\x5b\x31\xc2\x37\x9b\x58\x6d\xde\xd5\x7d\x77\x31\xc3\x0f\x4c\x7c\x2b\x56\xf2\xcb\xec\xd6\xfa\x19\x95\x57\x67\xcb\x61\x79\x7d\x51\x4c\xfd\xf2\xa1\x7c\x98\x56\x55\x75\xf6\x7f\x26\x30\x8e\x62\x3d\xfa\xd8\xd4\xe5\xa6\xa9\xcb\x51\x7c\xb3\x09\x7d\x70\xc5\x5a\x85\xdd\x52\x4c\xab\xcb\xa2\x59\x5c\x3f\xc6\x6e\xd1\x4a\x5d\x9d\xdf\xec\x17\x73\x73\x83\xde\xcb\xe9\xec\xd3\xa7\xfb\xb2\x3d\x7f\x0e\xf4\x24\xcb\xbe\x3e\xfd\x84\x63\x40\x2b\xf9\xf3\x97\x70\x14\x9f\x7c\x3d\xf9\x27\x00\x00\xff\xff\x8f\x35\xa9\x73\x72\x04\x00\x00")
+var _ConfigCliFleetWakuSandboxJson = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x94\x54\x4d\x6f\xdb\x46\x10\xbd\xfb\x57\x10\x3c\x97\xd2\xec\x17\x77\xd7\xb7\xca\x96\x50\x24\x90\x50\x49\x96\x1d\xbb\xe8\x61\x76\x77\x46\xa6\x25\x91\x8a\x48\x2a\x76\x8a\xfc\xf7\x42\xae\x53\x3b\x08\x5a\xc0\xd7\xf7\x1e\x66\xde\xcc\x1b\xcc\x5f\x67\x59\x96\x2f\xa8\x4e\xf4\xf5\xd8\xf4\x6d\x7e\x9e\x31\x6e\x5b\xfa\xe5\x04\xcf\x9a\xcb\xaa\x8d\xcd\x91\x0e\x4f\xf9\x79\xd6\x1d\xfa\x7f\xe0\x8b\x6d\xdf\x76\x74\xb8\x68\x6a\xae\xd6\xf9\x79\x76\x2a\x91\x65\xf9\xb8\xc6\xb0\xa5\xf4\x46\x99\x65\xf9\x64\x4b\xd4\xe5\xe7\x59\xfe\x05\x37\xfd\xa0\xc5\x3a\x85\xe6\x31\x7f\x21\x47\x4d\xd3\xcd\x9a\x44\xa7\xae\x7f\xfc\xf9\x02\x5e\x1d\x4e\xd5\xd3\x14\xab\xed\x92\x0e\x47\x3a\xfc\xc0\xfe\xde\xb7\xf7\xb3\xa6\xab\xb8\x8a\xd8\x55\x4d\xdd\xbe\xd1\x3c\x2b\xb2\x2c\xd7\x20\x02\x1a\x4a\xa8\x41\x96\xd6\xa5\x68\x1d\x02\x6a\xe0\x04\xd6\x1b\xd6\x84\x2e\x08\x52\xda\x5b\x19\x75\x12\x26\xb2\x52\x18\x41\x48\x2f\x95\x16\xd1\x79\x86\x18\x62\xa9\x2c\xa3\x67\x8b\x8a\x99\x20\xf8\xc4\xe4\x81\x7c\x4c\x48\x16\x85\xf6\xd2\x18\x00\x0c\x20\x42\x89\x5e\xc4\xd2\x06\x24\x2d\xd1\x5b\x7c\x19\x2f\xcb\x72\xe1\x84\xd0\x22\x88\x24\x84\xf0\xe0\x10\x19\x0c\x6b\xeb\x1c\x95\xd6\x3a\x8a\x60\xc1\x2a\x14\x49\x93\x88\xa4\x55\xb4\xca\x09\x13\x35\x10\x69\xb2\x4a\x1b\x14\x31\xb0\x41\x0f\xa8\x0d\x97\x20\x02\x2b\x5b\x2a\x16\x32\x50\xa9\x02\x88\x52\xea\x80\x82\x55\x49\x14\xbc\xb1\x52\x1b\x43\x16\x94\x0e\x8e\x3d\xcb\xa8\x5f\x9d\x18\xe6\xa8\x74\x32\xcc\x09\x85\x83\xe4\x75\x4c\xca\x5b\x9d\x3c\x25\x19\x02\x38\x49\x89\x4a\xc7\x4a\xcb\x80\x21\x05\x72\x20\x22\x31\x07\x9b\xd0\x83\x04\x67\x93\x56\xec\x11\x7d\x29\xa2\x0d\xce\x80\xf4\xca\x38\x67\x75\x04\x47\x0c\x9a\x22\x26\xcf\x22\x79\x83\x82\x81\xb4\x76\x31\xa4\x64\x12\x68\x65\x20\xda\xfc\xd9\xc8\xf7\x14\x97\x1d\x76\x55\xfc\x29\xfa\xd7\x33\xfc\x89\xba\xc1\x4d\xff\x2f\xf8\x7d\xa8\x61\xaa\x5b\x3d\xac\x9b\x44\x05\x88\x41\x6a\x0a\xdc\xb5\x6a\xf0\xf6\xd2\x06\x6d\x87\x5d\xdf\x0e\xaa\xdd\xb0\x8b\xfb\xa1\x02\x05\x6a\xb8\x97\xfb\xa1\x28\x57\x55\x2f\x7f\xfb\x75\x37\x5f\x4e\x67\xe3\x47\x5e\xdd\xae\x3e\x73\xff\xe9\x66\x73\x69\x2e\x71\x76\x57\x4f\x6f\xeb\x6a\xbd\x78\x9c\x7c\x0c\x1b\xd5\xc5\xf1\x64\x4e\x73\x1a\xbf\xae\xf3\xc7\xce\xeb\x58\xf4\x6d\x11\xa9\xee\x0e\xb8\x15\x05\xbe\xd3\x42\xc9\x4f\x9f\xc7\xe2\x61\x64\xa6\x4d\xfd\xf5\xd8\x4c\xd3\xca\x1d\x6d\x19\x6e\xae\xdd\x1d\xcd\xf6\x75\xbc\xc4\xdd\xad\x98\xce\x3f\xf1\x43\x1a\xfd\x97\x05\x8c\x45\xac\x8b\xfb\xa6\x5e\x6f\x9a\x7a\x5d\xc4\x77\x5a\x58\x7e\x38\x2e\x3f\xec\xef\x1f\x17\x29\xd4\xd5\x7a\x75\x6d\xc2\xc3\x62\x71\x37\x19\xdd\x5f\x75\x37\x93\xab\xe5\x53\xf5\x11\xe7\xa3\xa7\x8b\x87\x2f\xbb\xfd\xf5\x4b\x94\x67\x59\xf6\xed\xf9\x1d\x9c\xa2\xb9\x96\xff\xff\x0d\x4e\xe2\xb3\x6f\x67\x7f\x07\x00\x00\xff\xff\x07\x70\x8a\xdf\x6d\x04\x00\x00")
 
-func ConfigCliFleetWakuv2ProdJsonBytes() ([]byte, error) {
+func ConfigCliFleetWakuSandboxJsonBytes() ([]byte, error) {
 	return bindataRead(
-		_ConfigCliFleetWakuv2ProdJson,
-		"../config/cli/fleet-wakuv2.prod.json",
+		_ConfigCliFleetWakuSandboxJson,
+		"../config/cli/fleet-waku.sandbox.json",
 	)
 }
 
-func ConfigCliFleetWakuv2ProdJson() (*asset, error) {
-	bytes, err := ConfigCliFleetWakuv2ProdJsonBytes()
+func ConfigCliFleetWakuSandboxJson() (*asset, error) {
+	bytes, err := ConfigCliFleetWakuSandboxJsonBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-wakuv2.prod.json", size: 1138, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x17, 0x9c, 0x2f, 0x31, 0x55, 0x27, 0x32, 0x2b, 0x23, 0xec, 0xde, 0xb0, 0x22, 0x28, 0x14, 0x33, 0x4f, 0xd2, 0x1d, 0x14, 0x2, 0x17, 0x6f, 0x76, 0x60, 0x94, 0x59, 0x4d, 0xcb, 0x5c, 0xbd, 0x29}}
+	info := bindataFileInfo{name: "../config/cli/fleet-waku.sandbox.json", size: 1133, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x42, 0x47, 0xed, 0x68, 0x8c, 0x33, 0x1d, 0xce, 0x41, 0x6f, 0x36, 0x6e, 0xd4, 0x3d, 0x57, 0x61, 0xd9, 0x31, 0xe6, 0xeb, 0xb, 0xb9, 0x93, 0xbf, 0x6b, 0xd6, 0xae, 0x8b, 0xe8, 0x51, 0x6f, 0xd2}}
 	return a, nil
 }
 
-var _ConfigCliFleetWakuv2TestJson = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x94\x54\x4f\x6f\x1b\xb7\x13\xbd\xfb\x53\x2c\xf6\xfc\x93\x34\x24\x87\x4b\xd2\xb7\xc4\x3f\xbb\x86\x6a\x0b\xae\x6d\xd9\x51\x8a\x1e\x86\xe4\x50\x5e\x4b\x5a\x2a\xfb\x47\x51\x5c\xe4\xbb\x17\x72\x9d\xda\x41\xd0\x02\xb9\xbe\xf7\x30\xf3\x66\xde\x60\xfe\x3c\x2a\x8a\xf2\x9a\x9b\xc8\x4f\xbb\x3c\x74\xe5\x71\x91\x68\xdd\xf1\xff\x0e\xf0\x2c\xff\xbf\xee\x42\xde\x71\xfb\xa5\x3c\x2e\xfa\x76\xf8\x1b\x3e\x59\x0f\x5d\xcf\xed\x49\x6e\x52\xbd\x2c\x8f\x8b\x43\x89\xa2\x28\x4f\x1b\xf2\x6b\x8e\x6f\x94\x45\x51\x9e\xad\x99\xfb\xf2\xb8\x28\x3f\xd3\x6a\xd8\xc9\x71\xcf\x5d\x5f\xbe\x70\xef\x73\xee\x67\x39\xf2\xa1\xe9\xef\x7f\xbc\x80\xb7\xed\xa1\x78\xbc\xa4\x7a\x7d\xc3\xed\x8e\xdb\xef\xd8\xab\xa1\x7b\x98\xe5\xbe\x4e\x75\xa0\xbe\xce\x4d\xf7\x46\xf3\xac\x28\x8a\x12\x41\x78\xd2\x1c\x09\x41\x56\xc6\xc6\x60\x2c\x01\x21\xa4\x08\xc6\xe9\x84\x4c\xd6\x0b\x56\xe8\x8c\x0c\x18\x85\x0e\x49\x29\x0a\x20\xa4\x93\x0a\x45\xb0\x2e\x41\xf0\xa1\x52\x26\x91\x4b\x86\x54\x4a\x0c\xde\xc5\xc4\x0e\xd8\x85\x48\x6c\x48\xa0\x93\x5a\x03\x90\x07\xe1\x2b\x72\x22\x54\xc6\x13\xa3\x24\x67\xe8\x65\xbc\xa2\x28\x85\x15\x02\x85\x17\x51\x08\xe1\xc0\x12\x25\xd0\x09\x8d\xb5\x5c\x19\x63\x39\x80\x01\xa3\x48\x44\x64\x11\x18\x55\x30\xca\x0a\x1d\x10\x98\x91\x8d\x42\x4d\x22\xf8\xa4\xc9\x01\xa1\x4e\x15\x08\x9f\x94\xa9\x54\x12\xd2\x73\xa5\x3c\x88\x4a\xa2\x27\x91\x54\xc5\xec\x9d\x36\x12\xb5\x66\x03\x0a\xbd\x4d\x2e\xc9\x80\xaf\x4e\x74\x4a\x41\x61\xd4\x29\x45\x12\x16\xa2\xc3\x10\x95\x33\x18\x1d\x47\xe9\x3d\x58\xc9\x91\x2b\x9b\x14\x4a\x4f\x3e\x7a\xb6\x20\x02\xa7\xe4\x4d\x24\x07\x12\xac\x89\xa8\x92\x23\x72\x95\x08\xc6\x5b\x0d\xd2\x29\x6d\xad\xc1\x00\x96\x13\x20\x07\x8a\x2e\x89\xe8\x34\x89\x04\x8c\x68\x83\x8f\x51\x47\x40\xa5\x21\x98\xf2\xd9\xc8\xb7\x14\x6f\x7a\xea\xeb\xf0\x43\xf4\xaf\x57\xf8\x03\x75\x4f\xab\xe1\x1f\xf0\xdb\x50\x93\xd8\x74\x38\x69\x72\xe4\x11\x88\x71\xcc\x23\xda\x74\x6a\xfc\xe6\xd0\xc6\x5d\x4f\xfd\xd0\xd5\x9b\x71\xc3\xfd\xa4\x0f\xdb\x89\x02\x05\x6a\xb2\x95\xdb\x89\xa8\xe6\xf5\x20\xcf\xdf\x6d\xae\x2e\xd8\x5c\x3e\x6d\xec\x6d\xb7\x98\x0f\x7e\x79\xf2\xee\x5e\xd0\x34\xf3\xd9\x4d\xd8\xb7\x17\x8f\x76\xbb\x3d\x3f\xab\x77\x57\xd9\x19\x3f\xff\xf8\xba\xd0\xef\x7b\x2f\xc3\x68\xe8\x46\x81\x9b\xbe\xa5\xb5\x18\xd1\x4f\x9b\x98\x7a\xc9\xd2\x7e\xba\xf8\xb0\xbf\xd5\xab\x8f\xfb\xbb\xf9\x3c\x4f\x7b\x23\x4f\x2f\x9f\x66\xbf\x7c\x78\x8f\xe6\x7a\xbf\xd7\x0f\x9f\xd5\x27\x5c\x3c\xde\xfc\x9b\x09\x0a\xa3\xd0\x8c\x1e\x72\xb3\x5c\xe5\x66\x39\x0a\x3f\x6b\x62\xb5\xbb\xaf\xbf\x9c\x75\xcb\xeb\x87\x61\x7a\xea\xdd\x34\x3d\x2e\xf6\xa7\xab\x7c\x7e\xb1\x6c\xe6\xbf\x6d\x5a\x31\xd3\x9b\x5f\xef\x9b\xc5\xe3\x7e\x71\x7d\xb7\x79\x09\xf4\xa8\x28\xbe\x3e\xff\x84\x43\x40\x77\xf2\xbf\x5f\xc2\x41\x7c\xf4\xf5\xe8\xaf\x00\x00\x00\xff\xff\xb3\x4d\xf8\x70\x72\x04\x00\x00")
+var _ConfigCliFleetWakuTestJson = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x94\x54\x4d\x6f\x1b\x47\x0c\xbd\xfb\x57\x2c\xf6\x5c\x49\x9c\xaf\x9d\x19\xdf\x5c\xd9\xa9\xe0\xd6\x82\xe3\x8f\xc4\x45\xd1\x03\x87\x43\xca\x6b\xc9\xbb\xea\x7e\xc8\xb0\x8a\xfc\xf7\x42\xae\x13\x27\x08\x5a\x20\xd7\xf7\x1e\xc8\x47\x3e\x82\x7f\x1f\x15\x45\x79\xc5\x4d\xe6\xfd\xae\x1d\xfb\xf2\xb8\x10\xdc\xf4\xfc\xd3\x01\x5e\xb6\xa7\x75\x4f\xed\x8e\xbb\xe7\xf2\xb8\x18\xba\xf1\x5f\x78\xbe\x19\xfb\x81\xbb\x79\xdb\x48\xbd\x2a\x8f\x8b\x43\x89\xa2\x28\xcf\x1a\x4c\x1b\xce\x5f\x29\x8b\xa2\x7c\xb7\x61\x1e\xca\xe3\xa2\x7c\xc2\xf5\x38\x1d\xb8\x1f\xca\x57\xe6\xe7\xb6\x1d\x96\x6d\xe6\x43\xcb\x3f\xfe\x7c\x05\x6f\xba\x43\xe9\x7c\x81\xf5\xe6\x9a\xbb\x1d\x77\xdf\xb0\x97\x63\x7f\xbf\x6c\x87\x5a\x6a\xc2\xa1\x6e\x9b\xfe\x2b\xcd\x8b\xa2\x28\x4a\x0b\x2a\xa1\xe3\x8c\x16\x74\xe5\x43\x26\x1f\x10\xd0\x82\x64\xf0\xd1\x89\x65\x0c\x49\xb1\xb1\xd1\x6b\xb2\x59\x39\x12\x63\x90\x40\xe9\xa8\x8d\x55\x14\xa2\x00\x25\xaa\x8c\x17\x8c\xe2\xd1\x88\x30\xa4\x98\x85\x23\x70\xa4\x8c\xec\x51\xd9\xa8\x9d\x03\xc0\x04\x2a\x55\x18\x15\x55\x3e\x21\x5b\x8d\xd1\xe3\xeb\x78\x45\x51\xaa\xa0\x94\x55\x49\x65\xa5\x54\x84\x80\x28\xe0\xc4\xfa\x10\xb8\xf2\x3e\x30\x81\x07\x6f\x50\x65\xcb\x8a\xd8\x1a\xf2\x26\x28\x47\x16\x98\x2d\x7b\x63\x1d\x2a\x4a\xe2\x30\x02\x5a\x27\x15\xa8\x24\xc6\x57\x46\x94\x4e\x5c\x99\x04\xaa\xd2\x36\xa1\x12\x53\x31\xa7\xe8\xbc\xb6\xce\xb1\x07\x63\x53\x90\x28\x9a\xec\x9b\x13\x27\x42\xc6\x66\x27\x92\x51\x05\xc8\xd1\x52\x36\xd1\xdb\x1c\x39\xeb\x94\x20\x68\xce\x5c\x05\x31\x56\x27\x4c\x39\x71\x00\x45\x2c\x92\x7c\xc6\x08\x1a\x82\xcf\xd6\x48\x44\x8c\x95\x22\x9f\x82\x03\x1d\x8d\x0b\xc1\x5b\x82\xc0\x02\x96\x09\x73\x14\x95\xa3\x43\x25\xc0\xd6\x06\x4a\x39\xbb\x0c\xd6\x38\x20\x5f\xbe\x18\xf9\x9c\xe2\xf5\x80\x43\x4d\xdf\x45\xff\x76\x83\xdf\x51\x1f\x71\x3d\x7e\x01\x3f\x0f\x35\xcb\x4d\x6f\x67\x4d\x9b\x79\x02\x6a\x9a\xdb\x09\x3e\xf6\x66\xfa\xe5\xcc\xa6\xfd\x80\xc3\xd8\xd7\x8f\xd3\x86\x87\xd9\x40\xdb\x99\x01\x03\x66\xb6\xd5\xdb\x99\xaa\x6e\xeb\x51\x2f\x4e\xd6\xcf\xeb\x15\x9e\xcd\x17\xfd\x53\x6d\x7e\xff\xf5\xdc\xe5\x8b\xdf\xd2\x5f\x7a\x7d\xf9\x61\xde\x86\x28\xf4\x7c\x93\x4d\xb8\xa5\xf7\xa7\x15\x3f\xb8\x8f\x6f\xeb\xfc\xb6\xf3\x8a\x26\x63\x3f\x21\x6e\x86\x0e\x37\x6a\x82\x3f\x66\xe1\xf1\x74\xbe\x0d\x77\xe7\x71\xaf\x78\xa7\xc2\x7e\xdc\x85\xe5\x82\xd7\x27\xfd\xc3\xf2\x99\xf7\x27\xbb\xc7\x0b\x79\x77\x76\xbe\xae\xef\xb1\xab\x87\x5f\xfe\xcb\x02\xd2\x84\x9a\xc9\x7d\xdb\xac\xd6\x6d\xb3\x9a\xd0\x0f\x6e\x61\xbf\xc0\x9b\x4b\x77\xde\xdf\x3e\xc9\x55\x5c\x5e\x85\xab\x87\xb8\x98\x6b\xbb\x1d\xaf\xab\x96\xf0\x36\x3c\xed\xd9\xbe\xef\xee\xba\x58\xdf\x6d\x5f\xa3\x3c\x2a\x8a\x4f\x2f\xbf\xe0\x10\xcd\x07\xfd\xff\xaf\xe0\x20\x3e\xfa\x74\xf4\x4f\x00\x00\x00\xff\xff\x2c\x15\x77\xfa\x6a\x04\x00\x00")
 
-func ConfigCliFleetWakuv2TestJsonBytes() ([]byte, error) {
+func ConfigCliFleetWakuTestJsonBytes() ([]byte, error) {
 	return bindataRead(
-		_ConfigCliFleetWakuv2TestJson,
-		"../config/cli/fleet-wakuv2.test.json",
+		_ConfigCliFleetWakuTestJson,
+		"../config/cli/fleet-waku.test.json",
 	)
 }
 
-func ConfigCliFleetWakuv2TestJson() (*asset, error) {
-	bytes, err := ConfigCliFleetWakuv2TestJsonBytes()
+func ConfigCliFleetWakuTestJson() (*asset, error) {
+	bytes, err := ConfigCliFleetWakuTestJsonBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-wakuv2.test.json", size: 1138, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xba, 0x99, 0x5c, 0x53, 0x41, 0xbc, 0x7b, 0xe, 0x41, 0x43, 0x59, 0x22, 0x59, 0xbf, 0xc, 0x1f, 0xca, 0xf0, 0x6a, 0x65, 0xa7, 0x85, 0x22, 0x35, 0x13, 0x22, 0xc2, 0x55, 0x55, 0xcc, 0xda, 0x8}}
+	info := bindataFileInfo{name: "../config/cli/fleet-waku.test.json", size: 1130, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7a, 0x9, 0xc6, 0x7e, 0x4f, 0xad, 0x1e, 0x9, 0xd2, 0xad, 0x15, 0x91, 0x24, 0x78, 0x8a, 0x20, 0x9f, 0x1c, 0xbf, 0xa6, 0xd0, 0xad, 0x9f, 0x5, 0x2a, 0xc1, 0x8f, 0x88, 0x25, 0xcb, 0xa3, 0x7c}}
 	return a, nil
 }
 
@@ -345,7 +344,7 @@ func ConfigCliLesEnabledJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/les-enabled.json", size: 58, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "../config/cli/les-enabled.json", size: 58, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7e, 0xee, 0x27, 0xa7, 0x74, 0xa0, 0x46, 0xa1, 0x41, 0xed, 0x4d, 0x16, 0x5b, 0xf3, 0xf0, 0x7c, 0xc8, 0x2f, 0x6f, 0x47, 0xa4, 0xbb, 0x5f, 0x43, 0x33, 0xd, 0x9, 0x9d, 0xea, 0x9e, 0x15, 0xee}}
 	return a, nil
 }
@@ -365,7 +364,7 @@ func ConfigCliMailserverEnabledJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/mailserver-enabled.json", size: 176, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "../config/cli/mailserver-enabled.json", size: 176, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x34, 0xec, 0x81, 0x8b, 0x99, 0xb6, 0xdb, 0xc0, 0x8b, 0x46, 0x97, 0x96, 0xc7, 0x58, 0x30, 0x33, 0xef, 0x54, 0x25, 0x87, 0x7b, 0xb9, 0x94, 0x6b, 0x18, 0xa4, 0x5b, 0x58, 0x67, 0x7c, 0x44, 0xa6}}
 	return a, nil
 }
@@ -385,7 +384,7 @@ func ConfigStatusChainGenesisJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/status-chain-genesis.json", size: 612, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "../config/status-chain-genesis.json", size: 612, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb, 0xf0, 0xc, 0x1, 0x95, 0x65, 0x6, 0x55, 0x48, 0x8f, 0x83, 0xa0, 0xb4, 0x81, 0xda, 0xad, 0x30, 0x6d, 0xb2, 0x78, 0x1b, 0x26, 0x4, 0x13, 0x12, 0x9, 0x6, 0xae, 0x3a, 0x2c, 0x1, 0x71}}
 	return a, nil
 }
@@ -405,7 +404,7 @@ func keysBootnodeKey() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/bootnode.key", size: 65, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "keys/bootnode.key", size: 65, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x31, 0xcf, 0x27, 0xd4, 0x96, 0x2e, 0x32, 0xcd, 0x58, 0x96, 0x2a, 0xe5, 0x8c, 0xa0, 0xf1, 0x73, 0x1f, 0xd6, 0xd6, 0x8b, 0xb, 0x73, 0xd3, 0x2c, 0x84, 0x1a, 0x56, 0xa4, 0x74, 0xb6, 0x95, 0x20}}
 	return a, nil
 }
@@ -425,7 +424,7 @@ func keysFirebaseauthkey() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/firebaseauthkey", size: 153, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "keys/firebaseauthkey", size: 153, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe, 0x69, 0x23, 0x64, 0x7d, 0xf9, 0x14, 0x37, 0x6f, 0x2b, 0x1, 0xf0, 0xb0, 0xa4, 0xb2, 0xd0, 0x18, 0xcd, 0xf9, 0xeb, 0x57, 0xa3, 0xfd, 0x79, 0x25, 0xa7, 0x9c, 0x3, 0xce, 0x26, 0xec, 0xe1}}
 	return a, nil
 }
@@ -445,7 +444,7 @@ func keysTestAccount1StatusChainPk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account1-status-chain.pk", size: 489, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "keys/test-account1-status-chain.pk", size: 489, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8f, 0xba, 0x35, 0x1, 0x2b, 0x9d, 0xad, 0xf0, 0x2d, 0x3c, 0x4d, 0x6, 0xb5, 0x22, 0x2, 0x47, 0xd4, 0x1c, 0xf4, 0x31, 0x2f, 0xb, 0x5b, 0x27, 0x5d, 0x43, 0x97, 0x58, 0x2d, 0xf0, 0xe1, 0xbe}}
 	return a, nil
 }
@@ -465,7 +464,7 @@ func keysTestAccount1Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account1.pk", size: 491, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "keys/test-account1.pk", size: 491, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9, 0x43, 0xc2, 0xf4, 0x8c, 0xc6, 0x64, 0x25, 0x8c, 0x7, 0x8c, 0xa8, 0x89, 0x2b, 0x7b, 0x9b, 0x4f, 0x81, 0xcb, 0xce, 0x3d, 0xef, 0x82, 0x9c, 0x27, 0x27, 0xa9, 0xc5, 0x46, 0x70, 0x30, 0x38}}
 	return a, nil
 }
@@ -485,7 +484,7 @@ func keysTestAccount2StatusChainPk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account2-status-chain.pk", size: 489, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "keys/test-account2-status-chain.pk", size: 489, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9, 0xf8, 0x5c, 0xe9, 0x92, 0x96, 0x2d, 0x88, 0x2b, 0x8e, 0x42, 0x3f, 0xa4, 0x93, 0x6c, 0xad, 0xe9, 0xc0, 0x1b, 0x8a, 0x8, 0x8c, 0x5e, 0x7a, 0x84, 0xa2, 0xf, 0x9f, 0x77, 0x58, 0x2c, 0x2c}}
 	return a, nil
 }
@@ -505,7 +504,7 @@ func keysTestAccount2Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account2.pk", size: 491, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "keys/test-account2.pk", size: 491, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9f, 0x72, 0xd5, 0x95, 0x5c, 0x5a, 0x99, 0x9d, 0x2f, 0x21, 0x83, 0xd7, 0x10, 0x17, 0x4a, 0x3d, 0x65, 0xc9, 0x26, 0x1a, 0x2c, 0x9d, 0x65, 0x63, 0xd2, 0xa0, 0xfc, 0x7c, 0x0, 0x87, 0x38, 0x9f}}
 	return a, nil
 }
@@ -525,7 +524,7 @@ func keysTestAccount3BeforeEip55Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account3-before-eip55.pk", size: 489, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "keys/test-account3-before-eip55.pk", size: 489, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x81, 0x40, 0x56, 0xc1, 0x5e, 0x10, 0x6e, 0x28, 0x15, 0x3, 0x4e, 0xc4, 0xc4, 0x71, 0x4d, 0x16, 0x99, 0xcc, 0x1b, 0x63, 0xee, 0x10, 0x20, 0xe4, 0x59, 0x52, 0x3f, 0xc0, 0xad, 0x15, 0x13, 0x72}}
 	return a, nil
 }
@@ -621,60 +620,44 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"emojis.txt": emojisTxt,
-
+	"emojis.txt":          emojisTxt,
 	"../config/README.md": ConfigReadmeMd,
-
 	"../config/cli/anon-metric-node-client.json": ConfigCliAnonMetricNodeClientJson,
-
 	"../config/cli/anon-metric-node-server.json": ConfigCliAnonMetricNodeServerJson,
-
-	"../config/cli/fleet-eth.prod.json": ConfigCliFleetEthProdJson,
-
-	"../config/cli/fleet-eth.staging.json": ConfigCliFleetEthStagingJson,
-
-	"../config/cli/fleet-shards.staging.json": ConfigCliFleetShardsStagingJson,
-
-	"../config/cli/fleet-shards.test.json": ConfigCliFleetShardsTestJson,
-
-	"../config/cli/fleet-status.prod.json": ConfigCliFleetStatusProdJson,
-
-	"../config/cli/fleet-status.test.json": ConfigCliFleetStatusTestJson,
-
-	"../config/cli/fleet-wakuv2.prod.json": ConfigCliFleetWakuv2ProdJson,
-
-	"../config/cli/fleet-wakuv2.test.json": ConfigCliFleetWakuv2TestJson,
-
-	"../config/cli/les-enabled.json": ConfigCliLesEnabledJson,
-
-	"../config/cli/mailserver-enabled.json": ConfigCliMailserverEnabledJson,
-
-	"../config/status-chain-genesis.json": ConfigStatusChainGenesisJson,
-
-	"keys/bootnode.key": keysBootnodeKey,
-
-	"keys/firebaseauthkey": keysFirebaseauthkey,
-
-	"keys/test-account1-status-chain.pk": keysTestAccount1StatusChainPk,
-
-	"keys/test-account1.pk": keysTestAccount1Pk,
-
-	"keys/test-account2-status-chain.pk": keysTestAccount2StatusChainPk,
-
-	"keys/test-account2.pk": keysTestAccount2Pk,
-
-	"keys/test-account3-before-eip55.pk": keysTestAccount3BeforeEip55Pk,
+	"../config/cli/fleet-eth.prod.json":          ConfigCliFleetEthProdJson,
+	"../config/cli/fleet-eth.staging.json":       ConfigCliFleetEthStagingJson,
+	"../config/cli/fleet-shards.staging.json":    ConfigCliFleetShardsStagingJson,
+	"../config/cli/fleet-shards.test.json":       ConfigCliFleetShardsTestJson,
+	"../config/cli/fleet-status.prod.json":       ConfigCliFleetStatusProdJson,
+	"../config/cli/fleet-status.test.json":       ConfigCliFleetStatusTestJson,
+	"../config/cli/fleet-waku.sandbox.json":      ConfigCliFleetWakuSandboxJson,
+	"../config/cli/fleet-waku.test.json":         ConfigCliFleetWakuTestJson,
+	"../config/cli/les-enabled.json":             ConfigCliLesEnabledJson,
+	"../config/cli/mailserver-enabled.json":      ConfigCliMailserverEnabledJson,
+	"../config/status-chain-genesis.json":        ConfigStatusChainGenesisJson,
+	"keys/bootnode.key":                          keysBootnodeKey,
+	"keys/firebaseauthkey":                       keysFirebaseauthkey,
+	"keys/test-account1-status-chain.pk":         keysTestAccount1StatusChainPk,
+	"keys/test-account1.pk":                      keysTestAccount1Pk,
+	"keys/test-account2-status-chain.pk":         keysTestAccount2StatusChainPk,
+	"keys/test-account2.pk":                      keysTestAccount2Pk,
+	"keys/test-account3-before-eip55.pk":         keysTestAccount3BeforeEip55Pk,
 }
+
+// AssetDebug is true if the assets were built with the debug flag enabled.
+const AssetDebug = false
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -707,35 +690,35 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"..": &bintree{nil, map[string]*bintree{
-		"config": &bintree{nil, map[string]*bintree{
-			"README.md": &bintree{ConfigReadmeMd, map[string]*bintree{}},
-			"cli": &bintree{nil, map[string]*bintree{
-				"anon-metric-node-client.json": &bintree{ConfigCliAnonMetricNodeClientJson, map[string]*bintree{}},
-				"anon-metric-node-server.json": &bintree{ConfigCliAnonMetricNodeServerJson, map[string]*bintree{}},
-				"fleet-eth.prod.json":          &bintree{ConfigCliFleetEthProdJson, map[string]*bintree{}},
-				"fleet-eth.staging.json":       &bintree{ConfigCliFleetEthStagingJson, map[string]*bintree{}},
-				"fleet-shards.staging.json":    &bintree{ConfigCliFleetShardsStagingJson, map[string]*bintree{}},
-				"fleet-shards.test.json":       &bintree{ConfigCliFleetShardsTestJson, map[string]*bintree{}},
-				"fleet-status.prod.json":       &bintree{ConfigCliFleetStatusProdJson, map[string]*bintree{}},
-				"fleet-status.test.json":       &bintree{ConfigCliFleetStatusTestJson, map[string]*bintree{}},
-				"fleet-wakuv2.prod.json":       &bintree{ConfigCliFleetWakuv2ProdJson, map[string]*bintree{}},
-				"fleet-wakuv2.test.json":       &bintree{ConfigCliFleetWakuv2TestJson, map[string]*bintree{}},
-				"les-enabled.json":             &bintree{ConfigCliLesEnabledJson, map[string]*bintree{}},
-				"mailserver-enabled.json":      &bintree{ConfigCliMailserverEnabledJson, map[string]*bintree{}},
+	"..": {nil, map[string]*bintree{
+		"config": {nil, map[string]*bintree{
+			"README.md": {ConfigReadmeMd, map[string]*bintree{}},
+			"cli": {nil, map[string]*bintree{
+				"anon-metric-node-client.json": {ConfigCliAnonMetricNodeClientJson, map[string]*bintree{}},
+				"anon-metric-node-server.json": {ConfigCliAnonMetricNodeServerJson, map[string]*bintree{}},
+				"fleet-eth.prod.json":          {ConfigCliFleetEthProdJson, map[string]*bintree{}},
+				"fleet-eth.staging.json":       {ConfigCliFleetEthStagingJson, map[string]*bintree{}},
+				"fleet-shards.staging.json":    {ConfigCliFleetShardsStagingJson, map[string]*bintree{}},
+				"fleet-shards.test.json":       {ConfigCliFleetShardsTestJson, map[string]*bintree{}},
+				"fleet-status.prod.json":       {ConfigCliFleetStatusProdJson, map[string]*bintree{}},
+				"fleet-status.test.json":       {ConfigCliFleetStatusTestJson, map[string]*bintree{}},
+				"fleet-waku.sandbox.json":      {ConfigCliFleetWakuSandboxJson, map[string]*bintree{}},
+				"fleet-waku.test.json":         {ConfigCliFleetWakuTestJson, map[string]*bintree{}},
+				"les-enabled.json":             {ConfigCliLesEnabledJson, map[string]*bintree{}},
+				"mailserver-enabled.json":      {ConfigCliMailserverEnabledJson, map[string]*bintree{}},
 			}},
-			"status-chain-genesis.json": &bintree{ConfigStatusChainGenesisJson, map[string]*bintree{}},
+			"status-chain-genesis.json": {ConfigStatusChainGenesisJson, map[string]*bintree{}},
 		}},
 	}},
-	"emojis.txt": &bintree{emojisTxt, map[string]*bintree{}},
-	"keys": &bintree{nil, map[string]*bintree{
-		"bootnode.key":                  &bintree{keysBootnodeKey, map[string]*bintree{}},
-		"firebaseauthkey":               &bintree{keysFirebaseauthkey, map[string]*bintree{}},
-		"test-account1-status-chain.pk": &bintree{keysTestAccount1StatusChainPk, map[string]*bintree{}},
-		"test-account1.pk":              &bintree{keysTestAccount1Pk, map[string]*bintree{}},
-		"test-account2-status-chain.pk": &bintree{keysTestAccount2StatusChainPk, map[string]*bintree{}},
-		"test-account2.pk":              &bintree{keysTestAccount2Pk, map[string]*bintree{}},
-		"test-account3-before-eip55.pk": &bintree{keysTestAccount3BeforeEip55Pk, map[string]*bintree{}},
+	"emojis.txt": {emojisTxt, map[string]*bintree{}},
+	"keys": {nil, map[string]*bintree{
+		"bootnode.key":                  {keysBootnodeKey, map[string]*bintree{}},
+		"firebaseauthkey":               {keysFirebaseauthkey, map[string]*bintree{}},
+		"test-account1-status-chain.pk": {keysTestAccount1StatusChainPk, map[string]*bintree{}},
+		"test-account1.pk":              {keysTestAccount1Pk, map[string]*bintree{}},
+		"test-account2-status-chain.pk": {keysTestAccount2StatusChainPk, map[string]*bintree{}},
+		"test-account2.pk":              {keysTestAccount2Pk, map[string]*bintree{}},
+		"test-account3-before-eip55.pk": {keysTestAccount3BeforeEip55Pk, map[string]*bintree{}},
 	}},
 }}
 
@@ -753,7 +736,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}

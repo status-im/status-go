@@ -73,11 +73,14 @@ var (
 				params.FleetProd,
 				params.FleetStaging,
 				params.FleetTest,
-				params.FleetStatusTest,
-				params.FleetStatusProd,
-				params.FleetShardsTest,
+				params.FleetWakuSandbox,
+				params.FleetWakuTest,
 				params.FleetShardsStaging,
-			}, params.FleetProd,
+				params.FleetShardsTest,
+				params.FleetStatusProd,
+				params.FleetStatusTest,
+			},
+			params.FleetProd,
 		),
 	)
 	listenAddr = flag.String("addr", "", "address to bind listener to")
