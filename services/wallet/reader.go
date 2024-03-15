@@ -401,18 +401,10 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 					if !isVisible {
 						isVisible = balance.Cmp(big.NewFloat(0.0)) > 0 || r.isCachedToken(cachedTokens, address, token.Symbol, token.ChainID)
 					}
-					balance1DayAgo, err := r.tokenManager.GetTokenHistoricalBalance(address, token.ChainID, token.Symbol, dayAgoTimestamp)
-					if err != nil {
-						return nil, err
-					}
-					balance1DayAgoStr := "0"
-					if balance1DayAgo != nil {
-						balance1DayAgoStr = balance1DayAgo.String()
-					}
 					balancesPerChain[token.ChainID] = ChainBalance{
 						RawBalance:     hexBalance.String(),
 						Balance:        balance,
-						Balance1DayAgo: balance1DayAgoStr,
+						Balance1DayAgo: "0",
 						Address:        token.Address,
 						ChainID:        token.ChainID,
 						HasError:       hasError,
@@ -421,6 +413,17 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 
 				if !isVisible && !belongsToMandatoryTokens(symbol) {
 					continue
+				}
+
+				for _, balance := range balancesPerChain {
+					balance1DayAgo, err := r.tokenManager.GetTokenHistoricalBalance(address, balance.ChainID, symbol, dayAgoTimestamp)
+					if err != nil {
+						return nil, err
+					}
+					if balance1DayAgo != nil {
+						balance.Balance1DayAgo = balance1DayAgo.String()
+						balancesPerChain[balance.ChainID] = balance
+					}
 				}
 
 				walletToken := Token{
