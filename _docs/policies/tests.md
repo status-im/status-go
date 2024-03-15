@@ -9,8 +9,8 @@
   - Prove that the functionality performs as described
   - Can be falsified
   - Are resistant to fuzzing
-- All new `integration tests` MUST BE validated via 10000 tests.
-  - This can be achieved using the `-count` or `-test.count` flag with the test command eg: `-count 10000` / `-test.count 10000`
+- All new `integration tests` MUST BE validated via a minimum of 1000 tests.
+  - This can be achieved using the `-count` or `-test.count` flag with the test command eg: `-count 1000` / `-test.count 1000`
   - Where the CI can not support this work flow automatically, the developer MUST perform validation tests via local testing.
     - `TODO` Add link to issue for CI automation of validation test runs of new `integration tests`.
   - Ensuring that the test passes consistently every time gives confidence that the test is not flaky.
@@ -39,7 +39,10 @@ Determine who caused the flaky test.
 flowchart TB
     A([PR ready for merge]) --> B{Have any test failed?}
     B -->|No| C[🎉 Proceed with merge 🪄]
-    B -->|Yes| D{Did you write the test for this PR?}
+    B -->|Yes| D{
+        Is the failing test introduced
+        or altered by this PR?
+    }
     D -->|No| E[Check rerun reports.]
     D -->|Yes| F[
         It is likely your changes introduced the flakiness.
@@ -53,21 +56,21 @@ flowchart TB
 ```
 
 #### Reporting Flaky Tests
-- If an old test fails and/or seems flaky either locally or in CI, you MUST report the event.
-  - Check the `status-go` GitHub repo issues for the test name(s) failing.
-  - If the test appears in the list of flaky test issues
-    - If the issue is open
-      - Add a comment to the issue
-      - Detail that you have experienced the test being flaky and in what context (local vs CI, link to the PR or branch).
-    - If the issue is closed
-      - Reopen the issue OR create a new issue referencing the previous issue
-        - Either is fine, use your best judgement in this case.
-      - Detail that you have experienced the test being flaky and in what context (local vs CI, link to the PR or branch).
-  - If the test does not appear in the list of flaky test issues
-    - create a new issue
-      - The issue title should include the flaky test name
-      - The issue should use the https://github.com/status-im/status-go/labels/E%3AFlaky%20Test label
+If an old test fails and/or seems flaky either locally or in CI, you MUST report the event.
+- Check the `status-go` GitHub repo issues for the test name(s) failing.
+- If the test appears in the list of flaky test issues
+  - If the issue is open
+    - Add a comment to the issue
     - Detail that you have experienced the test being flaky and in what context (local vs CI, link to the PR or branch).
+  - If the issue is closed
+    - Reopen the issue OR create a new issue referencing the previous issue
+      - Either is fine, use your best judgement in this case.
+    - Detail that you have experienced the test being flaky and in what context (local vs CI, link to the PR or branch).
+- If the test does not appear in the list of flaky test issues
+  - create a new issue
+    - The issue title should include the flaky test name
+    - The issue should use the https://github.com/status-im/status-go/labels/E%3AFlaky%20Test label
+  - Detail that you have experienced the test being flaky and in what context (local vs CI, link to the PR or branch).
 
 ```mermaid
 flowchart TB
