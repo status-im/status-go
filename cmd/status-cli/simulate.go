@@ -33,8 +33,8 @@ func simulate(cCtx *cli.Context) error {
 	logger = rawLogger.Sugar()
 
 	logger.Info("Running dm command, flags passed:")
-	for _, flag := range cCtx.FlagNames() {
-		logger.Infof("  %s: %v\n", flag, cCtx.Value(flag))
+	for _, flag := range DmFlags {
+		logger.Infof("-%s %v", flag.Names()[0], cCtx.Value(flag.Names()[0]))
 	}
 
 	// Start Alice and Bob's messengers

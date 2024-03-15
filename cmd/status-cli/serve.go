@@ -29,14 +29,13 @@ func serve(cCtx *cli.Context) error {
 	logger = rawLogger.Sugar()
 
 	logger.Info("Running serve command, flags passed:")
-	for _, flag := range cCtx.FlagNames() {
-		logger.Infof("  %s: %v\n", flag, cCtx.Value(flag))
+	for _, flag := range ServeFlags {
+		logger.Infof("-%s %v", flag.Names()[0], cCtx.Value(flag.Names()[0]))
 	}
 
 	name := cCtx.String(NameFlag)
 	port := cCtx.Int(PortFlag)
 
-	// Start Alice and Bob's messengers
 	messenger, err := startMessenger(cCtx, name, port)
 	if err != nil {
 		return err

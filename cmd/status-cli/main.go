@@ -31,6 +31,40 @@ var CommonFlags = []cli.Flag{
 	},
 }
 
+var DmFlags = append([]cli.Flag{
+	&cli.BoolFlag{
+		Name:    InteractiveFlag,
+		Aliases: []string{"i"},
+		Usage:   "Use interactive mode",
+	},
+	&cli.IntFlag{
+		Name:    CountFlag,
+		Aliases: []string{"c"},
+		Value:   1,
+		Usage:   "How many messages to sent from each user",
+	},
+}, CommonFlags...)
+
+var ServeFlags = append([]cli.Flag{
+	&cli.StringFlag{
+		Name:    NameFlag,
+		Aliases: []string{"n"},
+		Value:   "Alice",
+		Usage:   "Name of the user",
+	},
+	&cli.StringFlag{
+		Name:    AddFlag,
+		Aliases: []string{"a"},
+		Usage:   "Add a friend with the public key",
+	},
+	&cli.IntFlag{
+		Name:    PortFlag,
+		Aliases: []string{"p"},
+		Value:   8545,
+		Usage:   "HTTP Server port to listen on",
+	},
+}, CommonFlags...)
+
 var logger *zap.SugaredLogger
 
 type StatusCLI struct {
@@ -47,19 +81,7 @@ func main() {
 				Name:    "dm",
 				Aliases: []string{"d"},
 				Usage:   "Send direct message",
-				Flags: append([]cli.Flag{
-					&cli.BoolFlag{
-						Name:    InteractiveFlag,
-						Aliases: []string{"i"},
-						Usage:   "Use interactive mode",
-					},
-					&cli.IntFlag{
-						Name:    CountFlag,
-						Aliases: []string{"c"},
-						Value:   1,
-						Usage:   "How many messages to sent from each user",
-					},
-				}, CommonFlags...),
+				Flags:   DmFlags,
 				Action: func(cCtx *cli.Context) error {
 					return simulate(cCtx)
 				},
@@ -68,25 +90,7 @@ func main() {
 				Name:    "serve",
 				Aliases: []string{"s"},
 				Usage:   "Start a server to send and receive messages",
-				Flags: append([]cli.Flag{
-					&cli.StringFlag{
-						Name:    NameFlag,
-						Aliases: []string{"n"},
-						Value:   "Alice",
-						Usage:   "Name of the user",
-					},
-					&cli.StringFlag{
-						Name:    AddFlag,
-						Aliases: []string{"a"},
-						Usage:   "Add a friend with the public key",
-					},
-					&cli.IntFlag{
-						Name:    PortFlag,
-						Aliases: []string{"p"},
-						Value:   8545,
-						Usage:   "HTTP Server port to listen on",
-					},
-				}, CommonFlags...),
+				Flags:   ServeFlags,
 				Action: func(cCtx *cli.Context) error {
 					return serve(cCtx)
 				},
