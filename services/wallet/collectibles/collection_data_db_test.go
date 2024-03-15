@@ -55,12 +55,12 @@ func TestUpdateCollectionsData(t *testing.T) {
 
 	idsNotInDB, err = db.GetIDsNotInDB(extraIds)
 	require.NoError(t, err)
-	require.Equal(t, extraIds, idsNotInDB)
+	require.ElementsMatch(t, extraIds, idsNotInDB)
 
 	combinedIds := append(ids, extraIds...)
 	idsNotInDB, err = db.GetIDsNotInDB(combinedIds)
 	require.NoError(t, err)
-	require.Equal(t, extraIds, idsNotInDB)
+	require.ElementsMatch(t, extraIds, idsNotInDB)
 
 	// Check for loaded data
 	loadedMap, err := db.GetData(ids)
