@@ -41,9 +41,6 @@ func (s *MessengerCommunityMetricsSuite) prepareCommunityAndChatIDs() (*communit
 
 	// Create another chat
 	chat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status",
 			Emoji:       "👍",

@@ -55,13 +55,9 @@ func (s *CommunitySuite) TestCreateCategory() {
 		DisplayName: "new-chat-display-name",
 		Description: "new-chat-description",
 	}
-	permissions := &protobuf.CommunityPermissions{
-		Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-	}
 
 	_, err = org.CreateChat(newChatID, &protobuf.CommunityChat{
-		Identity:    identity,
-		Permissions: permissions,
+		Identity: identity,
 	})
 	s.Require().NoError(err)
 
@@ -121,16 +117,12 @@ func (s *CommunitySuite) TestEditCategory() {
 		DisplayName: "new-chat-display-name",
 		Description: "new-chat-description",
 	}
-	permissions := &protobuf.CommunityPermissions{
-		Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-	}
 
 	testChatID2 := "test-chat-id-2"
 	testChatID3 := "test-chat-id-3"
 
 	_, err = org.CreateChat(testChatID2, &protobuf.CommunityChat{
-		Identity:    identity1,
-		Permissions: permissions,
+		Identity: identity1,
 	})
 	s.Require().NoError(err)
 	identity2 := &protobuf.ChatIdentity{
@@ -139,8 +131,7 @@ func (s *CommunitySuite) TestEditCategory() {
 	}
 
 	_, err = org.CreateChat(testChatID3, &protobuf.CommunityChat{
-		Identity:    identity2,
-		Permissions: permissions,
+		Identity: identity2,
 	})
 	s.Require().NoError(err)
 
@@ -170,9 +161,6 @@ func (s *CommunitySuite) TestEditCategory() {
 func (s *CommunitySuite) TestDeleteCategory() {
 	org := s.buildCommunity(&s.identity.PublicKey)
 	org.config.PrivateKey = s.identity
-	permissions := &protobuf.CommunityPermissions{
-		Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-	}
 
 	testChatID2 := "test-chat-id-2"
 	testChatID3 := "test-chat-id-3"
@@ -185,8 +173,7 @@ func (s *CommunitySuite) TestDeleteCategory() {
 	}
 
 	_, err := org.CreateChat(testChatID2, &protobuf.CommunityChat{
-		Identity:    identity1,
-		Permissions: permissions,
+		Identity: identity1,
 	})
 	s.Require().NoError(err)
 
@@ -196,8 +183,7 @@ func (s *CommunitySuite) TestDeleteCategory() {
 	}
 
 	_, err = org.CreateChat(testChatID3, &protobuf.CommunityChat{
-		Identity:    identity2,
-		Permissions: permissions,
+		Identity: identity2,
 	})
 	s.Require().NoError(err)
 
@@ -237,9 +223,6 @@ func (s *CommunitySuite) TestDeleteCategory() {
 func (s *CommunitySuite) TestDeleteChatOrder() {
 	org := s.buildCommunity(&s.identity.PublicKey)
 	org.config.PrivateKey = s.identity
-	permissions := &protobuf.CommunityPermissions{
-		Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-	}
 
 	testChatID2 := "test-chat-id-2"
 	testChatID3 := "test-chat-id-3"
@@ -252,8 +235,7 @@ func (s *CommunitySuite) TestDeleteChatOrder() {
 	}
 
 	_, err := org.CreateChat(testChatID2, &protobuf.CommunityChat{
-		Identity:    identity1,
-		Permissions: permissions,
+		Identity: identity1,
 	})
 	s.Require().NoError(err)
 	identity2 := &protobuf.ChatIdentity{
@@ -262,8 +244,7 @@ func (s *CommunitySuite) TestDeleteChatOrder() {
 	}
 
 	_, err = org.CreateChat(testChatID3, &protobuf.CommunityChat{
-		Identity:    identity2,
-		Permissions: permissions,
+		Identity: identity2,
 	})
 	s.Require().NoError(err)
 

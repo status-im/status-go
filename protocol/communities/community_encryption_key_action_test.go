@@ -746,9 +746,8 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 			s.Require().NoError(err)
 
 			_, err = origin.CreateChat(channelID, &protobuf.CommunityChat{
-				Members:     map[string]*protobuf.CommunityMember{},
-				Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_AUTO_ACCEPT},
-				Identity:    &protobuf.ChatIdentity{},
+				Members:  map[string]*protobuf.CommunityMember{},
+				Identity: &protobuf.ChatIdentity{},
 			})
 			s.Require().NoError(err)
 
@@ -797,9 +796,8 @@ func (s *CommunityEncryptionKeyActionSuite) TestNilOrigin() {
 	chatID := types.EncodeHex(crypto.CompressPubkey(&s.identity.PublicKey)) + channelID
 
 	_, err = newCommunity.CreateChat(channelID, &protobuf.CommunityChat{
-		Members:     map[string]*protobuf.CommunityMember{},
-		Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_AUTO_ACCEPT},
-		Identity:    &protobuf.ChatIdentity{},
+		Members:  map[string]*protobuf.CommunityMember{},
+		Identity: &protobuf.ChatIdentity{},
 	})
 	s.Require().NoError(err)
 
@@ -957,9 +955,8 @@ func (s *CommunityEncryptionKeyActionSuite) TestControlNodeChange() {
 			s.Require().NoError(err)
 
 			_, err = origin.CreateChat(channelID, &protobuf.CommunityChat{
-				Members:     map[string]*protobuf.CommunityMember{},
-				Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_AUTO_ACCEPT},
-				Identity:    &protobuf.ChatIdentity{},
+				Members:  map[string]*protobuf.CommunityMember{},
+				Identity: &protobuf.ChatIdentity{},
 			})
 			s.Require().NoError(err)
 

@@ -118,13 +118,9 @@ func (s *CommunitySuite) TestCreateChat() {
 		DisplayName: "new-chat-display-name",
 		Description: "new-chat-description",
 	}
-	permissions := &protobuf.CommunityPermissions{
-		Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-	}
 
 	_, err := org.CreateChat(newChatID, &protobuf.CommunityChat{
-		Identity:    identity,
-		Permissions: permissions,
+		Identity: identity,
 	})
 
 	s.Require().Equal(ErrNotAuthorized, err)
@@ -133,8 +129,7 @@ func (s *CommunitySuite) TestCreateChat() {
 	org.config.ID = &s.identity.PublicKey
 
 	changes, err := org.CreateChat(newChatID, &protobuf.CommunityChat{
-		Identity:    identity,
-		Permissions: permissions,
+		Identity: identity,
 	})
 
 	description := org.config.CommunityDescription
@@ -144,7 +139,6 @@ func (s *CommunitySuite) TestCreateChat() {
 	s.Require().NotNil(description.Chats[newChatID])
 	s.Require().NotEmpty(description.Clock)
 	s.Require().Equal(len(description.Chats)-1, int(description.Chats[newChatID].Position))
-	s.Require().Equal(permissions, description.Chats[newChatID].Permissions)
 	s.Require().Equal(identity, description.Chats[newChatID].Identity)
 
 	s.Require().NotNil(changes)
@@ -153,8 +147,7 @@ func (s *CommunitySuite) TestCreateChat() {
 	// Add a community with the same name
 
 	_, err = org.CreateChat("different-chat-id", &protobuf.CommunityChat{
-		Identity:    identity,
-		Permissions: permissions,
+		Identity: identity,
 	})
 
 	s.Require().Error(err)
@@ -170,14 +163,9 @@ func (s *CommunitySuite) TestEditChat() {
 		Emoji:       "😎",
 		Color:       "#000000",
 	}
-	permissions := &protobuf.CommunityPermissions{
-		Access:  protobuf.CommunityPermissions_AUTO_ACCEPT,
-		Private: false,
-	}
 
 	_, err := org.CreateChat(newChatID, &protobuf.CommunityChat{
-		Identity:    identity,
-		Permissions: permissions,
+		Identity: identity,
 	})
 	s.Require().NoError(err)
 
@@ -189,13 +177,8 @@ func (s *CommunitySuite) TestEditChat() {
 		Emoji:       "🤘",
 		Color:       "#FFFFFF",
 	}
-	editedPermissions := &protobuf.CommunityPermissions{
-		Access:  protobuf.CommunityPermissions_AUTO_ACCEPT,
-		Private: true,
-	}
 	_, err = org.EditChat(newChatID, &protobuf.CommunityChat{
-		Identity:    editedIdentity,
-		Permissions: editedPermissions,
+		Identity: editedIdentity,
 	})
 	s.Require().Equal(ErrNotAuthorized, err)
 
@@ -203,21 +186,18 @@ func (s *CommunitySuite) TestEditChat() {
 	org.config.PrivateKey = s.identity
 	org.config.ID = &s.identity.PublicKey
 	editChanges, err := org.EditChat(newChatID, &protobuf.CommunityChat{
-		Identity:    editedIdentity,
-		Permissions: editedPermissions,
+		Identity: editedIdentity,
 	})
 
 	s.Require().NoError(err)
 
 	s.Require().NotNil(description.Chats[newChatID])
 	s.Require().NotEmpty(description.Clock)
-	s.Require().Equal(editedPermissions, description.Chats[newChatID].Permissions)
 	s.Require().Equal(editedIdentity, description.Chats[newChatID].Identity)
 
 	s.Require().NotNil(editChanges)
 	s.Require().NotNil(editChanges.ChatsModified[newChatID])
 	s.Require().Equal(editChanges.ChatsModified[newChatID].ChatModified.Identity, editedIdentity)
-	s.Require().Equal(editChanges.ChatsModified[newChatID].ChatModified.Permissions, editedPermissions)
 }
 
 func (s *CommunitySuite) TestDeleteChat() {
@@ -341,34 +321,10 @@ func (s *CommunitySuite) TestValidateRequestToJoin() {
 		Clock:       uint64(time.Now().Unix()),
 	}
 
-	requestWithChatID := &protobuf.CommunityRequestToJoin{
-		EnsName:     "donvanvliet.stateofus.eth",
-		CommunityId: s.communityID,
-		ChatId:      testChatID1,
-		Clock:       uint64(time.Now().Unix()),
-	}
-
 	requestWithoutENS := &protobuf.CommunityRequestToJoin{
 		CommunityId: s.communityID,
 		Clock:       uint64(time.Now().Unix()),
 	}
-
-	requestWithChatWithoutENS := &protobuf.CommunityRequestToJoin{
-		CommunityId: s.communityID,
-		ChatId:      testChatID1,
-		Clock:       uint64(time.Now().Unix()),
-	}
-
-	// MATRIX
-	// NO_MEMBERHSIP - NO_MEMBERSHIP -> Error -> Anyone can join org, chat is read/write for anyone
-	// NO_MEMBRISHIP - INVITATION_ONLY -> Error -> Anyone can join org, chat is invitation only
-	// NO_MEMBERSHIP - ON_REQUEST -> Success -> Anyone can join org, chat is on request and needs approval
-	// INVITATION_ONLY - NO_MEMBERSHIP -> TODO -> Org is invitation only, chat is read-write for members
-	// INVITATION_ONLY - INVITATION_ONLY -> Error -> Org is invitation only, chat is invitation only
-	// INVITATION_ONLY - ON_REQUEST -> TODO -> Error -> Org is invitation only, member of the org need to request access for chat
-	// ON_REQUEST - NO_MEMBRERSHIP -> TODO -> Error -> Org is on request, chat is read write for members
-	// ON_REQUEST - INVITATION_ONLY -> Error -> Org is on request, chat is invitation only for members
-	// ON_REQUEST - ON_REQUEST -> Fine -> Org is on request, chat is on request
 
 	testCases := []struct {
 		name    string
@@ -398,44 +354,6 @@ func (s *CommunitySuite) TestValidateRequestToJoin() {
 			request: requestWithoutENS,
 			err:     ErrCantRequestAccess,
 		},
-		{
-			name:    "ens-only chat and missing ens",
-			config:  s.configChatENSOnly(),
-			signer:  signer,
-			request: requestWithChatWithoutENS,
-			err:     ErrCantRequestAccess,
-		},
-		{
-			name:    "missing chat",
-			config:  s.configOnRequest(),
-			signer:  signer,
-			request: requestWithChatID,
-			err:     ErrChatNotFound,
-		},
-		// Org-Chat combinations
-		// NO_MEMBERSHIP-NO_MEMBERSHIP = error as you should not be
-		// requesting access
-		{
-			name:    "no-membership org with no-membeship chat",
-			config:  s.configNoMembershipOrgNoMembershipChat(),
-			signer:  signer,
-			request: requestWithChatID,
-			err:     ErrCantRequestAccess,
-		},
-		// NO_MEMBERSHIP-ON_REQUEST = this is a valid case
-		{
-			name:    "no-membership org with on-request chat",
-			config:  s.configNoMembershipOrgOnRequestChat(),
-			signer:  signer,
-			request: requestWithChatID,
-		},
-		// ON_REQUEST-ON_REQUEST success
-		{
-			name:    "on-request org with on-request chat",
-			config:  s.configOnRequestOrgOnRequestChat(),
-			signer:  signer,
-			request: requestWithChatID,
-		},
 	}
 
 	for _, tc := range testCases {
@@ -444,56 +362,6 @@ func (s *CommunitySuite) TestValidateRequestToJoin() {
 			s.Require().NoError(err)
 			err = org.ValidateRequestToJoin(tc.signer, tc.request)
 			s.Require().Equal(tc.err, err)
-		})
-	}
-}
-
-func (s *CommunitySuite) TestCanPost() {
-	notMember := &s.member3.PublicKey
-	member := &s.member1.PublicKey
-
-	testCases := []struct {
-		name    string
-		config  Config
-		member  *ecdsa.PublicKey
-		err     error
-		canPost bool
-	}{
-		{
-			name:    "no-membership org with no-membership chat",
-			config:  s.configNoMembershipOrgNoMembershipChat(),
-			member:  notMember,
-			canPost: false,
-		},
-		{
-			name:    "membership org with no-membership chat-not-a-member",
-			config:  s.configOnRequestOrgNoMembershipChat(),
-			member:  notMember,
-			canPost: false,
-		},
-		{
-			name:    "membership org with no-membership chat",
-			config:  s.configOnRequestOrgNoMembershipChat(),
-			member:  member,
-			canPost: true,
-		},
-		{
-			name:    "creator can always post of course",
-			config:  s.configOnRequestOrgNoMembershipChat(),
-			member:  &s.identity.PublicKey,
-			canPost: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		s.Run(tc.name, func() {
-			var err error
-			org, err := New(tc.config, &TimeSourceStub{}, &DescriptionEncryptorMock{})
-			s.Require().NoError(err)
-
-			canPost, err := org.CanPost(tc.member, testChatID1, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
-			s.Require().Equal(tc.err, err)
-			s.Require().Equal(tc.canPost, canPost)
 		})
 	}
 }
@@ -571,9 +439,8 @@ func (s *CommunitySuite) TestHandleCommunityDescription() {
 				changes := org.emptyCommunityChanges()
 				changes.MembersAdded[s.member3Key] = &protobuf.CommunityMember{}
 				changes.ChatsAdded[testChatID2] = &protobuf.CommunityChat{
-					Identity:    &protobuf.ChatIdentity{DisplayName: "added-chat", Description: "description"},
-					Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_MANUAL_ACCEPT},
-					Members:     make(map[string]*protobuf.CommunityMember)}
+					Identity: &protobuf.ChatIdentity{DisplayName: "added-chat", Description: "description"},
+					Members:  make(map[string]*protobuf.CommunityMember)}
 				changes.ChatsAdded[testChatID2].Members[s.member3Key] = &protobuf.CommunityMember{}
 
 				return changes
@@ -626,26 +493,6 @@ func (s *CommunitySuite) TestValidateCommunityDescription() {
 			name:        "empty org permissions",
 			description: s.emptyPermissionsCommunityDescription(),
 			err:         ErrInvalidCommunityDescriptionNoOrgPermissions,
-		},
-		{
-			name:        "empty chat permissions",
-			description: s.emptyChatPermissionsCommunityDescription(),
-			err:         ErrInvalidCommunityDescriptionNoChatPermissions,
-		},
-		{
-			name:        "unknown org permissions",
-			description: s.unknownOrgPermissionsCommunityDescription(),
-			err:         ErrInvalidCommunityDescriptionUnknownOrgAccess,
-		},
-		{
-			name:        "unknown chat permissions",
-			description: s.unknownChatPermissionsCommunityDescription(),
-			err:         ErrInvalidCommunityDescriptionUnknownChatAccess,
-		},
-		{
-			name:        "member in chat but not in org",
-			description: s.memberInChatNotInOrgCommunityDescription(),
-			err:         ErrInvalidCommunityDescriptionMemberInChatButNotInOrg,
 		},
 	}
 
@@ -724,7 +571,7 @@ func (s *CommunitySuite) emptyCommunityDescriptionWithChat() *protobuf.Community
 	}
 
 	desc.Categories[testCategoryID1] = &protobuf.CommunityCategory{CategoryId: testCategoryID1, Name: testCategoryName1, Position: 0}
-	desc.Chats[testChatID1] = &protobuf.CommunityChat{Position: 0, Permissions: &protobuf.CommunityPermissions{}, Members: make(map[string]*protobuf.CommunityMember)}
+	desc.Chats[testChatID1] = &protobuf.CommunityChat{Position: 0, Members: make(map[string]*protobuf.CommunityMember)}
 	desc.Members[common.PubkeyToHex(&s.member1.PublicKey)] = &protobuf.CommunityMember{}
 	desc.Chats[testChatID1].Members[common.PubkeyToHex(&s.member1.PublicKey)] = &protobuf.CommunityMember{}
 
@@ -749,42 +596,6 @@ func (s *CommunitySuite) configOnRequest() Config {
 	return s.newConfig(s.identity, description)
 }
 
-func (s *CommunitySuite) configNoMembershipOrgNoMembershipChat() Config {
-	description := s.emptyCommunityDescriptionWithChat()
-	description.Permissions.Access = protobuf.CommunityPermissions_AUTO_ACCEPT
-	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_AUTO_ACCEPT
-	return s.newConfig(s.identity, description)
-}
-
-func (s *CommunitySuite) configNoMembershipOrgOnRequestChat() Config {
-	description := s.emptyCommunityDescriptionWithChat()
-	description.Permissions.Access = protobuf.CommunityPermissions_AUTO_ACCEPT
-	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
-	return s.newConfig(s.identity, description)
-}
-
-func (s *CommunitySuite) configOnRequestOrgOnRequestChat() Config {
-	description := s.emptyCommunityDescriptionWithChat()
-	description.Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
-	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
-	return s.newConfig(s.identity, description)
-}
-
-func (s *CommunitySuite) configOnRequestOrgNoMembershipChat() Config {
-	description := s.emptyCommunityDescriptionWithChat()
-	description.Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
-	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_AUTO_ACCEPT
-	return s.newConfig(s.identity, description)
-}
-
-func (s *CommunitySuite) configChatENSOnly() Config {
-	description := s.emptyCommunityDescriptionWithChat()
-	description.Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
-	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
-	description.Chats[testChatID1].Permissions.EnsOnly = true
-	return s.newConfig(s.identity, description)
-}
-
 func (s *CommunitySuite) configENSOnly() Config {
 	description := s.emptyCommunityDescription()
 	description.Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
@@ -792,14 +603,8 @@ func (s *CommunitySuite) configENSOnly() Config {
 	return s.newConfig(s.identity, description)
 }
 
-func (s *CommunitySuite) config() Config {
-	config := s.configOnRequestOrgOnRequestChat()
-	return config
-}
-
 func (s *CommunitySuite) buildCommunityDescription() *protobuf.CommunityDescription {
-	config := s.configOnRequestOrgOnRequestChat()
-	desc := config.CommunityDescription
+	desc := s.emptyCommunityDescriptionWithChat()
 	desc.Clock = 1
 	desc.Members = make(map[string]*protobuf.CommunityMember)
 	desc.Members[s.member1Key] = &protobuf.CommunityMember{}
@@ -819,32 +624,14 @@ func (s *CommunitySuite) emptyPermissionsCommunityDescription() *protobuf.Commun
 	return desc
 }
 
-func (s *CommunitySuite) emptyChatPermissionsCommunityDescription() *protobuf.CommunityDescription {
-	desc := s.buildCommunityDescription()
-	desc.Chats[testChatID1].Permissions = nil
-	return desc
-}
-
-func (s *CommunitySuite) unknownOrgPermissionsCommunityDescription() *protobuf.CommunityDescription {
-	desc := s.buildCommunityDescription()
-	desc.Permissions.Access = protobuf.CommunityPermissions_UNKNOWN_ACCESS
-	return desc
-}
-
-func (s *CommunitySuite) unknownChatPermissionsCommunityDescription() *protobuf.CommunityDescription {
-	desc := s.buildCommunityDescription()
-	desc.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_UNKNOWN_ACCESS
-	return desc
-}
-
-func (s *CommunitySuite) memberInChatNotInOrgCommunityDescription() *protobuf.CommunityDescription {
-	desc := s.buildCommunityDescription()
-	desc.Chats[testChatID1].Members[s.member3Key] = &protobuf.CommunityMember{}
-	return desc
+func (s *CommunitySuite) configOnRequestOrgOnRequestChat() Config {
+	description := s.emptyCommunityDescriptionWithChat()
+	description.Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
+	return s.newConfig(s.identity, description)
 }
 
 func (s *CommunitySuite) buildCommunity(owner *ecdsa.PublicKey) *Community {
-	config := s.config()
+	config := s.configOnRequestOrgOnRequestChat()
 	config.ID = owner
 	config.CommunityDescription = s.buildCommunityDescription()
 
@@ -889,9 +676,8 @@ func (s *CommunitySuite) addedChatCommunityDescription(org *Community) *protobuf
 	description.Clock++
 	description.Members[s.member3Key] = &protobuf.CommunityMember{}
 	description.Chats[testChatID2] = &protobuf.CommunityChat{
-		Identity:    &protobuf.ChatIdentity{DisplayName: "added-chat", Description: "description"},
-		Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_MANUAL_ACCEPT},
-		Members:     make(map[string]*protobuf.CommunityMember)}
+		Identity: &protobuf.ChatIdentity{DisplayName: "added-chat", Description: "description"},
+		Members:  make(map[string]*protobuf.CommunityMember)}
 	description.Chats[testChatID2].Members[s.member3Key] = &protobuf.CommunityMember{}
 
 	return description

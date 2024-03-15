@@ -502,7 +502,6 @@ func (chat *Chat) populateCommunityFields(community *communities.Community) erro
 
 	chat.CategoryID = commChat.CategoryId
 	chat.Position = commChat.Position
-	chat.Permissions = commChat.Permissions
 	chat.Emoji = commChat.Identity.Emoji
 	chat.Name = commChat.Identity.DisplayName
 	chat.Description = commChat.Identity.Description

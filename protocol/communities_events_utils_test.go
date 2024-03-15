@@ -1004,9 +1004,6 @@ func controlNodeCreatesCommunityPermission(base CommunityEventsTestsInterface, c
 
 func testCreateEditDeleteChannels(base CommunityEventsTestsInterface, community *communities.Community) {
 	newChat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "chat from the event sender",
 			Emoji:       "",
@@ -1573,9 +1570,6 @@ func testReorderChannelsAndCategories(base CommunityEventsTestsInterface, commun
 	categoryID2 := createCommunityCategory(base, community, newCategory)
 
 	chat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "chat from event-sender",
 			Emoji:       "",
@@ -1724,9 +1718,6 @@ func testMemberReceiveEventsWhenControlNodeOffline(base CommunityEventsTestsInte
 	eventSender := base.GetEventSender()
 
 	newAdminChat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "chat from event sender",
 			Emoji:       "",

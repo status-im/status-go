@@ -314,9 +314,6 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
 
 	orgChat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core",
 			Emoji:       "😎",
@@ -432,9 +429,6 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 
 	// Create another org chat
 	orgChat = &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core-ui",
 			Emoji:       "👍",
@@ -629,9 +623,6 @@ func (s *MessengerCommunitiesSuite) TestPinMessageInCommunityChat() {
 
 	// Create a community chat
 	orgChat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core",
 			Emoji:       "😎",
@@ -2280,9 +2271,6 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
 	community := response.Communities()[0]
 
 	orgChat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core",
 			Emoji:       "😎",
@@ -2714,7 +2702,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_EncryptionKeys() {
 					Decimals:          uint64(18),
 				},
 			},
-			ChatIds: []string{chat.ID},
+			ChatIDs: []string{chat.ID},
 		}
 
 		_, err = s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)
@@ -3125,9 +3113,6 @@ func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 	s.Require().NotNil(newCommunity)
 
 	orgChat1 := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core",
 			Emoji:       "😎",
@@ -3136,9 +3121,6 @@ func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 	}
 
 	orgChat2 := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core2",
 			Emoji:       "😎",
@@ -3268,9 +3250,6 @@ func (s *MessengerCommunitiesSuite) TestMuteAllCommunityChats() {
 	s.Require().NotNil(newCommunity)
 
 	orgChat1 := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core",
 			Emoji:       "😎",
@@ -3279,9 +3258,6 @@ func (s *MessengerCommunitiesSuite) TestMuteAllCommunityChats() {
 	}
 
 	orgChat2 := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core2",
 			Emoji:       "😎",
@@ -4085,9 +4061,6 @@ func (s *MessengerCommunitiesSuite) TestBanUserAndDeleteAllUserMessages() {
 	community, _ := s.createCommunity()
 
 	orgChat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "chat test delete messages",
 			Emoji:       "😎",

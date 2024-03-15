@@ -1474,8 +1474,7 @@ func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *prot
 		return nil, nil, err
 	}
 
-	// We can't edit permissions and members with an Edit, so we set to what we had, otherwise they will be lost
-	chat.Permissions = oldChat.Permissions
+	// We can't edit members with an Edit, so we set to what we had, otherwise they will be lost
 	chat.Members = oldChat.Members
 
 	changes, err := community.EditChat(chatID, chat)
@@ -4736,7 +4735,7 @@ func (m *Manager) AddCommunityToken(token *community_token.CommunityToken, clock
 			Type:          permissionType,
 			TokenCriteria: []*protobuf.TokenCriteria{tokenCriteria},
 			IsPrivate:     true,
-			ChatIds:       []string{},
+			ChatIDs:       []string{},
 		}
 
 		community, _, err = m.createCommunityTokenPermission(request, community)
