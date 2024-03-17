@@ -1432,9 +1432,39 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption
 				if m.communitiesManager == nil {
 					continue
 				}
-				if err := m.communitiesManager.NewHashRatchetKeys(keys); err != nil {
-					m.logger.Error("failed to invalidate cache for decrypted communities", zap.Error(err))
-				}
+
+				func() {
+					// Prevents race condition on messenger response
+					m.handleMessagesMutex.Lock()
+					defer m.handleMessagesMutex.Unlock()
+
+					communityIDs, err := m.communitiesManager.InvalidateDecryptedCommunityCacheForKeys(keys)
+					if err != nil {
+						m.logger.Error("failed to invalidate cache for decrypted communities", zap.Error(err))
+						return
+					}
+
+					if len(communityIDs) == 0 || m.config.messengerSignalsHandler == nil {
+						return
+					}
+
+					// Decrypt communities with new keys and update client with newly decrypted data.
+					response := &MessengerResponse{}
+					for _, id := range communityIDs {
+						unlock := m.communitiesManager.Lock(id)
+						defer unlock()
+						community, err := m.communitiesManager.GetByID(id) // It does decryption behind the scenes.
+						if err != nil {
+							m.logger.Error("failed to decrypt community with new keys", zap.Error(err))
+							continue
+						}
+
+						m.logger.Debug("decrypted community with new keys", zap.String("communityID", community.IDString()))
+						response.AddCommunity(community)
+					}
+					m.config.messengerSignalsHandler.MessengerResponse(response)
+				}()
+
 			case <-subscriptions.Quit:
 				m.logger.Debug("quitting encryption subscription loop")
 				return
@@ -3728,7 +3758,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 				senderID := contactIDFromPublicKey(publicKey)
 
 				if len(msg.EncryptionLayer.HashRatchetInfo) != 0 {
-					err := m.communitiesManager.NewHashRatchetKeys(msg.EncryptionLayer.HashRatchetInfo)
+					_, err := m.communitiesManager.InvalidateDecryptedCommunityCacheForKeys(msg.EncryptionLayer.HashRatchetInfo)
 					if err != nil {
 						m.logger.Warn("failed to invalidate communities description cache", zap.Error(err))
 					}

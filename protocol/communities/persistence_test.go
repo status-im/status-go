@@ -977,7 +977,7 @@ func (s *PersistenceSuite) TestDecryptedCommunityCache() {
 	s.Require().Nil(retrievedCommunity)
 
 	// invalidating the cache
-	err = s.db.InvalidateDecryptedCommunityCacheForKeys([]*encryption.HashRatchetInfo{{KeyID: keyID1}})
+	_, err = s.db.InvalidateDecryptedCommunityCacheForKeys([]*encryption.HashRatchetInfo{{KeyID: keyID1}})
 	s.Require().NoError(err)
 
 	// community cannot be retrieved anymore

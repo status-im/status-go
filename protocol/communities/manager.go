@@ -1723,12 +1723,12 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		id = crypto.CompressPubkey(signer)
 	}
 
+	m.communityLock.Lock(id)
+	defer m.communityLock.Unlock(id)
 	failedToDecrypt, processedDescription, err := m.preprocessDescription(id, description)
 	if err != nil {
 		return nil, err
 	}
-	m.communityLock.Lock(id)
-	defer m.communityLock.Unlock(id)
 	community, err := m.GetByID(id)
 	if err != nil && err != ErrOrgNotFound {
 		return nil, err
@@ -1813,7 +1813,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	return r, nil
 }
 
-func (m *Manager) NewHashRatchetKeys(keys []*encryption.HashRatchetInfo) error {
+func (m *Manager) InvalidateDecryptedCommunityCacheForKeys(keys []*encryption.HashRatchetInfo) ([][]byte, error) {
 	return m.persistence.InvalidateDecryptedCommunityCacheForKeys(keys)
 }
 
@@ -3430,6 +3430,11 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 
 		return nil
 	})
+}
+
+func (m *Manager) Lock(communityID types.HexBytes) func() {
+	m.communityLock.Lock(communityID)
+	return func() { m.communityLock.Unlock(communityID) }
 }
 
 func (m *Manager) GetByID(id []byte) (*Community, error) {

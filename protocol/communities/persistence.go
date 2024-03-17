@@ -1874,10 +1874,10 @@ func (p *Persistence) UpsertAppliedCommunityEvents(communityID types.HexBytes, p
 	return err
 }
 
-func (p *Persistence) InvalidateDecryptedCommunityCacheForKeys(keys []*encryption.HashRatchetInfo) error {
+func (p *Persistence) InvalidateDecryptedCommunityCacheForKeys(keys []*encryption.HashRatchetInfo) ([][]byte, error) {
 	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	defer func() {
@@ -1890,7 +1890,7 @@ func (p *Persistence) InvalidateDecryptedCommunityCacheForKeys(keys []*encryptio
 	}()
 
 	if len(keys) == 0 {
-		return nil
+		return nil, nil
 	}
 	idsArgs := make([]interface{}, 0, len(keys))
 	for _, k := range keys {
@@ -1901,10 +1901,10 @@ func (p *Persistence) InvalidateDecryptedCommunityCacheForKeys(keys []*encryptio
 
 	query := "SELECT DISTINCT(community_id) FROM encrypted_community_description_missing_keys WHERE key_id IN (" + inVector + ")" // nolint: gosec
 
-	var communityIDs []interface{}
+	communityIDs := [][]byte{}
 	rows, err := tx.Query(query, idsArgs...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -1912,20 +1912,25 @@ func (p *Persistence) InvalidateDecryptedCommunityCacheForKeys(keys []*encryptio
 		var communityID []byte
 		err = rows.Scan(&communityID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		communityIDs = append(communityIDs, communityID)
 	}
 	if len(communityIDs) == 0 {
-		return nil
+		return communityIDs, nil
+	}
+
+	communityIDsAsInterface := make([]interface{}, len(communityIDs))
+	for i, v := range communityIDs {
+		communityIDsAsInterface[i] = v
 	}
 
 	inVector = strings.Repeat("?, ", len(communityIDs)-1) + "?"
 
 	query = "DELETE FROM encrypted_community_description_cache WHERE community_id IN (" + inVector + ")" //nolint: gosec
-	_, err = tx.Exec(query, communityIDs...)
+	_, err = tx.Exec(query, communityIDsAsInterface...)
 
-	return err
+	return communityIDs, err
 }
 
 func (p *Persistence) SaveDecryptedCommunityDescription(communityID []byte, missingKeys []*CommunityPrivateDataFailedToDecrypt, description *protobuf.CommunityDescription) error {
