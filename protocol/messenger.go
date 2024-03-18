@@ -3704,6 +3704,19 @@ func (m *Messenger) outputToCSV(timestamp uint32, messageID types.HexBytes, from
 	}
 }
 
+func (m *Messenger) shouldSkipDuplicate(messageType protobuf.ApplicationMetadataMessage_Type) bool {
+	// Permit re-processing of ApplicationMetadataMessage_COMMUNITY_DESCRIPTION messages,
+	// as they may be queued pending receipt of decryption keys.
+	allowedDuplicateTypes := map[protobuf.ApplicationMetadataMessage_Type]struct{}{
+		protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION: struct{}{},
+	}
+	if _, isAllowedDuplicate := allowedDuplicateTypes[messageType]; isAllowedDuplicate {
+		return false
+	}
+
+	return true
+}
+
 func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter][]*types.Message) error {
 
 	messageState := m.buildMessageState()
@@ -3740,8 +3753,8 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 				if err != nil {
 					logger.Warn("failed to check message exists", zap.Error(err))
 				}
-				if exists {
-					logger.Debug("messageExists", zap.String("messageID", messageID))
+				if exists && m.shouldSkipDuplicate(msg.ApplicationLayer.Type) {
+					logger.Debug("skipping duplicate", zap.String("messageID", messageID))
 					continue
 				}
 
@@ -3939,8 +3952,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				if err != nil {
 					logger.Warn("failed to check message exists", zap.Error(err))
 				}
-				if exists {
-					logger.Debug("messageExists", zap.String("messageID", messageID))
+				if exists && m.shouldSkipDuplicate(msg.ApplicationLayer.Type) {
+					logger.Debug("skipping duplicate", zap.String("messageID", messageID))
 					continue
 				}
 
