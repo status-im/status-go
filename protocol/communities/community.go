@@ -1066,7 +1066,8 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 
 	response := o.emptyCommunityChanges()
 
-	if description.Clock <= o.config.CommunityDescription.Clock {
+	// Enables processing of identical clocks. Identical descriptions may be reprocessed upon subsequent receipt of the previously missing encryption key.
+	if description.Clock < o.config.CommunityDescription.Clock {
 		return response, nil
 	}
 
