@@ -67,7 +67,7 @@ func (c *findNewBlocksCommand) detectTransfers(parent context.Context, accounts 
 			tokenAddresses = append(tokenAddresses, token.Address)
 		}
 	}
-	log.Info("findNewBlocksCommand detectTransfers", "cnt", len(tokenAddresses))
+	log.Debug("findNewBlocksCommand detectTransfers", "cnt", len(tokenAddresses))
 
 	ctx, cancel := context.WithTimeout(parent, requestTimeout)
 	defer cancel()
@@ -116,12 +116,16 @@ func (c *findNewBlocksCommand) detectNonceChange(parent context.Context, to *big
 
 		lastNonceInfo, ok := c.lastNonces[account]
 		if !ok || lastNonceInfo.blockNumber.Cmp(blockRange.eth.LastKnown) != 0 {
-			log.Info("Fetching old nonce", "at", blockRange.eth.LastKnown, "acc", account)
-
-			oldNonce, err = c.balanceCacher.NonceAt(parent, c.chainClient, account, blockRange.eth.LastKnown)
-			if err != nil {
-				log.Error("findNewBlocksCommand can't get nonce", "error", err, "account", account, "chain", c.chainClient.NetworkID())
-				return nil, err
+			log.Debug("Fetching old nonce", "at", blockRange.eth.LastKnown, "acc", account)
+			if blockRange.eth.LastKnown == nil {
+				blockRange.eth.LastKnown = big.NewInt(0)
+				oldNonce = new(int64) // At 0 block nonce is 0
+			} else {
+				oldNonce, err = c.balanceCacher.NonceAt(parent, c.chainClient, account, blockRange.eth.LastKnown)
+				if err != nil {
+					log.Error("findNewBlocksCommand can't get nonce", "error", err, "account", account, "chain", c.chainClient.NetworkID())
+					return nil, err
+				}
 			}
 		} else {
 			oldNonce = lastNonceInfo.nonce
@@ -133,7 +137,7 @@ func (c *findNewBlocksCommand) detectNonceChange(parent context.Context, to *big
 			return nil, err
 		}
 
-		log.Info("Comparing nonces", "oldNonce", *oldNonce, "newNonce", *newNonce, "to", to, "acc", account)
+		log.Debug("Comparing nonces", "oldNonce", *oldNonce, "newNonce", *newNonce, "to", to, "acc", account)
 
 		if *newNonce != *oldNonce {
 			addressesWithChange[account] = blockRange.eth.LastKnown
