@@ -9,10 +9,10 @@ var ErrCreateAccountInvalidPassword = errors.New("create-account: invalid passwo
 var ErrCreateAccountInvalidCustomizationColor = errors.New("create-account: invalid customization color")
 var ErrCreateAccountInvalidRootKeystoreDir = errors.New("create-account: invalid root keystore directory")
 var ErrCreateAccountInvalidBackupDisabledDataDir = errors.New("create-account: invalid backup disabled data directory")
-var ErrCreateAccountInvalidLogFilePath = errors.New("create-account: invalid log file path")
 
 type CreateAccount struct {
 	// BackupDisabledDataDir is the directory where backup is disabled
+	// WARNING: This is used as `RootDataDir`. Consider renaming?
 	BackupDisabledDataDir string `json:"backupDisabledDataDir"`
 
 	DeviceName         string `json:"deviceName"`
@@ -37,12 +37,16 @@ type CreateAccount struct {
 	VerifyTransactionChainID *int64  `json:"verifyTransactionChainID"`
 	UpstreamConfig           string  `json:"upstreamConfig"`
 
-	CurrentNetwork string `json:"currentNetwork"`
-	NetworkID      uint64 `json:"networkId"`
+	// Deprecated: CurrentNetwork is deprecated
+	CurrentNetwork string  `json:"currentNetwork"`
+	NetworkID      *uint64 `json:"networkId"`
 
 	TestNetworksEnabled bool `json:"testNetworksEnabled"`
 
 	WalletSecretsConfig
+
+	TorrentConfigEnabled *bool
+	TorrentConfigPort    *int
 }
 
 type WalletSecretsConfig struct {
@@ -86,10 +90,6 @@ func ValidateAccountCreationRequest(c CreateAccount) error {
 
 	if len(c.BackupDisabledDataDir) == 0 {
 		return ErrCreateAccountInvalidBackupDisabledDataDir
-	}
-
-	if len(c.LogFilePath) == 0 {
-		return ErrCreateAccountInvalidLogFilePath
 	}
 
 	return nil
