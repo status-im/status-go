@@ -1071,10 +1071,12 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 
 	if request != nil {
 		if isOutgoing {
-			notification := m.generateOutgoingContactRequestNotification(contact, request)
-			err = m.addActivityCenterNotification(state.Response, notification, nil)
-			if err != nil {
-				return err
+			if !previouslyAccepted {
+				notification := m.generateOutgoingContactRequestNotification(contact, request)
+				err = m.addActivityCenterNotification(state.Response, notification, nil)
+				if err != nil {
+					return err
+				}
 			}
 		} else {
 			err = m.createIncomingContactRequestNotification(contact, state, request, processingResponse.newContactRequestReceived)

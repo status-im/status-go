@@ -1741,7 +1741,8 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 }
 
 func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
-	_, err := m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID.String(), m.GetCurrentTimeInMillis())
+	notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID.String(), m.GetCurrentTimeInMillis())
+
 	if err != nil {
 		return nil, err
 	}
@@ -1750,6 +1751,7 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 	if err != nil {
 		return nil, err
 	}
+	mr.AddActivityCenterNotifications(notifications)
 
 	community, ok := mr.communities[communityID.String()]
 	if !ok {
