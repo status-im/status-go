@@ -820,11 +820,14 @@ type testFetchRealCommunityExampleTokenInfo struct {
 
 var testFetchRealCommunityExample = []struct {
 	CommunityID            string
+	CommunityURL           string       // If set, takes precedence over CommunityID
 	CommunityShard         *shard.Shard // WARNING: I didn't test a sharded community
 	Fleet                  string
 	UseShardAsDefaultTopic bool
 	ClusterID              uint16
 	UserPrivateKeyString   string // When empty a new user will be created
+	// Optional request parameters
+	CustomOptions []StoreNodeRequestOption
 	// Setup OwnerPublicKey and CommunityTokens if the community has owner token
 	// This is needed to mock the owner verification
 	OwnerPublicKey  string
@@ -966,6 +969,41 @@ var testFetchRealCommunityExample = []struct {
 			"0x98d98453f6017517d0114989da0938aad59a3ad9a10839c181f453283f64f5c9",
 		},
 	},
+	{
+		CommunityURL: "https://status.app/c/G4IAAMQn9ucHF-V3W5Ouuy0xf0BtTjlwCANJEmwB2CG5p2xKUYzK_l37kzXulUppltT1t6mBcCEJsljRoGrKCP7rWommQomrMA2gBN7RrvCMkFqQwnCNzkNYWrLG85E6GVoM_nolTtfIzl53J1N-tj8fz4_TnO4IIw==#zQ3shZeEJqTC1xhGUjxuS4rtHSrhJ8vUYp64v6qWkLpvdy9L9",
+		//CommunityID:            "0x02b5bdaf5a25fcfe2ee14c501fab1836b8de57f61621080c3d52073d16de0d98d6",
+		Fleet:                  params.FleetShardsTest,
+		UseShardAsDefaultTopic: true,
+		OwnerPublicKey:         "0x04953f5f0d355b37c39d1d6460a31ed1114455f8263b3fd1b84406c5f12c9eb7dfb76ba7513b92186010928254984fe98aee069b4c7e20f9ea3da497c3ae769477",
+		CommunityTokens: []testFetchRealCommunityExampleTokenInfo{
+			{
+				ChainID:         10,
+				ContractAddress: "0x9eDc11E5932372387E76ff3dcF66DB5465893823",
+			},
+			{
+				ChainID:         10,
+				ContractAddress: "0xD91d2E898f996308D643E3b9C78f5FEb5c5F404F",
+			},
+			{
+				ChainID:         10,
+				ContractAddress: "0x852E13D2BDFC4C3a761DA7B450f631b555b39C5E",
+			},
+			{
+				ChainID:         10,
+				ContractAddress: "0x000CfAd029EE94d120e0c136278582F94Cdc532c",
+			},
+			{
+				ChainID:         10,
+				ContractAddress: "0x21F6F5Cb75E81e5104D890D750270eD6538C50cb",
+			},
+		},
+		ClusterID:              shard.MainStatusShardCluster,
+		CheckExpectedEnvelopes: false,
+		CustomOptions: []StoreNodeRequestOption{
+			WithInitialPageSize(1),
+			WithStopWhenDataFound(true),
+		},
+	},
 }
 
 func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
@@ -973,7 +1011,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 		return
 	}
 
-	exampleToRun := testFetchRealCommunityExample[2]
+	exampleToRun := testFetchRealCommunityExample[3]
 
 	// Test configuration
 	communityID := exampleToRun.CommunityID
@@ -984,6 +1022,13 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 	userPrivateKeyString := exampleToRun.UserPrivateKeyString
 	ownerPublicKey := exampleToRun.OwnerPublicKey
 	communityTokens := exampleToRun.CommunityTokens
+
+	if exampleToRun.CommunityURL != "" {
+		urlResponse, err := ParseSharedURL(exampleToRun.CommunityURL)
+		s.Require().NoError(err)
+		s.Require().NotNil(urlResponse.Community)
+		communityID = urlResponse.Community.CommunityID
+	}
 
 	// Prepare things depending on the configuration
 	nodesList := mailserversDB.DefaultMailserversByFleet(fleet)
@@ -1004,14 +1049,12 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 	wg := sync.WaitGroup{}
 
 	// We run a separate request for each node in the fleet.
-
 	for i, mailserver := range nodesList {
 		wg.Add(1)
-
 		go func(i int, mailserver mailserversDB.Mailserver) {
 			defer wg.Done()
 
-			fmt.Printf("--- starting for %s\n", mailserver.ID)
+			fmt.Printf("--- starting request [%d] from %s\n", i, mailserver.ID)
 
 			result := singleResult{}
 
@@ -1098,6 +1141,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 				WithStopWhenDataFound(false),                         // In this test we want all envelopes to be fetched
 				WithInitialPageSize(defaultStoreNodeRequestPageSize), // Because we're fetching all envelopes anyway
 			}
+			storeNodeRequestOptions = append(storeNodeRequestOptions, exampleToRun.CustomOptions...)
 
 			fetchedCommunity, stats, err := user.storeNodeRequestsManager.FetchCommunity(communityAddress, storeNodeRequestOptions)
 

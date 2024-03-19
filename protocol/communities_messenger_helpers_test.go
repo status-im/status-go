@@ -110,7 +110,9 @@ func (c *CollectiblesServiceMock) SetMockCollectibleContractData(chainID uint64,
 	if c.Collectibles == nil {
 		c.Collectibles = make(map[uint64]map[string]*communitytokens.CollectibleContractData)
 	}
-	c.Collectibles[chainID] = make(map[string]*communitytokens.CollectibleContractData)
+	if _, ok := c.Collectibles[chainID]; !ok {
+		c.Collectibles[chainID] = make(map[string]*communitytokens.CollectibleContractData)
+	}
 	c.Collectibles[chainID][contractAddress] = collectible
 }
 

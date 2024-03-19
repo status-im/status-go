@@ -23,8 +23,12 @@ type testWakuV2Config struct {
 
 func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 	wakuConfig := &waku2.Config{
-		UseShardAsDefaultTopic: cfg.useShardAsDefaultTopic,
-		ClusterID:              cfg.clusterID,
+		UseShardAsDefaultTopic:   cfg.useShardAsDefaultTopic,
+		ClusterID:                cfg.clusterID,
+		LightClient:              false,
+		EnablePeerExchangeServer: true,
+		EnablePeerExchangeClient: false,
+		EnableDiscV5:             true,
 	}
 
 	var db *sql.DB
