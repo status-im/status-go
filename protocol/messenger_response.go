@@ -33,11 +33,6 @@ type RemovedMessage struct {
 	DeletedBy string `json:"deletedBy,omitempty"`
 }
 
-type DeletedMessage struct {
-	ID     string `json:"id"`
-	ChatID string `json:"chatID"`
-}
-
 type ClearedHistory struct {
 	ChatID    string `json:"chatId"`
 	ClearedAt uint64 `json:"clearedAt"`
@@ -605,13 +600,13 @@ func (r *MessengerResponse) AddRemovedMessage(rm *RemovedMessage) {
 	}
 }
 
-func (r *MessengerResponse) AddDeletedMessages(messagesToAdd []*DeletedMessage) {
+func (r *MessengerResponse) AddDeletedMessages(messagesToAdd []*protobuf.DeleteCommunityMemberMessage) {
 	if r.deletedMessages == nil {
 		r.deletedMessages = make(map[string]string)
 	}
 
 	for _, message := range messagesToAdd {
-		r.deletedMessages[message.ID] = message.ChatID
+		r.deletedMessages[message.Id] = message.ChatId
 	}
 }
 

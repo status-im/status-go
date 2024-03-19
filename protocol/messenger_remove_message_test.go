@@ -11,15 +11,15 @@ import (
 	"github.com/status-im/status-go/server"
 )
 
-func TestMessengerDeleteMessageSuite(t *testing.T) {
-	suite.Run(t, new(MessengerDeleteMessageSuite))
+func TestMessengerRemoveMessageSuite(t *testing.T) {
+	suite.Run(t, new(MessengerRemoveMessageSuite))
 }
 
-type MessengerDeleteMessageSuite struct {
+type MessengerRemoveMessageSuite struct {
 	MessengerBaseTestSuite
 }
 
-func (s *MessengerDeleteMessageSuite) TestDeleteMessage() {
+func (s *MessengerRemoveMessageSuite) TestDeleteMessage() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
@@ -68,7 +68,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessage() {
 	s.Require().ErrorContains(err, "can't find chat")
 }
 
-func (s *MessengerDeleteMessageSuite) TestDeleteMessagePreviousLastMessage() {
+func (s *MessengerRemoveMessageSuite) TestDeleteMessagePreviousLastMessage() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
@@ -117,7 +117,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessagePreviousLastMessage() {
 
 }
 
-func (s *MessengerDeleteMessageSuite) TestDeleteWrongMessageType() {
+func (s *MessengerRemoveMessageSuite) TestDeleteWrongMessageType() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
@@ -144,7 +144,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteWrongMessageType() {
 
 // TODO fix activity center notifications not being deleted when a message is deleted
 
-func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
+func (s *MessengerRemoveMessageSuite) TestDeleteMessageFirstThenMessage() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
@@ -197,7 +197,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
 	s.Require().Nil(state.Response.Chats()[0].LastMessage)
 }
 
-func (s *MessengerDeleteMessageSuite) TestDeleteImageMessage() {
+func (s *MessengerRemoveMessageSuite) TestDeleteImageMessage() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
@@ -271,7 +271,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteImageMessage() {
 	s.Require().ErrorContains(err, "can't find chat")
 }
 
-func (s *MessengerDeleteMessageSuite) TestDeleteImageMessageFirstThenMessage() {
+func (s *MessengerRemoveMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
@@ -349,7 +349,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 	s.Require().Nil(state.Response.Chats()[0].LastMessage)
 }
 
-func (s *MessengerDeleteMessageSuite) TestDeleteMessageWithAMention() {
+func (s *MessengerRemoveMessageSuite) TestDeleteMessageWithAMention() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
@@ -409,7 +409,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageWithAMention() {
 
 // This test makes sure the UnviewMessageCount doesn't go below 0 in a very rare case where the Chat could be marked
 // as read but the message still unseen (Seen == false)
-func (s *MessengerDeleteMessageSuite) TestDeleteMessageAndChatIsAlreadyRead() {
+func (s *MessengerRemoveMessageSuite) TestDeleteMessageAndChatIsAlreadyRead() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
@@ -468,7 +468,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageAndChatIsAlreadyRead() {
 	s.Require().Equal(0, int(state.Response.Chats()[0].UnviewedMessagesCount))
 }
 
-func (s *MessengerDeleteMessageSuite) TestDeleteMessageReplyToImage() {
+func (s *MessengerRemoveMessageSuite) TestDeleteMessageReplyToImage() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
@@ -521,7 +521,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageReplyToImage() {
 	s.Require().NotEmpty(sendResponse.Messages()[0].ImageLocalURL)
 }
 
-func (s *MessengerDeleteMessageSuite) TestDeleteMessageForMeReplyToImage() {
+func (s *MessengerRemoveMessageSuite) TestDeleteMessageForMeReplyToImage() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 

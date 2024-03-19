@@ -2922,7 +2922,7 @@ func (db sqlitePersistence) saveBridgeMessage(tx *sql.Tx, message *protobuf.Brid
 	return
 }
 
-func (db sqlitePersistence) GetCommunityMemberAllMessagesID(member string, communityID string) ([]*DeletedMessage, error) {
+func (db sqlitePersistence) GetCommunityMemberMessagesToDelete(member string, communityID string) ([]*protobuf.DeleteCommunityMemberMessage, error) {
 	rows, err := db.db.Query(`SELECT m.id, m.chat_id FROM user_messages as m
 		INNER JOIN chats AS ch ON ch.id = m.chat_id AND ch.community_id = ?
 		WHERE m.source = ?`, communityID, member)
@@ -2933,11 +2933,11 @@ func (db sqlitePersistence) GetCommunityMemberAllMessagesID(member string, commu
 
 	defer rows.Close()
 
-	result := []*DeletedMessage{}
+	result := []*protobuf.DeleteCommunityMemberMessage{}
 
 	for rows.Next() {
-		removeMsgsInfo := &DeletedMessage{}
-		err = rows.Scan(&removeMsgsInfo.ID, &removeMsgsInfo.ChatID)
+		removeMsgsInfo := &protobuf.DeleteCommunityMemberMessage{}
+		err = rows.Scan(&removeMsgsInfo.Id, &removeMsgsInfo.ChatId)
 		if err != nil {
 			return nil, err
 		}
@@ -3024,4 +3024,21 @@ func (db sqlitePersistence) findAndUpdateRepliedTo(tx *sql.Tx, discordParentMess
 		return nil
 	}
 	return db.updateStatusMessagesWithResponse(tx, []string{statusMessageID}, repliedMessageID)
+}
+
+func (db sqlitePersistence) GetCommunityMemberAllMessages(member string, communityID string) ([]*common.Message, error) {
+	additionalRequestData := "INNER JOIN chats AS ch ON ch.id = m1.chat_id AND ch.community_id = ? WHERE m1.source = ?"
+	query := db.buildMessagesQueryWithAdditionalFields("", additionalRequestData)
+
+	rows, err := db.db.Query(query, communityID, member)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return []*common.Message{}, nil
+		}
+
+		return nil, err
+	}
+
+	return getMessagesFromScanRows(db, rows, false)
 }

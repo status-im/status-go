@@ -2740,7 +2740,7 @@ func (m *Messenger) BanUserFromCommunity(ctx context.Context, request *requests.
 	response.AddCommunity(community)
 
 	if request.DeleteAllMessages && community.IsControlNode() {
-		deleteMessagesResponse, err := m.DeleteAllCommunityMemberMessages(request.User.String(), request.CommunityID.String())
+		deleteMessagesResponse, err := m.deleteCommunityMemberMessages(request.User.String(), request.CommunityID.String(), []*protobuf.DeleteCommunityMemberMessage{})
 		if err != nil {
 			return nil, err
 		}
@@ -2894,7 +2894,7 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 	if len(communityResponse.Changes.MembersBanned) > 0 {
 		for memberID, deleteAllMessages := range communityResponse.Changes.MembersBanned {
 			if deleteAllMessages {
-				response, err := m.DeleteAllCommunityMemberMessages(memberID, community.IDString())
+				response, err := m.deleteCommunityMemberMessages(memberID, community.IDString(), []*protobuf.DeleteCommunityMemberMessage{})
 				if err != nil {
 					return err
 				}
@@ -4434,4 +4434,106 @@ func (m *Messenger) leaveCommunityDueToKickOrBan(changes *communities.CommunityC
 	if err := stateResponse.Merge(response); err != nil {
 		m.logger.Error("cannot merge leave and notification response", zap.Error(err))
 	}
+}
+
+func (m *Messenger) GetCommunityMemberAllMessages(request *requests.CommunityMemberMessages) ([]*common.Message, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	messages, err := m.persistence.GetCommunityMemberAllMessages(request.MemberPublicKey, request.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, message := range messages {
+		updatedMessages, err := m.persistence.MessagesByResponseTo(message.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		messages = append(messages, updatedMessages...)
+	}
+
+	return messages, nil
+
+}
+
+func (m *Messenger) DeleteCommunityMemberMessages(request *requests.DeleteCommunityMemberMessages) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	community, err := m.GetCommunityByID(request.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+
+	if community == nil {
+		return nil, communities.ErrOrgNotFound
+	}
+
+	if !community.IsControlNode() && !community.IsPrivilegedMember(m.IdentityPublicKey()) {
+		return nil, communities.ErrNotEnoughPermissions
+	}
+
+	memberPubKey, err := common.HexToPubkey(request.MemberPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if community.IsMemberOwner(memberPubKey) && !m.IdentityPublicKey().Equal(memberPubKey) {
+		return nil, communities.ErrNotOwner
+	}
+
+	deleteMessagesResponse, err := m.deleteCommunityMemberMessages(request.MemberPubKey, request.CommunityID.String(), request.Messages)
+	if err != nil {
+		return nil, err
+	}
+
+	deletedMessages := &protobuf.DeleteCommunityMemberMessages{
+		Clock:       uint64(time.Now().Unix()),
+		CommunityId: community.ID(),
+		MemberId:    request.MemberPubKey,
+		Messages:    request.Messages,
+	}
+
+	payload, err := proto.Marshal(deletedMessages)
+	if err != nil {
+		return nil, err
+	}
+
+	rawMessage := common.RawMessage{
+		Payload:             payload,
+		Sender:              community.PrivateKey(),
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_DELETE_COMMUNITY_MEMBER_MESSAGES,
+		PubsubTopic:         community.PubsubTopic(),
+	}
+
+	_, err = m.sender.SendPublic(context.Background(), community.IDString(), rawMessage)
+
+	return deleteMessagesResponse, err
+}
+
+func (m *Messenger) HandleDeleteCommunityMemberMessages(state *ReceivedMessageState, request *protobuf.DeleteCommunityMemberMessages, statusMessage *v1protocol.StatusMessage) error {
+	community, err := m.communitiesManager.GetByID(request.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	if community == nil {
+		return communities.ErrOrgNotFound
+	}
+
+	if !community.ControlNode().Equal(state.CurrentMessageState.PublicKey) && !community.IsPrivilegedMember(state.CurrentMessageState.PublicKey) {
+		return communities.ErrNotAuthorized
+	}
+
+	deleteMessagesResponse, err := m.deleteCommunityMemberMessages(request.MemberId, community.IDString(), request.Messages)
+	if err != nil {
+		return err
+	}
+
+	return state.Response.Merge(deleteMessagesResponse)
 }
