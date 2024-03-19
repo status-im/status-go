@@ -1006,7 +1006,7 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 		if isNewRoleAdmin {
 			if !isCurrentRoleAdmin {
 				newPrivilegedRoles[protobuf.CommunityMember_ROLE_ADMIN] =
-					append(newPrivilegedRoles[protobuf.CommunityMember_ROLE_TOKEN_MASTER], memberPubKey)
+					append(newPrivilegedRoles[protobuf.CommunityMember_ROLE_ADMIN], memberPubKey)
 			}
 			// Skip further validation if user has Admin permissions
 			continue
