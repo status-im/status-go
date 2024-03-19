@@ -92,3 +92,9 @@ test_*.log
 vendor/github.com/waku-org/go-zerokit-rln-x86_64/
 vendor/github.com/waku-org/go-zerokit-rln-apple/
 vendor/github.com/waku-org/go-zerokit-rln-arm/
+
+# status-cli logs
+alice.log
+bob.log
+test-alice/
+test-bob/

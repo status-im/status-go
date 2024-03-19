@@ -111,6 +111,9 @@ statusd-prune: build/bin/statusd-prune
 spiff-workflow: ##@build Build node for SpiffWorkflow BPMN software
 spiff-workflow: build/bin/spiff-workflow
 
+status-cli: ##@build Build status-cli to send messages
+status-cli: build/bin/status-cli
+
 statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
 	@echo "Building docker image for ststusd-prune..."
 	docker build --file _assets/build/Dockerfile-prune . \

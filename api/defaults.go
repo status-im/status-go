@@ -186,7 +186,7 @@ func buildWalletConfig(request *requests.WalletSecretsConfig) params.WalletConfi
 	return walletConfig
 }
 
-func defaultNodeConfig(installationID string, request *requests.CreateAccount) (*params.NodeConfig, error) {
+func defaultNodeConfig(installationID string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.NetworkID = request.NetworkID
@@ -271,6 +271,12 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 	}
 
 	nodeConfig.Networks = BuildDefaultNetworks(request)
+
+	for _, opt := range opts {
+		if err := opt(nodeConfig); err != nil {
+			return nil, err
+		}
+	}
 
 	return nodeConfig, nil
 }

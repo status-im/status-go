@@ -470,6 +470,9 @@ func rowsToTransactions(rows *sql.Rows) (transactions []*PendingTransaction, err
 }
 
 func (tm *PendingTxTracker) GetAllPending() ([]*PendingTransaction, error) {
+	if tm.db == nil {
+		return nil, errors.New("database is not initialized")
+	}
 	rows, err := tm.db.Query(selectFromPending+"WHERE status = ?", Pending)
 	if err != nil {
 		return nil, err
