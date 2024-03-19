@@ -257,3 +257,15 @@ message Storenode {
 message CommunityReevaluatePermissionsRequest {
   bytes community_id = 1;
 }
+
+message DeleteCommunityMemberMessage {
+  string id = 1;
+  string chat_id = 2;
+}
+
+message DeleteCommunityMemberMessages {
+  uint64 clock = 1;
+  bytes community_id = 2;
+  string member_id = 3;
+  repeated DeleteCommunityMemberMessage messages = 4;
+}

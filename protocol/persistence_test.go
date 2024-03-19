@@ -2029,25 +2029,25 @@ func TestBridgeMessageReplies(t *testing.T) {
 	require.Equal(t, "333", responseTo)
 }
 
-func TestGetCommunityMemberAllNonDeletedMessages(t *testing.T) {
+func createAndSaveMessage(p *sqlitePersistence, id string, from string, deleted bool, communityID string) error {
+	return p.SaveMessages([]*common.Message{{
+		ID:          id,
+		From:        from,
+		CommunityID: communityID,
+		ChatMessage: &protobuf.ChatMessage{
+			Timestamp: uint64(time.Now().Unix()),
+			Text:      "some-text",
+			ChatId:    testPublicChatID,
+		},
+		Deleted: deleted,
+	}})
+}
+
+func TestGetCommunityMemberMessagesID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := newSQLitePersistence(db)
 	testCommunity := "test-community"
-	clock := uint64(time.Now().Unix())
-	saveMessage := func(id string, from string, deleted bool) {
-		err = p.SaveMessages([]*common.Message{{
-			ID:          id,
-			From:        from,
-			CommunityID: testCommunity,
-			ChatMessage: &protobuf.ChatMessage{
-				Timestamp: clock,
-				Text:      "some-text",
-				ChatId:    testPublicChatID,
-			},
-			Deleted: deleted,
-		}})
-	}
 
 	chat := &Chat{
 		ID:          testPublicChatID,
@@ -2057,35 +2057,81 @@ func TestGetCommunityMemberAllNonDeletedMessages(t *testing.T) {
 	err = p.SaveChats([]*Chat{chat})
 	require.NoError(t, err)
 
-	messages, err := p.GetCommunityMemberAllMessagesID(testPK, testCommunity)
+	messages, err := p.GetCommunityMemberMessagesToDelete(testPK, testCommunity)
 	require.NoError(t, err)
 	require.Len(t, messages, 0)
 
-	saveMessage("1", testPK, false)
+	require.NoError(t, createAndSaveMessage(p, "1", testPK, false, testCommunity))
 
-	messages, err = p.GetCommunityMemberAllMessagesID(testPK, "wrong community")
+	messages, err = p.GetCommunityMemberMessagesToDelete(testPK, "wrong community")
 	require.NoError(t, err)
 	require.Len(t, messages, 0)
 
-	messages, err = p.GetCommunityMemberAllMessagesID("wrong user name", testCommunity)
+	messages, err = p.GetCommunityMemberMessagesToDelete("wrong user name", testCommunity)
 	require.NoError(t, err)
 	require.Len(t, messages, 0)
 
-	messages, err = p.GetCommunityMemberAllMessagesID(testPK, testCommunity)
+	messages, err = p.GetCommunityMemberMessagesToDelete(testPK, testCommunity)
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+	require.Exactly(t, "1", messages[0].Id)
+	require.Exactly(t, testPublicChatID, messages[0].ChatId)
+
+	require.NoError(t, createAndSaveMessage(p, "2", "another user", false, testCommunity))
+
+	messages, err = p.GetCommunityMemberMessagesToDelete(testPK, testCommunity)
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+
+	require.NoError(t, createAndSaveMessage(p, "3", testPK, true, testCommunity))
+
+	messages, err = p.GetCommunityMemberMessagesToDelete(testPK, testCommunity)
+	require.NoError(t, err)
+	require.Len(t, messages, 2)
+}
+
+func TestGetCommunityMemberMessages(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+	testCommunity := "test-community"
+
+	chat := &Chat{
+		ID:          testPublicChatID,
+		CommunityID: testCommunity,
+	}
+
+	err = p.SaveChats([]*Chat{chat})
+	require.NoError(t, err)
+
+	messages, err := p.GetCommunityMemberAllMessages(testPK, testCommunity)
+	require.NoError(t, err)
+	require.Len(t, messages, 0)
+
+	require.NoError(t, createAndSaveMessage(p, "1", testPK, false, testCommunity))
+
+	messages, err = p.GetCommunityMemberAllMessages(testPK, "wrong community")
+	require.NoError(t, err)
+	require.Len(t, messages, 0)
+
+	messages, err = p.GetCommunityMemberAllMessages("wrong user name", testCommunity)
+	require.NoError(t, err)
+	require.Len(t, messages, 0)
+
+	messages, err = p.GetCommunityMemberAllMessages(testPK, testCommunity)
 	require.NoError(t, err)
 	require.Len(t, messages, 1)
 	require.Exactly(t, "1", messages[0].ID)
-	require.Exactly(t, testPublicChatID, messages[0].ChatID)
 
-	saveMessage("2", "another user", false)
+	require.NoError(t, createAndSaveMessage(p, "2", "another user", false, testCommunity))
 
-	messages, err = p.GetCommunityMemberAllMessagesID(testPK, testCommunity)
+	messages, err = p.GetCommunityMemberAllMessages(testPK, testCommunity)
 	require.NoError(t, err)
 	require.Len(t, messages, 1)
 
-	saveMessage("3", testPK, true)
+	require.NoError(t, createAndSaveMessage(p, "3", testPK, true, testCommunity))
 
-	messages, err = p.GetCommunityMemberAllMessagesID(testPK, testCommunity)
+	messages, err = p.GetCommunityMemberAllMessages(testPK, testCommunity)
 	require.NoError(t, err)
 	require.Len(t, messages, 2)
 }

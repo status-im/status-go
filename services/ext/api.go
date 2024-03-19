@@ -1775,6 +1775,15 @@ func (api *PublicAPI) SetCustomizationColor(ctx context.Context, request *reques
 	return api.service.messenger.SetCustomizationColor(ctx, request)
 }
 
+func (api *PublicAPI) GetCommunityMemberAllMessages(request *requests.CommunityMemberMessages) ([]*common.Message, error) {
+	return api.service.messenger.GetCommunityMemberAllMessages(request)
+}
+
+// Delete a specific community member messages or all community member messages (based on provided parameters)
+func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteCommunityMemberMessages) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DeleteCommunityMemberMessages(request)
+}
+
 // -----
 // HELPER
 // -----

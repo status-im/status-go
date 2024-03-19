@@ -519,10 +519,14 @@ func (m *Messenger) SendGroupChatMessage(request *requests.SendGroupChatMessage)
 	return m.sendChatMessage(context.Background(), message)
 }
 
-func (m *Messenger) DeleteAllCommunityMemberMessages(member string, communityID string) (*MessengerResponse, error) {
-	messagesToDelete, err := m.persistence.GetCommunityMemberAllMessagesID(member, communityID)
-	if err != nil {
-		return nil, err
+func (m *Messenger) deleteCommunityMemberMessages(member string, communityID string, deleteMessages []*protobuf.DeleteCommunityMemberMessage) (*MessengerResponse, error) {
+	messagesToDelete := deleteMessages
+	var err error
+	if len(deleteMessages) == 0 {
+		messagesToDelete, err = m.persistence.GetCommunityMemberMessagesToDelete(member, communityID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	response := &MessengerResponse{}
@@ -532,7 +536,7 @@ func (m *Messenger) DeleteAllCommunityMemberMessages(member string, communityID 
 	}
 
 	for _, messageToDelete := range messagesToDelete {
-		updatedMessages, err := m.persistence.MessagesByResponseTo(messageToDelete.ID)
+		updatedMessages, err := m.persistence.MessagesByResponseTo(messageToDelete.Id)
 		if err != nil {
 			return nil, err
 		}
@@ -544,7 +548,7 @@ func (m *Messenger) DeleteAllCommunityMemberMessages(member string, communityID 
 	messageIDs := make([]string, 0, len(messagesToDelete))
 
 	for _, rm := range messagesToDelete {
-		messageIDs = append(messageIDs, rm.ID)
+		messageIDs = append(messageIDs, rm.Id)
 	}
 
 	if err = m.persistence.DeleteMessages(messageIDs); err != nil {

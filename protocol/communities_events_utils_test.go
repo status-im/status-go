@@ -771,7 +771,7 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 	waitOnMessengerResponse(s, verifyPendingState, base.GetMember())
 
 	checkMsgDeletion := func(messenger *Messenger, expectedMsgsCount int) {
-		msgs, err := messenger.persistence.GetCommunityMemberAllMessagesID(bannedPK, communityStr)
+		msgs, err := messenger.persistence.GetCommunityMemberMessagesToDelete(bannedPK, communityStr)
 		s.Require().NoError(err)
 		s.Require().Len(msgs, expectedMsgsCount)
 	}
