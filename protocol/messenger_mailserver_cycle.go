@@ -432,12 +432,10 @@ func (m *Messenger) getActiveMailserver(communityID ...string) *mailservers.Mail
 	}
 	ms, err := m.communityStorenodes.GetStorenodeByCommunnityID(communityID[0])
 	if err != nil {
-		if errors.Is(err, storenodes.ErrNotFound) {
-			m.logger.Debug("not found specific mailserver for community, using global", zap.String("communityID", communityID[0]))
-		} else {
-			m.logger.Error("not found specific mailserver for community, using global", zap.String("communityID", communityID[0]), zap.Error(err))
+		if !errors.Is(err, storenodes.ErrNotFound) {
+			m.logger.Error("getting storenode for community, using global", zap.String("communityID", communityID[0]), zap.Error(err))
 		}
-		// if we don't find a specific mailserver for the community, we use the global one
+		// if we don't find a specific mailserver for the community, we just use the regular mailserverCycle's one
 		return m.mailserverCycle.activeMailserver
 	}
 	return &ms
