@@ -104,6 +104,7 @@ type CommunityChat struct {
 	Members                 map[string]*protobuf.CommunityMember `json:"members"`
 	Permissions             *protobuf.CommunityPermissions       `json:"permissions"`
 	CanPost                 bool                                 `json:"canPost"`
+	CanView                 bool                                 `json:"canView"`
 	ViewersCanPostReactions bool                                 `json:"viewersCanPostReactions"`
 	Position                int                                  `json:"position"`
 	CategoryID              string                               `json:"categoryID"`
@@ -187,6 +188,11 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
+			canView, err := o.CanView(o.config.MemberIdentity, id)
+			if err != nil {
+				return nil, err
+			}
+
 			chat := CommunityChat{
 				ID:                      id,
 				Name:                    c.Identity.DisplayName,
@@ -196,6 +202,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 				Permissions:             c.Permissions,
 				Members:                 c.Members,
 				CanPost:                 canPost,
+				CanView:                 canView,
 				ViewersCanPostReactions: c.ViewersCanPostReactions,
 				TokenGated:              o.channelEncrypted(id),
 				CategoryID:              c.CategoryId,
@@ -328,6 +335,11 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
+			canView, err := o.CanView(o.config.MemberIdentity, id)
+			if err != nil {
+				return nil, err
+			}
+
 			chat := CommunityChat{
 				ID:                      id,
 				Name:                    c.Identity.DisplayName,
@@ -337,6 +349,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				Permissions:             c.Permissions,
 				Members:                 c.Members,
 				CanPost:                 canPost,
+				CanView:                 canView,
 				ViewersCanPostReactions: c.ViewersCanPostReactions,
 				TokenGated:              o.channelEncrypted(id),
 				CategoryID:              c.CategoryId,
@@ -1875,6 +1888,51 @@ func (o *Community) VerifyGrantSignature(data []byte) (*protobuf.Grant, error) {
 	}
 
 	return grant, nil
+}
+
+func (o *Community) CanView(pk *ecdsa.PublicKey, chatID string) (bool, error) {
+	if o.config.CommunityDescription.Chats == nil {
+		o.config.Logger.Debug("Community.CanView: no-chats")
+		return false, nil
+	}
+
+	chat, ok := o.config.CommunityDescription.Chats[chatID]
+	if !ok {
+		o.config.Logger.Debug("Community.CanView: no chat with id", zap.String("chat-id", chatID))
+		return false, nil
+	}
+
+	// community creator can always post, return immediately
+	if common.IsPubKeyEqual(pk, o.ControlNode()) {
+		return true, nil
+	}
+
+	if o.isBanned(pk) {
+		o.config.Logger.Debug("Community.CanView: user is banned", zap.String("chat-id", chatID))
+		return false, nil
+	}
+
+	if o.config.CommunityDescription.Members == nil {
+		o.config.Logger.Debug("Community.CanView: no members in org", zap.String("chat-id", chatID))
+		return false, nil
+	}
+
+	// If community member, also check chat membership next
+	_, ok = o.config.CommunityDescription.Members[common.PubkeyToHex(pk)]
+	if !ok {
+		o.config.Logger.Debug("Community.CanView: not a community member", zap.String("chat-id", chatID))
+		return false, nil
+	}
+
+	if chat.Members == nil {
+		o.config.Logger.Debug("Community.CanView: no members in chat", zap.String("chat-id", chatID))
+		return false, nil
+	}
+
+	member, isChatMember := chat.Members[common.PubkeyToHex(pk)]
+	isPoster := member.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_POSTER
+	isViewer := member.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
+	return isChatMember && (isPoster || isViewer), nil
 }
 
 func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, messageType protobuf.ApplicationMetadataMessage_Type) (bool, error) {
