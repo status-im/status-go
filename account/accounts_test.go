@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -328,7 +327,7 @@ func (s *ManagerTestSuite) TestMigrateKeyStoreDir() {
 	err := os.Mkdir(newKeyDir, 0777)
 	s.Require().NoError(err)
 
-	files, _ := ioutil.ReadDir(newKeyDir)
+	files, _ := os.ReadDir(newKeyDir)
 	s.Equal(0, len(files))
 
 	address := types.HexToAddress(s.walletAddress).Hex()
@@ -336,21 +335,21 @@ func (s *ManagerTestSuite) TestMigrateKeyStoreDir() {
 	err = s.accManager.MigrateKeyStoreDir(oldKeyDir, newKeyDir, addresses)
 	s.Require().NoError(err)
 
-	files, _ = ioutil.ReadDir(newKeyDir)
+	files, _ = os.ReadDir(newKeyDir)
 	s.Equal(1, len(files))
 }
 
 func (s *ManagerTestSuite) TestReEncryptKey() {
 	var firstKeyPath string
-	files, _ := ioutil.ReadDir(s.keydir)
+	files, _ := os.ReadDir(s.keydir)
 
-	// thiere is only one file in this dir,
+	// there is only one file in this dir,
 	// is there a better way to reference it?
 	for _, f := range files {
 		firstKeyPath = filepath.Join(s.keydir, f.Name())
 	}
 
-	rawKey, _ := ioutil.ReadFile(firstKeyPath)
+	rawKey, _ := os.ReadFile(firstKeyPath)
 	reEncryptedKey, _ := s.accManager.ReEncryptKey(rawKey, testPassword, newTestPassword)
 
 	type Key struct {
@@ -392,7 +391,7 @@ func (s *ManagerTestSuite) TestReEncryptKeyStoreDir() {
 		// walk should not throw callback errors
 		s.Require().NoError(err)
 
-		rawKeyFile, err := ioutil.ReadFile(path)
+		rawKeyFile, err := os.ReadFile(path)
 		s.Require().NoError(err)
 
 		// should not decrypt with old password
