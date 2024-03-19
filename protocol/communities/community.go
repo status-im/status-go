@@ -129,6 +129,7 @@ const (
 	CommunityMemberBanPending
 	CommunityMemberUnbanPending
 	CommunityMemberKickPending
+	CommunityMemberBanWithAllMessagesDelete
 )
 
 func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
@@ -1643,8 +1644,12 @@ func (o *Community) PendingAndBannedMembers() map[string]CommunityMemberState {
 	result := make(map[string]CommunityMemberState)
 
 	if o.config.CommunityDescription.BannedMembers != nil {
-		for bannedMemberID := range o.config.CommunityDescription.BannedMembers {
-			result[bannedMemberID] = CommunityMemberBanned
+		for bannedMemberID, banInfo := range o.config.CommunityDescription.BannedMembers {
+			state := CommunityMemberBanned
+			if banInfo.DeleteAllMessages {
+				state = CommunityMemberBanWithAllMessagesDelete
+			}
+			result[bannedMemberID] = state
 		}
 	}
 
