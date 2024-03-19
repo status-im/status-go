@@ -711,7 +711,12 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 			return errors.New("alice was not added to the banned list")
 		}
 
-		if modifiedCommmunity.PendingAndBannedMembers()[bannedPK] != communities.CommunityMemberBanned {
+		expectedState := communities.CommunityMemberBanned
+		if banRequest.DeleteAllMessages {
+			expectedState = communities.CommunityMemberBanWithAllMessagesDelete
+		}
+
+		if modifiedCommmunity.PendingAndBannedMembers()[bannedPK] != expectedState {
 			return errors.New("alice should be in the pending state")
 		}
 

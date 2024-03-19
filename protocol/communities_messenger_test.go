@@ -2359,12 +2359,14 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
 	s.Require().True(community.IsBanned(&s.alice.identity.PublicKey))
 	s.Require().Len(community.PendingAndBannedMembers(), 1)
+	s.Require().Equal(community.PendingAndBannedMembers()[s.alice.IdentityPublicKeyString()], communities.CommunityMemberBanned)
 
 	response, err = WaitOnMessengerResponse(
 		s.alice,
 		func(r *MessengerResponse) bool {
 			return len(r.Communities()) == 1 &&
 				len(r.Communities()[0].PendingAndBannedMembers()) == 1 &&
+				community.PendingAndBannedMembers()[s.alice.IdentityPublicKeyString()] == communities.CommunityMemberBanned &&
 				r.Communities()[0].IsBanned(&s.alice.identity.PublicKey) &&
 				len(r.ActivityCenterNotifications()) == 1 &&
 				!r.ActivityCenterState().HasSeen &&
@@ -4157,6 +4159,7 @@ func (s *MessengerCommunitiesSuite) TestBanUserAndDeleteAllUserMessages() {
 	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
 	s.Require().True(community.IsBanned(&s.alice.identity.PublicKey))
 	s.Require().Len(community.PendingAndBannedMembers(), 1)
+	s.Require().Equal(community.PendingAndBannedMembers()[s.alice.IdentityPublicKeyString()], communities.CommunityMemberBanWithAllMessagesDelete)
 
 	response, err = WaitOnMessengerResponse(
 		s.alice,
@@ -4179,6 +4182,7 @@ func (s *MessengerCommunitiesSuite) TestBanUserAndDeleteAllUserMessages() {
 	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
 	s.Require().True(community.IsBanned(&s.alice.identity.PublicKey))
 	s.Require().Len(community.PendingAndBannedMembers(), 1)
+	s.Require().Equal(community.PendingAndBannedMembers()[s.alice.IdentityPublicKeyString()], communities.CommunityMemberBanWithAllMessagesDelete)
 	s.Require().False(community.Joined())
 	s.Require().False(community.Spectated())
 }
