@@ -1361,6 +1361,25 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 	err = <-waitOnChannelKeyToBeDistributedToBob
 	s.Require().NoError(err)
 
+	// wait until bob permissions are upgraded
+	_, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			community, err = s.bob.communitiesManager.GetByID(community.ID())
+			s.Require().NoError(err)
+			chats := community.Chats()
+			if len(chats) == 0 {
+				return false
+			}
+			if chats[chat.ID] == nil {
+				return false
+			}
+			members = chats[chat.ID].Members
+			return len(members) == 2 && members[s.bob.myHexIdentity()] != nil && members[s.bob.myHexIdentity()].ChannelRole == protobuf.CommunityMember_CHANNEL_ROLE_POSTER
+		},
+		"bob never got post permissions",
+	)
+
 	msg = s.sendChatMessage(s.bob, chat.ID, "hello on closed channel from Bob")
 
 	// owner can read the message

@@ -451,6 +451,44 @@ func (s *CommunitySuite) TestValidateRequestToJoin() {
 	}
 }
 
+func (s *CommunitySuite) TestCanPostCanView() {
+	chatID := "chat-id"
+	memberKey := common.PubkeyToHex(&s.member1.PublicKey)
+	// Member has no channel role
+	description := &protobuf.CommunityDescription{
+		Members: map[string]*protobuf.CommunityMember{
+			memberKey: &protobuf.CommunityMember{},
+		},
+		Chats: map[string]*protobuf.CommunityChat{
+			chatID: &protobuf.CommunityChat{
+				Members: map[string]*protobuf.CommunityMember{
+					memberKey: &protobuf.CommunityMember{},
+				},
+			},
+		},
+	}
+
+	community := &Community{config: &Config{ID: &s.member2.PublicKey}}
+	community.config.CommunityDescription = description
+
+	result, err := community.CanPost(&s.member1.PublicKey, chatID, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
+	s.Require().NoError(err)
+	s.Require().True(result)
+
+	result = community.CanView(&s.member1.PublicKey, chatID)
+	s.Require().True(result)
+
+	// member has view channel permissions
+	description.Chats[chatID].Members[memberKey].ChannelRole = protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
+
+	result, err = community.CanPost(&s.member1.PublicKey, chatID, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
+	s.Require().NoError(err)
+	s.Require().False(result)
+
+	result = community.CanView(&s.member1.PublicKey, chatID)
+	s.Require().True(result)
+}
+
 func (s *CommunitySuite) TestCanPost() {
 	notMember := &s.member3.PublicKey
 	member := &s.member1.PublicKey
