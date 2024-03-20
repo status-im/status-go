@@ -1550,11 +1550,16 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			}
 		}
 
+		encryptedDescription, err := community.EncryptedDescription()
+		if err != nil {
+			return nil, err
+		}
+
 		requestToJoinResponseProto := &protobuf.CommunityRequestToJoinResponse{
 			Clock:                    community.Clock(),
 			Accepted:                 true,
 			CommunityId:              community.ID(),
-			Community:                community.Description(),
+			Community:                encryptedDescription,
 			Grant:                    grant,
 			ProtectedTopicPrivateKey: crypto.FromECDSA(key),
 			Shard:                    community.Shard().Protobuffer(),
