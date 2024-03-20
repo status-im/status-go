@@ -1929,10 +1929,8 @@ func (o *Community) CanView(pk *ecdsa.PublicKey, chatID string) (bool, error) {
 		return false, nil
 	}
 
-	member, isChatMember := chat.Members[common.PubkeyToHex(pk)]
-	isPoster := member.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_POSTER
-	isViewer := member.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
-	return isChatMember && (isPoster || isViewer), nil
+	_, isChatMember := chat.Members[common.PubkeyToHex(pk)]
+	return isChatMember, nil
 }
 
 func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, messageType protobuf.ApplicationMetadataMessage_Type) (bool, error) {
@@ -1991,7 +1989,7 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, messageType prot
 		return isPoster || (isViewer && chat.ViewersCanPostReactions), nil
 
 	default:
-		return isChatMember, nil
+		return isChatMember && !(member.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_VIEWER), nil
 	}
 }
 
