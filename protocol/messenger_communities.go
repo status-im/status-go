@@ -614,6 +614,9 @@ func (m *Messenger) IsDisplayNameDupeOfCommunityMember(name string) (bool, error
 	for _, community := range append(controlled, joined...) {
 		for memberKey := range community.Members() {
 			contact := m.GetContactByID(memberKey)
+			if contact == nil {
+				continue
+			}
 			if strings.Compare(contact.DisplayName, name) == 0 {
 				return true, nil
 			}
