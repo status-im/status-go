@@ -58,6 +58,7 @@ func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, marketManager
 		persistence:                    persistence,
 		walletFeed:                     walletFeed,
 		lastWalletTokenUpdateTimestamp: atomic.Int64{},
+		refreshBalanceCache:            true,
 	}
 }
 
