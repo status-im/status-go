@@ -63,15 +63,10 @@ type Token struct {
 }
 
 type ReceivedToken struct {
-	Address       common.Address  `json:"address"`
-	Name          string          `json:"name"`
-	Symbol        string          `json:"symbol"`
-	Image         string          `json:"image,omitempty"`
-	ChainID       uint64          `json:"chainId"`
-	CommunityData *community.Data `json:"community_data,omitempty"`
-	Amount        float64         `json:"amount"`
-	TxHash        common.Hash     `json:"txHash"`
-	IsFirst       bool            `json:"isFirst"`
+	Token
+	Amount  float64     `json:"amount"`
+	TxHash  common.Hash `json:"txHash"`
+	IsFirst bool        `json:"isFirst"`
 }
 
 func (t *Token) IsNative() bool {
@@ -829,17 +824,13 @@ func (tm *Manager) SignalCommunityTokenReceived(address common.Address, txHash c
 	}
 
 	floatAmount, _ := new(big.Float).Quo(new(big.Float).SetInt(value), new(big.Float).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(t.Decimals)), nil))).Float64()
+	t.Image = tm.mediaServer.MakeCommunityTokenImagesURL(t.CommunityData.ID, t.ChainID, t.Symbol)
 
 	receivedToken := ReceivedToken{
-		Address:       t.Address,
-		Name:          t.Name,
-		Symbol:        t.Symbol,
-		Image:         t.Image,
-		ChainID:       t.ChainID,
-		CommunityData: t.CommunityData,
-		Amount:        floatAmount,
-		TxHash:        txHash,
-		IsFirst:       isFirst,
+		Token:   *t,
+		Amount:  floatAmount,
+		TxHash:  txHash,
+		IsFirst: isFirst,
 	}
 
 	encodedMessage, err := json.Marshal(receivedToken)
