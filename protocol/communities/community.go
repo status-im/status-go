@@ -1427,6 +1427,17 @@ func (o *Community) Description() *protobuf.CommunityDescription {
 	return o.config.CommunityDescription
 }
 
+func (o *Community) EncryptedDescription() (*protobuf.CommunityDescription, error) {
+	clone := proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription)
+	if o.encryptor != nil {
+		err := encryptDescription(o.encryptor, o, clone)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return clone, nil
+}
+
 func (o *Community) DescriptionProtocolMessage() []byte {
 	return o.config.CommunityDescriptionProtocolMessage
 }

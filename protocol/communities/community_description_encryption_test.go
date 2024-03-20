@@ -50,13 +50,13 @@ type DescriptionEncryptorMock struct {
 
 func (dem *DescriptionEncryptorMock) encryptCommunityDescription(community *Community, d *protobuf.CommunityDescription) (string, []byte, error) {
 	keyIDSeqNo := uuid.New().String()
-	dem.descriptions[keyIDSeqNo] = d
+	dem.descriptions[keyIDSeqNo] = proto.Clone(d).(*protobuf.CommunityDescription)
 	return keyIDSeqNo, []byte("encryptedDescription"), nil
 }
 
 func (dem *DescriptionEncryptorMock) encryptCommunityDescriptionChannel(community *Community, channelID string, d *protobuf.CommunityDescription) (string, []byte, error) {
 	keyIDSeqNo := uuid.New().String()
-	dem.descriptions[keyIDSeqNo] = d
+	dem.descriptions[keyIDSeqNo] = proto.Clone(d).(*protobuf.CommunityDescription)
 	dem.channelIDToKeyIDSeqNo[channelID] = keyIDSeqNo
 	return keyIDSeqNo, []byte("encryptedDescription"), nil
 }
@@ -86,6 +86,7 @@ func (s *CommunityEncryptionDescriptionSuite) description() *protobuf.CommunityD
 			"memberA": &protobuf.CommunityMember{},
 			"memberB": &protobuf.CommunityMember{},
 		},
+		ActiveMembersCount: 1,
 		Chats: map[string]*protobuf.CommunityChat{
 			"channelA": &protobuf.CommunityChat{
 				Members: map[string]*protobuf.CommunityMember{
@@ -97,6 +98,13 @@ func (s *CommunityEncryptionDescriptionSuite) description() *protobuf.CommunityD
 				Members: map[string]*protobuf.CommunityMember{
 					"memberA": &protobuf.CommunityMember{},
 				},
+			},
+		},
+		Categories: map[string]*protobuf.CommunityCategory{
+			"categoryA": &protobuf.CommunityCategory{
+				CategoryId: "categoryA",
+				Name:       "categoryA",
+				Position:   0,
 			},
 		},
 		PrivateData: map[string][]byte{},
@@ -128,18 +136,23 @@ func (s *CommunityEncryptionDescriptionSuite) TestEncryptionDecryption() {
 	s.Require().NoError(err)
 	s.Require().Len(description.PrivateData, 2)
 
-	// members and chats should become empty (encrypted)
+	// members, chats, categories should become empty (encrypted)
 	s.Require().Empty(description.Members)
+	s.Require().Empty(description.ActiveMembersCount)
 	s.Require().Empty(description.Chats)
+	s.Require().Empty(description.Categories)
 	s.Require().Equal(description.IntroMessage, "one of not encrypted fields")
 
 	// members and chats should be brought back
 	_, err = decryptDescription([]byte("some-id"), s.descriptionEncryptor, description, s.logger)
 	s.Require().NoError(err)
 	s.Require().Len(description.Members, 2)
+	s.Require().EqualValues(description.ActiveMembersCount, 1)
 	s.Require().Len(description.Chats, 2)
 	s.Require().Len(description.Chats["channelA"].Members, 2)
 	s.Require().Len(description.Chats["channelB"].Members, 1)
+	s.Require().Len(description.Categories, 1)
+	s.Require().Equal(description.Categories["categoryA"].Name, "categoryA")
 	s.Require().Equal(description.IntroMessage, "one of not encrypted fields")
 }
 
@@ -163,19 +176,24 @@ func (s *CommunityEncryptionDescriptionSuite) TestDecryption_NoKeys() {
 	_, err := decryptDescription([]byte("some-id"), s.descriptionEncryptor, description, s.logger)
 	s.Require().NoError(err)
 	s.Require().Len(description.Members, 2)
+	s.Require().EqualValues(description.ActiveMembersCount, 1)
 	s.Require().Len(description.Chats, 2)
 	s.Require().Len(description.Chats["channelA"].Members, 2)
 	s.Require().Len(description.Chats["channelB"].Members, 0) // encrypted channel
+	s.Require().Len(description.Categories, 1)
+	s.Require().Equal(description.Categories["categoryA"].Name, "categoryA")
 	s.Require().Equal(description.IntroMessage, "one of not encrypted fields")
 
 	description = proto.Clone(encryptedDescription).(*protobuf.CommunityDescription)
-	// forget the keys, so chats and members can't be decrypted
+	// forget the keys, so members, chats, categories can't be decrypted
 	s.descriptionEncryptor.forgetAllKeys()
 
-	// members and chats should be empty
+	// members, chats, categories should be empty
 	_, err = decryptDescription([]byte("some-id"), s.descriptionEncryptor, description, s.logger)
 	s.Require().NoError(err)
 	s.Require().Empty(description.Members)
+	s.Require().Empty(description.ActiveMembersCount)
 	s.Require().Empty(description.Chats)
+	s.Require().Empty(description.Categories)
 	s.Require().Equal(description.IntroMessage, "one of not encrypted fields")
 }
