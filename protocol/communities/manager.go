@@ -937,179 +937,137 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 	return community, changes, nil
 }
 
-type evaluateMemberPermissionParams struct {
-	community *Community
-
-	becomeMemberPermissionsMemo      []*CommunityTokenPermission
-	becomeTokenMasterPermissionsMemo []*CommunityTokenPermission
-	becomeAdminPermissionsMemo       []*CommunityTokenPermission
-}
-
-func (e evaluateMemberPermissionParams) becomeMemberPermissions() []*CommunityTokenPermission {
-	if e.becomeMemberPermissionsMemo == nil {
-		e.becomeMemberPermissionsMemo = e.community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-	}
-	return e.becomeMemberPermissionsMemo
-}
-
-func (e evaluateMemberPermissionParams) becomeTokenMasterPermissions() []*CommunityTokenPermission {
-	if e.becomeTokenMasterPermissionsMemo == nil {
-		e.becomeTokenMasterPermissionsMemo = e.community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
-	}
-
-	return e.becomeTokenMasterPermissionsMemo
-}
-
-func (e evaluateMemberPermissionParams) becomeAdminPermissions() []*CommunityTokenPermission {
-	if e.becomeAdminPermissionsMemo == nil {
-		e.becomeAdminPermissionsMemo = e.community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
-	}
-
-	return e.becomeAdminPermissionsMemo
-}
-
-func (m *Manager) evaluateMemberPermissions(memberKey string, params evaluateMemberPermissionParams) (*protobuf.CommunityMember_Roles, error) {
-	community := params.community
-	becomeMemberPermissions := params.becomeMemberPermissions()
-	becomeTokenMasterPermissions := params.becomeTokenMasterPermissions()
-	becomeAdminPermissions := params.becomeAdminPermissions()
+func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
+	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
+	becomeTokenMasterPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 
 	hasMemberPermissions := len(becomeMemberPermissions) > 0
-
-	memberPubKey, err := common.HexToPubkey(memberKey)
-	if err != nil {
-		return nil, err
-	}
-
-	if memberKey == common.PubkeyToHex(&m.identity.PublicKey) || community.IsMemberOwner(memberPubKey) {
-		return nil, err
-	}
-
-	isCurrentRoleTokenMaster := community.IsMemberTokenMaster(memberPubKey)
-	isCurrentRoleAdmin := community.IsMemberAdmin(memberPubKey)
-	requestID := CalculateRequestID(memberKey, community.ID())
-	revealedAccounts, err := m.persistence.GetRequestToJoinRevealedAddresses(requestID)
-	if err != nil {
-		return nil, err
-	}
-
-	memberHasWallet := len(revealedAccounts) > 0
-
-	// Check if user has privilege role without sharing the account to controlNode
-	// or user treated as a member without wallet in closed community
-	if !memberHasWallet && (hasMemberPermissions || isCurrentRoleTokenMaster || isCurrentRoleAdmin) {
-		_, err = community.RemoveUserFromOrg(memberPubKey)
-		return nil, err
-	}
-
-	accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(revealedAccounts)
-
-	isNewRoleTokenMaster, err := m.ReevaluatePrivilegedMember(community, becomeTokenMasterPermissions, accountsAndChainIDs, memberPubKey,
-		protobuf.CommunityMember_ROLE_TOKEN_MASTER, isCurrentRoleTokenMaster)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if isNewRoleTokenMaster {
-		// Skip further validation if user has TokenMaster permissions
-		if !isCurrentRoleTokenMaster {
-			role := protobuf.CommunityMember_ROLE_TOKEN_MASTER
-			return &role, nil
-		}
-		return nil, nil
-	}
-
-	isNewRoleAdmin, err := m.ReevaluatePrivilegedMember(community, becomeAdminPermissions, accountsAndChainIDs, memberPubKey,
-		protobuf.CommunityMember_ROLE_ADMIN, isCurrentRoleAdmin)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if isNewRoleAdmin {
-		if !isCurrentRoleAdmin {
-			role := protobuf.CommunityMember_ROLE_ADMIN
-			return &role, nil
-
-		}
-		// Skip further validation if user has Admin permissions
-		return nil, nil
-	}
-
-	if hasMemberPermissions {
-		permissionResponse, err := m.PermissionChecker.CheckPermissions(becomeMemberPermissions, accountsAndChainIDs, true)
-		if err != nil {
-			return nil, err
-		}
-
-		if !permissionResponse.Satisfied {
-			_, err = community.RemoveUserFromOrg(memberPubKey)
-			// Skip channels validation if user has been removed
-			return nil, err
-		}
-	}
-
-	// Validate channel permissions
-	for channelID := range community.Chats() {
-		chatID := community.ChatID(channelID)
-
-		viewOnlyPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
-		viewAndPostPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
-
-		if len(viewOnlyPermissions) == 0 && len(viewAndPostPermissions) == 0 {
-			// ensure all members are added back if channel permissions were removed
-			_, err = community.PopulateChatWithAllMembers(channelID)
-			return nil, err
-		}
-
-		response, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountsAndChainIDs, true)
-		if err != nil {
-			return nil, err
-		}
-
-		isMemberAlreadyInChannel := community.IsMemberInChat(memberPubKey, channelID)
-
-		if response.ViewOnlyPermissions.Satisfied || response.ViewAndPostPermissions.Satisfied {
-			channelRole := protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
-			if response.ViewAndPostPermissions.Satisfied {
-				channelRole = protobuf.CommunityMember_CHANNEL_ROLE_POSTER
-			}
-
-			// Add the member back to the chat member list in case the role changed (it replaces the previous values)
-			_, err := community.AddMemberToChat(channelID, memberPubKey, []protobuf.CommunityMember_Roles{}, channelRole)
-			if err != nil {
-				return nil, err
-			}
-		} else if isMemberAlreadyInChannel {
-			_, err := community.RemoveUserFromChat(memberPubKey, channelID)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	return nil, nil
-}
-
-func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
 
 	newPrivilegedRoles := make(map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey)
 	newPrivilegedRoles[protobuf.CommunityMember_ROLE_TOKEN_MASTER] = []*ecdsa.PublicKey{}
 	newPrivilegedRoles[protobuf.CommunityMember_ROLE_ADMIN] = []*ecdsa.PublicKey{}
 
 	for memberKey := range community.Members() {
-		newPermission, err := m.evaluateMemberPermissions(memberKey, evaluateMemberPermissionParams{community: community})
+		memberPubKey, err := common.HexToPubkey(memberKey)
 		if err != nil {
 			return nil, err
 		}
-		if newPermission != nil {
-			memberPubKey, err := common.HexToPubkey(memberKey)
+
+		if memberKey == common.PubkeyToHex(&m.identity.PublicKey) || community.IsMemberOwner(memberPubKey) {
+			continue
+		}
+
+		isCurrentRoleTokenMaster := community.IsMemberTokenMaster(memberPubKey)
+		isCurrentRoleAdmin := community.IsMemberAdmin(memberPubKey)
+		requestID := CalculateRequestID(memberKey, community.ID())
+		revealedAccounts, err := m.persistence.GetRequestToJoinRevealedAddresses(requestID)
+		if err != nil {
+			return nil, err
+		}
+
+		memberHasWallet := len(revealedAccounts) > 0
+
+		// Check if user has privilege role without sharing the account to controlNode
+		// or user treated as a member without wallet in closed community
+		if !memberHasWallet && (hasMemberPermissions || isCurrentRoleTokenMaster || isCurrentRoleAdmin) {
+			_, err = community.RemoveUserFromOrg(memberPubKey)
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
+
+		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(revealedAccounts)
+
+		isNewRoleTokenMaster, err := m.ReevaluatePrivilegedMember(community, becomeTokenMasterPermissions, accountsAndChainIDs, memberPubKey,
+			protobuf.CommunityMember_ROLE_TOKEN_MASTER, isCurrentRoleTokenMaster)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if isNewRoleTokenMaster {
+			if !isCurrentRoleTokenMaster {
+				newPrivilegedRoles[protobuf.CommunityMember_ROLE_TOKEN_MASTER] =
+					append(newPrivilegedRoles[protobuf.CommunityMember_ROLE_TOKEN_MASTER], memberPubKey)
+			}
+			// Skip further validation if user has TokenMaster permissions
+			continue
+		}
+
+		isNewRoleAdmin, err := m.ReevaluatePrivilegedMember(community, becomeAdminPermissions, accountsAndChainIDs, memberPubKey,
+			protobuf.CommunityMember_ROLE_ADMIN, isCurrentRoleAdmin)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if isNewRoleAdmin {
+			if !isCurrentRoleAdmin {
+				newPrivilegedRoles[protobuf.CommunityMember_ROLE_ADMIN] =
+					append(newPrivilegedRoles[protobuf.CommunityMember_ROLE_TOKEN_MASTER], memberPubKey)
+			}
+			// Skip further validation if user has Admin permissions
+			continue
+		}
+
+		if hasMemberPermissions {
+			permissionResponse, err := m.PermissionChecker.CheckPermissions(becomeMemberPermissions, accountsAndChainIDs, true)
 			if err != nil {
 				return nil, err
 			}
 
-			newPrivilegedRoles[*newPermission] = append(newPrivilegedRoles[*newPermission], memberPubKey)
+			if !permissionResponse.Satisfied {
+				_, err = community.RemoveUserFromOrg(memberPubKey)
+				if err != nil {
+					return nil, err
+				}
+				// Skip channels validation if user has been removed
+				continue
+			}
+		}
+
+		// Validate channel permissions
+		for channelID := range community.Chats() {
+			chatID := community.ChatID(channelID)
+
+			viewOnlyPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
+			viewAndPostPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
+
+			if len(viewOnlyPermissions) == 0 && len(viewAndPostPermissions) == 0 {
+				// ensure all members are added back if channel permissions were removed
+				_, err = community.PopulateChatWithAllMembers(channelID)
+				if err != nil {
+					return nil, err
+				}
+				continue
+			}
+
+			response, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountsAndChainIDs, true)
+			if err != nil {
+				return nil, err
+			}
+
+			isMemberAlreadyInChannel := community.IsMemberInChat(memberPubKey, channelID)
+
+			if response.ViewOnlyPermissions.Satisfied || response.ViewAndPostPermissions.Satisfied {
+				channelRole := protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
+				if response.ViewAndPostPermissions.Satisfied {
+					channelRole = protobuf.CommunityMember_CHANNEL_ROLE_POSTER
+				}
+
+				// Add the member back to the chat member list in case the role changed (it replaces the previous values)
+				_, err := community.AddMemberToChat(channelID, memberPubKey, []protobuf.CommunityMember_Roles{}, channelRole)
+				if err != nil {
+					return nil, err
+				}
+			} else if isMemberAlreadyInChannel {
+				_, err := community.RemoveUserFromChat(memberPubKey, channelID)
+				if err != nil {
+					return nil, err
+				}
+			}
 		}
 	}
 
@@ -2426,6 +2384,69 @@ func (m *Manager) CheckPermissionToJoin(id []byte, addresses []gethcommon.Addres
 
 }
 
+func (m *Manager) accountsSatisfyPermissionsToJoin(community *Community, accounts []*protobuf.RevealedAccount) (bool, protobuf.CommunityMember_Roles, error) {
+	accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(accounts)
+	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
+	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+	becomeTokenMasterPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+
+	if m.accountsHasPrivilegedPermission(becomeTokenMasterPermissions, accountsAndChainIDs) {
+		return true, protobuf.CommunityMember_ROLE_TOKEN_MASTER, nil
+	}
+	if m.accountsHasPrivilegedPermission(becomeAdminPermissions, accountsAndChainIDs) {
+		return true, protobuf.CommunityMember_ROLE_ADMIN, nil
+	}
+
+	if len(becomeMemberPermissions) > 0 {
+		permissionResponse, err := m.PermissionChecker.CheckPermissions(becomeMemberPermissions, accountsAndChainIDs, true)
+		if err != nil {
+			return false, protobuf.CommunityMember_ROLE_NONE, err
+		}
+
+		return permissionResponse.Satisfied, protobuf.CommunityMember_ROLE_NONE, nil
+	}
+
+	return true, protobuf.CommunityMember_ROLE_NONE, nil
+}
+
+func (m *Manager) accountsSatisfyPermissionsToJoinChannels(community *Community, accounts []*protobuf.RevealedAccount) (map[string]*protobuf.CommunityChat, map[string]*protobuf.CommunityChat, error) {
+	viewChats := make(map[string]*protobuf.CommunityChat)
+	viewAndPostChats := make(map[string]*protobuf.CommunityChat)
+
+	accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(accounts)
+
+	for channelID, channel := range community.config.CommunityDescription.Chats {
+		channelViewOnlyPermissions := community.ChannelTokenPermissionsByType(community.IDString()+channelID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
+		channelViewAndPostPermissions := community.ChannelTokenPermissionsByType(community.IDString()+channelID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
+		channelPermissions := append(channelViewOnlyPermissions, channelViewAndPostPermissions...)
+
+		if len(channelPermissions) == 0 {
+			viewAndPostChats[channelID] = channel
+			continue
+		}
+
+		permissionResponse, err := m.PermissionChecker.CheckPermissions(channelPermissions, accountsAndChainIDs, true)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if permissionResponse.Satisfied {
+			highestRole := calculateRolesAndHighestRole(permissionResponse.Permissions).HighestRole
+			if highestRole == nil {
+				return nil, nil, errors.New("failed to calculate highest role")
+			}
+			switch highestRole.Role {
+			case protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL:
+				viewChats[channelID] = channel
+			case protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL:
+				viewAndPostChats[channelID] = channel
+			}
+		}
+	}
+
+	return viewChats, viewAndPostChats, nil
+}
+
 func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, error) {
 	pk, err := common.HexToPubkey(dbRequest.PublicKey)
 	if err != nil {
@@ -2443,14 +2464,42 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 			return nil, err
 		}
 
-		_, err = m.evaluateMemberPermissions(dbRequest.PublicKey, evaluateMemberPermissionParams{community: community})
+		permissionsSatisfied, role, err := m.accountsSatisfyPermissionsToJoin(community, revealedAccounts)
 		if err != nil {
 			return nil, err
 		}
 
-		permissionsSatisfied := community.HasMember(pk)
 		if !permissionsSatisfied {
 			return community, ErrNoPermissionToJoin
+		}
+
+		memberRoles := []protobuf.CommunityMember_Roles{}
+		if role != protobuf.CommunityMember_ROLE_NONE {
+			memberRoles = []protobuf.CommunityMember_Roles{role}
+		}
+
+		_, err = community.AddMember(pk, memberRoles)
+		if err != nil {
+			return nil, err
+		}
+
+		viewChannels, postChannels, err := m.accountsSatisfyPermissionsToJoinChannels(community, revealedAccounts)
+		if err != nil {
+			return nil, err
+		}
+
+		for channelID := range viewChannels {
+			_, err = community.AddMemberToChat(channelID, pk, memberRoles, protobuf.CommunityMember_CHANNEL_ROLE_VIEWER)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		for channelID := range postChannels {
+			_, err = community.AddMemberToChat(channelID, pk, memberRoles, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		dbRequest.State = RequestToJoinStateAccepted
