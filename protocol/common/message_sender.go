@@ -760,7 +760,7 @@ func (s *MessageSender) unwrapDatasyncMessage(m *v1protocol.StatusMessage, respo
 	response.DatasyncRequests = append(response.DatasyncRequests, datasyncMessage.Requests...)
 	for _, o := range datasyncMessage.GroupOffers {
 		for _, mID := range o.MessageIds {
-			response.DatasyncOffers = append(response.DatasyncOffers, DatasyncOffer{GroupID: o.GroupId, MessageID: mID})
+			response.DatasyncOffers = append(response.DatasyncOffers, DatasyncOffer{ChatID: o.GroupId, MessageID: mID})
 		}
 	}
 
@@ -834,7 +834,7 @@ func (s *MessageSender) HandleMessages(wakuMessage *types.Message) (*HandleMessa
 }
 
 type DatasyncOffer struct {
-	GroupID   []byte
+	ChatID    []byte
 	MessageID []byte
 }
 

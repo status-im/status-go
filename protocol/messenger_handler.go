@@ -2457,7 +2457,7 @@ func (m *Messenger) addPeersyncingMessage(chat *Chat, msg *v1protocol.StatusMess
 	syncMessage := peersyncing.SyncMessage{
 		Type:      syncMessageType,
 		ID:        msg.ApplicationLayer.ID,
-		GroupID:   []byte(chat.ID),
+		ChatID:    []byte(chat.ID),
 		Payload:   msg.EncryptionLayer.Payload,
 		Timestamp: uint64(msg.TransportLayer.Message.Timestamp),
 	}
