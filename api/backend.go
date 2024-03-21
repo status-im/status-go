@@ -3,6 +3,7 @@ package api
 import (
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -15,22 +16,20 @@ import (
 
 // StatusBackend defines the contract for the Status.im service
 type StatusBackend interface {
-	// IsNodeRunning() bool                       // NOTE: Only used in tests
 	StartNode(config *params.NodeConfig) error // NOTE: Only used in canary
 	StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string, conf *params.NodeConfig) error
 	StartNodeWithAccount(acc multiaccounts.Account, password string, conf *params.NodeConfig) error
 	StartNodeWithAccountAndInitialConfig(account multiaccounts.Account, password string, settings settings.Settings, conf *params.NodeConfig, subaccs []*accounts.Account) error
 	StopNode() error
-	// RestartNode() error // NOTE: Only used in tests
 
 	GetNodeConfig() (*params.NodeConfig, error)
 	UpdateRootDataDir(datadir string)
 
-	// SelectAccount(loginParams account.LoginParams) error
+	SelectAccount(loginParams account.LoginParams) error
 	OpenAccounts() error
 	GetAccounts() ([]multiaccounts.Account, error)
 	LocalPairingStarted() error
-	// SaveAccount(account multiaccounts.Account) error
+	SaveAccount(account multiaccounts.Account) error
 	SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, settings settings.Settings, conf *params.NodeConfig, subaccs []*accounts.Account, keyHex string) error
 	Recover(rpcParams personal.RecoverParams) (types.Address, error)
 	Logout() error
