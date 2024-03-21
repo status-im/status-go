@@ -150,3 +150,8 @@ func (b *BalanceDB) getEntryPreviousTo(item *entry) (res *entry, err error) {
 
 	return res, nil
 }
+
+func (b *BalanceDB) removeBalanceHistory(address common.Address) error {
+	_, err := b.db.Exec("DELETE FROM balance_history WHERE address = ?", address)
+	return err
+}

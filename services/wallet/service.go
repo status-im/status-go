@@ -113,7 +113,7 @@ func NewService(
 	coingecko := coingecko.NewClient()
 	marketManager := market.NewManager(cryptoCompare, coingecko, feed)
 	reader := NewReader(rpcClient, tokenManager, marketManager, communityManager, accountsDB, NewPersistence(db), feed)
-	history := history.NewService(db, accountsDB, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
+	history := history.NewService(db, accountsDB, accountFeed, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
 
 	openseaHTTPClient := opensea.NewHTTPClient()
