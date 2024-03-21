@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.7.0'
+library 'status-jenkins-lib@v1.8.10'
 
 pipeline {
   agent { label 'macos && aarch64 && xcode-15.1 && nix-2.19' }
@@ -31,7 +31,7 @@ pipeline {
   }
 
   environment {
-    TARGET   = 'ios'
+    PLATFORM = 'ios'
     TMPDIR   = "${WORKSPACE_TMP}"
     GOPATH   = "${WORKSPACE_TMP}/go"
     GOCACHE  = "${WORKSPACE_TMP}/gocache"
