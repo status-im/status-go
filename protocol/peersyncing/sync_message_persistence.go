@@ -28,7 +28,7 @@ func (p *SyncMessageSQLitePersistence) Add(message SyncMessage) error {
 	if err := message.Valid(); err != nil {
 		return err
 	}
-	_, err := p.db.Exec(`INSERT INTO peersyncing_messages (id, type, group_id, payload, timestamp) VALUES (?, ?, ?, ?, ?)`, message.ID, message.Type, message.GroupID, message.Payload, message.Timestamp)
+	_, err := p.db.Exec(`INSERT INTO peersyncing_messages (id, type, group_id, payload, timestamp) VALUES (?, ?, ?, ?, ?)`, message.ID, message.Type, message.ChatID, message.Payload, message.Timestamp)
 	return err
 }
 
@@ -44,7 +44,7 @@ func (p *SyncMessageSQLitePersistence) All() ([]SyncMessage, error) {
 	for rows.Next() {
 		var m SyncMessage
 
-		err := rows.Scan(&m.ID, &m.Type, &m.GroupID, &m.Payload, &m.Timestamp)
+		err := rows.Scan(&m.ID, &m.Type, &m.ChatID, &m.Payload, &m.Timestamp)
 		if err != nil {
 			return nil, err
 		}
@@ -66,7 +66,7 @@ func (p *SyncMessageSQLitePersistence) ByGroupID(groupID []byte, limit int) ([]S
 	for rows.Next() {
 		var m SyncMessage
 
-		err := rows.Scan(&m.ID, &m.Type, &m.GroupID, &m.Payload, &m.Timestamp)
+		err := rows.Scan(&m.ID, &m.Type, &m.ChatID, &m.Payload, &m.Timestamp)
 		if err != nil {
 			return nil, err
 		}
@@ -100,7 +100,7 @@ func (p *SyncMessageSQLitePersistence) Complement(messages []SyncMessage) ([]Syn
 	for rows.Next() {
 		var m SyncMessage
 
-		err := rows.Scan(&m.ID, &m.Type, &m.GroupID, &m.Payload, &m.Timestamp)
+		err := rows.Scan(&m.ID, &m.Type, &m.ChatID, &m.Payload, &m.Timestamp)
 		if err != nil {
 			return nil, err
 		}
@@ -145,7 +145,7 @@ func (p *SyncMessageSQLitePersistence) ByGroupIDs(ids [][]byte, limit int) ([]Sy
 	for rows.Next() {
 		var m SyncMessage
 
-		err := rows.Scan(&m.ID, &m.Type, &m.GroupID, &m.Payload, &m.Timestamp)
+		err := rows.Scan(&m.ID, &m.Type, &m.ChatID, &m.Payload, &m.Timestamp)
 		if err != nil {
 			return nil, err
 		}
@@ -180,7 +180,7 @@ func (p *SyncMessageSQLitePersistence) ByMessageIDs(ids [][]byte) ([]SyncMessage
 	for rows.Next() {
 		var m SyncMessage
 
-		err := rows.Scan(&m.ID, &m.Type, &m.GroupID, &m.Payload, &m.Timestamp)
+		err := rows.Scan(&m.ID, &m.Type, &m.ChatID, &m.Payload, &m.Timestamp)
 		if err != nil {
 			return nil, err
 		}

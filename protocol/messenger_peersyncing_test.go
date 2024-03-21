@@ -243,7 +243,7 @@ func (s *MessengerPeersyncingSuite) TestCanSyncMessageWith() {
 
 	syncMessage := peersyncing.SyncMessage{
 		ID:        []byte("test-id"),
-		GroupID:   []byte(chat.ID),
+		ChatID:    []byte(chat.ID),
 		Type:      peersyncing.SyncMessageCommunityType,
 		Payload:   []byte("some-payload"),
 		Timestamp: 1,

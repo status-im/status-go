@@ -2529,7 +2529,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		syncMessage := peersyncing.SyncMessage{
 			Type:      syncMessageType,
 			ID:        types.Hex2Bytes(rawMessage.ID),
-			GroupID:   []byte(chat.ID),
+			ChatID:    []byte(chat.ID),
 			Payload:   wrappedMessage,
 			Timestamp: m.transport.GetCurrentTime() / 1000,
 		}

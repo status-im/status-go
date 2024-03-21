@@ -139,7 +139,7 @@ func (m *Messenger) sendDatasyncOffers() error {
 		}
 		availableMessagesMap := make(map[string][][]byte)
 		for _, m := range availableMessages {
-			groupID := types.Bytes2Hex(m.GroupID)
+			groupID := types.Bytes2Hex(m.ChatID)
 			availableMessagesMap[groupID] = append(availableMessagesMap[groupID], m.ID)
 		}
 
@@ -188,7 +188,7 @@ func (m *Messenger) OnDatasyncOffer(response *common.HandleMessageResponse) erro
 	var offeredMessages []peersyncing.SyncMessage
 
 	for _, o := range offers {
-		offeredMessages = append(offeredMessages, peersyncing.SyncMessage{GroupID: o.GroupID, ID: o.MessageID})
+		offeredMessages = append(offeredMessages, peersyncing.SyncMessage{ChatID: o.ChatID, ID: o.MessageID})
 	}
 
 	messagesToFetch, err := m.peersyncing.OnOffer(offeredMessages)
@@ -231,11 +231,12 @@ func (m *Messenger) OnDatasyncOffer(response *common.HandleMessageResponse) erro
 	return nil
 }
 
+// TODO(alwx): peer syncing
 // canSyncMessageWith checks the permission of a message
 func (m *Messenger) canSyncMessageWith(message peersyncing.SyncMessage, peer *ecdsa.PublicKey) (bool, error) {
 	switch message.Type {
 	case peersyncing.SyncMessageCommunityType:
-		chat, ok := m.allChats.Load(string(message.GroupID))
+		chat, ok := m.allChats.Load(string(message.ChatID))
 		if !ok {
 			return false, nil
 		}
@@ -245,7 +246,13 @@ func (m *Messenger) canSyncMessageWith(message peersyncing.SyncMessage, peer *ec
 		}
 
 		return m.canSyncCommunityMessageWith(chat, community, peer)
-
+	case peersyncing.SyncMessageOneToOneType:
+		chat, ok := m.allChats.Load(string(message.ChatID))
+		if !ok {
+			return false, nil
+		}
+		key := common.PubkeyToHex(peer)
+		return chat.HasMember(key), nil
 	default:
 		return false, nil
 	}
