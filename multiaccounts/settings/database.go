@@ -145,14 +145,11 @@ INSERT INTO settings (
   omit_transfers_history_scan,
   mnemonic_was_not_shown,
   wallet_token_preferences_group_by_community,
-  wallet_show_community_asset_when_sending_tokens,
-  wallet_display_assets_below_balance,
-  wallet_display_assets_below_balance_threshold,
   wallet_collectible_preferences_group_by_collection,
   wallet_collectible_preferences_group_by_community
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,?,?,?,?,
-?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?,?,?)`,
+?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
@@ -183,9 +180,6 @@ INSERT INTO settings (
 		s.OmitTransfersHistoryScan,
 		s.MnemonicWasNotShown,
 		s.TokenGroupByCommunity,
-		s.ShowCommunityAssetWhenSendingTokens,
-		s.DisplayAssetsBelowBalance,
-		s.DisplayAssetsBelowBalanceThreshold,
 		s.CollectibleGroupByCollection,
 		s.CollectibleGroupByCommunity,
 	)
