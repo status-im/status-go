@@ -34,7 +34,7 @@ IPFS_GATEWAY_URL ?= https://ipfs.status.im/
 ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
  detected_OS := Windows
 else
- detected_OS := $(strip $(SHELL=/bin/sh shell uname))
+ detected_OS := $(strip $(shell uname))
 endif
 
 ifeq ($(detected_OS),Darwin)
@@ -86,8 +86,6 @@ DOCKER_TEST_IMAGE = golang:1.13
 GO_CMD_PATHS := $(filter-out library, $(wildcard cmd/*))
 GO_CMD_NAMES := $(notdir $(GO_CMD_PATHS))
 GO_CMD_BUILDS := $(addprefix build/bin/, $(GO_CMD_NAMES))
-
-
 
 # Our custom config is located in nix/nix.conf
 export NIX_USER_CONF_FILES = $(PWD)/nix/nix.conf
@@ -141,9 +139,9 @@ all: $(GO_CMD_NAMES)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
-		-o ./$@ ./cmd/$(notdir $@)
-	@echo "Compilation done."
-	@echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
+		-o ./$@ ./cmd/$(notdir $@) ;\
+	echo "Compilation done." ;\
+	echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
 bootnode: ##@build Build discovery v5 bootnode using status-go deps
 bootnode: build/bin/bootnode
