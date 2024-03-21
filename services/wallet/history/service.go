@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
 
+	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -47,6 +48,7 @@ type Service struct {
 	balance         *Balance
 	db              *sql.DB
 	accountsDB      *accounts.Database
+	accountFeed     *event.Feed
 	eventFeed       *event.Feed
 	rpcClient       *statusrpc.Client
 	networkManager  *network.Manager
@@ -54,15 +56,17 @@ type Service struct {
 	serviceContext  context.Context
 	cancelFn        context.CancelFunc
 	transferWatcher *Watcher
+	accWatcher      *accountsevent.Watcher
 	exchange        *Exchange
 	balanceCache    balance.CacheIface
 }
 
-func NewService(db *sql.DB, accountsDB *accounts.Database, eventFeed *event.Feed, rpcClient *statusrpc.Client, tokenManager *token.Manager, marketManager *market.Manager, balanceCache balance.CacheIface) *Service {
+func NewService(db *sql.DB, accountsDB *accounts.Database, accountFeed *event.Feed, eventFeed *event.Feed, rpcClient *statusrpc.Client, tokenManager *token.Manager, marketManager *market.Manager, balanceCache balance.CacheIface) *Service {
 	return &Service{
 		balance:        NewBalance(NewBalanceDB(db)),
 		db:             db,
 		accountsDB:     accountsDB,
+		accountFeed:    accountFeed,
 		eventFeed:      eventFeed,
 		rpcClient:      rpcClient,
 		networkManager: rpcClient.NetworkManager,
@@ -78,6 +82,7 @@ func (s *Service) Stop() {
 	}
 
 	s.stopTransfersWatcher()
+	s.stopAccountWatcher()
 }
 
 func (s *Service) triggerEvent(eventType walletevent.EventType, account statustypes.Address, message string) {
@@ -94,6 +99,7 @@ func (s *Service) Start() {
 	log.Debug("Starting balance history service")
 
 	s.startTransfersWatcher()
+	s.startAccountWatcher()
 
 	go func() {
 		s.serviceContext, s.cancelFn = context.WithCancel(context.Background())
@@ -561,5 +567,32 @@ func (s *Service) stopTransfersWatcher() {
 	if s.transferWatcher != nil {
 		s.transferWatcher.Stop()
 		s.transferWatcher = nil
+	}
+}
+
+func (s *Service) startAccountWatcher() {
+	if s.accWatcher == nil {
+		s.accWatcher = accountsevent.NewWatcher(s.accountsDB, s.accountFeed, func(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address) {
+			s.onAccountsChanged(changedAddresses, eventType, currentAddresses)
+		})
+	}
+	s.accWatcher.Start()
+}
+
+func (s *Service) stopAccountWatcher() {
+	if s.accWatcher != nil {
+		s.accWatcher.Stop()
+		s.accWatcher = nil
+	}
+}
+
+func (s *Service) onAccountsChanged(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address) {
+	if eventType == accountsevent.EventTypeRemoved {
+		for _, address := range changedAddresses {
+			err := s.balance.db.removeBalanceHistory(address)
+			if err != nil {
+				log.Error("Error removing balance history", "address", address, "err", err)
+			}
+		}
 	}
 }
