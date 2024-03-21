@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# WARNING: Versions 2.14, 2.15, 2.16 have an issue creating gcroots:
-# https://github.com/NixOS/nix/issues/8564
 export NIX_VERSION="2.19.3"
 export NIX_PACKAGE="nixVersions.nix_2_19"
 export NIX_INSTALL_URL="https://nixos.org/releases/nix/nix-${NIX_VERSION}/install"
