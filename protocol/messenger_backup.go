@@ -429,6 +429,10 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 		return nil, err
 	}
 
+	if m.account == nil {
+		return nil, nil
+	}
+
 	keyUID := m.account.KeyUID
 	images, err := m.multiAccounts.GetIdentityImages(keyUID)
 	if err != nil {

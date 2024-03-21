@@ -231,7 +231,6 @@ func main() {
 			protocol.WithWalletDatabase(walletDB),
 			protocol.WithTorrentConfig(&config.TorrentConfig),
 			protocol.WithWalletConfig(&config.WalletConfig),
-			protocol.WithRPCClient(backend.StatusNode().RPCClient()),
 			protocol.WithAccountManager(backend.AccountManager()),
 		}
 
