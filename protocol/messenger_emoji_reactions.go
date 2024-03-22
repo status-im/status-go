@@ -42,7 +42,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 		MessageType:          protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 		// Don't resend using datasync, that would create quite a lot
 		// of traffic if clicking too eagelry
-		ResendAutomatically: false,
+		ResendType: common.ResendTypeNone,
 	})
 	if err != nil {
 		return nil, err
@@ -127,7 +127,7 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 		MessageType:          protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 		// Don't resend using datasync, that would create quite a lot
 		// of traffic if clicking too eagelry
-		ResendAutomatically: false,
+		ResendType: common.ResendTypeNone,
 	})
 	if err != nil {
 		return nil, err

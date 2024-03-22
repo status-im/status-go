@@ -719,6 +719,20 @@ func WithMailserver() Option {
 	}
 }
 
+func WithDiscV5BootstrapNodes(nodes []string) Option {
+	return func(c *NodeConfig) error {
+		c.ClusterConfig.DiscV5BootstrapNodes = nodes
+		return nil
+	}
+}
+
+func WithWakuNodes(nodes []string) Option {
+	return func(c *NodeConfig) error {
+		c.ClusterConfig.WakuNodes = nodes
+		return nil
+	}
+}
+
 // NewNodeConfigWithDefaults creates new node configuration object
 // with some defaults suitable for adhoc use.
 func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option) (*NodeConfig, error) {

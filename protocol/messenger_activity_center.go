@@ -287,9 +287,9 @@ func (m *Messenger) syncActivityCenterReadByIDs(ctx context.Context, ids []types
 	}
 
 	return m.sendToPairedDevices(ctx, common.RawMessage{
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_READ,
-		ResendAutomatically: true,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_READ,
+		ResendType:  common.ResendTypeDataSync,
 	})
 }
 
@@ -305,9 +305,9 @@ func (m *Messenger) syncActivityCenterUnreadByIDs(ctx context.Context, ids []typ
 	}
 
 	return m.sendToPairedDevices(ctx, common.RawMessage{
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_UNREAD,
-		ResendAutomatically: true,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_UNREAD,
+		ResendType:  common.ResendTypeDataSync,
 	})
 }
 
@@ -408,9 +408,9 @@ func (m *Messenger) syncActivityCenterAcceptedByIDs(ctx context.Context, ids []t
 	}
 
 	return m.sendToPairedDevices(ctx, common.RawMessage{
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_ACCEPTED,
-		ResendAutomatically: true,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_ACCEPTED,
+		ResendType:  common.ResendTypeDataSync,
 	})
 }
 
@@ -450,9 +450,9 @@ func (m *Messenger) syncActivityCenterCommunityRequestDecision(ctx context.Conte
 	}
 
 	return m.sendToPairedDevices(ctx, common.RawMessage{
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_COMMUNITY_REQUEST_DECISION,
-		ResendAutomatically: true,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_COMMUNITY_REQUEST_DECISION,
+		ResendType:  common.ResendTypeDataSync,
 	})
 }
 
@@ -530,9 +530,9 @@ func (m *Messenger) syncActivityCenterDeletedByIDs(ctx context.Context, ids []ty
 	}
 
 	return m.sendToPairedDevices(ctx, common.RawMessage{
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_DELETED,
-		ResendAutomatically: true,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_DELETED,
+		ResendType:  common.ResendTypeDataSync,
 	})
 }
 
@@ -556,9 +556,9 @@ func (m *Messenger) syncActivityCenterDismissedByIDs(ctx context.Context, ids []
 	}
 
 	return m.sendToPairedDevices(ctx, common.RawMessage{
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_DISMISSED,
-		ResendAutomatically: true,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_DISMISSED,
+		ResendType:  common.ResendTypeDataSync,
 	})
 }
 

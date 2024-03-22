@@ -924,9 +924,10 @@ func (db sqlitePersistence) ExpiredMessagesIDs(maxSendCount int) ([]string, erro
 			FROM
 				raw_messages
 			WHERE
-			(message_type IN (?, ?) OR resend_automatically) AND sent = ? AND send_count <= ?`,
+			(message_type IN (?, ?) OR resend_type=?) AND sent = ? AND send_count <= ?`,
 		protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
+		common.ResendTypeRawMessage,
 		false,
 		maxSendCount)
 	if err != nil {

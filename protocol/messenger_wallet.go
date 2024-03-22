@@ -511,10 +511,10 @@ func (m *Messenger) syncTokenPreferences(rawMessageHandler RawMessageHandler) er
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_TOKEN_PREFERENCES,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_TOKEN_PREFERENCES,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -608,10 +608,10 @@ func (m *Messenger) syncCollectiblePreferences(rawMessageHandler RawMessageHandl
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_COLLECTIBLE_PREFERENCES,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_COLLECTIBLE_PREFERENCES,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -655,10 +655,10 @@ func (m *Messenger) syncAccountsPositions(rawMessageHandler RawMessageHandler) e
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACCOUNTS_POSITIONS,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACCOUNTS_POSITIONS,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -683,10 +683,10 @@ func (m *Messenger) syncWalletAccount(acc *accounts.Account, rawMessageHandler R
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACCOUNT,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACCOUNT,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -703,9 +703,9 @@ func (m *Messenger) syncKeypair(keypair *accounts.Keypair, rawMessageHandler Raw
 
 	_, chat := m.getLastClockWithRelatedChat()
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		ResendAutomatically: true,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_KEYPAIR,
+		LocalChatID: chat.ID,
+		ResendType:  common.ResendTypeDataSync,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_KEYPAIR,
 	}
 
 	message, err := m.prepareSyncKeypairMessage(keypair)

@@ -166,7 +166,7 @@ func (s *MessageSender) SendPrivate(
 	// Currently we don't support sending through datasync and setting custom waku fields,
 	// as the datasync interface is not rich enough to propagate that information, so we
 	// would have to add some complexity to handle this.
-	if rawMessage.ResendAutomatically && (rawMessage.Sender != nil || rawMessage.SkipEncryptionLayer || rawMessage.SendOnPersonalTopic) {
+	if rawMessage.ResendType == ResendTypeDataSync && (rawMessage.Sender != nil || rawMessage.SkipEncryptionLayer || rawMessage.SendOnPersonalTopic) {
 		return nil, errors.New("setting identity, skip-encryption or personal topic and datasync not supported")
 	}
 
@@ -182,7 +182,7 @@ func (s *MessageSender) SendPrivate(
 // using the community topic and their key
 func (s *MessageSender) SendCommunityMessage(
 	ctx context.Context,
-	rawMessage RawMessage,
+	rawMessage *RawMessage,
 ) ([]byte, error) {
 	s.logger.Debug(
 		"sending a community message",
@@ -191,7 +191,7 @@ func (s *MessageSender) SendCommunityMessage(
 	)
 	rawMessage.Sender = s.identity
 
-	return s.sendCommunity(ctx, &rawMessage)
+	return s.sendCommunity(ctx, rawMessage)
 }
 
 // SendPubsubTopicKey sends the protected topic key for a community to a list of recipients
@@ -421,7 +421,7 @@ func (s *MessageSender) sendPrivate(
 	// earlier than the scheduled
 	s.notifyOnScheduledMessage(recipient, rawMessage)
 
-	if s.datasync != nil && s.featureFlags.Datasync && rawMessage.ResendAutomatically {
+	if s.datasync != nil && s.featureFlags.Datasync && rawMessage.ResendType == ResendTypeDataSync {
 		// No need to call transport tracking.
 		// It is done in a data sync dispatch step.
 		datasyncID, err := s.addToDataSync(recipient, wrappedMessage)

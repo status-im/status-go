@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/rand"
 	"os"
 	"strconv"
@@ -675,62 +674,6 @@ func (m *Messenger) processSentMessages(ids []string) error {
 		}
 	}
 
-	return nil
-}
-
-func (m *Messenger) shouldResendMessage(message *common.RawMessage, t common.TimeSource) (bool, error) {
-	if m.featureFlags.ResendRawMessagesDisabled {
-		return false, nil
-	}
-	//exponential backoff depends on how many attempts to send message already made
-	power := math.Pow(2, float64(message.SendCount-1))
-	backoff := uint64(power) * uint64(m.config.messageResendMinDelay.Milliseconds())
-	backoffElapsed := t.GetCurrentTime() > (message.LastSent + backoff)
-	return backoffElapsed, nil
-}
-
-func (m *Messenger) resendExpiredMessages() error {
-	if m.connectionState.Offline {
-		return errors.New("offline")
-	}
-
-	ids, err := m.persistence.ExpiredMessagesIDs(m.config.messageResendMaxCount)
-	if err != nil {
-		return errors.Wrapf(err, "Can't get expired reactions from db")
-	}
-
-	for _, id := range ids {
-		rawMessage, err := m.persistence.RawMessageByID(id)
-		if err != nil {
-			return errors.Wrapf(err, "Can't get raw message with id %v", id)
-		}
-
-		chat, ok := m.allChats.Load(rawMessage.LocalChatID)
-		if !ok {
-			return ErrChatNotFound
-		}
-
-		if !(chat.Public() || chat.CommunityChat()) {
-			return errors.New("Only public chats and community chats messages are resent")
-		}
-
-		ok, err = m.shouldResendMessage(rawMessage, m.getTimesource())
-		if err != nil {
-			return err
-		}
-
-		if ok {
-			err = m.persistence.SaveRawMessage(rawMessage)
-			if err != nil {
-				return errors.Wrapf(err, "Can't save raw message marked as non-expired")
-			}
-
-			err = m.reSendRawMessage(context.Background(), rawMessage.ID)
-			if err != nil {
-				return errors.Wrapf(err, "Can't resend expired message with id %v", rawMessage.ID)
-			}
-		}
-	}
 	return nil
 }
 
@@ -1613,26 +1556,6 @@ func (m *Messenger) watchCommunitiesToUnmute() {
 	}()
 }
 
-// watchExpiredMessages regularly checks for expired emojis and invoke their resending
-func (m *Messenger) watchExpiredMessages() {
-	m.logger.Debug("watching expired messages")
-	go func() {
-		for {
-			select {
-			case <-time.After(time.Second):
-				if m.Online() {
-					err := m.resendExpiredMessages()
-					if err != nil {
-						m.logger.Debug("failed to resend expired message", zap.Error(err))
-					}
-				}
-			case <-m.quit:
-				return
-			}
-		}
-	}()
-}
-
 // watchIdentityImageChanges checks for identity images changes and publishes to the contact code when it happens
 func (m *Messenger) watchIdentityImageChanges() {
 	m.logger.Debug("watching identity image changes")
@@ -2112,30 +2035,6 @@ func (m *Messenger) reregisterForPushNotifications() error {
 	return m.pushNotificationClient.Reregister(m.pushNotificationOptions())
 }
 
-// pull a message from the database and send it again
-func (m *Messenger) reSendRawMessage(ctx context.Context, messageID string) error {
-	message, err := m.persistence.RawMessageByID(messageID)
-	if err != nil {
-		return err
-	}
-
-	chat, ok := m.allChats.Load(message.LocalChatID)
-	if !ok {
-		return errors.New("chat not found")
-	}
-
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             message.Payload,
-		PubsubTopic:         message.PubsubTopic,
-		MessageType:         message.MessageType,
-		Recipients:          message.Recipients,
-		ResendAutomatically: message.ResendAutomatically,
-		SendCount:           message.SendCount,
-	})
-	return err
-}
-
 // ReSendChatMessage pulls a message from the database and sends it again
 func (m *Messenger) ReSendChatMessage(ctx context.Context, messageID string) error {
 	return m.reSendRawMessage(ctx, messageID)
@@ -2288,7 +2187,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 				rawMessage.HashRatchetGroupID = rawMessage.CommunityID
 			}
 
-			id, err = m.sender.SendCommunityMessage(ctx, rawMessage)
+			id, err = m.sender.SendCommunityMessage(ctx, &rawMessage)
 			if err != nil {
 				return rawMessage, err
 			}
@@ -2486,7 +2385,10 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		SendPushNotification: m.featureFlags.PushNotifications,
 		Payload:              encodedMessage,
 		MessageType:          protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
-		ResendAutomatically:  true,
+		ResendType:           common.ResendTypeRawMessage,
+	}
+	if chat.ChatType == ChatTypeOneToOne {
+		rawMessage.ResendType = common.ResendTypeDataSync
 	}
 
 	// We want to save the raw message before dispatching it, to avoid race conditions
@@ -2699,10 +2601,10 @@ func (m *Messenger) syncProfilePictures(rawMessageHandler RawMessageHandler, ide
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_PROFILE_PICTURES,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_PROFILE_PICTURES,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -2915,10 +2817,10 @@ func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID st
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_CONTACT_REQUEST_DECISION,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_CONTACT_REQUEST_DECISION,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -2976,10 +2878,10 @@ func (m *Messenger) SendPairInstallation(ctx context.Context, rawMessageHandler 
 		rawMessageHandler = m.dispatchPairInstallationMessage
 	}
 	_, err = rawMessageHandler(ctx, common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_PAIR_INSTALLATION,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_PAIR_INSTALLATION,
+		ResendType:  common.ResendTypeDataSync,
 	})
 	if err != nil {
 		return nil, err
@@ -3041,10 +2943,10 @@ func (m *Messenger) syncChat(ctx context.Context, chatToSync *Chat, rawMessageHa
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_CHAT,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_CHAT,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -3074,10 +2976,10 @@ func (m *Messenger) syncClearHistory(ctx context.Context, publicChat *Chat, rawM
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_CLEAR_HISTORY,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_CLEAR_HISTORY,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -3106,10 +3008,10 @@ func (m *Messenger) syncChatRemoving(ctx context.Context, id string, rawMessageH
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_CHAT_REMOVED,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_CHAT_REMOVED,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -3140,10 +3042,10 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact, rawMessag
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT_V2,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT_V2,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -3221,10 +3123,10 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_COMMUNITY,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_COMMUNITY,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -3258,10 +3160,10 @@ func (m *Messenger) SyncBookmark(ctx context.Context, bookmark *browsers.Bookmar
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_BOOKMARK,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_BOOKMARK,
+		ResendType:  common.ResendTypeDataSync,
 	}
 	_, err = rawMessageHandler(ctx, rawMessage)
 	if err != nil {
@@ -3331,10 +3233,10 @@ func (m *Messenger) syncEnsUsernameDetail(ctx context.Context, usernameDetail *e
 
 	_, chat := m.getLastClockWithRelatedChat()
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ENS_USERNAME_DETAIL,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ENS_USERNAME_DETAIL,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -3360,10 +3262,10 @@ func (m *Messenger) syncAccountCustomizationColor(ctx context.Context, acc *mult
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACCOUNT_CUSTOMIZATION_COLOR,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACCOUNT_CUSTOMIZATION_COLOR,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = m.dispatchMessage(ctx, rawMessage)
@@ -3388,10 +3290,10 @@ func (m *Messenger) SyncTrustedUser(ctx context.Context, publicKey string, ts ve
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_TRUSTED_USER,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_TRUSTED_USER,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -3427,10 +3329,10 @@ func (m *Messenger) SyncVerificationRequest(ctx context.Context, vr *verificatio
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_VERIFICATION_REQUEST,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_VERIFICATION_REQUEST,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -4556,10 +4458,10 @@ func (m *Messenger) syncChatMessagesRead(ctx context.Context, chatID string, clo
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_CHAT_MESSAGES_READ,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_CHAT_MESSAGES_READ,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -4848,11 +4750,15 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 	if err != nil {
 		return nil, err
 	}
+	resendType := common.ResendTypeRawMessage
+	if chat.ChatType == ChatTypeOneToOne {
+		resendType = common.ResendTypeDataSync
+	}
 	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_REQUEST_TRANSACTION,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_REQUEST_TRANSACTION,
+		ResendType:  resendType,
 	})
 
 	message.CommandParameters = &common.CommandParameters{
@@ -4921,11 +4827,16 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 	if err != nil {
 		return nil, err
 	}
+
+	resendType := common.ResendTypeRawMessage
+	if chat.ChatType == ChatTypeOneToOne {
+		resendType = common.ResendTypeDataSync
+	}
 	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_REQUEST_ADDRESS_FOR_TRANSACTION,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_REQUEST_ADDRESS_FOR_TRANSACTION,
+		ResendType:  resendType,
 	})
 
 	message.CommandParameters = &common.CommandParameters{
@@ -5020,11 +4931,15 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 		return nil, err
 	}
 
+	resendType := common.ResendTypeRawMessage
+	if chat.ChatType == ChatTypeOneToOne {
+		resendType = common.ResendTypeDataSync
+	}
 	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_ACCEPT_REQUEST_ADDRESS_FOR_TRANSACTION,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_ACCEPT_REQUEST_ADDRESS_FOR_TRANSACTION,
+		ResendType:  resendType,
 	})
 
 	if err != nil {
@@ -5100,11 +5015,15 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 		return nil, err
 	}
 
+	resendType := common.ResendTypeRawMessage
+	if chat.ChatType == ChatTypeOneToOne {
+		resendType = common.ResendTypeDataSync
+	}
 	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_DECLINE_REQUEST_TRANSACTION,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_DECLINE_REQUEST_TRANSACTION,
+		ResendType:  resendType,
 	})
 
 	if err != nil {
@@ -5179,11 +5098,15 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 		return nil, err
 	}
 
+	resendType := common.ResendTypeRawMessage
+	if chat.ChatType == ChatTypeOneToOne {
+		resendType = common.ResendTypeDataSync
+	}
 	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_DECLINE_REQUEST_ADDRESS_FOR_TRANSACTION,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_DECLINE_REQUEST_ADDRESS_FOR_TRANSACTION,
+		ResendType:  resendType,
 	})
 
 	if err != nil {
@@ -5273,11 +5196,15 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 		return nil, err
 	}
 
+	resendType := common.ResendTypeRawMessage
+	if chat.ChatType == ChatTypeOneToOne {
+		resendType = common.ResendTypeDataSync
+	}
 	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SEND_TRANSACTION,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SEND_TRANSACTION,
+		ResendType:  resendType,
 	})
 
 	if err != nil {
@@ -5347,11 +5274,15 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 		return nil, err
 	}
 
+	resendType := common.ResendTypeRawMessage
+	if chat.ChatType == ChatTypeOneToOne {
+		resendType = common.ResendTypeDataSync
+	}
 	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SEND_TRANSACTION,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SEND_TRANSACTION,
+		ResendType:  resendType,
 	})
 
 	if err != nil {
@@ -5932,10 +5863,10 @@ func (m *Messenger) syncDeleteForMeMessage(ctx context.Context, rawMessageDispat
 				return err2
 			}
 			rawMessage := common.RawMessage{
-				LocalChatID:         chatID,
-				Payload:             encodedMessage,
-				MessageType:         protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE,
-				ResendAutomatically: true,
+				LocalChatID: chatID,
+				Payload:     encodedMessage,
+				MessageType: protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE,
+				ResendType:  common.ResendTypeDataSync,
 			}
 			_, err2 = rawMessageDispatcher(ctx, rawMessage)
 			if err2 != nil {
@@ -5968,10 +5899,10 @@ func (m *Messenger) syncSocialLinks(ctx context.Context, rawMessageDispatcher Ra
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINKS,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINKS,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageDispatcher(ctx, rawMessage)
