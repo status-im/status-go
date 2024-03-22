@@ -71,10 +71,6 @@ import (
 )
 
 var (
-	// ErrWhisperClearIdentitiesFailure clearing whisper identities has failed.
-	ErrWhisperClearIdentitiesFailure = errors.New("failed to clear whisper identities")
-	// ErrWhisperIdentityInjectionFailure injecting whisper identities has failed.
-	ErrWhisperIdentityInjectionFailure = errors.New("failed to inject identity into Whisper")
 	// ErrWakuIdentityInjectionFailure injecting whisper identities has failed.
 	ErrWakuIdentityInjectionFailure = errors.New("failed to inject identity into waku")
 	// ErrUnsupportedRPCMethod is for methods not supported by the RPC interface
@@ -971,12 +967,12 @@ func (b *GethStatusBackend) GetSettings() (*settings.Settings, error) {
 		return nil, err
 	}
 
-	settings, err := accountsDB.GetSettings()
+	s, err := accountsDB.GetSettings()
 	if err != nil {
 		return nil, err
 	}
 
-	return &settings, nil
+	return &s, nil
 }
 
 func (b *GethStatusBackend) GetEnsUsernames() ([]*ens.UsernameDetail, error) {
@@ -1007,11 +1003,11 @@ func (b *GethStatusBackend) LoggedIn(keyUID string, err error) error {
 		signal.SendLoggedIn(nil, nil, nil, err)
 		return err
 	}
-	settings, err := b.GetSettings()
+	s, err := b.GetSettings()
 	if err != nil {
 		return err
 	}
-	account, err := b.getAccountByKeyUID(keyUID)
+	acc, err := b.getAccountByKeyUID(keyUID)
 	if err != nil {
 		return err
 	}
@@ -1027,7 +1023,7 @@ func (b *GethStatusBackend) LoggedIn(keyUID string, err error) error {
 			return err
 		}
 	}
-	signal.SendLoggedIn(account, settings, ensUsernamesJSON, nil)
+	signal.SendLoggedIn(acc, s, ensUsernamesJSON, nil)
 	return nil
 }
 
@@ -1083,7 +1079,7 @@ func (b *GethStatusBackend) reEncryptKeyStoreDir(currentPassword string, newPass
 }
 
 func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string) error {
-	account, err := b.multiaccountsDB.GetAccount(keyUID)
+	acc, err := b.multiaccountsDB.GetAccount(keyUID)
 	if err != nil {
 		return err
 	}
@@ -1120,7 +1116,7 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 			// because UI calls Logout and Quit afterwards. It should not be UI-dependent
 			// and should be handled gracefully here if it makes sense to run dummy node after
 			// logout
-			err = b.startNodeWithAccount(*account, pass, b.config, nil)
+			err = b.startNodeWithAccount(*acc, pass, b.config, nil)
 			if err != nil {
 				b.logger.Error("failed to start node", zap.Error(err))
 				return
@@ -1139,16 +1135,16 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 	// First change app DB password, because it also reencrypts the keystore,
 	// otherwise if we call changeWalletDbPassword first and logout, we will fail
 	// to reencrypt	the keystore
-	err = b.changeAppDBPassword(account, logout, password, newPassword)
+	err = b.changeAppDBPassword(acc, logout, password, newPassword)
 	if err != nil {
 		return err
 	}
 
 	// Already logged out but pass a param to decouple the logic for testing
-	err = b.changeWalletDBPassword(account, noLogout, password, newPassword)
+	err = b.changeWalletDBPassword(acc, noLogout, password, newPassword)
 	if err != nil {
 		// Revert the password to original
-		err2 := b.changeAppDBPassword(account, noLogout, newPassword, password)
+		err2 := b.changeAppDBPassword(acc, noLogout, newPassword, password)
 		if err2 != nil {
 			b.logger.Error("failed to revert app db password", zap.Error(err2))
 		}
@@ -1335,7 +1331,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		return err
 	}
 
-	// This check is added due to mobile app cause it doesn't support a Keycard features as desktop app.
+	// This check is added due to mobile app because it doesn't support a Keycard features as desktop app.
 	// We should remove the following line once mobile and desktop app align.
 	if len(keycardUID) > 0 {
 		displayName, err := accountDB.DisplayName()
@@ -1741,7 +1737,7 @@ func (b *GethStatusBackend) buildAccount(request *requests.CreateAccount, input 
 }
 
 func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, input *prepareAccountInput) (*settings.Settings, error) {
-	settings, err := defaultSettings(input.keyUID, input.address, input.derivedAddresses)
+	s, err := defaultSettings(input.keyUID, input.address, input.derivedAddresses)
 	if err != nil {
 		return nil, err
 	}
@@ -1756,7 +1752,7 @@ func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, inp
 		settings.Mnemonic = &input.mnemonic
 		// TODO(rasom): uncomment it as soon as address will be properly
 		// marked as shown on mobile client
-		//settings.MnemonicWasNotShown = true
+		//s.MnemonicWasNotShown = true
 	}
 
 	if !input.fetchBackup {
@@ -1980,7 +1976,7 @@ func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password strin
 	}
 
 	if !b.appDBExists(keyUID) || !b.walletDBExists(keyUID) {
-		return errors.New("One or more databases not created")
+		return errors.New("one or more databases not created")
 	}
 
 	err = b.ensureDBsOpened(multiaccounts.Account{KeyUID: keyUID, KDFIterations: kdfIterations}, password)
@@ -2130,7 +2126,7 @@ func (b *GethStatusBackend) saveAccountsAndSettings(settings settings.Settings, 
 		LastUsedDerivationIndex: 0,
 	}
 
-	// When creating a new account, the chat account should have position -1, cause it doesn't participate
+	// When creating a new account, the chat account should have position -1, because it doesn't participate
 	// in the wallet view and default wallet account should be at position 0.
 	for _, acc := range subaccs {
 		if acc.Chat {
@@ -2391,26 +2387,26 @@ func (b *GethStatusBackend) Recover(rpcParams personal.RecoverParams) (types.Add
 
 // SignTypedData accepts data and password. Gets verified account and signs typed data.
 func (b *GethStatusBackend) SignTypedData(typed typeddata.TypedData, address string, password string) (types.HexBytes, error) {
-	account, err := b.getVerifiedWalletAccount(address, password)
+	acc, err := b.getVerifiedWalletAccount(address, password)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
-	sig, err := typeddata.Sign(typed, account.PrivateKey(), chain)
+	sig, err := typeddata.Sign(typed, acc.PrivateKey(), chain)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
-	return types.HexBytes(sig), err
+	return sig, err
 }
 
 // SignTypedDataV4 accepts data and password. Gets verified account and signs typed data.
 func (b *GethStatusBackend) SignTypedDataV4(typed signercore.TypedData, address string, password string) (types.HexBytes, error) {
-	account, err := b.getVerifiedWalletAccount(address, password)
+	acc, err := b.getVerifiedWalletAccount(address, password)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
-	sig, err := typeddata.SignTypedDataV4(typed, account.PrivateKey(), chain)
+	sig, err := typeddata.SignTypedDataV4(typed, acc.PrivateKey(), chain)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
@@ -2471,7 +2467,7 @@ func (b *GethStatusBackend) registerHandlers() error {
 	return nil
 }
 
-func unsupportedMethodHandler(ctx context.Context, chainID uint64, rpcParams ...interface{}) (interface{}, error) {
+func unsupportedMethodHandler(_ context.Context, _ uint64, _ ...interface{}) (interface{}, error) {
 	return nil, ErrUnsupportedRPCMethod
 }
 
@@ -2609,7 +2605,7 @@ func (b *GethStatusBackend) switchToPreLoginLog() error {
 	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
 }
 
-// cleanupServices stops parts of services that doesn't managed by a node and removes injected data from services.
+// cleanupServices stops parts of services that aren't managed by a node and removes injected data from services.
 func (b *GethStatusBackend) cleanupServices() error {
 	b.selectedAccountKeyID = ""
 	if b.statusNode == nil {
@@ -2786,9 +2782,9 @@ func (b *GethStatusBackend) SignGroupMembership(content string) (string, error) 
 }
 
 func (b *GethStatusBackend) Messenger() *protocol.Messenger {
-	node := b.StatusNode()
-	if node != nil {
-		accountService := node.AccountService()
+	statusNode := b.StatusNode()
+	if statusNode != nil {
+		accountService := statusNode.AccountService()
 		if accountService != nil {
 			return accountService.GetMessenger()
 		}
