@@ -471,10 +471,10 @@ func (m *Messenger) SendGroupChatInvitationRequest(ctx context.Context, chatID s
 	}
 
 	spec := common.RawMessage{
-		LocalChatID:         adminPK,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_GROUP_CHAT_INVITATION,
-		ResendAutomatically: true,
+		LocalChatID: adminPK,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_GROUP_CHAT_INVITATION,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	pkey, err := hex.DecodeString(adminPK[2:])
@@ -539,10 +539,10 @@ func (m *Messenger) SendGroupChatInvitationRejection(ctx context.Context, invita
 	}
 
 	spec := common.RawMessage{
-		LocalChatID:         invitationR.From,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_GROUP_CHAT_INVITATION,
-		ResendAutomatically: true,
+		LocalChatID: invitationR.From,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_GROUP_CHAT_INVITATION,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	pkey, err := hex.DecodeString(invitationR.From[2:])
