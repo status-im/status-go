@@ -33,7 +33,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		return nil, ErrInvalidEditOrDeleteAuthor
 	}
 
-	if message.ContentType != protobuf.ChatMessage_TEXT_PLAIN && message.ContentType != protobuf.ChatMessage_EMOJI && message.ContentType != protobuf.ChatMessage_IMAGE {
+	if message.ContentType != protobuf.ChatMessage_TEXT_PLAIN && message.ContentType != protobuf.ChatMessage_EMOJI && message.ContentType != protobuf.ChatMessage_IMAGE && message.ContentType != protobuf.ChatMessage_BRIDGE_MESSAGE {
 		return nil, ErrInvalidEditContentType
 	}
 
@@ -373,7 +373,13 @@ func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message 
 	if err := ValidateText(editMessage.Text); err != nil {
 		return err
 	}
-	message.Text = editMessage.Text
+
+	if editMessage.ContentType != protobuf.ChatMessage_BRIDGE_MESSAGE {
+		message.Text = editMessage.Text
+	} else {
+		message.GetBridgeMessage().Content = editMessage.Text
+	}
+
 	message.EditedAt = editMessage.Clock
 	message.UnfurledLinks = editMessage.UnfurledLinks
 	message.UnfurledStatusLinks = editMessage.UnfurledStatusLinks

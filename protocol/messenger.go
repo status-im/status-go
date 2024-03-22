@@ -6047,3 +6047,7 @@ func (m *Messenger) startMessageSegmentsCleanupLoop() {
 		}
 	}()
 }
+
+func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string) (string, error) {
+	return m.persistence.FindStatusMessageIDForBridgeMessageID(bridgeMessageID)
+}
