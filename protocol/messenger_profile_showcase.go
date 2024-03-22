@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	crand "crypto/rand"
@@ -16,7 +15,6 @@ import (
 
 	eth_common "github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
@@ -235,40 +233,8 @@ func (m *Messenger) fromProfileShowcaseCommunityProto(senderPubKey *ecdsa.Public
 	entries := []*identity.ProfileShowcaseCommunity{}
 	for _, message := range messages {
 		entry := &identity.ProfileShowcaseCommunity{
-			CommunityID:      message.CommunityId,
-			Order:            int(message.Order),
-			MembershipStatus: identity.ProfileShowcaseMembershipStatusUnproven,
-		}
-
-		community, err := m.FetchCommunity(&FetchCommunityRequest{
-			CommunityKey:    message.CommunityId,
-			Shard:           nil,
-			TryDatabase:     true,
-			WaitForResponse: true,
-		})
-		if err != nil {
-			m.logger.Warn("failed to fetch community for profile entry ", zap.Error(err))
-		}
-
-		if community != nil && community.Encrypted() {
-			grant, err := community.VerifyGrantSignature(message.Grant)
-			if err != nil {
-				m.logger.Warn("failed to verify grant signature ", zap.Error(err))
-				entry.MembershipStatus = identity.ProfileShowcaseMembershipStatusNotAMember
-			} else {
-				if grant != nil && bytes.Equal(grant.MemberId, crypto.CompressPubkey(senderPubKey)) {
-					entry.MembershipStatus = identity.ProfileShowcaseMembershipStatusProvenMember
-				} else { // Show as not a member if membership can't be proven
-					entry.MembershipStatus = identity.ProfileShowcaseMembershipStatusNotAMember
-				}
-			}
-		} else if community != nil {
-			// Use member list as a proof for unecrypted communities
-			if community.HasMember(senderPubKey) {
-				entry.MembershipStatus = identity.ProfileShowcaseMembershipStatusProvenMember
-			} else {
-				entry.MembershipStatus = identity.ProfileShowcaseMembershipStatusNotAMember
-			}
+			CommunityID: message.CommunityId,
+			Order:       int(message.Order),
 		}
 
 		entries = append(entries, entry)

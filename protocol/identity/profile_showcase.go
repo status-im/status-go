@@ -86,9 +86,8 @@ type ProfileShowcasePreferences struct {
 // Profile showcase for a contact
 
 type ProfileShowcaseCommunity struct {
-	CommunityID      string                          `json:"communityId"`
-	Order            int                             `json:"order"`
-	MembershipStatus ProfileShowcaseMembershipStatus `json:"membershipStatus"`
+	CommunityID string `json:"communityId"`
+	Order       int    `json:"order"`
 }
 
 type ProfileShowcaseAccount struct {
