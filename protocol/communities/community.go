@@ -1176,7 +1176,12 @@ func (o *Community) ValidateEditSharedAddresses(signer *ecdsa.PublicKey, request
 		return errors.New("no addresses were shared")
 	}
 
-	if request.Clock < o.config.CommunityDescription.Members[common.PubkeyToHex(signer)].LastUpdateClock {
+	member, exists := o.config.CommunityDescription.Members[common.PubkeyToHex(signer)]
+	if !exists {
+		return errors.New("signer is not a community member")
+	}
+
+	if request.Clock < member.LastUpdateClock {
 		return errors.New("edit request is older than the last one we have. Ignore")
 	}
 
