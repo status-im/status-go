@@ -97,7 +97,7 @@ func (t *Transactor) NextNonce(rpcClient *rpc.Client, chainID uint64, from types
 		chainID == wallet_common.OptimismSepolia ||
 		chainID == wallet_common.OptimismGoerli {
 		if t.pendingTracker != nil {
-			countOfPendingTXs, err := t.pendingTracker.GetPendingTxForSuggestedNonce(wallet_common.ChainID(chainID), common.Address(from), nonce)
+			countOfPendingTXs, err := t.pendingTracker.CountPendingTxsFromNonce(wallet_common.ChainID(chainID), common.Address(from), nonce)
 			if err != nil {
 				return 0, err
 			}
@@ -168,7 +168,7 @@ func (t *Transactor) SendRawTransaction(chainID uint64, rawTx string) error {
 	return rpcWrapper.SendRawTransaction(ctx, rawTx)
 }
 
-func createPendingTransactions(from common.Address, symbol string, chainID uint64, multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) (pTx *PendingTransaction) {
+func createPendingTransaction(from common.Address, symbol string, chainID uint64, multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) (pTx *PendingTransaction) {
 
 	pTx = &PendingTransaction{
 		Hash:               tx.Hash(),
@@ -200,7 +200,7 @@ func (t *Transactor) sendTransaction(rpcWrapper *rpcWrapper, from common.Address
 
 	if t.pendingTracker != nil {
 
-		tx := createPendingTransactions(from, symbol, rpcWrapper.chainID, multiTransactionID, tx)
+		tx := createPendingTransaction(from, symbol, rpcWrapper.chainID, multiTransactionID, tx)
 
 		err := t.pendingTracker.StoreAndTrackPendingTx(tx)
 		if err != nil {
