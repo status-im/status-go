@@ -260,7 +260,7 @@ func Login(accountData, password string) string {
 	return makeJSONResponse(nil)
 }
 
-// Login loads a key file (for a given address), tries to decrypt it using the password,
+// Deprecated: LoginWithConfig loads a key file (for a given address), tries to decrypt it using the password,
 // to verify ownership if verified, purges all the previous identities from Whisper,
 // and injects verified key as shh identity. It then updates the accounts node db configuration
 // mergin the values received in the configJSON parameter
@@ -346,7 +346,7 @@ func RestoreAccountAndLogin(requestJSON string) string {
 	return makeJSONResponse(nil)
 }
 
-// SaveAccountAndLogin saves account in status-go database..
+// Deprecated: SaveAccountAndLogin saves account in status-go database..
 func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subaccountData string) string {
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(accountData), &account)
