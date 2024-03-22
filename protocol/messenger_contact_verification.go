@@ -67,10 +67,10 @@ func (m *Messenger) SendContactVerificationRequest(ctx context.Context, contactI
 	}
 
 	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_REQUEST_CONTACT_VERIFICATION,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_REQUEST_CONTACT_VERIFICATION,
+		ResendType:  common.ResendTypeDataSync,
 	})
 
 	if err != nil {
@@ -232,10 +232,10 @@ func (m *Messenger) CancelVerificationRequest(ctx context.Context, id string) (*
 	}
 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_CANCEL_CONTACT_VERIFICATION,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_CANCEL_CONTACT_VERIFICATION,
+		ResendType:  common.ResendTypeDataSync,
 	})
 
 	if err != nil {
@@ -323,10 +323,10 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 	}
 
 	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_VERIFICATION,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_VERIFICATION,
+		ResendType:  common.ResendTypeDataSync,
 	})
 
 	if err != nil {
@@ -643,10 +643,10 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 	}
 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_DECLINE_CONTACT_VERIFICATION,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_DECLINE_CONTACT_VERIFICATION,
+		ResendType:  common.ResendTypeDataSync,
 	})
 
 	if err != nil {

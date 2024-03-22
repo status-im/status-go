@@ -97,7 +97,7 @@ func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(community *comm
 		HashRatchetGroupID:    hashRatchetGroupID,
 		PubsubTopic:           community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
-	_, err := ckd.sender.SendCommunityMessage(context.Background(), rawMessage)
+	_, err := ckd.sender.SendCommunityMessage(context.Background(), &rawMessage)
 
 	if err != nil {
 		return err

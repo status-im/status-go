@@ -758,10 +758,10 @@ func (m *Messenger) syncProfileShowcasePreferences(ctx context.Context, rawMessa
 
 	_, chat := m.getLastClockWithRelatedChat()
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_PROFILE_SHOWCASE_PREFERENCES,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_PROFILE_SHOWCASE_PREFERENCES,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)

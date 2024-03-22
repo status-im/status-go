@@ -313,6 +313,13 @@ func (w *Waku) SubscribeToConnStatusChanges() *types.ConnStatusSubscription {
 	return subscription
 }
 
+func (w *Waku) GetNodeENRString() (string, error) {
+	if w.node == nil {
+		return "", errors.New("node not initialized")
+	}
+	return w.node.ENR().String(), nil
+}
+
 func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string) ([]*enode.Node, error) {
 	wg := sync.WaitGroup{}
 	mu := sync.Mutex{}

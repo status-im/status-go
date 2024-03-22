@@ -24,10 +24,10 @@ func buildRawSyncSettingMessage(msg *protobuf.SyncSetting, chatID string) (*comm
 	}
 
 	return &common.RawMessage{
-		LocalChatID:         chatID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_SETTING,
-		ResendAutomatically: true,
+		LocalChatID: chatID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_SETTING,
+		ResendType:  common.ResendTypeDataSync,
 	}, nil
 }
 

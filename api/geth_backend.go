@@ -1302,7 +1302,7 @@ func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error)
 	return info.KeyUID, nil
 }
 
-func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, fetchBackup bool, request *requests.CreateAccount) (*multiaccounts.Account, error) {
+func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, fetchBackup bool, request *requests.CreateAccount, opts ...params.Option) (*multiaccounts.Account, error) {
 	keystoreDir := keystoreRelativePath
 
 	b.UpdateRootDataDir(request.BackupDisabledDataDir)
@@ -1406,7 +1406,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		//settings.MnemonicWasNotShown = true
 	}
 
-	nodeConfig, err := defaultNodeConfig(settings.InstallationID, request)
+	nodeConfig, err := defaultNodeConfig(settings.InstallationID, request, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1454,14 +1454,16 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 	return &account, nil
 }
 
-func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccount) (*multiaccounts.Account, error) {
+// CreateAccountAndLogin creates a new account and logs in with it.
+// NOTE: requests.CreateAccount is used for public, params.Option maybe used for internal usage.
+func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccount, opts ...params.Option) (*multiaccounts.Account, error) {
 	validation := &requests.CreateAccountValidation{
 		AllowEmptyDisplayName: false,
 	}
 	if err := request.Validate(validation); err != nil {
 		return nil, err
 	}
-	return b.generateOrImportAccount("", 1, false, request)
+	return b.generateOrImportAccount("", 1, false, request, opts...)
 }
 
 func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPassword string, newPassword string) error {

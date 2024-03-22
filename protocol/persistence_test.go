@@ -780,7 +780,6 @@ func TestDontOverwriteSentStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	rawMessage.Sent = false
-	rawMessage.ResendAutomatically = true
 	err = p.SaveRawMessage(rawMessage)
 	require.NoError(t, err)
 
@@ -788,7 +787,6 @@ func TestDontOverwriteSentStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	require.True(t, m.Sent)
-	require.True(t, m.ResendAutomatically)
 }
 
 func TestPersistenceEmojiReactions(t *testing.T) {

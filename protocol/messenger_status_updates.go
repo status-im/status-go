@@ -65,11 +65,11 @@ func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error
 	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         contactCodeTopic,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_STATUS_UPDATE,
-		ResendAutomatically: true,
-		Ephemeral:           statusUpdate.StatusType == protobuf.StatusUpdate_AUTOMATIC,
+		LocalChatID: contactCodeTopic,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_STATUS_UPDATE,
+		ResendType:  common.ResendTypeNone, // does this need to be resent?
+		Ephemeral:   statusUpdate.StatusType == protobuf.StatusUpdate_AUTOMATIC,
 	}
 
 	_, err = m.sender.SendPublic(ctx, contactCodeTopic, rawMessage)
@@ -167,12 +167,12 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         community.StatusUpdatesChannelID(),
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_STATUS_UPDATE,
-		ResendAutomatically: true,
-		Ephemeral:           statusUpdate.StatusType == protobuf.StatusUpdate_AUTOMATIC,
-		PubsubTopic:         community.PubsubTopic(),
+		LocalChatID: community.StatusUpdatesChannelID(),
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_STATUS_UPDATE,
+		ResendType:  common.ResendTypeNone, // does this need to be resent?
+		Ephemeral:   statusUpdate.StatusType == protobuf.StatusUpdate_AUTOMATIC,
+		PubsubTopic: community.PubsubTopic(),
 	}
 
 	_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)

@@ -207,7 +207,7 @@ func buildWalletConfig(request *requests.WalletSecretsConfig) params.WalletConfi
 	return walletConfig
 }
 
-func defaultNodeConfig(installationID string, request *requests.CreateAccount) (*params.NodeConfig, error) {
+func defaultNodeConfig(installationID string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.LogEnabled = request.LogEnabled
@@ -333,6 +333,12 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 		nodeConfig.HTTPHost = request.APIConfig.HTTPHost
 		nodeConfig.HTTPPort = request.APIConfig.HTTPPort
 		nodeConfig.APIModules = request.APIConfig.APIModules
+	}
+
+	for _, opt := range opts {
+		if err := opt(nodeConfig); err != nil {
+			return nil, err
+		}
 	}
 
 	return nodeConfig, nil
