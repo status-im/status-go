@@ -102,7 +102,8 @@ func NewService(
 
 	communityManager := community.NewManager(db, mediaServer, feed)
 	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
-	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer, feed)
+	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer, feed, accountFeed, accountsDB)
+	tokenManager.Start()
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(db, gethManager, transactor, config, accountsDB, pendingTxManager, feed)
 	blockChainState := blockchainstate.NewBlockChainState()
@@ -262,6 +263,7 @@ func (s *Service) Stop() error {
 	s.history.Stop()
 	s.activity.Stop()
 	s.collectibles.Stop()
+	s.tokenManager.Stop()
 	s.started = false
 	log.Info("wallet stopped")
 	return nil

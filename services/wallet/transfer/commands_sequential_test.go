@@ -1048,7 +1048,7 @@ func TestFindBlocksCommand(t *testing.T) {
 		}
 		client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 		client.SetClient(tc.NetworkID(), tc)
-		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil)
+		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil)
 		tokenManager.SetTokens([]*token.Token{
 			{
 				Address:  tokenTXXAddress,
@@ -1182,7 +1182,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 
 	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil)
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil)
 
 	tokenManager.SetTokens([]*token.Token{
 		{
@@ -1303,7 +1303,7 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 
 		client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 		client.SetClient(tc.NetworkID(), tc)
-		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil)
+		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil)
 
 		tokenManager.SetTokens([]*token.Token{
 			{
@@ -1385,7 +1385,7 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 
 	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil)
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil)
 
 	wdb := NewDB(db)
 	blockChannel := make(chan []*DBHeader, 10)
@@ -1502,7 +1502,7 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 	client.SetClient(tc.NetworkID(), tc)
 
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil)
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil)
 
 	tokenManager.SetTokens([]*token.Token{
 		{
