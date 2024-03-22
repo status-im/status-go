@@ -1992,6 +1992,8 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, err
 	}
 
+	eventsMessage.Events = m.validateAndFilterEvents(community, eventsMessage.Events)
+
 	if !community.IsPrivilegedMember(signer) {
 		return nil, errors.New("user has not permissions to send events")
 	}
