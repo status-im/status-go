@@ -1,17 +1,31 @@
 package token
 
 import (
+	"errors"
 	"math/big"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/rpc/network"
+	mediaserver "github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/transactions/fake"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -296,4 +310,76 @@ func TestGetTokenHistoricalBalance(t *testing.T) {
 	balance, err = manager.GetTokenHistoricalBalance(account, chainID, testSymbol, timestamp)
 	require.NoError(t, err)
 	require.Equal(t, expectedBalance, balance)
+}
+
+func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
+	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	accountsDB, err := accounts.NewDB(appDB)
+	require.NoError(t, err)
+
+	address := common.HexToAddress("0x1234")
+	accountFeed := event.Feed{}
+	chainID := uint64(1)
+	txServiceMockCtrl := gomock.NewController(t)
+	server, _ := fake.NewTestServer(txServiceMockCtrl)
+	client := gethrpc.DialInProc(server)
+	rpcClient, _ := rpc.NewClient(client, chainID, params.UpstreamRPCConfig{}, nil, nil)
+	rpcClient.UpstreamChainID = chainID
+	nm := network.NewManager(appDB)
+	mediaServer, err := mediaserver.NewMediaServer(appDB, nil, nil, walletDB)
+	require.NoError(t, err)
+
+	manager := NewTokenManager(walletDB, rpcClient, nil, nm, appDB, mediaServer, nil, &accountFeed, accountsDB)
+
+	// Insert balances for address
+	marked, err := manager.MarkAsPreviouslyOwnedToken(&Token{
+		Address:  common.HexToAddress("0x1234"),
+		Symbol:   "Dummy",
+		Decimals: 18,
+		ChainID:  1,
+	}, address)
+	require.NoError(t, err)
+	require.True(t, marked)
+
+	tokenByAddress, err := manager.GetPreviouslyOwnedTokens()
+	require.NoError(t, err)
+	require.Len(t, tokenByAddress, 1)
+
+	// Start service
+	manager.startAccountsWatcher()
+
+	// Watching accounts must start before sending event.
+	// To avoid running goroutine immediately and let the controller subscribe first,
+	// use any delay.
+	group := sync.WaitGroup{}
+	group.Add(1)
+	go func() {
+		defer group.Done()
+		time.Sleep(1 * time.Millisecond)
+
+		accountFeed.Send(accountsevent.Event{
+			Type:     accountsevent.EventTypeRemoved,
+			Accounts: []common.Address{address},
+		})
+
+		require.NoError(t, utils.Eventually(func() error {
+			tokenByAddress, err := manager.GetPreviouslyOwnedTokens()
+			if err == nil && len(tokenByAddress) == 0 {
+				return nil
+			}
+			return errors.New("Token not removed")
+		}, 100*time.Millisecond, 10*time.Millisecond))
+	}()
+
+	group.Wait()
+
+	// Stop service
+	txServiceMockCtrl.Finish()
+	server.Stop()
+	manager.stopAccountsWatcher()
 }
