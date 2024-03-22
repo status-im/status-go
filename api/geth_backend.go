@@ -1348,18 +1348,18 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		return nil, err
 	}
 
-	kdfIterations := dbsetup.ReducedKDFIterationsNumber
-	if request.KdfIterations != nil {
-		kdfIterations = *request.KdfIterations
-	}
-
 	account := multiaccounts.Account{
 		KeyUID:                  info.KeyUID,
 		Name:                    request.DisplayName,
 		CustomizationColor:      multiacccommon.CustomizationColor(request.CustomizationColor),
 		CustomizationColorClock: customizationColorClock,
-		KDFIterations:           kdfIterations,
+		KDFIterations:           request.KdfIterations,
 	}
+
+	if account.KDFIterations == 0 {
+		account.KDFIterations = dbsetup.ReducedKDFIterationsNumber
+	}
+
 	if request.ImagePath != "" {
 		iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
 		if err != nil {
