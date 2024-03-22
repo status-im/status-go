@@ -2213,11 +2213,6 @@ func (m *Manager) handleCommunityEventRequestAccepted(community *Community, comm
 	signer := communityEvent.MemberToAction
 	request := communityEvent.RequestToJoin
 
-	if signer == "" || request == nil {
-		m.logger.Warn("malformed accepted event doesn't have a request or signer")
-		return nil, nil
-	}
-
 	requestToJoin := &RequestToJoin{
 		PublicKey:   signer,
 		Clock:       request.Clock,
@@ -2267,11 +2262,6 @@ func (m *Manager) handleCommunityEventRequestRejected(community *Community, comm
 
 	signer := communityEvent.MemberToAction
 	request := communityEvent.RequestToJoin
-
-	if signer == "" || request == nil {
-		m.logger.Warn("malformed rejected event doesn't have a request or signer")
-		return nil, nil
-	}
 
 	requestToJoin := &RequestToJoin{
 		PublicKey:   signer,
