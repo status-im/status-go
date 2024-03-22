@@ -15,6 +15,11 @@ pipeline {
       defaultValue: false,
       description: 'Enable to create build for release.',
     )
+    string(
+      name: 'RELEASE_IMAGE_TAG',
+      description: 'Release Docker image tag.',
+      defaultValue: params.RELEASE_IMAGE_TAG ?: 'deploy-test',
+    )
   }
 
   options {
@@ -41,8 +46,6 @@ pipeline {
     /* Makefile parameters */
     DOCKER_IMAGE_NAME = 'statusteam/status-go'
     DOCKER_IMAGE_CUSTOM_TAG = "ci-build-${utils.gitCommit()}"
-    /* Release docker image settings. */
-    RELEASE_IMAGE_TAG = "deploy-test"
   }
 
   stages {
