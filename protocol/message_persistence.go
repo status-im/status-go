@@ -1551,6 +1551,18 @@ func (db sqlitePersistence) SaveMessages(messages []*common.Message) (err error)
 		}
 
 		if msg.ContentType == protobuf.ChatMessage_BRIDGE_MESSAGE {
+			// check updates first
+			var hasMessage bool
+			hasMessage, err = db.bridgeMessageExists(tx, msg.GetBridgeMessage().MessageID)
+			if err != nil {
+				return
+			}
+			if hasMessage {
+				// bridge message exists, this is edit
+				err = db.updateBridgeMessageContent(tx, msg.GetBridgeMessage().MessageID, msg.GetBridgeMessage().Content)
+				return
+			}
+
 			err = db.saveBridgeMessage(tx, msg.GetBridgeMessage(), msg.ID)
 			if err != nil {
 				return
@@ -2967,9 +2979,26 @@ func (db sqlitePersistence) findStatusMessageIdsReplies(tx *sql.Tx, bridgeMessag
 	return statusMessageIDs, nil
 }
 
-// Finds status messages id which are replies for bridgeMessageID
-func (db sqlitePersistence) findStatusMessageIdsRepliedTo(tx *sql.Tx, parentMessageID string) (string, error) {
-	rows, err := tx.Query(`SELECT user_messages_id FROM bridge_messages WHERE message_id = ?`, parentMessageID)
+func (db sqlitePersistence) FindStatusMessageIdForBridgeMessageId(messageID string) (string, error) {
+	rows, err := db.db.Query(`SELECT user_messages_id FROM bridge_messages WHERE message_id = ?`, messageID)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		var statusMessageID string
+		err = rows.Scan(&statusMessageID)
+		if err != nil {
+			return "", err
+		}
+		return statusMessageID, nil
+	}
+	return "", nil
+}
+
+func (db sqlitePersistence) findStatusMessageIdForBridgeMessageId(tx *sql.Tx, messageID string) (string, error) {
+	rows, err := tx.Query(`SELECT user_messages_id FROM bridge_messages WHERE message_id = ?`, messageID)
 	if err != nil {
 		return "", err
 	}
@@ -3003,6 +3032,23 @@ func (db sqlitePersistence) updateStatusMessagesWithResponse(tx *sql.Tx, statusM
 	return err
 }
 
+func (db sqlitePersistence) bridgeMessageExists(tx *sql.Tx, bridgeMessageID string) (exists bool, err error) {
+	err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM bridge_messages WHERE message_id = ?)`, bridgeMessageID).Scan(&exists)
+	return exists, err
+}
+
+func (db sqlitePersistence) updateBridgeMessageContent(tx *sql.Tx, bridgeMessageID string, content string) error {
+	sql := "UPDATE bridge_messages SET content = ? WHERE message_id = ?"
+	stmt, err := tx.Prepare(sql)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(content, bridgeMessageID)
+	return err
+}
+
 // Finds if there are any messages that are replies to that message (in case replies were received earlier)
 func (db sqlitePersistence) findAndUpdateReplies(tx *sql.Tx, bridgeMessageID string, statusMessageID string) error {
 	replyMessageIds, err := db.findStatusMessageIdsReplies(tx, bridgeMessageID)
@@ -3016,7 +3062,8 @@ func (db sqlitePersistence) findAndUpdateReplies(tx *sql.Tx, bridgeMessageID str
 }
 
 func (db sqlitePersistence) findAndUpdateRepliedTo(tx *sql.Tx, discordParentMessageID string, statusMessageID string) error {
-	repliedMessageID, err := db.findStatusMessageIdsRepliedTo(tx, discordParentMessageID)
+	// Finds status messages id which are replies for bridgeMessageID
+	repliedMessageID, err := db.findStatusMessageIdForBridgeMessageId(tx, discordParentMessageID)
 	if err != nil {
 		return err
 	}
