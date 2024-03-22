@@ -632,6 +632,10 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		return err
 	}
 
+	if request.RuntimeLogLevel != "" {
+		b.config.LogLevel = request.RuntimeLogLevel
+	}
+
 	if b.config.WakuV2Config.Enabled && request.WakuV2Nameserver != "" {
 		b.config.WakuV2Config.Nameserver = request.WakuV2Nameserver
 	}
@@ -1361,7 +1365,20 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 	}
 
 	if request.ImagePath != "" {
-		iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
+		imageCropRectangle := request.ImageCropRectangle
+		if imageCropRectangle == nil {
+			// Default crop rectangle used by mobile
+			imageCropRectangle = &requests.ImageCropRectangle{
+				Ax: 0,
+				Ay: 0,
+				Bx: 1000,
+				By: 1000,
+			}
+		}
+
+		iis, err := images.GenerateIdentityImages(request.ImagePath,
+			imageCropRectangle.Ax, imageCropRectangle.Ay, imageCropRectangle.Bx, imageCropRectangle.By)
+
 		if err != nil {
 			return nil, err
 		}

@@ -10,18 +10,26 @@ var ErrCreateAccountInvalidCustomizationColor = errors.New("create-account: inva
 var ErrCreateAccountInvalidRootKeystoreDir = errors.New("create-account: invalid root keystore directory")
 var ErrCreateAccountInvalidBackupDisabledDataDir = errors.New("create-account: invalid backup disabled data directory")
 
+type ImageCropRectangle struct {
+	Ax int `json:"ax"`
+	Ay int `json:"ay"`
+	Bx int `json:"bx"`
+	By int `json:"by"`
+}
+
 type CreateAccount struct {
 	// BackupDisabledDataDir is the directory where backup is disabled
 	// WARNING: This is used as `RootDataDir`. Consider renaming?
 	BackupDisabledDataDir string `json:"backupDisabledDataDir"`
 	KdfIterations         int    `json:"kdfIterations"`
 
-	DeviceName         string `json:"deviceName"`
-	DisplayName        string `json:"displayName"`
-	Password           string `json:"password"`
-	ImagePath          string `json:"imagePath"`
-	CustomizationColor string `json:"customizationColor"`
-	Emoji              string `json:"emoji"`
+	DeviceName         string              `json:"deviceName"`
+	DisplayName        string              `json:"displayName"`
+	Password           string              `json:"password"`
+	ImagePath          string              `json:"imagePath"`
+	ImageCropRectangle *ImageCropRectangle `json:"imageCropRectangle"`
+	CustomizationColor string              `json:"customizationColor"`
+	Emoji              string              `json:"emoji"`
 
 	WakuV2Nameserver  *string `json:"wakuV2Nameserver"`
 	WakuV2LightClient bool    `json:"wakuV2LightClient"`
