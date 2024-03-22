@@ -14,6 +14,7 @@ type CreateAccount struct {
 	// BackupDisabledDataDir is the directory where backup is disabled
 	// WARNING: This is used as `RootDataDir`. Consider renaming?
 	BackupDisabledDataDir string `json:"backupDisabledDataDir"`
+	KdfIterations         *int   `json:"kdfIterations"`
 
 	DeviceName         string `json:"deviceName"`
 	DisplayName        string `json:"displayName"`
