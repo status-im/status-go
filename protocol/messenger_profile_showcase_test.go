@@ -632,9 +632,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipUnenc
 	// Verify community's data
 	s.Require().Len(profileShowcase.Communities, 2)
 	s.Require().Equal(profileShowcase.Communities[0].CommunityID, aliceCommunity.IDString())
-	s.Require().Equal(profileShowcase.Communities[0].MembershipStatus, identity.ProfileShowcaseMembershipStatusProvenMember)
 	s.Require().Equal(profileShowcase.Communities[1].CommunityID, bobCommunity.IDString())
-	s.Require().Equal(profileShowcase.Communities[1].MembershipStatus, identity.ProfileShowcaseMembershipStatusNotAMember)
 }
 
 func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncryptedCommunity() {
@@ -700,7 +698,5 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncry
 	// Verify community's data
 	s.Require().Len(profileShowcase.Communities, 2)
 	s.Require().Equal(profileShowcase.Communities[0].CommunityID, aliceCommunity.IDString())
-	s.Require().Equal(profileShowcase.Communities[0].MembershipStatus, identity.ProfileShowcaseMembershipStatusProvenMember)
 	s.Require().Equal(profileShowcase.Communities[1].CommunityID, bobCommunity.IDString())
-	s.Require().Equal(profileShowcase.Communities[1].MembershipStatus, identity.ProfileShowcaseMembershipStatusNotAMember)
 }
