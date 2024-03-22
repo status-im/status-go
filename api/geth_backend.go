@@ -1284,7 +1284,7 @@ func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAcco
 		return nil, err
 	}
 
-	return b.generateOrImportAccount(request.Mnemonic, 0, &request.CreateAccount)
+	return b.generateOrImportAccount(request.Mnemonic, 0, request.FetchBackup, &request.CreateAccount)
 }
 
 func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error) {
@@ -1298,7 +1298,7 @@ func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error)
 	return info.KeyUID, nil
 }
 
-func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, request *requests.CreateAccount, opts ...params.Option) (*multiaccounts.Account, error) {
+func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, fetchBackup bool, request *requests.CreateAccount, opts ...params.Option) (*multiaccounts.Account, error) {
 	keystoreDir := keystoreRelativePath
 
 	b.UpdateRootDataDir(request.BackupDisabledDataDir)
@@ -1387,7 +1387,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 	if err != nil {
 		return nil, err
 	}
-	if mnemonic != "" {
+	if mnemonic != "" && fetchBackup {
 		nodeConfig.ProcessBackedupMessages = true
 	}
 
@@ -1436,7 +1436,7 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
-	return b.generateOrImportAccount("", 1, request, opts...)
+	return b.generateOrImportAccount("", 1, false, request, opts...)
 }
 
 func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPassword string, newPassword string) error {

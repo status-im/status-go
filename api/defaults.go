@@ -203,6 +203,7 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	nodeConfig.LogLevel = "ERROR"
 	nodeConfig.DataDir = "/ethereum/mainnet_rpc"
 	nodeConfig.KeycardPairingDataFile = defaultKeycardPairingDataFile
+	nodeConfig.ProcessBackedupMessages = false
 
 	if request.LogLevel != nil {
 		nodeConfig.LogLevel = *request.LogLevel

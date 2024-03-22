@@ -71,12 +71,14 @@ type WalletSecretsConfig struct {
 }
 
 func (c *CreateAccount) Validate() error {
-	return ValidateAccountCreationRequest(*c)
+	return ValidateAccountCreationRequest(*c, false)
 }
 
-func ValidateAccountCreationRequest(c CreateAccount) error {
+func ValidateAccountCreationRequest(c CreateAccount, allowEmptyDisplayName bool) error {
 	// TODO(cammellos): Add proper validation for password/displayname/etc
-	if len(c.DisplayName) == 0 {
+
+	// Empty display name is allowed during account restore
+	if len(c.DisplayName) == 0 && !allowEmptyDisplayName {
 		return ErrCreateAccountInvalidDisplayName
 	}
 
