@@ -1,8 +1,8 @@
 {
   /* This should match Nixpkgs commit in status-mobile. */
   source ? builtins.fetchTarball {
-    url = "https://github.com/NixOS/nixpkgs/archive/e7603eba51f2c7820c0a182c6bbb351181caa8e7.tar.gz";
-    sha256 = "sha256:0mwck8jyr74wh1b7g6nac1mxy6a0rkppz8n12andsffybsipz5jw";
+    url = "https://github.com/NixOS/nixpkgs/archive/224fd9a362487ab2894dac0df161c84ab1d8880b.tar.gz";
+    sha256 = "sha256:1syvl39pi1h8lf5gkd9h7ksn5hp34cj7pa3abr59217kv0bdklhy";
   },
   pkgs ? import (source){
     config = {
@@ -60,7 +60,7 @@ in pkgs.mkShell {
 
   buildInputs = with pkgs; [
     git jq which
-    go_1_19 golangci-lint go-junit-report gopls go-bindata gomobileMod
+    go_1_21 golangci-lint go-junit-report gopls go-bindata gomobileMod
     mockgen protobuf3_20 protoc-gen-go gotestsum
   ] ++ lib.optional stdenv.isDarwin xcodeWrapper;
 
