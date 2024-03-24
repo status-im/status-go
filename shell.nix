@@ -25,6 +25,20 @@
           ];
         };
 
+        # https://github.com/golang/go/issues/58426
+        gomobile = prev.gomobile.override {
+          buildGoModule = args: prev.buildGo120Module ( args // rec {
+            version = "unstable-2023-11-27";
+            src = prev.fetchgit {
+              rev = "76ac6878050a2eef81867f2c6c21108e59919e8f";
+              name = "gomobile";
+              url = "https://go.googlesource.com/mobile";
+              sha256 = "sha256-mq7gKccvI7VCBEiQTueWxMPOCgg/MGE8y2+BlwWx5pw=";
+            };
+            vendorHash = "sha256-8OBLVd4zs89hoJXzC8BPRgrYjjR7DiA39+7tTaSYUFI=";
+          });
+        };
+
         go-junit-report = prev.go-junit-report.overrideAttrs ( attrs : rec {
           version = "2.1.0";
 
