@@ -88,7 +88,8 @@ func (e *eventsProcessor) validateEvent(event *CommunityEvent) error {
 
 // Filter invalid and outdated events.
 func (e *eventsProcessor) filterEvents() {
-	for _, event := range e.message.Events {
+	for _, ev := range e.message.Events {
+		event := ev
 		if err := e.validateEvent(&event); err == nil {
 			e.eventsToApply = append(e.eventsToApply, event)
 		} else {
@@ -100,7 +101,8 @@ func (e *eventsProcessor) filterEvents() {
 // Merge message's events with community's events.
 func (e *eventsProcessor) mergeEvents() {
 	if e.community.config.EventsData != nil {
-		for _, event := range e.community.config.EventsData.Events {
+		for _, ev := range e.community.config.EventsData.Events {
+			event := ev
 			if err := e.validateEvent(&event); err == nil {
 				e.eventsToApply = append(e.eventsToApply, event)
 			} else {
