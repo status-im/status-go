@@ -230,6 +230,7 @@ func (m *Messenger) toProfileShowcaseSocialLinksProto(preferences []*identity.Pr
 }
 
 func (m *Messenger) fromProfileShowcaseCommunityProto(senderPubKey *ecdsa.PublicKey, messages []*protobuf.ProfileShowcaseCommunity) []*identity.ProfileShowcaseCommunity {
+	// NOTE: no requests are allowed to be made here
 	entries := []*identity.ProfileShowcaseCommunity{}
 	for _, message := range messages {
 		entry := &identity.ProfileShowcaseCommunity{
@@ -243,6 +244,7 @@ func (m *Messenger) fromProfileShowcaseCommunityProto(senderPubKey *ecdsa.Public
 }
 
 func (m *Messenger) fromProfileShowcaseAccountProto(messages []*protobuf.ProfileShowcaseAccount) []*identity.ProfileShowcaseAccount {
+	// NOTE: no requests are allowed to be made here
 	entries := []*identity.ProfileShowcaseAccount{}
 	for _, entry := range messages {
 		entries = append(entries, &identity.ProfileShowcaseAccount{
@@ -257,6 +259,7 @@ func (m *Messenger) fromProfileShowcaseAccountProto(messages []*protobuf.Profile
 }
 
 func (m *Messenger) fromProfileShowcaseCollectibleProto(messages []*protobuf.ProfileShowcaseCollectible) []*identity.ProfileShowcaseCollectible {
+	// NOTE: no requests are allowed to be made here
 	entries := []*identity.ProfileShowcaseCollectible{}
 	for _, message := range messages {
 		entry := &identity.ProfileShowcaseCollectible{
@@ -271,6 +274,7 @@ func (m *Messenger) fromProfileShowcaseCollectibleProto(messages []*protobuf.Pro
 }
 
 func (m *Messenger) fromProfileShowcaseVerifiedTokenProto(messages []*protobuf.ProfileShowcaseVerifiedToken) []*identity.ProfileShowcaseVerifiedToken {
+	// NOTE: no requests are allowed to be made here
 	entries := []*identity.ProfileShowcaseVerifiedToken{}
 	for _, entry := range messages {
 		entries = append(entries, &identity.ProfileShowcaseVerifiedToken{
@@ -282,6 +286,7 @@ func (m *Messenger) fromProfileShowcaseVerifiedTokenProto(messages []*protobuf.P
 }
 
 func (m *Messenger) fromProfileShowcaseUnverifiedTokenProto(messages []*protobuf.ProfileShowcaseUnverifiedToken) []*identity.ProfileShowcaseUnverifiedToken {
+	// NOTE: no requests are allowed to be made here
 	entries := []*identity.ProfileShowcaseUnverifiedToken{}
 	for _, entry := range messages {
 		entries = append(entries, &identity.ProfileShowcaseUnverifiedToken{
@@ -294,6 +299,7 @@ func (m *Messenger) fromProfileShowcaseUnverifiedTokenProto(messages []*protobuf
 }
 
 func (m *Messenger) fromProfileShowcaseSocialLinkProto(messages []*protobuf.ProfileShowcaseSocialLink) []*identity.ProfileShowcaseSocialLink {
+	// NOTE: no requests are allowed to be made here
 	entries := []*identity.ProfileShowcaseSocialLink{}
 	for _, entry := range messages {
 		entries = append(entries, &identity.ProfileShowcaseSocialLink{
@@ -350,6 +356,7 @@ func (m *Messenger) GetProfileShowcasePreferences() (*identity.ProfileShowcasePr
 }
 
 func (m *Messenger) GetProfileShowcaseForContact(contactID string) (*identity.ProfileShowcase, error) {
+	// TODO: validate & fetch profile showcase entities here
 	return m.persistence.GetProfileShowcaseForContact(contactID)
 }
 
@@ -600,7 +607,6 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState
 		return err
 	}
 
-	state.Response.AddProfileShowcase(newShowcase)
 	return nil
 }
 
