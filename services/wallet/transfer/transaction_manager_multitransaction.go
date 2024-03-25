@@ -14,14 +14,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/wallet/bridge"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
@@ -124,34 +122,7 @@ func insertMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) (wal
 }
 
 func (tm *TransactionManager) InsertMultiTransaction(multiTransaction *MultiTransaction) (wallet_common.MultiTransactionIDType, error) {
-	return tm.insertMultiTransactionAndNotify(tm.db, multiTransaction, nil)
-}
-
-func (tm *TransactionManager) insertMultiTransactionAndNotify(db *sql.DB, multiTransaction *MultiTransaction, chainIDs []uint64) (wallet_common.MultiTransactionIDType, error) {
-	id, err := insertMultiTransaction(db, multiTransaction)
-	if err != nil {
-		publishMultiTransactionUpdatedEvent(db, multiTransaction, tm.eventFeed, chainIDs)
-	}
-	return id, err
-}
-
-// publishMultiTransactionUpdatedEvent notify listeners of new multi transaction (used in activity history)
-func publishMultiTransactionUpdatedEvent(db *sql.DB, multiTransaction *MultiTransaction, eventFeed *event.Feed, chainIDs []uint64) {
-	publishFn := func(chainID uint64) {
-		eventFeed.Send(walletevent.Event{
-			Type:     EventMTTransactionUpdate,
-			ChainID:  chainID,
-			Accounts: []common.Address{multiTransaction.FromAddress, multiTransaction.ToAddress},
-			At:       int64(multiTransaction.Timestamp),
-		})
-	}
-	if len(chainIDs) > 0 {
-		for _, chainID := range chainIDs {
-			publishFn(chainID)
-		}
-	} else {
-		publishFn(0)
-	}
+	return insertMultiTransaction(tm.db, multiTransaction)
 }
 
 func updateMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) error {
@@ -198,14 +169,10 @@ func (tm *TransactionManager) CreateMultiTransactionFromCommand(ctx context.Cont
 
 	multiTransaction := multiTransactionFromCommand(command)
 
-	chainIDs := make([]uint64, 0, len(data))
-	for _, tx := range data {
-		chainIDs = append(chainIDs, tx.ChainID)
+	if multiTransaction.Type == MultiTransactionSend && multiTransaction.FromNetworkID == 0 && len(data) == 1 {
+		multiTransaction.FromNetworkID = data[0].ChainID
 	}
-	if multiTransaction.Type == MultiTransactionSend && multiTransaction.FromNetworkID == 0 && len(chainIDs) == 1 {
-		multiTransaction.FromNetworkID = chainIDs[0]
-	}
-	multiTransactionID, err := tm.insertMultiTransactionAndNotify(tm.db, multiTransaction, chainIDs)
+	multiTransactionID, err := insertMultiTransaction(tm.db, multiTransaction)
 	if err != nil {
 		return nil, err
 	}
