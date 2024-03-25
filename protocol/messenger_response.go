@@ -69,32 +69,32 @@ type MessengerResponse struct {
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
-	notifications               map[string]*localnotifications.Notification
-	requestsToJoinCommunity     map[string]*communities.RequestToJoin
-	chats                       map[string]*Chat
-	removedChats                map[string]bool
-	removedMessages             map[string]*RemovedMessage
-	deletedMessages             map[string]string
-	communities                 map[string]*communities.Community
-	communitiesSettings         map[string]*communities.CommunitySettings
-	activityCenterNotifications map[string]*ActivityCenterNotification
-	activityCenterState         *ActivityCenterState
-	messages                    map[string]*common.Message
-	pinMessages                 map[string]*common.PinMessage
-	discordMessages             map[string]*protobuf.DiscordMessage
-	discordMessageAttachments   map[string]*protobuf.DiscordMessageAttachment
-	discordMessageAuthors       map[string]*protobuf.DiscordMessageAuthor
-	currentStatus               *UserStatus
-	statusUpdates               map[string]UserStatus
-	clearedHistories            map[string]*ClearedHistory
-	verificationRequests        map[string]*verification.Request
-	trustStatus                 map[string]verification.TrustStatus
-	emojiReactions              map[string]*EmojiReaction
-	savedAddresses              map[string]*wallet.SavedAddress
-	SocialLinksInfo             *identity.SocialLinksInfo
-	ensUsernameDetails          []*ensservice.UsernameDetail
-	updatedProfileShowcases     map[string]*identity.ProfileShowcase
-	seenAndUnseenMessages       map[string]*SeenUnseenMessages
+	notifications                    map[string]*localnotifications.Notification
+	requestsToJoinCommunity          map[string]*communities.RequestToJoin
+	chats                            map[string]*Chat
+	removedChats                     map[string]bool
+	removedMessages                  map[string]*RemovedMessage
+	deletedMessages                  map[string]string
+	communities                      map[string]*communities.Community
+	communitiesSettings              map[string]*communities.CommunitySettings
+	activityCenterNotifications      map[string]*ActivityCenterNotification
+	activityCenterState              *ActivityCenterState
+	messages                         map[string]*common.Message
+	pinMessages                      map[string]*common.PinMessage
+	discordMessages                  map[string]*protobuf.DiscordMessage
+	discordMessageAttachments        map[string]*protobuf.DiscordMessageAttachment
+	discordMessageAuthors            map[string]*protobuf.DiscordMessageAuthor
+	currentStatus                    *UserStatus
+	statusUpdates                    map[string]UserStatus
+	clearedHistories                 map[string]*ClearedHistory
+	verificationRequests             map[string]*verification.Request
+	trustStatus                      map[string]verification.TrustStatus
+	emojiReactions                   map[string]*EmojiReaction
+	savedAddresses                   map[string]*wallet.SavedAddress
+	SocialLinksInfo                  *identity.SocialLinksInfo
+	ensUsernameDetails               []*ensservice.UsernameDetail
+	updatedProfileShowcaseContactIDs map[string]bool
+	seenAndUnseenMessages            map[string]*SeenUnseenMessages
 }
 
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
@@ -119,31 +119,31 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		TrustStatus             map[string]verification.TrustStatus `json:"trustStatus,omitempty"`
 		// Notifications a list of notifications derived from messenger events
 		// that are useful to notify the user about
-		Notifications                 []*localnotifications.Notification      `json:"notifications"`
-		Communities                   []*communities.Community                `json:"communities,omitempty"`
-		CommunitiesSettings           []*communities.CommunitySettings        `json:"communitiesSettings,omitempty"`
-		ActivityCenterNotifications   []*ActivityCenterNotification           `json:"activityCenterNotifications,omitempty"`
-		ActivityCenterState           *ActivityCenterState                    `json:"activityCenterState,omitempty"`
-		CurrentStatus                 *UserStatus                             `json:"currentStatus,omitempty"`
-		StatusUpdates                 []UserStatus                            `json:"statusUpdates,omitempty"`
-		Settings                      []*settings.SyncSettingField            `json:"settings,omitempty"`
-		IdentityImages                []images.IdentityImage                  `json:"identityImages,omitempty"`
-		CustomizationColor            string                                  `json:"customizationColor,omitempty"`
-		WatchOnlyAccounts             []*accounts.Account                     `json:"watchOnlyAccounts,omitempty"`
-		Keypairs                      []*accounts.Keypair                     `json:"keypairs,omitempty"`
-		AccountsPositions             []*accounts.Account                     `json:"accountsPositions,omitempty"`
-		TokenPreferences              []walletsettings.TokenPreferences       `json:"tokenPreferences,omitempty"`
-		CollectiblePreferences        []walletsettings.CollectiblePreferences `json:"collectiblePreferences,omitempty"`
-		DiscordCategories             []*discord.Category                     `json:"discordCategories,omitempty"`
-		DiscordChannels               []*discord.Channel                      `json:"discordChannels,omitempty"`
-		DiscordOldestMessageTimestamp int                                     `json:"discordOldestMessageTimestamp"`
-		DiscordMessages               []*protobuf.DiscordMessage              `json:"discordMessages,omitempty"`
-		DiscordMessageAttachments     []*protobuf.DiscordMessageAttachment    `json:"discordMessageAtachments,omitempty"`
-		SavedAddresses                []*wallet.SavedAddress                  `json:"savedAddresses,omitempty"`
-		SocialLinksInfo               *identity.SocialLinksInfo               `json:"socialLinksInfo,omitempty"`
-		EnsUsernameDetails            []*ensservice.UsernameDetail            `json:"ensUsernameDetails,omitempty"`
-		UpdatedProfileShowcases       []*identity.ProfileShowcase             `json:"updatedProfileShowcases,omitempty"`
-		SeenAndUnseenMessages         []*SeenUnseenMessages                   `json:"seenAndUnseenMessages,omitempty"`
+		Notifications                    []*localnotifications.Notification      `json:"notifications"`
+		Communities                      []*communities.Community                `json:"communities,omitempty"`
+		CommunitiesSettings              []*communities.CommunitySettings        `json:"communitiesSettings,omitempty"`
+		ActivityCenterNotifications      []*ActivityCenterNotification           `json:"activityCenterNotifications,omitempty"`
+		ActivityCenterState              *ActivityCenterState                    `json:"activityCenterState,omitempty"`
+		CurrentStatus                    *UserStatus                             `json:"currentStatus,omitempty"`
+		StatusUpdates                    []UserStatus                            `json:"statusUpdates,omitempty"`
+		Settings                         []*settings.SyncSettingField            `json:"settings,omitempty"`
+		IdentityImages                   []images.IdentityImage                  `json:"identityImages,omitempty"`
+		CustomizationColor               string                                  `json:"customizationColor,omitempty"`
+		WatchOnlyAccounts                []*accounts.Account                     `json:"watchOnlyAccounts,omitempty"`
+		Keypairs                         []*accounts.Keypair                     `json:"keypairs,omitempty"`
+		AccountsPositions                []*accounts.Account                     `json:"accountsPositions,omitempty"`
+		TokenPreferences                 []walletsettings.TokenPreferences       `json:"tokenPreferences,omitempty"`
+		CollectiblePreferences           []walletsettings.CollectiblePreferences `json:"collectiblePreferences,omitempty"`
+		DiscordCategories                []*discord.Category                     `json:"discordCategories,omitempty"`
+		DiscordChannels                  []*discord.Channel                      `json:"discordChannels,omitempty"`
+		DiscordOldestMessageTimestamp    int                                     `json:"discordOldestMessageTimestamp"`
+		DiscordMessages                  []*protobuf.DiscordMessage              `json:"discordMessages,omitempty"`
+		DiscordMessageAttachments        []*protobuf.DiscordMessageAttachment    `json:"discordMessageAtachments,omitempty"`
+		SavedAddresses                   []*wallet.SavedAddress                  `json:"savedAddresses,omitempty"`
+		SocialLinksInfo                  *identity.SocialLinksInfo               `json:"socialLinksInfo,omitempty"`
+		EnsUsernameDetails               []*ensservice.UsernameDetail            `json:"ensUsernameDetails,omitempty"`
+		UpdatedProfileShowcaseContactIDs []string                                `json:"updatedProfileShowcaseContactIDs,omitempty"`
+		SeenAndUnseenMessages            []*SeenUnseenMessages                   `json:"seenAndUnseenMessages,omitempty"`
 	}{
 		Contacts:                r.Contacts,
 		Installations:           r.Installations,
@@ -163,29 +163,29 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		TokenPreferences:        r.TokenPreferences,
 		CollectiblePreferences:  r.CollectiblePreferences,
 
-		Messages:                      r.Messages(),
-		VerificationRequests:          r.VerificationRequests(),
-		SavedAddresses:                r.SavedAddresses(),
-		Notifications:                 r.Notifications(),
-		Chats:                         r.Chats(),
-		Communities:                   r.Communities(),
-		CommunitiesSettings:           r.CommunitiesSettings(),
-		RemovedChats:                  r.RemovedChats(),
-		RemovedMessages:               r.RemovedMessages(),
-		DeletedMessages:               r.DeletedMessagesInChats(),
-		ClearedHistories:              r.ClearedHistories(),
-		ActivityCenterNotifications:   r.ActivityCenterNotifications(),
-		ActivityCenterState:           r.ActivityCenterState(),
-		PinMessages:                   r.PinMessages(),
-		EmojiReactions:                r.EmojiReactions(),
-		StatusUpdates:                 r.StatusUpdates(),
-		DiscordCategories:             r.DiscordCategories,
-		DiscordChannels:               r.DiscordChannels,
-		DiscordOldestMessageTimestamp: r.DiscordOldestMessageTimestamp,
-		SocialLinksInfo:               r.SocialLinksInfo,
-		EnsUsernameDetails:            r.EnsUsernameDetails(),
-		UpdatedProfileShowcases:       r.GetUpdatedProfileShowcases(),
-		SeenAndUnseenMessages:         r.GetSeenAndUnseenMessages(),
+		Messages:                         r.Messages(),
+		VerificationRequests:             r.VerificationRequests(),
+		SavedAddresses:                   r.SavedAddresses(),
+		Notifications:                    r.Notifications(),
+		Chats:                            r.Chats(),
+		Communities:                      r.Communities(),
+		CommunitiesSettings:              r.CommunitiesSettings(),
+		RemovedChats:                     r.RemovedChats(),
+		RemovedMessages:                  r.RemovedMessages(),
+		DeletedMessages:                  r.DeletedMessagesInChats(),
+		ClearedHistories:                 r.ClearedHistories(),
+		ActivityCenterNotifications:      r.ActivityCenterNotifications(),
+		ActivityCenterState:              r.ActivityCenterState(),
+		PinMessages:                      r.PinMessages(),
+		EmojiReactions:                   r.EmojiReactions(),
+		StatusUpdates:                    r.StatusUpdates(),
+		DiscordCategories:                r.DiscordCategories,
+		DiscordChannels:                  r.DiscordChannels,
+		DiscordOldestMessageTimestamp:    r.DiscordOldestMessageTimestamp,
+		SocialLinksInfo:                  r.SocialLinksInfo,
+		EnsUsernameDetails:               r.EnsUsernameDetails(),
+		UpdatedProfileShowcaseContactIDs: r.GetUpdatedProfileShowcaseContactIDs(),
+		SeenAndUnseenMessages:            r.GetSeenAndUnseenMessages(),
 	}
 
 	responseItem.TrustStatus = r.TrustStatus()
@@ -328,7 +328,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.verificationRequests)+
 		len(r.requestsToJoinCommunity)+
 		len(r.savedAddresses)+
-		len(r.updatedProfileShowcases)+
+		len(r.updatedProfileShowcaseContactIDs)+
 		len(r.seenAndUnseenMessages)+
 		len(r.ensUsernameDetails) == 0 &&
 		r.currentStatus == nil &&
@@ -368,7 +368,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddEnsUsernameDetails(response.EnsUsernameDetails())
 	r.AddRequestsToJoinCommunity(response.RequestsToJoinCommunity())
 	r.AddBookmarks(response.GetBookmarks())
-	r.AddProfileShowcases(response.GetUpdatedProfileShowcases())
+	r.AddSeveralUpdatedProfileShowcaseContactIDs(response.GetUpdatedProfileShowcaseContactIDs())
 	r.AddSeveralSeenAndUnseenMessages(response.GetSeenAndUnseenMessages())
 	r.CommunityChanges = append(r.CommunityChanges, response.CommunityChanges...)
 	r.BackupHandled = response.BackupHandled
@@ -870,26 +870,30 @@ func (r *MessengerResponse) HasDiscordChannel(id string) bool {
 	return false
 }
 
-func (r *MessengerResponse) AddProfileShowcases(showcases []*identity.ProfileShowcase) {
-	for _, showcase := range showcases {
-		r.AddProfileShowcase(showcase)
+func (r *MessengerResponse) AddSeveralUpdatedProfileShowcaseContactIDs(contactIDs []string) {
+	for _, contactID := range contactIDs {
+		r.AddUpdatedProfileShowcaseContactID(contactID)
 	}
 }
 
-func (r *MessengerResponse) AddProfileShowcase(showcase *identity.ProfileShowcase) {
-	if r.updatedProfileShowcases == nil {
-		r.updatedProfileShowcases = make(map[string]*identity.ProfileShowcase)
+func (r *MessengerResponse) AddUpdatedProfileShowcaseContactID(contactID string) {
+	if r.updatedProfileShowcaseContactIDs == nil {
+		r.updatedProfileShowcaseContactIDs = make(map[string]bool)
 	}
 
-	r.updatedProfileShowcases[showcase.ContactID] = showcase
+	if _, exists := r.updatedProfileShowcaseContactIDs[contactID]; exists {
+		return
+	}
+
+	r.updatedProfileShowcaseContactIDs[contactID] = true
 }
 
-func (r *MessengerResponse) GetUpdatedProfileShowcases() []*identity.ProfileShowcase {
-	var showcases []*identity.ProfileShowcase
-	for _, showcase := range r.updatedProfileShowcases {
-		showcases = append(showcases, showcase)
+func (r *MessengerResponse) GetUpdatedProfileShowcaseContactIDs() []string {
+	var contactIDs []string
+	for contactID, _ := range r.updatedProfileShowcaseContactIDs {
+		contactIDs = append(contactIDs, contactID)
 	}
-	return showcases
+	return contactIDs
 }
 
 func (r *MessengerResponse) AddSeveralSeenAndUnseenMessages(messages []*SeenUnseenMessages) {
