@@ -3068,30 +3068,6 @@ func (m *Messenger) HandleCommunityEventsMessage(state *ReceivedMessageState, me
 	return m.handleCommunityResponse(state, communityResponse)
 }
 
-// Re-sends rejected events, if any.
-func (m *Messenger) HandleCommunityEventsMessageRejected(state *ReceivedMessageState, message *protobuf.CommunityEventsMessageRejected, statusMessage *v1protocol.StatusMessage) error {
-	signer := state.CurrentMessageState.PublicKey
-	reapplyEventsMessage, err := m.communitiesManager.HandleCommunityEventsMessageRejected(signer, message)
-	if err != nil {
-		return err
-	}
-	if reapplyEventsMessage == nil {
-		return nil
-	}
-
-	community, err := m.communitiesManager.GetByID(reapplyEventsMessage.CommunityID)
-	if err != nil {
-		return err
-	}
-
-	err = m.publishCommunityEvents(community, reapplyEventsMessage)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // HandleCommunityShardKey handles the private keys for the community shards
 func (m *Messenger) HandleCommunityShardKey(state *ReceivedMessageState, message *protobuf.CommunityShardKey, statusMessage *v1protocol.StatusMessage) error {
 	community, err := m.communitiesManager.GetByID(message.CommunityId)
