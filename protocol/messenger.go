@@ -2741,8 +2741,10 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 	}
 
 	m.allContacts.Range(func(contactID string, contact *Contact) bool {
-		if contact.ID != myID &&
-			(contact.LocalNickname != "" || contact.added() || contact.Blocked) {
+		if contact.ID == myID {
+			return true
+		}
+		if contact.LocalNickname != "" || contact.added() || contact.hasAddedUs() || contact.Blocked {
 			if err = m.syncContact(ctx, contact, rawMessageHandler); err != nil {
 				return false
 			}
