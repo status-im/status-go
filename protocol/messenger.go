@@ -2518,7 +2518,6 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			syncMessageType = peersyncing.SyncMessageCommunityType
 		} else if chat.PrivateGroupChat() {
 			syncMessageType = peersyncing.SyncMessagePrivateGroup
-
 		}
 
 		wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, rawMessage.Sender)

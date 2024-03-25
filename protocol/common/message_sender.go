@@ -761,7 +761,6 @@ func (s *MessageSender) unwrapDatasyncMessage(m *v1protocol.StatusMessage, respo
 	response.DatasyncSender = m.SigPubKey()
 	response.DatasyncAcks = append(response.DatasyncAcks, datasyncMessage.Acks...)
 	response.DatasyncRequests = append(response.DatasyncRequests, datasyncMessage.Requests...)
-	// TODO(alwx): peer syncing
 	for _, o := range datasyncMessage.GroupOffers {
 		for _, mID := range o.MessageIds {
 			response.DatasyncOffers = append(response.DatasyncOffers, DatasyncOffer{ChatID: o.GroupId, MessageID: mID})
