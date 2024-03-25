@@ -71,32 +71,25 @@ func (e *eventsProcessor) validateDescription() error {
 	return nil
 }
 
-// Filter invalid and outdated events.
-func (e *eventsProcessor) filterEvents() {
-	validateEvent := func(event *CommunityEvent) error {
-		if e.lastlyAppliedEvents != nil {
-			if clock, found := e.lastlyAppliedEvents[event.EventTypeID()]; found && clock >= event.CommunityEventClock {
-				return errors.New("event outdated")
-			}
+func (e *eventsProcessor) validateEvent(event *CommunityEvent) error {
+	if e.lastlyAppliedEvents != nil {
+		if clock, found := e.lastlyAppliedEvents[event.EventTypeID()]; found && clock >= event.CommunityEventClock {
+			return errors.New("event outdated")
 		}
-
-		signer, err := event.RecoverSigner()
-		if err != nil {
-			return err
-		}
-
-		err = e.community.validateEvent(event, signer)
-		if err != nil {
-			return err
-		}
-
-		return nil
 	}
 
-	for i := range e.message.Events {
-		event := e.message.Events[i]
+	signer, err := event.RecoverSigner()
+	if err != nil {
+		return err
+	}
 
-		if err := validateEvent(&event); err == nil {
+	return e.community.validateEvent(event, signer)
+}
+
+// Filter invalid and outdated events.
+func (e *eventsProcessor) filterEvents() {
+	for _, event := range e.message.Events {
+		if err := e.validateEvent(&event); err == nil {
 			e.eventsToApply = append(e.eventsToApply, event)
 		} else {
 			e.logger.Warn("invalid community event", zap.String("EventTypeID", event.EventTypeID()), zap.Uint64("clock", event.CommunityEventClock), zap.Error(err))
@@ -107,7 +100,17 @@ func (e *eventsProcessor) filterEvents() {
 // Merge message's events with community's events.
 func (e *eventsProcessor) mergeEvents() {
 	if e.community.config.EventsData != nil {
-		e.eventsToApply = append(e.eventsToApply, e.community.config.EventsData.Events...)
+		for _, event := range e.community.config.EventsData.Events {
+			if err := e.validateEvent(&event); err == nil {
+				e.eventsToApply = append(e.eventsToApply, event)
+			} else {
+				// NOTE: this should not happen, events should be validated before they are saved in the db.
+				// It has been identified that an invalid event is saved to the database for some reason.
+				// The code flow leading to this behavior is not yet known.
+				// https://github.com/status-im/status-desktop/issues/14106
+				e.logger.Error("invalid community event read from db", zap.String("EventTypeID", event.EventTypeID()), zap.Uint64("clock", event.CommunityEventClock), zap.Error(err))
+			}
+		}
 	}
 }
 
