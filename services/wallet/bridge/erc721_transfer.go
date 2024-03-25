@@ -98,6 +98,24 @@ func (s *ERC721TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwor
 	return uint64(increasedEstimation), nil
 }
 
+func (s *ERC721TransferBridge) BuildTx(network *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int) (*ethTypes.Transaction, error) {
+	toAddr := types.Address(toAddress)
+	sendArgs := &TransactionBridge{
+		ERC721TransferTx: &ERC721TransferTxArgs{
+			SendTxArgs: transactions.SendTxArgs{
+				From:  types.Address(fromAddress),
+				To:    &toAddr,
+				Value: (*hexutil.Big)(amountIn),
+				Data:  types.HexBytes("0x0"),
+			},
+			TokenID:   (*hexutil.Big)(big.NewInt(0)),
+			Recipient: toAddress,
+		},
+	}
+
+	return s.BuildTransaction(sendArgs)
+}
+
 func (s *ERC721TransferBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
 	ethClient, err := s.rpcClient.EthClient(sendArgs.ChainID)
 	if err != nil {
