@@ -106,15 +106,22 @@ func (m *Messenger) SaveSyncDisplayName(displayName string, clock uint64) error 
 		return err
 	}
 
+	preferredName, err := m.settings.GetPreferredUsername()
+	if err != nil {
+		return err
+	}
+
 	preferredNameClock, err := m.settings.GetSettingLastSynced(settings.PreferredName)
 	if err != nil {
 		return err
 	}
 	// When either the display name or preferred name changes, m.account.Name should be updated.
 	// However, a race condition can occur during BackupData, where m.account.Name could be incorrectly updated.
-	// The final value of m.account.Name depending on which backup message(BackedUpProfile/BackedUpSettings) arrives later.
+	// The final value of m.account.Name depends on which backup message(BackedUpProfile/BackedUpSettings) arrives later.
 	// So we should check the clock of the preferred name and only update m.account.Name if it's older than the display name.
-	if preferredNameClock < clock {
+	// Yet even if the preferred name clock is older, but the preferred name was empty, we should still update m.account.Name.
+
+	if preferredNameClock < clock || preferredName == "" {
 		m.account.Name = displayName
 		return m.multiAccounts.SaveAccount(*m.account)
 	}
