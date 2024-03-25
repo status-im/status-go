@@ -17,13 +17,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/bridge"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
-)
-
-const (
-	// EventMTTransactionUpdate is emitted when a multi-transaction is updated (added or deleted)
-	EventMTTransactionUpdate walletevent.EventType = "multi-transaction-update"
 )
 
 type SignatureDetails struct {
