@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	crand "crypto/rand"
@@ -15,6 +16,7 @@ import (
 
 	eth_common "github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
@@ -105,6 +107,48 @@ func (m *Messenger) validateCollectiblesOwnership(accounts []*identity.ProfileSh
 	}
 
 	return nil
+}
+
+func (m *Messenger) validateCommunitiesMembership(communities []*identity.ProfileShowcaseCommunity, contactPubKey *ecdsa.PublicKey) ([]*identity.ProfileShowcaseCommunity, error) {
+	validatedCommunities := []*identity.ProfileShowcaseCommunity{}
+
+	for _, communityEntry := range communities {
+		community, err := m.FetchCommunity(&FetchCommunityRequest{
+			CommunityKey:    communityEntry.CommunityID,
+			Shard:           nil,
+			TryDatabase:     true,
+			WaitForResponse: true,
+		})
+		if err != nil {
+			m.logger.Warn("failed to fetch community for profile entry ", zap.Error(err))
+		}
+
+		if community != nil && community.Encrypted() {
+			grant, err := community.VerifyGrantSignature(communityEntry.Grant)
+			if err != nil {
+				m.logger.Warn("failed to verify grant signature ", zap.Error(err))
+				communityEntry.MembershipStatus = identity.ProfileShowcaseMembershipStatusNotAMember
+			} else {
+				if grant != nil && bytes.Equal(grant.MemberId, crypto.CompressPubkey(contactPubKey)) {
+					communityEntry.MembershipStatus = identity.ProfileShowcaseMembershipStatusProvenMember
+				} else { // Show as not a member if membership can't be proven
+					communityEntry.MembershipStatus = identity.ProfileShowcaseMembershipStatusNotAMember
+				}
+			}
+		} else if community != nil {
+			// Use member list as a proof for unecrypted communities
+			if community.HasMember(contactPubKey) {
+				communityEntry.MembershipStatus = identity.ProfileShowcaseMembershipStatusProvenMember
+			} else {
+				communityEntry.MembershipStatus = identity.ProfileShowcaseMembershipStatusNotAMember
+			}
+		} else {
+			communityEntry.MembershipStatus = identity.ProfileShowcaseMembershipStatusUnproven
+		}
+		validatedCommunities = append(validatedCommunities, communityEntry)
+	}
+
+	return validatedCommunities, nil
 }
 
 func (m *Messenger) toProfileShowcaseCommunityProto(preferences []*identity.ProfileShowcaseCommunityPreference, visibility identity.ProfileShowcaseVisibility) []*protobuf.ProfileShowcaseCommunity {
@@ -236,6 +280,7 @@ func (m *Messenger) fromProfileShowcaseCommunityProto(senderPubKey *ecdsa.Public
 		entry := &identity.ProfileShowcaseCommunity{
 			CommunityID: message.CommunityId,
 			Order:       int(message.Order),
+			Grant:       message.Grant,
 		}
 
 		entries = append(entries, entry)
@@ -356,8 +401,22 @@ func (m *Messenger) GetProfileShowcasePreferences() (*identity.ProfileShowcasePr
 }
 
 func (m *Messenger) GetProfileShowcaseForContact(contactID string) (*identity.ProfileShowcase, error) {
-	// TODO: validate & fetch profile showcase entities here
-	return m.persistence.GetProfileShowcaseForContact(contactID)
+	profileShowcase, err := m.persistence.GetProfileShowcaseForContact(contactID)
+	if err != nil {
+		return nil, err
+	}
+
+	contactPubKey, err := common.HexToPubkey(contactID)
+	if err != nil {
+		return nil, err
+	}
+
+	profileShowcase.Communities, err = m.validateCommunitiesMembership(profileShowcase.Communities, contactPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return profileShowcase, nil
 }
 
 func (m *Messenger) GetProfileShowcaseAccountsByAddress(address string) ([]*identity.ProfileShowcaseAccount, error) {

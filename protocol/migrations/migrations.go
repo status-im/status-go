@@ -130,6 +130,7 @@
 // 1709805967_simplify_profile_showcase_preferences.up.sql (701B)
 // 1709828431_add_community_description_cache.up.sql (730B)
 // 1710331283_add_bio_to_contacts.up.sql (42B)
+// 1711389881_add_profile_showcase_community_grant.up.sql (86B)
 // README.md (554B)
 // doc.go (870B)
 
@@ -2799,6 +2800,26 @@ func _1710331283_add_bio_to_contactsUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1711389881_add_profile_showcase_community_grantUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\x41\x0e\x02\x21\x0c\x05\xd0\xbd\xa7\xf8\xf7\x70\x55\x04\x57\x75\x26\x31\xb0\x26\xa4\x41\x25\x71\xa8\xa1\x35\x5e\xdf\x47\x9c\xd3\x1d\x99\x02\x27\x7c\x96\x3e\xc6\xbb\x57\x7b\xe9\x4f\x9a\xf5\x2a\x7a\x1c\xdf\x39\x7c\x74\xab\xa2\xd3\x9b\xb8\x81\x62\xc4\x65\xe7\x72\xdb\xf0\x5c\x6d\x3a\x02\xef\x01\x31\x5d\xa9\x70\xc6\x56\x98\xcf\xa7\x7f\x00\x00\x00\xff\xff\x50\x71\xc8\xa0\x56\x00\x00\x00")
+
+func _1711389881_add_profile_showcase_community_grantUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1711389881_add_profile_showcase_community_grantUpSql,
+		"1711389881_add_profile_showcase_community_grant.up.sql",
+	)
+}
+
+func _1711389881_add_profile_showcase_community_grantUpSql() (*asset, error) {
+	bytes, err := _1711389881_add_profile_showcase_community_grantUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1711389881_add_profile_showcase_community_grant.up.sql", size: 86, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x45, 0x39, 0x37, 0xf3, 0x6a, 0xb, 0xb8, 0x38, 0x8, 0xcb, 0x62, 0xe1, 0x5b, 0xf2, 0xc, 0x6c, 0xf2, 0xa3, 0x5c, 0xeb, 0x22, 0x4f, 0x6c, 0xe1, 0x56, 0xd1, 0xd1, 0x3, 0xf9, 0x6d, 0x5e, 0x69}}
+	return a, nil
+}
+
 var _readmeMd = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x54\x91\xc1\xce\xd3\x30\x10\x84\xef\x7e\x8a\x91\x7a\x01\xa9\x2a\x8f\xc0\x0d\x71\x82\x03\x48\x1c\xc9\x36\x9e\x36\x96\x1c\x6f\xf0\xae\x93\xe6\xed\x91\xa3\xc2\xdf\xff\x66\xed\xd8\x33\xdf\x78\x4f\xa7\x13\xbe\xea\x06\x57\x6c\x35\x39\x31\xa7\x7b\x15\x4f\x5a\xec\x73\x08\xbf\x08\x2d\x79\x7f\x4a\x43\x5b\x86\x17\xfd\x8c\x21\xea\x56\x5e\x47\x90\x4a\x14\x75\x48\xde\x64\x37\x2c\x6a\x96\xae\x99\x48\x05\xf6\x27\x77\x13\xad\x08\xae\x8a\x51\xe7\x25\xf3\xf1\xa9\x9f\xf9\x58\x58\x2c\xad\xbc\xe0\x8b\x56\xf0\x21\x5d\xeb\x4c\x95\xb3\xae\x84\x60\xd4\xdc\xe6\x82\x5d\x1b\x36\x6d\x39\x62\x92\xf5\xb8\x11\xdb\x92\xd3\x28\xce\xe0\x13\xe1\x72\xcd\x3c\x63\xd4\x65\x87\xae\xac\xe8\xc3\x28\x2e\x67\x44\x66\x3a\x21\x25\xa2\x72\xac\x14\x67\xbc\x84\x9f\x53\x32\x8c\x52\x70\x25\x56\xd6\xfd\x8d\x05\x37\xad\x30\x9d\x9f\xa6\x86\x0f\xcd\x58\x7f\xcf\x34\x93\x3b\xed\x90\x9f\xa4\x1f\xcf\x30\x85\x4d\x07\x58\xaf\x7f\x25\xc4\x9d\xf3\x72\x64\x84\xd0\x7f\xf9\x9b\x3a\x2d\x84\xef\x85\x48\x66\x8d\xd8\x88\x9b\x8c\x8c\x98\x5b\xf6\x74\x14\x4e\x33\x0d\xc9\xe0\x93\x38\xda\x12\xc5\x69\xbd\xe4\xf0\x2e\x7a\x78\x07\x1c\xfe\x13\x9f\x91\x29\x31\x95\x7b\x7f\x62\x59\x37\xb4\xe5\x5e\x25\xfe\x33\xee\xd5\x53\x71\xd6\xda\x3a\xd8\xcb\xde\x2e\xf8\xa1\x90\x55\x53\x0c\xc7\xaa\x0d\xe9\x76\x14\x29\x1c\x7b\x68\xdd\x2f\xe1\x6f\x00\x00\x00\xff\xff\x3c\x0a\xc2\xfe\x2a\x02\x00\x00")
 
 func readmeMdBytes() ([]byte, error) {
@@ -3060,8 +3081,9 @@ var _bindata = map[string]func() (*asset, error){
 	"1709805967_simplify_profile_showcase_preferences.up.sql":                     _1709805967_simplify_profile_showcase_preferencesUpSql,
 	"1709828431_add_community_description_cache.up.sql":                           _1709828431_add_community_description_cacheUpSql,
 	"1710331283_add_bio_to_contacts.up.sql":                                       _1710331283_add_bio_to_contactsUpSql,
-	"README.md":                                                                   readmeMd,
-	"doc.go":                                                                      docGo,
+	"1711389881_add_profile_showcase_community_grant.up.sql":                      _1711389881_add_profile_showcase_community_grantUpSql,
+	"README.md": readmeMd,
+	"doc.go":    docGo,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -3240,8 +3262,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1709805967_simplify_profile_showcase_preferences.up.sql":                     {_1709805967_simplify_profile_showcase_preferencesUpSql, map[string]*bintree{}},
 	"1709828431_add_community_description_cache.up.sql":                           {_1709828431_add_community_description_cacheUpSql, map[string]*bintree{}},
 	"1710331283_add_bio_to_contacts.up.sql":                                       {_1710331283_add_bio_to_contactsUpSql, map[string]*bintree{}},
-	"README.md":                                                                   {readmeMd, map[string]*bintree{}},
-	"doc.go":                                                                      {docGo, map[string]*bintree{}},
+	"1711389881_add_profile_showcase_community_grant.up.sql":                      {_1711389881_add_profile_showcase_community_grantUpSql, map[string]*bintree{}},
+	"README.md": {readmeMd, map[string]*bintree{}},
+	"doc.go":    {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
