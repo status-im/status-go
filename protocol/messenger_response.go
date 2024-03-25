@@ -890,7 +890,7 @@ func (r *MessengerResponse) AddUpdatedProfileShowcaseContactID(contactID string)
 
 func (r *MessengerResponse) GetUpdatedProfileShowcaseContactIDs() []string {
 	var contactIDs []string
-	for contactID, _ := range r.updatedProfileShowcaseContactIDs {
+	for contactID := range r.updatedProfileShowcaseContactIDs {
 		contactIDs = append(contactIDs, contactID)
 	}
 	return contactIDs
