@@ -211,9 +211,6 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
            case protobuf.ApplicationMetadataMessage_SYNC_ACCOUNTS_POSITIONS:
 		return m.handleSyncAccountsPositionsProtobuf(messageState, protoBytes, msg, filter)
         
-           case protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE_REJECTED:
-		return m.handleCommunityEventsMessageRejectedProtobuf(messageState, protoBytes, msg, filter)
-        
            case protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE:
 		return m.handleCommunityPrivilegedUserSyncMessageProtobuf(messageState, protoBytes, msg, filter)
         
@@ -1529,24 +1526,6 @@ func (m *Messenger) handleSyncAccountsPositionsProtobuf(messageState *ReceivedMe
 	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.ApplicationLayer.Type, p)
 
 	return m.HandleSyncAccountsPositions(messageState, p, msg)
-	
-}
-
-
-func (m *Messenger) handleCommunityEventsMessageRejectedProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
-	m.logger.Info("handling CommunityEventsMessageRejected")
-	
-
-	
-	p := &protobuf.CommunityEventsMessageRejected{}
-	err := proto.Unmarshal(protoBytes, p)
-	if err != nil {
-		return err
-	}
-
-	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.ApplicationLayer.Type, p)
-
-	return m.HandleCommunityEventsMessageRejected(messageState, p, msg)
 	
 }
 

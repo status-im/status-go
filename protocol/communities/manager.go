@@ -1949,34 +1949,6 @@ func (m *Manager) signEvents(community *Community) error {
 	return nil
 }
 
-func (m *Manager) validateAndFilterEvents(community *Community, events []CommunityEvent) []CommunityEvent {
-	validatedEvents := make([]CommunityEvent, 0, len(events))
-
-	validateEvent := func(event *CommunityEvent) error {
-		signer, err := event.RecoverSigner()
-		if err != nil {
-			return err
-		}
-
-		err = community.ValidateEvent(event, signer)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	for i := range events {
-		if err := validateEvent(&events[i]); err == nil {
-			validatedEvents = append(validatedEvents, events[i])
-		} else {
-			m.logger.Warn("invalid community event", zap.Error(err))
-		}
-	}
-
-	return validatedEvents
-}
-
 func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message *protobuf.CommunityEventsMessage) (*CommunityResponse, error) {
 	if signer == nil {
 		return nil, errors.New("signer can't be nil")
@@ -2065,62 +2037,6 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		Changes:        EvaluateCommunityChanges(originCommunity, community),
 		RequestsToJoin: additionalCommunityResponse.RequestsToJoin,
 	}, nil
-}
-
-// Creates new CommunityEventsMessage by re-applying our rejected events on top of latest known CommunityDescription.
-// Returns nil if none of our events were rejected.
-func (m *Manager) HandleCommunityEventsMessageRejected(signer *ecdsa.PublicKey, message *protobuf.CommunityEventsMessageRejected) (*CommunityEventsMessage, error) {
-	if signer == nil {
-		return nil, errors.New("signer can't be nil")
-	}
-
-	id := crypto.CompressPubkey(signer)
-	community, err := m.GetByID(id)
-	if err != nil {
-		return nil, err
-	}
-
-	eventsMessage, err := CommunityEventsMessageFromProtobuf(message.Msg)
-	if err != nil {
-		return nil, err
-	}
-
-	communityDescription, err := validateAndGetEventsMessageCommunityDescription(eventsMessage.EventsBaseCommunityDescription, signer)
-	if err != nil {
-		return nil, err
-	}
-	// the privileged member did not receive updated CommunityDescription so his events
-	// will be send on top of outdated CommunityDescription
-	if communityDescription.Clock != community.Clock() {
-		return nil, errors.New("resend rejected community events aborted, client node has outdated community description")
-	}
-
-	eventsMessage.Events = m.validateAndFilterEvents(community, eventsMessage.Events)
-
-	myRejectedEvents := make([]CommunityEvent, 0)
-	for _, rejectedEvent := range eventsMessage.Events {
-		rejectedEventSigner, err := rejectedEvent.RecoverSigner()
-		if err != nil {
-			continue
-		}
-
-		if rejectedEventSigner.Equal(m.identity.Public()) {
-			myRejectedEvents = append(myRejectedEvents, rejectedEvent)
-		}
-	}
-
-	if len(myRejectedEvents) == 0 {
-		return nil, nil
-	}
-
-	// Re-apply rejected events on top of latest known `CommunityDescription`
-	community.config.EventsData = &EventsData{
-		EventsBaseCommunityDescription: community.config.CommunityDescriptionProtocolMessage,
-		Events:                         myRejectedEvents,
-	}
-	reapplyEventsMessage := community.toCommunityEventsMessage()
-
-	return reapplyEventsMessage, nil
 }
 
 func (m *Manager) handleAdditionalAdminChanges(community *Community) (*CommunityResponse, error) {
