@@ -11,8 +11,8 @@ type SyncMessagePersistence interface {
 	Add(SyncMessage) error
 	All() ([]SyncMessage, error)
 	Complement([]SyncMessage) ([]SyncMessage, error)
-	ByGroupID([]byte, int) ([]SyncMessage, error)
-	ByGroupIDs([][]byte, int) ([]SyncMessage, error)
+	ByChatID([]byte, int) ([]SyncMessage, error)
+	ByChatIDs([][]byte, int) ([]SyncMessage, error)
 	ByMessageIDs([][]byte) ([]SyncMessage, error)
 }
 
@@ -54,7 +54,7 @@ func (p *SyncMessageSQLitePersistence) All() ([]SyncMessage, error) {
 	return messages, nil
 }
 
-func (p *SyncMessageSQLitePersistence) ByGroupID(groupID []byte, limit int) ([]SyncMessage, error) {
+func (p *SyncMessageSQLitePersistence) ByChatID(groupID []byte, limit int) ([]SyncMessage, error) {
 	var messages []SyncMessage
 	rows, err := p.db.Query(`SELECT id, type, group_id, payload, timestamp FROM peersyncing_messages WHERE group_id = ? ORDER BY timestamp DESC LIMIT ?`, groupID, limit)
 	if err != nil {
@@ -120,7 +120,7 @@ func (p *SyncMessageSQLitePersistence) Complement(messages []SyncMessage) ([]Syn
 	return complement, nil
 }
 
-func (p *SyncMessageSQLitePersistence) ByGroupIDs(ids [][]byte, limit int) ([]SyncMessage, error) {
+func (p *SyncMessageSQLitePersistence) ByChatIDs(ids [][]byte, limit int) ([]SyncMessage, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}

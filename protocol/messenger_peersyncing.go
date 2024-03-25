@@ -22,7 +22,7 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
-var peerSyncingLoopInterval time.Duration = 60 * time.Second
+var peerSyncingLoopInterval = 60 * time.Second
 var maxAdvertiseMessages = 40
 
 func (m *Messenger) markDeliveredMessages(acks [][]byte) {
@@ -118,12 +118,30 @@ func (m *Messenger) sendDatasyncOffers() error {
 		return nil
 	}
 
-	communities, err := m.communitiesManager.Joined()
+	err = m.sendDatasyncOffersForCommunities()
 	if err != nil {
 		return err
 	}
 
-	for _, community := range communities {
+	err = m.sendDatasyncOffersForChats()
+	if err != nil {
+		return err
+	}
+
+	// Check all the group ids that need to be on offer
+	// Get all the messages that need to be offered
+	// Prepare datasync messages
+	// Dispatch them to the right group
+	return nil
+}
+
+func (m *Messenger) sendDatasyncOffersForCommunities() error {
+	joinedCommunities, err := m.communitiesManager.Joined()
+	if err != nil {
+		return err
+	}
+
+	for _, community := range joinedCommunities {
 		var chatIDs [][]byte
 		for id := range community.Chats() {
 			chatIDs = append(chatIDs, []byte(community.IDString()+id))
@@ -133,22 +151,22 @@ func (m *Messenger) sendDatasyncOffers() error {
 			continue
 		}
 
-		availableMessages, err := m.peersyncing.AvailableMessagesByGroupIDs(chatIDs, maxAdvertiseMessages)
+		availableMessages, err := m.peersyncing.AvailableMessagesByChatIDs(chatIDs, maxAdvertiseMessages)
 		if err != nil {
 			return err
 		}
 		availableMessagesMap := make(map[string][][]byte)
 		for _, m := range availableMessages {
-			groupID := types.Bytes2Hex(m.ChatID)
-			availableMessagesMap[groupID] = append(availableMessagesMap[groupID], m.ID)
+			chatID := types.Bytes2Hex(m.ChatID)
+			availableMessagesMap[chatID] = append(availableMessagesMap[chatID], m.ID)
 		}
 
 		datasyncMessage := &datasyncproto.Payload{}
 		if len(availableMessages) == 0 {
 			continue
 		}
-		for groupID, m := range availableMessagesMap {
-			datasyncMessage.GroupOffers = append(datasyncMessage.GroupOffers, &datasyncproto.Offer{GroupId: types.Hex2Bytes(groupID), MessageIds: m})
+		for chatID, m := range availableMessagesMap {
+			datasyncMessage.GroupOffers = append(datasyncMessage.GroupOffers, &datasyncproto.Offer{GroupId: types.Hex2Bytes(chatID), MessageIds: m})
 		}
 		payload, err := proto.Marshal(datasyncMessage)
 		if err != nil {
@@ -164,12 +182,48 @@ func (m *Messenger) sendDatasyncOffers() error {
 		if err != nil {
 			return err
 		}
-
 	}
-	// Check all the group ids that need to be on offer
-	// Get all the messages that need to be offered
-	// Prepare datasync messages
-	// Dispatch them to the right group
+	return nil
+}
+
+func (m *Messenger) sendDatasyncOffersForChats() error {
+	for _, chat := range m.Chats() {
+		availableMessages, err := m.peersyncing.AvailableMessagesByChatID([]byte(chat.ID), maxAdvertiseMessages)
+		if err != nil {
+			return err
+		}
+		availableMessagesMap := make(map[string][][]byte)
+		for _, m := range availableMessages {
+			chatID := types.Bytes2Hex(m.ChatID)
+			availableMessagesMap[chatID] = append(availableMessagesMap[chatID], m.ID)
+		}
+
+		datasyncMessage := &datasyncproto.Payload{}
+		if len(availableMessages) == 0 {
+			continue
+		}
+		for chatID, m := range availableMessagesMap {
+			datasyncMessage.GroupOffers = append(datasyncMessage.GroupOffers, &datasyncproto.Offer{GroupId: types.Hex2Bytes(chatID), MessageIds: m})
+		}
+		payload, err := proto.Marshal(datasyncMessage)
+		if err != nil {
+			return err
+		}
+
+		publicKey, err := chat.PublicKey()
+		if err != nil {
+			return err
+		}
+		rawMessage := common.RawMessage{
+			Payload:             payload,
+			Ephemeral:           true,
+			SkipApplicationWrap: true,
+		}
+		_, err = m.sender.SendPrivate(context.Background(), publicKey, &rawMessage)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -231,7 +285,6 @@ func (m *Messenger) OnDatasyncOffer(response *common.HandleMessageResponse) erro
 	return nil
 }
 
-// TODO(alwx): peer syncing
 // canSyncMessageWith checks the permission of a message
 func (m *Messenger) canSyncMessageWith(message peersyncing.SyncMessage, peer *ecdsa.PublicKey) (bool, error) {
 	switch message.Type {

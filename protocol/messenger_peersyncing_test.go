@@ -140,6 +140,8 @@ func (s *MessengerPeersyncingSuite) thirdPartyTest(community *communities.Commun
 
 	s.joinCommunity(community, s.owner, s.bob)
 
+	// TODO(alwx): test needs to be written
+
 	// Bob should now send an offer
 	_, err = WaitOnMessengerResponse(
 		s.bob,

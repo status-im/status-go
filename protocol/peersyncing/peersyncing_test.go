@@ -29,13 +29,13 @@ func (s *PeerSyncingSuite) SetupTest() {
 	s.p = New(Config{Database: db})
 }
 
-var testGroupID = []byte("group-id")
+var testCommunityID = []byte("community-id")
 
 func (s *PeerSyncingSuite) TestBasic() {
 
 	syncMessage := SyncMessage{
 		ID:        []byte("test-id"),
-		ChatID:    testGroupID,
+		ChatID:    testCommunityID,
 		Type:      SyncMessageCommunityType,
 		Payload:   []byte("test"),
 		Timestamp: 1,
@@ -48,19 +48,19 @@ func (s *PeerSyncingSuite) TestBasic() {
 	s.Require().NoError(err)
 	s.Require().Len(allMessages, 1)
 
-	byGroupID, err := s.p.AvailableMessagesByGroupID(syncMessage.ChatID, 10)
+	byGroupID, err := s.p.AvailableMessagesByChatID(syncMessage.ChatID, 10)
 
 	s.Require().NoError(err)
 	s.Require().Len(byGroupID, 1)
 
-	byGroupID, err = s.p.AvailableMessagesByGroupID([]byte("random-group-id"), 10)
+	byGroupID, err = s.p.AvailableMessagesByChatID([]byte("random-group-id"), 10)
 
 	s.Require().NoError(err)
 	s.Require().Len(byGroupID, 0)
 
 	newSyncMessage := SyncMessage{
 		ID:        []byte("test-id-2"),
-		ChatID:    testGroupID,
+		ChatID:    testCommunityID,
 		Type:      SyncMessageCommunityType,
 		Payload:   []byte("test-2"),
 		Timestamp: 2,
@@ -77,7 +77,7 @@ func (s *PeerSyncingSuite) TestOrderAndLimit() {
 
 	syncMessage1 := SyncMessage{
 		ID:        []byte("test-id-1"),
-		ChatID:    testGroupID,
+		ChatID:    testCommunityID,
 		Type:      SyncMessageCommunityType,
 		Payload:   []byte("test"),
 		Timestamp: 1,
@@ -85,7 +85,7 @@ func (s *PeerSyncingSuite) TestOrderAndLimit() {
 
 	syncMessage2 := SyncMessage{
 		ID:        []byte("test-id-2"),
-		ChatID:    testGroupID,
+		ChatID:    testCommunityID,
 		Type:      SyncMessageCommunityType,
 		Payload:   []byte("test"),
 		Timestamp: 2,
@@ -93,7 +93,7 @@ func (s *PeerSyncingSuite) TestOrderAndLimit() {
 
 	syncMessage3 := SyncMessage{
 		ID:        []byte("test-id-3"),
-		ChatID:    testGroupID,
+		ChatID:    testCommunityID,
 		Type:      SyncMessageCommunityType,
 		Payload:   []byte("test"),
 		Timestamp: 3,
@@ -101,7 +101,7 @@ func (s *PeerSyncingSuite) TestOrderAndLimit() {
 
 	syncMessage4 := SyncMessage{
 		ID:        []byte("test-id-4"),
-		ChatID:    testGroupID,
+		ChatID:    testCommunityID,
 		Type:      SyncMessageCommunityType,
 		Payload:   []byte("test"),
 		Timestamp: 4,
@@ -112,7 +112,7 @@ func (s *PeerSyncingSuite) TestOrderAndLimit() {
 	s.Require().NoError(s.p.Add(syncMessage3))
 	s.Require().NoError(s.p.Add(syncMessage4))
 
-	byGroupID, err := s.p.AvailableMessagesByGroupID(testGroupID, 10)
+	byGroupID, err := s.p.AvailableMessagesByChatID(testCommunityID, 10)
 
 	s.Require().NoError(err)
 	s.Require().Len(byGroupID, 4)
@@ -122,7 +122,7 @@ func (s *PeerSyncingSuite) TestOrderAndLimit() {
 	s.Require().Equal(syncMessage3.ID, byGroupID[1].ID)
 	s.Require().Equal(syncMessage4.ID, byGroupID[0].ID)
 
-	byGroupID, err = s.p.AvailableMessagesByGroupID(testGroupID, 3)
+	byGroupID, err = s.p.AvailableMessagesByChatID(testCommunityID, 3)
 
 	s.Require().NoError(err)
 	s.Require().Len(byGroupID, 3)
