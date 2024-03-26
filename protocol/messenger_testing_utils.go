@@ -16,8 +16,6 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	waku2 "github.com/status-im/status-go/wakuv2"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/protocol/common"
@@ -391,7 +389,7 @@ func RandomColor() string {
 }
 
 func RandomCommunityTags(count int) []string {
-	all := maps.Keys(requests.TagsEmojies)
+	all := requests.Tags
 	tags := make([]string, 0, count)
 	indexes := map[int]struct{}{}
 

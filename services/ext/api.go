@@ -408,7 +408,7 @@ func (api *PublicAPI) IsDisplayNameDupeOfCommunityMember(name string) (bool, err
 
 // CommunityTags return the list of possible community tags
 func (api *PublicAPI) CommunityTags(parent context.Context) map[string]string {
-	return requests.TagsEmojies
+	return requests.TagsEmojis
 }
 
 // CuratedCommunities returns the list of curated communities stored in the smart contract. If a community is

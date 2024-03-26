@@ -450,19 +450,20 @@ func (o *Community) CommunityTokensMetadata() []*protobuf.CommunityTokenMetadata
 }
 
 func (o *Community) Tags() []CommunityTag {
-	if o != nil &&
-		o.config != nil &&
-		o.config.CommunityDescription != nil {
-		var result []CommunityTag
-		for _, t := range o.config.CommunityDescription.Tags {
-			result = append(result, CommunityTag{
-				Name:  t,
-				Emoji: requests.TagsEmojies[t],
-			})
-		}
-		return result
+	if o == nil ||
+		o.config == nil ||
+		o.config.CommunityDescription == nil {
+		return nil
 	}
-	return nil
+
+	result := make([]CommunityTag, 0, len(o.config.CommunityDescription.Tags))
+	for _, t := range o.config.CommunityDescription.Tags {
+		result = append(result, CommunityTag{
+			Name:  t,
+			Emoji: requests.TagsEmojis[t],
+		})
+	}
+	return result
 }
 
 func (o *Community) TagsRaw() []string {
@@ -470,17 +471,10 @@ func (o *Community) TagsRaw() []string {
 }
 
 func (o *Community) TagsIndices() []uint32 {
-	indices := []uint32{}
+	var indices []uint32
 	for _, t := range o.config.CommunityDescription.Tags {
-		i := uint32(0)
-		for k := range requests.TagsEmojies {
-			if k == t {
-				indices = append(indices, i)
-			}
-			i++
-		}
+		indices = append(indices, requests.TagsIndices[t])
 	}
-
 	return indices
 }
 
