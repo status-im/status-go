@@ -106,4 +106,5 @@ type Bridge interface {
 	Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error)
 	GetContractAddress(network *params.Network, token *token.Token) *common.Address
 	BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error)
+	ValidateTransaction(sendArgs *TransactionBridge) error
 }

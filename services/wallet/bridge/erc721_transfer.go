@@ -142,3 +142,10 @@ func (s *ERC721TransferBridge) CalculateAmountOut(from, to *params.Network, amou
 func (s *ERC721TransferBridge) GetContractAddress(network *params.Network, token *token.Token) *common.Address {
 	return &token.Address
 }
+
+func (s *ERC721TransferBridge) ValidateTransaction(sendArgs *TransactionBridge) error {
+	if sendArgs.ERC721TransferTx == nil {
+		return fmt.Errorf("erc721 transfer transaction is nil")
+	}
+	return nil
+}

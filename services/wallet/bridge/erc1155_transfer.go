@@ -149,3 +149,10 @@ func (s *ERC1155TransferBridge) CalculateAmountOut(from, to *params.Network, amo
 func (s *ERC1155TransferBridge) GetContractAddress(network *params.Network, token *token.Token) *common.Address {
 	return &token.Address
 }
+
+func (s *ERC1155TransferBridge) ValidateTransaction(sendArgs *TransactionBridge) error {
+	if sendArgs.ERC1155TransferTx == nil {
+		return fmt.Errorf("erc1155 transfer transaction is nil")
+	}
+	return nil
+}
