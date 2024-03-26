@@ -266,6 +266,11 @@ func (c *Controller) cleanUpRemovedAccount(address common.Address) {
 	if err != nil {
 		log.Error("Failed to delete blocks ranges sequential", "error", err)
 	}
+
+	err = c.transactionManager.removeMultiTransactionByAddress(address)
+	if err != nil {
+		log.Error("Failed to delete multitransactions", "error", err)
+	}
 }
 
 func (c *Controller) cleanupAccountsLeftovers() error {

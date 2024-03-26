@@ -458,3 +458,67 @@ func (tm *TransactionManager) getVerifiedWalletAccount(address, password string)
 		AccountKey: key,
 	}, nil
 }
+
+func (tm *TransactionManager) removeMultiTransactionByAddress(address common.Address) error {
+	// We must not remove those transactions, where from_address and to_address are different and both are stored in accounts DB
+	// and one of them is equal to the address, as we want to keep the records for the other address
+	// That is why we don't use cascade delete here with references to transfers table, as we might have 2 records in multi_transactions
+	// for the same transaction, one for each address
+
+	stmt, err := tm.db.Prepare(`SELECT rowid, from_address, to_address
+								FROM multi_transactions
+								WHERE from_address=? OR to_address=?`)
+	if err != nil {
+		return err
+	}
+
+	rows, err := stmt.Query(address, address)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	rowIDs := make([]int, 0)
+	rowID, fromAddress, toAddress := 0, common.Address{}, common.Address{}
+	for rows.Next() {
+		err = rows.Scan(&rowID, &fromAddress, &toAddress)
+		if err != nil {
+			log.Error("Failed to scan row", "error", err)
+			continue
+		}
+
+		// Remove self transactions as well, leave only those where we have the counterparty in accounts DB
+		if fromAddress != toAddress {
+			// If both addresses are stored in accounts DB, we don't remove the record
+			var addressToCheck common.Address
+			if fromAddress == address {
+				addressToCheck = toAddress
+			} else {
+				addressToCheck = fromAddress
+			}
+			counterpartyExists, err := tm.accountsDB.AddressExists(types.Address(addressToCheck))
+			if err != nil {
+				log.Error("Failed to query accounts db for a given address", "address", address, "error", err)
+				continue
+			}
+
+			// Skip removal if counterparty is in accounts DB and removed address is not sender
+			if counterpartyExists && address != fromAddress {
+				continue
+			}
+		}
+
+		rowIDs = append(rowIDs, rowID)
+	}
+
+	if len(rowIDs) > 0 {
+		for _, rowID := range rowIDs {
+			_, err = tm.db.Exec(`DELETE FROM multi_transactions WHERE rowid=?`, rowID)
+			if err != nil {
+				log.Error("Failed to remove multitransaction", "rowid", rowID, "error", err)
+			}
+		}
+	}
+
+	return err
+}
