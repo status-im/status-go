@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	mathRand "math/rand"
 	"sync"
 	"time"
 
@@ -15,8 +16,6 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	waku2 "github.com/status-im/status-go/wakuv2"
-
-	"golang.org/x/exp/maps"
 
 	"github.com/stretchr/testify/suite"
 
@@ -391,20 +390,20 @@ func RandomColor() string {
 }
 
 func RandomCommunityTags(count int) []string {
-	all := maps.Keys(requests.TagsEmojies)
-	tags := make([]string, 0, count)
-	indexes := map[int]struct{}{}
+	availableTagsCount := requests.AvailableTagsCount()
 
-	for len(indexes) != count {
-		index := randomInt(len(all))
-		indexes[index] = struct{}{}
+	if count > availableTagsCount {
+		count = availableTagsCount
 	}
 
-	for index := range indexes {
-		tags = append(tags, all[index])
+	//source := mathRand.New(mathRand.NewSource(time.Now().UnixNano()))
+	indices := mathRand.Perm(availableTagsCount)
+	shuffled := make([]string, count)
+	for i := 0; i < count; i++ {
+		shuffled[i] = requests.TagByIndex(uint32(indices[i]))
 	}
 
-	return tags
+	return shuffled
 }
 
 func RandomBytes(length int) []byte {

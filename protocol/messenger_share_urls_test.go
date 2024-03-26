@@ -41,9 +41,10 @@ func (s *MessengerShareUrlsSuite) createCommunity() *communities.Community {
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
+		Tags:        RandomCommunityTags(3),
 	}
 
-	// Create an community chat
+	// Create a community chat
 	response, err := s.m.CreateCommunity(description, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -245,6 +246,13 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithData() {
 
 	expectedURL := fmt.Sprintf("%s/c/%s#%s", baseShareURL, communityData, chatKey)
 	s.Require().Equal(expectedURL, url)
+
+	response, err := ParseSharedURL(url)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().NotNil(response.Community)
+	s.Require().Equal(community.IDString(), response.Community.CommunityID)
+	s.Require().Equal(community.TagsIndices(), response.Community.TagIndices)
 }
 
 func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
