@@ -94,6 +94,8 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	s.ShowCommunityAssetWhenSendingTokens = true
 	s.DisplayAssetsBelowBalance = false
 
+	s.TestNetworksEnabled = false
+
 	return s, nil
 }
 

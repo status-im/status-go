@@ -40,6 +40,8 @@ type CreateAccount struct {
 	CurrentNetwork string `json:"currentNetwork"`
 	NetworkID      uint64 `json:"networkId"`
 
+	TestNetworksEnabled bool `json:"testNetworksEnabled"`
+
 	WalletSecretsConfig
 }
 
