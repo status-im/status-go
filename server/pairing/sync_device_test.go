@@ -67,19 +67,15 @@ func TestSyncDeviceSuite(t *testing.T) {
 
 type SyncDeviceSuite struct {
 	suite.Suite
-	logger                 *zap.Logger
-	password               string
-	clientAsSenderTmpdir   string
-	clientAsReceiverTmpdir string
-	pairThreeDevicesTmpdir string
+	logger   *zap.Logger
+	password string
+	tmpdir   string
 }
 
 func (s *SyncDeviceSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 	s.password = "password"
-	s.clientAsSenderTmpdir = s.T().TempDir()
-	s.clientAsReceiverTmpdir = s.T().TempDir()
-	s.pairThreeDevicesTmpdir = s.T().TempDir()
+	s.tmpdir = s.T().TempDir()
 }
 
 func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *api.GethStatusBackend {
@@ -280,9 +276,9 @@ func (s *SyncDeviceSuite) checkMutualContact(backend *api.GethStatusBackend, con
 }
 
 func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
-	clientTmpDir := filepath.Join(s.clientAsSenderTmpdir, "client")
+	clientTmpDir := filepath.Join(s.tmpdir, "client")
 	clientBackend := s.prepareBackendWithAccount("", clientTmpDir)
-	serverTmpDir := filepath.Join(s.clientAsSenderTmpdir, "server")
+	serverTmpDir := filepath.Join(s.tmpdir, "server")
 	serverBackend := s.prepareBackendWithoutAccount(serverTmpDir)
 	defer func() {
 		require.NoError(s.T(), serverBackend.Logout())
@@ -408,11 +404,11 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 }
 
 func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
-	clientTmpDir := filepath.Join(s.clientAsReceiverTmpdir, "client")
+	clientTmpDir := filepath.Join(s.tmpdir, "client")
 	clientBackend := s.prepareBackendWithoutAccount(clientTmpDir)
 	ctx := context.TODO()
 
-	serverTmpDir := filepath.Join(s.clientAsReceiverTmpdir, "server")
+	serverTmpDir := filepath.Join(s.tmpdir, "server")
 	serverBackend := s.prepareBackendWithAccount("", serverTmpDir)
 	defer func() {
 		require.NoError(s.T(), clientBackend.Logout())
@@ -554,22 +550,22 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 }
 
 func (s *SyncDeviceSuite) TestPairingThreeDevices() {
-	bobTmpDir := filepath.Join(s.pairThreeDevicesTmpdir, "bob")
+	bobTmpDir := filepath.Join(s.tmpdir, "bob")
 	bobBackend := s.prepareBackendWithAccount("", bobTmpDir)
 	bobMessenger := bobBackend.Messenger()
 	_, err := bobMessenger.Start()
 	s.Require().NoError(err)
 
-	alice1TmpDir := filepath.Join(s.pairThreeDevicesTmpdir, "alice1")
+	alice1TmpDir := filepath.Join(s.tmpdir, "alice1")
 	alice1Backend := s.prepareBackendWithAccount("", alice1TmpDir)
 	alice1Messenger := alice1Backend.Messenger()
 	_, err = alice1Messenger.Start()
 	s.Require().NoError(err)
 
-	alice2TmpDir := filepath.Join(s.pairThreeDevicesTmpdir, "alice2")
+	alice2TmpDir := filepath.Join(s.tmpdir, "alice2")
 	alice2Backend := s.prepareBackendWithoutAccount(alice2TmpDir)
 
-	alice3TmpDir := filepath.Join(s.pairThreeDevicesTmpdir, "alice3")
+	alice3TmpDir := filepath.Join(s.tmpdir, "alice3")
 	alice3Backend := s.prepareBackendWithoutAccount(alice3TmpDir)
 
 	defer func() {
@@ -580,14 +576,13 @@ func (s *SyncDeviceSuite) TestPairingThreeDevices() {
 	}()
 
 	// Make Alice and Bob mutual contacts
-	messageText := "hello!"
-	bobPublicKey := types.EncodeHex(crypto.FromECDSAPub(bobMessenger.IdentityPublicKey()))
+	bobPublicKey := bobMessenger.GetSelfContact().ID
 	request := &requests.SendContactRequest{
 		ID:      bobPublicKey,
-		Message: messageText,
+		Message: protocol.RandomLettersString(5),
 	}
 	s.sendContactRequest(request, alice1Messenger)
-	contactRequest := s.receiveContactRequest(messageText, bobMessenger)
+	contactRequest := s.receiveContactRequest(request.Message, bobMessenger)
 	s.acceptContactRequest(contactRequest, alice1Messenger, bobMessenger)
 	s.checkMutualContact(alice1Backend, bobPublicKey)
 
@@ -608,6 +603,77 @@ func (s *SyncDeviceSuite) TestPairingThreeDevices() {
 
 	s.checkMutualContact(alice3Backend, bobPublicKey)
 	s.Require().Equal(1, len(alice3Backend.Messenger().Contacts()))
+}
+
+func (s *SyncDeviceSuite) createUser(name string) (*api.GethStatusBackend, string) {
+	tmpDir := filepath.Join(s.tmpdir, name)
+	backend := s.prepareBackendWithAccount("", tmpDir)
+	_, err := backend.Messenger().Start()
+	s.Require().NoError(err)
+	return backend, tmpDir
+}
+
+func (s *SyncDeviceSuite) TestPairPendingContactRequest() {
+	bobBackend, _ := s.createUser("bob")
+	defer func() {
+		s.Require().NoError(bobBackend.Logout())
+	}()
+
+	alice1Backend, alice1TmpDir := s.createUser("alice1")
+	defer func() {
+		s.Require().NoError(alice1Backend.Logout())
+	}()
+
+	// Create a pending CR from alice to bob
+	bobPublicKey := bobBackend.Messenger().IdentityPublicKeyString()
+	alicePublicKey := alice1Backend.Messenger().IdentityPublicKeyString()
+	request := &requests.SendContactRequest{
+		ID:      alicePublicKey,
+		Message: protocol.RandomLettersString(5),
+	}
+	s.sendContactRequest(request, bobBackend.Messenger())
+	contactRequest := s.receiveContactRequest(request.Message, alice1Backend.Messenger())
+	s.Require().Equal(request.Message, contactRequest.Text)
+
+	alice2TmpDir := filepath.Join(s.tmpdir, "alice2")
+	alice2Backend := s.prepareBackendWithoutAccount(alice2TmpDir)
+	defer func() {
+		s.Require().NoError(alice2Backend.Logout())
+	}()
+
+	// Pair alice-1 <-> alice-2
+	s.logger.Info("pairing Alice-1 and Alice-2")
+	s.pairAccounts(alice1Backend, alice1TmpDir, alice2Backend, alice2TmpDir)
+
+	s.logger.Debug("public keys",
+		zap.String("alice", alice1Backend.Messenger().IdentityPublicKeyString()),
+		zap.String("bob", bobBackend.Messenger().IdentityPublicKeyString()),
+	)
+
+	ensurePendingContact := func(m *protocol.Messenger) {
+		contacts := m.Contacts()
+		s.Require().Len(contacts, 1)
+
+		c := contacts[0]
+		s.Require().Equal(bobPublicKey, c.ID)
+		s.Require().Equal(protocol.ContactRequestStateReceived, c.ContactRequestRemoteState)
+		s.Require().Equal(protocol.ContactRequestStateNone, c.ContactRequestLocalState)
+
+		acRequest := protocol.ActivityCenterNotificationsRequest{
+			ActivityTypes: []protocol.ActivityCenterType{
+				protocol.ActivityCenterNotificationTypeContactRequest,
+			},
+			ReadType: protocol.ActivityCenterQueryParamsReadAll,
+			Limit:    10,
+		}
+		r, err := m.ActivityCenterNotifications(acRequest)
+		s.Require().NoError(err)
+		s.Require().Len(r.Notifications, 1)
+	}
+
+	// Ensure both devices have the pending Bob contact
+	ensurePendingContact(alice1Backend.Messenger())
+	ensurePendingContact(alice2Backend.Messenger())
 }
 
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
@@ -787,10 +853,10 @@ func containsKeystoreFile(directory, key string) bool {
 func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 	ctx := context.TODO()
 
-	serverTmpDir := filepath.Join(s.clientAsReceiverTmpdir, "server")
+	serverTmpDir := filepath.Join(s.tmpdir, "server")
 	serverBackend := s.prepareBackendWithAccount(profileKeypairMnemonic, serverTmpDir)
 
-	clientTmpDir := filepath.Join(s.clientAsReceiverTmpdir, "client")
+	clientTmpDir := filepath.Join(s.tmpdir, "client")
 	clientBackend := s.prepareBackendWithAccount(profileKeypairMnemonic, clientTmpDir)
 	defer func() {
 		require.NoError(s.T(), clientBackend.Logout())
@@ -896,13 +962,13 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	ctx := context.TODO()
 
 	// Prepare server
-	serverTmpDir := filepath.Join(s.clientAsReceiverTmpdir, "server")
+	serverTmpDir := filepath.Join(s.tmpdir, "server")
 	serverBackend := s.prepareBackendWithAccount(profileKeypairMnemonic1, serverTmpDir)
 	serverMessenger := serverBackend.Messenger()
 	serverAccountsAPI := serverBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
 
 	// Prepare client
-	clientTmpDir := filepath.Join(s.clientAsReceiverTmpdir, "client")
+	clientTmpDir := filepath.Join(s.tmpdir, "client")
 	clientBackend := s.prepareBackendWithAccount(profileKeypairMnemonic1, clientTmpDir)
 	clientMessenger := clientBackend.Messenger()
 	clientAccountsAPI := clientBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
@@ -1190,9 +1256,9 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 }
 
 func (s *SyncDeviceSuite) TestPreventLoggedInAccountLocalPairingClientAsReceiver() {
-	clientTmpDir := filepath.Join(s.clientAsSenderTmpdir, "client")
+	clientTmpDir := filepath.Join(s.tmpdir, "client")
 	clientBackend := s.prepareBackendWithAccount("", clientTmpDir)
-	serverTmpDir := filepath.Join(s.clientAsSenderTmpdir, "server")
+	serverTmpDir := filepath.Join(s.tmpdir, "server")
 	serverBackend := s.prepareBackendWithAccount("", serverTmpDir)
 	defer func() {
 		s.NoError(serverBackend.Logout())
@@ -1237,9 +1303,9 @@ func (s *SyncDeviceSuite) TestPreventLoggedInAccountLocalPairingClientAsReceiver
 }
 
 func (s *SyncDeviceSuite) TestPreventLoggedInAccountLocalPairingClientAsSender() {
-	clientTmpDir := filepath.Join(s.clientAsSenderTmpdir, "client")
+	clientTmpDir := filepath.Join(s.tmpdir, "client")
 	clientBackend := s.prepareBackendWithAccount("", clientTmpDir)
-	serverTmpDir := filepath.Join(s.clientAsSenderTmpdir, "server")
+	serverTmpDir := filepath.Join(s.tmpdir, "server")
 	serverBackend := s.prepareBackendWithAccount("", serverTmpDir)
 	defer func() {
 		s.NoError(serverBackend.Logout())
