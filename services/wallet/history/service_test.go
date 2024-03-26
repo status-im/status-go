@@ -418,13 +418,14 @@ func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
 			Accounts: []common.Address{address},
 		})
 
-		require.NoError(t, utils.Eventually(func() error {
+		err := utils.Eventually(func() error {
 			entries, err := database.getNewerThan(&assetIdentity{1, []common.Address{address}, "ETH"}, 0)
 			if err == nil && len(entries) == 0 {
 				return nil
 			}
 			return errors.New("data is not removed")
-		}, 100*time.Millisecond, 10*time.Millisecond))
+		}, 100*time.Millisecond, 10*time.Millisecond)
+		require.NoError(t, err)
 	}()
 
 	group.Wait()

@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ethereum/go-ethereum/event"
+
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -25,7 +27,9 @@ func TestKeycardPairingsFile(t *testing.T) {
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
-	service := NewService(db, accountsDb, appDB, &rpc.Client{NetworkManager: network.NewManager(db)}, nil, nil, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, nil)
+	accountFeed := &event.Feed{}
+
+	service := NewService(db, accountsDb, appDB, &rpc.Client{NetworkManager: network.NewManager(db)}, accountFeed, nil, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, nil)
 
 	data, err := service.KeycardPairings().GetPairingsJSONFileContent()
 	require.NoError(t, err)

@@ -1,19 +1,23 @@
 package transfer
 
 import (
+	"context"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
+	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -31,16 +35,17 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	accountFeed := &event.Feed{}
 
 	bcstate := blockchainstate.NewBlockChainState()
+	transactionManager := NewTransactionManager(walletDB, nil, nil, nil, accountsDB, nil, nil)
 	c := NewTransferController(
 		walletDB,
 		accountsDB,
 		nil, // rpcClient
 		accountFeed,
-		nil, // transferFeed
-		nil, // transactionManager
-		nil, // pendingTxManager
-		nil, // tokenManager
-		nil, // balanceCacher
+		nil,                // transferFeed
+		transactionManager, // transactionManager
+		nil,                // pendingTxManager
+		nil,                // tokenManager
+		nil,                // balanceCacher
 		bcstate,
 	)
 
@@ -80,11 +85,73 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, ranges)
 
+	// Insert multitransactions
+	// Save address to accounts DB which transactions we want to preserve
+	counterparty := common.Address{0x1}
+	err = accountsDB.SaveOrUpdateAccounts([]*accounts.Account{
+		{Address: types.Address(counterparty), Chat: false, Wallet: true},
+	}, false)
+	require.NoError(t, err)
+
+	// Self multi transaction
+	midSelf, err := transactionManager.InsertMultiTransaction(&MultiTransaction{
+		FromAddress: address,
+		ToAddress:   address,
+		FromAsset:   "ETH",
+		ToAsset:     "DAI",
+		FromAmount:  &hexutil.Big{},
+		ToAmount:    &hexutil.Big{},
+		Timestamp:   1,
+	})
+
+	require.NoError(t, err)
+	mtxs, err := transactionManager.GetMultiTransactions(context.Background(), []wallet_common.MultiTransactionIDType{midSelf})
+	require.NoError(t, err)
+	require.Len(t, mtxs, 1)
+
+	// Send multi transaction
+	mt := &MultiTransaction{
+		FromAddress: address,
+		ToAddress:   counterparty,
+		FromAsset:   "ETH",
+		ToAsset:     "DAI",
+		FromAmount:  &hexutil.Big{},
+		ToAmount:    &hexutil.Big{},
+		Timestamp:   2,
+	}
+	mid, err := transactionManager.InsertMultiTransaction(mt)
+
+	require.NoError(t, err)
+	mtxs, err = transactionManager.GetMultiTransactions(context.Background(), []wallet_common.MultiTransactionIDType{midSelf, mid})
+	require.NoError(t, err)
+	require.Len(t, mtxs, 2)
+
+	// Another Send multi-transaction where sender and receiver are inverted (both accounts are in accounts DB)
+	midReverse, err := transactionManager.InsertMultiTransaction(&MultiTransaction{
+		FromAddress: mt.ToAddress,
+		ToAddress:   mt.FromAddress,
+		FromAsset:   mt.FromAsset,
+		ToAsset:     mt.ToAsset,
+		FromAmount:  mt.FromAmount,
+		ToAmount:    mt.ToAmount,
+		Timestamp:   mt.Timestamp + 1,
+	})
+
+	require.NoError(t, err)
+	mtxs, err = transactionManager.GetMultiTransactions(context.Background(), []wallet_common.MultiTransactionIDType{midSelf, mid, midReverse})
+	require.NoError(t, err)
+	require.Len(t, mtxs, 3)
+
+	// Start watching accounts
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	c.accWatcher = accountsevent.NewWatcher(c.accountsDB, c.accountFeed, func(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address) {
 		c.onAccountsChanged(changedAddresses, eventType, currentAddresses, []uint64{chainID})
 
 		// Quit channel event handler before  destroying the channel
 		go func() {
+			defer wg.Done()
+
 			time.Sleep(1 * time.Millisecond)
 			// Wait for DB to be cleaned up
 			c.accWatcher.Stop()
@@ -107,6 +174,11 @@ func TestController_watchAccountsChanges(t *testing.T) {
 			require.Nil(t, ranges.tokens.FirstKnown)
 			require.Nil(t, ranges.tokens.LastKnown)
 			require.Nil(t, ranges.tokens.Start)
+
+			mtxs, err := transactionManager.GetMultiTransactions(context.Background(), []wallet_common.MultiTransactionIDType{mid, midSelf, midReverse})
+			require.NoError(t, err)
+			require.Len(t, mtxs, 1)
+			require.Equal(t, midReverse, mtxs[0].ID)
 		}()
 	})
 	c.startAccountWatcher([]uint64{chainID})
@@ -122,6 +194,8 @@ func TestController_watchAccountsChanges(t *testing.T) {
 			Accounts: []common.Address{address},
 		})
 	}()
+
+	wg.Wait()
 }
 
 func TestController_cleanupAccountLeftovers(t *testing.T) {
@@ -146,17 +220,18 @@ func TestController_cleanupAccountLeftovers(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, storedAccs, 1)
 
+	transactionManager := NewTransactionManager(walletDB, nil, nil, nil, accountsDB, nil, nil)
 	bcstate := blockchainstate.NewBlockChainState()
 	c := NewTransferController(
 		walletDB,
 		accountsDB,
-		nil, // rpcClient
-		nil, // accountFeed
-		nil, // transferFeed
-		nil, // transactionManager
-		nil, // pendingTxManager
-		nil, // tokenManager
-		nil, // balanceCacher
+		nil,                // rpcClient
+		nil,                // accountFeed
+		nil,                // transferFeed
+		transactionManager, // transactionManager
+		nil,                // pendingTxManager
+		nil,                // tokenManager
+		nil,                // balanceCacher
 		bcstate,
 	)
 	chainID := uint64(777)
