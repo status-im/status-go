@@ -29,10 +29,6 @@ const defaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.js
 const defaultArchivesRelativePath = "data/archivedata"
 const defaultTorrentTorrentsRelativePath = "data/torrents"
 
-var defautTorrentConfig = params.TorrentConfig{
-	Enabled: false,
-}
-
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
 
 var DefaultFleet = params.FleetShardsTest

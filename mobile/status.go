@@ -279,7 +279,9 @@ func CreateAccountAndLogin(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	err = request.Validate()
+	err = request.Validate(&requests.CreateAccountValidation{
+		AllowEmptyDisplayName: false,
+	})
 	if err != nil {
 		return makeJSONResponse(err)
 	}

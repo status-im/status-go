@@ -101,6 +101,7 @@ func (c *CreateAccount) Validate(validation *CreateAccountValidation) error {
 	return nil
 }
 
+// NOTE: Reasoning for this struct here: https://github.com/status-im/status-go/pull/4980#discussion_r1539219099
 type CreateAccountValidation struct {
 	AllowEmptyDisplayName bool
 }

@@ -831,7 +831,6 @@ func TestLoginAccount(t *testing.T) {
 		Emoji:                 "some",
 		Password:              password,
 		BackupDisabledDataDir: tmpdir,
-		NetworkID:             1,
 		LogFilePath:           tmpdir + "/log",
 		WakuV2Nameserver:      &nameserver,
 	}
@@ -1074,8 +1073,7 @@ func TestConvertAccount(t *testing.T) {
 	defaultSettings, err := defaultSettings(genAccInfo, derivedAccounts, nil)
 	require.NoError(t, err)
 	nodeConfig, err := defaultNodeConfig(defaultSettings.InstallationID, &requests.CreateAccount{
-		NetworkID: 1,
-		LogLevel:  defaultSettings.LogLevel,
+		LogLevel: defaultSettings.LogLevel,
 	})
 	require.NoError(t, err)
 	nodeConfig.DataDir = rootDataDir
@@ -1388,7 +1386,6 @@ func TestCreateWallet(t *testing.T) {
 		Emoji:                 "emoji",
 		Password:              password,
 		BackupDisabledDataDir: tmpdir,
-		NetworkID:             1,
 		LogFilePath:           tmpdir + "/log",
 	}
 	c := make(chan interface{}, 10)
@@ -1447,7 +1444,6 @@ func TestSetFleet(t *testing.T) {
 		CustomizationColor:    "#ffffff",
 		Password:              password,
 		BackupDisabledDataDir: tmpdir,
-		NetworkID:             1,
 		LogFilePath:           tmpdir + "/log",
 		Emoji:                 "some",
 	}
@@ -1517,7 +1513,6 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 		CustomizationColor:    "#ffffff",
 		Password:              password,
 		BackupDisabledDataDir: tmpdir,
-		NetworkID:             1,
 		LogFilePath:           tmpdir + "/log",
 		Emoji:                 "some",
 	}
