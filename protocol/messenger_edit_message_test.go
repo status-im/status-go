@@ -90,6 +90,80 @@ func (s *MessengerEditMessageSuite) TestEditMessage() {
 	s.Require().Equal(ErrInvalidEditOrDeleteAuthor, err)
 }
 
+func (s *MessengerEditMessageSuite) TestEditBridgeMessage() {
+	theirMessenger := s.newMessenger()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err := theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	bridgeMessage := buildTestMessage(*theirChat)
+	bridgeMessage.ContentType = protobuf.ChatMessage_BRIDGE_MESSAGE
+	bridgeMessage.Payload = &protobuf.ChatMessage_BridgeMessage{
+		BridgeMessage: &protobuf.BridgeMessage{
+			BridgeName:      "discord",
+			UserName:        "user1",
+			UserAvatar:      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
+			UserID:          "123",
+			Content:         "text1",
+			MessageID:       "456",
+			ParentMessageID: "789",
+		},
+	}
+
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), bridgeMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+
+	messageToEdit := sendResponse.Messages()[0]
+
+	messageID, err := types.DecodeHex(messageToEdit.ID)
+	s.Require().NoError(err)
+
+	editedText := "edited text"
+	editedMessage := &requests.EditMessage{
+		ID:          messageID,
+		Text:        editedText,
+		ContentType: protobuf.ChatMessage_BRIDGE_MESSAGE,
+	}
+
+	sendResponse, err = theirMessenger.EditMessage(context.Background(), editedMessage)
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+	s.Require().NotEmpty(sendResponse.Messages()[0].EditedAt)
+	s.Require().Equal(sendResponse.Messages()[0].Text, "text-input-message")
+	s.Require().Equal(sendResponse.Messages()[0].GetBridgeMessage().Content, editedText)
+	s.Require().Len(sendResponse.Chats(), 1)
+	s.Require().NotNil(sendResponse.Chats()[0].LastMessage)
+	s.Require().NotEmpty(sendResponse.Chats()[0].LastMessage.EditedAt)
+
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+
+	s.Require().NotEmpty(response.Chats()[0].LastMessage.EditedAt)
+	s.Require().Equal(response.Messages()[0].GetBridgeMessage().Content, "edited text")
+}
+
 func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
