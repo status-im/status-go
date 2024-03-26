@@ -161,4 +161,4 @@ def getDefaultUnitTestUseDevelopmentLogger() { isTestNightlyJob() ? false : true
 
 def getDefaultUnitTestFailfast() { isTestNightlyJob() ? false : true }
 
-def getDefaultTimeout() { isTestNightlyJob() ? 5*60 : 40 }
+def getDefaultTimeout() { isTestNightlyJob() ? 5*60 : 50 }
