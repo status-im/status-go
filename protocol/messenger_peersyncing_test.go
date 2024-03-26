@@ -140,8 +140,6 @@ func (s *MessengerPeersyncingSuite) thirdPartyTest(community *communities.Commun
 
 	s.joinCommunity(community, s.owner, s.bob)
 
-	// TODO(alwx): test needs to be written
-
 	// Bob should now send an offer
 	_, err = WaitOnMessengerResponse(
 		s.bob,
@@ -262,4 +260,12 @@ func (s *MessengerPeersyncingSuite) TestCanSyncMessageWith() {
 	canSyncWithAlice, err := s.owner.canSyncCommunityMessageWith(chat, community, &s.alice.identity.PublicKey)
 	s.Require().NoError(err)
 	s.Require().True(canSyncWithAlice)
+}
+
+func (s *MessengerPeersyncingSuite) TestSyncOneToOne() {
+	// TODO(alwx):
+}
+
+func (s *MessengerPeersyncingSuite) TestCanSyncOneToOneMessageWith() {
+	// TODO(alwx):
 }
