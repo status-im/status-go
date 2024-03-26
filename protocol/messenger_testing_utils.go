@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	mathRand "math/rand"
 	"sync"
 	"time"
 
@@ -390,19 +391,19 @@ func RandomColor() string {
 
 func RandomCommunityTags(count int) []string {
 	availableTagsCount := requests.AvailableTagsCount()
-	tags := make([]string, 0, count)
-	indexes := map[int]struct{}{}
 
-	for len(indexes) != count {
-		index := randomInt(availableTagsCount)
-		indexes[index] = struct{}{}
+	if count > availableTagsCount {
+		count = availableTagsCount
 	}
 
-	for index := range indexes {
-		tags = append(tags, requests.TagByIndex(index))
+	//source := mathRand.New(mathRand.NewSource(time.Now().UnixNano()))
+	indices := mathRand.Perm(availableTagsCount)
+	shuffled := make([]string, count)
+	for i := 0; i < count; i++ {
+		shuffled[i] = requests.TagByIndex(uint32(indices[i]))
 	}
 
-	return tags
+	return shuffled
 }
 
 func RandomBytes(length int) []byte {

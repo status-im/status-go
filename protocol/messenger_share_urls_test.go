@@ -44,7 +44,7 @@ func (s *MessengerShareUrlsSuite) createCommunity() *communities.Community {
 		Tags:        RandomCommunityTags(3),
 	}
 
-	// Create an community chat
+	// Create a community chat
 	response, err := s.m.CreateCommunity(description, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
