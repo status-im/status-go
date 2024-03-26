@@ -576,14 +576,13 @@ func (s *SyncDeviceSuite) TestPairingThreeDevices() {
 	}()
 
 	// Make Alice and Bob mutual contacts
-	messageText := "hello!"
-	bobPublicKey := types.EncodeHex(crypto.FromECDSAPub(bobMessenger.IdentityPublicKey()))
+	bobPublicKey := bobMessenger.GetSelfContact().ID
 	request := &requests.SendContactRequest{
 		ID:      bobPublicKey,
-		Message: messageText,
+		Message: protocol.RandomLettersString(5),
 	}
 	s.sendContactRequest(request, alice1Messenger)
-	contactRequest := s.receiveContactRequest(messageText, bobMessenger)
+	contactRequest := s.receiveContactRequest(request.Message, bobMessenger)
 	s.acceptContactRequest(contactRequest, alice1Messenger, bobMessenger)
 	s.checkMutualContact(alice1Backend, bobPublicKey)
 
@@ -626,16 +625,15 @@ func (s *SyncDeviceSuite) TestPairPendingContactRequest() {
 	}()
 
 	// Create a pending CR from alice to bob
-	messageText := "hello!"
 	bobPublicKey := bobBackend.Messenger().IdentityPublicKeyString()
 	alicePublicKey := alice1Backend.Messenger().IdentityPublicKeyString()
 	request := &requests.SendContactRequest{
 		ID:      alicePublicKey,
-		Message: messageText,
+		Message: protocol.RandomLettersString(5),
 	}
 	s.sendContactRequest(request, bobBackend.Messenger())
-	contactRequest := s.receiveContactRequest(messageText, alice1Backend.Messenger())
-	s.Require().Equal(messageText, contactRequest.Text)
+	contactRequest := s.receiveContactRequest(request.Message, alice1Backend.Messenger())
+	s.Require().Equal(request.Message, contactRequest.Text)
 
 	alice2TmpDir := filepath.Join(s.tmpdir, "alice2")
 	alice2Backend := s.prepareBackendWithoutAccount(alice2TmpDir)
