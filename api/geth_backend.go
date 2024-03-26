@@ -1454,8 +1454,10 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 }
 
 func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccount, opts ...params.Option) (*multiaccounts.Account, error) {
-
-	if err := request.Validate(); err != nil {
+	validation := &requests.CreateAccountValidation{
+		AllowEmptyDisplayName: false,
+	}
+	if err := request.Validate(validation); err != nil {
 		return nil, err
 	}
 	return b.generateOrImportAccount("", 1, false, request, opts...)

@@ -79,15 +79,10 @@ type WalletSecretsConfig struct {
 	AlchemyOptimismSepoliaToken string `json:"alchemyOptimismSepoliaToken"`
 }
 
-func (c *CreateAccount) Validate() error {
-	return ValidateAccountCreationRequest(*c, false)
-}
-
-func ValidateAccountCreationRequest(c CreateAccount, allowEmptyDisplayName bool) error {
+func (c *CreateAccount) Validate(validation *CreateAccountValidation) error {
 	// TODO(cammellos): Add proper validation for password/displayname/etc
-
 	// Empty display name is allowed during account restore
-	if len(c.DisplayName) == 0 && !allowEmptyDisplayName {
+	if len(c.DisplayName) == 0 && !validation.AllowEmptyDisplayName {
 		return ErrCreateAccountInvalidDisplayName
 	}
 
@@ -104,5 +99,8 @@ func ValidateAccountCreationRequest(c CreateAccount, allowEmptyDisplayName bool)
 	}
 
 	return nil
+}
 
+type CreateAccountValidation struct {
+	AllowEmptyDisplayName bool
 }

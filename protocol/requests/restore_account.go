@@ -17,5 +17,7 @@ func (c *RestoreAccount) Validate() error {
 		return ErrRestoreAccountInvalidMnemonic
 	}
 
-	return ValidateAccountCreationRequest(c.CreateAccount, true)
+	return c.CreateAccount.Validate(&CreateAccountValidation{
+		AllowEmptyDisplayName: true,
+	})
 }
