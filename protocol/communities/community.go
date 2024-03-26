@@ -460,7 +460,7 @@ func (o *Community) Tags() []CommunityTag {
 	for _, t := range o.config.CommunityDescription.Tags {
 		result = append(result, CommunityTag{
 			Name:  t,
-			Emoji: requests.TagsEmojis[t],
+			Emoji: requests.TagEmoji(t),
 		})
 	}
 	return result
@@ -473,7 +473,7 @@ func (o *Community) TagsRaw() []string {
 func (o *Community) TagsIndices() []uint32 {
 	var indices []uint32
 	for _, t := range o.config.CommunityDescription.Tags {
-		indices = append(indices, requests.TagsIndices[t])
+		indices = append(indices, requests.TagIndex(t))
 	}
 	return indices
 }

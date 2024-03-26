@@ -389,17 +389,17 @@ func RandomColor() string {
 }
 
 func RandomCommunityTags(count int) []string {
-	all := requests.Tags
+	availableTagsCount := requests.AvailableTagsCount()
 	tags := make([]string, 0, count)
 	indexes := map[int]struct{}{}
 
 	for len(indexes) != count {
-		index := randomInt(len(all))
+		index := randomInt(availableTagsCount)
 		indexes[index] = struct{}{}
 	}
 
 	for index := range indexes {
-		tags = append(tags, all[index])
+		tags = append(tags, requests.TagByIndex(index))
 	}
 
 	return tags
