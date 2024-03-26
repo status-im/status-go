@@ -1572,3 +1572,53 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 
 	require.NoError(t, b.Logout())
 }
+
+func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
+	utils.Init()
+	tmpdir := t.TempDir()
+
+	b := NewGethStatusBackend()
+
+	// Creating an account with test networks enabled
+	createAccountRequest1 := &requests.CreateAccount{
+		DisplayName:           "User-1",
+		CustomizationColor:    "#ffffff",
+		Emoji:                 "some",
+		Password:              "password123",
+		BackupDisabledDataDir: tmpdir,
+		NetworkID:             1,
+		LogFilePath:           tmpdir + "/log",
+		TestNetworksEnabled:   true,
+	}
+	_, err := b.CreateAccountAndLogin(createAccountRequest1)
+	require.NoError(t, err)
+	statusNode := b.statusNode
+	require.NotNil(t, statusNode)
+
+	settings, err := b.GetSettings()
+	require.NoError(t, err)
+	require.True(t, settings.TestNetworksEnabled)
+
+	require.NoError(t, b.Logout())
+
+	// Creating an account with test networks disabled
+	createAccountRequest2 := &requests.CreateAccount{
+		DisplayName:           "User-2",
+		CustomizationColor:    "#ffffff",
+		Emoji:                 "some",
+		Password:              "password",
+		BackupDisabledDataDir: tmpdir,
+		NetworkID:             1,
+		LogFilePath:           tmpdir + "/log",
+	}
+	_, err = b.CreateAccountAndLogin(createAccountRequest2)
+	require.NoError(t, err)
+	statusNode = b.statusNode
+	require.NotNil(t, statusNode)
+
+	settings, err = b.GetSettings()
+	require.NoError(t, err)
+	require.False(t, settings.TestNetworksEnabled)
+
+	require.NoError(t, b.Logout())
+}

@@ -146,10 +146,11 @@ INSERT INTO settings (
   mnemonic_was_not_shown,
   wallet_token_preferences_group_by_community,
   wallet_collectible_preferences_group_by_collection,
-  wallet_collectible_preferences_group_by_community
+  wallet_collectible_preferences_group_by_community,
+  test_networks_enabled
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,?,?,?,?,
-?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?)`,
+?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
@@ -182,6 +183,7 @@ INSERT INTO settings (
 		s.TokenGroupByCommunity,
 		s.CollectibleGroupByCollection,
 		s.CollectibleGroupByCommunity,
+		s.TestNetworksEnabled,
 	)
 	if err != nil {
 		return err

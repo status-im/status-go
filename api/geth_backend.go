@@ -1372,6 +1372,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 	settings.DisplayName = request.DisplayName
 	settings.PreviewPrivacy = request.PreviewPrivacy
 	settings.CurrentNetwork = request.CurrentNetwork
+	settings.TestNetworksEnabled = request.TestNetworksEnabled
 
 	// If restoring an account, we don't set the mnemonic
 	if mnemonic == "" {

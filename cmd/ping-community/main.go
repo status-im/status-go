@@ -315,6 +315,8 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	defaultSettings.ProfilePicturesVisibility = settings.ProfilePicturesVisibilityEveryone
 	defaultSettings.LinkPreviewRequestEnabled = true
 
+	defaultSettings.TestNetworksEnabled = false
+
 	visibleTokens := make(map[string][]string)
 	visibleTokens["mainnet"] = []string{"SNT"}
 	visibleTokensJSON, err := json.Marshal(visibleTokens)
