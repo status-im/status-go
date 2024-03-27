@@ -37,7 +37,7 @@ GIT_COMMIT = $(shell git rev-parse --short HEAD)
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 ENABLE_METRICS ?= true
-BUILD_TAGS ?= gowaku_no_rln
+BUILD_TAGS ?= gowaku_no_rln,nosqlite
 BUILD_FLAGS ?= $(shell echo "-ldflags='\
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
@@ -237,7 +237,7 @@ setup: setup-check setup-build setup-dev tidy
 
 setup-check: ##@setup Check if Go compiler is installed.
 ifeq (, $(shell which go))
-	$(error "No Go compiler found! Make sure to install 1.19.0 or newer.")
+	$(error "No Go compiler found! Make sure to install 1.21.0 or newer.")
 endif
 
 setup-dev: ##@setup Install all necessary tools for development
@@ -256,7 +256,7 @@ install-gomobile: ##@install Go Mobile Build Tools
 	GO111MODULE=off go get -d golang.org/x/mobile/cmd/gobind
 
 install-lint: ##@install Install Linting Tools
-	GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
+	GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.57.1
 
 install-junit-report: ##@install Install Junit Report Tool for Jenkins integration
 	GO111MODULE=on go install github.com/jstemmer/go-junit-report/v2@latest
