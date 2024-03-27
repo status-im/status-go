@@ -400,10 +400,14 @@ func (m *Messenger) GetProfileShowcasePreferences() (*identity.ProfileShowcasePr
 	return m.persistence.GetProfileShowcasePreferences()
 }
 
-func (m *Messenger) GetProfileShowcaseForContact(contactID string) (*identity.ProfileShowcase, error) {
+func (m *Messenger) GetProfileShowcaseForContact(contactID string, validate bool) (*identity.ProfileShowcase, error) {
 	profileShowcase, err := m.persistence.GetProfileShowcaseForContact(contactID)
 	if err != nil {
 		return nil, err
+	}
+
+	if !validate {
+		return profileShowcase, nil
 	}
 
 	contactPubKey, err := common.HexToPubkey(contactID)
@@ -415,6 +419,8 @@ func (m *Messenger) GetProfileShowcaseForContact(contactID string) (*identity.Pr
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO: validate collectibles & assets ownership
 
 	return profileShowcase, nil
 }

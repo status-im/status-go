@@ -480,8 +480,14 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	)
 	s.Require().NoError(err)
 
-	profileShowcase, err := mutualContact.GetProfileShowcaseForContact(contactID)
+	profileShowcase, err := mutualContact.GetProfileShowcaseForContact(contactID, false)
 	s.Require().NoError(err)
+
+	s.Require().Len(profileShowcase.Communities, 2)
+	s.Require().Equal(profileShowcase.Communities[0].CommunityID, request.Communities[0].CommunityID)
+	s.Require().Equal(profileShowcase.Communities[0].Order, request.Communities[0].Order)
+	s.Require().Equal(profileShowcase.Communities[1].CommunityID, request.Communities[1].CommunityID)
+	s.Require().Equal(profileShowcase.Communities[1].Order, request.Communities[1].Order)
 
 	s.Require().Len(profileShowcase.Accounts, 2)
 	s.Require().Equal(profileShowcase.Accounts[0].Address, request.Accounts[0].Address)
@@ -525,7 +531,7 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	)
 	s.Require().NoError(err)
 
-	profileShowcase, err = verifiedContact.GetProfileShowcaseForContact(contactID)
+	profileShowcase, err = verifiedContact.GetProfileShowcaseForContact(contactID, false)
 	s.Require().NoError(err)
 
 	s.Require().Len(profileShowcase.Accounts, 2)
@@ -620,7 +626,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipUnenc
 	)
 	s.Require().NoError(err)
 
-	profileShowcase, err := bob.GetProfileShowcaseForContact(contactID)
+	profileShowcase, err := bob.GetProfileShowcaseForContact(contactID, true)
 	s.Require().NoError(err)
 
 	// Verify community's data
@@ -688,7 +694,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncry
 	)
 	s.Require().NoError(err)
 
-	profileShowcase, err := bob.GetProfileShowcaseForContact(contactID)
+	profileShowcase, err := bob.GetProfileShowcaseForContact(contactID, true)
 	s.Require().NoError(err)
 
 	// Verify community's data
