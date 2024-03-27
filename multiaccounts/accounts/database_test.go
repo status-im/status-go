@@ -3,6 +3,7 @@ package accounts
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -458,4 +459,207 @@ func TestKeypairs(t *testing.T) {
 			require.True(t, err == ErrDbKeypairNotFound)
 		})
 	}
+}
+
+func TestResolvingSuggestedDerivationPath(t *testing.T) {
+	kp := GetProfileKeypairForTest(true, true, true)
+	totalNumOfAccounts := len(kp.Accounts)
+
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	// check the db
+	dbKp, err := db.GetKeypairByKeyUID(kp.KeyUID)
+	require.Error(t, err)
+	require.True(t, err == ErrDbKeypairNotFound)
+	require.Nil(t, dbKp)
+
+	expectedLastUsedDerivationIndex := uint64(2)
+
+	// save keypair
+	err = db.SaveOrUpdateKeypair(kp)
+	require.NoError(t, err)
+	dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, totalNumOfAccounts, len(dbKp.Accounts))
+	require.Equal(t, expectedLastUsedDerivationIndex, dbKp.LastUsedDerivationIndex)
+
+	// check number of addresses to generate
+	numOfAddresses, err := db.GetNumOfAddressesToGenerateForKeypair(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, maxNumOfGeneratedAddresses, numOfAddresses)
+
+	// check suggested path
+	suggestedPath, err := db.ResolveSuggestedPathForKeypair(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("%s%d", statusWalletRootPath, expectedLastUsedDerivationIndex+1), suggestedPath)
+
+	// prepare new account with the next suggested path
+	generatedWalletAccountThatWillBeRemovedLater := &Account{
+		Address:               types.Address{0x05},
+		KeyUID:                kp.KeyUID,
+		Wallet:                false,
+		Chat:                  false,
+		Type:                  AccountTypeGenerated,
+		Path:                  suggestedPath,
+		PublicKey:             types.Hex2Bytes("0x000000005"),
+		Name:                  "Generated Acc 4",
+		Emoji:                 "emoji-4",
+		ColorID:               common.CustomizationColorPrimary,
+		Hidden:                false,
+		Clock:                 0,
+		Removed:               false,
+		Operable:              AccountFullyOperable,
+		ProdPreferredChainIDs: "1",
+		TestPreferredChainIDs: "5",
+	}
+
+	// add new account with the next suggested path
+	err = db.SaveOrUpdateAccounts([]*Account{generatedWalletAccountThatWillBeRemovedLater}, false)
+	require.NoError(t, err)
+
+	totalNumOfAccounts++
+	expectedLastUsedDerivationIndex++
+
+	dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, totalNumOfAccounts, len(dbKp.Accounts))
+	require.Equal(t, expectedLastUsedDerivationIndex, dbKp.LastUsedDerivationIndex)
+
+	// check suggested path
+	suggestedPath, err = db.ResolveSuggestedPathForKeypair(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("%s%d", statusWalletRootPath, expectedLastUsedDerivationIndex+1), suggestedPath)
+
+	customSuggestedPath := fmt.Sprintf("%s%d", statusWalletRootPath, expectedLastUsedDerivationIndex+1+1)
+
+	// prepare new account with the custom suggested path
+	generatedWalletAccount := &Account{
+		Address:               types.Address{0x07},
+		KeyUID:                kp.KeyUID,
+		Wallet:                false,
+		Chat:                  false,
+		Type:                  AccountTypeGenerated,
+		Path:                  customSuggestedPath,
+		PublicKey:             types.Hex2Bytes("0x000000007"),
+		Name:                  "Generated Acc 6",
+		Emoji:                 "emoji-6",
+		ColorID:               common.CustomizationColorPrimary,
+		Hidden:                false,
+		Clock:                 0,
+		Removed:               false,
+		Operable:              AccountFullyOperable,
+		ProdPreferredChainIDs: "1",
+		TestPreferredChainIDs: "5",
+	}
+
+	// add new account with the next suggested path
+	err = db.SaveOrUpdateAccounts([]*Account{generatedWalletAccount}, false)
+	require.NoError(t, err)
+
+	totalNumOfAccounts++
+
+	dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, totalNumOfAccounts, len(dbKp.Accounts))
+	require.Equal(t, expectedLastUsedDerivationIndex, dbKp.LastUsedDerivationIndex)
+
+	// check suggested path
+	suggestedPath, err = db.ResolveSuggestedPathForKeypair(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("%s%d", statusWalletRootPath, expectedLastUsedDerivationIndex+1), suggestedPath)
+
+	// prepare new account with the next suggested path
+	generatedWalletAccount = &Account{
+		Address:               types.Address{0x06},
+		KeyUID:                kp.KeyUID,
+		Wallet:                false,
+		Chat:                  false,
+		Type:                  AccountTypeGenerated,
+		Path:                  suggestedPath,
+		PublicKey:             types.Hex2Bytes("0x000000006"),
+		Name:                  "Generated Acc 5",
+		Emoji:                 "emoji-5",
+		ColorID:               common.CustomizationColorPrimary,
+		Hidden:                false,
+		Clock:                 0,
+		Removed:               false,
+		Operable:              AccountFullyOperable,
+		ProdPreferredChainIDs: "1",
+		TestPreferredChainIDs: "5",
+	}
+
+	// add new account with the next suggested path
+	err = db.SaveOrUpdateAccounts([]*Account{generatedWalletAccount}, false)
+	require.NoError(t, err)
+
+	totalNumOfAccounts++
+	expectedLastUsedDerivationIndex++
+
+	dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, totalNumOfAccounts, len(dbKp.Accounts))
+	require.Equal(t, expectedLastUsedDerivationIndex, dbKp.LastUsedDerivationIndex)
+
+	// check suggested path
+	suggestedPath, err = db.ResolveSuggestedPathForKeypair(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("%s%d", statusWalletRootPath, expectedLastUsedDerivationIndex+2), suggestedPath)
+
+	// prepare new account with the next suggested path
+	generatedWalletAccount = &Account{
+		Address:               types.Address{0x08},
+		KeyUID:                kp.KeyUID,
+		Wallet:                false,
+		Chat:                  false,
+		Type:                  AccountTypeGenerated,
+		Path:                  suggestedPath,
+		PublicKey:             types.Hex2Bytes("0x000000008"),
+		Name:                  "Generated Acc 7",
+		Emoji:                 "emoji-7",
+		ColorID:               common.CustomizationColorPrimary,
+		Hidden:                false,
+		Clock:                 0,
+		Removed:               false,
+		Operable:              AccountFullyOperable,
+		ProdPreferredChainIDs: "1",
+		TestPreferredChainIDs: "5",
+	}
+
+	// add new account with the next suggested path
+	err = db.SaveOrUpdateAccounts([]*Account{generatedWalletAccount}, false)
+	require.NoError(t, err)
+
+	totalNumOfAccounts++
+	expectedLastUsedDerivationIndex += 2
+
+	dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, totalNumOfAccounts, len(dbKp.Accounts))
+	require.Equal(t, expectedLastUsedDerivationIndex, dbKp.LastUsedDerivationIndex)
+
+	// check suggested path
+	suggestedPath, err = db.ResolveSuggestedPathForKeypair(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("%s%d", statusWalletRootPath, expectedLastUsedDerivationIndex+1), suggestedPath)
+
+	// remove account
+	err = db.RemoveAccount(generatedWalletAccountThatWillBeRemovedLater.Address, 0)
+	require.NoError(t, err)
+
+	totalNumOfAccounts--
+
+	dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, totalNumOfAccounts, len(dbKp.Accounts))
+	require.Equal(t, expectedLastUsedDerivationIndex, dbKp.LastUsedDerivationIndex)
+
+	_, err = db.GetAccountByAddress(generatedWalletAccountThatWillBeRemovedLater.Address)
+	require.Error(t, err)
+	require.True(t, err == ErrDbAccountNotFound)
+
+	// check suggested path after removing account
+	suggestedPath, err = db.ResolveSuggestedPathForKeypair(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("%s%d", statusWalletRootPath, expectedLastUsedDerivationIndex+1), suggestedPath)
 }
