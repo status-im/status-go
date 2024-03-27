@@ -3,6 +3,8 @@ package communities
 import (
 	"crypto/ecdsa"
 
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -25,12 +27,13 @@ func (m *Manager) HandleRequestToJoinPrivilegedUserSyncMessage(message *protobuf
 	requestsToJoin := make([]*RequestToJoin, 0)
 	for signer, requestToJoinProto := range message.RequestToJoin {
 		requestToJoin := &RequestToJoin{
-			PublicKey:        signer,
-			Clock:            requestToJoinProto.Clock,
-			ENSName:          requestToJoinProto.EnsName,
-			CommunityID:      requestToJoinProto.CommunityId,
-			State:            state,
-			RevealedAccounts: requestToJoinProto.RevealedAccounts,
+			PublicKey:          signer,
+			Clock:              requestToJoinProto.Clock,
+			ENSName:            requestToJoinProto.EnsName,
+			CustomizationColor: multiaccountscommon.IDToColorFallbackToBlue(requestToJoinProto.CustomizationColor),
+			CommunityID:        requestToJoinProto.CommunityId,
+			State:              state,
+			RevealedAccounts:   requestToJoinProto.RevealedAccounts,
 		}
 		requestToJoin.CalculateID()
 

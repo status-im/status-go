@@ -92,10 +92,12 @@ func (s *MessengerSettingsSuite) TestSetCustomizationColor() {
 
 	err = s.m.SetCustomizationColor(context.TODO(), &requests.SetCustomizationColor{KeyUID: s.m.account.KeyUID, CustomizationColor: common.CustomizationColorBlue})
 	s.Require().NoError(err)
+	s.Require().Equal(s.m.account.GetCustomizationColor(), common.CustomizationColorBlue)
 	_, err = WaitOnMessengerResponse(s.m2, func(r *MessengerResponse) bool {
 		return len(r.CustomizationColor) > 0
 	}, "message syncAccountCustomizationColor not received")
 	s.Require().NoError(err)
+	s.Require().Equal(s.m2.account.GetCustomizationColor(), common.CustomizationColorBlue)
 	acc, err = s.m2.multiAccounts.GetAccount(s.m.account.KeyUID)
 	s.Require().NoError(err)
 	acc2, err = s.m2.multiAccounts.GetAccount(s.m2.account.KeyUID)

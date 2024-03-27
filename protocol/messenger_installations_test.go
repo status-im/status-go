@@ -15,6 +15,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
@@ -68,11 +69,12 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 
 	contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
 	s.Require().NoError(err)
-	response, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: contact.ID})
+	response, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: contact.ID, CustomizationColor: string(multiaccountscommon.CustomizationColorRed)})
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Contacts, 1)
 	s.Require().Equal(response.Contacts[0].ID, contact.ID)
+	s.Require().Equal(response.Contacts[0].CustomizationColor, multiaccountscommon.CustomizationColorRed)
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
@@ -89,6 +91,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	// Simulate update from contact
 	contact.LastUpdated = 10
 	contact.DisplayName = "display-name"
+	contact.CustomizationColor = multiaccountscommon.CustomizationColorRed
 
 	s.Require().NoError(s.m.persistence.SaveContacts([]*Contact{contact}))
 	// Trigger syncing of contact
@@ -103,7 +106,8 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 				r.Contacts[0].ID == contact.ID &&
 				// Make sure lastupdated is **not** synced
 				actualContact.LastUpdated == 0 &&
-				r.Contacts[0].DisplayName == "display-name"
+				r.Contacts[0].DisplayName == "display-name" &&
+				r.Contacts[0].CustomizationColor == multiaccountscommon.CustomizationColorRed
 		},
 		"contact not received",
 	)
@@ -128,7 +132,6 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 }
 
 func (s *MessengerInstallationSuite) TestSyncInstallation() {
-
 	// add contact
 	contactKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -142,7 +145,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.m.allContacts.Store(contact.ID, contact)
 
 	contact.LocalNickname = "Test Nickname"
-	_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: contact.ID})
+	_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: contact.ID, CustomizationColor: string(multiaccountscommon.CustomizationColorRed)})
 	s.Require().NoError(err)
 	_, err = s.m.SetContactLocalNickname(&requests.SetContactLocalNickname{ID: types.Hex2Bytes(contact.ID), Nickname: contact.LocalNickname})
 	s.Require().NoError(err)
@@ -330,6 +333,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	s.Require().True(actualContact.added())
 	s.Require().Equal("Test Nickname", actualContact.LocalNickname)
+	s.Require().Equal(multiaccountscommon.CustomizationColorRed, actualContact.CustomizationColor)
 	s.Require().True(actualContact.hasAddedUs())
 	s.Require().True(actualContact.mutual())
 

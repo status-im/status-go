@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/eth-node/types"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -22,16 +23,17 @@ const (
 )
 
 type RequestToJoin struct {
-	ID               types.HexBytes              `json:"id"`
-	PublicKey        string                      `json:"publicKey"`
-	Clock            uint64                      `json:"clock"`
-	ENSName          string                      `json:"ensName,omitempty"`
-	ChatID           string                      `json:"chatId"`
-	CommunityID      types.HexBytes              `json:"communityId"`
-	State            RequestToJoinState          `json:"state"`
-	Our              bool                        `json:"our"`
-	Deleted          bool                        `json:"deleted"`
-	RevealedAccounts []*protobuf.RevealedAccount `json:"revealedAccounts,omitempty"`
+	ID                 types.HexBytes                         `json:"id"`
+	PublicKey          string                                 `json:"publicKey"`
+	Clock              uint64                                 `json:"clock"`
+	ENSName            string                                 `json:"ensName,omitempty"`
+	ChatID             string                                 `json:"chatId"`
+	CommunityID        types.HexBytes                         `json:"communityId"`
+	State              RequestToJoinState                     `json:"state"`
+	Our                bool                                   `json:"our"`
+	Deleted            bool                                   `json:"deleted"`
+	RevealedAccounts   []*protobuf.RevealedAccount            `json:"revealedAccounts,omitempty"`
+	CustomizationColor multiaccountscommon.CustomizationColor `json:"customizationColor,omitempty"`
 }
 
 func (r *RequestToJoin) CalculateID() {
@@ -40,23 +42,25 @@ func (r *RequestToJoin) CalculateID() {
 
 func (r *RequestToJoin) ToCommunityRequestToJoinProtobuf() *protobuf.CommunityRequestToJoin {
 	return &protobuf.CommunityRequestToJoin{
-		Clock:            r.Clock,
-		EnsName:          r.ENSName,
-		CommunityId:      r.CommunityID,
-		RevealedAccounts: r.RevealedAccounts,
+		Clock:              r.Clock,
+		EnsName:            r.ENSName,
+		CommunityId:        r.CommunityID,
+		RevealedAccounts:   r.RevealedAccounts,
+		CustomizationColor: multiaccountscommon.ColorToIDFallbackToBlue(r.CustomizationColor),
 	}
 }
 
 func (r *RequestToJoin) ToSyncProtobuf() *protobuf.SyncCommunityRequestsToJoin {
 	return &protobuf.SyncCommunityRequestsToJoin{
-		Id:               r.ID,
-		PublicKey:        r.PublicKey,
-		Clock:            r.Clock,
-		EnsName:          r.ENSName,
-		ChatId:           r.ChatID,
-		CommunityId:      r.CommunityID,
-		State:            uint64(r.State),
-		RevealedAccounts: r.RevealedAccounts,
+		Id:                 r.ID,
+		PublicKey:          r.PublicKey,
+		Clock:              r.Clock,
+		EnsName:            r.ENSName,
+		ChatId:             r.ChatID,
+		CommunityId:        r.CommunityID,
+		State:              uint64(r.State),
+		RevealedAccounts:   r.RevealedAccounts,
+		CustomizationColor: multiaccountscommon.ColorToIDFallbackToBlue(r.CustomizationColor),
 	}
 }
 
@@ -69,10 +73,11 @@ func (r *RequestToJoin) InitFromSyncProtobuf(proto *protobuf.SyncCommunityReques
 	r.CommunityID = proto.CommunityId
 	r.State = RequestToJoinState(proto.State)
 	r.RevealedAccounts = proto.RevealedAccounts
+	r.CustomizationColor = multiaccountscommon.IDToColorFallbackToBlue(proto.CustomizationColor)
 }
 
 func (r *RequestToJoin) Empty() bool {
-	return len(r.ID)+len(r.PublicKey)+int(r.Clock)+len(r.ENSName)+len(r.ChatID)+len(r.CommunityID)+int(r.State) == 0
+	return len(r.ID)+len(r.PublicKey)+int(r.Clock)+len(r.ENSName)+len(r.ChatID)+len(r.CommunityID)+int(r.State)+len(r.CustomizationColor) == 0
 }
 
 func (r *RequestToJoin) ShouldRetainDeclined(clock uint64) (bool, error) {
