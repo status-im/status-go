@@ -209,7 +209,7 @@ func (s *ActivityCenterPersistenceTestSuite) Test_DeleteActivityCenterNotificati
 	_, err = p.DeleteActivityCenterNotificationForMessage(chat.ID, messages[1].ID, currentMilliseconds())
 	s.Require().NoError(err)
 
-	for _, id := range []types.HexBytes{nID2, nID3} {
+	for _, id := range []types.HexBytes{nID1, nID2} {
 		notif, err = p.GetActivityCenterNotificationByID(id)
 		s.Require().NoError(err, notif.ID)
 		s.Require().True(notif.Deleted, notif.ID)
@@ -226,6 +226,62 @@ func (s *ActivityCenterPersistenceTestSuite) Test_DeleteActivityCenterNotificati
 	// Test: don't do anything if passed a chat and message without notifications.
 	_, err = p.DeleteActivityCenterNotificationForMessage(chat2.ID, messages[2].ID, currentMilliseconds())
 	s.Require().NoError(err)
+}
+
+func (s *ActivityCenterPersistenceTestSuite) Test_ActivityCenterNotificationsCountDeleteLastMessage() {
+	db, err := openTestDB()
+	s.Require().NoError(err)
+	p := newSQLitePersistence(db)
+
+	chat := CreatePublicChat("test-chat", &testTimeSource{})
+	err = p.SaveChat(*chat)
+	s.Require().NoError(err)
+
+	messages := []*common.Message{
+		{
+			ID:          "0x1",
+			ChatMessage: &protobuf.ChatMessage{},
+			LocalChatID: chat.ID,
+		},
+		{
+			ID:          "0x2",
+			ChatMessage: &protobuf.ChatMessage{},
+			LocalChatID: chat.ID,
+		},
+	}
+	err = p.SaveMessages(messages)
+	s.Require().NoError(err)
+
+	chat.LastMessage = messages[1]
+	err = p.SaveChat(*chat)
+	s.Require().NoError(err)
+
+	nID1 := types.HexBytes("1")
+	nID2 := types.HexBytes("2")
+
+	s.createNotifications(p, []*ActivityCenterNotification{
+		{
+			ID:          nID1,
+			ChatID:      chat.ID,
+			Type:        ActivityCenterNotificationTypeMention,
+			Message:     messages[0],
+			LastMessage: messages[1],
+		},
+		{
+			ID:          nID2,
+			ChatID:      chat.ID,
+			Type:        ActivityCenterNotificationTypeMention,
+			Message:     messages[1],
+			LastMessage: messages[1],
+		},
+	})
+
+	_, err = p.DeleteActivityCenterNotificationForMessage(chat.ID, messages[1].ID, currentMilliseconds())
+	s.Require().NoError(err)
+
+	count, err := p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, true)
+	s.Require().NoError(err)
+	s.Require().Equal(uint64(1), count)
 }
 
 func (s *ActivityCenterPersistenceTestSuite) Test_AcceptActivityCenterNotificationsForInvitesFromUser() {
