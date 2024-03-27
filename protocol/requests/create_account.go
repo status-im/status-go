@@ -46,7 +46,8 @@ type CreateAccount struct {
 	VerifyTransactionChainID *int64  `json:"verifyTransactionChainID"`
 	UpstreamConfig           string  `json:"upstreamConfig"`
 
-	// Deprecated: CurrentNetwork is deprecated
+	// Deprecated: CurrentNetwork is deprecated. It was passed and not used, so nothing should be passed instead.
+	// If you want to use non-default network, use NetworkID.
 	CurrentNetwork string  `json:"currentNetwork"`
 	NetworkID      *uint64 `json:"networkId"`
 
