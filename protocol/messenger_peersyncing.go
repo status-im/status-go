@@ -304,8 +304,7 @@ func (m *Messenger) canSyncMessageWith(message peersyncing.SyncMessage, peer *ec
 		if !ok {
 			return false, nil
 		}
-		key := common.PubkeyToHex(peer)
-		return chat.HasMember(key), nil
+		return m.canSyncOneToOneMessageWith(chat, peer)
 	default:
 		return false, nil
 	}
@@ -316,6 +315,10 @@ func (m *Messenger) canSyncMessageWith(message peersyncing.SyncMessage, peer *ec
 // As an approximation it should be ok, but worth thinking about how to address this.
 func (m *Messenger) canSyncCommunityMessageWith(chat *Chat, community *communities.Community, peer *ecdsa.PublicKey) (bool, error) {
 	return community.IsMemberInChat(peer, chat.CommunityChatID()), nil
+}
+
+func (m *Messenger) canSyncOneToOneMessageWith(chat *Chat, peer *ecdsa.PublicKey) (bool, error) {
+	return chat.HasMember(common.PubkeyToHex(peer)), nil
 }
 
 func (m *Messenger) OnDatasyncRequests(requester *ecdsa.PublicKey, messageIDs [][]byte) error {

@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"encoding/hex"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -263,9 +265,51 @@ func (s *MessengerPeersyncingSuite) TestCanSyncMessageWith() {
 }
 
 func (s *MessengerPeersyncingSuite) TestSyncOneToOne() {
-	// TODO(alwx):
+	s.alice.featureFlags.Peersyncing = true
+	s.owner.featureFlags.Peersyncing = true
+
+	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.alice.identity.PublicKey))
+	chat := CreateOneToOneChat(pkString, &s.alice.identity.PublicKey, s.owner.transport)
+
+	inputMessage := common.NewMessage()
+	inputMessage.ChatId = chat.ID
+	chat.LastClockValue = uint64(100000000000000)
+	err := s.owner.SaveChat(chat)
+	s.NoError(err)
+	response, err := s.owner.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Equal(1, len(response.Messages()), "it returns the message")
 }
 
 func (s *MessengerPeersyncingSuite) TestCanSyncOneToOneMessageWith() {
-	// TODO(alwx):
+	s.alice.featureFlags.Peersyncing = true
+	s.owner.featureFlags.Peersyncing = true
+
+	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.alice.identity.PublicKey))
+	chat := CreateOneToOneChat(pkString, &s.alice.identity.PublicKey, s.owner.transport)
+
+	inputMessage := common.NewMessage()
+	inputMessage.ChatId = chat.ID
+	chat.LastClockValue = uint64(100000000000000)
+	err := s.owner.SaveChat(chat)
+	s.NoError(err)
+	_, err = s.alice.Join(chat)
+	s.NoError(err)
+
+	syncMessage := peersyncing.SyncMessage{
+		ID:        []byte("test-id"),
+		ChatID:    []byte(chat.ID),
+		Type:      peersyncing.SyncMessageOneToOneType,
+		Payload:   []byte("some-payload"),
+		Timestamp: 1,
+	}
+	s.Require().NoError(s.owner.peersyncing.Add(syncMessage))
+
+	canSyncWithBob, err := s.owner.canSyncOneToOneMessageWith(chat, &s.bob.identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().False(canSyncWithBob)
+
+	canSyncWithAlice, err := s.owner.canSyncOneToOneMessageWith(chat, &s.alice.identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().True(canSyncWithAlice)
 }
