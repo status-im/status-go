@@ -271,14 +271,60 @@ func (s *MessengerPeersyncingSuite) TestSyncOneToOne() {
 	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.alice.identity.PublicKey))
 	chat := CreateOneToOneChat(pkString, &s.alice.identity.PublicKey, s.owner.transport)
 
-	inputMessage := common.NewMessage()
-	inputMessage.ChatId = chat.ID
 	chat.LastClockValue = uint64(100000000000000)
 	err := s.owner.SaveChat(chat)
 	s.NoError(err)
-	response, err := s.owner.SendChatMessage(context.Background(), inputMessage)
+	_, err = s.alice.Join(chat)
 	s.NoError(err)
-	s.Require().Equal(1, len(response.Messages()), "it returns the message")
+
+	chatID := chat.ID
+	inputMessage := common.NewMessage()
+	inputMessage.ChatId = chatID
+	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	inputMessage.Text = "some text"
+
+	ctx := context.Background()
+
+	// Send message, it should be received
+	response, err := s.alice.SendChatMessage(ctx, inputMessage)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	messageID := response.Messages()[0].ID
+
+	// Make sure the message makes it to the owner
+	response, err = WaitOnMessengerResponse(
+		s.owner,
+		func(r *MessengerResponse) bool {
+			return len(r.Messages()) == 1 && r.Messages()[0].ID == messageID
+		},
+		"message not received",
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	msg, err := s.owner.peersyncing.AvailableMessages()
+	s.Require().NoError(err)
+	s.Require().Len(msg, 1)
+
+	// Alice should now send an offer
+	_, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return s.alice.peersyncingOffers[messageID[2:]] != 0
+		},
+		"offer not sent",
+	)
+	s.Require().NoError(err)
+
+	// Owner should now reply to the offer
+	_, err = WaitOnMessengerResponse(
+		s.owner,
+		func(r *MessengerResponse) bool {
+			return s.owner.peersyncingRequests[s.alice.myHexIdentity()+messageID[2:]] != 0
+		},
+		"request not sent",
+	)
+	s.Require().NoError(err)
 }
 
 func (s *MessengerPeersyncingSuite) TestCanSyncOneToOneMessageWith() {
@@ -288,8 +334,6 @@ func (s *MessengerPeersyncingSuite) TestCanSyncOneToOneMessageWith() {
 	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.alice.identity.PublicKey))
 	chat := CreateOneToOneChat(pkString, &s.alice.identity.PublicKey, s.owner.transport)
 
-	inputMessage := common.NewMessage()
-	inputMessage.ChatId = chat.ID
 	chat.LastClockValue = uint64(100000000000000)
 	err := s.owner.SaveChat(chat)
 	s.NoError(err)
@@ -301,7 +345,7 @@ func (s *MessengerPeersyncingSuite) TestCanSyncOneToOneMessageWith() {
 		ChatID:    []byte(chat.ID),
 		Type:      peersyncing.SyncMessageOneToOneType,
 		Payload:   []byte("some-payload"),
-		Timestamp: 1,
+		Timestamp: chat.LastClockValue,
 	}
 	s.Require().NoError(s.owner.peersyncing.Add(syncMessage))
 
