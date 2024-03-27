@@ -28,13 +28,13 @@ func (p *SyncMessageSQLitePersistence) Add(message SyncMessage) error {
 	if err := message.Valid(); err != nil {
 		return err
 	}
-	_, err := p.db.Exec(`INSERT INTO peersyncing_messages (id, type, group_id, payload, timestamp) VALUES (?, ?, ?, ?, ?)`, message.ID, message.Type, message.ChatID, message.Payload, message.Timestamp)
+	_, err := p.db.Exec(`INSERT INTO peersyncing_messages (id, type, chat_id, payload, timestamp) VALUES (?, ?, ?, ?, ?)`, message.ID, message.Type, message.ChatID, message.Payload, message.Timestamp)
 	return err
 }
 
 func (p *SyncMessageSQLitePersistence) All() ([]SyncMessage, error) {
 	var messages []SyncMessage
-	rows, err := p.db.Query(`SELECT id, type, group_id, payload, timestamp FROM peersyncing_messages`)
+	rows, err := p.db.Query(`SELECT id, type, chat_id, payload, timestamp FROM peersyncing_messages`)
 	if err != nil {
 		return nil, err
 	}
@@ -54,9 +54,9 @@ func (p *SyncMessageSQLitePersistence) All() ([]SyncMessage, error) {
 	return messages, nil
 }
 
-func (p *SyncMessageSQLitePersistence) ByChatID(groupID []byte, limit int) ([]SyncMessage, error) {
+func (p *SyncMessageSQLitePersistence) ByChatID(chatID []byte, limit int) ([]SyncMessage, error) {
 	var messages []SyncMessage
-	rows, err := p.db.Query(`SELECT id, type, group_id, payload, timestamp FROM peersyncing_messages WHERE group_id = ? ORDER BY timestamp DESC LIMIT ?`, groupID, limit)
+	rows, err := p.db.Query(`SELECT id, type, chat_id, payload, timestamp FROM peersyncing_messages WHERE chat_id = ? ORDER BY timestamp DESC LIMIT ?`, chatID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (p *SyncMessageSQLitePersistence) Complement(messages []SyncMessage) ([]Syn
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "SELECT id, type, group_id, payload, timestamp FROM peersyncing_messages WHERE id IN (" + inVector + ")" // nolint: gosec
+	query := "SELECT id, type, chat_id, payload, timestamp FROM peersyncing_messages WHERE id IN (" + inVector + ")" // nolint: gosec
 
 	availableMessages := make(map[string]SyncMessage)
 	rows, err := p.db.Query(query, ids...)
@@ -132,7 +132,7 @@ func (p *SyncMessageSQLitePersistence) ByChatIDs(ids [][]byte, limit int) ([]Syn
 	queryArgs = append(queryArgs, limit)
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "SELECT id, type, group_id, payload, timestamp FROM peersyncing_messages WHERE group_id IN (" + inVector + ") ORDER BY timestamp DESC LIMIT ?" // nolint: gosec
+	query := "SELECT id, type, chat_id, payload, timestamp FROM peersyncing_messages WHERE chat_id IN (" + inVector + ") ORDER BY timestamp DESC LIMIT ?" // nolint: gosec
 
 	var messages []SyncMessage
 	rows, err := p.db.Query(query, queryArgs...)
@@ -167,7 +167,7 @@ func (p *SyncMessageSQLitePersistence) ByMessageIDs(ids [][]byte) ([]SyncMessage
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "SELECT id, type, group_id, payload, timestamp FROM peersyncing_messages WHERE id IN (" + inVector + ")" // nolint: gosec
+	query := "SELECT id, type, chat_id, payload, timestamp FROM peersyncing_messages WHERE id IN (" + inVector + ")" // nolint: gosec
 
 	var messages []SyncMessage
 	rows, err := p.db.Query(query, queryArgs...)
