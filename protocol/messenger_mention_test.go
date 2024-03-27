@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -794,7 +795,7 @@ func TestMentionSuggestionCases(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("%d", i+1), func(t *testing.T) {
-			ctx, err := mentionManager.OnChangeText(chatID, tc.inputText)
+			ctx, err := mentionManager.OnChangeText(chatID, tc.inputText, uint64(i+1), now())
 			require.NoError(t, err)
 			t.Logf("Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
 			require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
@@ -806,7 +807,7 @@ func TestMentionSuggestionAfterToInputField(t *testing.T) {
 	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(t, nil)
 	_, err := mentionManager.ToInputField(chatID, "abc")
 	require.NoError(t, err)
-	ctx, err := mentionManager.OnChangeText(chatID, "@")
+	ctx, err := mentionManager.OnChangeText(chatID, "@", 1, now())
 	require.NoError(t, err)
 	require.Equal(t, len(mentionableUserMap), len(ctx.MentionSuggestions))
 }
@@ -826,7 +827,7 @@ func TestMentionSuggestionSpecialInputModeForAndroid(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("%d", i+1), func(t *testing.T) {
-			ctx, err := mentionManager.OnChangeText(chatID, tc.inputText)
+			ctx, err := mentionManager.OnChangeText(chatID, tc.inputText, uint64(i+1), now())
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
 			t.Logf("Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
@@ -849,7 +850,7 @@ func TestMentionSuggestionSpecialChars(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("%d", i+1), func(t *testing.T) {
-			ctx, err := mentionManager.OnChangeText(chatID, tc.inputText)
+			ctx, err := mentionManager.OnChangeText(chatID, tc.inputText, uint64(i+1), now())
 			require.NoError(t, err)
 			t.Logf("Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
 			require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
@@ -878,8 +879,8 @@ func TestMentionSuggestionAtSignSpaceCases(t *testing.T) {
 
 	var ctx *ChatMentionContext
 	var err error
-	for _, tc := range testCases {
-		ctx, err = mentionManager.OnChangeText(chatID, tc.inputText)
+	for i, tc := range testCases {
+		ctx, err = mentionManager.OnChangeText(chatID, tc.inputText, uint64(i+1), now())
 		require.NoError(t, err)
 		t.Logf("After OnChangeText, Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
 		require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
@@ -894,12 +895,14 @@ func TestMentionSuggestionAtSignSpaceCases(t *testing.T) {
 func TestSelectMention(t *testing.T) {
 	mentionableUsers, chatID, mentionManager := setupMentionSuggestionTest(t, nil)
 
+	var callID uint64 = 1
 	text := "@u2 abc"
-	ctx, err := mentionManager.OnChangeText(chatID, text)
+	ctx, err := mentionManager.OnChangeText(chatID, text, callID, now())
 	require.NoError(t, err)
 	require.Equal(t, 0, len(ctx.MentionSuggestions))
 
-	ctx, err = mentionManager.OnChangeText(chatID, "@u abc")
+	callID++
+	ctx, err = mentionManager.OnChangeText(chatID, "@u abc", callID, now())
 	require.NoError(t, err)
 	require.Equal(t, len(mentionableUsers), len(ctx.MentionSuggestions))
 
@@ -909,20 +912,27 @@ func TestSelectMention(t *testing.T) {
 	require.Equal(t, text, ctx.NewText)
 	require.Equal(t, text, ctx.PreviousText)
 
-	ctx, err = mentionManager.OnChangeText(chatID, text)
+	callID++
+	ctx, err = mentionManager.OnChangeText(chatID, text, callID, now())
 	require.NoError(t, err)
 	require.Equal(t, 0, len(ctx.MentionSuggestions))
 }
 
+func now() int64 {
+	return time.Now().UnixMilli()
+}
+
 func TestInputSegments(t *testing.T) {
 	_, chatID, mentionManager := setupMentionSuggestionTest(t, nil)
-	ctx, err := mentionManager.OnChangeText(chatID, "@u1")
+	var callID uint64 = 1
+	ctx, err := mentionManager.OnChangeText(chatID, "@u1", callID, now())
 	require.NoError(t, err)
 	require.Equal(t, 1, len(ctx.InputSegments))
 	require.Equal(t, Text, ctx.InputSegments[0].Type)
 	require.Equal(t, "@u1", ctx.InputSegments[0].Value)
 
-	ctx, err = mentionManager.OnChangeText(chatID, "@u1 @User Number One")
+	callID++
+	ctx, err = mentionManager.OnChangeText(chatID, "@u1 @User Number One", callID, now())
 	require.NoError(t, err)
 	require.Equal(t, 2, len(ctx.InputSegments))
 	require.Equal(t, Text, ctx.InputSegments[0].Type)
@@ -930,13 +940,15 @@ func TestInputSegments(t *testing.T) {
 	require.Equal(t, Mention, ctx.InputSegments[1].Type)
 	require.Equal(t, "@User Number One", ctx.InputSegments[1].Value)
 
-	ctx, err = mentionManager.OnChangeText(chatID, "@u1 @User Number O")
+	callID++
+	ctx, err = mentionManager.OnChangeText(chatID, "@u1 @User Number O", callID, now())
 	require.NoError(t, err)
 	require.Equal(t, 2, len(ctx.InputSegments))
 	require.Equal(t, Text, ctx.InputSegments[1].Type)
 	require.Equal(t, "@User Number O", ctx.InputSegments[1].Value)
 
-	ctx, err = mentionManager.OnChangeText(chatID, "@u2 @User Number One")
+	callID++
+	ctx, err = mentionManager.OnChangeText(chatID, "@u2 @User Number One", callID, now())
 	require.NoError(t, err)
 	require.Equal(t, 3, len(ctx.InputSegments))
 	require.Equal(t, Mention, ctx.InputSegments[0].Type)
@@ -946,7 +958,8 @@ func TestInputSegments(t *testing.T) {
 	require.Equal(t, Mention, ctx.InputSegments[2].Type)
 	require.Equal(t, "@User Number One", ctx.InputSegments[2].Value)
 
-	ctx, err = mentionManager.OnChangeText(chatID, "@u2 @User Number One a ")
+	callID++
+	ctx, err = mentionManager.OnChangeText(chatID, "@u2 @User Number One a ", callID, now())
 	require.NoError(t, err)
 	require.Equal(t, 4, len(ctx.InputSegments))
 	require.Equal(t, Mention, ctx.InputSegments[2].Type)
@@ -954,7 +967,8 @@ func TestInputSegments(t *testing.T) {
 	require.Equal(t, Text, ctx.InputSegments[3].Type)
 	require.Equal(t, " a ", ctx.InputSegments[3].Value)
 
-	ctx, err = mentionManager.OnChangeText(chatID, "@u2 @User Numbed One a ")
+	callID++
+	ctx, err = mentionManager.OnChangeText(chatID, "@u2 @User Numbed One a ", callID, now())
 	require.NoError(t, err)
 	require.Equal(t, 3, len(ctx.InputSegments))
 	require.Equal(t, Mention, ctx.InputSegments[0].Type)
@@ -962,7 +976,8 @@ func TestInputSegments(t *testing.T) {
 	require.Equal(t, Text, ctx.InputSegments[2].Type)
 	require.Equal(t, "@User Numbed One a ", ctx.InputSegments[2].Value)
 
-	ctx, err = mentionManager.OnChangeText(chatID, "@ @ ")
+	callID++
+	ctx, err = mentionManager.OnChangeText(chatID, "@ @ ", callID, now())
 	require.NoError(t, err)
 	require.Equal(t, 2, len(ctx.InputSegments))
 	require.Equal(t, Text, ctx.InputSegments[0].Type)
@@ -970,7 +985,8 @@ func TestInputSegments(t *testing.T) {
 	require.Equal(t, Text, ctx.InputSegments[1].Type)
 	require.Equal(t, "@ ", ctx.InputSegments[1].Value)
 
-	ctx, err = mentionManager.OnChangeText(chatID, "@u3 @ ")
+	callID++
+	ctx, err = mentionManager.OnChangeText(chatID, "@u3 @ ", callID, now())
 	require.NoError(t, err)
 	require.Equal(t, 3, len(ctx.InputSegments))
 	require.Equal(t, Mention, ctx.InputSegments[0].Type)
@@ -980,20 +996,27 @@ func TestInputSegments(t *testing.T) {
 	require.Equal(t, Text, ctx.InputSegments[2].Type)
 	require.Equal(t, "@ ", ctx.InputSegments[2].Value)
 
-	_, err = mentionManager.OnChangeText(chatID, " @ @User Number Three ")
+	callID++
+	_, err = mentionManager.OnChangeText(chatID, " @ @User Number Three ", callID, now())
 	require.NoError(t, err)
-	_, err = mentionManager.OnChangeText(chatID, "@U @ @User Number Three ")
+	callID++
+	_, err = mentionManager.OnChangeText(chatID, "@U @ @User Number Three ", callID, now())
 	require.NoError(t, err)
 	ctx, err = mentionManager.SelectMention(chatID, "@U @ @User Number Three ", "User Number Three", "0xpk3")
 	require.NoError(t, err)
 	require.Equal(t, 2, mentionTypeNum(ctx.InputSegments))
 
-	ctx, _ = mentionManager.OnChangeText(chatID, "@User Number Threea")
+	callID++
+	ctx, _ = mentionManager.OnChangeText(chatID, "@User Number Threea", callID, now())
 	require.Equal(t, 0, mentionTypeNum(ctx.InputSegments))
 
-	ctx, _ = mentionManager.OnChangeText(chatID, "@User Number Threea\n@u2\nabc@u3 asa")
+	callID++
+	ctx, err = mentionManager.OnChangeText(chatID, "@User Number Threea\n@u2\nabc@u3 asa", callID, now())
+	require.NoError(t, err)
 	require.Equal(t, 2, mentionTypeNum(ctx.InputSegments))
-	ctx, _ = mentionManager.OnChangeText(chatID, "@User Number Thre\n@u2\nabc@u3 asa")
+	callID++
+	ctx, err = mentionManager.OnChangeText(chatID, "@User Number Thre\n@u2\nabc@u3 asa", callID, now())
+	require.NoError(t, err)
 	require.Equal(t, 2, mentionTypeNum(ctx.InputSegments))
 	require.Equal(t, "@u2", ctx.InputSegments[1].Value)
 	require.Equal(t, "@u3", ctx.InputSegments[3].Value)

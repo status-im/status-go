@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -165,6 +166,11 @@ type ChatMentionContext struct {
 	MentionState       *MentionState
 	PreviousText       string // user input text before the last change
 	NewText            string
+
+	CallID       uint64
+	CallTime     int64
+	mu           *sync.Mutex
+	LatestCallID uint64
 }
 
 func NewChatMentionContext(chatID string) *ChatMentionContext {
@@ -172,6 +178,7 @@ func NewChatMentionContext(chatID string) *ChatMentionContext {
 		ChatID:             chatID,
 		MentionSuggestions: make(map[string]*MentionableUser),
 		MentionState:       new(MentionState),
+		mu:                 new(sync.Mutex),
 	}
 }
 
@@ -293,11 +300,28 @@ func (m *MentionManager) ReplaceWithPublicKey(chatID, text string) (string, erro
 	return newText, nil
 }
 
-func (m *MentionManager) OnChangeText(chatID, fullText string) (*ChatMentionContext, error) {
+func withCallID(ctx *ChatMentionContext, callID uint64, callTime int64) *ChatMentionContext {
+	result := *ctx
+	result.CallID = callID
+	result.CallTime = callTime
+	return &result
+}
+
+func (m *MentionManager) OnChangeText(chatID, fullText string, callID uint64, callTime int64) (*ChatMentionContext, error) {
 	ctx := m.getChatMentionContext(chatID)
+	if callID > 0 {
+		ctx.mu.Lock()
+		if callID <= ctx.LatestCallID {
+			ctx.mu.Unlock()
+			return withCallID(ctx, callID, callTime), fmt.Errorf("callID is less than or equal to latestCallID, callID: %d, maxCallID: %d", callID, ctx.LatestCallID)
+		}
+		ctx.LatestCallID = callID
+		ctx.mu.Unlock()
+	}
+
 	diff := diffText(ctx.PreviousText, fullText)
 	if diff == nil {
-		return ctx, nil
+		return withCallID(ctx, callID, callTime), nil
 	}
 	ctx.PreviousText = fullText
 	if ctx.MentionState == nil {
@@ -311,11 +335,12 @@ func (m *MentionManager) OnChangeText(chatID, fullText string) (*ChatMentionCont
 
 	atIndexes, err := calculateAtIndexEntries(ctx.MentionState)
 	if err != nil {
-		return ctx, err
+		return withCallID(ctx, callID, callTime), err
 	}
 	ctx.MentionState.AtIdxs = atIndexes
 	m.logger.Debug("OnChangeText", zap.String("chatID", chatID), zap.Any("state", ctx.MentionState))
-	return m.calculateSuggestions(chatID, fullText)
+	ctx, err = m.calculateSuggestions(chatID, fullText)
+	return withCallID(ctx, callID, callTime), err
 }
 
 func (m *MentionManager) calculateSuggestions(chatID, fullText string) (*ChatMentionContext, error) {
@@ -347,8 +372,8 @@ func (m *MentionManager) calculateSuggestionsWithMentionableUsers(chatID string,
 	}
 
 	newAtIndexEntries := checkIdxForMentions(fullText, state.AtIdxs, mentionableUsers)
-	calculatedInput, success := calculateInput(fullText, newAtIndexEntries)
-	if !success {
+	calculatedInput, inputSegmentString := calculateInput(fullText, newAtIndexEntries)
+	if fullText != inputSegmentString {
 		m.logger.Warn("calculateSuggestionsWithMentionableUsers: calculateInput failed", zap.String("chatID", chatID), zap.String("fullText", fullText), zap.Any("state", state))
 	}
 
@@ -401,7 +426,7 @@ func (m *MentionManager) SelectMention(chatID, text, primaryName, publicKey stri
 
 	ctx.NewText = string(tr[:atSignIdx+1]) + primaryName + space + string(tr[mentionEnd:])
 
-	ctx, err := m.OnChangeText(chatID, ctx.NewText)
+	_, err := m.OnChangeText(chatID, ctx.NewText, 0, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -988,9 +1013,9 @@ func appendInputSegment(result *[]InputSegment, typ SegmentType, value string, f
 	}
 }
 
-func calculateInput(text string, atIndexEntries []*AtIndexEntry) ([]InputSegment, bool) {
+func calculateInput(text string, atIndexEntries []*AtIndexEntry) ([]InputSegment, string) {
 	if len(atIndexEntries) == 0 {
-		return []InputSegment{{Type: Text, Value: text}}, true
+		return []InputSegment{{Type: Text, Value: text}}, text
 	}
 	idxCount := len(atIndexEntries)
 	lastFrom := atIndexEntries[idxCount-1].From
@@ -1026,7 +1051,7 @@ func calculateInput(text string, atIndexEntries []*AtIndexEntry) ([]InputSegment
 		}
 	}
 
-	return result, fullText == text
+	return result, fullText
 }
 
 func subs(s string, start int, end ...int) string {
