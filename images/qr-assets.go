@@ -266,24 +266,26 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"_assets/tests/1.gif": _assetsTests1Gif,
-	"_assets/tests/2x1.png": _assetsTests2x1Png,
-	"_assets/tests/spin.gif": _assetsTestsSpinGif,
+	"_assets/tests/1.gif":             _assetsTests1Gif,
+	"_assets/tests/2x1.png":           _assetsTests2x1Png,
+	"_assets/tests/spin.gif":          _assetsTestsSpinGif,
 	"_assets/tests/qr/QRWithLogo.png": _assetsTestsQrQrwithlogoPng,
-	"_assets/tests/qr/defaultQR.png": _assetsTestsQrDefaultqrPng,
-	"_assets/tests/qr/status.png": _assetsTestsQrStatusPng,
-	"_assets/tests/wikipedia.ico": _assetsTestsWikipediaIco,
+	"_assets/tests/qr/defaultQR.png":  _assetsTestsQrDefaultqrPng,
+	"_assets/tests/qr/status.png":     _assetsTestsQrStatusPng,
+	"_assets/tests/wikipedia.ico":     _assetsTestsWikipediaIco,
 }
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"}
 // AssetDir("data/img") would return []string{"a.png", "b.png"}
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error
@@ -314,17 +316,18 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = &bintree{nil, map[string]*bintree{
 	"_assets": &bintree{nil, map[string]*bintree{
 		"tests": &bintree{nil, map[string]*bintree{
-			"1.gif": &bintree{_assetsTests1Gif, map[string]*bintree{}},
+			"1.gif":   &bintree{_assetsTests1Gif, map[string]*bintree{}},
 			"2x1.png": &bintree{_assetsTests2x1Png, map[string]*bintree{}},
 			"qr": &bintree{nil, map[string]*bintree{
 				"QRWithLogo.png": &bintree{_assetsTestsQrQrwithlogoPng, map[string]*bintree{}},
-				"defaultQR.png": &bintree{_assetsTestsQrDefaultqrPng, map[string]*bintree{}},
-				"status.png": &bintree{_assetsTestsQrStatusPng, map[string]*bintree{}},
+				"defaultQR.png":  &bintree{_assetsTestsQrDefaultqrPng, map[string]*bintree{}},
+				"status.png":     &bintree{_assetsTestsQrStatusPng, map[string]*bintree{}},
 			}},
-			"spin.gif": &bintree{_assetsTestsSpinGif, map[string]*bintree{}},
+			"spin.gif":      &bintree{_assetsTestsSpinGif, map[string]*bintree{}},
 			"wikipedia.ico": &bintree{_assetsTestsWikipediaIco, map[string]*bintree{}},
 		}},
 	}},
@@ -376,4 +379,3 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
-

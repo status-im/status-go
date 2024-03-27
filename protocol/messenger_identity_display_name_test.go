@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
@@ -181,4 +182,43 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameSync() {
 	dbProfileKp, err = alicesOtherDevice.settings.GetKeypairByKeyUID(profileKp.KeyUID)
 	s.Require().NoError(err)
 	s.Require().Equal(testDisplayName, dbProfileKp.Name)
+}
+
+func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameRestrictions() {
+	// check display name for the created instance
+	displayName, err := s.m.settings.DisplayName()
+	s.Require().NoError(err)
+	s.Require().Equal(DefaultProfileDisplayName, displayName)
+
+	// add profile keypair
+	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp.KeyUID = s.m.account.KeyUID
+	profileKp.Name = DefaultProfileDisplayName
+	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
+
+	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
+	s.Require().NoError(err)
+
+	setInvalidName := func(invalidName string, expectedErr error) {
+		err = s.m.SetDisplayName(invalidName)
+		s.Require().ErrorIs(err, expectedErr)
+	}
+
+	setInvalidName("test.eth", utils.ErrInvalidDisplayNameRegExp)
+	setInvalidName("test-eth", utils.ErrInvalidDisplayNameEthSuffix)
+	setInvalidName("test_eth", utils.ErrInvalidDisplayNameEthSuffix)
+
+	setInvalidName("dot.not", utils.ErrInvalidDisplayNameRegExp)
+	setInvalidName("t", utils.ErrInvalidDisplayNameRegExp)
+	setInvalidName("tt", utils.ErrInvalidDisplayNameRegExp)
+	setInvalidName("ttt", utils.ErrInvalidDisplayNameRegExp)
+	setInvalidName("tttt", utils.ErrInvalidDisplayNameRegExp)
+	setInvalidName("name is bigger than 24 symb", utils.ErrInvalidDisplayNameRegExp)
+
+	err = s.m.SetDisplayName("name with space")
+	s.Require().NoError(err)
+	displayName, err = s.m.settings.DisplayName()
+	s.Require().NoError(err)
+	s.Require().Equal("name with space", displayName)
+
 }
