@@ -26,7 +26,7 @@ help: SHELL := /bin/sh
 help: ##@other Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
-RELEASE_TAG := v$(SHELL=/bin/sh shell cat VERSION)
+RELEASE_TAG := v$(file < VERSION)
 RELEASE_DIR := /tmp/release-$(RELEASE_TAG)
 GOLANGCI_BINARY=golangci-lint
 IPFS_GATEWAY_URL ?= https://ipfs.status.im/
@@ -52,8 +52,8 @@ CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 export GOPATH ?= $(HOME)/go
 
 GIT_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-GIT_COMMIT = $(SHELL=/bin/sh shell git rev-parse --short HEAD)
-GIT_AUTHOR ?= $(SHELL=/bin/sh shell git config user.email || echo $$USER)
+GIT_COMMIT := $(call sh, git rev-parse --short HEAD)
+GIT_AUTHOR := $(call sh, git config user.email || echo $$USER)
 
 ENABLE_METRICS ?= true
 BUILD_TAGS ?= gowaku_no_rln
@@ -96,6 +96,12 @@ export _NIX_GCROOTS = ./.nix-gcroots
 # Nix targets
 #----------------
 
+# Use $(call sh, <COMMAND>) instead of $(shell <COMMAND>) to avoid
+# invoking a Nix shell when normal shell will suffice, it's faster.
+# This works because it's defined before we set SHELL to Nix one.
+define sh
+$(shell $(1))
+endef
 
 SHELL := ./nix/scripts/shell.sh
 shell: export TARGET ?= default
@@ -162,6 +168,7 @@ spiff-workflow: build/bin/spiff-workflow
 status-cli: ##@build Build status-cli to send messages
 status-cli: build/bin/status-cli
 
+statusd-prune-docker-image: SHELL := /bin/sh
 statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
 	@echo "Building docker image for ststusd-prune..."
 	docker build --file _assets/build/Dockerfile-prune . \
@@ -264,14 +271,17 @@ push-docker-images: docker-image bootnode-image
 
 clean-docker-images: SHELL := /bin/sh
 clean-docker-images:
-	docker rmi -f $(SHELL=/bin/sh shell docker image ls --filter="reference=$(DOCKER_IMAGE_NAME)" --quiet)
+	docker rmi -f $$(docker image ls --filter="reference=$(DOCKER_IMAGE_NAME)" --quiet)
 
 # See https://www.gnu.org/software/make/manual/html_node/Target_002dspecific.html to understand this magic.
-push-docker-images: SHELL := /bin/sh
-push-docker-images-latest: GIT_BRANCH = $(SHELL=/bin/sh shell git rev-parse --abbrev-ref HEAD)
-push-docker-images-latest: GIT_LOCAL  = $(SHELL=/bin/sh shell git rev-parse @)
-push-docker-images-latest: GIT_REMOTE = $(SHELL=/bin/sh shell git fetch -q && git rev-parse remotes/origin/develop || echo 'NO_DEVELOP')
-push-docker-images-latest: docker-image bootnode-image
+push-docker-images-latest: SHELL := /bin/sh
+push-docker-images-latest: GIT_BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
+push-docker-images-latest: GIT_LOCAL  = $(shell git rev-parse @)
+push-docker-images-latest: GIT_REMOTE = $(shell git fetch -q && git rev-parse remotes/origin/develop || echo 'NO_DEVELOP')
+push-docker-images-latest:
+	echo $(GIT_BRANCH)
+	echo $(GIT_LOCAL)
+	echo $(GIT_REMOTE)
 	@echo "Pushing latest docker images..."
 	@echo "Checking git branch..."
 ifneq ("$(GIT_BRANCH)", "develop")
@@ -289,7 +299,7 @@ setup: ##@setup Install all tools
 setup: setup-dev
 
 setup-dev: ##@setup Install all necessary tools for development
-setup-dev: 
+setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
 generate-handlers:
@@ -336,7 +346,7 @@ test-unit: export UNIT_TEST_COUNT ?= 1
 test-unit: export UNIT_TEST_FAILFAST ?= true
 test-unit: export UNIT_TEST_RERUN_FAILS ?= true
 test-unit: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
-test-unit: export UNIT_TEST_PACKAGES ?= $(SHELL=/bin/sh shell go list ./... | \
+test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | \
 	grep -v /vendor | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
@@ -425,14 +435,14 @@ clean-mailserver-docker: ##@Easy Clean your Docker container running a mailserve
 
 migration: DEFAULT_MIGRATION_PATH := appdatabase/migrations/sql
 migration:
-	touch $(DEFAULT_MIGRATION_PATH)/$(SHELL=/bin/sh shell date +%s)_$(D).up.sql
+	touch $(DEFAULT_MIGRATION_PATH)/$$(date '+%s')_$(D).up.sql
 
 migration-check:
 	bash _assets/scripts/migration_check.sh
 
 migration-wallet: DEFAULT_WALLET_MIGRATION_PATH := walletdatabase/migrations/sql
 migration-wallet:
-	touch $(DEFAULT_WALLET_MIGRATION_PATH)/$(SHELL=/bin/sh shell date +%s)_$(D).up.sql
+	touch $(DEFAULT_WALLET_MIGRATION_PATH)/$$(date +%s)_$(D).up.sql
 
 install-git-hooks:
 	@ln -sf $(if $(filter $(detected_OS), Linux),-r,) \
@@ -443,7 +453,7 @@ install-git-hooks:
 
 migration-protocol: DEFAULT_PROTOCOL_PATH := protocol/migrations/sqlite
 migration-protocol:
-	touch $(DEFAULT_PROTOCOL_PATH)/$(SHELL=/bin/sh shell date +%s)_$(D).up.sql
+	touch $(DEFAULT_PROTOCOL_PATH)/$$(date +%s)_$(D).up.sql
 
 PROXY_WRAPPER_PATH = $(CURDIR)/vendor/github.com/siphiuel/lc-proxy-wrapper
 -include $(PROXY_WRAPPER_PATH)/Makefile.vars
