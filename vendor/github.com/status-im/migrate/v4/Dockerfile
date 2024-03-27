@@ -13,7 +13,7 @@ ENV SOURCES="file go_bindata github github_ee aws_s3 google_cloud_storage godoc_
 
 RUN go build -a -o build/migrate.linux-386 -ldflags="-s -w -X main.Version=${VERSION}" -tags "$DATABASES $SOURCES" ./cmd/migrate
 
-FROM alpine:3.10
+FROM alpine:3.18.4
 
 RUN apk add --no-cache ca-certificates
 
