@@ -74,6 +74,9 @@ pipeline {
     }
 
     stage('Migration') {
+      when { // https://github.com/status-im/status-go/issues/4993#issuecomment-2022685544
+        expression { !isTestNightlyJob() }
+      }
       steps { script {
         nix.shell('make migration-check', pure: false)
       } }
