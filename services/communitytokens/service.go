@@ -3,13 +3,16 @@ package communitytokens
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/pkg/errors"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts/community-tokens/ownertoken"
 	communityownertokenregistry "github.com/status-im/status-go/contracts/community-tokens/registry"
@@ -18,6 +21,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/utils"
 	wcommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -29,6 +33,10 @@ type ServiceInterface interface {
 	DeploymentSignatureDigest(chainID uint64, addressFrom string, communityID string) ([]byte, error)
 }
 
+type CommunityTokenFunctionalityInterface interface {
+	AddCommunityToken(communityID string, chainID int, address string) error
+}
+
 // Collectibles service
 type Service struct {
 	manager         *Manager
@@ -36,16 +44,21 @@ type Service struct {
 	pendingTracker  *transactions.PendingTxTracker
 	config          *params.NodeConfig
 	db              *Database
+	messenger       CommunityTokenFunctionalityInterface
+	walletFeed      *event.Feed
+	walletWatcher   *walletevent.Watcher
 }
 
 // Returns a new Collectibles Service.
-func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, pendingTracker *transactions.PendingTxTracker, config *params.NodeConfig, appDb *sql.DB) *Service {
+func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, pendingTracker *transactions.PendingTxTracker,
+	config *params.NodeConfig, appDb *sql.DB, walletFeed *event.Feed) *Service {
 	return &Service{
 		manager:         &Manager{rpcClient: rpcClient},
 		accountsManager: accountsManager,
 		pendingTracker:  pendingTracker,
 		config:          config,
 		db:              NewCommunityTokensDatabase(appDb),
+		walletFeed:      walletFeed,
 	}
 }
 
@@ -68,12 +81,85 @@ func (s *Service) APIs() []ethRpc.API {
 
 // Start is run when a service is started.
 func (s *Service) Start() error {
+
+	s.walletWatcher = walletevent.NewWatcher(s.walletFeed, s.handleWalletEvent)
+	s.walletWatcher.Start()
+
 	return nil
+}
+
+func (s *Service) handleWalletEvent(event walletevent.Event) {
+	if event.Type == transactions.EventPendingTransactionStatusChanged {
+		var p transactions.StatusChangedPayload
+		err := json.Unmarshal([]byte(event.Message), &p)
+		if err != nil {
+			log.Error(errors.Wrap(err, fmt.Sprintf("can't parse transaction message %v\n", event.Message)).Error())
+			return
+		}
+		if p.Status == transactions.Pending {
+			return
+		}
+		pendingTransaction, err := s.pendingTracker.GetPendingEntry(p.ChainID, p.Hash)
+		if err != nil {
+			log.Error(errors.Wrap(err, fmt.Sprintf("no pending transaction with hash %v on chain %v\n", p.Hash, p.ChainID)).Error())
+			return
+		}
+		switch pendingTransaction.Type {
+		case transactions.DeployCommunityToken:
+			s.handleDeployCommunityToken(p.Status, pendingTransaction)
+		case transactions.AirdropCommunityToken:
+			s.handleAirdropCommunityToken(p.Status, pendingTransaction)
+		case transactions.RemoteDestructCollectible:
+			s.handleRemoteDestructCollectible(p.Status, pendingTransaction)
+		case transactions.BurnCommunityToken:
+			s.handleBurnCommunityToken(p.Status, pendingTransaction)
+		case transactions.DeployOwnerToken:
+			s.handleDeployOwnerToken(p.Status, pendingTransaction)
+		case transactions.SetSignerPublicKey:
+			s.handleSetSignerPubKey(p.Status, pendingTransaction)
+		default:
+			return
+		}
+
+		err = s.pendingTracker.Delete(context.Background(), p.ChainID, p.Hash)
+		if err != nil {
+			log.Error(errors.Wrap(err, fmt.Sprintf("can't delete pending transaction with hash %v on chain %v\n", p.Hash, p.ChainID)).Error())
+		}
+	}
+}
+
+func (s *Service) handleAirdropCommunityToken(status string, pendingTransaction *transactions.PendingTransaction) {
+
+}
+
+func (s *Service) handleRemoteDestructCollectible(status string, pendingTransaction *transactions.PendingTransaction) {
+
+}
+
+func (s *Service) handleBurnCommunityToken(status string, pendingTransaction *transactions.PendingTransaction) {
+
+}
+
+func (s *Service) handleDeployOwnerToken(status string, pendingTransaction *transactions.PendingTransaction) {
+
+}
+
+func (s *Service) handleDeployCommunityToken(status string, pendingTransaction *transactions.PendingTransaction) {
+
+}
+
+func (s *Service) handleSetSignerPubKey(status string, pendingTransaction *transactions.PendingTransaction) {
+
 }
 
 // Stop is run when a service is stopped.
 func (s *Service) Stop() error {
+	s.walletWatcher.Stop()
 	return nil
+}
+
+func (s *Service) Init(messenger CommunityTokenFunctionalityInterface) {
+	s.messenger = messenger
 }
 
 func (s *Service) NewCommunityOwnerTokenRegistryInstance(chainID uint64, contractAddress string) (*communityownertokenregistry.CommunityOwnerTokenRegistry, error) {
