@@ -256,3 +256,41 @@ func setRPCs(networks []params.Network, request *requests.WalletSecretsConfig) [
 func BuildDefaultNetworks(request *requests.CreateAccount) []params.Network {
 	return setRPCs(defaultNetworks, &request.WalletSecretsConfig)
 }
+
+func FillDefaultWalletLoginConfig(config *params.NodeConfig) {
+	if len(config.Networks) == 0 {
+		for _, n := range defaultNetworks {
+			if config.WalletConfig.InfuraAPIKey != "" {
+				if strings.Contains(n.RPCURL, "infura") {
+					n.RPCURL += config.WalletConfig.InfuraAPIKey
+				}
+				if strings.Contains(n.FallbackURL, "infura") {
+					n.FallbackURL += config.WalletConfig.InfuraAPIKey
+				}
+			}
+
+			if config.WalletConfig.PoktAPIKey != "" {
+				if strings.Contains(n.RPCURL, "grove") {
+					n.RPCURL += config.WalletConfig.PoktAPIKey
+				}
+				if strings.Contains(n.FallbackURL, "grove") {
+					n.FallbackURL += config.WalletConfig.PoktAPIKey
+				}
+			}
+			config.Networks = append(config.Networks, n)
+		}
+	}
+
+	config.NetworkID = defaultNetworks[0].ChainID
+
+	config.UpstreamConfig.URL = defaultNetworks[0].RPCURL
+	config.UpstreamConfig.Enabled = true
+
+	config.ShhextConfig.VerifyENSURL = defaultNetworks[0].FallbackURL
+	config.ShhextConfig.VerifyTransactionURL = defaultNetworks[0].FallbackURL
+}
+
+func FillDefaultWalletNodeConfig(config *params.NodeConfig) {
+	config.NetworkID = defaultNetworks[0].ChainID
+	config.UpstreamConfig.URL = defaultNetworks[0].RPCURL
+}
