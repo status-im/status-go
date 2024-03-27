@@ -1,4 +1,4 @@
-FROM golang:1.14
+FROM golang:bookworm
 
 COPY . /go/src/github.com/pion/stun
 
