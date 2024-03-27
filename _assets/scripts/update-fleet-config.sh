@@ -12,8 +12,8 @@ fleets=(
 wakufleets=(
     'status.prod'
     'status.test'
-    'wakuv2.prod'
-    'wakuv2.test'
+    'waku.sandbox'
+    'waku.test'
 )
 
 # Notify fleet is configured for all fleets.
