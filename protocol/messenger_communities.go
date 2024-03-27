@@ -776,8 +776,9 @@ func (m *Messenger) unsubscribeFromShard(shard *shard.Shard) error {
 
 func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes, forceJoin bool) (*MessengerResponse, error) {
 	logger := m.logger.Named("joinCommunity")
-
 	response := &MessengerResponse{}
+	community, _ := m.communitiesManager.GetByID(communityID)
+	isCommunityMember := community.Joined()
 
 	community, err := m.communitiesManager.JoinCommunity(communityID, forceJoin)
 	if err != nil {
@@ -821,6 +822,19 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 
 	if err = m.PublishIdentityImage(); err != nil {
 		return nil, err
+	}
+	// Was applicant not a member and successfully joined?
+	if !isCommunityMember && community.Joined() {
+		joinedNotification := &localnotifications.Notification{
+			ID:       gethcommon.Hash(types.BytesToHash([]byte(`you-joined-` + communityID.String()))),
+			Title:    community.Name(),
+			Message:  community.Name(),
+			BodyType: localnotifications.CategoryCommunityJoined,
+			Category: localnotifications.CategoryCommunityJoined,
+			Deeplink: "status-app://cr/" + community.IDString(),
+			Image:    "",
+		}
+		response.AddNotification(joinedNotification)
 	}
 
 	return response, nil
@@ -1727,7 +1741,7 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 }
 
 func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
-	_, err := m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID.String(), m.GetCurrentTimeInMillis())
+	notifications, err := m.persistence.DeleteAllActivityCenterNotificationsForCommunity(communityID.String(), m.GetCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
@@ -1736,7 +1750,14 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 	if err != nil {
 		return nil, err
 	}
+	mr.AddActivityCenterNotifications(notifications)
 
+	state, err := m.persistence.GetActivityCenterState()
+	if err != nil {
+		return nil, err
+	}
+
+	mr.SetActivityCenterState(state)
 	community, ok := mr.communities[communityID.String()]
 	if !ok {
 		return nil, communities.ErrOrgNotFound
