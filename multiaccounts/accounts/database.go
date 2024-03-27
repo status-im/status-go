@@ -24,6 +24,10 @@ const (
 	zeroAddress              = "0x0000000000000000000000000000000000000000"
 	SyncedFromBackup         = "backup" // means a keypair is coming from backed up data
 	ThirtyDaysInMilliseconds = 30 * 24 * 60 * 60 * 1000
+
+	maxNumOfGeneratedAddresses            = uint64(100)
+	numOfGeneratedAddressesRegularKeypair = maxNumOfGeneratedAddresses
+	numOfGeneratedAddressesKeycardKeypair = uint64(10)
 )
 
 var (
@@ -1670,4 +1674,78 @@ func (db *Database) AddressWasShown(address types.Address) error {
 
 	_, err = tx.Exec(`UPDATE keypairs_accounts SET address_was_not_shown = 0 WHERE address = ?`, address)
 	return err
+}
+
+func (db *Database) resolveNumOfAddressesToGenerate(keypair *Keypair) uint64 {
+	if keypair == nil {
+		return maxNumOfGeneratedAddresses
+	}
+
+	if !keypair.MigratedToKeycard() {
+		return numOfGeneratedAddressesRegularKeypair
+	}
+
+	final := numOfGeneratedAddressesKeycardKeypair + keypair.LastUsedDerivationIndex
+	if final < maxNumOfGeneratedAddresses {
+		return final
+	}
+	return maxNumOfGeneratedAddresses
+}
+
+func (db *Database) GetNumOfAddressesToGenerateForKeypair(keyUID string) (uint64, error) {
+	kp, err := db.GetKeypairByKeyUID(keyUID)
+	if err != nil {
+		if err == ErrDbKeypairNotFound {
+			return maxNumOfGeneratedAddresses, nil
+		}
+		return 0, err
+	}
+
+	return db.resolveNumOfAddressesToGenerate(kp), nil
+}
+
+func (db *Database) ResolveSuggestedPathForKeypair(keyUID string) (suggestedPath string, err error) {
+	var tx *sql.Tx
+	tx, err = db.db.Begin()
+	if err != nil {
+		return "", err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	var kp *Keypair
+	kp, err = db.getKeypairByKeyUID(tx, keyUID, true)
+	if err != nil {
+		if err == ErrDbKeypairNotFound {
+			return fmt.Sprintf("%s0", statusWalletRootPath), nil
+		}
+		return "", err
+	}
+
+	numOfAddressesToGenerater := db.resolveNumOfAddressesToGenerate(kp)
+
+	nextIndex := kp.LastUsedDerivationIndex + 1
+	for i := nextIndex; i < numOfAddressesToGenerater; i++ {
+		suggestedPath := fmt.Sprintf("%s%d", statusWalletRootPath, i)
+
+		found := false
+		for _, acc := range kp.Accounts {
+			if acc.Path != suggestedPath {
+				continue
+			}
+			found = true
+			break
+		}
+		if !found {
+			return suggestedPath, nil
+		}
+	}
+
+	return "", errors.New("couldn't find available path for new account")
 }

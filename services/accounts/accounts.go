@@ -612,3 +612,11 @@ func (api *API) UpdateKeycardUID(ctx context.Context, oldKeycardUID string, newK
 func (api *API) AddressWasShown(address types.Address) error {
 	return api.db.AddressWasShown(address)
 }
+
+func (api *API) GetNumOfAddressesToGenerateForKeypair(keyUID string) (uint64, error) {
+	return api.db.GetNumOfAddressesToGenerateForKeypair(keyUID)
+}
+
+func (api *API) ResolveSuggestedPathForKeypair(keyUID string) (string, error) {
+	return api.db.ResolveSuggestedPathForKeypair(keyUID)
+}
