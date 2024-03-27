@@ -1581,7 +1581,6 @@ func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 		Emoji:                 "some",
 		Password:              "password123",
 		BackupDisabledDataDir: tmpdir,
-		NetworkID:             1,
 		LogFilePath:           tmpdir + "/log",
 		TestNetworksEnabled:   true,
 	}
@@ -1603,7 +1602,6 @@ func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 		Emoji:                 "some",
 		Password:              "password",
 		BackupDisabledDataDir: tmpdir,
-		NetworkID:             1,
 		LogFilePath:           tmpdir + "/log",
 	}
 	_, err = b.CreateAccountAndLogin(createAccountRequest2)
