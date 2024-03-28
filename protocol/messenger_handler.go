@@ -17,6 +17,7 @@ import (
 
 	"github.com/google/uuid"
 
+	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -1212,7 +1213,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message *pr
 		return ErrMessageNotAllowed
 	}
 
-	if err = ValidateDisplayName(&message.DisplayName); err != nil {
+	if err = utils.ValidateDisplayName(&message.DisplayName); err != nil {
 		return err
 	}
 
@@ -3023,7 +3024,7 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci *protobuf
 	}
 
 	if clockChanged {
-		if err = ValidateDisplayName(&ci.DisplayName); err != nil {
+		if err = utils.ValidateDisplayName(&ci.DisplayName); err != nil {
 			return err
 		}
 
