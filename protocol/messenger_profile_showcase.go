@@ -109,6 +109,35 @@ func (m *Messenger) validateCollectiblesOwnership(accounts []*identity.ProfileSh
 	return nil
 }
 
+func (m *Messenger) validateCommunityMembershipEntry(
+	entry *identity.ProfileShowcaseCommunity,
+	community *communities.Community,
+	contactPubKey *ecdsa.PublicKey) (identity.ProfileShowcaseMembershipStatus, error) {
+	if community == nil {
+		return identity.ProfileShowcaseMembershipStatusUnproven, nil
+	}
+
+	if community.Encrypted() {
+		grant, err := community.VerifyGrantSignature(entry.Grant)
+		if err != nil {
+			m.logger.Warn("failed to verify grant signature ", zap.Error(err))
+			return identity.ProfileShowcaseMembershipStatusNotAMember, nil
+		}
+
+		if grant != nil && bytes.Equal(grant.MemberId, crypto.CompressPubkey(contactPubKey)) {
+			return identity.ProfileShowcaseMembershipStatusProvenMember, nil
+		}
+		// Show as not a member if membership can't be proven
+		return identity.ProfileShowcaseMembershipStatusNotAMember, nil
+	}
+
+	if community.HasMember(contactPubKey) {
+		return identity.ProfileShowcaseMembershipStatusProvenMember, nil
+	}
+
+	return identity.ProfileShowcaseMembershipStatusNotAMember, nil
+}
+
 func (m *Messenger) validateCommunitiesMembership(communities []*identity.ProfileShowcaseCommunity, contactPubKey *ecdsa.PublicKey) ([]*identity.ProfileShowcaseCommunity, error) {
 	validatedCommunities := []*identity.ProfileShowcaseCommunity{}
 
@@ -121,29 +150,12 @@ func (m *Messenger) validateCommunitiesMembership(communities []*identity.Profil
 		})
 		if err != nil {
 			m.logger.Warn("failed to fetch community for profile entry ", zap.Error(err))
+			continue
 		}
 
-		if community != nil && community.Encrypted() {
-			grant, err := community.VerifyGrantSignature(communityEntry.Grant)
-			if err != nil {
-				m.logger.Warn("failed to verify grant signature ", zap.Error(err))
-				communityEntry.MembershipStatus = identity.ProfileShowcaseMembershipStatusNotAMember
-			} else {
-				if grant != nil && bytes.Equal(grant.MemberId, crypto.CompressPubkey(contactPubKey)) {
-					communityEntry.MembershipStatus = identity.ProfileShowcaseMembershipStatusProvenMember
-				} else { // Show as not a member if membership can't be proven
-					communityEntry.MembershipStatus = identity.ProfileShowcaseMembershipStatusNotAMember
-				}
-			}
-		} else if community != nil {
-			// Use member list as a proof for unecrypted communities
-			if community.HasMember(contactPubKey) {
-				communityEntry.MembershipStatus = identity.ProfileShowcaseMembershipStatusProvenMember
-			} else {
-				communityEntry.MembershipStatus = identity.ProfileShowcaseMembershipStatusNotAMember
-			}
-		} else {
-			communityEntry.MembershipStatus = identity.ProfileShowcaseMembershipStatusUnproven
+		communityEntry.MembershipStatus, err = m.validateCommunityMembershipEntry(communityEntry, community, contactPubKey)
+		if err != nil {
+			m.logger.Warn("failed to verify grant signature ", zap.Error(err))
 		}
 		validatedCommunities = append(validatedCommunities, communityEntry)
 	}
@@ -274,7 +286,7 @@ func (m *Messenger) toProfileShowcaseSocialLinksProto(preferences []*identity.Pr
 }
 
 func (m *Messenger) fromProfileShowcaseCommunityProto(senderPubKey *ecdsa.PublicKey, messages []*protobuf.ProfileShowcaseCommunity) []*identity.ProfileShowcaseCommunity {
-	// NOTE: no requests are allowed to be made here
+	// NOTE: no requests to the network are allowed to be made here, called in the receiver thread
 	entries := []*identity.ProfileShowcaseCommunity{}
 	for _, message := range messages {
 		entry := &identity.ProfileShowcaseCommunity{
@@ -289,7 +301,7 @@ func (m *Messenger) fromProfileShowcaseCommunityProto(senderPubKey *ecdsa.Public
 }
 
 func (m *Messenger) fromProfileShowcaseAccountProto(messages []*protobuf.ProfileShowcaseAccount) []*identity.ProfileShowcaseAccount {
-	// NOTE: no requests are allowed to be made here
+	// NOTE: no requests to the network are allowed to be made here, called in the receiver thread
 	entries := []*identity.ProfileShowcaseAccount{}
 	for _, entry := range messages {
 		entries = append(entries, &identity.ProfileShowcaseAccount{
@@ -304,7 +316,7 @@ func (m *Messenger) fromProfileShowcaseAccountProto(messages []*protobuf.Profile
 }
 
 func (m *Messenger) fromProfileShowcaseCollectibleProto(messages []*protobuf.ProfileShowcaseCollectible) []*identity.ProfileShowcaseCollectible {
-	// NOTE: no requests are allowed to be made here
+	// NOTE: no requests to the network are allowed to be made here, called in the receiver thread
 	entries := []*identity.ProfileShowcaseCollectible{}
 	for _, message := range messages {
 		entry := &identity.ProfileShowcaseCollectible{
@@ -319,7 +331,7 @@ func (m *Messenger) fromProfileShowcaseCollectibleProto(messages []*protobuf.Pro
 }
 
 func (m *Messenger) fromProfileShowcaseVerifiedTokenProto(messages []*protobuf.ProfileShowcaseVerifiedToken) []*identity.ProfileShowcaseVerifiedToken {
-	// NOTE: no requests are allowed to be made here
+	// NOTE: no requests to the network are allowed to be made here, called in the receiver thread
 	entries := []*identity.ProfileShowcaseVerifiedToken{}
 	for _, entry := range messages {
 		entries = append(entries, &identity.ProfileShowcaseVerifiedToken{
@@ -331,7 +343,7 @@ func (m *Messenger) fromProfileShowcaseVerifiedTokenProto(messages []*protobuf.P
 }
 
 func (m *Messenger) fromProfileShowcaseUnverifiedTokenProto(messages []*protobuf.ProfileShowcaseUnverifiedToken) []*identity.ProfileShowcaseUnverifiedToken {
-	// NOTE: no requests are allowed to be made here
+	// NOTE: no requests to the network are allowed to be made here, called in the receiver thread
 	entries := []*identity.ProfileShowcaseUnverifiedToken{}
 	for _, entry := range messages {
 		entries = append(entries, &identity.ProfileShowcaseUnverifiedToken{
@@ -344,7 +356,7 @@ func (m *Messenger) fromProfileShowcaseUnverifiedTokenProto(messages []*protobuf
 }
 
 func (m *Messenger) fromProfileShowcaseSocialLinkProto(messages []*protobuf.ProfileShowcaseSocialLink) []*identity.ProfileShowcaseSocialLink {
-	// NOTE: no requests are allowed to be made here
+	// NOTE: no requests to the network are allowed to be made here, called in the receiver thread
 	entries := []*identity.ProfileShowcaseSocialLink{}
 	for _, entry := range messages {
 		entries = append(entries, &identity.ProfileShowcaseSocialLink{
@@ -420,7 +432,7 @@ func (m *Messenger) GetProfileShowcaseForContact(contactID string, validate bool
 		return nil, err
 	}
 
-	// TODO: validate collectibles & assets ownership
+	// TODO: validate collectibles & assets ownership, https://github.com/status-im/status-desktop/issues/14129
 
 	return profileShowcase, nil
 }
