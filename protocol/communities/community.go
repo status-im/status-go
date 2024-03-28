@@ -108,6 +108,7 @@ type CommunityChat struct {
 	Permissions             *protobuf.CommunityPermissions       `json:"permissions"`
 	CanPost                 bool                                 `json:"canPost"`
 	CanView                 bool                                 `json:"canView"`
+	CanPostReactions        bool                                 `json:"canPostReactions"`
 	ViewersCanPostReactions bool                                 `json:"viewersCanPostReactions"`
 	Position                int                                  `json:"position"`
 	CategoryID              string                               `json:"categoryID"`
@@ -185,9 +186,13 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 			communityItem.Encrypted = o.Encrypted()
 		}
 		for id, c := range o.config.CommunityDescription.Chats {
-			// NOTE: Here `CanPost` is only set for ChatMessage. But it can be different for reactions/pin/etc.
+			// NOTE: Here `CanPost` is only set for ChatMessage and Emoji reactions. But it can be different for pin/etc.
 			// Consider adding more properties to `CommunityChat` to reflect that.
 			canPost, err := o.CanPost(o.config.MemberIdentity, id, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
+			if err != nil {
+				return nil, err
+			}
+			canPostReactions, err := o.CanPost(o.config.MemberIdentity, id, protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
 			if err != nil {
 				return nil, err
 			}
@@ -203,6 +208,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 				Members:                 c.Members,
 				CanPost:                 canPost,
 				CanView:                 canView,
+				CanPostReactions:        canPostReactions,
 				ViewersCanPostReactions: c.ViewersCanPostReactions,
 				TokenGated:              o.channelEncrypted(id),
 				CategoryID:              c.CategoryId,
@@ -335,6 +341,10 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
+			canPostReactions, err := o.CanPost(o.config.MemberIdentity, id, protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
+			if err != nil {
+				return nil, err
+			}
 			canView := o.CanView(o.config.MemberIdentity, id)
 
 			chat := CommunityChat{
@@ -347,6 +357,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				Members:                 c.Members,
 				CanPost:                 canPost,
 				CanView:                 canView,
+				CanPostReactions:        canPostReactions,
 				ViewersCanPostReactions: c.ViewersCanPostReactions,
 				TokenGated:              o.channelEncrypted(id),
 				CategoryID:              c.CategoryId,
