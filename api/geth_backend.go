@@ -632,6 +632,10 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		return err
 	}
 
+	if request.RuntimeLogLevel != "" {
+		b.config.LogLevel = request.RuntimeLogLevel
+	}
+
 	if b.config.WakuV2Config.Enabled && request.WakuV2Nameserver != "" {
 		b.config.WakuV2Config.Nameserver = request.WakuV2Nameserver
 	}
@@ -1284,7 +1288,7 @@ func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAcco
 		return nil, err
 	}
 
-	return b.generateOrImportAccount(request.Mnemonic, 0, &request.CreateAccount)
+	return b.generateOrImportAccount(request.Mnemonic, 0, request.FetchBackup, &request.CreateAccount)
 }
 
 func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error) {
@@ -1298,7 +1302,7 @@ func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error)
 	return info.KeyUID, nil
 }
 
-func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, request *requests.CreateAccount, opts ...params.Option) (*multiaccounts.Account, error) {
+func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, fetchBackup bool, request *requests.CreateAccount, opts ...params.Option) (*multiaccounts.Account, error) {
 	keystoreDir := keystoreRelativePath
 
 	b.UpdateRootDataDir(request.BackupDisabledDataDir)
@@ -1353,10 +1357,28 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		Name:                    request.DisplayName,
 		CustomizationColor:      multiacccommon.CustomizationColor(request.CustomizationColor),
 		CustomizationColorClock: customizationColorClock,
-		KDFIterations:           dbsetup.ReducedKDFIterationsNumber,
+		KDFIterations:           request.KdfIterations,
 	}
+
+	if account.KDFIterations == 0 {
+		account.KDFIterations = dbsetup.ReducedKDFIterationsNumber
+	}
+
 	if request.ImagePath != "" {
-		iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
+		imageCropRectangle := request.ImageCropRectangle
+		if imageCropRectangle == nil {
+			// Default crop rectangle used by mobile
+			imageCropRectangle = &requests.ImageCropRectangle{
+				Ax: 0,
+				Ay: 0,
+				Bx: 1000,
+				By: 1000,
+			}
+		}
+
+		iis, err := images.GenerateIdentityImages(request.ImagePath,
+			imageCropRectangle.Ax, imageCropRectangle.Ay, imageCropRectangle.Bx, imageCropRectangle.By)
+
 		if err != nil {
 			return nil, err
 		}
@@ -1387,7 +1409,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 	if err != nil {
 		return nil, err
 	}
-	if mnemonic != "" {
+	if mnemonic != "" && fetchBackup {
 		nodeConfig.ProcessBackedupMessages = true
 	}
 
@@ -1432,11 +1454,13 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 }
 
 func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccount, opts ...params.Option) (*multiaccounts.Account, error) {
-
-	if err := request.Validate(); err != nil {
+	validation := &requests.CreateAccountValidation{
+		AllowEmptyDisplayName: false,
+	}
+	if err := request.Validate(validation); err != nil {
 		return nil, err
 	}
-	return b.generateOrImportAccount("", 1, request, opts...)
+	return b.generateOrImportAccount("", 1, false, request, opts...)
 }
 
 func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPassword string, newPassword string) error {

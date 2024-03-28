@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"math/big"
+	"path/filepath"
 
 	"github.com/google/uuid"
 
@@ -24,6 +25,9 @@ const shardsTestClusterID = 16
 const walletAccountDefaultName = "Account 1"
 const keystoreRelativePath = "keystore"
 const defaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
+
+const defaultArchivesRelativePath = "data/archivedata"
+const defaultTorrentTorrentsRelativePath = "data/torrents"
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
 
@@ -189,16 +193,27 @@ func buildWalletConfig(request *requests.WalletSecretsConfig) params.WalletConfi
 func defaultNodeConfig(installationID string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
-	nodeConfig.NetworkID = request.NetworkID
 	nodeConfig.LogEnabled = request.LogEnabled
 	nodeConfig.LogFile = "geth.log"
 	nodeConfig.LogDir = request.LogFilePath
 	nodeConfig.LogLevel = "ERROR"
 	nodeConfig.DataDir = "/ethereum/mainnet_rpc"
 	nodeConfig.KeycardPairingDataFile = defaultKeycardPairingDataFile
+	nodeConfig.ProcessBackedupMessages = false
 
 	if request.LogLevel != nil {
 		nodeConfig.LogLevel = *request.LogLevel
+		nodeConfig.LogEnabled = true
+	} else {
+		nodeConfig.LogEnabled = false
+	}
+
+	nodeConfig.Networks = BuildDefaultNetworks(request)
+
+	if request.NetworkID != nil {
+		nodeConfig.NetworkID = *request.NetworkID
+	} else {
+		nodeConfig.NetworkID = nodeConfig.Networks[0].ChainID
 	}
 
 	if request.UpstreamConfig != "" {
@@ -206,6 +221,9 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 			Enabled: true,
 			URL:     request.UpstreamConfig,
 		}
+	} else {
+		nodeConfig.UpstreamConfig.URL = defaultNetworks[0].RPCURL
+		nodeConfig.UpstreamConfig.Enabled = true
 	}
 
 	nodeConfig.Name = "StatusIM"
@@ -248,10 +266,14 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 
 	if request.VerifyTransactionURL != nil {
 		nodeConfig.ShhextConfig.VerifyTransactionURL = *request.VerifyTransactionURL
+	} else {
+		nodeConfig.ShhextConfig.VerifyTransactionURL = defaultNetworks[0].FallbackURL
 	}
 
 	if request.VerifyENSURL != nil {
 		nodeConfig.ShhextConfig.VerifyENSURL = *request.VerifyENSURL
+	} else {
+		nodeConfig.ShhextConfig.VerifyENSURL = defaultNetworks[0].FallbackURL
 	}
 
 	if request.VerifyTransactionChainID != nil {
@@ -270,7 +292,24 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 		nodeConfig.LogEnabled = false
 	}
 
-	nodeConfig.Networks = BuildDefaultNetworks(request)
+	if request.NetworkID != nil {
+		nodeConfig.NetworkID = *request.NetworkID
+	}
+
+	nodeConfig.TorrentConfig = params.TorrentConfig{
+		Enabled:    false,
+		Port:       0,
+		DataDir:    filepath.Join(nodeConfig.RootDataDir, defaultArchivesRelativePath),
+		TorrentDir: filepath.Join(nodeConfig.RootDataDir, defaultTorrentTorrentsRelativePath),
+	}
+
+	if request.TorrentConfigEnabled != nil {
+		nodeConfig.TorrentConfig.Enabled = *request.TorrentConfigEnabled
+
+	}
+	if request.TorrentConfigPort != nil {
+		nodeConfig.TorrentConfig.Port = *request.TorrentConfigPort
+	}
 
 	for _, opt := range opts {
 		if err := opt(nodeConfig); err != nil {

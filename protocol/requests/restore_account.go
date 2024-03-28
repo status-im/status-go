@@ -7,7 +7,8 @@ import (
 var ErrRestoreAccountInvalidMnemonic = errors.New("restore-account: invalid mnemonic")
 
 type RestoreAccount struct {
-	Mnemonic string `json:"mnemonic"`
+	Mnemonic    string `json:"mnemonic"`
+	FetchBackup bool   `json:"fetchBackup"`
 	CreateAccount
 }
 
@@ -16,5 +17,7 @@ func (c *RestoreAccount) Validate() error {
 		return ErrRestoreAccountInvalidMnemonic
 	}
 
-	return ValidateAccountCreationRequest(c.CreateAccount)
+	return c.CreateAccount.Validate(&CreateAccountValidation{
+		AllowEmptyDisplayName: true,
+	})
 }

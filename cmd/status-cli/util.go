@@ -68,7 +68,6 @@ func startMessenger(cCtx *cli.Context, name string, port int) (*StatusCLI, error
 		Emoji:                 "some",
 		Password:              "some-password",
 		BackupDisabledDataDir: fmt.Sprintf("./test-%s", strings.ToLower(name)),
-		NetworkID:             1,
 		LogFilePath:           "log",
 	}
 	opts := []params.Option{withHTTP(port)}

@@ -9,18 +9,27 @@ var ErrCreateAccountInvalidPassword = errors.New("create-account: invalid passwo
 var ErrCreateAccountInvalidCustomizationColor = errors.New("create-account: invalid customization color")
 var ErrCreateAccountInvalidRootKeystoreDir = errors.New("create-account: invalid root keystore directory")
 var ErrCreateAccountInvalidBackupDisabledDataDir = errors.New("create-account: invalid backup disabled data directory")
-var ErrCreateAccountInvalidLogFilePath = errors.New("create-account: invalid log file path")
+
+type ImageCropRectangle struct {
+	Ax int `json:"ax"`
+	Ay int `json:"ay"`
+	Bx int `json:"bx"`
+	By int `json:"by"`
+}
 
 type CreateAccount struct {
 	// BackupDisabledDataDir is the directory where backup is disabled
+	// WARNING: This is used as `RootDataDir`. Consider renaming?
 	BackupDisabledDataDir string `json:"backupDisabledDataDir"`
+	KdfIterations         int    `json:"kdfIterations"`
 
-	DeviceName         string `json:"deviceName"`
-	DisplayName        string `json:"displayName"`
-	Password           string `json:"password"`
-	ImagePath          string `json:"imagePath"`
-	CustomizationColor string `json:"customizationColor"`
-	Emoji              string `json:"emoji"`
+	DeviceName         string              `json:"deviceName"`
+	DisplayName        string              `json:"displayName"`
+	Password           string              `json:"password"`
+	ImagePath          string              `json:"imagePath"`
+	ImageCropRectangle *ImageCropRectangle `json:"imageCropRectangle"`
+	CustomizationColor string              `json:"customizationColor"`
+	Emoji              string              `json:"emoji"`
 
 	WakuV2Nameserver  *string `json:"wakuV2Nameserver"`
 	WakuV2LightClient bool    `json:"wakuV2LightClient"`
@@ -37,12 +46,17 @@ type CreateAccount struct {
 	VerifyTransactionChainID *int64  `json:"verifyTransactionChainID"`
 	UpstreamConfig           string  `json:"upstreamConfig"`
 
-	CurrentNetwork string `json:"currentNetwork"`
-	NetworkID      uint64 `json:"networkId"`
+	// Deprecated: CurrentNetwork is deprecated. It was passed and not used, so nothing should be passed instead.
+	// If you want to use non-default network, use NetworkID.
+	CurrentNetwork string  `json:"currentNetwork"`
+	NetworkID      *uint64 `json:"networkId"`
 
 	TestNetworksEnabled bool `json:"testNetworksEnabled"`
 
 	WalletSecretsConfig
+
+	TorrentConfigEnabled *bool
+	TorrentConfigPort    *int
 }
 
 type WalletSecretsConfig struct {
@@ -66,13 +80,10 @@ type WalletSecretsConfig struct {
 	AlchemyOptimismSepoliaToken string `json:"alchemyOptimismSepoliaToken"`
 }
 
-func (c *CreateAccount) Validate() error {
-	return ValidateAccountCreationRequest(*c)
-}
-
-func ValidateAccountCreationRequest(c CreateAccount) error {
+func (c *CreateAccount) Validate(validation *CreateAccountValidation) error {
 	// TODO(cammellos): Add proper validation for password/displayname/etc
-	if len(c.DisplayName) == 0 {
+	// Empty display name is allowed during account restore
+	if len(c.DisplayName) == 0 && !validation.AllowEmptyDisplayName {
 		return ErrCreateAccountInvalidDisplayName
 	}
 
@@ -88,10 +99,10 @@ func ValidateAccountCreationRequest(c CreateAccount) error {
 		return ErrCreateAccountInvalidBackupDisabledDataDir
 	}
 
-	if len(c.LogFilePath) == 0 {
-		return ErrCreateAccountInvalidLogFilePath
-	}
-
 	return nil
+}
 
+// NOTE: Reasoning for this struct here: https://github.com/status-im/status-go/pull/4980#discussion_r1539219099
+type CreateAccountValidation struct {
+	AllowEmptyDisplayName bool
 }
