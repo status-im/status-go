@@ -31,7 +31,7 @@ pipeline {
   }
 
   environment {
-    PLATEFORM = 'android'
+    PLATFORM = 'android'
     TMPDIR    = "${WORKSPACE_TMP}"
     GOPATH    = "${WORKSPACE_TMP}/go"
     GOCACHE   = "${WORKSPACE_TMP}/gocache"
