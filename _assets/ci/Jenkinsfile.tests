@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.7.0'
+library 'status-jenkins-lib@v1.8.10'
 
 pipeline {
   agent { label 'linux && x86_64 && nix-2.14' }
@@ -46,7 +46,7 @@ pipeline {
   }
 
   environment {
-    TARGET   = 'tests'
+    PLATFORM = 'tests'
     DB_CONT  = "status-go-test-db-${env.EXECUTOR_NUMBER.toInteger() + 1}"
     DB_PORT  = "${5432 + env.EXECUTOR_NUMBER.toInteger()}"
     TMPDIR   = "${WORKSPACE_TMP}"
@@ -66,7 +66,6 @@ pipeline {
 
     stage('Vendor Check') {
       steps { script {
-        nix.shell('make install-modvendor', pure: false)
         nix.shell('make vendor', pure: false)
         /* fail build if vendoring hasn't been done */
         nix.shell('git diff --exit-code --no-color --stat vendor/')

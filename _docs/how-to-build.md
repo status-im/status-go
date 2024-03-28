@@ -8,8 +8,10 @@ status-go is an underlying part of Status. It heavily depends on [go-ethereum](h
 
 ### 1. Requirements
 
-* Go version >=1.18 (but check go.mod anyway).
+* Nix (Installed automatically)
 * Docker (only if cross-compiling).
+
+> go is provided by Nix
 
 ### 2. Clone the repository
 
@@ -20,20 +22,7 @@ cd status-go
 
 ### 3. Set up build environment
 
-status-go uses Makefile to perform the most common actions. See `make help` output for available commands.
-The first thing to do to get started is to run 
-
-```shell
-make setup
-```
-
-That’ll ensure that all tools required to do a first build are installed and set up. This script prepares and installs the following:
-* golangci-lint
-* mockgen
-* go-bindata
-* protobuf compiler and protoc-gen-go
-* jq
-* modvendor
+status-go uses nix in the Makefile to provide every tools required.
 
 ### 4. Build the statusd CLI
 
@@ -48,20 +37,6 @@ Once that is completed, you can run it straight away with a default configuratio
 ```shell
 build/bin/statusd
 ```
-
-*Known issues:*
-
-- You need to downgrade golang version to v1.20 to fix the quic compile issues.
-- Add `$HOME/go/bin` in `.zshrc` or `.bashrc` of home folder to fix `modvendor: not found...`
-- Fix `undefined: secp256k1.VerifySignature` on Ubuntu,
-  ```shell
-  go env -w CGO_ENABLED=1
-  
-  # optional
-  apt-get update
-  # optional
-  apt-get install build-essential
-  ```
 
 ### 5. Build a library for Android and iOS
 

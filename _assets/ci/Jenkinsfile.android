@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.7.0'
+library 'status-jenkins-lib@v1.8.10'
 
 pipeline {
   agent { label 'linux && x86_64 && nix-2.14' }
@@ -31,13 +31,13 @@ pipeline {
   }
 
   environment {
-    TARGET   = 'android'
-    TMPDIR   = "${WORKSPACE_TMP}"
-    GOPATH   = "${WORKSPACE_TMP}/go"
-    GOCACHE  = "${WORKSPACE_TMP}/gocache"
-    PATH     = "${PATH}:${GOPATH}/bin"
-    REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
-    ARTIFACT = utils.pkgFilename(name: "status-go", type: "android", ext: "aar", version: null)
+    PLATFORM = 'android'
+    TMPDIR    = "${WORKSPACE_TMP}"
+    GOPATH    = "${WORKSPACE_TMP}/go"
+    GOCACHE   = "${WORKSPACE_TMP}/gocache"
+    PATH      = "${PATH}:${GOPATH}/bin"
+    REPO_SRC  = "${GOPATH}/src/github.com/status-im/status-go"
+    ARTIFACT  = utils.pkgFilename(name: "status-go", type: "android", ext: "aar", version: null)
   }
 
   stages {
