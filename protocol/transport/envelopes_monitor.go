@@ -244,7 +244,7 @@ func (m *EnvelopesMonitor) handleAcknowledgedBatch(event types.EnvelopeEvent) {
 	m.logger.Debug("received a confirmation", zap.String("batch", event.Batch.String()), zap.String("peer", event.Peer.String()))
 	envelopeErrors, ok := event.Data.([]types.EnvelopeError)
 	if event.Data != nil && !ok {
-		m.logger.Error("received unexpected data in the the confirmation event", zap.Any("data", event.Data))
+		m.logger.Error("received unexpected data in the confirmation event", zap.Any("data", event.Data))
 	}
 	failedEnvelopes := map[types.Hash]struct{}{}
 	for i := range envelopeErrors {
