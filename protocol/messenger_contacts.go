@@ -297,10 +297,10 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 			return nil, err
 		}
 		_, err = m.dispatchMessage(context.Background(), common.RawMessage{
-			LocalChatID:         contactRequest.From,
-			Payload:             encodedMessage,
-			MessageType:         protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_REQUEST,
-			ResendAutomatically: true,
+			LocalChatID: contactRequest.From,
+			Payload:     encodedMessage,
+			MessageType: protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_REQUEST,
+			ResendType:  common.ResendTypeDataSync,
 		})
 		if err != nil {
 			return nil, err
@@ -1073,10 +1073,10 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, displayName, 
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chatID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_CONTACT_UPDATE,
-		ResendAutomatically: true,
+		LocalChatID: chatID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_CONTACT_UPDATE,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -1151,10 +1151,10 @@ func (m *Messenger) sendRetractContactRequest(contact *Contact) error {
 	}
 
 	_, err = m.dispatchMessage(context.Background(), common.RawMessage{
-		LocalChatID:         contact.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_RETRACT_CONTACT_REQUEST,
-		ResendAutomatically: true,
+		LocalChatID: contact.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_RETRACT_CONTACT_REQUEST,
+		ResendType:  common.ResendTypeDataSync,
 	})
 	if err != nil {
 		return err

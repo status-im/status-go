@@ -70,7 +70,10 @@ func (db RawMessagesPersistence) SaveRawMessage(message *RawMessage) error {
 			message.Sent = oldMessage.Sent
 		}
 	}
-
+	var sender []byte
+	if message.Sender != nil {
+		sender = crypto.FromECDSA(message.Sender)
+	}
 	_, err = tx.Exec(`
 		 INSERT INTO
 		 raw_messages
@@ -81,28 +84,41 @@ func (db RawMessagesPersistence) SaveRawMessage(message *RawMessage) error {
 		   send_count,
 		   sent,
 		   message_type,
-		   resend_automatically,
 		   recipients,
 		   skip_encryption,
-	           send_push_notification,
+	       send_push_notification,
 		   skip_group_message_wrap,
 		   send_on_personal_topic,
-		   payload
+		   payload,
+		   sender,
+		   community_id,
+		   resend_type,
+		   pubsub_topic,
+		   hash_ratchet_group_id,
+		   community_key_ex_msg_type,
+		   resend_method
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		message.ID,
 		message.LocalChatID,
 		message.LastSent,
 		message.SendCount,
 		message.Sent,
 		message.MessageType,
-		message.ResendAutomatically,
 		encodedRecipients.Bytes(),
 		message.SkipEncryptionLayer,
 		message.SendPushNotification,
 		message.SkipGroupMessageWrap,
 		message.SendOnPersonalTopic,
-		message.Payload)
+		message.Payload,
+		sender,
+		message.CommunityID,
+		message.ResendType,
+		message.PubsubTopic,
+		message.HashRatchetGroupID,
+		message.CommunityKeyExMsgType,
+		message.ResendMethod,
+	)
 	return err
 }
 
@@ -126,8 +142,8 @@ func (db RawMessagesPersistence) RawMessageByID(id string) (*RawMessage, error) 
 func (db RawMessagesPersistence) rawMessageByID(tx *sql.Tx, id string) (*RawMessage, error) {
 	var rawPubKeys [][]byte
 	var encodedRecipients []byte
-	var skipGroupMessageWrap sql.NullBool
-	var sendOnPersonalTopic sql.NullBool
+	var skipGroupMessageWrap, sendOnPersonalTopic sql.NullBool
+	var sender []byte
 	message := &RawMessage{}
 
 	err := tx.QueryRow(`
@@ -138,13 +154,19 @@ func (db RawMessagesPersistence) rawMessageByID(tx *sql.Tx, id string) (*RawMess
 			  send_count,
 			  sent,
 			  message_type,
-			  resend_automatically,
 			  recipients,
 			  skip_encryption,
-		          send_push_notification,
+		      send_push_notification,
 			  skip_group_message_wrap,
 			  send_on_personal_topic,
-		          payload
+		      payload,
+			  sender,
+			  community_id,
+			  resend_type,
+			  pubsub_topic,
+			  hash_ratchet_group_id,
+			  community_key_ex_msg_type,
+			  resend_method
 			FROM
 				raw_messages
 			WHERE
@@ -157,20 +179,25 @@ func (db RawMessagesPersistence) rawMessageByID(tx *sql.Tx, id string) (*RawMess
 		&message.SendCount,
 		&message.Sent,
 		&message.MessageType,
-		&message.ResendAutomatically,
 		&encodedRecipients,
 		&message.SkipEncryptionLayer,
 		&message.SendPushNotification,
 		&skipGroupMessageWrap,
 		&sendOnPersonalTopic,
 		&message.Payload,
+		&sender,
+		&message.CommunityID,
+		&message.ResendType,
+		&message.PubsubTopic,
+		&message.HashRatchetGroupID,
+		&message.CommunityKeyExMsgType,
+		&message.ResendMethod,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if rawPubKeys != nil {
-		// Restore recipients
+	if encodedRecipients != nil {
 		decoder := gob.NewDecoder(bytes.NewBuffer(encodedRecipients))
 		err = decoder.Decode(&rawPubKeys)
 		if err != nil {
@@ -193,6 +220,12 @@ func (db RawMessagesPersistence) rawMessageByID(tx *sql.Tx, id string) (*RawMess
 		message.SendOnPersonalTopic = sendOnPersonalTopic.Bool
 	}
 
+	if sender != nil {
+		message.Sender, err = crypto.ToECDSA(sender)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return message, nil
 }
 

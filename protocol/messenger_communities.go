@@ -1147,13 +1147,18 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	rawMessage := common.RawMessage{
 		Payload:             payload,
 		CommunityID:         community.ID(),
+		ResendType:          common.ResendTypeRawMessage,
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
 		PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
 	}
 
-	_, err = m.SendMessageToControlNode(community, rawMessage)
+	_, err = m.SendMessageToControlNode(community, &rawMessage)
 	if err != nil {
+		return nil, err
+	}
+
+	if _, err = m.UpsertRawMessageToWatch(&rawMessage); err != nil {
 		return nil, err
 	}
 
@@ -1161,12 +1166,16 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		privilegedMembers := community.GetFilteredPrivilegedMembers(map[string]struct{}{})
 
 		for _, member := range privilegedMembers[protobuf.CommunityMember_ROLE_OWNER] {
+			//TODO(frank): need support resending following message? if yes then we need to generate a different message ID first
+			// and save the corresponding rawMessage into the database
 			_, err := m.sender.SendPrivate(context.Background(), member, &rawMessage)
 			if err != nil {
 				return nil, err
 			}
 		}
 		for _, member := range privilegedMembers[protobuf.CommunityMember_ROLE_TOKEN_MASTER] {
+			//TODO(frank): need support resending following message? if yes then we need to generate a different message ID first
+			// and save the corresponding rawMessage into the database
 			_, err := m.sender.SendPrivate(context.Background(), member, &rawMessage)
 			if err != nil {
 				return nil, err
@@ -1182,6 +1191,8 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		rawMessage.Payload = payload
 
 		for _, member := range privilegedMembers[protobuf.CommunityMember_ROLE_ADMIN] {
+			//TODO(frank): need support resending following message? if yes then we need to generate a different message ID first
+			// and save the corresponding rawMessage into the database
 			_, err := m.sender.SendPrivate(context.Background(), member, &rawMessage)
 			if err != nil {
 				return nil, err
@@ -1312,10 +1323,15 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_EDIT_SHARED_ADDRESSES,
 		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		ResendType:          common.ResendTypeRawMessage,
 	}
 
-	_, err = m.SendMessageToControlNode(community, rawMessage)
+	_, err = m.SendMessageToControlNode(community, &rawMessage)
 	if err != nil {
+		return nil, err
+	}
+
+	if _, err = m.UpsertRawMessageToWatch(&rawMessage); err != nil {
 		return nil, err
 	}
 
@@ -1329,6 +1345,8 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 			continue
 		}
 		for _, member := range members {
+			//TODO(frank): need support resending following message? if yes then we need to generate a different message ID first
+			// and save the corresponding rawMessage into the database
 			_, err := m.sender.SendPrivate(context.Background(), member, &rawMessage)
 			if err != nil {
 				return nil, err
@@ -1476,10 +1494,15 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
 		PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
+		ResendType:          common.ResendTypeRawMessage,
 	}
 
-	_, err = m.SendMessageToControlNode(community, rawMessage)
+	_, err = m.SendMessageToControlNode(community, &rawMessage)
 	if err != nil {
+		return nil, err
+	}
+
+	if _, err = m.UpsertRawMessageToWatch(&rawMessage); err != nil {
 		return nil, err
 	}
 
@@ -1489,6 +1512,8 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 
 		privilegedMembers := community.GetPrivilegedMembers()
 		for _, privilegedMember := range privilegedMembers {
+			//TODO(frank): need support resending following message? if yes then we need to generate a different message ID first
+			// and save the corresponding rawMessage into the database
 			_, err := m.sender.SendPrivate(context.Background(), privilegedMember, &rawMessage)
 			if err != nil {
 				return nil, err
@@ -1585,9 +1610,13 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 		rawMessage := &common.RawMessage{
 			Payload:             payload,
 			Sender:              community.PrivateKey(),
+			CommunityID:         community.ID(),
 			SkipEncryptionLayer: true,
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
 			PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
+			ResendType:          common.ResendTypeRawMessage,
+			ResendMethod:        common.ResendMethodSendPrivate,
+			Recipients:          []*ecdsa.PublicKey{pk},
 		}
 
 		if community.Encrypted() {
@@ -1597,6 +1626,10 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 
 		_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
 		if err != nil {
+			return nil, err
+		}
+
+		if _, err = m.UpsertRawMessageToWatch(rawMessage); err != nil {
 			return nil, err
 		}
 	}
@@ -1776,10 +1809,15 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 			SkipEncryptionLayer: true,
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
 			PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in the community pubsub topic
+			ResendType:          common.ResendTypeRawMessage,
 		}
 
-		_, err = m.SendMessageToControlNode(community, rawMessage)
+		_, err = m.SendMessageToControlNode(community, &rawMessage)
 		if err != nil {
+			return nil, err
+		}
+
+		if _, err = m.UpsertRawMessageToWatch(&rawMessage); err != nil {
 			return nil, err
 		}
 	}
@@ -2441,7 +2479,7 @@ func (m *Messenger) ReevaluateCommunityMembersPermissions(request *requests.Reev
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REEVALUATE_PERMISSIONS_REQUEST,
 			PubsubTopic:         community.PubsubTopic(),
 		}
-		_, err = m.SendMessageToControlNode(community, rawMessage)
+		_, err = m.SendMessageToControlNode(community, &rawMessage)
 		if err != nil {
 			return nil, err
 		}
@@ -2711,10 +2749,10 @@ func (m *Messenger) SendCommunityShardKey(community *communities.Community, pubk
 	}
 
 	rawMessage := common.RawMessage{
-		Recipients:          pubkeys,
-		ResendAutomatically: true,
-		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_SHARD_KEY,
-		Payload:             encodedMessage,
+		Recipients:  pubkeys,
+		ResendType:  common.ResendTypeDataSync,
+		MessageType: protobuf.ApplicationMetadataMessage_COMMUNITY_SHARD_KEY,
+		Payload:     encodedMessage,
 	}
 
 	_, err = m.sender.SendPubsubTopicKey(context.Background(), &rawMessage)
@@ -3241,6 +3279,9 @@ func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, co
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
 		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		ResendType:          common.ResendTypeRawMessage,
+		ResendMethod:        common.ResendMethodSendPrivate,
+		Recipients:          []*ecdsa.PublicKey{receiver},
 	}
 
 	if err = m.communitiesManager.SaveRequestToJoin(requestToJoin); err != nil {
@@ -3248,6 +3289,12 @@ func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, co
 	}
 
 	_, err = m.sender.SendPrivate(context.Background(), receiver, &rawMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = m.UpsertRawMessageToWatch(&rawMessage)
+
 	return requestToJoin, err
 }
 
@@ -3833,10 +3880,10 @@ func (m *Messenger) SyncCommunitySettings(ctx context.Context, settings *communi
 	}
 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_COMMUNITY_SETTINGS,
-		ResendAutomatically: true,
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_COMMUNITY_SETTINGS,
+		ResendType:  common.ResendTypeDataSync,
 	})
 	if err != nil {
 		return err
@@ -4362,11 +4409,15 @@ func (m *Messenger) CreateResponseWithACNotification(communityID string, acType 
 	return response, nil
 }
 
-func (m *Messenger) SendMessageToControlNode(community *communities.Community, rawMessage common.RawMessage) ([]byte, error) {
+// SendMessageToControlNode sends a message to the control node of the community.
+// use pointer to rawMessage to get the message ID and other updated properties.
+func (m *Messenger) SendMessageToControlNode(community *communities.Community, rawMessage *common.RawMessage) ([]byte, error) {
 	if !community.PublicKey().Equal(community.ControlNode()) {
-		return m.sender.SendPrivate(context.Background(), community.ControlNode(), &rawMessage)
+		rawMessage.ResendMethod = common.ResendMethodSendPrivate
+		rawMessage.Recipients = []*ecdsa.PublicKey{community.ControlNode()}
+		return m.sender.SendPrivate(context.Background(), community.ControlNode(), rawMessage)
 	}
-
+	rawMessage.ResendMethod = common.ResendMethodSendCommunityMessage
 	return m.sender.SendCommunityMessage(context.Background(), rawMessage)
 }
 

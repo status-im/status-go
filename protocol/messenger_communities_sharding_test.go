@@ -187,10 +187,10 @@ func (s *MessengerCommunitiesShardingSuite) TestIgnoreOutdatedShardKey() {
 		s.Require().NoError(err)
 
 		rawMessage := common.RawMessage{
-			Recipients:          []*ecdsa.PublicKey{&s.alice.identity.PublicKey},
-			ResendAutomatically: true,
-			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_SHARD_KEY,
-			Payload:             encodedMessage,
+			Recipients:  []*ecdsa.PublicKey{&s.alice.identity.PublicKey},
+			ResendType:  common.ResendTypeDataSync,
+			MessageType: protobuf.ApplicationMetadataMessage_COMMUNITY_SHARD_KEY,
+			Payload:     encodedMessage,
 		}
 
 		_, err = s.owner.sender.SendPubsubTopicKey(context.Background(), &rawMessage)

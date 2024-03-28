@@ -56,7 +56,7 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 		Payload:              encodedMessage,
 		MessageType:          protobuf.ApplicationMetadataMessage_PIN_MESSAGE,
 		SkipGroupMessageWrap: true,
-		ResendAutomatically:  true,
+		ResendType:           GetResendTypeForChat(chat),
 	}
 	_, err = m.dispatchMessage(ctx, rawMessage)
 	if err != nil {
