@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"encoding/hex"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -243,7 +245,7 @@ func (s *MessengerPeersyncingSuite) TestCanSyncMessageWith() {
 
 	syncMessage := peersyncing.SyncMessage{
 		ID:        []byte("test-id"),
-		GroupID:   []byte(chat.ID),
+		ChatID:    []byte(chat.ID),
 		Type:      peersyncing.SyncMessageCommunityType,
 		Payload:   []byte("some-payload"),
 		Timestamp: 1,
@@ -258,6 +260,100 @@ func (s *MessengerPeersyncingSuite) TestCanSyncMessageWith() {
 	s.Require().False(canSyncWithBob)
 
 	canSyncWithAlice, err := s.owner.canSyncCommunityMessageWith(chat, community, &s.alice.identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().True(canSyncWithAlice)
+}
+
+func (s *MessengerPeersyncingSuite) TestSyncOneToOne() {
+	s.alice.featureFlags.Peersyncing = true
+	s.owner.featureFlags.Peersyncing = true
+
+	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.alice.identity.PublicKey))
+	chat := CreateOneToOneChat(pkString, &s.alice.identity.PublicKey, s.owner.transport)
+
+	chat.LastClockValue = uint64(100000000000000)
+	err := s.owner.SaveChat(chat)
+	s.NoError(err)
+	_, err = s.alice.Join(chat)
+	s.NoError(err)
+
+	chatID := chat.ID
+	inputMessage := common.NewMessage()
+	inputMessage.ChatId = chatID
+	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	inputMessage.Text = "some text"
+
+	ctx := context.Background()
+
+	// Send message, it should be received
+	response, err := s.alice.SendChatMessage(ctx, inputMessage)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	messageID := response.Messages()[0].ID
+
+	// Make sure the message makes it to the owner
+	response, err = WaitOnMessengerResponse(
+		s.owner,
+		func(r *MessengerResponse) bool {
+			return len(r.Messages()) == 1 && r.Messages()[0].ID == messageID
+		},
+		"message not received",
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	msg, err := s.owner.peersyncing.AvailableMessages()
+	s.Require().NoError(err)
+	s.Require().Len(msg, 1)
+
+	// Alice should now send an offer
+	_, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return s.alice.peersyncingOffers[messageID[2:]] != 0
+		},
+		"offer not sent",
+	)
+	s.Require().NoError(err)
+
+	// Owner should now reply to the offer
+	_, err = WaitOnMessengerResponse(
+		s.owner,
+		func(r *MessengerResponse) bool {
+			return s.owner.peersyncingRequests[s.alice.myHexIdentity()+messageID[2:]] != 0
+		},
+		"request not sent",
+	)
+	s.Require().NoError(err)
+}
+
+func (s *MessengerPeersyncingSuite) TestCanSyncOneToOneMessageWith() {
+	s.alice.featureFlags.Peersyncing = true
+	s.owner.featureFlags.Peersyncing = true
+
+	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.alice.identity.PublicKey))
+	chat := CreateOneToOneChat(pkString, &s.alice.identity.PublicKey, s.owner.transport)
+
+	chat.LastClockValue = uint64(100000000000000)
+	err := s.owner.SaveChat(chat)
+	s.NoError(err)
+	_, err = s.alice.Join(chat)
+	s.NoError(err)
+
+	syncMessage := peersyncing.SyncMessage{
+		ID:        []byte("test-id"),
+		ChatID:    []byte(chat.ID),
+		Type:      peersyncing.SyncMessageOneToOneType,
+		Payload:   []byte("some-payload"),
+		Timestamp: chat.LastClockValue,
+	}
+	s.Require().NoError(s.owner.peersyncing.Add(syncMessage))
+
+	canSyncWithBob, err := s.owner.canSyncOneToOneMessageWith(chat, &s.bob.identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().False(canSyncWithBob)
+
+	canSyncWithAlice, err := s.owner.canSyncOneToOneMessageWith(chat, &s.alice.identity.PublicKey)
 	s.Require().NoError(err)
 	s.Require().True(canSyncWithAlice)
 }

@@ -25,12 +25,12 @@ func (p *PeerSyncing) AvailableMessages() ([]SyncMessage, error) {
 	return p.persistence.All()
 }
 
-func (p *PeerSyncing) AvailableMessagesByGroupID(groupID []byte, limit int) ([]SyncMessage, error) {
-	return p.persistence.ByGroupID(groupID, limit)
+func (p *PeerSyncing) AvailableMessagesByChatID(groupID []byte, limit int) ([]SyncMessage, error) {
+	return p.persistence.ByChatID(groupID, limit)
 }
 
-func (p *PeerSyncing) AvailableMessagesByGroupIDs(groupIDs [][]byte, limit int) ([]SyncMessage, error) {
-	return p.persistence.ByGroupIDs(groupIDs, limit)
+func (p *PeerSyncing) AvailableMessagesByChatIDs(groupIDs [][]byte, limit int) ([]SyncMessage, error) {
+	return p.persistence.ByChatIDs(groupIDs, limit)
 }
 
 func (p *PeerSyncing) MessagesByIDs(messageIDs [][]byte) ([]SyncMessage, error) {
