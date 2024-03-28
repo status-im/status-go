@@ -40,10 +40,9 @@ const selectProfileShowcaseSocialLinkPreferenceQuery = "SELECT url, text, visibi
 const clearProfileShowcaseSocialLinkPreferencesQuery = "DELETE FROM profile_showcase_social_links_preferences"                                                                   // #nosec G101
 
 // Profile showcase for a contact
-
-const upsertContactProfileShowcaseCommunityQuery = "INSERT OR REPLACE INTO profile_showcase_communities_contacts(contact_id, community_id, sort_order) VALUES (?, ?, ?)" // #nosec G101
-const selectContactProfileShowcaseCommunityQuery = "SELECT community_id, sort_order FROM profile_showcase_communities_contacts WHERE contact_id = ?"                     // #nosec G101
-const removeContactProfileShowcaseCommunityQuery = "DELETE FROM profile_showcase_communities_contacts WHERE contact_id = ?"                                              // #nosec G101
+const upsertContactProfileShowcaseCommunityQuery = "INSERT OR REPLACE INTO profile_showcase_communities_contacts(contact_id, community_id, sort_order, grant) VALUES (?, ?, ?, ?)" // #nosec G101
+const selectContactProfileShowcaseCommunityQuery = "SELECT community_id, sort_order, grant FROM profile_showcase_communities_contacts WHERE contact_id = ?"                        // #nosec G101
+const removeContactProfileShowcaseCommunityQuery = "DELETE FROM profile_showcase_communities_contacts WHERE contact_id = ?"                                                        // #nosec G101
 
 const upsertContactProfileShowcaseAccountQuery = "INSERT OR REPLACE INTO profile_showcase_accounts_contacts(contact_id, address, name, color_id, emoji, sort_order) VALUES (?, ?, ?, ?, ?, ?)" // #nosec G101
 const selectContactProfileShowcaseAccountQuery = "SELECT * FROM profile_showcase_accounts_contacts WHERE contact_id = ?"                                                                       // #nosec G101
@@ -391,6 +390,7 @@ func (db sqlitePersistence) saveProfileShowcaseCommunityContact(tx *sql.Tx, cont
 		contactID,
 		community.CommunityID,
 		community.Order,
+		community.Grant,
 	)
 
 	return err
@@ -405,9 +405,11 @@ func (db sqlitePersistence) getProfileShowcaseCommunitiesContact(tx *sql.Tx, con
 	communities := []*identity.ProfileShowcaseCommunity{}
 
 	for rows.Next() {
-		community := &identity.ProfileShowcaseCommunity{}
+		community := &identity.ProfileShowcaseCommunity{
+			MembershipStatus: identity.ProfileShowcaseMembershipStatusUnproven,
+		}
 
-		err := rows.Scan(&community.CommunityID, &community.Order)
+		err := rows.Scan(&community.CommunityID, &community.Order, &community.Grant)
 		if err != nil {
 			return nil, err
 		}

@@ -1697,8 +1697,8 @@ func (api *PublicAPI) GetProfileShowcasePreferences() (*identity.ProfileShowcase
 }
 
 // Get profile showcase for a contact
-func (api *PublicAPI) GetProfileShowcaseForContact(contactID string) (*identity.ProfileShowcase, error) {
-	return api.service.messenger.GetProfileShowcaseForContact(contactID)
+func (api *PublicAPI) GetProfileShowcaseForContact(contactID string, validate bool) (*identity.ProfileShowcase, error) {
+	return api.service.messenger.GetProfileShowcaseForContact(contactID, validate)
 }
 
 // Get profile showcase accounts by address
