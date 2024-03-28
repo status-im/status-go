@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/v1"
 )
@@ -343,7 +344,7 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		return errors.New("mutual state event system message content type not allowed")
 	}
 
-	if err := ValidateDisplayName(&message.DisplayName); err != nil {
+	if err := utils.ValidateDisplayName(&message.DisplayName); err != nil {
 		return err
 	}
 

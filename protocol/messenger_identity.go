@@ -4,15 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"runtime"
 	"strings"
 
+	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	sociallinkssettings "github.com/status-im/status-go/multiaccounts/settings_social_links"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/identity"
-	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/server"
 )
 
@@ -21,37 +20,9 @@ const (
 	maxSocialLinkTextLength = 24
 )
 
-var ErrInvalidDisplayNameRegExp = errors.New("only letters, numbers, underscores and hyphens allowed")
-var ErrInvalidDisplayNameEthSuffix = errors.New(`usernames ending with "eth" are not allowed`)
-var ErrInvalidDisplayNameNotAllowed = errors.New("name is not allowed")
 var ErrInvalidBioLength = errors.New("invalid bio length")
 var ErrInvalidSocialLinkTextLength = errors.New("invalid social link text length")
 var ErrDisplayNameDupeOfCommunityMember = errors.New("display name duplicates on of community members")
-
-func ValidateDisplayName(displayName *string) error {
-	name := strings.TrimSpace(*displayName)
-	*displayName = name
-
-	if name == "" {
-		return nil
-	}
-
-	// ^[\\w-\\s]{5,24}$ to allow spaces
-	if match, _ := regexp.MatchString("^[\\w-\\s]{5,24}$", name); !match {
-		return ErrInvalidDisplayNameRegExp
-	}
-
-	// .eth should not happen due to the regexp above, but let's keep it here in case the regexp is changed in the future
-	if strings.HasSuffix(name, "_eth") || strings.HasSuffix(name, ".eth") || strings.HasSuffix(name, "-eth") {
-		return ErrInvalidDisplayNameEthSuffix
-	}
-
-	if alias.IsAlias(name) {
-		return ErrInvalidDisplayNameNotAllowed
-	}
-
-	return nil
-}
 
 func (m *Messenger) SetDisplayName(displayName string) error {
 	currDisplayName, err := m.settings.DisplayName()
@@ -63,7 +34,7 @@ func (m *Messenger) SetDisplayName(displayName string) error {
 		return nil // Do nothing
 	}
 
-	if err = ValidateDisplayName(&displayName); err != nil {
+	if err = utils.ValidateDisplayName(&displayName); err != nil {
 		return err
 	}
 

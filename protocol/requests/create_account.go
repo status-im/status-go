@@ -1,7 +1,9 @@
 package requests
 
 import (
-	"errors"
+	"github.com/pkg/errors"
+
+	utils "github.com/status-im/status-go/common"
 )
 
 var ErrCreateAccountInvalidDisplayName = errors.New("create-account: invalid display name")
@@ -85,6 +87,10 @@ func (c *CreateAccount) Validate(validation *CreateAccountValidation) error {
 	// Empty display name is allowed during account restore
 	if len(c.DisplayName) == 0 && !validation.AllowEmptyDisplayName {
 		return ErrCreateAccountInvalidDisplayName
+	}
+
+	if err := utils.ValidateDisplayName(&c.DisplayName); err != nil {
+		return errors.Wrap(ErrCreateAccountInvalidDisplayName, err.Error())
 	}
 
 	if len(c.Password) == 0 {
