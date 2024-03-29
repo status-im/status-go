@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	w_common "github.com/status-im/status-go/services/wallet/common"
@@ -57,6 +58,7 @@ var (
 // Service provides an async interface, ensuring only one filter request, of each type, is running at a time. It also provides lazy load of NFT info and token mapping
 type Service struct {
 	db           *sql.DB
+	accountsDB   *accounts.Database
 	tokenManager token.ManagerInterface
 	collectibles collectibles.ManagerInterface
 	eventFeed    *event.Feed
@@ -78,9 +80,10 @@ func (s *Service) nextSessionID() SessionID {
 	return SessionID(s.lastSessionID.Add(1))
 }
 
-func NewService(db *sql.DB, tokenManager token.ManagerInterface, collectibles collectibles.ManagerInterface, eventFeed *event.Feed, pendingTracker *transactions.PendingTxTracker) *Service {
+func NewService(db *sql.DB, accountsDB *accounts.Database, tokenManager token.ManagerInterface, collectibles collectibles.ManagerInterface, eventFeed *event.Feed, pendingTracker *transactions.PendingTxTracker) *Service {
 	return &Service{
 		db:           db,
+		accountsDB:   accountsDB,
 		tokenManager: tokenManager,
 		collectibles: collectibles,
 		eventFeed:    eventFeed,
@@ -117,8 +120,9 @@ type FilterResponse struct {
 //
 // All calls will trigger an EventActivityFilteringDone event with the result of the filtering
 // TODO #12120: replace with session based APIs
-func (s *Service) FilterActivityAsync(requestID int32, addresses []common.Address, allAddresses bool, chainIDs []w_common.ChainID, filter Filter, offset int, limit int) {
+func (s *Service) FilterActivityAsync(requestID int32, addresses []common.Address, chainIDs []w_common.ChainID, filter Filter, offset int, limit int) {
 	s.scheduler.Enqueue(requestID, filterTask, func(ctx context.Context) (interface{}, error) {
+		allAddresses := s.areAllAddresses(addresses)
 		activities, err := getActivityEntries(ctx, s.getDeps(), addresses, allAddresses, chainIDs, filter, offset, limit)
 		return activities, err
 	}, func(result interface{}, taskType async.TaskType, err error) {
@@ -395,4 +399,52 @@ func sendResponseEvent(eventFeed *event.Feed, requestID *int32, eventType wallet
 	}
 
 	eventFeed.Send(event)
+}
+
+func (s *Service) getWalletAddreses() ([]common.Address, error) {
+	ethAddresses, err := s.accountsDB.GetWalletAddresses()
+	if err != nil {
+		return nil, err
+	}
+
+	addresses := make([]common.Address, 0, len(ethAddresses))
+	for _, ethAddress := range ethAddresses {
+		addresses = append(addresses, common.Address(ethAddress))
+	}
+
+	return addresses, nil
+}
+
+func (s *Service) areAllAddresses(addresses []common.Address) bool {
+	// Compare with addresses in accountsDB
+	walletAddresses, err := s.getWalletAddreses()
+	if err != nil {
+		log.Error("Error getting wallet addresses", "error", err)
+		return false
+	}
+
+	// Check if passed addresses are the same as in the accountsDB ignoring the order
+	return areSlicesEqual(walletAddresses, addresses)
+}
+
+// Comparison function to check if slices are the same ignoring the order
+func areSlicesEqual(a, b []common.Address) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	// Create a map of addresses
+	aMap := make(map[common.Address]struct{}, len(a))
+	for _, address := range a {
+		aMap[address] = struct{}{}
+	}
+
+	// Check if all passed addresses are in the map
+	for _, address := range b {
+		if _, ok := aMap[address]; !ok {
+			return false
+		}
+	}
+
+	return true
 }

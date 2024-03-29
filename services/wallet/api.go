@@ -598,10 +598,10 @@ func (api *API) FetchAllCurrencyFormats() (currency.FormatPerSymbol, error) {
 }
 
 // @deprecated replaced by session APIs; see #12120
-func (api *API) FilterActivityAsync(requestID int32, addresses []common.Address, allAddresses bool, chainIDs []wcommon.ChainID, filter activity.Filter, offset int, limit int) error {
-	log.Debug("wallet.api.FilterActivityAsync", "requestID", requestID, "addr.count", len(addresses), "allAddresses", allAddresses, "chainIDs.count", len(chainIDs), "offset", offset, "limit", limit)
+func (api *API) FilterActivityAsync(requestID int32, addresses []common.Address, chainIDs []wcommon.ChainID, filter activity.Filter, offset int, limit int) error {
+	log.Debug("wallet.api.FilterActivityAsync", "requestID", requestID, "addr.count", len(addresses), "chainIDs.count", len(chainIDs), "offset", offset, "limit", limit)
 
-	api.s.activity.FilterActivityAsync(requestID, addresses, allAddresses, chainIDs, filter, offset, limit)
+	api.s.activity.FilterActivityAsync(requestID, addresses, chainIDs, filter, offset, limit)
 	return nil
 }
 
@@ -613,10 +613,10 @@ func (api *API) CancelActivityFilterTask(requestID int32) error {
 	return nil
 }
 
-func (api *API) StartActivityFilterSession(addresses []common.Address, allAddresses bool, chainIDs []wcommon.ChainID, filter activity.Filter, firstPageCount int) (activity.SessionID, error) {
-	log.Debug("wallet.api.StartActivityFilterSession", "addr.count", len(addresses), "allAddresses", allAddresses, "chainIDs.count", len(chainIDs), "firstPageCount", firstPageCount)
+func (api *API) StartActivityFilterSession(addresses []common.Address, chainIDs []wcommon.ChainID, filter activity.Filter, firstPageCount int) (activity.SessionID, error) {
+	log.Debug("wallet.api.StartActivityFilterSession", "addr.count", len(addresses), "chainIDs.count", len(chainIDs), "firstPageCount", firstPageCount)
 
-	return api.s.activity.StartFilterSession(addresses, allAddresses, chainIDs, filter, firstPageCount), nil
+	return api.s.activity.StartFilterSession(addresses, chainIDs, filter, firstPageCount), nil
 }
 
 func (api *API) UpdateActivityFilterForSession(sessionID activity.SessionID, filter activity.Filter, firstPageCount int) error {
