@@ -2874,8 +2874,7 @@ func (m *Manager) checkChannelPermissions(viewOnlyPermissions []*CommunityTokenP
 	}
 	response.ViewOnlyPermissions.Permissions = viewOnlyPermissionsResponse.Permissions
 
-	if (hasViewOnlyPermissions && !viewOnlyPermissionsResponse.Satisfied) ||
-		(hasViewOnlyPermissions && !hasViewAndPostPermissions) {
+	if hasViewOnlyPermissions && !hasViewAndPostPermissions {
 		response.ViewAndPostPermissions.Satisfied = false
 	} else {
 		response.ViewAndPostPermissions.Satisfied = viewAndPostPermissionsResponse.Satisfied

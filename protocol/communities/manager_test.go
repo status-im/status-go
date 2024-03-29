@@ -1136,6 +1136,85 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissionsCombina
 	s.Require().False(resp.ViewAndPostPermissions.Satisfied)
 }
 
+// Same as the one above, but reversed where the View permission is not satisfied, but the view and post is
+func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissionsCombination2() {
+
+	m, _, tm := s.setupManagerForTokenPermissions()
+
+	var chainID uint64 = 5
+	contractAddresses := make(map[uint64]string)
+	contractAddresses[chainID] = "0x3d6afaa395c31fcd391fe3d562e75fe9e8ec7e6a"
+	var decimals uint64 = 18
+
+	accountChainIDsCombination := []*AccountChainIDsCombination{
+		&AccountChainIDsCombination{
+			Address:  gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32"),
+			ChainIDs: []uint64{chainID},
+		},
+	}
+
+	var viewOnlyTokenCriteria = []*protobuf.TokenCriteria{
+		&protobuf.TokenCriteria{
+			ContractAddresses: contractAddresses,
+			Symbol:            "STT",
+			Type:              protobuf.CommunityTokenType_ERC20,
+			Name:              "Status Test Token",
+			AmountInWei:       "1000000000000000000",
+			Decimals:          decimals,
+		},
+	}
+
+	var viewOnlyPermissions = []*CommunityTokenPermission{
+		&CommunityTokenPermission{
+			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				Id:            "some-id",
+				Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+				TokenCriteria: viewOnlyTokenCriteria,
+				ChatIds:       []string{"test-channel-id", "test-channel-id-2"},
+			},
+		},
+	}
+
+	testContractAddresses := make(map[uint64]string)
+	testContractAddresses[chainID] = "0x123"
+
+	// Set up token criteria that won't be satisfied
+	var viewAndPostTokenCriteria = []*protobuf.TokenCriteria{
+		&protobuf.TokenCriteria{
+			ContractAddresses: testContractAddresses,
+			Symbol:            "TEST",
+			Type:              protobuf.CommunityTokenType_ERC20,
+			Name:              "TEST token",
+			AmountInWei:       "1000000000000000000",
+			Decimals:          decimals,
+		},
+	}
+
+	var viewAndPostPermissions = []*CommunityTokenPermission{
+		&CommunityTokenPermission{
+			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				Id:            "some-id",
+				Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+				TokenCriteria: viewAndPostTokenCriteria,
+				ChatIds:       []string{"test-channel-id", "test-channel-id-2"},
+			},
+		},
+	}
+
+	// Set response for viewOnly permissions
+	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), 0)
+	// Set resopnse for viewAndPost permissions
+	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(testContractAddresses[chainID]), int64(1*math.Pow(10, float64(decimals))))
+
+	resp, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountChainIDsCombination, false)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+
+	// Both permissions should be satisfied, even though view is not satisfied
+	s.Require().True(resp.ViewOnlyPermissions.Satisfied)
+	s.Require().True(resp.ViewAndPostPermissions.Satisfied)
+}
+
 func (s *ManagerSuite) TestCheckAllChannelsPermissions_EmptyPermissions() {
 
 	m, _, _ := s.setupManagerForTokenPermissions()
