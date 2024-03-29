@@ -10,6 +10,8 @@ import (
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
+	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -73,6 +75,11 @@ func setupTestService(tb testing.TB) (state testState) {
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(tb, err)
 
+	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(tb, err)
+	accountsDB, err := accounts.NewDB(appDB)
+	require.NoError(tb, err)
+
 	state.eventFeed = new(event.Feed)
 	state.tokenMock = &mockTokenManager{}
 	state.collectiblesMock = &mockCollectiblesManager{}
@@ -83,7 +90,7 @@ func setupTestService(tb testing.TB) (state testState) {
 	pendingCheckInterval := time.Second
 	state.pendingTracker = transactions.NewPendingTxTracker(db, state.chainClient, nil, state.eventFeed, pendingCheckInterval)
 
-	state.service = NewService(db, state.tokenMock, state.collectiblesMock, state.eventFeed, state.pendingTracker)
+	state.service = NewService(db, accountsDB, state.tokenMock, state.collectiblesMock, state.eventFeed, state.pendingTracker)
 	state.service.debounceDuration = 0
 	state.close = func() {
 		require.NoError(tb, state.pendingTracker.Stop())
@@ -171,7 +178,7 @@ func TestService_UpdateCollectibleInfo(t *testing.T) {
 		},
 	}, nil).Once()
 
-	state.service.FilterActivityAsync(0, append(fromAddresses, toAddresses...), true, allNetworksFilter(), Filter{}, 0, 3)
+	state.service.FilterActivityAsync(0, append(fromAddresses, toAddresses...), allNetworksFilter(), Filter{}, 0, 3)
 
 	filterResponseCount := 0
 	var updates []EntryData
@@ -221,7 +228,7 @@ func TestService_UpdateCollectibleInfo_Error(t *testing.T) {
 
 	state.collectiblesMock.On("FetchAssetsByCollectibleUniqueID", mock.Anything).Return(nil, thirdparty.ErrChainIDNotSupported).Once()
 
-	state.service.FilterActivityAsync(0, append(fromAddresses, toAddresses...), true, allNetworksFilter(), Filter{}, 0, 5)
+	state.service.FilterActivityAsync(0, append(fromAddresses, toAddresses...), allNetworksFilter(), Filter{}, 0, 5)
 
 	filterResponseCount := 0
 	updatesCount := 0
@@ -378,7 +385,7 @@ func TestService_IncrementalUpdateOnTop(t *testing.T) {
 	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
 	defer cleanup()
 
-	sessionID := state.service.StartFilterSession(allAddresses, true, allNetworksFilter(), Filter{}, 5)
+	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 5)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 
@@ -453,7 +460,7 @@ func TestService_IncrementalUpdateMixed(t *testing.T) {
 	)
 	defer cleanup()
 
-	sessionID := state.service.StartFilterSession(allAddresses, true, allNetworksFilter(), Filter{}, 5)
+	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 5)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 
@@ -500,7 +507,7 @@ func TestService_IncrementalUpdateFetchWindow(t *testing.T) {
 	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
 	defer cleanup()
 
-	sessionID := state.service.StartFilterSession(allAddresses, true, allNetworksFilter(), Filter{}, 2)
+	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 2)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 
@@ -549,7 +556,7 @@ func TestService_IncrementalUpdateFetchWindowNoReset(t *testing.T) {
 	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
 	defer cleanup()
 
-	sessionID := state.service.StartFilterSession(allAddresses, true, allNetworksFilter(), Filter{}, 2)
+	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 2)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 
@@ -596,7 +603,7 @@ func TestService_FilteredIncrementalUpdateResetAndClear(t *testing.T) {
 	allAddresses = append(append(allAddresses, newFromTrs...), newToTrs...)
 
 	// 1. User visualizes transactions for the first time
-	sessionID := state.service.StartFilterSession(allAddresses, true, allNetworksFilter(), Filter{}, 4)
+	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 4)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 

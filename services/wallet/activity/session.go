@@ -55,10 +55,9 @@ type Session struct {
 
 	// Filter info
 	//
-	addresses    []eth.Address
-	allAddresses bool
-	chainIDs     []common.ChainID
-	filter       Filter
+	addresses []eth.Address
+	chainIDs  []common.ChainID
+	filter    Filter
 
 	// model is a mirror of the data model presentation has (sent by EventActivityFilteringDone)
 	model []EntryIdentity
@@ -81,16 +80,16 @@ type SessionUpdate struct {
 }
 
 type fullFilterParams struct {
-	sessionID    SessionID
-	addresses    []eth.Address
-	allAddresses bool
-	chainIDs     []common.ChainID
-	filter       Filter
+	sessionID SessionID
+	addresses []eth.Address
+	chainIDs  []common.ChainID
+	filter    Filter
 }
 
 func (s *Service) internalFilter(f fullFilterParams, offset int, count int, processResults func(entries []Entry) (offsetOverride int)) {
 	s.scheduler.Enqueue(int32(f.sessionID), filterTask, func(ctx context.Context) (interface{}, error) {
-		activities, err := getActivityEntries(ctx, s.getDeps(), f.addresses, f.allAddresses, f.chainIDs, f.filter, offset, count)
+		allAddresses := s.areAllAddresses(f.addresses)
+		activities, err := getActivityEntries(ctx, s.getDeps(), f.addresses, allAddresses, f.chainIDs, f.filter, offset, count)
 		return activities, err
 	}, func(result interface{}, taskType async.TaskType, err error) {
 		res := FilterResponse{
@@ -131,11 +130,10 @@ func mirrorIdentities(entries []Entry) []EntryIdentity {
 func (s *Service) internalFilterForSession(session *Session, firstPageCount int) {
 	s.internalFilter(
 		fullFilterParams{
-			sessionID:    session.id,
-			addresses:    session.addresses,
-			allAddresses: session.allAddresses,
-			chainIDs:     session.chainIDs,
-			filter:       session.filter,
+			sessionID: session.id,
+			addresses: session.addresses,
+			chainIDs:  session.chainIDs,
+			filter:    session.filter,
 		},
 		0,
 		firstPageCount,
@@ -150,16 +148,15 @@ func (s *Service) internalFilterForSession(session *Session, firstPageCount int)
 	)
 }
 
-func (s *Service) StartFilterSession(addresses []eth.Address, allAddresses bool, chainIDs []common.ChainID, filter Filter, firstPageCount int) SessionID {
+func (s *Service) StartFilterSession(addresses []eth.Address, chainIDs []common.ChainID, filter Filter, firstPageCount int) SessionID {
 	sessionID := s.nextSessionID()
 
 	session := &Session{
 		id: sessionID,
 
-		addresses:    addresses,
-		allAddresses: allAddresses,
-		chainIDs:     chainIDs,
-		filter:       filter,
+		addresses: addresses,
+		chainIDs:  chainIDs,
+		filter:    filter,
 
 		model: make([]EntryIdentity, 0, firstPageCount),
 	}
@@ -214,11 +211,10 @@ func (s *Service) UpdateFilterForSession(id SessionID, filter Filter, firstPageC
 		// In this case we need to flag all the new entries that are not in the noFilterModel
 		s.internalFilter(
 			fullFilterParams{
-				sessionID:    session.id,
-				addresses:    session.addresses,
-				allAddresses: session.allAddresses,
-				chainIDs:     session.chainIDs,
-				filter:       session.filter,
+				sessionID: session.id,
+				addresses: session.addresses,
+				chainIDs:  session.chainIDs,
+				filter:    session.filter,
 			},
 			0,
 			firstPageCount,
@@ -257,11 +253,10 @@ func (s *Service) ResetFilterSession(id SessionID, firstPageCount int) error {
 
 	s.internalFilter(
 		fullFilterParams{
-			sessionID:    id,
-			addresses:    session.addresses,
-			allAddresses: session.allAddresses,
-			chainIDs:     session.chainIDs,
-			filter:       session.filter,
+			sessionID: id,
+			addresses: session.addresses,
+			chainIDs:  session.chainIDs,
+			filter:    session.filter,
 		},
 		0,
 		firstPageCount,
@@ -302,11 +297,10 @@ func (s *Service) GetMoreForFilterSession(id SessionID, pageCount int) error {
 	prevModelLen := len(session.model)
 	s.internalFilter(
 		fullFilterParams{
-			sessionID:    id,
-			addresses:    session.addresses,
-			allAddresses: session.allAddresses,
-			chainIDs:     session.chainIDs,
-			filter:       session.filter,
+			sessionID: id,
+			addresses: session.addresses,
+			chainIDs:  session.chainIDs,
+			filter:    session.filter,
 		},
 		prevModelLen+len(session.new),
 		pageCount,
@@ -362,7 +356,8 @@ func (s *Service) detectNew(changeCount int) {
 		session := s.sessions[sessionID]
 
 		fetchLen := len(session.model) + changeCount
-		activities, err := getActivityEntries(context.Background(), s.getDeps(), session.addresses, session.allAddresses, session.chainIDs, session.filter, 0, fetchLen)
+		allAddresses := s.areAllAddresses(session.addresses)
+		activities, err := getActivityEntries(context.Background(), s.getDeps(), session.addresses, allAddresses, session.chainIDs, session.filter, 0, fetchLen)
 		if err != nil {
 			log.Error("Error getting activity entries", "error", err)
 			continue
