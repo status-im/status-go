@@ -3057,6 +3057,7 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci *protobuf
 			if err != nil {
 				return err
 			}
+			state.Response.AddUpdatedProfileShowcaseContactID(contact.ID)
 		}
 	}
 
