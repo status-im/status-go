@@ -85,7 +85,7 @@ func retrieveMessagesLoop(ctx context.Context, cli *StatusCLI, tick time.Duratio
 			}
 			if response != nil && len(response.Messages()) != 0 {
 				for _, message := range response.Messages() {
-					cli.logger.Info("receive message: ", message.Text)
+					cli.logger.Info("message received: ", message.Text)
 					if message.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT {
 						msgCh <- message.ID
 					}

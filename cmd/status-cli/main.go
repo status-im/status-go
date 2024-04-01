@@ -31,11 +31,11 @@ var CommonFlags = []cli.Flag{
 	},
 }
 
-var DmFlags = append([]cli.Flag{
+var SimulateFlags = append([]cli.Flag{
 	&cli.BoolFlag{
 		Name:    InteractiveFlag,
 		Aliases: []string{"i"},
-		Usage:   "Use interactive mode",
+		Usage:   "Use interactive mode to input the messages",
 	},
 	&cli.IntFlag{
 		Name:    CountFlag,
@@ -78,10 +78,9 @@ func main() {
 	app := &cli.App{
 		Commands: []*cli.Command{
 			{
-				Name:    "dm",
-				Aliases: []string{"d"},
-				Usage:   "Send direct message",
-				Flags:   DmFlags,
+				Name:  "simulate",
+				Usage: "Simulate the process of sending direct messages",
+				Flags: SimulateFlags,
 				Action: func(cCtx *cli.Context) error {
 					return simulate(cCtx)
 				},

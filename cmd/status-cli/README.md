@@ -49,20 +49,20 @@ curl -XPOST http://127.0.0.1:8545 -H 'Content-type: application/json' -d '{"json
 ```
 
 
-### Run `dm` command:
+### Run `simulate` command:
 
 ```bash
 # simulate DM between two accounts
-./status-cli dm
+./status-cli simulate
 
 # simulate DM in a interactive way
-./status-cli dm -i
+./status-cli simulate -i
 
 # simulate DM with 3 messages
-./status-cli dm -c 3
+./status-cli simulate -c 3
 
 # run in light mode
-./status-cli dm --light
+./status-cli simulate --light
 ```
 
 You can run the commands with `--light` to work as a light client.

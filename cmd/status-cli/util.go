@@ -31,9 +31,7 @@ func setupLogger(file string) *zap.Logger {
 		logger.Fatalf("Error initializing logger: %v", err)
 	}
 
-	newLogger := logutils.ZapLogger()
-
-	return newLogger
+	return logutils.ZapLogger()
 }
 
 func startMessenger(cCtx *cli.Context, name string, port int) (*StatusCLI, error) {
@@ -51,7 +49,7 @@ func startMessenger(cCtx *cli.Context, name string, port int) (*StatusCLI, error
 	backend := api.NewGethStatusBackend()
 
 	createAccountRequest := &requests.CreateAccount{
-		DisplayName:           "some-display-name",
+		DisplayName:           name,
 		CustomizationColor:    "#ffffff",
 		Emoji:                 "some",
 		Password:              "some-password",

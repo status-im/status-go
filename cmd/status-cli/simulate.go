@@ -32,8 +32,8 @@ func simulate(cCtx *cli.Context) error {
 	}
 	logger = rawLogger.Sugar()
 
-	logger.Info("Running dm command, flags passed:")
-	for _, flag := range DmFlags {
+	logger.Info("Running simulate command, flags passed:")
+	for _, flag := range SimulateFlags {
 		logger.Infof("-%s %v", flag.Names()[0], cCtx.Value(flag.Names()[0]))
 	}
 
