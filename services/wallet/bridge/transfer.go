@@ -32,7 +32,7 @@ func (s *TransferBridge) Name() string {
 	return "Transfer"
 }
 
-func (s *TransferBridge) Can(from, to *params.Network, token *token.Token, balance *big.Int) (bool, error) {
+func (s *TransferBridge) Can(from, to *params.Network, token *token.Token, toToken *token.Token, balance *big.Int) (bool, error) {
 	return from.ChainID == to.ChainID, nil
 }
 
@@ -40,7 +40,7 @@ func (s *TransferBridge) CalculateFees(from, to *params.Network, token *token.To
 	return big.NewInt(0), big.NewInt(0), nil
 }
 
-func (s *TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
+func (s *TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
 	estimation := uint64(0)
 	var err error
 	if token.Symbol == "ETH" {

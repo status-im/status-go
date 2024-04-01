@@ -153,7 +153,7 @@ func (s *CBridge) getTransferConfig(isTest bool) (*cbridge.GetTransferConfigsRes
 	return &res, nil
 }
 
-func (s *CBridge) Can(from, to *params.Network, token *token.Token, balance *big.Int) (bool, error) {
+func (s *CBridge) Can(from, to *params.Network, token *token.Token, toToken *token.Token, balance *big.Int) (bool, error) {
 	if from.ChainID == to.ChainID {
 		return false, nil
 	}
@@ -221,7 +221,7 @@ func (s *CBridge) CalculateFees(from, to *params.Network, token *token.Token, am
 	return big.NewInt(0), new(big.Int).Add(baseFee, percFee), nil
 }
 
-func (s *CBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
+func (s *CBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
 	var input []byte
 	value := new(big.Int)
 

@@ -72,7 +72,7 @@ type ReceivedToken struct {
 }
 
 func (t *Token) IsNative() bool {
-	return t.Address == nativeChainAddress
+	return strings.EqualFold(t.Symbol, "ETH")
 }
 
 type List struct {
