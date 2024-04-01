@@ -37,11 +37,11 @@ func serve(cCtx *cli.Context) error {
 	port := cCtx.Int(PortFlag)
 	apiModules := cCtx.String(APIModulesFlag)
 
-	messenger, err := startMessenger(cCtx, name, port, apiModules)
+	messenger, err := startService(cCtx, name, port, apiModules)
 	if err != nil {
 		return err
 	}
-	defer stopMessenger(messenger)
+	defer stopService(messenger)
 
 	// Retrieve for messages
 	var wg sync.WaitGroup

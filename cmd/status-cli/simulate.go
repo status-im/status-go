@@ -40,17 +40,17 @@ func simulate(cCtx *cli.Context) error {
 	// Start Alice and Bob's messengers
 	apiModules := cCtx.String(APIModulesFlag)
 
-	alice, err := startMessenger(cCtx, "Alice", 0, apiModules)
+	alice, err := startService(cCtx, "Alice", 0, apiModules)
 	if err != nil {
 		return err
 	}
-	defer stopMessenger(alice)
+	defer stopService(alice)
 
-	bob, err := startMessenger(cCtx, "Bob", 0, apiModules)
+	bob, err := startService(cCtx, "Bob", 0, apiModules)
 	if err != nil {
 		return err
 	}
-	defer stopMessenger(bob)
+	defer stopService(bob)
 
 	// Retrieve for messages
 	msgCh := make(chan string)

@@ -16,7 +16,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func sendContactRequest(cCtx *cli.Context, from *StatusCLI, toID string) error {
+func sendContactRequest(cCtx *cli.Context, from *ServiceData, toID string) error {
 	from.logger.Info("send contact request, contact public key: ", toID)
 	request := &requests.SendContactRequest{
 		ID:      toID,
@@ -31,7 +31,7 @@ func sendContactRequest(cCtx *cli.Context, from *StatusCLI, toID string) error {
 	return nil
 }
 
-func sendContactRequestAcceptance(cCtx *cli.Context, from *StatusCLI, msgID string) error {
+func sendContactRequestAcceptance(cCtx *cli.Context, from *ServiceData, msgID string) error {
 	from.logger.Info("accept contact request, message ID: ", msgID)
 	resp, err := from.messenger.AcceptContactRequest(cCtx.Context, &requests.AcceptContactRequest{ID: types.Hex2Bytes(msgID)})
 	if err != nil {
@@ -42,7 +42,7 @@ func sendContactRequestAcceptance(cCtx *cli.Context, from *StatusCLI, msgID stri
 	return nil
 }
 
-func sendDirectMessage(ctx context.Context, from *StatusCLI, text string) error {
+func sendDirectMessage(ctx context.Context, from *ServiceData, text string) error {
 	if len(from.messenger.MutualContacts()) == 0 {
 		return nil
 	}
@@ -67,7 +67,7 @@ func sendDirectMessage(ctx context.Context, from *StatusCLI, text string) error 
 	return nil
 }
 
-func retrieveMessagesLoop(ctx context.Context, cli *StatusCLI, tick time.Duration, msgCh chan string, wg *sync.WaitGroup) {
+func retrieveMessagesLoop(ctx context.Context, cli *ServiceData, tick time.Duration, msgCh chan string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	ticker := time.NewTicker(tick)
@@ -97,7 +97,7 @@ func retrieveMessagesLoop(ctx context.Context, cli *StatusCLI, tick time.Duratio
 	}
 }
 
-func sendMessageLoop(ctx context.Context, cli *StatusCLI, tick time.Duration, wg *sync.WaitGroup, sem chan struct{}, cancel context.CancelFunc) {
+func sendMessageLoop(ctx context.Context, cli *ServiceData, tick time.Duration, wg *sync.WaitGroup, sem chan struct{}, cancel context.CancelFunc) {
 	defer wg.Done()
 
 	ticker := time.NewTicker(tick)
