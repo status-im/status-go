@@ -102,19 +102,27 @@ func (s *ERC1155TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwo
 }
 
 func (s *ERC1155TransferBridge) BuildTx(network *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int) (*ethTypes.Transaction, error) {
-	toAddr := types.Address(toAddress)
+	contractAddress := types.Address(token.Address)
+
+	// We store ERC1155 Token ID using big.Int.String() in token.Symbol
+	tokenID, success := new(big.Int).SetString(token.Symbol, 10)
+	if !success {
+		return nil, fmt.Errorf("failed to convert ERC1155's Symbol %s to big.Int", token.Symbol)
+	}
+
 	sendArgs := &TransactionBridge{
 		ERC1155TransferTx: &ERC1155TransferTxArgs{
 			SendTxArgs: transactions.SendTxArgs{
 				From:  types.Address(fromAddress),
-				To:    &toAddr,
+				To:    &contractAddress,
 				Value: (*hexutil.Big)(amountIn),
 				Data:  types.HexBytes("0x0"),
 			},
-			TokenID:   (*hexutil.Big)(big.NewInt(0)),
+			TokenID:   (*hexutil.Big)(tokenID),
 			Recipient: toAddress,
 			Amount:    (*hexutil.Big)(amountIn),
 		},
+		ChainID: network.ChainID,
 	}
 
 	return s.BuildTransaction(sendArgs)
