@@ -16,14 +16,14 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func sendContactRequest(cCtx *cli.Context, from *ServiceData, toID string) error {
-	from.logger.Info("send contact request, contact public key: ", toID)
+func (cli *StatusCLI) sendContactRequest(cCtx *cli.Context, toID string) error {
+	cli.logger.Info("send contact request, contact public key: ", toID)
 	request := &requests.SendContactRequest{
 		ID:      toID,
 		Message: "Hello!",
 	}
-	resp, err := from.messenger.SendContactRequest(cCtx.Context, request)
-	from.logger.Info("function SendContactRequest response.messages: ", resp.Messages())
+	resp, err := cli.messenger.SendContactRequest(cCtx.Context, request)
+	cli.logger.Info("function SendContactRequest response.messages: ", resp.Messages())
 	if err != nil {
 		return err
 	}
@@ -31,25 +31,25 @@ func sendContactRequest(cCtx *cli.Context, from *ServiceData, toID string) error
 	return nil
 }
 
-func sendContactRequestAcceptance(cCtx *cli.Context, from *ServiceData, msgID string) error {
-	from.logger.Info("accept contact request, message ID: ", msgID)
-	resp, err := from.messenger.AcceptContactRequest(cCtx.Context, &requests.AcceptContactRequest{ID: types.Hex2Bytes(msgID)})
+func (cli *StatusCLI) sendContactRequestAcceptance(cCtx *cli.Context, msgID string) error {
+	cli.logger.Info("accept contact request, message ID: ", msgID)
+	resp, err := cli.messenger.AcceptContactRequest(cCtx.Context, &requests.AcceptContactRequest{ID: types.Hex2Bytes(msgID)})
 	if err != nil {
 		return err
 	}
-	from.logger.Info("function AcceptContactRequest response: ", resp.Messages())
+	cli.logger.Info("function AcceptContactRequest response: ", resp.Messages())
 
 	return nil
 }
 
-func sendDirectMessage(ctx context.Context, from *ServiceData, text string) error {
-	if len(from.messenger.MutualContacts()) == 0 {
+func (cli *StatusCLI) sendDirectMessage(ctx context.Context, text string) error {
+	if len(cli.messenger.MutualContacts()) == 0 {
 		return nil
 	}
-	chat := from.messenger.Chat(from.messenger.MutualContacts()[0].ID)
-	from.logger.Info("send message to contact: ", chat.ID)
+	chat := cli.messenger.Chat(cli.messenger.MutualContacts()[0].ID)
+	cli.logger.Info("send message to contact: ", chat.ID)
 
-	clock, timestamp := chat.NextClockAndTimestamp(from.messenger.GetTransport())
+	clock, timestamp := chat.NextClockAndTimestamp(cli.messenger.GetTransport())
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
 	inputMessage.LocalChatID = chat.ID
@@ -59,7 +59,7 @@ func sendDirectMessage(ctx context.Context, from *ServiceData, text string) erro
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = text
 
-	_, err := from.messenger.SendChatMessage(ctx, inputMessage)
+	_, err := cli.messenger.SendChatMessage(ctx, inputMessage)
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func sendDirectMessage(ctx context.Context, from *ServiceData, text string) erro
 	return nil
 }
 
-func retrieveMessagesLoop(ctx context.Context, cli *ServiceData, tick time.Duration, msgCh chan string, wg *sync.WaitGroup) {
+func (cli *StatusCLI) retrieveMessagesLoop(ctx context.Context, tick time.Duration, msgCh chan string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	ticker := time.NewTicker(tick)
@@ -97,7 +97,7 @@ func retrieveMessagesLoop(ctx context.Context, cli *ServiceData, tick time.Durat
 	}
 }
 
-func sendMessageLoop(ctx context.Context, cli *ServiceData, tick time.Duration, wg *sync.WaitGroup, sem chan struct{}, cancel context.CancelFunc) {
+func (cli *StatusCLI) sendMessageLoop(ctx context.Context, tick time.Duration, wg *sync.WaitGroup, sem chan struct{}, cancel context.CancelFunc) {
 	defer wg.Done()
 
 	ticker := time.NewTicker(tick)
@@ -130,7 +130,7 @@ func sendMessageLoop(ctx context.Context, cli *ServiceData, tick time.Duration, 
 				continue
 			}
 
-			err = sendDirectMessage(ctx, cli, message)
+			err = cli.sendDirectMessage(ctx, message)
 			time.Sleep(WaitingInterval)
 			<-sem
 			if err != nil {

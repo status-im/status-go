@@ -2,15 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
@@ -40,37 +38,37 @@ func simulate(cCtx *cli.Context) error {
 	// Start Alice and Bob's messengers
 	apiModules := cCtx.String(APIModulesFlag)
 
-	alice, err := startService(cCtx, "Alice", 0, apiModules)
+	alice, err := start(cCtx, "Alice", 0, apiModules)
 	if err != nil {
 		return err
 	}
-	defer stopService(alice)
+	defer alice.stop()
 
-	bob, err := startService(cCtx, "Bob", 0, apiModules)
+	bob, err := start(cCtx, "Bob", 0, apiModules)
 	if err != nil {
 		return err
 	}
-	defer stopService(bob)
+	defer bob.stop()
 
 	// Retrieve for messages
 	msgCh := make(chan string)
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	go retrieveMessagesLoop(ctx, alice, RetrieveInterval, nil, &wg)
+	go alice.retrieveMessagesLoop(ctx, RetrieveInterval, nil, &wg)
 	wg.Add(1)
-	go retrieveMessagesLoop(ctx, bob, RetrieveInterval, msgCh, &wg)
+	go bob.retrieveMessagesLoop(ctx, RetrieveInterval, msgCh, &wg)
 
 	// Send contact request from Alice to Bob, bob accept the request
 	time.Sleep(WaitingInterval)
-	destID := types.EncodeHex(crypto.FromECDSAPub(bob.messenger.IdentityPublicKey()))
-	err = sendContactRequest(cCtx, alice, destID)
+	destID := bob.messenger.GetSelfContact().ID
+	err = alice.sendContactRequest(cCtx, destID)
 	if err != nil {
 		return err
 	}
 
 	msgID := <-msgCh
-	err = sendContactRequestAcceptance(cCtx, bob, msgID)
+	err = bob.sendContactRequestAcceptance(cCtx, msgID)
 	if err != nil {
 		return err
 	}
@@ -80,19 +78,19 @@ func simulate(cCtx *cli.Context) error {
 	if interactive {
 		sem := make(chan struct{}, 1)
 		wg.Add(1)
-		go sendMessageLoop(ctx, alice, SendInterval, &wg, sem, cancel)
+		go alice.sendMessageLoop(ctx, SendInterval, &wg, sem, cancel)
 		wg.Add(1)
-		go sendMessageLoop(ctx, bob, SendInterval, &wg, sem, cancel)
+		go bob.sendMessageLoop(ctx, SendInterval, &wg, sem, cancel)
 	} else {
 		time.Sleep(WaitingInterval)
 		for i := 0; i < cCtx.Int(CountFlag); i++ {
-			err = sendDirectMessage(ctx, alice, "hello bob :)")
+			err = alice.sendDirectMessage(ctx, fmt.Sprintf("message from alice, number: %d", i+1))
 			if err != nil {
 				return err
 			}
 			time.Sleep(WaitingInterval)
 
-			err = sendDirectMessage(ctx, bob, "hello Alice ~")
+			err = bob.sendDirectMessage(ctx, fmt.Sprintf("message from bob, number: %d", i+1))
 			if err != nil {
 				return err
 			}

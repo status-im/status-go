@@ -37,23 +37,23 @@ func serve(cCtx *cli.Context) error {
 	port := cCtx.Int(PortFlag)
 	apiModules := cCtx.String(APIModulesFlag)
 
-	messenger, err := startService(cCtx, name, port, apiModules)
+	cli, err := start(cCtx, name, port, apiModules)
 	if err != nil {
 		return err
 	}
-	defer stopService(messenger)
+	defer cli.stop()
 
 	// Retrieve for messages
 	var wg sync.WaitGroup
 	msgCh := make(chan string)
 
 	wg.Add(1)
-	go retrieveMessagesLoop(ctx, messenger, RetrieveInterval, msgCh, &wg)
+	go cli.retrieveMessagesLoop(ctx, RetrieveInterval, msgCh, &wg)
 
 	// Send contact request from Alice to Bob, bob accept the request
 	dest := cCtx.String(AddFlag)
 	if dest != "" {
-		err := sendContactRequest(cCtx, messenger, dest)
+		err := cli.sendContactRequest(cCtx, dest)
 		if err != nil {
 			return err
 		}
@@ -61,7 +61,7 @@ func serve(cCtx *cli.Context) error {
 
 	go func() {
 		msgID := <-msgCh
-		err = sendContactRequestAcceptance(cCtx, messenger, msgID)
+		err = cli.sendContactRequestAcceptance(cCtx, msgID)
 		if err != nil {
 			logger.Error(err)
 			return
@@ -71,7 +71,7 @@ func serve(cCtx *cli.Context) error {
 	// Send message if mutual contact exists
 	sem := make(chan struct{}, 1)
 	wg.Add(1)
-	go sendMessageLoop(ctx, messenger, SendInterval, &wg, sem, cancel)
+	go cli.sendMessageLoop(ctx, SendInterval, &wg, sem, cancel)
 
 	wg.Wait()
 	logger.Info("Exiting")

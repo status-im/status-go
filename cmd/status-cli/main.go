@@ -74,7 +74,7 @@ var ServeFlags = append([]cli.Flag{
 
 var logger *zap.SugaredLogger
 
-type ServiceData struct {
+type StatusCLI struct {
 	name      string
 	messenger *protocol.Messenger
 	backend   *api.GethStatusBackend

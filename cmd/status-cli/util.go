@@ -34,7 +34,7 @@ func setupLogger(file string) *zap.Logger {
 	return logutils.ZapLogger()
 }
 
-func startService(cCtx *cli.Context, name string, port int, apiModules string) (*ServiceData, error) {
+func start(cCtx *cli.Context, name string, port int, apiModules string) (*StatusCLI, error) {
 	namedLogger := logger.Named(name)
 	namedLogger.Info("starting messager")
 
@@ -81,7 +81,7 @@ func startService(cCtx *cli.Context, name string, port int, apiModules string) (
 
 	time.Sleep(WaitingInterval)
 
-	data := ServiceData{
+	data := StatusCLI{
 		name:      name,
 		messenger: messenger,
 		backend:   backend,
@@ -91,7 +91,7 @@ func startService(cCtx *cli.Context, name string, port int, apiModules string) (
 	return &data, nil
 }
 
-func stopService(cli *ServiceData) {
+func (cli *StatusCLI) stop() {
 	err := cli.backend.StopNode()
 	if err != nil {
 		logger.Error(err)
