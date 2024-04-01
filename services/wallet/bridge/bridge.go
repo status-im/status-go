@@ -14,6 +14,8 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
+var ZeroAddress = common.Address{}
+
 const IncreaseEstimatedGasFactor = 1.1
 
 func getSigner(chainID uint64, from types.Address, verifiedAccount *account.SelectedExtKey) bind.SignerFn {
@@ -31,6 +33,7 @@ type TransactionBridge struct {
 	CbridgeTx         *CBridgeTxArgs
 	ERC721TransferTx  *ERC721TransferTxArgs
 	ERC1155TransferTx *ERC1155TransferTxArgs
+	SwapTx            *SwapTxArgs
 }
 
 func (t *TransactionBridge) Value() *big.Int {
@@ -99,9 +102,9 @@ func (t *TransactionBridge) Data() types.HexBytes {
 
 type Bridge interface {
 	Name() string
-	Can(from *params.Network, to *params.Network, token *token.Token, balance *big.Int) (bool, error)
+	Can(from *params.Network, to *params.Network, token *token.Token, toToken *token.Token, balance *big.Int) (bool, error)
 	CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int, nativeTokenPrice, tokenPrice float64, gasPrice *big.Float) (*big.Int, *big.Int, error)
-	EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) (uint64, error)
+	EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error)
 	CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error)
 	Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error)
 	GetContractAddress(network *params.Network, token *token.Token) *common.Address

@@ -347,6 +347,10 @@ func (tm *TransactionManager) sendTransactions(multiTransaction *MultiTransactio
 			tx.ERC1155TransferTx.MultiTransactionID = multiTransaction.ID
 			tx.ERC1155TransferTx.Symbol = multiTransaction.FromAsset
 		}
+		if tx.SwapTx != nil {
+			tx.SwapTx.MultiTransactionID = multiTransaction.ID
+			tx.SwapTx.Symbol = multiTransaction.FromAsset
+		}
 
 		hash, err := bridges[tx.BridgeName].Send(tx, selectedAccount)
 		if err != nil {

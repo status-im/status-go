@@ -426,6 +426,7 @@ func (api *API) GetSuggestedRoutes(
 	addrTo common.Address,
 	amountIn *hexutil.Big,
 	tokenID string,
+	toTokenID string,
 	disabledFromChainIDs,
 	disabledToChaindIDs,
 	preferedChainIDs []uint64,
@@ -433,7 +434,7 @@ func (api *API) GetSuggestedRoutes(
 	fromLockedAmount map[uint64]*hexutil.Big,
 ) (*SuggestedRoutes, error) {
 	log.Debug("call to GetSuggestedRoutes")
-	return api.router.suggestedRoutes(ctx, sendType, addrFrom, addrTo, amountIn.ToInt(), tokenID, disabledFromChainIDs,
+	return api.router.suggestedRoutes(ctx, sendType, addrFrom, addrTo, amountIn.ToInt(), tokenID, toTokenID, disabledFromChainIDs,
 		disabledToChaindIDs, preferedChainIDs, gasFeeMode, fromLockedAmount)
 }
 

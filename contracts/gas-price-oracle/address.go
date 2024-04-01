@@ -18,7 +18,7 @@ var contractAddressByChainID = map[uint64]common.Address{
 func ContractAddress(chainID uint64) (common.Address, error) {
 	addr, exists := contractAddressByChainID[chainID]
 	if !exists {
-		return *new(common.Address), ErrorNotAvailableOnChainID
+		return common.Address{}, ErrorNotAvailableOnChainID
 	}
 	return addr, nil
 }

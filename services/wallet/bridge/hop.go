@@ -108,7 +108,7 @@ func (h *HopBridge) Name() string {
 	return "Hop"
 }
 
-func (h *HopBridge) Can(from, to *params.Network, token *token.Token, balance *big.Int) (bool, error) {
+func (h *HopBridge) Can(from, to *params.Network, token *token.Token, toToken *token.Token, balance *big.Int) (bool, error) {
 	if balance.Cmp(big.NewInt(0)) == 0 {
 		return false, nil
 	}
@@ -132,7 +132,7 @@ func (h *HopBridge) Can(from, to *params.Network, token *token.Token, balance *b
 	return true, nil
 }
 
-func (h *HopBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
+func (h *HopBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
 	var input []byte
 	value := new(big.Int)
 

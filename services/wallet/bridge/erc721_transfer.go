@@ -40,7 +40,7 @@ func (s *ERC721TransferBridge) Name() string {
 	return "ERC721Transfer"
 }
 
-func (s *ERC721TransferBridge) Can(from, to *params.Network, token *token.Token, balance *big.Int) (bool, error) {
+func (s *ERC721TransferBridge) Can(from, to *params.Network, token *token.Token, toToken *token.Token, balance *big.Int) (bool, error) {
 	return from.ChainID == to.ChainID, nil
 }
 
@@ -48,7 +48,7 @@ func (s *ERC721TransferBridge) CalculateFees(from, to *params.Network, token *to
 	return big.NewInt(0), big.NewInt(0), nil
 }
 
-func (s *ERC721TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
+func (s *ERC721TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
 	ethClient, err := s.rpcClient.EthClient(fromNetwork.ChainID)
 	if err != nil {
 		return 0, err
