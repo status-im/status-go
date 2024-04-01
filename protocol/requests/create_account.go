@@ -59,6 +59,11 @@ type CreateAccount struct {
 
 	TorrentConfigEnabled *bool
 	TorrentConfigPort    *int
+
+	HTTPEnabled bool   `json:"httpEnabled"`
+	APIModules  string `json:"apiModules"`
+	HTTPHost    string `json:"httpHost"`
+	HTTPPort    int    `json:"httpPort"`
 }
 
 type WalletSecretsConfig struct {
