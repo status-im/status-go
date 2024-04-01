@@ -34,7 +34,7 @@ func setupLogger(file string) *zap.Logger {
 	return logutils.ZapLogger()
 }
 
-func startMessenger(cCtx *cli.Context, name string, port int) (*StatusCLI, error) {
+func startMessenger(cCtx *cli.Context, name string, port int, apiModules string) (*StatusCLI, error) {
 	namedLogger := logger.Named(name)
 	namedLogger.Info("starting messager")
 
@@ -56,7 +56,7 @@ func startMessenger(cCtx *cli.Context, name string, port int) (*StatusCLI, error
 		BackupDisabledDataDir: fmt.Sprintf("./test-%s", strings.ToLower(name)),
 		LogFilePath:           "log",
 		HTTPEnabled:           true,
-		APIModules:            "waku,wakuext,wakuv2,permissions,eth",
+		APIModules:            apiModules,
 		HTTPHost:              "127.0.0.1",
 		HTTPPort:              port,
 	}

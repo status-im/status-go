@@ -35,8 +35,9 @@ func serve(cCtx *cli.Context) error {
 
 	name := cCtx.String(NameFlag)
 	port := cCtx.Int(PortFlag)
+	apiModules := cCtx.String(APIModulesFlag)
 
-	messenger, err := startMessenger(cCtx, name, port)
+	messenger, err := startMessenger(cCtx, name, port, apiModules)
 	if err != nil {
 		return err
 	}

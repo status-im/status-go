@@ -18,6 +18,7 @@ const CountFlag = "count"
 const NameFlag = "name"
 const AddFlag = "add"
 const PortFlag = "port"
+const APIModulesFlag = "api-modules"
 
 const RetrieveInterval = 300 * time.Millisecond
 const SendInterval = 1 * time.Second
@@ -28,6 +29,12 @@ var CommonFlags = []cli.Flag{
 		Name:    LightFlag,
 		Aliases: []string{"l"},
 		Usage:   "Enable light mode",
+	},
+	&cli.StringFlag{
+		Name:    APIModulesFlag,
+		Aliases: []string{"m"},
+		Value:   "waku,wakuext,wakuv2,permissions,eth",
+		Usage:   "API modules to enable",
 	},
 }
 
