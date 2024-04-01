@@ -39,8 +39,8 @@ func ValidateDisplayName(displayName *string) error {
 		return nil
 	}
 
-	// ^[\\w-\\s]{5,24}$ to allow spaces
-	if match, _ := regexp.MatchString("^[\\w-\\s]{5,24}$", name); !match {
+	// ^[\\w-\\s]{3,24}$ to allow spaces
+	if match, _ := regexp.MatchString("^[\\w-\\s]{3,24}$", name); !match {
 		return ErrInvalidDisplayNameRegExp
 	}
 
