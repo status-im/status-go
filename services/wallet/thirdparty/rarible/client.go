@@ -44,7 +44,7 @@ func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 	switch uint64(chainID) {
 	case walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet:
 		return "https://api.rarible.org", nil
-	case walletCommon.ArbitrumSepolia:
+	case walletCommon.EthereumSepolia, walletCommon.ArbitrumSepolia:
 		return "https://testnet-api.rarible.org", nil
 	}
 
