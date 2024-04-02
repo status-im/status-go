@@ -31,7 +31,7 @@ func chainStringToChainID(chainString string, isMainnet bool) walletCommon.Chain
 		if isMainnet {
 			chainID = walletCommon.EthereumMainnet
 		} else {
-			chainID = walletCommon.EthereumGoerli
+			chainID = walletCommon.EthereumSepolia
 		}
 	case arbitrumString:
 		if isMainnet {
@@ -46,7 +46,7 @@ func chainStringToChainID(chainString string, isMainnet bool) walletCommon.Chain
 func chainIDToChainString(chainID walletCommon.ChainID) string {
 	chainString := ""
 	switch uint64(chainID) {
-	case walletCommon.EthereumMainnet, walletCommon.EthereumGoerli:
+	case walletCommon.EthereumMainnet, walletCommon.EthereumSepolia:
 		chainString = ethereumString
 	case walletCommon.ArbitrumMainnet, walletCommon.ArbitrumSepolia:
 		chainString = arbitrumString
