@@ -360,7 +360,7 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 
 						requiredAmount, success := new(big.Int).SetString(tokenRequirement.AmountInWei, 10)
 						if !success {
-							return nil, fmt.Errorf("amountInWeis value is incorrect")
+							return nil, fmt.Errorf("amountInWeis value is incorrect: %s", tokenRequirement.AmountInWei)
 						}
 
 						if accumulatedBalance.Cmp(requiredAmount) != -1 {
