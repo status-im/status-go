@@ -25,6 +25,18 @@
           ];
         };
 
+        # https://github.com/golang/go/issues/58426
+        gomobile = prev.gomobile.overrideAttrs (attrs: rec {
+          version = "unstable-2023-03-24";
+
+          src = prev.fetchFromGitHub {
+            owner = "golang";
+            repo = "mobile";
+            rev = "76ac6878050a2eef81867f2c6c21108e59919e8f";
+            sha256 = "sha256-mq7gKccvI7VCBEiQTueWxMPOCgg/MGE8y2+BlwWx5pw=";
+          };
+        });
+
         go-junit-report = prev.go-junit-report.overrideAttrs ( attrs : rec {
           version = "2.1.0";
 
