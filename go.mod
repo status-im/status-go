@@ -1,6 +1,6 @@
 module github.com/status-im/status-go
 
-go 1.19
+go 1.20
 
 replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.13
 
