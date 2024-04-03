@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -1299,6 +1300,7 @@ func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFrom
 	messageText := "hello, Bobby!"
 
 	alice := s.m
+	alice.account.CustomizationColor = multiaccountscommon.CustomizationColorBeige
 
 	bob1 := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, bob1)
@@ -1324,6 +1326,7 @@ func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFrom
 
 	// Get bob perspective of alice for backup
 	aliceFromBob := bob1.Contacts()[0]
+	s.Require().Equal(aliceFromBob.CustomizationColor, alice.account.GetCustomizationColor())
 	state := bob2.buildMessageState()
 
 	// Restore alice's contact from backup
@@ -1334,6 +1337,7 @@ func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFrom
 	// Accept latest CR for a contact
 	resp, err := bob2.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: types.Hex2Bytes(aliceID)})
 	s.Require().NoError(err)
+	s.Require().Len(resp.Contacts, 1)
 
 	// Make sure the message is updated
 	s.Require().NotNil(resp)

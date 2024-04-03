@@ -25,6 +25,8 @@ import (
 	utils "github.com/status-im/status-go/common"
 
 	"github.com/status-im/status-go/account"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -1092,7 +1094,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, communities.ErrAlreadyJoined
 	}
 
-	requestToJoin := m.communitiesManager.CreateRequestToJoin(request)
+	requestToJoin := m.communitiesManager.CreateRequestToJoin(request, m.account.GetCustomizationColor())
 
 	if len(request.AddressesToReveal) > 0 {
 		revealedAddresses := make([]gethcommon.Address, 0)
@@ -1123,11 +1125,12 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	}
 
 	requestToJoinProto := &protobuf.CommunityRequestToJoin{
-		Clock:            requestToJoin.Clock,
-		EnsName:          requestToJoin.ENSName,
-		DisplayName:      displayName,
-		CommunityId:      request.CommunityID,
-		RevealedAccounts: requestToJoin.RevealedAccounts,
+		Clock:              requestToJoin.Clock,
+		EnsName:            requestToJoin.ENSName,
+		DisplayName:        displayName,
+		CommunityId:        request.CommunityID,
+		RevealedAccounts:   requestToJoin.RevealedAccounts,
+		CustomizationColor: multiaccountscommon.ColorToIDFallbackToBlue(requestToJoin.CustomizationColor),
 	}
 
 	community, _, err = m.communitiesManager.SaveRequestToJoinAndCommunity(requestToJoin, community)
@@ -1459,10 +1462,11 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 	}
 
 	cancelRequestToJoinProto := &protobuf.CommunityCancelRequestToJoin{
-		Clock:       community.Clock(),
-		EnsName:     requestToJoin.ENSName,
-		DisplayName: displayName,
-		CommunityId: community.ID(),
+		Clock:              community.Clock(),
+		EnsName:            requestToJoin.ENSName,
+		DisplayName:        displayName,
+		CommunityId:        community.ID(),
+		CustomizationColor: multiaccountscommon.ColorToIDFallbackToBlue(requestToJoin.CustomizationColor),
 	}
 
 	payload, err := proto.Marshal(cancelRequestToJoinProto)

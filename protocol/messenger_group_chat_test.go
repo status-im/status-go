@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	userimage "github.com/status-im/status-go/images"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -449,6 +451,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemovalOutOfOrder() {
 
 func (s *MessengerGroupChatSuite) TestGroupChatMembersInfoSync() {
 	admin, memberA, memberB := s.newMessenger(), s.newMessenger(), s.newMessenger()
+	memberB.account.CustomizationColor = multiaccountscommon.CustomizationColorBlue
 	s.Require().NoError(admin.settings.SaveSettingField(settings.DisplayName, "admin"))
 	s.Require().NoError(memberA.settings.SaveSettingField(settings.DisplayName, "memberA"))
 	s.Require().NoError(memberB.settings.SaveSettingField(settings.DisplayName, "memberB"))
@@ -481,7 +484,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersInfoSync() {
 				return false
 			}
 			contact, ok := memberA.allContacts.Load(common.PubkeyToHex(&memberB.identity.PublicKey))
-			return ok && contact.DisplayName == "memberB"
+			return ok && contact.DisplayName == "memberB" && contact.CustomizationColor == memberB.account.GetCustomizationColor()
 		},
 		"DisplayName is not the same",
 	)

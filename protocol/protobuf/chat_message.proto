@@ -232,6 +232,8 @@ message ChatMessage {
 
   UnfurledStatusLinks unfurled_status_links = 18;
 
+  uint32 customization_color = 19;
+
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;
     TEXT_PLAIN = 1;

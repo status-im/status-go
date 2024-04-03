@@ -95,6 +95,17 @@ func (a *Account) FromProtobuf(ma *protobuf.MultiAccount) {
 	a.CustomizationColorClock = ma.CustomizationColorClock
 }
 
+func (a *Account) GetCustomizationColor() common.CustomizationColor {
+	if len(a.CustomizationColor) == 0 {
+		return common.CustomizationColorBlue
+	}
+	return a.CustomizationColor
+}
+
+func (a *Account) GetCustomizationColorID() uint32 {
+	return common.ColorToIDFallbackToBlue(a.GetCustomizationColor())
+}
+
 type MultiAccountMarshaller interface {
 	ToMultiAccount() *Account
 }

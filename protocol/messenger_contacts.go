@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -106,7 +107,17 @@ func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, 
 
 	m.logger.Info("acceptContactRequest")
 
-	response, err := m.addContact(ctx, contactRequest.From, "", "", "", contactRequest.ID, "", fromSyncing, false, false)
+	var ensName, nickname, displayName string
+	customizationColor := multiaccountscommon.IDToColorFallbackToBlue(contactRequest.CustomizationColor)
+
+	if contact, ok := m.allContacts.Load(contactRequest.From); ok {
+		ensName = contact.EnsName
+		nickname = contact.LocalNickname
+		displayName = contact.DisplayName
+		customizationColor = contact.CustomizationColor
+	}
+
+	response, err := m.addContact(ctx, contactRequest.From, ensName, nickname, displayName, customizationColor, contactRequest.ID, "", fromSyncing, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -237,12 +248,23 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 		return nil, err
 	}
 
+	var ensName, nickname, displayName string
+	customizationColor := multiaccountscommon.CustomizationColorBlue
+
+	if contact, ok := m.allContacts.Load(chatID); ok {
+		ensName = contact.EnsName
+		nickname = contact.LocalNickname
+		displayName = contact.DisplayName
+		customizationColor = contact.CustomizationColor
+	}
+
 	return m.addContact(
 		ctx,
 		chatID,
-		"",
-		"",
-		"",
+		ensName,
+		nickname,
+		displayName,
+		customizationColor,
 		"",
 		request.Message,
 		false,
@@ -355,7 +377,11 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	return response, nil
 }
 
-func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, displayName, contactRequestID string, contactRequestText string, fromSyncing bool, sendContactUpdate bool, createOutgoingContactRequestNotification bool) (*MessengerResponse, error) {
+func (m *Messenger) addContact(ctx context.Context,
+	pubKey, ensName, nickname, displayName string,
+	customizationColor multiaccountscommon.CustomizationColor,
+	contactRequestID, contactRequestText string,
+	fromSyncing, sendContactUpdate, createOutgoingContactRequestNotification bool) (*MessengerResponse, error) {
 	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: pubKey})
 	if err != nil {
 		return nil, err
@@ -385,6 +411,8 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 	if len(displayName) != 0 {
 		contact.DisplayName = displayName
 	}
+
+	contact.CustomizationColor = customizationColor
 
 	contact.LastUpdatedLocally = clock
 	contact.ContactRequestSent(clock)
@@ -446,20 +474,19 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 		return nil, err
 	}
 
-	// Get ENS name of a current user
-	ensName, err = m.settings.ENSName()
-	if err != nil {
-		return nil, err
-	}
-
-	// Get display name of a current user
-	displayName, err = m.settings.DisplayName()
-	if err != nil {
-		return nil, err
-	}
-
 	if sendContactUpdate {
-		response, err = m.sendContactUpdate(context.Background(), pubKey, displayName, ensName, "", m.dispatchMessage)
+		// Get ENS name of a current user
+		ensName, err = m.settings.ENSName()
+		if err != nil {
+			return nil, err
+		}
+
+		// Get display name of a current user
+		displayName, err = m.settings.DisplayName()
+		if err != nil {
+			return nil, err
+		}
+		response, err = m.sendContactUpdate(context.Background(), pubKey, displayName, ensName, "", m.account.GetCustomizationColor(), m.dispatchMessage)
 		if err != nil {
 			return nil, err
 		}
@@ -568,8 +595,10 @@ func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, conta
 	contactRequest.Text = text
 	if outgoing {
 		contactRequest.From = m.myHexIdentity()
+		contactRequest.CustomizationColor = m.account.GetCustomizationColorID()
 	} else {
 		contactRequest.From = contact.ID
+		contactRequest.CustomizationColor = multiaccountscommon.ColorToIDFallbackToBlue(contact.CustomizationColor)
 	}
 	contactRequest.LocalChatID = contact.ID
 	contactRequest.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
@@ -618,6 +647,7 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 		request.ENSName,
 		request.Nickname,
 		request.DisplayName,
+		multiaccountscommon.CustomizationColor(request.CustomizationColor),
 		"",
 		defaultContactRequestText(),
 		false,
@@ -1005,7 +1035,7 @@ func (m *Messenger) UnblockContact(contactID string) (*MessengerResponse, error)
 }
 
 // Send contact updates to all contacts added by us
-func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImage string) (err error) {
+func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImage string, customizationColor multiaccountscommon.CustomizationColor) (err error) {
 	myID := contactIDFromPublicKey(&m.identity.PublicKey)
 
 	displayName, err := m.settings.DisplayName()
@@ -1013,14 +1043,18 @@ func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImag
 		return err
 	}
 
-	if _, err = m.sendContactUpdate(ctx, myID, displayName, ensName, profileImage, m.dispatchMessage); err != nil {
+	if len(customizationColor) == 0 && m.account != nil {
+		customizationColor = m.account.GetCustomizationColor()
+	}
+
+	if _, err = m.sendContactUpdate(ctx, myID, displayName, ensName, profileImage, customizationColor, m.dispatchMessage); err != nil {
 		return err
 	}
 
 	// TODO: This should not be sending paired messages, as we do it above
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.added() {
-			if _, err = m.sendContactUpdate(ctx, contact.ID, displayName, ensName, profileImage, m.dispatchMessage); err != nil {
+			if _, err = m.sendContactUpdate(ctx, contact.ID, displayName, ensName, profileImage, customizationColor, m.dispatchMessage); err != nil {
 				return false
 			}
 		}
@@ -1036,16 +1070,19 @@ func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImag
 // on the messenger first.
 
 // SendContactUpdate sends a contact update to a user and adds the user to contacts
-func (m *Messenger) SendContactUpdate(ctx context.Context, chatID, ensName, profileImage string) (*MessengerResponse, error) {
+func (m *Messenger) SendContactUpdate(ctx context.Context, chatID, ensName, profileImage string, customizationColor multiaccountscommon.CustomizationColor) (*MessengerResponse, error) {
 	displayName, err := m.settings.DisplayName()
 	if err != nil {
 		return nil, err
 	}
 
-	return m.sendContactUpdate(ctx, chatID, displayName, ensName, profileImage, m.dispatchMessage)
+	return m.sendContactUpdate(ctx, chatID, displayName, ensName, profileImage, customizationColor, m.dispatchMessage)
 }
 
-func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, displayName, ensName, profileImage string, rawMessageHandler RawMessageHandler) (*MessengerResponse, error) {
+func (m *Messenger) sendContactUpdate(ctx context.Context,
+	chatID, displayName, ensName, profileImage string,
+	customizationColor multiaccountscommon.CustomizationColor,
+	rawMessageHandler RawMessageHandler) (*MessengerResponse, error) {
 	var response MessengerResponse
 
 	contact, ok := m.allContacts.Load(chatID)
@@ -1066,7 +1103,9 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, displayName, 
 		ContactRequestClock:           contact.ContactRequestLocalClock,
 		ContactRequestPropagatedState: contact.ContactRequestPropagatedState(),
 		PublicKey:                     contact.ID,
+		CustomizationColor:            multiaccountscommon.ColorToIDFallbackToBlue(customizationColor),
 	}
+
 	encodedMessage, err := proto.Marshal(contactUpdate)
 	if err != nil {
 		return nil, err
@@ -1236,10 +1275,13 @@ func (m *Messenger) BuildContact(request *requests.BuildContact) (*Contact, erro
 			contact.ENSVerified = true
 			contact.EnsName = request.ENSName
 		}
+
+		if len(contact.CustomizationColor) == 0 {
+			contact.CustomizationColor = multiaccountscommon.CustomizationColorBlue
+		}
 	}
 
 	// Schedule sync filter to fetch information about the contact
-
 	publicKey, err := contact.PublicKey()
 	if err != nil {
 		return nil, err
