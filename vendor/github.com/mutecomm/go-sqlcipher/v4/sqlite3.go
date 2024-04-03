@@ -208,6 +208,8 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // SQLiteTimestampFormats is timestamp formats understood by both this module
@@ -1673,7 +1675,7 @@ func (d *SQLiteDriver) Open(dsn string) (driver.Conn, error) {
 
 // Close the connection.
 func (c *SQLiteConn) Close() error {
-	fmt.Println("CALLLED CLOSE")
+	log.Warn("CALLLED CLOSE")
 	printStackTrace()
 	rv := C.sqlite3_close_v2(c.db)
 	if rv != C.SQLITE_OK {
@@ -2138,5 +2140,5 @@ func (rc *SQLiteRows) nextSyncLocked(dest []driver.Value) error {
 func printStackTrace() {
 	buf := make([]byte, 1<<16)
 	stackSize := runtime.Stack(buf, true)
-	fmt.Printf("=== BEGIN STACK TRACE ===\n%s\n=== END STACK TRACE ===\n", buf[:stackSize])
+	log.Warn(fmt.Sprintf("=== BEGIN STACK TRACE ===\n%s\n=== END STACK TRACE ===\n", buf[:stackSize]))
 }
