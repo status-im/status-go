@@ -3330,7 +3330,7 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 			if err != nil {
 				m.logger.Error("invalid EventsBaseCommunityDescription", zap.Error(err))
 			}
-			if eventsDescription.Clock == community.Clock() {
+			if eventsDescription != nil && eventsDescription.Clock == community.Clock() {
 				community.applyEvents()
 			}
 		}
