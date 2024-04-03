@@ -1558,7 +1558,7 @@ func (m *Messenger) watchChatsAndCommunitiesToUnmute() {
 	go func() {
 		for {
 			select {
-			case <-time.After(3 * time.Second): // Poll every 3 seconds
+			case <-time.After(1 * time.Minute):
 				response := &MessengerResponse{}
 				m.allChats.Range(func(chatID string, c *Chat) bool {
 					chatMuteTill, _ := time.Parse(time.RFC3339, c.MuteTill.Format(time.RFC3339))
@@ -1593,7 +1593,7 @@ func (m *Messenger) watchCommunitiesToUnmute() {
 	go func() {
 		for {
 			select {
-			case <-time.After(3 * time.Second): // Poll every 3 seconds
+			case <-time.After(1 * time.Minute):
 				response, err := m.CheckCommunitiesToUnmute()
 				if err != nil {
 					return
