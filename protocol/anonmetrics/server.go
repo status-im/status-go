@@ -54,7 +54,7 @@ func (s *Server) StoreMetrics(appMetricsBatch *protobuf.AnonymousMetricBatch) (a
 		return nil, nil
 	}
 
-	s.Logger.Debug("StoreMetrics() triggered with payload",
+	s.Logger.Warn("StoreMetrics() triggered with payload",
 		zap.Reflect("appMetricsBatch", appMetricsBatch))
 	appMetrics, err = adaptProtoBatchToModels(appMetricsBatch)
 	if err != nil {

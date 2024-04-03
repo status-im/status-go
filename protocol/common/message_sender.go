@@ -161,7 +161,7 @@ func (s *MessageSender) SendPrivate(
 	recipient *ecdsa.PublicKey,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
-	s.logger.Debug(
+	s.logger.Warn(
 		"sending a private message",
 		zap.String("public-key", types.EncodeHex(crypto.FromECDSAPub(recipient))),
 		zap.String("site", "SendPrivate"),
@@ -187,7 +187,7 @@ func (s *MessageSender) SendCommunityMessage(
 	ctx context.Context,
 	rawMessage RawMessage,
 ) ([]byte, error) {
-	s.logger.Debug(
+	s.logger.Warn(
 		"sending a community message",
 		zap.String("communityId", types.EncodeHex(rawMessage.CommunityID)),
 		zap.String("site", "SendCommunityMessage"),
@@ -202,7 +202,7 @@ func (s *MessageSender) SendPubsubTopicKey(
 	ctx context.Context,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
-	s.logger.Debug(
+	s.logger.Warn(
 		"sending the protected topic key for a community",
 		zap.String("communityId", types.EncodeHex(rawMessage.CommunityID)),
 		zap.String("site", "SendPubsubTopicKey"),
@@ -237,7 +237,7 @@ func (s *MessageSender) SendGroup(
 	recipients []*ecdsa.PublicKey,
 	rawMessage RawMessage,
 ) ([]byte, error) {
-	s.logger.Debug(
+	s.logger.Warn(
 		"sending a private group message",
 		zap.String("site", "SendGroup"),
 	)
@@ -297,7 +297,7 @@ func (s *MessageSender) sendCommunity(
 	ctx context.Context,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
-	s.logger.Debug("sending community message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(&rawMessage.Sender.PublicKey))))
+	s.logger.Warn("sending community message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(&rawMessage.Sender.PublicKey))))
 
 	// Set sender
 	if rawMessage.Sender == nil {
@@ -387,7 +387,7 @@ func (s *MessageSender) sendCommunity(
 		}
 	}
 
-	s.logger.Debug("sent community message ", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
+	s.logger.Warn("sent community message ", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
 	s.transport.Track(messageID, hashes, newMessages)
 
 	return messageID, nil
@@ -399,7 +399,7 @@ func (s *MessageSender) sendPrivate(
 	recipient *ecdsa.PublicKey,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
-	s.logger.Debug("sending private message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
+	s.logger.Warn("sending private message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
 
 	var wrappedMessage []byte
 	var err error
@@ -473,7 +473,7 @@ func (s *MessageSender) sendPrivate(
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
 
-		s.logger.Debug("sent private message skipProtocolLayer", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
+		s.logger.Warn("sent private message skipProtocolLayer", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
 		s.transport.Track(messageID, hashes, newMessages)
 
 	} else {
@@ -488,7 +488,7 @@ func (s *MessageSender) sendPrivate(
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
 
-		s.logger.Debug("sent private message without datasync", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
+		s.logger.Warn("sent private message without datasync", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
 		s.transport.Track(messageID, hashes, newMessages)
 	}
 
@@ -501,7 +501,7 @@ func (s *MessageSender) SendPairInstallation(
 	recipient *ecdsa.PublicKey,
 	rawMessage RawMessage,
 ) ([]byte, error) {
-	s.logger.Debug("sending private message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
+	s.logger.Warn("sending private message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
 
 	wrappedMessage, err := s.wrapMessageV1(&rawMessage)
 	if err != nil {
@@ -679,7 +679,7 @@ func (s *MessageSender) SendPublic(
 		if err != nil {
 			return nil, err
 		}
-		s.logger.Debug("adding key id to message", zap.String("keyid", types.Bytes2Hex(keyID)))
+		s.logger.Warn("adding key id to message", zap.String("keyid", types.Bytes2Hex(keyID)))
 		// We send the message over the community topic
 		spec, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, wrappedMessage, ratchet)
 		if err != nil {
@@ -740,7 +740,7 @@ func (s *MessageSender) SendPublic(
 
 	s.notifyOnSentMessage(sentMessage)
 
-	s.logger.Debug("sent public message", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
+	s.logger.Warn("sent public message", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
 	s.transport.Track(messageID, hashes, newMessages)
 
 	return messageID, nil
@@ -814,10 +814,10 @@ func (s *MessageSender) HandleMessages(wakuMessage *types.Message) (*HandleMessa
 
 		var processedIds [][]byte
 		for _, message := range messages {
-			hlogger.Info("handling out of order encrypted messages", zap.String("hash", types.Bytes2Hex(message.Hash)))
+			hlogger.Warn("handling out of order encrypted messages", zap.String("hash", types.Bytes2Hex(message.Hash)))
 			r, err := s.handleMessage(message)
 			if err != nil {
-				hlogger.Debug("failed to handle hash ratchet message", zap.Error(err))
+				hlogger.Warn("failed to handle hash ratchet message", zap.Error(err))
 				continue
 			}
 			response.DatasyncMessages = append(response.toPublicResponse().StatusMessages, r.Messages()...)
@@ -899,7 +899,7 @@ func (s *MessageSender) handleMessage(wakuMessage *types.Message) (*handleMessag
 
 	err = s.handleSegmentationLayer(message)
 	if err != nil {
-		hlogger.Debug("failed to handle segmentation layer message", zap.Error(err))
+		hlogger.Warn("failed to handle segmentation layer message", zap.Error(err))
 
 		// Segments not completed yet, stop processing
 		if err == ErrMessageSegmentsIncomplete {
@@ -913,7 +913,7 @@ func (s *MessageSender) handleMessage(wakuMessage *types.Message) (*handleMessag
 
 	err = s.handleEncryptionLayer(context.Background(), message)
 	if err != nil {
-		hlogger.Debug("failed to handle an encryption message", zap.Error(err))
+		hlogger.Warn("failed to handle an encryption message", zap.Error(err))
 
 		// Hash ratchet with a group id not found yet, stop processing
 		if err == encryption.ErrHashRatchetGroupIDNotFound {
@@ -924,7 +924,7 @@ func (s *MessageSender) handleMessage(wakuMessage *types.Message) (*handleMessag
 	if s.datasync != nil && s.datasyncEnabled {
 		err := s.unwrapDatasyncMessage(message, response)
 		if err != nil {
-			hlogger.Debug("failed to handle datasync message", zap.Error(err))
+			hlogger.Warn("failed to handle datasync message", zap.Error(err))
 		}
 	}
 
@@ -1085,7 +1085,7 @@ func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey 
 		if err != nil {
 			return nil, nil, err
 		}
-		s.logger.Debug("adding key id to message", zap.String("keyid", types.Bytes2Hex(keyID)))
+		s.logger.Warn("adding key id to message", zap.String("keyid", types.Bytes2Hex(keyID)))
 		// We send the message over the community topic
 		spec, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, wrappedMessage, ratchet)
 		if err != nil {
@@ -1154,10 +1154,10 @@ func (s *MessageSender) sendMessageSpec(ctx context.Context, publicKey *ecdsa.Pu
 		}
 		// process shared secret
 		if messageSpec.AgreedSecret {
-			logger.Debug("sending using shared secret")
+			logger.Warn("sending using shared secret")
 			hash, err = s.transport.SendPrivateWithSharedSecret(ctx, newMessage, publicKey, messageSpec.SharedSecret.Key)
 		} else {
-			logger.Debug("sending partitioned topic")
+			logger.Warn("sending partitioned topic")
 			hash, err = s.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
 		}
 		if err != nil {
@@ -1340,7 +1340,7 @@ func (s *MessageSender) segmentMessage(newMessage *types.NewMessage) ([]*types.N
 	// We set the max message size to 3/4 of the allowed message size, to leave
 	// room for segment message metadata.
 	newMessages, err := segmentMessage(newMessage, int(s.transport.MaxMessageSize()/4*3))
-	s.logger.Debug("message segmented", zap.Int("segments", len(newMessages)))
+	s.logger.Warn("message segmented", zap.Int("segments", len(newMessages)))
 	return newMessages, err
 }
 
@@ -1359,7 +1359,7 @@ func (s *MessageSender) handleSegmentationLayer(message *v1protocol.StatusMessag
 		return errors.Wrap(err, "failed to unmarshal SegmentMessage")
 	}
 
-	hlogger.Debug("handling message segment", zap.String("EntireMessageHash", types.HexBytes(segmentMessage.EntireMessageHash).String()),
+	hlogger.Warn("handling message segment", zap.String("EntireMessageHash", types.HexBytes(segmentMessage.EntireMessageHash).String()),
 		zap.Uint32("Index", segmentMessage.Index), zap.Uint32("SegmentsCount", segmentMessage.SegmentsCount))
 
 	alreadyCompleted, err := s.persistence.IsMessageAlreadyCompleted(segmentMessage.EntireMessageHash)

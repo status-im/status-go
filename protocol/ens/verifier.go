@@ -118,7 +118,7 @@ func (v *Verifier) Subscribe() chan []*VerificationRecord {
 }
 
 func (v *Verifier) publish(records []*VerificationRecord) {
-	v.logger.Info("publishing records", zap.Any("records", records))
+	v.logger.Warn("publishing records", zap.Any("records", records))
 	// Publish on channels, drop if buffer is full
 	for _, s := range v.subscriptions {
 		select {
@@ -137,7 +137,7 @@ func (v *Verifier) ReverseResolve(address gethcommon.Address) (string, error) {
 
 // Verify verifies that a registered ENS name matches the expected public key
 func (v *Verifier) verify(rpcEndpoint, contractAddress string) error {
-	v.logger.Debug("verifying ENS Names", zap.String("endpoint", rpcEndpoint))
+	v.logger.Warn("verifying ENS Names", zap.String("endpoint", rpcEndpoint))
 	verifier := v.node.NewENSVerifier(v.logger)
 
 	var ensDetails []enstypes.ENSDetails
@@ -157,7 +157,7 @@ func (v *Verifier) verify(rpcEndpoint, contractAddress string) error {
 			PublicKeyString: r.PublicKey[2:],
 			Name:            r.Name,
 		})
-		v.logger.Debug("verifying ens name", zap.Any("record", r))
+		v.logger.Warn("verifying ens name", zap.Any("record", r))
 	}
 
 	ensResponse, err := verifier.CheckBatch(ensDetails, rpcEndpoint, contractAddress)

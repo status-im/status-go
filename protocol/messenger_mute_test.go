@@ -117,11 +117,11 @@ func (s *MessengerMuteSuite) TestSetMuteForDuration() {
 		currTime, currTimeErr := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 
 		if chatMuteTillErr != nil {
-			s.logger.Info("err", zap.Any("Couldn't parse muteTill", err))
+			s.logger.Warn("err", zap.Any("Couldn't parse muteTill", err))
 			return
 		}
 		if currTimeErr != nil {
-			s.logger.Info("err", zap.Any("Couldn't parse current time", err))
+			s.logger.Warn("err", zap.Any("Couldn't parse current time", err))
 			return
 		}
 

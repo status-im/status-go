@@ -26,7 +26,7 @@ func (m *Messenger) GetCurrentUserStatus() (*UserStatus, error) {
 
 	err := m.settings.GetCurrentStatus(status)
 	if err != nil {
-		m.logger.Debug("Error obtaining latest status", zap.Error(err))
+		m.logger.Warn("Error obtaining latest status", zap.Error(err))
 		return nil, err
 	}
 
@@ -40,7 +40,7 @@ func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error
 	}
 
 	if !shouldBroadcastUserStatus {
-		m.logger.Debug("user status should not be broadcasted")
+		m.logger.Warn("user status should not be broadcasted")
 		return nil
 	}
 
@@ -96,29 +96,29 @@ func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error
 func (m *Messenger) sendCurrentUserStatus(ctx context.Context) {
 	err := m.persistence.CleanOlderStatusUpdates()
 	if err != nil {
-		m.logger.Debug("Error cleaning status updates", zap.Error(err))
+		m.logger.Warn("Error cleaning status updates", zap.Error(err))
 		return
 	}
 
 	shouldBroadcastUserStatus, err := m.settings.ShouldBroadcastUserStatus()
 	if err != nil {
-		m.logger.Debug("Error while getting status broadcast setting", zap.Error(err))
+		m.logger.Warn("Error while getting status broadcast setting", zap.Error(err))
 		return
 	}
 
 	if !shouldBroadcastUserStatus {
-		m.logger.Debug("user status should not be broadcasted")
+		m.logger.Warn("user status should not be broadcasted")
 		return
 	}
 
 	currStatus, err := m.GetCurrentUserStatus()
 	if err != nil {
-		m.logger.Debug("Error obtaining latest status", zap.Error(err))
+		m.logger.Warn("Error obtaining latest status", zap.Error(err))
 		return
 	}
 
 	if err := m.sendUserStatus(ctx, *currStatus); err != nil {
-		m.logger.Debug("Error when sending the latest user status", zap.Error(err))
+		m.logger.Warn("Error when sending the latest user status", zap.Error(err))
 	}
 }
 
@@ -127,18 +127,18 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 
 	shouldBroadcastUserStatus, err := m.settings.ShouldBroadcastUserStatus()
 	if err != nil {
-		logger.Debug("m.settings.ShouldBroadcastUserStatus error", zap.Error(err))
+		logger.Warn("m.settings.ShouldBroadcastUserStatus error", zap.Error(err))
 		return err
 	}
 
 	if !shouldBroadcastUserStatus {
-		logger.Debug("user status should not be broadcasted")
+		logger.Warn("user status should not be broadcasted")
 		return nil
 	}
 
 	status, err := m.GetCurrentUserStatus()
 	if err != nil {
-		logger.Debug("Error obtaining latest status", zap.Error(err))
+		logger.Warn("Error obtaining latest status", zap.Error(err))
 		return err
 	}
 
@@ -146,7 +146,7 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 
 	err = m.settings.SaveSettingField(settings.CurrentUserStatus, status)
 	if err != nil {
-		logger.Debug("m.settings.SaveSetting error",
+		logger.Warn("m.settings.SaveSetting error",
 			zap.Any("current-user-status", status),
 			zap.Error(err))
 		return err
@@ -160,7 +160,7 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 
 	encodedMessage, err := proto.Marshal(statusUpdate)
 	if err != nil {
-		logger.Debug("proto.Marshal error",
+		logger.Warn("proto.Marshal error",
 			zap.Any("protobuf.StatusUpdate", statusUpdate),
 			zap.Error(err))
 		return err
@@ -177,7 +177,7 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 
 	_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
 	if err != nil {
-		logger.Debug("m.sender.SendPublic error", zap.Error(err))
+		logger.Warn("m.sender.SendPublic error", zap.Error(err))
 		return err
 	}
 
@@ -185,7 +185,7 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 }
 
 func (m *Messenger) broadcastLatestUserStatus() {
-	m.logger.Debug("broadcasting user status")
+	m.logger.Warn("broadcasting user status")
 	ctx := context.Background()
 	go func() {
 		// Ensure that we are connected before sending a message
@@ -219,12 +219,12 @@ func (m *Messenger) SetUserStatus(ctx context.Context, newStatus int, newCustomT
 
 	currStatus, err := m.GetCurrentUserStatus()
 	if err != nil {
-		m.logger.Debug("Error obtaining latest status", zap.Error(err))
+		m.logger.Warn("Error obtaining latest status", zap.Error(err))
 		return err
 	}
 
 	if newStatus == currStatus.StatusType && newCustomText == currStatus.CustomText {
-		m.logger.Debug("Status type did not change")
+		m.logger.Warn("Status type did not change")
 		return nil
 	}
 
@@ -242,7 +242,7 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *pro
 	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) { // Status message is ours
 		currentStatus, err := m.GetCurrentUserStatus()
 		if err != nil {
-			m.logger.Debug("Error obtaining latest status", zap.Error(err))
+			m.logger.Warn("Error obtaining latest status", zap.Error(err))
 			return err
 		}
 
@@ -286,7 +286,7 @@ func (m *Messenger) timeoutStatusUpdates(fromClock uint64, tillClock uint64) {
 			m.config.messengerSignalsHandler.StatusUpdatesTimedOut(&deactivatedStatusUpdates)
 		}
 	} else {
-		m.logger.Debug("Unable to get deactivated automatic status updates from db", zap.Error(err))
+		m.logger.Warn("Unable to get deactivated automatic status updates from db", zap.Error(err))
 	}
 }
 
@@ -317,7 +317,7 @@ func (m *Messenger) timeoutAutomaticStatusUpdates() {
 					// No More status updates to timeout, keep loop running at five minutes interval
 					waitDuration = fiveMinutes
 				} else {
-					m.logger.Debug("Unable to timeout automatic status updates", zap.Error(err))
+					m.logger.Warn("Unable to timeout automatic status updates", zap.Error(err))
 					return
 				}
 			case <-m.quit:

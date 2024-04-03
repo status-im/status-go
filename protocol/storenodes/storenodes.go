@@ -95,7 +95,7 @@ func (m *CommunityStorenodes) ReloadFromDB() error {
 		data.storenodes = append(data.storenodes, node)
 		m.storenodesByCommunityID[communityID] = data
 	}
-	m.logger.Debug("loaded communities storenodes", zap.Int("count", len(dbNodes)))
+	m.logger.Warn("loaded communities storenodes", zap.Int("count", len(dbNodes)))
 	return nil
 }
 

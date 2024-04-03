@@ -77,7 +77,7 @@ func (m *Messenger) HandleCommunityPublicStorenodesInfo(state *ReceivedMessageSt
 	_, err = m.communitiesManager.GetByID(sn.CommunityId)
 	if err != nil {
 		if errors.Is(err, communities.ErrOrgNotFound) {
-			logger.Debug("ignoring control message, community not found")
+			logger.Warn("ignoring control message, community not found")
 			return nil
 		}
 		logger.Error("failed get community by id", zap.Error(err))

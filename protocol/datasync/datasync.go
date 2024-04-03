@@ -33,12 +33,12 @@ func (d *DataSync) Unwrap(sender *ecdsa.PublicKey, payload []byte) (*protobuf.Pa
 	datasyncMessage, err := unwrap(payload)
 	// If it failed to decode is not a protobuf message, if it successfully decoded but body is empty, is likedly a protobuf wrapped message
 	if err != nil {
-		logger.Debug("Unwrapping datasync message failed", zap.Error(err))
+		logger.Warn("Unwrapping datasync message failed", zap.Error(err))
 		return nil, err
 	} else if !datasyncMessage.IsValid() {
 		return nil, errors.New("handling non-datasync message")
 	} else {
-		logger.Debug("handling datasync message")
+		logger.Warn("handling datasync message")
 		if d.sendingEnabled {
 			d.add(sender, &datasyncMessage)
 		}

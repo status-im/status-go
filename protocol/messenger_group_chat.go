@@ -51,7 +51,7 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "CreateGroupChatWithMembers"))
-	logger.Info("Creating group chat", zap.String("name", name), zap.Any("members", convertedKeyMembers))
+	logger.Warn("Creating group chat", zap.String("name", name), zap.Any("members", convertedKeyMembers))
 	chat := CreateGroupChat(m.getTimesource())
 
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
@@ -114,7 +114,7 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 func (m *Messenger) CreateGroupChatFromInvitation(name string, chatID string, adminPK string) (*MessengerResponse, error) {
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "CreateGroupChatFromInvitation"))
-	logger.Info("Creating group chat from invitation", zap.String("name", name))
+	logger.Warn("Creating group chat from invitation", zap.String("name", name))
 	chat := CreateGroupChat(m.getTimesource())
 	chat.ID = chatID
 	chat.Name = name
@@ -134,7 +134,7 @@ type removeMembersFromGroupChatResponse struct {
 func (m *Messenger) removeMembersFromGroupChat(ctx context.Context, chat *Chat, members []string) (*removeMembersFromGroupChatResponse, error) {
 	chatID := chat.ID
 	logger := m.logger.With(zap.String("site", "RemoveMembersFromGroupChat"))
-	logger.Info("Removing members form group chat", zap.String("chatID", chatID), zap.Any("members", members))
+	logger.Warn("Removing members form group chat", zap.String("chatID", chatID), zap.Any("members", members))
 	group, err := newProtocolGroupFromChat(chat)
 	if err != nil {
 		return nil, err
@@ -211,7 +211,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "AddMembersFromGroupChat"))
-	logger.Info("Adding members form group chat", zap.String("chatID", chatID), zap.Any("members", members))
+	logger.Warn("Adding members form group chat", zap.String("chatID", chatID), zap.Any("members", members))
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
@@ -233,7 +233,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 
 	//approve invitations
 	for _, member := range members {
-		logger.Info("ApproveInvitationByChatIdAndFrom", zap.String("chatID", chatID), zap.Any("member", member))
+		logger.Warn("ApproveInvitationByChatIdAndFrom", zap.String("chatID", chatID), zap.Any("member", member))
 
 		groupChatInvitation := &GroupChatInvitation{
 			GroupChatInvitation: &protobuf.GroupChatInvitation{
@@ -289,7 +289,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 
 func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name string) (*MessengerResponse, error) {
 	logger := m.logger.With(zap.String("site", "ChangeGroupChatName"))
-	logger.Info("Changing group chat name", zap.String("chatID", chatID), zap.String("name", name))
+	logger.Warn("Changing group chat name", zap.String("chatID", chatID), zap.String("name", name))
 
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
@@ -345,7 +345,7 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 
 func (m *Messenger) EditGroupChat(ctx context.Context, chatID string, name string, color string, image images.CroppedImage) (*MessengerResponse, error) {
 	logger := m.logger.With(zap.String("site", "EditGroupChat"))
-	logger.Info("Editing group chat details", zap.String("chatID", chatID), zap.String("name", name), zap.String("color", color))
+	logger.Warn("Editing group chat details", zap.String("chatID", chatID), zap.String("name", name), zap.String("color", color))
 
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
@@ -443,7 +443,7 @@ func (m *Messenger) EditGroupChat(ctx context.Context, chatID string, name strin
 func (m *Messenger) SendGroupChatInvitationRequest(ctx context.Context, chatID string, adminPK string,
 	message string) (*MessengerResponse, error) {
 	logger := m.logger.With(zap.String("site", "SendGroupChatInvitationRequest"))
-	logger.Info("Sending group chat invitation request", zap.String("chatID", chatID),
+	logger.Warn("Sending group chat invitation request", zap.String("chatID", chatID),
 		zap.String("adminPK", adminPK), zap.String("message", message))
 
 	var response MessengerResponse
@@ -515,7 +515,7 @@ func (m *Messenger) GetGroupChatInvitations() ([]*GroupChatInvitation, error) {
 
 func (m *Messenger) SendGroupChatInvitationRejection(ctx context.Context, invitationRequestID string) (*MessengerResponse, error) {
 	logger := m.logger.With(zap.String("site", "SendGroupChatInvitationRejection"))
-	logger.Info("Sending group chat invitation reject", zap.String("invitationRequestID", invitationRequestID))
+	logger.Warn("Sending group chat invitation reject", zap.String("invitationRequestID", invitationRequestID))
 
 	invitationR, err := m.persistence.InvitationByID(invitationRequestID)
 	if err != nil {
@@ -582,7 +582,7 @@ func (m *Messenger) SendGroupChatInvitationRejection(ctx context.Context, invita
 func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, members []string) (*MessengerResponse, error) {
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "AddAdminsToGroupChat"))
-	logger.Info("Add admins to group chat", zap.String("chatID", chatID), zap.Any("members", members))
+	logger.Warn("Add admins to group chat", zap.String("chatID", chatID), zap.Any("members", members))
 
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {

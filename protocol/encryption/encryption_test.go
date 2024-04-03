@@ -96,24 +96,24 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 	s.Require().NotNil(aliceKey)
 	s.Require().NotNil(bobKey)
 
-	s.logger.Info("Hash ratchet key exchange 1")
+	s.logger.Warn("Hash ratchet key exchange 1")
 	keyID1, err := s.alice.encryptor.GenerateHashRatchetKey(groupID)
 	s.Require().NoError(err)
 
 	hashRatchetKeyExMsg1, err := s.alice.BuildHashRatchetKeyExchangeMessage(aliceKey, &bobKey.PublicKey, groupID, []*HashRatchetKeyCompatibility{keyID1})
 	s.Require().NoError(err)
 
-	s.logger.Info("Hash ratchet key exchange 1", zap.Any("msg", hashRatchetKeyExMsg1.Message))
+	s.logger.Warn("Hash ratchet key exchange 1", zap.Any("msg", hashRatchetKeyExMsg1.Message))
 	s.Require().NotNil(hashRatchetKeyExMsg1)
 
-	s.logger.Info("Handle hash ratchet key msg 1")
+	s.logger.Warn("Handle hash ratchet key msg 1")
 	decryptedResponse1, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, hashRatchetKeyExMsg1.Message, defaultMessageID)
 	s.Require().NoError(err)
 	s.Require().NotNil(decryptedResponse1)
 
 	decryptedHashRatchetKeyBytes1 := decryptedResponse1.DecryptedMessage
 	decryptedHashRatchetKeyID1, err := s.bob.encryptor.persistence.GetCurrentKeyForGroup(groupID)
-	s.logger.Info("Current hash ratchet key in DB 1", zap.Any("keyId", decryptedHashRatchetKeyID1))
+	s.logger.Warn("Current hash ratchet key in DB 1", zap.Any("keyId", decryptedHashRatchetKeyID1))
 	s.Require().NoError(err)
 	s.Require().NotNil(decryptedHashRatchetKeyID1)
 	s.Require().NotNil(decryptedHashRatchetKeyID1.Key)
@@ -161,23 +161,23 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 	hashRatchetKeyExMsg2, err := s.bob.BuildHashRatchetKeyExchangeMessage(bobKey, &aliceKey.PublicKey, groupID, []*HashRatchetKeyCompatibility{keyID2})
 	s.Require().NoError(err)
 
-	s.logger.Info("Hash ratchet key exchange 2", zap.Any("msg", hashRatchetKeyExMsg2.Message))
+	s.logger.Warn("Hash ratchet key exchange 2", zap.Any("msg", hashRatchetKeyExMsg2.Message))
 	s.Require().NotNil(hashRatchetKeyExMsg2)
 
-	s.logger.Info("Handle hash ratchet key msg 2")
+	s.logger.Warn("Handle hash ratchet key msg 2")
 	decryptedResponse4, err := s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, hashRatchetKeyExMsg2.Message, defaultMessageID)
 	s.Require().NoError(err)
 	decryptedHashRatchetKeyBytes2 := decryptedResponse4.DecryptedMessage
 	decryptedHashRatchetKeyID2, err := s.alice.encryptor.persistence.GetCurrentKeyForGroup(groupID)
 	s.Require().NoError(err)
-	s.logger.Info("Current hash ratchet key in DB 2", zap.Any("keyId", decryptedHashRatchetKeyID2))
+	s.logger.Warn("Current hash ratchet key in DB 2", zap.Any("keyId", decryptedHashRatchetKeyID2))
 	s.Require().NotNil(decryptedHashRatchetKeyID2)
 	s.Require().NotNil(decryptedHashRatchetKeyBytes2)
 
 	payload3 := []byte("community msg 3")
 	hashRatchetMsg3, err := s.alice.BuildHashRatchetMessage(groupID, payload3)
 
-	s.logger.Info("BuildHashRatchetMessage err", zap.Any("err", err))
+	s.logger.Warn("BuildHashRatchetMessage err", zap.Any("err", err))
 	s.Require().NotNil(hashRatchetMsg3)
 	s.Require().NotNil(hashRatchetMsg3.Message)
 
@@ -185,7 +185,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 
 	decryptedResponse5, err := s.bob.HandleMessage(bobKey, nil, hashRatchetMsg3.Message, defaultMessageID)
 
-	s.logger.Info("HandleHashRatchetMessage err", zap.Any("err", err))
+	s.logger.Warn("HandleHashRatchetMessage err", zap.Any("err", err))
 	s.Require().NotNil(decryptedResponse5)
 	s.Equal(payload3, decryptedResponse5.DecryptedMessage)
 
@@ -210,7 +210,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 	decryptedResponse9, err := s.bob.HandleMessage(bobKey, nil, hashRatchetMsg3.Message, defaultMessageID)
 	s.Require().NoError(err)
 
-	s.logger.Info("HandleHashRatchetMessage err", zap.Any("err", err))
+	s.logger.Warn("HandleHashRatchetMessage err", zap.Any("err", err))
 	s.Require().NotNil(decryptedResponse6)
 	s.Equal(payload6, decryptedResponse6.DecryptedMessage)
 	s.Require().NotNil(decryptedResponse7)
@@ -1010,7 +1010,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetCompatibility() {
 	s.Require().NotNil(bobKey)
 
 	// We create a hash ratchet on bob
-	s.logger.Info("Hash ratchet key exchange 1")
+	s.logger.Warn("Hash ratchet key exchange 1")
 	keyID1, err := s.bob.encryptor.GenerateHashRatchetKey(groupID)
 	s.Require().NoError(err)
 
@@ -1137,14 +1137,14 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSendOutOfOrder() {
 	s.Require().NotNil(aliceKey)
 	s.Require().NotNil(bobKey)
 
-	s.logger.Info("Hash ratchet key exchange 1")
+	s.logger.Warn("Hash ratchet key exchange 1")
 	keyID1, err := s.alice.encryptor.GenerateHashRatchetKey(groupID)
 	s.Require().NoError(err)
 
 	hashRatchetKeyExMsg1, err := s.alice.BuildHashRatchetKeyExchangeMessage(aliceKey, &bobKey.PublicKey, groupID, []*HashRatchetKeyCompatibility{keyID1})
 	s.Require().NoError(err)
 
-	s.logger.Info("Hash ratchet key exchange 1", zap.Any("msg", hashRatchetKeyExMsg1.Message))
+	s.logger.Warn("Hash ratchet key exchange 1", zap.Any("msg", hashRatchetKeyExMsg1.Message))
 	s.Require().NotNil(hashRatchetKeyExMsg1)
 
 	payload1 := []byte("community msg 1")
@@ -1159,14 +1159,14 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSendOutOfOrder() {
 	s.Require().Error(err)
 	s.Require().Equal(err, ErrHashRatchetGroupIDNotFound)
 
-	s.logger.Info("Handle hash ratchet key msg 1")
+	s.logger.Warn("Handle hash ratchet key msg 1")
 	decryptedResponse1, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, hashRatchetKeyExMsg1.Message, defaultMessageID)
 	s.Require().NoError(err)
 	s.Require().NotNil(decryptedResponse1)
 
 	decryptedHashRatchetKeyBytes1 := decryptedResponse1.DecryptedMessage
 	decryptedHashRatchetKeyID1, err := s.bob.encryptor.persistence.GetCurrentKeyForGroup(groupID)
-	s.logger.Info("Current hash ratchet key in DB 1", zap.Any("keyId", decryptedHashRatchetKeyID1))
+	s.logger.Warn("Current hash ratchet key in DB 1", zap.Any("keyId", decryptedHashRatchetKeyID1))
 	s.Require().NoError(err)
 	s.Require().NotNil(decryptedHashRatchetKeyID1)
 	s.Require().NotNil(decryptedHashRatchetKeyID1.Key)

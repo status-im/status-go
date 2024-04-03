@@ -32,7 +32,7 @@ func (m *Messenger) startAutoMessageLoop() error {
 		return nil
 	}
 
-	m.logger.Info("[auto message] starting auto message loop")
+	m.logger.Warn("[auto message] starting auto message loop")
 	ticker := time.NewTicker(autoMessageInterval)
 	count := 0
 	go func() {

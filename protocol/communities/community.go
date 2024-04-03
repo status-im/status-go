@@ -1902,13 +1902,13 @@ func (o *Community) VerifyGrantSignature(data []byte) (*protobuf.Grant, error) {
 
 func (o *Community) CanView(pk *ecdsa.PublicKey, chatID string) bool {
 	if o.config.CommunityDescription.Chats == nil {
-		o.config.Logger.Debug("Community.CanView: no-chats")
+		o.config.Logger.Warn("Community.CanView: no-chats")
 		return false
 	}
 
 	chat, ok := o.config.CommunityDescription.Chats[chatID]
 	if !ok {
-		o.config.Logger.Debug("Community.CanView: no chat with id", zap.String("chat-id", chatID))
+		o.config.Logger.Warn("Community.CanView: no chat with id", zap.String("chat-id", chatID))
 		return false
 	}
 
@@ -1918,24 +1918,24 @@ func (o *Community) CanView(pk *ecdsa.PublicKey, chatID string) bool {
 	}
 
 	if o.isBanned(pk) {
-		o.config.Logger.Debug("Community.CanView: user is banned", zap.String("chat-id", chatID))
+		o.config.Logger.Warn("Community.CanView: user is banned", zap.String("chat-id", chatID))
 		return false
 	}
 
 	if o.config.CommunityDescription.Members == nil {
-		o.config.Logger.Debug("Community.CanView: no members in org", zap.String("chat-id", chatID))
+		o.config.Logger.Warn("Community.CanView: no members in org", zap.String("chat-id", chatID))
 		return false
 	}
 
 	// If community member, also check chat membership next
 	_, ok = o.config.CommunityDescription.Members[common.PubkeyToHex(pk)]
 	if !ok {
-		o.config.Logger.Debug("Community.CanView: not a community member", zap.String("chat-id", chatID))
+		o.config.Logger.Warn("Community.CanView: not a community member", zap.String("chat-id", chatID))
 		return false
 	}
 
 	if chat.Members == nil {
-		o.config.Logger.Debug("Community.CanView: no members in chat", zap.String("chat-id", chatID))
+		o.config.Logger.Warn("Community.CanView: no members in chat", zap.String("chat-id", chatID))
 		return false
 	}
 

@@ -31,7 +31,7 @@ func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 		// semantic
 		messageIDBytes, err := m.persistence.MarkAsConfirmed(ack, true)
 		if err != nil {
-			m.logger.Info("got datasync acknowledge for message we don't have in db", zap.String("ack", hex.EncodeToString(ack)))
+			m.logger.Warn("got datasync acknowledge for message we don't have in db", zap.String("ack", hex.EncodeToString(ack)))
 			continue
 		}
 
@@ -40,14 +40,14 @@ func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 
 		err = m.UpdateMessageOutgoingStatus(messageID, common.OutgoingStatusDelivered)
 		if err != nil {
-			m.logger.Debug("Can't set message status as delivered", zap.Error(err))
+			m.logger.Warn("Can't set message status as delivered", zap.Error(err))
 		}
 
 		//send signal to client that message status updated
 		if m.config.messengerSignalsHandler != nil {
 			message, err := m.persistence.MessageByID(messageID)
 			if err != nil {
-				m.logger.Debug("Can't get message from database", zap.Error(err))
+				m.logger.Warn("Can't get message from database", zap.Error(err))
 				continue
 			}
 			m.config.messengerSignalsHandler.MessageDelivered(message.LocalChatID, messageID)
@@ -98,7 +98,7 @@ func (m *Messenger) startPeerSyncingLoop() {
 
 			case <-m.quit:
 				ticker.Stop()
-				logger.Debug("peersyncing loop stopped")
+				logger.Warn("peersyncing loop stopped")
 				return
 			}
 		}
@@ -352,7 +352,7 @@ func (m *Messenger) sendDataSync(receiver state.PeerID, payload *datasyncproto.P
 		return err
 	}
 
-	m.logger.Debug("sent private messages", zap.Any("messageIDs", hexMessageIDs), zap.Strings("hashes", types.EncodeHexes(hashes)))
+	m.logger.Warn("sent private messages", zap.Any("messageIDs", hexMessageIDs), zap.Strings("hashes", types.EncodeHexes(hashes)))
 	m.transport.TrackMany(messageIDs, hashes, newMessages)
 
 	return nil

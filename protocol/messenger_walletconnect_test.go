@@ -30,14 +30,14 @@ func (s *WalletConnectSessionsSuite) TestCreateReadAndDeleteSessions() {
 		PeerID:   peerID1,
 		DAppName: dappName1,
 		DAppURL:  url,
-		Info:     sessionInfo,
+		Warn:     sessionInfo,
 	}
 
 	wcSession2 := &requests.AddWalletConnectSession{
 		PeerID:   peerID2,
 		DAppName: dappName2,
 		DAppURL:  url,
-		Info:     sessionInfo,
+		Warn:     sessionInfo,
 	}
 
 	err := s.m.AddWalletConnectSession(wcSession1)
@@ -53,11 +53,11 @@ func (s *WalletConnectSessionsSuite) TestCreateReadAndDeleteSessions() {
 	s.Require().Equal(response[0].PeerID, peerID2)
 	s.Require().Equal(response[0].DAppName, dappName2)
 	s.Require().Equal(response[0].DAppURL, url)
-	s.Require().Equal(response[0].Info, sessionInfo)
+	s.Require().Equal(response[0].Warn, sessionInfo)
 	s.Require().Equal(response[1].PeerID, peerID1)
 	s.Require().Equal(response[1].DAppName, dappName1)
 	s.Require().Equal(response[1].DAppURL, url)
-	s.Require().Equal(response[1].Info, sessionInfo)
+	s.Require().Equal(response[1].Warn, sessionInfo)
 
 	errWhileDeletion := s.m.DestroyWalletConnectSession(peerID1)
 	s.Require().NoError(errWhileDeletion)

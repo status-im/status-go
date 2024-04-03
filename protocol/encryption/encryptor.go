@@ -128,7 +128,7 @@ func (s *encryptor) ConfirmMessageProcessed(messageID []byte) error {
 	id := confirmationIDString(messageID)
 	confirmationData, ok := s.messageIDs[id]
 	if !ok {
-		s.logger.Debug("could not confirm message or message already confirmed", zap.String("messageID", id))
+		s.logger.Warn("could not confirm message or message already confirmed", zap.String("messageID", id))
 		// We are ok with this, means no key material is stored (public message, or already confirmed)
 		return nil
 	}
@@ -256,13 +256,13 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 
 	// We should not be sending a signal if it's coming from us, as we receive our own messages
 	if msg == nil && !samePublicKeys(*theirIdentityKey, myIdentityKey.PublicKey) {
-		s.logger.Debug("message is coming from someone else, but not targeting our installation id")
+		s.logger.Warn("message is coming from someone else, but not targeting our installation id")
 		return nil, ErrDeviceNotFound
 	} else if msg == nil && theirInstallationID != s.config.InstallationID {
-		s.logger.Debug("message is coming from same public key, but different installation id")
+		s.logger.Warn("message is coming from same public key, but different installation id")
 		return nil, ErrNotPairedDevice
 	} else if msg == nil && theirInstallationID == s.config.InstallationID {
-		s.logger.Debug("message is coming from us and is nil")
+		s.logger.Warn("message is coming from us and is nil")
 		return nil, nil
 	}
 
@@ -506,7 +506,7 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 
 	if len(installations) == 0 {
 		// We don't have any, send a message with DH
-		logger.Debug("no installations, sending to all devices")
+		logger.Warn("no installations, sending to all devices")
 		encryptedPayload, err := s.EncryptPayloadWithDH(theirIdentityKey, payload)
 		return encryptedPayload, targetedInstallations, err
 	}
@@ -517,7 +517,7 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 	for _, installation := range installations {
 		installationID := installation.ID
 		ilogger := logger.With(zap.String("installation-id", installationID))
-		ilogger.Debug("processing installation")
+		ilogger.Warn("processing installation")
 		if s.config.InstallationID == installationID {
 			continue
 		}
@@ -536,7 +536,7 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 		targetedInstallations = append(targetedInstallations, installation)
 
 		if drInfo != nil {
-			ilogger.Debug("found DR info for installation")
+			ilogger.Warn("found DR info for installation")
 			encryptedPayload, drHeader, err := s.encryptUsingDR(theirIdentityKey, drInfo, payload)
 			if err != nil {
 				return nil, nil, err
@@ -567,7 +567,7 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 
 		}
 
-		ilogger.Debug("DR info not found, using bundle")
+		ilogger.Warn("DR info not found, using bundle")
 
 		theirSignedPreKey := theirSignedPreKeyContainer.GetSignedPreKey()
 
@@ -613,7 +613,7 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 	for _, i := range targetedInstallations {
 		installationIDs = append(installationIDs, i.ID)
 	}
-	logger.Info(
+	logger.Warn(
 		"built a message",
 		zap.Strings("installation-ids", installationIDs),
 	)
@@ -650,7 +650,7 @@ func (s *encryptor) EncryptHashRatchetPayload(ratchet *HashRatchetKeyCompatibili
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	logger.Debug("encrypting hash ratchet message")
+	logger.Warn("encrypting hash ratchet message")
 	encryptedPayload, newSeqNo, err := s.EncryptWithHR(ratchet, payload)
 	if err != nil {
 		return nil, err

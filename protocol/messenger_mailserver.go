@@ -90,7 +90,7 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 
 func (m *Messenger) connectToNewMailserverAndWait() error {
 	// Handle pinned mailservers
-	m.logger.Info("disconnecting mailserver")
+	m.logger.Warn("disconnecting mailserver")
 	pinnedMailserver, err := m.getPinnedMailserver()
 	if err != nil {
 		m.logger.Error("could not obtain the pinned mailserver", zap.Error(err))
@@ -116,13 +116,13 @@ func (m *Messenger) performMailserverRequest(ms *mailservers.Mailserver, fn func
 		if !m.communityStorenodes.IsCommunityStoreNode(ms.ID) && !m.isMailserverAvailable(ms.ID) {
 			return nil, errors.New("mailserver not available")
 		}
-		m.logger.Info("trying performing mailserver requests", zap.Uint("try", tries), zap.String("mailserverID", ms.ID))
+		m.logger.Warn("trying performing mailserver requests", zap.Uint("try", tries), zap.String("mailserverID", ms.ID))
 
 		// Peform request
 		response, err := fn(*ms) // pass by value because we don't want the fn to modify the mailserver
 		if err == nil {
 			// Reset failed requests
-			m.logger.Debug("mailserver request performed successfully",
+			m.logger.Warn("mailserver request performed successfully",
 				zap.String("mailserverID", ms.ID))
 			ms.FailedRequests = 0
 			return response, nil
@@ -342,12 +342,12 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 	}
 
 	if forceFetchingBackup || !backupFetched {
-		m.logger.Info("fetching backup")
+		m.logger.Warn("fetching backup")
 		err := m.syncBackup()
 		if err != nil {
 			return nil, err
 		}
-		m.logger.Info("backup fetched")
+		m.logger.Warn("backup fetched")
 	}
 
 	filters := m.transport.Filters()
@@ -562,7 +562,7 @@ func (m *Messenger) syncFiltersFrom(ms mailservers.Mailserver, filters []*transp
 		}
 	}
 
-	m.logger.Debug("topics synced")
+	m.logger.Warn("topics synced")
 	if m.config.messengerSignalsHandler != nil {
 		m.config.messengerSignalsHandler.HistoryRequestCompleted()
 	}
@@ -698,7 +698,7 @@ func processMailserverBatch(
 		zap.Int64("from", int64(batch.From)),
 		zap.Int64("to", int64(batch.To)))
 
-	logger.Info("syncing topic")
+	logger.Warn("syncing topic")
 
 	wg := sync.WaitGroup{}
 	workWg := sync.WaitGroup{}
@@ -714,7 +714,7 @@ func processMailserverBatch(
 	wg.Add(1)
 	go func() {
 		defer func() {
-			logger.Debug("mailserver batch producer complete")
+			logger.Warn("mailserver batch producer complete")
 			wg.Done()
 		}()
 
@@ -729,10 +729,10 @@ func processMailserverBatch(
 
 			select {
 			case <-ctx.Done():
-				logger.Debug("processBatch producer - context done")
+				logger.Warn("processBatch producer - context done")
 				return
 			default:
-				logger.Debug("processBatch producer - creating work")
+				logger.Warn("processBatch producer - creating work")
 				workCh <- work{
 					pubsubTopic:   batch.PubsubTopic,
 					contentTopics: batch.Topics[i:j],
@@ -747,7 +747,7 @@ func processMailserverBatch(
 			workCompleteCh <- struct{}{}
 		}()
 
-		logger.Debug("processBatch producer complete")
+		logger.Warn("processBatch producer complete")
 	}()
 
 	var result error
@@ -756,7 +756,7 @@ loop:
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Debug("processBatch cleanup - context done")
+			logger.Warn("processBatch cleanup - context done")
 			result = ctx.Err()
 			if errors.Is(result, context.Canceled) {
 				result = nil
@@ -767,7 +767,7 @@ loop:
 				continue
 			}
 
-			logger.Debug("processBatch - received work")
+			logger.Warn("processBatch - received work")
 			semaphore <- 1
 			go func(w work) { // Consumer
 				defer func() {
@@ -781,7 +781,7 @@ loop:
 				queryCancel()
 
 				if err != nil {
-					logger.Debug("failed to send request", zap.Error(err))
+					logger.Warn("failed to send request", zap.Error(err))
 					errCh <- err
 					return
 				}
@@ -803,7 +803,7 @@ loop:
 					return
 				}
 
-				logger.Debug("processBatch producer - creating work (cursor)")
+				logger.Warn("processBatch producer - creating work (cursor)")
 
 				workWg.Add(1)
 				workCh <- work{
@@ -815,11 +815,11 @@ loop:
 				}
 			}(w)
 		case err := <-errCh:
-			logger.Debug("processBatch - received error", zap.Error(err))
+			logger.Warn("processBatch - received error", zap.Error(err))
 			cancel() // Kill go routines
 			return err
 		case <-workCompleteCh:
-			logger.Debug("processBatch - all jobs complete")
+			logger.Warn("processBatch - all jobs complete")
 			cancel() // Kill go routines
 		}
 	}
@@ -828,10 +828,10 @@ loop:
 
 	// NOTE(camellos): Disabling for now, not critical and I'd rather take a bit more time
 	// to test it
-	//logger.Info("waiting until message processed")
+	//logger.Warn("waiting until message processed")
 	//m.waitUntilP2PMessagesProcessed()
 
-	logger.Info("synced topic", zap.NamedError("hasError", result))
+	logger.Warn("synced topic", zap.NamedError("hasError", result))
 	return result
 }
 
@@ -912,7 +912,7 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 			chat.SyncedFrom = batch.From
 		}
 
-		m.logger.Debug("setting sync timestamps", zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
+		m.logger.Warn("setting sync timestamps", zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
 
 		err = m.persistence.SetSyncTimestamps(batch.From, chat.SyncedTo, chat.ID)
 		from = batch.From
@@ -1059,7 +1059,7 @@ func (m *Messenger) fetchMessages(chatID string, duration time.Duration) (uint32
 
 	ms := m.getActiveMailserver(chat.CommunityID)
 	_, err := m.performMailserverRequest(ms, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
-		m.logger.Debug("fetching messages", zap.String("chatID", chatID), zap.String("mailserver", ms.Name))
+		m.logger.Warn("fetching messages", zap.String("chatID", chatID), zap.String("mailserver", ms.Name))
 		pubsubTopic, topics, err := m.topicsForChat(chatID)
 		if err != nil {
 			return nil, nil
@@ -1088,7 +1088,7 @@ func (m *Messenger) fetchMessages(chatID string, duration time.Duration) (uint32
 			chat.SyncedFrom = batch.From
 		}
 
-		m.logger.Debug("setting sync timestamps", zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
+		m.logger.Warn("setting sync timestamps", zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
 
 		err = m.persistence.SetSyncTimestamps(batch.From, chat.SyncedTo, chat.ID)
 		from = batch.From

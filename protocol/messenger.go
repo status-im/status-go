@@ -251,7 +251,7 @@ func (interceptor EnvelopeEventsInterceptor) EnvelopeSent(identifiers [][]byte) 
 
 		err := interceptor.Messenger.processSentMessages(ids)
 		if err != nil {
-			interceptor.Messenger.logger.Info("messenger failed to process sent messages", zap.Error(err))
+			interceptor.Messenger.logger.Warn("messenger failed to process sent messages", zap.Error(err))
 		}
 
 		// We notify the client, regardless whether we were able to mark them as sent
@@ -349,7 +349,7 @@ func NewMessenger(
 			return nil, errors.Wrap(err, "failed to create  Transport")
 		}
 	} else {
-		logger.Info("failed to find Waku service; trying WakuV2", zap.Error(err))
+		logger.Warn("failed to find Waku service; trying WakuV2", zap.Error(err))
 		wakuV2, err := node.GetWakuV2(nil)
 		if err != nil || wakuV2 == nil {
 			return nil, errors.Wrap(err, "failed to find Whisper and Waku V1/V2 services")
@@ -627,7 +627,7 @@ func NewMessenger(
 		interceptor := EnvelopeEventsInterceptor{c.envelopesMonitorConfig.EnvelopeEventsHandler, messenger}
 		err := messenger.transport.SetEnvelopeEventsHandler(interceptor)
 		if err != nil {
-			logger.Info("Unable to set envelopes event handler", zap.Error(err))
+			logger.Warn("Unable to set envelopes event handler", zap.Error(err))
 		}
 	}
 
@@ -755,7 +755,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	m.logger.Info("starting messenger", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))))
+	m.logger.Warn("starting messenger", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))))
 	// Start push notification server
 	if m.pushNotificationServer != nil {
 		if err := m.pushNotificationServer.Start(); err != nil {
@@ -937,7 +937,7 @@ func (m *Messenger) cleanTopics() error {
 		}
 	}
 
-	m.logger.Debug("keeping topics", zap.Any("filters", filters))
+	m.logger.Warn("keeping topics", zap.Any("filters", filters))
 
 	return m.mailserversDatabase.SetTopics(filters)
 }
@@ -983,7 +983,7 @@ func (m *Messenger) buildContactCodeAdvertisement() (*protobuf.ContactCodeAdvert
 	if m.pushNotificationClient == nil || !m.pushNotificationClient.Enabled() {
 		return nil, nil
 	}
-	m.logger.Debug("adding push notification info to contact code bundle")
+	m.logger.Warn("adding push notification info to contact code bundle")
 	info, err := m.pushNotificationClient.MyPushNotificationQueryInfo()
 	if err != nil {
 		return nil, err
@@ -1000,7 +1000,7 @@ func (m *Messenger) buildContactCodeAdvertisement() (*protobuf.ContactCodeAdvert
 // layer, which will propagate our bundle
 func (m *Messenger) publishContactCode() error {
 	var payload []byte
-	m.logger.Debug("sending contact code")
+	m.logger.Warn("sending contact code")
 	contactCodeAdvertisement, err := m.buildContactCodeAdvertisement()
 	if err != nil {
 		m.logger.Error("could not build contact code advertisement", zap.Error(err))
@@ -1016,9 +1016,9 @@ func (m *Messenger) publishContactCode() error {
 	}
 
 	if contactCodeAdvertisement.ChatIdentity != nil {
-		m.logger.Debug("attached chat identity", zap.Int("images len", len(contactCodeAdvertisement.ChatIdentity.Images)))
+		m.logger.Warn("attached chat identity", zap.Int("images len", len(contactCodeAdvertisement.ChatIdentity.Images)))
 	} else {
-		m.logger.Debug("no attached chat identity")
+		m.logger.Warn("no attached chat identity")
 	}
 
 	payload, err = proto.Marshal(contactCodeAdvertisement)
@@ -1053,7 +1053,7 @@ func (m *Messenger) publishContactCode() error {
 		}
 	}
 
-	m.logger.Debug("contact code sent")
+	m.logger.Warn("contact code sent")
 	return err
 }
 
@@ -1276,8 +1276,8 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 // context 'public-chat' will attach only the 'thumbnail' IdentityImage
 // context 'private-chat' will attach all IdentityImage
 func (m *Messenger) createChatIdentity(context ChatContext) (*protobuf.ChatIdentity, error) {
-	m.logger.Info(fmt.Sprintf("account keyUID '%s'", m.account.KeyUID))
-	m.logger.Info(fmt.Sprintf("context '%s'", context))
+	m.logger.Warn(fmt.Sprintf("account keyUID '%s'", m.account.KeyUID))
+	m.logger.Warn(fmt.Sprintf("context '%s'", context))
 
 	displayName, err := m.settings.DisplayName()
 	if err != nil {
@@ -1332,7 +1332,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *
 	}
 
 	if s.ProfilePicturesShowTo == settings.ProfilePicturesShowToNone {
-		m.logger.Info(fmt.Sprintf("settings.ProfilePicturesShowTo is set to '%d', skipping attaching IdentityImages", s.ProfilePicturesShowTo))
+		m.logger.Warn(fmt.Sprintf("settings.ProfilePicturesShowTo is set to '%d', skipping attaching IdentityImages", s.ProfilePicturesShowTo))
 		return nil
 	}
 
@@ -1340,7 +1340,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *
 
 	switch context {
 	case publicChat:
-		m.logger.Info(fmt.Sprintf("handling %s ChatIdentity", context))
+		m.logger.Warn(fmt.Sprintf("handling %s ChatIdentity", context))
 
 		img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, images.SmallDimName)
 		if err != nil {
@@ -1351,26 +1351,26 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *
 			return nil
 		}
 
-		m.logger.Debug(fmt.Sprintf("%s images.IdentityImage '%s'", context, spew.Sdump(img)))
+		m.logger.Warn(fmt.Sprintf("%s images.IdentityImage '%s'", context, spew.Sdump(img)))
 
 		ciis[images.SmallDimName] = m.adaptIdentityImageToProtobuf(img)
-		m.logger.Debug(fmt.Sprintf("%s protobuf.IdentityImage '%s'", context, spew.Sdump(ciis)))
+		m.logger.Warn(fmt.Sprintf("%s protobuf.IdentityImage '%s'", context, spew.Sdump(ciis)))
 		ci.Images = ciis
 
 	case privateChat:
-		m.logger.Info(fmt.Sprintf("handling %s ChatIdentity", context))
+		m.logger.Warn(fmt.Sprintf("handling %s ChatIdentity", context))
 
 		imgs, err := m.multiAccounts.GetIdentityImages(m.account.KeyUID)
 		if err != nil {
 			return err
 		}
 
-		m.logger.Debug(fmt.Sprintf("%s images.IdentityImage '%s'", context, spew.Sdump(imgs)))
+		m.logger.Warn(fmt.Sprintf("%s images.IdentityImage '%s'", context, spew.Sdump(imgs)))
 
 		for _, img := range imgs {
 			ciis[img.Name] = m.adaptIdentityImageToProtobuf(img)
 		}
-		m.logger.Debug(fmt.Sprintf("%s protobuf.IdentityImage '%s'", context, spew.Sdump(ciis)))
+		m.logger.Warn(fmt.Sprintf("%s protobuf.IdentityImage '%s'", context, spew.Sdump(ciis)))
 		ci.Images = ciis
 
 	default:
@@ -1436,7 +1436,7 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption
 					m.logger.Error("failed to invalidate cache for decrypted communities", zap.Error(err))
 				}
 			case <-subscriptions.Quit:
-				m.logger.Debug("quitting encryption subscription loop")
+				m.logger.Warn("quitting encryption subscription loop")
 				return
 			}
 		}
@@ -1446,10 +1446,10 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption
 func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
 	var contacts []*Contact
 	for _, record := range records {
-		m.logger.Info("handling record", zap.Any("record", record))
+		m.logger.Warn("handling record", zap.Any("record", record))
 		contact, ok := m.allContacts.Load(record.PublicKey)
 		if !ok {
-			m.logger.Info("contact not found")
+			m.logger.Warn("contact not found")
 			continue
 		}
 
@@ -1458,7 +1458,7 @@ func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
 		contacts = append(contacts, contact)
 	}
 
-	m.logger.Info("handled records", zap.Any("contacts", contacts))
+	m.logger.Warn("handled records", zap.Any("contacts", contacts))
 	if len(contacts) != 0 {
 		if err := m.persistence.SaveContacts(contacts); err != nil {
 			m.logger.Error("failed to save contacts", zap.Error(err))
@@ -1475,11 +1475,11 @@ func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.Verification
 			select {
 			case records, more := <-c:
 				if !more {
-					m.logger.Info("No more records, quitting")
+					m.logger.Warn("No more records, quitting")
 					return
 				}
 				if len(records) != 0 {
-					m.logger.Info("handling records", zap.Any("records", records))
+					m.logger.Warn("handling records", zap.Any("records", records))
 					m.handleENSVerified(records)
 				}
 			case <-m.quit:
@@ -1498,7 +1498,7 @@ func (m *Messenger) watchConnectionChange() {
 			return
 		}
 		state = newState
-		m.logger.Debug("connection changed", zap.Bool("online", state))
+		m.logger.Warn("connection changed", zap.Bool("online", state))
 		m.handleConnectionChange(state)
 	}
 
@@ -1527,7 +1527,7 @@ func (m *Messenger) watchConnectionChange() {
 		}
 	}
 
-	m.logger.Debug("watching connection changes")
+	m.logger.Warn("watching connection changes")
 	m.Online()
 	m.handleConnectionChange(state)
 
@@ -1554,7 +1554,7 @@ func (m *Messenger) watchConnectionChange() {
 
 // watchChatsAndCommunitiesToUnmute regularly checks for chats and communities that should be unmuted
 func (m *Messenger) watchChatsAndCommunitiesToUnmute() {
-	m.logger.Debug("watching unmuted chats")
+	m.logger.Warn("watching unmuted chats")
 	go func() {
 		for {
 			select {
@@ -1567,7 +1567,7 @@ func (m *Messenger) watchChatsAndCommunitiesToUnmute() {
 					if currTime.After(chatMuteTill) && !chatMuteTill.Equal(time.Time{}) && c.Muted {
 						err := m.persistence.UnmuteChat(c.ID)
 						if err != nil {
-							m.logger.Info("err", zap.Any("Couldn't unmute chat", err))
+							m.logger.Warn("err", zap.Any("Couldn't unmute chat", err))
 							return false
 						}
 						c.Muted = false
@@ -1589,7 +1589,7 @@ func (m *Messenger) watchChatsAndCommunitiesToUnmute() {
 
 // watchCommunitiesToUnmute regularly checks for communities that should be unmuted
 func (m *Messenger) watchCommunitiesToUnmute() {
-	m.logger.Debug("watching unmuted communities")
+	m.logger.Warn("watching unmuted communities")
 	go func() {
 		for {
 			select {
@@ -1611,7 +1611,7 @@ func (m *Messenger) watchCommunitiesToUnmute() {
 
 // watchExpiredMessages regularly checks for expired emojis and invoke their resending
 func (m *Messenger) watchExpiredMessages() {
-	m.logger.Debug("watching expired messages")
+	m.logger.Warn("watching expired messages")
 	go func() {
 		for {
 			select {
@@ -1619,7 +1619,7 @@ func (m *Messenger) watchExpiredMessages() {
 				if m.Online() {
 					err := m.resendExpiredMessages()
 					if err != nil {
-						m.logger.Debug("failed to resend expired message", zap.Error(err))
+						m.logger.Warn("failed to resend expired message", zap.Error(err))
 					}
 				}
 			case <-m.quit:
@@ -1631,7 +1631,7 @@ func (m *Messenger) watchExpiredMessages() {
 
 // watchIdentityImageChanges checks for identity images changes and publishes to the contact code when it happens
 func (m *Messenger) watchIdentityImageChanges() {
-	m.logger.Debug("watching identity image changes")
+	m.logger.Warn("watching identity image changes")
 	if m.multiAccounts == nil {
 		return
 	}
@@ -1673,7 +1673,7 @@ func (m *Messenger) watchIdentityImageChanges() {
 }
 
 func (m *Messenger) watchPendingCommunityRequestToJoin() {
-	m.logger.Debug("watching community request to join")
+	m.logger.Warn("watching community request to join")
 
 	go func() {
 		for {
@@ -1964,9 +1964,9 @@ func (m *Messenger) Shutdown() (err error) {
 	m.cancel()
 	m.shutdownWaitGroup.Wait()
 	for i, task := range m.shutdownTasks {
-		m.logger.Debug("running shutdown task", zap.Int("n", i))
+		m.logger.Warn("running shutdown task", zap.Int("n", i))
 		if tErr := task(); tErr != nil {
-			m.logger.Info("shutdown task failed", zap.Error(tErr))
+			m.logger.Warn("shutdown task failed", zap.Error(tErr))
 			if err == nil {
 				// First error appeared.
 				err = tErr
@@ -2100,7 +2100,7 @@ func (m *Messenger) addMessagesAndChat(chat *Chat, messages []*common.Message, r
 }
 
 func (m *Messenger) reregisterForPushNotifications() error {
-	m.logger.Info("contact state changed, re-registering for push notification")
+	m.logger.Warn("contact state changed, re-registering for push notification")
 	if m.pushNotificationClient == nil {
 		return nil
 	}
@@ -2154,7 +2154,7 @@ func (m *Messenger) hasPairedDevices() bool {
 		}
 		return true
 	})
-	logger.Debug("installations info",
+	logger.Warn("installations info",
 		zap.Int("Number of installations", m.allInstallations.Len()),
 		zap.Int("Number of enabled installations", count))
 	return count > 1
@@ -2230,7 +2230,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 		}
 
 	case ChatTypePublic, ChatTypeProfile:
-		logger.Debug("sending public message", zap.String("chatName", chat.Name))
+		logger.Warn("sending public message", zap.String("chatName", chat.Name))
 		id, err = m.sender.SendPublic(ctx, chat.ID, rawMessage)
 		if err != nil {
 			return rawMessage, err
@@ -2257,7 +2257,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			return rawMessage, fmt.Errorf("can't post message type '%d' on chat '%s'", rawMessage.MessageType, chat.ID)
 		}
 
-		logger.Debug("sending community chat message", zap.String("chatName", chat.Name))
+		logger.Warn("sending community chat message", zap.String("chatName", chat.Name))
 		isCommunityEncrypted, err := m.communitiesManager.IsEncrypted(chat.CommunityID)
 		if err != nil {
 			return rawMessage, err
@@ -2290,7 +2290,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			}
 		}
 	case ChatTypePrivateGroupChat:
-		logger.Debug("sending group message", zap.String("chatName", chat.Name))
+		logger.Warn("sending group message", zap.String("chatName", chat.Name))
 		if rawMessage.Recipients == nil {
 			rawMessage.Recipients, err = chat.MembersAsPublicKeys()
 			if err != nil {
@@ -2562,7 +2562,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	response.SetMessages(msg)
 	response.AddChat(chat)
 
-	m.logger.Debug("inside sendChatMessage",
+	m.logger.Warn("inside sendChatMessage",
 		zap.String("id", message.ID),
 		zap.String("text", message.Text),
 		zap.String("from", message.From),
@@ -2883,7 +2883,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 }
 
 func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID string, accepted bool, rawMessageHandler RawMessageHandler) error {
-	m.logger.Info("syncContactRequestDecision", zap.Any("from", requestID))
+	m.logger.Warn("syncContactRequestDecision", zap.Any("from", requestID))
 	if !m.hasPairedDevices() {
 		return nil
 	}
@@ -3182,10 +3182,10 @@ func (m *Messenger) propagateSyncInstallationCommunityWithHRKeys(msg *protobuf.S
 func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Community, rawMessageHandler RawMessageHandler) error {
 	logger := m.logger.Named("syncCommunity")
 	if !m.hasPairedDevices() {
-		logger.Debug("device has no paired devices")
+		logger.Warn("device has no paired devices")
 		return nil
 	}
-	logger.Debug("device has paired device(s)")
+	logger.Warn("device has paired device(s)")
 
 	clock, chat := m.getLastClockWithRelatedChat()
 
@@ -3225,7 +3225,7 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 	if err != nil {
 		return err
 	}
-	logger.Debug("message dispatched")
+	logger.Warn("message dispatched")
 
 	chat.LastClockValue = clock
 	return m.saveChat(chat)
@@ -3732,14 +3732,14 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 
 			handleMessageResponse, err := m.sender.HandleMessages(shhMessage)
 			if err != nil {
-				logger.Info("failed to decode messages", zap.Error(err))
+				logger.Warn("failed to decode messages", zap.Error(err))
 				continue
 			}
 			statusMessages := handleMessageResponse.StatusMessages
 
 			for _, msg := range statusMessages {
 				logger := logger.With(zap.String("message-id", msg.TransportLayer.Message.ThirdPartyID))
-				logger.Debug("processing message")
+				logger.Warn("processing message")
 
 				publicKey := msg.SigPubKey()
 				senderID := contactIDFromPublicKey(publicKey)
@@ -3758,7 +3758,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 					logger.Warn("failed to check message exists", zap.Error(err))
 				}
 				if exists && m.shouldSkipDuplicate(msg.ApplicationLayer.Type) {
-					logger.Debug("skipping duplicate", zap.String("messageID", messageID))
+					logger.Warn("skipping duplicate", zap.String("messageID", messageID))
 					continue
 				}
 
@@ -3768,7 +3768,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 				} else {
 					c, err := buildContact(senderID, publicKey)
 					if err != nil {
-						logger.Info("failed to build contact", zap.Error(err))
+						logger.Warn("failed to build contact", zap.Error(err))
 						continue
 					}
 					contact = c
@@ -3784,7 +3784,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 
 				if msg.ApplicationLayer.Payload != nil {
 
-					logger.Debug("Handling parsed message")
+					logger.Warn("Handling parsed message")
 
 					switch msg.ApplicationLayer.Type {
 
@@ -3873,7 +3873,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 	controlledCommunitiesChatIDs, err := m.communitiesManager.GetOwnedCommunitiesChatIDs()
 	if err != nil {
-		logger.Info("failed to retrieve admin communities", zap.Error(err))
+		logger.Warn("failed to retrieve admin communities", zap.Error(err))
 	}
 
 	iterator := m.retrievedMessagesIteratorFactory(chatWithMessages)
@@ -3887,7 +3887,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			allMessagesProcessed := true
 
 			if controlledCommunitiesChatIDs[filter.ChatID] && storeWakuMessages {
-				logger.Debug("storing waku message")
+				logger.Warn("storing waku message")
 				err := m.communitiesManager.StoreWakuMessage(shhMessage)
 				if err != nil {
 					logger.Warn("failed to store waku message", zap.Error(err))
@@ -3899,7 +3899,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				if m.telemetryClient != nil {
 					go m.telemetryClient.UpdateEnvelopeProcessingError(shhMessage, err)
 				}
-				logger.Info("failed to decode messages", zap.Error(err))
+				logger.Warn("failed to decode messages", zap.Error(err))
 				continue
 			}
 
@@ -3918,11 +3918,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				m.logger.Warn("failed to handle datasync metadata", zap.Error(err))
 			}
 
-			logger.Debug("processing messages further", zap.Int("count", len(statusMessages)))
+			logger.Warn("processing messages further", zap.Int("count", len(statusMessages)))
 
 			for _, msg := range statusMessages {
 				logger := logger.With(zap.String("message-id", msg.ApplicationLayer.ID.String()))
-				logger.Info("processing message")
+				logger.Warn("processing message")
 				publicKey := msg.SigPubKey()
 
 				m.handleInstallations(msg.EncryptionLayer.Installations)
@@ -3934,7 +3934,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 				senderID := contactIDFromPublicKey(publicKey)
 				ownID := contactIDFromPublicKey(m.IdentityPublicKey())
-				m.logger.Info("processing message", zap.Any("type", msg.ApplicationLayer.Type), zap.String("senderID", senderID))
+				m.logger.Warn("processing message", zap.Any("type", msg.ApplicationLayer.Type), zap.String("senderID", senderID))
 
 				if senderID == ownID {
 					// Skip own messages of certain types
@@ -3957,14 +3957,14 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					logger.Warn("failed to check message exists", zap.Error(err))
 				}
 				if exists && m.shouldSkipDuplicate(msg.ApplicationLayer.Type) {
-					logger.Debug("skipping duplicate", zap.String("messageID", messageID))
+					logger.Warn("skipping duplicate", zap.String("messageID", messageID))
 					continue
 				}
 
 				if !contactFound {
 					c, err := buildContact(senderID, publicKey)
 					if err != nil {
-						logger.Info("failed to build contact", zap.Error(err))
+						logger.Warn("failed to build contact", zap.Error(err))
 						allMessagesProcessed = false
 						continue
 					}
@@ -3992,10 +3992,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 						continue
 					}
-					logger.Debug("Handled parsed message")
+					logger.Warn("Handled parsed message")
 
 				} else {
-					logger.Debug("parsed message is nil")
+					logger.Warn("parsed message is nil")
 				}
 			}
 
@@ -5385,13 +5385,13 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 	}
 
 	logger := m.logger.With(zap.String("site", "ValidateTransactions"))
-	logger.Debug("Validating transactions")
+	logger.Warn("Validating transactions")
 	txs, err := m.persistence.TransactionsToValidate()
 	if err != nil {
 		logger.Error("Error pulling", zap.Error(err))
 		return nil, err
 	}
-	logger.Debug("Txs", zap.Int("count", len(txs)), zap.Any("txs", txs))
+	logger.Warn("Txs", zap.Int("count", len(txs)), zap.Any("txs", txs))
 	var response MessengerResponse
 	validator := NewTransactionValidator(addresses, m.persistence, m.verifyTransactionClient, m.logger)
 	responses, err := validator.ValidateTransactions(ctx)
@@ -5734,7 +5734,7 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 
 	switch chat.ChatType {
 	case ChatTypeOneToOne:
-		l.Debug("sending private message")
+		l.Warn("sending private message")
 		message.SetMessageType(protobuf.MessageType_ONE_TO_ONE)
 		encodedMessage, err = proto.Marshal(message.GetProtobuf())
 		if err != nil {
@@ -5742,7 +5742,7 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 		}
 
 	case ChatTypePublic, ChatTypeProfile:
-		l.Debug("sending public message", zap.String("chatName", chat.Name))
+		l.Warn("sending public message", zap.String("chatName", chat.Name))
 		message.SetMessageType(protobuf.MessageType_PUBLIC_GROUP)
 		encodedMessage, err = proto.Marshal(message.GetProtobuf())
 		if err != nil {
@@ -5750,7 +5750,7 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 		}
 
 	case ChatTypeCommunityChat:
-		l.Debug("sending community chat message", zap.String("chatName", chat.Name))
+		l.Warn("sending community chat message", zap.String("chatName", chat.Name))
 		message.SetMessageType(protobuf.MessageType_COMMUNITY_CHAT)
 		encodedMessage, err = proto.Marshal(message.GetProtobuf())
 		if err != nil {
@@ -5759,7 +5759,7 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 
 	case ChatTypePrivateGroupChat:
 		message.SetMessageType(protobuf.MessageType_PRIVATE_GROUP)
-		l.Debug("sending group message", zap.String("chatName", chat.Name))
+		l.Warn("sending group message", zap.String("chatName", chat.Name))
 		if !message.WrapGroupMessage() {
 			encodedMessage, err = proto.Marshal(message.GetProtobuf())
 			if err != nil {
@@ -5852,7 +5852,7 @@ func (m *Messenger) HandleSyncVerificationRequest(state *ReceivedMessageState, m
 	if message.From == myPubKey { // Verification requests we sent
 		contact, ok := m.allContacts.Load(message.To)
 		if !ok {
-			m.logger.Info("contact not found")
+			m.logger.Warn("contact not found")
 			return nil
 		}
 

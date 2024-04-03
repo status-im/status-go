@@ -215,7 +215,7 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlUR
 	}
 
 	for _, url := range urls {
-		m.logger.Debug("unfurling", zap.String("url", url))
+		m.logger.Warn("unfurling", zap.String("url", url))
 
 		if IsStatusSharedURL(url) {
 			unfurler := NewStatusUnfurler(url, m, m.logger)

@@ -180,7 +180,7 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		if err != nil {
 			return errors.Wrap(err, "failed to schedule sync filter")
 		}
-		m.logger.Debug("result of schedule sync filter", zap.Bool("ok", ok))
+		m.logger.Warn("result of schedule sync filter", zap.Bool("ok", ok))
 	} else {
 		existingGroup, err := newProtocolGroupFromChat(chat)
 		if err != nil {
@@ -864,7 +864,7 @@ func (m *Messenger) HandleSyncChatMessagesRead(state *ReceivedMessageState, mess
 func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, response *MessengerResponse, message *protobuf.PinMessage, forceSeen bool) error {
 	logger := m.logger.With(zap.String("site", "HandlePinMessage"))
 
-	logger.Info("Handling pin message")
+	logger.Warn("Handling pin message")
 
 	publicKey, err := pinner.PublicKey()
 	if err != nil {
@@ -910,7 +910,7 @@ func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, r
 
 	// Nothing to do, returning
 	if !inserted {
-		m.logger.Info("pin message already processed")
+		m.logger.Warn("pin message already processed")
 		return nil
 	}
 
@@ -964,9 +964,9 @@ func (m *Messenger) handleAcceptContactRequest(
 	originalRequest *common.Message,
 	clock uint64) (ContactRequestProcessingResponse, error) {
 
-	m.logger.Debug("received contact request", zap.Uint64("clock-sent", clock), zap.Uint64("current-clock", contact.ContactRequestRemoteClock), zap.Uint64("current-state", uint64(contact.ContactRequestRemoteState)))
+	m.logger.Warn("received contact request", zap.Uint64("clock-sent", clock), zap.Uint64("current-clock", contact.ContactRequestRemoteClock), zap.Uint64("current-state", uint64(contact.ContactRequestRemoteState)))
 	if contact.ContactRequestRemoteClock > clock {
-		m.logger.Debug("not handling accept since clock lower")
+		m.logger.Warn("not handling accept since clock lower")
 		return ContactRequestProcessingResponse{}, nil
 	}
 
@@ -1112,14 +1112,14 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 
 func (m *Messenger) handleRetractContactRequest(state *ReceivedMessageState, contact *Contact, message *protobuf.RetractContactRequest) error {
 	if contact.ID == m.myHexIdentity() {
-		m.logger.Debug("retraction coming from us, ignoring")
+		m.logger.Warn("retraction coming from us, ignoring")
 		return nil
 	}
 
-	m.logger.Debug("handling retracted contact request", zap.Uint64("clock", message.Clock))
+	m.logger.Warn("handling retracted contact request", zap.Uint64("clock", message.Clock))
 	r := contact.ContactRequestRetracted(message.Clock, false)
 	if !r.processed {
-		m.logger.Debug("not handling retract since clock lower")
+		m.logger.Warn("not handling retract since clock lower")
 		return nil
 	}
 
@@ -1222,13 +1222,13 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message *pr
 		chat.Active = false
 	}
 
-	logger.Debug("Handling contact update")
+	logger.Warn("Handling contact update")
 
 	if message.ContactRequestPropagatedState != nil {
-		logger.Debug("handling contact request propagated state", zap.Any("state before update", contact.ContactRequestPropagatedState()))
+		logger.Warn("handling contact request propagated state", zap.Any("state before update", contact.ContactRequestPropagatedState()))
 		result := contact.ContactRequestPropagatedStateReceived(message.ContactRequestPropagatedState)
 		if result.sendBackState {
-			logger.Debug("sending back state")
+			logger.Warn("sending back state")
 			// This is a bit dangerous, since it might trigger a ping-pong of contact updates
 			// also it should backoff/debounce
 			_, err = m.sendContactUpdate(context.Background(), contact.ID, "", "", "", m.dispatchMessage)
@@ -1249,7 +1249,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message *pr
 			}
 		}
 
-		logger.Debug("handled propagated state", zap.Any("state after update", contact.ContactRequestPropagatedState()))
+		logger.Warn("handled propagated state", zap.Any("state after update", contact.ContactRequestPropagatedState()))
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
 	}
@@ -1321,7 +1321,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 
 	community, err := m.communitiesManager.GetByID(id)
 	if err != nil && err != communities.ErrOrgNotFound {
-		m.logger.Debug("Couldn't get community for community with id: ", zap.Any("id", id))
+		m.logger.Warn("Couldn't get community for community with id: ", zap.Any("id", id))
 		return err
 	}
 	if community == nil {
@@ -1330,7 +1330,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 
 	settings, err := m.communitiesManager.GetCommunitySettingsByID(id)
 	if err != nil {
-		m.logger.Debug("Couldn't get community settings for community with id: ", zap.Any("id", id))
+		m.logger.Warn("Couldn't get community settings for community with id: ", zap.Any("id", id))
 		return err
 	}
 	if settings == nil {
@@ -1944,7 +1944,7 @@ func (m *Messenger) handleDeleteMessage(state *ReceivedMessageState, deleteMessa
 
 		// we shouldn't sync deleted notification here,
 		// as the same user on different devices will receive the same message(DeleteMessage) ?
-		m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", messageToDelete.ID))
+		m.logger.Warn("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", messageToDelete.ID))
 		_, err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, messageToDelete.ID, m.GetCurrentTimeInMillis())
 
 		if err != nil {
@@ -2060,7 +2060,7 @@ func (m *Messenger) HandleSyncDeleteForMeMessage(state *ReceivedMessageState, de
 
 		// we shouldn't sync deleted notification here,
 		// as the same user on different devices will receive the same message(DeleteForMeMessage) ?
-		m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", messageToDelete.ID))
+		m.logger.Warn("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", messageToDelete.ID))
 		_, err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, messageToDelete.ID, m.GetCurrentTimeInMillis())
 		if err != nil {
 			m.logger.Warn("failed to delete notifications for deleted message", zap.Error(err))
@@ -2093,7 +2093,7 @@ func handleContactRequestChatMessage(receivedMessage *common.Message, contact *C
 		response = contact.ContactRequestReceived(receivedMessage.Clock)
 	}
 	if !response.processed {
-		logger.Info("not handling contact message since clock lower")
+		logger.Warn("not handling contact message since clock lower")
 		return false, nil
 
 	}
@@ -2316,7 +2316,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		}
 
 		if chatContact.mutual() || chatContact.dismissed() {
-			m.logger.Info("ignoring contact request message for a mutual or dismissed contact")
+			m.logger.Warn("ignoring contact request message for a mutual or dismissed contact")
 			return nil
 		}
 
@@ -2396,7 +2396,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 	}
 
 	if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
-		m.logger.Debug("Handling community content type")
+		m.logger.Warn("Handling community content type")
 
 		signer, description, err := communities.UnwrapCommunityDescriptionMessage(receivedMessage.GetCommunity())
 		if err != nil {
@@ -2614,7 +2614,7 @@ func (m *Messenger) HandleSendTransaction(messageState *ReceivedMessageState, co
 		From:            messageState.CurrentMessageState.PublicKey,
 		RetryCount:      0,
 	}
-	m.logger.Info("Saving transction to validate", zap.Any("transaction", transactionToValidate))
+	m.logger.Warn("Saving transction to validate", zap.Any("transaction", transactionToValidate))
 
 	return m.persistence.SaveTransactionToValidate(transactionToValidate)
 }
@@ -2867,7 +2867,7 @@ func (m *Messenger) HandleEmojiReaction(state *ReceivedMessageState, pbEmojiR *p
 	// Set local chat id
 	emojiReaction.LocalChatID = chat.ID
 
-	logger.Debug("Handling emoji reaction")
+	logger.Warn("Handling emoji reaction")
 
 	if chat.LastClockValue < pbEmojiR.Clock {
 		chat.LastClockValue = pbEmojiR.Clock
@@ -2957,7 +2957,7 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci *protobuf
 	viewFromContacts := s.ProfilePicturesVisibility == settings.ProfilePicturesVisibilityContactsOnly
 	viewFromNoOne := s.ProfilePicturesVisibility == settings.ProfilePicturesVisibilityNone
 
-	m.logger.Debug("settings found",
+	m.logger.Warn("settings found",
 		zap.Bool("viewFromContacts", viewFromContacts),
 		zap.Bool("viewFromNoOne", viewFromNoOne),
 	)
@@ -3894,7 +3894,7 @@ func (m *Messenger) HandleSyncTrustedUser(state *ReceivedMessageState, message *
 
 		contact, ok := m.allContacts.Load(message.Id)
 		if !ok {
-			m.logger.Info("contact not found")
+			m.logger.Warn("contact not found")
 			return nil
 		}
 

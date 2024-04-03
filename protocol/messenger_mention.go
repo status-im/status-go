@@ -314,7 +314,7 @@ func (m *MentionManager) OnChangeText(chatID, fullText string) (*ChatMentionCont
 		return ctx, err
 	}
 	ctx.MentionState.AtIdxs = atIndexes
-	m.logger.Debug("OnChangeText", zap.String("chatID", chatID), zap.Any("state", ctx.MentionState))
+	m.logger.Warn("OnChangeText", zap.String("chatID", chatID), zap.Any("state", ctx.MentionState))
 	return m.calculateSuggestions(chatID, fullText)
 }
 
@@ -325,7 +325,7 @@ func (m *MentionManager) calculateSuggestions(chatID, fullText string) (*ChatMen
 	if err != nil {
 		return nil, err
 	}
-	m.logger.Debug("calculateSuggestions", zap.String("chatID", chatID), zap.String("fullText", fullText), zap.Int("num of mentionable user", len(mentionableUsers)))
+	m.logger.Warn("calculateSuggestions", zap.String("chatID", chatID), zap.String("fullText", fullText), zap.Int("num of mentionable user", len(mentionableUsers)))
 
 	m.calculateSuggestionsWithMentionableUsers(chatID, fullText, mentionableUsers)
 
@@ -368,7 +368,7 @@ func (m *MentionManager) calculateSuggestionsWithMentionableUsers(chatID string,
 	var suggestions map[string]*MentionableUser
 	if atSignIdx != -1 {
 		searchedText := strings.ToLower(subs(fullText, atSignIdx+1, end))
-		m.logger.Debug("calculateSuggestionsWithMentionableUsers", zap.Int("atSignIdx", atSignIdx), zap.String("searchedText", searchedText), zap.String("fullText", fullText), zap.Any("state", state), zap.Int("end", end))
+		m.logger.Warn("calculateSuggestionsWithMentionableUsers", zap.Int("atSignIdx", atSignIdx), zap.String("searchedText", searchedText), zap.String("fullText", fullText), zap.Any("state", state), zap.Int("end", end))
 		if end-atSignIdx <= 100 {
 			suggestions = getUserSuggestions(mentionableUsers, searchedText, -1)
 		}

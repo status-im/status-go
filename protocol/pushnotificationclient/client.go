@@ -323,14 +323,14 @@ func (c *Client) GetServers() ([]*PushNotificationServer, error) {
 }
 
 func (c *Client) Reregister(options *RegistrationOptions) error {
-	c.config.Logger.Debug("re-registering")
+	c.config.Logger.Warn("re-registering")
 	if len(c.deviceToken) == 0 {
-		c.config.Logger.Info("no device token, not registering")
+		c.config.Logger.Warn("no device token, not registering")
 		return nil
 	}
 
 	if !c.config.RemoteNotificationsEnabled {
-		c.config.Logger.Info("remote notifications not enabled, not registering")
+		c.config.Logger.Warn("remote notifications not enabled, not registering")
 		return nil
 	}
 
@@ -368,7 +368,7 @@ func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushN
 		return err
 	}
 	if len(currentServers) == 0 && len(c.config.DefaultServers) != 0 {
-		c.config.Logger.Debug("servers empty, checking default servers")
+		c.config.Logger.Warn("servers empty, checking default servers")
 		for _, s := range c.pickDefaultServers(c.config.DefaultServers) {
 			err = c.AddPushNotificationsServer(s, ServerTypeDefault)
 			if err != nil {
@@ -408,7 +408,7 @@ func (c *Client) HandlePushNotificationRegistrationResponse(publicKey *ecdsa.Pub
 		return nil
 	}
 
-	c.config.Logger.Debug("received push notification registration response", zap.Any("response", response))
+	c.config.Logger.Warn("received push notification registration response", zap.Any("response", response))
 
 	if len(response.RequestId) == 0 {
 		return errors.New("empty requestId")
@@ -464,7 +464,7 @@ func (c *Client) processQueryInfo(clientPublicKey *ecdsa.PublicKey, serverPublic
 
 	// no luck
 	if len(accessToken) == 0 {
-		c.config.Logger.Debug("not in the allowed key list")
+		c.config.Logger.Warn("not in the allowed key list")
 		return nil
 	}
 
@@ -495,8 +495,8 @@ func (c *Client) processQueryInfo(clientPublicKey *ecdsa.PublicKey, serverPublic
 
 // HandlePushNotificationQueryResponse should update the data in the database for a given user
 func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.PublicKey, response *protobuf.PushNotificationQueryResponse) error {
-	c.config.Logger.Debug("received push notification query response", zap.Any("response", response))
-	if response == nil || len(response.Info) == 0 {
+	c.config.Logger.Warn("received push notification query response", zap.Any("response", response))
+	if response == nil || len(response.Warn) == 0 {
 		return errors.New("empty response from the server")
 	}
 
@@ -507,12 +507,12 @@ func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.Publ
 		return err
 	}
 	if clientPublicKey == nil {
-		c.config.Logger.Debug("query not found")
+		c.config.Logger.Warn("query not found")
 		return nil
 	}
 
 	// process query, make sure to validate grant as coming from the server
-	for _, info := range response.Info {
+	for _, info := range response.Warn {
 		err := c.processQueryInfo(clientPublicKey, serverPublicKey, info)
 		if err != nil {
 
@@ -534,9 +534,9 @@ func (c *Client) HandleContactCodeAdvertisement(clientPublicKey *ecdsa.PublicKey
 		return nil
 	}
 
-	c.config.Logger.Debug("received contact code advertisement", zap.Any("advertisement", message))
+	c.config.Logger.Warn("received contact code advertisement", zap.Any("advertisement", message))
 	for _, info := range message.PushNotificationInfo {
-		c.config.Logger.Debug("handling push notification query info")
+		c.config.Logger.Warn("handling push notification query info")
 		serverPublicKey, err := crypto.DecompressPubkey(info.ServerPublicKey)
 		if err != nil {
 			c.config.Logger.Error("could not unmarshal server pubkey", zap.Binary("server-key", info.ServerPublicKey))
@@ -563,9 +563,9 @@ func (c *Client) HandlePushNotificationResponse(serverKey *ecdsa.PublicKey, resp
 	}
 
 	messageID := response.MessageId
-	c.config.Logger.Debug("received response for", zap.String("messageID", types.EncodeHex(messageID)))
+	c.config.Logger.Warn("received response for", zap.String("messageID", types.EncodeHex(messageID)))
 	for _, report := range response.Reports {
-		c.config.Logger.Debug("received response", zap.Any("report", report))
+		c.config.Logger.Warn("received response", zap.Any("report", report))
 		err := c.persistence.UpdateNotificationResponse(messageID, report)
 		if err != nil {
 			return err
@@ -579,14 +579,14 @@ func (c *Client) HandlePushNotificationResponse(serverKey *ecdsa.PublicKey, resp
 }
 
 func (c *Client) RemovePushNotificationServer(publicKey *ecdsa.PublicKey) error {
-	c.config.Logger.Debug("removing push notification server", zap.Any("public-key", publicKey))
+	c.config.Logger.Warn("removing push notification server", zap.Any("public-key", publicKey))
 	//TODO: this needs implementing. It requires unregistering from the server and
 	// likely invalidate the device token of the user
 	return errors.New("not implemented")
 }
 
 func (c *Client) AddPushNotificationsServer(publicKey *ecdsa.PublicKey, serverType ServerType) error {
-	c.config.Logger.Debug("adding push notifications server", zap.Any("public-key", publicKey))
+	c.config.Logger.Warn("adding push notifications server", zap.Any("public-key", publicKey))
 	currentServers, err := c.persistence.GetServers()
 	if err != nil {
 		return err
@@ -632,40 +632,40 @@ func (c *Client) DisableSending() {
 }
 
 func (c *Client) EnablePushNotificationsFromContactsOnly(options *RegistrationOptions) error {
-	c.config.Logger.Debug("enabling push notification from contacts only")
+	c.config.Logger.Warn("enabling push notification from contacts only")
 	c.config.AllowFromContactsOnly = true
 	if c.lastPushNotificationRegistration != nil && c.config.RemoteNotificationsEnabled {
-		c.config.Logger.Debug("re-registering after enabling push notifications from contacts only")
+		c.config.Logger.Warn("re-registering after enabling push notifications from contacts only")
 		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, options)
 	}
 	return nil
 }
 
 func (c *Client) DisablePushNotificationsFromContactsOnly(options *RegistrationOptions) error {
-	c.config.Logger.Debug("disabling push notification from contacts only")
+	c.config.Logger.Warn("disabling push notification from contacts only")
 	c.config.AllowFromContactsOnly = false
 	if c.lastPushNotificationRegistration != nil && c.config.RemoteNotificationsEnabled {
-		c.config.Logger.Debug("re-registering after disabling push notifications from contacts only")
+		c.config.Logger.Warn("re-registering after disabling push notifications from contacts only")
 		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, options)
 	}
 	return nil
 }
 
 func (c *Client) EnablePushNotificationsBlockMentions(options *RegistrationOptions) error {
-	c.config.Logger.Debug("disabling push notifications for mentions")
+	c.config.Logger.Warn("disabling push notifications for mentions")
 	c.config.BlockMentions = true
 	if c.lastPushNotificationRegistration != nil && c.config.RemoteNotificationsEnabled {
-		c.config.Logger.Debug("re-registering after disabling push notifications for mentions")
+		c.config.Logger.Warn("re-registering after disabling push notifications for mentions")
 		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, options)
 	}
 	return nil
 }
 
 func (c *Client) DisablePushNotificationsBlockMentions(options *RegistrationOptions) error {
-	c.config.Logger.Debug("enabling push notifications for mentions")
+	c.config.Logger.Warn("enabling push notifications for mentions")
 	c.config.BlockMentions = false
 	if c.lastPushNotificationRegistration != nil && c.config.RemoteNotificationsEnabled {
-		c.config.Logger.Debug("re-registering after enabling push notifications for mentions")
+		c.config.Logger.Warn("re-registering after enabling push notifications for mentions")
 		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, options)
 	}
 	return nil
@@ -710,23 +710,23 @@ func (c *Client) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
 // subscribeForMessageEvents subscribes for newly sent/scheduled messages so we can check if we need to send a push notification
 func (c *Client) subscribeForMessageEvents() {
 	go func() {
-		c.config.Logger.Debug("subscribing for message events")
+		c.config.Logger.Warn("subscribing for message events")
 		messageEventsSubscription := c.messageSender.SubscribeToMessageEvents()
 		for {
 			select {
 			case m, more := <-messageEventsSubscription:
 				if !more {
-					c.config.Logger.Debug("no more message events, quitting")
+					c.config.Logger.Warn("no more message events, quitting")
 					return
 				}
 				switch m.Type {
 				case common.MessageScheduled:
-					c.config.Logger.Debug("handling message scheduled")
+					c.config.Logger.Warn("handling message scheduled")
 					if err := c.handleMessageScheduled(m); err != nil {
 						c.config.Logger.Error("failed to handle message", zap.Error(err))
 					}
 				case common.MessageSent:
-					c.config.Logger.Debug("handling message sent")
+					c.config.Logger.Warn("handling message sent")
 					if err := c.handleMessageSent(m); err != nil {
 						c.config.Logger.Error("failed to handle message", zap.Error(err))
 					}
@@ -799,7 +799,7 @@ func (c *Client) startResendingLoop() {
 // queryNotificationInfo will block and query for the client token, if force is set it
 // will ignore the cool off period
 func (c *Client) queryNotificationInfo(publicKey *ecdsa.PublicKey, force bool) error {
-	c.config.Logger.Debug("retrieving queried at")
+	c.config.Logger.Warn("retrieving queried at")
 
 	// Check if we queried recently
 	queriedAt, err := c.persistence.GetQueriedAt(publicKey)
@@ -807,12 +807,12 @@ func (c *Client) queryNotificationInfo(publicKey *ecdsa.PublicKey, force bool) e
 		c.config.Logger.Error("failed to retrieve queried at", zap.Error(err))
 		return err
 	}
-	c.config.Logger.Debug("checking if querying necessary")
+	c.config.Logger.Warn("checking if querying necessary")
 
 	// Naively query again if too much time has passed.
 	// Here it might not be necessary
 	if force || time.Now().Unix()-queriedAt > staleQueryTimeInSeconds {
-		c.config.Logger.Debug("querying info")
+		c.config.Logger.Warn("querying info")
 		err := c.queryPushNotificationInfo(publicKey)
 		if err != nil {
 			c.config.Logger.Error("could not query pn info", zap.Error(err))
@@ -883,17 +883,17 @@ func (c *Client) handlePublicMessageSent(sentMessage *common.SentMessage) error 
 	}
 
 	messageID := sentMessage.MessageIDs[0]
-	c.config.Logger.Debug("handling public messages", zap.Binary("messageID", messageID))
+	c.config.Logger.Warn("handling public messages", zap.Binary("messageID", messageID))
 	tracked, err := c.persistence.TrackedMessage(messageID)
 	if err != nil {
 		return err
 	}
 
 	if !tracked {
-		c.config.Logger.Debug("messageID not tracked, nothing to do", zap.Binary("messageID", messageID))
+		c.config.Logger.Warn("messageID not tracked, nothing to do", zap.Binary("messageID", messageID))
 	}
 
-	c.config.Logger.Debug("messageID tracked", zap.Binary("messageID", messageID))
+	c.config.Logger.Warn("messageID tracked", zap.Binary("messageID", messageID))
 
 	message, err := c.getMessage(types.EncodeHex(messageID))
 	if err != nil {
@@ -906,9 +906,9 @@ func (c *Client) handlePublicMessageSent(sentMessage *common.SentMessage) error 
 		return nil
 	}
 
-	c.config.Logger.Debug("message found", zap.Binary("messageID", messageID))
+	c.config.Logger.Warn("message found", zap.Binary("messageID", messageID))
 	for _, pkString := range message.Mentions {
-		c.config.Logger.Debug("handling mention", zap.String("publickey", pkString))
+		c.config.Logger.Warn("handling mention", zap.String("publickey", pkString))
 		pubkeyBytes, err := types.DecodeHex(pkString)
 		if err != nil {
 			return err
@@ -925,7 +925,7 @@ func (c *Client) handlePublicMessageSent(sentMessage *common.SentMessage) error 
 			return err
 		}
 
-		c.config.Logger.Debug("should no mention", zap.Any("publickey", shouldNotify))
+		c.config.Logger.Warn("should no mention", zap.Any("publickey", shouldNotify))
 		// we send the notifications and return the info of the devices notified
 		infos, err := c.SendNotification(publicKey, nil, messageID, message.LocalChatID, protobuf.PushNotification_MENTION)
 		if err != nil {
@@ -934,7 +934,7 @@ func (c *Client) handlePublicMessageSent(sentMessage *common.SentMessage) error 
 
 		// mark message as sent so we don't notify again
 		for _, i := range infos {
-			c.config.Logger.Debug("marking as sent ", zap.Binary("mid", messageID), zap.String("id", i.InstallationID))
+			c.config.Logger.Warn("marking as sent ", zap.Binary("mid", messageID), zap.String("id", i.InstallationID))
 			if err := c.notifiedOn(publicKey, i.InstallationID, messageID, message.LocalChatID, protobuf.PushNotification_MESSAGE); err != nil {
 				return err
 			}
@@ -951,7 +951,7 @@ func (c *Client) handlePublicMessageSent(sentMessage *common.SentMessage) error 
 // dispatch a push notification messages might be batched, if coming
 // from datasync for example.
 func (c *Client) handleDirectMessageSent(sentMessage *common.SentMessage) error {
-	c.config.Logger.Debug("handling direct messages", zap.Any("messageIDs", sentMessage.MessageIDs))
+	c.config.Logger.Warn("handling direct messages", zap.Any("messageIDs", sentMessage.MessageIDs))
 
 	publicKey := sentMessage.PublicKey
 
@@ -970,7 +970,7 @@ func (c *Client) handleDirectMessageSent(sentMessage *common.SentMessage) error 
 
 	// Nothing to do
 	if len(trackedMessageIDs) == 0 {
-		c.config.Logger.Debug("nothing to do for", zap.Any("messageIDs", sentMessage.MessageIDs))
+		c.config.Logger.Warn("nothing to do for", zap.Any("messageIDs", sentMessage.MessageIDs))
 		return nil
 	}
 
@@ -999,11 +999,11 @@ func (c *Client) handleDirectMessageSent(sentMessage *common.SentMessage) error 
 
 	// Is there anything we should be notifying on?
 	if !anyActionableMessage {
-		c.config.Logger.Debug("no actionable installation IDs")
+		c.config.Logger.Warn("no actionable installation IDs")
 		return nil
 	}
 
-	c.config.Logger.Debug("actionable messages", zap.Any("messageIDs", trackedMessageIDs), zap.Any("installation-ids", installationIDs))
+	c.config.Logger.Warn("actionable messages", zap.Any("messageIDs", trackedMessageIDs), zap.Any("installation-ids", installationIDs))
 
 	// Get message to check chatID. Again we use the first message for simplicity, but we should send one for each chatID. Messages though are very rarely batched.
 	message, err := c.getMessage(types.EncodeHex(trackedMessageIDs[0]))
@@ -1034,7 +1034,7 @@ func (c *Client) handleDirectMessageSent(sentMessage *common.SentMessage) error 
 	for _, i := range infos {
 		for _, messageID := range trackedMessageIDs {
 
-			c.config.Logger.Debug("marking as sent ", zap.Binary("mid", messageID), zap.String("id", i.InstallationID))
+			c.config.Logger.Warn("marking as sent ", zap.Binary("mid", messageID), zap.String("id", i.InstallationID))
 			if err := c.notifiedOn(publicKey, i.InstallationID, messageID, chatID, protobuf.PushNotification_MESSAGE); err != nil {
 				return err
 			}
@@ -1155,7 +1155,7 @@ func (c *Client) allowedKeyList(token []byte, contactIDs []*ecdsa.PublicKey) ([]
 // or if a contact has been removed
 func (c *Client) getToken(contactIDs []*ecdsa.PublicKey) string {
 	if c.lastPushNotificationRegistration == nil || len(c.lastPushNotificationRegistration.AccessToken) == 0 || c.shouldRefreshToken(c.lastContactIDs, contactIDs, c.lastPushNotificationRegistration.AllowFromContactsOnly, c.config.AllowFromContactsOnly) {
-		c.config.Logger.Info("refreshing access token")
+		c.config.Logger.Warn("refreshing access token")
 		return uuid.New().String()
 	}
 	return c.lastPushNotificationRegistration.AccessToken
@@ -1335,7 +1335,7 @@ func (c *Client) SendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 	if err != nil {
 		return nil, err
 	}
-	c.config.Logger.Debug("queried info")
+	c.config.Logger.Warn("queried info")
 
 	// retrieve info from the database
 	info, err := c.GetPushNotificationInfo(publicKey, installationIDs)
@@ -1373,7 +1373,7 @@ func (c *Client) SendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 
 	}
 
-	c.config.Logger.Debug("actionable info", zap.Int("count", len(actionableInfos)))
+	c.config.Logger.Warn("actionable info", zap.Int("count", len(actionableInfos)))
 
 	// add ephemeral key and listen to it
 	ephemeralKey, err := crypto.GenerateKey()
@@ -1432,7 +1432,7 @@ func (c *Client) SendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 }
 
 func (c *Client) resendNotification(pn *SentNotification) error {
-	c.config.Logger.Debug("resending notification")
+	c.config.Logger.Warn("resending notification")
 	pn.RetryCount++
 	pn.LastTriedAt = time.Now().Unix()
 	err := c.persistence.UpsertSentNotification(pn)
@@ -1460,7 +1460,7 @@ func (c *Client) resendNotification(pn *SentNotification) error {
 // resendingLoop is a loop that is running when push notifications need to be resent, it only runs when needed, it will quit if no work is necessary.
 func (c *Client) resendingLoop() error {
 	for {
-		c.config.Logger.Debug("running resending loop")
+		c.config.Logger.Warn("running resending loop")
 		var lowestNextRetry int64
 
 		// fetch retriable notifications
@@ -1471,17 +1471,17 @@ func (c *Client) resendingLoop() error {
 		}
 
 		if len(retriableNotifications) == 0 {
-			c.config.Logger.Debug("no retriable notifications, quitting")
+			c.config.Logger.Warn("no retriable notifications, quitting")
 			return nil
 		}
 
-		c.config.Logger.Debug("have some retriable notifications", zap.Int("retryable-notifications", len(retriableNotifications)))
+		c.config.Logger.Warn("have some retriable notifications", zap.Int("retryable-notifications", len(retriableNotifications)))
 
 		for _, pn := range retriableNotifications {
 
 			// check if we should retry the notification
 			if shouldRetryPushNotification(pn) {
-				c.config.Logger.Debug("retrying pn")
+				c.config.Logger.Warn("retrying pn")
 				err := c.resendNotification(pn)
 				if err != nil {
 					return err
@@ -1519,14 +1519,14 @@ func (c *Client) registrationLoop() error {
 		return nil
 	}
 	for {
-		c.config.Logger.Debug("running registration loop")
+		c.config.Logger.Warn("running registration loop")
 		servers, err := c.persistence.GetServers()
 		if err != nil {
 			c.config.Logger.Error("failed retrieving servers, quitting registration loop", zap.Error(err))
 			return err
 		}
 		if len(servers) == 0 {
-			c.config.Logger.Debug("nothing to do, quitting registration loop")
+			c.config.Logger.Warn("nothing to do, quitting registration loop")
 			return nil
 		}
 
@@ -1538,17 +1538,17 @@ func (c *Client) registrationLoop() error {
 		}
 
 		if len(nonRegisteredServers) == 0 {
-			c.config.Logger.Debug("registered with all servers, quitting registration loop")
+			c.config.Logger.Warn("registered with all servers, quitting registration loop")
 			return nil
 		}
 
-		c.config.Logger.Debug("Trying to register with", zap.Int("servers", len(nonRegisteredServers)))
+		c.config.Logger.Warn("Trying to register with", zap.Int("servers", len(nonRegisteredServers)))
 
 		var lowestNextRetry int64
 
 		for _, server := range nonRegisteredServers {
 			if shouldRetryRegisteringWithServer(server) {
-				c.config.Logger.Debug("registering with server", zap.Any("server", server))
+				c.config.Logger.Warn("registering with server", zap.Any("server", server))
 				err := c.registerWithServer(c.lastPushNotificationRegistration, server)
 				if err != nil {
 					return err
@@ -1562,7 +1562,7 @@ func (c *Client) registrationLoop() error {
 
 		nextRetry := lowestNextRetry - time.Now().Unix()
 		waitFor := time.Duration(nextRetry)
-		c.config.Logger.Debug("Waiting for", zap.Any("wait for", waitFor))
+		c.config.Logger.Warn("Waiting for", zap.Any("wait for", waitFor))
 		select {
 
 		case <-time.After(waitFor * time.Second):
@@ -1621,14 +1621,14 @@ func (c *Client) handleGrant(clientPublicKey *ecdsa.PublicKey, serverPublicKey *
 
 // handleAllowedKeyList will try to decrypt a token from the list, to see if we are allowed to send push notification to a given user
 func (c *Client) handleAllowedKeyList(publicKey *ecdsa.PublicKey, allowedKeyList [][]byte) string {
-	c.config.Logger.Debug("handling allowed key list")
+	c.config.Logger.Warn("handling allowed key list")
 	for _, encryptedToken := range allowedKeyList {
 		token, err := c.decryptToken(publicKey, encryptedToken)
 		if err != nil {
 			c.config.Logger.Warn("could not decrypt token", zap.Error(err))
 			continue
 		}
-		c.config.Logger.Debug("decrypted token")
+		c.config.Logger.Warn("decrypted token")
 		return string(token)
 	}
 	return ""

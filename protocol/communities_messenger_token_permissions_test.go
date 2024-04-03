@@ -643,7 +643,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	s.Require().LessOrEqual(1, len(storeNodeListenAddresses))
 
 	storeNodeAddress := storeNodeListenAddresses[0]
-	s.logger.Info("store node ready", zap.String("address", storeNodeAddress))
+	s.logger.Warn("store node ready", zap.String("address", storeNodeAddress))
 
 	// Create messengers
 
@@ -688,7 +688,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 
 	// send message to the channel
 	msg := s.sendChatMessage(s.owner, chat.ID, messages[0])
-	s.logger.Debug("owner sent a message",
+	s.logger.Warn("owner sent a message",
 		zap.String("messageText", msg.Text),
 		zap.String("messageID", msg.ID),
 	)
@@ -806,7 +806,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 
 	// send message to channel
 	msg = s.sendChatMessage(s.owner, chat.ID, messages[2])
-	s.logger.Debug("owner sent a message",
+	s.logger.Warn("owner sent a message",
 		zap.String("messageText", msg.Text),
 		zap.String("messageID", msg.ID),
 	)

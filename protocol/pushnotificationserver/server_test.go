@@ -537,11 +537,11 @@ func (s *ServerSuite) TestbuildPushNotificationQueryResponseNoFiltering() {
 	queryResponse := s.server.buildPushNotificationQueryResponse(query)
 	s.Require().NotNil(queryResponse)
 	s.Require().True(queryResponse.Success)
-	s.Require().Len(queryResponse.Info, 1)
-	s.Require().Equal(s.accessToken, queryResponse.Info[0].AccessToken)
-	s.Require().Equal(hashedPublicKey, queryResponse.Info[0].PublicKey)
-	s.Require().Equal(s.installationID, queryResponse.Info[0].InstallationId)
-	s.Require().Nil(queryResponse.Info[0].AllowedKeyList)
+	s.Require().Len(queryResponse.Warn, 1)
+	s.Require().Equal(s.accessToken, queryResponse.Warn[0].AccessToken)
+	s.Require().Equal(hashedPublicKey, queryResponse.Warn[0].PublicKey)
+	s.Require().Equal(s.installationID, queryResponse.Warn[0].InstallationId)
+	s.Require().Nil(queryResponse.Warn[0].AllowedKeyList)
 }
 
 func (s *ServerSuite) TestbuildPushNotificationQueryResponseWithFiltering() {
@@ -575,10 +575,10 @@ func (s *ServerSuite) TestbuildPushNotificationQueryResponseWithFiltering() {
 	queryResponse := s.server.buildPushNotificationQueryResponse(query)
 	s.Require().NotNil(queryResponse)
 	s.Require().True(queryResponse.Success)
-	s.Require().Len(queryResponse.Info, 1)
-	s.Require().Equal(hashedPublicKey, queryResponse.Info[0].PublicKey)
-	s.Require().Equal(s.installationID, queryResponse.Info[0].InstallationId)
-	s.Require().Equal(allowedKeyList, queryResponse.Info[0].AllowedKeyList)
+	s.Require().Len(queryResponse.Warn, 1)
+	s.Require().Equal(hashedPublicKey, queryResponse.Warn[0].PublicKey)
+	s.Require().Equal(s.installationID, queryResponse.Warn[0].InstallationId)
+	s.Require().Equal(allowedKeyList, queryResponse.Warn[0].AllowedKeyList)
 }
 
 func (s *ServerSuite) TestPushNotificationMentions() {

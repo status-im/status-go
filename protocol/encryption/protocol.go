@@ -589,7 +589,7 @@ func (p *Protocol) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey) (*Bundle, 
 // ConfirmMessageProcessed confirms and deletes message keys for the given messages
 func (p *Protocol) ConfirmMessageProcessed(messageID []byte) error {
 	logger := p.logger.With(zap.String("site", "ConfirmMessageProcessed"))
-	logger.Debug("confirming message", zap.String("messageID", types.EncodeHex(messageID)))
+	logger.Warn("confirming message", zap.String("messageID", types.EncodeHex(messageID)))
 	return p.encryptor.ConfirmMessageProcessed(messageID)
 }
 
@@ -650,7 +650,7 @@ func (p *Protocol) HandleHashRatchetKeys(groupID []byte, keys *HRKeys, myIdentit
 		if err != nil {
 			return nil, err
 		}
-		p.logger.Debug("retrieved keys", zap.String("keyID", types.Bytes2Hex(keyID)))
+		p.logger.Warn("retrieved keys", zap.String("keyID", types.Bytes2Hex(keyID)))
 
 		// Payload contains hash ratchet key
 		err = p.encryptor.persistence.SaveHashRatchetKey(ratchet)
@@ -682,7 +682,7 @@ func (p *Protocol) HandleHashRatchetKeys(groupID []byte, keys *HRKeys, myIdentit
 			if err != nil {
 				return nil, err
 			}
-			p.logger.Debug("retrieved group keys", zap.String("keyID", types.Bytes2Hex(keyID)))
+			p.logger.Warn("retrieved group keys", zap.String("keyID", types.Bytes2Hex(keyID)))
 			// Payload contains hash ratchet key
 			err = p.encryptor.persistence.SaveHashRatchetKey(ratchet)
 			if err != nil {
@@ -711,7 +711,7 @@ func (p *Protocol) HandleMessage(
 	logger := p.logger.With(zap.String("site", "HandleMessage"))
 	response := &DecryptMessageResponse{}
 
-	logger.Debug("received a protocol message",
+	logger.Warn("received a protocol message",
 		zap.String("sender-public-key",
 			types.EncodeHex(crypto.FromECDSAPub(theirPublicKey))),
 		zap.String("my-installation-id", p.encryptor.config.InstallationID),

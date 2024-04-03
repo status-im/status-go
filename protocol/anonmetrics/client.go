@@ -60,7 +60,7 @@ func (c *Client) sendUnprocessedMetrics() {
 		return
 	}
 
-	c.Logger.Debug("sendUnprocessedMetrics() triggered")
+	c.Logger.Warn("sendUnprocessedMetrics() triggered")
 
 	c.DBLock.Lock()
 	defer c.DBLock.Unlock()
@@ -70,10 +70,10 @@ func (c *Client) sendUnprocessedMetrics() {
 	if err != nil {
 		c.Logger.Error("failed to get unprocessed messages grouped by session", zap.Error(err))
 	}
-	c.Logger.Debug("unprocessed metrics from db", zap.Reflect("uam", uam))
+	c.Logger.Warn("unprocessed metrics from db", zap.Reflect("uam", uam))
 
 	for session, batch := range uam {
-		c.Logger.Debug("processing uam from session", zap.String("session", session))
+		c.Logger.Warn("processing uam from session", zap.String("session", session))
 
 		// Convert the metrics into protobuf
 		amb, err := adaptModelsToProtoBatch(batch, &c.Identity.PublicKey)
@@ -103,7 +103,7 @@ func (c *Client) sendUnprocessedMetrics() {
 			MessageType:         protobuf.ApplicationMetadataMessage_ANONYMOUS_METRIC_BATCH,
 		}
 
-		c.Logger.Debug("rawMessage prepared from unprocessed anonymous metrics", zap.Reflect("rawMessage", rawMessage))
+		c.Logger.Warn("rawMessage prepared from unprocessed anonymous metrics", zap.Reflect("rawMessage", rawMessage))
 
 		// Send the metrics batch
 		_, err = c.messageSender.SendPrivate(context.Background(), c.Config.SendAddress, &rawMessage)
@@ -125,13 +125,13 @@ func (c *Client) mainLoop() error {
 		return nil
 	}
 
-	c.Logger.Debug("mainLoop() triggered")
+	c.Logger.Warn("mainLoop() triggered")
 
 	for {
 		c.sendUnprocessedMetrics()
 
 		waitFor := time.Duration(c.IntervalInc.Next()) * time.Second
-		c.Logger.Debug("mainLoop() wait interval set", zap.Duration("waitFor", waitFor))
+		c.Logger.Warn("mainLoop() wait interval set", zap.Duration("waitFor", waitFor))
 		select {
 		case <-time.After(waitFor):
 		case <-c.mainLoopQuit:
@@ -145,12 +145,12 @@ func (c *Client) startMainLoop() {
 		return
 	}
 
-	c.Logger.Debug("startMainLoop() triggered")
+	c.Logger.Warn("startMainLoop() triggered")
 
 	c.stopMainLoop()
 	c.mainLoopQuit = make(chan struct{})
 	go func() {
-		c.Logger.Debug("startMainLoop() anonymous go routine triggered")
+		c.Logger.Warn("startMainLoop() anonymous go routine triggered")
 		err := c.mainLoop()
 		if err != nil {
 			c.Logger.Error("main loop exited with an error", zap.Error(err))
@@ -196,7 +196,7 @@ func (c *Client) startDeleteLoop() {
 }
 
 func (c *Client) Start() error {
-	c.Logger.Debug("Main Start() triggered")
+	c.Logger.Warn("Main Start() triggered")
 	if c.messageSender == nil {
 		return errors.New("can't start, missing message processor")
 	}
@@ -207,10 +207,10 @@ func (c *Client) Start() error {
 }
 
 func (c *Client) stopMainLoop() {
-	c.Logger.Debug("stopMainLoop() triggered")
+	c.Logger.Warn("stopMainLoop() triggered")
 
 	if c.mainLoopQuit != nil {
-		c.Logger.Debug("mainLoopQuit not set, attempting to close")
+		c.Logger.Warn("mainLoopQuit not set, attempting to close")
 
 		close(c.mainLoopQuit)
 		c.mainLoopQuit = nil

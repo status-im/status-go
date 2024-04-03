@@ -74,7 +74,7 @@ func (m *Messenger) syncSettings(rawMessageHandler RawMessageHandler) error {
 			logger.Error("dispatchMessage", zap.Error(err))
 			return err
 		}
-		logger.Debug("dispatchMessage success", zap.Any("rm", rm))
+		logger.Warn("dispatchMessage success", zap.Any("rm", rm))
 	}
 
 	return nil
@@ -106,7 +106,7 @@ func (m *Messenger) extractAndSaveSyncSetting(syncSetting *protobuf.SyncSetting)
 
 	err = m.settings.SaveSyncSetting(sf, value, syncSetting.Clock)
 	if err == errors.ErrNewClockOlderThanCurrent {
-		m.logger.Info("extractSyncSetting - SaveSyncSetting :", zap.Error(err))
+		m.logger.Warn("extractSyncSetting - SaveSyncSetting :", zap.Error(err))
 		return nil, nil
 	}
 	if err != nil {
@@ -129,7 +129,7 @@ func (m *Messenger) startSyncSettingsLoop() {
 			select {
 			case s := <-m.settings.GetSyncQueue():
 				if s.CanSync(settings.FromInterface) {
-					logger.Debug("setting for sync received from settings.SyncQueue")
+					logger.Warn("setting for sync received from settings.SyncQueue")
 
 					clock, chat := m.getLastClockWithRelatedChat()
 
@@ -151,7 +151,7 @@ func (m *Messenger) startSyncSettingsLoop() {
 						break
 					}
 
-					logger.Debug("message dispatched")
+					logger.Warn("message dispatched")
 				}
 			case <-m.quit:
 				return

@@ -374,8 +374,8 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 }
 
 func (m *Manager) LogStdout(msg string, fields ...zap.Field) {
-	m.stdoutLogger.Info(msg, fields...)
-	m.logger.Debug(msg, fields...)
+	m.stdoutLogger.Warn(msg, fields...)
+	m.logger.Warn(msg, fields...)
 }
 
 type archiveMDSlice []*archiveMetadata
@@ -454,14 +454,14 @@ func (m *Manager) runENSVerificationLoop() {
 		for {
 			select {
 			case <-m.quit:
-				m.logger.Debug("quitting ens verification loop")
+				m.logger.Warn("quitting ens verification loop")
 				return
 			case records, more := <-m.ensSubscription:
 				if !more {
-					m.logger.Debug("no more ens records, quitting")
+					m.logger.Warn("no more ens records, quitting")
 					return
 				}
-				m.logger.Info("received records", zap.Any("records", records))
+				m.logger.Warn("received records", zap.Any("records", records))
 			}
 		}
 	}()
@@ -473,12 +473,12 @@ func (m *Manager) CommunitiesToValidate() (map[string][]communityToValidate, err
 }
 
 func (m *Manager) runOwnerVerificationLoop() {
-	m.logger.Info("starting owner verification loop")
+	m.logger.Warn("starting owner verification loop")
 	go func() {
 		for {
 			select {
 			case <-m.quit:
-				m.logger.Debug("quitting owner verification loop")
+				m.logger.Warn("quitting owner verification loop")
 				return
 			case <-time.After(validateInterval):
 				// If ownerverifier is nil, we skip, this is useful for testing
@@ -493,7 +493,7 @@ func (m *Manager) runOwnerVerificationLoop() {
 					continue
 				}
 				for id, communities := range communitiesToValidate {
-					m.logger.Info("validating communities", zap.String("id", id), zap.Int("count", len(communities)))
+					m.logger.Warn("validating communities", zap.String("id", id), zap.Int("count", len(communities)))
 
 					_, _ = m.validateCommunity(communities)
 				}
@@ -527,7 +527,7 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 			continue
 		}
 
-		m.logger.Info("validating community", zap.String("id", types.EncodeHex(community.id)), zap.String("signer", common.PubkeyToHex(signer)))
+		m.logger.Warn("validating community", zap.String("id", types.EncodeHex(community.id)), zap.String("signer", common.PubkeyToHex(signer)))
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 		defer cancel()
@@ -557,7 +557,7 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 
 		if response != nil {
 
-			m.logger.Info("community validated", zap.String("id", types.EncodeHex(community.id)), zap.String("signer", common.PubkeyToHex(signer)))
+			m.logger.Warn("community validated", zap.String("id", types.EncodeHex(community.id)), zap.String("signer", common.PubkeyToHex(signer)))
 			m.publish(&Subscription{TokenCommunityValidated: response})
 			err := m.persistence.DeleteCommunitiesToValidateByCommunityID(community.id)
 			if err != nil {
@@ -662,7 +662,7 @@ func (m *Manager) StartTorrentClient() error {
 		}
 	}
 
-	m.logger.Info("Starting torrent client", zap.Any("port", port))
+	m.logger.Warn("Starting torrent client", zap.Any("port", port))
 	// Instantiating the client will make it bootstrap and listen eagerly,
 	// so no go routine is needed here
 	client, err := torrent.NewClient(config)
@@ -676,7 +676,7 @@ func (m *Manager) StartTorrentClient() error {
 func (m *Manager) StopTorrentClient() []error {
 	if m.TorrentClientStarted() {
 		m.StopHistoryArchiveTasksIntervals()
-		m.logger.Info("Stopping torrent client")
+		m.logger.Warn("Stopping torrent client")
 		errs := m.torrentClient.Close()
 		if len(errs) > 0 {
 			return errs
@@ -900,7 +900,7 @@ func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommuni
 		if err != nil {
 			return nil, nil, err
 		}
-		m.logger.Info("generate key for token", zap.String("group-id", types.Bytes2Hex(community.ID())), zap.String("key-id", types.Bytes2Hex(keyID)))
+		m.logger.Warn("generate key for token", zap.String("group-id", types.Bytes2Hex(community.ID())), zap.String("key-id", types.Bytes2Hex(keyID)))
 	}
 
 	community, changes, err := m.createCommunityTokenPermission(request, community)
@@ -1133,8 +1133,8 @@ func (m *Manager) ReevaluateMembersPeriodically(communityID types.HexBytes) {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
-	logger.Debug("loop started")
-	defer logger.Debug("loop stopped")
+	logger.Warn("loop started")
+	defer logger.Warn("loop stopped")
 
 	for {
 		select {
@@ -1686,7 +1686,7 @@ func (m *Manager) GenerateRequestsToJoinForAutoApprovalOnNewOwnership(communityI
 
 func (m *Manager) Queue(signer *ecdsa.PublicKey, community *Community, clock uint64, payload []byte) error {
 
-	m.logger.Info("queuing community", zap.String("id", community.IDString()), zap.String("signer", common.PubkeyToHex(signer)))
+	m.logger.Warn("queuing community", zap.String("id", community.IDString()), zap.String("signer", common.PubkeyToHex(signer)))
 
 	communityToValidate := communityToValidate{
 		id:         community.ID(),
@@ -1705,7 +1705,7 @@ func (m *Manager) Queue(signer *ecdsa.PublicKey, community *Community, clock uin
 }
 
 func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte, verifiedOwner *ecdsa.PublicKey, communityShard *protobuf.Shard) (*CommunityResponse, error) {
-	m.logger.Debug("HandleCommunityDescriptionMessage", zap.String("communityID", description.ID), zap.Uint64("clock", description.Clock))
+	m.logger.Warn("HandleCommunityDescriptionMessage", zap.String("communityID", description.ID), zap.Uint64("clock", description.Clock))
 
 	if signer == nil {
 		return nil, errors.New("signer can't be nil")
@@ -1785,7 +1785,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 
 	if hasTokenOwnership && verifiedOwner != nil {
 		// Override verified owner
-		m.logger.Info("updating verified owner",
+		m.logger.Warn("updating verified owner",
 			zap.String("communityID", community.IDString()),
 			zap.String("verifiedOwner", common.PubkeyToHex(verifiedOwner)),
 			zap.String("signer", common.PubkeyToHex(signer)),
@@ -2866,7 +2866,7 @@ func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tok
 		for _, owner := range walletAddresses {
 			balances, err := m.collectiblesManager.FetchBalancesByOwnerAndContractAddress(ctx, walletcommon.ChainID(chainID), owner, contractAddresses)
 			if err != nil {
-				m.logger.Info("couldn't fetch owner assets", zap.Error(err))
+				m.logger.Warn("couldn't fetch owner assets", zap.Error(err))
 				return nil, err
 			}
 			ownedERC721Tokens[chainID][owner] = balances
@@ -3538,22 +3538,22 @@ func (m *Manager) PendingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestT
 }
 
 func (m *Manager) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
-	m.logger.Info("fetching pending invitations", zap.String("community-id", id.String()))
+	m.logger.Warn("fetching pending invitations", zap.String("community-id", id.String()))
 	return m.persistence.PendingRequestsToJoinForCommunity(id)
 }
 
 func (m *Manager) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
-	m.logger.Info("fetching declined invitations", zap.String("community-id", id.String()))
+	m.logger.Warn("fetching declined invitations", zap.String("community-id", id.String()))
 	return m.persistence.DeclinedRequestsToJoinForCommunity(id)
 }
 
 func (m *Manager) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
-	m.logger.Info("fetching canceled invitations", zap.String("community-id", id.String()))
+	m.logger.Warn("fetching canceled invitations", zap.String("community-id", id.String()))
 	return m.persistence.CanceledRequestsToJoinForCommunity(id)
 }
 
 func (m *Manager) AcceptedRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
-	m.logger.Info("fetching canceled invitations", zap.String("community-id", id.String()))
+	m.logger.Warn("fetching canceled invitations", zap.String("community-id", id.String()))
 	return m.persistence.AcceptedRequestsToJoinForCommunity(id)
 }
 
@@ -3566,12 +3566,12 @@ func (m *Manager) DeclinedPendingRequestsToJoinForCommunity(id types.HexBytes) (
 }
 
 func (m *Manager) AllNonApprovedCommunitiesRequestsToJoin() ([]*RequestToJoin, error) {
-	m.logger.Info("fetching all non-approved invitations for all communities")
+	m.logger.Warn("fetching all non-approved invitations for all communities")
 	return m.persistence.AllNonApprovedCommunitiesRequestsToJoin()
 }
 
 func (m *Manager) RequestsToJoinForCommunityAwaitingAddresses(id types.HexBytes) ([]*RequestToJoin, error) {
-	m.logger.Info("fetching ownership changed invitations", zap.String("community-id", id.String()))
+	m.logger.Warn("fetching ownership changed invitations", zap.String("community-id", id.String()))
 	return m.persistence.RequestsToJoinForCommunityAwaitingAddresses(id)
 }
 
@@ -3868,7 +3868,7 @@ func (m *Manager) StopHistoryArchiveTasksIntervals() {
 func (m *Manager) StopHistoryArchiveTasksInterval(communityID types.HexBytes) {
 	task, exists := m.historyArchiveTasks.Load(communityID.String())
 	if exists {
-		m.logger.Info("Stopping history archive tasks interval", zap.Any("id", communityID.String()))
+		m.logger.Warn("Stopping history archive tasks interval", zap.Any("id", communityID.String()))
 		close(task.(chan struct{})) // Need to cast to the chan
 	}
 }
@@ -4219,7 +4219,7 @@ func (m *Manager) UnseedHistoryArchiveTorrent(communityID types.HexBytes) {
 	if exists {
 		torrent, ok := m.torrentClient.Torrent(hash)
 		if ok {
-			m.logger.Debug("Unseeding and dropping torrent for community: ", zap.Any("id", id))
+			m.logger.Warn("Unseeding and dropping torrent for community: ", zap.Any("id", id))
 			torrent.Drop()
 			delete(m.torrentTasks, id)
 
@@ -4266,7 +4266,7 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 		return nil, err
 	}
 
-	m.logger.Debug("adding torrent via magnetlink for community", zap.String("id", id), zap.String("magnetlink", magnetlink))
+	m.logger.Warn("adding torrent via magnetlink for community", zap.String("id", id), zap.String("magnetlink", magnetlink))
 	torrent, err := m.torrentClient.AddMagnet(magnetlink)
 	if err != nil {
 		return nil, err
@@ -4477,7 +4477,7 @@ func (m *Manager) ExtractMessagesFromHistoryArchive(communityID types.HexBytes, 
 
 		pk, err := crypto.DecompressPubkey(communityID)
 		if err != nil {
-			m.logger.Debug("failed to decompress community pubkey", zap.Error(err))
+			m.logger.Warn("failed to decompress community pubkey", zap.Error(err))
 			return nil, err
 		}
 		decryptedBytes, err := m.encryptor.HandleMessage(m.identity, pk, &protocolMessage, make([]byte, 0))
@@ -5339,7 +5339,7 @@ func (m *Manager) encryptCommunityDescriptionImpl(groupID []byte, d *protobuf.Co
 		return "", nil, err
 	}
 
-	m.logger.Debug("encrypting community description", zap.String("community", string(communityJSON)), zap.String("groupID", types.Bytes2Hex(groupID)), zap.String("key-id", types.Bytes2Hex(keyID)))
+	m.logger.Warn("encrypting community description", zap.String("community", string(communityJSON)), zap.String("groupID", types.Bytes2Hex(groupID)), zap.String("key-id", types.Bytes2Hex(keyID)))
 	keyIDSeqNo := fmt.Sprintf("%s%d", hex.EncodeToString(keyID), newSeqNo)
 
 	return keyIDSeqNo, encryptedPayload, nil

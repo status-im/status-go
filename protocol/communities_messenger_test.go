@@ -2648,7 +2648,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	s.Require().NoError(err)
 	s.Len(tcs, 2, "There must be 2 communities")
 
-	s.logger.Debug("", zap.Any("tcs", tcs))
+	s.logger.Warn("", zap.Any("tcs", tcs))
 
 	// Get the new community from their db
 	tnc, err := alicesOtherDevice.communitiesManager.GetByID(newCommunity.ID())

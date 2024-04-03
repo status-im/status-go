@@ -65,8 +65,8 @@ func NewPublicWakuAPI(w *Waku) *PublicWakuAPI {
 	return api
 }
 
-// Info contains diagnostic information.
-type Info struct {
+// Warn contains diagnostic information.
+type Warn struct {
 	Messages       int     `json:"messages"`       // Number of floating messages.
 	MinPow         float64 `json:"minPow"`         // Minimal accepted PoW
 	MaxMessageSize uint32  `json:"maxMessageSize"` // Maximum accepted message size
@@ -74,9 +74,9 @@ type Info struct {
 
 // Context is used higher up the food-chain and without significant refactoring is not a simple thing to remove / change
 
-// Info returns diagnostic information about the waku node.
-func (api *PublicWakuAPI) Info(ctx context.Context) Info {
-	return Info{
+// Warn returns diagnostic information about the waku node.
+func (api *PublicWakuAPI) Warn(ctx context.Context) Warn {
+	return Warn{
 		Messages:       len(api.w.msgQueue) + len(api.w.p2pMsgQueue),
 		MinPow:         api.w.MinPow(),
 		MaxMessageSize: api.w.MaxMessageSize(),
@@ -498,7 +498,7 @@ func (api *PublicWakuAPI) GetFilterMessages(id string) ([]*Message, error) {
 	messages := make([]*Message, 0, len(receivedMessages))
 	for _, msg := range receivedMessages {
 
-		logger.Debug("retrieved filter message", zap.String("hash", msg.EnvelopeHash.String()), zap.Bool("isP2P", msg.P2P), zap.String("topic", msg.Topic.String()))
+		logger.Warn("retrieved filter message", zap.String("hash", msg.EnvelopeHash.String()), zap.Bool("isP2P", msg.P2P), zap.String("topic", msg.Topic.String()))
 		messages = append(messages, ToWakuMessage(msg))
 	}
 

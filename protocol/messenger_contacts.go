@@ -104,7 +104,7 @@ func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, 
 		return nil, err
 	}
 
-	m.logger.Info("acceptContactRequest")
+	m.logger.Warn("acceptContactRequest")
 
 	response, err := m.addContact(ctx, contactRequest.From, "", "", "", contactRequest.ID, "", fromSyncing, false, false)
 	if err != nil {
@@ -151,7 +151,7 @@ func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.
 }
 
 func (m *Messenger) declineContactRequest(requestID string, fromSyncing bool) (*MessengerResponse, error) {
-	m.logger.Info("declineContactRequest")
+	m.logger.Warn("declineContactRequest")
 	contactRequest, err := m.persistence.MessageByID(requestID)
 	if err != nil {
 		return nil, err
@@ -253,7 +253,7 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 
 func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, contactRequestID string, fromSyncing bool) (*MessengerResponse, error) {
 
-	m.logger.Debug("updateAcceptedContactRequest", zap.String("contactRequestID", contactRequestID))
+	m.logger.Warn("updateAcceptedContactRequest", zap.String("contactRequestID", contactRequestID))
 
 	contactRequest, err := m.persistence.MessageByID(contactRequestID)
 	if err != nil {
@@ -629,7 +629,7 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 func (m *Messenger) resetLastPublishedTimeForChatIdentity() error {
 	// Reset last published time for ChatIdentity so new contact can receive data
 	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
-	m.logger.Debug("contact state changed ResetWhenChatIdentityLastPublished")
+	m.logger.Warn("contact state changed ResetWhenChatIdentityLastPublished")
 	return m.persistence.ResetWhenChatIdentityLastPublished(contactCodeTopic)
 }
 

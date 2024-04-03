@@ -77,7 +77,7 @@ func NewStoreNodeRequestManager(m *Messenger) *StoreNodeRequestManager {
 func (m *StoreNodeRequestManager) FetchCommunity(community communities.CommunityShard, opts []StoreNodeRequestOption) (*communities.Community, StoreNodeRequestStats, error) {
 	cfg := buildStoreNodeRequestConfig(opts)
 
-	m.logger.Info("requesting community from store node",
+	m.logger.Warn("requesting community from store node",
 		zap.Any("community", community),
 		zap.Any("config", cfg))
 
@@ -133,7 +133,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(community communities.Community
 // of this spam first to get the envelopes in other content topics. To avoid this we keep independent requests
 // for each content topic.
 func (m *StoreNodeRequestManager) FetchCommunities(communities []communities.CommunityShard, opts []StoreNodeRequestOption) error {
-	m.logger.Info("requesting communities from store node", zap.Any("communities", communities))
+	m.logger.Warn("requesting communities from store node", zap.Any("communities", communities))
 
 	// when fetching multiple communities we don't wait for the response
 	opts = append(opts, WithWaitForResponseOption(false))
@@ -154,7 +154,7 @@ func (m *StoreNodeRequestManager) FetchContact(contactID string, opts []StoreNod
 
 	cfg := buildStoreNodeRequestConfig(opts)
 
-	m.logger.Info("requesting contact from store node",
+	m.logger.Warn("requesting contact from store node",
 		zap.Any("contactID", contactID),
 		zap.Any("config", cfg))
 
@@ -343,7 +343,7 @@ func (r *storeNodeRequest) finalize() {
 	r.manager.activeRequestsLock.Lock()
 	defer r.manager.activeRequestsLock.Unlock()
 
-	r.manager.logger.Info("request finished",
+	r.manager.logger.Warn("request finished",
 		zap.Any("requestID", r.requestID),
 		zap.Bool("communityFound", r.result.community != nil),
 		zap.Bool("contactFound", r.result.contact != nil),
@@ -422,7 +422,7 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 
 		if community == nil {
 			// community not found in the database, request next page
-			logger.Debug("community still not fetched")
+			logger.Warn("community still not fetched")
 			return true, r.config.FurtherPageSize
 		}
 
@@ -433,14 +433,14 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 		// but I don't think that's possible right now. We check if clock was updated instead.
 
 		if community.Clock() <= r.minimumDataClock {
-			logger.Debug("local community description is not newer than existing",
+			logger.Warn("local community description is not newer than existing",
 				zap.Any("existingClock", community.Clock()),
 				zap.Any("minimumDataClock", r.minimumDataClock),
 			)
 			return true, r.config.FurtherPageSize
 		}
 
-		logger.Debug("community found",
+		logger.Warn("community found",
 			zap.String("displayName", community.Name()))
 
 		r.result.community = community
@@ -468,7 +468,7 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 			}
 		}
 
-		logger.Debug("shard found",
+		logger.Warn("shard found",
 			zap.String("community", communityIDStr),
 			zap.Any("shard", shardResult),
 		)
@@ -480,11 +480,11 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 
 		if contact == nil {
 			// contact not found in the database, request next page
-			logger.Debug("contact still not fetched")
+			logger.Warn("contact still not fetched")
 			return true, r.config.FurtherPageSize
 		}
 
-		logger.Debug("contact found",
+		logger.Warn("contact found",
 			zap.String("displayName", contact.DisplayName))
 
 		r.result.contact = contact
@@ -494,7 +494,7 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 }
 
 func (r *storeNodeRequest) routine() {
-	r.manager.logger.Info("starting store node request",
+	r.manager.logger.Warn("starting store node request",
 		zap.Any("requestID", r.requestID),
 		zap.String("pubsubTopic", r.pubsubTopic),
 		zap.Any("contentTopic", r.contentTopic),
@@ -542,7 +542,7 @@ func (r *storeNodeRequest) routine() {
 			PubsubTopic: r.pubsubTopic,
 			Topics:      []types.TopicType{r.contentTopic},
 		}
-		r.manager.logger.Info("perform store node request", zap.Any("batch", batch))
+		r.manager.logger.Warn("perform store node request", zap.Any("batch", batch))
 		if r.manager.onPerformingBatch != nil {
 			r.manager.onPerformingBatch(batch)
 		}

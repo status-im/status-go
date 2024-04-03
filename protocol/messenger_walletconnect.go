@@ -8,7 +8,7 @@ type WalletConnectSession struct {
 	PeerID   string `json:"peerId"`
 	DAppName string `json:"dappName"`
 	DAppURL  string `json:"dappURL"`
-	Info     string `json:"info"`
+	Warn     string `json:"info"`
 }
 
 func (m *Messenger) getWalletConnectSession() ([]WalletConnectSession, error) {
@@ -24,7 +24,7 @@ func (m *Messenger) AddWalletConnectSession(request *requests.AddWalletConnectSe
 		PeerID:   request.PeerID,
 		DAppName: request.DAppName,
 		DAppURL:  request.DAppURL,
-		Info:     request.Info,
+		Warn:     request.Warn,
 	}
 
 	return m.persistence.InsertWalletConnectSession(session)

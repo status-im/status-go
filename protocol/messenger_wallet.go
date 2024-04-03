@@ -34,13 +34,13 @@ func (m *Messenger) retrieveWalletBalances() error {
 	}
 
 	if len(accounts) == 0 {
-		m.logger.Info("no accounts to sync wallet balance")
+		m.logger.Warn("no accounts to sync wallet balance")
 	}
 
 	var ethAccounts []ethcommon.Address
 
 	for _, acc := range accounts {
-		m.logger.Info("syncing wallet address", zap.String("account", acc.Address.Hex()))
+		m.logger.Warn("syncing wallet address", zap.String("account", acc.Address.Hex()))
 		ethAccounts = append(ethAccounts, ethcommon.BytesToAddress(acc.Address.Bytes()))
 	}
 
@@ -57,7 +57,7 @@ func (m *Messenger) retrieveWalletBalances() error {
 }
 
 func (m *Messenger) watchWalletBalances() {
-	m.logger.Info("watching wallet balances")
+	m.logger.Warn("watching wallet balances")
 
 	if m.walletAPI == nil {
 		m.logger.Warn("wallet service not enabled")

@@ -36,7 +36,7 @@ func TestLoggerWithJSONHexEncoder(t *testing.T) {
 	l, err := cfg.Build()
 	require.NoError(t, err)
 
-	l.With(zap.Binary("some-field", []byte{0x01, 0x02, 0x03})).Debug("test message")
+	l.With(zap.Binary("some-field", []byte{0x01, 0x02, 0x03})).Warn("test message")
 	err = l.Sync()
 	require.NoError(t, err)
 
@@ -71,7 +71,7 @@ func TestLoggerWithConsoleHexEncoder(t *testing.T) {
 	l, err := cfg.Build()
 	require.NoError(t, err)
 
-	l.With(zap.Binary("some-field", []byte{0x01, 0x02, 0x03})).Debug("test message")
+	l.With(zap.Binary("some-field", []byte{0x01, 0x02, 0x03})).Warn("test message")
 	err = l.Sync()
 	require.NoError(t, err)
 

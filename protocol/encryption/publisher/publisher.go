@@ -45,7 +45,7 @@ func New(logger *zap.Logger) *Publisher {
 func (p *Publisher) Start() <-chan struct{} {
 	logger := p.logger.With(zap.String("site", "Start"))
 
-	logger.Info("starting publisher")
+	logger.Warn("starting publisher")
 
 	p.notifyCh = make(chan struct{}, 100)
 	p.quit = make(chan struct{})
@@ -83,7 +83,7 @@ func (p *Publisher) tickerLoop() {
 				err := p.notify()
 				switch err {
 				case errNotEnoughTimePassed:
-					logger.Debug("not enough time passed")
+					logger.Warn("not enough time passed")
 				case nil:
 					// skip
 				default:

@@ -34,7 +34,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			} else {
 				c, err := buildContact(message.PublicKey, publicKey)
 				if err != nil {
-					m.logger.Info("failed to build contact", zap.Error(err))
+					m.logger.Warn("failed to build contact", zap.Error(err))
 					continue
 				}
 				contact = c

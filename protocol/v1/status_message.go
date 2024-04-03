@@ -166,7 +166,7 @@ func (m *StatusMessage) HandleApplicationLayer() error {
 	m.ApplicationLayer.SigPubKey = recoveredKey
 	// Calculate ID using the wrapped record
 	m.ApplicationLayer.ID = MessageID(recoveredKey, m.EncryptionLayer.Payload)
-	log.Debug("calculated ID for envelope", "envelopeHash", hexutil.Encode(m.TransportLayer.Hash), "messageId", hexutil.Encode(m.ApplicationLayer.ID))
+	log.Warn("calculated ID for envelope", "envelopeHash", hexutil.Encode(m.TransportLayer.Hash), "messageId", hexutil.Encode(m.ApplicationLayer.ID))
 
 	m.ApplicationLayer.Payload = message.Payload
 	m.ApplicationLayer.Type = message.Type

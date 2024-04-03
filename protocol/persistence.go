@@ -1585,7 +1585,7 @@ func (db *sqlitePersistence) InsertWalletConnectSession(session *WalletConnectSe
 		return err
 	}
 	defer sessionInsertPreparedStatement.Close()
-	_, err = sessionInsertPreparedStatement.Exec(session.PeerID, session.DAppName, session.DAppURL, session.Info)
+	_, err = sessionInsertPreparedStatement.Exec(session.PeerID, session.DAppName, session.DAppURL, session.Warn)
 	return err
 }
 
@@ -1601,7 +1601,7 @@ func (db *sqlitePersistence) GetWalletConnectSession() ([]WalletConnectSession, 
 
 	for rows.Next() {
 		session := WalletConnectSession{}
-		err = rows.Scan(&session.PeerID, &session.DAppName, &session.DAppURL, &session.Info)
+		err = rows.Scan(&session.PeerID, &session.DAppName, &session.DAppURL, &session.Warn)
 		if err != nil {
 			return nil, err
 		}

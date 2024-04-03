@@ -13,7 +13,7 @@ type AddWalletConnectSession struct {
 	PeerID   string `json:"id"`
 	DAppName string `json:"dappName"`
 	DAppURL  string `json:"dappUrl"`
-	Info     string `json:"info"`
+	Warn     string `json:"info"`
 }
 
 func (c *AddWalletConnectSession) Validate() error {
@@ -29,7 +29,7 @@ func (c *AddWalletConnectSession) Validate() error {
 		return ErrAddWalletConnectSessionInvalidDAppURL
 	}
 
-	if len(c.Info) == 0 {
+	if len(c.Warn) == 0 {
 		return ErrAddWalletConnectSessionInvalidInfo
 	}
 

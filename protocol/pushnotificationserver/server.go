@@ -58,9 +58,9 @@ func (s *Server) Start() error {
 		s.config.Logger = logger
 	}
 
-	s.config.Logger.Info("starting push notification server")
+	s.config.Logger.Warn("starting push notification server")
 	if s.config.Identity == nil {
-		s.config.Logger.Debug("Identity nil")
+		s.config.Logger.Warn("Identity nil")
 		// Pull identity from database
 		identity, err := s.persistence.GetIdentity()
 		if err != nil {
@@ -89,7 +89,7 @@ func (s *Server) Start() error {
 		}
 	}
 
-	s.config.Logger.Info("started push notification server", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&s.config.Identity.PublicKey))))
+	s.config.Logger.Warn("started push notification server", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&s.config.Identity.PublicKey))))
 
 	return nil
 }
@@ -147,7 +147,7 @@ func (s *Server) HandlePushNotificationQuery(publicKey *ecdsa.PublicKey, message
 func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
 	messageID []byte,
 	request *protobuf.PushNotificationRequest) error {
-	s.config.Logger.Debug("handling pn request", zap.Binary("message-id", messageID))
+	s.config.Logger.Warn("handling pn request", zap.Binary("message-id", messageID))
 
 	// This is at-most-once semantic for now
 	exists, err := s.persistence.PushNotificationExists(messageID)
@@ -156,7 +156,7 @@ func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
 	}
 
 	if exists {
-		s.config.Logger.Debug("already handled")
+		s.config.Logger.Warn("already handled")
 		return nil
 	}
 
@@ -312,7 +312,7 @@ func (s *Server) validateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 // buildPushNotificationQueryResponse check if we have the client information and send them back
 func (s *Server) buildPushNotificationQueryResponse(query *protobuf.PushNotificationQuery) *protobuf.PushNotificationQueryResponse {
 
-	s.config.Logger.Debug("handling push notification query")
+	s.config.Logger.Warn("handling push notification query")
 	response := &protobuf.PushNotificationQueryResponse{}
 	if query == nil || len(query.PublicKeys) == 0 {
 		return response
@@ -341,7 +341,7 @@ func (s *Server) buildPushNotificationQueryResponse(query *protobuf.PushNotifica
 		} else {
 			info.AccessToken = registration.AccessToken
 		}
-		response.Info = append(response.Info, info)
+		response.Warn = append(response.Warn, info)
 	}
 
 	response.Success = true
@@ -380,10 +380,10 @@ func (s *Server) buildPushNotificationReport(pn *protobuf.PushNotification, regi
 		s.config.Logger.Warn("empty registration")
 		report.Error = protobuf.PushNotificationReport_NOT_REGISTERED
 	} else if registration.AccessToken != pn.AccessToken {
-		s.config.Logger.Debug("invalid token")
+		s.config.Logger.Warn("invalid token")
 		report.Error = protobuf.PushNotificationReport_WRONG_TOKEN
 	} else if (s.isMessageNotification(pn) && !s.isValidMessageNotification(pn, registration)) || (s.isMentionNotification(pn) && !s.isValidMentionNotification(pn, registration)) || (s.isRequestToJoinCommunityNotification(pn) && !s.isValidRequestToJoinCommunityNotification(pn, registration)) {
-		s.config.Logger.Debug("filtered notification")
+		s.config.Logger.Warn("filtered notification")
 		// We report as successful but don't send the notification
 		// for privacy reasons, as otherwise we would disclose that
 		// the sending client has been blocked or that the registering
@@ -391,7 +391,7 @@ func (s *Server) buildPushNotificationReport(pn *protobuf.PushNotification, regi
 		report.Success = true
 	} else {
 		response.sendNotification = true
-		s.config.Logger.Debug("sending push notification")
+		s.config.Logger.Warn("sending push notification")
 		report.Success = true
 	}
 
@@ -443,7 +443,7 @@ func (s *Server) buildPushNotificationRequestResponse(request *protobuf.PushNoti
 		response.Reports = append(response.Reports, report)
 	}
 
-	s.config.Logger.Debug("built pn request")
+	s.config.Logger.Warn("built pn request")
 	if len(requestAndRegistrations) == 0 {
 		s.config.Logger.Warn("no request and registration")
 		return response, nil
@@ -474,7 +474,7 @@ func (s *Server) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {
 // buildPushNotificationRegistrationResponse will check the registration is valid, save it, and listen to the topic for the queries
 func (s *Server) buildPushNotificationRegistrationResponse(publicKey *ecdsa.PublicKey, payload []byte) *protobuf.PushNotificationRegistrationResponse {
 
-	s.config.Logger.Debug("handling push notification registration")
+	s.config.Logger.Warn("handling push notification registration")
 	response := &protobuf.PushNotificationRegistrationResponse{
 		RequestId: common.Shake256(payload),
 	}
@@ -492,7 +492,7 @@ func (s *Server) buildPushNotificationRegistrationResponse(publicKey *ecdsa.Publ
 	}
 
 	if registration.Unregister {
-		s.config.Logger.Debug("unregistering client")
+		s.config.Logger.Warn("unregistering client")
 		// We save an empty registration, only keeping version and installation-id
 		if err := s.persistence.UnregisterPushNotificationRegistration(common.HashPublicKey(publicKey), registration.InstallationId, registration.Version); err != nil {
 			response.Error = protobuf.PushNotificationRegistrationResponse_INTERNAL_ERROR
@@ -514,7 +514,7 @@ func (s *Server) buildPushNotificationRegistrationResponse(publicKey *ecdsa.Publ
 	}
 	response.Success = true
 
-	s.config.Logger.Debug("handled push notification registration successfully")
+	s.config.Logger.Warn("handled push notification registration successfully")
 
 	return response
 }

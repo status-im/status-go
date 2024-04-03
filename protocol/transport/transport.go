@@ -259,9 +259,9 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 			// Exclude anything that is a cache hit
 			if !hits[types.EncodeHex(msgs[i].Hash)] {
 				result[*filter] = append(result[*filter], msgs[i])
-				logger.Debug("message not cached", zap.String("hash", types.EncodeHex(msgs[i].Hash)))
+				logger.Warn("message not cached", zap.String("hash", types.EncodeHex(msgs[i].Hash)))
 			} else {
-				logger.Debug("message cached", zap.String("hash", types.EncodeHex(msgs[i].Hash)))
+				logger.Warn("message cached", zap.String("hash", types.EncodeHex(msgs[i].Hash)))
 				t.waku.MarkP2PMessageAsProcessed(common.BytesToHash(msgs[i].Hash))
 			}
 		}
@@ -369,7 +369,7 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.
 	newMessage.Topic = filter.ContentTopic
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
-	t.logger.Debug("SENDING message", zap.Binary("topic", filter.ContentTopic[:]))
+	t.logger.Warn("SENDING message", zap.Binary("topic", filter.ContentTopic[:]))
 
 	return t.api.Post(ctx, *newMessage)
 }
@@ -608,7 +608,7 @@ func (t *Transport) waitForRequestCompleted(ctx context.Context, requestID []byt
 // ConfirmMessagesProcessed marks the messages as processed in the cache so
 // they won't be passed to the next layer anymore
 func (t *Transport) ConfirmMessagesProcessed(ids []string, timestamp uint64) error {
-	t.logger.Debug("confirming message processed", zap.Any("ids", ids), zap.Any("timestamp", timestamp))
+	t.logger.Warn("confirming message processed", zap.Any("ids", ids), zap.Any("timestamp", timestamp))
 	return t.cache.Add(ids, timestamp)
 }
 
@@ -626,7 +626,7 @@ func (t *Transport) SetEnvelopeEventsHandler(handler EnvelopeEventsHandler) erro
 }
 
 func (t *Transport) ClearProcessedMessageIDsCache() error {
-	t.logger.Debug("clearing processed messages cache")
+	t.logger.Warn("clearing processed messages cache")
 	t.waku.ClearEnvelopesCache()
 	return t.cache.Clear()
 }

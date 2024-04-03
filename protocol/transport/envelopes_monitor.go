@@ -214,15 +214,15 @@ func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
 	if envelope.state == EnvelopeSent {
 		return
 	}
-	m.logger.Debug("envelope is sent", zap.String("hash", event.Hash.String()), zap.String("peer", event.Peer.String()))
+	m.logger.Warn("envelope is sent", zap.String("hash", event.Hash.String()), zap.String("peer", event.Peer.String()))
 	if confirmationExpected {
 		if _, ok := m.batches[event.Batch]; !ok {
 			m.batches[event.Batch] = map[types.Hash]struct{}{}
 		}
 		m.batches[event.Batch][event.Hash] = struct{}{}
-		m.logger.Debug("waiting for a confirmation", zap.String("batch", event.Batch.String()))
+		m.logger.Warn("waiting for a confirmation", zap.String("batch", event.Batch.String()))
 	} else {
-		m.logger.Debug("confirmation not expected, marking as sent")
+		m.logger.Warn("confirmation not expected, marking as sent")
 		envelope.state = EnvelopeSent
 		m.processIdentifiers(envelope.identifiers)
 	}
@@ -239,9 +239,9 @@ func (m *EnvelopesMonitor) handleAcknowledgedBatch(event types.EnvelopeEvent) {
 
 	envelopes, ok := m.batches[event.Batch]
 	if !ok {
-		m.logger.Debug("batch is not found", zap.String("batch", event.Batch.String()))
+		m.logger.Warn("batch is not found", zap.String("batch", event.Batch.String()))
 	}
-	m.logger.Debug("received a confirmation", zap.String("batch", event.Batch.String()), zap.String("peer", event.Peer.String()))
+	m.logger.Warn("received a confirmation", zap.String("batch", event.Batch.String()), zap.String("peer", event.Peer.String()))
 	envelopeErrors, ok := event.Data.([]types.EnvelopeError)
 	if event.Data != nil && !ok {
 		m.logger.Error("received unexpected data in the the confirmation event", zap.Any("data", event.Data))
@@ -291,7 +291,7 @@ func (m *EnvelopesMonitor) handleEnvelopeFailure(hash types.Hash, err error) {
 			return
 		}
 		if envelope.attempts < m.maxAttempts {
-			m.logger.Debug("retrying to send a message", zap.String("hash", hash.String()), zap.Int("attempt", envelope.attempts+1))
+			m.logger.Warn("retrying to send a message", zap.String("hash", hash.String()), zap.Int("attempt", envelope.attempts+1))
 			hex, err := m.api.Post(context.TODO(), *envelope.message)
 			if err != nil {
 				m.logger.Error("failed to retry sending message", zap.String("hash", hash.String()), zap.Int("attempt", envelope.attempts+1), zap.Error(err))
@@ -308,7 +308,7 @@ func (m *EnvelopesMonitor) handleEnvelopeFailure(hash types.Hash, err error) {
 				identifiers: envelope.identifiers,
 			}
 		} else {
-			m.logger.Debug("envelope expired", zap.String("hash", hash.String()))
+			m.logger.Warn("envelope expired", zap.String("hash", hash.String()))
 			if m.handler != nil {
 				m.handler.EnvelopeExpired(envelope.identifiers, err)
 			}
@@ -326,7 +326,7 @@ func (m *EnvelopesMonitor) handleEventEnvelopeReceived(event types.EnvelopeEvent
 	if !ok || envelope.state != EnvelopePosted {
 		return
 	}
-	m.logger.Debug("expected envelope received", zap.String("hash", event.Hash.String()), zap.String("peer", event.Peer.String()))
+	m.logger.Warn("expected envelope received", zap.String("hash", event.Hash.String()), zap.String("peer", event.Peer.String()))
 	envelope.state = EnvelopeSent
 	m.processIdentifiers(envelope.identifiers)
 }

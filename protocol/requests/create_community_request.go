@@ -96,7 +96,7 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 	if c.Image != "" || c.Banner.ImagePath != "" {
 		ciis := make(map[string]*protobuf.IdentityImage)
 		if c.Image != "" {
-			log.Info("has-image", "image", c.Image)
+			log.Warn("has-image", "image", c.Image)
 			imgs, err := images.GenerateIdentityImages(c.Image, c.ImageAx, c.ImageAy, c.ImageBx, c.ImageBy)
 			if err != nil {
 				return nil, err
@@ -106,7 +106,7 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 			}
 		}
 		if c.Banner.ImagePath != "" {
-			log.Info("has-banner", "image", c.Banner.ImagePath)
+			log.Warn("has-banner", "image", c.Banner.ImagePath)
 			img, err := images.GenerateBannerImage(c.Banner.ImagePath, c.Banner.X, c.Banner.Y, c.Banner.X+c.Banner.Width, c.Banner.Y+c.Banner.Height)
 			if err != nil {
 				return nil, err
@@ -114,7 +114,7 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 			ciis[img.Name] = adaptIdentityImageToProtobuf(*img)
 		}
 		ci.Images = ciis
-		log.Info("set images", "images", ci)
+		log.Warn("set images", "images", ci)
 	}
 
 	description := &protobuf.CommunityDescription{

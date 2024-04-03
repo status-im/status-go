@@ -91,7 +91,7 @@ func sendGoRushNotification(request *GoRushRequest, url string, logger *zap.Logg
 	defer response.Body.Close()
 	body, _ := ioutil.ReadAll(response.Body)
 
-	logger.Info("Sent gorush request", zap.String("response", string(body)))
+	logger.Warn("Sent gorush request", zap.String("response", string(body)))
 
 	return nil
 }

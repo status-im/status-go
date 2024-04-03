@@ -84,7 +84,7 @@ func (m *Messenger) StartMailserverCycle(mailservers []mailservers.Mailserver) e
 		return fmt.Errorf("unsupported waku version: %d", version)
 	}
 
-	m.logger.Debug("starting mailserver cycle",
+	m.logger.Warn("starting mailserver cycle",
 		zap.Uint("WakuVersion", m.transport.WakuVersion()),
 		zap.Any("mailservers", mailservers),
 	)
@@ -100,10 +100,10 @@ func (m *Messenger) DisconnectActiveMailserver() {
 
 func (m *Messenger) disconnectMailserver() error {
 	if m.mailserverCycle.activeMailserver == nil {
-		m.logger.Info("no active mailserver")
+		m.logger.Warn("no active mailserver")
 		return nil
 	}
-	m.logger.Info("disconnecting active mailserver", zap.String("nodeID", m.mailserverCycle.activeMailserver.ID))
+	m.logger.Warn("disconnecting active mailserver", zap.String("nodeID", m.mailserverCycle.activeMailserver.ID))
 	m.mailPeersMutex.Lock()
 	pInfo, ok := m.mailserverCycle.peers[m.mailserverCycle.activeMailserver.ID]
 	if ok {
@@ -142,7 +142,7 @@ func (m *Messenger) disconnectActiveMailserver() {
 }
 
 func (m *Messenger) cycleMailservers() {
-	m.logger.Info("Automatically switching mailserver")
+	m.logger.Warn("Automatically switching mailserver")
 
 	if m.mailserverCycle.activeMailserver != nil {
 		m.disconnectActiveMailserver()
@@ -232,7 +232,7 @@ func (m *Messenger) findNewMailserver() error {
 
 	//	TODO: remove this check once sockets are stable on x86_64 emulators
 	if findNearestMailServer {
-		m.logger.Info("Finding a new mailserver...")
+		m.logger.Warn("Finding a new mailserver...")
 
 		var mailserverStr []string
 		for _, m := range allMailservers {
@@ -261,7 +261,7 @@ func (m *Messenger) findNewMailserver() error {
 		var availableMailservers []*mailservers.PingResult
 		for _, result := range pingResult {
 			if result.Err != nil {
-				m.logger.Info("connecting error", zap.String("err", *result.Err))
+				m.logger.Warn("connecting error", zap.String("err", *result.Err))
 				continue // The results with error are ignored
 			}
 			availableMailservers = append(availableMailservers, result)
@@ -316,7 +316,7 @@ func (m *Messenger) findNewMailserver() error {
 
 		msPing := sortedMailservers[r.Int64()]
 		ms := mailserversByAddress[msPing.Address]
-		m.logger.Info("connecting to mailserver", zap.String("address", ms.Address))
+		m.logger.Warn("connecting to mailserver", zap.String("address", ms.Address))
 		return m.connectToMailserver(ms)
 	}
 
@@ -341,7 +341,7 @@ func (m *Messenger) findNewMailserver() error {
 
 	msPing := allMailservers[r.Int64()]
 	ms := mailserversByAddress[msPing.Address]
-	m.logger.Info("connecting to mailserver", zap.String("address", ms.Address))
+	m.logger.Warn("connecting to mailserver", zap.String("address", ms.Address))
 	return m.connectToMailserver(ms)
 
 }
@@ -358,7 +358,7 @@ func (m *Messenger) mailserverStatus(mailserverID string) connStatus {
 
 func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 
-	m.logger.Info("connecting to mailserver", zap.Any("peer", ms.ID))
+	m.logger.Warn("connecting to mailserver", zap.Any("peer", ms.ID))
 
 	m.mailserverCycle.activeMailserver = &ms
 	signal.SendMailserverChanged(m.mailserverCycle.activeMailserver.Address, m.mailserverCycle.activeMailserver.ID)
@@ -404,7 +404,7 @@ func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 
 		if ms.Version == 2 {
 			m.mailserverCycle.activeMailserver.FailedRequests = 0
-			m.logger.Info("mailserver available", zap.String("address", m.mailserverCycle.activeMailserver.UniqueID()))
+			m.logger.Warn("mailserver available", zap.String("address", m.mailserverCycle.activeMailserver.UniqueID()))
 			m.EmitMailserverAvailable()
 			signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver.Address, m.mailserverCycle.activeMailserver.ID)
 
@@ -494,7 +494,7 @@ func (m *Messenger) penalizeMailserver(id string) {
 
 // handleMailserverCycleEvent runs every 1 second or when updating peers to keep the data of the active mailserver updated
 func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) error {
-	m.logger.Debug("mailserver cycle event",
+	m.logger.Warn("mailserver cycle event",
 		zap.Any("connected", connectedPeers),
 		zap.Any("peer-info", m.mailserverCycle.peers))
 
@@ -521,7 +521,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 			}
 		}
 		if !found && (pInfo.status == connected || (pInfo.status == connecting && pInfo.lastConnectionAttempt.Add(8*time.Second).Before(time.Now()))) {
-			m.logger.Info("peer disconnected", zap.String("peer", pID))
+			m.logger.Warn("peer disconnected", zap.String("peer", pID))
 			pInfo.status = disconnected
 			pInfo.canConnectAfter = time.Now().Add(defaultBackoff)
 		}
@@ -547,7 +547,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 			m.mailPeersMutex.Lock()
 			pInfo, ok := m.mailserverCycle.peers[id]
 			if !ok || pInfo.status != connected {
-				m.logger.Info("peer connected", zap.String("peer", connectedPeer.UniqueID))
+				m.logger.Warn("peer connected", zap.String("peer", connectedPeer.UniqueID))
 				pInfo.status = connected
 				if pInfo.canConnectAfter.Before(time.Now()) {
 					pInfo.canConnectAfter = time.Now().Add(defaultBackoff)
@@ -557,7 +557,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 
 				if id == m.mailserverCycle.activeMailserver.ID {
 					m.mailserverCycle.activeMailserver.FailedRequests = 0
-					m.logger.Info("mailserver available", zap.String("address", connectedPeer.UniqueID))
+					m.logger.Warn("mailserver available", zap.String("address", connectedPeer.UniqueID))
 					m.EmitMailserverAvailable()
 					signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver.Address, m.mailserverCycle.activeMailserver.ID)
 				}
@@ -581,7 +581,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 		if m.mailserverCycle.activeMailserver.FailedRequests >= mailserverMaxFailedRequests {
 			m.penalizeMailserver(m.mailserverCycle.activeMailserver.ID)
 			signal.SendMailserverNotWorking()
-			m.logger.Info("connecting too many failed requests")
+			m.logger.Warn("connecting too many failed requests")
 			m.mailserverCycle.activeMailserver.FailedRequests = 0
 
 			return m.connectToNewMailserverAndWait()
@@ -593,7 +593,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 
 		if ok {
 			if pInfo.status != connected && pInfo.lastConnectionAttempt.Add(20*time.Second).Before(time.Now()) {
-				m.logger.Info("penalizing mailserver & disconnecting connecting", zap.String("id", m.mailserverCycle.activeMailserver.ID))
+				m.logger.Warn("penalizing mailserver & disconnecting connecting", zap.String("id", m.mailserverCycle.activeMailserver.ID))
 
 				signal.SendMailserverNotWorking()
 				m.penalizeMailserver(m.mailserverCycle.activeMailserver.ID)
@@ -605,13 +605,13 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 		m.cycleMailservers()
 	}
 
-	m.logger.Debug("updated-peers", zap.Any("peers", m.mailserverCycle.peers))
+	m.logger.Warn("updated-peers", zap.Any("peers", m.mailserverCycle.peers))
 
 	return nil
 }
 
 func (m *Messenger) asyncRequestAllHistoricMessages() {
-	m.logger.Debug("asyncRequestAllHistoricMessages")
+	m.logger.Warn("asyncRequestAllHistoricMessages")
 	go func() {
 		_, err := m.RequestAllHistoricMessages(false, true)
 		if err != nil {
@@ -737,7 +737,7 @@ func (m *Messenger) SubscribeMailserverAvailable() chan struct{} {
 }
 
 func (m *Messenger) disconnectStorenodeIfRequired() error {
-	m.logger.Debug("wakuV2 storenode status verification")
+	m.logger.Warn("wakuV2 storenode status verification")
 
 	if m.mailserverCycle.activeMailserver == nil {
 		// No active storenode, find a new one
@@ -749,7 +749,7 @@ func (m *Messenger) disconnectStorenodeIfRequired() error {
 	if m.mailserverCycle.activeMailserver.FailedRequests >= mailserverMaxFailedRequests {
 		m.penalizeMailserver(m.mailserverCycle.activeMailserver.ID)
 		signal.SendMailserverNotWorking()
-		m.logger.Info("too many failed requests", zap.String("storenode", m.mailserverCycle.activeMailserver.UniqueID()))
+		m.logger.Warn("too many failed requests", zap.String("storenode", m.mailserverCycle.activeMailserver.UniqueID()))
 		m.mailserverCycle.activeMailserver.FailedRequests = 0
 		return m.connectToNewMailserverAndWait()
 	}

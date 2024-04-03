@@ -84,13 +84,13 @@ func (p *Peer) Start() error {
 		return err
 	}
 	go p.update()
-	p.logger.Debug("starting peer", zap.String("peerID", types.EncodeHex(p.ID())))
+	p.logger.Warn("starting peer", zap.String("peerID", types.EncodeHex(p.ID())))
 	return nil
 }
 
 func (p *Peer) Stop() {
 	close(p.quit)
-	p.logger.Debug("stopping peer", zap.String("peerID", types.EncodeHex(p.ID())))
+	p.logger.Warn("stopping peer", zap.String("peerID", types.EncodeHex(p.ID())))
 }
 
 func (p *Peer) NotifyAboutPowRequirementChange(pow float64) (err error) {
@@ -222,7 +222,7 @@ func (p *Peer) Run() error {
 		// fetch the next packet
 		packet, err := p.rw.ReadMsg()
 		if err != nil {
-			logger.Info("failed to read a message", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
+			logger.Warn("failed to read a message", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 			return err
 		}
 
@@ -280,7 +280,7 @@ func (p *Peer) handlePacket(packet p2p.Msg) error {
 	default:
 		// New message common might be implemented in the future versions of Waku.
 		// For forward compatibility, just ignore.
-		p.logger.Debug("ignored packet with message code", zap.Uint64("code", packet.Code))
+		p.logger.Warn("ignored packet with message code", zap.Uint64("code", packet.Code))
 	}
 
 	return nil
@@ -316,7 +316,7 @@ func (p *Peer) handleMessageResponseCode(packet p2p.Msg) error {
 		return fmt.Errorf("invalid response message: %v", err)
 	}
 	if resp.Version != 1 {
-		p.logger.Info("received unsupported version of MultiVersionResponse for messageResponseCode packet", zap.Uint("version", resp.Version))
+		p.logger.Warn("received unsupported version of MultiVersionResponse for messageResponseCode packet", zap.Uint("version", resp.Version))
 		return nil
 	}
 
@@ -348,7 +348,7 @@ func (p *Peer) handleP2PRequestCode(packet p2p.Msg) error {
 	if errDepReq == nil {
 		return p.host.OnDeprecatedMessagesRequest(&requestDeprecated, p)
 	}
-	p.logger.Info("failed to decode p2p request message (deprecated)", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(errDepReq))
+	p.logger.Warn("failed to decode p2p request message (deprecated)", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(errDepReq))
 
 	// As we failed to decode the request, let's set the offset
 	// to the beginning and try decode it again.
@@ -361,7 +361,7 @@ func (p *Peer) handleP2PRequestCode(packet p2p.Msg) error {
 	if errReq == nil {
 		return p.host.OnMessagesRequest(request, p)
 	}
-	p.logger.Info("failed to decode p2p request message", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(errReq))
+	p.logger.Warn("failed to decode p2p request message", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(errReq))
 
 	return errors.New("invalid p2p request message")
 }
@@ -498,7 +498,7 @@ func (p *Peer) update() {
 
 		case <-transmit.C:
 			if err := p.broadcast(); err != nil {
-				p.logger.Debug("broadcasting failed", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
+				p.logger.Warn("broadcasting failed", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 				return
 			}
 
@@ -510,7 +510,7 @@ func (p *Peer) update() {
 
 func (p *Peer) setOptions(peerOptions StatusOptions) error {
 
-	p.logger.Debug("settings options", zap.String("peerID", types.EncodeHex(p.ID())), zap.Any("Options", peerOptions))
+	p.logger.Warn("settings options", zap.String("peerID", types.EncodeHex(p.ID())), zap.Any("Options", peerOptions))
 
 	if err := peerOptions.Validate(); err != nil {
 		return fmt.Errorf("p [%x]: sent invalid options: %v", p.ID(), err)
@@ -588,7 +588,7 @@ func (p *Peer) broadcast() error {
 
 	batchHash, err := p.SendBundle(bundle)
 	if err != nil {
-		p.logger.Debug("failed to deliver envelopes", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
+		p.logger.Warn("failed to deliver envelopes", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 		return err
 	}
 
@@ -605,7 +605,7 @@ func (p *Peer) broadcast() error {
 		}
 		p.host.SendEnvelopeEvent(event)
 	}
-	p.logger.Debug("broadcasted bundles successfully", zap.String("peerID", types.EncodeHex(p.ID())), zap.Int("count", len(bundle)))
+	p.logger.Warn("broadcasted bundles successfully", zap.String("peerID", types.EncodeHex(p.ID())), zap.Int("count", len(bundle)))
 	return nil
 }
 

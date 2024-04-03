@@ -652,7 +652,7 @@ type PushNotificationQueryResponse struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Info      []*PushNotificationQueryInfo `protobuf:"bytes,1,rep,name=info,proto3" json:"info,omitempty"`
+	Warn      []*PushNotificationQueryInfo `protobuf:"bytes,1,rep,name=info,proto3" json:"info,omitempty"`
 	MessageId []byte                       `protobuf:"bytes,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
 	Success   bool                         `protobuf:"varint,3,opt,name=success,proto3" json:"success,omitempty"`
 }
@@ -691,7 +691,7 @@ func (*PushNotificationQueryResponse) Descriptor() ([]byte, []int) {
 
 func (x *PushNotificationQueryResponse) GetInfo() []*PushNotificationQueryInfo {
 	if x != nil {
-		return x.Info
+		return x.Warn
 	}
 	return nil
 }

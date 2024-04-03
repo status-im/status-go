@@ -753,7 +753,7 @@ func ValidateContactVerificationRequest(request *protobuf.RequestContactVerifica
 
 func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState, request *protobuf.RequestContactVerification, statusMessage *v1protocol.StatusMessage) error {
 	if err := ValidateContactVerificationRequest(request); err != nil {
-		m.logger.Debug("Invalid verification request", zap.Error(err))
+		m.logger.Warn("Invalid verification request", zap.Error(err))
 		return err
 	}
 
@@ -768,13 +768,13 @@ func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState
 
 	contact := state.CurrentMessageState.Contact
 	if !contact.mutual() {
-		m.logger.Debug("Received a verification request for a non added mutual contact", zap.String("contactID", contactID))
+		m.logger.Warn("Received a verification request for a non added mutual contact", zap.String("contactID", contactID))
 		return errors.New("must be a mutual contact")
 	}
 
 	persistedVR, err := m.verificationDatabase.GetVerificationRequest(id)
 	if err != nil {
-		m.logger.Debug("Error obtaining verification request", zap.Error(err))
+		m.logger.Warn("Error obtaining verification request", zap.Error(err))
 		return err
 	}
 
@@ -800,10 +800,10 @@ func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState
 
 	err = m.verificationDatabase.SaveVerificationRequest(persistedVR)
 	if err != nil {
-		m.logger.Debug("Error storing verification request", zap.Error(err))
+		m.logger.Warn("Error storing verification request", zap.Error(err))
 		return err
 	}
-	m.logger.Info("SAVED", zap.String("id", persistedVR.ID))
+	m.logger.Warn("SAVED", zap.String("id", persistedVR.ID))
 
 	err = m.SyncVerificationRequest(context.Background(), persistedVR, m.dispatchMessage)
 	if err != nil {
@@ -846,7 +846,7 @@ func ValidateAcceptContactVerification(request *protobuf.AcceptContactVerificati
 
 func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState, request *protobuf.AcceptContactVerification, statusMessage *v1protocol.StatusMessage) error {
 	if err := ValidateAcceptContactVerification(request); err != nil {
-		m.logger.Debug("Invalid AcceptContactVerification", zap.Error(err))
+		m.logger.Warn("Invalid AcceptContactVerification", zap.Error(err))
 		return err
 	}
 
@@ -859,13 +859,13 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 
 	contact := state.CurrentMessageState.Contact
 	if !contact.mutual() {
-		m.logger.Debug("Received a verification response for a non mutual contact", zap.String("contactID", contactID))
+		m.logger.Warn("Received a verification response for a non mutual contact", zap.String("contactID", contactID))
 		return errors.New("must be a mutual contact")
 	}
 
 	persistedVR, err := m.verificationDatabase.GetVerificationRequest(request.Id)
 	if err != nil {
-		m.logger.Debug("Error obtaining verification request", zap.Error(err))
+		m.logger.Warn("Error obtaining verification request", zap.Error(err))
 		return err
 	}
 
@@ -891,7 +891,7 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 
 	err = m.verificationDatabase.SaveVerificationRequest(persistedVR)
 	if err != nil {
-		m.logger.Debug("Error storing verification request", zap.Error(err))
+		m.logger.Warn("Error storing verification request", zap.Error(err))
 		return err
 	}
 
@@ -948,13 +948,13 @@ func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState
 
 	contact := state.CurrentMessageState.Contact
 	if !contact.mutual() {
-		m.logger.Debug("Received a verification decline for a non mutual contact", zap.String("contactID", contactID))
+		m.logger.Warn("Received a verification decline for a non mutual contact", zap.String("contactID", contactID))
 		return errors.New("must be a mutual contact")
 	}
 
 	persistedVR, err := m.verificationDatabase.GetVerificationRequest(request.Id)
 	if err != nil {
-		m.logger.Debug("Error obtaining verification request", zap.Error(err))
+		m.logger.Warn("Error obtaining verification request", zap.Error(err))
 		return err
 	}
 
@@ -996,7 +996,7 @@ func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState
 
 	err = m.verificationDatabase.SaveVerificationRequest(persistedVR)
 	if err != nil {
-		m.logger.Debug("Error storing verification request", zap.Error(err))
+		m.logger.Warn("Error storing verification request", zap.Error(err))
 		return err
 	}
 
@@ -1028,12 +1028,12 @@ func (m *Messenger) HandleCancelContactVerification(state *ReceivedMessageState,
 
 	persistedVR, err := m.verificationDatabase.GetVerificationRequest(request.Id)
 	if err != nil {
-		m.logger.Debug("Error obtaining verification request", zap.Error(err))
+		m.logger.Warn("Error obtaining verification request", zap.Error(err))
 		return err
 	}
 
 	if persistedVR != nil && persistedVR.RequestStatus != verification.RequestStatusPENDING {
-		m.logger.Debug("Only pending verification request can be canceled", zap.String("contactID", contactID))
+		m.logger.Warn("Only pending verification request can be canceled", zap.String("contactID", contactID))
 		return errors.New("must be a pending verification request")
 	}
 
@@ -1049,7 +1049,7 @@ func (m *Messenger) HandleCancelContactVerification(state *ReceivedMessageState,
 
 	err = m.verificationDatabase.SaveVerificationRequest(persistedVR)
 	if err != nil {
-		m.logger.Debug("Error storing verification request", zap.Error(err))
+		m.logger.Warn("Error storing verification request", zap.Error(err))
 		return err
 	}
 

@@ -48,7 +48,7 @@ func (m *Messenger) startBackupLoop() {
 					continue
 				}
 				if !enabled {
-					m.logger.Debug("backup not enabled, skipping")
+					m.logger.Warn("backup not enabled, skipping")
 					continue
 				}
 
@@ -60,10 +60,10 @@ func (m *Messenger) startBackupLoop() {
 
 				now := time.Now().Unix()
 				if uint64(now) <= backupIntervalSeconds+lastBackup {
-					m.logger.Debug("not backing up")
+					m.logger.Warn("not backing up")
 					continue
 				}
-				m.logger.Debug("backing up data")
+				m.logger.Warn("backing up data")
 
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 				defer cancel()

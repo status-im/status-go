@@ -168,7 +168,7 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 			identityStr := PublicKeyToStr(pk)
 			rawFilter, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey, true)
 			if err != nil {
-				f.logger.Debug("could not register community filter", zap.Error(err))
+				f.logger.Warn("could not register community filter", zap.Error(err))
 				return nil, err
 
 			}
@@ -185,7 +185,7 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 
 			f.filters[filterID] = filter
 
-			f.logger.Debug("registering filter for", zap.String("chatID", filterID), zap.String("type", "community"), zap.String("topic", rawFilter.Topic.String()))
+			f.logger.Warn("registering filter for", zap.String("chatID", filterID), zap.String("type", "community"), zap.String("topic", rawFilter.Topic.String()))
 
 			filters = append(filters, filter)
 		}
@@ -386,7 +386,7 @@ func (f *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 	// but we discard envelopes if listen is false.
 	filter, err := f.addAsymmetric(chatID, "", identity, listen)
 	if err != nil {
-		f.logger.Debug("could not register personal topic filter", zap.Error(err))
+		f.logger.Warn("could not register personal topic filter", zap.Error(err))
 		return nil, err
 	}
 
@@ -401,7 +401,7 @@ func (f *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 
 	f.filters[chatID] = chat
 
-	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "personal"), zap.String("topic", filter.Topic.String()))
+	f.logger.Warn("registering filter for", zap.String("chatID", chatID), zap.String("type", "personal"), zap.String("topic", filter.Topic.String()))
 
 	return chat, nil
 
@@ -424,7 +424,7 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 	// but we discard envelopes if listen is false.
 	filter, err := f.addAsymmetric(chatID, "", identity, listen)
 	if err != nil {
-		f.logger.Debug("could not register partitioned topic", zap.String("chatID", chatID), zap.Error(err))
+		f.logger.Warn("could not register partitioned topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
 	}
 
@@ -440,7 +440,7 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 
 	f.filters[chatID] = chat
 
-	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "partitioned"), zap.String("topic", filter.Topic.String()))
+	f.logger.Warn("registering filter for", zap.String("chatID", chatID), zap.String("type", "partitioned"), zap.String("topic", filter.Topic.String()))
 
 	return chat, nil
 }
@@ -459,7 +459,7 @@ func (f *FiltersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter,
 	keyString := hex.EncodeToString(secret.Key)
 	filter, err := f.addSymmetric(keyString, "")
 	if err != nil {
-		f.logger.Debug("could not register negotiated topic", zap.Error(err))
+		f.logger.Warn("could not register negotiated topic", zap.Error(err))
 		return nil, err
 	}
 
@@ -476,7 +476,7 @@ func (f *FiltersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter,
 
 	f.filters[chat.ChatID] = chat
 
-	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "negotiated"), zap.String("topic", filter.Topic.String()))
+	f.logger.Warn("registering filter for", zap.String("chatID", chatID), zap.String("type", "negotiated"), zap.String("topic", filter.Topic.String()))
 
 	return chat, nil
 }
@@ -515,7 +515,7 @@ func (f *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 
 	discoveryResponse, err := f.addAsymmetric(personalDiscoveryChat.ChatID, personalDiscoveryChat.PubsubTopic, f.privateKey, true)
 	if err != nil {
-		f.logger.Debug("could not register discovery topic", zap.String("chatID", personalDiscoveryChat.ChatID), zap.Error(err))
+		f.logger.Warn("could not register discovery topic", zap.String("chatID", personalDiscoveryChat.ChatID), zap.Error(err))
 		return nil, err
 	}
 
@@ -524,7 +524,7 @@ func (f *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 
 	f.filters[personalDiscoveryChat.ChatID] = personalDiscoveryChat
 
-	f.logger.Debug("registering filter for", zap.String("chatID", personalDiscoveryChat.ChatID), zap.String("type", "discovery"), zap.String("topic", personalDiscoveryChat.ContentTopic.String()))
+	f.logger.Warn("registering filter for", zap.String("chatID", personalDiscoveryChat.ChatID), zap.String("type", "discovery"), zap.String("topic", personalDiscoveryChat.ContentTopic.String()))
 
 	return []*Filter{personalDiscoveryChat}, nil
 }
@@ -546,7 +546,7 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 
 	filterAndTopic, err := f.addSymmetric(chatID, pubsubTopic)
 	if err != nil {
-		f.logger.Debug("could not register public chat topic", zap.String("chatID", chatID), zap.Error(err))
+		f.logger.Warn("could not register public chat topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
 	}
 
@@ -562,7 +562,7 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 
 	f.filters[chatID] = chat
 
-	f.logger.Debug("registering filter for",
+	f.logger.Warn("registering filter for",
 		zap.String("chatID", chatID),
 		zap.String("type", "public"),
 		zap.String("ContentTopic", filterAndTopic.Topic.String()),
@@ -585,7 +585,7 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 
 	contactCodeFilter, err := f.addSymmetric(chatID, "")
 	if err != nil {
-		f.logger.Debug("could not register contact code topic", zap.String("chatID", chatID), zap.Error(err))
+		f.logger.Warn("could not register contact code topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
 	}
 
@@ -600,7 +600,7 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 
 	f.filters[chatID] = chat
 
-	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "contact-code"), zap.String("topic", contactCodeFilter.Topic.String()))
+	f.logger.Warn("registering filter for", zap.String("chatID", chatID), zap.String("type", "contact-code"), zap.String("topic", contactCodeFilter.Topic.String()))
 
 	return chat, nil
 }

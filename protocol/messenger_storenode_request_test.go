@@ -164,7 +164,7 @@ func (s *MessengerStoreNodeRequestSuite) createStore() {
 
 	s.wakuStoreNode = NewTestWakuV2(&s.Suite, cfg)
 	s.storeNodeAddress = s.wakuListenAddress(s.wakuStoreNode)
-	s.logger.Info("store node ready", zap.String("address", s.storeNodeAddress))
+	s.logger.Warn("store node ready", zap.String("address", s.storeNodeAddress))
 }
 
 func (s *MessengerStoreNodeRequestSuite) tearDownOwner() {
@@ -335,7 +335,7 @@ func (s *MessengerStoreNodeRequestSuite) setupEnvelopesWatcher(wakuNode *waku2.W
 				}
 				envelope := wakuNode.GetEnvelope(envelopeEvent.Hash)
 				cb(envelope)
-				s.logger.Debug("envelope available event for fetched content topic",
+				s.logger.Warn("envelope available event for fetched content topic",
 					zap.Any("envelopeEvent", envelopeEvent),
 					zap.Any("envelope", envelope),
 				)
@@ -390,7 +390,7 @@ func (s *MessengerStoreNodeRequestSuite) ensureStoreNodeEnvelopes(contentTopic *
 	result, err := s.wakuStoreNode.StoreNode().Query(context.Background(), query, queryOptions...)
 	s.Require().NoError(err)
 	s.Require().GreaterOrEqual(len(result.Messages), minimumCount)
-	s.logger.Debug("store node query result", zap.Int("messagesCount", len(result.Messages)))
+	s.logger.Warn("store node query result", zap.Int("messagesCount", len(result.Messages)))
 }
 
 func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityInfo() {
@@ -1224,9 +1224,9 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 	s.createOwner()
 	s.createBob()
 
-	s.logger.Debug("store node info", zap.String("peerID", s.wakuStoreNode.PeerID().String()))
-	s.logger.Debug("owner node info", zap.String("peerID", gethbridge.GetGethWakuV2From(s.ownerWaku).PeerID().String()))
-	s.logger.Debug("bob node info", zap.String("peerID", gethbridge.GetGethWakuV2From(s.bobWaku).PeerID().String()))
+	s.logger.Warn("store node info", zap.String("peerID", s.wakuStoreNode.PeerID().String()))
+	s.logger.Warn("owner node info", zap.String("peerID", gethbridge.GetGethWakuV2From(s.ownerWaku).PeerID().String()))
+	s.logger.Warn("bob node info", zap.String("peerID", gethbridge.GetGethWakuV2From(s.bobWaku).PeerID().String()))
 
 	// Connect to store node to force "online" status
 	{

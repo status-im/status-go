@@ -100,7 +100,7 @@ func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 	faviconPath := GetFavicon(bodyBytes)
 	t, err := fetchImage(u.logger, u.httpClient, faviconPath, false)
 	if err != nil {
-		u.logger.Info("failed to fetch favicon", zap.String("url", u.url.String()), zap.Error(err))
+		u.logger.Warn("failed to fetch favicon", zap.String("url", u.url.String()), zap.Error(err))
 	} else {
 		preview.Favicon.DataURI = t.DataURI
 	}
@@ -116,7 +116,7 @@ func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 		if err != nil {
 			// Given we want to fetch thumbnails on a best-effort basis, if an error
 			// happens we simply log it.
-			u.logger.Info("failed to fetch thumbnail", zap.String("url", u.url.String()), zap.Error(err))
+			u.logger.Warn("failed to fetch thumbnail", zap.String("url", u.url.String()), zap.Error(err))
 		} else {
 			preview.Thumbnail = t
 		}

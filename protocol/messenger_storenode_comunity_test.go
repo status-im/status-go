@@ -223,7 +223,7 @@ func (s *MessengerStoreNodeCommunitySuite) setupEnvelopesWatcher(wakuNode *waku2
 				}
 				envelope := wakuNode.GetEnvelope(envelopeEvent.Hash)
 				cb(envelope)
-				s.logger.Debug("envelope available event for fetched content topic",
+				s.logger.Warn("envelope available event for fetched content topic",
 					zap.Any("envelopeEvent", envelopeEvent),
 					zap.Any("envelope", envelope),
 				)

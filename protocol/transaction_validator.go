@@ -52,7 +52,7 @@ func NewTransactionValidator(addresses []types.Address, persistence *sqlitePersi
 	for _, a := range addresses {
 		addressesMap[strings.ToLower(a.Hex())] = true
 	}
-	logger.Debug("Checking addresses", zap.Any("addrse", addressesMap))
+	logger.Warn("Checking addresses", zap.Any("addrse", addressesMap))
 
 	return &TransactionValidator{
 		persistence: persistence,
@@ -216,11 +216,11 @@ func (t *TransactionValidator) validateTransaction(ctx context.Context, message 
 	}
 
 	if len(message.Data()) != 0 {
-		t.logger.Debug("Validating token")
+		t.logger.Warn("Validating token")
 		return t.validateTokenTransfer(parameters, message)
 	}
 
-	t.logger.Debug("Validating eth")
+	t.logger.Warn("Validating eth")
 	return t.validateEthereumTransfer(parameters, message)
 }
 
@@ -229,17 +229,17 @@ func (t *TransactionValidator) ValidateTransactions(ctx context.Context) ([]*Ver
 		return nil, nil
 	}
 	var response []*VerifyTransactionResponse
-	t.logger.Debug("Started validating transactions")
+	t.logger.Warn("Started validating transactions")
 	transactions, err := t.persistence.TransactionsToValidate()
 	if err != nil {
 		return nil, err
 	}
 
-	t.logger.Debug("Transactions to validated", zap.Any("transactions", transactions))
+	t.logger.Warn("Transactions to validated", zap.Any("transactions", transactions))
 
 	for _, transaction := range transactions {
 		var validationResult *VerifyTransactionResponse
-		t.logger.Debug("Validating transaction", zap.Any("transaction", transaction))
+		t.logger.Warn("Validating transaction", zap.Any("transaction", transaction))
 		if transaction.CommandID != "" {
 			chatID := contactIDFromPublicKey(transaction.From)
 			message, err := t.persistence.MessageByCommandID(chatID, transaction.CommandID)
@@ -248,7 +248,7 @@ func (t *TransactionValidator) ValidateTransactions(ctx context.Context) ([]*Ver
 				return nil, err
 			}
 			if message == nil {
-				t.logger.Info("No message found, ignoring transaction")
+				t.logger.Warn("No message found, ignoring transaction")
 				// This is not a valid case, ignore transaction
 				transaction.Validate = false
 				transaction.RetryCount++
@@ -281,7 +281,7 @@ func (t *TransactionValidator) ValidateTransactions(ctx context.Context) ([]*Ver
 		}
 
 		if validationResult.Pending {
-			t.logger.Debug("Pending transaction skipping")
+			t.logger.Warn("Pending transaction skipping")
 			// Check if we should stop updating
 			continue
 		}
@@ -295,10 +295,10 @@ func (t *TransactionValidator) ValidateTransactions(ctx context.Context) ([]*Ver
 		}
 
 		if !validationResult.Valid {
-			t.logger.Debug("Transaction not valid")
+			t.logger.Warn("Transaction not valid")
 			continue
 		}
-		t.logger.Debug("Transaction valid")
+		t.logger.Warn("Transaction valid")
 		validationResult.Transaction = transaction
 		response = append(response, validationResult)
 	}
@@ -306,7 +306,7 @@ func (t *TransactionValidator) ValidateTransactions(ctx context.Context) ([]*Ver
 }
 
 func (t *TransactionValidator) ValidateTransaction(ctx context.Context, parameters *common.CommandParameters, from *ecdsa.PublicKey) (*VerifyTransactionResponse, error) {
-	t.logger.Debug("validating transaction", zap.Any("transaction", parameters), zap.Any("from", from))
+	t.logger.Warn("validating transaction", zap.Any("transaction", parameters), zap.Any("from", from))
 	hash := parameters.TransactionHash
 	c, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -317,7 +317,7 @@ func (t *TransactionValidator) ValidateTransaction(ctx context.Context, paramete
 	}
 	switch status {
 	case coretypes.TransactionStatusPending:
-		t.logger.Debug("Transaction pending")
+		t.logger.Warn("Transaction pending")
 		return &VerifyTransactionResponse{Pending: true}, nil
 	case coretypes.TransactionStatusFailed:
 
