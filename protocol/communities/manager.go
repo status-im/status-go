@@ -1937,6 +1937,10 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 }
 
 func (m *Manager) signEvents(community *Community) error {
+	if community == nil || community.config == nil || community.config.EventsData == nil {
+		m.logger.Warn("no events data")
+		return nil
+	}
 	for i := range community.config.EventsData.Events {
 		communityEvent := &community.config.EventsData.Events[i]
 		if communityEvent.Signature == nil || len(communityEvent.Signature) == 0 {

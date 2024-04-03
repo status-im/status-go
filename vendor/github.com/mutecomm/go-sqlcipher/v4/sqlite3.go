@@ -1673,6 +1673,8 @@ func (d *SQLiteDriver) Open(dsn string) (driver.Conn, error) {
 
 // Close the connection.
 func (c *SQLiteConn) Close() error {
+	fmt.Println("CALLLED CLOSE")
+	printStackTrace()
 	rv := C.sqlite3_close_v2(c.db)
 	if rv != C.SQLITE_OK {
 		return c.lastError()
@@ -2131,4 +2133,10 @@ func (rc *SQLiteRows) nextSyncLocked(dest []driver.Value) error {
 		}
 	}
 	return nil
+}
+
+func printStackTrace() {
+	buf := make([]byte, 1<<16)
+	stackSize := runtime.Stack(buf, true)
+	fmt.Printf("=== BEGIN STACK TRACE ===\n%s\n=== END STACK TRACE ===\n", buf[:stackSize])
 }
