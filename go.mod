@@ -84,6 +84,7 @@ require (
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/jellydator/ttlcache/v3 v3.1.0
 	github.com/jmoiron/sqlx v1.3.5
+	github.com/klauspost/reedsolomon v1.12.1
 	github.com/ladydascalie/currency v1.6.0
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.2
@@ -177,7 +178,7 @@ require (
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
-	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
+	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/koron/go-ssdp v0.0.4 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
@@ -279,7 +280,7 @@ require (
 	go.uber.org/fx v1.20.0 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/term v0.11.0 // indirect
 	golang.org/x/tools v0.12.1-0.20230818130535-1517d1a3ba60 // indirect
 	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f // indirect
