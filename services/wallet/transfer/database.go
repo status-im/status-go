@@ -562,8 +562,8 @@ func markBlocksAsLoaded(chainID uint64, creator statementCreator, address common
 }
 
 // GetOwnedMultiTransactionID returns sql.ErrNoRows if no transaction is found for the given identity
-func GetOwnedMultiTransactionID(tx *sql.Tx, chainID w_common.ChainID, id common.Hash, address common.Address) (mTID int64, err error) {
-	row := tx.QueryRow(`SELECT COALESCE(multi_transaction_id, 0) FROM transfers WHERE network_id = ? AND hash = ? AND address = ?`, chainID, id, address)
+func GetOwnedMultiTransactionID(tx *sql.Tx, chainID w_common.ChainID, hash common.Hash, address common.Address) (mTID int64, err error) {
+	row := tx.QueryRow(`SELECT COALESCE(multi_transaction_id, 0) FROM transfers WHERE network_id = ? AND tx_hash = ? AND address = ?`, chainID, hash, address)
 	err = row.Scan(&mTID)
 	if err != nil {
 		return 0, err
