@@ -12,4 +12,8 @@ message SegmentMessage {
   uint32 segments_count = 3;
   // The payload data for this particular segment
   bytes payload = 4;
+  // Index of this parity segment
+  uint32 parity_segment_index = 5;
+  // Total number of parity segments
+  uint32 parity_segments_count = 6;
 }

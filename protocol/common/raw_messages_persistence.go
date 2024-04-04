@@ -347,33 +347,46 @@ func (db *RawMessagesPersistence) IsMessageAlreadyCompleted(hash []byte) (bool, 
 	return alreadyCompleted > 0, nil
 }
 
-func (db *RawMessagesPersistence) SaveMessageSegment(segment *protobuf.SegmentMessage, sigPubKey *ecdsa.PublicKey, timestamp int64) error {
+func (db *RawMessagesPersistence) SaveMessageSegment(segment *SegmentMessage, sigPubKey *ecdsa.PublicKey, timestamp int64) error {
 	sigPubKeyBlob := crypto.CompressPubkey(sigPubKey)
 
-	_, err := db.db.Exec("INSERT INTO message_segments (hash, segment_index, segments_count, sig_pub_key, payload, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
-		segment.EntireMessageHash, segment.Index, segment.SegmentsCount, sigPubKeyBlob, segment.Payload, timestamp)
+	_, err := db.db.Exec("INSERT INTO message_segments (hash, segment_index, segments_count, parity_segment_index, parity_segments_count, sig_pub_key, payload, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		segment.EntireMessageHash, segment.Index, segment.SegmentsCount, segment.ParitySegmentIndex, segment.ParitySegmentsCount, sigPubKeyBlob, segment.Payload, timestamp)
 
 	return err
 }
 
 // Get ordered message segments for given hash
-func (db *RawMessagesPersistence) GetMessageSegments(hash []byte, sigPubKey *ecdsa.PublicKey) ([]*protobuf.SegmentMessage, error) {
+func (db *RawMessagesPersistence) GetMessageSegments(hash []byte, sigPubKey *ecdsa.PublicKey) ([]*SegmentMessage, error) {
 	sigPubKeyBlob := crypto.CompressPubkey(sigPubKey)
 
-	rows, err := db.db.Query("SELECT hash, segment_index, segments_count, payload FROM message_segments WHERE hash = ? AND sig_pub_key = ? ORDER BY segment_index", hash, sigPubKeyBlob)
+	rows, err := db.db.Query(`
+		SELECT
+			hash, segment_index, segments_count, parity_segment_index, parity_segments_count, payload
+		FROM
+			message_segments
+		WHERE
+			hash = ? AND sig_pub_key = ?
+		ORDER BY
+			(segments_count = 0) ASC, -- Prioritize segments_count > 0
+			segment_index ASC,
+			parity_segment_index ASC`,
+		hash, sigPubKeyBlob)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var segments []*protobuf.SegmentMessage
+	var segments []*SegmentMessage
 	for rows.Next() {
-		var segment protobuf.SegmentMessage
-		err := rows.Scan(&segment.EntireMessageHash, &segment.Index, &segment.SegmentsCount, &segment.Payload)
+		segment := &SegmentMessage{
+			SegmentMessage: &protobuf.SegmentMessage{},
+		}
+		err := rows.Scan(&segment.EntireMessageHash, &segment.Index, &segment.SegmentsCount, &segment.ParitySegmentIndex, &segment.ParitySegmentsCount, &segment.Payload)
 		if err != nil {
 			return nil, err
 		}
-		segments = append(segments, &segment)
+		segments = append(segments, segment)
 	}
 	err = rows.Err()
 	if err != nil {
