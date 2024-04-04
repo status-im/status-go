@@ -341,6 +341,7 @@ func (c *transfersCommand) confirmPendingTransactions(tx *sql.Tx, allTransfers [
 					continue
 				} else if err != nil {
 					log.Warn("GetOwnedMultiTransactionID", "error", err)
+				existingMTID, err := GetOwnedMultiTransactionID(tx, chainID, txHash, tr.Address)
 					continue
 				}
 				mTID = w_common.NewAndSet(existingMTID)
