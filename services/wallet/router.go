@@ -99,6 +99,10 @@ func (s SendType) isTransfer() bool {
 	return s == Transfer || s.IsCollectiblesTransfer()
 }
 
+func (s SendType) needL1Fee() bool {
+	return s != ENSRegister && s != ENSRelease && s != ENSSetPubKey && s != StickersBuy
+}
+
 func (s SendType) isAvailableBetween(from, to *params.Network) bool {
 	if s.IsCollectiblesTransfer() {
 		return from.ChainID == to.ChainID
@@ -713,13 +717,16 @@ func (r *Router) suggestedRoutes(
 						continue
 					}
 
-					tx, err := bridge.BuildTx(network, addrFrom, addrTo, token, amountIn)
-					if err != nil {
-						continue
-					}
+					var l1GasFeeWei uint64 = 0
+					if sendType.needL1Fee() {
+						tx, err := bridge.BuildTx(network, addrFrom, addrTo, token, amountIn)
+						if err != nil {
+							continue
+						}
 
-					l1GasFeeWei, _ := r.s.feesManager.getL1Fee(ctx, network.ChainID, tx)
-					l1GasFeeWei += l1ApprovalFee
+						l1GasFeeWei, _ = r.s.feesManager.getL1Fee(ctx, network.ChainID, tx)
+						l1GasFeeWei += l1ApprovalFee
+					}
 					gasFees.L1GasFee = weiToGwei(big.NewInt(int64(l1GasFeeWei)))
 
 					requiredNativeBalance := new(big.Int).Mul(gweiToWei(maxFees), big.NewInt(int64(gasLimit)))
