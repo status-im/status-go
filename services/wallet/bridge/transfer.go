@@ -87,12 +87,36 @@ func (s *TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *par
 
 func (s *TransferBridge) BuildTx(network *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int) (*ethTypes.Transaction, error) {
 	toAddr := types.Address(toAddress)
+	if strings.EqualFold(token.Symbol, "ETH") {
+		sendArgs := &TransactionBridge{
+			TransferTx: &transactions.SendTxArgs{
+				From:  types.Address(fromAddress),
+				To:    &toAddr,
+				Value: (*hexutil.Big)(amountIn),
+				Data:  types.HexBytes("0x0"),
+			},
+			ChainID: network.ChainID,
+		}
+
+		return s.BuildTransaction(sendArgs)
+	}
+	abi, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
+	if err != nil {
+		return nil, err
+	}
+	input, err := abi.Pack("transfer",
+		toAddress,
+		amountIn,
+	)
+	if err != nil {
+		return nil, err
+	}
 	sendArgs := &TransactionBridge{
 		TransferTx: &transactions.SendTxArgs{
 			From:  types.Address(fromAddress),
 			To:    &toAddr,
-			Value: (*hexutil.Big)(amountIn),
-			Data:  types.HexBytes("0x0"),
+			Value: (*hexutil.Big)(big.NewInt(0)),
+			Data:  input,
 		},
 		ChainID: network.ChainID,
 	}
