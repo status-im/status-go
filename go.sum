@@ -1997,8 +1997,8 @@ github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4/go.mod h1:hmpnZ
 github.com/status-im/keycard-go v0.0.0-20190316090335-8537d3370df4/go.mod h1:RZLeN1LMWmRsyYjvAu+I6Dm9QmlDaIIt+Y+4Kd7Tp+Q=
 github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969 h1:Oo2KZNP70KE0+IUJSidPj/BFS/RXNHmKIJOdckzml2E=
 github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969/go.mod h1:RZLeN1LMWmRsyYjvAu+I6Dm9QmlDaIIt+Y+4Kd7Tp+Q=
-github.com/status-im/markdown v0.0.0-20231114210825-6c2d15b5dc57 h1:AuJFXERIFVzUjf9rrTb8vamFubB6Ks/e8aUasDr4pOM=
-github.com/status-im/markdown v0.0.0-20231114210825-6c2d15b5dc57/go.mod h1:5rjPyv3KffPNVbFjnsVy0NGj9+JeW40WvXLdxH1VKuE=
+github.com/status-im/markdown v0.0.0-20240404192634-b7e33c6ac3d4 h1:KBeXtOoisXjiSCkNVmZcq15kK4NmSi4p1hyZeUcT5dY=
+github.com/status-im/markdown v0.0.0-20240404192634-b7e33c6ac3d4/go.mod h1:5rjPyv3KffPNVbFjnsVy0NGj9+JeW40WvXLdxH1VKuE=
 github.com/status-im/migrate/v4 v4.6.2-status.3 h1:Khwjb59NzniloUr5i9s9AtkEyqBbQFt1lkoAu66sAu0=
 github.com/status-im/migrate/v4 v4.6.2-status.3/go.mod h1:c/kc90n47GZu/58nnz1OMLTf7uE4Da4gZP5qmU+A/v8=
 github.com/status-im/mvds v0.0.27-0.20240111144448-92d364e4be82 h1:A7jtwOlDMUGUPx5tTwUPewMoIprvo9oN9kU0H1CP+FQ=
