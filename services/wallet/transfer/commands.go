@@ -322,6 +322,20 @@ func (c *transfersCommand) saveAndConfirmPending(allTransfers []Transfer, blockN
 	return resErr
 }
 
+func externalTransactionOrError(err error, mTID int64) bool {
+	if err == sql.ErrNoRows {
+		// External transaction downloaded, ignore it
+		return true
+	} else if err != nil {
+		log.Warn("GetOwnedMultiTransactionID", "error", err)
+		return true
+	} else if mTID <= 0 {
+		// Existing external transaction, ignore it
+		return true
+	}
+	return false
+}
+
 func (c *transfersCommand) confirmPendingTransactions(tx *sql.Tx, allTransfers []Transfer) (notifyFunctions []func()) {
 	notifyFunctions = make([]func(), 0)
 
@@ -335,17 +349,11 @@ func (c *transfersCommand) confirmPendingTransactions(tx *sql.Tx, allTransfers [
 				continue
 			} else {
 				// Outside transaction, already confirmed by another duplicate or not yet downloaded
-				existingMTID, err := GetOwnedMultiTransactionID(tx, chainID, tr.ID, tr.Address)
-				if err == sql.ErrNoRows || existingMTID == 0 {
-					// Outside transaction, ignore it
-					continue
-				} else if err != nil {
-					log.Warn("GetOwnedMultiTransactionID", "error", err)
 				existingMTID, err := GetOwnedMultiTransactionID(tx, chainID, txHash, tr.Address)
+				if externalTransactionOrError(err, existingMTID) {
 					continue
 				}
 				mTID = w_common.NewAndSet(existingMTID)
-
 			}
 		} else if err != nil {
 			log.Warn("GetOwnedPendingStatus", "error", err)
