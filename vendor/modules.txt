@@ -461,9 +461,12 @@ github.com/klauspost/compress/internal/cpuinfo
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-# github.com/klauspost/cpuid/v2 v2.2.5
+# github.com/klauspost/cpuid/v2 v2.2.7
 ## explicit; go 1.15
 github.com/klauspost/cpuid/v2
+# github.com/klauspost/reedsolomon v1.12.1
+## explicit; go 1.18
+github.com/klauspost/reedsolomon
 # github.com/koron/go-ssdp v0.0.4
 ## explicit; go 1.19
 github.com/koron/go-ssdp
@@ -1238,11 +1241,10 @@ golang.org/x/net/route
 ## explicit; go 1.17
 golang.org/x/sync/errgroup
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.11.0
-## explicit; go 1.17
+# golang.org/x/sys v0.18.0
+## explicit; go 1.18
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
-golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
