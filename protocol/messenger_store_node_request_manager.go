@@ -79,7 +79,9 @@ func (m *StoreNodeRequestManager) FetchCommunity(community communities.Community
 
 	m.logger.Info("requesting community from store node",
 		zap.Any("community", community),
-		zap.Any("config", cfg))
+		zap.Any("config", cfg),
+		zap.Stack("stack"),
+	)
 
 	requestCommunity := func(communityID string, shard *shard.Shard) (*communities.Community, StoreNodeRequestStats, error) {
 		channel, err := m.subscribeToRequest(storeNodeCommunityRequest, communityID, shard, cfg)

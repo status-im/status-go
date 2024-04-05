@@ -938,7 +938,7 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 }
 
 func (m *Manager) ReevaluateMembersWrapper(community *Community) (roles map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, err error) {
-	logger := m.logger.Named("---ReevaluateMembers").With(zap.String("name", community.Name()), zap.String("communityID", community.IDString()), zap.Uint64("clock", community.Clock()))
+	logger := m.logger.With(zap.String("logger", "---ReevaluateMembers")).With(zap.String("name", community.Name()), zap.String("communityID", community.IDString()), zap.Uint64("clock", community.Clock()))
 	logger.Debug("START", zap.Stack("stack"))
 	defer func() {
 		logger.Debug("END", zap.Error(err))
@@ -961,7 +961,7 @@ func (m *Manager) ReevaluateMembers(community *Community, logger *zap.Logger) (m
 	logger.Debug("Loop members", zap.Int("membersCount", len(community.Members())))
 
 	for memberKey := range community.Members() {
-		memberLogger := logger.Named("ForMember").With(zap.String("memberKey", memberKey))
+		memberLogger := logger.With(zap.String("logger", "---ForMember")).With(zap.String("memberKey", memberKey))
 
 		memberPubKey, err := common.HexToPubkey(memberKey)
 		if err != nil {
@@ -1049,7 +1049,7 @@ func (m *Manager) ReevaluateMembers(community *Community, logger *zap.Logger) (m
 
 		// Validate channel permissions
 		for channelID, channel := range community.Chats() {
-			channelLogger := memberLogger.Named("ForChannel").With(zap.String("channelName", channel.Identity.DisplayName))
+			channelLogger := memberLogger.With(zap.String("logger", "---ForChannel")).With(zap.String("channelName", channel.Identity.DisplayName))
 			chatID := community.ChatID(channelID)
 
 			viewOnlyPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
@@ -2949,7 +2949,7 @@ type CheckChannelViewAndPostPermissionsResult struct {
 }
 
 func (m *Manager) checkChannelPermissions(viewOnlyPermissions []*CommunityTokenPermission, viewAndPostPermissions []*CommunityTokenPermission, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckChannelPermissionsResponse, error) {
-	logger := m.logger.Named("---checkChannelPermissions")
+	logger := m.logger.With(zap.String("logger", "---checkChannelPermissions"))
 	logger.Debug("stacktrace", zap.Stack("stack"))
 
 	response := &CheckChannelPermissionsResponse{
