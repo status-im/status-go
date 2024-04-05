@@ -30,7 +30,7 @@ type SuggestedFees struct {
 	MaxFeePerGasLow      *big.Float `json:"maxFeePerGasLow"`
 	MaxFeePerGasMedium   *big.Float `json:"maxFeePerGasMedium"`
 	MaxFeePerGasHigh     *big.Float `json:"maxFeePerGasHigh"`
-	L1GasFee             *big.Float `json:"l1GasFee"`
+	L1GasFee             *big.Float `json:"l1GasFee,omitempty"`
 	EIP1559Enabled       bool       `json:"eip1559Enabled"`
 }
 
