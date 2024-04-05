@@ -663,7 +663,7 @@ func (s *Service) fetchCommunity(communityID string, fetchLatest bool) (*communi
 		_, err := s.messenger.FetchCommunity(&protocol.FetchCommunityRequest{
 			CommunityKey:    communityID,
 			Shard:           shard,
-			TryDatabase:     false,
+			TryDatabase:     true,
 			WaitForResponse: true,
 		})
 		if err != nil {
