@@ -2,8 +2,10 @@ package profiling
 
 import (
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime/pprof"
+	"syscall"
 )
 
 // CPUFilename is a filename in which the CPU profiling is stored.
@@ -15,6 +17,8 @@ var cpuFile *os.File
 // the profile will be buffered and written to the file in folder dataDir.
 func StartCPUProfile(dataDir string) error {
 	if cpuFile == nil {
+		signal.Notify(make(chan os.Signal), syscall.SIGPROF) // enable profiling for shared libraries
+
 		var err error
 		cpuFile, err = os.Create(filepath.Join(dataDir, CPUFilename))
 		if err != nil {

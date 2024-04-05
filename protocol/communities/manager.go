@@ -33,6 +33,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/common/shard"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
@@ -937,9 +938,38 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 	return community, changes, nil
 }
 
+var _startProfilingOnce sync.Once
+var _stopProfilingOnce sync.Once
+
 func (m *Manager) ReevaluateMembersWrapper(community *Community) (roles map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, err error) {
 	logger := m.logger.With(zap.String("logger", "---ReevaluateMembers")).With(zap.String("name", community.Name()), zap.String("communityID", community.IDString()), zap.Uint64("clock", community.Clock()))
 	logger.Debug("START", zap.Stack("stack"))
+	if community.Name() == "Status" {
+		_startProfilingOnce.Do(func() {
+			cwd, err := os.Getwd()
+			if err != nil {
+				logger.Error("can't get cwd", zap.Error(err))
+				return
+			}
+			err = profiling.StartCPUProfile(cwd)
+			if err != nil {
+				logger.Error("can't start cpu profiling", zap.Error(err))
+				return
+			}
+			logger.Debug("started profiling", zap.String("dir", cwd))
+		})
+
+		defer func() {
+			_stopProfilingOnce.Do(func() {
+				err = profiling.StopCPUProfile()
+				if err != nil {
+					logger.Error("can't stop cpu profiling", zap.Error(err))
+					return
+				}
+				logger.Debug("stopped profiling")
+			})
+		}()
+	}
 	defer func() {
 		logger.Debug("END", zap.Error(err))
 	}()
