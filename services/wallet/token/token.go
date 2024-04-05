@@ -721,7 +721,9 @@ func (tm *Manager) GetBalancesAtByChain(parent context.Context, clients map[uint
 				fetchChainBalance = true
 			}
 		}
+		log.Info("ChECKING FERIN")
 		if fetchChainBalance {
+			log.Info("ChECKING FERIN chain")
 			group.Add(func(parent context.Context) error {
 				ctx, cancel := context.WithTimeout(parent, requestTimeout)
 				defer cancel()

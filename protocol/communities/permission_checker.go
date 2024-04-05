@@ -221,6 +221,8 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 	for chainID, tokens := range erc20TokenRequirements {
 		erc20ChainIDsMap[chainID] = true
 		for contractAddress := range tokens {
+			p.logger.Info("adding", zap.String("contract address", contractAddress))
+			p.logger.Info("adding", zap.String("contract address 2", gethcommon.HexToAddress(contractAddress).String()))
 			erc20TokenAddresses = append(erc20TokenAddresses, gethcommon.HexToAddress(contractAddress))
 		}
 	}
@@ -357,7 +359,13 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 					contractAddress := gethcommon.HexToAddress(address)
 					for account := range ownedERC20TokenBalances[chainID] {
 						p.logger.Info("checking token erc20 3", zap.Any("chain-id", chainID), zap.Any("address", address), zap.Any("account", account))
+						p.logger.Info("owned",
+							zap.Any("accuont", account),
+							zap.Any("owned", ownedERC20TokenBalances[chainID]),
+							zap.Any("owned", ownedERC20TokenBalances[chainID][account]),
+							zap.Any("owned", ownedERC20TokenBalances[chainID][contractAddress]))
 						if _, exists := ownedERC20TokenBalances[chainID][account][contractAddress]; !exists {
+							p.logger.Info("not exist", zap.Any("account", account))
 							continue
 						}
 
@@ -376,6 +384,7 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 						// satisfies required amount
 						prevBalance := accumulatedBalance
 						accumulatedBalance.Add(prevBalance, value.ToInt())
+						p.logger.Info("accbalance", zap.Any("account", account), zap.String("acc balance", accumulatedBalance.String()))
 
 						requiredAmount, success := new(big.Int).SetString(tokenRequirement.AmountInWei, 10)
 						if !success {
