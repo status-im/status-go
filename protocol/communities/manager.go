@@ -2416,29 +2416,37 @@ func (m *Manager) accountsSatisfyPermissionsToJoinChannels(community *Community,
 	accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(accounts)
 
 	for channelID, channel := range community.config.CommunityDescription.Chats {
+		m.logger.Info("checking permissions for", zap.String("channel-id", channelID))
 		channelViewOnlyPermissions := community.ChannelTokenPermissionsByType(community.IDString()+channelID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
 		channelViewAndPostPermissions := community.ChannelTokenPermissionsByType(community.IDString()+channelID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
 		channelPermissions := append(channelViewOnlyPermissions, channelViewAndPostPermissions...)
+		m.logger.Info("channel view-only", zap.Any("view-only", channelViewOnlyPermissions))
+		m.logger.Info("channel view-and-post", zap.Any("view-only", channelViewAndPostPermissions))
 
 		if len(channelPermissions) == 0 {
+			m.logger.Info("no chanel permissions")
 			viewAndPostChats[channelID] = channel
 			continue
 		}
 
 		permissionResponse, err := m.PermissionChecker.CheckPermissions(channelPermissions, accountsAndChainIDs, true)
 		if err != nil {
+			m.logger.Error("channel permisisons failed to check", zap.Error(err))
 			return nil, nil, err
 		}
 
 		if permissionResponse.Satisfied {
+			m.logger.Info("permission response satisified", zap.Any("permission", permissionResponse.Permissions))
 			highestRole := calculateRolesAndHighestRole(permissionResponse.Permissions).HighestRole
 			if highestRole == nil {
 				return nil, nil, errors.New("failed to calculate highest role")
 			}
 			switch highestRole.Role {
 			case protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL:
+				m.logger.Info("can view highest")
 				viewChats[channelID] = channel
 			case protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL:
+				m.logger.Info("can post highest")
 				viewAndPostChats[channelID] = channel
 			}
 		}

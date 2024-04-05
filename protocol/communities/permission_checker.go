@@ -235,26 +235,31 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 	// if there are no chain IDs that match token criteria chain IDs
 	// we aren't able to check balances on selected networks
 	if len(erc20ChainIDsMap) > 0 && len(chainIDsForERC20) == 0 {
+		p.logger.Info("network not supported")
 		response.NetworksNotSupported = true
 		return response, nil
 	}
 
 	ownedERC20TokenBalances := make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, 0)
 	if len(chainIDsForERC20) > 0 {
+		p.logger.Info("getting erc20 balances")
 		// this only returns balances for the networks we're actually interested in
 		balances, err := p.tokenManager.GetBalancesByChain(context.Background(), accounts, erc20TokenAddresses, chainIDsForERC20)
 		if err != nil {
 			return nil, err
 		}
+		p.logger.Info("got balances", zap.Any("balnaces", balances))
 		ownedERC20TokenBalances = balances
 	}
 
 	ownedERC721Tokens := make(CollectiblesByChain)
 	if len(chainIDsForERC721) > 0 {
+		p.logger.Info("getting erc21")
 		collectibles, err := p.GetOwnedERC721Tokens(accounts, erc721TokenRequirements, chainIDsForERC721)
 		if err != nil {
 			return nil, err
 		}
+		p.logger.Info("got colectibles", zap.Any("balnaces", collectibles))
 		ownedERC721Tokens = collectibles
 	}
 
@@ -262,6 +267,7 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 
 	for _, tokenPermission := range permissions {
 
+		p.logger.Info("checking permission", zap.Any("p", tokenPermission))
 		permissionRequirementsMet := true
 		response.Permissions[tokenPermission.Id] = &PermissionTokenCriteriaResult{Role: tokenPermission.Type}
 
@@ -270,12 +276,14 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 		// as not fulfilled
 		for _, tokenRequirement := range tokenPermission.TokenCriteria {
 
+			p.logger.Info("checking token requirement", zap.Any("p", tokenRequirement))
 			tokenRequirementMet := false
 			tokenRequirementResponse := TokenRequirementResponse{TokenCriteria: tokenRequirement}
 
 			if tokenRequirement.Type == protobuf.CommunityTokenType_ERC721 {
 				if len(ownedERC721Tokens) == 0 {
 
+					p.logger.Info("checking token requirement 2")
 					response.Permissions[tokenPermission.Id].TokenRequirements = append(response.Permissions[tokenPermission.Id].TokenRequirements, tokenRequirementResponse)
 					response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, false)
 					continue
@@ -283,18 +291,24 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 
 			chainIDLoopERC721:
 				for chainID, addressStr := range tokenRequirement.ContractAddresses {
+					p.logger.Info("checking token requirement 3")
 					contractAddress := gethcommon.HexToAddress(addressStr)
 					if _, exists := ownedERC721Tokens[chainID]; !exists || len(ownedERC721Tokens[chainID]) == 0 {
+						p.logger.Info("checking token requirement 4")
 						continue chainIDLoopERC721
 					}
 
+					p.logger.Info("checking token requirement 5")
 					for account := range ownedERC721Tokens[chainID] {
+						p.logger.Info("checking token requirement 6", zap.Any("account", account))
 						if _, exists := ownedERC721Tokens[chainID][account]; !exists {
 							continue
 						}
 
+						p.logger.Info("checking token requirement 7")
 						tokenBalances := ownedERC721Tokens[chainID][account][contractAddress]
 						if len(tokenBalances) > 0 {
+							p.logger.Info("checking token requirement 8")
 							// 'account' owns some TokenID owned from contract 'address'
 							if _, exists := accountsChainIDsCombinations[account]; !exists {
 								accountsChainIDsCombinations[account] = make(map[uint64]bool)
@@ -323,7 +337,9 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 					}
 				}
 			} else if tokenRequirement.Type == protobuf.CommunityTokenType_ERC20 {
+				p.logger.Info("checking token erc20 1")
 				if len(ownedERC20TokenBalances) == 0 {
+					p.logger.Info("checking token erc20 2")
 					response.Permissions[tokenPermission.Id].TokenRequirements = append(response.Permissions[tokenPermission.Id].TokenRequirements, tokenRequirementResponse)
 					response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, false)
 					continue
@@ -333,11 +349,14 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 
 			chainIDLoopERC20:
 				for chainID, address := range tokenRequirement.ContractAddresses {
+					p.logger.Info("checking token erc20 2", zap.Any("chain-id", chainID), zap.Any("address", address))
 					if _, exists := ownedERC20TokenBalances[chainID]; !exists || len(ownedERC20TokenBalances[chainID]) == 0 {
+						p.logger.Info("checking token erc20 3", zap.Any("chain-id", chainID), zap.Any("address", address))
 						continue chainIDLoopERC20
 					}
 					contractAddress := gethcommon.HexToAddress(address)
 					for account := range ownedERC20TokenBalances[chainID] {
+						p.logger.Info("checking token erc20 3", zap.Any("chain-id", chainID), zap.Any("address", address), zap.Any("account", account))
 						if _, exists := ownedERC20TokenBalances[chainID][account][contractAddress]; !exists {
 							continue
 						}
@@ -360,10 +379,12 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 
 						requiredAmount, success := new(big.Int).SetString(tokenRequirement.AmountInWei, 10)
 						if !success {
+							p.logger.Info("checking token erc20 3", zap.Any("chain-id", chainID), zap.Any("address", address), zap.Any("account", account))
 							return nil, fmt.Errorf("amountInWeis value is incorrect")
 						}
 
 						if accumulatedBalance.Cmp(requiredAmount) != -1 {
+							p.logger.Info("checking token erc20 4", zap.Any("chain-id", chainID), zap.Any("address", address), zap.Any("account", account))
 							tokenRequirementMet = true
 							if shortcircuit {
 								break chainIDLoopERC20
@@ -414,6 +435,7 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 		// if only one of them is fulfilled, the user gets permission
 		// to join and we can stop early
 		if shortcircuit && permissionRequirementsMet {
+			p.logger.Info("breaking")
 			break
 		}
 	}
@@ -429,7 +451,9 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 		response.ValidCombinations = append(response.ValidCombinations, combination)
 	}
 
+	p.logger.Info("response", zap.Any("response", response))
 	response.calculateSatisfied()
+	p.logger.Info("response 2", zap.Any("response", response))
 
 	return response, nil
 }
