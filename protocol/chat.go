@@ -56,6 +56,7 @@ const (
 	MuteFor15MinsDuration = 15 * time.Minute
 	MuteFor1HrsDuration   = time.Hour
 	MuteFor8HrsDuration   = 8 * time.Hour
+	MuteFor24HrsDuration  = 24 * time.Hour
 	MuteFor1WeekDuration  = 7 * 24 * time.Hour
 )
 
@@ -63,6 +64,7 @@ const (
 	MuteFor15Min requests.MutingVariation = iota + 1
 	MuteFor1Hr
 	MuteFor8Hr
+	MuteFor24Hr
 	MuteFor1Week
 	MuteTillUnmuted
 	MuteTill1Min
