@@ -4,19 +4,16 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"strings"
 
 	"github.com/pkg/errors"
 
-	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/contracts/community-tokens/assets"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	communitytokendeployer "github.com/status-im/status-go/contracts/community-tokens/deployer"
-	"github.com/status-im/status-go/contracts/community-tokens/mastertoken"
 	"github.com/status-im/status-go/contracts/community-tokens/ownertoken"
 	communityownertokenregistry "github.com/status-im/status-go/contracts/community-tokens/registry"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -321,147 +318,35 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 		CommunityToken:  savedCommunityToken}, nil
 }
 
-// Returns gas units + 10%
-func (api *API) DeployCollectiblesEstimate(ctx context.Context, chainID uint64, fromAddress string) (uint64, error) {
-	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
-	if err != nil {
-		log.Error(err.Error())
-		return 0, err
-	}
-
-	collectiblesABI, err := abi.JSON(strings.NewReader(collectibles.CollectiblesABI))
-	if err != nil {
-		return 0, err
-	}
-
-	// use random parameters, they will not have impact on deployment results
-	data, err := collectiblesABI.Pack("" /*constructor name is empty*/, "name", "SYMBOL", big.NewInt(20), true, false, "tokenUri",
-		common.HexToAddress("0x77b48394c650520012795a1a25696d7eb542d110"), common.HexToAddress("0x77b48394c650520012795a1a25696d7eb542d110"))
-	if err != nil {
-		return 0, err
-	}
-
-	callMsg := ethereum.CallMsg{
-		From:  common.HexToAddress(fromAddress),
-		To:    nil,
-		Value: big.NewInt(0),
-		Data:  append(common.FromHex(collectibles.CollectiblesBin), data...),
-	}
-	estimate, err := ethClient.EstimateGas(ctx, callMsg)
-	if err != nil {
-		return 0, err
-	}
-
-	finalEstimation := estimate + uint64(float32(estimate)*0.1)
-	log.Debug("Collectibles deployment gas estimation: ", finalEstimation)
-	return finalEstimation, nil
+func (api *API) DeployCollectiblesEstimate(ctx context.Context, chainID uint64, fromAddress string) (*CommunityTokenFees, error) {
+	return api.s.deployCollectiblesEstimate(ctx, chainID, fromAddress)
 }
 
-// Returns gas units + 10%
-func (api *API) DeployAssetsEstimate(ctx context.Context, chainID uint64, fromAddress string) (uint64, error) {
-	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
-	if err != nil {
-		log.Error(err.Error())
-		return 0, err
-	}
-
-	assetsABI, err := abi.JSON(strings.NewReader(assets.AssetsABI))
-	if err != nil {
-		return 0, err
-	}
-
-	// use random parameters, they will not have impact on deployment results
-	data, err := assetsABI.Pack("" /*constructor name is empty*/, "name", "SYMBOL", uint8(18), big.NewInt(20), "tokenUri",
-		common.HexToAddress("0x77b48394c650520012795a1a25696d7eb542d110"), common.HexToAddress("0x77b48394c650520012795a1a25696d7eb542d110"))
-	if err != nil {
-		return 0, err
-	}
-
-	callMsg := ethereum.CallMsg{
-		From:  common.HexToAddress(fromAddress),
-		To:    nil,
-		Value: big.NewInt(0),
-		Data:  append(common.FromHex(assets.AssetsBin), data...),
-	}
-	estimate, err := ethClient.EstimateGas(ctx, callMsg)
-	if err != nil {
-		return 0, err
-	}
-
-	finalEstimation := estimate + uint64(float32(estimate)*0.1)
-	log.Debug("Assets deployment gas estimation: ", finalEstimation)
-	return finalEstimation, nil
+func (api *API) DeployAssetsEstimate(ctx context.Context, chainID uint64, fromAddress string) (*CommunityTokenFees, error) {
+	return api.s.deployAssetsEstimate(ctx, chainID, fromAddress)
 }
 
 func (api *API) DeployOwnerTokenEstimate(ctx context.Context, chainID uint64, fromAddress string,
 	ownerTokenParameters DeploymentParameters, masterTokenParameters DeploymentParameters,
-	communityID string, signerPubKey string) (uint64, error) {
-	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
-	if err != nil {
-		log.Error(err.Error())
-		return 0, err
-	}
-
-	deployerAddress, err := communitytokendeployer.ContractAddress(chainID)
-	if err != nil {
-		return 0, err
-	}
-
-	deployerABI, err := abi.JSON(strings.NewReader(communitytokendeployer.CommunityTokenDeployerABI))
-	if err != nil {
-		return 0, err
-	}
-
-	ownerTokenConfig := communitytokendeployer.CommunityTokenDeployerTokenConfig{
-		Name:    ownerTokenParameters.Name,
-		Symbol:  ownerTokenParameters.Symbol,
-		BaseURI: ownerTokenParameters.TokenURI,
-	}
-
-	masterTokenConfig := communitytokendeployer.CommunityTokenDeployerTokenConfig{
-		Name:    masterTokenParameters.Name,
-		Symbol:  masterTokenParameters.Symbol,
-		BaseURI: masterTokenParameters.TokenURI,
-	}
-
-	signature, err := api.s.Messenger.CreateCommunityTokenDeploymentSignature(ctx, chainID, fromAddress, communityID)
-	if err != nil {
-		return 0, err
-	}
-
-	communitySignature, err := prepareDeploymentSignatureStruct(types.HexBytes(signature).String(), communityID, common.HexToAddress(fromAddress))
-	if err != nil {
-		return 0, err
-	}
-
-	data, err := deployerABI.Pack("deploy", ownerTokenConfig, masterTokenConfig, communitySignature, common.FromHex(signerPubKey))
-
-	if err != nil {
-		return 0, err
-	}
-
-	toAddr := deployerAddress
-	fromAddr := common.HexToAddress(fromAddress)
-
-	callMsg := ethereum.CallMsg{
-		From:  fromAddr,
-		To:    &toAddr,
-		Value: big.NewInt(0),
-		Data:  data,
-	}
-	estimate, err := ethClient.EstimateGas(ctx, callMsg)
-	if err != nil {
-		return 0, err
-	}
-	return estimate + uint64(float32(estimate)*0.1), nil
+	communityID string, signerPubKey string) (*CommunityTokenFees, error) {
+	return api.s.deployOwnerTokenEstimate(ctx, chainID, fromAddress, ownerTokenParameters, masterTokenParameters, communityID, signerPubKey)
 }
 
-func (api *API) NewMasterTokenInstance(chainID uint64, contractAddress string) (*mastertoken.MasterToken, error) {
-	backend, err := api.s.manager.rpcClient.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-	return mastertoken.NewMasterToken(common.HexToAddress(contractAddress), backend)
+func (api *API) EstimateMintTokens(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, walletAddresses []string, amount *bigint.BigInt) (*CommunityTokenFees, error) {
+	return api.s.mintTokensEstimate(ctx, chainID, contractAddress, fromAddress, walletAddresses, amount)
+}
+
+// This is only ERC721 function
+func (api *API) EstimateRemoteBurn(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, tokenIds []*bigint.BigInt) (*CommunityTokenFees, error) {
+	return api.s.remoteBurnEstimate(ctx, chainID, contractAddress, fromAddress, tokenIds)
+}
+
+func (api *API) EstimateBurn(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, burnAmount *bigint.BigInt) (*CommunityTokenFees, error) {
+	return api.s.burnEstimate(ctx, chainID, contractAddress, fromAddress, burnAmount)
+}
+
+func (api *API) EstimateSetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, newSignerPubKey string) (*CommunityTokenFees, error) {
+	return api.s.setSignerPubKeyEstimate(ctx, chainID, contractAddress, fromAddress, newSignerPubKey)
 }
 
 func (api *API) NewOwnerTokenInstance(chainID uint64, contractAddress string) (*ownertoken.OwnerToken, error) {
@@ -484,37 +369,17 @@ func (api *API) NewAssetsInstance(chainID uint64, contractAddress string) (*asse
 	return api.s.manager.NewAssetsInstance(chainID, contractAddress)
 }
 
-// if we want to mint 2 tokens to addresses ["a", "b"] we need to mint
-// twice to every address - we need to send to smart contract table ["a", "a", "b", "b"]
-func (api *API) multiplyWalletAddresses(amount *bigint.BigInt, contractAddresses []string) []string {
-	var totalAddresses []string
-	for i := big.NewInt(1); i.Cmp(amount.Int) <= 0; {
-		totalAddresses = append(totalAddresses, contractAddresses...)
-		i.Add(i, big.NewInt(1))
-	}
-	return totalAddresses
-}
-
-func (api *API) PrepareMintCollectiblesData(walletAddresses []string, amount *bigint.BigInt) []common.Address {
-	totalAddresses := api.multiplyWalletAddresses(amount, walletAddresses)
-	var usersAddresses = []common.Address{}
-	for _, k := range totalAddresses {
-		usersAddresses = append(usersAddresses, common.HexToAddress(k))
-	}
-	return usersAddresses
-}
-
 // Universal minting function for every type of token.
 func (api *API) MintTokens(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, walletAddresses []string, amount *bigint.BigInt) (string, error) {
 
-	err := api.ValidateWalletsAndAmounts(walletAddresses, amount)
+	err := api.s.ValidateWalletsAndAmounts(walletAddresses, amount)
 	if err != nil {
 		return "", err
 	}
 
 	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
-	contractInst, err := NewTokenInstance(api, chainID, contractAddress)
+	contractInst, err := NewTokenInstance(api.s, chainID, contractAddress)
 	if err != nil {
 		return "", err
 	}
@@ -539,51 +404,6 @@ func (api *API) MintTokens(ctx context.Context, chainID uint64, contractAddress 
 	}
 
 	return tx.Hash().Hex(), nil
-}
-
-func (api *API) EstimateMintTokens(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, walletAddresses []string, amount *bigint.BigInt) (uint64, error) {
-	tokenType, err := api.s.db.GetTokenType(chainID, contractAddress)
-	if err != nil {
-		return 0, err
-	}
-
-	switch tokenType {
-	case protobuf.CommunityTokenType_ERC721:
-		return api.EstimateMintCollectibles(ctx, chainID, contractAddress, fromAddress, walletAddresses, amount)
-	case protobuf.CommunityTokenType_ERC20:
-		return api.EstimateMintAssets(ctx, chainID, contractAddress, fromAddress, walletAddresses, amount)
-	default:
-		return 0, fmt.Errorf("unknown token type: %v", tokenType)
-	}
-}
-
-func (api *API) EstimateMintCollectibles(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, walletAddresses []string, amount *bigint.BigInt) (uint64, error) {
-	err := api.ValidateWalletsAndAmounts(walletAddresses, amount)
-	if err != nil {
-		return 0, err
-	}
-	usersAddresses := api.PrepareMintCollectiblesData(walletAddresses, amount)
-	return api.estimateMethod(ctx, chainID, contractAddress, fromAddress, "mintTo", usersAddresses)
-}
-
-func (api *API) PrepareMintAssetsData(walletAddresses []string, amount *bigint.BigInt) ([]common.Address, []*big.Int) {
-	var usersAddresses = []common.Address{}
-	var amountsList = []*big.Int{}
-	for _, k := range walletAddresses {
-		usersAddresses = append(usersAddresses, common.HexToAddress(k))
-		amountsList = append(amountsList, amount.Int)
-	}
-	return usersAddresses, amountsList
-}
-
-// Estimate MintAssets cost.
-func (api *API) EstimateMintAssets(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, walletAddresses []string, amount *bigint.BigInt) (uint64, error) {
-	err := api.ValidateWalletsAndAmounts(walletAddresses, amount)
-	if err != nil {
-		return 0, err
-	}
-	usersAddresses, amountsList := api.PrepareMintAssetsData(walletAddresses, amount)
-	return api.estimateMethod(ctx, chainID, contractAddress, fromAddress, "mintTo", usersAddresses, amountsList)
 }
 
 // This is only ERC721 function
@@ -614,7 +434,7 @@ func (api *API) RemoteDestructedAmount(ctx context.Context, chainID uint64, cont
 
 // This is only ERC721 function
 func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, tokenIds []*bigint.BigInt, additionalData string) (string, error) {
-	err := api.validateTokens(tokenIds)
+	err := api.s.validateTokens(tokenIds)
 	if err != nil {
 		return "", err
 	}
@@ -626,7 +446,7 @@ func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress 
 		tempTokenIds = append(tempTokenIds, v.Int)
 	}
 
-	contractInst, err := NewTokenInstance(api, chainID, contractAddress)
+	contractInst, err := NewTokenInstance(api.s, chainID, contractAddress)
 	if err != nil {
 		return "", err
 	}
@@ -653,21 +473,6 @@ func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress 
 	return tx.Hash().Hex(), nil
 }
 
-// This is only ERC721 function
-func (api *API) EstimateRemoteBurn(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, tokenIds []*bigint.BigInt) (uint64, error) {
-	err := api.validateTokens(tokenIds)
-	if err != nil {
-		return 0, err
-	}
-
-	var tempTokenIds []*big.Int
-	for _, v := range tokenIds {
-		tempTokenIds = append(tempTokenIds, v.Int)
-	}
-
-	return api.estimateMethod(ctx, chainID, contractAddress, fromAddress, "remoteBurn", tempTokenIds)
-}
-
 func (api *API) GetCollectiblesContractInstance(chainID uint64, contractAddress string) (*collectibles.Collectibles, error) {
 	return api.s.manager.GetCollectiblesContractInstance(chainID, contractAddress)
 }
@@ -677,84 +482,23 @@ func (api *API) GetAssetContractInstance(chainID uint64, contractAddress string)
 }
 
 func (api *API) RemainingSupply(ctx context.Context, chainID uint64, contractAddress string) (*bigint.BigInt, error) {
-	tokenType, err := api.s.db.GetTokenType(chainID, contractAddress)
-	if err != nil {
-		return nil, err
-	}
-	switch tokenType {
-	case protobuf.CommunityTokenType_ERC721:
-		return api.remainingCollectiblesSupply(ctx, chainID, contractAddress)
-	case protobuf.CommunityTokenType_ERC20:
-		return api.remainingAssetsSupply(ctx, chainID, contractAddress)
-	default:
-		return nil, fmt.Errorf("unknown token type: %v", tokenType)
-	}
-}
-
-// RemainingSupply = MaxSupply - MintedCount
-func (api *API) remainingCollectiblesSupply(ctx context.Context, chainID uint64, contractAddress string) (*bigint.BigInt, error) {
-	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	contractInst, err := api.NewCollectiblesInstance(chainID, contractAddress)
-	if err != nil {
-		return nil, err
-	}
-	maxSupply, err := contractInst.MaxSupply(callOpts)
-	if err != nil {
-		return nil, err
-	}
-	mintedCount, err := contractInst.MintedCount(callOpts)
-	if err != nil {
-		return nil, err
-	}
-	var res = new(big.Int)
-	res.Sub(maxSupply, mintedCount)
-	return &bigint.BigInt{Int: res}, nil
-}
-
-// RemainingSupply = MaxSupply - TotalSupply
-func (api *API) remainingAssetsSupply(ctx context.Context, chainID uint64, contractAddress string) (*bigint.BigInt, error) {
-	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	contractInst, err := api.NewAssetsInstance(chainID, contractAddress)
-	if err != nil {
-		return nil, err
-	}
-	maxSupply, err := contractInst.MaxSupply(callOpts)
-	if err != nil {
-		return nil, err
-	}
-	totalSupply, err := contractInst.TotalSupply(callOpts)
-	if err != nil {
-		return nil, err
-	}
-	var res = new(big.Int)
-	res.Sub(maxSupply, totalSupply)
-	return &bigint.BigInt{Int: res}, nil
-}
-
-func (api *API) prepareNewMaxSupply(ctx context.Context, chainID uint64, contractAddress string, burnAmount *bigint.BigInt) (*big.Int, error) {
-	maxSupply, err := api.s.maxSupply(ctx, chainID, contractAddress)
-	if err != nil {
-		return nil, err
-	}
-	var newMaxSupply = new(big.Int)
-	newMaxSupply.Sub(maxSupply, burnAmount.Int)
-	return newMaxSupply, nil
+	return api.s.remainingSupply(ctx, chainID, contractAddress)
 }
 
 func (api *API) Burn(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, burnAmount *bigint.BigInt) (string, error) {
-	err := api.validateBurnAmount(ctx, burnAmount, chainID, contractAddress)
+	err := api.s.validateBurnAmount(ctx, burnAmount, chainID, contractAddress)
 	if err != nil {
 		return "", err
 	}
 
 	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
-	newMaxSupply, err := api.prepareNewMaxSupply(ctx, chainID, contractAddress, burnAmount)
+	newMaxSupply, err := api.s.prepareNewMaxSupply(ctx, chainID, contractAddress, burnAmount)
 	if err != nil {
 		return "", err
 	}
 
-	contractInst, err := NewTokenInstance(api, chainID, contractAddress)
+	contractInst, err := NewTokenInstance(api.s, chainID, contractAddress)
 	if err != nil {
 		return "", err
 	}
@@ -781,88 +525,6 @@ func (api *API) Burn(ctx context.Context, chainID uint64, contractAddress string
 	return tx.Hash().Hex(), nil
 }
 
-func (api *API) EstimateBurn(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, burnAmount *bigint.BigInt) (uint64, error) {
-	err := api.validateBurnAmount(ctx, burnAmount, chainID, contractAddress)
-	if err != nil {
-		return 0, err
-	}
-
-	newMaxSupply, err := api.prepareNewMaxSupply(ctx, chainID, contractAddress, burnAmount)
-	if err != nil {
-		return 0, err
-	}
-
-	return api.estimateMethod(ctx, chainID, contractAddress, fromAddress, "setMaxSupply", newMaxSupply)
-}
-
-func (api *API) ValidateWalletsAndAmounts(walletAddresses []string, amount *bigint.BigInt) error {
-	if len(walletAddresses) == 0 {
-		return errors.New("wallet addresses list is empty")
-	}
-	if amount.Cmp(big.NewInt(0)) <= 0 {
-		return errors.New("amount is <= 0")
-	}
-	return nil
-}
-
-func (api *API) validateTokens(tokenIds []*bigint.BigInt) error {
-	if len(tokenIds) == 0 {
-		return errors.New("token list is empty")
-	}
-	return nil
-}
-
-func (api *API) validateBurnAmount(ctx context.Context, burnAmount *bigint.BigInt, chainID uint64, contractAddress string) error {
-	if burnAmount.Cmp(big.NewInt(0)) <= 0 {
-		return errors.New("burnAmount is less than 0")
-	}
-	remainingSupply, err := api.RemainingSupply(ctx, chainID, contractAddress)
-	if err != nil {
-		return err
-	}
-	if burnAmount.Cmp(remainingSupply.Int) > 1 {
-		return errors.New("burnAmount is bigger than remaining amount")
-	}
-	return nil
-}
-
-func (api *API) estimateMethodForTokenInstance(ctx context.Context, contractInstance TokenInstance, chainID uint64, contractAddress string, fromAddress string, methodName string, args ...interface{}) (uint64, error) {
-	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
-	if err != nil {
-		log.Error(err.Error())
-		return 0, err
-	}
-
-	data, err := contractInstance.PackMethod(ctx, methodName, args...)
-
-	if err != nil {
-		return 0, err
-	}
-
-	toAddr := common.HexToAddress(contractAddress)
-	fromAddr := common.HexToAddress(fromAddress)
-
-	callMsg := ethereum.CallMsg{
-		From:  fromAddr,
-		To:    &toAddr,
-		Value: big.NewInt(0),
-		Data:  data,
-	}
-	estimate, err := ethClient.EstimateGas(ctx, callMsg)
-	if err != nil {
-		return 0, err
-	}
-	return estimate + uint64(float32(estimate)*0.1), nil
-}
-
-func (api *API) estimateMethod(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, methodName string, args ...interface{}) (uint64, error) {
-	contractInst, err := NewTokenInstance(api, chainID, contractAddress)
-	if err != nil {
-		return 0, err
-	}
-	return api.estimateMethodForTokenInstance(ctx, contractInst, chainID, contractAddress, fromAddress, methodName, args...)
-}
-
 // Gets signer public key from smart contract with a given chainId and address
 func (api *API) GetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string) (string, error) {
 	return api.s.GetSignerPubKey(ctx, chainID, contractAddress)
@@ -880,20 +542,6 @@ func (api *API) SafeGetOwnerTokenAddress(ctx context.Context, chainID uint64, co
 
 func (api *API) SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, newSignerPubKey string) (string, error) {
 	return api.s.SetSignerPubKey(ctx, chainID, contractAddress, txArgs, password, newSignerPubKey)
-}
-
-func (api *API) EstimateSetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, newSignerPubKey string) (uint64, error) {
-	if len(newSignerPubKey) <= 0 {
-		return 0, fmt.Errorf("signerPubKey is empty")
-	}
-
-	contractInst, err := api.NewOwnerTokenInstance(chainID, contractAddress)
-	if err != nil {
-		return 0, err
-	}
-	ownerTokenInstance := &OwnerTokenInstance{instance: contractInst}
-
-	return api.estimateMethodForTokenInstance(ctx, ownerTokenInstance, chainID, contractAddress, fromAddress, "setSignerPublicKey", common.FromHex(newSignerPubKey))
 }
 
 func (api *API) OwnerTokenOwnerAddress(ctx context.Context, chainID uint64, contractAddress string) (string, error) {

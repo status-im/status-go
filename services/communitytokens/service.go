@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/contracts/community-tokens/mastertoken"
 	"github.com/status-im/status-go/contracts/community-tokens/ownertoken"
 	communityownertokenregistry "github.com/status-im/status-go/contracts/community-tokens/registry"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -28,6 +29,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
 	"github.com/status-im/status-go/services/utils"
+	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -45,11 +47,13 @@ type Service struct {
 	Messenger       *protocol.Messenger
 	walletFeed      *event.Feed
 	walletWatcher   *walletevent.Watcher
+	transactor      *transactions.Transactor
+	feeManager      *wallet.FeeManager
 }
 
 // Returns a new Collectibles Service.
 func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, pendingTracker *transactions.PendingTxTracker,
-	config *params.NodeConfig, appDb *sql.DB, walletFeed *event.Feed) *Service {
+	config *params.NodeConfig, appDb *sql.DB, walletFeed *event.Feed, transactor *transactions.Transactor) *Service {
 	return &Service{
 		manager:         &Manager{rpcClient: rpcClient},
 		accountsManager: accountsManager,
@@ -57,6 +61,8 @@ func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, pen
 		config:          config,
 		db:              communitytokensdatabase.NewCommunityTokensDatabase(appDb),
 		walletFeed:      walletFeed,
+		transactor:      transactor,
+		feeManager:      &wallet.FeeManager{RPCClient: rpcClient},
 	}
 }
 
@@ -270,6 +276,110 @@ func (s *Service) NewOwnerTokenInstance(chainID uint64, contractAddress string) 
 	}
 	return ownertoken.NewOwnerToken(common.HexToAddress(contractAddress), backend)
 
+}
+
+func (s *Service) NewMasterTokenInstance(chainID uint64, contractAddress string) (*mastertoken.MasterToken, error) {
+	backend, err := s.manager.rpcClient.EthClient(chainID)
+	if err != nil {
+		return nil, err
+	}
+	return mastertoken.NewMasterToken(common.HexToAddress(contractAddress), backend)
+}
+
+func (s *Service) validateTokens(tokenIds []*bigint.BigInt) error {
+	if len(tokenIds) == 0 {
+		return errors.New("token list is empty")
+	}
+	return nil
+}
+
+func (s *Service) validateBurnAmount(ctx context.Context, burnAmount *bigint.BigInt, chainID uint64, contractAddress string) error {
+	if burnAmount.Cmp(big.NewInt(0)) <= 0 {
+		return errors.New("burnAmount is less than 0")
+	}
+	remainingSupply, err := s.remainingSupply(ctx, chainID, contractAddress)
+	if err != nil {
+		return err
+	}
+	if burnAmount.Cmp(remainingSupply.Int) > 1 {
+		return errors.New("burnAmount is bigger than remaining amount")
+	}
+	return nil
+}
+
+func (s *Service) remainingSupply(ctx context.Context, chainID uint64, contractAddress string) (*bigint.BigInt, error) {
+	tokenType, err := s.db.GetTokenType(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	switch tokenType {
+	case protobuf.CommunityTokenType_ERC721:
+		return s.remainingCollectiblesSupply(ctx, chainID, contractAddress)
+	case protobuf.CommunityTokenType_ERC20:
+		return s.remainingAssetsSupply(ctx, chainID, contractAddress)
+	default:
+		return nil, fmt.Errorf("unknown token type: %v", tokenType)
+	}
+}
+
+func (s *Service) prepareNewMaxSupply(ctx context.Context, chainID uint64, contractAddress string, burnAmount *bigint.BigInt) (*big.Int, error) {
+	maxSupply, err := s.maxSupply(ctx, chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	var newMaxSupply = new(big.Int)
+	newMaxSupply.Sub(maxSupply, burnAmount.Int)
+	return newMaxSupply, nil
+}
+
+// RemainingSupply = MaxSupply - MintedCount
+func (s *Service) remainingCollectiblesSupply(ctx context.Context, chainID uint64, contractAddress string) (*bigint.BigInt, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := s.manager.NewCollectiblesInstance(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	maxSupply, err := contractInst.MaxSupply(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	mintedCount, err := contractInst.MintedCount(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	var res = new(big.Int)
+	res.Sub(maxSupply, mintedCount)
+	return &bigint.BigInt{Int: res}, nil
+}
+
+// RemainingSupply = MaxSupply - TotalSupply
+func (s *Service) remainingAssetsSupply(ctx context.Context, chainID uint64, contractAddress string) (*bigint.BigInt, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := s.manager.NewAssetsInstance(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	maxSupply, err := contractInst.MaxSupply(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	totalSupply, err := contractInst.TotalSupply(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	var res = new(big.Int)
+	res.Sub(maxSupply, totalSupply)
+	return &bigint.BigInt{Int: res}, nil
+}
+
+func (s *Service) ValidateWalletsAndAmounts(walletAddresses []string, amount *bigint.BigInt) error {
+	if len(walletAddresses) == 0 {
+		return errors.New("wallet addresses list is empty")
+	}
+	if amount.Cmp(big.NewInt(0)) <= 0 {
+		return errors.New("amount is <= 0")
+	}
+	return nil
 }
 
 func (s *Service) GetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string) (string, error) {

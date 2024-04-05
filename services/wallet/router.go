@@ -646,7 +646,7 @@ func (r *Router) suggestedRoutes(
 		}
 
 		group.Add(func(c context.Context) error {
-			gasFees, err := r.s.feesManager.suggestedFees(ctx, network.ChainID)
+			gasFees, err := r.s.feesManager.SuggestedFees(ctx, network.ChainID)
 			if err != nil {
 				return err
 			}
@@ -747,7 +747,7 @@ func (r *Router) suggestedRoutes(
 							continue
 						}
 
-						l1GasFeeWei, _ = r.s.feesManager.getL1Fee(ctx, network.ChainID, tx)
+						l1GasFeeWei, _ = r.s.feesManager.GetL1Fee(ctx, network.ChainID, tx)
 						l1GasFeeWei += l1ApprovalFee
 					}
 

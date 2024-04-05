@@ -55,7 +55,6 @@ func (t OwnerTokenInstance) PackMethod(ctx context.Context, methodName string, a
 type MasterTokenInstance struct {
 	TokenInstance
 	instance *mastertoken.MasterToken
-	api      *API
 }
 
 func (t MasterTokenInstance) RemoteBurn(transactOpts *bind.TransactOpts, tokenIds []*big.Int) (*types.Transaction, error) {
@@ -63,7 +62,7 @@ func (t MasterTokenInstance) RemoteBurn(transactOpts *bind.TransactOpts, tokenId
 }
 
 func (t MasterTokenInstance) Mint(transactOpts *bind.TransactOpts, walletAddresses []string, amount *bigint.BigInt) (*types.Transaction, error) {
-	usersAddresses := t.api.PrepareMintCollectiblesData(walletAddresses, amount)
+	usersAddresses := prepareMintCollectiblesData(walletAddresses, amount)
 	return t.instance.MintTo(transactOpts, usersAddresses)
 }
 
@@ -83,7 +82,6 @@ func (t MasterTokenInstance) PackMethod(ctx context.Context, methodName string, 
 type CollectibleInstance struct {
 	TokenInstance
 	instance *collectibles.Collectibles
-	api      *API
 }
 
 func (t CollectibleInstance) RemoteBurn(transactOpts *bind.TransactOpts, tokenIds []*big.Int) (*types.Transaction, error) {
@@ -91,7 +89,7 @@ func (t CollectibleInstance) RemoteBurn(transactOpts *bind.TransactOpts, tokenId
 }
 
 func (t CollectibleInstance) Mint(transactOpts *bind.TransactOpts, walletAddresses []string, amount *bigint.BigInt) (*types.Transaction, error) {
-	usersAddresses := t.api.PrepareMintCollectiblesData(walletAddresses, amount)
+	usersAddresses := prepareMintCollectiblesData(walletAddresses, amount)
 	return t.instance.MintTo(transactOpts, usersAddresses)
 }
 
@@ -111,7 +109,6 @@ func (t CollectibleInstance) PackMethod(ctx context.Context, methodName string, 
 type AssetInstance struct {
 	TokenInstance
 	instance *assets.Assets
-	api      *API
 }
 
 func (t AssetInstance) RemoteBurn(transactOpts *bind.TransactOpts, tokenIds []*big.Int) (*types.Transaction, error) {
@@ -121,7 +118,7 @@ func (t AssetInstance) RemoteBurn(transactOpts *bind.TransactOpts, tokenIds []*b
 // The amount should be in smallest denomination of the asset (like wei) with decimal = 18, eg.
 // if we want to mint 2.34 of the token, then amount should be 234{16 zeros}.
 func (t AssetInstance) Mint(transactOpts *bind.TransactOpts, walletAddresses []string, amount *bigint.BigInt) (*types.Transaction, error) {
-	usersAddresses, amountsList := t.api.PrepareMintAssetsData(walletAddresses, amount)
+	usersAddresses, amountsList := prepareMintAssetsData(walletAddresses, amount)
 	return t.instance.MintTo(transactOpts, usersAddresses, amountsList)
 }
 
@@ -139,36 +136,36 @@ func (t AssetInstance) PackMethod(ctx context.Context, methodName string, args .
 
 // creator
 
-func NewTokenInstance(api *API, chainID uint64, contractAddress string) (TokenInstance, error) {
-	tokenType, err := api.s.db.GetTokenType(chainID, contractAddress)
+func NewTokenInstance(s *Service, chainID uint64, contractAddress string) (TokenInstance, error) {
+	tokenType, err := s.db.GetTokenType(chainID, contractAddress)
 	if err != nil {
 		return nil, err
 	}
-	privLevel, err := api.s.db.GetTokenPrivilegesLevel(chainID, contractAddress)
+	privLevel, err := s.db.GetTokenPrivilegesLevel(chainID, contractAddress)
 	if err != nil {
 		return nil, err
 	}
 	switch {
 	case privLevel == token.OwnerLevel:
-		contractInst, err := api.NewOwnerTokenInstance(chainID, contractAddress)
+		contractInst, err := s.NewOwnerTokenInstance(chainID, contractAddress)
 		if err != nil {
 			return nil, err
 		}
 		return &OwnerTokenInstance{instance: contractInst}, nil
 	case privLevel == token.MasterLevel:
-		contractInst, err := api.NewMasterTokenInstance(chainID, contractAddress)
+		contractInst, err := s.NewMasterTokenInstance(chainID, contractAddress)
 		if err != nil {
 			return nil, err
 		}
 		return &MasterTokenInstance{instance: contractInst}, nil
 	case tokenType == protobuf.CommunityTokenType_ERC721:
-		contractInst, err := api.NewCollectiblesInstance(chainID, contractAddress)
+		contractInst, err := s.manager.NewCollectiblesInstance(chainID, contractAddress)
 		if err != nil {
 			return nil, err
 		}
 		return &CollectibleInstance{instance: contractInst}, nil
 	case tokenType == protobuf.CommunityTokenType_ERC20:
-		contractInst, err := api.NewAssetsInstance(chainID, contractAddress)
+		contractInst, err := s.manager.NewAssetsInstance(chainID, contractAddress)
 		if err != nil {
 			return nil, err
 		}

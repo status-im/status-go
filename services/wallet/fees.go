@@ -89,7 +89,7 @@ func gweiToWei(val *big.Float) *big.Int {
 	return res
 }
 
-func (f *FeeManager) suggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
+func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
 	backend, err := f.RPCClient.EthClient(chainID)
 	if err != nil {
 		return nil, err
@@ -256,8 +256,7 @@ func (f *FeeManager) getFeeHistorySorted(chainID uint64) ([]*big.Int, error) {
 	return fees, nil
 }
 
-func (f *FeeManager) getL1Fee(ctx context.Context, chainID uint64, tx *ethTypes.Transaction) (uint64, error) {
-
+func (f *FeeManager) GetL1Fee(ctx context.Context, chainID uint64, tx *ethTypes.Transaction) (uint64, error) {
 	ethClient, err := f.RPCClient.EthClient(chainID)
 	if err != nil {
 		return 0, err
