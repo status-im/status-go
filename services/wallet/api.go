@@ -412,7 +412,7 @@ func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[st
 
 func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
 	log.Debug("call to GetSuggestedFees")
-	return api.s.feesManager.suggestedFees(ctx, chainID)
+	return api.s.feesManager.SuggestedFees(ctx, chainID)
 }
 
 func (api *API) GetEstimatedLatestBlockNumber(ctx context.Context, chainID uint64) (uint64, error) {
