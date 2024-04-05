@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -939,16 +938,16 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 }
 
 func (m *Manager) ReevaluateMembersWrapper(community *Community) (roles map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, err error) {
-	debug.PrintStack()
-	fmt.Println("(>_<)", "---ReevaluateMembers (START)---", community.Name(), community.Clock())
+	logger := m.logger.Named("---ReevaluateMembers").With(zap.String("name", community.Name()), zap.String("communityID", community.IDString()), zap.Uint64("clock", community.Clock()))
+	logger.Debug("START", zap.Stack("stack"))
 	defer func() {
-		fmt.Println("(>_<)", "---ReevaluateMembers (END)---", community.Name(), community.Clock(), err)
+		logger.Debug("END", zap.Error(err))
 	}()
 
-	return m.ReevaluateMembers(community)
+	return m.ReevaluateMembers(community, logger)
 }
 
-func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
+func (m *Manager) ReevaluateMembers(community *Community, logger *zap.Logger) (map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 	becomeTokenMasterPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
@@ -959,13 +958,18 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 	newPrivilegedRoles[protobuf.CommunityMember_ROLE_TOKEN_MASTER] = []*ecdsa.PublicKey{}
 	newPrivilegedRoles[protobuf.CommunityMember_ROLE_ADMIN] = []*ecdsa.PublicKey{}
 
+	logger.Debug("Loop members", zap.Int("membersCount", len(community.Members())))
+
 	for memberKey := range community.Members() {
+		memberLogger := logger.Named("ForMember").With(zap.String("memberKey", memberKey))
+
 		memberPubKey, err := common.HexToPubkey(memberKey)
 		if err != nil {
 			return nil, err
 		}
 
 		if memberKey == common.PubkeyToHex(&m.identity.PublicKey) || community.IsMemberOwner(memberPubKey) {
+			memberLogger.Debug("1")
 			continue
 		}
 
@@ -986,6 +990,7 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 			if err != nil {
 				return nil, err
 			}
+			memberLogger.Debug("2")
 			continue
 		}
 
@@ -1004,6 +1009,7 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 					append(newPrivilegedRoles[protobuf.CommunityMember_ROLE_TOKEN_MASTER], memberPubKey)
 			}
 			// Skip further validation if user has TokenMaster permissions
+			memberLogger.Debug("3")
 			continue
 		}
 
@@ -1020,6 +1026,7 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 					append(newPrivilegedRoles[protobuf.CommunityMember_ROLE_ADMIN], memberPubKey)
 			}
 			// Skip further validation if user has Admin permissions
+			memberLogger.Debug("4")
 			continue
 		}
 
@@ -1035,18 +1042,20 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 					return nil, err
 				}
 				// Skip channels validation if user has been removed
+				memberLogger.Debug("5")
 				continue
 			}
 		}
 
 		// Validate channel permissions
 		for channelID, channel := range community.Chats() {
+			channelLogger := memberLogger.Named("ForChannel").With(zap.String("channelName", channel.Identity.DisplayName))
 			chatID := community.ChatID(channelID)
 
 			viewOnlyPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
 			viewAndPostPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
 
-			fmt.Println("(>_<)", "---Validate channel permissions 1---", community.Name(), community.Clock(), memberKey, channel.Identity.DisplayName, len(viewOnlyPermissions), len(viewAndPostPermissions))
+			channelLogger.Debug("permissions", zap.Int("viewOnlyCount", len(viewOnlyPermissions)), zap.Int("viewAndPostCount", len(viewAndPostPermissions)))
 
 			if len(viewOnlyPermissions) == 0 && len(viewAndPostPermissions) == 0 {
 				// ensure all members are added back if channel permissions were removed
@@ -1054,6 +1063,7 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 				if err != nil {
 					return nil, err
 				}
+				channelLogger.Debug("1")
 				continue
 			}
 
@@ -1062,7 +1072,7 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 				return nil, err
 			}
 
-			fmt.Println("(>_<)", "---Validate channel permissions 2---", community.Name(), community.Clock(), memberKey, channel.Identity.DisplayName, response.ViewOnlyPermissions.Satisfied, response.ViewAndPostPermissions.Satisfied)
+			channelLogger.Debug("response", zap.Bool("viewOnly", response.ViewOnlyPermissions.Satisfied), zap.Bool("viewAndPost", response.ViewAndPostPermissions.Satisfied))
 
 			isMemberAlreadyInChannel := community.IsMemberInChat(memberPubKey, channelID)
 
@@ -1077,13 +1087,13 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 				if err != nil {
 					return nil, err
 				}
-				fmt.Println("(>_<)", "---Validate channel permissions 3 (add member to chat)---", community.Name(), community.Clock(), memberKey, channel.Identity.DisplayName)
+				channelLogger.Debug("add member to chat")
 			} else if isMemberAlreadyInChannel {
 				_, err := community.RemoveUserFromChat(memberPubKey, channelID)
 				if err != nil {
 					return nil, err
 				}
-				fmt.Println("(>_<)", "---Validate channel permissions 4 (remove member from chat)---", community.Name(), community.Clock(), memberKey, channel.Identity.DisplayName)
+				channelLogger.Debug("remove member from chat")
 			}
 		}
 	}
@@ -2939,6 +2949,9 @@ type CheckChannelViewAndPostPermissionsResult struct {
 }
 
 func (m *Manager) checkChannelPermissions(viewOnlyPermissions []*CommunityTokenPermission, viewAndPostPermissions []*CommunityTokenPermission, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckChannelPermissionsResponse, error) {
+	logger := m.logger.Named("---checkChannelPermissions")
+	logger.Debug("stacktrace", zap.Stack("stack"))
+
 	response := &CheckChannelPermissionsResponse{
 		ViewOnlyPermissions: &CheckChannelViewOnlyPermissionsResult{
 			Satisfied:   false,
@@ -2950,7 +2963,6 @@ func (m *Manager) checkChannelPermissions(viewOnlyPermissions []*CommunityTokenP
 		},
 	}
 
-	fmt.Println("(>_<)", "---checkChannelPermissions 1---", len(viewOnlyPermissions), len(viewAndPostPermissions))
 	viewOnlyPermissionsResponse, err := m.PermissionChecker.CheckPermissions(viewOnlyPermissions, accountsAndChainIDs, shortcircuit)
 	if err != nil {
 		return nil, err
@@ -2960,7 +2972,9 @@ func (m *Manager) checkChannelPermissions(viewOnlyPermissions []*CommunityTokenP
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("(>_<)", "---checkChannelPermissions 2---", viewOnlyPermissionsResponse.Satisfied, viewAndPostPermissionsResponse.Satisfied)
+
+	logger.Debug("response", zap.Int("viewOnlyCount", len(viewOnlyPermissions)), zap.Int("viewAndPostCount", len(viewAndPostPermissions)),
+		zap.Bool("viewSatisfied", viewOnlyPermissionsResponse.Satisfied), zap.Bool("viewAndPostSatisfied", viewAndPostPermissionsResponse.Satisfied))
 
 	hasViewOnlyPermissions := len(viewOnlyPermissions) > 0
 	hasViewAndPostPermissions := len(viewAndPostPermissions) > 0
@@ -2980,7 +2994,7 @@ func (m *Manager) checkChannelPermissions(viewOnlyPermissions []*CommunityTokenP
 	}
 	response.ViewAndPostPermissions.Permissions = viewAndPostPermissionsResponse.Permissions
 
-	fmt.Println("(>_<)", "---checkChannelPermissions 3---", response.ViewOnlyPermissions.Satisfied, response.ViewAndPostPermissions.Satisfied)
+	logger.Debug("combined response", zap.Bool("viewSatisfied", response.ViewOnlyPermissions.Satisfied), zap.Bool("viewAndPostSatisfied", response.ViewAndPostPermissions.Satisfied))
 
 	return response, nil
 }
