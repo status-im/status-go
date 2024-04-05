@@ -725,6 +725,7 @@ func (tm *Manager) GetBalancesAtByChain(parent context.Context, clients map[uint
 		if fetchChainBalance {
 			log.Info("ChECKING FERIN chain")
 			group.Add(func(parent context.Context) error {
+				log.Info("checking chain id", "client", client.NetworkID(), "block", atBlock, "accounts", accounts)
 				ctx, cancel := context.WithTimeout(parent, requestTimeout)
 				defer cancel()
 				res, err := ethScanContract.EtherBalances(&bind.CallOpts{
@@ -738,6 +739,7 @@ func (tm *Manager) GetBalancesAtByChain(parent context.Context, clients map[uint
 				for idx, account := range accounts {
 					balance := new(big.Int)
 					balance.SetBytes(res[idx].Data)
+					log.Info("checking chain id", "client", client.NetworkID(), "block", atBlock, "accounts", accounts, "balance", balance.String())
 					updateBalance(client.NetworkID(), account, common.HexToAddress("0x"), balance)
 				}
 
