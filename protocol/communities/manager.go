@@ -57,7 +57,7 @@ var pieceLength = 100 * 1024
 
 const maxArchiveSizeInBytes = 30000000
 
-var memberPermissionsCheckInterval = 1 * time.Hour
+var memberPermissionsCheckInterval = 10 * time.Minute
 var validateInterval = 2 * time.Minute
 
 // Used for testing only
