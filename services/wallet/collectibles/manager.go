@@ -728,7 +728,7 @@ func (o *Manager) fillCommunityID(asset *thirdparty.FullCollectibleData) error {
 }
 
 func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*thirdparty.FullCollectibleData) error {
-	communityInfo, err := o.communityManager.FetchCommunityInfo(communityID)
+	communityInfo, err := o.communityManager.FetchCommunityInfoForCollectibles(communityID, idsFromAssets(communityAssets))
 
 	// If the community is found, we update the DB.
 	// If the community is not found, we only insert new entries to the DB (don't replace what is already there).
