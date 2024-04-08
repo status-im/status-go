@@ -1,6 +1,7 @@
 package communities
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
@@ -862,7 +863,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	if err != nil {
 		return nil, err
 	}
-	err = m.persistence.SaveCommunityGrant(community.IDString(), grant, description.Clock)
+	err = m.persistence.SaveCommunityGrant(community.IDString(), grant, uint64(time.Now().UnixMilli()))
 	if err != nil {
 		return nil, err
 	}
@@ -1415,7 +1416,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 	if err != nil {
 		return nil, err
 	}
-	err = m.persistence.SaveCommunityGrant(community.IDString(), grant, community.Description().Clock)
+	err = m.persistence.SaveCommunityGrant(community.IDString(), grant, uint64(time.Now().UnixMilli()))
 	if err != nil {
 		return nil, err
 	}
@@ -2979,8 +2980,11 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	if err = m.handleCommunityGrant(community.ID(), request.Grant, request.Clock); err != nil {
-		return nil, err
+	if community.Encrypted() && len(request.Grant) > 0 {
+		_, err = m.HandleCommunityGrant(community, request.Grant, request.Clock)
+		if err != nil && err != ErrGrantOlder && err != ErrGrantExpired {
+			m.logger.Error("Error handling a community grant", zap.Error(err))
+		}
 	}
 
 	err = m.persistence.SaveCommunity(community)
@@ -4870,17 +4874,26 @@ func (m *Manager) handleCommunityTokensMetadata(community *Community) error {
 	return nil
 }
 
-func (m *Manager) handleCommunityGrant(communityID types.HexBytes, grant []byte, clock uint64) error {
-	_, oldClock, err := m.persistence.GetCommunityGrant(communityID.String())
+func (m *Manager) HandleCommunityGrant(community *Community, grant []byte, clock uint64) (uint64, error) {
+	_, oldClock, err := m.GetCommunityGrant(community.IDString())
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if oldClock >= clock {
-		return nil
+		return 0, ErrGrantOlder
 	}
 
-	return m.persistence.SaveCommunityGrant(communityID.String(), grant, clock)
+	verifiedGrant, err := community.VerifyGrantSignature(grant)
+	if err != nil {
+		return 0, err
+	}
+
+	if !bytes.Equal(verifiedGrant.MemberId, crypto.CompressPubkey(&m.identity.PublicKey)) {
+		return 0, ErrGrantMemberPublicKeyIsDifferent
+	}
+
+	return clock - oldClock, m.persistence.SaveCommunityGrant(community.IDString(), grant, clock)
 }
 
 func (m *Manager) FetchCommunityToken(community *Community, tokenMetadata *protobuf.CommunityTokenMetadata, chainID uint64, contractAddress string) (*community_token.CommunityToken, error) {

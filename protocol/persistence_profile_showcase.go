@@ -14,6 +14,7 @@ const selectProfileShowcasePreferencesQuery = "SELECT clock FROM profile_showcas
 
 const upsertProfileShowcaseCommunityPreferenceQuery = "INSERT OR REPLACE INTO profile_showcase_communities_preferences(community_id, visibility, sort_order) VALUES (?, ?, ?)" // #nosec G101
 const selectProfileShowcaseCommunityPreferenceQuery = "SELECT community_id, visibility, sort_order FROM profile_showcase_communities_preferences"                              // #nosec G101
+const selectSpecifiedShowcaseCommunityPreferenceQuery = "SELECT community_id, visibility, sort_order FROM profile_showcase_communities_preferences WHERE community_id = ?"     // #nosec G101
 const deleteProfileShowcaseCommunityPreferenceQuery = "DELETE FROM profile_showcase_communities_preferences WHERE community_id = ?"                                            // #nosec G101
 const clearProfileShowcaseCommunitiyPreferencesQuery = "DELETE FROM profile_showcase_communities_preferences"                                                                  // #nosec G101
 
@@ -99,13 +100,10 @@ func (db sqlitePersistence) saveProfileShowcaseCommunityPreference(tx *sql.Tx, c
 	return err
 }
 
-func (db sqlitePersistence) getProfileShowcaseCommunitiesPreferences(tx *sql.Tx) ([]*identity.ProfileShowcaseCommunityPreference, error) {
-	rows, err := tx.Query(selectProfileShowcaseCommunityPreferenceQuery)
-	if err != nil {
-		return nil, err
+func (db sqlitePersistence) processProfileShowcaseCommunityPreferences(rows *sql.Rows) (result []*identity.ProfileShowcaseCommunityPreference, err error) {
+	if rows == nil {
+		return nil, errors.New("rows is nil")
 	}
-
-	communities := []*identity.ProfileShowcaseCommunityPreference{}
 
 	for rows.Next() {
 		community := &identity.ProfileShowcaseCommunityPreference{}
@@ -120,9 +118,33 @@ func (db sqlitePersistence) getProfileShowcaseCommunitiesPreferences(tx *sql.Tx)
 			return nil, err
 		}
 
-		communities = append(communities, community)
+		result = append(result, community)
 	}
-	return communities, nil
+
+	err = rows.Err()
+	return
+}
+
+func (db sqlitePersistence) getProfileShowcaseCommunitiesPreferences(tx *sql.Tx) ([]*identity.ProfileShowcaseCommunityPreference, error) {
+	rows, err := tx.Query(selectProfileShowcaseCommunityPreferenceQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	return db.processProfileShowcaseCommunityPreferences(rows)
+}
+
+func (db sqlitePersistence) GetProfileShowcaseCommunityPreference(communityID string) (*identity.ProfileShowcaseCommunityPreference, error) {
+	rows, err := db.db.Query(selectSpecifiedShowcaseCommunityPreferenceQuery, communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	communities, err := db.processProfileShowcaseCommunityPreferences(rows)
+	if len(communities) > 0 {
+		return communities[0], err
+	}
+	return nil, err
 }
 
 func (db sqlitePersistence) DeleteProfileShowcaseCommunityPreference(communityID string) (bool, error) {

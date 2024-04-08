@@ -51,6 +51,12 @@ var messageArchiveInterval = 7 * 24 * time.Hour
 // 1 day interval
 var updateActiveMembersInterval = 24 * time.Hour
 
+// 1 day interval
+var grantUpdateInterval = 24 * time.Hour
+
+// 4 hours interval
+var grantInvokesProfileDispatchInterval = 4 * time.Hour
+
 const discordTimestampLayout = time.RFC3339
 
 const (
@@ -481,8 +487,8 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 				lastPublished = time.Now().Unix()
 
 			case <-m.quit:
+				ticker.Stop()
 				return
-
 			}
 		}
 	}()
@@ -526,6 +532,121 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 				}
 
 			case <-m.quit:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+}
+
+func (m *Messenger) HandleCommunityUpdateGrant(state *ReceivedMessageState, update *protobuf.CommunityUpdateGrant, statusMessage *v1protocol.StatusMessage) error {
+	community, err := m.communitiesManager.GetByID(update.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	return m.handleCommunityGrant(community, update.Grant, uint64(time.Now().UnixMilli()))
+}
+
+func (m *Messenger) handleCommunityGrant(community *communities.Community, grant []byte, clock uint64) error {
+	difference, err := m.communitiesManager.HandleCommunityGrant(community, grant, clock)
+	if err == communities.ErrGrantOlder || err == communities.ErrGrantExpired {
+		// Don't log an error for these cases
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	// if grant is significantly newer than the one we have, we should check the profile showcase
+	if time.Duration(difference)*time.Millisecond > grantInvokesProfileDispatchInterval {
+		err = m.UpdateProfileShowcaseCommunity(community)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Messenger) publishGrantForCommunityMemeber(community *communities.Community, memberKey string) error {
+	memberPubKey, err := common.HexToPubkey(memberKey)
+	if err != nil {
+		return err
+	}
+
+	grant, err := community.BuildGrant(memberPubKey, "")
+	if err != nil {
+		return err
+	}
+
+	update := &protobuf.CommunityUpdateGrant{
+		Clock:       uint64(time.Now().Unix()),
+		CommunityId: community.ID(),
+		Grant:       grant,
+	}
+
+	payload, err := proto.Marshal(update)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := &common.RawMessage{
+		Payload:             payload,
+		Sender:              community.PrivateKey(),
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_UPDATE_GRANT,
+		PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
+	}
+	_, err = m.sender.SendPrivate(context.Background(), memberPubKey, rawMessage)
+	return err
+}
+
+func (m *Messenger) publishGrantsForControlledCommunities() {
+	controlledCommunities, err := m.communitiesManager.Controlled()
+	if err != nil {
+		m.logger.Error("failed fetch controlled communities for grants update", zap.Error(err))
+	}
+
+	for _, community := range controlledCommunities {
+		// Skip unencrypted communities
+		if !community.Encrypted() {
+			continue
+		}
+
+		for memberKey := range community.Members() {
+			if memberKey == m.IdentityPublicKeyString() {
+				grant, err := community.BuildGrant(m.IdentityPublicKey(), "")
+				if err != nil {
+					m.logger.Error("can't build grant for controlled community", zap.Error(err))
+				}
+				err = m.handleCommunityGrant(community, grant, uint64(time.Now().UnixMilli()))
+				if err != nil {
+					m.logger.Error("error handling grant for controlled community", zap.Error(err))
+				}
+			} else {
+				// TODO: optimise sending grants to members, see https://github.com/status-im/status-go/pull/5024#discussion_r1560662007
+				err = m.publishGrantForCommunityMemeber(community, memberKey)
+				if err != nil {
+					m.logger.Error("failed to update grant for community member", zap.Error(err))
+				}
+			}
+		}
+	}
+}
+
+func (m *Messenger) schedulePublishGrantsForControlledCommunities() {
+	// Send once immediately
+	m.publishGrantsForControlledCommunities()
+
+	ticker := time.NewTicker(grantUpdateInterval)
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				m.publishGrantsForControlledCommunities()
+			case <-m.quit:
+				ticker.Stop()
 				return
 			}
 		}

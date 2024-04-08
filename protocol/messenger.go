@@ -813,6 +813,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.handleCommunitiesSubscription(m.communitiesManager.Subscribe())
 	m.handleCommunitiesHistoryArchivesSubscription(m.communitiesManager.Subscribe())
 	m.updateCommunitiesActiveMembersPeriodically()
+	m.schedulePublishGrantsForControlledCommunities()
 	m.handleENSVerificationSubscription(ensSubscription)
 	m.watchConnectionChange()
 	m.watchChatsAndCommunitiesToUnmute()

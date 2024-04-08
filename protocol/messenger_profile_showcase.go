@@ -118,13 +118,13 @@ func (m *Messenger) validateCommunityMembershipEntry(
 	}
 
 	if community.Encrypted() {
-		grant, err := community.VerifyGrantSignature(entry.Grant)
+		verifiedGrant, err := community.VerifyGrantSignature(entry.Grant)
 		if err != nil {
 			m.logger.Warn("failed to verify grant signature ", zap.Error(err))
-			return identity.ProfileShowcaseMembershipStatusNotAMember, nil
+			return identity.ProfileShowcaseMembershipStatusUnproven, nil
 		}
 
-		if grant != nil && bytes.Equal(grant.MemberId, crypto.CompressPubkey(contactPubKey)) {
+		if bytes.Equal(verifiedGrant.MemberId, crypto.CompressPubkey(contactPubKey)) {
 			return identity.ProfileShowcaseMembershipStatusProvenMember, nil
 		}
 		// Show as not a member if membership can't be proven
@@ -432,8 +432,6 @@ func (m *Messenger) GetProfileShowcaseForContact(contactID string, validate bool
 		return nil, err
 	}
 
-	// TODO: validate collectibles & assets ownership, https://github.com/status-im/status-desktop/issues/14129
-
 	return profileShowcase, nil
 }
 
@@ -711,6 +709,19 @@ func (m *Messenger) DeleteProfileShowcaseWalletAccount(account *accounts.Account
 		return m.DispatchProfileShowcase()
 	}
 	return nil
+}
+
+func (m *Messenger) UpdateProfileShowcaseCommunity(community *communities.Community) error {
+	profileCommunity, err := m.persistence.GetProfileShowcaseCommunityPreference(community.IDString())
+	if err != nil {
+		return err
+	}
+
+	if profileCommunity == nil {
+		// No corresponding profile entry, exit
+		return nil
+	}
+	return m.DispatchProfileShowcase()
 }
 
 func (m *Messenger) DeleteProfileShowcaseCommunity(community *communities.Community) error {

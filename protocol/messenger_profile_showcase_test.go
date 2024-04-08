@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -702,5 +703,141 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncry
 	s.Require().Equal(profileShowcase.Communities[0].CommunityID, aliceCommunity.IDString())
 	s.Require().Equal(profileShowcase.Communities[0].MembershipStatus, identity.ProfileShowcaseMembershipStatusProvenMember)
 	s.Require().Equal(profileShowcase.Communities[1].CommunityID, bobCommunity.IDString())
-	s.Require().Equal(profileShowcase.Communities[1].MembershipStatus, identity.ProfileShowcaseMembershipStatusNotAMember)
+	s.Require().Equal(profileShowcase.Communities[1].MembershipStatus, identity.ProfileShowcaseMembershipStatusUnproven)
+}
+
+// The scenario tested is as follow:
+// 1) Owner creates an encrypted community
+// 2) Bob add Alice becommes a mutual contacts
+// 3) Alice and bob join the community
+// 4) Alice presents the community in her profile showcase
+// 5) Bob gets the community from Alice's profile showcase and validates community's membership with grant
+// 6) Wait until the grant expires, Bob should not be able to validate the membership anymore (commented step)
+// 7) Owner updates the grant
+// 8) Bob should be able to validate the membership again
+func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGrantUpdate() {
+	// NOTE: commented to reduce test length communities.GrantExpirationTime = 200 * time.Millisecond
+	grantInvokesProfileDispatchInterval = 1 * time.Millisecond
+	alice := s.m
+
+	// Set Display name to pass shouldPublishChatIdentity check
+	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp.KeyUID = alice.account.KeyUID
+	profileKp.Accounts[0].KeyUID = alice.account.KeyUID
+
+	err := alice.settings.SaveOrUpdateKeypair(profileKp)
+	s.Require().NoError(err)
+
+	err = alice.SetDisplayName("Alice")
+	s.Require().NoError(err)
+
+	// 1) Owner creates an encrypted community
+	owner := s.newMessengerForProfileShowcase()
+	defer TearDownMessenger(&s.Suite, owner)
+
+	owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
+
+	community, _ := createEncryptedCommunity(&s.Suite, owner)
+	s.Require().True(community.Encrypted())
+
+	// 2) Bob add Alice becommes a mutual contacts
+	bob := s.newMessengerForProfileShowcase()
+	defer TearDownMessenger(&s.Suite, bob)
+
+	s.mutualContact(bob)
+
+	// 3) Alice and bob join the community
+	advertiseCommunityTo(&s.Suite, community, owner, alice)
+	advertiseCommunityTo(&s.Suite, community, owner, bob)
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	joinCommunity(&s.Suite, community, owner, alice, request, "")
+
+	joinedCommunities, err := alice.communitiesManager.Joined()
+	s.Require().NoError(err)
+	s.Require().Len(joinedCommunities, 1)
+	s.Require().Equal(joinedCommunities[0].IDString(), community.IDString())
+	s.Require().True(joinedCommunities[0].Encrypted())
+
+	grant, clock, err := alice.communitiesManager.GetCommunityGrant(community.IDString())
+	s.Require().NoError(err)
+	s.Require().NotEqual(grant, []byte{})
+	s.Require().True(clock > 0)
+
+	// 4) Alice presents the community in her profile showcase
+	err = alice.SetProfileShowcasePreferences(&identity.ProfileShowcasePreferences{
+		Communities: []*identity.ProfileShowcaseCommunityPreference{
+			&identity.ProfileShowcaseCommunityPreference{
+				CommunityID:        community.IDString(),
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+		},
+	}, false)
+	s.Require().NoError(err)
+
+	// 5) Bob gets the community from Alice's profile showcase and validates community's membership with grant
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
+	_, err = WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return r.updatedProfileShowcaseContactIDs[contactID] == true
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	profileShowcase, err := bob.GetProfileShowcaseForContact(contactID, true)
+	s.Require().NoError(err)
+	s.Require().Len(profileShowcase.Communities, 1)
+	s.Require().Equal(community.IDString(), profileShowcase.Communities[0].CommunityID)
+	s.Require().Equal(identity.ProfileShowcaseMembershipStatusProvenMember, profileShowcase.Communities[0].MembershipStatus)
+
+	// NOTE: this step is commented because it requires significant time to wait for the grant to expire
+	// and smaller timeouts can lead test to be flaky, but it should be working
+
+	// 6) Wait until the grant expires, Bob should not be able to validate the membership anymore
+	// time.Sleep(communities.GrantExpirationTime)
+
+	// profileShowcase, err = bob.GetProfileShowcaseForContact(contactID, true)
+	// s.Require().NoError(err)
+	// s.Require().Len(profileShowcase.Communities, 1)
+	// s.Require().Equal(community.IDString(), profileShowcase.Communities[0].CommunityID)
+	// s.Require().Equal(identity.ProfileShowcaseMembershipStatusUnproven, profileShowcase.Communities[0].MembershipStatus)
+
+	// 7) Owner updates the grant
+	owner.publishGrantsForControlledCommunities()
+
+	// Retrieve for grant clock update
+	err = tt.RetryWithBackOff(func() error {
+		_, err = alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, updatedClock, err := alice.communitiesManager.GetCommunityGrant(community.IDString())
+		if err != nil {
+			return err
+		}
+
+		if clock == updatedClock {
+			return errors.New("can't recive an updated grant")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	// 8) Bob should be able to validate the membership again
+	_, err = WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return r.updatedProfileShowcaseContactIDs[contactID] == true
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	profileShowcase, err = bob.GetProfileShowcaseForContact(contactID, true)
+	s.Require().NoError(err)
+	s.Require().Len(profileShowcase.Communities, 1)
+	s.Require().Equal(profileShowcase.Communities[0].CommunityID, community.IDString())
+	s.Require().Equal(profileShowcase.Communities[0].MembershipStatus, identity.ProfileShowcaseMembershipStatusProvenMember)
 }
