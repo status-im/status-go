@@ -439,6 +439,12 @@ migration:
 migration-check:
 	bash _assets/scripts/migration_check.sh
 
+commit-check:
+	bash _assets/scripts/commit_check.sh
+
+tag-version:
+	bash _assets/scripts/tag_version.sh $(TARGET_COMMIT)
+
 migration-wallet: DEFAULT_WALLET_MIGRATION_PATH := walletdatabase/migrations/sql
 migration-wallet:
 	touch $(DEFAULT_WALLET_MIGRATION_PATH)/$$(date +%s)_$(D).up.sql

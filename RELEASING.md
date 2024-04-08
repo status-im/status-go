@@ -17,24 +17,34 @@ We use `0` as the MAJOR version and bump only MINOR when there are breaking chan
 
 After successful build, open it (https://ci.status.im/job/status-go/job/manual/$BUILD_ID/) in a browser. Artifacts will have a random ID, for example `status-go-android-181221-143603-5708af.aar`, means that `181221-143603-5708af` is a version you can use in [status-mobile](https://github.com/status-im/status-mobile).
 
-## Releasing a new patch (no breaking changes or a hot-fix release)
 
-TODO: create a script that can do that instead of manual work.
+## Release branch
 
-1. Checkout a release branch you want to release from (release branches have names like `release/0.X`),
-1. Cherry-pick a commit you want to include OR merge `develop` branch,
-1. Bump `Y` (`0.X.Y`) in the current version (`VERSION` file),
-1. Commit and push the change to `release/0.X` branch,
-1. Go to [Jenkins job](https://ci.status.im/job/status-go/job/manual/), select "RELEASE" and use `release/0.X` branch name.
+The release branch takes the form of `release/v0.y.x`, where `x` is hardcoded.
+For example a valid release branch name is `release/v0.177.x` or `release/v0.188.x`.
+Currently commits on this branch are not tagged and the branch name is used as a ref.
 
-## Releasing a new version (breaking changes)
+### Hotfixes
 
-TODO: create a script that can do that instead of manual work.
+If an hotfix is necessary on the release branch (that happens after the app is released, and we need to push out a patched version), we historically tagged it using the format `release/v0.177.x+hotfix.1`.
 
-1. Merge your PR to `develop` branch,
-1. Pull `develop` branch locally,
-1. Bump `X`, reset `Z` to `0` and commit to `develop` with a message "Bump version to 0.X.Y",
-1. Checkout a new branch `release/0.X`,
-1. Remove `-beta.Z` suffix from the current version (`VERSION` file),
-1. Commit and push the change,
-1. Go to [Jenkins job](https://ci.status.im/job/status-go/job/manual/), select "RELEASE" and use `release/0.X` branch.
+
+The process over release branches is still in work since we still had few coordinated release between desktop and mobile, and we are still in the exploration phase.
+
+
+## Tagging versions
+
+To tag a version, you should run the command:
+
+`make tag-version` to create a tag for `HEAD`
+
+or 
+
+`make tag-version TARGET_COMMIT={hash}` to create a tag for a specific hash
+
+You will have to then check the tag is correct, and push the tag:
+
+`git push origin {tag_created}`
+
+
+That can then be used as a stable tag.
