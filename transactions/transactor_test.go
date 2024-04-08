@@ -266,7 +266,9 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 		},
 	}
 
-	for _, scenario := range scenarios {
+	for _, localScenario := range scenarios {
+		// to satisfy gosec: C601 checks
+		scenario := localScenario
 		desc := fmt.Sprintf("nonceFromNetwork: %d, tx nonce: %d, expect error: %v", scenario.nonceFromNetwork, scenario.txNonce, scenario.expectError)
 		s.T().Run(desc, func(t *testing.T) {
 			nonce := scenario.txNonce
