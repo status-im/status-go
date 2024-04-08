@@ -35,3 +35,11 @@ Please, note that we follow [Effective Go](https://golang.org/doc/effective_go.h
 
 2. Preserve as much history as possible.
    If you need to re-name file use `git mv` - it will preserve git history.
+
+## Commit format
+
+We use a slight variation of [Conventional commits](https://www.conventionalcommits.org/en/v1.0.0/).
+
+We enforce the usage of `!` for breaking changes, or `_` for non-breaking. The rationale is that
+if we don't enforce one or the other, often devs will forget to add `!` to breaking changes.
+Forcing to add one or the other, will also hopefully force devs to make a decision with each commit.
