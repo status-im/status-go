@@ -4061,26 +4061,51 @@ func (m *Messenger) CheckPermissionsToJoinCommunity(request *requests.CheckPermi
 	return m.communitiesManager.CheckPermissionToJoin(request.CommunityID, addresses)
 }
 
-func (m *Messenger) CheckCommunityChannelPermissions(request *requests.CheckCommunityChannelPermissions) (*communities.CheckChannelPermissionsResponse, error) {
-	if err := request.Validate(); err != nil {
-		return nil, err
+func (m *Messenger) getSharedAddresses(communityID types.HexBytes, requestAddresses []string) ([]gethcommon.Address, error) {
+	addressesMap := make(map[string]struct{})
+
+	for _, v := range requestAddresses {
+		addressesMap[v] = struct{}{}
 	}
 
-	var addresses []gethcommon.Address
+	if len(requestAddresses) == 0 {
+		sharedAddresses, err := m.GetRevealedAccounts(communityID, common.PubkeyToHex(&m.identity.PublicKey))
+		if err != nil {
+			return nil, err
+		}
 
-	if len(request.Addresses) == 0 {
+		for _, v := range sharedAddresses {
+			addressesMap[v.Address] = struct{}{}
+		}
+	}
+
+	if len(addressesMap) == 0 {
 		accounts, err := m.settings.GetActiveAccounts()
 		if err != nil {
 			return nil, err
 		}
 
 		for _, a := range accounts {
-			addresses = append(addresses, gethcommon.HexToAddress(a.Address.Hex()))
+			addressesMap[a.Address.Hex()] = struct{}{}
 		}
-	} else {
-		for _, v := range request.Addresses {
-			addresses = append(addresses, gethcommon.HexToAddress(v))
-		}
+	}
+
+	var addresses []gethcommon.Address
+	for addr := range addressesMap {
+		addresses = append(addresses, gethcommon.HexToAddress(addr))
+	}
+
+	return addresses, nil
+}
+
+func (m *Messenger) CheckCommunityChannelPermissions(request *requests.CheckCommunityChannelPermissions) (*communities.CheckChannelPermissionsResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	addresses, err := m.getSharedAddresses(request.CommunityID, request.Addresses)
+	if err != nil {
+		return nil, err
 	}
 
 	return m.communitiesManager.CheckChannelPermissions(request.CommunityID, request.ChatID, addresses)
@@ -4091,21 +4116,9 @@ func (m *Messenger) CheckAllCommunityChannelsPermissions(request *requests.Check
 		return nil, err
 	}
 
-	var addresses []gethcommon.Address
-
-	if len(request.Addresses) == 0 {
-		accounts, err := m.settings.GetActiveAccounts()
-		if err != nil {
-			return nil, err
-		}
-
-		for _, a := range accounts {
-			addresses = append(addresses, gethcommon.HexToAddress(a.Address.Hex()))
-		}
-	} else {
-		for _, v := range request.Addresses {
-			addresses = append(addresses, gethcommon.HexToAddress(v))
-		}
+	addresses, err := m.getSharedAddresses(request.CommunityID, request.Addresses)
+	if err != nil {
+		return nil, err
 	}
 
 	return m.communitiesManager.CheckAllChannelsPermissions(request.CommunityID, addresses)

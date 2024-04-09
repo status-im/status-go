@@ -863,6 +863,44 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPe
 	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
 }
 
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestSharedAddressesReturnsRevealedAccount() {
+	community, _ := s.createCommunity()
+
+	permissionRequest := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				AmountInWei:       "100000000000000000000",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+
+	response, err := s.owner.CreateCommunityTokenPermission(&permissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+
+	s.advertiseCommunityTo(community, s.alice)
+
+	s.joinCommunity(community, s.alice, bobPassword, []string{})
+
+	revealedAccounts, err := s.alice.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccounts, 2)
+	s.Require().Equal(aliceAddress1, revealedAccounts[0].Address)
+	s.Require().Equal(aliceAddress2, revealedAccounts[1].Address)
+
+	sharedAddresses, err := s.alice.getSharedAddresses(community.ID(), []string{})
+	s.Require().NoError(err)
+	s.Require().Len(sharedAddresses, 2)
+	s.Require().Equal(sharedAddresses[0].String(), revealedAccounts[0].Address)
+	s.Require().Equal(sharedAddresses[1].String(), revealedAccounts[1].Address)
+}
+
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWithMemberAndAdminPermission() {
 	community, _ := s.createCommunity()
 
