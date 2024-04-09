@@ -123,6 +123,7 @@ func GenerateTestCollectionsData(count int) (result []CollectionData) {
 			ImagePayload: []byte(fmt.Sprintf("imagepayload-%d", i)),
 			Traits:       traits,
 			CommunityID:  fmt.Sprintf("community-%d", i),
+			Socials:      nil,
 		}
 		result = append(result, newCollection)
 	}

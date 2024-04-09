@@ -390,6 +390,10 @@ func (o *Client) FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs
 	return ret, nil
 }
 
+func (o *Client) FetchCollectionSocials(ctx context.Context, contractID thirdparty.ContractID) (*thirdparty.CollectionSocials, error) {
+	return nil, thirdparty.ErrEndpointNotSupported
+}
+
 func (o *Client) FetchCollectionsDataByContractID(ctx context.Context, contractIDs []thirdparty.ContractID) ([]thirdparty.CollectionData, error) {
 	ret := make([]thirdparty.CollectionData, 0, len(contractIDs))
 

@@ -42,6 +42,15 @@ func (m *mockCollectiblesManager) FetchAssetsByCollectibleUniqueID(ctx context.C
 	return res.([]thirdparty.FullCollectibleData), args.Error(1)
 }
 
+func (m *mockCollectiblesManager) FetchCollectionSocialsAsync(contractID thirdparty.ContractID) error {
+	args := m.Called(contractID)
+	res := args.Get(0)
+	if res == nil {
+		return args.Error(1)
+	}
+	return nil
+}
+
 // mockTokenManager implements the token.ManagerInterface
 type mockTokenManager struct {
 	mock.Mock

@@ -152,6 +152,13 @@ type CollectionData struct {
 	ImageURL     string                `json:"image_url"`
 	ImagePayload []byte
 	Traits       map[string]CollectionTrait `json:"traits"`
+	Socials      *CollectionSocials         `json:"socials"`
+}
+
+type CollectionSocials struct {
+	Website       string `json:"website"`
+	TwitterHandle string `json:"twitter_handle"`
+	Provider      string `json:"provider"`
 }
 
 type CollectibleTrait struct {
@@ -273,6 +280,7 @@ type CollectibleAccountOwnershipProvider interface {
 type CollectibleDataProvider interface {
 	CollectibleProvider
 	FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs []CollectibleUniqueID) ([]FullCollectibleData, error)
+	FetchCollectionSocials(ctx context.Context, contractID ContractID) (*CollectionSocials, error)
 }
 
 type CollectionDataProvider interface {

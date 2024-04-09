@@ -342,6 +342,12 @@ func (api *API) GetCollectiblesByUniqueIDAsync(requestID int32, uniqueIDs []thir
 	return nil
 }
 
+func (api *API) FetchCollectionSocialsAsync(contractID thirdparty.ContractID) error {
+	log.Debug("wallet.api.FetchCollectionSocialsAsync", "contractID", contractID)
+
+	return api.s.collectiblesManager.FetchCollectionSocialsAsync(contractID)
+}
+
 func (api *API) GetCollectibleOwnersByContractAddress(ctx context.Context, chainID wcommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
 	log.Debug("call to GetCollectibleOwnersByContractAddress")
 	return api.s.collectiblesManager.FetchCollectibleOwnersByContractAddress(ctx, chainID, contractAddress)

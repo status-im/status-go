@@ -24,6 +24,7 @@ func TestUnmarshallCollection(t *testing.T) {
 		Name:         "CryptoKitties",
 		ImageURL:     "https://i.seadn.io/gae/C272ZRW1RGGef9vKMePFSCeKc1Lw6U40wl9ofNVxzUxFdj84hH9xJRQNf-7wgs7W8qw8RWe-1ybKp-VKuU5D-tg?w=500&auto=format",
 		Traits:       make(map[string]thirdparty.CollectionTrait),
+		Socials:      &thirdparty.CollectionSocials{Website: "", TwitterHandle: "CryptoKitties", Provider: "alchemy"},
 	}
 
 	collection := Contract{}
@@ -79,6 +80,7 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 				Slug:         "",
 				ImageURL:     "",
 				Traits:       make(map[string]thirdparty.CollectionTrait),
+				Socials:      &thirdparty.CollectionSocials{Website: "", TwitterHandle: "", Provider: "alchemy"},
 			},
 			AccountBalance: &bigint.BigInt{
 				Int: expectedBalance0,
@@ -137,6 +139,7 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 				Slug:         "",
 				ImageURL:     "https://raw.seadn.io/files/e7765f13c4658f514d0efc008ae7f300.png",
 				Traits:       make(map[string]thirdparty.CollectionTrait),
+				Socials:      &thirdparty.CollectionSocials{Website: "", TwitterHandle: "SimpsonPunksETH", Provider: "alchemy"},
 			},
 			AccountBalance: &bigint.BigInt{
 				Int: expectedBalance1,
