@@ -1302,7 +1302,7 @@ func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error)
 	return info.KeyUID, nil
 }
 
-func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, fetchBackup bool, request *requests.CreateAccount, opts ...params.Option) (*multiaccounts.Account, error) {
+func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, fetchBackup bool, request *requests.CreateAccount) (*multiaccounts.Account, error) {
 	keystoreDir := keystoreRelativePath
 
 	b.UpdateRootDataDir(request.BackupDisabledDataDir)
@@ -1405,7 +1405,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		//settings.MnemonicWasNotShown = true
 	}
 
-	nodeConfig, err := defaultNodeConfig(settings.InstallationID, request, opts...)
+	nodeConfig, err := defaultNodeConfig(settings.InstallationID, request)
 	if err != nil {
 		return nil, err
 	}
@@ -1453,14 +1453,14 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 	return &account, nil
 }
 
-func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccount, opts ...params.Option) (*multiaccounts.Account, error) {
+func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccount) (*multiaccounts.Account, error) {
 	validation := &requests.CreateAccountValidation{
 		AllowEmptyDisplayName: false,
 	}
 	if err := request.Validate(validation); err != nil {
 		return nil, err
 	}
-	return b.generateOrImportAccount("", 1, false, request, opts...)
+	return b.generateOrImportAccount("", 1, false, request)
 }
 
 func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPassword string, newPassword string) error {

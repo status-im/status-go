@@ -9,7 +9,6 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wakuv2ext"
 
@@ -32,23 +31,10 @@ func setupLogger(file string) *zap.Logger {
 		logger.Fatalf("Error initializing logger: %v", err)
 	}
 
-	newLogger := logutils.ZapLogger()
-
-	return newLogger
+	return logutils.ZapLogger()
 }
 
-func withHTTP(port int) params.Option {
-	return func(c *params.NodeConfig) error {
-		c.APIModules = "waku,wakuext,wakuv2,permissions,eth"
-		c.HTTPEnabled = true
-		c.HTTPHost = "127.0.0.1"
-		c.HTTPPort = port
-
-		return nil
-	}
-}
-
-func startMessenger(cCtx *cli.Context, name string, port int) (*StatusCLI, error) {
+func start(cCtx *cli.Context, name string, port int, apiModules string) (*StatusCLI, error) {
 	namedLogger := logger.Named(name)
 	namedLogger.Info("starting messager")
 
@@ -63,15 +49,19 @@ func startMessenger(cCtx *cli.Context, name string, port int) (*StatusCLI, error
 	backend := api.NewGethStatusBackend()
 
 	createAccountRequest := &requests.CreateAccount{
-		DisplayName:           "some-display-name",
+		DisplayName:           name,
 		CustomizationColor:    "#ffffff",
 		Emoji:                 "some",
 		Password:              "some-password",
 		BackupDisabledDataDir: fmt.Sprintf("./test-%s", strings.ToLower(name)),
 		LogFilePath:           "log",
+		APIConfig: &requests.APIConfig{
+			APIModules: apiModules,
+			HTTPHost:   "127.0.0.1",
+			HTTPPort:   port,
+		},
 	}
-	opts := []params.Option{withHTTP(port)}
-	_, err = backend.CreateAccountAndLogin(createAccountRequest, opts...)
+	_, err = backend.CreateAccountAndLogin(createAccountRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +92,7 @@ func startMessenger(cCtx *cli.Context, name string, port int) (*StatusCLI, error
 	return &data, nil
 }
 
-func stopMessenger(cli *StatusCLI) {
+func (cli *StatusCLI) stop() {
 	err := cli.backend.StopNode()
 	if err != nil {
 		logger.Error(err)

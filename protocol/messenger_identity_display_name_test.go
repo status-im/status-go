@@ -220,5 +220,4 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameRestrictions() 
 	displayName, err = s.m.settings.DisplayName()
 	s.Require().NoError(err)
 	s.Require().Equal("name with space", displayName)
-
 }

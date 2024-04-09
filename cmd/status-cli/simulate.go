@@ -2,15 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
@@ -32,65 +30,67 @@ func simulate(cCtx *cli.Context) error {
 	}
 	logger = rawLogger.Sugar()
 
-	logger.Info("Running dm command, flags passed:")
-	for _, flag := range DmFlags {
+	logger.Info("Running simulate command, flags passed:")
+	for _, flag := range SimulateFlags {
 		logger.Infof("-%s %v", flag.Names()[0], cCtx.Value(flag.Names()[0]))
 	}
 
-	// Start Alice and Bob's messengers
-	alice, err := startMessenger(cCtx, "Alice", 0)
-	if err != nil {
-		return err
-	}
-	defer stopMessenger(alice)
+	// Start messengers
+	apiModules := cCtx.String(APIModulesFlag)
 
-	bob, err := startMessenger(cCtx, "Bob", 0)
+	alice, err := start(cCtx, "Alice", 0, apiModules)
 	if err != nil {
 		return err
 	}
-	defer stopMessenger(bob)
+	defer alice.stop()
+
+	charlie, err := start(cCtx, "Charlie", 0, apiModules)
+	if err != nil {
+		return err
+	}
+	defer charlie.stop()
 
 	// Retrieve for messages
 	msgCh := make(chan string)
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	go retrieveMessagesLoop(ctx, alice, RetrieveInterval, nil, &wg)
+	go alice.retrieveMessagesLoop(ctx, RetrieveInterval, nil, &wg)
 	wg.Add(1)
-	go retrieveMessagesLoop(ctx, bob, RetrieveInterval, msgCh, &wg)
+	go charlie.retrieveMessagesLoop(ctx, RetrieveInterval, msgCh, &wg)
 
-	// Send contact request from Alice to Bob, bob accept the request
+	// Send contact request from Alice to Charlie, charlie accept the request
 	time.Sleep(WaitingInterval)
-	destID := types.EncodeHex(crypto.FromECDSAPub(bob.messenger.IdentityPublicKey()))
-	err = sendContactRequest(cCtx, alice, destID)
+	destID := charlie.messenger.GetSelfContact().ID
+	err = alice.sendContactRequest(cCtx, destID)
 	if err != nil {
 		return err
 	}
 
 	msgID := <-msgCh
-	err = sendContactRequestAcceptance(cCtx, bob, msgID)
+	err = charlie.sendContactRequestAcceptance(cCtx, msgID)
 	if err != nil {
 		return err
 	}
 
-	// Send DM between alice to bob
+	// Send DM between alice to charlie
 	interactive := cCtx.Bool(InteractiveFlag)
 	if interactive {
 		sem := make(chan struct{}, 1)
 		wg.Add(1)
-		go sendMessageLoop(ctx, alice, SendInterval, &wg, sem, cancel)
+		go alice.sendMessageLoop(ctx, SendInterval, &wg, sem, cancel)
 		wg.Add(1)
-		go sendMessageLoop(ctx, bob, SendInterval, &wg, sem, cancel)
+		go charlie.sendMessageLoop(ctx, SendInterval, &wg, sem, cancel)
 	} else {
 		time.Sleep(WaitingInterval)
 		for i := 0; i < cCtx.Int(CountFlag); i++ {
-			err = sendDirectMessage(ctx, alice, "hello bob :)")
+			err = alice.sendDirectMessage(ctx, fmt.Sprintf("message from alice, number: %d", i+1))
 			if err != nil {
 				return err
 			}
 			time.Sleep(WaitingInterval)
 
-			err = sendDirectMessage(ctx, bob, "hello Alice ~")
+			err = charlie.sendDirectMessage(ctx, fmt.Sprintf("message from charlie, number: %d", i+1))
 			if err != nil {
 				return err
 			}

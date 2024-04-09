@@ -190,7 +190,7 @@ func buildWalletConfig(request *requests.WalletSecretsConfig) params.WalletConfi
 	return walletConfig
 }
 
-func defaultNodeConfig(installationID string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
+func defaultNodeConfig(installationID string, request *requests.CreateAccount) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.LogEnabled = request.LogEnabled
@@ -311,10 +311,11 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 		nodeConfig.TorrentConfig.Port = *request.TorrentConfigPort
 	}
 
-	for _, opt := range opts {
-		if err := opt(nodeConfig); err != nil {
-			return nil, err
-		}
+	if request.APIConfig != nil {
+		nodeConfig.HTTPEnabled = true
+		nodeConfig.HTTPHost = request.APIConfig.HTTPHost
+		nodeConfig.HTTPPort = request.APIConfig.HTTPPort
+		nodeConfig.APIModules = request.APIConfig.APIModules
 	}
 
 	return nodeConfig, nil
