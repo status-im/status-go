@@ -828,7 +828,7 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 	// Was applicant not a member and successfully joined?
 	if !isCommunityMember && community.Joined() {
 		joinedNotification := &localnotifications.Notification{
-			ID:       gethcommon.Hash(types.BytesToHash([]byte(`you-joined-`+ communityID.String()))),
+			ID:       gethcommon.Hash(types.BytesToHash([]byte(`you-joined-` + communityID.String()))),
 			Title:    community.Name(),
 			Message:  community.Name(),
 			BodyType: localnotifications.CategoryCommunityJoined,
