@@ -21,7 +21,7 @@ func NewCollectibleDataDB(sqlDb *sql.DB) *CollectibleDataDB {
 	}
 }
 
-const collectibleDataColumns = "chain_id, contract_address, token_id, provider, name, description, permalink, image_url, image_payload, animation_url, animation_media_type, background_color, token_uri, community_id"
+const collectibleDataColumns = "chain_id, contract_address, token_id, provider, name, description, permalink, image_url, image_payload, animation_url, animation_media_type, background_color, token_uri, community_id, soulbound"
 const collectibleCommunityDataColumns = "community_privileges_level"
 const collectibleTraitsColumns = "chain_id, contract_address, token_id, trait_type, trait_value, display_type, max_value"
 const selectCollectibleTraitsColumns = "trait_type, trait_value, display_type, max_value"
@@ -108,7 +108,7 @@ func upsertCollectibleTraits(creator sqlite.StatementCreator, id thirdparty.Coll
 
 func setCollectiblesData(creator sqlite.StatementCreator, collectibles []thirdparty.CollectibleData, allowUpdate bool) error {
 	insertCollectible, err := creator.Prepare(fmt.Sprintf(`%s INTO collectible_data_cache (%s) 
-																				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, insertStatement(allowUpdate), collectibleDataColumns))
+																				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, insertStatement(allowUpdate), collectibleDataColumns))
 	if err != nil {
 		return err
 	}
@@ -129,6 +129,7 @@ func setCollectiblesData(creator sqlite.StatementCreator, collectibles []thirdpa
 			c.BackgroundColor,
 			c.TokenURI,
 			c.CommunityID,
+			c.Soulbound,
 		)
 		if err != nil {
 			return err
@@ -194,6 +195,7 @@ func scanCollectiblesDataRow(row *sql.Row) (*thirdparty.CollectibleData, error) 
 		&c.BackgroundColor,
 		&c.TokenURI,
 		&c.CommunityID,
+		&c.Soulbound,
 	)
 	if err != nil {
 		return nil, err

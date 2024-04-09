@@ -24,6 +24,7 @@
 // 1707160323_add_contract_type_table.up.sql (282B)
 // 1708089811_add_nullable_fiesl_blocks_ranges.up.sql (450B)
 // 1710189541_add_nonce_to_pending_transactions.up.sql (54B)
+// 1712567001_add_soulbound_collectible_cache.up.sql (75B)
 // doc.go (94B)
 
 package migrations
@@ -572,6 +573,26 @@ func _1710189541_add_nonce_to_pending_transactionsUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1712567001_add_soulbound_collectible_cacheUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\x31\x0e\xc3\x20\x0c\x05\xd0\xab\xfc\x7b\x74\x32\xc5\x4c\x6e\x91\x5a\x98\x11\x18\xa4\x44\xb2\xc2\x10\xb8\x7f\x1e\x49\xe2\x1f\x12\x39\x61\xe8\x34\x1b\xba\xce\x66\xa3\xf4\xba\x6a\xd1\xaa\xc7\x00\x79\x8f\x77\x94\xfc\xf9\xe2\x9e\xdb\xda\xdc\x57\x87\x8b\x51\xe0\x39\x50\x96\x84\x40\xf2\xe7\xd7\x13\x00\x00\xff\xff\x77\x57\xe4\x5f\x4b\x00\x00\x00")
+
+func _1712567001_add_soulbound_collectible_cacheUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1712567001_add_soulbound_collectible_cacheUpSql,
+		"1712567001_add_soulbound_collectible_cache.up.sql",
+	)
+}
+
+func _1712567001_add_soulbound_collectible_cacheUpSql() (*asset, error) {
+	bytes, err := _1712567001_add_soulbound_collectible_cacheUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1712567001_add_soulbound_collectible_cache.up.sql", size: 75, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x2e, 0x6c, 0x8b, 0x92, 0x49, 0x6c, 0x6, 0x66, 0x4c, 0xbb, 0x63, 0x4a, 0xc6, 0x7, 0xf2, 0x75, 0xef, 0xa9, 0xe5, 0xd9, 0x6c, 0x90, 0x9, 0xe4, 0x5f, 0xd1, 0xf3, 0x0, 0xd2, 0xf3, 0x0, 0xb8}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xcb\x41\x0e\x02\x31\x08\x05\xd0\x7d\x4f\xf1\x2f\x00\xe8\xca\xc4\xc4\xc3\xa0\x43\x08\x19\x5b\xc6\x96\xfb\xc7\x4d\xdf\xfe\x5d\xfa\x39\xd5\x0d\xeb\xf7\x6d\x4d\xc4\xf3\xe9\x36\x6c\x6a\x19\x3c\xe9\x1d\xe3\xd0\x52\x50\xcf\xa3\xa2\xdb\xeb\xfe\xb8\x6d\xa0\xeb\x74\xf4\xf0\xa9\x15\x39\x16\x28\xc1\x2c\x7b\xb0\x27\x58\xda\x3f\x00\x00\xff\xff\x57\xd4\xd5\x90\x5e\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -707,6 +728,7 @@ var _bindata = map[string]func() (*asset, error){
 	"1707160323_add_contract_type_table.up.sql":                                     _1707160323_add_contract_type_tableUpSql,
 	"1708089811_add_nullable_fiesl_blocks_ranges.up.sql":                            _1708089811_add_nullable_fiesl_blocks_rangesUpSql,
 	"1710189541_add_nonce_to_pending_transactions.up.sql":                           _1710189541_add_nonce_to_pending_transactionsUpSql,
+	"1712567001_add_soulbound_collectible_cache.up.sql":                             _1712567001_add_soulbound_collectible_cacheUpSql,
 	"doc.go": docGo,
 }
 
@@ -780,6 +802,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1707160323_add_contract_type_table.up.sql":                                     {_1707160323_add_contract_type_tableUpSql, map[string]*bintree{}},
 	"1708089811_add_nullable_fiesl_blocks_ranges.up.sql":                            {_1708089811_add_nullable_fiesl_blocks_rangesUpSql, map[string]*bintree{}},
 	"1710189541_add_nonce_to_pending_transactions.up.sql":                           {_1710189541_add_nonce_to_pending_transactionsUpSql, map[string]*bintree{}},
+	"1712567001_add_soulbound_collectible_cache.up.sql":                             {_1712567001_add_soulbound_collectible_cacheUpSql, map[string]*bintree{}},
 	"doc.go": {docGo, map[string]*bintree{}},
 }}
 

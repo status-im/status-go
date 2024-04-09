@@ -28,6 +28,7 @@ type CollectibleData struct {
 	AnimationMediaType *string                        `json:"animation_media_type,omitempty"`
 	Traits             *[]thirdparty.CollectibleTrait `json:"traits,omitempty"`
 	BackgroundColor    *string                        `json:"background_color,omitempty"`
+	Soulbound          *bool                          `json:"soulbound,omitempty"`
 }
 
 type CollectionData struct {
@@ -84,6 +85,7 @@ func fullCollectibleDataToHeader(c thirdparty.FullCollectibleData) Collectible {
 			AnimationURL:       &c.CollectibleData.AnimationURL,
 			AnimationMediaType: &c.CollectibleData.AnimationMediaType,
 			BackgroundColor:    &c.CollectibleData.BackgroundColor,
+			Soulbound:          &c.CollectibleData.Soulbound,
 		},
 	}
 	if c.CollectionData != nil {
@@ -125,6 +127,7 @@ func fullCollectibleDataToDetails(c thirdparty.FullCollectibleData) Collectible 
 			AnimationMediaType: &c.CollectibleData.AnimationMediaType,
 			BackgroundColor:    &c.CollectibleData.BackgroundColor,
 			Traits:             &c.CollectibleData.Traits,
+			Soulbound:          &c.CollectibleData.Soulbound,
 		},
 	}
 	if c.CollectionData != nil {

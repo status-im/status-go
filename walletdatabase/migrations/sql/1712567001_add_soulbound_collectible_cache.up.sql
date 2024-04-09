@@ -1,0 +1,1 @@
+ALTER TABLE collectible_data_cache ADD COLUMN soulbound BOOL DEFAULT FALSE;
