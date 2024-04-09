@@ -354,7 +354,7 @@ canary-test: node-canary
 
 lint:
 	@echo "lint"
-	@golangci-lint --exclude=SA1019 run ./... --deadline=5m
+	@golangci-lint run ./...
 
 ci: lint canary-test test-unit test-e2e ##@tests Run all linters and tests at once
 
