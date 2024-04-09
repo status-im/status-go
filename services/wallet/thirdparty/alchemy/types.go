@@ -104,7 +104,9 @@ func (r *Raw) UnmarshalJSON(b []byte) error {
 }
 
 type OpenSeaMetadata struct {
-	ImageURL string `json:"imageUrl"`
+	ImageURL        string `json:"imageUrl"`
+	TwitterUsername string `json:"twitterUsername"`
+	ExternalURL     string `json:"externalUrl"`
 }
 
 type Contract struct {
@@ -184,6 +186,14 @@ func alchemyToContractType(tokenType string) walletCommon.ContractType {
 	}
 }
 
+func (c *Contract) toCollectionSocials() thirdparty.CollectionSocials {
+	ret := thirdparty.CollectionSocials{
+		Website:       c.OpenSeaMetadata.ExternalURL,
+		TwitterHandle: c.OpenSeaMetadata.TwitterUsername,
+	}
+	return ret
+}
+
 func (c *Contract) toCollectionData(id thirdparty.ContractID) thirdparty.CollectionData {
 	ret := thirdparty.CollectionData{
 		ID:           id,
@@ -192,6 +202,7 @@ func (c *Contract) toCollectionData(id thirdparty.ContractID) thirdparty.Collect
 		Name:         c.Name,
 		ImageURL:     c.OpenSeaMetadata.ImageURL,
 		Traits:       make(map[string]thirdparty.CollectionTrait, 0),
+		Socials:      c.toCollectionSocials(),
 	}
 	return ret
 }

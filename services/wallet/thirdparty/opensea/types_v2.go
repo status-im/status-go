@@ -139,12 +139,14 @@ type ContractID struct {
 }
 
 type CollectionData struct {
-	Collection  string         `json:"collection"`
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
-	Owner       common.Address `json:"owner"`
-	ImageURL    string         `json:"image_url"`
-	Contracts   []ContractID   `json:"contracts"`
+	Collection    string         `json:"collection"`
+	Name          string         `json:"name"`
+	Description   string         `json:"description"`
+	Owner         common.Address `json:"owner"`
+	ImageURL      string         `json:"image_url"`
+	Contracts     []ContractID   `json:"contracts"`
+	Website       string         `json:"project_url"`
+	TwitterHandle string         `json:"twitter_username"`
 }
 
 func (c *NFT) id(chainID walletCommon.ChainID) thirdparty.CollectibleUniqueID {
@@ -225,6 +227,14 @@ func (c *DetailedNFT) toCommon(chainID walletCommon.ChainID) thirdparty.FullColl
 	}
 }
 
+func (c *CollectionData) toCollectionSocials() thirdparty.CollectionSocials {
+	ret := thirdparty.CollectionSocials{
+		Website:       c.Website,
+		TwitterHandle: c.TwitterHandle,
+	}
+	return ret
+}
+
 func (c *CollectionData) toCommon(id thirdparty.ContractID, tokenStandard string) thirdparty.CollectionData {
 	ret := thirdparty.CollectionData{
 		ID:           id,
@@ -233,6 +243,7 @@ func (c *CollectionData) toCommon(id thirdparty.ContractID, tokenStandard string
 		Name:         c.Name,
 		Slug:         c.Collection,
 		ImageURL:     c.ImageURL,
+		Socials:      c.toCollectionSocials(),
 	}
 	return ret
 }

@@ -216,9 +216,10 @@ type Collection struct {
 }
 
 type CollectionMetadata struct {
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Contents    []Content `json:"content"`
+	Name         string    `json:"name"`
+	Description  string    `json:"description"`
+	Contents     []Content `json:"content"`
+	ExternalLink string    `json:"externalLink"`
 }
 
 type Content struct {
@@ -310,6 +311,13 @@ func raribleToCollectionsData(l []Collection, isMainnet bool) []thirdparty.Colle
 	return ret
 }
 
+func (c *Collection) toCollectionSocials() thirdparty.CollectionSocials {
+	ret := thirdparty.CollectionSocials{
+		Website: c.Metadata.ExternalLink,
+	}
+	return ret
+}
+
 func (c *Collection) toCommon(id thirdparty.ContractID) thirdparty.CollectionData {
 	ret := thirdparty.CollectionData{
 		ID:           id,
@@ -319,6 +327,7 @@ func (c *Collection) toCommon(id thirdparty.ContractID) thirdparty.CollectionDat
 		Slug:         "", /* Missing from the API for now */
 		ImageURL:     getImageURL(c.Metadata.Contents),
 		Traits:       make(map[string]thirdparty.CollectionTrait, 0), /* Missing from the API for now */
+		Socials:      c.toCollectionSocials(),
 	}
 	return ret
 }

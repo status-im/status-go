@@ -35,12 +35,18 @@ const (
 
 	EventOwnedCollectiblesFilteringDone walletevent.EventType = "wallet-owned-collectibles-filtering-done"
 	EventGetCollectiblesDetailsDone     walletevent.EventType = "wallet-get-collectibles-details-done"
+	EventGetCollectibleSocialsDone      walletevent.EventType = "wallet-get-collectible-socials-done"
 )
 
 type OwnershipUpdateMessage struct {
 	Added   []thirdparty.CollectibleUniqueID `json:"added"`
 	Updated []thirdparty.CollectibleUniqueID `json:"updated"`
 	Removed []thirdparty.CollectibleUniqueID `json:"removed"`
+}
+
+type CollectibleSocialsMessage struct {
+	ID      thirdparty.CollectibleUniqueID `json:"id"`
+	Socials thirdparty.CollectionSocials   `json:"socials"`
 }
 
 type CollectibleDataType byte
@@ -78,6 +84,10 @@ var (
 	}
 	getCollectiblesDataTask = async.TaskType{
 		ID:     2,
+		Policy: async.ReplacementPolicyCancelOld,
+	}
+	fetchCollectibleSocialsTask = async.TaskType{
+		ID:     3,
 		Policy: async.ReplacementPolicyCancelOld,
 	}
 )
@@ -546,4 +556,10 @@ func (s *Service) notifyCommunityCollectiblesReceived(ownedCollectibles OwnedCol
 		},
 		Message: string(encodedMessage),
 	})
+}
+
+func (s *Service) FetchCollectibleSocialsAsync(requestID int32, uniqueID thirdparty.CollectibleUniqueID) {
+	s.scheduler.Enqueue(requestID, fetchCollectibleSocialsTask, func(ctx context.Context) (interface{}, error) {
+		return "", s.manager.FetchCollectibleSocialsAsync(ctx, uniqueID)
+	}, func(result interface{}, taskType async.TaskType, err error) {})
 }

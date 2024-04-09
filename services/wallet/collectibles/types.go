@@ -32,9 +32,15 @@ type CollectibleData struct {
 }
 
 type CollectionData struct {
-	Name     string `json:"name"`
-	Slug     string `json:"slug"`
-	ImageURL string `json:"image_url"`
+	Name     string            `json:"name"`
+	Slug     string            `json:"slug"`
+	ImageURL string            `json:"image_url"`
+	Socials  CollectionSocials `json:"socials"`
+}
+
+type CollectionSocials struct {
+	Website       string `json:"website"`
+	TwitterHandle string `json:"twitter_handle"`
 }
 
 type CommunityData struct {
@@ -64,6 +70,22 @@ func idsToCollectibles(ids []thirdparty.CollectibleUniqueID) []Collectible {
 	return res
 }
 
+func thirdpartyCollectionDataToCollectionData(collectionData *thirdparty.CollectionData) CollectionData {
+	ret := CollectionData{}
+	if collectionData != nil {
+		ret = CollectionData{
+			Name:     collectionData.Name,
+			Slug:     collectionData.Slug,
+			ImageURL: collectionData.ImageURL,
+		}
+		ret.Socials = CollectionSocials{
+			Website:       collectionData.Socials.Website,
+			TwitterHandle: collectionData.Socials.TwitterHandle,
+		}
+	}
+	return ret
+}
+
 func getContractType(c thirdparty.FullCollectibleData) w_common.ContractType {
 	if c.CollectibleData.ContractType != w_common.ContractTypeUnknown {
 		return c.CollectibleData.ContractType
@@ -88,13 +110,8 @@ func fullCollectibleDataToHeader(c thirdparty.FullCollectibleData) Collectible {
 			Soulbound:          &c.CollectibleData.Soulbound,
 		},
 	}
-	if c.CollectionData != nil {
-		ret.CollectionData = &CollectionData{
-			Name:     c.CollectionData.Name,
-			Slug:     c.CollectionData.Slug,
-			ImageURL: c.CollectionData.ImageURL,
-		}
-	}
+	collectionData := thirdpartyCollectionDataToCollectionData(c.CollectionData)
+	ret.CollectionData = &collectionData
 	if c.CollectibleData.CommunityID != "" {
 		communityData := communityInfoToData(c.CollectibleData.CommunityID, c.CommunityInfo, c.CollectibleCommunityInfo)
 		ret.CommunityData = &communityData
@@ -130,13 +147,8 @@ func fullCollectibleDataToDetails(c thirdparty.FullCollectibleData) Collectible 
 			Soulbound:          &c.CollectibleData.Soulbound,
 		},
 	}
-	if c.CollectionData != nil {
-		ret.CollectionData = &CollectionData{
-			Name:     c.CollectionData.Name,
-			Slug:     c.CollectionData.Slug,
-			ImageURL: c.CollectionData.ImageURL,
-		}
-	}
+	collectionData := thirdpartyCollectionDataToCollectionData(c.CollectionData)
+	ret.CollectionData = &collectionData
 	if c.CollectibleData.CommunityID != "" {
 		communityData := communityInfoToData(c.CollectibleData.CommunityID, c.CommunityInfo, c.CollectibleCommunityInfo)
 		ret.CommunityData = &communityData

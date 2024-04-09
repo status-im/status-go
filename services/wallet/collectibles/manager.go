@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/thirdparty/alchemy"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -48,6 +49,7 @@ var (
 
 type ManagerInterface interface {
 	FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID, asyncFetch bool) ([]thirdparty.FullCollectibleData, error)
+	FetchCollectibleSocialsAsync(ctx context.Context, uniqueID thirdparty.CollectibleUniqueID) error
 }
 
 type Manager struct {
@@ -1026,4 +1028,94 @@ func (o *Manager) SearchCollections(ctx context.Context, chainID walletCommon.Ch
 		return nil, ErrAllProvidersFailedForChainID
 	}
 	return nil, ErrNoProvidersAvailableForChainID
+}
+
+func (o *Manager) FetchCollectibleSocialsAsync(ctx context.Context, uniqueID thirdparty.CollectibleUniqueID) error {
+	hasValidSocials := o.collectionsDataDB.GetSocialsValidForID(uniqueID)
+
+	if !hasValidSocials {
+		// Atomic group stores the error from the first failed command and stops other commands on error
+		group := async.NewAtomicGroup(ctx)
+		group.Add(func(ctx context.Context) error {
+			defer o.checkConnectionStatus(uniqueID.ContractID.ChainID)
+
+			socials, err := o.fetchSocialsForCollectibleUniqueID(ctx, uniqueID.ContractID.ChainID, uniqueID)
+			if err != nil {
+				log.Debug("FetchCollectibleSocials failed for", "chainID", uniqueID.ContractID.ChainID, "uniqueID", uniqueID, "err", err)
+				return err
+			}
+
+			socialsMessage := CollectibleSocialsMessage{
+				ID:      uniqueID,
+				Socials: socials,
+			}
+
+			err = o.collectionsDataDB.SetCollectionSocialsData(uniqueID.ContractID, socials)
+			if err != nil {
+				log.Error("Error saving socials to DB: %v", err)
+				return nil
+			}
+
+			payload, err := json.Marshal(socialsMessage)
+			if err != nil {
+				log.Error("Error marshaling response: %v", err)
+				return nil
+			}
+
+			event := walletevent.Event{
+				Type:    EventGetCollectibleSocialsDone,
+				Message: string(payload),
+			}
+
+			o.feed.Send(event)
+			return err
+		})
+
+		group.Wait()
+		return group.Error()
+	}
+	return nil
+}
+
+func (o *Manager) fetchSocialsForCollectibleUniqueID(ctx context.Context, chainID walletCommon.ChainID, idToFetch thirdparty.CollectibleUniqueID) (thirdparty.CollectionSocials, error) {
+	socials := thirdparty.CollectionSocials{}
+	providerFound := false
+	cmdRes := circuitbreaker.CommandResult{}
+	for _, provider := range o.providers.CollectibleDataProviders {
+		if provider.ID() == alchemy.AlchemyID {
+			cmd := circuitbreaker.Command{}
+			if !provider.IsChainSupported(chainID) {
+				continue
+			}
+
+			// Some provider was found for the chainID
+			providerFound = true
+
+			provider := provider
+			cmd.Add(circuitbreaker.NewFunctor(func() ([]any, error) {
+				socials, err := provider.FetchCollectibleSocialsByUniqueID(ctx, idToFetch)
+				return []any{socials.Website, socials.TwitterHandle}, err
+			}))
+
+			cmdRes = o.getCircuitBreaker(chainID).Execute(cmd)
+
+			if len(cmdRes.Result()) > 0 {
+				// Only update website if non empty website is found
+				if len(cmdRes.Result()[0].(string)) > 0 {
+					socials.Website = cmdRes.Result()[0].(string)
+				}
+				// Only update twitterHandle if non empty twitterHandle is found
+				if len(cmdRes.Result()[1].(string)) > 0 {
+					socials.TwitterHandle = cmdRes.Result()[1].(string)
+				}
+			}
+			break
+		}
+	}
+
+	if !providerFound {
+		return thirdparty.CollectionSocials{}, ErrNoProvidersAvailableForChainID // lets not stop the group if no providers are available for the chain
+	}
+
+	return socials, cmdRes.Error()
 }

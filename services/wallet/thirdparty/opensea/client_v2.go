@@ -133,6 +133,17 @@ func (o *ClientV2) FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueI
 	return o.fetchDetailedAssets(ctx, uniqueIDs)
 }
 
+func (o *ClientV2) FetchCollectibleSocialsByUniqueID(ctx context.Context, uniqueID thirdparty.CollectibleUniqueID) (thirdparty.CollectionSocials, error) {
+	resp, err := o.FetchCollectionsDataByContractID(ctx, []thirdparty.ContractID{uniqueID.ContractID})
+	if err != nil {
+		return thirdparty.CollectionSocials{}, err
+	}
+	if len(resp) > 0 {
+		return resp[0].Socials, nil
+	}
+	return thirdparty.CollectionSocials{}, nil
+}
+
 func (o *ClientV2) fetchAssets(ctx context.Context, chainID walletCommon.ChainID, pathParams []string, queryParams url.Values, limit int, cursor string) (*thirdparty.FullCollectibleDataContainer, error) {
 	assets := new(thirdparty.FullCollectibleDataContainer)
 

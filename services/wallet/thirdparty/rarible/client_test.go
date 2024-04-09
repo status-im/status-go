@@ -24,6 +24,7 @@ func TestUnmarshallCollection(t *testing.T) {
 		Name:         "CryptoKitties",
 		ImageURL:     "https://i.seadn.io/gae/C272ZRW1RGGef9vKMePFSCeKc1Lw6U40wl9ofNVxzUxFdj84hH9xJRQNf-7wgs7W8qw8RWe-1ybKp-VKuU5D-tg?w=500&auto=format",
 		Traits:       make(map[string]thirdparty.CollectionTrait),
+		Socials:      thirdparty.CollectionSocials{Website: "https://www.cryptokitties.co/", TwitterHandle: ""},
 	}
 
 	collection := Collection{}
