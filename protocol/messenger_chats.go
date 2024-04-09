@@ -76,6 +76,7 @@ func (m *Messenger) ChatsPreview() []*ChatPreview {
 				SyncedFrom:            chat.SyncedFrom,
 				Highlight:             chat.Highlight,
 				Members:               chat.Members,
+				Base64Image:           chat.Base64Image,
 			}
 
 			if chat.LastMessage != nil {

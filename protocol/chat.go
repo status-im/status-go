@@ -243,6 +243,9 @@ type ChatPreview struct {
 	From             string `json:"from"`
 	Deleted          bool   `json:"deleted"`
 	DeletedForMe     bool   `json:"deletedForMe"`
+
+	// Image of the chat in Base64 format
+	Base64Image string `json:"image,omitempty"`
 }
 
 func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {
