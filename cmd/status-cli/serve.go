@@ -50,7 +50,7 @@ func serve(cCtx *cli.Context) error {
 	wg.Add(1)
 	go cli.retrieveMessagesLoop(ctx, RetrieveInterval, msgCh, &wg)
 
-	// Send contact request from Alice to Bob, bob accept the request
+	// Send and accept contact request
 	dest := cCtx.String(AddFlag)
 	if dest != "" {
 		err := cli.sendContactRequest(cCtx, dest)

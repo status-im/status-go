@@ -26,7 +26,7 @@ You can also run `make status-cli` in the root directory to build the binary.
 # run alice's server
 ./status-cli serve
 
-# run Bob's server in another terminal with the logged pubkey of Alice
+# run charlie's server in another terminal with the logged pubkey of Alice
 ./status-cli serve -n charlie -p 8565 -a <alice-pubkey>
 ```
 
