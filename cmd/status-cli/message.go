@@ -83,12 +83,13 @@ func (cli *StatusCLI) retrieveMessagesLoop(ctx context.Context, tick time.Durati
 				cli.logger.Error("failed to retrieve raw messages", "err", err)
 				continue
 			}
-			if response != nil && len(response.Messages()) != 0 {
-				for _, message := range response.Messages() {
-					cli.logger.Info("message received: ", message.Text)
-					if message.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT {
-						msgCh <- message.ID
-					}
+			if response == nil {
+				continue
+			}
+			for _, message := range response.Messages() {
+				cli.logger.Info("message received: ", message.Text)
+				if message.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT {
+					msgCh <- message.ID
 				}
 			}
 		case <-ctx.Done():

@@ -55,10 +55,11 @@ func start(cCtx *cli.Context, name string, port int, apiModules string) (*Status
 		Password:              "some-password",
 		BackupDisabledDataDir: fmt.Sprintf("./test-%s", strings.ToLower(name)),
 		LogFilePath:           "log",
-		HTTPEnabled:           true,
-		APIModules:            apiModules,
-		HTTPHost:              "127.0.0.1",
-		HTTPPort:              port,
+		APIConfig: &requests.APIConfig{
+			APIModules: apiModules,
+			HTTPHost:   "127.0.0.1",
+			HTTPPort:   port,
+		},
 	}
 	_, err = backend.CreateAccountAndLogin(createAccountRequest)
 	if err != nil {

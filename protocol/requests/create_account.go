@@ -19,6 +19,12 @@ type ImageCropRectangle struct {
 	By int `json:"by"`
 }
 
+type APIConfig struct {
+	APIModules string `json:"apiModules"`
+	HTTPHost   string `json:"httpHost"`
+	HTTPPort   int    `json:"httpPort"`
+}
+
 type CreateAccount struct {
 	// BackupDisabledDataDir is the directory where backup is disabled
 	// WARNING: This is used as `RootDataDir`. Consider renaming?
@@ -60,10 +66,7 @@ type CreateAccount struct {
 	TorrentConfigEnabled *bool
 	TorrentConfigPort    *int
 
-	HTTPEnabled bool   `json:"httpEnabled"`
-	APIModules  string `json:"apiModules"`
-	HTTPHost    string `json:"httpHost"`
-	HTTPPort    int    `json:"httpPort"`
+	APIConfig *APIConfig `json:"apiConfig"`
 }
 
 type WalletSecretsConfig struct {

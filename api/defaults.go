@@ -311,11 +311,11 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 		nodeConfig.TorrentConfig.Port = *request.TorrentConfigPort
 	}
 
-	if request.HTTPEnabled {
+	if request.APIConfig != nil {
 		nodeConfig.HTTPEnabled = true
-		nodeConfig.HTTPHost = request.HTTPHost
-		nodeConfig.HTTPPort = request.HTTPPort
-		nodeConfig.APIModules = request.APIModules
+		nodeConfig.HTTPHost = request.APIConfig.HTTPHost
+		nodeConfig.HTTPPort = request.APIConfig.HTTPPort
+		nodeConfig.APIModules = request.APIConfig.APIModules
 	}
 
 	return nodeConfig, nil

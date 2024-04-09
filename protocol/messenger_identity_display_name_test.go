@@ -211,17 +211,13 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameRestrictions() 
 	setInvalidName("dot.not", utils.ErrInvalidDisplayNameRegExp)
 	setInvalidName("t", utils.ErrInvalidDisplayNameRegExp)
 	setInvalidName("tt", utils.ErrInvalidDisplayNameRegExp)
+	setInvalidName("ttt", utils.ErrInvalidDisplayNameRegExp)
+	setInvalidName("tttt", utils.ErrInvalidDisplayNameRegExp)
 	setInvalidName("name is bigger than 24 symb", utils.ErrInvalidDisplayNameRegExp)
 
-	setValidName := func(validName string) {
-		err = s.m.SetDisplayName(validName)
-		s.Require().NoError(err)
-		displayName, err = s.m.settings.DisplayName()
-		s.Require().NoError(err)
-		s.Require().Equal(validName, displayName)
-	}
-
-	setValidName("name with space")
-	setValidName("Bob")
-	setValidName("Alice")
+	err = s.m.SetDisplayName("name with space")
+	s.Require().NoError(err)
+	displayName, err = s.m.settings.DisplayName()
+	s.Require().NoError(err)
+	s.Require().Equal("name with space", displayName)
 }
