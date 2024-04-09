@@ -178,6 +178,7 @@ type CollectibleData struct {
 	BackgroundColor    string             `json:"background_color"`
 	TokenURI           string             `json:"token_uri"`
 	IsFirst            bool               `json:"is_first"`
+	Soulbound          bool               `json:"soulbound"`
 }
 
 // Community-related collectible info. Present only for collectibles minted in a community.

@@ -592,6 +592,7 @@ func (s *Service) FillCollectibleMetadata(collectible *thirdparty.FullCollectibl
 	collectible.CollectibleData.Description = tokenMetadata.GetDescription()
 	collectible.CollectibleData.ImagePayload = imagePayload
 	collectible.CollectibleData.Traits = getCollectibleCommunityTraits(communityToken)
+	collectible.CollectibleData.Soulbound = !communityToken.Transferable
 
 	if collectible.CollectionData == nil {
 		collectible.CollectionData = &thirdparty.CollectionData{
