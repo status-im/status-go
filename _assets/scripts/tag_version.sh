@@ -41,11 +41,12 @@ calculate_new_version() {
 
 
 main() {
-    target_commit=${1:-HEAD}
-    new_version=$(calculate_new_version "$target_commit")
+    new_version=$(calculate_new_version "$1")
     echo "calculated new version: $new_version" >&2
 
-    git tag -a "$new_version" "$target_commit" -m "release $target_commit"
+    git tag -a "$new_version" "$1" -m "release $new_version"
 }
 
-main "$1"
+target_commit=${1:-HEAD}
+
+main "$target_commit"
