@@ -13,6 +13,5 @@ type CommunityInfoProvider interface {
 
 	// Collectible-related methods
 	GetCommunityID(tokenURI string) string
-	FillCollectibleMetadata(collectible *FullCollectibleData) error
-	FetchCommunityInfoForCollectibles(communityID string, ids []CollectibleUniqueID) (*CommunityInfo, error)
+	FillCollectiblesMetadata(communityID string, cs []*FullCollectibleData) (bool, error)
 }
