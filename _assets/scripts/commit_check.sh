@@ -22,7 +22,7 @@ parse_commits() {
             # Uncomment the line below if you want to exit on an invalid commit message
             exit 1
         fi
-    done < <(git log --format=%B "$start_commit".."$end_commit" | sed '/^\s*$/d')
+    done < <(git log --format=%s "$start_commit".."$end_commit")
 
     echo "$is_breaking_change"
 }
