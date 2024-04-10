@@ -728,25 +728,16 @@ func (o *Manager) fillCommunityID(asset *thirdparty.FullCollectibleData) error {
 }
 
 func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*thirdparty.FullCollectibleData) error {
-	communityInfo, err := o.communityManager.FetchCommunityInfoForCollectibles(communityID, idsFromAssets(communityAssets))
+	communityFound, err := o.communityManager.FillCollectiblesMetadata(communityID, communityAssets)
+	if err != nil {
+		log.Error("FillCollectiblesMetadata failed", "communityID", communityID, "err", err)
+	} else if !communityFound {
+		log.Warn("fetchCommunityAssets community not found", "communityID", communityID)
+	}
 
 	// If the community is found, we update the DB.
 	// If the community is not found, we only insert new entries to the DB (don't replace what is already there).
-	allowUpdate := false
-	if err != nil {
-		log.Error("fetchCommunityInfo failed", "communityID", communityID, "err", err)
-	} else if communityInfo == nil {
-		log.Warn("fetchCommunityAssets community not found", "communityID", communityID)
-	} else {
-		for _, communityAsset := range communityAssets {
-			err := o.communityManager.FillCollectibleMetadata(communityAsset)
-			if err != nil {
-				log.Error("FillCollectibleMetadata failed", "communityID", communityID, "err", err)
-				return err
-			}
-		}
-		allowUpdate = true
-	}
+	allowUpdate := communityFound
 
 	collectiblesData := make([]thirdparty.CollectibleData, 0, len(communityAssets))
 	collectionsData := make([]thirdparty.CollectionData, 0, len(communityAssets))

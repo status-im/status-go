@@ -52,6 +52,7 @@ import (
 	"github.com/status-im/status-go/services/ext/mailservers"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/collectibles"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/wakuv2"
@@ -533,7 +534,30 @@ func (s *Service) GetCommunityID(tokenURI string) string {
 	return ""
 }
 
-func (s *Service) FillCollectibleMetadata(collectible *thirdparty.FullCollectibleData) error {
+func (s *Service) FillCollectiblesMetadata(communityID string, cs []*thirdparty.FullCollectibleData) (bool, error) {
+	if s.messenger == nil {
+		return false, fmt.Errorf("messenger not ready")
+	}
+
+	community, err := s.fetchCommunityInfoForCollectibles(communityID, collectibles.IDsFromAssets(cs))
+	if err != nil {
+		return false, err
+	}
+	if community == nil {
+		return false, nil
+	}
+
+	for _, collectible := range cs {
+		err := s.FillCollectibleMetadata(community, collectible)
+		if err != nil {
+			return true, err
+		}
+	}
+
+	return true, nil
+}
+
+func (s *Service) FillCollectibleMetadata(community *communities.Community, collectible *thirdparty.FullCollectibleData) error {
 	if s.messenger == nil {
 		return fmt.Errorf("messenger not ready")
 	}
@@ -547,14 +571,6 @@ func (s *Service) FillCollectibleMetadata(collectible *thirdparty.FullCollectibl
 
 	if communityID == "" {
 		return fmt.Errorf("invalid communityID")
-	}
-
-	community, err := s.messenger.FindCommunityInfoFromDB(communityID)
-	if err != nil {
-		if err == communities.ErrOrgNotFound {
-			return nil
-		}
-		return err
 	}
 
 	tokenMetadata, err := s.fetchCommunityCollectibleMetadata(community, id.ContractID)
@@ -632,7 +648,7 @@ func communityToInfo(community *communities.Community) *thirdparty.CommunityInfo
 	}
 }
 
-func (s *Service) fetchCommunityFromStoreNodes(communityID string) (*thirdparty.CommunityInfo, error) {
+func (s *Service) fetchCommunityFromStoreNodes(communityID string) (*communities.Community, error) {
 	community, err := s.messenger.FetchCommunity(&protocol.FetchCommunityRequest{
 		CommunityKey:    communityID,
 		TryDatabase:     false,
@@ -641,7 +657,7 @@ func (s *Service) fetchCommunityFromStoreNodes(communityID string) (*thirdparty.
 	if err != nil {
 		return nil, err
 	}
-	return communityToInfo(community), nil
+	return community, nil
 }
 
 // Fetch latest community from store nodes.
@@ -657,18 +673,17 @@ func (s *Service) FetchCommunityInfo(communityID string) (*thirdparty.CommunityI
 
 	// Fetch latest version from store nodes
 	if community == nil || !community.IsControlNode() {
-		return s.fetchCommunityFromStoreNodes(communityID)
+		community, err = s.fetchCommunityFromStoreNodes(communityID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return communityToInfo(community), nil
 }
 
 // Fetch latest community from store nodes only if any collectibles data is missing.
-func (s *Service) FetchCommunityInfoForCollectibles(communityID string, ids []thirdparty.CollectibleUniqueID) (*thirdparty.CommunityInfo, error) {
-	if s.messenger == nil {
-		return nil, fmt.Errorf("messenger not ready")
-	}
-
+func (s *Service) fetchCommunityInfoForCollectibles(communityID string, ids []thirdparty.CollectibleUniqueID) (*communities.Community, error) {
 	community, err := s.messenger.FindCommunityInfoFromDB(communityID)
 	if err != nil && err != communities.ErrOrgNotFound {
 		return nil, err
@@ -679,7 +694,7 @@ func (s *Service) FetchCommunityInfoForCollectibles(communityID string, ids []th
 	}
 
 	if community.IsControlNode() {
-		return communityToInfo(community), nil
+		return community, nil
 	}
 
 	contractIDs := func() map[string]thirdparty.ContractID {
@@ -706,7 +721,7 @@ func (s *Service) FetchCommunityInfoForCollectibles(communityID string, ids []th
 		return s.fetchCommunityFromStoreNodes(communityID)
 	}
 
-	return communityToInfo(community), nil
+	return community, nil
 }
 
 func (s *Service) fetchCommunityToken(communityID string, contractID thirdparty.ContractID) (*token.CommunityToken, error) {
