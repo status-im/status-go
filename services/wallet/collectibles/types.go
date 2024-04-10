@@ -202,7 +202,7 @@ func communityInfoToData(communityID string, community *thirdparty.CommunityInfo
 	return ret
 }
 
-func idsFromAssets(assets []*thirdparty.FullCollectibleData) []thirdparty.CollectibleUniqueID {
+func IDsFromAssets(assets []*thirdparty.FullCollectibleData) []thirdparty.CollectibleUniqueID {
 	result := make([]thirdparty.CollectibleUniqueID, len(assets))
 	for i, asset := range assets {
 		result[i] = asset.CollectibleData.ID
