@@ -58,8 +58,8 @@ func (cm *Manager) GetCommunityID(tokenURI string) string {
 	return cm.communityInfoProvider.GetCommunityID(tokenURI)
 }
 
-func (cm *Manager) FillCollectibleMetadata(c *thirdparty.FullCollectibleData) error {
-	return cm.communityInfoProvider.FillCollectibleMetadata(c)
+func (cm *Manager) FillCollectiblesMetadata(communityID string, cs []*thirdparty.FullCollectibleData) (bool, error) {
+	return cm.communityInfoProvider.FillCollectiblesMetadata(communityID, cs)
 }
 
 func (cm *Manager) setCommunityInfo(id string, c *thirdparty.CommunityInfo) (err error) {
@@ -82,12 +82,6 @@ func (cm *Manager) fetchCommunityInfo(communityID string, fetcher func() (*third
 func (cm *Manager) FetchCommunityInfo(communityID string) (*thirdparty.CommunityInfo, error) {
 	return cm.fetchCommunityInfo(communityID, func() (*thirdparty.CommunityInfo, error) {
 		return cm.communityInfoProvider.FetchCommunityInfo(communityID)
-	})
-}
-
-func (cm *Manager) FetchCommunityInfoForCollectibles(communityID string, ids []thirdparty.CollectibleUniqueID) (*thirdparty.CommunityInfo, error) {
-	return cm.fetchCommunityInfo(communityID, func() (*thirdparty.CommunityInfo, error) {
-		return cm.communityInfoProvider.FetchCommunityInfoForCollectibles(communityID, ids)
 	})
 }
 
