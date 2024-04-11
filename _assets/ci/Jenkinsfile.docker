@@ -45,7 +45,7 @@ pipeline {
     PATH     = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
     /* Makefile parameters */
     DOCKER_IMAGE_NAME = 'statusteam/status-go'
-    DOCKER_IMAGE_CUSTOM_TAG = "ci-build-${utils.gitCommit()}"
+    DOCKER_IMAGE_CUSTOM_TAG = "ci-build-${git.commit()}"
   }
 
   stages {
@@ -60,7 +60,7 @@ pipeline {
 
     stage('Push') { steps { dir(env.REPO) { script {
       withDockerRegistry([credentialsId: "dockerhub-statusteam-auto", url: ""]) {
-        image.push("v${utils.getVersion()}-${utils.gitCommit()}")
+        image.push("v${utils.getVersion()}-${git.commit()}")
       }
     } } } }
 
