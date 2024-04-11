@@ -103,6 +103,8 @@ define sh
 $(shell $(1))
 endef
 
+# TODO: Define more specific shells.
+TARGET := default
 SHELL := ./nix/scripts/shell.sh
 shell: export TARGET ?= default
 shell: ##@prepare Enter into a pre-configured shell
