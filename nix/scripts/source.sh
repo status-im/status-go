@@ -11,6 +11,7 @@ source_nix_profile() {
     if [[ "${NIX_INSTALL_TYPE}" == "multi" ]]; then
         source "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
     elif [[ "${NIX_INSTALL_TYPE}" == "single" ]]; then
+        export USER="${USER:-$(id -nu)}" # Missing in Docker.
         source "${HOME}/.nix-profile/etc/profile.d/nix.sh"
     elif [[ "${NIX_INSTALL_TYPE}" == "nixos" ]]; then
         echo "Sourcing profile not necessary on NixOS!" >&2
