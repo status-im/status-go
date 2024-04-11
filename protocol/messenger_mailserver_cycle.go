@@ -763,6 +763,8 @@ func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
 	// NOTE: https://stackoverflow.com/questions/32705582/how-to-get-time-tick-to-tick-immediately
 	timeout += time.Second
 
+	m.logger.Info(fmt.Sprintf("Waiting for available store node with timeout: %v", timeout))
+
 	finish := make(chan struct{})
 	cancel := make(chan struct{})
 
@@ -774,12 +776,16 @@ func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
 			wg.Done()
 		}()
 		for !m.isMailserverAvailable(m.getActiveMailserverID()) {
+			m.logger.Info("Mailserver is not available, waiting...")
 			select {
 			case <-m.SubscribeMailserverAvailable():
+				m.logger.Info("Received mailserver available event")
 			case <-cancel:
 				return
+				m.logger.Info("Waiting for mailserver canceled")
 			}
 		}
+		m.logger.Info("Mailserver is available")
 	}()
 
 	go func() {
@@ -787,15 +793,21 @@ func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
 			close(finish)
 		}()
 		wg.Wait()
+		m.logger.Info("Waiting for mailserver finished")
 	}()
 
 	select {
 	case <-finish:
+		m.logger.Info("Mailserver is available, returning true")
 	case <-time.After(timeout):
 		close(cancel)
+		m.logger.Info("Timeout reached, canceling wait")
 	case <-m.ctx.Done():
+		m.logger.Info("Context canceled, canceling wait")
 		close(cancel)
 	}
 
-	return m.isMailserverAvailable(m.getActiveMailserverID())
+	available := m.isMailserverAvailable(m.getActiveMailserverID())
+	m.logger.Info(fmt.Sprintf("Mailserver availability: %v", available))
+	return available
 }
