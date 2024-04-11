@@ -2011,8 +2011,8 @@ github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088 h1:ClCAP2FPCvl8hG
 github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088/go.mod h1:+92j1tN27DypDeBFxkg0uzkqfh1bNHTZe3Bv2PjvxpM=
 github.com/status-im/status-go/extkeys v1.1.2 h1:FSjARgDathJ3rIapJt851LsIXP9Oyuu2M2jPJKuzloU=
 github.com/status-im/status-go/extkeys v1.1.2/go.mod h1:hCmFzb2jiiVF2voZKYbzuhOQiHHCmyLJsZJXrFFg7BY=
-github.com/status-im/tcp-shaker v1.1.1-status h1:TnVeeWlq2SKCWotHc4Vi6qZQfY8TTe3VLmu1xpEFYhg=
-github.com/status-im/tcp-shaker v1.1.1-status/go.mod h1:RYo/itke1oU5k/6sj9DNM3QAwtE5rZSgg5JnkOv83hk=
+github.com/status-im/tcp-shaker v1.1.1-status.0.20240417125641-944607f9e45b h1:Q9YZlpjB2P4LSyn1+zQCdLJq8e66HJPqzuNCqfjFcMc=
+github.com/status-im/tcp-shaker v1.1.1-status.0.20240417125641-944607f9e45b/go.mod h1:RYo/itke1oU5k/6sj9DNM3QAwtE5rZSgg5JnkOv83hk=
 github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857 h1:sPkzT7Z7uLmejOsBRlZ0kwDWpqjpHJsp834o5nbhqho=
 github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857/go.mod h1:lq9I5ROto5tcua65GmCE6SIW7VE0ucdEBs1fn4z7uWU=
 github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980/go.mod h1:AO3tvPzVZ/ayst6UlUKUv6rcPQInYe3IknH3jYhAKu8=

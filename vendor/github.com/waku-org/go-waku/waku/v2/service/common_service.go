@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"sync"
-	"sync/atomic"
 )
 
 // this is common layout for all the services that require mutex protection and a guarantee that all running goroutines will be finished before stop finishes execution. This guarantee comes from waitGroup all one has to use CommonService.WaitGroup() in the goroutines that should finish by the end of stop function.
@@ -13,7 +12,7 @@ type CommonService struct {
 	cancel  context.CancelFunc
 	ctx     context.Context
 	wg      sync.WaitGroup
-	started atomic.Bool
+	started bool
 }
 
 func NewCommonService() *CommonService {
@@ -29,13 +28,13 @@ func NewCommonService() *CommonService {
 func (sp *CommonService) Start(ctx context.Context, fn func() error) error {
 	sp.Lock()
 	defer sp.Unlock()
-	if sp.started.Load() {
+	if sp.started {
 		return ErrAlreadyStarted
 	}
-	sp.started.Store(true)
+	sp.started = true
 	sp.ctx, sp.cancel = context.WithCancel(ctx)
 	if err := fn(); err != nil {
-		sp.started.Store(false)
+		sp.started = false
 		sp.cancel()
 		return err
 	}
@@ -49,18 +48,18 @@ var ErrNotStarted = errors.New("not started")
 func (sp *CommonService) Stop(fn func()) {
 	sp.Lock()
 	defer sp.Unlock()
-	if !sp.started.Load() {
+	if !sp.started {
 		return
 	}
 	sp.cancel()
 	fn()
 	sp.wg.Wait()
-	sp.started.Store(false)
+	sp.started = false
 }
 
 // This is not a mutex protected function, it is up to the caller to use it in a mutex protected context
 func (sp *CommonService) ErrOnNotRunning() error {
-	if !sp.started.Load() {
+	if !sp.started {
 		return ErrNotStarted
 	}
 	return nil
