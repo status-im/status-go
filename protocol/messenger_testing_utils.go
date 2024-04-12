@@ -418,7 +418,16 @@ func RandomBytes(length int) []byte {
 
 func DummyProfileShowcasePreferences(withCollectibles bool) *identity.ProfileShowcasePreferences {
 	preferences := &identity.ProfileShowcasePreferences{
-		Communities: []*identity.ProfileShowcaseCommunityPreference{}, // empty to avoid fetching
+		Communities: []*identity.ProfileShowcaseCommunityPreference{
+			{
+				CommunityID:        "0x254254546768764565565",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityEveryone,
+			},
+			{
+				CommunityID:        "0x865241434343432412343",
+				ShowcaseVisibility: identity.ProfileShowcaseVisibilityContacts,
+			},
+		},
 		Accounts: []*identity.ProfileShowcaseAccountPreference{
 			{
 				Address:            "0x0000000000000000000000000033433445133423",

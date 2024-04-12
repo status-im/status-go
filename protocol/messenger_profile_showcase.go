@@ -107,6 +107,63 @@ func (m *Messenger) validateCollectiblesOwnership(accounts []*identity.ProfileSh
 	return nil
 }
 
+func (m *Messenger) validateCommunityMembershipEntry(
+	entry *identity.ProfileShowcaseCommunity,
+	community *communities.Community,
+	contactPubKey *ecdsa.PublicKey) (identity.ProfileShowcaseMembershipStatus, error) {
+	if community == nil {
+		return identity.ProfileShowcaseMembershipStatusUnproven, nil
+	}
+
+	if community.Encrypted() {
+		// NOTE: commentend for 0.177.x release, actual fix is here:
+		// https://github.com/status-im/status-go/pull/5024
+		return identity.ProfileShowcaseMembershipStatusProvenMember, nil
+		// grant, err := community.VerifyGrantSignature(entry.Grant)
+		// if err != nil {
+		// 	m.logger.Warn("failed to verify grant signature ", zap.Error(err))
+		// 	return identity.ProfileShowcaseMembershipStatusNotAMember, nil
+		// }
+
+		// if grant != nil && bytes.Equal(grant.MemberId, crypto.CompressPubkey(contactPubKey)) {
+		// 	return identity.ProfileShowcaseMembershipStatusProvenMember, nil
+		// }
+		// // Show as not a member if membership can't be proven
+		// return identity.ProfileShowcaseMembershipStatusNotAMember, nil
+	}
+
+	if community.HasMember(contactPubKey) {
+		return identity.ProfileShowcaseMembershipStatusProvenMember, nil
+	}
+
+	return identity.ProfileShowcaseMembershipStatusNotAMember, nil
+}
+
+func (m *Messenger) validateCommunitiesMembership(communities []*identity.ProfileShowcaseCommunity, contactPubKey *ecdsa.PublicKey) ([]*identity.ProfileShowcaseCommunity, error) {
+	validatedCommunities := []*identity.ProfileShowcaseCommunity{}
+
+	for _, communityEntry := range communities {
+		community, err := m.FetchCommunity(&FetchCommunityRequest{
+			CommunityKey:    communityEntry.CommunityID,
+			Shard:           nil,
+			TryDatabase:     true,
+			WaitForResponse: true,
+		})
+		if err != nil {
+			m.logger.Warn("failed to fetch community for profile entry ", zap.Error(err))
+			continue
+		}
+
+		communityEntry.MembershipStatus, err = m.validateCommunityMembershipEntry(communityEntry, community, contactPubKey)
+		if err != nil {
+			m.logger.Warn("failed to verify grant signature ", zap.Error(err))
+		}
+		validatedCommunities = append(validatedCommunities, communityEntry)
+	}
+
+	return validatedCommunities, nil
+}
+
 func (m *Messenger) toProfileShowcaseCommunityProto(preferences []*identity.ProfileShowcaseCommunityPreference, visibility identity.ProfileShowcaseVisibility) []*protobuf.ProfileShowcaseCommunity {
 	entries := []*protobuf.ProfileShowcaseCommunity{}
 	for _, preference := range preferences {
@@ -230,11 +287,13 @@ func (m *Messenger) toProfileShowcaseSocialLinksProto(preferences []*identity.Pr
 }
 
 func (m *Messenger) fromProfileShowcaseCommunityProto(senderPubKey *ecdsa.PublicKey, messages []*protobuf.ProfileShowcaseCommunity) []*identity.ProfileShowcaseCommunity {
+	// NOTE: no requests to the network are allowed to be made here, called in the receiver thread
 	entries := []*identity.ProfileShowcaseCommunity{}
 	for _, message := range messages {
 		entry := &identity.ProfileShowcaseCommunity{
 			CommunityID: message.CommunityId,
 			Order:       int(message.Order),
+			Grant:       message.Grant,
 		}
 
 		entries = append(entries, entry)
@@ -243,6 +302,7 @@ func (m *Messenger) fromProfileShowcaseCommunityProto(senderPubKey *ecdsa.Public
 }
 
 func (m *Messenger) fromProfileShowcaseAccountProto(messages []*protobuf.ProfileShowcaseAccount) []*identity.ProfileShowcaseAccount {
+	// NOTE: no requests to the network are allowed to be made here, called in the receiver thread
 	entries := []*identity.ProfileShowcaseAccount{}
 	for _, entry := range messages {
 		entries = append(entries, &identity.ProfileShowcaseAccount{
@@ -257,6 +317,7 @@ func (m *Messenger) fromProfileShowcaseAccountProto(messages []*protobuf.Profile
 }
 
 func (m *Messenger) fromProfileShowcaseCollectibleProto(messages []*protobuf.ProfileShowcaseCollectible) []*identity.ProfileShowcaseCollectible {
+	// NOTE: no requests to the network are allowed to be made here, called in the receiver thread
 	entries := []*identity.ProfileShowcaseCollectible{}
 	for _, message := range messages {
 		entry := &identity.ProfileShowcaseCollectible{
@@ -271,6 +332,7 @@ func (m *Messenger) fromProfileShowcaseCollectibleProto(messages []*protobuf.Pro
 }
 
 func (m *Messenger) fromProfileShowcaseVerifiedTokenProto(messages []*protobuf.ProfileShowcaseVerifiedToken) []*identity.ProfileShowcaseVerifiedToken {
+	// NOTE: no requests to the network are allowed to be made here, called in the receiver thread
 	entries := []*identity.ProfileShowcaseVerifiedToken{}
 	for _, entry := range messages {
 		entries = append(entries, &identity.ProfileShowcaseVerifiedToken{
@@ -282,6 +344,7 @@ func (m *Messenger) fromProfileShowcaseVerifiedTokenProto(messages []*protobuf.P
 }
 
 func (m *Messenger) fromProfileShowcaseUnverifiedTokenProto(messages []*protobuf.ProfileShowcaseUnverifiedToken) []*identity.ProfileShowcaseUnverifiedToken {
+	// NOTE: no requests to the network are allowed to be made here, called in the receiver thread
 	entries := []*identity.ProfileShowcaseUnverifiedToken{}
 	for _, entry := range messages {
 		entries = append(entries, &identity.ProfileShowcaseUnverifiedToken{
@@ -294,6 +357,7 @@ func (m *Messenger) fromProfileShowcaseUnverifiedTokenProto(messages []*protobuf
 }
 
 func (m *Messenger) fromProfileShowcaseSocialLinkProto(messages []*protobuf.ProfileShowcaseSocialLink) []*identity.ProfileShowcaseSocialLink {
+	// NOTE: no requests to the network are allowed to be made here, called in the receiver thread
 	entries := []*identity.ProfileShowcaseSocialLink{}
 	for _, entry := range messages {
 		entries = append(entries, &identity.ProfileShowcaseSocialLink{
@@ -349,8 +413,29 @@ func (m *Messenger) GetProfileShowcasePreferences() (*identity.ProfileShowcasePr
 	return m.persistence.GetProfileShowcasePreferences()
 }
 
-func (m *Messenger) GetProfileShowcaseForContact(contactID string) (*identity.ProfileShowcase, error) {
-	return m.persistence.GetProfileShowcaseForContact(contactID)
+func (m *Messenger) GetProfileShowcaseForContact(contactID string, validate bool) (*identity.ProfileShowcase, error) {
+	profileShowcase, err := m.persistence.GetProfileShowcaseForContact(contactID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !validate {
+		return profileShowcase, nil
+	}
+
+	contactPubKey, err := common.HexToPubkey(contactID)
+	if err != nil {
+		return nil, err
+	}
+
+	profileShowcase.Communities, err = m.validateCommunitiesMembership(profileShowcase.Communities, contactPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: validate collectibles & assets ownership, https://github.com/status-im/status-desktop/issues/14129
+
+	return profileShowcase, nil
 }
 
 func (m *Messenger) GetProfileShowcaseAccountsByAddress(address string) ([]*identity.ProfileShowcaseAccount, error) {
@@ -600,7 +685,6 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState
 		return err
 	}
 
-	state.Response.AddProfileShowcase(newShowcase)
 	return nil
 }
 

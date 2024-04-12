@@ -471,17 +471,23 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 	// Get summarised profile data for mutual contact
-	resp, err := WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		mutualContact,
 		func(r *MessengerResponse) bool {
-			return len(r.updatedProfileShowcases) > 0 && r.updatedProfileShowcases[contactID] != nil
+			return r.updatedProfileShowcaseContactIDs[contactID] == true
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.updatedProfileShowcases, 1)
 
-	profileShowcase := resp.updatedProfileShowcases[contactID]
+	profileShowcase, err := mutualContact.GetProfileShowcaseForContact(contactID, false)
+	s.Require().NoError(err)
+
+	s.Require().Len(profileShowcase.Communities, 2)
+	s.Require().Equal(profileShowcase.Communities[0].CommunityID, request.Communities[0].CommunityID)
+	s.Require().Equal(profileShowcase.Communities[0].Order, request.Communities[0].Order)
+	s.Require().Equal(profileShowcase.Communities[1].CommunityID, request.Communities[1].CommunityID)
+	s.Require().Equal(profileShowcase.Communities[1].Order, request.Communities[1].Order)
 
 	s.Require().Len(profileShowcase.Accounts, 2)
 	s.Require().Equal(profileShowcase.Accounts[0].Address, request.Accounts[0].Address)
@@ -516,18 +522,16 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.Require().Equal(profileShowcase.SocialLinks[1].Order, request.SocialLinks[2].Order)
 
 	// Get summarised profile data for verified contact
-	resp, err = WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		verifiedContact,
 		func(r *MessengerResponse) bool {
-			return len(r.updatedProfileShowcases) > 0 && r.updatedProfileShowcases[contactID] != nil
+			return r.updatedProfileShowcaseContactIDs[contactID] == true
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.updatedProfileShowcases, 1)
 
-	// Here let's try synchronous
-	profileShowcase, err = verifiedContact.GetProfileShowcaseForContact(contactID)
+	profileShowcase, err = verifiedContact.GetProfileShowcaseForContact(contactID, false)
 	s.Require().NoError(err)
 
 	s.Require().Len(profileShowcase.Accounts, 2)
@@ -613,17 +617,17 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipUnenc
 	s.Require().NoError(err)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
-	resp, err := WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		bob,
 		func(r *MessengerResponse) bool {
-			return len(r.updatedProfileShowcases) > 0 && r.updatedProfileShowcases[contactID] != nil
+			return r.updatedProfileShowcaseContactIDs[contactID] == true
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.updatedProfileShowcases, 1)
 
-	profileShowcase := resp.updatedProfileShowcases[contactID]
+	profileShowcase, err := bob.GetProfileShowcaseForContact(contactID, true)
+	s.Require().NoError(err)
 
 	// Verify community's data
 	s.Require().Len(profileShowcase.Communities, 2)
@@ -679,17 +683,17 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncry
 	s.Require().NoError(err)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
-	resp, err := WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		bob,
 		func(r *MessengerResponse) bool {
-			return len(r.updatedProfileShowcases) > 0 && r.updatedProfileShowcases[contactID] != nil
+			return r.updatedProfileShowcaseContactIDs[contactID] == true
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.updatedProfileShowcases, 1)
 
-	profileShowcase := resp.updatedProfileShowcases[contactID]
+	profileShowcase, err := bob.GetProfileShowcaseForContact(contactID, true)
+	s.Require().NoError(err)
 
 	// Verify community's data
 	s.Require().Len(profileShowcase.Communities, 2)
