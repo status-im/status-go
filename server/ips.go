@@ -7,6 +7,7 @@ import (
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
+	"github.com/wlynxg/anet"
 )
 
 var (
@@ -101,7 +102,7 @@ func getLocalAddresses() ([][]net.IP, error) {
 		return getAndroidLocalIP()
 	}
 
-	nis, err := net.Interfaces()
+	nis, err := anet.Interfaces()
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +167,7 @@ func findReachableAddresses(remoteIPs []net.IP, localNets []net.IPNet) []net.IP 
 func getAllAvailableNetworks() ([]net.IPNet, error) {
 	var localNets []net.IPNet
 
-	nis, err := net.Interfaces()
+	nis, err := anet.Interfaces()
 	if err != nil {
 		return nil, err
 	}
