@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	crand "crypto/rand"
@@ -16,7 +15,6 @@ import (
 
 	eth_common "github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
@@ -118,17 +116,20 @@ func (m *Messenger) validateCommunityMembershipEntry(
 	}
 
 	if community.Encrypted() {
-		grant, err := community.VerifyGrantSignature(entry.Grant)
-		if err != nil {
-			m.logger.Warn("failed to verify grant signature ", zap.Error(err))
-			return identity.ProfileShowcaseMembershipStatusNotAMember, nil
-		}
+		// NOTE: commentend for 0.177.x release, actual fix is here:
+		// https://github.com/status-im/status-go/pull/5024
+		return identity.ProfileShowcaseMembershipStatusProvenMember, nil
+		// grant, err := community.VerifyGrantSignature(entry.Grant)
+		// if err != nil {
+		// 	m.logger.Warn("failed to verify grant signature ", zap.Error(err))
+		// 	return identity.ProfileShowcaseMembershipStatusNotAMember, nil
+		// }
 
-		if grant != nil && bytes.Equal(grant.MemberId, crypto.CompressPubkey(contactPubKey)) {
-			return identity.ProfileShowcaseMembershipStatusProvenMember, nil
-		}
-		// Show as not a member if membership can't be proven
-		return identity.ProfileShowcaseMembershipStatusNotAMember, nil
+		// if grant != nil && bytes.Equal(grant.MemberId, crypto.CompressPubkey(contactPubKey)) {
+		// 	return identity.ProfileShowcaseMembershipStatusProvenMember, nil
+		// }
+		// // Show as not a member if membership can't be proven
+		// return identity.ProfileShowcaseMembershipStatusNotAMember, nil
 	}
 
 	if community.HasMember(contactPubKey) {
