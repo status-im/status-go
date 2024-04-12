@@ -23,6 +23,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -615,6 +616,7 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 				}
 				return
 			case env := <-sub[0].Ch:
+				fmt.Println("===MSG HASH RECEIVED:", hex.EncodeToString(env.Hash()))
 				err := w.OnNewEnvelopes(env, common.RelayedMessageType, false)
 				if err != nil {
 					w.logger.Error("OnNewEnvelopes error", zap.Error(err))
@@ -981,6 +983,9 @@ func (w *Waku) broadcast() {
 					peerCnt := len(w.node.Relay().PubSub().ListPeers(env.PubsubTopic()))
 					logger.Info("publishing message via relay", zap.Int("peerCnt", peerCnt))
 					_, err := w.node.Relay().Publish(w.ctx, env.Message(), relay.WithPubSubTopic(env.PubsubTopic()))
+					if err == nil {
+						fmt.Println("====MSG HASH SENT:", hex.EncodeToString(env.Hash()))
+					}
 					return err
 				}
 			}
