@@ -49,8 +49,6 @@ func (sp *CommonDiscoveryService) GetListeningChan() <-chan PeerData {
 	return sp.channel
 }
 func (sp *CommonDiscoveryService) PushToChan(data PeerData) bool {
-	sp.RLock()
-	defer sp.RUnlock()
 	if err := sp.ErrOnNotRunning(); err != nil {
 		return false
 	}
