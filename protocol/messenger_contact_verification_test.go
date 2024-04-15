@@ -116,7 +116,7 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
 	s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
 
-	// Make sure the message is updated, sender s2de
+	// Make sure the message is updated, sender side
 	s.Require().NotNil(resp)
 	s.Require().Len(resp.Messages(), 2)
 
@@ -492,6 +492,65 @@ func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests()
 
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().Equal(common.ContactVerificationStateUntrustworthy, resp.Messages()[0].ContactVerificationState)
+}
+
+func (s *MessengerVerificationRequests) TestRemoveTrustVerificationStatus() {
+	// GIVEN
+	theirMessenger := s.newMessenger(s.shh)
+	defer TearDownMessenger(&s.Suite, theirMessenger)
+
+	s.mutualContact(theirMessenger)
+
+	theirPk := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	challenge := "challenge"
+
+	resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
+	s.Require().NoError(err)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	verificationRequestID := resp.VerificationRequests()[0].ID
+
+	// Wait for the message to reach its destination
+	resp, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool {
+			return len(r.VerificationRequests()) == 1 && len(r.ActivityCenterNotifications()) == 1
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(resp.VerificationRequests(), 1)
+
+	resp, err = theirMessenger.AcceptContactVerificationRequest(context.Background(), verificationRequestID, "hello back")
+	s.Require().NoError(err)
+	s.Require().Len(resp.VerificationRequests(), 1)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool {
+			return len(r.VerificationRequests()) == 1
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	// Mark as trusted
+	_, err = s.m.VerifiedTrusted(context.Background(), &requests.VerifiedTrusted{ID: types.FromHex(verificationRequestID)})
+	s.Require().NoError(err)
+
+	// WHEN
+	_, err = s.m.RemoveTrustVerificationStatus(context.Background(), theirPk)
+	s.Require().NoError(err)
+
+	// THEN
+	trustStatus, err := s.m.GetTrustStatus(theirPk)
+	s.Require().NoError(err)
+	s.Require().Equal(verification.TrustStatusUNKNOWN, trustStatus)
+
+	contact, _ := s.m.allContacts.Load(theirPk)
+	s.Require().NotNil(contact)
+	s.Require().Equal(VerificationStatusUNVERIFIED, contact.VerificationStatus)
+	s.Require().Equal(verification.TrustStatusUNKNOWN, contact.TrustStatus)
 }
 
 func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
