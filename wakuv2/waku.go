@@ -32,6 +32,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jellydator/ttlcache/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	"github.com/multiformats/go-multiaddr"
@@ -78,6 +79,7 @@ const messageQueueLimit = 1024
 const requestTimeout = 30 * time.Second
 const bootnodesQueryBackoffMs = 200
 const bootnodesMaxRetries = 7
+const cacheTTL = 20 * time.Minute
 
 type ITelemetryClient interface {
 	PushReceivedEnvelope(*protocol.Envelope)
@@ -101,9 +103,9 @@ type Waku struct {
 	symKeys     map[string][]byte            // Symmetric key storage
 	keyMu       sync.RWMutex                 // Mutex associated with key stores
 
-	envelopes   map[gethcommon.Hash]*common.ReceivedMessage // Pool of envelopes currently tracked by this node
-	expirations map[uint32]mapset.Set                       // Message expiration pool
-	poolMu      sync.RWMutex                                // Mutex to sync the message and expiration pools
+	envelopeCache *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] // Pool of envelopes currently tracked by this node
+	expirations   map[uint32]mapset.Set                                     // Message expiration pool
+	poolMu        sync.RWMutex                                              // Mutex to sync the message and expiration pools
 
 	bandwidthCounter *metrics.BandwidthCounter
 
@@ -155,6 +157,12 @@ func (w *Waku) SetStatusTelemetryClient(client ITelemetryClient) {
 	w.statusTelemetryClient = client
 }
 
+func newTTLCache() *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] {
+	cache := ttlcache.New[gethcommon.Hash, *common.ReceivedMessage](ttlcache.WithTTL[gethcommon.Hash, *common.ReceivedMessage](cacheTTL))
+	go cache.Start()
+	return cache
+}
+
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
 func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.ID, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
@@ -183,7 +191,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		cfg:                             cfg,
 		privateKeys:                     make(map[string]*ecdsa.PrivateKey),
 		symKeys:                         make(map[string][]byte),
-		envelopes:                       make(map[gethcommon.Hash]*common.ReceivedMessage),
+		envelopeCache:                   newTTLCache(),
 		expirations:                     make(map[uint32]mapset.Set),
 		msgQueue:                        make(chan *common.ReceivedMessage, messageQueueLimit),
 		sendQueue:                       make(chan *protocol.Envelope, 1000),
@@ -1035,7 +1043,7 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
 	w.sendQueue <- envelope
 
 	w.poolMu.Lock()
-	_, alreadyCached := w.envelopes[gethcommon.BytesToHash(envelope.Hash())]
+	alreadyCached := w.envelopeCache.Has(gethcommon.BytesToHash(envelope.Hash()))
 	w.poolMu.Unlock()
 	if !alreadyCached {
 		recvMessage := common.NewReceivedMessage(envelope, common.RelayedMessageType)
@@ -1280,6 +1288,8 @@ func (w *Waku) setupRelaySubscriptions() error {
 func (w *Waku) Stop() error {
 	w.cancel()
 
+	w.envelopeCache.Stop()
+
 	err := w.identifyService.Close()
 	if err != nil {
 		return err
@@ -1344,21 +1354,19 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 
 // addEnvelope adds an envelope to the envelope map, used for sending
 func (w *Waku) addEnvelope(envelope *common.ReceivedMessage) {
-	hash := envelope.Hash()
-
 	w.poolMu.Lock()
-	w.envelopes[hash] = envelope
+	w.envelopeCache.Set(envelope.Hash(), envelope, ttlcache.DefaultTTL)
 	w.poolMu.Unlock()
 }
 
 func (w *Waku) add(recvMessage *common.ReceivedMessage, processImmediately bool) (bool, error) {
 	common.EnvelopesReceivedCounter.Inc()
 
-	hash := recvMessage.Hash()
-
 	w.poolMu.Lock()
-	envelope, alreadyCached := w.envelopes[hash]
+	envelope := w.envelopeCache.Get(recvMessage.Hash())
+	alreadyCached := envelope != nil
 	w.poolMu.Unlock()
+
 	if !alreadyCached {
 		recvMessage.Processed.Store(false)
 		w.addEnvelope(recvMessage)
@@ -1375,7 +1383,7 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage, processImmediately bool)
 		common.EnvelopesSizeMeter.Observe(float64(len(recvMessage.Envelope.Message().Payload)))
 	}
 
-	if !alreadyCached || !envelope.Processed.Load() {
+	if !alreadyCached || !envelope.Value().Processed.Load() {
 		if processImmediately {
 			logger.Debug("immediately processing envelope")
 			w.processReceivedMessage(recvMessage)
@@ -1444,24 +1452,18 @@ func (w *Waku) processReceivedMessage(e *common.ReceivedMessage) {
 	})
 }
 
-// Envelopes retrieves all the messages currently pooled by the node.
-func (w *Waku) Envelopes() []*common.ReceivedMessage {
-	w.poolMu.RLock()
-	defer w.poolMu.RUnlock()
-
-	all := make([]*common.ReceivedMessage, 0, len(w.envelopes))
-	for _, envelope := range w.envelopes {
-		all = append(all, envelope)
-	}
-	return all
-}
-
 // GetEnvelope retrieves an envelope from the message queue by its hash.
 // It returns nil if the envelope can not be found.
 func (w *Waku) GetEnvelope(hash gethcommon.Hash) *common.ReceivedMessage {
 	w.poolMu.RLock()
 	defer w.poolMu.RUnlock()
-	return w.envelopes[hash]
+
+	envelope := w.envelopeCache.Get(hash)
+	if envelope == nil {
+		return nil
+	}
+
+	return envelope.Value()
 }
 
 // isEnvelopeCached checks if envelope with specific hash has already been received and cached.
@@ -1469,14 +1471,15 @@ func (w *Waku) IsEnvelopeCached(hash gethcommon.Hash) bool {
 	w.poolMu.Lock()
 	defer w.poolMu.Unlock()
 
-	_, exist := w.envelopes[hash]
-	return exist
+	return w.envelopeCache.Has(hash)
 }
 
 func (w *Waku) ClearEnvelopesCache() {
 	w.poolMu.Lock()
 	defer w.poolMu.Unlock()
-	w.envelopes = make(map[gethcommon.Hash]*common.ReceivedMessage)
+
+	w.envelopeCache.Stop()
+	w.envelopeCache = newTTLCache()
 }
 
 func (w *Waku) PeerCount() int {
