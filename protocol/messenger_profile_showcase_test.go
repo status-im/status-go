@@ -805,7 +805,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGra
 	// s.Require().Equal(identity.ProfileShowcaseMembershipStatusUnproven, profileShowcase.Communities[0].MembershipStatus)
 
 	// 7) Owner updates the grant
-	owner.publishGrantsForControlledCommunities()
+	owner.updateGrantsForControlledCommunities()
 
 	// Retrieve for grant clock update
 	err = tt.RetryWithBackOff(func() error {

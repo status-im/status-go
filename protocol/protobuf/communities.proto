@@ -274,7 +274,7 @@ message DeleteCommunityMemberMessages {
 }
 
 message CommunityUpdateGrant {
-  uint64 clock = 1;
+  uint64 timestamp = 1;
   bytes community_id = 2;
-  bytes grant = 3;
+  map<uint32, bytes> grants = 3;
 }

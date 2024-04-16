@@ -2533,9 +2533,9 @@ type CommunityUpdateGrant struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Clock       uint64 `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	CommunityId []byte `protobuf:"bytes,2,opt,name=community_id,json=communityId,proto3" json:"community_id,omitempty"`
-	Grant       []byte `protobuf:"bytes,3,opt,name=grant,proto3" json:"grant,omitempty"`
+	Timestamp   uint64            `protobuf:"varint,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	CommunityId []byte            `protobuf:"bytes,2,opt,name=community_id,json=communityId,proto3" json:"community_id,omitempty"`
+	Grants      map[uint32][]byte `protobuf:"bytes,3,rep,name=grants,proto3" json:"grants,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (x *CommunityUpdateGrant) Reset() {
@@ -2570,9 +2570,9 @@ func (*CommunityUpdateGrant) Descriptor() ([]byte, []int) {
 	return file_communities_proto_rawDescGZIP(), []int{30}
 }
 
-func (x *CommunityUpdateGrant) GetClock() uint64 {
+func (x *CommunityUpdateGrant) GetTimestamp() uint64 {
 	if x != nil {
-		return x.Clock
+		return x.Timestamp
 	}
 	return 0
 }
@@ -2584,9 +2584,9 @@ func (x *CommunityUpdateGrant) GetCommunityId() []byte {
 	return nil
 }
 
-func (x *CommunityUpdateGrant) GetGrant() []byte {
+func (x *CommunityUpdateGrant) GetGrants() map[uint32][]byte {
 	if x != nil {
-		return x.Grant
+		return x.Grants
 	}
 	return nil
 }
@@ -3072,14 +3072,22 @@ var file_communities_proto_rawDesc = []byte{
 	0x26, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x44, 0x65, 0x6c, 0x65, 0x74,
 	0x65, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72,
 	0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x52, 0x08, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65,
-	0x73, 0x22, 0x65, 0x0a, 0x14, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x55, 0x70,
-	0x64, 0x61, 0x74, 0x65, 0x47, 0x72, 0x61, 0x6e, 0x74, 0x12, 0x14, 0x0a, 0x05, 0x63, 0x6c, 0x6f,
-	0x63, 0x6b, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05, 0x63, 0x6c, 0x6f, 0x63, 0x6b, 0x12,
-	0x21, 0x0a, 0x0c, 0x63, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x5f, 0x69, 0x64, 0x18,
-	0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0b, 0x63, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79,
-	0x49, 0x64, 0x12, 0x14, 0x0a, 0x05, 0x67, 0x72, 0x61, 0x6e, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28,
-	0x0c, 0x52, 0x05, 0x67, 0x72, 0x61, 0x6e, 0x74, 0x42, 0x0d, 0x5a, 0x0b, 0x2e, 0x2f, 0x3b, 0x70,
-	0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x73, 0x22, 0xd6, 0x01, 0x0a, 0x14, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x55,
+	0x70, 0x64, 0x61, 0x74, 0x65, 0x47, 0x72, 0x61, 0x6e, 0x74, 0x12, 0x1c, 0x0a, 0x09, 0x74, 0x69,
+	0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x09, 0x74,
+	0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x12, 0x21, 0x0a, 0x0c, 0x63, 0x6f, 0x6d, 0x6d,
+	0x75, 0x6e, 0x69, 0x74, 0x79, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0b,
+	0x63, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x49, 0x64, 0x12, 0x42, 0x0a, 0x06, 0x67,
+	0x72, 0x61, 0x6e, 0x74, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x2a, 0x2e, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79,
+	0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x47, 0x72, 0x61, 0x6e, 0x74, 0x2e, 0x47, 0x72, 0x61, 0x6e,
+	0x74, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x06, 0x67, 0x72, 0x61, 0x6e, 0x74, 0x73, 0x1a,
+	0x39, 0x0a, 0x0b, 0x47, 0x72, 0x61, 0x6e, 0x74, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10,
+	0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x6b, 0x65, 0x79,
+	0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52,
+	0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x42, 0x0d, 0x5a, 0x0b, 0x2e, 0x2f,
+	0x3b, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+	0x33,
 }
 
 var (
@@ -3095,7 +3103,7 @@ func file_communities_proto_rawDescGZIP() []byte {
 }
 
 var file_communities_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_communities_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
+var file_communities_proto_msgTypes = make([]protoimpl.MessageInfo, 42)
 var file_communities_proto_goTypes = []interface{}{
 	(CommunityMember_Roles)(0),                    // 0: protobuf.CommunityMember.Roles
 	(CommunityMember_ChannelRole)(0),              // 1: protobuf.CommunityMember.ChannelRole
@@ -3142,24 +3150,25 @@ var file_communities_proto_goTypes = []interface{}{
 	nil,                                           // 42: protobuf.CommunityDescription.PrivateDataEntry
 	nil,                                           // 43: protobuf.CommunityChat.MembersEntry
 	nil,                                           // 44: protobuf.WakuMessageArchiveIndex.ArchivesEntry
-	(CommunityTokenType)(0),                       // 45: protobuf.CommunityTokenType
-	(*ChatIdentity)(nil),                          // 46: protobuf.ChatIdentity
-	(*Shard)(nil),                                 // 47: protobuf.Shard
+	nil,                                           // 45: protobuf.CommunityUpdateGrant.GrantsEntry
+	(CommunityTokenType)(0),                       // 46: protobuf.CommunityTokenType
+	(*ChatIdentity)(nil),                          // 47: protobuf.ChatIdentity
+	(*Shard)(nil),                                 // 48: protobuf.Shard
 }
 var file_communities_proto_depIdxs = []int32{
 	0,  // 0: protobuf.CommunityMember.roles:type_name -> protobuf.CommunityMember.Roles
 	15, // 1: protobuf.CommunityMember.revealed_accounts:type_name -> protobuf.RevealedAccount
 	1,  // 2: protobuf.CommunityMember.channel_role:type_name -> protobuf.CommunityMember.ChannelRole
 	35, // 3: protobuf.CommunityTokenMetadata.contract_addresses:type_name -> protobuf.CommunityTokenMetadata.ContractAddressesEntry
-	45, // 4: protobuf.CommunityTokenMetadata.tokenType:type_name -> protobuf.CommunityTokenType
+	46, // 4: protobuf.CommunityTokenMetadata.tokenType:type_name -> protobuf.CommunityTokenType
 	2,  // 5: protobuf.CommunityPermissions.access:type_name -> protobuf.CommunityPermissions.Access
 	36, // 6: protobuf.TokenCriteria.contract_addresses:type_name -> protobuf.TokenCriteria.ContractAddressesEntry
-	45, // 7: protobuf.TokenCriteria.type:type_name -> protobuf.CommunityTokenType
+	46, // 7: protobuf.TokenCriteria.type:type_name -> protobuf.CommunityTokenType
 	3,  // 8: protobuf.CommunityTokenPermission.type:type_name -> protobuf.CommunityTokenPermission.Type
 	8,  // 9: protobuf.CommunityTokenPermission.token_criteria:type_name -> protobuf.TokenCriteria
 	37, // 10: protobuf.CommunityDescription.members:type_name -> protobuf.CommunityDescription.MembersEntry
 	7,  // 11: protobuf.CommunityDescription.permissions:type_name -> protobuf.CommunityPermissions
-	46, // 12: protobuf.CommunityDescription.identity:type_name -> protobuf.ChatIdentity
+	47, // 12: protobuf.CommunityDescription.identity:type_name -> protobuf.ChatIdentity
 	38, // 13: protobuf.CommunityDescription.chats:type_name -> protobuf.CommunityDescription.ChatsEntry
 	39, // 14: protobuf.CommunityDescription.categories:type_name -> protobuf.CommunityDescription.CategoriesEntry
 	12, // 15: protobuf.CommunityDescription.admin_settings:type_name -> protobuf.CommunityAdminSettings
@@ -3169,29 +3178,30 @@ var file_communities_proto_depIdxs = []int32{
 	42, // 19: protobuf.CommunityDescription.privateData:type_name -> protobuf.CommunityDescription.PrivateDataEntry
 	43, // 20: protobuf.CommunityChat.members:type_name -> protobuf.CommunityChat.MembersEntry
 	7,  // 21: protobuf.CommunityChat.permissions:type_name -> protobuf.CommunityPermissions
-	46, // 22: protobuf.CommunityChat.identity:type_name -> protobuf.ChatIdentity
+	47, // 22: protobuf.CommunityChat.identity:type_name -> protobuf.ChatIdentity
 	15, // 23: protobuf.CommunityRequestToJoin.revealed_accounts:type_name -> protobuf.RevealedAccount
 	15, // 24: protobuf.CommunityEditSharedAddresses.revealed_accounts:type_name -> protobuf.RevealedAccount
 	10, // 25: protobuf.CommunityRequestToJoinResponse.community:type_name -> protobuf.CommunityDescription
-	47, // 26: protobuf.CommunityRequestToJoinResponse.shard:type_name -> protobuf.Shard
+	48, // 26: protobuf.CommunityRequestToJoinResponse.shard:type_name -> protobuf.Shard
 	24, // 27: protobuf.WakuMessageArchive.metadata:type_name -> protobuf.WakuMessageArchiveMetadata
 	23, // 28: protobuf.WakuMessageArchive.messages:type_name -> protobuf.WakuMessage
 	24, // 29: protobuf.WakuMessageArchiveIndexMetadata.metadata:type_name -> protobuf.WakuMessageArchiveMetadata
 	44, // 30: protobuf.WakuMessageArchiveIndex.archives:type_name -> protobuf.WakuMessageArchiveIndex.ArchivesEntry
 	30, // 31: protobuf.CommunityStorenodes.storenodes:type_name -> protobuf.Storenode
 	32, // 32: protobuf.DeleteCommunityMemberMessages.messages:type_name -> protobuf.DeleteCommunityMemberMessage
-	5,  // 33: protobuf.CommunityDescription.MembersEntry.value:type_name -> protobuf.CommunityMember
-	13, // 34: protobuf.CommunityDescription.ChatsEntry.value:type_name -> protobuf.CommunityChat
-	14, // 35: protobuf.CommunityDescription.CategoriesEntry.value:type_name -> protobuf.CommunityCategory
-	9,  // 36: protobuf.CommunityDescription.TokenPermissionsEntry.value:type_name -> protobuf.CommunityTokenPermission
-	11, // 37: protobuf.CommunityDescription.BannedMembersEntry.value:type_name -> protobuf.CommunityBanInfo
-	5,  // 38: protobuf.CommunityChat.MembersEntry.value:type_name -> protobuf.CommunityMember
-	26, // 39: protobuf.WakuMessageArchiveIndex.ArchivesEntry.value:type_name -> protobuf.WakuMessageArchiveIndexMetadata
-	40, // [40:40] is the sub-list for method output_type
-	40, // [40:40] is the sub-list for method input_type
-	40, // [40:40] is the sub-list for extension type_name
-	40, // [40:40] is the sub-list for extension extendee
-	0,  // [0:40] is the sub-list for field type_name
+	45, // 33: protobuf.CommunityUpdateGrant.grants:type_name -> protobuf.CommunityUpdateGrant.GrantsEntry
+	5,  // 34: protobuf.CommunityDescription.MembersEntry.value:type_name -> protobuf.CommunityMember
+	13, // 35: protobuf.CommunityDescription.ChatsEntry.value:type_name -> protobuf.CommunityChat
+	14, // 36: protobuf.CommunityDescription.CategoriesEntry.value:type_name -> protobuf.CommunityCategory
+	9,  // 37: protobuf.CommunityDescription.TokenPermissionsEntry.value:type_name -> protobuf.CommunityTokenPermission
+	11, // 38: protobuf.CommunityDescription.BannedMembersEntry.value:type_name -> protobuf.CommunityBanInfo
+	5,  // 39: protobuf.CommunityChat.MembersEntry.value:type_name -> protobuf.CommunityMember
+	26, // 40: protobuf.WakuMessageArchiveIndex.ArchivesEntry.value:type_name -> protobuf.WakuMessageArchiveIndexMetadata
+	41, // [41:41] is the sub-list for method output_type
+	41, // [41:41] is the sub-list for method input_type
+	41, // [41:41] is the sub-list for extension type_name
+	41, // [41:41] is the sub-list for extension extendee
+	0,  // [0:41] is the sub-list for field type_name
 }
 
 func init() { file_communities_proto_init() }
@@ -3582,7 +3592,7 @@ func file_communities_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_communities_proto_rawDesc,
 			NumEnums:      4,
-			NumMessages:   41,
+			NumMessages:   42,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
