@@ -1620,13 +1620,8 @@ func TestSaveCommunityChat(t *testing.T) {
 		Description:           "community-chat-name-description",
 		FirstMessageTimestamp: 1,
 	}
-	permissions := &protobuf.CommunityPermissions{
-		Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-	}
-
 	communityChat := &protobuf.CommunityChat{
-		Identity:    identity,
-		Permissions: permissions,
+		Identity: identity,
 	}
 
 	chat := CreateCommunityChat("test-or-gid", "test-chat-id", communityChat, &testTimeSource{})

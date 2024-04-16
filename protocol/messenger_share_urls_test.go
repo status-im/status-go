@@ -75,9 +75,6 @@ func (s *MessengerShareUrlsSuite) createCommunityWithChannel() (*communities.Com
 	community := s.createCommunity()
 
 	chat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core",
 			Emoji:       "😎",

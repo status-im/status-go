@@ -196,7 +196,6 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 				Color:                   c.Identity.Color,
 				Emoji:                   c.Identity.Emoji,
 				Description:             c.Identity.Description,
-				Permissions:             c.Permissions,
 				Members:                 c.Members,
 				CanPost:                 canPost,
 				CanView:                 canView,
@@ -340,7 +339,6 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				Emoji:                   c.Identity.Emoji,
 				Color:                   c.Identity.Color,
 				Description:             c.Identity.Description,
-				Permissions:             c.Permissions,
 				Members:                 c.Members,
 				CanPost:                 canPost,
 				CanView:                 canView,
@@ -1131,10 +1129,6 @@ func (o *Community) ValidateRequestToJoin(signer *ecdsa.PublicKey, request *prot
 		return ErrCantRequestAccess
 	}
 
-	if len(request.ChatId) != 0 {
-		return o.validateRequestToJoinWithChatID(request)
-	}
-
 	err := o.validateRequestToJoinWithoutChatID(request)
 	if err != nil {
 		return err
@@ -1300,26 +1294,6 @@ func (o *Community) MemberRole(pubKey *ecdsa.PublicKey) protobuf.CommunityMember
 	}
 
 	return protobuf.CommunityMember_ROLE_NONE
-}
-
-func (o *Community) validateRequestToJoinWithChatID(request *protobuf.CommunityRequestToJoin) error {
-
-	chat, ok := o.config.CommunityDescription.Chats[request.ChatId]
-
-	if !ok {
-		return ErrChatNotFound
-	}
-
-	// If chat is no permissions, access should not have been requested
-	if chat.Permissions.Access != protobuf.CommunityPermissions_MANUAL_ACCEPT {
-		return ErrCantRequestAccess
-	}
-
-	if chat.Permissions.EnsOnly && len(request.EnsName) == 0 {
-		return ErrCantRequestAccess
-	}
-
-	return nil
 }
 
 func (o *Community) ManualAccept() bool {

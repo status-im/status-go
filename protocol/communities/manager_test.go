@@ -1233,9 +1233,6 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions_EmptyPermissions() {
 			DisplayName: "chat1",
 			Description: "description",
 		},
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Members: make(map[string]*protobuf.CommunityMember),
 	}
 
@@ -1284,9 +1281,6 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 			DisplayName: "chat1",
 			Description: "description",
 		},
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
 		Members: make(map[string]*protobuf.CommunityMember),
 	}
 
@@ -1302,9 +1296,6 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "chat2",
 			Description: "description",
-		},
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Members: make(map[string]*protobuf.CommunityMember),
 	}
@@ -1344,7 +1335,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 		CommunityID:   community.ID(),
 		Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
 		TokenCriteria: tokenCriteria,
-		ChatIds:       []string{chatID1, chatID2},
+		ChatIDs:       []string{chatID1, chatID2},
 	}
 
 	_, changes, err = m.CreateCommunityTokenPermission(viewOnlyPermission)
@@ -1427,7 +1418,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 		CommunityID:   community.ID(),
 		Type:          protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
 		TokenCriteria: tokenCriteria,
-		ChatIds:       []string{chatID1, chatID2},
+		ChatIDs:       []string{chatID1, chatID2},
 	}
 
 	_, changes, err = m.CreateCommunityTokenPermission(viewAndPostPermission)
@@ -1613,9 +1604,6 @@ func (s *ManagerSuite) buildCommunityWithChat() (*Community, string, error) {
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "added-chat",
 			Description: "description",
-		},
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Members: make(map[string]*protobuf.CommunityMember),
 	}

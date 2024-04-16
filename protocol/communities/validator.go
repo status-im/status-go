@@ -9,12 +9,6 @@ func validateCommunityChat(desc *protobuf.CommunityDescription, chat *protobuf.C
 	if chat == nil {
 		return ErrInvalidCommunityDescription
 	}
-	if chat.Permissions == nil {
-		return ErrInvalidCommunityDescriptionNoChatPermissions
-	}
-	if chat.Permissions.Access == protobuf.CommunityPermissions_UNKNOWN_ACCESS {
-		return ErrInvalidCommunityDescriptionUnknownChatAccess
-	}
 
 	if len(chat.CategoryId) != 0 {
 		if _, exists := desc.Categories[chat.CategoryId]; !exists {

@@ -1939,6 +1939,24 @@ func (m *Messenger) CheckAndDeletePendingRequestToJoinCommunity(ctx context.Cont
 	return nil, nil
 }
 
+func (m *Messenger) CreateCommunityChannel(request *requests.CreateCommunityChannel) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	communityChat := &protobuf.CommunityChat{
+		CategoryId: request.CategoryID,
+		Position:   request.Position,
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: request.Name,
+			Description: request.Description,
+			Color:       request.Color,
+		},
+	}
+
+	return m.CreateCommunityChat(request.CommunityID, communityChat)
+}
+
 func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.CommunityChat) (*MessengerResponse, error) {
 	var response MessengerResponse
 
@@ -2120,9 +2138,6 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 				Description:           "General channel for the community",
 				Color:                 community.Description().Identity.Color,
 				FirstMessageTimestamp: FirstMessageTimestampNoMessage,
-			},
-			Permissions: &protobuf.CommunityPermissions{
-				Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 			},
 		})
 		if err != nil {
