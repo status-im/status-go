@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 )
 

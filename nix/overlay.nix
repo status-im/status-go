@@ -22,9 +22,9 @@ in rec {
     ];
   };
 
-  go = prev.go_1_19;
-  buildGoModule = prev.buildGo119Module;
-  buildGoPackage = prev.buildGo119Package;
+  go = prev.go_1_21;
+  buildGoModule = prev.buildGo121Module;
+  buildGoPackage = prev.buildGo121Package;
 
   golangci-lint = prev.golangci-lint.override {
     buildGoModule = args: prev.buildGo119Module ( args // rec {
