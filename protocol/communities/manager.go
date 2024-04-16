@@ -764,6 +764,9 @@ func (m *Manager) Spectated() ([]*Community, error) {
 }
 
 func (m *Manager) CommunityUpdateLastOpenedAt(communityID types.HexBytes, timestamp int64) (*Community, error) {
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
+
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
@@ -886,6 +889,9 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 }
 
 func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommunityTokenPermission) (*Community, *CommunityChanges, error) {
+	m.communityLock.Lock(request.CommunityID)
+	defer m.communityLock.Unlock(request.CommunityID)
+
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
@@ -919,6 +925,9 @@ func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommuni
 }
 
 func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTokenPermission) (*Community, *CommunityChanges, error) {
+	m.communityLock.Lock(request.CommunityID)
+	defer m.communityLock.Unlock(request.CommunityID)
+
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
@@ -940,6 +949,9 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 }
 
 func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
+	m.communityLock.Lock(community.ID())
+	defer m.communityLock.Unlock(community.ID())
+
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 	becomeTokenMasterPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
@@ -1173,6 +1185,9 @@ func (m *Manager) ScheduleMembersReevaluation(communityID types.HexBytes) error 
 }
 
 func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommunityTokenPermission) (*Community, *CommunityChanges, error) {
+	m.communityLock.Lock(request.CommunityID)
+	defer m.communityLock.Unlock(request.CommunityID)
+
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
@@ -1211,6 +1226,9 @@ func (m *Manager) ReevaluateCommunityMembersPermissions(community *Community) er
 }
 
 func (m *Manager) DeleteCommunity(id types.HexBytes) error {
+	m.communityLock.Lock(id)
+	defer m.communityLock.Unlock(id)
+
 	err := m.persistence.DeleteCommunity(id)
 	if err != nil {
 		return err
@@ -1218,7 +1236,7 @@ func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 	return m.persistence.DeleteCommunitySettings(id)
 }
 
-func (m *Manager) UpdateShard(community *Community, shard *shard.Shard, clock uint64) error {
+func (m *Manager) updateShard(community *Community, shard *shard.Shard, clock uint64) error {
 	community.config.Shard = shard
 	if shard == nil {
 		return m.persistence.DeleteCommunityShard(community.ID())
@@ -1227,8 +1245,18 @@ func (m *Manager) UpdateShard(community *Community, shard *shard.Shard, clock ui
 	return m.persistence.SaveCommunityShard(community.ID(), shard, clock)
 }
 
+func (m *Manager) UpdateShard(community *Community, shard *shard.Shard, clock uint64) error {
+	m.communityLock.Lock(community.ID())
+	defer m.communityLock.Unlock(community.ID())
+
+	return m.updateShard(community, shard, clock)
+}
+
 // SetShard assigns a shard to a community
 func (m *Manager) SetShard(communityID types.HexBytes, shard *shard.Shard) (*Community, error) {
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
+
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
@@ -1236,7 +1264,7 @@ func (m *Manager) SetShard(communityID types.HexBytes, shard *shard.Shard) (*Com
 
 	community.increaseClock()
 
-	err = m.UpdateShard(community, shard, community.Clock())
+	err = m.updateShard(community, shard, community.Clock())
 	if err != nil {
 		return nil, err
 	}
@@ -1260,6 +1288,9 @@ func (m *Manager) UpdatePubsubTopicPrivateKey(topic string, privKey *ecdsa.Priva
 // EditCommunity takes a description, updates the community with the description,
 // saves it and returns it
 func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, error) {
+	m.communityLock.Lock(request.CommunityID)
+	defer m.communityLock.Unlock(request.CommunityID)
+
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, err
@@ -1322,6 +1353,9 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 }
 
 func (m *Manager) RemovePrivateKey(id types.HexBytes) (*Community, error) {
+	m.communityLock.Lock(id)
+	defer m.communityLock.Unlock(id)
+
 	community, err := m.GetByID(id)
 	if err != nil {
 		return community, err
@@ -1354,6 +1388,9 @@ func (m *Manager) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) 
 
 func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Community, error) {
 	communityID := crypto.CompressPubkey(&key.PublicKey)
+
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
 
 	community, err := m.GetByID(communityID)
 	if err != nil && err != ErrOrgNotFound {
@@ -1461,6 +1498,9 @@ func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.Communit
 }
 
 func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *protobuf.CommunityChat) (*Community, *CommunityChanges, error) {
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
+
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, nil, err
@@ -1494,6 +1534,9 @@ func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *prot
 }
 
 func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Community, *CommunityChanges, error) {
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
+
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, nil, err
@@ -1551,6 +1594,9 @@ func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory, publ
 }
 
 func (m *Manager) EditCategory(request *requests.EditCommunityCategory) (*Community, *CommunityChanges, error) {
+	m.communityLock.Lock(request.CommunityID)
+	defer m.communityLock.Unlock(request.CommunityID)
+
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
@@ -1577,6 +1623,9 @@ func (m *Manager) EditCategory(request *requests.EditCommunityCategory) (*Commun
 }
 
 func (m *Manager) EditChatFirstMessageTimestamp(communityID types.HexBytes, chatID string, timestamp uint32) (*Community, *CommunityChanges, error) {
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
+
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, nil, err
@@ -1604,6 +1653,9 @@ func (m *Manager) EditChatFirstMessageTimestamp(communityID types.HexBytes, chat
 }
 
 func (m *Manager) ReorderCategories(request *requests.ReorderCommunityCategories) (*Community, *CommunityChanges, error) {
+	m.communityLock.Lock(request.CommunityID)
+	defer m.communityLock.Unlock(request.CommunityID)
+
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
@@ -1623,6 +1675,9 @@ func (m *Manager) ReorderCategories(request *requests.ReorderCommunityCategories
 }
 
 func (m *Manager) ReorderChat(request *requests.ReorderCommunityChat) (*Community, *CommunityChanges, error) {
+	m.communityLock.Lock(request.CommunityID)
+	defer m.communityLock.Unlock(request.CommunityID)
+
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
@@ -1647,6 +1702,9 @@ func (m *Manager) ReorderChat(request *requests.ReorderCommunityChat) (*Communit
 }
 
 func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Community, *CommunityChanges, error) {
+	m.communityLock.Lock(request.CommunityID)
+	defer m.communityLock.Unlock(request.CommunityID)
+
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
@@ -1961,6 +2019,9 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, err
 	}
 
+	m.communityLock.Lock(eventsMessage.CommunityID)
+	defer m.communityLock.Unlock(eventsMessage.CommunityID)
+
 	community, err := m.GetByID(eventsMessage.CommunityID)
 	if err != nil {
 		return nil, err
@@ -2240,6 +2301,9 @@ func (m *Manager) markRequestToJoinAsAcceptedPending(pk *ecdsa.PublicKey, commun
 }
 
 func (m *Manager) DeletePendingRequestToJoin(request *RequestToJoin) error {
+	m.communityLock.Lock(request.CommunityID)
+	defer m.communityLock.Unlock(request.CommunityID)
+
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return err
@@ -2264,10 +2328,16 @@ func (m *Manager) UpdateClockInRequestToJoin(id types.HexBytes, clock uint64) er
 }
 
 func (m *Manager) SetMuted(id types.HexBytes, muted bool) error {
+	m.communityLock.Lock(id)
+	defer m.communityLock.Unlock(id)
+
 	return m.persistence.SetMuted(id, muted)
 }
 
 func (m *Manager) MuteCommunityTill(communityID []byte, muteTill time.Time) error {
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
+
 	return m.persistence.MuteCommunityTill(communityID, muteTill)
 }
 func (m *Manager) CancelRequestToJoin(request *requests.CancelRequestToJoinCommunity) (*RequestToJoin, *Community, error) {
@@ -2368,6 +2438,9 @@ func (m *Manager) accountsSatisfyPermissionsToJoinChannels(community *Community,
 }
 
 func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, error) {
+	m.communityLock.Lock(dbRequest.CommunityID)
+	defer m.communityLock.Unlock(dbRequest.CommunityID)
+
 	pk, err := common.HexToPubkey(dbRequest.PublicKey)
 	if err != nil {
 		return nil, err
@@ -2470,6 +2543,9 @@ func (m *Manager) GetRequestToJoin(ID types.HexBytes) (*RequestToJoin, error) {
 }
 
 func (m *Manager) DeclineRequestToJoin(dbRequest *RequestToJoin) (*Community, error) {
+	m.communityLock.Lock(dbRequest.CommunityID)
+	defer m.communityLock.Unlock(dbRequest.CommunityID)
+
 	community, err := m.GetByID(dbRequest.CommunityID)
 	if err != nil {
 		return nil, err
@@ -2513,6 +2589,9 @@ func (m *Manager) shouldUserRetainDeclined(signer *ecdsa.PublicKey, community *C
 }
 
 func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityCancelRequestToJoin) (*RequestToJoin, error) {
+	m.communityLock.Lock(request.CommunityId)
+	defer m.communityLock.Unlock(request.CommunityId)
+
 	community, err := m.GetByID(request.CommunityId)
 	if err != nil {
 		return nil, err
@@ -2679,6 +2758,9 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 }
 
 func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, request *protobuf.CommunityEditSharedAddresses) error {
+	m.communityLock.Lock(request.CommunityId)
+	defer m.communityLock.Unlock(request.CommunityId)
+
 	community, err := m.GetByID(request.CommunityId)
 	if err != nil {
 		return err
@@ -2797,6 +2879,9 @@ func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tok
 }
 
 func (m *Manager) CheckChannelPermissions(communityID types.HexBytes, chatID string, addresses []gethcommon.Address) (*CheckChannelPermissionsResponse, error) {
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
+
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
@@ -2934,6 +3019,9 @@ type CheckAllChannelsPermissionsResponse struct {
 }
 
 func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoinResponse) (*RequestToJoin, error) {
+	m.communityLock.Lock(request.CommunityId)
+	defer m.communityLock.Unlock(request.CommunityId)
+
 	pkString := common.PubkeyToHex(&m.identity.PublicKey)
 
 	community, err := m.GetByID(request.CommunityId)
@@ -3053,6 +3141,9 @@ func UnwrapCommunityDescriptionMessage(payload []byte) (*ecdsa.PublicKey, *proto
 }
 
 func (m *Manager) JoinCommunity(id types.HexBytes, forceJoin bool) (*Community, error) {
+	m.communityLock.Lock(id)
+	defer m.communityLock.Unlock(id)
+
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
@@ -3072,6 +3163,7 @@ func (m *Manager) JoinCommunity(id types.HexBytes, forceJoin bool) (*Community, 
 func (m *Manager) SpectateCommunity(id types.HexBytes) (*Community, error) {
 	m.communityLock.Lock(id)
 	defer m.communityLock.Unlock(id)
+
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
@@ -3110,6 +3202,9 @@ func (m *Manager) GetRequestToJoinByPkAndCommunityID(pk *ecdsa.PublicKey, commun
 }
 
 func (m *Manager) UpdateCommunityDescriptionMagnetlinkMessageClock(communityID types.HexBytes, clock uint64) error {
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
+
 	community, err := m.GetByIDString(communityID.String())
 	if err != nil {
 		return err
@@ -3131,6 +3226,9 @@ func (m *Manager) GetLastSeenMagnetlink(communityID types.HexBytes) (string, err
 }
 
 func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
+	m.communityLock.Lock(id)
+	defer m.communityLock.Unlock(id)
+
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
@@ -3148,6 +3246,9 @@ func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 
 // Same as LeaveCommunity, but we have an option to stay spectating
 func (m *Manager) KickedOutOfCommunity(id types.HexBytes, spectateMode bool) (*Community, error) {
+	m.communityLock.Lock(id)
+	defer m.communityLock.Unlock(id)
+
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
@@ -3167,6 +3268,9 @@ func (m *Manager) KickedOutOfCommunity(id types.HexBytes, spectateMode bool) (*C
 }
 
 func (m *Manager) AddMemberOwnerToCommunity(communityID types.HexBytes, pk *ecdsa.PublicKey) (*Community, error) {
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
+
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
@@ -3187,6 +3291,9 @@ func (m *Manager) AddMemberOwnerToCommunity(communityID types.HexBytes, pk *ecds
 }
 
 func (m *Manager) RemoveUserFromCommunity(id types.HexBytes, pk *ecdsa.PublicKey) (*Community, error) {
+	m.communityLock.Lock(id)
+	defer m.communityLock.Unlock(id)
+
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
@@ -3206,6 +3313,9 @@ func (m *Manager) RemoveUserFromCommunity(id types.HexBytes, pk *ecdsa.PublicKey
 }
 
 func (m *Manager) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunity) (*Community, error) {
+	m.communityLock.Lock(request.CommunityID)
+	defer m.communityLock.Unlock(request.CommunityID)
+
 	id := request.CommunityID
 	publicKey, err := common.HexToPubkey(request.User.String())
 	if err != nil {
@@ -3231,6 +3341,9 @@ func (m *Manager) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunit
 }
 
 func (m *Manager) AddRoleToMember(request *requests.AddRoleToMember) (*Community, error) {
+	m.communityLock.Lock(request.CommunityID)
+	defer m.communityLock.Unlock(request.CommunityID)
+
 	id := request.CommunityID
 	publicKey, err := common.HexToPubkey(request.User.String())
 	if err != nil {
@@ -3262,6 +3375,9 @@ func (m *Manager) AddRoleToMember(request *requests.AddRoleToMember) (*Community
 }
 
 func (m *Manager) RemoveRoleFromMember(request *requests.RemoveRoleFromMember) (*Community, error) {
+	m.communityLock.Lock(request.CommunityID)
+	defer m.communityLock.Unlock(request.CommunityID)
+
 	id := request.CommunityID
 	publicKey, err := common.HexToPubkey(request.User.String())
 	if err != nil {
@@ -3293,6 +3409,9 @@ func (m *Manager) RemoveRoleFromMember(request *requests.RemoveRoleFromMember) (
 }
 
 func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (*Community, error) {
+	m.communityLock.Lock(request.CommunityID)
+	defer m.communityLock.Unlock(request.CommunityID)
+
 	id := request.CommunityID
 
 	publicKey, err := common.HexToPubkey(request.User.String())
@@ -3379,10 +3498,16 @@ func (m *Manager) GetCommunityShard(communityID types.HexBytes) (*shard.Shard, e
 }
 
 func (m *Manager) SaveCommunityShard(communityID types.HexBytes, shard *shard.Shard, clock uint64) error {
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
+
 	return m.persistence.SaveCommunityShard(communityID, shard, clock)
 }
 
 func (m *Manager) DeleteCommunityShard(communityID types.HexBytes) error {
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
+
 	return m.persistence.DeleteCommunityShard(communityID)
 }
 
@@ -4613,7 +4738,15 @@ func (m *Manager) AddCommunityToken(token *community_token.CommunityToken, clock
 		return nil, errors.New("Token is absent in database")
 	}
 
-	community, err := m.GetByIDString(token.CommunityID)
+	communityID, err := types.DecodeHex(token.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
+
+	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
 	}
@@ -4696,7 +4829,15 @@ func (m *Manager) RemoveCommunityToken(chainID int, contractAddress string) erro
 }
 
 func (m *Manager) SetCommunityActiveMembersCount(communityID string, activeMembersCount uint64) error {
-	community, err := m.GetByIDString(communityID)
+	id, err := types.DecodeHex(communityID)
+	if err != nil {
+		return err
+	}
+
+	m.communityLock.Lock(id)
+	defer m.communityLock.Unlock(id)
+
+	community, err := m.GetByID(id)
 	if err != nil {
 		return err
 	}
@@ -4714,20 +4855,6 @@ func (m *Manager) SetCommunityActiveMembersCount(communityID string, activeMembe
 		m.publish(&Subscription{Community: community})
 	}
 
-	return nil
-}
-
-// UpdateCommunity takes a Community persists it and republishes it.
-// The clock is incremented meaning even a no change update will be republished by the admin, and parsed by the member.
-func (m *Manager) UpdateCommunity(c *Community) error {
-	c.increaseClock()
-
-	err := m.persistence.SaveCommunity(c)
-	if err != nil {
-		return err
-	}
-
-	m.publish(&Subscription{Community: c})
 	return nil
 }
 
@@ -5009,6 +5136,9 @@ func (m *Manager) PromoteSelfToControlNode(community *Community, clock uint64) (
 	if community == nil {
 		return nil, ErrOrgNotFound
 	}
+
+	m.communityLock.Lock(community.ID())
+	defer m.communityLock.Unlock(community.ID())
 
 	ownerChanged, err := m.promoteSelfToControlNode(community, clock)
 	if err != nil {
