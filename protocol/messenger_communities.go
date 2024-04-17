@@ -545,7 +545,7 @@ func (m *Messenger) HandleCommunityUpdateGrant(state *ReceivedMessageState, mess
 		return err
 	}
 
-	grant, err := m.encryptor.DecryptRecipientGrant(m.identity, state.CurrentMessageState.PublicKey, message.Grants)
+	grant, err := m.encryptor.DecryptCommunityGrant(m.identity, state.CurrentMessageState.PublicKey, message.Grants)
 	if err != nil {
 		return err
 	}
@@ -574,7 +574,7 @@ func (m *Messenger) handleCommunityGrant(community *communities.Community, grant
 }
 
 func (m *Messenger) publishGroupGrantMessage(community *communities.Community, timestamp uint64, recipientGrants map[*ecdsa.PublicKey][]byte) error {
-	grants, err := m.encryptor.EncryptRecipientGrants(community.PrivateKey(), recipientGrants)
+	grants, err := m.encryptor.EncryptCommunityGrants(community.PrivateKey(), recipientGrants)
 	if err != nil {
 		return err
 	}
@@ -642,7 +642,7 @@ func (m *Messenger) updateGrantsForControlledCommunities() {
 		}
 		err = m.publishGroupGrantMessage(community, uint64(time.Now().UnixMilli()), memberGrants)
 		if err != nil {
-			m.logger.Error("failed to update grant for community member", zap.Error(err))
+			m.logger.Error("failed to update grant for community members", zap.Error(err))
 		}
 	}
 }

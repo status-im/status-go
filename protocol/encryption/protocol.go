@@ -423,7 +423,7 @@ func (p *Protocol) BuildHashRatchetMessage(groupID []byte, payload []byte) (*Pro
 	return spec, nil
 }
 
-func (p *Protocol) EncryptRecipientGrants(privateKey *ecdsa.PrivateKey, recipientGrants map[*ecdsa.PublicKey][]byte) (map[uint32][]byte, error) {
+func (p *Protocol) EncryptCommunityGrants(privateKey *ecdsa.PrivateKey, recipientGrants map[*ecdsa.PublicKey][]byte) (map[uint32][]byte, error) {
 	grants := make(map[uint32][]byte)
 
 	for recipientKey, grant := range recipientGrants {
@@ -438,18 +438,13 @@ func (p *Protocol) EncryptRecipientGrants(privateKey *ecdsa.PrivateKey, recipien
 		}
 
 		kBytes := publicKeyMostRelevantBytes(recipientKey)
-
-		if grants[kBytes] == nil {
-			grants[kBytes] = encryptedGrant
-		} else {
-			grants[kBytes] = append(grants[kBytes], encryptedGrant...)
-		}
+		grants[kBytes] = encryptedGrant
 	}
 
 	return grants, nil
 }
 
-func (p *Protocol) DecryptRecipientGrant(myIdentityKey *ecdsa.PrivateKey, communityKey *ecdsa.PublicKey, grants map[uint32][]byte) ([]byte, error) {
+func (p *Protocol) DecryptCommunityGrant(myIdentityKey *ecdsa.PrivateKey, senderKey *ecdsa.PublicKey, grants map[uint32][]byte) ([]byte, error) {
 	kBytes := publicKeyMostRelevantBytes(&myIdentityKey.PublicKey)
 
 	ecryptedGrant, ok := grants[kBytes]
@@ -457,7 +452,7 @@ func (p *Protocol) DecryptRecipientGrant(myIdentityKey *ecdsa.PrivateKey, commun
 		return nil, errors.New("can't find related grant in the map")
 	}
 
-	sharedKey, err := generateSharedKey(myIdentityKey, communityKey)
+	sharedKey, err := generateSharedKey(myIdentityKey, senderKey)
 	if err != nil {
 		return nil, err
 	}

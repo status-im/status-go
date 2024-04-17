@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -716,7 +717,8 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncry
 // 7) Owner updates the grant
 // 8) Bob should be able to validate the membership again
 func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGrantUpdate() {
-	// NOTE: commented to reduce test length communities.GrantExpirationTime = 200 * time.Millisecond
+	// NOTE: smaller timeouts can lead test to be flaky
+	communities.GrantExpirationTime = 500 * time.Millisecond
 	grantInvokesProfileDispatchInterval = 1 * time.Millisecond
 	alice := s.m
 
@@ -792,17 +794,14 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGra
 	s.Require().Equal(community.IDString(), profileShowcase.Communities[0].CommunityID)
 	s.Require().Equal(identity.ProfileShowcaseMembershipStatusProvenMember, profileShowcase.Communities[0].MembershipStatus)
 
-	// NOTE: this step is commented because it requires significant time to wait for the grant to expire
-	// and smaller timeouts can lead test to be flaky, but it should be working
-
 	// 6) Wait until the grant expires, Bob should not be able to validate the membership anymore
-	// time.Sleep(communities.GrantExpirationTime)
+	time.Sleep(communities.GrantExpirationTime)
 
-	// profileShowcase, err = bob.GetProfileShowcaseForContact(contactID, true)
-	// s.Require().NoError(err)
-	// s.Require().Len(profileShowcase.Communities, 1)
-	// s.Require().Equal(community.IDString(), profileShowcase.Communities[0].CommunityID)
-	// s.Require().Equal(identity.ProfileShowcaseMembershipStatusUnproven, profileShowcase.Communities[0].MembershipStatus)
+	profileShowcase, err = bob.GetProfileShowcaseForContact(contactID, true)
+	s.Require().NoError(err)
+	s.Require().Len(profileShowcase.Communities, 1)
+	s.Require().Equal(community.IDString(), profileShowcase.Communities[0].CommunityID)
+	s.Require().Equal(identity.ProfileShowcaseMembershipStatusUnproven, profileShowcase.Communities[0].MembershipStatus)
 
 	// 7) Owner updates the grant
 	owner.updateGrantsForControlledCommunities()
