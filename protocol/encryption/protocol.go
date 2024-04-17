@@ -3,6 +3,7 @@ package encryption
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"database/sql"
 	"fmt"
 
@@ -420,6 +421,43 @@ func (p *Protocol) BuildHashRatchetMessage(groupID []byte, payload []byte) (*Pro
 		Message: message,
 	}
 	return spec, nil
+}
+
+func (p *Protocol) EncryptCommunityGrants(privateKey *ecdsa.PrivateKey, recipientGrants map[*ecdsa.PublicKey][]byte) (map[uint32][]byte, error) {
+	grants := make(map[uint32][]byte)
+
+	for recipientKey, grant := range recipientGrants {
+		sharedKey, err := generateSharedKey(privateKey, recipientKey)
+		if err != nil {
+			return nil, err
+		}
+
+		encryptedGrant, err := encrypt(grant, sharedKey, rand.Reader)
+		if err != nil {
+			return nil, err
+		}
+
+		kBytes := publicKeyMostRelevantBytes(recipientKey)
+		grants[kBytes] = encryptedGrant
+	}
+
+	return grants, nil
+}
+
+func (p *Protocol) DecryptCommunityGrant(myIdentityKey *ecdsa.PrivateKey, senderKey *ecdsa.PublicKey, grants map[uint32][]byte) ([]byte, error) {
+	kBytes := publicKeyMostRelevantBytes(&myIdentityKey.PublicKey)
+
+	ecryptedGrant, ok := grants[kBytes]
+	if !ok {
+		return nil, errors.New("can't find related grant in the map")
+	}
+
+	sharedKey, err := generateSharedKey(myIdentityKey, senderKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return decrypt(ecryptedGrant, sharedKey)
 }
 
 func (p *Protocol) GetKeyExMessageSpecs(groupID []byte, identity *ecdsa.PrivateKey, recipients []*ecdsa.PublicKey, forceRekey bool) ([]*ProtocolMessageSpec, error) {

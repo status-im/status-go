@@ -51,6 +51,12 @@ var messageArchiveInterval = 7 * 24 * time.Hour
 // 1 day interval
 var updateActiveMembersInterval = 24 * time.Hour
 
+// 1 day interval
+var grantUpdateInterval = 24 * time.Hour
+
+// 4 hours interval
+var grantInvokesProfileDispatchInterval = 4 * time.Hour
+
 const discordTimestampLayout = time.RFC3339
 
 const (
@@ -481,8 +487,8 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 				lastPublished = time.Now().Unix()
 
 			case <-m.quit:
+				ticker.Stop()
 				return
-
 			}
 		}
 	}()
@@ -526,6 +532,134 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 				}
 
 			case <-m.quit:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+}
+
+func (m *Messenger) HandleCommunityUpdateGrant(state *ReceivedMessageState, message *protobuf.CommunityUpdateGrant, statusMessage *v1protocol.StatusMessage) error {
+	community, err := m.communitiesManager.GetByID(message.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	grant, err := m.encryptor.DecryptCommunityGrant(m.identity, state.CurrentMessageState.PublicKey, message.Grants)
+	if err != nil {
+		return err
+	}
+
+	return m.handleCommunityGrant(community, grant, message.Timestamp)
+}
+
+func (m *Messenger) handleCommunityGrant(community *communities.Community, grant []byte, clock uint64) error {
+	difference, err := m.communitiesManager.HandleCommunityGrant(community, grant, clock)
+	if err == communities.ErrGrantOlder || err == communities.ErrGrantExpired {
+		// Don't log an error for these cases
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	// if grant is significantly newer than the one we have, we should check the profile showcase
+	if time.Duration(difference)*time.Millisecond > grantInvokesProfileDispatchInterval {
+		err = m.UpdateProfileShowcaseCommunity(community)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Messenger) publishGroupGrantMessage(community *communities.Community, timestamp uint64, recipientGrants map[*ecdsa.PublicKey][]byte) error {
+	grants, err := m.encryptor.EncryptCommunityGrants(community.PrivateKey(), recipientGrants)
+	if err != nil {
+		return err
+	}
+
+	message := &protobuf.CommunityUpdateGrant{
+		Timestamp:   timestamp,
+		CommunityId: community.ID(),
+		Grants:      grants,
+	}
+
+	payload, err := proto.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		Payload:             payload,
+		Sender:              community.PrivateKey(),
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_UPDATE_GRANT,
+		PubsubTopic:         community.PubsubTopic(),
+	}
+
+	_, err = m.sender.SendPublic(context.Background(), community.IDString(), rawMessage)
+	return err
+}
+
+func (m *Messenger) updateGrantsForControlledCommunities() {
+	controlledCommunities, err := m.communitiesManager.Controlled()
+	if err != nil {
+		m.logger.Error("failed fetch controlled communities for grants update", zap.Error(err))
+	}
+
+	for _, community := range controlledCommunities {
+		// Skip unencrypted communities
+		if !community.Encrypted() {
+			continue
+		}
+
+		memberGrants := map[*ecdsa.PublicKey][]byte{}
+		for memberKey := range community.Members() {
+			if memberKey == m.IdentityPublicKeyString() {
+				grant, err := community.BuildGrant(m.IdentityPublicKey(), "")
+				if err != nil {
+					m.logger.Error("can't build own grant for controlled community", zap.Error(err))
+				}
+
+				err = m.handleCommunityGrant(community, grant, uint64(time.Now().UnixMilli()))
+				if err != nil {
+					m.logger.Error("error handling grant for controlled community", zap.Error(err))
+				}
+			} else {
+				memberPubKey, err := common.HexToPubkey(memberKey)
+				if err != nil {
+					m.logger.Error("Pubkey decode ", zap.Error(err))
+				}
+
+				grant, err := community.BuildGrant(memberPubKey, "")
+				if err != nil {
+					m.logger.Error("can't build member's grant for controlled community", zap.Error(err))
+				}
+
+				memberGrants[memberPubKey] = grant
+			}
+		}
+		err = m.publishGroupGrantMessage(community, uint64(time.Now().UnixMilli()), memberGrants)
+		if err != nil {
+			m.logger.Error("failed to update grant for community members", zap.Error(err))
+		}
+	}
+}
+
+func (m *Messenger) schedulePublishGrantsForControlledCommunities() {
+	// Send once immediately
+	m.updateGrantsForControlledCommunities()
+
+	ticker := time.NewTicker(grantUpdateInterval)
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				m.updateGrantsForControlledCommunities()
+			case <-m.quit:
+				ticker.Stop()
 				return
 			}
 		}

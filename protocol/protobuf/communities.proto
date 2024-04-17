@@ -12,6 +12,7 @@ message Grant {
   bytes member_id = 2;
   string chat_id = 3;
   uint64 clock = 4;
+  uint64 expires = 5;
 }
 
 message CommunityMember {
@@ -270,4 +271,10 @@ message DeleteCommunityMemberMessages {
   bytes community_id = 2;
   string member_id = 3;
   repeated DeleteCommunityMemberMessage messages = 4;
+}
+
+message CommunityUpdateGrant {
+  uint64 timestamp = 1;
+  bytes community_id = 2;
+  map<uint32, bytes> grants = 3;
 }

@@ -31,6 +31,9 @@ import (
 
 const signatureLength = 65
 
+// GrantExpirationTime interval of 7 days
+var GrantExpirationTime = 168 * time.Hour
+
 type Config struct {
 	PrivateKey                          *ecdsa.PrivateKey
 	ControlNode                         *ecdsa.PublicKey
@@ -1881,6 +1884,9 @@ func (o *Community) VerifyGrantSignature(data []byte) (*protobuf.Grant, error) {
 	if !bytes.Equal(grant.CommunityId, o.ID()) {
 		return nil, ErrInvalidGrant
 	}
+	if grant.Expires < uint64(time.Now().UnixMilli()) {
+		return nil, ErrGrantExpired
+	}
 
 	extractedPublicKey, err := crypto.SigToPub(crypto.Keccak256(payload), signature)
 	if err != nil {
@@ -1973,6 +1979,7 @@ func (o *Community) buildGrant(key *ecdsa.PublicKey, chatID string) ([]byte, err
 			MemberId:    crypto.CompressPubkey(key),
 			ChatId:      chatID,
 			Clock:       o.config.CommunityDescription.Clock,
+			Expires:     uint64(time.Now().Add(GrantExpirationTime).UnixMilli()),
 		}
 		marshaledGrant, err := proto.Marshal(grant)
 		if err != nil {
