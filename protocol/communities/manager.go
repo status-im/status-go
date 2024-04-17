@@ -149,10 +149,6 @@ func (c *CommunityLock) Init() {
 	c.locks = make(map[string]*sync.Mutex)
 }
 
-func (c *CommunityLock) Release() {
-	c.locks = nil
-}
-
 type HistoryArchiveDownloadTask struct {
 	CancelChan chan struct{}
 	Waiter     sync.WaitGroup
@@ -578,7 +574,6 @@ func (m *Manager) Stop() error {
 		close(c)
 	}
 	m.StopTorrentClient()
-	m.communityLock.Release()
 	return nil
 }
 
