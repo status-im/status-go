@@ -183,6 +183,7 @@ func evaluateCommunityChangesByDescription(origin, modified *protobuf.CommunityD
 		if _, ok := origin.Chats[chatID]; !ok {
 			changes.ChatsAdded[chatID] = chat
 		} else {
+
 			// Check for members added
 			for pk, member := range modified.Chats[chatID].Members {
 				if _, ok := origin.Chats[chatID].Members[pk]; !ok {
@@ -192,7 +193,6 @@ func evaluateCommunityChangesByDescription(origin, modified *protobuf.CommunityD
 							MembersRemoved: make(map[string]*protobuf.CommunityMember),
 						}
 					}
-
 					changes.ChatsModified[chatID].MembersAdded[pk] = member
 				}
 			}
@@ -206,7 +206,6 @@ func evaluateCommunityChangesByDescription(origin, modified *protobuf.CommunityD
 							MembersRemoved: make(map[string]*protobuf.CommunityMember),
 						}
 					}
-
 					changes.ChatsModified[chatID].MembersRemoved[pk] = member
 				}
 			}
