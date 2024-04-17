@@ -242,7 +242,6 @@ func (m *Messenger) findNewMailserver() error {
 	}
 
 	allMailservers := m.mailserverCycle.allMailservers
-	m.logger.Info(fmt.Sprintf("m.mailserverCycle.allMailservers -> %v", allMailservers))
 
 	//	TODO: remove this check once sockets are stable on x86_64 emulators
 	if findNearestMailServer {
@@ -266,8 +265,6 @@ func (m *Messenger) findNewMailserver() error {
 			parseFn = mailservers.EnodeStringToAddr
 		}
 
-		m.logger.Info(fmt.Sprintf("mailserverStr before DoPing -> %v", mailserverStr))
-		m.logger.Info(fmt.Sprintf("mailserverStr before parseFn -> %v", parseFn))
 		pingResult, err := mailservers.DoPing(context.Background(), mailserverStr, 500, parseFn)
 		if err != nil {
 			// pinging mailservers might fail, but we don't care
@@ -443,14 +440,9 @@ func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 // getActiveMailserver returns the active mailserver if a communityID is present then it'll return the mailserver
 // for that community if it has a mailserver setup otherwise it'll return the global mailserver
 func (m *Messenger) getActiveMailserver(communityID ...string) *mailservers.Mailserver {
-	m.logger.Info("inside getActiveMailserver")
-	m.logger.Info(fmt.Sprintf("for communityID: %s", communityID))
 	if len(communityID) == 0 || communityID[0] == "" {
-		m.logger.Info("communityID empty")
-		m.logger.Info(fmt.Sprintf("m.mailserverCycle.activeMailserver -> %v", m.mailserverCycle.activeMailserver))
 		return m.mailserverCycle.activeMailserver
 	}
-	m.logger.Info("before GetStorenodeByCommunnityID")
 	ms, err := m.communityStorenodes.GetStorenodeByCommunnityID(communityID[0])
 	if err != nil {
 		if !errors.Is(err, storenodes.ErrNotFound) {
@@ -463,8 +455,6 @@ func (m *Messenger) getActiveMailserver(communityID ...string) *mailservers.Mail
 }
 
 func (m *Messenger) getActiveMailserverID(communityID ...string) string {
-	m.logger.Info("inside getActiveMailserverID")
-	m.logger.Info(fmt.Sprintf("for communityID: %s", communityID))
 	ms := m.getActiveMailserver(communityID...)
 	if ms == nil {
 		return ""
@@ -786,8 +776,6 @@ func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
 	// NOTE: https://stackoverflow.com/questions/32705582/how-to-get-time-tick-to-tick-immediately
 	timeout += time.Second
 
-	m.logger.Info(fmt.Sprintf("Waiting for available store node with timeout: %v", timeout))
-
 	finish := make(chan struct{})
 	cancel := make(chan struct{})
 
@@ -799,16 +787,12 @@ func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
 			wg.Done()
 		}()
 		for !m.isMailserverAvailable(m.getActiveMailserverID()) {
-			m.logger.Info("Mailserver is not available, waiting...")
 			select {
 			case <-m.SubscribeMailserverAvailable():
-				m.logger.Info("Received mailserver available event")
 			case <-cancel:
 				return
-				m.logger.Info("Waiting for mailserver canceled")
 			}
 		}
-		m.logger.Info("Mailserver is available")
 	}()
 
 	go func() {
@@ -816,21 +800,15 @@ func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
 			close(finish)
 		}()
 		wg.Wait()
-		m.logger.Info("Waiting for mailserver finished")
 	}()
 
 	select {
 	case <-finish:
-		m.logger.Info("Mailserver is available, returning true")
 	case <-time.After(timeout):
 		close(cancel)
-		m.logger.Info("Timeout reached, canceling wait")
 	case <-m.ctx.Done():
-		m.logger.Info("Context canceled, canceling wait")
 		close(cancel)
 	}
 
-	available := m.isMailserverAvailable(m.getActiveMailserverID())
-	m.logger.Info(fmt.Sprintf("Mailserver availability: %v", available))
-	return available
+	return m.isMailserverAvailable(m.getActiveMailserverID())
 }

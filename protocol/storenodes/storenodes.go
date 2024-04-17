@@ -2,7 +2,6 @@ package storenodes
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
 	"go.uber.org/zap"
@@ -42,14 +41,11 @@ type storenodesData struct {
 
 // GetStorenodeByCommunnityID returns the active storenode for a community
 func (m *CommunityStorenodes) GetStorenodeByCommunnityID(communityID string) (mailservers.Mailserver, error) {
-	m.logger.Info("inside GetStorenodeByCommunnityID")
-	m.logger.Info(fmt.Sprintf("for communityID: %s", communityID))
 	m.storenodesByCommunityIDMutex.RLock()
 	defer m.storenodesByCommunityIDMutex.RUnlock()
 
 	msData, ok := m.storenodesByCommunityID[communityID]
 	if !ok || len(msData.storenodes) == 0 {
-		m.logger.Info("len(msData.storenodes) == 0 ")
 		return mailservers.Mailserver{}, ErrNotFound
 	}
 	return toMailserver(msData.storenodes[0]), nil
