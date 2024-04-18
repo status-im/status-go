@@ -114,7 +114,7 @@ func (h *HopBridge) Can(from, to *params.Network, token *token.Token, toToken *t
 		return false, nil
 	}
 
-	if from.ChainID == to.ChainID {
+	if from.ChainID == to.ChainID || toToken != nil {
 		return false, nil
 	}
 

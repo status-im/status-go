@@ -41,7 +41,7 @@ func (s *ERC721TransferBridge) Name() string {
 }
 
 func (s *ERC721TransferBridge) Can(from, to *params.Network, token *token.Token, toToken *token.Token, balance *big.Int) (bool, error) {
-	return from.ChainID == to.ChainID, nil
+	return from.ChainID == to.ChainID && toToken == nil, nil
 }
 
 func (s *ERC721TransferBridge) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int, nativeTokenPrice, tokenPrice float64, gasPrice *big.Float) (*big.Int, *big.Int, error) {
