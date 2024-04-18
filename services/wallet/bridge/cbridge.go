@@ -154,7 +154,7 @@ func (s *CBridge) getTransferConfig(isTest bool) (*cbridge.GetTransferConfigsRes
 }
 
 func (s *CBridge) Can(from, to *params.Network, token *token.Token, toToken *token.Token, balance *big.Int) (bool, error) {
-	if from.ChainID == to.ChainID {
+	if from.ChainID == to.ChainID || toToken != nil {
 		return false, nil
 	}
 
