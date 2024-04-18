@@ -26,8 +26,8 @@ var (
 	// This should not happen because the protocol forbids sending a message to
 	// non-paired devices, however, in theory it is possible to receive such a message.
 	ErrNotPairedDevice            = errors.New("received a message from not paired device")
-	ErrHashRatchetSeqNoTooHigh    = errors.New("Hash ratchet seq no is too high")
-	ErrHashRatchetGroupIDNotFound = errors.New("Hash ratchet group id not found")
+	ErrHashRatchetSeqNoTooHigh    = errors.New("hash ratchet seq no is too high")
+	ErrHashRatchetGroupIDNotFound = errors.New("hash ratchet group id not found")
 	ErrNoEncryptionKey            = errors.New("no encryption key found for the community")
 )
 
