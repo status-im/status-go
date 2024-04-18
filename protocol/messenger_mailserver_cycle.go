@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"net"
 	"runtime"
 	"sort"
 	"strings"
@@ -27,6 +28,8 @@ const defaultBackoff = 10 * time.Second
 const graylistBackoff = 3 * time.Minute
 const isAndroidEmulator = runtime.GOOS == "android" && runtime.GOARCH == "amd64"
 const findNearestMailServer = !isAndroidEmulator
+const overrideDNS = runtime.GOOS == "android"
+const bootstrapDNS = "8.8.8.8:53"
 
 func (m *Messenger) mailserversByFleet(fleet string) []mailservers.Mailserver {
 	return mailservers.DefaultMailserversByFleet(fleet)
@@ -219,6 +222,22 @@ type SortedMailserver struct {
 }
 
 func (m *Messenger) findNewMailserver() error {
+
+	// we have to override DNS manually because of https://github.com/status-im/status-mobile/issues/19581
+	if overrideDNS {
+		var dialer net.Dialer
+		net.DefaultResolver = &net.Resolver{
+			PreferGo: false,
+			Dial: func(context context.Context, _, _ string) (net.Conn, error) {
+				conn, err := dialer.DialContext(context, "udp", bootstrapDNS)
+				if err != nil {
+					return nil, err
+				}
+				return conn, nil
+			},
+		}
+	}
+
 	pinnedMailserver, err := m.getPinnedMailserver()
 	if err != nil {
 		m.logger.Error("Could not obtain the pinned mailserver", zap.Error(err))

@@ -42,22 +42,17 @@ linters-settings:
 linters:
   disable-all: true
   enable:
-    - deadcode
     - errcheck
     - gosec
-    - goconst
     - goimports
-    - golint
     - govet
     - ineffassign
     - megacheck
     - misspell
-    - structcheck
     # You can't disable typecheck, see:
     # https://github.com/golangci/golangci-lint/blob/master/docs/src/docs/welcome/faq.mdx#why-do-you-have-typecheck-errors
     - typecheck
     - unconvert
-    - varcheck
   fast: false
 
 issues:

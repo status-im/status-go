@@ -22,12 +22,12 @@ in rec {
     ];
   };
 
-  go = prev.go_1_19;
-  buildGoModule = prev.buildGo119Module;
-  buildGoPackage = prev.buildGo119Package;
+  go = prev.go_1_20;
+  buildGoModule = prev.buildGo120Module;
+  buildGoPackage = prev.buildGo120Package;
 
   golangci-lint = prev.golangci-lint.override {
-    buildGoModule = args: prev.buildGo119Module ( args // rec {
+    buildGoModule = args: prev.buildGo120Module ( args // rec {
       version = "1.52.2";
       src = prev.fetchFromGitHub {
         owner = "golangci";
