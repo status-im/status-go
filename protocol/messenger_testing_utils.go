@@ -67,6 +67,19 @@ func (m *MessengerSignalsHandlerMock) SendWakuBackedUpKeypair(*wakusync.WakuBack
 func (m *MessengerSignalsHandlerMock) SendWakuBackedUpWatchOnlyAccount(*wakusync.WakuBackedUpDataResponse) {
 }
 
+func (m *MessengerSignalsHandlerMock) BackupPerformed(uint64)                    {}
+func (m *MessengerSignalsHandlerMock) HistoryArchivesProtocolEnabled()           {}
+func (m *MessengerSignalsHandlerMock) HistoryArchivesProtocolDisabled()          {}
+func (m *MessengerSignalsHandlerMock) CreatingHistoryArchives(string)            {}
+func (m *MessengerSignalsHandlerMock) NoHistoryArchivesCreated(string, int, int) {}
+func (m *MessengerSignalsHandlerMock) HistoryArchivesCreated(string, int, int)   {}
+func (m *MessengerSignalsHandlerMock) HistoryArchivesSeeding(string)             {}
+func (m *MessengerSignalsHandlerMock) HistoryArchivesUnseeded(string)            {}
+func (m *MessengerSignalsHandlerMock) HistoryArchiveDownloaded(string, int, int) {}
+func (m *MessengerSignalsHandlerMock) DownloadingHistoryArchivesStarted(string)  {}
+func (m *MessengerSignalsHandlerMock) DownloadingHistoryArchivesFinished(string) {}
+func (m *MessengerSignalsHandlerMock) ImportingHistoryArchiveMessages(string)    {}
+
 func (m *MessengerSignalsHandlerMock) MessengerResponse(response *MessengerResponse) {
 	// Non-blocking send
 	select {

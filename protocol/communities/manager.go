@@ -4506,6 +4506,10 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 	}
 }
 
+func (m *Manager) SaveMessageArchiveID(communityID types.HexBytes, hash string) error {
+	return m.persistence.SaveMessageArchiveID(communityID, hash)
+}
+
 func (m *Manager) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
 	return m.persistence.GetMessageArchiveIDsToImport(communityID)
 }
