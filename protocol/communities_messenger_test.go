@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -2693,6 +2694,92 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	// There can be only one control node
 	s.False(tnc.IsControlNode())
 	s.True(tnc.IsOwner())
+}
+
+func (s *MessengerCommunitiesSuite) TestSyncMultipleCommunities() {
+	const numberOfCommunitiesToCreate = 5
+	// Create new device
+	alicesOtherDevice := s.createOtherDevice(s.alice)
+	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
+	var newCommunities [numberOfCommunitiesToCreate]*communities.Community
+	for i := 0; i < numberOfCommunitiesToCreate; i++ {
+		// Create community[i]
+		createCommunityReq := &requests.CreateCommunity{
+			Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
+			Name:        "new community " + strconv.Itoa(i),
+			Color:       "#000000",
+			Description: "new community description",
+		}
+
+		mr, err := s.alice.CreateCommunity(createCommunityReq, true)
+		s.Require().NoError(err, "s.alice.CreateCommunity")
+		for _, com := range mr.Communities() {
+			if com.Name() == createCommunityReq.Name {
+				newCommunities[i] = com
+			}
+		}
+		s.Require().NotNil(newCommunities[i])
+
+	}
+
+	// Check that Alice has n = numberOfCommunitiesToCreate communities
+	cs, err := s.alice.communitiesManager.All()
+	s.Require().NoError(err, "communitiesManager.All")
+	s.Len(cs, numberOfCommunitiesToCreate + 1, "Must have numberOfCommunitiesToCreate communities")
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		_, err = alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		// Do we have a new synced community?
+		for i := 0; i < numberOfCommunitiesToCreate; i++ {
+			_, err = alicesOtherDevice.communitiesManager.GetSyncedRawCommunity(newCommunities[i].ID())
+			if err != nil {
+				return fmt.Errorf("community with sync not received %w", err)
+			}
+		}
+
+		return nil
+	})
+	s.Require().NoError(err)
+
+	// Count the number of communities in their device
+	tcs, err := alicesOtherDevice.communitiesManager.All()
+	s.Require().NoError(err)
+	s.Len(tcs, numberOfCommunitiesToCreate + 1, "There must be 2 communities")
+
+	s.logger.Debug("", zap.Any("tcs", tcs))
+
+	// // Get the new community from their db
+	// tnc, err := alicesOtherDevice.communitiesManager.GetByID(newCommunity.ID())
+	// s.Require().NoError(err)
+
+	// // Check the community on their device matched the new community on Alice's device
+	// s.Equal(newCommunity.ID(), tnc.ID())
+	// s.Equal(newCommunity.Name(), tnc.Name())
+	// s.Equal(newCommunity.DescriptionText(), tnc.DescriptionText())
+	// s.Equal(newCommunity.IDString(), tnc.IDString())
+
+	// // Private Key for synced community should be null
+	// s.Require().NotNil(newCommunity.PrivateKey())
+	// s.Require().Nil(tnc.PrivateKey())
+
+	// s.Equal(newCommunity.PublicKey(), tnc.PublicKey())
+	// s.Equal(newCommunity.Verified(), tnc.Verified())
+	// s.Equal(newCommunity.Muted(), tnc.Muted())
+	// s.Equal(newCommunity.Joined(), tnc.Joined())
+	// s.Equal(newCommunity.Spectated(), tnc.Spectated())
+
+	// s.True(newCommunity.IsControlNode())
+	// s.True(newCommunity.IsOwner())
+
+	// Even though synced device have the private key, it is not the control node
+	// There can be only one control node
+	// s.False(tnc.IsControlNode())
+	// s.True(tnc.IsOwner())
 }
 
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_EncryptionKeys() {
