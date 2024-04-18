@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"unicode/utf8"
 
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -100,7 +101,7 @@ func (m *Messenger) SaveSyncDisplayName(displayName string, clock uint64) error 
 }
 
 func ValidateBio(bio *string) error {
-	if len(*bio) > maxBioLength {
+	if utf8.RuneCountInString(*bio) > maxBioLength {
 		return ErrInvalidBioLength
 	}
 	return nil
