@@ -1358,6 +1358,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		CustomizationColor:      multiacccommon.CustomizationColor(request.CustomizationColor),
 		CustomizationColorClock: customizationColorClock,
 		KDFIterations:           request.KdfIterations,
+		Timestamp:               time.Now().Unix(),
 	}
 
 	if account.KDFIterations == 0 {

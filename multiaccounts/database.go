@@ -323,7 +323,7 @@ func (db *Database) SaveAccount(account Account) error {
 		account.KDFIterations = dbsetup.ReducedKDFIterationsNumber
 	}
 
-	_, err = db.db.Exec("INSERT OR REPLACE INTO accounts (name, identicon, colorHash, colorId, customizationColor, customizationColorClock, keycardPairing, keyUid, kdfIterations) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", account.Name, account.Identicon, colorHash, account.ColorID, account.CustomizationColor, account.CustomizationColorClock, account.KeycardPairing, account.KeyUID, account.KDFIterations)
+	_, err = db.db.Exec("INSERT OR REPLACE INTO accounts (name, identicon, colorHash, colorId, customizationColor, customizationColorClock, keycardPairing, keyUid, kdfIterations, loginTimestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", account.Name, account.Identicon, colorHash, account.ColorID, account.CustomizationColor, account.CustomizationColorClock, account.KeycardPairing, account.KeyUID, account.KDFIterations, account.Timestamp)
 	if err != nil {
 		return err
 	}

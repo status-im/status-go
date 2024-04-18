@@ -28,7 +28,7 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 func TestAccounts(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	expected := Account{Name: "string", KeyUID: "string", CustomizationColor: common.CustomizationColorBlue, ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: dbsetup.ReducedKDFIterationsNumber}
+	expected := Account{Name: "string", KeyUID: "string", CustomizationColor: common.CustomizationColorBlue, ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: dbsetup.ReducedKDFIterationsNumber, Timestamp: 1712856359}
 	require.NoError(t, db.SaveAccount(expected))
 	accounts, err := db.GetAccounts()
 	require.NoError(t, err)
