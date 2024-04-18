@@ -999,6 +999,10 @@ func (api *PublicAPI) RemoveTrustStatus(ctx context.Context, contactID string) e
 	return api.service.messenger.RemoveTrustStatus(ctx, contactID)
 }
 
+func (api *PublicAPI) RemoveTrustVerificationStatus(ctx context.Context, contactID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RemoveTrustVerificationStatus(ctx, contactID)
+}
+
 func (api *PublicAPI) GetTrustStatus(ctx context.Context, contactID string) (verification.TrustStatus, error) {
 	return api.service.messenger.GetTrustStatus(contactID)
 }
