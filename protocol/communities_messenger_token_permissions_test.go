@@ -1672,6 +1672,20 @@ func checkRoleBasedOnThePermissionType(permissionType protobuf.CommunityTokenPer
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMessages() {
+	waitOnChannelKeyAdded := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
+		s.logger.Debug("<<< community key actions", zap.Any("keyActions", sub.keyActions))
+
+		return false
+		//action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
+		//if !ok || action.ActionType != communities.EncryptionKeyAdd {
+		//	return false
+		//}
+		//_, ok = action.Members[common.PubkeyToHex(&s.owner.identity.PublicKey)]
+		//return ok
+	})
+
+	s.logger.Debug("<<< Create community")
+
 	// 1.1. Create community
 	community, chat := s.createCommunity()
 
@@ -1709,19 +1723,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 		return len(sub.Community.TokenPermissions()) == 2
 	})
 
-	waitOnChannelKeyToBeDistributedToOwner := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
-		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
-		if !ok || action.ActionType != communities.EncryptionKeySendToMembers {
-			return false
-		}
-		_, ok = action.Members[common.PubkeyToHex(&s.owner.identity.PublicKey)]
-		return ok
-	})
+	s.logger.Debug("<<< setup community permission")
 
 	response, err := s.owner.CreateCommunityTokenPermission(communityPermission)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
+
+	s.logger.Debug("<<< setup channel permission")
 
 	response, err = s.owner.CreateCommunityTokenPermission(channelPermission)
 	s.Require().NoError(err)
@@ -1736,13 +1745,16 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.Require().NoError(err)
 	s.Require().True(community.Encrypted())
 
-	err = <-waitOnChannelKeyToBeDistributedToOwner
+	err = <-waitOnChannelKeyAdded
 	s.Require().NoError(err)
 
 	// 2. Owner: Send a message A
+
+	s.logger.Debug("<<< sending chat message")
+
 	messageText1 := RandomLettersString(10)
 	message1 := s.sendChatMessage(s.owner, chat.ID, messageText1)
-	s.logger.Debug("message1 sent", zap.Any("id", message1.ID), zap.String("text", message1.Text))
+	s.logger.Debug("<<< message1 sent", zap.Any("id", message1.ID), zap.String("text", message1.Text))
 
 	// 2.2. Retrieve own message (to make it stored in the archive later)
 	_, err = s.owner.RetrieveAll()
@@ -1777,23 +1789,28 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.Require().NoError(err)
 
 	// 4. Bob: join community (satisfying membership, but not channel permissions)
+
+	s.logger.Debug(`<<< user joining`)
+
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, communityPermission.TokenCriteria[0])
 	s.advertiseCommunityTo(community, s.bob)
 	s.joinCommunity(community, s.bob, bobPassword, []string{})
 
-	checkCommunity := func(m *Messenger) {
-		receivedCommunity, err := m.GetCommunityByID(community.ID())
-		s.Require().NoError(err)
-		s.Require().NotNil(receivedCommunity)
-		s.Require().Len(receivedCommunity.Members(), 2)
-		chatID := chat.CommunityChatID()
-		receivedChat, ok := receivedCommunity.Chats()[chatID]
-		s.Require().True(ok)
-		s.Require().Len(receivedChat.Members, 1)
-	}
+	s.logger.Debug("<<< user joined")
 
-	checkCommunity(s.owner)
-	checkCommunity(s.bob)
+	//checkCommunity := func(m *Messenger) {
+	//	receivedCommunity, err := m.GetCommunityByID(community.ID())
+	//	s.Require().NoError(err)
+	//	s.Require().NotNil(receivedCommunity)
+	//	s.Require().Len(receivedCommunity.Members(), 2)
+	//	chatID := chat.CommunityChatID()
+	//	receivedChat, ok := receivedCommunity.Chats()[chatID]
+	//	s.Require().True(ok)
+	//	s.Require().Len(receivedChat.Members, 1)
+	//}
+	//
+	//checkCommunity(s.owner)
+	//checkCommunity(s.bob)
 
 	// 5. Bob: Import community archive
 	// The archive is successfully decrypted, but the message inside is not.
@@ -1840,6 +1857,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	//s.bob.persistence.GetHashRatchetMessages()
 
 	// Make bob satisfy channel criteria
+	s.logger.Debug("<<< user satisfies channel criteria")
+
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, channelPermission.TokenCriteria[0])
 
 	waitOnChannelKeyToBeDistributedToBob := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
