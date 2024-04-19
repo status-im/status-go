@@ -126,6 +126,7 @@ type PermissionTokenCriteriaResult struct {
 	Role              protobuf.CommunityTokenPermission_Type `json:"roles"`
 	TokenRequirements []TokenRequirementResponse             `json:"tokenRequirement"`
 	Criteria          []bool                                 `json:"criteria"`
+	ID                string                                 `json:"id"`
 }
 
 type AccountChainIDsCombination struct {
