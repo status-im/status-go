@@ -1709,6 +1709,15 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 		return len(sub.Community.TokenPermissions()) == 2
 	})
 
+	waitOnChannelKeyToBeDistributedToOwner := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
+		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
+		if !ok || action.ActionType != communities.EncryptionKeySendToMembers {
+			return false
+		}
+		_, ok = action.Members[common.PubkeyToHex(&s.owner.identity.PublicKey)]
+		return ok
+	})
+
 	response, err := s.owner.CreateCommunityTokenPermission(communityPermission)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -1727,9 +1736,13 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.Require().NoError(err)
 	s.Require().True(community.Encrypted())
 
+	err = <-waitOnChannelKeyToBeDistributedToOwner
+	s.Require().NoError(err)
+
 	// 2. Owner: Send a message A
 	messageText1 := RandomLettersString(10)
 	message1 := s.sendChatMessage(s.owner, chat.ID, messageText1)
+	s.logger.Debug("message1 sent", zap.Any("id", message1.ID), zap.String("text", message1.Text))
 
 	// 2.2. Retrieve own message (to make it stored in the archive later)
 	_, err = s.owner.RetrieveAll()
@@ -1760,10 +1773,27 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.Require().Len(archiveIDs, 1)
 	s.logger.Debug("archive created", zap.Any("archiveIDs", archiveIDs))
 
+	community, err = s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+
 	// 4. Bob: join community (satisfying membership, but not channel permissions)
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, communityPermission.TokenCriteria[0])
 	s.advertiseCommunityTo(community, s.bob)
 	s.joinCommunity(community, s.bob, bobPassword, []string{})
+
+	checkCommunity := func(m *Messenger) {
+		receivedCommunity, err := m.GetCommunityByID(community.ID())
+		s.Require().NoError(err)
+		s.Require().NotNil(receivedCommunity)
+		s.Require().Len(receivedCommunity.Members(), 2)
+		chatID := chat.CommunityChatID()
+		receivedChat, ok := receivedCommunity.Chats()[chatID]
+		s.Require().True(ok)
+		s.Require().Len(receivedChat.Members, 1)
+	}
+
+	checkCommunity(s.owner)
+	checkCommunity(s.bob)
 
 	// 5. Bob: Import community archive
 	// The archive is successfully decrypted, but the message inside is not.
@@ -1788,6 +1818,13 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	err = s.bob.communitiesManager.SaveMessageArchiveID(community.ID(), archiveHash)
 	s.Require().NoError(err)
 
+	ownerCommunity, err := s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	bobCommunity, err := s.bob.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+
+	s.logger.Debug("<<< community before importing", zap.Any("owner", ownerCommunity), zap.Any("bob", bobCommunity))
+
 	s.bob.importDelayer.once.Do(func() {
 		close(s.bob.importDelayer.wait)
 	})
@@ -1799,6 +1836,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	receivedMessage1, err := s.bob.MessageByID(message1.ID)
 	s.Require().Nil(receivedMessage1)
 	s.Require().Error(err)
+
+	//s.bob.persistence.GetHashRatchetMessages()
 
 	// Make bob satisfy channel criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, channelPermission.TokenCriteria[0])
@@ -1823,6 +1862,22 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.Require().NoError(err)
 
 	// Finally ensure that the message from archive was retrieved and decrypted
+
+	// Message could have been retreived durting previous wait
+	//receivedMessage1, err = s.bob.MessageByID(message1.ID)
+	//if err != nil {
+	//	s.Require().NotNil(receivedMessage1)
+	//	return
+	//}
+
+	//_, err = WaitOnMessengerResponse(
+	//	s.bob,
+	//	func(r *MessengerResponse) bool {
+	//		_, ok := r.messages[message1.ID]
+	//		return ok
+	//	},
+	//	"message1 not retrieved",
+	//)
 	response, err = s.bob.RetrieveAll()
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
