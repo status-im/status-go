@@ -75,9 +75,9 @@ func (s *ConfigTestSuite) TestValidationKeyUID() {
 }
 
 func (s *ConfigTestSuite) TestValidationNotEndKeyUID() {
-	nodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
+	nodeConfig, err := nodeConfigForLocalPairSync(uuid.New().String(), "", "/dummy/path")
 	nodeConfig.RootDataDir = "/tmp"
-	require.NoError(s.T(), err, "defaultNodeConfig should not return error")
+	require.NoError(s.T(), err, "nodeConfigForLocalPairSync should not return error")
 	s.T().Run("Valid keystore path without keyUID", func(t *testing.T) {
 		r := &ReceiverConfig{
 			NodeConfig:            nodeConfig,
@@ -86,7 +86,7 @@ func (s *ConfigTestSuite) TestValidationNotEndKeyUID() {
 			KDFIterations:         1,
 			SettingCurrentNetwork: "mainnet",
 		}
-
+		assert.NoError(t, setDefaultNodeConfig(r.NodeConfig))
 		assert.NoError(t, validateAndVerifyNodeConfig(r, r), "ReceiverConfig validation should pass")
 	})
 
@@ -98,6 +98,7 @@ func (s *ConfigTestSuite) TestValidationNotEndKeyUID() {
 			KDFIterations:         1,
 			SettingCurrentNetwork: "mainnet",
 		}
+		assert.NoError(t, setDefaultNodeConfig(r.NodeConfig))
 		assert.Error(t, validateAndVerifyNodeConfig(r, r), "ReceiverConfig validation should fail")
 	})
 }

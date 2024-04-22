@@ -31,6 +31,8 @@ const defaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.js
 const defaultArchivesRelativePath = "data/archivedata"
 const defaultTorrentTorrentsRelativePath = "data/torrents"
 
+const DefaultDataDir = "/ethereum/mainnet_rpc"
+
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
 
 var DefaultFleet = params.FleetShardsTest
@@ -212,7 +214,7 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 	nodeConfig.LogFile = "geth.log"
 	nodeConfig.LogDir = request.LogFilePath
 	nodeConfig.LogLevel = "ERROR"
-	nodeConfig.DataDir = "/ethereum/mainnet_rpc"
+	nodeConfig.DataDir = DefaultDataDir
 	nodeConfig.KeycardPairingDataFile = defaultKeycardPairingDataFile
 	nodeConfig.ProcessBackedupMessages = false
 
@@ -223,7 +225,7 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 		nodeConfig.LogEnabled = false
 	}
 
-	nodeConfig.Networks = BuildDefaultNetworks(request)
+	nodeConfig.Networks = BuildDefaultNetworks(&request.WalletSecretsConfig)
 
 	if request.NetworkID != nil {
 		nodeConfig.NetworkID = *request.NetworkID

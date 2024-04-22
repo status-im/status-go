@@ -523,7 +523,11 @@ func setupReceivingClient(backend *api.GethStatusBackend, cs, configJSON string)
 	if err != nil {
 		return nil, err
 	}
-	err = validateAndVerifyNodeConfig(conf, conf.ReceiverConfig)
+	receiverConf := conf.ReceiverConfig
+	if err = setDefaultNodeConfig(receiverConf.NodeConfig); err != nil {
+		return nil, err
+	}
+	err = validateAndVerifyNodeConfig(conf, receiverConf)
 	if err != nil {
 		return nil, err
 	}
