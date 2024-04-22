@@ -1,12 +1,12 @@
 package peersyncing
 
 import (
-	"github.com/status-im/status-go/eth-node/types"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 )

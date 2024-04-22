@@ -22,7 +22,7 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
-var peerSyncingLoopInterval = 60 * time.Second
+var peerSyncingLoopInterval time.Duration = 60 * time.Second
 var maxAdvertiseMessages = 40
 
 func (m *Messenger) markDeliveredMessages(acks [][]byte) {
@@ -229,7 +229,7 @@ func (m *Messenger) OnDatasyncOffer(response *common.HandleMessageResponse) erro
 	var offeredMessages []peersyncing.SyncMessage
 
 	for _, o := range offers {
-		offeredMessages = append(offeredMessages, peersyncing.SyncMessage{ChatID: o.ChatID, ID: o.MessageID})
+		offeredMessages = append(offeredMessages, peersyncing.SyncMessage{ChatID: o.GroupID, ID: o.MessageID})
 	}
 
 	messagesToFetch, err := m.peersyncing.OnOffer(offeredMessages)
