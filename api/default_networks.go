@@ -253,6 +253,6 @@ func setRPCs(networks []params.Network, request *requests.WalletSecretsConfig) [
 	return networksWithRPC
 }
 
-func BuildDefaultNetworks(request *requests.CreateAccount) []params.Network {
-	return setRPCs(defaultNetworks, &request.WalletSecretsConfig)
+func BuildDefaultNetworks(walletSecretsConfig *requests.WalletSecretsConfig) []params.Network {
+	return setRPCs(defaultNetworks, walletSecretsConfig)
 }

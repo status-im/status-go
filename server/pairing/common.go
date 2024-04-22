@@ -10,6 +10,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/requests"
+
 	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/status-im/status-go/account/generator"
@@ -116,14 +119,6 @@ func validateAndVerifyPassword(s interface{}, senderConfig *SenderConfig) error 
 }
 
 func validateAndVerifyNodeConfig(s interface{}, receiverConfig *ReceiverConfig) error {
-	if receiverConfig.NodeConfig != nil {
-		// we should update with defaults before validation
-		err := receiverConfig.NodeConfig.UpdateWithDefaults()
-		if err != nil {
-			return err
-		}
-	}
-
 	err := validate(s)
 	if err != nil {
 		return err
@@ -246,6 +241,37 @@ func validateKeystoreFilesConfig(backend *api.GethStatusBackend, conf interface{
 
 	if keystorePath == "" {
 		return fmt.Errorf("keyStorePath can not be empty")
+	}
+
+	return nil
+}
+
+func setDefaultNodeConfig(c *params.NodeConfig) error {
+	if c == nil {
+		return nil
+	}
+
+	err := c.UpdateWithDefaults()
+	if err != nil {
+		return err
+	}
+
+	if len(c.Networks) == 0 {
+		c.Networks = api.BuildDefaultNetworks(&requests.WalletSecretsConfig{})
+	}
+
+	if c.NetworkID == 0 {
+		// because PR https://github.com/status-im/status-mobile/pull/19467/files removed :networks/networks,
+		// we need to set the networkID and RPCURL here to make local pairing work again
+		c.NetworkID = c.Networks[0].ChainID
+		c.UpstreamConfig = params.UpstreamRPCConfig{
+			URL:     c.Networks[0].RPCURL,
+			Enabled: true,
+		}
+	}
+
+	if c.DataDir == "" {
+		c.DataDir = api.DefaultDataDir
 	}
 
 	return nil

@@ -269,7 +269,7 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.NetworkID = 1
 	nodeConfig.LogLevel = "DEBUG"
-	nodeConfig.DataDir = "/ethereum/mainnet_rpc"
+	nodeConfig.DataDir = api.DefaultDataDir
 	nodeConfig.HTTPEnabled = true
 	nodeConfig.HTTPPort = 8545
 	// FIXME: This should be taken from CLI flags.

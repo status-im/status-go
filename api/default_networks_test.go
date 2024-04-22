@@ -19,7 +19,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		},
 	}
 
-	actualNetworks := BuildDefaultNetworks(request)
+	actualNetworks := BuildDefaultNetworks(&request.WalletSecretsConfig)
 
 	require.Len(t, actualNetworks, 9)
 
@@ -75,7 +75,7 @@ func TestBuildDefaultNetworksGanache(t *testing.T) {
 		},
 	}
 
-	actualNetworks := BuildDefaultNetworks(request)
+	actualNetworks := BuildDefaultNetworks(&request.WalletSecretsConfig)
 
 	require.Len(t, actualNetworks, 9)
 

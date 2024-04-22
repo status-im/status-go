@@ -114,8 +114,14 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *ap
 
 	account.Name = settings.Name
 
-	nodeConfig, err := defaultNodeConfig(settings.InstallationID, account.KeyUID)
+	nodeConfig, err := nodeConfigForLocalPairSync(settings.InstallationID, account.KeyUID, tmpdir)
 	require.NoError(s.T(), err)
+	nodeConfig.NetworkID = 1
+	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
+		Enabled: true,
+		URL:     "https://mainnet.infura.io/v3/800c641949d64d768a5070a1b0511938",
+	}
+	nodeConfig.DataDir = api.DefaultDataDir
 
 	walletDerivedAccount := derivedAddresses[pathDefaultWallet]
 	walletAccount := &accounts.Account{
@@ -187,7 +193,7 @@ func (s *SyncDeviceSuite) pairAccounts(serverBackend *api.GethStatusBackend, ser
 	err = clientBackend.OpenAccounts()
 	require.NoError(s.T(), err)
 
-	clientNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
+	clientNodeConfig, err := nodeConfigForLocalPairSync(uuid.New().String(), "", clientDir)
 	require.NoError(s.T(), err)
 
 	clientKeystoreDir := filepath.Join(clientDir, keystoreDir)
@@ -290,7 +296,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.NoError(s.T(), err)
 	err = serverBackend.OpenAccounts()
 	require.NoError(s.T(), err)
-	serverNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
+	serverNodeConfig, err := nodeConfigForLocalPairSync(uuid.New().String(), "", serverTmpDir)
 	require.NoError(s.T(), err)
 	serverKeystoreDir := filepath.Join(serverTmpDir, keystoreDir)
 	serverPayloadSourceConfig := &ReceiverServerConfig{
@@ -471,7 +477,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), err)
 	err = clientBackend.OpenAccounts()
 	require.NoError(s.T(), err)
-	clientNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
+	clientNodeConfig, err := nodeConfigForLocalPairSync(uuid.New().String(), "", clientTmpDir)
 	require.NoError(s.T(), err)
 	clientKeystoreDir := filepath.Join(clientTmpDir, keystoreDir)
 	clientPayloadSourceConfig := ReceiverClientConfig{
@@ -724,19 +730,12 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	return syncSettings, nil
 }
 
-func defaultNodeConfig(installationID, keyUID string) (*params.NodeConfig, error) {
+func nodeConfigForLocalPairSync(installationID, keyUID, tmpDir string) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
-	nodeConfig.NetworkID = 1
 	nodeConfig.LogLevel = "DEBUG"
-	nodeConfig.DataDir = filepath.Join("ethereum/mainnet_rpc")
 	nodeConfig.KeyStoreDir = filepath.Join(keystoreDir, keyUID)
 	nodeConfig.KeycardPairingDataFile = filepath.Join("keycard", "pairings.json")
-	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
-		Enabled: true,
-		URL:     "https://mainnet.infura.io/v3/800c641949d64d768a5070a1b0511938",
-	}
-
 	nodeConfig.Name = "StatusIM"
 	clusterConfig, err := params.LoadClusterConfigFromFleet("eth.prod")
 	if err != nil {
@@ -756,7 +755,7 @@ func defaultNodeConfig(installationID, keyUID string) (*params.NodeConfig, error
 	}
 
 	nodeConfig.ShhextConfig = params.ShhextConfig{
-		BackupDisabledDataDir:      nodeConfig.DataDir,
+		BackupDisabledDataDir:      tmpDir,
 		InstallationID:             installationID,
 		MaxMessageDeliveryAttempts: 6,
 		MailServerConfirmations:    true,
@@ -1283,7 +1282,7 @@ func (s *SyncDeviceSuite) TestPreventLoggedInAccountLocalPairingClientAsReceiver
 	s.NoError(err)
 
 	clientKeystoreDir := filepath.Join(clientTmpDir, keystoreDir)
-	clientNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
+	clientNodeConfig, err := nodeConfigForLocalPairSync(uuid.New().String(), "", clientTmpDir)
 	s.NoError(err)
 	clientPayloadSourceConfig := ReceiverClientConfig{
 		ReceiverConfig: &ReceiverConfig{
@@ -1312,7 +1311,7 @@ func (s *SyncDeviceSuite) TestPreventLoggedInAccountLocalPairingClientAsSender()
 		s.NoError(clientBackend.Logout())
 	}()
 
-	serverNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
+	serverNodeConfig, err := nodeConfigForLocalPairSync(uuid.New().String(), "", serverTmpDir)
 	s.NoError(err)
 	serverKeystoreDir := filepath.Join(serverTmpDir, keystoreDir)
 	serverPayloadSourceConfig := &ReceiverServerConfig{
