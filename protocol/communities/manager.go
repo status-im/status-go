@@ -4914,8 +4914,18 @@ func (m *Manager) saveAndPublish(community *Community) error {
 }
 
 func (m *Manager) GetRevealedAddresses(communityID types.HexBytes, memberPk string) ([]*protobuf.RevealedAccount, error) {
+	logger := m.logger.Named("GetRevealedAddresses")
+
 	requestID := CalculateRequestID(memberPk, communityID)
-	return m.persistence.GetRequestToJoinRevealedAddresses(requestID)
+	response, err := m.persistence.GetRequestToJoinRevealedAddresses(requestID)
+
+	revealedAddresses := make([]string, len(response))
+	for i, acc := range response {
+		revealedAddresses[i] = acc.Address
+	}
+	logger.Debug("Revealed addresses", zap.Any("Addresses:", revealedAddresses))
+
+	return response, err
 }
 
 func (m *Manager) ReevaluatePrivilegedMember(community *Community, tokenPermissions []*CommunityTokenPermission,
