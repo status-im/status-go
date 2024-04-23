@@ -12,7 +12,9 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/identity/alias"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 )
 
@@ -99,6 +101,19 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	s.DisplayAssetsBelowBalance = false
 
 	s.TestNetworksEnabled = false
+
+	// Default user status
+	currentUserStatus, err := json.Marshal(protocol.UserStatus{
+		PublicKey:  chatKeyString,
+		StatusType: int(protobuf.StatusUpdate_AUTOMATIC),
+		Clock:      0,
+		CustomText: "",
+	})
+	if err != nil {
+		return nil, err
+	}
+	userRawMessage := json.RawMessage(currentUserStatus)
+	s.CurrentUserStatus = &userRawMessage
 
 	return s, nil
 }
