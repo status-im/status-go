@@ -51,6 +51,7 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 }
 
 func TestResolver(t *testing.T) {
+	t.Skip("skip test using infura")
 	api, cancel := setupTestAPI(t)
 	defer cancel()
 
@@ -60,6 +61,7 @@ func TestResolver(t *testing.T) {
 }
 
 func TestGetName(t *testing.T) {
+	t.Skip("skip test using infura")
 	api, cancel := setupTestAPI(t)
 	defer cancel()
 
@@ -69,6 +71,7 @@ func TestGetName(t *testing.T) {
 }
 
 func TestOwnerOf(t *testing.T) {
+	t.Skip("skip test using infura")
 	api, cancel := setupTestAPI(t)
 	defer cancel()
 
@@ -78,6 +81,7 @@ func TestOwnerOf(t *testing.T) {
 }
 
 func TestContentHash(t *testing.T) {
+	t.Skip("skip test using infura")
 	api, cancel := setupTestAPI(t)
 	defer cancel()
 
@@ -87,6 +91,7 @@ func TestContentHash(t *testing.T) {
 }
 
 func TestPublicKeyOf(t *testing.T) {
+	t.Skip("skip test using infura")
 	api, cancel := setupTestAPI(t)
 	defer cancel()
 
@@ -100,6 +105,7 @@ func TestPublicKeyOf(t *testing.T) {
 }
 
 func TestAddressOf(t *testing.T) {
+	t.Skip("skip test using infura")
 	api, cancel := setupTestAPI(t)
 	defer cancel()
 
@@ -109,6 +115,7 @@ func TestAddressOf(t *testing.T) {
 }
 
 func TestExpireAt(t *testing.T) {
+	t.Skip("skip test using infura")
 	api, cancel := setupTestAPI(t)
 	defer cancel()
 
@@ -118,6 +125,7 @@ func TestExpireAt(t *testing.T) {
 }
 
 func TestPrice(t *testing.T) {
+	t.Skip("skip test using infura")
 	api, cancel := setupTestAPI(t)
 	defer cancel()
 
@@ -127,6 +135,7 @@ func TestPrice(t *testing.T) {
 }
 
 func TestResourceURL(t *testing.T) {
+	t.Skip("skip test using infura")
 	api, cancel := setupTestAPI(t)
 	defer cancel()
 

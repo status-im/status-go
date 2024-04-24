@@ -30,6 +30,7 @@ func createDB(t *testing.T) (*sql.DB, func()) {
 }
 
 func setupTestAPI(t *testing.T) (*API, func()) {
+	t.Skip("skip test using infura")
 	db, cancel := createDB(t)
 
 	keyStoreDir := t.TempDir()
