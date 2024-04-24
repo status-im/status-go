@@ -222,7 +222,10 @@ func (r *Reader) startWalletEventsWatcher() {
 
 		for _, address := range event.Accounts {
 			timestamp, ok := r.lastWalletTokenUpdateTimestamp.Load(address)
-			timecheck := timestamp.(int64) - activityReloadMarginSeconds
+			timecheck := int64(0)
+			if ok {
+				timecheck = timestamp.(int64) - activityReloadMarginSeconds
+			}
 
 			if !ok || event.At > timecheck {
 				r.triggerDelayedWalletReload()
