@@ -55,6 +55,7 @@ func (s *ProxySuite) startRpcClient(infuraURL string) *Client {
 }
 
 func (s *ProxySuite) TestRun() {
+	s.T().Skip("skip test using infura")
 	infuraURL := "https://mainnet.infura.io/v3/800c641949d64d768a5070a1b0511938"
 	client := s.startRpcClient(infuraURL)
 
