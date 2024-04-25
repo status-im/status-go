@@ -713,7 +713,7 @@ func (r *Router) suggestedRoutes(
 						continue
 					}
 
-					tx, err := bridge.BuildTx(network, addrFrom, addrTo, token, amountIn)
+					tx, err := bridge.BuildTx(network, addrTo, addrFrom, token, amountIn)
 					if err != nil {
 						continue
 					}
