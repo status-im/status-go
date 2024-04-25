@@ -28,7 +28,7 @@ const defaultBackoff = 10 * time.Second
 const graylistBackoff = 3 * time.Minute
 const isAndroidEmulator = runtime.GOOS == "android" && runtime.GOARCH == "amd64"
 const findNearestMailServer = !isAndroidEmulator
-const overrideDNS = runtime.GOOS == "android"
+const overrideDNS = runtime.GOOS == "android" || runtime.GOOS == "ios"
 const bootstrapDNS = "8.8.8.8:53"
 
 func (m *Messenger) mailserversByFleet(fleet string) []mailservers.Mailserver {
