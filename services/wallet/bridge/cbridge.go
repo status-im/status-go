@@ -288,7 +288,7 @@ func (s *CBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Net
 	return uint64(increasedEstimation), nil
 }
 
-func (s *CBridge) BuildTx(network *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int) (*ethTypes.Transaction, error) {
+func (s *CBridge) BuildTx(fromNetwork, toNetwork *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int, bonderFee *big.Int) (*ethTypes.Transaction, error) {
 	toAddr := types.Address(toAddress)
 	sendArgs := &TransactionBridge{
 		CbridgeTx: &CBridgeTxArgs{
@@ -298,11 +298,12 @@ func (s *CBridge) BuildTx(network *params.Network, fromAddress common.Address, t
 				Value: (*hexutil.Big)(amountIn),
 				Data:  types.HexBytes("0x0"),
 			},
-			ChainID:   network.ChainID,
+			ChainID:   toNetwork.ChainID,
 			Symbol:    token.Symbol,
 			Recipient: toAddress,
 			Amount:    (*hexutil.Big)(amountIn),
 		},
+		ChainID: fromNetwork.ChainID,
 	}
 
 	return s.BuildTransaction(sendArgs)

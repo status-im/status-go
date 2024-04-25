@@ -115,7 +115,7 @@ func (s *SwapParaswap) GetContractAddress(network *params.Network, token *token.
 	return &address
 }
 
-func (s *SwapParaswap) BuildTx(network *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int) (*ethTypes.Transaction, error) {
+func (s *SwapParaswap) BuildTx(network, _ *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int, _ *big.Int) (*ethTypes.Transaction, error) {
 	toAddr := types.Address(toAddress)
 	sendArgs := &TransactionBridge{
 		SwapTx: &SwapTxArgs{

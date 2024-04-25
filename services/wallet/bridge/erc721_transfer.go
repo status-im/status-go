@@ -98,7 +98,7 @@ func (s *ERC721TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwor
 	return uint64(increasedEstimation), nil
 }
 
-func (s *ERC721TransferBridge) BuildTx(network *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int) (*ethTypes.Transaction, error) {
+func (s *ERC721TransferBridge) BuildTx(network, _ *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int, _ *big.Int) (*ethTypes.Transaction, error) {
 	contractAddress := types.Address(token.Address)
 
 	// We store ERC721 Token ID using big.Int.String() in token.Symbol

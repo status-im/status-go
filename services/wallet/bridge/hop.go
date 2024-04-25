@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"strings"
@@ -215,7 +216,7 @@ func (h *HopBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.N
 	return uint64(increasedEstimation), nil
 }
 
-func (h *HopBridge) BuildTx(network *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int) (*ethTypes.Transaction, error) {
+func (h *HopBridge) BuildTx(fromNetwork, toNetwork *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int, bonderFee *big.Int) (*ethTypes.Transaction, error) {
 	toAddr := types.Address(toAddress)
 	sendArgs := &TransactionBridge{
 		HopTx: &HopTxArgs{
@@ -225,11 +226,13 @@ func (h *HopBridge) BuildTx(network *params.Network, fromAddress common.Address,
 				Value: (*hexutil.Big)(amountIn),
 				Data:  types.HexBytes("0x0"),
 			},
-			ChainID:   network.ChainID,
 			Symbol:    token.Symbol,
 			Recipient: toAddress,
 			Amount:    (*hexutil.Big)(amountIn),
+			BonderFee: (*hexutil.Big)(bonderFee),
+			ChainID:   toNetwork.ChainID,
 		},
+		ChainID: fromNetwork.ChainID,
 	}
 
 	return h.BuildTransaction(sendArgs)
@@ -249,10 +252,10 @@ func (h *HopBridge) GetContractAddress(network *params.Network, token *token.Tok
 func (h *HopBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
 	fromNetwork := h.contractMaker.RPCClient.NetworkManager.Find(sendArgs.ChainID)
 	if fromNetwork == nil {
-		return tx, err
+		return tx, fmt.Errorf("ChainID not supported %d", sendArgs.ChainID)
 	}
 
-	nonce, err := h.transactor.NextNonce(h.contractMaker.RPCClient, sendArgs.ChainID, sendArgs.HopTx.From)
+	nonce, err := h.transactor.NextNonce(h.contractMaker.RPCClient, fromNetwork.ChainID, sendArgs.HopTx.From)
 	if err != nil {
 		return tx, err
 	}
@@ -333,7 +336,7 @@ func (h *HopBridge) swapAndSend(chainID uint64, hopArgs *HopTxArgs, signerFn bin
 
 	tx, err = ammWrapper.SwapAndSend(
 		txOpts,
-		big.NewInt(int64(hopArgs.ChainID)),
+		new(big.Int).SetUint64(hopArgs.ChainID),
 		hopArgs.Recipient,
 		hopArgs.Amount.ToInt(),
 		hopArgs.BonderFee.ToInt(),
