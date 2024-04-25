@@ -215,26 +215,6 @@ func (h *HopBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.N
 	return uint64(increasedEstimation), nil
 }
 
-func (h *HopBridge) BuildTx(network *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int) (*ethTypes.Transaction, error) {
-	toAddr := types.Address(toAddress)
-	sendArgs := &TransactionBridge{
-		HopTx: &HopTxArgs{
-			SendTxArgs: transactions.SendTxArgs{
-				From:  types.Address(fromAddress),
-				To:    &toAddr,
-				Value: (*hexutil.Big)(amountIn),
-				Data:  types.HexBytes("0x0"),
-			},
-			ChainID:   network.ChainID,
-			Symbol:    token.Symbol,
-			Recipient: toAddress,
-			Amount:    (*hexutil.Big)(amountIn),
-		},
-	}
-
-	return h.BuildTransaction(sendArgs)
-}
-
 func (h *HopBridge) GetContractAddress(network *params.Network, token *token.Token) *common.Address {
 	var address common.Address
 	if network.Layer == 1 {
