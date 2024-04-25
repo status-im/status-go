@@ -742,7 +742,7 @@ func (r *Router) suggestedRoutes(
 
 					var l1GasFeeWei uint64
 					if sendType.needL1Fee() {
-						tx, err := bridge.BuildTx(network, addrFrom, addrTo, token, amountIn)
+						tx, err := bridge.BuildTx(network, dest, addrFrom, addrTo, token, amountIn, bonderFees)
 						if err != nil {
 							continue
 						}

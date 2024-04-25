@@ -85,7 +85,7 @@ func (s *TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *par
 	return uint64(increasedEstimation), nil
 }
 
-func (s *TransferBridge) BuildTx(network *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int) (*ethTypes.Transaction, error) {
+func (s *TransferBridge) BuildTx(network, _ *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int, bonderFee *big.Int) (*ethTypes.Transaction, error) {
 	toAddr := types.Address(toAddress)
 	if strings.EqualFold(token.Symbol, "ETH") {
 		sendArgs := &TransactionBridge{
