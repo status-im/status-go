@@ -1,6 +1,9 @@
 .PHONY: statusgo statusd-prune all test clean help
 .PHONY: statusgo-android statusgo-ios
 
+# Clear any GOROOT set outside of the Nix shell
+export GOROOT=
+
 # This is a code for automatic help generator.
 # It supports ANSI colors and categories.
 # To add new item into help output, simply add comments
