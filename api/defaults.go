@@ -26,12 +26,20 @@ const defaultMnemonicLength = 12
 const shardsTestClusterID = 16
 const walletAccountDefaultName = "Account 1"
 const keystoreRelativePath = "keystore"
-const defaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
+const DefaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
 
-const defaultArchivesRelativePath = "data/archivedata"
-const defaultTorrentTorrentsRelativePath = "data/torrents"
+const DefaultArchivesRelativePath = "data/archivedata"
+const DefaultTorrentTorrentsRelativePath = "data/torrents"
 
 const DefaultDataDir = "/ethereum/mainnet_rpc"
+const DefaultNodeName = "StatusIM"
+const DefaultLogFile = "geth.log"
+const DefaultLogLevel = "ERROR"
+const DefaultMaxPeers = 20
+const DefaultMaxPendingPeers = 20
+const DefaultListenAddr = ":0"
+const DefaultMaxMessageDeliveryAttempts = 6
+const DefaultVerifyTransactionChainID = 1
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
 
@@ -125,12 +133,16 @@ func SetDefaultFleet(nodeConfig *params.NodeConfig) error {
 }
 
 func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
+	specifiedWakuV2Config := nodeConfig.WakuV2Config
 	nodeConfig.WakuV2Config = params.WakuV2Config{
 		Enabled:        true,
 		EnableDiscV5:   true,
 		DiscoveryLimit: 20,
 		Host:           "0.0.0.0",
 		AutoUpdate:     true,
+		// mobile may need override following options
+		LightClient: specifiedWakuV2Config.LightClient,
+		Nameserver:  specifiedWakuV2Config.Nameserver,
 	}
 
 	clusterConfig, err := params.LoadClusterConfigFromFleet(fleet)
@@ -211,11 +223,11 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.LogEnabled = request.LogEnabled
-	nodeConfig.LogFile = "geth.log"
+	nodeConfig.LogFile = DefaultLogFile
 	nodeConfig.LogDir = request.LogFilePath
-	nodeConfig.LogLevel = "ERROR"
+	nodeConfig.LogLevel = DefaultLogLevel
 	nodeConfig.DataDir = DefaultDataDir
-	nodeConfig.KeycardPairingDataFile = defaultKeycardPairingDataFile
+	nodeConfig.KeycardPairingDataFile = DefaultKeycardPairingDataFile
 	nodeConfig.ProcessBackedupMessages = false
 
 	if request.LogLevel != nil {
@@ -243,11 +255,11 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 		nodeConfig.UpstreamConfig.Enabled = true
 	}
 
-	nodeConfig.Name = "StatusIM"
+	nodeConfig.Name = DefaultNodeName
 	nodeConfig.Rendezvous = false
 	nodeConfig.NoDiscovery = true
-	nodeConfig.MaxPeers = 20
-	nodeConfig.MaxPendingPeers = 20
+	nodeConfig.MaxPeers = DefaultMaxPeers
+	nodeConfig.MaxPendingPeers = DefaultMaxPendingPeers
 
 	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig)
 
@@ -256,7 +268,7 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
 	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
 
-	nodeConfig.ListenAddr = ":0"
+	nodeConfig.ListenAddr = DefaultListenAddr
 
 	err := SetDefaultFleet(nodeConfig)
 	if err != nil {
@@ -274,9 +286,9 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	nodeConfig.ShhextConfig = params.ShhextConfig{
 		BackupDisabledDataDir:      request.BackupDisabledDataDir,
 		InstallationID:             installationID,
-		MaxMessageDeliveryAttempts: 6,
+		MaxMessageDeliveryAttempts: DefaultMaxMessageDeliveryAttempts,
 		MailServerConfirmations:    true,
-		VerifyTransactionChainID:   1,
+		VerifyTransactionChainID:   DefaultVerifyTransactionChainID,
 		DataSyncEnabled:            true,
 		PFSEnabled:                 true,
 	}
@@ -301,14 +313,6 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 		nodeConfig.ShhextConfig.VerifyENSContractAddress = *request.VerifyENSContractAddress
 	}
 
-	if request.LogLevel != nil {
-		nodeConfig.LogLevel = *request.LogLevel
-		nodeConfig.LogEnabled = true
-
-	} else {
-		nodeConfig.LogEnabled = false
-	}
-
 	if request.NetworkID != nil {
 		nodeConfig.NetworkID = *request.NetworkID
 	}
@@ -316,8 +320,8 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	nodeConfig.TorrentConfig = params.TorrentConfig{
 		Enabled:    false,
 		Port:       0,
-		DataDir:    filepath.Join(nodeConfig.RootDataDir, defaultArchivesRelativePath),
-		TorrentDir: filepath.Join(nodeConfig.RootDataDir, defaultTorrentTorrentsRelativePath),
+		DataDir:    filepath.Join(nodeConfig.RootDataDir, DefaultArchivesRelativePath),
+		TorrentDir: filepath.Join(nodeConfig.RootDataDir, DefaultTorrentTorrentsRelativePath),
 	}
 
 	if request.TorrentConfigEnabled != nil {
