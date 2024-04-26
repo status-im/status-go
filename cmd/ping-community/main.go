@@ -371,12 +371,12 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.ShhextConfig = params.ShhextConfig{
 		BackupDisabledDataDir:      "",
 		InstallationID:             installationID,
-		MaxMessageDeliveryAttempts: 6,
+		MaxMessageDeliveryAttempts: api.DefaultMaxMessageDeliveryAttempts,
 		MailServerConfirmations:    true,
 		VerifyTransactionURL:       "",
 		VerifyENSURL:               "",
 		VerifyENSContractAddress:   "",
-		VerifyTransactionChainID:   1,
+		VerifyTransactionChainID:   api.DefaultVerifyTransactionChainID,
 		DataSyncEnabled:            true,
 		PFSEnabled:                 true,
 	}

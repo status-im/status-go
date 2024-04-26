@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
 
@@ -246,6 +248,10 @@ func validateKeystoreFilesConfig(backend *api.GethStatusBackend, conf interface{
 	return nil
 }
 
+// setDefaultNodeConfig sets default values for the node configuration.
+// Config Values still needed from the mobile include
+// VerifyTransactionURL/VerifyENSURL/VerifyENSContractAddress/VerifyTransactionChainID
+// LogEnabled/LogDir/RootDataDir/LightClient/Nameserver
 func setDefaultNodeConfig(c *params.NodeConfig) error {
 	if c == nil {
 		return nil
@@ -256,22 +262,94 @@ func setDefaultNodeConfig(c *params.NodeConfig) error {
 		return err
 	}
 
-	if len(c.Networks) == 0 {
+	// following specifiedXXX variables are used to check if frontend has specified the value
+	// if not, the default value is set. NOTE: we also check 2 extra fields: WakuV2Config(LightClient|Nameserver)
+	// see api.SetFleet for more details
+	specifiedVerifyTransactionURL := c.ShhextConfig.VerifyTransactionURL
+	specifiedVerifyENSURL := c.ShhextConfig.VerifyENSURL
+	specifiedVerifyENSContractAddress := c.ShhextConfig.VerifyENSContractAddress
+	specifiedVerifyTransactionChainID := c.ShhextConfig.VerifyTransactionChainID
+	specifiedNetworkID := c.NetworkID
+	specifiedNetworks := c.Networks
+	specifiedUpstreamConfigURL := c.UpstreamConfig.URL
+	specifiedLogEnabled := c.LogEnabled
+	specifiedLogLevel := c.LogLevel
+	specifiedFleet := c.ClusterConfig.Fleet
+	specifiedInstallationID := c.ShhextConfig.InstallationID
+	specifiedTorrentConfigEnabled := c.TorrentConfig.Enabled
+	specifiedTorrentConfigPort := c.TorrentConfig.Port
+
+	if len(specifiedNetworks) == 0 {
 		c.Networks = api.BuildDefaultNetworks(&requests.WalletSecretsConfig{})
 	}
 
-	if c.NetworkID == 0 {
-		// because PR https://github.com/status-im/status-mobile/pull/19467/files removed :networks/networks,
-		// we need to set the networkID and RPCURL here to make local pairing work again
+	if specifiedNetworkID == 0 {
 		c.NetworkID = c.Networks[0].ChainID
-		c.UpstreamConfig = params.UpstreamRPCConfig{
-			URL:     c.Networks[0].RPCURL,
-			Enabled: true,
+	}
+
+	c.UpstreamConfig.Enabled = true
+	if specifiedUpstreamConfigURL == "" {
+		c.UpstreamConfig.URL = c.Networks[0].RPCURL
+	}
+
+	if specifiedLogEnabled && specifiedLogLevel == "" {
+		c.LogLevel = api.DefaultLogLevel
+	}
+	c.LogFile = api.DefaultLogFile
+
+	c.Name = api.DefaultNodeName
+	c.DataDir = api.DefaultDataDir
+	c.KeycardPairingDataFile = api.DefaultKeycardPairingDataFile
+	c.Rendezvous = false
+	c.NoDiscovery = true
+	c.MaxPeers = api.DefaultMaxPeers
+	c.MaxPendingPeers = api.DefaultMaxPendingPeers
+
+	c.LocalNotificationsConfig = params.LocalNotificationsConfig{Enabled: true}
+	c.BrowsersConfig = params.BrowsersConfig{Enabled: true}
+	c.PermissionsConfig = params.PermissionsConfig{Enabled: true}
+	c.MailserversConfig = params.MailserversConfig{Enabled: true}
+
+	c.ListenAddr = api.DefaultListenAddr
+
+	if specifiedFleet == "" {
+		err = api.SetDefaultFleet(c)
+		if err != nil {
+			return err
 		}
 	}
 
-	if c.DataDir == "" {
-		c.DataDir = api.DefaultDataDir
+	if specifiedInstallationID == "" {
+		specifiedInstallationID = uuid.New().String()
+	}
+
+	c.ShhextConfig = params.ShhextConfig{
+		BackupDisabledDataDir:      c.RootDataDir,
+		InstallationID:             specifiedInstallationID,
+		MaxMessageDeliveryAttempts: api.DefaultMaxMessageDeliveryAttempts,
+		MailServerConfirmations:    true,
+		DataSyncEnabled:            true,
+		PFSEnabled:                 true,
+		VerifyTransactionURL:       specifiedVerifyTransactionURL,
+		VerifyENSURL:               specifiedVerifyENSURL,
+		VerifyENSContractAddress:   specifiedVerifyENSContractAddress,
+	}
+	if specifiedVerifyTransactionChainID == 0 {
+		c.ShhextConfig.VerifyTransactionChainID = int64(c.Networks[0].ChainID)
+	}
+
+	if specifiedVerifyTransactionURL == "" {
+		c.ShhextConfig.VerifyTransactionURL = c.Networks[0].FallbackURL
+	}
+	if specifiedVerifyENSURL == "" {
+		c.ShhextConfig.VerifyENSURL = c.Networks[0].FallbackURL
+	}
+
+	c.TorrentConfig = params.TorrentConfig{
+		Enabled:    specifiedTorrentConfigEnabled,
+		Port:       specifiedTorrentConfigPort,
+		DataDir:    filepath.Join(c.RootDataDir, api.DefaultArchivesRelativePath),
+		TorrentDir: filepath.Join(c.RootDataDir, api.DefaultTorrentTorrentsRelativePath),
 	}
 
 	return nil

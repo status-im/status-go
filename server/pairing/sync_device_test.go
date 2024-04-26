@@ -115,13 +115,9 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *ap
 	account.Name = settings.Name
 
 	nodeConfig, err := nodeConfigForLocalPairSync(settings.InstallationID, account.KeyUID, tmpdir)
+	nodeConfig.RootDataDir = tmpdir
 	require.NoError(s.T(), err)
-	nodeConfig.NetworkID = 1
-	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
-		Enabled: true,
-		URL:     "https://mainnet.infura.io/v3/800c641949d64d768a5070a1b0511938",
-	}
-	nodeConfig.DataDir = api.DefaultDataDir
+	require.NoError(s.T(), setDefaultNodeConfig(nodeConfig))
 
 	walletDerivedAccount := derivedAddresses[pathDefaultWallet]
 	walletAccount := &accounts.Account{
@@ -733,39 +729,22 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 func nodeConfigForLocalPairSync(installationID, keyUID, tmpDir string) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
+	nodeConfig.LogEnabled = true
 	nodeConfig.LogLevel = "DEBUG"
+	nodeConfig.LogDir = tmpDir
 	nodeConfig.KeyStoreDir = filepath.Join(keystoreDir, keyUID)
 	nodeConfig.KeycardPairingDataFile = filepath.Join("keycard", "pairings.json")
-	nodeConfig.Name = "StatusIM"
-	clusterConfig, err := params.LoadClusterConfigFromFleet("eth.prod")
+	nodeConfig.ShhextConfig = params.ShhextConfig{
+		InstallationID: installationID,
+	}
+
+	// need specify cluster config here, otherwise TestPairingThreeDevices will fail due to no messages(CR) received
+	// TODO(frank) need to figure out why above happen
+	clusterConfig, err := params.LoadClusterConfigFromFleet(params.FleetProd)
 	if err != nil {
 		return nil, err
 	}
 	nodeConfig.ClusterConfig = *clusterConfig
-
-	nodeConfig.WalletConfig = params.WalletConfig{Enabled: false}
-	nodeConfig.LocalNotificationsConfig = params.LocalNotificationsConfig{Enabled: true}
-	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: false}
-	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
-	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
-	nodeConfig.WakuConfig = params.WakuConfig{
-		Enabled:     true,
-		LightClient: true,
-		MinimumPoW:  0.000001,
-	}
-
-	nodeConfig.ShhextConfig = params.ShhextConfig{
-		BackupDisabledDataDir:      tmpDir,
-		InstallationID:             installationID,
-		MaxMessageDeliveryAttempts: 6,
-		MailServerConfirmations:    true,
-		VerifyTransactionURL:       "",
-		VerifyENSURL:               "",
-		VerifyENSContractAddress:   "",
-		VerifyTransactionChainID:   1,
-		DataSyncEnabled:            true,
-		PFSEnabled:                 true,
-	}
 
 	return nodeConfig, nil
 }
