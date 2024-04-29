@@ -364,6 +364,13 @@ func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n
 
 	conf.Networks = n.Networks
 
+	if n.WalletConfig.InfuraKey != "" {
+		url := infuraURL(conf.NetworkID, n.WalletConfig.InfuraKey)
+		if url != "" {
+			conf.UpstreamConfig.URL = url
+		}
+
+	}
 	if err := b.saveNodeConfig(conf); err != nil {
 		return nil, err
 	}
@@ -1347,4 +1354,15 @@ func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) e
 	}
 
 	return nil
+}
+
+func infuraURL(chainID uint64, token string) string {
+	if chainID == params.MainNetworkID {
+		return "https://mainnet.infura.io/v3/" + token
+	} else if chainID == params.RopstenNetworkID {
+		return "https://ropsten.infura.io/v3/" + token
+	} else if chainID == params.GoerliNetworkID {
+		return "https://goerli.infura.io/v3/" + token
+	}
+	return ""
 }

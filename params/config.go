@@ -522,6 +522,7 @@ type Network struct {
 type WalletConfig struct {
 	Enabled       bool
 	OpenseaAPIKey string `json:"OpenseaAPIKey"`
+	InfuraKey     string `json:"InfuraKey"`
 }
 
 // LocalNotificationsConfig extra configuration for localnotifications.Service.
