@@ -90,7 +90,6 @@ pipeline {
       } }
     }
 
-
     stage('Lint') {
       steps { script {
         nix.shell('make lint', pure: true)
@@ -100,6 +99,13 @@ pipeline {
     stage('Canary') {
       steps { script {
         nix.shell('make canary-test', pure: true)
+      } }
+    }
+
+    stage('Setup Codeclimate') {
+      steps { script {
+        sh "curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter"
+        sh "chmod +x ./cc-test-reporter"
       } }
     }
 
@@ -114,7 +120,9 @@ pipeline {
           "--publish=${DB_PORT}:${DB_PORT}",
         ].join(' '), "-p ${DB_PORT}") { c ->
           nix.shell('make generate-handlers', pure: true)
+          sh "./cc-test-reporter before-build"
           nix.shell('make test-unit V=1', pure: false)
+          sh "./cc-test-reporter after-build --prefix=github.com/status-im/status-go"
         }
       } }
       post { cleanup { /* Leftover DB containers. */
