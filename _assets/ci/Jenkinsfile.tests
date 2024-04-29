@@ -102,7 +102,7 @@ pipeline {
       } }
     }
 
-    stage('Setup Codeclimate') {
+    stage('Setup CodeClimate') {
       steps { script {
         sh "curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter"
         sh "chmod +x ./cc-test-reporter"
@@ -122,7 +122,14 @@ pipeline {
           nix.shell('make generate-handlers', pure: true)
           sh "./cc-test-reporter before-build"
           nix.shell('make test-unit V=1', pure: false)
-          sh "./cc-test-reporter after-build --prefix=github.com/status-im/status-go"
+          withCredentials([
+            string(
+              credentialsId: 'codeclimate-test-reporter-id',
+              variable: 'CC_TEST_REPORTER_ID'
+            ),
+          ]) {
+            sh "./cc-test-reporter after-build --prefix=github.com/status-im/status-go"
+          }
         }
       } }
       post { cleanup { /* Leftover DB containers. */
