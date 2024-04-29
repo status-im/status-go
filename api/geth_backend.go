@@ -365,12 +365,18 @@ func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n
 	conf.Networks = n.Networks
 
 	if n.WalletConfig.InfuraKey != "" {
+
+		mainnetURL := "https://mainnet.infura.io/v3/" + n.WalletConfig.InfuraKey
+
 		url := infuraURL(conf.NetworkID, n.WalletConfig.InfuraKey)
 		if url != "" {
 			conf.UpstreamConfig.URL = url
 		}
 
+		conf.ShhextConfig.VerifyTransactionURL = mainnetURL
+		conf.ShhextConfig.VerifyENSURL = mainnetURL
 	}
+
 	if err := b.saveNodeConfig(conf); err != nil {
 		return nil, err
 	}
