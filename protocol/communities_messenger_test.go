@@ -1642,31 +1642,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
-
-	s.Require().NoError(s.bob.SaveChat(chat))
-
-	message := buildTestMessage(*chat)
-	message.CommunityID = community.IDString()
-
-	// We send a community link to alice
-	response, err = s.bob.SendChatMessage(context.Background(), message)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	// Retrieve community link & community
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("message not received")
-		}
-		return nil
-	})
-
-	s.Require().NoError(err)
+	s.advertiseCommunityTo(community, s.bob, s.alice)
 
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	// We try to join the org
