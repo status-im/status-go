@@ -30,6 +30,11 @@ pipeline {
       defaultValue: getDefaultUnitTestUseDevelopmentLogger(),
       description: 'Should the job use detailed logging for tests, potentially generating large logs?'
     )
+    booleanParam(
+      name: 'UNIT_TEST_REPORT_CODECLIMATE',
+      defaultValue: getDefaultUnitTestReportCodeClimate(),
+      description: 'Should the job report test coverage to CodeClimate?'
+    )
   }
 
   options {
@@ -120,15 +125,13 @@ pipeline {
           "--publish=${DB_PORT}:${DB_PORT}",
         ].join(' '), "-p ${DB_PORT}") { c ->
           nix.shell('make generate-handlers', pure: true)
-          sh "./cc-test-reporter before-build"
-          nix.shell('make test-unit V=1', pure: false)
           withCredentials([
             string(
               credentialsId: 'codeclimate-test-reporter-id',
               variable: 'CC_TEST_REPORTER_ID'
             ),
           ]) {
-            sh "./cc-test-reporter after-build --prefix=github.com/status-im/status-go"
+            nix.shell('make test-unit V=1', pure: false)
           }
         }
       } }
@@ -185,6 +188,8 @@ def getDefaultUnitTestCount() { isTestNightlyJob() ? '20' : '1' }
 def getDefaultUnitTestRerunFails() { isTestNightlyJob() ? false : true }
 
 def getDefaultUnitTestUseDevelopmentLogger() { isTestNightlyJob() ? false : true }
+
+def getDefaultUnitTestReportCodeClimate() { isTestNightlyJob() ? false : true }
 
 def getDefaultUnitTestFailfast() { isTestNightlyJob() ? false : true }
 
