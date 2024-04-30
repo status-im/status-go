@@ -713,7 +713,9 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncry
 // 4) Alice presents the community in her profile showcase
 // 5) Bob gets the community from Alice's profile showcase and tries to validate community's membership with expired grant
 func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesGrantExpires() {
+	grantInvokesProfileDispatchIntervalBackup := grantInvokesProfileDispatchInterval
 	grantInvokesProfileDispatchInterval = 1 * time.Millisecond
+	communitiesGrantExpirationTimeBackup := communities.GrantExpirationTime
 	communities.GrantExpirationTime = 1 * time.Millisecond
 	alice := s.m
 
@@ -769,6 +771,10 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesGrantExpires(
 	s.Require().Len(profileShowcase.Communities, 1)
 	s.Require().Equal(community.IDString(), profileShowcase.Communities[0].CommunityID)
 	s.Require().Equal(identity.ProfileShowcaseMembershipStatusUnproven, profileShowcase.Communities[0].MembershipStatus)
+
+	// Return values back because they can affect other tests
+	grantInvokesProfileDispatchInterval = grantInvokesProfileDispatchIntervalBackup
+	communities.GrantExpirationTime = communitiesGrantExpirationTimeBackup
 }
 
 // The scenario tested is as follow:
@@ -780,6 +786,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesGrantExpires(
 // 6) Owner updates the grant
 // 7) Bob should be able to validate the membership again
 func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGrantUpdate() {
+	grantInvokesProfileDispatchIntervalBackup := grantInvokesProfileDispatchInterval
 	grantInvokesProfileDispatchInterval = 1 * time.Millisecond
 	alice := s.m
 
@@ -891,4 +898,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGra
 	s.Require().Len(profileShowcase.Communities, 1)
 	s.Require().Equal(profileShowcase.Communities[0].CommunityID, community.IDString())
 	s.Require().Equal(profileShowcase.Communities[0].MembershipStatus, identity.ProfileShowcaseMembershipStatusProvenMember)
+
+	// Return values back because they can affect other tests
+	grantInvokesProfileDispatchInterval = grantInvokesProfileDispatchIntervalBackup
 }
