@@ -70,7 +70,7 @@ type TestMessengerProfileShowcase struct {
 	// a single waku service should be shared.
 	shh              types.Waku
 	logger           *zap.Logger
-	collectiblesMock *CollectiblesManagerMock
+	collectiblesMock CollectiblesManagerMock
 }
 
 func (s *TestMessengerProfileShowcase) SetupTest() {
@@ -100,10 +100,10 @@ func (s *TestMessengerProfileShowcase) newMessengerForProfileShowcase() *Messeng
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	s.collectiblesMock = &CollectiblesManagerMock{}
+	s.collectiblesMock = CollectiblesManagerMock{}
 
 	options := []Option{
-		WithCollectiblesManager(s.collectiblesMock),
+		WithCollectiblesManager(&s.collectiblesMock),
 	}
 
 	m, err := newMessengerWithKey(s.shh, privateKey, s.logger, options)
@@ -426,8 +426,6 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 }
 
 func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
-	s.T().Skip("flaky test")
-
 	// Set Display name to pass shouldPublishChatIdentity check
 	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
 	profileKp.KeyUID = s.m.account.KeyUID
@@ -439,21 +437,26 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	err = s.m.SetDisplayName("bobby")
 	s.Require().NoError(err)
 
-	// Add mutual contact
-	mutualContact := s.newMessengerForProfileShowcase()
-	defer TearDownMessenger(&s.Suite, mutualContact)
-
-	s.mutualContact(mutualContact)
-
-	// Add identity verified contact
-	verifiedContact := s.newMessengerForProfileShowcase()
-	defer TearDownMessenger(&s.Suite, verifiedContact)
-
-	s.mutualContact(verifiedContact)
-	s.verifiedContact(verifiedContact)
-
 	// Save preferences to dispatch changes
 	request := DummyProfileShowcasePreferences(true)
+
+	// Save wallet accounts to pass the validation
+	acc1 := &accounts.Account{
+		Address: types.HexToAddress(request.Accounts[0].Address),
+		Type:    accounts.AccountTypeGenerated,
+		Name:    "Test Account 1",
+		ColorID: "",
+		Emoji:   "emoji",
+	}
+	acc2 := &accounts.Account{
+		Address: types.HexToAddress(request.Accounts[1].Address),
+		Type:    accounts.AccountTypeSeed,
+		Name:    "Test Account 2",
+		ColorID: "",
+		Emoji:   "emoji",
+	}
+	err = s.m.settings.SaveOrUpdateAccounts([]*accounts.Account{acc1, acc2}, true)
+	s.Require().NoError(err)
 
 	// Provide collectible balances test response
 	collectible := request.Collectibles[0]
@@ -470,6 +473,29 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 
 	err = s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().NoError(err)
+
+	profileShowcasePreferences, err := s.m.GetProfileShowcasePreferences()
+	s.Require().NoError(err)
+
+	// Make sure the count for entries is correct
+	s.Require().Len(profileShowcasePreferences.Communities, 2)
+	s.Require().Len(profileShowcasePreferences.Accounts, 2)
+	s.Require().Len(profileShowcasePreferences.Collectibles, 1)
+	s.Require().Len(profileShowcasePreferences.VerifiedTokens, 3)
+	s.Require().Len(profileShowcasePreferences.UnverifiedTokens, 2)
+
+	// Add mutual contact
+	mutualContact := s.newMessengerForProfileShowcase()
+	defer TearDownMessenger(&s.Suite, mutualContact)
+
+	s.mutualContact(mutualContact)
+
+	// Add identity verified contact
+	verifiedContact := s.newMessengerForProfileShowcase()
+	defer TearDownMessenger(&s.Suite, verifiedContact)
+
+	s.mutualContact(verifiedContact)
+	s.verifiedContact(verifiedContact)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 	// Get summarised profile data for mutual contact
