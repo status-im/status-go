@@ -1004,6 +1004,10 @@ func (o *Community) Edit(description *protobuf.CommunityDescription) {
 	o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled = description.AdminSettings.PinMessageAllMembersEnabled
 }
 
+func (o *Community) EditPermissionAccess(permissionAccess protobuf.CommunityPermissions_Access) {
+	o.config.CommunityDescription.Permissions.Access = permissionAccess
+}
+
 func (o *Community) Join() {
 	o.config.Joined = true
 	o.config.JoinedAt = time.Now().Unix()

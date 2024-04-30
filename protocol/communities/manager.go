@@ -56,6 +56,8 @@ var defaultAnnounceList = [][]string{
 var pieceLength = 100 * 1024
 
 const maxArchiveSizeInBytes = 30000000
+const maxNbMembers = 5000
+const maxNbPendingRequestedMembers = 100
 
 var memberPermissionsCheckInterval = 1 * time.Hour
 var validateInterval = 2 * time.Minute
@@ -1291,7 +1293,7 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 
 	newDescription, err := request.ToCommunityDescription()
 	if err != nil {
-		return nil, fmt.Errorf("Can't create community description: %v", err)
+		return nil, fmt.Errorf("can't create community description: %v", err)
 	}
 
 	// If permissions weren't explicitly set on original request, use existing ones
@@ -2725,6 +2727,14 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 		return nil, nil, err
 	}
 
+	nbPendingRequestsToJoin, err := m.persistence.GetNumberOfPendingRequestsToJoin(community.ID())
+	if err != nil {
+		return nil, nil, err
+	}
+	if nbPendingRequestsToJoin > maxNbPendingRequestedMembers {
+		return nil, nil, errors.New("max number of requests to join reached")
+	}
+
 	requestToJoin := &RequestToJoin{
 		PublicKey:        common.PubkeyToHex(signer),
 		Clock:            request.Clock,
@@ -2813,6 +2823,15 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 				// community ownership changed, accept request automatically
 				requestToJoin.State = RequestToJoinStateAccepted
 				return community, requestToJoin, nil
+			}
+		}
+
+		// Check if we reached the limit, if we did, change the community setting to be On Request
+		if community.AutoAccept() && community.MembersCount() >= maxNbMembers {
+			community.EditPermissionAccess(protobuf.CommunityPermissions_MANUAL_ACCEPT)
+			err = m.saveAndPublish(community)
+			if err != nil {
+				return nil, nil, err
 			}
 		}
 
