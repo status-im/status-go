@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -3468,6 +3469,82 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 	err = s.owner.HandleCommunityRequestToJoin(messageState, requestToJoinProto, &statusMessage)
 
 	s.Require().ErrorContains(err, "can't request access")
+}
+
+func (s *MessengerCommunitiesSuite) TestCommunityMaxNumberOfMembers() {
+	john := s.newMessenger()
+	_, err := john.Start()
+	s.Require().NoError(err)
+
+	defer TearDownMessenger(&s.Suite, john)
+
+	// Bring back the original values
+	defer communities.SetMaxNbMembers(5000)
+	defer communities.SetMaxNbPendingRequestedMembers(100)
+
+	community, _ := s.createCommunity()
+
+	communities.SetMaxNbMembers(2)
+	communities.SetMaxNbPendingRequestedMembers(1)
+
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.advertiseCommunityTo(community, s.owner, s.bob)
+	s.advertiseCommunityTo(community, s.owner, john)
+
+	// Alice joins the community correctly
+	s.joinCommunity(community, s.owner, s.alice)
+
+	// Bob also tries to join, but he will be put in the requests to join to approve and won't join
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err := s.bob.RequestToJoinCommunity(request)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
+	requestID := response.RequestsToJoinCommunity()[0].ID
+
+	response, err = WaitOnMessengerResponse(
+		s.owner,
+		func(r *MessengerResponse) bool {
+			for _, req := range r.RequestsToJoinCommunity() {
+				if reflect.DeepEqual(req.ID, requestID) {
+					return true
+				}
+			}
+			return false
+		},
+		"no request to join",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
+	s.Require().Equal(communities.RequestToJoinStatePending, response.RequestsToJoinCommunity()[0].State)
+
+	// We confirm that there are still 2 members only and the access setting is now manual
+	updatedCommunity, err := s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(updatedCommunity.Members(), 2)
+	s.Require().Equal(protobuf.CommunityPermissions_MANUAL_ACCEPT, updatedCommunity.Permissions().Access)
+
+	// John also tries to join, but he his request will be ignored as it exceeds the max number of pending requests
+	requestJohn := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err = john.RequestToJoinCommunity(requestJohn)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
+	requestJohnID := response.RequestsToJoinCommunity()[0].ID
+
+	_, err = WaitOnMessengerResponse(
+		s.owner,
+		func(r *MessengerResponse) bool {
+			for _, req := range r.RequestsToJoinCommunity() {
+				if reflect.DeepEqual(req.ID, requestJohnID) {
+					return true
+				}
+			}
+			return false
+		},
+		"no request to join",
+	)
+	s.Require().Error(err)
 }
 
 func (s *MessengerCommunitiesSuite) TestHandleImport() {

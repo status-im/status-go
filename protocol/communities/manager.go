@@ -56,8 +56,9 @@ var defaultAnnounceList = [][]string{
 var pieceLength = 100 * 1024
 
 const maxArchiveSizeInBytes = 30000000
-const maxNbMembers = 5000
-const maxNbPendingRequestedMembers = 100
+
+var maxNbMembers = 5000
+var maxNbPendingRequestedMembers = 100
 
 var memberPermissionsCheckInterval = 1 * time.Hour
 var validateInterval = 2 * time.Minute
@@ -65,6 +66,12 @@ var validateInterval = 2 * time.Minute
 // Used for testing only
 func SetValidateInterval(duration time.Duration) {
 	validateInterval = duration
+}
+func SetMaxNbMembers(maxNb int) {
+	maxNbMembers = maxNb
+}
+func SetMaxNbPendingRequestedMembers(maxNb int) {
+	maxNbPendingRequestedMembers = maxNb
 }
 
 // errors
@@ -2731,7 +2738,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 	if err != nil {
 		return nil, nil, err
 	}
-	if nbPendingRequestsToJoin > maxNbPendingRequestedMembers {
+	if nbPendingRequestsToJoin >= maxNbPendingRequestedMembers {
 		return nil, nil, errors.New("max number of requests to join reached")
 	}
 

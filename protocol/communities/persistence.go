@@ -844,7 +844,7 @@ func (p *Persistence) GetRequestToJoin(id []byte) (*RequestToJoin, error) {
 
 func (p *Persistence) GetNumberOfPendingRequestsToJoin(communityID types.HexBytes) (int, error) {
 	var count int
-	err := p.db.QueryRow(`SELECT count(1) FROM communities_requests_to_join WHERE community_id = ? AND state = ?`, communityID.String(), RequestToJoinStatePending).Scan(&count)
+	err := p.db.QueryRow(`SELECT count(1) FROM communities_requests_to_join WHERE community_id = ? AND state = ?`, communityID, RequestToJoinStatePending).Scan(&count)
 	if err != nil {
 		return 0, err
 	}

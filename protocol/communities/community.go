@@ -1006,6 +1006,9 @@ func (o *Community) Edit(description *protobuf.CommunityDescription) {
 
 func (o *Community) EditPermissionAccess(permissionAccess protobuf.CommunityPermissions_Access) {
 	o.config.CommunityDescription.Permissions.Access = permissionAccess
+	if o.IsControlNode() {
+		o.increaseClock()
+	}
 }
 
 func (o *Community) Join() {
