@@ -367,13 +367,7 @@ test-unit: export UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE ?= \
 test-unit: export UNIT_TEST_PACKAGES_WITH_EXTENDED_TIMEOUT ?= \
 	github.com/status-im/status-go/protocol
 test-unit: ##@tests Run unit and integration tests
-ifdef UNIT_TEST_REPORT_CODECLIMATE
-	cc-test-reporter before-build
-endif
 	./_assets/scripts/run_unit_tests.sh
-ifdef UNIT_TEST_REPORT_CODECLIMATE
-	cc-test-reporter after-build --prefix=github.com/status-im/status-go
-endif
 
 test-unit-race: export GOTEST_EXTRAFLAGS=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag

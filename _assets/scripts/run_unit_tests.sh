@@ -99,6 +99,10 @@ run_test_for_package() {
   return ${go_test_exit}
 }
 
+if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
+	./cc-test-reporter before-build
+fi
+
 for package in ${UNIT_TEST_PACKAGES}; do
   for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
     if ! is_parallelizable "${package}" || [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
@@ -132,3 +136,7 @@ fi
 echo "mode: atomic" > c.out
 grep -h -v "^mode:" ./**/*.coverage.out >> c.out
 rm -rf ./**/*.coverage.out
+
+if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
+	./cc-test-reporter after-build --prefix=github.com/status-im/status-go
+fi
