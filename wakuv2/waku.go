@@ -34,6 +34,7 @@ import (
 
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	"github.com/multiformats/go-multiaddr"
 	"google.golang.org/protobuf/proto"
@@ -1774,6 +1775,10 @@ func (w *Waku) Clean() error {
 
 func (w *Waku) PeerID() peer.ID {
 	return w.node.Host().ID()
+}
+
+func (w *Waku) Peerstore() peerstore.Peerstore {
+	return w.node.Host().Peerstore()
 }
 
 // validatePrivateKey checks the format of the given private key.

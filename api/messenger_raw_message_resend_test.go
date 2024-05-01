@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cenkalti/backoff/v3"
+
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -134,6 +136,27 @@ func (s *MessengerRawMessageResendTest) createAliceBobBackendAndLogin() {
 	s.T().Logf("shareLogDir: %s", shareLogDir)
 	s.createBackendAndLogin(&s.aliceBackend, &s.aliceMessenger, "alice66", pxServerNodeENR, shareLogDir)
 	s.createBackendAndLogin(&s.bobBackend, &s.bobMessenger, "bob66", pxServerNodeENR, shareLogDir)
+
+	aliceWaku := s.aliceBackend.StatusNode().WakuV2Service()
+	bobWaku := s.bobBackend.StatusNode().WakuV2Service()
+	// NOTE: default MaxInterval is 10s, which is too short for the test
+	// TODO(frank) figure out why it takes so long for the peers to know each other
+	err = tt.RetryWithBackOff(func() error {
+		if len(aliceWaku.Peerstore().Addrs(bobWaku.PeerID())) > 0 {
+			return nil
+		}
+		s.T().Logf("alice don't know bob's addresses")
+		return errors.New("alice don't know bob's addresses")
+	}, func(b *backoff.ExponentialBackOff) { b.MaxInterval = 20 * time.Second })
+	s.Require().NoError(err)
+	err = tt.RetryWithBackOff(func() error {
+		if len(bobWaku.Peerstore().Addrs(aliceWaku.PeerID())) > 0 {
+			return nil
+		}
+		s.T().Logf("bob don't know alice's addresses")
+		return errors.New("bob don't know alice's addresses")
+	}, func(b *backoff.ExponentialBackOff) { b.MaxInterval = 20 * time.Second })
+	s.Require().NoError(err)
 }
 
 func (s *MessengerRawMessageResendTest) createBackendAndLogin(backend **GethStatusBackend, messenger **protocol.Messenger, displayName, pxServerNodeENR, shareLogDir string) {
