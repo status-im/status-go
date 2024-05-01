@@ -240,7 +240,7 @@ func (s *Server) decryptRegistration(publicKey *ecdsa.PublicKey, payload []byte)
 	return common.Decrypt(payload, sharedKey)
 }
 
-// validateRegistration validates a new message against the last one received for a given installationID and and public key
+// validateRegistration validates a new message against the last one received for a given installationID and public key
 // and return the decrypted message
 func (s *Server) validateRegistration(publicKey *ecdsa.PublicKey, payload []byte) (*protobuf.PushNotificationRegistration, error) {
 	if payload == nil {

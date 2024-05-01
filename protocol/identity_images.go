@@ -54,7 +54,7 @@ func EncryptIdentityImagesWithContactPubKeys(iis map[string]*protobuf.IdentityIm
 				return false
 			}
 
-			// Append the the encrypted main AES key to the IdentityImage's EncryptionKeys slice.
+			// Append the encrypted main AES key to the IdentityImage's EncryptionKeys slice.
 			ii.EncryptionKeys = append(ii.EncryptionKeys, eAESKey)
 			return true
 		})
