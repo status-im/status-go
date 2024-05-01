@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -197,4 +198,31 @@ func (s *TestMessengerPrepareMessageSuite) Test_WHEN_QuotedMessageDoesNotContain
 	s.Require().NoError(err)
 
 	s.Require().Equal(json.RawMessage(nil), retrievedMessages[0].QuotedMessage.AlbumImages)
+}
+
+func (s *TestMessengerPrepareMessageSuite) Test_WHEN_MessageContainsImage_THEN_PreparedMessageByIDContainsLink() {
+	// GIVEN: message with image saved to DB
+	message := s.generateTextMessage("id-1", "1", 1, "")
+	message.ContentType = protobuf.ChatMessage_IMAGE
+	message.Payload = &protobuf.ChatMessage_Image{
+		Image: &protobuf.ImageMessage{
+			Format:  1,
+			Payload: RandomBytes(100),
+		},
+	}
+
+	err := s.m.SaveMessages([]*common.Message{message})
+	s.Require().NoError(err)
+
+	mediaServer, err := server.NewMediaServer(s.m.database, nil, nil, nil)
+	s.Require().NoError(err)
+	s.Require().NoError(mediaServer.Start())
+	s.m.httpServer = mediaServer
+
+	// WHEN: message is prepared
+	loadedMessage, err := s.m.MessageByID(message.ID)
+	s.Require().NoError(err)
+
+	// THEN: message contains image link
+	s.Require().True(strings.HasPrefix(loadedMessage.ImageLocalURL, "https://Localhost"))
 }

@@ -4197,7 +4197,17 @@ func (m *Messenger) storeSyncBookmarks(bookmarkMap map[string]*browsers.Bookmark
 }
 
 func (m *Messenger) MessageByID(id string) (*common.Message, error) {
-	return m.persistence.MessageByID(id)
+	msg, err := m.persistence.MessageByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if m.httpServer != nil {
+		err = m.prepareMessage(msg, m.httpServer)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return msg, nil
 }
 
 func (m *Messenger) MessagesExist(ids []string) (map[string]bool, error) {
