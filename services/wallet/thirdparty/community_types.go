@@ -9,6 +9,7 @@ type CommunityInfo struct {
 }
 
 type CommunityInfoProvider interface {
+	GetCommunityInfoFromDB(communityID string) (*CommunityInfo, error)
 	FetchCommunityInfo(communityID string) (*CommunityInfo, error)
 
 	// Collectible-related methods

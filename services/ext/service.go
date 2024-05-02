@@ -659,6 +659,11 @@ func (s *Service) fetchCommunityFromStoreNodes(communityID string) (*communities
 	return community, nil
 }
 
+func (s *Service) GetCommunityInfoFromDB(communityID string) (*thirdparty.CommunityInfo, error) {
+	community, err := s.messenger.FindCommunityInfoFromDB(communityID)
+	return communityToInfo(community), err
+}
+
 // Fetch latest community from store nodes.
 func (s *Service) FetchCommunityInfo(communityID string) (*thirdparty.CommunityInfo, error) {
 	if s.messenger == nil {

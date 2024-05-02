@@ -59,7 +59,24 @@ func (cm *Manager) GetCommunityID(tokenURI string) string {
 }
 
 func (cm *Manager) FillCollectiblesMetadata(communityID string, cs []*thirdparty.FullCollectibleData) (bool, error) {
-	return cm.communityInfoProvider.FillCollectiblesMetadata(communityID, cs)
+	communityFound, err := cm.communityInfoProvider.FillCollectiblesMetadata(communityID, cs)
+	if err != nil {
+		return communityFound, err
+	}
+
+	if communityFound {
+		// Update local community data cache
+		community, err := cm.communityInfoProvider.GetCommunityInfoFromDB(communityID)
+		if err != nil {
+			log.Error("GetCommunityInfoFromDB failed", "communityID", communityID, "err", err)
+			return communityFound, err
+		}
+		err = cm.setCommunityInfo(communityID, community)
+		if err != nil {
+			log.Error("SetCommunityInfo failed", "communityID", community)
+		}
+	}
+	return communityFound, nil
 }
 
 func (cm *Manager) setCommunityInfo(id string, c *thirdparty.CommunityInfo) (err error) {
