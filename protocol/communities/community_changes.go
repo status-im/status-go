@@ -2,6 +2,7 @@ package communities
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 
 	slices "golang.org/x/exp/slices"
 
@@ -161,6 +162,7 @@ func evaluateCommunityChangesByDescription(origin, modified *protobuf.CommunityD
 	// Check for removed members at the org level
 	for pk, member := range origin.Members {
 		if _, ok := modified.Members[pk]; !ok {
+			fmt.Println("=== Someone was kicked", pk)
 			changes.MembersRemoved[pk] = member
 		}
 	}

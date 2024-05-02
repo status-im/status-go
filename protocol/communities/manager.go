@@ -1956,6 +1956,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 
 		if changes.HasMemberLeft(pkString) {
 			// If we joined previously the community, that means we have been kicked
+			fmt.Println("=== I was kicked", pkString)
 			changes.MemberKicked = community.Joined()
 		}
 	}

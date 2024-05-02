@@ -441,6 +441,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 
 					// control node changed and we were kicked out. It now awaits our addresses
 					if communityResponse.Changes.ControlNodeChanged != nil && communityResponse.Changes.MemberKicked {
+						fmt.Println("=== Kicked because control node changed")
 						requestToJoin, err := m.sendSharedAddressToControlNode(communityResponse.Community.ControlNode(), communityResponse.Community)
 
 						if err != nil {
@@ -4437,6 +4438,7 @@ func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) 
 			}
 
 		} else if changes.MemberKicked {
+			fmt.Println("=== Kicked from community changes")
 			notificationType := ActivityCenterNotificationTypeCommunityKicked
 			if changes.IsMemberBanned(pkString) {
 				notificationType = ActivityCenterNotificationTypeCommunityBanned
