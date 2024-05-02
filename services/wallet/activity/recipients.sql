@@ -91,7 +91,7 @@ FROM (
 						FROM
 							tr_network_ids
 						WHERE
-							multi_transactions.ROWID = tr_network_ids.multi_transaction_id
+							multi_transactions.id = tr_network_ids.multi_transaction_id
 					)
 					OR EXISTS (
 						SELECT
@@ -99,7 +99,7 @@ FROM (
 						FROM
 							pending_network_ids
 						WHERE
-							multi_transactions.ROWID = pending_network_ids.multi_transaction_id
+							multi_transactions.id = pending_network_ids.multi_transaction_id
 					)
 				)
 			)

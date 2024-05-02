@@ -21,11 +21,10 @@ import (
 	"github.com/status-im/status-go/services/wallet/bridge"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/transactions"
 )
 
-const multiTransactionColumns = "from_network_id, from_tx_hash, from_address, from_asset, from_amount, to_network_id, to_tx_hash, to_address, to_asset, to_amount, type, cross_tx_id, timestamp"
-const selectMultiTransactionColumns = "COALESCE(from_network_id, 0), from_tx_hash, from_address, from_asset, from_amount, COALESCE(to_network_id, 0), to_tx_hash, to_address, to_asset, to_amount, type, cross_tx_id, timestamp"
+const multiTransactionColumns = "id, from_network_id, from_tx_hash, from_address, from_asset, from_amount, to_network_id, to_tx_hash, to_address, to_asset, to_amount, type, cross_tx_id, timestamp"
+const selectMultiTransactionColumns = "id, COALESCE(from_network_id, 0), from_tx_hash, from_address, from_asset, from_amount, COALESCE(to_network_id, 0), to_tx_hash, to_address, to_asset, to_amount, type, cross_tx_id, timestamp"
 
 func rowsToMultiTransactions(rows *sql.Rows) ([]*MultiTransaction, error) {
 	var multiTransactions []*MultiTransaction
@@ -79,22 +78,15 @@ func rowsToMultiTransactions(rows *sql.Rows) ([]*MultiTransaction, error) {
 	return multiTransactions, nil
 }
 
-func getMultiTransactionTimestamp(multiTransaction *MultiTransaction) uint64 {
-	if multiTransaction.Timestamp != 0 {
-		return multiTransaction.Timestamp
-	}
-	return uint64(time.Now().Unix())
-}
-
-// insertMultiTransaction inserts a multi transaction into the database and updates multi-transaction ID and timestamp
-func insertMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) (wallet_common.MultiTransactionIDType, error) {
+// insertMultiTransaction inserts a multi transaction into the database and updates timestamp
+func insertMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) error {
 	insert, err := db.Prepare(fmt.Sprintf(`INSERT INTO multi_transactions (%s)
-											VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, multiTransactionColumns))
+											VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, multiTransactionColumns))
 	if err != nil {
-		return wallet_common.NoMultiTransactionID, err
+		return err
 	}
-	timestamp := getMultiTransactionTimestamp(multiTransaction)
-	result, err := insert.Exec(
+	_, err = insert.Exec(
+		multiTransaction.ID,
 		multiTransaction.FromNetworkID,
 		multiTransaction.FromTxHash,
 		multiTransaction.FromAddress,
@@ -107,22 +99,18 @@ func insertMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) (wal
 		multiTransaction.ToAmount.String(),
 		multiTransaction.Type,
 		multiTransaction.CrossTxID,
-		timestamp,
+		multiTransaction.Timestamp,
 	)
 	if err != nil {
-		return wallet_common.NoMultiTransactionID, err
+		return err
 	}
 	defer insert.Close()
-	multiTransactionID, err := result.LastInsertId()
 
-	multiTransaction.Timestamp = timestamp
-	multiTransaction.ID = wallet_common.MultiTransactionIDType(multiTransactionID)
-
-	return wallet_common.MultiTransactionIDType(multiTransactionID), err
+	return err
 }
 
 func (tm *TransactionManager) InsertMultiTransaction(multiTransaction *MultiTransaction) (wallet_common.MultiTransactionIDType, error) {
-	return insertMultiTransaction(tm.db, multiTransaction)
+	return multiTransaction.ID, insertMultiTransaction(tm.db, multiTransaction)
 }
 
 func updateMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) error {
@@ -130,13 +118,12 @@ func updateMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) erro
 		return fmt.Errorf("no multitransaction ID")
 	}
 
-	update, err := db.Prepare(fmt.Sprintf(`REPLACE INTO multi_transactions (rowid, %s)
+	update, err := db.Prepare(fmt.Sprintf(`REPLACE INTO multi_transactions (%s)
 	VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, multiTransactionColumns))
 
 	if err != nil {
 		return err
 	}
-	timestamp := getMultiTransactionTimestamp(multiTransaction)
 	_, err = update.Exec(
 		multiTransaction.ID,
 		multiTransaction.FromNetworkID,
@@ -151,7 +138,7 @@ func updateMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) erro
 		multiTransaction.ToAmount.String(),
 		multiTransaction.Type,
 		multiTransaction.CrossTxID,
-		timestamp,
+		multiTransaction.Timestamp,
 	)
 	if err != nil {
 		return err
@@ -163,55 +150,53 @@ func (tm *TransactionManager) UpdateMultiTransaction(multiTransaction *MultiTran
 	return updateMultiTransaction(tm.db, multiTransaction)
 }
 
-// In case of keycard account, password should be empty
 func (tm *TransactionManager) CreateMultiTransactionFromCommand(ctx context.Context, command *MultiTransactionCommand,
-	data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, password string) (*MultiTransactionCommandResult, error) {
+	data []*bridge.TransactionBridge) (*MultiTransaction, error) {
 
 	multiTransaction := multiTransactionFromCommand(command)
 
 	if multiTransaction.Type == MultiTransactionSend && multiTransaction.FromNetworkID == 0 && len(data) == 1 {
 		multiTransaction.FromNetworkID = data[0].ChainID
 	}
-	multiTransactionID, err := insertMultiTransaction(tm.db, multiTransaction)
+
+	return multiTransaction, nil
+}
+
+func (tm *TransactionManager) SendTransactionForSigningToKeycard(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge) error {
+	acc, err := tm.accountsDB.GetAccountByAddress(types.Address(multiTransaction.FromAddress))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	multiTransaction.ID = multiTransactionID
-	if password == "" {
-		acc, err := tm.accountsDB.GetAccountByAddress(types.Address(multiTransaction.FromAddress))
-		if err != nil {
-			return nil, err
-		}
-
-		kp, err := tm.accountsDB.GetKeypairByKeyUID(acc.KeyUID)
-		if err != nil {
-			return nil, err
-		}
-
-		if !kp.MigratedToKeycard() {
-			return nil, fmt.Errorf("account being used is not migrated to a keycard, password is required")
-		}
-
-		tm.multiTransactionForKeycardSigning = multiTransaction
-		tm.transactionsBridgeData = data
-		hashes, err := tm.buildTransactions(bridges)
-		if err != nil {
-			return nil, err
-		}
-
-		signal.SendTransactionsForSigningEvent(hashes)
-
-		return nil, nil
+	kp, err := tm.accountsDB.GetKeypairByKeyUID(acc.KeyUID)
+	if err != nil {
+		return err
 	}
 
-	hashes, err := tm.sendTransactions(multiTransaction, data, bridges, password)
+	if !kp.MigratedToKeycard() {
+		return fmt.Errorf("account being used is not migrated to a keycard, password is required")
+	}
+
+	tm.multiTransactionForKeycardSigning = multiTransaction
+	tm.transactionsBridgeData = data
+	hashes, err := tm.buildTransactions(bridges)
+	if err != nil {
+		return err
+	}
+
+	signal.SendTransactionsForSigningEvent(hashes)
+
+	return nil
+}
+
+func (tm *TransactionManager) SendTransactions(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, account *account.SelectedExtKey) (*MultiTransactionCommandResult, error) {
+	hashes, err := tm.sendTransactions(multiTransaction, data, bridges, account)
 	if err != nil {
 		return nil, err
 	}
 
 	return &MultiTransactionCommandResult{
-		ID:     int64(multiTransactionID),
+		ID:     int64(multiTransaction.ID),
 		Hashes: hashes,
 	}, nil
 }
@@ -267,6 +252,11 @@ func (tm *TransactionManager) ProceedWithTransactionsSignatures(ctx context.Cont
 		hashes[desc.chainID] = append(hashes[desc.chainID], hash)
 	}
 
+	_, err := tm.InsertMultiTransaction(tm.multiTransactionForKeycardSigning)
+	if err != nil {
+		log.Error("failed to insert multi transaction", "err", err)
+	}
+
 	return &MultiTransactionCommandResult{
 		ID:     int64(tm.multiTransactionForKeycardSigning.ID),
 		Hashes: hashes,
@@ -274,18 +264,21 @@ func (tm *TransactionManager) ProceedWithTransactionsSignatures(ctx context.Cont
 }
 
 func multiTransactionFromCommand(command *MultiTransactionCommand) *MultiTransaction {
-
-	log.Info("Creating multi transaction", "command", command)
-
-	multiTransaction := &MultiTransaction{
-		FromAddress: command.FromAddress,
-		ToAddress:   command.ToAddress,
-		FromAsset:   command.FromAsset,
-		ToAsset:     command.ToAsset,
-		FromAmount:  command.FromAmount,
-		ToAmount:    new(hexutil.Big),
-		Type:        command.Type,
-	}
+	multiTransaction := NewMultiTransaction(
+		/* Timestamp:     */ uint64(time.Now().Unix()),
+		/* FromNetworkID: */ 0,
+		/* ToNetworkID:	  */ 0,
+		/* FromTxHash:    */ common.Hash{},
+		/* ToTxHash:      */ common.Hash{},
+		/* FromAddress:   */ command.FromAddress,
+		/* ToAddress:     */ command.ToAddress,
+		/* FromAsset:     */ command.FromAsset,
+		/* ToAsset:       */ command.ToAsset,
+		/* FromAmount:    */ command.FromAmount,
+		/* ToAmount:      */ new(hexutil.Big),
+		/* Type:		  */ command.Type,
+		/* CrossTxID:	  */ "",
+	)
 
 	return multiTransaction
 }
@@ -315,15 +308,8 @@ func (tm *TransactionManager) buildTransactions(bridges map[string]bridge.Bridge
 }
 
 func (tm *TransactionManager) sendTransactions(multiTransaction *MultiTransaction,
-	data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, password string) (
+	data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, account *account.SelectedExtKey) (
 	map[uint64][]types.Hash, error) {
-
-	log.Info("Making transactions", "multiTransaction", multiTransaction)
-
-	selectedAccount, err := tm.getVerifiedWalletAccount(multiTransaction.FromAddress.Hex(), password)
-	if err != nil {
-		return nil, err
-	}
 
 	hashes := make(map[uint64][]types.Hash)
 	for _, tx := range data {
@@ -352,9 +338,9 @@ func (tm *TransactionManager) sendTransactions(multiTransaction *MultiTransactio
 			tx.SwapTx.Symbol = multiTransaction.FromAsset
 		}
 
-		hash, err := bridges[tx.BridgeName].Send(tx, selectedAccount)
+		hash, err := bridges[tx.BridgeName].Send(tx, account)
 		if err != nil {
-			return nil, err
+			return nil, err // TODO: One of transfers within transaction could have been sent. Need to notify user about it
 		}
 		hashes[tx.ChainID] = append(hashes[tx.ChainID], hash)
 	}
@@ -369,9 +355,9 @@ func (tm *TransactionManager) GetMultiTransactions(ctx context.Context, ids []wa
 		args[i] = v
 	}
 
-	stmt, err := tm.db.Prepare(fmt.Sprintf(`SELECT rowid, %s
+	stmt, err := tm.db.Prepare(fmt.Sprintf(`SELECT %s
 											FROM multi_transactions
-											WHERE rowid in (%s)`,
+											WHERE id in (%s)`,
 		selectMultiTransactionColumns,
 		strings.Join(placeholders, ",")))
 	if err != nil {
@@ -389,7 +375,7 @@ func (tm *TransactionManager) GetMultiTransactions(ctx context.Context, ids []wa
 }
 
 func (tm *TransactionManager) getBridgeMultiTransactions(ctx context.Context, toChainID uint64, crossTxID string) ([]*MultiTransaction, error) {
-	stmt, err := tm.db.Prepare(fmt.Sprintf(`SELECT rowid, %s
+	stmt, err := tm.db.Prepare(fmt.Sprintf(`SELECT %s
 											FROM multi_transactions
 											WHERE type=? AND to_network_id=? AND cross_tx_id=?`,
 		multiTransactionColumns))
@@ -439,29 +425,11 @@ func (tm *TransactionManager) GetBridgeDestinationMultiTransaction(ctx context.C
 	return nil, nil
 }
 
-func (tm *TransactionManager) getVerifiedWalletAccount(address, password string) (*account.SelectedExtKey, error) {
-	exists, err := tm.accountsDB.AddressExists(types.HexToAddress(address))
-	if err != nil {
-		log.Error("failed to query db for a given address", "address", address, "error", err)
-		return nil, err
-	}
-
-	if !exists {
-		log.Error("failed to get a selected account", "err", transactions.ErrInvalidTxSender)
-		return nil, transactions.ErrAccountDoesntExist
-	}
-
-	key, err := tm.gethManager.VerifyAccountPassword(tm.config.KeyStoreDir, address, password)
-	if err != nil {
-		log.Error("failed to verify account", "account", address, "error", err)
-		return nil, err
-	}
-
-	return &account.SelectedExtKey{
-		Address:    key.Address,
-		AccountKey: key,
-	}, nil
+func idFromTimestamp() wallet_common.MultiTransactionIDType {
+	return wallet_common.MultiTransactionIDType(time.Now().UnixMilli())
 }
+
+var multiTransactionIDGenerator func() wallet_common.MultiTransactionIDType = idFromTimestamp
 
 func (tm *TransactionManager) removeMultiTransactionByAddress(address common.Address) error {
 	// We must not remove those transactions, where from_address and to_address are different and both are stored in accounts DB
@@ -469,7 +437,7 @@ func (tm *TransactionManager) removeMultiTransactionByAddress(address common.Add
 	// That is why we don't use cascade delete here with references to transfers table, as we might have 2 records in multi_transactions
 	// for the same transaction, one for each address
 
-	stmt, err := tm.db.Prepare(`SELECT rowid, from_address, to_address
+	stmt, err := tm.db.Prepare(`SELECT id, from_address, to_address
 								FROM multi_transactions
 								WHERE from_address=? OR to_address=?`)
 	if err != nil {
@@ -482,10 +450,10 @@ func (tm *TransactionManager) removeMultiTransactionByAddress(address common.Add
 	}
 	defer rows.Close()
 
-	rowIDs := make([]int, 0)
-	rowID, fromAddress, toAddress := 0, common.Address{}, common.Address{}
+	ids := make([]int, 0)
+	id, fromAddress, toAddress := 0, common.Address{}, common.Address{}
 	for rows.Next() {
-		err = rows.Scan(&rowID, &fromAddress, &toAddress)
+		err = rows.Scan(&id, &fromAddress, &toAddress)
 		if err != nil {
 			log.Error("Failed to scan row", "error", err)
 			continue
@@ -512,14 +480,14 @@ func (tm *TransactionManager) removeMultiTransactionByAddress(address common.Add
 			}
 		}
 
-		rowIDs = append(rowIDs, rowID)
+		ids = append(ids, id)
 	}
 
-	if len(rowIDs) > 0 {
-		for _, rowID := range rowIDs {
-			_, err = tm.db.Exec(`DELETE FROM multi_transactions WHERE rowid=?`, rowID)
+	if len(ids) > 0 {
+		for _, id := range ids {
+			_, err = tm.db.Exec(`DELETE FROM multi_transactions WHERE id=?`, id)
 			if err != nil {
-				log.Error("Failed to remove multitransaction", "rowid", rowID, "error", err)
+				log.Error("Failed to remove multitransaction", "id", id, "error", err)
 			}
 		}
 	}

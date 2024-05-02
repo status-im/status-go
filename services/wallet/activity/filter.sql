@@ -445,7 +445,7 @@ SELECT
 	NULL AS transfer_hash,
 	NULL AS pending_hash,
 	NULL AS network_id,
-	multi_transactions.ROWID AS multi_tx_id,
+	multi_transactions.id AS multi_tx_id,
 	multi_transactions.timestamp AS timestamp,
 	multi_transactions.type AS mt_type,
 	NULL as tr_type,
@@ -488,8 +488,8 @@ SELECT
 FROM
 	multi_transactions
 	CROSS JOIN filter_conditions
-	LEFT JOIN tr_status ON multi_transactions.ROWID = tr_status.multi_transaction_id
-	LEFT JOIN pending_status ON multi_transactions.ROWID = pending_status.multi_transaction_id
+	LEFT JOIN tr_status ON multi_transactions.id = tr_status.multi_transaction_id
+	LEFT JOIN pending_status ON multi_transactions.id = pending_status.multi_transaction_id
 WHERE
 	(
 		(
@@ -577,7 +577,7 @@ WHERE
 					FROM
 						tr_network_ids
 					WHERE
-						multi_transactions.ROWID = tr_network_ids.multi_transaction_id
+						multi_transactions.id = tr_network_ids.multi_transaction_id
 				)
 				OR EXISTS (
 					SELECT
@@ -585,7 +585,7 @@ WHERE
 					FROM
 						pending_network_ids
 					WHERE
-						multi_transactions.ROWID = pending_network_ids.multi_transaction_id
+						multi_transactions.id = pending_network_ids.multi_transaction_id
 				)
 			)
 		)

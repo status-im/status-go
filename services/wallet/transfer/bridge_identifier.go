@@ -45,23 +45,21 @@ func upsertHopBridgeOriginTx(ctx context.Context, transactionManager *Transactio
 	}
 
 	if multiTx == nil {
-		multiTx = &MultiTransaction{
-			// Data from "origin" transaction
-			FromNetworkID: params.fromNetworkID,
-			FromTxHash:    params.fromTxHash,
-			FromAddress:   params.fromAddress,
-			FromAsset:     params.fromAsset,
-			FromAmount:    (*hexutil.Big)(params.fromAmount),
-			ToNetworkID:   params.toNetworkID,
-			ToAddress:     params.toAddress,
-			// To be replaced by "destination" transaction, need to be non-null
-			ToAsset:  params.fromAsset,
-			ToAmount: (*hexutil.Big)(params.fromAmount),
-			// Common data
-			Type:      MultiTransactionBridge,
-			CrossTxID: params.crossTxID,
-			Timestamp: params.timestamp,
-		}
+		multiTx = NewMultiTransaction(
+			/* Timestamp:     */ params.timestamp, // Common data
+			/* FromNetworkID: */ params.fromNetworkID, // Data from "origin" transaction
+			/* ToNetworkID:   */ params.toNetworkID, // Data from "origin" transaction
+			/* FromTxHash:    */ params.fromTxHash, // Data from "origin" transaction
+			/* ToTxHash:      */ common.Hash{},
+			/* FromAddress:   */ params.fromAddress, // Data from "origin" transaction
+			/* ToAddress:     */ params.toAddress, // Data from "origin" transaction
+			/* FromAsset:     */ params.fromAsset, // Data from "origin" transaction
+			/* ToAsset:       */ params.fromAsset, // To be replaced by "destination" transaction, need to be non-null
+			/* FromAmount:    */ (*hexutil.Big)(params.fromAmount), // Data from "origin" transaction
+			/* ToAmount:      */ (*hexutil.Big)(params.fromAmount), // To be replaced by "destination" transaction, need to be non-null
+			/* Type:      	  */ MultiTransactionBridge, // Common data
+			/* CrossTxID:	  */ params.crossTxID, // Common data
+		)
 
 		_, err := transactionManager.InsertMultiTransaction(multiTx)
 		if err != nil {
@@ -102,22 +100,21 @@ func upsertHopBridgeDestinationTx(ctx context.Context, transactionManager *Trans
 	}
 
 	if multiTx == nil {
-		multiTx = &MultiTransaction{
-			// To be replaced by "origin" transaction, need to be non-null
-			FromAddress: params.toAddress,
-			FromAsset:   params.toAsset,
-			FromAmount:  (*hexutil.Big)(params.toAmount),
-			// Data from "destination" transaction
-			ToNetworkID: params.toNetworkID,
-			ToTxHash:    params.toTxHash,
-			ToAddress:   params.toAddress,
-			ToAsset:     params.toAsset,
-			ToAmount:    (*hexutil.Big)(params.toAmount),
-			// Common data
-			Type:      MultiTransactionBridge,
-			CrossTxID: params.crossTxID,
-			Timestamp: params.timestamp,
-		}
+		multiTx = NewMultiTransaction(
+			/* Timestamp: 	  */ params.timestamp, // Common data
+			/* FromNetworkID: */ 0, // not set
+			/* ToNetworkID:   */ params.toNetworkID, // Data from "destination" transaction
+			/* FromTxHash:    */ common.Hash{},
+			/* ToTxHash:      */ params.toTxHash, // Data from "destination" transaction
+			/* FromAddress:   */ params.toAddress, // To be replaced by "origin" transaction, need to be non-null
+			/* ToAddress:     */ params.toAddress, // Data from "destination" transaction
+			/* FromAsset:     */ params.toAsset, // To be replaced by "origin" transaction, need to be non-null
+			/* ToAsset:       */ params.toAsset, // Data from "destination" transaction
+			/* FromAmount:    */ (*hexutil.Big)(params.toAmount), // To be replaced by "origin" transaction, need to be non-null
+			/* ToAmount:      */ (*hexutil.Big)(params.toAmount), // Data from "destination" transaction
+			/* Type:      	  */ MultiTransactionBridge, // Common data
+			/* CrossTxID: 	  */ params.crossTxID, // Common data
+		)
 
 		_, err := transactionManager.InsertMultiTransaction(multiTx)
 		if err != nil {
