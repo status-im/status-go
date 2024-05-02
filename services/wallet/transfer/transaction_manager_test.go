@@ -43,39 +43,39 @@ func TestBridgeMultiTransactions(t *testing.T) {
 	manager, stop := setupTestTransactionDB(t)
 	defer stop()
 
-	trx1 := MultiTransaction{
-		Timestamp:     123,
-		FromNetworkID: 0,
-		ToNetworkID:   1,
-		FromTxHash:    common.Hash{5},
-		// Empty ToTxHash
-		FromAddress: common.Address{1},
-		ToAddress:   common.Address{2},
-		FromAsset:   "fromAsset",
-		ToAsset:     "toAsset",
-		FromAmount:  (*hexutil.Big)(big.NewInt(123)),
-		ToAmount:    (*hexutil.Big)(big.NewInt(234)),
-		Type:        MultiTransactionBridge,
-		CrossTxID:   "crossTxD1",
-	}
+	trx1 := NewMultiTransaction(
+		/* Timestamp:		*/ 123,
+		/* FromNetworkID:	*/ 0,
+		/* ToNetworkID:		*/ 1,
+		/* FromTxHash: 		*/ common.Hash{5},
+		/* // Empty ToTxHash */ common.Hash{},
+		/* FromAddress:	 	*/ common.Address{1},
+		/* ToAddress:   	*/ common.Address{2},
+		/* FromAsset:   	*/ "fromAsset",
+		/* ToAsset:     	*/ "toAsset",
+		/* FromAmount:  	*/ (*hexutil.Big)(big.NewInt(123)),
+		/* ToAmount:    	*/ (*hexutil.Big)(big.NewInt(234)),
+		/* Type:        	*/ MultiTransactionBridge,
+		/* CrossTxID:   	*/ "crossTxD1",
+	)
 
-	trx2 := MultiTransaction{
-		Timestamp:     321,
-		FromNetworkID: 1,
-		ToNetworkID:   0,
-		//Empty FromTxHash
-		ToTxHash:    common.Hash{6},
-		FromAddress: common.Address{2},
-		ToAddress:   common.Address{1},
-		FromAsset:   "fromAsset",
-		ToAsset:     "toAsset",
-		FromAmount:  (*hexutil.Big)(big.NewInt(123)),
-		ToAmount:    (*hexutil.Big)(big.NewInt(234)),
-		Type:        MultiTransactionBridge,
-		CrossTxID:   "crossTxD2",
-	}
+	trx2 := NewMultiTransaction(
+		/* Timestamp:     */ 321,
+		/* FromNetworkID: */ 1,
+		/* ToNetworkID:   */ 0,
+		/* //Empty FromTxHash */ common.Hash{},
+		/* ToTxHash:    */ common.Hash{6},
+		/* FromAddress: */ common.Address{2},
+		/* ToAddress:   */ common.Address{1},
+		/* FromAsset:   */ "fromAsset",
+		/* ToAsset:     */ "toAsset",
+		/* FromAmount:  */ (*hexutil.Big)(big.NewInt(123)),
+		/* ToAmount:    */ (*hexutil.Big)(big.NewInt(234)),
+		/* Type:        */ MultiTransactionBridge,
+		/* CrossTxID:   */ "crossTxD2",
+	)
 
-	trxs := []*MultiTransaction{&trx1, &trx2}
+	trxs := []*MultiTransaction{trx1, trx2}
 
 	var err error
 	ids := make([]wallet_common.MultiTransactionIDType, len(trxs))
@@ -88,7 +88,7 @@ func TestBridgeMultiTransactions(t *testing.T) {
 	rst, err := manager.GetBridgeOriginMultiTransaction(context.Background(), trx1.ToNetworkID, trx1.CrossTxID)
 	require.NoError(t, err)
 	require.NotEmpty(t, rst)
-	require.True(t, areMultiTransactionsEqual(&trx1, rst))
+	require.True(t, areMultiTransactionsEqual(trx1, rst))
 
 	rst, err = manager.GetBridgeDestinationMultiTransaction(context.Background(), trx1.ToNetworkID, trx1.CrossTxID)
 	require.NoError(t, err)
@@ -101,31 +101,34 @@ func TestBridgeMultiTransactions(t *testing.T) {
 	rst, err = manager.GetBridgeDestinationMultiTransaction(context.Background(), trx2.ToNetworkID, trx2.CrossTxID)
 	require.NoError(t, err)
 	require.NotEmpty(t, rst)
-	require.True(t, areMultiTransactionsEqual(&trx2, rst))
+	require.True(t, areMultiTransactionsEqual(trx2, rst))
 }
 
 func TestMultiTransactions(t *testing.T) {
 	manager, stop := setupTestTransactionDB(t)
 	defer stop()
 
-	trx1 := MultiTransaction{
-		Timestamp:     123,
-		FromNetworkID: 0,
-		ToNetworkID:   1,
-		FromTxHash:    common.Hash{5},
-		ToTxHash:      common.Hash{6},
-		FromAddress:   common.Address{1},
-		ToAddress:     common.Address{2},
-		FromAsset:     "fromAsset",
-		ToAsset:       "toAsset",
-		FromAmount:    (*hexutil.Big)(big.NewInt(123)),
-		ToAmount:      (*hexutil.Big)(big.NewInt(234)),
-		Type:          MultiTransactionBridge,
-		CrossTxID:     "crossTxD",
-	}
+	trx1 := *NewMultiTransaction(
+		/* Timestamp:    */ 123,
+		/* FromNetworkID:*/ 0,
+		/* ToNetworkID:  */ 1,
+		/* FromTxHash:   */ common.Hash{5},
+		/* ToTxHash:     */ common.Hash{6},
+		/* FromAddress:  */ common.Address{1},
+		/* ToAddress:    */ common.Address{2},
+		/* FromAsset:    */ "fromAsset",
+		/* ToAsset:      */ "toAsset",
+		/* FromAmount:   */ (*hexutil.Big)(big.NewInt(123)),
+		/* ToAmount:     */ (*hexutil.Big)(big.NewInt(234)),
+		/* Type:         */ MultiTransactionBridge,
+		/* CrossTxID:    */ "crossTxD",
+	)
 	trx2 := trx1
 	trx2.FromAmount = (*hexutil.Big)(big.NewInt(456))
 	trx2.ToAmount = (*hexutil.Big)(big.NewInt(567))
+	trx2.ID = generateMultiTransactionID()
+
+	require.NotEqual(t, trx1.ID, trx2.ID)
 
 	trxs := []*MultiTransaction{&trx1, &trx2}
 

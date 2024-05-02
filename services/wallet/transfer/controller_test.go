@@ -94,15 +94,21 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	// Self multi transaction
-	midSelf, err := transactionManager.InsertMultiTransaction(&MultiTransaction{
-		FromAddress: address,
-		ToAddress:   address,
-		FromAsset:   "ETH",
-		ToAsset:     "DAI",
-		FromAmount:  &hexutil.Big{},
-		ToAmount:    &hexutil.Big{},
-		Timestamp:   1,
-	})
+	midSelf, err := transactionManager.InsertMultiTransaction(NewMultiTransaction(
+		/* Timestamp:     */ 1,
+		/* FromNetworkID: */ 1,
+		/* ToNetworkID:	  */ 1,
+		/* FromTxHash:    */ common.Hash{},
+		/* ToTxHash:      */ common.Hash{},
+		/* FromAddress:   */ address,
+		/* ToAddress:     */ address,
+		/* FromAsset:     */ "ETH",
+		/* ToAsset:       */ "DAI",
+		/* FromAmount:    */ &hexutil.Big{},
+		/* ToAmount:      */ &hexutil.Big{},
+		/* Type:		  */ MultiTransactionSend,
+		/* CrossTxID:	  */ "",
+	))
 
 	require.NoError(t, err)
 	mtxs, err := transactionManager.GetMultiTransactions(context.Background(), []wallet_common.MultiTransactionIDType{midSelf})
@@ -110,15 +116,21 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	require.Len(t, mtxs, 1)
 
 	// Send multi transaction
-	mt := &MultiTransaction{
-		FromAddress: address,
-		ToAddress:   counterparty,
-		FromAsset:   "ETH",
-		ToAsset:     "DAI",
-		FromAmount:  &hexutil.Big{},
-		ToAmount:    &hexutil.Big{},
-		Timestamp:   2,
-	}
+	mt := NewMultiTransaction(
+		/* Timestamp:     */ 2,
+		/* FromNetworkID: */ 1,
+		/* ToNetworkID:	  */ 1,
+		/* FromTxHash:    */ common.Hash{},
+		/* ToTxHash:      */ common.Hash{},
+		/* FromAddress:   */ address,
+		/* ToAddress:     */ counterparty,
+		/* FromAsset:     */ "ETH",
+		/* ToAsset:       */ "DAI",
+		/* FromAmount:    */ &hexutil.Big{},
+		/* ToAmount:      */ &hexutil.Big{},
+		/* Type:		  */ MultiTransactionSend,
+		/* CrossTxID:	  */ "",
+	)
 	mid, err := transactionManager.InsertMultiTransaction(mt)
 
 	require.NoError(t, err)
@@ -127,15 +139,21 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	require.Len(t, mtxs, 2)
 
 	// Another Send multi-transaction where sender and receiver are inverted (both accounts are in accounts DB)
-	midReverse, err := transactionManager.InsertMultiTransaction(&MultiTransaction{
-		FromAddress: mt.ToAddress,
-		ToAddress:   mt.FromAddress,
-		FromAsset:   mt.FromAsset,
-		ToAsset:     mt.ToAsset,
-		FromAmount:  mt.FromAmount,
-		ToAmount:    mt.ToAmount,
-		Timestamp:   mt.Timestamp + 1,
-	})
+	midReverse, err := transactionManager.InsertMultiTransaction(NewMultiTransaction(
+		/* Timestamp:     */ mt.Timestamp+1,
+		/* FromNetworkID: */ 1,
+		/* ToNetworkID:	  */ 1,
+		/* FromTxHash:    */ common.Hash{},
+		/* ToTxHash:      */ common.Hash{},
+		/* FromAddress:   */ mt.ToAddress,
+		/* ToAddress:     */ mt.FromAddress,
+		/* FromAsset:     */ mt.FromAsset,
+		/* ToAsset:       */ mt.ToAsset,
+		/* FromAmount:    */ mt.FromAmount,
+		/* ToAmount:      */ mt.ToAmount,
+		/* Type:		  */ MultiTransactionSend,
+		/* CrossTxID:	  */ "",
+	))
 
 	require.NoError(t, err)
 	mtxs, err = transactionManager.GetMultiTransactions(context.Background(), []wallet_common.MultiTransactionIDType{midSelf, mid, midReverse})

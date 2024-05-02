@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/network"
@@ -526,7 +527,13 @@ func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address s
 
 func (api *API) SignMessage(ctx context.Context, message types.HexBytes, address common.Address, password string) (string, error) {
 	log.Debug("[WalletAPI::SignMessage]", "message", message, "address", address)
-	return api.s.transactionManager.SignMessage(message, address, password)
+
+	selectedAccount, err := api.s.gethManager.VerifyAccountPassword(api.s.Config().KeyStoreDir, address.Hex(), password)
+	if err != nil {
+		return "", err
+	}
+
+	return api.s.transactionManager.SignMessage(message, selectedAccount)
 }
 
 func (api *API) BuildTransaction(ctx context.Context, chainID uint64, sendTxArgsJSON string) (response *transfer.TxResponse, err error) {
@@ -574,7 +581,32 @@ func (api *API) SendTransactionWithSignature(ctx context.Context, chainID uint64
 
 func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionCommand *transfer.MultiTransactionCommand, data []*bridge.TransactionBridge, password string) (*transfer.MultiTransactionCommandResult, error) {
 	log.Debug("[WalletAPI:: CreateMultiTransaction] create multi transaction")
-	return api.s.transactionManager.CreateMultiTransactionFromCommand(ctx, multiTransactionCommand, data, api.router.bridges, password)
+
+	cmd, err := api.s.transactionManager.CreateMultiTransactionFromCommand(ctx, multiTransactionCommand, data)
+	if err != nil {
+		return nil, err
+	}
+
+	if password != "" {
+		selectedAccount, err := api.getVerifiedWalletAccount(multiTransactionCommand.FromAddress.Hex(), password)
+		if err != nil {
+			return nil, err
+		}
+
+		cmdRes, err := api.s.transactionManager.SendTransactions(ctx, cmd, data, api.router.bridges, selectedAccount)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = api.s.transactionManager.InsertMultiTransaction(cmd)
+		if err != nil {
+			return nil, err
+		}
+
+		return cmdRes, nil
+	}
+
+	return nil, api.s.transactionManager.SendTransactionForSigningToKeycard(ctx, cmd, data, api.router.bridges)
 }
 
 func (api *API) ProceedWithTransactionsSignatures(ctx context.Context, signatures map[string]transfer.SignatureDetails) (*transfer.MultiTransactionCommandResult, error) {
@@ -739,4 +771,29 @@ func (api *API) WCAuthRequest(ctx context.Context, address common.Address, authM
 	log.Debug("wallet.api.wc.AuthRequest", "address", address, "authMessage", authMessage)
 
 	return api.s.walletConnect.AuthRequest(address, authMessage)
+}
+
+func (api *API) getVerifiedWalletAccount(address, password string) (*account.SelectedExtKey, error) {
+	exists, err := api.s.accountsDB.AddressExists(types.HexToAddress(address))
+	if err != nil {
+		log.Error("failed to query db for a given address", "address", address, "error", err)
+		return nil, err
+	}
+
+	if !exists {
+		log.Error("failed to get a selected account", "err", transactions.ErrInvalidTxSender)
+		return nil, transactions.ErrAccountDoesntExist
+	}
+
+	keyStoreDir := api.s.Config().KeyStoreDir
+	key, err := api.s.gethManager.VerifyAccountPassword(keyStoreDir, address, password)
+	if err != nil {
+		log.Error("failed to verify account", "account", address, "error", err)
+		return nil, err
+	}
+
+	return &account.SelectedExtKey{
+		Address:    key.Address,
+		AccountKey: key,
+	}, nil
 }

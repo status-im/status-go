@@ -201,6 +201,7 @@ func NewService(
 		blockChainState:       blockChainState,
 		keycardPairings:       NewKeycardPairings(),
 		walletConnect:         walletconnect,
+		config:                config,
 	}
 }
 
@@ -235,6 +236,7 @@ type Service struct {
 	blockChainState       *blockchainstate.BlockChainState
 	keycardPairings       *KeycardPairings
 	walletConnect         *walletconnect.Service
+	config                *params.NodeConfig
 }
 
 // Start signals transmitter.
@@ -292,4 +294,8 @@ func (s *Service) IsStarted() bool {
 
 func (s *Service) KeycardPairings() *KeycardPairings {
 	return s.keycardPairings
+}
+
+func (s *Service) Config() *params.NodeConfig {
+	return s.config
 }

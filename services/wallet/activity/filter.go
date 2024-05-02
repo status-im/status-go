@@ -152,7 +152,7 @@ func GetRecipients(ctx context.Context, db *sql.DB, chainIDs []common.ChainID, a
 	return entries, hasMore, nil
 }
 
-func GetOldestTimestamp(ctx context.Context, db *sql.DB, addresses []eth.Address) (timestamp int64, err error) {
+func GetOldestTimestamp(ctx context.Context, db *sql.DB, addresses []eth.Address) (timestamp uint64, err error) {
 	filterAllAddresses := len(addresses) == 0
 	involvedAddresses := noEntriesInTmpTableSQLValues
 	if !filterAllAddresses {
