@@ -1092,8 +1092,12 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 	return newPrivilegedRoles, m.saveAndPublish(community)
 }
 
-func (m *Manager) ReevaluateMembersPeriodically(communityID types.HexBytes) {
+func (m *Manager) StartMembersReevaluationLoop(communityID types.HexBytes, reevaluateOnStart bool) {
 	logger := m.logger.Named("reevaluate members loop").With(zap.String("communityID", communityID.String()))
+	go m.reevaluateMembersLoop(communityID, reevaluateOnStart)
+}
+
+func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOnStart bool) {
 
 	if _, exists := m.membersReevaluationTasks.Load(communityID.String()); exists {
 		return
@@ -1127,24 +1131,27 @@ func (m *Manager) ReevaluateMembersPeriodically(communityID types.HexBytes) {
 			return nil
 		}
 
-		if task.lastSuccessTime.Before(time.Now().Add(-memberPermissionsCheckInterval)) ||
-			task.lastSuccessTime.Before(task.onDemandRequestTime) {
-			community, err := m.GetByID(communityID)
-			if err != nil {
-				if err == ErrOrgNotFound {
-					return criticalError{
-						error: err,
-					}
-				}
-				return err
-			}
-
-			err = m.ReevaluateCommunityMembersPermissions(community)
-			if err != nil {
-				return err
-			}
-			task.lastSuccessTime = time.Now()
+		if !task.lastSuccessTime.Before(time.Now().Add(-memberPermissionsCheckInterval)) &&
+			!task.lastSuccessTime.Before(task.onDemandRequestTime) {
+			return nil
 		}
+
+		community, err := m.GetByID(communityID)
+		if err != nil {
+			if errors.Is(err, ErrOrgNotFound) {
+				return criticalError{
+					error: err,
+				}
+			}
+			return err
+		}
+
+		err = m.reevaluateCommunityMembersPermissions(community)
+		if err != nil {
+			return err
+		}
+
+		task.lastSuccessTime = time.Now()
 		return nil
 	}
 
@@ -1154,16 +1161,24 @@ func (m *Manager) ReevaluateMembersPeriodically(communityID types.HexBytes) {
 	logger.Debug("loop started")
 	defer logger.Debug("loop stopped")
 
+	reevaluate := reevaluateOnStart
+
 	for {
-		select {
-		case <-ticker.C:
+		if reevaluate {
 			err := reevaluateMembers()
 			if err != nil {
 				logger.Error("reevaluation failed", zap.Error(err))
-				if _, isCritical := err.(*criticalError); isCritical {
+				var criticalError *criticalError
+				if errors.As(err, &criticalError) {
 					return
 				}
 			}
+		}
+
+		select {
+		case <-ticker.C:
+			reevaluate = true
+			continue
 
 		case <-m.quit:
 			return
@@ -1210,7 +1225,7 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 	return community, changes, nil
 }
 
-func (m *Manager) ReevaluateCommunityMembersPermissions(community *Community) error {
+func (m *Manager) reevaluateCommunityMembersPermissions(community *Community) error {
 	if community == nil {
 		return ErrOrgNotFound
 	}

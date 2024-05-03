@@ -820,7 +820,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 
 	for _, c := range controlledCommunities {
 		if c.Joined() && c.HasTokenPermissions() {
-			go m.communitiesManager.ReevaluateMembersPeriodically(c.ID())
+			go m.communitiesManager.StartMembersReevaluationLoop(c.ID(), false)
 		}
 	}
 
