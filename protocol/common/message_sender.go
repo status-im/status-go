@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"sync"
 	"time"
 
@@ -294,7 +295,8 @@ func (s *MessageSender) sendCommunity(
 	ctx context.Context,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
-	s.logger.Debug("sending community message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(&rawMessage.Sender.PublicKey))))
+	s.logger.Debug("sending community message",
+		zap.String("recipient", PubkeyToHex(&rawMessage.Sender.PublicKey)))
 
 	// Set sender
 	if rawMessage.Sender == nil {
@@ -335,7 +337,11 @@ func (s *MessageSender) sendCommunity(
 
 			for i, spec := range keyExMessageSpecs {
 				recipient := rawMessage.Recipients[i]
-				_, _, err = s.sendMessageSpec(ctx, recipient, spec, [][]byte{messageID})
+				specHashes, _, err := s.sendMessageSpec(ctx, recipient, spec, [][]byte{messageID})
+				s.logger.Debug("<<< sendCommunityMessage",
+					zap.Any("hashes", types.EncodeHexes(specHashes)),
+					zap.Error(err),
+				)
 				if err != nil {
 					return nil, err
 				}
@@ -349,7 +355,12 @@ func (s *MessageSender) sendCommunity(
 	}
 
 	// If it's a chat message, we send it on the community chat topic
-	if ShouldCommunityMessageBeEncrypted(rawMessage.MessageType) {
+	encrypted := ShouldCommunityMessageBeEncrypted(rawMessage.MessageType)
+
+	if encrypted {
+		s.logger.Debug("<<< calling BuildHashRatchetMessage",
+			zap.String("messageID", messageID.String()))
+
 		messageSpec, err := s.protocol.BuildHashRatchetMessage(rawMessage.HashRatchetGroupID, wrappedMessage)
 		if err != nil {
 			return nil, err
@@ -384,7 +395,12 @@ func (s *MessageSender) sendCommunity(
 		}
 	}
 
-	s.logger.Debug("sent community message ", zap.String("messageID", messageID.String()), zap.Strings("hashes", types.EncodeHexes(hashes)))
+	s.logger.Debug("sent community message",
+		zap.Bool("encrypted", encrypted),
+		zap.String("messageID", messageID.String()),
+		zap.Strings("hashes", types.EncodeHexes(hashes)),
+	)
+
 	s.transport.Track(messageID, hashes, newMessages)
 
 	return messageID, nil
@@ -574,6 +590,12 @@ func (s *MessageSender) EncodeAbridgedMembershipUpdate(
 }
 
 func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMessage *RawMessage, wrappedMessage []byte, rekey bool) ([][]byte, []*types.NewMessage, error) {
+	s.logger.Debug("<<< dispatchCommunityChatMessage",
+		zap.String("messageID", rawMessage.ID),
+		zap.Bool("rekey", rekey),
+		zap.String("HashRatchetGroupID", hexutil.Encode(rawMessage.HashRatchetGroupID)),
+	)
+
 	payload := wrappedMessage
 	var err error
 	if rekey && len(rawMessage.HashRatchetGroupID) != 0 {
@@ -808,6 +830,10 @@ func (s *MessageSender) HandleMessages(wakuMessage *types.Message) (*HandleMessa
 		if err != nil {
 			return nil, err
 		}
+
+		logger.Debug("<<< handling queued hash ratchet messages",
+			zap.Int("count", len(messages)),
+		)
 
 		var processedIds [][]byte
 		for _, message := range messages {

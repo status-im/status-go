@@ -3,6 +3,8 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -13,6 +15,7 @@ import (
 type CommunitiesKeyDistributorImpl struct {
 	sender    *common.MessageSender
 	encryptor *encryption.Protocol
+	logger    *zap.Logger
 }
 
 func (ckd *CommunitiesKeyDistributorImpl) Generate(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
@@ -97,7 +100,21 @@ func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(community *comm
 		HashRatchetGroupID:    hashRatchetGroupID,
 		PubsubTopic:           community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
-	_, err := ckd.sender.SendCommunityMessage(context.Background(), &rawMessage)
+	messageID, err := ckd.sender.SendCommunityMessage(context.Background(), &rawMessage)
+
+	pubkeyStrings := make([]string, len(pubkeys))
+	for i, pubkey := range pubkeys {
+		pubkeyStrings[i] = common.PubkeyToHex(pubkey)
+	}
+
+	ckd.logger.Debug("<<< sendKeyExchangeMessage",
+		zap.Any("messageID", hex.EncodeToString(messageID)),
+		zap.Any("err", err),
+		zap.Any("msgType", msgType),
+		zap.Any("communityID", community.IDString()),
+		zap.Any("hashRatchetGroupID", hex.EncodeToString(hashRatchetGroupID)),
+		zap.Any("pubkeys", pubkeyStrings),
+	)
 
 	if err != nil {
 		return err

@@ -760,7 +760,9 @@ func (p *Protocol) HandleMessage(
 	}
 
 	// Process bundles
-	for _, bundle := range protocolMessage.GetBundles() {
+	for i, bundle := range protocolMessage.GetBundles() {
+		p.logger.Debug("processing bundle", zap.Int("index", i))
+
 		// Should we stop processing if the bundle cannot be verified?
 		newInstallations, err := p.ProcessPublicBundle(myIdentityKey, bundle)
 		if err != nil {
@@ -771,6 +773,8 @@ func (p *Protocol) HandleMessage(
 
 	// Check if it's a public message
 	if publicMessage := protocolMessage.GetPublicMessage(); publicMessage != nil {
+		p.logger.Debug("received a public message")
+
 		// Nothing to do, as already in cleartext
 		response.DecryptedMessage = publicMessage
 		return response, nil
@@ -778,6 +782,8 @@ func (p *Protocol) HandleMessage(
 
 	// Decrypt message
 	if encryptedMessage := protocolMessage.GetEncryptedMessage(); encryptedMessage != nil {
+		p.logger.Debug("received an encrypted message")
+
 		message, err := p.encryptor.DecryptPayload(
 			myIdentityKey,
 			theirPublicKey,

@@ -1441,6 +1441,7 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 }
 
 func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessage) (*MessengerResponse, error) {
+	m.logger.Debug("handling archive messages", zap.Int("count", len(archiveMessages)))
 
 	messagesToHandle := make(map[transport.Filter][]*types.Message)
 

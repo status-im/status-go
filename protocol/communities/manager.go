@@ -336,6 +336,7 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 
 	manager.persistence = &Persistence{
 		db:                      db,
+		logger:                  logger,
 		recordBundleToCommunity: manager.dbRecordBundleToCommunity,
 	}
 
@@ -920,6 +921,7 @@ func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommuni
 		return nil, nil, err
 	}
 
+	m.logger.Debug("<<< CreateCommunityTokenPermission -> saveAndPublish")
 	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
@@ -1109,10 +1111,13 @@ func (m *Manager) StartMembersReevaluationLoop(communityID types.HexBytes, reeva
 }
 
 func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOnStart bool) {
+	logger := m.logger.With(zap.String("communityID", communityID.String()))
 
 	if _, exists := m.membersReevaluationTasks.Load(communityID.String()); exists {
+		logger.Debug("<<< reevaluateMembersLoop: task already exists")
 		return
 	}
+	logger.Debug("<<< reevaluateMembersLoop starting", zap.Bool("reevaluateOnStart", reevaluateOnStart))
 
 	m.membersReevaluationTasks.Store(communityID.String(), &membersReevaluationTask{})
 	defer m.membersReevaluationTasks.Delete(communityID.String())
@@ -1137,13 +1142,21 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 		task.mutex.Lock()
 		defer task.mutex.Unlock()
 
-		// Ensure reevaluation is performed not more often than once per minute.
+		logger.Debug("<<< reevaluateMembers",
+			zap.String("communityID", communityID.String()),
+			zap.Any("lastSuccessTime", task.lastSuccessTime),
+			zap.Any("onDemandRequestTime", task.onDemandRequestTime),
+		)
+
+		// Ensure reevaluation is performed not more often than once per minute
 		if task.lastSuccessTime.After(time.Now().Add(-1 * time.Minute)) {
+			logger.Debug("<<< reevaluateMembers: skipping as too frequent")
 			return nil
 		}
 
 		if !task.lastSuccessTime.Before(time.Now().Add(-memberPermissionsCheckInterval)) &&
 			!task.lastSuccessTime.Before(task.onDemandRequestTime) {
+			logger.Debug("<<< reevaluateMembers: skipping as not enough time passed")
 			return nil
 		}
 
@@ -3676,6 +3689,14 @@ func (m *Manager) IsChannelEncrypted(communityID string, chatID string) (bool, e
 	}
 
 	channelID := strings.TrimPrefix(chatID, communityID)
+
+	m.logger.Debug("<<< IsChannelEncrypted",
+		zap.String("chatID", chatID),
+		zap.String("communityID", communityID),
+		zap.String("channelID", channelID),
+		zap.Any("community", community),
+	)
+
 	return community.ChannelEncrypted(channelID), nil
 }
 
@@ -4550,6 +4571,10 @@ func (m *Manager) ExtractMessagesFromHistoryArchive(communityID types.HexBytes, 
 	archive := &protobuf.WakuMessageArchive{}
 
 	err = proto.Unmarshal(data, archive)
+	m.logger.Debug("<<< unmarshalled archive message",
+		zap.Bool("encrypted", err != nil),
+	)
+
 	if err != nil {
 		// The archive data might eb encrypted so we try to decrypt instead first
 		var protocolMessage encryption.ProtocolMessage

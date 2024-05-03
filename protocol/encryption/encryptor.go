@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"sync"
 	"time"
 
@@ -90,7 +92,7 @@ func newEncryptor(db *sql.DB, config encryptorConfig) *encryptor {
 		persistence: newSQLitePersistence(db),
 		config:      config,
 		messageIDs:  make(map[string]*confirmationData),
-		logger:      config.Logger.With(zap.Namespace("encryptor")),
+		logger:      config.Logger.Named("encryptor"),
 	}
 }
 
@@ -251,6 +253,18 @@ func (s *encryptor) GetMessage(msgs map[string]*EncryptedMessageProtocol) *Encry
 func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirInstallationID string, msgs map[string]*EncryptedMessageProtocol, messageID []byte) ([]byte, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	s.logger.Debug("<<< DecryptPayload",
+		zap.Any("messageID", hex.EncodeToString(messageID)),
+	)
+
+	for i, msg := range msgs {
+		s.logger.Debug(fmt.Sprintf("msg[%s]", i),
+			zap.Uint32("seqNo", msg.GetHRHeader().GetSeqNo()),
+			zap.String("groupID", hexutil.Encode(msg.GetHRHeader().GetGroupId())),
+			zap.String("keyID", hexutil.Encode(msg.GetHRHeader().GetKeyId())),
+		)
+	}
 
 	msg := s.GetMessage(msgs)
 
@@ -644,13 +658,14 @@ func (s *encryptor) GenerateHashRatchetKey(groupID []byte) (*HashRatchetKeyCompa
 func (s *encryptor) EncryptHashRatchetPayload(ratchet *HashRatchetKeyCompatibility, payload []byte) (map[string]*EncryptedMessageProtocol, error) {
 	logger := s.logger.With(
 		zap.String("site", "EncryptHashRatchetPayload"),
-		zap.Any("group-id", ratchet.GroupID),
-		zap.Any("key-id", ratchet.keyID))
+		zap.String("groupID", hexutil.Encode(ratchet.GroupID)),
+		zap.String("keyID", hexutil.Encode(ratchet.keyID)),
+	)
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	logger.Debug("encrypting hash ratchet message")
+	logger.Debug("<<< encrypting hash ratchet message")
 	encryptedPayload, newSeqNo, err := s.EncryptWithHR(ratchet, payload)
 	if err != nil {
 		return nil, err
@@ -712,6 +727,10 @@ func (s *encryptor) EncryptWithHR(ratchet *HashRatchetKeyCompatibility, payload 
 }
 
 func (s *encryptor) DecryptWithHR(ratchet *HashRatchetKeyCompatibility, seqNo uint32, payload []byte) ([]byte, error) {
+	s.logger.Debug("decrypting hash ratchet message",
+		zap.Any("seq-no", seqNo),
+	)
+
 	// Key exchange message, nothing to decrypt
 	if seqNo == 0 {
 		return payload, nil

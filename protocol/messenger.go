@@ -480,6 +480,7 @@ func NewMessenger(
 	communitiesKeyDistributor := &CommunitiesKeyDistributorImpl{
 		sender:    sender,
 		encryptor: encryptionProtocol,
+		logger:    logger.Named("communitiesKeyDistributor"),
 	}
 
 	communitiesManager, err := communities.NewManager(identity, installationID, database, encryptionProtocol, logger, ensVerifier, c.communityTokensService, transp, transp, communitiesKeyDistributor, c.torrentConfig, managerOptions...)
@@ -1376,6 +1377,9 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption
 				}
 
 			case keys := <-subscriptions.NewHashRatchetKeys:
+				m.logger.Debug("received new hash ratchet keys",
+					zap.Int("keys", len(keys)),
+				)
 				if m.communitiesManager == nil {
 					continue
 				}
@@ -2170,6 +2174,13 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			return rawMessage, err
 		}
 		isEncrypted := isCommunityEncrypted || isChannelEncrypted
+
+		logger.Debug("<<< dispatchMessage",
+			zap.Bool("isEncrypted", isEncrypted),
+			zap.Bool("isChannelEncrypted", isChannelEncrypted),
+			zap.String("messageID", rawMessage.ID),
+		)
+
 		if !isEncrypted {
 			id, err = m.sender.SendPublic(ctx, chat.ID, rawMessage)
 			if err != nil {
@@ -3842,7 +3853,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 				senderID := contactIDFromPublicKey(publicKey)
 				ownID := contactIDFromPublicKey(m.IdentityPublicKey())
-				m.logger.Info("processing message", zap.Any("type", msg.ApplicationLayer.Type), zap.String("senderID", senderID))
+				logger.Info("processing message",
+					zap.Any("type", msg.ApplicationLayer.Type),
+					zap.String("senderID", senderID))
 
 				if senderID == ownID {
 					// Skip own messages of certain types

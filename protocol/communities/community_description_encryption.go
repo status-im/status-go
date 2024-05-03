@@ -82,7 +82,9 @@ func decryptDescription(id types.HexBytes, encryptor DescriptionEncryptor, descr
 		}
 		if err != nil {
 			// ignore error, try to decrypt next data
-			logger.Debug("failed to decrypt community private data", zap.String("keyIDSeqNo", keyIDSeqNo), zap.Error(err))
+			logger.Debug("failed to decrypt community private data",
+				zap.String("keyIDSeqNo", keyIDSeqNo),
+				zap.Error(err))
 			continue
 		}
 		decryptedDescription := decryptedDescriptionResponse.Description

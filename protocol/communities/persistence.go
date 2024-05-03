@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"go.uber.org/zap"
+
 	"math/big"
 	"strconv"
 	"strings"
@@ -24,7 +26,8 @@ import (
 )
 
 type Persistence struct {
-	db *sql.DB
+	db     *sql.DB
+	logger *zap.Logger
 
 	recordBundleToCommunity func(*CommunityRecordBundle) (*Community, error)
 }
@@ -187,6 +190,11 @@ func (p *Persistence) saveCommunity(r *CommunityRecord) error {
 }
 
 func (p *Persistence) SaveCommunity(community *Community) error {
+	p.logger.Error("<<< SaveCommunity",
+		zap.Uint64("clock", community.Clock()),
+		zap.String("communityID", community.IDString()),
+		zap.Any("community", community),
+	)
 	record, err := communityToRecord(community)
 	if err != nil {
 		return err
