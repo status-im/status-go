@@ -36,17 +36,17 @@ func setupBenchmark(b *testing.B, accountsCount int, inMemory bool) (deps Filter
 	}
 
 	i := 0
-	multiTxs := make([]transfer.TestMultiTransaction, mtSendCount+mtSwapCount+mtBridgeCount)
+	multiTxs := make([]transfer.MultiTransaction, mtSendCount+mtSwapCount+mtBridgeCount)
 	for ; i < mtSendCount; i++ {
 		multiTxs[i] = transfer.GenerateTestSendMultiTransaction(trs[i])
 		trs[i].From = accounts[i%len(accounts)]
 		multiTxs[i].FromAddress = trs[i].From
 		// Currently the network ID is not filled in for send transactions
-		multiTxs[i].FromNetworkID = nil
-		multiTxs[i].ToNetworkID = nil
+		multiTxs[i].FromNetworkID = 0
+		multiTxs[i].ToNetworkID = 0
 
-		multiTxs[i].MultiTransactionID = transfer.InsertTestMultiTransaction(b, deps.db, &multiTxs[i])
-		trs[i].MultiTransactionID = multiTxs[i].MultiTransactionID
+		multiTxs[i].ID = transfer.InsertTestMultiTransaction(b, deps.db, &multiTxs[i])
+		trs[i].MultiTransactionID = multiTxs[i].ID
 	}
 
 	for j := 0; j < mtSwapCount; i, j = i+1, j+1 {
@@ -54,8 +54,8 @@ func setupBenchmark(b *testing.B, accountsCount int, inMemory bool) (deps Filter
 		trs[i].From = accounts[i%len(accounts)]
 		multiTxs[i].FromAddress = trs[i].From
 
-		multiTxs[i].MultiTransactionID = transfer.InsertTestMultiTransaction(b, deps.db, &multiTxs[i])
-		trs[i].MultiTransactionID = multiTxs[i].MultiTransactionID
+		multiTxs[i].ID = transfer.InsertTestMultiTransaction(b, deps.db, &multiTxs[i])
+		trs[i].MultiTransactionID = multiTxs[i].ID
 	}
 
 	for mtIdx := 0; mtIdx < mtBridgeCount; i, mtIdx = i+2, mtIdx+1 {
@@ -68,9 +68,9 @@ func setupBenchmark(b *testing.B, accountsCount int, inMemory bool) (deps Filter
 		multiTxs[mtIdx].ToAddress = trs[secondTrIdx].To
 		multiTxs[mtIdx].FromAddress = trs[i].From
 
-		multiTxs[mtIdx].MultiTransactionID = transfer.InsertTestMultiTransaction(b, deps.db, &multiTxs[mtIdx])
-		trs[firstTrIdx].MultiTransactionID = multiTxs[mtIdx].MultiTransactionID
-		trs[secondTrIdx].MultiTransactionID = multiTxs[mtIdx].MultiTransactionID
+		multiTxs[mtIdx].ID = transfer.InsertTestMultiTransaction(b, deps.db, &multiTxs[mtIdx])
+		trs[firstTrIdx].MultiTransactionID = multiTxs[mtIdx].ID
+		trs[secondTrIdx].MultiTransactionID = multiTxs[mtIdx].ID
 	}
 
 	for i = 0; i < transactionCount-pendingCount; i++ {

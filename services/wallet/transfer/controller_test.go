@@ -35,6 +35,7 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	accountFeed := &event.Feed{}
 
 	bcstate := blockchainstate.NewBlockChainState()
+	SetMultiTransactionIDGenerator(StaticIDCounter()) // to have different multi-transaction IDs even with fast execution
 	transactionManager := NewTransactionManager(walletDB, nil, nil, nil, accountsDB, nil, nil)
 	c := NewTransferController(
 		walletDB,
