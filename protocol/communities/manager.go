@@ -743,7 +743,7 @@ func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []string) (*Kn
 		}
 
 		community, err := m.GetByID(types.HexBytes(communityIDBytes))
-		if err != nil {
+		if err != nil && err != ErrOrgNotFound {
 			return nil, err
 		}
 
