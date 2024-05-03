@@ -96,6 +96,7 @@ func setupTestActivityDBStorageChoice(tb testing.TB, inMemory bool) (deps Filter
 }
 
 func setupTestActivityDB(tb testing.TB) (deps FilterDependencies, close func()) {
+	transfer.SetMultiTransactionIDGenerator(transfer.StaticIDCounter()) // to have different multi-transaction IDs even with fast execution
 	return setupTestActivityDBStorageChoice(tb, true)
 }
 
@@ -108,10 +109,10 @@ type testData struct {
 	multiTx2Tr2       transfer.TestTransfer // index 6, SNT/Mainnet
 	multiTx2PendingTr transfer.TestTransfer // index 7, DAI/Mainnet
 
-	multiTx1   transfer.TestMultiTransaction
+	multiTx1   transfer.MultiTransaction
 	multiTx1ID common.MultiTransactionIDType
 
-	multiTx2   transfer.TestMultiTransaction
+	multiTx2   transfer.MultiTransaction
 	multiTx2ID common.MultiTransactionIDType
 
 	nextIndex int
@@ -136,7 +137,7 @@ func fillTestData(t *testing.T, db *sql.DB) (td testData, fromAddresses, toAddre
 	td.multiTx1Tr2 = trs[4]
 
 	td.multiTx1 = transfer.GenerateTestSendMultiTransaction(td.multiTx1Tr1)
-	td.multiTx1.ToToken = testutils.DaiSymbol
+	td.multiTx1.ToAsset = testutils.DaiSymbol
 	td.multiTx1ID = transfer.InsertTestMultiTransaction(t, db, &td.multiTx1)
 
 	td.multiTx1Tr1.MultiTransactionID = td.multiTx1ID
@@ -151,7 +152,8 @@ func fillTestData(t *testing.T, db *sql.DB) (td testData, fromAddresses, toAddre
 	td.multiTx2PendingTr = trs[6]
 
 	td.multiTx2 = transfer.GenerateTestSendMultiTransaction(td.multiTx2Tr1)
-	td.multiTx2.ToToken = testutils.SntSymbol
+	td.multiTx2.ToAsset = testutils.SntSymbol
+
 	td.multiTx2ID = transfer.InsertTestMultiTransaction(t, db, &td.multiTx2)
 
 	td.multiTx2Tr1.MultiTransactionID = td.multiTx2ID
@@ -250,13 +252,13 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		payloadType:    MultiTransactionPT,
 		transaction:    nil,
 		id:             td.multiTx1ID,
-		timestamp:      td.multiTx1.Timestamp,
+		timestamp:      int64(td.multiTx1.Timestamp),
 		activityType:   SendAT,
 		activityStatus: FinalizedAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1.FromAmount)),
-		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx1.ToAmount)),
-		tokenOut:       tokenFromSymbol(nil, td.multiTx1.FromToken),
-		tokenIn:        tokenFromSymbol(nil, td.multiTx1.ToToken),
+		amountOut:      td.multiTx1.FromAmount,
+		amountIn:       td.multiTx1.ToAmount,
+		tokenOut:       tokenFromSymbol(nil, td.multiTx1.FromAsset),
+		tokenIn:        tokenFromSymbol(nil, td.multiTx1.ToAsset),
 		symbolOut:      common.NewAndSet("USDC"),
 		symbolIn:       common.NewAndSet("DAI"),
 		sender:         &td.multiTx1.FromAddress,
@@ -266,15 +268,15 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		payloadType:    MultiTransactionPT,
 		transaction:    nil,
 		id:             td.multiTx2ID,
-		timestamp:      td.multiTx2.Timestamp,
+		timestamp:      int64(td.multiTx2.Timestamp),
 		activityType:   SendAT,
 		activityStatus: PendingAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx2.FromAmount)),
-		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx2.ToAmount)),
+		amountOut:      td.multiTx2.FromAmount,
+		amountIn:       td.multiTx2.ToAmount,
 		symbolOut:      common.NewAndSet("USDC"),
 		symbolIn:       common.NewAndSet("SNT"),
-		tokenOut:       tokenFromSymbol(nil, td.multiTx2.FromToken),
-		tokenIn:        tokenFromSymbol(nil, td.multiTx2.ToToken),
+		tokenOut:       tokenFromSymbol(nil, td.multiTx2.FromAsset),
+		tokenIn:        tokenFromSymbol(nil, td.multiTx2.ToAsset),
 		sender:         &td.multiTx2.FromAddress,
 		recipient:      &td.multiTx2.ToAddress,
 	}, entries[0])
@@ -331,43 +333,44 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 
 	// Test start only
 	var filter Filter
-	filter.Period.StartTimestamp = td.multiTx1.Timestamp
+	filter.Period.StartTimestamp = int64(td.multiTx1.Timestamp)
 	filter.Period.EndTimestamp = NoLimitTimestampForPeriod
 	entries, err := getActivityEntries(context.Background(), deps, allAddresses, true, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 8, len(entries))
 
+	const simpleTrIndex = 5
 	// Check start and end content
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: trs[5].ChainID, Hash: trs[5].Hash, Address: trs[5].To},
+		transaction:    &transfer.TransactionIdentity{ChainID: trs[simpleTrIndex].ChainID, Hash: trs[simpleTrIndex].Hash, Address: trs[simpleTrIndex].To},
 		id:             0,
-		timestamp:      trs[5].Timestamp,
+		timestamp:      trs[simpleTrIndex].Timestamp,
 		activityType:   ReceiveAT,
 		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(0)),
-		amountIn:       (*hexutil.Big)(big.NewInt(trs[5].Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(trs[simpleTrIndex].Value)),
 		tokenOut:       nil,
-		tokenIn:        TTrToToken(t, &trs[5].TestTransaction),
+		tokenIn:        TTrToToken(t, &trs[simpleTrIndex].TestTransaction),
 		symbolOut:      nil,
 		symbolIn:       common.NewAndSet("USDC"),
-		sender:         &trs[5].From,
-		recipient:      &trs[5].To,
+		sender:         &trs[simpleTrIndex].From,
+		recipient:      &trs[simpleTrIndex].To,
 		chainIDOut:     nil,
-		chainIDIn:      &trs[5].ChainID,
-		transferType:   expectedTokenType(trs[5].Token.Address),
+		chainIDIn:      &trs[simpleTrIndex].ChainID,
+		transferType:   expectedTokenType(trs[simpleTrIndex].Token.Address),
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
 		transaction:    nil,
 		id:             td.multiTx1ID,
-		timestamp:      td.multiTx1.Timestamp,
+		timestamp:      int64(td.multiTx1.Timestamp),
 		activityType:   SendAT,
 		activityStatus: FinalizedAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1.FromAmount)),
-		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx1.ToAmount)),
-		tokenOut:       tokenFromSymbol(nil, td.multiTx1.FromToken),
-		tokenIn:        tokenFromSymbol(nil, td.multiTx1.ToToken),
+		amountOut:      td.multiTx1.FromAmount,
+		amountIn:       td.multiTx1.ToAmount,
+		tokenOut:       tokenFromSymbol(nil, td.multiTx1.FromAsset),
+		tokenIn:        tokenFromSymbol(nil, td.multiTx1.ToAsset),
 		symbolOut:      common.NewAndSet("USDC"),
 		symbolIn:       common.NewAndSet("DAI"),
 		sender:         &td.multiTx1.FromAddress,
@@ -407,13 +410,13 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		payloadType:    MultiTransactionPT,
 		transaction:    nil,
 		id:             td.multiTx1ID,
-		timestamp:      td.multiTx1.Timestamp,
+		timestamp:      int64(td.multiTx1.Timestamp),
 		activityType:   SendAT,
 		activityStatus: FinalizedAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1.FromAmount)),
-		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx1.ToAmount)),
-		tokenOut:       tokenFromSymbol(nil, td.multiTx1.FromToken),
-		tokenIn:        tokenFromSymbol(nil, td.multiTx1.ToToken),
+		amountOut:      td.multiTx1.FromAmount,
+		amountIn:       td.multiTx1.ToAmount,
+		tokenOut:       tokenFromSymbol(nil, td.multiTx1.FromAsset),
+		tokenIn:        tokenFromSymbol(nil, td.multiTx1.ToAsset),
 		symbolOut:      common.NewAndSet("USDC"),
 		symbolIn:       common.NewAndSet("DAI"),
 		sender:         &td.multiTx1.FromAddress,
@@ -632,7 +635,7 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 	// Adds 4 extractable transactions
 	td, tdFromAdds, tdToAddrs := fillTestData(t, deps.db)
 	// Add 5 extractable transactions: one MultiTransactionSwap, two MultiTransactionBridge and two MultiTransactionSend
-	multiTxs := make([]transfer.TestMultiTransaction, 5)
+	multiTxs := make([]transfer.MultiTransaction, 5)
 	trs, fromAddrs, toAddrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, len(multiTxs)*2)
 	multiTxs[0] = transfer.GenerateTestBridgeMultiTransaction(trs[0], trs[1])
 	multiTxs[1] = transfer.GenerateTestSwapMultiTransaction(trs[2], testutils.SntSymbol, 100) // trs[3]
@@ -874,13 +877,13 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 		payloadType:    MultiTransactionPT,
 		transaction:    nil,
 		id:             td.multiTx2ID,
-		timestamp:      td.multiTx2.Timestamp,
+		timestamp:      int64(td.multiTx2.Timestamp),
 		activityType:   SendAT,
 		activityStatus: PendingAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx2.FromAmount)),
-		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx2.ToAmount)),
-		tokenOut:       tokenFromSymbol(nil, td.multiTx2.FromToken),
-		tokenIn:        tokenFromSymbol(nil, td.multiTx2.ToToken),
+		amountOut:      td.multiTx2.FromAmount,
+		amountIn:       td.multiTx2.ToAmount,
+		tokenOut:       tokenFromSymbol(nil, td.multiTx2.FromAsset),
+		tokenIn:        tokenFromSymbol(nil, td.multiTx2.ToAsset),
 		symbolOut:      common.NewAndSet("USDC"),
 		symbolIn:       common.NewAndSet("SNT"),
 		sender:         &td.multiTx2.FromAddress,
@@ -1206,14 +1209,14 @@ func TestGetActivityEntriesFilterByNetworksOfSubTransactions(t *testing.T) {
 	trs[2].ChainID = 1233
 	mt1 := transfer.GenerateTestBridgeMultiTransaction(trs[0], trs[1])
 	trs[0].MultiTransactionID = transfer.InsertTestMultiTransaction(t, deps.db, &mt1)
-	trs[1].MultiTransactionID = mt1.MultiTransactionID
-	trs[2].MultiTransactionID = mt1.MultiTransactionID
+	trs[1].MultiTransactionID = mt1.ID
+	trs[2].MultiTransactionID = mt1.ID
 
 	trs[3].ChainID = 1234
 	mt2 := transfer.GenerateTestSwapMultiTransaction(trs[3], testutils.SntSymbol, 100)
 	// insertMultiTransaction will insert 0 instead of NULL
-	mt2.FromNetworkID = common.NewAndSet(uint64(0))
-	mt2.ToNetworkID = common.NewAndSet(uint64(0))
+	mt2.FromNetworkID = 0
+	mt2.ToNetworkID = 0
 	trs[3].MultiTransactionID = transfer.InsertTestMultiTransaction(t, deps.db, &mt2)
 
 	for i := range trs {
@@ -1234,20 +1237,20 @@ func TestGetActivityEntriesFilterByNetworksOfSubTransactions(t *testing.T) {
 	entries, err = getActivityEntries(context.Background(), deps, toTrs, false, chainIDs, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(entries))
-	require.Equal(t, entries[0].id, mt1.MultiTransactionID)
+	require.Equal(t, entries[0].id, mt1.ID)
 
 	// Filter by pending_transactions sub-transacitons
 	chainIDs = []common.ChainID{trs[2].ChainID}
 	entries, err = getActivityEntries(context.Background(), deps, toTrs, false, chainIDs, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(entries))
-	require.Equal(t, entries[0].id, mt1.MultiTransactionID)
+	require.Equal(t, entries[0].id, mt1.ID)
 
 	chainIDs = []common.ChainID{trs[3].ChainID}
 	entries, err = getActivityEntries(context.Background(), deps, toTrs, false, chainIDs, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(entries))
-	require.Equal(t, entries[0].id, mt2.MultiTransactionID)
+	require.Equal(t, entries[0].id, mt2.ID)
 }
 
 func TestGetActivityEntriesCheckToAndFrom(t *testing.T) {
@@ -1366,11 +1369,11 @@ func TestGetMultiTxDetails(t *testing.T) {
 	_, err := getMultiTxDetails(context.Background(), deps.db, 0)
 	require.EqualError(t, err, "invalid tx id")
 
-	details, err := getMultiTxDetails(context.Background(), deps.db, int(td.multiTx1.MultiTransactionID))
+	details, err := getMultiTxDetails(context.Background(), deps.db, int(td.multiTx1.ID))
 	require.NoError(t, err)
 
 	require.Equal(t, "", details.ID)
-	require.Equal(t, int(td.multiTx1.MultiTransactionID), details.MultiTxID)
+	require.Equal(t, int(td.multiTx1.ID), details.MultiTxID)
 	require.Equal(t, td.multiTx1Tr2.Nonce, details.Nonce)
 	require.Equal(t, 2, len(details.ChainDetails))
 	require.Equal(t, td.multiTx1Tr1.ChainID, common.ChainID(details.ChainDetails[0].ChainID))

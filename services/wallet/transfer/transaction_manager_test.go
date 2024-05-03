@@ -18,6 +18,7 @@ import (
 func setupTestTransactionDB(t *testing.T) (*TransactionManager, func()) {
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
+	SetMultiTransactionIDGenerator(StaticIDCounter()) // to have different multi-transaction IDs even with fast execution
 	return &TransactionManager{db, nil, nil, nil, nil, nil, nil, nil, nil, nil}, func() {
 		require.NoError(t, db.Close())
 	}
@@ -80,9 +81,8 @@ func TestBridgeMultiTransactions(t *testing.T) {
 	var err error
 	ids := make([]wallet_common.MultiTransactionIDType, len(trxs))
 	for i, trx := range trxs {
-		ids[i], err = insertMultiTransaction(manager.db, trx)
+		ids[i], err = manager.InsertMultiTransaction(trx)
 		require.NoError(t, err)
-		require.Equal(t, wallet_common.MultiTransactionIDType(i+1), ids[i])
 	}
 
 	rst, err := manager.GetBridgeOriginMultiTransaction(context.Background(), trx1.ToNetworkID, trx1.CrossTxID)
@@ -126,7 +126,7 @@ func TestMultiTransactions(t *testing.T) {
 	trx2 := trx1
 	trx2.FromAmount = (*hexutil.Big)(big.NewInt(456))
 	trx2.ToAmount = (*hexutil.Big)(big.NewInt(567))
-	trx2.ID = generateMultiTransactionID()
+	trx2.ID = multiTransactionIDGenerator()
 
 	require.NotEqual(t, trx1.ID, trx2.ID)
 
@@ -135,9 +135,8 @@ func TestMultiTransactions(t *testing.T) {
 	var err error
 	ids := make([]wallet_common.MultiTransactionIDType, len(trxs))
 	for i, trx := range trxs {
-		ids[i], err = insertMultiTransaction(manager.db, trx)
+		ids[i], err = manager.InsertMultiTransaction(trx)
 		require.NoError(t, err)
-		require.Equal(t, wallet_common.MultiTransactionIDType(i+1), ids[i])
 	}
 
 	rst, err := manager.GetMultiTransactions(context.Background(), []wallet_common.MultiTransactionIDType{ids[0], 555})

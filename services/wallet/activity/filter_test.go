@@ -29,10 +29,10 @@ func setupTestFilterDB(t *testing.T) (db *sql.DB, close func()) {
 }
 
 // insertTestData inserts 6 extractable activity entries: 2 transfers, 2 pending transactions and 2 multi transactions
-func insertTestData(t *testing.T, db *sql.DB, nullifyToForIndexes []int) (trs []transfer.TestTransfer, toTrs []eth.Address, multiTxs []transfer.TestMultiTransaction) {
+func insertTestData(t *testing.T, db *sql.DB, nullifyToForIndexes []int) (trs []transfer.TestTransfer, toTrs []eth.Address, multiTxs []transfer.MultiTransaction) {
 	// Add 6 extractable transactions
 	trs, _, toTrs = transfer.GenerateTestTransfers(t, db, 0, 10)
-	multiTxs = []transfer.TestMultiTransaction{
+	multiTxs = []transfer.MultiTransaction{
 		transfer.GenerateTestBridgeMultiTransaction(trs[0], trs[1]),
 		transfer.GenerateTestSwapMultiTransaction(trs[2], testutils.SntSymbol, 100),
 	}
@@ -89,7 +89,7 @@ func TestGetRecipients(t *testing.T) {
 	dupTrs, _, _ := transfer.GenerateTestTransfers(t, db, 8, 4)
 	dupTrs[0].To = trs[1].To
 	dupTrs[2].To = trs[2].To
-	dupMultiTxs := []transfer.TestMultiTransaction{
+	dupMultiTxs := []transfer.MultiTransaction{
 		transfer.GenerateTestSendMultiTransaction(dupTrs[0]),
 		transfer.GenerateTestSwapMultiTransaction(dupTrs[2], testutils.SntSymbol, 100),
 	}
@@ -159,7 +159,7 @@ func TestGetOldestTimestampEmptyDB(t *testing.T) {
 
 	timestamp, err := GetOldestTimestamp(context.Background(), db, []eth.Address{eth.HexToAddress("0x1")})
 	require.NoError(t, err)
-	require.Equal(t, int64(0), timestamp)
+	require.Equal(t, uint64(0), timestamp)
 }
 
 func TestGetOldestTimestamp(t *testing.T) {
@@ -178,14 +178,14 @@ func TestGetOldestTimestamp(t *testing.T) {
 		trs[3].To,
 	})
 	require.NoError(t, err)
-	require.Equal(t, trs[3].Timestamp, timestamp)
+	require.Equal(t, uint64(trs[3].Timestamp), timestamp)
 
 	// Test from filter
 	timestamp, err = GetOldestTimestamp(context.Background(), db, []eth.Address{
 		trs[4].From,
 	})
 	require.NoError(t, err)
-	require.Equal(t, trs[4].Timestamp, timestamp)
+	require.Equal(t, uint64(trs[4].Timestamp), timestamp)
 
 	// Test MT
 	timestamp, err = GetOldestTimestamp(context.Background(), db, []eth.Address{
@@ -199,7 +199,7 @@ func TestGetOldestTimestamp(t *testing.T) {
 		trs[6].To,
 	})
 	require.NoError(t, err)
-	require.Equal(t, trs[6].Timestamp, timestamp)
+	require.Equal(t, uint64(trs[6].Timestamp), timestamp)
 }
 
 func TestGetOldestTimestamp_NullAddresses(t *testing.T) {
@@ -219,21 +219,21 @@ func TestGetOldestTimestamp_NullAddresses(t *testing.T) {
 	// Extract oldest timestamp, no filter
 	timestamp, err := GetOldestTimestamp(context.Background(), db, []eth.Address{})
 	require.NoError(t, err)
-	require.Equal(t, trs[0].Timestamp, timestamp)
+	require.Equal(t, uint64(trs[0].Timestamp), timestamp)
 
 	// Test to filter
 	timestamp, err = GetOldestTimestamp(context.Background(), db, []eth.Address{
 		trs[1].To, trs[2].To,
 	})
 	require.NoError(t, err)
-	require.Equal(t, trs[1].Timestamp, timestamp)
+	require.Equal(t, uint64(trs[1].Timestamp), timestamp)
 
 	// Test from filter
 	timestamp, err = GetOldestTimestamp(context.Background(), db, []eth.Address{
 		trs[1].From,
 	})
 	require.NoError(t, err)
-	require.Equal(t, int64(0), timestamp)
+	require.Equal(t, uint64(0), timestamp)
 }
 
 func TestGetActivityCollectiblesEmptyDB(t *testing.T) {

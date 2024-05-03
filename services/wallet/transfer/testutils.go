@@ -38,17 +38,17 @@ type TestTransfer struct {
 }
 
 type TestMultiTransaction struct {
-	MultiTransactionID   common.MultiTransactionIDType
-	MultiTransactionType MultiTransactionType
-	FromAddress          eth_common.Address
-	ToAddress            eth_common.Address
-	FromToken            string
-	ToToken              string
-	FromAmount           int64
-	ToAmount             int64
-	Timestamp            int64
-	FromNetworkID        *uint64
-	ToNetworkID          *uint64
+	MultiTransactionID common.MultiTransactionIDType
+	Type               MultiTransactionType
+	FromAddress        eth_common.Address
+	ToAddress          eth_common.Address
+	FromAsset          string
+	ToToken            string
+	FromAmount         int64
+	ToAmount           int64
+	Timestamp          int64
+	FromNetworkID      *uint64
+	ToNetworkID        *uint64
 }
 
 func SeedToToken(seed int) *token.Token {
@@ -93,42 +93,42 @@ func generateTestTransfer(seed int) TestTransfer {
 	}
 }
 
-func GenerateTestSendMultiTransaction(tr TestTransfer) TestMultiTransaction {
-	return TestMultiTransaction{
-		MultiTransactionType: MultiTransactionSend,
-		FromAddress:          tr.From,
-		ToAddress:            tr.To,
-		FromToken:            tr.Token.Symbol,
-		ToToken:              tr.Token.Symbol,
-		FromAmount:           tr.Value,
-		ToAmount:             0,
-		Timestamp:            tr.Timestamp,
+func GenerateTestSendMultiTransaction(tr TestTransfer) MultiTransaction {
+	return MultiTransaction{
+		Type:        MultiTransactionSend,
+		FromAddress: tr.From,
+		ToAddress:   tr.To,
+		FromAsset:   tr.Token.Symbol,
+		ToAsset:     tr.Token.Symbol,
+		FromAmount:  (*hexutil.Big)(big.NewInt(tr.Value)),
+		ToAmount:    (*hexutil.Big)(big.NewInt(0)),
+		Timestamp:   uint64(tr.Timestamp),
 	}
 }
 
-func GenerateTestSwapMultiTransaction(tr TestTransfer, toToken string, toAmount int64) TestMultiTransaction {
-	return TestMultiTransaction{
-		MultiTransactionType: MultiTransactionSwap,
-		FromAddress:          tr.From,
-		ToAddress:            tr.To,
-		FromToken:            tr.Token.Symbol,
-		ToToken:              toToken,
-		FromAmount:           tr.Value,
-		ToAmount:             toAmount,
-		Timestamp:            tr.Timestamp,
+func GenerateTestSwapMultiTransaction(tr TestTransfer, toToken string, toAmount int64) MultiTransaction {
+	return MultiTransaction{
+		Type:        MultiTransactionSwap,
+		FromAddress: tr.From,
+		ToAddress:   tr.To,
+		FromAsset:   tr.Token.Symbol,
+		ToAsset:     toToken,
+		FromAmount:  (*hexutil.Big)(big.NewInt(tr.Value)),
+		ToAmount:    (*hexutil.Big)(big.NewInt(toAmount)),
+		Timestamp:   uint64(tr.Timestamp),
 	}
 }
 
-func GenerateTestBridgeMultiTransaction(fromTr, toTr TestTransfer) TestMultiTransaction {
-	return TestMultiTransaction{
-		MultiTransactionType: MultiTransactionBridge,
-		FromAddress:          fromTr.From,
-		ToAddress:            toTr.To,
-		FromToken:            fromTr.Token.Symbol,
-		ToToken:              toTr.Token.Symbol,
-		FromAmount:           fromTr.Value,
-		ToAmount:             toTr.Value,
-		Timestamp:            fromTr.Timestamp,
+func GenerateTestBridgeMultiTransaction(fromTr, toTr TestTransfer) MultiTransaction {
+	return MultiTransaction{
+		Type:        MultiTransactionBridge,
+		FromAddress: fromTr.From,
+		ToAddress:   toTr.To,
+		FromAsset:   fromTr.Token.Symbol,
+		ToAsset:     toTr.Token.Symbol,
+		FromAmount:  (*hexutil.Big)(big.NewInt(fromTr.Value)),
+		ToAmount:    (*hexutil.Big)(big.NewInt(toTr.Value)),
+		Timestamp:   uint64(fromTr.Timestamp),
 	}
 }
 
@@ -367,30 +367,34 @@ func InsertTestPendingTransaction(tb testing.TB, db *sql.DB, tr *TestTransfer) {
 	require.NoError(tb, err)
 }
 
-func InsertTestMultiTransaction(tb testing.TB, db *sql.DB, tr *TestMultiTransaction) common.MultiTransactionIDType {
-	fromTokenType := tr.FromToken
-	if tr.FromToken == "" {
-		fromTokenType = testutils.EthSymbol
+func InsertTestMultiTransaction(tb testing.TB, db *sql.DB, tr *MultiTransaction) common.MultiTransactionIDType {
+	if tr.FromAsset == "" {
+		tr.FromAsset = testutils.EthSymbol
 	}
-	toTokenType := tr.ToToken
-	if tr.ToToken == "" {
-		toTokenType = testutils.EthSymbol
+	if tr.ToAsset == "" {
+		tr.ToAsset = testutils.EthSymbol
 	}
-	fromAmount := (*hexutil.Big)(big.NewInt(tr.FromAmount))
-	toAmount := (*hexutil.Big)(big.NewInt(tr.ToAmount))
 
-	result, err := db.Exec(`
-		INSERT INTO multi_transactions (from_address, from_asset, from_amount, to_address, to_asset, to_amount, type, timestamp, from_network_id, to_network_id
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		tr.FromAddress, fromTokenType, fromAmount.String(), tr.ToAddress, toTokenType, toAmount.String(), tr.MultiTransactionType, tr.Timestamp, tr.FromNetworkID, tr.ToNetworkID)
+	tr.ID = multiTransactionIDGenerator()
+	err := insertMultiTransaction(db, tr)
 	require.NoError(tb, err)
-	rowID, err := result.LastInsertId()
-	require.NoError(tb, err)
-	tr.MultiTransactionID = common.MultiTransactionIDType(rowID)
-	return tr.MultiTransactionID
+	return tr.ID
 }
 
 // For using in tests only outside the package
 func SaveTransfersMarkBlocksLoaded(database *Database, chainID uint64, address eth_common.Address, transfers []Transfer, blocks []*big.Int) error {
 	return saveTransfersMarkBlocksLoaded(database.client, chainID, address, transfers, blocks)
+}
+
+func SetMultiTransactionIDGenerator(f func() common.MultiTransactionIDType) {
+	multiTransactionIDGenerator = f
+}
+
+func StaticIDCounter() (f func() common.MultiTransactionIDType) {
+	var i int
+	f = func() common.MultiTransactionIDType {
+		i++
+		return common.MultiTransactionIDType(i)
+	}
+	return
 }
