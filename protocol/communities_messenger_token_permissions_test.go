@@ -1672,22 +1672,15 @@ func checkRoleBasedOnThePermissionType(permissionType protobuf.CommunityTokenPer
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMessages() {
-	waitOnChannelKeyAdded := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
-		s.logger.Debug("<<< community key actions", zap.Any("keyActions", sub.keyActions))
-
-		return false
-		//action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
-		//if !ok || action.ActionType != communities.EncryptionKeyAdd {
-		//	return false
-		//}
-		//_, ok = action.Members[common.PubkeyToHex(&s.owner.identity.PublicKey)]
-		//return ok
-	})
-
-	s.logger.Debug("<<< Create community")
+	s.logger.Debug("<<< create community")
 
 	// 1.1. Create community
 	community, chat := s.createCommunity()
+
+	s.logger.Debug("<<< created community",
+		zap.String("communityID", community.IDString()),
+		zap.String("chatID", chat.ID),
+	)
 
 	// 1.2. Setup permissions
 	communityPermission := &requests.CreateCommunityTokenPermission{
@@ -1719,6 +1712,18 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 		},
 	}
 
+	waitOnChannelKeyAdded := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
+		s.logger.Debug("<<< community key actions", zap.Any("keyActions", sub.keyActions))
+		//return false
+
+		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
+		if !ok || action.ActionType != communities.EncryptionKeyAdd {
+			return false
+		}
+		_, ok = action.Members[common.PubkeyToHex(&s.owner.identity.PublicKey)]
+		return ok
+	})
+
 	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
 		return len(sub.Community.TokenPermissions()) == 2
 	})
@@ -1741,10 +1746,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.Require().True(community.HasTokenPermissions())
 	s.Require().Len(community.TokenPermissions(), 2)
 
+	s.logger.Debug("<<< waitOnCommunityPermissionCreated")
 	err = <-waitOnCommunityPermissionCreated
 	s.Require().NoError(err)
 	s.Require().True(community.Encrypted())
 
+	s.logger.Debug("<<< waitOnChannelKeyAdded")
 	err = <-waitOnChannelKeyAdded
 	s.Require().NoError(err)
 
@@ -1774,6 +1781,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 		TorrentDir: os.TempDir() + "/torrents",
 		Port:       0,
 	}
+
 	// Share archive directory between all users
 	s.owner.communitiesManager.SetTorrentConfig(&torrentConfig)
 	s.bob.communitiesManager.SetTorrentConfig(&torrentConfig)
@@ -1783,7 +1791,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	archiveIDs, err := s.owner.communitiesManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, community.Encrypted())
 	s.Require().NoError(err)
 	s.Require().Len(archiveIDs, 1)
-	s.logger.Debug("archive created", zap.Any("archiveIDs", archiveIDs))
+	s.logger.Debug("<<< archive created", zap.Any("archiveIDs", archiveIDs))
 
 	community, err = s.owner.GetCommunityByID(community.ID())
 	s.Require().NoError(err)
@@ -1792,14 +1800,37 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 
 	s.logger.Debug(`<<< user joining`)
 
+	waitKeys := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
+		//s.logger.Debug("<<< community key actions 2", zap.Any("keyActions", sub.keyActions))
+		return false
+		//action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
+		//if !ok || action.ActionType != communities.EncryptionKeySendToMembers {
+		//	return false
+		//}
+		//_, ok = action.Members[common.PubkeyToHex(&s.bob.identity.PublicKey)]
+		//return ok
+	})
+
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, communityPermission.TokenCriteria[0])
 	s.advertiseCommunityTo(community, s.bob)
 	s.joinCommunity(community, s.bob, bobPassword, []string{})
 
+	_ = <-waitKeys
+	//s.Require().NoError(err)
+
+	response, _ = WaitOnMessengerResponse(s.bob,
+		func(r *MessengerResponse) bool {
+			return false
+		}, "")
+
+	s.logger.Debug("<<< response", zap.Any("response", response))
 	s.logger.Debug("<<< user joined")
 
+	// NOTE: For Bob the channel members list will be empty, as Bob doesn't satisfy channel criteria
+	// 		 So we won't be able to import the message from the archive
 	//checkCommunity := func(m *Messenger) {
 	//	receivedCommunity, err := m.GetCommunityByID(community.ID())
+	//	s.logger.Debug("<<< community logged", zap.Any("community", receivedCommunity))
 	//	s.Require().NoError(err)
 	//	s.Require().NotNil(receivedCommunity)
 	//	s.Require().Len(receivedCommunity.Members(), 2)
@@ -1808,7 +1839,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	//	s.Require().True(ok)
 	//	s.Require().Len(receivedChat.Members, 1)
 	//}
-	//
 	//checkCommunity(s.owner)
 	//checkCommunity(s.bob)
 
@@ -1841,6 +1871,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.Require().NoError(err)
 
 	s.logger.Debug("<<< community before importing", zap.Any("owner", ownerCommunity), zap.Any("bob", bobCommunity))
+	chatMembers := bobCommunity.Chats()[chat.CommunityChatID()].Members
+	s.Require().Nil(chatMembers) // Because Bob doesn't have access to the channel
 
 	s.bob.importDelayer.once.Do(func() {
 		close(s.bob.importDelayer.wait)
@@ -1848,6 +1880,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	cancel := make(chan struct{})
 	err = s.bob.importHistoryArchives(community.ID(), cancel)
 	s.Require().NoError(err)
+
+	s.logger.Debug("<<< importHistoryArchives finished")
 
 	// Ensure message1 wasn't imported, as it's encrypted, and we don't have access to the channel
 	receivedMessage1, err := s.bob.MessageByID(message1.ID)
@@ -1882,7 +1916,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 
 	// Finally ensure that the message from archive was retrieved and decrypted
 
-	// Message could have been retreived durting previous wait
+	// Message could have been retreived during previous wait
 	//receivedMessage1, err = s.bob.MessageByID(message1.ID)
 	//if err != nil {
 	//	s.Require().NotNil(receivedMessage1)
