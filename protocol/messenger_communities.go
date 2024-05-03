@@ -291,6 +291,10 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 	publishOrgAndDistributeEncryptionKeys := func(community *communities.Community) {
 		recentlyPublishedOrg := recentlyPublishedOrgs[community.IDString()]
 
+		if recentlyPublishedOrg != nil && community.Clock() <= recentlyPublishedOrg.Clock() {
+			return
+		}
+
 		// evaluate and distribute encryption keys (if any)
 		encryptionKeyActions := communities.EvaluateCommunityEncryptionKeyActions(recentlyPublishedOrg, community)
 		err := m.communitiesKeyDistributor.Distribute(community, encryptionKeyActions)
