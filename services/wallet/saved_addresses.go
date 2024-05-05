@@ -25,6 +25,7 @@ type SavedAddress struct {
 	IsTest          bool                              `json:"isTest"`
 	CreatedAt       int64                             `json:"createdAt"`
 	Removed         bool                              `json:"removed"`
+	Emoji           string                            `json:"emoji"`
 	savedAddressMeta
 }
 
@@ -66,7 +67,7 @@ func NewSavedAddressesManager(db *sql.DB) *SavedAddressesManager {
 	return &SavedAddressesManager{db: db}
 }
 
-const rawQueryColumnsOrder = "address, name, removed, update_clock, chain_short_names, ens_name, is_test, created_at, color"
+const rawQueryColumnsOrder = "address, name, removed, update_clock, chain_short_names, ens_name, is_test, created_at, color, emoji"
 
 // getSavedAddressesFromDBRows retrieves all data based on SELECT Query using rawQueryColumnsOrder
 func getSavedAddressesFromDBRows(rows *sql.Rows) ([]*SavedAddress, error) {
@@ -84,6 +85,7 @@ func getSavedAddressesFromDBRows(rows *sql.Rows) ([]*SavedAddress, error) {
 			&sa.IsTest,
 			&sa.CreatedAt,
 			&sa.ColorID,
+			&sa.Emoji,
 		)
 		if err != nil {
 			return nil, err
@@ -165,10 +167,11 @@ func (sam *SavedAddressesManager) upsertSavedAddress(sa SavedAddress, tx *sql.Tx
 			ens_name,
 			is_test,
 			created_at,
-			color
+			color,
+			emoji
 		)
 	VALUES
-		(?, ?, ?, ?, ?, ?, ?, ?, ?)
+		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	insert, err := tx.Prepare(sqlStatement)
 	if err != nil {
@@ -176,7 +179,7 @@ func (sam *SavedAddressesManager) upsertSavedAddress(sa SavedAddress, tx *sql.Tx
 	}
 	defer insert.Close()
 	_, err = insert.Exec(sa.Address, sa.Name, sa.Removed, sa.UpdateClock, sa.ChainShortNames, sa.ENSName,
-		sa.IsTest, sa.CreatedAt, sa.ColorID)
+		sa.IsTest, sa.CreatedAt, sa.ColorID, sa.Emoji)
 	return err
 }
 
