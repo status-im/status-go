@@ -444,15 +444,18 @@ func (m *Manager) Start() error {
 	if m.ownerVerifier != nil {
 		m.runOwnerVerificationLoop()
 	}
+	return nil
+}
 
-	if m.torrentConfig != nil && m.torrentConfig.Enabled {
-		err := m.StartTorrentClient()
-		if err != nil {
-			m.LogStdout("couldn't start torrent client", zap.Error(err))
+func (m *Manager) SetOnline(online bool) {
+	if online {
+		if m.torrentConfig != nil && m.torrentConfig.Enabled && !m.TorrentClientStarted() {
+			err := m.StartTorrentClient()
+			if err != nil {
+				m.LogStdout("couldn't start torrent client", zap.Error(err))
+			}
 		}
 	}
-
-	return nil
 }
 
 func (m *Manager) runENSVerificationLoop() {
