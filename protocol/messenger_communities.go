@@ -109,11 +109,12 @@ func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) err
 		return nil
 	}
 
-	communityJSON, err := json.Marshal(org)
-	if err != nil {
-		return err
-	}
-	m.logger.Debug("publishing org", zap.String("org-id", org.IDString()), zap.Uint64("clock", org.Clock()), zap.String("org", string(communityJSON)))
+	m.logger.Debug("publishing community",
+		zap.Uint64("clock", org.Clock()),
+		zap.String("communityID", org.IDString()),
+		zap.Any("community", org),
+	)
+
 	payload, err := org.MarshaledDescription()
 
 	if err != nil {
