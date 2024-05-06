@@ -899,6 +899,11 @@ func (m *Messenger) handleConnectionChange(online bool) {
 		}
 	}
 
+	// Update Communities manager
+	if m.communitiesManager != nil {
+		m.communitiesManager.SetOnline(online)
+	}
+
 	// Publish contact code
 	if online && m.shouldPublishContactCode {
 		if err := m.publishContactCode(); err != nil {

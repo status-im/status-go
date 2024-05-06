@@ -501,6 +501,16 @@ func (s *ManagerSuite) TestStopTorrentClient_ShouldStopHistoryArchiveTasks() {
 	s.Require().Equal(count, 0)
 }
 
+func (s *ManagerSuite) TestStartTorrentClient_DelayedUntilOnline() {
+	torrentConfig := buildTorrentConfig()
+	s.manager.SetTorrentConfig(&torrentConfig)
+
+	s.Require().False(s.manager.TorrentClientStarted())
+
+	s.manager.SetOnline(true)
+	s.Require().True(s.manager.TorrentClientStarted())
+}
+
 func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_WithoutMessages() {
 
 	torrentConfig := buildTorrentConfig()
