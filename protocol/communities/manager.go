@@ -954,8 +954,8 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 
 // WARNING: ReevaluateMembers is only public to be used in messenger tests.
 func (m *Manager) ReevaluateMembers(communityID types.HexBytes) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
-	m.communityLock.Lock(community.ID())
-	defer m.communityLock.Unlock(community.ID())
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
 
 	community, err := m.GetByID(communityID)
 	if err != nil {
@@ -1105,7 +1105,6 @@ func (m *Manager) ReevaluateMembers(communityID types.HexBytes) (*Community, map
 }
 
 func (m *Manager) StartMembersReevaluationLoop(communityID types.HexBytes, reevaluateOnStart bool) {
-	logger := m.logger.Named("reevaluate members loop").With(zap.String("communityID", communityID.String()))
 	go m.reevaluateMembersLoop(communityID, reevaluateOnStart)
 }
 
@@ -1165,16 +1164,12 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
-	logger.Debug("loop started")
-	defer logger.Debug("loop stopped")
-
 	reevaluate := reevaluateOnStart
 
 	for {
 		if reevaluate {
 			err := reevaluateMembers()
 			if err != nil {
-				logger.Error("reevaluation failed", zap.Error(err))
 				var criticalError *criticalError
 				if errors.As(err, &criticalError) {
 					return
