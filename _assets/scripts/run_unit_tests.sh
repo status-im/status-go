@@ -100,7 +100,7 @@ run_test_for_package() {
 }
 
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
-	./cc-test-reporter before-build
+	cc-test-reporter before-build
 fi
 
 for package in ${UNIT_TEST_PACKAGES}; do
@@ -138,5 +138,5 @@ grep -h -v "^mode:" ./**/*.coverage.out >> c.out
 rm -rf ./**/*.coverage.out
 
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
-	./cc-test-reporter after-build --prefix=github.com/status-im/status-go
+	cc-test-reporter after-build --prefix=github.com/status-im/status-go
 fi
