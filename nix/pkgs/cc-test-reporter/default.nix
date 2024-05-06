@@ -17,8 +17,8 @@ in stdenv.mkDerivation rec {
     url = "https://codeclimate.com/downloads/test-reporter/test-reporter-${version}-${platform}-amd64";
     hash = lib.getAttr platform {
       darwin = "sha256-uO9aRL3cJe+KCoC+uN6cBQy8xGQHim6h5Qzw36QO7EY=";
-      linux = "ne79mW3w9tHJ+3lAWzluuRp6yjWsy4lpdV/KpmjaTa0=";
-      windows = "8pn8csW9l5xMerZWAwIwWcrO7OLNWEM03yPEMMllaak=";
+      linux = "sha256-ne79mW3w9tHJ+3lAWzluuRp6yjWsy4lpdV/KpmjaTa0=";
+      windows = "sha256-8pn8csW9l5xMerZWAwIwWcrO7OLNWEM03yPEMMllaak=";
     };
    };
 
