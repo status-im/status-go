@@ -1157,9 +1157,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 
 	// force owner to reevaluate channel members
 	// in production it will happen automatically, by periodic check
-	community, err = s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
+	community, _, err = s.owner.communitiesManager.ReevaluateMembers(community.ID())
 	s.Require().NoError(err)
 
 	err = <-waitOnChannelKeyToBeDistributedToBob
@@ -1330,9 +1328,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 
 	// force owner to reevaluate channel members
 	// in production it will happen automatically, by periodic check
-	community, err = s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
+	community, _, err = s.owner.communitiesManager.ReevaluateMembers(community.ID())
 	s.Require().NoError(err)
 
 	err = <-waitOnChannelKeyToBeDistributedToBob
@@ -1383,9 +1379,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 
 	// force owner to reevaluate channel members
 	// in production it will happen automatically, by periodic check
-	community, err = s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	roles, err := s.owner.communitiesManager.ReevaluateMembers(community)
+	community, roles, err := s.owner.communitiesManager.ReevaluateMembers(community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(roles, 2)
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
@@ -1485,7 +1479,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().True(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
 
 	// the control node re-evaluates the roles of the participants, checking that the privileged user has not lost his role
-	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
+	community, _, err = s.owner.communitiesManager.ReevaluateMembers(community.ID())
 	s.Require().NoError(err)
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
@@ -1507,7 +1501,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().NoError(err)
 	s.Require().False(community.HasTokenPermissions())
 
-	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
+	community, _, err = s.owner.communitiesManager.ReevaluateMembers(community.ID())
 	s.Require().NoError(err)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
@@ -1600,7 +1594,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().True(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
 
 	// the control node reevaluates the roles of the participants, checking that the privileged user has not lost his role
-	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
+	community, _, err = s.owner.communitiesManager.ReevaluateMembers(community.ID())
 	s.Require().NoError(err)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
@@ -1623,7 +1617,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities()[0].TokenPermissions(), 1)
 
-	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
+	community, _, err = s.owner.communitiesManager.ReevaluateMembers(community.ID())
 	s.Require().NoError(err)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
@@ -1647,7 +1641,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities()[0].TokenPermissions(), 0)
 
-	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
+	community, _, err = s.owner.communitiesManager.ReevaluateMembers(community.ID())
 	s.Require().NoError(err)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())

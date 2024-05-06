@@ -952,9 +952,21 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 	return community, changes, nil
 }
 
-func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
+// WARNING: ReevaluateMembers is only public to be used in messenger tests.
+func (m *Manager) ReevaluateMembers(communityID types.HexBytes) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
 	m.communityLock.Lock(community.ID())
 	defer m.communityLock.Unlock(community.ID())
+
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// TODO: Control node needs to be notified to do a permission check if TokenMasters did airdrop
+	// of the token which is using in a community permissions
+	if !community.IsControlNode() {
+		return nil, nil, ErrNotEnoughPermissions
+	}
 
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
@@ -969,7 +981,7 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 	for memberKey := range community.Members() {
 		memberPubKey, err := common.HexToPubkey(memberKey)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		if memberKey == common.PubkeyToHex(&m.identity.PublicKey) || community.IsMemberOwner(memberPubKey) {
@@ -981,7 +993,7 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 		requestID := CalculateRequestID(memberKey, community.ID())
 		revealedAccounts, err := m.persistence.GetRequestToJoinRevealedAddresses(requestID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		memberHasWallet := len(revealedAccounts) > 0
@@ -991,7 +1003,7 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 		if !memberHasWallet && (hasMemberPermissions || isCurrentRoleTokenMaster || isCurrentRoleAdmin) {
 			_, err = community.RemoveUserFromOrg(memberPubKey)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			continue
 		}
@@ -1002,7 +1014,7 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 			protobuf.CommunityMember_ROLE_TOKEN_MASTER, isCurrentRoleTokenMaster)
 
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		if isNewRoleTokenMaster {
@@ -1018,7 +1030,7 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 			protobuf.CommunityMember_ROLE_ADMIN, isCurrentRoleAdmin)
 
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		if isNewRoleAdmin {
@@ -1033,13 +1045,13 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 		if hasMemberPermissions {
 			permissionResponse, err := m.PermissionChecker.CheckPermissions(becomeMemberPermissions, accountsAndChainIDs, true)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			if !permissionResponse.Satisfied {
 				_, err = community.RemoveUserFromOrg(memberPubKey)
 				if err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 				// Skip channels validation if user has been removed
 				continue
@@ -1057,14 +1069,14 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 				// ensure all members are added back if channel permissions were removed
 				_, err = community.PopulateChatWithAllMembers(channelID)
 				if err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 				continue
 			}
 
 			response, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountsAndChainIDs, true)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			isMemberAlreadyInChannel := community.IsMemberInChat(memberPubKey, channelID)
@@ -1078,18 +1090,18 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 				// Add the member back to the chat member list in case the role changed (it replaces the previous values)
 				_, err := community.AddMemberToChat(channelID, memberPubKey, []protobuf.CommunityMember_Roles{}, channelRole)
 				if err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 			} else if isMemberAlreadyInChannel {
 				_, err := community.RemoveUserFromChat(memberPubKey, channelID)
 				if err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 			}
 		}
 	}
 
-	return newPrivilegedRoles, m.saveAndPublish(community)
+	return community, newPrivilegedRoles, m.saveAndPublish(community)
 }
 
 func (m *Manager) StartMembersReevaluationLoop(communityID types.HexBytes, reevaluateOnStart bool) {
@@ -1136,18 +1148,13 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 			return nil
 		}
 
-		community, err := m.GetByID(communityID)
+		err = m.reevaluateCommunityMembersPermissions(communityID)
 		if err != nil {
 			if errors.Is(err, ErrOrgNotFound) {
 				return criticalError{
 					error: err,
 				}
 			}
-			return err
-		}
-
-		err = m.reevaluateCommunityMembersPermissions(community)
-		if err != nil {
 			return err
 		}
 
@@ -1225,18 +1232,8 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 	return community, changes, nil
 }
 
-func (m *Manager) reevaluateCommunityMembersPermissions(community *Community) error {
-	if community == nil {
-		return ErrOrgNotFound
-	}
-
-	// TODO: Control node needs to be notified to do a permission check if TokenMasters did airdrop
-	// of the token which is using in a community permissions
-	if !community.IsControlNode() {
-		return ErrNotEnoughPermissions
-	}
-
-	newPrivilegedMembers, err := m.ReevaluateMembers(community)
+func (m *Manager) reevaluateCommunityMembersPermissions(communityID types.HexBytes) error {
+	community, newPrivilegedMembers, err := m.ReevaluateMembers(communityID)
 	if err != nil {
 		return err
 	}
@@ -4937,7 +4934,9 @@ func (m *Manager) saveAndPublish(community *Community) error {
 	if community.IsControlNode() {
 		m.publish(&Subscription{Community: community})
 		return nil
-	} else if community.HasPermissionToSendCommunityEvents() {
+	}
+
+	if community.HasPermissionToSendCommunityEvents() {
 		err := m.signEvents(community)
 		if err != nil {
 			return err
