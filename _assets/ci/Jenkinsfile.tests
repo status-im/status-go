@@ -107,13 +107,6 @@ pipeline {
       } }
     }
 
-    stage('Setup CodeClimate') {
-      steps { script {
-        sh "curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter"
-        sh "chmod +x ./cc-test-reporter"
-      } }
-    }
-
     stage('Unit Tests') {
       environment {
         TEST_POSTGRES_PORT = "${env.DB_PORT}"
