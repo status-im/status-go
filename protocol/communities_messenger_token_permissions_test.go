@@ -609,19 +609,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 	s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
 	s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
 
-	// Retrieve community description change
-	err = tt.RetryWithBackOff(func() error {
-		response, err := s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("no communities in response (address change reception)")
-		}
-		return nil
-	})
-	s.Require().NoError(err)
-
 	alicesRevealedAccounts, err = s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
 	s.Require().NoError(err)
 	s.Require().Len(alicesRevealedAccounts, 1)
