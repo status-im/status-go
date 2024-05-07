@@ -48,8 +48,8 @@ func TestBuildDefaultNetworks(t *testing.T) {
 
 	require.Equal(t, optimismSepoliaChainID, actualNetworks[5].ChainID)
 
-	require.True(t, strings.Contains(actualNetworks[5].RPCURL, infuraToken))
-	require.Equal(t, "", actualNetworks[5].FallbackURL)
+	require.True(t, strings.Contains(actualNetworks[5].RPCURL, poktToken))
+	require.True(t, strings.Contains(actualNetworks[5].FallbackURL, infuraToken))
 
 	require.Equal(t, arbitrumChainID, actualNetworks[6].ChainID)
 
@@ -63,8 +63,8 @@ func TestBuildDefaultNetworks(t *testing.T) {
 
 	require.Equal(t, arbitrumSepoliaChainID, actualNetworks[8].ChainID)
 
-	require.True(t, strings.Contains(actualNetworks[8].RPCURL, infuraToken))
-	require.Equal(t, "", actualNetworks[8].FallbackURL)
+	require.True(t, strings.Contains(actualNetworks[8].RPCURL, poktToken))
+	require.True(t, strings.Contains(actualNetworks[8].FallbackURL, infuraToken))
 }
 
 func TestBuildDefaultNetworksGanache(t *testing.T) {
