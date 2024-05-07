@@ -117,8 +117,8 @@ var optimismGoerli = params.Network{
 var optimismSepolia = params.Network{
 	ChainID:                optimismSepoliaChainID,
 	ChainName:              "Optimism",
-	RPCURL:                 "https://optimism-sepolia.infura.io/v3/",
-	FallbackURL:            "",
+	RPCURL:                 "https://optimism-sepolia-archival.rpc.grove.city/v1/",
+	FallbackURL:            "https://optimism-sepolia.infura.io/v3/",
 	BlockExplorerURL:       "https://sepolia-optimism.etherscan.io/",
 	IconURL:                "network/Network=Optimism",
 	ChainColor:             "#E90101",
@@ -171,8 +171,8 @@ var arbitrumGoerli = params.Network{
 var arbitrumSepolia = params.Network{
 	ChainID:                arbitrumSepoliaChainID,
 	ChainName:              "Arbitrum",
-	RPCURL:                 "https://arbitrum-sepolia.infura.io/v3/",
-	FallbackURL:            "",
+	RPCURL:                 "https://arbitrum-sepolia-archival.rpc.grove.city/v1/",
+	FallbackURL:            "https://arbitrum-sepolia.infura.io/v3/",
 	BlockExplorerURL:       "https://sepolia-explorer.arbitrum.io/",
 	IconURL:                "network/Network=Arbitrum",
 	ChainColor:             "#51D0F0",
