@@ -28,7 +28,7 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 		LightClient:              false,
 		EnablePeerExchangeServer: true,
 		EnablePeerExchangeClient: false,
-		EnableDiscV5:             true,
+		EnableDiscV5:             false,
 	}
 
 	var db *sql.DB
