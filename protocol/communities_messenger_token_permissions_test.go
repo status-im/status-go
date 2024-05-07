@@ -988,13 +988,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWith
 			},
 		},
 	}
-	response, err := s.owner.CreateCommunityTokenPermission(&permissionRequestMember)
-	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
 
 	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
 		return sub.Community.HasTokenPermissions()
 	})
+
+	response, err := s.owner.CreateCommunityTokenPermission(&permissionRequestMember)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
 
 	err = <-waitOnCommunityPermissionCreated
 	s.Require().NoError(err)
@@ -1013,15 +1014,16 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWith
 			},
 		},
 	}
+
+	waitOnCommunityPermissionCreated = waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		return len(sub.Community.TokenPermissions()) == 2
+	})
+
 	response, err = s.owner.CreateCommunityTokenPermission(&permissionRequestAdmin)
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.Communities()[0].TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN), 1)
 	s.Require().Len(response.Communities()[0].TokenPermissions(), 2)
-
-	waitOnCommunityPermissionCreated = waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
-		return len(sub.Community.TokenPermissions()) == 2
-	})
 
 	err = <-waitOnCommunityPermissionCreated
 	s.Require().NoError(err)
