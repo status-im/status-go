@@ -108,7 +108,9 @@ endef
 
 # TODO: Define more specific shells.
 TARGET := default
-SHELL := ./nix/scripts/shell.sh
+ifneq ($(detected_OS),Windows)
+ SHELL := ./nix/scripts/shell.sh
+endif
 shell: export TARGET ?= default
 shell: ##@prepare Enter into a pre-configured shell
 ifndef IN_NIX_SHELL
