@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +36,7 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/server"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/waku"
 )
@@ -4277,4 +4279,84 @@ func (s *MessengerCommunitiesSuite) TestIsDisplayNameDupeOfCommunityMember() {
 	result, err = s.alice.IsDisplayNameDupeOfCommunityMember("Bobby")
 	s.Require().NoError(err)
 	s.Require().False(result)
+}
+
+func (s *MessengerCommunitiesSuite) sendImageToCommunity(sender *Messenger, chatID string) *common.Message {
+	ctx := context.Background()
+	messageToSend := common.NewMessage()
+	messageToSend.ChatId = chatID
+	messageToSend.ContentType = protobuf.ChatMessage_IMAGE
+
+	// base64 image
+	encodedB64Image := "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII"
+	decodedBytes, _ := base64.StdEncoding.DecodeString(encodedB64Image)
+
+	messageToSend.Payload = &protobuf.ChatMessage_Image{
+		Image: &protobuf.ImageMessage{
+			Format:  1, // PNG
+			Payload: decodedBytes,
+		},
+	}
+
+	response, err := sender.SendChatMessage(ctx, messageToSend)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	sentMessage := response.Messages()[0]
+
+	receivers := []*Messenger{s.alice, s.bob, s.owner}
+	for _, receiver := range receivers {
+		if receiver == sender {
+			continue
+		}
+		_, err = WaitOnMessengerResponse(receiver, func(response *MessengerResponse) bool {
+			return len(response.Messages()) == 1 && response.Messages()[0].ID == sentMessage.ID
+		}, "receiver did not receive message")
+		s.Require().NoError(err)
+	}
+	return sentMessage
+}
+
+func (s *MessengerCommunitiesSuite) TestMemberMessagesHasImageLink() {
+	// GIVEN
+	community, communityChat := s.createCommunity()
+
+	addMediaServer := func(messenger *Messenger) {
+		mediaServer, err := server.NewMediaServer(messenger.database, nil, nil, nil)
+		s.Require().NoError(err)
+		s.Require().NoError(mediaServer.Start())
+		messenger.httpServer = mediaServer
+	}
+	addMediaServer(s.alice)
+	addMediaServer(s.bob)
+	addMediaServer(s.owner)
+
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+
+	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
+	joinCommunity(&s.Suite, community, s.owner, s.alice, request, "")
+
+	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
+	joinCommunity(&s.Suite, community, s.owner, s.bob, request, "")
+
+	// WHEN: alice sends an image message
+	sentMessage := s.sendImageToCommunity(s.alice, communityChat.ID)
+
+	// THEN: everyone see alice message with image link
+	requireMessageWithImage := func(messenger *Messenger, memberPubKey string, communityID string) {
+		storedMessages, err := messenger.GetCommunityMemberAllMessages(
+			&requests.CommunityMemberMessages{
+				CommunityID:     communityID,
+				MemberPublicKey: memberPubKey})
+		s.Require().NoError(err)
+		s.Require().Equal(1, len(storedMessages))
+		memberMessage := storedMessages[0]
+		s.Require().Equal(sentMessage.ID, memberMessage.ID)
+		s.Require().True(strings.HasPrefix(memberMessage.ImageLocalURL, "https://Localhost"))
+	}
+	communityID := community.IDString()
+	alicePubKey := s.alice.IdentityPublicKeyString()
+
+	requireMessageWithImage(s.owner, alicePubKey, communityID)
+	requireMessageWithImage(s.alice, alicePubKey, communityID)
+	requireMessageWithImage(s.bob, alicePubKey, communityID)
 }

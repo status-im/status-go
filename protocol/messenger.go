@@ -3547,12 +3547,9 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 			return err
 		}
 		if m.httpServer != nil {
-			for _, msg := range album {
-				err = m.prepareMessage(msg, m.httpServer)
-
-				if err != nil {
-					return err
-				}
+			err = m.prepareMessagesList(album)
+			if err != nil {
+				return err
 			}
 		}
 
@@ -4158,11 +4155,9 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 	}
 
 	if m.httpServer != nil {
-		for _, msg := range msgs {
-			err = m.prepareMessage(msg, m.httpServer)
-			if err != nil {
-				return nil, "", err
-			}
+		err = m.prepareMessagesList(msgs)
+		if err != nil {
+			return nil, "", err
 		}
 	}
 
@@ -4170,6 +4165,19 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 }
 
 func (m *Messenger) prepareMessages(messages map[string]*common.Message) error {
+	if m.httpServer == nil {
+		return nil
+	}
+	for idx := range messages {
+		err := m.prepareMessage(messages[idx], m.httpServer)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Messenger) prepareMessagesList(messages []*common.Message) error {
 	if m.httpServer == nil {
 		return nil
 	}
