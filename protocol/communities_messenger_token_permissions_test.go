@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 	"sync"
@@ -20,6 +21,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -630,14 +632,20 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 }
 
 // NOTE(cammellos): Disabling for now as flaky, for some reason does not pass on CI, but passes locally
-/*
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions() {
+	s.T().Skip("flaky test")
+
 	// Create a store node
 	// This is needed to fetch the messages after rejoining the community
 	var err error
 
-	storeNodeLogger := s.logger.Named("store-node-waku")
-	wakuStoreNode := NewTestWakuV2(&s.Suite, storeNodeLogger, true, true, false, shard.UndefinedShardValue)
+	cfg := testWakuV2Config{
+		logger:                 s.logger.Named("store-node-waku"),
+		enableStore:            false,
+		useShardAsDefaultTopic: false,
+		clusterID:              shard.UndefinedShardValue,
+	}
+	wakuStoreNode := NewTestWakuV2(&s.Suite, cfg)
 
 	storeNodeListenAddresses := wakuStoreNode.ListenAddresses()
 	s.Require().LessOrEqual(1, len(storeNodeListenAddresses))
@@ -826,7 +834,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 		fmt.Printf("ID: %s\n", m.ID)
 	}
 	s.Require().NoError(err)
-}*/
+}
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPermission() {
 
