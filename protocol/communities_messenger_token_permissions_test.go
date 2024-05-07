@@ -564,7 +564,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 
 	request := &requests.EditSharedAddresses{CommunityID: community.ID(), AddressesToReveal: []string{aliceAddress1}, AirdropAddress: aliceAddress1}
 
-	signingParams, err := s.alice.GenerateJoiningCommunityRequestsForSigning(s.alice.IdentityPublicKeyString(), community.ID(), request.AddressesToReveal)
+	signingParams, err := s.alice.GenerateJoiningCommunityRequestsForSigning(common.PubkeyToHex(&s.alice.identity.PublicKey), community.ID(), request.AddressesToReveal)
 	s.Require().NoError(err)
 
 	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(alicePassword)))

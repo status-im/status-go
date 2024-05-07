@@ -131,6 +131,9 @@ func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) err
 	}
 	if org.Encrypted() {
 		members := org.GetMemberPubkeys()
+		if err != nil {
+			return err
+		}
 		rawMessage.CommunityKeyExMsgType = common.KeyExMsgRekey
 		// This should be the one that it was used to encrypt this community
 		rawMessage.HashRatchetGroupID = org.ID()
@@ -288,7 +291,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 	publishOrgAndDistributeEncryptionKeys := func(community *communities.Community) {
 		recentlyPublishedOrg := recentlyPublishedOrgs[community.IDString()]
 
-		if recentlyPublishedOrg != nil && community.Clock() < recentlyPublishedOrg.Clock() {
+		if recentlyPublishedOrg != nil && community.Clock() <= recentlyPublishedOrg.Clock() {
 			return
 		}
 
