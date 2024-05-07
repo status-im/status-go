@@ -4651,7 +4651,10 @@ func (m *Messenger) GetCommunityMemberAllMessages(request *requests.CommunityMem
 
 		messages = append(messages, updatedMessages...)
 	}
-
+	err = m.prepareMessagesList(messages)
+	if err != nil {
+		return nil, err
+	}
 	return messages, nil
 
 }
