@@ -184,6 +184,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, waku types.Waku, name string, extraOptions []Option) *Messenger {
+	communityManagerOptions := []communities.ManagerOption{
+		communities.WithAllowForcingCommunityMembersReevaluation(true),
+	}
+	extraOptions = append(extraOptions, WithCommunityManagerOptions(communityManagerOptions))
+
 	return newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			logger:       s.logger.Named(name),
