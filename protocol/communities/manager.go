@@ -114,6 +114,7 @@ type Manager struct {
 	PermissionChecker            PermissionChecker
 	keyDistributor               KeyDistributor
 	communityLock                *CommunityLock
+	forceMembersReevaluation     chan types.HexBytes
 }
 
 type CommunityLock struct {
@@ -192,6 +193,11 @@ type managerOptions struct {
 	walletConfig           *params.WalletConfig
 	communityTokensService communitytokens.ServiceInterface
 	permissionChecker      PermissionChecker
+
+	// allowForcingCommunityMembersReevaluation indicates whether we should allow forcing community members reevaluation.
+	// This will allow using `force` argument in ScheduleMembersReevaluation.
+	// Should only be used in tests.
+	allowForcingCommunityMembersReevaluation bool
 }
 
 type TokenManager interface {
@@ -287,6 +293,12 @@ func WithCommunityTokensService(communityTokensService communitytokens.ServiceIn
 	}
 }
 
+func WithAllowForcingCommunityMembersReevaluation(enabled bool) ManagerOption {
+	return func(opts *managerOptions) {
+		opts.allowForcingCommunityMembersReevaluation = enabled
+	}
+}
+
 type OwnerVerifier interface {
 	SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error)
 }
@@ -376,6 +388,11 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 			logger:              logger,
 			ensVerifier:         ensverifier,
 		}
+	}
+
+	if managerConfig.allowForcingCommunityMembersReevaluation {
+		manager.logger.Warn("allowing forcing community members reevaluation, this should only be used in test environment")
+		manager.forceMembersReevaluation = make(chan types.HexBytes, 10)
 	}
 
 	return manager, nil
@@ -1128,7 +1145,7 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 		error
 	}
 
-	reevaluateMembers := func() (err error) {
+	reevaluateMembers := func(force bool) (err error) {
 		t, exists := m.membersReevaluationTasks.Load(communityID.String())
 		if !exists {
 			return criticalError{
@@ -1151,7 +1168,7 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 		)
 
 		// Ensure reevaluation is performed not more often than once per minute
-		if task.lastSuccessTime.After(time.Now().Add(-1 * time.Minute)) {
+		if !force && task.lastSuccessTime.After(time.Now().Add(-1*time.Minute)) {
 			logger.Debug("<<< reevaluateMembers: skipping as too frequent")
 			return nil
 		}
@@ -1180,10 +1197,11 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 	defer ticker.Stop()
 
 	reevaluate := reevaluateOnStart
+	force := false
 
 	for {
 		if reevaluate {
-			err := reevaluateMembers()
+			err := reevaluateMembers(force)
 			if err != nil {
 				var criticalError *criticalError
 				if errors.As(err, &criticalError) {
@@ -1192,9 +1210,17 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 			}
 		}
 
+		force = false
+		reevaluate = false
+
 		select {
 		case <-ticker.C:
 			reevaluate = true
+			continue
+
+		case forceCommunityID := <-m.forceMembersReevaluation:
+			reevaluate = forceCommunityID.String() == communityID.String()
+			force = true
 			continue
 
 		case <-m.quit:
@@ -1203,7 +1229,18 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 	}
 }
 
+func (m *Manager) ForceMembersReevaluation(communityID types.HexBytes) error {
+	if m.forceMembersReevaluation == nil {
+		return errors.New("forcing members reevaluation is not allowed")
+	}
+	return m.scheduleMembersReevaluation(communityID, true)
+}
+
 func (m *Manager) ScheduleMembersReevaluation(communityID types.HexBytes) error {
+	return m.scheduleMembersReevaluation(communityID, false)
+}
+
+func (m *Manager) scheduleMembersReevaluation(communityID types.HexBytes, forceImmediateReevaluation bool) error {
 	t, exists := m.membersReevaluationTasks.Load(communityID.String())
 	if !exists {
 		return errors.New("reevaluation task doesn't exist")
@@ -1216,6 +1253,10 @@ func (m *Manager) ScheduleMembersReevaluation(communityID types.HexBytes) error 
 	task.mutex.Lock()
 	defer task.mutex.Unlock()
 	task.onDemandRequestTime = time.Now()
+
+	if forceImmediateReevaluation {
+		m.forceMembersReevaluation <- communityID
+	}
 
 	return nil
 }
