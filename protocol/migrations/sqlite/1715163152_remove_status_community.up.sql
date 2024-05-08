@@ -1,0 +1,3 @@
+DELETE FROM communities_communities WHERE id = X'039b2da47552aa117a96ea8f1d4d108ba66637c7517a3c94a57b99dbb8a002eda2';
+DELETE FROM communities_events WHERE id = X'039b2da47552aa117a96ea8f1d4d108ba66637c7517a3c94a57b99dbb8a002eda2';
+DELETE FROM communities_shards WHERE community_id = X'039b2da47552aa117a96ea8f1d4d108ba66637c7517a3c94a57b99dbb8a002eda2';
