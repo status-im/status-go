@@ -1157,7 +1157,6 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 
 		// Ensure reevaluation is performed not more often than once per minute
 		if !force && task.lastSuccessTime.After(time.Now().Add(-1*time.Minute)) {
-			logger.Debug("<<< reevaluateMembers: skipping as too frequent")
 			return nil
 		}
 
