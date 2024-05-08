@@ -881,19 +881,32 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestSharedAddressesReturnsRe
 
 	s.advertiseCommunityTo(community, s.alice)
 
-	s.joinCommunity(community, s.alice, bobPassword, []string{})
+	s.joinCommunity(community, s.alice, alicePassword, []string{})
 
 	revealedAccounts, err := s.alice.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().NoError(err)
-	s.Require().Len(revealedAccounts, 2)
-	s.Require().Equal(aliceAddress1, revealedAccounts[0].Address)
-	s.Require().Equal(aliceAddress2, revealedAccounts[1].Address)
+
+	revealedAddressesMap := make(map[string]struct{}, len(revealedAccounts))
+	for _, acc := range revealedAccounts {
+		revealedAddressesMap[acc.Address] = struct{}{}
+	}
+
+	s.Require().Len(revealedAddressesMap, 2)
+	s.Require().Contains(revealedAddressesMap, aliceAddress1)
+	s.Require().Contains(revealedAddressesMap, aliceAddress2)
 
 	sharedAddresses, err := s.alice.getSharedAddresses(community.ID(), []string{})
 	s.Require().NoError(err)
 	s.Require().Len(sharedAddresses, 2)
-	s.Require().Equal(sharedAddresses[0].String(), revealedAccounts[0].Address)
-	s.Require().Equal(sharedAddresses[1].String(), revealedAccounts[1].Address)
+
+	sharedAddressesMap := make(map[string]struct{}, len(sharedAddresses))
+	for _, acc := range sharedAddresses {
+		sharedAddressesMap[acc.String()] = struct{}{}
+	}
+
+	s.Require().Len(sharedAddressesMap, 2)
+	s.Require().Contains(sharedAddressesMap, aliceAddress1)
+	s.Require().Contains(sharedAddressesMap, aliceAddress2)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWithMemberAndAdminPermission() {
