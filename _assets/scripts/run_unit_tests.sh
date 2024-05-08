@@ -120,6 +120,15 @@ for package in ${UNIT_TEST_PACKAGES}; do
   wait # Wait for all background jobs to finish
 done
 
+# Gather test coverage results
+echo "mode: atomic" > c.out
+grep -h -v "^mode:" ./**/*.coverage.out >> c.out
+rm -rf ./**/*.coverage.out
+
+if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
+	cc-test-reporter after-build --prefix=github.com/status-im/status-go
+fi
+
 shopt -s globstar nullglob # Enable recursive globbing
 if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
   for exit_code_file in "${GIT_ROOT}"/**/exit_code_*.txt; do
@@ -130,13 +139,4 @@ if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
       exit ${exit_code}
     fi
   done
-fi
-
-# Gather test coverage results
-echo "mode: atomic" > c.out
-grep -h -v "^mode:" ./**/*.coverage.out >> c.out
-rm -rf ./**/*.coverage.out
-
-if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
-	cc-test-reporter after-build --prefix=github.com/status-im/status-go
 fi
