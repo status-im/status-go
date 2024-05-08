@@ -1227,7 +1227,15 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 }
 
 func (m *Manager) reevaluateCommunityMembersPermissions(communityID types.HexBytes) error {
+	// Publish when the reevluation started since it can take a while
+	signal.SendCommunityMemberReevaluationStarted(types.EncodeHex(communityID))
+
 	community, newPrivilegedMembers, err := m.ReevaluateMembers(communityID)
+
+	// Publish the reevaluation ending, even if it errored
+	// A possible improvement would be to pass the error here
+	signal.SendCommunityMemberReevaluationEnded(types.EncodeHex(communityID))
+
 	if err != nil {
 		return err
 	}
