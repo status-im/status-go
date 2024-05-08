@@ -153,7 +153,14 @@ func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) err
 		rawMessage.HashRatchetGroupID = org.ID()
 		rawMessage.Recipients = members
 	}
-	_, err = m.sender.SendPublic(context.Background(), org.IDString(), rawMessage)
+	messageID, err := m.sender.SendPublic(context.Background(), org.IDString(), rawMessage)
+	if err == nil {
+		m.logger.Debug("published community",
+			zap.String("communityID", org.IDString()),
+			zap.String("messageID", hexutil.Encode(messageID)),
+			zap.Uint64("clock", org.Clock()),
+		)
+	}
 	return err
 }
 
@@ -367,7 +374,6 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 			m.logger.Warn("failed to publish public shard info", zap.Error(err))
 			return
 		}
-		m.logger.Debug("published public shard info")
 
 		// signal client with published community
 		if m.config.messengerSignalsHandler != nil {
