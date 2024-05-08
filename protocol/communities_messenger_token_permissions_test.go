@@ -112,7 +112,7 @@ func (tckd *TestCommunitiesKeyDistributor) waitOnKeyDistribution(condition func(
 					return
 				}
 
-			case <-time.After(1000 * time.Millisecond):
+			case <-time.After(2000 * time.Millisecond):
 				errCh <- errors.New("timed out when waiting for key distribution")
 				return
 			}
@@ -1503,9 +1503,20 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().NoError(err)
 	s.Require().True(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
 
+	waitOnPermissionsReevaluated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		if sub.Community == nil {
+			return false
+		}
+		return checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, sub.Community)
+	})
+
 	// the control node re-evaluates the roles of the participants, checking that the privileged user has not lost his role
 	err = s.owner.communitiesManager.ForceMembersReevaluation(community.ID())
 	s.Require().NoError(err)
+
+	err = <-waitOnPermissionsReevaluated
+	s.Require().NoError(err)
+
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
 	s.Require().True(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
@@ -1526,7 +1537,17 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().NoError(err)
 	s.Require().False(community.HasTokenPermissions())
 
+	waitOnPermissionsReevaluated = waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		if sub.Community == nil {
+			return false
+		}
+		return !checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, sub.Community)
+	})
+
 	err = s.owner.communitiesManager.ForceMembersReevaluation(community.ID())
+	s.Require().NoError(err)
+
+	err = <-waitOnPermissionsReevaluated
 	s.Require().NoError(err)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
@@ -1611,6 +1632,13 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.makeAddressSatisfyTheCriteria(testChainID1, aliceAddress1, tokenPermission.TokenCriteria[0])
 	s.makeAddressSatisfyTheCriteria(testChainID1, aliceAddress1, tokenMemberPermission.TokenCriteria[0])
 
+	waitOnAliceAddedToCommunity := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		if sub.Community == nil {
+			return false
+		}
+		return checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, sub.Community)
+	})
+
 	// join community as a privileged user
 	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress1})
 
@@ -1620,6 +1648,9 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 
 	// the control node reevaluates the roles of the participants, checking that the privileged user has not lost his role
 	err = s.owner.communitiesManager.ForceMembersReevaluation(community.ID())
+	s.Require().NoError(err)
+
+	err = <-waitOnAliceAddedToCommunity
 	s.Require().NoError(err)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
@@ -1642,7 +1673,17 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities()[0].TokenPermissions(), 1)
 
+	waitOnAliceLostPermission := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		if sub.Community == nil {
+			return false
+		}
+		return !checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, sub.Community)
+	})
+
 	err = s.owner.communitiesManager.ForceMembersReevaluation(community.ID())
+	s.Require().NoError(err)
+
+	err = <-waitOnAliceLostPermission
 	s.Require().NoError(err)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
@@ -1666,7 +1707,17 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities()[0].TokenPermissions(), 0)
 
+	waitOnReevaluation := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		if sub.Community == nil {
+			return false
+		}
+		return !checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, sub.Community)
+	})
+
 	err = s.owner.communitiesManager.ForceMembersReevaluation(community.ID())
+	s.Require().NoError(err)
+
+	err = <-waitOnReevaluation
 	s.Require().NoError(err)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
