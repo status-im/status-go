@@ -219,6 +219,12 @@ type EnvelopeEventsInterceptor struct {
 	Messenger             *Messenger
 }
 
+type LatestContactRequest struct {
+	MessageID           string
+	ContactRequestState common.ContactRequestState
+	ContactID           string
+}
+
 func (m *Messenger) GetOwnPrimaryName() (string, error) {
 	ensName, err := m.settings.ENSName()
 	if err != nil {
@@ -2715,20 +2721,8 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
-	ids, err := m.persistence.LatestContactRequestIDs()
-
-	if err != nil {
+	if err = m.syncLatestContactRequest(ctx, rawMessageHandler); err != nil {
 		return err
-	}
-
-	for id, state := range ids {
-		if state == common.ContactRequestStateAccepted || state == common.ContactRequestStateDismissed {
-			accepted := state == common.ContactRequestStateAccepted
-			err := m.syncContactRequestDecision(ctx, id, accepted, rawMessageHandler)
-			if err != nil {
-				return err
-			}
-		}
 	}
 
 	// we have to sync deleted keypairs as well
@@ -2797,7 +2791,26 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 	return nil
 }
 
-func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID string, accepted bool, rawMessageHandler RawMessageHandler) error {
+func (m *Messenger) syncLatestContactRequest(ctx context.Context, rawMessageHandler RawMessageHandler) error {
+	latestContactRequests, err := m.persistence.LatestContactRequestIDs()
+
+	if err != nil {
+		return err
+	}
+
+	for _, r := range latestContactRequests {
+		if r.ContactRequestState == common.ContactRequestStateAccepted || r.ContactRequestState == common.ContactRequestStateDismissed {
+			accepted := r.ContactRequestState == common.ContactRequestStateAccepted
+			err = m.syncContactRequestDecision(ctx, r.MessageID, r.ContactID, accepted, rawMessageHandler)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID, contactId string, accepted bool, rawMessageHandler RawMessageHandler) error {
 	m.logger.Info("syncContactRequestDecision", zap.Any("from", requestID))
 	if !m.hasPairedDevices() {
 		return nil
@@ -2814,6 +2827,7 @@ func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID st
 
 	message := &protobuf.SyncContactRequestDecision{
 		RequestId:      requestID,
+		ContactId:      contactId,
 		Clock:          clock,
 		DecisionStatus: status,
 	}

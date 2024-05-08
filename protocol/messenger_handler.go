@@ -3784,17 +3784,15 @@ func (m *Messenger) HandleSyncContactRequestDecision(state *ReceivedMessageState
 	var response *MessengerResponse
 
 	if message.DecisionStatus == protobuf.SyncContactRequestDecision_ACCEPTED {
-		response, err = m.updateAcceptedContactRequest(nil, message.RequestId, true)
+		response, err = m.updateAcceptedContactRequest(nil, message.RequestId, message.ContactId, true)
 	} else {
-		response, err = m.declineContactRequest(message.RequestId, true)
+		response, err = m.declineContactRequest(message.RequestId, message.ContactId, true)
 	}
 	if err != nil {
 		return err
 	}
 
-	state.Response = response
-
-	return nil
+	return state.Response.Merge(response)
 }
 
 func (m *Messenger) HandlePushNotificationRegistration(state *ReceivedMessageState, encryptedRegistration []byte, statusMessage *v1protocol.StatusMessage) error {

@@ -153,7 +153,7 @@ func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.
 		return nil, err
 	}
 
-	err = m.syncContactRequestDecision(ctx, request.ID.String(), true, m.dispatchMessage)
+	err = m.syncContactRequestDecision(ctx, request.ID.String(), "", true, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -161,19 +161,37 @@ func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.
 	return response, nil
 }
 
-func (m *Messenger) declineContactRequest(requestID string, fromSyncing bool) (*MessengerResponse, error) {
+func (m *Messenger) declineContactRequest(requestID, contactID string, fromSyncing bool) (*MessengerResponse, error) {
 	m.logger.Info("declineContactRequest")
-	contactRequest, err := m.persistence.MessageByID(requestID)
-	if err != nil {
-		return nil, err
-	}
 
-	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: contactRequest.From})
+	var (
+		contactRequest *common.Message
+		err            error
+	)
+	contactRequest, err = m.persistence.MessageByID(requestID)
+	if err == common.ErrRecordNotFound && fromSyncing {
+		// original requestID(Message ID) is useless since we don't sync UserMessage in this case
+		requestID = defaultContactRequestID(contactID)
+		contactRequest, err = m.persistence.MessageByID(requestID)
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	response := &MessengerResponse{}
+	var contact *Contact
+	if contactRequest != nil {
+		contact, err = m.BuildContact(&requests.BuildContact{PublicKey: contactRequest.From})
+		if err != nil {
+			return nil, err
+		}
+		contactRequest.ContactRequestState = common.ContactRequestStateDismissed
+		err = m.persistence.SetContactRequestState(contactRequest.ID, contactRequest.ContactRequestState)
+		if err != nil {
+			return nil, err
+		}
+		response.AddMessage(contactRequest)
+	}
 
 	if !fromSyncing {
 		_, clock, err := m.getOneToOneAndNextClock(contact)
@@ -189,15 +207,9 @@ func (m *Messenger) declineContactRequest(requestID string, fromSyncing bool) (*
 
 		response.AddContact(contact)
 	}
-	contactRequest.ContactRequestState = common.ContactRequestStateDismissed
-
-	err = m.persistence.SetContactRequestState(contactRequest.ID, contactRequest.ContactRequestState)
-	if err != nil {
-		return nil, err
-	}
 
 	// update notification with the correct status
-	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(contactRequest.ID))
+	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(requestID))
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +226,6 @@ func (m *Messenger) declineContactRequest(requestID string, fromSyncing bool) (*
 			return nil, err
 		}
 	}
-	response.AddMessage(contactRequest)
 	return response, nil
 }
 
@@ -224,12 +235,12 @@ func (m *Messenger) DeclineContactRequest(ctx context.Context, request *requests
 		return nil, err
 	}
 
-	response, err := m.declineContactRequest(request.ID.String(), false)
+	response, err := m.declineContactRequest(request.ID.String(), "", false)
 	if err != nil {
 		return nil, err
 	}
 
-	err = m.syncContactRequestDecision(ctx, request.ID.String(), false, m.dispatchMessage)
+	err = m.syncContactRequestDecision(ctx, request.ID.String(), "", false, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -273,11 +284,20 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 	)
 }
 
-func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, contactRequestID string, fromSyncing bool) (*MessengerResponse, error) {
+func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, contactRequestID, contactID string, fromSyncing bool) (*MessengerResponse, error) {
+	m.logger.Debug("updateAcceptedContactRequest", zap.String("contactRequestID", contactRequestID), zap.String("contactID", contactID), zap.Bool("fromSyncing", fromSyncing))
 
-	m.logger.Debug("updateAcceptedContactRequest", zap.String("contactRequestID", contactRequestID))
+	var (
+		contactRequest *common.Message
+		err            error
+	)
 
-	contactRequest, err := m.persistence.MessageByID(contactRequestID)
+	contactRequest, err = m.persistence.MessageByID(contactRequestID)
+	if err == common.ErrRecordNotFound && fromSyncing {
+		// original requestID(Message ID) is useless since we don't sync UserMessage in this case
+		contactRequestID = defaultContactRequestID(contactID)
+		contactRequest, err = m.persistence.MessageByID(contactRequestID)
+	}
 	if err != nil {
 		m.logger.Error("contact request not found", zap.String("contactRequestID", contactRequestID), zap.Error(err))
 		return nil, err
@@ -493,7 +513,7 @@ func (m *Messenger) addContact(ctx context.Context,
 	}
 
 	if len(contactRequestID) != 0 {
-		updatedResponse, err := m.updateAcceptedContactRequest(response, contactRequestID, false)
+		updatedResponse, err := m.updateAcceptedContactRequest(response, contactRequestID, "", false)
 		if err != nil {
 			return nil, err
 		}
