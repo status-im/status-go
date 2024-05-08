@@ -971,8 +971,7 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 	return community, changes, nil
 }
 
-// WARNING: ReevaluateMembers is only public to be used in messenger tests.
-func (m *Manager) ReevaluateMembers(communityID types.HexBytes) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
+func (m *Manager) reevaluateMembers(communityID types.HexBytes) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
@@ -1284,7 +1283,7 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 }
 
 func (m *Manager) reevaluateCommunityMembersPermissions(communityID types.HexBytes) error {
-	community, newPrivilegedMembers, err := m.ReevaluateMembers(communityID)
+	community, newPrivilegedMembers, err := m.reevaluateMembers(communityID)
 	if err != nil {
 		return err
 	}
