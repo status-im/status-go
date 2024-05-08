@@ -2141,15 +2141,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissi
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMessages() {
-	s.logger.Debug("<<< create community")
-
 	// 1.1. Create community
 	community, chat := s.createCommunity()
-
-	s.logger.Debug("<<< created community",
-		zap.String("communityID", community.IDString()),
-		zap.String("chatID", chat.ID),
-	)
 
 	// 1.2. Setup permissions
 	communityPermission := &requests.CreateCommunityTokenPermission{
@@ -2182,9 +2175,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	}
 
 	waitOnChannelKeyAdded := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
-		s.logger.Debug("<<< community key actions", zap.Any("keyActions", sub.keyActions))
-		//return false
-
 		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
 		if !ok || action.ActionType != communities.EncryptionKeyAdd {
 			return false
@@ -2197,14 +2187,10 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 		return len(sub.Community.TokenPermissions()) == 2
 	})
 
-	s.logger.Debug("<<< setup community permission")
-
 	response, err := s.owner.CreateCommunityTokenPermission(communityPermission)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
-
-	s.logger.Debug("<<< setup channel permission")
 
 	response, err = s.owner.CreateCommunityTokenPermission(channelPermission)
 	s.Require().NoError(err)
@@ -2215,22 +2201,16 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.Require().True(community.HasTokenPermissions())
 	s.Require().Len(community.TokenPermissions(), 2)
 
-	s.logger.Debug("<<< waitOnCommunityPermissionCreated")
 	err = <-waitOnCommunityPermissionCreated
 	s.Require().NoError(err)
 	s.Require().True(community.Encrypted())
 
-	s.logger.Debug("<<< waitOnChannelKeyAdded")
 	err = <-waitOnChannelKeyAdded
 	s.Require().NoError(err)
 
 	// 2. Owner: Send a message A
-
-	s.logger.Debug("<<< sending chat message")
-
 	messageText1 := RandomLettersString(10)
 	message1 := s.sendChatMessage(s.owner, chat.ID, messageText1)
-	s.logger.Debug("<<< message1 sent", zap.Any("id", message1.ID), zap.String("text", message1.Text))
 
 	// 2.2. Retrieve own message (to make it stored in the archive later)
 	_, err = s.owner.RetrieveAll()
@@ -2260,7 +2240,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	archiveIDs, err := s.owner.communitiesManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, community.Encrypted())
 	s.Require().NoError(err)
 	s.Require().Len(archiveIDs, 1)
-	s.logger.Debug("<<< archive created", zap.Any("archiveIDs", archiveIDs))
 
 	community, err = s.owner.GetCommunityByID(community.ID())
 	s.Require().NoError(err)
@@ -2270,8 +2249,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.advertiseCommunityTo(community, s.bob)
 
 	waitForKeysDistributedToBob := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
-		s.logger.Debug("<<< community key actions 2", zap.Any("keyActions", sub.keyActions))
-
 		action := sub.keyActions.CommunityKeyAction
 		if action.ActionType != communities.EncryptionKeySendToMembers {
 			return false
@@ -2280,13 +2257,10 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 		return ok
 	})
 
-	s.logger.Debug(`<<< user joining`)
 	s.joinCommunity(community, s.bob, bobPassword, []string{})
 
 	err = <-waitForKeysDistributedToBob
 	s.Require().NoError(err)
-
-	s.logger.Debug("<<< user joined")
 
 	// 5. Bob: Import community archive
 	// The archive is successfully decrypted, but the message inside is not.
@@ -2311,16 +2285,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	err = s.bob.communitiesManager.SaveMessageArchiveID(community.ID(), archiveHash)
 	s.Require().NoError(err)
 
-	{ // WARNING: This can be removed, debugging purposes only
-		ownerCommunity, err := s.owner.GetCommunityByID(community.ID())
-		s.Require().NoError(err)
-		bobCommunity, err := s.bob.GetCommunityByID(community.ID())
-		s.Require().NoError(err)
-		s.logger.Debug("<<< community before importing", zap.Any("owner", ownerCommunity), zap.Any("bob", bobCommunity))
-		chatMembers := bobCommunity.Chats()[chat.CommunityChatID()].Members
-		s.Require().Nil(chatMembers) // Because Bob doesn't have access to the channel
-	}
-
 	// Import archive
 	s.bob.importDelayer.once.Do(func() {
 		close(s.bob.importDelayer.wait)
@@ -2328,8 +2292,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	cancel := make(chan struct{})
 	err = s.bob.importHistoryArchives(community.ID(), cancel)
 	s.Require().NoError(err)
-
-	s.logger.Debug("<<< importHistoryArchives finished")
 
 	// Ensure message1 wasn't imported, as it's encrypted, and we don't have access to the channel
 	receivedMessage1, err := s.bob.MessageByID(message1.ID)
@@ -2342,8 +2304,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.Require().Equal(1, hashRatchetMessagesCount)
 
 	// Make bob satisfy channel criteria
-	s.logger.Debug("<<< making bob satisfying channel criteria")
-
 	waitOnChannelKeyToBeDistributedToBob := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
 		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
 		if !ok || action.ActionType != communities.EncryptionKeySendToMembers {
@@ -2368,19 +2328,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 
 	// NOTE: In theory a single RetrieveAll call should be enough,
 	// 		 because we immediately process all hash ratchet messages
-	//response, err = s.bob.RetrieveAll()
-
-	// But we process in a loop for now just in case.
-	// E.g. keys are not distributed yet
-	response, err = WaitOnMessengerResponse(
-		s.bob,
-		func(r *MessengerResponse) bool {
-			_, ok := r.messages[message1.ID]
-			return ok
-		},
-		"message1 not retrieved",
-	)
-
+	response, err = s.bob.RetrieveAll()
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
 
