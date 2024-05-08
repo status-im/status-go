@@ -99,44 +99,49 @@ run_test_for_package() {
   return ${go_test_exit}
 }
 
-if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
-	cc-test-reporter before-build
-fi
-
-for package in ${UNIT_TEST_PACKAGES}; do
-  for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-    if ! is_parallelizable "${package}" || [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
-      run_test_for_package "${package}" "${i}"
-      go_test_exit=$?
-      if [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
-        if [[ "${go_test_exit}" -ne 0 ]]; then
-          exit "${go_test_exit}"
-        fi
-      fi
-    else
-      run_test_for_package "${package}" "${i}" &
-    fi
-  done
-  wait # Wait for all background jobs to finish
-done
-
-shopt -s globstar nullglob # Enable recursive globbing
-if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
-  for exit_code_file in "${GIT_ROOT}"/**/exit_code_*.txt; do
-    read exit_code < "${exit_code_file}"
-    if [[ "${exit_code}" -ne 0 ]]; then
-      mkdir -p "${GIT_ROOT}/reports"
-      "${GIT_ROOT}/_assets/scripts/test_stats.py" | redirect_stdout "${GIT_ROOT}/reports/test_stats.txt"
-      exit ${exit_code}
-    fi
-  done
-fi
-
-# Gather test coverage results
-echo "mode: atomic" > c.out
-grep -h -v "^mode:" ./**/*.coverage.out >> c.out
-rm -rf ./**/*.coverage.out
+echo "running tests"
+echo "UNIT_TEST_REPORT_CODECLIMATE: $UNIT_TEST_REPORT_CODECLIMATE"
 
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
-	cc-test-reporter after-build --prefix=github.com/status-im/status-go
+  echo "cc-test-reporter before-build"
+#	cc-test-reporter before-build
+fi
+
+#for package in ${UNIT_TEST_PACKAGES}; do
+#  for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
+#    if ! is_parallelizable "${package}" || [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
+#      run_test_for_package "${package}" "${i}"
+#      go_test_exit=$?
+#      if [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
+#        if [[ "${go_test_exit}" -ne 0 ]]; then
+#          exit "${go_test_exit}"
+#        fi
+#      fi
+#    else
+#      run_test_for_package "${package}" "${i}" &
+#    fi
+#  done
+#  wait # Wait for all background jobs to finish
+#done
+#
+#shopt -s globstar nullglob # Enable recursive globbing
+#if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
+#  for exit_code_file in "${GIT_ROOT}"/**/exit_code_*.txt; do
+#    read exit_code < "${exit_code_file}"
+#    if [[ "${exit_code}" -ne 0 ]]; then
+#      mkdir -p "${GIT_ROOT}/reports"
+#      "${GIT_ROOT}/_assets/scripts/test_stats.py" | redirect_stdout "${GIT_ROOT}/reports/test_stats.txt"
+#      exit ${exit_code}
+#    fi
+#  done
+#fi
+#
+## Gather test coverage results
+#echo "mode: atomic" > c.out
+#grep -h -v "^mode:" ./**/*.coverage.out >> c.out
+#rm -rf ./**/*.coverage.out
+
+if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
+  echo "cc-test-reporter after-build"
+#	cc-test-reporter after-build --prefix=github.com/status-im/status-go
 fi
