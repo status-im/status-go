@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.8.10'
+library 'status-jenkins-lib@v1.8.15'
 
 pipeline {
   agent { label 'linux && x86_64 && nix-2.14' }
@@ -17,22 +17,22 @@ pipeline {
     )
     booleanParam(
       name: 'UNIT_TEST_FAILFAST',
-      defaultValue: getDefaultUnitTestFailfast(),
+      defaultValue: !isTestNightlyJob(),
       description: 'Should the job fail fast on first test failure?'
     )
     booleanParam(
       name: 'UNIT_TEST_RERUN_FAILS',
-      defaultValue: getDefaultUnitTestRerunFails(),
+      defaultValue: !isTestNightlyJob(),
       description: 'Should the job rerun failed tests?'
     )
     booleanParam(
       name: 'UNIT_TEST_USE_DEVELOPMENT_LOGGER',
-      defaultValue: getDefaultUnitTestUseDevelopmentLogger(),
+      defaultValue: !isTestNightlyJob(),
       description: 'Should the job use detailed logging for tests, potentially generating large logs?'
     )
     booleanParam(
       name: 'UNIT_TEST_REPORT_CODECLIMATE',
-      defaultValue: getDefaultUnitTestReportCodeClimate(),
+      defaultValue: !isTestNightlyJob(),
       description: 'Should the job report test coverage to CodeClimate?'
     )
   }
@@ -59,6 +59,12 @@ pipeline {
     GOCACHE  = "${WORKSPACE_TMP}/gocache"
     PATH     = "${PATH}:${GOPATH}/bin"
     REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
+
+    /* Hack-fix for params not being set in env on first job run. */
+    UNIT_TEST_FAILFAST =               "${params.UNIT_TEST_FAILFAST}"
+    UNIT_TEST_RERUN_FAILS =            "${params.UNIT_TEST_RERUN_FAILS}"
+    UNIT_TEST_USE_DEVELOPMENT_LOGGER = "${params.UNIT_TEST_USE_DEVELOPMENT_LOGGER}"
+    UNIT_TEST_REPORT_CODECLIMATE =     "${params.UNIT_TEST_REPORT_CODECLIMATE}"
   }
 
   stages {
@@ -136,34 +142,36 @@ pipeline {
 
   post {
     always  {
-      script { env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText" }
       script {
-        if (isTestNightlyJob()) {
-          archiveArtifacts artifacts: '**/report_*.xml, **/test_*.log'
+        env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
 
+        if (isTestNightlyJob()) {
+          archiveArtifacts('**/report_*.xml, **/test_*.log')
           def totalSize = sh(script: "find . -name 'report_*.xml' | xargs wc -c | tail -n1 | awk '{print \$1}'", returnStdout: true).trim()
-          echo "Total size of all report_*.xml files: ${totalSize} bytes"
+          println("Total size of all report_*.xml files: ${totalSize} bytes.")
         }
         if (params.UNIT_TEST_RERUN_FAILS) {
           def rerunReports = findFiles(glob: '**/report_rerun_fails_*.txt')
           if (rerunReports.length > 0) {
-            archiveArtifacts artifacts: '**/report_rerun_fails_*.txt'
+            archiveArtifacts('**/report_rerun_fails_*.txt')
           }
         }
+        junit(
+          testResults: '**/report_*.xml',
+          skipOldReports: true,
+          skipPublishingChecks: true,
+          skipMarkingBuildUnstable: true
+        )
+        publishHTML(target: [
+          allowMissing:           true,
+          alwaysLinkToLastBuild:  true,
+          keepAll:                true,
+          reportDir:    'reports',
+          reportFiles:  'test_stats.txt',
+          reportName:   'Reports',
+          reportTitles: 'Test Stats'
+        ])
       }
-      junit testResults:          '**/report_*.xml',
-            skipOldReports:       true,
-            skipPublishingChecks: true,
-            skipMarkingBuildUnstable: true
-      publishHTML target: [
-        allowMissing:           true,
-        alwaysLinkToLastBuild:  true,
-        keepAll:                true,
-        reportDir:              'reports',
-        reportFiles:            'test_stats.txt',
-        reportName:             'Reports',
-        reportTitles:           'Test Stats'
-      ]
     }
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
@@ -177,13 +185,5 @@ pipeline {
 def isTestNightlyJob() { env.JOB_BASE_NAME == 'tests-nightly' }
 
 def getDefaultUnitTestCount() { isTestNightlyJob() ? '20' : '1' }
-
-def getDefaultUnitTestRerunFails() { isTestNightlyJob() ? false : true }
-
-def getDefaultUnitTestUseDevelopmentLogger() { isTestNightlyJob() ? false : true }
-
-def getDefaultUnitTestReportCodeClimate() { isTestNightlyJob() ? false : true }
-
-def getDefaultUnitTestFailfast() { isTestNightlyJob() ? false : true }
 
 def getDefaultTimeout() { isTestNightlyJob() ? 5*60 : 50 }
