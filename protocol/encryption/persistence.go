@@ -764,7 +764,11 @@ func (s *sqlitePersistence) GetHashRatchetCache(ratchet *HashRatchetKeyCompatibi
 		}
 	}
 
-	err = tx.QueryRow("SELECT key FROM hash_ratchet_encryption WHERE key_id = ? OR deprecated_key_id = ?", keyID, ratchet.DeprecatedKeyID()).Scan(&key)
+	err = tx.QueryRow("SELECT key FROM hash_ratchet_encryption WHERE key_id = ? OR (deprecated_key_id = ? AND group_id = ?)",
+		keyID,
+		ratchet.DeprecatedKeyID(),
+		ratchet.GroupID,
+	).Scan(&key)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
