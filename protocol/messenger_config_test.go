@@ -5,6 +5,7 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/t/helpers"
 )
@@ -41,6 +42,13 @@ func WithAutoRequestHistoricMessages(enabled bool) Option {
 func WithCuratedCommunitiesUpdateLoop(enabled bool) Option {
 	return func(c *config) error {
 		c.codeControlFlags.CuratedCommunitiesUpdateLoopEnabled = enabled
+		return nil
+	}
+}
+
+func WithCommunityManagerOptions(options []communities.ManagerOption) Option {
+	return func(c *config) error {
+		c.communityManagerOptions = options
 		return nil
 	}
 }

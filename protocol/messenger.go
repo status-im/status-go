@@ -477,6 +477,8 @@ func NewMessenger(
 		managerOptions = append(managerOptions, communities.WithCommunityTokensService(c.communityTokensService))
 	}
 
+	managerOptions = append(managerOptions, c.communityManagerOptions...)
+
 	communitiesKeyDistributor := &CommunitiesKeyDistributorImpl{
 		sender:    sender,
 		encryptor: encryptionProtocol,
