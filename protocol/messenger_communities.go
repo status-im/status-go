@@ -292,6 +292,10 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 	publishOrgAndDistributeEncryptionKeys := func(community *communities.Community) {
 		recentlyPublishedOrg := recentlyPublishedOrgs[community.IDString()]
 
+		if recentlyPublishedOrg != nil && community.Clock() <= recentlyPublishedOrg.Clock() {
+			return
+		}
+
 		// evaluate and distribute encryption keys (if any)
 		encryptionKeyActions := communities.EvaluateCommunityEncryptionKeyActions(recentlyPublishedOrg, community)
 		err := m.communitiesKeyDistributor.Distribute(community, encryptionKeyActions)
@@ -2498,14 +2502,7 @@ func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommu
 	}
 
 	if community.IsControlNode() {
-		// check existing member permission once, then check periodically
-		go func() {
-			if err := m.communitiesManager.ReevaluateCommunityMembersPermissions(community); err != nil {
-				m.logger.Debug("failed to check member permissions", zap.Error(err))
-			}
-
-			m.communitiesManager.ReevaluateMembersPeriodically(community.ID())
-		}()
+		m.communitiesManager.StartMembersReevaluationLoop(community.ID(), true)
 	}
 
 	// ensure HRkeys are synced
@@ -2538,11 +2535,10 @@ func (m *Messenger) EditCommunityTokenPermission(request *requests.EditCommunity
 	//
 	// We do this in a separate routine to not block this function
 	if community.IsControlNode() {
-		go func() {
-			if err := m.communitiesManager.ReevaluateCommunityMembersPermissions(community); err != nil {
-				m.logger.Debug("failed to check member permissions", zap.Error(err))
-			}
-		}()
+		err = m.communitiesManager.ScheduleMembersReevaluation(community.ID())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	response := &MessengerResponse{}
@@ -2565,11 +2561,10 @@ func (m *Messenger) DeleteCommunityTokenPermission(request *requests.DeleteCommu
 	// check if members still fulfill the token criteria
 	// We do this in a separate routine to not block this function
 	if community.IsControlNode() {
-		go func() {
-			if err = m.communitiesManager.ReevaluateCommunityMembersPermissions(community); err != nil {
-				m.logger.Debug("failed to check member permissions", zap.Error(err))
-			}
-		}()
+		err = m.communitiesManager.ScheduleMembersReevaluation(community.ID())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	response := &MessengerResponse{}
