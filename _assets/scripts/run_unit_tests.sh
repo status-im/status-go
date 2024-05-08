@@ -100,6 +100,7 @@ run_test_for_package() {
 }
 
 echo "running tests"
+echo "UNIT_TEST_REPORT_CODECLIMATE: $UNIT_TEST_REPORT_CODECLIMATE"
 
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
   echo "cc-test-reporter before-build"
