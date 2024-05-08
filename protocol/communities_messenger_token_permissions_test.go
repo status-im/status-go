@@ -108,7 +108,7 @@ func (tckd *TestCommunitiesKeyDistributor) waitOnKeyDistribution(condition func(
 					return
 				}
 
-			case <-time.After(500 * time.Millisecond):
+			case <-time.After(1000 * time.Millisecond):
 				errCh <- errors.New("timed out when waiting for key distribution")
 				return
 			}

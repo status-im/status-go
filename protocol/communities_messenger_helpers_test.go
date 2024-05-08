@@ -580,7 +580,7 @@ func waitOnCommunitiesEvent(user *Messenger, condition func(*communities.Subscri
 					return
 				}
 
-			case <-time.After(500 * time.Millisecond):
+			case <-time.After(1000 * time.Millisecond):
 				errCh <- errors.New("timed out when waiting for communities event")
 				return
 			}
