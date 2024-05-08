@@ -2361,8 +2361,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	//community, _, err = s.owner.communitiesManager.ReevaluateMembers(community.ID())
 	err = s.owner.communitiesManager.ScheduleMembersReevaluation(community.ID())
 	s.Require().NoError(err)
-	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
-	s.Require().NoError(err)
 
 	err = <-waitOnChannelKeyToBeDistributedToBob
 	s.Require().NoError(err)
