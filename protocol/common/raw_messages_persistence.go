@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"encoding/gob"
+	"errors"
 	"strings"
 	"time"
 
@@ -354,6 +355,18 @@ func (db RawMessagesPersistence) GetHashRatchetMessages(keyID []byte) ([]*types.
 	}
 
 	return messages, nil
+}
+
+func (db RawMessagesPersistence) GetHashRatchetMessagesCountForGroup(groupID []byte) (int, error) {
+	var count int
+	err := db.db.QueryRow(`SELECT count(*) FROM hash_ratchet_encrypted_messages WHERE group_id = ?`, groupID).Scan(&count)
+	if err == nil {
+		return count, nil
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return 0, err
 }
 
 func (db RawMessagesPersistence) DeleteHashRatchetMessages(ids [][]byte) error {
