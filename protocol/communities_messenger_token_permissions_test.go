@@ -13,7 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/protobuf/proto"
+
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
@@ -27,6 +30,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
@@ -2263,50 +2267,27 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.Require().NoError(err)
 
 	// 4. Bob: join community (satisfying membership, but not channel permissions)
-
-	s.logger.Debug(`<<< user joining`)
-
-	waitKeys := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
-		//s.logger.Debug("<<< community key actions 2", zap.Any("keyActions", sub.keyActions))
-		return false
-		//action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
-		//if !ok || action.ActionType != communities.EncryptionKeySendToMembers {
-		//	return false
-		//}
-		//_, ok = action.Members[common.PubkeyToHex(&s.bob.identity.PublicKey)]
-		//return ok
-	})
-
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, communityPermission.TokenCriteria[0])
 	s.advertiseCommunityTo(community, s.bob)
+
+	waitForKeysDistributedToBob := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
+		s.logger.Debug("<<< community key actions 2", zap.Any("keyActions", sub.keyActions))
+
+		action := sub.keyActions.CommunityKeyAction
+		if action.ActionType != communities.EncryptionKeySendToMembers {
+			return false
+		}
+		_, ok := action.Members[s.bob.IdentityPublicKeyString()]
+		return ok
+	})
+
+	s.logger.Debug(`<<< user joining`)
 	s.joinCommunity(community, s.bob, bobPassword, []string{})
 
-	_ = <-waitKeys
-	//s.Require().NoError(err)
+	err = <-waitForKeysDistributedToBob
+	s.Require().NoError(err)
 
-	response, _ = WaitOnMessengerResponse(s.bob,
-		func(r *MessengerResponse) bool {
-			return false
-		}, "")
-
-	s.logger.Debug("<<< response", zap.Any("response", response))
 	s.logger.Debug("<<< user joined")
-
-	// NOTE: For Bob the channel members list will be empty, as Bob doesn't satisfy channel criteria
-	// 		 So we won't be able to import the message from the archive
-	//checkCommunity := func(m *Messenger) {
-	//	receivedCommunity, err := m.GetCommunityByID(community.ID())
-	//	s.logger.Debug("<<< community logged", zap.Any("community", receivedCommunity))
-	//	s.Require().NoError(err)
-	//	s.Require().NotNil(receivedCommunity)
-	//	s.Require().Len(receivedCommunity.Members(), 2)
-	//	chatID := chat.CommunityChatID()
-	//	receivedChat, ok := receivedCommunity.Chats()[chatID]
-	//	s.Require().True(ok)
-	//	s.Require().Len(receivedChat.Members, 1)
-	//}
-	//checkCommunity(s.owner)
-	//checkCommunity(s.bob)
 
 	// 5. Bob: Import community archive
 	// The archive is successfully decrypted, but the message inside is not.
@@ -2331,15 +2312,17 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	err = s.bob.communitiesManager.SaveMessageArchiveID(community.ID(), archiveHash)
 	s.Require().NoError(err)
 
-	ownerCommunity, err := s.owner.GetCommunityByID(community.ID())
-	s.Require().NoError(err)
-	bobCommunity, err := s.bob.GetCommunityByID(community.ID())
-	s.Require().NoError(err)
+	{ // WARNING: This can be removed, debugging purposes only
+		ownerCommunity, err := s.owner.GetCommunityByID(community.ID())
+		s.Require().NoError(err)
+		bobCommunity, err := s.bob.GetCommunityByID(community.ID())
+		s.Require().NoError(err)
+		s.logger.Debug("<<< community before importing", zap.Any("owner", ownerCommunity), zap.Any("bob", bobCommunity))
+		chatMembers := bobCommunity.Chats()[chat.CommunityChatID()].Members
+		s.Require().Nil(chatMembers) // Because Bob doesn't have access to the channel
+	}
 
-	s.logger.Debug("<<< community before importing", zap.Any("owner", ownerCommunity), zap.Any("bob", bobCommunity))
-	chatMembers := bobCommunity.Chats()[chat.CommunityChatID()].Members
-	s.Require().Nil(chatMembers) // Because Bob doesn't have access to the channel
-
+	// Import archive
 	s.bob.importDelayer.once.Do(func() {
 		close(s.bob.importDelayer.wait)
 	})
@@ -2354,12 +2337,13 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.Require().Nil(receivedMessage1)
 	s.Require().Error(err)
 
-	//s.bob.persistence.GetHashRatchetMessages()
+	chatID := []byte(chat.ID)
+	hashRatchetMessagesCount, err := s.bob.persistence.GetHashRatchetMessagesCountForGroup(chatID)
+	s.Require().NoError(err)
+	s.Require().Equal(1, hashRatchetMessagesCount)
 
 	// Make bob satisfy channel criteria
-	s.logger.Debug("<<< user satisfies channel criteria")
-
-	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, channelPermission.TokenCriteria[0])
+	s.logger.Debug("<<< making bob satisfying channel criteria")
 
 	waitOnChannelKeyToBeDistributedToBob := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
 		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
@@ -2370,9 +2354,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 		return ok
 	})
 
+	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, channelPermission.TokenCriteria[0])
+
 	// force owner to reevaluate channel members
 	// in production it will happen automatically, by periodic check
-	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	//community, _, err = s.owner.communitiesManager.ReevaluateMembers(community.ID())
+	err = s.owner.communitiesManager.ScheduleMembersReevaluation(community.ID())
 	s.Require().NoError(err)
 	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
 	s.Require().NoError(err)
@@ -2382,25 +2369,67 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 
 	// Finally ensure that the message from archive was retrieved and decrypted
 
-	// Message could have been retreived during previous wait
-	//receivedMessage1, err = s.bob.MessageByID(message1.ID)
-	//if err != nil {
-	//	s.Require().NotNil(receivedMessage1)
-	//	return
-	//}
+	// NOTE: In theory a single RetrieveAll call should be enough,
+	// 		 because we immediately process all hash ratchet messages
+	//response, err = s.bob.RetrieveAll()
 
-	//_, err = WaitOnMessengerResponse(
-	//	s.bob,
-	//	func(r *MessengerResponse) bool {
-	//		_, ok := r.messages[message1.ID]
-	//		return ok
-	//	},
-	//	"message1 not retrieved",
-	//)
-	response, err = s.bob.RetrieveAll()
+	// But we process in a loop for now just in case.
+	// E.g. keys are not distributed yet
+	response, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			_, ok := r.messages[message1.ID]
+			return ok
+		},
+		"message1 not retrieved",
+	)
+
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
+
 	receivedMessage1, ok := response.messages[message1.ID]
 	s.Require().True(ok)
 	s.Require().Equal(messageText1, receivedMessage1.Text)
+}
+
+func TestHandleEncryptionLayer(t *testing.T) {
+	src := []byte{
+		0xA, 0x41, 0x5, 0xEA, 0x71, 0xA1, 0x2B, 0x1A,
+		0xC5, 0x58, 0x9E, 0xBC, 0x9, 0x44, 0x38, 0xB4,
+		0x5C, 0xF, 0x32, 0x77, 0x79, 0xFF, 0x5E, 0x81,
+		0x5, 0xDE, 0x17, 0x20, 0xC1, 0x4D, 0xFA, 0xCC,
+		0x72, 0x9A, 0x31, 0xE9, 0x29, 0xB9, 0xCF, 0x3E,
+		0x66, 0xD5, 0xD0, 0x81, 0x96, 0xDB, 0xCD, 0x5C,
+		0x6F, 0x9A, 0x92, 0xC2, 0x6, 0x88, 0x7, 0x83,
+		0xE7, 0x46, 0xDE, 0x19, 0xAD, 0x1, 0xE7, 0x1B,
+		0x6C, 0x3B, 0x1, 0x12, 0x6F, 0xA, 0x41, 0xCB,
+		0xD8, 0x4B, 0xCB, 0x3E, 0xC7, 0xB1, 0xE8, 0x58,
+		0x6F, 0xEC, 0xAB, 0xCC, 0x21, 0x92, 0xAF, 0xA3,
+		0xDF, 0x61, 0x9B, 0x7D, 0x20, 0x3B, 0xD5, 0x52,
+		0xD9, 0x35, 0x64, 0x44, 0x39, 0xA0, 0x64, 0x24,
+		0x33, 0x36, 0xAA, 0x9D, 0xD7, 0xFF, 0x4F, 0xD0,
+		0xA5, 0xE7, 0x37, 0xE4, 0x77, 0x3F, 0x55, 0xE1,
+		0x36, 0xD5, 0x5B, 0xF8, 0x42, 0x0, 0x5A, 0xFA,
+		0xDD, 0x37, 0x9F, 0x68, 0x98, 0x93, 0x3D, 0x0,
+		0x12, 0x2A, 0x8, 0x9B, 0xF4, 0x91, 0x9C, 0xF5,
+		0x31, 0x12, 0x21, 0x2, 0x59, 0xB1, 0xFF, 0xA5,
+		0xF5, 0x8B, 0xF, 0xDC, 0x44, 0x45, 0x39, 0x3,
+		0x19, 0xCD, 0x8C, 0xD7, 0x6B, 0xDF, 0x4, 0xAF,
+		0x8B, 0x2C, 0x27, 0xDC, 0xBC, 0x4F, 0xEC, 0xCD,
+		0x29, 0xA8, 0x9C, 0xEA, 0x18, 0x4F,
+	}
+	//
+	//decoded := make([]byte, hex.DecodedLen(len(src)))
+	//decodedLen, err := hex.Decode(decoded, src)
+	//s.Require().NoError(err)
+	//
+
+	logger := tt.MustCreateTestLogger()
+
+	decoded := string(src)
+	logger.Debug("<<< decoded", zap.Any("decoded", decoded))
+
+	var protocolMessage encryption.ProtocolMessage
+	err := proto.Unmarshal(src, &protocolMessage)
+	require.NoError(t, err)
 }
