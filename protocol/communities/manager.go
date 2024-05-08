@@ -6,7 +6,6 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -5428,12 +5427,11 @@ func (m *Manager) encryptCommunityDescriptionImpl(groupID []byte, d *protobuf.Co
 		return "", nil, err
 	}
 
-	communityJSON, err := json.Marshal(d)
-	if err != nil {
-		return "", nil, err
-	}
+	m.logger.Debug("encrypting community description",
+		zap.Any("community", d),
+		zap.String("groupID", types.Bytes2Hex(groupID)),
+		zap.String("keyID", types.Bytes2Hex(keyID)))
 
-	m.logger.Debug("encrypting community description", zap.String("community", string(communityJSON)), zap.String("groupID", types.Bytes2Hex(groupID)), zap.String("key-id", types.Bytes2Hex(keyID)))
 	keyIDSeqNo := fmt.Sprintf("%s%d", hex.EncodeToString(keyID), newSeqNo)
 
 	return keyIDSeqNo, encryptedPayload, nil
