@@ -62,6 +62,7 @@ run_test_for_package() {
   echo -e "${GRN}Testing:${RST} ${package} Iteration:${iteration}"
   package_dir=$(go list -f "{{.Dir}}" "${package}")
   output_file="${package_dir}/test_${iteration}.log"
+  coverage_file="${package_dir}/test_${iteration}.coverage.out"
 
   if has_extended_timeout "${package}"; then
     package_timeout="${UNIT_TEST_PACKAGE_TIMEOUT_EXTENDED}"
@@ -82,7 +83,9 @@ run_test_for_package() {
     -v ${GOTEST_EXTRAFLAGS} \
     -timeout "${package_timeout}" \
     -count 1 \
-    -tags "${BUILD_TAGS}" | \
+    -tags "${BUILD_TAGS}" \
+    -covermode=atomic \
+    -coverprofile="${coverage_file}" | \
     redirect_stdout "${output_file}"
 
   local go_test_exit=$?
@@ -95,6 +98,10 @@ run_test_for_package() {
 
   return ${go_test_exit}
 }
+
+if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
+	cc-test-reporter before-build
+fi
 
 for package in ${UNIT_TEST_PACKAGES}; do
   for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
@@ -123,4 +130,13 @@ if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
       exit ${exit_code}
     fi
   done
+fi
+
+# Gather test coverage results
+echo "mode: atomic" > c.out
+grep -h -v "^mode:" ./**/*.coverage.out >> c.out
+rm -rf ./**/*.coverage.out
+
+if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
+	cc-test-reporter after-build --prefix=github.com/status-im/status-go
 fi

@@ -51,6 +51,7 @@ in rec {
 
   # Custom packages
   go-modvendor = callPackage ./pkgs/go-modvendor { };
+  cc-test-reporter = callPackage ./pkgs/cc-test-reporter { };
 
   gomobile = (prev.gomobile.overrideAttrs (old: {
     patches = [
