@@ -32,7 +32,7 @@ pipeline {
     )
     booleanParam(
       name: 'UNIT_TEST_REPORT_CODECLIMATE',
-      defaultValue: getDefaultUnitTestReportCodeClimate(),
+      defaultValue: true,
       description: 'Should the job report test coverage to CodeClimate?'
     )
   }
@@ -181,8 +181,6 @@ def getDefaultUnitTestCount() { isTestNightlyJob() ? '20' : '1' }
 def getDefaultUnitTestRerunFails() { isTestNightlyJob() ? false : true }
 
 def getDefaultUnitTestUseDevelopmentLogger() { isTestNightlyJob() ? false : true }
-
-def getDefaultUnitTestReportCodeClimate() { isTestNightlyJob() ? false : true }
 
 def getDefaultUnitTestFailfast() { isTestNightlyJob() ? false : true }
 
