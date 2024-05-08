@@ -1114,7 +1114,9 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 	logger := m.logger.With(zap.String("communityID", communityID.String()))
 
 	if _, exists := m.membersReevaluationTasks.Load(communityID.String()); exists {
-		logger.Debug("<<< reevaluateMembersLoop: task already exists")
+		logger.Debug("<<< reevaluateMembersLoop: task already exists",
+			zap.Bool("reevaluateOnStart", reevaluateOnStart),
+		)
 		return
 	}
 	logger.Debug("<<< reevaluateMembersLoop starting", zap.Bool("reevaluateOnStart", reevaluateOnStart))

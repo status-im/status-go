@@ -4,9 +4,10 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
@@ -359,7 +360,10 @@ func (s *MessageSender) sendCommunity(
 
 	if encrypted {
 		s.logger.Debug("<<< calling BuildHashRatchetMessage",
-			zap.String("messageID", messageID.String()))
+			zap.String("messageID", messageID.String()),
+			zap.String("groupIdString", string(rawMessage.HashRatchetGroupID)),
+			zap.String("groupIdBytes", hexutil.Encode(rawMessage.HashRatchetGroupID)),
+		)
 
 		messageSpec, err := s.protocol.BuildHashRatchetMessage(rawMessage.HashRatchetGroupID, wrappedMessage)
 		if err != nil {
@@ -593,7 +597,7 @@ func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMes
 	s.logger.Debug("<<< dispatchCommunityChatMessage",
 		zap.String("messageID", rawMessage.ID),
 		zap.Bool("rekey", rekey),
-		zap.String("HashRatchetGroupID", hexutil.Encode(rawMessage.HashRatchetGroupID)),
+		zap.String("HashRatchetGroupID", string(rawMessage.HashRatchetGroupID)),
 	)
 
 	payload := wrappedMessage
@@ -812,8 +816,14 @@ func (s *MessageSender) HandleMessages(wakuMessage *types.Message) (*HandleMessa
 		// Hash ratchet with a group id not found yet, save the message for future processing
 		if err == encryption.ErrHashRatchetGroupIDNotFound && len(response.Message.EncryptionLayer.HashRatchetInfo) == 1 {
 			info := response.Message.EncryptionLayer.HashRatchetInfo[0]
+			hlogger.Debug("<<< saving hash ratchet message for future processing",
+				zap.String("groupIdString", string(info.GroupID)),
+				zap.String("groupIdHex", hexutil.Encode(info.GroupID)),
+			)
 			return nil, s.persistence.SaveHashRatchetMessage(info.GroupID, info.KeyID, wakuMessage)
 		}
+
+		hlogger.Debug("<<< failed to handle message", zap.Error(err))
 
 		// The current message segment has been successfully retrieved.
 		// However, the collection of segments is not yet complete.

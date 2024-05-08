@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/common"
@@ -112,7 +113,7 @@ func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(community *comm
 		zap.Any("err", err),
 		zap.Any("msgType", msgType),
 		zap.Any("communityID", community.IDString()),
-		zap.Any("hashRatchetGroupID", hex.EncodeToString(hashRatchetGroupID)),
+		zap.Any("hashRatchetGroupID", string(hashRatchetGroupID)),
 		zap.Any("pubkeys", pubkeyStrings),
 	)
 

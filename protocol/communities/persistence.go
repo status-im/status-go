@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
 	"go.uber.org/zap"
 
 	"math/big"

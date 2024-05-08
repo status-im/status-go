@@ -6,9 +6,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	dr "github.com/status-im/doubleratchet"
 	"go.uber.org/zap"
@@ -89,7 +90,7 @@ func defaultEncryptorConfig(installationID string, logger *zap.Logger) encryptor
 // newEncryptor creates a new EncryptionService instance.
 func newEncryptor(db *sql.DB, config encryptorConfig) *encryptor {
 	return &encryptor{
-		persistence: newSQLitePersistence(db),
+		persistence: newSQLitePersistence(db, config.Logger.Named("encryptor.persistence")),
 		config:      config,
 		messageIDs:  make(map[string]*confirmationData),
 		logger:      config.Logger.Named("encryptor"),
@@ -259,9 +260,10 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 	)
 
 	for i, msg := range msgs {
-		s.logger.Debug(fmt.Sprintf("msg[%s]", i),
+		s.logger.Debug(fmt.Sprintf("<<< msg[%s]", i),
 			zap.Uint32("seqNo", msg.GetHRHeader().GetSeqNo()),
-			zap.String("groupID", hexutil.Encode(msg.GetHRHeader().GetGroupId())),
+			zap.String("groupIdString", string(msg.GetHRHeader().GetGroupId())),
+			zap.String("groupIdHex", hexutil.Encode(msg.GetHRHeader().GetGroupId())),
 			zap.String("keyID", hexutil.Encode(msg.GetHRHeader().GetKeyId())),
 		)
 	}
@@ -658,8 +660,11 @@ func (s *encryptor) GenerateHashRatchetKey(groupID []byte) (*HashRatchetKeyCompa
 func (s *encryptor) EncryptHashRatchetPayload(ratchet *HashRatchetKeyCompatibility, payload []byte) (map[string]*EncryptedMessageProtocol, error) {
 	logger := s.logger.With(
 		zap.String("site", "EncryptHashRatchetPayload"),
-		zap.String("groupID", hexutil.Encode(ratchet.GroupID)),
-		zap.String("keyID", hexutil.Encode(ratchet.keyID)),
+		zap.String("groupIdString", string(ratchet.GroupID)),
+		zap.String("groupIdBytes", hexutil.Encode(ratchet.GroupID)),
+		zap.String("keyId", hexutil.Encode(ratchet.keyID)),
+		zap.Any("timestamp", ratchet.Timestamp),
+		zap.String("key", hexutil.Encode(ratchet.Key)),
 	)
 
 	s.mutex.Lock()
@@ -667,6 +672,9 @@ func (s *encryptor) EncryptHashRatchetPayload(ratchet *HashRatchetKeyCompatibili
 
 	logger.Debug("<<< encrypting hash ratchet message")
 	encryptedPayload, newSeqNo, err := s.EncryptWithHR(ratchet, payload)
+	logger.Debug("<<< encrypted hash ratchet message",
+		zap.Any("newSeqNo", newSeqNo),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -685,6 +693,12 @@ func (s *encryptor) EncryptHashRatchetPayload(ratchet *HashRatchetKeyCompatibili
 		},
 		Payload: encryptedPayload,
 	}
+
+	logger.Debug("finished",
+		zap.String("groupIdString", string(ratchet.GroupID)),
+		zap.String("groupIdBytes", hexutil.Encode(ratchet.GroupID)),
+		zap.String("keyID", hexutil.Encode(keyID)),
+	)
 
 	response := make(map[string]*EncryptedMessageProtocol)
 	response[noInstallationID] = dmp
@@ -727,8 +741,12 @@ func (s *encryptor) EncryptWithHR(ratchet *HashRatchetKeyCompatibility, payload 
 }
 
 func (s *encryptor) DecryptWithHR(ratchet *HashRatchetKeyCompatibility, seqNo uint32, payload []byte) ([]byte, error) {
-	s.logger.Debug("decrypting hash ratchet message",
-		zap.Any("seq-no", seqNo),
+	logger := s.logger.With(zap.String("site", "<<< DecryptWithHR"))
+	logger.Debug("decrypting hash ratchet message",
+		zap.Any("seqNo", seqNo),
+		zap.String("groupIdString", string(ratchet.GroupID)),
+		zap.String("groupIdBytes", hexutil.Encode(ratchet.GroupID)),
+		zap.String("keyID", hexutil.Encode(ratchet.keyID)),
 	)
 
 	// Key exchange message, nothing to decrypt
@@ -742,8 +760,20 @@ func (s *encryptor) DecryptWithHR(ratchet *HashRatchetKeyCompatibility, seqNo ui
 	}
 
 	if hrCache == nil {
+		logger.Debug("loaded NULL hash ratchet cache")
 		return nil, ErrHashRatchetGroupIDNotFound
 	}
+
+	logger.Debug("loaded hash ratchet cache",
+		zap.Any("hrCache", hrCache),
+		zap.String("groupIdString", string(ratchet.GroupID)),
+		zap.String("groupIdBytes", hexutil.Encode(ratchet.GroupID)),
+		zap.String("keyID", hexutil.Encode(ratchet.keyID)),
+		zap.String("hash", hex.EncodeToString(hrCache.Hash)),
+		zap.Any("seqNo", seqNo),
+		zap.String("key", hexutil.Encode(hrCache.Key)),
+		zap.Uint32("deprecatedKeyId", hrCache.DeprecatedKeyID),
+	)
 
 	// Handle mesages with seqNo less than the one in db
 	// 1. Check cache. If present for a particular seqNo, all good

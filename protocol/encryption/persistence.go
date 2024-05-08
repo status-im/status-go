@@ -7,6 +7,10 @@ import (
 	"errors"
 	"strings"
 
+	"go.uber.org/zap"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	dr "github.com/status-im/doubleratchet"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -33,12 +37,14 @@ type sqlitePersistence struct {
 	DB             *sql.DB
 	keysStorage    dr.KeysStorage
 	sessionStorage dr.SessionStorage
+	logger         *zap.Logger
 }
 
-func newSQLitePersistence(db *sql.DB) *sqlitePersistence {
+func newSQLitePersistence(db *sql.DB, logger *zap.Logger) *sqlitePersistence {
 	return &sqlitePersistence{
 		DB:             db,
 		keysStorage:    newSQLiteKeysStorage(db),
+		logger:         logger,
 		sessionStorage: newSQLiteSessionStorage(db),
 	}
 }
@@ -764,6 +770,15 @@ func (s *sqlitePersistence) GetHashRatchetCache(ratchet *HashRatchetKeyCompatibi
 		}
 	}
 
+	s.logger.Debug("<<< GetHashRatchetCache",
+		zap.Uint32("seqNo", seqNo),
+		zap.String("groupIdString", string(ratchet.GroupID)),
+		zap.String("groupIdBytes", hexutil.Encode(ratchet.GroupID)),
+		zap.String("keyId", hexutil.Encode(keyID)),
+		zap.Uint32("deprecatedKeyID", ratchet.DeprecatedKeyID()),
+		zap.Error(err),
+	)
+
 	err = tx.QueryRow("SELECT key FROM hash_ratchet_encryption WHERE key_id = ? OR deprecated_key_id = ?", keyID, ratchet.DeprecatedKeyID()).Scan(&key)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -964,6 +979,17 @@ func (s *sqlitePersistence) SaveHashRatchetKeyHash(
 
 	_, err = stmt.Exec(ratchet.GroupID, keyID, hash, seqNo)
 
+	s.logger.Debug("<<< SaveHashRatchetKeyHash",
+		zap.Uint32("seqNo", seqNo),
+		zap.String("hash", hexutil.Encode(hash)),
+		zap.String("groupIdString", string(ratchet.GroupID)),
+		zap.String("groupIdBytes", hexutil.Encode(ratchet.GroupID)),
+		zap.String("keyId", hexutil.Encode(keyID)),
+		zap.String("key", hexutil.Encode(ratchet.Key)),
+		zap.Uint64("timestamp", ratchet.Timestamp),
+		zap.Error(err),
+	)
+
 	return err
 }
 
@@ -982,6 +1008,16 @@ func (s *sqlitePersistence) SaveHashRatchetKey(ratchet *HashRatchetKeyCompatibil
 	}
 
 	_, err = stmt.Exec(ratchet.GroupID, keyID, ratchet.Timestamp, ratchet.DeprecatedKeyID(), ratchet.Key)
+
+	s.logger.Debug("<<< SaveHashRatchetKey",
+		zap.String("groupIdString", string(ratchet.GroupID)),
+		zap.String("groupIdBytes", hexutil.Encode(ratchet.GroupID)),
+		zap.String("keyId", hexutil.Encode(keyID)),
+		zap.String("key", hexutil.Encode(ratchet.Key)),
+		zap.Uint64("timestamp", ratchet.Timestamp),
+		zap.Uint32("deprecatedKeyID", ratchet.DeprecatedKeyID()),
+		zap.Error(err),
+	)
 
 	return err
 }
