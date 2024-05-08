@@ -63,7 +63,7 @@ func doMigration(db *sql.DB) error {
 
 // InitializeDB creates db file at a given path and applies migrations.
 func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, error) {
-	db, err := sqlite.OpenDB(path, password, kdfIterationsNumber)
+	db, err := sqlite.OpenDB(path, "", kdfIterationsNumber)
 	if err != nil {
 		return nil, err
 	}
