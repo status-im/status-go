@@ -412,10 +412,6 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 		}
 		response.Permissions[tokenPermission.Id].ID = tokenPermission.Id
 
-		if tokenPermission.IsPrivate && !permissionRequirementsMet {
-			delete(response.Permissions, tokenPermission.Id)
-		}
-
 		// multiple permissions are treated as logical OR, meaning
 		// if only one of them is fulfilled, the user gets permission
 		// to join and we can stop early
