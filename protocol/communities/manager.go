@@ -106,6 +106,7 @@ type Manager struct {
 	historyArchiveTasksWaitGroup sync.WaitGroup
 	historyArchiveTasks          sync.Map // stores `chan struct{}`
 	membersReevaluationTasks     sync.Map // stores `membersReevaluationTask`
+	forceMembersReevaluation     map[string]chan struct{}
 	torrentTasks                 map[string]metainfo.Hash
 	historyArchiveDownloadTasks  map[string]*HistoryArchiveDownloadTask
 	stopped                      bool
@@ -191,6 +192,11 @@ type managerOptions struct {
 	walletConfig           *params.WalletConfig
 	communityTokensService communitytokens.ServiceInterface
 	permissionChecker      PermissionChecker
+
+	// allowForcingCommunityMembersReevaluation indicates whether we should allow forcing community members reevaluation.
+	// This will allow using `force` argument in ScheduleMembersReevaluation.
+	// Should only be used in tests.
+	allowForcingCommunityMembersReevaluation bool
 }
 
 type TokenManager interface {
@@ -286,6 +292,12 @@ func WithCommunityTokensService(communityTokensService communitytokens.ServiceIn
 	}
 }
 
+func WithAllowForcingCommunityMembersReevaluation(enabled bool) ManagerOption {
+	return func(opts *managerOptions) {
+		opts.allowForcingCommunityMembersReevaluation = enabled
+	}
+}
+
 type OwnerVerifier interface {
 	SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error)
 }
@@ -374,6 +386,11 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 			logger:              logger,
 			ensVerifier:         ensverifier,
 		}
+	}
+
+	if managerConfig.allowForcingCommunityMembersReevaluation {
+		manager.logger.Warn("allowing forcing community members reevaluation, this should only be used in test environment")
+		manager.forceMembersReevaluation = make(map[string]chan struct{}, 10)
 	}
 
 	return manager, nil
@@ -954,8 +971,7 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 	return community, changes, nil
 }
 
-// WARNING: ReevaluateMembers is only public to be used in messenger tests.
-func (m *Manager) ReevaluateMembers(communityID types.HexBytes) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
+func (m *Manager) reevaluateMembers(communityID types.HexBytes) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
@@ -1119,11 +1135,17 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 	m.membersReevaluationTasks.Store(communityID.String(), &membersReevaluationTask{})
 	defer m.membersReevaluationTasks.Delete(communityID.String())
 
+	var forceReevaluation chan struct{}
+	if m.forceMembersReevaluation != nil {
+		forceReevaluation = make(chan struct{}, 10)
+		m.forceMembersReevaluation[communityID.String()] = forceReevaluation
+	}
+
 	type criticalError struct {
 		error
 	}
 
-	reevaluateMembers := func() (err error) {
+	reevaluateMembers := func(force bool) (err error) {
 		t, exists := m.membersReevaluationTasks.Load(communityID.String())
 		if !exists {
 			return criticalError{
@@ -1139,8 +1161,8 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 		task.mutex.Lock()
 		defer task.mutex.Unlock()
 
-		// Ensure reevaluation is performed not more often than once per minute.
-		if task.lastSuccessTime.After(time.Now().Add(-1 * time.Minute)) {
+		// Ensure reevaluation is performed not more often than once per minute
+		if !force && task.lastSuccessTime.After(time.Now().Add(-1*time.Minute)) {
 			return nil
 		}
 
@@ -1167,10 +1189,11 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 	defer ticker.Stop()
 
 	reevaluate := reevaluateOnStart
+	force := false
 
 	for {
 		if reevaluate {
-			err := reevaluateMembers()
+			err := reevaluateMembers(force)
 			if err != nil {
 				var criticalError *criticalError
 				if errors.As(err, &criticalError) {
@@ -1179,9 +1202,17 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 			}
 		}
 
+		force = false
+		reevaluate = false
+
 		select {
 		case <-ticker.C:
 			reevaluate = true
+			continue
+
+		case <-forceReevaluation:
+			reevaluate = true
+			force = true
 			continue
 
 		case <-m.quit:
@@ -1190,7 +1221,18 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 	}
 }
 
+func (m *Manager) ForceMembersReevaluation(communityID types.HexBytes) error {
+	if m.forceMembersReevaluation == nil {
+		return errors.New("forcing members reevaluation is not allowed")
+	}
+	return m.scheduleMembersReevaluation(communityID, true)
+}
+
 func (m *Manager) ScheduleMembersReevaluation(communityID types.HexBytes) error {
+	return m.scheduleMembersReevaluation(communityID, false)
+}
+
+func (m *Manager) scheduleMembersReevaluation(communityID types.HexBytes, forceImmediateReevaluation bool) error {
 	t, exists := m.membersReevaluationTasks.Load(communityID.String())
 	if !exists {
 		return errors.New("reevaluation task doesn't exist")
@@ -1203,6 +1245,10 @@ func (m *Manager) ScheduleMembersReevaluation(communityID types.HexBytes) error 
 	task.mutex.Lock()
 	defer task.mutex.Unlock()
 	task.onDemandRequestTime = time.Now()
+
+	if forceImmediateReevaluation {
+		m.forceMembersReevaluation[communityID.String()] <- struct{}{}
+	}
 
 	return nil
 }
@@ -1233,7 +1279,7 @@ func (m *Manager) reevaluateCommunityMembersPermissions(communityID types.HexByt
 	// Publish when the reevluation started since it can take a while
 	signal.SendCommunityMemberReevaluationStarted(types.EncodeHex(communityID))
 
-	community, newPrivilegedMembers, err := m.ReevaluateMembers(communityID)
+	community, newPrivilegedMembers, err := m.reevaluateMembers(communityID)
 
 	// Publish the reevaluation ending, even if it errored
 	// A possible improvement would be to pass the error here

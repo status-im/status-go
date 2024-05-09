@@ -118,6 +118,8 @@ type config struct {
 
 	messageResendMinDelay time.Duration
 	messageResendMaxCount int
+
+	communityManagerOptions []communities.ManagerOption
 }
 
 func messengerDefaultConfig() config {
