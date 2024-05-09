@@ -172,7 +172,9 @@ func isVMError(err error) bool {
 }
 
 func isRPSLimitError(err error) bool {
-	return strings.Contains(err.Error(), "backoff_seconds")
+	return strings.Contains(err.Error(), "backoff_seconds") ||
+		strings.Contains(err.Error(), "has exceeded its throughput limit") ||
+		strings.Contains(err.Error(), "request rate exceeded")
 }
 
 func (c *ClientWithFallback) SetIsConnected(value bool) {
@@ -216,10 +218,25 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, main func() ([]any, e
 		if err != nil {
 			if isRPSLimitError(err) {
 				c.mainLimiter.ReduceLimit()
-			} else if isVMError(err) {
+
+				err = c.mainLimiter.WaitForRequestsAvailability(1)
+				if err != nil {
+					return err
+				}
+
+				res, err = main()
+				if err == nil {
+					resultChan <- CommandResult{res: res}
+					return nil
+				}
+
+			}
+
+			if isVMError(err) {
 				resultChan <- CommandResult{err: err}
 				return nil
 			}
+
 			return err
 		}
 		resultChan <- CommandResult{res: res}
@@ -238,10 +255,25 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, main func() ([]any, e
 		if err != nil {
 			if isRPSLimitError(err) {
 				c.fallbackLimiter.ReduceLimit()
-			} else if isVMError(err) {
+
+				err = c.fallbackLimiter.WaitForRequestsAvailability(1)
+				if err != nil {
+					return err
+				}
+
+				res, err = fallback()
+				if err == nil {
+					resultChan <- CommandResult{res: res}
+					return nil
+				}
+
+			}
+
+			if isVMError(err) {
 				resultChan <- CommandResult{err: err}
 				return nil
 			}
+
 			return err
 		}
 		resultChan <- CommandResult{res: res}
