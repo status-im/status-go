@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	defaultMaxRequestsPerSecond = 100
+	defaultMaxRequestsPerSecond = 50
 	minRequestsPerSecond        = 20
 	requestsPerSecondStep       = 10
 
