@@ -60,7 +60,7 @@ const maxArchiveSizeInBytes = 30000000
 var maxNbMembers = 5000
 var maxNbPendingRequestedMembers = 100
 
-var memberPermissionsCheckInterval = 1 * time.Hour
+var memberPermissionsCheckInterval = 2 * time.Hour
 var validateInterval = 2 * time.Minute
 
 // Used for testing only
