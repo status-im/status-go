@@ -2721,7 +2721,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
-	if err = m.syncLatestContactRequest(ctx, rawMessageHandler); err != nil {
+	if err = m.syncLatestContactRequests(ctx, rawMessageHandler); err != nil {
 		return err
 	}
 
@@ -2791,8 +2791,8 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 	return nil
 }
 
-func (m *Messenger) syncLatestContactRequest(ctx context.Context, rawMessageHandler RawMessageHandler) error {
-	latestContactRequests, err := m.persistence.LatestContactRequestIDs()
+func (m *Messenger) syncLatestContactRequests(ctx context.Context, rawMessageHandler RawMessageHandler) error {
+	latestContactRequests, err := m.persistence.LatestContactRequests()
 
 	if err != nil {
 		return err

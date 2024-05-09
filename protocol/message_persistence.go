@@ -951,9 +951,8 @@ func (db sqlitePersistence) LatestPendingContactRequestIDForContact(contactID st
 	return id, nil
 }
 
-func (db sqlitePersistence) LatestContactRequestIDs() ([]LatestContactRequest, error) {
+func (db sqlitePersistence) LatestContactRequests() ([]LatestContactRequest, error) {
 	res := make([]LatestContactRequest, 0)
-	// we limit to 20 is enough?
 	rows, err := db.db.Query(
 		fmt.Sprintf(
 			`
@@ -964,7 +963,7 @@ func (db sqlitePersistence) LatestContactRequestIDs() ([]LatestContactRequest, e
 			WHERE
 				m1.content_type = ?
 			ORDER BY %s DESC
-			LIMIT 20
+			LIMIT 200
 		`, cursor), protobuf.ChatMessage_CONTACT_REQUEST)
 
 	if err != nil {

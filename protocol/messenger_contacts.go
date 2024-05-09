@@ -164,11 +164,7 @@ func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.
 func (m *Messenger) declineContactRequest(requestID, contactID string, fromSyncing bool) (*MessengerResponse, error) {
 	m.logger.Info("declineContactRequest")
 
-	var (
-		contactRequest *common.Message
-		err            error
-	)
-	contactRequest, err = m.persistence.MessageByID(requestID)
+	contactRequest, err := m.persistence.MessageByID(requestID)
 	if err == common.ErrRecordNotFound && fromSyncing {
 		// original requestID(Message ID) is useless since we don't sync UserMessage in this case
 		requestID = defaultContactRequestID(contactID)
@@ -287,12 +283,7 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, contactRequestID, contactID string, fromSyncing bool) (*MessengerResponse, error) {
 	m.logger.Debug("updateAcceptedContactRequest", zap.String("contactRequestID", contactRequestID), zap.String("contactID", contactID), zap.Bool("fromSyncing", fromSyncing))
 
-	var (
-		contactRequest *common.Message
-		err            error
-	)
-
-	contactRequest, err = m.persistence.MessageByID(contactRequestID)
+	contactRequest, err := m.persistence.MessageByID(contactRequestID)
 	if err == common.ErrRecordNotFound && fromSyncing {
 		// original requestID(Message ID) is useless since we don't sync UserMessage in this case
 		contactRequestID = defaultContactRequestID(contactID)
