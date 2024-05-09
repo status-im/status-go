@@ -11,6 +11,7 @@ import (
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -301,28 +302,9 @@ func (m *Messenger) backupCommunities(ctx context.Context, clock uint64) ([]*pro
 	for _, c := range cs {
 		_, beingImported := m.importingCommunities[c.IDString()]
 		if !beingImported {
-			settings, err := m.communitiesManager.GetCommunitySettingsByID(c.ID())
+			backupMessage, err := m.backupCommunity(c, clock)
 			if err != nil {
 				return nil, err
-			}
-
-			syncControlNode, err := m.communitiesManager.GetSyncControlNode(c.ID())
-			if err != nil {
-				return nil, err
-			}
-
-			syncMessage, err := c.ToSyncInstallationCommunityProtobuf(clock, settings, syncControlNode)
-			if err != nil {
-				return nil, err
-			}
-
-			err = m.propagateSyncInstallationCommunityWithHRKeys(syncMessage, c)
-			if err != nil {
-				return nil, err
-			}
-
-			backupMessage := &protobuf.Backup{
-				Communities: []*protobuf.SyncInstallationCommunity{syncMessage},
 			}
 
 			backupMessages = append(backupMessages, backupMessage)
@@ -330,6 +312,33 @@ func (m *Messenger) backupCommunities(ctx context.Context, clock uint64) ([]*pro
 	}
 
 	return backupMessages, nil
+}
+
+func (m *Messenger) backupCommunity(community *communities.Community, clock uint64) (*protobuf.Backup, error) {
+	communityId := community.ID()
+	settings, err := m.communitiesManager.GetCommunitySettingsByID(communityId)
+	if err != nil {
+		return nil, err
+	}
+
+	syncControlNode, err := m.communitiesManager.GetSyncControlNode(communityId)
+	if err != nil {
+		return nil, err
+	}
+
+	syncMessage, err := community.ToSyncInstallationCommunityProtobuf(clock, settings, syncControlNode)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.propagateSyncInstallationCommunityWithHRKeys(syncMessage, community)
+	if err != nil {
+		return nil, err
+	}
+
+	return &protobuf.Backup{
+		Communities: []*protobuf.SyncInstallationCommunity{syncMessage},
+	}, nil
 }
 
 func (m *Messenger) backupChats(ctx context.Context, clock uint64) []*protobuf.Backup {

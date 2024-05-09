@@ -278,3 +278,7 @@ message CommunityUpdateGrant {
   bytes community_id = 2;
   map<uint32, bytes> grants = 3;
 }
+
+message CommunityEncryptionKeysRequest {
+  bytes community_id = 1;
+}

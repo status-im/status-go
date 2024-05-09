@@ -558,6 +558,60 @@ func (m *Messenger) HandleCommunityUpdateGrant(state *ReceivedMessageState, mess
 	return m.handleCommunityGrant(community, grant, message.Timestamp)
 }
 
+func (m *Messenger) HandleCommunityEncryptionKeysRequest(state *ReceivedMessageState, message *protobuf.CommunityEncryptionKeysRequest, statusMessage *v1protocol.StatusMessage) error {
+	community, err := m.communitiesManager.GetByID(message.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	if !community.IsControlNode() {
+		return communities.ErrNotControlNode
+	}
+	signer := state.CurrentMessageState.PublicKey
+	return m.handleCommunityEncryptionKeysRequest(community, signer)
+}
+
+func (m *Messenger) handleCommunityEncryptionKeysRequest(community *communities.Community, signer *ecdsa.PublicKey) error {
+	if !community.HasMember(signer) {
+		return communities.ErrMemberNotFound
+	}
+
+	keyActions := &communities.EncryptionKeyActions{
+		CommunityKeyAction: communities.EncryptionKeyAction{},
+		ChannelKeysActions: map[string]communities.EncryptionKeyAction{},
+	}
+
+	pkStr := common.PubkeyToHex(signer)
+	members := make(map[string]*protobuf.CommunityMember)
+	members[pkStr] = community.GetMember(signer)
+
+	if community.Encrypted() {
+		keyActions.CommunityKeyAction = communities.EncryptionKeyAction{
+			ActionType: communities.EncryptionKeySendToMembers,
+			Members:    members,
+		}
+	}
+
+	for channelID, channel := range community.Chats() {
+		channelMembers := channel.GetMembers()
+		member, exists := channelMembers[pkStr]
+		if exists && community.ChannelEncrypted(channelID) {
+			members[pkStr] = member
+			keyActions.ChannelKeysActions[channelID] = communities.EncryptionKeyAction{
+				ActionType: communities.EncryptionKeySendToMembers,
+				Members:    members,
+			}
+		}
+	}
+
+	err := m.communitiesKeyDistributor.Distribute(community, keyActions)
+	if err != nil {
+		m.logger.Error("failed to send community keys", zap.Error(err), zap.String("community ID", community.IDString()))
+	}
+
+	return nil
+}
+
 func (m *Messenger) handleCommunityGrant(community *communities.Community, grant []byte, clock uint64) error {
 	difference, err := m.communitiesManager.HandleCommunityGrant(community, grant, clock)
 	if err == communities.ErrGrantOlder || err == communities.ErrGrantExpired {
