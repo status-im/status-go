@@ -106,6 +106,7 @@ type Manager struct {
 	historyArchiveTasksWaitGroup sync.WaitGroup
 	historyArchiveTasks          sync.Map // stores `chan struct{}`
 	membersReevaluationTasks     sync.Map // stores `membersReevaluationTask`
+	forceMembersReevaluation     map[string]chan struct{}
 	torrentTasks                 map[string]metainfo.Hash
 	historyArchiveDownloadTasks  map[string]*HistoryArchiveDownloadTask
 	stopped                      bool
@@ -113,7 +114,6 @@ type Manager struct {
 	PermissionChecker            PermissionChecker
 	keyDistributor               KeyDistributor
 	communityLock                *CommunityLock
-	forceMembersReevaluation     chan types.HexBytes
 }
 
 type CommunityLock struct {
@@ -390,7 +390,7 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 
 	if managerConfig.allowForcingCommunityMembersReevaluation {
 		manager.logger.Warn("allowing forcing community members reevaluation, this should only be used in test environment")
-		manager.forceMembersReevaluation = make(chan types.HexBytes, 10)
+		manager.forceMembersReevaluation = make(map[string]chan struct{}, 10)
 	}
 
 	return manager, nil
@@ -1135,6 +1135,12 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 	m.membersReevaluationTasks.Store(communityID.String(), &membersReevaluationTask{})
 	defer m.membersReevaluationTasks.Delete(communityID.String())
 
+	var forceReevaluation chan struct{}
+	if m.forceMembersReevaluation != nil {
+		forceReevaluation = make(chan struct{}, 10)
+		m.forceMembersReevaluation[communityID.String()] = forceReevaluation
+	}
+
 	type criticalError struct {
 		error
 	}
@@ -1204,8 +1210,8 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 			reevaluate = true
 			continue
 
-		case forceCommunityID := <-m.forceMembersReevaluation:
-			reevaluate = forceCommunityID.String() == communityID.String()
+		case <-forceReevaluation:
+			reevaluate = true
 			force = true
 			continue
 
@@ -1241,7 +1247,7 @@ func (m *Manager) scheduleMembersReevaluation(communityID types.HexBytes, forceI
 	task.onDemandRequestTime = time.Now()
 
 	if forceImmediateReevaluation {
-		m.forceMembersReevaluation <- communityID
+		m.forceMembersReevaluation[communityID.String()] <- struct{}{}
 	}
 
 	return nil
