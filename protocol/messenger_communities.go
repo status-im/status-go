@@ -46,7 +46,7 @@ import (
 )
 
 // 7 days interval
-var messageArchiveInterval = 7 * 24 * time.Hour
+var messageArchiveInterval = time.Minute // 7 * 24 * time.Hour
 
 // 1 day interval
 var updateActiveMembersInterval = 24 * time.Hour
@@ -2721,6 +2721,7 @@ func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerRe
 
 	id := community.ID()
 
+	fmt.Println("---------------------------> EditCommunity::m.torrentClientReady::", m.torrentClientReady())
 	if m.torrentClientReady() {
 		if !communitySettings.HistoryArchiveSupportEnabled {
 			m.communitiesManager.StopHistoryArchiveTasksInterval(id)
@@ -3699,6 +3700,7 @@ func (m *Messenger) HandleSyncCommunitySettings(messageState *ReceivedMessageSta
 }
 
 func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community) {
+	fmt.Println("-----------------------> InitHistoryArchiveTasks")
 
 	m.communitiesManager.LogStdout("initializing history archive tasks")
 
@@ -3843,6 +3845,7 @@ func (m *Messenger) checkIfIMemberOfCommunity(communityID types.HexBytes) error 
 }
 
 func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) error {
+	fmt.Println("---------------------> resumeHistoryArchivesImport::start")
 	archiveIDsToImport, err := m.communitiesManager.GetMessageArchiveIDsToImport(communityID)
 	if err != nil {
 		return err
@@ -3875,6 +3878,8 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 	// this wait groups tracks the ongoing task for a particular community
 	task.Waiter.Add(1)
 
+	fmt.Println("---------------------> resumeHistoryArchivesImport::loop")
+
 	go func() {
 		defer task.Waiter.Done()
 		err := m.importHistoryArchives(communityID, task.CancelChan)
@@ -3895,6 +3900,7 @@ func (m *Messenger) SlowdownArchivesImport() {
 }
 
 func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel chan struct{}) error {
+	fmt.Println("---------------------> importHistoryArchives::start")
 	importTicker := time.NewTicker(100 * time.Millisecond)
 	defer importTicker.Stop()
 
@@ -3911,6 +3917,8 @@ func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel cha
 		return nil
 	}
 
+	fmt.Println("---------------------> importHistoryArchives::dalayer ready")
+
 importMessageArchivesLoop:
 	for {
 		select {
@@ -3918,6 +3926,7 @@ importMessageArchivesLoop:
 			m.communitiesManager.LogStdout("interrupted importing history archive messages")
 			return nil
 		case <-importTicker.C:
+			fmt.Println("---------------------> importHistoryArchives::tick")
 			err := m.checkIfIMemberOfCommunity(communityID)
 			if err != nil {
 				break importMessageArchivesLoop
@@ -3946,6 +3955,8 @@ importMessageArchivesLoop:
 			}
 
 			m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(types.EncodeHex(communityID))
+
+			fmt.Println("---------------------> importHistoryArchives::loop")
 
 			for _, messagesChunk := range chunkSlice(archiveMessages, importMessagesChunkSize) {
 				if err := m.importRateLimiter.Wait(ctx); err != nil {
@@ -4050,6 +4061,8 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Println("---------------------------> EnableCommunityHistoryArchiveProtocol::m.torrentClientReady::", m.torrentClientReady())
 
 	if len(controlledCommunities) > 0 {
 		go m.InitHistoryArchiveTasks(controlledCommunities)

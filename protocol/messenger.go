@@ -818,6 +818,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
+	fmt.Println("---------------------------> Start::m.torrentClientReady::", m.torrentClientReady())
 	if m.torrentClientReady() {
 		available := m.SubscribeMailserverAvailable()
 		go func() {
@@ -3919,6 +3920,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				}
 
 				if msg.ApplicationLayer.Payload != nil {
+
+					if fromArchive {
+						fmt.Println("---------------------> dispatchToHandler::fromArhive")
+					}
 
 					err := m.dispatchToHandler(messageState, msg.ApplicationLayer.Payload, msg, filter, fromArchive)
 					if err != nil {

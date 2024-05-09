@@ -3924,6 +3924,7 @@ func (m *Manager) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics
 }
 
 func (m *Manager) StartHistoryArchiveTasksInterval(community *Community, interval time.Duration) {
+	fmt.Println("---------------------> Starting history archive tasks interval::", interval)
 	id := community.IDString()
 	if _, exists := m.historyArchiveTasks.Load(id); exists {
 		m.LogStdout("history archive tasks interval already in progres", zap.String("id", id))
@@ -3941,6 +3942,7 @@ func (m *Manager) StartHistoryArchiveTasksInterval(community *Community, interva
 	for {
 		select {
 		case <-ticker.C:
+			fmt.Println("---------------------> Tick history archive task")
 			m.LogStdout("starting archive task...", zap.String("id", id))
 			lastArchiveEndDateTimestamp, err := m.GetHistoryArchivePartitionStartTimestamp(community.ID())
 			if err != nil {
@@ -3980,6 +3982,7 @@ func (m *Manager) StartHistoryArchiveTasksInterval(community *Community, interva
 }
 
 func (m *Manager) StopHistoryArchiveTasksIntervals() {
+	fmt.Println("---------------------> Stopping history archive tasks intervals")
 	m.historyArchiveTasks.Range(func(_, task interface{}) bool {
 		close(task.(chan struct{})) // Need to cast to the chan
 		return true
@@ -3991,6 +3994,7 @@ func (m *Manager) StopHistoryArchiveTasksIntervals() {
 }
 
 func (m *Manager) StopHistoryArchiveTasksInterval(communityID types.HexBytes) {
+	fmt.Println("---------------------> Stopping history archive tasks interval for community::", communityID.String())
 	task, exists := m.historyArchiveTasks.Load(communityID.String())
 	if exists {
 		m.logger.Info("Stopping history archive tasks interval", zap.Any("id", communityID.String()))
@@ -4004,14 +4008,13 @@ type EncodedArchiveData struct {
 }
 
 func (m *Manager) CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
-	return m.CreateHistoryArchiveTorrent(communityID, messages, topics, startDate, endDate, partition, encrypt)
+	return m.createHistoryArchiveTorrent(communityID, messages, topics, startDate, endDate, partition, encrypt)
 }
 
 func (m *Manager) CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
-
-	return m.CreateHistoryArchiveTorrent(communityID, make([]*types.Message, 0), topics, startDate, endDate, partition, encrypt)
+	return m.createHistoryArchiveTorrent(communityID, make([]*types.Message, 0), topics, startDate, endDate, partition, encrypt)
 }
-func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, msgs []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+func (m *Manager) createHistoryArchiveTorrent(communityID types.HexBytes, msgs []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
 
 	loadFromDB := len(msgs) == 0
 
@@ -4383,6 +4386,7 @@ type HistoryArchiveDownloadTaskInfo struct {
 }
 
 func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error) {
+	fmt.Println("-------------------> DownloadHistoryArchivesByMagnetlink")
 
 	id := communityID.String()
 
@@ -4391,11 +4395,15 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 		return nil, err
 	}
 
+	fmt.Println("-------------------> DownloadHistoryArchivesByMagnetlink:: URL parsed")
+
 	m.logger.Debug("adding torrent via magnetlink for community", zap.String("id", id), zap.String("magnetlink", magnetlink))
 	torrent, err := m.torrentClient.AddMagnet(magnetlink)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("-------------------> DownloadHistoryArchivesByMagnetlink:: magnetic added")
 
 	downloadTaskInfo := &HistoryArchiveDownloadTaskInfo{
 		TotalDownloadedArchivesCount: 0,
@@ -4671,6 +4679,7 @@ func (m *Manager) createWakuMessageArchive(from time.Time, to time.Time, message
 }
 
 func (m *Manager) LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.WakuMessageArchiveIndex, error) {
+	fmt.Println("---------------------> LoadHistoryArchiveIndexFromFile::start")
 	wakuMessageArchiveIndexProto := &protobuf.WakuMessageArchiveIndex{}
 
 	indexPath := m.archiveIndexFile(communityID.String())
@@ -4684,6 +4693,8 @@ func (m *Manager) LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, commu
 		return nil, err
 	}
 
+	fmt.Println("---------------------> LoadHistoryArchiveIndexFromFile::len(wakuMessageArchiveIndexProto.Archives)::", len(wakuMessageArchiveIndexProto.Archives))
+	fmt.Println("---------------------> LoadHistoryArchiveIndexFromFile::len(indexData)::", len(indexData))
 	if len(wakuMessageArchiveIndexProto.Archives) == 0 && len(indexData) > 0 {
 		// This means we're dealing with an encrypted index file, so we have to decrypt it first
 		var protocolMessage encryption.ProtocolMessage

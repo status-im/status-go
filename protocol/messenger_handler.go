@@ -1322,6 +1322,7 @@ func (m *Messenger) HandleSyncPairInstallation(state *ReceivedMessageState, mess
 }
 
 func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessageState, communityPubKey *ecdsa.PublicKey, magnetlink string, clock uint64) error {
+	fmt.Println("---------------------> HandleHistoryArchiveMagnetlinkMessage::start")
 	id := types.HexBytes(crypto.CompressPubkey(communityPubKey))
 
 	community, err := m.communitiesManager.GetByID(id)
@@ -1342,12 +1343,14 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		return nil
 	}
 
+	fmt.Println("---------------------> HandleHistoryArchiveMagnetlinkMessage::torrentClientReady::", m.torrentClientReady())
+
 	if m.torrentClientReady() && settings.HistoryArchiveSupportEnabled {
 		lastClock, err := m.communitiesManager.GetMagnetlinkMessageClock(id)
 		if err != nil {
 			return err
 		}
-		lastSeenMagnetlink, err := m.communitiesManager.GetLastSeenMagnetlink(id)
+		//lastSeenMagnetlink, err := m.communitiesManager.GetLastSeenMagnetlink(id)
 		if err != nil {
 			return err
 		}
@@ -1355,10 +1358,10 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		// if it originates from a community that the current account is
 		// part of and doesn't own the private key at the same time
 		if !community.IsControlNode() && community.Joined() && clock >= lastClock {
-			if lastSeenMagnetlink == magnetlink {
-				m.communitiesManager.LogStdout("already processed this magnetlink")
-				return nil
-			}
+			// if lastSeenMagnetlink == magnetlink {
+			// 	m.communitiesManager.LogStdout("already processed this magnetlink")
+			// 	return nil
+			// }
 
 			m.communitiesManager.UnseedHistoryArchiveTorrent(id)
 			currentTask := m.communitiesManager.GetHistoryArchiveDownloadTask(id.String())
@@ -1397,6 +1400,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 }
 
 func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetlink string, cancel chan struct{}) {
+	fmt.Println("---------------------> downloadAndImportHistoryArchives::start")
 	downloadTaskInfo, err := m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
 	if err != nil {
 		logMsg := "failed to download history archive data"
@@ -1413,12 +1417,16 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 		}
 	}
 
+	fmt.Println("---------------------> downloadAndImportHistoryArchives::1")
+
 	if downloadTaskInfo.Cancelled {
 		if downloadTaskInfo.TotalDownloadedArchivesCount > 0 {
 			m.communitiesManager.LogStdout(fmt.Sprintf("downloaded %d of %d archives so far", downloadTaskInfo.TotalDownloadedArchivesCount, downloadTaskInfo.TotalArchivesCount))
 		}
 		return
 	}
+
+	fmt.Println("---------------------> downloadAndImportHistoryArchives::2")
 
 	err = m.communitiesManager.UpdateLastSeenMagnetlink(id, magnetlink)
 	if err != nil {
@@ -1429,6 +1437,8 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 	if err != nil {
 		return
 	}
+
+	fmt.Println("---------------------> downloadAndImportHistoryArchives::3")
 
 	err = m.importHistoryArchives(id, cancel)
 	if err != nil {
@@ -1441,6 +1451,8 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 }
 
 func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessage) (*MessengerResponse, error) {
+
+	fmt.Println("---------------------> handleArchiveMessages")
 
 	messagesToHandle := make(map[transport.Filter][]*types.Message)
 
@@ -1479,11 +1491,14 @@ func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessag
 		return nil, err
 	}
 
+	fmt.Println("---------------------> Starting handleRetrievedMessages")
+
 	response, err := m.handleRetrievedMessages(otherMessages, false, true)
 	if err != nil {
 		m.communitiesManager.LogStdout("failed to write history archive messages to database", zap.Error(err))
 		return nil, err
 	}
+	fmt.Println("---------------------> Successful handled archive message")
 
 	return response, nil
 }
@@ -1639,6 +1654,7 @@ func (m *Messenger) HandleCommunityEditSharedAddresses(state *ReceivedMessageSta
 }
 
 func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageState, requestToJoinResponseProto *protobuf.CommunityRequestToJoinResponse, statusMessage *v1protocol.StatusMessage) error {
+	fmt.Println("-------------------> HandleCommunityRequestToJoinResponse")
 	signer := state.CurrentMessageState.PublicKey
 	if requestToJoinResponseProto.CommunityId == nil {
 		return ErrInvalidCommunityID
@@ -1668,7 +1684,11 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		return err
 	}
 
+	fmt.Println("-------------------> HandleCommunityRequestToJoinResponse::HasMember::", community.HasMember(&m.identity.PublicKey))
+
 	if requestToJoinResponseProto.Accepted && community != nil && community.HasMember(&m.identity.PublicKey) {
+
+		fmt.Println("-------------------> HandleCommunityRequestToJoinResponse::true")
 
 		communityShardKey := &protobuf.CommunityShardKey{
 			CommunityId: requestToJoinResponseProto.CommunityId,
@@ -1693,10 +1713,12 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 			return err
 		}
 
+		fmt.Println("-------------------> HandleCommunityRequestToJoinResponse::Accepted")
 		if len(response.Communities()) > 0 {
 			communitySettings := response.CommunitiesSettings()[0]
 			community := response.Communities()[0]
 
+			fmt.Println("-------------------> Is torrent ready::", m.torrentClientReady())
 			magnetlink := requestToJoinResponseProto.MagnetUri
 			if m.torrentClientReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
 
@@ -1722,6 +1744,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 					m.shutdownWaitGroup.Add(1)
 					defer m.shutdownWaitGroup.Done()
 
+					fmt.Println("-------------------> downloadAndImportHistoryArchives..")
 					m.downloadAndImportHistoryArchives(community.ID(), magnetlink, task.CancelChan)
 				}(currentTask)
 
@@ -2117,6 +2140,8 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		logger.Warn("failed to validate message", zap.Error(err))
 		return err
 	}
+
+	fmt.Println("---------------------> handleChatMessage, ID: ", state.CurrentMessageState.MessageID)
 
 	receivedMessage := &common.Message{
 		ID:               state.CurrentMessageState.MessageID,

@@ -1738,7 +1738,6 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			}
 
 			if m.torrentClientReady() && communitySettings.HistoryArchiveSupportEnabled {
-
 				err = m.communitiesManager.SeedHistoryArchiveTorrent(discordCommunity.ID())
 				if err != nil {
 					m.logger.Error("failed to seed history archive", zap.Error(err))
