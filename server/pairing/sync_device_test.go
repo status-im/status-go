@@ -678,7 +678,10 @@ func (s *SyncDeviceSuite) TestPairPendingContactRequest() {
 	ensurePendingContact(alice2Backend.Messenger())
 }
 
-func (s *SyncDeviceSuite) TestPairDeclineContactRequest() {
+type contactRequestAction func(messenger *protocol.Messenger, contactRequestID string) (*protocol.MessengerResponse, error)
+type notificationValidateFunc func(r *protocol.ActivityCenterPaginationResponse)
+
+func (s *SyncDeviceSuite) testPairContactRequest(requestAction contactRequestAction, validateFunc notificationValidateFunc) {
 	bobBackend, _ := s.createUser("bob")
 	defer func() {
 		s.Require().NoError(bobBackend.Logout())
@@ -697,7 +700,7 @@ func (s *SyncDeviceSuite) TestPairDeclineContactRequest() {
 	s.sendContactRequest(request, bobBackend.Messenger())
 	contactRequest := s.receiveContactRequest(request.Message, alice1Backend.Messenger())
 	s.Require().Equal(request.Message, contactRequest.Text)
-	_, err := alice1Backend.Messenger().DeclineContactRequest(context.Background(), &requests.DeclineContactRequest{ID: types.Hex2Bytes(contactRequest.ID)})
+	_, err := requestAction(alice1Backend.Messenger(), contactRequest.ID)
 	s.Require().NoError(err)
 
 	alice2TmpDir := filepath.Join(s.tmpdir, "alice2")
@@ -707,7 +710,7 @@ func (s *SyncDeviceSuite) TestPairDeclineContactRequest() {
 	}()
 	s.pairAccounts(alice1Backend, alice1TmpDir, alice2Backend, alice2TmpDir)
 
-	ensureACDeclined := func(m *protocol.Messenger) {
+	internalNotificationValidateFunc := func(m *protocol.Messenger) {
 		acRequest := protocol.ActivityCenterNotificationsRequest{
 			ActivityTypes: []protocol.ActivityCenterType{
 				protocol.ActivityCenterNotificationTypeContactRequest,
@@ -717,60 +720,35 @@ func (s *SyncDeviceSuite) TestPairDeclineContactRequest() {
 		}
 		r, err := m.ActivityCenterNotifications(acRequest)
 		s.Require().NoError(err)
+		validateFunc(r)
+	}
+
+	internalNotificationValidateFunc(alice1Backend.Messenger())
+	internalNotificationValidateFunc(alice2Backend.Messenger())
+}
+
+func (s *SyncDeviceSuite) TestPairDeclineContactRequest() {
+	declineContactRequest := func(messenger *protocol.Messenger, contactRequestID string) (*protocol.MessengerResponse, error) {
+		return messenger.DeclineContactRequest(context.Background(), &requests.DeclineContactRequest{ID: types.Hex2Bytes(contactRequestID)})
+	}
+	s.testPairContactRequest(declineContactRequest, func(r *protocol.ActivityCenterPaginationResponse) {
 		s.Require().Len(r.Notifications, 1)
+		s.Require().False(r.Notifications[0].Accepted)
 		s.Require().True(r.Notifications[0].Dismissed)
 		s.Require().True(r.Notifications[0].Read)
-	}
-	ensureACDeclined(alice1Backend.Messenger())
-	ensureACDeclined(alice2Backend.Messenger())
+	})
 }
 
 func (s *SyncDeviceSuite) TestPairAcceptContactRequest() {
-	bobBackend, _ := s.createUser("bob")
-	defer func() {
-		s.Require().NoError(bobBackend.Logout())
-	}()
-
-	alice1Backend, alice1TmpDir := s.createUser("alice1")
-	defer func() {
-		s.Require().NoError(alice1Backend.Logout())
-	}()
-
-	alicePublicKey := alice1Backend.Messenger().IdentityPublicKeyString()
-	request := &requests.SendContactRequest{
-		ID:      alicePublicKey,
-		Message: protocol.RandomLettersString(5),
+	acceptContactRequest := func(messenger *protocol.Messenger, contactRequestID string) (*protocol.MessengerResponse, error) {
+		return messenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequestID)})
 	}
-	s.sendContactRequest(request, bobBackend.Messenger())
-	contactRequest := s.receiveContactRequest(request.Message, alice1Backend.Messenger())
-	s.Require().Equal(request.Message, contactRequest.Text)
-	_, err := alice1Backend.Messenger().AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequest.ID)})
-	s.Require().NoError(err)
-
-	alice2TmpDir := filepath.Join(s.tmpdir, "alice2")
-	alice2Backend := s.prepareBackendWithoutAccount(alice2TmpDir)
-	defer func() {
-		s.Require().NoError(alice2Backend.Logout())
-	}()
-	s.pairAccounts(alice1Backend, alice1TmpDir, alice2Backend, alice2TmpDir)
-
-	ensureACAccepted := func(m *protocol.Messenger) {
-		acRequest := protocol.ActivityCenterNotificationsRequest{
-			ActivityTypes: []protocol.ActivityCenterType{
-				protocol.ActivityCenterNotificationTypeContactRequest,
-			},
-			ReadType: protocol.ActivityCenterQueryParamsReadAll,
-			Limit:    10,
-		}
-		r, err := m.ActivityCenterNotifications(acRequest)
-		s.Require().NoError(err)
+	s.testPairContactRequest(acceptContactRequest, func(r *protocol.ActivityCenterPaginationResponse) {
 		s.Require().Len(r.Notifications, 1)
 		s.Require().True(r.Notifications[0].Accepted)
 		s.Require().False(r.Notifications[0].Dismissed)
 		s.Require().True(r.Notifications[0].Read)
-	}
-	ensureACAccepted(alice1Backend.Messenger())
-	ensureACAccepted(alice2Backend.Messenger())
+	})
 }
 
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
