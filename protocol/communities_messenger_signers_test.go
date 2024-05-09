@@ -732,3 +732,96 @@ func (s *MessengerCommunitiesSignersSuite) TestSyncTokenGatedCommunity() {
 		})
 	}
 }
+
+func (s *MessengerCommunitiesSignersSuite) TestWithMintedOwnerTokenApplyCommunityEventsUponMakingDeviceControlNode() {
+	community := s.createCommunity(s.john)
+
+	// john mints owner token
+	var chainID uint64 = 1
+	tokenAddress := "token-address"
+	tokenName := "tokenName"
+	tokenSymbol := "TSM"
+	_, err := s.john.SaveCommunityToken(&token.CommunityToken{
+		TokenType:       protobuf.CommunityTokenType_ERC721,
+		CommunityID:     community.IDString(),
+		Address:         tokenAddress,
+		ChainID:         int(chainID),
+		Name:            tokenName,
+		Supply:          &bigint.BigInt{},
+		Symbol:          tokenSymbol,
+		PrivilegesLevel: token.OwnerLevel,
+	}, nil)
+	s.Require().NoError(err)
+
+	err = s.john.AddCommunityToken(community.IDString(), int(chainID), tokenAddress)
+	s.Require().NoError(err)
+
+	// Make sure there is no control node
+	s.Require().False(common.IsPubKeyEqual(community.ControlNode(), &s.john.identity.PublicKey))
+
+	// Trick. We need to remove the community private key otherwise the events
+	// will be signed and Events will be approved instead of being in Pending State.
+	_, err = s.john.RemovePrivateKey(community.ID())
+	s.Require().NoError(err)
+
+	request := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_ADMIN,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				AmountInWei:       "100000000000000000000",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+
+	response, err := s.john.CreateCommunityTokenPermission(&request)
+	s.Require().NoError(err)
+	s.Require().Len(response.CommunityChanges, 1)
+	s.Require().Len(response.CommunityChanges[0].TokenPermissionsAdded, 1)
+
+	addedPermission := func() *communities.CommunityTokenPermission {
+		for _, permission := range response.CommunityChanges[0].TokenPermissionsAdded {
+			return permission
+		}
+		return nil
+	}()
+	s.Require().NotNil(addedPermission)
+	s.Require().Equal(communities.TokenPermissionAdditionPending, addedPermission.State)
+
+	messengerReponse, err := s.john.PromoteSelfToControlNode(community.ID())
+
+	s.Require().NoError(err)
+	s.Require().Len(messengerReponse.Communities(), 1)
+
+	tokenPermissions := messengerReponse.Communities()[0].TokenPermissions()
+	s.Require().Len(tokenPermissions, 2)
+
+	tokenPermissionsMap := make(map[protobuf.CommunityTokenPermission_Type]struct{}, len(tokenPermissions))
+	for _, t := range tokenPermissions {
+		tokenPermissionsMap[t.Type] = struct{}{}
+	}
+
+	s.Require().Len(tokenPermissionsMap, 2)
+	s.Require().Contains(tokenPermissionsMap, protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER)
+	s.Require().Contains(tokenPermissionsMap, protobuf.CommunityTokenPermission_BECOME_ADMIN)
+
+	for _, v := range tokenPermissions {
+		s.Require().Equal(communities.TokenPermissionApproved, v.State)
+	}
+}
+
+func (s *MessengerCommunitiesSignersSuite) TestWithoutMintedOwnerTokenMakingDeviceControlNodeIsBlocked() {
+	community := s.createCommunity(s.john)
+
+	// Make sure there is no control node
+	s.Require().False(common.IsPubKeyEqual(community.ControlNode(), &s.john.identity.PublicKey))
+
+	response, err := s.john.PromoteSelfToControlNode(community.ID())
+	s.Require().Nil(response)
+	s.Require().NotNil(err)
+	s.Require().Error(err, "Owner token is needed")
+}

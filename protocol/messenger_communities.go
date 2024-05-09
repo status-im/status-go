@@ -71,6 +71,18 @@ const (
 	maxChunkSizeBytes    = 1500000
 )
 
+const (
+	ErrOwnerTokenNeeded                     = "Owner token is needed" // #nosec G101
+	ErrMissingCommunityID                   = "CommunityID has to be provided"
+	ErrForbiddenProfileOrWatchOnlyAccount   = "Cannot join a community using profile chat or watch-only account"
+	ErrSigningJoinRequestForKeycardAccounts = "Signing a joining community request for accounts migrated to keycard must be done with a keycard"
+	ErrNotPartOfCommunity                   = "Not part of the community"
+	ErrNotAdminOrOwner                      = "Not admin or owner"
+	ErrSignerIsNil                          = "Signer can't be nil"
+	ErrSyncMessagesSentByNonControlNode     = "Accepted/requested to join sync messages can be send only by the control node"
+	ErrReceiverIsNil                        = "Receiver can't be nil"
+)
+
 type FetchCommunityRequest struct {
 	// CommunityKey should be either a public or a private community key
 	CommunityKey    string       `json:"communityKey"`
@@ -1175,7 +1187,7 @@ func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, com
 
 func (m *Messenger) GenerateJoiningCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]account.SignParams, error) {
 	if len(communityID) == 0 {
-		return nil, errors.New("communityID has to be provided")
+		return nil, errors.New(ErrMissingCommunityID)
 	}
 	return m.generateCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal, false)
 }
@@ -1200,7 +1212,7 @@ func (m *Messenger) SignData(signParams []account.SignParams) ([]string, error) 
 		}
 
 		if account.Chat || account.Type == accounts.AccountTypeWatch {
-			return nil, errors.New("cannot join a community using profile chat or watch-only account")
+			return nil, errors.New(ErrForbiddenProfileOrWatchOnlyAccount)
 		}
 
 		keypair, err := m.settings.GetKeypairByKeyUID(account.KeyUID)
@@ -1209,7 +1221,7 @@ func (m *Messenger) SignData(signParams []account.SignParams) ([]string, error) 
 		}
 
 		if keypair.MigratedToKeycard() {
-			return nil, errors.New("signing a joining community request for accounts migrated to keycard must be done with a keycard")
+			return nil, errors.New(ErrSigningJoinRequestForKeycardAccounts)
 		}
 
 		verifiedAccount, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, param.Address, param.Password)
@@ -1419,7 +1431,7 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 	}
 
 	if !community.HasMember(m.IdentityPublicKey()) {
-		return nil, errors.New("not part of the community")
+		return nil, errors.New(ErrNotPartOfCommunity)
 	}
 
 	revealedAddresses := make([]gethcommon.Address, 0)
@@ -2332,7 +2344,7 @@ func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*Mes
 	}
 
 	if !community.IsControlNode() {
-		return nil, errors.New("not admin or owner")
+		return nil, errors.New(ErrNotAdminOrOwner)
 	}
 
 	// Reset the community private key
@@ -2411,7 +2423,7 @@ func (m *Messenger) SetCommunityStorenodes(request *requests.SetCommunityStoreno
 		return nil, err
 	}
 	if !community.IsControlNode() {
-		return nil, errors.New("not admin or owner")
+		return nil, errors.New(ErrNotAdminOrOwner)
 	}
 
 	if err := m.communityStorenodes.UpdateStorenodesInDB(request.CommunityID, request.Storenodes, 0); err != nil {
@@ -3264,7 +3276,7 @@ func (m *Messenger) HandleCommunityShardKey(state *ReceivedMessageState, message
 
 	signer := state.CurrentMessageState.PublicKey
 	if signer == nil {
-		return errors.New("signer can't be nil")
+		return errors.New(ErrReceiverIsNil)
 	}
 
 	err = m.handleCommunityShardAndFiltersFromProto(community, message)
@@ -3324,7 +3336,7 @@ func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communiti
 
 func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMessageState, signer *ecdsa.PublicKey, message *protobuf.CommunityPrivilegedUserSyncMessage) error {
 	if signer == nil {
-		return errors.New("signer can't be nil")
+		return errors.New(ErrSignerIsNil)
 	}
 
 	community, err := m.communitiesManager.GetByID(message.CommunityId)
@@ -3337,7 +3349,7 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 	// CONTROL_NODE were sent by a control node
 	isControlNodeMsg := common.IsPubKeyEqual(community.ControlNode(), signer)
 	if !isControlNodeMsg {
-		return errors.New("accepted/requested to join sync messages can be send only by the control node")
+		return errors.New(ErrSyncMessagesSentByNonControlNode)
 	}
 
 	err = m.communitiesManager.ValidateCommunityPrivilegedUserSyncMessage(message)
@@ -3373,7 +3385,7 @@ func (m *Messenger) HandleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 
 func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, community *communities.Community) (*communities.RequestToJoin, error) {
 	if receiver == nil {
-		return nil, errors.New("receiver can't be nil")
+		return nil, errors.New(ErrReceiverIsNil)
 	}
 
 	if community == nil {
@@ -4499,6 +4511,10 @@ func (m *Messenger) PromoteSelfToControlNode(communityID types.HexBytes) (*Messe
 
 	if err != nil {
 		return nil, err
+	}
+
+	if !communities.HasTokenOwnership(community.Description()) {
+		return nil, errors.New(ErrOwnerTokenNeeded)
 	}
 
 	changes, err := m.communitiesManager.PromoteSelfToControlNode(community, clock)
