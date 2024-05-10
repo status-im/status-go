@@ -18,7 +18,7 @@ const keyBumpValue = uint64(10)
 
 // GetCurrentTime64 returns the current unix time in milliseconds
 func GetCurrentTime() uint64 {
-	return (uint64)(time.Now().UnixNano() / int64(time.Second))
+	return (uint64)(time.Now().UnixMilli())
 }
 
 // bumpKeyID takes a timestampID and returns its value incremented by the keyBumpValue
