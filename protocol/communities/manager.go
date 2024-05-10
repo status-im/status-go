@@ -2107,17 +2107,9 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 			return nil, err
 		}
 	}
-	err = community.processEvents(eventsMessage, lastlyAppliedEvents)
-	if err != nil {
-		return nil, err
-	}
 
-	additionalCommunityResponse, err := m.handleAdditionalAdminChanges(community)
+	additionalCommunityResponse, err := m.handleCommunityEventsAndMetadata(community, eventsMessage, lastlyAppliedEvents)
 	if err != nil {
-		return nil, err
-	}
-
-	if err = m.handleCommunityTokensMetadata(community); err != nil {
 		return nil, err
 	}
 
@@ -5289,9 +5281,73 @@ func (m *Manager) promoteSelfToControlNode(community *Community, clock uint64) (
 		return false, err
 	}
 
+	err = m.handleCommunityEvents(community)
+	if err != nil {
+		return false, err
+	}
+
 	community.increaseClock()
 
 	return ownerChanged, nil
+}
+
+func (m *Manager) handleCommunityEventsAndMetadata(community *Community, eventsMessage *CommunityEventsMessage,
+	lastlyAppliedEvents map[string]uint64) (*CommunityResponse, error) {
+	err := community.processEvents(eventsMessage, lastlyAppliedEvents)
+	if err != nil {
+		return nil, err
+	}
+
+	additionalCommunityResponse, err := m.handleAdditionalAdminChanges(community)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = m.handleCommunityTokensMetadata(community); err != nil {
+		return nil, err
+	}
+
+	return additionalCommunityResponse, err
+}
+
+func (m *Manager) handleCommunityEvents(community *Community) error {
+	if community.config.EventsData == nil {
+		return nil
+	}
+
+	lastlyAppliedEvents, err := m.persistence.GetAppliedCommunityEvents(community.ID())
+	if err != nil {
+		return err
+	}
+
+	_, err = m.handleCommunityEventsAndMetadata(community, community.toCommunityEventsMessage(), lastlyAppliedEvents)
+	if err != nil {
+		return err
+	}
+
+	appliedEvents := map[string]uint64{}
+	if community.config.EventsData != nil {
+		for _, event := range community.config.EventsData.Events {
+			appliedEvents[event.EventTypeID()] = event.CommunityEventClock
+		}
+	}
+
+	community.config.EventsData = nil // clear events, they are already applied
+	community.increaseClock()
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.UpsertAppliedCommunityEvents(community.ID(), appliedEvents)
+	if err != nil {
+		return err
+	}
+
+	m.publish(&Subscription{Community: community})
+
+	return nil
 }
 
 func (m *Manager) shareRequestsToJoinWithNewPrivilegedMembers(community *Community, newPrivilegedMembers map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey) error {
