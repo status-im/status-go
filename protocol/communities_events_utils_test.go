@@ -115,7 +115,7 @@ func setUpCommunityAndRoles(base CommunityEventsTestsInterface, role protobuf.Co
 	tcs2, err := base.GetControlNode().communitiesManager.All()
 	suite := base.GetSuite()
 	suite.Require().NoError(err, "eventSender.communitiesManager.All")
-	suite.Len(tcs2, 1, "Must have 1 community")
+	suite.Len(tcs2, 0, "Must have 0 community")
 
 	// ControlNode creates a community and chat
 	community := createTestCommunity(base, protobuf.CommunityPermissions_AUTO_ACCEPT)
@@ -419,7 +419,7 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 	tcs2, err := base.GetControlNode().communitiesManager.All()
 	s := base.GetSuite()
 	s.Require().NoError(err, "eventSender.communitiesManager.All")
-	s.Len(tcs2, 1, "Must have 1 community")
+	s.Len(tcs2, 0, "Must have 0 community")
 
 	// control node creates a community and chat
 	community := createTestCommunity(base, protobuf.CommunityPermissions_MANUAL_ACCEPT)
@@ -2140,7 +2140,7 @@ func testMemberReceiveRequestsToJoinAfterGettingNewRole(base CommunityEventsTest
 	tcs2, err := base.GetControlNode().communitiesManager.All()
 	s := base.GetSuite()
 	s.Require().NoError(err, "eventSender.communitiesManager.All")
-	s.Len(tcs2, 1, "Must have 1 community")
+	s.Len(tcs2, 0, "Must have 0 community")
 
 	// control node creates a community and chat
 	community := createTestCommunity(base, protobuf.CommunityPermissions_MANUAL_ACCEPT)

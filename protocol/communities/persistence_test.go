@@ -53,10 +53,9 @@ func (s *PersistenceSuite) SetupTest() {
 }
 
 func (s *PersistenceSuite) TestSaveCommunity() {
-	// there is one community inserted by default
 	communities, err := s.db.AllCommunities(&s.identity.PublicKey)
 	s.Require().NoError(err)
-	s.Require().Len(communities, 1)
+	s.Require().Len(communities, 0)
 
 	community := Community{
 		config: &Config{
@@ -76,13 +75,13 @@ func (s *PersistenceSuite) TestSaveCommunity() {
 
 	communities, err = s.db.AllCommunities(&s.identity.PublicKey)
 	s.Require().NoError(err)
-	s.Require().Len(communities, 2)
-	s.Equal(types.HexBytes(crypto.CompressPubkey(&s.identity.PublicKey)), communities[1].ID())
-	s.Equal(true, communities[1].Joined())
-	s.Equal(true, communities[1].Spectated())
-	s.Equal(true, communities[1].Verified())
-	s.Equal(true, communities[1].Muted())
-	s.Equal(time.Time{}, communities[1].MuteTill())
+	s.Require().Len(communities, 1)
+	s.Equal(types.HexBytes(crypto.CompressPubkey(&s.identity.PublicKey)), communities[0].ID())
+	s.Equal(true, communities[0].Joined())
+	s.Equal(true, communities[0].Spectated())
+	s.Equal(true, communities[0].Verified())
+	s.Equal(true, communities[0].Muted())
+	s.Equal(time.Time{}, communities[0].MuteTill())
 }
 
 func (s *PersistenceSuite) TestShouldHandleSyncCommunity() {
@@ -105,7 +104,7 @@ func (s *PersistenceSuite) TestShouldHandleSyncCommunity() {
 
 	rcrs, err := s.db.getAllCommunitiesRaw()
 	s.Require().NoError(err, "should have no error from getAllCommunitiesRaw")
-	s.Len(rcrs, 2, "length of all communities raw should be 2")
+	s.Len(rcrs, 1, "length of all communities raw should be 1")
 
 	// check again to see is the community should be synced
 	sc.Clock--

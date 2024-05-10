@@ -202,7 +202,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	s.Require().NoError(err)
 	communities, err := s.alice.Communities()
 	s.Require().NoError(err)
-	s.Require().Len(communities, 2)
+	s.Require().Len(communities, 1)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(community.IDString(), response.Messages()[0].CommunityID)
@@ -401,7 +401,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().NoError(err)
 	communities, err := s.alice.Communities()
 	s.Require().NoError(err)
-	s.Require().Len(communities, 2)
+	s.Require().Len(communities, 1)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(community.IDString(), response.Messages()[0].CommunityID)
@@ -486,7 +486,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().NoError(err)
 	communities, err = s.alice.Communities()
 	s.Require().NoError(err)
-	s.Require().Len(communities, 2)
+	s.Require().Len(communities, 1)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().NotNil(actualChat)
 	s.Require().Equal(community.IDString(), actualChat.CommunityID)
@@ -895,13 +895,9 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 
 	allCommunities, err := s.alice.Communities()
 	s.Require().NoError(err)
-	s.Require().Len(allCommunities, 2)
-
-	if bytes.Equal(allCommunities[0].ID(), community.ID()) {
-		s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
-	} else {
-		s.Require().Equal(allCommunities[1].RequestedToJoinAt(), requestToJoin1.Clock)
-	}
+	s.Require().Len(allCommunities, 1)
+	s.Require().Equal(allCommunities[0].ID(), community.ID())
+	s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
 
 	// pull to make sure it has been saved
 	requestsToJoin, err := s.alice.MyPendingRequestsToJoin()
@@ -1537,13 +1533,9 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 
 	allCommunities, err := s.alice.Communities()
 	s.Require().NoError(err)
-	s.Require().Len(allCommunities, 2)
-
-	if bytes.Equal(allCommunities[0].ID(), community.ID()) {
-		s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
-	} else {
-		s.Require().Equal(allCommunities[1].RequestedToJoinAt(), requestToJoin1.Clock)
-	}
+	s.Require().Len(allCommunities, 1)
+	s.Require().Equal(allCommunities[0].ID(), community.ID())
+	s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
 
 	// pull to make sure it has been saved
 	requestsToJoin, err := s.alice.MyPendingRequestsToJoin()
@@ -1699,13 +1691,9 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 
 	allCommunities, err := s.alice.Communities()
 	s.Require().NoError(err)
-	s.Require().Len(allCommunities, 2)
-
-	if bytes.Equal(allCommunities[0].ID(), community.ID()) {
-		s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
-	} else {
-		s.Require().Equal(allCommunities[1].RequestedToJoinAt(), requestToJoin1.Clock)
-	}
+	s.Require().Len(allCommunities, 1)
+	s.Require().Equal(allCommunities[0].ID(), community.ID())
+	s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
 
 	// pull to make sure it has been saved
 	requestsToJoin, err := s.alice.MyPendingRequestsToJoin()
@@ -1995,13 +1983,9 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 
 	allCommunities, err := s.alice.Communities()
 	s.Require().NoError(err)
-	s.Require().Len(allCommunities, 2)
-
-	if bytes.Equal(allCommunities[0].ID(), community.ID()) {
-		s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
-	} else {
-		s.Require().Equal(allCommunities[1].RequestedToJoinAt(), requestToJoin1.Clock)
-	}
+	s.Require().Len(allCommunities, 1)
+	s.Require().Equal(allCommunities[0].ID(), community.ID())
+	s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
 
 	// Retrieve request to join
 	err = tt.RetryWithBackOff(func() error {
@@ -2436,7 +2420,7 @@ func (s *MessengerCommunitiesSuite) createOtherDevice(m1 *Messenger) *Messenger 
 
 	tcs, err := m2.communitiesManager.All()
 	s.Require().NoError(err, "m2.communitiesManager.All")
-	s.Len(tcs, 1, "Must have 1 communities")
+	s.Len(tcs, 0, "Must have 0 communities")
 
 	// Pair devices
 	metadata := &multidevice.InstallationMetadata{
@@ -2616,10 +2600,10 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	}
 	s.Require().NotNil(newCommunity)
 
-	// Check that Alice has 2 communities
+	// Check that Alice has 1 community
 	cs, err := s.alice.communitiesManager.All()
 	s.Require().NoError(err, "communitiesManager.All")
-	s.Len(cs, 2, "Must have 2 communities")
+	s.Len(cs, 1, "Must have 1 community")
 
 	// Wait for the message to reach its destination
 	err = tt.RetryWithBackOff(func() error {
@@ -2641,7 +2625,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	// Count the number of communities in their device
 	tcs, err := alicesOtherDevice.communitiesManager.All()
 	s.Require().NoError(err)
-	s.Len(tcs, 2, "There must be 2 communities")
+	s.Len(tcs, 1, "There must be 1 community")
 
 	s.logger.Debug("", zap.Any("tcs", tcs))
 
@@ -2767,10 +2751,10 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 	PairDevices(&s.Suite, s.alice, alicesOtherDevice)
 
-	// Check bob the admin has only one community
+	// Check bob the admin has 0 community
 	tcs2, err := s.bob.communitiesManager.All()
 	s.Require().NoError(err, "admin.communitiesManager.All")
-	s.Len(tcs2, 1, "Must have 1 communities")
+	s.Len(tcs2, 0, "Must have 0 communities")
 
 	// Bob the admin creates a community
 	createCommunityReq := &requests.CreateCommunity{
@@ -2786,19 +2770,19 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 
 	community := mr.Communities()[0]
 
-	// Check that admin has 2 communities
+	// Check that admin has 1 community
 	acs, err := s.bob.communitiesManager.All()
 	s.Require().NoError(err, "communitiesManager.All")
-	s.Len(acs, 2, "Must have 2 communities")
+	s.Len(acs, 1, "Must have 1 communities")
 
-	// Check that Alice has only 1 community on either device
+	// Check that Alice has 0 communities on either device
 	cs, err := s.alice.communitiesManager.All()
 	s.Require().NoError(err, "communitiesManager.All")
-	s.Len(cs, 1, "Must have 1 communities")
+	s.Len(cs, 0, "Must have 0 communities")
 
 	tcs1, err := alicesOtherDevice.communitiesManager.All()
 	s.Require().NoError(err, "alicesOtherDevice.communitiesManager.All")
-	s.Len(tcs1, 1, "Must have 1 communities")
+	s.Len(tcs1, 0, "Must have 0 communities")
 
 	// Bob the admin opens up a 1-1 chat with alice
 	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
@@ -2824,10 +2808,10 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	})
 	s.Require().NoError(err)
 
-	// Check that alice now has 2 communities
+	// Check that alice now has 1 community
 	cs, err = s.alice.communitiesManager.All()
 	s.Require().NoError(err, "communitiesManager.All")
-	s.Len(cs, 2, "Must have 2 communities")
+	s.Len(cs, 1, "Must have 1 community")
 	for _, c := range cs {
 		s.False(c.Joined(), "Must not have joined the community")
 	}
@@ -2864,13 +2848,9 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	// pull all communities to make sure we set RequestedToJoinAt
 	allCommunities, err := s.alice.Communities()
 	s.Require().NoError(err)
-	s.Len(allCommunities, 2)
-
-	if bytes.Equal(allCommunities[0].ID(), community.ID()) {
-		s.Equal(allCommunities[0].RequestedToJoinAt(), aRtj.Clock)
-	} else {
-		s.Equal(allCommunities[1].RequestedToJoinAt(), aRtj.Clock)
-	}
+	s.Len(allCommunities, 1)
+	s.Require().Equal(allCommunities[0].ID(), community.ID())
+	s.Require().Equal(allCommunities[0].RequestedToJoinAt(), aRtj.Clock)
 
 	// pull to make sure it has been saved
 	requestsToJoin, err := s.alice.MyPendingRequestsToJoin()
@@ -2976,10 +2956,10 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 	PairDevices(&s.Suite, s.alice, alicesOtherDevice)
 
-	// Check bob the admin has only one community
+	// Check bob the admin has only zero community
 	tcs2, err := s.bob.communitiesManager.All()
 	s.Require().NoError(err, "admin.communitiesManager.All")
-	s.Len(tcs2, 1, "Must have 1 communities")
+	s.Len(tcs2, 0, "Must have 0 communities")
 
 	// Bob the admin creates a community
 	createCommunityReq := &requests.CreateCommunity{
@@ -2995,19 +2975,19 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 
 	community := mr.Communities()[0]
 
-	// Check that admin has 2 communities
+	// Check that admin has 1 community
 	acs, err := s.bob.communitiesManager.All()
 	s.Require().NoError(err, "communitiesManager.All")
-	s.Len(acs, 2, "Must have 2 communities")
+	s.Len(acs, 1, "Must have 1 community")
 
-	// Check that Alice has only 1 community on either device
+	// Check that Alice has 0 community on either device
 	cs, err := s.alice.communitiesManager.All()
 	s.Require().NoError(err, "communitiesManager.All")
-	s.Len(cs, 1, "Must have 1 communities")
+	s.Len(cs, 0, "Must have 0 communities")
 
 	tcs1, err := alicesOtherDevice.communitiesManager.All()
 	s.Require().NoError(err, "alicesOtherDevice.communitiesManager.All")
-	s.Len(tcs1, 1, "Must have 1 communities")
+	s.Len(tcs1, 0, "Must have 0 communities")
 
 	// Bob the admin opens up a 1-1 chat with alice
 	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
@@ -3033,10 +3013,10 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	})
 	s.Require().NoError(err)
 
-	// Check that alice now has 2 communities
+	// Check that alice now has 1 community
 	cs, err = s.alice.communitiesManager.All()
 	s.Require().NoError(err, "communitiesManager.All")
-	s.Len(cs, 2, "Must have 2 communities")
+	s.Len(cs, 1, "Must have 1 community")
 	for _, c := range cs {
 		s.False(c.Joined(), "Must not have joined the community")
 	}
@@ -3980,13 +3960,9 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 
 	allCommunities, err := s.alice.Communities()
 	s.Require().NoError(err)
-	s.Require().Len(allCommunities, 2)
-
-	if bytes.Equal(allCommunities[0].ID(), community.ID()) {
-		s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
-	} else {
-		s.Require().Equal(allCommunities[1].RequestedToJoinAt(), requestToJoin1.Clock)
-	}
+	s.Require().Len(allCommunities, 1)
+	s.Require().Equal(allCommunities[0].ID(), community.ID())
+	s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
 
 	// pull to make sure it has been saved
 	requestsToJoin, err := s.alice.MyPendingRequestsToJoin()
