@@ -152,6 +152,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 
 	s.bobWaku = wakuNodes[1]
 	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, s.bobWaku, "bob", []Option{})
+	s.bob.EnableBackedupMessagesProcessing()
 
 	s.aliceWaku = wakuNodes[2]
 	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, s.aliceWaku, "alice", []Option{})
@@ -1749,4 +1750,137 @@ func checkRoleBasedOnThePermissionType(permissionType protobuf.CommunityTokenPer
 	default:
 		panic("Unknown permission, please, update the test")
 	}
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBackupRestore() {
+	community, chat := s.createCommunity()
+
+	// bob joins the community
+	s.advertiseCommunityTo(community, s.bob)
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
+
+	// setup view channel permission
+	channelPermissionRequest := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				AmountInWei:       "100000000000000000000",
+				Decimals:          uint64(18),
+			},
+		},
+		ChatIds: []string{chat.ID},
+	}
+
+	// make bob satisfy channel criteria
+	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, channelPermissionRequest.TokenCriteria[0])
+	defer s.resetMockedBalances() // reset mocked balances, this test in run with different test cases
+
+	response, err := s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().True(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
+
+	// reevalate community member permissions in order get encryption keys
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+
+	waitOnChannelKeyToBeDistributedToBob := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
+		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
+		if !ok || action.ActionType != communities.EncryptionKeyAdd {
+			return false
+		}
+
+		_, ok = action.Members[common.PubkeyToHex(&s.bob.identity.PublicKey)]
+		return ok
+	})
+
+	err = <-waitOnChannelKeyToBeDistributedToBob
+	s.Require().NoError(err)
+
+	// bob receives community changes
+	// channel members should not be empty,
+	// this info is available only to channel members with encryption key
+	_, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			c, err := s.bob.GetCommunityByID(community.ID())
+			if err != nil {
+				return false
+			}
+			if c == nil {
+				return false
+			}
+			channel := c.Chats()[chat.CommunityChatID()]
+			if channel != nil && len(channel.Members) < 2 {
+				return false
+			}
+
+			return channel.Permissions != nil
+		},
+		"no community that satisfies criteria",
+	)
+	s.Require().NoError(err)
+
+	// owner send message to the channel
+	msg := s.sendChatMessage(s.owner, chat.ID, "hello to encrypted channel")
+
+	// bob can read the message
+	response, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			_, ok := r.messages[msg.ID]
+			return ok
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+
+	// Simulate backup creation and handling backup message
+	// As a result, bob sends request to resend encryption keys to the owner
+	clock, _ := s.bob.getLastClockWithRelatedChat()
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+
+	backupMessage, err := s.bob.backupCommunity(community, clock)
+	s.Require().NoError(err)
+
+	err = s.bob.HandleBackup(s.bob.buildMessageState(), backupMessage, nil)
+	s.Require().NoError(err)
+
+	// regenerate key for the channel in order to check that owner will send keys
+	// on bob request from `HandleBackup`
+	_, err = s.owner.encryptor.GenerateHashRatchetKey([]byte(community.IDString() + chat.CommunityChatID()))
+	s.Require().NoError(err)
+
+	// FIXME: `HandleCommunityEncryptionKeysRequest` does not return any response
+	// ad-hoc solution - wait for `WaitOnMessengerResponse` timeout
+	_, _ = WaitOnMessengerResponse(
+		s.owner,
+		func(r *MessengerResponse) bool {
+			return false
+		},
+		"no community that satisfies criteria",
+	)
+
+	// msg will be encrypted using new keys
+	msg = s.sendChatMessage(s.owner, chat.ID, "hello to closed channel with the new key")
+
+	// bob received new keys and can read the message
+	response, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			_, ok := r.messages[msg.ID]
+			return ok
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
 }

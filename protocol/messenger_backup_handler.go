@@ -5,9 +5,13 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/golang/protobuf/proto"
+
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -59,12 +63,11 @@ func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.
 		errors = append(errors, err)
 	}
 
-	for _, community := range message.Communities {
-		err = m.handleSyncInstallationCommunity(state, community, nil)
-		if err != nil {
-			errors = append(errors, err)
-		}
+	communityErrors := m.handleSyncedCommunities(state, message)
+	if len(communityErrors) > 0 {
+		errors = append(errors, communityErrors...)
 	}
+
 	err = m.handleBackedUpSettings(message.Setting)
 	if err != nil {
 		errors = append(errors, err)
@@ -302,6 +305,79 @@ func (m *Messenger) handleWatchOnlyAccount(message *protobuf.SyncAccount) error 
 		}
 
 		m.config.messengerSignalsHandler.SendWakuBackedUpWatchOnlyAccount(&response)
+	}
+
+	return nil
+}
+
+func (m *Messenger) handleSyncedCommunities(state *ReceivedMessageState, message *protobuf.Backup) []error {
+	var errors []error
+	for _, syncCommunity := range message.Communities {
+		err := m.handleSyncInstallationCommunity(state, syncCommunity, nil)
+		if err != nil {
+			errors = append(errors, err)
+		}
+
+		err = m.requestCommunityKeys(state, syncCommunity)
+		if err != nil {
+			errors = append(errors, err)
+		}
+	}
+
+	return errors
+}
+
+func (m *Messenger) requestCommunityKeys(state *ReceivedMessageState, syncCommunity *protobuf.SyncInstallationCommunity) error {
+	if !syncCommunity.Joined {
+		return nil
+	}
+
+	community, err := m.GetCommunityByID(syncCommunity.Id)
+	if err != nil {
+		return err
+	}
+
+	if community == nil {
+		return communities.ErrOrgNotFound
+	}
+
+	isEncrypted := syncCommunity.Encrypted || len(syncCommunity.EncryptionKeysV2) > 0
+	if !isEncrypted {
+		// check if we have encrypted channels
+		myPk := m.IdentityPublicKeyString()
+		for channelID, channel := range community.Chats() {
+			_, exists := channel.GetMembers()[myPk]
+			if exists && community.ChannelEncrypted(channelID) {
+				isEncrypted = true
+				break
+			}
+		}
+	}
+
+	if isEncrypted {
+		request := &protobuf.CommunityEncryptionKeysRequest{
+			CommunityId: syncCommunity.Id,
+		}
+
+		payload, err := proto.Marshal(request)
+		if err != nil {
+			return err
+		}
+
+		rawMessage := &common.RawMessage{
+			Payload:             payload,
+			Sender:              m.identity,
+			CommunityID:         community.ID(),
+			SkipEncryptionLayer: true,
+			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_ENCRYPTION_KEYS_REQUEST,
+		}
+
+		_, err = m.SendMessageToControlNode(community, rawMessage)
+
+		if err != nil {
+			m.logger.Error("failed to request community encryption keys", zap.String("communityId", community.IDString()), zap.Error(err))
+			return err
+		}
 	}
 
 	return nil
