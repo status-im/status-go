@@ -296,12 +296,11 @@ func (s *ManagerSuite) TestCreateCommunity() {
 
 	communities, err := s.manager.All()
 	s.Require().NoError(err)
-	// Consider status default community
-	s.Require().Len(communities, 2)
+	s.Require().Len(communities, 1)
 
 	actualCommunity := communities[0]
-	if bytes.Equal(community.ID(), communities[1].ID()) {
-		actualCommunity = communities[1]
+	if bytes.Equal(community.ID(), communities[0].ID()) {
+		actualCommunity = communities[0]
 	}
 
 	s.Require().Equal(community.ID(), actualCommunity.ID())
@@ -341,8 +340,7 @@ func (s *ManagerSuite) TestCreateCommunity_WithBanner() {
 
 	communities, err := s.manager.All()
 	s.Require().NoError(err)
-	// Consider status default community
-	s.Require().Len(communities, 2)
+	s.Require().Len(communities, 1)
 	s.Require().Equal(len(community.config.CommunityDescription.Identity.Images), 1)
 	testIdentityImage, isMapContainsKey := community.config.CommunityDescription.Identity.Images[userimages.BannerIdentityName]
 	s.Require().True(isMapContainsKey)
@@ -376,12 +374,11 @@ func (s *ManagerSuite) TestEditCommunity() {
 	//ensure updated community successfully stored
 	communities, err := s.manager.All()
 	s.Require().NoError(err)
-	// Consider status default community
-	s.Require().Len(communities, 2)
+	s.Require().Len(communities, 1)
 
 	storedCommunity := communities[0]
-	if bytes.Equal(community.ID(), communities[1].ID()) {
-		storedCommunity = communities[1]
+	if bytes.Equal(community.ID(), communities[0].ID()) {
+		storedCommunity = communities[0]
 	}
 
 	s.Require().Equal(storedCommunity.ID(), updatedCommunity.ID())

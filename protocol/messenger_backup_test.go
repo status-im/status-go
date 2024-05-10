@@ -671,7 +671,7 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 	// Safety check
 	communities, err := bob2.Communities()
 	s.Require().NoError(err)
-	s.Require().Len(communities, 1)
+	s.Require().Len(communities, 0)
 
 	// Wait for the message to reach its destination
 	_, err = WaitOnMessengerResponse(
