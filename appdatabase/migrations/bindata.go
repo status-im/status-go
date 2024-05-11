@@ -110,6 +110,7 @@
 // 1708416025_make_sepolia_default.up.sql (81B)
 // 1709203128_fix_chain_colors.up.sql (244B)
 // 1709795716_migration_order_fix.up.sql (7.909kB)
+// 1715418953_add_emoji_to_saved_addresses.up.sql (110B)
 // doc.go (94B)
 
 package migrations
@@ -2378,6 +2379,26 @@ func _1709795716_migration_order_fixUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1715418953_add_emoji_to_saved_addressesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x4e\x2c\x4b\x4d\x89\x4f\x4c\x49\x29\x4a\x2d\x2e\x4e\x2d\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\xcd\xcd\xcf\xca\x54\x08\x71\x8d\x08\x51\xf0\xf3\x0f\x51\xf0\x0b\xf5\xf1\x51\x70\x71\x75\x73\x0c\xf5\x09\x51\x50\x52\xb2\xe6\x0a\x0d\x70\x71\x0c\xc1\x34\x21\xd8\x35\x04\xaa\xd5\x16\xac\x0c\x10\x00\x00\xff\xff\xad\x42\x7e\x81\x6e\x00\x00\x00")
+
+func _1715418953_add_emoji_to_saved_addressesUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1715418953_add_emoji_to_saved_addressesUpSql,
+		"1715418953_add_emoji_to_saved_addresses.up.sql",
+	)
+}
+
+func _1715418953_add_emoji_to_saved_addressesUpSql() (*asset, error) {
+	bytes, err := _1715418953_add_emoji_to_saved_addressesUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1715418953_add_emoji_to_saved_addresses.up.sql", size: 110, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xec, 0xdc, 0xbd, 0x88, 0x4d, 0xc5, 0xf1, 0x33, 0x3b, 0x77, 0x12, 0xdf, 0xe6, 0x7, 0xf7, 0xf8, 0xe2, 0x99, 0x4b, 0x41, 0x6d, 0xf5, 0xda, 0x9f, 0xa0, 0xde, 0xdb, 0xd2, 0xd7, 0x12, 0x2b, 0xf8}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xcb\x41\x0e\x02\x31\x08\x05\xd0\x7d\x4f\xf1\x2f\x00\xe8\xca\xc4\xc4\xc3\xa0\x43\x08\x19\x5b\xc6\x96\xfb\xc7\x4d\xdf\xfe\x5d\xfa\x39\xd5\x0d\xeb\xf7\x6d\x4d\xc4\xf3\xe9\x36\x6c\x6a\x19\x3c\xe9\x1d\xe3\xd0\x52\x50\xcf\xa3\xa2\xdb\xeb\xfe\xb8\x6d\xa0\xeb\x74\xf4\xf0\xa9\x15\x39\x16\x28\xc1\x2c\x7b\xb0\x27\x58\xda\x3f\x00\x00\xff\xff\x57\xd4\xd5\x90\x5e\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -2599,7 +2620,8 @@ var _bindata = map[string]func() (*asset, error){
 	"1708416025_make_sepolia_default.up.sql":                                   _1708416025_make_sepolia_defaultUpSql,
 	"1709203128_fix_chain_colors.up.sql":                                       _1709203128_fix_chain_colorsUpSql,
 	"1709795716_migration_order_fix.up.sql":                                    _1709795716_migration_order_fixUpSql,
-	"doc.go":                                                                   docGo,
+	"1715418953_add_emoji_to_saved_addresses.up.sql":                           _1715418953_add_emoji_to_saved_addressesUpSql,
+	"doc.go": docGo,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -2758,7 +2780,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1708416025_make_sepolia_default.up.sql":                                   {_1708416025_make_sepolia_defaultUpSql, map[string]*bintree{}},
 	"1709203128_fix_chain_colors.up.sql":                                       {_1709203128_fix_chain_colorsUpSql, map[string]*bintree{}},
 	"1709795716_migration_order_fix.up.sql":                                    {_1709795716_migration_order_fixUpSql, map[string]*bintree{}},
-	"doc.go":                                                                   {docGo, map[string]*bintree{}},
+	"1715418953_add_emoji_to_saved_addresses.up.sql":                           {_1715418953_add_emoji_to_saved_addressesUpSql, map[string]*bintree{}},
+	"doc.go": {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
