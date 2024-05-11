@@ -3400,10 +3400,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1712745141_hash_ratchet_encrypted_messages_key_id.up.sql":                    {_1712745141_hash_ratchet_encrypted_messages_key_idUpSql, map[string]*bintree{}},
 	"1712905223_add_parity_to_message_segments.up.sql":                            {_1712905223_add_parity_to_message_segmentsUpSql, map[string]*bintree{}},
 	"1713169458_update_raw_messages_with_resend_features.up.sql":                  {_1713169458_update_raw_messages_with_resend_featuresUpSql, map[string]*bintree{}},
-<<<<<<< HEAD
-=======
 	"1714914305_add-emoji-to-saved-addresses.up.sql":                              {_1714914305_addEmojiToSavedAddressesUpSql, map[string]*bintree{}},
->>>>>>> ca71fda17 (feat(wallet)_: Add emoji to saved addresses)
 	"README.md": {readmeMd, map[string]*bintree{}},
 	"doc.go":    {docGo, map[string]*bintree{}},
 }}
