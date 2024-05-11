@@ -136,7 +136,6 @@
 // 1712745141_hash_ratchet_encrypted_messages_key_id.up.sql (111B)
 // 1712905223_add_parity_to_message_segments.up.sql (792B)
 // 1713169458_update_raw_messages_with_resend_features.up.sql (608B)
-// 1714914305_add-emoji-to-saved-addresses.up.sql (110B)
 // README.md (554B)
 // doc.go (870B)
 
@@ -2926,26 +2925,6 @@ func _1713169458_update_raw_messages_with_resend_featuresUpSql() (*asset, error)
 	return a, nil
 }
 
-var __1714914305_addEmojiToSavedAddressesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x4e\x2c\x4b\x4d\x89\x4f\x4c\x49\x29\x4a\x2d\x2e\x4e\x2d\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\xcd\xcd\xcf\xca\x54\x08\x71\x8d\x08\x51\xf0\xf3\x0f\x51\xf0\x0b\xf5\xf1\x51\x70\x71\x75\x73\x0c\xf5\x09\x51\x50\x52\xb2\xe6\x0a\x0d\x70\x71\x0c\xc1\x34\x21\xd8\x35\x04\xaa\xd5\x16\xac\x0c\x10\x00\x00\xff\xff\xad\x42\x7e\x81\x6e\x00\x00\x00")
-
-func _1714914305_addEmojiToSavedAddressesUpSqlBytes() ([]byte, error) {
-	return bindataRead(
-		__1714914305_addEmojiToSavedAddressesUpSql,
-		"1714914305_add-emoji-to-saved-addresses.up.sql",
-	)
-}
-
-func _1714914305_addEmojiToSavedAddressesUpSql() (*asset, error) {
-	bytes, err := _1714914305_addEmojiToSavedAddressesUpSqlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "1714914305_add-emoji-to-saved-addresses.up.sql", size: 110, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xec, 0xdc, 0xbd, 0x88, 0x4d, 0xc5, 0xf1, 0x33, 0x3b, 0x77, 0x12, 0xdf, 0xe6, 0x7, 0xf7, 0xf8, 0xe2, 0x99, 0x4b, 0x41, 0x6d, 0xf5, 0xda, 0x9f, 0xa0, 0xde, 0xdb, 0xd2, 0xd7, 0x12, 0x2b, 0xf8}}
-	return a, nil
-}
-
 var _readmeMd = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x54\x91\xc1\xce\xd3\x30\x10\x84\xef\x7e\x8a\x91\x7a\x01\xa9\x2a\x8f\xc0\x0d\x71\x82\x03\x48\x1c\xc9\x36\x9e\x36\x96\x1c\x6f\xf0\xae\x93\xe6\xed\x91\xa3\xc2\xdf\xff\x66\xed\xd8\x33\xdf\x78\x4f\xa7\x13\xbe\xea\x06\x57\x6c\x35\x39\x31\xa7\x7b\x15\x4f\x5a\xec\x73\x08\xbf\x08\x2d\x79\x7f\x4a\x43\x5b\x86\x17\xfd\x8c\x21\xea\x56\x5e\x47\x90\x4a\x14\x75\x48\xde\x64\x37\x2c\x6a\x96\xae\x99\x48\x05\xf6\x27\x77\x13\xad\x08\xae\x8a\x51\xe7\x25\xf3\xf1\xa9\x9f\xf9\x58\x58\x2c\xad\xbc\xe0\x8b\x56\xf0\x21\x5d\xeb\x4c\x95\xb3\xae\x84\x60\xd4\xdc\xe6\x82\x5d\x1b\x36\x6d\x39\x62\x92\xf5\xb8\x11\xdb\x92\xd3\x28\xce\xe0\x13\xe1\x72\xcd\x3c\x63\xd4\x65\x87\xae\xac\xe8\xc3\x28\x2e\x67\x44\x66\x3a\x21\x25\xa2\x72\xac\x14\x67\xbc\x84\x9f\x53\x32\x8c\x52\x70\x25\x56\xd6\xfd\x8d\x05\x37\xad\x30\x9d\x9f\xa6\x86\x0f\xcd\x58\x7f\xcf\x34\x93\x3b\xed\x90\x9f\xa4\x1f\xcf\x30\x85\x4d\x07\x58\xaf\x7f\x25\xc4\x9d\xf3\x72\x64\x84\xd0\x7f\xf9\x9b\x3a\x2d\x84\xef\x85\x48\x66\x8d\xd8\x88\x9b\x8c\x8c\x98\x5b\xf6\x74\x14\x4e\x33\x0d\xc9\xe0\x93\x38\xda\x12\xc5\x69\xbd\xe4\xf0\x2e\x7a\x78\x07\x1c\xfe\x13\x9f\x91\x29\x31\x95\x7b\x7f\x62\x59\x37\xb4\xe5\x5e\x25\xfe\x33\xee\xd5\x53\x71\xd6\xda\x3a\xd8\xcb\xde\x2e\xf8\xa1\x90\x55\x53\x0c\xc7\xaa\x0d\xe9\x76\x14\x29\x1c\x7b\x68\xdd\x2f\xe1\x6f\x00\x00\x00\xff\xff\x3c\x0a\xc2\xfe\x2a\x02\x00\x00")
 
 func readmeMdBytes() ([]byte, error) {
@@ -3213,7 +3192,6 @@ var _bindata = map[string]func() (*asset, error){
 	"1712745141_hash_ratchet_encrypted_messages_key_id.up.sql":                    _1712745141_hash_ratchet_encrypted_messages_key_idUpSql,
 	"1712905223_add_parity_to_message_segments.up.sql":                            _1712905223_add_parity_to_message_segmentsUpSql,
 	"1713169458_update_raw_messages_with_resend_features.up.sql":                  _1713169458_update_raw_messages_with_resend_featuresUpSql,
-	"1714914305_add-emoji-to-saved-addresses.up.sql":                              _1714914305_addEmojiToSavedAddressesUpSql,
 	"README.md": readmeMd,
 	"doc.go":    docGo,
 }
@@ -3400,7 +3378,6 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1712745141_hash_ratchet_encrypted_messages_key_id.up.sql":                    {_1712745141_hash_ratchet_encrypted_messages_key_idUpSql, map[string]*bintree{}},
 	"1712905223_add_parity_to_message_segments.up.sql":                            {_1712905223_add_parity_to_message_segmentsUpSql, map[string]*bintree{}},
 	"1713169458_update_raw_messages_with_resend_features.up.sql":                  {_1713169458_update_raw_messages_with_resend_featuresUpSql, map[string]*bintree{}},
-	"1714914305_add-emoji-to-saved-addresses.up.sql":                              {_1714914305_addEmojiToSavedAddressesUpSql, map[string]*bintree{}},
 	"README.md": {readmeMd, map[string]*bintree{}},
 	"doc.go":    {docGo, map[string]*bintree{}},
 }}
