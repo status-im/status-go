@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"flag"
 	"fmt"
@@ -157,6 +158,40 @@ func main() {
 		logger.Error("Failed to init keystore", "error", err)
 		return
 	}
+
+	if config.NodeKey == "" {
+		logger.Error("node key needs to be set if running a push notification server")
+		return
+	}
+
+	identity, err := crypto.HexToECDSA(config.NodeKey)
+	if err != nil {
+		logger.Error("node key is invalid", "error", err)
+		return
+	}
+
+	// Generate installationID from public key, so it's always the same
+	installationID, err := uuid.FromBytes(crypto.CompressPubkey(&identity.PublicKey)[:16])
+	if err != nil {
+		logger.Error("cannot create installation id", "error", err)
+		return
+	}
+
+	err = createDirsFromConfig(config)
+	if err != nil {
+		logger.Error("failed to create directories", "error", err)
+		return
+	}
+
+	appDB, walletDB, err := openDatabases(config.DataDir + "/" + installationID.String())
+	if err != nil {
+		log.Error("failed to open databases")
+		return
+	}
+
+	backend.StatusNode().SetAppDB(appDB)
+	backend.StatusNode().SetWalletDB(walletDB)
+
 	err = backend.StartNode(config)
 	if err != nil {
 		logger.Error("Node start failed", "error", err)
@@ -191,35 +226,6 @@ func main() {
 	}
 
 	if config.PushNotificationServerConfig.Enabled {
-		if config.NodeKey == "" {
-			logger.Error("node key needs to be set if running a push notification server")
-			return
-		}
-
-		identity, err := crypto.HexToECDSA(config.NodeKey)
-		if err != nil {
-			logger.Error("node key is invalid", "error", err)
-			return
-		}
-
-		// Generate installationID from public key, so it's always the same
-		installationID, err := uuid.FromBytes(crypto.CompressPubkey(&identity.PublicKey)[:16])
-		if err != nil {
-			logger.Error("cannot create installation id", "error", err)
-			return
-		}
-
-		walletDB, err := walletdatabase.InitializeDB(config.DataDir+"/"+installationID.String()+"-wallet.db", "", dbsetup.ReducedKDFIterationsNumber)
-		if err != nil {
-			logger.Error("failed to initialize app db", "error", err)
-			return
-		}
-
-		appDB, err := appdatabase.InitializeDB(config.DataDir+"/"+installationID.String()+".db", "", dbsetup.ReducedKDFIterationsNumber)
-		if err != nil {
-			logger.Error("failed to initialize app db", "error", err)
-			return
-		}
 		options := []protocol.Option{
 			protocol.WithPushNotifications(),
 			protocol.WithPushNotificationServerConfig(&pushnotificationserver.Config{
@@ -431,4 +437,40 @@ func retrieveMessagesLoop(messenger *protocol.Messenger, tick time.Duration, can
 			return
 		}
 	}
+}
+
+func openDatabases(path string) (*sql.DB, *sql.DB, error) {
+	walletDB, err := walletdatabase.InitializeDB(path+"-wallet.db", "", dbsetup.ReducedKDFIterationsNumber)
+	if err != nil {
+		logger.Error("failed to initialize wallet db", "error", err)
+		return nil, nil, err
+	}
+
+	appDB, err := appdatabase.InitializeDB(path+".db", "", dbsetup.ReducedKDFIterationsNumber)
+	if err != nil {
+		logger.Error("failed to initialize app db", "error", err)
+		return nil, nil, err
+	}
+
+	return appDB, walletDB, nil
+}
+
+func createDirsFromConfig(config *params.NodeConfig) error {
+	// If DataDir is empty, it means we want to create an ephemeral node
+	// keeping data only in memory.
+	if config.DataDir != "" {
+		// make sure data directory exists
+		if err := os.MkdirAll(filepath.Clean(config.DataDir), os.ModePerm); err != nil {
+			return fmt.Errorf("make node: make data directory: %v", err)
+		}
+	}
+
+	if config.KeyStoreDir != "" {
+		// make sure keys directory exists
+		if err := os.MkdirAll(filepath.Clean(config.KeyStoreDir), os.ModePerm); err != nil {
+			return fmt.Errorf("make node: make keys directory: %v", err)
+		}
+	}
+
+	return nil
 }

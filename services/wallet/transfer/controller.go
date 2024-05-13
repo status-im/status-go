@@ -119,12 +119,14 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 		return nil
 	}
 
+	omitHistory := false
 	multiaccSettings, err := c.accountsDB.GetSettings()
 	if err != nil {
-		return err
+		log.Error("Failed to get multiacc settings") // not critical
+	} else {
+		omitHistory = multiaccSettings.OmitTransfersHistoryScan
 	}
 
-	omitHistory := multiaccSettings.OmitTransfersHistoryScan
 	if omitHistory {
 		err := c.accountsDB.SaveSettingField(settings.OmitTransfersHistoryScan, false)
 		if err != nil {

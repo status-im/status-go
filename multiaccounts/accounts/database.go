@@ -296,6 +296,10 @@ type Database struct {
 
 // NewDB returns a new instance of *Database
 func NewDB(db *sql.DB) (*Database, error) {
+	if db == nil {
+		return nil, errDbPassedParameterIsNil
+	}
+
 	sDB, err := settings.MakeNewDB(db)
 	if err != nil {
 		return nil, err

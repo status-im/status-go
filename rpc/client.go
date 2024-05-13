@@ -79,6 +79,10 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 
 	log := log.New("package", "status-go/rpc.Client")
 	networkManager := network.NewManager(db)
+	if networkManager == nil {
+		return nil, errors.New("failed to create network manager")
+	}
+
 	err = networkManager.Init(networks)
 	if err != nil {
 		log.Error("Network manager failed to initialize", "error", err)
