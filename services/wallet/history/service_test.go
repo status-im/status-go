@@ -371,7 +371,7 @@ func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
 	txServiceMockCtrl := gomock.NewController(t)
 	server, _ := fake.NewTestServer(txServiceMockCtrl)
 	client := gethrpc.DialInProc(server)
-	rpcClient, _ := rpc.NewClient(client, chainID, params.UpstreamRPCConfig{}, nil, nil)
+	rpcClient, _ := rpc.NewClient(client, chainID, params.UpstreamRPCConfig{}, nil, appDB)
 	rpcClient.UpstreamChainID = chainID
 
 	service := NewService(walletDB, accountsDB, &accountFeed, &walletFeed, rpcClient, nil, nil, nil)
