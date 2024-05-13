@@ -4554,3 +4554,19 @@ func (s *MessengerCommunitiesSuite) TestAliceDidNotProcessOutdatedCommunityReque
 	err = s.alice.HandleCommunityRequestToJoinResponse(state, requestToJoinResponse, nil)
 	s.Require().NoError(err)
 }
+
+func (s *MessengerCommunitiesSuite) TestMembershipRequestAutoAcceptedDuringReevaluateMembers() {
+	community, _ := s.createCommunity()
+	community2, _ := s.createCommunity()
+
+	s.Require().NotEqual(community.ID(), community2.ID())
+	s.Require().True(community.AutoAccept())
+
+	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.alice)
+
+	// No need to actually reevaluate members, just lock on other community
+	s.owner.communitiesManager.LockOnCommunity(community2.ID())
+
+	s.joinCommunity(community, s.owner, s.alice)
+	s.owner.communitiesManager.UnlockOnCommunity(community2.ID())
+}

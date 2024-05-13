@@ -151,6 +151,14 @@ func (c *CommunityLock) Init() {
 	c.locks = make(map[string]*sync.Mutex)
 }
 
+func (m *Manager) LockOnCommunity(communityID types.HexBytes) {
+	m.communityLock.Lock(communityID)
+}
+
+func (m *Manager) UnlockOnCommunity(communityID types.HexBytes) {
+	m.communityLock.Unlock(communityID)
+}
+
 type HistoryArchiveDownloadTask struct {
 	CancelChan chan struct{}
 	Waiter     sync.WaitGroup
@@ -2093,11 +2101,15 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	if err != nil {
 		return nil, err
 	}
-	m.communityLock.Lock(id)
-	defer m.communityLock.Unlock(id)
+
 	community, err := m.GetByID(id)
 	if err != nil && err != ErrOrgNotFound {
 		return nil, err
+	}
+
+	// We should not process the community description on the control node
+	if community != nil && community.IsControlNode() {
+		return nil, nil
 	}
 
 	// We don't process failed to decrypt if the whole metadata is encrypted
@@ -2105,6 +2117,9 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	if community != nil && community.Joined() && len(failedToDecrypt) != 0 && processedDescription != nil && len(processedDescription.Members) == 0 {
 		return &CommunityResponse{FailedToDecrypt: failedToDecrypt}, nil
 	}
+
+	m.communityLock.Lock(id)
+	defer m.communityLock.Unlock(id)
 
 	// We should queue only if the community has a token owner, and the owner has been verified
 	hasTokenOwnership := HasTokenOwnership(processedDescription)
@@ -3891,16 +3906,10 @@ func (m *Manager) GetCommunityShard(communityID types.HexBytes) (*shard.Shard, e
 }
 
 func (m *Manager) SaveCommunityShard(communityID types.HexBytes, shard *shard.Shard, clock uint64) error {
-	m.communityLock.Lock(communityID)
-	defer m.communityLock.Unlock(communityID)
-
 	return m.persistence.SaveCommunityShard(communityID, shard, clock)
 }
 
 func (m *Manager) DeleteCommunityShard(communityID types.HexBytes) error {
-	m.communityLock.Lock(communityID)
-	defer m.communityLock.Unlock(communityID)
-
 	return m.persistence.DeleteCommunityShard(communityID)
 }
 

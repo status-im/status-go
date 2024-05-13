@@ -555,15 +555,6 @@ func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, co
 	userCommunity, err := user.GetCommunityByID(community.ID())
 	s.Require().NoError(err)
 	s.Require().True(userCommunity.HasMember(&user.identity.PublicKey))
-
-	_, err = WaitOnMessengerResponse(
-		controlNode,
-		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&user.identity.PublicKey)
-		},
-		"control node did not receive request to join response",
-	)
-	s.Require().NoError(err)
 }
 
 func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text string) *common.Message {
