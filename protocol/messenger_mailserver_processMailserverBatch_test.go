@@ -40,13 +40,13 @@ func (t *mockTransport) SendMessagesRequestForTopics(
 	peerID []byte,
 	from, to uint32,
 	previousCursor []byte,
-	previousStoreCursor *types.StoreRequestCursor,
+	previousStoreCursor types.StoreRequestCursor,
 	pubsubTopic string,
 	contentTopics []types.TopicType,
 	limit uint32,
 	waitForResponse bool,
 	processEnvelopes bool,
-) (cursor []byte, storeCursor *types.StoreRequestCursor, envelopesCount int, err error) {
+) (cursor []byte, storeCursor types.StoreRequestCursor, envelopesCount int, err error) {
 	var response queryResponse
 	if previousCursor == nil {
 		initialResponse := getInitialResponseKey(contentTopics)

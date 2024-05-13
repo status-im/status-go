@@ -25,7 +25,7 @@ type MessagesRequest struct {
 	// Cursor is used as starting point for paginated requests.
 	Cursor []byte `json:"cursor"`
 	// StoreCursor is used as starting point for WAKUV2 paginatedRequests
-	StoreCursor *StoreRequestCursor `json:"storeCursor"`
+	StoreCursor StoreRequestCursor `json:"storeCursor"`
 	// Bloom is a filter to match requested messages.
 	Bloom []byte `json:"bloom"`
 	// PubsubTopic is the gossipsub topic on which the message was broadcasted
@@ -35,12 +35,7 @@ type MessagesRequest struct {
 	ContentTopics [][]byte `json:"contentTopics"`
 }
 
-type StoreRequestCursor struct {
-	Digest       []byte `json:"digest"`
-	ReceiverTime int64  `json:"receiverTime"`
-	SenderTime   int64  `json:"senderTime"`
-	PubsubTopic  string `json:"pubsubTopic"`
-}
+type StoreRequestCursor []byte
 
 // SetDefaults sets the From and To defaults
 func (r *MessagesRequest) SetDefaults(now time.Time) {

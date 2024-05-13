@@ -62,7 +62,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
-	storepb "github.com/waku-org/go-waku/waku/v2/protocol/legacy_store/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
@@ -1261,26 +1260,26 @@ func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Ha
 	return append(ackHashes, missedHashes...)
 }
 
-func (w *Waku) Query(ctx context.Context, peerID peer.ID, query legacy_store.Query, cursor *storepb.Index, opts []legacy_store.HistoryRequestOption, processEnvelopes bool) (*storepb.Index, int, error) {
+func (w *Waku) Query(ctx context.Context, peerID peer.ID, query store.FilterCriteria, cursor []byte, opts []store.RequestOption, processEnvelopes bool) ([]byte, int, error) {
 	requestID := protocol.GenerateRequestID()
 
 	opts = append(opts,
-		legacy_store.WithRequestID(requestID),
-		legacy_store.WithPeer(peerID),
-		legacy_store.WithCursor(cursor))
+		store.WithRequestID(requestID),
+		store.WithPeer(peerID),
+		store.WithCursor(cursor))
 
 	logger := w.logger.With(zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", peerID))
 
 	logger.Debug("store.query",
-		logutils.WakuMessageTimestamp("startTime", query.StartTime),
-		logutils.WakuMessageTimestamp("endTime", query.EndTime),
-		zap.Strings("contentTopics", query.ContentTopics),
+		logutils.WakuMessageTimestamp("startTime", query.TimeStart),
+		logutils.WakuMessageTimestamp("endTime", query.TimeEnd),
+		zap.Strings("contentTopics", query.ContentTopics.ToList()),
 		zap.String("pubsubTopic", query.PubsubTopic),
-		zap.Stringer("cursor", cursor),
+		zap.String("cursor", hexutil.Encode(cursor)),
 	)
 
 	queryStart := time.Now()
-	result, err := w.node.LegacyStore().Query(ctx, query, opts...)
+	result, err := w.node.Store().Query(ctx, query, opts...)
 	queryDuration := time.Since(queryStart)
 	if err != nil {
 		logger.Error("error querying storenode", zap.Error(err))
@@ -1291,15 +1290,15 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, query legacy_store.Que
 		return nil, 0, err
 	}
 
-	logger.Debug("store.query response",
-		zap.Duration("queryDuration", queryDuration),
-		zap.Int("numMessages", len(result.Messages)),
-		zap.Stringer("cursor", result.Cursor()))
+	messages := result.Messages()
+	envelopesCount := len(messages)
+	w.logger.Debug("store.query response", zap.Duration("queryDuration", queryDuration), zap.Int("numMessages", envelopesCount), zap.Bool("hasCursor", result.IsComplete() && result.Cursor() != nil))
+	for _, mkv := range messages {
+		msg := mkv.Message
 
-	for _, msg := range result.Messages {
 		// Temporarily setting RateLimitProof to nil so it matches the WakuMessage protobuffer we are sending
 		// See https://github.com/vacp2p/rfc/issues/563
-		msg.RateLimitProof = nil
+		mkv.Message.RateLimitProof = nil
 
 		envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), query.PubsubTopic)
 		logger.Info("received waku2 store message",
@@ -1314,7 +1313,7 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, query legacy_store.Que
 		}
 	}
 
-	return result.Cursor(), len(result.Messages), nil
+	return result.Cursor(), envelopesCount, nil
 }
 
 // Start implements node.Service, starting the background data propagation thread
@@ -1927,7 +1926,7 @@ func (w *Waku) AddStorePeer(address string) (peer.ID, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, wps.Static, w.cfg.DefaultShardedPubsubTopics, legacy_store.StoreID_v20beta4)
+	peerID, err := w.node.AddPeer(addr, wps.Static, w.cfg.DefaultShardedPubsubTopics, store.StoreQueryID_v300)
 	if err != nil {
 		return "", err
 	}
@@ -2055,6 +2054,10 @@ func FormatPeerStats(wakuNode *node.WakuNode) map[string]types.WakuV2Peer {
 	return p
 }
 
-func (w *Waku) StoreNode() legacy_store.Store {
+func (w *Waku) StoreNode() *store.WakuStore {
+	return w.node.Store()
+}
+
+func (w *Waku) LegacyStoreNode() legacy_store.Store {
 	return w.node.LegacyStore()
 }
