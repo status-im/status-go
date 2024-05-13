@@ -5,7 +5,6 @@ import (
 
 	"github.com/forPelevin/gomoji"
 
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
@@ -13,7 +12,7 @@ import (
 )
 
 type SendMessageResponse struct {
-	Chat     *Chat             `json:"chat"`
+	Chat     *protocol.Chat    `json:"chat"`
 	Messages []*common.Message `json:"messages"`
 }
 
@@ -49,18 +48,8 @@ func (api *API) SendSticker(ctx context.Context, communityID types.HexBytes, cha
 func (api *API) toSendMessageResponse(response *protocol.MessengerResponse) (*SendMessageResponse, error) {
 	protocolChat := response.Chats()[0]
 
-	community, err := api.s.messenger.GetCommunityByID(types.HexBytes(protocolChat.CommunityID))
-	if err != nil {
-		return nil, err
-	}
-
-	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
-	chat, err := api.toAPIChat(protocolChat, community, pubKey, false)
-	if err != nil {
-		return nil, err
-	}
 	return &SendMessageResponse{
-		Chat:     chat,
+		Chat:     protocolChat,
 		Messages: response.Messages(),
 	}, nil
 }

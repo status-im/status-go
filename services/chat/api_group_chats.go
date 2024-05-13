@@ -11,23 +11,23 @@ import (
 )
 
 type GroupChatResponse struct {
-	Chat     *Chat             `json:"chat"`
+	Chat     *protocol.Chat    `json:"chat"`
 	Messages []*common.Message `json:"messages"`
 }
 
 type GroupChatResponseWithInvitations struct {
-	Chat        *Chat                           `json:"chat"`
+	Chat        *protocol.Chat                  `json:"chat"`
 	Messages    []*common.Message               `json:"messages"`
 	Invitations []*protocol.GroupChatInvitation `json:"invitations"`
 }
 
 type CreateOneToOneChatResponse struct {
-	Chat    *Chat             `json:"chat,omitempty"`
+	Chat    *protocol.Chat    `json:"chat,omitempty"`
 	Contact *protocol.Contact `json:"contact,omitempty"`
 }
 
 type StartGroupChatResponse struct {
-	Chat     *Chat               `json:"chat,omitempty"`
+	Chat     *protocol.Chat      `json:"chat,omitempty"`
 	Contacts []*protocol.Contact `json:"contacts"`
 	Messages []*common.Message   `json:"messages,omitempty"`
 }
@@ -37,16 +37,12 @@ func (api *API) CreateOneToOneChat(ctx context.Context, communityID types.HexByt
 		return nil, ErrCommunitiesNotSupported
 	}
 
-	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
 	response, err := api.s.messenger.CreateOneToOneChat(&requests.CreateOneToOneChat{ID: ID, ENSName: ensName})
 	if err != nil {
 		return nil, err
 	}
 
-	chat, err := api.toAPIChat(response.Chats()[0], nil, pubKey, false)
-	if err != nil {
-		return nil, err
-	}
+	chat := response.Chats()[0]
 
 	var contact *protocol.Contact
 	if ensName != "" {
@@ -156,8 +152,6 @@ func (api *API) StartGroupChat(ctx context.Context, communityID types.HexBytes, 
 		return nil, ErrCommunitiesNotSupported
 	}
 
-	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
-
 	var response *protocol.MessengerResponse
 	var err error
 	if len(members) == 1 {
@@ -178,10 +172,7 @@ func (api *API) StartGroupChat(ctx context.Context, communityID types.HexBytes, 
 		}
 	}
 
-	chat, err := api.toAPIChat(response.Chats()[0], nil, pubKey, false)
-	if err != nil {
-		return nil, err
-	}
+	chat := response.Chats()[0]
 
 	return &StartGroupChatResponse{
 		Chat:     chat,
@@ -191,10 +182,7 @@ func (api *API) StartGroupChat(ctx context.Context, communityID types.HexBytes, 
 }
 
 func (api *API) toGroupChatResponse(pubKey string, response *protocol.MessengerResponse) (*GroupChatResponse, error) {
-	chat, err := api.toAPIChat(response.Chats()[0], nil, pubKey, false)
-	if err != nil {
-		return nil, err
-	}
+	chat := response.Chats()[0]
 
 	return &GroupChatResponse{
 		Chat:     chat,
