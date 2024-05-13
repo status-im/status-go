@@ -54,7 +54,7 @@ func (s *MessengerRawMessageResendTest) SetupTest() {
 		UseShardAsDefaultTopic:   true,
 		DefaultShardPubsubTopic:  shard.DefaultShardPubsubTopic(),
 	}
-	s.exchangeBootNode, err = wakuv2.New("", "", exchangeNodeConfig, logger.Named("pxServerNode"), nil, nil, nil, nil)
+	s.exchangeBootNode, err = wakuv2.New(nil, "", exchangeNodeConfig, logger.Named("pxServerNode"), nil, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(s.exchangeBootNode.Start())
 

@@ -1,10 +1,12 @@
 package node
 
 import (
+	"crypto/ecdsa"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
@@ -20,6 +23,7 @@ import (
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/common"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/mailserver"
@@ -347,7 +351,29 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig, telemetryServe
 			cfg.MaxMessageSize = nodeConfig.WakuV2Config.MaxMessageSize
 		}
 
-		w, err := wakuv2.New(nodeConfig.NodeKey, nodeConfig.ClusterConfig.Fleet, cfg, logutils.ZapLogger(), b.appDB, b.timeSource(), signal.SendHistoricMessagesRequestFailed, signal.SendPeerStats)
+		var nodeKey *ecdsa.PrivateKey
+		var err error
+		if nodeConfig.NodeKey != "" {
+			nodeKey, err = crypto.HexToECDSA(nodeConfig.NodeKey)
+			if err != nil {
+				return nil, fmt.Errorf("could not convert nodekey into a valid private key: %v", err)
+			}
+		} else {
+			nodeKeyStr := os.Getenv("WAKUV2_NODE_KEY")
+			if nodeKeyStr != "" {
+				nodeKeyBytes, err := hexutil.Decode(nodeKeyStr)
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode the go-waku private key: %v", err)
+				}
+
+				nodeKey, err = crypto.ToECDSA(nodeKeyBytes)
+				if err != nil {
+					return nil, fmt.Errorf("could not convert nodekey into a valid private key: %v", err)
+				}
+			}
+		}
+
+		w, err := wakuv2.New(nodeKey, nodeConfig.ClusterConfig.Fleet, cfg, logutils.ZapLogger(), b.appDB, b.timeSource(), signal.SendHistoricMessagesRequestFailed, signal.SendPeerStats)
 
 		if err != nil {
 			return nil, err
