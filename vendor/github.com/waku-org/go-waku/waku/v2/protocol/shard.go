@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/waku-org/go-waku/waku/v2/hash"
@@ -20,7 +19,6 @@ const ClusterIndex = 1
 const GenerationZeroShardsCount = 8
 
 var (
-	ErrTooManyShards     = errors.New("too many shards")
 	ErrInvalidShard      = errors.New("invalid shard")
 	ErrInvalidShardCount = errors.New("invalid shard count")
 	ErrExpected130Bytes  = errors.New("invalid data: expected 130 bytes")
@@ -32,10 +30,6 @@ type RelayShards struct {
 }
 
 func NewRelayShards(clusterID uint16, shardIDs ...uint16) (RelayShards, error) {
-	if len(shardIDs) > math.MaxUint8 {
-		return RelayShards{}, ErrTooManyShards
-	}
-
 	shardIDSet := make(map[uint16]struct{})
 	for _, index := range shardIDs {
 		if index > MaxShardIndex {
@@ -64,19 +58,25 @@ func (rs RelayShards) Topics() []WakuPubSubTopic {
 	return result
 }
 
-func (rs RelayShards) Contains(cluster uint16, index uint16) bool {
+func (rs RelayShards) ContainsAnyShard(cluster uint16, indexes []uint16) bool {
 	if rs.ClusterID != cluster {
 		return false
 	}
 
 	found := false
-	for _, idx := range rs.ShardIDs {
-		if idx == index {
-			found = true
+	for _, rsIdx := range rs.ShardIDs {
+		for _, idx := range indexes {
+			if rsIdx == idx {
+				return true
+			}
 		}
 	}
 
 	return found
+}
+
+func (rs RelayShards) Contains(cluster uint16, index uint16) bool {
+	return rs.ContainsAnyShard(cluster, []uint16{index})
 }
 
 func (rs RelayShards) ContainsShardPubsubTopic(topic WakuPubSubTopic) bool {
@@ -136,10 +136,6 @@ func (rs RelayShards) ContainsTopic(topic string) bool {
 }
 
 func (rs RelayShards) ShardList() ([]byte, error) {
-	if len(rs.ShardIDs) > math.MaxUint8 {
-		return nil, ErrTooManyShards
-	}
-
 	var result []byte
 
 	result = binary.BigEndian.AppendUint16(result, rs.ClusterID)
@@ -267,4 +263,12 @@ func GeneratePubsubToContentTopicMap(pubsubTopic string, contentTopics []string)
 		pubSubTopicMap[pubsubTopic] = append(pubSubTopicMap[pubsubTopic], contentTopics...)
 	}
 	return pubSubTopicMap, nil
+}
+
+func ShardsToTopics(clusterId int, shards []int) []string {
+	pubsubTopics := make([]string, len(shards))
+	for i, shard := range shards {
+		pubsubTopics[i] = NewStaticShardingPubsubTopic(uint16(clusterId), uint16(shard)).String()
+	}
+	return pubsubTopics
 }

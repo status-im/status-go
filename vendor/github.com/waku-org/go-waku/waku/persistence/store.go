@@ -11,8 +11,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store/pb"
 	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -317,8 +317,10 @@ func (d *DBStore) Put(env *protocol.Envelope) error {
 		storedAt = env.Index().ReceiverTime
 	}
 
+	hash := env.Hash()
+
 	start := time.Now()
-	_, err = stmt.Exec(env.Index().Digest, env.Hash(), storedAt, env.Message().GetTimestamp(), env.Message().ContentTopic, env.PubsubTopic(), env.Message().Payload, env.Message().GetVersion())
+	_, err = stmt.Exec(env.Index().Digest, hash[:], storedAt, env.Message().GetTimestamp(), env.Message().ContentTopic, env.PubsubTopic(), env.Message().Payload, env.Message().GetVersion())
 	if err != nil {
 		return err
 	}

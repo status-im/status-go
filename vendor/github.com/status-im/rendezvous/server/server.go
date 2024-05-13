@@ -154,7 +154,7 @@ func (srv *Server) startListener() error {
 			}
 		}
 	})
-	addr, err := ma.NewMultiaddr(fmt.Sprintf("/ethv4/%s", h.ID().Pretty()))
+	addr, err := ma.NewMultiaddr(fmt.Sprintf("/ethv4/%s", h.ID()))
 	if err != nil {
 		return err
 	}

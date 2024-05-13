@@ -12,14 +12,15 @@ import (
 	"github.com/libp2p/go-msgio/pbio"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/peerstore"
+	"github.com/waku-org/go-waku/waku/v2/protocol"
 	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange/pb"
 	"github.com/waku-org/go-waku/waku/v2/service"
 	"go.uber.org/zap"
 )
 
-func (wakuPX *WakuPeerExchange) Request(ctx context.Context, numPeers int, opts ...PeerExchangeOption) error {
-	params := new(PeerExchangeParameters)
+func (wakuPX *WakuPeerExchange) Request(ctx context.Context, numPeers int, opts ...RequestOption) error {
+	params := new(PeerExchangeRequestParameters)
 	params.host = wakuPX.h
 	params.log = wakuPX.log
 	params.pm = wakuPX.pm
@@ -43,11 +44,16 @@ func (wakuPX *WakuPeerExchange) Request(ctx context.Context, numPeers int, opts 
 	}
 
 	if params.pm != nil && params.selectedPeer == "" {
-		var err error
-		params.selectedPeer, err = wakuPX.pm.SelectPeer(
+		pubsubTopics := []string{}
+		if params.clusterID != 0 {
+			pubsubTopics = append(pubsubTopics,
+				protocol.NewStaticShardingPubsubTopic(uint16(params.clusterID), uint16(params.shard)).String())
+		}
+		selectedPeers, err := wakuPX.pm.SelectPeers(
 			peermanager.PeerSelectionCriteria{
 				SelectionType: params.peerSelectionType,
 				Proto:         PeerExchangeID_v20alpha1,
+				PubsubTopics:  pubsubTopics,
 				SpecificPeers: params.preferredPeers,
 				Ctx:           ctx,
 			},
@@ -55,6 +61,7 @@ func (wakuPX *WakuPeerExchange) Request(ctx context.Context, numPeers int, opts 
 		if err != nil {
 			return err
 		}
+		params.selectedPeer = selectedPeers[0]
 	}
 	if params.selectedPeer == "" {
 		wakuPX.metrics.RecordError(dialFailure)
@@ -93,10 +100,10 @@ func (wakuPX *WakuPeerExchange) Request(ctx context.Context, numPeers int, opts 
 
 	stream.Close()
 
-	return wakuPX.handleResponse(ctx, responseRPC.Response)
+	return wakuPX.handleResponse(ctx, responseRPC.Response, params)
 }
 
-func (wakuPX *WakuPeerExchange) handleResponse(ctx context.Context, response *pb.PeerExchangeResponse) error {
+func (wakuPX *WakuPeerExchange) handleResponse(ctx context.Context, response *pb.PeerExchangeResponse, params *PeerExchangeRequestParameters) error {
 	var discoveredPeers []struct {
 		addrInfo peer.AddrInfo
 		enr      *enode.Node
@@ -110,6 +117,16 @@ func (wakuPX *WakuPeerExchange) handleResponse(ctx context.Context, response *pb
 		if err != nil {
 			wakuPX.log.Error("converting bytes to enr", zap.Error(err))
 			return err
+		}
+
+		if params.clusterID != 0 {
+			wakuPX.log.Debug("clusterID is non zero, filtering by shard")
+			rs, err := wenr.RelaySharding(enrRecord)
+			if err != nil || rs == nil || !rs.Contains(uint16(params.clusterID), uint16(params.shard)) {
+				wakuPX.log.Debug("peer doesn't matches filter", zap.Int("shard", params.shard))
+				continue
+			}
+			wakuPX.log.Debug("peer matches filter", zap.Int("shard", params.shard))
 		}
 
 		enodeRecord, err := enode.New(enode.ValidSchemes, enrRecord)

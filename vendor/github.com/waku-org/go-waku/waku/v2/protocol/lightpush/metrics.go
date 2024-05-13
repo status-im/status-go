@@ -53,6 +53,7 @@ var (
 	writeRequestFailure  metricsErrCategory = "write_request_failure"
 	writeResponseFailure metricsErrCategory = "write_response_failure"
 	dialFailure          metricsErrCategory = "dial_failure"
+	rateLimitFailure     metricsErrCategory = "ratelimit_failure"
 	messagePushFailure   metricsErrCategory = "message_push_failure"
 	requestBodyFailure   metricsErrCategory = "request_failure"
 	responseBodyFailure  metricsErrCategory = "response_body_failure"

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package report
 
 import (
@@ -15,7 +18,7 @@ type ReceiverInterceptorFactory struct {
 }
 
 // NewInterceptor constructs a new ReceiverInterceptor
-func (r *ReceiverInterceptorFactory) NewInterceptor(id string) (interceptor.Interceptor, error) {
+func (r *ReceiverInterceptorFactory) NewInterceptor(_ string) (interceptor.Interceptor, error) {
 	i := &ReceiverInterceptor{
 		interval: 1 * time.Second,
 		now:      time.Now,
@@ -98,13 +101,9 @@ func (r *ReceiverInterceptor) loop(rtcpWriter interceptor.RTCPWriter) {
 		case <-ticker.C:
 			now := r.now()
 			r.streams.Range(func(key, value interface{}) bool {
-				stream := value.(*receiverStream)
-
-				var pkts []rtcp.Packet
-
-				pkts = append(pkts, stream.generateReport(now))
-
-				if _, err := rtcpWriter.Write(pkts, interceptor.Attributes{}); err != nil {
+				if stream, ok := value.(*receiverStream); !ok {
+					r.log.Warnf("failed to cast ReceiverInterceptor stream")
+				} else if _, err := rtcpWriter.Write([]rtcp.Packet{stream.generateReport(now)}, interceptor.Attributes{}); err != nil {
 					r.log.Warnf("failed sending: %+v", err)
 				}
 
@@ -172,8 +171,11 @@ func (r *ReceiverInterceptor) BindRTCPReader(reader interceptor.RTCPReader) inte
 					continue
 				}
 
-				stream := value.(*receiverStream)
-				stream.processSenderReport(r.now(), sr)
+				if stream, ok := value.(*receiverStream); !ok {
+					r.log.Warnf("failed to cast ReceiverInterceptor stream")
+				} else {
+					stream.processSenderReport(r.now(), sr)
+				}
 			}
 		}
 

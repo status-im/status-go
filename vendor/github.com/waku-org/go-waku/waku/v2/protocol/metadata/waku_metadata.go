@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"math"
+	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -31,6 +33,9 @@ type WakuMetadata struct {
 	cancel    context.CancelFunc
 	clusterID uint16
 	localnode *enode.LocalNode
+
+	peerShardsMutex sync.RWMutex
+	peerShards      map[peer.ID][]uint16
 
 	log *zap.Logger
 }
@@ -63,16 +68,22 @@ func (wakuM *WakuMetadata) Start(ctx context.Context) error {
 
 	wakuM.ctx = ctx
 	wakuM.cancel = cancel
+	wakuM.peerShards = make(map[peer.ID][]uint16)
+
+	wakuM.h.SetStreamHandlerMatch(MetadataID_v1, protocol.PrefixTextMatch(string(MetadataID_v1)), wakuM.onRequest(ctx))
 
 	wakuM.h.Network().Notify(wakuM)
 
-	wakuM.h.SetStreamHandlerMatch(MetadataID_v1, protocol.PrefixTextMatch(string(MetadataID_v1)), wakuM.onRequest(ctx))
 	wakuM.log.Info("metadata protocol started")
 	return nil
 }
 
-func (wakuM *WakuMetadata) getClusterAndShards() (*uint32, []uint32, error) {
-	shard, err := enr.RelaySharding(wakuM.localnode.Node().Record())
+func (wakuM *WakuMetadata) RelayShard() (*protocol.RelayShards, error) {
+	return enr.RelaySharding(wakuM.localnode.Node().Record())
+}
+
+func (wakuM *WakuMetadata) ClusterAndShards() (*uint32, []uint32, error) {
+	shard, err := wakuM.RelayShard()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -98,7 +109,7 @@ func (wakuM *WakuMetadata) Request(ctx context.Context, peerID peer.ID) (*protoc
 		return nil, err
 	}
 
-	clusterID, shards, err := wakuM.getClusterAndShards()
+	clusterID, shards, err := wakuM.ClusterAndShards()
 	if err != nil {
 		if err := stream.Reset(); err != nil {
 			wakuM.log.Error("resetting connection", zap.Error(err))
@@ -109,6 +120,8 @@ func (wakuM *WakuMetadata) Request(ctx context.Context, peerID peer.ID) (*protoc
 	request := &pb.WakuMetadataRequest{}
 	request.ClusterId = clusterID
 	request.Shards = shards
+	// TODO: remove with nwaku 0.28 deployment
+	request.ShardsDeprecated = shards // nolint: staticcheck
 
 	writer := pbio.NewDelimitedWriter(stream)
 	reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
@@ -140,8 +153,15 @@ func (wakuM *WakuMetadata) Request(ctx context.Context, peerID peer.ID) (*protoc
 
 	rClusterID := uint16(*response.ClusterId)
 	var rShardIDs []uint16
-	for _, i := range response.Shards {
-		rShardIDs = append(rShardIDs, uint16(i))
+	if len(response.Shards) != 0 {
+		for _, i := range response.Shards {
+			rShardIDs = append(rShardIDs, uint16(i))
+		}
+	} else {
+		// TODO: remove with nwaku 0.28 deployment
+		for _, i := range response.ShardsDeprecated { // nolint: staticcheck
+			rShardIDs = append(rShardIDs, uint16(i))
+		}
 	}
 
 	rs, err := protocol.NewRelayShards(rClusterID, rShardIDs...)
@@ -171,12 +191,14 @@ func (wakuM *WakuMetadata) onRequest(ctx context.Context) func(network.Stream) {
 
 		response := new(pb.WakuMetadataResponse)
 
-		clusterID, shards, err := wakuM.getClusterAndShards()
+		clusterID, shards, err := wakuM.ClusterAndShards()
 		if err != nil {
 			logger.Error("obtaining shard info", zap.Error(err))
 		} else {
 			response.ClusterId = clusterID
 			response.Shards = shards
+			// TODO: remove with nwaku 0.28 deployment
+			response.ShardsDeprecated = shards // nolint: staticcheck
 		}
 
 		err = writer.WriteMsg(response)
@@ -241,11 +263,79 @@ func (wakuM *WakuMetadata) Connected(n network.Network, cc network.Conn) {
 
 		if shard.ClusterID != wakuM.clusterID {
 			wakuM.disconnectPeer(peerID, errors.New("different clusterID reported"))
+			return
 		}
+
+		// Store shards so they're used to verify if a relay peer supports the same shards we do
+		wakuM.peerShardsMutex.Lock()
+		defer wakuM.peerShardsMutex.Unlock()
+		wakuM.peerShards[peerID] = shard.ShardIDs
 	}()
 }
 
 // Disconnected is called when a connection closed
 func (wakuM *WakuMetadata) Disconnected(n network.Network, cc network.Conn) {
-	// Do nothing
+	// We no longer need the shard info for that peer
+	wakuM.peerShardsMutex.Lock()
+	defer wakuM.peerShardsMutex.Unlock()
+	delete(wakuM.peerShards, cc.RemotePeer())
+}
+
+func (wakuM *WakuMetadata) GetPeerShards(ctx context.Context, peerID peer.ID) ([]uint16, error) {
+	// Already connected and we got the shard info, return immediatly
+	wakuM.peerShardsMutex.RLock()
+	shards, ok := wakuM.peerShards[peerID]
+	wakuM.peerShardsMutex.RUnlock()
+	if ok {
+		return shards, nil
+	}
+
+	// Shard info pending. Let's wait
+	t := time.NewTicker(200 * time.Millisecond)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-t.C:
+			wakuM.peerShardsMutex.RLock()
+			shards, ok := wakuM.peerShards[peerID]
+			wakuM.peerShardsMutex.RUnlock()
+			if ok {
+				return shards, nil
+			}
+		}
+	}
+}
+
+func (wakuM *WakuMetadata) disconnect(peerID peer.ID) {
+	wakuM.h.Peerstore().RemovePeer(peerID)
+	err := wakuM.h.Network().ClosePeer(peerID)
+	if err != nil {
+		wakuM.log.Error("disconnecting peer", logging.HostID("peerID", peerID), zap.Error(err))
+	}
+}
+
+func (wakuM *WakuMetadata) DisconnectPeerOnShardMismatch(ctx context.Context, peerID peer.ID) error {
+	peerShards, err := wakuM.GetPeerShards(ctx, peerID)
+	if err != nil {
+		wakuM.log.Error("could not obtain peer shards", zap.Error(err), logging.HostID("peerID", peerID))
+		wakuM.disconnect(peerID)
+		return err
+	}
+
+	rs, err := wakuM.RelayShard()
+	if err != nil {
+		wakuM.log.Error("could not obtain shards", zap.Error(err))
+		wakuM.disconnect(peerID)
+		return err
+	}
+
+	if !rs.ContainsAnyShard(rs.ClusterID, peerShards) {
+		wakuM.log.Info("shard mismatch", logging.HostID("peerID", peerID), zap.Uint16("clusterID", rs.ClusterID), zap.Uint16s("ourShardIDs", rs.ShardIDs), zap.Uint16s("theirShardIDs", peerShards))
+		wakuM.disconnect(peerID)
+		return errors.New("shard mismatch")
+	}
+
+	return nil
 }

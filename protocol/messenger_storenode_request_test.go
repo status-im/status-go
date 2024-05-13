@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/store"
+	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -380,10 +380,10 @@ func (s *MessengerStoreNodeRequestSuite) ensureStoreNodeEnvelopes(contentTopic *
 	time.Sleep(100 * time.Millisecond)
 
 	// Directly ensure profile is available on store node
-	queryOptions := []store.HistoryRequestOption{
-		store.WithLocalQuery(),
+	queryOptions := []legacy_store.HistoryRequestOption{
+		legacy_store.WithLocalQuery(),
 	}
-	query := store.Query{
+	query := legacy_store.Query{
 		PubsubTopic:   "",
 		ContentTopics: []string{contentTopic.ContentTopic()},
 	}

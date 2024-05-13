@@ -28,6 +28,7 @@ const peerOrigin = "origin"
 const peerENR = "enr"
 const peerDirection = "direction"
 const peerPubSubTopics = "pubSubTopics"
+const peerScore = "score"
 
 // ConnectionFailures contains connection failure information towards all peers
 type ConnectionFailures struct {
@@ -61,6 +62,9 @@ type WakuPeerstore interface {
 	SetPubSubTopics(p peer.ID, topics []string) error
 	PeersByPubSubTopics(pubSubTopics []string, specificPeers ...peer.ID) peer.IDSlice
 	PeersByPubSubTopic(pubSubTopic string, specificPeers ...peer.ID) peer.IDSlice
+
+	SetScore(peer.ID, float64) error
+	Score(peer.ID) (float64, error)
 }
 
 // NewWakuPeerstore creates a new WakuPeerStore object
@@ -86,6 +90,21 @@ func (ps *WakuPeerstoreImpl) Origin(p peer.ID) (Origin, error) {
 	}
 
 	return result.(Origin), nil
+}
+
+// SetScore sets score for a specific peer.
+func (ps *WakuPeerstoreImpl) SetScore(p peer.ID, score float64) error {
+	return ps.peerStore.Put(p, peerScore, score)
+}
+
+// Score fetches the peerScore for a specific peer.
+func (ps *WakuPeerstoreImpl) Score(p peer.ID) (float64, error) {
+	result, err := ps.peerStore.Get(p, peerScore)
+	if err != nil {
+		return -1, err
+	}
+
+	return result.(float64), nil
 }
 
 // PeersByOrigin returns the list of peers for a specific origin

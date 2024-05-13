@@ -2,6 +2,7 @@ package peermanager
 
 import (
 	"context"
+	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/event"
@@ -30,7 +31,7 @@ func (pm *PeerManager) handleNewRelayTopicSubscription(pubsubTopic string, topic
 		//Nothing to be done, as we are already subscribed to this topic.
 		return
 	}
-	pm.subRelayTopics[pubsubTopic] = &NodeTopicDetails{topicInst}
+	pm.subRelayTopics[pubsubTopic] = &NodeTopicDetails{topicInst, UnHealthy}
 	//Check how many relay peers we are connected to that subscribe to this topic, if less than D find peers in peerstore and connect.
 	//If no peers in peerStore, trigger discovery for this topic?
 	relevantPeersForPubSubTopic := pm.host.Peerstore().(*wps.WakuPeerstoreImpl).PeersByPubSubTopic(pubsubTopic)
@@ -44,7 +45,9 @@ func (pm *PeerManager) handleNewRelayTopicSubscription(pubsubTopic string, topic
 		}
 	}
 
-	if connectedPeers >= waku_proto.GossipSubOptimalFullMeshSize { //TODO: Use a config rather than hard-coding.
+	pm.checkAndUpdateTopicHealth(pm.subRelayTopics[pubsubTopic])
+
+	if connectedPeers >= waku_proto.GossipSubDMin { //TODO: Use a config rather than hard-coding.
 		// Should we use optimal number or define some sort of a config for the node to choose from?
 		// A desktop node may choose this to be 4-6, whereas a service node may choose this to be 8-12 based on resources it has
 		// or bandwidth it can support.
@@ -58,10 +61,10 @@ func (pm *PeerManager) handleNewRelayTopicSubscription(pubsubTopic string, topic
 		numPeersToConnect := notConnectedPeers.Len() - connectedPeers
 		if numPeersToConnect < 0 {
 			numPeersToConnect = notConnectedPeers.Len()
-		} else if numPeersToConnect-connectedPeers > waku_proto.GossipSubOptimalFullMeshSize {
-			numPeersToConnect = waku_proto.GossipSubOptimalFullMeshSize - connectedPeers
+		} else if numPeersToConnect-connectedPeers > waku_proto.GossipSubDMin {
+			numPeersToConnect = waku_proto.GossipSubDMin - connectedPeers
 		}
-		if numPeersToConnect+connectedPeers < waku_proto.GossipSubOptimalFullMeshSize {
+		if numPeersToConnect+connectedPeers < waku_proto.GossipSubDMin {
 			triggerDiscovery = true
 		}
 		//For now all peers are being given same priority,
@@ -118,17 +121,38 @@ func (pm *PeerManager) handlerPeerTopicEvent(peerEvt relay.EvtPeerTopic) {
 	wps := pm.host.Peerstore().(*wps.WakuPeerstoreImpl)
 	peerID := peerEvt.PeerID
 	if peerEvt.State == relay.PEER_JOINED {
+		if pm.metadata != nil {
+			rs, err := pm.metadata.RelayShard()
+			if err != nil {
+				pm.logger.Error("could not obtain the cluster and shards of wakunode", zap.Error(err))
+			} else if rs != nil && rs.ClusterID != 0 {
+				ctx, cancel := context.WithTimeout(pm.ctx, 7*time.Second)
+				defer cancel()
+				if err := pm.metadata.DisconnectPeerOnShardMismatch(ctx, peerEvt.PeerID); err != nil {
+					return
+				}
+			}
+		}
+
 		err := wps.AddPubSubTopic(peerID, peerEvt.PubsubTopic)
 		if err != nil {
 			pm.logger.Error("failed to add pubSubTopic for peer",
 				logging.HostID("peerID", peerID), zap.String("topic", peerEvt.PubsubTopic), zap.Error(err))
 		}
+
+		pm.topicMutex.RLock()
+		defer pm.topicMutex.RUnlock()
+		pm.checkAndUpdateTopicHealth(pm.subRelayTopics[peerEvt.PubsubTopic])
+
 	} else if peerEvt.State == relay.PEER_LEFT {
 		err := wps.RemovePubSubTopic(peerID, peerEvt.PubsubTopic)
 		if err != nil {
 			pm.logger.Error("failed to remove pubSubTopic for peer",
 				logging.HostID("peerID", peerID), zap.Error(err))
 		}
+		pm.topicMutex.RLock()
+		defer pm.topicMutex.RUnlock()
+		pm.checkAndUpdateTopicHealth(pm.subRelayTopics[peerEvt.PubsubTopic])
 	} else {
 		pm.logger.Error("unknown peer event received", zap.Int("eventState", int(peerEvt.State)))
 	}

@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -31,12 +32,8 @@ var (
 	}
 )
 
-const (
-	// NextProtoH3Draft29 is the ALPN protocol negotiated during the TLS handshake, for QUIC draft 29.
-	NextProtoH3Draft29 = "h3-29"
-	// NextProtoH3 is the ALPN protocol negotiated during the TLS handshake, for QUIC v1 and v2.
-	NextProtoH3 = "h3"
-)
+// NextProtoH3 is the ALPN protocol negotiated during the TLS handshake, for QUIC v1 and v2.
+const NextProtoH3 = "h3"
 
 // StreamType is the stream type of a unidirectional stream.
 type StreamType uint64
@@ -62,8 +59,6 @@ func versionToALPN(v protocol.VersionNumber) string {
 	switch v {
 	case protocol.Version1, protocol.Version2:
 		return NextProtoH3
-	case protocol.VersionDraft29:
-		return NextProtoH3Draft29
 	default:
 		return ""
 	}
@@ -178,7 +173,7 @@ type Server struct {
 
 	// EnableDatagrams enables support for HTTP/3 datagrams.
 	// If set to true, QuicConfig.EnableDatagram will be set.
-	// See https://datatracker.ietf.org/doc/html/draft-ietf-masque-h3-datagram-07.
+	// See https://datatracker.ietf.org/doc/html/rfc9297.
 	EnableDatagrams bool
 
 	// MaxHeaderBytes controls the maximum number of bytes the server will
@@ -575,14 +570,22 @@ func (s *Server) handleRequest(conn quic.Connection, str quic.Stream, decoder *q
 	}
 	req, err := requestFromHeaders(hfs)
 	if err != nil {
-		// TODO: use the right error code
-		return newStreamError(ErrCodeGeneralProtocolError, err)
+		return newStreamError(ErrCodeMessageError, err)
 	}
 
-	connState := conn.ConnectionState().TLS.ConnectionState
+	connState := conn.ConnectionState().TLS
 	req.TLS = &connState
 	req.RemoteAddr = conn.RemoteAddr().String()
-	body := newRequestBody(newStream(str, onFrameError))
+
+	// Check that the client doesn't send more data in DATA frames than indicated by the Content-Length header (if set).
+	// See section 4.1.2 of RFC 9114.
+	var httpStr Stream
+	if _, ok := req.Header["Content-Length"]; ok && req.ContentLength >= 0 {
+		httpStr = newLengthLimitedStream(newStream(str, onFrameError), req.ContentLength)
+	} else {
+		httpStr = newStream(str, onFrameError)
+	}
+	body := newRequestBody(httpStr)
 	req.Body = body
 
 	if s.logger.Debug() {
@@ -596,7 +599,6 @@ func (s *Server) handleRequest(conn quic.Connection, str quic.Stream, decoder *q
 	ctx = context.WithValue(ctx, http.LocalAddrContextKey, conn.LocalAddr())
 	req = req.WithContext(ctx)
 	r := newResponseWriter(str, conn, s.logger)
-	defer r.Flush()
 	handler := s.Handler
 	if handler == nil {
 		handler = http.DefaultServeMux
@@ -624,10 +626,15 @@ func (s *Server) handleRequest(conn quic.Connection, str quic.Stream, decoder *q
 		return requestError{err: errHijacked}
 	}
 
-	if panicked {
-		r.WriteHeader(http.StatusInternalServerError)
-	} else {
-		r.WriteHeader(http.StatusOK)
+	// only write response when there is no panic
+	if !panicked {
+		// response not written to the client yet, set Content-Length
+		if !r.written {
+			if _, haveCL := r.header["Content-Length"]; !haveCL {
+				r.header.Set("Content-Length", strconv.FormatInt(r.numWritten, 10))
+			}
+		}
+		r.Flush()
 	}
 	// If the EOF was read by the handler, CancelRead() is a no-op.
 	str.CancelRead(quic.StreamErrorCode(ErrCodeNoError))

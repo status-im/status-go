@@ -8,9 +8,23 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
 
 type PeerExchangeParameters struct {
+	limiter *rate.Limiter
+}
+
+type Option func(*PeerExchangeParameters)
+
+// WithRateLimiter is an option used to specify a rate limiter for requests received in lightpush protocol
+func WithRateLimiter(r rate.Limit, b int) Option {
+	return func(params *PeerExchangeParameters) {
+		params.limiter = rate.NewLimiter(r, b)
+	}
+}
+
+type PeerExchangeRequestParameters struct {
 	host              host.Host
 	selectedPeer      peer.ID
 	peerAddr          multiaddr.Multiaddr
@@ -18,13 +32,15 @@ type PeerExchangeParameters struct {
 	preferredPeers    peer.IDSlice
 	pm                *peermanager.PeerManager
 	log               *zap.Logger
+	shard             int
+	clusterID         int
 }
 
-type PeerExchangeOption func(*PeerExchangeParameters) error
+type RequestOption func(*PeerExchangeRequestParameters) error
 
 // WithPeer is an option used to specify the peerID to fetch peers from
-func WithPeer(p peer.ID) PeerExchangeOption {
-	return func(params *PeerExchangeParameters) error {
+func WithPeer(p peer.ID) RequestOption {
+	return func(params *PeerExchangeRequestParameters) error {
 		params.selectedPeer = p
 		if params.peerAddr != nil {
 			return errors.New("peerAddr and peerId options are mutually exclusive")
@@ -36,8 +52,8 @@ func WithPeer(p peer.ID) PeerExchangeOption {
 // WithPeerAddr is an option used to specify a peerAddress to fetch peers from
 // This new peer will be added to peerStore.
 // Note that this option is mutually exclusive to WithPeerAddr, only one of them can be used.
-func WithPeerAddr(pAddr multiaddr.Multiaddr) PeerExchangeOption {
-	return func(params *PeerExchangeParameters) error {
+func WithPeerAddr(pAddr multiaddr.Multiaddr) RequestOption {
+	return func(params *PeerExchangeRequestParameters) error {
 		params.peerAddr = pAddr
 		if params.selectedPeer != "" {
 			return errors.New("peerAddr and peerId options are mutually exclusive")
@@ -51,8 +67,8 @@ func WithPeerAddr(pAddr multiaddr.Multiaddr) PeerExchangeOption {
 // from that list assuming it supports the chosen protocol, otherwise it will chose a peer
 // from the node peerstore
 // Note: this option can only be used if WakuNode is initialized which internally intializes the peerManager
-func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) PeerExchangeOption {
-	return func(params *PeerExchangeParameters) error {
+func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) RequestOption {
+	return func(params *PeerExchangeRequestParameters) error {
 		params.peerSelectionType = peermanager.Automatic
 		params.preferredPeers = fromThesePeers
 		return nil
@@ -63,8 +79,8 @@ func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) PeerExchangeOption {
 // with the lowest ping. If a list of specific peers is passed, the peer will be chosen
 // from that list assuming it supports the chosen protocol, otherwise it will chose a peer
 // from the node peerstore
-func WithFastestPeerSelection(fromThesePeers ...peer.ID) PeerExchangeOption {
-	return func(params *PeerExchangeParameters) error {
+func WithFastestPeerSelection(fromThesePeers ...peer.ID) RequestOption {
+	return func(params *PeerExchangeRequestParameters) error {
 		params.peerSelectionType = peermanager.LowestRTT
 		params.preferredPeers = fromThesePeers
 		return nil
@@ -72,8 +88,17 @@ func WithFastestPeerSelection(fromThesePeers ...peer.ID) PeerExchangeOption {
 }
 
 // DefaultOptions are the default options to be used when using the lightpush protocol
-func DefaultOptions(host host.Host) []PeerExchangeOption {
-	return []PeerExchangeOption{
+func DefaultOptions(host host.Host) []RequestOption {
+	return []RequestOption{
 		WithAutomaticPeerSelection(),
+	}
+}
+
+// Use this if you want to filter peers by specific shards
+func FilterByShard(clusterID int, shard int) RequestOption {
+	return func(params *PeerExchangeRequestParameters) error {
+		params.shard = shard
+		params.clusterID = clusterID
+		return nil
 	}
 }

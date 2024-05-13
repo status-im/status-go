@@ -39,6 +39,7 @@ var (
 	decodeRPCFailure metricsErrCategory = "decode_rpc_failure"
 	pxFailure        metricsErrCategory = "px_failure"
 	dialFailure      metricsErrCategory = "dial_failure"
+	rateLimitFailure metricsErrCategory = "ratelimit_failure"
 )
 
 // RecordError increases the counter for different error types

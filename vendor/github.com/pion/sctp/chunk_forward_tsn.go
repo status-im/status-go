@@ -43,9 +43,10 @@ const (
 	forwardTSNStreamLength = 4
 )
 
+// Forward TSN chunk errors
 var (
-	errMarshalStreamFailed = errors.New("failed to marshal stream")
-	errChunkTooShort       = errors.New("chunk too short")
+	ErrMarshalStreamFailed = errors.New("failed to marshal stream")
+	ErrChunkTooShort       = errors.New("chunk too short")
 )
 
 func (c *chunkForwardTSN) unmarshal(raw []byte) error {
@@ -54,7 +55,7 @@ func (c *chunkForwardTSN) unmarshal(raw []byte) error {
 	}
 
 	if len(c.raw) < newCumulativeTSNLength {
-		return errChunkTooShort
+		return ErrChunkTooShort
 	}
 
 	c.newCumulativeTSN = binary.BigEndian.Uint32(c.raw[0:])
@@ -65,7 +66,7 @@ func (c *chunkForwardTSN) unmarshal(raw []byte) error {
 		s := chunkForwardTSNStream{}
 
 		if err := s.unmarshal(c.raw[offset:]); err != nil {
-			return fmt.Errorf("%w: %v", errMarshalStreamFailed, err)
+			return fmt.Errorf("%w: %v", ErrMarshalStreamFailed, err) //nolint:errorlint
 		}
 
 		c.streams = append(c.streams, s)
@@ -84,7 +85,7 @@ func (c *chunkForwardTSN) marshal() ([]byte, error) {
 	for _, s := range c.streams {
 		b, err := s.marshal()
 		if err != nil {
-			return nil, fmt.Errorf("%w: %v", errMarshalStreamFailed, err)
+			return nil, fmt.Errorf("%w: %v", ErrMarshalStreamFailed, err) //nolint:errorlint
 		}
 		out = append(out, b...)
 	}
@@ -129,7 +130,7 @@ func (s *chunkForwardTSNStream) length() int {
 
 func (s *chunkForwardTSNStream) unmarshal(raw []byte) error {
 	if len(raw) < forwardTSNStreamLength {
-		return errChunkTooShort
+		return ErrChunkTooShort
 	}
 	s.identifier = binary.BigEndian.Uint16(raw[0:])
 	s.sequence = binary.BigEndian.Uint16(raw[2:])
