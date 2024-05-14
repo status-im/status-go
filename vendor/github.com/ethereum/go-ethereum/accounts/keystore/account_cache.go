@@ -167,6 +167,7 @@ func removeAccount(slice []accounts.Account, elem accounts.Account) []accounts.A
 // The exact matching rules are explained by the documentation of accounts.Account.
 // Callers must hold ac.mu.
 func (ac *accountCache) find(a accounts.Account) (accounts.Account, error) {
+	fmt.Println("FINDING CACHE", a)
 	// Limit search to address candidates if possible.
 	matches := ac.all
 	if (a.Address != common.Address{}) {
@@ -239,6 +240,7 @@ func (ac *accountCache) close() {
 // scanAccounts checks if any changes have occurred on the filesystem, and
 // updates the account cache accordingly
 func (ac *accountCache) scanAccounts() error {
+	fmt.Println("SCAANING", ac.keydir)
 	// Scan the entire folder metadata for file changes
 	creates, deletes, updates, err := ac.fileC.scan(ac.keydir)
 	if err != nil {

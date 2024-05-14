@@ -24,6 +24,7 @@ import (
 	"crypto/ecdsa"
 	crand "crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -378,10 +379,12 @@ func (ks *KeyStore) Find(a accounts.Account) (accounts.Account, error) {
 }
 
 func (ks *KeyStore) getDecryptedKey(a accounts.Account, auth string) (accounts.Account, *Key, error) {
+	fmt.Println("GETTING DECRYPTED KEY", a, auth)
 	a, err := ks.Find(a)
 	if err != nil {
 		return a, nil, err
 	}
+	fmt.Println("GETTING KEY", a, auth)
 	key, err := ks.storage.GetKey(a.Address, a.URL.Path, auth)
 	return a, key, err
 }

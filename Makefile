@@ -311,6 +311,7 @@ setup-dev:
 
 generate-handlers:
 	go generate ./_assets/generate_handlers/
+generate: export BUILD_TAGS ?=
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/... ./walletdatabase/... ./_assets/generate_handlers
 

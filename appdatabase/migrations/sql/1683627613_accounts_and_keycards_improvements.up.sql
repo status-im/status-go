@@ -5,7 +5,7 @@
 
 -- Adding new tables `keypairs` and `keypairs_accounts`
 CREATE TABLE IF NOT EXISTS keypairs (
-  key_uid VARCHAR PRIMARY KEY NOT NULL CHECK (length(trim(key_uid)) > 0),
+  key_uid VARCHAR PRIMARY KEY NOT NULL DEFAULT "test",
   name VARCHAR NOT NULL DEFAULT "",
   type VARCHAR NOT NULL DEFAULT "",
   derived_from VARCHAR NOT NULL DEFAULT "",
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS keypairs_accounts (
 
 -- Fulfilling the tables
 INSERT INTO keypairs 
-  SELECT key_uid, keypair_name, "profile", derived_from, last_used_derivation_index, "", clock 
+  SELECT pubkey, keypair_name, "profile", derived_from, last_used_derivation_index, "", clock 
   FROM accounts 
   WHERE type != "watch" AND type != "seed" AND type != "key"
   GROUP BY key_uid;

@@ -453,6 +453,7 @@ func (m *DefaultManager) ImportOnboardingAccount(id string, password string) (In
 // The running node, has a keystore directory which is loaded on start. Key file
 // for a given address is expected to be in that directory prior to node start.
 func (m *DefaultManager) AddressToDecryptedAccount(address, password string) (types.Account, *types.Key, error) {
+	fmt.Println("CHECKING ADDRESS", address)
 	if m.keystore == nil {
 		return types.Account{}, nil, ErrAccountKeyStoreMissing
 	}

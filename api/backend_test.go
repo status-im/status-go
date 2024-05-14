@@ -1269,9 +1269,9 @@ func login(t *testing.T, conf *params.NodeConfig) {
 	// used to determine if login process works correctly after a migration
 
 	// Expected account data:
-	keyUID := "0x7c46c8f6f059ab72d524f2a6d356904db30bb0392636172ab3929a6bd2220f84" // #nosec G101
-	username := "TestUser"
-	passwd := "0xC888C9CE9E098D5864D3DED6EBCC140A12142263BACE3A23A36F9905F12BD64A" // #nosec G101
+	keyUID := "0xadbfbc1f600185d8830314e2676a7bcfe2388e920480c39230ee6ab97d42540d"
+	username := "Ample Blueviolet Fly"
+	passwd := "0x1040e704f2d2ca1a6a50fedaf8ce712517f7387fba2c64717e6c416e381f190d"
 
 	b := NewGethStatusBackend()
 
@@ -1305,7 +1305,7 @@ func login(t *testing.T, conf *params.NodeConfig) {
 func TestLoginAndMigrationsStillWorkWithExistingUsers(t *testing.T) {
 	utils.Init()
 
-	srcFolder := "../static/test-0.132.0-account/"
+	srcFolder := "../static/test-old-account/"
 
 	tmpdir := t.TempDir()
 
