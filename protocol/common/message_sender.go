@@ -1278,3 +1278,14 @@ func (s *MessageSender) GetCurrentKeyForGroup(groupID []byte) (*encryption.HashR
 func (s *MessageSender) GetKeysForGroup(groupID []byte) ([]*encryption.HashRatchetKeyCompatibility, error) {
 	return s.protocol.GetKeysForGroup(groupID)
 }
+
+func (s *MessageSender) CleanupHashRatchetEncryptedMessages() error {
+	monthAgo := time.Now().AddDate(0, -1, 0).Unix()
+
+	err := s.persistence.DeleteHashRatchetMessagesOlderThan(monthAgo)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

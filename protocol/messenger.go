@@ -786,6 +786,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		m.startCuratedCommunitiesUpdateLoop()
 	}
 	m.startMessageSegmentsCleanupLoop()
+	m.startHashRatchetEncryptedMessagesCleanupLoop()
 
 	if err := m.cleanTopics(); err != nil {
 		return nil, err
@@ -5980,8 +5981,8 @@ func (m *Messenger) GetDeleteForMeMessages() ([]*protobuf.SyncDeleteForMeMessage
 	return m.persistence.GetDeleteForMeMessages()
 }
 
-func (m *Messenger) startMessageSegmentsCleanupLoop() {
-	logger := m.logger.Named("messageSegmentsCleanupLoop")
+func (m *Messenger) startCleanupLoop(name string, cleanupFunc func() error) {
+	logger := m.logger.Named(name)
 
 	go func() {
 		// Delay by a few minutes to minimize messenger's startup time
@@ -5992,9 +5993,9 @@ func (m *Messenger) startMessageSegmentsCleanupLoop() {
 				// Set the regular interval after the first execution
 				interval = 1 * time.Hour
 
-				err := m.sender.CleanupSegments()
+				err := cleanupFunc()
 				if err != nil {
-					logger.Error("failed to cleanup segments", zap.Error(err))
+					logger.Error("failed to cleanup", zap.Error(err))
 				}
 
 			case <-m.quit:
@@ -6002,6 +6003,14 @@ func (m *Messenger) startMessageSegmentsCleanupLoop() {
 			}
 		}
 	}()
+}
+
+func (m *Messenger) startMessageSegmentsCleanupLoop() {
+	m.startCleanupLoop("messageSegmentsCleanupLoop", m.sender.CleanupSegments)
+}
+
+func (m *Messenger) startHashRatchetEncryptedMessagesCleanupLoop() {
+	m.startCleanupLoop("hashRatchetEncryptedMessagesCleanupLoop", m.sender.CleanupHashRatchetEncryptedMessages)
 }
 
 func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string) (string, error) {
