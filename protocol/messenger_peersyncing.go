@@ -118,37 +118,47 @@ func (m *Messenger) sendDatasyncOffers() error {
 		return nil
 	}
 
-	communities, err := m.communitiesManager.Joined()
+	err = m.sendDatasyncOffersForCommunities()
 	if err != nil {
 		return err
 	}
 
-	for _, community := range communities {
+	err = m.sendDatasyncOffersForChats()
+	if err != nil {
+		return err
+	}
+
+	// Check all the group ids that need to be on offer
+	// Get all the messages that need to be offered
+	// Prepare datasync messages
+	// Dispatch them to the right group
+	return nil
+}
+
+func (m *Messenger) sendDatasyncOffersForCommunities() error {
+	joinedCommunities, err := m.communitiesManager.Joined()
+	if err != nil {
+		return err
+	}
+
+	for _, community := range joinedCommunities {
 		var chatIDs [][]byte
 		for id := range community.Chats() {
 			chatIDs = append(chatIDs, []byte(community.IDString()+id))
 		}
-
 		if len(chatIDs) == 0 {
 			continue
 		}
-
-		availableMessages, err := m.peersyncing.AvailableMessagesByGroupIDs(chatIDs, maxAdvertiseMessages)
+		availableMessagesMap, err := m.peersyncing.AvailableMessagesMapByChatIDs(chatIDs, maxAdvertiseMessages)
 		if err != nil {
 			return err
 		}
-		availableMessagesMap := make(map[string][][]byte)
-		for _, m := range availableMessages {
-			groupID := types.Bytes2Hex(m.GroupID)
-			availableMessagesMap[groupID] = append(availableMessagesMap[groupID], m.ID)
-		}
-
 		datasyncMessage := &datasyncproto.Payload{}
-		if len(availableMessages) == 0 {
+		if len(availableMessagesMap) == 0 {
 			continue
 		}
-		for groupID, m := range availableMessagesMap {
-			datasyncMessage.GroupOffers = append(datasyncMessage.GroupOffers, &datasyncproto.Offer{GroupId: types.Hex2Bytes(groupID), MessageIds: m})
+		for chatID, m := range availableMessagesMap {
+			datasyncMessage.GroupOffers = append(datasyncMessage.GroupOffers, &datasyncproto.Offer{GroupId: types.Hex2Bytes(chatID), MessageIds: m})
 		}
 		payload, err := proto.Marshal(datasyncMessage)
 		if err != nil {
@@ -164,12 +174,43 @@ func (m *Messenger) sendDatasyncOffers() error {
 		if err != nil {
 			return err
 		}
-
 	}
-	// Check all the group ids that need to be on offer
-	// Get all the messages that need to be offered
-	// Prepare datasync messages
-	// Dispatch them to the right group
+	return nil
+}
+
+func (m *Messenger) sendDatasyncOffersForChats() error {
+	for _, chat := range m.Chats() {
+		chatIDBytes := []byte(chat.ID)
+		availableMessagesMap, err := m.peersyncing.AvailableMessagesMapByChatIDs([][]byte{chatIDBytes}, maxAdvertiseMessages)
+		if err != nil {
+			return err
+		}
+		datasyncMessage := &datasyncproto.Payload{}
+		if len(availableMessagesMap) == 0 {
+			continue
+		}
+		for _, message := range availableMessagesMap {
+			datasyncMessage.GroupOffers = append(datasyncMessage.GroupOffers, &datasyncproto.Offer{GroupId: chatIDBytes, MessageIds: message})
+		}
+		payload, err := proto.Marshal(datasyncMessage)
+		if err != nil {
+			return err
+		}
+
+		publicKey, err := chat.PublicKey()
+		if err != nil {
+			return err
+		}
+		rawMessage := common.RawMessage{
+			Payload:             payload,
+			Ephemeral:           true,
+			SkipApplicationWrap: true,
+		}
+		_, err = m.sender.SendPrivate(context.Background(), publicKey, &rawMessage)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -188,7 +229,7 @@ func (m *Messenger) OnDatasyncOffer(response *common.HandleMessageResponse) erro
 	var offeredMessages []peersyncing.SyncMessage
 
 	for _, o := range offers {
-		offeredMessages = append(offeredMessages, peersyncing.SyncMessage{GroupID: o.GroupID, ID: o.MessageID})
+		offeredMessages = append(offeredMessages, peersyncing.SyncMessage{ChatID: o.GroupID, ID: o.MessageID})
 	}
 
 	messagesToFetch, err := m.peersyncing.OnOffer(offeredMessages)
@@ -235,7 +276,7 @@ func (m *Messenger) OnDatasyncOffer(response *common.HandleMessageResponse) erro
 func (m *Messenger) canSyncMessageWith(message peersyncing.SyncMessage, peer *ecdsa.PublicKey) (bool, error) {
 	switch message.Type {
 	case peersyncing.SyncMessageCommunityType:
-		chat, ok := m.allChats.Load(string(message.GroupID))
+		chat, ok := m.allChats.Load(string(message.ChatID))
 		if !ok {
 			return false, nil
 		}
@@ -245,7 +286,12 @@ func (m *Messenger) canSyncMessageWith(message peersyncing.SyncMessage, peer *ec
 		}
 
 		return m.canSyncCommunityMessageWith(chat, community, peer)
-
+	case peersyncing.SyncMessageOneToOneType:
+		chat, ok := m.allChats.Load(string(message.ChatID))
+		if !ok {
+			return false, nil
+		}
+		return m.canSyncOneToOneMessageWith(chat, peer)
 	default:
 		return false, nil
 	}
@@ -256,6 +302,10 @@ func (m *Messenger) canSyncMessageWith(message peersyncing.SyncMessage, peer *ec
 // As an approximation it should be ok, but worth thinking about how to address this.
 func (m *Messenger) canSyncCommunityMessageWith(chat *Chat, community *communities.Community, peer *ecdsa.PublicKey) (bool, error) {
 	return community.IsMemberInChat(peer, chat.CommunityChatID()), nil
+}
+
+func (m *Messenger) canSyncOneToOneMessageWith(chat *Chat, peer *ecdsa.PublicKey) (bool, error) {
+	return chat.HasMember(common.PubkeyToHex(peer)), nil
 }
 
 func (m *Messenger) OnDatasyncRequests(requester *ecdsa.PublicKey, messageIDs [][]byte) error {

@@ -137,6 +137,7 @@
 // 1712905223_add_parity_to_message_segments.up.sql (792B)
 // 1713169458_update_raw_messages_with_resend_features.up.sql (608B)
 // 1715163152_remove_status_community.up.sql (354B)
+// 1715163262_rename_peersyncing_group_id_field.up.sql (212B)
 // README.md (554B)
 // doc.go (870B)
 
@@ -2947,6 +2948,26 @@ func _1715163152_remove_status_communityUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1715163262_rename_peersyncing_group_id_fieldUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x7c\xcd\x31\x0a\xc3\x20\x18\x47\xf1\xdd\x53\xfc\xc7\x16\x7a\x83\x4c\x36\xf9\x0a\x01\xa3\xc5\x58\xc8\x26\x92\x88\x75\x30\x95\x68\x87\xde\xbe\x4b\xe8\x14\xba\xff\x78\xaf\xd3\xea\x8e\x5e\x76\x34\xa1\xbf\x81\xa6\x7e\x34\x23\xb2\xf7\x5b\xf9\xac\x73\x5c\x83\x4d\xbe\x14\x17\x7c\xb1\x35\x26\x5f\xaa\x4b\xb9\x61\x8c\x0b\x43\x1a\x86\x5f\x05\x1d\x62\x68\x92\x7c\x20\xb4\x4a\x3c\x06\x89\xb0\xbd\xde\xd9\xc6\x05\x46\x61\x7e\xba\x6a\xe3\xd2\x30\xd6\x6a\xe2\x86\xf6\xf9\xff\x25\x94\x3c\x14\xa7\xbd\x76\xc1\x8f\x9e\x1b\xf6\x0d\x00\x00\xff\xff\xf3\xaa\x82\x37\xd4\x00\x00\x00")
+
+func _1715163262_rename_peersyncing_group_id_fieldUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1715163262_rename_peersyncing_group_id_fieldUpSql,
+		"1715163262_rename_peersyncing_group_id_field.up.sql",
+	)
+}
+
+func _1715163262_rename_peersyncing_group_id_fieldUpSql() (*asset, error) {
+	bytes, err := _1715163262_rename_peersyncing_group_id_fieldUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1715163262_rename_peersyncing_group_id_field.up.sql", size: 212, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7b, 0x8d, 0x51, 0xe3, 0x46, 0xc, 0x1e, 0xf1, 0xe, 0xc2, 0xb3, 0x43, 0xfb, 0xed, 0xb0, 0x30, 0x45, 0x63, 0x18, 0x59, 0x19, 0x9d, 0x7e, 0x3f, 0x54, 0x87, 0xbf, 0x9f, 0x6, 0x9, 0x78, 0xec}}
+	return a, nil
+}
+
 var _readmeMd = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x54\x91\xc1\xce\xd3\x30\x10\x84\xef\x7e\x8a\x91\x7a\x01\xa9\x2a\x8f\xc0\x0d\x71\x82\x03\x48\x1c\xc9\x36\x9e\x36\x96\x1c\x6f\xf0\xae\x93\xe6\xed\x91\xa3\xc2\xdf\xff\x66\xed\xd8\x33\xdf\x78\x4f\xa7\x13\xbe\xea\x06\x57\x6c\x35\x39\x31\xa7\x7b\x15\x4f\x5a\xec\x73\x08\xbf\x08\x2d\x79\x7f\x4a\x43\x5b\x86\x17\xfd\x8c\x21\xea\x56\x5e\x47\x90\x4a\x14\x75\x48\xde\x64\x37\x2c\x6a\x96\xae\x99\x48\x05\xf6\x27\x77\x13\xad\x08\xae\x8a\x51\xe7\x25\xf3\xf1\xa9\x9f\xf9\x58\x58\x2c\xad\xbc\xe0\x8b\x56\xf0\x21\x5d\xeb\x4c\x95\xb3\xae\x84\x60\xd4\xdc\xe6\x82\x5d\x1b\x36\x6d\x39\x62\x92\xf5\xb8\x11\xdb\x92\xd3\x28\xce\xe0\x13\xe1\x72\xcd\x3c\x63\xd4\x65\x87\xae\xac\xe8\xc3\x28\x2e\x67\x44\x66\x3a\x21\x25\xa2\x72\xac\x14\x67\xbc\x84\x9f\x53\x32\x8c\x52\x70\x25\x56\xd6\xfd\x8d\x05\x37\xad\x30\x9d\x9f\xa6\x86\x0f\xcd\x58\x7f\xcf\x34\x93\x3b\xed\x90\x9f\xa4\x1f\xcf\x30\x85\x4d\x07\x58\xaf\x7f\x25\xc4\x9d\xf3\x72\x64\x84\xd0\x7f\xf9\x9b\x3a\x2d\x84\xef\x85\x48\x66\x8d\xd8\x88\x9b\x8c\x8c\x98\x5b\xf6\x74\x14\x4e\x33\x0d\xc9\xe0\x93\x38\xda\x12\xc5\x69\xbd\xe4\xf0\x2e\x7a\x78\x07\x1c\xfe\x13\x9f\x91\x29\x31\x95\x7b\x7f\x62\x59\x37\xb4\xe5\x5e\x25\xfe\x33\xee\xd5\x53\x71\xd6\xda\x3a\xd8\xcb\xde\x2e\xf8\xa1\x90\x55\x53\x0c\xc7\xaa\x0d\xe9\x76\x14\x29\x1c\x7b\x68\xdd\x2f\xe1\x6f\x00\x00\x00\xff\xff\x3c\x0a\xc2\xfe\x2a\x02\x00\x00")
 
 func readmeMdBytes() ([]byte, error) {
@@ -3352,6 +3373,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1715163152_remove_status_community.up.sql": _1715163152_remove_status_communityUpSql,
 
+	"1715163262_rename_peersyncing_group_id_field.up.sql": _1715163262_rename_peersyncing_group_id_fieldUpSql,
+
 	"README.md": readmeMd,
 
 	"doc.go": docGo,
@@ -3361,11 +3384,13 @@ var _bindata = map[string]func() (*asset, error){
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -3535,6 +3560,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1712905223_add_parity_to_message_segments.up.sql":                            &bintree{_1712905223_add_parity_to_message_segmentsUpSql, map[string]*bintree{}},
 	"1713169458_update_raw_messages_with_resend_features.up.sql":                  &bintree{_1713169458_update_raw_messages_with_resend_featuresUpSql, map[string]*bintree{}},
 	"1715163152_remove_status_community.up.sql":                                   &bintree{_1715163152_remove_status_communityUpSql, map[string]*bintree{}},
+	"1715163262_rename_peersyncing_group_id_field.up.sql":                         &bintree{_1715163262_rename_peersyncing_group_id_fieldUpSql, map[string]*bintree{}},
 	"README.md": &bintree{readmeMd, map[string]*bintree{}},
 	"doc.go":    &bintree{docGo, map[string]*bintree{}},
 }}
