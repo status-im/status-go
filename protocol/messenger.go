@@ -82,6 +82,11 @@ const (
 	privateChat ChatContext = "private-chat"
 )
 
+// errors
+var (
+	ErrChatNotFoundError = errors.New("Chat not found")
+)
+
 var communityAdvertiseIntervalSecond int64 = 60 * 60
 
 // messageCacheIntervalMs is how long we should keep processed messages in the cache, in ms
@@ -2382,7 +2387,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(message.ChatId)
 	if !ok {
-		return nil, errors.New("Chat not found")
+		return nil, ErrChatNotFoundError
 	}
 
 	err = m.handleStandaloneChatIdentity(chat)
@@ -4343,11 +4348,72 @@ func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm s
 		return nil, err
 	}
 
-	return m.persistence.AllMessageByChatIDWhichMatchTerm(chatID, searchTerm, caseSensitive)
+	messages, err := m.persistence.AllMessageByChatIDWhichMatchTerm(chatID, searchTerm, caseSensitive)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.filterOutHiddenChatMessages(messages)
+
 }
 
 func (m *Messenger) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityIds []string, chatIds []string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
-	return m.persistence.AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityIds, chatIds, searchTerm, caseSensitive)
+	messages, err := m.persistence.AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityIds, chatIds, searchTerm, caseSensitive)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.filterOutHiddenChatMessages(messages)
+}
+
+func (m *Messenger) filterOutHiddenChatMessages(messages []*common.Message) ([]*common.Message, error) {
+	communitiesCache := make(map[string]*communities.Community)
+	chatVisibilityCache := make(map[string]bool)
+	var filteredMessages []*common.Message
+
+	for _, message := range messages {
+		chatVisible, ok := chatVisibilityCache[message.ChatId]
+		if ok && chatVisible {
+			filteredMessages = append(filteredMessages, message)
+			continue
+		}
+
+		chat, ok := m.allChats.Load(message.ChatId)
+		if !ok {
+			return nil, ErrChatNotFoundError
+		}
+
+		if chat.CommunityID == "" {
+			filteredMessages = append(filteredMessages, message)
+			continue
+		}
+
+		community, ok := communitiesCache[chat.CommunityID]
+		if !ok {
+			communityID, err := hexutil.Decode(chat.CommunityID)
+			if err != nil {
+				return nil, err
+			}
+			comm, err := m.communitiesManager.GetByID(communityID)
+			if err != nil {
+				if err == communities.ErrOrgNotFound {
+					continue
+				}
+				return nil, err
+			}
+			communitiesCache[chat.CommunityID] = comm
+			community = comm
+		}
+
+		canView := community.CanView(&m.identity.PublicKey, chat.CommunityChannelID())
+		chatVisibilityCache[chat.ID] = canView
+
+		if canView {
+			filteredMessages = append(filteredMessages, message)
+		}
+	}
+
+	return filteredMessages, nil
 }
 
 func (m *Messenger) SaveMessages(messages []*common.Message) error {
@@ -4522,7 +4588,7 @@ func (m *Messenger) syncChatMessagesRead(ctx context.Context, chatID string, clo
 func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool) error {
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
-		return errors.New("chat not found")
+		return ErrChatNotFoundError
 	}
 
 	_, _, err := m.persistence.MarkAllRead(chatID, clock)
@@ -4566,7 +4632,7 @@ func (m *Messenger) MarkAllRead(ctx context.Context, chatID string) (*MessengerR
 	if clock == 0 {
 		chat, ok := m.allChats.Load(chatID)
 		if !ok {
-			return nil, errors.New("chat not found")
+			return nil, ErrChatNotFoundError
 		}
 		clock, _ = chat.NextClockAndTimestamp(m.getTimesource())
 	}
@@ -4709,7 +4775,7 @@ func (m *Messenger) muteChat(chat *Chat, contact *Contact, mutedTill time.Time) 
 func (m *Messenger) UnmuteChat(chatID string) error {
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
-		return errors.New("chat not found")
+		return ErrChatNotFoundError
 	}
 
 	var contact *Contact
@@ -4772,7 +4838,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
-		return nil, errors.New("Chat not found")
+		return nil, ErrChatNotFoundError
 	}
 	if chat.ChatType != ChatTypeOneToOne {
 		return nil, errors.New("Need to be a one-to-one chat")
@@ -4850,7 +4916,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
-		return nil, errors.New("Chat not found")
+		return nil, ErrChatNotFoundError
 	}
 	if chat.ChatType != ChatTypeOneToOne {
 		return nil, errors.New("Need to be a one-to-one chat")
@@ -4939,7 +5005,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
-		return nil, errors.New("Chat not found")
+		return nil, ErrChatNotFoundError
 	}
 	if chat.ChatType != ChatTypeOneToOne {
 		return nil, errors.New("Need to be a one-to-one chat")
@@ -5035,7 +5101,7 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
-		return nil, errors.New("Chat not found")
+		return nil, ErrChatNotFoundError
 	}
 	if chat.ChatType != ChatTypeOneToOne {
 		return nil, errors.New("Need to be a one-to-one chat")
@@ -5118,7 +5184,7 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
-		return nil, errors.New("Chat not found")
+		return nil, ErrChatNotFoundError
 	}
 	if chat.ChatType != ChatTypeOneToOne {
 		return nil, errors.New("Need to be a one-to-one chat")
@@ -5201,7 +5267,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
-		return nil, errors.New("Chat not found")
+		return nil, ErrChatNotFoundError
 	}
 	if chat.ChatType != ChatTypeOneToOne {
 		return nil, errors.New("Need to be a one-to-one chat")
@@ -5290,7 +5356,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
-		return nil, errors.New("Chat not found")
+		return nil, ErrChatNotFoundError
 	}
 	if chat.ChatType != ChatTypeOneToOne {
 		return nil, errors.New("Need to be a one-to-one chat")

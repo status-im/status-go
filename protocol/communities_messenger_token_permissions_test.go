@@ -1246,6 +1246,133 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 	}
 }
 
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestSearchMessageinPermissionedChannel() {
+	community, chat := s.createCommunity()
+
+	newChat := protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			EnsOnly: false,
+			Private: false,
+			Access:  1,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "new-channel",
+			Description: "description",
+			Emoji:       "",
+			Color:       "",
+		},
+		CategoryId:              "",
+		ViewersCanPostReactions: true,
+		HideIfPermissionsNotMet: false,
+	}
+
+	response, err := s.owner.CreateCommunityChat(community.ID(), &newChat)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	newChatID := response.Chats()[0].ID
+
+	// bob joins the community
+	s.advertiseCommunityTo(community, s.bob)
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
+
+	// send message to the original channel
+	msg := s.sendChatMessage(s.owner, chat.ID, "hello on open community")
+
+	// bob can read the message
+	response, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			_, ok := r.messages[msg.ID]
+			return ok
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+
+	// send message to the new channel
+	msgText := "hello on new chat"
+	msg = s.sendChatMessage(s.owner, newChatID, msgText)
+
+	// bob can read the message
+	response, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			_, ok := r.messages[msg.ID]
+			return ok
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+
+	waitOnBobToBeKickedFromChannel := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		channel, ok := sub.Community.Chats()[chat.CommunityChatID()]
+		return ok && len(channel.Members) == 1
+	})
+	waitOnChannelToBeRekeyedOnceBobIsKicked := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
+		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
+		return ok && (action.ActionType == communities.EncryptionKeyRekey || action.ActionType == communities.EncryptionKeyAdd)
+	})
+
+	// setup view channel permission
+	channelPermissionRequest := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				AmountInWei:       "100000000000000000000",
+				Decimals:          uint64(18),
+			},
+		},
+		ChatIds: []string{chat.ID},
+	}
+
+	response, err = s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().True(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
+
+	err = <-waitOnBobToBeKickedFromChannel
+	s.Require().NoError(err)
+
+	err = <-waitOnChannelToBeRekeyedOnceBobIsKicked
+	s.Require().NoError(err)
+
+	// bob receives community changes
+	// channel members should be empty,
+	// this info is available only to channel members
+	_, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			c, err := s.bob.GetCommunityByID(community.ID())
+			if err != nil {
+				return false
+			}
+			if c == nil {
+				return false
+			}
+			channel := c.Chats()[chat.CommunityChatID()]
+			return channel != nil && len(channel.Members) == 0
+		},
+		"no community that satisfies criteria",
+	)
+	s.Require().NoError(err)
+
+	// Bob searches for "hello" but only finds it in the new channel
+	communities := make([]string, 1)
+	communities[0] = community.IDString()
+	messages, err := s.bob.AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communities, make([]string, 0), "hello", false)
+	s.Require().NoError(err)
+	s.Require().Len(messages, 1)
+	s.Require().Equal(msgText, messages[0].Text)
+}
+
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhenChangingPermissions() {
 	community, chat := s.createCommunity()
 

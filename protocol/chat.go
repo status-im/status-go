@@ -514,6 +514,10 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 	}
 }
 
+func (c *Chat) CommunityChannelID() string {
+	return strings.TrimPrefix(c.ID, c.CommunityID)
+}
+
 func (c *Chat) DeepLink() string {
 	if c.OneToOne() {
 		return "status-app://p/" + c.ID
@@ -523,7 +527,7 @@ func (c *Chat) DeepLink() string {
 	}
 
 	if c.CommunityChat() {
-		communityChannelID := strings.TrimPrefix(c.ID, c.CommunityID)
+		communityChannelID := c.CommunityChannelID()
 		pubkey, err := types.DecodeHex(c.CommunityID)
 		if err != nil {
 			return ""
