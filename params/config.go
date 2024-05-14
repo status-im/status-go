@@ -522,7 +522,7 @@ type Network struct {
 type WalletConfig struct {
 	Enabled       bool
 	OpenseaAPIKey string `json:"OpenseaAPIKey"`
-	InfuraKey     string `json:"InfuraKey"`
+	PoktKey       string `json:"PoktKey"`
 }
 
 // LocalNotificationsConfig extra configuration for localnotifications.Service.
@@ -944,14 +944,13 @@ func loadConfigFromAsset(name string, config *NodeConfig) error {
 //
 // A single error for a struct:
 //
-//   type TestStruct struct {
-//       TestField string `validate:"required"`
-//   }
+//	type TestStruct struct {
+//	    TestField string `validate:"required"`
+//	}
 //
 // has the following format:
 //
-//   Key: 'TestStruct.TestField' Error:Field validation for 'TestField' failed on the 'required' tag
-//
+//	Key: 'TestStruct.TestField' Error:Field validation for 'TestField' failed on the 'required' tag
 func (c *NodeConfig) Validate() error {
 	validate := NewValidator()
 

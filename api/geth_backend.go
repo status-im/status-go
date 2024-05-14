@@ -364,11 +364,11 @@ func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n
 
 	conf.Networks = n.Networks
 
-	if n.WalletConfig.InfuraKey != "" {
+	if n.WalletConfig.PoktKey != "" {
 
-		mainnetURL := "https://mainnet.infura.io/v3/" + n.WalletConfig.InfuraKey
+		mainnetURL := "https://eth-archival.gateway.pokt.network/v1/lb/" + n.WalletConfig.PoktKey
 
-		url := infuraURL(conf.NetworkID, n.WalletConfig.InfuraKey)
+		url := poktURL(conf.NetworkID, n.WalletConfig.PoktKey)
 		if url != "" {
 			conf.UpstreamConfig.URL = url
 		}
@@ -1362,13 +1362,11 @@ func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) e
 	return nil
 }
 
-func infuraURL(chainID uint64, token string) string {
+func poktURL(chainID uint64, token string) string {
 	if chainID == params.MainNetworkID {
-		return "https://mainnet.infura.io/v3/" + token
-	} else if chainID == params.RopstenNetworkID {
-		return "https://ropsten.infura.io/v3/" + token
+		return "https://eth-archival.gateway.pokt.network/v1/lb/" + token
 	} else if chainID == params.GoerliNetworkID {
-		return "https://goerli.infura.io/v3/" + token
+		return "https://goerli-archival.gateway.pokt.network/v1/lb/" + token
 	}
 	return ""
 }
