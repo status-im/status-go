@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
-	"net/http"
+	netUrl "net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +24,7 @@ import (
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/bridge/cbridge"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
@@ -41,6 +42,7 @@ type CBridgeTxArgs struct {
 
 type CBridge struct {
 	rpcClient          *rpc.Client
+	httpClient         *thirdparty.HTTPClient
 	transactor         *transactions.Transactor
 	tokenManager       *token.Manager
 	prodTransferConfig *cbridge.GetTransferConfigsResponse
@@ -50,6 +52,7 @@ type CBridge struct {
 func NewCbridge(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager) *CBridge {
 	return &CBridge{
 		rpcClient:    rpcClient,
+		httpClient:   thirdparty.NewHTTPClient(),
 		transactor:   transactor,
 		tokenManager: tokenManager,
 	}
@@ -60,43 +63,27 @@ func (s *CBridge) Name() string {
 }
 
 func (s *CBridge) estimateAmt(from, to *params.Network, amountIn *big.Int, symbol string) (*cbridge.EstimateAmtResponse, error) {
-	client := &http.Client{
-		Timeout: time.Second * 5,
-	}
 	base := baseURL
 	if from.IsTest {
 		base = testBaseURL
 	}
-	url := fmt.Sprintf(
-		"%s/v2/estimateAmt?src_chain_id=%d&dst_chain_id=%d&token_symbol=%s&amt=%s&usr_addr=0xaa47c83316edc05cf9ff7136296b026c5de7eccd&slippage_tolerance=500",
-		base,
-		from.ChainID,
-		to.ChainID,
-		symbol,
-		amountIn.String(),
-	)
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	params := netUrl.Values{}
+	params.Add("src_chain_id", strconv.Itoa(int(from.ChainID)))
+	params.Add("dst_chain_id", strconv.Itoa(int(to.ChainID)))
+	params.Add("token_symbol", symbol)
+	params.Add("amt", amountIn.String())
+	params.Add("usr_addr", "0xaa47c83316edc05cf9ff7136296b026c5de7eccd")
+	params.Add("slippage_tolerance", "500")
+
+	url := fmt.Sprintf("%s/v2/estimateAmt", base)
+	response, err := s.httpClient.DoGetRequest(context.Background(), url, params)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			fmt.Println("failed to close cbridge request body", "err", err)
-		}
-	}()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
 	var res cbridge.EstimateAmtResponse
-	err = json.Unmarshal(body, &res)
+	err = json.Unmarshal(response, &res)
 	if err != nil {
 		return nil, err
 	}
@@ -112,36 +99,18 @@ func (s *CBridge) getTransferConfig(isTest bool) (*cbridge.GetTransferConfigsRes
 		return s.testTransferConfig, nil
 	}
 
-	client := &http.Client{
-		Timeout: time.Second * 5,
-	}
 	base := baseURL
 	if isTest {
 		base = testBaseURL
 	}
 	url := fmt.Sprintf("%s/v2/getTransferConfigs", base)
-
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	response, err := s.httpClient.DoGetRequest(context.Background(), url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			fmt.Println("failed to close cbridge request body", "err", err)
-		}
-	}()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
 	var res cbridge.GetTransferConfigsResponse
-	err = json.Unmarshal(body, &res)
+	err = json.Unmarshal(response, &res)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +122,7 @@ func (s *CBridge) getTransferConfig(isTest bool) (*cbridge.GetTransferConfigsRes
 	return &res, nil
 }
 
-func (s *CBridge) Can(from, to *params.Network, token *token.Token, toToken *token.Token, balance *big.Int) (bool, error) {
+func (s *CBridge) AvailableFor(from, to *params.Network, token *token.Token, toToken *token.Token) (bool, error) {
 	if from.ChainID == to.ChainID || toToken != nil {
 		return false, nil
 	}
@@ -210,7 +179,7 @@ func (s *CBridge) Can(from, to *params.Network, token *token.Token, toToken *tok
 	return true, nil
 }
 
-func (s *CBridge) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int, nativeTokenPrice, tokenPrice float64, gasPrice *big.Float) (*big.Int, *big.Int, error) {
+func (s *CBridge) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int) (*big.Int, *big.Int, error) {
 	amt, err := s.estimateAmt(from, to, amountIn, token.Symbol)
 	if err != nil {
 		return nil, nil, err

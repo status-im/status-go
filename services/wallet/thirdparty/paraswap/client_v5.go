@@ -1,13 +1,15 @@
 package paraswap
 
+import "github.com/status-im/status-go/services/wallet/thirdparty"
+
 type ClientV5 struct {
-	httpClient *HTTPClient
+	httpClient *thirdparty.HTTPClient
 	chainID    uint64
 }
 
 func NewClientV5(chainID uint64) *ClientV5 {
 	return &ClientV5{
-		httpClient: NewHTTPClient(),
+		httpClient: thirdparty.NewHTTPClient(),
 		chainID:    chainID,
 	}
 }

@@ -27,6 +27,11 @@ import (
 	walletToken "github.com/status-im/status-go/services/wallet/token"
 )
 
+// //////////////////////////////////////////////////////////////////////////////
+// TODO: once new router is in place, remove this `router.go` file,
+// rename and make `router_v2.go` file the main and only file
+// //////////////////////////////////////////////////////////////////////////////
+
 const EstimateUsername = "RandomUsername"
 const EstimatePubKey = "0x04bb2024ce5d72e45d4a4f8589ae657ef9745855006996115a23a1af88d536cf02c0524a585fce7bfa79d6a9669af735eda6205d6c7e5b3cdc2b8ff7b2fa1f0b56"
 const ERC721TransferString = "ERC721Transfer"
@@ -524,10 +529,6 @@ func (r *Router) suggestedRoutes(
 						continue
 					}
 
-					if !sendType.isAvailableBetween(network, dest) {
-						continue
-					}
-
 					if len(preferedChainIDs) > 0 && !containsNetworkChainID(dest, preferedChainIDs) {
 						continue
 					}
@@ -535,11 +536,15 @@ func (r *Router) suggestedRoutes(
 						continue
 					}
 
-					can, err := bridge.Can(network, dest, token, toToken, maxAmountIn.ToInt())
+					can, err := bridge.AvailableFor(network, dest, token, toToken)
 					if err != nil || !can {
 						continue
 					}
-					bonderFees, tokenFees, err := bridge.CalculateFees(network, dest, token, amountIn, prices["ETH"], prices[tokenID], gasFees.GasPrice)
+					if maxAmountIn.ToInt().Cmp(big.NewInt(0)) == 0 {
+						continue
+					}
+
+					bonderFees, tokenFees, err := bridge.CalculateFees(network, dest, token, amountIn)
 					if err != nil {
 						continue
 					}

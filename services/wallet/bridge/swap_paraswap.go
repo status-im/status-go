@@ -42,7 +42,7 @@ func (s *SwapParaswap) Name() string {
 	return "Paraswap"
 }
 
-func (s *SwapParaswap) Can(from, to *params.Network, token *walletToken.Token, toToken *walletToken.Token, balance *big.Int) (bool, error) {
+func (s *SwapParaswap) AvailableFor(from, to *params.Network, token *walletToken.Token, toToken *walletToken.Token) (bool, error) {
 	if token == nil || toToken == nil {
 		return false, errors.New("token and toToken cannot be nil")
 	}
@@ -87,7 +87,7 @@ func (s *SwapParaswap) Can(from, to *params.Network, token *walletToken.Token, t
 	return true, nil
 }
 
-func (s *SwapParaswap) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int, nativeTokenPrice, tokenPrice float64, gasPrice *big.Float) (*big.Int, *big.Int, error) {
+func (s *SwapParaswap) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int) (*big.Int, *big.Int, error) {
 	return big.NewInt(0), big.NewInt(0), nil
 }
 
