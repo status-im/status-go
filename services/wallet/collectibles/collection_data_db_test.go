@@ -104,3 +104,50 @@ func TestUpdateCollectionsData(t *testing.T) {
 	require.Equal(t, c0, loadedMap[c0.ID.HashKey()])
 	require.Equal(t, c1, loadedMap[c1.ID.HashKey()])
 }
+
+func TestCollectionSocialsData(t *testing.T) {
+	db, cleanDB := setupCollectionDataDBTest(t)
+	defer cleanDB()
+
+	data := thirdparty.GenerateTestCollectionsData(10)
+
+	ids := make([]thirdparty.ContractID, 0, len(data))
+	for _, collection := range data {
+		ids = append(ids, collection.ID)
+	}
+
+	err := db.SetData(data, true)
+	require.NoError(t, err)
+
+	// Check for loaded data
+	loadedMap, err := db.GetData(ids)
+	require.NoError(t, err)
+	require.Equal(t, len(data), len(loadedMap))
+
+	// Valid check for ID should return false as it was not set initially
+	socials, err := db.GetSocialsForID(data[0].ID)
+	require.NoError(t, err)
+	require.Nil(t, socials)
+
+	// Now we'll try to set socials data for the first item
+	socialsToSet := &thirdparty.CollectionSocials{
+		Website:       "new-website",
+		TwitterHandle: "newTwitterHandle",
+		Provider:      "alchemy",
+	}
+	err = db.SetCollectionSocialsData(data[0].ID, socialsToSet)
+	require.NoError(t, err)
+
+	// Valid check for ID should return true as it was now set
+	socials, err = db.GetSocialsForID(data[0].ID)
+	require.NoError(t, err)
+	require.Equal(t, socials, socialsToSet)
+
+	// Check the loaded data again for socials
+	loadedMap, err = db.GetData(ids)
+	require.NoError(t, err)
+	require.Equal(t, len(data), len(loadedMap))
+
+	require.Equal(t, socials.Website, loadedMap[data[0].ID.HashKey()].Socials.Website)
+	require.Equal(t, socials.TwitterHandle, loadedMap[data[0].ID.HashKey()].Socials.TwitterHandle)
+}

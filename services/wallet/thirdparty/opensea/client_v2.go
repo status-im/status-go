@@ -133,6 +133,11 @@ func (o *ClientV2) FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueI
 	return o.fetchDetailedAssets(ctx, uniqueIDs)
 }
 
+func (o *ClientV2) FetchCollectionSocials(ctx context.Context, contractID thirdparty.ContractID) (*thirdparty.CollectionSocials, error) {
+	// we dont want to use opensea as any small number of requests can also lead to throttling
+	return nil, thirdparty.ErrEndpointNotSupported
+}
+
 func (o *ClientV2) fetchAssets(ctx context.Context, chainID walletCommon.ChainID, pathParams []string, queryParams url.Values, limit int, cursor string) (*thirdparty.FullCollectibleDataContainer, error) {
 	assets := new(thirdparty.FullCollectibleDataContainer)
 

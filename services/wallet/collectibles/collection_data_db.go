@@ -21,6 +21,8 @@ func NewCollectionDataDB(sqlDb *sql.DB) *CollectionDataDB {
 const collectionDataColumns = "chain_id, contract_address, provider, name, slug, image_url, image_payload, community_id"
 const collectionTraitsColumns = "chain_id, contract_address, trait_type, min, max"
 const selectCollectionTraitsColumns = "trait_type, min, max"
+const collectionSocialsColumns = "chain_id, contract_address, provider, website, twitter_handle"
+const selectCollectionSocialsColumns = "website, twitter_handle, provider"
 
 func rowsToCollectionTraits(rows *sql.Rows) (map[string]thirdparty.CollectionTrait, error) {
 	traits := make(map[string]thirdparty.CollectionTrait)
@@ -129,6 +131,13 @@ func setCollectionsData(creator sqlite.StatementCreator, collections []thirdpart
 			err = upsertCollectionTraits(creator, c.ID, c.Traits)
 			if err != nil {
 				return err
+			}
+
+			if c.Socials != nil {
+				err = upsertCollectionSocials(creator, c.ID, c.Socials)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -246,8 +255,107 @@ func (o *CollectionDataDB) GetData(ids []thirdparty.ContractID) (map[string]thir
 				return nil, err
 			}
 
+			// Get socials from different table
+			c.Socials, err = getCollectionSocials(o.db, c.ID)
+			if err != nil {
+				return nil, err
+			}
+
 			ret[c.ID.HashKey()] = *c
 		}
 	}
 	return ret, nil
+}
+
+func (o *CollectionDataDB) GetSocialsForID(contractID thirdparty.ContractID) (*thirdparty.CollectionSocials, error) {
+	return getCollectionSocials(o.db, contractID)
+}
+
+func (o *CollectionDataDB) SetCollectionSocialsData(id thirdparty.ContractID, collectionSocials *thirdparty.CollectionSocials) (err error) {
+	tx, err := o.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	// Insert new collections socials
+	if collectionSocials != nil {
+		err = upsertCollectionSocials(tx, id, collectionSocials)
+		if err != nil {
+			return err
+		}
+	}
+
+	return
+}
+
+func rowsToCollectionSocials(rows *sql.Rows) (*thirdparty.CollectionSocials, error) {
+	var socials *thirdparty.CollectionSocials
+	socials = nil
+	for rows.Next() {
+		var website string
+		var twitterHandle string
+		var provider string
+		err := rows.Scan(
+			&website,
+			&twitterHandle,
+			&provider,
+		)
+		if err != nil {
+			return nil, err
+		}
+		socials = &thirdparty.CollectionSocials{
+			Website:       website,
+			TwitterHandle: twitterHandle,
+			Provider:      provider}
+	}
+	return socials, nil
+}
+
+func getCollectionSocials(creator sqlite.StatementCreator, id thirdparty.ContractID) (*thirdparty.CollectionSocials, error) {
+	// Get socials
+	selectSocials, err := creator.Prepare(fmt.Sprintf(`SELECT %s
+                FROM collection_socials_cache
+                WHERE chain_id = ? AND contract_address = ?`, selectCollectionSocialsColumns))
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := selectSocials.Query(
+		id.ChainID,
+		id.Address,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return rowsToCollectionSocials(rows)
+}
+
+func upsertCollectionSocials(creator sqlite.StatementCreator, id thirdparty.ContractID, socials *thirdparty.CollectionSocials) error {
+	// Insert socials
+	insertSocial, err := creator.Prepare(fmt.Sprintf(`INSERT OR REPLACE INTO collection_socials_cache (%s)
+        VALUES (?, ?, ?, ?, ?)`, collectionSocialsColumns))
+	if err != nil {
+		return err
+	}
+
+	_, err = insertSocial.Exec(
+		id.ChainID,
+		id.Address,
+		socials.Provider,
+		socials.Website,
+		socials.TwitterHandle,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

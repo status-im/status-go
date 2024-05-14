@@ -376,6 +376,17 @@ func (o *Client) FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs
 	return ret, nil
 }
 
+func (o *Client) FetchCollectionSocials(ctx context.Context, contractID thirdparty.ContractID) (*thirdparty.CollectionSocials, error) {
+	resp, err := o.FetchCollectionsDataByContractID(ctx, []thirdparty.ContractID{contractID})
+	if err != nil {
+		return nil, err
+	}
+	if len(resp) > 0 {
+		return resp[0].Socials, nil
+	}
+	return nil, nil
+}
+
 func getContractAddressBatches(ids []thirdparty.ContractID) []BatchContractAddresses {
 	batches := make([]BatchContractAddresses, 0)
 

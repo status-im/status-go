@@ -48,6 +48,7 @@ var (
 
 type ManagerInterface interface {
 	FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID, asyncFetch bool) ([]thirdparty.FullCollectibleData, error)
+	FetchCollectionSocialsAsync(contractID thirdparty.ContractID) error
 }
 
 type Manager struct {
@@ -1026,4 +1027,85 @@ func (o *Manager) SearchCollections(ctx context.Context, chainID walletCommon.Ch
 		return nil, ErrAllProvidersFailedForChainID
 	}
 	return nil, ErrNoProvidersAvailableForChainID
+}
+
+func (o *Manager) FetchCollectionSocialsAsync(contractID thirdparty.ContractID) error {
+	go func() {
+		defer o.checkConnectionStatus(contractID.ChainID)
+
+		socials, err := o.getOrFetchSocialsForCollection(context.Background(), contractID)
+		if err != nil || socials == nil {
+			log.Debug("FetchCollectionSocialsAsync failed for", "chainID", contractID.ChainID, "address", contractID.Address, "err", err)
+			return
+		}
+
+		socialsMessage := CollectionSocialsMessage{
+			ID:      contractID,
+			Socials: socials,
+		}
+
+		payload, err := json.Marshal(socialsMessage)
+		if err != nil {
+			log.Error("Error marshaling response: %v", err)
+			return
+		}
+
+		event := walletevent.Event{
+			Type:    EventGetCollectionSocialsDone,
+			Message: string(payload),
+		}
+
+		o.feed.Send(event)
+	}()
+
+	return nil
+}
+
+func (o *Manager) getOrFetchSocialsForCollection(ctx context.Context, contractID thirdparty.ContractID) (*thirdparty.CollectionSocials, error) {
+	socials, err := o.collectionsDataDB.GetSocialsForID(contractID)
+	if err != nil {
+		log.Debug("getOrFetchSocialsForCollection failed for", "chainID", contractID.ChainID, "address", contractID.Address, "err", err)
+		return nil, err
+	}
+	if socials == nil {
+		return o.fetchSocialsForCollection(context.Background(), contractID)
+	}
+	return socials, nil
+}
+
+func (o *Manager) fetchSocialsForCollection(ctx context.Context, contractID thirdparty.ContractID) (*thirdparty.CollectionSocials, error) {
+	cmd := circuitbreaker.Command{}
+	for _, provider := range o.providers.CollectibleDataProviders {
+		if !provider.IsChainSupported(contractID.ChainID) {
+			continue
+		}
+
+		provider := provider
+		cmd.Add(circuitbreaker.NewFunctor(func() ([]interface{}, error) {
+			socials, err := provider.FetchCollectionSocials(ctx, contractID)
+			if err != nil {
+				log.Error("FetchCollectionSocials failed for", "provider", provider.ID(), "chainID", contractID.ChainID, "err", err)
+			}
+			return []interface{}{socials}, err
+		}))
+	}
+
+	if cmd.IsEmpty() {
+		return nil, ErrNoProvidersAvailableForChainID // lets not stop the group if no providers are available for the chain
+	}
+
+	cmdRes := o.getCircuitBreaker(contractID.ChainID).Execute(cmd)
+	if cmdRes.Error() != nil {
+		log.Error("fetchSocialsForCollection failed for", "chainID", contractID.ChainID, "err", cmdRes.Error())
+		return nil, cmdRes.Error()
+	}
+
+	socials := cmdRes.Result()[0].(*thirdparty.CollectionSocials)
+	err := o.collectionsDataDB.SetCollectionSocialsData(contractID, socials)
+	if err != nil {
+		log.Error("Error saving socials to DB: %v", err)
+		return nil, err
+	}
+
+	return socials, cmdRes.Error()
 }
