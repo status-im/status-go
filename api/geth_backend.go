@@ -366,7 +366,7 @@ func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n
 
 	if n.WalletConfig.PoktKey != "" {
 
-		mainnetURL := "https://eth-archival.gateway.pokt.network/v1/lb/" + n.WalletConfig.PoktKey
+		mainnetURL := "https://eth-archival.rpc.grove.city/v1/" + n.WalletConfig.PoktKey
 
 		url := poktURL(conf.NetworkID, n.WalletConfig.PoktKey)
 		if url != "" {
@@ -1364,9 +1364,9 @@ func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) e
 
 func poktURL(chainID uint64, token string) string {
 	if chainID == params.MainNetworkID {
-		return "https://eth-archival.gateway.pokt.network/v1/lb/" + token
+		return "https://eth-archival.rpc.grove.city/v1/" + token
 	} else if chainID == params.GoerliNetworkID {
-		return "https://goerli-archival.gateway.pokt.network/v1/lb/" + token
+		return "https://goerli-archival.rpc.grove.city/v1/" + token
 	}
 	return ""
 }
