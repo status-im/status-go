@@ -40,7 +40,7 @@ func (c *ClientV5) BuildTransaction(ctx context.Context, srcTokenAddress common.
 	params["priceRoute"] = priceRoute
 
 	url := fmt.Sprintf(transactionsURL, c.chainID)
-	response, err := c.httpClient.doPostRequest(ctx, url, params)
+	response, err := c.httpClient.DoPostRequest(ctx, url, params)
 	if err != nil {
 		return Transaction{}, err
 	}

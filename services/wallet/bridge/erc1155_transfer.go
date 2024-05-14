@@ -41,11 +41,11 @@ func (s *ERC1155TransferBridge) Name() string {
 	return "ERC1155Transfer"
 }
 
-func (s *ERC1155TransferBridge) Can(from, to *params.Network, token *token.Token, toToken *token.Token, balance *big.Int) (bool, error) {
+func (s *ERC1155TransferBridge) AvailableFor(from, to *params.Network, token *token.Token, toToken *token.Token) (bool, error) {
 	return from.ChainID == to.ChainID && toToken == nil, nil
 }
 
-func (s *ERC1155TransferBridge) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int, nativeTokenPrice, tokenPrice float64, gasPrice *big.Float) (*big.Int, *big.Int, error) {
+func (s *ERC1155TransferBridge) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int) (*big.Int, *big.Int, error) {
 	return big.NewInt(0), big.NewInt(0), nil
 }
 

@@ -101,9 +101,12 @@ func (t *TransactionBridge) Data() types.HexBytes {
 }
 
 type Bridge interface {
+	// returns the name of the bridge
 	Name() string
-	Can(from *params.Network, to *params.Network, token *token.Token, toToken *token.Token, balance *big.Int) (bool, error)
-	CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int, nativeTokenPrice, tokenPrice float64, gasPrice *big.Float) (*big.Int, *big.Int, error)
+	// checks if the bridge is available for the given networks/tokens
+	AvailableFor(from *params.Network, to *params.Network, token *token.Token, toToken *token.Token) (bool, error)
+	// calculates the fees for the bridge and returns the amount BonderFee and TokenFee (used for bridges)
+	CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int) (*big.Int, *big.Int, error)
 	EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error)
 	CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error)
 	Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error)

@@ -2,10 +2,11 @@ package bridge
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
+	netUrl "net/url"
 	"strings"
 	"time"
 
@@ -23,64 +24,11 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
-
-const HopLpFeeBps = 4
-const HopCanonicalTokenIndex = 0
-const HophTokenIndex = 1
-const HopMinBonderFeeUsd = 0.25
-
-var HopBondTransferGasLimit = map[uint64]int64{
-	1:      165000,
-	5:      165000,
-	10:     100000000,
-	42161:  2500000,
-	420:    100000000,
-	421613: 2500000,
-}
-var HopSettlementGasLimitPerTx = map[uint64]int64{
-	1:      5141,
-	5:      5141,
-	10:     8545,
-	42161:  19843,
-	420:    8545,
-	421613: 19843,
-}
-var HopBonderFeeBps = map[string]map[uint64]int64{
-	"USDC": {
-		1:      14,
-		5:      14,
-		10:     14,
-		42161:  14,
-		420:    14,
-		421613: 14,
-	},
-	"USDT": {
-		1:      26,
-		10:     26,
-		421613: 26,
-	},
-	"DAI": {
-		1:     26,
-		10:    26,
-		42161: 26,
-	},
-	"ETH": {
-		1:      5,
-		5:      5,
-		10:     5,
-		42161:  5,
-		420:    5,
-		421613: 5,
-	},
-	"WBTC": {
-		1:     23,
-		10:    23,
-		42161: 23,
-	},
-}
 
 type HopTxArgs struct {
 	transactions.SendTxArgs
@@ -91,15 +39,71 @@ type HopTxArgs struct {
 	BonderFee *hexutil.Big   `json:"bonderFee"`
 }
 
+type BonderFee struct {
+	AmountIn                *big.Int `json:"amountIn"`
+	Slippage                float32  `json:"slippage"`
+	AmountOutMin            *big.Int `json:"amountOutMin"`
+	DestinationAmountOutMin *big.Int `json:"destinationAmountOutMin"`
+	BonderFee               *big.Int `json:"bonderFee"`
+	EstimatedRecieved       *big.Int `json:"estimatedRecieved"`
+	Deadline                int64    `json:"deadline"`
+	DestinationDeadline     int64    `json:"destinationDeadline"`
+}
+
+func (bf *BonderFee) UnmarshalJSON(data []byte) error {
+	type Alias BonderFee
+	aux := &struct {
+		AmountIn                string  `json:"amountIn"`
+		Slippage                float32 `json:"slippage"`
+		AmountOutMin            string  `json:"amountOutMin"`
+		DestinationAmountOutMin string  `json:"destinationAmountOutMin"`
+		BonderFee               string  `json:"bonderFee"`
+		EstimatedRecieved       string  `json:"estimatedRecieved"`
+		Deadline                int64   `json:"deadline"`
+		DestinationDeadline     *int64  `json:"destinationDeadline"`
+		*Alias
+	}{
+		Alias: (*Alias)(bf),
+	}
+
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	bf.AmountIn = new(big.Int)
+	bf.AmountIn.SetString(aux.AmountIn, 10)
+
+	bf.AmountOutMin = new(big.Int)
+	bf.AmountOutMin.SetString(aux.AmountOutMin, 10)
+
+	bf.DestinationAmountOutMin = new(big.Int)
+	bf.DestinationAmountOutMin.SetString(aux.DestinationAmountOutMin, 10)
+
+	bf.BonderFee = new(big.Int)
+	bf.BonderFee.SetString(aux.BonderFee, 10)
+
+	bf.EstimatedRecieved = new(big.Int)
+	bf.EstimatedRecieved.SetString(aux.EstimatedRecieved, 10)
+
+	if aux.DestinationDeadline != nil {
+		bf.DestinationDeadline = *aux.DestinationDeadline
+	}
+
+	return nil
+}
+
 type HopBridge struct {
 	transactor    *transactions.Transactor
+	httpClient    *thirdparty.HTTPClient
 	tokenManager  *token.Manager
 	contractMaker *contracts.ContractMaker
+	bonderFee     *BonderFee
 }
 
 func NewHopBridge(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager) *HopBridge {
 	return &HopBridge{
 		contractMaker: &contracts.ContractMaker{RPCClient: rpcClient},
+		httpClient:    thirdparty.NewHTTPClient(),
 		transactor:    transactor,
 		tokenManager:  tokenManager,
 	}
@@ -109,27 +113,16 @@ func (h *HopBridge) Name() string {
 	return "Hop"
 }
 
-func (h *HopBridge) Can(from, to *params.Network, token *token.Token, toToken *token.Token, balance *big.Int) (bool, error) {
-	if balance.Cmp(big.NewInt(0)) == 0 {
-		return false, nil
-	}
-
+func (h *HopBridge) AvailableFor(from, to *params.Network, token *token.Token, toToken *token.Token) (bool, error) {
 	if from.ChainID == to.ChainID || toToken != nil {
 		return false, nil
 	}
 
-	fees, ok := HopBonderFeeBps[token.Symbol]
-	if !ok {
+	// currently Hop bridge is not available for testnets
+	if from.IsTest || to.IsTest {
 		return false, nil
 	}
 
-	if _, ok := fees[from.ChainID]; !ok {
-		return false, nil
-	}
-
-	if _, ok := fees[to.ChainID]; !ok {
-		return false, nil
-	}
 	return true, nil
 }
 
@@ -349,142 +342,50 @@ func (h *HopBridge) swapAndSend(chainID uint64, hopArgs *HopTxArgs, signerFn bin
 	return tx, err
 }
 
-// CalculateBonderFees logics come from: https://docs.hop.exchange/fee-calculation
-func (h *HopBridge) CalculateBonderFees(from, to *params.Network, token *token.Token, amountIn *big.Int, nativeTokenPrice, tokenPrice float64, gasPrice *big.Float) (*big.Int, error) {
-	amount := new(big.Float).SetInt(amountIn)
-	totalFee := big.NewFloat(0)
-	destinationTxFee, err := h.getDestinationTxFee(from, to, nativeTokenPrice, tokenPrice, gasPrice)
-	if err != nil {
-		return nil, err
+func (h *HopBridge) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int) (*big.Int, *big.Int, error) {
+	const (
+		HopMainnetChainName  = "ethereum"
+		HopOptimismChainName = "optimism"
+		HopArbitrumChainName = "arbitrum"
+	)
+
+	fromChainName := HopMainnetChainName
+	if from.ChainID == walletCommon.OptimismMainnet {
+		fromChainName = HopOptimismChainName
+	} else if from.ChainID == walletCommon.ArbitrumMainnet {
+		fromChainName = HopArbitrumChainName
 	}
 
-	bonderFeeRelative, err := h.getBonderFeeRelative(from, to, amount, token)
-	if err != nil {
-		return nil, err
+	toChainName := HopMainnetChainName
+	if from.ChainID == walletCommon.OptimismMainnet {
+		toChainName = HopOptimismChainName
+	} else if from.ChainID == walletCommon.ArbitrumMainnet {
+		toChainName = HopArbitrumChainName
 	}
-	if from.Layer != 1 {
-		adjustedBonderFee, err := h.calcFromHTokenAmount(to, bonderFeeRelative, token.Symbol)
-		if err != nil {
-			return nil, err
-		}
-		adjustedDestinationTxFee, err := h.calcToHTokenAmount(to, destinationTxFee, token.Symbol)
-		if err != nil {
-			return nil, err
-		}
 
-		bonderFeeAbsolute := h.getBonderFeeAbsolute(tokenPrice)
-		if adjustedBonderFee.Cmp(bonderFeeAbsolute) == -1 {
-			adjustedBonderFee = bonderFeeAbsolute
-		}
+	params := netUrl.Values{}
+	params.Add("amount", amountIn.String())
+	params.Add("token", token.Symbol)
+	params.Add("fromChain", fromChainName)
+	params.Add("toChain", toChainName)
+	params.Add("slippage", "0.5") // menas 0.5%
 
-		totalFee.Add(adjustedBonderFee, adjustedDestinationTxFee)
-	}
-	res, _ := new(big.Float).Mul(totalFee, big.NewFloat(math.Pow(10, float64(token.Decimals)))).Int(nil)
-	return res, nil
-}
-
-func (h *HopBridge) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int, nativeTokenPrice, tokenPrice float64, gasPrice *big.Float) (*big.Int, *big.Int, error) {
-	bonderFees, err := h.CalculateBonderFees(from, to, token, amountIn, nativeTokenPrice, tokenPrice, gasPrice)
+	url := "https://api.hop.exchange/v1/quote"
+	response, err := h.httpClient.DoGetRequest(context.Background(), url, params)
 	if err != nil {
 		return nil, nil, err
 	}
-	amountOut, err := h.amountOut(from, to, new(big.Float).SetInt(amountIn), token.Symbol)
+
+	err = json.Unmarshal(response, h.bonderFee)
 	if err != nil {
 		return nil, nil, err
 	}
-	amountOutInt, _ := amountOut.Int(nil)
 
-	return bonderFees, new(big.Int).Add(
-		bonderFees,
-		new(big.Int).Sub(amountIn, amountOutInt),
-	), nil
-}
+	tokenFee := new(big.Int).Sub(h.bonderFee.AmountIn, h.bonderFee.EstimatedRecieved)
 
-func (h *HopBridge) calcToHTokenAmount(network *params.Network, amount *big.Float, symbol string) (*big.Float, error) {
-	if network.Layer == 1 || amount.Cmp(big.NewFloat(0)) == 0 {
-		return amount, nil
-	}
-
-	contract, err := h.contractMaker.NewHopL2SaddlSwap(network.ChainID, symbol)
-	if err != nil {
-		return nil, err
-	}
-	amountInt, _ := amount.Int(nil)
-	res, err := contract.CalculateSwap(&bind.CallOpts{Context: context.Background()}, HopCanonicalTokenIndex, HophTokenIndex, amountInt)
-	if err != nil {
-		return nil, err
-	}
-
-	return new(big.Float).SetInt(res), nil
-}
-
-func (h *HopBridge) calcFromHTokenAmount(network *params.Network, amount *big.Float, symbol string) (*big.Float, error) {
-	if network.Layer == 1 || amount.Cmp(big.NewFloat(0)) == 0 {
-		return amount, nil
-	}
-	contract, err := h.contractMaker.NewHopL2SaddlSwap(network.ChainID, symbol)
-	if err != nil {
-		return nil, err
-	}
-	amountInt, _ := amount.Int(nil)
-	res, err := contract.CalculateSwap(&bind.CallOpts{Context: context.Background()}, HophTokenIndex, HopCanonicalTokenIndex, amountInt)
-	if err != nil {
-		return nil, err
-	}
-
-	return new(big.Float).SetInt(res), nil
+	return h.bonderFee.BonderFee, tokenFee, nil
 }
 
 func (h *HopBridge) CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error) {
-	amountOut, err := h.amountOut(from, to, new(big.Float).SetInt(amountIn), symbol)
-	if err != nil {
-		return nil, err
-	}
-	amountOutInt, _ := amountOut.Int(nil)
-	return amountOutInt, nil
-}
-
-func (h *HopBridge) amountOut(from, to *params.Network, amountIn *big.Float, symbol string) (*big.Float, error) {
-	hTokenAmount, err := h.calcToHTokenAmount(from, amountIn, symbol)
-	if err != nil {
-		return nil, err
-	}
-	return h.calcFromHTokenAmount(to, hTokenAmount, symbol)
-}
-
-func (h *HopBridge) getBonderFeeRelative(from, to *params.Network, amount *big.Float, token *token.Token) (*big.Float, error) {
-	if from.Layer != 1 {
-		return big.NewFloat(0), nil
-	}
-
-	hTokenAmount, err := h.calcToHTokenAmount(from, amount, token.Symbol)
-	if err != nil {
-		return nil, err
-	}
-	feeBps := HopBonderFeeBps[token.Symbol][to.ChainID]
-
-	factor := new(big.Float).Mul(hTokenAmount, big.NewFloat(float64(feeBps)))
-	return new(big.Float).Quo(
-		factor,
-		big.NewFloat(10000),
-	), nil
-}
-
-func (h *HopBridge) getBonderFeeAbsolute(tokenPrice float64) *big.Float {
-	return new(big.Float).Quo(big.NewFloat(HopMinBonderFeeUsd), big.NewFloat(tokenPrice))
-}
-
-func (h *HopBridge) getDestinationTxFee(from, to *params.Network, nativeTokenPrice, tokenPrice float64, gasPrice *big.Float) (*big.Float, error) {
-	if from.Layer != 1 {
-		return big.NewFloat(0), nil
-	}
-
-	bondTransferGasLimit := HopBondTransferGasLimit[to.ChainID]
-	settlementGasLimit := HopSettlementGasLimitPerTx[to.ChainID]
-	totalGasLimit := new(big.Int).Add(big.NewInt(bondTransferGasLimit), big.NewInt(settlementGasLimit))
-
-	rate := new(big.Float).Quo(big.NewFloat(nativeTokenPrice), big.NewFloat(tokenPrice))
-
-	txFeeEth := new(big.Float).Mul(gasPrice, new(big.Float).SetInt(totalGasLimit))
-	return new(big.Float).Mul(txFeeEth, rate), nil
+	return h.bonderFee.EstimatedRecieved, nil
 }

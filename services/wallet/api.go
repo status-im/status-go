@@ -445,6 +445,25 @@ func (api *API) GetSuggestedRoutes(
 		disabledToChaindIDs, preferedChainIDs, gasFeeMode, fromLockedAmount)
 }
 
+func (api *API) GetSuggestedRoutesV2(
+	ctx context.Context,
+	sendType SendType,
+	addrFrom common.Address,
+	addrTo common.Address,
+	amountIn *hexutil.Big,
+	tokenID string,
+	toTokenID string,
+	disabledFromChainIDs,
+	disabledToChaindIDs,
+	preferedChainIDs []uint64,
+	gasFeeMode GasFeeMode,
+	fromLockedAmount map[uint64]*hexutil.Big,
+) (*SuggestedRoutesV2, error) {
+	log.Debug("call to GetSuggestedRoutesV2")
+	return api.router.suggestedRoutesV2(ctx, sendType, addrFrom, addrTo, amountIn.ToInt(), tokenID, toTokenID, disabledFromChainIDs,
+		disabledToChaindIDs, preferedChainIDs, gasFeeMode, fromLockedAmount)
+}
+
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
 func (api *API) GetDerivedAddresses(ctx context.Context, password string, derivedFrom string, paths []string) ([]*DerivedAddress, error) {
 	info, err := api.s.gethManager.AccountsGenerator().LoadAccount(derivedFrom, password)

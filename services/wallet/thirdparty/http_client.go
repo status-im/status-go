@@ -1,4 +1,4 @@
-package paraswap
+package thirdparty
 
 import (
 	"bytes"
@@ -24,7 +24,7 @@ func NewHTTPClient() *HTTPClient {
 	}
 }
 
-func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl.Values) ([]byte, error) {
+func (c *HTTPClient) DoGetRequest(ctx context.Context, url string, params netUrl.Values) ([]byte, error) {
 	if len(params) > 0 {
 		url = url + "?" + params.Encode()
 	}
@@ -48,7 +48,7 @@ func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl
 	return body, nil
 }
 
-func (c *HTTPClient) doPostRequest(ctx context.Context, url string, params map[string]interface{}) ([]byte, error) {
+func (c *HTTPClient) DoPostRequest(ctx context.Context, url string, params map[string]interface{}) ([]byte, error) {
 	jsonData, err := json.Marshal(params)
 	if err != nil {
 		return nil, err

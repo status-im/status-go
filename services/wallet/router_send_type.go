@@ -87,22 +87,6 @@ func (s SendType) needL1Fee() bool {
 	return s != ENSRegister && s != ENSRelease && s != ENSSetPubKey && s != StickersBuy
 }
 
-func (s SendType) isAvailableBetween(from, to *params.Network) bool {
-	if s.IsCollectiblesTransfer() {
-		return from.ChainID == to.ChainID
-	}
-
-	if s == Bridge {
-		return from.ChainID != to.ChainID
-	}
-
-	if s == Swap {
-		return from.ChainID == to.ChainID
-	}
-
-	return true
-}
-
 func (s SendType) canUseBridge(b bridge.Bridge) bool {
 	if s == ERC721Transfer && b.Name() != ERC721TransferString {
 		return false
