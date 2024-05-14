@@ -372,6 +372,11 @@ func (db RawMessagesPersistence) DeleteHashRatchetMessages(ids [][]byte) error {
 	return err
 }
 
+func (db *RawMessagesPersistence) DeleteHashRatchetMessagesOlderThan(timestamp int64) error {
+	_, err := db.db.Exec("DELETE FROM hash_ratchet_encrypted_messages WHERE timestamp < ?", timestamp)
+	return err
+}
+
 func (db *RawMessagesPersistence) IsMessageAlreadyCompleted(hash []byte) (bool, error) {
 	var alreadyCompleted int
 	err := db.db.QueryRow("SELECT COUNT(*) FROM message_segments_completed WHERE hash = ?", hash).Scan(&alreadyCompleted)
