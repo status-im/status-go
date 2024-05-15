@@ -11,8 +11,8 @@ import (
 
 	gowakuPersistence "github.com/waku-org/go-waku/waku/persistence"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
+	storepb "github.com/waku-org/go-waku/waku/v2/protocol/legacy_store/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 

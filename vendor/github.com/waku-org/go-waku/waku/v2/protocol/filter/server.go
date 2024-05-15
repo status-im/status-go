@@ -82,6 +82,8 @@ func (wf *WakuFilterFullNode) start(sub *relay.Subscription) error {
 	wf.WaitGroup().Add(1)
 	go wf.filterListener(wf.Context())
 
+	wf.subscriptions.Start(wf.Context())
+
 	wf.log.Info("filter-subscriber protocol started")
 	return nil
 }
@@ -155,9 +157,11 @@ func (wf *WakuFilterFullNode) reply(ctx context.Context, stream network.Stream, 
 }
 
 func (wf *WakuFilterFullNode) ping(ctx context.Context, stream network.Stream, request *pb.FilterSubscribeRequest) {
-	exists := wf.subscriptions.Has(stream.Conn().RemotePeer())
+	peerID := stream.Conn().RemotePeer()
 
+	exists := wf.subscriptions.Has(peerID)
 	if exists {
+		wf.subscriptions.Refresh(peerID)
 		wf.reply(ctx, stream, request, http.StatusOK)
 	} else {
 		wf.reply(ctx, stream, request, http.StatusNotFound, peerHasNoSubscription)
@@ -218,7 +222,7 @@ func (wf *WakuFilterFullNode) filterListener(ctx context.Context) {
 	handle := func(envelope *protocol.Envelope) error {
 		msg := envelope.Message()
 		pubsubTopic := envelope.PubsubTopic()
-		logger := utils.MessagesLogger("filter").With(logging.HexBytes("hash", envelope.Hash()),
+		logger := utils.MessagesLogger("filter").With(logging.Hash(envelope.Hash()),
 			zap.String("pubsubTopic", envelope.PubsubTopic()),
 			zap.String("contentTopic", envelope.Message().ContentTopic),
 		)
@@ -265,7 +269,6 @@ func (wf *WakuFilterFullNode) pushMessage(ctx context.Context, logger *zap.Logge
 
 	stream, err := wf.h.NewStream(ctx, peerID, FilterPushID_v20beta1)
 	if err != nil {
-		wf.subscriptions.FlagAsFailure(peerID)
 		if errors.Is(context.DeadlineExceeded, err) {
 			wf.metrics.RecordError(pushTimeoutFailure)
 		} else {
@@ -284,7 +287,6 @@ func (wf *WakuFilterFullNode) pushMessage(ctx context.Context, logger *zap.Logge
 			wf.metrics.RecordError(writeResponseFailure)
 		}
 		logger.Error("pushing messages to peer", zap.Error(err))
-		wf.subscriptions.FlagAsFailure(peerID)
 		if err := stream.Reset(); err != nil {
 			wf.log.Error("resetting connection", zap.Error(err))
 		}
@@ -292,8 +294,6 @@ func (wf *WakuFilterFullNode) pushMessage(ctx context.Context, logger *zap.Logge
 	}
 
 	stream.Close()
-
-	wf.subscriptions.FlagAsSuccess(peerID)
 
 	logger.Debug("message pushed succesfully")
 

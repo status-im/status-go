@@ -15,8 +15,8 @@ import (
 
 func (old *FilterSubscribeParameters) Copy() *FilterSubscribeParameters {
 	return &FilterSubscribeParameters{
-		selectedPeer: old.selectedPeer,
-		requestID:    old.requestID,
+		selectedPeers: old.selectedPeers,
+		requestID:     old.requestID,
 	}
 }
 
@@ -35,10 +35,11 @@ func WithPingRequestId(requestId []byte) FilterPingOption {
 
 type (
 	FilterSubscribeParameters struct {
-		selectedPeer      peer.ID
+		selectedPeers     peer.IDSlice
 		peerAddr          multiaddr.Multiaddr
 		peerSelectionType peermanager.PeerSelection
 		preferredPeers    peer.IDSlice
+		maxPeers          int
 		requestID         []byte
 		log               *zap.Logger
 
@@ -72,7 +73,7 @@ func WithTimeout(timeout time.Duration) Option {
 // Note that this option is mutually exclusive to WithPeerAddr, only one of them can be used.
 func WithPeer(p peer.ID) FilterSubscribeOption {
 	return func(params *FilterSubscribeParameters) error {
-		params.selectedPeer = p
+		params.selectedPeers = append(params.selectedPeers, p)
 		if params.peerAddr != nil {
 			return errors.New("peerAddr and peerId options are mutually exclusive")
 		}
@@ -86,9 +87,16 @@ func WithPeer(p peer.ID) FilterSubscribeOption {
 func WithPeerAddr(pAddr multiaddr.Multiaddr) FilterSubscribeOption {
 	return func(params *FilterSubscribeParameters) error {
 		params.peerAddr = pAddr
-		if params.selectedPeer != "" {
+		if len(params.selectedPeers) != 0 {
 			return errors.New("peerAddr and peerId options are mutually exclusive")
 		}
+		return nil
+	}
+}
+
+func WithMaxPeersPerContentFilter(numPeers int) FilterSubscribeOption {
+	return func(params *FilterSubscribeParameters) error {
+		params.maxPeers = numPeers
 		return nil
 	}
 }
@@ -186,7 +194,7 @@ func WithPeerManager(pm *peermanager.PeerManager) Option {
 
 func DefaultOptions() []Option {
 	return []Option{
-		WithTimeout(24 * time.Hour),
+		WithTimeout(5 * time.Minute),
 		WithMaxSubscribers(DefaultMaxSubscriptions),
 	}
 }

@@ -10,9 +10,23 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
 
-type lightPushParameters struct {
+type LightpushParameters struct {
+	limiter *rate.Limiter
+}
+
+type Option func(*LightpushParameters)
+
+// WithRateLimiter is an option used to specify a rate limiter for requests received in lightpush protocol
+func WithRateLimiter(r rate.Limit, b int) Option {
+	return func(params *LightpushParameters) {
+		params.limiter = rate.NewLimiter(r, b)
+	}
+}
+
+type lightPushRequestParameters struct {
 	host              host.Host
 	peerAddr          multiaddr.Multiaddr
 	selectedPeer      peer.ID
@@ -24,12 +38,12 @@ type lightPushParameters struct {
 	pubsubTopic       string
 }
 
-// Option is the type of options accepted when performing LightPush protocol requests
-type Option func(*lightPushParameters) error
+// RequestOption is the type of options accepted when performing LightPush protocol requests
+type RequestOption func(*lightPushRequestParameters) error
 
 // WithPeer is an option used to specify the peerID to push a waku message to
-func WithPeer(p peer.ID) Option {
-	return func(params *lightPushParameters) error {
+func WithPeer(p peer.ID) RequestOption {
+	return func(params *lightPushRequestParameters) error {
 		params.selectedPeer = p
 		if params.peerAddr != nil {
 			return errors.New("peerAddr and peerId options are mutually exclusive")
@@ -41,8 +55,8 @@ func WithPeer(p peer.ID) Option {
 // WithPeerAddr is an option used to specify a peerAddress
 // This new peer will be added to peerStore.
 // Note that this option is mutually exclusive to WithPeerAddr, only one of them can be used.
-func WithPeerAddr(pAddr multiaddr.Multiaddr) Option {
-	return func(params *lightPushParameters) error {
+func WithPeerAddr(pAddr multiaddr.Multiaddr) RequestOption {
+	return func(params *lightPushRequestParameters) error {
 		params.peerAddr = pAddr
 		if params.selectedPeer != "" {
 			return errors.New("peerAddr and peerId options are mutually exclusive")
@@ -55,8 +69,8 @@ func WithPeerAddr(pAddr multiaddr.Multiaddr) Option {
 // to push a waku message to. If a list of specific peers is passed, the peer will be chosen
 // from that list assuming it supports the chosen protocol, otherwise it will chose a peer
 // from the node peerstore
-func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) Option {
-	return func(params *lightPushParameters) error {
+func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) RequestOption {
+	return func(params *lightPushRequestParameters) error {
 		params.peerSelectionType = peermanager.Automatic
 		params.preferredPeers = fromThesePeers
 		return nil
@@ -67,24 +81,24 @@ func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) Option {
 // with the lowest ping. If a list of specific peers is passed, the peer will be chosen
 // from that list assuming it supports the chosen protocol, otherwise it will chose a peer
 // from the node peerstore
-func WithFastestPeerSelection(fromThesePeers ...peer.ID) Option {
-	return func(params *lightPushParameters) error {
+func WithFastestPeerSelection(fromThesePeers ...peer.ID) RequestOption {
+	return func(params *lightPushRequestParameters) error {
 		params.peerSelectionType = peermanager.LowestRTT
 		return nil
 	}
 }
 
 // WithPubSubTopic is used to specify the pubsub topic on which a WakuMessage will be broadcasted
-func WithPubSubTopic(pubsubTopic string) Option {
-	return func(params *lightPushParameters) error {
+func WithPubSubTopic(pubsubTopic string) RequestOption {
+	return func(params *lightPushRequestParameters) error {
 		params.pubsubTopic = pubsubTopic
 		return nil
 	}
 }
 
 // WithDefaultPubsubTopic is used to indicate that the message should be broadcasted in the default pubsub topic
-func WithDefaultPubsubTopic() Option {
-	return func(params *lightPushParameters) error {
+func WithDefaultPubsubTopic() RequestOption {
+	return func(params *lightPushRequestParameters) error {
 		params.pubsubTopic = relay.DefaultWakuTopic
 		return nil
 	}
@@ -92,8 +106,8 @@ func WithDefaultPubsubTopic() Option {
 
 // WithRequestID is an option to set a specific request ID to be used when
 // publishing a message
-func WithRequestID(requestID []byte) Option {
-	return func(params *lightPushParameters) error {
+func WithRequestID(requestID []byte) RequestOption {
+	return func(params *lightPushRequestParameters) error {
 		params.requestID = requestID
 		return nil
 	}
@@ -101,16 +115,16 @@ func WithRequestID(requestID []byte) Option {
 
 // WithAutomaticRequestID is an option to automatically generate a request ID
 // when publishing a message
-func WithAutomaticRequestID() Option {
-	return func(params *lightPushParameters) error {
+func WithAutomaticRequestID() RequestOption {
+	return func(params *lightPushRequestParameters) error {
 		params.requestID = protocol.GenerateRequestID()
 		return nil
 	}
 }
 
 // DefaultOptions are the default options to be used when using the lightpush protocol
-func DefaultOptions(host host.Host) []Option {
-	return []Option{
+func DefaultOptions(host host.Host) []RequestOption {
+	return []RequestOption{
 		WithAutomaticRequestID(),
 		WithAutomaticPeerSelection(),
 	}

@@ -60,6 +60,9 @@ func IsThinWaist(m ma.Multiaddr) bool {
 // or /ip6zone/<any value>/ip6/<one of the preceding ip6 values>/*
 func IsIPLoopback(m ma.Multiaddr) bool {
 	m = zoneless(m)
+	if m == nil {
+		return false
+	}
 	c, _ := ma.SplitFirst(m)
 	if c == nil {
 		return false
@@ -76,6 +79,9 @@ func IsIPLoopback(m ma.Multiaddr) bool {
 // routable.
 func IsIP6LinkLocal(m ma.Multiaddr) bool {
 	m = zoneless(m)
+	if m == nil {
+		return false
+	}
 	c, _ := ma.SplitFirst(m)
 	if c == nil || c.Protocol().Code != ma.P_IP6 {
 		return false

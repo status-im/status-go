@@ -20,6 +20,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange/pb"
 	"github.com/waku-org/go-waku/waku/v2/service"
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
 
 // PeerExchangeID_v20alpha1 is the current Waku Peer Exchange protocol identifier
@@ -47,12 +48,13 @@ type WakuPeerExchange struct {
 
 	peerConnector PeerConnector
 	enrCache      *enrCache
+	limiter       *rate.Limiter
 }
 
 // NewWakuPeerExchange returns a new instance of WakuPeerExchange struct
 // Takes an optional peermanager if WakuPeerExchange is being created along with WakuNode.
 // If using libp2p host, then pass peermanager as nil
-func NewWakuPeerExchange(disc *discv5.DiscoveryV5, peerConnector PeerConnector, pm *peermanager.PeerManager, reg prometheus.Registerer, log *zap.Logger) (*WakuPeerExchange, error) {
+func NewWakuPeerExchange(disc *discv5.DiscoveryV5, peerConnector PeerConnector, pm *peermanager.PeerManager, reg prometheus.Registerer, log *zap.Logger, opts ...Option) (*WakuPeerExchange, error) {
 	wakuPX := new(WakuPeerExchange)
 	wakuPX.disc = disc
 	wakuPX.metrics = newMetrics(reg)
@@ -62,6 +64,12 @@ func NewWakuPeerExchange(disc *discv5.DiscoveryV5, peerConnector PeerConnector, 
 	wakuPX.pm = pm
 	wakuPX.CommonService = service.NewCommonService()
 
+	params := &PeerExchangeParameters{}
+	for _, opt := range opts {
+		opt(params)
+	}
+
+	wakuPX.limiter = params.limiter
 	return wakuPX, nil
 }
 
@@ -87,6 +95,14 @@ func (wakuPX *WakuPeerExchange) start() error {
 func (wakuPX *WakuPeerExchange) onRequest() func(network.Stream) {
 	return func(stream network.Stream) {
 		logger := wakuPX.log.With(logging.HostID("peer", stream.Conn().RemotePeer()))
+
+		if wakuPX.limiter != nil && !wakuPX.limiter.Allow() {
+			wakuPX.metrics.RecordError(rateLimitFailure)
+			wakuPX.log.Error("exceeds the rate limit")
+			// TODO: peer exchange protocol should contain an err field
+			return
+		}
+
 		requestRPC := &pb.PeerExchangeRPC{}
 		reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
 		err := reader.ReadMsg(requestRPC)

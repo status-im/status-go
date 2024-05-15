@@ -8,14 +8,14 @@ import (
 )
 
 // StreamErrorCode is an error code used for stream termination.
-type StreamErrorCode uint8
+type StreamErrorCode uint32
 
 // SessionErrorCode is an error code for session termination.
 type SessionErrorCode uint32
 
 const (
 	firstErrorCode = 0x52e4a40fa8db
-	lastErrorCode  = 0x52e4a40fa9e2
+	lastErrorCode  = 0x52e5ac983162
 )
 
 func webtransportCodeToHTTPCode(n StreamErrorCode) quic.StreamErrorCode {

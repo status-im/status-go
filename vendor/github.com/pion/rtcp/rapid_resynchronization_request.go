@@ -14,6 +14,10 @@ type RapidResynchronizationRequest struct {
 	MediaSSRC uint32
 }
 
+// RapidResynchronisationRequest is provided as RFC 6051 spells resynchronization with an s.
+// We provide both names to be consistent with other RFCs which spell resynchronization with a z.
+type RapidResynchronisationRequest = RapidResynchronizationRequest
+
 const (
 	rrrLength       = 2
 	rrrHeaderLength = ssrcLength * 2

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package ice
 
 import (
@@ -44,12 +47,12 @@ func (a *Agent) connect(ctx context.Context, isControlling bool, remoteUfrag, re
 	if err != nil {
 		return nil, err
 	}
-	err = a.startConnectivityChecks(isControlling, remoteUfrag, remotePwd)
+	err = a.startConnectivityChecks(isControlling, remoteUfrag, remotePwd) //nolint:contextcheck
 	if err != nil {
 		return nil, err
 	}
 
-	// block until pair selected
+	// Block until pair selected
 	select {
 	case <-a.done:
 		return nil, a.getErr()
@@ -70,7 +73,7 @@ func (c *Conn) Read(p []byte) (int, error) {
 		return 0, err
 	}
 
-	n, err := c.agent.buffer.Read(p)
+	n, err := c.agent.buf.Read(p)
 	atomic.AddUint64(&c.bytesReceived, uint64(n))
 	return n, err
 }
@@ -130,16 +133,16 @@ func (c *Conn) RemoteAddr() net.Addr {
 }
 
 // SetDeadline is a stub
-func (c *Conn) SetDeadline(t time.Time) error {
+func (c *Conn) SetDeadline(time.Time) error {
 	return nil
 }
 
 // SetReadDeadline is a stub
-func (c *Conn) SetReadDeadline(t time.Time) error {
+func (c *Conn) SetReadDeadline(time.Time) error {
 	return nil
 }
 
 // SetWriteDeadline is a stub
-func (c *Conn) SetWriteDeadline(t time.Time) error {
+func (c *Conn) SetWriteDeadline(time.Time) error {
 	return nil
 }

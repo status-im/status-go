@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package dtls
 
 import (
@@ -8,7 +11,7 @@ import (
 	"github.com/pion/dtls/v2/pkg/crypto/elliptic"
 	"github.com/pion/dtls/v2/pkg/crypto/prf"
 	"github.com/pion/dtls/v2/pkg/protocol/handshake"
-	"github.com/pion/transport/replaydetector"
+	"github.com/pion/transport/v2/replaydetector"
 )
 
 // State holds the dtls connection state and implements both encoding.BinaryMarshaler and encoding.BinaryUnmarshaler
@@ -75,10 +78,10 @@ func (s *State) serialize() *serializedState {
 	localRnd := s.localRandom.MarshalFixed()
 	remoteRnd := s.remoteRandom.MarshalFixed()
 
-	epoch := s.localEpoch.Load().(uint16)
+	epoch := s.getLocalEpoch()
 	return &serializedState{
-		LocalEpoch:            epoch,
-		RemoteEpoch:           s.remoteEpoch.Load().(uint16),
+		LocalEpoch:            s.getLocalEpoch(),
+		RemoteEpoch:           s.getRemoteEpoch(),
 		CipherSuiteID:         uint16(s.cipherSuite.ID()),
 		MasterSecret:          s.masterSecret,
 		SequenceNumber:        atomic.LoadUint64(&s.localSequenceNumber[epoch]),
@@ -169,10 +172,8 @@ func (s *State) UnmarshalBinary(data []byte) error {
 	}
 
 	s.deserialize(serialized)
-	if err := s.initCipherSuite(); err != nil {
-		return err
-	}
-	return nil
+
+	return s.initCipherSuite()
 }
 
 // ExportKeyingMaterial returns length bytes of exported key material in a new
@@ -180,7 +181,7 @@ func (s *State) UnmarshalBinary(data []byte) error {
 // This allows protocols to use DTLS for key establishment, but
 // then use some of the keying material for their own purposes
 func (s *State) ExportKeyingMaterial(label string, context []byte, length int) ([]byte, error) {
-	if s.localEpoch.Load().(uint16) == 0 {
+	if s.getLocalEpoch() == 0 {
 		return nil, errHandshakeInProgress
 	} else if len(context) != 0 {
 		return nil, errContextUnsupported
@@ -198,4 +199,18 @@ func (s *State) ExportKeyingMaterial(label string, context []byte, length int) (
 		seed = append(append(seed, remoteRandom[:]...), localRandom[:]...)
 	}
 	return prf.PHash(s.masterSecret, seed, length, s.cipherSuite.HashFunc())
+}
+
+func (s *State) getRemoteEpoch() uint16 {
+	if remoteEpoch, ok := s.remoteEpoch.Load().(uint16); ok {
+		return remoteEpoch
+	}
+	return 0
+}
+
+func (s *State) getLocalEpoch() uint16 {
+	if localEpoch, ok := s.localEpoch.Load().(uint16); ok {
+		return localEpoch
+	}
+	return 0
 }

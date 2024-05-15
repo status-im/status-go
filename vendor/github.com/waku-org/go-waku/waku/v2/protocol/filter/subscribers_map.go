@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"sync"
@@ -17,14 +18,15 @@ type PubsubTopics map[string]protocol.ContentTopicSet // pubsubTopic => contentT
 
 var errNotFound = errors.New("not found")
 
+const cleanupInterval = time.Minute
+
 type SubscribersMap struct {
 	sync.RWMutex
 
 	items       map[peer.ID]PubsubTopics
 	interestMap map[string]PeerSet // key: sha256(pubsubTopic-contentTopic) => peers
-
 	timeout     time.Duration
-	failedPeers map[peer.ID]time.Time
+	lastSeen    map[peer.ID]time.Time
 }
 
 func NewSubscribersMap(timeout time.Duration) *SubscribersMap {
@@ -32,8 +34,12 @@ func NewSubscribersMap(timeout time.Duration) *SubscribersMap {
 		items:       make(map[peer.ID]PubsubTopics),
 		interestMap: make(map[string]PeerSet),
 		timeout:     timeout,
-		failedPeers: make(map[peer.ID]time.Time),
+		lastSeen:    make(map[peer.ID]time.Time),
 	}
+}
+
+func (sub *SubscribersMap) Start(ctx context.Context) {
+	go sub.cleanUp(ctx, cleanupInterval)
 }
 
 func (sub *SubscribersMap) Clear() {
@@ -42,12 +48,14 @@ func (sub *SubscribersMap) Clear() {
 
 	sub.items = make(map[peer.ID]PubsubTopics)
 	sub.interestMap = make(map[string]PeerSet)
-	sub.failedPeers = make(map[peer.ID]time.Time)
+	sub.lastSeen = make(map[peer.ID]time.Time)
 }
 
 func (sub *SubscribersMap) Set(peerID peer.ID, pubsubTopic string, contentTopics []string) {
 	sub.Lock()
 	defer sub.Unlock()
+
+	sub.lastSeen[peerID] = time.Now()
 
 	pubsubTopicMap, ok := sub.items[peerID]
 	if !ok {
@@ -105,6 +113,10 @@ func (sub *SubscribersMap) Delete(peerID peer.ID, pubsubTopic string, contentTop
 		return errNotFound
 	}
 
+	// Updating first the lastSeen since this is a valid activity
+	// (it will still get deleted if all content topics are removed)
+	sub.lastSeen[peerID] = time.Now()
+
 	// Removing content topics individually
 	for _, c := range contentTopics {
 		c := c
@@ -123,6 +135,7 @@ func (sub *SubscribersMap) Delete(peerID peer.ID, pubsubTopic string, contentTop
 
 	if len(sub.items[peerID]) == 0 {
 		delete(sub.items, peerID)
+		delete(sub.lastSeen, peerID)
 	}
 
 	return nil
@@ -142,6 +155,7 @@ func (sub *SubscribersMap) deleteAll(peerID peer.ID) error {
 	}
 
 	delete(sub.items, peerID)
+	delete(sub.lastSeen, peerID)
 
 	return nil
 }
@@ -158,6 +172,7 @@ func (sub *SubscribersMap) RemoveAll() {
 	defer sub.Unlock()
 
 	sub.items = make(map[peer.ID]PubsubTopics)
+	sub.lastSeen = make(map[peer.ID]time.Time)
 }
 
 func (sub *SubscribersMap) Count() int {
@@ -213,34 +228,31 @@ func getKey(pubsubTopic string, contentTopic string) string {
 
 }
 
-func (sub *SubscribersMap) IsFailedPeer(peerID peer.ID) bool {
-	sub.RLock()
-	defer sub.RUnlock()
-	_, ok := sub.failedPeers[peerID]
-	return ok
-}
-
-func (sub *SubscribersMap) FlagAsSuccess(peerID peer.ID) {
+func (sub *SubscribersMap) Refresh(peerID peer.ID) {
 	sub.Lock()
 	defer sub.Unlock()
 
-	_, ok := sub.failedPeers[peerID]
-	if ok {
-		delete(sub.failedPeers, peerID)
-	}
+	sub.lastSeen[peerID] = time.Now()
 }
 
-func (sub *SubscribersMap) FlagAsFailure(peerID peer.ID) {
-	sub.Lock()
-	defer sub.Unlock()
+func (sub *SubscribersMap) cleanUp(ctx context.Context, cleanupInterval time.Duration) {
+	t := time.NewTicker(cleanupInterval)
+	defer t.Stop()
 
-	lastFailure, ok := sub.failedPeers[peerID]
-	if ok {
-		elapsedTime := time.Since(lastFailure)
-		if elapsedTime < sub.timeout {
-			_ = sub.deleteAll(peerID)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			sub.Lock()
+			for peerID, lastSeen := range sub.lastSeen {
+				elapsedTime := time.Since(lastSeen)
+				if elapsedTime < sub.timeout {
+					_ = sub.deleteAll(peerID)
+				}
+
+			}
+			sub.Unlock()
 		}
-	} else {
-		sub.failedPeers[peerID] = time.Now()
 	}
 }

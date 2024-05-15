@@ -16,6 +16,7 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/waku-org/go-waku/logging"
+	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	waku_proto "github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/service"
@@ -114,6 +115,7 @@ func (w *WakuRelay) peerScoreInspector(peerScoresSnapshots map[peer.ID]*pubsub.P
 				w.log.Error("could not disconnect peer", logging.HostID("peer", pid), zap.Error(err))
 			}
 		}
+		_ = w.host.Peerstore().(wps.WakuPeerstore).SetScore(pid, snap.Score)
 	}
 }
 
@@ -253,19 +255,19 @@ func (w *WakuRelay) subscribeToPubsubTopic(topic string) (*pubsubTopicSubscripti
 // Publish is used to broadcast a WakuMessage to a pubsub topic. The pubsubTopic is derived from contentTopic
 // specified in the message via autosharding. To publish to a specific pubsubTopic, the `WithPubSubTopic` option should
 // be provided
-func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage, opts ...PublishOption) ([]byte, error) {
+func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage, opts ...PublishOption) (pb.MessageHash, error) {
 	// Publish a `WakuMessage` to a PubSub topic.
 	if w.pubsub == nil {
-		return nil, errors.New("PubSub hasn't been set")
+		return pb.MessageHash{}, errors.New("PubSub hasn't been set")
 	}
 
 	if message == nil {
-		return nil, errors.New("message can't be null")
+		return pb.MessageHash{}, errors.New("message can't be null")
 	}
 
 	err := message.Validate()
 	if err != nil {
-		return nil, err
+		return pb.MessageHash{}, err
 	}
 
 	params := new(publishParameters)
@@ -276,39 +278,39 @@ func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage, opts .
 	if params.pubsubTopic == "" {
 		params.pubsubTopic, err = waku_proto.GetPubSubTopicFromContentTopic(message.ContentTopic)
 		if err != nil {
-			return nil, err
+			return pb.MessageHash{}, err
 		}
 	}
 
 	if !w.EnoughPeersToPublishToTopic(params.pubsubTopic) {
-		return nil, errors.New("not enough peers to publish")
+		return pb.MessageHash{}, errors.New("not enough peers to publish")
 	}
 
-	w.topicsMutex.RLock()
-	defer w.topicsMutex.RUnlock()
+	w.topicsMutex.Lock()
+	defer w.topicsMutex.Unlock()
 
 	pubSubTopic, err := w.upsertTopic(params.pubsubTopic)
 	if err != nil {
-		return nil, err
+		return pb.MessageHash{}, err
 	}
 
 	out, err := proto.Marshal(message)
 	if err != nil {
-		return nil, err
+		return pb.MessageHash{}, err
 	}
 
 	if len(out) > w.relayParams.maxMsgSizeBytes {
-		return nil, errors.New("message size exceeds gossipsub max message size")
+		return pb.MessageHash{}, errors.New("message size exceeds gossipsub max message size")
 	}
 
 	err = pubSubTopic.Publish(ctx, out)
 	if err != nil {
-		return nil, err
+		return pb.MessageHash{}, err
 	}
 
 	hash := message.Hash(params.pubsubTopic)
 
-	w.logMessages.Debug("waku.relay published", zap.String("pubsubTopic", params.pubsubTopic), logging.HexBytes("hash", hash), zap.Int64("publishTime", w.timesource.Now().UnixNano()), zap.Int("payloadSizeBytes", len(message.Payload)))
+	w.logMessages.Debug("waku.relay published", zap.String("pubsubTopic", params.pubsubTopic), logging.Hash(hash), zap.Int64("publishTime", w.timesource.Now().UnixNano()), zap.Int("payloadSizeBytes", len(message.Payload)))
 
 	return hash, nil
 }

@@ -1,9 +1,12 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package srtp
 
 import (
 	"fmt"
 
-	"github.com/pion/transport/replaydetector"
+	"github.com/pion/transport/v2/replaydetector"
 )
 
 const (
@@ -16,6 +19,7 @@ const (
 	labelSRTCPSalt              = 0x05
 
 	maxSequenceNumber = 65535
+	maxROC            = (1 << 32) - 1
 
 	seqNumMedian = 1 << 15
 	seqNumMax    = 1 << 16
@@ -26,8 +30,8 @@ const (
 // Encrypt/Decrypt state for a single SRTP SSRC
 type srtpSSRCState struct {
 	ssrc                 uint32
-	index                uint64
 	rolloverHasProcessed bool
+	index                uint64
 	replayDetector       replaydetector.ReplayDetector
 }
 
@@ -41,6 +45,9 @@ type srtcpSSRCState struct {
 // Context represents a SRTP cryptographic context.
 // Context can only be used for one-way operations.
 // it must either used ONLY for encryption or ONLY for decryption.
+// Note that Context does not provide any concurrency protection:
+// access to a Context from multiple goroutines requires external
+// synchronization.
 type Context struct {
 	cipher srtpCipher
 
@@ -57,8 +64,7 @@ type Context struct {
 // Passing multiple options which set the same parameter let the last one valid.
 // Following example create SRTP Context with replay protection with window size of 256.
 //
-//   decCtx, err := srtp.CreateContext(key, salt, profile, srtp.SRTPReplayProtection(256))
-//
+//	decCtx, err := srtp.CreateContext(key, salt, profile, srtp.SRTPReplayProtection(256))
 func CreateContext(masterKey, masterSalt []byte, profile ProtectionProfile, opts ...ContextOption) (c *Context, err error) {
 	keyLen, err := profile.keyLen()
 	if err != nil {
@@ -82,10 +88,10 @@ func CreateContext(masterKey, masterSalt []byte, profile ProtectionProfile, opts
 	}
 
 	switch profile {
-	case ProtectionProfileAeadAes128Gcm:
-		c.cipher, err = newSrtpCipherAeadAesGcm(masterKey, masterSalt)
-	case ProtectionProfileAes128CmHmacSha1_80:
-		c.cipher, err = newSrtpCipherAesCmHmacSha1(masterKey, masterSalt)
+	case ProtectionProfileAeadAes128Gcm, ProtectionProfileAeadAes256Gcm:
+		c.cipher, err = newSrtpCipherAeadAesGcm(profile, masterKey, masterSalt)
+	case ProtectionProfileAes128CmHmacSha1_32, ProtectionProfileAes128CmHmacSha1_80:
+		c.cipher, err = newSrtpCipherAesCmHmacSha1(profile, masterKey, masterSalt)
 	default:
 		return nil, fmt.Errorf("%w: %#v", errNoSuchSRTPProfile, profile)
 	}
@@ -109,13 +115,13 @@ func CreateContext(masterKey, masterSalt []byte, profile ProtectionProfile, opts
 }
 
 // https://tools.ietf.org/html/rfc3550#appendix-A.1
-func (s *srtpSSRCState) nextRolloverCount(sequenceNumber uint16) (uint32, func()) {
+func (s *srtpSSRCState) nextRolloverCount(sequenceNumber uint16) (roc uint32, diff int32, overflow bool) {
 	seq := int32(sequenceNumber)
 	localRoc := uint32(s.index >> 16)
 	localSeq := int32(s.index & (seqNumMax - 1))
 
 	guessRoc := localRoc
-	var difference int32 = 0
+	var difference int32
 
 	if s.rolloverHasProcessed {
 		// When localROC is equal to 0, and entering seq-localSeq > seqNumMedian
@@ -144,15 +150,17 @@ func (s *srtpSSRCState) nextRolloverCount(sequenceNumber uint16) (uint32, func()
 		}
 	}
 
-	return guessRoc, func() {
-		if !s.rolloverHasProcessed {
-			s.index |= uint64(sequenceNumber)
-			s.rolloverHasProcessed = true
-			return
-		}
-		if difference > 0 {
-			s.index += uint64(difference)
-		}
+	return guessRoc, difference, (guessRoc == 0 && localRoc == maxROC)
+}
+
+func (s *srtpSSRCState) updateRolloverCount(sequenceNumber uint16, difference int32) {
+	if !s.rolloverHasProcessed {
+		s.index |= uint64(sequenceNumber)
+		s.rolloverHasProcessed = true
+		return
+	}
+	if difference > 0 {
+		s.index += uint64(difference)
 	}
 }
 
@@ -196,7 +204,8 @@ func (c *Context) ROC(ssrc uint32) (uint32, bool) {
 // SetROC sets SRTP rollover counter value of specified SSRC.
 func (c *Context) SetROC(ssrc uint32, roc uint32) {
 	s := c.getSRTPSSRCState(ssrc)
-	s.index = uint64(roc<<16) | (s.index & (seqNumMax - 1))
+	s.index = uint64(roc) << 16
+	s.rolloverHasProcessed = false
 }
 
 // Index returns SRTCP index value of specified SSRC.

@@ -193,7 +193,9 @@ func (tab *Table) setFallbackNodes(nodes []*enode.Node) error {
 			return fmt.Errorf("bad bootstrap node %q: %v", n, err)
 		}
 	}
+	tab.mutex.Lock()
 	tab.nursery = wrapNodes(nodes)
+	tab.mutex.Unlock()
 	return nil
 }
 
@@ -305,7 +307,9 @@ func (tab *Table) doRefresh(done chan struct{}) {
 
 func (tab *Table) loadSeedNodes() {
 	seeds := wrapNodes(tab.db.QuerySeeds(seedCount, seedMaxAge))
+	tab.mutex.Lock()
 	seeds = append(seeds, tab.nursery...)
+	tab.mutex.Unlock()
 	for i := range seeds {
 		seed := seeds[i]
 		age := log.Lazy{Fn: func() interface{} { return time.Since(tab.db.LastPongReceived(seed.ID(), seed.IP())) }}

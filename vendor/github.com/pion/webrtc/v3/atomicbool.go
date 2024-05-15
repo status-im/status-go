@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import "sync/atomic"
@@ -20,7 +23,7 @@ func (b *atomicBool) get() bool {
 }
 
 func (b *atomicBool) swap(value bool) bool {
-	var i int32 = 0
+	var i int32
 	if value {
 		i = 1
 	}

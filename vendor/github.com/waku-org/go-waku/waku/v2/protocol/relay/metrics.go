@@ -61,7 +61,7 @@ func (m *metricsImpl) RecordMessage(envelope *waku_proto.Envelope) {
 		messageSize.Observe(payloadSizeInKb)
 		pubsubTopic := envelope.PubsubTopic()
 		messages.WithLabelValues(pubsubTopic).Inc()
-		m.log.Debug("waku.relay received", zap.String("pubsubTopic", pubsubTopic), logging.HexBytes("hash", envelope.Hash()), zap.Int64("receivedTime", envelope.Index().ReceiverTime), zap.Int("payloadSizeBytes", payloadSizeInBytes))
+		m.log.Debug("waku.relay received", zap.String("pubsubTopic", pubsubTopic), logging.Hash(envelope.Hash()), zap.Int64("receivedTime", envelope.Index().ReceiverTime), zap.Int("payloadSizeBytes", payloadSizeInBytes))
 	}()
 }
 

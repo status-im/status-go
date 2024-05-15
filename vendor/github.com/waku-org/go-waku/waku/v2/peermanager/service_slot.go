@@ -19,14 +19,10 @@ func newPeerMap() *peerMap {
 	}
 }
 
-func (pm *peerMap) getRandom() (peer.ID, error) {
+func (pm *peerMap) getRandom(count int) (peerSet, error) {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
-	for pID := range pm.m {
-		return pID, nil
-	}
-	return "", ErrNoPeersAvailable
-
+	return getRandom(pm.m, count)
 }
 
 func (pm *peerMap) remove(pID peer.ID) {

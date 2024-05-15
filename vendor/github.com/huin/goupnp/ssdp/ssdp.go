@@ -35,6 +35,15 @@ type HTTPUClient interface {
 	) ([]*http.Response, error)
 }
 
+// HTTPUClientCtx is an optional interface that will be used to perform
+// HTTP-over-UDP requests if the client implements it.
+type HTTPUClientCtx interface {
+	DoWithContext(
+		req *http.Request,
+		numSends int,
+	) ([]*http.Response, error)
+}
+
 // SSDPRawSearchCtx performs a fairly raw SSDP search request, and returns the
 // unique response(s) that it receives. Each response has the requested
 // searchTarget, a USN, and a valid location. maxWaitSeconds states how long to
@@ -49,8 +58,64 @@ func SSDPRawSearchCtx(
 	maxWaitSeconds int,
 	numSends int,
 ) ([]*http.Response, error) {
+	req, err := prepareRequest(ctx, searchTarget, maxWaitSeconds)
+	if err != nil {
+		return nil, err
+	}
+
+	allResponses, err := httpu.Do(req, time.Duration(maxWaitSeconds)*time.Second+100*time.Millisecond, numSends)
+	if err != nil {
+		return nil, err
+	}
+	return processSSDPResponses(searchTarget, allResponses)
+}
+
+// RawSearch performs a fairly raw SSDP search request, and returns the
+// unique response(s) that it receives. Each response has the requested
+// searchTarget, a USN, and a valid location. If the provided context times out
+// or is canceled, the search will be aborted. numSends is the number of
+// requests to send - 3 is a reasonable value for this.
+//
+// The provided context should have a deadline, since the SSDP protocol
+// requires the max wait time be included in search requests. If the context
+// has no deadline, then a default deadline of 3 seconds will be applied.
+func RawSearch(
+	ctx context.Context,
+	httpu HTTPUClientCtx,
+	searchTarget string,
+	numSends int,
+) ([]*http.Response, error) {
+	// We need a timeout value to include in the SSDP request; get it by
+	// checking the deadline on the context.
+	var maxWaitSeconds int
+	if deadline, ok := ctx.Deadline(); ok {
+		maxWaitSeconds = int(deadline.Sub(time.Now()) / time.Second)
+	} else {
+		// Pick a default timeout of 3 seconds if none was provided.
+		maxWaitSeconds = 3
+
+		var cancel func()
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(maxWaitSeconds)*time.Second)
+		defer cancel()
+	}
+
+	req, err := prepareRequest(ctx, searchTarget, maxWaitSeconds)
+	if err != nil {
+		return nil, err
+	}
+
+	allResponses, err := httpu.DoWithContext(req, numSends)
+	if err != nil {
+		return nil, err
+	}
+	return processSSDPResponses(searchTarget, allResponses)
+}
+
+// prepareRequest checks the provided parameters and constructs a SSDP search
+// request to be sent.
+func prepareRequest(ctx context.Context, searchTarget string, maxWaitSeconds int) (*http.Request, error) {
 	if maxWaitSeconds < 1 {
-		return nil, errors.New("ssdp: maxWaitSeconds must be >= 1")
+		return nil, errors.New("ssdp: request timeout must be at least 1s")
 	}
 
 	req := (&http.Request{
@@ -67,11 +132,13 @@ func SSDPRawSearchCtx(
 			"ST":   []string{searchTarget},
 		},
 	}).WithContext(ctx)
-	allResponses, err := httpu.Do(req, time.Duration(maxWaitSeconds)*time.Second+100*time.Millisecond, numSends)
-	if err != nil {
-		return nil, err
-	}
+	return req, nil
+}
 
+func processSSDPResponses(
+	searchTarget string,
+	allResponses []*http.Response,
+) ([]*http.Response, error) {
 	isExactSearch := searchTarget != SSDPAll && searchTarget != UPNPRootDevice
 
 	seenIDs := make(map[string]bool)

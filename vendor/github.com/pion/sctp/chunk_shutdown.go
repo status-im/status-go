@@ -26,9 +26,10 @@ const (
 	cumulativeTSNAckLength = 4
 )
 
+// Shutdown chunk errors
 var (
-	errInvalidChunkSize     = errors.New("invalid chunk size")
-	errChunkTypeNotShutdown = errors.New("ChunkType is not of type SHUTDOWN")
+	ErrInvalidChunkSize     = errors.New("invalid chunk size")
+	ErrChunkTypeNotShutdown = errors.New("ChunkType is not of type SHUTDOWN")
 )
 
 func (c *chunkShutdown) unmarshal(raw []byte) error {
@@ -37,11 +38,11 @@ func (c *chunkShutdown) unmarshal(raw []byte) error {
 	}
 
 	if c.typ != ctShutdown {
-		return fmt.Errorf("%w: actually is %s", errChunkTypeNotShutdown, c.typ.String())
+		return fmt.Errorf("%w: actually is %s", ErrChunkTypeNotShutdown, c.typ.String())
 	}
 
 	if len(c.raw) != cumulativeTSNAckLength {
-		return errInvalidChunkSize
+		return ErrInvalidChunkSize
 	}
 
 	c.cumulativeTSNAck = binary.BigEndian.Uint32(c.raw[0:])

@@ -77,6 +77,9 @@ func (p *PubSub) handleNewStream(s network.Stream) {
 
 			return
 		}
+		if len(msgbytes) == 0 {
+			continue
+		}
 
 		rpc := new(RPC)
 		err = rpc.Unmarshal(msgbytes)

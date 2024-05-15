@@ -23,9 +23,9 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
+	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
 
 	"github.com/status-im/status-go/appdatabase"
@@ -183,7 +183,7 @@ func TestBasicWakuV2(t *testing.T) {
 		b.InitialInterval = 500 * time.Millisecond
 	}
 	err = tt.RetryWithBackOff(func() error {
-		storeResult, err := w.query(context.Background(), storeNode.PeerID, relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-int64(marginInSeconds)), uint64(timestampInSeconds+int64(marginInSeconds)), []byte{}, []store.HistoryRequestOption{})
+		storeResult, err := w.query(context.Background(), storeNode.PeerID, relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-int64(marginInSeconds)), uint64(timestampInSeconds+int64(marginInSeconds)), []byte{}, []legacy_store.HistoryRequestOption{})
 		if err != nil || len(storeResult.Messages) == 0 {
 			// in case of failure extend timestamp margin up to 40secs
 			if marginInSeconds < 40 {
@@ -461,7 +461,7 @@ func TestWakuV2Store(t *testing.T) {
 	marginInSeconds := 5
 
 	// Query the second node's store for the message
-	storeResult, err := w1.query(context.Background(), w2.node.Host().ID(), relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-int64(marginInSeconds)), uint64(timestampInSeconds+int64(marginInSeconds)), []byte{}, []store.HistoryRequestOption{})
+	storeResult, err := w1.query(context.Background(), w2.node.Host().ID(), relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-int64(marginInSeconds)), uint64(timestampInSeconds+int64(marginInSeconds)), []byte{}, []legacy_store.HistoryRequestOption{})
 	require.NoError(t, err)
 	require.True(t, len(storeResult.Messages) > 0, "no messages received from store node")
 }

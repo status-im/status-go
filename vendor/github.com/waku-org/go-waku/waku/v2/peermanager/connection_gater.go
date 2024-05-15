@@ -16,18 +16,20 @@ import (
 // the number of connections per IP address
 type ConnectionGater struct {
 	sync.Mutex
-	logger  *zap.Logger
-	limiter map[string]int
+	logger        *zap.Logger
+	limiter       map[string]int
+	maxConnsPerIP int
 }
 
-const maxConnsPerIP = 10
-
 // NewConnectionGater creates a new instance of ConnectionGater
-func NewConnectionGater(logger *zap.Logger) *ConnectionGater {
+func NewConnectionGater(maxConnsPerIP int, logger *zap.Logger) *ConnectionGater {
 	c := &ConnectionGater{
-		logger:  logger.Named("connection-gater"),
-		limiter: make(map[string]int),
+		logger:        logger.Named("connection-gater"),
+		maxConnsPerIP: maxConnsPerIP,
+		limiter:       make(map[string]int),
 	}
+
+	c.logger.Info("configured settings", zap.Int("maxConnsPerIP", maxConnsPerIP))
 
 	return c
 }
@@ -103,7 +105,7 @@ func (c *ConnectionGater) validateInboundConn(addr multiaddr.Multiaddr) bool {
 	c.Lock()
 	defer c.Unlock()
 
-	if currConnections := c.limiter[ip.String()]; currConnections+1 > maxConnsPerIP {
+	if currConnections := c.limiter[ip.String()]; c.maxConnsPerIP > 0 && currConnections+1 > c.maxConnsPerIP {
 		return false
 	}
 

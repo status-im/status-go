@@ -62,7 +62,7 @@ func (c *Client) PushReceivedMessages(filter transport.Filter, sshMessage *types
 func (c *Client) PushReceivedEnvelope(envelope *v2protocol.Envelope) {
 	url := fmt.Sprintf("%s/received-envelope", c.serverURL)
 	postBody := map[string]interface{}{
-		"messageHash":    types.EncodeHex(envelope.Hash()),
+		"messageHash":    envelope.Hash().String(),
 		"sentAt":         uint32(envelope.Message().GetTimestamp() / int64(time.Second)),
 		"pubsubTopic":    envelope.PubsubTopic(),
 		"topic":          envelope.Message().ContentTopic,

@@ -8,8 +8,8 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/store"
-	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
+	storepb "github.com/waku-org/go-waku/waku/v2/protocol/legacy_store/pb"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/connection"
@@ -177,19 +177,19 @@ func (w *gethWakuV2Wrapper) SendMessagesRequest(peerID []byte, r types.MessagesR
 }
 
 func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID []byte, r types.MessagesRequest, processEnvelopes bool) (*types.StoreRequestCursor, int, error) {
-	var options []store.HistoryRequestOption
+	var options []legacy_store.HistoryRequestOption
 
 	peer, err := peer.Decode(string(peerID))
 	if err != nil {
 		return nil, 0, err
 	}
 
-	options = []store.HistoryRequestOption{
-		store.WithPaging(false, uint64(r.Limit)),
+	options = []legacy_store.HistoryRequestOption{
+		legacy_store.WithPaging(false, uint64(r.Limit)),
 	}
 
 	if r.StoreCursor != nil {
-		options = append(options, store.WithCursor(&storepb.Index{
+		options = append(options, legacy_store.WithCursor(&storepb.Index{
 			Digest:       r.StoreCursor.Digest,
 			ReceiverTime: r.StoreCursor.ReceiverTime,
 			SenderTime:   r.StoreCursor.SenderTime,

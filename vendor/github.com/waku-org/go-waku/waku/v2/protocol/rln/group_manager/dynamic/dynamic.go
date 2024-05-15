@@ -73,11 +73,13 @@ func (gm *DynamicGroupManager) handler(events []*contracts.RLNMemberRegistered, 
 			}
 			eventsPerBlock = append(eventsPerBlock, event)
 			toInsertTable.Set(event.Raw.BlockNumber, eventsPerBlock)
-
-			if event.Raw.BlockNumber > lastBlockProcessed {
-				lastBlockProcessed = event.Raw.BlockNumber
-			}
 		}
+		if event.Raw.BlockNumber > lastBlockProcessed {
+			lastBlockProcessed = event.Raw.BlockNumber
+		}
+	}
+	if len(events) == 0 {
+		lastBlockProcessed = latestProcessBlock
 	}
 
 	err := gm.RemoveMembers(toRemoveTable)

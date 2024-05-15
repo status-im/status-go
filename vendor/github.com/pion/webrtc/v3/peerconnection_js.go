@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build js && wasm
 // +build js,wasm
 
@@ -566,14 +569,31 @@ func iceServersToValue(iceServers []ICEServer) js.Value {
 	return js.ValueOf(maps)
 }
 
+func oauthCredentialToValue(o OAuthCredential) js.Value {
+	out := map[string]interface{}{
+		"MACKey":      o.MACKey,
+		"AccessToken": o.AccessToken,
+	}
+	return js.ValueOf(out)
+}
+
 func iceServerToValue(server ICEServer) js.Value {
-	return js.ValueOf(map[string]interface{}{
-		"urls":     stringsToValue(server.URLs), // required
-		"username": stringToValueOrUndefined(server.Username),
-		// Note: credential and credentialType are not currently supported.
-		// "credential":     interfaceToValueOrUndefined(server.Credential),
-		// "credentialType": stringEnumToValueOrUndefined(server.CredentialType.String()),
-	})
+	out := map[string]interface{}{
+		"urls": stringsToValue(server.URLs), // required
+	}
+	if server.Username != "" {
+		out["username"] = stringToValueOrUndefined(server.Username)
+	}
+	if server.Credential != nil {
+		switch t := server.Credential.(type) {
+		case string:
+			out["credential"] = stringToValueOrUndefined(t)
+		case OAuthCredential:
+			out["credential"] = oauthCredentialToValue(t)
+		}
+	}
+	out["credentialType"] = stringEnumToValueOrUndefined(server.CredentialType.String())
+	return js.ValueOf(out)
 }
 
 func valueToConfiguration(configValue js.Value) Configuration {
@@ -604,14 +624,36 @@ func valueToICEServers(iceServersValue js.Value) []ICEServer {
 	return iceServers
 }
 
+func valueToICECredential(iceCredentialValue js.Value) interface{} {
+	if iceCredentialValue.IsNull() || iceCredentialValue.IsUndefined() {
+		return nil
+	}
+	if iceCredentialValue.Type() == js.TypeString {
+		return iceCredentialValue.String()
+	}
+	if iceCredentialValue.Type() == js.TypeObject {
+		return OAuthCredential{
+			MACKey:      iceCredentialValue.Get("MACKey").String(),
+			AccessToken: iceCredentialValue.Get("AccessToken").String(),
+		}
+	}
+	return nil
+}
+
 func valueToICEServer(iceServerValue js.Value) ICEServer {
-	return ICEServer{
+	tpe, err := newICECredentialType(valueToStringOrZero(iceServerValue.Get("credentialType")))
+	if err != nil {
+		tpe = ICECredentialTypePassword
+	}
+	s := ICEServer{
 		URLs:     valueToStrings(iceServerValue.Get("urls")), // required
 		Username: valueToStringOrZero(iceServerValue.Get("username")),
 		// Note: Credential and CredentialType are not currently supported.
-		// Credential: iceServerValue.Get("credential"),
-		// CredentialType: newICECredentialType(valueToStringOrZero(iceServerValue.Get("credentialType"))),
+		Credential:     valueToICECredential(iceServerValue.Get("credential")),
+		CredentialType: tpe,
 	}
+
+	return s
 }
 
 func valueToICECandidate(val js.Value) *ICECandidate {

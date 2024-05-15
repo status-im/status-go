@@ -40,6 +40,8 @@ func msgIDFn(pmsg *pubsub_pb.Message) string {
 	return string(hash.SHA256(pmsg.Data))
 }
 
+const PeerPublishThreshold = -1000
+
 func (w *WakuRelay) setDefaultPeerScoreParams() {
 	w.peerScoreParams = &pubsub.PeerScoreParams{
 		Topics:        make(map[string]*pubsub.TopicScoreParams),
@@ -59,10 +61,10 @@ func (w *WakuRelay) setDefaultPeerScoreParams() {
 		BehaviourPenaltyDecay:  0.986,
 	}
 	w.peerScoreThresholds = &pubsub.PeerScoreThresholds{
-		GossipThreshold:             -100,   // no gossip is sent to peers below this score
-		PublishThreshold:            -1000,  // no self-published msgs are sent to peers below this score
-		GraylistThreshold:           -10000, // used to trigger disconnections + ignore peer if below this score
-		OpportunisticGraftThreshold: 0,      // grafts better peers if the mesh median score drops below this. unset.
+		GossipThreshold:             -100,                 // no gossip is sent to peers below this score
+		PublishThreshold:            PeerPublishThreshold, // no self-published msgs are sent to peers below this score
+		GraylistThreshold:           -10000,               // used to trigger disconnections + ignore peer if below this score
+		OpportunisticGraftThreshold: 0,                    // grafts better peers if the mesh median score drops below this. unset.
 	}
 }
 
@@ -72,11 +74,11 @@ func (w *WakuRelay) defaultPubsubOptions() []pubsub.Option {
 	cfg.PruneBackoff = time.Minute
 	cfg.UnsubscribeBackoff = 5 * time.Second
 	cfg.GossipFactor = 0.25
-	cfg.D = waku_proto.GossipSubOptimalFullMeshSize
+	cfg.D = waku_proto.GossipSubDMin
 	cfg.Dlo = 4
 	cfg.Dhi = 8
 	cfg.Dout = 3
-	cfg.Dlazy = waku_proto.GossipSubOptimalFullMeshSize
+	cfg.Dlazy = waku_proto.GossipSubDMin
 	cfg.HeartbeatInterval = time.Second
 	cfg.HistoryLength = 6
 	cfg.HistoryGossip = 3

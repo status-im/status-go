@@ -29,7 +29,7 @@ func NewSubscriptionMap(logger *zap.Logger) *SubscriptionsMap {
 }
 
 func (m *SubscriptionsMap) Count() int {
-        m.RLock()
+	m.RLock()
 	defer m.RUnlock()
 	return len(m.items)
 }
@@ -199,7 +199,7 @@ func iterateSubscriptionSet(logger *zap.Logger, subscriptions SubscriptionSet, e
 	}
 }
 
-func (m *SubscriptionsMap) GetSubscription(peerID peer.ID, contentFilter protocol.ContentFilter) []*SubscriptionDetails {
+func (m *SubscriptionsMap) GetSubscriptionsForPeer(peerID peer.ID, contentFilter protocol.ContentFilter) []*SubscriptionDetails {
 	m.RLock()
 	defer m.RUnlock()
 
@@ -216,4 +216,8 @@ func (m *SubscriptionsMap) GetSubscription(peerID peer.ID, contentFilter protoco
 		}
 	}
 	return output
+}
+
+func (m *SubscriptionsMap) GetAllSubscriptions() []*SubscriptionDetails {
+	return m.GetSubscriptionsForPeer("", protocol.ContentFilter{})
 }

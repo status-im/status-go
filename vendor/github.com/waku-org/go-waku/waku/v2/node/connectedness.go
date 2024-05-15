@@ -9,10 +9,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/waku-org/go-waku/logging"
-	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_filter"
-	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"go.uber.org/zap"
 
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
@@ -20,14 +16,6 @@ import (
 
 // PeerStatis is a map of peer IDs to supported protocols
 type PeerStats map[peer.ID][]protocol.ID
-
-// ConnStatus is used to indicate if the node is online, has access to history
-// and also see the list of peers the node is aware of
-type ConnStatus struct {
-	IsOnline   bool
-	HasHistory bool
-	Peers      PeerStats
-}
 
 type PeerConnection struct {
 	PeerID    peer.ID
@@ -112,15 +100,6 @@ func (c ConnectionNotifier) ClosedStream(n network.Network, s network.Stream) {
 func (c ConnectionNotifier) Close() {
 }
 
-func (w *WakuNode) sendConnStatus() {
-	isOnline, hasHistory := w.Status()
-	if w.connStatusChan != nil {
-		connStatus := ConnStatus{IsOnline: isOnline, HasHistory: hasHistory, Peers: w.PeerStats()}
-		w.connStatusChan <- connStatus
-	}
-
-}
-
 func (w *WakuNode) connectednessListener(ctx context.Context) {
 	defer w.wg.Done()
 
@@ -128,53 +107,7 @@ func (w *WakuNode) connectednessListener(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-w.protocolEventSub.Out():
-		case <-w.identificationEventSub.Out():
 		case <-w.connectionNotif.DisconnectChan:
 		}
-		w.sendConnStatus()
 	}
-}
-
-// Status returns the current status of the node (online or not)
-// and if the node has access to history nodes or not
-func (w *WakuNode) Status() (isOnline bool, hasHistory bool) {
-	hasRelay := false
-	hasLightPush := false
-	hasStore := false
-	hasFilter := false
-
-	for _, peer := range w.host.Network().Peers() {
-		protocols, err := w.host.Peerstore().GetProtocols(peer)
-		if err != nil {
-			w.log.Warn("reading peer protocols", logging.HostID("peer", peer), zap.Error(err))
-		}
-
-		for _, protocol := range protocols {
-			if !hasRelay && protocol == relay.WakuRelayID_v200 {
-				hasRelay = true
-			}
-			if !hasLightPush && protocol == lightpush.LightPushID_v20beta1 {
-				hasLightPush = true
-			}
-			if !hasStore && protocol == store.StoreID_v20beta4 {
-				hasStore = true
-			}
-			if !hasFilter && protocol == legacy_filter.FilterID_v20beta1 {
-				hasFilter = true
-			}
-		}
-	}
-
-	if hasStore {
-		hasHistory = true
-	}
-
-	if w.opts.enableFilterLightNode && !w.opts.enableRelay {
-		isOnline = hasLightPush && hasFilter
-	} else {
-		isOnline = hasRelay || hasLightPush && (hasStore || hasFilter)
-	}
-
-	return
 }

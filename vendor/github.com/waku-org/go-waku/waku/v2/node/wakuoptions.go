@@ -12,12 +12,12 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p"
+	mplex "github.com/libp2p/go-libp2p-mplex"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	basichost "github.com/libp2p/go-libp2p/p2p/host/basic"
-	"github.com/libp2p/go-libp2p/p2p/muxer/mplex"
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
@@ -26,10 +26,10 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
-	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_filter"
+	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/rendezvous"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
@@ -37,23 +37,26 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// Default userAgent
-const userAgent string = "go-waku"
+// Default UserAgent
+const UserAgent string = "go-waku"
 
 // Default minRelayPeersToPublish
 const defaultMinRelayPeersToPublish = 0
 
+const DefaultMaxConnectionsPerIP = 5
+
 type WakuNodeParameters struct {
-	hostAddr       *net.TCPAddr
-	clusterID      uint16
-	dns4Domain     string
-	advertiseAddrs []multiaddr.Multiaddr
-	multiAddr      []multiaddr.Multiaddr
-	addressFactory basichost.AddrsFactory
-	privKey        *ecdsa.PrivateKey
-	libP2POpts     []libp2p.Option
-	peerstore      peerstore.Peerstore
-	prometheusReg  prometheus.Registerer
+	hostAddr            *net.TCPAddr
+	maxConnectionsPerIP int
+	clusterID           uint16
+	dns4Domain          string
+	advertiseAddrs      []multiaddr.Multiaddr
+	multiAddr           []multiaddr.Multiaddr
+	addressFactory      basichost.AddrsFactory
+	privKey             *ecdsa.PrivateKey
+	libP2POpts          []libp2p.Option
+	peerstore           peerstore.Peerstore
+	prometheusReg       prometheus.Registerer
 
 	circuitRelayMinInterval time.Duration
 	circuitRelayBootDelay   time.Duration
@@ -70,20 +73,17 @@ type WakuNodeParameters struct {
 	logger   *zap.Logger
 	logLevel logging.LogLevel
 
-	enableRelay            bool
-	enableLegacyFilter     bool
-	isLegacyFilterFullNode bool
-	enableFilterLightNode  bool
-	enableFilterFullNode   bool
-	legacyFilterOpts       []legacy_filter.Option
-	filterOpts             []filter.Option
-	pubsubOpts             []pubsub.Option
+	enableRelay           bool
+	enableFilterLightNode bool
+	enableFilterFullNode  bool
+	filterOpts            []filter.Option
+	pubsubOpts            []pubsub.Option
 
 	minRelayPeersToPublish int
 	maxMsgSizeBytes        int
 
 	enableStore     bool
-	messageProvider store.MessageProvider
+	messageProvider legacy_store.MessageProvider
 
 	enableRendezvousPoint bool
 	rendezvousDB          *rendezvous.DB
@@ -112,8 +112,8 @@ type WakuNodeParameters struct {
 
 	enableLightPush bool
 
-	connStatusC chan<- ConnStatus
-	connNotifCh chan<- PeerConnection
+	connNotifCh        chan<- PeerConnection
+	topicHealthNotifCh chan<- peermanager.TopicHealthStatus
 
 	storeFactory storeFactory
 }
@@ -124,6 +124,7 @@ type WakuNodeOption func(*WakuNodeParameters) error
 var DefaultWakuNodeOptions = []WakuNodeOption{
 	WithPrometheusRegisterer(prometheus.NewRegistry()),
 	WithMaxPeerConnections(50),
+	WithMaxConnectionsPerIP(DefaultMaxConnectionsPerIP),
 	WithCircuitRelayParams(2*time.Second, 3*time.Minute),
 }
 
@@ -151,6 +152,7 @@ func (w WakuNodeParameters) AddressFactory() basichost.AddrsFactory {
 func WithLogger(l *zap.Logger) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.logger = l
+		logging.SetAllLoggers(logging.LogLevel(l.Level()))
 		logging.SetPrimaryCore(l.Core())
 		return nil
 	}
@@ -304,6 +306,14 @@ func WithClusterID(clusterID uint16) WakuNodeOption {
 	}
 }
 
+// WithMaxConnectionsPerIP sets the max number of allowed peers from the same IP
+func WithMaxConnectionsPerIP(limit int) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.maxConnectionsPerIP = limit
+		return nil
+	}
+}
+
 // WithNTP is used to use ntp for any operation that requires obtaining time
 // A list of ntp servers can be passed but if none is specified, some defaults
 // will be used
@@ -399,17 +409,6 @@ func WithPeerExchange() WakuNodeOption {
 	}
 }
 
-// WithLegacyWakuFilter enables the legacy Waku Filter protocol. This WakuNodeOption
-// accepts a list of WakuFilter gossipsub options to setup the protocol
-func WithLegacyWakuFilter(fullnode bool, filterOpts ...legacy_filter.Option) WakuNodeOption {
-	return func(params *WakuNodeParameters) error {
-		params.enableLegacyFilter = true
-		params.isLegacyFilterFullNode = fullnode
-		params.legacyFilterOpts = filterOpts
-		return nil
-	}
-}
-
 // WithWakuFilter enables the Waku Filter V2 protocol for lightnode functionality
 func WithWakuFilterLightNode() WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
@@ -449,7 +448,7 @@ func WithWakuStoreFactory(factory storeFactory) WakuNodeOption {
 
 // WithMessageProvider is a WakuNodeOption that sets the MessageProvider
 // used to store and retrieve persisted messages
-func WithMessageProvider(s store.MessageProvider) WakuNodeOption {
+func WithMessageProvider(s legacy_store.MessageProvider) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		if s == nil {
 			return errors.New("message provider can't be nil")
@@ -472,16 +471,6 @@ func WithLightPush() WakuNodeOption {
 func WithKeepAlive(t time.Duration) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.keepAliveInterval = t
-		return nil
-	}
-}
-
-// WithConnectionStatusChannel is a WakuNodeOption used to set a channel where the
-// connection status changes will be pushed to. It's useful to identify when peer
-// connections and disconnections occur
-func WithConnectionStatusChannel(connStatus chan ConnStatus) WakuNodeOption {
-	return func(params *WakuNodeParameters) error {
-		params.connStatusC = connStatus
 		return nil
 	}
 }
@@ -553,6 +542,13 @@ func WithCircuitRelayParams(minInterval time.Duration, bootDelay time.Duration) 
 	}
 }
 
+func WithTopicHealthStatusChannel(ch chan<- peermanager.TopicHealthStatus) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.topicHealthNotifCh = ch
+		return nil
+	}
+}
+
 // Default options used in the libp2p node
 var DefaultLibP2POptions = []libp2p.Option{
 	libp2p.ChainOptions(
@@ -560,7 +556,7 @@ var DefaultLibP2POptions = []libp2p.Option{
 		libp2p.Transport(quic.NewTransport),
 		libp2p.Transport(libp2pwebtransport.New),
 	),
-	libp2p.UserAgent(userAgent),
+	libp2p.UserAgent(UserAgent),
 	libp2p.ChainOptions(
 		libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
 		libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport),
