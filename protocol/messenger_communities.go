@@ -3173,7 +3173,7 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 
 	removedChatIDs := make([]string, 0)
 	for id := range communityResponse.Changes.ChatsRemoved {
-		chatID := community.IDString() + id
+		chatID := community.ChatID(id)
 		_, ok := state.AllChats.Load(chatID)
 		if ok {
 			removedChatIDs = append(removedChatIDs, chatID)
@@ -3181,6 +3181,24 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 			err := m.DeleteChat(chatID)
 			if err != nil {
 				m.logger.Error("couldn't delete chat", zap.Error(err))
+			}
+		}
+	}
+
+	// Check if we have been removed from a chat (ie no longer have access)
+	for channelID, changes := range communityResponse.Changes.ChatsModified {
+		if _, ok := changes.MembersRemoved[common.PubkeyToHex(&m.identity.PublicKey)]; ok {
+			chatID := community.ChatID(channelID)
+
+			if chat, ok := state.AllChats.Load(chatID); ok {
+				// Reset the chat's message counts
+				chat.UnviewedMessagesCount = 0
+				chat.UnviewedMentionsCount = 0
+				err := m.saveChat(chat)
+				if err != nil {
+					return err
+				}
+				state.Response.AddChat(chat)
 			}
 		}
 	}

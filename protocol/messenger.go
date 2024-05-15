@@ -1758,9 +1758,8 @@ func (m *Messenger) Init() error {
 			continue
 		}
 
-		m.allChats.Store(chat.ID, chat)
-
 		if !chat.Active || chat.Timeline() {
+			m.allChats.Store(chat.ID, chat)
 			continue
 		}
 
@@ -1784,6 +1783,17 @@ func (m *Messenger) Init() error {
 				communityInfo[chat.CommunityID] = community
 			}
 
+			if chat.UnviewedMessagesCount > 0 || chat.UnviewedMentionsCount > 0 {
+				// Make sure the unread count is 0 for the channels the user cannot view
+				// It's possible that the users received messages to a channel before permissions were added
+				canView := community.CanView(&m.identity.PublicKey, chat.CommunityChatID())
+
+				if !canView {
+					chat.UnviewedMessagesCount = 0
+					chat.UnviewedMentionsCount = 0
+				}
+			}
+
 			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: community.PubsubTopic()})
 		case ChatTypeOneToOne:
 			pk, err := chat.PublicKey()
@@ -1802,6 +1812,8 @@ func (m *Messenger) Init() error {
 		default:
 			return errors.New("invalid chat type")
 		}
+
+		m.allChats.Store(chat.ID, chat)
 	}
 
 	// Timeline and profile chats are deprecated.
