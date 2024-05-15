@@ -47,16 +47,14 @@ const (
 var (
 	// This will work only for binance testnet as mainnet doesn't support
 	// archival request.
-	binanceChainErc20BatchSize   = big.NewInt(5000)
-	goerliErc20BatchSize         = big.NewInt(100000)
-	goerliErc20ArbitrumBatchSize = big.NewInt(10000)
-	goerliErc20OptimismBatchSize = big.NewInt(10000)
-	erc20BatchSize               = big.NewInt(500000)
-	binancChainID                = uint64(56)
-	goerliChainID                = uint64(5)
-	goerliArbitrumChainID        = uint64(421613)
-	goerliOptimismChainID        = uint64(420)
-	binanceTestChainID           = uint64(97)
+	binanceChainErc20BatchSize    = big.NewInt(5000)
+	goerliErc20BatchSize          = big.NewInt(100000)
+	goerliErc20ArbitrumBatchSize  = big.NewInt(10000)
+	goerliErc20OptimismBatchSize  = big.NewInt(10000)
+	sepoliaErc20BatchSize         = big.NewInt(100000)
+	sepoliaErc20ArbitrumBatchSize = big.NewInt(10000)
+	sepoliaErc20OptimismBatchSize = big.NewInt(10000)
+	erc20BatchSize                = big.NewInt(100000)
 
 	transfersRetryInterval = 5 * time.Second
 )
@@ -134,23 +132,26 @@ func (c *erc20HistoricalCommand) Command() async.Command {
 }
 
 func getErc20BatchSize(chainID uint64) *big.Int {
-	if isBinanceChain(chainID) {
-		return binanceChainErc20BatchSize
-	}
-
-	if chainID == goerliChainID {
+	switch chainID {
+	case w_common.EthereumSepolia:
+		return sepoliaErc20BatchSize
+	case w_common.OptimismSepolia:
+		return sepoliaErc20OptimismBatchSize
+	case w_common.ArbitrumSepolia:
+		return sepoliaErc20ArbitrumBatchSize
+	case w_common.EthereumGoerli:
 		return goerliErc20BatchSize
-	}
-
-	if chainID == goerliOptimismChainID {
+	case w_common.OptimismGoerli:
 		return goerliErc20OptimismBatchSize
-	}
-
-	if chainID == goerliArbitrumChainID {
+	case w_common.ArbitrumGoerli:
 		return goerliErc20ArbitrumBatchSize
+	case w_common.BinanceChainID:
+		return binanceChainErc20BatchSize
+	case w_common.BinanceTestChainID:
+		return binanceChainErc20BatchSize
+	default:
+		return erc20BatchSize
 	}
-
-	return erc20BatchSize
 }
 
 func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
@@ -606,10 +607,6 @@ func loadTransfers(ctx context.Context, blockDAO *BlockDAO, db *Database,
 		log.Debug("loadTransfers finished for account", "in", time.Since(start), "chain", chainClient.NetworkID())
 	}
 	return nil
-}
-
-func isBinanceChain(chainID uint64) bool {
-	return chainID == binancChainID || chainID == binanceTestChainID
 }
 
 // Ensure 1 DBHeader per Block Hash

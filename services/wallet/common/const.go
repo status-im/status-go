@@ -14,16 +14,18 @@ const (
 type ChainID uint64
 
 const (
-	UnknownChainID  uint64 = 0
-	EthereumMainnet uint64 = 1
-	EthereumGoerli  uint64 = 5
-	EthereumSepolia uint64 = 11155111
-	OptimismMainnet uint64 = 10
-	OptimismGoerli  uint64 = 420
-	OptimismSepolia uint64 = 11155420
-	ArbitrumMainnet uint64 = 42161
-	ArbitrumGoerli  uint64 = 421613
-	ArbitrumSepolia uint64 = 421614
+	UnknownChainID     uint64 = 0
+	EthereumMainnet    uint64 = 1
+	EthereumGoerli     uint64 = 5
+	EthereumSepolia    uint64 = 11155111
+	OptimismMainnet    uint64 = 10
+	OptimismGoerli     uint64 = 420
+	OptimismSepolia    uint64 = 11155420
+	ArbitrumMainnet    uint64 = 42161
+	ArbitrumGoerli     uint64 = 421613
+	ArbitrumSepolia    uint64 = 421614
+	BinanceChainID     uint64 = 56 // obsolete?
+	BinanceTestChainID uint64 = 97 // obsolete?
 )
 
 type ContractType byte
