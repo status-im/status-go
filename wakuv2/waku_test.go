@@ -42,7 +42,7 @@ func TestDiscoveryV5(t *testing.T) {
 	config.EnableDiscV5 = true
 	config.DiscV5BootstrapNodes = []string{testENRBootstrap}
 	config.DiscoveryLimit = 20
-	w, err := New("", "", config, nil, nil, nil, nil, nil)
+	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, w.Start())
@@ -67,7 +67,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	config.DiscV5BootstrapNodes = []string{"enrtree://AOGECG2SPND25EEFMAJ5WF3KSGJNSGV356DSTL2YVLLZWIV6SAYBM@1.1.1.2"}
 	config.DiscoveryLimit = 20
 	config.UDPPort = 9002
-	w, err := New("", "", config, nil, nil, nil, nil, nil)
+	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, w.Start())
@@ -120,7 +120,7 @@ func TestBasicWakuV2(t *testing.T) {
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
 	config.WakuNodes = []string{enrTreeAddress}
-	w, err := New("", "", config, nil, nil, nil, nil, nil)
+	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 
@@ -229,7 +229,7 @@ func TestPeerExchange(t *testing.T) {
 	config.EnableDiscV5 = true
 	config.EnablePeerExchangeServer = true
 	config.EnablePeerExchangeClient = false
-	pxServerNode, err := New("", "", config, logger.Named("pxServerNode"), nil, nil, nil, nil)
+	pxServerNode, err := New(nil, "", config, logger.Named("pxServerNode"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, pxServerNode.Start())
 
@@ -241,7 +241,7 @@ func TestPeerExchange(t *testing.T) {
 	config.EnablePeerExchangeServer = false
 	config.EnablePeerExchangeClient = false
 	config.DiscV5BootstrapNodes = []string{pxServerNode.node.ENR().String()}
-	discV5Node, err := New("", "", config, logger.Named("discV5Node"), nil, nil, nil, nil)
+	discV5Node, err := New(nil, "", config, logger.Named("discV5Node"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, discV5Node.Start())
 
@@ -259,7 +259,7 @@ func TestPeerExchange(t *testing.T) {
 	config.Resolver = resolver
 
 	config.WakuNodes = []string{url}
-	lightNode, err := New("", "", config, logger.Named("lightNode"), nil, nil, nil, nil)
+	lightNode, err := New(nil, "", config, logger.Named("lightNode"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, lightNode.Start())
 
@@ -301,7 +301,7 @@ func TestWakuV2Filter(t *testing.T) {
 	config.DiscoveryLimit = 20
 	config.WakuNodes = []string{enrTreeAddress}
 	fleet := "status.test" // Need a name fleet so that LightClient is not set to false
-	w, err := New("", fleet, config, nil, nil, nil, nil, nil)
+	w, err := New(nil, fleet, config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 
@@ -390,7 +390,7 @@ func TestWakuV2Store(t *testing.T) {
 	w1PeersCh := make(chan []string, 100) // buffered not to block on the send side
 
 	// Start the first Waku node
-	w1, err := New("", "", config1, nil, nil, nil, nil, func(cs types.ConnStatus) {
+	w1, err := New(nil, "", config1, nil, nil, nil, nil, func(cs types.ConnStatus) {
 		w1PeersCh <- maps.Keys(cs.Peers)
 	})
 	require.NoError(t, err)
@@ -414,7 +414,7 @@ func TestWakuV2Store(t *testing.T) {
 	}
 
 	// Start the second Waku node
-	w2, err := New("", "", config2, nil, sql2, nil, nil, nil)
+	w2, err := New(nil, "", config2, nil, sql2, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w2.Start())
 	w2EnvelopeCh := make(chan common.EnvelopeEvent, 100)

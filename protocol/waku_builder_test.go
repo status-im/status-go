@@ -44,7 +44,7 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 	}
 
 	wakuNode, err := waku2.New(
-		"",
+		nil,
 		"",
 		wakuConfig,
 		cfg.logger,

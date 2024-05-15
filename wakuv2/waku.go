@@ -166,7 +166,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.ID, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.ID, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -216,16 +216,12 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
 	waku.bandwidthCounter = metrics.NewBandwidthCounter()
 
-	var privateKey *ecdsa.PrivateKey
-	if nodeKey != "" {
-		privateKey, err = crypto.HexToECDSA(nodeKey)
-	} else {
-		// If no nodekey is provided, create an ephemeral key
-		privateKey, err = crypto.GenerateKey()
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to setup the go-waku private key: %v", err)
+	if nodeKey == nil {
+		// No nodekey is provided, create an ephemeral key
+		nodeKey, err = crypto.GenerateKey()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate a random go-waku private key: %v", err)
+		}
 	}
 
 	hostAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprint(cfg.Host, ":", cfg.Port))
@@ -243,7 +239,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 
 	opts := []node.WakuNodeOption{
 		node.WithLibP2POptions(libp2pOpts...),
-		node.WithPrivateKey(privateKey),
+		node.WithPrivateKey(nodeKey),
 		node.WithHostAddress(hostAddr),
 		node.WithTopicHealthStatusChannel(waku.topicHealthStatusChan),
 		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
