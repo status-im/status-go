@@ -279,8 +279,11 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 		}
 
 		allChats = append(allChats, response.Chats()...)
-		if len(response.Contacts) == 1 {
-			actualContact = response.Contacts[0]
+		for _, c := range response.Contacts {
+			if c.LocalNickname == contact.LocalNickname {
+				actualContact = c
+				break
+			}
 		}
 		bookmarks = append(bookmarks, response.GetBookmarks()...)
 

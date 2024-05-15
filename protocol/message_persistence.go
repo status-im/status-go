@@ -951,19 +951,19 @@ func (db sqlitePersistence) LatestPendingContactRequestIDForContact(contactID st
 	return id, nil
 }
 
-func (db sqlitePersistence) LatestContactRequestIDs() (map[string]common.ContactRequestState, error) {
-	res := map[string]common.ContactRequestState{}
+func (db sqlitePersistence) LatestContactRequests() ([]LatestContactRequest, error) {
+	res := make([]LatestContactRequest, 0)
 	rows, err := db.db.Query(
 		fmt.Sprintf(
 			`
 			SELECT
-                                id, contact_request_state
+                                id, contact_request_state, local_chat_id
 			FROM
 				user_messages m1
 			WHERE
 				m1.content_type = ?
 			ORDER BY %s DESC
-			LIMIT 20
+			LIMIT 200
 		`, cursor), protobuf.ChatMessage_CONTACT_REQUEST)
 
 	if err != nil {
@@ -975,12 +975,17 @@ func (db sqlitePersistence) LatestContactRequestIDs() (map[string]common.Contact
 	for rows.Next() {
 		var id string
 		var contactRequestState sql.NullInt64
-		err := rows.Scan(&id, &contactRequestState)
+		var localChatID string
+		err := rows.Scan(&id, &contactRequestState, &localChatID)
 
 		if err != nil {
 			return nil, err
 		}
-		res[id] = common.ContactRequestState(contactRequestState.Int64)
+		res = append(res, LatestContactRequest{
+			MessageID:           id,
+			ContactRequestState: common.ContactRequestState(contactRequestState.Int64),
+			ContactID:           localChatID,
+		})
 	}
 
 	return res, nil
