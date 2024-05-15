@@ -748,6 +748,43 @@ func (s *CommunitySuite) TestChannelTokenPermissionsByType() {
 	s.Require().Equal(result[0].ChatIds, viewAndPostPermissions[0].ChatIds)
 }
 
+func (s *CommunitySuite) TestChannelEncrypted() {
+	org := s.buildCommunity(&s.identity.PublicKey)
+	someChannelID := "some-channel-id"
+	someChatID := org.ChatID(someChannelID)
+
+	s.Require().False(org.ChannelEncrypted(someChannelID))
+
+	_, err := org.UpsertTokenPermission(&protobuf.CommunityTokenPermission{
+		Id:            "A",
+		Type:          protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
+		TokenCriteria: []*protobuf.TokenCriteria{},
+		ChatIds:       []string{someChatID},
+	})
+	s.Require().NoError(err)
+	s.Require().True(org.channelEncrypted(someChannelID))
+
+	_, err = org.UpsertTokenPermission(&protobuf.CommunityTokenPermission{
+		Id:            "B",
+		Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+		TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
+		ChatIds:       []string{someChatID},
+	})
+	s.Require().NoError(err)
+	s.Require().True(org.channelEncrypted(someChannelID))
+
+	// Channels with `view` permission without token requirements shouldn't be encrypted.
+	// See: https://github.com/status-im/status-desktop/issues/14748
+	_, err = org.UpsertTokenPermission(&protobuf.CommunityTokenPermission{
+		Id:            "C",
+		Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+		TokenCriteria: []*protobuf.TokenCriteria{},
+		ChatIds:       []string{someChatID},
+	})
+	s.Require().NoError(err)
+	s.Require().False(org.channelEncrypted(someChannelID))
+}
+
 func (s *CommunitySuite) emptyCommunityDescription() *protobuf.CommunityDescription {
 	return &protobuf.CommunityDescription{
 		Permissions: &protobuf.CommunityPermissions{},

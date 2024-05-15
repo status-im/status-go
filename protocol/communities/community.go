@@ -1736,27 +1736,32 @@ func (o *Community) HasTokenPermissions() bool {
 }
 
 func (o *Community) channelEncrypted(channelID string) bool {
-	return o.channelHasTokenPermissions(o.ChatID(channelID))
-}
+	chatID := o.ChatID(channelID)
 
-func (o *Community) ChannelEncrypted(channelID string) bool {
-	return o.ChannelHasTokenPermissions(o.ChatID(channelID))
-}
+	hasPermission := false
+	viewableByEveryone := false
 
-func (o *Community) channelHasTokenPermissions(chatID string) bool {
-	for _, tokenPermission := range o.tokenPermissions() {
-		if includes(tokenPermission.ChatIds, chatID) {
-			return true
+	for _, p := range o.tokenPermissions() {
+		if !includes(p.ChatIds, chatID) {
+			continue
+		}
+
+		hasPermission = true
+
+		if p.Type == protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL &&
+			len(p.TokenCriteria) == 0 {
+			viewableByEveryone = true
+			break
 		}
 	}
 
-	return false
+	return hasPermission && !viewableByEveryone
 }
 
-func (o *Community) ChannelHasTokenPermissions(chatID string) bool {
+func (o *Community) ChannelEncrypted(channelID string) bool {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
-	return o.channelHasTokenPermissions(chatID)
+	return o.channelEncrypted(channelID)
 }
 
 func TokenPermissionsByType(permissions map[string]*CommunityTokenPermission, permissionType protobuf.CommunityTokenPermission_Type) []*CommunityTokenPermission {
