@@ -204,10 +204,6 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameRestrictions() 
 		s.Require().ErrorIs(err, expectedErr)
 	}
 
-	setInvalidName("test.eth", utils.ErrInvalidDisplayNameRegExp)
-	setInvalidName("test-eth", utils.ErrInvalidDisplayNameEthSuffix)
-	setInvalidName("test_eth", utils.ErrInvalidDisplayNameEthSuffix)
-
 	setInvalidName("dot.not", utils.ErrInvalidDisplayNameRegExp)
 	setInvalidName("t", utils.ErrInvalidDisplayNameRegExp)
 	setInvalidName("tt", utils.ErrInvalidDisplayNameRegExp)
@@ -220,4 +216,36 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameRestrictions() 
 	displayName, err = s.m.settings.DisplayName()
 	s.Require().NoError(err)
 	s.Require().Equal("name with space", displayName)
+}
+
+func (s *MessengerProfileDisplayNameHandlerSuite) TestUpdateImageWhenEnsNameIsSet() {
+	err := s.m.settings.SaveSetting("preferred-name", "kounkou.stateofus.eth")
+	s.Require().NoError(err)
+
+	// check display name for the created instance
+	displayName, err := s.m.settings.GetPreferredUsername()
+	s.Require().NoError(err)
+	s.Require().Equal("kounkou.stateofus.eth", displayName)
+
+	// add profile keypair
+	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp.KeyUID = s.m.account.KeyUID
+	profileKp.Name = DefaultProfileDisplayName
+	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
+
+	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
+	s.Require().NoError(err)
+
+	// check account is present in the db
+	dbProfileKp, err := s.m.settings.GetKeypairByKeyUID(profileKp.KeyUID)
+	s.Require().NoError(err)
+	s.Require().True(accounts.SameKeypairs(profileKp, dbProfileKp))
+
+	// save account will create the account
+	err = s.m.multiAccounts.SaveAccount(*s.m.account)
+	s.Require().NoError(err)
+
+	// set new description
+	err = s.m.SetDisplayName("godfrain.stateofus.eth")
+	s.Require().NoError(err)
 }

@@ -15,6 +15,8 @@ var ErrInvalidDisplayNameRegExp = errors.New("only letters, numbers, underscores
 var ErrInvalidDisplayNameEthSuffix = errors.New(`usernames ending with "eth" are not allowed`)
 var ErrInvalidDisplayNameNotAllowed = errors.New("name is not allowed")
 
+var DISPLAY_NAME_EXT = []string{"_eth", ".eth", "-eth"}
+
 func RecoverKey(m *protobuf.ApplicationMetadataMessage) (*ecdsa.PublicKey, error) {
 	if m.Signature == nil {
 		return nil, nil
@@ -45,8 +47,10 @@ func ValidateDisplayName(displayName *string) error {
 	}
 
 	// .eth should not happen due to the regexp above, but let's keep it here in case the regexp is changed in the future
-	if strings.HasSuffix(name, "_eth") || strings.HasSuffix(name, ".eth") || strings.HasSuffix(name, "-eth") {
-		return ErrInvalidDisplayNameEthSuffix
+	for _, ext := range DISPLAY_NAME_EXT {
+		if strings.HasSuffix(*displayName, ext) {
+			return ErrInvalidDisplayNameEthSuffix
+		}
 	}
 
 	if alias.IsAlias(name) {
@@ -54,4 +58,17 @@ func ValidateDisplayName(displayName *string) error {
 	}
 
 	return nil
+}
+
+// implementation referenced from https://github.com/embarklabs/embark/blob/master/packages/plugins/ens/src/index.js
+func IsENSName(displayName string) bool {
+	if len(displayName) == 0 {
+		return false
+	}
+
+	if strings.HasSuffix(displayName, ".eth") {
+		return true
+	}
+
+	return false
 }
