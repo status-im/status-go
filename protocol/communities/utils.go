@@ -38,7 +38,7 @@ func ExtractTokenCriteria(permissions []*CommunityTokenPermission) (erc20TokenCr
 				if isERC20 && !existsERC20 {
 					erc20TokenCriteria[chainID] = make(map[string]*protobuf.TokenCriteria)
 				}
-
+				// TODO: check if we do not duplicate this due to ToLower case
 				_, existsERC721 = erc721TokenCriteria[chainID][contractAddress]
 				if isERC721 && !existsERC721 {
 					erc721TokenCriteria[chainID][strings.ToLower(contractAddress)] = tokenRequirement

@@ -3619,7 +3619,8 @@ func (t *testPermissionChecker) CheckPermissionToJoin(*communities.Community, []
 	return &communities.CheckPermissionsResponse{Satisfied: true}, nil
 
 }
-func (t *testPermissionChecker) CheckPermissions(permissions []*communities.CommunityTokenPermission, accountsAndChainIDs []*communities.AccountChainIDsCombination, shortcircuit bool) (*communities.CheckPermissionsResponse, error) {
+
+func (t *testPermissionChecker) CheckPermissions(permissionsParsedData *communities.PreParsedCommunityPermissionsData, accountsAndChainIDs []*communities.AccountChainIDsCombination, shortcircuit bool) (*communities.CheckPermissionsResponse, error) {
 	return &communities.CheckPermissionsResponse{Satisfied: true}, nil
 }
 

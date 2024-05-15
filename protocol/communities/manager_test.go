@@ -210,6 +210,8 @@ func (s *ManagerSuite) TestRetrieveTokens() {
 		},
 	}
 
+	preParsedPermissions := preParsedCommunityPermissionsData(permissions)
+
 	accountChainIDsCombination := []*AccountChainIDsCombination{
 		&AccountChainIDsCombination{
 			Address:  gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32"),
@@ -218,14 +220,14 @@ func (s *ManagerSuite) TestRetrieveTokens() {
 	}
 	// Set response to exactly the right one
 	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), int64(1*math.Pow(10, float64(decimals))))
-	resp, err := m.PermissionChecker.CheckPermissions(permissions, accountChainIDsCombination, false)
+	resp, err := m.PermissionChecker.CheckPermissions(preParsedPermissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().True(resp.Satisfied)
 
 	// Set response to 0
 	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), 0)
-	resp, err = m.PermissionChecker.CheckPermissions(permissions, accountChainIDsCombination, false)
+	resp, err = m.PermissionChecker.CheckPermissions(preParsedPermissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().False(resp.Satisfied)
@@ -259,6 +261,8 @@ func (s *ManagerSuite) TestRetrieveCollectibles() {
 		},
 	}
 
+	preParsedPermissions := preParsedCommunityPermissionsData(permissions)
+
 	accountChainIDsCombination := []*AccountChainIDsCombination{
 		&AccountChainIDsCombination{
 			Address:  gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32"),
@@ -269,7 +273,7 @@ func (s *ManagerSuite) TestRetrieveCollectibles() {
 	// Set response to exactly the right one
 	tokenBalances = []thirdparty.TokenBalance{tokenBalance(tokenID, 1)}
 	cm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), tokenBalances)
-	resp, err := m.PermissionChecker.CheckPermissions(permissions, accountChainIDsCombination, false)
+	resp, err := m.PermissionChecker.CheckPermissions(preParsedPermissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().True(resp.Satisfied)
@@ -277,7 +281,7 @@ func (s *ManagerSuite) TestRetrieveCollectibles() {
 	// Set balances to 0
 	tokenBalances = []thirdparty.TokenBalance{}
 	cm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), tokenBalances)
-	resp, err = m.PermissionChecker.CheckPermissions(permissions, accountChainIDsCombination, false)
+	resp, err = m.PermissionChecker.CheckPermissions(preParsedPermissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().False(resp.Satisfied)
@@ -932,9 +936,11 @@ func (s *ManagerSuite) TestCheckChannelPermissions_NoPermissions() {
 
 	var viewOnlyPermissions = make([]*CommunityTokenPermission, 0)
 	var viewAndPostPermissions = make([]*CommunityTokenPermission, 0)
+	viewOnlyPreParsedPermissions := preParsedCommunityPermissionsData(viewOnlyPermissions)
+	viewAndPostPreParsedPermissions := preParsedCommunityPermissionsData(viewAndPostPermissions)
 
 	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), 0)
-	resp, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountChainIDsCombination, false)
+	resp, err := m.checkChannelPermissions(viewOnlyPreParsedPermissions, viewAndPostPreParsedPermissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
@@ -984,8 +990,11 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewOnlyPermissions() {
 
 	var viewAndPostPermissions = make([]*CommunityTokenPermission, 0)
 
+	viewOnlyPreParsedPermissions := preParsedCommunityPermissionsData(viewOnlyPermissions)
+	viewAndPostPreParsedPermissions := preParsedCommunityPermissionsData(viewAndPostPermissions)
+
 	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), 0)
-	resp, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountChainIDsCombination, false)
+	resp, err := m.checkChannelPermissions(viewOnlyPreParsedPermissions, viewAndPostPreParsedPermissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
@@ -996,7 +1005,7 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewOnlyPermissions() {
 
 	// Set response to exactly the right one
 	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), int64(1*math.Pow(10, float64(decimals))))
-	resp, err = m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountChainIDsCombination, false)
+	resp, err = m.checkChannelPermissions(viewOnlyPreParsedPermissions, viewAndPostPreParsedPermissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
@@ -1044,8 +1053,11 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissions() {
 
 	var viewOnlyPermissions = make([]*CommunityTokenPermission, 0)
 
+	viewOnlyPreParsedPermissions := preParsedCommunityPermissionsData(viewOnlyPermissions)
+	viewAndPostPreParsedPermissions := preParsedCommunityPermissionsData(viewAndPostPermissions)
+
 	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), 0)
-	resp, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountChainIDsCombination, false)
+	resp, err := m.checkChannelPermissions(viewOnlyPreParsedPermissions, viewAndPostPreParsedPermissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
@@ -1056,7 +1068,7 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissions() {
 
 	// Set response to exactly the right one
 	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), int64(1*math.Pow(10, float64(decimals))))
-	resp, err = m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountChainIDsCombination, false)
+	resp, err = m.checkChannelPermissions(viewOnlyPreParsedPermissions, viewAndPostPreParsedPermissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
@@ -1134,7 +1146,10 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissionsCombina
 	// Set resopnse for viewAndPost permissions
 	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(testContractAddresses[chainID]), 0)
 
-	resp, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountChainIDsCombination, false)
+	viewOnlyPreParsedPermissions := preParsedCommunityPermissionsData(viewOnlyPermissions)
+	viewAndPostPreParsedPermissions := preParsedCommunityPermissionsData(viewAndPostPermissions)
+
+	resp, err := m.checkChannelPermissions(viewOnlyPreParsedPermissions, viewAndPostPreParsedPermissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
@@ -1213,7 +1228,10 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissionsCombina
 	// Set resopnse for viewAndPost permissions
 	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(testContractAddresses[chainID]), int64(1*math.Pow(10, float64(decimals))))
 
-	resp, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountChainIDsCombination, false)
+	viewOnlyPreParsedPermissions := preParsedCommunityPermissionsData(viewOnlyPermissions)
+	viewAndPostPreParsedPermissions := preParsedCommunityPermissionsData(viewAndPostPermissions)
+
+	resp, err := m.checkChannelPermissions(viewOnlyPreParsedPermissions, viewAndPostPreParsedPermissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
