@@ -18,7 +18,6 @@ var coinGeckoMapping = map[string]string{
 	"SNT":   "status",
 	"ETH":   "ethereum",
 	"AST":   "airswap",
-	"AMB":   "",
 	"ABT":   "arcblock",
 	"ATM":   "",
 	"BNB":   "binancecoin",
@@ -26,7 +25,6 @@ var coinGeckoMapping = map[string]string{
 	"CDT":   "",
 	"COMP":  "compound-coin",
 	"EDG":   "edgeless",
-	"ELF":   "",
 	"ENG":   "enigma",
 	"EOS":   "eos",
 	"GEN":   "daostack",
@@ -46,13 +44,11 @@ var coinGeckoMapping = map[string]string{
 	"GRT":   "the-graph",
 	"TNT":   "tierion",
 	"TRX":   "tron",
-	"TGT":   "",
 	"RARE":  "superrare",
 	"UNI":   "uniswap",
 	"USDC":  "usd-coin",
 	"USDP":  "paxos-standard",
 	"VRS":   "",
-	"TIME":  "",
 	"USDT":  "tether",
 	"SHIB":  "shiba-inu",
 	"LINK":  "chainlink",
@@ -80,20 +76,52 @@ type GeckoMarketValues struct {
 }
 
 type GeckoToken struct {
-	ID     string `json:"id"`
-	Symbol string `json:"symbol"`
-	Name   string `json:"name"`
+	ID          string `json:"id"`
+	Symbol      string `json:"symbol"`
+	Name        string `json:"name"`
+	EthPlatform bool
 }
 
 type Client struct {
 	client           *http.Client
-	tokens           map[string]GeckoToken
+	tokens           map[string][]GeckoToken
 	tokensURL        string
 	fetchTokensMutex sync.Mutex
 }
 
 func NewClient() *Client {
-	return &Client{client: &http.Client{Timeout: time.Minute}, tokens: make(map[string]GeckoToken), tokensURL: fmt.Sprintf("%scoins/list", baseURL)}
+	return &Client{client: &http.Client{Timeout: time.Minute}, tokens: make(map[string][]GeckoToken), tokensURL: fmt.Sprintf("%scoins/list?include_platform=true", baseURL)}
+}
+
+func (gt *GeckoToken) UnmarshalJSON(data []byte) error {
+	// Define an auxiliary struct to hold the JSON data
+	var aux struct {
+		ID        string `json:"id"`
+		Symbol    string `json:"symbol"`
+		Name      string `json:"name"`
+		Platforms struct {
+			Ethereum string `json:"ethereum"`
+			// Other platforms can be added here if needed
+		} `json:"platforms"`
+	}
+
+	// Unmarshal the JSON data into the auxiliary struct
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Set the fields of GeckoToken from the auxiliary struct
+	gt.ID = aux.ID
+	gt.Symbol = aux.Symbol
+	gt.Name = aux.Name
+
+	// Check if "ethereum" key exists in the platforms map
+	if aux.Platforms.Ethereum != "" {
+		gt.EthPlatform = true
+	} else {
+		gt.EthPlatform = false
+	}
+	return nil
 }
 
 func (c *Client) DoQuery(url string) (*http.Response, error) {
@@ -105,18 +133,40 @@ func (c *Client) DoQuery(url string) (*http.Response, error) {
 	return resp, nil
 }
 
-func mapTokensToSymbols(tokens []GeckoToken, tokenMap map[string]GeckoToken) {
+func mapTokensToSymbols(tokens []GeckoToken, tokenMap map[string][]GeckoToken) {
 	for _, token := range tokens {
-		if id, ok := coinGeckoMapping[strings.ToUpper(token.Symbol)]; ok {
+		symbol := strings.ToUpper(token.Symbol)
+		if id, ok := coinGeckoMapping[symbol]; ok {
 			if id != token.ID {
 				continue
 			}
 		}
-		tokenMap[strings.ToUpper(token.Symbol)] = token
+		tokenMap[symbol] = append(tokenMap[symbol], token)
 	}
 }
 
-func (c *Client) getTokens() (map[string]GeckoToken, error) {
+func getGeckoTokenFromSymbol(tokens map[string][]GeckoToken, symbol string) (GeckoToken, error) {
+	tokenList, ok := tokens[strings.ToUpper(symbol)]
+	if !ok {
+		return GeckoToken{}, fmt.Errorf("token not found for symbol %s", symbol)
+	}
+	for _, t := range tokenList {
+		if t.EthPlatform {
+			return t, nil
+		}
+	}
+	return tokenList[0], nil
+}
+
+func getIDFromSymbol(tokens map[string][]GeckoToken, symbol string) (string, error) {
+	token, err := getGeckoTokenFromSymbol(tokens, symbol)
+	if err != nil {
+		return "", err
+	}
+	return token.ID, nil
+}
+
+func (c *Client) getTokens() (map[string][]GeckoToken, error) {
 	c.fetchTokensMutex.Lock()
 	defer c.fetchTokensMutex.Unlock()
 
@@ -153,21 +203,14 @@ func (c *Client) mapSymbolsToIds(symbols []string) ([]string, error) {
 	}
 	ids := make([]string, 0)
 	for _, symbol := range utils.RenameSymbols(symbols) {
-		if token, ok := tokens[symbol]; ok {
-			ids = append(ids, token.ID)
+		id, err := getIDFromSymbol(tokens, symbol)
+		if err == nil {
+			ids = append(ids, id)
 		}
 	}
 	ids = utils.RemoveDuplicates(ids)
+
 	return ids, nil
-}
-
-func (c *Client) getIDFromSymbol(symbol string) (string, error) {
-	tokens, err := c.getTokens()
-	if err != nil {
-		return "", err
-	}
-
-	return tokens[strings.ToUpper(symbol)].ID, nil
 }
 
 func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
@@ -193,10 +236,14 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 		return nil, fmt.Errorf("%s - %s", err, string(body))
 	}
 
+	tokens, err := c.getTokens()
+	if err != nil {
+		return nil, err
+	}
 	result := make(map[string]map[string]float64)
 	for _, symbol := range symbols {
 		result[symbol] = map[string]float64{}
-		id, err := c.getIDFromSymbol(utils.GetRealSymbol(symbol))
+		id, err := getIDFromSymbol(tokens, utils.GetRealSymbol(symbol))
 		if err != nil {
 			return nil, err
 		}
@@ -215,14 +262,14 @@ func (c *Client) FetchTokenDetails(symbols []string) (map[string]thirdparty.Toke
 	}
 	result := make(map[string]thirdparty.TokenDetails)
 	for _, symbol := range symbols {
-		if value, ok := tokens[utils.GetRealSymbol(symbol)]; ok {
+		token, err := getGeckoTokenFromSymbol(tokens, utils.GetRealSymbol(symbol))
+		if err == nil {
 			result[symbol] = thirdparty.TokenDetails{
-				ID:     value.ID,
-				Name:   value.Name,
+				ID:     token.ID,
+				Name:   token.Name,
 				Symbol: symbol,
 			}
 		}
-
 	}
 	return result, nil
 }
@@ -251,9 +298,14 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 		return nil, fmt.Errorf("%s - %s", err, string(body))
 	}
 
+	tokens, err := c.getTokens()
+	if err != nil {
+		return nil, err
+	}
+
 	result := make(map[string]thirdparty.TokenMarketValues)
 	for _, symbol := range symbols {
-		id, err := c.getIDFromSymbol(utils.GetRealSymbol(symbol))
+		id, err := getIDFromSymbol(tokens, utils.GetRealSymbol(symbol))
 		if err != nil {
 			return nil, err
 		}
@@ -282,7 +334,12 @@ func (c *Client) FetchHistoricalHourlyPrices(symbol string, currency string, lim
 }
 
 func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
-	id, err := c.getIDFromSymbol(utils.GetRealSymbol(symbol))
+	tokens, err := c.getTokens()
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := getIDFromSymbol(tokens, utils.GetRealSymbol(symbol))
 	if err != nil {
 		return nil, err
 	}
