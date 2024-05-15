@@ -19,7 +19,7 @@ var (
 	// archival request.
 	binanceChainMaxInitialRange       = big.NewInt(500000)
 	binanceChainErc20BatchSize        = big.NewInt(5000)
-	erc20BatchSize                    = big.NewInt(100000)
+	erc20BatchSize                    = big.NewInt(5000)
 	binancChainID                     = uint64(56)
 	binanceTestChainID                = uint64(97)
 	numberOfBlocksCheckedPerIteration = 40
