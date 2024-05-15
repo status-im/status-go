@@ -219,7 +219,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{"some-chat-id"},
 				},
 			},
@@ -231,7 +231,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{"some-chat-id"},
 				},
 			},
@@ -244,7 +244,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id-1",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{"some-chat-id"},
 				},
 			},
@@ -252,7 +252,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id-1",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{"some-chat-id"},
 				},
 				&protobuf.CommunityTokenPermission{
@@ -284,7 +284,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id-2",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{"some-chat-id"},
 				},
 			},
@@ -304,7 +304,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{""},
 				},
 			},
@@ -316,7 +316,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{""},
 				},
 			},
@@ -342,7 +342,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id-2",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{""},
 				},
 			},
@@ -645,7 +645,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{chatID},
 				},
 			},
@@ -662,7 +662,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{chatID},
 				},
 			},
@@ -680,7 +680,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{chatID},
 				},
 			},
@@ -688,7 +688,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{chatID},
 				},
 			},
@@ -708,7 +708,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{chatID},
 				},
 			},
@@ -716,7 +716,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{chatID},
 				},
 			},
@@ -813,7 +813,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestNilOrigin() {
 		&protobuf.CommunityTokenPermission{
 			Id:            "some-id-2",
 			Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-			TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+			TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 			ChatIds:       []string{chatID},
 		},
 	}
@@ -892,7 +892,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestControlNodeChange() {
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{chatID},
 				},
 			},
@@ -925,7 +925,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestControlNodeChange() {
 				&protobuf.CommunityTokenPermission{
 					Id:            "some-id-2",
 					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					TokenCriteria: []*protobuf.TokenCriteria{&protobuf.TokenCriteria{}},
 					ChatIds:       []string{chatID},
 				},
 			},
