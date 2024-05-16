@@ -327,6 +327,17 @@ func (p *Persistence) rowsToCommunities(rows *sql.Rows) (comms []*Community, err
 	return comms, nil
 }
 
+func (p *Persistence) LeftCommunities(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
+	query := communitiesBaseQuery + ` WHERE NOT c.Joined AND NOT c.spectated AND r.state != ?`
+
+	rows, err := p.db.Query(query, common.PubkeyToHex(memberIdentity), RequestToJoinStatePending)
+	if err != nil {
+		return nil, err
+	}
+
+	return p.rowsToCommunities(rows)
+}
+
 func (p *Persistence) JoinedAndPendingCommunitiesWithRequests(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
 	query := communitiesBaseQuery + ` WHERE c.Joined OR r.state = ?`
 

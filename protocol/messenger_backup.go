@@ -26,6 +26,12 @@ var backupTickerInterval = 120 * time.Second
 // backups
 var backupIntervalSeconds uint64 = 28800
 
+type CommunitySet struct {
+	Joined  []*communities.Community
+	Left    []*communities.Community
+	Deleted []*communities.Community
+}
+
 func (m *Messenger) backupEnabled() (bool, error) {
 	return m.settings.BackupEnabled()
 }
@@ -286,8 +292,13 @@ func (m *Messenger) backupContacts(ctx context.Context) []*protobuf.Backup {
 	return backupMessages
 }
 
-func (m *Messenger) backupCommunities(ctx context.Context, clock uint64) ([]*protobuf.Backup, error) {
+func (m *Messenger) retrieveAllCommunities() (*CommunitySet, error) {
 	joinedCs, err := m.communitiesManager.JoinedAndPendingCommunitiesWithRequests()
+	if err != nil {
+		return nil, err
+	}
+
+	leftCs, err := m.communitiesManager.LeftCommunities()
 	if err != nil {
 		return nil, err
 	}
@@ -297,9 +308,23 @@ func (m *Messenger) backupCommunities(ctx context.Context, clock uint64) ([]*pro
 		return nil, err
 	}
 
+	return &CommunitySet{
+		Joined:  joinedCs,
+		Left:    leftCs,
+		Deleted: deletedCs,
+	}, nil
+}
+
+func (m *Messenger) backupCommunities(ctx context.Context, clock uint64) ([]*protobuf.Backup, error) {
+	communitySet, err := m.retrieveAllCommunities()
+	if err != nil {
+		return nil, err
+	}
+
 	var backupMessages []*protobuf.Backup
-	cs := append(joinedCs, deletedCs...)
-	for _, c := range cs {
+	combinedCs := append(append(communitySet.Joined, communitySet.Left...), communitySet.Deleted...)
+
+	for _, c := range combinedCs {
 		_, beingImported := m.importingCommunities[c.IDString()]
 		if !beingImported {
 			backupMessage, err := m.backupCommunity(c, clock)
