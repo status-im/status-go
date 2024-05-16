@@ -9,24 +9,6 @@ import (
 	"strings"
 )
 
-// func sendResponseEvent(eventFeed *event.Feed, eventType walletevent.EventType, payloadObj interface{}, resErr error) {
-// 	payload, err := json.Marshal(payloadObj)
-// 	if err != nil {
-// 		log.Error("Error marshaling WC response: %v; result error: %w", err, resErr)
-// 	} else {
-// 		err = resErr
-// 	}
-
-// 	event := walletevent.Event{
-// 		Type:    eventType,
-// 		Message: string(payload),
-// 	}
-
-// 	sentCount := eventFeed.Send(event)
-
-// 	log.Debug("wallet.api.wc RESPONSE", "eventType", eventType, "error", err, "payload.len", len(payload), "sentCount", sentCount)
-// }
-
 // Returns namspace name, chainID and error
 func parseCaip2ChainID(str string) (string, uint64, error) {
 	caip2 := strings.Split(str, ":")
