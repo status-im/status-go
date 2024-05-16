@@ -231,5 +231,41 @@ func DefaultMailservers() []Mailserver {
 			Fleet:   params.FleetShardsTest,
 			Version: 2,
 		},
+		Mailserver{
+			ID:      "store-01.do-ams3.shards.staging.status.im",
+			Address: "/dns4/store-01.do-ams3.shards.staging.status.im/tcp/30303/p2p/16Uiu2HAm3xVDaz6SRJ6kErwC21zBJEZjavVXg7VSkoWzaV1aMA3F",
+			Fleet:   params.FleetShardsStaging,
+			Version: 2,
+		},
+		Mailserver{
+			ID:      "store-02.do-ams3.shards.staging.status.im",
+			Address: "/dns4/store-02.do-ams3.shards.staging.status.im/tcp/30303/p2p/16Uiu2HAmCDSnT8oNpMR9HH6uipD71KstYuDCAQGpek9XDAVmqdEr",
+			Fleet:   params.FleetShardsStaging,
+			Version: 2,
+		},
+		Mailserver{
+			ID:      "store-01.gc-us-central1-a.shards.staging.status.im",
+			Address: "/dns4/store-01.gc-us-central1-a.shards.staging.status.im/tcp/30303/p2p/16Uiu2HAmB7Ur9HQqo3cWDPovRQjo57fxWWDaQx27WxSzDGhN4JKg",
+			Fleet:   params.FleetShardsStaging,
+			Version: 2,
+		},
+		Mailserver{
+			ID:      "store-02.gc-us-central1-a.shards.staging.status.im",
+			Address: "/dns4/store-02.gc-us-central1-a.shards.staging.status.im/tcp/30303/p2p/16Uiu2HAmKBd6crqQNZ6nKCSCpHCAwUPn3DUDmkcPSWUTyVXpxKsW",
+			Fleet:   params.FleetShardsStaging,
+			Version: 2,
+		},
+		Mailserver{
+			ID:      "store-01.ac-cn-hongkong-c.shards.staging.status.im",
+			Address: "/dns4/store-01.ac-cn-hongkong-c.shards.staging.status.im/tcp/30303/p2p/16Uiu2HAmMU7Y29oL6DmoJfBFv8J4JhYzYgazPL7nGKJFBV3qcj2E",
+			Fleet:   params.FleetShardsStaging,
+			Version: 2,
+		},
+		Mailserver{
+			ID:      "store-02.ac-cn-hongkong-c.shards.staging.status.im",
+			Address: "/dns4/store-02.ac-cn-hongkong-c.shards.staging.status.im/tcp/30303/p2p/16Uiu2HAmU7xtcwytXpGpeDrfyhJkiFvTkQbLB9upL5MXPLGceG9K",
+			Fleet:   params.FleetShardsStaging,
+			Version: 2,
+		},
 	}
 }
