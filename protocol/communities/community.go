@@ -936,40 +936,65 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey, communityBanInfo *
 	return o.config.CommunityDescription, nil
 }
 
-func (o *Community) AddRoleToMember(pk *ecdsa.PublicKey, role protobuf.CommunityMember_Roles) (*protobuf.CommunityDescription, error) {
-	o.mutex.Lock()
-	defer o.mutex.Unlock()
-
-	if !o.IsControlNode() {
-		return nil, ErrNotControlNode
-	}
-
+func (o *Community) setRoleToMember(pk *ecdsa.PublicKey, role protobuf.CommunityMember_Roles, setter func(member *protobuf.CommunityMember, role protobuf.CommunityMember_Roles) bool) (*protobuf.CommunityDescription, error) {
 	updated := false
-	addRole := func(member *protobuf.CommunityMember) {
-		roles := make(map[protobuf.CommunityMember_Roles]bool)
-		roles[role] = true
-		if !o.memberHasRoles(member, roles) {
-			member.Roles = append(member.Roles, role)
-			updated = true
-		}
-	}
 
 	member := o.getMember(pk)
 	if member != nil {
-		addRole(member)
+		updated = setter(member, role)
 	}
 
 	for channelID := range o.chats() {
 		chatMember := o.getChatMember(pk, channelID)
 		if chatMember != nil {
-			addRole(member)
+			_ = setter(member, role)
 		}
 	}
 
 	if updated {
 		o.increaseClock()
 	}
+
 	return o.config.CommunityDescription, nil
+}
+
+func (o *Community) SetRoleToMember(pk *ecdsa.PublicKey, role protobuf.CommunityMember_Roles) (*protobuf.CommunityDescription, error) {
+	if !o.IsControlNode() {
+		return nil, ErrNotControlNode
+	}
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	setRole := func(member *protobuf.CommunityMember, role protobuf.CommunityMember_Roles) bool {
+		if len(member.Roles) == 1 && member.Roles[0] == role {
+			return false
+		}
+		member.Roles = []protobuf.CommunityMember_Roles{role}
+		return true
+	}
+
+	return o.setRoleToMember(pk, role, setRole)
+}
+
+// Deprecated: roles are mutually exclusive, use SetRoleToMember instead.
+func (o *Community) AddRoleToMember(pk *ecdsa.PublicKey, role protobuf.CommunityMember_Roles) (*protobuf.CommunityDescription, error) {
+	if !o.IsControlNode() {
+		return nil, ErrNotControlNode
+	}
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	addRole := func(member *protobuf.CommunityMember, role protobuf.CommunityMember_Roles) bool {
+		roles := make(map[protobuf.CommunityMember_Roles]bool)
+		roles[role] = true
+		if !o.memberHasRoles(member, roles) {
+			member.Roles = append(member.Roles, role)
+			return true
+		}
+		return false
+	}
+
+	return o.setRoleToMember(pk, role, addRole)
 }
 
 func (o *Community) RemoveRoleFromMember(pk *ecdsa.PublicKey, role protobuf.CommunityMember_Roles) (*protobuf.CommunityDescription, error) {
