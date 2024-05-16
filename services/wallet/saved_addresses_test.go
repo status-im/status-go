@@ -39,7 +39,7 @@ func TestSavedAddressesAdd(t *testing.T) {
 	sa := SavedAddress{
 		Address:         common.Address{1},
 		Name:            "Zilliqa",
-		ChainShortNames: "eth:arb:",
+		ChainShortNames: "eth:arb1:",
 		ENSName:         "test.stateofus.eth",
 		ColorID:         multiAccCommon.CustomizationColorGreen,
 		IsTest:          false,
@@ -97,7 +97,7 @@ func TestSavedAddressesMetadata(t *testing.T) {
 		savedAddressMeta: savedAddressMeta{
 			UpdateClock: 234,
 		},
-		ChainShortNames: "eth:arb:",
+		ChainShortNames: "eth:arb1:",
 		ENSName:         "test.stateofus.eth",
 		ColorID:         multiAccCommon.CustomizationColorGreen,
 		IsTest:          false,

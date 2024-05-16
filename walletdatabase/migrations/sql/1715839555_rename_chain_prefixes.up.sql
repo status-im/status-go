@@ -1,0 +1,2 @@
+UPDATE saved_addresses SET chain_short_names = REPLACE(chain_short_names, 'arb:', 'arb1:') WHERE chain_short_names LIKE '%arb:%';
+UPDATE saved_addresses SET chain_short_names = REPLACE(chain_short_names, 'opt:', 'oeth:') WHERE chain_short_names LIKE '%opt:%';
