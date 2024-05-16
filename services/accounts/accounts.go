@@ -3,6 +3,7 @@ package accounts
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -86,18 +87,22 @@ func (api *API) MoveWalletAccount(ctx context.Context, fromPosition int64, toPos
 }
 
 func (api *API) UpdateTokenPreferences(ctx context.Context, preferences []walletsettings.TokenPreferences) error {
+	fmt.Println("================= API UPDATE TokenPreferences")
 	return (*api.messenger).UpdateTokenPreferences(preferences)
 }
 
 func (api *API) GetTokenPreferences(ctx context.Context) ([]walletsettings.TokenPreferences, error) {
+	fmt.Println("================= API GET TokenPreferences")
 	return (*api.messenger).GetTokenPreferences()
 }
 
 func (api *API) UpdateCollectiblePreferences(ctx context.Context, preferences []walletsettings.CollectiblePreferences) error {
+	fmt.Println("================= API UPDATE CollectiblePreferences")
 	return (*api.messenger).UpdateCollectiblePreferences(preferences)
 }
 
 func (api *API) GetCollectiblePreferences(ctx context.Context) ([]walletsettings.CollectiblePreferences, error) {
+	fmt.Println("================= API GET CollectiblePreferences")
 	return (*api.messenger).GetCollectiblePreferences()
 }
 
