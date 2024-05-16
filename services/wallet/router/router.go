@@ -556,6 +556,10 @@ func (r *Router) SuggestedRoutes(
 						continue
 					}
 
+					if !sendType.isAvailableBetween(network, dest) {
+						continue
+					}
+
 					if len(preferedChainIDs) > 0 && !containsNetworkChainID(dest, preferedChainIDs) {
 						continue
 					}

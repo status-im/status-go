@@ -407,6 +407,14 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						continue
 					}
 
+					if !input.SendType.isAvailableFor(network) {
+						continue
+					}
+
+					if !input.SendType.isAvailableBetween(network, dest) {
+						continue
+					}
+
 					if len(input.PreferedChainIDs) > 0 && !containsNetworkChainID(dest, input.PreferedChainIDs) {
 						continue
 					}

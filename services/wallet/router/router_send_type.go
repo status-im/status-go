@@ -103,6 +103,22 @@ func (s SendType) canUseBridge(b bridge.Bridge) bool {
 	}
 }
 
+func (s SendType) isAvailableBetween(from, to *params.Network) bool {
+	if s.IsCollectiblesTransfer() {
+		return from.ChainID == to.ChainID
+	}
+
+	if s == Bridge {
+		return from.ChainID != to.ChainID
+	}
+
+	if s == Swap {
+		return from.ChainID == to.ChainID
+	}
+
+	return true
+}
+
 func (s SendType) isAvailableFor(network *params.Network) bool {
 	// Set of network ChainIDs allowed for any type of transaction
 	allAllowedNetworks := map[uint64]bool{
