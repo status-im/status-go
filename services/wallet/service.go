@@ -35,7 +35,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/rarible"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
-	"github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 )
@@ -170,8 +169,6 @@ func NewService(
 
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed, pendingTxManager)
 
-	walletconnect := walletconnect.NewService(db, rpcClient.NetworkManager, accountsDB, transactionManager, gethManager, feed, config)
-
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -199,7 +196,6 @@ func NewService(
 		decoder:               NewDecoder(),
 		blockChainState:       blockChainState,
 		keycardPairings:       NewKeycardPairings(),
-		walletConnect:         walletconnect,
 		config:                config,
 	}
 }
@@ -233,7 +229,6 @@ type Service struct {
 	decoder               *Decoder
 	blockChainState       *blockchainstate.BlockChainState
 	keycardPairings       *KeycardPairings
-	walletConnect         *walletconnect.Service
 	config                *params.NodeConfig
 }
 
