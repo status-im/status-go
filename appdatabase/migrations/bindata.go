@@ -110,6 +110,7 @@
 // 1708416025_make_sepolia_default.up.sql (81B)
 // 1709203128_fix_chain_colors.up.sql (244B)
 // 1709795716_migration_order_fix.up.sql (7.909kB)
+// 1715756976_network_short_names_update.up.sql (256B)
 // doc.go (94B)
 
 package migrations
@@ -2378,6 +2379,26 @@ func _1709795716_migration_order_fixUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1715756976_network_short_names_updateUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x0a\x0d\x70\x71\x0c\x71\x55\xc8\x4b\x2d\x29\xcf\x2f\xca\x2e\x56\x08\x76\x0d\x51\x28\xce\xc8\x2f\x2a\x89\xcf\x4b\xcc\x4d\x55\xb0\x55\x50\xcf\x4f\x2d\xc9\x50\x57\x08\xf7\x70\x0d\x72\x55\x48\xce\x48\xcc\xcc\x8b\xcf\x4c\x51\xb0\x55\x30\x34\x34\x34\x35\x35\x31\x32\xb0\xe6\x22\xdf\x08\xa2\x34\x27\x16\x25\x19\x62\xd1\x6c\x62\x64\x68\x66\x48\xa9\x7e\x13\x6b\x40\x00\x00\x00\xff\xff\x84\x96\x2d\x64\x00\x01\x00\x00")
+
+func _1715756976_network_short_names_updateUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1715756976_network_short_names_updateUpSql,
+		"1715756976_network_short_names_update.up.sql",
+	)
+}
+
+func _1715756976_network_short_names_updateUpSql() (*asset, error) {
+	bytes, err := _1715756976_network_short_names_updateUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1715756976_network_short_names_update.up.sql", size: 256, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x47, 0xab, 0x2, 0xa5, 0x73, 0x82, 0xf, 0xb9, 0x96, 0xa5, 0x60, 0xe9, 0xbb, 0x52, 0xc1, 0xe3, 0xe0, 0x39, 0xe3, 0xe, 0x52, 0xa, 0xc9, 0xbe, 0xaa, 0x1, 0xee, 0x5, 0xbe, 0x5, 0x40, 0x22}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xcb\x41\x0e\x02\x31\x08\x05\xd0\x7d\x4f\xf1\x2f\x00\xe8\xca\xc4\xc4\xc3\xa0\x43\x08\x19\x5b\xc6\x96\xfb\xc7\x4d\xdf\xfe\x5d\xfa\x39\xd5\x0d\xeb\xf7\x6d\x4d\xc4\xf3\xe9\x36\x6c\x6a\x19\x3c\xe9\x1d\xe3\xd0\x52\x50\xcf\xa3\xa2\xdb\xeb\xfe\xb8\x6d\xa0\xeb\x74\xf4\xf0\xa9\x15\x39\x16\x28\xc1\x2c\x7b\xb0\x27\x58\xda\x3f\x00\x00\xff\xff\x57\xd4\xd5\x90\x5e\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -2599,7 +2620,8 @@ var _bindata = map[string]func() (*asset, error){
 	"1708416025_make_sepolia_default.up.sql":                                   _1708416025_make_sepolia_defaultUpSql,
 	"1709203128_fix_chain_colors.up.sql":                                       _1709203128_fix_chain_colorsUpSql,
 	"1709795716_migration_order_fix.up.sql":                                    _1709795716_migration_order_fixUpSql,
-	"doc.go":                                                                   docGo,
+	"1715756976_network_short_names_update.up.sql":                             _1715756976_network_short_names_updateUpSql,
+	"doc.go": docGo,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -2758,7 +2780,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1708416025_make_sepolia_default.up.sql":                                   {_1708416025_make_sepolia_defaultUpSql, map[string]*bintree{}},
 	"1709203128_fix_chain_colors.up.sql":                                       {_1709203128_fix_chain_colorsUpSql, map[string]*bintree{}},
 	"1709795716_migration_order_fix.up.sql":                                    {_1709795716_migration_order_fixUpSql, map[string]*bintree{}},
-	"doc.go":                                                                   {docGo, map[string]*bintree{}},
+	"1715756976_network_short_names_update.up.sql":                             {_1715756976_network_short_names_updateUpSql, map[string]*bintree{}},
+	"doc.go": {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
