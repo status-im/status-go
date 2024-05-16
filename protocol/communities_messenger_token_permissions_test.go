@@ -1605,15 +1605,15 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 		},
 	}
 
+	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		return sub.Community.HasTokenPermissions()
+	})
+
 	response, err := s.owner.CreateCommunityTokenPermission(createTokenPermission)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().True(response.Communities()[0].HasTokenPermissions())
-
-	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
-		return sub.Community.HasTokenPermissions()
-	})
 
 	err = <-waitOnCommunityPermissionCreated
 	s.Require().NoError(err)
@@ -1662,6 +1662,13 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 		PermissionID: tokenPermission.Id,
 	}
 
+	waitOnPermissionsReevaluated = waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		if sub.Community == nil {
+			return false
+		}
+		return !checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, sub.Community)
+	})
+
 	response, err = s.owner.DeleteCommunityTokenPermission(deleteTokenPermission)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -1671,13 +1678,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
 	s.Require().False(community.HasTokenPermissions())
-
-	waitOnPermissionsReevaluated = waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
-		if sub.Community == nil {
-			return false
-		}
-		return !checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, sub.Community)
-	})
 
 	err = s.owner.communitiesManager.ForceMembersReevaluation(community.ID())
 	s.Require().NoError(err)

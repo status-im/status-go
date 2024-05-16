@@ -180,6 +180,7 @@ func (t *HistoryArchiveDownloadTask) Cancel() {
 }
 
 type membersReevaluationTask struct {
+	lastStartTime       time.Time
 	lastSuccessTime     time.Time
 	onDemandRequestTime time.Time
 	mutex               sync.Mutex
@@ -1055,37 +1056,80 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 	return community, changes, nil
 }
 
+type reevaluateMemberRole struct {
+	old protobuf.CommunityMember_Roles
+	new protobuf.CommunityMember_Roles
+}
+
+func (rmr reevaluateMemberRole) hasChanged() bool {
+	return rmr.old != rmr.new
+}
+
+func (rmr reevaluateMemberRole) isPrivileged() bool {
+	return rmr.new != protobuf.CommunityMember_ROLE_NONE
+}
+
+func (rmr reevaluateMemberRole) hasChangedToPrivileged() bool {
+	return rmr.hasChanged() && rmr.old == protobuf.CommunityMember_ROLE_NONE
+}
+
+type reevaluateMembersResult struct {
+	membersToRemove             map[string]struct{}
+	membersRoles                map[string]*reevaluateMemberRole
+	membersToRemoveFromChannels map[string]map[string]struct{}
+	membersToAddToChannels      map[string]map[string]protobuf.CommunityMember_ChannelRole
+}
+
+func (rmr *reevaluateMembersResult) newPrivilegedRoles() (map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
+	result := map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey{}
+
+	for memberKey, roles := range rmr.membersRoles {
+		if roles.hasChangedToPrivileged() {
+			memberPubKey, err := common.HexToPubkey(memberKey)
+			if err != nil {
+				return nil, err
+			}
+			if result[roles.new] == nil {
+				result[roles.new] = []*ecdsa.PublicKey{}
+			}
+			result[roles.new] = append(result[roles.new], memberPubKey)
+		}
+	}
+
+	return result, nil
+}
+
 // use it only for testing purposes
 func (m *Manager) ReevaluateMembers(communityID types.HexBytes) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
 	return m.reevaluateMembers(communityID)
 }
 
+// First, the community is read from the database,
+// then the members are reevaluated, and only then
+// the community is locked and changes are applied.
+// NOTE: Changes made to the same community
+// while reevaluation is ongoing are respected
+// and do not affect the result of this function.
+// If permissions are changed in the meantime,
+// they will be accommodated with the next reevaluation.
 func (m *Manager) reevaluateMembers(communityID types.HexBytes) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
-	m.communityLock.Lock(communityID)
-	defer m.communityLock.Unlock(communityID)
-
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: Control node needs to be notified to do a permission check if TokenMasters did airdrop
-	// of the token which is using in a community permissions
 	if !community.IsControlNode() {
 		return nil, nil, ErrNotEnoughPermissions
 	}
 
 	communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsData(community.tokenPermissions())
 
-	hasMemberPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_MEMBER] != nil
-
-	if len(channelPermissionsPreParsedData) == 0 {
-		community.PopulateChannelsWithAllMembers()
+	result := &reevaluateMembersResult{
+		membersToRemove:             map[string]struct{}{},
+		membersRoles:                map[string]*reevaluateMemberRole{},
+		membersToRemoveFromChannels: map[string]map[string]struct{}{},
+		membersToAddToChannels:      map[string]map[string]protobuf.CommunityMember_ChannelRole{},
 	}
-
-	newPrivilegedRoles := make(map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey)
-	newPrivilegedRoles[protobuf.CommunityMember_ROLE_TOKEN_MASTER] = []*ecdsa.PublicKey{}
-	newPrivilegedRoles[protobuf.CommunityMember_ROLE_ADMIN] = []*ecdsa.PublicKey{}
 
 	membersAccounts, err := m.persistence.GetCommunityRequestsToJoinRevealedAddresses(community.ID())
 	if err != nil {
@@ -1102,128 +1146,200 @@ func (m *Manager) reevaluateMembers(communityID types.HexBytes) (*Community, map
 			continue
 		}
 
-		isCurrentRoleTokenMaster := community.IsMemberTokenMaster(memberPubKey)
-		isCurrentRoleAdmin := community.IsMemberAdmin(memberPubKey)
-
-		revealedAccount, exists := membersAccounts[memberKey]
-		memberHasWallet := exists
-
-		// Check if user has privilege role without sharing the account to controlNode
-		// or user treated as a member without wallet in closed community
-		if !memberHasWallet && (hasMemberPermissions || isCurrentRoleTokenMaster || isCurrentRoleAdmin) {
-			_, err = community.RemoveUserFromOrg(memberPubKey)
-			if err != nil {
-				return nil, nil, err
-			}
+		revealedAccount, memberHasWallet := membersAccounts[memberKey]
+		if !memberHasWallet {
+			result.membersToRemove[memberKey] = struct{}{}
 			continue
 		}
 
 		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(revealedAccount)
 
-		isNewRoleTokenMaster, err := m.ReevaluatePrivilegedMember(
-			community,
-			communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER],
-			accountsAndChainIDs,
-			memberPubKey,
-			protobuf.CommunityMember_ROLE_TOKEN_MASTER, isCurrentRoleTokenMaster)
-
-		if err != nil {
-			return nil, nil, err
+		result.membersRoles[memberKey] = &reevaluateMemberRole{
+			old: community.MemberRole(memberPubKey),
+			new: protobuf.CommunityMember_ROLE_NONE,
 		}
 
-		if isNewRoleTokenMaster {
-			if !isCurrentRoleTokenMaster {
-				newPrivilegedRoles[protobuf.CommunityMember_ROLE_TOKEN_MASTER] =
-					append(newPrivilegedRoles[protobuf.CommunityMember_ROLE_TOKEN_MASTER], memberPubKey)
+		becomeTokenMasterPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER]
+		if becomeTokenMasterPermissions != nil {
+			permissionResponse, err := m.PermissionChecker.CheckPermissions(becomeTokenMasterPermissions, accountsAndChainIDs, true)
+			if err != nil {
+				return nil, nil, err
 			}
-			// Skip further validation if user has TokenMaster permissions
-			continue
-		}
 
-		isNewRoleAdmin, err := m.ReevaluatePrivilegedMember(
-			community,
-			communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_ADMIN],
-			accountsAndChainIDs,
-			memberPubKey,
-			protobuf.CommunityMember_ROLE_ADMIN, isCurrentRoleAdmin)
-
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if isNewRoleAdmin {
-			if !isCurrentRoleAdmin {
-				newPrivilegedRoles[protobuf.CommunityMember_ROLE_ADMIN] =
-					append(newPrivilegedRoles[protobuf.CommunityMember_ROLE_ADMIN], memberPubKey)
+			if permissionResponse.Satisfied {
+				result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
+				// Skip further validation if user has TokenMaster permissions
+				continue
 			}
-			// Skip further validation if user has Admin permissions
-			continue
 		}
 
-		if hasMemberPermissions {
-			permissionResponse, err := m.PermissionChecker.CheckPermissions(
-				communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_MEMBER],
-				accountsAndChainIDs,
-				true)
+		becomeAdminPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_ADMIN]
+		if becomeAdminPermissions != nil {
+			permissionResponse, err := m.PermissionChecker.CheckPermissions(becomeAdminPermissions, accountsAndChainIDs, true)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			if permissionResponse.Satisfied {
+				result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_ADMIN
+				// Skip further validation if user has Admin permissions
+				continue
+			}
+		}
+
+		becomeMemberPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_MEMBER]
+		if becomeMemberPermissions != nil {
+			permissionResponse, err := m.PermissionChecker.CheckPermissions(becomeMemberPermissions, accountsAndChainIDs, true)
 			if err != nil {
 				return nil, nil, err
 			}
 
 			if !permissionResponse.Satisfied {
-				_, err = community.RemoveUserFromOrg(memberPubKey)
-				if err != nil {
-					return nil, nil, err
-				}
+				result.membersToRemove[memberKey] = struct{}{}
 				// Skip channels validation if user has been removed
 				continue
 			}
 		}
 
-		err = m.reevaluateMemberChannelsPermissions(community, memberPubKey, channelPermissionsPreParsedData, accountsAndChainIDs)
+		addToChannels, removeFromChannels, err := m.reevaluateMemberChannelsPermissions(community, memberPubKey, channelPermissionsPreParsedData, accountsAndChainIDs)
 		if err != nil {
 			return nil, nil, err
 		}
+		result.membersToAddToChannels[memberKey] = addToChannels
+		result.membersToRemoveFromChannels[memberKey] = removeFromChannels
+	}
+
+	newPrivilegedRoles, err := result.newPrivilegedRoles()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Note: community itself may have changed in the meantime of permissions reevaluation.
+	community, err = m.applyReevaluateMembersResult(communityID, result)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	return community, newPrivilegedRoles, m.saveAndPublish(community)
 }
 
-func (m *Manager) reevaluateMemberChannelsPermissions(community *Community, memberPubKey *ecdsa.PublicKey,
-	channelPermissionsPreParsedData map[string]*PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination) error {
+// Apply results on the most up-to-date community.
+func (m *Manager) applyReevaluateMembersResult(communityID types.HexBytes, result *reevaluateMembersResult) (*Community, error) {
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
 
-	if len(channelPermissionsPreParsedData) == 0 {
-		return nil
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
 	}
+
+	if !community.IsControlNode() {
+		return nil, ErrNotEnoughPermissions
+	}
+
+	// Remove members.
+	for memberKey := range result.membersToRemove {
+		memberPubKey, err := common.HexToPubkey(memberKey)
+		if err != nil {
+			return nil, err
+		}
+		_, err = community.RemoveUserFromOrg(memberPubKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Ensure members have proper roles.
+	for memberKey, roles := range result.membersRoles {
+		memberPubKey, err := common.HexToPubkey(memberKey)
+		if err != nil {
+			return nil, err
+		}
+
+		if !community.HasMember(memberPubKey) {
+			continue
+		}
+
+		_, err = community.SetRoleToMember(memberPubKey, roles.new)
+		if err != nil {
+			return nil, err
+		}
+
+		// Ensure privileged members can post in all chats.
+		if roles.isPrivileged() {
+			for channelID := range community.Chats() {
+				_, err = community.AddMemberToChat(channelID, memberPubKey, []protobuf.CommunityMember_Roles{roles.new}, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
+	// Remove members from channels.
+	for memberKey, channels := range result.membersToRemoveFromChannels {
+		memberPubKey, err := common.HexToPubkey(memberKey)
+		if err != nil {
+			return nil, err
+		}
+
+		for channelID := range channels {
+			_, err = community.RemoveUserFromChat(memberPubKey, channelID)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// Add unprivileged members to channels.
+	for memberKey, channels := range result.membersToAddToChannels {
+		memberPubKey, err := common.HexToPubkey(memberKey)
+		if err != nil {
+			return nil, err
+		}
+
+		if !community.HasMember(memberPubKey) {
+			continue
+		}
+
+		for channelID, channelRole := range channels {
+			_, err = community.AddMemberToChat(channelID, memberPubKey, []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_NONE}, channelRole)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return community, nil
+}
+
+func (m *Manager) reevaluateMemberChannelsPermissions(community *Community, memberPubKey *ecdsa.PublicKey,
+	channelPermissionsPreParsedData map[string]*PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination) (map[string]protobuf.CommunityMember_ChannelRole, map[string]struct{}, error) {
+
+	addToChannels := map[string]protobuf.CommunityMember_ChannelRole{}
+	removeFromChannels := map[string]struct{}{}
 
 	// check which permissions we satisfy and which not
 	channelPermissionsCheckResult, err := m.checkChannelsPermissions(channelPermissionsPreParsedData, accountsAndChainIDs, true)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	for channelID := range community.Chats() {
-		chatID := community.ChatID(channelID)
-		isMemberAlreadyInChannel := community.IsMemberInChat(memberPubKey, channelID)
+		channelPermissionsCheckResult, hasChannelPermission := channelPermissionsCheckResult[community.ChatID(channelID)]
 
-		channelPermissionsCheckResult, exists := channelPermissionsCheckResult[chatID]
-
-		// if channel permissions were removed member must be added back
-		if !exists {
-			if !isMemberAlreadyInChannel {
-				_, err := community.AddMemberToChat(channelID, memberPubKey, []protobuf.CommunityMember_Roles{}, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
-				if err != nil {
-					return err
-				}
-			}
+		// ensure member is added if channel has no permissions
+		if !hasChannelPermission {
+			addToChannels[channelID] = protobuf.CommunityMember_CHANNEL_ROLE_POSTER
 			continue
 		}
 
-		viewAndPostSatisfied, viewAndPosPermissionExists := channelPermissionsCheckResult[protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL]
+		viewAndPostSatisfied, viewAndPostPermissionExists := channelPermissionsCheckResult[protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL]
 		viewOnlySatisfied, viewOnlyPermissionExists := channelPermissionsCheckResult[protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL]
 
 		satisfied := false
 		channelRole := protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
-		if viewAndPosPermissionExists && viewAndPostSatisfied {
+		if viewAndPostPermissionExists && viewAndPostSatisfied {
 			satisfied = viewAndPostSatisfied
 			channelRole = protobuf.CommunityMember_CHANNEL_ROLE_POSTER
 		} else if !satisfied && viewOnlyPermissionExists {
@@ -1231,19 +1347,13 @@ func (m *Manager) reevaluateMemberChannelsPermissions(community *Community, memb
 		}
 
 		if satisfied {
-			// Add the member back to the chat member list in case the role changed (it replaces the previous values)
-			_, err := community.AddMemberToChat(channelID, memberPubKey, []protobuf.CommunityMember_Roles{}, channelRole)
-			if err != nil {
-				return err
-			}
-		} else if !satisfied && isMemberAlreadyInChannel {
-			_, err := community.RemoveUserFromChat(memberPubKey, channelID)
-			if err != nil {
-				return err
-			}
+			addToChannels[channelID] = channelRole
+		} else {
+			removeFromChannels[channelID] = struct{}{}
 		}
 	}
-	return nil
+
+	return addToChannels, removeFromChannels, nil
 }
 
 func (m *Manager) checkChannelsPermissions(channelsPermissionsPreParsedData map[string]*PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (map[string]map[protobuf.CommunityTokenPermission_Type]bool, error) {
@@ -1302,7 +1412,7 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 		}
 
 		if !task.lastSuccessTime.Before(time.Now().Add(-memberPermissionsCheckInterval)) &&
-			!task.lastSuccessTime.Before(task.onDemandRequestTime) {
+			!task.lastStartTime.Before(task.onDemandRequestTime) {
 			return false
 		}
 
@@ -1327,6 +1437,10 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 			return nil
 		}
 
+		task.mutex.Lock()
+		task.lastStartTime = time.Now()
+		task.mutex.Unlock()
+
 		err = m.reevaluateCommunityMembersPermissions(communityID)
 		if err != nil {
 			if errors.Is(err, ErrOrgNotFound) {
@@ -1338,9 +1452,10 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 		}
 
 		task.mutex.Lock()
-		defer task.mutex.Unlock()
 		task.lastSuccessTime = time.Now()
+		task.mutex.Unlock()
 
+		m.logger.Info("reevaluation finished", zap.String("communityID", communityID.String()), zap.Duration("elapsed", task.lastSuccessTime.Sub(task.lastStartTime)))
 		return nil
 	}
 
@@ -5283,55 +5398,6 @@ func (m *Manager) GetRevealedAddresses(communityID types.HexBytes, memberPk stri
 	logger.Debug("Revealed addresses", zap.Any("Addresses:", revealedAddresses))
 
 	return response, err
-}
-
-func (m *Manager) ReevaluatePrivilegedMember(community *Community, permissionsData *PreParsedCommunityPermissionsData,
-	accountsAndChainIDs []*AccountChainIDsCombination, memberPubKey *ecdsa.PublicKey,
-	privilegedRole protobuf.CommunityMember_Roles, alreadyHasPrivilegedRole bool) (bool, error) {
-
-	hasPrivilegedRolePermissions := permissionsData != nil
-	removeCurrentRole := false
-
-	if hasPrivilegedRolePermissions {
-		permissionResponse, err := m.PermissionChecker.CheckPermissions(permissionsData, accountsAndChainIDs, true)
-		if err != nil {
-			m.logger.Warn("check privileged permission failed: %v", zap.Error(err))
-			return alreadyHasPrivilegedRole, err
-		} else if permissionResponse.Satisfied && !alreadyHasPrivilegedRole {
-			_, err = community.AddRoleToMember(memberPubKey, privilegedRole)
-			if err != nil {
-				return alreadyHasPrivilegedRole, err
-			}
-			alreadyHasPrivilegedRole = true
-		} else if !permissionResponse.Satisfied && alreadyHasPrivilegedRole {
-			removeCurrentRole = true
-			alreadyHasPrivilegedRole = false
-		}
-	}
-
-	// Remove privileged role if user does not pass role permissions check or
-	// Community does not have permissions but user has a role
-	if removeCurrentRole || (!hasPrivilegedRolePermissions && alreadyHasPrivilegedRole) {
-		_, err := community.RemoveRoleFromMember(memberPubKey, privilegedRole)
-		if err != nil {
-			return alreadyHasPrivilegedRole, err
-		}
-		alreadyHasPrivilegedRole = false
-	}
-
-	if alreadyHasPrivilegedRole {
-		// Make sure privileged user is added to every channel
-		for channelID := range community.Chats() {
-			if !community.IsMemberInChat(memberPubKey, channelID) {
-				_, err := community.AddMemberToChat(channelID, memberPubKey, []protobuf.CommunityMember_Roles{privilegedRole}, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
-				if err != nil {
-					return alreadyHasPrivilegedRole, err
-				}
-			}
-		}
-	}
-
-	return alreadyHasPrivilegedRole, nil
 }
 
 func (m *Manager) handleCommunityTokensMetadata(community *Community) error {
