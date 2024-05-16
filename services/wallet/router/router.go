@@ -1,4 +1,4 @@
-package wallet
+package router
 
 import (
 	"context"
@@ -19,12 +19,17 @@ import (
 	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/bridge"
+	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/token"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/transactions"
 )
 
 // //////////////////////////////////////////////////////////////////////////////
@@ -272,14 +277,15 @@ func newSuggestedRoutes(
 	}
 }
 
-func NewRouter(s *Service) *Router {
+func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager, marketManager *market.Manager,
+	collectibles *collectibles.Service, collectiblesManager *collectibles.Manager, ensService *ens.Service, stickersService *stickers.Service) *Router {
 	bridges := make(map[string]bridge.Bridge)
-	transfer := bridge.NewTransferBridge(s.rpcClient, s.transactor)
-	erc721Transfer := bridge.NewERC721TransferBridge(s.rpcClient, s.transactor)
-	erc1155Transfer := bridge.NewERC1155TransferBridge(s.rpcClient, s.transactor)
-	cbridge := bridge.NewCbridge(s.rpcClient, s.transactor, s.tokenManager)
-	hop := bridge.NewHopBridge(s.rpcClient, s.transactor, s.tokenManager)
-	paraswap := bridge.NewSwapParaswap(s.rpcClient, s.transactor, s.tokenManager)
+	transfer := bridge.NewTransferBridge(rpcClient, transactor)
+	erc721Transfer := bridge.NewERC721TransferBridge(rpcClient, transactor)
+	erc1155Transfer := bridge.NewERC1155TransferBridge(rpcClient, transactor)
+	cbridge := bridge.NewCbridge(rpcClient, transactor, tokenManager)
+	hop := bridge.NewHopBridge(rpcClient, transactor, tokenManager)
+	paraswap := bridge.NewSwapParaswap(rpcClient, transactor, tokenManager)
 	bridges[transfer.Name()] = transfer
 	bridges[erc721Transfer.Name()] = erc721Transfer
 	bridges[hop.Name()] = hop
@@ -287,7 +293,25 @@ func NewRouter(s *Service) *Router {
 	bridges[erc1155Transfer.Name()] = erc1155Transfer
 	bridges[paraswap.Name()] = paraswap
 
-	return &Router{s, bridges, s.rpcClient}
+	return &Router{
+		rpcClient:           rpcClient,
+		tokenManager:        tokenManager,
+		marketManager:       marketManager,
+		collectiblesService: collectibles,
+		collectiblesManager: collectiblesManager,
+		ensService:          ensService,
+		stickersService:     stickersService,
+		feesManager:         &FeeManager{rpcClient},
+		bridges:             bridges,
+	}
+}
+
+func (r *Router) GetFeesManager() *FeeManager {
+	return r.feesManager
+}
+
+func (r *Router) GetBridges() map[string]bridge.Bridge {
+	return r.bridges
 }
 
 func containsNetworkChainID(network *params.Network, chainIDs []uint64) bool {
@@ -301,9 +325,15 @@ func containsNetworkChainID(network *params.Network, chainIDs []uint64) bool {
 }
 
 type Router struct {
-	s         *Service
-	bridges   map[string]bridge.Bridge
-	rpcClient *rpc.Client
+	rpcClient           *rpc.Client
+	tokenManager        *token.Manager
+	marketManager       *market.Manager
+	collectiblesService *collectibles.Service
+	collectiblesManager *collectibles.Manager
+	ensService          *ens.Service
+	stickersService     *stickers.Service
+	feesManager         *FeeManager
+	bridges             map[string]bridge.Bridge
 }
 
 func (r *Router) requireApproval(ctx context.Context, sendType SendType, approvalContractAddress *common.Address, account common.Address, network *params.Network, token *token.Token, amountIn *big.Int) (
@@ -385,12 +415,12 @@ func (r *Router) requireApproval(ctx context.Context, sendType SendType, approva
 }
 
 func (r *Router) getBalance(ctx context.Context, network *params.Network, token *token.Token, account common.Address) (*big.Int, error) {
-	client, err := r.s.rpcClient.EthClient(network.ChainID)
+	client, err := r.rpcClient.EthClient(network.ChainID)
 	if err != nil {
 		return nil, err
 	}
 
-	return r.s.tokenManager.GetBalance(ctx, client, account, token.Address)
+	return r.tokenManager.GetBalance(ctx, client, account, token.Address)
 }
 
 func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network, token *token.Token, account common.Address) (*big.Int, error) {
@@ -399,7 +429,7 @@ func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network,
 		return nil, errors.New("failed to convert token symbol to big.Int")
 	}
 
-	balances, err := r.s.collectiblesManager.FetchERC1155Balances(
+	balances, err := r.collectiblesManager.FetchERC1155Balances(
 		ctx,
 		account,
 		walletCommon.ChainID(network.ChainID),
@@ -417,7 +447,7 @@ func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network,
 	return balances[0].Int, nil
 }
 
-func (r *Router) suggestedRoutes(
+func (r *Router) SuggestedRoutes(
 	ctx context.Context,
 	sendType SendType,
 	addrFrom common.Address,
@@ -430,18 +460,15 @@ func (r *Router) suggestedRoutes(
 	preferedChainIDs []uint64,
 	gasFeeMode GasFeeMode,
 	fromLockedAmount map[uint64]*hexutil.Big,
+	testnetMode bool,
 ) (*SuggestedRoutes, error) {
-	areTestNetworksEnabled, err := r.s.accountsDB.GetTestNetworksEnabled()
+
+	networks, err := r.rpcClient.NetworkManager.Get(false)
 	if err != nil {
 		return nil, err
 	}
 
-	networks, err := r.s.rpcClient.NetworkManager.Get(false)
-	if err != nil {
-		return nil, err
-	}
-
-	prices, err := sendType.FetchPrices(r.s, tokenID)
+	prices, err := sendType.FetchPrices(r.marketManager, tokenID)
 	if err != nil {
 		return nil, err
 	}
@@ -453,7 +480,7 @@ func (r *Router) suggestedRoutes(
 
 	for networkIdx := range networks {
 		network := networks[networkIdx]
-		if network.IsTest != areTestNetworksEnabled {
+		if network.IsTest != testnetMode {
 			continue
 		}
 
@@ -465,23 +492,23 @@ func (r *Router) suggestedRoutes(
 			continue
 		}
 
-		token := sendType.FindToken(r.s, addrFrom, network, tokenID)
+		token := sendType.FindToken(r.tokenManager, r.collectiblesService, addrFrom, network, tokenID)
 		if token == nil {
 			continue
 		}
 
 		var toToken *walletToken.Token
 		if sendType == Swap {
-			toToken = sendType.FindToken(r.s, common.Address{}, network, toTokenID)
+			toToken = sendType.FindToken(r.tokenManager, r.collectiblesService, common.Address{}, network, toTokenID)
 		}
 
-		nativeToken := r.s.tokenManager.FindToken(network, network.NativeCurrencySymbol)
+		nativeToken := r.tokenManager.FindToken(network, network.NativeCurrencySymbol)
 		if nativeToken == nil {
 			continue
 		}
 
 		group.Add(func(c context.Context) error {
-			gasFees, err := r.s.feesManager.SuggestedFees(ctx, network.ChainID)
+			gasFees, err := r.feesManager.SuggestedFees(ctx, network.ChainID)
 			if err != nil {
 				return err
 			}
@@ -514,14 +541,14 @@ func (r *Router) suggestedRoutes(
 			}
 			maxFees := gasFees.feeFor(gasFeeMode)
 
-			estimatedTime := r.s.feesManager.transactionEstimatedTime(ctx, network.ChainID, maxFees)
+			estimatedTime := r.feesManager.TransactionEstimatedTime(ctx, network.ChainID, maxFees)
 			for _, bridge := range r.bridges {
 				if !sendType.canUseBridge(bridge) {
 					continue
 				}
 
 				for _, dest := range networks {
-					if dest.IsTest != areTestNetworksEnabled {
+					if dest.IsTest != testnetMode {
 						continue
 					}
 
@@ -566,7 +593,7 @@ func (r *Router) suggestedRoutes(
 							continue
 						}
 					} else {
-						gasLimit = sendType.EstimateGas(r.s, network, addrFrom, tokenID)
+						gasLimit = sendType.EstimateGas(r.ensService, r.stickersService, network, addrFrom, tokenID)
 					}
 
 					approvalContractAddress := bridge.GetContractAddress(network, token)
@@ -582,7 +609,7 @@ func (r *Router) suggestedRoutes(
 							continue
 						}
 
-						l1GasFeeWei, _ = r.s.feesManager.GetL1Fee(ctx, network.ChainID, tx)
+						l1GasFeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, tx)
 						l1GasFeeWei += l1ApprovalFee
 					}
 

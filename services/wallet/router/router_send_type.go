@@ -1,4 +1,4 @@
-package wallet
+package router
 
 import (
 	"context"
@@ -10,9 +10,13 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/bridge"
+	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
@@ -35,13 +39,13 @@ func (s SendType) IsCollectiblesTransfer() bool {
 	return s == ERC721Transfer || s == ERC1155Transfer
 }
 
-func (s SendType) FetchPrices(service *Service, tokenID string) (map[string]float64, error) {
+func (s SendType) FetchPrices(marketManager *market.Manager, tokenID string) (map[string]float64, error) {
 	symbols := []string{tokenID, "ETH"}
 	if s.IsCollectiblesTransfer() {
 		symbols = []string{"ETH"}
 	}
 
-	pricesMap, err := service.marketManager.FetchPrices(symbols, []string{"USD"})
+	pricesMap, err := marketManager.FetchPrices(symbols, []string{"USD"})
 	if err != nil {
 		return nil, err
 	}
@@ -55,9 +59,9 @@ func (s SendType) FetchPrices(service *Service, tokenID string) (map[string]floa
 	return prices, nil
 }
 
-func (s SendType) FindToken(service *Service, account common.Address, network *params.Network, tokenID string) *token.Token {
+func (s SendType) FindToken(tokenManager *token.Manager, collectibles *collectibles.Service, account common.Address, network *params.Network, tokenID string) *token.Token {
 	if !s.IsCollectiblesTransfer() {
-		return service.tokenManager.FindToken(network, tokenID)
+		return tokenManager.FindToken(network, tokenID)
 	}
 
 	parts := strings.Split(tokenID, ":")
@@ -66,7 +70,7 @@ func (s SendType) FindToken(service *Service, account common.Address, network *p
 	if !success {
 		return nil
 	}
-	uniqueID, err := service.collectibles.GetOwnedCollectible(walletCommon.ChainID(network.ChainID), account, contractAddress, collectibleTokenID)
+	uniqueID, err := collectibles.GetOwnedCollectible(walletCommon.ChainID(network.ChainID), account, contractAddress, collectibleTokenID)
 	if err != nil || uniqueID == nil {
 		return nil
 	}
@@ -127,28 +131,28 @@ func (s SendType) isAvailableFor(network *params.Network) bool {
 	return false
 }
 
-func (s SendType) EstimateGas(service *Service, network *params.Network, from common.Address, tokenID string) uint64 {
+func (s SendType) EstimateGas(ensService *ens.Service, stickersService *stickers.Service, network *params.Network, from common.Address, tokenID string) uint64 {
 	tx := transactions.SendTxArgs{
 		From:  (types.Address)(from),
 		Value: (*hexutil.Big)(zero),
 	}
 	switch s {
 	case ENSRegister:
-		estimate, err := service.ens.API().RegisterEstimate(context.Background(), network.ChainID, tx, EstimateUsername, EstimatePubKey)
+		estimate, err := ensService.API().RegisterEstimate(context.Background(), network.ChainID, tx, EstimateUsername, EstimatePubKey)
 		if err != nil {
 			return 400000
 		}
 		return estimate
 
 	case ENSRelease:
-		estimate, err := service.ens.API().ReleaseEstimate(context.Background(), network.ChainID, tx, EstimateUsername)
+		estimate, err := ensService.API().ReleaseEstimate(context.Background(), network.ChainID, tx, EstimateUsername)
 		if err != nil {
 			return 200000
 		}
 		return estimate
 
 	case ENSSetPubKey:
-		estimate, err := service.ens.API().SetPubKeyEstimate(context.Background(), network.ChainID, tx, fmt.Sprint(EstimateUsername, ".stateofus.eth"), EstimatePubKey)
+		estimate, err := ensService.API().SetPubKeyEstimate(context.Background(), network.ChainID, tx, fmt.Sprint(EstimateUsername, ".stateofus.eth"), EstimatePubKey)
 		if err != nil {
 			return 400000
 		}
@@ -156,7 +160,7 @@ func (s SendType) EstimateGas(service *Service, network *params.Network, from co
 
 	case StickersBuy:
 		packID := &bigint.BigInt{Int: big.NewInt(2)}
-		estimate, err := service.stickers.API().BuyEstimate(context.Background(), network.ChainID, (types.Address)(from), packID)
+		estimate, err := stickersService.API().BuyEstimate(context.Background(), network.ChainID, (types.Address)(from), packID)
 		if err != nil {
 			return 400000
 		}

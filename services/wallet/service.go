@@ -185,7 +185,6 @@ func NewService(
 		cryptoOnRampManager:   cryptoOnRampManager,
 		collectiblesManager:   collectiblesManager,
 		collectibles:          collectibles,
-		feesManager:           &FeeManager{rpcClient},
 		gethManager:           gethManager,
 		marketManager:         marketManager,
 		transactor:            transactor,
@@ -217,7 +216,6 @@ type Service struct {
 	pendingTxManager      *transactions.PendingTxTracker
 	cryptoOnRampManager   *CryptoOnRampManager
 	transferController    *transfer.Controller
-	feesManager           *FeeManager
 	marketManager         *market.Manager
 	started               bool
 	collectiblesManager   *collectibles.Manager
@@ -298,4 +296,36 @@ func (s *Service) KeycardPairings() *KeycardPairings {
 
 func (s *Service) Config() *params.NodeConfig {
 	return s.config
+}
+
+func (s *Service) GetRPCClient() *rpc.Client {
+	return s.rpcClient
+}
+
+func (s *Service) GetTransactor() *transactions.Transactor {
+	return s.transactor
+}
+
+func (s *Service) GetTokenManager() *token.Manager {
+	return s.tokenManager
+}
+
+func (s *Service) GetMarketManager() *market.Manager {
+	return s.marketManager
+}
+
+func (s *Service) GetCollectiblesService() *collectibles.Service {
+	return s.collectibles
+}
+
+func (s *Service) GetCollectiblesManager() *collectibles.Manager {
+	return s.collectiblesManager
+}
+
+func (s *Service) GetEnsService() *ens.Service {
+	return s.ens
+}
+
+func (s *Service) GetStickersService() *stickers.Service {
+	return s.stickers
 }

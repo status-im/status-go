@@ -17,14 +17,14 @@ import (
 	communitytokendeployer "github.com/status-im/status-go/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/transactions"
 )
 
 type CommunityTokenFees struct {
 	GasUnits      uint64                `json:"gasUnits"`
-	SuggestedFees *wallet.SuggestedFees `json:"suggestedFees"`
+	SuggestedFees *router.SuggestedFees `json:"suggestedFees"`
 }
 
 func weiToGwei(val *big.Int) *big.Float {
@@ -373,7 +373,7 @@ func (s *Service) prepareCommunityTokenFees(ctx context.Context, from common.Add
 	}, nil
 }
 
-func (s *Service) suggestedFeesToSendTxArgs(from common.Address, to *common.Address, gas uint64, suggestedFees *wallet.SuggestedFees) transactions.SendTxArgs {
+func (s *Service) suggestedFeesToSendTxArgs(from common.Address, to *common.Address, gas uint64, suggestedFees *router.SuggestedFees) transactions.SendTxArgs {
 	sendArgs := transactions.SendTxArgs{}
 	sendArgs.From = types.Address(from)
 	sendArgs.To = (*types.Address)(to)
