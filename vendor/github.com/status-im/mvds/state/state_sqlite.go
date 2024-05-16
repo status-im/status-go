@@ -28,7 +28,7 @@ func (p *sqliteSyncState) Add(newState State) error {
 	}
 
 	_, err := p.db.Exec(`
-		INSERT INTO mvds_states 
+		INSERT OR IGNORE INTO mvds_states 
 			(type, send_count, send_epoch, group_id, peer_id, message_id) 
 		VALUES 
 			(?, ?, ?, ?, ?, ?)`,

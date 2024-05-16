@@ -51,7 +51,7 @@ require (
 	github.com/status-im/doubleratchet v3.0.0+incompatible
 	github.com/status-im/markdown v0.0.0-20240404192634-b7e33c6ac3d4
 	github.com/status-im/migrate/v4 v4.6.2-status.3
-	github.com/status-im/mvds v0.0.27-0.20240111144448-92d364e4be82
+	github.com/status-im/mvds v0.0.27-0.20240515104308-70c8806b0f3e
 	github.com/status-im/rendezvous v1.3.8-0.20240110194857-cc5be22bf83e
 	github.com/status-im/status-go/extkeys v1.1.2
 	github.com/status-im/tcp-shaker v1.1.1-status
