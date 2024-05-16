@@ -25,6 +25,7 @@ import (
 	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
+	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -35,7 +36,8 @@ import (
 )
 
 func NewAPI(s *Service) *API {
-	router := NewRouter(s)
+	router := router.NewRouter(s.GetRPCClient(), s.GetTransactor(), s.GetTokenManager(), s.GetMarketManager(), s.GetCollectiblesService(),
+		s.GetCollectiblesManager(), s.GetEnsService(), s.GetStickersService())
 	return &API{s, s.reader, router}
 }
 
@@ -43,7 +45,7 @@ func NewAPI(s *Service) *API {
 type API struct {
 	s      *Service
 	reader *Reader
-	router *Router
+	router *router.Router
 }
 
 func (api *API) StartWallet(ctx context.Context) error {
@@ -410,9 +412,9 @@ func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[st
 	return api.s.marketManager.FetchTokenDetails(symbols)
 }
 
-func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
+func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*router.SuggestedFees, error) {
 	log.Debug("call to GetSuggestedFees")
-	return api.s.feesManager.SuggestedFees(ctx, chainID)
+	return api.router.GetFeesManager().SuggestedFees(ctx, chainID)
 }
 
 func (api *API) GetEstimatedLatestBlockNumber(ctx context.Context, chainID uint64) (uint64, error) {
@@ -421,14 +423,14 @@ func (api *API) GetEstimatedLatestBlockNumber(ctx context.Context, chainID uint6
 }
 
 // @deprecated
-func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Float) (TransactionEstimation, error) {
+func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Float) (router.TransactionEstimation, error) {
 	log.Debug("call to getTransactionEstimatedTime")
-	return api.s.feesManager.transactionEstimatedTime(ctx, chainID, maxFeePerGas), nil
+	return api.router.GetFeesManager().TransactionEstimatedTime(ctx, chainID, maxFeePerGas), nil
 }
 
 func (api *API) GetSuggestedRoutes(
 	ctx context.Context,
-	sendType SendType,
+	sendType router.SendType,
 	addrFrom common.Address,
 	addrTo common.Address,
 	amountIn *hexutil.Big,
@@ -437,17 +439,30 @@ func (api *API) GetSuggestedRoutes(
 	disabledFromChainIDs,
 	disabledToChaindIDs,
 	preferedChainIDs []uint64,
-	gasFeeMode GasFeeMode,
+	gasFeeMode router.GasFeeMode,
 	fromLockedAmount map[uint64]*hexutil.Big,
-) (*SuggestedRoutes, error) {
+) (*router.SuggestedRoutes, error) {
 	log.Debug("call to GetSuggestedRoutes")
-	return api.router.suggestedRoutes(ctx, sendType, addrFrom, addrTo, amountIn.ToInt(), tokenID, toTokenID, disabledFromChainIDs,
-		disabledToChaindIDs, preferedChainIDs, gasFeeMode, fromLockedAmount)
+
+	testnetMode, err := api.s.accountsDB.GetTestNetworksEnabled()
+	if err != nil {
+		return nil, err
+	}
+
+	return api.router.SuggestedRoutes(ctx, sendType, addrFrom, addrTo, amountIn.ToInt(), tokenID, toTokenID, disabledFromChainIDs,
+		disabledToChaindIDs, preferedChainIDs, gasFeeMode, fromLockedAmount, testnetMode)
 }
 
-func (api *API) GetSuggestedRoutesV2(ctx context.Context, input *RouteInputParams) (*SuggestedRoutesV2, error) {
+func (api *API) GetSuggestedRoutesV2(ctx context.Context, input *router.RouteInputParams) (*router.SuggestedRoutesV2, error) {
 	log.Debug("call to GetSuggestedRoutesV2")
-	return api.router.suggestedRoutesV2(ctx, input)
+	testnetMode, err := api.s.accountsDB.GetTestNetworksEnabled()
+	if err != nil {
+		return nil, err
+	}
+
+	input.TestnetMode = testnetMode
+
+	return api.router.SuggestedRoutesV2(ctx, input)
 }
 
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
@@ -604,7 +619,7 @@ func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionComm
 			return nil, err
 		}
 
-		cmdRes, err := api.s.transactionManager.SendTransactions(ctx, cmd, data, api.router.bridges, selectedAccount)
+		cmdRes, err := api.s.transactionManager.SendTransactions(ctx, cmd, data, api.router.GetBridges(), selectedAccount)
 		if err != nil {
 			return nil, err
 		}
@@ -617,7 +632,7 @@ func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionComm
 		return cmdRes, nil
 	}
 
-	return nil, api.s.transactionManager.SendTransactionForSigningToKeycard(ctx, cmd, data, api.router.bridges)
+	return nil, api.s.transactionManager.SendTransactionForSigningToKeycard(ctx, cmd, data, api.router.GetBridges())
 }
 
 func (api *API) ProceedWithTransactionsSignatures(ctx context.Context, signatures map[string]transfer.SignatureDetails) (*transfer.MultiTransactionCommandResult, error) {

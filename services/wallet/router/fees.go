@@ -1,4 +1,4 @@
-package wallet
+package router
 
 import (
 	"context"
@@ -195,7 +195,6 @@ func (f *FeeManager) getBaseFee(ctx context.Context, client chain.ClientInterfac
 	case common.OptimismGoerli:
 	case common.ArbitrumGoerli:
 		config = params.GoerliChainConfig
-
 	}
 
 	baseFee := misc.CalcBaseFee(config, header)
@@ -238,7 +237,7 @@ func (f *FeeManager) getPriorityFees(ctx context.Context, client chain.ClientInt
 	return priorityFee, nil
 }
 
-func (f *FeeManager) transactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Float) TransactionEstimation {
+func (f *FeeManager) TransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Float) TransactionEstimation {
 	fees, err := f.getFeeHistorySorted(chainID)
 	if err != nil {
 		return Unknown

@@ -1,4 +1,4 @@
-package wallet
+package router
 
 import (
 	"context"
@@ -16,17 +16,18 @@ import (
 )
 
 type RouteInputParams struct {
-	SendType             SendType                `json:"sendType"`
-	AddrFrom             common.Address          `json:"addrFrom"`
-	AddrTo               common.Address          `json:"addrTo"`
-	AmountIn             *hexutil.Big            `json:"amountIn"`
-	TokenID              string                  `json:"tokenID"`
+	SendType             SendType                `json:"sendType" validate:"required"`
+	AddrFrom             common.Address          `json:"addrFrom" validate:"required"`
+	AddrTo               common.Address          `json:"addrTo" validate:"required"`
+	AmountIn             *hexutil.Big            `json:"amountIn" validate:"required"`
+	TokenID              string                  `json:"tokenID" validate:"required"`
 	ToTokenID            string                  `json:"toTokenID"`
 	DisabledFromChainIDs []uint64                `json:"disabledFromChainIDs"`
 	DisabledToChaindIDs  []uint64                `json:"disabledToChaindIDs"`
 	PreferedChainIDs     []uint64                `json:"preferedChainIDs"`
-	GasFeeMode           GasFeeMode              `json:"gasFeeMode"`
+	GasFeeMode           GasFeeMode              `json:"gasFeeMode" validate:"required"`
 	FromLockedAmount     map[uint64]*hexutil.Big `json:"fromLockedAmount"`
+	TestnetMode          bool                    `json:"testnetMode"`
 }
 
 type PathV2 struct {
@@ -339,14 +340,8 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 	return best
 }
 
-func (r *Router) suggestedRoutesV2(ctx context.Context, input *RouteInputParams) (*SuggestedRoutesV2, error) {
-
-	areTestNetworksEnabled, err := r.s.accountsDB.GetTestNetworksEnabled()
-	if err != nil {
-		return nil, err
-	}
-
-	networks, err := r.s.rpcClient.NetworkManager.Get(false)
+func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams) (*SuggestedRoutesV2, error) {
+	networks, err := r.rpcClient.NetworkManager.Get(false)
 	if err != nil {
 		return nil, err
 	}
@@ -359,7 +354,7 @@ func (r *Router) suggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 
 	for networkIdx := range networks {
 		network := networks[networkIdx]
-		if network.IsTest != areTestNetworksEnabled {
+		if network.IsTest != input.TestnetMode {
 			continue
 		}
 
@@ -371,14 +366,14 @@ func (r *Router) suggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 			continue
 		}
 
-		token := input.SendType.FindToken(r.s, input.AddrFrom, network, input.TokenID)
+		token := input.SendType.FindToken(r.tokenManager, r.collectiblesService, input.AddrFrom, network, input.TokenID)
 		if token == nil {
 			continue
 		}
 
 		var toToken *walletToken.Token
 		if input.SendType == Swap {
-			toToken = input.SendType.FindToken(r.s, common.Address{}, network, input.ToTokenID)
+			toToken = input.SendType.FindToken(r.tokenManager, r.collectiblesService, common.Address{}, network, input.ToTokenID)
 		}
 
 		amountLocked := false
@@ -397,7 +392,7 @@ func (r *Router) suggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 		}
 
 		group.Add(func(c context.Context) error {
-			client, err := r.s.rpcClient.EthClient(network.ChainID)
+			client, err := r.rpcClient.EthClient(network.ChainID)
 			if err != nil {
 				return err
 			}
@@ -408,7 +403,7 @@ func (r *Router) suggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 				}
 
 				for _, dest := range networks {
-					if dest.IsTest != areTestNetworksEnabled {
+					if dest.IsTest != input.TestnetMode {
 						continue
 					}
 
@@ -437,7 +432,7 @@ func (r *Router) suggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 							continue
 						}
 					} else {
-						gasLimit = input.SendType.EstimateGas(r.s, network, input.AddrFrom, input.TokenID)
+						gasLimit = input.SendType.EstimateGas(r.ensService, r.stickersService, network, input.AddrFrom, input.TokenID)
 					}
 
 					approvalContractAddress := bridge.GetContractAddress(network, token)
@@ -454,15 +449,15 @@ func (r *Router) suggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 							continue
 						}
 
-						l1FeeWei, _ = r.s.feesManager.GetL1Fee(ctx, network.ChainID, tx)
+						l1FeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, tx)
 					}
 
-					baseFee, err := r.s.feesManager.getBaseFee(ctx, client)
+					baseFee, err := r.feesManager.getBaseFee(ctx, client)
 					if err != nil {
 						continue
 					}
 
-					priorityFees, err := r.s.feesManager.getPriorityFees(ctx, client, baseFee)
+					priorityFees, err := r.feesManager.getPriorityFees(ctx, client, baseFee)
 					if err != nil {
 						continue
 					}
@@ -480,7 +475,7 @@ func (r *Router) suggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 
 					maxFeesPerGas := new(big.Float)
 					maxFeesPerGas.Add(new(big.Float).SetInt(baseFee), new(big.Float).SetInt(selctedPriorityFee))
-					estimatedTime := r.s.feesManager.transactionEstimatedTime(ctx, network.ChainID, maxFeesPerGas)
+					estimatedTime := r.feesManager.TransactionEstimatedTime(ctx, network.ChainID, maxFeesPerGas)
 					if approvalRequired && estimatedTime < MoreThanFiveMinutes {
 						estimatedTime += 1
 					}
@@ -524,7 +519,7 @@ func (r *Router) suggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 
 	group.Wait()
 
-	prices, err := input.SendType.FetchPrices(r.s, input.TokenID)
+	prices, err := input.SendType.FetchPrices(r.marketManager, input.TokenID)
 	if err != nil {
 		return nil, err
 	}
@@ -553,7 +548,7 @@ func (r *Router) suggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 			}
 		}
 
-		nativeToken := r.s.tokenManager.FindToken(path.From, path.From.NativeCurrencySymbol)
+		nativeToken := r.tokenManager.FindToken(path.From, path.From.NativeCurrencySymbol)
 		if nativeToken == nil {
 			return nil, errors.New("native token not found")
 		}
