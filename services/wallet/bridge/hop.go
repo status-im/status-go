@@ -343,24 +343,20 @@ func (h *HopBridge) swapAndSend(chainID uint64, hopArgs *HopTxArgs, signerFn bin
 }
 
 func (h *HopBridge) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int) (*big.Int, *big.Int, error) {
-	const (
-		HopMainnetChainName  = "ethereum"
-		HopOptimismChainName = "optimism"
-		HopArbitrumChainName = "arbitrum"
-	)
-
-	fromChainName := HopMainnetChainName
-	if from.ChainID == walletCommon.OptimismMainnet {
-		fromChainName = HopOptimismChainName
-	} else if from.ChainID == walletCommon.ArbitrumMainnet {
-		fromChainName = HopArbitrumChainName
+	hopChainsMap := map[uint64]string{
+		walletCommon.EthereumMainnet: "ethereum",
+		walletCommon.OptimismMainnet: "optimism",
+		walletCommon.ArbitrumMainnet: "arbitrum",
 	}
 
-	toChainName := HopMainnetChainName
-	if from.ChainID == walletCommon.OptimismMainnet {
-		toChainName = HopOptimismChainName
-	} else if from.ChainID == walletCommon.ArbitrumMainnet {
-		toChainName = HopArbitrumChainName
+	fromChainName, ok := hopChainsMap[from.ChainID]
+	if !ok {
+		return nil, nil, errors.New("from chain not supported")
+	}
+
+	toChainName, ok := hopChainsMap[to.ChainID]
+	if !ok {
+		return nil, nil, errors.New("to chain not supported")
 	}
 
 	params := netUrl.Values{}

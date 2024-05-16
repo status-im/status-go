@@ -14,6 +14,7 @@ import (
 	gaspriceoracle "github.com/status-im/status-go/contracts/gas-price-oracle"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/services/wallet/common"
 )
 
 type GasFeeMode int
@@ -101,6 +102,9 @@ func gweiToWei(val *big.Float) *big.Int {
 
 // //////////////////////////////////////////////////////////////////////////////
 // TODO: remove `suggestedFees` function once new router is in place
+//
+// But we should check the client since this function is exposed to API as `GetSuggestedFees` call.
+// Maybe we should keep it and remove it later when the client is ready for that change.
 // //////////////////////////////////////////////////////////////////////////////
 func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
 	backend, err := f.RPCClient.EthClient(chainID)
@@ -124,13 +128,10 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*Sugges
 		}, nil
 	}
 
-	header, err := backend.HeaderByNumber(ctx, nil)
+	baseFee, err := f.getBaseFee(ctx, backend)
 	if err != nil {
 		return nil, err
 	}
-
-	config := params.MainnetChainConfig
-	baseFee := misc.CalcBaseFee(config, header)
 
 	fees, err := f.getFeeHistorySorted(chainID)
 	if err != nil {
@@ -176,15 +177,25 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*Sugges
 	}, nil
 }
 
-func (f *FeeManager) getBaseFee(ctx context.Context, client chain.ClientInterface, testnetMode bool) (*big.Int, error) {
+func (f *FeeManager) getBaseFee(ctx context.Context, client chain.ClientInterface) (*big.Int, error) {
 	header, err := client.HeaderByNumber(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 
+	chainID := client.NetworkID()
+
 	config := params.MainnetChainConfig
-	if testnetMode {
+	switch chainID {
+	case common.EthereumSepolia:
+	case common.OptimismSepolia:
+	case common.ArbitrumSepolia:
 		config = params.SepoliaChainConfig
+	case common.EthereumGoerli:
+	case common.OptimismGoerli:
+	case common.ArbitrumGoerli:
+		config = params.GoerliChainConfig
+
 	}
 
 	baseFee := misc.CalcBaseFee(config, header)

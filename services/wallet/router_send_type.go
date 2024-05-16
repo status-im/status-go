@@ -88,39 +88,39 @@ func (s SendType) needL1Fee() bool {
 }
 
 func (s SendType) canUseBridge(b bridge.Bridge) bool {
-	if s == ERC721Transfer && b.Name() != ERC721TransferString {
-		return false
+	bridgeName := b.Name()
+	switch s {
+	case ERC721Transfer:
+		return bridgeName == ERC721TransferString
+	case ERC1155Transfer:
+		return bridgeName == ERC1155TransferString
+	default:
+		return true
 	}
-
-	if s != ERC721Transfer && b.Name() == ERC721TransferString {
-		return false
-	}
-
-	if s == ERC1155Transfer && b.Name() != ERC1155TransferString {
-		return false
-	}
-
-	if s != ERC1155Transfer && b.Name() == ERC1155TransferString {
-		return false
-	}
-
-	return true
 }
 
 func (s SendType) isAvailableFor(network *params.Network) bool {
+	// Set of network ChainIDs allowed for any type of transaction
+	allAllowedNetworks := map[uint64]bool{
+		walletCommon.EthereumMainnet: true,
+		walletCommon.EthereumGoerli:  true,
+		walletCommon.EthereumSepolia: true,
+	}
+
+	// Additional specific networks for the Swap SendType
+	swapAllowedNetworks := map[uint64]bool{
+		walletCommon.EthereumMainnet: true,
+		walletCommon.OptimismMainnet: true,
+		walletCommon.ArbitrumMainnet: true,
+	}
+
+	// Check for Swap specific networks
 	if s == Swap {
-		return network.ChainID == walletCommon.EthereumMainnet ||
-			network.ChainID == walletCommon.OptimismMainnet ||
-			network.ChainID == walletCommon.ArbitrumMainnet
+		return swapAllowedNetworks[network.ChainID]
 	}
 
-	if s == Transfer || s == Bridge || s.IsCollectiblesTransfer() {
-		return true
-	}
-
-	if network.ChainID == walletCommon.EthereumMainnet ||
-		network.ChainID == walletCommon.EthereumGoerli ||
-		network.ChainID == walletCommon.EthereumSepolia {
+	// Check for any SendType available for all networks
+	if s == Transfer || s == Bridge || s.IsCollectiblesTransfer() || allAllowedNetworks[network.ChainID] {
 		return true
 	}
 
@@ -132,38 +132,37 @@ func (s SendType) EstimateGas(service *Service, network *params.Network, from co
 		From:  (types.Address)(from),
 		Value: (*hexutil.Big)(zero),
 	}
-	if s == ENSRegister {
+	switch s {
+	case ENSRegister:
 		estimate, err := service.ens.API().RegisterEstimate(context.Background(), network.ChainID, tx, EstimateUsername, EstimatePubKey)
 		if err != nil {
 			return 400000
 		}
 		return estimate
-	}
 
-	if s == ENSRelease {
+	case ENSRelease:
 		estimate, err := service.ens.API().ReleaseEstimate(context.Background(), network.ChainID, tx, EstimateUsername)
 		if err != nil {
 			return 200000
 		}
 		return estimate
-	}
 
-	if s == ENSSetPubKey {
+	case ENSSetPubKey:
 		estimate, err := service.ens.API().SetPubKeyEstimate(context.Background(), network.ChainID, tx, fmt.Sprint(EstimateUsername, ".stateofus.eth"), EstimatePubKey)
 		if err != nil {
 			return 400000
 		}
 		return estimate
-	}
 
-	if s == StickersBuy {
+	case StickersBuy:
 		packID := &bigint.BigInt{Int: big.NewInt(2)}
 		estimate, err := service.stickers.API().BuyEstimate(context.Background(), network.ChainID, (types.Address)(from), packID)
 		if err != nil {
 			return 400000
 		}
 		return estimate
-	}
 
-	return 0
+	default:
+		return 0
+	}
 }

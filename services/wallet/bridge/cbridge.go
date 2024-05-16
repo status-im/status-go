@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	netUrl "net/url"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -68,7 +68,7 @@ func (s *CBridge) estimateAmt(from, to *params.Network, amountIn *big.Int, symbo
 		base = testBaseURL
 	}
 
-	params := netUrl.Values{}
+	params := url.Values{}
 	params.Add("src_chain_id", strconv.Itoa(int(from.ChainID)))
 	params.Add("dst_chain_id", strconv.Itoa(int(to.ChainID)))
 	params.Add("token_symbol", symbol)
