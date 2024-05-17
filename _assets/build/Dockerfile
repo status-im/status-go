@@ -1,5 +1,6 @@
 # Build status-go in a Go builder container
-FROM golang:1.19-alpine as builder
+FROM golang:1.20-alpine3.18 as builder
+
 
 RUN apk add --no-cache make gcc g++ musl-dev linux-headers
 
@@ -13,7 +14,7 @@ ADD . .
 RUN make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" SHELL="/bin/sh"
 
 # Copy the binary to the second image
-FROM alpine:latest
+FROM alpine:3.18
 
 ARG build_target=statusgo
 
