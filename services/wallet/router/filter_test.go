@@ -201,3 +201,31 @@ func TestHasSufficientCapacityV2(t *testing.T) {
 		})
 	}
 }
+
+func TestFilterNetworkComplianceV2(t *testing.T) {
+	fromLockedAmount := map[uint64]*hexutil.Big{
+		1: (*hexutil.Big)(big.NewInt(100)),
+		2: (*hexutil.Big)(big.NewInt(0)),
+	}
+
+	routes := [][]*PathV2{
+		{
+			{From: &params.Network{ChainID: 1}},
+			{From: &params.Network{ChainID: 3}},
+		},
+		{
+			{From: &params.Network{ChainID: 2}},
+			{From: &params.Network{ChainID: 3}},
+		},
+	}
+
+	expectedRoutes := [][]*PathV2{
+		{
+			{From: &params.Network{ChainID: 1}},
+			{From: &params.Network{ChainID: 3}},
+		},
+	}
+
+	filteredRoutes := filterNetworkComplianceV2(routes, fromLockedAmount)
+	assert.Equal(t, expectedRoutes, filteredRoutes)
+}
