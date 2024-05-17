@@ -4,8 +4,6 @@ package params
 const (
 	FleetUndefined     = ""
 	FleetProd          = "eth.prod"
-	FleetStaging       = "eth.staging"
-	FleetTest          = "eth.test"
 	FleetShardsStaging = "shards.staging"
 	FleetShardsTest    = "shards.test"
 	FleetStatusProd    = "status.prod"
@@ -60,7 +58,7 @@ var supportedFleets = map[FleetName]map[NodeType][]string{
 		},
 		DiscV5BootstrapNodes: {
 			"enrtree://AIRVQ5DDA4FFWLRBCHJWUWOO6X6S4ZTZ5B667LQ6AJU6PEYDLRD5O@sandbox.waku.nodes.status.im",
-		}
+		},
 	},
 	FleetWakuTest: {
 		WakuNodes: {
@@ -68,8 +66,8 @@ var supportedFleets = map[FleetName]map[NodeType][]string{
 		},
 		DiscV5BootstrapNodes: {
 			"enrtree://AOGYWMBYOUIMOENHXCHILPKY3ZRFEULMFI4DOM442QSZ73TT2A7VI@test.waku.nodes.status.im",
-		}
-	}
+		},
+	},
 }
 
 func DefaultWakuNodes(fleet string) []string {
