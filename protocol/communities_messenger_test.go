@@ -4337,3 +4337,73 @@ func (s *MessengerCommunitiesSuite) TestMemberMessagesHasImageLink() {
 	requireMessageWithImage(s.alice, alicePubKey, communityID)
 	requireMessageWithImage(s.bob, alicePubKey, communityID)
 }
+
+func (s *MessengerCommunitiesSuite) TestOpenAndNotJoinedCommunityNewChannelIsNotEmpty() {
+	// Create an open community
+	community, _ := s.createCommunity()
+	s.Require().Len(community.Chats(), 1)
+	s.Require().False(community.Encrypted())
+
+	// Bob joins the community
+	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	joinCommunity(&s.Suite, community, s.owner, s.bob, request, "")
+
+	// Alice just observes the community
+	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
+	_, err := s.alice.SpectateCommunity(community.ID())
+	s.Require().NoError(err)
+
+	aliceCommunity, err := s.alice.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(aliceCommunity.Chats(), 1)
+
+	// Owner creates a new channel
+	newChannel := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "new channel",
+			Emoji:       "",
+			Description: "chat created after joining the community",
+		},
+	}
+
+	response, err := s.owner.CreateCommunityChat(community.ID(), newChannel)
+	s.Require().NoError(err)
+	s.Require().Len(response.CommunityChanges, 1)
+	s.Require().Len(response.CommunityChanges[0].ChatsAdded, 1)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Chats()[0].Members, 2)
+	for _, chat := range response.Communities()[0].Chats() {
+		s.Require().Len(chat.Members, 2)
+	}
+
+	// Check Alice gets the correct member list for a new channel
+	_, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			if len(r.Chats()) == 1 && len(r.Communities()) > 0 {
+				for _, chat := range r.Chats() {
+					s.Require().Len(chat.Members, 2)
+				}
+				for _, chat := range r.Communities()[0].Chats() {
+					s.Require().Len(chat.Members, 2)
+				}
+				return true
+			}
+			return false
+		},
+		"no commiunity message for Alice",
+	)
+	s.Require().NoError(err)
+
+	aliceCommunity, err = s.alice.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(aliceCommunity.Chats(), 2)
+	for _, chat := range aliceCommunity.Chats() {
+		s.Require().Len(chat.Members, 2)
+	}
+}
