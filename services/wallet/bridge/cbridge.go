@@ -215,8 +215,14 @@ func (s *CBridge) CalculateFees(from, to *params.Network, token *token.Token, am
 	if err != nil {
 		return nil, nil, err
 	}
-	baseFee, _ := new(big.Int).SetString(amt.BaseFee, 10)
-	percFee, _ := new(big.Int).SetString(amt.PercFee, 10)
+	baseFee, ok := new(big.Int).SetString(amt.BaseFee, 10)
+	if !ok {
+		return nil, nil, errors.New("failed to parse base fee")
+	}
+	percFee, ok := new(big.Int).SetString(amt.PercFee, 10)
+	if !ok {
+		return nil, nil, errors.New("failed to parse percentage fee")
+	}
 
 	return big.NewInt(0), new(big.Int).Add(baseFee, percFee), nil
 }
