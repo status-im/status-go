@@ -481,6 +481,11 @@ func (m *Manager) Start() error {
 	if m.ownerVerifier != nil {
 		m.runOwnerVerificationLoop()
 	}
+
+	go func() {
+		_ = m.fillMissingCommunityTokens()
+	}()
+
 	return nil
 }
 
@@ -511,6 +516,61 @@ func (m *Manager) runENSVerificationLoop() {
 			}
 		}
 	}()
+}
+
+// This function is mostly a way to fix any community that is missing tokens in its description
+func (m *Manager) fillMissingCommunityTokens() error {
+	controlledCommunities, err := m.Controlled()
+	if err != nil {
+		m.logger.Error("failed to retrieve orgs", zap.Error(err))
+		return err
+	}
+
+	unlock := func() {
+		for _, c := range controlledCommunities {
+			m.communityLock.Unlock(c.ID())
+		}
+	}
+	for _, c := range controlledCommunities {
+		m.communityLock.Lock(c.ID())
+	}
+	defer unlock()
+
+	for _, community := range controlledCommunities {
+		tokens, err := m.GetCommunityTokens(community.IDString())
+		if err != nil {
+			m.logger.Error("failed to retrieve community tokens", zap.Error(err))
+			return err
+		}
+
+		for _, token := range tokens {
+			if token.DeployState != community_token.Deployed {
+				continue
+			}
+			tokenMetadata := &protobuf.CommunityTokenMetadata{
+				ContractAddresses: map[uint64]string{uint64(token.ChainID): token.Address},
+				Description:       token.Description,
+				Image:             token.Base64Image,
+				Symbol:            token.Symbol,
+				TokenType:         token.TokenType,
+				Name:              token.Name,
+				Decimals:          uint32(token.Decimals),
+			}
+			modified, err := community.UpsertCommunityTokensMetadata(tokenMetadata)
+			if err != nil {
+				m.logger.Error("failed to add token metadata to the description", zap.Error(err))
+				return err
+			}
+			if modified {
+				err = m.saveAndPublish(community)
+				if err != nil {
+					m.logger.Error("failed to save the new community", zap.Error(err))
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // Only for testing
