@@ -277,6 +277,8 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	// FIXME: This should be taken from CLI flags.
 	nodeConfig.HTTPVirtualHosts = []string{"localhost", "wakunode"}
 	nodeConfig.APIModules = *apiModules
+	// Disable to avoid errors about empty ClusterConfig.BootNodes.
+	nodeConfig.NoDiscovery = true
 
 	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
 		Enabled: true,
