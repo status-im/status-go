@@ -18,9 +18,10 @@ func filterRoutesV2(routes [][]*PathV2, amountIn *big.Int, fromLockedAmount map[
 // filterNetworkComplianceV2 performs the first level of filtering based on network inclusion/exclusion criteria.
 func filterNetworkComplianceV2(routes [][]*PathV2, fromLockedAmount map[uint64]*hexutil.Big) [][]*PathV2 {
 	var filteredRoutes [][]*PathV2
+	fromIncluded, fromExcluded := setupRouteValidationMapsV2(fromLockedAmount)
 
 	for _, route := range routes {
-		if isValidForNetworkComplianceV2(route, fromLockedAmount) {
+		if isValidForNetworkComplianceV2(route, fromIncluded, fromExcluded) {
 			filteredRoutes = append(filteredRoutes, route)
 		}
 	}
@@ -28,9 +29,7 @@ func filterNetworkComplianceV2(routes [][]*PathV2, fromLockedAmount map[uint64]*
 }
 
 // isValidForNetworkComplianceV2 checks if a route complies with network inclusion/exclusion criteria.
-func isValidForNetworkComplianceV2(route []*PathV2, fromLockedAmount map[uint64]*hexutil.Big) bool {
-	fromIncluded, fromExcluded := setupRouteValidationMapsV2(fromLockedAmount)
-
+func isValidForNetworkComplianceV2(route []*PathV2, fromIncluded, fromExcluded map[uint64]bool) bool {
 	for _, path := range route {
 		if fromExcluded[path.From.ChainID] {
 			return false
