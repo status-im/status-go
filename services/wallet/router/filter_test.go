@@ -144,3 +144,60 @@ func TestIsValidForNetworkComplianceV2(t *testing.T) {
 		})
 	}
 }
+
+func TestHasSufficientCapacityV2(t *testing.T) {
+	tests := []struct {
+		name             string
+		route            []*PathV2
+		amountIn         *big.Int
+		fromLockedAmount map[uint64]*hexutil.Big
+		expectedResult   bool
+	}{
+		{
+			name: "Sufficient capacity with multiple paths",
+			route: []*PathV2{
+				{From: &params.Network{ChainID: 1}, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+				{From: &params.Network{ChainID: 2}, AmountIn: (*hexutil.Big)(big.NewInt(200))},
+			},
+			amountIn: big.NewInt(150),
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(50)),
+				2: (*hexutil.Big)(big.NewInt(100)),
+			},
+			expectedResult: true,
+		},
+		{
+			name: "Insufficient capacity",
+			route: []*PathV2{
+				{From: &params.Network{ChainID: 1}, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+				{From: &params.Network{ChainID: 2}, AmountIn: (*hexutil.Big)(big.NewInt(50))},
+			},
+			amountIn: big.NewInt(200),
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(50)),
+				2: (*hexutil.Big)(big.NewInt(50)),
+			},
+			expectedResult: false,
+		},
+		{
+			name: "Exact capacity match",
+			route: []*PathV2{
+				{From: &params.Network{ChainID: 1}, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+				{From: &params.Network{ChainID: 2}, AmountIn: (*hexutil.Big)(big.NewInt(50))},
+			},
+			amountIn: big.NewInt(150),
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(100)),
+				2: (*hexutil.Big)(big.NewInt(50)),
+			},
+			expectedResult: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := hasSufficientCapacityV2(tt.route, tt.amountIn, tt.fromLockedAmount)
+			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+}
