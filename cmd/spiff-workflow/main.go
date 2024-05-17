@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	stdlog "log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -15,15 +17,19 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/ethereum/go-ethereum/log"
+	gethmetrics "github.com/ethereum/go-ethereum/metrics"
 
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/metrics"
+	nodemetrics "github.com/status-im/status-go/metrics/node"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/protocol"
@@ -44,6 +50,8 @@ var (
 	apiModules       = flag.String("api-modules", "wakuext,ext,waku,ens", "API modules to enable in the HTTP server")
 	pprofEnabled     = flag.Bool("pprof", false, "Enable runtime profiling via pprof")
 	pprofPort        = flag.Int("pprof-port", 52525, "Port for runtime profiling via pprof")
+	metricsEnabled   = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call")
+	metricsPort      = flag.Int("metrics-port", 9305, "Port for the Prometheus /metrics endpoint")
 
 	dataDir   = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
 	networkID = flag.Int(
@@ -124,6 +132,18 @@ func main() {
 	if err != nil {
 		logger.Error("failed import account", "err", err)
 		return
+	}
+
+	// handle interrupt signals
+	interruptCh := exitOnInterruptSignal(backend.StatusNode())
+
+	// Start collecting metrics. Metrics can be enabled by providing `-metrics` flag
+	// or setting `gethmetrics.Enabled` to true during compilation time:
+	// https://github.com/status-im/go-ethereum/pull/76.
+	if *metricsEnabled || gethmetrics.Enabled {
+		go startNodeMetrics(interruptCh, backend.StatusNode())
+		go gethmetrics.CollectProcessMetrics(3 * time.Second)
+		go metrics.NewMetricsServer(*metricsPort, gethmetrics.DefaultRegistry).Listen()
 	}
 
 	wakuextservice := backend.StatusNode().WakuV2ExtService()
@@ -418,4 +438,53 @@ func retrieveMessagesLoop(messenger *protocol.Messenger, tick time.Duration) {
 			}
 		}
 	}
+}
+
+// exitOnInterruptSignal catches interrupt signal (SIGINT) and
+// stops the node. It times out after 5 seconds
+// if the node can not be stopped.
+func exitOnInterruptSignal(statusNode *node.StatusNode) <-chan struct{} {
+	interruptCh := make(chan struct{})
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt)
+		defer signal.Stop(sigChan)
+		<-sigChan
+		close(interruptCh)
+		logger.Info("Got interrupt, shutting down...")
+		if err := statusNode.Stop(); err != nil {
+			logger.Error("Failed to stop node", "error", err)
+			os.Exit(1)
+		}
+	}()
+	return interruptCh
+}
+
+// startCollectingStats collects various stats about the node and other protocols like Whisper.
+func startNodeMetrics(interruptCh <-chan struct{}, statusNode *node.StatusNode) {
+	logger.Info("Starting collecting node metrics")
+
+	gNode := statusNode.GethNode()
+	if gNode == nil {
+		logger.Error("Failed to run metrics because it could not get the node")
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		// Try to subscribe and collect metrics. In case of an error, retry.
+		for {
+			if err := nodemetrics.SubscribeServerEvents(ctx, gNode); err != nil {
+				logger.Error("Failed to subscribe server events", "error", err)
+			} else {
+				// no error means that the subscription was terminated by purpose
+				return
+			}
+
+			time.Sleep(time.Second)
+		}
+	}()
+
+	<-interruptCh
 }
