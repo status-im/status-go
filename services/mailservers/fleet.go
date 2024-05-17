@@ -70,42 +70,6 @@ func DefaultMailservers() []Mailserver {
 			Version: 1,
 		},
 		Mailserver{
-			ID:      "mail-01.ac-cn-hongkong-c.eth.staging",
-			Address: "enode://b74859176c9751d314aeeffc26ec9f866a412752e7ddec91b19018a18e7cca8d637cfe2cedcb972f8eb64d816fbd5b4e89c7e8c7fd7df8a1329fa43db80b0bfe@47.52.90.156:443",
-			Fleet:   params.FleetStaging,
-			Version: 1,
-		},
-		Mailserver{
-			ID:      "mail-01.do-ams3.eth.staging",
-			Address: "enode://69f72baa7f1722d111a8c9c68c39a31430e9d567695f6108f31ccb6cd8f0adff4991e7fdca8fa770e75bc8a511a87d24690cbc80e008175f40c157d6f6788d48@206.189.240.16:443",
-			Fleet:   params.FleetStaging,
-			Version: 1,
-		},
-		Mailserver{
-			ID:      "mail-01.gc-us-central1-a.eth.staging",
-			Address: "enode://e4fc10c1f65c8aed83ac26bc1bfb21a45cc1a8550a58077c8d2de2a0e0cd18e40fd40f7e6f7d02dc6cd06982b014ce88d6e468725ffe2c138e958788d0002a7f@35.239.193.41:443",
-			Fleet:   params.FleetStaging,
-			Version: 1,
-		},
-		Mailserver{
-			ID:      "mail-01.ac-cn-hongkong-c.eth.test",
-			Address: "enode://619dbb5dda12e85bf0eb5db40fb3de625609043242737c0e975f7dfd659d85dc6d9a84f9461a728c5ab68c072fed38ca6a53917ca24b8e93cc27bdef3a1e79ac@47.52.188.196:443",
-			Fleet:   params.FleetTest,
-			Version: 1,
-		},
-		Mailserver{
-			ID:      "mail-01.do-ams3.eth.test",
-			Address: "enode://e4865fe6c2a9c1a563a6447990d8e9ce672644ae3e08277ce38ec1f1b690eef6320c07a5d60c3b629f5d4494f93d6b86a745a0bf64ab295bbf6579017adc6ed8@206.189.243.161:443",
-			Fleet:   params.FleetTest,
-			Version: 1,
-		},
-		Mailserver{
-			ID:      "mail-01.gc-us-central1-a.eth.test",
-			Address: "enode://707e57453acd3e488c44b9d0e17975371e2f8fb67525eae5baca9b9c8e06c86cde7c794a6c2e36203bf9f56cae8b0e50f3b33c4c2b694a7baeea1754464ce4e3@35.192.229.172:443",
-			Fleet:   params.FleetTest,
-			Version: 1,
-		},
-		Mailserver{
 			ID:      "node-01.ac-cn-hongkong-c.waku.sandbox",
 			Address: "/dns4/node-01.ac-cn-hongkong-c.waku.sandbox.status.im/tcp/30303/p2p/16Uiu2HAmSJvSJphxRdbnigUV5bjRRZFBhTtWFTSyiKaQByCjwmpV",
 			Fleet:   params.FleetWakuSandbox,

@@ -6,7 +6,6 @@ echo "Downloading https://fleets.status.im/"
 json=$(curl --silent https://fleets.status.im/)
 fleets=(
     'eth.prod'
-    'eth.staging'
 )
 
 wakufleets=(
