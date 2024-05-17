@@ -1051,3 +1051,55 @@ func (s *PersistenceSuite) TestDecryptedCommunityCacheClock() {
 	s.Require().NoError(err)
 	s.Require().Equal(count, 1)
 }
+
+func (s *PersistenceSuite) TestGetCommunityRequestsToJoinRevealedAddresses() {
+	clock := uint64(time.Now().Unix())
+	communityID := types.HexBytes{7, 7, 7, 7, 7, 7, 7, 7}
+	revealedAddress := "address1"
+	chainIds := []uint64{1, 2}
+	publicKey := common.PubkeyToHex(&s.identity.PublicKey)
+	signature := []byte("test")
+
+	// No data in database
+	accounts, err := s.db.GetCommunityRequestsToJoinRevealedAddresses(communityID)
+	s.Require().NoError(err)
+	_, exists := accounts[publicKey]
+	s.Require().False(exists)
+
+	expectedRtj := &RequestToJoin{
+		ID:          types.HexBytes{1, 2, 3, 4, 5, 6, 7, 8},
+		PublicKey:   publicKey,
+		Clock:       clock,
+		CommunityID: communityID,
+		State:       RequestToJoinStateAccepted,
+		RevealedAccounts: []*protobuf.RevealedAccount{
+			{
+				Address:          revealedAddress,
+				ChainIds:         chainIds,
+				IsAirdropAddress: true,
+				Signature:        signature,
+			},
+		},
+	}
+
+	// Request to join was stored without revealed account
+	err = s.db.SaveRequestToJoin(expectedRtj)
+	s.Require().NoError(err, "SaveRequestToJoin shouldn't give any error")
+
+	// revealed account is absent
+	accounts, err = s.db.GetCommunityRequestsToJoinRevealedAddresses(communityID)
+	s.Require().NoError(err, "RevealedAccounts empty, shouldn't give any error")
+
+	_, exists = accounts[publicKey]
+	s.Require().False(exists)
+
+	// save revealed accounts for the previous request to join
+	err = s.db.SaveRequestToJoinRevealedAddresses(expectedRtj.ID, expectedRtj.RevealedAccounts)
+	s.Require().NoError(err)
+
+	accounts, err = s.db.GetCommunityRequestsToJoinRevealedAddresses(communityID)
+	s.Require().NoError(err)
+	memberAccounts, exists := accounts[publicKey]
+	s.Require().True(exists)
+	s.Require().Len(memberAccounts, 1)
+}

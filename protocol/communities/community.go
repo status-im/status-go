@@ -2186,6 +2186,14 @@ func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey,
 	return changes, nil
 }
 
+func (o *Community) PopulateChannelsWithAllMembers() {
+	members := o.Members()
+	for _, channel := range o.Chats() {
+		channel.Members = members
+	}
+	o.increaseClock()
+}
+
 func (o *Community) PopulateChatWithAllMembers(chatID string) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
@@ -2479,6 +2487,7 @@ func (o *Community) deleteTokenPermission(permissionID string) (*CommunityChange
 	changes := o.emptyCommunityChanges()
 
 	changes.TokenPermissionsRemoved[permissionID] = NewCommunityTokenPermission(permission)
+
 	return changes, nil
 }
 

@@ -2055,3 +2055,59 @@ func (p *Persistence) getDecryptedCommunityDescriptionByID(tx *sql.Tx, community
 		return nil, err
 	}
 }
+
+func (p *Persistence) GetCommunityRequestsToJoinRevealedAddresses(communityID []byte) (map[string][]*protobuf.RevealedAccount, error) {
+	accounts := make(map[string][]*protobuf.RevealedAccount)
+
+	rows, err := p.db.Query(`
+	SELECT r.public_key,
+		a.address, a.chain_ids, a.is_airdrop_address, a.signature
+	FROM communities_requests_to_join r
+	LEFT JOIN communities_requests_to_join_revealed_addresses a ON r.id = a.request_id
+	WHERE r.community_id = ? AND r.state = ?`, communityID, RequestToJoinStateAccepted)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return accounts, nil
+		}
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var rawPublicKey sql.NullString
+		var address sql.NullString
+		var chainIDsStr sql.NullString
+		var isAirdropAddress sql.NullBool
+		var signature sql.RawBytes
+
+		err = rows.Scan(&rawPublicKey, &address, &chainIDsStr, &isAirdropAddress, &signature)
+		if err != nil {
+			return nil, err
+		}
+
+		if !rawPublicKey.Valid {
+			return nil, errors.New("GetCommunityRequestsToJoinRevealedAddresses: invalid public key")
+		}
+
+		publicKey := rawPublicKey.String
+
+		revealedAccount, err := toRevealedAccount(address, chainIDsStr, isAirdropAddress, signature)
+		if err != nil {
+			return nil, err
+		}
+
+		if revealedAccount == nil {
+			continue
+		}
+
+		if _, exists := accounts[publicKey]; !exists {
+			accounts[publicKey] = []*protobuf.RevealedAccount{revealedAccount}
+		} else {
+			accounts[publicKey] = append(accounts[publicKey], revealedAccount)
+		}
+	}
+
+	return accounts, nil
+}

@@ -7,11 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
@@ -2010,4 +2012,123 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 	)
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissionsPerformance() {
+	// This test is created for a performance degradation tracking for reevaluateMember permissions
+	// current scenario mostly track channels permissions reevaluating, but feel free to expand it to
+	// other scenarios or test you performance improvements
+
+	// in average, it took nearly 100-105 ms to check one permission for a current scenario:
+	// - 10 members
+	// - 10 channels
+	// - one permission (channel permission for all 10 channels is set up)
+
+	// currently, adding any new permission to test must twice the current test average time
+
+	community, chat := s.createCommunity()
+
+	community, err := s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(community.Chats(), 2)
+
+	requestToJoin := &communities.RequestToJoin{
+		Clock:       uint64(time.Now().Unix()),
+		CommunityID: community.ID(),
+		State:       communities.RequestToJoinStateAccepted,
+		RevealedAccounts: []*protobuf.RevealedAccount{
+			{
+				Address:          bobAddress,
+				ChainIds:         []uint64{testChainID1},
+				IsAirdropAddress: true,
+				Signature:        []byte("test"),
+			},
+		},
+	}
+	communityRole := []protobuf.CommunityMember_Roles{}
+
+	keysCount := 10
+
+	for i := 0; i < keysCount; i++ {
+		privateKey, err := crypto.GenerateKey()
+		s.Require().NoError(err)
+
+		memberPubKeyStr := common.PubkeyToHex(&privateKey.PublicKey)
+		requestId := communities.CalculateRequestID(memberPubKeyStr, community.ID())
+		requestToJoin.ID = requestId
+		requestToJoin.PublicKey = memberPubKeyStr
+
+		err = s.owner.communitiesManager.SaveRequestToJoin(requestToJoin)
+		s.Require().NoError(err)
+		err = s.owner.communitiesManager.SaveRequestToJoinRevealedAddresses(requestId, requestToJoin.RevealedAccounts)
+		s.Require().NoError(err)
+		_, err = community.AddMember(&privateKey.PublicKey, communityRole)
+		s.Require().NoError(err)
+		_, err = community.AddMemberToChat(chat.CommunityChatID(), &privateKey.PublicKey, communityRole, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
+		s.Require().NoError(err)
+	}
+
+	s.Require().Equal(community.MembersCount(), keysCount+1) // 1 is owner
+
+	chatsCount := 8 // in total will be 10, 2 channels were created during creating the community
+
+	for i := 0; i < chatsCount; i++ {
+		newChat := &protobuf.CommunityChat{
+			Permissions: &protobuf.CommunityPermissions{
+				Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
+			},
+			Identity: &protobuf.ChatIdentity{
+				DisplayName: "name-" + strconv.Itoa(i),
+				Description: "",
+			},
+		}
+
+		chatID := uuid.New().String()
+		_, err = community.CreateChat(chatID, newChat)
+		s.Require().NoError(err)
+	}
+
+	s.Require().Len(community.Chats(), chatsCount+2) // 2 chats were created during community creation
+
+	err = s.owner.communitiesManager.SaveCommunity(community)
+	s.Require().NoError(err)
+
+	// setup view channel permission
+	channelPermissionRequest := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				AmountInWei:       "100000000000000000000",
+				Decimals:          uint64(18),
+			},
+		},
+		ChatIds: community.ChatIDs(),
+	}
+
+	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, channelPermissionRequest.TokenCriteria[0])
+	defer s.resetMockedBalances() // reset mocked balances, this test in run with different test cases
+
+	// create permission using communitiesManager in order not to launch blocking reevaluation loop
+	community, _, err = s.owner.communitiesManager.CreateCommunityTokenPermission(&channelPermissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(community.TokenPermissions(), 1)
+
+	for _, ids := range community.ChatIDs() {
+		s.Require().True(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), ids))
+	}
+
+	// force owner to reevaluate channel members
+	// in production it will happen automatically, by periodic check
+	start := time.Now()
+	_, _, err = s.owner.communitiesManager.ReevaluateMembers(community.ID())
+	s.Require().NoError(err)
+
+	elapsed := time.Since(start)
+
+	fmt.Println("ReevaluateMembers Time: ", elapsed)
+	s.Require().Less(elapsed.Seconds(), 2.0)
 }

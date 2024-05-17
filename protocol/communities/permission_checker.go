@@ -22,7 +22,7 @@ import (
 
 type PermissionChecker interface {
 	CheckPermissionToJoin(*Community, []gethcommon.Address) (*CheckPermissionToJoinResponse, error)
-	CheckPermissions(permissions []*CommunityTokenPermission, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckPermissionsResponse, error)
+	CheckPermissions(permissionsParsedData *PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckPermissionsResponse, error)
 }
 
 type DefaultPermissionChecker struct {
@@ -31,6 +31,18 @@ type DefaultPermissionChecker struct {
 	ensVerifier         *ens.Verifier
 
 	logger *zap.Logger
+}
+
+type PreParsedPermissionsData struct {
+	Erc721TokenRequirements map[uint64]map[string]*protobuf.TokenCriteria
+	Erc20TokenAddresses     []gethcommon.Address
+	Erc20ChainIDsMap        map[uint64]bool
+	Erc721ChainIDsMap       map[uint64]bool
+}
+
+type PreParsedCommunityPermissionsData struct {
+	*PreParsedPermissionsData
+	Permissions []*CommunityTokenPermission
 }
 
 func (p *DefaultPermissionChecker) getOwnedENS(addresses []gethcommon.Address) ([]string, error) {
@@ -159,8 +171,8 @@ func (p *DefaultPermissionChecker) CheckPermissionToJoin(community *Community, a
 		return becomeMemberPermissionsResponse, nil
 	}
 	// If there are any admin or token master permissions, combine result.
-
-	adminOrTokenPermissionsResponse, err := p.CheckPermissions(adminOrTokenMasterPermissionsToJoin, accountsAndChainIDs, false)
+	preParsedPermissions := preParsedCommunityPermissionsData(adminOrTokenMasterPermissionsToJoin)
+	adminOrTokenPermissionsResponse, err := p.CheckPermissions(preParsedPermissions, accountsAndChainIDs, false)
 	if err != nil {
 		return nil, err
 	}
@@ -191,13 +203,15 @@ func (p *DefaultPermissionChecker) checkPermissionsOrDefault(permissions []*Comm
 		}
 		return response, nil
 	}
-	return p.CheckPermissions(permissions, accountsAndChainIDs, false)
+
+	preParsedPermissions := preParsedCommunityPermissionsData(permissions)
+	return p.CheckPermissions(preParsedPermissions, accountsAndChainIDs, false)
 }
 
 // CheckPermissions will retrieve balances and check whether the user has
 // permission to join the community, if shortcircuit is true, it will stop as soon
 // as we know the answer
-func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityTokenPermission, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckPermissionsResponse, error) {
+func (p *DefaultPermissionChecker) CheckPermissions(permissionsParsedData *PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckPermissionsResponse, error) {
 
 	response := &CheckPermissionsResponse{
 		Satisfied:         false,
@@ -205,28 +219,23 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 		ValidCombinations: make([]*AccountChainIDsCombination, 0),
 	}
 
-	erc20TokenRequirements, erc721TokenRequirements, _ := ExtractTokenCriteria(permissions)
+	if permissionsParsedData == nil {
+		response.Satisfied = true
+		return response, nil
+	}
 
-	erc20ChainIDsMap := make(map[uint64]bool)
-	erc721ChainIDsMap := make(map[uint64]bool)
+	erc721TokenRequirements := permissionsParsedData.Erc721TokenRequirements
 
-	erc20TokenAddresses := make([]gethcommon.Address, 0)
+	erc20ChainIDsMap := permissionsParsedData.Erc20ChainIDsMap
+	erc721ChainIDsMap := permissionsParsedData.Erc721ChainIDsMap
+
+	erc20TokenAddresses := permissionsParsedData.Erc20TokenAddresses
+
 	accounts := make([]gethcommon.Address, 0)
 
+	// TODO: move outside in order not to convert it
 	for _, accountAndChainIDs := range accountsAndChainIDs {
 		accounts = append(accounts, accountAndChainIDs.Address)
-	}
-
-	// figure out chain IDs we're interested in
-	for chainID, tokens := range erc20TokenRequirements {
-		erc20ChainIDsMap[chainID] = true
-		for contractAddress := range tokens {
-			erc20TokenAddresses = append(erc20TokenAddresses, gethcommon.HexToAddress(contractAddress))
-		}
-	}
-
-	for chainID := range erc721TokenRequirements {
-		erc721ChainIDsMap[chainID] = true
 	}
 
 	chainIDsForERC20 := calculateChainIDsSet(accountsAndChainIDs, erc20ChainIDsMap)
@@ -260,7 +269,7 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 
 	accountsChainIDsCombinations := make(map[gethcommon.Address]map[uint64]bool)
 
-	for _, tokenPermission := range permissions {
+	for _, tokenPermission := range permissionsParsedData.Permissions {
 
 		permissionRequirementsMet := true
 		response.Permissions[tokenPermission.Id] = &PermissionTokenCriteriaResult{Role: tokenPermission.Type}
@@ -434,4 +443,65 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissions []*CommunityToke
 	response.calculateSatisfied()
 
 	return response, nil
+}
+
+func preParsedPermissionsData(permissions []*CommunityTokenPermission) *PreParsedPermissionsData {
+	erc20TokenRequirements, erc721TokenRequirements, _ := ExtractTokenCriteria(permissions)
+
+	erc20ChainIDsMap := make(map[uint64]bool)
+	erc721ChainIDsMap := make(map[uint64]bool)
+
+	erc20TokenAddresses := make([]gethcommon.Address, 0)
+
+	// figure out chain IDs we're interested in
+	for chainID, tokens := range erc20TokenRequirements {
+		erc20ChainIDsMap[chainID] = true
+		for contractAddress := range tokens {
+			erc20TokenAddresses = append(erc20TokenAddresses, gethcommon.HexToAddress(contractAddress))
+		}
+	}
+
+	for chainID := range erc721TokenRequirements {
+		erc721ChainIDsMap[chainID] = true
+	}
+
+	return &PreParsedPermissionsData{
+		Erc721TokenRequirements: erc721TokenRequirements,
+		Erc20TokenAddresses:     erc20TokenAddresses,
+		Erc20ChainIDsMap:        erc20ChainIDsMap,
+		Erc721ChainIDsMap:       erc721ChainIDsMap,
+	}
+}
+
+func preParsedCommunityPermissionsData(permissions []*CommunityTokenPermission) *PreParsedCommunityPermissionsData {
+	if len(permissions) == 0 {
+		return nil
+	}
+
+	return &PreParsedCommunityPermissionsData{
+		Permissions:              permissions,
+		PreParsedPermissionsData: preParsedPermissionsData(permissions),
+	}
+}
+
+func PreParsePermissionsData(permissions map[string]*CommunityTokenPermission) (map[protobuf.CommunityTokenPermission_Type]*PreParsedCommunityPermissionsData, map[string]*PreParsedCommunityPermissionsData) {
+	becomeMemberPermissions := TokenPermissionsByType(permissions, protobuf.CommunityTokenPermission_BECOME_MEMBER)
+	becomeAdminPermissions := TokenPermissionsByType(permissions, protobuf.CommunityTokenPermission_BECOME_ADMIN)
+	becomeTokenMasterPermissions := TokenPermissionsByType(permissions, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+
+	viewOnlyPermissions := TokenPermissionsByType(permissions, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
+	viewAndPostPermissions := TokenPermissionsByType(permissions, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
+	channelPermissions := append(viewAndPostPermissions, viewOnlyPermissions...)
+
+	communityPermissionsPreParsedData := make(map[protobuf.CommunityTokenPermission_Type]*PreParsedCommunityPermissionsData)
+	communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_MEMBER] = preParsedCommunityPermissionsData(becomeMemberPermissions)
+	communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_ADMIN] = preParsedCommunityPermissionsData(becomeAdminPermissions)
+	communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER] = preParsedCommunityPermissionsData(becomeTokenMasterPermissions)
+
+	channelPermissionsPreParsedData := make(map[string]*PreParsedCommunityPermissionsData)
+	for _, channelPermission := range channelPermissions {
+		channelPermissionsPreParsedData[channelPermission.Id] = preParsedCommunityPermissionsData([]*CommunityTokenPermission{channelPermission})
+	}
+
+	return communityPermissionsPreParsedData, channelPermissionsPreParsedData
 }
