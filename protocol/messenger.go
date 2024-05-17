@@ -3560,13 +3560,13 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 	}
 
 	if chat.CommunityChat() {
-		joinedClock, err := m.communitiesManager.GetCommunityRequestToJoinClock(&publicKey, message.CommunityID)
+		// Ignore mentions & replies in community before joining
+		joinedClock, err := m.communitiesManager.GetCommunityRequestToJoinClock(&publicKey, chat.CommunityID)
 		if err != nil {
 			return err
 		}
 
-		// Ignore mentions & replies in community before joining
-		if message.Clock < joinedClock {
+		if joinedClock == 0 || message.Clock < joinedClock {
 			return nil
 		}
 	}

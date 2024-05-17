@@ -4407,3 +4407,83 @@ func (s *MessengerCommunitiesSuite) TestOpenAndNotJoinedCommunityNewChannelIsNot
 		s.Require().Len(chat.Members, 2)
 	}
 }
+
+func (s *MessengerCommunitiesSuite) sendMention(sender *Messenger, chatID string) *common.Message {
+	ctx := context.Background()
+	messageToSend := common.NewMessage()
+	messageToSend.ChatId = chatID
+	messageToSend.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	messageToSend.Text = "Hello @" + common.EveryoneMentionTag
+
+	response, err := sender.SendChatMessage(ctx, messageToSend)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().True(response.Messages()[0].Mentioned)
+	return response.Messages()[0]
+}
+
+func (s *MessengerCommunitiesSuite) TestAliceDoesNotReceiveMentionWhenSpectating() {
+	// GIVEN: Create an open community
+	community, communityChat := s.createCommunity()
+	community, err := s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(community.Chats(), 1)
+	s.Require().False(community.Encrypted())
+
+	// Alice SPECTATES the community
+	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
+	_, err = s.alice.SpectateCommunity(community.ID())
+	s.Require().NoError(err)
+
+	aliceCommunity, err := s.alice.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Contains(aliceCommunity.ChatIDs(), communityChat.ID)
+
+	// Bob JOINS the community
+	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	joinCommunity(&s.Suite, community, s.owner, s.bob, request, "")
+
+	// Check Alice gets the updated community
+	_, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && r.Communities()[0].MembersCount() == 2
+		},
+		"no community updates for Alice",
+	)
+	s.Require().NoError(err)
+
+	// WHEN: Bob sends a message to a channel with mention
+	sentMessage := s.sendMention(s.bob, communityChat.ID)
+
+	// THEN: Check Alice gets the message, but no activity center notification
+	_, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Messages()) == 1 && len(r.ActivityCenterNotifications()) == 0 &&
+				r.Messages()[0].ID == sentMessage.ID
+		},
+		"no message for Alice",
+	)
+	s.Require().NoError(err)
+
+	// Alice joins community
+	request = &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	joinCommunity(&s.Suite, community, s.owner, s.alice, request, "")
+
+	// Bob sends a message with mention
+	sentMessage = s.sendMention(s.bob, communityChat.ID)
+
+	// Check Alice gets the message and activity center notification
+	_, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Messages()) == 1 && len(r.ActivityCenterNotifications()) == 1 &&
+				r.Messages()[0].ID == sentMessage.ID && r.ActivityCenterNotifications()[0].Message.ID == sentMessage.ID &&
+				r.ActivityCenterNotifications()[0].Type == ActivityCenterNotificationTypeMention
+		},
+		"no message for Alice",
+	)
+	s.Require().NoError(err)
+}

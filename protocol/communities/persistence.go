@@ -862,6 +862,16 @@ func (p *Persistence) GetNumberOfPendingRequestsToJoin(communityID types.HexByte
 	return count, nil
 }
 
+func (p *Persistence) GetRequestToJoinClockByPkAndCommunityID(pk string, communityID types.HexBytes) (uint64, error) {
+	var clock uint64
+
+	err := p.db.QueryRow(`
+		SELECT clock 
+		FROM communities_requests_to_join 
+		WHERE public_key = ? AND community_id = ?`, pk, communityID).Scan(&clock)
+	return clock, err
+}
+
 func (p *Persistence) GetRequestToJoinByPkAndCommunityID(pk string, communityID []byte) (*RequestToJoin, error) {
 	request := &RequestToJoin{}
 	err := p.db.QueryRow(`SELECT id,public_key,clock,ens_name,customization_color,chat_id,community_id,state FROM communities_requests_to_join WHERE public_key = ? AND community_id = ?`, pk, communityID).Scan(&request.ID, &request.PublicKey, &request.Clock, &request.ENSName, &request.CustomizationColor, &request.ChatID, &request.CommunityID, &request.State)

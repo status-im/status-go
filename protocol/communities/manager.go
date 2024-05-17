@@ -3694,17 +3694,20 @@ func (m *Manager) GetRequestToJoinIDByPkAndCommunityID(pk *ecdsa.PublicKey, comm
 }
 
 func (m *Manager) GetCommunityRequestToJoinClock(pk *ecdsa.PublicKey, communityID string) (uint64, error) {
-	request, err := m.persistence.GetRequestToJoinByPkAndCommunityID(common.PubkeyToHex(pk), []byte(communityID))
+	communityIDBytes, err := types.DecodeHex(communityID)
+	if err != nil {
+		return 0, err
+	}
+
+	joinClock, err := m.persistence.GetRequestToJoinClockByPkAndCommunityID(common.PubkeyToHex(pk), communityIDBytes)
+
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
 	} else if err != nil {
 		return 0, err
 	}
 
-	if request == nil || request.State != RequestToJoinStateAccepted {
-		return 0, nil
-	}
-	return request.Clock, nil
+	return joinClock, nil
 }
 
 func (m *Manager) GetRequestToJoinByPkAndCommunityID(pk *ecdsa.PublicKey, communityID []byte) (*RequestToJoin, error) {
