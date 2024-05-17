@@ -369,33 +369,217 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 }
 
 func TestFilterCapacityValidationV2(t *testing.T) {
-	fromLockedAmount := map[uint64]*hexutil.Big{
-		1: (*hexutil.Big)(big.NewInt(50)),
-		2: (*hexutil.Big)(big.NewInt(100)),
-	}
+	network1 := &params.Network{ChainID: 1}
+	network2 := &params.Network{ChainID: 2}
+	network3 := &params.Network{ChainID: 3}
 
-	routes := [][]*PathV2{
+	tests := []struct {
+		name             string
+		routes           [][]*PathV2
+		amountIn         *big.Int
+		fromLockedAmount map[uint64]*hexutil.Big
+		expectedRoutes   [][]*PathV2
+	}{
 		{
-			{From: &params.Network{ChainID: 1}, AmountIn: (*hexutil.Big)(big.NewInt(100))},
-			{From: &params.Network{ChainID: 2}, AmountIn: (*hexutil.Big)(big.NewInt(200))},
+			name: "Sufficient capacity with multiple paths",
+			routes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(200))},
+				},
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(50))},
+					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+				},
+			},
+			amountIn: big.NewInt(150),
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(50)),
+				2: (*hexutil.Big)(big.NewInt(100)),
+			},
+			expectedRoutes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: false},
+					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(200)), AmountInLocked: false},
+				},
+			},
 		},
 		{
-			{From: &params.Network{ChainID: 3}, AmountIn: (*hexutil.Big)(big.NewInt(100))},
-			{From: &params.Network{ChainID: 4}, AmountIn: (*hexutil.Big)(big.NewInt(50))},
+			name: "Insufficient capacity",
+			routes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(50))},
+				},
+			},
+			amountIn: big.NewInt(200),
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(50)),
+				2: (*hexutil.Big)(big.NewInt(50)),
+			},
+			expectedRoutes: [][]*PathV2{},
 		},
-	}
-
-	amountIn := big.NewInt(120)
-
-	expectedRoutes := [][]*PathV2{
 		{
-			{From: &params.Network{ChainID: 1}, AmountIn: (*hexutil.Big)(big.NewInt(100))},
-			{From: &params.Network{ChainID: 2}, AmountIn: (*hexutil.Big)(big.NewInt(200))},
+			name: "Exact capacity match",
+			routes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(50))},
+				},
+			},
+			amountIn: big.NewInt(150),
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(100)),
+				2: (*hexutil.Big)(big.NewInt(50)),
+			},
+			expectedRoutes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: true},
+					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(50)), AmountInLocked: true},
+				},
+			},
+		},
+		{
+			name: "No locked amounts",
+			routes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(50))},
+				},
+			},
+			amountIn:         big.NewInt(150),
+			fromLockedAmount: map[uint64]*hexutil.Big{},
+			expectedRoutes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: false},
+					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(50)), AmountInLocked: false},
+				},
+			},
+		},
+		{
+			name: "Single route with sufficient capacity",
+			routes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(200))},
+				},
+			},
+			amountIn: big.NewInt(150),
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(50)),
+			},
+			expectedRoutes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(200)), AmountInLocked: false},
+				},
+			},
+		},
+		{
+			name: "Single route with insufficient capacity",
+			routes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+				},
+			},
+			amountIn: big.NewInt(150),
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(50)),
+			},
+			expectedRoutes: [][]*PathV2{},
+		},
+		{
+			name:     "Empty routes",
+			routes:   [][]*PathV2{},
+			amountIn: big.NewInt(150),
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(50)),
+			},
+			expectedRoutes: [][]*PathV2{},
+		},
+		{
+			name: "Routes with duplicate chain IDs",
+			routes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+				},
+			},
+			amountIn: big.NewInt(150),
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(50)),
+			},
+			expectedRoutes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: false},
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: false},
+				},
+			},
+		},
+		{
+			name: "Partial locked amounts",
+			routes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{From: network3, AmountIn: (*hexutil.Big)(big.NewInt(200))},
+				},
+			},
+			amountIn: big.NewInt(250),
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(50)),
+				2: (*hexutil.Big)(big.NewInt(0)),
+				3: (*hexutil.Big)(big.NewInt(100)),
+			},
+			expectedRoutes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: true},
+					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: false},
+					{From: network3, AmountIn: (*hexutil.Big)(big.NewInt(200)), AmountInLocked: true},
+				},
+			},
+		},
+		{
+			name: "Mixed networks with sufficient capacity",
+			routes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{From: network3, AmountIn: (*hexutil.Big)(big.NewInt(200))},
+				},
+			},
+			amountIn: big.NewInt(250),
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(100)),
+				3: (*hexutil.Big)(big.NewInt(200)),
+			},
+			expectedRoutes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: true},
+					{From: network3, AmountIn: (*hexutil.Big)(big.NewInt(200)), AmountInLocked: true},
+				},
+			},
+		},
+		{
+			name: "Mixed networks with insufficient capacity",
+			routes: [][]*PathV2{
+				{
+					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{From: network3, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+				},
+			},
+			amountIn: big.NewInt(250),
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(50)),
+				3: (*hexutil.Big)(big.NewInt(100)),
+			},
+			expectedRoutes: [][]*PathV2{},
 		},
 	}
 
-	filteredRoutes := filterCapacityValidationV2(routes, amountIn, fromLockedAmount)
-	assert.Equal(t, expectedRoutes, filteredRoutes)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filteredRoutes := filterCapacityValidationV2(tt.routes, tt.amountIn, tt.fromLockedAmount)
+			assert.Equal(t, tt.expectedRoutes, filteredRoutes)
+		})
+	}
 }
 
 func TestFilterRoutesV2(t *testing.T) {
