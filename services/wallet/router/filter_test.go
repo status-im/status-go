@@ -54,3 +54,40 @@ func TestSetupRouteValidationMapsV2(t *testing.T) {
 		})
 	}
 }
+
+func TestCalculateTotalRestAmountV2(t *testing.T) {
+	tests := []struct {
+		name          string
+		route         []*PathV2
+		expectedTotal *big.Int
+	}{
+		{
+			name: "Multiple paths with varying amounts",
+			route: []*PathV2{
+				{AmountIn: (*hexutil.Big)(big.NewInt(100))},
+				{AmountIn: (*hexutil.Big)(big.NewInt(200))},
+				{AmountIn: (*hexutil.Big)(big.NewInt(300))},
+			},
+			expectedTotal: big.NewInt(600),
+		},
+		{
+			name: "Single path",
+			route: []*PathV2{
+				{AmountIn: (*hexutil.Big)(big.NewInt(500))},
+			},
+			expectedTotal: big.NewInt(500),
+		},
+		{
+			name:          "No paths",
+			route:         []*PathV2{},
+			expectedTotal: big.NewInt(0),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			total := calculateTotalRestAmountV2(tt.route)
+			assert.Equal(t, tt.expectedTotal, total)
+		})
+	}
+}
