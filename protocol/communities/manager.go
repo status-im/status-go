@@ -1165,6 +1165,23 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 		error
 	}
 
+	shouldReevaluate := func(task *membersReevaluationTask, force bool) bool {
+		task.mutex.Lock()
+		defer task.mutex.Unlock()
+
+		// Ensure reevaluation is performed not more often than once per minute
+		if !force && task.lastSuccessTime.After(time.Now().Add(-1*time.Minute)) {
+			return false
+		}
+
+		if !task.lastSuccessTime.Before(time.Now().Add(-memberPermissionsCheckInterval)) &&
+			!task.lastSuccessTime.Before(task.onDemandRequestTime) {
+			return false
+		}
+
+		return true
+	}
+
 	reevaluateMembers := func(force bool) (err error) {
 		t, exists := m.membersReevaluationTasks.Load(communityID.String())
 		if !exists {
@@ -1178,16 +1195,8 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 				error: errors.New("invalid task type"),
 			}
 		}
-		task.mutex.Lock()
-		defer task.mutex.Unlock()
 
-		// Ensure reevaluation is performed not more often than once per minute
-		if !force && task.lastSuccessTime.After(time.Now().Add(-1*time.Minute)) {
-			return nil
-		}
-
-		if !task.lastSuccessTime.Before(time.Now().Add(-memberPermissionsCheckInterval)) &&
-			!task.lastSuccessTime.Before(task.onDemandRequestTime) {
+		if !shouldReevaluate(task, force) {
 			return nil
 		}
 
@@ -1201,7 +1210,10 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 			return err
 		}
 
+		task.mutex.Lock()
+		defer task.mutex.Unlock()
 		task.lastSuccessTime = time.Now()
+
 		return nil
 	}
 
