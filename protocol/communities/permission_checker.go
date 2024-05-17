@@ -34,7 +34,6 @@ type DefaultPermissionChecker struct {
 }
 
 type PreParsedPermissionsData struct {
-	Erc20TokenRequirements  map[uint64]map[string]*protobuf.TokenCriteria
 	Erc721TokenRequirements map[uint64]map[string]*protobuf.TokenCriteria
 	Erc20TokenAddresses     []gethcommon.Address
 	Erc20ChainIDsMap        map[uint64]bool
@@ -467,7 +466,6 @@ func preParsedPermissionsData(permissions []*CommunityTokenPermission) *PreParse
 	}
 
 	return &PreParsedPermissionsData{
-		Erc20TokenRequirements:  erc20TokenRequirements,
 		Erc721TokenRequirements: erc721TokenRequirements,
 		Erc20TokenAddresses:     erc20TokenAddresses,
 		Erc20ChainIDsMap:        erc20ChainIDsMap,
