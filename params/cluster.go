@@ -4,6 +4,8 @@ package params
 const (
 	FleetUndefined     = ""
 	FleetProd          = "eth.prod"
+	FleetStaging       = "eth.staging"
+	FleetTest          = "eth.test"
 	FleetShardsStaging = "shards.staging"
 	FleetShardsTest    = "shards.test"
 	FleetStatusProd    = "status.prod"
@@ -20,16 +22,63 @@ type Cluster struct {
 	RendezvousNodes []string `json:"rendezvousnodes"`
 }
 
+type FleetName = string
+type NodeType = string
+
+const (
+	WakuNodes            NodeType = "WakuNodes"
+	DiscV5BootstrapNodes NodeType = "DiscV5BootstrapNodes"
+)
+
 // DefaultWakuNodes is a list of "supported" fleets. This list is populated to clients UI settings.
-var supportedFleets = map[string][]string{
-	FleetShardsStaging: {"enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@boot.staging.shards.nodes.status.im"},
-	FleetShardsTest:    {"enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"},
-	FleetWakuSandbox:   {"enrtree://AIRVQ5DDA4FFWLRBCHJWUWOO6X6S4ZTZ5B667LQ6AJU6PEYDLRD5O@sandbox.waku.nodes.status.im"},
-	FleetWakuTest:      {"enrtree://AOGYWMBYOUIMOENHXCHILPKY3ZRFEULMFI4DOM442QSZ73TT2A7VI@test.waku.nodes.status.im"},
+var supportedFleets = map[FleetName]map[NodeType][]string{
+	FleetShardsStaging: {
+		WakuNodes: {
+			"enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@boot.staging.shards.nodes.status.im",
+		},
+		DiscV5BootstrapNodes: {
+			"enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@boot.staging.shards.nodes.status.im",
+			"enr:-QEQuEDsh6FgAb_36cReaX7W4gWx_7_GNpsUki7bXMoMrrrWij5pDEyV3guR-urDW_6GJTAzpQiJV61F-CfNn_NxPbY-AYJpZIJ2NIJpcISPxvrpim11bHRpYWRkcnO4YAAtNihib290LTAxLmRvLWFtczMuc2hhcmRzLnN0YWdpbmcuc3RhdHVzLmltBnZfAC82KGJvb3QtMDEuZG8tYW1zMy5zaGFyZHMuc3RhZ2luZy5zdGF0dXMuaW0GAbveA4Jyc40AEAUAAQAgAEAAgAEAiXNlY3AyNTZrMaEDIH8BcuEzgnmwPQTu7BPYyg4u4om7K9qekKA2gT_H2wSDdGNwgnZfg3VkcIIjKIV3YWt1Mg0",
+			"enr:-QEiuECWCuk1CoefbPYUV_cff27t-471k_QhJ_MvgOUQmRE4vgI6h9fD4LgXy7TZNSFXeBBP9haWJB7lx8Wujx-LPmhrAYJpZIJ2NIJpcIRoxQVgim11bHRpYWRkcnO4cgA2NjFib290LTAxLmdjLXVzLWNlbnRyYWwxLWEuc2hhcmRzLnN0YWdpbmcuc3RhdHVzLmltBnZfADg2MWJvb3QtMDEuZ2MtdXMtY2VudHJhbDEtYS5zaGFyZHMuc3RhZ2luZy5zdGF0dXMuaW0GAbveA4Jyc40AEAUAAQAgAEAAgAEAiXNlY3AyNTZrMaEDNAvlGjekD1YV4WpmjwArGAH2g9kHFJnMRfgUhcIkoA2DdGNwgnZfg3VkcIIjKIV3YWt1Mg0",
+			"enr:-QEiuEAcHWW7aNBtJhigTCAnKu9-H1b98SWpBJkGm3PAxth5QjJA0kdiabOfou4HgCD6RuyZEnFE5L8ymahouw3kWRiWAYJpZIJ2NIJpcIQvTKi6im11bHRpYWRkcnO4cgA2NjFib290LTAxLmFjLWNuLWhvbmdrb25nLWMuc2hhcmRzLnN0YWdpbmcuc3RhdHVzLmltBnZfADg2MWJvb3QtMDEuYWMtY24taG9uZ2tvbmctYy5zaGFyZHMuc3RhZ2luZy5zdGF0dXMuaW0GAbveA4Jyc40AEAUAAQAgAEAAgAEAiXNlY3AyNTZrMaEDkbgV7oqPNmFtX5FzSPi9WH8kkmrPB1R3n9xRXge91M-DdGNwgnZfg3VkcIIjKIV3YWt1Mg0",
+		},
+	},
+	FleetShardsTest: {
+		WakuNodes: {
+			"enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im",
+		},
+		DiscV5BootstrapNodes: {
+			"enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im",
+			"enr:-QEKuECA0zhRJej2eaOoOPddNcYr7-5NdRwuoLCe2EE4wfEYkAZhFotg6Kkr8K15pMAGyUyt0smHkZCjLeld0BUzogNtAYJpZIJ2NIJpcISnYxMvim11bHRpYWRkcnO4WgAqNiVib290LTAxLmRvLWFtczMuc2hhcmRzLnRlc3Quc3RhdHVzLmltBnZfACw2JWJvb3QtMDEuZG8tYW1zMy5zaGFyZHMudGVzdC5zdGF0dXMuaW0GAbveA4Jyc40AEAUAAQAgAEAAgAEAiXNlY3AyNTZrMaEC3rRtFQSgc24uWewzXaxTY8hDAHB8sgnxr9k8Rjb5GeSDdGNwgnZfg3VkcIIjKIV3YWt1Mg0",
+			"enr:-QEcuEAgXDqrYd_TrpUWtn3zmxZ9XPm7O3GS6lV7aMJJOTsbOAAeQwSd_eoHcCXqVzTUtwTyB4855qtbd8DARnExyqHPAYJpZIJ2NIJpcIQihw1Xim11bHRpYWRkcnO4bAAzNi5ib290LTAxLmdjLXVzLWNlbnRyYWwxLWEuc2hhcmRzLnRlc3Quc3RhdHVzLmltBnZfADU2LmJvb3QtMDEuZ2MtdXMtY2VudHJhbDEtYS5zaGFyZHMudGVzdC5zdGF0dXMuaW0GAbveA4Jyc40AEAUAAQAgAEAAgAEAiXNlY3AyNTZrMaECxjqgDQ0WyRSOilYU32DA5k_XNlDis3m1VdXkK9xM6kODdGNwgnZfg3VkcIIjKIV3YWt1Mg0",
+			"enr:-QEcuEAX6Qk-vVAoJLxR4A_4UVogGhvQrqKW4DFKlf8MA1PmCjgowL-LBtSC9BLjXbb8gf42FdDHGtSjEvvWKD10erxqAYJpZIJ2NIJpcIQI2hdMim11bHRpYWRkcnO4bAAzNi5ib290LTAxLmFjLWNuLWhvbmdrb25nLWMuc2hhcmRzLnRlc3Quc3RhdHVzLmltBnZfADU2LmJvb3QtMDEuYWMtY24taG9uZ2tvbmctYy5zaGFyZHMudGVzdC5zdGF0dXMuaW0GAbveA4Jyc40AEAUAAQAgAEAAgAEAiXNlY3AyNTZrMaEDP7CbRk-YKJwOFFM4Z9ney0GPc7WPJaCwGkpNRyla7mCDdGNwgnZfg3VkcIIjKIV3YWt1Mg0",
+		},
+	},
+	FleetWakuSandbox: {
+		WakuNodes: {
+			"enrtree://AIRVQ5DDA4FFWLRBCHJWUWOO6X6S4ZTZ5B667LQ6AJU6PEYDLRD5O@sandbox.waku.nodes.status.im",
+		},
+		DiscV5BootstrapNodes: {
+			"enrtree://AIRVQ5DDA4FFWLRBCHJWUWOO6X6S4ZTZ5B667LQ6AJU6PEYDLRD5O@sandbox.waku.nodes.status.im",
+		}
+	},
+	FleetWakuTest: {
+		WakuNodes: {
+			"enrtree://AOGYWMBYOUIMOENHXCHILPKY3ZRFEULMFI4DOM442QSZ73TT2A7VI@test.waku.nodes.status.im",
+		},
+		DiscV5BootstrapNodes: {
+			"enrtree://AOGYWMBYOUIMOENHXCHILPKY3ZRFEULMFI4DOM442QSZ73TT2A7VI@test.waku.nodes.status.im",
+		}
+	}
 }
 
 func DefaultWakuNodes(fleet string) []string {
-	return supportedFleets[fleet]
+	return supportedFleets[fleet][WakuNodes]
+}
+
+func DefaultDiscV5Nodes(fleet string) []string {
+	return supportedFleets[fleet][DiscV5BootstrapNodes]
+
 }
 
 func IsFleetSupported(fleet string) bool {
@@ -37,6 +86,6 @@ func IsFleetSupported(fleet string) bool {
 	return ok
 }
 
-func GetSupportedFleets() map[string][]string {
+func GetSupportedFleets() map[FleetName]map[NodeType][]string {
 	return supportedFleets
 }

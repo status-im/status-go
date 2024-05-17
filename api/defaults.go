@@ -152,7 +152,7 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	nodeConfig.ClusterConfig = *clusterConfig
 	nodeConfig.ClusterConfig.Fleet = fleet
 	nodeConfig.ClusterConfig.WakuNodes = params.DefaultWakuNodes(fleet)
-	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = params.DefaultWakuNodes(fleet)
+	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = params.DefaultDiscV5Nodes(fleet)
 
 	if fleet == params.FleetShardsTest {
 		nodeConfig.ClusterConfig.ClusterID = shardsTestClusterID
