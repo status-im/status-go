@@ -6,6 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
+	"github.com/status-im/status-go/params"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -88,6 +90,57 @@ func TestCalculateTotalRestAmountV2(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			total := calculateTotalRestAmountV2(tt.route)
 			assert.Equal(t, tt.expectedTotal, total)
+		})
+	}
+}
+
+func TestIsValidForNetworkComplianceV2(t *testing.T) {
+	tests := []struct {
+		name             string
+		route            []*PathV2
+		fromLockedAmount map[uint64]*hexutil.Big
+		expectedResult   bool
+	}{
+		{
+			name: "Valid route with required chain IDs included",
+			route: []*PathV2{
+				{From: &params.Network{ChainID: 1}},
+				{From: &params.Network{ChainID: 3}},
+			},
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(100)),
+				2: (*hexutil.Big)(big.NewInt(0)),
+			},
+			expectedResult: true,
+		},
+		{
+			name: "Invalid route with excluded chain ID",
+			route: []*PathV2{
+				{From: &params.Network{ChainID: 2}},
+			},
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(100)),
+				2: (*hexutil.Big)(big.NewInt(0)),
+			},
+			expectedResult: false,
+		},
+		{
+			name: "Route missing required chain ID",
+			route: []*PathV2{
+				{From: &params.Network{ChainID: 3}},
+			},
+			fromLockedAmount: map[uint64]*hexutil.Big{
+				1: (*hexutil.Big)(big.NewInt(100)),
+				2: (*hexutil.Big)(big.NewInt(50)),
+			},
+			expectedResult: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isValidForNetworkComplianceV2(tt.route, tt.fromLockedAmount)
+			assert.Equal(t, tt.expectedResult, result)
 		})
 	}
 }
