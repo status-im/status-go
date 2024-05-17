@@ -2112,20 +2112,19 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissi
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, channelPermissionRequest.TokenCriteria[0])
 	defer s.resetMockedBalances() // reset mocked balances, this test in run with different test cases
 
-	response, err := s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)
+	// create permission using communitiesManager in order not to launch blocking reevaluation loop
+	community, _, err = s.owner.communitiesManager.CreateCommunityTokenPermission(&channelPermissionRequest)
 	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Communities()[0].TokenPermissions(), 1)
+	s.Require().Len(community.TokenPermissions(), 1)
 
-	for _, ids := range response.Communities()[0].ChatIDs() {
+	for _, ids := range community.ChatIDs() {
 		s.Require().True(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), ids))
 	}
 
 	// force owner to reevaluate channel members
 	// in production it will happen automatically, by periodic check
 	start := time.Now()
-
-	err = s.owner.communitiesManager.ScheduleMembersReevaluation(community.ID())
+	_, _, err = s.owner.communitiesManager.ReevaluateMembers(community.ID())
 	s.Require().NoError(err)
 
 	elapsed := time.Since(start)

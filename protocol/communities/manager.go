@@ -991,6 +991,11 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 	return community, changes, nil
 }
 
+// use it only for testing purposes
+func (m *Manager) ReevaluateMembers(communityID types.HexBytes) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
+	return m.reevaluateMembers(communityID)
+}
+
 func (m *Manager) reevaluateMembers(communityID types.HexBytes) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
