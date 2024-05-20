@@ -25,6 +25,9 @@ import (
 
 var findBlocksRetryInterval = 5 * time.Second
 
+const transferHistoryTag = "transfer_history"
+const newTransferHistoryTag = "new_transfer_history"
+
 type nonceInfo struct {
 	nonce       *int64
 	blockNumber *big.Int
@@ -431,7 +434,6 @@ type findBlocksCommand struct {
 	balanceCacher             balance.Cacher
 	feed                      *event.Feed
 	noLimit                   bool
-	transactionManager        *TransactionManager
 	tokenManager              *token.Manager
 	fromBlockNumber           *big.Int
 	logsCheckLastKnownBlock   *big.Int
@@ -940,7 +942,6 @@ type loadBlocksAndTransfersCommand struct {
 	// Not to be set by the caller
 	transfersLoaded map[common.Address]bool // For event RecentHistoryReady to be sent only once per account during app lifetime
 	loops           atomic.Int32
-	// onExit          func(ctx context.Context, err error)
 }
 
 func (c *loadBlocksAndTransfersCommand) incLoops() {
@@ -1114,18 +1115,19 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *asyn
 
 	for _, rangeItem := range ranges {
 		log.Debug("range item", "r", rangeItem, "n", c.chainClient.NetworkID(), "a", account)
+
+		chainClient := chain.ClientWithTag(c.chainClient, transferHistoryTag)
 		fbc := &findBlocksCommand{
 			accounts:                  []common.Address{account},
 			db:                        c.db,
 			accountsDB:                c.accountsDB,
 			blockRangeDAO:             c.blockRangeDAO,
-			chainClient:               c.chainClient,
+			chainClient:               chainClient,
 			balanceCacher:             c.balanceCacher,
 			feed:                      c.feed,
 			noLimit:                   false,
 			fromBlockNumber:           rangeItem[0],
 			toBlockNumber:             rangeItem[1],
-			transactionManager:        c.transactionManager,
 			tokenManager:              c.tokenManager,
 			blocksLoadedCh:            blocksLoadedCh,
 			defaultNodeBlockChunkSize: DefaultNodeBlockChunkSize,
@@ -1156,7 +1158,6 @@ func (c *loadBlocksAndTransfersCommand) startFetchingNewBlocks(ctx context.Conte
 				feed:                      c.feed,
 				noLimit:                   false,
 				fromBlockNumber:           fromNum,
-				transactionManager:        c.transactionManager,
 				tokenManager:              c.tokenManager,
 				blocksLoadedCh:            blocksLoadedCh,
 				defaultNodeBlockChunkSize: DefaultNodeBlockChunkSize,

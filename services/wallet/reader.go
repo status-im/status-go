@@ -443,7 +443,7 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 
 					hasError := false
 					if client, ok := clients[token.ChainID]; ok {
-						hasError = err != nil || !client.GetIsConnected()
+						hasError = err != nil || !client.IsConnected()
 					}
 					if !isVisible {
 						isVisible = balance.Cmp(big.NewFloat(0.0)) > 0 || r.isCachedToken(cachedTokens, address, token.Symbol, token.ChainID)
@@ -576,7 +576,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 					}
 					hasError := false
 					if client, ok := clients[token.ChainID]; ok {
-						hasError = err != nil || !client.GetIsConnected()
+						hasError = err != nil || !client.IsConnected()
 					}
 					if !isVisible {
 						isVisible = balance.Cmp(big.NewFloat(0.0)) > 0 || r.isCachedToken(cachedTokens, address, token.Symbol, token.ChainID)

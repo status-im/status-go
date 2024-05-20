@@ -19,13 +19,14 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/services/rpcstats"
+	"github.com/status-im/status-go/services/wallet/connection"
 )
 
 type BatchCallClient interface {
 	BatchCallContext(ctx context.Context, b []rpc.BatchElem) error
 }
 
-type ClientInterface interface {
+type ChainInterface interface {
 	BatchCallContext(ctx context.Context, b []rpc.BatchElem) error
 	HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error)
 	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
@@ -41,35 +42,61 @@ type ClientInterface interface {
 	CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error)
 	CallContract(ctx context.Context, call ethereum.CallMsg, blockNumber *big.Int) ([]byte, error)
 	CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error
-	GetWalletNotifier() func(chainId uint64, message string)
-	SetWalletNotifier(notifier func(chainId uint64, message string))
 	TransactionByHash(ctx context.Context, hash common.Hash) (*types.Transaction, bool, error)
 	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
 	BlockNumber(ctx context.Context) (uint64, error)
-	SetIsConnected(value bool)
-	GetIsConnected() bool
+}
+
+type ClientInterface interface {
+	ChainInterface
+	GetWalletNotifier() func(chainId uint64, message string)
+	SetWalletNotifier(notifier func(chainId uint64, message string))
+	connection.Connectable
 	bind.ContractCaller
 	bind.ContractTransactor
 	bind.ContractFilterer
+}
+
+type Tagger interface {
+	Tag() string
+	SetTag(tag string)
+	DeepCopyTag() Tagger
+}
+
+func DeepCopyTagger(t Tagger) Tagger {
+	return t.DeepCopyTag()
+}
+
+// Shallow copy of the client with a deep copy of tag
+func ClientWithTag(chainClient ClientInterface, tag string) ClientInterface {
+	newClient := chainClient
+	if tagIface, ok := chainClient.(Tagger); ok {
+		tagIface = DeepCopyTagger(tagIface)
+		tagIface.SetTag(tag)
+		newClient = tagIface.(ClientInterface)
+	}
+
+	return newClient
 }
 
 type ClientWithFallback struct {
 	ChainID         uint64
 	main            *ethclient.Client
 	fallback        *ethclient.Client
-	mainLimiter     *RPCLimiter
-	fallbackLimiter *RPCLimiter
+	mainLimiter     *RPCRpsLimiter
+	fallbackLimiter *RPCRpsLimiter
 
 	mainRPC     *rpc.Client
 	fallbackRPC *rpc.Client
 
 	WalletNotifier func(chainId uint64, message string)
 
-	IsConnected     bool
-	IsConnectedLock sync.RWMutex
+	isConnected     bool
+	isConnectedLock sync.RWMutex
 	LastCheckedAt   int64
 
 	circuitBreakerCmdName string
+	tag                   string
 }
 
 // Don't mark connection as failed if we get one of these errors
@@ -98,7 +125,7 @@ type CommandResult struct {
 	err error
 }
 
-func NewSimpleClient(mainLimiter *RPCLimiter, main *rpc.Client, chainID uint64) *ClientWithFallback {
+func NewSimpleClient(mainLimiter *RPCRpsLimiter, main *rpc.Client, chainID uint64) *ClientWithFallback {
 	circuitBreakerCmdName := fmt.Sprintf("ethClient_%d", chainID)
 	hystrix.ConfigureCommand(circuitBreakerCmdName, hystrix.CommandConfig{
 		Timeout:               10000,
@@ -115,13 +142,13 @@ func NewSimpleClient(mainLimiter *RPCLimiter, main *rpc.Client, chainID uint64) 
 		fallbackLimiter:       nil,
 		mainRPC:               main,
 		fallbackRPC:           nil,
-		IsConnected:           true,
+		isConnected:           true,
 		LastCheckedAt:         time.Now().Unix(),
 		circuitBreakerCmdName: circuitBreakerCmdName,
 	}
 }
 
-func NewClient(mainLimiter *RPCLimiter, main *rpc.Client, fallbackLimiter *RPCLimiter, fallback *rpc.Client, chainID uint64) *ClientWithFallback {
+func NewClient(mainLimiter *RPCRpsLimiter, main *rpc.Client, fallbackLimiter *RPCRpsLimiter, fallback *rpc.Client, chainID uint64) *ClientWithFallback {
 	circuitBreakerCmdName := fmt.Sprintf("ethClient_%d", chainID)
 	hystrix.ConfigureCommand(circuitBreakerCmdName, hystrix.CommandConfig{
 		Timeout:               20000,
@@ -142,7 +169,7 @@ func NewClient(mainLimiter *RPCLimiter, main *rpc.Client, fallbackLimiter *RPCLi
 		fallbackLimiter:       fallbackLimiter,
 		mainRPC:               main,
 		fallbackRPC:           fallback,
-		IsConnected:           true,
+		isConnected:           true,
 		LastCheckedAt:         time.Now().Unix(),
 		circuitBreakerCmdName: circuitBreakerCmdName,
 	}
@@ -178,20 +205,20 @@ func isRPSLimitError(err error) bool {
 }
 
 func (c *ClientWithFallback) SetIsConnected(value bool) {
-	c.IsConnectedLock.Lock()
-	defer c.IsConnectedLock.Unlock()
+	c.isConnectedLock.Lock()
+	defer c.isConnectedLock.Unlock()
 	c.LastCheckedAt = time.Now().Unix()
 	if !value {
-		if c.IsConnected {
+		if c.isConnected {
 			if c.WalletNotifier != nil {
 				c.WalletNotifier(c.ChainID, "down")
 			}
-			c.IsConnected = false
+			c.isConnected = false
 		}
 
 	} else {
-		if !c.IsConnected {
-			c.IsConnected = true
+		if !c.isConnected {
+			c.isConnected = true
 			if c.WalletNotifier != nil {
 				c.WalletNotifier(c.ChainID, "up")
 			}
@@ -199,10 +226,10 @@ func (c *ClientWithFallback) SetIsConnected(value bool) {
 	}
 }
 
-func (c *ClientWithFallback) GetIsConnected() bool {
-	c.IsConnectedLock.RLock()
-	defer c.IsConnectedLock.RUnlock()
-	return c.IsConnected
+func (c *ClientWithFallback) IsConnected() bool {
+	c.isConnectedLock.RLock()
+	defer c.isConnectedLock.RUnlock()
+	return c.isConnected
 }
 
 func (c *ClientWithFallback) makeCall(ctx context.Context, main func() ([]any, error), fallback func() ([]any, error)) ([]any, error) {
@@ -292,7 +319,7 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, main func() ([]any, e
 }
 
 func (c *ClientWithFallback) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
-	rpcstats.CountCall("eth_BlockByHash")
+	rpcstats.CountCallWithTag("eth_BlockByHash", c.tag)
 
 	res, err := c.makeCall(
 		ctx,
@@ -310,7 +337,7 @@ func (c *ClientWithFallback) BlockByHash(ctx context.Context, hash common.Hash) 
 }
 
 func (c *ClientWithFallback) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
-	rpcstats.CountCall("eth_BlockByNumber")
+	rpcstats.CountCallWithTag("eth_BlockByNumber", c.tag)
 	res, err := c.makeCall(
 		ctx,
 		func() ([]any, error) { a, err := c.main.BlockByNumber(ctx, number); return []any{a}, err },
@@ -327,7 +354,7 @@ func (c *ClientWithFallback) BlockByNumber(ctx context.Context, number *big.Int)
 }
 
 func (c *ClientWithFallback) BlockNumber(ctx context.Context) (uint64, error) {
-	rpcstats.CountCall("eth_BlockNumber")
+	rpcstats.CountCallWithTag("eth_BlockNumber", c.tag)
 
 	res, err := c.makeCall(
 		ctx,
@@ -345,7 +372,7 @@ func (c *ClientWithFallback) BlockNumber(ctx context.Context) (uint64, error) {
 }
 
 func (c *ClientWithFallback) PeerCount(ctx context.Context) (uint64, error) {
-	rpcstats.CountCall("eth_PeerCount")
+	rpcstats.CountCallWithTag("eth_PeerCount", c.tag)
 
 	res, err := c.makeCall(
 		ctx,
@@ -363,7 +390,7 @@ func (c *ClientWithFallback) PeerCount(ctx context.Context) (uint64, error) {
 }
 
 func (c *ClientWithFallback) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
-	rpcstats.CountCall("eth_HeaderByHash")
+	rpcstats.CountCallWithTag("eth_HeaderByHash", c.tag)
 	res, err := c.makeCall(
 		ctx,
 		func() ([]any, error) { a, err := c.main.HeaderByHash(ctx, hash); return []any{a}, err },
@@ -378,7 +405,7 @@ func (c *ClientWithFallback) HeaderByHash(ctx context.Context, hash common.Hash)
 }
 
 func (c *ClientWithFallback) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
-	rpcstats.CountCall("eth_HeaderByNumber")
+	rpcstats.CountCallWithTag("eth_HeaderByNumber", c.tag)
 	res, err := c.makeCall(
 		ctx,
 		func() ([]any, error) { a, err := c.main.HeaderByNumber(ctx, number); return []any{a}, err },
@@ -393,7 +420,7 @@ func (c *ClientWithFallback) HeaderByNumber(ctx context.Context, number *big.Int
 }
 
 func (c *ClientWithFallback) TransactionByHash(ctx context.Context, hash common.Hash) (*types.Transaction, bool, error) {
-	rpcstats.CountCall("eth_TransactionByHash")
+	rpcstats.CountCallWithTag("eth_TransactionByHash", c.tag)
 
 	res, err := c.makeCall(
 		ctx,
@@ -526,7 +553,7 @@ func (c *ClientWithFallback) NetworkID() uint64 {
 }
 
 func (c *ClientWithFallback) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
-	rpcstats.CountCall("eth_BalanceAt")
+	rpcstats.CountCallWithTag("eth_BalanceAt", c.tag)
 
 	res, err := c.makeCall(
 		ctx,
@@ -586,7 +613,7 @@ func (c *ClientWithFallback) CodeAt(ctx context.Context, account common.Address,
 }
 
 func (c *ClientWithFallback) NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error) {
-	rpcstats.CountCall("eth_NonceAt")
+	rpcstats.CountCallWithTag("eth_NonceAt", c.tag)
 
 	res, err := c.makeCall(
 		ctx,
@@ -604,7 +631,7 @@ func (c *ClientWithFallback) NonceAt(ctx context.Context, account common.Address
 }
 
 func (c *ClientWithFallback) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error) {
-	rpcstats.CountCall("eth_FilterLogs")
+	rpcstats.CountCallWithTag("eth_FilterLogs", c.tag)
 
 	res, err := c.makeCall(
 		ctx,
@@ -925,7 +952,7 @@ func (c *ClientWithFallback) GetBaseFeeFromBlock(ctx context.Context, blockNumbe
 // This function preserves the additional data. This is the cheapest way to obtain
 // the block hash for a given block number.
 func (c *ClientWithFallback) CallBlockHashByTransaction(ctx context.Context, blockNumber *big.Int, index uint) (common.Hash, error) {
-	rpcstats.CountCall("eth_FullTransactionByBlockNumberAndIndex")
+	rpcstats.CountCallWithTag("eth_FullTransactionByBlockNumberAndIndex", c.tag)
 
 	res, err := c.makeCall(
 		ctx,
@@ -964,4 +991,17 @@ func (c *ClientWithFallback) toggleConnectionState(err error) {
 		}
 	}
 	c.SetIsConnected(connected)
+}
+
+func (c *ClientWithFallback) Tag() string {
+	return c.tag
+}
+
+func (c *ClientWithFallback) SetTag(tag string) {
+	c.tag = tag
+}
+
+func (c *ClientWithFallback) DeepCopyTag() Tagger {
+	copy := *c
+	return &copy
 }

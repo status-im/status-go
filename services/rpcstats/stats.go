@@ -2,47 +2,70 @@ package rpcstats
 
 import (
 	"sync"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 type RPCUsageStats struct {
-	total            uint
-	counterPerMethod map[string]uint
-	rw               sync.RWMutex
+	total                  uint
+	counterPerMethod       sync.Map
+	counterPerMethodPerTag sync.Map
 }
 
 var stats *RPCUsageStats
 
 func getInstance() *RPCUsageStats {
 	if stats == nil {
-		stats = &RPCUsageStats{
-			total:            0,
-			counterPerMethod: map[string]uint{},
-		}
+		stats = &RPCUsageStats{}
 	}
 	return stats
 }
 
-func getStats() (uint, map[string]uint) {
+func getStats() (uint, sync.Map) {
 	stats := getInstance()
-	stats.rw.RLock()
-	defer stats.rw.RUnlock()
 	return stats.total, stats.counterPerMethod
 }
 
+// func getStatsWithTag(tag string) (sync.Map, bool) {
+// 	stats := getInstance()
+// 	value, ok := stats.counterPerMethodPerTag.Load(tag)
+// 	return value.(sync.Map), ok
+// }
+
 func resetStats() {
 	stats := getInstance()
-	stats.rw.Lock()
-	defer stats.rw.Unlock()
-
 	stats.total = 0
-	stats.counterPerMethod = map[string]uint{}
+	stats.counterPerMethod = sync.Map{}
+	stats.counterPerMethodPerTag = sync.Map{}
 }
 
-func CountCall(method string) {
-	stats := getInstance()
-	stats.rw.Lock()
-	defer stats.rw.Unlock()
+// func resetStatsWithTag(tag string) {
+// 	stats := getInstance()
+// 	stats.counterPerMethodPerTag.Delete(tag)
+// }
 
+func CountCall(method string) {
+	log.Info("CountCall", "method", method)
+
+	stats := getInstance()
 	stats.total++
-	stats.counterPerMethod[method]++
+	value, _ := stats.counterPerMethod.LoadOrStore(method, uint(0))
+	stats.counterPerMethod.Store(method, value.(uint)+1)
+}
+
+func CountCallWithTag(method string, tag string) {
+	if tag == "" {
+		CountCall(method)
+		return
+	}
+
+	stats := getInstance()
+	value, _ := stats.counterPerMethodPerTag.LoadOrStore(tag, sync.Map{})
+	methodMap := value.(sync.Map)
+	value, _ = methodMap.LoadOrStore(method, uint(0))
+	methodMap.Store(method, value.(uint)+1)
+
+	log.Info("CountCallWithTag", "method", method, "tag", tag, "count", value.(uint)+1)
+
+	CountCall(method)
 }
