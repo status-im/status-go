@@ -55,6 +55,8 @@ type ClientInterface interface {
 	bind.ContractCaller
 	bind.ContractTransactor
 	bind.ContractFilterer
+	GetLimiter() RequestLimiter
+	SetLimiter(RequestLimiter)
 }
 
 type Tagger interface {
@@ -85,6 +87,7 @@ type ClientWithFallback struct {
 	fallback        *ethclient.Client
 	mainLimiter     *RPCRpsLimiter
 	fallbackLimiter *RPCRpsLimiter
+	commonLimiter   RequestLimiter
 
 	mainRPC     *rpc.Client
 	fallbackRPC *rpc.Client
@@ -233,6 +236,12 @@ func (c *ClientWithFallback) IsConnected() bool {
 }
 
 func (c *ClientWithFallback) makeCall(ctx context.Context, main func() ([]any, error), fallback func() ([]any, error)) ([]any, error) {
+	if c.commonLimiter != nil {
+		if limited, err := c.commonLimiter.IsLimitReached(c.tag); limited {
+			return nil, fmt.Errorf("rate limit exceeded for %s: %s", c.tag, err)
+		}
+	}
+
 	resultChan := make(chan CommandResult, 1)
 	c.LastCheckedAt = time.Now().Unix()
 	errChan := hystrix.Go(c.circuitBreakerCmdName, func() error {
@@ -1004,4 +1013,12 @@ func (c *ClientWithFallback) SetTag(tag string) {
 func (c *ClientWithFallback) DeepCopyTag() Tagger {
 	copy := *c
 	return &copy
+}
+
+func (c *ClientWithFallback) GetLimiter() RequestLimiter {
+	return c.commonLimiter
+}
+
+func (c *ClientWithFallback) SetLimiter(limiter RequestLimiter) {
+	c.commonLimiter = limiter
 }
