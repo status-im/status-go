@@ -53,8 +53,8 @@ type Client struct {
 	upstream           chain.ClientInterface
 	rpcClientsMutex    sync.RWMutex
 	rpcClients         map[uint64]chain.ClientInterface
-	rpcLimiterMutex    sync.RWMutex
-	limiterPerProvider map[string]*chain.RPCLimiter
+	rpsLimiterMutex    sync.RWMutex
+	limiterPerProvider map[string]*chain.RPCRpsLimiter
 
 	router         *router
 	NetworkManager *network.Manager
@@ -93,7 +93,7 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		NetworkManager:     networkManager,
 		handlers:           make(map[string]Handler),
 		rpcClients:         make(map[uint64]chain.ClientInterface),
-		limiterPerProvider: make(map[string]*chain.RPCLimiter),
+		limiterPerProvider: make(map[string]*chain.RPCRpsLimiter),
 		log:                log,
 	}
 
@@ -105,7 +105,7 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		if err != nil {
 			return nil, fmt.Errorf("dial upstream server: %s", err)
 		}
-		limiter, err := c.getRPCLimiter(c.upstreamURL)
+		limiter, err := c.getRPCRpsLimiter(c.upstreamURL)
 		if err != nil {
 			return nil, fmt.Errorf("get RPC limiter: %s", err)
 		}
@@ -137,17 +137,17 @@ func extractLastParamFromURL(inputURL string) (string, error) {
 	return lastSegment, nil
 }
 
-func (c *Client) getRPCLimiter(URL string) (*chain.RPCLimiter, error) {
+func (c *Client) getRPCRpsLimiter(URL string) (*chain.RPCRpsLimiter, error) {
 	apiKey, err := extractLastParamFromURL(URL)
 	if err != nil {
 		return nil, err
 	}
-	c.rpcLimiterMutex.Lock()
-	defer c.rpcLimiterMutex.Unlock()
+	c.rpsLimiterMutex.Lock()
+	defer c.rpsLimiterMutex.Unlock()
 	if limiter, ok := c.limiterPerProvider[apiKey]; ok {
 		return limiter, nil
 	}
-	limiter := chain.NewRPCLimiter()
+	limiter := chain.NewRPCRpsLimiter()
 	c.limiterPerProvider[apiKey] = limiter
 	return limiter, nil
 }
@@ -175,14 +175,14 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 		return nil, fmt.Errorf("dial upstream server: %s", err)
 	}
 
-	rpcLimiter, err := c.getRPCLimiter(network.RPCURL)
+	rpcLimiter, err := c.getRPCRpsLimiter(network.RPCURL)
 	if err != nil {
 		return nil, fmt.Errorf("get RPC limiter: %s", err)
 	}
 
 	var (
 		rpcFallbackClient  *gethrpc.Client
-		rpcFallbackLimiter *chain.RPCLimiter
+		rpcFallbackLimiter *chain.RPCRpsLimiter
 	)
 	if len(network.FallbackURL) > 0 {
 		rpcFallbackClient, err = gethrpc.Dial(network.FallbackURL)
@@ -190,7 +190,7 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 			return nil, fmt.Errorf("dial upstream server: %s", err)
 		}
 
-		rpcFallbackLimiter, err = c.getRPCLimiter(network.FallbackURL)
+		rpcFallbackLimiter, err = c.getRPCRpsLimiter(network.FallbackURL)
 		if err != nil {
 			return nil, fmt.Errorf("get RPC fallback limiter: %s", err)
 		}
@@ -252,12 +252,12 @@ func (c *Client) UpdateUpstreamURL(url string) error {
 	if err != nil {
 		return err
 	}
-	rpcLimiter, err := c.getRPCLimiter(url)
+	rpsLimiter, err := c.getRPCRpsLimiter(url)
 	if err != nil {
 		return err
 	}
 	c.Lock()
-	c.upstream = chain.NewSimpleClient(rpcLimiter, rpcClient, c.UpstreamChainID)
+	c.upstream = chain.NewSimpleClient(rpsLimiter, rpcClient, c.UpstreamChainID)
 	c.upstreamURL = url
 	c.Unlock()
 

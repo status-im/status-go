@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+type Connectable interface {
+	SetIsConnected(bool)
+	IsConnected() bool
+}
+
 type StateChangeCb func(State)
 
 type Status struct {
