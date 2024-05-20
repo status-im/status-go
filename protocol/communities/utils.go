@@ -2,11 +2,12 @@ package communities
 
 import (
 	"fmt"
-	"strings"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 func CalculateRequestID(publicKey string, communityID types.HexBytes) types.HexBytes {
@@ -14,43 +15,34 @@ func CalculateRequestID(publicKey string, communityID types.HexBytes) types.HexB
 	return crypto.Keccak256([]byte(idString))
 }
 
-func ExtractTokenCriteria(permissions []*CommunityTokenPermission) (erc20TokenCriteria map[uint64]map[string]*protobuf.TokenCriteria, erc721TokenCriteria map[uint64]map[string]*protobuf.TokenCriteria, ensTokenCriteria []string) {
-	erc20TokenCriteria = make(map[uint64]map[string]*protobuf.TokenCriteria)
-	erc721TokenCriteria = make(map[uint64]map[string]*protobuf.TokenCriteria)
-	ensTokenCriteria = make([]string, 0)
+type TokenAddressesByChain = map[walletcommon.ChainID]map[gethcommon.Address]struct{}
+
+func extractContractAddressesByChain(permissions []*CommunityTokenPermission) (erc20TokenAddresses TokenAddressesByChain, erc721TokenAddresses TokenAddressesByChain) {
+	erc20TokenAddresses = TokenAddressesByChain{}
+	erc721TokenAddresses = TokenAddressesByChain{}
 
 	for _, tokenPermission := range permissions {
 		for _, tokenRequirement := range tokenPermission.TokenCriteria {
 
 			isERC721 := tokenRequirement.Type == protobuf.CommunityTokenType_ERC721
 			isERC20 := tokenRequirement.Type == protobuf.CommunityTokenType_ERC20
-			isENS := tokenRequirement.Type == protobuf.CommunityTokenType_ENS
 
 			for chainID, contractAddress := range tokenRequirement.ContractAddresses {
+				chainIDKey := walletcommon.ChainID(chainID)
+				contractAddressKey := gethcommon.HexToAddress(contractAddress)
 
-				_, existsERC721 := erc721TokenCriteria[chainID]
-
-				if isERC721 && !existsERC721 {
-					erc721TokenCriteria[chainID] = make(map[string]*protobuf.TokenCriteria)
-				}
-				_, existsERC20 := erc20TokenCriteria[chainID]
-
-				if isERC20 && !existsERC20 {
-					erc20TokenCriteria[chainID] = make(map[string]*protobuf.TokenCriteria)
-				}
-				// TODO: check if we do not duplicate this due to ToLower case
-				_, existsERC721 = erc721TokenCriteria[chainID][contractAddress]
-				if isERC721 && !existsERC721 {
-					erc721TokenCriteria[chainID][strings.ToLower(contractAddress)] = tokenRequirement
+				if isERC721 {
+					if erc721TokenAddresses[chainIDKey] == nil {
+						erc721TokenAddresses[chainIDKey] = map[gethcommon.Address]struct{}{}
+					}
+					erc721TokenAddresses[chainIDKey][contractAddressKey] = struct{}{}
 				}
 
-				_, existsERC20 = erc20TokenCriteria[chainID][contractAddress]
-				if isERC20 && !existsERC20 {
-					erc20TokenCriteria[chainID][strings.ToLower(contractAddress)] = tokenRequirement
-				}
-
-				if isENS {
-					ensTokenCriteria = append(ensTokenCriteria, tokenRequirement.EnsPattern)
+				if isERC20 {
+					if erc20TokenAddresses[chainIDKey] == nil {
+						erc20TokenAddresses[chainIDKey] = map[gethcommon.Address]struct{}{}
+					}
+					erc20TokenAddresses[chainIDKey][contractAddressKey] = struct{}{}
 				}
 			}
 		}
