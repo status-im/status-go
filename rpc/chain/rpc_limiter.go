@@ -31,15 +31,36 @@ type RequestsStorage interface {
 	Set(data RequestData) error
 }
 
+// InMemRequestsStorage is an in-memory dummy implementation of RequestsStorage
+type InMemRequestsStorage struct {
+	data RequestData
+}
+
+func NewInMemRequestsStorage() *InMemRequestsStorage {
+	return &InMemRequestsStorage{}
+}
+
+func (s *InMemRequestsStorage) Get(tag string) (RequestData, error) {
+	return s.data, nil
+}
+
+func (s *InMemRequestsStorage) Set(data RequestData) error {
+	s.data = data
+	return nil
+}
+
 type RequestData struct {
 	Tag       string
 	CreatedAt time.Time
 	Period    time.Duration
+	MaxReqs   int
+	NumReqs   int
 }
 
 type RequestLimiter interface {
-	SetMaxRequests(tag string, maxRequests int, interval time.Duration)
-	IsLimitReached(tag string) bool
+	SetMaxRequests(tag string, maxRequests int, interval time.Duration) error
+	GetMaxRequests(tag string) (RequestData, error)
+	IsLimitReached(tag string) (bool, error)
 }
 
 type RPCRequestLimiter struct {
@@ -52,39 +73,71 @@ func NewRequestLimiter(storage RequestsStorage) *RPCRequestLimiter {
 	}
 }
 
-func (rl *RPCRequestLimiter) SetMaxRequests(tag string, maxRequests int, interval time.Duration) {
-	err := rl.saveToStorage(tag, maxRequests, interval)
+func (rl *RPCRequestLimiter) SetMaxRequests(tag string, maxRequests int, interval time.Duration) error {
+	err := rl.saveToStorage(tag, maxRequests, interval, 0, time.Now())
 	if err != nil {
 		log.Error("Failed to save request data to storage", "error", err)
-		return
-	}
-
-	// Set max requests logic here
-}
-
-func (rl *RPCRequestLimiter) saveToStorage(tag string, maxRequests int, interval time.Duration) error {
-	data := RequestData{
-		Tag:       tag,
-		CreatedAt: time.Now(),
-		Period:    interval,
-	}
-
-	err := rl.storage.Set(data)
-	if err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (rl *RPCRequestLimiter) IsLimitReached(tag string) bool {
+func (rl *RPCRequestLimiter) GetMaxRequests(tag string) (RequestData, error) {
 	data, err := rl.storage.Get(tag)
 	if err != nil {
 		log.Error("Failed to get request data from storage", "error", err, "tag", tag)
-		return false
+		return RequestData{}, err
 	}
 
-	return time.Since(data.CreatedAt) >= data.Period
+	return data, nil
+}
+
+func (rl *RPCRequestLimiter) saveToStorage(tag string, maxRequests int, interval time.Duration, numReqs int, timestamp time.Time) error {
+	data := RequestData{
+		Tag:       tag,
+		CreatedAt: timestamp,
+		Period:    interval,
+		MaxReqs:   maxRequests,
+		NumReqs:   numReqs,
+	}
+
+	err := rl.storage.Set(data)
+	if err != nil {
+		log.Error("Failed to save request data to storage", "error", err)
+		return err
+	}
+
+	return nil
+}
+
+func (rl *RPCRequestLimiter) IsLimitReached(tag string) (bool, error) {
+	data, err := rl.storage.Get(tag)
+	if err != nil {
+		return false, err
+	}
+
+	// Check if a number of requests is over the limit within the interval
+	if time.Since(data.CreatedAt) < data.Period {
+		if data.NumReqs >= data.MaxReqs {
+			return true, nil
+		}
+
+		err := rl.saveToStorage(tag, data.MaxReqs, data.Period, data.NumReqs+1, data.CreatedAt)
+		if err != nil {
+			return false, err
+		}
+
+		return false, nil
+	}
+
+	// Reset the number of requests if the interval has passed
+	err = rl.saveToStorage(tag, data.MaxReqs, data.Period, 0, time.Now())
+	if err != nil {
+		return false, err
+	}
+
+	return false, nil
 }
 
 type RPCRpsLimiter struct {

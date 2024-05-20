@@ -25,8 +25,13 @@ import (
 
 var findBlocksRetryInterval = 5 * time.Second
 
-const transferHistoryTag = "transfer_history"
-const newTransferHistoryTag = "new_transfer_history"
+const (
+	transferHistoryTag    = "transfer_history"
+	newTransferHistoryTag = "new_transfer_history"
+
+	transferHistoryMaxRequests       = 100
+	transferHistoryMaxRequestsPeriod = 10 * time.Second
+)
 
 type nonceInfo struct {
 	nonce       *int64
@@ -1117,6 +1122,10 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *asyn
 		log.Debug("range item", "r", rangeItem, "n", c.chainClient.NetworkID(), "a", account)
 
 		chainClient := chain.ClientWithTag(c.chainClient, transferHistoryTag)
+		limiter := chain.NewRequestLimiter(chain.NewInMemRequestsStorage())
+		limiter.SetMaxRequests(transferHistoryTag, transferHistoryMaxRequests, transferHistoryMaxRequestsPeriod)
+		chainClient.SetLimiter(limiter)
+
 		fbc := &findBlocksCommand{
 			accounts:                  []common.Address{account},
 			db:                        c.db,
