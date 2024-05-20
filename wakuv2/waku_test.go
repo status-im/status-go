@@ -296,6 +296,7 @@ func TestWakuV2Filter(t *testing.T) {
 	config.LightClient = true
 	config.KeepAliveInterval = 1
 	config.MinPeersForFilter = 2
+	config.UseShardAsDefaultTopic = true
 	config.EnableDiscV5 = true
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
@@ -320,6 +321,7 @@ func TestWakuV2Filter(t *testing.T) {
 
 	filter := &common.Filter{
 		Messages:      common.NewMemoryMessageStore(),
+		PubsubTopic:   "/waku/2/rs/16/1",
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{[]byte{1, 2, 3, 4}}),
 	}
 
