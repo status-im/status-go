@@ -83,8 +83,11 @@ func (s SendType) FindToken(tokenManager *token.Manager, collectibles *collectib
 	}
 }
 
-func (s SendType) isTransfer() bool {
-	return s == Transfer || s == Swap || s.IsCollectiblesTransfer()
+func (s SendType) isTransfer(routerV2Logic bool) bool {
+	return s == Transfer ||
+		s == Bridge && routerV2Logic ||
+		s == Swap ||
+		s.IsCollectiblesTransfer()
 }
 
 func (s SendType) needL1Fee() bool {

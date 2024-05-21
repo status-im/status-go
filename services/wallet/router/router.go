@@ -591,7 +591,7 @@ func (r *Router) SuggestedRoutes(
 						}
 					}
 					gasLimit := uint64(0)
-					if sendType.isTransfer() {
+					if sendType.isTransfer(false) {
 						gasLimit, err = bridge.EstimateGas(network, dest, addrFrom, addrTo, token, toToken, amountIn)
 						if err != nil {
 							continue
@@ -608,12 +608,12 @@ func (r *Router) SuggestedRoutes(
 
 					var l1GasFeeWei uint64
 					if sendType.needL1Fee() {
-						tx, err := bridge.BuildTx(network, dest, addrFrom, addrTo, token, amountIn, bonderFees)
+						txInputData, err := bridge.PackTxInputData(network, dest, addrFrom, addrTo, token, amountIn)
 						if err != nil {
 							continue
 						}
 
-						l1GasFeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, tx)
+						l1GasFeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, txInputData)
 						l1GasFeeWei += l1ApprovalFee
 					}
 

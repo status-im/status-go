@@ -196,28 +196,22 @@ func (s *CBridge) CalculateFees(from, to *params.Network, token *token.Token, am
 	return big.NewInt(0), new(big.Int).Add(baseFee, percFee), nil
 }
 
-func (s *CBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
-	var input []byte
-	value := new(big.Int)
-
+func (c *CBridge) PackTxInputData(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
 	abi, err := abi.JSON(strings.NewReader(celer.CelerABI))
 	if err != nil {
-		return 0, err
+		return []byte{}, err
 	}
 
 	if token.IsNative() {
-		input, err = abi.Pack("sendNative",
+		return abi.Pack("sendNative",
 			to,
 			amountIn,
 			toNetwork.ChainID,
 			uint64(time.Now().UnixMilli()),
 			500,
 		)
-		if err != nil {
-			return 0, err
-		}
 	} else {
-		input, err = abi.Pack("send",
+		return abi.Pack("send",
 			to,
 			token.Address,
 			amountIn,
@@ -225,9 +219,15 @@ func (s *CBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Net
 			uint64(time.Now().UnixMilli()),
 			500,
 		)
-		if err != nil {
-			return 0, err
-		}
+	}
+}
+
+func (s *CBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
+	value := new(big.Int)
+
+	input, err := s.PackTxInputData(fromNetwork, toNetwork, from, to, token, amountIn)
+	if err != nil {
+		return 0, err
 	}
 
 	contractAddress := s.GetContractAddress(fromNetwork, nil)

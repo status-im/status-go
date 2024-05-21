@@ -9,7 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/consensus/misc"
-	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
 	gaspriceoracle "github.com/status-im/status-go/contracts/gas-price-oracle"
 	"github.com/status-im/status-go/rpc"
@@ -330,7 +329,12 @@ func (f *FeeManager) getFeeHistorySorted(chainID uint64) ([]*big.Int, error) {
 	return fees, nil
 }
 
-func (f *FeeManager) GetL1Fee(ctx context.Context, chainID uint64, tx *ethTypes.Transaction) (uint64, error) {
+// Returns L1 fee for placing a transaction to L1 chain, appicable only for txs made from L2.
+func (f *FeeManager) GetL1Fee(ctx context.Context, chainID uint64, input []byte) (uint64, error) {
+	if chainID == common.EthereumMainnet || chainID == common.EthereumSepolia && chainID != common.EthereumGoerli {
+		return 0, nil
+	}
+
 	ethClient, err := f.RPCClient.EthClient(chainID)
 	if err != nil {
 		return 0, err
@@ -348,12 +352,7 @@ func (f *FeeManager) GetL1Fee(ctx context.Context, chainID uint64, tx *ethTypes.
 
 	callOpt := &bind.CallOpts{}
 
-	data, err := tx.MarshalBinary()
-	if err != nil {
-		return 0, err
-	}
-
-	result, err := contract.GetL1Fee(callOpt, data)
+	result, err := contract.GetL1Fee(callOpt, input)
 	if err != nil {
 		return 0, err
 	}
