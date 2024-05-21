@@ -29,8 +29,9 @@ const (
 	transferHistoryTag    = "transfer_history"
 	newTransferHistoryTag = "new_transfer_history"
 
-	transferHistoryLimit       = 10000
-	transferHistoryLimitPeriod = 24 * time.Hour
+	transferHistoryLimit           = 10000
+	transferHistoryLimitPerAccount = 5000
+	transferHistoryLimitPeriod     = 24 * time.Hour
 )
 
 type nonceInfo struct {
@@ -1121,8 +1122,12 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *asyn
 	for _, rangeItem := range ranges {
 		log.Debug("range item", "r", rangeItem, "n", c.chainClient.NetworkID(), "a", account)
 
-		chainClient := chain.ClientWithTag(c.chainClient, transferHistoryTag)
-		limiter := chain.NewRequestLimiter(chain.NewInMemRequestsMapStorage())
+		// Each account has its own limit and a global limit for all accounts
+		accountTag := transferHistoryTag + "_" + account.String()
+		chainClient := chain.ClientWithTag(c.chainClient, accountTag, transferHistoryTag)
+		storage := chain.NewInMemRequestsMapStorage()
+		limiter := chain.NewRequestLimiter(storage)
+		limiter.SetLimit(accountTag, transferHistoryLimitPerAccount, transferHistoryLimitPeriod)
 		limiter.SetLimit(transferHistoryTag, transferHistoryLimit, transferHistoryLimitPeriod)
 		chainClient.SetLimiter(limiter)
 

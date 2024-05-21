@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/afex/hystrix-go/hystrix"
@@ -62,6 +62,8 @@ type ClientInterface interface {
 type Tagger interface {
 	Tag() string
 	SetTag(tag string)
+	GroupTag() string
+	SetGroupTag(tag string)
 	DeepCopyTag() Tagger
 }
 
@@ -69,12 +71,15 @@ func DeepCopyTagger(t Tagger) Tagger {
 	return t.DeepCopyTag()
 }
 
-// Shallow copy of the client with a deep copy of tag
-func ClientWithTag(chainClient ClientInterface, tag string) ClientInterface {
+// Shallow copy of the client with a deep copy of tag and group tag
+// To avoid passing tags as parameter to every chain call, it is sufficient for now
+// to set the tag and group tag once on the client
+func ClientWithTag(chainClient ClientInterface, tag, groupTag string) ClientInterface {
 	newClient := chainClient
 	if tagIface, ok := chainClient.(Tagger); ok {
 		tagIface = DeepCopyTagger(tagIface)
 		tagIface.SetTag(tag)
+		tagIface.SetGroupTag(tag)
 		newClient = tagIface.(ClientInterface)
 	}
 
@@ -94,12 +99,12 @@ type ClientWithFallback struct {
 
 	WalletNotifier func(chainId uint64, message string)
 
-	isConnected     bool
-	isConnectedLock sync.RWMutex
-	LastCheckedAt   int64
+	isConnected   *atomic.Bool
+	LastCheckedAt int64
 
 	circuitBreakerCmdName string
-	tag                   string
+	tag                   string // tag for the limiter
+	groupTag              string // tag for the limiter group
 }
 
 // Don't mark connection as failed if we get one of these errors
@@ -137,6 +142,8 @@ func NewSimpleClient(mainLimiter *RPCRpsLimiter, main *rpc.Client, chainID uint6
 		ErrorPercentThreshold: 25,
 	})
 
+	isConnected := &atomic.Bool{}
+	isConnected.Store(true)
 	return &ClientWithFallback{
 		ChainID:               chainID,
 		main:                  ethclient.NewClient(main),
@@ -145,7 +152,7 @@ func NewSimpleClient(mainLimiter *RPCRpsLimiter, main *rpc.Client, chainID uint6
 		fallbackLimiter:       nil,
 		mainRPC:               main,
 		fallbackRPC:           nil,
-		isConnected:           true,
+		isConnected:           isConnected,
 		LastCheckedAt:         time.Now().Unix(),
 		circuitBreakerCmdName: circuitBreakerCmdName,
 	}
@@ -164,6 +171,9 @@ func NewClient(mainLimiter *RPCRpsLimiter, main *rpc.Client, fallbackLimiter *RP
 	if fallback != nil {
 		fallbackEthClient = ethclient.NewClient(fallback)
 	}
+	isConnected := &atomic.Bool{}
+	isConnected.Store(true)
+
 	return &ClientWithFallback{
 		ChainID:               chainID,
 		main:                  ethclient.NewClient(main),
@@ -172,7 +182,7 @@ func NewClient(mainLimiter *RPCRpsLimiter, main *rpc.Client, fallbackLimiter *RP
 		fallbackLimiter:       fallbackLimiter,
 		mainRPC:               main,
 		fallbackRPC:           fallback,
-		isConnected:           true,
+		isConnected:           isConnected,
 		LastCheckedAt:         time.Now().Unix(),
 		circuitBreakerCmdName: circuitBreakerCmdName,
 	}
@@ -208,20 +218,18 @@ func isRPSLimitError(err error) bool {
 }
 
 func (c *ClientWithFallback) SetIsConnected(value bool) {
-	c.isConnectedLock.Lock()
-	defer c.isConnectedLock.Unlock()
 	c.LastCheckedAt = time.Now().Unix()
 	if !value {
-		if c.isConnected {
+		if c.isConnected.Load() {
 			if c.WalletNotifier != nil {
 				c.WalletNotifier(c.ChainID, "down")
 			}
-			c.isConnected = false
+			c.isConnected.Store(false)
 		}
 
 	} else {
-		if !c.isConnected {
-			c.isConnected = true
+		if !c.isConnected.Load() {
+			c.isConnected.Store(true)
 			if c.WalletNotifier != nil {
 				c.WalletNotifier(c.ChainID, "up")
 			}
@@ -230,15 +238,17 @@ func (c *ClientWithFallback) SetIsConnected(value bool) {
 }
 
 func (c *ClientWithFallback) IsConnected() bool {
-	c.isConnectedLock.RLock()
-	defer c.isConnectedLock.RUnlock()
-	return c.isConnected
+	return c.isConnected.Load()
 }
 
 func (c *ClientWithFallback) makeCall(ctx context.Context, main func() ([]any, error), fallback func() ([]any, error)) ([]any, error) {
 	if c.commonLimiter != nil {
 		if allow, err := c.commonLimiter.Allow(c.tag); !allow {
 			return nil, fmt.Errorf("tag=%s, %w", c.tag, err)
+		}
+
+		if allow, err := c.commonLimiter.Allow(c.groupTag); !allow {
+			return nil, fmt.Errorf("groupTag=%s, %w", c.groupTag, err)
 		}
 	}
 
@@ -1008,6 +1018,14 @@ func (c *ClientWithFallback) Tag() string {
 
 func (c *ClientWithFallback) SetTag(tag string) {
 	c.tag = tag
+}
+
+func (c *ClientWithFallback) GroupTag() string {
+	return c.groupTag
+}
+
+func (c *ClientWithFallback) SetGroupTag(tag string) {
+	c.groupTag = tag
 }
 
 func (c *ClientWithFallback) DeepCopyTag() Tagger {
