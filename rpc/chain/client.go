@@ -237,7 +237,7 @@ func (c *ClientWithFallback) IsConnected() bool {
 
 func (c *ClientWithFallback) makeCall(ctx context.Context, main func() ([]any, error), fallback func() ([]any, error)) ([]any, error) {
 	if c.commonLimiter != nil {
-		if limited, err := c.commonLimiter.IsLimitReached(c.tag); limited {
+		if allow, err := c.commonLimiter.Allow(c.tag); !allow {
 			return nil, fmt.Errorf("tag=%s, %w", c.tag, err)
 		}
 	}

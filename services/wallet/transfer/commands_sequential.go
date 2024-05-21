@@ -29,8 +29,8 @@ const (
 	transferHistoryTag    = "transfer_history"
 	newTransferHistoryTag = "new_transfer_history"
 
-	transferHistoryMaxRequests       = 10000
-	transferHistoryMaxRequestsPeriod = 24 * time.Hour
+	transferHistoryLimit       = 10000
+	transferHistoryLimitPeriod = 24 * time.Hour
 )
 
 type nonceInfo struct {
@@ -1123,7 +1123,7 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *asyn
 
 		chainClient := chain.ClientWithTag(c.chainClient, transferHistoryTag)
 		limiter := chain.NewRequestLimiter(chain.NewInMemRequestsMapStorage())
-		limiter.SetMaxRequests(transferHistoryTag, transferHistoryMaxRequests, transferHistoryMaxRequestsPeriod)
+		limiter.SetLimit(transferHistoryTag, transferHistoryLimit, transferHistoryLimitPeriod)
 		chainClient.SetLimiter(limiter)
 
 		fbc := &findBlocksCommand{

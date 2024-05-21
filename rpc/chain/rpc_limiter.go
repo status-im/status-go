@@ -63,9 +63,9 @@ type RequestData struct {
 }
 
 type RequestLimiter interface {
-	SetMaxRequests(tag string, maxRequests int, interval time.Duration) error
-	GetMaxRequests(tag string) (*RequestData, error)
-	IsLimitReached(tag string) (bool, error)
+	SetLimit(tag string, maxRequests int, interval time.Duration) error
+	GetLimit(tag string) (*RequestData, error)
+	Allow(tag string) (bool, error)
 }
 
 type RPCRequestLimiter struct {
@@ -78,7 +78,7 @@ func NewRequestLimiter(storage RequestsStorage) *RPCRequestLimiter {
 	}
 }
 
-func (rl *RPCRequestLimiter) SetMaxRequests(tag string, maxRequests int, interval time.Duration) error {
+func (rl *RPCRequestLimiter) SetLimit(tag string, maxRequests int, interval time.Duration) error {
 	err := rl.saveToStorage(tag, maxRequests, interval, 0, time.Now())
 	if err != nil {
 		log.Error("Failed to save request data to storage", "error", err)
@@ -88,7 +88,7 @@ func (rl *RPCRequestLimiter) SetMaxRequests(tag string, maxRequests int, interva
 	return nil
 }
 
-func (rl *RPCRequestLimiter) GetMaxRequests(tag string) (*RequestData, error) {
+func (rl *RPCRequestLimiter) GetLimit(tag string) (*RequestData, error) {
 	data, err := rl.storage.Get(tag)
 	if err != nil {
 		return nil, err
@@ -115,37 +115,38 @@ func (rl *RPCRequestLimiter) saveToStorage(tag string, maxRequests int, interval
 	return nil
 }
 
-func (rl *RPCRequestLimiter) IsLimitReached(tag string) (bool, error) {
+func (rl *RPCRequestLimiter) Allow(tag string) (bool, error) {
 	data, err := rl.storage.Get(tag)
+	log.Info("Allow", "data", data)
 	if err != nil {
-		return false, err
+		return true, err
 	}
 
 	if data == nil {
-		return false, nil
+		return true, nil
 	}
 
 	// Check if a number of requests is over the limit within the interval
 	if time.Since(data.CreatedAt) < data.Period {
 		if data.NumReqs >= data.MaxReqs {
-			return true, nil
+			return false, nil
 		}
 
 		err := rl.saveToStorage(tag, data.MaxReqs, data.Period, data.NumReqs+1, data.CreatedAt)
 		if err != nil {
-			return false, err
+			return true, err
 		}
 
-		return false, nil
+		return true, nil
 	}
 
 	// Reset the number of requests if the interval has passed
 	err = rl.saveToStorage(tag, data.MaxReqs, data.Period, 0, time.Now())
 	if err != nil {
-		return false, err
+		return true, err // still allow if failed to save
 	}
 
-	return false, nil
+	return true, nil
 }
 
 type RPCRpsLimiter struct {
