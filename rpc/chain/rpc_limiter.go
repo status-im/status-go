@@ -5,8 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/google/uuid"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 const (
@@ -27,25 +28,29 @@ type callerOnWait struct {
 }
 
 type RequestsStorage interface {
-	Get(tag string) (RequestData, error)
-	Set(data RequestData) error
+	Get(tag string) (*RequestData, error)
+	Set(data *RequestData) error
 }
 
-// InMemRequestsStorage is an in-memory dummy implementation of RequestsStorage
-type InMemRequestsStorage struct {
-	data RequestData
+type InMemRequestsMapStorage struct {
+	data sync.Map
 }
 
-func NewInMemRequestsStorage() *InMemRequestsStorage {
-	return &InMemRequestsStorage{}
+func NewInMemRequestsMapStorage() *InMemRequestsMapStorage {
+	return &InMemRequestsMapStorage{}
 }
 
-func (s *InMemRequestsStorage) Get(tag string) (RequestData, error) {
-	return s.data, nil
+func (s *InMemRequestsMapStorage) Get(tag string) (*RequestData, error) {
+	data, ok := s.data.Load(tag)
+	if !ok {
+		return nil, nil
+	}
+
+	return data.(*RequestData), nil
 }
 
-func (s *InMemRequestsStorage) Set(data RequestData) error {
-	s.data = data
+func (s *InMemRequestsMapStorage) Set(data *RequestData) error {
+	s.data.Store(data.Tag, data)
 	return nil
 }
 
@@ -59,7 +64,7 @@ type RequestData struct {
 
 type RequestLimiter interface {
 	SetMaxRequests(tag string, maxRequests int, interval time.Duration) error
-	GetMaxRequests(tag string) (RequestData, error)
+	GetMaxRequests(tag string) (*RequestData, error)
 	IsLimitReached(tag string) (bool, error)
 }
 
@@ -83,18 +88,17 @@ func (rl *RPCRequestLimiter) SetMaxRequests(tag string, maxRequests int, interva
 	return nil
 }
 
-func (rl *RPCRequestLimiter) GetMaxRequests(tag string) (RequestData, error) {
+func (rl *RPCRequestLimiter) GetMaxRequests(tag string) (*RequestData, error) {
 	data, err := rl.storage.Get(tag)
 	if err != nil {
-		log.Error("Failed to get request data from storage", "error", err, "tag", tag)
-		return RequestData{}, err
+		return nil, err
 	}
 
 	return data, nil
 }
 
 func (rl *RPCRequestLimiter) saveToStorage(tag string, maxRequests int, interval time.Duration, numReqs int, timestamp time.Time) error {
-	data := RequestData{
+	data := &RequestData{
 		Tag:       tag,
 		CreatedAt: timestamp,
 		Period:    interval,
@@ -115,6 +119,10 @@ func (rl *RPCRequestLimiter) IsLimitReached(tag string) (bool, error) {
 	data, err := rl.storage.Get(tag)
 	if err != nil {
 		return false, err
+	}
+
+	if data == nil {
+		return false, nil
 	}
 
 	// Check if a number of requests is over the limit within the interval
