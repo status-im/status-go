@@ -1,9 +1,14 @@
 package appdatabase
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -20,6 +25,7 @@ import (
 const nodeCfgMigrationDate = 1640111208
 
 var customSteps = []*sqlite.PostStep{
+	{Version: 1662365868, CustomMigration: fixMissingKeyUIDForAccounts},
 	{Version: 1674136690, CustomMigration: migrateEnsUsernames},
 	{Version: 1686048341, CustomMigration: migrateWalletJSONBlobs, RollBackVersion: 1686041510},
 	{Version: 1687193315, CustomMigration: migrateWalletTransferFromToAddresses, RollBackVersion: 1686825075},
@@ -74,6 +80,36 @@ func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, erro
 	}
 
 	return db, nil
+}
+
+func fixMissingKeyUIDForAccounts(sqlTx *sql.Tx) error {
+	rows, err := sqlTx.Query(`SELECT address,pubkey FROM accounts WHERE pubkey IS NOT NULL`)
+	if err != nil {
+		log.Error("Migrating accounts: failed to query accounts", "err", err.Error())
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		acc := accounts.Account{}
+		err = rows.Scan(&acc.Address, &acc.PublicKey)
+		if err != nil {
+			log.Error("Migrating accounts: failed to scan records", "err", err.Error())
+			return err
+		}
+		pk, err := crypto.UnmarshalPubkey(acc.PublicKey)
+		if err != nil {
+			log.Error("Migrating accounts: failed to unmarshal pubkey", "err", err.Error(), "pubkey", string(acc.PublicKey))
+			return err
+		}
+		pkBytes := sha256.Sum256(crypto.FromECDSAPub(pk))
+		keyUIDHex := hexutil.Encode(pkBytes[:])
+		_, err = sqlTx.Exec(`UPDATE accounts SET key_uid = ? WHERE address = ?`, keyUIDHex, acc.Address)
+		if err != nil {
+			log.Error("Migrating accounts: failed to update key_uid", "err", err.Error())
+			return err
+		}
+	}
+	return nil
 }
 
 func migrateEnsUsernames(sqlTx *sql.Tx) error {
