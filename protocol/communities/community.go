@@ -865,6 +865,24 @@ func (o *Community) AddCommunityTokensMetadata(token *protobuf.CommunityTokenMet
 	return o.config.CommunityDescription, nil
 }
 
+func containsToken(tokens []*protobuf.CommunityTokenMetadata, symbol string) bool {
+	for _, token := range tokens {
+		if token.Symbol == symbol {
+			return true
+		}
+	}
+	return false
+}
+
+func (o *Community) UpsertCommunityTokensMetadata(token *protobuf.CommunityTokenMetadata) (bool, error) {
+	if containsToken(o.config.CommunityDescription.CommunityTokensMetadata, token.Symbol) {
+		return false, nil
+	}
+
+	_, err := o.AddCommunityTokensMetadata(token)
+	return true, err
+}
+
 func (o *Community) UnbanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()

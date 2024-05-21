@@ -19,6 +19,7 @@ import (
 	userimages "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
+	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
 	v1 "github.com/status-im/status-go/protocol/v1"
@@ -2002,4 +2003,49 @@ func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSignersIgnoreIfNotRetu
 	fetchedCommunity, err := m.GetByID(community.ID())
 	s.Require().NoError(err)
 	s.Require().Equal(clock1, fetchedCommunity.config.CommunityDescription.Clock)
+}
+
+func (s *ManagerSuite) TestFillMissingCommunityTokens() {
+	// Create community
+	request := &requests.CreateCommunity{
+		Name:        "status",
+		Description: "token membership description",
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+	}
+
+	community, err := s.manager.CreateCommunity(request, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(community)
+	s.Require().Len(community.CommunityTokensMetadata(), 0)
+
+	// Create community token but without adding to the description
+	token := community_token.CommunityToken{
+		TokenType:          protobuf.CommunityTokenType_ERC721,
+		CommunityID:        community.IDString(),
+		Address:            "0x001",
+		Name:               "TestTok",
+		Symbol:             "TST",
+		Description:        "Desc",
+		Supply:             &bigint.BigInt{Int: big.NewInt(0)},
+		InfiniteSupply:     true,
+		Transferable:       true,
+		RemoteSelfDestruct: true,
+		ChainID:            1,
+		DeployState:        community_token.Deployed,
+		Base64Image:        "",
+		Decimals:           18,
+		Deployer:           "0x0002",
+		PrivilegesLevel:    community_token.CommunityLevel,
+	}
+
+	err = s.manager.persistence.AddCommunityToken(&token)
+	s.Require().NoError(err)
+
+	// Fill community with missing token
+	err = s.manager.fillMissingCommunityTokens()
+	s.Require().NoError(err)
+
+	community, err = s.manager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(community.CommunityTokensMetadata(), 1)
 }
