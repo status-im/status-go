@@ -69,6 +69,7 @@ import (
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/wakuv2/common"
 	"github.com/status-im/status-go/wakuv2/persistence"
@@ -1079,8 +1080,8 @@ func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 
 	w.logger.Debug("store.query",
 		zap.String("requestID", hexutil.Encode(requestID)),
-		zap.Int64p("startTime", query.StartTime),
-		zap.Int64p("endTime", query.EndTime),
+		logutils.WakuMessageTimestamp("startTime", query.StartTime),
+		logutils.WakuMessageTimestamp("endTime", query.StartTime),
 		zap.Strings("contentTopics", query.ContentTopics),
 		zap.String("pubsubTopic", query.PubsubTopic),
 		zap.Stringer("peerID", peerID))
