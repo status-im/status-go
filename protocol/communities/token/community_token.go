@@ -38,4 +38,5 @@ type CommunityToken struct {
 	Decimals           int                         `json:"decimals"`
 	Deployer           string                      `json:"deployer"`
 	PrivilegesLevel    PrivilegesLevel             `json:"privilegesLevel"`
+	TransactionHash    string                      `json:"transactionHash"`
 }

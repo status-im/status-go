@@ -137,7 +137,7 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 	}
 
 	savedCommunityToken, err := api.s.CreateCommunityTokenAndSave(int(chainID), deploymentParameters, txArgs.From.Hex(), address.Hex(),
-		protobuf.CommunityTokenType_ERC721, token.CommunityLevel)
+		protobuf.CommunityTokenType_ERC721, token.CommunityLevel, tx.Hash().Hex())
 	if err != nil {
 		return DeploymentDetails{}, err
 	}
@@ -249,12 +249,12 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64,
 	}
 
 	savedOwnerToken, err := api.s.CreateCommunityTokenAndSave(int(chainID), ownerTokenParameters, txArgs.From.Hex(),
-		api.s.TemporaryOwnerContractAddress(tx.Hash().Hex()), protobuf.CommunityTokenType_ERC721, token.OwnerLevel)
+		api.s.TemporaryOwnerContractAddress(tx.Hash().Hex()), protobuf.CommunityTokenType_ERC721, token.OwnerLevel, tx.Hash().Hex())
 	if err != nil {
 		return DeploymentDetails{}, err
 	}
 	savedMasterToken, err := api.s.CreateCommunityTokenAndSave(int(chainID), masterTokenParameters, txArgs.From.Hex(),
-		api.s.TemporaryMasterContractAddress(tx.Hash().Hex()), protobuf.CommunityTokenType_ERC721, token.MasterLevel)
+		api.s.TemporaryMasterContractAddress(tx.Hash().Hex()), protobuf.CommunityTokenType_ERC721, token.MasterLevel, tx.Hash().Hex())
 	if err != nil {
 		return DeploymentDetails{}, err
 	}
@@ -264,6 +264,11 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64,
 		TransactionHash: tx.Hash().Hex(),
 		OwnerToken:      savedOwnerToken,
 		MasterToken:     savedMasterToken}, nil
+}
+
+// recovery function which starts transaction tracking again
+func (api *API) ReTrackOwnerTokenDeploymentTransaction(ctx context.Context, chainID uint64, contractAddress string) error {
+	return api.s.ReTrackOwnerTokenDeploymentTransaction(ctx, chainID, contractAddress)
 }
 
 func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentParameters DeploymentParameters, txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
@@ -307,7 +312,7 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 	}
 
 	savedCommunityToken, err := api.s.CreateCommunityTokenAndSave(int(chainID), deploymentParameters, txArgs.From.Hex(), address.Hex(),
-		protobuf.CommunityTokenType_ERC20, token.CommunityLevel)
+		protobuf.CommunityTokenType_ERC20, token.CommunityLevel, tx.Hash().Hex())
 	if err != nil {
 		return DeploymentDetails{}, err
 	}
