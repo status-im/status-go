@@ -455,7 +455,7 @@ func openDatabases(path string) (*sql.DB, *sql.DB, error) {
 		return nil, nil, err
 	}
 
-	appDB, err := appdatabase.InitializeDB(path+".db", "", dbsetup.ReducedKDFIterationsNumber)
+	appDB, err := appdatabase.InitializeDB(path+".db", "", dbsetup.ReducedKDFIterationsNumber, "")
 	if err != nil {
 		logger.Error("failed to initialize app db", "error", err)
 		return nil, nil, err

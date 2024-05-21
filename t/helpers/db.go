@@ -17,7 +17,7 @@ func SetupTestSQLDB(dbInit dbsetup.DatabaseInitializer, prefix string) (*sql.DB,
 		return nil, nil, err
 	}
 
-	db, err := dbInit.Initialize(tmpfile.Name(), "password", kdfIterationsNumberForTests)
+	db, err := dbInit.Initialize(tmpfile.Name(), "password", kdfIterationsNumberForTests, "")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -32,7 +32,7 @@ func SetupTestSQLDB(dbInit dbsetup.DatabaseInitializer, prefix string) (*sql.DB,
 }
 
 func SetupTestMemorySQLDB(dbInit dbsetup.DatabaseInitializer) (*sql.DB, error) {
-	db, err := dbInit.Initialize(dbsetup.InMemoryPath, "password", kdfIterationsNumberForTests)
+	db, err := dbInit.Initialize(dbsetup.InMemoryPath, "password", kdfIterationsNumberForTests, "")
 	if err != nil {
 		return nil, err
 	}

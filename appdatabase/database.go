@@ -28,11 +28,11 @@ var customSteps = []*sqlite.PostStep{
 type DbInitializer struct {
 }
 
-func (a DbInitializer) Initialize(path, password string, kdfIterationsNumber int) (*sql.DB, error) {
-	return InitializeDB(path, password, kdfIterationsNumber)
+func (a DbInitializer) Initialize(path, password string, kdfIterationsNumber int, keyUID string) (*sql.DB, error) {
+	return InitializeDB(path, password, kdfIterationsNumber, keyUID)
 }
 
-func doMigration(db *sql.DB) error {
+func doMigration(db *sql.DB, keyUID string) error {
 	lastMigration, migrationTableExists, err := sqlite.GetLastMigrationVersion(db)
 	if err != nil {
 		return err
@@ -52,8 +52,13 @@ func doMigration(db *sql.DB) error {
 		}
 	}
 
+	postSteps := []*sqlite.PostStep{
+		fixMissingKeyUIDForAccounts(keyUID),
+	}
+	postSteps = append(postSteps, customSteps...)
+
 	// Run all the new migrations
-	err = migrations.Migrate(db, customSteps)
+	err = migrations.Migrate(db, postSteps)
 	if err != nil {
 		return err
 	}
@@ -62,18 +67,31 @@ func doMigration(db *sql.DB) error {
 }
 
 // InitializeDB creates db file at a given path and applies migrations.
-func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, error) {
+func InitializeDB(path, password string, kdfIterationsNumber int, keyUID string) (*sql.DB, error) {
 	db, err := sqlite.OpenDB(path, password, kdfIterationsNumber)
 	if err != nil {
 		return nil, err
 	}
 
-	err = doMigration(db)
+	err = doMigration(db, keyUID)
 	if err != nil {
 		return nil, err
 	}
 
 	return db, nil
+}
+
+func fixMissingKeyUIDForAccounts(keyUID string) *sqlite.PostStep {
+	return &sqlite.PostStep{
+		Version: 1662365868,
+		CustomMigration: func(sqlTx *sql.Tx) error {
+			if keyUID == "" {
+				return nil
+			}
+			_, err := sqlTx.Exec(`UPDATE accounts SET key_uid = ? WHERE 1=1`, keyUID)
+			return err
+		},
+	}
 }
 
 func migrateEnsUsernames(sqlTx *sql.Tx) error {

@@ -16,7 +16,8 @@ const InMemoryPath = ":memory:"
 const ReducedKDFIterationsNumber = 3200
 
 type DatabaseInitializer interface {
-	Initialize(path, password string, kdfIterationsNumber int) (*sql.DB, error)
+	// Initialize keyUID is used to make mobile db migrating from v1 to v2 smooth without breaking the db
+	Initialize(path, password string, kdfIterationsNumber int, keyUID string) (*sql.DB, error)
 }
 
 // GetDBFilename takes an instance of sql.DB and returns the filename of the "main" database

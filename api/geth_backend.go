@@ -378,7 +378,7 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 		return errors.New("Failed to migrate db file: " + err.Error())
 	}
 
-	b.appDB, err = appdatabase.InitializeDB(dbFilePath, password, account.KDFIterations)
+	b.appDB, err = appdatabase.InitializeDB(dbFilePath, password, account.KDFIterations, account.KeyUID)
 	if err != nil {
 		b.log.Error("failed to initialize db", "err", err.Error())
 		return err

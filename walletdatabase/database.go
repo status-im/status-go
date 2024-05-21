@@ -10,7 +10,7 @@ import (
 type DbInitializer struct {
 }
 
-func (a DbInitializer) Initialize(path, password string, kdfIterationsNumber int) (*sql.DB, error) {
+func (a DbInitializer) Initialize(path, password string, kdfIterationsNumber int, keyUID string) (*sql.DB, error) {
 	return InitializeDB(path, password, kdfIterationsNumber)
 }
 
