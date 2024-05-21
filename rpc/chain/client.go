@@ -238,7 +238,7 @@ func (c *ClientWithFallback) IsConnected() bool {
 func (c *ClientWithFallback) makeCall(ctx context.Context, main func() ([]any, error), fallback func() ([]any, error)) ([]any, error) {
 	if c.commonLimiter != nil {
 		if limited, err := c.commonLimiter.IsLimitReached(c.tag); limited {
-			return nil, fmt.Errorf("rate limit exceeded for %s: %s", c.tag, err)
+			return nil, fmt.Errorf("tag=%s, %w", c.tag, err)
 		}
 	}
 

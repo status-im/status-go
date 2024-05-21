@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTest() (*InMemRequestsStorage, RequestLimiter) {
-	storage := NewInMemRequestsStorage()
+func setupTest() (*InMemRequestsMapStorage, RequestLimiter) {
+	storage := NewInMemRequestsMapStorage()
 	rl := NewRequestLimiter(storage)
 	return storage, rl
 }
@@ -37,7 +37,7 @@ func TestSetMaxRequests(t *testing.T) {
 func TestGetMaxRequests(t *testing.T) {
 	storage, rl := setupTest()
 
-	data := RequestData{
+	data := &RequestData{
 		Tag:     "testTag",
 		Period:  time.Second,
 		MaxReqs: 10,
@@ -63,7 +63,7 @@ func TestIsLimitReachedWithinPeriod(t *testing.T) {
 	interval := time.Second
 
 	// Set up the storage with test data
-	data := RequestData{
+	data := &RequestData{
 		Tag:       tag,
 		Period:    interval,
 		CreatedAt: time.Now(),
@@ -95,7 +95,7 @@ func TestIsLimitReachedWhenPeriodPassed(t *testing.T) {
 	interval := time.Second
 
 	// Set up the storage with test data
-	data := RequestData{
+	data := &RequestData{
 		Tag:       tag,
 		Period:    interval,
 		CreatedAt: time.Now().Add(-interval),
