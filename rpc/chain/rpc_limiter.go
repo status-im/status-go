@@ -70,6 +70,7 @@ type RequestLimiter interface {
 
 type RPCRequestLimiter struct {
 	storage RequestsStorage
+	mu      sync.Mutex
 }
 
 func NewRequestLimiter(storage RequestsStorage) *RPCRequestLimiter {
@@ -116,8 +117,10 @@ func (rl *RPCRequestLimiter) saveToStorage(tag string, maxRequests int, interval
 }
 
 func (rl *RPCRequestLimiter) Allow(tag string) (bool, error) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
 	data, err := rl.storage.Get(tag)
-	log.Info("Allow", "data", data)
 	if err != nil {
 		return true, err
 	}

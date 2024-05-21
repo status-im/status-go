@@ -65,6 +65,8 @@ type TestClient struct {
 	callsCounter                   map[string]int
 	currentBlock                   uint64
 	limiter                        chain.RequestLimiter
+	tag                            string
+	groupTag                       string
 }
 
 var countAndlog = func(tc *TestClient, method string, params ...interface{}) error {
@@ -1047,8 +1049,12 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 	// Reimplement the common function that is called from every method to check for the limit
 	countAndlog = func(tc *TestClient, method string, params ...interface{}) error {
 		if tc.GetLimiter() != nil {
-			if allow, _ := tc.GetLimiter().Allow(transferHistoryTag); !allow {
+			if allow, _ := tc.GetLimiter().Allow(tc.tag); !allow {
 				t.Log("ERROR: requests over limit")
+				return chain.ErrRequestsOverLimit
+			}
+			if allow, _ := tc.GetLimiter().Allow(tc.groupTag); !allow {
+				t.Log("ERROR: requests over limit for group tag")
 				return chain.ErrRequestsOverLimit
 			}
 		}
@@ -1221,6 +1227,54 @@ func TestFindBlocksCommandWithLimiterTagDifferentThanTransfers(t *testing.T) {
 		close(blockChannel)
 		require.NoError(t, group.Error())
 		require.Greater(t, tc.getCounter(), maxRequests)
+	}
+}
+
+func TestFindBlocksCommandWithLimiterForMultipleAccountsSameGroup(t *testing.T) {
+	rangeSize := 20
+	maxRequestsTotal := 5
+	limit1 := 3
+	limit2 := 3
+	account1 := common.HexToAddress("0x1234")
+	account2 := common.HexToAddress("0x5678")
+	balances := map[common.Address][][]int{account1: {{5, 1, 0}, {20, 2, 0}, {45, 1, 1}, {46, 50, 0}, {75, 0, 1}}, account2: {{5, 1, 0}, {20, 2, 0}, {45, 1, 1}, {46, 50, 0}, {75, 0, 1}}}
+	outgoingERC20Transfers := map[common.Address][]testERC20Transfer{account1: {{big.NewInt(6), tokenTXXAddress, big.NewInt(1), walletcommon.Erc20TransferEventType}}}
+	incomingERC20Transfers := map[common.Address][]testERC20Transfer{account2: {{big.NewInt(6), tokenTXXAddress, big.NewInt(1), walletcommon.Erc20TransferEventType}}}
+
+	// Limiters share the same storage
+	storage := chain.NewInMemRequestsMapStorage()
+
+	// Set up the first account
+	fbc, tc, blockChannel, _ := setupFindBlocksCommand(t, account1, big.NewInt(0), big.NewInt(20), rangeSize, balances, outgoingERC20Transfers, nil, nil, nil)
+	tc.tag = transferHistoryTag + account1.String()
+	tc.groupTag = transferHistoryTag
+
+	limiter1 := chain.NewRequestLimiter(storage)
+	limiter1.SetLimit(transferHistoryTag, maxRequestsTotal, time.Hour)
+	limiter1.SetLimit(transferHistoryTag+account1.String(), limit1, time.Hour)
+	tc.SetLimiter(limiter1)
+
+	// Set up the second account
+	fbc2, tc2, _, _ := setupFindBlocksCommand(t, account2, big.NewInt(0), big.NewInt(20), rangeSize, balances, nil, incomingERC20Transfers, nil, nil)
+	tc2.tag = transferHistoryTag + account2.String()
+	tc2.groupTag = transferHistoryTag
+	limiter2 := chain.NewRequestLimiter(storage)
+	limiter2.SetLimit(transferHistoryTag, maxRequestsTotal, time.Hour)
+	limiter2.SetLimit(transferHistoryTag+account2.String(), limit2, time.Hour)
+	tc2.SetLimiter(limiter2)
+	fbc2.blocksLoadedCh = blockChannel
+
+	ctx := context.Background()
+	group := async.NewGroup(ctx)
+	group.Add(fbc.Command(1 * time.Millisecond))
+	group.Add(fbc2.Command(1 * time.Millisecond))
+
+	select {
+	case <-ctx.Done():
+		t.Log("ERROR")
+	case <-group.WaitAsync():
+		close(blockChannel)
+		require.LessOrEqual(t, tc.getCounter(), maxRequestsTotal)
 	}
 }
 
