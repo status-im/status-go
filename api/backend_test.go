@@ -1267,7 +1267,7 @@ func copyDir(srcFolder string, dstFolder string, t *testing.T) {
 	}
 }
 
-func login(t *testing.T, conf *params.NodeConfig) {
+func loginDesktopUser(t *testing.T, conf *params.NodeConfig) {
 	// The following passwords and DB used in this test unit are only
 	// used to determine if login process works correctly after a migration
 
@@ -1305,7 +1305,7 @@ func login(t *testing.T, conf *params.NodeConfig) {
 
 }
 
-func TestLoginAndMigrationsStillWorkWithExistingUsers(t *testing.T) {
+func TestLoginAndMigrationsStillWorkWithExistingDesktopUser(t *testing.T) {
 	utils.Init()
 
 	srcFolder := "../static/test-0.132.0-account/"
@@ -1317,8 +1317,38 @@ func TestLoginAndMigrationsStillWorkWithExistingUsers(t *testing.T) {
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
 
-	login(t, conf)
-	login(t, conf) // Login twice to catch weird errors that only appear after logout
+	loginDesktopUser(t, conf)
+	loginDesktopUser(t, conf) // Login twice to catch weird errors that only appear after logout
+}
+
+func loginMobileUser(t *testing.T, rootDataDir string) {
+	keyUID := "0x855ab0a932e5325daab7a550b9fcd78d2a17de5e2b7a52241f82505ea9d87629"
+	passwd := "0x20756cad9b728c8225fd8cedb6badaf8731e174506950219ea657cd54f35f46c" // #nosec G101
+
+	b := NewGethStatusBackend()
+	b.UpdateRootDataDir(rootDataDir)
+	require.NoError(t, b.OpenAccounts())
+
+	require.NoError(t, b.Login(keyUID, passwd))
+	db, err := accounts.NewDB(b.appDB)
+	require.NoError(t, err)
+	kps, err := db.GetAllKeypairs()
+	require.NoError(t, err)
+	require.NotNil(t, kps)
+	require.NoError(t, b.Logout())
+}
+
+func TestLoginAndMigrationsStillWorkWithExistingMobileUser(t *testing.T) {
+	utils.Init()
+
+	srcFolder := "../static/test-mobile-release-1.20.x-aa6e4b2-account/"
+
+	tmpdir := t.TempDir()
+
+	copyDir(srcFolder, tmpdir, t)
+
+	loginMobileUser(t, tmpdir)
+	loginMobileUser(t, tmpdir) // Login twice to catch weird errors that only appear after logout
 }
 
 func TestChangeDatabasePassword(t *testing.T) {
