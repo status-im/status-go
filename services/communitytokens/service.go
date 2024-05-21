@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -512,7 +513,7 @@ func (s *Service) maxSupply(ctx context.Context, chainID uint64, contractAddress
 }
 
 func (s *Service) CreateCommunityTokenAndSave(chainID int, deploymentParameters DeploymentParameters,
-	deployerAddress string, contractAddress string, tokenType protobuf.CommunityTokenType, privilegesLevel token.PrivilegesLevel) (*token.CommunityToken, error) {
+	deployerAddress string, contractAddress string, tokenType protobuf.CommunityTokenType, privilegesLevel token.PrivilegesLevel, transactionHash string) (*token.CommunityToken, error) {
 
 	tokenToSave := &token.CommunityToken{
 		TokenType:          tokenType,
@@ -531,17 +532,32 @@ func (s *Service) CreateCommunityTokenAndSave(chainID int, deploymentParameters 
 		Deployer:           deployerAddress,
 		PrivilegesLevel:    privilegesLevel,
 		Base64Image:        deploymentParameters.Base64Image,
+		TransactionHash:    transactionHash,
 	}
 
 	return s.Messenger.SaveCommunityToken(tokenToSave, deploymentParameters.CroppedImage)
 }
 
+const (
+	MasterSuffix = "-master"
+	OwnerSuffix  = "-owner"
+)
+
 func (s *Service) TemporaryMasterContractAddress(hash string) string {
-	return hash + "-master"
+	return hash + MasterSuffix
 }
 
 func (s *Service) TemporaryOwnerContractAddress(hash string) string {
-	return hash + "-owner"
+	return hash + OwnerSuffix
+}
+
+func (s *Service) HashFromTemporaryContractAddress(address string) string {
+	if strings.HasSuffix(address, OwnerSuffix) {
+		return strings.TrimSuffix(address, OwnerSuffix)
+	} else if strings.HasSuffix(address, MasterSuffix) {
+		return strings.TrimSuffix(address, MasterSuffix)
+	}
+	return ""
 }
 
 func (s *Service) GetMasterTokenContractAddressFromHash(ctx context.Context, chainID uint64, txHash string) (string, error) {
@@ -604,4 +620,49 @@ func (s *Service) GetOwnerTokenContractAddressFromHash(ctx context.Context, chai
 		}
 	}
 	return "", fmt.Errorf("can't find owner token address in transaction: %v", txHash)
+}
+
+func (s *Service) ReTrackOwnerTokenDeploymentTransaction(ctx context.Context, chainID uint64, contractAddress string) error {
+	communityToken, err := s.Messenger.GetCommunityTokenByChainAndAddress(int(chainID), contractAddress)
+	if err != nil {
+		return err
+	}
+	if communityToken == nil {
+		return fmt.Errorf("can't find token with address %v on chain %v", contractAddress, chainID)
+	}
+	if communityToken.DeployState != token.InProgress {
+		return fmt.Errorf("token with address %v on chain %v is not in progress", contractAddress, chainID)
+	}
+
+	hashString := communityToken.TransactionHash
+	if hashString == "" && (communityToken.PrivilegesLevel == token.OwnerLevel || communityToken.PrivilegesLevel == token.MasterLevel) {
+		hashString = s.HashFromTemporaryContractAddress(communityToken.Address)
+	}
+
+	if hashString == "" {
+		return fmt.Errorf("can't find transaction hash for token with address %v on chain %v", contractAddress, chainID)
+	}
+
+	transactionType := transactions.DeployCommunityToken
+	if communityToken.PrivilegesLevel == token.OwnerLevel || communityToken.PrivilegesLevel == token.MasterLevel {
+		transactionType = transactions.DeployOwnerToken
+	}
+
+	_, err = s.pendingTracker.GetPendingEntry(wcommon.ChainID(chainID), common.HexToHash(hashString))
+	if errors.Is(err, sql.ErrNoRows) {
+		// start only if no pending transaction in database
+		err = s.pendingTracker.TrackPendingTransaction(
+			wcommon.ChainID(chainID),
+			common.HexToHash(hashString),
+			common.HexToAddress(communityToken.Deployer),
+			common.Address{},
+			transactionType,
+			transactions.Keep,
+			"",
+		)
+		log.Debug("retracking pending transaction with hashId ", hashString)
+	} else {
+		log.Debug("pending transaction with hashId is already tracked ", hashString)
+	}
+	return err
 }

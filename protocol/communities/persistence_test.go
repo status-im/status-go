@@ -395,6 +395,7 @@ func (s *PersistenceSuite) TestGetCommunityToken() {
 		ChainID:            1,
 		DeployState:        token.InProgress,
 		Base64Image:        "ABCD",
+		TransactionHash:    "0x1234",
 	}
 
 	err = s.db.AddCommunityToken(&tokenERC721)
@@ -426,6 +427,7 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 		Base64Image:        "ABCD",
 		Deployer:           "0xDep1",
 		PrivilegesLevel:    token.OwnerLevel,
+		TransactionHash:    "0x1234",
 	}
 
 	tokenERC20 := token.CommunityToken{
@@ -445,6 +447,7 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 		Decimals:           21,
 		Deployer:           "0xDep2",
 		PrivilegesLevel:    token.CommunityLevel,
+		TransactionHash:    "0x123456",
 	}
 
 	err = s.db.AddCommunityToken(&tokenERC721)
