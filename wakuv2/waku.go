@@ -69,6 +69,7 @@ import (
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/wakuv2/common"
 	"github.com/status-im/status-go/wakuv2/persistence"
@@ -1079,8 +1080,8 @@ func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 
 	w.logger.Debug("store.query",
 		zap.String("requestID", hexutil.Encode(requestID)),
-		zap.Int64p("startTime", query.StartTime),
-		zap.Int64p("endTime", query.EndTime),
+		logutils.WakuMessageTimestamp("startTime", query.StartTime),
+		logutils.WakuMessageTimestamp("endTime", query.EndTime),
 		zap.Strings("contentTopics", query.ContentTopics),
 		zap.String("pubsubTopic", query.PubsubTopic),
 		zap.Stringer("peerID", peerID))
@@ -1092,7 +1093,10 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 	requestID := protocol.GenerateRequestID()
 	pubsubTopic = w.getPubsubTopic(pubsubTopic)
 
+	queryStart := time.Now()
 	result, err := w.query(ctx, peerID, pubsubTopic, topics, from, to, requestID, opts)
+	queryDuration := time.Since(queryStart)
+
 	if err != nil {
 		w.logger.Error("error querying storenode",
 			zap.String("requestID", hexutil.Encode(requestID)),
@@ -1106,6 +1110,7 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 	}
 
 	envelopesCount = len(result.Messages)
+	w.logger.Debug("store.query response", zap.Duration("queryDuration", queryDuration), zap.Int("numMessages", envelopesCount), zap.Bool("hasCursor", result.IsComplete() && result.Cursor() != nil))
 
 	for _, msg := range result.Messages {
 		// Temporarily setting RateLimitProof to nil so it matches the WakuMessage protobuffer we are sending
