@@ -40,29 +40,37 @@ func (s *TransferBridge) CalculateFees(from, to *params.Network, token *token.To
 	return big.NewInt(0), big.NewInt(0), nil
 }
 
+func (s *TransferBridge) PackTxInputData(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
+	if token.Symbol == "ETH" {
+		return []byte("eth_sendRawTransaction"), nil
+	} else {
+		abi, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
+		if err != nil {
+			return []byte{}, err
+		}
+		return abi.Pack("transfer",
+			to,
+			amountIn,
+		)
+	}
+}
+
 func (s *TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
 	estimation := uint64(0)
 	var err error
+
+	input, err := s.PackTxInputData(fromNetwork, toNetwork, from, to, token, amountIn)
+	if err != nil {
+		return 0, err
+	}
+
 	if token.Symbol == "ETH" {
-		estimation, err = s.transactor.EstimateGas(fromNetwork, from, to, amountIn, []byte("eth_sendRawTransaction"))
+		estimation, err = s.transactor.EstimateGas(fromNetwork, from, to, amountIn, input)
 		if err != nil {
 			return 0, err
 		}
 	} else {
 		ethClient, err := s.rpcClient.EthClient(fromNetwork.ChainID)
-		if err != nil {
-			return 0, err
-		}
-
-		abi, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
-		if err != nil {
-			return 0, err
-		}
-		input, err := abi.Pack("transfer",
-			to,
-			amountIn,
-		)
-
 		if err != nil {
 			return 0, err
 		}
@@ -81,6 +89,7 @@ func (s *TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *par
 		}
 
 	}
+
 	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
 	return uint64(increasedEstimation), nil
 }

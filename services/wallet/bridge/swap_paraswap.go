@@ -91,6 +91,11 @@ func (s *SwapParaswap) CalculateFees(from, to *params.Network, token *token.Toke
 	return big.NewInt(0), big.NewInt(0), nil
 }
 
+func (s *SwapParaswap) PackTxInputData(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
+	// not sure what we can do here since we're using the api to build the transaction
+	return []byte{}, nil
+}
+
 func (s *SwapParaswap) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
 	priceRoute, err := s.paraswapClient.FetchPriceRoute(context.Background(), token.Address, token.Decimals, toToken.Address, toToken.Decimals, amountIn, from, to)
 	if err != nil {

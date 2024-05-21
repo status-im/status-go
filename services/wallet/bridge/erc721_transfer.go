@@ -48,29 +48,33 @@ func (s *ERC721TransferBridge) CalculateFees(from, to *params.Network, token *to
 	return big.NewInt(0), big.NewInt(0), nil
 }
 
+func (s *ERC721TransferBridge) PackTxInputData(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
+	abi, err := abi.JSON(strings.NewReader(collectibles.CollectiblesMetaData.ABI))
+	if err != nil {
+		return []byte{}, err
+	}
+
+	id, success := big.NewInt(0).SetString(token.Symbol, 0)
+	if !success {
+		return []byte{}, fmt.Errorf("failed to convert %s to big.Int", token.Symbol)
+	}
+
+	return abi.Pack("safeTransferFrom",
+		from,
+		to,
+		id,
+	)
+}
+
 func (s *ERC721TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
 	ethClient, err := s.rpcClient.EthClient(fromNetwork.ChainID)
 	if err != nil {
 		return 0, err
 	}
 
-	var input []byte
 	value := new(big.Int)
 
-	abi, err := abi.JSON(strings.NewReader(collectibles.CollectiblesMetaData.ABI))
-	if err != nil {
-		return 0, err
-	}
-	id, success := big.NewInt(0).SetString(token.Symbol, 0)
-	if !success {
-		return 0, fmt.Errorf("failed to convert %s to big.Int", token.Symbol)
-	}
-	input, err = abi.Pack("safeTransferFrom",
-		from,
-		to,
-		id,
-	)
-
+	input, err := s.PackTxInputData(fromNetwork, toNetwork, from, to, token, amountIn)
 	if err != nil {
 		return 0, err
 	}

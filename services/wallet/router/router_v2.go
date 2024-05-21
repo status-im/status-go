@@ -266,12 +266,8 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 	for _, route := range routes {
 		currentCost := big.NewFloat(0)
 		for _, path := range route {
-			if path.FromToken.IsNative() {
-				path.requiredNativeBalance = new(big.Int).Set(path.AmountIn.ToInt())
-			} else {
-				path.requiredTokenBalance = new(big.Int).Set(path.AmountIn.ToInt())
-				path.requiredNativeBalance = big.NewInt(0)
-			}
+			path.requiredTokenBalance = new(big.Int).Set(path.AmountIn.ToInt())
+			path.requiredNativeBalance = big.NewInt(0)
 
 			// ecaluate the cost of the path
 			pathCost := big.NewFloat(0)
@@ -434,7 +430,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 					}
 
 					gasLimit := uint64(0)
-					if input.SendType.isTransfer() {
+					if input.SendType.isTransfer(true) {
 						gasLimit, err = bridge.EstimateGas(network, dest, input.AddrFrom, input.AddrTo, token, toToken, amountToSend)
 						if err != nil {
 							continue
@@ -452,12 +448,12 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 					var l1FeeWei uint64
 					if input.SendType.needL1Fee() {
 
-						tx, err := bridge.BuildTx(network, dest, input.AddrFrom, input.AddrTo, token, amountToSend, bonderFees)
+						txInputData, err := bridge.PackTxInputData(network, dest, input.AddrFrom, input.AddrTo, token, amountToSend)
 						if err != nil {
 							continue
 						}
 
-						l1FeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, tx)
+						l1FeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, txInputData)
 					}
 
 					baseFee, err := r.feesManager.getBaseFee(ctx, client)

@@ -393,7 +393,12 @@ func (s *Service) estimateL1Fee(ctx context.Context, chainID uint64, sendArgs tr
 		return 0, err
 	}
 
-	return s.feeManager.GetL1Fee(ctx, chainID, transaction)
+	data, err := transaction.MarshalBinary()
+	if err != nil {
+		return 0, err
+	}
+
+	return s.feeManager.GetL1Fee(ctx, chainID, data)
 }
 
 func (s *Service) estimateMethodForTokenInstance(ctx context.Context, contractInstance TokenInstance, chainID uint64, contractAddress string, fromAddress string, methodName string, args ...interface{}) (uint64, error) {

@@ -24,11 +24,14 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
+
+const SevenDaysInSeconds = 604800
 
 type HopTxArgs struct {
 	transactions.SendTxArgs
@@ -40,14 +43,14 @@ type HopTxArgs struct {
 }
 
 type BonderFee struct {
-	AmountIn                *big.Int `json:"amountIn"`
-	Slippage                float32  `json:"slippage"`
-	AmountOutMin            *big.Int `json:"amountOutMin"`
-	DestinationAmountOutMin *big.Int `json:"destinationAmountOutMin"`
-	BonderFee               *big.Int `json:"bonderFee"`
-	EstimatedRecieved       *big.Int `json:"estimatedRecieved"`
-	Deadline                int64    `json:"deadline"`
-	DestinationDeadline     int64    `json:"destinationDeadline"`
+	AmountIn                *bigint.BigInt `json:"amountIn"`
+	Slippage                float32        `json:"slippage"`
+	AmountOutMin            *bigint.BigInt `json:"amountOutMin"`
+	DestinationAmountOutMin *bigint.BigInt `json:"destinationAmountOutMin"`
+	BonderFee               *bigint.BigInt `json:"bonderFee"`
+	EstimatedRecieved       *bigint.BigInt `json:"estimatedRecieved"`
+	Deadline                int64          `json:"deadline"`
+	DestinationDeadline     int64          `json:"destinationDeadline"`
 }
 
 func (bf *BonderFee) UnmarshalJSON(data []byte) error {
@@ -70,20 +73,22 @@ func (bf *BonderFee) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	bf.AmountIn = new(big.Int)
+	bf.AmountIn = &bigint.BigInt{Int: new(big.Int)}
 	bf.AmountIn.SetString(aux.AmountIn, 10)
 
-	bf.AmountOutMin = new(big.Int)
+	bf.AmountOutMin = &bigint.BigInt{Int: new(big.Int)}
 	bf.AmountOutMin.SetString(aux.AmountOutMin, 10)
 
-	bf.DestinationAmountOutMin = new(big.Int)
+	bf.DestinationAmountOutMin = &bigint.BigInt{Int: new(big.Int)}
 	bf.DestinationAmountOutMin.SetString(aux.DestinationAmountOutMin, 10)
 
-	bf.BonderFee = new(big.Int)
+	bf.BonderFee = &bigint.BigInt{Int: new(big.Int)}
 	bf.BonderFee.SetString(aux.BonderFee, 10)
 
-	bf.EstimatedRecieved = new(big.Int)
+	bf.EstimatedRecieved = &bigint.BigInt{Int: new(big.Int)}
 	bf.EstimatedRecieved.SetString(aux.EstimatedRecieved, 10)
+
+	bf.Deadline = aux.Deadline
 
 	if aux.DestinationDeadline != nil {
 		bf.DestinationDeadline = *aux.DestinationDeadline
@@ -126,12 +131,41 @@ func (h *HopBridge) AvailableFor(from, to *params.Network, token *token.Token, t
 	return true, nil
 }
 
-func (h *HopBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
-	var input []byte
-	value := new(big.Int)
+func (h *HopBridge) PackTxInputData(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
+	if fromNetwork.Layer == 1 {
+		ABI, err := abi.JSON(strings.NewReader(hopBridge.HopBridgeABI))
+		if err != nil {
+			return []byte{}, err
+		}
 
-	now := time.Now()
-	deadline := big.NewInt(now.Unix() + 604800)
+		return ABI.Pack("sendToL2",
+			big.NewInt(int64(toNetwork.ChainID)),
+			to,
+			h.bonderFee.AmountIn.Int,
+			h.bonderFee.AmountOutMin.Int,
+			big.NewInt(h.bonderFee.Deadline),
+			common.HexToAddress("0x0"),
+			big.NewInt(0))
+	} else {
+		ABI, err := abi.JSON(strings.NewReader(hopWrapper.HopWrapperABI))
+		if err != nil {
+			return []byte{}, err
+		}
+
+		return ABI.Pack("swapAndSend",
+			big.NewInt(int64(toNetwork.ChainID)),
+			to,
+			h.bonderFee.AmountIn.Int,
+			h.bonderFee.BonderFee.Int,
+			h.bonderFee.AmountOutMin.Int,
+			big.NewInt(h.bonderFee.Deadline),
+			h.bonderFee.DestinationAmountOutMin.Int,
+			big.NewInt(h.bonderFee.DestinationDeadline))
+	}
+}
+
+func (h *HopBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
+	value := new(big.Int)
 
 	if token.IsNative() {
 		value = amountIn
@@ -144,43 +178,9 @@ func (h *HopBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.N
 
 	ctx := context.Background()
 
-	if fromNetwork.Layer == 1 {
-		ABI, err := abi.JSON(strings.NewReader(hopBridge.HopBridgeABI))
-		if err != nil {
-			return 0, err
-		}
-
-		input, err = ABI.Pack("sendToL2",
-			big.NewInt(int64(toNetwork.ChainID)),
-			to,
-			amountIn,
-			big.NewInt(0),
-			deadline,
-			common.HexToAddress("0x0"),
-			big.NewInt(0))
-
-		if err != nil {
-			return 0, err
-		}
-	} else {
-		ABI, err := abi.JSON(strings.NewReader(hopWrapper.HopWrapperABI))
-		if err != nil {
-			return 0, err
-		}
-
-		input, err = ABI.Pack("swapAndSend",
-			big.NewInt(int64(toNetwork.ChainID)),
-			to,
-			amountIn,
-			big.NewInt(0),
-			big.NewInt(0),
-			deadline,
-			big.NewInt(0),
-			deadline)
-
-		if err != nil {
-			return 0, err
-		}
+	input, err := h.PackTxInputData(fromNetwork, toNetwork, from, to, token, amountIn)
+	if err != nil {
+		return 0, err
 	}
 
 	ethClient, err := h.contractMaker.RPCClient.EthClient(fromNetwork.ChainID)
@@ -286,14 +286,26 @@ func (h *HopBridge) sendToL2(chainID uint64, hopArgs *HopTxArgs, signerFn bind.S
 	if token.IsNative() {
 		txOpts.Value = (*big.Int)(hopArgs.Amount)
 	}
-	now := time.Now()
-	deadline := big.NewInt(now.Unix() + 604800)
+
+	var (
+		deadline     *big.Int
+		amountOutMin *big.Int
+	)
+
+	if h.bonderFee != nil {
+		deadline = big.NewInt(h.bonderFee.Deadline)
+		amountOutMin = h.bonderFee.AmountOutMin.Int
+	} else {
+		now := time.Now()
+		deadline = big.NewInt(now.Unix() + SevenDaysInSeconds)
+	}
+
 	tx, err = bridge.SendToL2(
 		txOpts,
 		big.NewInt(int64(hopArgs.ChainID)),
 		hopArgs.Recipient,
 		hopArgs.Amount.ToInt(),
-		big.NewInt(0),
+		amountOutMin,
 		deadline,
 		common.HexToAddress("0x0"),
 		big.NewInt(0),
@@ -317,14 +329,26 @@ func (h *HopBridge) swapAndSend(chainID uint64, hopArgs *HopTxArgs, signerFn bin
 	if token.IsNative() {
 		txOpts.Value = (*big.Int)(hopArgs.Amount)
 	}
-	now := time.Now()
-	deadline := big.NewInt(now.Unix() + 604800)
+
+	var deadline *big.Int
 	amountOutMin := big.NewInt(0)
-	destinationDeadline := big.NewInt(now.Unix() + 604800)
+	destinationDeadline := big.NewInt(0)
 	destinationAmountOutMin := big.NewInt(0)
 
-	if toNetwork.Layer == 1 {
-		destinationDeadline = big.NewInt(0)
+	// https://docs.hop.exchange/v/developer-docs/smart-contracts/integration#l2-greater-than-l1-and-l2-greater-than-l2
+	// Do not set `destinationAmountOutMin` and `destinationDeadline` when sending to L1 because there is no AMM on L1,
+	// otherwise the computed transferId will be invalid and the transfer will be unbondable. These parameters should be set to 0 when sending to L1.
+	if h.bonderFee != nil {
+		deadline = big.NewInt(h.bonderFee.Deadline)
+		amountOutMin = h.bonderFee.AmountOutMin.Int
+		destinationDeadline = big.NewInt(h.bonderFee.DestinationDeadline)
+		destinationAmountOutMin = h.bonderFee.DestinationAmountOutMin.Int
+	} else {
+		now := time.Now()
+		deadline = big.NewInt(now.Unix() + SevenDaysInSeconds)
+		if toNetwork.Layer != 1 {
+			destinationDeadline = big.NewInt(now.Unix() + SevenDaysInSeconds)
+		}
 	}
 
 	tx, err = ammWrapper.SwapAndSend(
@@ -372,16 +396,17 @@ func (h *HopBridge) CalculateFees(from, to *params.Network, token *token.Token, 
 		return nil, nil, err
 	}
 
+	h.bonderFee = &BonderFee{}
 	err = json.Unmarshal(response, h.bonderFee)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	tokenFee := new(big.Int).Sub(h.bonderFee.AmountIn, h.bonderFee.EstimatedRecieved)
+	tokenFee := new(big.Int).Sub(h.bonderFee.AmountIn.Int, h.bonderFee.EstimatedRecieved.Int)
 
-	return h.bonderFee.BonderFee, tokenFee, nil
+	return h.bonderFee.BonderFee.Int, tokenFee, nil
 }
 
 func (h *HopBridge) CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error) {
-	return h.bonderFee.EstimatedRecieved, nil
+	return h.bonderFee.EstimatedRecieved.Int, nil
 }
