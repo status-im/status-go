@@ -917,3 +917,58 @@ func (s *MessengerBackupSuite) TestBackupChats() {
 	s.Require().True(ok)
 	s.Require().Equal("", chat.Name)
 }
+
+func (s *MessengerBackupSuite) TestLeftCommunitiesAreBackedUp() {
+	bob1 := s.m
+	// Create bob2
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
+	s.Require().NoError(err)
+	defer TearDownMessenger(&s.Suite, bob2)
+
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
+		Name:        "other-status",
+		Color:       "#fffff4",
+		Description: "other status community description",
+	}
+
+	// Create another community chat
+	response, err := bob1.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	newCommunity := response.Communities()[0]
+
+	response, err = bob1.LeaveCommunity(newCommunity.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// trigger artificial Backup
+	_, err = bob1.BackupData(context.Background())
+	s.Require().NoError(err)
+
+	communities, err := bob1.Communities()
+	s.Require().NoError(err)
+	s.Require().Len(communities, 1)
+
+	// Safety check
+	communities, err = bob2.Communities()
+	s.Require().NoError(err)
+	s.Require().Len(communities, 0)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		bob2,
+		func(r *MessengerResponse) bool {
+			return r.BackupHandled
+		},
+		"no messages",
+	)
+
+	s.Require().NoError(err)
+
+	communities, err = bob2.JoinedCommunities()
+	s.Require().NoError(err)
+	s.Require().Len(communities, 0)
+}
