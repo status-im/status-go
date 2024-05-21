@@ -1047,7 +1047,7 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 	// Reimplement the common function that is called from every method to check for the limit
 	countAndlog = func(tc *TestClient, method string, params ...interface{}) error {
 		if tc.GetLimiter() != nil {
-			if limited, _ := tc.GetLimiter().IsLimitReached(transferHistoryTag); limited {
+			if allow, _ := tc.GetLimiter().Allow(transferHistoryTag); !allow {
 				t.Log("ERROR: requests over limit")
 				return chain.ErrRequestsOverLimit
 			}
@@ -1180,7 +1180,7 @@ func TestFindBlocksCommandWithLimiter(t *testing.T) {
 	fbc, tc, blockChannel, _ := setupFindBlocksCommand(t, accountAddress, big.NewInt(0), big.NewInt(20), rangeSize, balances, nil, nil, nil, nil)
 
 	limiter := chain.NewRequestLimiter(chain.NewInMemRequestsMapStorage())
-	limiter.SetMaxRequests(transferHistoryTag, maxRequests, time.Hour)
+	limiter.SetLimit(transferHistoryTag, maxRequests, time.Hour)
 	tc.SetLimiter(limiter)
 
 	ctx := context.Background()
@@ -1207,7 +1207,7 @@ func TestFindBlocksCommandWithLimiterTagDifferentThanTransfers(t *testing.T) {
 
 	fbc, tc, blockChannel, _ := setupFindBlocksCommand(t, accountAddress, big.NewInt(0), big.NewInt(20), rangeSize, balances, outgoingERC20Transfers, incomingERC20Transfers, nil, nil)
 	limiter := chain.NewRequestLimiter(chain.NewInMemRequestsMapStorage())
-	limiter.SetMaxRequests("some-other-tag-than-transfer-history", maxRequests, time.Hour)
+	limiter.SetLimit("some-other-tag-than-transfer-history", maxRequests, time.Hour)
 	tc.SetLimiter(limiter)
 
 	ctx := context.Background()
