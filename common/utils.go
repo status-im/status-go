@@ -14,6 +14,7 @@ import (
 var ErrInvalidDisplayNameRegExp = errors.New("only letters, numbers, underscores and hyphens allowed")
 var ErrInvalidDisplayNameEthSuffix = errors.New(`usernames ending with "eth" are not allowed`)
 var ErrInvalidDisplayNameNotAllowed = errors.New("name is not allowed")
+var ErrInvalidDisplayNameLength = errors.New("length must be between 5 and 24 characters")
 
 var DISPLAY_NAME_EXT = []string{"_eth", ".eth", "-eth"}
 
@@ -39,6 +40,11 @@ func ValidateDisplayName(displayName *string) error {
 
 	if name == "" {
 		return nil
+	}
+
+	//keep in sync with he regex below!
+	if len(name) < 5 || len(name) > 24 {
+		return ErrInvalidDisplayNameLength
 	}
 
 	// ^[\\w-\\s]{5,24}$ to allow spaces
