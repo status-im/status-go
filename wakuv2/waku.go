@@ -1144,8 +1144,6 @@ func (w *Waku) Start() error {
 
 	go func() {
 		defer w.wg.Done()
-
-		isConnected := false
 		for {
 			select {
 			case <-w.ctx.Done():
@@ -1156,7 +1154,6 @@ func (w *Waku) Start() error {
 				// TODO: https://github.com/status-im/status-go/issues/4628
 				// This code is not using the topic health status correctly.
 				// It assumes we are using a single pubsub topic for now
-
 				latestConnStatus := formatConnStatus(w.node, c)
 				w.logger.Debug("peer stats",
 					zap.Int("peersCount", len(latestConnStatus.Peers)),
@@ -1171,23 +1168,9 @@ func (w *Waku) Start() error {
 					w.onPeerStats(latestConnStatus)
 				}
 
-				if w.cfg.EnableDiscV5 {
-					// Restarting DiscV5
-					if !latestConnStatus.IsOnline && isConnected {
-						w.logger.Info("Restarting DiscV5: offline and is connected")
-						isConnected = false
-						w.node.DiscV5().Stop()
-					} else if latestConnStatus.IsOnline && !isConnected {
-						w.logger.Info("Restarting DiscV5: online and is not connected")
-						isConnected = true
-						if w.node.DiscV5().ErrOnNotRunning() != nil {
-							err := w.node.DiscV5().Start(w.ctx)
-							if err != nil {
-								w.logger.Error("Could not start DiscV5", zap.Error(err))
-							}
-						}
-					}
-				}
+				w.ConnectionChanged(connection.State{
+					Offline: !latestConnStatus.IsOnline,
+				})
 			}
 		}
 	}()
@@ -1543,7 +1526,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 		}
 	}
 
-	w.offline = !state.Offline
+	w.offline = state.Offline
 }
 
 // seedBootnodesForDiscV5 tries to fetch bootnodes
@@ -1600,16 +1583,17 @@ func (w *Waku) seedBootnodesForDiscV5() {
 			}
 		// If we go online, trigger immediately
 		case <-w.connectionChanged:
-			if canQuery() {
-				err := w.restartDiscV5()
-				if err != nil {
-					w.logger.Warn("failed to restart discv5", zap.Error(err))
+			if w.cfg.EnableDiscV5 {
+				if canQuery() {
+					err := w.restartDiscV5()
+					if err != nil {
+						w.logger.Warn("failed to restart discv5", zap.Error(err))
+					}
+
 				}
-
+				retries = 0
+				lastTry = now()
 			}
-			retries = 0
-			lastTry = now()
-
 		case <-w.ctx.Done():
 			w.wg.Done()
 			w.logger.Debug("bootnode seeding stopped")
