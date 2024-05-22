@@ -1125,7 +1125,7 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *asyn
 		// Each account has its own limit and a global limit for all accounts
 		accountTag := transferHistoryTag + "_" + account.String()
 		chainClient := chain.ClientWithTag(c.chainClient, accountTag, transferHistoryTag)
-		storage := chain.NewInMemRequestsMapStorage()
+		storage := chain.NewLimitsDBStorage(c.db.client)
 		limiter := chain.NewRequestLimiter(storage)
 		limiter.SetLimit(accountTag, transferHistoryLimitPerAccount, transferHistoryLimitPeriod)
 		limiter.SetLimit(transferHistoryTag, transferHistoryLimit, transferHistoryLimitPeriod)

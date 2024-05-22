@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"database/sql"
 	"fmt"
 	"sync"
 	"time"
@@ -27,9 +28,9 @@ type callerOnWait struct {
 	ch       chan bool
 }
 
-type RequestsStorage interface {
-	Get(tag string) (*RequestData, error)
-	Set(data *RequestData) error
+type LimitsStorage interface {
+	Get(tag string) (*LimitData, error)
+	Set(data *LimitData) error
 }
 
 type InMemRequestsMapStorage struct {
@@ -40,21 +41,56 @@ func NewInMemRequestsMapStorage() *InMemRequestsMapStorage {
 	return &InMemRequestsMapStorage{}
 }
 
-func (s *InMemRequestsMapStorage) Get(tag string) (*RequestData, error) {
+func (s *InMemRequestsMapStorage) Get(tag string) (*LimitData, error) {
 	data, ok := s.data.Load(tag)
 	if !ok {
 		return nil, nil
 	}
 
-	return data.(*RequestData), nil
+	return data.(*LimitData), nil
 }
 
-func (s *InMemRequestsMapStorage) Set(data *RequestData) error {
+func (s *InMemRequestsMapStorage) Set(data *LimitData) error {
+	if data == nil {
+		return fmt.Errorf("data is nil")
+	}
+
 	s.data.Store(data.Tag, data)
 	return nil
 }
 
-type RequestData struct {
+type LimitsDBStorage struct {
+	db *RPCLimiterDB
+}
+
+func NewLimitsDBStorage(db *sql.DB) *LimitsDBStorage {
+	return &LimitsDBStorage{
+		db: NewRPCLimiterDB(db),
+	}
+}
+
+func (s *LimitsDBStorage) Get(tag string) (*LimitData, error) {
+	return s.db.GetRPCLimit(tag)
+}
+
+func (s *LimitsDBStorage) Set(data *LimitData) error {
+	if data == nil {
+		return fmt.Errorf("data is nil")
+	}
+
+	limit, err := s.db.GetRPCLimit(data.Tag)
+	if err != nil {
+		return err
+	}
+
+	if limit == nil {
+		return s.db.CreateRPCLimit(*data)
+	}
+
+	return s.db.UpdateRPCLimit(*data)
+}
+
+type LimitData struct {
 	Tag       string
 	CreatedAt time.Time
 	Period    time.Duration
@@ -64,16 +100,16 @@ type RequestData struct {
 
 type RequestLimiter interface {
 	SetLimit(tag string, maxRequests int, interval time.Duration) error
-	GetLimit(tag string) (*RequestData, error)
+	GetLimit(tag string) (*LimitData, error)
 	Allow(tag string) (bool, error)
 }
 
 type RPCRequestLimiter struct {
-	storage RequestsStorage
+	storage LimitsStorage
 	mu      sync.Mutex
 }
 
-func NewRequestLimiter(storage RequestsStorage) *RPCRequestLimiter {
+func NewRequestLimiter(storage LimitsStorage) *RPCRequestLimiter {
 	return &RPCRequestLimiter{
 		storage: storage,
 	}
@@ -89,7 +125,7 @@ func (rl *RPCRequestLimiter) SetLimit(tag string, maxRequests int, interval time
 	return nil
 }
 
-func (rl *RPCRequestLimiter) GetLimit(tag string) (*RequestData, error) {
+func (rl *RPCRequestLimiter) GetLimit(tag string) (*LimitData, error) {
 	data, err := rl.storage.Get(tag)
 	if err != nil {
 		return nil, err
@@ -99,7 +135,7 @@ func (rl *RPCRequestLimiter) GetLimit(tag string) (*RequestData, error) {
 }
 
 func (rl *RPCRequestLimiter) saveToStorage(tag string, maxRequests int, interval time.Duration, numReqs int, timestamp time.Time) error {
-	data := &RequestData{
+	data := &LimitData{
 		Tag:       tag,
 		CreatedAt: timestamp,
 		Period:    interval,
