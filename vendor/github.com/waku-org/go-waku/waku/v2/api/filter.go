@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -11,7 +10,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
 	"go.uber.org/zap"
-	"golang.org/x/exp/maps"
 )
 
 const FilterPingTimeout = 5 * time.Second
@@ -39,6 +37,7 @@ type Sub struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 	log           *zap.Logger
+	closing       chan string
 }
 
 // Subscribe
@@ -53,37 +52,40 @@ func Subscribe(ctx context.Context, wf *filter.WakuFilterLightNode, contentFilte
 	sub.log = log.Named("filter-api")
 	sub.log.Debug("filter subscribe params", zap.Int("maxPeers", config.MaxPeers), zap.Stringer("contentFilter", contentFilter))
 	subs, err := sub.subscribe(contentFilter, sub.Config.MaxPeers)
-
+	sub.closing = make(chan string, config.MaxPeers)
 	if err != nil {
 		return nil, err
 	}
 	sub.multiplex(subs)
-	go sub.healthCheckLoop()
+	go sub.waitOnSubClose()
 	return sub, nil
 }
 
 func (apiSub *Sub) Unsubscribe() {
 	apiSub.cancel()
-
 }
 
-func (apiSub *Sub) healthCheckLoop() {
-	// Health checks
-	ticker := time.NewTicker(FilterPingTimeout)
-	defer ticker.Stop()
+func (apiSub *Sub) waitOnSubClose() {
 	for {
 		select {
 		case <-apiSub.ctx.Done():
-			apiSub.log.Debug("healthCheckLoop: Done()")
+			apiSub.log.Debug("apiSub context: Done()")
 			apiSub.cleanup()
 			return
-		case <-ticker.C:
-			apiSub.log.Debug("healthCheckLoop: checkAliveness()")
-			topicCounts := apiSub.getTopicCounts()
-			apiSub.resubscribe(topicCounts)
+		case subId := <-apiSub.closing:
+			//trigger closing and resubscribe flow for subscription.
+			apiSub.closeAndResubscribe(subId)
 		}
 	}
+}
 
+func (apiSub *Sub) closeAndResubscribe(subId string) {
+	apiSub.log.Debug("sub closeAndResubscribe", zap.String("subID", subId))
+
+	apiSub.subs[subId].Close()
+	failedPeer := apiSub.subs[subId].PeerID
+	delete(apiSub.subs, subId)
+	apiSub.resubscribe(failedPeer)
 }
 
 func (apiSub *Sub) cleanup() {
@@ -93,6 +95,7 @@ func (apiSub *Sub) cleanup() {
 	}()
 
 	for _, s := range apiSub.subs {
+		close(s.Closing)
 		_, err := apiSub.wf.UnsubscribeWithSubscription(apiSub.ctx, s)
 		if err != nil {
 			//Logging with info as this is part of cleanup
@@ -103,101 +106,36 @@ func (apiSub *Sub) cleanup() {
 
 }
 
-// Returns active sub counts for each pubsub topic
-func (apiSub *Sub) getTopicCounts() map[string]int {
-	// Buffered chan for sub aliveness results
-	type CheckResult struct {
-		sub   *subscription.SubscriptionDetails
-		alive bool
-	}
-	checkResults := make(chan CheckResult, len(apiSub.subs))
-	var wg sync.WaitGroup
-
-	// Run pings asynchronously
-	for _, s := range apiSub.subs {
-		wg.Add(1)
-		go func(sub *subscription.SubscriptionDetails) {
-			defer wg.Done()
-			ctx, cancelFunc := context.WithTimeout(apiSub.ctx, FilterPingTimeout)
-			defer cancelFunc()
-			err := apiSub.wf.IsSubscriptionAlive(ctx, sub)
-
-			apiSub.log.Debug("Check result:", zap.Any("subID", sub.ID), zap.Bool("result", err == nil))
-			checkResults <- CheckResult{sub, err == nil}
-		}(s)
-	}
-
-	// Collect healthy topic counts
-	topicCounts := make(map[string]int)
-
-	topicMap, _ := protocol.ContentFilterToPubSubTopicMap(apiSub.ContentFilter)
-	for _, t := range maps.Keys(topicMap) {
-		topicCounts[t] = 0
-	}
-	wg.Wait()
-	close(checkResults)
-	for s := range checkResults {
-		if !s.alive {
-			// Close inactive subs
-			s.sub.Close()
-			delete(apiSub.subs, s.sub.ID)
-		} else {
-			topicCounts[s.sub.ContentFilter.PubsubTopic]++
-		}
-	}
-
-	return topicCounts
-}
-
 // Attempts to resubscribe on topics that lack subscriptions
-func (apiSub *Sub) resubscribe(topicCounts map[string]int) {
-
-	// Delete healthy topics
-	for t, cnt := range topicCounts {
-		if cnt == apiSub.Config.MaxPeers {
-			delete(topicCounts, t)
-		}
-	}
-
-	if len(topicCounts) == 0 {
-		// All topics healthy, return
-		return
-	}
-	var wg sync.WaitGroup
-
+func (apiSub *Sub) resubscribe(failedPeer peer.ID) {
 	// Re-subscribe asynchronously
-	newSubs := make(chan []*subscription.SubscriptionDetails)
+	existingSubCount := len(apiSub.subs)
+	apiSub.log.Debug("subscribing again", zap.Stringer("contentFilter", apiSub.ContentFilter), zap.Int("numPeers", apiSub.Config.MaxPeers-existingSubCount))
+	var peersToExclude peer.IDSlice
+	peersToExclude = append(peersToExclude, failedPeer)
+	for _, sub := range apiSub.subs {
+		peersToExclude = append(peersToExclude, sub.PeerID)
+	}
+	subs, err := apiSub.subscribe(apiSub.ContentFilter, apiSub.Config.MaxPeers-existingSubCount, peersToExclude...)
+	if err != nil {
+		return
+	} //Not handling scenario where all requested subs are not received as that will get handled in next cycle.
 
-	for t, cnt := range topicCounts {
-		cFilter := protocol.ContentFilter{PubsubTopic: t, ContentTopics: apiSub.ContentFilter.ContentTopics}
-		wg.Add(1)
-		go func(count int) {
-			defer wg.Done()
-			subs, err := apiSub.subscribe(cFilter, apiSub.Config.MaxPeers-count)
-			if err != nil {
-				return
-			} //Not handling scenario where all requested subs are not received as that will get handled in next cycle.
-			newSubs <- subs
-		}(cnt)
-	}
-	wg.Wait()
-	close(newSubs)
 	apiSub.log.Debug("resubscribe(): before range newSubs")
-	for subs := range newSubs {
-		if subs != nil {
-			apiSub.multiplex(subs)
-		}
-	}
-	apiSub.log.Debug("checkAliveness(): close(newSubs)")
-	//close(newSubs)
+
+	apiSub.multiplex(subs)
 }
 
-func (apiSub *Sub) subscribe(contentFilter protocol.ContentFilter, peerCount int) ([]*subscription.SubscriptionDetails, error) {
+func (apiSub *Sub) subscribe(contentFilter protocol.ContentFilter, peerCount int, peersToExclude ...peer.ID) ([]*subscription.SubscriptionDetails, error) {
 	// Low-level subscribe, returns a set of SubscriptionDetails
 	options := make([]filter.FilterSubscribeOption, 0)
 	options = append(options, filter.WithMaxPeersPerContentFilter(int(peerCount)))
 	for _, p := range apiSub.Config.Peers {
 		options = append(options, filter.WithPeer(p))
+	}
+	if len(peersToExclude) > 0 {
+		apiSub.log.Debug("subscribing with peersToExclude", zap.Stringer("peersToExclude", peersToExclude[0]))
+		options = append(options, filter.WithPeersToExclude(peersToExclude...))
 	}
 	subs, err := apiSub.wf.Subscribe(apiSub.ctx, contentFilter, options...)
 
@@ -206,7 +144,7 @@ func (apiSub *Sub) subscribe(contentFilter protocol.ContentFilter, peerCount int
 			// Partial Failure, for now proceed as we don't expect this to happen wrt specific topics.
 			// Rather it can happen in case subscription with one of the peer fails.
 			// This can further get automatically handled at resubscribe,
-			apiSub.log.Error("partial failure in Filter subscribe", zap.Error(err))
+			apiSub.log.Error("partial failure in Filter subscribe", zap.Error(err), zap.Int("successCount", len(subs)))
 			return subs, nil
 		}
 		// In case of complete subscription failure, application or user needs to handle and probably retry based on error
@@ -228,6 +166,12 @@ func (apiSub *Sub) multiplex(subs []*subscription.SubscriptionDetails) {
 			for env := range subDetails.C {
 				apiSub.DataCh <- env
 			}
+		}(subDetails)
+		go func(subDetails *subscription.SubscriptionDetails) {
+			<-subDetails.Closing
+			apiSub.log.Debug("sub closing", zap.String("subID", subDetails.ID))
+
+			apiSub.closing <- subDetails.ID
 		}(subDetails)
 	}
 }

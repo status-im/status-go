@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"io"
 	"math"
 	"math/big"
@@ -21,6 +20,8 @@ import (
 	"testing"
 	"time"
 	"unicode/utf8"
+
+	"github.com/waku-org/go-waku/waku/v2/protocol"
 
 	gcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -46,6 +47,21 @@ type StringGenerator func(maxLength int) (string, error)
 // GetHostAddress returns the first listen address used by a host
 func GetHostAddress(ha host.Host) multiaddr.Multiaddr {
 	return ha.Addrs()[0]
+}
+
+// Returns a full multiaddr of host appended by peerID
+func GetAddr(h host.Host) multiaddr.Multiaddr {
+	id, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", h.ID().String()))
+	var selectedAddr multiaddr.Multiaddr
+	//For now skipping circuit relay addresses as libp2p seems to be returning empty p2p-circuit addresses.
+	for _, addr := range h.Network().ListenAddresses() {
+		if strings.Contains(addr.String(), "p2p-circuit") {
+			continue
+		}
+		selectedAddr = addr
+		break
+	}
+	return selectedAddr.Encapsulate(id)
 }
 
 // FindFreePort returns an available port number
