@@ -2,6 +2,7 @@ package token
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"sync"
 	"testing"
@@ -382,4 +383,45 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	txServiceMockCtrl.Finish()
 	server.Stop()
 	manager.stopAccountsWatcher()
+}
+
+func Test_tokensListsValidity(t *testing.T) {
+	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	accountsDB, err := accounts.NewDB(appDB)
+	require.NoError(t, err)
+
+	nm := network.NewManager(appDB)
+
+	manager := NewTokenManager(walletDB, nil, nil, nm, appDB, nil, nil, nil, accountsDB)
+	require.NotNil(t, manager)
+
+	tokensListWrapper := manager.GetList()
+	require.NotNil(t, tokensListWrapper)
+	allLists := tokensListWrapper.Data
+	require.Greater(t, len(allLists), 0)
+
+	tmpMap := make(map[string][]*Token)
+	for _, list := range allLists {
+		for _, token := range list.Tokens {
+			key := fmt.Sprintf("%d-%s", token.ChainID, token.Symbol)
+			if added, ok := tmpMap[key]; ok {
+				found := false
+				for _, a := range added {
+					if a.Address == token.Address {
+						found = true
+						break
+					}
+				}
+
+				require.True(t, found)
+			} else {
+				tmpMap[key] = []*Token{token}
+			}
+		}
+	}
 }
