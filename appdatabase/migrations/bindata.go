@@ -111,6 +111,7 @@
 // 1709203128_fix_chain_colors.up.sql (244B)
 // 1709795716_migration_order_fix.up.sql (7.909kB)
 // 1715756976_network_short_names_update.up.sql (256B)
+// 1716385243_no_discovery.up.sql (44B)
 // doc.go (94B)
 
 package migrations
@@ -2400,6 +2401,26 @@ func _1715756976_network_short_names_updateUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1716385243_no_discoveryUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x0a\x0d\x70\x71\x0c\x71\x55\xc8\xcb\x4f\x49\x8d\x4f\xce\xcf\x4b\xcb\x4c\x57\x08\x76\x0d\x51\xc8\xcb\x8f\x4f\xc9\x2c\x4e\xce\x2f\x4b\x2d\xaa\x54\xb0\x55\x28\x29\x2a\x4d\xb5\xe6\x02\x04\x00\x00\xff\xff\xe6\x6d\xe0\x1c\x2c\x00\x00\x00")
+
+func _1716385243_no_discoveryUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1716385243_no_discoveryUpSql,
+		"1716385243_no_discovery.up.sql",
+	)
+}
+
+func _1716385243_no_discoveryUpSql() (*asset, error) {
+	bytes, err := _1716385243_no_discoveryUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1716385243_no_discovery.up.sql", size: 44, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9c, 0x43, 0xee, 0xcd, 0x88, 0x1d, 0x13, 0xed, 0x29, 0x55, 0x18, 0x5b, 0x29, 0x62, 0x20, 0xce, 0x4d, 0xa0, 0xa1, 0xe3, 0x2, 0xf1, 0x80, 0x3b, 0x8e, 0x8, 0x6b, 0x9, 0xcc, 0xe3, 0x9a, 0xa1}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xcb\x41\x0e\x02\x31\x08\x05\xd0\x7d\x4f\xf1\x2f\x00\xe8\xca\xc4\xc4\xc3\xa0\x43\x08\x19\x5b\xc6\x96\xfb\xc7\x4d\xdf\xfe\x5d\xfa\x39\xd5\x0d\xeb\xf7\x6d\x4d\xc4\xf3\xe9\x36\x6c\x6a\x19\x3c\xe9\x1d\xe3\xd0\x52\x50\xcf\xa3\xa2\xdb\xeb\xfe\xb8\x6d\xa0\xeb\x74\xf4\xf0\xa9\x15\x39\x16\x28\xc1\x2c\x7b\xb0\x27\x58\xda\x3f\x00\x00\xff\xff\x57\xd4\xd5\x90\x5e\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -2733,6 +2754,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1715756976_network_short_names_update.up.sql": _1715756976_network_short_names_updateUpSql,
 
+	"1716385243_no_discovery.up.sql": _1716385243_no_discoveryUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -2888,7 +2911,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1709203128_fix_chain_colors.up.sql":                                       &bintree{_1709203128_fix_chain_colorsUpSql, map[string]*bintree{}},
 	"1709795716_migration_order_fix.up.sql":                                    &bintree{_1709795716_migration_order_fixUpSql, map[string]*bintree{}},
 	"1715756976_network_short_names_update.up.sql":                             &bintree{_1715756976_network_short_names_updateUpSql, map[string]*bintree{}},
-	"doc.go": &bintree{docGo, map[string]*bintree{}},
+	"1716385243_no_discovery.up.sql":                                           &bintree{_1716385243_no_discoveryUpSql, map[string]*bintree{}},
+	"doc.go":                                                                   &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

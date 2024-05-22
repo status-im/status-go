@@ -1326,10 +1326,7 @@ func loginMobileUser(t *testing.T, rootDataDir string) {
 	b.UpdateRootDataDir(rootDataDir)
 	require.NoError(t, b.OpenAccounts())
 
-	// fixme(Frank) we need specify NoDiscovery to true to avoid error: "NoDiscovery is false, but ClusterConfig.BootNodes is empty"
-	// relate mobile issue: https://github.com/status-im/status-mobile/issues/20140
-	conf := &params.NodeConfig{NoDiscovery: true}
-	require.NoError(t, b.StartNodeWithAccount(multiaccounts.Account{KeyUID: keyUID}, passwd, conf))
+	require.NoError(t, b.Login(keyUID, passwd))
 	require.NoError(t, b.Logout())
 }
 

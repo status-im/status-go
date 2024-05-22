@@ -254,6 +254,7 @@ type ClusterConfig struct {
 	StaticNodes []string
 
 	// BootNodes is a list of bootnodes.
+	// Deprecated: won't be used at all in wakuv2
 	BootNodes []string
 
 	// TrustedMailServers is a list of verified and trusted Mail Server nodes.
@@ -334,9 +335,11 @@ type NodeConfig struct {
 	NodeKey string
 
 	// NoDiscovery set to true will disable discovery protocol.
+	// Deprecated: won't be used at all in wakuv2
 	NoDiscovery bool
 
 	// Rendezvous enables discovery protocol.
+	// Deprecated: won't be used at all in wakuv2
 	Rendezvous bool
 
 	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
