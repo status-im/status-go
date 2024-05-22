@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/status-im/status-go/services/wallet/thirdparty"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -68,9 +70,9 @@ func TestGetTokensSuccess(t *testing.T) {
 	defer stop()
 
 	geckoClient := &Client{
-		client:    srv.Client(),
-		tokens:    make(map[string][]GeckoToken),
-		tokensURL: srv.URL,
+		httpClient: thirdparty.NewHTTPClient(),
+		tokens:     make(map[string][]GeckoToken),
+		tokensURL:  srv.URL,
 	}
 
 	tokenMap, err := geckoClient.getTokens()
@@ -150,9 +152,9 @@ func TestGetTokensEthPlatform(t *testing.T) {
 	defer stop()
 
 	geckoClient := &Client{
-		client:    srv.Client(),
-		tokens:    make(map[string][]GeckoToken),
-		tokensURL: srv.URL,
+		httpClient: thirdparty.NewHTTPClient(),
+		tokens:     make(map[string][]GeckoToken),
+		tokensURL:  srv.URL,
 	}
 
 	tokenMap, err := geckoClient.getTokens()
@@ -166,9 +168,9 @@ func TestGetTokensFailure(t *testing.T) {
 	defer stop()
 
 	geckoClient := &Client{
-		client:    srv.Client(),
-		tokens:    make(map[string][]GeckoToken),
-		tokensURL: srv.URL,
+		httpClient: thirdparty.NewHTTPClient(),
+		tokens:     make(map[string][]GeckoToken),
+		tokensURL:  srv.URL,
 	}
 
 	_, err := geckoClient.getTokens()
