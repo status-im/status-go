@@ -73,7 +73,7 @@ func TestClosingsqlDB(t *testing.T) {
 	password := "settings-tests"
 
 	// Make connection with sql.DB
-	db, err := appdatabase.InitializeDB(testFileName, password, dbsetup.ReducedKDFIterationsNumber)
+	db, err := appdatabase.InitializeDB(testFileName, password, dbsetup.ReducedKDFIterationsNumber, "")
 
 	// handle removing the test file on any exit
 	defer func() {
@@ -98,7 +98,7 @@ func TestClosingsqlDB(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make another connection with sql.DB
-	db2, err := appdatabase.InitializeDB(testFileName, password, dbsetup.ReducedKDFIterationsNumber)
+	db2, err := appdatabase.InitializeDB(testFileName, password, dbsetup.ReducedKDFIterationsNumber, "")
 	require.NoError(t, err)
 
 	// Init settings.Database struct using second connection

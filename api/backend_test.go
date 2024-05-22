@@ -1264,7 +1264,7 @@ func copyDir(srcFolder string, dstFolder string, t *testing.T) {
 	}
 }
 
-func login(t *testing.T, conf *params.NodeConfig) {
+func loginDesktopUser(t *testing.T, conf *params.NodeConfig) {
 	// The following passwords and DB used in this test unit are only
 	// used to determine if login process works correctly after a migration
 
@@ -1302,7 +1302,7 @@ func login(t *testing.T, conf *params.NodeConfig) {
 
 }
 
-func TestLoginAndMigrationsStillWorkWithExistingUsers(t *testing.T) {
+func TestLoginAndMigrationsStillWorkWithExistingDesktopUser(t *testing.T) {
 	utils.Init()
 
 	srcFolder := "../static/test-0.132.0-account/"
@@ -1314,8 +1314,36 @@ func TestLoginAndMigrationsStillWorkWithExistingUsers(t *testing.T) {
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
 
-	login(t, conf)
-	login(t, conf) // Login twice to catch weird errors that only appear after logout
+	loginDesktopUser(t, conf)
+	loginDesktopUser(t, conf) // Login twice to catch weird errors that only appear after logout
+}
+
+func loginMobileUser(t *testing.T, rootDataDir string) {
+	keyUID := "0x24e820f007f6da0f56d394cdf1573d4c01ba716d5f39d0cf95e47bbf06e96d7d"
+	passwd := "0x20756cad9b728c8225fd8cedb6badaf8731e174506950219ea657cd54f35f46c" // #nosec G101
+
+	b := NewGethStatusBackend()
+	b.UpdateRootDataDir(rootDataDir)
+	require.NoError(t, b.OpenAccounts())
+
+	// fixme(Frank) we need specify NoDiscovery to true to avoid error: "NoDiscovery is false, but ClusterConfig.BootNodes is empty"
+	// relate mobile issue: https://github.com/status-im/status-mobile/issues/20140
+	conf := &params.NodeConfig{NoDiscovery: true}
+	require.NoError(t, b.StartNodeWithAccount(multiaccounts.Account{KeyUID: keyUID}, passwd, conf))
+	require.NoError(t, b.Logout())
+}
+
+func TestLoginAndMigrationsStillWorkWithExistingMobileUser(t *testing.T) {
+	utils.Init()
+
+	srcFolder := "../static/test-release-1.20.x-aa6e4b2-account/"
+
+	tmpdir := t.TempDir()
+
+	copyDir(srcFolder, tmpdir, t)
+
+	loginMobileUser(t, tmpdir)
+	loginMobileUser(t, tmpdir) // Login twice to catch weird errors that only appear after logout
 }
 
 func TestChangeDatabasePassword(t *testing.T) {
