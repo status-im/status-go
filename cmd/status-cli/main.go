@@ -19,6 +19,7 @@ const NameFlag = "name"
 const AddFlag = "add"
 const PortFlag = "port"
 const APIModulesFlag = "api-modules"
+const TelemetryServerURLFlag = "telemetry-server-url"
 
 const RetrieveInterval = 300 * time.Millisecond
 const SendInterval = 1 * time.Second
@@ -35,6 +36,11 @@ var CommonFlags = []cli.Flag{
 		Aliases: []string{"m"},
 		Value:   "waku,wakuext,wakuv2,permissions,eth",
 		Usage:   "API modules to enable",
+	},
+	&cli.StringFlag{
+		Name:    TelemetryServerURLFlag,
+		Aliases: []string{"t"},
+		Usage:   "Telemetry server URL",
 	},
 }
 

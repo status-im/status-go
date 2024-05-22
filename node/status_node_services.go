@@ -142,9 +142,11 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 			if err != nil {
 				return err
 			}
+			if telemetryServerURL != "" {
+				config.WakuV2Config.TelemetryServerURL = telemetryServerURL
+			}
 		}
-
-		waku2Service, err := b.wakuV2Service(config, telemetryServerURL)
+		waku2Service, err := b.wakuV2Service(config)
 		if err != nil {
 			return err
 		}
@@ -312,7 +314,7 @@ func (b *StatusNode) wakuService(wakuCfg *params.WakuConfig, clusterCfg *params.
 
 }
 
-func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig, telemetryServerURL string) (*wakuv2.Waku, error) {
+func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku, error) {
 	if b.wakuV2Srvc == nil {
 		cfg := &wakuv2.Config{
 			MaxMessageSize:          wakucommon.DefaultMaxMessageSize,
@@ -332,7 +334,7 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig, telemetryServe
 			AutoUpdate:              nodeConfig.WakuV2Config.AutoUpdate,
 			DefaultShardPubsubTopic: shard.DefaultShardPubsubTopic(),
 			UseShardAsDefaultTopic:  nodeConfig.WakuV2Config.UseShardAsDefaultTopic,
-			TelemetryServerURL:      telemetryServerURL,
+			TelemetryServerURL:      nodeConfig.WakuV2Config.TelemetryServerURL,
 			ClusterID:               nodeConfig.ClusterConfig.ClusterID,
 		}
 

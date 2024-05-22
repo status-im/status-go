@@ -34,7 +34,7 @@ func setupLogger(file string) *zap.Logger {
 	return logutils.ZapLogger()
 }
 
-func start(cCtx *cli.Context, name string, port int, apiModules string) (*StatusCLI, error) {
+func start(cCtx *cli.Context, name string, port int, apiModules string, telemetryUrl string) (*StatusCLI, error) {
 	namedLogger := logger.Named(name)
 	namedLogger.Info("starting messager")
 
@@ -60,6 +60,7 @@ func start(cCtx *cli.Context, name string, port int, apiModules string) (*Status
 			HTTPHost:   "127.0.0.1",
 			HTTPPort:   port,
 		},
+		TelemetryServerURL: telemetryUrl,
 	}
 	_, err = backend.CreateAccountAndLogin(createAccountRequest)
 	if err != nil {
