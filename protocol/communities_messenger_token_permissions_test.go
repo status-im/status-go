@@ -959,13 +959,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWit
 			},
 		},
 	}
-	response, err = s.owner.CreateCommunityTokenPermission(&permissionRequestAdmin)
-	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
 
 	waitOnCommunityPermissionCreated = waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
 		return len(sub.Community.TokenPermissions()) == 2
 	})
+
+	response, err = s.owner.CreateCommunityTokenPermission(&permissionRequestAdmin)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
 
 	err = <-waitOnCommunityPermissionCreated
 	s.Require().NoError(err)
