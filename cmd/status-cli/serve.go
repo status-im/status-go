@@ -36,8 +36,9 @@ func serve(cCtx *cli.Context) error {
 	name := cCtx.String(NameFlag)
 	port := cCtx.Int(PortFlag)
 	apiModules := cCtx.String(APIModulesFlag)
+	telemetryUrl := cCtx.String(TelemetryServerURLFlag)
 
-	cli, err := start(cCtx, name, port, apiModules)
+	cli, err := start(cCtx, name, port, apiModules, telemetryUrl)
 	if err != nil {
 		return err
 	}

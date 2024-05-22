@@ -66,6 +66,8 @@ type CreateAccount struct {
 	TorrentConfigEnabled *bool
 	TorrentConfigPort    *int
 
+	TelemetryServerURL string `json:"telemetryServerURL"`
+
 	APIConfig *APIConfig `json:"apiConfig"`
 }
 

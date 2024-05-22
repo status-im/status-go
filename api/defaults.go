@@ -283,6 +283,10 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 		nodeConfig.WakuV2Config.Nameserver = *request.WakuV2Nameserver
 	}
 
+	if request.TelemetryServerURL != "" {
+		nodeConfig.WakuV2Config.TelemetryServerURL = request.TelemetryServerURL
+	}
+
 	nodeConfig.ShhextConfig = params.ShhextConfig{
 		BackupDisabledDataDir:      request.BackupDisabledDataDir,
 		InstallationID:             installationID,

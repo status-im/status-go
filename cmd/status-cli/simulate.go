@@ -37,14 +37,15 @@ func simulate(cCtx *cli.Context) error {
 
 	// Start messengers
 	apiModules := cCtx.String(APIModulesFlag)
+	telemetryUrl := cCtx.String(TelemetryServerURLFlag)
 
-	alice, err := start(cCtx, "Alice", 0, apiModules)
+	alice, err := start(cCtx, "Alice", 0, apiModules, telemetryUrl)
 	if err != nil {
 		return err
 	}
 	defer alice.stop()
 
-	charlie, err := start(cCtx, "Charlie", 0, apiModules)
+	charlie, err := start(cCtx, "Charlie", 0, apiModules, telemetryUrl)
 	if err != nil {
 		return err
 	}
