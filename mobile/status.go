@@ -403,6 +403,14 @@ func DeleteMultiaccount(keyUID, keyStoreDir string) string {
 	return makeJSONResponse(nil)
 }
 
+func MakeSeedPhraseKeypairFullyOperable(mnemonic string, password string) string {
+	err := statusBackend.MakeSeedPhraseKeypairFullyOperable(mnemonic, password)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return makeJSONResponse(nil)
+}
+
 // DeleteImportedKey
 func DeleteImportedKey(address, password, keyStoreDir string) string {
 	err := statusBackend.DeleteImportedKey(address, password, keyStoreDir)

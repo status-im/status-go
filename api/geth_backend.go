@@ -45,6 +45,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server/pairing/statecontrol"
+	accountsAPI "github.com/status-im/status-go/services/accounts"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
@@ -84,6 +85,7 @@ type GethStatusBackend struct {
 
 	statusNode               *node.StatusNode
 	personalAPI              *personal.PublicAPI
+	accountsAPI              *accountsAPI.API
 	multiaccountsDB          *multiaccounts.Database
 	account                  *multiaccounts.Account
 	accountManager           *account.GethManager
@@ -109,12 +111,14 @@ func (b *GethStatusBackend) initialize() {
 	accountManager := account.NewGethManager()
 	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI()
+	accountsAPI := accountsAPI.NewAccountsAPI()
 	statusNode := node.New(transactor)
 
 	b.statusNode = statusNode
 	b.accountManager = accountManager
 	b.transactor = transactor
 	b.personalAPI = personalAPI
+	b.accountsAPI = accountsAPI
 	b.statusNode.SetMultiaccountsDB(b.multiaccountsDB)
 	b.log = log.New("package", "status-go/api.GethStatusBackend")
 	b.LocalPairingStateManager = new(statecontrol.ProcessStateManager)
@@ -1972,6 +1976,13 @@ func (b *GethStatusBackend) SignMessage(rpcParams personal.SignParams) (types.He
 // key that was used to calculate the signature in the message
 func (b *GethStatusBackend) Recover(rpcParams personal.RecoverParams) (types.Address, error) {
 	return b.personalAPI.Recover(rpcParams)
+}
+
+func (b *GethStatusBackend) MakeSeedPhraseKeypairFullyOperable(mnemonic string, password string) error {
+	err := b.accountsAPI.MakeSeedPhraseKeypairFullyOperable(context.TODO(), mnemonic, password)
+	if err != nil {
+		return err
+	}
 }
 
 // SignTypedData accepts data and password. Gets verified account and signs typed data.
