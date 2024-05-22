@@ -328,27 +328,12 @@ func createCommunityConfigurable(s *suite.Suite, owner *Messenger, permission pr
 	community := response.Communities()[0]
 	s.Require().True(community.Joined())
 	s.Require().True(community.IsControlNode())
+	s.Require().Len(community.Chats(), 1)
 
 	s.Require().Len(response.CommunitiesSettings(), 1)
 	communitySettings := response.CommunitiesSettings()[0]
 	s.Require().Equal(communitySettings.CommunityID, community.IDString())
 	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
-
-	orgChat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
-		},
-		Identity: &protobuf.ChatIdentity{
-			DisplayName: "status-core",
-			Emoji:       "😎",
-			Description: "status-core community chat",
-		},
-	}
-
-	response, err = owner.CreateCommunityChat(community.ID(), orgChat)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Chats(), 1)
 
 	return community, response.Chats()[0]
 }

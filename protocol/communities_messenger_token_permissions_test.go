@@ -2030,7 +2030,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissi
 
 	community, err := s.owner.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
-	s.Require().Len(community.Chats(), 2)
+	s.Require().Len(community.Chats(), 1)
 
 	requestToJoin := &communities.RequestToJoin{
 		Clock:       uint64(time.Now().Unix()),
@@ -2070,7 +2070,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissi
 
 	s.Require().Equal(community.MembersCount(), keysCount+1) // 1 is owner
 
-	chatsCount := 8 // in total will be 10, 2 channels were created during creating the community
+	chatsCount := 9 // in total will be 10, 1 channel were created during creating the community
 
 	for i := 0; i < chatsCount; i++ {
 		newChat := &protobuf.CommunityChat{
@@ -2088,7 +2088,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissi
 		s.Require().NoError(err)
 	}
 
-	s.Require().Len(community.Chats(), chatsCount+2) // 2 chats were created during community creation
+	s.Require().Len(community.Chats(), chatsCount+1) // 1 chat were created during community creation
 
 	err = s.owner.communitiesManager.SaveCommunity(community)
 	s.Require().NoError(err)

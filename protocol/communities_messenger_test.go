@@ -2172,7 +2172,7 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 			numberInactiveChats++
 		}
 	}
-	s.Require().Equal(3, numberInactiveChats)
+	s.Require().Equal(2, numberInactiveChats)
 
 	// alice can rejoin
 	s.joinCommunity(community, s.owner, s.alice)
