@@ -517,6 +517,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		chat.UnviewedMentionsCount = uint(unviewedMentionsCount)
 
 		// Restore members
+		chat.Members = []ChatMember{}
 		membersDecoder := gob.NewDecoder(bytes.NewBuffer(encodedMembers))
 		err = membersDecoder.Decode(&chat.Members)
 		if err != nil {

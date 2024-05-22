@@ -495,12 +495,24 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 	}
 
 	timestamp := timesource.GetCurrentTime()
+
+	// Populate community _channel_ members to _chat_ members
+	chatMembers := []ChatMember{}
+	for pubKey := range orgChat.Members {
+		chatMember := ChatMember{
+			ID:    pubKey,
+			Admin: false,
+		}
+		chatMembers = append(chatMembers, chatMember)
+	}
+
 	return &Chat{
 		CommunityID:              orgID,
 		CategoryID:               orgChat.CategoryId,
 		HideIfPermissionsNotMet:  orgChat.HideIfPermissionsNotMet,
 		Name:                     orgChat.Identity.DisplayName,
 		Description:              orgChat.Identity.Description,
+		Members:                  chatMembers,
 		Active:                   true,
 		Color:                    color,
 		Emoji:                    orgChat.Identity.Emoji,
@@ -570,6 +582,7 @@ func CreatePublicChat(name string, timesource common.TimeSource) *Chat {
 		ReadMessagesAtClockValue: 0,
 		Color:                    chatColors[rand.Intn(len(chatColors))], // nolint: gosec
 		ChatType:                 ChatTypePublic,
+		Members:                  []ChatMember{},
 	}
 }
 
