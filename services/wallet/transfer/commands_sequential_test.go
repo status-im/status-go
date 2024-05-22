@@ -332,7 +332,10 @@ var ethscanAddress = common.HexToAddress("0x000000000000000000000000000000000077
 var balanceCheckAddress = common.HexToAddress("0x0000000000000000000000000000000010777333")
 
 func (tc *TestClient) CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error) {
-	tc.countAndlog("CodeAt", fmt.Sprintf("contract: %s, blockNumber: %d", contract, blockNumber))
+	err := tc.countAndlog("CodeAt", fmt.Sprintf("contract: %s, blockNumber: %d", contract, blockNumber))
+	if err != nil {
+		return nil, err
+	}
 
 	if ethscanAddress == contract || balanceCheckAddress == contract {
 		return []byte{1}, nil
@@ -1182,7 +1185,8 @@ func TestFindBlocksCommandWithLimiter(t *testing.T) {
 	fbc, tc, blockChannel, _ := setupFindBlocksCommand(t, accountAddress, big.NewInt(0), big.NewInt(20), rangeSize, balances, nil, nil, nil, nil)
 
 	limiter := chain.NewRequestLimiter(chain.NewInMemRequestsMapStorage())
-	limiter.SetLimit(transferHistoryTag, maxRequests, time.Hour)
+	err := limiter.SetLimit(transferHistoryTag, maxRequests, time.Hour)
+	require.NoError(t, err)
 	tc.SetLimiter(limiter)
 	tc.tag = transferHistoryTag
 
@@ -1210,7 +1214,8 @@ func TestFindBlocksCommandWithLimiterTagDifferentThanTransfers(t *testing.T) {
 
 	fbc, tc, blockChannel, _ := setupFindBlocksCommand(t, accountAddress, big.NewInt(0), big.NewInt(20), rangeSize, balances, outgoingERC20Transfers, incomingERC20Transfers, nil, nil)
 	limiter := chain.NewRequestLimiter(chain.NewInMemRequestsMapStorage())
-	limiter.SetLimit("some-other-tag-than-transfer-history", maxRequests, time.Hour)
+	err := limiter.SetLimit("some-other-tag-than-transfer-history", maxRequests, time.Hour)
+	require.NoError(t, err)
 	tc.SetLimiter(limiter)
 
 	ctx := context.Background()
@@ -1247,8 +1252,10 @@ func TestFindBlocksCommandWithLimiterForMultipleAccountsSameGroup(t *testing.T) 
 	tc.groupTag = transferHistoryTag
 
 	limiter1 := chain.NewRequestLimiter(storage)
-	limiter1.SetLimit(transferHistoryTag, maxRequestsTotal, time.Hour)
-	limiter1.SetLimit(transferHistoryTag+account1.String(), limit1, time.Hour)
+	err := limiter1.SetLimit(transferHistoryTag, maxRequestsTotal, time.Hour)
+	require.NoError(t, err)
+	err = limiter1.SetLimit(transferHistoryTag+account1.String(), limit1, time.Hour)
+	require.NoError(t, err)
 	tc.SetLimiter(limiter1)
 
 	// Set up the second account
@@ -1256,8 +1263,10 @@ func TestFindBlocksCommandWithLimiterForMultipleAccountsSameGroup(t *testing.T) 
 	tc2.tag = transferHistoryTag + account2.String()
 	tc2.groupTag = transferHistoryTag
 	limiter2 := chain.NewRequestLimiter(storage)
-	limiter2.SetLimit(transferHistoryTag, maxRequestsTotal, time.Hour)
-	limiter2.SetLimit(transferHistoryTag+account2.String(), limit2, time.Hour)
+	err = limiter2.SetLimit(transferHistoryTag, maxRequestsTotal, time.Hour)
+	require.NoError(t, err)
+	err = limiter2.SetLimit(transferHistoryTag+account2.String(), limit2, time.Hour)
+	require.NoError(t, err)
 	tc2.SetLimiter(limiter2)
 	fbc2.blocksLoadedCh = blockChannel
 

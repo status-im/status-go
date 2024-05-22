@@ -2,6 +2,7 @@ package chain
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -1005,7 +1006,7 @@ func (c *ClientWithFallback) SetWalletNotifier(notifier func(chainId uint64, mes
 func (c *ClientWithFallback) toggleConnectionState(err error) {
 	connected := true
 	if err != nil {
-		if !isVMError(err) && err != ErrRequestsOverLimit {
+		if !isVMError(err) && !errors.Is(ErrRequestsOverLimit, err) {
 			connected = false
 		}
 	}

@@ -1127,8 +1127,14 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *asyn
 		chainClient := chain.ClientWithTag(c.chainClient, accountTag, transferHistoryTag)
 		storage := chain.NewLimitsDBStorage(c.db.client)
 		limiter := chain.NewRequestLimiter(storage)
-		limiter.SetLimit(accountTag, transferHistoryLimitPerAccount, transferHistoryLimitPeriod)
-		limiter.SetLimit(transferHistoryTag, transferHistoryLimit, transferHistoryLimitPeriod)
+		err := limiter.SetLimit(accountTag, transferHistoryLimitPerAccount, transferHistoryLimitPeriod)
+		if err != nil {
+			log.Error("fetchHistoryBlocksForAccount SetLimit", "error", err, "accountTag", accountTag)
+		}
+		err = limiter.SetLimit(transferHistoryTag, transferHistoryLimit, transferHistoryLimitPeriod)
+		if err != nil {
+			log.Error("fetchHistoryBlocksForAccount SetLimit", "error", err, "groupTag", transferHistoryTag)
+		}
 		chainClient.SetLimiter(limiter)
 
 		fbc := &findBlocksCommand{
