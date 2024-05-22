@@ -103,6 +103,8 @@ if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
 	cc-test-reporter before-build
 fi
 
+echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
+
 for package in ${UNIT_TEST_PACKAGES}; do
   for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
     if ! is_parallelizable "${package}" || [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
