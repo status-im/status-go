@@ -1061,7 +1061,9 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
 
 func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, requestID []byte, opts []legacy_store.HistoryRequestOption) (*legacy_store.Result, error) {
 
-	opts = append(opts, legacy_store.WithRequestID(requestID))
+	if len(requestID) != 0 {
+		opts = append(opts, legacy_store.WithRequestID(requestID))
+	}
 
 	strTopics := make([]string, len(topics))
 	for i, t := range topics {
