@@ -1,13 +1,12 @@
 package coingecko
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
+	"net/url"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/utils"
@@ -83,14 +82,18 @@ type GeckoToken struct {
 }
 
 type Client struct {
-	client           *http.Client
+	httpClient       *thirdparty.HTTPClient
 	tokens           map[string][]GeckoToken
 	tokensURL        string
 	fetchTokensMutex sync.Mutex
 }
 
 func NewClient() *Client {
-	return &Client{client: &http.Client{Timeout: time.Minute}, tokens: make(map[string][]GeckoToken), tokensURL: fmt.Sprintf("%scoins/list?include_platform=true", baseURL)}
+	return &Client{
+		httpClient: thirdparty.NewHTTPClient(),
+		tokens:     make(map[string][]GeckoToken),
+		tokensURL:  fmt.Sprintf("%scoins/list", baseURL),
+	}
 }
 
 func (gt *GeckoToken) UnmarshalJSON(data []byte) error {
@@ -122,15 +125,6 @@ func (gt *GeckoToken) UnmarshalJSON(data []byte) error {
 		gt.EthPlatform = false
 	}
 	return nil
-}
-
-func (c *Client) DoQuery(url string) (*http.Response, error) {
-	resp, err := c.client.Get(url)
-
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
 }
 
 func mapTokensToSymbols(tokens []GeckoToken, tokenMap map[string][]GeckoToken) {
@@ -174,19 +168,17 @@ func (c *Client) getTokens() (map[string][]GeckoToken, error) {
 		return c.tokens, nil
 	}
 
-	resp, err := c.DoQuery(c.tokensURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+	params := url.Values{}
+	params.Add("include_platform", "true")
 
-	body, err := ioutil.ReadAll(resp.Body)
+	url := c.tokensURL
+	response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
 	if err != nil {
 		return nil, err
 	}
 
 	var tokens []GeckoToken
-	err = json.Unmarshal(body, &tokens)
+	err = json.Unmarshal(response, &tokens)
 	if err != nil {
 		return nil, err
 	}
@@ -218,22 +210,21 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 	if err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%ssimple/price?ids=%s&vs_currencies=%s", baseURL, strings.Join(ids, ","), strings.Join(currencies, ","))
-	resp, err := c.DoQuery(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	params := url.Values{}
+	params.Add("ids", strings.Join(ids, ","))
+	params.Add("vs_currencies", strings.Join(currencies, ","))
+
+	url := fmt.Sprintf("%ssimple/price", baseURL)
+	response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
 	if err != nil {
 		return nil, err
 	}
 
 	prices := make(map[string]map[string]float64)
-	err = json.Unmarshal(body, &prices)
+	err = json.Unmarshal(response, &prices)
 	if err != nil {
-		return nil, fmt.Errorf("%s - %s", err, string(body))
+		return nil, fmt.Errorf("%s - %s", err, string(response))
 	}
 
 	tokens, err := c.getTokens()
@@ -279,23 +270,26 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 	if err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%scoins/markets?ids=%s&vs_currency=%s&order=market_cap_desc&per_page=250&page=1&sparkline=false&price_change_percentage=%s", baseURL, strings.Join(ids, ","), currency, "1h%2C24h")
 
-	resp, err := c.DoQuery(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+	params := url.Values{}
+	params.Add("ids", strings.Join(ids, ","))
+	params.Add("vs_currency", currency)
+	params.Add("order", "market_cap_desc")
+	params.Add("per_page", "250")
+	params.Add("page", "1")
+	params.Add("sparkline", "false")
+	params.Add("price_change_percentage", "1h,24h")
 
-	body, err := ioutil.ReadAll(resp.Body)
+	url := fmt.Sprintf("%scoins/markets", baseURL)
+	response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
 	if err != nil {
 		return nil, err
 	}
 
 	var marketValues []GeckoMarketValues
-	err = json.Unmarshal(body, &marketValues)
+	err = json.Unmarshal(response, &marketValues)
 	if err != nil {
-		return nil, fmt.Errorf("%s - %s", err, string(body))
+		return nil, fmt.Errorf("%s - %s", err, string(response))
 	}
 
 	tokens, err := c.getTokens()
@@ -344,19 +338,18 @@ func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limi
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%scoins/%s/market_chart?vs_currency=%s&days=30", baseURL, id, currency)
-	resp, err := c.DoQuery(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+	params := url.Values{}
+	params.Add("vs_currency", currency)
+	params.Add("days", "30")
 
-	body, err := ioutil.ReadAll(resp.Body)
+	url := fmt.Sprintf("%scoins/%s/market_chart", baseURL, id)
+	response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
 	if err != nil {
 		return nil, err
 	}
+
 	var container HistoricalPriceContainer
-	err = json.Unmarshal(body, &container)
+	err = json.Unmarshal(response, &container)
 	if err != nil {
 		return nil, err
 	}

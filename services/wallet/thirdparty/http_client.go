@@ -11,6 +11,7 @@ import (
 )
 
 const requestTimeout = 5 * time.Second
+const maxNumOfRequestRetries = 5
 
 type HTTPClient struct {
 	client *http.Client
@@ -34,7 +35,14 @@ func (c *HTTPClient) DoGetRequest(ctx context.Context, url string, params netUrl
 		return nil, err
 	}
 
-	resp, err := c.client.Do(req)
+	var resp *http.Response
+	for i := 0; i < maxNumOfRequestRetries; i++ {
+		resp, err = c.client.Do(req)
+		if err == nil || i == maxNumOfRequestRetries-1 {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 	if err != nil {
 		return nil, err
 	}
