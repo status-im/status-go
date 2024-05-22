@@ -1175,10 +1175,6 @@ func TestFindBlocksCommand(t *testing.T) {
 }
 
 func TestFindBlocksCommandWithLimiter(t *testing.T) {
-	// Set up logging
-	// handler := log.StreamHandler(os.Stdout, log.TerminalFormat(true))
-	// log.Root().SetHandler(handler)
-
 	maxRequests := 1
 	rangeSize := 20
 	accountAddress := common.HexToAddress("0x1234")
@@ -1188,6 +1184,7 @@ func TestFindBlocksCommandWithLimiter(t *testing.T) {
 	limiter := chain.NewRequestLimiter(chain.NewInMemRequestsMapStorage())
 	limiter.SetLimit(transferHistoryTag, maxRequests, time.Hour)
 	tc.SetLimiter(limiter)
+	tc.tag = transferHistoryTag
 
 	ctx := context.Background()
 	group := async.NewAtomicGroup(ctx)
@@ -1803,6 +1800,7 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 			},
 		},
 		accountsDB:    accDB,
+		db:            wdb,
 		contractMaker: maker,
 	}
 

@@ -38,7 +38,7 @@ func TestGetLimit(t *testing.T) {
 	storage, rl := setupTest()
 
 	// Define test inputs
-	data := &RequestData{
+	data := &LimitData{
 		Tag:     "testTag",
 		Period:  time.Second,
 		MaxReqs: 10,
@@ -63,7 +63,7 @@ func TestAllowWithinPeriod(t *testing.T) {
 	interval := time.Second
 
 	// Set up the storage with test data
-	data := &RequestData{
+	data := &LimitData{
 		Tag:       tag,
 		Period:    interval,
 		CreatedAt: time.Now(),
@@ -95,7 +95,7 @@ func TestAllowWhenPeriodPassed(t *testing.T) {
 	interval := time.Second
 
 	// Set up the storage with test data
-	data := &RequestData{
+	data := &LimitData{
 		Tag:       tag,
 		Period:    interval,
 		CreatedAt: time.Now().Add(-interval),
