@@ -44,7 +44,8 @@ func TestGetLimit(t *testing.T) {
 		MaxReqs: 10,
 		NumReqs: 1,
 	}
-	storage.Set(data)
+	err := storage.Set(data)
+	require.NoError(t, err)
 
 	// Call the GetLimit method
 	ret, err := rl.GetLimit(data.Tag)
@@ -69,7 +70,8 @@ func TestAllowWithinPeriod(t *testing.T) {
 		CreatedAt: time.Now(),
 		MaxReqs:   maxRequests,
 	}
-	storage.Set(data)
+	err := storage.Set(data)
+	require.NoError(t, err)
 
 	// Call the Allow method
 	for i := 0; i < maxRequests; i++ {
@@ -102,7 +104,8 @@ func TestAllowWhenPeriodPassed(t *testing.T) {
 		MaxReqs:   maxRequests,
 		NumReqs:   maxRequests,
 	}
-	storage.Set(data)
+	err := storage.Set(data)
+	require.NoError(t, err)
 
 	// Call the Allow method
 	allow, err := rl.Allow(tag)
