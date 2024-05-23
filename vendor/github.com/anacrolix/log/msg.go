@@ -2,8 +2,6 @@ package log
 
 import (
 	"fmt"
-
-	"github.com/anacrolix/missinggo/iter"
 )
 
 type Msg struct {
@@ -61,7 +59,7 @@ type msgWithValues struct {
 	values []interface{}
 }
 
-func (me msgWithValues) Values(cb iter.Callback) {
+func (me msgWithValues) Values(cb valueIterCallback) {
 	for _, v := range me.values {
 		if !cb(v) {
 			return
