@@ -29,6 +29,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 )
@@ -767,4 +768,23 @@ func (api *API) getVerifiedWalletAccount(address, password string) (*account.Sel
 		Address:    key.Address,
 		AccountKey: key,
 	}, nil
+}
+
+// AddWalletConnectSession adds or updates a session wallet connect session
+func (api *API) AddWalletConnectSession(ctx context.Context, session_json string) error {
+	log.Debug("wallet.api.AddWalletConnectSession", "rpcURL", len(session_json))
+	return walletconnect.AddSession(api.s.db, api.s.config.Networks, session_json)
+}
+
+// DisconnectWalletConnectSession removes a wallet connect session
+func (api *API) DisconnectWalletConnectSession(ctx context.Context, topic walletconnect.Topic) error {
+	log.Debug("wallet.api.DisconnectWalletConnectSession", "topic", topic)
+	return walletconnect.DisconnectSession(api.s.db, topic)
+}
+
+// GetWalletConnectDapps returns all active wallet connect dapps
+// Active dApp are those having active sessions (not expired and not disconnected)
+func (api *API) GetWalletConnectDapps(ctx context.Context, validAtTimestamp int64, testChains bool) ([]walletconnect.DBDApp, error) {
+	log.Debug("wallet.api.GetWalletConnectDapps", "validAtTimestamp", validAtTimestamp, "testChains", testChains)
+	return walletconnect.GetActiveDapps(api.s.db, validAtTimestamp, testChains)
 }
