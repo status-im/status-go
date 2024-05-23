@@ -105,7 +105,7 @@ func NewService(
 	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer, feed, accountFeed, accountsDB)
 	tokenManager.Start()
 	savedAddressesManager := &SavedAddressesManager{db: db}
-	transactionManager := transfer.NewTransactionManager(db, gethManager, transactor, config, accountsDB, pendingTxManager, feed)
+	transactionManager := transfer.NewTransactionManager(transfer.NewMultiTransactionDB(db), gethManager, transactor, config, accountsDB, pendingTxManager, feed)
 	blockChainState := blockchainstate.NewBlockChainState()
 	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountFeed, feed, transactionManager, pendingTxManager,
 		tokenManager, balanceCacher, blockChainState)
