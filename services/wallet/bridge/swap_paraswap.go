@@ -91,7 +91,7 @@ func (s *SwapParaswap) CalculateFees(from, to *params.Network, token *token.Toke
 	return big.NewInt(0), big.NewInt(0), nil
 }
 
-func (s *SwapParaswap) PackTxInputData(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
+func (s *SwapParaswap) PackTxInputData(contractType string, fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
 	// not sure what we can do here since we're using the api to build the transaction
 	return []byte{}, nil
 }
@@ -107,17 +107,17 @@ func (s *SwapParaswap) EstimateGas(fromNetwork *params.Network, toNetwork *param
 	return priceRoute.GasCost.Uint64(), nil
 }
 
-func (s *SwapParaswap) GetContractAddress(network *params.Network, token *token.Token) *common.Address {
-	var address common.Address
+func (s *SwapParaswap) GetContractAddress(network *params.Network, token *token.Token) (address common.Address, err error) {
 	if network.ChainID == walletCommon.EthereumMainnet {
 		address = common.HexToAddress("0x216b4b4ba9f3e719726886d34a177484278bfcae")
 	} else if network.ChainID == walletCommon.ArbitrumMainnet {
 		address = common.HexToAddress("0x216b4b4ba9f3e719726886d34a177484278bfcae")
 	} else if network.ChainID == walletCommon.OptimismMainnet {
 		address = common.HexToAddress("0x216b4b4ba9f3e719726886d34a177484278bfcae")
+	} else {
+		err = errors.New("unsupported network")
 	}
-
-	return &address
+	return
 }
 
 func (s *SwapParaswap) BuildTx(network, _ *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int, _ *big.Int) (*ethTypes.Transaction, error) {

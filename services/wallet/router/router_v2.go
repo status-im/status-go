@@ -266,6 +266,8 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 	for _, route := range routes {
 		currentCost := big.NewFloat(0)
 		for _, path := range route {
+			tokenDenominator := big.NewFloat(math.Pow(10, float64(path.FromToken.Decimals)))
+
 			path.requiredTokenBalance = new(big.Int).Set(path.AmountIn.ToInt())
 			path.requiredNativeBalance = big.NewInt(0)
 
@@ -283,11 +285,11 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 			}
 
 			if path.TxBonderFees != nil && path.TxBonderFees.ToInt().Cmp(zero) > 0 {
-				bonderFeeInWei := path.TxBonderFees.ToInt()
-				bonderFeeInEth := gweiToEth(weiToGwei(bonderFeeInWei))
+				path.requiredTokenBalance.Add(path.requiredTokenBalance, path.TxBonderFees.ToInt())
+				pathCost.Add(pathCost, new(big.Float).Mul(
+					new(big.Float).Quo(new(big.Float).SetInt(path.TxBonderFees.ToInt()), tokenDenominator),
+					new(big.Float).SetFloat64(tokenPrice)))
 
-				path.requiredNativeBalance.Add(path.requiredNativeBalance, bonderFeeInWei)
-				pathCost.Add(pathCost, new(big.Float).Mul(bonderFeeInEth, nativeTokenPrice))
 			}
 
 			if path.TxL1Fee != nil && path.TxL1Fee.ToInt().Cmp(zero) > 0 {
@@ -301,7 +303,7 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 			if path.TxTokenFees != nil && path.TxTokenFees.ToInt().Cmp(zero) > 0 && path.FromToken != nil {
 				path.requiredTokenBalance.Add(path.requiredTokenBalance, path.TxTokenFees.ToInt())
 				pathCost.Add(pathCost, new(big.Float).Mul(
-					new(big.Float).Quo(new(big.Float).SetInt(path.TxTokenFees.ToInt()), big.NewFloat(math.Pow(10, float64(path.FromToken.Decimals)))),
+					new(big.Float).Quo(new(big.Float).SetInt(path.TxTokenFees.ToInt()), tokenDenominator),
 					new(big.Float).SetFloat64(tokenPrice)))
 			}
 
@@ -439,8 +441,11 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						gasLimit = input.SendType.EstimateGas(r.ensService, r.stickersService, network, input.AddrFrom, input.TokenID)
 					}
 
-					approvalContractAddress := bridge.GetContractAddress(network, token)
-					approvalRequired, approvalAmountRequired, approvalGasLimit, l1ApprovalFee, err := r.requireApproval(ctx, input.SendType, approvalContractAddress, input.AddrFrom, network, token, amountToSend)
+					approvalContractAddress, err := bridge.GetContractAddress(network, token)
+					if err != nil {
+						continue
+					}
+					approvalRequired, approvalAmountRequired, approvalGasLimit, l1ApprovalFee, err := r.requireApproval(ctx, input.SendType, &approvalContractAddress, input.AddrFrom, network, token, amountToSend)
 					if err != nil {
 						continue
 					}
@@ -448,7 +453,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 					var l1FeeWei uint64
 					if input.SendType.needL1Fee() {
 
-						txInputData, err := bridge.PackTxInputData(network, dest, input.AddrFrom, input.AddrTo, token, amountToSend)
+						txInputData, err := bridge.PackTxInputData("", network, dest, input.AddrFrom, input.AddrTo, token, amountToSend)
 						if err != nil {
 							continue
 						}
@@ -505,7 +510,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 
 						ApprovalRequired:        approvalRequired,
 						ApprovalAmountRequired:  (*hexutil.Big)(approvalAmountRequired),
-						ApprovalContractAddress: approvalContractAddress,
+						ApprovalContractAddress: &approvalContractAddress,
 						ApprovalBaseFee:         (*hexutil.Big)(baseFee),
 						ApprovalPriorityFee:     (*hexutil.Big)(selctedPriorityFee),
 						ApprovalGasAmount:       approvalGasLimit,

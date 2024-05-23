@@ -7,10 +7,6 @@ import (
 	"github.com/status-im/status-go/contracts/balancechecker"
 	"github.com/status-im/status-go/contracts/directory"
 	"github.com/status-im/status-go/contracts/ethscan"
-	"github.com/status-im/status-go/contracts/hop"
-	hopBridge "github.com/status-im/status-go/contracts/hop/bridge"
-	hopSwap "github.com/status-im/status-go/contracts/hop/swap"
-	hopWrapper "github.com/status-im/status-go/contracts/hop/wrapper"
 	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/contracts/registrar"
 	"github.com/status-im/status-go/contracts/resolver"
@@ -200,54 +196,6 @@ func (c *ContractMaker) NewBalanceChecker(chainID uint64) (*balancechecker.Balan
 		return nil, err
 	}
 	return balancechecker.NewBalanceChecker(
-		contractAddr,
-		backend,
-	)
-}
-
-func (c *ContractMaker) NewHopL2SaddlSwap(chainID uint64, symbol string) (*hopSwap.HopSwap, error) {
-	contractAddr, err := hop.L2SaddleSwapContractAddress(chainID, symbol)
-	if err != nil {
-		return nil, err
-	}
-
-	backend, err := c.RPCClient.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-	return hopSwap.NewHopSwap(
-		contractAddr,
-		backend,
-	)
-}
-
-func (c *ContractMaker) NewHopL1Bridge(chainID uint64, symbol string) (*hopBridge.HopBridge, error) {
-	contractAddr, err := hop.L1BridgeContractAddress(chainID, symbol)
-	if err != nil {
-		return nil, err
-	}
-
-	backend, err := c.RPCClient.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-	return hopBridge.NewHopBridge(
-		contractAddr,
-		backend,
-	)
-}
-
-func (c *ContractMaker) NewHopL2AmmWrapper(chainID uint64, symbol string) (*hopWrapper.HopWrapper, error) {
-	contractAddr, err := hop.L2AmmWrapperContractAddress(chainID, symbol)
-	if err != nil {
-		return nil, err
-	}
-
-	backend, err := c.RPCClient.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-	return hopWrapper.NewHopWrapper(
 		contractAddr,
 		backend,
 	)

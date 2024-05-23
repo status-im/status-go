@@ -196,7 +196,7 @@ func (s *CBridge) CalculateFees(from, to *params.Network, token *token.Token, am
 	return big.NewInt(0), new(big.Int).Add(baseFee, percFee), nil
 }
 
-func (c *CBridge) PackTxInputData(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
+func (c *CBridge) PackTxInputData(contractType string, fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
 	abi, err := abi.JSON(strings.NewReader(celer.CelerABI))
 	if err != nil {
 		return []byte{}, err
@@ -225,14 +225,14 @@ func (c *CBridge) PackTxInputData(fromNetwork *params.Network, toNetwork *params
 func (s *CBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
 	value := new(big.Int)
 
-	input, err := s.PackTxInputData(fromNetwork, toNetwork, from, to, token, amountIn)
+	input, err := s.PackTxInputData("", fromNetwork, toNetwork, from, to, token, amountIn)
 	if err != nil {
 		return 0, err
 	}
 
-	contractAddress := s.GetContractAddress(fromNetwork, nil)
-	if contractAddress == nil {
-		return 0, errors.New("contract not found")
+	contractAddress, err := s.GetContractAddress(fromNetwork, nil)
+	if err != nil {
+		return 0, err
 	}
 
 	ethClient, err := s.rpcClient.EthClient(fromNetwork.ChainID)
@@ -242,15 +242,9 @@ func (s *CBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Net
 
 	ctx := context.Background()
 
-	if code, err := ethClient.PendingCodeAt(ctx, *contractAddress); err != nil {
-		return 0, err
-	} else if len(code) == 0 {
-		return 0, bind.ErrNoCode
-	}
-
 	msg := ethereum.CallMsg{
 		From:  from,
-		To:    contractAddress,
+		To:    &contractAddress,
 		Value: value,
 		Data:  input,
 	}
@@ -284,23 +278,22 @@ func (s *CBridge) BuildTx(fromNetwork, toNetwork *params.Network, fromAddress co
 	return s.BuildTransaction(sendArgs)
 }
 
-func (s *CBridge) GetContractAddress(network *params.Network, token *token.Token) *common.Address {
+func (s *CBridge) GetContractAddress(network *params.Network, token *token.Token) (common.Address, error) {
 	transferConfig, err := s.getTransferConfig(network.IsTest)
 	if err != nil {
-		return nil
+		return common.Address{}, err
 	}
 	if transferConfig.Err != nil {
-		return nil
+		return common.Address{}, errors.New(transferConfig.Err.Msg)
 	}
 
 	for _, chain := range transferConfig.Chains {
 		if uint64(chain.Id) == network.ChainID {
-			addr := common.HexToAddress(chain.ContractAddr)
-			return &addr
+			return common.HexToAddress(chain.ContractAddr), nil
 		}
 	}
 
-	return nil
+	return common.Address{}, errors.New("contract not found")
 }
 
 func (s *CBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (*ethTypes.Transaction, error) {
@@ -312,16 +305,16 @@ func (s *CBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerF
 	if token == nil {
 		return nil, errors.New("token not found")
 	}
-	addrs := s.GetContractAddress(fromNetwork, nil)
-	if addrs == nil {
-		return nil, errors.New("contract not found")
+	addrs, err := s.GetContractAddress(fromNetwork, nil)
+	if err != nil {
+		return nil, err
 	}
 
 	backend, err := s.rpcClient.EthClient(sendArgs.ChainID)
 	if err != nil {
 		return nil, err
 	}
-	contract, err := celer.NewCeler(*addrs, backend)
+	contract, err := celer.NewCeler(addrs, backend)
 	if err != nil {
 		return nil, err
 	}

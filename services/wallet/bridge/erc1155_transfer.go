@@ -49,7 +49,7 @@ func (s *ERC1155TransferBridge) CalculateFees(from, to *params.Network, token *t
 	return big.NewInt(0), big.NewInt(0), nil
 }
 
-func (s *ERC1155TransferBridge) PackTxInputData(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
+func (s *ERC1155TransferBridge) PackTxInputData(contractType string, fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
 	abi, err := abi.JSON(strings.NewReader(ierc1155.Ierc1155ABI))
 	if err != nil {
 		return []byte{}, err
@@ -77,7 +77,7 @@ func (s *ERC1155TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwo
 
 	value := new(big.Int)
 
-	input, err := s.PackTxInputData(fromNetwork, toNetwork, from, to, token, amountIn)
+	input, err := s.PackTxInputData("", fromNetwork, toNetwork, from, to, token, amountIn)
 	if err != nil {
 		return 0, err
 	}
@@ -177,6 +177,6 @@ func (s *ERC1155TransferBridge) CalculateAmountOut(from, to *params.Network, amo
 	return amountIn, nil
 }
 
-func (s *ERC1155TransferBridge) GetContractAddress(network *params.Network, token *token.Token) *common.Address {
-	return &token.Address
+func (s *ERC1155TransferBridge) GetContractAddress(network *params.Network, token *token.Token) (common.Address, error) {
+	return token.Address, nil
 }

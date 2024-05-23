@@ -40,7 +40,7 @@ func (s *TransferBridge) CalculateFees(from, to *params.Network, token *token.To
 	return big.NewInt(0), big.NewInt(0), nil
 }
 
-func (s *TransferBridge) PackTxInputData(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
+func (s *TransferBridge) PackTxInputData(contractType string, fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
 	if token.Symbol == "ETH" {
 		return []byte("eth_sendRawTransaction"), nil
 	} else {
@@ -59,7 +59,7 @@ func (s *TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *par
 	estimation := uint64(0)
 	var err error
 
-	input, err := s.PackTxInputData(fromNetwork, toNetwork, from, to, token, amountIn)
+	input, err := s.PackTxInputData("", fromNetwork, toNetwork, from, to, token, amountIn)
 	if err != nil {
 		return 0, err
 	}
@@ -145,6 +145,6 @@ func (s *TransferBridge) CalculateAmountOut(from, to *params.Network, amountIn *
 	return amountIn, nil
 }
 
-func (s *TransferBridge) GetContractAddress(network *params.Network, token *token.Token) *common.Address {
-	return nil
+func (s *TransferBridge) GetContractAddress(network *params.Network, token *token.Token) (common.Address, error) {
+	return common.Address{}, nil
 }
