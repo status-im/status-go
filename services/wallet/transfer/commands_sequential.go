@@ -1127,7 +1127,13 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *asyn
 		chainClient := chain.ClientWithTag(c.chainClient, accountTag, transferHistoryTag)
 		storage := chain.NewLimitsDBStorage(c.db.client)
 		limiter := chain.NewRequestLimiter(storage)
-		err := limiter.SetLimit(accountTag, transferHistoryLimitPerAccount, transferHistoryLimitPeriod)
+
+		// Check if limit is already reached, then skip the comamnd
+		if allow, _ := limiter.Allow(accountTag); !allow {
+			continue
+		}
+
+		err := limiter.SetLimit(accountTag, transferHistoryLimitPerAccount, chain.LimitInfinitely)
 		if err != nil {
 			log.Error("fetchHistoryBlocksForAccount SetLimit", "error", err, "accountTag", accountTag)
 		}

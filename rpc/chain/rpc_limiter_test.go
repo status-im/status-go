@@ -114,3 +114,29 @@ func TestAllowWhenPeriodPassed(t *testing.T) {
 	// Verify the result
 	require.True(t, allow)
 }
+
+func TestAllowRestrictInfinitelyWhenLimitReached(t *testing.T) {
+	storage, rl := setupTest()
+
+	// Define test inputs
+	tag := "testTag"
+	maxRequests := 10
+
+	// Set up the storage with test data
+	data := &LimitData{
+		Tag:       tag,
+		Period:    LimitInfinitely,
+		CreatedAt: time.Now(),
+		MaxReqs:   maxRequests,
+		NumReqs:   maxRequests,
+	}
+	err := storage.Set(data)
+	require.NoError(t, err)
+
+	// Call the Allow method
+	allow, err := rl.Allow(tag)
+	require.NoError(t, err)
+
+	// Verify the result
+	require.False(t, allow)
+}

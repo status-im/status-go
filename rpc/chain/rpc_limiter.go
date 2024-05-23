@@ -16,7 +16,8 @@ const (
 	minRequestsPerSecond        = 20
 	requestsPerSecondStep       = 10
 
-	tickerInterval = 1 * time.Second
+	tickerInterval  = 1 * time.Second
+	LimitInfinitely = 0
 )
 
 var (
@@ -163,6 +164,11 @@ func (rl *RPCRequestLimiter) Allow(tag string) (bool, error) {
 
 	if data == nil {
 		return true, nil
+	}
+
+	// Check if period is forever
+	if data.Period.Milliseconds() == LimitInfinitely {
+		return false, nil
 	}
 
 	// Check if a number of requests is over the limit within the interval
