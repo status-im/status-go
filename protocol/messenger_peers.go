@@ -13,7 +13,7 @@ func (m *Messenger) AddStorePeer(address string) (peer.ID, error) {
 }
 
 func (m *Messenger) AddRelayPeer(address string) (peer.ID, error) {
-	return m.transport.AddStorePeer(address)
+	return m.transport.AddRelayPeer(address)
 }
 
 func (m *Messenger) DialPeer(address string) error {
