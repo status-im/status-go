@@ -80,7 +80,7 @@ func (s *LimitsDBStorage) Set(data *LimitData) error {
 	}
 
 	limit, err := s.db.GetRPCLimit(data.Tag)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
 
@@ -166,13 +166,8 @@ func (rl *RPCRequestLimiter) Allow(tag string) (bool, error) {
 		return true, nil
 	}
 
-	// Check if period is forever
-	if data.Period.Milliseconds() == LimitInfinitely {
-		return false, nil
-	}
-
 	// Check if a number of requests is over the limit within the interval
-	if time.Since(data.CreatedAt) < data.Period {
+	if time.Since(data.CreatedAt) < data.Period || data.Period.Milliseconds() == LimitInfinitely {
 		if data.NumReqs >= data.MaxReqs {
 			return false, nil
 		}

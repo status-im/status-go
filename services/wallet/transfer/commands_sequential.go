@@ -1130,6 +1130,7 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *asyn
 
 		// Check if limit is already reached, then skip the comamnd
 		if allow, _ := limiter.Allow(accountTag); !allow {
+			log.Debug("fetchHistoryBlocksForAccount limit reached", "account", account, "chain", c.chainClient.NetworkID())
 			continue
 		}
 
