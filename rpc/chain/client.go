@@ -80,7 +80,7 @@ func ClientWithTag(chainClient ClientInterface, tag, groupTag string) ClientInte
 	if tagIface, ok := chainClient.(Tagger); ok {
 		tagIface = DeepCopyTagger(tagIface)
 		tagIface.SetTag(tag)
-		tagIface.SetGroupTag(tag)
+		tagIface.SetGroupTag(groupTag)
 		newClient = tagIface.(ClientInterface)
 	}
 

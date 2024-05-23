@@ -540,7 +540,7 @@ func removeGasOnlyEthTransfer(creator statementCreator, t transferDBFields) erro
 	if err != nil {
 		return err
 	}
-	log.Debug("removeGasOnlyEthTransfer row deleted ", count)
+	log.Debug("removeGasOnlyEthTransfer rows deleted", "count", count)
 	return nil
 }
 

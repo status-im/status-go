@@ -769,7 +769,7 @@ func (tm *Manager) GetBalancesAtByChain(parent context.Context, clients map[uint
 					BlockNumber: atBlock,
 				}, accounts)
 				if err != nil {
-					log.Error("can't fetch chain balance 5", err)
+					log.Error("can't fetch chain balance 5", "err", err)
 					return nil
 				}
 				for idx, account := range accounts {
@@ -804,7 +804,7 @@ func (tm *Manager) GetBalancesAtByChain(parent context.Context, clients map[uint
 						}
 
 						if len(res) != len(chunk) {
-							log.Error("can't fetch erc20 token balance 7", "account", account, "error response not complete")
+							log.Error("can't fetch erc20 token balance 7", "account", account, "error", "response not complete")
 							return nil
 						}
 
@@ -823,7 +823,7 @@ func (tm *Manager) GetBalancesAtByChain(parent context.Context, clients map[uint
 						balance, err := tm.GetTokenBalanceAt(ctx, client, account, token, atBlock)
 						if err != nil {
 							if err != bind.ErrNoCode {
-								log.Error("can't fetch erc20 token balance 8", "account", account, "token", token, "error on fetching token balance")
+								log.Error("can't fetch erc20 token balance 8", "account", account, "token", token, "error", "on fetching token balance")
 
 								return nil
 							}
