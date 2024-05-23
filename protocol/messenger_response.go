@@ -19,7 +19,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/storenodes"
 	"github.com/status-im/status-go/protocol/verification"
@@ -91,7 +90,6 @@ type MessengerResponse struct {
 	trustStatus                      map[string]verification.TrustStatus
 	emojiReactions                   map[string]*EmojiReaction
 	savedAddresses                   map[string]*wallet.SavedAddress
-	SocialLinksInfo                  *identity.SocialLinksInfo
 	ensUsernameDetails               []*ensservice.UsernameDetail
 	updatedProfileShowcaseContactIDs map[string]bool
 	seenAndUnseenMessages            map[string]*SeenUnseenMessages
@@ -140,7 +138,6 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordMessages                  []*protobuf.DiscordMessage              `json:"discordMessages,omitempty"`
 		DiscordMessageAttachments        []*protobuf.DiscordMessageAttachment    `json:"discordMessageAtachments,omitempty"`
 		SavedAddresses                   []*wallet.SavedAddress                  `json:"savedAddresses,omitempty"`
-		SocialLinksInfo                  *identity.SocialLinksInfo               `json:"socialLinksInfo,omitempty"`
 		EnsUsernameDetails               []*ensservice.UsernameDetail            `json:"ensUsernameDetails,omitempty"`
 		UpdatedProfileShowcaseContactIDs []string                                `json:"updatedProfileShowcaseContactIDs,omitempty"`
 		SeenAndUnseenMessages            []*SeenUnseenMessages                   `json:"seenAndUnseenMessages,omitempty"`
@@ -182,7 +179,6 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordCategories:                r.DiscordCategories,
 		DiscordChannels:                  r.DiscordChannels,
 		DiscordOldestMessageTimestamp:    r.DiscordOldestMessageTimestamp,
-		SocialLinksInfo:                  r.SocialLinksInfo,
 		EnsUsernameDetails:               r.EnsUsernameDetails(),
 		UpdatedProfileShowcaseContactIDs: r.GetUpdatedProfileShowcaseContactIDs(),
 		SeenAndUnseenMessages:            r.GetSeenAndUnseenMessages(),
@@ -333,7 +329,6 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.ensUsernameDetails) == 0 &&
 		r.currentStatus == nil &&
 		r.activityCenterState == nil &&
-		r.SocialLinksInfo == nil &&
 		r.CustomizationColor == ""
 }
 
@@ -378,7 +373,6 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AccountsPositions = append(r.AccountsPositions, response.AccountsPositions...)
 	r.TokenPreferences = append(r.TokenPreferences, response.TokenPreferences...)
 	r.CollectiblePreferences = append(r.CollectiblePreferences, response.CollectiblePreferences...)
-	r.SocialLinksInfo = response.SocialLinksInfo
 
 	return nil
 }

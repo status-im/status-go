@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"runtime"
@@ -10,19 +9,15 @@ import (
 
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	sociallinkssettings "github.com/status-im/status-go/multiaccounts/settings_social_links"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/server"
 )
 
 const (
-	maxBioLength            = 240
-	maxSocialLinkTextLength = 24
+	maxBioLength = 240
 )
 
 var ErrInvalidBioLength = errors.New("invalid bio length")
-var ErrInvalidSocialLinkTextLength = errors.New("invalid social link text length")
 var ErrDisplayNameDupeOfCommunityMember = errors.New("display name duplicates on of community members")
 
 func (m *Messenger) SetDisplayName(displayName string) error {
@@ -130,70 +125,6 @@ func (m *Messenger) SetBio(bio string) error {
 	}
 
 	return m.publishContactCode()
-}
-
-func ValidateSocialLinks(socialLinks identity.SocialLinks) error {
-	for _, link := range socialLinks {
-		l := link
-		if err := ValidateSocialLink(l); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func ValidateSocialLink(link *identity.SocialLink) error {
-	if len(link.Text) > maxSocialLinkTextLength {
-		return ErrInvalidSocialLinkTextLength
-	}
-	return nil
-}
-
-func (m *Messenger) AddOrReplaceSocialLinks(socialLinks identity.SocialLinks) error {
-	if len(socialLinks) > sociallinkssettings.MaxNumOfSocialLinks {
-		return errors.New("exceeded maximum number of social links")
-	}
-
-	currentSocialLinks, err := m.settings.GetSocialLinks()
-	if err != nil {
-		return err
-	}
-
-	if currentSocialLinks.Equal(socialLinks) {
-		return nil // Do nothing
-	}
-
-	err = ValidateSocialLinks(socialLinks)
-	if err != nil {
-		return err
-	}
-
-	err = m.withChatClock(func(chatID string, clock uint64) error {
-		err = m.settings.AddOrReplaceSocialLinksIfNewer(socialLinks, clock)
-		if err != nil {
-			return err
-		}
-		m.selfContact.SocialLinks = socialLinks
-		m.publishSelfContactSubscriptions(&SelfContactChangeEvent{
-			SocialLinksChanged: true,
-		})
-
-		err = m.syncSocialLinks(context.Background(), m.dispatchMessage)
-		return err
-	})
-	if err != nil {
-		return err
-	}
-
-	if err = m.resetLastPublishedTimeForChatIdentity(); err != nil {
-		return err
-	}
-
-	return m.publishContactCode()
-}
-
-func (m *Messenger) GetSocialLinks() (identity.SocialLinks, error) {
-	return m.settings.GetSocialLinks()
 }
 
 func (m *Messenger) setInstallationHostname() error {

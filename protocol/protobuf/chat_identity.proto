@@ -27,7 +27,7 @@ message ChatIdentity {
 
   string emoji = 7;
 
-  repeated SocialLink social_links = 8;
+  repeated SocialLink social_links = 8 [deprecated = true];
 
   // first known message timestamp in seconds (valid only for community chats for now)
   // 0 - unknown

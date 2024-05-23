@@ -76,7 +76,7 @@ message ApplicationMetadataMessage {
     COMMUNITY_CANCEL_REQUEST_TO_JOIN = 60;
     CANCEL_CONTACT_VERIFICATION = 61;
     SYNC_KEYPAIR = 62;
-    SYNC_SOCIAL_LINKS = 63;
+    SYNC_SOCIAL_LINKS = 63 [deprecated=true];
     SYNC_ENS_USERNAME_DETAIL = 64;
     reserved 65;
     reserved "SYNC_ACTIVITY_CENTER_NOTIFICATIONS";

@@ -193,9 +193,6 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
            case protobuf.ApplicationMetadataMessage_SYNC_KEYPAIR:
 		return m.handleSyncKeypairProtobuf(messageState, protoBytes, msg, filter)
         
-           case protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINKS:
-		return m.handleSyncSocialLinksProtobuf(messageState, protoBytes, msg, filter)
-        
            case protobuf.ApplicationMetadataMessage_SYNC_ENS_USERNAME_DETAIL:
 		return m.handleSyncEnsUsernameDetailProtobuf(messageState, protoBytes, msg, filter)
         
@@ -1404,29 +1401,6 @@ func (m *Messenger) handleSyncKeypairProtobuf(messageState *ReceivedMessageState
 	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.ApplicationLayer.Type, p)
 
 	return m.HandleSyncKeypair(messageState, p, msg)
-	
-}
-
-
-func (m *Messenger) handleSyncSocialLinksProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
-	m.logger.Info("handling SyncSocialLinks")
-	
-	if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-		m.logger.Warn("not coming from us, ignoring")
-		return nil
-	}
-	
-
-	
-	p := &protobuf.SyncSocialLinks{}
-	err := proto.Unmarshal(protoBytes, p)
-	if err != nil {
-		return err
-	}
-
-	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.ApplicationLayer.Type, p)
-
-	return m.HandleSyncSocialLinks(messageState, p, msg)
 	
 }
 

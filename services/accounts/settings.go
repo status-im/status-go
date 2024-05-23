@@ -2,14 +2,12 @@ package accounts
 
 import (
 	"context"
-	"errors"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/identity"
 )
 
 func NewSettingsAPI(messenger **protocol.Messenger, db *accounts.Database, config *params.NodeConfig) *SettingsAPI {
@@ -169,25 +167,6 @@ func (api *SettingsAPI) DeleteExemptions(id string) error {
 // Deprecated: Use api.go/SetBio instead
 func (api *SettingsAPI) SetBio(bio string) error {
 	return (*api.messenger).SetBio(bio)
-}
-
-// Deprecated: use social links from ProfileShowcasePreferences
-func (api *SettingsAPI) GetSocialLinks() (identity.SocialLinks, error) {
-	return api.db.GetSocialLinks()
-}
-
-// Deprecated: use social links from ProfileShowcasePreferences
-func (api *SettingsAPI) AddOrReplaceSocialLinks(links identity.SocialLinks) error {
-	for _, link := range links {
-		if len(link.Text) == 0 {
-			return errors.New("`Text` field of a social link must be set")
-		}
-		if len(link.URL) == 0 {
-			return errors.New("`URL` field of a social link must be set")
-		}
-	}
-
-	return (*api.messenger).AddOrReplaceSocialLinks(links)
 }
 
 func (api *SettingsAPI) MnemonicWasShown() error {

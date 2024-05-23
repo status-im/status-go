@@ -32,7 +32,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -319,10 +318,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 		URL:  "https://status.im",
 	})
 	require.NoError(s.T(), err)
-	// generate social link
-	socialLinksToAdd := identity.SocialLinks{{Text: identity.GithubID, URL: socialLinkURL}}
-	err = clientBackend.Messenger().AddOrReplaceSocialLinks(socialLinksToAdd)
-	require.NoError(s.T(), err)
+
 	// generate ens username
 	err = clientBackend.StatusNode().EnsService().API().Add(ctx, ensChainID, ensUsername)
 	require.NoError(s.T(), err)
@@ -351,14 +347,12 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 
 	// check that the server has the same data as the client
 	serverBrowserAPI := serverBackend.StatusNode().BrowserService().APIs()[0].Service.(*browsers.API)
+
 	bookmarks, err := serverBrowserAPI.GetBookmarks(ctx)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), 1, len(bookmarks))
 	require.Equal(s.T(), "status.im", bookmarks[0].Name)
-	serverSocialLinks, err := serverBackend.Messenger().GetSocialLinks()
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), 1, len(serverSocialLinks))
-	require.True(s.T(), socialLinksToAdd.Equal(serverSocialLinks))
+
 	uds, err := serverBackend.StatusNode().EnsService().API().GetEnsUsernames(ctx)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), 1, len(uds))
@@ -366,6 +360,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.Equal(s.T(), uint64(ensChainID), uds[0].ChainID)
 	require.False(s.T(), uds[0].Removed)
 	require.Greater(s.T(), uds[0].Clock, uint64(0))
+
 	serverProfileShowcasePreferences, err := serverBackend.Messenger().GetProfileShowcasePreferences()
 	require.NoError(s.T(), err)
 	require.True(s.T(), reflect.DeepEqual(profileShowcasePreferences, serverProfileShowcasePreferences))
@@ -383,6 +378,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	err = clientMessenger.DisableInstallation(serverNodeConfig.ShhextConfig.InstallationID)
 	require.NoError(s.T(), err)
 	require.False(s.T(), clientMessenger.HasPairedDevices())
+
 	clientNodeConfig, err := clientBackend.GetNodeConfig()
 	require.NoError(s.T(), err)
 	err = serverMessenger.DisableInstallation(clientNodeConfig.ShhextConfig.InstallationID)
@@ -443,11 +439,8 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	})
 	require.NoError(s.T(), err)
 
-	// generate social link
 	serverMessenger := serverBackend.Messenger()
-	socialLinksToAdd := identity.SocialLinks{{Text: identity.GithubID, URL: socialLinkURL}}
-	err = serverMessenger.AddOrReplaceSocialLinks(socialLinksToAdd)
-	require.NoError(s.T(), err)
+
 	// generate ens username
 	err = serverBackend.StatusNode().EnsService().API().Add(ctx, ensChainID, ensUsername)
 	require.NoError(s.T(), err)
@@ -499,11 +492,6 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), 1, len(bookmarks))
 	require.Equal(s.T(), "status.im", bookmarks[0].Name)
-
-	clientSocialLinks, err := clientMessenger.GetSocialLinks()
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), 1, len(clientSocialLinks))
-	require.True(s.T(), socialLinksToAdd.Equal(clientSocialLinks))
 
 	clientProfileShowcasePreferences, err := clientMessenger.GetProfileShowcasePreferences()
 	require.NoError(s.T(), err)

@@ -9,7 +9,6 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/identity"
 )
 
 func TestMessengerContacts(t *testing.T) {
@@ -35,7 +34,6 @@ func (s *MessengerContactsTestSuite) Test_SelfContact() {
 	displayName := "DisplayName_1"
 	bio := "Bio_1"
 	ensName := "EnsName_1.eth"
-	socialLinks := identity.SocialLinks{{Text: identity.TelegramID, URL: "dummy.telegram"}}
 	identityImages := images.SampleIdentityImages()
 
 	identityImagesMap := make(map[string]images.IdentityImage)
@@ -83,11 +81,6 @@ func (s *MessengerContactsTestSuite) Test_SelfContact() {
 
 	SetIdentityImagesAndWaitForChange(&s.Suite, s.m, timeout, setIdentityImages)
 
-	// Set social links. They are applied immediately, no need to wait.
-
-	err = s.m.AddOrReplaceSocialLinks(socialLinks)
-	s.Require().NoError(err)
-
 	// Check values
 
 	selfContact := s.m.GetContactByID(s.m.IdentityPublicKeyString())
@@ -95,6 +88,5 @@ func (s *MessengerContactsTestSuite) Test_SelfContact() {
 	s.Require().Equal(displayName, selfContact.DisplayName)
 	s.Require().Equal(bio, selfContact.Bio)
 	s.Require().Equal(ensName, selfContact.EnsName)
-	s.Require().Equal(socialLinks, selfContact.SocialLinks)
 	s.Require().Equal(identityImagesMap, selfContact.Images)
 }

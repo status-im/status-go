@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	notificationssettings "github.com/status-im/status-go/multiaccounts/settings_notifications"
-	sociallinkssettings "github.com/status-im/status-go/multiaccounts/settings_social_links"
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
@@ -289,7 +288,6 @@ func (a *Keypair) Operability() AccountOperable {
 type Database struct {
 	settings.DatabaseSettingsManager
 	*notificationssettings.NotificationsSettings
-	*sociallinkssettings.SocialLinksSettings
 	*walletsettings.WalletSettings
 	db *sql.DB
 }
@@ -305,10 +303,9 @@ func NewDB(db *sql.DB) (*Database, error) {
 		return nil, err
 	}
 	sn := notificationssettings.NewNotificationsSettings(db)
-	ssl := sociallinkssettings.NewSocialLinksSettings(db)
 	sw := walletsettings.NewWalletSettings(db)
 
-	return &Database{sDB, sn, ssl, sw, db}, nil
+	return &Database{sDB, sn, sw, db}, nil
 }
 
 // DB Gets db sql.DB

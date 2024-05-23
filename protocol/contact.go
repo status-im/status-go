@@ -15,7 +15,6 @@ import (
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/verification"
 )
@@ -112,9 +111,6 @@ type Contact struct {
 
 	// Bio - description of the contact (tell us about yourself)
 	Bio string `json:"bio"`
-
-	// Deprecated: use social links from ProfileShowcasePreferences
-	SocialLinks identity.SocialLinks `json:"socialLinks"`
 
 	Images map[string]images.IdentityImage `json:"images"`
 
@@ -412,9 +408,6 @@ func buildSelfContact(identity *ecdsa.PrivateKey, settings *accounts.Database, m
 			if s.PreferredName != nil {
 				c.EnsName = *s.PreferredName
 			}
-		}
-		if socialLinks, err := settings.GetSocialLinks(); err != nil {
-			c.SocialLinks = socialLinks
 		}
 	}
 
