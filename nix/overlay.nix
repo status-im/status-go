@@ -27,15 +27,15 @@ in rec {
   buildGoPackage = prev.buildGo121Package;
 
   golangci-lint = prev.golangci-lint.override {
-    buildGoModule = args: prev.buildGo120Module ( args // rec {
-      version = "1.52.2";
+    buildGoModule = args: prev.buildGo121Module ( args // rec {
+      version = "1.54.0";
       src = prev.fetchFromGitHub {
         owner = "golangci";
         repo = "golangci-lint";
         rev = "v${version}";
-        hash = "sha256-FmNXjOMDDdGxMQvy5f1NoaqrKFpmlPWclXooMxXP8zg=";
+        hash = "sha256-UXN5gN1SNv3uvBCliJQ+5PSGHRL7RyU6pmZtGUTFsrQ=";
       };
-      vendorHash = "sha256-BhD3a0LNc3hpiH4QC8FpmNn3swx3to8+6gfcgZT8TLg=";
+      vendorHash = "sha256-jUlK/A0HxBrIby2C0zYFtnxQX1bgKVyypI3QdH4u/rg=";
     });
   };
 
