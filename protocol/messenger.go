@@ -3542,6 +3542,28 @@ func (r *ReceivedMessageState) updateExistingActivityCenterNotification(publicKe
 	return nil
 }
 
+// function returns if the community is joined before the clock
+func (m *Messenger) isCommunityJoinedBeforeClock(publicKey ecdsa.PublicKey, communityID string, clock uint64) (bool, error) {
+	community, err := m.communitiesManager.GetByIDString(communityID)
+	if err != nil {
+		return false, err
+	}
+
+	if !community.Joined() || clock < uint64(community.JoinedAt()) {
+		joinedClock, err := m.communitiesManager.GetCommunityRequestToJoinClock(&publicKey, communityID)
+		if err != nil {
+			return false, err
+		}
+
+		// no request to join, or request to join is after the message
+		if joinedClock == 0 || clock < joinedClock {
+			return false, nil
+		}
+		return true, nil
+	}
+	return true, nil
+}
+
 // addNewActivityCenterNotification takes a common.Message and generates a new ActivityCenterNotification and appends it to the
 // []Response.ActivityCenterNotifications if the message is m.New
 func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.PublicKey, m *Messenger, message *common.Message, responseTo *common.Message) error {
@@ -3560,13 +3582,9 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 	}
 
 	if chat.CommunityChat() {
-		joinedClock, err := m.communitiesManager.GetCommunityRequestToJoinClock(&publicKey, message.CommunityID)
-		if err != nil {
-			return err
-		}
-
 		// Ignore mentions & replies in community before joining
-		if message.Clock < joinedClock {
+		ok, err := m.isCommunityJoinedBeforeClock(publicKey, chat.CommunityID, message.Clock)
+		if err != nil || !ok {
 			return nil
 		}
 	}
