@@ -245,7 +245,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
 		node.WithMaxPeerConnections(cfg.DiscoveryLimit),
 		node.WithLogger(logger),
-		node.WithLogLevel(logger.Level()),
+		node.WithLogLevel(zap.InfoLevel),
 		node.WithClusterID(cfg.ClusterID),
 		node.WithMaxMsgSize(1024 * 1024),
 	}
@@ -551,7 +551,7 @@ func (w *Waku) runPeerExchangeLoop() {
 			if peersToDiscover <= 0 {
 				continue
 			}
-
+			var peers peer.IDSlice
 			// We select only the nodes discovered via DNS Discovery that support peer exchange
 			w.dnsAddressCacheLock.RLock()
 			for _, record := range w.dnsAddressCache {
@@ -559,12 +559,18 @@ func (w *Waku) runPeerExchangeLoop() {
 					if len(discoveredNode.PeerInfo.Addrs) == 0 {
 						continue
 					}
-					go w.identifyAndConnect(w.ctx, true, discoveredNode.PeerInfo)
-
+					//go w.identifyAndConnect(w.ctx, true, discoveredNode.PeerInfo)
+					go func(pInfo peer.AddrInfo) {
+						err := w.node.Host().Connect(w.ctx, pInfo)
+						if err != nil {
+							w.logger.Error("failed to connect to peer", zap.Error(err))
+						}
+					}(discoveredNode.PeerInfo)
+					peers = append(peers, discoveredNode.PeerID)
 				}
 			}
 			w.dnsAddressCacheLock.RUnlock()
-			err := w.node.PeerExchange().Request(w.ctx, peersToDiscover, peer_exchange.WithAutomaticPeerSelection())
+			err := w.node.PeerExchange().Request(w.ctx, peersToDiscover, peer_exchange.WithAutomaticPeerSelection(peers...))
 			if err != nil {
 				w.logger.Error("couldnt request peers via peer exchange", zap.Error(err))
 			}
