@@ -1,7 +1,6 @@
 package transfer
 
 import (
-	"database/sql"
 	"fmt"
 	"math/big"
 	"time"
@@ -35,7 +34,7 @@ type TransactionDescription struct {
 }
 
 type TransactionManager struct {
-	db             *sql.DB
+	storage        MultiTransactionStorage
 	gethManager    *account.GethManager
 	transactor     *transactions.Transactor
 	config         *params.NodeConfig
@@ -45,11 +44,19 @@ type TransactionManager struct {
 
 	multiTransactionForKeycardSigning *MultiTransaction
 	transactionsBridgeData            []*bridge.TransactionBridge
-	transactionsForKeycardSingning    map[common.Hash]*TransactionDescription
+	transactionsForKeycardSigning     map[common.Hash]*TransactionDescription
+}
+
+type MultiTransactionStorage interface {
+	CreateMultiTransaction(tx *MultiTransaction) error
+	ReadMultiTransactions(ids []wallet_common.MultiTransactionIDType) ([]*MultiTransaction, error)
+	ReadMultiTransactionsByDetails(details *MultiTxDetails) ([]*MultiTransaction, error)
+	UpdateMultiTransaction(tx *MultiTransaction) error
+	DeleteMultiTransaction(id wallet_common.MultiTransactionIDType) error
 }
 
 func NewTransactionManager(
-	db *sql.DB,
+	storage MultiTransactionStorage,
 	gethManager *account.GethManager,
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
@@ -58,7 +65,7 @@ func NewTransactionManager(
 	eventFeed *event.Feed,
 ) *TransactionManager {
 	return &TransactionManager{
-		db:             db,
+		storage:        storage,
 		gethManager:    gethManager,
 		transactor:     transactor,
 		config:         config,
@@ -78,6 +85,7 @@ const (
 	MultiTransactionSend = iota
 	MultiTransactionSwap
 	MultiTransactionBridge
+	MultiTransactionTypeInvalid = 255
 )
 
 type MultiTransaction struct {
@@ -235,6 +243,12 @@ func (tm *TransactionManager) BuildRawTransaction(chainID uint64, sendArgs trans
 	}, nil
 }
 
-func (tm *TransactionManager) SendTransactionWithSignature(chainID uint64, txType transactions.PendingTrxType, sendArgs transactions.SendTxArgs, signature []byte) (hash types.Hash, err error) {
-	return tm.transactor.BuildTransactionAndSendWithSignature(chainID, sendArgs, signature)
+func (tm *TransactionManager) SendTransactionWithSignature(chainID uint64, sendArgs transactions.SendTxArgs, signature []byte) (hash types.Hash, err error) {
+	txWithSignature, err := tm.transactor.BuildTransactionWithSignature(chainID, sendArgs, signature)
+	if err != nil {
+		return hash, err
+	}
+
+	hash, err = tm.transactor.SendTransactionWithSignature(common.Address(sendArgs.From), sendArgs.Symbol, sendArgs.MultiTransactionID, txWithSignature)
+	return hash, err
 }

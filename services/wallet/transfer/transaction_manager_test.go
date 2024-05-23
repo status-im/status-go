@@ -19,7 +19,7 @@ func setupTestTransactionDB(t *testing.T) (*TransactionManager, func()) {
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	SetMultiTransactionIDGenerator(StaticIDCounter()) // to have different multi-transaction IDs even with fast execution
-	return &TransactionManager{db, nil, nil, nil, nil, nil, nil, nil, nil, nil}, func() {
+	return &TransactionManager{NewMultiTransactionDB(db), nil, nil, nil, nil, nil, nil, nil, nil, nil}, func() {
 		require.NoError(t, db.Close())
 	}
 }
@@ -146,7 +146,7 @@ func TestMultiTransactions(t *testing.T) {
 
 	trx1.FromAmount = (*hexutil.Big)(big.NewInt(789))
 	trx1.ToAmount = (*hexutil.Big)(big.NewInt(890))
-	err = updateMultiTransaction(manager.db, &trx1)
+	err = manager.UpdateMultiTransaction(&trx1)
 	require.NoError(t, err)
 
 	rst, err = manager.GetMultiTransactions(context.Background(), ids)

@@ -36,7 +36,7 @@ func TestController_watchAccountsChanges(t *testing.T) {
 
 	bcstate := blockchainstate.NewBlockChainState()
 	SetMultiTransactionIDGenerator(StaticIDCounter()) // to have different multi-transaction IDs even with fast execution
-	transactionManager := NewTransactionManager(walletDB, nil, nil, nil, accountsDB, nil, nil)
+	transactionManager := NewTransactionManager(NewInMemMultiTransactionStorage(), nil, nil, nil, accountsDB, nil, nil)
 	c := NewTransferController(
 		walletDB,
 		accountsDB,
@@ -239,7 +239,7 @@ func TestController_cleanupAccountLeftovers(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, storedAccs, 1)
 
-	transactionManager := NewTransactionManager(walletDB, nil, nil, nil, accountsDB, nil, nil)
+	transactionManager := NewTransactionManager(NewMultiTransactionDB(walletDB), nil, nil, nil, accountsDB, nil, nil)
 	bcstate := blockchainstate.NewBlockChainState()
 	c := NewTransferController(
 		walletDB,

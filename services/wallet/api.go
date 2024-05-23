@@ -626,7 +626,7 @@ func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionComm
 
 		_, err = api.s.transactionManager.InsertMultiTransaction(cmd)
 		if err != nil {
-			return nil, err
+			log.Error("Failed to save multi transaction", "error", err) // not critical
 		}
 
 		return cmdRes, nil
