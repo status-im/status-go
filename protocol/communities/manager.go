@@ -3298,8 +3298,8 @@ func (m *Manager) checkChannelPermissionsLight(community *Community, communityCh
 	viewSatisfied := !hasViewOnlyPermissions || (meAsMember != nil && meAsMember.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_VIEWER)
 	postSatisfied := !hasViewAndPostPermissions || (meAsMember != nil && meAsMember.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
 
-	finalViewSatisfied := m.computeViewOnlySatisfied(hasViewOnlyPermissions, hasViewAndPostPermissions, viewSatisfied, postSatisfied)
-	finalPostSatisfied := m.computeViewAndPostSatisfied(hasViewOnlyPermissions, hasViewAndPostPermissions, postSatisfied)
+	finalViewSatisfied := computeViewOnlySatisfied(hasViewOnlyPermissions, hasViewAndPostPermissions, viewSatisfied, postSatisfied)
+	finalPostSatisfied := computeViewAndPostSatisfied(hasViewOnlyPermissions, hasViewAndPostPermissions, postSatisfied)
 
 	return &CheckChannelPermissionsResponse{
 		ViewOnlyPermissions: &CheckChannelViewOnlyPermissionsResult{
@@ -3353,7 +3353,7 @@ type CheckChannelViewAndPostPermissionsResult struct {
 	Permissions map[string]*PermissionTokenCriteriaResult `json:"permissions"`
 }
 
-func (m *Manager) computeViewOnlySatisfied(hasViewOnlyPermissions bool, hasViewAndPostPermissions bool, checkedViewOnlySatisfied bool, checkedViewAndPostSatisified bool) bool {
+func computeViewOnlySatisfied(hasViewOnlyPermissions bool, hasViewAndPostPermissions bool, checkedViewOnlySatisfied bool, checkedViewAndPostSatisified bool) bool {
 	if (hasViewAndPostPermissions && !hasViewOnlyPermissions) || (hasViewOnlyPermissions && hasViewAndPostPermissions && checkedViewAndPostSatisified) {
 		return checkedViewAndPostSatisified
 	} else {
@@ -3361,7 +3361,7 @@ func (m *Manager) computeViewOnlySatisfied(hasViewOnlyPermissions bool, hasViewA
 	}
 }
 
-func (m *Manager) computeViewAndPostSatisfied(hasViewOnlyPermissions bool, hasViewAndPostPermissions bool, checkedViewAndPostSatisified bool) bool {
+func computeViewAndPostSatisfied(hasViewOnlyPermissions bool, hasViewAndPostPermissions bool, checkedViewAndPostSatisified bool) bool {
 	if hasViewOnlyPermissions && !hasViewAndPostPermissions {
 		return false
 	} else {
@@ -3370,18 +3370,6 @@ func (m *Manager) computeViewAndPostSatisfied(hasViewOnlyPermissions bool, hasVi
 }
 
 func (m *Manager) checkChannelPermissions(viewOnlyPreParsedPermissions *PreParsedCommunityPermissionsData, viewAndPostPreParsedPermissions *PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckChannelPermissionsResponse, error) {
-
-	response := &CheckChannelPermissionsResponse{
-		ViewOnlyPermissions: &CheckChannelViewOnlyPermissionsResult{
-			Satisfied:   false,
-			Permissions: make(map[string]*PermissionTokenCriteriaResult),
-		},
-		ViewAndPostPermissions: &CheckChannelViewAndPostPermissionsResult{
-			Satisfied:   false,
-			Permissions: make(map[string]*PermissionTokenCriteriaResult),
-		},
-	}
-
 	viewOnlyPermissionsResponse, err := m.PermissionChecker.CheckPermissions(viewOnlyPreParsedPermissions, accountsAndChainIDs, shortcircuit)
 	if err != nil {
 		return nil, err
@@ -3395,13 +3383,42 @@ func (m *Manager) checkChannelPermissions(viewOnlyPreParsedPermissions *PreParse
 	hasViewOnlyPermissions := viewOnlyPreParsedPermissions != nil
 	hasViewAndPostPermissions := viewAndPostPreParsedPermissions != nil
 
-	response.ViewOnlyPermissions.Satisfied = m.computeViewOnlySatisfied(hasViewOnlyPermissions, hasViewAndPostPermissions, viewOnlyPermissionsResponse.Satisfied, viewAndPostPermissionsResponse.Satisfied)
-	response.ViewOnlyPermissions.Permissions = viewOnlyPermissionsResponse.Permissions
+	return computeCheckChannelPermissionsResponse(hasViewOnlyPermissions, hasViewAndPostPermissions,
+			viewOnlyPermissionsResponse, viewAndPostPermissionsResponse),
+		nil
+}
 
-	response.ViewAndPostPermissions.Satisfied = m.computeViewAndPostSatisfied(hasViewOnlyPermissions, hasViewAndPostPermissions, viewAndPostPermissionsResponse.Satisfied)
-	response.ViewAndPostPermissions.Permissions = viewAndPostPermissionsResponse.Permissions
+func computeCheckChannelPermissionsResponse(hasViewOnlyPermissions bool, hasViewAndPostPermissions bool,
+	viewOnlyPermissionsResponse *CheckPermissionsResponse, viewAndPostPermissionsResponse *CheckPermissionsResponse) *CheckChannelPermissionsResponse {
 
-	return response, nil
+	response := &CheckChannelPermissionsResponse{
+		ViewOnlyPermissions: &CheckChannelViewOnlyPermissionsResult{
+			Satisfied:   false,
+			Permissions: make(map[string]*PermissionTokenCriteriaResult),
+		},
+		ViewAndPostPermissions: &CheckChannelViewAndPostPermissionsResult{
+			Satisfied:   false,
+			Permissions: make(map[string]*PermissionTokenCriteriaResult),
+		},
+	}
+
+	viewOnlySatisfied := !hasViewOnlyPermissions || viewOnlyPermissionsResponse.Satisfied
+	viewAndPostSatisfied := !hasViewAndPostPermissions || viewAndPostPermissionsResponse.Satisfied
+
+	response.ViewOnlyPermissions.Satisfied = computeViewOnlySatisfied(hasViewOnlyPermissions, hasViewAndPostPermissions,
+		viewOnlySatisfied, viewAndPostSatisfied)
+	if viewOnlyPermissionsResponse != nil {
+		response.ViewOnlyPermissions.Permissions = viewOnlyPermissionsResponse.Permissions
+	}
+
+	response.ViewAndPostPermissions.Satisfied = computeViewAndPostSatisfied(hasViewOnlyPermissions, hasViewAndPostPermissions,
+		viewAndPostSatisfied)
+
+	if viewAndPostPermissionsResponse != nil {
+		response.ViewAndPostPermissions.Permissions = viewAndPostPermissionsResponse.Permissions
+	}
+
+	return response
 }
 
 func (m *Manager) CheckAllChannelsPermissions(communityID types.HexBytes, addresses []gethcommon.Address) (*CheckAllChannelsPermissionsResponse, error) {
@@ -3418,25 +3435,57 @@ func (m *Manager) CheckAllChannelsPermissions(communityID types.HexBytes, addres
 	}
 	accountsAndChainIDs := combineAddressesAndChainIDs(addresses, allChainIDs)
 
+	_, channelsPermissionsPreParsedData := PreParsePermissionsData(community.tokenPermissions())
+
+	channelPermissionsCheckResult := make(map[string]map[protobuf.CommunityTokenPermission_Type]*CheckPermissionsResponse)
+
+	for permissionId, channelsPermissionPreParsedData := range channelsPermissionsPreParsedData {
+		permissionResponse, err := m.PermissionChecker.CheckPermissions(channelsPermissionPreParsedData, accountsAndChainIDs, false)
+		if err != nil {
+			return nil, err
+		}
+
+		// Note: in `PreParsedCommunityPermissionsData` for channels there will be only one permission for channels
+		for _, chatId := range channelsPermissionPreParsedData.Permissions[0].ChatIds {
+			if _, exists := channelPermissionsCheckResult[chatId]; !exists {
+				channelPermissionsCheckResult[chatId] = make(map[protobuf.CommunityTokenPermission_Type]*CheckPermissionsResponse)
+			}
+			storedPermissionResponse, exists := channelPermissionsCheckResult[chatId][channelsPermissionPreParsedData.Permissions[0].Type]
+			if !exists {
+				channelPermissionsCheckResult[chatId][channelsPermissionPreParsedData.Permissions[0].Type] =
+					permissionResponse
+			} else {
+				channelPermissionsCheckResult[chatId][channelsPermissionPreParsedData.Permissions[0].Type].Permissions[permissionId] =
+					permissionResponse.Permissions[permissionId]
+				channelPermissionsCheckResult[chatId][channelsPermissionPreParsedData.Permissions[0].Type].Satisfied =
+					storedPermissionResponse.Satisfied || permissionResponse.Satisfied
+			}
+		}
+	}
+
 	response := &CheckAllChannelsPermissionsResponse{
 		Channels: make(map[string]*CheckChannelPermissionsResponse),
 	}
 
-	// TODO: optimize
 	for channelID := range channels {
-		viewOnlyPermissions := community.ChannelTokenPermissionsByType(community.IDString()+channelID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
-		viewAndPostPermissions := community.ChannelTokenPermissionsByType(community.IDString()+channelID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
-		viewOnlyPreParsedPermissions := preParsedCommunityPermissionsData(viewOnlyPermissions)
-		viewAndPostPreParsedPermissions := preParsedCommunityPermissionsData(viewAndPostPermissions)
-		checkChannelPermissionsResponse, err := m.checkChannelPermissions(viewOnlyPreParsedPermissions, viewAndPostPreParsedPermissions, accountsAndChainIDs, false)
+		chatId := community.ChatID(channelID)
+
+		channelCheckPermissionsResponse, exists := channelPermissionsCheckResult[chatId]
+
+		var channelPermissionsResponse *CheckChannelPermissionsResponse
+		if !exists {
+			channelPermissionsResponse = computeCheckChannelPermissionsResponse(false, false, nil, nil)
+		} else {
+			viewPermissionsResponse, viewExists := channelCheckPermissionsResponse[protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL]
+			postPermissionsResponse, postExists := channelCheckPermissionsResponse[protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL]
+			channelPermissionsResponse = computeCheckChannelPermissionsResponse(viewExists, postExists, viewPermissionsResponse, postPermissionsResponse)
+		}
+
+		err = m.persistence.SaveCheckChannelPermissionResponse(community.IDString(), chatId, channelPermissionsResponse)
 		if err != nil {
 			return nil, err
 		}
-		err = m.persistence.SaveCheckChannelPermissionResponse(community.IDString(), community.IDString()+channelID, checkChannelPermissionsResponse)
-		if err != nil {
-			return nil, err
-		}
-		response.Channels[community.IDString()+channelID] = checkChannelPermissionsResponse
+		response.Channels[chatId] = channelPermissionsResponse
 	}
 	return response, nil
 }
