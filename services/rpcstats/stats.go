@@ -51,6 +51,5 @@ func CountCallWithTag(method string, tag string) {
 	methodMap := value.(*sync.Map)
 	value, _ = methodMap.LoadOrStore(method, uint(0))
 	methodMap.Store(method, value.(uint)+1)
-
-	CountCall(method)
+	stats.total++
 }
