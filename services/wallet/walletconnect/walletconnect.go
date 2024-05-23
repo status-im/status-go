@@ -1,15 +1,18 @@
 package walletconnect
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -61,6 +64,8 @@ type VerifyContext struct {
 	Verified Verified `json:"verified"`
 }
 
+// Params has RequiredNamespaces entries if part of "proposal namespace" and Namespaces entries if part of "session namespace"
+// see https://specs.walletconnect.com/2.0/specs/clients/sign/namespaces#controller-side-validation-of-incoming-proposal-namespaces-wallet
 type Params struct {
 	ID                 int64                `json:"id"`
 	PairingTopic       Topic                `json:"pairingTopic"`
@@ -138,8 +143,8 @@ func (n *Namespace) Valid(namespaceName string, chainID *uint64) bool {
 	return true
 }
 
-// Valid params
-func (p *Params) Valid() bool {
+// ValidateForProposal validates params part of the Proposal Namespace
+func (p *Params) ValidateForProposal() bool {
 	for key, ns := range p.RequiredNamespaces {
 		var chainID *uint64
 		if strings.Contains(key, ":") {
@@ -165,15 +170,62 @@ func (p *Params) Valid() bool {
 	return true
 }
 
-// Valid session propsal
+// ValidateProposal validates params part of the Proposal Namespace
 // https://specs.walletconnect.com/2.0/specs/clients/sign/namespaces#controller-side-validation-of-incoming-proposal-namespaces-wallet
-func (p *SessionProposal) Valid() bool {
-	return p.Params.Valid()
+func (p *SessionProposal) ValidateProposal() bool {
+	return p.Params.ValidateForProposal()
 }
 
-func sessionProposalToSupportedChain(caipChains []string, supportsChain func(uint64) bool) (chains []uint64, eipChains []string) {
-	chains = make([]uint64, 0, 1)
-	eipChains = make([]string, 0, 1)
+// AddSession adds a new active session to the database
+func AddSession(db *sql.DB, networks []params.Network, session_json string) error {
+	var session Session
+	err := json.Unmarshal([]byte(session_json), &session)
+	if err != nil {
+		return fmt.Errorf("unmarshal session: %v", err)
+	}
+
+	chains := supportedChainsInSession(session)
+	testChains, err := areTestChains(networks, chains)
+	if err != nil {
+		return fmt.Errorf("areTestChains: %v", err)
+	}
+
+	rowEntry := DBSession{
+		Topic:            session.PairingTopic,
+		Disconnected:     false,
+		SessionJSON:      session_json,
+		Expiry:           session.Expiry,
+		CreatedTimestamp: time.Now().Unix(),
+		PairingTopic:     session.PairingTopic,
+		TestChains:       testChains,
+		DBDApp: DBDApp{
+			URL:  session.Peer.Metadata.URL,
+			Name: session.Peer.Metadata.Name,
+		},
+	}
+	if len(session.Peer.Metadata.Icons) > 0 {
+		rowEntry.IconURL = session.Peer.Metadata.Icons[0]
+	}
+
+	return UpsertSession(db, rowEntry)
+}
+
+// areTestChains assumes chains to tests are all testnets or all mainnets
+func areTestChains(networks []params.Network, chainIDs []uint64) (isTest bool, err error) {
+	for _, n := range networks {
+		for _, chainID := range chainIDs {
+			if n.ChainID == chainID {
+				return n.IsTest, nil
+			}
+		}
+	}
+
+	return false, fmt.Errorf("no network found for chainIDs %v", chainIDs)
+}
+
+func supportedChainsInSession(session Session) []uint64 {
+	caipChains := session.Namespaces[SupportedEip155Namespace].Chains
+	chains := make([]uint64, 0, len(caipChains))
 	for _, caip2Str := range caipChains {
 		_, chainID, err := parseCaip2ChainID(caip2Str)
 		if err != nil {
@@ -181,14 +233,9 @@ func sessionProposalToSupportedChain(caipChains []string, supportsChain func(uin
 			continue
 		}
 
-		if !supportsChain(chainID) {
-			continue
-		}
-
-		eipChains = append(eipChains, caip2Str)
 		chains = append(chains, chainID)
 	}
-	return
+	return chains
 }
 
 func caip10Accounts(accounts []*accounts.Account, chains []uint64) []string {
