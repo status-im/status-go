@@ -108,11 +108,11 @@ type Bridge interface {
 	// calculates the fees for the bridge and returns the amount BonderFee and TokenFee (used for bridges)
 	CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int) (*big.Int, *big.Int, error)
 	// Pack the method for sending tx and method call's data
-	PackTxInputData(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error)
+	PackTxInputData(contractType string, fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error)
 	EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error)
 	CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error)
 	Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error)
-	GetContractAddress(network *params.Network, token *token.Token) *common.Address
+	GetContractAddress(network *params.Network, token *token.Token) (common.Address, error)
 	BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error)
 	BuildTx(fromNetwork, toNetwork *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int, bonderFee *big.Int) (*ethTypes.Transaction, error)
 }

@@ -600,15 +600,18 @@ func (r *Router) SuggestedRoutes(
 						gasLimit = sendType.EstimateGas(r.ensService, r.stickersService, network, addrFrom, tokenID)
 					}
 
-					approvalContractAddress := bridge.GetContractAddress(network, token)
-					approvalRequired, approvalAmountRequired, approvalGasLimit, l1ApprovalFee, err := r.requireApproval(ctx, sendType, approvalContractAddress, addrFrom, network, token, amountIn)
+					approvalContractAddress, err := bridge.GetContractAddress(network, token)
+					if err != nil {
+						continue
+					}
+					approvalRequired, approvalAmountRequired, approvalGasLimit, l1ApprovalFee, err := r.requireApproval(ctx, sendType, &approvalContractAddress, addrFrom, network, token, amountIn)
 					if err != nil {
 						continue
 					}
 
 					var l1GasFeeWei uint64
 					if sendType.needL1Fee() {
-						txInputData, err := bridge.PackTxInputData(network, dest, addrFrom, addrTo, token, amountIn)
+						txInputData, err := bridge.PackTxInputData("", network, dest, addrFrom, addrTo, token, amountIn)
 						if err != nil {
 							continue
 						}
@@ -673,7 +676,7 @@ func (r *Router) SuggestedRoutes(
 						ApprovalRequired:        approvalRequired,
 						ApprovalGasFees:         approvalGasFees,
 						ApprovalAmountRequired:  (*hexutil.Big)(approvalAmountRequired),
-						ApprovalContractAddress: approvalContractAddress,
+						ApprovalContractAddress: &approvalContractAddress,
 					})
 					mu.Unlock()
 				}
