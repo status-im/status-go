@@ -333,17 +333,13 @@ func TestHasSufficientCapacityV2(t *testing.T) {
 			fromLockedAmount: map[uint64]*hexutil.Big{1: &amount1, 2: &amount2},
 			expected:         true,
 		},
-		// TODO: Find out what the expected behaviour for this case should be
-		// I expect false but the test returns true
-		/*
-			{
-				name:             "Path does not meet required amount due to insufficient rest",
-				route:            []*PathV2{path1, path2, path4},
-				amountIn:         big.NewInt(600),
-				fromLockedAmount: map[uint64]*hexutil.Big{1: &amount1, 4: &amount4},
-				expected:         false,
-			},
-		*/
+		{
+			name:             "Path does not meet required amount due to insufficient rest",
+			route:            []*PathV2{path1, path2, path4},
+			amountIn:         big.NewInt(800),
+			fromLockedAmount: map[uint64]*hexutil.Big{1: &amount1, 4: &amount4},
+			expected:         false,
+		},
 		{
 			name:             "Empty route",
 			route:            []*PathV2{},
@@ -823,7 +819,6 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 			expectedRoutes: [][]*PathV2{},
 		},
 		{
-			// TODO this seems wrong also. Should this test case work?
 			name: "Partial locked amounts",
 			routes: [][]*PathV2{
 				{
@@ -835,7 +830,7 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 			amountIn: big.NewInt(250),
 			fromLockedAmount: map[uint64]*hexutil.Big{
 				1: (*hexutil.Big)(big.NewInt(50)),
-				2: (*hexutil.Big)(big.NewInt(0)),
+				2: (*hexutil.Big)(big.NewInt(0)), // Excluded path
 				3: (*hexutil.Big)(big.NewInt(100)),
 			},
 			expectedRoutes: [][]*PathV2{},
