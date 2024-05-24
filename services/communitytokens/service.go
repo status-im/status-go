@@ -145,11 +145,31 @@ func (s *Service) handleWalletEvent(event walletevent.Event) {
 }
 
 func (s *Service) handleAirdropCommunityToken(status string, pendingTransaction *transactions.PendingTransaction) (*token.CommunityToken, error) {
-	return s.Messenger.GetCommunityTokenByChainAndAddress(int(pendingTransaction.ChainID), pendingTransaction.To.String())
+	communityToken, err := s.Messenger.GetCommunityTokenByChainAndAddress(int(pendingTransaction.ChainID), pendingTransaction.To.String())
+	if communityToken == nil {
+		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", pendingTransaction.ChainID, pendingTransaction.To.String())
+	} else {
+		publishErr := s.publishTokenActionToPrivilegedMembers(communityToken.CommunityID, uint64(communityToken.ChainID),
+			communityToken.Address, protobuf.CommunityTokenAction_AIRDROP)
+		if publishErr != nil {
+			log.Warn("can't publish airdrop action")
+		}
+	}
+	return communityToken, err
 }
 
 func (s *Service) handleRemoteDestructCollectible(status string, pendingTransaction *transactions.PendingTransaction) (*token.CommunityToken, error) {
-	return s.Messenger.GetCommunityTokenByChainAndAddress(int(pendingTransaction.ChainID), pendingTransaction.To.String())
+	communityToken, err := s.Messenger.GetCommunityTokenByChainAndAddress(int(pendingTransaction.ChainID), pendingTransaction.To.String())
+	if communityToken == nil {
+		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", pendingTransaction.ChainID, pendingTransaction.To.String())
+	} else {
+		publishErr := s.publishTokenActionToPrivilegedMembers(communityToken.CommunityID, uint64(communityToken.ChainID),
+			communityToken.Address, protobuf.CommunityTokenAction_REMOTE_DESTRUCT)
+		if publishErr != nil {
+			log.Warn("can't publish remote destruct action")
+		}
+	}
+	return communityToken, err
 }
 
 func (s *Service) handleBurnCommunityToken(status string, pendingTransaction *transactions.PendingTransaction) (*token.CommunityToken, error) {
@@ -166,7 +186,18 @@ func (s *Service) handleBurnCommunityToken(status string, pendingTransaction *tr
 		}
 	}
 
-	return s.Messenger.GetCommunityTokenByChainAndAddress(int(pendingTransaction.ChainID), pendingTransaction.To.String())
+	communityToken, err := s.Messenger.GetCommunityTokenByChainAndAddress(int(pendingTransaction.ChainID), pendingTransaction.To.String())
+
+	if communityToken == nil {
+		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", pendingTransaction.ChainID, pendingTransaction.To.String())
+	} else {
+		publishErr := s.publishTokenActionToPrivilegedMembers(communityToken.CommunityID, uint64(communityToken.ChainID),
+			communityToken.Address, protobuf.CommunityTokenAction_BURN)
+		if publishErr != nil {
+			log.Warn("can't publish burn action")
+		}
+	}
+	return communityToken, err
 }
 
 func (s *Service) handleDeployOwnerToken(status string, pendingTransaction *transactions.PendingTransaction) (*token.CommunityToken, *token.CommunityToken, error) {
@@ -443,6 +474,33 @@ func (s *Service) DeploymentSignatureDigest(chainID uint64, addressFrom string, 
 	return s.manager.DeploymentSignatureDigest(chainID, addressFrom, communityID)
 }
 
+func (s *Service) ProcessCommunityTokenAction(message *protobuf.CommunityTokenAction) error {
+	communityToken, err := s.Messenger.GetCommunityTokenByChainAndAddress(int(message.ChainId), message.ContractAddress)
+	if err != nil {
+		return err
+	}
+	if communityToken == nil {
+		return fmt.Errorf("can't find community token in database: chain %v, address %v", message.ChainId, message.ContractAddress)
+	}
+
+	if message.ActionType == protobuf.CommunityTokenAction_BURN {
+		// get new max supply and update database
+		newMaxSupply, err := s.maxSupply(context.Background(), uint64(communityToken.ChainID), communityToken.Address)
+		if err != nil {
+			return nil
+		}
+		err = s.Messenger.UpdateCommunityTokenSupply(communityToken.ChainID, communityToken.Address, &bigint.BigInt{Int: newMaxSupply})
+		if err != nil {
+			return err
+		}
+		communityToken, _ = s.Messenger.GetCommunityTokenByChainAndAddress(int(message.ChainId), message.ContractAddress)
+	}
+
+	signal.SendCommunityTokenActionSignal(communityToken, message.ActionType)
+
+	return nil
+}
+
 func (s *Service) SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, newSignerPubKey string) (string, error) {
 
 	if len(newSignerPubKey) <= 0 {
@@ -665,4 +723,12 @@ func (s *Service) ReTrackOwnerTokenDeploymentTransaction(ctx context.Context, ch
 		log.Debug("pending transaction with hashId is already tracked ", hashString)
 	}
 	return err
+}
+
+func (s *Service) publishTokenActionToPrivilegedMembers(communityID string, chainID uint64, contractAddress string, actionType protobuf.CommunityTokenAction_ActionType) error {
+	decodedCommunityID, err := types.DecodeHex(communityID)
+	if err != nil {
+		return err
+	}
+	return s.Messenger.PublishTokenActionToPrivilegedMembers(decodedCommunityID, chainID, contractAddress, actionType)
 }

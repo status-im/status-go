@@ -225,6 +225,7 @@ type CommunityTokensServiceInterface interface {
 	GetAssetContractData(chainID uint64, contractAddress string) (*AssetContractData, error)
 	SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error)
 	DeploymentSignatureDigest(chainID uint64, addressFrom string, communityID string) ([]byte, error)
+	ProcessCommunityTokenAction(message *protobuf.CommunityTokenAction) error
 }
 
 type DefaultTokenManager struct {
