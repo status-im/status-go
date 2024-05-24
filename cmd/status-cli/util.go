@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wakuv2ext"
+	"github.com/status-im/status-go/telemetry"
 
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
@@ -38,7 +39,7 @@ func start(cCtx *cli.Context, name string, port int, apiModules string, telemetr
 	namedLogger := logger.Named(name)
 	namedLogger.Info("starting messager")
 
-	_ = setupLogger(name)
+	logger := setupLogger(name)
 
 	path := fmt.Sprintf("./test-%s", strings.ToLower(name))
 	err := os.MkdirAll(path, os.ModePerm)
@@ -70,6 +71,11 @@ func start(cCtx *cli.Context, name string, port int, apiModules string, telemetr
 	wakuService := backend.StatusNode().WakuV2ExtService()
 	if wakuService == nil {
 		return nil, errors.New("waku service is not available")
+	}
+
+	if telemetryUrl != "" {
+		telemetryClient := telemetry.NewClient(logger, telemetryUrl, backend.SelectedAccountKeyID(), name)
+		backend.StatusNode().WakuV2Service().SetStatusTelemetryClient(telemetryClient)
 	}
 	wakuAPI := wakuv2ext.NewPublicAPI(wakuService)
 
