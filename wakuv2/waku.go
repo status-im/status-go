@@ -89,6 +89,7 @@ const messageSentPeriod = 5 // in seconds
 
 type ITelemetryClient interface {
 	PushReceivedEnvelope(*protocol.Envelope)
+	PushSentEnvelope(*protocol.Envelope, PublishMethod)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -947,28 +948,65 @@ func (w *Waku) SkipPublishToTopic(value bool) {
 	w.cfg.SkipPublishToTopic = value
 }
 
+type PublishMethod int
+
+const (
+	LightPush PublishMethod = iota
+	Relay
+)
+
+func (pm PublishMethod) String() string {
+	switch pm {
+	case LightPush:
+		return "LightPush"
+	case Relay:
+		return "Relay"
+	default:
+		return "Unknown"
+	}
+}
+
 func (w *Waku) broadcast() {
 	for {
 		select {
 		case envelope := <-w.sendQueue:
 			logger := w.logger.With(zap.Stringer("envelopeHash", envelope.Hash()), zap.String("pubsubTopic", envelope.PubsubTopic()), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().GetTimestamp()))
 			var fn publishFn
+			var publishMethod PublishMethod
 			if w.cfg.SkipPublishToTopic {
 				// For now only used in testing to simulate going offline
 				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
 					return errors.New("test send failure")
 				}
 			} else if w.cfg.LightClient {
+				publishMethod = LightPush
 				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
 					logger.Info("publishing message via lightpush")
 					_, err := w.node.Lightpush().Publish(w.ctx, env.Message(), lightpush.WithPubSubTopic(env.PubsubTopic()))
 					return err
 				}
 			} else {
+				publishMethod = Relay
 				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
 					peerCnt := len(w.node.Relay().PubSub().ListPeers(env.PubsubTopic()))
 					logger.Info("publishing message via relay", zap.Int("peerCnt", peerCnt))
 					_, err := w.node.Relay().Publish(w.ctx, env.Message(), relay.WithPubSubTopic(env.PubsubTopic()))
+					return err
+				}
+			}
+
+			// Wraps the publish function with a call to the telemetry client
+			if w.statusTelemetryClient != nil {
+				sendFn := fn
+				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
+					err := sendFn(env, logger)
+					if err == nil {
+						w.statusTelemetryClient.PushSentEnvelope(env, publishMethod)
+					}
+					// else {
+					// TODO: send error from Relay or LightPush to Telemetry
+					// w.statusTelemetryClient.PushError(err)
+					// }
 					return err
 				}
 			}

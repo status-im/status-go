@@ -50,5 +50,7 @@ func (c *BandwidthTelemetryClient) PushProtocolStats(relayStats metrics.Stats, s
 	_, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		c.logger.Error("Error sending message to telemetry server", zap.Error(err))
+	} else {
+		c.logger.Debug("Successfully pushed protocol stats to telemetry server")
 	}
 }
