@@ -6,12 +6,10 @@ import (
 	"encoding/json"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/appdatabase/migrations"
@@ -20,6 +18,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/sqlite"
+
+	e_types "github.com/status-im/status-go/eth-node/types"
 )
 
 const nodeCfgMigrationDate = 1640111208
@@ -90,20 +90,21 @@ func fixMissingKeyUIDForAccounts(sqlTx *sql.Tx) error {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		acc := accounts.Account{}
-		err = rows.Scan(&acc.Address, &acc.PublicKey)
+		var address e_types.Address
+		var pubkey e_types.HexBytes
+		err = rows.Scan(&address, &pubkey)
 		if err != nil {
 			log.Error("Migrating accounts: failed to scan records", "err", err.Error())
 			return err
 		}
-		pk, err := crypto.UnmarshalPubkey(acc.PublicKey)
+		pk, err := crypto.UnmarshalPubkey(pubkey)
 		if err != nil {
-			log.Error("Migrating accounts: failed to unmarshal pubkey", "err", err.Error(), "pubkey", string(acc.PublicKey))
+			log.Error("Migrating accounts: failed to unmarshal pubkey", "err", err.Error(), "pubkey", string(pubkey))
 			return err
 		}
 		pkBytes := sha256.Sum256(crypto.FromECDSAPub(pk))
 		keyUIDHex := hexutil.Encode(pkBytes[:])
-		_, err = sqlTx.Exec(`UPDATE accounts SET key_uid = ? WHERE address = ?`, keyUIDHex, acc.Address)
+		_, err = sqlTx.Exec(`UPDATE accounts SET key_uid = ? WHERE address = ?`, keyUIDHex, address)
 		if err != nil {
 			log.Error("Migrating accounts: failed to update key_uid", "err", err.Error())
 			return err
