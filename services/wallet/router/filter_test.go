@@ -1,7 +1,6 @@
 package router
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -34,41 +33,41 @@ var (
 	path5 = &PathV2{From: network5, AmountIn: &amount5}
 )
 
-func routesEqual(expected, actual [][]*PathV2) bool {
+func routesEqual(t *testing.T, expected, actual [][]*PathV2) bool {
 	if len(expected) != len(actual) {
 		return false
 	}
 	for i := range expected {
-		if !pathsEqual(expected[i], actual[i]) {
+		if !pathsEqual(t, expected[i], actual[i]) {
 			return false
 		}
 	}
 	return true
 }
 
-func pathsEqual(expected, actual []*PathV2) bool {
+func pathsEqual(t *testing.T, expected, actual []*PathV2) bool {
 	if len(expected) != len(actual) {
 		return false
 	}
 	for i := range expected {
-		if !pathEqual(expected[i], actual[i]) {
+		if !pathEqual(t, expected[i], actual[i]) {
 			return false
 		}
 	}
 	return true
 }
 
-func pathEqual(expected, actual *PathV2) bool {
+func pathEqual(t *testing.T, expected, actual *PathV2) bool {
 	if expected.From.ChainID != actual.From.ChainID {
-		fmt.Printf("expected chain ID '%d' , actual chain ID '%d'", expected.From.ChainID, actual.From.ChainID)
+		t.Logf("expected chain ID '%d' , actual chain ID '%d'", expected.From.ChainID, actual.From.ChainID)
 		return false
 	}
 	if expected.AmountIn.ToInt().Cmp(actual.AmountIn.ToInt()) != 0 {
-		fmt.Printf("expected AmountIn '%d' , actual AmountIn '%d'", expected.AmountIn.ToInt(), actual.AmountIn.ToInt())
+		t.Logf("expected AmountIn '%d' , actual AmountIn '%d'", expected.AmountIn.ToInt(), actual.AmountIn.ToInt())
 		return false
 	}
 	if expected.AmountInLocked != actual.AmountInLocked {
-		fmt.Printf("expected AmountInLocked '%t' , actual AmountInLocked '%t'", expected.AmountInLocked, actual.AmountInLocked)
+		t.Logf("expected AmountInLocked '%t' , actual AmountInLocked '%t'", expected.AmountInLocked, actual.AmountInLocked)
 		return false
 	}
 	return true
@@ -671,9 +670,9 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fmt.Printf("Original Routes: %+v\n", tt.routes)
+			t.Logf("Original Routes: %+v\n", tt.routes)
 			filteredRoutes := filterNetworkComplianceV2(tt.routes, tt.fromLockedAmount)
-			fmt.Printf("Filtered Routes: %+v\n", filteredRoutes)
+			t.Logf("Filtered Routes: %+v\n", filteredRoutes)
 			assert.Equal(t, tt.expected, filteredRoutes)
 		})
 	}
@@ -875,7 +874,7 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filteredRoutes := filterCapacityValidationV2(tt.routes, tt.amountIn, tt.fromLockedAmount)
-			if !routesEqual(tt.expectedRoutes, filteredRoutes) {
+			if !routesEqual(t, tt.expectedRoutes, filteredRoutes) {
 				t.Errorf("Expected: %+v, Actual: %+v", tt.expectedRoutes, filteredRoutes)
 			}
 		})
@@ -977,9 +976,9 @@ func TestFilterRoutesV2(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fmt.Printf("Original Routes: %+v\n", tt.routes)
+			t.Logf("Original Routes: %+v\n", tt.routes)
 			filteredRoutes := filterRoutesV2(tt.routes, tt.amountIn, tt.fromLockedAmount)
-			fmt.Printf("Filtered Routes: %+v\n", filteredRoutes)
+			t.Logf("Filtered Routes: %+v\n", filteredRoutes)
 			assert.Equal(t, tt.expectedRoutes, filteredRoutes)
 		})
 	}
