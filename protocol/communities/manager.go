@@ -61,7 +61,7 @@ const maxArchiveSizeInBytes = 30000000
 var maxNbMembers = 5000
 var maxNbPendingRequestedMembers = 100
 
-var memberPermissionsCheckInterval = 1 * time.Hour
+var memberPermissionsCheckInterval = 8 * time.Hour
 var validateInterval = 2 * time.Minute
 
 // Used for testing only
@@ -1406,8 +1406,8 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 		task.mutex.Lock()
 		defer task.mutex.Unlock()
 
-		// Ensure reevaluation is performed not more often than once per minute
-		if !force && task.lastSuccessTime.After(time.Now().Add(-1*time.Minute)) {
+		// Ensure reevaluation is performed not more often than once per 5 minutes
+		if !force && task.lastSuccessTime.After(time.Now().Add(-5*time.Minute)) {
 			return false
 		}
 
