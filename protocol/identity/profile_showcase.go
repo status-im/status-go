@@ -31,6 +31,15 @@ const (
 	ProfileShowcaseMembershipStatusNotAMember
 )
 
+const (
+	TwitterID      = "__twitter"
+	PersonalSiteID = "__personal_site"
+	GithubID       = "__github"
+	YoutubeID      = "__youtube"
+	DiscordID      = "__discord"
+	TelegramID     = "__telegram"
+)
+
 // Profile showcase preferences
 
 type ProfileShowcaseCommunityPreference struct {

@@ -21,7 +21,6 @@ import (
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 
-	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/browsers"
 )
@@ -716,37 +715,6 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 		}
 	}
 
-	// Read social links
-	for _, contact := range allContacts {
-		rows, err := db.db.Query(`SELECT link_text, link_url FROM chat_identity_social_links WHERE chat_id = ?`, contact.ID)
-		if err != nil {
-			return nil, err
-		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var (
-				text sql.NullString
-				url  sql.NullString
-			)
-			err := rows.Scan(
-				&text, &url,
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			link := &identity.SocialLink{}
-			if text.Valid {
-				link.Text = text.String
-			}
-			if url.Valid {
-				link.URL = url.String
-			}
-			contact.SocialLinks = append(contact.SocialLinks, link)
-		}
-	}
-
 	var response []*Contact
 	for key := range allContacts {
 		response = append(response, allContacts[key])
@@ -892,25 +860,6 @@ func (db sqlitePersistence) UpdateContactChatIdentity(contactID string, chatIden
 			return false, false, err
 		}
 		imagesUpdated = true
-	}
-
-	if clockUpdated && chatIdentity.SocialLinks != nil {
-		stmt, err := tx.Prepare(`INSERT INTO chat_identity_social_links (chat_id, link_text, link_url) VALUES (?, ?, ?)`)
-		if err != nil {
-			return clockUpdated, imagesUpdated, err
-		}
-		defer stmt.Close()
-
-		for _, link := range chatIdentity.SocialLinks {
-			_, err = stmt.Exec(
-				contactID,
-				link.Text,
-				link.Url,
-			)
-			if err != nil {
-				return clockUpdated, imagesUpdated, err
-			}
-		}
 	}
 
 	return

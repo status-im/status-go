@@ -490,21 +490,6 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 		pictureProtos[i] = p
 	}
 
-	socialLinks, err := m.settings.GetSocialLinks()
-	if err != nil {
-		return nil, err
-	}
-
-	socialLinksClock, err := m.settings.GetSocialLinksClock()
-	if err != nil {
-		return nil, err
-	}
-
-	syncSocialLinks := &protobuf.SyncSocialLinks{
-		SocialLinks: socialLinks.ToProtobuf(),
-		Clock:       socialLinksClock,
-	}
-
 	ensUsernameDetails, err := m.getEnsUsernameDetails()
 	if err != nil {
 		return nil, err
@@ -530,7 +515,6 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 			DisplayName:                displayName,
 			Pictures:                   pictureProtos,
 			DisplayNameClock:           displayNameClock,
-			SocialLinks:                syncSocialLinks,
 			EnsUsernameDetails:         ensUsernameDetailProtos,
 			ProfileShowcasePreferences: ToProfileShowcasePreferencesProto(profileShowcasePreferences),
 		},

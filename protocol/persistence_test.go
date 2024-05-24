@@ -1201,11 +1201,6 @@ func TestUpdateContactChatIdentity(t *testing.T) {
 	require.Len(t, contacts, 1)
 
 	require.Len(t, contacts[0].Images, 0)
-	require.Len(t, contacts[0].SocialLinks, 2)
-	require.Equal(t, "Personal Site", contacts[0].SocialLinks[0].Text)
-	require.Equal(t, "status.im", contacts[0].SocialLinks[0].URL)
-	require.Equal(t, "Twitter", contacts[0].SocialLinks[1].Text)
-	require.Equal(t, "Status_ico", contacts[0].SocialLinks[1].URL)
 }
 
 func TestRemovedProfileImage(t *testing.T) {

@@ -138,6 +138,7 @@
 // 1713169458_update_raw_messages_with_resend_features.up.sql (608B)
 // 1715163152_remove_status_community.up.sql (354B)
 // 1715163262_rename_peersyncing_group_id_field.up.sql (212B)
+// 1716413241_remove_social_links.up.sql (38B)
 // README.md (554B)
 // doc.go (870B)
 
@@ -2967,6 +2968,26 @@ func _1715163262_rename_peersyncing_group_id_fieldUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1716413241_remove_social_linksUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x09\xf2\x0f\x50\x08\x71\x74\xf2\x71\x55\x48\xce\x48\x2c\x89\xcf\x4c\x49\xcd\x2b\xc9\x2c\xa9\x8c\x2f\xce\x4f\xce\x4c\xcc\x89\xcf\xc9\xcc\xcb\x2e\xb6\x06\x04\x00\x00\xff\xff\xe8\x99\x75\xf0\x26\x00\x00\x00")
+
+func _1716413241_remove_social_linksUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1716413241_remove_social_linksUpSql,
+		"1716413241_remove_social_links.up.sql",
+	)
+}
+
+func _1716413241_remove_social_linksUpSql() (*asset, error) {
+	bytes, err := _1716413241_remove_social_linksUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1716413241_remove_social_links.up.sql", size: 38, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x50, 0x9c, 0xd6, 0x47, 0xe6, 0xc8, 0xe7, 0x9b, 0xae, 0xaf, 0x43, 0xb0, 0xc5, 0x51, 0x74, 0x1c, 0x3e, 0xa3, 0x2c, 0x28, 0xaf, 0x9, 0x1d, 0x33, 0x8e, 0x82, 0xc0, 0x48, 0x6a, 0x74, 0x5a, 0xd3}}
+	return a, nil
+}
+
 var _readmeMd = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x54\x91\xc1\xce\xd3\x30\x10\x84\xef\x7e\x8a\x91\x7a\x01\xa9\x2a\x8f\xc0\x0d\x71\x82\x03\x48\x1c\xc9\x36\x9e\x36\x96\x1c\x6f\xf0\xae\x93\xe6\xed\x91\xa3\xc2\xdf\xff\x66\xed\xd8\x33\xdf\x78\x4f\xa7\x13\xbe\xea\x06\x57\x6c\x35\x39\x31\xa7\x7b\x15\x4f\x5a\xec\x73\x08\xbf\x08\x2d\x79\x7f\x4a\x43\x5b\x86\x17\xfd\x8c\x21\xea\x56\x5e\x47\x90\x4a\x14\x75\x48\xde\x64\x37\x2c\x6a\x96\xae\x99\x48\x05\xf6\x27\x77\x13\xad\x08\xae\x8a\x51\xe7\x25\xf3\xf1\xa9\x9f\xf9\x58\x58\x2c\xad\xbc\xe0\x8b\x56\xf0\x21\x5d\xeb\x4c\x95\xb3\xae\x84\x60\xd4\xdc\xe6\x82\x5d\x1b\x36\x6d\x39\x62\x92\xf5\xb8\x11\xdb\x92\xd3\x28\xce\xe0\x13\xe1\x72\xcd\x3c\x63\xd4\x65\x87\xae\xac\xe8\xc3\x28\x2e\x67\x44\x66\x3a\x21\x25\xa2\x72\xac\x14\x67\xbc\x84\x9f\x53\x32\x8c\x52\x70\x25\x56\xd6\xfd\x8d\x05\x37\xad\x30\x9d\x9f\xa6\x86\x0f\xcd\x58\x7f\xcf\x34\x93\x3b\xed\x90\x9f\xa4\x1f\xcf\x30\x85\x4d\x07\x58\xaf\x7f\x25\xc4\x9d\xf3\x72\x64\x84\xd0\x7f\xf9\x9b\x3a\x2d\x84\xef\x85\x48\x66\x8d\xd8\x88\x9b\x8c\x8c\x98\x5b\xf6\x74\x14\x4e\x33\x0d\xc9\xe0\x93\x38\xda\x12\xc5\x69\xbd\xe4\xf0\x2e\x7a\x78\x07\x1c\xfe\x13\x9f\x91\x29\x31\x95\x7b\x7f\x62\x59\x37\xb4\xe5\x5e\x25\xfe\x33\xee\xd5\x53\x71\xd6\xda\x3a\xd8\xcb\xde\x2e\xf8\xa1\x90\x55\x53\x0c\xc7\xaa\x0d\xe9\x76\x14\x29\x1c\x7b\x68\xdd\x2f\xe1\x6f\x00\x00\x00\xff\xff\x3c\x0a\xc2\xfe\x2a\x02\x00\x00")
 
 func readmeMdBytes() ([]byte, error) {
@@ -3236,8 +3257,9 @@ var _bindata = map[string]func() (*asset, error){
 	"1713169458_update_raw_messages_with_resend_features.up.sql":                  _1713169458_update_raw_messages_with_resend_featuresUpSql,
 	"1715163152_remove_status_community.up.sql":                                   _1715163152_remove_status_communityUpSql,
 	"1715163262_rename_peersyncing_group_id_field.up.sql":                         _1715163262_rename_peersyncing_group_id_fieldUpSql,
-	"README.md": readmeMd,
-	"doc.go":    docGo,
+	"1716413241_remove_social_links.up.sql":                                       _1716413241_remove_social_linksUpSql,
+	"README.md":                                                                   readmeMd,
+	"doc.go":                                                                      docGo,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -3424,8 +3446,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1713169458_update_raw_messages_with_resend_features.up.sql":                  {_1713169458_update_raw_messages_with_resend_featuresUpSql, map[string]*bintree{}},
 	"1715163152_remove_status_community.up.sql":                                   {_1715163152_remove_status_communityUpSql, map[string]*bintree{}},
 	"1715163262_rename_peersyncing_group_id_field.up.sql":                         {_1715163262_rename_peersyncing_group_id_fieldUpSql, map[string]*bintree{}},
-	"README.md": {readmeMd, map[string]*bintree{}},
-	"doc.go":    {docGo, map[string]*bintree{}},
+	"1716413241_remove_social_links.up.sql":                                       {_1716413241_remove_social_linksUpSql, map[string]*bintree{}},
+	"README.md":                                                                   {readmeMd, map[string]*bintree{}},
+	"doc.go":                                                                      {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

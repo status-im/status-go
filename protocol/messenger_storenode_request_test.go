@@ -283,7 +283,6 @@ func (s *MessengerStoreNodeRequestSuite) requireCommunitiesEqual(c *communities.
 func (s *MessengerStoreNodeRequestSuite) requireContactsEqual(c *Contact, expected *Contact) {
 	s.Require().Equal(expected.DisplayName, c.DisplayName)
 	s.Require().Equal(expected.Bio, c.Bio)
-	s.Require().Equal(expected.SocialLinks, c.SocialLinks)
 }
 
 func (s *MessengerStoreNodeRequestSuite) fetchCommunity(m *Messenger, communityShard communities.CommunityShard, expectedCommunity *communities.Community) StoreNodeRequestStats {

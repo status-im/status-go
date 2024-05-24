@@ -38,7 +38,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	sociallinkssettings "github.com/status-im/status-go/multiaccounts/settings_social_links"
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/common/shard"
@@ -47,7 +46,6 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 	"github.com/status-im/status-go/protocol/ens"
-	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/peersyncing"
@@ -1054,17 +1052,12 @@ func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) e
 		return err
 	}
 
-	socialLinks, err := m.settings.GetSocialLinks()
-	if err != nil {
-		return err
-	}
-
 	profileShowcase, err := m.GetProfileShowcaseForSelfIdentity()
 	if err != nil {
 		return err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks, profileShowcase, multiaccountscommon.IDToColorFallbackToBlue(cca.ChatIdentity.CustomizationColor))
+	identityHash, err := m.getIdentityHash(displayName, bio, img, profileShowcase, multiaccountscommon.IDToColorFallbackToBlue(cca.ChatIdentity.CustomizationColor))
 	if err != nil {
 		return err
 	}
@@ -1141,17 +1134,12 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		return err
 	}
 
-	socialLinks, err := m.settings.GetSocialLinks()
-	if err != nil {
-		return err
-	}
-
 	profileShowcase, err := m.GetProfileShowcaseForSelfIdentity()
 	if err != nil {
 		return err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks, profileShowcase, multiaccountscommon.IDToColorFallbackToBlue(ci.CustomizationColor))
+	identityHash, err := m.getIdentityHash(displayName, bio, img, profileShowcase, multiaccountscommon.IDToColorFallbackToBlue(ci.CustomizationColor))
 	if err != nil {
 		return err
 	}
@@ -1164,22 +1152,17 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 	return nil
 }
 
-func (m *Messenger) getIdentityHash(displayName, bio string, img *images.IdentityImage, socialLinks identity.SocialLinks, profileShowcase *protobuf.ProfileShowcase, customizationColor multiaccountscommon.CustomizationColor) ([]byte, error) {
-	socialLinksData, err := socialLinks.Serialize()
-	if err != nil {
-		return []byte{}, err
-	}
-
+func (m *Messenger) getIdentityHash(displayName, bio string, img *images.IdentityImage, profileShowcase *protobuf.ProfileShowcase, customizationColor multiaccountscommon.CustomizationColor) ([]byte, error) {
 	profileShowcaseData, err := proto.Marshal(profileShowcase)
 	if err != nil {
 		return []byte{}, err
 	}
 
 	if img == nil {
-		return crypto.Keccak256([]byte(displayName), []byte(bio), socialLinksData, profileShowcaseData, []byte(customizationColor)), nil
+		return crypto.Keccak256([]byte(displayName), []byte(bio), profileShowcaseData, []byte(customizationColor)), nil
 	}
 
-	return crypto.Keccak256(img.Payload, []byte(displayName), []byte(bio), socialLinksData, profileShowcaseData, []byte(customizationColor)), nil
+	return crypto.Keccak256(img.Payload, []byte(displayName), []byte(bio), profileShowcaseData, []byte(customizationColor)), nil
 }
 
 // shouldPublishChatIdentity returns true if the last time the ChatIdentity was attached was more than 24 hours ago
@@ -1213,17 +1196,12 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 		return false, err
 	}
 
-	socialLinks, err := m.settings.GetSocialLinks()
-	if err != nil {
-		return false, err
-	}
-
 	profileShowcase, err := m.GetProfileShowcaseForSelfIdentity()
 	if err != nil {
 		return false, err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks, profileShowcase, m.account.GetCustomizationColor())
+	identityHash, err := m.getIdentityHash(displayName, bio, img, profileShowcase, m.account.GetCustomizationColor())
 	if err != nil {
 		return false, err
 	}
@@ -1253,11 +1231,6 @@ func (m *Messenger) createChatIdentity(context ChatContext) (*protobuf.ChatIdent
 		return nil, err
 	}
 
-	socialLinks, err := m.settings.GetSocialLinks()
-	if err != nil {
-		return nil, err
-	}
-
 	profileShowcase, err := m.GetProfileShowcaseForSelfIdentity()
 	if err != nil {
 		return nil, err
@@ -1268,7 +1241,6 @@ func (m *Messenger) createChatIdentity(context ChatContext) (*protobuf.ChatIdent
 		EnsName:            "", // TODO add ENS name handling to dedicate PR
 		DisplayName:        displayName,
 		Description:        bio,
-		SocialLinks:        socialLinks.ToProtobuf(),
 		ProfileShowcase:    profileShowcase,
 		CustomizationColor: m.account.GetCustomizationColorID(),
 	}
@@ -2790,11 +2762,6 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 	}
 
 	err = m.syncAccountsPositions(rawMessageHandler)
-	if err != nil {
-		return err
-	}
-
-	err = m.syncSocialLinks(context.Background(), rawMessageHandler)
 	if err != nil {
 		return err
 	}
@@ -6009,81 +5976,6 @@ func (m *Messenger) syncDeleteForMeMessage(ctx context.Context, rawMessageDispat
 		}
 		return nil
 	})
-}
-
-func (m *Messenger) syncSocialLinks(ctx context.Context, rawMessageDispatcher RawMessageHandler) error {
-	if !m.hasPairedDevices() {
-		return nil
-	}
-
-	dbSocialLinks, err := m.settings.GetSocialLinks()
-	if err != nil {
-		return err
-	}
-
-	dbClock, err := m.settings.GetSocialLinksClock()
-	if err != nil {
-		return err
-	}
-
-	_, chat := m.getLastClockWithRelatedChat()
-	encodedMessage, err := proto.Marshal(dbSocialLinks.ToSyncProtobuf(dbClock))
-	if err != nil {
-		return err
-	}
-
-	rawMessage := common.RawMessage{
-		LocalChatID: chat.ID,
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINKS,
-		ResendType:  common.ResendTypeDataSync,
-	}
-
-	_, err = rawMessageDispatcher(ctx, rawMessage)
-	return err
-}
-
-func (m *Messenger) HandleSyncSocialLinks(state *ReceivedMessageState, message *protobuf.SyncSocialLinks, statusMessage *v1protocol.StatusMessage) error {
-	return m.handleSyncSocialLinks(message, func(links identity.SocialLinks) {
-		state.Response.SocialLinksInfo = &identity.SocialLinksInfo{
-			Links:   links,
-			Removed: len(links) == 0,
-		}
-	})
-}
-
-func (m *Messenger) handleSyncSocialLinks(message *protobuf.SyncSocialLinks, callback func(identity.SocialLinks)) error {
-	if message == nil {
-		return nil
-	}
-	var (
-		links identity.SocialLinks
-		err   error
-	)
-	for _, sl := range message.SocialLinks {
-		link := &identity.SocialLink{
-			Text: sl.Text,
-			URL:  sl.Url,
-		}
-		err = ValidateSocialLink(link)
-		if err != nil {
-			return err
-		}
-
-		links = append(links, link)
-	}
-
-	err = m.settings.AddOrReplaceSocialLinksIfNewer(links, message.Clock)
-	if err != nil {
-		if err == sociallinkssettings.ErrOlderSocialLinksProvided {
-			return nil
-		}
-		return err
-	}
-
-	callback(links)
-
-	return nil
 }
 
 func (m *Messenger) GetDeleteForMeMessages() ([]*protobuf.SyncDeleteForMeMessage, error) {

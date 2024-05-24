@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/wakusync"
@@ -172,13 +171,6 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 			}
 			response.SetImages(idImages)
 		}
-	}
-
-	err = m.handleSyncSocialLinks(message.SocialLinks, func(links identity.SocialLinks) {
-		response.SetSocialLinks(links)
-	})
-	if err != nil {
-		return err
 	}
 
 	profileShowcasePreferences, err := m.saveProfileShowcasePreferencesProto(message.ProfileShowcasePreferences, false)

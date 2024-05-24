@@ -390,7 +390,7 @@ message BackedUpProfile {
   string display_name = 2;
   uint64 display_name_clock = 3;
   repeated SyncProfilePicture pictures = 4;
-  SyncSocialLinks social_links = 5;
+  SyncSocialLinks social_links = 5 [deprecated = true];
   repeated SyncEnsUsernameDetail ens_username_details = 6;
   SyncProfileShowcasePreferences profile_showcase_preferences = 7;
 }
@@ -420,6 +420,7 @@ message SyncKeycard {
 message SyncSocialLinks {
   repeated SocialLink social_links = 1;
   uint64 clock = 2;
+  option deprecated = true;
 }
 
 message SyncAccountCustomizationColor {

@@ -28,7 +28,6 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/peersyncing"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -3059,16 +3058,6 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci *protobuf
 
 		if contact.Bio != ci.Description {
 			contact.Bio = ci.Description
-			contactModified = true
-		}
-
-		socialLinks := identity.NewSocialLinks(ci.SocialLinks)
-		if err = ValidateSocialLinks(socialLinks); err != nil {
-			return err
-		}
-
-		if !contact.SocialLinks.Equal(socialLinks) {
-			contact.SocialLinks = socialLinks
 			contactModified = true
 		}
 
