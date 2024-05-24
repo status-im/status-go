@@ -1190,49 +1190,19 @@ func (w *Waku) Start() error {
 	go func() {
 		defer w.wg.Done()
 
+		healthUpdateTicker := time.NewTicker(time.Duration(w.cfg.PeerStatsUpdateInterval) * time.Second)
+		defer healthUpdateTicker.Stop()
+		var lastTopicHealth peermanager.TopicHealthStatus
+
 		isConnected := false
 		for {
 			select {
 			case <-w.ctx.Done():
 				return
 			case c := <-w.topicHealthStatusChan:
-				w.connStatusMu.Lock()
-
-				// TODO: https://github.com/status-im/status-go/issues/4628
-				// This code is not using the topic health status correctly.
-				// It assumes we are using a single pubsub topic for now
-
-				latestConnStatus := formatConnStatus(w.node, c)
-				w.logger.Debug("peer stats",
-					zap.Int("peersCount", len(latestConnStatus.Peers)),
-					zap.Any("stats", latestConnStatus))
-				for k, subs := range w.connStatusSubscriptions {
-					if !subs.Send(latestConnStatus) {
-						delete(w.connStatusSubscriptions, k)
-					}
-				}
-				w.connStatusMu.Unlock()
-				if w.onPeerStats != nil {
-					w.onPeerStats(latestConnStatus)
-				}
-
-				if w.cfg.EnableDiscV5 {
-					// Restarting DiscV5
-					if !latestConnStatus.IsOnline && isConnected {
-						w.logger.Info("Restarting DiscV5: offline and is connected")
-						isConnected = false
-						w.node.DiscV5().Stop()
-					} else if latestConnStatus.IsOnline && !isConnected {
-						w.logger.Info("Restarting DiscV5: online and is not connected")
-						isConnected = true
-						if w.node.DiscV5().ErrOnNotRunning() != nil {
-							err := w.node.DiscV5().Start(w.ctx)
-							if err != nil {
-								w.logger.Error("Could not start DiscV5", zap.Error(err))
-							}
-						}
-					}
-				}
+				lastTopicHealth = c
+			case <-healthUpdateTicker.C:
+				w.processConnStatusUpdate(isConnected, lastTopicHealth)
 			}
 		}
 	}()
@@ -1270,6 +1240,46 @@ func (w *Waku) Start() error {
 	go w.seedBootnodesForDiscV5()
 
 	return nil
+}
+
+func (w *Waku) processConnStatusUpdate(isConnected bool, lastTopicHealth peermanager.TopicHealthStatus) {
+	w.connStatusMu.Lock()
+
+	// TODO: https://github.com/status-im/status-go/issues/4628
+	// This code is not using the topic health status correctly.
+	// It assumes we are using a single pubsub topic for now
+
+	latestConnStatus := formatConnStatus(w.node, lastTopicHealth)
+	w.logger.Debug("peer stats",
+		zap.Int("peersCount", len(latestConnStatus.Peers)),
+		zap.Any("stats", latestConnStatus))
+	for k, subs := range w.connStatusSubscriptions {
+		if !subs.Send(latestConnStatus) {
+			delete(w.connStatusSubscriptions, k)
+		}
+	}
+	w.connStatusMu.Unlock()
+	if w.onPeerStats != nil {
+		w.onPeerStats(latestConnStatus)
+	}
+
+	if w.cfg.EnableDiscV5 {
+		// Restarting DiscV5
+		if !latestConnStatus.IsOnline && isConnected {
+			w.logger.Info("Restarting DiscV5: offline and is connected")
+			isConnected = false
+			w.node.DiscV5().Stop()
+		} else if latestConnStatus.IsOnline && !isConnected {
+			w.logger.Info("Restarting DiscV5: online and is not connected")
+			isConnected = true
+			if w.node.DiscV5().ErrOnNotRunning() != nil {
+				err := w.node.DiscV5().Start(w.ctx)
+				if err != nil {
+					w.logger.Error("Could not start DiscV5", zap.Error(err))
+				}
+			}
+		}
+	}
 }
 
 func (w *Waku) setupRelaySubscriptions() error {

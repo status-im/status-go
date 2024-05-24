@@ -66,6 +66,7 @@ type Config struct {
 	ClusterID                uint16           `toml:",omitempty"`
 	EnableConfirmations      bool             `toml:",omitempty"` // Enable sending message confirmations
 	SkipPublishToTopic       bool             `toml:",omitempty"` // Used in testing
+	PeerStatsUpdateInterval  uint             `toml:",omitempty"`
 }
 
 func (c *Config) Validate(logger *zap.Logger) error {
@@ -118,6 +119,10 @@ func setDefaults(cfg *Config) *Config {
 
 	if cfg.MinPeersForFilter == 0 {
 		cfg.MinPeersForFilter = DefaultConfig.MinPeersForFilter
+	}
+
+	if cfg.PeerStatsUpdateInterval == 0 {
+		cfg.PeerStatsUpdateInterval = 5
 	}
 
 	if cfg.DefaultShardPubsubTopic == "" {

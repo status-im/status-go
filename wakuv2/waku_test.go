@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
 	"os"
 	"testing"
@@ -383,6 +384,36 @@ func TestWakuV2Filter(t *testing.T) {
 	require.Greater(t, len(stats[filterID]), 0)
 
 	require.NoError(t, w.Stop())
+}
+
+func TestWakuV2PeerUpdateInterval(t *testing.T) {
+	// Configuration for the first Waku node
+	config1 := &Config{
+		Port:                    0,
+		EnableDiscV5:            false,
+		DiscoveryLimit:          20,
+		EnableStore:             false,
+		StoreCapacity:           100,
+		StoreSeconds:            3600,
+		KeepAliveInterval:       10,
+		PeerStatsUpdateInterval: 1,
+	}
+
+	updateCnt := 0
+	// Start the first Waku node
+	w1, err := New(nil, "", config1, nil, nil, nil, nil, func(cs types.ConnStatus) {
+		updateCnt++
+	})
+	require.NoError(t, err)
+	require.NoError(t, w1.Start())
+
+	defer func() {
+		require.NoError(t, w1.Stop())
+	}()
+	nSeconds := 5
+	time.Sleep(time.Duration(nSeconds) * time.Second)
+	fmt.Println("### cnt: ", zap.Int("cnt", updateCnt))
+	require.True(t, updateCnt < nSeconds)
 }
 
 func TestWakuV2Store(t *testing.T) {
