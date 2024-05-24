@@ -1,11 +1,22 @@
 package router
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
+	"go.uber.org/zap"
 )
+
+var logger *zap.Logger
+
+func init() {
+	var err error
+	logger, err = zap.NewProduction()
+	if err != nil {
+		panic(err)
+	}
+}
 
 func filterRoutesV2(routes [][]*PathV2, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) [][]*PathV2 {
 	if len(fromLockedAmount) == 0 {
@@ -40,16 +51,18 @@ func filterNetworkComplianceV2(routes [][]*PathV2, fromLockedAmount map[uint64]*
 
 // isValidForNetworkComplianceV2 checks if a route complies with network inclusion/exclusion criteria.
 func isValidForNetworkComplianceV2(route []*PathV2, fromIncluded, fromExcluded map[uint64]bool) bool {
-	fmt.Printf("Initial fromIncluded: %+v\n", fromIncluded)
-	fmt.Printf("Initial fromExcluded: %+v\n", fromExcluded)
+	logger.Debug("Initial inclusion/exclusion maps",
+		zap.Any("fromIncluded", fromIncluded),
+		zap.Any("fromExcluded", fromExcluded),
+	)
 
 	for _, path := range route {
 		if path == nil || path.From == nil {
-			fmt.Printf("Invalid path: %+v\n", path)
+			logger.Debug("Invalid path", zap.Any("path", path))
 			return false
 		}
 		if _, ok := fromExcluded[path.From.ChainID]; ok {
-			fmt.Printf("Excluded chain ID: %d\n", path.From.ChainID)
+			logger.Debug("Excluded chain ID", zap.Uint64("chainID", path.From.ChainID))
 			return false
 		}
 		if _, ok := fromIncluded[path.From.ChainID]; ok {
@@ -57,11 +70,11 @@ func isValidForNetworkComplianceV2(route []*PathV2, fromIncluded, fromExcluded m
 		}
 	}
 
-	fmt.Printf("fromIncluded after loop: %+v\n", fromIncluded)
+	logger.Debug("fromIncluded after loop", zap.Any("fromIncluded", fromIncluded))
 
 	for chainID, included := range fromIncluded {
 		if !included {
-			fmt.Printf("Missing included chain ID: %d\n", chainID)
+			logger.Debug("Missing included chain ID", zap.Uint64("chainID", chainID))
 			return false
 		}
 	}
@@ -103,16 +116,16 @@ func hasSufficientCapacityV2(route []*PathV2, amountIn *big.Int, fromLockedAmoun
 			requiredAmountIn := new(big.Int).Sub(amountIn, amount.ToInt())
 			restAmountIn := calculateRestAmountInV2(route, path)
 
-			fmt.Printf("Checking path: %+v\n", path)
-			fmt.Printf("Required amount in: %s\n", requiredAmountIn.String())
-			fmt.Printf("Rest amount in: %s\n", restAmountIn.String())
+			logger.Debug("Checking path", zap.Any("path", path))
+			logger.Debug("Required amount in", zap.String("requiredAmountIn", requiredAmountIn.String()))
+			logger.Debug("Rest amount in", zap.String("restAmountIn", restAmountIn.String()))
 
 			if restAmountIn.Cmp(requiredAmountIn) >= 0 {
 				path.AmountIn = amount
 				path.AmountInLocked = true
-				fmt.Printf("Path has sufficient capacity: %+v\n", path)
+				logger.Debug("Path has sufficient capacity", zap.Any("path", path))
 			} else {
-				fmt.Printf("Path does not have sufficient capacity: %+v\n", path)
+				logger.Debug("Path does not have sufficient capacity", zap.Any("path", path))
 				return false
 			}
 		}
