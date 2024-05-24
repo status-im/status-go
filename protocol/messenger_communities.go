@@ -590,6 +590,10 @@ func (m *Messenger) HandleCommunityEncryptionKeysRequest(state *ReceivedMessageS
 	return m.handleCommunityEncryptionKeysRequest(community, signer)
 }
 
+func (m *Messenger) HandleCommunityTokenAction(state *ReceivedMessageState, message *protobuf.CommunityTokenAction, statusMessage *v1protocol.StatusMessage) error {
+	return m.communityTokensService.ProcessCommunityTokenAction(message)
+}
+
 func (m *Messenger) handleCommunityEncryptionKeysRequest(community *communities.Community, signer *ecdsa.PublicKey) error {
 	if !community.HasMember(signer) {
 		return communities.ErrMemberNotFound
@@ -1605,6 +1609,57 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 	response.AddCommunity(community)
 
 	return response, nil
+}
+
+func (m *Messenger) PublishTokenActionToPrivilegedMembers(communityID []byte, chainID uint64, contractAddress string, actionType protobuf.CommunityTokenAction_ActionType) error {
+
+	community, err := m.communitiesManager.GetByID(communityID)
+	if err != nil {
+		return err
+	}
+
+	tokenActionProto := &protobuf.CommunityTokenAction{
+		ChainId:         chainID,
+		ContractAddress: contractAddress,
+		ActionType:      actionType,
+	}
+
+	payload, err := proto.Marshal(tokenActionProto)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		Payload:      payload,
+		CommunityID:  community.ID(),
+		ResendType:   common.ResendTypeRawMessage,
+		ResendMethod: common.ResendMethodSendPrivate,
+		MessageType:  protobuf.ApplicationMetadataMessage_COMMUNITY_TOKEN_ACTION,
+		PubsubTopic:  community.PubsubTopic(),
+	}
+
+	skipMembers := make(map[string]struct{})
+	skipMembers[common.PubkeyToHex(&m.identity.PublicKey)] = struct{}{}
+	privilegedMembers := community.GetFilteredPrivilegedMembers(skipMembers)
+
+	allRecipients := privilegedMembers[protobuf.CommunityMember_ROLE_OWNER]
+	allRecipients = append(allRecipients, privilegedMembers[protobuf.CommunityMember_ROLE_TOKEN_MASTER]...)
+
+	for _, recipient := range allRecipients {
+		_, err := m.sender.SendPrivate(context.Background(), recipient, &rawMessage)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(allRecipients) > 0 {
+		rawMessage.Recipients = allRecipients
+		if _, err = m.UpsertRawMessageToWatch(&rawMessage); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (m *Messenger) GetRevealedAccounts(communityID types.HexBytes, memberPk string) ([]*protobuf.RevealedAccount, error) {
