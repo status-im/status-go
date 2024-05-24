@@ -888,10 +888,6 @@ func (m *Manager) JoinedAndPendingCommunitiesWithRequests() ([]*Community, error
 	return m.persistence.JoinedAndPendingCommunitiesWithRequests(&m.identity.PublicKey)
 }
 
-func (m *Manager) LeftCommunities() ([]*Community, error) {
-	return m.persistence.LeftCommunities(&m.identity.PublicKey)
-}
-
 func (m *Manager) DeletedCommunities() ([]*Community, error) {
 	return m.persistence.DeletedCommunities(&m.identity.PublicKey)
 }
