@@ -81,7 +81,7 @@ func (n *testNode) PeersCount() int {
 	return 1
 }
 
-func (s *MessengerSuite) TestInit() {
+func (s *MessengerSuite) TestInitFilters() {
 	testCases := []struct {
 		Name         string
 		Prep         func()
@@ -174,7 +174,7 @@ func (s *MessengerSuite) TestInit() {
 	for _, tc := range testCases {
 		s.Run(tc.Name, func() {
 			tc.Prep()
-			err := s.m.Init()
+			err := s.m.InitFilters()
 			s.Require().NoError(err)
 			filters := s.m.transport.Filters()
 			expectedFilters += tc.AddedFilters

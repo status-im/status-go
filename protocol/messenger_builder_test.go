@@ -106,7 +106,12 @@ func newTestMessenger(waku types.Waku, config testMessengerConfig) (*Messenger, 
 		m.retrievedMessagesIteratorFactory = config.messagesOrderController.newMessagesIterator
 	}
 
-	err = m.Init()
+	err = m.InitInstallations()
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.InitFilters()
 	if err != nil {
 		return nil, err
 	}

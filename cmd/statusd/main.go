@@ -287,9 +287,15 @@ func main() {
 				return
 			}
 
-			err = messenger.Init()
+			err = messenger.InitInstallations()
 			if err != nil {
-				logger.Error("failed to init messenger", "error", err)
+				logger.Error("failed to init messenger installations", "error", err)
+				return
+			}
+
+			err = messenger.InitFilters()
+			if err != nil {
+				logger.Error("failed to init messenger filters", "error", err)
 				return
 			}
 
@@ -424,11 +430,11 @@ func printUsage() {
 	usage := `
 Usage: statusd [options]
 Examples:
-  statusd                                        # run regular Whisper node that joins Status network
-  statusd -c ./default.json                      # run node with configuration specified in ./default.json file
-  statusd -c ./default.json -c ./standalone.json # run node with configuration specified in ./default.json file, after merging ./standalone.json file
-  statusd -c ./default.json -metrics             # run node with configuration specified in ./default.json file, and expose ethereum metrics with debug_metrics jsonrpc call
-  statusd -c ./default.json -log DEBUG --seed-phrase="test test test test test test test test test test test junk" --password=password # run node with configuration specified in ./default.json file, and import account with seed phrase and password
+	statusd                                        # run regular Whisper node that joins Status network
+	statusd -c ./default.json                      # run node with configuration specified in ./default.json file
+	statusd -c ./default.json -c ./standalone.json # run node with configuration specified in ./default.json file, after merging ./standalone.json file
+	statusd -c ./default.json -metrics             # run node with configuration specified in ./default.json file, and expose ethereum metrics with debug_metrics jsonrpc call
+	statusd -c ./default.json -log DEBUG --seed-phrase="test test test test test test test test test test test junk" --password=password # run node with configuration specified in ./default.json file, and import account with seed phrase and password
 
 Options:
 `
