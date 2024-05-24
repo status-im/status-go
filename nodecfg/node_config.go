@@ -802,6 +802,16 @@ func SetLogLevel(db *sql.DB, logLevel string) error {
 	return err
 }
 
+func SetMaxLogBackups(db *sql.DB, maxLogBackups uint) error {
+	_, err := db.Exec(`UPDATE log_config SET max_backups = ?`, maxLogBackups)
+	return err
+}
+
+func SaveNewWakuNode(db *sql.DB, nodeAddress string) error {
+	_, err := db.Exec(`INSERT OR REPLACE INTO cluster_nodes (node, type, synthetic_id) VALUES (?, ?, 'id')`, nodeAddress, WakuNodes)
+	return err
+}
+
 func SetWakuV2CustomNodes(db *sql.DB, customNodes map[string]string) error {
 	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {

@@ -1773,8 +1773,16 @@ func (api *PublicAPI) SetLogLevel(request *requests.SetLogLevel) error {
 	return api.service.messenger.SetLogLevel(request)
 }
 
+func (api *PublicAPI) SetMaxLogBackups(request *requests.SetMaxLogBackups) error {
+	return api.service.messenger.SetMaxLogBackups(request)
+}
+
 func (api *PublicAPI) SetCustomNodes(request *requests.SetCustomNodes) error {
 	return api.service.messenger.SetCustomNodes(request)
+}
+
+func (api *PublicAPI) SaveNewWakuNode(request *requests.SaveNewWakuNode) error {
+	return api.service.messenger.SaveNewWakuNode(request)
 }
 
 func (api *PublicAPI) SetCustomizationColor(ctx context.Context, request *requests.SetCustomizationColor) error {
