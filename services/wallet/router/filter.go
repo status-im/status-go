@@ -75,7 +75,7 @@ func setupRouteValidationMapsV2(fromLockedAmount map[uint64]*hexutil.Big) (map[u
 	fromExcluded := make(map[uint64]bool)
 
 	for chainID, amount := range fromLockedAmount {
-		if amount.ToInt().Cmp(zero) == 0 {
+		if amount.ToInt().Cmp(zero) <= 0 {
 			fromExcluded[chainID] = false
 		} else {
 			fromIncluded[chainID] = false
