@@ -835,6 +835,10 @@ loop:
 	return result
 }
 
+func (m *Messenger) DisableStoreNodes() {
+	m.featureFlags.StoreNodesDisabled = true
+}
+
 func (m *Messenger) processMailserverBatch(ms mailservers.Mailserver, batch MailserverBatch) error {
 	if m.featureFlags.StoreNodesDisabled {
 		return nil

@@ -154,6 +154,8 @@ func main() {
 
 	wakuext := waku2extn.NewPublicAPI(wakuextservice)
 
+	messenger := wakuext.Messenger()
+	messenger.DisableStoreNodes()
 	// This will start the push notification server as well as
 	// the config is set to Enabled
 	_, err = wakuext.StartMessenger()
@@ -162,7 +164,7 @@ func main() {
 		return
 	}
 
-	retrieveMessagesLoop(wakuext.Messenger(), 300*time.Millisecond)
+	retrieveMessagesLoop(messenger, 300*time.Millisecond)
 
 }
 
