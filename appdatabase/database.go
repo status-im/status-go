@@ -25,7 +25,6 @@ import (
 const nodeCfgMigrationDate = 1640111208
 
 var customSteps = []*sqlite.PostStep{
-	{Version: 1662365868, CustomMigration: fixMissingKeyUIDForAccounts},
 	{Version: 1674136690, CustomMigration: migrateEnsUsernames},
 	{Version: 1686048341, CustomMigration: migrateWalletJSONBlobs, RollBackVersion: 1686041510},
 	{Version: 1687193315, CustomMigration: migrateWalletTransferFromToAddresses, RollBackVersion: 1686825075},
@@ -58,8 +57,12 @@ func doMigration(db *sql.DB) error {
 		}
 	}
 
+	postSteps := []*sqlite.PostStep{
+		{Version: 1662365868, CustomMigration: fixMissingKeyUIDForAccounts},
+	}
+	postSteps = append(postSteps, customSteps...)
 	// Run all the new migrations
-	err = migrations.Migrate(db, customSteps)
+	err = migrations.Migrate(db, postSteps)
 	if err != nil {
 		return err
 	}
