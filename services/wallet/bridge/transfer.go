@@ -21,10 +21,10 @@ import (
 
 type TransferBridge struct {
 	rpcClient  *rpc.Client
-	transactor *transactions.Transactor
+	transactor transactions.TransactorIface
 }
 
-func NewTransferBridge(rpcClient *rpc.Client, transactor *transactions.Transactor) *TransferBridge {
+func NewTransferBridge(rpcClient *rpc.Client, transactor transactions.TransactorIface) *TransferBridge {
 	return &TransferBridge{rpcClient: rpcClient, transactor: transactor}
 }
 

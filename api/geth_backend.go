@@ -18,6 +18,7 @@ import (
 
 	"github.com/imdario/mergo"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -1950,7 +1951,12 @@ func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs 
 }
 
 func (b *GethStatusBackend) SendTransactionWithSignature(sendArgs transactions.SendTxArgs, sig []byte) (hash types.Hash, err error) {
-	return b.transactor.BuildTransactionAndSendWithSignature(b.transactor.NetworkID(), sendArgs, sig)
+	txWithSignature, err := b.transactor.BuildTransactionWithSignature(b.transactor.NetworkID(), sendArgs, sig)
+	if err != nil {
+		return hash, err
+	}
+
+	return b.transactor.SendTransactionWithSignature(common.Address(sendArgs.From), sendArgs.Symbol, sendArgs.MultiTransactionID, txWithSignature)
 }
 
 // HashTransaction validate the transaction and returns new sendArgs and the transaction hash.

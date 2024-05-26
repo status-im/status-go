@@ -23,7 +23,7 @@ func (tm *TransactionManager) UpdateMultiTransaction(multiTransaction *MultiTran
 	return tm.storage.UpdateMultiTransaction(multiTransaction)
 }
 
-func (tm *TransactionManager) CreateMultiTransactionFromCommand(ctx context.Context, command *MultiTransactionCommand,
+func (tm *TransactionManager) CreateMultiTransactionFromCommand(command *MultiTransactionCommand,
 	data []*bridge.TransactionBridge) (*MultiTransaction, error) {
 
 	multiTransaction := multiTransactionFromCommand(command)
@@ -107,7 +107,7 @@ func (tm *TransactionManager) ProceedWithTransactionsSignatures(ctx context.Cont
 }
 
 func (tm *TransactionManager) GetMultiTransactions(ctx context.Context, ids []wallet_common.MultiTransactionIDType) ([]*MultiTransaction, error) {
-	return tm.storage.ReadMultiTransactions(ids)
+	return tm.storage.ReadMultiTransactions(&MultiTxDetails{IDs: ids})
 }
 
 func (tm *TransactionManager) GetBridgeOriginMultiTransaction(ctx context.Context, toChainID uint64, crossTxID string) (*MultiTransaction, error) {
@@ -115,7 +115,7 @@ func (tm *TransactionManager) GetBridgeOriginMultiTransaction(ctx context.Contex
 	details.ToChainID = toChainID
 	details.CrossTxID = crossTxID
 
-	multiTxs, err := tm.storage.ReadMultiTransactionsByDetails(details)
+	multiTxs, err := tm.storage.ReadMultiTransactions(details)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (tm *TransactionManager) GetBridgeDestinationMultiTransaction(ctx context.C
 	details.ToChainID = toChainID
 	details.CrossTxID = crossTxID
 
-	multiTxs, err := tm.storage.ReadMultiTransactionsByDetails(details)
+	multiTxs, err := tm.storage.ReadMultiTransactions(details)
 	if err != nil {
 		return nil, err
 	}

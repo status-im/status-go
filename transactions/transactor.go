@@ -44,6 +44,19 @@ func (e *ErrBadNonce) Error() string {
 	return fmt.Sprintf("bad nonce. expected %d, got %d", e.expectedNonce, e.nonce)
 }
 
+// Transactor is an interface that defines the methods for validating and sending transactions.
+type TransactorIface interface {
+	NextNonce(rpcClient *rpc.Client, chainID uint64, from types.Address) (uint64, error)
+	EstimateGas(network *params.Network, from common.Address, to common.Address, value *big.Int, input []byte) (uint64, error)
+	SendTransaction(sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error)
+	SendTransactionWithChainID(chainID uint64, sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error)
+	ValidateAndBuildTransaction(chainID uint64, sendArgs SendTxArgs) (tx *gethtypes.Transaction, err error)
+	AddSignatureToTransaction(chainID uint64, tx *gethtypes.Transaction, sig []byte) (*gethtypes.Transaction, error)
+	SendRawTransaction(chainID uint64, rawTx string) error
+	BuildTransactionWithSignature(chainID uint64, args SendTxArgs, sig []byte) (*gethtypes.Transaction, error)
+	SendTransactionWithSignature(from common.Address, symbol string, multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) (hash types.Hash, err error)
+}
+
 // Transactor validates, signs transactions.
 // It uses upstream to propagate transactions to the Ethereum network.
 type Transactor struct {
@@ -218,29 +231,9 @@ func (t *Transactor) SendTransactionWithSignature(from common.Address, symbol st
 	return t.sendTransaction(rpcWrapper, from, symbol, multiTransactionID, tx)
 }
 
-func (t *Transactor) AddSignatureToTransactionAndSend(chainID uint64, from common.Address, symbol string,
-	multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction, sig []byte) (hash types.Hash, err error) {
-	txWithSignature, err := t.AddSignatureToTransaction(chainID, tx, sig)
-	if err != nil {
-		return hash, err
-	}
-
-	return t.SendTransactionWithSignature(from, symbol, multiTransactionID, txWithSignature)
-}
-
-// BuildTransactionAndSendWithSignature receive a transaction and a signature, serialize them together and propage it to the network.
+// BuildTransactionAndSendWithSignature receive a transaction and a signature, serialize them together
 // It's different from eth_sendRawTransaction because it receives a signature and not a serialized transaction with signature.
 // Since the transactions is already signed, we assume it was validated and used the right nonce.
-func (t *Transactor) BuildTransactionAndSendWithSignature(chainID uint64, args SendTxArgs, sig []byte) (hash types.Hash, err error) {
-	txWithSignature, err := t.BuildTransactionWithSignature(chainID, args, sig)
-	if err != nil {
-		return hash, err
-	}
-
-	hash, err = t.SendTransactionWithSignature(common.Address(args.From), args.Symbol, args.MultiTransactionID, txWithSignature)
-	return hash, err
-}
-
 func (t *Transactor) BuildTransactionWithSignature(chainID uint64, args SendTxArgs, sig []byte) (*gethtypes.Transaction, error) {
 	if !args.Valid() {
 		return nil, ErrInvalidSendTxArgs

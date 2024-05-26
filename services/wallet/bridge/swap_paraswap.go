@@ -28,10 +28,10 @@ type SwapTxArgs struct {
 type SwapParaswap struct {
 	paraswapClient *paraswap.ClientV5
 	priceRoute     paraswap.Route
-	transactor     *transactions.Transactor
+	transactor     transactions.TransactorIface
 }
 
-func NewSwapParaswap(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *walletToken.Manager) *SwapParaswap {
+func NewSwapParaswap(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *walletToken.Manager) *SwapParaswap {
 	return &SwapParaswap{
 		paraswapClient: paraswap.NewClientV5(walletCommon.EthereumMainnet),
 		transactor:     transactor,

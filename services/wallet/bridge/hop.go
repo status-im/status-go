@@ -107,14 +107,14 @@ func (bf *BonderFee) UnmarshalJSON(data []byte) error {
 }
 
 type HopBridge struct {
-	transactor    *transactions.Transactor
+	transactor    transactions.TransactorIface
 	httpClient    *thirdparty.HTTPClient
 	tokenManager  *token.Manager
 	contractMaker *contracts.ContractMaker
 	bonderFee     *BonderFee
 }
 
-func NewHopBridge(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager) *HopBridge {
+func NewHopBridge(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *token.Manager) *HopBridge {
 	return &HopBridge{
 		contractMaker: &contracts.ContractMaker{RPCClient: rpcClient},
 		httpClient:    thirdparty.NewHTTPClient(),

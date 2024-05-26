@@ -178,7 +178,7 @@ func (tm *TransactionManager) removeMultiTransactionByAddress(address common.Add
 
 	details := NewMultiTxDetails()
 	details.FromAddress = address
-	mtxs, err := tm.storage.ReadMultiTransactionsByDetails(details)
+	mtxs, err := tm.storage.ReadMultiTransactions(details)
 
 	ids := make([]wallet_common.MultiTransactionIDType, 0)
 	for _, mtx := range mtxs {

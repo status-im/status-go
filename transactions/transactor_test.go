@@ -313,11 +313,18 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 					Return(common.Hash{}, nil)
 			}
 
-			_, err = s.manager.BuildTransactionAndSendWithSignature(s.nodeConfig.NetworkID, args, sig)
+			tx, err = s.manager.BuildTransactionWithSignature(s.nodeConfig.NetworkID, args, sig)
 			if scenario.expectError {
 				s.Error(err)
 			} else {
 				s.NoError(err)
+
+				_, err = s.manager.SendTransactionWithSignature(common.Address(args.From), args.Symbol, args.MultiTransactionID, tx)
+				if scenario.expectError {
+					s.Error(err)
+				} else {
+					s.NoError(err)
+				}
 			}
 		})
 	}
@@ -325,7 +332,7 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 
 func (s *TransactorSuite) TestSendTransactionWithSignature_InvalidSignature() {
 	args := SendTxArgs{}
-	_, err := s.manager.BuildTransactionAndSendWithSignature(1, args, []byte{})
+	_, err := s.manager.BuildTransactionWithSignature(1, args, []byte{})
 	s.Equal(ErrInvalidSignatureSize, err)
 }
 

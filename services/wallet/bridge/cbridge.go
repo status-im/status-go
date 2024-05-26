@@ -43,13 +43,13 @@ type CBridgeTxArgs struct {
 type CBridge struct {
 	rpcClient          *rpc.Client
 	httpClient         *thirdparty.HTTPClient
-	transactor         *transactions.Transactor
+	transactor         transactions.TransactorIface
 	tokenManager       *token.Manager
 	prodTransferConfig *cbridge.GetTransferConfigsResponse
 	testTransferConfig *cbridge.GetTransferConfigsResponse
 }
 
-func NewCbridge(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager) *CBridge {
+func NewCbridge(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *token.Manager) *CBridge {
 	return &CBridge{
 		rpcClient:    rpcClient,
 		httpClient:   thirdparty.NewHTTPClient(),
