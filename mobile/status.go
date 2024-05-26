@@ -1002,8 +1002,8 @@ func GetPasswordStrengthScore(paramsJSON string) string {
 }
 
 type FleetDescription struct {
-	DefaultFleet string              `json:"defaultFleet"`
-	Fleets       map[string][]string `json:"fleets"`
+	DefaultFleet string                         `json:"defaultFleet"`
+	Fleets       map[string]map[string][]string `json:"fleets"`
 }
 
 func Fleets() string {

@@ -324,6 +324,8 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string) 
 	mu := sync.Mutex{}
 	var result []*enode.Node
 
+	w.seededBootnodesForDiscV5 = true
+
 	retrieveENR := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -343,7 +345,11 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string) 
 			wg.Add(1)
 			go func(addr string) {
 				defer wg.Done()
-				w.dnsDiscover(ctx, addr, retrieveENR)
+				if err := w.dnsDiscover(ctx, addr, retrieveENR); err != nil {
+					mu.Lock()
+					w.seededBootnodesForDiscV5 = false
+					mu.Unlock()
+				}
 			}(addrString)
 		} else {
 			// It's a normal enr
@@ -356,14 +362,12 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string) 
 	}
 	wg.Wait()
 
-	w.seededBootnodesForDiscV5 = len(result) > 0
-
 	return result, nil
 }
 
 type fnApplyToEachPeer func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup)
 
-func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnApplyToEachPeer) {
+func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnApplyToEachPeer) error {
 	w.logger.Info("retrieving nodes", zap.String("enr", enrtreeAddress))
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
@@ -387,7 +391,7 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 		discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrtreeAddress, opts...)
 		if err != nil {
 			w.logger.Warn("dns discovery error ", zap.Error(err))
-			return
+			return err
 		}
 
 		if len(discoveredNodes) != 0 {
@@ -402,6 +406,8 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 		apply(d, wg)
 	}
 	wg.Wait()
+
+	return nil
 }
 
 func (w *Waku) discoverAndConnectPeers() error {
@@ -416,7 +422,11 @@ func (w *Waku) discoverAndConnectPeers() error {
 		addrString := addrString
 		if strings.HasPrefix(addrString, "enrtree://") {
 			// Use DNS Discovery
-			go w.dnsDiscover(w.ctx, addrString, fnApply)
+			go func() {
+				if err := w.dnsDiscover(w.ctx, addrString, fnApply); err != nil {
+					w.logger.Error("could not obtain dns discovery peers for ClusterConfig.WakuNodes", zap.Error(err), zap.String("dnsDiscURL", addrString))
+				}
+			}()
 		} else {
 			// It is a normal multiaddress
 			addr, err := multiaddr.NewMultiaddr(addrString)
