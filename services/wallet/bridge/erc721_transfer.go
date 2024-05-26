@@ -29,10 +29,10 @@ type ERC721TransferTxArgs struct {
 
 type ERC721TransferBridge struct {
 	rpcClient  *rpc.Client
-	transactor *transactions.Transactor
+	transactor transactions.TransactorIface
 }
 
-func NewERC721TransferBridge(rpcClient *rpc.Client, transactor *transactions.Transactor) *ERC721TransferBridge {
+func NewERC721TransferBridge(rpcClient *rpc.Client, transactor transactions.TransactorIface) *ERC721TransferBridge {
 	return &ERC721TransferBridge{rpcClient: rpcClient, transactor: transactor}
 }
 

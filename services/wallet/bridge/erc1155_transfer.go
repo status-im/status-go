@@ -30,10 +30,10 @@ type ERC1155TransferTxArgs struct {
 
 type ERC1155TransferBridge struct {
 	rpcClient  *rpc.Client
-	transactor *transactions.Transactor
+	transactor transactions.TransactorIface
 }
 
-func NewERC1155TransferBridge(rpcClient *rpc.Client, transactor *transactions.Transactor) *ERC1155TransferBridge {
+func NewERC1155TransferBridge(rpcClient *rpc.Client, transactor transactions.TransactorIface) *ERC1155TransferBridge {
 	return &ERC1155TransferBridge{rpcClient: rpcClient, transactor: transactor}
 }
 

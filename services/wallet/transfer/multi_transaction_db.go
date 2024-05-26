@@ -9,20 +9,38 @@ import (
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 )
 
-// DO NOT CREATE IT MANUALLY! Use NewMultiTxDetails() instead
+// Since we already use MultitransactionIDType in DB, and its default value is 0 (Send)
+// this type is used to with default value 0 to represent invalid type to avoid bugs
+// when devs forget to call NewMultiTxDetails()
+type MultiTransactionDBType MultiTransactionType
+
+const (
+	MultiTransactionDBTypeInvalid = 0
+	MultiTransactionDBSend        = iota
+	MultiTransactionDBSwap
+	MultiTransactionDBBridge
+)
+
+func mtDBTypeToMTType(mtDBType MultiTransactionDBType) MultiTransactionType {
+	if mtDBType == MultiTransactionDBTypeInvalid {
+		return MultiTransactionTypeInvalid
+	}
+
+	return MultiTransactionType(mtDBType - 1)
+}
+
 type MultiTxDetails struct {
+	IDs         []wallet_common.MultiTransactionIDType
 	AnyAddress  common.Address
 	FromAddress common.Address
 	ToAddress   common.Address
 	ToChainID   uint64
 	CrossTxID   string
-	Type        MultiTransactionType
+	Type        MultiTransactionDBType
 }
 
 func NewMultiTxDetails() *MultiTxDetails {
-	details := &MultiTxDetails{}
-	details.Type = MultiTransactionTypeInvalid
-	return details
+	return &MultiTxDetails{}
 }
 
 type MultiTransactionDB struct {
@@ -65,34 +83,7 @@ func (mtDB *MultiTransactionDB) CreateMultiTransaction(multiTransaction *MultiTr
 	return err
 }
 
-func (mtDB *MultiTransactionDB) ReadMultiTransactions(ids []wallet_common.MultiTransactionIDType) ([]*MultiTransaction, error) {
-	placeholders := make([]string, len(ids))
-	args := make([]interface{}, len(ids))
-	for i, v := range ids {
-		placeholders[i] = "?"
-		args[i] = v
-	}
-
-	stmt, err := mtDB.db.Prepare(fmt.Sprintf(`SELECT %s
-											FROM multi_transactions
-											WHERE id in (%s)`,
-		selectMultiTransactionColumns,
-		strings.Join(placeholders, ",")))
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
-
-	rows, err := stmt.Query(args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	return rowsToMultiTransactions(rows)
-}
-
-func (mtDB *MultiTransactionDB) ReadMultiTransactionsByDetails(details *MultiTxDetails) ([]*MultiTransaction, error) {
+func (mtDB *MultiTransactionDB) ReadMultiTransactions(details *MultiTxDetails) ([]*MultiTransaction, error) {
 	if details == nil {
 		return nil, fmt.Errorf("details is nil")
 	}
@@ -101,6 +92,14 @@ func (mtDB *MultiTransactionDB) ReadMultiTransactionsByDetails(details *MultiTxD
 
 	args := []interface{}{}
 
+	if len(details.IDs) > 0 {
+		placeholders := make([]string, len(details.IDs))
+		for i, v := range details.IDs {
+			placeholders[i] = "?"
+			args = append(args, v)
+		}
+		whereClause += fmt.Sprintf("id in (%s) AND ", strings.Join(placeholders, ","))
+	}
 	if (details.AnyAddress != common.Address{}) {
 		whereClause += "(from_address=? OR to_address=?) AND "
 		args = append(args, details.AnyAddress, details.AnyAddress)
@@ -121,9 +120,9 @@ func (mtDB *MultiTransactionDB) ReadMultiTransactionsByDetails(details *MultiTxD
 		whereClause += "cross_tx_id=? AND "
 		args = append(args, details.CrossTxID)
 	}
-	if details.Type != MultiTransactionTypeInvalid {
+	if details.Type != MultiTransactionDBTypeInvalid {
 		whereClause += "type=? AND "
-		args = append(args, details.Type)
+		args = append(args, mtDBTypeToMTType(details.Type))
 	}
 
 	stmt, err := mtDB.db.Prepare(fmt.Sprintf(`SELECT %s

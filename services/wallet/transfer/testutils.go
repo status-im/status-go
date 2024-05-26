@@ -37,6 +37,11 @@ type TestTransfer struct {
 	Token *token.Token
 }
 
+type TestCollectibleTransfer struct {
+	TestTransfer
+	TestCollectible
+}
+
 func SeedToToken(seed int) *token.Token {
 	tokenIndex := seed % len(TestTokens)
 	return TestTokens[tokenIndex]
@@ -77,6 +82,28 @@ func generateTestTransfer(seed int) TestTransfer {
 		Value:           int64(seed),
 		Token:           token,
 	}
+}
+
+// Will be used in tests to generate a collectible transfer
+// nolint:unused
+func generateTestCollectibleTransfer(seed int) TestCollectibleTransfer {
+	collectibleIndex := seed % len(TestCollectibles)
+	collectible := TestCollectibles[collectibleIndex]
+	tr := TestCollectibleTransfer{
+		TestTransfer: TestTransfer{
+			TestTransaction: generateTestTransaction(seed),
+			To:              eth_common.HexToAddress(fmt.Sprintf("0x3%d", seed)),
+			Value:           int64(seed),
+			Token: &token.Token{
+				Address: collectible.TokenAddress,
+				Name:    "Collectible",
+				ChainID: uint64(collectible.ChainID),
+			},
+		},
+		TestCollectible: collectible,
+	}
+	tr.TestTransaction.ChainID = collectible.ChainID
+	return tr
 }
 
 func GenerateTestSendMultiTransaction(tr TestTransfer) MultiTransaction {
@@ -422,21 +449,13 @@ func (s *InMemMultiTransactionStorage) DeleteMultiTransaction(id common.MultiTra
 	return nil
 }
 
-func (s *InMemMultiTransactionStorage) ReadMultiTransactions(ids []common.MultiTransactionIDType) ([]*MultiTransaction, error) {
-	var multiTxs []*MultiTransaction
-	for _, id := range ids {
-		multiTx, ok := s.storage[id]
-		if !ok {
-			continue
-		}
-		multiTxs = append(multiTxs, multiTx)
-	}
-	return multiTxs, nil
-}
-
-func (s *InMemMultiTransactionStorage) ReadMultiTransactionsByDetails(details *MultiTxDetails) ([]*MultiTransaction, error) {
+func (s *InMemMultiTransactionStorage) ReadMultiTransactions(details *MultiTxDetails) ([]*MultiTransaction, error) {
 	var multiTxs []*MultiTransaction
 	for _, multiTx := range s.storage {
+		if len(details.IDs) > 0 && !testutils.SliceContains(details.IDs, multiTx.ID) {
+			continue
+		}
+
 		if (details.AnyAddress != eth_common.Address{}) &&
 			(multiTx.FromAddress != details.AnyAddress && multiTx.ToAddress != details.AnyAddress) {
 			continue
@@ -454,7 +473,7 @@ func (s *InMemMultiTransactionStorage) ReadMultiTransactionsByDetails(details *M
 			continue
 		}
 
-		if details.Type != MultiTransactionTypeInvalid && multiTx.Type != details.Type {
+		if details.Type != MultiTransactionDBTypeInvalid && multiTx.Type != mtDBTypeToMTType(details.Type) {
 			continue
 		}
 

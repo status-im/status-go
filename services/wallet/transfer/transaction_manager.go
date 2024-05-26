@@ -36,7 +36,7 @@ type TransactionDescription struct {
 type TransactionManager struct {
 	storage        MultiTransactionStorage
 	gethManager    *account.GethManager
-	transactor     *transactions.Transactor
+	transactor     transactions.TransactorIface
 	config         *params.NodeConfig
 	accountsDB     *accounts.Database
 	pendingTracker *transactions.PendingTxTracker
@@ -49,8 +49,7 @@ type TransactionManager struct {
 
 type MultiTransactionStorage interface {
 	CreateMultiTransaction(tx *MultiTransaction) error
-	ReadMultiTransactions(ids []wallet_common.MultiTransactionIDType) ([]*MultiTransaction, error)
-	ReadMultiTransactionsByDetails(details *MultiTxDetails) ([]*MultiTransaction, error)
+	ReadMultiTransactions(details *MultiTxDetails) ([]*MultiTransaction, error)
 	UpdateMultiTransaction(tx *MultiTransaction) error
 	DeleteMultiTransaction(id wallet_common.MultiTransactionIDType) error
 }
@@ -58,7 +57,7 @@ type MultiTransactionStorage interface {
 func NewTransactionManager(
 	storage MultiTransactionStorage,
 	gethManager *account.GethManager,
-	transactor *transactions.Transactor,
+	transactor transactions.TransactorIface,
 	config *params.NodeConfig,
 	accountsDB *accounts.Database,
 	pendingTxManager *transactions.PendingTxTracker,

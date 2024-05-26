@@ -602,13 +602,13 @@ func (api *API) SendTransactionWithSignature(ctx context.Context, chainID uint64
 	if err != nil {
 		return hash, err
 	}
-	return api.s.transactionManager.SendTransactionWithSignature(chainID, txType, params, sig)
+	return api.s.transactionManager.SendTransactionWithSignature(chainID, params, sig)
 }
 
 func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionCommand *transfer.MultiTransactionCommand, data []*bridge.TransactionBridge, password string) (*transfer.MultiTransactionCommandResult, error) {
 	log.Debug("[WalletAPI:: CreateMultiTransaction] create multi transaction")
 
-	cmd, err := api.s.transactionManager.CreateMultiTransactionFromCommand(ctx, multiTransactionCommand, data)
+	cmd, err := api.s.transactionManager.CreateMultiTransactionFromCommand(multiTransactionCommand, data)
 	if err != nil {
 		return nil, err
 	}

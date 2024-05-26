@@ -32,7 +32,9 @@ func TestCreateMultiTransaction(t *testing.T) {
 	require.NoError(t, err)
 
 	// Add assertions here to verify the result of the CreateMultiTransaction method
-	mtx, err := mtDB.ReadMultiTransactions([]wallet_common.MultiTransactionIDType{multiTransaction.ID})
+	details := NewMultiTxDetails()
+	details.IDs = []wallet_common.MultiTransactionIDType{multiTransaction.ID}
+	mtx, err := mtDB.ReadMultiTransactions(details)
 	require.NoError(t, err)
 	require.Len(t, mtx, 1)
 	require.True(t, areMultiTransactionsEqual(&multiTransaction, mtx[0]))
@@ -50,6 +52,9 @@ func TestReadMultiTransactions(t *testing.T) {
 	tr3 := generateTestTransfer(3)
 	mt3 := GenerateTestSwapMultiTransaction(tr3, "SNT", 100)
 
+	require.NotEqual(t, mt1.ID, mt2.ID)
+	require.NotEqual(t, mt1.ID, mt3.ID)
+
 	err := mtDB.CreateMultiTransaction(&mt1)
 	require.NoError(t, err)
 	err = mtDB.CreateMultiTransaction(&mt2)
@@ -58,8 +63,9 @@ func TestReadMultiTransactions(t *testing.T) {
 	require.NoError(t, err)
 
 	// Read multi transactions
-	ids := []wallet_common.MultiTransactionIDType{mt1.ID, mt2.ID, mt3.ID}
-	mtx, err := mtDB.ReadMultiTransactions(ids)
+	details := NewMultiTxDetails()
+	details.IDs = []wallet_common.MultiTransactionIDType{mt1.ID, mt2.ID, mt3.ID}
+	mtx, err := mtDB.ReadMultiTransactions(details)
 	require.NoError(t, err)
 	require.Len(t, mtx, 3)
 	require.True(t, areMultiTransactionsEqual(&mt1, mtx[0]))
@@ -96,7 +102,9 @@ func TestUpdateMultiTransaction(t *testing.T) {
 	require.NoError(t, err)
 
 	// Read the updated multi transaction
-	mtx, err := mtDB.ReadMultiTransactions([]wallet_common.MultiTransactionIDType{multiTransaction.ID})
+	details := NewMultiTxDetails()
+	details.IDs = []wallet_common.MultiTransactionIDType{multiTransaction.ID}
+	mtx, err := mtDB.ReadMultiTransactions(details)
 	require.NoError(t, err)
 	require.Len(t, mtx, 1)
 	require.True(t, areMultiTransactionsEqual(&multiTransaction, mtx[0]))
@@ -118,7 +126,8 @@ func TestDeleteMultiTransaction(t *testing.T) {
 	require.NoError(t, err)
 
 	// Read the deleted multi transaction
-	mtx, err := mtDB.ReadMultiTransactions([]wallet_common.MultiTransactionIDType{multiTransaction.ID})
+	mtx, err := mtDB.ReadMultiTransactions(&MultiTxDetails{
+		IDs: []wallet_common.MultiTransactionIDType{multiTransaction.ID}})
 	require.NoError(t, err)
 	require.Len(t, mtx, 0)
 }
