@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -4363,7 +4364,7 @@ func (m *Manager) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics
 func (m *Manager) StartHistoryArchiveTasksInterval(community *Community, interval time.Duration) {
 	id := community.IDString()
 	if _, exists := m.historyArchiveTasks.Load(id); exists {
-		m.LogStdout("history archive tasks interval already in progres", zap.String("id", id))
+		m.LogStdout("history archive tasks interval already in progress", zap.String("id", id))
 		return
 	}
 
@@ -4445,9 +4446,9 @@ func (m *Manager) CreateHistoryArchiveTorrentFromMessages(communityID types.HexB
 }
 
 func (m *Manager) CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
-
 	return m.CreateHistoryArchiveTorrent(communityID, make([]*types.Message, 0), topics, startDate, endDate, partition, encrypt)
 }
+
 func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, msgs []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
 
 	loadFromDB := len(msgs) == 0
@@ -4528,7 +4529,6 @@ func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, msgs [
 					messages = append(messages, *msg)
 				}
 			}
-
 		}
 
 		if len(messages) == 0 {
@@ -4541,6 +4541,8 @@ func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, msgs [
 			}
 			continue
 		}
+
+		m.LogStdout("creating archive with messages", zap.Int("messagesCount", len(messages)))
 
 		// Not only do we partition messages, we also chunk them
 		// roughly by size, such that each chunk will not exceed a given
@@ -4990,6 +4992,10 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 	}
 }
 
+func (m *Manager) SaveMessageArchiveID(communityID types.HexBytes, hash string) error {
+	return m.persistence.SaveMessageArchiveID(communityID, hash)
+}
+
 func (m *Manager) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
 	return m.persistence.GetMessageArchiveIDsToImport(communityID)
 }
@@ -5008,7 +5014,9 @@ func (m *Manager) ExtractMessagesFromHistoryArchive(communityID types.HexBytes, 
 	}
 	defer dataFile.Close()
 
-	m.LogStdout("extracting messages from history archive", zap.String("archive id", archiveID))
+	m.LogStdout("extracting messages from history archive",
+		zap.String("communityID", communityID.String()),
+		zap.String("archiveID", archiveID))
 	metadata := index.Archives[archiveID]
 
 	_, err = dataFile.Seek(int64(metadata.Offset), 0)
@@ -5049,7 +5057,7 @@ func (m *Manager) ExtractMessagesFromHistoryArchive(communityID types.HexBytes, 
 		}
 		err = proto.Unmarshal(decryptedBytes.DecryptedMessage, archive)
 		if err != nil {
-			m.LogStdout("failed to unmarshal message archive data", zap.Error(err))
+			m.LogStdout("failed to unmarshal message archive", zap.Error(err))
 			return nil, err
 		}
 	}
@@ -5151,15 +5159,15 @@ func (m *Manager) TorrentFileExists(communityID string) bool {
 }
 
 func (m *Manager) torrentFile(communityID string) string {
-	return m.torrentConfig.TorrentDir + "/" + communityID + ".torrent"
+	return path.Join(m.torrentConfig.TorrentDir, communityID+".torrent")
 }
 
 func (m *Manager) archiveIndexFile(communityID string) string {
-	return m.torrentConfig.DataDir + "/" + communityID + "/index"
+	return path.Join(m.torrentConfig.DataDir, communityID, "index")
 }
 
 func (m *Manager) archiveDataFile(communityID string) string {
-	return m.torrentConfig.DataDir + "/" + communityID + "/data"
+	return path.Join(m.torrentConfig.DataDir, communityID, "data")
 }
 
 func topicsAsByteArrays(topics []types.TopicType) [][]byte {

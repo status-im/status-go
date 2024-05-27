@@ -36,6 +36,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/discord"
+	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
@@ -152,7 +153,14 @@ func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) err
 		rawMessage.HashRatchetGroupID = org.ID()
 		rawMessage.Recipients = members
 	}
-	_, err = m.sender.SendPublic(context.Background(), org.IDString(), rawMessage)
+	messageID, err := m.sender.SendPublic(context.Background(), org.IDString(), rawMessage)
+	if err == nil {
+		m.logger.Debug("published community",
+			zap.String("communityID", org.IDString()),
+			zap.String("messageID", hexutil.Encode(messageID)),
+			zap.Uint64("clock", org.Clock()),
+		)
+	}
 	return err
 }
 
@@ -366,7 +374,6 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 			m.logger.Warn("failed to publish public shard info", zap.Error(err))
 			return
 		}
-		m.logger.Debug("published public shard info")
 
 		// signal client with published community
 		if m.config.messengerSignalsHandler != nil {
@@ -3911,8 +3918,20 @@ func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel cha
 		return nil
 	}
 
+	delayImport := false
+
 importMessageArchivesLoop:
 	for {
+		if delayImport {
+			select {
+			case <-ctx.Done():
+				m.communitiesManager.LogStdout("interrupted importing history archive messages")
+				return nil
+			case <-time.After(1 * time.Hour):
+				delayImport = false
+			}
+		}
+
 		select {
 		case <-ctx.Done():
 			m.communitiesManager.LogStdout("interrupted importing history archive messages")
@@ -3933,7 +3952,7 @@ importMessageArchivesLoop:
 				break importMessageArchivesLoop
 			}
 
-			m.communitiesManager.LogStdout(fmt.Sprintf("importing message archive, %d left", len(archiveIDsToImport)))
+			m.communitiesManager.LogStdout("importing message archive", zap.Int("left", len(archiveIDsToImport)))
 
 			// only process one archive at a time, so in case of cancel we don't
 			// wait for all archives to be processed first
@@ -3941,6 +3960,12 @@ importMessageArchivesLoop:
 
 			archiveMessages, err := m.communitiesManager.ExtractMessagesFromHistoryArchive(communityID, downloadedArchiveID)
 			if err != nil {
+				if errors.Is(err, encryption.ErrHashRatchetGroupIDNotFound) {
+					// In case we're missing hash ratchet keys, best we can do is
+					// to wait for them to be received and try import again.
+					delayImport = true
+					continue
+				}
 				m.communitiesManager.LogStdout("failed to extract history archive messages", zap.Error(err))
 				continue
 			}
@@ -4054,7 +4079,9 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 	if len(controlledCommunities) > 0 {
 		go m.InitHistoryArchiveTasks(controlledCommunities)
 	}
-	m.config.messengerSignalsHandler.HistoryArchivesProtocolEnabled()
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryArchivesProtocolEnabled()
+	}
 	return nil
 }
 
@@ -4077,7 +4104,9 @@ func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 	if err != nil {
 		return err
 	}
-	m.config.messengerSignalsHandler.HistoryArchivesProtocolDisabled()
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryArchivesProtocolDisabled()
+	}
 	return nil
 }
 
