@@ -409,9 +409,6 @@ func (r *Reader) getWalletTokenBalances(ctx context.Context, addresses []common.
 	if updateBalances || updateAnyway {
 		latestBalances, err = r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
 		if err != nil {
-			for _, client := range clients {
-				client.SetIsConnected(false)
-			}
 			log.Info("tokenManager.GetBalancesByChain error", "err", err)
 			return nil, err
 		}
@@ -554,9 +551,6 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 
 	balances, err := r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
 	if err != nil {
-		for _, client := range clients {
-			client.SetIsConnected(false)
-		}
 		log.Info("tokenManager.GetBalancesByChain error", "err", err)
 		return nil, err
 	}
