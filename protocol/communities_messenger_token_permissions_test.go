@@ -80,22 +80,31 @@ func (tckd *TestCommunitiesKeyDistributor) Distribute(community *communities.Com
 	return nil
 }
 
+func (tckd *TestCommunitiesKeyDistributor) subscribeToKeyDistribution() chan *CommunityAndKeyActions {
+	subscription := make(chan *CommunityAndKeyActions, 40)
+	tckd.mutex.Lock()
+	defer tckd.mutex.Unlock() // Ensure the mutex is always unlocked
+	tckd.subscriptions[subscription] = true
+	return subscription
+}
+
+func (tckd *TestCommunitiesKeyDistributor) unsubscribeFromKeyDistribution(subscription chan *CommunityAndKeyActions) {
+	tckd.mutex.Lock()
+	delete(tckd.subscriptions, subscription)
+	tckd.mutex.Unlock()
+	close(subscription)
+}
+
 func (tckd *TestCommunitiesKeyDistributor) waitOnKeyDistribution(condition func(*CommunityAndKeyActions) bool) <-chan error {
 	errCh := make(chan error, 1)
 
-	subscription := make(chan *CommunityAndKeyActions, 40)
-	tckd.mutex.Lock()
-	tckd.subscriptions[subscription] = true
-	tckd.mutex.Unlock()
+	subscription := tckd.subscribeToKeyDistribution()
 
 	go func() {
 		defer func() {
 			close(errCh)
 
-			tckd.mutex.Lock()
-			delete(tckd.subscriptions, subscription)
-			tckd.mutex.Unlock()
-			close(subscription)
+			tckd.unsubscribeFromKeyDistribution(subscription)
 		}()
 
 		for {
@@ -1993,15 +2002,41 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 	_, err = s.owner.encryptor.GenerateHashRatchetKey([]byte(community.IDString() + chat.CommunityChatID()))
 	s.Require().NoError(err)
 
-	// FIXME: `HandleCommunityEncryptionKeysRequest` does not return any response
-	// ad-hoc solution - wait for `WaitOnMessengerResponse` timeout
-	_, _ = WaitOnMessengerResponse(
+	testCommunitiesKeyDistributor, ok := s.owner.communitiesKeyDistributor.(*TestCommunitiesKeyDistributor)
+	s.Require().True(ok)
+	s.Require().NotNil(testCommunitiesKeyDistributor)
+	subscription := testCommunitiesKeyDistributor.subscribeToKeyDistribution()
+
+	// `HandleCommunityEncryptionKeysRequest` does not return any response
+	// To make sure that `HandleCommunityEncryptionKeysRequest` was called and new keys sent
+	// we will subscribe to key distribution
+	checkKeyWasSent := func() bool {
+		var sub *CommunityAndKeyActions
+		select {
+		case sub = <-subscription:
+		default:
+			return false // No data available, return false
+		}
+		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
+		if !ok || action.ActionType != communities.EncryptionKeySendToMembers {
+			return false
+		}
+
+		_, ok = action.Members[common.PubkeyToHex(&s.bob.identity.PublicKey)]
+		return ok
+	}
+
+	_, err = WaitOnMessengerResponse(
 		s.owner,
 		func(r *MessengerResponse) bool {
-			return false
+			return checkKeyWasSent()
 		},
 		"no community that satisfies criteria",
 	)
+
+	testCommunitiesKeyDistributor.unsubscribeFromKeyDistribution(subscription)
+
+	s.Require().NoError(err)
 
 	// msg will be encrypted using new keys
 	msg = s.sendChatMessage(s.owner, chat.ID, "hello to closed channel with the new key")
