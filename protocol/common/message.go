@@ -596,6 +596,8 @@ func (m *Message) PrepareContent(identity string) error {
 	switch m.ContentType {
 	case protobuf.ChatMessage_DISCORD_MESSAGE:
 		parsedText = markdown.Parse([]byte(m.GetDiscordMessage().Content), nil)
+	case protobuf.ChatMessage_BRIDGE_MESSAGE:
+		parsedText = markdown.Parse([]byte(m.GetBridgeMessage().Content), nil)
 	default:
 		parsedText = markdown.Parse([]byte(m.Text), nil)
 	}
