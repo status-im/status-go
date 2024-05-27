@@ -2315,8 +2315,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 
 	// force owner to reevaluate channel members
 	// in production it will happen automatically, by periodic check
-	//community, _, err = s.owner.communitiesManager.ReevaluateMembers(community.ID())
-	err = s.owner.communitiesManager.ScheduleMembersReevaluation(community.ID())
+	err = s.owner.communitiesManager.ForceMembersReevaluation(community.ID())
 	s.Require().NoError(err)
 
 	err = <-waitOnChannelKeyToBeDistributedToBob
