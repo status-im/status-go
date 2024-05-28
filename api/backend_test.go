@@ -1335,6 +1335,8 @@ func loginMobileUser(t *testing.T, rootDataDir string) {
 	//    Wallet: 0, Chat: 0, Type: 'watch', Path: '', Name: 'watch-only', Derived_from: '', Pubkey: <null>
 	// 6. Address: 0xB7A1233D1309CE665A3A4DB088E4A046EB333545
 	//    Wallet: 0, Chat: 0, Type: 'seed', Path: m/44'/60'/0'/0/0, Name: 'seed', Derived_from: '', Pubkey: 0x04FDE3E5...
+	// seed phrase for 0xB7A1233D1309CE665A3A4DB088E4A046EB333545: vocal blouse script census island armor seek catch wool narrow peasant attract
+	// private key for 0x516312D69737C5E6EF16F22E0097FF5D9F0C4196: c3ad0b50652318f845565c13761e5369ce75dcbc2a94616e15b829d4b07410fe
 	keyUID := "0x855ab0a932e5325daab7a550b9fcd78d2a17de5e2b7a52241f82505ea9d87629"
 	passwd := "0x20756cad9b728c8225fd8cedb6badaf8731e174506950219ea657cd54f35f46c" // #nosec G101
 
@@ -1377,6 +1379,14 @@ func loginMobileUser(t *testing.T, rootDataDir string) {
 	require.NoError(t, err)
 	require.Equal(t, seedKps[0].KeyUID, info.KeyUID)
 	require.Equal(t, seedKps[0].Accounts[0].KeyUID, info.KeyUID)
+	mnemonicNoExtraSpaces := strings.Join(strings.Fields("vocal blouse script census island armor seek catch wool narrow peasant attract"), " ")
+	importedSeedAccountInfo, err := generator.ImportMnemonic(mnemonicNoExtraSpaces, "")
+	require.NoError(t, err)
+	derivedAddresses, err := generator.DeriveAddresses(importedSeedAccountInfo.ID, paths)
+	require.NoError(t, err)
+	require.Equal(t, derivedAddresses[pathDefaultWallet].PublicKey, "0x04fde3e58a7379161da2adf033fbee076e2ba11fca8b07c4d06610b399911a60017e4c108eae243487d19e273f99c2d6af13ff5e330783f4389212092b01cc616c")
+	//TODO(frank) we need fix following line
+	//require.True(t, importedSeedAccountInfo.KeyUID == seedKps[0].KeyUID)
 
 	// Check key keypair
 	keyKps, ok := keypairMap[accounts.KeypairTypeKey]
@@ -1387,6 +1397,9 @@ func loginMobileUser(t *testing.T, rootDataDir string) {
 	require.NoError(t, err)
 	require.Equal(t, keyKps[0].KeyUID, info.KeyUID)
 	require.Equal(t, keyKps[0].Accounts[0].KeyUID, info.KeyUID)
+	info, err = generator.ImportPrivateKey("c3ad0b50652318f845565c13761e5369ce75dcbc2a94616e15b829d4b07410fe")
+	require.NoError(t, err)
+	require.Equal(t, keyKps[0].KeyUID, info.KeyUID)
 
 	require.NoError(t, b.Logout())
 }
