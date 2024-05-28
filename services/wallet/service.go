@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/market"
+	"github.com/status-im/status-go/services/wallet/onramp"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/alchemy"
 	"github.com/status-im/status-go/services/wallet/thirdparty/coingecko"
@@ -60,8 +61,8 @@ func NewService(
 	feed *event.Feed,
 	mediaServer *server.MediaServer,
 ) *Service {
-	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
-		dataSourceType: DataSourceStatic,
+	cryptoOnRampManager := onramp.NewManager(&onramp.Options{
+		DataSourceType: onramp.DataSourceStatic,
 	})
 
 	signals := &walletevent.SignalsTransmitter{
@@ -210,7 +211,7 @@ type Service struct {
 	communityManager      *community.Manager
 	transactionManager    *transfer.TransactionManager
 	pendingTxManager      *transactions.PendingTxTracker
-	cryptoOnRampManager   *CryptoOnRampManager
+	cryptoOnRampManager   *onramp.Manager
 	transferController    *transfer.Controller
 	marketManager         *market.Manager
 	started               bool
