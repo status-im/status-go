@@ -698,7 +698,7 @@ func (w *WakuNode) AddPeer(address ma.Multiaddr, origin wps.Origin, pubSubTopics
 }
 
 // AddDiscoveredPeer to add a discovered peer to the node peerStore
-func (w *WakuNode) AddDiscoveredPeer(ID peer.ID, addrs []ma.Multiaddr, origin wps.Origin, pubsubTopics []string, connectNow bool) {
+func (w *WakuNode) AddDiscoveredPeer(ID peer.ID, addrs []ma.Multiaddr, origin wps.Origin, pubsubTopics []string, enr *enode.Node, connectNow bool) {
 	p := service.PeerData{
 		Origin: origin,
 		AddrInfo: peer.AddrInfo{
@@ -706,6 +706,7 @@ func (w *WakuNode) AddDiscoveredPeer(ID peer.ID, addrs []ma.Multiaddr, origin wp
 			Addrs: addrs,
 		},
 		PubsubTopics: pubsubTopics,
+		ENR:          enr,
 	}
 	w.peermanager.AddDiscoveredPeer(p, connectNow)
 }
