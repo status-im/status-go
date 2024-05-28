@@ -23,15 +23,17 @@ type Client struct {
 	logger     *zap.Logger
 	keyUID     string
 	nodeName   string
+	version    string
 }
 
-func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName string) *Client {
+func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName string, version string) *Client {
 	return &Client{
 		serverURL:  serverURL,
 		httpClient: &http.Client{Timeout: time.Minute},
 		logger:     logger,
 		keyUID:     keyUID,
 		nodeName:   nodeName,
+		version:    version,
 	}
 }
 
@@ -51,6 +53,7 @@ func (c *Client) PushReceivedMessages(filter transport.Filter, sshMessage *types
 			"receiverKeyUID": c.keyUID,
 			"nodeName":       c.nodeName,
 			"messageSize":    len(sshMessage.Payload),
+			"statusVersion":  c.version,
 		})
 	}
 	body, _ := json.Marshal(postBody)
@@ -71,6 +74,7 @@ func (c *Client) PushReceivedEnvelope(envelope *v2protocol.Envelope) {
 		"topic":          envelope.Message().ContentTopic,
 		"receiverKeyUID": c.keyUID,
 		"nodeName":       c.nodeName,
+		"statusVersion":  c.version,
 	}
 	body, _ := json.Marshal(postBody)
 	_, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
@@ -91,6 +95,7 @@ func (c *Client) PushSentEnvelope(envelope *v2protocol.Envelope, publishMethod w
 		"senderKeyUID":  c.keyUID,
 		"nodeName":      c.nodeName,
 		"publishMethod": publishMethod.String(),
+		"statusVersion": c.version,
 	}
 	body, _ := json.Marshal(postBody)
 	_, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))

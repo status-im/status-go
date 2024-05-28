@@ -299,6 +299,7 @@ func NewMessenger(
 	node types.Node,
 	installationID string,
 	peerStore *mailservers.PeerStore,
+	version string,
 	opts ...Option,
 ) (*Messenger, error) {
 	var messenger *Messenger
@@ -428,7 +429,7 @@ func NewMessenger(
 
 	var telemetryClient *telemetry.Client
 	if c.telemetryServerURL != "" {
-		telemetryClient = telemetry.NewClient(logger, c.telemetryServerURL, c.account.KeyUID, nodeName)
+		telemetryClient = telemetry.NewClient(logger, c.telemetryServerURL, c.account.KeyUID, nodeName, version)
 		if c.wakuService != nil {
 			c.wakuService.SetStatusTelemetryClient(telemetryClient)
 		}
