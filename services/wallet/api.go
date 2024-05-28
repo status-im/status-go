@@ -25,6 +25,7 @@ import (
 	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
+	"github.com/status-im/status-go/services/wallet/onramp"
 	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -305,7 +306,7 @@ func (api *API) WatchTransactionByChainID(ctx context.Context, chainID uint64, t
 	}
 }
 
-func (api *API) GetCryptoOnRamps(ctx context.Context) ([]CryptoOnRamp, error) {
+func (api *API) GetCryptoOnRamps(ctx context.Context) ([]onramp.CryptoOnRamp, error) {
 	return api.s.cryptoOnRampManager.Get()
 }
 

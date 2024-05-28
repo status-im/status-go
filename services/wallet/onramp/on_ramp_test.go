@@ -1,4 +1,4 @@
-package wallet
+package onramp
 
 import (
 	"net/http"
@@ -10,18 +10,18 @@ import (
 )
 
 const (
-	path = "../../_assets/tests/"
+	path = "../../../_assets/tests/"
 )
 
 func TestCryptoOnRamps_Get(t *testing.T) {
 	s := httptest.NewServer(http.FileServer(http.Dir(path)))
 	defer s.Close()
 
-	cs := []*CryptoOnRampManager{
-		{options: &CryptoOnRampOptions{dataSourceType: DataSourceStatic}},
-		{options: &CryptoOnRampOptions{
-			dataSourceType: DataSourceHTTP,
-			dataSource:     s.URL + "/ramps.json",
+	cs := []*Manager{
+		{options: &Options{DataSourceType: DataSourceStatic}},
+		{options: &Options{
+			DataSourceType: DataSourceHTTP,
+			DataSource:     s.URL + "/ramps.json",
 		}},
 	}
 
@@ -38,9 +38,9 @@ func TestCryptoOnRampManager_hasCacheExpired(t *testing.T) {
 	s := httptest.NewServer(http.FileServer(http.Dir(path)))
 	defer s.Close()
 
-	corm := NewCryptoOnRampManager(&CryptoOnRampOptions{
-		dataSourceType: DataSourceHTTP,
-		dataSource:     s.URL + "/ramps.json",
+	corm := NewManager(&Options{
+		DataSourceType: DataSourceHTTP,
+		DataSource:     s.URL + "/ramps.json",
 	})
 	nt := time.Time{}.Add(30 * time.Minute)
 
