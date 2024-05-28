@@ -1752,8 +1752,6 @@ func (m *Messenger) Init() error {
 	if err != nil {
 		return err
 	}
-
-	communityInfo := make(map[string]*communities.Community)
 	for _, chat := range chats {
 		if err := chat.Validate(); err != nil {
 			logger.Warn("failed to validate chat", zap.Error(err))
@@ -1770,13 +1768,20 @@ func (m *Messenger) Init() error {
 			continue
 		}
 
+		communityInfo := make(map[string]*communities.Community)
+
 		switch chat.ChatType {
 		case ChatTypePublic, ChatTypeProfile:
 			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID})
 		case ChatTypeCommunityChat:
+			communityID, err := hexutil.Decode(chat.CommunityID)
+			if err != nil {
+				return err
+			}
+
 			community, ok := communityInfo[chat.CommunityID]
 			if !ok {
-				community, err = m.communitiesManager.GetByIDString(chat.CommunityID)
+				community, err = m.communitiesManager.GetByID(communityID)
 				if err != nil {
 					return err
 				}
