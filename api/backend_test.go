@@ -1322,6 +1322,19 @@ func TestLoginAndMigrationsStillWorkWithExistingDesktopUser(t *testing.T) {
 }
 
 func loginMobileUser(t *testing.T, rootDataDir string) {
+	// what we have in table `accounts` before test run:
+	// 1. Address: 0x23A5CEF34B18920785F4B895849936F65CBDEF73
+	//    Wallet: 1, Chat: 0, Type: '', Path: m/44'/60'/0'/0/0, Name: 'Main account', Derived_from: '', Pubkey: 0x047B67AD2...
+	// 2. Address: 0x4851276E2B7DC3B8BEF1749127031BCB3578492D
+	//    Wallet: 0, Chat: 1, Type: '', Path: m/43'/60'/1581'/0'/0, Name: 'Cadetblue Fuzzy Flickertailsquirrel', Derived_from: '', Pubkey: 0x04F96F6F5...
+	// 3. Address: 0x4D26E5C2F85BA5D10BDA6B031E1C1579F8ECFA1F
+	//    Wallet: 0, Chat: 0, Type: 'generated', Path: m/44'/60'/0'/1, Name: 'generated', Derived_from: '', Pubkey: 0x04488EDA7...
+	// 4. Address: 0x516312D69737C5E6EF16F22E0097FF5D9F0C4196
+	//    Wallet: 0, Chat: 0, Type: 'key', Path: m/44'/60'/0'/0/0, Name: 'key', Derived_from: '', Pubkey: 0x040D5E4E3...
+	// 5. Address: 0x95222290DD7278AA3DDD389CC1E1D165CC4BAFE5
+	//    Wallet: 0, Chat: 0, Type: 'watch', Path: '', Name: 'watch-only', Derived_from: '', Pubkey: <null>
+	// 6. Address: 0xB7A1233D1309CE665A3A4DB088E4A046EB333545
+	//    Wallet: 0, Chat: 0, Type: 'seed', Path: m/44'/60'/0'/0/0, Name: 'seed', Derived_from: '', Pubkey: 0x04FDE3E5...
 	keyUID := "0x855ab0a932e5325daab7a550b9fcd78d2a17de5e2b7a52241f82505ea9d87629"
 	passwd := "0x20756cad9b728c8225fd8cedb6badaf8731e174506950219ea657cd54f35f46c" // #nosec G101
 
@@ -1332,9 +1345,49 @@ func loginMobileUser(t *testing.T, rootDataDir string) {
 	require.NoError(t, b.Login(keyUID, passwd))
 	db, err := accounts.NewDB(b.appDB)
 	require.NoError(t, err)
+	accs, err := db.GetAllAccounts()
+	require.NoError(t, err)
+	require.True(t, len(accs) == 6)
 	kps, err := db.GetAllKeypairs()
 	require.NoError(t, err)
-	require.NotNil(t, kps)
+	require.True(t, len(kps) == 3)
+
+	// Create a map to categorize keypairs by their type
+	keypairMap := make(map[accounts.KeypairType][]*accounts.Keypair)
+	for _, kp := range kps {
+		keypairMap[kp.Type] = append(keypairMap[kp.Type], kp)
+	}
+
+	// Check profile keypair
+	profileKps, ok := keypairMap[accounts.KeypairTypeProfile]
+	require.True(t, ok, "Profile keypair not found")
+	require.True(t, len(profileKps) == 1, "Unexpected number of profile keypairs")
+	require.True(t, len(profileKps[0].Accounts) == 3)
+	for _, a := range profileKps[0].Accounts {
+		require.Equal(t, a.KeyUID, keyUID)
+	}
+
+	generator := b.AccountManager().AccountsGenerator()
+	// Check seed keypair
+	seedKps, ok := keypairMap[accounts.KeypairTypeSeed]
+	require.True(t, ok, "Seed keypair not found")
+	require.True(t, len(seedKps) == 1, "Unexpected number of seed keypairs")
+	require.True(t, len(seedKps[0].Accounts) == 1)
+	info, err := generator.LoadAccount(seedKps[0].Accounts[0].Address.Hex(), passwd)
+	require.NoError(t, err)
+	require.Equal(t, seedKps[0].KeyUID, info.KeyUID)
+	require.Equal(t, seedKps[0].Accounts[0].KeyUID, info.KeyUID)
+
+	// Check key keypair
+	keyKps, ok := keypairMap[accounts.KeypairTypeKey]
+	require.True(t, ok, "Key keypair not found")
+	require.True(t, len(keyKps) == 1, "Unexpected number of key keypairs")
+	require.True(t, len(keyKps[0].Accounts) == 1)
+	info, err = generator.LoadAccount(keyKps[0].Accounts[0].Address.Hex(), passwd)
+	require.NoError(t, err)
+	require.Equal(t, keyKps[0].KeyUID, info.KeyUID)
+	require.Equal(t, keyKps[0].Accounts[0].KeyUID, info.KeyUID)
+
 	require.NoError(t, b.Logout())
 }
 
