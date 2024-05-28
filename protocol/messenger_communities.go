@@ -1042,6 +1042,26 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 			Image:    "",
 		}
 		response.AddNotification(joinedNotification)
+
+		// Activity Center notification
+		requestID := communities.CalculateRequestID(common.PubkeyToHex(&m.identity.PublicKey), communityID)
+		notification, err := m.persistence.GetActivityCenterNotificationByID(requestID)
+		if err != nil {
+			return nil, err
+		}
+
+		if notification != nil && notification.MembershipStatus != ActivityCenterMembershipStatusAccepted {
+			notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
+			notification.Read = false
+			notification.Deleted = false
+
+			notification.UpdatedAt = m.GetCurrentTimeInMillis()
+			err = m.addActivityCenterNotification(response, notification, nil)
+			if err != nil {
+				m.logger.Error("failed to update request to join accepted notification", zap.Error(err))
+				return nil, err
+			}
+		}
 	}
 
 	return response, nil
