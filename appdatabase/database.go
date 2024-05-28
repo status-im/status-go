@@ -30,6 +30,8 @@ var customSteps = []*sqlite.PostStep{
 	{Version: 1687193315, CustomMigration: migrateWalletTransferFromToAddresses, RollBackVersion: 1686825075},
 }
 
+var CurrentAppDBKeyUID string
+
 type DbInitializer struct {
 }
 
@@ -86,7 +88,7 @@ func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, erro
 }
 
 func fixMissingKeyUIDForAccounts(sqlTx *sql.Tx) error {
-	rows, err := sqlTx.Query(`SELECT address,pubkey FROM accounts WHERE pubkey IS NOT NULL`)
+	rows, err := sqlTx.Query(`SELECT address,pubkey FROM accounts WHERE pubkey IS NOT NULL AND type != '' AND type != 'generated'`)
 	if err != nil {
 		log.Error("Migrating accounts: failed to query accounts", "err", err.Error())
 		return err
@@ -109,9 +111,13 @@ func fixMissingKeyUIDForAccounts(sqlTx *sql.Tx) error {
 		keyUIDHex := hexutil.Encode(pkBytes[:])
 		_, err = sqlTx.Exec(`UPDATE accounts SET key_uid = ? WHERE address = ?`, keyUIDHex, address)
 		if err != nil {
-			log.Error("Migrating accounts: failed to update key_uid", "err", err.Error())
+			log.Error("Migrating accounts: failed to update key_uid for imported accounts", "err", err.Error())
 			return err
 		}
+	}
+	_, err = sqlTx.Exec(`UPDATE accounts SET key_uid = ? WHERE type = '' OR type = 'generated'`, CurrentAppDBKeyUID)
+	if err != nil {
+		log.Error("Migrating accounts: failed to update key_uid", "err", err.Error())
 	}
 	return nil
 }
