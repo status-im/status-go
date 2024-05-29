@@ -74,7 +74,7 @@ func start(cCtx *cli.Context, name string, port int, apiModules string, telemetr
 	}
 
 	if telemetryUrl != "" {
-		telemetryClient := telemetry.NewClient(logger, telemetryUrl, backend.SelectedAccountKeyID(), name)
+		telemetryClient := telemetry.NewClient(logger, telemetryUrl, backend.SelectedAccountKeyID(), name, "cli")
 		backend.StatusNode().WakuV2Service().SetStatusTelemetryClient(telemetryClient)
 	}
 	wakuAPI := wakuv2ext.NewPublicAPI(wakuService)
