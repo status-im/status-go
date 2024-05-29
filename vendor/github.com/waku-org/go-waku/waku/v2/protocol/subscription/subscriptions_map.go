@@ -75,7 +75,7 @@ func (sub *SubscriptionsMap) NewSubscription(peerID peer.ID, cf protocol.Content
 		PeerID:        peerID,
 		C:             make(chan *protocol.Envelope, 1024),
 		ContentFilter: protocol.ContentFilter{PubsubTopic: cf.PubsubTopic, ContentTopics: maps.Clone(cf.ContentTopics)},
-		Closing:       make(chan struct{}),
+		Closing:       make(chan bool),
 	}
 
 	// Increase the number of subscriptions for this (pubsubTopic, contentTopic) pair

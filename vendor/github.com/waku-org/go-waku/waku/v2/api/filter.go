@@ -75,6 +75,7 @@ func (apiSub *Sub) waitOnSubClose() {
 		case subId := <-apiSub.closing:
 			//trigger closing and resubscribe flow for subscription.
 			apiSub.closeAndResubscribe(subId)
+
 		}
 	}
 }
@@ -89,13 +90,9 @@ func (apiSub *Sub) closeAndResubscribe(subId string) {
 }
 
 func (apiSub *Sub) cleanup() {
-	apiSub.log.Debug("ENTER cleanup()")
-	defer func() {
-		apiSub.log.Debug("EXIT cleanup()")
-	}()
+	apiSub.log.Debug("Cleaning up subscription", zap.Stringer("config", apiSub.Config))
 
 	for _, s := range apiSub.subs {
-		close(s.Closing)
 		_, err := apiSub.wf.UnsubscribeWithSubscription(apiSub.ctx, s)
 		if err != nil {
 			//Logging with info as this is part of cleanup
@@ -168,10 +165,14 @@ func (apiSub *Sub) multiplex(subs []*subscription.SubscriptionDetails) {
 			}
 		}(subDetails)
 		go func(subDetails *subscription.SubscriptionDetails) {
-			<-subDetails.Closing
-			apiSub.log.Debug("sub closing", zap.String("subID", subDetails.ID))
+			select {
+			case <-apiSub.ctx.Done():
+				return
+			case <-subDetails.Closing:
+				apiSub.log.Debug("sub closing", zap.String("subID", subDetails.ID))
 
-			apiSub.closing <- subDetails.ID
+				apiSub.closing <- subDetails.ID
+			}
 		}(subDetails)
 	}
 }
