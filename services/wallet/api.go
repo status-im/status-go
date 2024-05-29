@@ -326,6 +326,11 @@ func (api *API) GetCollectibleOwnersByContractAddress(ctx context.Context, chain
 	return api.s.collectiblesManager.FetchCollectibleOwnersByContractAddress(ctx, chainID, contractAddress)
 }
 
+func (api *API) FetchCollectibleOwnersByContractAddress(ctx context.Context, chainID wcommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
+	log.Debug("call to FetchCollectibleOwnersByContractAddress")
+	return api.s.collectiblesManager.FetchCollectibleOwnersByContractAddress(ctx, chainID, contractAddress)
+}
+
 func (api *API) SearchCollectibles(ctx context.Context, chainID wcommon.ChainID, text string, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
 	log.Debug("call to SearchCollectibles")
 	return api.s.collectiblesManager.SearchCollectibles(ctx, chainID, text, cursor, limit, providerID)

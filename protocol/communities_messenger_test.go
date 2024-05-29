@@ -3624,6 +3624,10 @@ func (t *testPermissionChecker) CheckPermissions(permissionsParsedData *communit
 	return &communities.CheckPermissionsResponse{Satisfied: true}, nil
 }
 
+func (t *testPermissionChecker) CheckPermissionsWithPreFetchedData(permissionsParsedData *communities.PreParsedCommunityPermissionsData, accountsAndChainIDs []*communities.AccountChainIDsCombination, shortcircuit bool, collectiblesOwners communities.CollectiblesOwners) (*communities.CheckPermissionsResponse, error) {
+	return &communities.CheckPermissionsResponse{Satisfied: true}, nil
+}
+
 func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 	community, chat := createEncryptedCommunity(&s.Suite, s.owner)
 	s.Require().True(community.Encrypted())

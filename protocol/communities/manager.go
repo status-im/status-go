@@ -302,6 +302,7 @@ func (m *DefaultTokenManager) GetAllChainIDs() ([]uint64, error) {
 type CollectiblesManager interface {
 	FetchBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletcommon.ChainID, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error)
 	GetCollectibleOwnership(id thirdparty.CollectibleUniqueID) ([]thirdparty.AccountBalance, error)
+	FetchCollectibleOwnersByContractAddress(ctx context.Context, chainID walletcommon.ChainID, contractAddress gethcommon.Address) (*thirdparty.CollectibleContractOwnership, error)
 }
 
 func (m *DefaultTokenManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error) {
@@ -984,6 +985,27 @@ func (rmr *reevaluateMembersResult) newPrivilegedRoles() (map[protobuf.Community
 	return result, nil
 }
 
+// Fetch all owners for all collectibles.
+func (m *Manager) fetchCollectiblesOwners(collectibles map[walletcommon.ChainID]map[gethcommon.Address]struct{}) (CollectiblesOwners, error) {
+	if m.collectiblesManager == nil {
+		return nil, errors.New("no collectibles manager")
+	}
+
+	collectiblesOwners := make(CollectiblesOwners)
+	for chainID, contractAddresses := range collectibles {
+		collectiblesOwners[chainID] = make(map[gethcommon.Address]*thirdparty.CollectibleContractOwnership)
+
+		for contractAddress := range contractAddresses {
+			ownership, err := m.collectiblesManager.FetchCollectibleOwnersByContractAddress(context.Background(), chainID, contractAddress)
+			if err != nil {
+				return nil, err
+			}
+			collectiblesOwners[chainID][contractAddress] = ownership
+		}
+	}
+	return collectiblesOwners, nil
+}
+
 // use it only for testing purposes
 func (m *Manager) ReevaluateMembers(communityID types.HexBytes) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
 	return m.reevaluateMembers(communityID)
@@ -1008,6 +1030,12 @@ func (m *Manager) reevaluateMembers(communityID types.HexBytes) (*Community, map
 	}
 
 	communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsData(community.tokenPermissions())
+
+	// Optimization: Fetch all collectibles owners before members iteration to avoid asking providers for the same collectibles.
+	collectiblesOwners, err := m.fetchCollectiblesOwners(CollectibleAddressesFromPreParsedPermissionsData(communityPermissionsPreParsedData, channelPermissionsPreParsedData))
+	if err != nil {
+		return nil, nil, err
+	}
 
 	result := &reevaluateMembersResult{
 		membersToRemove:             map[string]struct{}{},
@@ -1046,7 +1074,7 @@ func (m *Manager) reevaluateMembers(communityID types.HexBytes) (*Community, map
 
 		becomeTokenMasterPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER]
 		if becomeTokenMasterPermissions != nil {
-			permissionResponse, err := m.PermissionChecker.CheckPermissions(becomeTokenMasterPermissions, accountsAndChainIDs, true)
+			permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(becomeTokenMasterPermissions, accountsAndChainIDs, true, collectiblesOwners)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -1060,7 +1088,7 @@ func (m *Manager) reevaluateMembers(communityID types.HexBytes) (*Community, map
 
 		becomeAdminPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_ADMIN]
 		if becomeAdminPermissions != nil {
-			permissionResponse, err := m.PermissionChecker.CheckPermissions(becomeAdminPermissions, accountsAndChainIDs, true)
+			permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(becomeAdminPermissions, accountsAndChainIDs, true, collectiblesOwners)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -1074,7 +1102,7 @@ func (m *Manager) reevaluateMembers(communityID types.HexBytes) (*Community, map
 
 		becomeMemberPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_MEMBER]
 		if becomeMemberPermissions != nil {
-			permissionResponse, err := m.PermissionChecker.CheckPermissions(becomeMemberPermissions, accountsAndChainIDs, true)
+			permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(becomeMemberPermissions, accountsAndChainIDs, true, collectiblesOwners)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -1086,7 +1114,7 @@ func (m *Manager) reevaluateMembers(communityID types.HexBytes) (*Community, map
 			}
 		}
 
-		addToChannels, removeFromChannels, err := m.reevaluateMemberChannelsPermissions(community, memberPubKey, channelPermissionsPreParsedData, accountsAndChainIDs)
+		addToChannels, removeFromChannels, err := m.reevaluateMemberChannelsPermissions(community, memberPubKey, channelPermissionsPreParsedData, accountsAndChainIDs, collectiblesOwners)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1199,13 +1227,13 @@ func (m *Manager) applyReevaluateMembersResult(communityID types.HexBytes, resul
 }
 
 func (m *Manager) reevaluateMemberChannelsPermissions(community *Community, memberPubKey *ecdsa.PublicKey,
-	channelPermissionsPreParsedData map[string]*PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination) (map[string]protobuf.CommunityMember_ChannelRole, map[string]struct{}, error) {
+	channelPermissionsPreParsedData map[string]*PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, collectiblesOwners CollectiblesOwners) (map[string]protobuf.CommunityMember_ChannelRole, map[string]struct{}, error) {
 
 	addToChannels := map[string]protobuf.CommunityMember_ChannelRole{}
 	removeFromChannels := map[string]struct{}{}
 
 	// check which permissions we satisfy and which not
-	channelPermissionsCheckResult, err := m.checkChannelsPermissions(channelPermissionsPreParsedData, accountsAndChainIDs, true)
+	channelPermissionsCheckResult, err := m.checkChannelsPermissionsWithPreFetchedData(channelPermissionsPreParsedData, accountsAndChainIDs, true, collectiblesOwners)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1241,10 +1269,18 @@ func (m *Manager) reevaluateMemberChannelsPermissions(community *Community, memb
 	return addToChannels, removeFromChannels, nil
 }
 
-func (m *Manager) checkChannelsPermissions(channelsPermissionsPreParsedData map[string]*PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (map[string]map[protobuf.CommunityTokenPermission_Type]bool, error) {
+func (m *Manager) checkChannelsPermissionsImpl(channelsPermissionsPreParsedData map[string]*PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool, collectiblesOwners CollectiblesOwners) (map[string]map[protobuf.CommunityTokenPermission_Type]bool, error) {
+	checkPermissions := func(channelsPermissionPreParsedData *PreParsedCommunityPermissionsData) (*CheckPermissionsResponse, error) {
+		if collectiblesOwners != nil {
+			return m.PermissionChecker.CheckPermissionsWithPreFetchedData(channelsPermissionPreParsedData, accountsAndChainIDs, true, collectiblesOwners)
+		} else {
+			return m.PermissionChecker.CheckPermissions(channelsPermissionPreParsedData, accountsAndChainIDs, true)
+		}
+	}
+
 	channelPermissionsCheckResult := make(map[string]map[protobuf.CommunityTokenPermission_Type]bool)
 	for _, channelsPermissionPreParsedData := range channelsPermissionsPreParsedData {
-		permissionResponse, err := m.PermissionChecker.CheckPermissions(channelsPermissionPreParsedData, accountsAndChainIDs, true)
+		permissionResponse, err := checkPermissions(channelsPermissionPreParsedData)
 		if err != nil {
 			return channelPermissionsCheckResult, err
 		}
@@ -1262,6 +1298,14 @@ func (m *Manager) checkChannelsPermissions(channelsPermissionsPreParsedData map[
 		}
 	}
 	return channelPermissionsCheckResult, nil
+}
+
+func (m *Manager) checkChannelsPermissionsWithPreFetchedData(channelsPermissionsPreParsedData map[string]*PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool, collectiblesOwners CollectiblesOwners) (map[string]map[protobuf.CommunityTokenPermission_Type]bool, error) {
+	return m.checkChannelsPermissionsImpl(channelsPermissionsPreParsedData, accountsAndChainIDs, shortcircuit, collectiblesOwners)
+}
+
+func (m *Manager) checkChannelsPermissions(channelsPermissionsPreParsedData map[string]*PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (map[string]map[protobuf.CommunityTokenPermission_Type]bool, error) {
+	return m.checkChannelsPermissionsImpl(channelsPermissionsPreParsedData, accountsAndChainIDs, shortcircuit, nil)
 }
 
 func (m *Manager) StartMembersReevaluationLoop(communityID types.HexBytes, reevaluateOnStart bool) {
