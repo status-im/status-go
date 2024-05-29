@@ -411,25 +411,6 @@ func (m *Manager) LogStdout(msg string, fields ...zap.Field) {
 	m.logger.Debug(msg, fields...)
 }
 
-type archiveMDSlice []*archiveMetadata
-
-type archiveMetadata struct {
-	hash string
-	from uint64
-}
-
-func (md archiveMDSlice) Len() int {
-	return len(md)
-}
-
-func (md archiveMDSlice) Swap(i, j int) {
-	md[i], md[j] = md[j], md[i]
-}
-
-func (md archiveMDSlice) Less(i, j int) bool {
-	return md[i].from > md[j].from
-}
-
 type Subscription struct {
 	Community                                *Community
 	CreatingHistoryArchivesSignal            *signal.CreatingHistoryArchivesSignal
@@ -4043,37 +4024,6 @@ func (m *Manager) StoreWakuMessages(messages []*types.Message) error {
 
 func (m *Manager) GetLatestWakuMessageTimestamp(topics []types.TopicType) (uint64, error) {
 	return m.persistence.GetLatestWakuMessageTimestamp(topics)
-}
-
-type EncodedArchiveData struct {
-	padding int
-	bytes   []byte
-}
-
-type HistoryArchiveDownloadTaskInfo struct {
-	TotalDownloadedArchivesCount int
-	TotalArchivesCount           int
-	Cancelled                    bool
-}
-
-func (m *Manager) SaveMessageArchiveID(communityID types.HexBytes, hash string) error {
-	return m.persistence.SaveMessageArchiveID(communityID, hash)
-}
-
-func (m *Manager) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
-	return m.persistence.GetMessageArchiveIDsToImport(communityID)
-}
-func (m *Manager) SetMessageArchiveIDImported(communityID types.HexBytes, hash string, imported bool) error {
-	return m.persistence.SetMessageArchiveIDImported(communityID, hash, imported)
-}
-
-func topicsAsByteArrays(topics []types.TopicType) [][]byte {
-	var topicsAsByteArrays [][]byte
-	for _, t := range topics {
-		topic := types.TopicTypeToByteArray(t)
-		topicsAsByteArrays = append(topicsAsByteArrays, topic)
-	}
-	return topicsAsByteArrays
 }
 
 func (m *Manager) GetCommunityToken(communityID string, chainID int, address string) (*community_token.CommunityToken, error) {
