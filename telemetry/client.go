@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/wakuv2"
 
 	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 )
@@ -72,7 +73,25 @@ func (c *Client) PushReceivedEnvelope(envelope *v2protocol.Envelope) {
 	body, _ := json.Marshal(postBody)
 	_, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		c.logger.Error("Error sending envelope to telemetry server", zap.Error(err))
+		c.logger.Error("Error sending received envelope to telemetry server", zap.Error(err))
+	}
+}
+
+func (c *Client) PushSentEnvelope(envelope *v2protocol.Envelope, publishMethod wakuv2.PublishMethod) {
+	url := fmt.Sprintf("%s/sent-envelope", c.serverURL)
+	postBody := map[string]interface{}{
+		"messageHash":   envelope.Hash().String(),
+		"sentAt":        uint32(envelope.Message().GetTimestamp() / int64(time.Second)),
+		"pubsubTopic":   envelope.PubsubTopic(),
+		"topic":         envelope.Message().ContentTopic,
+		"senderKeyUID":  c.keyUID,
+		"nodeName":      c.nodeName,
+		"publishMethod": publishMethod.String(),
+	}
+	body, _ := json.Marshal(postBody)
+	_, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		c.logger.Error("Error sending pushed envelope to telemetry server", zap.Error(err))
 	}
 }
 
