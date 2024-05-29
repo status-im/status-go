@@ -130,6 +130,8 @@ type Waku struct {
 	sendMsgIDs   map[string]map[gethcommon.Hash]uint32
 	sendMsgIDsMu sync.RWMutex
 
+	storePeerID peer.ID
+
 	topicHealthStatusChan   chan peermanager.TopicHealthStatus
 	connStatusSubscriptions map[string]*types.ConnStatusSubscription
 	connStatusMu            sync.Mutex
@@ -992,6 +994,9 @@ func (w *Waku) checkIfMessagesStored() {
 			for pubsubTopic, subMsgs := range w.sendMsgIDs {
 				var queryMsgIds []gethcommon.Hash
 				for msgID, sendTime := range subMsgs {
+					if len(queryMsgIds) >= 20 {
+						break
+					}
 					// message is sent 5 seconds ago, check if it's stored
 					if uint32(w.timesource.Now().Unix()) > sendTime+5 {
 						queryMsgIds = append(queryMsgIds, msgID)
@@ -1060,34 +1065,42 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
 
 // ctx, peer, r.PubsubTopic, contentTopics, uint64(r.From), uint64(r.To), options, processEnvelopes
 func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Hash, pubsubTopic string) {
-	selectedPeers, err := w.node.PeerManager().SelectPeers(
-		peermanager.PeerSelectionCriteria{
-			SelectionType: peermanager.Automatic,
-			Proto:         store.StoreQueryID_v300,
-			PubsubTopics:  []string{pubsubTopic},
-			Ctx:           ctx,
-		},
-	)
-	if err != nil {
-		w.logger.Warn("could not select peers", zap.Error(err))
-		return
+	selectedPeer := w.storePeerID
+	if selectedPeer == "" {
+		selectedPeers, err := w.node.PeerManager().SelectPeers(
+			peermanager.PeerSelectionCriteria{
+				SelectionType: peermanager.Automatic,
+				Proto:         store.StoreQueryID_v300,
+				PubsubTopics:  []string{pubsubTopic},
+				Ctx:           ctx,
+			},
+		)
+		if err != nil {
+			w.logger.Error("could not select peers", zap.Error(err))
+			return
+		}
+		selectedPeer = selectedPeers[0]
 	}
 
 	var opts []store.RequestOption
 	requestID := protocol.GenerateRequestID()
 	opts = append(opts, store.WithRequestID(requestID))
-	opts = append(opts, store.WithPeer(selectedPeers[0]))
+	opts = append(opts, store.WithPeer(selectedPeer))
 
 	messageHashes := make([]pb.MessageHash, len(hashes))
 	for i, hash := range hashes {
 		messageHashes[i] = pb.ToMessageHash(hash.Bytes())
 	}
 
+	w.logger.Debug("store.queryByHash request", zap.String("requestID", hexutil.Encode(requestID)), zap.String("peerID", selectedPeer.String()), zap.Any("messageHashes", messageHashes))
+
 	result, err := w.node.Store().QueryByHash(ctx, messageHashes, opts...)
 	if err != nil {
-		w.logger.Warn("store.queryByHash failed", zap.String("requestID", hexutil.Encode(requestID)), zap.Error(err))
+		w.logger.Error("store.queryByHash failed", zap.String("requestID", hexutil.Encode(requestID)), zap.String("peerID", selectedPeer.String()), zap.Error(err))
 		return
 	}
+
+	w.logger.Debug("store.queryByHash result", zap.String("requestID", hexutil.Encode(requestID)), zap.Int("messages", len(result.Messages())))
 
 	var ackHashes []gethcommon.Hash
 	var missedHashes []gethcommon.Hash
@@ -1099,10 +1112,19 @@ func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Ha
 				break
 			}
 		}
+
 		if found {
 			ackHashes = append(ackHashes, hash)
+			w.SendEnvelopeEvent(common.EnvelopeEvent{
+				Hash:  hash,
+				Event: common.EventEnvelopeSent,
+			})
 		} else {
 			missedHashes = append(missedHashes, hash)
+			w.SendEnvelopeEvent(common.EnvelopeEvent{
+				Hash:  hash,
+				Event: common.EventEnvelopeExpired,
+			})
 		}
 
 		subMsgs := w.sendMsgIDs[pubsubTopic]
@@ -1116,20 +1138,6 @@ func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Ha
 
 	w.logger.Debug("Ack message hashes", zap.Any("ackHashes", ackHashes))
 	w.logger.Debug("Missed message hashes", zap.Any("missedHashes", missedHashes))
-
-	for _, hash := range ackHashes {
-		w.SendEnvelopeEvent(common.EnvelopeEvent{
-			Hash:  hash,
-			Event: common.EventEnvelopeSent,
-		})
-	}
-
-	for _, hash := range missedHashes {
-		w.SendEnvelopeEvent(common.EnvelopeEvent{
-			Hash:  hash,
-			Event: common.EventEnvelopeExpired,
-		})
-	}
 }
 
 func (w *Waku) Query(ctx context.Context, peerID peer.ID, query legacy_store.Query, cursor *storepb.Index, opts []legacy_store.HistoryRequestOption, processEnvelopes bool) (*storepb.Index, int, error) {
