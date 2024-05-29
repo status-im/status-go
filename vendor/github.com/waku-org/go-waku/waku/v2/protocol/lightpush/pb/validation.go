@@ -2,6 +2,10 @@ package pb
 
 import "errors"
 
+// This special value for requestId indicates that the message was rate limited
+// and we did not retreive the requestId to avoid a potential attack vector.
+const REQUESTID_RATE_LIMITED = "N/A"
+
 var (
 	errMissingRequestID   = errors.New("missing RequestId field")
 	errMissingQuery       = errors.New("missing Query field")
@@ -32,6 +36,9 @@ func (x *PushRpc) ValidateRequest() error {
 }
 
 func (x *PushRpc) ValidateResponse(requestID string) error {
+	if x.RequestId == REQUESTID_RATE_LIMITED {
+		return nil
+	}
 	if x.RequestId == "" {
 		return errMissingRequestID
 	}

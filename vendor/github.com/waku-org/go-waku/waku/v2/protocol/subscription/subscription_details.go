@@ -25,10 +25,11 @@ type PeerContentFilter struct {
 type SubscriptionDetails struct {
 	sync.RWMutex
 
-	ID     string `json:"subscriptionID"`
-	mapRef *SubscriptionsMap
-	Closed bool `json:"-"`
-	once   sync.Once
+	ID      string `json:"subscriptionID"`
+	mapRef  *SubscriptionsMap
+	Closed  bool `json:"-"`
+	once    sync.Once
+	Closing chan struct{}
 
 	PeerID        peer.ID                 `json:"peerID"`
 	ContentFilter protocol.ContentFilter  `json:"contentFilters"`
@@ -96,7 +97,6 @@ func (s *SubscriptionDetails) CloseC() {
 	s.once.Do(func() {
 		s.Lock()
 		defer s.Unlock()
-
 		s.Closed = true
 		close(s.C)
 	})

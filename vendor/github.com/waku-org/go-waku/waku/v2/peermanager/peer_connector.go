@@ -193,7 +193,6 @@ func (c *PeerConnectionStrategy) canDialPeer(pi peer.AddrInfo) bool {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 	val, ok := c.cache.Get(pi.ID)
-	var cachedPeer *connCacheData
 	if ok {
 		tv := val.(*connCacheData)
 		now := time.Now()
@@ -204,15 +203,25 @@ func (c *PeerConnectionStrategy) canDialPeer(pi peer.AddrInfo) bool {
 		}
 		c.logger.Debug("Proceeding with connecting to peer",
 			zap.Time("currentTime", now), zap.Time("nextTry", tv.nextTry))
-		tv.nextTry = now.Add(tv.strat.Delay())
+	}
+	return true
+}
+
+func (c *PeerConnectionStrategy) addConnectionBackoff(peerID peer.ID) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+	val, ok := c.cache.Get(peerID)
+	var cachedPeer *connCacheData
+	if ok {
+		tv := val.(*connCacheData)
+		tv.nextTry = time.Now().Add(tv.strat.Delay())
 	} else {
 		cachedPeer = &connCacheData{strat: c.backoff()}
 		cachedPeer.nextTry = time.Now().Add(cachedPeer.strat.Delay())
 		c.logger.Debug("Initializing connectionCache for peer ",
-			logging.HostID("peerID", pi.ID), zap.Time("until", cachedPeer.nextTry))
-		c.cache.Add(pi.ID, cachedPeer)
+			logging.HostID("peerID", peerID), zap.Time("until", cachedPeer.nextTry))
+		c.cache.Add(peerID, cachedPeer)
 	}
-	return true
 }
 
 func (c *PeerConnectionStrategy) dialPeers() {
@@ -255,6 +264,7 @@ func (c *PeerConnectionStrategy) dialPeer(pi peer.AddrInfo, sem chan struct{}) {
 	defer cancel()
 	err := c.host.Connect(ctx, pi)
 	if err != nil && !errors.Is(err, context.Canceled) {
+		c.addConnectionBackoff(pi.ID)
 		c.host.Peerstore().(wps.WakuPeerstore).AddConnFailure(pi)
 		c.logger.Warn("connecting to peer", logging.HostID("peerID", pi.ID), zap.Error(err))
 	}

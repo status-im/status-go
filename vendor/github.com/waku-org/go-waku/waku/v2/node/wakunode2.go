@@ -291,7 +291,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 
 	w.filterFullNode = filter.NewWakuFilterFullNode(w.timesource, w.opts.prometheusReg, w.log, w.opts.filterOpts...)
 	w.filterLightNode = filter.NewWakuFilterLightNode(w.bcaster, w.peermanager, w.timesource, w.opts.prometheusReg, w.log)
-	w.lightPush = lightpush.NewWakuLightPush(w.Relay(), w.peermanager, w.opts.prometheusReg, w.log)
+	w.lightPush = lightpush.NewWakuLightPush(w.Relay(), w.peermanager, w.opts.prometheusReg, w.log, w.opts.lightpushOpts...)
 
 	w.store = store.NewWakuStore(w.peermanager, w.timesource, w.log)
 
@@ -698,7 +698,7 @@ func (w *WakuNode) AddPeer(address ma.Multiaddr, origin wps.Origin, pubSubTopics
 }
 
 // AddDiscoveredPeer to add a discovered peer to the node peerStore
-func (w *WakuNode) AddDiscoveredPeer(ID peer.ID, addrs []ma.Multiaddr, origin wps.Origin, pubsubTopics []string, connectNow bool) {
+func (w *WakuNode) AddDiscoveredPeer(ID peer.ID, addrs []ma.Multiaddr, origin wps.Origin, pubsubTopics []string, enr *enode.Node, connectNow bool) {
 	p := service.PeerData{
 		Origin: origin,
 		AddrInfo: peer.AddrInfo{
@@ -706,6 +706,7 @@ func (w *WakuNode) AddDiscoveredPeer(ID peer.ID, addrs []ma.Multiaddr, origin wp
 			Addrs: addrs,
 		},
 		PubsubTopics: pubsubTopics,
+		ENR:          enr,
 	}
 	w.peermanager.AddDiscoveredPeer(p, connectNow)
 }
@@ -843,7 +844,7 @@ func (w *WakuNode) Peers() ([]*Peer, error) {
 			Protocols:    protocols,
 			Connected:    connected,
 			Addrs:        addrs,
-			PubsubTopics: topics,
+			PubsubTopics: maps.Keys(topics),
 		})
 	}
 	return peers, nil
