@@ -1135,12 +1135,42 @@ func (w *Waku) Start() error {
 
 	go func() {
 		defer w.wg.Done()
-
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
 		isConnected := false
 		for {
 			select {
 			case <-w.ctx.Done():
 				return
+			case <-ticker.C:
+				//TODO: Need to fix.
+				// Temporary changes for lightNodes to have health check based on connected peers.
+				//This needs to be enhanced to be based on healthy Filter and lightPush peers available for each shard.
+				//This would get fixed as part of https://github.com/waku-org/go-waku/issues/1114
+				if w.cfg.LightClient {
+					w.connStatusMu.Lock()
+
+					peers := w.node.Host().Network().Peers()
+					w.logger.Debug("peer stats",
+						zap.Int("peersCount", len(peers)))
+					isOnline := false
+					if len(peers) > 0 {
+						isOnline = true
+					}
+					connStatus := types.ConnStatus{
+						IsOnline: isOnline,
+						Peers:    FormatPeerStats(w.node),
+					}
+					for k, subs := range w.connStatusSubscriptions {
+						if !subs.Send(connStatus) {
+							delete(w.connStatusSubscriptions, k)
+						}
+					}
+					w.connStatusMu.Unlock()
+					if w.onPeerStats != nil {
+						w.onPeerStats(connStatus)
+					}
+				}
 			case c := <-w.topicHealthStatusChan:
 				w.connStatusMu.Lock()
 
