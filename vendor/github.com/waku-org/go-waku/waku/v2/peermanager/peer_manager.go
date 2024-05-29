@@ -84,6 +84,7 @@ type PeerManager struct {
 	discoveryService       *discv5.DiscoveryV5
 	wakuprotoToENRFieldMap map[protocol.ID]WakuProtoInfo
 	TopicHealthNotifCh     chan<- TopicHealthStatus
+	rttCache               *FastestPeerSelector
 }
 
 // PeerSelection provides various options based on which Peer is selected from a list of peers.
@@ -188,6 +189,7 @@ func NewPeerManager(maxConnections int, maxPeers int, metadata *metadata.WakuMet
 		subRelayTopics:         make(map[string]*NodeTopicDetails),
 		maxPeers:               maxPeers,
 		wakuprotoToENRFieldMap: map[protocol.ID]WakuProtoInfo{},
+		rttCache:               NewFastestPeerSelector(logger),
 	}
 	logger.Info("PeerManager init values", zap.Int("maxConnections", maxConnections),
 		zap.Int("maxRelayPeers", maxRelayPeers),
@@ -206,6 +208,7 @@ func (pm *PeerManager) SetDiscv5(discv5 *discv5.DiscoveryV5) {
 // SetHost sets the host to be used in order to access the peerStore.
 func (pm *PeerManager) SetHost(host host.Host) {
 	pm.host = host
+	pm.rttCache.SetHost(host)
 }
 
 // SetPeerConnector sets the peer connector to be used for establishing relay connections.
@@ -215,7 +218,6 @@ func (pm *PeerManager) SetPeerConnector(pc *PeerConnectionStrategy) {
 
 // Start starts the processing to be done by peer manager.
 func (pm *PeerManager) Start(ctx context.Context) {
-
 	pm.RegisterWakuProtocol(relay.WakuRelayID_v200, relay.WakuRelayENRField)
 
 	pm.ctx = ctx
@@ -429,17 +431,21 @@ func (pm *PeerManager) AddDiscoveredPeer(p service.PeerData, connectNow bool) {
 	if err == nil {
 		enr, err := pm.host.Peerstore().(wps.WakuPeerstore).ENR(p.AddrInfo.ID)
 		// Verifying if the enr record is more recent (DiscV5 and peer exchange can return peers already seen)
-		if err == nil && enr.Record().Seq() >= p.ENR.Seq() {
-			return
-		}
-		if err != nil {
-			//Peer is already in peer-store but it doesn't have an enr, but discovered peer has ENR
-			pm.logger.Info("peer already found in peerstore, but doesn't have an ENR record, re-adding",
-				logging.HostID("peer", p.AddrInfo.ID), zap.Uint64("newENRSeq", p.ENR.Seq()))
+		if err == nil {
+			if p.ENR != nil {
+				if enr.Record().Seq() >= p.ENR.Seq() {
+					return
+				}
+				//Peer is already in peer-store but stored ENR is older than discovered one.
+				pm.logger.Info("peer already found in peerstore, but re-adding it as ENR sequence is higher than locally stored",
+					logging.HostID("peer", p.AddrInfo.ID), zap.Uint64("newENRSeq", p.ENR.Seq()), zap.Uint64("storedENRSeq", enr.Record().Seq()))
+			} else {
+				pm.logger.Info("peer already found in peerstore, but no new ENR", logging.HostID("peer", p.AddrInfo.ID))
+			}
 		} else {
-			//Peer is already in peer-store but stored ENR is older than discovered one.
-			pm.logger.Info("peer already found in peerstore, but re-adding it as ENR sequence is higher than locally stored",
-				logging.HostID("peer", p.AddrInfo.ID), zap.Uint64("newENRSeq", p.ENR.Seq()), zap.Uint64("storedENRSeq", enr.Record().Seq()))
+			//Peer is in peer-store but it doesn't have an enr
+			pm.logger.Info("peer already found in peerstore, but doesn't have an ENR record, re-adding",
+				logging.HostID("peer", p.AddrInfo.ID))
 		}
 	}
 
