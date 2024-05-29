@@ -120,6 +120,32 @@ func (m *testCollectiblesManager) GetCollectibleOwnership(id thirdparty.Collecti
 	return nil, errors.New("GetCollectibleOwnership is not implemented for testCollectiblesManager")
 }
 
+func (m *testCollectiblesManager) FetchCollectibleOwnersByContractAddress(ctx context.Context, chainID walletCommon.ChainID, contractAddress gethcommon.Address) (*thirdparty.CollectibleContractOwnership, error) {
+	ret := &thirdparty.CollectibleContractOwnership{
+		ContractAddress: contractAddress,
+		Owners:          []thirdparty.CollectibleOwner{},
+	}
+
+	balancesPerOwner, ok := m.response[uint64(chainID)]
+	if !ok {
+		return ret, nil
+	}
+
+	for ownerAddress, collectibles := range balancesPerOwner {
+		for collectibleAddress, balances := range collectibles {
+			if collectibleAddress == contractAddress {
+				ret.Owners = append(ret.Owners, thirdparty.CollectibleOwner{
+					OwnerAddress:  ownerAddress,
+					TokenBalances: balances,
+				})
+				break
+			}
+		}
+	}
+
+	return ret, nil
+}
+
 type testTokenManager struct {
 	response map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
 }

@@ -24,6 +24,8 @@ import (
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
@@ -70,6 +72,37 @@ func (m *TokenManagerMock) GetBalancesByChain(ctx context.Context, accounts, tok
 func (m *TokenManagerMock) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *walletToken.Token {
 	time.Sleep(100 * time.Millisecond) // simulate response time
 	return nil
+}
+
+type CollectiblesManagerMock struct {
+	response map[thirdparty.CollectibleUniqueID][]thirdparty.AccountBalance
+}
+
+func (m *CollectiblesManagerMock) FetchBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID,
+	ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
+	return nil, errors.New("FetchBalancesByOwnerAndContractAddress is not implemented for testCollectiblesManager")
+}
+
+func (m *CollectiblesManagerMock) GetCollectibleOwnership(requestedID thirdparty.CollectibleUniqueID) ([]thirdparty.AccountBalance, error) {
+	// NOTE: TokenID inside of thirdparty.CollectibleUniqueID is a pointer so m.response[id] is now working
+	for id, balances := range m.response {
+		if id.ContractID.Address == requestedID.ContractID.Address &&
+			id.ContractID.ChainID == requestedID.ContractID.ChainID {
+			return balances, nil
+		}
+	}
+	return []thirdparty.AccountBalance{}, nil
+}
+
+func (m *CollectiblesManagerMock) SetResponse(id thirdparty.CollectibleUniqueID, balances []thirdparty.AccountBalance) {
+	if m.response == nil {
+		m.response = map[thirdparty.CollectibleUniqueID][]thirdparty.AccountBalance{}
+	}
+	m.response[id] = balances
+}
+
+func (m *CollectiblesManagerMock) FetchCollectibleOwnersByContractAddress(ctx context.Context, chainID walletCommon.ChainID, contractAddress gethcommon.Address) (*thirdparty.CollectibleContractOwnership, error) {
+	return nil, errors.New("FetchCollectibleOwnersByContractAddress is not implemented for CollectiblesManagerMock")
 }
 
 type CollectiblesServiceMock struct {
@@ -227,9 +260,12 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku types.Waku, config testCom
 		Balances: config.mockedBalances,
 	}
 
+	collectiblesManagerMock := &CollectiblesManagerMock{}
+
 	options := []Option{
 		WithAccountManager(accountsManagerMock),
 		WithTokenManager(tokenManagerMock),
+		WithCollectiblesManager(collectiblesManagerMock),
 		WithCommunityTokensService(config.collectiblesService),
 		WithAppSettings(*config.appSettings, *config.nodeConfig),
 	}
