@@ -1752,7 +1752,16 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 	conf.Version = params.Version
 	conf.RootDataDir = b.rootDataDir
 	conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
-	conf.ShhextConfig.BackupDisabledDataDir = filepath.Join(b.rootDataDir, conf.ShhextConfig.BackupDisabledDataDir)
+
+	backupDir := conf.ShhextConfig.BackupDisabledDataDir
+	if !filepath.IsAbs(backupDir) {
+		backupDir = filepath.Join(b.rootDataDir, backupDir)
+	}
+	if !filepath.IsAbs(backupDir) {
+		b.log.Warn("BackupDisabledDataDir was expected to be absolute path, instead it is ", backupDir)
+	}
+	conf.ShhextConfig.BackupDisabledDataDir = backupDir
+
 	if len(conf.LogDir) == 0 {
 		conf.LogFile = filepath.Join(b.rootDataDir, conf.LogFile)
 	} else {
