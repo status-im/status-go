@@ -138,7 +138,7 @@ func NewSimpleClient(mainLimiter *RPCRpsLimiter, main *rpc.Client, chainID uint6
 	circuitBreakerCmdName := fmt.Sprintf("ethClient_%d", chainID)
 	hystrix.ConfigureCommand(circuitBreakerCmdName, hystrix.CommandConfig{
 		Timeout:               10000,
-		MaxConcurrentRequests: 100,
+		MaxConcurrentRequests: 10,
 		SleepWindow:           300000,
 		ErrorPercentThreshold: 25,
 	})
@@ -163,7 +163,7 @@ func NewClient(mainLimiter *RPCRpsLimiter, main *rpc.Client, fallbackLimiter *RP
 	circuitBreakerCmdName := fmt.Sprintf("ethClient_%d", chainID)
 	hystrix.ConfigureCommand(circuitBreakerCmdName, hystrix.CommandConfig{
 		Timeout:               20000,
-		MaxConcurrentRequests: 100,
+		MaxConcurrentRequests: 10,
 		SleepWindow:           300000,
 		ErrorPercentThreshold: 25,
 	})

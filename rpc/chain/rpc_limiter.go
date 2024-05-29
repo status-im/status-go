@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	defaultMaxRequestsPerSecond = 50
-	minRequestsPerSecond        = 20
-	requestsPerSecondStep       = 10
+	defaultMaxRequestsPerSecond = 20
+	minRequestsPerSecond        = 10
+	requestsPerSecondStep       = 5
 
 	tickerInterval  = 1 * time.Second
 	LimitInfinitely = 0

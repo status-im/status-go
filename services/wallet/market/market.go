@@ -38,7 +38,7 @@ type Manager struct {
 func NewManager(main thirdparty.MarketDataProvider, fallback thirdparty.MarketDataProvider, feed *event.Feed) *Manager {
 	hystrix.ConfigureCommand("marketClient", hystrix.CommandConfig{
 		Timeout:               10000,
-		MaxConcurrentRequests: 100,
+		MaxConcurrentRequests: 10,
 		SleepWindow:           300000,
 		ErrorPercentThreshold: 25,
 	})
