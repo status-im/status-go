@@ -28,8 +28,6 @@ const (
 	FilterEventGetStats
 )
 
-const pingTimeout = 10 * time.Second
-
 type FilterSubs map[string]subscription.SubscriptionSet
 
 type FilterEvent struct {
