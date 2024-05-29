@@ -76,9 +76,7 @@ func newFilterManager(ctx context.Context, logger *zap.Logger, getFilterFn func(
 	mgr.config = config
 	mgr.node = node
 	mgr.isFilterSubAlive = func(sub *subscription.SubscriptionDetails) error {
-		ctx, cancel := context.WithTimeout(ctx, pingTimeout)
-		defer cancel()
-		return mgr.node.FilterLightnode().IsSubscriptionAlive(ctx, sub)
+		return nil
 	}
 
 	return mgr

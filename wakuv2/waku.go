@@ -412,7 +412,7 @@ func (w *Waku) discoverAndConnectPeers() error {
 	fnApply := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
 		defer wg.Done()
 		if len(d.PeerInfo.Addrs) != 0 {
-			go w.connect(d.PeerInfo, wps.DNSDiscovery)
+			go w.connect(d.PeerInfo, d.ENR, wps.DNSDiscovery)
 		}
 	}
 
@@ -439,17 +439,17 @@ func (w *Waku) discoverAndConnectPeers() error {
 				continue
 			}
 
-			go w.connect(*peerInfo, wps.Static)
+			go w.connect(*peerInfo, nil, wps.Static)
 		}
 	}
 
 	return nil
 }
 
-func (w *Waku) connect(peerInfo peer.AddrInfo, origin wps.Origin) {
+func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origin) {
 	// Connection will be prunned eventually by the connection manager if needed
 	// The peer connector in go-waku uses Connect, so it will execute identify as part of its
-	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, []string{w.cfg.DefaultShardPubsubTopic}, true)
+	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, []string{w.cfg.DefaultShardPubsubTopic}, enr, true)
 }
 
 func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
@@ -520,7 +520,7 @@ func (w *Waku) runPeerExchangeLoop() {
 					}
 					// Attempt to connect to the peers.
 					// Peers will be added to the libp2p peer store thanks to identify
-					go w.connect(discoveredNode.PeerInfo, wps.DNSDiscovery)
+					go w.connect(discoveredNode.PeerInfo, discoveredNode.ENR, wps.DNSDiscovery)
 					peers = append(peers, discoveredNode.PeerID)
 				}
 			}
