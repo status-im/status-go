@@ -79,14 +79,6 @@ func (s *ERC721TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwor
 		return 0, err
 	}
 
-	ctx := context.Background()
-
-	if code, err := ethClient.PendingCodeAt(ctx, token.Address); err != nil {
-		return 0, err
-	} else if len(code) == 0 {
-		return 0, bind.ErrNoCode
-	}
-
 	msg := ethereum.CallMsg{
 		From:  from,
 		To:    &token.Address,
@@ -94,7 +86,7 @@ func (s *ERC721TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwor
 		Data:  input,
 	}
 
-	estimation, err := ethClient.EstimateGas(ctx, msg)
+	estimation, err := ethClient.EstimateGas(context.Background(), msg)
 	if err != nil {
 		return 0, err
 	}
