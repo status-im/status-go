@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -454,11 +455,7 @@ func (b *GethStatusBackend) setupLogSettings() error {
 	return nil
 }
 
-// StartNodeWithKey instead of loading addresses from database this method derives address from key
-// and uses it in application.
-// TODO: we should use a proper struct with optional values instead of duplicating the regular functions
-// with small variants for keycard, this created too many bugs
-func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password string, keyHex string, inputNodeCfg *params.NodeConfig) error {
+func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string, nodecfg *params.NodeConfig) error {
 	if acc.KDFIterations == 0 {
 		kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(acc.KeyUID)
 		if err != nil {
@@ -468,73 +465,12 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 		acc.KDFIterations = kdfIterations
 	}
 
-	err := b.ensureDBsOpened(acc, password)
-	if err != nil {
-		return err
-	}
-
-	err = b.loadNodeConfig(inputNodeCfg)
-	if err != nil {
-		return err
-	}
-
-	err = b.setupLogSettings()
-	if err != nil {
-		return err
-	}
-
-	accountsDB, err := accounts.NewDB(b.appDB)
-	if err != nil {
-		return err
-	}
-
-	if acc.ColorHash == nil {
-		multiAccount, err := b.updateAccountColorHashAndColorID(acc.KeyUID, accountsDB)
-		if err != nil {
-			return err
-		}
-		acc = *multiAccount
-	}
-
-	b.account = &acc
-
-	walletAddr, err := accountsDB.GetWalletAddress()
-	if err != nil {
-		return err
-	}
-	watchAddrs, err := accountsDB.GetAddresses()
-	if err != nil {
-		return err
-	}
 	chatKey, err := ethcrypto.HexToECDSA(keyHex)
 	if err != nil {
 		return err
 	}
-	err = b.StartNode(b.config)
-	if err != nil {
-		return err
-	}
-	if err := b.accountManager.SetChatAccount(chatKey); err != nil {
-		return err
-	}
-	_, err = b.accountManager.SelectedChatAccount()
-	if err != nil {
-		return err
-	}
-	b.accountManager.SetAccountAddresses(walletAddr, watchAddrs...)
-	err = b.injectAccountsIntoServices()
-	if err != nil {
-		return err
-	}
-	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
-func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string, nodecfg *params.NodeConfig) error {
-	err := b.startNodeWithKey(acc, password, keyHex, nodecfg)
+	err = b.startNodeWithAccount(acc, password, nodecfg, chatKey)
 	if err != nil {
 		// Stop node for clean up
 		_ = b.StopNode()
@@ -737,7 +673,7 @@ func (b *GethStatusBackend) UpdateNodeConfigFleet(acc multiaccounts.Account, pas
 	return nil
 }
 
-func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, inputNodeCfg *params.NodeConfig) error {
+func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, inputNodeCfg *params.NodeConfig, chatKey *ecdsa.PrivateKey) error {
 	err := b.ensureDBsOpened(acc, password)
 	if err != nil {
 		return err
@@ -793,10 +729,29 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		return err
 	}
 
-	err = b.SelectAccount(login)
-	if err != nil {
-		return err
+	if chatKey == nil {
+		// Load account from keystore
+		err = b.SelectAccount(login)
+		if err != nil {
+			return err
+		}
+	} else {
+		// In case of keycard, we don't have keystore, but we directly have the private key
+		if err := b.accountManager.SetChatAccount(chatKey); err != nil {
+			return err
+		}
+		_, err = b.accountManager.SelectedChatAccount()
+		if err != nil {
+			return err
+		}
+
+		b.accountManager.SetAccountAddresses(walletAddr, watchAddrs...)
+		err = b.injectAccountsIntoServices()
+		if err != nil {
+			return err
+		}
 	}
+
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
 	if err != nil {
 		b.log.Info("failed to update account")
@@ -861,11 +816,11 @@ func (b *GethStatusBackend) MigrateKeyStoreDir(acc multiaccounts.Account, passwo
 }
 
 func (b *GethStatusBackend) Login(keyUID, password string) error {
-	return b.startNodeWithAccount(multiaccounts.Account{KeyUID: keyUID}, password, nil)
+	return b.startNodeWithAccount(multiaccounts.Account{KeyUID: keyUID}, password, nil, nil)
 }
 
 func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string, nodecfg *params.NodeConfig) error {
-	err := b.startNodeWithAccount(acc, password, nodecfg)
+	err := b.startNodeWithAccount(acc, password, nodecfg, nil)
 	if err != nil {
 		// Stop node for clean up
 		_ = b.StopNode()
@@ -993,9 +948,9 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 				// because UI calls Logout and Quit afterwards. It should not be UI-dependent
 				// and should be handled gracefully here if it makes sense to run dummy node after
 				// logout
-				_ = b.startNodeWithAccount(*account, password, nil)
+				_ = b.startNodeWithAccount(*account, password, nil, nil)
 			} else {
-				_ = b.startNodeWithAccount(*account, newPassword, nil)
+				_ = b.startNodeWithAccount(*account, newPassword, nil, nil)
 			}
 		}
 	}
@@ -1708,7 +1663,23 @@ func enrichMultiAccountByPublicKey(account *multiaccounts.Account, publicKey typ
 	return nil
 }
 
-func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(account multiaccounts.Account, password string, settings settings.Settings, nodecfg *params.NodeConfig, subaccs []*accounts.Account, keyHex string) error {
+func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(
+	account multiaccounts.Account,
+	password string,
+	settings settings.Settings,
+	nodecfg *params.NodeConfig,
+	subaccs []*accounts.Account,
+	keyHex string,
+) error {
+	b.log.Info("<<< SaveAccountAndStartNodeWithKey",
+		"account", account,
+		"settings", settings,
+		"nodecfg", nodecfg,
+		"subaccs", subaccs,
+		"keyHex", keyHex,
+		"password", password,
+	)
+
 	err := enrichMultiAccountBySubAccounts(&account, subaccs)
 	if err != nil {
 		return err
@@ -1738,7 +1709,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	nodecfg *params.NodeConfig,
 	subaccs []*accounts.Account,
 ) error {
-	b.log.Info("node config", "config", nodecfg)
+	b.log.Info("<<< node config", "config", nodecfg)
 
 	err := enrichMultiAccountBySubAccounts(&account, subaccs)
 	if err != nil {

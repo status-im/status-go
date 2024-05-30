@@ -18,7 +18,7 @@ type Key struct {
 	// ExtendedKey is the extended key of the PrivateKey itself, and it's used
 	// to derive child keys.
 	ExtendedKey *extkeys.ExtendedKey
-	// SubAccountIndex is DEPRECATED
+	// Deprecated: SubAccountIndex
 	// It was use in Status to keep track of the number of sub-account created
 	// before having multi-account support.
 	SubAccountIndex uint32
