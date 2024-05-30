@@ -235,7 +235,7 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		Payload:              encodedMessage,
 		MessageType:          protobuf.ApplicationMetadataMessage_DELETE_MESSAGE,
 		SkipGroupMessageWrap: true,
-		ResendType:           GetResendTypeForChat(chat),
+		ResendType:           chat.DefaultResendType(),
 	}
 
 	_, err = m.dispatchMessage(ctx, rawMessage)

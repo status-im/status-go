@@ -438,46 +438,10 @@ func (w *Waku) discoverAndConnectPeers() error {
 	return nil
 }
 
-func (w *Waku) identifyAndConnect(ctx context.Context, isLightClient bool, peerInfo peer.AddrInfo) {
-	ctx, cancel := context.WithTimeout(ctx, 7*time.Second)
-	defer cancel()
-
-	err := w.node.Host().Connect(ctx, peerInfo)
-	if err != nil {
-		w.logger.Error("could not connect to peer", zap.Any("peer", peerInfo), zap.Error(err))
-		return
-	}
-
-	conns := w.node.Host().Network().ConnsToPeer(peerInfo.ID)
-	if len(conns) == 0 {
-		return // No connection
-	}
-
-	select {
-	case <-w.ctx.Done():
-		return
-	case <-w.identifyService.IdentifyWait(conns[0]):
-		if isLightClient {
-			err = w.node.Host().Network().ClosePeer(peerInfo.ID)
-			if err != nil {
-				w.logger.Error("could not close connections to peer", zap.Stringer("peer", peerInfo.ID), zap.Error(err))
-			}
-			return
-		}
-
-		supportedProtocols, err := w.node.Host().Peerstore().SupportsProtocols(peerInfo.ID, relay.WakuRelayID_v200)
-		if err != nil {
-			w.logger.Error("could not obtain protocols", zap.Stringer("peer", peerInfo.ID), zap.Error(err))
-			return
-		}
-
-		if len(supportedProtocols) == 0 {
-			err = w.node.Host().Network().ClosePeer(peerInfo.ID)
-			if err != nil {
-				w.logger.Error("could not close connections to peer", zap.Stringer("peer", peerInfo.ID), zap.Error(err))
-			}
-		}
-	}
+func (w *Waku) connect(peerInfo peer.AddrInfo, origin wps.Origin) {
+	// Connection will be prunned eventually by the connection manager if needed
+	// The peer connector in go-waku uses Connect, so it will execute identify as part of its
+	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, []string{w.cfg.DefaultShardPubsubTopic}, nil, true)
 }
 
 func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {

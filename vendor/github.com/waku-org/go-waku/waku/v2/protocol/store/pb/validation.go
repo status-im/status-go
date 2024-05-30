@@ -14,7 +14,6 @@ var (
 	errMaxContentTopics       = errors.New("exceeds the maximum number of ContentTopics allowed")
 	errEmptyContentTopic      = errors.New("one or more content topics specified is empty")
 	errMissingPubsubTopic     = errors.New("missing PubsubTopic field")
-	errMissingContentTopics   = errors.New("missing ContentTopics field")
 	errMissingStatusCode      = errors.New("missing StatusCode field")
 	errInvalidTimeRange       = errors.New("invalid time range")
 	errInvalidMessageHash     = errors.New("invalid message hash")
@@ -40,9 +39,7 @@ func (x *StoreQueryRequest) Validate() error {
 			return errMissingPubsubTopic
 		}
 
-		if len(x.ContentTopics) == 0 {
-			return errMissingContentTopics
-		} else if len(x.ContentTopics) > MaxContentTopics {
+		if len(x.ContentTopics) > MaxContentTopics {
 			return errMaxContentTopics
 		} else {
 			for _, m := range x.ContentTopics {
@@ -83,6 +80,10 @@ func (x *WakuMessageKeyValue) Validate() error {
 	}
 
 	if x.Message != nil {
+		if x.GetPubsubTopic() == "" {
+			return errMissingPubsubTopic
+		}
+
 		return x.Message.Validate()
 	}
 

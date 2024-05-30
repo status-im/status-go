@@ -163,6 +163,47 @@ func (s *ChatTestSuite) TestUpdateFirstMessageTimestamp() {
 	setAndCheck(100, true, 100)
 }
 
+func (s *ChatTestSuite) TestDefaultResendType() {
+	testID := "some-id"
+	testCases := []struct {
+		Name               string
+		ExpectedResendType common.ResendType
+		Chat               Chat
+	}{
+		{
+			Name:               "one to one chat",
+			ExpectedResendType: common.ResendTypeDataSync,
+			Chat: Chat{
+				ID:       testID,
+				ChatType: ChatTypeOneToOne,
+			},
+		},
+		{
+			Name:               "private group chat",
+			ExpectedResendType: common.ResendTypeDataSync,
+			Chat: Chat{
+				ID:       testID,
+				ChatType: ChatTypePrivateGroupChat,
+			},
+		},
+		{
+			Name:               "community chat",
+			ExpectedResendType: common.ResendTypeRawMessage,
+			Chat: Chat{
+				ID:       testID,
+				ChatType: ChatTypeCommunityChat,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.Name, func() {
+			s.Require().Equal(tc.ExpectedResendType, tc.Chat.DefaultResendType())
+		})
+	}
+
+}
+
 func (s *ChatTestSuite) TestDeepLink() {
 	chat := &Chat{
 		CommunityID: "0x02b1188c997e666cd5505ffd5c4b5fdbe3084b78a486d8e709da3b32ad3708a89e",
