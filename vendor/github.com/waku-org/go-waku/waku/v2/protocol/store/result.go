@@ -33,10 +33,6 @@ func (r *Result) Query() *pb.StoreQueryRequest {
 	return r.storeRequest
 }
 
-func (r *Result) PubsubTopic() string {
-	return r.storeRequest.GetPubsubTopic()
-}
-
 func (r *Result) Next(ctx context.Context) (bool, error) {
 	if !r.started {
 		r.started = true

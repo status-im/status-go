@@ -2410,10 +2410,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		SendPushNotification: m.featureFlags.PushNotifications,
 		Payload:              encodedMessage,
 		MessageType:          protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
-		ResendType:           common.ResendTypeRawMessage,
-	}
-	if chat.ChatType == ChatTypeOneToOne {
-		rawMessage.ResendType = common.ResendTypeDataSync
+		ResendType:           chat.DefaultResendType(),
 	}
 
 	// We want to save the raw message before dispatching it, to avoid race conditions

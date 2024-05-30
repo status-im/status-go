@@ -8,6 +8,7 @@ import "waku/message/v1/message.proto";
 message WakuMessageKeyValue {
   optional bytes message_hash = 1; // Globally unique key for a Waku Message
   optional waku.message.v1.WakuMessage message = 2; // Full message content as value
+  optional string pubsub_topic = 3;
 }
 
 message StoreQueryRequest {
