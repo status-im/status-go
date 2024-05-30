@@ -25,12 +25,12 @@ import (
 	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
+	"github.com/status-im/status-go/services/wallet/onramp"
 	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
-	wc "github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 )
@@ -305,7 +305,7 @@ func (api *API) WatchTransactionByChainID(ctx context.Context, chainID uint64, t
 	}
 }
 
-func (api *API) GetCryptoOnRamps(ctx context.Context) ([]CryptoOnRamp, error) {
+func (api *API) GetCryptoOnRamps(ctx context.Context) ([]onramp.CryptoOnRamp, error) {
 	return api.s.cryptoOnRampManager.Get()
 }
 
@@ -746,59 +746,6 @@ func (api *API) FetchChainIDForURL(ctx context.Context, rpcURL string) (*big.Int
 	return client.ChainID(ctx)
 }
 
-// WCPairSessionProposal responds to "session_proposal" event
-func (api *API) WCPairSessionProposal(ctx context.Context, sessionProposalJSON string) (*wc.PairSessionResponse, error) {
-	log.Debug("wallet.api.wc.PairSessionProposal", "proposal.len", len(sessionProposalJSON))
-
-	var data wc.SessionProposal
-	err := json.Unmarshal([]byte(sessionProposalJSON), &data)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.s.walletConnect.PairSessionProposal(data)
-}
-
-// WCSaveOrUpdateSession records a session established between Status app and dapp
-func (api *API) WCSaveOrUpdateSession(ctx context.Context, sessionProposalJSON string) error {
-	log.Debug("wallet.api.wc.WCSaveOrUpdateSession", "proposal.len", len(sessionProposalJSON))
-
-	var data wc.Session
-	err := json.Unmarshal([]byte(sessionProposalJSON), &data)
-	if err != nil {
-		return err
-	}
-
-	return api.s.walletConnect.SaveOrUpdateSession(data)
-}
-
-// WCChangeSessionState changes the active state of a session
-func (api *API) WCChangeSessionState(ctx context.Context, topic walletconnect.Topic, active bool) error {
-	log.Debug("wallet.api.wc.WCChangeSessionState", "topic", topic, "active", active)
-
-	return api.s.walletConnect.ChangeSessionState(topic, active)
-}
-
-// WCSessionRequest responds to "session_request" event
-func (api *API) WCSessionRequest(ctx context.Context, sessionRequestJSON string) (*transfer.TxResponse, error) {
-	log.Debug("wallet.api.wc.SessionRequest", "request.len", len(sessionRequestJSON))
-
-	var request wc.SessionRequest
-	err := json.Unmarshal([]byte(sessionRequestJSON), &request)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.s.walletConnect.SessionRequest(request)
-}
-
-// WCAuthRequest responds to "auth_request" event
-func (api *API) WCAuthRequest(ctx context.Context, address common.Address, authMessage string) (*transfer.TxResponse, error) {
-	log.Debug("wallet.api.wc.AuthRequest", "address", address, "authMessage", authMessage)
-
-	return api.s.walletConnect.AuthRequest(address, authMessage)
-}
-
 func (api *API) getVerifiedWalletAccount(address, password string) (*account.SelectedExtKey, error) {
 	exists, err := api.s.accountsDB.AddressExists(types.HexToAddress(address))
 	if err != nil {
@@ -822,4 +769,23 @@ func (api *API) getVerifiedWalletAccount(address, password string) (*account.Sel
 		Address:    key.Address,
 		AccountKey: key,
 	}, nil
+}
+
+// AddWalletConnectSession adds or updates a session wallet connect session
+func (api *API) AddWalletConnectSession(ctx context.Context, session_json string) error {
+	log.Debug("wallet.api.AddWalletConnectSession", "rpcURL", len(session_json))
+	return walletconnect.AddSession(api.s.db, api.s.config.Networks, session_json)
+}
+
+// DisconnectWalletConnectSession removes a wallet connect session
+func (api *API) DisconnectWalletConnectSession(ctx context.Context, topic walletconnect.Topic) error {
+	log.Debug("wallet.api.DisconnectWalletConnectSession", "topic", topic)
+	return walletconnect.DisconnectSession(api.s.db, topic)
+}
+
+// GetWalletConnectDapps returns all active wallet connect dapps
+// Active dApp are those having active sessions (not expired and not disconnected)
+func (api *API) GetWalletConnectDapps(ctx context.Context, validAtTimestamp int64, testChains bool) ([]walletconnect.DBDApp, error) {
+	log.Debug("wallet.api.GetWalletConnectDapps", "validAtTimestamp", validAtTimestamp, "testChains", testChains)
+	return walletconnect.GetActiveDapps(api.s.db, validAtTimestamp, testChains)
 }

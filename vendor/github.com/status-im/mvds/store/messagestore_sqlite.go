@@ -24,7 +24,7 @@ func NewPersistentMessageStore(db *sql.DB) *persistentMessageStore {
 func (p *persistentMessageStore) Add(message *protobuf.Message) error {
 	id := message.ID()
 	_, err := p.db.Exec(
-		`INSERT INTO mvds_messages (id, group_id, timestamp, body)
+		`INSERT OR IGNORE INTO mvds_messages (id, group_id, timestamp, body)
 		VALUES (?, ?, ?, ?)`,
 		id[:],
 		message.GroupId,

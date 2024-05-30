@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/market"
+	"github.com/status-im/status-go/services/wallet/onramp"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/alchemy"
 	"github.com/status-im/status-go/services/wallet/thirdparty/coingecko"
@@ -35,7 +36,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/rarible"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
-	"github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 )
@@ -61,8 +61,8 @@ func NewService(
 	feed *event.Feed,
 	mediaServer *server.MediaServer,
 ) *Service {
-	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
-		dataSourceType: DataSourceStatic,
+	cryptoOnRampManager := onramp.NewManager(&onramp.Options{
+		DataSourceType: onramp.DataSourceStatic,
 	})
 
 	signals := &walletevent.SignalsTransmitter{
@@ -170,8 +170,6 @@ func NewService(
 
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed, pendingTxManager)
 
-	walletconnect := walletconnect.NewService(db, rpcClient.NetworkManager, accountsDB, transactionManager, gethManager, feed, config)
-
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -199,7 +197,6 @@ func NewService(
 		decoder:               NewDecoder(),
 		blockChainState:       blockChainState,
 		keycardPairings:       NewKeycardPairings(),
-		walletConnect:         walletconnect,
 		config:                config,
 	}
 }
@@ -214,7 +211,7 @@ type Service struct {
 	communityManager      *community.Manager
 	transactionManager    *transfer.TransactionManager
 	pendingTxManager      *transactions.PendingTxTracker
-	cryptoOnRampManager   *CryptoOnRampManager
+	cryptoOnRampManager   *onramp.Manager
 	transferController    *transfer.Controller
 	marketManager         *market.Manager
 	started               bool
@@ -233,7 +230,6 @@ type Service struct {
 	decoder               *Decoder
 	blockChainState       *blockchainstate.BlockChainState
 	keycardPairings       *KeycardPairings
-	walletConnect         *walletconnect.Service
 	config                *params.NodeConfig
 }
 

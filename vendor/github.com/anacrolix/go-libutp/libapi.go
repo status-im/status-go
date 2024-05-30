@@ -26,10 +26,10 @@ const (
 
 var (
 	mu                 sync.Mutex
-	libContextToSocket = map[*C.utp_context]*Socket{}
+	libContextToSocket = map[*utpContext]*Socket{}
 )
 
-func getSocketForLibContext(uc *C.utp_context) *Socket {
+func getSocketForLibContext(uc *utpContext) *Socket {
 	return libContextToSocket[uc]
 }
 

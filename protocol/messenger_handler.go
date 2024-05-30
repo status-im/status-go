@@ -1730,29 +1730,6 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		}
 	}
 
-	// Activity Center notification
-	requestID := communities.CalculateRequestID(common.PubkeyToHex(&m.identity.PublicKey), requestToJoinResponseProto.CommunityId)
-	notification, err := m.persistence.GetActivityCenterNotificationByID(requestID)
-	if err != nil {
-		return err
-	}
-
-	if notification != nil {
-		if requestToJoinResponseProto.Accepted {
-			notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
-			notification.Read = false
-			notification.Deleted = false
-		} else {
-			notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
-		}
-		notification.UpdatedAt = m.GetCurrentTimeInMillis()
-		err = m.addActivityCenterNotification(state.Response, notification, nil)
-		if err != nil {
-			m.logger.Error("failed to update notification", zap.Error(err))
-			return err
-		}
-	}
-
 	return nil
 }
 
