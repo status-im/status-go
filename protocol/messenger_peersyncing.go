@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -22,10 +23,11 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
-var peerSyncingLoopInterval time.Duration = 60 * time.Second
+var peerSyncingLoopInterval time.Duration = 1 * time.Second
 var maxAdvertiseMessages = 40
 
 func (m *Messenger) markDeliveredMessages(acks [][]byte) {
+	//fmt.Println("### markDeliveredMessages ", len(acks))
 	for _, ack := range acks {
 		//get message ID from database by datasync ID, with at-least-one
 		// semantic
@@ -43,6 +45,7 @@ func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 			m.logger.Debug("Can't set message status as delivered", zap.Error(err))
 		}
 
+		fmt.Println("### messageID ", messageID)
 		//send signal to client that message status updated
 		if m.config.messengerSignalsHandler != nil {
 			message, err := m.persistence.MessageByID(messageID)
@@ -56,13 +59,15 @@ func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 }
 
 func (m *Messenger) handleDatasyncMetadata(response *common.HandleMessageResponse) error {
+	isPeerSyncingEnabled, err := m.settings.GetPeerSyncingEnabled()
+	//fmt.Println("### handleDatasyncMetadata ", m.featureFlags.Peersyncing, " ", isPeerSyncingEnabled)
 	m.OnDatasyncAcks(response.DatasyncSender, response.DatasyncAcks)
 
 	if !m.featureFlags.Peersyncing {
 		return nil
 	}
 
-	isPeerSyncingEnabled, err := m.settings.GetPeerSyncingEnabled()
+	//isPeerSyncingEnabled, err := m.settings.GetPeerSyncingEnabled()
 	if err != nil {
 		return err
 	}
@@ -86,6 +91,7 @@ func (m *Messenger) handleDatasyncMetadata(response *common.HandleMessageRespons
 func (m *Messenger) startPeerSyncingLoop() {
 	logger := m.logger.Named("PeerSyncingLoop")
 
+	fmt.Println("### startPeerSyncingLoop")
 	ticker := time.NewTicker(peerSyncingLoopInterval)
 	go func() {
 		for {
@@ -106,10 +112,12 @@ func (m *Messenger) startPeerSyncingLoop() {
 }
 
 func (m *Messenger) sendDatasyncOffers() error {
+	fmt.Println("### sendDatasyncOffers1")
 	if !m.featureFlags.Peersyncing {
 		return nil
 	}
 
+	fmt.Println("### sendDatasyncOffers2")
 	isPeerSyncingEnabled, err := m.settings.GetPeerSyncingEnabled()
 	if err != nil {
 		return err
@@ -118,11 +126,13 @@ func (m *Messenger) sendDatasyncOffers() error {
 		return nil
 	}
 
+	fmt.Println("### sendDatasyncOffers3")
 	err = m.sendDatasyncOffersForCommunities()
 	if err != nil {
 		return err
 	}
 
+	fmt.Println("### sendDatasyncOffers4")
 	err = m.sendDatasyncOffersForChats()
 	if err != nil {
 		return err
@@ -179,6 +189,7 @@ func (m *Messenger) sendDatasyncOffersForCommunities() error {
 }
 
 func (m *Messenger) sendDatasyncOffersForChats() error {
+	fmt.Println("### sendDatasyncOffersForChats")
 	for _, chat := range m.Chats() {
 		chatIDBytes := []byte(chat.ID)
 		availableMessagesMap, err := m.peersyncing.AvailableMessagesMapByChatIDs([][]byte{chatIDBytes}, maxAdvertiseMessages)

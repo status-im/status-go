@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
@@ -493,4 +494,61 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersInfoSync() {
 	s.NoError(admin.Shutdown())
 	s.NoError(memberA.Shutdown())
 	s.NoError(memberB.Shutdown())
+}
+
+func (s *MessengerGroupChatSuite) TestGroupChatMessageDelivery() {
+	// Setup group chat
+	admin, memberA, memberB := s.newMessenger(), s.newMessenger(), s.newMessenger()
+
+	admin.featureFlags.Peersyncing = true
+	admin.settings.SetPeerSyncingEnabled(true)
+	memberA.featureFlags.Peersyncing = true
+	memberA.settings.SetPeerSyncingEnabled(true)
+	memberB.featureFlags.Peersyncing = true
+	memberB.settings.SetPeerSyncingEnabled(true)
+
+	memberB.account.CustomizationColor = multiaccountscommon.CustomizationColorBlue
+	s.Require().NoError(admin.settings.SaveSettingField(settings.DisplayName, "admin"))
+	s.Require().NoError(memberA.settings.SaveSettingField(settings.DisplayName, "memberA"))
+	s.Require().NoError(memberB.settings.SaveSettingField(settings.DisplayName, "memberB"))
+
+	members := []string{common.PubkeyToHex(&memberA.identity.PublicKey), common.PubkeyToHex(&memberB.identity.PublicKey)}
+
+	s.makeMutualContacts(admin, memberA)
+	s.makeMutualContacts(admin, memberB)
+
+	groupChat := s.createGroupChat(admin, "test_group_chat", members)
+	s.verifyGroupChatCreated(memberA, true)
+	s.verifyGroupChatCreated(memberB, true)
+
+	response, err := WaitOnMessengerResponse(
+		memberA,
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
+		"chat invitation not received",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().True(response.Chats()[0].Active)
+	s.Require().Len(response.Chats()[0].Members, 3)
+
+	// Send a message
+	ctx := context.Background()
+	inputMessage := buildTestMessage(*groupChat)
+	_, err = memberA.SendChatMessage(ctx, inputMessage)
+	s.Require().NoError(err)
+
+	response, err = WaitOnMessengerResponse(
+		memberB,
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
+		"messages not received",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(inputMessage.Text, response.Messages()[0].Text)
+
+	time.Sleep(10 * time.Second)
+
+	defer s.NoError(admin.Shutdown())
+	defer s.NoError(memberA.Shutdown())
+	defer s.NoError(memberB.Shutdown())
 }

@@ -127,6 +127,7 @@ func (s *MessageSender) SetHandleSharedSecrets(handler func([]*sharedsecret.Secr
 }
 
 func (s *MessageSender) StartDatasync(handler func(peer state.PeerID, payload *datasyncproto.Payload) error) error {
+	//fmt.Println("### startDataSync", s.datasyncEnabled)
 	if !s.datasyncEnabled {
 		return nil
 	}
@@ -917,6 +918,8 @@ func (s *MessageSender) handleMessage(wakuMessage *types.Message) (*handleMessag
 			return response, err
 		}
 	}
+
+	//fmt.Println("### messagesender ", s.datasync != nil, " ", s.datasyncEnabled)
 
 	if s.datasync != nil && s.datasyncEnabled {
 		err := s.unwrapDatasyncMessage(message, response)

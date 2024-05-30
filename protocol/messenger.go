@@ -777,6 +777,8 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchPendingCommunityRequestToJoin()
 	m.broadcastLatestUserStatus()
 	m.timeoutAutomaticStatusUpdates()
+
+	fmt.Println("### Messenger.Start() 1")
 	if !m.config.featureFlags.DisableCheckingForBackup {
 		m.startBackupLoop()
 	}
@@ -786,6 +788,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 			return nil, err
 		}
 	}
+	fmt.Println("### Messenger.Start() 2")
 	m.startPeerSyncingLoop()
 	m.startSyncSettingsLoop()
 	m.startSettingsChangesLoop()
