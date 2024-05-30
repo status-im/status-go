@@ -1137,7 +1137,6 @@ func (w *Waku) Start() error {
 		defer w.wg.Done()
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
-		isConnected := false
 		for {
 			select {
 			case <-w.ctx.Done():
