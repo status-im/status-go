@@ -4371,14 +4371,6 @@ func (m *Messenger) CheckPermissionsToJoinCommunity(request *requests.CheckPermi
 	return m.communitiesManager.CheckPermissionToJoin(request.CommunityID, addresses)
 }
 
-func (m *Messenger) CheckPermissionsToJoinCommunityLight(request *requests.CheckPermissionToJoinCommunity) (bool, error) {
-	if err := request.Validate(); err != nil {
-		return false, err
-	}
-
-	return m.communitiesManager.CheckPermissionToJoinLight(request.CommunityID)
-}
-
 func (m *Messenger) getSharedAddresses(communityID types.HexBytes, requestAddresses []string) ([]gethcommon.Address, error) {
 	addressesMap := make(map[string]struct{})
 
@@ -4440,22 +4432,6 @@ func (m *Messenger) CheckAllCommunityChannelsPermissions(request *requests.Check
 	}
 
 	return m.communitiesManager.CheckAllChannelsPermissions(request.CommunityID, addresses)
-}
-
-func (m *Messenger) CheckCommunityChannelPermissionsLight(request *requests.CheckCommunityChannelPermissions) (*communities.CheckChannelPermissionsResponse, error) {
-	if err := request.Validate(); err != nil {
-		return nil, err
-	}
-
-	return m.communitiesManager.CheckChannelPermissionsLight(request.CommunityID, request.ChatID)
-}
-
-func (m *Messenger) CheckAllCommunityChannelsPermissionsLight(request *requests.CheckAllCommunityChannelsPermissions) (*communities.CheckAllChannelsPermissionsResponse, error) {
-	if err := request.Validate(); err != nil {
-		return nil, err
-	}
-
-	return m.communitiesManager.CheckAllChannelsPermissionsLight(request.CommunityID)
 }
 
 func (m *Messenger) GetCommunityCheckChannelPermissionResponses(communityID types.HexBytes) (*communities.CheckAllChannelsPermissionsResponse, error) {

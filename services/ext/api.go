@@ -1590,24 +1590,12 @@ func (api *PublicAPI) CheckPermissionsToJoinCommunity(request *requests.CheckPer
 	return api.service.messenger.CheckPermissionsToJoinCommunity(request)
 }
 
-func (api *PublicAPI) CheckPermissionsToJoinCommunityLight(request *requests.CheckPermissionToJoinCommunity) (bool, error) {
-	return api.service.messenger.CheckPermissionsToJoinCommunityLight(request)
-}
-
 func (api *PublicAPI) CheckCommunityChannelPermissions(request *requests.CheckCommunityChannelPermissions) (*communities.CheckChannelPermissionsResponse, error) {
 	return api.service.messenger.CheckCommunityChannelPermissions(request)
 }
 
-func (api *PublicAPI) CheckCommunityChannelPermissionsLight(request *requests.CheckCommunityChannelPermissions) (*communities.CheckChannelPermissionsResponse, error) {
-	return api.service.messenger.CheckCommunityChannelPermissionsLight(request)
-}
-
 func (api *PublicAPI) CheckAllCommunityChannelsPermissions(request *requests.CheckAllCommunityChannelsPermissions) (*communities.CheckAllChannelsPermissionsResponse, error) {
 	return api.service.messenger.CheckAllCommunityChannelsPermissions(request)
-}
-
-func (api *PublicAPI) CheckAllCommunityChannelsPermissionsLight(request *requests.CheckAllCommunityChannelsPermissions) (*communities.CheckAllChannelsPermissionsResponse, error) {
-	return api.service.messenger.CheckAllCommunityChannelsPermissionsLight(request)
 }
 
 func (api *PublicAPI) CollectCommunityMetrics(request *requests.CommunityMetricsRequest) (*protocol.CommunityMetricsResponse, error) {
