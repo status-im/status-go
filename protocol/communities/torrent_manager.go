@@ -67,15 +67,30 @@ type TorrentManager struct {
 
 	logger       *zap.Logger
 	stdoutLogger *zap.Logger
+
+	persistence *Persistence
+	transport   *transport.Transport
+	identity    *ecdsa.PrivateKey
+	encryptor   *encryption.Protocol
+
+	publisher Publisher
 }
 
-func NewTorrentManager(torrentConfig *params.TorrentConfig, logger, stdoutLogger *zap.Logger) *TorrentManager {
+func NewTorrentManager(torrentConfig *params.TorrentConfig, logger, stdoutLogger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) *TorrentManager {
 	return &TorrentManager{
 		torrentConfig:               torrentConfig,
 		torrentTasks:                make(map[string]metainfo.Hash),
 		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
-		logger:                      logger,
-		stdoutLogger:                stdoutLogger,
+
+		logger:       logger,
+		stdoutLogger: stdoutLogger,
+
+		persistence: persistence,
+		transport:   transport,
+		identity:    identity,
+		encryptor:   encryptor,
+
+		publisher: publisher,
 	}
 }
 
@@ -429,7 +444,7 @@ func (m *TorrentManager) CreateHistoryArchiveTorrent(communityID types.HexBytes,
 	var encodedArchives []*EncodedArchiveData
 	topicsAsByteArrays := topicsAsByteArrays(topics)
 
-	m.publish(&Subscription{CreatingHistoryArchivesSignal: &signal.CreatingHistoryArchivesSignal{
+	m.publisher.publish(&Subscription{CreatingHistoryArchivesSignal: &signal.CreatingHistoryArchivesSignal{
 		CommunityID: communityID.String(),
 	}})
 
@@ -629,7 +644,7 @@ func (m *TorrentManager) CreateHistoryArchiveTorrent(communityID types.HexBytes,
 
 		m.LogStdout("torrent created", zap.Any("from", startDate.Unix()), zap.Any("to", endDate.Unix()))
 
-		m.publish(&Subscription{
+		m.publisher.publish(&Subscription{
 			HistoryArchivesCreatedSignal: &signal.HistoryArchivesCreatedSignal{
 				CommunityID: communityID.String(),
 				From:        int(startDate.Unix()),
@@ -638,7 +653,7 @@ func (m *TorrentManager) CreateHistoryArchiveTorrent(communityID types.HexBytes,
 		})
 	} else {
 		m.LogStdout("no archives created")
-		m.publish(&Subscription{
+		m.publisher.publish(&Subscription{
 			NoHistoryArchivesCreatedSignal: &signal.NoHistoryArchivesCreatedSignal{
 				CommunityID: communityID.String(),
 				From:        int(startDate.Unix()),
@@ -693,7 +708,7 @@ func (m *TorrentManager) SeedHistoryArchiveTorrent(communityID types.HexBytes) e
 
 	torrent.DownloadAll()
 
-	m.publish(&Subscription{
+	m.publisher.publish(&Subscription{
 		HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
 			CommunityID: communityID.String(),
 		},
@@ -717,7 +732,7 @@ func (m *TorrentManager) UnseedHistoryArchiveTorrent(communityID types.HexBytes)
 			torrent.Drop()
 			delete(m.torrentTasks, id)
 
-			m.publish(&Subscription{
+			m.publisher.publish(&Subscription{
 				HistoryArchivesUnseededSignal: &signal.HistoryArchivesUnseededSignal{
 					CommunityID: id,
 				},
@@ -829,7 +844,7 @@ func (m *TorrentManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 
 					sort.Sort(sort.Reverse(archiveHashes))
 
-					m.publish(&Subscription{
+					m.publisher.publish(&Subscription{
 						DownloadingHistoryArchivesStartedSignal: &signal.DownloadingHistoryArchivesStartedSignal{
 							CommunityID: communityID.String(),
 						},
@@ -895,7 +910,7 @@ func (m *TorrentManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 							m.LogStdout("couldn't save message archive ID", zap.Error(err))
 							continue
 						}
-						m.publish(&Subscription{
+						m.publisher.publish(&Subscription{
 							HistoryArchiveDownloadedSignal: &signal.HistoryArchiveDownloadedSignal{
 								CommunityID: communityID.String(),
 								From:        int(metadata.Metadata.From),
@@ -903,7 +918,7 @@ func (m *TorrentManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 							},
 						})
 					}
-					m.publish(&Subscription{
+					m.publisher.publish(&Subscription{
 						HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
 							CommunityID: communityID.String(),
 						},
