@@ -288,6 +288,19 @@ func (c *Chat) IsActivePersonalChat() bool {
 	return c.Active && (c.OneToOne() || c.PrivateGroupChat() || c.Public()) && c.CommunityID == ""
 }
 
+// DefaultResendType returns the resend type for a chat.
+// This function currently infers the ResendType from the chat type.
+// Note that specific message might have different resent types. At times
+// some messages dictate their ResendType based on their own properties and
+// context, rather than the chat type it is associated with.
+func (c *Chat) DefaultResendType() common.ResendType {
+	if c.OneToOne() || c.PrivateGroupChat() {
+		return common.ResendTypeDataSync
+	}
+
+	return common.ResendTypeRawMessage
+}
+
 func (c *Chat) shouldBeSynced() bool {
 	isPublicChat := !c.Timeline() && !c.ProfileUpdates() && c.Public()
 	return isPublicChat || c.OneToOne() || c.PrivateGroupChat()

@@ -449,7 +449,7 @@ func (w *Waku) discoverAndConnectPeers() error {
 func (w *Waku) connect(peerInfo peer.AddrInfo, origin wps.Origin) {
 	// Connection will be prunned eventually by the connection manager if needed
 	// The peer connector in go-waku uses Connect, so it will execute identify as part of its
-	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, []string{w.cfg.DefaultShardPubsubTopic}, true)
+	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, []string{w.cfg.DefaultShardPubsubTopic}, nil, true)
 }
 
 func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
