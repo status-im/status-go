@@ -45,6 +45,10 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
+type Publisher interface {
+	publish(subscription *Subscription)
+}
+
 var defaultAnnounceList = [][]string{
 	{"udp://tracker.opentrackr.org:1337/announce"},
 	{"udp://tracker.openbittorrent.com:6969/announce"},
@@ -350,15 +354,15 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 		quit:           make(chan struct{}),
 		transport:      transport,
 		timesource:     timesource,
-		torrentManager: NewTorrentManager(torrentConfig, logger, stdoutLogger),
 		keyDistributor: keyDistributor,
 		communityLock:  NewCommunityLock(logger),
 	}
 
-	manager.persistence = &Persistence{
+	persistence := &Persistence{
 		db:                      db,
 		recordBundleToCommunity: manager.dbRecordBundleToCommunity,
 	}
+	manager.persistence = persistence
 
 	if managerConfig.accountsManager != nil {
 		manager.accountsManager = managerConfig.accountsManager
@@ -402,6 +406,8 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 		manager.logger.Warn("allowing forcing community members reevaluation, this should only be used in test environment")
 		manager.forceMembersReevaluation = make(map[string]chan struct{}, 10)
 	}
+
+	manager.torrentManager = NewTorrentManager(torrentConfig, logger, stdoutLogger, persistence, transport, identity, encryptor, manager)
 
 	return manager, nil
 }
