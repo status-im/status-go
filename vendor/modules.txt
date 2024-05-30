@@ -42,10 +42,10 @@ github.com/anacrolix/dht/v2/types
 # github.com/anacrolix/envpprof v1.1.1
 ## explicit; go 1.12
 github.com/anacrolix/envpprof
-# github.com/anacrolix/go-libutp v1.2.0
+# github.com/anacrolix/go-libutp v1.3.1
 ## explicit; go 1.14
 github.com/anacrolix/go-libutp
-# github.com/anacrolix/log v0.10.1-0.20220123034749-3920702c17f8
+# github.com/anacrolix/log v0.13.1
 ## explicit; go 1.12
 github.com/anacrolix/log
 # github.com/anacrolix/missinggo v1.3.0
@@ -1122,7 +1122,7 @@ github.com/xeipuuv/gojsonreference
 ## explicit
 github.com/xeipuuv/gojsonschema
 # github.com/xrash/smetrics v0.0.0-20240312152122-5f08fbb34913
-## explicit; go 1.15
+## explicit; go 1.15.0
 github.com/xrash/smetrics
 # github.com/yeqown/go-qrcode/v2 v2.2.1
 ## explicit; go 1.18

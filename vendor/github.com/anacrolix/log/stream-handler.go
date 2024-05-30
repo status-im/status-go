@@ -27,7 +27,7 @@ func LineFormatter(msg Record) []byte {
 		names = pcNames(pc[0], names)
 	}
 	ret := []byte(fmt.Sprintf(
-		"%s %-5s %s: %s",
+		"%s %s %s: %s",
 		time.Now().Format("2006-01-02T15:04:05-0700"),
 		msg.Level.LogString(),
 		names,
