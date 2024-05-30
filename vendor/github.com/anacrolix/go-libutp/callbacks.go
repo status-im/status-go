@@ -11,9 +11,17 @@ import (
 	"strings"
 	"sync/atomic"
 	"unsafe"
+
+	"github.com/anacrolix/log"
 )
 
-func (a *C.utp_callback_arguments) bufBytes() []byte {
+type utpCallbackArguments C.utp_callback_arguments
+
+func (a *utpCallbackArguments) goContext() *utpContext {
+	return (*utpContext)(a.context)
+}
+
+func (a *utpCallbackArguments) bufBytes() []byte {
 	return *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
 		uintptr(unsafe.Pointer(a.buf)),
 		int(a.len),
@@ -21,27 +29,27 @@ func (a *C.utp_callback_arguments) bufBytes() []byte {
 	}))
 }
 
-func (a *C.utp_callback_arguments) state() C.int {
+func (a *utpCallbackArguments) state() C.int {
 	return *(*C.int)(unsafe.Pointer(&a.anon0))
 }
 
-func (a *C.utp_callback_arguments) error_code() C.int {
+func (a *utpCallbackArguments) error_code() C.int {
 	return *(*C.int)(unsafe.Pointer(&a.anon0))
 }
 
-func (a *C.utp_callback_arguments) address() *C.struct_sockaddr {
+func (a *utpCallbackArguments) address() *C.struct_sockaddr {
 	return *(**C.struct_sockaddr)(unsafe.Pointer(&a.anon0[0]))
 }
 
-func (a *C.utp_callback_arguments) addressLen() C.socklen_t {
+func (a *utpCallbackArguments) addressLen() C.socklen_t {
 	return *(*C.socklen_t)(unsafe.Pointer(&a.anon1[0]))
 }
 
 var sends int64
 
 //export sendtoCallback
-func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
-	s := getSocketForLibContext(a.context)
+func sendtoCallback(a *utpCallbackArguments) (ret C.uint64) {
+	s := getSocketForLibContext(a.goContext())
 	b := a.bufBytes()
 	var sendToUdpAddr net.UDPAddr
 	if err := structSockaddrToUDPAddr(a.address(), &sendToUdpAddr); err != nil {
@@ -68,7 +76,7 @@ func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 			// Rate-limited. Probably Linux. The implementation might try
 			// again later.
 		} else {
-			s.logger.Printf("error sending packet: %s", err)
+			s.logger.Levelf(log.Debug, "error sending packet: %v", err)
 		}
 		return
 	}
@@ -80,26 +88,26 @@ func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 }
 
 //export errorCallback
-func errorCallback(a *C.utp_callback_arguments) C.uint64 {
-	s := getSocketForLibContext(a.context)
+func errorCallback(a *utpCallbackArguments) C.uint64 {
+	s := getSocketForLibContext(a.goContext())
 	err := errorForCode(a.error_code())
 	if logCallbacks {
 		s.logger.Printf("error callback: socket %p: %s", a.socket, err)
 	}
-	libContextToSocket[a.context].conns[a.socket].onError(err)
+	libContextToSocket[a.goContext()].conns[a.socket].onError(err)
 	return 0
 }
 
 //export logCallback
-func logCallback(a *C.utp_callback_arguments) C.uint64 {
-	s := getSocketForLibContext(a.context)
+func logCallback(a *utpCallbackArguments) C.uint64 {
+	s := getSocketForLibContext(a.goContext())
 	s.logger.Printf("libutp: %s", C.GoString((*C.char)(unsafe.Pointer(a.buf))))
 	return 0
 }
 
 //export stateChangeCallback
-func stateChangeCallback(a *C.utp_callback_arguments) C.uint64 {
-	s := libContextToSocket[a.context]
+func stateChangeCallback(a *utpCallbackArguments) C.uint64 {
+	s := libContextToSocket[a.goContext()]
 	c := s.conns[a.socket]
 	if logCallbacks {
 		s.logger.Printf("state changed: conn %p: %s", c, libStateName(a.state()))
@@ -126,8 +134,8 @@ func stateChangeCallback(a *C.utp_callback_arguments) C.uint64 {
 }
 
 //export readCallback
-func readCallback(a *C.utp_callback_arguments) C.uint64 {
-	s := libContextToSocket[a.context]
+func readCallback(a *utpCallbackArguments) C.uint64 {
+	s := libContextToSocket[a.goContext()]
 	c := s.conns[a.socket]
 	b := a.bufBytes()
 	if logCallbacks {
@@ -142,8 +150,8 @@ func readCallback(a *C.utp_callback_arguments) C.uint64 {
 }
 
 //export acceptCallback
-func acceptCallback(a *C.utp_callback_arguments) C.uint64 {
-	s := getSocketForLibContext(a.context)
+func acceptCallback(a *utpCallbackArguments) C.uint64 {
+	s := getSocketForLibContext(a.goContext())
 	if logCallbacks {
 		s.logger.Printf("accept callback: %#v", *a)
 	}
@@ -154,8 +162,8 @@ func acceptCallback(a *C.utp_callback_arguments) C.uint64 {
 }
 
 //export getReadBufferSizeCallback
-func getReadBufferSizeCallback(a *C.utp_callback_arguments) (ret C.uint64) {
-	s := libContextToSocket[a.context]
+func getReadBufferSizeCallback(a *utpCallbackArguments) (ret C.uint64) {
+	s := libContextToSocket[a.goContext()]
 	c := s.conns[a.socket]
 	if c == nil {
 		// socket hasn't been added to the Socket.conns yet. The read buffer
@@ -168,8 +176,8 @@ func getReadBufferSizeCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 }
 
 //export firewallCallback
-func firewallCallback(a *C.utp_callback_arguments) C.uint64 {
-	s := getSocketForLibContext(a.context)
+func firewallCallback(a *utpCallbackArguments) C.uint64 {
+	s := getSocketForLibContext(a.goContext())
 	if s.syncFirewallCallback != nil {
 		var addr net.UDPAddr
 		structSockaddrToUDPAddr(a.address(), &addr)
