@@ -579,7 +579,7 @@ func NewMessenger(
 			ensVerifier.Stop,
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
-			torrentManager.StopTorrentClient,
+			torrentManager.Stop,
 			encryptionProtocol.Stop,
 			func() error {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -829,7 +829,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	if m.torrentClientReady() {
+	if m.torrentManager.IsReady() {
 		available := m.SubscribeMailserverAvailable()
 		go func() {
 			<-available
@@ -918,7 +918,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 		}
 	}
 
-	// Update Communities manager
+	// Update torrent manager
 	if m.torrentManager != nil {
 		m.torrentManager.SetOnline(online)
 	}

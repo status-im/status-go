@@ -1839,7 +1839,7 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			Shard:                    community.Shard().Protobuffer(),
 		}
 
-		if m.torrentClientReady() && m.torrentManager.TorrentFileExists(community.IDString()) {
+		if m.torrentManager.IsReady() && m.torrentManager.TorrentFileExists(community.IDString()) {
 			magnetlink, err := m.torrentManager.GetHistoryArchiveMagnetlink(community.ID())
 			if err != nil {
 				m.logger.Warn("couldn't get magnet link for community", zap.Error(err))
@@ -2748,7 +2748,7 @@ func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerRe
 
 	id := community.ID()
 
-	if m.torrentClientReady() {
+	if m.torrentManager.IsReady() {
 		if !communitySettings.HistoryArchiveSupportEnabled {
 			m.torrentManager.StopHistoryArchiveTasksInterval(id)
 		} else if !m.torrentManager.IsSeedingHistoryArchiveTorrent(id) {
@@ -2833,7 +2833,7 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		return nil, err
 	}
 
-	if m.torrentClientReady() {
+	if m.torrentManager.IsReady() {
 		var communities []*communities.Community
 		communities = append(communities, community)
 		go m.InitHistoryArchiveTasks(communities)
@@ -4115,7 +4115,7 @@ func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 		return nil
 	}
 
-	m.torrentManager.StopTorrentClient()
+	m.torrentManager.Stop()
 
 	nodeConfig.TorrentConfig.Enabled = false
 	err = m.settings.SaveSetting("node-config", nodeConfig)
@@ -4224,15 +4224,6 @@ func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, 
 	}
 
 	return wakuMessages, nil
-}
-
-func (m *Messenger) torrentClientReady() bool {
-	// Simply checking for `torrentConfig.Enabled` isn't enough
-	// as there's a possiblity that the torrent client couldn't
-	// be instantiated (for example in case of port conflicts)
-	return m.config.torrentConfig != nil &&
-		m.config.torrentConfig.Enabled &&
-		m.torrentManager.TorrentClientStarted()
 }
 
 func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c *communities.Community) ([]*types.Message, error) {
