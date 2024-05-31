@@ -990,6 +990,8 @@ func (w *Waku) checkIfMessagesStored() {
 		case <-ticker.C:
 			w.logger.Debug("Running loop for messages stored check")
 			w.sendMsgIDsMu.Lock()
+			pubsubTopics := make([]string, 0, len(w.sendMsgIDs))
+			pubsubMessageIds := make([][]gethcommon.Hash, 0, len(w.sendMsgIDs))
 			for pubsubTopic, subMsgs := range w.sendMsgIDs {
 				var queryMsgIds []gethcommon.Hash
 				for msgID, sendTime := range subMsgs {
@@ -1003,11 +1005,35 @@ func (w *Waku) checkIfMessagesStored() {
 				}
 				w.logger.Debug("Store query for message hashes", zap.Any("queryMsgIds", queryMsgIds), zap.String("pubsubTopic", pubsubTopic))
 				if len(queryMsgIds) > 0 {
-					w.messageHashBasedQuery(w.ctx, queryMsgIds, pubsubTopic)
+					pubsubTopics = append(pubsubTopics, pubsubTopic)
+					pubsubMessageIds = append(pubsubMessageIds, queryMsgIds)
 				}
 			}
-
 			w.sendMsgIDsMu.Unlock()
+
+			pubsubProcessedMessages := make([][]gethcommon.Hash, len(pubsubMessageIds))
+			for i, pubsubTopic := range pubsubTopics {
+				processedMessages := w.messageHashBasedQuery(w.ctx, pubsubMessageIds[i], pubsubTopic)
+				pubsubProcessedMessages = append(pubsubProcessedMessages, processedMessages)
+			}
+
+			w.sendMsgIDsMu.Lock()
+			for i, pubsubTopic := range pubsubTopics {
+				subMsgs, ok := w.sendMsgIDs[pubsubTopic]
+				if !ok {
+					continue
+				}
+				for _, hash := range pubsubProcessedMessages[i] {
+					delete(subMsgs, hash)
+					if len(subMsgs) == 0 {
+						delete(w.sendMsgIDs, pubsubTopic)
+					} else {
+						w.sendMsgIDs[pubsubTopic] = subMsgs
+					}
+				}
+			}
+			w.sendMsgIDsMu.Unlock()
+
 		}
 	}
 }
@@ -1061,7 +1087,7 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
 }
 
 // ctx, peer, r.PubsubTopic, contentTopics, uint64(r.From), uint64(r.To), options, processEnvelopes
-func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Hash, pubsubTopic string) {
+func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Hash, pubsubTopic string) []gethcommon.Hash {
 	selectedPeer := w.storePeerID
 	if selectedPeer == "" {
 		selectedPeers, err := w.node.PeerManager().SelectPeers(
@@ -1074,7 +1100,7 @@ func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Ha
 		)
 		if err != nil {
 			w.logger.Error("could not select peers", zap.Error(err))
-			return
+			return []gethcommon.Hash{}
 		}
 		selectedPeer = selectedPeers[0]
 	}
@@ -1094,7 +1120,7 @@ func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Ha
 	result, err := w.node.Store().QueryByHash(ctx, messageHashes, opts...)
 	if err != nil {
 		w.logger.Error("store.queryByHash failed", zap.String("requestID", hexutil.Encode(requestID)), zap.String("peerID", selectedPeer.String()), zap.Error(err))
-		return
+		return []gethcommon.Hash{}
 	}
 
 	w.logger.Debug("store.queryByHash result", zap.String("requestID", hexutil.Encode(requestID)), zap.Int("messages", len(result.Messages())))
@@ -1123,18 +1149,12 @@ func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Ha
 				Event: common.EventEnvelopeExpired,
 			})
 		}
-
-		subMsgs := w.sendMsgIDs[pubsubTopic]
-		delete(subMsgs, hash)
-		if len(subMsgs) == 0 {
-			delete(w.sendMsgIDs, pubsubTopic)
-		} else {
-			w.sendMsgIDs[pubsubTopic] = subMsgs
-		}
 	}
 
 	w.logger.Debug("Ack message hashes", zap.Any("ackHashes", ackHashes))
 	w.logger.Debug("Missed message hashes", zap.Any("missedHashes", missedHashes))
+
+	return append(ackHashes, missedHashes...)
 }
 
 func (w *Waku) Query(ctx context.Context, peerID peer.ID, query legacy_store.Query, cursor *storepb.Index, opts []legacy_store.HistoryRequestOption, processEnvelopes bool) (*storepb.Index, int, error) {
