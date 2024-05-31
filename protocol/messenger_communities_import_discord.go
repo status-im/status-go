@@ -971,7 +971,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 				m.logger.Error("Failed to get community settings", zap.Error(err))
 				continue
 			}
-			if m.torrentClientReady() && communitySettings.HistoryArchiveSupportEnabled {
+			if m.torrentManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
 
 				err = m.torrentManager.SeedHistoryArchiveTorrent(request.CommunityID)
 				if err != nil {
@@ -1737,7 +1737,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				continue
 			}
 
-			if m.torrentClientReady() && communitySettings.HistoryArchiveSupportEnabled {
+			if m.torrentManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
 
 				err = m.torrentManager.SeedHistoryArchiveTorrent(discordCommunity.ID())
 				if err != nil {

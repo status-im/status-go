@@ -208,7 +208,7 @@ func (m *TorrentManager) StartTorrentClient() error {
 	return nil
 }
 
-func (m *TorrentManager) StopTorrentClient() error {
+func (m *TorrentManager) Stop() error {
 	if m.TorrentClientStarted() {
 		m.StopHistoryArchiveTasksIntervals()
 		m.logger.Info("Stopping torrent client")
@@ -223,6 +223,15 @@ func (m *TorrentManager) StopTorrentClient() error {
 
 func (m *TorrentManager) TorrentClientStarted() bool {
 	return m.torrentClient != nil
+}
+
+func (m *TorrentManager) IsReady() bool {
+	// Simply checking for `torrentConfig.Enabled` isn't enough
+	// as there's a possibility that the torrent client couldn't
+	// be instantiated (for example in case of port conflicts)
+	return m.torrentConfig != nil &&
+		m.torrentConfig.Enabled &&
+		m.TorrentClientStarted()
 }
 
 func (m *TorrentManager) GetCommunityChatsFilters(communityID types.HexBytes) ([]*transport.Filter, error) {
