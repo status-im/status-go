@@ -1342,7 +1342,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		return nil
 	}
 
-	if m.torrentClientReady() && settings.HistoryArchiveSupportEnabled {
+	if m.torrentManager.IsReady() && settings.HistoryArchiveSupportEnabled {
 		lastClock, err := m.communitiesManager.GetMagnetlinkMessageClock(id)
 		if err != nil {
 			return err
@@ -1728,7 +1728,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		}
 
 		magnetlink := requestToJoinResponseProto.MagnetUri
-		if m.torrentClientReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
+		if m.torrentManager.IsReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
 
 			currentTask := m.torrentManager.GetHistoryArchiveDownloadTask(community.IDString())
 			go func(currentTask *communities.HistoryArchiveDownloadTask) {
