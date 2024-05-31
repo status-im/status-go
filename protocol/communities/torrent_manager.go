@@ -2,6 +2,7 @@ package communities
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -14,7 +15,6 @@ import (
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/golang/protobuf/proto"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -76,7 +76,12 @@ type TorrentManager struct {
 	publisher Publisher
 }
 
-func NewTorrentManager(torrentConfig *params.TorrentConfig, logger, stdoutLogger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) *TorrentManager {
+func NewTorrentManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) (*TorrentManager, error) {
+	stdoutLogger, err := zap.NewDevelopment()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create archive logger %w", err)
+	}
+
 	return &TorrentManager{
 		torrentConfig:               torrentConfig,
 		torrentTasks:                make(map[string]metainfo.Hash),
@@ -91,7 +96,7 @@ func NewTorrentManager(torrentConfig *params.TorrentConfig, logger, stdoutLogger
 		encryptor:   encryptor,
 
 		publisher: publisher,
-	}
+	}, nil
 }
 
 // LogStdout is copied directly from Manager, consider a refactor
@@ -203,17 +208,17 @@ func (m *TorrentManager) StartTorrentClient() error {
 	return nil
 }
 
-func (m *TorrentManager) StopTorrentClient() []error {
+func (m *TorrentManager) StopTorrentClient() error {
 	if m.TorrentClientStarted() {
 		m.StopHistoryArchiveTasksIntervals()
 		m.logger.Info("Stopping torrent client")
 		errs := m.torrentClient.Close()
 		if len(errs) > 0 {
-			return errs
+			return errors.Join(errs...)
 		}
 		m.torrentClient = nil
 	}
-	return make([]error, 0)
+	return nil
 }
 
 func (m *TorrentManager) TorrentClientStarted() bool {

@@ -94,11 +94,9 @@ type Manager struct {
 	tokenManager             TokenManager
 	collectiblesManager      CollectiblesManager
 	logger                   *zap.Logger
-	stdoutLogger             *zap.Logger
 	transport                *transport.Transport
 	timesource               common.TimeSource
 	quit                     chan struct{}
-	torrentManager           *TorrentManager
 	walletConfig             *params.WalletConfig
 	communityTokensService   CommunityTokensServiceInterface
 	membersReevaluationTasks sync.Map // stores `membersReevaluationTask`
@@ -318,7 +316,7 @@ type OwnerVerifier interface {
 	SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error)
 }
 
-func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, ensverifier *ens.Verifier, ownerVerifier OwnerVerifier, transport *transport.Transport, timesource common.TimeSource, keyDistributor KeyDistributor, torrentConfig *params.TorrentConfig, opts ...ManagerOption) (*Manager, error) {
+func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, ensverifier *ens.Verifier, ownerVerifier OwnerVerifier, transport *transport.Transport, timesource common.TimeSource, keyDistributor KeyDistributor, opts ...ManagerOption) (*Manager, error) {
 	if identity == nil {
 		return nil, errors.New("empty identity")
 	}
@@ -334,11 +332,6 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 		}
 	}
 
-	stdoutLogger, err := zap.NewDevelopment()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create archive logger")
-	}
-
 	managerConfig := managerOptions{}
 	for _, opt := range opts {
 		opt(&managerConfig)
@@ -346,7 +339,6 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 
 	manager := &Manager{
 		logger:         logger,
-		stdoutLogger:   stdoutLogger,
 		encryptor:      encryptor,
 		identity:       identity,
 		installationID: installationID,
@@ -358,11 +350,10 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 		communityLock:  NewCommunityLock(logger),
 	}
 
-	persistence := &Persistence{
+	manager.persistence = &Persistence{
 		db:                      db,
 		recordBundleToCommunity: manager.dbRecordBundleToCommunity,
 	}
-	manager.persistence = persistence
 
 	if managerConfig.accountsManager != nil {
 		manager.accountsManager = managerConfig.accountsManager
@@ -407,14 +398,7 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 		manager.forceMembersReevaluation = make(map[string]chan struct{}, 10)
 	}
 
-	manager.torrentManager = NewTorrentManager(torrentConfig, logger, stdoutLogger, persistence, transport, identity, encryptor, manager)
-
 	return manager, nil
-}
-
-func (m *Manager) LogStdout(msg string, fields ...zap.Field) {
-	m.stdoutLogger.Info(msg, fields...)
-	m.logger.Debug(msg, fields...)
 }
 
 type Subscription struct {
@@ -648,7 +632,6 @@ func (m *Manager) Stop() error {
 	for _, c := range m.subscriptions {
 		close(c)
 	}
-	m.torrentManager.StopTorrentClient()
 	return nil
 }
 
@@ -4863,6 +4846,11 @@ func (m *Manager) decryptCommunityDescription(keyIDSeqNo string, d []byte) (*Dec
 		Description: &description,
 	}
 	return decryptCommunityResponse, nil
+}
+
+// GetPersistence returns the instantiated *Persistence used by the Manager
+func (m *Manager) GetPersistence() *Persistence {
+	return m.persistence
 }
 
 func ToLinkPreveiwThumbnail(image images.IdentityImage) (*common.LinkPreviewThumbnail, error) {
