@@ -128,7 +128,7 @@ func (wf *WakuFilterFullNode) onRequest(ctx context.Context) func(network.Stream
 
 		wf.metrics.RecordRequest(subscribeRequest.FilterSubscribeType.String(), time.Since(start))
 
-		logger.Info("received request", zap.String("requestType", subscribeRequest.FilterSubscribeType.String()))
+		logger.Info("received request", zap.Stringer("serverID", wf.h.ID()), zap.Stringer("requestType", subscribeRequest.FilterSubscribeType))
 	}
 }
 

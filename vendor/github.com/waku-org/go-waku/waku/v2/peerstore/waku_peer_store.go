@@ -8,6 +8,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/waku-org/go-waku/waku/v2/protocol"
+	"golang.org/x/exp/maps"
 )
 
 // Origin is used to determine how the peer is identified,
@@ -58,7 +60,7 @@ type WakuPeerstore interface {
 
 	AddPubSubTopic(p peer.ID, topic string) error
 	RemovePubSubTopic(p peer.ID, topic string) error
-	PubSubTopics(p peer.ID) ([]string, error)
+	PubSubTopics(p peer.ID) (protocol.TopicSet, error)
 	SetPubSubTopics(p peer.ID, topics []string) error
 	PeersByPubSubTopics(pubSubTopics []string, specificPeers ...peer.ID) peer.IDSlice
 	PeersByPubSubTopic(pubSubTopic string, specificPeers ...peer.ID) peer.IDSlice
@@ -175,13 +177,12 @@ func (ps *WakuPeerstoreImpl) AddPubSubTopic(p peer.ID, topic string) error {
 	if err != nil {
 		return err
 	}
-	for _, t := range existingTopics {
-		if t == topic {
-			return nil
-		}
+
+	if _, found := existingTopics[topic]; found {
+		return nil
 	}
-	existingTopics = append(existingTopics, topic)
-	return ps.peerStore.Put(p, peerPubSubTopics, existingTopics)
+	existingTopics[topic] = struct{}{}
+	return ps.peerStore.Put(p, peerPubSubTopics, maps.Keys(existingTopics))
 }
 
 // RemovePubSubTopic removes a pubSubTopic from the peer
@@ -195,14 +196,9 @@ func (ps *WakuPeerstoreImpl) RemovePubSubTopic(p peer.ID, topic string) error {
 		return nil
 	}
 
-	for i := range existingTopics {
-		if existingTopics[i] == topic {
-			existingTopics = append(existingTopics[:i], existingTopics[i+1:]...)
-			break
-		}
-	}
+	delete(existingTopics, topic)
 
-	err = ps.SetPubSubTopics(p, existingTopics)
+	err = ps.SetPubSubTopics(p, maps.Keys(existingTopics))
 	if err != nil {
 		return err
 	}
@@ -215,16 +211,16 @@ func (ps *WakuPeerstoreImpl) SetPubSubTopics(p peer.ID, topics []string) error {
 }
 
 // PubSubTopics fetches list of pubSubTopics for a peer
-func (ps *WakuPeerstoreImpl) PubSubTopics(p peer.ID) ([]string, error) {
+func (ps *WakuPeerstoreImpl) PubSubTopics(p peer.ID) (protocol.TopicSet, error) {
 	result, err := ps.peerStore.Get(p, peerPubSubTopics)
 	if err != nil {
 		if errors.Is(err, peerstore.ErrNotFound) {
-			return nil, nil
+			return protocol.NewTopicSet(), nil
 		} else {
 			return nil, err
 		}
 	}
-	return result.([]string), nil
+	return protocol.NewTopicSet((result.([]string))...), nil
 }
 
 // PeersByPubSubTopic Returns list of peers that support list of pubSubTopics
@@ -235,22 +231,16 @@ func (ps *WakuPeerstoreImpl) PeersByPubSubTopics(pubSubTopics []string, specific
 	}
 	var result peer.IDSlice
 	for _, p := range specificPeers {
-		topics, err := ps.PubSubTopics(p)
+		peerMatch := true
+		peerTopics, err := ps.PubSubTopics(p)
 		if err == nil {
-			//Convoluted and crazy logic to find subset of topics
-			// Could not find a better way to do it?
-			peerTopicMap := make(map[string]struct{})
-			match := true
-			for _, topic := range topics {
-				peerTopicMap[topic] = struct{}{}
-			}
-			for _, topic := range pubSubTopics {
-				if _, ok := peerTopicMap[topic]; !ok {
-					match = false
+			for _, t := range pubSubTopics {
+				if _, ok := peerTopics[t]; !ok {
+					peerMatch = false
 					break
 				}
 			}
-			if match {
+			if peerMatch {
 				result = append(result, p)
 			}
 		} //Note: skipping a peer in case of an error as there would be others available.
@@ -268,7 +258,7 @@ func (ps *WakuPeerstoreImpl) PeersByPubSubTopic(pubSubTopic string, specificPeer
 	for _, p := range specificPeers {
 		topics, err := ps.PubSubTopics(p)
 		if err == nil {
-			for _, topic := range topics {
+			for topic := range topics {
 				if topic == pubSubTopic {
 					result = append(result, p)
 				}

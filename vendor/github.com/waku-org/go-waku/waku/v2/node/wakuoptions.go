@@ -28,6 +28,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
+	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/rendezvous"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
@@ -77,6 +78,7 @@ type WakuNodeParameters struct {
 	enableFilterFullNode  bool
 	filterOpts            []filter.Option
 	pubsubOpts            []pubsub.Option
+	lightpushOpts         []lightpush.Option
 
 	minRelayPeersToPublish int
 	maxMsgSizeBytes        int
@@ -458,9 +460,10 @@ func WithMessageProvider(s legacy_store.MessageProvider) WakuNodeOption {
 }
 
 // WithLightPush is a WakuNodeOption that enables the lightpush protocol
-func WithLightPush() WakuNodeOption {
+func WithLightPush(lightpushOpts ...lightpush.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableLightPush = true
+		params.lightpushOpts = lightpushOpts
 		return nil
 	}
 }

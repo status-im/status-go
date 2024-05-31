@@ -13,6 +13,7 @@ import (
 	waku_proto "github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
 )
 
 func (pm *PeerManager) SubscribeToRelayEvtBus(bus event.Bus) error {
@@ -103,7 +104,7 @@ func (pm *PeerManager) handleNewRelayTopicUnSubscription(pubsubTopic string) {
 					logging.HostID("peerID", peer))
 				continue
 			}
-			if len(peerTopics) == 1 && peerTopics[0] == pubsubTopic {
+			if len(peerTopics) == 1 && maps.Keys(peerTopics)[0] == pubsubTopic {
 				err := pm.host.Network().ClosePeer(peer)
 				if err != nil {
 					pm.logger.Warn("Failed to disconnect connection towards peer",
