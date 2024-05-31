@@ -3999,10 +3999,6 @@ func (m *Manager) CanceledRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*Request
 	return m.persistence.CanceledRequestsToJoinForUser(common.PubkeyToHex(pk))
 }
 
-func (m *Manager) CanceledRequestToJoinForUserForCommunityID(pk *ecdsa.PublicKey, communityID []byte) (*RequestToJoin, error) {
-	return m.persistence.CanceledRequestToJoinForUserForCommunityID(common.PubkeyToHex(pk), communityID)
-}
-
 func (m *Manager) PendingRequestsToJoin() ([]*RequestToJoin, error) {
 	return m.persistence.PendingRequestsToJoin()
 }

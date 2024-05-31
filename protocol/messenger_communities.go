@@ -1037,6 +1037,7 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 	if err = m.PublishIdentityImage(); err != nil {
 		return nil, err
 	}
+
 	// Was applicant not a member and successfully joined?
 	if !isCommunityMember && community.Joined() {
 		joinedNotification := &localnotifications.Notification{
@@ -2904,10 +2905,6 @@ func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*Messenger
 
 func (m *Messenger) MyCanceledRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.CanceledRequestsToJoinForUser(&m.identity.PublicKey)
-}
-
-func (m *Messenger) MyCanceledRequestToJoinForCommunityID(communityID []byte) (*communities.RequestToJoin, error) {
-	return m.communitiesManager.CanceledRequestToJoinForUserForCommunityID(&m.identity.PublicKey, communityID)
 }
 
 func (m *Messenger) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, error) {
