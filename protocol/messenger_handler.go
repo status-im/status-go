@@ -1355,12 +1355,12 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		// part of and doesn't own the private key at the same time
 		if !community.IsControlNode() && community.Joined() && clock >= lastClock {
 			if lastSeenMagnetlink == magnetlink {
-				m.communitiesManager.LogStdout("already processed this magnetlink")
+				m.torrentManager.LogStdout("already processed this magnetlink")
 				return nil
 			}
 
-			m.communitiesManager.UnseedHistoryArchiveTorrent(id)
-			currentTask := m.communitiesManager.GetHistoryArchiveDownloadTask(id.String())
+			m.torrentManager.UnseedHistoryArchiveTorrent(id)
+			currentTask := m.torrentManager.GetHistoryArchiveDownloadTask(id.String())
 
 			go func(currentTask *communities.HistoryArchiveDownloadTask, communityID types.HexBytes) {
 
@@ -1377,7 +1377,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 					Cancelled:  false,
 				}
 
-				m.communitiesManager.AddHistoryArchiveDownloadTask(communityID.String(), task)
+				m.torrentManager.AddHistoryArchiveDownloadTask(communityID.String(), task)
 
 				// this wait groups tracks the ongoing task for a particular community
 				task.Waiter.Add(1)
@@ -1396,32 +1396,32 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 }
 
 func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetlink string, cancel chan struct{}) {
-	downloadTaskInfo, err := m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
+	downloadTaskInfo, err := m.torrentManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
 	if err != nil {
 		logMsg := "failed to download history archive data"
 		if err == communities.ErrTorrentTimedout {
-			m.communitiesManager.LogStdout("torrent has timed out, trying once more...")
-			downloadTaskInfo, err = m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
+			m.torrentManager.LogStdout("torrent has timed out, trying once more...")
+			downloadTaskInfo, err = m.torrentManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
 			if err != nil {
-				m.communitiesManager.LogStdout(logMsg, zap.Error(err))
+				m.torrentManager.LogStdout(logMsg, zap.Error(err))
 				return
 			}
 		} else {
-			m.communitiesManager.LogStdout(logMsg, zap.Error(err))
+			m.torrentManager.LogStdout(logMsg, zap.Error(err))
 			return
 		}
 	}
 
 	if downloadTaskInfo.Cancelled {
 		if downloadTaskInfo.TotalDownloadedArchivesCount > 0 {
-			m.communitiesManager.LogStdout(fmt.Sprintf("downloaded %d of %d archives so far", downloadTaskInfo.TotalDownloadedArchivesCount, downloadTaskInfo.TotalArchivesCount))
+			m.torrentManager.LogStdout(fmt.Sprintf("downloaded %d of %d archives so far", downloadTaskInfo.TotalDownloadedArchivesCount, downloadTaskInfo.TotalArchivesCount))
 		}
 		return
 	}
 
 	err = m.communitiesManager.UpdateLastSeenMagnetlink(id, magnetlink)
 	if err != nil {
-		m.communitiesManager.LogStdout("couldn't update last seen magnetlink", zap.Error(err))
+		m.torrentManager.LogStdout("couldn't update last seen magnetlink", zap.Error(err))
 	}
 
 	err = m.checkIfIMemberOfCommunity(id)
@@ -1431,7 +1431,7 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 
 	err = m.importHistoryArchives(id, cancel)
 	if err != nil {
-		m.communitiesManager.LogStdout("failed to import history archives", zap.Error(err))
+		m.torrentManager.LogStdout("failed to import history archives", zap.Error(err))
 		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
 		return
 	}
@@ -1474,13 +1474,13 @@ func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessag
 
 	err := m.handleImportedMessages(importedMessages)
 	if err != nil {
-		m.communitiesManager.LogStdout("failed to handle imported messages", zap.Error(err))
+		m.torrentManager.LogStdout("failed to handle imported messages", zap.Error(err))
 		return nil, err
 	}
 
 	response, err := m.handleRetrievedMessages(otherMessages, false, true)
 	if err != nil {
-		m.communitiesManager.LogStdout("failed to write history archive messages to database", zap.Error(err))
+		m.torrentManager.LogStdout("failed to write history archive messages to database", zap.Error(err))
 		return nil, err
 	}
 
@@ -1699,7 +1699,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 			magnetlink := requestToJoinResponseProto.MagnetUri
 			if m.torrentClientReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
 
-				currentTask := m.communitiesManager.GetHistoryArchiveDownloadTask(community.IDString())
+				currentTask := m.torrentManager.GetHistoryArchiveDownloadTask(community.IDString())
 				go func(currentTask *communities.HistoryArchiveDownloadTask) {
 
 					// Cancel ongoing download/import task
@@ -1713,7 +1713,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 						Waiter:     *new(sync.WaitGroup),
 						Cancelled:  false,
 					}
-					m.communitiesManager.AddHistoryArchiveDownloadTask(community.IDString(), task)
+					m.torrentManager.AddHistoryArchiveDownloadTask(community.IDString(), task)
 
 					task.Waiter.Add(1)
 					defer task.Waiter.Done()

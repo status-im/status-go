@@ -113,6 +113,7 @@ type Messenger struct {
 	pushNotificationClient    *pushnotificationclient.Client
 	pushNotificationServer    *pushnotificationserver.Server
 	communitiesManager        *communities.Manager
+	torrentManager            *communities.TorrentManager
 	communitiesKeyDistributor communities.KeyDistributor
 	accountsManager           account.Manager
 	mentionsManager           *MentionManager
@@ -492,7 +493,12 @@ func NewMessenger(
 		encryptor: encryptionProtocol,
 	}
 
-	communitiesManager, err := communities.NewManager(identity, installationID, database, encryptionProtocol, logger, ensVerifier, c.communityTokensService, transp, transp, communitiesKeyDistributor, c.torrentConfig, managerOptions...)
+	communitiesManager, err := communities.NewManager(identity, installationID, database, encryptionProtocol, logger, ensVerifier, c.communityTokensService, transp, transp, communitiesKeyDistributor, managerOptions...)
+	if err != nil {
+		return nil, err
+	}
+
+	torrentManager, err := communities.NewTorrentManager(c.torrentConfig, logger, communitiesManager.GetPersistence(), transp, identity, encryptionProtocol, communitiesManager)
 	if err != nil {
 		return nil, err
 	}
@@ -527,6 +533,7 @@ func NewMessenger(
 		pushNotificationServer:     pushNotificationServer,
 		communitiesManager:         communitiesManager,
 		communitiesKeyDistributor:  communitiesKeyDistributor,
+		torrentManager:             torrentManager,
 		accountsManager:            c.accountsManager,
 		ensVerifier:                ensVerifier,
 		featureFlags:               c.featureFlags,
@@ -572,6 +579,7 @@ func NewMessenger(
 			ensVerifier.Stop,
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
+			torrentManager.StopTorrentClient,
 			encryptionProtocol.Stop,
 			func() error {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -911,8 +919,8 @@ func (m *Messenger) handleConnectionChange(online bool) {
 	}
 
 	// Update Communities manager
-	if m.communitiesManager != nil {
-		m.communitiesManager.SetOnline(online)
+	if m.torrentManager != nil {
+		m.torrentManager.SetOnline(online)
 	}
 
 	// Publish contact code
@@ -3738,11 +3746,11 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 
 	importMessagesToSave := messageState.Response.DiscordMessages()
 	if len(importMessagesToSave) > 0 {
-		m.communitiesManager.LogStdout(fmt.Sprintf("saving %d discord messages", len(importMessagesToSave)))
+		m.torrentManager.LogStdout(fmt.Sprintf("saving %d discord messages", len(importMessagesToSave)))
 		m.handleImportMessagesMutex.Lock()
 		err := m.persistence.SaveDiscordMessages(importMessagesToSave)
 		if err != nil {
-			m.communitiesManager.LogStdout("failed to save discord messages", zap.Error(err))
+			m.torrentManager.LogStdout("failed to save discord messages", zap.Error(err))
 			m.handleImportMessagesMutex.Unlock()
 			return err
 		}
@@ -3751,11 +3759,11 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 
 	messageAttachmentsToSave := messageState.Response.DiscordMessageAttachments()
 	if len(messageAttachmentsToSave) > 0 {
-		m.communitiesManager.LogStdout(fmt.Sprintf("saving %d discord message attachments", len(messageAttachmentsToSave)))
+		m.torrentManager.LogStdout(fmt.Sprintf("saving %d discord message attachments", len(messageAttachmentsToSave)))
 		m.handleImportMessagesMutex.Lock()
 		err := m.persistence.SaveDiscordMessageAttachments(messageAttachmentsToSave)
 		if err != nil {
-			m.communitiesManager.LogStdout("failed to save discord message attachments", zap.Error(err))
+			m.torrentManager.LogStdout("failed to save discord message attachments", zap.Error(err))
 			m.handleImportMessagesMutex.Unlock()
 			return err
 		}
@@ -3764,7 +3772,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 
 	messagesToSave := messageState.Response.Messages()
 	if len(messagesToSave) > 0 {
-		m.communitiesManager.LogStdout(fmt.Sprintf("saving %d app messages", len(messagesToSave)))
+		m.torrentManager.LogStdout(fmt.Sprintf("saving %d app messages", len(messagesToSave)))
 		m.handleMessagesMutex.Lock()
 		err := m.SaveMessages(messagesToSave)
 		if err != nil {
