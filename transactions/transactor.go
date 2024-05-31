@@ -322,10 +322,6 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 		if err != nil {
 			return validatedArgs, hash, err
 		}
-		if gas < defaultGas {
-			t.log.Info("default gas will be used because estimated is lower", "estimated", gas, "default", defaultGas)
-			gas = defaultGas
-		}
 	} else {
 		gas = uint64(*args.Gas)
 	}
@@ -411,10 +407,6 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 		})
 		if err != nil {
 			return tx, err
-		}
-		if gas < defaultGas {
-			t.log.Info("default gas will be used because estimated is lower", "estimated", gas, "default", defaultGas)
-			gas = defaultGas
 		}
 	}
 

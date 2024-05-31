@@ -41,7 +41,7 @@ func (s *TransferBridge) CalculateFees(from, to *params.Network, token *token.To
 }
 
 func (s *TransferBridge) PackTxInputData(contractType string, fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
-	if token.Symbol == "ETH" {
+	if token.IsNative() {
 		return []byte("eth_sendRawTransaction"), nil
 	} else {
 		abi, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
@@ -64,7 +64,7 @@ func (s *TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *par
 		return 0, err
 	}
 
-	if token.Symbol == "ETH" {
+	if token.IsNative() {
 		estimation, err = s.transactor.EstimateGas(fromNetwork, from, to, amountIn, input)
 		if err != nil {
 			return 0, err
@@ -96,7 +96,7 @@ func (s *TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *par
 
 func (s *TransferBridge) BuildTx(network, _ *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int, bonderFee *big.Int) (*ethTypes.Transaction, error) {
 	toAddr := types.Address(toAddress)
-	if strings.EqualFold(token.Symbol, "ETH") {
+	if token.IsNative() {
 		sendArgs := &TransactionBridge{
 			TransferTx: &transactions.SendTxArgs{
 				From:  types.Address(fromAddress),
