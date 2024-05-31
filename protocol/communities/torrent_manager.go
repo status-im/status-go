@@ -99,7 +99,7 @@ func NewTorrentManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, 
 	}, nil
 }
 
-// LogStdout is copied directly from Manager, consider a refactor
+// LogStdout appears to be some kind of debug tool specifically for torrent functionality
 func (m *TorrentManager) LogStdout(msg string, fields ...zap.Field) {
 	m.stdoutLogger.Info(msg, fields...)
 	m.logger.Debug(msg, fields...)
@@ -107,7 +107,7 @@ func (m *TorrentManager) LogStdout(msg string, fields ...zap.Field) {
 
 func (m *TorrentManager) SetOnline(online bool) {
 	if online {
-		if m.torrentConfig != nil && m.torrentConfig.Enabled && !m.TorrentClientStarted() {
+		if m.torrentConfig != nil && m.torrentConfig.Enabled && !m.torrentClientStarted() {
 			err := m.StartTorrentClient()
 			if err != nil {
 				m.LogStdout("couldn't start torrent client", zap.Error(err))
@@ -175,7 +175,7 @@ func (m *TorrentManager) StartTorrentClient() error {
 		return fmt.Errorf("can't start torrent client: missing torrentConfig")
 	}
 
-	if m.TorrentClientStarted() {
+	if m.torrentClientStarted() {
 		return nil
 	}
 
@@ -209,8 +209,8 @@ func (m *TorrentManager) StartTorrentClient() error {
 }
 
 func (m *TorrentManager) Stop() error {
-	if m.TorrentClientStarted() {
-		m.StopHistoryArchiveTasksIntervals()
+	if m.torrentClientStarted() {
+		m.stopHistoryArchiveTasksIntervals()
 		m.logger.Info("Stopping torrent client")
 		errs := m.torrentClient.Close()
 		if len(errs) > 0 {
@@ -221,7 +221,7 @@ func (m *TorrentManager) Stop() error {
 	return nil
 }
 
-func (m *TorrentManager) TorrentClientStarted() bool {
+func (m *TorrentManager) torrentClientStarted() bool {
 	return m.torrentClient != nil
 }
 
@@ -231,7 +231,7 @@ func (m *TorrentManager) IsReady() bool {
 	// be instantiated (for example in case of port conflicts)
 	return m.torrentConfig != nil &&
 		m.torrentConfig.Enabled &&
-		m.TorrentClientStarted()
+		m.torrentClientStarted()
 }
 
 func (m *TorrentManager) GetCommunityChatsFilters(communityID types.HexBytes) ([]*transport.Filter, error) {
@@ -261,11 +261,11 @@ func (m *TorrentManager) GetCommunityChatsTopics(communityID types.HexBytes) ([]
 	return topics, nil
 }
 
-func (m *TorrentManager) GetOldestWakuMessageTimestamp(topics []types.TopicType) (uint64, error) {
+func (m *TorrentManager) getOldestWakuMessageTimestamp(topics []types.TopicType) (uint64, error) {
 	return m.persistence.GetOldestWakuMessageTimestamp(topics)
 }
 
-func (m *TorrentManager) GetLastMessageArchiveEndDate(communityID types.HexBytes) (uint64, error) {
+func (m *TorrentManager) getLastMessageArchiveEndDate(communityID types.HexBytes) (uint64, error) {
 	return m.persistence.GetLastMessageArchiveEndDate(communityID)
 }
 
@@ -289,7 +289,7 @@ func (m *TorrentManager) GetHistoryArchivePartitionStartTimestamp(communityID ty
 		topics = append(topics, filter.ContentTopic)
 	}
 
-	lastArchiveEndDateTimestamp, err := m.GetLastMessageArchiveEndDate(communityID)
+	lastArchiveEndDateTimestamp, err := m.getLastMessageArchiveEndDate(communityID)
 	if err != nil {
 		m.LogStdout("failed to get last archive end date", zap.Error(err))
 		return 0, err
@@ -300,7 +300,7 @@ func (m *TorrentManager) GetHistoryArchivePartitionStartTimestamp(communityID ty
 		// means we haven't created an archive before, which means
 		// the next thing to look at is the oldest waku message timestamp for
 		// this community
-		lastArchiveEndDateTimestamp, err = m.GetOldestWakuMessageTimestamp(topics)
+		lastArchiveEndDateTimestamp, err = m.getOldestWakuMessageTimestamp(topics)
 		if err != nil {
 			m.LogStdout("failed to get oldest waku message timestamp", zap.Error(err))
 			return 0, err
@@ -381,7 +381,7 @@ func (m *TorrentManager) StartHistoryArchiveTasksInterval(community *Community, 
 	}
 }
 
-func (m *TorrentManager) StopHistoryArchiveTasksIntervals() {
+func (m *TorrentManager) stopHistoryArchiveTasksIntervals() {
 	m.historyArchiveTasks.Range(func(_, task interface{}) bool {
 		close(task.(chan struct{})) // Need to cast to the chan
 		return true
@@ -401,14 +401,14 @@ func (m *TorrentManager) StopHistoryArchiveTasksInterval(communityID types.HexBy
 }
 
 func (m *TorrentManager) CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
-	return m.CreateHistoryArchiveTorrent(communityID, messages, topics, startDate, endDate, partition, encrypt)
+	return m.createHistoryArchiveTorrent(communityID, messages, topics, startDate, endDate, partition, encrypt)
 }
 
 func (m *TorrentManager) CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
-	return m.CreateHistoryArchiveTorrent(communityID, make([]*types.Message, 0), topics, startDate, endDate, partition, encrypt)
+	return m.createHistoryArchiveTorrent(communityID, make([]*types.Message, 0), topics, startDate, endDate, partition, encrypt)
 }
 
-func (m *TorrentManager) CreateHistoryArchiveTorrent(communityID types.HexBytes, msgs []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+func (m *TorrentManager) createHistoryArchiveTorrent(communityID types.HexBytes, msgs []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
 
 	loadFromDB := len(msgs) == 0
 
@@ -764,10 +764,6 @@ func (m *TorrentManager) IsSeedingHistoryArchiveTorrent(communityID types.HexByt
 
 func (m *TorrentManager) GetHistoryArchiveDownloadTask(communityID string) *HistoryArchiveDownloadTask {
 	return m.historyArchiveDownloadTasks[communityID]
-}
-
-func (m *TorrentManager) DeleteHistoryArchiveDownloadTask(communityID string) {
-	delete(m.historyArchiveDownloadTasks, communityID)
 }
 
 func (m *TorrentManager) AddHistoryArchiveDownloadTask(communityID string, task *HistoryArchiveDownloadTask) {
