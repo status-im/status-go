@@ -989,7 +989,6 @@ func (w *Waku) checkIfMessagesStored() {
 			return
 		case <-ticker.C:
 			w.logger.Debug("Running loop for messages stored check")
-			w.logger.Debug("Send Message IDs", zap.Any("sendMsgIDs", w.sendMsgIDs))
 			w.sendMsgIDsMu.Lock()
 			for pubsubTopic, subMsgs := range w.sendMsgIDs {
 				var queryMsgIds []gethcommon.Hash
@@ -1018,13 +1017,11 @@ type publishFn = func(envelope *protocol.Envelope, logger *zap.Logger) error
 func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publishFn, logger *zap.Logger) {
 	defer w.wg.Done()
 
-	var event common.EventType
 	if err := publishFn(envelope, logger); err != nil {
 		logger.Error("could not send message", zap.Error(err))
-		event = common.EventEnvelopeExpired
 		w.SendEnvelopeEvent(common.EnvelopeEvent{
 			Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
-			Event: event,
+			Event: common.EventEnvelopeExpired,
 		})
 	}
 }
@@ -1432,7 +1429,7 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage, processImmediately bool)
 	if !alreadyCached || !envelope.Value().Processed.Load() {
 		if processImmediately {
 			logger.Debug("immediately processing envelope")
-			w.processReceivedMessage(recvMessage)
+			w.processMessage(recvMessage)
 		} else {
 			logger.Debug("posting event")
 			w.postEvent(recvMessage) // notify the local node about the new message
@@ -1457,12 +1454,12 @@ func (w *Waku) processQueueLoop() {
 		case <-w.ctx.Done():
 			return
 		case e := <-w.msgQueue:
-			w.processReceivedMessage(e)
+			w.processMessage(e)
 		}
 	}
 }
 
-func (w *Waku) processReceivedMessage(e *common.ReceivedMessage) {
+func (w *Waku) processMessage(e *common.ReceivedMessage) {
 	logger := w.logger.With(
 		zap.Stringer("envelopeHash", e.Envelope.Hash()),
 		zap.String("pubsubTopic", e.PubsubTopic),
