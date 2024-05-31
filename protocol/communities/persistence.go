@@ -691,26 +691,6 @@ func (p *Persistence) CanceledRequestsToJoinForUser(pk string) ([]*RequestToJoin
 	return requests, nil
 }
 
-func (p *Persistence) CanceledRequestToJoinForUserForCommunityID(pk string, communityID []byte) (*RequestToJoin, error) {
-	row := p.db.QueryRow(`SELECT id,public_key,clock,ens_name,chat_id,community_id,state
-	FROM
-	communities_requests_to_join
-	WHERE
-	state = ? AND public_key = ? AND community_id = ?`,
-		RequestToJoinStateCanceled, pk, communityID)
-
-	request := &RequestToJoin{}
-
-	err := row.Scan(&request.ID, &request.PublicKey, &request.Clock, &request.ENSName, &request.ChatID, &request.CommunityID, &request.State)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-
-	return request, nil
-}
-
 func (p *Persistence) RequestsToJoinForUserByState(pk string, state RequestToJoinState) ([]*RequestToJoin, error) {
 	var requests []*RequestToJoin
 	rows, err := p.db.Query(`SELECT id,public_key,clock,ens_name,chat_id,community_id,state FROM communities_requests_to_join WHERE state = ? AND public_key = ?`, state, pk)
@@ -855,8 +835,8 @@ func (p *Persistence) GetRequestToJoinClockByPkAndCommunityID(pk string, communi
 	var clock uint64
 
 	err := p.db.QueryRow(`
-		SELECT clock 
-		FROM communities_requests_to_join 
+		SELECT clock
+		FROM communities_requests_to_join
 		WHERE public_key = ? AND community_id = ?`, pk, communityID).Scan(&clock)
 	return clock, err
 }
