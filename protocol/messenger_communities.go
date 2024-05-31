@@ -1895,6 +1895,7 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			Shard:                    community.Shard().Protobuffer(),
 		}
 
+		// The purpose of this torrent code is to get the 'magnetlink' to populate 'requestToJoinResponseProto.MagnetUri'
 		if m.torrentManager.IsReady() && m.torrentManager.TorrentFileExists(community.IDString()) {
 			magnetlink, err := m.torrentManager.GetHistoryArchiveMagnetlink(community.ID())
 			if err != nil {
