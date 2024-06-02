@@ -2,18 +2,29 @@ package transfer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/pkg/errors"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/wallet/bridge"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/transactions"
 )
 
 const multiTransactionColumns = "id, from_network_id, from_tx_hash, from_address, from_asset, from_amount, to_network_id, to_tx_hash, to_address, to_asset, to_amount, type, cross_tx_id, timestamp"
 const selectMultiTransactionColumns = "id, COALESCE(from_network_id, 0), from_tx_hash, from_address, from_asset, from_amount, COALESCE(to_network_id, 0), to_tx_hash, to_address, to_asset, to_amount, type, cross_tx_id, timestamp"
+
+var pendingTxTimeout time.Duration = 10 * time.Minute
+var ErrWatchPendingTxTimeout = errors.New("timeout watching for pending transaction")
+var ErrPendingTxNotExists = errors.New("pending transaction does not exist")
 
 func (tm *TransactionManager) InsertMultiTransaction(multiTransaction *MultiTransaction) (wallet_common.MultiTransactionIDType, error) {
 	return multiTransaction.ID, tm.storage.CreateMultiTransaction(multiTransaction)
@@ -148,4 +159,35 @@ func (tm *TransactionManager) GetBridgeDestinationMultiTransaction(ctx context.C
 	}
 
 	return nil, nil
+}
+
+func (tm *TransactionManager) WatchTransaction(ctx context.Context, chainID uint64, transactionHash common.Hash) error {
+	// Workaround to keep the blocking call until the clients use the PendingTxTracker APIs
+	eventChan := make(chan walletevent.Event, 2)
+	sub := tm.eventFeed.Subscribe(eventChan)
+	defer sub.Unsubscribe()
+
+	status, err := tm.pendingTracker.Watch(ctx, wallet_common.ChainID(chainID), transactionHash)
+	if err == nil && *status != transactions.Pending {
+		log.Error("transaction is not pending", "status", status)
+		return nil
+	}
+
+	for {
+		select {
+		case we := <-eventChan:
+			if transactions.EventPendingTransactionStatusChanged == we.Type {
+				var p transactions.StatusChangedPayload
+				err = json.Unmarshal([]byte(we.Message), &p)
+				if err != nil {
+					return err
+				}
+				if p.ChainID == wallet_common.ChainID(chainID) && p.Hash == transactionHash {
+					return nil
+				}
+			}
+		case <-time.After(pendingTxTimeout):
+			return ErrWatchPendingTxTimeout
+		}
+	}
 }

@@ -2,21 +2,28 @@ package transfer
 
 import (
 	"context"
+	"encoding/json"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/bridge"
 	"github.com/status-im/status-go/services/wallet/bridge/mock_bridge"
+	wallet_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/transactions/mock_transactor"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 func deepCopy(tx *transactions.SendTxArgs) *transactions.SendTxArgs {
@@ -146,7 +153,7 @@ func TestSendTransactionsETHFailOnBridge(t *testing.T) {
 
 	// Call the SendTransactions method
 	_, err := tm.SendTransactions(context.Background(), multiTransaction, data, bridges, account)
-	require.Error(t, expectedErr, err)
+	require.ErrorIs(t, expectedErr, err)
 }
 
 func TestSendTransactionsETHFailOnTransactor(t *testing.T) {
@@ -162,5 +169,78 @@ func TestSendTransactionsETHFailOnTransactor(t *testing.T) {
 
 	// Call the SendTransactions method
 	_, err := tm.SendTransactions(context.Background(), multiTransaction, data, bridges, account)
-	require.Error(t, expectedErr, err)
+	require.ErrorIs(t, expectedErr, err)
+}
+
+func TestWatchTransaction(t *testing.T) {
+	tm, _, _ := setupTransactionManager(t)
+	chainID := uint64(1)
+	pendingTxTimeout = 2 * time.Millisecond
+
+	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+	chainClient := transactions.NewMockChainClient()
+	eventFeed := &event.Feed{}
+	// For now, pending tracker is not interface, so we have to use a real one
+	tm.pendingTracker = transactions.NewPendingTxTracker(walletDB, chainClient, nil, eventFeed, pendingTxTimeout)
+	tm.eventFeed = eventFeed
+
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 2*pendingTxTimeout)
+	defer cancel()
+
+	// Insert a pending transaction
+	txs := transactions.MockTestTransactions(t, chainClient, []transactions.TestTxSummary{{}})
+	err = tm.pendingTracker.StoreAndTrackPendingTx(&txs[0]) // We dont need to track it, but no other way to insert it
+	require.NoError(t, err)
+
+	txEventPayload := transactions.StatusChangedPayload{
+		TxIdentity: transactions.TxIdentity{
+			Hash:    txs[0].Hash,
+			ChainID: wallet_common.ChainID(chainID),
+		},
+		Status: transactions.Pending,
+	}
+	jsonPayload, err := json.Marshal(txEventPayload)
+	require.NoError(t, err)
+
+	go func() {
+		time.Sleep(pendingTxTimeout / 2)
+		eventFeed.Send(walletevent.Event{
+			Type:    transactions.EventPendingTransactionStatusChanged,
+			Message: string(jsonPayload),
+		})
+	}()
+
+	// Call the WatchTransaction method
+	err = tm.WatchTransaction(ctx, chainID, txs[0].Hash)
+	require.NoError(t, err)
+}
+
+func TestWatchTransaction_Timeout(t *testing.T) {
+	tm, _, _ := setupTransactionManager(t)
+	chainID := uint64(1)
+	transactionHash := common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
+	pendingTxTimeout = 2 * time.Millisecond
+
+	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+	chainClient := transactions.NewMockChainClient()
+	eventFeed := &event.Feed{}
+	// For now, pending tracker is not interface, so we have to use a real one
+	tm.pendingTracker = transactions.NewPendingTxTracker(walletDB, chainClient, nil, eventFeed, pendingTxTimeout)
+	tm.eventFeed = eventFeed
+
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Microsecond)
+	defer cancel()
+
+	// Insert a pending transaction
+	txs := transactions.MockTestTransactions(t, chainClient, []transactions.TestTxSummary{{}})
+	err = tm.pendingTracker.StoreAndTrackPendingTx(&txs[0]) // We dont need to track it, but no other way to insert it
+	require.NoError(t, err)
+
+	// Call the WatchTransaction method
+	err = tm.WatchTransaction(ctx, chainID, transactionHash)
+	require.ErrorIs(t, err, ErrWatchPendingTxTimeout)
 }
