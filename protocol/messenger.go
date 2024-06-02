@@ -3746,11 +3746,11 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 
 	importMessagesToSave := messageState.Response.DiscordMessages()
 	if len(importMessagesToSave) > 0 {
-		m.torrentManager.LogStdout(fmt.Sprintf("saving %d discord messages", len(importMessagesToSave)))
+		m.logger.Debug(fmt.Sprintf("saving %d discord messages", len(importMessagesToSave)))
 		m.handleImportMessagesMutex.Lock()
 		err := m.persistence.SaveDiscordMessages(importMessagesToSave)
 		if err != nil {
-			m.torrentManager.LogStdout("failed to save discord messages", zap.Error(err))
+			m.logger.Debug("failed to save discord messages", zap.Error(err))
 			m.handleImportMessagesMutex.Unlock()
 			return err
 		}
@@ -3759,11 +3759,11 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 
 	messageAttachmentsToSave := messageState.Response.DiscordMessageAttachments()
 	if len(messageAttachmentsToSave) > 0 {
-		m.torrentManager.LogStdout(fmt.Sprintf("saving %d discord message attachments", len(messageAttachmentsToSave)))
+		m.logger.Debug(fmt.Sprintf("saving %d discord message attachments", len(messageAttachmentsToSave)))
 		m.handleImportMessagesMutex.Lock()
 		err := m.persistence.SaveDiscordMessageAttachments(messageAttachmentsToSave)
 		if err != nil {
-			m.torrentManager.LogStdout("failed to save discord message attachments", zap.Error(err))
+			m.logger.Debug("failed to save discord message attachments", zap.Error(err))
 			m.handleImportMessagesMutex.Unlock()
 			return err
 		}
@@ -3772,7 +3772,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 
 	messagesToSave := messageState.Response.Messages()
 	if len(messagesToSave) > 0 {
-		m.torrentManager.LogStdout(fmt.Sprintf("saving %d app messages", len(messagesToSave)))
+		m.logger.Debug(fmt.Sprintf("saving %d app messages", len(messagesToSave)))
 		m.handleMessagesMutex.Lock()
 		err := m.SaveMessages(messagesToSave)
 		if err != nil {
