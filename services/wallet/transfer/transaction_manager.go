@@ -38,7 +38,7 @@ type TransactionManager struct {
 	gethManager    *account.GethManager
 	transactor     transactions.TransactorIface
 	config         *params.NodeConfig
-	accountsDB     *accounts.Database
+	accountsDB     accounts.AccountsStorage
 	pendingTracker *transactions.PendingTxTracker
 	eventFeed      *event.Feed
 
@@ -59,7 +59,7 @@ func NewTransactionManager(
 	gethManager *account.GethManager,
 	transactor transactions.TransactorIface,
 	config *params.NodeConfig,
-	accountsDB *accounts.Database,
+	accountsDB accounts.AccountsStorage,
 	pendingTxManager *transactions.PendingTxTracker,
 	eventFeed *event.Feed,
 ) *TransactionManager {
@@ -160,6 +160,10 @@ func NewMultiTransaction(timestamp uint64, fromNetworkID, toNetworkID uint64, fr
 }
 
 func (tm *TransactionManager) SignMessage(message types.HexBytes, account *types.Key) (string, error) {
+	if account == nil || account.PrivateKey == nil {
+		return "", fmt.Errorf("account or private key is nil")
+	}
+
 	signature, err := crypto.Sign(message[:], account.PrivateKey)
 
 	return types.EncodeHex(signature), err

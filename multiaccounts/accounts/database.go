@@ -284,6 +284,13 @@ func (a *Keypair) Operability() AccountOperable {
 	return AccountFullyOperable
 }
 
+// TODO: implement clean full interface. This might require refactoring Database methods
+type AccountsStorage interface {
+	GetKeypairByKeyUID(keyUID string) (*Keypair, error)
+	GetAccountByAddress(address types.Address) (*Account, error)
+	AddressExists(address types.Address) (bool, error)
+}
+
 // Database sql wrapper for operations with browser objects.
 type Database struct {
 	settings.DatabaseSettingsManager
