@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 
 	utils "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/params"
 )
 
 var ErrCreateAccountInvalidDisplayName = errors.New("create-account: invalid display name")
@@ -56,8 +57,9 @@ type CreateAccount struct {
 
 	// Deprecated: CurrentNetwork is deprecated. It was passed and not used, so nothing should be passed instead.
 	// If you want to use non-default network, use NetworkID.
-	CurrentNetwork string  `json:"currentNetwork"`
-	NetworkID      *uint64 `json:"networkId"`
+	CurrentNetwork       string           `json:"currentNetwork"`
+	NetworkID            *uint64          `json:"networkId"`
+	TestOverrideNetworks []params.Network `json:"-"` // This is used for testing purposes only
 
 	TestNetworksEnabled bool `json:"testNetworksEnabled"`
 
