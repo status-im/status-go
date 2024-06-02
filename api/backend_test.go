@@ -1622,3 +1622,31 @@ func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 
 	require.NoError(t, b.Logout())
 }
+
+func TestRestoreAccountAndLogin(t *testing.T) {
+	utils.Init()
+	tmpdir := t.TempDir()
+
+	backend := NewGethStatusBackend()
+
+	// Test case 1: Valid restore account request
+	restoreRequest := &requests.RestoreAccount{
+		Mnemonic:    "test test test test test test test test test test test test",
+		FetchBackup: false,
+		CreateAccount: requests.CreateAccount{
+			DisplayName:           "Account1",
+			DeviceName:            "StatusIM",
+			Password:              "password",
+			CustomizationColor:    "0x000000",
+			BackupDisabledDataDir: tmpdir,
+		},
+	}
+	account, err := backend.RestoreAccountAndLogin(restoreRequest)
+	require.NoError(t, err)
+	require.NotNil(t, account)
+
+	// Test case 2: Invalid restore account request
+	invalidRequest := &requests.RestoreAccount{}
+	_, err = backend.RestoreAccountAndLogin(invalidRequest)
+	require.Error(t, err)
+}

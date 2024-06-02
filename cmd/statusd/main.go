@@ -34,6 +34,7 @@ import (
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -86,6 +87,8 @@ var (
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
 	metricsEnabled = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call")
 	metricsPort    = flag.Int("metrics-port", 9305, "Port for the Prometheus /metrics endpoint")
+	seedPhrase     = flag.String("seed-phrase", "", "Seed phrase for account creation")
+	password       = flag.String("password", "", "Password for account")
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -107,6 +110,12 @@ func main() {
 	if flag.NArg() > 0 {
 		printUsage()
 		logger.Error("Extra args in command line: %v", flag.Args())
+		os.Exit(1)
+	}
+
+	if *seedPhrase != "" && *password == "" {
+		printUsage()
+		logger.Error("password is required when seed phrase is provided")
 		os.Exit(1)
 	}
 
@@ -162,12 +171,6 @@ func main() {
 	}
 
 	backend := api.NewGethStatusBackend()
-	err = backend.AccountManager().InitKeystore(config.KeyStoreDir)
-	if err != nil {
-		logger.Error("Failed to init keystore", "error", err)
-		return
-	}
-
 	if config.NodeKey == "" {
 		logger.Error("node key needs to be set if running a push notification server")
 		return
@@ -186,96 +189,119 @@ func main() {
 		return
 	}
 
-	err = createDirsFromConfig(config)
-	if err != nil {
-		logger.Error("failed to create directories", "error", err)
-		return
-	}
+	if *seedPhrase != "" {
+		// Remove data inside dir to avoid conflicts with existing data or account restoration fails
+		if err := os.RemoveAll(config.DataDir); err != nil {
+			logger.Error("failed to remove data dir", "error", err)
+			return
+		}
 
-	appDB, walletDB, err := openDatabases(config.DataDir + "/" + installationID.String())
-	if err != nil {
-		log.Error("failed to open databases")
-		return
-	}
+		if err := createDirsFromConfig(config); err != nil {
+			logger.Error("failed to create directories", "error", err)
+			return
+		}
 
-	backend.StatusNode().SetAppDB(appDB)
-	backend.StatusNode().SetWalletDB(walletDB)
+		request := requests.RestoreAccount{
+			Mnemonic:    *seedPhrase,
+			FetchBackup: false,
+			CreateAccount: requests.CreateAccount{
+				DisplayName:           "Account1",
+				DeviceName:            "StatusIM",
+				Password:              *password,
+				CustomizationColor:    "0x000000",
+				BackupDisabledDataDir: config.DataDir,
+				APIConfig: &requests.APIConfig{
+					HTTPHost:   config.HTTPHost,
+					HTTPPort:   config.HTTPPort,
+					APIModules: config.APIModules,
+				},
+				NetworkID:            &config.NetworkID,
+				TestOverrideNetworks: config.Networks,
+			},
+		}
 
-	err = backend.StartNode(config)
-	if err != nil {
-		logger.Error("Node start failed", "error", err)
-		return
-	}
-
-	err = sdnotify.Ready()
-	if err == sdnotify.ErrSdNotifyNoSocket {
-		logger.Debug("sd_notify socket not available")
-	} else if err != nil {
-		logger.Warn("sd_notify READY call failed", "error", err)
+		_, err := backend.RestoreAccountAndLogin(&request)
+		if err != nil {
+			logger.Error("failed to import account", "error", err)
+			return
+		}
 	} else {
-		// systemd aliveness notifications, affects only Linux
-		go startSystemDWatchdog()
-	}
-
-	// handle interrupt signals
-	interruptCh := haltOnInterruptSignal(backend.StatusNode())
-
-	// Start collecting metrics. Metrics can be enabled by providing `-metrics` flag
-	// or setting `gethmetrics.Enabled` to true during compilation time:
-	// https://github.com/status-im/go-ethereum/pull/76.
-	if *metricsEnabled || gethmetrics.Enabled {
-		go startCollectingNodeMetrics(interruptCh, backend.StatusNode())
-		go gethmetrics.CollectProcessMetrics(3 * time.Second)
-		go metrics.NewMetricsServer(*metricsPort, gethmetrics.DefaultRegistry).Listen()
-	}
-
-	// Check if profiling shall be enabled.
-	if *pprofEnabled {
-		profiling.NewProfiler(*pprofPort).Go()
-	}
-
-	if config.PushNotificationServerConfig.Enabled {
-		options := []protocol.Option{
-			protocol.WithPushNotifications(),
-			protocol.WithPushNotificationServerConfig(&pushnotificationserver.Config{
-				Enabled:   config.PushNotificationServerConfig.Enabled,
-				Identity:  config.PushNotificationServerConfig.Identity,
-				GorushURL: config.PushNotificationServerConfig.GorushURL,
-			}),
-			protocol.WithDatabase(appDB),
-			protocol.WithWalletDatabase(walletDB),
-			protocol.WithTorrentConfig(&config.TorrentConfig),
-			protocol.WithWalletConfig(&config.WalletConfig),
-			protocol.WithAccountManager(backend.AccountManager()),
-		}
-
-		messenger, err := protocol.NewMessenger(
-			config.Name,
-			identity,
-			gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()),
-			installationID.String(),
-			nil,
-			options...,
-		)
+		appDB, walletDB, err := startNode(config, backend, installationID)
 		if err != nil {
-			logger.Error("failed to create messenger", "error", err)
+			logger.Error("failed to start node", "error", err)
 			return
 		}
 
-		err = messenger.Init()
-		if err != nil {
-			logger.Error("failed to init messenger", "error", err)
-			return
+		err = sdnotify.Ready()
+		if err == sdnotify.ErrSdNotifyNoSocket {
+			logger.Debug("sd_notify socket not available")
+		} else if err != nil {
+			logger.Warn("sd_notify READY call failed", "error", err)
+		} else {
+			// systemd aliveness notifications, affects only Linux
+			go startSystemDWatchdog()
 		}
 
-		// This will start the push notification server as well as
-		// the config is set to Enabled
-		_, err = messenger.Start()
-		if err != nil {
-			logger.Error("failed to start messenger", "error", err)
-			return
+		// handle interrupt signals
+		interruptCh := haltOnInterruptSignal(backend.StatusNode())
+
+		// Start collecting metrics. Metrics can be enabled by providing `-metrics` flag
+		// or setting `gethmetrics.Enabled` to true during compilation time:
+		// https://github.com/status-im/go-ethereum/pull/76.
+		if *metricsEnabled || gethmetrics.Enabled {
+			go startCollectingNodeMetrics(interruptCh, backend.StatusNode())
+			go gethmetrics.CollectProcessMetrics(3 * time.Second)
+			go metrics.NewMetricsServer(*metricsPort, gethmetrics.DefaultRegistry).Listen()
 		}
-		go retrieveMessagesLoop(messenger, 300*time.Millisecond, interruptCh)
+
+		// Check if profiling shall be enabled.
+		if *pprofEnabled {
+			profiling.NewProfiler(*pprofPort).Go()
+		}
+
+		if config.PushNotificationServerConfig.Enabled {
+			options := []protocol.Option{
+				protocol.WithPushNotifications(),
+				protocol.WithPushNotificationServerConfig(&pushnotificationserver.Config{
+					Enabled:   config.PushNotificationServerConfig.Enabled,
+					Identity:  config.PushNotificationServerConfig.Identity,
+					GorushURL: config.PushNotificationServerConfig.GorushURL,
+				}),
+				protocol.WithDatabase(appDB),
+				protocol.WithWalletDatabase(walletDB),
+				protocol.WithTorrentConfig(&config.TorrentConfig),
+				protocol.WithWalletConfig(&config.WalletConfig),
+				protocol.WithAccountManager(backend.AccountManager()),
+			}
+
+			messenger, err := protocol.NewMessenger(
+				config.Name,
+				identity,
+				gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()),
+				installationID.String(),
+				nil,
+				options...,
+			)
+			if err != nil {
+				logger.Error("failed to create messenger", "error", err)
+				return
+			}
+
+			err = messenger.Init()
+			if err != nil {
+				logger.Error("failed to init messenger", "error", err)
+				return
+			}
+
+			// This will start the push notification server as well as
+			// the config is set to Enabled
+			_, err = messenger.Start()
+			if err != nil {
+				logger.Error("failed to start messenger", "error", err)
+				return
+			}
+			go retrieveMessagesLoop(messenger, 300*time.Millisecond, interruptCh)
+		}
 	}
 
 	gethNode := backend.StatusNode().GethNode()
@@ -402,6 +428,7 @@ Examples:
   statusd -c ./default.json                      # run node with configuration specified in ./default.json file
   statusd -c ./default.json -c ./standalone.json # run node with configuration specified in ./default.json file, after merging ./standalone.json file
   statusd -c ./default.json -metrics             # run node with configuration specified in ./default.json file, and expose ethereum metrics with debug_metrics jsonrpc call
+  statusd -c ./default.json -log DEBUG --seed-phrase="test test test test test test test test test test test junk" --password=password # run node with configuration specified in ./default.json file, and import account with seed phrase and password
 
 Options:
 `
@@ -482,4 +509,35 @@ func createDirsFromConfig(config *params.NodeConfig) error {
 	}
 
 	return nil
+}
+
+func startNode(config *params.NodeConfig, backend *api.GethStatusBackend, installationID uuid.UUID) (*sql.DB, *sql.DB, error) {
+	err := backend.AccountManager().InitKeystore(config.KeyStoreDir)
+	if err != nil {
+		logger.Error("Failed to init keystore", "error", err)
+		return nil, nil, err
+	}
+
+	err = createDirsFromConfig(config)
+	if err != nil {
+		logger.Error("failed to create directories", "error", err)
+		return nil, nil, err
+	}
+
+	appDB, walletDB, err := openDatabases(config.DataDir + "/" + installationID.String())
+	if err != nil {
+		log.Error("failed to open databases")
+		return nil, nil, err
+	}
+
+	backend.StatusNode().SetAppDB(appDB)
+	backend.StatusNode().SetWalletDB(walletDB)
+
+	err = backend.StartNode(config)
+	if err != nil {
+		logger.Error("Node start failed", "error", err)
+		return nil, nil, err
+	}
+
+	return appDB, walletDB, nil
 }

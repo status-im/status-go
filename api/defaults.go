@@ -237,7 +237,11 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 		nodeConfig.LogEnabled = false
 	}
 
-	nodeConfig.Networks = BuildDefaultNetworks(&request.WalletSecretsConfig)
+	if request.TestOverrideNetworks != nil {
+		nodeConfig.Networks = request.TestOverrideNetworks
+	} else {
+		nodeConfig.Networks = BuildDefaultNetworks(&request.WalletSecretsConfig)
+	}
 
 	if request.NetworkID != nil {
 		nodeConfig.NetworkID = *request.NetworkID
