@@ -3910,12 +3910,12 @@ func (m *Messenger) enableHistoryArchivesImportAfterDelay() {
 func (m *Messenger) checkIfIMemberOfCommunity(communityID types.HexBytes) error {
 	community, err := m.communitiesManager.GetByID(communityID)
 	if err != nil {
-		m.torrentManager.LogStdout("couldn't get community to import archives", zap.Error(err))
+		m.logger.Error("couldn't get community to import archives", zap.Error(err))
 		return err
 	}
 
 	if !community.HasMember(&m.identity.PublicKey) {
-		m.torrentManager.LogStdout("can't import archives when user not a member of community")
+		m.logger.Error("can't import archives when user not a member of community")
 		return ErrUserNotMember
 	}
 
