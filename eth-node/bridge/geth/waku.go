@@ -123,6 +123,10 @@ func (w *GethWakuWrapper) SubscribeToConnStatusChanges() (*types.ConnStatusSubsc
 	return nil, errors.New("not available in WakuV1")
 }
 
+func (w *GethWakuWrapper) SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []string) error {
+	return errors.New("not available in WakuV1")
+}
+
 // Peers function only added for compatibility with waku V2
 func (w *GethWakuWrapper) Peers() map[string]types.WakuV2Peer {
 	p := make(map[string]types.WakuV2Peer)

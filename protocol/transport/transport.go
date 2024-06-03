@@ -14,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/connection"
@@ -739,4 +740,37 @@ func (t *Transport) ConfirmMessageDelivered(messageID string) {
 
 func (t *Transport) SetStorePeerID(peerID peer.ID) {
 	t.waku.SetStorePeerID(peerID)
+}
+
+func (t *Transport) SetCriteriaForMissingMessageVerification(peerID peer.ID, filters []*Filter) {
+	if t.waku.Version() != 2 {
+		return
+	}
+
+	topicMap := make(map[string]map[string]struct{})
+	for _, f := range filters {
+		if !f.Listen || f.Ephemeral {
+			continue
+		}
+
+		_, ok := topicMap[f.PubsubTopic]
+		if !ok {
+			topicMap[f.PubsubTopic] = make(map[string]struct{})
+		}
+
+		topicMap[f.PubsubTopic][f.ContentTopic.String()] = struct{}{}
+	}
+
+	for pubsubTopic, contentTopics := range topicMap {
+		ctList := maps.Keys(contentTopics)
+		err := t.waku.SetCriteriaForMissingMessageVerification(peerID, pubsubTopic, ctList)
+		if err != nil {
+			t.logger.Error("could not check for missing messages",
+				zap.Error(err),
+				zap.Stringer("peerID", peerID),
+				zap.String("pubsubTopic", pubsubTopic),
+				zap.Strings("contentTopics", ctList))
+			return
+		}
+	}
 }

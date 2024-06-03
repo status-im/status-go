@@ -844,6 +844,8 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
+	go m.checkForMissingMessagesLoop()
+
 	controlledCommunities, err := m.communitiesManager.Controlled()
 	if err != nil {
 		return nil, err
