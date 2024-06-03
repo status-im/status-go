@@ -68,7 +68,7 @@ var (
 
 const (
 	oldMobileUserKeyUID = "0x855ab0a932e5325daab7a550b9fcd78d2a17de5e2b7a52241f82505ea9d87629"
-	oldMobileUserPasswd = "0x20756cad9b728c8225fd8cedb6badaf8731e174506950219ea657cd54f35f46c"
+	oldMobileUserPasswd = "0x20756cad9b728c8225fd8cedb6badaf8731e174506950219ea657cd54f35f46c" // #nosec G101
 )
 
 func setupTestDB() (*sql.DB, func() error, error) {
@@ -1439,7 +1439,7 @@ func TestAddWalletAccountAfterUpgradingFromMobileV1(t *testing.T) {
 	for _, kp := range kps {
 		keypairMap[kp.Type] = append(keypairMap[kp.Type], kp)
 	}
-	profileKps, _ := keypairMap[accounts.KeypairTypeProfile]
+	profileKps := keypairMap[accounts.KeypairTypeProfile]
 	profileKp := profileKps[0]
 	require.True(t, profileKp.DerivedFrom == walletRootAddress.Hex())
 	require.False(t, masterAddress.Hex() == walletRootAddress.Hex())
