@@ -3946,7 +3946,7 @@ importMessageArchivesLoop:
 		if delayImport {
 			select {
 			case <-ctx.Done():
-				m.torrentManager.LogStdout("interrupted importing history archive messages")
+				m.logger.Debug("interrupted importing history archive messages")
 				return nil
 			case <-time.After(1 * time.Hour):
 				delayImport = false
@@ -3955,7 +3955,7 @@ importMessageArchivesLoop:
 
 		select {
 		case <-ctx.Done():
-			m.torrentManager.LogStdout("interrupted importing history archive messages")
+			m.logger.Debug("interrupted importing history archive messages")
 			return nil
 		case <-importTicker.C:
 			err := m.checkIfIMemberOfCommunity(communityID)
@@ -3964,16 +3964,16 @@ importMessageArchivesLoop:
 			}
 			archiveIDsToImport, err := m.torrentManager.GetMessageArchiveIDsToImport(communityID)
 			if err != nil {
-				m.torrentManager.LogStdout("couldn't get message archive IDs to import", zap.Error(err))
+				m.logger.Error("couldn't get message archive IDs to import", zap.Error(err))
 				return err
 			}
 
 			if len(archiveIDsToImport) == 0 {
-				m.torrentManager.LogStdout("no message archives to import")
+				m.logger.Debug("no message archives to import")
 				break importMessageArchivesLoop
 			}
 
-			m.torrentManager.LogStdout("importing message archive", zap.Int("left", len(archiveIDsToImport)))
+			m.logger.Info("importing message archive", zap.Int("left", len(archiveIDsToImport)))
 
 			// only process one archive at a time, so in case of cancel we don't
 			// wait for all archives to be processed first
@@ -3987,7 +3987,7 @@ importMessageArchivesLoop:
 					delayImport = true
 					continue
 				}
-				m.torrentManager.LogStdout("failed to extract history archive messages", zap.Error(err))
+				m.logger.Error("failed to extract history archive messages", zap.Error(err))
 				continue
 			}
 
@@ -3996,14 +3996,14 @@ importMessageArchivesLoop:
 			for _, messagesChunk := range chunkSlice(archiveMessages, importMessagesChunkSize) {
 				if err := m.importRateLimiter.Wait(ctx); err != nil {
 					if !errors.Is(err, context.Canceled) {
-						m.torrentManager.LogStdout("rate limiter error when handling archive messages", zap.Error(err))
+						m.logger.Error("rate limiter error when handling archive messages", zap.Error(err))
 					}
 					continue importMessageArchivesLoop
 				}
 
 				response, err := m.handleArchiveMessages(messagesChunk)
 				if err != nil {
-					m.torrentManager.LogStdout("failed to handle archive messages", zap.Error(err))
+					m.logger.Error("failed to handle archive messages", zap.Error(err))
 					continue importMessageArchivesLoop
 				}
 
@@ -4017,7 +4017,7 @@ importMessageArchivesLoop:
 
 			err = m.torrentManager.SetMessageArchiveIDImported(communityID, downloadedArchiveID, true)
 			if err != nil {
-				m.torrentManager.LogStdout("failed to mark history message archive as imported", zap.Error(err))
+				m.logger.Error("failed to mark history message archive as imported", zap.Error(err))
 				continue
 			}
 		}
