@@ -1041,6 +1041,21 @@ func (w *Waku) checkIfMessagesStored() {
 	}
 }
 
+func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
+	w.sendMsgIDsMu.Lock()
+	defer w.sendMsgIDsMu.Unlock()
+	for pubsubTopic, subMsgs := range w.sendMsgIDs {
+		for _, hash := range hashes {
+			delete(subMsgs, hash)
+			if len(subMsgs) == 0 {
+				delete(w.sendMsgIDs, pubsubTopic)
+			} else {
+				w.sendMsgIDs[pubsubTopic] = subMsgs
+			}
+		}
+	}
+}
+
 type publishFn = func(envelope *protocol.Envelope, logger *zap.Logger) error
 
 func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publishFn, logger *zap.Logger) {

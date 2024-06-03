@@ -717,3 +717,15 @@ func (t *Transport) RemovePubsubTopicKey(topic string) error {
 	}
 	return nil
 }
+
+func (t *Transport) ConfirmMessageDelivered(messageID string) {
+	hashes, ok := t.envelopesMonitor.identifierHashes[messageID]
+	if !ok {
+		return
+	}
+	commHashes := make([]common.Hash, len(hashes))
+	for i, h := range hashes {
+		commHashes[i] = common.BytesToHash(h[:])
+	}
+	t.waku.ConfirmMessageDelivered(commHashes)
+}

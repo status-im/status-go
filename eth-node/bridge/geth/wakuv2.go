@@ -333,3 +333,7 @@ func GetWakuV2FilterFrom(f types.Filter) *wakucommon.Filter {
 func (w *wakuV2FilterWrapper) ID() string {
 	return w.id
 }
+
+func (w *gethWakuV2Wrapper) ConfirmMessageDelivered(hashes []common.Hash) {
+	w.waku.ConfirmMessageDelivered(hashes)
+}

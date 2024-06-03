@@ -178,4 +178,7 @@ type Waku interface {
 
 	// ClearEnvelopesCache clears waku envelopes cache
 	ClearEnvelopesCache()
+
+	// ConfirmMessageDelivered updates a message has been delivered in waku
+	ConfirmMessageDelivered(hash []common.Hash)
 }

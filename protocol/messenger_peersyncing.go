@@ -43,6 +43,8 @@ func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 			m.logger.Debug("Can't set message status as delivered", zap.Error(err))
 		}
 
+		m.transport.ConfirmMessageDelivered(messageID)
+
 		//send signal to client that message status updated
 		if m.config.messengerSignalsHandler != nil {
 			message, err := m.persistence.MessageByID(messageID)
