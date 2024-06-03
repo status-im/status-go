@@ -29,8 +29,13 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-const baseURL = "https://cbridge-prod2.celer.app"
-const testBaseURL = "https://cbridge-v2-test.celer.network"
+const (
+	baseURL     = "https://cbridge-prod2.celer.app"
+	testBaseURL = "https://cbridge-v2-test.celer.network"
+
+	maxSlippage = uint32(1000)
+	ethSymbol   = "ETH"
+)
 
 type CBridgeTxArgs struct {
 	transactions.SendTxArgs
@@ -138,11 +143,11 @@ func (s *CBridge) AvailableFor(from, to *params.Network, token *token.Token, toT
 	var fromAvailable *cbridge.Chain
 	var toAvailable *cbridge.Chain
 	for _, chain := range transferConfig.Chains {
-		if uint64(chain.GetId()) == from.ChainID {
+		if uint64(chain.GetId()) == from.ChainID && chain.GasTokenSymbol == ethSymbol {
 			fromAvailable = chain
 		}
 
-		if uint64(chain.GetId()) == to.ChainID {
+		if uint64(chain.GetId()) == to.ChainID && chain.GasTokenSymbol == ethSymbol {
 			toAvailable = chain
 		}
 	}
@@ -208,7 +213,7 @@ func (c *CBridge) PackTxInputData(contractType string, fromNetwork *params.Netwo
 			amountIn,
 			toNetwork.ChainID,
 			uint64(time.Now().UnixMilli()),
-			500,
+			maxSlippage,
 		)
 	} else {
 		return abi.Pack("send",
@@ -217,7 +222,7 @@ func (c *CBridge) PackTxInputData(contractType string, fromNetwork *params.Netwo
 			amountIn,
 			toNetwork.ChainID,
 			uint64(time.Now().UnixMilli()),
-			500,
+			maxSlippage,
 		)
 	}
 }
@@ -251,7 +256,14 @@ func (s *CBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Net
 
 	estimation, err := ethClient.EstimateGas(ctx, msg)
 	if err != nil {
-		return 0, err
+		if !token.IsNative() {
+			// TODO: this is a temporary solution until we find a better way to estimate the gas
+			// hardcoding the estimation for other than ETH, cause we cannot get a proper estimation without having an approval placed first
+			// this is an error we're facing otherwise: `execution reverted: ERC20: transfer amount exceeds allowance`
+			estimation = 350000
+		} else {
+			return 0, err
+		}
 	}
 	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
 	return uint64(increasedEstimation), nil
@@ -327,7 +339,7 @@ func (s *CBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerF
 			(*big.Int)(sendArgs.CbridgeTx.Amount),
 			sendArgs.CbridgeTx.ChainID,
 			uint64(time.Now().UnixMilli()),
-			500,
+			maxSlippage,
 		)
 	}
 
@@ -338,7 +350,7 @@ func (s *CBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerF
 		(*big.Int)(sendArgs.CbridgeTx.Amount),
 		sendArgs.CbridgeTx.ChainID,
 		uint64(time.Now().UnixMilli()),
-		500,
+		maxSlippage,
 	)
 }
 
