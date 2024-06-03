@@ -9,12 +9,15 @@ import (
 
 // Result represents a valid response from a store node
 type Result struct {
-	started      bool
-	messages     []*pb.WakuMessageKeyValue
-	store        *WakuStore
-	storeRequest *pb.StoreQueryRequest
-	cursor       []byte
-	peerID       peer.ID
+	noCursor bool
+	done     bool
+
+	messages      []*pb.WakuMessageKeyValue
+	store         *WakuStore
+	storeRequest  *pb.StoreQueryRequest
+	storeResponse *pb.StoreQueryResponse
+	cursor        []byte
+	peerID        peer.ID
 }
 
 func (r *Result) Cursor() []byte {
@@ -22,7 +25,7 @@ func (r *Result) Cursor() []byte {
 }
 
 func (r *Result) IsComplete() bool {
-	return r.cursor == nil
+	return r.noCursor && r.done
 }
 
 func (r *Result) PeerID() peer.ID {
@@ -33,32 +36,32 @@ func (r *Result) Query() *pb.StoreQueryRequest {
 	return r.storeRequest
 }
 
-func (r *Result) Next(ctx context.Context) (bool, error) {
-	if !r.started {
-		r.started = true
-		return len(r.messages) != 0, nil
-	}
+func (r *Result) Response() *pb.StoreQueryResponse {
+	return r.storeResponse
+}
 
-	if r.IsComplete() {
-		r.cursor = nil
+func (r *Result) Next(ctx context.Context) error {
+	if r.noCursor {
+		r.done = true
 		r.messages = nil
-		return false, nil
+		return nil
 	}
 
 	newResult, err := r.store.next(ctx, r)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	r.cursor = newResult.cursor
 	r.messages = newResult.messages
 
-	return !r.IsComplete(), nil
+	if r.cursor == nil {
+		r.noCursor = true
+	}
+
+	return nil
 }
 
 func (r *Result) Messages() []*pb.WakuMessageKeyValue {
-	if !r.started {
-		return nil
-	}
 	return r.messages
 }

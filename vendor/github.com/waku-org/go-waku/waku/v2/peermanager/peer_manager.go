@@ -277,10 +277,10 @@ func (pm *PeerManager) getRelayPeers(specificPeers ...peer.ID) (inRelayPeers pee
 
 	//Need to filter peers to check if they support relay
 	if inPeers.Len() != 0 {
-		inRelayPeers, _ = pm.FilterPeersByProto(inPeers, relay.WakuRelayID_v200)
+		inRelayPeers, _ = pm.FilterPeersByProto(inPeers, nil, relay.WakuRelayID_v200)
 	}
 	if outPeers.Len() != 0 {
-		outRelayPeers, _ = pm.FilterPeersByProto(outPeers, relay.WakuRelayID_v200)
+		outRelayPeers, _ = pm.FilterPeersByProto(outPeers, nil, relay.WakuRelayID_v200)
 	}
 	return
 }
