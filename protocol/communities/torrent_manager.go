@@ -11,15 +11,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/anacrolix/torrent"
-	"github.com/anacrolix/torrent/metainfo"
-	"go.uber.org/zap"
-
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/signal"
+
+	"github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/metainfo"
+	"go.uber.org/zap"
 )
 
 type archiveMDSlice []*archiveMetadata
@@ -50,6 +50,30 @@ type HistoryArchiveDownloadTaskInfo struct {
 	TotalDownloadedArchivesCount int
 	TotalArchivesCount           int
 	Cancelled                    bool
+}
+
+type TorrentContract interface {
+	ArchiveContract
+
+	LogStdout(string, ...zap.Field)
+	SetOnline(bool)
+	SetTorrentConfig(*params.TorrentConfig)
+	StartTorrentClient() error
+	Stop() error
+	IsReady() bool
+	GetCommunityChatsFilters(communityID types.HexBytes) ([]*transport.Filter, error)
+	GetCommunityChatsTopics(communityID types.HexBytes) ([]types.TopicType, error)
+	GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error)
+	CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error
+	StartHistoryArchiveTasksInterval(community *Community, interval time.Duration)
+	StopHistoryArchiveTasksInterval(communityID types.HexBytes)
+	SeedHistoryArchiveTorrent(communityID types.HexBytes) error
+	UnseedHistoryArchiveTorrent(communityID types.HexBytes)
+	IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool
+	GetHistoryArchiveDownloadTask(communityID string) *HistoryArchiveDownloadTask
+	AddHistoryArchiveDownloadTask(communityID string, task *HistoryArchiveDownloadTask)
+	DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
+	TorrentFileExists(communityID string) bool
 }
 
 type TorrentManager struct {
