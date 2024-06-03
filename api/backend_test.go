@@ -17,6 +17,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/protocol/tt"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -61,6 +64,11 @@ var (
 		PublicKey:         "0x04211fe0f69772ecf7eb0b5bfc7678672508a9fb01f2d699096f0d59ef7fe1a0cb1e648a80190db1c0f5f088872444d846f2956d0bd84069f3f9f69335af852ac0",
 		SigningPhrase:     "yurt joey vibe",
 		WalletRootAddress: types.HexToAddress("0xeB591fd819F86D0A6a2EF2Bcb94f77807a7De1a6")}
+)
+
+const (
+	oldMobileUserKeyUID = "0x855ab0a932e5325daab7a550b9fcd78d2a17de5e2b7a52241f82505ea9d87629"
+	oldMobileUserPasswd = "0x20756cad9b728c8225fd8cedb6badaf8731e174506950219ea657cd54f35f46c"
 )
 
 func setupTestDB() (*sql.DB, func() error, error) {
@@ -1334,14 +1342,11 @@ func loginMobileUser(t *testing.T, rootDataDir string) {
 	//    Wallet: 0, Chat: 0, Type: 'seed', Path: m/44'/60'/0'/0/0, Name: 'seed', Derived_from: '', Pubkey: 0x04FDE3E5...
 	// seed phrase for 0xB7A1233D1309CE665A3A4DB088E4A046EB333545: vocal blouse script census island armor seek catch wool narrow peasant attract
 	// private key for 0x516312D69737C5E6EF16F22E0097FF5D9F0C4196: c3ad0b50652318f845565c13761e5369ce75dcbc2a94616e15b829d4b07410fe
-	keyUID := "0x855ab0a932e5325daab7a550b9fcd78d2a17de5e2b7a52241f82505ea9d87629"
-	passwd := "0x20756cad9b728c8225fd8cedb6badaf8731e174506950219ea657cd54f35f46c" // #nosec G101
-
 	b := NewGethStatusBackend()
 	b.UpdateRootDataDir(rootDataDir)
 	require.NoError(t, b.OpenAccounts())
 
-	require.NoError(t, b.Login(keyUID, passwd))
+	require.NoError(t, b.Login(oldMobileUserKeyUID, oldMobileUserPasswd))
 	db, err := accounts.NewDB(b.appDB)
 	require.NoError(t, err)
 	accs, err := db.GetAllAccounts()
@@ -1363,7 +1368,7 @@ func loginMobileUser(t *testing.T, rootDataDir string) {
 	require.True(t, len(profileKps) == 1, "Unexpected number of profile keypairs")
 	require.True(t, len(profileKps[0].Accounts) == 3)
 	for _, a := range profileKps[0].Accounts {
-		require.Equal(t, a.KeyUID, keyUID)
+		require.Equal(t, a.KeyUID, oldMobileUserKeyUID)
 	}
 
 	generator := b.AccountManager().AccountsGenerator()
@@ -1372,7 +1377,7 @@ func loginMobileUser(t *testing.T, rootDataDir string) {
 	require.True(t, ok, "Seed keypair not found")
 	require.True(t, len(seedKps) == 1, "Unexpected number of seed keypairs")
 	require.True(t, len(seedKps[0].Accounts) == 1)
-	info, err := generator.LoadAccount(seedKps[0].Accounts[0].Address.Hex(), passwd)
+	info, err := generator.LoadAccount(seedKps[0].Accounts[0].Address.Hex(), oldMobileUserPasswd)
 	require.NoError(t, err)
 	require.Equal(t, seedKps[0].KeyUID, info.KeyUID)
 	require.Equal(t, seedKps[0].Accounts[0].KeyUID, info.KeyUID)
@@ -1390,7 +1395,7 @@ func loginMobileUser(t *testing.T, rootDataDir string) {
 	require.True(t, ok, "Key keypair not found")
 	require.True(t, len(keyKps) == 1, "Unexpected number of key keypairs")
 	require.True(t, len(keyKps[0].Accounts) == 1)
-	info, err = generator.LoadAccount(keyKps[0].Accounts[0].Address.Hex(), passwd)
+	info, err = generator.LoadAccount(keyKps[0].Accounts[0].Address.Hex(), oldMobileUserPasswd)
 	require.NoError(t, err)
 	require.Equal(t, keyKps[0].KeyUID, info.KeyUID)
 	require.Equal(t, keyKps[0].Accounts[0].KeyUID, info.KeyUID)
@@ -1403,15 +1408,73 @@ func loginMobileUser(t *testing.T, rootDataDir string) {
 
 func TestLoginAndMigrationsStillWorkWithExistingMobileUser(t *testing.T) {
 	utils.Init()
-
 	srcFolder := "../static/test-mobile-release-1.20.x-aa6e4b2-account/"
-
 	tmpdir := t.TempDir()
-
 	copyDir(srcFolder, tmpdir, t)
-
 	loginMobileUser(t, tmpdir)
 	loginMobileUser(t, tmpdir) // Login twice to catch weird errors that only appear after logout
+}
+
+// TestAddWalletAccount for test data description pls see comments within loginMobileUser
+func TestAddWalletAccountAfterUpgradingFromMobileV1(t *testing.T) {
+	utils.Init()
+	srcFolder := "../static/test-mobile-release-1.20.x-aa6e4b2-account/"
+	tmpdir := t.TempDir()
+	copyDir(srcFolder, tmpdir, t)
+
+	b := NewGethStatusBackend()
+	b.UpdateRootDataDir(tmpdir)
+	require.NoError(t, b.OpenAccounts())
+
+	require.NoError(t, b.Login(oldMobileUserKeyUID, oldMobileUserPasswd))
+	db, _ := accounts.NewDB(b.appDB)
+	walletRootAddress, err := db.GetWalletRootAddress()
+	require.NoError(t, err)
+	masterAddress, err := db.GetMasterAddress()
+	require.NoError(t, err)
+
+	kps, _ := db.GetAllKeypairs()
+	// Create a map to categorize keypairs by their type
+	keypairMap := make(map[accounts.KeypairType][]*accounts.Keypair)
+	for _, kp := range kps {
+		keypairMap[kp.Type] = append(keypairMap[kp.Type], kp)
+	}
+	profileKps, _ := keypairMap[accounts.KeypairTypeProfile]
+	profileKp := profileKps[0]
+	require.True(t, profileKp.DerivedFrom == walletRootAddress.Hex())
+	require.False(t, masterAddress.Hex() == walletRootAddress.Hex())
+
+	// simulate mobile frontend adding a wallet account
+	suggestedPath, err := db.ResolveSuggestedPathForKeypair(oldMobileUserKeyUID)
+	require.NoError(t, err)
+	generator := b.AccountManager().AccountsGenerator()
+	accountInfo, err := generator.LoadAccount(profileKp.DerivedFrom, oldMobileUserPasswd)
+	require.NoError(t, err)
+	infoMap, err := generator.DeriveAddresses(accountInfo.ID, []string{suggestedPath})
+	require.NoError(t, err)
+	require.Len(t, infoMap, 1)
+	deriveAccountInfo := infoMap[suggestedPath]
+	derivedAddress := types.HexToAddress(deriveAccountInfo.Address)
+	accountsAPI := b.StatusNode().AccountService().AccountsAPI()
+	err = accountsAPI.AddAccount(context.Background(), oldMobileUserPasswd, &accounts.Account{
+		Address:   derivedAddress,
+		KeyUID:    oldMobileUserKeyUID,
+		Wallet:    false,
+		Chat:      false,
+		Type:      accounts.AccountTypeGenerated,
+		Path:      suggestedPath,
+		PublicKey: types.Hex2Bytes(deriveAccountInfo.PublicKey),
+		Name:      "GeneratedAccount2",
+		Emoji:     "emoji",
+		ColorID:   common.CustomizationColorBlue,
+	})
+	require.NoError(t, err)
+	// need retry since there's a possible of getting "no key for given address or file" error
+	err = tt.RetryWithBackOff(func() error {
+		return accountsAPI.DeleteAccount(context.Background(), derivedAddress)
+	})
+	require.NoError(t, err)
+	require.NoError(t, b.Logout())
 }
 
 func TestChangeDatabasePassword(t *testing.T) {

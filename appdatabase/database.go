@@ -115,9 +115,17 @@ func fixMissingKeyUIDForAccounts(sqlTx *sql.Tx) error {
 			return err
 		}
 	}
-	_, err = sqlTx.Exec(`UPDATE accounts SET key_uid = ? WHERE type = '' OR type = 'generated'`, CurrentAppDBKeyUID)
+
+	var walletRootAddress e_types.Address
+	err = sqlTx.QueryRow(`SELECT wallet_root_address FROM settings WHERE synthetic_id='id'`).Scan(&walletRootAddress)
 	if err != nil {
-		log.Error("Migrating accounts: failed to update key_uid", "err", err.Error())
+		log.Error("Migrating accounts: failed to get wallet_root_address", "err", err.Error())
+		return err
+	}
+	_, err = sqlTx.Exec(`UPDATE accounts SET key_uid = ?, derived_from = ? WHERE type = '' OR type = 'generated'`, CurrentAppDBKeyUID, walletRootAddress.Hex())
+	if err != nil {
+		log.Error("Migrating accounts: failed to update key_uid/derived_from", "err", err.Error())
+		return err
 	}
 	return nil
 }
