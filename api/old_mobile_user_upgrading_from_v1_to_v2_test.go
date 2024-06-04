@@ -101,8 +101,8 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) loginMobileUser() {
 	derivedAddresses, err := generator.DeriveAddresses(importedSeedAccountInfo.ID, paths)
 	s.Require().NoError(err)
 	s.Require().Equal(derivedAddresses[pathDefaultWallet].PublicKey, "0x04fde3e58a7379161da2adf033fbee076e2ba11fca8b07c4d06610b399911a60017e4c108eae243487d19e273f99c2d6af13ff5e330783f4389212092b01cc616c")
-	//TODO(frank) we need fix following line
-	//require.True(t, importedSeedAccountInfo.KeyUID == seedKps[0].KeyUID)
+	//following line shows: we're unable to calculate the right KeyUID with the wrong public key from existing records for the imported seed account
+	s.Require().False(importedSeedAccountInfo.KeyUID == seedKps[0].KeyUID)
 
 	// Check key keypair
 	keyKps, ok := keypairMap[accounts.KeypairTypeKey]
