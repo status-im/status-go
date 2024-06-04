@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/status-im/status-go/services/wallet"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -1256,6 +1257,13 @@ func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAcco
 
 	var chatKey *ecdsa.PrivateKey
 
+	if request.KeycardWhisperPrivateKey != "" {
+		chatKey, err = ethcrypto.HexToECDSA(request.KeycardWhisperPrivateKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	err = b.StartNodeWithAccountAndInitialConfig(*account, request.Password, *settings, nodeConfig, subAccounts, chatKey)
 	if err != nil {
 		b.log.Error("start node", err)
@@ -1287,12 +1295,17 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		return nil, nil, nil, nil, err
 	}
 
-	account, info, err := b.generateAccount(*info, customizationColorClock, request)
+	derivedAddresses, err := b.getDerivedAddresses(info.ID)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
 
-	derivedAddresses, err := b.getDerivedAddresses(info.ID)
+	if request.KeycardInstanceUID != "" {
+		encryption := derivedAddresses[pathEncryption]
+		request.Password = encryption.PublicKey
+	}
+
+	account, info, err := b.generateAccount(*info, customizationColorClock, request)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -1311,6 +1324,25 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 	subAccounts, err := b.prepareSubAccounts(mnemonic, account.KeyUID, derivedAddresses, request)
 	if err != nil {
 		return nil, nil, nil, nil, err
+	}
+
+	if request.KeycardInstanceUID != "" {
+		kp := wallet.NewKeycardPairings()
+		kp.SetKeycardPairingsFile(nodeConfig.KeycardPairingDataFile)
+		pairings, err := kp.GetPairings()
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+
+		keycard, ok := pairings[request.KeycardInstanceUID]
+		if !ok {
+			return nil, nil, nil, nil, errors.New("keycard not found in pairings file")
+		}
+
+		settings.KeycardInstanceUID = request.KeycardInstanceUID
+		settings.KeycardPairedOn = time.Now().Unix()
+		settings.KeycardPairing = keycard.Key
+		account.KeycardPairing = keycard.Key
 	}
 
 	return account, settings, nodeConfig, subAccounts, nil
@@ -1474,12 +1506,7 @@ func (b *GethStatusBackend) prepareSubAccounts(mnemonic, keyUID string, derivedA
 
 func (b *GethStatusBackend) getDerivedAddresses(id string) (map[string]generator.AccountInfo, error) {
 	accountGenerator := b.accountManager.AccountsGenerator()
-	derivedAddresses, err := accountGenerator.DeriveAddresses(id, paths)
-	if err != nil {
-		return nil, err
-	}
-
-	return derivedAddresses, nil
+	return accountGenerator.DeriveAddresses(id, paths)
 }
 
 // CreateAccountAndLogin creates a new account and logs in with it.
@@ -1498,6 +1525,13 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 	}
 
 	var chatKey *ecdsa.PrivateKey
+
+	if request.KeycardWhisperPrivateKey != "" {
+		chatKey, err = ethcrypto.HexToECDSA(request.KeycardWhisperPrivateKey)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	err = b.StartNodeWithAccountAndInitialConfig(*account, request.Password, *settings, nodeConfig, subAccounts, chatKey)
 	if err != nil {

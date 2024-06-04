@@ -223,8 +223,11 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	nodeConfig.LogDir = request.LogFilePath
 	nodeConfig.LogLevel = DefaultLogLevel
 	nodeConfig.DataDir = DefaultDataDir
-	nodeConfig.KeycardPairingDataFile = DefaultKeycardPairingDataFile
 	nodeConfig.ProcessBackedupMessages = false
+	nodeConfig.KeycardPairingDataFile = DefaultKeycardPairingDataFile
+	if request.KeycardPairingDataFile != nil {
+		nodeConfig.KeycardPairingDataFile = *request.KeycardPairingDataFile
+	}
 
 	if request.LogLevel != nil {
 		nodeConfig.LogLevel = *request.LogLevel
