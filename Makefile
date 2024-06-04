@@ -55,8 +55,8 @@ CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 export GOPATH ?= $(HOME)/go
 
 GIT_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-GIT_COMMIT := $(call sh, git rev-parse --short HEAD)
-GIT_AUTHOR := $(call sh, git config user.email || echo $$USER)
+GIT_COMMIT := $(shell git rev-parse --short HEAD)
+GIT_AUTHOR := $(shell git config user.email || echo $$USER)
 
 ENABLE_METRICS ?= true
 BUILD_TAGS ?= gowaku_no_rln
