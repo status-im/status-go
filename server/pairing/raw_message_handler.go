@@ -2,8 +2,11 @@ package pairing
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	"path/filepath"
+
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -93,12 +96,17 @@ func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload,
 		// because client don't know keyUID before received data, we need help client to update keystore dir
 		keystoreDir := filepath.Join(nodeConfig.KeyStoreDir, account.KeyUID)
 		nodeConfig.KeyStoreDir = keystoreDir
-		if accountPayload.exist {
-			if len(accountPayload.chatKey) == 0 {
-				err = s.backend.StartNodeWithAccount(*account, accountPayload.password, nodeConfig)
-			} else {
-				err = s.backend.StartNodeWithKey(*account, accountPayload.password, accountPayload.chatKey, nodeConfig)
+
+		var chatKey *ecdsa.PrivateKey
+		if accountPayload.chatKey != "" {
+			chatKey, err = ethcrypto.HexToECDSA(accountPayload.chatKey)
+			if err != nil {
+				return err
 			}
+		}
+
+		if accountPayload.exist {
+			err = s.backend.StartNodeWithAccount(*account, accountPayload.password, nodeConfig, chatKey)
 		} else {
 			accountManager := s.backend.AccountManager()
 			err = accountManager.InitKeystore(filepath.Join(nodeConfig.RootDataDir, keystoreDir))
@@ -109,11 +117,7 @@ func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload,
 			rmp.setting.InstallationID = nodeConfig.ShhextConfig.InstallationID
 			rmp.setting.CurrentNetwork = settingCurrentNetwork
 
-			if len(accountPayload.chatKey) == 0 {
-				err = s.backend.StartNodeWithAccountAndInitialConfig(*account, accountPayload.password, *rmp.setting, nodeConfig, rmp.profileKeypair.Accounts)
-			} else {
-				err = s.backend.SaveAccountAndStartNodeWithKey(*account, accountPayload.password, *rmp.setting, nodeConfig, rmp.profileKeypair.Accounts, accountPayload.chatKey)
-			}
+			err = s.backend.StartNodeWithAccountAndInitialConfig(*account, accountPayload.password, *rmp.setting, nodeConfig, rmp.profileKeypair.Accounts, chatKey)
 		}
 		if err != nil {
 			return err

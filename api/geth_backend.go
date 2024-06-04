@@ -455,6 +455,7 @@ func (b *GethStatusBackend) setupLogSettings() error {
 	return nil
 }
 
+// Deprecated: Use StartNodeWithAccount instead.
 func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string, nodecfg *params.NodeConfig) error {
 	if acc.KDFIterations == 0 {
 		kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(acc.KeyUID)
@@ -819,8 +820,8 @@ func (b *GethStatusBackend) Login(keyUID, password string) error {
 	return b.startNodeWithAccount(multiaccounts.Account{KeyUID: keyUID}, password, nil, nil)
 }
 
-func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string, nodecfg *params.NodeConfig) error {
-	err := b.startNodeWithAccount(acc, password, nodecfg, nil)
+func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string, nodecfg *params.NodeConfig, chatKey *ecdsa.PrivateKey) error {
+	err := b.startNodeWithAccount(acc, password, nodecfg, chatKey)
 	if err != nil {
 		// Stop node for clean up
 		_ = b.StopNode()
@@ -1254,7 +1255,9 @@ func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAcco
 		return nil, err
 	}
 
-	err = b.StartNodeWithAccountAndInitialConfig(*account, request.Password, *settings, nodeConfig, subAccounts)
+	var chatKey *ecdsa.PrivateKey
+
+	err = b.StartNodeWithAccountAndInitialConfig(*account, request.Password, *settings, nodeConfig, subAccounts, chatKey)
 	if err != nil {
 		b.log.Error("start node", err)
 		return nil, err
@@ -1495,7 +1498,9 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 		return nil, err
 	}
 
-	err = b.StartNodeWithAccountAndInitialConfig(*account, request.Password, *settings, nodeConfig, subAccounts)
+	var chatKey *ecdsa.PrivateKey
+
+	err = b.StartNodeWithAccountAndInitialConfig(*account, request.Password, *settings, nodeConfig, subAccounts, chatKey)
 	if err != nil {
 		b.log.Error("start node", err)
 		return nil, err
@@ -1663,6 +1668,7 @@ func enrichMultiAccountByPublicKey(account *multiaccounts.Account, publicKey typ
 	return nil
 }
 
+// Deprecated: Use CreateAccountAndLogin instead
 func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(
 	account multiaccounts.Account,
 	password string,
@@ -1708,6 +1714,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	settings settings.Settings,
 	nodecfg *params.NodeConfig,
 	subaccs []*accounts.Account,
+	chatKey *ecdsa.PrivateKey,
 ) error {
 	b.log.Info("<<< node config", "config", nodecfg)
 
@@ -1727,7 +1734,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	if err != nil {
 		return err
 	}
-	return b.StartNodeWithAccount(account, password, nodecfg)
+	return b.StartNodeWithAccount(account, password, nodecfg, chatKey)
 }
 
 // TODO: change in `saveAccountsAndSettings` function param `subaccs []*accounts.Account` parameter to `profileKeypair *accounts.Keypair` parameter

@@ -1135,7 +1135,7 @@ func TestConvertAccount(t *testing.T) {
 	err = backend.ensureAppDBOpened(account, password)
 	require.NoError(t, err)
 
-	err = backend.StartNodeWithAccountAndInitialConfig(account, password, *defaultSettings, nodeConfig, profileKeypair.Accounts)
+	err = backend.StartNodeWithAccountAndInitialConfig(account, password, *defaultSettings, nodeConfig, profileKeypair.Accounts, nil)
 	require.NoError(t, err)
 	multiaccounts, err := backend.GetAccounts()
 	require.NoError(t, err)
@@ -1294,7 +1294,7 @@ func loginDesktopUser(t *testing.T, conf *params.NodeConfig) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := b.StartNodeWithAccount(accounts[0], passwd, conf)
+		err := b.StartNodeWithAccount(accounts[0], passwd, conf, nil)
 		require.NoError(t, err)
 	}()
 

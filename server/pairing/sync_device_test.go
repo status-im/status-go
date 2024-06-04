@@ -140,7 +140,7 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *ap
 	}
 
 	accounts := []*accounts.Account{walletAccount, chatAccount}
-	err = backend.StartNodeWithAccountAndInitialConfig(account, s.password, *settings, nodeConfig, accounts)
+	err = backend.StartNodeWithAccountAndInitialConfig(account, s.password, *settings, nodeConfig, accounts, nil)
 	require.NoError(s.T(), err)
 	multiaccounts, err := backend.GetAccounts()
 	require.NoError(s.T(), err)

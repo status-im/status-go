@@ -1,6 +1,8 @@
 package api
 
 import (
+	"crypto/ecdsa"
+
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -18,8 +20,8 @@ type StatusBackend interface {
 	// IsNodeRunning() bool                       // NOTE: Only used in tests
 	StartNode(config *params.NodeConfig) error // NOTE: Only used in canary
 	StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string, conf *params.NodeConfig) error
-	StartNodeWithAccount(acc multiaccounts.Account, password string, conf *params.NodeConfig) error
-	StartNodeWithAccountAndInitialConfig(account multiaccounts.Account, password string, settings settings.Settings, conf *params.NodeConfig, subaccs []*accounts.Account) error
+	StartNodeWithAccount(acc multiaccounts.Account, password string, conf *params.NodeConfig, chatKey *ecdsa.PrivateKey) error
+	StartNodeWithAccountAndInitialConfig(account multiaccounts.Account, password string, settings settings.Settings, conf *params.NodeConfig, subaccs []*accounts.Account, chatKey *ecdsa.PrivateKey) error
 	StopNode() error
 	// RestartNode() error // NOTE: Only used in tests
 

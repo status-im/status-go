@@ -420,9 +420,9 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	fmt.Println(nodeConfig)
 	accounts := []*accounts.Account{walletAccount, chatAccount}
 	if !exist {
-		return backend.StartNodeWithAccountAndInitialConfig(account, "", *settings, nodeConfig, accounts)
+		return backend.StartNodeWithAccountAndInitialConfig(account, "", *settings, nodeConfig, accounts, nil)
 	}
-	return backend.StartNodeWithAccount(account, "", nodeConfig)
+	return backend.StartNodeWithAccount(account, "", nodeConfig, nil)
 }
 
 func retrieveMessagesLoop(messenger *protocol.Messenger, tick time.Duration) {
