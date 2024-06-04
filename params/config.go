@@ -609,6 +609,7 @@ type PushNotificationServerConfig struct {
 type ShhextConfig struct {
 	PFSEnabled bool
 	// BackupDisabledDataDir is the file system folder the node should use for any data storage needs that it doesn't want backed up.
+	// It should be set as a relative path. loadNodeConfig will prepend rootDataDir to it to make it absolute.
 	BackupDisabledDataDir string
 	// InstallationId id of the current installation
 	InstallationID string
