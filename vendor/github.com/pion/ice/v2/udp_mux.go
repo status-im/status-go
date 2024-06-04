@@ -36,7 +36,7 @@ type UDPMuxDefault struct {
 	connsIPv4, connsIPv6 map[string]*udpMuxedConn
 
 	addressMapMu sync.RWMutex
-	addressMap   map[string]*udpMuxedConn
+	addressMap   map[udpMuxedConnAddr]*udpMuxedConn
 
 	// Buffer pool to recycle buffers for net.UDPAddr encodes/decodes
 	pool *sync.Pool
@@ -46,8 +46,6 @@ type UDPMuxDefault struct {
 	// For UDP connection listen at unspecified address
 	localAddrsForUnspecified []net.Addr
 }
-
-const maxAddrSize = 512
 
 // UDPMuxParams are parameters for UDPMux.
 type UDPMuxParams struct {
@@ -89,7 +87,7 @@ func NewUDPMuxDefault(params UDPMuxParams) *UDPMuxDefault {
 			if params.Net == nil {
 				var err error
 				if params.Net, err = stdnet.NewNet(); err != nil {
-					params.Logger.Errorf("failed to get create network: %v", err)
+					params.Logger.Errorf("Failed to get create network: %v", err)
 				}
 			}
 
@@ -99,13 +97,13 @@ func NewUDPMuxDefault(params UDPMuxParams) *UDPMuxDefault {
 					localAddrsForUnspecified = append(localAddrsForUnspecified, &net.UDPAddr{IP: ip, Port: addr.Port})
 				}
 			} else {
-				params.Logger.Errorf("failed to get local interfaces for unspecified addr: %v", err)
+				params.Logger.Errorf("Failed to get local interfaces for unspecified addr: %v", err)
 			}
 		}
 	}
 
 	m := &UDPMuxDefault{
-		addressMap: map[string]*udpMuxedConn{},
+		addressMap: map[udpMuxedConnAddr]*udpMuxedConn{},
 		params:     params,
 		connsIPv4:  make(map[string]*udpMuxedConn),
 		connsIPv6:  make(map[string]*udpMuxedConn),
@@ -113,7 +111,7 @@ func NewUDPMuxDefault(params UDPMuxParams) *UDPMuxDefault {
 		pool: &sync.Pool{
 			New: func() interface{} {
 				// Big enough buffer to fit both packet and address
-				return newBufferHolder(receiveMTU + maxAddrSize)
+				return newBufferHolder(receiveMTU)
 			},
 		},
 		localAddrsForUnspecified: localAddrsForUnspecified,
@@ -246,7 +244,7 @@ func (m *UDPMuxDefault) writeTo(buf []byte, rAddr net.Addr) (n int, err error) {
 	return m.params.UDPConn.WriteTo(buf, rAddr)
 }
 
-func (m *UDPMuxDefault) registerConnForAddress(conn *udpMuxedConn, addr string) {
+func (m *UDPMuxDefault) registerConnForAddress(conn *udpMuxedConn, addr udpMuxedConnAddr) {
 	if m.IsClosed() {
 		return
 	}
@@ -290,7 +288,7 @@ func (m *UDPMuxDefault) connWorker() {
 			if os.IsTimeout(err) {
 				continue
 			} else if !errors.Is(err, io.EOF) {
-				logger.Errorf("could not read udp packet: %v", err)
+				logger.Errorf("Failed to read UDP packet: %v", err)
 			}
 
 			return
@@ -298,13 +296,13 @@ func (m *UDPMuxDefault) connWorker() {
 
 		udpAddr, ok := addr.(*net.UDPAddr)
 		if !ok {
-			logger.Errorf("underlying PacketConn did not return a UDPAddr")
+			logger.Errorf("Underlying PacketConn did not return a UDPAddr")
 			return
 		}
 
 		// If we have already seen this address dispatch to the appropriate destination
 		m.addressMapMu.Lock()
-		destinationConn := m.addressMap[addr.String()]
+		destinationConn := m.addressMap[newUDPMuxedConnAddr(udpAddr)]
 		m.addressMapMu.Unlock()
 
 		// If we haven't seen this address before but is a STUN packet lookup by ufrag
@@ -333,12 +331,12 @@ func (m *UDPMuxDefault) connWorker() {
 		}
 
 		if destinationConn == nil {
-			m.params.Logger.Tracef("dropping packet from %s, addr: %s", udpAddr.String(), addr.String())
+			m.params.Logger.Tracef("Dropping packet from %s, addr: %s", udpAddr, addr)
 			continue
 		}
 
 		if err = destinationConn.writePacket(buf[:n], udpAddr); err != nil {
-			m.params.Logger.Errorf("could not write packet: %v", err)
+			m.params.Logger.Errorf("Failed to write packet: %v", err)
 		}
 	}
 }
@@ -353,11 +351,18 @@ func (m *UDPMuxDefault) getConn(ufrag string, isIPv6 bool) (val *udpMuxedConn, o
 }
 
 type bufferHolder struct {
-	buf []byte
+	next *bufferHolder
+	buf  []byte
+	addr *net.UDPAddr
 }
 
 func newBufferHolder(size int) *bufferHolder {
 	return &bufferHolder{
 		buf: make([]byte, size),
 	}
+}
+
+func (b *bufferHolder) reset() {
+	b.next = nil
+	b.addr = nil
 }

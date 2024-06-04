@@ -18,7 +18,7 @@ func (p *PubSubNotif) ClosedStream(n network.Network, s network.Stream) {
 
 func (p *PubSubNotif) Connected(n network.Network, c network.Conn) {
 	// ignore transient connections
-	if c.Stat().Transient {
+	if c.Stat().Limited {
 		return
 	}
 
@@ -48,7 +48,7 @@ func (p *PubSubNotif) ListenClose(n network.Network, _ ma.Multiaddr) {
 func (p *PubSubNotif) Initialize() {
 	isTransient := func(pid peer.ID) bool {
 		for _, c := range p.host.Network().ConnsToPeer(pid) {
-			if !c.Stat().Transient {
+			if !c.Stat().Limited {
 				return false
 			}
 		}

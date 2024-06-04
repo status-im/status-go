@@ -19,7 +19,6 @@ import (
 
 	logging "github.com/ipfs/go-log/v2"
 	pool "github.com/libp2p/go-buffer-pool"
-	asnutil "github.com/libp2p/go-libp2p-asn-util"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
@@ -296,7 +295,7 @@ func (r *Relay) handleConnect(s network.Stream, msg *pbv2.HopMessage) pbv2.Statu
 	destConns := r.conns[dest.ID]
 	if destConns >= r.rc.MaxCircuits {
 		r.mx.Unlock()
-		log.Debugf("refusing connection from %s to %s; too many connecitons to %s", src, dest.ID, dest.ID)
+		log.Debugf("refusing connection from %s to %s; too many connections to %s", src, dest.ID, dest.ID)
 		fail(pbv2.Status_RESOURCE_LIMIT_EXCEEDED)
 		return pbv2.Status_RESOURCE_LIMIT_EXCEEDED
 	}
@@ -557,6 +556,8 @@ func (r *Relay) handleError(s network.Stream, status pbv2.Status) {
 }
 
 func (r *Relay) writeResponse(s network.Stream, status pbv2.Status, rsvp *pbv2.Reservation, limit *pbv2.Limit) error {
+	s.SetWriteDeadline(time.Now().Add(StreamTimeout))
+	defer s.SetWriteDeadline(time.Time{})
 	wr := util.NewDelimitedWriter(s)
 
 	var msg pbv2.HopMessage
@@ -624,8 +625,6 @@ func (r *Relay) makeLimitMsg(p peer.ID) *pbv2.Limit {
 }
 
 func (r *Relay) background() {
-	asnutil.Store.Init()
-
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 

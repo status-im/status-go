@@ -31,8 +31,8 @@ type candidateBase struct {
 
 	resolvedAddr net.Addr
 
-	lastSent     atomic.Value
-	lastReceived atomic.Value
+	lastSent     atomic.Int64
+	lastReceived atomic.Int64
 	conn         net.PacketConn
 
 	currAgent *Agent
@@ -268,6 +268,7 @@ func (c *candidateBase) handleInboundPacket(buf []byte, srcAddr net.Addr) {
 		}
 
 		if err := a.run(c, func(ctx context.Context, a *Agent) {
+			// nolint: contextcheck
 			a.handleInbound(m, c, srcAddr)
 		}); err != nil {
 			a.log.Warnf("Failed to handle message: %v", err)
@@ -336,14 +337,34 @@ func (c *candidateBase) writeTo(raw []byte, dst Candidate) (int, error) {
 		if errors.Is(err, io.ErrClosedPipe) {
 			return n, err
 		}
-		c.agent().log.Infof("%s: %v", errSendPacket, err)
+		c.agent().log.Infof("Failed to send packet: %v", err)
 		return n, nil
 	}
 	c.seen(true)
 	return n, nil
 }
 
+// TypePreference returns the type preference for this candidate
+func (c *candidateBase) TypePreference() uint16 {
+	pref := c.Type().Preference()
+	if pref == 0 {
+		return 0
+	}
+
+	if c.NetworkType().IsTCP() {
+		var tcpPriorityOffset uint16 = defaultTCPPriorityOffset
+		if c.agent() != nil {
+			tcpPriorityOffset = c.agent().tcpPriorityOffset
+		}
+
+		pref -= tcpPriorityOffset
+	}
+
+	return pref
+}
+
 // Priority computes the priority for this ICE Candidate
+// See: https://www.rfc-editor.org/rfc/rfc8445#section-5.1.2.1
 func (c *candidateBase) Priority() uint32 {
 	if c.priorityOverride != 0 {
 		return c.priorityOverride
@@ -355,9 +376,10 @@ func (c *candidateBase) Priority() uint32 {
 	// candidates for a particular component for a particular data stream
 	// that have the same type, the local preference MUST be unique for each
 	// one.
-	return (1<<24)*uint32(c.Type().Preference()) +
+
+	return (1<<24)*uint32(c.TypePreference()) +
 		(1<<8)*uint32(c.LocalPreference()) +
-		uint32(256-c.Component())
+		(1<<0)*uint32(256-c.Component())
 }
 
 // Equal is used to compare two candidateBases
@@ -378,27 +400,27 @@ func (c *candidateBase) String() string {
 // LastReceived returns a time.Time indicating the last time
 // this candidate was received
 func (c *candidateBase) LastReceived() time.Time {
-	if lastReceived, ok := c.lastReceived.Load().(time.Time); ok {
-		return lastReceived
+	if lastReceived := c.lastReceived.Load(); lastReceived != 0 {
+		return time.Unix(0, lastReceived)
 	}
 	return time.Time{}
 }
 
 func (c *candidateBase) setLastReceived(t time.Time) {
-	c.lastReceived.Store(t)
+	c.lastReceived.Store(t.UnixNano())
 }
 
 // LastSent returns a time.Time indicating the last time
 // this candidate was sent
 func (c *candidateBase) LastSent() time.Time {
-	if lastSent, ok := c.lastSent.Load().(time.Time); ok {
-		return lastSent
+	if lastSent := c.lastSent.Load(); lastSent != 0 {
+		return time.Unix(0, lastSent)
 	}
 	return time.Time{}
 }
 
 func (c *candidateBase) setLastSent(t time.Time) {
-	c.lastSent.Store(t)
+	c.lastSent.Store(t.UnixNano())
 }
 
 func (c *candidateBase) seen(outbound bool) {

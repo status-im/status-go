@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package sctp
 
 import (
@@ -202,4 +205,8 @@ func (p *chunkPayloadData) setAllInflight() {
 			p._allInflight = true
 		}
 	}
+}
+
+func (p *chunkPayloadData) isFragmented() bool {
+	return !(p.head == nil && p.beginningFragment && p.endingFragment)
 }

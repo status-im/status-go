@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package sctp
 
 import (
@@ -33,9 +36,9 @@ func (q *payloadQueue) updateSortedKeys() {
 	})
 }
 
-func (q *payloadQueue) canPush(p *chunkPayloadData, cumulativeTSN uint32) bool {
+func (q *payloadQueue) canPush(p *chunkPayloadData, cumulativeTSN uint32, maxTSNOffset uint32) bool {
 	_, ok := q.chunkMap[p.tsn]
-	if ok || sna32LTE(p.tsn, cumulativeTSN) {
+	if ok || sna32LTE(p.tsn, cumulativeTSN) || sna32GTE(p.tsn, cumulativeTSN+maxTSNOffset) {
 		return false
 	}
 	return true

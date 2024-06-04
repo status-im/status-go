@@ -2,6 +2,8 @@ package webtransport
 
 import (
 	"context"
+	"crypto/tls"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -13,13 +15,15 @@ import (
 	"github.com/quic-go/quic-go/quicvarint"
 )
 
+var errNoWebTransport = errors.New("server didn't enable WebTransport")
+
 type Dialer struct {
-	// If not set, reasonable defaults will be used.
-	// In order for WebTransport to function, this implementation will:
-	// * overwrite the StreamHijacker and UniStreamHijacker
-	// * enable datagram support
-	// * set the MaxIncomingStreams to 100 on the quic.Config, if unset
-	*http3.RoundTripper
+	// TLSClientConfig is the TLS client config used when dialing the QUIC connection.
+	// It must set the h3 ALPN.
+	TLSClientConfig *tls.Config
+
+	// QUICConfig is the QUIC config used when dialing the QUIC connection.
+	QUICConfig *quic.Config
 
 	// StreamReorderingTime is the time an incoming WebTransport stream that cannot be associated
 	// with a session is buffered.
@@ -27,6 +31,10 @@ type Dialer struct {
 	// and arrives after the first WebTransport stream(s) for that session.
 	// Defaults to 5 seconds.
 	StreamReorderingTimeout time.Duration
+
+	// DialAddr is the function used to dial the underlying QUIC connection.
+	// If unset, quic.DialAddrEarly will be used.
+	DialAddr func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (quic.EarlyConnection, error)
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -43,47 +51,29 @@ func (d *Dialer) init() {
 	}
 	d.conns = *newSessionManager(timeout)
 	d.ctx, d.ctxCancel = context.WithCancel(context.Background())
-	if d.RoundTripper == nil {
-		d.RoundTripper = &http3.RoundTripper{}
-	}
-	d.RoundTripper.EnableDatagrams = true
-	if d.RoundTripper.AdditionalSettings == nil {
-		d.RoundTripper.AdditionalSettings = make(map[uint64]uint64)
-	}
-	d.RoundTripper.StreamHijacker = func(ft http3.FrameType, conn quic.Connection, str quic.Stream, e error) (hijacked bool, err error) {
-		if isWebTransportError(e) {
-			return true, nil
-		}
-		if ft != webTransportFrameType {
-			return false, nil
-		}
-		id, err := quicvarint.Read(quicvarint.NewReader(str))
-		if err != nil {
-			if isWebTransportError(err) {
-				return true, nil
-			}
-			return false, err
-		}
-		d.conns.AddStream(conn, str, sessionID(id))
-		return true, nil
-	}
-	d.RoundTripper.UniStreamHijacker = func(st http3.StreamType, conn quic.Connection, str quic.ReceiveStream, err error) (hijacked bool) {
-		if st != webTransportUniStreamType && !isWebTransportError(err) {
-			return false
-		}
-		d.conns.AddUniStream(conn, str)
-		return true
-	}
-	if d.QuicConfig == nil {
-		d.QuicConfig = &quic.Config{}
-	}
-	if d.QuicConfig.MaxIncomingStreams == 0 {
-		d.QuicConfig.MaxIncomingStreams = 100
-	}
 }
 
 func (d *Dialer) Dial(ctx context.Context, urlStr string, reqHdr http.Header) (*http.Response, *Session, error) {
 	d.initOnce.Do(func() { d.init() })
+
+	// Technically, this is not true. DATAGRAMs could be sent using the Capsule protocol.
+	// However, quic-go currently enforces QUIC datagram support if HTTP/3 datagrams are enabled.
+	quicConf := d.QUICConfig
+	if quicConf == nil {
+		quicConf = &quic.Config{EnableDatagrams: true}
+	} else if !d.QUICConfig.EnableDatagrams {
+		return nil, nil, errors.New("webtransport: DATAGRAM support required, enable it via QUICConfig.EnableDatagrams")
+	}
+
+	tlsConf := d.TLSClientConfig
+	if tlsConf == nil {
+		tlsConf = &tls.Config{}
+	} else {
+		tlsConf = tlsConf.Clone()
+	}
+	if len(tlsConf.NextProtos) == 0 {
+		tlsConf.NextProtos = []string{http3.NextProtoH3}
+	}
 
 	u, err := url.Parse(urlStr)
 	if err != nil {
@@ -102,20 +92,80 @@ func (d *Dialer) Dial(ctx context.Context, urlStr string, reqHdr http.Header) (*
 	}
 	req = req.WithContext(ctx)
 
-	rsp, err := d.RoundTripper.RoundTripOpt(req, http3.RoundTripOpt{DontCloseRequestStream: true})
+	dialAddr := d.DialAddr
+	if dialAddr == nil {
+		dialAddr = quic.DialAddrEarly
+	}
+	qconn, err := dialAddr(ctx, u.Host, tlsConf, quicConf)
+	if err != nil {
+		return nil, nil, err
+	}
+	rt := &http3.SingleDestinationRoundTripper{
+		Connection:      qconn,
+		EnableDatagrams: true,
+		StreamHijacker: func(ft http3.FrameType, connTracingID quic.ConnectionTracingID, str quic.Stream, e error) (hijacked bool, err error) {
+			if isWebTransportError(e) {
+				return true, nil
+			}
+			if ft != webTransportFrameType {
+				return false, nil
+			}
+			id, err := quicvarint.Read(quicvarint.NewReader(str))
+			if err != nil {
+				if isWebTransportError(err) {
+					return true, nil
+				}
+				return false, err
+			}
+			d.conns.AddStream(connTracingID, str, sessionID(id))
+			return true, nil
+		},
+		UniStreamHijacker: func(st http3.StreamType, connTracingID quic.ConnectionTracingID, str quic.ReceiveStream, err error) (hijacked bool) {
+			if st != webTransportUniStreamType && !isWebTransportError(err) {
+				return false
+			}
+			d.conns.AddUniStream(connTracingID, str)
+			return true
+		},
+	}
+
+	conn := rt.Start()
+	select {
+	case <-conn.ReceivedSettings():
+	case <-d.ctx.Done():
+		return nil, nil, context.Cause(d.ctx)
+	}
+	settings := conn.Settings()
+	if !settings.EnableExtendedConnect {
+		return nil, nil, errors.New("server didn't enable Extended CONNECT")
+	}
+	if !settings.EnableDatagrams {
+		return nil, nil, errors.New("server didn't enable HTTP/3 datagram support")
+	}
+	if settings.Other == nil {
+		return nil, nil, errNoWebTransport
+	}
+	s, ok := settings.Other[settingsEnableWebtransport]
+	if !ok || s != 1 {
+		return nil, nil, errNoWebTransport
+	}
+
+	requestStr, err := rt.OpenRequestStream(ctx) // TODO: put this on the Connection (maybe introduce a ClientConnection?)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := requestStr.SendRequestHeader(req); err != nil {
+		return nil, nil, err
+	}
+	// TODO(#136): create the session to allow optimistic opening of streams and sending of datagrams
+	rsp, err := requestStr.ReadResponse()
 	if err != nil {
 		return nil, nil, err
 	}
 	if rsp.StatusCode < 200 || rsp.StatusCode >= 300 {
 		return rsp, nil, fmt.Errorf("received status %d", rsp.StatusCode)
 	}
-	str := rsp.Body.(http3.HTTPStreamer).HTTPStream()
-	conn := d.conns.AddSession(
-		rsp.Body.(http3.Hijacker).StreamCreator(),
-		sessionID(str.StreamID()),
-		str,
-	)
-	return rsp, conn, nil
+	return rsp, d.conns.AddSession(conn, sessionID(requestStr.StreamID()), requestStr), nil
 }
 
 func (d *Dialer) Close() error {

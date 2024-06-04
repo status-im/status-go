@@ -246,8 +246,9 @@ func (s *WakuStore) next(ctx context.Context, r *Result) (*Result, error) {
 }
 
 func (s *WakuStore) queryFrom(ctx context.Context, storeRequest *pb.StoreQueryRequest, selectedPeer peer.ID) (*pb.StoreQueryResponse, error) {
-	logger := s.log.With(logging.HostID("peer", selectedPeer))
-	logger.Info("sending store request")
+	logger := s.log.With(logging.HostID("peer", selectedPeer), zap.String("requestId", hex.EncodeToString([]byte(storeRequest.RequestId))))
+
+	logger.Debug("sending store request")
 
 	stream, err := s.h.NewStream(ctx, selectedPeer, StoreQueryID_v300)
 	if err != nil {

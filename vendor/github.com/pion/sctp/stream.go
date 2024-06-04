@@ -1,10 +1,12 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package sctp
 
 import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -172,6 +174,11 @@ func (s *Stream) SetReadDeadline(deadline time.Time) error {
 				t.Stop()
 				return
 			case <-t.C:
+				select {
+				case <-readTimeoutCancel:
+					return
+				default:
+				}
 				s.lock.Lock()
 				if s.readErr == nil {
 					s.readErr = ErrReadDeadlineExceeded
@@ -258,7 +265,7 @@ func (s *Stream) Write(p []byte) (n int, err error) {
 func (s *Stream) WriteSCTP(p []byte, ppi PayloadProtocolIdentifier) (int, error) {
 	maxMessageSize := s.association.MaxMessageSize()
 	if len(p) > int(maxMessageSize) {
-		return 0, fmt.Errorf("%w: %v", ErrOutboundPacketTooLarge, math.MaxUint16)
+		return 0, fmt.Errorf("%w: %v", ErrOutboundPacketTooLarge, maxMessageSize)
 	}
 
 	if s.State() != StreamStateOpen {

@@ -990,7 +990,7 @@ func (ps *peerScore) getIPs(p peer.ID) []string {
 	conns := ps.host.Network().ConnsToPeer(p)
 	res := make([]string, 0, 1)
 	for _, c := range conns {
-		if c.Stat().Transient {
+		if c.Stat().Limited {
 			// ignore transient
 			continue
 		}

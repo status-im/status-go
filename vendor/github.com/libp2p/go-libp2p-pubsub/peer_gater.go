@@ -303,7 +303,7 @@ func (pg *peerGater) getPeerIP(p peer.ID) string {
 		// most streams; it's a nightmare to track multiple IPs per peer, so pick the best one.
 		streams := make(map[string]int)
 		for _, c := range conns {
-			if c.Stat().Transient {
+			if c.Stat().Limited {
 				// ignore transient
 				continue
 			}

@@ -129,7 +129,7 @@ func (h *packetHandlerMap) Add(id protocol.ConnectionID, handler packetHandler) 
 	return true
 }
 
-func (h *packetHandlerMap) AddWithConnID(clientDestConnID, newConnID protocol.ConnectionID, fn func() (packetHandler, bool)) bool {
+func (h *packetHandlerMap) AddWithConnID(clientDestConnID, newConnID protocol.ConnectionID, handler packetHandler) bool {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 
@@ -137,12 +137,8 @@ func (h *packetHandlerMap) AddWithConnID(clientDestConnID, newConnID protocol.Co
 		h.logger.Debugf("Not adding connection ID %s for a new connection, as it already exists.", clientDestConnID)
 		return false
 	}
-	conn, ok := fn()
-	if !ok {
-		return false
-	}
-	h.handlers[clientDestConnID] = conn
-	h.handlers[newConnID] = conn
+	h.handlers[clientDestConnID] = handler
+	h.handlers[newConnID] = handler
 	h.logger.Debugf("Adding connection IDs %s and %s for a new connection.", clientDestConnID, newConnID)
 	return true
 }
@@ -168,18 +164,17 @@ func (h *packetHandlerMap) Retire(id protocol.ConnectionID) {
 // Depending on which side closed the connection, we need to:
 // * remote close: absorb delayed packets
 // * local close: retransmit the CONNECTION_CLOSE packet, in case it was lost
-func (h *packetHandlerMap) ReplaceWithClosed(ids []protocol.ConnectionID, pers protocol.Perspective, connClosePacket []byte) {
+func (h *packetHandlerMap) ReplaceWithClosed(ids []protocol.ConnectionID, connClosePacket []byte) {
 	var handler packetHandler
 	if connClosePacket != nil {
 		handler = newClosedLocalConn(
 			func(addr net.Addr, info packetInfo) {
 				h.enqueueClosePacket(closePacket{payload: connClosePacket, addr: addr, info: info})
 			},
-			pers,
 			h.logger,
 		)
 	} else {
-		handler = newClosedRemoteConn(pers)
+		handler = newClosedRemoteConn()
 	}
 
 	h.mutex.Lock()
@@ -191,7 +186,6 @@ func (h *packetHandlerMap) ReplaceWithClosed(ids []protocol.ConnectionID, pers p
 
 	time.AfterFunc(h.deleteRetiredConnsAfter, func() {
 		h.mutex.Lock()
-		handler.shutdown()
 		for _, id := range ids {
 			delete(h.handlers, id)
 		}
@@ -218,23 +212,6 @@ func (h *packetHandlerMap) GetByResetToken(token protocol.StatelessResetToken) (
 
 	handler, ok := h.resetTokens[token]
 	return handler, ok
-}
-
-func (h *packetHandlerMap) CloseServer() {
-	h.mutex.Lock()
-	var wg sync.WaitGroup
-	for _, handler := range h.handlers {
-		if handler.getPerspective() == protocol.PerspectiveServer {
-			wg.Add(1)
-			go func(handler packetHandler) {
-				// blocks until the CONNECTION_CLOSE has been sent and the run-loop has stopped
-				handler.shutdown()
-				wg.Done()
-			}(handler)
-		}
-	}
-	h.mutex.Unlock()
-	wg.Wait()
 }
 
 func (h *packetHandlerMap) Close(e error) {

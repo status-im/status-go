@@ -12,9 +12,14 @@ var log *zap.Logger
 var messageLoggers map[string]*zap.Logger
 
 // Logger creates a zap.Logger with some reasonable defaults
-func Logger() *zap.Logger {
+func Logger(name ...string) *zap.Logger {
+	loggerName := "gowaku"
+	if len(name) != 0 {
+		loggerName = name[0]
+	}
+
 	if log == nil {
-		InitLogger("console", "stdout")
+		InitLogger("console", "stdout", loggerName)
 	}
 	return log
 }
@@ -34,7 +39,7 @@ func MessagesLogger(prefix string) *zap.Logger {
 }
 
 // InitLogger initializes a global logger using an specific encoding
-func InitLogger(encoding string, output string) {
+func InitLogger(encoding string, output string, name string) {
 	cfg := logging.GetConfig()
 
 	if encoding == "json" {
@@ -72,5 +77,5 @@ func InitLogger(encoding string, output string) {
 
 	logging.SetupLogging(cfg)
 
-	log = logging.Logger("gowaku").Desugar()
+	log = logging.Logger(name).Desugar()
 }
