@@ -991,8 +991,8 @@ func (w *Waku) checkIfMessagesStored() {
 			w.logger.Debug("stop the look for message stored check")
 			return
 		case <-ticker.C:
-			w.logger.Debug("running loop for messages stored check")
 			w.sendMsgIDsMu.Lock()
+			w.logger.Debug("running loop for messages stored check", zap.Any("messageIds", w.sendMsgIDs))
 			pubsubTopics := make([]string, 0, len(w.sendMsgIDs))
 			pubsubMessageIds := make([][]gethcommon.Hash, 0, len(w.sendMsgIDs))
 			for pubsubTopic, subMsgs := range w.sendMsgIDs {

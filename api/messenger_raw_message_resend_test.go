@@ -232,7 +232,7 @@ func (s *MessengerRawMessageResendTest) TestMessageResend() {
 		rawMessage, err := s.bobMessenger.RawMessageByID(ids[0])
 		s.Require().NoError(err)
 		s.Require().NotNil(rawMessage)
-		if !rawMessage.Sent {
+		if rawMessage.SendCount < 2 {
 			return errors.New("message ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN was not resent yet")
 		}
 		return nil
