@@ -136,7 +136,7 @@ func (m *EnvelopesMonitor) Add(messageIDs [][]byte, envelopeHashes []types.Hash,
 	defer m.mu.Unlock()
 
 	for _, messageID := range messageIDs {
-		m.messageEnvelopeHashes[string(messageID)] = envelopeHashes
+		m.messageEnvelopeHashes[types.HexBytes(messageID).String()] = envelopeHashes
 	}
 
 	for i, envelopeHash := range envelopeHashes {
@@ -399,7 +399,7 @@ func (m *EnvelopesMonitor) processMessageIDs(messageIDs [][]byte) {
 	sentMessageIDs := make([][]byte, 0, len(messageIDs))
 
 	for _, messageID := range messageIDs {
-		hashes, ok := m.messageEnvelopeHashes[string(messageID)]
+		hashes, ok := m.messageEnvelopeHashes[types.HexBytes(messageID).String()]
 		if !ok {
 			continue
 		}
@@ -432,6 +432,6 @@ func (m *EnvelopesMonitor) clearMessageState(envelopeID types.Hash) {
 	}
 	delete(m.envelopes, envelopeID)
 	for _, messageID := range envelope.messageIDs {
-		delete(m.messageEnvelopeHashes, string(messageID))
+		delete(m.messageEnvelopeHashes, types.HexBytes(messageID).String())
 	}
 }

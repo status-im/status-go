@@ -719,7 +719,7 @@ func (t *Transport) RemovePubsubTopicKey(topic string) error {
 }
 
 func (t *Transport) ConfirmMessageDelivered(messageID string) {
-	hashes, ok := t.envelopesMonitor.identifierHashes[messageID]
+	hashes, ok := t.envelopesMonitor.messageEnvelopeHashes[messageID]
 	if !ok {
 		return
 	}

@@ -1014,10 +1014,10 @@ func (w *Waku) checkIfMessagesStored() {
 			}
 			w.sendMsgIDsMu.Unlock()
 
-			pubsubProcessedMessages := make([][]gethcommon.Hash, len(pubsubMessageIds))
+			pubsubProcessedMessages := make([][]gethcommon.Hash, len(pubsubTopics))
 			for i, pubsubTopic := range pubsubTopics {
 				processedMessages := w.messageHashBasedQuery(w.ctx, pubsubMessageIds[i], pubsubTopic)
-				pubsubProcessedMessages = append(pubsubProcessedMessages, processedMessages)
+				pubsubProcessedMessages[i] = processedMessages
 			}
 
 			w.sendMsgIDsMu.Lock()
@@ -1035,6 +1035,7 @@ func (w *Waku) checkIfMessagesStored() {
 					}
 				}
 			}
+			w.logger.Debug("messages for next store hash query", zap.Any("messageIds", w.sendMsgIDs))
 			w.sendMsgIDsMu.Unlock()
 
 		}
