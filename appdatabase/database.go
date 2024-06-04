@@ -89,11 +89,6 @@ func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, erro
 
 func fixMissingKeyUIDForAccounts(sqlTx *sql.Tx) error {
 	rows, err := sqlTx.Query(`SELECT address,pubkey FROM accounts WHERE pubkey IS NOT NULL AND type != '' AND type != 'generated'`)
-	if err == sql.ErrNoRows {
-		// we shouldn't reach here, but if we do, it probably happened from the test
-		log.Warn("Migrating accounts: no accounts found")
-		return nil
-	}
 	if err != nil {
 		log.Error("Migrating accounts: failed to query accounts", "err", err.Error())
 		return err
