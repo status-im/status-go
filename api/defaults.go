@@ -21,6 +21,7 @@ import (
 const pathWalletRoot = "m/44'/60'/0'/0"
 const pathEIP1581 = "m/43'/60'/1581'"
 const pathDefaultChat = pathEIP1581 + "/0'/0"
+const pathEncryption = pathEIP1581 + "/1'/0"
 const pathDefaultWallet = pathWalletRoot + "/0"
 const defaultMnemonicLength = 12
 const shardsTestClusterID = 16
@@ -38,7 +39,7 @@ const DefaultListenAddr = ":0"
 const DefaultMaxMessageDeliveryAttempts = 6
 const DefaultVerifyTransactionChainID = 1
 
-var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
+var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet, pathEncryption}
 
 var DefaultFleet = params.FleetShardsTest
 
