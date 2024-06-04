@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -8,6 +9,11 @@ import (
 
 type KeycardPairings struct {
 	pairingsFile string
+}
+
+type KeycardPairing struct {
+	Key   string `json:"key"`
+	Index int    `json:"index"`
 }
 
 func NewKeycardPairings() *KeycardPairings {
@@ -42,4 +48,19 @@ func (kp *KeycardPairings) SetPairingsJSONFileContent(content []byte) error {
 	}
 
 	return ioutil.WriteFile(kp.pairingsFile, content, 0600)
+}
+
+func (kp *KeycardPairings) GetPairings() (map[string]KeycardPairing, error) {
+	content, err := kp.GetPairingsJSONFileContent()
+	if err != nil {
+		return nil, err
+	}
+
+	pairings := make(map[string]KeycardPairing)
+	err = json.Unmarshal(content, &pairings)
+	if err != nil {
+		return nil, err
+	}
+
+	return pairings, nil
 }
