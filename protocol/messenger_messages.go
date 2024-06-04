@@ -102,16 +102,12 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 			return nil, err
 		}
 
-		resendType := common.ResendTypeRawMessage
-		if chat.ChatType == ChatTypeOneToOne {
-			resendType = common.ResendTypeDataSync
-		}
 		rawMessage := common.RawMessage{
 			LocalChatID:          chat.ID,
 			Payload:              encodedMessage,
 			MessageType:          protobuf.ApplicationMetadataMessage_EDIT_MESSAGE,
 			SkipGroupMessageWrap: true,
-			ResendType:           resendType,
+			ResendType:           chat.DefaultResendType(),
 		}
 		_, err = m.dispatchMessage(ctx, rawMessage)
 		if err != nil {
