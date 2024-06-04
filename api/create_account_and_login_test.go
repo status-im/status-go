@@ -22,7 +22,7 @@ func TestCreateAccountAndLogin(t *testing.T) {
     "wakuV2Nameserver":"1.1.1.1",
     "mnemonic":null,
     "verifyENSContractAddress":"0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
-    "backupDisabledDataDir":"%s",
+    "rootDataDir":"%s",
     "password":"0x20756cad9b728c8225fd8cedb6badaf8731e174506950219ea657cd54f35f46c",
     "displayName":"%s",
     "logEnabled":true,

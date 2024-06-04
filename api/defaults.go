@@ -292,7 +292,6 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	}
 
 	nodeConfig.ShhextConfig = params.ShhextConfig{
-		BackupDisabledDataDir:      "./",
 		InstallationID:             installationID,
 		MaxMessageDeliveryAttempts: DefaultMaxMessageDeliveryAttempts,
 		MailServerConfirmations:    true,

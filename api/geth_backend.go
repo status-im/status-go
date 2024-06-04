@@ -1832,11 +1832,10 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 	conf.Version = params.Version
 	conf.RootDataDir = b.rootDataDir
 	conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
-	conf.ShhextConfig.BackupDisabledDataDir = filepath.Join(b.rootDataDir, conf.ShhextConfig.BackupDisabledDataDir)
 	conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
 
-	if _, err = os.Stat(conf.ShhextConfig.BackupDisabledDataDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(conf.ShhextConfig.BackupDisabledDataDir, os.ModePerm); err != nil {
+	if _, err = os.Stat(conf.RootDataDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(conf.RootDataDir, os.ModePerm); err != nil {
 			b.log.Warn("failed to create data directory", zap.Error(err))
 			return err
 		}
