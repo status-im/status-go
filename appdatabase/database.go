@@ -89,6 +89,11 @@ func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, erro
 
 func fixMissingKeyUIDForAccounts(sqlTx *sql.Tx) error {
 	rows, err := sqlTx.Query(`SELECT address,pubkey FROM accounts WHERE pubkey IS NOT NULL AND type != '' AND type != 'generated'`)
+	if err == sql.ErrNoRows {
+		// we shouldn't reach here, but if we do, it probably happened from the test
+		log.Warn("Migrating accounts: no accounts found")
+		return nil
+	}
 	if err != nil {
 		log.Error("Migrating accounts: failed to query accounts", "err", err.Error())
 		return err
@@ -115,9 +120,22 @@ func fixMissingKeyUIDForAccounts(sqlTx *sql.Tx) error {
 			return err
 		}
 	}
-	_, err = sqlTx.Exec(`UPDATE accounts SET key_uid = ? WHERE type = '' OR type = 'generated'`, CurrentAppDBKeyUID)
+
+	var walletRootAddress e_types.Address
+	err = sqlTx.QueryRow(`SELECT wallet_root_address FROM settings WHERE synthetic_id='id'`).Scan(&walletRootAddress)
+	if err == sql.ErrNoRows {
+		// we shouldn't reach here, but if we do, it probably happened from the test
+		log.Warn("Migrating accounts: no wallet_root_address found in settings")
+		return nil
+	}
 	if err != nil {
-		log.Error("Migrating accounts: failed to update key_uid", "err", err.Error())
+		log.Error("Migrating accounts: failed to get wallet_root_address", "err", err.Error())
+		return err
+	}
+	_, err = sqlTx.Exec(`UPDATE accounts SET key_uid = ?, derived_from = ? WHERE type = '' OR type = 'generated'`, CurrentAppDBKeyUID, walletRootAddress.Hex())
+	if err != nil {
+		log.Error("Migrating accounts: failed to update key_uid/derived_from", "err", err.Error())
+		return err
 	}
 	return nil
 }
