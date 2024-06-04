@@ -475,13 +475,12 @@ func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password
 	if err != nil {
 		// Stop node for clean up
 		_ = b.StopNode()
-		return err
 	}
 	// get logged in
-	if !b.LocalPairingStateManager.IsPairing() {
-		return b.LoggedIn(acc.KeyUID, err)
+	if b.LocalPairingStateManager.IsPairing() {
+		return nil
 	}
-	return nil
+	return b.LoggedIn(acc.KeyUID, err)
 }
 
 func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n *params.NodeConfig) (*params.NodeConfig, error) {
