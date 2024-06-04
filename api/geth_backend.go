@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go.uber.org/zap"
 	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/sqlite"
