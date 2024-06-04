@@ -1,10 +1,15 @@
+//go:build android || ios
+// +build android ios
+
 package communities
 
 import (
+	"crypto/ecdsa"
 	"time"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/transport"
 
 	"go.uber.org/zap"
@@ -13,6 +18,16 @@ import (
 type TorrentManagerMobile struct {
 	ArchiveManagerMobile
 	logger *zap.Logger
+}
+
+// NewTorrentManager this function is only built and called when the "android || ios" build OS criteria are met
+// In this case this version of NewTorrentManager will return the mobile "nil" TorrentManagerMobile ensuring that the
+// build command will not import or build the torrent deps for the mobile OS.
+// NOTE: It is intentional that this file contains the identical function name as in "manager_torrent.go"
+func NewTorrentManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) (TorrentContract, error) {
+	return &TorrentManagerMobile{
+		logger: logger,
+	}, nil
 }
 
 func (tmm *TorrentManagerMobile) LogStdout(input string, fields ...zap.Field) {

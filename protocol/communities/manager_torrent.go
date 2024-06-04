@@ -1,3 +1,6 @@
+//go:build windows || linux || darwin
+// +build windows linux darwin
+
 package communities
 
 import (
@@ -96,7 +99,11 @@ type TorrentManager struct {
 	publisher Publisher
 }
 
-func NewTorrentManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) (*TorrentManager, error) {
+// NewTorrentManager this function is only built and called when the "windows || linux || darwin" build OS criteria are met
+// In this case this version of NewTorrentManager will return the full Desktop TorrentManager ensuring that the
+// build command will import and build the torrent deps for the Desktop OSes.
+// NOTE: It is intentional that this file contains the identical function name as in "manager_torrent_mobile.go"
+func NewTorrentManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) (TorrentContract, error) {
 	stdoutLogger, err := zap.NewDevelopment()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create archive logger %w", err)
