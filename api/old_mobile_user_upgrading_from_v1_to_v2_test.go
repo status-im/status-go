@@ -2,18 +2,20 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/suite"
-
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
+	"github.com/status-im/status-go/sqlite"
+
+	"github.com/stretchr/testify/suite"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/utils"
 )
 
@@ -179,9 +181,52 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradin
 }
 
 func (s *OldMobileUserUpgradingFromV1ToV2Test) TestFixMissingKeyUIDForAccounts() {
-	// prepare an empty database
-	_, err := appdatabase.InitializeDB(sqlite.InMemoryPath, "1234567890", dbsetup.ReducedKDFIterationsNumber)
-	// sql.ErrNoRows is expected here when query with: `SELECT wallet_root_address FROM settings WHERE synthetic_id='id'`
-	// but fixMissingKeyUIDForAccounts should return nil
+	db, err := sqlite.OpenDB(sqlite.InMemoryPath, "1234567890", dbsetup.ReducedKDFIterationsNumber)
 	s.Require().NoError(err)
+	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
+	s.Require().NoError(err)
+	s.Require().ErrorContains(appdatabase.FixMissingKeyUIDForAccounts(tx), "no such table: accounts")
+	s.Require().NoError(tx.Rollback())
+
+	_, err = db.Exec(`
+create table accounts
+(
+    address      VARCHAR not null primary key,
+    wallet       BOOLEAN,
+    chat         BOOLEAN,
+    type         TEXT,
+    storage      TEXT,
+    pubkey       BLOB,
+    path         TEXT,
+    name         TEXT,
+    color        TEXT,
+    created_at   DATETIME           not null,
+    updated_at   DATETIME           not null,
+    hidden       BOOL default FALSE not null,
+    emoji        TEXT default ""    not null,
+    derived_from TEXT default ""    not null,
+    clock        INT  default 0     not null
+) without rowid;`)
+	s.Require().NoError(err)
+	tx, err = db.BeginTx(context.Background(), &sql.TxOptions{})
+	s.Require().NoError(err)
+	s.Require().ErrorContains(appdatabase.FixMissingKeyUIDForAccounts(tx), "no such table: settings")
+	s.Require().NoError(tx.Rollback())
+
+	_, err = db.Exec(`
+create table settings
+(
+    address                               VARCHAR                    not null,
+    key_uid                               VARCHAR                    not null,
+    latest_derived_path                   UNSIGNED INT default 0,
+    public_key                            VARCHAR                    not null,
+    synthetic_id                          VARCHAR      default 'id'  not null primary key,
+    wallet_root_address                   VARCHAR                    not null
+) without rowid;`)
+	s.Require().NoError(err)
+	tx, err = db.BeginTx(context.Background(), &sql.TxOptions{})
+	s.Require().NoError(err)
+	// no rows in `settings` table, but we expect no error
+	s.Require().NoError(appdatabase.FixMissingKeyUIDForAccounts(tx))
+	s.Require().NoError(tx.Commit())
 }
