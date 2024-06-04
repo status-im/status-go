@@ -141,10 +141,15 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 	s.identity = identity
 
 	dataDir := filepath.Clean(s.config.ShhextConfig.BackupDisabledDataDir)
+	logger.Warn("mkdatadir", zap.String("dataDir", dataDir))
 
-	if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
-		return err
+	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
+			logger.Warn("mkdatadir MkdirAllERR", zap.Error(err))
+			return err
+		}
 	}
+	logger.Warn("mkdatadir osStat ERR", zap.Error(err))
 
 	envelopesMonitorConfig := &transport.EnvelopesMonitorConfig{
 		MaxAttempts:                      s.config.ShhextConfig.MaxMessageDeliveryAttempts,

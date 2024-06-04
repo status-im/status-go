@@ -1753,6 +1753,13 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 	conf.RootDataDir = b.rootDataDir
 	conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
 
+	b.log.Warn("inspect BackupDisabledDataDir",
+		"BackupDisabledDataDir", conf.ShhextConfig.BackupDisabledDataDir,
+		"b.rootDataDir", b.rootDataDir,
+		"joined", filepath.Join(b.rootDataDir, conf.ShhextConfig.BackupDisabledDataDir),
+		"BackupDisabledDataDir isabs", filepath.IsAbs(conf.ShhextConfig.BackupDisabledDataDir),
+		"rootDataDir isabs", filepath.IsAbs(b.rootDataDir))
+
 	backupDir := conf.ShhextConfig.BackupDisabledDataDir
 	if !filepath.IsAbs(backupDir) {
 		backupDir = filepath.Join(b.rootDataDir, backupDir)
