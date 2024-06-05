@@ -381,7 +381,6 @@ func TestWakuV2Filter(t *testing.T) {
 	// Mock peers going down
 	_, err = w.node.FilterLightnode().UnsubscribeWithSubscription(w.ctx, subscriptions[0])
 	require.NoError(t, err)
-	close(subscriptions[0].Closing)
 
 	//subscriptions[0].Close()
 

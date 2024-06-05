@@ -63,7 +63,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/legacy_store/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
-	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/connection"
@@ -490,7 +489,7 @@ func (w *Waku) GetStats() types.StatsSummary {
 	}
 }
 
-func (w *Waku) runPeerExchangeLoop() {
+/* func (w *Waku) runPeerExchangeLoop() {
 	defer w.wg.Done()
 	if !w.cfg.EnablePeerExchangeClient {
 		// Currently peer exchange client is only used for light nodes
@@ -534,7 +533,7 @@ func (w *Waku) runPeerExchangeLoop() {
 			}
 		}
 	}
-}
+} */
 
 func (w *Waku) getPubsubTopic(topic string) string {
 	if topic == "" || !w.cfg.UseShardAsDefaultTopic {
@@ -1093,6 +1092,47 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 	return
 }
 
+func (w *Waku) lightClientConnectionStatus() {
+	w.connStatusMu.Lock()
+
+	peers := w.node.Host().Network().Peers()
+	peersByPubSubTopic := w.node.Host().Peerstore().(wps.WakuPeerstore).PeersByPubSubTopics([]string{w.cfg.DefaultShardPubsubTopic})
+
+	w.logger.Debug("peer stats",
+		zap.Int("peersCount", len(peers)), zap.Int("peersByPubSubTopic", len(peersByPubSubTopic)))
+	//subs := w.node.FilterLightnode().Subscriptions()
+	//w.logger.Debug("filter subs count", zap.Int("count", len(subs)))
+	isOnline := false
+	if len(peers) > 0 {
+		isOnline = true
+	}
+	connStatus := types.ConnStatus{
+		IsOnline: isOnline,
+		Peers:    FormatPeerStats(w.node),
+	}
+	for k, subs := range w.connStatusSubscriptions {
+		if !subs.Send(connStatus) {
+			delete(w.connStatusSubscriptions, k)
+		}
+	}
+	w.connStatusMu.Unlock()
+	if w.onPeerStats != nil {
+		w.onPeerStats(connStatus)
+	}
+	//TODOL needs fixing, right now invoking everytime.
+	//Trigger FilterManager to take care of any pending filter subscriptions
+	//TODO: Pass pubsubTopic based on topicHealth notif received.
+	go w.filterManager.onConnectionStatusChange(w.cfg.DefaultShardPubsubTopic, isOnline)
+
+	if w.offline && isOnline {
+		if err := w.discoverAndConnectPeers(); err != nil {
+			w.logger.Error("failed to add wakuv2 peers", zap.Error(err))
+		}
+	}
+
+	w.offline = !isOnline
+}
+
 // Start implements node.Service, starting the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Start() error {
@@ -1147,33 +1187,7 @@ func (w *Waku) Start() error {
 				//This needs to be enhanced to be based on healthy Filter and lightPush peers available for each shard.
 				//This would get fixed as part of https://github.com/waku-org/go-waku/issues/1114
 				if w.cfg.LightClient {
-					w.connStatusMu.Lock()
-
-					peers := w.node.Host().Network().Peers()
-					w.logger.Debug("peer stats",
-						zap.Int("peersCount", len(peers)))
-					isOnline := false
-					if len(peers) > 0 {
-						isOnline = true
-					}
-					connStatus := types.ConnStatus{
-						IsOnline: isOnline,
-						Peers:    FormatPeerStats(w.node),
-					}
-					for k, subs := range w.connStatusSubscriptions {
-						if !subs.Send(connStatus) {
-							delete(w.connStatusSubscriptions, k)
-						}
-					}
-					w.connStatusMu.Unlock()
-					if w.onPeerStats != nil {
-						w.onPeerStats(connStatus)
-					}
-					if connStatus.IsOnline {
-						//Trigger FilterManager to take care of any pending filter subscriptions
-						//TODO: Pass pubsubTopic based on topicHealth notif received.
-						w.filterManager.onConnectionStatusChange(w.cfg.DefaultShardPubsubTopic, true)
-					}
+					w.lightClientConnectionStatus()
 				}
 			case c := <-w.topicHealthStatusChan:
 				w.connStatusMu.Lock()
@@ -1203,7 +1217,9 @@ func (w *Waku) Start() error {
 	}()
 
 	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL)
-	go w.runPeerExchangeLoop()
+	//TODO: commenting for now so that only fleet nodes are used.
+	//Need to uncomment once filter peer scoring etc is implemented.
+	//go w.runPeerExchangeLoop()
 
 	if w.cfg.LightClient {
 		// Create FilterManager that will main peer connectivity
