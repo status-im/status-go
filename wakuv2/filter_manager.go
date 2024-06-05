@@ -93,8 +93,8 @@ func (mgr *FilterManager) subscribeAndRunLoop(f filterConfig) {
 }
 
 func (mgr *FilterManager) onConnectionStatusChange(pubsubTopic string, newStatus bool) {
-	/*mgr.logger.Debug("inside onConnectionStatusChange", zap.Bool("newStatus", newStatus),
-	zap.Int("filtersCount", len(mgr.filters)), zap.Int("filterQueueLen", len(mgr.filterQueue)))*/
+	mgr.logger.Debug("inside onConnectionStatusChange", zap.Bool("newStatus", newStatus),
+		zap.Int("filtersCount", len(mgr.filters)), zap.Int("filterQueueLen", len(mgr.filterQueue)))
 	//TODO: Move this logic to a regular loop which checks if peers are available and subscribes.
 	if newStatus { //Online
 		if len(mgr.filterQueue) > 0 {
@@ -109,6 +109,7 @@ func (mgr *FilterManager) onConnectionStatusChange(pubsubTopic string, newStatus
 			}
 		}
 	} else if !newStatus && mgr.peersAvailable { //Offline
+		mgr.logger.Info("going offline, removing all filter subscriptions")
 		mgr.Lock()
 		for filterID, subDetails := range mgr.filters {
 			mgr.logger.Debug("unsubscribing filter", zap.String("filterID", filterID), zap.Stringer("contentFilter", subDetails.sub.ContentFilter))

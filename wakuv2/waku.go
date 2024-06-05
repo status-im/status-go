@@ -1171,7 +1171,7 @@ func (w *Waku) Start() error {
 		}
 	}
 
-	w.wg.Add(2)
+	w.wg.Add(1)
 
 	go func() {
 		defer w.wg.Done()
