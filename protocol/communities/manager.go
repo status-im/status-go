@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"golang.org/x/exp/slices"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -1768,14 +1769,47 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 		return nil, nil, err
 	}
 
+	// Check for channel permissions
+	changes := community.emptyCommunityChanges()
+	for tokenPermissionID, tokenPermission := range community.tokenPermissions() {
+		if !slices.Contains(tokenPermission.GetChatIds(), chatID) {
+			continue
+		}
+
+		if len(tokenPermission.GetChatIds()) == 1 {
+			// Delete channel permission, if there is only one channel
+			deletePermissionChanges, err := community.DeleteTokenPermission(tokenPermissionID)
+			if err != nil {
+				return nil, nil, err
+			}
+			changes.Merge(deletePermissionChanges)
+		} else {
+			// Remove the channel from the permission, if there are other channels
+			for i, id := range tokenPermission.GetChatIds() {
+				if id == chatID {
+					tokenPermission.ChatIds = append(tokenPermission.GetChatIds()[:i], tokenPermission.GetChatIds()[i+1:]...)
+					break
+				}
+			}
+
+			updatePermissionChanges, err := community.UpsertTokenPermission(tokenPermission.CommunityTokenPermission)
+			if err != nil {
+				return nil, nil, err
+			}
+			changes.Merge(updatePermissionChanges)
+		}
+	}
+
 	// Remove communityID prefix from chatID if exists
 	if strings.HasPrefix(chatID, communityID.String()) {
 		chatID = strings.TrimPrefix(chatID, communityID.String())
 	}
-	changes, err := community.DeleteChat(chatID)
+
+	deleteChanges, err := community.DeleteChat(chatID)
 	if err != nil {
 		return nil, nil, err
 	}
+	changes.Merge(deleteChanges)
 
 	err = m.saveAndPublish(community)
 	if err != nil {
