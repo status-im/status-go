@@ -19,6 +19,7 @@ const (
 	MultiTransactionDBSend        = iota
 	MultiTransactionDBSwap
 	MultiTransactionDBBridge
+	MultiTransactionDBApprove
 )
 
 func mtDBTypeToMTType(mtDBType MultiTransactionDBType) MultiTransactionType {

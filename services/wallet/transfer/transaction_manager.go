@@ -84,6 +84,7 @@ const (
 	MultiTransactionSend = iota
 	MultiTransactionSwap
 	MultiTransactionBridge
+	MultiTransactionApprove
 	MultiTransactionTypeInvalid = 255
 )
 

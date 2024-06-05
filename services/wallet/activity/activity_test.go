@@ -606,7 +606,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 	}, entries[0])
 }
 
-func countTypes(entries []Entry) (sendCount, receiveCount, contractCount, mintCount, swapCount, buyCount, bridgeCount int) {
+func countTypes(entries []Entry) (sendCount, receiveCount, contractCount, mintCount, swapCount, buyCount, bridgeCount, approveCount int) {
 	for _, entry := range entries {
 		switch entry.activityType {
 		case SendAT:
@@ -623,6 +623,8 @@ func countTypes(entries []Entry) (sendCount, receiveCount, contractCount, mintCo
 			contractCount++
 		case MintAT:
 			mintCount++
+		case ApproveAT:
+			approveCount++
 		}
 	}
 	return
@@ -634,14 +636,15 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 
 	// Adds 4 extractable transactions
 	td, tdFromAdds, tdToAddrs := fillTestData(t, deps.db)
-	// Add 5 extractable transactions: one MultiTransactionSwap, two MultiTransactionBridge and two MultiTransactionSend
-	multiTxs := make([]transfer.MultiTransaction, 5)
+	// Add 6 extractable transactions: one MultiTransactionSwap, two MultiTransactionBridge, two MultiTransactionSend and one MultiTransactionApprove
+	multiTxs := make([]transfer.MultiTransaction, 6)
 	trs, fromAddrs, toAddrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, len(multiTxs)*2)
 	multiTxs[0] = transfer.GenerateTestBridgeMultiTransaction(trs[0], trs[1])
 	multiTxs[1] = transfer.GenerateTestSwapMultiTransaction(trs[2], testutils.SntSymbol, 100) // trs[3]
 	multiTxs[2] = transfer.GenerateTestSendMultiTransaction(trs[4])                           // trs[5]
 	multiTxs[3] = transfer.GenerateTestBridgeMultiTransaction(trs[6], trs[7])
-	multiTxs[4] = transfer.GenerateTestSendMultiTransaction(trs[8]) // trs[9]
+	multiTxs[4] = transfer.GenerateTestSendMultiTransaction(trs[8])     // trs[9]
+	multiTxs[5] = transfer.GenerateTestApproveMultiTransaction(trs[10]) // trs[11]
 
 	var lastMT common.MultiTransactionIDType
 	for i := range trs {
@@ -684,10 +687,10 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 
 	filter.Types = allActivityTypesFilter()
 	// Set tr1 to Receive and pendingTr to Send; rest of two MT remain default Send
-	addresses := []eth.Address{td.tr1.To, td.pendingTr.From, td.multiTx1.FromAddress, td.multiTx2.FromAddress, trs[0].From, trs[2].From, trs[4].From, trs[6].From, trs[8].From, trsSpecial[0].To, trsSpecial[1].To, trsSpecial[2].From}
+	addresses := []eth.Address{td.tr1.To, td.pendingTr.From, td.multiTx1.FromAddress, td.multiTx2.FromAddress, trs[0].From, trs[2].From, trs[4].From, trs[6].From, trs[8].From, trs[10].From, trsSpecial[0].To, trsSpecial[1].To, trsSpecial[2].From}
 	entries, err := getActivityEntries(context.Background(), deps, addresses, false, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
-	require.Equal(t, 12, len(entries))
+	require.Equal(t, 13, len(entries))
 
 	filter.Types = []Type{SendAT, SwapAT}
 	entries, err = getActivityEntries(context.Background(), deps, addresses, false, []common.ChainID{}, filter, 0, 15)
@@ -696,7 +699,7 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 	// 3 from td Send + 2 trs MT Send + 1 (swap)
 	require.Equal(t, 6, len(entries))
 
-	sendCount, receiveCount, contractCount, mintCount, swapCount, _, bridgeCount := countTypes(entries)
+	sendCount, receiveCount, contractCount, mintCount, swapCount, _, bridgeCount, approveCount := countTypes(entries)
 
 	require.Equal(t, 5, sendCount)
 	require.Equal(t, 0, receiveCount)
@@ -704,45 +707,63 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 	require.Equal(t, 0, mintCount)
 	require.Equal(t, 1, swapCount)
 	require.Equal(t, 0, bridgeCount)
+	require.Equal(t, 0, approveCount)
 
 	filter.Types = []Type{BridgeAT, ReceiveAT}
 	entries, err = getActivityEntries(context.Background(), deps, addresses, false, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
 
-	sendCount, receiveCount, contractCount, mintCount, swapCount, _, bridgeCount = countTypes(entries)
+	sendCount, receiveCount, contractCount, mintCount, swapCount, _, bridgeCount, approveCount = countTypes(entries)
 	require.Equal(t, 0, sendCount)
 	require.Equal(t, 1, receiveCount)
 	require.Equal(t, 0, contractCount)
 	require.Equal(t, 0, mintCount)
 	require.Equal(t, 0, swapCount)
 	require.Equal(t, 2, bridgeCount)
+	require.Equal(t, 0, approveCount)
 
 	filter.Types = []Type{MintAT}
 	entries, err = getActivityEntries(context.Background(), deps, addresses, false, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(entries))
 
-	sendCount, receiveCount, contractCount, mintCount, swapCount, _, bridgeCount = countTypes(entries)
+	sendCount, receiveCount, contractCount, mintCount, swapCount, _, bridgeCount, approveCount = countTypes(entries)
 	require.Equal(t, 0, sendCount)
 	require.Equal(t, 0, receiveCount)
 	require.Equal(t, 0, contractCount)
 	require.Equal(t, 2, mintCount)
 	require.Equal(t, 0, swapCount)
 	require.Equal(t, 0, bridgeCount)
+	require.Equal(t, 0, approveCount)
 
 	filter.Types = []Type{ContractDeploymentAT}
 	entries, err = getActivityEntries(context.Background(), deps, addresses, false, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(entries))
 
-	sendCount, receiveCount, contractCount, mintCount, swapCount, _, bridgeCount = countTypes(entries)
+	sendCount, receiveCount, contractCount, mintCount, swapCount, _, bridgeCount, approveCount = countTypes(entries)
 	require.Equal(t, 0, sendCount)
 	require.Equal(t, 0, receiveCount)
 	require.Equal(t, 1, contractCount)
 	require.Equal(t, 0, mintCount)
 	require.Equal(t, 0, swapCount)
 	require.Equal(t, 0, bridgeCount)
+	require.Equal(t, 0, approveCount)
+
+	filter.Types = []Type{ApproveAT}
+	entries, err = getActivityEntries(context.Background(), deps, addresses, false, []common.ChainID{}, filter, 0, 15)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(entries))
+
+	sendCount, receiveCount, contractCount, mintCount, swapCount, _, bridgeCount, approveCount = countTypes(entries)
+	require.Equal(t, 0, sendCount)
+	require.Equal(t, 0, receiveCount)
+	require.Equal(t, 0, contractCount)
+	require.Equal(t, 0, mintCount)
+	require.Equal(t, 0, swapCount)
+	require.Equal(t, 0, bridgeCount)
+	require.Equal(t, 1, approveCount)
 
 	// Filter with all addresses regression
 	filter.Types = []Type{SendAT}
