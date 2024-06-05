@@ -62,8 +62,8 @@ func (q *acceptQueue[T]) Chan() <-chan struct{} { return q.c }
 
 type Session struct {
 	sessionID  sessionID
-	qconn      http3.StreamCreator
-	requestStr quic.Stream
+	qconn      http3.Connection
+	requestStr http3.Stream
 
 	streamHdr    []byte
 	uniStreamHdr []byte
@@ -82,8 +82,8 @@ type Session struct {
 	streams streamsMap
 }
 
-func newSession(sessionID sessionID, qconn http3.StreamCreator, requestStr quic.Stream) *Session {
-	tracingID := qconn.Context().Value(quic.ConnectionTracingKey).(uint64)
+func newSession(sessionID sessionID, qconn http3.Connection, requestStr http3.Stream) *Session {
+	tracingID := qconn.Context().Value(quic.ConnectionTracingKey).(quic.ConnectionTracingID)
 	ctx, ctxCancel := context.WithCancel(context.WithValue(context.Background(), quic.ConnectionTracingKey, tracingID))
 	c := &Session{
 		sessionID:       sessionID,
@@ -112,10 +112,10 @@ func newSession(sessionID sessionID, qconn http3.StreamCreator, requestStr quic.
 }
 
 func (s *Session) handleConn() {
-	var closeErr *ConnectionError
+	var closeErr *SessionError
 	err := s.parseNextCapsule()
 	if !errors.As(err, &closeErr) {
-		closeErr = &ConnectionError{Remote: true}
+		closeErr = &SessionError{Remote: true}
 	}
 
 	s.closeMx.Lock()
@@ -131,7 +131,7 @@ func (s *Session) handleConn() {
 }
 
 // parseNextCapsule parses the next Capsule sent on the request stream.
-// It returns a ConnectionError, if the capsule received is a CLOSE_WEBTRANSPORT_SESSION Capsule.
+// It returns a SessionError, if the capsule received is a CLOSE_WEBTRANSPORT_SESSION Capsule.
 func (s *Session) parseNextCapsule() error {
 	for {
 		// TODO: enforce max size
@@ -150,7 +150,7 @@ func (s *Session) parseNextCapsule() error {
 			if err != nil {
 				return err
 			}
-			return &ConnectionError{
+			return &SessionError{
 				Remote:    true,
 				ErrorCode: SessionErrorCode(appErrCode),
 				Message:   string(appErrMsg),
@@ -390,6 +390,14 @@ func (s *Session) CloseWithError(code SessionErrorCode, msg string) error {
 	return err
 }
 
+func (s *Session) SendDatagram(b []byte) error {
+	return s.requestStr.SendDatagram(b)
+}
+
+func (s *Session) ReceiveDatagram(ctx context.Context) ([]byte, error) {
+	return s.requestStr.ReceiveDatagram(ctx)
+}
+
 func (s *Session) closeWithError(code SessionErrorCode, msg string) (bool /* first call to close session */, error) {
 	s.closeMx.Lock()
 	defer s.closeMx.Unlock()
@@ -397,7 +405,7 @@ func (s *Session) closeWithError(code SessionErrorCode, msg string) (bool /* fir
 	if s.closeErr != nil {
 		return false, nil
 	}
-	s.closeErr = &ConnectionError{
+	s.closeErr = &SessionError{
 		ErrorCode: code,
 		Message:   msg,
 	}
@@ -413,6 +421,6 @@ func (s *Session) closeWithError(code SessionErrorCode, msg string) (bool /* fir
 	)
 }
 
-func (c *Session) ConnectionState() quic.ConnectionState {
-	return c.qconn.ConnectionState()
+func (s *Session) ConnectionState() quic.ConnectionState {
+	return s.qconn.ConnectionState()
 }

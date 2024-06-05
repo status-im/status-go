@@ -108,6 +108,14 @@ func (s *SubscriptionDetails) Close() error {
 	return s.mapRef.Delete(s)
 }
 
+func (s *SubscriptionDetails) SetClosing() {
+	s.Lock()
+	defer s.Unlock()
+	if !s.Closed {
+		s.Closing <- true
+	}
+}
+
 func (s *SubscriptionDetails) MarshalJSON() ([]byte, error) {
 	result := struct {
 		PeerID        peer.ID  `json:"peerID"`

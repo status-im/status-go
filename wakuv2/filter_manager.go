@@ -32,6 +32,15 @@ type FilterManager struct {
 	onNewEnvelopes func(env *protocol.Envelope) error
 	logger         *zap.Logger
 	node           *filter.WakuFilterLightNode
+	peersAvailable bool
+	filterQueue    chan filterDetails
+}
+
+const filterQueueSize = 1000
+
+type filterDetails struct {
+	ID            string
+	contentFilter protocol.ContentFilter
 }
 
 func newFilterManager(ctx context.Context, logger *zap.Logger, cfg *Config, onNewEnvelopes func(env *protocol.Envelope) error, node *filter.WakuFilterLightNode) *FilterManager {
@@ -43,21 +52,47 @@ func newFilterManager(ctx context.Context, logger *zap.Logger, cfg *Config, onNe
 	mgr.onNewEnvelopes = onNewEnvelopes
 	mgr.filters = make(map[string]func())
 	mgr.node = node
+	mgr.peersAvailable = false
+	mgr.filterQueue = make(chan filterDetails, filterQueueSize)
 	return mgr
 }
 
 func (mgr *FilterManager) addFilter(filterID string, f *common.Filter) {
 	mgr.Lock()
 	defer mgr.Unlock()
-	ctx, cancel := context.WithCancel(mgr.ctx)
-	mgr.filters[filterID] = cancel
 	contentFilter := mgr.buildContentFilter(f.PubsubTopic, f.ContentTopics)
-	config := api.FilterConfig{MaxPeers: mgr.cfg.MinPeersForFilter}
-	sub, err := api.Subscribe(ctx, mgr.node, contentFilter, config, mgr.logger)
-	if err == nil {
-		go mgr.runFilterSubscriptionLoop(sub)
+	if mgr.peersAvailable {
+		go mgr.subscribeAndRunLoop(filterDetails{filterID, contentFilter})
+	} else {
+		mgr.filterQueue <- filterDetails{filterID, contentFilter}
 	}
+}
 
+func (mgr *FilterManager) subscribeAndRunLoop(f filterDetails) {
+	ctx, cancel := context.WithCancel(mgr.ctx)
+	mgr.Lock()
+	mgr.filters[f.ID] = cancel
+	mgr.Unlock()
+	config := api.FilterConfig{MaxPeers: mgr.cfg.MinPeersForFilter}
+
+	sub, err := api.Subscribe(ctx, mgr.node, f.contentFilter, config, mgr.logger)
+	if err == nil {
+		mgr.runFilterSubscriptionLoop(sub)
+	}
+}
+
+func (mgr *FilterManager) onConnectionStatusChange(pubsubTopic string, newStatus bool) {
+	//As of now nothing to be done in case of loss of connection as Filter subscription API would take care of it.
+	if newStatus == true {
+		mgr.peersAvailable = true
+		//Check if any filter subs are pending and subscribe them
+		for filter := range mgr.filterQueue {
+			go mgr.subscribeAndRunLoop(filter)
+			if len(mgr.filterQueue) == 0 {
+				break
+			}
+		}
+	}
 }
 
 func (mgr *FilterManager) removeFilter(filterID string) {

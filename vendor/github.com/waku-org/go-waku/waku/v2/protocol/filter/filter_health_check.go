@@ -26,9 +26,8 @@ func (wf *WakuFilterLightNode) PingPeer(peer peer.ID) {
 		subscriptions := wf.subscriptions.GetAllSubscriptionsForPeer(peer)
 		for _, subscription := range subscriptions {
 			wf.log.Debug("Notifying sub closing", zap.String("subID", subscription.ID))
-
 			//Indicating that subscription is closing,
-			subscription.Closing <- true
+			subscription.SetClosing()
 		}
 	}
 }

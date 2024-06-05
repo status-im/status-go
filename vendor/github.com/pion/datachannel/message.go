@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package datachannel
 
 import (
@@ -8,6 +11,7 @@ import (
 type message interface {
 	Marshal() ([]byte, error)
 	Unmarshal([]byte) error
+	String() string
 }
 
 // messageType is the first byte in a DataChannel message that specifies type

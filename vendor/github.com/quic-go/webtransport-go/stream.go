@@ -200,7 +200,10 @@ func maybeConvertStreamError(err error) error {
 		if cerr != nil {
 			return fmt.Errorf("stream reset, but failed to convert stream error %d: %w", streamErr.ErrorCode, cerr)
 		}
-		return &StreamError{ErrorCode: errorCode}
+		return &StreamError{
+			ErrorCode: errorCode,
+			Remote:    streamErr.Remote,
+		}
 	}
 	return err
 }

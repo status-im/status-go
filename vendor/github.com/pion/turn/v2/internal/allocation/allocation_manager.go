@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package allocation
 
 import (
@@ -27,7 +30,7 @@ type Manager struct {
 	lock sync.RWMutex
 	log  logging.LeveledLogger
 
-	allocations  map[string]*Allocation
+	allocations  map[FiveTupleFingerprint]*Allocation
 	reservations []*reservation
 
 	allocatePacketConn func(network string, requestedPort int) (net.PacketConn, net.Addr, error)
@@ -48,7 +51,7 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 
 	return &Manager{
 		log:                config.LeveledLogger,
-		allocations:        make(map[string]*Allocation, 64),
+		allocations:        make(map[FiveTupleFingerprint]*Allocation, 64),
 		allocatePacketConn: config.AllocatePacketConn,
 		allocateConn:       config.AllocateConn,
 		permissionHandler:  config.PermissionHandler,
@@ -110,7 +113,7 @@ func (m *Manager) CreateAllocation(fiveTuple *FiveTuple, turnSocket net.PacketCo
 	a.RelaySocket = conn
 	a.RelayAddr = relayAddr
 
-	m.log.Debugf("listening on relay addr: %s", a.RelayAddr.String())
+	m.log.Debugf("Listening on relay address: %s", a.RelayAddr)
 
 	a.lifetimeTimer = time.AfterFunc(lifetime, func() {
 		m.DeleteAllocation(a.fiveTuple)
@@ -202,7 +205,7 @@ func (m *Manager) GetRandomEvenPort() (int, error) {
 // GrantPermission handles permission requests by calling the permission handler callback
 // associated with the TURN server listener socket
 func (m *Manager) GrantPermission(sourceAddr net.Addr, peerIP net.IP) error {
-	// no permission handler: open
+	// No permission handler: open
 	if m.permissionHandler == nil {
 		return nil
 	}

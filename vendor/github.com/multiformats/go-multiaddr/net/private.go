@@ -44,8 +44,21 @@ var unroutableCIDR4 = []string{
 	"255.255.255.255/32",
 }
 var unroutableCIDR6 = []string{
-	"ff00::/8",
+	"ff00::/8",      // multicast
+	"2001:db8::/32", // documentation
 }
+
+var globalUnicast []*net.IPNet
+var globalUnicastCIDR6 = []string{
+	"2000::/3",
+}
+
+var nat64CIDRs = []string{
+	"64:ff9b:1::/48", // RFC 8215
+	"64:ff9b::/96",   // RFC 6052
+}
+
+var nat64 []*net.IPNet
 
 // unResolvableDomains do not resolve to an IP address.
 // Ref: https://en.wikipedia.org/wiki/Special-use_domain_name#Reserved_domain_names
@@ -82,6 +95,8 @@ func init() {
 	Private6 = parseCIDR(privateCIDR6)
 	Unroutable4 = parseCIDR(unroutableCIDR4)
 	Unroutable6 = parseCIDR(unroutableCIDR6)
+	globalUnicast = parseCIDR(globalUnicastCIDR6)
+	nat64 = parseCIDR(nat64CIDRs)
 }
 
 func parseCIDR(cidrs []string) []*net.IPNet {
@@ -109,7 +124,23 @@ func IsPublicAddr(a ma.Multiaddr) bool {
 			isPublic = !inAddrRange(ip, Private4) && !inAddrRange(ip, Unroutable4)
 		case ma.P_IP6:
 			ip := net.IP(c.RawValue())
-			isPublic = !inAddrRange(ip, Private6) && !inAddrRange(ip, Unroutable6)
+			// IP6 documentation prefix(part of Unroutable6) is a subset of the ip6
+			// global unicast allocation so we ensure that it's not a documentation
+			// prefix by diffing with Unroutable6
+			isPublicUnicastAddr := inAddrRange(ip, globalUnicast) && !inAddrRange(ip, Unroutable6)
+			if isPublicUnicastAddr {
+				isPublic = true
+				return false
+			}
+			// The WellKnown NAT64 prefix(RFC 6052) can only reference a public IPv4
+			// address.
+			// The Local use NAT64 prefix(RFC 8215) can reference private IPv4
+			// addresses. But since the translation from Local use NAT64 prefix to IPv4
+			// address is left to the user we have no way of knowing which IPv4 address
+			// is referenced. We count these as Public addresses because a false
+			// negative for this method here is generally worse than a false positive.
+			isPublic = inAddrRange(ip, nat64)
+			return false
 		case ma.P_DNS, ma.P_DNS4, ma.P_DNS6, ma.P_DNSADDR:
 			dnsAddr := c.Value()
 			isPublic = true

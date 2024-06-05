@@ -25,13 +25,13 @@ type sessionManager struct {
 	timeout time.Duration
 
 	mx    sync.Mutex
-	conns map[http3.StreamCreator]map[sessionID]*session
+	conns map[quic.ConnectionTracingID]map[sessionID]*session
 }
 
 func newSessionManager(timeout time.Duration) *sessionManager {
 	m := &sessionManager{
 		timeout: timeout,
-		conns:   make(map[http3.StreamCreator]map[sessionID]*session),
+		conns:   make(map[quic.ConnectionTracingID]map[sessionID]*session),
 	}
 	m.ctx, m.ctxCancel = context.WithCancel(context.Background())
 	return m
@@ -41,8 +41,8 @@ func newSessionManager(timeout time.Duration) *sessionManager {
 // If the WebTransport session has not yet been established,
 // it starts a new go routine and waits for establishment of the session.
 // If that takes longer than timeout, the stream is reset.
-func (m *sessionManager) AddStream(qconn http3.StreamCreator, str quic.Stream, id sessionID) {
-	sess, isExisting := m.getOrCreateSession(qconn, id)
+func (m *sessionManager) AddStream(connTracingID quic.ConnectionTracingID, str quic.Stream, id sessionID) {
+	sess, isExisting := m.getOrCreateSession(connTracingID, id)
 	if isExisting {
 		sess.conn.addIncomingStream(str)
 		return
@@ -60,19 +60,19 @@ func (m *sessionManager) AddStream(qconn http3.StreamCreator, str quic.Stream, i
 		// Once no more streams are waiting for this session to be established,
 		// and this session is still outstanding, delete it from the map.
 		if sess.counter == 0 && sess.conn == nil {
-			m.maybeDelete(qconn, id)
+			m.maybeDelete(connTracingID, id)
 		}
 	}()
 }
 
-func (m *sessionManager) maybeDelete(qconn http3.StreamCreator, id sessionID) {
-	sessions, ok := m.conns[qconn]
+func (m *sessionManager) maybeDelete(connTracingID quic.ConnectionTracingID, id sessionID) {
+	sessions, ok := m.conns[connTracingID]
 	if !ok { // should never happen
 		return
 	}
 	delete(sessions, id)
 	if len(sessions) == 0 {
-		delete(m.conns, qconn)
+		delete(m.conns, connTracingID)
 	}
 }
 
@@ -80,14 +80,14 @@ func (m *sessionManager) maybeDelete(qconn http3.StreamCreator, id sessionID) {
 // If the WebTransport session has not yet been established,
 // it starts a new go routine and waits for establishment of the session.
 // If that takes longer than timeout, the stream is reset.
-func (m *sessionManager) AddUniStream(qconn http3.StreamCreator, str quic.ReceiveStream) {
+func (m *sessionManager) AddUniStream(connTracingID quic.ConnectionTracingID, str quic.ReceiveStream) {
 	idv, err := quicvarint.Read(quicvarint.NewReader(str))
 	if err != nil {
 		str.CancelRead(1337)
 	}
 	id := sessionID(idv)
 
-	sess, isExisting := m.getOrCreateSession(qconn, id)
+	sess, isExisting := m.getOrCreateSession(connTracingID, id)
 	if isExisting {
 		sess.conn.addIncomingUniStream(str)
 		return
@@ -105,19 +105,19 @@ func (m *sessionManager) AddUniStream(qconn http3.StreamCreator, str quic.Receiv
 		// Once no more streams are waiting for this session to be established,
 		// and this session is still outstanding, delete it from the map.
 		if sess.counter == 0 && sess.conn == nil {
-			m.maybeDelete(qconn, id)
+			m.maybeDelete(connTracingID, id)
 		}
 	}()
 }
 
-func (m *sessionManager) getOrCreateSession(qconn http3.StreamCreator, id sessionID) (sess *session, existed bool) {
+func (m *sessionManager) getOrCreateSession(connTracingID quic.ConnectionTracingID, id sessionID) (sess *session, existed bool) {
 	m.mx.Lock()
 	defer m.mx.Unlock()
 
-	sessions, ok := m.conns[qconn]
+	sessions, ok := m.conns[connTracingID]
 	if !ok {
 		sessions = make(map[sessionID]*session)
-		m.conns[qconn] = sessions
+		m.conns[connTracingID] = sessions
 	}
 
 	sess, ok = sessions[id]
@@ -164,16 +164,17 @@ func (m *sessionManager) handleUniStream(str quic.ReceiveStream, sess *session) 
 }
 
 // AddSession adds a new WebTransport session.
-func (m *sessionManager) AddSession(qconn http3.StreamCreator, id sessionID, requestStr quic.Stream) *Session {
+func (m *sessionManager) AddSession(qconn http3.Connection, id sessionID, requestStr http3.Stream) *Session {
 	conn := newSession(id, qconn, requestStr)
+	connTracingID := qconn.Context().Value(quic.ConnectionTracingKey).(quic.ConnectionTracingID)
 
 	m.mx.Lock()
 	defer m.mx.Unlock()
 
-	sessions, ok := m.conns[qconn]
+	sessions, ok := m.conns[connTracingID]
 	if !ok {
 		sessions = make(map[sessionID]*session)
-		m.conns[qconn] = sessions
+		m.conns[connTracingID] = sessions
 	}
 	if sess, ok := sessions[id]; ok {
 		// We might already have an entry of this session.

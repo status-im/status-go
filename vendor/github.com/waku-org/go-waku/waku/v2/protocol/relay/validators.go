@@ -3,7 +3,6 @@ package relay
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"encoding/binary"
 	"encoding/hex"
 	"time"
@@ -86,7 +85,7 @@ func (w *WakuRelay) topicValidator(topic string) func(ctx context.Context, peerI
 
 // AddSignedTopicValidator registers a gossipsub validator for a topic which will check that messages Meta field contains a valid ECDSA signature for the specified pubsub topic. This is used as a DoS prevention mechanism
 func (w *WakuRelay) AddSignedTopicValidator(topic string, publicKey *ecdsa.PublicKey) error {
-	w.log.Info("adding validator to signed topic", zap.String("topic", topic), zap.String("publicKey", hex.EncodeToString(elliptic.Marshal(publicKey.Curve, publicKey.X, publicKey.Y))))
+	w.log.Info("adding validator to signed topic", zap.String("topic", topic), zap.String("publicKey", hex.EncodeToString(secp256k1.S256().Marshal(publicKey.X, publicKey.Y))))
 
 	fn := signedTopicBuilder(w.timesource, publicKey)
 

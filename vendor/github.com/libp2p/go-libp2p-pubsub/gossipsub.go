@@ -9,12 +9,14 @@ import (
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
+	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/record"
+	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
 )
 
 const (
@@ -231,6 +233,7 @@ func DefaultGossipSubRouter(h host.Host) *GossipSubRouter {
 		iasked:    make(map[peer.ID]int),
 		outbound:  make(map[peer.ID]bool),
 		connect:   make(chan connectInfo, params.MaxPendingConnections),
+		cab:       pstoremem.NewAddrBook(),
 		mcache:    NewMessageCache(params.HistoryGossip, params.HistoryLength),
 		protos:    GossipSubDefaultProtocols,
 		feature:   GossipSubDefaultFeatures,
@@ -431,6 +434,7 @@ type GossipSubRouter struct {
 	outbound map[peer.ID]bool                 // connection direction cache, marks peers with outbound connections
 	backoff  map[string]map[peer.ID]time.Time // prune backoff
 	connect  chan connectInfo                 // px connection requests
+	cab      peerstore.AddrBook
 
 	protos  []protocol.ID
 	feature GossipSubFeatureTest
@@ -509,6 +513,9 @@ func (gs *GossipSubRouter) Attach(p *PubSub) {
 		go gs.connector()
 	}
 
+	// Manage our address book from events emitted by libp2p
+	go gs.manageAddrBook()
+
 	// connect to direct peers
 	if len(gs.direct) > 0 {
 		go func() {
@@ -519,6 +526,46 @@ func (gs *GossipSubRouter) Attach(p *PubSub) {
 				gs.connect <- connectInfo{p: p}
 			}
 		}()
+	}
+}
+
+func (gs *GossipSubRouter) manageAddrBook() {
+	sub, err := gs.p.host.EventBus().Subscribe([]interface{}{
+		&event.EvtPeerIdentificationCompleted{},
+		&event.EvtPeerConnectednessChanged{},
+	})
+	if err != nil {
+		log.Errorf("failed to subscribe to peer identification events: %v", err)
+		return
+	}
+	defer sub.Close()
+
+	for {
+		select {
+		case <-gs.p.ctx.Done():
+			return
+		case ev := <-sub.Out():
+			switch ev := ev.(type) {
+			case event.EvtPeerIdentificationCompleted:
+				if ev.SignedPeerRecord != nil {
+					cab, ok := peerstore.GetCertifiedAddrBook(gs.cab)
+					if ok {
+						ttl := peerstore.RecentlyConnectedAddrTTL
+						if gs.p.host.Network().Connectedness(ev.Peer) == network.Connected {
+							ttl = peerstore.ConnectedAddrTTL
+						}
+						_, err := cab.ConsumePeerRecord(ev.SignedPeerRecord, ttl)
+						if err != nil {
+							log.Warnf("failed to consume signed peer record: %v", err)
+						}
+					}
+				}
+			case event.EvtPeerConnectednessChanged:
+				if ev.Connectedness != network.Connected {
+					gs.cab.UpdateAddrs(ev.Peer, peerstore.ConnectedAddrTTL, peerstore.RecentlyConnectedAddrTTL)
+				}
+			}
+		}
 	}
 }
 
@@ -534,7 +581,7 @@ loop:
 	for _, c := range conns {
 		stat := c.Stat()
 
-		if stat.Transient {
+		if stat.Limited {
 			continue
 		}
 
@@ -951,7 +998,7 @@ func (gs *GossipSubRouter) connector() {
 			}
 
 			log.Debugf("connecting to %s", ci.p)
-			cab, ok := peerstore.GetCertifiedAddrBook(gs.p.host.Peerstore())
+			cab, ok := peerstore.GetCertifiedAddrBook(gs.cab)
 			if ok && ci.spr != nil {
 				_, err := cab.ConsumePeerRecord(ci.spr, peerstore.TempAddrTTL)
 				if err != nil {
@@ -960,7 +1007,7 @@ func (gs *GossipSubRouter) connector() {
 			}
 
 			ctx, cancel := context.WithTimeout(gs.p.ctx, gs.params.ConnectionTimeout)
-			err := gs.p.host.Connect(ctx, peer.AddrInfo{ID: ci.p})
+			err := gs.p.host.Connect(ctx, peer.AddrInfo{ID: ci.p, Addrs: gs.cab.Addrs(ci.p)})
 			cancel()
 			if err != nil {
 				log.Debugf("error connecting to %s: %s", ci.p, err)
@@ -1886,7 +1933,7 @@ func (gs *GossipSubRouter) makePrune(p peer.ID, topic string, doPX bool, isUnsub
 			return p != xp && gs.score.Score(xp) >= 0
 		})
 
-		cab, ok := peerstore.GetCertifiedAddrBook(gs.p.host.Peerstore())
+		cab, ok := peerstore.GetCertifiedAddrBook(gs.cab)
 		px = make([]*pb.PeerInfo, 0, len(peers))
 		for _, p := range peers {
 			// see if we have a signed peer record to send back; if we don't, just send

@@ -88,7 +88,7 @@ func NewWakuFilterLightNode(broadcaster relay.Broadcaster, pm *peermanager.PeerM
 	wf.pm = pm
 	wf.CommonService = service.NewCommonService()
 	wf.metrics = newMetrics(reg)
-	wf.peerPingInterval = 5 * time.Second
+	wf.peerPingInterval = 1 * time.Minute
 	return wf
 }
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package rtp
 
 import (
@@ -12,18 +15,22 @@ type Payloader interface {
 // Packetizer packetizes a payload
 type Packetizer interface {
 	Packetize(payload []byte, samples uint32) []*Packet
+	GeneratePadding(samples uint32) []*Packet
 	EnableAbsSendTime(value int)
 	SkipSamples(skippedSamples uint32)
 }
 
 type packetizer struct {
-	MTU              uint16
-	PayloadType      uint8
-	SSRC             uint32
-	Payloader        Payloader
-	Sequencer        Sequencer
-	Timestamp        uint32
-	ClockRate        uint32
+	MTU         uint16
+	PayloadType uint8
+	SSRC        uint32
+	Payloader   Payloader
+	Sequencer   Sequencer
+	Timestamp   uint32
+
+	// Deprecated: will be removed in a future version.
+	ClockRate uint32
+
 	extensionNumbers struct { // put extension numbers in here. If they're 0, the extension is disabled (0 is not a legal extension number)
 		AbsSendTime int // http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
 	}
@@ -69,6 +76,7 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 				SequenceNumber: p.Sequencer.NextSequenceNumber(),
 				Timestamp:      p.Timestamp, // Figure out how to do timestamps
 				SSRC:           p.SSRC,
+				CSRC:           []uint32{},
 			},
 			Payload: pp,
 		}
@@ -85,6 +93,38 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 		err = packets[len(packets)-1].SetExtension(uint8(p.extensionNumbers.AbsSendTime), b)
 		if err != nil {
 			return nil // never happens
+		}
+	}
+
+	return packets
+}
+
+// GeneratePadding returns required padding-only packages
+func (p *packetizer) GeneratePadding(samples uint32) []*Packet {
+	// Guard against an empty payload
+	if samples == 0 {
+		return nil
+	}
+
+	packets := make([]*Packet, samples)
+
+	for i := 0; i < int(samples); i++ {
+		pp := make([]byte, 255)
+		pp[254] = 255
+
+		packets[i] = &Packet{
+			Header: Header{
+				Version:        2,
+				Padding:        true,
+				Extension:      false,
+				Marker:         false,
+				PayloadType:    p.PayloadType,
+				SequenceNumber: p.Sequencer.NextSequenceNumber(),
+				Timestamp:      p.Timestamp, // Use latest timestamp
+				SSRC:           p.SSRC,
+				CSRC:           []uint32{},
+			},
+			Payload: pp,
 		}
 	}
 

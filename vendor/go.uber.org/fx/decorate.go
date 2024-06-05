@@ -123,6 +123,11 @@ import (
 //	  return r
 //	}),
 //
+// Decorators can not add new values to the graph,
+// only modify or replace existing ones.
+// Types returned by a decorator that are not already in the graph
+// will be ignored.
+//
 // # Decorator scope
 //
 // Modifications made to the Fx graph with fx.Decorate are scoped to the
@@ -216,7 +221,7 @@ func runDecorator(c container, d decorator, opts ...dig.DecorateOption) (err err
 	decorator := d.Target
 	defer func() {
 		if err != nil {
-			err = fmt.Errorf("fx.Decorate(%v) from:\n%+vFailed: %v", decorator, d.Stack, err)
+			err = fmt.Errorf("fx.Decorate(%v) from:\n%+vFailed: %w", decorator, d.Stack, err)
 		}
 	}()
 

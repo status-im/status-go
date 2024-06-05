@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 // Package datachannel implements WebRTC Data Channels
 package datachannel
 
@@ -71,12 +74,12 @@ type Config struct {
 	LoggerFactory        logging.LoggerFactory
 }
 
-func newDataChannel(stream *sctp.Stream, config *Config) (*DataChannel, error) {
+func newDataChannel(stream *sctp.Stream, config *Config) *DataChannel {
 	return &DataChannel{
 		Config: *config,
 		stream: stream,
 		log:    config.LoggerFactory.NewLogger("datachannel"),
-	}, nil
+	}
 }
 
 // Dial opens a data channels over SCTP
@@ -115,7 +118,12 @@ func Client(stream *sctp.Stream, config *Config) (*DataChannel, error) {
 			return nil, fmt.Errorf("failed to send ChannelOpen %w", err)
 		}
 	}
-	return newDataChannel(stream, config)
+	dc := newDataChannel(stream, config)
+
+	if err := dc.commitReliabilityParams(); err != nil {
+		return nil, err
+	}
+	return dc, nil
 }
 
 // Accept is used to accept incoming data channels over SCTP
@@ -164,10 +172,7 @@ func Server(stream *sctp.Stream, config *Config) (*DataChannel, error) {
 	config.Label = string(openMsg.Label)
 	config.Protocol = string(openMsg.Protocol)
 
-	dataChannel, err := newDataChannel(stream, config)
-	if err != nil {
-		return nil, err
-	}
+	dataChannel := newDataChannel(stream, config)
 
 	err = dataChannel.writeDataChannelAck()
 	if err != nil {
@@ -280,13 +285,9 @@ func (c *DataChannel) handleDCEP(data []byte) error {
 
 	switch msg := msg.(type) {
 	case *channelAck:
-		c.log.Debug("Received DATA_CHANNEL_ACK")
-		if err = c.commitReliabilityParams(); err != nil {
-			return err
-		}
 		c.onOpenComplete()
 	default:
-		return fmt.Errorf("%w %v", ErrInvalidMessageType, msg)
+		return fmt.Errorf("%w, wanted ACK got %v", ErrUnexpectedDataChannelType, msg)
 	}
 
 	return nil

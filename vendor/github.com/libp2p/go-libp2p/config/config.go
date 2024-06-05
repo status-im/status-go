@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"crypto/rand"
 	"errors"
 	"fmt"
@@ -23,7 +24,6 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/host/autonat"
 	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
-	blankhost "github.com/libp2p/go-libp2p/p2p/host/blank"
 	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
@@ -38,6 +38,7 @@ import (
 
 	ma "github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"github.com/quic-go/quic-go"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 )
@@ -128,6 +129,8 @@ type Config struct {
 	DialRanker network.DialRanker
 
 	SwarmOpts []swarm.Option
+
+	DisableIdentifyAddressDiscovery bool
 }
 
 func (cfg *Config) makeSwarm(eventBus event.Bus, enableMetrics bool) (*swarm.Swarm, error) {
@@ -190,20 +193,11 @@ func (cfg *Config) makeSwarm(eventBus event.Bus, enableMetrics bool) (*swarm.Swa
 	return swarm.NewSwarm(pid, cfg.Peerstore, eventBus, opts...)
 }
 
-func (cfg *Config) addTransports(h host.Host) error {
-	swrm, ok := h.Network().(transport.TransportNetwork)
-	if !ok {
-		// Should probably skip this if no transports.
-		return fmt.Errorf("swarm does not support transports")
-	}
-
+func (cfg *Config) addTransports() ([]fx.Option, error) {
 	fxopts := []fx.Option{
 		fx.WithLogger(func() fxevent.Logger { return getFXLogger() }),
 		fx.Provide(fx.Annotate(tptu.New, fx.ParamTags(`name:"security"`))),
 		fx.Supply(cfg.Muxers),
-		fx.Supply(h.ID()),
-		fx.Provide(func() host.Host { return h }),
-		fx.Provide(func() crypto.PrivKey { return h.Peerstore().PrivKey(h.ID()) }),
 		fx.Provide(func() connmgr.ConnectionGater { return cfg.ConnectionGater }),
 		fx.Provide(func() pnet.PSK { return cfg.PSK }),
 		fx.Provide(func() network.ResourceManager { return cfg.ResourceManager }),
@@ -265,12 +259,21 @@ func (cfg *Config) addTransports(h host.Host) error {
 	if cfg.QUICReuse != nil {
 		fxopts = append(fxopts, cfg.QUICReuse...)
 	} else {
-		fxopts = append(fxopts, fx.Provide(quicreuse.NewConnManager)) // TODO: close the ConnManager when shutting down the node
+		fxopts = append(fxopts,
+			fx.Provide(func(key quic.StatelessResetKey, tokenGenerator quic.TokenGeneratorKey, _ *swarm.Swarm, lifecycle fx.Lifecycle) (*quicreuse.ConnManager, error) {
+				cm, err := quicreuse.NewConnManager(key, tokenGenerator)
+				if err != nil {
+					return nil, err
+				}
+				lifecycle.Append(fx.StopHook(cm.Close))
+				return cm, nil
+			}),
+		)
 	}
 
 	fxopts = append(fxopts, fx.Invoke(
 		fx.Annotate(
-			func(tpts []transport.Transport) error {
+			func(swrm *swarm.Swarm, tpts []transport.Transport) error {
 				for _, t := range tpts {
 					if err := swrm.AddTransport(t); err != nil {
 						return err
@@ -278,63 +281,35 @@ func (cfg *Config) addTransports(h host.Host) error {
 				}
 				return nil
 			},
-			fx.ParamTags(`group:"transport"`),
+			fx.ParamTags("", `group:"transport"`),
 		)),
 	)
 	if cfg.Relay {
 		fxopts = append(fxopts, fx.Invoke(circuitv2.AddTransport))
 	}
-	app := fx.New(fxopts...)
-	if err := app.Err(); err != nil {
-		h.Close()
-		return err
-	}
-	return nil
+	return fxopts, nil
 }
 
-// NewNode constructs a new libp2p Host from the Config.
-//
-// This function consumes the config. Do not reuse it (really!).
-func (cfg *Config) NewNode() (host.Host, error) {
-	// If possible check that the resource manager conn limit is higher than the
-	// limit set in the conn manager.
-	if l, ok := cfg.ResourceManager.(connmgr.GetConnLimiter); ok {
-		err := cfg.ConnManager.CheckLimit(l)
-		if err != nil {
-			log.Warn(fmt.Sprintf("rcmgr limit conflicts with connmgr limit: %v", err))
-		}
-	}
-
-	eventBus := eventbus.NewBus(eventbus.WithMetricsTracer(eventbus.NewMetricsTracer(eventbus.WithRegisterer(cfg.PrometheusRegisterer))))
-	swrm, err := cfg.makeSwarm(eventBus, !cfg.DisableMetrics)
-	if err != nil {
-		return nil, err
-	}
-
-	if !cfg.DisableMetrics {
-		rcmgr.MustRegisterWith(cfg.PrometheusRegisterer)
-	}
-
+func (cfg *Config) newBasicHost(swrm *swarm.Swarm, eventBus event.Bus) (*bhost.BasicHost, error) {
 	h, err := bhost.NewHost(swrm, &bhost.HostOpts{
-		EventBus:             eventBus,
-		ConnManager:          cfg.ConnManager,
-		AddrsFactory:         cfg.AddrsFactory,
-		NATManager:           cfg.NATManager,
-		EnablePing:           !cfg.DisablePing,
-		UserAgent:            cfg.UserAgent,
-		ProtocolVersion:      cfg.ProtocolVersion,
-		EnableHolePunching:   cfg.EnableHolePunching,
-		HolePunchingOptions:  cfg.HolePunchingOptions,
-		EnableRelayService:   cfg.EnableRelayService,
-		RelayServiceOpts:     cfg.RelayServiceOpts,
-		EnableMetrics:        !cfg.DisableMetrics,
-		PrometheusRegisterer: cfg.PrometheusRegisterer,
+		EventBus:                        eventBus,
+		ConnManager:                     cfg.ConnManager,
+		AddrsFactory:                    cfg.AddrsFactory,
+		NATManager:                      cfg.NATManager,
+		EnablePing:                      !cfg.DisablePing,
+		UserAgent:                       cfg.UserAgent,
+		ProtocolVersion:                 cfg.ProtocolVersion,
+		EnableHolePunching:              cfg.EnableHolePunching,
+		HolePunchingOptions:             cfg.HolePunchingOptions,
+		EnableRelayService:              cfg.EnableRelayService,
+		RelayServiceOpts:                cfg.RelayServiceOpts,
+		EnableMetrics:                   !cfg.DisableMetrics,
+		PrometheusRegisterer:            cfg.PrometheusRegisterer,
+		DisableIdentifyAddressDiscovery: cfg.DisableIdentifyAddressDiscovery,
 	})
 	if err != nil {
-		swrm.Close()
 		return nil, err
 	}
-
 	if cfg.Relay {
 		// If we've enabled the relay, we should filter out relay
 		// addresses by default.
@@ -345,60 +320,144 @@ func (cfg *Config) NewNode() (host.Host, error) {
 			return oldFactory(autorelay.Filter(addrs))
 		}
 	}
+	return h, nil
+}
 
-	if err := cfg.addTransports(h); err != nil {
-		h.Close()
-		return nil, err
+// NewNode constructs a new libp2p Host from the Config.
+//
+// This function consumes the config. Do not reuse it (really!).
+func (cfg *Config) NewNode() (host.Host, error) {
+	if cfg.EnableAutoRelay && !cfg.Relay {
+		return nil, fmt.Errorf("cannot enable autorelay; relay is not enabled")
+	}
+	// If possible check that the resource manager conn limit is higher than the
+	// limit set in the conn manager.
+	if l, ok := cfg.ResourceManager.(connmgr.GetConnLimiter); ok {
+		err := cfg.ConnManager.CheckLimit(l)
+		if err != nil {
+			log.Warn(fmt.Sprintf("rcmgr limit conflicts with connmgr limit: %v", err))
+		}
 	}
 
-	// TODO: This method succeeds if listening on one address succeeds. We
-	// should probably fail if listening on *any* addr fails.
-	if err := h.Network().Listen(cfg.ListenAddrs...); err != nil {
-		h.Close()
+	if !cfg.DisableMetrics {
+		rcmgr.MustRegisterWith(cfg.PrometheusRegisterer)
+	}
+
+	fxopts := []fx.Option{
+		fx.Provide(func() event.Bus {
+			return eventbus.NewBus(eventbus.WithMetricsTracer(eventbus.NewMetricsTracer(eventbus.WithRegisterer(cfg.PrometheusRegisterer))))
+		}),
+		fx.Provide(func(eventBus event.Bus, lifecycle fx.Lifecycle) (*swarm.Swarm, error) {
+			sw, err := cfg.makeSwarm(eventBus, !cfg.DisableMetrics)
+			if err != nil {
+				return nil, err
+			}
+			lifecycle.Append(fx.StopHook(sw.Close))
+			return sw, nil
+		}),
+		// Make sure the swarm constructor depends on the quicreuse.ConnManager.
+		// That way, the ConnManager will be started before the swarm, and more importantly,
+		// the swarm will be stopped before the ConnManager.
+		fx.Decorate(func(sw *swarm.Swarm, _ *quicreuse.ConnManager, lifecycle fx.Lifecycle) *swarm.Swarm {
+			lifecycle.Append(fx.Hook{
+				OnStart: func(context.Context) error {
+					// TODO: This method succeeds if listening on one address succeeds. We
+					// should probably fail if listening on *any* addr fails.
+					return sw.Listen(cfg.ListenAddrs...)
+				},
+				OnStop: func(context.Context) error {
+					return sw.Close()
+				},
+			})
+			return sw
+		}),
+		fx.Provide(cfg.newBasicHost),
+		fx.Provide(func(bh *bhost.BasicHost) host.Host {
+			return bh
+		}),
+		fx.Provide(func(h *swarm.Swarm) peer.ID { return h.LocalPeer() }),
+		fx.Provide(func(h *swarm.Swarm) crypto.PrivKey { return h.Peerstore().PrivKey(h.LocalPeer()) }),
+	}
+	transportOpts, err := cfg.addTransports()
+	if err != nil {
 		return nil, err
 	}
+	fxopts = append(fxopts, transportOpts...)
 
 	// Configure routing and autorelay
-	var router routing.PeerRouting
 	if cfg.Routing != nil {
-		router, err = cfg.Routing(h)
-		if err != nil {
-			h.Close()
-			return nil, err
-		}
+		fxopts = append(fxopts,
+			fx.Provide(cfg.Routing),
+			fx.Provide(func(h host.Host, router routing.PeerRouting) *routed.RoutedHost {
+				return routed.Wrap(h, router)
+			}),
+		)
 	}
 
 	// Note: h.AddrsFactory may be changed by relayFinder, but non-relay version is
 	// used by AutoNAT below.
-	var ar *autorelay.AutoRelay
-	addrF := h.AddrsFactory
 	if cfg.EnableAutoRelay {
-		if !cfg.Relay {
-			h.Close()
-			return nil, fmt.Errorf("cannot enable autorelay; relay is not enabled")
-		}
 		if !cfg.DisableMetrics {
 			mt := autorelay.WithMetricsTracer(
 				autorelay.NewMetricsTracer(autorelay.WithRegisterer(cfg.PrometheusRegisterer)))
 			mtOpts := []autorelay.Option{mt}
 			cfg.AutoRelayOpts = append(mtOpts, cfg.AutoRelayOpts...)
 		}
-
-		ar, err = autorelay.NewAutoRelay(h, cfg.AutoRelayOpts...)
-		if err != nil {
-			return nil, err
-		}
+		fxopts = append(fxopts,
+			fx.Invoke(func(h *bhost.BasicHost, lifecycle fx.Lifecycle) (*autorelay.AutoRelay, error) {
+				ar, err := autorelay.NewAutoRelay(h, cfg.AutoRelayOpts...)
+				if err != nil {
+					return nil, err
+				}
+				lifecycle.Append(fx.StartStopHook(ar.Start, ar.Close))
+				return ar, nil
+			}),
+		)
 	}
 
+	var bh *bhost.BasicHost
+	fxopts = append(fxopts, fx.Invoke(func(bho *bhost.BasicHost) { bh = bho }))
+	fxopts = append(fxopts, fx.Invoke(func(h *bhost.BasicHost, lifecycle fx.Lifecycle) {
+		lifecycle.Append(fx.StartHook(h.Start))
+	}))
+
+	var rh *routed.RoutedHost
+	if cfg.Routing != nil {
+		fxopts = append(fxopts, fx.Invoke(func(bho *routed.RoutedHost) { rh = bho }))
+	}
+
+	app := fx.New(fxopts...)
+	if err := app.Start(context.Background()); err != nil {
+		return nil, err
+	}
+
+	if err := cfg.addAutoNAT(bh); err != nil {
+		app.Stop(context.Background())
+		if cfg.Routing != nil {
+			rh.Close()
+		} else {
+			bh.Close()
+		}
+		return nil, err
+	}
+
+	if cfg.Routing != nil {
+		return &closableRoutedHost{App: app, RoutedHost: rh}, nil
+	}
+	return &closableBasicHost{App: app, BasicHost: bh}, nil
+}
+
+func (cfg *Config) addAutoNAT(h *bhost.BasicHost) error {
+	addrF := h.AddrsFactory
 	autonatOpts := []autonat.Option{
 		autonat.UsingAddresses(func() []ma.Multiaddr {
 			return addrF(h.AllAddrs())
 		}),
 	}
 	if !cfg.DisableMetrics {
-		autonatOpts = append(autonatOpts,
-			autonat.WithMetricsTracer(
-				autonat.NewMetricsTracer(autonat.WithRegisterer(cfg.PrometheusRegisterer))))
+		autonatOpts = append(autonatOpts, autonat.WithMetricsTracer(
+			autonat.NewMetricsTracer(autonat.WithRegisterer(cfg.PrometheusRegisterer)),
+		))
 	}
 	if cfg.AutoNATConfig.ThrottleInterval != 0 {
 		autonatOpts = append(autonatOpts,
@@ -408,16 +467,15 @@ func (cfg *Config) NewNode() (host.Host, error) {
 	if cfg.AutoNATConfig.EnableService {
 		autonatPrivKey, _, err := crypto.GenerateEd25519Key(rand.Reader)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		ps, err := pstoremem.NewPeerstore()
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		// Pull out the pieces of the config that we _actually_ care about.
-		// Specifically, don't set up things like autorelay, listeners,
-		// identify, etc.
+		// Specifically, don't set up things like listeners, identify, etc.
 		autoNatCfg := Config{
 			Transports:         cfg.Transports,
 			Muxers:             cfg.Muxers,
@@ -436,21 +494,40 @@ func (cfg *Config) NewNode() (host.Host, error) {
 			},
 		}
 
-		dialer, err := autoNatCfg.makeSwarm(eventbus.NewBus(), false)
+		fxopts, err := autoNatCfg.addTransports()
 		if err != nil {
-			h.Close()
-			return nil, err
+			return err
 		}
-		dialerHost := blankhost.NewBlankHost(dialer)
-		if err := autoNatCfg.addTransports(dialerHost); err != nil {
-			dialerHost.Close()
-			h.Close()
-			return nil, err
+		var dialer *swarm.Swarm
+
+		fxopts = append(fxopts,
+			fx.Provide(eventbus.NewBus),
+			fx.Provide(func(lifecycle fx.Lifecycle, b event.Bus) (*swarm.Swarm, error) {
+				lifecycle.Append(fx.Hook{
+					OnStop: func(context.Context) error {
+						return ps.Close()
+					}})
+				var err error
+				dialer, err = autoNatCfg.makeSwarm(b, false)
+				return dialer, err
+
+			}),
+			fx.Provide(func(s *swarm.Swarm) peer.ID { return s.LocalPeer() }),
+			fx.Provide(func() crypto.PrivKey { return autonatPrivKey }),
+		)
+		app := fx.New(fxopts...)
+		if err := app.Err(); err != nil {
+			return err
 		}
-		// NOTE: We're dropping the blank host here but that's fine. It
-		// doesn't really _do_ anything and doesn't even need to be
-		// closed (as long as we close the underlying network).
-		autonatOpts = append(autonatOpts, autonat.EnableService(dialerHost.Network()))
+		err = app.Start(context.Background())
+		if err != nil {
+			return err
+		}
+		go func() {
+			<-dialer.Done() // The swarm used for autonat has closed, we can cleanup now
+			app.Stop(context.Background())
+		}()
+		autonatOpts = append(autonatOpts, autonat.EnableService(dialer))
 	}
 	if cfg.AutoNATConfig.ForceReachability != nil {
 		autonatOpts = append(autonatOpts, autonat.WithReachability(*cfg.AutoNATConfig.ForceReachability))
@@ -458,25 +535,10 @@ func (cfg *Config) NewNode() (host.Host, error) {
 
 	autonat, err := autonat.New(h, autonatOpts...)
 	if err != nil {
-		h.Close()
-		return nil, fmt.Errorf("cannot enable autorelay; autonat failed to start: %v", err)
+		return fmt.Errorf("cannot enable autorelay; autonat failed to start: %v", err)
 	}
 	h.SetAutoNat(autonat)
-
-	// start the host background tasks
-	h.Start()
-
-	var ho host.Host
-	ho = h
-	if router != nil {
-		ho = routed.Wrap(h, router)
-	}
-	if ar != nil {
-		arh := autorelay.NewAutoRelayHost(ho, ar)
-		arh.Start()
-		ho = arh
-	}
-	return ho, nil
+	return nil
 }
 
 // Option is a libp2p config option that can be given to the libp2p constructor

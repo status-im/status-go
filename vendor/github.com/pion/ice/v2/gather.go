@@ -32,7 +32,7 @@ func closeConnAndLog(c io.Closer, log logging.LeveledLogger, msg string, args ..
 		return
 	}
 
-	log.Warnf(msg)
+	log.Warnf(msg, args...)
 	if err := c.Close(); err != nil {
 		log.Warnf("Failed to close connection: %v", err)
 	}
@@ -400,7 +400,7 @@ func (a *Agent) gatherCandidatesSrflxUDPMux(ctx context.Context, urls []*stun.UR
 					hostPort := fmt.Sprintf("%s:%d", url.Host, url.Port)
 					serverAddr, err := a.net.ResolveUDPAddr(network, hostPort)
 					if err != nil {
-						a.log.Warnf("Failed to resolve STUN host: %s: %v", hostPort, err)
+						a.log.Debugf("Failed to resolve STUN host: %s: %v", hostPort, err)
 						return
 					}
 
@@ -462,7 +462,7 @@ func (a *Agent) gatherCandidatesSrflx(ctx context.Context, urls []*stun.URI, net
 				hostPort := fmt.Sprintf("%s:%d", url.Host, url.Port)
 				serverAddr, err := a.net.ResolveUDPAddr(network, hostPort)
 				if err != nil {
-					a.log.Warnf("Failed to resolve STUN host: %s: %v", hostPort, err)
+					a.log.Debugf("Failed to resolve STUN host: %s: %v", hostPort, err)
 					return
 				}
 

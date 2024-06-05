@@ -147,6 +147,11 @@ func (sub *SubscriptionsMap) Delete(subscription *SubscriptionDetails) error {
 		sub.decreaseSubFor(contentFilter.PubsubTopic, contentTopic)
 	}
 
+	if len(peerSubscription.SubsPerPubsubTopic) == 0 {
+		sub.logger.Debug("no more subs for peer", zap.Stringer("id", subscription.PeerID))
+		delete(sub.items, subscription.PeerID)
+	}
+
 	return nil
 }
 

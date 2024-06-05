@@ -1169,6 +1169,11 @@ func (w *Waku) Start() error {
 					if w.onPeerStats != nil {
 						w.onPeerStats(connStatus)
 					}
+					if connStatus.IsOnline {
+						//Trigger FilterManager to take care of any pending filter subscriptions
+						//TODO: Pass pubsubTopic based on topicHealth notif received.
+						w.filterManager.onConnectionStatusChange(w.cfg.DefaultShardPubsubTopic, true)
+					}
 				}
 			case c := <-w.topicHealthStatusChan:
 				w.connStatusMu.Lock()
@@ -1611,6 +1616,7 @@ func (w *Waku) seedBootnodesForDiscV5() {
 				retries = 0
 				lastTry = now()
 			}
+
 		case <-w.ctx.Done():
 			w.wg.Done()
 			w.logger.Debug("bootnode seeding stopped")
