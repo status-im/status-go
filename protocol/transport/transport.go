@@ -719,6 +719,9 @@ func (t *Transport) RemovePubsubTopicKey(topic string) error {
 }
 
 func (t *Transport) ConfirmMessageDelivered(messageID string) {
+	if t.envelopesMonitor == nil {
+		return
+	}
 	hashes, ok := t.envelopesMonitor.messageEnvelopeHashes[messageID]
 	if !ok {
 		return
