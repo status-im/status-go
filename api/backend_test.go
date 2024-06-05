@@ -849,7 +849,7 @@ func TestLoginAccount(t *testing.T) {
 		}
 	}
 
-	_, err := b.CreateAccountAndLogin(createAccountRequest)
+	acc, err := b.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
 	require.Equal(t, nameserver, b.config.WakuV2Config.Nameserver)
 
@@ -860,6 +860,9 @@ func TestLoginAccount(t *testing.T) {
 	accounts, err := b.GetAccounts()
 	require.NoError(t, err)
 	require.Len(t, accounts, 1)
+
+	require.NotEmpty(t, accounts[0].KeyUID)
+	require.Equal(t, acc.KeyUID, accounts[0].KeyUID)
 
 	loginAccountRequest := &requests.Login{
 		KeyUID:           accounts[0].KeyUID,
@@ -1380,6 +1383,10 @@ func TestCreateWallet(t *testing.T) {
 	tmpdir := t.TempDir()
 
 	b := NewGethStatusBackend()
+	defer func() {
+		require.NoError(t, b.StopNode())
+	}()
+
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:           "some-display-name",
 		CustomizationColor:    "#ffffff",
