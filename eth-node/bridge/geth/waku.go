@@ -317,3 +317,6 @@ func (w *wakuFilterWrapper) ID() string {
 
 func (w *GethWakuWrapper) ConfirmMessageDelivered(hashes []common.Hash) {
 }
+
+func (w *GethWakuWrapper) SetStorePeerID(peerID peer.ID) {
+}

@@ -181,4 +181,7 @@ type Waku interface {
 
 	// ConfirmMessageDelivered updates a message has been delivered in waku
 	ConfirmMessageDelivered(hash []common.Hash)
+
+	// SetStorePeerID updates the peer id of store node
+	SetStorePeerID(peerID peer.ID)
 }

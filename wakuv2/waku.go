@@ -1057,6 +1057,10 @@ func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
 	}
 }
 
+func (w *Waku) SetStorePeerID(peerID peer.ID) {
+	w.storePeerID = peerID
+}
+
 type publishFn = func(envelope *protocol.Envelope, logger *zap.Logger) error
 
 func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publishFn, logger *zap.Logger) {

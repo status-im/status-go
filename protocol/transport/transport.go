@@ -732,3 +732,7 @@ func (t *Transport) ConfirmMessageDelivered(messageID string) {
 	}
 	t.waku.ConfirmMessageDelivered(commHashes)
 }
+
+func (t *Transport) SetStorePeerID(peerID peer.ID) {
+	t.waku.SetStorePeerID(peerID)
+}
