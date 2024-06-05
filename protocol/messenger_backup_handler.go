@@ -333,6 +333,32 @@ func (m *Messenger) requestCommunityKeys(state *ReceivedMessageState, syncCommun
 		return communities.ErrOrgNotFound
 	}
 
+	// Send a request to get back our previous shared addresses
+	request := &protobuf.CommunitySharedAddressesRequest{
+		CommunityId: syncCommunity.Id,
+	}
+
+	payload, err := proto.Marshal(request)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := &common.RawMessage{
+		Payload:             payload,
+		Sender:              m.identity,
+		CommunityID:         community.ID(),
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_SHARED_ADDRESSES_REQUEST,
+	}
+
+	_, err = m.SendMessageToControlNode(community, rawMessage)
+
+	if err != nil {
+		m.logger.Error("failed to request shared addresses", zap.String("communityId", community.IDString()), zap.Error(err))
+		return err
+	}
+
+	// If the community is encrypted or one channel is, ask for the encryption keys back
 	isEncrypted := syncCommunity.Encrypted || len(syncCommunity.EncryptionKeysV2) > 0
 	if !isEncrypted {
 		// check if we have encrypted channels

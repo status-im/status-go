@@ -590,6 +590,32 @@ func (m *Messenger) HandleCommunityEncryptionKeysRequest(state *ReceivedMessageS
 	return m.handleCommunityEncryptionKeysRequest(community, signer)
 }
 
+func (m *Messenger) HandleCommunitySharedAddressesRequest(state *ReceivedMessageState, message *protobuf.CommunitySharedAddressesRequest, statusMessage *v1protocol.StatusMessage) error {
+	community, err := m.communitiesManager.GetByID(message.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	if !community.IsControlNode() {
+		return communities.ErrNotControlNode
+	}
+	signer := state.CurrentMessageState.PublicKey
+	return m.handleCommunitySharedAddressesRequest(community, signer)
+}
+
+func (m *Messenger) HandleCommunitySharedAddressesResponse(state *ReceivedMessageState, message *protobuf.CommunitySharedAddressesResponse, statusMessage *v1protocol.StatusMessage) error {
+	community, err := m.communitiesManager.GetByID(message.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	if !community.IsControlNode() {
+		return communities.ErrNotControlNode
+	}
+	signer := state.CurrentMessageState.PublicKey
+	return m.handleCommunitySharedAddressesResponse(community, signer, message.RevealedAccounts)
+}
+
 func (m *Messenger) HandleCommunityTokenAction(state *ReceivedMessageState, message *protobuf.CommunityTokenAction, statusMessage *v1protocol.StatusMessage) error {
 	return m.communityTokensService.ProcessCommunityTokenAction(message)
 }
@@ -633,6 +659,59 @@ func (m *Messenger) handleCommunityEncryptionKeysRequest(community *communities.
 	}
 
 	return nil
+}
+
+func (m *Messenger) handleCommunitySharedAddressesRequest(community *communities.Community, signer *ecdsa.PublicKey) error {
+	if !community.HasMember(signer) {
+		return communities.ErrMemberNotFound
+	}
+
+	pkStr := common.PubkeyToHex(signer)
+
+	revealedAccounts, err := m.communitiesManager.GetRevealedAddresses(community.ID(), pkStr)
+	if err != nil {
+		return err
+	}
+
+	requestToEditRevealedAccountsProto := &protobuf.CommunitySharedAddressesResponse{
+		CommunityId:      community.ID(),
+		RevealedAccounts: revealedAccounts,
+	}
+
+	payload, err := proto.Marshal(requestToEditRevealedAccountsProto)
+	if err != nil {
+		return err
+	}
+
+	controlNodePk := community.ControlNode()
+
+	rawMessage := common.RawMessage{
+		Payload:             payload,
+		Sender:              community.PrivateKey(),
+		CommunityID:         community.ID(),
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_SHARED_ADDRESSES_RESPONSE,
+		PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
+		ResendType:          common.ResendTypeRawMessage,
+		ResendMethod:        common.ResendMethodSendPrivate,
+		Recipients:          []*ecdsa.PublicKey{controlNodePk},
+	}
+
+	_, err = m.sender.SendPrivate(context.Background(), controlNodePk, &rawMessage)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Messenger) handleCommunitySharedAddressesResponse(community *communities.Community, signer *ecdsa.PublicKey, revealedAccounts []*protobuf.RevealedAccount) error {
+	if community.ControlNode() != signer {
+		return communities.ErrNotControlNode
+	}
+
+	requestID := communities.CalculateRequestID(common.PubkeyToHex(&m.identity.PublicKey), community.ID())
+	return m.communitiesManager.SaveRequestToJoinRevealedAddresses(requestID, revealedAccounts)
 }
 
 func (m *Messenger) handleCommunityGrant(community *communities.Community, grant []byte, clock uint64) error {
