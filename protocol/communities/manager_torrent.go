@@ -1,4 +1,6 @@
 //go:build (!android || !ios) && (windows || linux || darwin)
+// +build !android !ios
+// +build windows linux darwin
 
 package communities
 
