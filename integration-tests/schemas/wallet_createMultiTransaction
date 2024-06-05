@@ -1,0 +1,43 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "properties": {
+                "hashes": {
+                    "properties": {
+                        "31337": {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "31337"
+                    ],
+                    "type": "object"
+                },
+                "id": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "hashes",
+                "id"
+            ],
+            "type": "object"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}
