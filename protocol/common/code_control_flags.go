@@ -8,4 +8,6 @@ type CodeControlFlags struct {
 	// CuratedCommunitiesUpdateLoopEnabled indicates whether we should disable the curated communities update loop.
 	// Usually should be disabled in tests.
 	CuratedCommunitiesUpdateLoopEnabled bool
+	// Store node re-fetching interval in seconds
+	StoreNodeFetchInterval int
 }

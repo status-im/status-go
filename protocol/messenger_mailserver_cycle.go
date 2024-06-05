@@ -429,14 +429,7 @@ func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 
 			// Query mailserver
 			if m.config.codeControlFlags.AutoRequestHistoricMessages {
-				go func() {
-					_, err := m.performMailserverRequest(&ms, func(_ mailservers.Mailserver) (*MessengerResponse, error) {
-						return m.RequestAllHistoricMessages(false, false)
-					})
-					if err != nil {
-						m.logger.Error("could not perform mailserver request", zap.Error(err))
-					}
-				}()
+				m.storeSchedulerCh <- struct{}{}
 			}
 		}
 	}
@@ -582,12 +575,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 				}
 				// Query mailserver
 				if m.config.codeControlFlags.AutoRequestHistoricMessages {
-					go func() {
-						_, err := m.RequestAllHistoricMessages(false, true)
-						if err != nil {
-							m.logger.Error("failed to request historic messages", zap.Error(err))
-						}
-					}()
+					m.storeSchedulerCh <- struct{}{}
 				}
 			} else {
 				m.mailPeersMutex.Unlock()
@@ -627,16 +615,6 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 	m.logger.Debug("updated-peers", zap.Any("peers", m.mailserverCycle.peers))
 
 	return nil
-}
-
-func (m *Messenger) asyncRequestAllHistoricMessages() {
-	m.logger.Debug("asyncRequestAllHistoricMessages")
-	go func() {
-		_, err := m.RequestAllHistoricMessages(false, true)
-		if err != nil {
-			m.logger.Error("failed to request historic messages", zap.Error(err))
-		}
-	}()
 }
 
 func (m *Messenger) updateWakuV1PeerStatus() {

@@ -159,6 +159,8 @@ type Messenger struct {
 		once sync.Once
 	}
 
+	storeSchedulerCh chan struct{}
+
 	connectionState       connection.State
 	telemetryClient       *telemetry.Client
 	contractMaker         *contracts.ContractMaker
@@ -577,6 +579,7 @@ func NewMessenger(
 		communityStorenodes:  storenodes.NewCommunityStorenodes(storenodes.NewDB(database), logger),
 		account:              c.account,
 		quit:                 make(chan struct{}),
+		storeSchedulerCh:     make(chan struct{}, 10),
 		ctx:                  ctx,
 		cancel:               cancel,
 		importingCommunities: make(map[string]bool),
@@ -811,6 +814,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.startSyncSettingsLoop()
 	m.startSettingsChangesLoop()
 	m.startCommunityRekeyLoop()
+	m.startStoreNodeFetchLoop()
 	if m.config.codeControlFlags.CuratedCommunitiesUpdateLoopEnabled {
 		m.startCuratedCommunitiesUpdateLoop()
 	}
@@ -946,7 +950,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 
 	// Start fetching messages from store nodes
 	if online && m.config.codeControlFlags.AutoRequestHistoricMessages {
-		m.asyncRequestAllHistoricMessages()
+		m.storeSchedulerCh <- struct{}{}
 	}
 
 	// Update ENS verifier
@@ -1498,18 +1502,14 @@ func (m *Messenger) watchConnectionChange() {
 		// Instead we will poll the connection status.
 		m.logger.Warn("using WakuV1, can't watch connection changes, this might be have side-effects")
 		go pollConnectionStatus()
-		return
-	}
+	} else {
 
-	subscription, err := waku.SubscribeToConnStatusChanges()
-	if err != nil {
-		// Log error and fallback to polling
-		m.logger.Error("failed to subscribe to connection status changes", zap.Error(err))
-		go pollConnectionStatus()
-		return
-	}
+		// Wakuv2 is not going to return an error
+		// from SubscribeToConnStatusChanges
+		subscription, _ := waku.SubscribeToConnStatusChanges()
 
-	go subscribedConnectionStatus(subscription)
+		go subscribedConnectionStatus(subscription)
+	}
 }
 
 // watchChatsAndCommunitiesToUnmute regularly checks for chats and communities that should be unmuted
@@ -1909,6 +1909,7 @@ func (m *Messenger) Shutdown() (err error) {
 
 	close(m.quit)
 	m.cancel()
+	close(m.storeSchedulerCh)
 	m.shutdownWaitGroup.Wait()
 	for i, task := range m.shutdownTasks {
 		m.logger.Debug("running shutdown task", zap.Int("n", i))

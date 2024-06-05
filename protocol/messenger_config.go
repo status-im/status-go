@@ -129,6 +129,7 @@ func messengerDefaultConfig() config {
 
 	c.codeControlFlags.AutoRequestHistoricMessages = true
 	c.codeControlFlags.CuratedCommunitiesUpdateLoopEnabled = true
+	c.codeControlFlags.StoreNodeFetchInterval = 120
 	return c
 }
 

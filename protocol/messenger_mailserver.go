@@ -55,6 +55,51 @@ func (m *Messenger) shouldSync() (bool, error) {
 	return useMailserver, nil
 }
 
+func (m *Messenger) startStoreNodeFetchLoop() {
+	// Initial fetch
+	m.logger.Info("STORE_NODE_FETCH_LOOP before send")
+	m.storeSchedulerCh <- struct{}{}
+	m.logger.Info("STORE_NODE_FETCH_LOOP after send")
+	go func() {
+		fetching := false
+		m.logger.Info("STORE_NODE_FETCH_LOOP start")
+		for {
+			select {
+			case <-m.storeSchedulerCh:
+				if fetching {
+					// We don't want to queue up multiple store node requests,
+					// so we just drop them if there's one running already
+					m.logger.Info("STORE_NODE_FETCH_LOOP do nothing")
+					break
+				}
+				fetching = true
+				go func() {
+					m.logger.Info("STORE_NODE_FETCH_LOOP start fetching")
+					// We ignore the return value, as
+					// data is going to be set implicitly by syncFilters func
+					_, err := m.RequestAllHistoricMessages(false, true)
+
+					// Should be safe to modify it here, no multiple writes
+					// This means another refetch is now allowed to run
+					fetching = false
+
+					if err != nil {
+						m.logger.Error("failed to request historic messages", zap.Error(err))
+					}
+					m.logger.Info("STORE_NODE_FETCH_LOOP stop fetching")
+					// Schedule next fetch in StoreNodeFetchInterval seconds
+					// Might not be actually executed in case when e.g. connection status was changed
+					// and re-fetch was initiated
+					time.Sleep(time.Duration(m.config.codeControlFlags.StoreNodeFetchInterval) * time.Second)
+					m.logger.Info("STORE_NODE_FETCH_LOOP schedule next")
+					m.storeSchedulerCh <- struct{}{}
+				}()
+			case <-m.quit:
+				return
+			}
+		}
+	}()
+}
 func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 	shouldSync, err := m.shouldSync()
 	if err != nil {
@@ -376,6 +421,7 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 		allResponses.AddChats(response.Chats())
 		allResponses.AddMessages(response.Messages())
 	}
+
 	return allResponses, nil
 }
 
