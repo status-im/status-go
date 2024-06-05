@@ -1516,7 +1516,8 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 		w.storeMsgIDsMu.Unlock()
 	}
 
-	if e.MsgType == common.SendMessageType && !(*e.Envelope.Message().Ephemeral) {
+	ephemeral := e.Envelope.Message().Ephemeral
+	if e.MsgType == common.SendMessageType && (ephemeral == nil || !*ephemeral) {
 		w.sendMsgIDsMu.Lock()
 		subMsgs, ok := w.sendMsgIDs[e.PubsubTopic]
 		if !ok {

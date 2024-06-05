@@ -211,7 +211,7 @@ func (s *MessengerRawMessageResendTest) TestMessageSent() {
 		rawMessage, err := s.bobMessenger.RawMessageByID(ids[0])
 		s.Require().NoError(err)
 		s.Require().NotNil(rawMessage)
-		if rawMessage.Sent {
+		if rawMessage.SendCount > 0 {
 			return nil
 		}
 		return errors.New("raw message should be sent finally")
