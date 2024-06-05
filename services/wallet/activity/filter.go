@@ -41,6 +41,7 @@ const (
 	BridgeAT
 	ContractDeploymentAT
 	MintAT
+	ApproveAT
 )
 
 func allActivityTypesFilter() []Type {

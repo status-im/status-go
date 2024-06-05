@@ -148,6 +148,20 @@ func GenerateTestBridgeMultiTransaction(fromTr, toTr TestTransfer) MultiTransact
 	}
 }
 
+func GenerateTestApproveMultiTransaction(tr TestTransfer) MultiTransaction {
+	return MultiTransaction{
+		ID:          multiTransactionIDGenerator(),
+		Type:        MultiTransactionApprove,
+		FromAddress: tr.From,
+		ToAddress:   tr.To,
+		FromAsset:   tr.Token.Symbol,
+		ToAsset:     tr.Token.Symbol,
+		FromAmount:  (*hexutil.Big)(big.NewInt(tr.Value)),
+		ToAmount:    (*hexutil.Big)(big.NewInt(0)),
+		Timestamp:   uint64(tr.Timestamp),
+	}
+}
+
 // GenerateTestTransfers will generate transaction based on the TestTokens index and roll over if there are more than
 // len(TestTokens) transactions
 func GenerateTestTransfers(tb testing.TB, db *sql.DB, firstStartIndex int, count int) (result []TestTransfer, fromAddresses, toAddresses []eth_common.Address) {
