@@ -826,13 +826,13 @@ func TestLoginAccount(t *testing.T) {
 
 	b := NewGethStatusBackend()
 	createAccountRequest := &requests.CreateAccount{
-		DisplayName:           "some-display-name",
-		CustomizationColor:    "#ffffff",
-		Emoji:                 "some",
-		Password:              password,
-		BackupDisabledDataDir: tmpdir,
-		LogFilePath:           tmpdir + "/log",
-		WakuV2Nameserver:      &nameserver,
+		DisplayName:        "some-display-name",
+		CustomizationColor: "#ffffff",
+		Emoji:              "some",
+		Password:           password,
+		RootDataDir:        tmpdir,
+		LogFilePath:        tmpdir + "/log",
+		WakuV2Nameserver:   &nameserver,
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
@@ -1388,12 +1388,12 @@ func TestCreateWallet(t *testing.T) {
 	}()
 
 	createAccountRequest := &requests.CreateAccount{
-		DisplayName:           "some-display-name",
-		CustomizationColor:    "#ffffff",
-		Emoji:                 "emoji",
-		Password:              password,
-		BackupDisabledDataDir: tmpdir,
-		LogFilePath:           tmpdir + "/log",
+		DisplayName:        "some-display-name",
+		CustomizationColor: "#ffffff",
+		Emoji:              "emoji",
+		Password:           password,
+		RootDataDir:        tmpdir,
+		LogFilePath:        tmpdir + "/log",
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
@@ -1447,12 +1447,12 @@ func TestSetFleet(t *testing.T) {
 
 	b := NewGethStatusBackend()
 	createAccountRequest := &requests.CreateAccount{
-		DisplayName:           "some-display-name",
-		CustomizationColor:    "#ffffff",
-		Password:              password,
-		BackupDisabledDataDir: tmpdir,
-		LogFilePath:           tmpdir + "/log",
-		Emoji:                 "some",
+		DisplayName:        "some-display-name",
+		CustomizationColor: "#ffffff",
+		Password:           password,
+		RootDataDir:        tmpdir,
+		LogFilePath:        tmpdir + "/log",
+		Emoji:              "some",
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
@@ -1516,12 +1516,12 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 
 	b := NewGethStatusBackend()
 	createAccountRequest := &requests.CreateAccount{
-		DisplayName:           "some-display-name",
-		CustomizationColor:    "#ffffff",
-		Password:              password,
-		BackupDisabledDataDir: tmpdir,
-		LogFilePath:           tmpdir + "/log",
-		Emoji:                 "some",
+		DisplayName:        "some-display-name",
+		CustomizationColor: "#ffffff",
+		Password:           password,
+		RootDataDir:        tmpdir,
+		LogFilePath:        tmpdir + "/log",
+		Emoji:              "some",
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
@@ -1583,13 +1583,13 @@ func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 
 	// Creating an account with test networks enabled
 	createAccountRequest1 := &requests.CreateAccount{
-		DisplayName:           "User-1",
-		CustomizationColor:    "#ffffff",
-		Emoji:                 "some",
-		Password:              "password123",
-		BackupDisabledDataDir: tmpdir,
-		LogFilePath:           tmpdir + "/log",
-		TestNetworksEnabled:   true,
+		DisplayName:         "User-1",
+		CustomizationColor:  "#ffffff",
+		Emoji:               "some",
+		Password:            "password123",
+		RootDataDir:         tmpdir,
+		LogFilePath:         tmpdir + "/log",
+		TestNetworksEnabled: true,
 	}
 	_, err := b.CreateAccountAndLogin(createAccountRequest1)
 	require.NoError(t, err)
@@ -1604,12 +1604,12 @@ func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 
 	// Creating an account with test networks disabled
 	createAccountRequest2 := &requests.CreateAccount{
-		DisplayName:           "User-2",
-		CustomizationColor:    "#ffffff",
-		Emoji:                 "some",
-		Password:              "password",
-		BackupDisabledDataDir: tmpdir,
-		LogFilePath:           tmpdir + "/log",
+		DisplayName:        "User-2",
+		CustomizationColor: "#ffffff",
+		Emoji:              "some",
+		Password:           "password",
+		RootDataDir:        tmpdir,
+		LogFilePath:        tmpdir + "/log",
 	}
 	_, err = b.CreateAccountAndLogin(createAccountRequest2)
 	require.NoError(t, err)
@@ -1649,4 +1649,28 @@ func TestRestoreAccountAndLogin(t *testing.T) {
 	invalidRequest := &requests.RestoreAccount{}
 	_, err = backend.RestoreAccountAndLogin(invalidRequest)
 	require.Error(t, err)
+}
+
+func TestCreateAccountPathsValidation(t *testing.T) {
+	tmpdir := t.TempDir()
+
+	validation := &requests.CreateAccountValidation{
+		AllowEmptyDisplayName: false,
+	}
+
+	request := &requests.CreateAccount{
+		DisplayName:        "User-1",
+		Password:           "password123",
+		CustomizationColor: "#ffffff",
+		RootDataDir:        tmpdir,
+	}
+
+	err := request.Validate(validation)
+	require.NoError(t, err)
+
+	request.RootDataDir = ""
+	request.BackupDisabledDataDir = tmpdir
+	err = request.Validate(validation)
+	require.NoError(t, err)
+	require.Equal(t, tmpdir, request.RootDataDir)
 }

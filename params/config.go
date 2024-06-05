@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -608,8 +607,6 @@ type PushNotificationServerConfig struct {
 // ShhextConfig defines options used by shhext service.
 type ShhextConfig struct {
 	PFSEnabled bool
-	// BackupDisabledDataDir is the file system folder the node should use for any data storage needs that it doesn't want backed up.
-	BackupDisabledDataDir string
 	// InstallationId id of the current installation
 	InstallationID string
 	// MailServerConfirmations should be true if client wants to receive confirmatons only from a selected mail servers.
@@ -687,9 +684,6 @@ type TorrentConfig struct {
 func (c *ShhextConfig) Validate(validate *validator.Validate) error {
 	if err := validate.Struct(c); err != nil {
 		return err
-	}
-	if c.PFSEnabled && len(c.BackupDisabledDataDir) == 0 {
-		return errors.New("field BackupDisabledDataDir is required if PFSEnabled is true")
 	}
 	return nil
 }
@@ -878,6 +872,7 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 
 	config := &NodeConfig{
 		NetworkID:              networkID,
+		RootDataDir:            dataDir,
 		DataDir:                dataDir,
 		KeyStoreDir:            keyStoreDir,
 		KeycardPairingDataFile: keycardPairingDataFile,
@@ -912,10 +907,8 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 			DataDir:        wakuV2Dir,
 			MaxMessageSize: wakuv2common.DefaultMaxMessageSize,
 		},
-		ShhextConfig: ShhextConfig{
-			BackupDisabledDataDir: dataDir,
-		},
-		SwarmConfig: SwarmConfig{},
+		ShhextConfig: ShhextConfig{},
+		SwarmConfig:  SwarmConfig{},
 		TorrentConfig: TorrentConfig{
 			Enabled:    false,
 			Port:       9025,

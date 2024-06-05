@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/sqlite"
 
@@ -1321,7 +1323,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		return nil, nil, nil, nil, err
 	}
 
-	keyStoreDir, err := b.initKeyStoreDirWithAccount(request.BackupDisabledDataDir, info.KeyUID)
+	keyStoreDir, err := b.initKeyStoreDirWithAccount(request.RootDataDir, info.KeyUID)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -1355,8 +1357,8 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 	return account, settings, nodeConfig, subAccounts, nil
 }
 
-func (b *GethStatusBackend) initKeyStoreDirWithAccount(backupDisabledDataDir, keyUID string) (string, error) {
-	b.UpdateRootDataDir(backupDisabledDataDir)
+func (b *GethStatusBackend) initKeyStoreDirWithAccount(rootDataDir, keyUID string) (string, error) {
+	b.UpdateRootDataDir(rootDataDir)
 	keystoreDir := keystoreRelativePath
 	userKeyStoreDir := filepath.Join(keystoreDir, keyUID)
 	// Initialize keystore dir with account
@@ -1830,13 +1832,20 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 	conf.Version = params.Version
 	conf.RootDataDir = b.rootDataDir
 	conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
-	conf.ShhextConfig.BackupDisabledDataDir = filepath.Join(b.rootDataDir, conf.ShhextConfig.BackupDisabledDataDir)
+	conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
+
+	if _, err = os.Stat(conf.RootDataDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(conf.RootDataDir, os.ModePerm); err != nil {
+			b.log.Warn("failed to create data directory", zap.Error(err))
+			return err
+		}
+	}
+
 	if len(conf.LogDir) == 0 {
 		conf.LogFile = filepath.Join(b.rootDataDir, conf.LogFile)
 	} else {
 		conf.LogFile = filepath.Join(conf.LogDir, conf.LogFile)
 	}
-	conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
 
 	b.config = conf
 

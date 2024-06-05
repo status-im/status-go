@@ -8,9 +8,10 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	gomock "github.com/golang/mock/gomock"
+
 	common "github.com/ethereum/go-ethereum/common"
 	types "github.com/ethereum/go-ethereum/core/types"
-	gomock "github.com/golang/mock/gomock"
 	account "github.com/status-im/status-go/account"
 	types0 "github.com/status-im/status-go/eth-node/types"
 	bridge "github.com/status-im/status-go/services/wallet/bridge"

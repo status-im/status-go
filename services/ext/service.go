@@ -140,7 +140,8 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 
 	s.identity = identity
 
-	dataDir := filepath.Clean(s.config.ShhextConfig.BackupDisabledDataDir)
+	// This directory should have already been created in loadNodeConfig, keeping this to ensure.
+	dataDir := filepath.Clean(s.config.RootDataDir)
 
 	if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
 		return err

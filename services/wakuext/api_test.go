@@ -55,10 +55,10 @@ func TestRequestMessagesErrors(t *testing.T) {
 
 	handler := ext.NewHandlerMock(1)
 	config := params.NodeConfig{
+		RootDataDir: os.TempDir(),
 		ShhextConfig: params.ShhextConfig{
-			InstallationID:        "1",
-			BackupDisabledDataDir: os.TempDir(),
-			PFSEnabled:            true,
+			InstallationID: "1",
+			PFSEnabled:     true,
 		},
 	}
 	nodeWrapper := ext.NewTestNodeWrapper(nil, waku)
@@ -103,9 +103,9 @@ func TestRequestMessagesErrors(t *testing.T) {
 
 func TestInitProtocol(t *testing.T) {
 	config := params.NodeConfig{
+		RootDataDir: t.TempDir(),
 		ShhextConfig: params.ShhextConfig{
 			InstallationID:          "2",
-			BackupDisabledDataDir:   t.TempDir(),
 			PFSEnabled:              true,
 			MailServerConfirmations: true,
 			ConnectionTarget:        10,
@@ -176,9 +176,9 @@ func (s *ShhExtSuite) createAndAddNode() {
 
 	// set up protocol
 	config := params.NodeConfig{
+		RootDataDir: s.dir,
 		ShhextConfig: params.ShhextConfig{
 			InstallationID:          "1",
-			BackupDisabledDataDir:   s.dir,
 			PFSEnabled:              true,
 			MailServerConfirmations: true,
 			ConnectionTarget:        10,
