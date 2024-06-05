@@ -175,7 +175,7 @@ func (s *MessengerRawMessageResendTest) createBackendAndLogin(backend **GethStat
 	s.Require().NoError(err)
 }
 
-func (s *MessengerRawMessageResendTest) setCreateAccountRequest(displayName, backupDisabledDataDir, logFilePath string) *requests.CreateAccount {
+func (s *MessengerRawMessageResendTest) setCreateAccountRequest(displayName, rootDataDir, logFilePath string) *requests.CreateAccount {
 	nameServer := "1.1.1.1"
 	verifyENSContractAddress := "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
 	verifyTransactionChainID := int64(1)
@@ -187,7 +187,7 @@ func (s *MessengerRawMessageResendTest) setCreateAccountRequest(displayName, bac
 		UpstreamConfig:           verifyURL,
 		WakuV2Nameserver:         &nameServer,
 		VerifyENSContractAddress: &verifyENSContractAddress,
-		BackupDisabledDataDir:    backupDisabledDataDir,
+		RootDataDir:              rootDataDir,
 		Password:                 password,
 		DisplayName:              displayName,
 		LogEnabled:               true,

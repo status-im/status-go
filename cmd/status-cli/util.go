@@ -49,12 +49,12 @@ func start(cCtx *cli.Context, name string, port int, apiModules string) (*Status
 	backend := api.NewGethStatusBackend()
 
 	createAccountRequest := &requests.CreateAccount{
-		DisplayName:           name,
-		CustomizationColor:    "#ffffff",
-		Emoji:                 "some",
-		Password:              "some-password",
-		BackupDisabledDataDir: fmt.Sprintf("./test-%s", strings.ToLower(name)),
-		LogFilePath:           "log",
+		DisplayName:        name,
+		CustomizationColor: "#ffffff",
+		Emoji:              "some",
+		Password:           "some-password",
+		RootDataDir:        fmt.Sprintf("./test-%s", strings.ToLower(name)),
+		LogFilePath:        "log",
 		APIConfig: &requests.APIConfig{
 			APIModules: apiModules,
 			HTTPHost:   "127.0.0.1",

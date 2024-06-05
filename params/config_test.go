@@ -97,7 +97,6 @@ func TestConfigWriteRead(t *testing.T) {
 	loadedConfig := string(loadedConfigData)
 	require.Contains(t, loadedConfig, fmt.Sprintf(`"NetworkId": %d`, params.GoerliNetworkID))
 	require.Contains(t, loadedConfig, fmt.Sprintf(`"DataDir": "%s"`, tmpDir))
-	require.Contains(t, loadedConfig, fmt.Sprintf(`"BackupDisabledDataDir": "%s"`, tmpDir))
 }
 
 // TestNodeConfigValidate checks validation of individual fields.
@@ -113,8 +112,8 @@ func TestNodeConfigValidate(t *testing.T) {
 			Name: "Valid JSON config",
 			Config: `{
 				"NetworkId": 1,
+				"RootDataDir": "/tmp/data",
 				"DataDir": "/tmp/data",
-				"BackupDisabledDataDir": "/tmp/data",
 				"KeyStoreDir": "/tmp/data",
 				"KeycardPairingDataFile": "/tmp/data/keycard/pairings.json",
 				"NoDiscovery": true
@@ -244,7 +243,6 @@ func TestNodeConfigValidate(t *testing.T) {
 					"DataDir": "/foo"
 				},
 				"ShhextConfig": {
-					"BackupDisabledDataDir": "/some/dir",
 					"PFSEnabled": true
 				}
 			}`,
@@ -286,19 +284,6 @@ func TestNodeConfigValidate(t *testing.T) {
 				"KeyStoreDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json"
 			}`,
-		},
-		{
-			Name: "BackupDisabledDataDir must be set if PFSEnabled is true",
-			Config: `{
-				"NetworkId": 1,
-				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
-				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
-				"ShhextConfig": {
-					"PFSEnabled": true
-				}
-			}`,
-			Error: "field BackupDisabledDataDir is required if PFSEnabled is true",
 		},
 		{
 			Name:   "Missing APIModules",
