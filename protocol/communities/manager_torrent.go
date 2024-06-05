@@ -1,6 +1,5 @@
-//go:build (!android || !ios) && (windows || linux || darwin)
-// +build !android !ios
-// +build windows linux darwin
+//go:build !disable_torrent
+// +build !disable_torrent
 
 package communities
 
@@ -50,36 +49,6 @@ type EncodedArchiveData struct {
 	bytes   []byte
 }
 
-type HistoryArchiveDownloadTaskInfo struct {
-	TotalDownloadedArchivesCount int
-	TotalArchivesCount           int
-	Cancelled                    bool
-}
-
-type TorrentContract interface {
-	ArchiveContract
-
-	LogStdout(string, ...zap.Field)
-	SetOnline(bool)
-	SetTorrentConfig(*params.TorrentConfig)
-	StartTorrentClient() error
-	Stop() error
-	IsReady() bool
-	GetCommunityChatsFilters(communityID types.HexBytes) ([]*transport.Filter, error)
-	GetCommunityChatsTopics(communityID types.HexBytes) ([]types.TopicType, error)
-	GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error)
-	CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error
-	StartHistoryArchiveTasksInterval(community *Community, interval time.Duration)
-	StopHistoryArchiveTasksInterval(communityID types.HexBytes)
-	SeedHistoryArchiveTorrent(communityID types.HexBytes) error
-	UnseedHistoryArchiveTorrent(communityID types.HexBytes)
-	IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool
-	GetHistoryArchiveDownloadTask(communityID string) *HistoryArchiveDownloadTask
-	AddHistoryArchiveDownloadTask(communityID string, task *HistoryArchiveDownloadTask)
-	DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
-	TorrentFileExists(communityID string) bool
-}
-
 type TorrentManager struct {
 	torrentConfig                *params.TorrentConfig
 	torrentClient                *torrent.Client
@@ -100,7 +69,7 @@ type TorrentManager struct {
 	publisher Publisher
 }
 
-// NewTorrentManager this function is only built and called when the "windows || linux || darwin" build OS criteria are met
+// NewTorrentManager this function is only built and called when the "disable_torrent" build tag is not set
 // In this case this version of NewTorrentManager will return the full Desktop TorrentManager ensuring that the
 // build command will import and build the torrent deps for the Desktop OSes.
 // NOTE: It is intentional that this file contains the identical function name as in "manager_torrent_mobile.go"
