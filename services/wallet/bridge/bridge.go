@@ -35,6 +35,7 @@ const (
 	ERC721TransferName  = "ERC721Transfer"
 	ERC1155TransferName = "ERC1155Transfer"
 	ENSRegisterName     = "ENSRegister"
+	ENSReleaseName      = "ENSRelease"
 )
 
 func getSigner(chainID uint64, from types.Address, verifiedAccount *account.SelectedExtKey) bind.SignerFn {

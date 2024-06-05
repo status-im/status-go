@@ -108,6 +108,8 @@ func (s SendType) canUseBridge(b bridge.Bridge) bool {
 		return bridgeName == bridge.ERC1155TransferName
 	case ENSRegister:
 		return bridgeName == bridge.ENSRegisterName
+	case ENSRelease:
+		return bridgeName == bridge.ENSReleaseName
 	default:
 		return true
 	}

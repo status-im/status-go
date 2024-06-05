@@ -305,6 +305,12 @@ func validateInputData(input *RouteInputParams) error {
 		return nil
 	}
 
+	if input.SendType == ENSRelease {
+		if input.Username == "" {
+			return errors.New("username is required for ENSRelease")
+		}
+	}
+
 	if input.FromLockedAmount != nil && len(input.FromLockedAmount) > 0 {
 		for chainID, amount := range input.FromLockedAmount {
 			if input.TestnetMode {
