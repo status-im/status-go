@@ -158,6 +158,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	s.bobWaku = nil
 	s.aliceWaku = nil
 
+	s.resetMockedBalances()
+
 	s.logger = tt.MustCreateTestLogger()
 
 	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, false, []string{"owner", "bob", "alice"})
@@ -178,9 +180,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	s.Require().NoError(err)
 	_, err = s.alice.Start()
 	s.Require().NoError(err)
-
-	s.resetMockedBalances()
-
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
@@ -1602,15 +1601,15 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 	s.Require().Equal(msg.Text, response.Messages()[0].Text)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivilegedRoleInOpenCommunity(permissionType protobuf.CommunityTokenPermission_Type) {
+func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivilegedRoleInOpenCommunity(permissionType protobuf.CommunityTokenPermission_Type, tokenType protobuf.CommunityTokenType) {
 	community, _ := s.createCommunity()
 
 	createTokenPermission := &requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
 		Type:        permissionType,
 		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
-				Type:              protobuf.CommunityTokenType_ERC20,
+			{
+				Type:              tokenType,
 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
 				Symbol:            "TEST",
 				AmountInWei:       "100000000000000000000",
@@ -1705,23 +1704,31 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().False(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInOpenCommunity() {
-	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN)
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInOpenCommunity_ERC20() {
+	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN, protobuf.CommunityTokenType_ERC20)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInOpenCommunity() {
-	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInOpenCommunity_ERC721() {
+	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN, protobuf.CommunityTokenType_ERC721)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivilegedRoleInClosedCommunity(permissionType protobuf.CommunityTokenPermission_Type) {
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInOpenCommunity_ERC20() {
+	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, protobuf.CommunityTokenType_ERC20)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInOpenCommunity_ERC721() {
+	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, protobuf.CommunityTokenType_ERC721)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivilegedRoleInClosedCommunity(permissionType protobuf.CommunityTokenPermission_Type, tokenType protobuf.CommunityTokenType) {
 	community, _ := s.createCommunity()
 
 	createTokenPermission := &requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
 		Type:        permissionType,
 		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
-				Type:              protobuf.CommunityTokenType_ERC20,
+			{
+				Type:              tokenType,
 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
 				Symbol:            "TEST",
 				AmountInWei:       "100000000000000000000",
@@ -1740,8 +1747,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 		CommunityID: community.ID(),
 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
 		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
-				Type:              protobuf.CommunityTokenType_ERC20,
+			{
+				Type:              tokenType,
 				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
 				Symbol:            "TEST2",
 				AmountInWei:       "100000000000000000000",
@@ -1876,12 +1883,20 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().False(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInClosedCommunity() {
-	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN)
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInClosedCommunity_ERC20() {
+	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN, protobuf.CommunityTokenType_ERC20)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInClosedCommunity() {
-	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInClosedCommunity_ERC721() {
+	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN, protobuf.CommunityTokenType_ERC721)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInClosedCommunity_ERC20() {
+	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, protobuf.CommunityTokenType_ERC20)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInClosedCommunity_ERC721() {
+	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, protobuf.CommunityTokenType_ERC721)
 }
 
 func checkRoleBasedOnThePermissionType(permissionType protobuf.CommunityTokenPermission_Type, member *ecdsa.PublicKey, community *communities.Community) bool {

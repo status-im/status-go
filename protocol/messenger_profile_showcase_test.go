@@ -187,7 +187,7 @@ func (s *TestMessengerProfileShowcase) TestSaveAndGetProfileShowcasePreferences(
 			TxTimestamp: 0,
 		},
 	}
-	s.collectiblesMock.SetResponse(collectibleID, balances)
+	s.collectiblesMock.SetCollectibleOwnershipResponse(collectibleID, balances)
 
 	err = s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().NoError(err)
@@ -258,7 +258,7 @@ func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesW
 			TxTimestamp: 0,
 		},
 	}
-	s.collectiblesMock.SetResponse(collectibleID, balances)
+	s.collectiblesMock.SetCollectibleOwnershipResponse(collectibleID, balances)
 
 	err = s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().Equal(errorAccountVisibilityLowerThanCollectible, err)
@@ -441,7 +441,7 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 			TxTimestamp: 32443424,
 		},
 	}
-	s.collectiblesMock.SetResponse(collectibleID, balances)
+	s.collectiblesMock.SetCollectibleOwnershipResponse(collectibleID, balances)
 
 	err = s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().NoError(err)
