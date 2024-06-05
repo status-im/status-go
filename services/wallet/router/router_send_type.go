@@ -39,6 +39,10 @@ func (s SendType) IsCollectiblesTransfer() bool {
 	return s == ERC721Transfer || s == ERC1155Transfer
 }
 
+func (s SendType) IsEnsTransfer() bool {
+	return s == ENSRegister || s == ENSRelease || s == ENSSetPubKey
+}
+
 func (s SendType) FetchPrices(marketManager *market.Manager, tokenID string) (map[string]float64, error) {
 	symbols := []string{tokenID, "ETH"}
 	if s.IsCollectiblesTransfer() {
@@ -83,6 +87,7 @@ func (s SendType) FindToken(tokenManager *token.Manager, collectibles *collectib
 	}
 }
 
+// TODO: remove this function once we fully move to routerV2
 func (s SendType) isTransfer(routerV2Logic bool) bool {
 	return s == Transfer ||
 		s == Bridge && routerV2Logic ||
@@ -98,16 +103,18 @@ func (s SendType) canUseBridge(b bridge.Bridge) bool {
 	bridgeName := b.Name()
 	switch s {
 	case ERC721Transfer:
-		return bridgeName == ERC721TransferString
+		return bridgeName == bridge.ERC721TransferName
 	case ERC1155Transfer:
-		return bridgeName == ERC1155TransferString
+		return bridgeName == bridge.ERC1155TransferName
+	case ENSRegister:
+		return bridgeName == bridge.ENSRegisterName
 	default:
 		return true
 	}
 }
 
 func (s SendType) isAvailableBetween(from, to *params.Network) bool {
-	if s.IsCollectiblesTransfer() {
+	if s.IsCollectiblesTransfer() || s.IsEnsTransfer() {
 		return from.ChainID == to.ChainID
 	}
 
@@ -142,6 +149,10 @@ func (s SendType) isAvailableFor(network *params.Network) bool {
 		return swapAllowedNetworks[network.ChainID]
 	}
 
+	if s.IsEnsTransfer() {
+		return network.ChainID == walletCommon.EthereumMainnet || network.ChainID == walletCommon.EthereumSepolia
+	}
+
 	// Check for any SendType available for all networks
 	if s == Transfer || s == Bridge || s.IsCollectiblesTransfer() || allAllowedNetworks[network.ChainID] {
 		return true
@@ -150,10 +161,11 @@ func (s SendType) isAvailableFor(network *params.Network) bool {
 	return false
 }
 
+// TODO: remove this function once we fully move to routerV2
 func (s SendType) EstimateGas(ensService *ens.Service, stickersService *stickers.Service, network *params.Network, from common.Address, tokenID string) uint64 {
 	tx := transactions.SendTxArgs{
 		From:  (types.Address)(from),
-		Value: (*hexutil.Big)(zero),
+		Value: (*hexutil.Big)(bridge.ZeroBigIntValue),
 	}
 	switch s {
 	case ENSRegister:

@@ -12,7 +12,23 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/bridge"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
+)
+
+var (
+	supportedNetworks = map[uint64]bool{
+		walletCommon.EthereumMainnet: true,
+		walletCommon.OptimismMainnet: true,
+		walletCommon.ArbitrumMainnet: true,
+	}
+
+	supportedTestNetworks = map[uint64]bool{
+		walletCommon.EthereumSepolia: true,
+		walletCommon.OptimismSepolia: true,
+		walletCommon.ArbitrumSepolia: true,
+	}
 )
 
 type RouteInputParams struct {
@@ -28,6 +44,10 @@ type RouteInputParams struct {
 	GasFeeMode           GasFeeMode              `json:"gasFeeMode" validate:"required"`
 	FromLockedAmount     map[uint64]*hexutil.Big `json:"fromLockedAmount"`
 	TestnetMode          bool                    `json:"testnetMode"`
+
+	// For send types like EnsRegister, EnsRelease, EnsSetPubKey, StickersBuy
+	Username  string `json:"username"`
+	PublicKey string `json:"publicKey"`
 }
 
 type PathV2 struct {
@@ -112,7 +132,7 @@ func newSuggestedRoutesV2(
 		rest := new(big.Int).Set(amountIn)
 		for _, path := range best {
 			diff := new(big.Int).Sub(rest, path.AmountIn.ToInt())
-			if diff.Cmp(zero) >= 0 {
+			if diff.Cmp(bridge.ZeroBigIntValue) >= 0 {
 				path.AmountIn = (*hexutil.Big)(path.AmountIn.ToInt())
 			} else {
 				path.AmountIn = (*hexutil.Big)(new(big.Int).Set(rest))
@@ -214,7 +234,7 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 				pathCost = new(big.Float).Mul(txFeeInEth, nativeTokenPrice)
 			}
 
-			if path.TxBonderFees != nil && path.TxBonderFees.ToInt().Cmp(zero) > 0 {
+			if path.TxBonderFees != nil && path.TxBonderFees.ToInt().Cmp(bridge.ZeroBigIntValue) > 0 {
 				path.requiredTokenBalance.Add(path.requiredTokenBalance, path.TxBonderFees.ToInt())
 				pathCost.Add(pathCost, new(big.Float).Mul(
 					new(big.Float).Quo(new(big.Float).SetInt(path.TxBonderFees.ToInt()), tokenDenominator),
@@ -222,7 +242,7 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 
 			}
 
-			if path.TxL1Fee != nil && path.TxL1Fee.ToInt().Cmp(zero) > 0 {
+			if path.TxL1Fee != nil && path.TxL1Fee.ToInt().Cmp(bridge.ZeroBigIntValue) > 0 {
 				l1FeeInWei := path.TxL1Fee.ToInt()
 				l1FeeInEth := gweiToEth(weiToGwei(l1FeeInWei))
 
@@ -230,7 +250,7 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 				pathCost.Add(pathCost, new(big.Float).Mul(l1FeeInEth, nativeTokenPrice))
 			}
 
-			if path.TxTokenFees != nil && path.TxTokenFees.ToInt().Cmp(zero) > 0 && path.FromToken != nil {
+			if path.TxTokenFees != nil && path.TxTokenFees.ToInt().Cmp(bridge.ZeroBigIntValue) > 0 && path.FromToken != nil {
 				path.requiredTokenBalance.Add(path.requiredTokenBalance, path.TxTokenFees.ToInt())
 				pathCost.Add(pathCost, new(big.Float).Mul(
 					new(big.Float).Quo(new(big.Float).SetInt(path.TxTokenFees.ToInt()), tokenDenominator),
@@ -268,7 +288,50 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 	return best
 }
 
+func validateInputData(input *RouteInputParams) error {
+	if input.SendType == ENSRegister {
+		if input.Username == "" || input.PublicKey == "" {
+			return errors.New("username and public key are required for ENSRegister")
+		}
+		if input.TestnetMode {
+			if input.TokenID != bridge.SttSymbol {
+				return errors.New("only STT is supported for ENSRegister on testnet")
+			}
+		} else {
+			if input.TokenID != bridge.SntSymbol {
+				return errors.New("only SNT is supported for ENSRegister")
+			}
+		}
+		return nil
+	}
+
+	if input.FromLockedAmount != nil && len(input.FromLockedAmount) > 0 {
+		for chainID, amount := range input.FromLockedAmount {
+			if input.TestnetMode {
+				if !supportedTestNetworks[chainID] {
+					return errors.New("locked amount is not supported for the selected network")
+				}
+			} else {
+				if !supportedNetworks[chainID] {
+					return errors.New("locked amount is not supported for the selected network")
+				}
+			}
+
+			if amount == nil || amount.ToInt().Sign() < 0 {
+				return errors.New("locked amount must be positive")
+			}
+		}
+	}
+
+	return nil
+}
+
 func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams) (*SuggestedRoutesV2, error) {
+	err := validateInputData(input)
+	if err != nil {
+		return nil, err
+	}
+
 	networks, err := r.rpcClient.NetworkManager.Get(false)
 	if err != nil {
 		return nil, err
@@ -294,12 +357,16 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 			continue
 		}
 
-		token := input.SendType.FindToken(r.tokenManager, r.collectiblesService, input.AddrFrom, network, input.TokenID)
+		var (
+			token   *walletToken.Token
+			toToken *walletToken.Token
+		)
+
+		token = input.SendType.FindToken(r.tokenManager, r.collectiblesService, input.AddrFrom, network, input.TokenID)
 		if token == nil {
 			continue
 		}
 
-		var toToken *walletToken.Token
 		if input.SendType == Swap {
 			toToken = input.SendType.FindToken(r.tokenManager, r.collectiblesService, common.Address{}, network, input.ToTokenID)
 		}
@@ -325,8 +392,8 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 				return err
 			}
 
-			for _, bridge := range r.bridges {
-				if !input.SendType.canUseBridge(bridge) {
+			for _, brdg := range r.bridges {
+				if !input.SendType.canUseBridge(brdg) {
 					continue
 				}
 
@@ -351,27 +418,35 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						continue
 					}
 
-					can, err := bridge.AvailableFor(network, dest, token, toToken)
+					bridgeParams := bridge.BridgeParams{
+						FromChain: network,
+						ToChain:   dest,
+						FromToken: token,
+						ToToken:   toToken,
+						ToAddr:    input.AddrTo,
+						FromAddr:  input.AddrFrom,
+						AmountIn:  amountToSend,
+
+						Username:  input.Username,
+						PublicKey: input.PublicKey,
+					}
+
+					can, err := brdg.AvailableFor(bridgeParams)
 					if err != nil || !can {
 						continue
 					}
 
-					bonderFees, tokenFees, err := bridge.CalculateFees(network, dest, token, amountToSend)
+					bonderFees, tokenFees, err := brdg.CalculateFees(bridgeParams)
 					if err != nil {
 						continue
 					}
 
-					gasLimit := uint64(0)
-					if input.SendType.isTransfer(true) {
-						gasLimit, err = bridge.EstimateGas(network, dest, input.AddrFrom, input.AddrTo, token, toToken, amountToSend)
-						if err != nil {
-							continue
-						}
-					} else {
-						gasLimit = input.SendType.EstimateGas(r.ensService, r.stickersService, network, input.AddrFrom, input.TokenID)
+					gasLimit, err := brdg.EstimateGas(bridgeParams)
+					if err != nil {
+						continue
 					}
 
-					approvalContractAddress, err := bridge.GetContractAddress(network, token)
+					approvalContractAddress, err := brdg.GetContractAddress(bridgeParams)
 					if err != nil {
 						continue
 					}
@@ -383,7 +458,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 					var l1FeeWei uint64
 					if input.SendType.needL1Fee() {
 
-						txInputData, err := bridge.PackTxInputData("", network, dest, input.AddrFrom, input.AddrTo, token, amountToSend)
+						txInputData, err := brdg.PackTxInputData(bridgeParams, "")
 						if err != nil {
 							continue
 						}
@@ -407,7 +482,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						selctedPriorityFee = priorityFees.Low
 					}
 
-					amountOut, err := bridge.CalculateAmountOut(network, dest, amountToSend, token.Symbol)
+					amountOut, err := brdg.CalculateAmountOut(bridgeParams)
 					if err != nil {
 						continue
 					}
@@ -421,7 +496,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 
 					mu.Lock()
 					candidates = append(candidates, &PathV2{
-						BridgeName:     bridge.Name(),
+						BridgeName:     brdg.Name(),
 						FromChain:      network,
 						ToChain:        network,
 						FromToken:      token,

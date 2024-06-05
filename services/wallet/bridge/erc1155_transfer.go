@@ -15,9 +15,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts/ierc1155"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -38,53 +36,53 @@ func NewERC1155TransferBridge(rpcClient *rpc.Client, transactor transactions.Tra
 }
 
 func (s *ERC1155TransferBridge) Name() string {
-	return "ERC1155Transfer"
+	return ERC1155TransferName
 }
 
-func (s *ERC1155TransferBridge) AvailableFor(from, to *params.Network, token *token.Token, toToken *token.Token) (bool, error) {
-	return from.ChainID == to.ChainID && toToken == nil, nil
+func (s *ERC1155TransferBridge) AvailableFor(params BridgeParams) (bool, error) {
+	return params.FromChain.ChainID == params.ToChain.ChainID && params.ToToken == nil, nil
 }
 
-func (s *ERC1155TransferBridge) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int) (*big.Int, *big.Int, error) {
+func (s *ERC1155TransferBridge) CalculateFees(params BridgeParams) (*big.Int, *big.Int, error) {
 	return big.NewInt(0), big.NewInt(0), nil
 }
 
-func (s *ERC1155TransferBridge) PackTxInputData(contractType string, fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
+func (s *ERC1155TransferBridge) PackTxInputData(params BridgeParams, contractType string) ([]byte, error) {
 	abi, err := abi.JSON(strings.NewReader(ierc1155.Ierc1155ABI))
 	if err != nil {
 		return []byte{}, err
 	}
 
-	id, success := big.NewInt(0).SetString(token.Symbol, 0)
+	id, success := big.NewInt(0).SetString(params.FromToken.Symbol, 0)
 	if !success {
-		return []byte{}, fmt.Errorf("failed to convert %s to big.Int", token.Symbol)
+		return []byte{}, fmt.Errorf("failed to convert %s to big.Int", params.FromToken.Symbol)
 	}
 
 	return abi.Pack("safeTransferFrom",
-		from,
-		to,
+		params.FromAddr,
+		params.ToAddr,
 		id,
-		amountIn,
+		params.AmountIn,
 		[]byte{},
 	)
 }
 
-func (s *ERC1155TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
-	ethClient, err := s.rpcClient.EthClient(fromNetwork.ChainID)
+func (s *ERC1155TransferBridge) EstimateGas(params BridgeParams) (uint64, error) {
+	ethClient, err := s.rpcClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, err
 	}
 
 	value := new(big.Int)
 
-	input, err := s.PackTxInputData("", fromNetwork, toNetwork, from, to, token, amountIn)
+	input, err := s.PackTxInputData(params, "")
 	if err != nil {
 		return 0, err
 	}
 
 	msg := ethereum.CallMsg{
-		From:  from,
-		To:    &token.Address,
+		From:  params.FromAddr,
+		To:    &params.FromToken.Address,
 		Value: value,
 		Data:  input,
 	}
@@ -97,28 +95,28 @@ func (s *ERC1155TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwo
 	return uint64(increasedEstimation), nil
 }
 
-func (s *ERC1155TransferBridge) BuildTx(network, _ *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int, _ *big.Int) (*ethTypes.Transaction, error) {
-	contractAddress := types.Address(token.Address)
+func (s *ERC1155TransferBridge) BuildTx(params BridgeParams) (*ethTypes.Transaction, error) {
+	contractAddress := types.Address(params.FromToken.Address)
 
 	// We store ERC1155 Token ID using big.Int.String() in token.Symbol
-	tokenID, success := new(big.Int).SetString(token.Symbol, 10)
+	tokenID, success := new(big.Int).SetString(params.FromToken.Symbol, 10)
 	if !success {
-		return nil, fmt.Errorf("failed to convert ERC1155's Symbol %s to big.Int", token.Symbol)
+		return nil, fmt.Errorf("failed to convert ERC1155's Symbol %s to big.Int", params.FromToken.Symbol)
 	}
 
 	sendArgs := &TransactionBridge{
 		ERC1155TransferTx: &ERC1155TransferTxArgs{
 			SendTxArgs: transactions.SendTxArgs{
-				From:  types.Address(fromAddress),
+				From:  types.Address(params.FromAddr),
 				To:    &contractAddress,
-				Value: (*hexutil.Big)(amountIn),
+				Value: (*hexutil.Big)(params.AmountIn),
 				Data:  types.HexBytes("0x0"),
 			},
 			TokenID:   (*hexutil.Big)(tokenID),
-			Recipient: toAddress,
-			Amount:    (*hexutil.Big)(amountIn),
+			Recipient: params.ToAddr,
+			Amount:    (*hexutil.Big)(params.AmountIn),
 		},
-		ChainID: network.ChainID,
+		ChainID: params.FromChain.ChainID,
 	}
 
 	return s.BuildTransaction(sendArgs)
@@ -165,10 +163,10 @@ func (s *ERC1155TransferBridge) BuildTransaction(sendArgs *TransactionBridge) (*
 	return s.sendOrBuild(sendArgs, nil)
 }
 
-func (s *ERC1155TransferBridge) CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error) {
-	return amountIn, nil
+func (s *ERC1155TransferBridge) CalculateAmountOut(params BridgeParams) (*big.Int, error) {
+	return params.AmountIn, nil
 }
 
-func (s *ERC1155TransferBridge) GetContractAddress(network *params.Network, token *token.Token) (common.Address, error) {
-	return token.Address, nil
+func (s *ERC1155TransferBridge) GetContractAddress(params BridgeParams) (common.Address, error) {
+	return params.FromToken.Address, nil
 }
