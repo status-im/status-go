@@ -13,9 +13,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	account "github.com/status-im/status-go/account"
 	types0 "github.com/status-im/status-go/eth-node/types"
-	params "github.com/status-im/status-go/params"
 	bridge "github.com/status-im/status-go/services/wallet/bridge"
-	token "github.com/status-im/status-go/services/wallet/token"
 )
 
 // MockBridge is a mock of Bridge interface.
@@ -42,18 +40,18 @@ func (m *MockBridge) EXPECT() *MockBridgeMockRecorder {
 }
 
 // AvailableFor mocks base method.
-func (m *MockBridge) AvailableFor(from, to *params.Network, token, toToken *token.Token) (bool, error) {
+func (m *MockBridge) AvailableFor(params bridge.BridgeParams) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AvailableFor", from, to, token, toToken)
+	ret := m.ctrl.Call(m, "AvailableFor", params)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // AvailableFor indicates an expected call of AvailableFor.
-func (mr *MockBridgeMockRecorder) AvailableFor(from, to, token, toToken interface{}) *gomock.Call {
+func (mr *MockBridgeMockRecorder) AvailableFor(params interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AvailableFor", reflect.TypeOf((*MockBridge)(nil).AvailableFor), from, to, token, toToken)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AvailableFor", reflect.TypeOf((*MockBridge)(nil).AvailableFor), params)
 }
 
 // BuildTransaction mocks base method.
@@ -72,39 +70,39 @@ func (mr *MockBridgeMockRecorder) BuildTransaction(sendArgs interface{}) *gomock
 }
 
 // BuildTx mocks base method.
-func (m *MockBridge) BuildTx(fromNetwork, toNetwork *params.Network, fromAddress, toAddress common.Address, token *token.Token, amountIn, bonderFee *big.Int) (*types.Transaction, error) {
+func (m *MockBridge) BuildTx(params bridge.BridgeParams) (*types.Transaction, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BuildTx", fromNetwork, toNetwork, fromAddress, toAddress, token, amountIn, bonderFee)
+	ret := m.ctrl.Call(m, "BuildTx", params)
 	ret0, _ := ret[0].(*types.Transaction)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // BuildTx indicates an expected call of BuildTx.
-func (mr *MockBridgeMockRecorder) BuildTx(fromNetwork, toNetwork, fromAddress, toAddress, token, amountIn, bonderFee interface{}) *gomock.Call {
+func (mr *MockBridgeMockRecorder) BuildTx(params interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildTx", reflect.TypeOf((*MockBridge)(nil).BuildTx), fromNetwork, toNetwork, fromAddress, toAddress, token, amountIn, bonderFee)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildTx", reflect.TypeOf((*MockBridge)(nil).BuildTx), params)
 }
 
 // CalculateAmountOut mocks base method.
-func (m *MockBridge) CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error) {
+func (m *MockBridge) CalculateAmountOut(params bridge.BridgeParams) (*big.Int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CalculateAmountOut", from, to, amountIn, symbol)
+	ret := m.ctrl.Call(m, "CalculateAmountOut", params)
 	ret0, _ := ret[0].(*big.Int)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CalculateAmountOut indicates an expected call of CalculateAmountOut.
-func (mr *MockBridgeMockRecorder) CalculateAmountOut(from, to, amountIn, symbol interface{}) *gomock.Call {
+func (mr *MockBridgeMockRecorder) CalculateAmountOut(params interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateAmountOut", reflect.TypeOf((*MockBridge)(nil).CalculateAmountOut), from, to, amountIn, symbol)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateAmountOut", reflect.TypeOf((*MockBridge)(nil).CalculateAmountOut), params)
 }
 
 // CalculateFees mocks base method.
-func (m *MockBridge) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int) (*big.Int, *big.Int, error) {
+func (m *MockBridge) CalculateFees(params bridge.BridgeParams) (*big.Int, *big.Int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CalculateFees", from, to, token, amountIn)
+	ret := m.ctrl.Call(m, "CalculateFees", params)
 	ret0, _ := ret[0].(*big.Int)
 	ret1, _ := ret[1].(*big.Int)
 	ret2, _ := ret[2].(error)
@@ -112,39 +110,39 @@ func (m *MockBridge) CalculateFees(from, to *params.Network, token *token.Token,
 }
 
 // CalculateFees indicates an expected call of CalculateFees.
-func (mr *MockBridgeMockRecorder) CalculateFees(from, to, token, amountIn interface{}) *gomock.Call {
+func (mr *MockBridgeMockRecorder) CalculateFees(params interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateFees", reflect.TypeOf((*MockBridge)(nil).CalculateFees), from, to, token, amountIn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateFees", reflect.TypeOf((*MockBridge)(nil).CalculateFees), params)
 }
 
 // EstimateGas mocks base method.
-func (m *MockBridge) EstimateGas(fromNetwork, toNetwork *params.Network, from, to common.Address, token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
+func (m *MockBridge) EstimateGas(params bridge.BridgeParams) (uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EstimateGas", fromNetwork, toNetwork, from, to, token, toToken, amountIn)
+	ret := m.ctrl.Call(m, "EstimateGas", params)
 	ret0, _ := ret[0].(uint64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // EstimateGas indicates an expected call of EstimateGas.
-func (mr *MockBridgeMockRecorder) EstimateGas(fromNetwork, toNetwork, from, to, token, toToken, amountIn interface{}) *gomock.Call {
+func (mr *MockBridgeMockRecorder) EstimateGas(params interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EstimateGas", reflect.TypeOf((*MockBridge)(nil).EstimateGas), fromNetwork, toNetwork, from, to, token, toToken, amountIn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EstimateGas", reflect.TypeOf((*MockBridge)(nil).EstimateGas), params)
 }
 
 // GetContractAddress mocks base method.
-func (m *MockBridge) GetContractAddress(network *params.Network, token *token.Token) (common.Address, error) {
+func (m *MockBridge) GetContractAddress(params bridge.BridgeParams) (common.Address, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetContractAddress", network, token)
+	ret := m.ctrl.Call(m, "GetContractAddress", params)
 	ret0, _ := ret[0].(common.Address)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetContractAddress indicates an expected call of GetContractAddress.
-func (mr *MockBridgeMockRecorder) GetContractAddress(network, token interface{}) *gomock.Call {
+func (mr *MockBridgeMockRecorder) GetContractAddress(params interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetContractAddress", reflect.TypeOf((*MockBridge)(nil).GetContractAddress), network, token)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetContractAddress", reflect.TypeOf((*MockBridge)(nil).GetContractAddress), params)
 }
 
 // Name mocks base method.
@@ -162,18 +160,18 @@ func (mr *MockBridgeMockRecorder) Name() *gomock.Call {
 }
 
 // PackTxInputData mocks base method.
-func (m *MockBridge) PackTxInputData(contractType string, fromNetwork, toNetwork *params.Network, from, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
+func (m *MockBridge) PackTxInputData(params bridge.BridgeParams, contractType string) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PackTxInputData", contractType, fromNetwork, toNetwork, from, to, token, amountIn)
+	ret := m.ctrl.Call(m, "PackTxInputData", params, contractType)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PackTxInputData indicates an expected call of PackTxInputData.
-func (mr *MockBridgeMockRecorder) PackTxInputData(contractType, fromNetwork, toNetwork, from, to, token, amountIn interface{}) *gomock.Call {
+func (mr *MockBridgeMockRecorder) PackTxInputData(params, contractType interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PackTxInputData", reflect.TypeOf((*MockBridge)(nil).PackTxInputData), contractType, fromNetwork, toNetwork, from, to, token, amountIn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PackTxInputData", reflect.TypeOf((*MockBridge)(nil).PackTxInputData), params, contractType)
 }
 
 // Send mocks base method.
