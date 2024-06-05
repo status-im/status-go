@@ -237,6 +237,7 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 	configJSON := `{
 		"Name": "test",
 		"NetworkId": ` + strconv.Itoa(networkID) + `,
+		"RootDataDir": "` + testDir + `",
 		"DataDir": "` + testDir + `",
 		"KeyStoreDir": "` + path.Join(testDir, "keystore") + `",
 		"KeycardPairingDataFile": "` + path.Join(testDir, "keycard/pairings.json") + `",
@@ -246,9 +247,6 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 		"NoDiscovery": true,
 		"LightEthConfig": {
 			"Enabled": true
-		},
-		"ShhextConfig": {
-			"BackupDisabledDataDir": "` + testDir + `"
 		}
 	}`
 

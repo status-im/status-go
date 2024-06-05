@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/sqlite"
 
@@ -1305,13 +1307,12 @@ func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error)
 func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, fetchBackup bool, request *requests.CreateAccount, opts ...params.Option) (*multiaccounts.Account, error) {
 	keystoreDir := keystoreRelativePath
 
-	b.UpdateRootDataDir(request.BackupDisabledDataDir)
+	b.UpdateRootDataDir(request.RootDataDir)
 	err := b.OpenAccounts()
 	if err != nil {
 		b.log.Error("failed open accounts", err)
 		return nil, err
 	}
-
 	accountGenerator := b.accountManager.AccountsGenerator()
 
 	var info generator.GeneratedAccountInfo
@@ -1751,13 +1752,20 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 	conf.Version = params.Version
 	conf.RootDataDir = b.rootDataDir
 	conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
-	conf.ShhextConfig.BackupDisabledDataDir = filepath.Join(b.rootDataDir, conf.ShhextConfig.BackupDisabledDataDir)
+	conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
+
+	if _, err = os.Stat(conf.RootDataDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(conf.RootDataDir, os.ModePerm); err != nil {
+			b.log.Warn("failed to create data directory", zap.Error(err))
+			return err
+		}
+	}
+
 	if len(conf.LogDir) == 0 {
 		conf.LogFile = filepath.Join(b.rootDataDir, conf.LogFile)
 	} else {
 		conf.LogFile = filepath.Join(conf.LogDir, conf.LogFile)
 	}
-	conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
 
 	b.config = conf
 
