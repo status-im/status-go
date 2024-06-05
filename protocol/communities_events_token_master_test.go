@@ -61,6 +61,8 @@ func (s *TokenMasterCommunityEventsSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 
+	s.mockedBalances = createMockedWalletBalance(&s.Suite)
+
 	config := waku.DefaultConfig
 	config.MinimumAcceptedPoW = 0
 	shh := waku.New(&config, s.logger)
@@ -77,7 +79,6 @@ func (s *TokenMasterCommunityEventsSuite) SetupTest() {
 	_, err = s.alice.Start()
 	s.Require().NoError(err)
 
-	s.mockedBalances = createMockedWalletBalance(&s.Suite)
 }
 
 func (s *TokenMasterCommunityEventsSuite) TearDownTest() {
