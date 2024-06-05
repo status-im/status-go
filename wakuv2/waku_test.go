@@ -25,7 +25,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
 
 	"github.com/status-im/status-go/appdatabase"
@@ -35,13 +34,14 @@ import (
 	"github.com/status-im/status-go/wakuv2/common"
 )
 
-var testENRBootstrap = "enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
+var testENRBootstrap = "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@store.test.shards.nodes.status.im"
 
 func TestDiscoveryV5(t *testing.T) {
 	config := &Config{}
 	config.EnableDiscV5 = true
 	config.DiscV5BootstrapNodes = []string{testENRBootstrap}
 	config.DiscoveryLimit = 20
+	config.ClusterID = 16
 	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 
@@ -67,6 +67,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	config.DiscV5BootstrapNodes = []string{"enrtree://AOGECG2SPND25EEFMAJ5WF3KSGJNSGV356DSTL2YVLLZWIV6SAYBM@1.1.1.2"}
 	config.DiscoveryLimit = 20
 	config.UDPPort = 9002
+	config.ClusterID = 16
 	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 
@@ -116,6 +117,8 @@ func TestBasicWakuV2(t *testing.T) {
 
 	config := &Config{}
 	config.Port = 0
+	config.ClusterID = 16
+	config.UseShardAsDefaultTopic = true
 	config.EnableDiscV5 = true
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
@@ -152,6 +155,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, err)
 
 	filter := &common.Filter{
+		PubsubTopic:   config.DefaultShardPubsubTopic,
 		Messages:      common.NewMemoryMessageStore(),
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{[]byte{1, 2, 3, 4}}),
 	}
@@ -162,7 +166,9 @@ func TestBasicWakuV2(t *testing.T) {
 	msgTimestamp := w.timestamp()
 	contentTopic := maps.Keys(filter.ContentTopics)[0]
 
-	_, err = w.Send(relay.DefaultWakuTopic, &pb.WakuMessage{
+	time.Sleep(2 * time.Second)
+
+	_, err = w.Send(config.DefaultShardPubsubTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: contentTopic.ContentTopic(),
 		Version:      proto.Uint32(0),
@@ -183,18 +189,20 @@ func TestBasicWakuV2(t *testing.T) {
 		b.InitialInterval = 500 * time.Millisecond
 	}
 	err = tt.RetryWithBackOff(func() error {
-		storeResult, err := w.query(
+		_, envelopeCount, err := w.Query(
 			context.Background(),
 			storeNode.PeerID,
-			relay.DefaultWakuTopic,
-			[]common.TopicType{contentTopic},
-			uint64(timestampInSeconds-int64(marginInSeconds)),
-			uint64(timestampInSeconds+int64(marginInSeconds)),
-			[]byte{},
+			legacy_store.Query{
+				PubsubTopic:   config.DefaultShardPubsubTopic,
+				ContentTopics: []string{contentTopic.ContentTopic()},
+				StartTime:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
+				EndTime:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
+			},
 			nil,
 			[]legacy_store.HistoryRequestOption{},
+			false,
 		)
-		if err != nil || len(storeResult.Messages) == 0 {
+		if err != nil || envelopeCount == 0 {
 			// in case of failure extend timestamp margin up to 40secs
 			if marginInSeconds < 40 {
 				marginInSeconds += 5
@@ -236,6 +244,7 @@ func TestPeerExchange(t *testing.T) {
 	require.NoError(t, err)
 	// start node which serve as PeerExchange server
 	config := &Config{}
+	config.ClusterID = 16
 	config.EnableDiscV5 = true
 	config.EnablePeerExchangeServer = true
 	config.EnablePeerExchangeClient = false
@@ -247,6 +256,7 @@ func TestPeerExchange(t *testing.T) {
 
 	// start node that will be discovered by PeerExchange
 	config = &Config{}
+	config.ClusterID = 16
 	config.EnableDiscV5 = true
 	config.EnablePeerExchangeServer = false
 	config.EnablePeerExchangeClient = false
@@ -263,6 +273,7 @@ func TestPeerExchange(t *testing.T) {
 	resolver := mapResolver(tree.ToTXT("n"))
 
 	config = &Config{}
+	config.ClusterID = 16
 	config.EnablePeerExchangeServer = false
 	config.EnablePeerExchangeClient = true
 	config.LightClient = true
@@ -302,6 +313,7 @@ func TestWakuV2Filter(t *testing.T) {
 	}
 
 	config := &Config{}
+	config.ClusterID = 16
 	config.Port = 0
 	config.LightClient = true
 	config.KeepAliveInterval = 1
@@ -389,13 +401,15 @@ func TestWakuV2Filter(t *testing.T) {
 func TestWakuV2Store(t *testing.T) {
 	// Configuration for the first Waku node
 	config1 := &Config{
-		Port:              0,
-		EnableDiscV5:      false,
-		DiscoveryLimit:    20,
-		EnableStore:       false,
-		StoreCapacity:     100,
-		StoreSeconds:      3600,
-		KeepAliveInterval: 10,
+		Port:                   0,
+		UseShardAsDefaultTopic: true,
+		ClusterID:              16,
+		EnableDiscV5:           false,
+		DiscoveryLimit:         20,
+		EnableStore:            false,
+		StoreCapacity:          100,
+		StoreSeconds:           3600,
+		KeepAliveInterval:      10,
 	}
 	w1PeersCh := make(chan []string, 100) // buffered not to block on the send side
 
@@ -414,13 +428,15 @@ func TestWakuV2Store(t *testing.T) {
 	sql2, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 	config2 := &Config{
-		Port:              0,
-		EnableDiscV5:      false,
-		DiscoveryLimit:    20,
-		EnableStore:       true,
-		StoreCapacity:     100,
-		StoreSeconds:      3600,
-		KeepAliveInterval: 10,
+		Port:                   0,
+		UseShardAsDefaultTopic: true,
+		ClusterID:              16,
+		EnableDiscV5:           false,
+		DiscoveryLimit:         20,
+		EnableStore:            true,
+		StoreCapacity:          100,
+		StoreSeconds:           3600,
+		KeepAliveInterval:      10,
 	}
 
 	// Start the second Waku node
@@ -444,6 +460,7 @@ func TestWakuV2Store(t *testing.T) {
 	// Create a filter for the second node to catch messages
 	filter := &common.Filter{
 		Messages:      common.NewMemoryMessageStore(),
+		PubsubTopic:   config2.DefaultShardPubsubTopic,
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
 	}
 
@@ -453,7 +470,7 @@ func TestWakuV2Store(t *testing.T) {
 	// Send a message from the first node
 	msgTimestamp := w1.CurrentTime().UnixNano()
 	contentTopic := maps.Keys(filter.ContentTopics)[0]
-	_, err = w1.Send(relay.DefaultWakuTopic, &pb.WakuMessage{
+	_, err = w1.Send(config1.DefaultShardPubsubTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: contentTopic.ContentTopic(),
 		Version:      proto.Uint32(0),
@@ -469,21 +486,22 @@ func TestWakuV2Store(t *testing.T) {
 
 	timestampInSeconds := msgTimestamp / int64(time.Second)
 	marginInSeconds := 5
-
 	// Query the second node's store for the message
-	storeResult, err := w1.query(
+	_, envelopeCount, err := w1.Query(
 		context.Background(),
 		w2.node.Host().ID(),
-		relay.DefaultWakuTopic,
-		[]common.TopicType{contentTopic},
-		uint64(timestampInSeconds-int64(marginInSeconds)),
-		uint64(timestampInSeconds+int64(marginInSeconds)),
-		[]byte{},
+		legacy_store.Query{
+			PubsubTopic:   config1.DefaultShardPubsubTopic,
+			ContentTopics: []string{contentTopic.ContentTopic()},
+			StartTime:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
+			EndTime:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
+		},
 		nil,
 		[]legacy_store.HistoryRequestOption{},
+		false,
 	)
 	require.NoError(t, err)
-	require.True(t, len(storeResult.Messages) > 0, "no messages received from store node")
+	require.True(t, envelopeCount > 0, "no messages received from store node")
 }
 
 func waitForPeerConnection(t *testing.T, peerID string, peerCh chan []string) {

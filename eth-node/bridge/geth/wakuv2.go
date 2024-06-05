@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/legacy_store/pb"
@@ -198,12 +199,16 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID []b
 		}
 	}
 
-	var contentTopics []wakucommon.TopicType
+	query := legacy_store.Query{
+		StartTime:   proto.Int64(int64(r.From) * int64(time.Second)),
+		EndTime:     proto.Int64(int64(r.To) * int64(time.Second)),
+		PubsubTopic: w.waku.GetPubsubTopic(r.PubsubTopic),
+	}
 	for _, topic := range r.ContentTopics {
-		contentTopics = append(contentTopics, wakucommon.BytesToTopic(topic))
+		query.ContentTopics = append(query.ContentTopics, wakucommon.BytesToTopic(topic).ContentTopic())
 	}
 
-	pbCursor, envelopesCount, err := w.waku.Query(ctx, peer, r.PubsubTopic, contentTopics, uint64(r.From), uint64(r.To), cursor, options, processEnvelopes)
+	pbCursor, envelopesCount, err := w.waku.Query(ctx, peer, query, cursor, options, processEnvelopes)
 	if err != nil {
 		return nil, 0, err
 	}
