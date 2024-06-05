@@ -191,6 +191,7 @@ func TestBasicWakuV2(t *testing.T) {
 			uint64(timestampInSeconds-int64(marginInSeconds)),
 			uint64(timestampInSeconds+int64(marginInSeconds)),
 			[]byte{},
+			nil,
 			[]legacy_store.HistoryRequestOption{},
 		)
 		if err != nil || len(storeResult.Messages) == 0 {
@@ -478,6 +479,7 @@ func TestWakuV2Store(t *testing.T) {
 		uint64(timestampInSeconds-int64(marginInSeconds)),
 		uint64(timestampInSeconds+int64(marginInSeconds)),
 		[]byte{},
+		nil,
 		[]legacy_store.HistoryRequestOption{},
 	)
 	require.NoError(t, err)

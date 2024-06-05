@@ -1023,10 +1023,14 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
 	return envelope.Hash().Bytes(), nil
 }
 
-func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, requestID []byte, opts []legacy_store.HistoryRequestOption) (*legacy_store.Result, error) {
+func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, requestID []byte, cursor *storepb.Index, opts []legacy_store.HistoryRequestOption) (*legacy_store.Result, error) {
 
 	if len(requestID) != 0 {
 		opts = append(opts, legacy_store.WithRequestID(requestID))
+	}
+
+	if cursor != nil {
+		opts = append(opts, legacy_store.WithCursor(cursor))
 	}
 
 	strTopics := make([]string, len(topics))
@@ -1043,23 +1047,30 @@ func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 		PubsubTopic:   pubsubTopic,
 	}
 
+	cursorLogField := zap.Skip()
+	if cursor != nil {
+		cursorLogField = zap.Stringer("cursor", cursor)
+	}
+
 	w.logger.Debug("store.query",
 		zap.String("requestID", hexutil.Encode(requestID)),
 		logutils.WakuMessageTimestamp("startTime", query.StartTime),
 		logutils.WakuMessageTimestamp("endTime", query.EndTime),
 		zap.Strings("contentTopics", query.ContentTopics),
 		zap.String("pubsubTopic", query.PubsubTopic),
-		zap.Stringer("peerID", peerID))
+		zap.Stringer("peerID", peerID),
+		cursorLogField,
+	)
 
 	return w.node.LegacyStore().Query(ctx, query, opts...)
 }
 
-func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, opts []legacy_store.HistoryRequestOption, processEnvelopes bool) (cursor *storepb.Index, envelopesCount int, err error) {
+func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, cursor *storepb.Index, opts []legacy_store.HistoryRequestOption, processEnvelopes bool) (resultCursor *storepb.Index, envelopesCount int, err error) {
 	requestID := protocol.GenerateRequestID()
 	pubsubTopic = w.getPubsubTopic(pubsubTopic)
 
 	queryStart := time.Now()
-	result, err := w.query(ctx, peerID, pubsubTopic, topics, from, to, requestID, opts)
+	result, err := w.query(ctx, peerID, pubsubTopic, topics, from, to, requestID, cursor, opts)
 	queryDuration := time.Since(queryStart)
 
 	if err != nil {
@@ -1075,7 +1086,13 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 	}
 
 	envelopesCount = len(result.Messages)
-	w.logger.Debug("store.query response", zap.Duration("queryDuration", queryDuration), zap.Int("numMessages", envelopesCount), zap.Bool("hasCursor", result.IsComplete() && result.Cursor() != nil))
+
+	cursorLogField := zap.Skip()
+	if cursor != nil {
+		cursorLogField = zap.Stringer("cursor", cursor)
+	}
+
+	w.logger.Debug("store.query response", zap.String("requestID", hexutil.Encode(requestID)), zap.Duration("queryDuration", queryDuration), zap.Int("numMessages", envelopesCount), cursorLogField)
 
 	for _, msg := range result.Messages {
 		// Temporarily setting RateLimitProof to nil so it matches the WakuMessage protobuffer we are sending
@@ -1096,7 +1113,7 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 	}
 
 	if !result.IsComplete() {
-		cursor = result.Cursor()
+		resultCursor = result.Cursor()
 	}
 
 	return

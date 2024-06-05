@@ -188,13 +188,14 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID []b
 		legacy_store.WithPaging(false, uint64(r.Limit)),
 	}
 
+	var cursor *storepb.Index
 	if r.StoreCursor != nil {
-		options = append(options, legacy_store.WithCursor(&storepb.Index{
+		cursor = &storepb.Index{
 			Digest:       r.StoreCursor.Digest,
 			ReceiverTime: r.StoreCursor.ReceiverTime,
 			SenderTime:   r.StoreCursor.SenderTime,
 			PubsubTopic:  r.StoreCursor.PubsubTopic,
-		}))
+		}
 	}
 
 	var contentTopics []wakucommon.TopicType
@@ -202,7 +203,7 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID []b
 		contentTopics = append(contentTopics, wakucommon.BytesToTopic(topic))
 	}
 
-	pbCursor, envelopesCount, err := w.waku.Query(ctx, peer, r.PubsubTopic, contentTopics, uint64(r.From), uint64(r.To), options, processEnvelopes)
+	pbCursor, envelopesCount, err := w.waku.Query(ctx, peer, r.PubsubTopic, contentTopics, uint64(r.From), uint64(r.To), cursor, options, processEnvelopes)
 	if err != nil {
 		return nil, 0, err
 	}
