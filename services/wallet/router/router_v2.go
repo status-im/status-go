@@ -32,8 +32,8 @@ type RouteInputParams struct {
 
 type PathV2 struct {
 	BridgeName     string
-	From           *params.Network    // Source chain
-	To             *params.Network    // Destination chain
+	FromChain      *params.Network    // Source chain
+	ToChain        *params.Network    // Destination chain
 	FromToken      *walletToken.Token // Token on the source chain
 	AmountIn       *hexutil.Big       // Amount that will be sent from the source chain
 	AmountInLocked bool               // Is the amount locked
@@ -63,7 +63,7 @@ type PathV2 struct {
 }
 
 func (p *PathV2) Equal(o *PathV2) bool {
-	return p.From.ChainID == o.From.ChainID && p.To.ChainID == o.To.ChainID
+	return p.FromChain.ChainID == o.FromChain.ChainID && p.ToChain.ChainID == o.ToChain.ChainID
 }
 
 type SuggestedRoutesV2 struct {
@@ -134,7 +134,7 @@ func buildGraphV2(AmountIn *big.Int, routes []*PathV2, level int, sourceChainIDs
 	for _, route := range routes {
 		found := false
 		for _, chainID := range sourceChainIDs {
-			if chainID == route.From.ChainID {
+			if chainID == route.FromChain.ChainID {
 				found = true
 				break
 			}
@@ -156,7 +156,7 @@ func buildGraphV2(AmountIn *big.Int, routes []*PathV2, level int, sourceChainIDs
 		if newAmountIn.Sign() > 0 {
 			newSourceChainIDs := make([]uint64, len(sourceChainIDs))
 			copy(newSourceChainIDs, sourceChainIDs)
-			newSourceChainIDs = append(newSourceChainIDs, route.From.ChainID)
+			newSourceChainIDs = append(newSourceChainIDs, route.FromChain.ChainID)
 			node.Children = buildGraphV2(newAmountIn, newRoutes, level+1, newSourceChainIDs)
 
 			if len(node.Children) == 0 {
@@ -422,8 +422,8 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 					mu.Lock()
 					candidates = append(candidates, &PathV2{
 						BridgeName:     bridge.Name(),
-						From:           network,
-						To:             network,
+						FromChain:      network,
+						ToChain:        network,
 						FromToken:      token,
 						AmountIn:       (*hexutil.Big)(amountToSend),
 						AmountInLocked: amountLocked,
@@ -471,12 +471,12 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 		if path.requiredTokenBalance != nil && path.requiredTokenBalance.Cmp(big.NewInt(0)) > 0 {
 			tokenBalance := big.NewInt(1)
 			if input.SendType == ERC1155Transfer {
-				tokenBalance, err = r.getERC1155Balance(ctx, path.From, path.FromToken, input.AddrFrom)
+				tokenBalance, err = r.getERC1155Balance(ctx, path.FromChain, path.FromToken, input.AddrFrom)
 				if err != nil {
 					return nil, err
 				}
 			} else if input.SendType != ERC721Transfer {
-				tokenBalance, err = r.getBalance(ctx, path.From, path.FromToken, input.AddrFrom)
+				tokenBalance, err = r.getBalance(ctx, path.FromChain, path.FromToken, input.AddrFrom)
 				if err != nil {
 					return nil, err
 				}
@@ -487,12 +487,12 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 			}
 		}
 
-		nativeToken := r.tokenManager.FindToken(path.From, path.From.NativeCurrencySymbol)
+		nativeToken := r.tokenManager.FindToken(path.FromChain, path.FromChain.NativeCurrencySymbol)
 		if nativeToken == nil {
 			return nil, errors.New("native token not found")
 		}
 
-		nativeBalance, err := r.getBalance(ctx, path.From, nativeToken, input.AddrFrom)
+		nativeBalance, err := r.getBalance(ctx, path.FromChain, nativeToken, input.AddrFrom)
 		if err != nil {
 			return nil, err
 		}
