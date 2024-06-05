@@ -189,7 +189,7 @@ statusgo-android: ##@cross-compile Build status-go for Android
 	gomobile init; \
 	gomobile bind -v \
 		-target=android -ldflags="-s -w" \
-		-tags '$(BUILD_TAGS)' \
+		-tags '$(BUILD_TAGS) disable_torrent' \
 		$(BUILD_FLAGS_MOBILE) \
 		-o build/bin/statusgo.aar \
 		github.com/status-im/status-go/mobile
@@ -201,7 +201,7 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 	gomobile init; \
 	gomobile bind -v \
 		-target=ios -ldflags="-s -w" \
-		-tags 'nowatchdog $(BUILD_TAGS)' \
+		-tags 'nowatchdog $(BUILD_TAGS) disable_torrent' \
 		$(BUILD_FLAGS_MOBILE) \
 		-o build/bin/Statusgo.xcframework \
 		github.com/status-im/status-go/mobile

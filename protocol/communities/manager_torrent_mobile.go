@@ -1,6 +1,5 @@
-//go:build (!windows || !linux || !darwin) && (android || ios)
-// +build !windows !linux !darwin
-// +build android ios
+//go:build disable_torrent
+// +build disable_torrent
 
 package communities
 
@@ -21,7 +20,7 @@ type TorrentManagerMobile struct {
 	logger *zap.Logger
 }
 
-// NewTorrentManager this function is only built and called when the "android || ios" build OS criteria are met
+// NewTorrentManager this function is only built and called when the "disable_torrent" build tag is set
 // In this case this version of NewTorrentManager will return the mobile "nil" TorrentManagerMobile ensuring that the
 // build command will not import or build the torrent deps for the mobile OS.
 // NOTE: It is intentional that this file contains the identical function name as in "manager_torrent.go"
