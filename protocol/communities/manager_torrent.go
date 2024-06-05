@@ -97,12 +97,6 @@ func NewTorrentManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, 
 	}, nil
 }
 
-// LogStdout appears to be some kind of debug tool specifically for torrent functionality
-func (m *TorrentManager) LogStdout(msg string, fields ...zap.Field) {
-	m.stdoutLogger.Info(msg, fields...)
-	m.logger.Debug(msg, fields...)
-}
-
 func (m *TorrentManager) SetOnline(online bool) {
 	if online {
 		if m.torrentConfig != nil && m.torrentConfig.Enabled && !m.torrentClientStarted() {

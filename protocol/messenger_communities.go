@@ -4168,7 +4168,10 @@ func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 		return nil
 	}
 
-	m.torrentManager.Stop()
+	err = m.torrentManager.Stop()
+	if err != nil {
+		m.logger.Error("failed to stop torrent manager", zap.Error(err))
+	}
 
 	nodeConfig.TorrentConfig.Enabled = false
 	err = m.settings.SaveSetting("node-config", nodeConfig)

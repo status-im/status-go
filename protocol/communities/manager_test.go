@@ -15,12 +15,15 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	userimages "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/transport"
 	v1 "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -31,12 +34,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
-
 	"github.com/stretchr/testify/suite"
-
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/sqlite"
+	"go.uber.org/zap"
 )
 
 func TestManagerSuite(t *testing.T) {
@@ -45,10 +44,11 @@ func TestManagerSuite(t *testing.T) {
 
 type ManagerSuite struct {
 	suite.Suite
-	manager *Manager
+	manager        *Manager
+	torrentManager TorrentContract
 }
 
-func (s *ManagerSuite) buildManager(ownerVerifier OwnerVerifier) *Manager {
+func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, TorrentContract) {
 	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
@@ -56,17 +56,26 @@ func (s *ManagerSuite) buildManager(ownerVerifier OwnerVerifier) *Manager {
 
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
+
+	logger, err := zap.NewDevelopment()
 	s.Require().NoError(err)
-	m, err := NewManager(key, "", db, nil, nil, nil, ownerVerifier, nil, &TimeSourceStub{}, nil, nil)
+
+	m, err := NewManager(key, "", db, nil, logger, nil, ownerVerifier, nil, &TimeSourceStub{}, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
-	return m
+
+	tc := buildTorrentConfig()
+	t, err := NewTorrentManager(&tc, logger, m.GetPersistence(), nil, key, nil, m)
+	s.Require().NoError(err)
+
+	return m, t
 }
 
 func (s *ManagerSuite) SetupTest() {
-	m := s.buildManager(nil)
+	m, t := s.buildManagers(nil)
 	SetValidateInterval(30 * time.Millisecond)
 	s.manager = m
+	s.torrentManager = t
 }
 
 func intToBig(n int64) *hexutil.Big {
@@ -87,7 +96,7 @@ func tokenBalance(tokenID uint64, balance uint64) thirdparty.TokenBalance {
 func (s *ManagerSuite) getHistoryTasksCount() int {
 	// sync.Map doesn't have a Len function, so we need to count manually
 	count := 0
-	s.manager.historyArchiveTasks.Range(func(_, _ interface{}) bool {
+	s.torrentManager.(*TorrentManager).historyArchiveTasks.Range(func(_, _ interface{}) bool {
 		count++
 		return true
 	})
@@ -175,7 +184,7 @@ func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollect
 		WithTokenManager(tm),
 	}
 
-	m, err := NewManager(key, "", db, nil, nil, nil, nil, nil, &TimeSourceStub{}, nil, nil, options...)
+	m, err := NewManager(key, "", db, nil, nil, nil, nil, nil, &TimeSourceStub{}, nil, options...)
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
@@ -405,32 +414,32 @@ func (s *ManagerSuite) TestGetControlledCommunitiesChatIDs() {
 
 func (s *ManagerSuite) TestStartAndStopTorrentClient() {
 	torrentConfig := buildTorrentConfig()
-	s.manager.SetTorrentConfig(&torrentConfig)
+	s.torrentManager.SetTorrentConfig(&torrentConfig)
 
-	err := s.manager.StartTorrentClient()
+	err := s.torrentManager.StartTorrentClient()
 	s.Require().NoError(err)
-	s.Require().NotNil(s.manager.torrentClient)
-	defer s.manager.StopTorrentClient()
+	s.Require().NotNil(s.torrentManager.(*TorrentManager).torrentClient)
+	defer s.torrentManager.Stop() //nolint: errcheck
 
 	_, err = os.Stat(torrentConfig.DataDir)
 	s.Require().NoError(err)
-	s.Require().Equal(s.manager.TorrentClientStarted(), true)
+	s.Require().Equal(s.torrentManager.(*TorrentManager).torrentClientStarted(), true)
 }
 
 func (s *ManagerSuite) TestStartHistoryArchiveTasksInterval() {
 
 	torrentConfig := buildTorrentConfig()
-	s.manager.SetTorrentConfig(&torrentConfig)
+	s.torrentManager.SetTorrentConfig(&torrentConfig)
 
-	err := s.manager.StartTorrentClient()
+	err := s.torrentManager.StartTorrentClient()
 	s.Require().NoError(err)
-	defer s.manager.StopTorrentClient()
+	defer s.torrentManager.Stop() //nolint: errcheck
 
 	community, _, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
 
 	interval := 10 * time.Second
-	go s.manager.StartHistoryArchiveTasksInterval(community, interval)
+	go s.torrentManager.StartHistoryArchiveTasksInterval(community, interval)
 	// Due to async exec we need to wait a bit until we check
 	// the task count.
 	time.Sleep(5 * time.Second)
@@ -441,11 +450,11 @@ func (s *ManagerSuite) TestStartHistoryArchiveTasksInterval() {
 	// We wait another 5 seconds to ensure the first tick has kicked in
 	time.Sleep(5 * time.Second)
 
-	_, err = os.Stat(s.manager.torrentFile(community.IDString()))
+	_, err = os.Stat(torrentFile(torrentConfig.TorrentDir, community.IDString()))
 	s.Require().Error(err)
 
-	s.manager.StopHistoryArchiveTasksInterval(community.ID())
-	s.manager.historyArchiveTasksWaitGroup.Wait()
+	s.torrentManager.StopHistoryArchiveTasksInterval(community.ID())
+	s.torrentManager.(*TorrentManager).historyArchiveTasksWaitGroup.Wait()
 	count = s.getHistoryTasksCount()
 	s.Require().Equal(count, 0)
 }
@@ -453,24 +462,24 @@ func (s *ManagerSuite) TestStartHistoryArchiveTasksInterval() {
 func (s *ManagerSuite) TestStopHistoryArchiveTasksIntervals() {
 
 	torrentConfig := buildTorrentConfig()
-	s.manager.SetTorrentConfig(&torrentConfig)
+	s.torrentManager.SetTorrentConfig(&torrentConfig)
 
-	err := s.manager.StartTorrentClient()
+	err := s.torrentManager.StartTorrentClient()
 	s.Require().NoError(err)
-	defer s.manager.StopTorrentClient()
+	defer s.torrentManager.Stop() //nolint: errcheck
 
 	community, _, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
 
 	interval := 10 * time.Second
-	go s.manager.StartHistoryArchiveTasksInterval(community, interval)
+	go s.torrentManager.StartHistoryArchiveTasksInterval(community, interval)
 
 	time.Sleep(2 * time.Second)
 
 	count := s.getHistoryTasksCount()
 	s.Require().Equal(count, 1)
 
-	s.manager.StopHistoryArchiveTasksIntervals()
+	s.torrentManager.(*TorrentManager).stopHistoryArchiveTasksIntervals()
 
 	count = s.getHistoryTasksCount()
 	s.Require().Equal(count, 0)
@@ -478,17 +487,17 @@ func (s *ManagerSuite) TestStopHistoryArchiveTasksIntervals() {
 
 func (s *ManagerSuite) TestStopTorrentClient_ShouldStopHistoryArchiveTasks() {
 	torrentConfig := buildTorrentConfig()
-	s.manager.SetTorrentConfig(&torrentConfig)
+	s.torrentManager.SetTorrentConfig(&torrentConfig)
 
-	err := s.manager.StartTorrentClient()
+	err := s.torrentManager.StartTorrentClient()
 	s.Require().NoError(err)
-	defer s.manager.StopTorrentClient()
+	defer s.torrentManager.Stop() //nolint: errcheck
 
 	community, _, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
 
 	interval := 10 * time.Second
-	go s.manager.StartHistoryArchiveTasksInterval(community, interval)
+	go s.torrentManager.StartHistoryArchiveTasksInterval(community, interval)
 	// Due to async exec we need to wait a bit until we check
 	// the task count.
 	time.Sleep(2 * time.Second)
@@ -496,8 +505,8 @@ func (s *ManagerSuite) TestStopTorrentClient_ShouldStopHistoryArchiveTasks() {
 	count := s.getHistoryTasksCount()
 	s.Require().Equal(count, 1)
 
-	errs := s.manager.StopTorrentClient()
-	s.Require().Len(errs, 0)
+	err = s.torrentManager.Stop()
+	s.Require().NoError(err)
 
 	count = s.getHistoryTasksCount()
 	s.Require().Equal(count, 0)
@@ -505,18 +514,18 @@ func (s *ManagerSuite) TestStopTorrentClient_ShouldStopHistoryArchiveTasks() {
 
 func (s *ManagerSuite) TestStartTorrentClient_DelayedUntilOnline() {
 	torrentConfig := buildTorrentConfig()
-	s.manager.SetTorrentConfig(&torrentConfig)
+	s.torrentManager.SetTorrentConfig(&torrentConfig)
 
-	s.Require().False(s.manager.TorrentClientStarted())
+	s.Require().False(s.torrentManager.(*TorrentManager).torrentClientStarted())
 
-	s.manager.SetOnline(true)
-	s.Require().True(s.manager.TorrentClientStarted())
+	s.torrentManager.SetOnline(true)
+	s.Require().True(s.torrentManager.(*TorrentManager).torrentClientStarted())
 }
 
 func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_WithoutMessages() {
 
 	torrentConfig := buildTorrentConfig()
-	s.manager.SetTorrentConfig(&torrentConfig)
+	s.torrentManager.SetTorrentConfig(&torrentConfig)
 
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
@@ -530,22 +539,22 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_WithoutMessages() {
 	// Partition of 7 days
 	partition := 7 * 24 * time.Hour
 
-	_, err = s.manager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
+	_, err = s.torrentManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
 	s.Require().NoError(err)
 
 	// There are no waku messages in the database so we don't expect
 	// any archives to be created
-	_, err = os.Stat(s.manager.archiveDataFile(community.IDString()))
+	_, err = os.Stat(s.torrentManager.(*TorrentManager).archiveDataFile(community.IDString()))
 	s.Require().Error(err)
-	_, err = os.Stat(s.manager.archiveIndexFile(community.IDString()))
+	_, err = os.Stat(s.torrentManager.(*TorrentManager).archiveIndexFile(community.IDString()))
 	s.Require().Error(err)
-	_, err = os.Stat(s.manager.torrentFile(community.IDString()))
+	_, err = os.Stat(torrentFile(torrentConfig.TorrentDir, community.IDString()))
 	s.Require().Error(err)
 }
 
 func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldCreateArchive() {
 	torrentConfig := buildTorrentConfig()
-	s.manager.SetTorrentConfig(&torrentConfig)
+	s.torrentManager.SetTorrentConfig(&torrentConfig)
 
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
@@ -572,21 +581,21 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldCreateArchive() {
 	err = s.manager.StoreWakuMessage(&message3)
 	s.Require().NoError(err)
 
-	_, err = s.manager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
+	_, err = s.torrentManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
 	s.Require().NoError(err)
 
-	_, err = os.Stat(s.manager.archiveDataFile(community.IDString()))
+	_, err = os.Stat(s.torrentManager.(*TorrentManager).archiveDataFile(community.IDString()))
 	s.Require().NoError(err)
-	_, err = os.Stat(s.manager.archiveIndexFile(community.IDString()))
+	_, err = os.Stat(s.torrentManager.(*TorrentManager).archiveIndexFile(community.IDString()))
 	s.Require().NoError(err)
-	_, err = os.Stat(s.manager.torrentFile(community.IDString()))
+	_, err = os.Stat(torrentFile(torrentConfig.TorrentDir, community.IDString()))
 	s.Require().NoError(err)
 
-	index, err := s.manager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
+	index, err := s.torrentManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(index.Archives, 1)
 
-	totalData, err := os.ReadFile(s.manager.archiveDataFile(community.IDString()))
+	totalData, err := os.ReadFile(s.torrentManager.(*TorrentManager).archiveDataFile(community.IDString()))
 	s.Require().NoError(err)
 
 	for _, metadata := range index.Archives {
@@ -602,7 +611,7 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldCreateArchive() {
 
 func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldCreateMultipleArchives() {
 	torrentConfig := buildTorrentConfig()
-	s.manager.SetTorrentConfig(&torrentConfig)
+	s.torrentManager.SetTorrentConfig(&torrentConfig)
 
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
@@ -633,14 +642,14 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldCreateMultipleArchi
 	err = s.manager.StoreWakuMessage(&message4)
 	s.Require().NoError(err)
 
-	_, err = s.manager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
+	_, err = s.torrentManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
 	s.Require().NoError(err)
 
-	index, err := s.manager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
+	index, err := s.torrentManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(index.Archives, 3)
 
-	totalData, err := os.ReadFile(s.manager.archiveDataFile(community.IDString()))
+	totalData, err := os.ReadFile(s.torrentManager.(*TorrentManager).archiveDataFile(community.IDString()))
 	s.Require().NoError(err)
 
 	// First archive has 2 messages
@@ -664,7 +673,7 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldCreateMultipleArchi
 
 func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldAppendArchives() {
 	torrentConfig := buildTorrentConfig()
-	s.manager.SetTorrentConfig(&torrentConfig)
+	s.torrentManager.SetTorrentConfig(&torrentConfig)
 
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
@@ -682,10 +691,10 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldAppendArchives() {
 	err = s.manager.StoreWakuMessage(&message1)
 	s.Require().NoError(err)
 
-	_, err = s.manager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
+	_, err = s.torrentManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
 	s.Require().NoError(err)
 
-	index, err := s.manager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
+	index, err := s.torrentManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(index.Archives, 1)
 
@@ -697,17 +706,17 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldAppendArchives() {
 	err = s.manager.StoreWakuMessage(&message2)
 	s.Require().NoError(err)
 
-	_, err = s.manager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
+	_, err = s.torrentManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
 	s.Require().NoError(err)
 
-	index, err = s.manager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
+	index, err = s.torrentManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(index.Archives, 2)
 }
 
 func (s *ManagerSuite) TestCreateHistoryArchiveTorrentFromMessages() {
 	torrentConfig := buildTorrentConfig()
-	s.manager.SetTorrentConfig(&torrentConfig)
+	s.torrentManager.SetTorrentConfig(&torrentConfig)
 
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
@@ -727,21 +736,21 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrentFromMessages() {
 	// be part of the archive
 	message3 := buildMessage(endDate.Add(2*time.Hour), topic, []byte{3})
 
-	_, err = s.manager.CreateHistoryArchiveTorrentFromMessages(community.ID(), []*types.Message{&message1, &message2, &message3}, topics, startDate, endDate, partition, false)
+	_, err = s.torrentManager.CreateHistoryArchiveTorrentFromMessages(community.ID(), []*types.Message{&message1, &message2, &message3}, topics, startDate, endDate, partition, false)
 	s.Require().NoError(err)
 
-	_, err = os.Stat(s.manager.archiveDataFile(community.IDString()))
+	_, err = os.Stat(s.torrentManager.(*TorrentManager).archiveDataFile(community.IDString()))
 	s.Require().NoError(err)
-	_, err = os.Stat(s.manager.archiveIndexFile(community.IDString()))
+	_, err = os.Stat(s.torrentManager.(*TorrentManager).archiveIndexFile(community.IDString()))
 	s.Require().NoError(err)
-	_, err = os.Stat(s.manager.torrentFile(community.IDString()))
+	_, err = os.Stat(torrentFile(torrentConfig.TorrentDir, community.IDString()))
 	s.Require().NoError(err)
 
-	index, err := s.manager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
+	index, err := s.torrentManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(index.Archives, 1)
 
-	totalData, err := os.ReadFile(s.manager.archiveDataFile(community.IDString()))
+	totalData, err := os.ReadFile(s.torrentManager.(*TorrentManager).archiveDataFile(community.IDString()))
 	s.Require().NoError(err)
 
 	for _, metadata := range index.Archives {
@@ -757,7 +766,7 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrentFromMessages() {
 
 func (s *ManagerSuite) TestCreateHistoryArchiveTorrentFromMessages_ShouldCreateMultipleArchives() {
 	torrentConfig := buildTorrentConfig()
-	s.manager.SetTorrentConfig(&torrentConfig)
+	s.torrentManager.SetTorrentConfig(&torrentConfig)
 
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
@@ -779,14 +788,14 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrentFromMessages_ShouldCreateM
 	// This one should end up in the third archive
 	message4 := buildMessage(startDate.Add(14*24*time.Hour), topic, []byte{4})
 
-	_, err = s.manager.CreateHistoryArchiveTorrentFromMessages(community.ID(), []*types.Message{&message1, &message2, &message3, &message4}, topics, startDate, endDate, partition, false)
+	_, err = s.torrentManager.CreateHistoryArchiveTorrentFromMessages(community.ID(), []*types.Message{&message1, &message2, &message3, &message4}, topics, startDate, endDate, partition, false)
 	s.Require().NoError(err)
 
-	index, err := s.manager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
+	index, err := s.torrentManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(index.Archives, 3)
 
-	totalData, err := os.ReadFile(s.manager.archiveDataFile(community.IDString()))
+	totalData, err := os.ReadFile(s.torrentManager.(*TorrentManager).archiveDataFile(community.IDString()))
 	s.Require().NoError(err)
 
 	// First archive has 2 messages
@@ -810,7 +819,7 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrentFromMessages_ShouldCreateM
 
 func (s *ManagerSuite) TestCreateHistoryArchiveTorrentFromMessages_ShouldAppendArchives() {
 	torrentConfig := buildTorrentConfig()
-	s.manager.SetTorrentConfig(&torrentConfig)
+	s.torrentManager.SetTorrentConfig(&torrentConfig)
 
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
@@ -826,10 +835,10 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrentFromMessages_ShouldAppendA
 
 	message1 := buildMessage(startDate.Add(1*time.Hour), topic, []byte{1})
 
-	_, err = s.manager.CreateHistoryArchiveTorrentFromMessages(community.ID(), []*types.Message{&message1}, topics, startDate, endDate, partition, false)
+	_, err = s.torrentManager.CreateHistoryArchiveTorrentFromMessages(community.ID(), []*types.Message{&message1}, topics, startDate, endDate, partition, false)
 	s.Require().NoError(err)
 
-	index, err := s.manager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
+	index, err := s.torrentManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(index.Archives, 1)
 
@@ -839,21 +848,21 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrentFromMessages_ShouldAppendA
 
 	message2 := buildMessage(startDate.Add(2*time.Hour), topic, []byte{2})
 
-	_, err = s.manager.CreateHistoryArchiveTorrentFromMessages(community.ID(), []*types.Message{&message2}, topics, startDate, endDate, partition, false)
+	_, err = s.torrentManager.CreateHistoryArchiveTorrentFromMessages(community.ID(), []*types.Message{&message2}, topics, startDate, endDate, partition, false)
 	s.Require().NoError(err)
 
-	index, err = s.manager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
+	index, err = s.torrentManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(index.Archives, 2)
 }
 
 func (s *ManagerSuite) TestSeedHistoryArchiveTorrent() {
 	torrentConfig := buildTorrentConfig()
-	s.manager.SetTorrentConfig(&torrentConfig)
+	s.torrentManager.SetTorrentConfig(&torrentConfig)
 
-	err := s.manager.StartTorrentClient()
+	err := s.torrentManager.StartTorrentClient()
 	s.Require().NoError(err)
-	defer s.manager.StopTorrentClient()
+	defer s.torrentManager.Stop() //nolint: errcheck
 
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
@@ -869,15 +878,15 @@ func (s *ManagerSuite) TestSeedHistoryArchiveTorrent() {
 	err = s.manager.StoreWakuMessage(&message1)
 	s.Require().NoError(err)
 
-	_, err = s.manager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
+	_, err = s.torrentManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
 	s.Require().NoError(err)
 
-	err = s.manager.SeedHistoryArchiveTorrent(community.ID())
+	err = s.torrentManager.SeedHistoryArchiveTorrent(community.ID())
 	s.Require().NoError(err)
-	s.Require().Len(s.manager.torrentTasks, 1)
+	s.Require().Len(s.torrentManager.(*TorrentManager).torrentTasks, 1)
 
-	metaInfoHash := s.manager.torrentTasks[community.IDString()]
-	torrent, ok := s.manager.torrentClient.Torrent(metaInfoHash)
+	metaInfoHash := s.torrentManager.(*TorrentManager).torrentTasks[community.IDString()]
+	torrent, ok := s.torrentManager.(*TorrentManager).torrentClient.Torrent(metaInfoHash)
 	defer torrent.Drop()
 
 	s.Require().Equal(ok, true)
@@ -886,11 +895,11 @@ func (s *ManagerSuite) TestSeedHistoryArchiveTorrent() {
 
 func (s *ManagerSuite) TestUnseedHistoryArchiveTorrent() {
 	torrentConfig := buildTorrentConfig()
-	s.manager.SetTorrentConfig(&torrentConfig)
+	s.torrentManager.SetTorrentConfig(&torrentConfig)
 
-	err := s.manager.StartTorrentClient()
+	err := s.torrentManager.StartTorrentClient()
 	s.Require().NoError(err)
-	defer s.manager.StopTorrentClient()
+	defer s.torrentManager.Stop() //nolint: errcheck
 
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
@@ -906,17 +915,17 @@ func (s *ManagerSuite) TestUnseedHistoryArchiveTorrent() {
 	err = s.manager.StoreWakuMessage(&message1)
 	s.Require().NoError(err)
 
-	_, err = s.manager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
+	_, err = s.torrentManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
 	s.Require().NoError(err)
 
-	err = s.manager.SeedHistoryArchiveTorrent(community.ID())
+	err = s.torrentManager.SeedHistoryArchiveTorrent(community.ID())
 	s.Require().NoError(err)
-	s.Require().Len(s.manager.torrentTasks, 1)
+	s.Require().Len(s.torrentManager.(*TorrentManager).torrentTasks, 1)
 
-	metaInfoHash := s.manager.torrentTasks[community.IDString()]
+	metaInfoHash := s.torrentManager.(*TorrentManager).torrentTasks[community.IDString()]
 
-	s.manager.UnseedHistoryArchiveTorrent(community.ID())
-	_, ok := s.manager.torrentClient.Torrent(metaInfoHash)
+	s.torrentManager.UnseedHistoryArchiveTorrent(community.ID())
+	_, ok := s.torrentManager.(*TorrentManager).torrentClient.Torrent(metaInfoHash)
 	s.Require().Equal(ok, false)
 }
 
@@ -1674,7 +1683,7 @@ func (s *ManagerSuite) TestCommunityQueue() {
 	s.Require().NoError(err)
 
 	verifier := &testOwnerVerifier{}
-	m := s.buildManager(verifier)
+	m, _ := s.buildManagers(verifier)
 
 	createRequest := &requests.CreateCommunity{
 		Name:        "status",
@@ -1765,7 +1774,7 @@ func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSigners() {
 	s.Require().NoError(err)
 
 	verifier := &testOwnerVerifier{}
-	m := s.buildManager(verifier)
+	m, _ := s.buildManagers(verifier)
 
 	createRequest := &requests.CreateCommunity{
 		Name:        "status",
@@ -1894,7 +1903,7 @@ func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSignersIgnoreIfNotRetu
 	s.Require().NoError(err)
 
 	verifier := &testOwnerVerifier{}
-	m := s.buildManager(verifier)
+	m, _ := s.buildManagers(verifier)
 
 	createRequest := &requests.CreateCommunity{
 		Name:        "status",
