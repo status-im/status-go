@@ -57,16 +57,16 @@ func isValidForNetworkComplianceV2(route []*PathV2, fromIncluded, fromExcluded m
 	)
 
 	for _, path := range route {
-		if path == nil || path.From == nil {
+		if path == nil || path.FromChain == nil {
 			logger.Debug("Invalid path", zap.Any("path", path))
 			return false
 		}
-		if _, ok := fromExcluded[path.From.ChainID]; ok {
-			logger.Debug("Excluded chain ID", zap.Uint64("chainID", path.From.ChainID))
+		if _, ok := fromExcluded[path.FromChain.ChainID]; ok {
+			logger.Debug("Excluded chain ID", zap.Uint64("chainID", path.FromChain.ChainID))
 			return false
 		}
-		if _, ok := fromIncluded[path.From.ChainID]; ok {
-			fromIncluded[path.From.ChainID] = true
+		if _, ok := fromIncluded[path.FromChain.ChainID]; ok {
+			fromIncluded[path.FromChain.ChainID] = true
 		}
 	}
 
@@ -112,7 +112,7 @@ func filterCapacityValidationV2(routes [][]*PathV2, amountIn *big.Int, fromLocke
 // hasSufficientCapacityV2 checks if a route has sufficient capacity to handle the required amount.
 func hasSufficientCapacityV2(route []*PathV2, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) bool {
 	for _, path := range route {
-		if amount, ok := fromLockedAmount[path.From.ChainID]; ok {
+		if amount, ok := fromLockedAmount[path.FromChain.ChainID]; ok {
 			requiredAmountIn := new(big.Int).Sub(amountIn, amount.ToInt())
 			restAmountIn := calculateRestAmountInV2(route, path)
 
