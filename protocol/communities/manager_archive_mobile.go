@@ -1,6 +1,5 @@
-//go:build (!windows || !linux || !darwin) && (android || ios)
-// +build !windows !linux !darwin
-// +build android ios
+//go:build disable_torrent
+// +build disable_torrent
 
 package communities
 

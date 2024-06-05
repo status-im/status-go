@@ -158,6 +158,47 @@ type HistoryArchiveDownloadTask struct {
 	Cancelled  bool
 }
 
+type HistoryArchiveDownloadTaskInfo struct {
+	TotalDownloadedArchivesCount int
+	TotalArchivesCount           int
+	Cancelled                    bool
+}
+
+type ArchiveContract interface {
+	CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	SaveMessageArchiveID(communityID types.HexBytes, hash string) error
+	GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error)
+	SetMessageArchiveIDImported(communityID types.HexBytes, hash string, imported bool) error
+	ExtractMessagesFromHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error)
+	GetHistoryArchiveMagnetlink(communityID types.HexBytes) (string, error)
+	LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.WakuMessageArchiveIndex, error)
+}
+
+type TorrentContract interface {
+	ArchiveContract
+
+	LogStdout(string, ...zap.Field)
+	SetOnline(bool)
+	SetTorrentConfig(*params.TorrentConfig)
+	StartTorrentClient() error
+	Stop() error
+	IsReady() bool
+	GetCommunityChatsFilters(communityID types.HexBytes) ([]*transport.Filter, error)
+	GetCommunityChatsTopics(communityID types.HexBytes) ([]types.TopicType, error)
+	GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error)
+	CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error
+	StartHistoryArchiveTasksInterval(community *Community, interval time.Duration)
+	StopHistoryArchiveTasksInterval(communityID types.HexBytes)
+	SeedHistoryArchiveTorrent(communityID types.HexBytes) error
+	UnseedHistoryArchiveTorrent(communityID types.HexBytes)
+	IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool
+	GetHistoryArchiveDownloadTask(communityID string) *HistoryArchiveDownloadTask
+	AddHistoryArchiveDownloadTask(communityID string, task *HistoryArchiveDownloadTask)
+	DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
+	TorrentFileExists(communityID string) bool
+}
+
 func (t *HistoryArchiveDownloadTask) IsCancelled() bool {
 	t.m.RLock()
 	defer t.m.RUnlock()
