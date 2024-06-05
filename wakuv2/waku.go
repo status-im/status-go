@@ -448,7 +448,7 @@ func (w *Waku) discoverAndConnectPeers() error {
 func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origin) {
 	// Connection will be prunned eventually by the connection manager if needed
 	// The peer connector in go-waku uses Connect, so it will execute identify as part of its
-	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, []string{w.cfg.DefaultShardPubsubTopic}, enr, true)
+	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
 }
 
 func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
@@ -1096,12 +1096,12 @@ func (w *Waku) lightClientConnectionStatus() {
 	w.connStatusMu.Lock()
 
 	peers := w.node.Host().Network().Peers()
-	peersByPubSubTopic := w.node.Host().Peerstore().(wps.WakuPeerstore).PeersByPubSubTopics([]string{w.cfg.DefaultShardPubsubTopic})
+	peersByPubSubTopic := w.node.Host().Peerstore().(wps.WakuPeerstore).PeersByPubSubTopics(w.cfg.DefaultShardedPubsubTopics)
 
 	w.logger.Debug("peer stats",
 		zap.Int("peersCount", len(peers)), zap.Int("peersByPubSubTopic", len(peersByPubSubTopic)))
-	//subs := w.node.FilterLightnode().Subscriptions()
-	//w.logger.Debug("filter subs count", zap.Int("count", len(subs)))
+	subs := w.node.FilterLightnode().Subscriptions()
+	w.logger.Debug("filter subs count", zap.Int("count", len(subs)))
 	isOnline := false
 	if len(peers) > 0 {
 		isOnline = true
