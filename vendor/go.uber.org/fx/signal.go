@@ -12,7 +12,7 @@
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPSignalE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 // AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
@@ -79,7 +79,7 @@ type signalReceivers struct {
 	wait []chan ShutdownSignal
 }
 
-func (recv *signalReceivers) relayer(ctx context.Context) {
+func (recv *signalReceivers) relayer() {
 	defer func() {
 		recv.finished <- struct{}{}
 	}()
@@ -112,7 +112,7 @@ func (recv *signalReceivers) Start(ctx context.Context) {
 	recv.finished = make(chan struct{}, 1)
 	recv.shutdown = make(chan struct{}, 1)
 	recv.notify(recv.signals, os.Interrupt, _sigINT, _sigTERM)
-	go recv.relayer(ctx)
+	go recv.relayer()
 }
 
 func (recv *signalReceivers) Stop(ctx context.Context) error {

@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"io"
 
@@ -9,7 +10,6 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-	"github.com/libp2p/go-libp2p/internal/sha256"
 )
 
 // Secp256k1PrivateKey is a Secp256k1 private key

@@ -160,10 +160,9 @@ var connectednessPriority map[network.Connectedness]int
 func init() {
 	// Closer to 0 is prefered
 	connectednessPriority = map[network.Connectedness]int{
-		network.CanConnect:    1,
-		network.Connected:     1,
-		network.NotConnected:  2,
-		network.CannotConnect: 3,
+		network.Connected:    1,
+		network.NotConnected: 2,
+		network.Limited:      3,
 	}
 }
 

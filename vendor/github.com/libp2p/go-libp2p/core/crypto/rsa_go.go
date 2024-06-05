@@ -4,13 +4,13 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"errors"
 	"io"
 
 	pb "github.com/libp2p/go-libp2p/core/crypto/pb"
 	"github.com/libp2p/go-libp2p/core/internal/catch"
-	"github.com/libp2p/go-libp2p/internal/sha256"
 )
 
 // RsaPrivateKey is a rsa private key

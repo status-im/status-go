@@ -342,6 +342,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	dtlsConfig.ExtendedMasterSecret = t.api.settingEngine.dtls.extendedMasterSecret
 	dtlsConfig.ClientCAs = t.api.settingEngine.dtls.clientCAs
 	dtlsConfig.RootCAs = t.api.settingEngine.dtls.rootCAs
+	dtlsConfig.KeyLogWriter = t.api.settingEngine.dtls.keyLogWriter
 
 	// Connect as DTLS Client/Server, function is blocking and we
 	// must not hold the DTLSTransport lock
@@ -504,7 +505,7 @@ func (t *DTLSTransport) streamsForSSRC(ssrc SSRC, streamInfo interceptor.StreamI
 		return nil, nil, nil, nil, err
 	}
 
-	rtcpInterceptor := t.api.interceptor.BindRTCPReader(interceptor.RTPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
+	rtcpInterceptor := t.api.interceptor.BindRTCPReader(interceptor.RTCPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
 		n, err = rtcpReadStream.Read(in)
 		return n, a, err
 	}))

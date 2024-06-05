@@ -56,12 +56,12 @@ func (bc *bufferedConn) writeProcess() {
 		}
 
 		if err != nil {
-			bc.logger.Warnf("read buffer error: %s", err)
+			bc.logger.Warnf("Failed to read from buffer: %s", err)
 			continue
 		}
 
 		if _, err := bc.Conn.Write(pktBuf[:n]); err != nil {
-			bc.logger.Warnf("write error: %s", err)
+			bc.logger.Warnf("Failed to write: %s", err)
 			continue
 		}
 	}
@@ -85,6 +85,7 @@ type tcpPacketConn struct {
 	wg         sync.WaitGroup
 	closedChan chan struct{}
 	closeOnce  sync.Once
+	aliveTimer *time.Timer
 }
 
 type streamingPacket struct {
@@ -94,10 +95,11 @@ type streamingPacket struct {
 }
 
 type tcpPacketParams struct {
-	ReadBuffer  int
-	LocalAddr   net.Addr
-	Logger      logging.LeveledLogger
-	WriteBuffer int
+	ReadBuffer    int
+	LocalAddr     net.Addr
+	Logger        logging.LeveledLogger
+	WriteBuffer   int
+	AliveDuration time.Duration
 }
 
 func newTCPPacketConn(params tcpPacketParams) *tcpPacketConn {
@@ -110,11 +112,26 @@ func newTCPPacketConn(params tcpPacketParams) *tcpPacketConn {
 		closedChan: make(chan struct{}),
 	}
 
+	if params.AliveDuration > 0 {
+		p.aliveTimer = time.AfterFunc(params.AliveDuration, func() {
+			p.params.Logger.Warn("close tcp packet conn by alive timeout")
+			_ = p.Close()
+		})
+	}
+
 	return p
 }
 
+func (t *tcpPacketConn) ClearAliveTimer() {
+	t.mu.Lock()
+	if t.aliveTimer != nil {
+		t.aliveTimer.Stop()
+	}
+	t.mu.Unlock()
+}
+
 func (t *tcpPacketConn) AddConn(conn net.Conn, firstPacketData []byte) error {
-	t.params.Logger.Infof("AddConn: %s remote %s to local %s", conn.RemoteAddr().Network(), conn.RemoteAddr(), conn.LocalAddr())
+	t.params.Logger.Infof("Added connection: %s remote %s to local %s", conn.RemoteAddr().Network(), conn.RemoteAddr(), conn.LocalAddr())
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -160,7 +177,7 @@ func (t *tcpPacketConn) startReading(conn net.Conn) {
 	for {
 		n, err := readStreamingPacket(conn, buf)
 		if err != nil {
-			t.params.Logger.Infof("%v: %s", errReadingStreamingPacket, err)
+			t.params.Logger.Warnf("Failed to read streaming packet: %s", err)
 			t.handleRecv(streamingPacket{nil, conn.RemoteAddr(), err})
 			t.removeConn(conn)
 			return
@@ -231,7 +248,7 @@ func (t *tcpPacketConn) WriteTo(buf []byte, rAddr net.Addr) (n int, err error) {
 
 	n, err = writeStreamingPacket(conn, buf)
 	if err != nil {
-		t.params.Logger.Tracef("%w %s", errWriting, rAddr)
+		t.params.Logger.Tracef("%w %s", errWrite, rAddr)
 		return n, err
 	}
 
@@ -261,6 +278,9 @@ func (t *tcpPacketConn) Close() error {
 	t.closeOnce.Do(func() {
 		close(t.closedChan)
 		shouldCloseRecvChan = true
+		if t.aliveTimer != nil {
+			t.aliveTimer.Stop()
+		}
 	})
 
 	for _, conn := range t.conns {

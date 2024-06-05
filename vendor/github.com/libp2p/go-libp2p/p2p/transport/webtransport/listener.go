@@ -212,5 +212,14 @@ func (l *listener) Close() error {
 	l.reuseListener.Close()
 	err := l.server.Close()
 	<-l.serverClosed
+loop:
+	for {
+		select {
+		case conn := <-l.queue:
+			conn.Close()
+		default:
+			break loop
+		}
+	}
 	return err
 }

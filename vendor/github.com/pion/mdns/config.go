@@ -1,6 +1,10 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package mdns
 
 import (
+	"net"
 	"time"
 
 	"github.com/pion/logging"
@@ -23,5 +27,15 @@ type Config struct {
 	// when we get questions
 	LocalNames []string
 
+	// LocalAddress will override the published address with the given IP
+	// when set. Otherwise, the automatically determined address will be used.
+	LocalAddress net.IP
+
 	LoggerFactory logging.LoggerFactory
+
+	// IncludeLoopback will include loopback interfaces to be eligble for queries and answers.
+	IncludeLoopback bool
+
+	// Interfaces will override the interfaces used for queries and answers.
+	Interfaces []net.Interface
 }

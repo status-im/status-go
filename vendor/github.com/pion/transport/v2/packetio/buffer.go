@@ -38,8 +38,9 @@ type Buffer struct {
 	data       []byte
 	head, tail int
 
-	notify chan struct{} // non-nil when we have blocked readers
-	closed bool
+	notify  chan struct{}
+	waiting bool
+	closed  bool
 
 	count                 int
 	limitCount, limitSize int
@@ -56,6 +57,7 @@ const (
 // NewBuffer creates a new Buffer.
 func NewBuffer() *Buffer {
 	return &Buffer{
+		notify:       make(chan struct{}, 1),
 		readDeadline: deadline.New(),
 	}
 }
@@ -149,14 +151,6 @@ func (b *Buffer) Write(packet []byte) (int, error) {
 		}
 	}
 
-	var notify chan struct{}
-	if b.notify != nil {
-		// Prepare to notify readers, but only
-		// actually do it after we release the lock.
-		notify = b.notify
-		b.notify = nil
-	}
-
 	// store the length of the packet
 	b.data[b.tail] = uint8(len(packet) >> 8)
 	b.tail++
@@ -178,10 +172,17 @@ func (b *Buffer) Write(packet []byte) (int, error) {
 		b.tail = m
 	}
 	b.count++
+
+	waiting := b.waiting
+	b.waiting = false
+
 	b.mutex.Unlock()
 
-	if notify != nil {
-		close(notify)
+	if waiting {
+		select {
+		case b.notify <- struct{}{}:
+		default:
+		}
 	}
 
 	return len(packet), nil
@@ -244,7 +245,7 @@ func (b *Buffer) Read(packet []byte) (n int, err error) { //nolint:gocognit
 			}
 
 			b.count--
-
+			b.waiting = false
 			b.mutex.Unlock()
 
 			if copied < count {
@@ -258,16 +259,13 @@ func (b *Buffer) Read(packet []byte) (n int, err error) { //nolint:gocognit
 			return 0, io.EOF
 		}
 
-		if b.notify == nil {
-			b.notify = make(chan struct{})
-		}
-		notify := b.notify
+		b.waiting = true
 		b.mutex.Unlock()
 
 		select {
 		case <-b.readDeadline.Done():
 			return 0, &netError{ErrTimeout, true, true}
-		case <-notify:
+		case <-b.notify:
 		}
 	}
 }
@@ -282,14 +280,17 @@ func (b *Buffer) Close() (err error) {
 		return nil
 	}
 
-	notify := b.notify
-	b.notify = nil
+	waiting := b.waiting
+	b.waiting = false
 	b.closed = true
 
 	b.mutex.Unlock()
 
-	if notify != nil {
-		close(notify)
+	if waiting {
+		select {
+		case b.notify <- struct{}{}:
+		default:
+		}
 	}
 
 	return nil

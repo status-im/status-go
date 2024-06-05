@@ -826,7 +826,7 @@ func (pc *PeerConnection) CreateAnswer(*AnswerOptions) (SessionDescription, erro
 	if connectionRole == sdp.ConnectionRole(0) {
 		connectionRole = connectionRoleFromDtlsRole(defaultDtlsRoleAnswer)
 
-		// If one of the agents is lite and the other one is not, the lite agent must be the controlling agent.
+		// If one of the agents is lite and the other one is not, the lite agent must be the controlled agent.
 		// If both or neither agents are lite the offering agent is controlling.
 		// RFC 8445 S6.1.1
 		if isIceLiteSet(remoteDesc.parsed) && !pc.api.settingEngine.candidates.ICELite {
@@ -994,7 +994,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	}
 
 	desc.parsed = &sdp.SessionDescription{}
-	if err := desc.parsed.Unmarshal([]byte(desc.SDP)); err != nil {
+	if err := desc.parsed.UnmarshalString(desc.SDP); err != nil {
 		return err
 	}
 	if err := pc.setDescription(&desc, stateChangeOpSetLocal); err != nil {
@@ -1039,7 +1039,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	isRenegotation := pc.currentRemoteDescription != nil
+	isRenegotiation := pc.currentRemoteDescription != nil
 
 	if _, err := desc.Unmarshal(); err != nil {
 		return err
@@ -1142,7 +1142,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		return err
 	}
 
-	if isRenegotation && pc.iceTransport.haveRemoteCredentialsChange(remoteUfrag, remotePwd) {
+	if isRenegotiation && pc.iceTransport.haveRemoteCredentialsChange(remoteUfrag, remotePwd) {
 		// An ICE Restart only happens implicitly for a SetRemoteDescription of type offer
 		if !weOffer {
 			if err = pc.iceTransport.restart(); err != nil {
@@ -1163,7 +1163,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 
 	currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
 
-	if isRenegotation {
+	if isRenegotiation {
 		if weOffer {
 			_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, true)
 			if err = pc.startRTPSenders(currentTransceivers); err != nil {
@@ -1185,7 +1185,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 	}
 
 	iceRole := ICERoleControlled
-	// If one of the agents is lite and the other one is not, the lite agent must be the controlling agent.
+	// If one of the agents is lite and the other one is not, the lite agent must be the controlled agent.
 	// If both or neither agents are lite the offering agent is controlling.
 	// RFC 8445 S6.1.1
 	if (weOffer && remoteIsLite == pc.api.settingEngine.candidates.ICELite) || (remoteIsLite && !pc.api.settingEngine.candidates.ICELite) {
@@ -1576,12 +1576,11 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		return err
 	}
 
-	var mid, rid, rsid string
-	payloadType, err := handleUnknownRTPPacket(b[:i], uint8(midExtensionID), uint8(streamIDExtensionID), uint8(repairStreamIDExtensionID), &mid, &rid, &rsid)
-	if err != nil {
-		return err
+	if i < 4 {
+		return errRTPTooShort
 	}
 
+	payloadType := PayloadType(b[1] & 0x7f)
 	params, err := pc.api.mediaEngine.getRTPParametersByPayloadType(payloadType)
 	if err != nil {
 		return err
@@ -1593,14 +1592,21 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		return err
 	}
 
+	var mid, rid, rsid string
+	var paddingOnly bool
 	for readCount := 0; readCount <= simulcastProbeCount; readCount++ {
 		if mid == "" || (rid == "" && rsid == "") {
+			// skip padding only packets for probing
+			if paddingOnly {
+				readCount--
+			}
+
 			i, _, err := interceptor.Read(b, nil)
 			if err != nil {
 				return err
 			}
 
-			if _, err = handleUnknownRTPPacket(b[:i], uint8(midExtensionID), uint8(streamIDExtensionID), uint8(repairStreamIDExtensionID), &mid, &rid, &rsid); err != nil {
+			if _, paddingOnly, err = handleUnknownRTPPacket(b[:i], uint8(midExtensionID), uint8(streamIDExtensionID), uint8(repairStreamIDExtensionID), &mid, &rid, &rsid); err != nil {
 				return err
 			}
 
@@ -1660,17 +1666,17 @@ func (pc *PeerConnection) undeclaredRTPMediaProcessor() {
 			continue
 		}
 
+		pc.dtlsTransport.storeSimulcastStream(stream)
+
 		if atomic.AddUint64(&simulcastRoutineCount, 1) >= simulcastMaxProbeRoutines {
 			atomic.AddUint64(&simulcastRoutineCount, ^uint64(0))
 			pc.log.Warn(ErrSimulcastProbeOverflow.Error())
-			pc.dtlsTransport.storeSimulcastStream(stream)
 			continue
 		}
 
 		go func(rtpStream io.Reader, ssrc SSRC) {
 			if err := pc.handleIncomingSSRC(rtpStream, ssrc); err != nil {
 				pc.log.Errorf(incomingUnhandledRTPSsrc, ssrc, err)
-				pc.dtlsTransport.storeSimulcastStream(stream)
 			}
 			atomic.AddUint64(&simulcastRoutineCount, ^uint64(0))
 		}(stream, SSRC(ssrc))
@@ -2292,6 +2298,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(transceivers []*RTPTransceiver, u
 	if err != nil {
 		return nil, err
 	}
+	d.Attributes = append(d.Attributes, sdp.Attribute{Key: sdp.AttrKeyMsidSemantic, Value: "WMS*"})
 
 	iceParams, err := pc.iceGatherer.GetLocalParameters()
 	if err != nil {
@@ -2353,7 +2360,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(transceivers []*RTPTransceiver, u
 		return nil, err
 	}
 
-	return populateSDP(d, isPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, true, pc.api.mediaEngine, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), candidates, iceParams, mediaSections, pc.ICEGatheringState())
+	return populateSDP(d, isPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, true, pc.api.mediaEngine, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), candidates, iceParams, mediaSections, pc.ICEGatheringState(), nil)
 }
 
 // generateMatchedSDP generates a SDP and takes the remote state into account
@@ -2364,6 +2371,7 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 	if err != nil {
 		return nil, err
 	}
+	d.Attributes = append(d.Attributes, sdp.Attribute{Key: sdp.AttrKeyMsidSemantic, Value: "WMS*"})
 
 	iceParams, err := pc.iceGatherer.GetLocalParameters()
 	if err != nil {
@@ -2451,6 +2459,7 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 		}
 	}
 
+	var bundleGroup *string
 	// If we are offering also include unmatched local transceivers
 	if includeUnmatched {
 		if !detectedPlanB {
@@ -2469,6 +2478,10 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 				mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true})
 			}
 		}
+	} else if remoteDescription != nil {
+		groupValue, _ := remoteDescription.parsed.Attribute(sdp.AttrKeyGroup)
+		groupValue = strings.TrimLeft(groupValue, "BUNDLE")
+		bundleGroup = &groupValue
 	}
 
 	if pc.configuration.SDPSemantics == SDPSemanticsUnifiedPlanWithFallback && detectedPlanB {
@@ -2480,7 +2493,7 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 		return nil, err
 	}
 
-	return populateSDP(d, detectedPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, isExtmapAllowMixed, pc.api.mediaEngine, connectionRole, candidates, iceParams, mediaSections, pc.ICEGatheringState())
+	return populateSDP(d, detectedPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, isExtmapAllowMixed, pc.api.mediaEngine, connectionRole, candidates, iceParams, mediaSections, pc.ICEGatheringState(), bundleGroup)
 }
 
 func (pc *PeerConnection) setGatherCompleteHandler(handler func()) {

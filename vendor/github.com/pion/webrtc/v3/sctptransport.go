@@ -109,6 +109,7 @@ func (r *SCTPTransport) Start(SCTPCapabilities) error {
 	sctpAssociation, err := sctp.Client(sctp.Config{
 		NetConn:              dtlsTransport.conn,
 		MaxReceiveBufferSize: r.api.settingEngine.sctp.maxReceiveBufferSize,
+		EnableZeroChecksum:   r.api.settingEngine.sctp.enableZeroChecksum,
 		LoggerFactory:        r.api.settingEngine.LoggerFactory,
 	})
 	if err != nil {
@@ -362,9 +363,9 @@ func (r *SCTPTransport) State() SCTPTransportState {
 func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 	collector.Collecting()
 
-	stats := TransportStats{
+	stats := SCTPTransportStats{
 		Timestamp: statsTimestampFrom(time.Now()),
-		Type:      StatsTypeTransport,
+		Type:      StatsTypeSCTPTransport,
 		ID:        "sctpTransport",
 	}
 
@@ -372,6 +373,10 @@ func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 	if association != nil {
 		stats.BytesSent = association.BytesSent()
 		stats.BytesReceived = association.BytesReceived()
+		stats.SmoothedRoundTripTime = association.SRTT() * 0.001 // convert milliseconds to seconds
+		stats.CongestionWindow = association.CWND()
+		stats.ReceiverWindow = association.RWND()
+		stats.MTU = association.MTU()
 	}
 
 	collector.Collect(stats.ID, stats)
