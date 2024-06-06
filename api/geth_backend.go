@@ -532,6 +532,9 @@ func (b *GethStatusBackend) LoginAccount(request *requests.Login) error {
 		// Stop node for clean up
 		_ = b.StopNode()
 	}
+	if b.LocalPairingStateManager.IsPairing() {
+		return nil
+	}
 	return b.LoggedIn(request.KeyUID, err)
 }
 
