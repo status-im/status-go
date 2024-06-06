@@ -3780,18 +3780,18 @@ func (m *Messenger) HandleSyncCommunitySettings(messageState *ReceivedMessageSta
 
 func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community) {
 
-	m.torrentManager.LogStdout("initializing history archive tasks")
+	m.logger.Debug("initializing history archive tasks")
 
 	for _, c := range communities {
 
 		if c.Joined() {
 			settings, err := m.communitiesManager.GetCommunitySettingsByID(c.ID())
 			if err != nil {
-				m.torrentManager.LogStdout("failed to get community settings", zap.Error(err))
+				m.logger.Error("failed to get community settings", zap.Error(err))
 				continue
 			}
 			if !settings.HistoryArchiveSupportEnabled {
-				m.torrentManager.LogStdout("history archive support disabled for community", zap.String("id", c.IDString()))
+				m.logger.Debug("history archive support disabled for community", zap.String("id", c.IDString()))
 				continue
 			}
 
@@ -3799,18 +3799,18 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			if m.torrentManager.TorrentFileExists(c.IDString()) {
 				err = m.torrentManager.SeedHistoryArchiveTorrent(c.ID())
 				if err != nil {
-					m.torrentManager.LogStdout("failed to seed history archive", zap.Error(err))
+					m.logger.Error("failed to seed history archive", zap.Error(err))
 				}
 			}
 
 			filters, err := m.torrentManager.GetCommunityChatsFilters(c.ID())
 			if err != nil {
-				m.torrentManager.LogStdout("failed to get community chats filters for community", zap.Error(err))
+				m.logger.Error("failed to get community chats filters for community", zap.Error(err))
 				continue
 			}
 
 			if len(filters) == 0 {
-				m.torrentManager.LogStdout("no filters or chats for this community starting interval", zap.String("id", c.IDString()))
+				m.logger.Debug("no filters or chats for this community starting interval", zap.String("id", c.IDString()))
 				go m.torrentManager.StartHistoryArchiveTasksInterval(c, messageArchiveInterval)
 				continue
 			}
@@ -3826,7 +3826,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			// possibly missed since then
 			latestWakuMessageTimestamp, err := m.communitiesManager.GetLatestWakuMessageTimestamp(topics)
 			if err != nil {
-				m.torrentManager.LogStdout("failed to get Latest waku message timestamp", zap.Error(err))
+				m.logger.Error("failed to get Latest waku message timestamp", zap.Error(err))
 				continue
 			}
 
@@ -3844,7 +3844,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			ms := m.getActiveMailserver(c.ID().String())
 			_, err = m.syncFiltersFrom(*ms, filters, uint32(latestWakuMessageTimestamp))
 			if err != nil {
-				m.torrentManager.LogStdout("failed to request missing messages", zap.Error(err))
+				m.logger.Error("failed to request missing messages", zap.Error(err))
 				continue
 			}
 
@@ -3853,7 +3853,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			// If the last end date is at least `interval` ago, we create an archive immediately first
 			lastArchiveEndDateTimestamp, err := m.torrentManager.GetHistoryArchivePartitionStartTimestamp(c.ID())
 			if err != nil {
-				m.torrentManager.LogStdout("failed to get archive partition start timestamp", zap.Error(err))
+				m.logger.Error("failed to get archive partition start timestamp", zap.Error(err))
 				continue
 			}
 
@@ -3871,15 +3871,15 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				// Seed current archive in the meantime
 				err := m.torrentManager.SeedHistoryArchiveTorrent(c.ID())
 				if err != nil {
-					m.torrentManager.LogStdout("failed to seed history archive", zap.Error(err))
+					m.logger.Error("failed to seed history archive", zap.Error(err))
 				}
 				timeToNextInterval := messageArchiveInterval - durationSinceLastArchive
 
-				m.torrentManager.LogStdout("starting history archive tasks interval in", zap.Any("timeLeft", timeToNextInterval))
+				m.logger.Debug("starting history archive tasks interval in", zap.Any("timeLeft", timeToNextInterval))
 				time.AfterFunc(timeToNextInterval, func() {
 					err := m.torrentManager.CreateAndSeedHistoryArchive(c.ID(), topics, lastArchiveEndDate, to.Add(timeToNextInterval), messageArchiveInterval, c.Encrypted())
 					if err != nil {
-						m.torrentManager.LogStdout("failed to get create and seed history archive", zap.Error(err))
+						m.logger.Error("failed to get create and seed history archive", zap.Error(err))
 					}
 					go m.torrentManager.StartHistoryArchiveTasksInterval(c, messageArchiveInterval)
 				})
@@ -3889,7 +3889,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				// creation loop
 				err := m.torrentManager.CreateAndSeedHistoryArchive(c.ID(), topics, lastArchiveEndDate, to, messageArchiveInterval, c.Encrypted())
 				if err != nil {
-					m.torrentManager.LogStdout("failed to get create and seed history archive", zap.Error(err))
+					m.logger.Error("failed to get create and seed history archive", zap.Error(err))
 				}
 
 				go m.torrentManager.StartHistoryArchiveTasksInterval(c, messageArchiveInterval)
@@ -3959,7 +3959,7 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 		defer task.Waiter.Done()
 		err := m.importHistoryArchives(communityID, task.CancelChan)
 		if err != nil {
-			m.torrentManager.LogStdout("failed to import history archives", zap.Error(err))
+			m.logger.Error("failed to import history archives", zap.Error(err))
 		}
 		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(communityID))
 	}()

@@ -178,7 +178,6 @@ type ArchiveContract interface {
 type TorrentContract interface {
 	ArchiveContract
 
-	LogStdout(string, ...zap.Field)
 	SetOnline(bool)
 	SetTorrentConfig(*params.TorrentConfig)
 	StartTorrentClient() error

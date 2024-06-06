@@ -684,7 +684,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			chunksCount := len(discordMessageChunks)
 
 			for ii, msgs := range discordMessageChunks {
-				m.torrentManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d discord messages", ii+1, chunksCount, len(msgs)))
+				m.logger.Debug(fmt.Sprintf("saving %d/%d chunk with %d discord messages", ii+1, chunksCount, len(msgs)))
 				err := m.persistence.SaveDiscordMessages(msgs)
 				if err != nil {
 					m.cleanUpImportChannel(request.CommunityID.String(), newChat.ID)
@@ -727,7 +727,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			chunksCount = len(messageChunks)
 
 			for ii, msgs := range messageChunks {
-				m.torrentManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d app messages", ii+1, chunksCount, len(msgs)))
+				m.logger.Debug(fmt.Sprintf("saving %d/%d chunk with %d app messages", ii+1, chunksCount, len(msgs)))
 				err := m.persistence.SaveMessages(msgs)
 				if err != nil {
 					m.cleanUpImportChannel(request.CommunityID.String(), request.DiscordChannelID)
@@ -791,7 +791,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 				go func(id string, author *protobuf.DiscordMessageAuthor) {
 					defer wg.Done()
 
-					m.torrentManager.LogStdout(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
+					m.logger.Debug(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
 					imagePayload, err := discord.DownloadAvatarAsset(author.AvatarUrl)
 					if err != nil {
 						errmsg := fmt.Sprintf("Couldn't download profile avatar '%s': %s", author.AvatarUrl, err.Error())
@@ -845,7 +845,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 					defer wg.Done()
 					for ii, attachment := range attachments {
 
-						m.torrentManager.LogStdout(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
+						m.logger.Debug(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
 
 						assetPayload, contentType, err := discord.DownloadAsset(attachment.Url)
 						if err != nil {
@@ -889,7 +889,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			chunksCount = len(attachmentChunks)
 
 			for ii, attachments := range attachmentChunks {
-				m.torrentManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d discord message attachments", ii+1, chunksCount, len(attachments)))
+				m.logger.Debug(fmt.Sprintf("saving %d/%d chunk with %d discord message attachments", ii+1, chunksCount, len(attachments)))
 				err := m.persistence.SaveDiscordMessageAttachments(attachments)
 				if err != nil {
 					importProgress.AddTaskError(discord.DownloadAssetsTask, discord.Warning(err.Error()))
@@ -1460,7 +1460,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			chunksCount := len(discordMessageChunks)
 
 			for ii, msgs := range discordMessageChunks {
-				m.torrentManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d discord messages", ii+1, chunksCount, len(msgs)))
+				m.logger.Debug(fmt.Sprintf("saving %d/%d chunk with %d discord messages", ii+1, chunksCount, len(msgs)))
 				err = m.persistence.SaveDiscordMessages(msgs)
 				if err != nil {
 					m.cleanUpImport(communityID)
@@ -1503,7 +1503,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			chunksCount = len(messageChunks)
 
 			for ii, msgs := range messageChunks {
-				m.torrentManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d app messages", ii+1, chunksCount, len(msgs)))
+				m.logger.Debug(fmt.Sprintf("saving %d/%d chunk with %d app messages", ii+1, chunksCount, len(msgs)))
 				err = m.persistence.SaveMessages(msgs)
 				if err != nil {
 					m.cleanUpImport(communityID)
@@ -1563,7 +1563,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				go func(id string, author *protobuf.DiscordMessageAuthor) {
 					defer wg.Done()
 
-					m.torrentManager.LogStdout(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
+					m.logger.Debug(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
 					imagePayload, err := discord.DownloadAvatarAsset(author.AvatarUrl)
 					if err != nil {
 						errmsg := fmt.Sprintf("Couldn't download profile avatar '%s': %s", author.AvatarUrl, err.Error())
@@ -1615,7 +1615,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 					defer wg.Done()
 					for ii, attachment := range attachments {
 
-						m.torrentManager.LogStdout(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
+						m.logger.Debug(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
 
 						assetPayload, contentType, err := discord.DownloadAsset(attachment.Url)
 						if err != nil {
@@ -1659,7 +1659,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			chunksCount = len(attachmentChunks)
 
 			for ii, attachments := range attachmentChunks {
-				m.torrentManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d discord message attachments", ii+1, chunksCount, len(attachments)))
+				m.logger.Debug(fmt.Sprintf("saving %d/%d chunk with %d discord message attachments", ii+1, chunksCount, len(attachments)))
 				err = m.persistence.SaveDiscordMessageAttachments(attachments)
 				if err != nil {
 					m.cleanUpImport(communityID)

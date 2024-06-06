@@ -65,7 +65,7 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, Tor
 	s.Require().NoError(m.Start())
 
 	tc := buildTorrentConfig()
-	t, err := NewTorrentManager(&tc, logger, m.GetPersistence(), nil, key, nil, m)
+	t := NewTorrentManager(&tc, logger, m.GetPersistence(), nil, key, nil, m)
 	s.Require().NoError(err)
 
 	return m, t
