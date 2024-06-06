@@ -23,7 +23,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/wallet/bridge/cbridge"
+	"github.com/status-im/status-go/services/wallet/router/bridge/cbridge"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"

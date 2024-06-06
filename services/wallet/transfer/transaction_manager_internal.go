@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/services/wallet/bridge"
+	"github.com/status-im/status-go/services/wallet/router/bridge"
 )
 
 func (tm *TransactionManager) buildTransactions(bridges map[string]bridge.Bridge) ([]string, error) {
