@@ -24,14 +24,10 @@ type TorrentManagerMobile struct {
 // In this case this version of NewTorrentManager will return the mobile "nil" TorrentManagerMobile ensuring that the
 // build command will not import or build the torrent deps for the mobile OS.
 // NOTE: It is intentional that this file contains the identical function name as in "manager_torrent.go"
-func NewTorrentManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) (TorrentContract, error) {
+func NewTorrentManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) *TorrentManagerMobile {
 	return &TorrentManagerMobile{
 		logger: logger,
-	}, nil
-}
-
-func (tmm *TorrentManagerMobile) LogStdout(input string, fields ...zap.Field) {
-	tmm.logger.Debug(input, fields...)
+	}
 }
 
 func (tmm *TorrentManagerMobile) SetOnline(online bool) {}

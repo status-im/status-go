@@ -32,9 +32,7 @@ import (
 type ArchiveManager struct {
 	torrentConfig *params.TorrentConfig
 
-	logger       *zap.Logger
-	stdoutLogger *zap.Logger
-
+	logger      *zap.Logger
 	persistence *Persistence
 	identity    *ecdsa.PrivateKey
 	encryptor   *encryption.Protocol
@@ -42,22 +40,15 @@ type ArchiveManager struct {
 	publisher Publisher
 }
 
-func NewArchiveManager(torrentConfig *params.TorrentConfig, logger, stdoutLogger *zap.Logger, persistence *Persistence, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) *ArchiveManager {
+func NewArchiveManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) *ArchiveManager {
 	return &ArchiveManager{
 		torrentConfig: torrentConfig,
 		logger:        logger,
-		stdoutLogger:  stdoutLogger,
 		persistence:   persistence,
 		identity:      identity,
 		encryptor:     encryptor,
 		publisher:     publisher,
 	}
-}
-
-// LogStdout appears to be some kind of debug tool specifically for torrent functionality
-func (m *ArchiveManager) LogStdout(msg string, fields ...zap.Field) {
-	m.stdoutLogger.Info(msg, fields...)
-	m.logger.Debug(msg, fields...)
 }
 
 func (m *ArchiveManager) createHistoryArchiveTorrent(communityID types.HexBytes, msgs []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
@@ -114,7 +105,7 @@ func (m *ArchiveManager) createHistoryArchiveTorrent(communityID types.HexBytes,
 		CommunityID: communityID.String(),
 	}})
 
-	m.LogStdout("creating archives",
+	m.logger.Debug("creating archives",
 		zap.Any("startDate", startDate),
 		zap.Any("endDate", endDate),
 		zap.Duration("partition", partition),
@@ -123,7 +114,7 @@ func (m *ArchiveManager) createHistoryArchiveTorrent(communityID types.HexBytes,
 		if from.Equal(endDate) || from.After(endDate) {
 			break
 		}
-		m.LogStdout("creating message archive",
+		m.logger.Debug("creating message archive",
 			zap.Any("from", from),
 			zap.Any("to", to),
 		)
@@ -144,7 +135,7 @@ func (m *ArchiveManager) createHistoryArchiveTorrent(communityID types.HexBytes,
 
 		if len(messages) == 0 {
 			// No need to create an archive with zero messages
-			m.LogStdout("no messages in this partition")
+			m.logger.Debug("no messages in this partition")
 			from = to
 			to = to.Add(partition)
 			if to.After(endDate) {
@@ -153,7 +144,7 @@ func (m *ArchiveManager) createHistoryArchiveTorrent(communityID types.HexBytes,
 			continue
 		}
 
-		m.LogStdout("creating archive with messages", zap.Int("messagesCount", len(messages)))
+		m.logger.Debug("creating archive with messages", zap.Int("messagesCount", len(messages)))
 
 		// Not only do we partition messages, we also chunk them
 		// roughly by size, such that each chunk will not exceed a given
@@ -308,7 +299,7 @@ func (m *ArchiveManager) createHistoryArchiveTorrent(communityID types.HexBytes,
 			return archiveIDs, err
 		}
 
-		m.LogStdout("torrent created", zap.Any("from", startDate.Unix()), zap.Any("to", endDate.Unix()))
+		m.logger.Debug("torrent created", zap.Any("from", startDate.Unix()), zap.Any("to", endDate.Unix()))
 
 		m.publisher.publish(&Subscription{
 			HistoryArchivesCreatedSignal: &signal.HistoryArchivesCreatedSignal{
@@ -318,7 +309,7 @@ func (m *ArchiveManager) createHistoryArchiveTorrent(communityID types.HexBytes,
 			},
 		})
 	} else {
-		m.LogStdout("no archives created")
+		m.logger.Debug("no archives created")
 		m.publisher.publish(&Subscription{
 			NoHistoryArchivesCreatedSignal: &signal.NoHistoryArchivesCreatedSignal{
 				CommunityID: communityID.String(),
@@ -433,22 +424,22 @@ func (m *ArchiveManager) ExtractMessagesFromHistoryArchive(communityID types.Hex
 	}
 	defer dataFile.Close()
 
-	m.LogStdout("extracting messages from history archive",
+	m.logger.Debug("extracting messages from history archive",
 		zap.String("communityID", communityID.String()),
 		zap.String("archiveID", archiveID))
 	metadata := index.Archives[archiveID]
 
 	_, err = dataFile.Seek(int64(metadata.Offset), 0)
 	if err != nil {
-		m.LogStdout("failed to seek archive data file", zap.Error(err))
+		m.logger.Error("failed to seek archive data file", zap.Error(err))
 		return nil, err
 	}
 
 	data := make([]byte, metadata.Size-metadata.Padding)
-	m.LogStdout("loading history archive data into memory", zap.Float64("data_size_MB", float64(metadata.Size-metadata.Padding)/1024.0/1024.0))
+	m.logger.Debug("loading history archive data into memory", zap.Float64("data_size_MB", float64(metadata.Size-metadata.Padding)/1024.0/1024.0))
 	_, err = dataFile.Read(data)
 	if err != nil {
-		m.LogStdout("failed failed to read archive data", zap.Error(err))
+		m.logger.Error("failed failed to read archive data", zap.Error(err))
 		return nil, err
 	}
 
@@ -460,23 +451,23 @@ func (m *ArchiveManager) ExtractMessagesFromHistoryArchive(communityID types.Hex
 		var protocolMessage encryption.ProtocolMessage
 		err := proto.Unmarshal(data, &protocolMessage)
 		if err != nil {
-			m.LogStdout("failed to unmarshal protocol message", zap.Error(err))
+			m.logger.Error("failed to unmarshal protocol message", zap.Error(err))
 			return nil, err
 		}
 
 		pk, err := crypto.DecompressPubkey(communityID)
 		if err != nil {
-			m.logger.Debug("failed to decompress community pubkey", zap.Error(err))
+			m.logger.Error("failed to decompress community pubkey", zap.Error(err))
 			return nil, err
 		}
 		decryptedBytes, err := m.encryptor.HandleMessage(m.identity, pk, &protocolMessage, make([]byte, 0))
 		if err != nil {
-			m.LogStdout("failed to decrypt message archive", zap.Error(err))
+			m.logger.Error("failed to decrypt message archive", zap.Error(err))
 			return nil, err
 		}
 		err = proto.Unmarshal(decryptedBytes.DecryptedMessage, archive)
 		if err != nil {
-			m.LogStdout("failed to unmarshal message archive", zap.Error(err))
+			m.logger.Error("failed to unmarshal message archive", zap.Error(err))
 			return nil, err
 		}
 	}

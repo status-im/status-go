@@ -63,9 +63,7 @@ type TorrentManager struct {
 	historyArchiveTasksWaitGroup sync.WaitGroup
 	historyArchiveTasks          sync.Map // stores `chan struct{}`
 
-	logger       *zap.Logger
-	stdoutLogger *zap.Logger
-
+	logger      *zap.Logger
 	persistence *Persistence
 	transport   *transport.Transport
 	identity    *ecdsa.PrivateKey
@@ -79,19 +77,13 @@ type TorrentManager struct {
 // In this case this version of NewTorrentManager will return the full Desktop TorrentManager ensuring that the
 // build command will import and build the torrent deps for the Desktop OSes.
 // NOTE: It is intentional that this file contains the identical function name as in "manager_torrent_mobile.go"
-func NewTorrentManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) (TorrentContract, error) {
-	stdoutLogger, err := zap.NewDevelopment()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create archive logger %w", err)
-	}
-
+func NewTorrentManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) *TorrentManager {
 	return &TorrentManager{
 		torrentConfig:               torrentConfig,
 		torrentTasks:                make(map[string]metainfo.Hash),
 		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
 
-		logger:       logger,
-		stdoutLogger: stdoutLogger,
+		logger: logger,
 
 		persistence: persistence,
 		transport:   transport,
@@ -99,8 +91,8 @@ func NewTorrentManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, 
 		encryptor:   encryptor,
 
 		publisher:      publisher,
-		ArchiveManager: NewArchiveManager(torrentConfig, logger, stdoutLogger, persistence, identity, encryptor, publisher),
-	}, nil
+		ArchiveManager: NewArchiveManager(torrentConfig, logger, persistence, identity, encryptor, publisher),
+	}
 }
 
 func (m *TorrentManager) SetOnline(online bool) {
@@ -108,7 +100,7 @@ func (m *TorrentManager) SetOnline(online bool) {
 		if m.torrentConfig != nil && m.torrentConfig.Enabled && !m.torrentClientStarted() {
 			err := m.StartTorrentClient()
 			if err != nil {
-				m.LogStdout("couldn't start torrent client", zap.Error(err))
+				m.logger.Error("couldn't start torrent client", zap.Error(err))
 			}
 		}
 	}
@@ -270,7 +262,7 @@ func (m *TorrentManager) getLastMessageArchiveEndDate(communityID types.HexBytes
 func (m *TorrentManager) GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error) {
 	filters, err := m.GetCommunityChatsFilters(communityID)
 	if err != nil {
-		m.LogStdout("failed to get community chats filters", zap.Error(err))
+		m.logger.Error("failed to get community chats filters", zap.Error(err))
 		return 0, err
 	}
 
@@ -289,7 +281,7 @@ func (m *TorrentManager) GetHistoryArchivePartitionStartTimestamp(communityID ty
 
 	lastArchiveEndDateTimestamp, err := m.getLastMessageArchiveEndDate(communityID)
 	if err != nil {
-		m.LogStdout("failed to get last archive end date", zap.Error(err))
+		m.logger.Error("failed to get last archive end date", zap.Error(err))
 		return 0, err
 	}
 
@@ -300,13 +292,13 @@ func (m *TorrentManager) GetHistoryArchivePartitionStartTimestamp(communityID ty
 		// this community
 		lastArchiveEndDateTimestamp, err = m.getOldestWakuMessageTimestamp(topics)
 		if err != nil {
-			m.LogStdout("failed to get oldest waku message timestamp", zap.Error(err))
+			m.logger.Error("failed to get oldest waku message timestamp", zap.Error(err))
 			return 0, err
 		}
 		if lastArchiveEndDateTimestamp == 0 {
 			// This means there's no waku message stored for this community so far
 			// (even after requesting possibly missed messages), so no messages exist yet that can be archived
-			m.LogStdout("can't find valid `lastArchiveEndTimestamp`")
+			m.logger.Debug("can't find valid `lastArchiveEndTimestamp`")
 			return 0, nil
 		}
 	}
@@ -326,7 +318,7 @@ func (m *TorrentManager) CreateAndSeedHistoryArchive(communityID types.HexBytes,
 func (m *TorrentManager) StartHistoryArchiveTasksInterval(community *Community, interval time.Duration) {
 	id := community.IDString()
 	if _, exists := m.historyArchiveTasks.Load(id); exists {
-		m.LogStdout("history archive tasks interval already in progress", zap.String("id", id))
+		m.logger.Error("history archive tasks interval already in progress", zap.String("id", id))
 		return
 	}
 
@@ -337,27 +329,27 @@ func (m *TorrentManager) StartHistoryArchiveTasksInterval(community *Community, 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	m.LogStdout("starting history archive tasks interval", zap.String("id", id))
+	m.logger.Debug("starting history archive tasks interval", zap.String("id", id))
 	for {
 		select {
 		case <-ticker.C:
-			m.LogStdout("starting archive task...", zap.String("id", id))
+			m.logger.Debug("starting archive task...", zap.String("id", id))
 			lastArchiveEndDateTimestamp, err := m.GetHistoryArchivePartitionStartTimestamp(community.ID())
 			if err != nil {
-				m.LogStdout("failed to get last archive end date", zap.Error(err))
+				m.logger.Error("failed to get last archive end date", zap.Error(err))
 				continue
 			}
 
 			if lastArchiveEndDateTimestamp == 0 {
 				// This means there are no waku messages for this community,
 				// so nothing to do here
-				m.LogStdout("couldn't determine archive start date - skipping")
+				m.logger.Debug("couldn't determine archive start date - skipping")
 				continue
 			}
 
 			topics, err := m.GetCommunityChatsTopics(community.ID())
 			if err != nil {
-				m.LogStdout("failed to get community chat topics ", zap.Error(err))
+				m.logger.Error("failed to get community chat topics ", zap.Error(err))
 				continue
 			}
 
@@ -367,7 +359,7 @@ func (m *TorrentManager) StartHistoryArchiveTasksInterval(community *Community, 
 
 			err = m.CreateAndSeedHistoryArchive(community.ID(), topics, lastArchiveEndDate, to, interval, community.Encrypted())
 			if err != nil {
-				m.LogStdout("failed to create and seed history archive", zap.Error(err))
+				m.logger.Error("failed to create and seed history archive", zap.Error(err))
 				continue
 			}
 		case <-cancel:
@@ -436,7 +428,7 @@ func (m *TorrentManager) SeedHistoryArchiveTorrent(communityID types.HexBytes) e
 
 	magnetLink := metaInfo.Magnet(nil, &info).String()
 
-	m.LogStdout("seeding torrent", zap.String("id", id), zap.String("magnetLink", magnetLink))
+	m.logger.Debug("seeding torrent", zap.String("id", id), zap.String("magnetLink", magnetLink))
 	return nil
 }
 
@@ -500,12 +492,12 @@ func (m *TorrentManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 	m.torrentTasks[id] = ml.InfoHash
 	timeout := time.After(20 * time.Second)
 
-	m.LogStdout("fetching torrent info", zap.String("magnetlink", magnetlink))
+	m.logger.Debug("fetching torrent info", zap.String("magnetlink", magnetlink))
 	select {
 	case <-timeout:
 		return nil, ErrTorrentTimedout
 	case <-cancelTask:
-		m.LogStdout("cancelled fetching torrent info")
+		m.logger.Debug("cancelled fetching torrent info")
 		downloadTaskInfo.Cancelled = true
 		return downloadTaskInfo, nil
 	case <-torrent.GotInfo():
@@ -521,14 +513,14 @@ func (m *TorrentManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 		indexFile := files[i]
 		indexFile.Download()
 
-		m.LogStdout("downloading history archive index")
+		m.logger.Debug("downloading history archive index")
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
 
 		for {
 			select {
 			case <-cancelTask:
-				m.LogStdout("cancelled downloading archive index")
+				m.logger.Debug("cancelled downloading archive index")
 				downloadTaskInfo.Cancelled = true
 				return downloadTaskInfo, nil
 			case <-ticker.C:
@@ -545,7 +537,7 @@ func (m *TorrentManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 					}
 
 					if len(existingArchiveIDs) == len(index.Archives) {
-						m.LogStdout("download cancelled, no new archives")
+						m.logger.Debug("download cancelled, no new archives")
 						return downloadTaskInfo, nil
 					}
 
@@ -586,8 +578,8 @@ func (m *TorrentManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 						endIndex := startIndex + int(metadata.Size)/pieceLength
 
 						downloadMsg := fmt.Sprintf("downloading data for message archive (%d/%d)", downloadTaskInfo.TotalDownloadedArchivesCount+1, downloadTaskInfo.TotalArchivesCount)
-						m.LogStdout(downloadMsg, zap.String("hash", hash))
-						m.LogStdout("pieces (start, end)", zap.Any("startIndex", startIndex), zap.Any("endIndex", endIndex-1))
+						m.logger.Debug(downloadMsg, zap.String("hash", hash))
+						m.logger.Debug("pieces (start, end)", zap.Any("startIndex", startIndex), zap.Any("endIndex", endIndex-1))
 						torrent.DownloadPieces(startIndex, endIndex)
 
 						piecesCompleted := make(map[int]bool)
@@ -615,7 +607,7 @@ func (m *TorrentManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 									break downloadLoop
 								}
 							case <-cancelTask:
-								m.LogStdout("downloading archive data interrupted")
+								m.logger.Debug("downloading archive data interrupted")
 								downloadTaskInfo.Cancelled = true
 								return downloadTaskInfo, nil
 							}
@@ -623,7 +615,7 @@ func (m *TorrentManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 						downloadTaskInfo.TotalDownloadedArchivesCount++
 						err = m.persistence.SaveMessageArchiveID(communityID, hash)
 						if err != nil {
-							m.LogStdout("couldn't save message archive ID", zap.Error(err))
+							m.logger.Error("couldn't save message archive ID", zap.Error(err))
 							continue
 						}
 						m.publisher.publish(&Subscription{
@@ -639,7 +631,7 @@ func (m *TorrentManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 							CommunityID: communityID.String(),
 						},
 					})
-					m.LogStdout("finished downloading archives")
+					m.logger.Debug("finished downloading archives")
 					return downloadTaskInfo, nil
 				}
 			}
