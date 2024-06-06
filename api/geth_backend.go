@@ -543,8 +543,6 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		return err
 	}
 
-	password := request.Password
-
 	acc := multiaccounts.Account{
 		KeyUID:        request.KeyUID,
 		KDFIterations: request.KdfIterations,
@@ -554,7 +552,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		acc.KDFIterations = dbsetup.ReducedKDFIterationsNumber
 	}
 
-	err := b.ensureDBsOpened(acc, password)
+	err := b.ensureDBsOpened(acc, request.Password)
 	if err != nil {
 		return err
 	}
@@ -566,7 +564,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 
 	defaultCfg.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig)
 
-	err = b.UpdateNodeConfigFleet(acc, password, defaultCfg)
+	err = b.UpdateNodeConfigFleet(acc, request.Password, defaultCfg)
 	if err != nil {
 		return err
 	}
@@ -617,7 +615,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		return err
 	}
 	login := account.LoginParams{
-		Password:       password,
+		Password:       request.Password,
 		ChatAddress:    chatAddr,
 		WatchAddresses: watchAddrs,
 		MainAccount:    walletAddr,
@@ -629,10 +627,28 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		return err
 	}
 
-	err = b.SelectAccount(login)
-	if err != nil {
-		return err
+	if chatKey := request.ChatPrivateKey(); chatKey == nil {
+		err = b.SelectAccount(login)
+		if err != nil {
+			return err
+		}
+	} else {
+		// In case of keycard, we don't have a keystore, instead we have private key loaded from the keycard
+		if err := b.accountManager.SetChatAccount(chatKey); err != nil {
+			return err
+		}
+		_, err = b.accountManager.SelectedChatAccount()
+		if err != nil {
+			return err
+		}
+
+		b.accountManager.SetAccountAddresses(walletAddr, watchAddrs...)
+		err = b.injectAccountsIntoServices()
+		if err != nil {
+			return err
+		}
 	}
+
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
 	if err != nil {
 		b.log.Info("failed to update account")
@@ -677,6 +693,7 @@ func (b *GethStatusBackend) UpdateNodeConfigFleet(acc multiaccounts.Account, pas
 	return nil
 }
 
+// Deprecated: Use loginAccount instead
 func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, inputNodeCfg *params.NodeConfig, chatKey *ecdsa.PrivateKey) error {
 	err := b.ensureDBsOpened(acc, password)
 	if err != nil {
