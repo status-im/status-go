@@ -108,6 +108,7 @@ func (m *ArchiveManager) SetOnline(online bool) {
 
 func (m *ArchiveManager) SetTorrentConfig(config *params.TorrentConfig) {
 	m.torrentConfig = config
+	m.ArchiveFileManager.torrentConfig = config
 }
 
 // getTCPandUDPport will return the same port number given if != 0,
