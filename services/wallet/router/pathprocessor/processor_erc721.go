@@ -1,4 +1,4 @@
-package bridge
+package pathprocessor
 
 import (
 	"context"
@@ -19,34 +19,34 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-type ERC721TransferTxArgs struct {
+type ERC721TxArgs struct {
 	transactions.SendTxArgs
 	TokenID   *hexutil.Big   `json:"tokenId"`
 	Recipient common.Address `json:"recipient"`
 }
 
-type ERC721TransferBridge struct {
+type ERC721Processor struct {
 	rpcClient  *rpc.Client
 	transactor transactions.TransactorIface
 }
 
-func NewERC721TransferBridge(rpcClient *rpc.Client, transactor transactions.TransactorIface) *ERC721TransferBridge {
-	return &ERC721TransferBridge{rpcClient: rpcClient, transactor: transactor}
+func NewERC721Processor(rpcClient *rpc.Client, transactor transactions.TransactorIface) *ERC721Processor {
+	return &ERC721Processor{rpcClient: rpcClient, transactor: transactor}
 }
 
-func (s *ERC721TransferBridge) Name() string {
-	return ERC721TransferName
+func (s *ERC721Processor) Name() string {
+	return ProcessorERC721Name
 }
 
-func (s *ERC721TransferBridge) AvailableFor(params BridgeParams) (bool, error) {
+func (s *ERC721Processor) AvailableFor(params ProcessorInputParams) (bool, error) {
 	return params.FromChain.ChainID == params.ToChain.ChainID && params.ToToken == nil, nil
 }
 
-func (s *ERC721TransferBridge) CalculateFees(params BridgeParams) (*big.Int, *big.Int, error) {
-	return big.NewInt(0), big.NewInt(0), nil
+func (s *ERC721Processor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
+	return ZeroBigIntValue, ZeroBigIntValue, nil
 }
 
-func (s *ERC721TransferBridge) PackTxInputData(params BridgeParams, contractType string) ([]byte, error) {
+func (s *ERC721Processor) PackTxInputData(params ProcessorInputParams, contractType string) ([]byte, error) {
 	abi, err := abi.JSON(strings.NewReader(collectibles.CollectiblesMetaData.ABI))
 	if err != nil {
 		return []byte{}, err
@@ -64,7 +64,7 @@ func (s *ERC721TransferBridge) PackTxInputData(params BridgeParams, contractType
 	)
 }
 
-func (s *ERC721TransferBridge) EstimateGas(params BridgeParams) (uint64, error) {
+func (s *ERC721Processor) EstimateGas(params ProcessorInputParams) (uint64, error) {
 	ethClient, err := s.rpcClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, err
@@ -93,7 +93,7 @@ func (s *ERC721TransferBridge) EstimateGas(params BridgeParams) (uint64, error) 
 	return uint64(increasedEstimation), nil
 }
 
-func (s *ERC721TransferBridge) BuildTx(params BridgeParams) (*ethTypes.Transaction, error) {
+func (s *ERC721Processor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
 	contractAddress := types.Address(params.FromToken.Address)
 
 	// We store ERC721 Token ID using big.Int.String() in token.Symbol
@@ -102,8 +102,8 @@ func (s *ERC721TransferBridge) BuildTx(params BridgeParams) (*ethTypes.Transacti
 		return nil, fmt.Errorf("failed to convert ERC721's Symbol %s to big.Int", params.FromToken.Symbol)
 	}
 
-	sendArgs := &TransactionBridge{
-		ERC721TransferTx: &ERC721TransferTxArgs{
+	sendArgs := &MultipathProcessorTxArgs{
+		ERC721TransferTx: &ERC721TxArgs{
 			SendTxArgs: transactions.SendTxArgs{
 				From:  types.Address(params.FromAddr),
 				To:    &contractAddress,
@@ -119,7 +119,7 @@ func (s *ERC721TransferBridge) BuildTx(params BridgeParams) (*ethTypes.Transacti
 	return s.BuildTransaction(sendArgs)
 }
 
-func (s *ERC721TransferBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
+func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
 	ethClient, err := s.rpcClient.EthClient(sendArgs.ChainID)
 	if err != nil {
 		return tx, err
@@ -145,7 +145,7 @@ func (s *ERC721TransferBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn
 	return tx, err
 }
 
-func (s *ERC721TransferBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
+func (s *ERC721Processor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
 	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.ERC721TransferTx.From, verifiedAccount))
 	if err != nil {
 		return hash, err
@@ -153,14 +153,14 @@ func (s *ERC721TransferBridge) Send(sendArgs *TransactionBridge, verifiedAccount
 	return types.Hash(tx.Hash()), nil
 }
 
-func (s *ERC721TransferBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error) {
+func (s *ERC721Processor) BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error) {
 	return s.sendOrBuild(sendArgs, nil)
 }
 
-func (s *ERC721TransferBridge) CalculateAmountOut(params BridgeParams) (*big.Int, error) {
+func (s *ERC721Processor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
 	return params.AmountIn, nil
 }
 
-func (s *ERC721TransferBridge) GetContractAddress(params BridgeParams) (common.Address, error) {
+func (s *ERC721Processor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
 	return params.FromToken.Address, nil
 }
