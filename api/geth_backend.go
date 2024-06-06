@@ -1338,7 +1338,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		return nil, nil, nil, nil, err
 	}
 
-	settings, err := b.prepareSettings(*info, derivedAddresses, request)
+	settings, err := b.prepareSettings(*info, derivedAddresses, request, mnemonic)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -1445,8 +1445,8 @@ func (b *GethStatusBackend) generateAccount(info generator.GeneratedAccountInfo,
 	return &account, &info, nil
 }
 
-func (b *GethStatusBackend) prepareSettings(info generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, request *requests.CreateAccount) (*settings.Settings, error) {
-	settings, err := defaultSettings(info, derivedAddresses, nil)
+func (b *GethStatusBackend) prepareSettings(info generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, request *requests.CreateAccount, mnemonic string) (*settings.Settings, error) {
+	settings, err := defaultSettings(info, derivedAddresses)
 	if err != nil {
 		return nil, err
 	}
@@ -1458,7 +1458,7 @@ func (b *GethStatusBackend) prepareSettings(info generator.GeneratedAccountInfo,
 	settings.TestNetworksEnabled = request.TestNetworksEnabled
 
 	// If restoring an account, we don't set the mnemonic
-	if info.Mnemonic == "" {
+	if mnemonic == "" {
 		settings.Mnemonic = &info.Mnemonic
 		settings.OmitTransfersHistoryScan = true
 		// TODO(rasom): uncomment it as soon as address will be properly
