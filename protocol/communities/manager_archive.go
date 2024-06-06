@@ -1,6 +1,12 @@
 //go:build !disable_torrent
 // +build !disable_torrent
 
+// Attribution to Pascal Precht, for further context please view the below issues
+// - https://github.com/status-im/status-go/issues/2563
+// - https://github.com/status-im/status-go/issues/2565
+// - https://github.com/status-im/status-go/issues/2567
+// - https://github.com/status-im/status-go/issues/2568
+
 package communities
 
 import (
