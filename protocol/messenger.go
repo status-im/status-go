@@ -1229,8 +1229,10 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 // context 'public-chat' will attach only the 'thumbnail' IdentityImage
 // context 'private-chat' will attach all IdentityImage
 func (m *Messenger) createChatIdentity(context ChatContext) (*protobuf.ChatIdentity, error) {
-	m.logger.Info(fmt.Sprintf("account keyUID '%s'", m.account.KeyUID))
-	m.logger.Info(fmt.Sprintf("context '%s'", context))
+	m.logger.Info("called createChatIdentity",
+		zap.String("account keyUID", m.account.KeyUID),
+		zap.String("context", string(context)),
+	)
 
 	displayName, err := m.settings.DisplayName()
 	if err != nil {
@@ -3746,7 +3748,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 
 	importMessagesToSave := messageState.Response.DiscordMessages()
 	if len(importMessagesToSave) > 0 {
-		m.logger.Debug(fmt.Sprintf("saving %d discord messages", len(importMessagesToSave)))
+		m.logger.Debug("saving discord messages", zap.Int("count", len(importMessagesToSave)))
 		m.handleImportMessagesMutex.Lock()
 		err := m.persistence.SaveDiscordMessages(importMessagesToSave)
 		if err != nil {
@@ -3759,7 +3761,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 
 	messageAttachmentsToSave := messageState.Response.DiscordMessageAttachments()
 	if len(messageAttachmentsToSave) > 0 {
-		m.logger.Debug(fmt.Sprintf("saving %d discord message attachments", len(messageAttachmentsToSave)))
+		m.logger.Debug("saving discord message attachments", zap.Int("count", len(messageAttachmentsToSave)))
 		m.handleImportMessagesMutex.Lock()
 		err := m.persistence.SaveDiscordMessageAttachments(messageAttachmentsToSave)
 		if err != nil {
@@ -3772,7 +3774,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 
 	messagesToSave := messageState.Response.Messages()
 	if len(messagesToSave) > 0 {
-		m.logger.Debug(fmt.Sprintf("saving %d app messages", len(messagesToSave)))
+		m.logger.Debug("saving %d app messages", zap.Int("count", len(messagesToSave)))
 		m.handleMessagesMutex.Lock()
 		err := m.SaveMessages(messagesToSave)
 		if err != nil {
@@ -4660,7 +4662,7 @@ func (m *Messenger) MarkAllReadInCommunity(ctx context.Context, communityID stri
 			m.allChats.Store(chat.ID, chat)
 			response.AddChat(chat)
 		} else {
-			err = errors.New(fmt.Sprintf("chat with chatID %s not found", chatID))
+			err = fmt.Errorf("chat with chatID %s not found", chatID)
 		}
 	}
 	return response, err
