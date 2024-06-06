@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
@@ -99,7 +100,8 @@ func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload,
 
 		var chatKey *ecdsa.PrivateKey
 		if accountPayload.chatKey != "" {
-			chatKey, err = ethcrypto.HexToECDSA(accountPayload.chatKey)
+			chatKeyHex := strings.Trim(accountPayload.chatKey, "0x")
+			chatKey, err = ethcrypto.HexToECDSA(chatKeyHex)
 			if err != nil {
 				return err
 			}

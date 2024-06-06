@@ -1,8 +1,17 @@
 package requests
 
-import "errors"
+import (
+	"crypto/ecdsa"
+	"errors"
+	"strings"
 
-var ErrLoginInvalidKeyUID = errors.New("login: invalid key-uid")
+	"github.com/status-im/status-go/eth-node/crypto"
+)
+
+var (
+	ErrLoginInvalidKeyUID                           = errors.New("login: invalid key-uid")
+	ErrCreateAccountInvalidKeycardWhisperPrivateKey = errors.New("create-account: invalid keycard whisper private key")
+)
 
 type Login struct {
 	Password string `json:"password"`
@@ -13,6 +22,8 @@ type Login struct {
 	WakuV2Nameserver      string `json:"wakuV2Nameserver"`
 	BandwidthStatsEnabled bool   `json:"bandwidthStatsEnabled"`
 
+	KeycardWhisperPrivateKey string `json:"keycardWhisperPrivateKey"`
+
 	WalletSecretsConfig
 }
 
@@ -20,5 +31,24 @@ func (c *Login) Validate() error {
 	if c.KeyUID == "" {
 		return ErrLoginInvalidKeyUID
 	}
+
+	if c.KeycardWhisperPrivateKey != "" {
+		_, err := parsePrivateKey(c.KeycardWhisperPrivateKey)
+		if err != nil {
+			return ErrCreateAccountInvalidKeycardWhisperPrivateKey
+		}
+	}
+
 	return nil
+}
+
+func (c *Login) ChatPrivateKey() *ecdsa.PrivateKey {
+	// Skip error check, as it's already validated in Validate
+	privateKey, _ := parsePrivateKey(c.KeycardWhisperPrivateKey)
+	return privateKey
+}
+
+func parsePrivateKey(privateKeyHex string) (*ecdsa.PrivateKey, error) {
+	privateKeyHex = strings.TrimPrefix(privateKeyHex, "0x")
+	return crypto.HexToECDSA(privateKeyHex)
 }
