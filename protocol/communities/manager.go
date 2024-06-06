@@ -164,7 +164,7 @@ type HistoryArchiveDownloadTaskInfo struct {
 	Cancelled                    bool
 }
 
-type ArchiveContract interface {
+type ArchiveFileService interface {
 	CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
 	CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
 	SaveMessageArchiveID(communityID types.HexBytes, hash string) error
@@ -175,8 +175,8 @@ type ArchiveContract interface {
 	LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.WakuMessageArchiveIndex, error)
 }
 
-type TorrentContract interface {
-	ArchiveContract
+type ArchiveService interface {
+	ArchiveFileService
 
 	SetOnline(bool)
 	SetTorrentConfig(*params.TorrentConfig)

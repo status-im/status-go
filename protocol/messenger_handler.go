@@ -1342,7 +1342,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		return nil
 	}
 
-	if m.torrentManager.IsReady() && settings.HistoryArchiveSupportEnabled {
+	if m.archiveManager.IsReady() && settings.HistoryArchiveSupportEnabled {
 		lastClock, err := m.communitiesManager.GetMagnetlinkMessageClock(id)
 		if err != nil {
 			return err
@@ -1360,8 +1360,8 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 				return nil
 			}
 
-			m.torrentManager.UnseedHistoryArchiveTorrent(id)
-			currentTask := m.torrentManager.GetHistoryArchiveDownloadTask(id.String())
+			m.archiveManager.UnseedHistoryArchiveTorrent(id)
+			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(id.String())
 
 			go func(currentTask *communities.HistoryArchiveDownloadTask, communityID types.HexBytes) {
 
@@ -1378,7 +1378,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 					Cancelled:  false,
 				}
 
-				m.torrentManager.AddHistoryArchiveDownloadTask(communityID.String(), task)
+				m.archiveManager.AddHistoryArchiveDownloadTask(communityID.String(), task)
 
 				// this wait groups tracks the ongoing task for a particular community
 				task.Waiter.Add(1)
@@ -1397,12 +1397,12 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 }
 
 func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetlink string, cancel chan struct{}) {
-	downloadTaskInfo, err := m.torrentManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
+	downloadTaskInfo, err := m.archiveManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
 	if err != nil {
 		logMsg := "failed to download history archive data"
 		if err == communities.ErrTorrentTimedout {
 			m.logger.Debug("torrent has timed out, trying once more...")
-			downloadTaskInfo, err = m.torrentManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
+			downloadTaskInfo, err = m.archiveManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
 			if err != nil {
 				m.logger.Error(logMsg, zap.Error(err))
 				return
@@ -1728,9 +1728,9 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		}
 
 		magnetlink := requestToJoinResponseProto.MagnetUri
-		if m.torrentManager.IsReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
+		if m.archiveManager.IsReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
 
-			currentTask := m.torrentManager.GetHistoryArchiveDownloadTask(community.IDString())
+			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(community.IDString())
 			go func(currentTask *communities.HistoryArchiveDownloadTask) {
 
 				// Cancel ongoing download/import task
@@ -1744,7 +1744,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 					Waiter:     *new(sync.WaitGroup),
 					Cancelled:  false,
 				}
-				m.torrentManager.AddHistoryArchiveDownloadTask(community.IDString(), task)
+				m.archiveManager.AddHistoryArchiveDownloadTask(community.IDString(), task)
 
 				task.Waiter.Add(1)
 				defer task.Waiter.Done()

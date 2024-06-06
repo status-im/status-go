@@ -113,7 +113,7 @@ type Messenger struct {
 	pushNotificationClient    *pushnotificationclient.Client
 	pushNotificationServer    *pushnotificationserver.Server
 	communitiesManager        *communities.Manager
-	torrentManager            communities.TorrentContract
+	archiveManager            communities.ArchiveService
 	communitiesKeyDistributor communities.KeyDistributor
 	accountsManager           account.Manager
 	mentionsManager           *MentionManager
@@ -501,7 +501,7 @@ func NewMessenger(
 	// Depending on the OS go will choose whether to use the "communities/manager_torrent_mobile.go" or
 	// "communities/manager_torrent.go" version of this function based on the build instructions for those files.
 	// See those file for more details.
-	torrentManager := communities.NewTorrentManager(c.torrentConfig, logger, communitiesManager.GetPersistence(), transp, identity, encryptionProtocol, communitiesManager)
+	torrentManager := communities.NewArchiveManager(c.torrentConfig, logger, communitiesManager.GetPersistence(), transp, identity, encryptionProtocol, communitiesManager)
 	if err != nil {
 		return nil, err
 	}
@@ -536,7 +536,7 @@ func NewMessenger(
 		pushNotificationServer:     pushNotificationServer,
 		communitiesManager:         communitiesManager,
 		communitiesKeyDistributor:  communitiesKeyDistributor,
-		torrentManager:             torrentManager,
+		archiveManager:             torrentManager,
 		accountsManager:            c.accountsManager,
 		ensVerifier:                ensVerifier,
 		featureFlags:               c.featureFlags,
@@ -832,7 +832,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	if m.torrentManager.IsReady() {
+	if m.archiveManager.IsReady() {
 		available := m.SubscribeMailserverAvailable()
 		go func() {
 			<-available
@@ -922,8 +922,8 @@ func (m *Messenger) handleConnectionChange(online bool) {
 	}
 
 	// Update torrent manager
-	if m.torrentManager != nil {
-		m.torrentManager.SetOnline(online)
+	if m.archiveManager != nil {
+		m.archiveManager.SetOnline(online)
 	}
 
 	// Publish contact code

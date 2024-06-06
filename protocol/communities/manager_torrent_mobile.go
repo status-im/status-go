@@ -15,76 +15,78 @@ import (
 	"go.uber.org/zap"
 )
 
-type TorrentManagerNop struct {
-	ArchiveManagerNop
+type ArchiveManagerNop struct {
+	*ArchiveFileManagerNop
 }
 
-// NewTorrentManager this function is only built and called when the "disable_torrent" build tag is set
-// In this case this version of NewTorrentManager will return the mobile "nil" TorrentManagerNop ensuring that the
+// NewArchiveManager this function is only built and called when the "disable_torrent" build tag is set
+// In this case this version of NewArchiveManager will return the mobile "nil" ArchiveManagerNop ensuring that the
 // build command will not import or build the torrent deps for the mobile OS.
 // NOTE: It is intentional that this file contains the identical function name as in "manager_torrent.go"
-func NewTorrentManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) *TorrentManagerNop {
-	return &TorrentManagerNop{}
+func NewArchiveManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) *ArchiveManagerNop {
+	return &ArchiveManagerNop{
+		&ArchiveFileManagerNop{},
+	}
 }
 
-func (tmm *TorrentManagerNop) SetOnline(online bool) {}
+func (tmm *ArchiveManagerNop) SetOnline(online bool) {}
 
-func (tmm *TorrentManagerNop) SetTorrentConfig(*params.TorrentConfig) {}
+func (tmm *ArchiveManagerNop) SetTorrentConfig(*params.TorrentConfig) {}
 
-func (tmm *TorrentManagerNop) StartTorrentClient() error {
+func (tmm *ArchiveManagerNop) StartTorrentClient() error {
 	return nil
 }
 
-func (tmm *TorrentManagerNop) Stop() error {
+func (tmm *ArchiveManagerNop) Stop() error {
 	return nil
 }
 
-func (tmm *TorrentManagerNop) IsReady() bool {
+func (tmm *ArchiveManagerNop) IsReady() bool {
 	return false
 }
 
-func (tmm *TorrentManagerNop) GetCommunityChatsFilters(communityID types.HexBytes) ([]*transport.Filter, error) {
+func (tmm *ArchiveManagerNop) GetCommunityChatsFilters(communityID types.HexBytes) ([]*transport.Filter, error) {
 	return nil, nil
 }
 
-func (tmm *TorrentManagerNop) GetCommunityChatsTopics(communityID types.HexBytes) ([]types.TopicType, error) {
+func (tmm *ArchiveManagerNop) GetCommunityChatsTopics(communityID types.HexBytes) ([]types.TopicType, error) {
 	return nil, nil
 }
 
-func (tmm *TorrentManagerNop) GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error) {
+func (tmm *ArchiveManagerNop) GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error) {
 	return 0, nil
 }
 
-func (tmm *TorrentManagerNop) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
+func (tmm *ArchiveManagerNop) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
 	return nil
 }
 
-func (tmm *TorrentManagerNop) StartHistoryArchiveTasksInterval(community *Community, interval time.Duration) {
+func (tmm *ArchiveManagerNop) StartHistoryArchiveTasksInterval(community *Community, interval time.Duration) {
 }
 
-func (tmm *TorrentManagerNop) StopHistoryArchiveTasksInterval(communityID types.HexBytes) {}
+func (tmm *ArchiveManagerNop) StopHistoryArchiveTasksInterval(communityID types.HexBytes) {}
 
-func (tmm *TorrentManagerNop) SeedHistoryArchiveTorrent(communityID types.HexBytes) error {
+func (tmm *ArchiveManagerNop) SeedHistoryArchiveTorrent(communityID types.HexBytes) error {
 	return nil
 }
 
-func (tmm *TorrentManagerNop) UnseedHistoryArchiveTorrent(communityID types.HexBytes) {}
+func (tmm *ArchiveManagerNop) UnseedHistoryArchiveTorrent(communityID types.HexBytes) {}
 
-func (tmm *TorrentManagerNop) IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool {
+func (tmm *ArchiveManagerNop) IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool {
 	return false
 }
 
-func (tmm *TorrentManagerNop) GetHistoryArchiveDownloadTask(communityID string) *HistoryArchiveDownloadTask {
+func (tmm *ArchiveManagerNop) GetHistoryArchiveDownloadTask(communityID string) *HistoryArchiveDownloadTask {
 	return nil
 }
 
-func (tmm *TorrentManagerNop) AddHistoryArchiveDownloadTask(communityID string, task *HistoryArchiveDownloadTask) {
+func (tmm *ArchiveManagerNop) AddHistoryArchiveDownloadTask(communityID string, task *HistoryArchiveDownloadTask) {
 }
 
-func (tmm *TorrentManagerNop) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error) {
+func (tmm *ArchiveManagerNop) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error) {
 	return nil, nil
 }
 
-func (tmm *TorrentManagerNop) TorrentFileExists(communityID string) bool {
+func (tmm *ArchiveManagerNop) TorrentFileExists(communityID string) bool {
 	return false
 }

@@ -944,7 +944,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 
 			wakuMessages := append(wakuChatMessages, wakuPinMessages...)
 
-			topics, err := m.torrentManager.GetCommunityChatsTopics(request.CommunityID)
+			topics, err := m.archiveManager.GetCommunityChatsTopics(request.CommunityID)
 			if err != nil {
 				m.logger.Error("failed to get community chat topics", zap.Error(err))
 				continue
@@ -953,7 +953,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			startDate := time.Unix(int64(exportData.OldestMessageTimestamp), 0)
 			endDate := time.Now()
 
-			_, err = m.torrentManager.CreateHistoryArchiveTorrentFromMessages(
+			_, err = m.archiveManager.CreateHistoryArchiveTorrentFromMessages(
 				request.CommunityID,
 				wakuMessages,
 				topics,
@@ -971,13 +971,13 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 				m.logger.Error("Failed to get community settings", zap.Error(err))
 				continue
 			}
-			if m.torrentManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
+			if m.archiveManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
 
-				err = m.torrentManager.SeedHistoryArchiveTorrent(request.CommunityID)
+				err = m.archiveManager.SeedHistoryArchiveTorrent(request.CommunityID)
 				if err != nil {
 					m.logger.Error("failed to seed history archive", zap.Error(err))
 				}
-				go m.torrentManager.StartHistoryArchiveTasksInterval(community, messageArchiveInterval)
+				go m.archiveManager.StartHistoryArchiveTasksInterval(community, messageArchiveInterval)
 			}
 		}
 
@@ -1714,7 +1714,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 			wakuMessages := append(wakuChatMessages, wakuPinMessages...)
 
-			topics, err := m.torrentManager.GetCommunityChatsTopics(discordCommunity.ID())
+			topics, err := m.archiveManager.GetCommunityChatsTopics(discordCommunity.ID())
 			if err != nil {
 				m.logger.Error("failed to get community chat topics", zap.Error(err))
 				continue
@@ -1723,7 +1723,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			startDate := time.Unix(int64(exportData.OldestMessageTimestamp), 0)
 			endDate := time.Now()
 
-			_, err = m.torrentManager.CreateHistoryArchiveTorrentFromMessages(
+			_, err = m.archiveManager.CreateHistoryArchiveTorrentFromMessages(
 				discordCommunity.ID(),
 				wakuMessages,
 				topics,
@@ -1737,13 +1737,13 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				continue
 			}
 
-			if m.torrentManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
+			if m.archiveManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
 
-				err = m.torrentManager.SeedHistoryArchiveTorrent(discordCommunity.ID())
+				err = m.archiveManager.SeedHistoryArchiveTorrent(discordCommunity.ID())
 				if err != nil {
 					m.logger.Error("failed to seed history archive", zap.Error(err))
 				}
-				go m.torrentManager.StartHistoryArchiveTasksInterval(discordCommunity, messageArchiveInterval)
+				go m.archiveManager.StartHistoryArchiveTasksInterval(discordCommunity, messageArchiveInterval)
 			}
 		}
 

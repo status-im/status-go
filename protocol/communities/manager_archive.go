@@ -29,7 +29,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type ArchiveManager struct {
+type ArchiveFileManager struct {
 	torrentConfig *params.TorrentConfig
 
 	logger      *zap.Logger
@@ -40,8 +40,8 @@ type ArchiveManager struct {
 	publisher Publisher
 }
 
-func NewArchiveManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) *ArchiveManager {
-	return &ArchiveManager{
+func NewArchiveFileManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) *ArchiveFileManager {
+	return &ArchiveFileManager{
 		torrentConfig: torrentConfig,
 		logger:        logger,
 		persistence:   persistence,
@@ -51,7 +51,7 @@ func NewArchiveManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, 
 	}
 }
 
-func (m *ArchiveManager) createHistoryArchiveTorrent(communityID types.HexBytes, msgs []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBytes, msgs []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
 
 	loadFromDB := len(msgs) == 0
 
@@ -335,11 +335,11 @@ func (m *ArchiveManager) createHistoryArchiveTorrent(communityID types.HexBytes,
 	return archiveIDs, nil
 }
 
-func (m *ArchiveManager) archiveIndexFile(communityID string) string {
+func (m *ArchiveFileManager) archiveIndexFile(communityID string) string {
 	return path.Join(m.torrentConfig.DataDir, communityID, "index")
 }
 
-func (m *ArchiveManager) createWakuMessageArchive(from time.Time, to time.Time, messages []types.Message, topics [][]byte) *protobuf.WakuMessageArchive {
+func (m *ArchiveFileManager) createWakuMessageArchive(from time.Time, to time.Time, messages []types.Message, topics [][]byte) *protobuf.WakuMessageArchive {
 	var wakuMessages []*protobuf.WakuMessage
 
 	for _, msg := range messages {
@@ -369,27 +369,27 @@ func (m *ArchiveManager) createWakuMessageArchive(from time.Time, to time.Time, 
 	return wakuMessageArchive
 }
 
-func (m *ArchiveManager) CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+func (m *ArchiveFileManager) CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
 	return m.createHistoryArchiveTorrent(communityID, messages, topics, startDate, endDate, partition, encrypt)
 }
 
-func (m *ArchiveManager) CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+func (m *ArchiveFileManager) CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
 	return m.createHistoryArchiveTorrent(communityID, make([]*types.Message, 0), topics, startDate, endDate, partition, encrypt)
 }
 
-func (m *ArchiveManager) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
+func (m *ArchiveFileManager) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
 	return m.persistence.GetMessageArchiveIDsToImport(communityID)
 }
 
-func (m *ArchiveManager) SaveMessageArchiveID(communityID types.HexBytes, hash string) error {
+func (m *ArchiveFileManager) SaveMessageArchiveID(communityID types.HexBytes, hash string) error {
 	return m.persistence.SaveMessageArchiveID(communityID, hash)
 }
 
-func (m *ArchiveManager) SetMessageArchiveIDImported(communityID types.HexBytes, hash string, imported bool) error {
+func (m *ArchiveFileManager) SetMessageArchiveIDImported(communityID types.HexBytes, hash string, imported bool) error {
 	return m.persistence.SetMessageArchiveIDImported(communityID, hash, imported)
 }
 
-func (m *ArchiveManager) GetHistoryArchiveMagnetlink(communityID types.HexBytes) (string, error) {
+func (m *ArchiveFileManager) GetHistoryArchiveMagnetlink(communityID types.HexBytes) (string, error) {
 	id := communityID.String()
 	torrentFile := torrentFile(m.torrentConfig.TorrentDir, id)
 
@@ -406,11 +406,11 @@ func (m *ArchiveManager) GetHistoryArchiveMagnetlink(communityID types.HexBytes)
 	return metaInfo.Magnet(nil, &info).String(), nil
 }
 
-func (m *ArchiveManager) archiveDataFile(communityID string) string {
+func (m *ArchiveFileManager) archiveDataFile(communityID string) string {
 	return path.Join(m.torrentConfig.DataDir, communityID, "data")
 }
 
-func (m *ArchiveManager) ExtractMessagesFromHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error) {
+func (m *ArchiveFileManager) ExtractMessagesFromHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error) {
 	id := communityID.String()
 
 	index, err := m.LoadHistoryArchiveIndexFromFile(m.identity, communityID)
@@ -474,7 +474,7 @@ func (m *ArchiveManager) ExtractMessagesFromHistoryArchive(communityID types.Hex
 	return archive.Messages, nil
 }
 
-func (m *ArchiveManager) LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.WakuMessageArchiveIndex, error) {
+func (m *ArchiveFileManager) LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.WakuMessageArchiveIndex, error) {
 	wakuMessageArchiveIndexProto := &protobuf.WakuMessageArchiveIndex{}
 
 	indexPath := m.archiveIndexFile(communityID.String())
