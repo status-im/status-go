@@ -1456,15 +1456,11 @@ func (b *GethStatusBackend) prepareSettings(info generator.GeneratedAccountInfo,
 	settings.PreviewPrivacy = request.PreviewPrivacy
 	settings.CurrentNetwork = request.CurrentNetwork
 	settings.TestNetworksEnabled = request.TestNetworksEnabled
-
-	// If restoring an account, we don't set the mnemonic
-	if info.Mnemonic == "" {
-		settings.Mnemonic = &info.Mnemonic
-		settings.OmitTransfersHistoryScan = true
-		// TODO(rasom): uncomment it as soon as address will be properly
-		// marked as shown on mobile client
-		//settings.MnemonicWasNotShown = true
-	}
+	settings.Mnemonic = &info.Mnemonic
+	settings.OmitTransfersHistoryScan = true
+	// TODO(rasom): uncomment it as soon as address will be properly
+	// marked as shown on mobile client
+	//settings.MnemonicWasNotShown = true
 
 	return settings, nil
 }
