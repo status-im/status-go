@@ -22,7 +22,7 @@ type ArchiveManagerNop struct {
 // NewArchiveManager this function is only built and called when the "disable_torrent" build tag is set
 // In this case this version of NewArchiveManager will return the mobile "nil" ArchiveManagerNop ensuring that the
 // build command will not import or build the torrent deps for the mobile OS.
-// NOTE: It is intentional that this file contains the identical function name as in "manager_torrent.go"
+// NOTE: It is intentional that this file contains the identical function name as in "manager_archive.go"
 func NewArchiveManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) *ArchiveManagerNop {
 	return &ArchiveManagerNop{
 		&ArchiveFileManagerNop{},

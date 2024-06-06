@@ -498,8 +498,8 @@ func NewMessenger(
 		return nil, err
 	}
 
-	// Depending on the OS go will choose whether to use the "communities/manager_torrent_mobile.go" or
-	// "communities/manager_torrent.go" version of this function based on the build instructions for those files.
+	// Depending on the OS go will choose whether to use the "communities/manager_archive_nop.go" or
+	// "communities/manager_archive.go" version of this function based on the build instructions for those files.
 	// See those file for more details.
 	torrentManager := communities.NewArchiveManager(c.torrentConfig, logger, communitiesManager.GetPersistence(), transp, identity, encryptionProtocol, communitiesManager)
 	if err != nil {
