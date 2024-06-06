@@ -110,6 +110,8 @@ func (s SendType) canUseBridge(b bridge.Bridge) bool {
 		return bridgeName == bridge.ENSRegisterName
 	case ENSRelease:
 		return bridgeName == bridge.ENSReleaseName
+	case ENSSetPubKey:
+		return bridgeName == bridge.ENSPublicKeyName
 	default:
 		return true
 	}

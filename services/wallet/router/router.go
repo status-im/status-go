@@ -285,6 +285,7 @@ func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, token
 	paraswap := bridge.NewSwapParaswap(rpcClient, transactor, tokenManager)
 	ensRegister := bridge.NewENSRegisterBridge(rpcClient, transactor, ensService)
 	ensRelease := bridge.NewENSReleaseBridge(rpcClient, transactor, ensService)
+	ensPublicKey := bridge.NewENSPublicKeyBridge(rpcClient, transactor, ensService)
 
 	bridges[transfer.Name()] = transfer
 	bridges[erc721Transfer.Name()] = erc721Transfer
@@ -294,6 +295,7 @@ func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, token
 	bridges[paraswap.Name()] = paraswap
 	bridges[ensRegister.Name()] = ensRegister
 	bridges[ensRelease.Name()] = ensRelease
+	bridges[ensPublicKey.Name()] = ensPublicKey
 
 	return &Router{
 		rpcClient:           rpcClient,
@@ -546,7 +548,7 @@ func (r *Router) SuggestedRoutes(
 			estimatedTime := r.feesManager.TransactionEstimatedTime(ctx, network.ChainID, maxFees)
 			for _, brdg := range r.bridges {
 				// Skip bridges that are added because of the Router V2, to not break the current functionality
-				if brdg.Name() == bridge.ENSRegisterName || brdg.Name() == bridge.ENSReleaseName {
+				if brdg.Name() == bridge.ENSRegisterName || brdg.Name() == bridge.ENSReleaseName || brdg.Name() == bridge.ENSPublicKeyName {
 					continue
 				}
 

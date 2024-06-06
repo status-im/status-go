@@ -2,14 +2,16 @@ package bridge
 
 import (
 	"encoding/hex"
+	"fmt"
 	"math/big"
+	"strings"
 
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -36,6 +38,7 @@ const (
 	ERC1155TransferName = "ERC1155Transfer"
 	ENSRegisterName     = "ENSRegister"
 	ENSReleaseName      = "ENSRelease"
+	ENSPublicKeyName    = "ENSPublicKey"
 )
 
 func getSigner(chainID uint64, from types.Address, verifiedAccount *account.SelectedExtKey) bind.SignerFn {
@@ -152,6 +155,14 @@ type Bridge interface {
 	BuildTx(params BridgeParams) (*ethTypes.Transaction, error)
 }
 
+func ValidateENSUsername(username string) error {
+	if !strings.HasSuffix(username, ".eth") {
+		return fmt.Errorf("username must end with .eth")
+	}
+
+	return nil
+}
+
 func extractCoordinates(pubkey string) ([32]byte, [32]byte) {
 	x, _ := hex.DecodeString(pubkey[4:68])
 	y, _ := hex.DecodeString(pubkey[68:132])
@@ -171,4 +182,19 @@ func usernameToLabel(username string) [32]byte {
 	copy(label[:], usernameHashed)
 
 	return label
+}
+
+func nameHash(name string) common.Hash {
+	node := common.Hash{}
+
+	if len(name) > 0 {
+		labels := strings.Split(name, ".")
+
+		for i := len(labels) - 1; i >= 0; i-- {
+			labelSha := crypto.Keccak256Hash([]byte(labels[i]))
+			node = crypto.Keccak256Hash(node.Bytes(), labelSha.Bytes())
+		}
+	}
+
+	return node
 }
