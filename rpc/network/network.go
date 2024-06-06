@@ -324,3 +324,26 @@ func (nm *Manager) GetConfiguredNetworks() []params.Network {
 func (nm *Manager) GetTestNetworksEnabled() (result bool, err error) {
 	return nm.accountsDB.GetTestNetworksEnabled()
 }
+
+// Returns all networks for active mode (test/prod) and in case of test mode,
+// returns either Goerli or Sepolia networks based on the value of isGoerliEnabled
+func (nm *Manager) GetActiveNetworks() ([]*params.Network, error) {
+	areTestNetworksEnabled, err := nm.GetTestNetworksEnabled()
+	if err != nil {
+		return nil, err
+	}
+
+	networks, err := nm.Get(false)
+	if err != nil {
+		return nil, err
+	}
+	availableNetworks := make([]*params.Network, 0)
+	for _, network := range networks {
+		if network.IsTest != areTestNetworksEnabled {
+			continue
+		}
+		availableNetworks = append(availableNetworks, network)
+	}
+
+	return availableNetworks, nil
+}

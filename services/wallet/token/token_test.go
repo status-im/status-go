@@ -35,13 +35,14 @@ func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 	require.NoError(t, err)
 
 	return &Manager{
-			db:                db,
-			RPCClient:         nil,
-			ContractMaker:     nil,
-			networkManager:    nil,
-			stores:            nil,
-			communityTokensDB: nil,
-			communityManager:  nil,
+			db:                   db,
+			RPCClient:            nil,
+			ContractMaker:        nil,
+			networkManager:       nil,
+			stores:               nil,
+			communityTokensDB:    nil,
+			communityManager:     nil,
+			tokenBalancesStorage: NewPersistence(db),
 		}, func() {
 			require.NoError(t, db.Close())
 		}
@@ -335,7 +336,7 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	mediaServer, err := mediaserver.NewMediaServer(appDB, nil, nil, walletDB)
 	require.NoError(t, err)
 
-	manager := NewTokenManager(walletDB, rpcClient, nil, nm, appDB, mediaServer, nil, &accountFeed, accountsDB)
+	manager := NewTokenManager(walletDB, rpcClient, nil, nm, appDB, mediaServer, nil, &accountFeed, accountsDB, NewPersistence(walletDB))
 
 	// Insert balances for address
 	marked, err := manager.MarkAsPreviouslyOwnedToken(&Token{
@@ -397,7 +398,7 @@ func Test_tokensListsValidity(t *testing.T) {
 
 	nm := network.NewManager(appDB)
 
-	manager := NewTokenManager(walletDB, nil, nil, nm, appDB, nil, nil, nil, accountsDB)
+	manager := NewTokenManager(walletDB, nil, nil, nm, appDB, nil, nil, nil, accountsDB, NewPersistence(walletDB))
 	require.NotNil(t, manager)
 
 	tokensListWrapper := manager.GetList()

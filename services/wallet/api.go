@@ -64,8 +64,25 @@ func (api *API) SetPairingsJSONFileContent(content []byte) error {
 	return api.s.keycardPairings.SetPairingsJSONFileContent(content)
 }
 
-func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
-	return api.reader.GetWalletToken(ctx, addresses)
+// Used by mobile
+func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]token.StorageToken, error) {
+	currency, err := api.s.accountsDB.GetCurrency()
+	if err != nil {
+		return nil, err
+	}
+
+	activeNetworks, err := api.s.rpcClient.NetworkManager.GetActiveNetworks()
+	if err != nil {
+		return nil, err
+	}
+
+	chainIDs := wcommon.NetworksToChainIDs(activeNetworks)
+	clients, err := api.s.rpcClient.EthClients(chainIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.reader.GetWalletToken(ctx, clients, addresses, currency)
 }
 
 // GetBalancesByChain return a map with key as chain id and value as map of account address and map of token address and balance
@@ -79,16 +96,19 @@ func (api *API) GetBalancesByChain(ctx context.Context, chainIDs []uint64, addre
 	return api.s.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokens)
 }
 
-func (api *API) GetWalletTokenBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
-	return api.reader.GetWalletTokenBalances(ctx, addresses)
-}
+func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]token.StorageToken, error) {
+	activeNetworks, err := api.s.rpcClient.NetworkManager.GetActiveNetworks()
+	if err != nil {
+		return nil, err
+	}
 
-func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
-	return api.reader.FetchOrGetCachedWalletBalances(ctx, addresses)
-}
+	chainIDs := wcommon.NetworksToChainIDs(activeNetworks)
+	clients, err := api.s.rpcClient.EthClients(chainIDs)
+	if err != nil {
+		return nil, err
+	}
 
-func (api *API) GetCachedWalletTokensWithoutMarketData(ctx context.Context) (map[common.Address][]Token, error) {
-	return api.reader.GetCachedWalletTokensWithoutMarketData()
+	return api.reader.FetchOrGetCachedWalletBalances(ctx, clients, addresses)
 }
 
 type DerivedAddress struct {
@@ -428,7 +448,7 @@ func (api *API) GetSuggestedRoutes(
 ) (*router.SuggestedRoutes, error) {
 	log.Debug("call to GetSuggestedRoutes")
 
-	testnetMode, err := api.s.accountsDB.GetTestNetworksEnabled()
+	testnetMode, err := api.s.rpcClient.NetworkManager.GetTestNetworksEnabled()
 	if err != nil {
 		return nil, err
 	}
@@ -439,7 +459,7 @@ func (api *API) GetSuggestedRoutes(
 
 func (api *API) GetSuggestedRoutesV2(ctx context.Context, input *router.RouteInputParams) (*router.SuggestedRoutesV2, error) {
 	log.Debug("call to GetSuggestedRoutesV2")
-	testnetMode, err := api.s.accountsDB.GetTestNetworksEnabled()
+	testnetMode, err := api.s.rpcClient.NetworkManager.GetTestNetworksEnabled()
 	if err != nil {
 		return nil, err
 	}

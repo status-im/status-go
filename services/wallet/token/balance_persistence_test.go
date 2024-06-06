@@ -1,4 +1,4 @@
-package wallet
+package token
 
 import (
 	"math/big"
@@ -21,7 +21,7 @@ func TestSaveTokens(t *testing.T) {
 	persistence := NewPersistence(db)
 	require.NotNil(t, persistence)
 
-	tokens := make(map[common.Address][]Token)
+	tokens := make(map[common.Address][]StorageToken)
 	address1 := common.HexToAddress("0xdAC17F958D2ee523a2206206994597C13D831ec7")
 	address2 := common.HexToAddress("0x5e4e65926ba27467555eb562121fac00d24e9dd2")
 
@@ -31,10 +31,12 @@ func TestSaveTokens(t *testing.T) {
 	var chain1 uint64 = 1
 	var chain2 uint64 = 2
 
-	token1 := Token{
-		Name:             "token-1",
-		Symbol:           "TT1",
-		Decimals:         10,
+	token1 := StorageToken{
+		Token: Token{
+			Name:     "token-1",
+			Symbol:   "TT1",
+			Decimals: 10,
+		},
 		BalancesPerChain: make(map[uint64]ChainBalance),
 		Description:      "description-1",
 		AssetWebsiteURL:  "url-1",
@@ -54,10 +56,12 @@ func TestSaveTokens(t *testing.T) {
 		ChainID:    chain2,
 	}
 
-	token2 := Token{
-		Name:             "token-2",
-		Symbol:           "TT2",
-		Decimals:         11,
+	token2 := StorageToken{
+		Token: Token{
+			Name:     "token-2",
+			Symbol:   "TT2",
+			Decimals: 11,
+		},
 		BalancesPerChain: make(map[uint64]ChainBalance),
 		Description:      "description-2",
 		AssetWebsiteURL:  "url-2",
@@ -70,10 +74,12 @@ func TestSaveTokens(t *testing.T) {
 		ChainID:    chain1,
 	}
 
-	token3 := Token{
-		Name:             "token-3",
-		Symbol:           "TT3",
-		Decimals:         11,
+	token3 := StorageToken{
+		Token: Token{
+			Name:     "token-3",
+			Symbol:   "TT3",
+			Decimals: 11,
+		},
 		BalancesPerChain: make(map[uint64]ChainBalance),
 		Description:      "description-3",
 		AssetWebsiteURL:  "url-3",
@@ -86,9 +92,9 @@ func TestSaveTokens(t *testing.T) {
 		ChainID:    chain1,
 	}
 
-	tokens[address1] = []Token{token1, token2}
+	tokens[address1] = []StorageToken{token1, token2}
 
-	tokens[address2] = []Token{token3}
+	tokens[address2] = []StorageToken{token3}
 
 	require.NoError(t, persistence.SaveTokens(tokens))
 
@@ -98,7 +104,7 @@ func TestSaveTokens(t *testing.T) {
 	require.NotNil(t, actualTokens[address1])
 	require.Len(t, actualTokens[address1], 2)
 
-	var actualToken1, actualToken2, actualToken3 Token
+	var actualToken1, actualToken2, actualToken3 StorageToken
 	if actualTokens[address1][0].Name == "token-1" {
 		actualToken1 = actualTokens[address1][0]
 		actualToken2 = actualTokens[address1][1]

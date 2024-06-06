@@ -1,4 +1,4 @@
-package wallet
+package token
 
 import (
 	"context"
@@ -8,6 +8,41 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+type TokenMarketValues struct {
+	MarketCap       float64 `json:"marketCap"`
+	HighDay         float64 `json:"highDay"`
+	LowDay          float64 `json:"lowDay"`
+	ChangePctHour   float64 `json:"changePctHour"`
+	ChangePctDay    float64 `json:"changePctDay"`
+	ChangePct24hour float64 `json:"changePct24hour"`
+	Change24hour    float64 `json:"change24hour"`
+	Price           float64 `json:"price"`
+	HasError        bool    `json:"hasError"`
+}
+
+type StorageToken struct {
+	Token
+	BalancesPerChain        map[uint64]ChainBalance      `json:"balancesPerChain"`
+	Description             string                       `json:"description"`
+	AssetWebsiteURL         string                       `json:"assetWebsiteUrl"`
+	BuiltOn                 string                       `json:"builtOn"`
+	MarketValuesPerCurrency map[string]TokenMarketValues `json:"marketValuesPerCurrency"`
+}
+
+type ChainBalance struct {
+	RawBalance     string         `json:"rawBalance"`
+	Balance        *big.Float     `json:"balance"`
+	Balance1DayAgo string         `json:"balance1DayAgo"`
+	Address        common.Address `json:"address"`
+	ChainID        uint64         `json:"chainId"`
+	HasError       bool           `json:"hasError"`
+}
+
+type TokenBalancesStorage interface {
+	SaveTokens(tokens map[common.Address][]StorageToken) error
+	GetTokens() (map[common.Address][]StorageToken, error)
+}
+
 type Persistence struct {
 	db *sql.DB
 }
@@ -16,7 +51,7 @@ func NewPersistence(db *sql.DB) *Persistence {
 	return &Persistence{db: db}
 }
 
-func (p *Persistence) SaveTokens(tokens map[common.Address][]Token) (err error) {
+func (p *Persistence) SaveTokens(tokens map[common.Address][]StorageToken) (err error) {
 	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return
@@ -48,7 +83,7 @@ func (p *Persistence) SaveTokens(tokens map[common.Address][]Token) (err error) 
 	return nil
 }
 
-func (p *Persistence) GetTokens() (map[common.Address][]Token, error) {
+func (p *Persistence) GetTokens() (map[common.Address][]StorageToken, error) {
 	rows, err := p.db.Query(`SELECT user_address, token_name, token_symbol, token_address, token_decimals, token_description, token_url, balance, raw_balance, chain_id FROM token_balances `)
 	if err != nil {
 		return nil, err
@@ -56,11 +91,11 @@ func (p *Persistence) GetTokens() (map[common.Address][]Token, error) {
 
 	defer rows.Close()
 
-	acc := make(map[common.Address]map[string]Token)
+	acc := make(map[common.Address]map[string]StorageToken)
 
 	for rows.Next() {
 		var addressStr, balance, rawBalance, tokenAddress string
-		token := Token{}
+		token := StorageToken{}
 		var chainID uint64
 
 		err := rows.Scan(&addressStr, &token.Name, &token.Symbol, &tokenAddress, &token.Decimals, &token.Description, &token.AssetWebsiteURL, &balance, &rawBalance, &chainID)
@@ -68,10 +103,12 @@ func (p *Persistence) GetTokens() (map[common.Address][]Token, error) {
 			return nil, err
 		}
 
+		token.Address = common.HexToAddress(tokenAddress)
+		token.ChainID = chainID
 		address := common.HexToAddress(addressStr)
 
 		if acc[address] == nil {
-			acc[address] = make(map[string]Token)
+			acc[address] = make(map[string]StorageToken)
 		}
 
 		if acc[address][token.Name].Name == "" {
@@ -95,7 +132,7 @@ func (p *Persistence) GetTokens() (map[common.Address][]Token, error) {
 		}
 	}
 
-	result := make(map[common.Address][]Token)
+	result := make(map[common.Address][]StorageToken)
 
 	for address, tks := range acc {
 		for _, t := range tks {

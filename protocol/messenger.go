@@ -467,7 +467,7 @@ func NewMessenger(
 	if c.tokenManager != nil {
 		managerOptions = append(managerOptions, communities.WithTokenManager(c.tokenManager))
 	} else if c.rpcClient != nil {
-		tokenManager := token.NewTokenManager(c.walletDb, c.rpcClient, community.NewManager(database, c.httpServer, nil), c.rpcClient.NetworkManager, database, c.httpServer, nil, nil, nil)
+		tokenManager := token.NewTokenManager(c.walletDb, c.rpcClient, community.NewManager(database, c.httpServer, nil), c.rpcClient.NetworkManager, database, c.httpServer, nil, nil, nil, token.NewPersistence(c.walletDb))
 		managerOptions = append(managerOptions, communities.WithTokenManager(communities.NewDefaultTokenManager(tokenManager)))
 	}
 
