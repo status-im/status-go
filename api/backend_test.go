@@ -1073,7 +1073,7 @@ func TestConvertAccount(t *testing.T) {
 	found = keystoreContainsFileForAccount(keyStoreDir, chatAddress)
 	require.True(t, found)
 
-	defaultSettings, err := defaultSettings(genAccInfo, derivedAccounts, nil)
+	defaultSettings, err := defaultSettings(genAccInfo, derivedAccounts)
 	require.NoError(t, err)
 	nodeConfig, err := defaultNodeConfig(defaultSettings.InstallationID, &requests.CreateAccount{
 		LogLevel: defaultSettings.LogLevel,
@@ -1418,7 +1418,9 @@ func TestCreateWallet(t *testing.T) {
 	walletRootAddress, err := db.GetWalletRootAddress()
 	require.NoError(t, err)
 
+	mnemonic, err := db.Mnemonic()
 	require.NoError(t, err)
+	require.NotEmpty(t, mnemonic)
 
 	derivedAddress, err := walletAPI.GetDerivedAddresses(context.Background(), password, walletRootAddress.String(), paths)
 	require.NoError(t, err)
@@ -1649,6 +1651,12 @@ func TestRestoreAccountAndLogin(t *testing.T) {
 	invalidRequest := &requests.RestoreAccount{}
 	_, err = backend.RestoreAccountAndLogin(invalidRequest)
 	require.Error(t, err)
+
+	db, err := accounts.NewDB(backend.appDB)
+	require.NoError(t, err)
+	mnemonic, err := db.Mnemonic()
+	require.NoError(t, err)
+	require.Empty(t, mnemonic)
 }
 
 func TestCreateAccountPathsValidation(t *testing.T) {

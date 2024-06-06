@@ -45,11 +45,10 @@ var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWa
 
 var DefaultFleet = params.FleetShardsTest
 
-func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
+func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
 
 	s := &settings.Settings{}
-	s.Mnemonic = &generatedAccountInfo.Mnemonic
 	s.BackupEnabled = true
 	logLevel := "INFO"
 	s.LogLevel = &logLevel
@@ -70,7 +69,6 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 
 	s.DappsAddress = types.HexToAddress(derivedAddresses[pathDefaultWallet].Address)
 	s.EIP1581Address = types.HexToAddress(derivedAddresses[pathEIP1581].Address)
-	s.Mnemonic = mnemonic
 
 	signingPhrase, err := buildSigningPhrase()
 	if err != nil {
