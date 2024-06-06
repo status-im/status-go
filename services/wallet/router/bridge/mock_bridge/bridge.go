@@ -14,7 +14,7 @@ import (
 	types "github.com/ethereum/go-ethereum/core/types"
 	account "github.com/status-im/status-go/account"
 	types0 "github.com/status-im/status-go/eth-node/types"
-	bridge "github.com/status-im/status-go/services/wallet/bridge"
+	bridge "github.com/status-im/status-go/services/wallet/router/bridge"
 )
 
 // MockBridge is a mock of Bridge interface.
