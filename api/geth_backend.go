@@ -1333,6 +1333,13 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		request.Password = encryption.PublicKey
 	}
 
+	if request.KeycardInstanceUID == "" {
+		err = b.storeAccount(info.ID, request.Password, paths)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	response.account, info, err = b.generateAccount(*info, customizationColorClock, request)
 	if err != nil {
 		return nil, err
@@ -1414,21 +1421,24 @@ func (b *GethStatusBackend) generateAccountInfo(mnemonic string) (*generator.Gen
 	return &info, nil
 }
 
-func (b *GethStatusBackend) generateAccount(info generator.GeneratedAccountInfo, customizationColorClock uint64, request *requests.CreateAccount) (*multiaccounts.Account, *generator.GeneratedAccountInfo, error) {
-	err := b.OpenAccounts()
-	if err != nil {
-		b.log.Error("failed open accounts", "err", err)
-		return nil, nil, err
-	}
-
+func (b *GethStatusBackend) storeAccount(id string, password string, paths []string) error {
 	accountGenerator := b.accountManager.AccountsGenerator()
 
-	_, err = accountGenerator.StoreAccount(info.ID, request.Password)
+	_, err := accountGenerator.StoreAccount(id, password)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	_, err = accountGenerator.StoreDerivedAccounts(info.ID, request.Password, paths)
+	_, err = accountGenerator.StoreDerivedAccounts(id, password, paths)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b *GethStatusBackend) generateAccount(info generator.GeneratedAccountInfo, customizationColorClock uint64, request *requests.CreateAccount) (*multiaccounts.Account, *generator.GeneratedAccountInfo, error) {
+	err := b.OpenAccounts()
 	if err != nil {
 		return nil, nil, err
 	}
