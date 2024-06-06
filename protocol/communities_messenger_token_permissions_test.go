@@ -2265,12 +2265,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	}
 
 	// Share archive directory between all users
-	s.owner.torrentManager.SetTorrentConfig(&torrentConfig)
-	s.bob.torrentManager.SetTorrentConfig(&torrentConfig)
+	s.owner.archiveManager.SetTorrentConfig(&torrentConfig)
+	s.bob.archiveManager.SetTorrentConfig(&torrentConfig)
 	s.owner.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
 	s.bob.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
 
-	archiveIDs, err := s.owner.torrentManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, community.Encrypted())
+	archiveIDs, err := s.owner.archiveManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, community.Encrypted())
 	s.Require().NoError(err)
 	s.Require().Len(archiveIDs, 1)
 
@@ -2302,12 +2302,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	// https://github.com/status-im/status-go/blob/6c82a6c2be7ebed93bcae3b9cf5053da3820de50/protocol/communities/manager.go#L4403
 
 	// Ensure owner has archive
-	archiveIndex, err := s.owner.torrentManager.LoadHistoryArchiveIndexFromFile(s.owner.identity, community.ID())
+	archiveIndex, err := s.owner.archiveManager.LoadHistoryArchiveIndexFromFile(s.owner.identity, community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(archiveIndex.Archives, 1)
 
 	// Ensure bob has archive (because they share same local directory)
-	archiveIndex, err = s.bob.torrentManager.LoadHistoryArchiveIndexFromFile(s.bob.identity, community.ID())
+	archiveIndex, err = s.bob.archiveManager.LoadHistoryArchiveIndexFromFile(s.bob.identity, community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(archiveIndex.Archives, 1)
 
@@ -2315,7 +2315,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 
 	// Save message archive ID as in
 	// https://github.com/status-im/status-go/blob/6c82a6c2be7ebed93bcae3b9cf5053da3820de50/protocol/communities/manager.go#L4325-L4336
-	err = s.bob.torrentManager.SaveMessageArchiveID(community.ID(), archiveHash)
+	err = s.bob.archiveManager.SaveMessageArchiveID(community.ID(), archiveHash)
 	s.Require().NoError(err)
 
 	// Import archive

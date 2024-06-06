@@ -55,7 +55,7 @@ type EncodedArchiveData struct {
 	bytes   []byte
 }
 
-type TorrentManager struct {
+type ArchiveManager struct {
 	torrentConfig                *params.TorrentConfig
 	torrentClient                *torrent.Client
 	torrentTasks                 map[string]metainfo.Hash
@@ -69,16 +69,16 @@ type TorrentManager struct {
 	identity    *ecdsa.PrivateKey
 	encryptor   *encryption.Protocol
 
-	*ArchiveManager
+	*ArchiveFileManager
 	publisher Publisher
 }
 
-// NewTorrentManager this function is only built and called when the "disable_torrent" build tag is not set
-// In this case this version of NewTorrentManager will return the full Desktop TorrentManager ensuring that the
+// NewArchiveManager this function is only built and called when the "disable_torrent" build tag is not set
+// In this case this version of NewArchiveManager will return the full Desktop ArchiveManager ensuring that the
 // build command will import and build the torrent deps for the Desktop OSes.
 // NOTE: It is intentional that this file contains the identical function name as in "manager_torrent_mobile.go"
-func NewTorrentManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) *TorrentManager {
-	return &TorrentManager{
+func NewArchiveManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) *ArchiveManager {
+	return &ArchiveManager{
 		torrentConfig:               torrentConfig,
 		torrentTasks:                make(map[string]metainfo.Hash),
 		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
@@ -90,12 +90,12 @@ func NewTorrentManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, 
 		identity:    identity,
 		encryptor:   encryptor,
 
-		publisher:      publisher,
-		ArchiveManager: NewArchiveManager(torrentConfig, logger, persistence, identity, encryptor, publisher),
+		publisher:          publisher,
+		ArchiveFileManager: NewArchiveFileManager(torrentConfig, logger, persistence, identity, encryptor, publisher),
 	}
 }
 
-func (m *TorrentManager) SetOnline(online bool) {
+func (m *ArchiveManager) SetOnline(online bool) {
 	if online {
 		if m.torrentConfig != nil && m.torrentConfig.Enabled && !m.torrentClientStarted() {
 			err := m.StartTorrentClient()
@@ -106,14 +106,14 @@ func (m *TorrentManager) SetOnline(online bool) {
 	}
 }
 
-func (m *TorrentManager) SetTorrentConfig(config *params.TorrentConfig) {
+func (m *ArchiveManager) SetTorrentConfig(config *params.TorrentConfig) {
 	m.torrentConfig = config
 }
 
 // getTCPandUDPport will return the same port number given if != 0,
 // otherwise, it will attempt to find a free random tcp and udp port using
 // the same number for both protocols
-func (m *TorrentManager) getTCPandUDPport(portNumber int) (int, error) {
+func (m *ArchiveManager) getTCPandUDPport(portNumber int) (int, error) {
 	if portNumber != 0 {
 		return portNumber, nil
 	}
@@ -160,7 +160,7 @@ func (m *TorrentManager) getTCPandUDPport(portNumber int) (int, error) {
 	return 0, fmt.Errorf("no free port found")
 }
 
-func (m *TorrentManager) StartTorrentClient() error {
+func (m *ArchiveManager) StartTorrentClient() error {
 	if m.torrentConfig == nil {
 		return fmt.Errorf("can't start torrent client: missing torrentConfig")
 	}
@@ -198,7 +198,7 @@ func (m *TorrentManager) StartTorrentClient() error {
 	return nil
 }
 
-func (m *TorrentManager) Stop() error {
+func (m *ArchiveManager) Stop() error {
 	if m.torrentClientStarted() {
 		m.stopHistoryArchiveTasksIntervals()
 		m.logger.Info("Stopping torrent client")
@@ -211,11 +211,11 @@ func (m *TorrentManager) Stop() error {
 	return nil
 }
 
-func (m *TorrentManager) torrentClientStarted() bool {
+func (m *ArchiveManager) torrentClientStarted() bool {
 	return m.torrentClient != nil
 }
 
-func (m *TorrentManager) IsReady() bool {
+func (m *ArchiveManager) IsReady() bool {
 	// Simply checking for `torrentConfig.Enabled` isn't enough
 	// as there's a possibility that the torrent client couldn't
 	// be instantiated (for example in case of port conflicts)
@@ -224,7 +224,7 @@ func (m *TorrentManager) IsReady() bool {
 		m.torrentClientStarted()
 }
 
-func (m *TorrentManager) GetCommunityChatsFilters(communityID types.HexBytes) ([]*transport.Filter, error) {
+func (m *ArchiveManager) GetCommunityChatsFilters(communityID types.HexBytes) ([]*transport.Filter, error) {
 	chatIDs, err := m.persistence.GetCommunityChatIDs(communityID)
 	if err != nil {
 		return nil, err
@@ -237,7 +237,7 @@ func (m *TorrentManager) GetCommunityChatsFilters(communityID types.HexBytes) ([
 	return filters, nil
 }
 
-func (m *TorrentManager) GetCommunityChatsTopics(communityID types.HexBytes) ([]types.TopicType, error) {
+func (m *ArchiveManager) GetCommunityChatsTopics(communityID types.HexBytes) ([]types.TopicType, error) {
 	filters, err := m.GetCommunityChatsFilters(communityID)
 	if err != nil {
 		return nil, err
@@ -251,15 +251,15 @@ func (m *TorrentManager) GetCommunityChatsTopics(communityID types.HexBytes) ([]
 	return topics, nil
 }
 
-func (m *TorrentManager) getOldestWakuMessageTimestamp(topics []types.TopicType) (uint64, error) {
+func (m *ArchiveManager) getOldestWakuMessageTimestamp(topics []types.TopicType) (uint64, error) {
 	return m.persistence.GetOldestWakuMessageTimestamp(topics)
 }
 
-func (m *TorrentManager) getLastMessageArchiveEndDate(communityID types.HexBytes) (uint64, error) {
+func (m *ArchiveManager) getLastMessageArchiveEndDate(communityID types.HexBytes) (uint64, error) {
 	return m.persistence.GetLastMessageArchiveEndDate(communityID)
 }
 
-func (m *TorrentManager) GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error) {
+func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error) {
 	filters, err := m.GetCommunityChatsFilters(communityID)
 	if err != nil {
 		m.logger.Error("failed to get community chats filters", zap.Error(err))
@@ -306,16 +306,16 @@ func (m *TorrentManager) GetHistoryArchivePartitionStartTimestamp(communityID ty
 	return lastArchiveEndDateTimestamp, nil
 }
 
-func (m *TorrentManager) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
+func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
 	m.UnseedHistoryArchiveTorrent(communityID)
-	_, err := m.ArchiveManager.CreateHistoryArchiveTorrentFromDB(communityID, topics, startDate, endDate, partition, encrypt)
+	_, err := m.ArchiveFileManager.CreateHistoryArchiveTorrentFromDB(communityID, topics, startDate, endDate, partition, encrypt)
 	if err != nil {
 		return err
 	}
 	return m.SeedHistoryArchiveTorrent(communityID)
 }
 
-func (m *TorrentManager) StartHistoryArchiveTasksInterval(community *Community, interval time.Duration) {
+func (m *ArchiveManager) StartHistoryArchiveTasksInterval(community *Community, interval time.Duration) {
 	id := community.IDString()
 	if _, exists := m.historyArchiveTasks.Load(id); exists {
 		m.logger.Error("history archive tasks interval already in progress", zap.String("id", id))
@@ -371,7 +371,7 @@ func (m *TorrentManager) StartHistoryArchiveTasksInterval(community *Community, 
 	}
 }
 
-func (m *TorrentManager) stopHistoryArchiveTasksIntervals() {
+func (m *ArchiveManager) stopHistoryArchiveTasksIntervals() {
 	m.historyArchiveTasks.Range(func(_, task interface{}) bool {
 		close(task.(chan struct{})) // Need to cast to the chan
 		return true
@@ -382,7 +382,7 @@ func (m *TorrentManager) stopHistoryArchiveTasksIntervals() {
 	m.historyArchiveTasksWaitGroup.Wait()
 }
 
-func (m *TorrentManager) StopHistoryArchiveTasksInterval(communityID types.HexBytes) {
+func (m *ArchiveManager) StopHistoryArchiveTasksInterval(communityID types.HexBytes) {
 	task, exists := m.historyArchiveTasks.Load(communityID.String())
 	if exists {
 		m.logger.Info("Stopping history archive tasks interval", zap.Any("id", communityID.String()))
@@ -390,7 +390,7 @@ func (m *TorrentManager) StopHistoryArchiveTasksInterval(communityID types.HexBy
 	}
 }
 
-func (m *TorrentManager) SeedHistoryArchiveTorrent(communityID types.HexBytes) error {
+func (m *ArchiveManager) SeedHistoryArchiveTorrent(communityID types.HexBytes) error {
 	m.UnseedHistoryArchiveTorrent(communityID)
 
 	id := communityID.String()
@@ -432,7 +432,7 @@ func (m *TorrentManager) SeedHistoryArchiveTorrent(communityID types.HexBytes) e
 	return nil
 }
 
-func (m *TorrentManager) UnseedHistoryArchiveTorrent(communityID types.HexBytes) {
+func (m *ArchiveManager) UnseedHistoryArchiveTorrent(communityID types.HexBytes) {
 	id := communityID.String()
 
 	hash, exists := m.torrentTasks[id]
@@ -453,22 +453,22 @@ func (m *TorrentManager) UnseedHistoryArchiveTorrent(communityID types.HexBytes)
 	}
 }
 
-func (m *TorrentManager) IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool {
+func (m *ArchiveManager) IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool {
 	id := communityID.String()
 	hash := m.torrentTasks[id]
 	torrent, ok := m.torrentClient.Torrent(hash)
 	return ok && torrent.Seeding()
 }
 
-func (m *TorrentManager) GetHistoryArchiveDownloadTask(communityID string) *HistoryArchiveDownloadTask {
+func (m *ArchiveManager) GetHistoryArchiveDownloadTask(communityID string) *HistoryArchiveDownloadTask {
 	return m.historyArchiveDownloadTasks[communityID]
 }
 
-func (m *TorrentManager) AddHistoryArchiveDownloadTask(communityID string, task *HistoryArchiveDownloadTask) {
+func (m *ArchiveManager) AddHistoryArchiveDownloadTask(communityID string, task *HistoryArchiveDownloadTask) {
 	m.historyArchiveDownloadTasks[communityID] = task
 }
 
-func (m *TorrentManager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error) {
+func (m *ArchiveManager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error) {
 
 	id := communityID.String()
 
@@ -526,7 +526,7 @@ func (m *TorrentManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 			case <-ticker.C:
 				if indexFile.BytesCompleted() == indexFile.Length() {
 
-					index, err := m.ArchiveManager.LoadHistoryArchiveIndexFromFile(m.identity, communityID)
+					index, err := m.ArchiveFileManager.LoadHistoryArchiveIndexFromFile(m.identity, communityID)
 					if err != nil {
 						return nil, err
 					}
@@ -639,7 +639,7 @@ func (m *TorrentManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 	}
 }
 
-func (m *TorrentManager) TorrentFileExists(communityID string) bool {
+func (m *ArchiveManager) TorrentFileExists(communityID string) bool {
 	_, err := os.Stat(torrentFile(m.torrentConfig.TorrentDir, communityID))
 	return err == nil
 }
