@@ -28,9 +28,6 @@ const walletAccountDefaultName = "Account 1"
 const keystoreRelativePath = "keystore"
 const DefaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
 
-const DefaultArchivesRelativePath = "data/archivedata"
-const DefaultTorrentTorrentsRelativePath = "data/torrents"
-
 const DefaultDataDir = "/ethereum/mainnet_rpc"
 const DefaultNodeName = "StatusIM"
 const DefaultLogFile = "geth.log"
@@ -325,8 +322,8 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	nodeConfig.TorrentConfig = params.TorrentConfig{
 		Enabled:    false,
 		Port:       0,
-		DataDir:    filepath.Join(nodeConfig.RootDataDir, DefaultArchivesRelativePath),
-		TorrentDir: filepath.Join(nodeConfig.RootDataDir, DefaultTorrentTorrentsRelativePath),
+		DataDir:    filepath.Join(nodeConfig.RootDataDir, params.ArchivesRelativePath),
+		TorrentDir: filepath.Join(nodeConfig.RootDataDir, params.TorrentTorrentsRelativePath),
 	}
 
 	if request.TorrentConfigEnabled != nil {

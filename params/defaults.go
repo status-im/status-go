@@ -6,6 +6,9 @@ const (
 	// StatusDatabase path relative to DataDir.
 	StatusDatabase = "status-db"
 
+	ArchivesRelativePath        = "data/archivedata"
+	TorrentTorrentsRelativePath = "data/torrents"
+
 	// SendTransactionMethodName https://docs.walletconnect.com/advanced/rpc-reference/ethereum-rpc#eth_sendtransaction
 	SendTransactionMethodName = "eth_sendTransaction"
 
