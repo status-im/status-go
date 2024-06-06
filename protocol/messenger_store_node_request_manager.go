@@ -99,7 +99,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(community communities.Community
 	communityShard := community.Shard
 	if communityShard == nil {
 		id := transport.CommunityShardInfoTopic(community.CommunityID)
-		fetchedShard, err := m.subscribeToRequest(storeNodeShardRequest, id, shard.DefaultShard(), cfg)
+		fetchedShard, err := m.subscribeToRequest(storeNodeShardRequest, id, shard.DefaultNonProtectedShard(), cfg)
 		if err != nil {
 			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a shard info request: %w", err)
 		}
