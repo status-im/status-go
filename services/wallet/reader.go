@@ -419,6 +419,7 @@ func (r *Reader) getWalletTokenBalances(clients map[uint64]chain.ClientInterface
 			for symbol, tokens := range getTokenBySymbols(tokenList) {
 				balancesPerChain := make(map[uint64]ChainBalance)
 				decimals := tokens[0].Decimals
+				isMandatoryToken := belongsToMandatoryTokens(symbol)
 				isVisible := false
 				for _, token := range tokens {
 					var balance *big.Float
@@ -445,6 +446,11 @@ func (r *Reader) getWalletTokenBalances(clients map[uint64]chain.ClientInterface
 					if !isVisible {
 						isVisible = balance.Cmp(big.NewFloat(0.0)) > 0 || r.isCachedToken(cachedTokens, address, token.Symbol, token.ChainID)
 					}
+
+					if !isVisible && !isMandatoryToken {
+						continue
+					}
+
 					balancesPerChain[token.ChainID] = ChainBalance{
 						RawBalance:     hexBalance.String(),
 						Balance:        balance,
@@ -453,10 +459,6 @@ func (r *Reader) getWalletTokenBalances(clients map[uint64]chain.ClientInterface
 						ChainID:        token.ChainID,
 						HasError:       hasError,
 					}
-				}
-
-				if !isVisible && !belongsToMandatoryTokens(symbol) {
-					continue
 				}
 
 				for _, balance := range balancesPerChain {
