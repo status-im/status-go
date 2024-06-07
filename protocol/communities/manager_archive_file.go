@@ -40,14 +40,14 @@ type ArchiveFileManager struct {
 	publisher Publisher
 }
 
-func NewArchiveFileManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) *ArchiveFileManager {
+func NewArchiveFileManager(amc *ArchiveManagerConfig) *ArchiveFileManager {
 	return &ArchiveFileManager{
-		torrentConfig: torrentConfig,
-		logger:        logger,
-		persistence:   persistence,
-		identity:      identity,
-		encryptor:     encryptor,
-		publisher:     publisher,
+		torrentConfig: amc.TorrentConfig,
+		logger:        amc.Logger,
+		persistence:   amc.Persistence,
+		identity:      amc.Identity,
+		encryptor:     amc.Encryptor,
+		publisher:     amc.Publisher,
 	}
 }
 

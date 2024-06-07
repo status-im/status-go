@@ -198,6 +198,16 @@ type ArchiveService interface {
 	TorrentFileExists(communityID string) bool
 }
 
+type ArchiveManagerConfig struct {
+	TorrentConfig *params.TorrentConfig
+	Logger        *zap.Logger
+	Persistence   *Persistence
+	Transport     *transport.Transport
+	Identity      *ecdsa.PrivateKey
+	Encryptor     *encryption.Protocol
+	Publisher     Publisher
+}
+
 func (t *HistoryArchiveDownloadTask) IsCancelled() bool {
 	t.m.RLock()
 	defer t.m.RUnlock()

@@ -77,21 +77,20 @@ type ArchiveManager struct {
 // In this case this version of NewArchiveManager will return the full Desktop ArchiveManager ensuring that the
 // build command will import and build the torrent deps for the Desktop OSes.
 // NOTE: It is intentional that this file contains the identical function name as in "manager_archive_nop.go"
-func NewArchiveManager(torrentConfig *params.TorrentConfig, logger *zap.Logger, persistence *Persistence, transport *transport.Transport, identity *ecdsa.PrivateKey, encryptor *encryption.Protocol, publisher Publisher) *ArchiveManager {
+func NewArchiveManager(amc *ArchiveManagerConfig) *ArchiveManager {
 	return &ArchiveManager{
-		torrentConfig:               torrentConfig,
+		torrentConfig:               amc.TorrentConfig,
 		torrentTasks:                make(map[string]metainfo.Hash),
 		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
 
-		logger: logger,
+		logger:      amc.Logger,
+		persistence: amc.Persistence,
+		transport:   amc.Transport,
+		identity:    amc.Identity,
+		encryptor:   amc.Encryptor,
 
-		persistence: persistence,
-		transport:   transport,
-		identity:    identity,
-		encryptor:   encryptor,
-
-		publisher:          publisher,
-		ArchiveFileManager: NewArchiveFileManager(torrentConfig, logger, persistence, identity, encryptor, publisher),
+		publisher:          amc.Publisher,
+		ArchiveFileManager: NewArchiveFileManager(amc),
 	}
 }
 

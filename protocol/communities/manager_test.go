@@ -64,8 +64,16 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *Ar
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
-	tc := buildTorrentConfig()
-	t := NewArchiveManager(&tc, logger, m.GetPersistence(), nil, key, nil, m)
+	amc := &ArchiveManagerConfig{
+		TorrentConfig: buildTorrentConfig(),
+		Logger:        logger,
+		Persistence:   m.GetPersistence(),
+		Transport:     nil,
+		Identity:      key,
+		Encryptor:     nil,
+		Publisher:     m,
+	}
+	t := NewArchiveManager(amc)
 	s.Require().NoError(err)
 
 	return m, t
@@ -1567,14 +1575,13 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 	s.Require().Len(response.Channels[chatID2].ViewOnlyPermissions.Permissions, 0)
 }
 
-func buildTorrentConfig() params.TorrentConfig {
-	torrentConfig := params.TorrentConfig{
+func buildTorrentConfig() *params.TorrentConfig {
+	return &params.TorrentConfig{
 		Enabled:    true,
 		DataDir:    os.TempDir() + "/archivedata",
 		TorrentDir: os.TempDir() + "/torrents",
 		Port:       0,
 	}
-	return torrentConfig
 }
 
 func buildMessage(timestamp time.Time, topic types.TopicType, hash []byte) types.Message {

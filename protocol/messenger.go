@@ -498,10 +498,20 @@ func NewMessenger(
 		return nil, err
 	}
 
+	amc := &communities.ArchiveManagerConfig{
+		TorrentConfig: c.torrentConfig,
+		Logger:        logger,
+		Persistence:   communitiesManager.GetPersistence(),
+		Transport:     transp,
+		Identity:      identity,
+		Encryptor:     encryptionProtocol,
+		Publisher:     communitiesManager,
+	}
+
 	// Depending on the OS go will choose whether to use the "communities/manager_archive_nop.go" or
 	// "communities/manager_archive.go" version of this function based on the build instructions for those files.
 	// See those file for more details.
-	torrentManager := communities.NewArchiveManager(c.torrentConfig, logger, communitiesManager.GetPersistence(), transp, identity, encryptionProtocol, communitiesManager)
+	archiveManager := communities.NewArchiveManager(amc)
 	if err != nil {
 		return nil, err
 	}
@@ -536,7 +546,7 @@ func NewMessenger(
 		pushNotificationServer:     pushNotificationServer,
 		communitiesManager:         communitiesManager,
 		communitiesKeyDistributor:  communitiesKeyDistributor,
-		archiveManager:             torrentManager,
+		archiveManager:             archiveManager,
 		accountsManager:            c.accountsManager,
 		ensVerifier:                ensVerifier,
 		featureFlags:               c.featureFlags,
@@ -582,7 +592,7 @@ func NewMessenger(
 			ensVerifier.Stop,
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
-			torrentManager.Stop,
+			archiveManager.Stop,
 			encryptionProtocol.Stop,
 			func() error {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
