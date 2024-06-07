@@ -64,7 +64,11 @@ func (api *API) SetPairingsJSONFileContent(content []byte) error {
 
 // Used by mobile
 func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
-	return api.reader.GetWalletToken(ctx, addresses)
+	currency, err := api.s.accountsDB.GetCurrency()
+	if err != nil {
+		return nil, err
+	}
+	return api.reader.GetWalletToken(ctx, addresses, currency)
 }
 
 // GetBalancesByChain return a map with key as chain id and value as map of account address and map of token address and balance
@@ -408,7 +412,7 @@ func (api *API) GetSuggestedRoutes(
 ) (*router.SuggestedRoutes, error) {
 	log.Debug("call to GetSuggestedRoutes")
 
-	testnetMode, err := api.s.accountsDB.GetTestNetworksEnabled()
+	testnetMode, err := api.s.rpcClient.NetworkManager.GetTestNetworksEnabled()
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +423,7 @@ func (api *API) GetSuggestedRoutes(
 
 func (api *API) GetSuggestedRoutesV2(ctx context.Context, input *router.RouteInputParams) (*router.SuggestedRoutesV2, error) {
 	log.Debug("call to GetSuggestedRoutesV2")
-	testnetMode, err := api.s.accountsDB.GetTestNetworksEnabled()
+	testnetMode, err := api.s.rpcClient.NetworkManager.GetTestNetworksEnabled()
 	if err != nil {
 		return nil, err
 	}
