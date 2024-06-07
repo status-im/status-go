@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
@@ -241,25 +242,25 @@ func (m *Manager) GetPermissionedBalances(
 	}
 	accountsAndChainIDs := combineAddressesAndChainIDs(accountAddresses, allChainIDs)
 
-	erc20TokenCriteriaByChain, erc721TokenCriteriaByChain, _ := ExtractTokenCriteria(tokenPermissions)
+	erc20TokenAddressesByChain, erc721TokenAddressesByChain := extractContractAddressesByChain(tokenPermissions)
 
 	accounts := make([]gethcommon.Address, 0, len(accountsAndChainIDs))
 	for _, accountAndChainIDs := range accountsAndChainIDs {
 		accounts = append(accounts, accountAndChainIDs.Address)
 	}
 
-	erc20ChainIDsSet := make(map[uint64]bool)
+	erc20ChainIDsSet := make(map[walletcommon.ChainID]struct{})
 	erc20TokenAddresses := make([]gethcommon.Address, 0)
-	for chainID, criterionByContractAddress := range erc20TokenCriteriaByChain {
-		erc20ChainIDsSet[chainID] = true
+	for chainID, criterionByContractAddress := range erc20TokenAddressesByChain {
+		erc20ChainIDsSet[chainID] = struct{}{}
 		for contractAddress := range criterionByContractAddress {
-			erc20TokenAddresses = append(erc20TokenAddresses, gethcommon.HexToAddress(contractAddress))
+			erc20TokenAddresses = append(erc20TokenAddresses, contractAddress)
 		}
 	}
 
-	erc721ChainIDsSet := make(map[uint64]bool)
-	for chainID := range erc721TokenCriteriaByChain {
-		erc721ChainIDsSet[chainID] = true
+	erc721ChainIDsSet := make(map[walletcommon.ChainID]struct{})
+	for chainID := range erc721TokenAddressesByChain {
+		erc721ChainIDsSet[chainID] = struct{}{}
 	}
 
 	erc20ChainIDs := calculateChainIDsSet(accountsAndChainIDs, erc20ChainIDsSet)
@@ -272,7 +273,7 @@ func (m *Manager) GetPermissionedBalances(
 
 	erc721Balances := make(CollectiblesByChain)
 	if len(erc721ChainIDs) > 0 {
-		balances, err := m.GetOwnedERC721Tokens(accounts, erc721TokenCriteriaByChain, erc721ChainIDs)
+		balances, err := m.GetOwnedERC721Tokens(accounts, erc721TokenAddressesByChain, erc721ChainIDs)
 		if err != nil {
 			return nil, err
 		}

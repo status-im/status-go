@@ -34,10 +34,10 @@ type DefaultPermissionChecker struct {
 }
 
 type PreParsedPermissionsData struct {
-	Erc721TokenRequirements map[uint64]map[string]*protobuf.TokenCriteria
-	Erc20TokenAddresses     []gethcommon.Address
-	Erc20ChainIDsMap        map[uint64]bool
-	Erc721ChainIDsMap       map[uint64]bool
+	Erc721TokenAddressesByChain TokenAddressesByChain
+	Erc20TokenAddresses         []gethcommon.Address
+	Erc20ChainIDs               map[walletcommon.ChainID]struct{}
+	Erc721ChainIDs              map[walletcommon.ChainID]struct{}
 }
 
 type PreParsedCommunityPermissionsData struct {
@@ -62,7 +62,7 @@ func (p *DefaultPermissionChecker) getOwnedENS(addresses []gethcommon.Address) (
 	}
 	return ownedENS, nil
 }
-func (p *DefaultPermissionChecker) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tokenRequirements map[uint64]map[string]*protobuf.TokenCriteria, chainIDs []uint64) (CollectiblesByChain, error) {
+func (p *DefaultPermissionChecker) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tokenRequirements TokenAddressesByChain, chainIDs []uint64) (CollectiblesByChain, error) {
 	if p.collectiblesManager == nil {
 		return nil, errors.New("no collectibles manager")
 	}
@@ -75,7 +75,7 @@ func (p *DefaultPermissionChecker) GetOwnedERC721Tokens(walletAddresses []gethco
 
 		skipChain := true
 		for _, cID := range chainIDs {
-			if chainID == cID {
+			if uint64(chainID) == cID {
 				skipChain = false
 			}
 		}
@@ -86,20 +86,20 @@ func (p *DefaultPermissionChecker) GetOwnedERC721Tokens(walletAddresses []gethco
 
 		contractAddresses := make([]gethcommon.Address, 0)
 		for contractAddress := range erc721Tokens {
-			contractAddresses = append(contractAddresses, gethcommon.HexToAddress(contractAddress))
+			contractAddresses = append(contractAddresses, contractAddress)
 		}
 
-		if _, exists := ownedERC721Tokens[chainID]; !exists {
-			ownedERC721Tokens[chainID] = make(map[gethcommon.Address]thirdparty.TokenBalancesPerContractAddress)
+		if _, exists := ownedERC721Tokens[uint64(chainID)]; !exists {
+			ownedERC721Tokens[uint64(chainID)] = make(map[gethcommon.Address]thirdparty.TokenBalancesPerContractAddress)
 		}
 
 		for _, owner := range walletAddresses {
-			balances, err := p.collectiblesManager.FetchBalancesByOwnerAndContractAddress(ctx, walletcommon.ChainID(chainID), owner, contractAddresses)
+			balances, err := p.collectiblesManager.FetchBalancesByOwnerAndContractAddress(ctx, chainID, owner, contractAddresses)
 			if err != nil {
 				p.logger.Info("couldn't fetch owner assets", zap.Error(err))
 				return nil, err
 			}
-			ownedERC721Tokens[chainID][owner] = balances
+			ownedERC721Tokens[uint64(chainID)][owner] = balances
 		}
 	}
 	return ownedERC721Tokens, nil
@@ -224,12 +224,10 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissionsParsedData *PrePa
 		return response, nil
 	}
 
-	erc721TokenRequirements := permissionsParsedData.Erc721TokenRequirements
-
-	erc20ChainIDsMap := permissionsParsedData.Erc20ChainIDsMap
-	erc721ChainIDsMap := permissionsParsedData.Erc721ChainIDsMap
-
+	erc721TokenAddressesByChain := permissionsParsedData.Erc721TokenAddressesByChain
 	erc20TokenAddresses := permissionsParsedData.Erc20TokenAddresses
+	erc20ChainIDs := permissionsParsedData.Erc20ChainIDs
+	erc721ChainIDs := permissionsParsedData.Erc721ChainIDs
 
 	accounts := make([]gethcommon.Address, 0)
 
@@ -238,12 +236,12 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissionsParsedData *PrePa
 		accounts = append(accounts, accountAndChainIDs.Address)
 	}
 
-	chainIDsForERC20 := calculateChainIDsSet(accountsAndChainIDs, erc20ChainIDsMap)
-	chainIDsForERC721 := calculateChainIDsSet(accountsAndChainIDs, erc721ChainIDsMap)
+	chainIDsForERC20 := calculateChainIDsSet(accountsAndChainIDs, erc20ChainIDs)
+	chainIDsForERC721 := calculateChainIDsSet(accountsAndChainIDs, erc721ChainIDs)
 
 	// if there are no chain IDs that match token criteria chain IDs
 	// we aren't able to check balances on selected networks
-	if len(erc20ChainIDsMap) > 0 && len(chainIDsForERC20) == 0 {
+	if len(erc20ChainIDs) > 0 && len(chainIDsForERC20) == 0 {
 		response.NetworksNotSupported = true
 		return response, nil
 	}
@@ -260,7 +258,7 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissionsParsedData *PrePa
 
 	ownedERC721Tokens := make(CollectiblesByChain)
 	if len(chainIDsForERC721) > 0 {
-		collectibles, err := p.GetOwnedERC721Tokens(accounts, erc721TokenRequirements, chainIDsForERC721)
+		collectibles, err := p.GetOwnedERC721Tokens(accounts, erc721TokenAddressesByChain, chainIDsForERC721)
 		if err != nil {
 			return nil, err
 		}
@@ -446,30 +444,30 @@ func (p *DefaultPermissionChecker) CheckPermissions(permissionsParsedData *PrePa
 }
 
 func preParsedPermissionsData(permissions []*CommunityTokenPermission) *PreParsedPermissionsData {
-	erc20TokenRequirements, erc721TokenRequirements, _ := ExtractTokenCriteria(permissions)
+	erc20TokenAddressesByChain, erc721TokenAddressesByChain := extractContractAddressesByChain(permissions)
 
-	erc20ChainIDsMap := make(map[uint64]bool)
-	erc721ChainIDsMap := make(map[uint64]bool)
+	erc20ChainIDsMap := map[walletcommon.ChainID]struct{}{}
+	erc721ChainIDsMap := map[walletcommon.ChainID]struct{}{}
 
 	erc20TokenAddresses := make([]gethcommon.Address, 0)
 
 	// figure out chain IDs we're interested in
-	for chainID, tokens := range erc20TokenRequirements {
-		erc20ChainIDsMap[chainID] = true
+	for chainID, tokens := range erc20TokenAddressesByChain {
+		erc20ChainIDsMap[chainID] = struct{}{}
 		for contractAddress := range tokens {
-			erc20TokenAddresses = append(erc20TokenAddresses, gethcommon.HexToAddress(contractAddress))
+			erc20TokenAddresses = append(erc20TokenAddresses, contractAddress)
 		}
 	}
 
-	for chainID := range erc721TokenRequirements {
-		erc721ChainIDsMap[chainID] = true
+	for chainID := range erc721TokenAddressesByChain {
+		erc721ChainIDsMap[chainID] = struct{}{}
 	}
 
 	return &PreParsedPermissionsData{
-		Erc721TokenRequirements: erc721TokenRequirements,
-		Erc20TokenAddresses:     erc20TokenAddresses,
-		Erc20ChainIDsMap:        erc20ChainIDsMap,
-		Erc721ChainIDsMap:       erc721ChainIDsMap,
+		Erc721TokenAddressesByChain: erc721TokenAddressesByChain,
+		Erc20TokenAddresses:         erc20TokenAddresses,
+		Erc20ChainIDs:               erc20ChainIDsMap,
+		Erc721ChainIDs:              erc721ChainIDsMap,
 	}
 }
 

@@ -3100,27 +3100,27 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 	return nil
 }
 
-func calculateChainIDsSet(accountsAndChainIDs []*AccountChainIDsCombination, requirementsChainIDs map[uint64]bool) []uint64 {
+// Return all chainIDs provided by revealed addresses that also exist in the token requirements.
+func calculateChainIDsSet(accountsAndChainIDs []*AccountChainIDsCombination, requirementsChainIDs map[walletcommon.ChainID]struct{}) []uint64 {
+	chainIDsSet := map[walletcommon.ChainID]struct{}{}
 
-	revealedAccountsChainIDs := make([]uint64, 0)
-	revealedAccountsChainIDsMap := make(map[uint64]bool)
-
-	// we want all chainIDs provided by revealed addresses that also exist
-	// in the token requirements
 	for _, accountAndChainIDs := range accountsAndChainIDs {
 		for _, chainID := range accountAndChainIDs.ChainIDs {
-			if requirementsChainIDs[chainID] && !revealedAccountsChainIDsMap[chainID] {
-				revealedAccountsChainIDsMap[chainID] = true
-				revealedAccountsChainIDs = append(revealedAccountsChainIDs, chainID)
-			}
+			chainIDsSet[walletcommon.ChainID(chainID)] = struct{}{}
 		}
 	}
-	return revealedAccountsChainIDs
+
+	chainIDs := make([]uint64, 0, len(chainIDsSet))
+	for chainID := range chainIDsSet {
+		chainIDs = append(chainIDs, uint64(chainID))
+	}
+
+	return chainIDs
 }
 
 type CollectiblesByChain = map[uint64]map[gethcommon.Address]thirdparty.TokenBalancesPerContractAddress
 
-func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tokenRequirements map[uint64]map[string]*protobuf.TokenCriteria, chainIDs []uint64) (CollectiblesByChain, error) {
+func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tokenRequirements TokenAddressesByChain, chainIDs []uint64) (CollectiblesByChain, error) {
 	if m.collectiblesManager == nil {
 		return nil, errors.New("no collectibles manager")
 	}
@@ -3133,7 +3133,7 @@ func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tok
 
 		skipChain := true
 		for _, cID := range chainIDs {
-			if chainID == cID {
+			if uint64(chainID) == cID {
 				skipChain = false
 			}
 		}
@@ -3144,20 +3144,20 @@ func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tok
 
 		contractAddresses := make([]gethcommon.Address, 0)
 		for contractAddress := range erc721Tokens {
-			contractAddresses = append(contractAddresses, gethcommon.HexToAddress(contractAddress))
+			contractAddresses = append(contractAddresses, contractAddress)
 		}
 
-		if _, exists := ownedERC721Tokens[chainID]; !exists {
-			ownedERC721Tokens[chainID] = make(map[gethcommon.Address]thirdparty.TokenBalancesPerContractAddress)
+		if _, exists := ownedERC721Tokens[uint64(chainID)]; !exists {
+			ownedERC721Tokens[uint64(chainID)] = make(map[gethcommon.Address]thirdparty.TokenBalancesPerContractAddress)
 		}
 
 		for _, owner := range walletAddresses {
-			balances, err := m.collectiblesManager.FetchBalancesByOwnerAndContractAddress(ctx, walletcommon.ChainID(chainID), owner, contractAddresses)
+			balances, err := m.collectiblesManager.FetchBalancesByOwnerAndContractAddress(ctx, chainID, owner, contractAddresses)
 			if err != nil {
 				m.logger.Info("couldn't fetch owner assets", zap.Error(err))
 				return nil, err
 			}
-			ownedERC721Tokens[chainID][owner] = balances
+			ownedERC721Tokens[uint64(chainID)][owner] = balances
 		}
 	}
 	return ownedERC721Tokens, nil
