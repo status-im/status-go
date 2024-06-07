@@ -62,6 +62,7 @@ func (api *API) SetPairingsJSONFileContent(content []byte) error {
 	return api.s.keycardPairings.SetPairingsJSONFileContent(content)
 }
 
+// Used by mobile
 func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
 	return api.reader.GetWalletToken(ctx, addresses)
 }
