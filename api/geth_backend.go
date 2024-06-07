@@ -569,7 +569,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 
 	err := b.ensureDBsOpened(acc, request.Password)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to open database")
 	}
 
 	defaultCfg := &params.NodeConfig{
@@ -581,12 +581,12 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 
 	err = b.UpdateNodeConfigFleet(acc, request.Password, defaultCfg)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to update node config fleet")
 	}
 
 	err = b.loadNodeConfig(defaultCfg)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to load node config")
 	}
 
 	if request.RuntimeLogLevel != "" {
@@ -603,31 +603,31 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 
 	err = b.setupLogSettings()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to setup log settings")
 	}
 
 	accountsDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create accounts db")
 	}
 
 	multiAccount, err := b.updateAccountColorHashAndColorID(acc.KeyUID, accountsDB)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to update account color hash and color id")
 	}
 	b.account = multiAccount
 
 	chatAddr, err := accountsDB.GetChatAddress()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get chat address")
 	}
 	walletAddr, err := accountsDB.GetWalletAddress()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get wallet address")
 	}
 	watchAddrs, err := accountsDB.GetWalletAddresses()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get wallet addresses")
 	}
 	login := account.LoginParams{
 		Password:       request.Password,
@@ -639,35 +639,35 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	err = b.StartNode(b.config)
 	if err != nil {
 		b.log.Info("failed to start node")
-		return err
+		return errors.Wrap(err, "failed to start node")
 	}
 
 	if chatKey := request.ChatPrivateKey(); chatKey == nil {
 		err = b.SelectAccount(login)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to select account")
 		}
 	} else {
 		// In case of keycard, we don't have a keystore, instead we have private key loaded from the keycard
 		if err := b.accountManager.SetChatAccount(chatKey); err != nil {
-			return err
+			return errors.Wrap(err, "failed to set chat account")
 		}
 		_, err = b.accountManager.SelectedChatAccount()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to get selected chat account")
 		}
 
 		b.accountManager.SetAccountAddresses(walletAddr, watchAddrs...)
 		err = b.injectAccountsIntoServices()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to inject accounts into services")
 		}
 	}
 
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
 	if err != nil {
-		b.log.Info("failed to update account")
-		return err
+		b.log.Error("failed to update account")
+		return errors.Wrap(err, "failed to update account")
 	}
 
 	return nil
