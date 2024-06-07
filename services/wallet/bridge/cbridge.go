@@ -29,8 +29,12 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-const baseURL = "https://cbridge-prod2.celer.app"
-const testBaseURL = "https://cbridge-v2-test.celer.network"
+const (
+	baseURL     = "https://cbridge-prod2.celer.app"
+	testBaseURL = "https://cbridge-v2-test.celer.network"
+
+	maxSlippage = uint32(1000)
+)
 
 type CBridgeTxArgs struct {
 	transactions.SendTxArgs
@@ -43,13 +47,13 @@ type CBridgeTxArgs struct {
 type CBridge struct {
 	rpcClient          *rpc.Client
 	httpClient         *thirdparty.HTTPClient
-	transactor         *transactions.Transactor
+	transactor         transactions.TransactorIface
 	tokenManager       *token.Manager
 	prodTransferConfig *cbridge.GetTransferConfigsResponse
 	testTransferConfig *cbridge.GetTransferConfigsResponse
 }
 
-func NewCbridge(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager) *CBridge {
+func NewCbridge(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *token.Manager) *CBridge {
 	return &CBridge{
 		rpcClient:    rpcClient,
 		httpClient:   thirdparty.NewHTTPClient(),
@@ -59,7 +63,7 @@ func NewCbridge(rpcClient *rpc.Client, transactor *transactions.Transactor, toke
 }
 
 func (s *CBridge) Name() string {
-	return "CBridge"
+	return CBridgeName
 }
 
 func (s *CBridge) estimateAmt(from, to *params.Network, amountIn *big.Int, symbol string) (*cbridge.EstimateAmtResponse, error) {
@@ -122,12 +126,12 @@ func (s *CBridge) getTransferConfig(isTest bool) (*cbridge.GetTransferConfigsRes
 	return &res, nil
 }
 
-func (s *CBridge) AvailableFor(from, to *params.Network, token *token.Token, toToken *token.Token) (bool, error) {
-	if from.ChainID == to.ChainID || toToken != nil {
+func (s *CBridge) AvailableFor(params BridgeParams) (bool, error) {
+	if params.FromChain.ChainID == params.ToChain.ChainID || params.ToToken != nil {
 		return false, nil
 	}
 
-	transferConfig, err := s.getTransferConfig(from.IsTest)
+	transferConfig, err := s.getTransferConfig(params.FromChain.IsTest)
 	if err != nil {
 		return false, err
 	}
@@ -138,11 +142,11 @@ func (s *CBridge) AvailableFor(from, to *params.Network, token *token.Token, toT
 	var fromAvailable *cbridge.Chain
 	var toAvailable *cbridge.Chain
 	for _, chain := range transferConfig.Chains {
-		if uint64(chain.GetId()) == from.ChainID {
+		if uint64(chain.GetId()) == params.FromChain.ChainID && chain.GasTokenSymbol == EthSymbol {
 			fromAvailable = chain
 		}
 
-		if uint64(chain.GetId()) == to.ChainID {
+		if uint64(chain.GetId()) == params.ToChain.ChainID && chain.GasTokenSymbol == EthSymbol {
 			toAvailable = chain
 		}
 	}
@@ -157,7 +161,7 @@ func (s *CBridge) AvailableFor(from, to *params.Network, token *token.Token, toT
 	}
 
 	for _, tokenInfo := range transferConfig.ChainToken[fromAvailable.GetId()].Token {
-		if tokenInfo.Token.Symbol == token.Symbol {
+		if tokenInfo.Token.Symbol == params.FromToken.Symbol {
 			found = true
 			break
 		}
@@ -168,19 +172,21 @@ func (s *CBridge) AvailableFor(from, to *params.Network, token *token.Token, toT
 
 	found = false
 	for _, tokenInfo := range transferConfig.ChainToken[toAvailable.GetId()].Token {
-		if tokenInfo.Token.Symbol == token.Symbol {
+		if tokenInfo.Token.Symbol == params.FromToken.Symbol {
 			found = true
 			break
 		}
 	}
+
 	if !found {
 		return false, nil
 	}
+
 	return true, nil
 }
 
-func (s *CBridge) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int) (*big.Int, *big.Int, error) {
-	amt, err := s.estimateAmt(from, to, amountIn, token.Symbol)
+func (s *CBridge) CalculateFees(params BridgeParams) (*big.Int, *big.Int, error) {
+	amt, err := s.estimateAmt(params.FromChain, params.ToChain, params.AmountIn, params.FromToken.Symbol)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -196,46 +202,46 @@ func (s *CBridge) CalculateFees(from, to *params.Network, token *token.Token, am
 	return big.NewInt(0), new(big.Int).Add(baseFee, percFee), nil
 }
 
-func (c *CBridge) PackTxInputData(contractType string, fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
+func (c *CBridge) PackTxInputData(params BridgeParams, contractType string) ([]byte, error) {
 	abi, err := abi.JSON(strings.NewReader(celer.CelerABI))
 	if err != nil {
 		return []byte{}, err
 	}
 
-	if token.IsNative() {
+	if params.FromToken.IsNative() {
 		return abi.Pack("sendNative",
-			to,
-			amountIn,
-			toNetwork.ChainID,
+			params.ToAddr,
+			params.AmountIn,
+			params.ToChain.ChainID,
 			uint64(time.Now().UnixMilli()),
-			500,
+			maxSlippage,
 		)
 	} else {
 		return abi.Pack("send",
-			to,
-			token.Address,
-			amountIn,
-			toNetwork.ChainID,
+			params.ToAddr,
+			params.FromToken.Address,
+			params.AmountIn,
+			params.ToChain.ChainID,
 			uint64(time.Now().UnixMilli()),
-			500,
+			maxSlippage,
 		)
 	}
 }
 
-func (s *CBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
+func (s *CBridge) EstimateGas(params BridgeParams) (uint64, error) {
 	value := new(big.Int)
 
-	input, err := s.PackTxInputData("", fromNetwork, toNetwork, from, to, token, amountIn)
+	input, err := s.PackTxInputData(params, "")
 	if err != nil {
 		return 0, err
 	}
 
-	contractAddress, err := s.GetContractAddress(fromNetwork, nil)
+	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
 		return 0, err
 	}
 
-	ethClient, err := s.rpcClient.EthClient(fromNetwork.ChainID)
+	ethClient, err := s.rpcClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, err
 	}
@@ -243,7 +249,7 @@ func (s *CBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Net
 	ctx := context.Background()
 
 	msg := ethereum.CallMsg{
-		From:  from,
+		From:  params.FromAddr,
 		To:    &contractAddress,
 		Value: value,
 		Data:  input,
@@ -251,35 +257,42 @@ func (s *CBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Net
 
 	estimation, err := ethClient.EstimateGas(ctx, msg)
 	if err != nil {
-		return 0, err
+		if !params.FromToken.IsNative() {
+			// TODO: this is a temporary solution until we find a better way to estimate the gas
+			// hardcoding the estimation for other than ETH, cause we cannot get a proper estimation without having an approval placed first
+			// this is an error we're facing otherwise: `execution reverted: ERC20: transfer amount exceeds allowance`
+			estimation = 350000
+		} else {
+			return 0, err
+		}
 	}
 	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
 	return uint64(increasedEstimation), nil
 }
 
-func (s *CBridge) BuildTx(fromNetwork, toNetwork *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int, bonderFee *big.Int) (*ethTypes.Transaction, error) {
-	toAddr := types.Address(toAddress)
+func (s *CBridge) BuildTx(params BridgeParams) (*ethTypes.Transaction, error) {
+	toAddr := types.Address(params.ToAddr)
 	sendArgs := &TransactionBridge{
 		CbridgeTx: &CBridgeTxArgs{
 			SendTxArgs: transactions.SendTxArgs{
-				From:  types.Address(fromAddress),
+				From:  types.Address(params.FromAddr),
 				To:    &toAddr,
-				Value: (*hexutil.Big)(amountIn),
+				Value: (*hexutil.Big)(params.AmountIn),
 				Data:  types.HexBytes("0x0"),
 			},
-			ChainID:   toNetwork.ChainID,
-			Symbol:    token.Symbol,
-			Recipient: toAddress,
-			Amount:    (*hexutil.Big)(amountIn),
+			ChainID:   params.ToChain.ChainID,
+			Symbol:    params.FromToken.Symbol,
+			Recipient: params.ToAddr,
+			Amount:    (*hexutil.Big)(params.AmountIn),
 		},
-		ChainID: fromNetwork.ChainID,
+		ChainID: params.FromChain.ChainID,
 	}
 
 	return s.BuildTransaction(sendArgs)
 }
 
-func (s *CBridge) GetContractAddress(network *params.Network, token *token.Token) (common.Address, error) {
-	transferConfig, err := s.getTransferConfig(network.IsTest)
+func (s *CBridge) GetContractAddress(params BridgeParams) (common.Address, error) {
+	transferConfig, err := s.getTransferConfig(params.FromChain.IsTest)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -288,7 +301,7 @@ func (s *CBridge) GetContractAddress(network *params.Network, token *token.Token
 	}
 
 	for _, chain := range transferConfig.Chains {
-		if uint64(chain.Id) == network.ChainID {
+		if uint64(chain.Id) == params.FromChain.ChainID {
 			return common.HexToAddress(chain.ContractAddr), nil
 		}
 	}
@@ -297,15 +310,17 @@ func (s *CBridge) GetContractAddress(network *params.Network, token *token.Token
 }
 
 func (s *CBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (*ethTypes.Transaction, error) {
-	fromNetwork := s.rpcClient.NetworkManager.Find(sendArgs.ChainID)
-	if fromNetwork == nil {
+	fromChain := s.rpcClient.NetworkManager.Find(sendArgs.ChainID)
+	if fromChain == nil {
 		return nil, errors.New("network not found")
 	}
-	token := s.tokenManager.FindToken(fromNetwork, sendArgs.CbridgeTx.Symbol)
+	token := s.tokenManager.FindToken(fromChain, sendArgs.CbridgeTx.Symbol)
 	if token == nil {
 		return nil, errors.New("token not found")
 	}
-	addrs, err := s.GetContractAddress(fromNetwork, nil)
+	addrs, err := s.GetContractAddress(BridgeParams{
+		FromChain: fromChain,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +342,7 @@ func (s *CBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerF
 			(*big.Int)(sendArgs.CbridgeTx.Amount),
 			sendArgs.CbridgeTx.ChainID,
 			uint64(time.Now().UnixMilli()),
-			500,
+			maxSlippage,
 		)
 	}
 
@@ -338,7 +353,7 @@ func (s *CBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerF
 		(*big.Int)(sendArgs.CbridgeTx.Amount),
 		sendArgs.CbridgeTx.ChainID,
 		uint64(time.Now().UnixMilli()),
-		500,
+		maxSlippage,
 	)
 }
 
@@ -355,8 +370,8 @@ func (s *CBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Trans
 	return s.sendOrBuild(sendArgs, nil)
 }
 
-func (s *CBridge) CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error) {
-	amt, err := s.estimateAmt(from, to, amountIn, symbol)
+func (s *CBridge) CalculateAmountOut(params BridgeParams) (*big.Int, error) {
+	amt, err := s.estimateAmt(params.FromChain, params.ToChain, params.AmountIn, params.FromToken.Symbol)
 	if err != nil {
 		return nil, err
 	}

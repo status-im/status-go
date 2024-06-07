@@ -13,35 +13,33 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
 
 type TransferBridge struct {
 	rpcClient  *rpc.Client
-	transactor *transactions.Transactor
+	transactor transactions.TransactorIface
 }
 
-func NewTransferBridge(rpcClient *rpc.Client, transactor *transactions.Transactor) *TransferBridge {
+func NewTransferBridge(rpcClient *rpc.Client, transactor transactions.TransactorIface) *TransferBridge {
 	return &TransferBridge{rpcClient: rpcClient, transactor: transactor}
 }
 
 func (s *TransferBridge) Name() string {
-	return "Transfer"
+	return TransferName
 }
 
-func (s *TransferBridge) AvailableFor(from, to *params.Network, token *token.Token, toToken *token.Token) (bool, error) {
-	return from.ChainID == to.ChainID && token != nil && toToken == nil, nil
+func (s *TransferBridge) AvailableFor(params BridgeParams) (bool, error) {
+	return params.FromChain.ChainID == params.ToChain.ChainID && params.FromToken != nil && params.ToToken == nil, nil
 }
 
-func (s *TransferBridge) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int) (*big.Int, *big.Int, error) {
+func (s *TransferBridge) CalculateFees(params BridgeParams) (*big.Int, *big.Int, error) {
 	return big.NewInt(0), big.NewInt(0), nil
 }
 
-func (s *TransferBridge) PackTxInputData(contractType string, fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
-	if token.Symbol == "ETH" {
+func (s *TransferBridge) PackTxInputData(params BridgeParams, contractType string) ([]byte, error) {
+	if params.FromToken.IsNative() {
 		return []byte("eth_sendRawTransaction"), nil
 	} else {
 		abi, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
@@ -49,28 +47,28 @@ func (s *TransferBridge) PackTxInputData(contractType string, fromNetwork *param
 			return []byte{}, err
 		}
 		return abi.Pack("transfer",
-			to,
-			amountIn,
+			params.ToAddr,
+			params.AmountIn,
 		)
 	}
 }
 
-func (s *TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
+func (s *TransferBridge) EstimateGas(params BridgeParams) (uint64, error) {
 	estimation := uint64(0)
 	var err error
 
-	input, err := s.PackTxInputData("", fromNetwork, toNetwork, from, to, token, amountIn)
+	input, err := s.PackTxInputData(params, "")
 	if err != nil {
 		return 0, err
 	}
 
-	if token.Symbol == "ETH" {
-		estimation, err = s.transactor.EstimateGas(fromNetwork, from, to, amountIn, input)
+	if params.FromToken.IsNative() {
+		estimation, err = s.transactor.EstimateGas(params.FromChain, params.FromAddr, params.ToAddr, params.AmountIn, input)
 		if err != nil {
 			return 0, err
 		}
 	} else {
-		ethClient, err := s.rpcClient.EthClient(fromNetwork.ChainID)
+		ethClient, err := s.rpcClient.EthClient(params.FromChain.ChainID)
 		if err != nil {
 			return 0, err
 		}
@@ -78,8 +76,8 @@ func (s *TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *par
 		ctx := context.Background()
 
 		msg := ethereum.CallMsg{
-			From: from,
-			To:   &token.Address,
+			From: params.FromAddr,
+			To:   &params.FromToken.Address,
 			Data: input,
 		}
 
@@ -94,17 +92,17 @@ func (s *TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *par
 	return uint64(increasedEstimation), nil
 }
 
-func (s *TransferBridge) BuildTx(network, _ *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int, bonderFee *big.Int) (*ethTypes.Transaction, error) {
-	toAddr := types.Address(toAddress)
-	if strings.EqualFold(token.Symbol, "ETH") {
+func (s *TransferBridge) BuildTx(params BridgeParams) (*ethTypes.Transaction, error) {
+	toAddr := types.Address(params.ToAddr)
+	if params.FromToken.IsNative() {
 		sendArgs := &TransactionBridge{
 			TransferTx: &transactions.SendTxArgs{
-				From:  types.Address(fromAddress),
+				From:  types.Address(params.FromAddr),
 				To:    &toAddr,
-				Value: (*hexutil.Big)(amountIn),
+				Value: (*hexutil.Big)(params.AmountIn),
 				Data:  types.HexBytes("0x0"),
 			},
-			ChainID: network.ChainID,
+			ChainID: params.FromChain.ChainID,
 		}
 
 		return s.BuildTransaction(sendArgs)
@@ -114,20 +112,20 @@ func (s *TransferBridge) BuildTx(network, _ *params.Network, fromAddress common.
 		return nil, err
 	}
 	input, err := abi.Pack("transfer",
-		toAddress,
-		amountIn,
+		params.ToAddr,
+		params.AmountIn,
 	)
 	if err != nil {
 		return nil, err
 	}
 	sendArgs := &TransactionBridge{
 		TransferTx: &transactions.SendTxArgs{
-			From:  types.Address(fromAddress),
+			From:  types.Address(params.FromAddr),
 			To:    &toAddr,
 			Value: (*hexutil.Big)(big.NewInt(0)),
 			Data:  input,
 		},
-		ChainID: network.ChainID,
+		ChainID: params.FromChain.ChainID,
 	}
 
 	return s.BuildTransaction(sendArgs)
@@ -141,10 +139,10 @@ func (s *TransferBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethType
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, *sendArgs.TransferTx)
 }
 
-func (s *TransferBridge) CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error) {
-	return amountIn, nil
+func (s *TransferBridge) CalculateAmountOut(params BridgeParams) (*big.Int, error) {
+	return params.AmountIn, nil
 }
 
-func (s *TransferBridge) GetContractAddress(network *params.Network, token *token.Token) (common.Address, error) {
+func (s *TransferBridge) GetContractAddress(params BridgeParams) (common.Address, error) {
 	return common.Address{}, nil
 }

@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"encoding/hex"
 	"math/big"
 
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
@@ -8,15 +9,34 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
 
-var ZeroAddress = common.Address{}
+var (
+	ZeroAddress     = common.Address{}
+	ZeroBigIntValue = big.NewInt(0)
+)
 
-const IncreaseEstimatedGasFactor = 1.1
+const (
+	IncreaseEstimatedGasFactor = 1.1
+
+	EthSymbol = "ETH"
+	SntSymbol = "SNT"
+	SttSymbol = "STT"
+
+	TransferName        = "Transfer"
+	HopName             = "Hop"
+	CBridgeName         = "CBridge"
+	SwapParaswapName    = "Paraswap"
+	ERC721TransferName  = "ERC721Transfer"
+	ERC1155TransferName = "ERC1155Transfer"
+	ENSRegisterName     = "ENSRegister"
+	ENSReleaseName      = "ENSRelease"
+)
 
 func getSigner(chainID uint64, from types.Address, verifiedAccount *account.SelectedExtKey) bind.SignerFn {
 	return func(addr common.Address, tx *ethTypes.Transaction) (*ethTypes.Transaction, error) {
@@ -100,19 +120,55 @@ func (t *TransactionBridge) Data() types.HexBytes {
 	return types.HexBytes("")
 }
 
+type BridgeParams struct {
+	FromChain *params.Network
+	ToChain   *params.Network
+	FromAddr  common.Address
+	ToAddr    common.Address
+	FromToken *token.Token
+	ToToken   *token.Token
+	AmountIn  *big.Int
+
+	// extra params
+	BonderFee *big.Int
+	Username  string
+	PublicKey string
+}
+
 type Bridge interface {
 	// returns the name of the bridge
 	Name() string
 	// checks if the bridge is available for the given networks/tokens
-	AvailableFor(from *params.Network, to *params.Network, token *token.Token, toToken *token.Token) (bool, error)
+	AvailableFor(params BridgeParams) (bool, error)
 	// calculates the fees for the bridge and returns the amount BonderFee and TokenFee (used for bridges)
-	CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int) (*big.Int, *big.Int, error)
+	CalculateFees(params BridgeParams) (*big.Int, *big.Int, error)
 	// Pack the method for sending tx and method call's data
-	PackTxInputData(contractType string, fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error)
-	EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error)
-	CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error)
+	PackTxInputData(params BridgeParams, contractType string) ([]byte, error)
+	EstimateGas(params BridgeParams) (uint64, error)
+	CalculateAmountOut(params BridgeParams) (*big.Int, error)
 	Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error)
-	GetContractAddress(network *params.Network, token *token.Token) (common.Address, error)
+	GetContractAddress(params BridgeParams) (common.Address, error)
 	BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error)
-	BuildTx(fromNetwork, toNetwork *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int, bonderFee *big.Int) (*ethTypes.Transaction, error)
+	BuildTx(params BridgeParams) (*ethTypes.Transaction, error)
+}
+
+func extractCoordinates(pubkey string) ([32]byte, [32]byte) {
+	x, _ := hex.DecodeString(pubkey[4:68])
+	y, _ := hex.DecodeString(pubkey[68:132])
+
+	var xByte [32]byte
+	copy(xByte[:], x)
+
+	var yByte [32]byte
+	copy(yByte[:], y)
+
+	return xByte, yByte
+}
+
+func usernameToLabel(username string) [32]byte {
+	usernameHashed := crypto.Keccak256([]byte(username))
+	var label [32]byte
+	copy(label[:], usernameHashed)
+
+	return label
 }

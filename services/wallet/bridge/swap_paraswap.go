@@ -11,11 +11,9 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
-	"github.com/status-im/status-go/services/wallet/token"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
@@ -28,10 +26,10 @@ type SwapTxArgs struct {
 type SwapParaswap struct {
 	paraswapClient *paraswap.ClientV5
 	priceRoute     paraswap.Route
-	transactor     *transactions.Transactor
+	transactor     transactions.TransactorIface
 }
 
-func NewSwapParaswap(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *walletToken.Manager) *SwapParaswap {
+func NewSwapParaswap(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *walletToken.Manager) *SwapParaswap {
 	return &SwapParaswap{
 		paraswapClient: paraswap.NewClientV5(walletCommon.EthereumMainnet),
 		transactor:     transactor,
@@ -39,22 +37,22 @@ func NewSwapParaswap(rpcClient *rpc.Client, transactor *transactions.Transactor,
 }
 
 func (s *SwapParaswap) Name() string {
-	return "Paraswap"
+	return SwapParaswapName
 }
 
-func (s *SwapParaswap) AvailableFor(from, to *params.Network, token *walletToken.Token, toToken *walletToken.Token) (bool, error) {
-	if token == nil || toToken == nil {
+func (s *SwapParaswap) AvailableFor(params BridgeParams) (bool, error) {
+	if params.FromToken == nil || params.ToToken == nil {
 		return false, errors.New("token and toToken cannot be nil")
 	}
 
-	if from.ChainID != to.ChainID {
+	if params.FromChain.ChainID != params.ToChain.ChainID {
 		return false, nil
 	}
 
-	s.paraswapClient.SetChainID(from.ChainID)
+	s.paraswapClient.SetChainID(params.FromChain.ChainID)
 
-	searchForToken := token.Address == ZeroAddress
-	searchForToToken := toToken.Address == ZeroAddress
+	searchForToken := params.FromToken.Address == ZeroAddress
+	searchForToToken := params.ToToken.Address == ZeroAddress
 	if searchForToToken || searchForToken {
 		tokensList, err := s.paraswapClient.FetchTokensList(context.Background())
 		if err != nil {
@@ -62,17 +60,17 @@ func (s *SwapParaswap) AvailableFor(from, to *params.Network, token *walletToken
 		}
 
 		for _, t := range tokensList {
-			if searchForToken && t.Symbol == token.Symbol {
-				token.Address = common.HexToAddress(t.Address)
-				token.Decimals = t.Decimals
+			if searchForToken && t.Symbol == params.FromToken.Symbol {
+				params.FromToken.Address = common.HexToAddress(t.Address)
+				params.FromToken.Decimals = t.Decimals
 				if !searchForToToken {
 					break
 				}
 			}
 
-			if searchForToToken && t.Symbol == toToken.Symbol {
-				toToken.Address = common.HexToAddress(t.Address)
-				toToken.Decimals = t.Decimals
+			if searchForToToken && t.Symbol == params.ToToken.Symbol {
+				params.ToToken.Address = common.HexToAddress(t.Address)
+				params.ToToken.Decimals = t.Decimals
 				if !searchForToken {
 					break
 				}
@@ -80,24 +78,25 @@ func (s *SwapParaswap) AvailableFor(from, to *params.Network, token *walletToken
 		}
 	}
 
-	if token.Address == ZeroAddress || toToken.Address == ZeroAddress {
+	if params.FromToken.Address == ZeroAddress || params.ToToken.Address == ZeroAddress {
 		return false, errors.New("cannot resolve token/s")
 	}
 
 	return true, nil
 }
 
-func (s *SwapParaswap) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int) (*big.Int, *big.Int, error) {
+func (s *SwapParaswap) CalculateFees(params BridgeParams) (*big.Int, *big.Int, error) {
 	return big.NewInt(0), big.NewInt(0), nil
 }
 
-func (s *SwapParaswap) PackTxInputData(contractType string, fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
+func (s *SwapParaswap) PackTxInputData(params BridgeParams, contractType string) ([]byte, error) {
 	// not sure what we can do here since we're using the api to build the transaction
 	return []byte{}, nil
 }
 
-func (s *SwapParaswap) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
-	priceRoute, err := s.paraswapClient.FetchPriceRoute(context.Background(), token.Address, token.Decimals, toToken.Address, toToken.Decimals, amountIn, from, to)
+func (s *SwapParaswap) EstimateGas(params BridgeParams) (uint64, error) {
+	priceRoute, err := s.paraswapClient.FetchPriceRoute(context.Background(), params.FromToken.Address, params.FromToken.Decimals,
+		params.ToToken.Address, params.ToToken.Decimals, params.AmountIn, params.FromAddr, params.ToAddr)
 	if err != nil {
 		return 0, err
 	}
@@ -107,12 +106,12 @@ func (s *SwapParaswap) EstimateGas(fromNetwork *params.Network, toNetwork *param
 	return priceRoute.GasCost.Uint64(), nil
 }
 
-func (s *SwapParaswap) GetContractAddress(network *params.Network, token *token.Token) (address common.Address, err error) {
-	if network.ChainID == walletCommon.EthereumMainnet {
+func (s *SwapParaswap) GetContractAddress(params BridgeParams) (address common.Address, err error) {
+	if params.FromChain.ChainID == walletCommon.EthereumMainnet {
 		address = common.HexToAddress("0x216b4b4ba9f3e719726886d34a177484278bfcae")
-	} else if network.ChainID == walletCommon.ArbitrumMainnet {
+	} else if params.FromChain.ChainID == walletCommon.ArbitrumMainnet {
 		address = common.HexToAddress("0x216b4b4ba9f3e719726886d34a177484278bfcae")
-	} else if network.ChainID == walletCommon.OptimismMainnet {
+	} else if params.FromChain.ChainID == walletCommon.OptimismMainnet {
 		address = common.HexToAddress("0x216b4b4ba9f3e719726886d34a177484278bfcae")
 	} else {
 		err = errors.New("unsupported network")
@@ -120,18 +119,18 @@ func (s *SwapParaswap) GetContractAddress(network *params.Network, token *token.
 	return
 }
 
-func (s *SwapParaswap) BuildTx(network, _ *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int, _ *big.Int) (*ethTypes.Transaction, error) {
-	toAddr := types.Address(toAddress)
+func (s *SwapParaswap) BuildTx(params BridgeParams) (*ethTypes.Transaction, error) {
+	toAddr := types.Address(params.ToAddr)
 	sendArgs := &TransactionBridge{
 		SwapTx: &SwapTxArgs{
 			SendTxArgs: transactions.SendTxArgs{
-				From:   types.Address(fromAddress),
+				From:   types.Address(params.FromAddr),
 				To:     &toAddr,
-				Value:  (*hexutil.Big)(amountIn),
+				Value:  (*hexutil.Big)(params.AmountIn),
 				Data:   types.HexBytes("0x0"),
-				Symbol: token.Symbol,
+				Symbol: params.FromToken.Symbol,
 			},
-			ChainID: network.ChainID,
+			ChainID: params.FromChain.ChainID,
 		},
 	}
 
@@ -202,6 +201,6 @@ func (s *SwapParaswap) Send(sendArgs *TransactionBridge, verifiedAccount *accoun
 	return s.transactor.SendTransactionWithChainID(txBridgeArgs.ChainID, txBridgeArgs.SwapTx.SendTxArgs, verifiedAccount)
 }
 
-func (s *SwapParaswap) CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error) {
+func (s *SwapParaswap) CalculateAmountOut(params BridgeParams) (*big.Int, error) {
 	return s.priceRoute.DestAmount.Int, nil
 }

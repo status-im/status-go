@@ -55,25 +55,20 @@ CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 export GOPATH ?= $(HOME)/go
 
 GIT_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-GIT_COMMIT := $(call sh, git rev-parse --short HEAD)
-GIT_AUTHOR := $(call sh, git config user.email || echo $$USER)
+GIT_COMMIT := $(shell git rev-parse --short HEAD)
+GIT_AUTHOR := $(shell git config user.email || echo $$USER)
 
 ENABLE_METRICS ?= true
 BUILD_TAGS ?= gowaku_no_rln
-define BUILD_FLAGS ?=
-	-ldflags="\
-	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
+
+BUILD_FLAGS ?= -ldflags="-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
 	-X github.com/status-im/status-go/params.IpfsGatewayURL=$(IPFS_GATEWAY_URL) \
 	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)"
-endef
 
-define BUILD_FLAGS_MOBILE ?=
-	-ldflags="\
-	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
+BUILD_FLAGS_MOBILE ?= -ldflags="-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
 	-X github.com/status-im/status-go/params.IpfsGatewayURL=$(IPFS_GATEWAY_URL)"
-endef
 
 networkid ?= StatusChain
 
@@ -342,6 +337,8 @@ mock: ##@other Regenerate mocks
 	mockgen -package=fake         -destination=transactions/fake/mock.go             -source=transactions/fake/txservice.go
 	mockgen -package=status       -destination=services/status/account_mock.go       -source=services/status/service.go
 	mockgen -package=peer         -destination=services/peer/discoverer_mock.go      -source=services/peer/service.go
+	mockgen -package=mock_transactor -destination=transactions/mock_transactor/transactor.go   -source=transactions/transactor.go
+	mockgen -package=mock_bridge     -destination=services/wallet/bridge/mock_bridge/bridge.go -source=services/wallet/bridge/bridge.go
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}

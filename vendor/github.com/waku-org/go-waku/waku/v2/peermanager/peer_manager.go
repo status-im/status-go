@@ -132,9 +132,13 @@ func (pm *PeerManager) checkAndUpdateTopicHealth(topic *NodeTopicDetails) int {
 					healthyPeerCount++
 				}
 			} else {
-				pm.logger.Warn("failed to fetch peer score ", zap.Error(err), logging.HostID("peer", p))
-				//For now considering peer as healthy if we can't fetch score.
-				healthyPeerCount++
+				if errors.Is(err, peerstore.ErrNotFound) {
+					// For now considering peer as healthy if we can't fetch score.
+					healthyPeerCount++
+					pm.logger.Debug("peer score is not available yet", logging.HostID("peer", p))
+				} else {
+					pm.logger.Warn("failed to fetch peer score ", zap.Error(err), logging.HostID("peer", p))
+				}
 			}
 		}
 	}

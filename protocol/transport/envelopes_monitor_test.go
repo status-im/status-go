@@ -1,8 +1,10 @@
 package transport
 
 import (
+	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -51,7 +53,7 @@ func (s *EnvelopesMonitorSuite) SetupTest() {
 		nil,
 		EnvelopesMonitorConfig{
 			EnvelopeEventsHandler:            s.eventsHandlerMock,
-			MaxAttempts:                      0,
+			MaxAttempts:                      6,
 			AwaitOnlyMailServerConfirmations: false,
 			IsMailserver:                     func(types.EnodeID) bool { return false },
 			Logger:                           zap.NewNop(),
@@ -199,7 +201,7 @@ func (s *EnvelopesMonitorSuite) TestMultipleHashes_EnvelopeExpired() {
 	err := s.monitor.Add(messageIDs, hashes, messages)
 	s.Require().NoError(err)
 
-	// If any envelope fails, then identifiers are considered as not sent
+	// If any envelope fails, then messageIDs are considered as not sent
 	s.monitor.handleEvent(types.EnvelopeEvent{
 		Event: types.EventEnvelopeExpired,
 		Hash:  hashes[0],
@@ -214,11 +216,52 @@ func (s *EnvelopesMonitorSuite) TestMultipleHashes_EnvelopeExpired() {
 	})
 
 	s.Require().Empty(s.eventsHandlerMock.envelopeSentCalls)
-	s.Require().Empty(s.monitor.identifierHashes)
+	s.Require().Empty(s.monitor.messageEnvelopeHashes)
 	s.Require().Len(s.monitor.envelopes, 2)
 }
 
 func (s *EnvelopesMonitorSuite) TestMultipleHashes_Failure() {
 	err := s.monitor.Add(testIDs, []types.Hash{{0x01}, {0x02}}, []*types.NewMessage{{}})
 	s.Require().Error(err)
+}
+
+func (s *EnvelopesMonitorSuite) TestRetryOnce() {
+	s.monitor.api = &mockWakuAPI{}
+	err := s.monitor.Add(testIDs, testHashes, []*types.NewMessage{{}})
+	s.Require().NoError(err)
+	envelope := s.monitor.envelopes[testHash]
+	envelope.attempts = 2
+	envelope.lastAttemptTime = time.Now().Add(-20 * time.Second)
+	s.monitor.retryQueue = append(s.monitor.retryQueue, envelope)
+
+	s.monitor.retryOnce()
+
+	s.Require().Equal(3, envelope.attempts)
+	s.Require().Len(s.monitor.retryQueue, 0)
+	s.Require().Equal(envelope.envelopeHashID, s.monitor.envelopes[envelope.envelopeHashID].envelopeHashID)
+}
+
+type mockWakuAPI struct{}
+
+func (m *mockWakuAPI) Post(ctx context.Context, msg types.NewMessage) ([]byte, error) {
+	return []byte{0x01}, nil
+}
+
+func (m *mockWakuAPI) AddPrivateKey(ctx context.Context, privateKey types.HexBytes) (string, error) {
+	return "", nil
+}
+func (m *mockWakuAPI) GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error) {
+	return "", nil
+}
+func (m *mockWakuAPI) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
+	return false, nil
+}
+func (m *mockWakuAPI) NewMessageFilter(req types.Criteria) (string, error) {
+	return "", nil
+}
+func (m *mockWakuAPI) GetFilterMessages(id string) ([]*types.Message, error) {
+	return nil, nil
+}
+func (m *mockWakuAPI) BloomFilter() []byte {
+	return nil
 }

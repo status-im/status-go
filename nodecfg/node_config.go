@@ -162,13 +162,13 @@ func insertLightETHConfig(tx *sql.Tx, c *params.NodeConfig) error {
 func insertShhExtConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO shhext_config (
-		pfs_enabled, backup_disabled_data_dir, installation_id, mailserver_confirmations, enable_connection_manager,
+		pfs_enabled, installation_id, mailserver_confirmations, enable_connection_manager,
 		enable_last_used_monitor, connection_target, request_delay, max_server_failures, max_message_delivery_attempts,
 		whisper_cache_dir, disable_generic_discovery_topic, send_v1_messages, data_sync_enabled, verify_transaction_url,
 		verify_ens_url, verify_ens_contract_address, verify_transaction_chain_id, anon_metrics_server_enabled,
 		anon_metrics_send_id, anon_metrics_server_postgres_uri, bandwidth_stats_enabled, synthetic_id
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
-		c.ShhextConfig.PFSEnabled, c.ShhextConfig.BackupDisabledDataDir, c.ShhextConfig.InstallationID, c.ShhextConfig.MailServerConfirmations, c.ShhextConfig.EnableConnectionManager,
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
+		c.ShhextConfig.PFSEnabled, c.ShhextConfig.InstallationID, c.ShhextConfig.MailServerConfirmations, c.ShhextConfig.EnableConnectionManager,
 		c.ShhextConfig.EnableLastUsedMonitor, c.ShhextConfig.ConnectionTarget, c.ShhextConfig.RequestsDelay, c.ShhextConfig.MaxServerFailures, c.ShhextConfig.MaxMessageDeliveryAttempts,
 		c.ShhextConfig.WhisperCacheDir, c.ShhextConfig.DisableGenericDiscoveryTopic, c.ShhextConfig.SendV1Messages, c.ShhextConfig.DataSyncEnabled, c.ShhextConfig.VerifyTransactionURL,
 		c.ShhextConfig.VerifyENSURL, c.ShhextConfig.VerifyENSContractAddress, c.ShhextConfig.VerifyTransactionChainID, c.ShhextConfig.AnonMetricsServerEnabled,
@@ -627,13 +627,13 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	}
 
 	err = tx.QueryRow(`
-	SELECT pfs_enabled, backup_disabled_data_dir, installation_id, mailserver_confirmations, enable_connection_manager,
+	SELECT pfs_enabled, installation_id, mailserver_confirmations, enable_connection_manager,
 	enable_last_used_monitor, connection_target, request_delay, max_server_failures, max_message_delivery_attempts,
 	whisper_cache_dir, disable_generic_discovery_topic, send_v1_messages, data_sync_enabled, verify_transaction_url,
 	verify_ens_url, verify_ens_contract_address, verify_transaction_chain_id, anon_metrics_server_enabled,
 	anon_metrics_send_id, anon_metrics_server_postgres_uri, bandwidth_stats_enabled FROM shhext_config WHERE synthetic_id = 'id'
 	`).Scan(
-		&nodecfg.ShhextConfig.PFSEnabled, &nodecfg.ShhextConfig.BackupDisabledDataDir, &nodecfg.ShhextConfig.InstallationID, &nodecfg.ShhextConfig.MailServerConfirmations, &nodecfg.ShhextConfig.EnableConnectionManager,
+		&nodecfg.ShhextConfig.PFSEnabled, &nodecfg.ShhextConfig.InstallationID, &nodecfg.ShhextConfig.MailServerConfirmations, &nodecfg.ShhextConfig.EnableConnectionManager,
 		&nodecfg.ShhextConfig.EnableLastUsedMonitor, &nodecfg.ShhextConfig.ConnectionTarget, &nodecfg.ShhextConfig.RequestsDelay, &nodecfg.ShhextConfig.MaxServerFailures, &nodecfg.ShhextConfig.MaxMessageDeliveryAttempts,
 		&nodecfg.ShhextConfig.WhisperCacheDir, &nodecfg.ShhextConfig.DisableGenericDiscoveryTopic, &nodecfg.ShhextConfig.SendV1Messages, &nodecfg.ShhextConfig.DataSyncEnabled, &nodecfg.ShhextConfig.VerifyTransactionURL,
 		&nodecfg.ShhextConfig.VerifyENSURL, &nodecfg.ShhextConfig.VerifyENSContractAddress, &nodecfg.ShhextConfig.VerifyTransactionChainID, &nodecfg.ShhextConfig.AnonMetricsServerEnabled,
@@ -799,6 +799,16 @@ func SetLightClient(db *sql.DB, enabled bool) error {
 
 func SetLogLevel(db *sql.DB, logLevel string) error {
 	_, err := db.Exec(`UPDATE log_config SET log_level = ?`, logLevel)
+	return err
+}
+
+func SetMaxLogBackups(db *sql.DB, maxLogBackups uint) error {
+	_, err := db.Exec(`UPDATE log_config SET max_backups = ?`, maxLogBackups)
+	return err
+}
+
+func SaveNewWakuNode(db *sql.DB, nodeAddress string) error {
+	_, err := db.Exec(`INSERT OR REPLACE INTO cluster_nodes (node, type, synthetic_id) VALUES (?, ?, 'id')`, nodeAddress, WakuNodes)
 	return err
 }
 

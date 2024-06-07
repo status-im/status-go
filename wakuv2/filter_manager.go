@@ -58,6 +58,7 @@ func newFilterManager(ctx context.Context, logger *zap.Logger, cfg *Config, onNe
 	mgr.node = node
 	mgr.peersAvailable = false
 	mgr.filterQueue = make(chan filterConfig, filterQueueSize)
+
 	return mgr
 }
 

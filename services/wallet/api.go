@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -31,7 +30,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
-	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -271,38 +269,11 @@ func (api *API) GetPendingTransactionsForIdentities(ctx context.Context, identit
 // TODO - #11861: Remove this and replace with EventPendingTransactionStatusChanged event and Delete to confirm the transaction where it is needed
 func (api *API) WatchTransactionByChainID(ctx context.Context, chainID uint64, transactionHash common.Hash) (err error) {
 	log.Debug("wallet.api.WatchTransactionByChainID", "chainID", chainID, "transactionHash", transactionHash)
-	var status *transactions.TxStatus
 	defer func() {
 		log.Debug("wallet.api.WatchTransactionByChainID return", "err", err, "chainID", chainID, "transactionHash", transactionHash)
 	}()
 
-	// Workaround to keep the blocking call until the clients use the PendingTxTracker APIs
-	eventChan := make(chan walletevent.Event, 2)
-	sub := api.s.feed.Subscribe(eventChan)
-	defer sub.Unsubscribe()
-
-	status, err = api.s.pendingTxManager.Watch(ctx, wcommon.ChainID(chainID), transactionHash)
-	if err == nil && *status != transactions.Pending {
-		return nil
-	}
-
-	for {
-		select {
-		case we := <-eventChan:
-			if transactions.EventPendingTransactionStatusChanged == we.Type {
-				var p transactions.StatusChangedPayload
-				err = json.Unmarshal([]byte(we.Message), &p)
-				if err != nil {
-					return err
-				}
-				if p.ChainID == wcommon.ChainID(chainID) && p.Hash == transactionHash {
-					return nil
-				}
-			}
-		case <-time.After(10 * time.Minute):
-			return errors.New("timeout watching for pending transaction")
-		}
-	}
+	return api.s.transactionManager.WatchTransaction(ctx, chainID, transactionHash)
 }
 
 func (api *API) GetCryptoOnRamps(ctx context.Context) ([]onramp.CryptoOnRamp, error) {
@@ -602,13 +573,13 @@ func (api *API) SendTransactionWithSignature(ctx context.Context, chainID uint64
 	if err != nil {
 		return hash, err
 	}
-	return api.s.transactionManager.SendTransactionWithSignature(chainID, txType, params, sig)
+	return api.s.transactionManager.SendTransactionWithSignature(chainID, params, sig)
 }
 
 func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionCommand *transfer.MultiTransactionCommand, data []*bridge.TransactionBridge, password string) (*transfer.MultiTransactionCommandResult, error) {
 	log.Debug("[WalletAPI:: CreateMultiTransaction] create multi transaction")
 
-	cmd, err := api.s.transactionManager.CreateMultiTransactionFromCommand(ctx, multiTransactionCommand, data)
+	cmd, err := api.s.transactionManager.CreateMultiTransactionFromCommand(multiTransactionCommand, data)
 	if err != nil {
 		return nil, err
 	}
@@ -626,7 +597,7 @@ func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionComm
 
 		_, err = api.s.transactionManager.InsertMultiTransaction(cmd)
 		if err != nil {
-			return nil, err
+			log.Error("Failed to save multi transaction", "error", err) // not critical
 		}
 
 		return cmdRes, nil

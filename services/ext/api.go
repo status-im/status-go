@@ -1590,24 +1590,12 @@ func (api *PublicAPI) CheckPermissionsToJoinCommunity(request *requests.CheckPer
 	return api.service.messenger.CheckPermissionsToJoinCommunity(request)
 }
 
-func (api *PublicAPI) CheckPermissionsToJoinCommunityLight(request *requests.CheckPermissionToJoinCommunity) (bool, error) {
-	return api.service.messenger.CheckPermissionsToJoinCommunityLight(request)
-}
-
 func (api *PublicAPI) CheckCommunityChannelPermissions(request *requests.CheckCommunityChannelPermissions) (*communities.CheckChannelPermissionsResponse, error) {
 	return api.service.messenger.CheckCommunityChannelPermissions(request)
 }
 
-func (api *PublicAPI) CheckCommunityChannelPermissionsLight(request *requests.CheckCommunityChannelPermissions) (*communities.CheckChannelPermissionsResponse, error) {
-	return api.service.messenger.CheckCommunityChannelPermissionsLight(request)
-}
-
 func (api *PublicAPI) CheckAllCommunityChannelsPermissions(request *requests.CheckAllCommunityChannelsPermissions) (*communities.CheckAllChannelsPermissionsResponse, error) {
 	return api.service.messenger.CheckAllCommunityChannelsPermissions(request)
-}
-
-func (api *PublicAPI) CheckAllCommunityChannelsPermissionsLight(request *requests.CheckAllCommunityChannelsPermissions) (*communities.CheckAllChannelsPermissionsResponse, error) {
-	return api.service.messenger.CheckAllCommunityChannelsPermissionsLight(request)
 }
 
 func (api *PublicAPI) CollectCommunityMetrics(request *requests.CommunityMetricsRequest) (*protocol.CommunityMetricsResponse, error) {
@@ -1785,8 +1773,16 @@ func (api *PublicAPI) SetLogLevel(request *requests.SetLogLevel) error {
 	return api.service.messenger.SetLogLevel(request)
 }
 
+func (api *PublicAPI) SetMaxLogBackups(request *requests.SetMaxLogBackups) error {
+	return api.service.messenger.SetMaxLogBackups(request)
+}
+
 func (api *PublicAPI) SetCustomNodes(request *requests.SetCustomNodes) error {
 	return api.service.messenger.SetCustomNodes(request)
+}
+
+func (api *PublicAPI) SaveNewWakuNode(request *requests.SaveNewWakuNode) error {
+	return api.service.messenger.SaveNewWakuNode(request)
 }
 
 func (api *PublicAPI) SetCustomizationColor(ctx context.Context, request *requests.SetCustomizationColor) error {

@@ -46,6 +46,19 @@ message CommunityTokenMetadata {
   uint32 decimals = 7;
 }
 
+message CommunityTokenAction {
+  enum ActionType {
+    UNKNOWN_ACTION_TYPE = 0;
+    AIRDROP = 1;
+    BURN = 2;
+    REMOTE_DESTRUCT = 3;
+  }
+
+  uint64 chain_id = 1;
+  string contract_address = 2;
+  ActionType action_type = 3;
+}
+
 message CommunityPermissions {
   enum Access {
     UNKNOWN_ACCESS = 0;

@@ -225,6 +225,7 @@ type CommunityTokensServiceInterface interface {
 	GetAssetContractData(chainID uint64, contractAddress string) (*AssetContractData, error)
 	SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error)
 	DeploymentSignatureDigest(chainID uint64, addressFrom string, communityID string) ([]byte, error)
+	ProcessCommunityTokenAction(message *protobuf.CommunityTokenAction) error
 }
 
 type DefaultTokenManager struct {
@@ -2703,17 +2704,6 @@ func (m *Manager) CheckPermissionToJoin(id []byte, addresses []gethcommon.Addres
 	return m.PermissionChecker.CheckPermissionToJoin(community, addresses)
 }
 
-// Light version of CheckPermissionToJoin, which does not use network requests.
-// Instead of checking wallet balances it checks if there is an access to a member list of the community.
-func (m *Manager) CheckPermissionToJoinLight(id []byte) (bool, error) {
-	community, err := m.GetByID(id)
-	if err != nil {
-		return false, err
-	}
-	meAsMember := community.GetMember(&m.identity.PublicKey)
-	return meAsMember != nil, nil
-}
-
 func (m *Manager) accountsSatisfyPermissionsToJoin(
 	communityPermissionsPreParsedData map[protobuf.CommunityTokenPermission_Type]*PreParsedCommunityPermissionsData,
 	accountsAndChainIDs []*AccountChainIDsCombination) (bool, protobuf.CommunityMember_Roles, error) {
@@ -3286,59 +3276,6 @@ func (m *Manager) CheckChannelPermissions(communityID types.HexBytes, chatID str
 	return response, nil
 }
 
-func (m *Manager) checkChannelPermissionsLight(community *Community, communityChat *protobuf.CommunityChat, channelID string) *CheckChannelPermissionsResponse {
-
-	viewOnlyPermissions := community.ChannelTokenPermissionsByType(community.IDString()+channelID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
-	viewAndPostPermissions := community.ChannelTokenPermissionsByType(community.IDString()+channelID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
-
-	hasViewOnlyPermissions := len(viewOnlyPermissions) > 0
-	hasViewAndPostPermissions := len(viewAndPostPermissions) > 0
-
-	meAsMember := communityChat.Members[common.PubkeyToHex(&m.identity.PublicKey)]
-
-	viewSatisfied := !hasViewOnlyPermissions || (meAsMember != nil && meAsMember.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_VIEWER)
-	postSatisfied := !hasViewAndPostPermissions || (meAsMember != nil && meAsMember.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
-
-	finalViewSatisfied := computeViewOnlySatisfied(hasViewOnlyPermissions, hasViewAndPostPermissions, viewSatisfied, postSatisfied)
-	finalPostSatisfied := computeViewAndPostSatisfied(hasViewOnlyPermissions, hasViewAndPostPermissions, postSatisfied)
-
-	return &CheckChannelPermissionsResponse{
-		ViewOnlyPermissions: &CheckChannelViewOnlyPermissionsResult{
-			Satisfied:   finalViewSatisfied,
-			Permissions: make(map[string]*PermissionTokenCriteriaResult),
-		},
-		ViewAndPostPermissions: &CheckChannelViewAndPostPermissionsResult{
-			Satisfied:   finalPostSatisfied,
-			Permissions: make(map[string]*PermissionTokenCriteriaResult),
-		},
-	}
-}
-
-// Light version of CheckChannelPermissions, which does not use network requests.
-// Instead of checking wallet balances it checks if there is an access to a member list of the chat.
-func (m *Manager) CheckChannelPermissionsLight(communityID types.HexBytes, chatID string) (*CheckChannelPermissionsResponse, error) {
-	community, err := m.GetByID(communityID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Remove communityID prefix from chatID if exists
-	if strings.HasPrefix(chatID, communityID.String()) {
-		chatID = strings.TrimPrefix(chatID, communityID.String())
-	}
-
-	if chatID == "" {
-		return nil, errors.New(fmt.Sprintf("couldn't check channel permissions, invalid chat id: %s", chatID))
-	}
-
-	communityChat, err := community.GetChat(chatID)
-	if err != nil {
-		return nil, err
-	}
-
-	return m.checkChannelPermissionsLight(community, communityChat, chatID), nil
-}
-
 type CheckChannelPermissionsResponse struct {
 	ViewOnlyPermissions    *CheckChannelViewOnlyPermissionsResult    `json:"viewOnlyPermissions"`
 	ViewAndPostPermissions *CheckChannelViewAndPostPermissionsResult `json:"viewAndPostPermissions"`
@@ -3487,27 +3424,6 @@ func (m *Manager) CheckAllChannelsPermissions(communityID types.HexBytes, addres
 			return nil, err
 		}
 		response.Channels[chatId] = channelPermissionsResponse
-	}
-	return response, nil
-}
-
-// Light version of CheckAllChannelsPermissionsLight, which does not use network requests.
-// Instead of checking wallet balances it checks if there is an access to a member list of chats.
-func (m *Manager) CheckAllChannelsPermissionsLight(communityID types.HexBytes) (*CheckAllChannelsPermissionsResponse, error) {
-
-	community, err := m.GetByID(communityID)
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CheckAllChannelsPermissionsResponse{
-		Channels: make(map[string]*CheckChannelPermissionsResponse),
-	}
-
-	channels := community.Chats()
-
-	for channelID, channel := range channels {
-		response.Channels[community.IDString()+channelID] = m.checkChannelPermissionsLight(community, channel, channelID)
 	}
 	return response, nil
 }
@@ -4082,10 +3998,6 @@ func (m *Manager) SaveRequestToJoin(request *RequestToJoin) error {
 
 func (m *Manager) CanceledRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
 	return m.persistence.CanceledRequestsToJoinForUser(common.PubkeyToHex(pk))
-}
-
-func (m *Manager) CanceledRequestToJoinForUserForCommunityID(pk *ecdsa.PublicKey, communityID []byte) (*RequestToJoin, error) {
-	return m.persistence.CanceledRequestToJoinForUserForCommunityID(common.PubkeyToHex(pk), communityID)
 }
 
 func (m *Manager) PendingRequestsToJoin() ([]*RequestToJoin, error) {

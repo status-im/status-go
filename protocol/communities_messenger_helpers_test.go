@@ -149,6 +149,10 @@ func (c *CollectiblesServiceMock) DeploymentSignatureDigest(chainID uint64, addr
 	return gethcommon.Hex2Bytes("ccbb375343347491706cf4b43796f7b96ccc89c9e191a8b78679daeba1684ec7"), nil
 }
 
+func (s *CollectiblesServiceMock) ProcessCommunityTokenAction(message *protobuf.CommunityTokenAction) error {
+	return nil
+}
+
 type testCommunitiesMessengerConfig struct {
 	testMessengerConfig
 

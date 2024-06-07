@@ -4014,10 +4014,11 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	s.Require().Empty(aliceJoinedCommunities)
 
 	// pull to make sure it has been saved
-	cancelRequestsToJoin, err := s.alice.MyCanceledRequestToJoinForCommunityID(community.ID())
+	myRequestToJoinId := communities.CalculateRequestID(s.alice.IdentityPublicKeyString(), community.ID())
+	canceledRequestToJoin, err := s.alice.communitiesManager.GetRequestToJoin(myRequestToJoinId)
 	s.Require().NoError(err)
-	s.Require().NotNil(cancelRequestsToJoin)
-	s.Require().Equal(cancelRequestsToJoin.State, communities.RequestToJoinStateCanceled)
+	s.Require().NotNil(canceledRequestToJoin)
+	s.Require().Equal(canceledRequestToJoin.State, communities.RequestToJoinStateCanceled)
 
 	s.Require().NoError(err)
 
@@ -4029,7 +4030,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	statusMessage.TransportLayer.Dst = community.PublicKey()
 
 	requestToJoinResponseProto := &protobuf.CommunityRequestToJoinResponse{
-		Clock:       cancelRequestsToJoin.Clock,
+		Clock:       canceledRequestToJoin.Clock,
 		CommunityId: community.ID(),
 		Accepted:    true,
 	}
@@ -4485,5 +4486,67 @@ func (s *MessengerCommunitiesSuite) TestAliceDoesNotReceiveMentionWhenSpectating
 		},
 		"no message for Alice",
 	)
+	s.Require().NoError(err)
+}
+
+// this test simulate the scenario, when we are leaving the community and after the leave
+// receiving outdated COMMUNITY_REQUEST_TO_JOIN_RESPONSE and joining the community again
+func (s *MessengerCommunitiesSuite) TestAliceDidNotProcessOutdatedCommunityRequestToJoinResponse() {
+	community, _ := s.createCommunity()
+
+	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	joinCommunity(&s.Suite, community, s.owner, s.alice, request, "")
+
+	response, err := s.alice.LeaveCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().False(response.Communities()[0].Joined())
+
+	// double-check that alice left the community
+	community, err = s.alice.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().False(community.Joined())
+
+	// prepare the same request to join response
+	community, err = s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+
+	grant, err := community.BuildGrant(s.alice.IdentityPublicKey(), "")
+	s.Require().NoError(err)
+
+	var key *ecdsa.PrivateKey
+	if s.owner.transport.WakuVersion() == 2 {
+		key, err = s.owner.transport.RetrievePubsubTopicKey(community.PubsubTopic())
+		s.Require().NoError(err)
+	}
+
+	encryptedDescription, err := community.EncryptedDescription()
+	s.Require().NoError(err)
+
+	requestToJoinResponse := &protobuf.CommunityRequestToJoinResponse{
+		Clock:                    community.Clock(),
+		Accepted:                 true,
+		CommunityId:              community.ID(),
+		Community:                encryptedDescription,
+		Grant:                    grant,
+		ProtectedTopicPrivateKey: crypto.FromECDSA(key),
+		Shard:                    community.Shard().Protobuffer(),
+	}
+
+	// alice handle duplicated request to join response
+	state := &ReceivedMessageState{
+		Response: &MessengerResponse{},
+		CurrentMessageState: &CurrentMessageState{
+			PublicKey: community.ControlNode(),
+		},
+	}
+
+	err = s.alice.HandleCommunityRequestToJoinResponse(state, requestToJoinResponse, nil)
+	s.Require().Error(err, ErrOutdatedCommunityRequestToJoin)
+
+	// alice receives new request to join when she's already joined
+	requestToJoinResponse.Clock = requestToJoinResponse.Clock + 1
+	err = s.alice.HandleCommunityRequestToJoinResponse(state, requestToJoinResponse, nil)
 	s.Require().NoError(err)
 }

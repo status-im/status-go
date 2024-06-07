@@ -2,6 +2,7 @@ package connection
 
 import (
 	"encoding/json"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -13,21 +14,22 @@ import (
 type StatusNotification map[string]State // id -> State
 
 type StatusNotifier struct {
-	statuses  map[string]*Status // id -> Status
+	statuses  *sync.Map // id -> Status
 	eventType walletevent.EventType
 	feed      *event.Feed
 }
 
-func NewStatusNotifier(statuses map[string]*Status, eventType walletevent.EventType, feed *event.Feed) *StatusNotifier {
+func NewStatusNotifier(statuses *sync.Map, eventType walletevent.EventType, feed *event.Feed) *StatusNotifier {
 	n := StatusNotifier{
 		statuses:  statuses,
 		eventType: eventType,
 		feed:      feed,
 	}
 
-	for _, status := range statuses {
-		status.SetStateChangeCb(n.notify)
-	}
+	statuses.Range(func(_, value interface{}) bool {
+		value.(*Status).SetStateChangeCb(n.notify)
+		return true
+	})
 
 	return &n
 }
@@ -37,13 +39,14 @@ func (n *StatusNotifier) notify(state State) {
 	// a single event, so we fetch them from the map
 	if n.feed != nil {
 		statusMap := make(StatusNotification)
-		for id, status := range n.statuses {
-			state := status.GetState()
+		n.statuses.Range(func(id, value interface{}) bool {
+			state := value.(*Status).GetState()
 			if state.Value == StateValueUnknown {
-				continue
+				return true
 			}
-			statusMap[id] = state
-		}
+			statusMap[id.(string)] = state
+			return true
+		})
 
 		encodedMessage, err := json.Marshal(statusMap)
 		if err != nil {

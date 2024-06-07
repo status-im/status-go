@@ -37,12 +37,9 @@ import (
 // rename and make `router_v2.go` file the main and only file
 // //////////////////////////////////////////////////////////////////////////////
 
+// TODO: remove the following two consts once we fully move to routerV2
 const EstimateUsername = "RandomUsername"
 const EstimatePubKey = "0x04bb2024ce5d72e45d4a4f8589ae657ef9745855006996115a23a1af88d536cf02c0524a585fce7bfa79d6a9669af735eda6205d6c7e5b3cdc2b8ff7b2fa1f0b56"
-const ERC721TransferString = "ERC721Transfer"
-const ERC1155TransferString = "ERC1155Transfer"
-
-var zero = big.NewInt(0)
 
 type Path struct {
 	BridgeName              string
@@ -151,7 +148,7 @@ func filterRoutes(routes [][]*Path, amountIn *big.Int, fromLockedAmount map[uint
 		fromIncluded := make(map[uint64]bool)
 		fromExcluded := make(map[uint64]bool)
 		for chainID, amount := range fromLockedAmount {
-			if amount.ToInt().Cmp(zero) == 0 {
+			if amount.ToInt().Cmp(bridge.ZeroBigIntValue) == 0 {
 				fromExcluded[chainID] = false
 			} else {
 				fromIncluded[chainID] = false
@@ -262,7 +259,7 @@ func newSuggestedRoutes(
 		rest := new(big.Int).Set(amountIn)
 		for _, path := range best {
 			diff := new(big.Int).Sub(rest, path.MaxAmountIn.ToInt())
-			if diff.Cmp(zero) >= 0 {
+			if diff.Cmp(bridge.ZeroBigIntValue) >= 0 {
 				path.AmountIn = (*hexutil.Big)(path.MaxAmountIn.ToInt())
 			} else {
 				path.AmountIn = (*hexutil.Big)(new(big.Int).Set(rest))
@@ -286,12 +283,17 @@ func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, token
 	cbridge := bridge.NewCbridge(rpcClient, transactor, tokenManager)
 	hop := bridge.NewHopBridge(rpcClient, transactor, tokenManager)
 	paraswap := bridge.NewSwapParaswap(rpcClient, transactor, tokenManager)
+	ensRegister := bridge.NewENSRegisterBridge(rpcClient, transactor, ensService)
+	ensRelease := bridge.NewENSReleaseBridge(rpcClient, transactor, ensService)
+
 	bridges[transfer.Name()] = transfer
 	bridges[erc721Transfer.Name()] = erc721Transfer
 	bridges[hop.Name()] = hop
 	bridges[cbridge.Name()] = cbridge
 	bridges[erc1155Transfer.Name()] = erc1155Transfer
 	bridges[paraswap.Name()] = paraswap
+	bridges[ensRegister.Name()] = ensRegister
+	bridges[ensRelease.Name()] = ensRelease
 
 	return &Router{
 		rpcClient:           rpcClient,
@@ -338,7 +340,7 @@ type Router struct {
 
 func (r *Router) requireApproval(ctx context.Context, sendType SendType, approvalContractAddress *common.Address, account common.Address, network *params.Network, token *token.Token, amountIn *big.Int) (
 	bool, *big.Int, uint64, uint64, error) {
-	if sendType.IsCollectiblesTransfer() {
+	if sendType.IsCollectiblesTransfer() || sendType.IsEnsTransfer() {
 		return false, nil, 0, 0, nil
 	}
 
@@ -542,8 +544,13 @@ func (r *Router) SuggestedRoutes(
 			maxFees := gasFees.feeFor(gasFeeMode)
 
 			estimatedTime := r.feesManager.TransactionEstimatedTime(ctx, network.ChainID, maxFees)
-			for _, bridge := range r.bridges {
-				if !sendType.canUseBridge(bridge) {
+			for _, brdg := range r.bridges {
+				// Skip bridges that are added because of the Router V2, to not break the current functionality
+				if brdg.Name() == bridge.ENSRegisterName || brdg.Name() == bridge.ENSReleaseName {
+					continue
+				}
+
+				if !sendType.canUseBridge(brdg) {
 					continue
 				}
 
@@ -567,7 +574,17 @@ func (r *Router) SuggestedRoutes(
 						continue
 					}
 
-					can, err := bridge.AvailableFor(network, dest, token, toToken)
+					bridgeParams := bridge.BridgeParams{
+						FromChain: network,
+						ToChain:   dest,
+						FromToken: token,
+						ToToken:   toToken,
+						ToAddr:    addrTo,
+						FromAddr:  addrFrom,
+						AmountIn:  amountIn,
+					}
+
+					can, err := brdg.AvailableFor(bridgeParams)
 					if err != nil || !can {
 						continue
 					}
@@ -575,11 +592,11 @@ func (r *Router) SuggestedRoutes(
 						continue
 					}
 
-					bonderFees, tokenFees, err := bridge.CalculateFees(network, dest, token, amountIn)
+					bonderFees, tokenFees, err := brdg.CalculateFees(bridgeParams)
 					if err != nil {
 						continue
 					}
-					if bonderFees.Cmp(zero) != 0 {
+					if bonderFees.Cmp(bridge.ZeroBigIntValue) != 0 {
 						if maxAmountIn.ToInt().Cmp(amountIn) >= 0 {
 							if bonderFees.Cmp(amountIn) >= 0 {
 								continue
@@ -592,7 +609,7 @@ func (r *Router) SuggestedRoutes(
 					}
 					gasLimit := uint64(0)
 					if sendType.isTransfer(false) {
-						gasLimit, err = bridge.EstimateGas(network, dest, addrFrom, addrTo, token, toToken, amountIn)
+						gasLimit, err = brdg.EstimateGas(bridgeParams)
 						if err != nil {
 							continue
 						}
@@ -600,7 +617,7 @@ func (r *Router) SuggestedRoutes(
 						gasLimit = sendType.EstimateGas(r.ensService, r.stickersService, network, addrFrom, tokenID)
 					}
 
-					approvalContractAddress, err := bridge.GetContractAddress(network, token)
+					approvalContractAddress, err := brdg.GetContractAddress(bridgeParams)
 					if err != nil {
 						continue
 					}
@@ -611,7 +628,7 @@ func (r *Router) SuggestedRoutes(
 
 					var l1GasFeeWei uint64
 					if sendType.needL1Fee() {
-						txInputData, err := bridge.PackTxInputData("", network, dest, addrFrom, addrTo, token, amountIn)
+						txInputData, err := brdg.PackTxInputData(bridgeParams, "")
 						if err != nil {
 							continue
 						}
@@ -661,12 +678,12 @@ func (r *Router) SuggestedRoutes(
 					cost.Add(cost, l1GasCost)
 					mu.Lock()
 					candidates = append(candidates, &Path{
-						BridgeName:              bridge.Name(),
+						BridgeName:              brdg.Name(),
 						From:                    network,
 						To:                      dest,
 						MaxAmountIn:             maxAmountIn,
-						AmountIn:                (*hexutil.Big)(zero),
-						AmountOut:               (*hexutil.Big)(zero),
+						AmountIn:                (*hexutil.Big)(bridge.ZeroBigIntValue),
+						AmountOut:               (*hexutil.Big)(bridge.ZeroBigIntValue),
 						GasAmount:               gasLimit,
 						GasFees:                 gasFees,
 						BonderFees:              (*hexutil.Big)(bonderFees),
@@ -691,7 +708,16 @@ func (r *Router) SuggestedRoutes(
 	suggestedRoutes.TokenPrice = prices[tokenID]
 	suggestedRoutes.NativeChainTokenPrice = prices["ETH"]
 	for _, path := range suggestedRoutes.Best {
-		amountOut, err := r.bridges[path.BridgeName].CalculateAmountOut(path.From, path.To, (*big.Int)(path.AmountIn), tokenID)
+		bridgeParams := bridge.BridgeParams{
+			FromChain: path.From,
+			ToChain:   path.To,
+			AmountIn:  path.AmountIn.ToInt(),
+			FromToken: &token.Token{
+				Symbol: tokenID,
+			},
+		}
+
+		amountOut, err := r.bridges[path.BridgeName].CalculateAmountOut(bridgeParams)
 		if err != nil {
 			continue
 		}

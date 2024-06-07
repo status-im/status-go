@@ -27,7 +27,6 @@ import (
 	hopL2CctpImplementation "github.com/status-im/status-go/contracts/hop/l2Contracts/l2CctpImplementation"
 	hopL2OptimismBridge "github.com/status-im/status-go/contracts/hop/l2Contracts/l2OptimismBridge"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -107,14 +106,14 @@ func (bf *BonderFee) UnmarshalJSON(data []byte) error {
 }
 
 type HopBridge struct {
-	transactor    *transactions.Transactor
+	transactor    transactions.TransactorIface
 	httpClient    *thirdparty.HTTPClient
 	tokenManager  *token.Manager
 	contractMaker *contracts.ContractMaker
 	bonderFee     *BonderFee
 }
 
-func NewHopBridge(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager) *HopBridge {
+func NewHopBridge(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *token.Manager) *HopBridge {
 	return &HopBridge{
 		contractMaker: &contracts.ContractMaker{RPCClient: rpcClient},
 		httpClient:    thirdparty.NewHTTPClient(),
@@ -124,14 +123,14 @@ func NewHopBridge(rpcClient *rpc.Client, transactor *transactions.Transactor, to
 }
 
 func (h *HopBridge) Name() string {
-	return "Hop"
+	return HopName
 }
 
-func (h *HopBridge) AvailableFor(from, to *params.Network, token *token.Token, toToken *token.Token) (bool, error) {
+func (h *HopBridge) AvailableFor(params BridgeParams) (bool, error) {
 	// We chcek if the contract is available on the network for the token
-	_, err := h.GetContractAddress(from, token)
+	_, err := h.GetContractAddress(params)
 	// toToken is not nil only if the send type is Swap
-	return err == nil && toToken == nil, nil
+	return err == nil && params.ToToken == nil, nil
 }
 
 func (c *HopBridge) getAppropriateABI(contractType string, chainID uint64, token *token.Token) (abi.ABI, error) {
@@ -164,51 +163,51 @@ func (c *HopBridge) getAppropriateABI(contractType string, chainID uint64, token
 	return abi.ABI{}, errors.New("not available for contract type")
 }
 
-func (h *HopBridge) PackTxInputData(contractType string, fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) ([]byte, error) {
-	abi, err := h.getAppropriateABI(contractType, fromNetwork.ChainID, token)
+func (h *HopBridge) PackTxInputData(params BridgeParams, contractType string) ([]byte, error) {
+	abi, err := h.getAppropriateABI(contractType, params.FromChain.ChainID, params.FromToken)
 	if err != nil {
 		return []byte{}, err
 	}
 
 	switch contractType {
 	case hop.CctpL1Bridge:
-		return h.packCctpL1BridgeTx(abi, toNetwork.ChainID, to)
+		return h.packCctpL1BridgeTx(abi, params.ToChain.ChainID, params.ToAddr)
 	case hop.L1Bridge:
-		return h.packL1BridgeTx(abi, toNetwork.ChainID, to)
+		return h.packL1BridgeTx(abi, params.ToChain.ChainID, params.ToAddr)
 	case hop.L2AmmWrapper:
-		return h.packL2AmmWrapperTx(abi, toNetwork.ChainID, to)
+		return h.packL2AmmWrapperTx(abi, params.ToChain.ChainID, params.ToAddr)
 	case hop.CctpL2Bridge:
-		return h.packCctpL2BridgeTx(abi, toNetwork.ChainID, to)
+		return h.packCctpL2BridgeTx(abi, params.ToChain.ChainID, params.ToAddr)
 	case hop.L2Bridge:
-		return h.packL2BridgeTx(abi, toNetwork.ChainID, to)
+		return h.packL2BridgeTx(abi, params.ToChain.ChainID, params.ToAddr)
 	}
 
 	return []byte{}, errors.New("contract type not supported yet")
 }
 
-func (h *HopBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, toToken *token.Token, amountIn *big.Int) (uint64, error) {
+func (h *HopBridge) EstimateGas(params BridgeParams) (uint64, error) {
 	value := big.NewInt(0)
-	if token.IsNative() {
-		value = amountIn
+	if params.FromToken.IsNative() {
+		value = params.AmountIn
 	}
 
-	contractAddress, contractType, err := hop.GetContractAddress(fromNetwork.ChainID, token.Symbol)
+	contractAddress, contractType, err := hop.GetContractAddress(params.FromChain.ChainID, params.FromToken.Symbol)
 	if err != nil {
 		return 0, err
 	}
 
-	input, err := h.PackTxInputData(contractType, fromNetwork, toNetwork, from, to, token, amountIn)
+	input, err := h.PackTxInputData(params, contractType)
 	if err != nil {
 		return 0, err
 	}
 
-	ethClient, err := h.contractMaker.RPCClient.EthClient(fromNetwork.ChainID)
+	ethClient, err := h.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, err
 	}
 
 	msg := ethereum.CallMsg{
-		From:  from,
+		From:  params.FromAddr,
 		To:    &contractAddress,
 		Value: value,
 		Data:  input,
@@ -216,7 +215,7 @@ func (h *HopBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.N
 
 	estimation, err := ethClient.EstimateGas(context.Background(), msg)
 	if err != nil {
-		if !token.IsNative() {
+		if !params.FromToken.IsNative() {
 			// TODO: this is a temporary solution until we find a better way to estimate the gas
 			// hardcoding the estimation for other than ETH, cause we cannot get a proper estimation without having an approval placed first
 			// this is an error we're facing otherwise: `execution reverted: ERC20: transfer amount exceeds allowance`
@@ -230,42 +229,42 @@ func (h *HopBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.N
 	return uint64(increasedEstimation), nil
 }
 
-func (h *HopBridge) BuildTx(fromNetwork, toNetwork *params.Network, fromAddress common.Address, toAddress common.Address, token *token.Token, amountIn *big.Int, bonderFee *big.Int) (*ethTypes.Transaction, error) {
-	toAddr := types.Address(toAddress)
+func (h *HopBridge) BuildTx(params BridgeParams) (*ethTypes.Transaction, error) {
+	toAddr := types.Address(params.ToAddr)
 	sendArgs := &TransactionBridge{
 		HopTx: &HopTxArgs{
 			SendTxArgs: transactions.SendTxArgs{
-				From:  types.Address(fromAddress),
+				From:  types.Address(params.FromAddr),
 				To:    &toAddr,
-				Value: (*hexutil.Big)(amountIn),
+				Value: (*hexutil.Big)(params.AmountIn),
 				Data:  types.HexBytes("0x0"),
 			},
-			Symbol:    token.Symbol,
-			Recipient: toAddress,
-			Amount:    (*hexutil.Big)(amountIn),
-			BonderFee: (*hexutil.Big)(bonderFee),
-			ChainID:   toNetwork.ChainID,
+			Symbol:    params.FromToken.Symbol,
+			Recipient: params.ToAddr,
+			Amount:    (*hexutil.Big)(params.AmountIn),
+			BonderFee: (*hexutil.Big)(params.BonderFee),
+			ChainID:   params.ToChain.ChainID,
 		},
-		ChainID: fromNetwork.ChainID,
+		ChainID: params.FromChain.ChainID,
 	}
 
 	return h.BuildTransaction(sendArgs)
 }
 
-func (h *HopBridge) GetContractAddress(network *params.Network, token *token.Token) (common.Address, error) {
-	address, _, err := hop.GetContractAddress(network.ChainID, token.Symbol)
+func (h *HopBridge) GetContractAddress(params BridgeParams) (common.Address, error) {
+	address, _, err := hop.GetContractAddress(params.FromChain.ChainID, params.FromToken.Symbol)
 	return address, err
 }
 
 func (h *HopBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
-	fromNetwork := h.contractMaker.RPCClient.NetworkManager.Find(sendArgs.ChainID)
-	if fromNetwork == nil {
+	fromChain := h.contractMaker.RPCClient.NetworkManager.Find(sendArgs.ChainID)
+	if fromChain == nil {
 		return tx, fmt.Errorf("ChainID not supported %d", sendArgs.ChainID)
 	}
 
-	token := h.tokenManager.FindToken(fromNetwork, sendArgs.HopTx.Symbol)
+	token := h.tokenManager.FindToken(fromChain, sendArgs.HopTx.Symbol)
 
-	nonce, err := h.transactor.NextNonce(h.contractMaker.RPCClient, fromNetwork.ChainID, sendArgs.HopTx.From)
+	nonce, err := h.transactor.NextNonce(h.contractMaker.RPCClient, fromChain.ChainID, sendArgs.HopTx.From)
 	if err != nil {
 		return tx, err
 	}
@@ -278,12 +277,12 @@ func (h *HopBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.Signe
 		txOpts.Value = (*big.Int)(sendArgs.HopTx.Amount)
 	}
 
-	ethClient, err := h.contractMaker.RPCClient.EthClient(fromNetwork.ChainID)
+	ethClient, err := h.contractMaker.RPCClient.EthClient(fromChain.ChainID)
 	if err != nil {
 		return tx, err
 	}
 
-	contractAddress, contractType, err := hop.GetContractAddress(fromNetwork.ChainID, sendArgs.HopTx.Symbol)
+	contractAddress, contractType, err := hop.GetContractAddress(fromChain.ChainID, sendArgs.HopTx.Symbol)
 	if err != nil {
 		return tx, err
 	}
@@ -316,32 +315,32 @@ func (h *HopBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Tra
 	return h.sendOrBuild(sendArgs, nil)
 }
 
-func (h *HopBridge) CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int) (*big.Int, *big.Int, error) {
+func (h *HopBridge) CalculateFees(params BridgeParams) (*big.Int, *big.Int, error) {
 	hopChainsMap := map[uint64]string{
 		walletCommon.EthereumMainnet: "ethereum",
 		walletCommon.OptimismMainnet: "optimism",
 		walletCommon.ArbitrumMainnet: "arbitrum",
 	}
 
-	fromChainName, ok := hopChainsMap[from.ChainID]
+	fromChainName, ok := hopChainsMap[params.FromChain.ChainID]
 	if !ok {
 		return nil, nil, errors.New("from chain not supported")
 	}
 
-	toChainName, ok := hopChainsMap[to.ChainID]
+	toChainName, ok := hopChainsMap[params.ToChain.ChainID]
 	if !ok {
 		return nil, nil, errors.New("to chain not supported")
 	}
 
-	params := netUrl.Values{}
-	params.Add("amount", amountIn.String())
-	params.Add("token", token.Symbol)
-	params.Add("fromChain", fromChainName)
-	params.Add("toChain", toChainName)
-	params.Add("slippage", "0.5") // menas 0.5%
+	reqParams := netUrl.Values{}
+	reqParams.Add("amount", params.AmountIn.String())
+	reqParams.Add("token", params.FromToken.Symbol)
+	reqParams.Add("fromChain", fromChainName)
+	reqParams.Add("toChain", toChainName)
+	reqParams.Add("slippage", "0.5") // menas 0.5%
 
 	url := "https://api.hop.exchange/v1/quote"
-	response, err := h.httpClient.DoGetRequest(context.Background(), url, params)
+	response, err := h.httpClient.DoGetRequest(context.Background(), url, reqParams)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -360,7 +359,7 @@ func (h *HopBridge) CalculateFees(from, to *params.Network, token *token.Token, 
 	return h.bonderFee.BonderFee.Int, tokenFee, nil
 }
 
-func (h *HopBridge) CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error) {
+func (h *HopBridge) CalculateAmountOut(params BridgeParams) (*big.Int, error) {
 	return h.bonderFee.EstimatedRecieved.Int, nil
 }
 

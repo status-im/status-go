@@ -64,7 +64,7 @@ type Manager struct {
 
 	mediaServer *server.MediaServer
 
-	statuses        map[string]*connection.Status
+	statuses        *sync.Map
 	statusNotifier  *connection.StatusNotifier
 	feed            *event.Feed
 	circuitBreakers sync.Map
@@ -79,26 +79,7 @@ func NewManager(
 	feed *event.Feed) *Manager {
 
 	ownershipDB := NewOwnershipDB(db)
-
-	statuses := make(map[string]*connection.Status)
-
-	allChainIDs := walletCommon.AllChainIDs()
-	for _, chainID := range allChainIDs {
-		status := connection.NewStatus()
-		state := status.GetState()
-		latestUpdateTimestamp, err := ownershipDB.GetLatestOwnershipUpdateTimestamp(chainID)
-		if err == nil {
-			state.LastSuccessAt = latestUpdateTimestamp
-			status.SetState(state)
-		}
-		statuses[chainID.String()] = status
-	}
-
-	statusNotifier := connection.NewStatusNotifier(
-		statuses,
-		EventCollectiblesConnectionStatusChanged,
-		feed,
-	)
+	statuses := initStatuses(ownershipDB)
 
 	return &Manager{
 		rpcClient: rpcClient,
@@ -112,7 +93,7 @@ func NewManager(
 		ownershipDB:        ownershipDB,
 		mediaServer:        mediaServer,
 		statuses:           statuses,
-		statusNotifier:     statusNotifier,
+		statusNotifier:     createStatusNotifier(statuses, feed),
 		feed:               feed,
 	}
 }
@@ -775,7 +756,7 @@ func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*th
 	return nil
 }
 
-func (o *Manager) fetchCommunityAssetsAsync(ctx context.Context, communityID string, communityAssets []*thirdparty.FullCollectibleData) {
+func (o *Manager) fetchCommunityAssetsAsync(_ context.Context, communityID string, communityAssets []*thirdparty.FullCollectibleData) {
 	if len(communityAssets) == 0 {
 		return
 	}
@@ -807,7 +788,7 @@ func (o *Manager) fillAnimationMediatype(ctx context.Context, asset *thirdparty.
 	return nil
 }
 
-func (o *Manager) processCollectionData(ctx context.Context, collections []thirdparty.CollectionData) error {
+func (o *Manager) processCollectionData(_ context.Context, collections []thirdparty.CollectionData) error {
 	return o.collectionsDataDB.SetData(collections, true)
 }
 
@@ -895,19 +876,33 @@ func (o *Manager) SetCollectibleTransferID(ownerAddress common.Address, id third
 // Reset connection status to trigger notifications
 // on the next status update
 func (o *Manager) ResetConnectionStatus() {
-	for _, status := range o.statuses {
-		status.ResetStateValue()
-	}
+	o.statuses.Range(func(key, value interface{}) bool {
+		value.(*connection.Status).ResetStateValue()
+		return true
+	})
 }
 
 func (o *Manager) checkConnectionStatus(chainID walletCommon.ChainID) {
 	for _, provider := range o.providers.GetProviderList() {
 		if provider.IsChainSupported(chainID) && provider.IsConnected() {
-			o.statuses[chainID.String()].SetIsConnected(true)
+			if status, ok := o.statuses.Load(chainID.String()); ok {
+				status.(*connection.Status).SetIsConnected(true)
+			}
 			return
 		}
 	}
-	o.statuses[chainID.String()].SetIsConnected(false)
+
+	// If no chain in statuses, add it
+	statusVal, ok := o.statuses.Load(chainID.String())
+	status := statusVal.(*connection.Status)
+	if !ok {
+		status = connection.NewStatus()
+		status.SetIsConnected(false)
+		o.statuses.Store(chainID.String(), status)
+		o.updateStatusNotifier()
+	} else {
+		status.SetIsConnected(false)
+	}
 }
 
 func (o *Manager) signalUpdatedCollectiblesData(ids []thirdparty.CollectibleUniqueID) {
@@ -1061,7 +1056,7 @@ func (o *Manager) FetchCollectionSocialsAsync(contractID thirdparty.ContractID) 
 	return nil
 }
 
-func (o *Manager) getOrFetchSocialsForCollection(ctx context.Context, contractID thirdparty.ContractID) (*thirdparty.CollectionSocials, error) {
+func (o *Manager) getOrFetchSocialsForCollection(_ context.Context, contractID thirdparty.ContractID) (*thirdparty.CollectionSocials, error) {
 	socials, err := o.collectionsDataDB.GetSocialsForID(contractID)
 	if err != nil {
 		log.Debug("getOrFetchSocialsForCollection failed for", "chainID", contractID.ChainID, "address", contractID.Address, "err", err)
@@ -1108,4 +1103,32 @@ func (o *Manager) fetchSocialsForCollection(ctx context.Context, contractID thir
 	}
 
 	return socials, cmdRes.Error()
+}
+
+func (o *Manager) updateStatusNotifier() {
+	o.statusNotifier = createStatusNotifier(o.statuses, o.feed)
+}
+
+func initStatuses(ownershipDB *OwnershipDB) *sync.Map {
+	statuses := &sync.Map{}
+	for _, chainID := range walletCommon.AllChainIDs() {
+		status := connection.NewStatus()
+		state := status.GetState()
+		latestUpdateTimestamp, err := ownershipDB.GetLatestOwnershipUpdateTimestamp(chainID)
+		if err == nil {
+			state.LastSuccessAt = latestUpdateTimestamp
+			status.SetState(state)
+		}
+		statuses.Store(chainID.String(), status)
+	}
+
+	return statuses
+}
+
+func createStatusNotifier(statuses *sync.Map, feed *event.Feed) *connection.StatusNotifier {
+	return connection.NewStatusNotifier(
+		statuses,
+		EventCollectiblesConnectionStatusChanged,
+		feed,
+	)
 }

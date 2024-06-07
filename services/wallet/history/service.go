@@ -486,11 +486,15 @@ func (s *Service) startTransfersWatcher() {
 			return
 		}
 
+		network := s.networkManager.Find(chainID)
+		if network == nil {
+			log.Error("Network not found", "chainID", chainID)
+			return
+		}
+
 		transferDB := transfer.NewDB(s.db)
 
 		for _, address := range addresses {
-			network := s.networkManager.Find(chainID)
-
 			transfers, err := transferDB.GetTransfersByAddressAndBlock(chainID, address, block, 1500) // 1500 is quite arbitrary and far from real, but should be enough to cover all transfers in a block
 			if err != nil {
 				log.Error("Error getting transfers", "chainID", chainID, "address", address.String(), "err", err)

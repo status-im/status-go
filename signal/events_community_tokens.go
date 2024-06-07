@@ -3,6 +3,7 @@ package signal
 import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 const (
@@ -10,6 +11,10 @@ const (
 	// EventCommunityTokenTransactionStatusChanged is triggered when community token contract
 	// transaction changed its status
 	EventCommunityTokenTransactionStatusChanged = "communityToken.communityTokenTransactionStatusChanged"
+
+	// EventCommunityTokenAction is triggered when the app receives a message that
+	// owner or some other token master did some token action, like: airdrop, burn, remote destruct
+	EventCommunityTokenAction = "communityToken.communityTokenAction"
 )
 
 type CommunityTokenTransactionSignal struct {
@@ -32,5 +37,17 @@ func SendCommunityTokenTransactionStatusSignal(transactionType string, success b
 		OwnerToken:      ownerToken,
 		MasterToken:     masterToken,
 		ErrorString:     errorString,
+	})
+}
+
+type CommunityTokenActionSignal struct {
+	CommunityToken *token.CommunityToken                    `json:"communityToken"` // community token changed by the other owner/master
+	ActionType     protobuf.CommunityTokenAction_ActionType `json:"actionType"`     // type od action made by the other owner/master
+}
+
+func SendCommunityTokenActionSignal(communityToken *token.CommunityToken, actionType protobuf.CommunityTokenAction_ActionType) {
+	send(EventCommunityTokenAction, CommunityTokenActionSignal{
+		CommunityToken: communityToken,
+		ActionType:     actionType,
 	})
 }

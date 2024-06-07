@@ -826,13 +826,13 @@ func TestLoginAccount(t *testing.T) {
 
 	b := NewGethStatusBackend()
 	createAccountRequest := &requests.CreateAccount{
-		DisplayName:           "some-display-name",
-		CustomizationColor:    "#ffffff",
-		Emoji:                 "some",
-		Password:              password,
-		BackupDisabledDataDir: tmpdir,
-		LogFilePath:           tmpdir + "/log",
-		WakuV2Nameserver:      &nameserver,
+		DisplayName:        "some-display-name",
+		CustomizationColor: "#ffffff",
+		Emoji:              "some",
+		Password:           password,
+		RootDataDir:        tmpdir,
+		LogFilePath:        tmpdir + "/log",
+		WakuV2Nameserver:   &nameserver,
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
@@ -849,7 +849,7 @@ func TestLoginAccount(t *testing.T) {
 		}
 	}
 
-	_, err := b.CreateAccountAndLogin(createAccountRequest)
+	acc, err := b.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
 	require.Equal(t, nameserver, b.config.WakuV2Config.Nameserver)
 
@@ -860,6 +860,9 @@ func TestLoginAccount(t *testing.T) {
 	accounts, err := b.GetAccounts()
 	require.NoError(t, err)
 	require.Len(t, accounts, 1)
+
+	require.NotEmpty(t, accounts[0].KeyUID)
+	require.Equal(t, acc.KeyUID, accounts[0].KeyUID)
 
 	loginAccountRequest := &requests.Login{
 		KeyUID:           accounts[0].KeyUID,
@@ -1070,7 +1073,7 @@ func TestConvertAccount(t *testing.T) {
 	found = keystoreContainsFileForAccount(keyStoreDir, chatAddress)
 	require.True(t, found)
 
-	defaultSettings, err := defaultSettings(genAccInfo, derivedAccounts, nil)
+	defaultSettings, err := defaultSettings(genAccInfo, derivedAccounts)
 	require.NoError(t, err)
 	nodeConfig, err := defaultNodeConfig(defaultSettings.InstallationID, &requests.CreateAccount{
 		LogLevel: defaultSettings.LogLevel,
@@ -1264,7 +1267,7 @@ func copyDir(srcFolder string, dstFolder string, t *testing.T) {
 	}
 }
 
-func login(t *testing.T, conf *params.NodeConfig) {
+func loginDesktopUser(t *testing.T, conf *params.NodeConfig) {
 	// The following passwords and DB used in this test unit are only
 	// used to determine if login process works correctly after a migration
 
@@ -1302,7 +1305,7 @@ func login(t *testing.T, conf *params.NodeConfig) {
 
 }
 
-func TestLoginAndMigrationsStillWorkWithExistingUsers(t *testing.T) {
+func TestLoginAndMigrationsStillWorkWithExistingDesktopUser(t *testing.T) {
 	utils.Init()
 
 	srcFolder := "../static/test-0.132.0-account/"
@@ -1314,8 +1317,8 @@ func TestLoginAndMigrationsStillWorkWithExistingUsers(t *testing.T) {
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
 
-	login(t, conf)
-	login(t, conf) // Login twice to catch weird errors that only appear after logout
+	loginDesktopUser(t, conf)
+	loginDesktopUser(t, conf) // Login twice to catch weird errors that only appear after logout
 }
 
 func TestChangeDatabasePassword(t *testing.T) {
@@ -1380,13 +1383,17 @@ func TestCreateWallet(t *testing.T) {
 	tmpdir := t.TempDir()
 
 	b := NewGethStatusBackend()
+	defer func() {
+		require.NoError(t, b.StopNode())
+	}()
+
 	createAccountRequest := &requests.CreateAccount{
-		DisplayName:           "some-display-name",
-		CustomizationColor:    "#ffffff",
-		Emoji:                 "emoji",
-		Password:              password,
-		BackupDisabledDataDir: tmpdir,
-		LogFilePath:           tmpdir + "/log",
+		DisplayName:        "some-display-name",
+		CustomizationColor: "#ffffff",
+		Emoji:              "emoji",
+		Password:           password,
+		RootDataDir:        tmpdir,
+		LogFilePath:        tmpdir + "/log",
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
@@ -1411,7 +1418,9 @@ func TestCreateWallet(t *testing.T) {
 	walletRootAddress, err := db.GetWalletRootAddress()
 	require.NoError(t, err)
 
+	mnemonic, err := db.Mnemonic()
 	require.NoError(t, err)
+	require.NotEmpty(t, mnemonic)
 
 	derivedAddress, err := walletAPI.GetDerivedAddresses(context.Background(), password, walletRootAddress.String(), paths)
 	require.NoError(t, err)
@@ -1440,12 +1449,12 @@ func TestSetFleet(t *testing.T) {
 
 	b := NewGethStatusBackend()
 	createAccountRequest := &requests.CreateAccount{
-		DisplayName:           "some-display-name",
-		CustomizationColor:    "#ffffff",
-		Password:              password,
-		BackupDisabledDataDir: tmpdir,
-		LogFilePath:           tmpdir + "/log",
-		Emoji:                 "some",
+		DisplayName:        "some-display-name",
+		CustomizationColor: "#ffffff",
+		Password:           password,
+		RootDataDir:        tmpdir,
+		LogFilePath:        tmpdir + "/log",
+		Emoji:              "some",
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
@@ -1509,12 +1518,12 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 
 	b := NewGethStatusBackend()
 	createAccountRequest := &requests.CreateAccount{
-		DisplayName:           "some-display-name",
-		CustomizationColor:    "#ffffff",
-		Password:              password,
-		BackupDisabledDataDir: tmpdir,
-		LogFilePath:           tmpdir + "/log",
-		Emoji:                 "some",
+		DisplayName:        "some-display-name",
+		CustomizationColor: "#ffffff",
+		Password:           password,
+		RootDataDir:        tmpdir,
+		LogFilePath:        tmpdir + "/log",
+		Emoji:              "some",
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
@@ -1576,13 +1585,13 @@ func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 
 	// Creating an account with test networks enabled
 	createAccountRequest1 := &requests.CreateAccount{
-		DisplayName:           "User-1",
-		CustomizationColor:    "#ffffff",
-		Emoji:                 "some",
-		Password:              "password123",
-		BackupDisabledDataDir: tmpdir,
-		LogFilePath:           tmpdir + "/log",
-		TestNetworksEnabled:   true,
+		DisplayName:         "User-1",
+		CustomizationColor:  "#ffffff",
+		Emoji:               "some",
+		Password:            "password123",
+		RootDataDir:         tmpdir,
+		LogFilePath:         tmpdir + "/log",
+		TestNetworksEnabled: true,
 	}
 	_, err := b.CreateAccountAndLogin(createAccountRequest1)
 	require.NoError(t, err)
@@ -1597,12 +1606,12 @@ func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 
 	// Creating an account with test networks disabled
 	createAccountRequest2 := &requests.CreateAccount{
-		DisplayName:           "User-2",
-		CustomizationColor:    "#ffffff",
-		Emoji:                 "some",
-		Password:              "password",
-		BackupDisabledDataDir: tmpdir,
-		LogFilePath:           tmpdir + "/log",
+		DisplayName:        "User-2",
+		CustomizationColor: "#ffffff",
+		Emoji:              "some",
+		Password:           "password",
+		RootDataDir:        tmpdir,
+		LogFilePath:        tmpdir + "/log",
 	}
 	_, err = b.CreateAccountAndLogin(createAccountRequest2)
 	require.NoError(t, err)
@@ -1614,4 +1623,62 @@ func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 	require.False(t, settings.TestNetworksEnabled)
 
 	require.NoError(t, b.Logout())
+}
+
+func TestRestoreAccountAndLogin(t *testing.T) {
+	utils.Init()
+	tmpdir := t.TempDir()
+
+	backend := NewGethStatusBackend()
+
+	// Test case 1: Valid restore account request
+	restoreRequest := &requests.RestoreAccount{
+		Mnemonic:    "test test test test test test test test test test test test",
+		FetchBackup: false,
+		CreateAccount: requests.CreateAccount{
+			DisplayName:           "Account1",
+			DeviceName:            "StatusIM",
+			Password:              "password",
+			CustomizationColor:    "0x000000",
+			BackupDisabledDataDir: tmpdir,
+		},
+	}
+	account, err := backend.RestoreAccountAndLogin(restoreRequest)
+	require.NoError(t, err)
+	require.NotNil(t, account)
+
+	// Test case 2: Invalid restore account request
+	invalidRequest := &requests.RestoreAccount{}
+	_, err = backend.RestoreAccountAndLogin(invalidRequest)
+	require.Error(t, err)
+
+	db, err := accounts.NewDB(backend.appDB)
+	require.NoError(t, err)
+	mnemonic, err := db.Mnemonic()
+	require.NoError(t, err)
+	require.Empty(t, mnemonic)
+}
+
+func TestCreateAccountPathsValidation(t *testing.T) {
+	tmpdir := t.TempDir()
+
+	validation := &requests.CreateAccountValidation{
+		AllowEmptyDisplayName: false,
+	}
+
+	request := &requests.CreateAccount{
+		DisplayName:        "User-1",
+		Password:           "password123",
+		CustomizationColor: "#ffffff",
+		RootDataDir:        tmpdir,
+	}
+
+	err := request.Validate(validation)
+	require.NoError(t, err)
+
+	request.RootDataDir = ""
+	request.BackupDisabledDataDir = tmpdir
+	err = request.Validate(validation)
+	require.NoError(t, err)
+	require.Equal(t, tmpdir, request.RootDataDir)
 }

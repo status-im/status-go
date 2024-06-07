@@ -590,6 +590,10 @@ func (m *Messenger) HandleCommunityEncryptionKeysRequest(state *ReceivedMessageS
 	return m.handleCommunityEncryptionKeysRequest(community, signer)
 }
 
+func (m *Messenger) HandleCommunityTokenAction(state *ReceivedMessageState, message *protobuf.CommunityTokenAction, statusMessage *v1protocol.StatusMessage) error {
+	return m.communityTokensService.ProcessCommunityTokenAction(message)
+}
+
 func (m *Messenger) handleCommunityEncryptionKeysRequest(community *communities.Community, signer *ecdsa.PublicKey) error {
 	if !community.HasMember(signer) {
 		return communities.ErrMemberNotFound
@@ -1037,6 +1041,7 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 	if err = m.PublishIdentityImage(); err != nil {
 		return nil, err
 	}
+
 	// Was applicant not a member and successfully joined?
 	if !isCommunityMember && community.Joined() {
 		joinedNotification := &localnotifications.Notification{
@@ -1604,6 +1609,57 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 	response.AddCommunity(community)
 
 	return response, nil
+}
+
+func (m *Messenger) PublishTokenActionToPrivilegedMembers(communityID []byte, chainID uint64, contractAddress string, actionType protobuf.CommunityTokenAction_ActionType) error {
+
+	community, err := m.communitiesManager.GetByID(communityID)
+	if err != nil {
+		return err
+	}
+
+	tokenActionProto := &protobuf.CommunityTokenAction{
+		ChainId:         chainID,
+		ContractAddress: contractAddress,
+		ActionType:      actionType,
+	}
+
+	payload, err := proto.Marshal(tokenActionProto)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		Payload:      payload,
+		CommunityID:  community.ID(),
+		ResendType:   common.ResendTypeRawMessage,
+		ResendMethod: common.ResendMethodSendPrivate,
+		MessageType:  protobuf.ApplicationMetadataMessage_COMMUNITY_TOKEN_ACTION,
+		PubsubTopic:  community.PubsubTopic(),
+	}
+
+	skipMembers := make(map[string]struct{})
+	skipMembers[common.PubkeyToHex(&m.identity.PublicKey)] = struct{}{}
+	privilegedMembers := community.GetFilteredPrivilegedMembers(skipMembers)
+
+	allRecipients := privilegedMembers[protobuf.CommunityMember_ROLE_OWNER]
+	allRecipients = append(allRecipients, privilegedMembers[protobuf.CommunityMember_ROLE_TOKEN_MASTER]...)
+
+	for _, recipient := range allRecipients {
+		_, err := m.sender.SendPrivate(context.Background(), recipient, &rawMessage)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(allRecipients) > 0 {
+		rawMessage.Recipients = allRecipients
+		if _, err = m.UpsertRawMessageToWatch(&rawMessage); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (m *Messenger) GetRevealedAccounts(communityID types.HexBytes, memberPk string) ([]*protobuf.RevealedAccount, error) {
@@ -2904,10 +2960,6 @@ func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*Messenger
 
 func (m *Messenger) MyCanceledRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.CanceledRequestsToJoinForUser(&m.identity.PublicKey)
-}
-
-func (m *Messenger) MyCanceledRequestToJoinForCommunityID(communityID []byte) (*communities.RequestToJoin, error) {
-	return m.communitiesManager.CanceledRequestToJoinForUserForCommunityID(&m.identity.PublicKey, communityID)
 }
 
 func (m *Messenger) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, error) {
@@ -4371,14 +4423,6 @@ func (m *Messenger) CheckPermissionsToJoinCommunity(request *requests.CheckPermi
 	return m.communitiesManager.CheckPermissionToJoin(request.CommunityID, addresses)
 }
 
-func (m *Messenger) CheckPermissionsToJoinCommunityLight(request *requests.CheckPermissionToJoinCommunity) (bool, error) {
-	if err := request.Validate(); err != nil {
-		return false, err
-	}
-
-	return m.communitiesManager.CheckPermissionToJoinLight(request.CommunityID)
-}
-
 func (m *Messenger) getSharedAddresses(communityID types.HexBytes, requestAddresses []string) ([]gethcommon.Address, error) {
 	addressesMap := make(map[string]struct{})
 
@@ -4440,22 +4484,6 @@ func (m *Messenger) CheckAllCommunityChannelsPermissions(request *requests.Check
 	}
 
 	return m.communitiesManager.CheckAllChannelsPermissions(request.CommunityID, addresses)
-}
-
-func (m *Messenger) CheckCommunityChannelPermissionsLight(request *requests.CheckCommunityChannelPermissions) (*communities.CheckChannelPermissionsResponse, error) {
-	if err := request.Validate(); err != nil {
-		return nil, err
-	}
-
-	return m.communitiesManager.CheckChannelPermissionsLight(request.CommunityID, request.ChatID)
-}
-
-func (m *Messenger) CheckAllCommunityChannelsPermissionsLight(request *requests.CheckAllCommunityChannelsPermissions) (*communities.CheckAllChannelsPermissionsResponse, error) {
-	if err := request.Validate(); err != nil {
-		return nil, err
-	}
-
-	return m.communitiesManager.CheckAllChannelsPermissionsLight(request.CommunityID)
 }
 
 func (m *Messenger) GetCommunityCheckChannelPermissionResponses(communityID types.HexBytes) (*communities.CheckAllChannelsPermissionsResponse, error) {

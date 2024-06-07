@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/wallet/bridge"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -25,12 +26,12 @@ var (
 	amount4 = hexutil.Big(*big.NewInt(400))
 	amount5 = hexutil.Big(*big.NewInt(500))
 
-	path0 = &PathV2{From: network4, AmountIn: &amount0}
-	path1 = &PathV2{From: network1, AmountIn: &amount1}
-	path2 = &PathV2{From: network2, AmountIn: &amount2}
-	path3 = &PathV2{From: network3, AmountIn: &amount3}
-	path4 = &PathV2{From: network4, AmountIn: &amount4}
-	path5 = &PathV2{From: network5, AmountIn: &amount5}
+	path0 = &PathV2{FromChain: network4, AmountIn: &amount0}
+	path1 = &PathV2{FromChain: network1, AmountIn: &amount1}
+	path2 = &PathV2{FromChain: network2, AmountIn: &amount2}
+	path3 = &PathV2{FromChain: network3, AmountIn: &amount3}
+	path4 = &PathV2{FromChain: network4, AmountIn: &amount4}
+	path5 = &PathV2{FromChain: network5, AmountIn: &amount5}
 )
 
 func routesEqual(t *testing.T, expected, actual [][]*PathV2) bool {
@@ -58,8 +59,8 @@ func pathsEqual(t *testing.T, expected, actual []*PathV2) bool {
 }
 
 func pathEqual(t *testing.T, expected, actual *PathV2) bool {
-	if expected.From.ChainID != actual.From.ChainID {
-		t.Logf("expected chain ID '%d' , actual chain ID '%d'", expected.From.ChainID, actual.From.ChainID)
+	if expected.FromChain.ChainID != actual.FromChain.ChainID {
+		t.Logf("expected chain ID '%d' , actual chain ID '%d'", expected.FromChain.ChainID, actual.FromChain.ChainID)
 		return false
 	}
 	if expected.AmountIn.ToInt().Cmp(actual.AmountIn.ToInt()) != 0 {
@@ -83,9 +84,9 @@ func TestSetupRouteValidationMapsV2(t *testing.T) {
 		{
 			name: "Mixed zero and non-zero amounts",
 			fromLockedAmount: map[uint64]*hexutil.Big{
-				1: (*hexutil.Big)(zero),
+				1: (*hexutil.Big)(bridge.ZeroBigIntValue),
 				2: (*hexutil.Big)(big.NewInt(200)),
-				3: (*hexutil.Big)(zero),
+				3: (*hexutil.Big)(bridge.ZeroBigIntValue),
 				4: (*hexutil.Big)(big.NewInt(400)),
 			},
 			expectedIncluded: map[uint64]bool{
@@ -112,8 +113,8 @@ func TestSetupRouteValidationMapsV2(t *testing.T) {
 		{
 			name: "All zero amounts",
 			fromLockedAmount: map[uint64]*hexutil.Big{
-				1: (*hexutil.Big)(zero),
-				2: (*hexutil.Big)(zero),
+				1: (*hexutil.Big)(bridge.ZeroBigIntValue),
+				2: (*hexutil.Big)(bridge.ZeroBigIntValue),
 			},
 			expectedIncluded: map[uint64]bool{},
 			expectedExcluded: map[uint64]bool{
@@ -134,7 +135,7 @@ func TestSetupRouteValidationMapsV2(t *testing.T) {
 		{
 			name: "Single zero amount",
 			fromLockedAmount: map[uint64]*hexutil.Big{
-				1: (*hexutil.Big)(zero),
+				1: (*hexutil.Big)(bridge.ZeroBigIntValue),
 			},
 			expectedIncluded: map[uint64]bool{},
 			expectedExcluded: map[uint64]bool{
@@ -367,17 +368,17 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 			name: "Mixed routes with valid and invalid paths",
 			routes: [][]*PathV2{
 				{
-					{From: network1},
-					{From: network3},
+					{FromChain: network1},
+					{FromChain: network3},
 				},
 				{
-					{From: network2},
-					{From: network3},
+					{FromChain: network2},
+					{FromChain: network3},
 				},
 				{
-					{From: network1},
-					{From: network2},
-					{From: network3},
+					{FromChain: network1},
+					{FromChain: network2},
+					{FromChain: network3},
 				},
 			},
 			fromLockedAmount: map[uint64]*hexutil.Big{
@@ -386,8 +387,8 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 			},
 			expected: [][]*PathV2{
 				{
-					{From: network1},
-					{From: network3},
+					{FromChain: network1},
+					{FromChain: network3},
 				},
 			},
 		},
@@ -395,12 +396,12 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 			name: "All valid routes",
 			routes: [][]*PathV2{
 				{
-					{From: network1},
-					{From: network3},
+					{FromChain: network1},
+					{FromChain: network3},
 				},
 				{
-					{From: network1},
-					{From: network4},
+					{FromChain: network1},
+					{FromChain: network4},
 				},
 			},
 			fromLockedAmount: map[uint64]*hexutil.Big{
@@ -408,12 +409,12 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 			},
 			expected: [][]*PathV2{
 				{
-					{From: network1},
-					{From: network3},
+					{FromChain: network1},
+					{FromChain: network3},
 				},
 				{
-					{From: network1},
-					{From: network4},
+					{FromChain: network1},
+					{FromChain: network4},
 				},
 			},
 		},
@@ -421,12 +422,12 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 			name: "All invalid routes",
 			routes: [][]*PathV2{
 				{
-					{From: network2},
-					{From: network3},
+					{FromChain: network2},
+					{FromChain: network3},
 				},
 				{
-					{From: network4},
-					{From: network5},
+					{FromChain: network4},
+					{FromChain: network5},
 				},
 			},
 			fromLockedAmount: map[uint64]*hexutil.Big{
@@ -447,23 +448,23 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 			name: "No locked amounts",
 			routes: [][]*PathV2{
 				{
-					{From: network1},
-					{From: network2},
+					{FromChain: network1},
+					{FromChain: network2},
 				},
 				{
-					{From: network3},
-					{From: network4},
+					{FromChain: network3},
+					{FromChain: network4},
 				},
 			},
 			fromLockedAmount: map[uint64]*hexutil.Big{},
 			expected: [][]*PathV2{
 				{
-					{From: network1},
-					{From: network2},
+					{FromChain: network1},
+					{FromChain: network2},
 				},
 				{
-					{From: network3},
-					{From: network4},
+					{FromChain: network3},
+					{FromChain: network4},
 				},
 			},
 		},
@@ -471,9 +472,9 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 			name: "Single route with mixed valid and invalid paths",
 			routes: [][]*PathV2{
 				{
-					{From: network1},
-					{From: network2},
-					{From: network3},
+					{FromChain: network1},
+					{FromChain: network2},
+					{FromChain: network3},
 				},
 			},
 			fromLockedAmount: map[uint64]*hexutil.Big{
@@ -486,9 +487,9 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 			name: "Routes with duplicate chain IDs",
 			routes: [][]*PathV2{
 				{
-					{From: network1},
-					{From: network1},
-					{From: network2},
+					{FromChain: network1},
+					{FromChain: network1},
+					{FromChain: network2},
 				},
 			},
 			fromLockedAmount: map[uint64]*hexutil.Big{
@@ -496,9 +497,9 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 			},
 			expected: [][]*PathV2{
 				{
-					{From: network1},
-					{From: network1},
-					{From: network2},
+					{FromChain: network1},
+					{FromChain: network1},
+					{FromChain: network2},
 				},
 			},
 		},
@@ -506,8 +507,8 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 			name: "Minimum and maximum chain IDs",
 			routes: [][]*PathV2{
 				{
-					{From: &params.Network{ChainID: 0}},
-					{From: &params.Network{ChainID: ^uint64(0)}},
+					{FromChain: &params.Network{ChainID: 0}},
+					{FromChain: &params.Network{ChainID: ^uint64(0)}},
 				},
 			},
 			fromLockedAmount: map[uint64]*hexutil.Big{
@@ -516,8 +517,8 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 			},
 			expected: [][]*PathV2{
 				{
-					{From: &params.Network{ChainID: 0}},
-					{From: &params.Network{ChainID: ^uint64(0)}},
+					{FromChain: &params.Network{ChainID: 0}},
+					{FromChain: &params.Network{ChainID: ^uint64(0)}},
 				},
 			},
 		},
@@ -527,8 +528,8 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 				var routes [][]*PathV2
 				for i := 0; i < 1000; i++ {
 					routes = append(routes, []*PathV2{
-						{From: &params.Network{ChainID: uint64(i + 1)}},
-						{From: &params.Network{ChainID: uint64(i + 1001)}},
+						{FromChain: &params.Network{ChainID: uint64(i + 1)}},
+						{FromChain: &params.Network{ChainID: uint64(i + 1001)}},
 					})
 				}
 				return routes
@@ -541,8 +542,8 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 				var routes [][]*PathV2
 				for i := 0; i < 1; i++ {
 					routes = append(routes, []*PathV2{
-						{From: &params.Network{ChainID: uint64(i + 1)}},
-						{From: &params.Network{ChainID: uint64(i + 1001)}},
+						{FromChain: &params.Network{ChainID: uint64(i + 1)}},
+						{FromChain: &params.Network{ChainID: uint64(i + 1001)}},
 					})
 				}
 				return routes
@@ -552,12 +553,12 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 			name: "Routes with missing data",
 			routes: [][]*PathV2{
 				{
-					{From: nil},
-					{From: network2},
+					{FromChain: nil},
+					{FromChain: network2},
 				},
 				{
-					{From: network1},
-					{From: nil},
+					{FromChain: network1},
+					{FromChain: nil},
 				},
 			},
 			fromLockedAmount: map[uint64]*hexutil.Big{
@@ -570,12 +571,12 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 			name: "Consistency check",
 			routes: [][]*PathV2{
 				{
-					{From: network1},
-					{From: network2},
+					{FromChain: network1},
+					{FromChain: network2},
 				},
 				{
-					{From: network1},
-					{From: network3},
+					{FromChain: network1},
+					{FromChain: network3},
 				},
 			},
 			fromLockedAmount: map[uint64]*hexutil.Big{
@@ -583,12 +584,12 @@ func TestFilterNetworkComplianceV2(t *testing.T) {
 			},
 			expected: [][]*PathV2{
 				{
-					{From: network1},
-					{From: network2},
+					{FromChain: network1},
+					{FromChain: network2},
 				},
 				{
-					{From: network1},
-					{From: network3},
+					{FromChain: network1},
+					{FromChain: network3},
 				},
 			},
 		},
@@ -690,12 +691,12 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 			name: "Sufficient capacity with multiple paths",
 			routes: [][]*PathV2{
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
-					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(200))},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{FromChain: network2, AmountIn: (*hexutil.Big)(big.NewInt(200))},
 				},
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(50))},
-					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(50))},
+					{FromChain: network2, AmountIn: (*hexutil.Big)(big.NewInt(100))},
 				},
 			},
 			amountIn: big.NewInt(150),
@@ -705,12 +706,12 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 			},
 			expectedRoutes: [][]*PathV2{
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(50)), AmountInLocked: true},
-					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: true},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(50)), AmountInLocked: true},
+					{FromChain: network2, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: true},
 				},
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(50)), AmountInLocked: true},
-					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: true},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(50)), AmountInLocked: true},
+					{FromChain: network2, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: true},
 				},
 			},
 		},
@@ -718,8 +719,8 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 			name: "Insufficient capacity",
 			routes: [][]*PathV2{
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
-					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(50))},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{FromChain: network2, AmountIn: (*hexutil.Big)(big.NewInt(50))},
 				},
 			},
 			amountIn: big.NewInt(200),
@@ -733,8 +734,8 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 			name: "Exact capacity match",
 			routes: [][]*PathV2{
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
-					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(50))},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{FromChain: network2, AmountIn: (*hexutil.Big)(big.NewInt(50))},
 				},
 			},
 			amountIn: big.NewInt(150),
@@ -744,8 +745,8 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 			},
 			expectedRoutes: [][]*PathV2{
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: true},
-					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(50)), AmountInLocked: true},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: true},
+					{FromChain: network2, AmountIn: (*hexutil.Big)(big.NewInt(50)), AmountInLocked: true},
 				},
 			},
 		},
@@ -753,16 +754,16 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 			name: "No locked amounts",
 			routes: [][]*PathV2{
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
-					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(50))},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{FromChain: network2, AmountIn: (*hexutil.Big)(big.NewInt(50))},
 				},
 			},
 			amountIn:         big.NewInt(150),
 			fromLockedAmount: map[uint64]*hexutil.Big{},
 			expectedRoutes: [][]*PathV2{
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: false},
-					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(50)), AmountInLocked: false},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: false},
+					{FromChain: network2, AmountIn: (*hexutil.Big)(big.NewInt(50)), AmountInLocked: false},
 				},
 			},
 		},
@@ -771,7 +772,7 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 			name: "Single route with sufficient capacity",
 			routes: [][]*PathV2{
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(200))},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(200))},
 				},
 			},
 			amountIn: big.NewInt(150),
@@ -784,7 +785,7 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 			name: "Single route with insufficient capacity",
 			routes: [][]*PathV2{
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
 				},
 			},
 			amountIn: big.NewInt(150),
@@ -807,8 +808,8 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 			name: "Routes with duplicate chain IDs",
 			routes: [][]*PathV2{
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
 				},
 			},
 			amountIn: big.NewInt(150),
@@ -821,9 +822,9 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 			name: "Partial locked amounts",
 			routes: [][]*PathV2{
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
-					{From: network2, AmountIn: (*hexutil.Big)(big.NewInt(100))},
-					{From: network3, AmountIn: (*hexutil.Big)(big.NewInt(200))},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{FromChain: network2, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{FromChain: network3, AmountIn: (*hexutil.Big)(big.NewInt(200))},
 				},
 			},
 			amountIn: big.NewInt(250),
@@ -838,8 +839,8 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 			name: "Mixed networks with sufficient capacity",
 			routes: [][]*PathV2{
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
-					{From: network3, AmountIn: (*hexutil.Big)(big.NewInt(200))},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{FromChain: network3, AmountIn: (*hexutil.Big)(big.NewInt(200))},
 				},
 			},
 			amountIn: big.NewInt(250),
@@ -849,8 +850,8 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 			},
 			expectedRoutes: [][]*PathV2{
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: true},
-					{From: network3, AmountIn: (*hexutil.Big)(big.NewInt(200)), AmountInLocked: true},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(100)), AmountInLocked: true},
+					{FromChain: network3, AmountIn: (*hexutil.Big)(big.NewInt(200)), AmountInLocked: true},
 				},
 			},
 		},
@@ -858,8 +859,8 @@ func TestFilterCapacityValidationV2(t *testing.T) {
 			name: "Mixed networks with insufficient capacity",
 			routes: [][]*PathV2{
 				{
-					{From: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
-					{From: network3, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{FromChain: network1, AmountIn: (*hexutil.Big)(big.NewInt(100))},
+					{FromChain: network3, AmountIn: (*hexutil.Big)(big.NewInt(100))},
 				},
 			},
 			amountIn: big.NewInt(250),

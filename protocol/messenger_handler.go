@@ -55,6 +55,7 @@ var (
 	ErrInvalidCommunityID                     = errors.New("invalid community id")
 	ErrTryingToApplyOldTokenPreferences       = errors.New("trying to apply old token preferences")
 	ErrTryingToApplyOldCollectiblePreferences = errors.New("trying to apply old collectible preferences")
+	ErrOutdatedCommunityRequestToJoin         = errors.New("outdated community request to join response")
 )
 
 // HandleMembershipUpdate updates a Chat instance according to the membership updates.
@@ -1643,14 +1644,30 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		return ErrInvalidCommunityID
 	}
 
-	myCancelledRequestToJoin, err := m.MyCanceledRequestToJoinForCommunityID(requestToJoinResponseProto.CommunityId)
+	myRequestToJoinId := communities.CalculateRequestID(m.IdentityPublicKeyString(), requestToJoinResponseProto.CommunityId)
 
+	requestToJoin, err := m.communitiesManager.GetRequestToJoin(myRequestToJoinId)
 	if err != nil {
 		return err
 	}
 
-	if myCancelledRequestToJoin != nil {
+	if requestToJoin.State == communities.RequestToJoinStateCanceled {
 		return nil
+	}
+
+	community, err := m.communitiesManager.GetByID(requestToJoinResponseProto.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	// check if it is outdated approved request to join
+	if requestToJoin.State != communities.RequestToJoinStatePending && requestToJoinResponseProto.Clock <= community.Clock() {
+		m.logger.Error(ErrOutdatedCommunityRequestToJoin.Error(),
+			zap.String("communityId", community.IDString()),
+			zap.Uint64("communityClock", community.Clock()),
+			zap.Uint64("requestToJoinClock", requestToJoinResponseProto.Clock),
+			zap.Uint8("state", uint8(requestToJoin.State)))
+		return ErrOutdatedCommunityRequestToJoin
 	}
 
 	updatedRequest, err := m.communitiesManager.HandleCommunityRequestToJoinResponse(signer, requestToJoinResponseProto)
@@ -1662,7 +1679,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		state.Response.AddRequestToJoinCommunity(updatedRequest)
 	}
 
-	community, err := m.communitiesManager.GetByID(requestToJoinResponseProto.CommunityId)
+	community, err = m.communitiesManager.GetByID(requestToJoinResponseProto.CommunityId)
 	if err != nil {
 		return err
 	}
@@ -1681,52 +1698,65 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 			return err
 		}
 
+		// Note: we can't guarantee that REQUEST_TO_JOIN_RESPONSE msg will be delivered before
+		// COMMUNITY_DESCRIPTION msg, so this msg can return an ErrOrgAlreadyJoined if we
+		// have been joined during COMMUNITY_DESCRIPTION
 		response, err := m.JoinCommunity(context.Background(), requestToJoinResponseProto.CommunityId, false)
-		if err != nil {
+		if err != nil && err != communities.ErrOrgAlreadyJoined {
 			return err
 		}
 
-		// we merge to include chats in response signal to joining a community
-		err = state.Response.Merge(response)
-		if err != nil {
-			return err
-		}
-
-		if len(response.Communities()) > 0 {
-			communitySettings := response.CommunitiesSettings()[0]
-			community := response.Communities()[0]
-
-			magnetlink := requestToJoinResponseProto.MagnetUri
-			if m.torrentClientReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
-
-				currentTask := m.communitiesManager.GetHistoryArchiveDownloadTask(community.IDString())
-				go func(currentTask *communities.HistoryArchiveDownloadTask) {
-
-					// Cancel ongoing download/import task
-					if currentTask != nil && !currentTask.IsCancelled() {
-						currentTask.Cancel()
-						currentTask.Waiter.Wait()
-					}
-
-					task := &communities.HistoryArchiveDownloadTask{
-						CancelChan: make(chan struct{}),
-						Waiter:     *new(sync.WaitGroup),
-						Cancelled:  false,
-					}
-					m.communitiesManager.AddHistoryArchiveDownloadTask(community.IDString(), task)
-
-					task.Waiter.Add(1)
-					defer task.Waiter.Done()
-
-					m.shutdownWaitGroup.Add(1)
-					defer m.shutdownWaitGroup.Done()
-
-					m.downloadAndImportHistoryArchives(community.ID(), magnetlink, task.CancelChan)
-				}(currentTask)
-
-				clock := requestToJoinResponseProto.Community.ArchiveMagnetlinkClock
-				return m.communitiesManager.UpdateMagnetlinkMessageClock(community.ID(), clock)
+		var communitySettings *communities.CommunitySettings
+		if response != nil {
+			// we merge to include chats in response signal to joining a community
+			err = state.Response.Merge(response)
+			if err != nil {
+				return err
 			}
+
+			if len(response.Communities()) > 0 {
+				communitySettings = response.CommunitiesSettings()[0]
+				community = response.Communities()[0]
+			}
+		}
+
+		if communitySettings == nil {
+			communitySettings, err = m.communitiesManager.GetCommunitySettingsByID(requestToJoinResponseProto.CommunityId)
+			if err != nil {
+				return nil
+			}
+		}
+
+		magnetlink := requestToJoinResponseProto.MagnetUri
+		if m.torrentClientReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
+
+			currentTask := m.communitiesManager.GetHistoryArchiveDownloadTask(community.IDString())
+			go func(currentTask *communities.HistoryArchiveDownloadTask) {
+
+				// Cancel ongoing download/import task
+				if currentTask != nil && !currentTask.IsCancelled() {
+					currentTask.Cancel()
+					currentTask.Waiter.Wait()
+				}
+
+				task := &communities.HistoryArchiveDownloadTask{
+					CancelChan: make(chan struct{}),
+					Waiter:     *new(sync.WaitGroup),
+					Cancelled:  false,
+				}
+				m.communitiesManager.AddHistoryArchiveDownloadTask(community.IDString(), task)
+
+				task.Waiter.Add(1)
+				defer task.Waiter.Done()
+
+				m.shutdownWaitGroup.Add(1)
+				defer m.shutdownWaitGroup.Done()
+
+				m.downloadAndImportHistoryArchives(community.ID(), magnetlink, task.CancelChan)
+			}(currentTask)
+
+			clock := requestToJoinResponseProto.Community.ArchiveMagnetlinkClock
+			return m.communitiesManager.UpdateMagnetlinkMessageClock(community.ID(), clock)
 		}
 	}
 

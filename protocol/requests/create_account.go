@@ -4,13 +4,14 @@ import (
 	"github.com/pkg/errors"
 
 	utils "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/params"
 )
 
 var ErrCreateAccountInvalidDisplayName = errors.New("create-account: invalid display name")
 var ErrCreateAccountInvalidPassword = errors.New("create-account: invalid password")
 var ErrCreateAccountInvalidCustomizationColor = errors.New("create-account: invalid customization color")
 var ErrCreateAccountInvalidRootKeystoreDir = errors.New("create-account: invalid root keystore directory")
-var ErrCreateAccountInvalidBackupDisabledDataDir = errors.New("create-account: invalid backup disabled data directory")
+var ErrCreateAccountInvalidRootDataDir = errors.New("create-account: invalid root data directory")
 
 type ImageCropRectangle struct {
 	Ax int `json:"ax"`
@@ -26,10 +27,13 @@ type APIConfig struct {
 }
 
 type CreateAccount struct {
-	// BackupDisabledDataDir is the directory where backup is disabled
-	// WARNING: This is used as `RootDataDir`. Consider renaming?
+	// Deprecated: BackupDisabledDataDir is the directory where backup is disabled
+	// Use `RootDataDir` instead. Effective BackupDisabledDataDir value will default to RootDataDir + "./".
 	BackupDisabledDataDir string `json:"backupDisabledDataDir"`
-	KdfIterations         int    `json:"kdfIterations"`
+
+	// RootDataDir is an absolute path to the root directory where all data will be stored.
+	RootDataDir   string `json:"rootDataDir"`
+	KdfIterations int    `json:"kdfIterations"`
 
 	DeviceName         string              `json:"deviceName"`
 	DisplayName        string              `json:"displayName"`
@@ -43,7 +47,7 @@ type CreateAccount struct {
 	WakuV2LightClient bool    `json:"wakuV2LightClient"`
 
 	LogLevel    *string `json:"logLevel"`
-	LogFilePath string  `json:"logFilePath"`
+	LogFilePath string  `json:"logFilePath"` // absolute path
 	LogEnabled  bool    `json:"logEnabled"`
 
 	PreviewPrivacy bool `json:"previewPrivacy"`
@@ -56,8 +60,9 @@ type CreateAccount struct {
 
 	// Deprecated: CurrentNetwork is deprecated. It was passed and not used, so nothing should be passed instead.
 	// If you want to use non-default network, use NetworkID.
-	CurrentNetwork string  `json:"currentNetwork"`
-	NetworkID      *uint64 `json:"networkId"`
+	CurrentNetwork       string           `json:"currentNetwork"`
+	NetworkID            *uint64          `json:"networkId"`
+	TestOverrideNetworks []params.Network `json:"-"` // This is used for testing purposes only
 
 	TestNetworksEnabled bool `json:"testNetworksEnabled"`
 
@@ -111,8 +116,14 @@ func (c *CreateAccount) Validate(validation *CreateAccountValidation) error {
 		return ErrCreateAccountInvalidCustomizationColor
 	}
 
-	if len(c.BackupDisabledDataDir) == 0 {
-		return ErrCreateAccountInvalidBackupDisabledDataDir
+	if len(c.RootDataDir) == 0 {
+		if c.BackupDisabledDataDir == "" {
+			return ErrCreateAccountInvalidRootDataDir
+		}
+		// NOTE: Fallback to old BackupDisabledDataDir field.
+		// Remove this when both desktop and mobile use the new `RootDataDir` field.
+		// Return error if `RootDataDir` is empty.
+		c.RootDataDir = c.BackupDisabledDataDir
 	}
 
 	return nil

@@ -36,7 +36,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/multiformats/go-multiaddr"
-	"google.golang.org/protobuf/proto"
 
 	"go.uber.org/zap"
 
@@ -535,7 +534,7 @@ func (w *Waku) GetStats() types.StatsSummary {
 	}
 } */
 
-func (w *Waku) getPubsubTopic(topic string) string {
+func (w *Waku) GetPubsubTopic(topic string) string {
 	if topic == "" || !w.cfg.UseShardAsDefaultTopic {
 		topic = w.cfg.DefaultShardPubsubTopic
 	}
@@ -543,7 +542,7 @@ func (w *Waku) getPubsubTopic(topic string) string {
 }
 
 func (w *Waku) unsubscribeFromPubsubTopicWithWakuRelay(topic string) error {
-	topic = w.getPubsubTopic(topic)
+	topic = w.GetPubsubTopic(topic)
 
 	if !w.node.Relay().IsSubscribed(topic) {
 		return nil
@@ -559,7 +558,7 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 		return errors.New("only available for full nodes")
 	}
 
-	topic = w.getPubsubTopic(topic)
+	topic = w.GetPubsubTopic(topic)
 
 	if w.node.Relay().IsSubscribed(topic) {
 		return nil
@@ -878,7 +877,7 @@ func (w *Waku) GetSymKey(id string) ([]byte, error) {
 // Subscribe installs a new message handler used for filtering, decrypting
 // and subsequent storing of incoming messages.
 func (w *Waku) Subscribe(f *common.Filter) (string, error) {
-	f.PubsubTopic = w.getPubsubTopic(f.PubsubTopic)
+	f.PubsubTopic = w.GetPubsubTopic(f.PubsubTopic)
 	id, err := w.filters.Install(f)
 	if err != nil {
 		return id, err
@@ -982,7 +981,7 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publishFn,
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
 func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
-	pubsubTopic = w.getPubsubTopic(pubsubTopic)
+	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
 	if w.protectedTopicStore != nil {
 		privKey, err := w.protectedTopicStore.FetchPrivateKey(pubsubTopic)
 		if err != nil {
@@ -1013,50 +1012,29 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
 	return envelope.Hash().Bytes(), nil
 }
 
-func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, requestID []byte, opts []legacy_store.HistoryRequestOption) (*legacy_store.Result, error) {
+func (w *Waku) Query(ctx context.Context, peerID peer.ID, query legacy_store.Query, cursor *storepb.Index, opts []legacy_store.HistoryRequestOption, processEnvelopes bool) (*storepb.Index, int, error) {
+	requestID := protocol.GenerateRequestID()
 
-	if len(requestID) != 0 {
-		opts = append(opts, legacy_store.WithRequestID(requestID))
-	}
+	opts = append(opts,
+		legacy_store.WithRequestID(requestID),
+		legacy_store.WithPeer(peerID),
+		legacy_store.WithCursor(cursor))
 
-	strTopics := make([]string, len(topics))
-	for i, t := range topics {
-		strTopics[i] = t.ContentTopic()
-	}
+	logger := w.logger.With(zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", peerID))
 
-	opts = append(opts, legacy_store.WithPeer(peerID))
-
-	query := legacy_store.Query{
-		StartTime:     proto.Int64(int64(from) * int64(time.Second)),
-		EndTime:       proto.Int64(int64(to) * int64(time.Second)),
-		ContentTopics: strTopics,
-		PubsubTopic:   pubsubTopic,
-	}
-
-	w.logger.Debug("store.query",
-		zap.String("requestID", hexutil.Encode(requestID)),
+	logger.Debug("store.query",
 		logutils.WakuMessageTimestamp("startTime", query.StartTime),
 		logutils.WakuMessageTimestamp("endTime", query.EndTime),
 		zap.Strings("contentTopics", query.ContentTopics),
 		zap.String("pubsubTopic", query.PubsubTopic),
-		zap.Stringer("peerID", peerID))
-
-	return w.node.LegacyStore().Query(ctx, query, opts...)
-}
-
-func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, opts []legacy_store.HistoryRequestOption, processEnvelopes bool) (cursor *storepb.Index, envelopesCount int, err error) {
-	requestID := protocol.GenerateRequestID()
-	pubsubTopic = w.getPubsubTopic(pubsubTopic)
+		zap.Stringer("cursor", cursor),
+	)
 
 	queryStart := time.Now()
-	result, err := w.query(ctx, peerID, pubsubTopic, topics, from, to, requestID, opts)
+	result, err := w.node.LegacyStore().Query(ctx, query, opts...)
 	queryDuration := time.Since(queryStart)
-
 	if err != nil {
-		w.logger.Error("error querying storenode",
-			zap.String("requestID", hexutil.Encode(requestID)),
-			zap.String("peerID", peerID.String()),
-			zap.Error(err))
+		logger.Error("error querying storenode", zap.Error(err))
 
 		if w.onHistoricMessagesRequestFailed != nil {
 			w.onHistoricMessagesRequestFailed(requestID, peerID, err)
@@ -1064,18 +1042,20 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 		return nil, 0, err
 	}
 
-	envelopesCount = len(result.Messages)
-	w.logger.Debug("store.query response", zap.Duration("queryDuration", queryDuration), zap.Int("numMessages", envelopesCount), zap.Bool("hasCursor", result.IsComplete() && result.Cursor() != nil))
+	logger.Debug("store.query response",
+		zap.Duration("queryDuration", queryDuration),
+		zap.Int("numMessages", len(result.Messages)),
+		zap.Stringer("cursor", result.Cursor()))
 
 	for _, msg := range result.Messages {
 		// Temporarily setting RateLimitProof to nil so it matches the WakuMessage protobuffer we are sending
 		// See https://github.com/vacp2p/rfc/issues/563
 		msg.RateLimitProof = nil
 
-		envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), pubsubTopic)
-		w.logger.Info("received waku2 store message",
+		envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), query.PubsubTopic)
+		logger.Info("received waku2 store message",
 			zap.Stringer("envelopeHash", envelope.Hash()),
-			zap.String("pubsubTopic", pubsubTopic),
+			zap.String("pubsubTopic", query.PubsubTopic),
 			zap.Int64p("timestamp", envelope.Message().Timestamp),
 		)
 
@@ -1085,11 +1065,7 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 		}
 	}
 
-	if !result.IsComplete() {
-		cursor = result.Cursor()
-	}
-
-	return
+	return result.Cursor(), len(result.Messages), nil
 }
 
 func (w *Waku) lightClientConnectionStatus() {
@@ -1488,7 +1464,7 @@ func (w *Waku) ListenAddresses() []string {
 }
 
 func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) error {
-	topic = w.getPubsubTopic(topic)
+	topic = w.GetPubsubTopic(topic)
 
 	if !w.cfg.LightClient {
 		err := w.subscribeToPubsubTopicWithWakuRelay(topic, pubkey)
@@ -1500,7 +1476,7 @@ func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) err
 }
 
 func (w *Waku) UnsubscribeFromPubsubTopic(topic string) error {
-	topic = w.getPubsubTopic(topic)
+	topic = w.GetPubsubTopic(topic)
 
 	if !w.cfg.LightClient {
 		err := w.unsubscribeFromPubsubTopicWithWakuRelay(topic)
@@ -1512,7 +1488,7 @@ func (w *Waku) UnsubscribeFromPubsubTopic(topic string) error {
 }
 
 func (w *Waku) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
-	topic = w.getPubsubTopic(topic)
+	topic = w.GetPubsubTopic(topic)
 	if w.protectedTopicStore == nil {
 		return nil, nil
 	}
@@ -1521,7 +1497,7 @@ func (w *Waku) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
 }
 
 func (w *Waku) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
-	topic = w.getPubsubTopic(topic)
+	topic = w.GetPubsubTopic(topic)
 	if w.protectedTopicStore == nil {
 		return nil
 	}
@@ -1530,7 +1506,7 @@ func (w *Waku) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) erro
 }
 
 func (w *Waku) RemovePubsubTopicKey(topic string) error {
-	topic = w.getPubsubTopic(topic)
+	topic = w.GetPubsubTopic(topic)
 	if w.protectedTopicStore == nil {
 		return nil
 	}

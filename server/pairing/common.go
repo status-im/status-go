@@ -324,7 +324,6 @@ func setDefaultNodeConfig(c *params.NodeConfig) error {
 	}
 
 	c.ShhextConfig = params.ShhextConfig{
-		BackupDisabledDataDir:      c.RootDataDir,
 		InstallationID:             specifiedInstallationID,
 		MaxMessageDeliveryAttempts: api.DefaultMaxMessageDeliveryAttempts,
 		MailServerConfirmations:    true,
