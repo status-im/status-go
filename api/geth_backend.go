@@ -5,9 +5,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/status-im/status-go/services/wallet"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -17,8 +15,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/services/ens"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/pkg/errors"
 
 	"github.com/imdario/mergo"
 
@@ -50,10 +47,13 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server/pairing/statecontrol"
+	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
+	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -541,6 +541,21 @@ func (b *GethStatusBackend) LoginAccount(request *requests.Login) error {
 func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	if err := request.Validate(); err != nil {
 		return err
+	}
+
+	if request.Mnemonic != "" {
+		info, err := b.generateAccountInfo(request.Mnemonic)
+		if err != nil {
+			return errors.Wrap(err, "failed to generate account info")
+		}
+
+		derivedAddresses, err := b.getDerivedAddresses(info.ID)
+		if err != nil {
+			return errors.Wrap(err, "failed to get derived addresses")
+		}
+
+		request.Password = derivedAddresses[pathEncryption].PublicKey
+		request.KeycardWhisperPrivateKey = derivedAddresses[pathDefaultChat].PrivateKey
 	}
 
 	acc := multiaccounts.Account{

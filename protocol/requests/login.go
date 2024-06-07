@@ -17,12 +17,17 @@ type Login struct {
 	Password string `json:"password"`
 	KeyUID   string `json:"keyUid"`
 
-	KdfIterations         int    `json:"kdfIterations"`
+	KdfIterations         int    `json:"kdfIterations"` // FIXME: KdfIterations should be loaded from multiaccounts db.
 	RuntimeLogLevel       string `json:"runtimeLogLevel"`
 	WakuV2Nameserver      string `json:"wakuV2Nameserver"`
 	BandwidthStatsEnabled bool   `json:"bandwidthStatsEnabled"`
-
+	
 	KeycardWhisperPrivateKey string `json:"keycardWhisperPrivateKey"`
+
+	// Mnemonic is used when the keycard is lost. When non-empty, mnemonic is used to generate required keypairs and:
+	// - Password is ignored and replaced with encryption private key
+	// - KeycardWhisperPrivateKey is ignored and replaced with chat private key
+	Mnemonic string `json:"mnemonic"`
 
 	WalletSecretsConfig
 }
