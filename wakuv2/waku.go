@@ -83,7 +83,7 @@ const requestTimeout = 30 * time.Second
 const bootnodesQueryBackoffMs = 200
 const bootnodesMaxRetries = 7
 const cacheTTL = 20 * time.Minute
-const maxHashQueryLength = 20
+const maxHashQueryLength = 100
 const hashQueryInterval = 5 * time.Second
 const messageSentPeriod = 5 // in seconds
 
