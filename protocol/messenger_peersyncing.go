@@ -43,7 +43,6 @@ func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 			m.logger.Debug("Can't set message status as delivered", zap.Error(err))
 		}
 
-		m.logger.Debug("got datasync acknowledge for message", zap.String("ack", hex.EncodeToString(ack)), zap.String("messageID", messageID))
 		m.transport.ConfirmMessageDelivered(messageID)
 
 		//send signal to client that message status updated
