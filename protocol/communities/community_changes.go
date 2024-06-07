@@ -74,6 +74,54 @@ func EmptyCommunityChanges() *CommunityChanges {
 	}
 }
 
+func (c *CommunityChanges) Merge(other *CommunityChanges) {
+	for memberID, member := range other.MembersAdded {
+		c.MembersAdded[memberID] = member
+	}
+	for memberID := range other.MembersRemoved {
+		c.MembersRemoved[memberID] = other.MembersRemoved[memberID]
+	}
+	for memberID, banned := range other.MembersBanned {
+		c.MembersBanned[memberID] = banned
+	}
+	for memberID, unbanned := range other.MembersUnbanned {
+		c.MembersUnbanned[memberID] = unbanned
+	}
+	for permissionID, permission := range other.TokenPermissionsAdded {
+		c.TokenPermissionsAdded[permissionID] = permission
+	}
+	for permissionID, permission := range other.TokenPermissionsModified {
+		c.TokenPermissionsModified[permissionID] = permission
+	}
+	for permissionID, permission := range other.TokenPermissionsRemoved {
+		c.TokenPermissionsRemoved[permissionID] = permission
+	}
+	for chatID, chat := range other.ChatsRemoved {
+		c.ChatsRemoved[chatID] = chat
+	}
+	for chatID, chat := range other.ChatsAdded {
+		c.ChatsAdded[chatID] = chat
+	}
+	for chatID, changes := range other.ChatsModified {
+		c.ChatsModified[chatID] = changes
+	}
+
+	c.CategoriesRemoved = append(c.CategoriesRemoved, other.CategoriesRemoved...)
+
+	for categoryID, category := range other.CategoriesAdded {
+		c.CategoriesAdded[categoryID] = category
+	}
+	for categoryID, category := range other.CategoriesModified {
+		c.CategoriesModified[categoryID] = category
+	}
+
+	c.MemberWalletsRemoved = append(c.MemberWalletsRemoved, other.MemberWalletsRemoved...)
+
+	for walletID, wallets := range other.MemberWalletsAdded {
+		c.MemberWalletsAdded[walletID] = wallets
+	}
+}
+
 func (c *CommunityChanges) HasNewMember(identity string) bool {
 	if len(c.MembersAdded) == 0 {
 		return false

@@ -2368,3 +2368,73 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.Require().True(ok)
 	s.Require().Equal(messageText1, receivedMessage1.Text)
 }
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestDeleteChannelWithTokenPermission() {
+	// Setup community with two permitted channels
+	community, firstChat := s.createCommunity()
+
+	response, err := s.owner.CreateCommunityChat(community.ID(), &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "new channel",
+			Emoji:       "",
+			Description: "chat created after joining the community",
+		},
+	})
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	secondChat := response.Chats()[0]
+
+	channelPermission := &requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
+		ChatIds:     []string{firstChat.ID, secondChat.ID},
+		TokenCriteria: []*protobuf.TokenCriteria{
+			{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
+				Symbol:            "TEST2",
+				AmountInWei:       "200000000000000000000",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+
+	response, err = s.owner.CreateCommunityTokenPermission(channelPermission)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	// Make sure both channels are covered with permission
+	community, err = s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(community.Chats(), 2)
+	s.Require().Len(community.TokenPermissions(), 1)
+	for _, permission := range community.TokenPermissions() {
+		s.Require().Len(permission.ChatIds, 2)
+		s.Require().True(permission.HasChat(firstChat.ID))
+		s.Require().True(permission.HasChat(secondChat.ID))
+	}
+
+	// Delete first community channel
+	response, err = s.owner.DeleteCommunityChat(community.ID(), firstChat.ID)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	community = response.Communities()[0]
+	s.Require().Len(community.Chats(), 1)
+	for _, permission := range community.TokenPermissions() {
+		s.Require().Len(permission.ChatIds, 1)
+		s.Require().False(permission.HasChat(firstChat.ID))
+		s.Require().True(permission.HasChat(secondChat.ID))
+	}
+
+	// Delete second community channel
+	response, err = s.owner.DeleteCommunityChat(community.ID(), secondChat.ID)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	community = response.Communities()[0]
+	s.Require().Len(community.Chats(), 0)
+	s.Require().Len(community.TokenPermissions(), 0)
+}

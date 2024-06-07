@@ -1768,14 +1768,50 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 		return nil, nil, err
 	}
 
+	// Check for channel permissions
+	changes := community.emptyCommunityChanges()
+	for tokenPermissionID, tokenPermission := range community.tokenPermissions() {
+		chats := tokenPermission.ChatIdsAsMap()
+		_, hasChat := chats[chatID]
+		if !hasChat {
+			continue
+		}
+
+		if len(chats) == 1 {
+			// Delete channel permission, if there is only one channel
+			deletePermissionChanges, err := community.DeleteTokenPermission(tokenPermissionID)
+			if err != nil {
+				return nil, nil, err
+			}
+			changes.Merge(deletePermissionChanges)
+		} else {
+			// Remove the channel from the permission, if there are other channels
+			delete(chats, chatID)
+
+			var chatIDs []string
+			for chatID := range chats {
+				chatIDs = append(chatIDs, chatID)
+			}
+			tokenPermission.ChatIds = chatIDs
+
+			updatePermissionChanges, err := community.UpsertTokenPermission(tokenPermission.CommunityTokenPermission)
+			if err != nil {
+				return nil, nil, err
+			}
+			changes.Merge(updatePermissionChanges)
+		}
+	}
+
 	// Remove communityID prefix from chatID if exists
 	if strings.HasPrefix(chatID, communityID.String()) {
 		chatID = strings.TrimPrefix(chatID, communityID.String())
 	}
-	changes, err := community.DeleteChat(chatID)
+
+	deleteChanges, err := community.DeleteChat(chatID)
 	if err != nil {
 		return nil, nil, err
 	}
+	changes.Merge(deleteChanges)
 
 	err = m.saveAndPublish(community)
 	if err != nil {
