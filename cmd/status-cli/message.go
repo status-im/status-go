@@ -47,7 +47,7 @@ func (cli *StatusCLI) sendDirectMessage(ctx context.Context, text string) error 
 		return nil
 	}
 	chat := cli.messenger.Chat(cli.messenger.MutualContacts()[0].ID)
-	cli.logger.Info("send message to contact: ", chat.ID)
+	cli.logger.Info("will send message to contact: ", chat.ID)
 
 	clock, timestamp := chat.NextClockAndTimestamp(cli.messenger.GetTransport())
 	inputMessage := common.NewMessage()
@@ -59,9 +59,13 @@ func (cli *StatusCLI) sendDirectMessage(ctx context.Context, text string) error 
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = text
 
-	_, err := cli.messenger.SendChatMessage(ctx, inputMessage)
+	resp, err := cli.messenger.SendChatMessage(ctx, inputMessage)
 	if err != nil {
 		return err
+	}
+
+	for _, message := range resp.Messages() {
+		cli.logger.Infof("sent message: %v (ID=%v)", message.Text, message.ID)
 	}
 
 	return nil
@@ -87,7 +91,7 @@ func (cli *StatusCLI) retrieveMessagesLoop(ctx context.Context, tick time.Durati
 				continue
 			}
 			for _, message := range response.Messages() {
-				cli.logger.Info("message received: ", message.Text)
+				cli.logger.Infof("message received: %v (ID=%v)", message.Text, message.ID)
 				if message.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT {
 					msgCh <- message.ID
 				}
