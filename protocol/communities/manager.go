@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"golang.org/x/exp/slices"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -1772,7 +1771,14 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 	// Check for channel permissions
 	changes := community.emptyCommunityChanges()
 	for tokenPermissionID, tokenPermission := range community.tokenPermissions() {
-		if !slices.Contains(tokenPermission.GetChatIds(), chatID) {
+		currentChatIndex := -1
+		for i, chat := range tokenPermission.GetChatIds() {
+			if chat == chatID {
+				currentChatIndex = i
+				break
+			}
+		}
+		if currentChatIndex == -1 {
 			continue
 		}
 
@@ -1785,12 +1791,7 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 			changes.Merge(deletePermissionChanges)
 		} else {
 			// Remove the channel from the permission, if there are other channels
-			for i, id := range tokenPermission.GetChatIds() {
-				if id == chatID {
-					tokenPermission.ChatIds = append(tokenPermission.GetChatIds()[:i], tokenPermission.GetChatIds()[i+1:]...)
-					break
-				}
-			}
+			tokenPermission.ChatIds = append(tokenPermission.GetChatIds()[:currentChatIndex], tokenPermission.GetChatIds()[currentChatIndex+1:]...)
 
 			updatePermissionChanges, err := community.UpsertTokenPermission(tokenPermission.CommunityTokenPermission)
 			if err != nil {
