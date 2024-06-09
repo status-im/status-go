@@ -2,26 +2,22 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
 	"os/signal"
-	"sync"
+	"strings"
 	"syscall"
+
+	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
+	msignal "github.com/status-im/status-go/signal"
 
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 )
 
 func serve(cCtx *cli.Context) error {
-	ctx, cancel := context.WithCancel(cCtx.Context)
-
-	go func() {
-		sig := make(chan os.Signal, 1)
-		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-		<-sig
-		cancel()
-	}()
-
 	rawLogger, err := zap.NewDevelopment()
 	if err != nil {
 		log.Fatalf("Error initializing logger: %v", err)
@@ -44,14 +40,32 @@ func serve(cCtx *cli.Context) error {
 	}
 	defer cli.stop()
 
-	// Retrieve for messages
-	var wg sync.WaitGroup
-	msgCh := make(chan string)
+	// Using the mobile signal handler to listen for received messages
+	// because if we call messenger.RetrieveAll() from different routines we will miss messages in one of them
+	// and the retrieve messages loop is started when starting a node, so we needed a different appproach,
+	// alternatively we could have implemented another notification mechanism in the messenger, but this signal is already in place
+	msignal.SetMobileSignalHandler(msignal.MobileSignalHandler(func(s []byte) {
+		if strings.Contains(string(s), `"type":"messages.new"`) {
+			var resp MobileSignalEvent
+			if err := json.Unmarshal(s, &resp); err != nil {
+				logger.Errorf("unmarshaling 'messages.new' response: %v", err)
+				return
+			}
 
-	wg.Add(1)
-	go cli.retrieveMessagesLoop(ctx, RetrieveInterval, msgCh, &wg)
+			for _, message := range resp.Event.Messages {
+				logger.Infof("message received: %v (ID=%v)", message.Text, message.ID)
+				// if request contact, accept it
+				if message.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT {
+					if err = cli.sendContactRequestAcceptance(cCtx, message.ID); err != nil {
+						logger.Errorf("accepting contact request: %v", err)
+						return
+					}
+				}
+			}
+		}
+	}))
 
-	// Send and accept contact request
+	// Send contact request
 	dest := cCtx.String(AddFlag)
 	if dest != "" {
 		err := cli.sendContactRequest(cCtx, dest)
@@ -60,22 +74,29 @@ func serve(cCtx *cli.Context) error {
 		}
 	}
 
+	// nightly testrunner looks for this log to consider node as started
+	logger.Info("retrieve messages...")
+
+	ctx, cancel := context.WithCancel(cCtx.Context)
 	go func() {
-		msgID := <-msgCh
-		err = cli.sendContactRequestAcceptance(cCtx, msgID)
-		if err != nil {
-			logger.Error(err)
-			return
-		}
+		// Wait for signal to exit
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+		<-sig
+		cancel()
 	}()
 
 	// Send message if mutual contact exists
-	sem := make(chan struct{}, 1)
-	wg.Add(1)
-	go cli.sendMessageLoop(ctx, SendInterval, &wg, sem, cancel)
+	cli.sendMessageLoop2(ctx)
 
-	wg.Wait()
 	logger.Info("Exiting")
 
 	return nil
+}
+
+type MobileSignalEvent struct {
+	Type  string `json:"type"`
+	Event struct {
+		Messages []*common.Message `json:"messages"`
+	} `json:"event"`
 }

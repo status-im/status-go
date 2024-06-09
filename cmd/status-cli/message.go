@@ -147,3 +147,60 @@ func (cli *StatusCLI) sendMessageLoop(ctx context.Context, tick time.Duration, w
 		}
 	}
 }
+
+func (cli *StatusCLI) sendMessageLoop2(ctx context.Context) {
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		if len(cli.messenger.MutualContacts()) == 0 {
+			// waits for 1 second before trying again
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		cli.logger.Info("Enter your message to send: (type 'quit' or 'q' to exit)")
+
+		message, err := readInput(ctx, reader)
+		if err != nil {
+			if err == context.Canceled {
+				return
+			}
+			cli.logger.Error("failed to read input", err)
+			continue
+		}
+		message = strings.TrimSpace(message)
+		if message == "quit" || message == "q" || strings.Contains(message, "\x03") {
+			return
+		}
+		if message == "" {
+			continue
+		}
+		if err = cli.sendDirectMessage(ctx, message); err != nil {
+			cli.logger.Error("failed to send direct message: ", err)
+			continue
+		}
+	}
+}
+
+// readInput reads input from the reader and respects context cancellation
+func readInput(ctx context.Context, reader *bufio.Reader) (string, error) {
+	inputCh := make(chan string, 1)
+	errCh := make(chan error, 1)
+
+	// Start a goroutine to read input
+	go func() {
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			errCh <- err
+			return
+		}
+		inputCh <- input
+	}()
+
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case input := <-inputCh:
+		return input, nil
+	case err := <-errCh:
+		return "", err
+	}
+}
