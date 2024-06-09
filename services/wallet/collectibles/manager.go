@@ -125,6 +125,42 @@ func (o *Manager) doContentTypeRequest(ctx context.Context, url string) (string,
 	return resp.Header.Get("Content-Type"), nil
 }
 
+func (o *Manager) getTokenBalancesByOwnerAddress(collectibles *thirdparty.CollectibleContractOwnership, ownerAddress common.Address) map[common.Address][]thirdparty.TokenBalance {
+	ret := make(map[common.Address][]thirdparty.TokenBalance)
+
+	for _, nftOwner := range collectibles.Owners {
+		if nftOwner.OwnerAddress == ownerAddress {
+			ret[collectibles.ContractAddress] = nftOwner.TokenBalances
+			break
+		}
+	}
+
+	return ret
+}
+
+func (o *Manager) FetchCachedBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID, ownerAddress common.Address, contractAddresses []common.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
+	ret := make(map[common.Address][]thirdparty.TokenBalance)
+
+	for _, contractAddress := range contractAddresses {
+		ret[contractAddress] = make([]thirdparty.TokenBalance, 0)
+	}
+
+	for _, contractAddress := range contractAddresses {
+		ownership, err := o.ownershipDB.FetchCachedCollectibleOwnersByContractAddress(chainID, contractAddress)
+		if err != nil {
+			return nil, err
+		}
+
+		t := o.getTokenBalancesByOwnerAddress(ownership, ownerAddress)
+
+		for address, tokenBalances := range t {
+			ret[address] = append(ret[address], tokenBalances...)
+		}
+	}
+
+	return ret, nil
+}
+
 // Need to combine different providers to support all needed ChainIDs
 func (o *Manager) FetchBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID, ownerAddress common.Address, contractAddresses []common.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
 	ret := make(thirdparty.TokenBalancesPerContractAddress)
@@ -142,12 +178,8 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(ctx context.Context, ch
 			if err != nil {
 				return nil, err
 			}
-			for _, nftOwner := range ownership.Owners {
-				if nftOwner.OwnerAddress == ownerAddress {
-					ret[contractAddress] = nftOwner.TokenBalances
-					break
-				}
-			}
+
+			ret = o.getTokenBalancesByOwnerAddress(ownership, ownerAddress)
 		}
 	} else if err == nil {
 		// Account ownership providers succeeded

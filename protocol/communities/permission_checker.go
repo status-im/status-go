@@ -176,7 +176,13 @@ func (p *DefaultPermissionChecker) CheckPermissionToJoin(community *Community, a
 	}
 	// If there are any admin or token master permissions, combine result.
 	preParsedPermissions := preParsedCommunityPermissionsData(adminOrTokenMasterPermissionsToJoin)
-	adminOrTokenPermissionsResponse, err := p.CheckPermissions(preParsedPermissions, accountsAndChainIDs, false)
+	var adminOrTokenPermissionsResponse *CheckPermissionsResponse
+
+	if community.IsControlNode() {
+		adminOrTokenPermissionsResponse, err = p.CheckPermissions(preParsedPermissions, accountsAndChainIDs, false)
+	} else {
+		adminOrTokenPermissionsResponse, err = p.CheckCachedPermissions(preParsedPermissions, accountsAndChainIDs, false)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -209,12 +215,14 @@ func (p *DefaultPermissionChecker) checkPermissionsOrDefault(permissions []*Comm
 	}
 
 	preParsedPermissions := preParsedCommunityPermissionsData(permissions)
-	return p.CheckPermissions(preParsedPermissions, accountsAndChainIDs, false)
+	return p.CheckCachedPermissions(preParsedPermissions, accountsAndChainIDs, false)
 }
 
 type ownedERC721TokensGetter = func(walletAddresses []gethcommon.Address, tokenRequirements map[uint64]map[string]*protobuf.TokenCriteria, chainIDs []uint64) (CollectiblesByChain, error)
+type balancesByChainGetter = func(ctx context.Context, accounts, tokens []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error)
 
-func (p *DefaultPermissionChecker) checkPermissions(permissionsParsedData *PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool, getOwnedERC721Tokens ownedERC721TokensGetter) (*CheckPermissionsResponse, error) {
+func (p *DefaultPermissionChecker) checkPermissions(permissionsParsedData *PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool,
+	getOwnedERC721Tokens ownedERC721TokensGetter, getBalancesByChain balancesByChainGetter) (*CheckPermissionsResponse, error) {
 
 	response := &CheckPermissionsResponse{
 		Satisfied:         false,
@@ -254,7 +262,7 @@ func (p *DefaultPermissionChecker) checkPermissions(permissionsParsedData *PrePa
 	ownedERC20TokenBalances := make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, 0)
 	if len(chainIDsForERC20) > 0 {
 		// this only returns balances for the networks we're actually interested in
-		balances, err := p.tokenManager.GetBalancesByChain(context.Background(), accounts, erc20TokenAddresses, chainIDsForERC20)
+		balances, err := getBalancesByChain(context.Background(), accounts, erc20TokenAddresses, chainIDsForERC20)
 		if err != nil {
 			return nil, err
 		}
@@ -448,15 +456,28 @@ func (p *DefaultPermissionChecker) checkPermissions(permissionsParsedData *PrePa
 	return response, nil
 }
 
+type balancesByOwnerAndContractAddressGetter = func(ctx context.Context, chainID walletcommon.ChainID, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (map[gethcommon.Address][]thirdparty.TokenBalance, error)
+
+func (p *DefaultPermissionChecker) handlePermissionsCheck(permissionsParsedData *PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool,
+	getBalancesByOwnerAndContractAddress balancesByOwnerAndContractAddressGetter,
+	getBalancesByChain balancesByChainGetter) (*CheckPermissionsResponse, error) {
+
+	var getOwnedERC721Tokens ownedERC721TokensGetter = func(walletAddresses []gethcommon.Address, tokenRequirements map[uint64]map[string]*protobuf.TokenCriteria, chainIDs []uint64) (CollectiblesByChain, error) {
+		return p.getOwnedERC721Tokens(walletAddresses, tokenRequirements, chainIDs, getBalancesByOwnerAndContractAddress)
+	}
+
+	return p.checkPermissions(permissionsParsedData, accountsAndChainIDs, shortcircuit, getOwnedERC721Tokens, getBalancesByChain)
+}
+
+func (p *DefaultPermissionChecker) CheckCachedPermissions(permissionsParsedData *PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckPermissionsResponse, error) {
+	return p.handlePermissionsCheck(permissionsParsedData, accountsAndChainIDs, shortcircuit, p.collectiblesManager.FetchCachedBalancesByOwnerAndContractAddress, p.tokenManager.GetCachedBalancesByChain)
+}
+
 // CheckPermissions will retrieve balances and check whether the user has
 // permission to join the community, if shortcircuit is true, it will stop as soon
 // as we know the answer
 func (p *DefaultPermissionChecker) CheckPermissions(permissionsParsedData *PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckPermissionsResponse, error) {
-	var getOwnedERC721Tokens ownedERC721TokensGetter = func(walletAddresses []gethcommon.Address, tokenRequirements map[uint64]map[string]*protobuf.TokenCriteria, chainIDs []uint64) (CollectiblesByChain, error) {
-		return p.getOwnedERC721Tokens(walletAddresses, tokenRequirements, chainIDs, p.collectiblesManager.FetchBalancesByOwnerAndContractAddress)
-	}
-
-	return p.checkPermissions(permissionsParsedData, accountsAndChainIDs, shortcircuit, getOwnedERC721Tokens)
+	return p.handlePermissionsCheck(permissionsParsedData, accountsAndChainIDs, shortcircuit, p.collectiblesManager.FetchBalancesByOwnerAndContractAddress, p.tokenManager.GetBalancesByChain)
 }
 
 type CollectiblesOwners = map[walletcommon.ChainID]map[gethcommon.Address]*thirdparty.CollectibleContractOwnership
@@ -492,7 +513,7 @@ func (p *DefaultPermissionChecker) CheckPermissionsWithPreFetchedData(permission
 		return p.getOwnedERC721Tokens(walletAddresses, tokenRequirements, chainIDs, getCollectiblesBalances)
 	}
 
-	return p.checkPermissions(permissionsParsedData, accountsAndChainIDs, shortcircuit, getOwnedERC721Tokens)
+	return p.checkPermissions(permissionsParsedData, accountsAndChainIDs, shortcircuit, getOwnedERC721Tokens, p.tokenManager.GetBalancesByChain)
 }
 
 func preParsedPermissionsData(permissions []*CommunityTokenPermission) *PreParsedPermissionsData {
