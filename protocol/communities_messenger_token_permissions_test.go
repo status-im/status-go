@@ -2069,6 +2069,54 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 	s.Require().Len(response.Messages(), 1)
 }
 
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendSharedAddressesOnBackupRestore() {
+	community, _ := s.createCommunity()
+
+	// bob joins the community
+	s.advertiseCommunityTo(community, s.bob)
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
+
+	currentBobSharedAddresses, err := s.bob.GetRevealedAccounts(community.ID(), s.bob.IdentityPublicKeyString())
+	s.Require().NoError(err)
+
+	// Simulate backup creation and handling backup message
+	// As a result, bob sends request to resend encryption keys to the owner
+	clock, _ := s.bob.getLastClockWithRelatedChat()
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+
+	backupMessage, err := s.bob.backupCommunity(community, clock)
+	s.Require().NoError(err)
+
+	err = s.bob.HandleBackup(s.bob.buildMessageState(), backupMessage, nil)
+	s.Require().NoError(err)
+
+	_, err = WaitOnMessengerResponse(
+		s.owner,
+		func(r *MessengerResponse) bool {
+			return r.BackupHandled
+		},
+		"request for shared accounts not received or handled",
+	)
+	s.Require().NoError(err)
+
+	// Owner will receive the request for addresses and send them back to Bob
+	response, err := WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			return len(r.requestsToJoinCommunity) > 0
+		},
+		"request to join not received",
+	)
+	s.Require().NoError(err)
+
+	requestID := communities.CalculateRequestID(common.PubkeyToHex(&s.bob.identity.PublicKey), community.ID())
+	requestToJoin, ok := response.requestsToJoinCommunity[requestID.String()]
+	s.Require().Equal(true, ok)
+	s.Require().Equal(currentBobSharedAddresses, requestToJoin.RevealedAccounts)
+}
+
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissionsPerformance() {
 	// This test is created for a performance degradation tracking for reevaluateMember permissions
 	// current scenario mostly track channels permissions reevaluating, but feel free to expand it to

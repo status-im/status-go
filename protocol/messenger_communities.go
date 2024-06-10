@@ -590,6 +590,29 @@ func (m *Messenger) HandleCommunityEncryptionKeysRequest(state *ReceivedMessageS
 	return m.handleCommunityEncryptionKeysRequest(community, signer)
 }
 
+func (m *Messenger) HandleCommunitySharedAddressesRequest(state *ReceivedMessageState, message *protobuf.CommunitySharedAddressesRequest, statusMessage *v1protocol.StatusMessage) error {
+	community, err := m.communitiesManager.GetByID(message.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	if !community.IsControlNode() {
+		return communities.ErrNotControlNode
+	}
+	signer := state.CurrentMessageState.PublicKey
+	return m.handleCommunitySharedAddressesRequest(state, community, signer)
+}
+
+func (m *Messenger) HandleCommunitySharedAddressesResponse(state *ReceivedMessageState, message *protobuf.CommunitySharedAddressesResponse, statusMessage *v1protocol.StatusMessage) error {
+	community, err := m.communitiesManager.GetByID(message.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	signer := state.CurrentMessageState.PublicKey
+	return m.handleCommunitySharedAddressesResponse(state, community, signer, message.RevealedAccounts)
+}
+
 func (m *Messenger) HandleCommunityTokenAction(state *ReceivedMessageState, message *protobuf.CommunityTokenAction, statusMessage *v1protocol.StatusMessage) error {
 	return m.communityTokensService.ProcessCommunityTokenAction(message)
 }
@@ -631,6 +654,74 @@ func (m *Messenger) handleCommunityEncryptionKeysRequest(community *communities.
 	if err != nil {
 		m.logger.Error("failed to send community keys", zap.Error(err), zap.String("community ID", community.IDString()))
 	}
+
+	return nil
+}
+
+func (m *Messenger) handleCommunitySharedAddressesRequest(state *ReceivedMessageState, community *communities.Community, signer *ecdsa.PublicKey) error {
+	if !community.HasMember(signer) {
+		return communities.ErrMemberNotFound
+	}
+
+	pkStr := common.PubkeyToHex(signer)
+
+	revealedAccounts, err := m.communitiesManager.GetRevealedAddresses(community.ID(), pkStr)
+	if err != nil {
+		return err
+	}
+
+	usersSharedAddressesProto := &protobuf.CommunitySharedAddressesResponse{
+		CommunityId:      community.ID(),
+		RevealedAccounts: revealedAccounts,
+	}
+
+	payload, err := proto.Marshal(usersSharedAddressesProto)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		Payload:             payload,
+		Sender:              community.PrivateKey(),
+		CommunityID:         community.ID(),
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_SHARED_ADDRESSES_RESPONSE,
+		PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
+		ResendType:          common.ResendTypeRawMessage,
+		ResendMethod:        common.ResendMethodSendPrivate,
+		Recipients:          []*ecdsa.PublicKey{signer},
+	}
+
+	_, err = m.sender.SendPrivate(context.Background(), signer, &rawMessage)
+	if err != nil {
+		return err
+	}
+
+	// Mark Backup as handled to tell the test that we handled the request
+	// This is a bit of a hack since no backup was performed, but it does come from someone's backup
+	state.Response.BackupHandled = true
+
+	return nil
+}
+
+func (m *Messenger) handleCommunitySharedAddressesResponse(state *ReceivedMessageState, community *communities.Community, signer *ecdsa.PublicKey, revealedAccounts []*protobuf.RevealedAccount) error {
+	isControlNodeMsg := common.IsPubKeyEqual(community.ControlNode(), signer)
+	if !isControlNodeMsg {
+		return errors.New(ErrSyncMessagesSentByNonControlNode)
+	}
+
+	requestID := communities.CalculateRequestID(common.PubkeyToHex(&m.identity.PublicKey), community.ID())
+	err := m.communitiesManager.SaveRequestToJoinRevealedAddresses(requestID, revealedAccounts)
+	if err != nil {
+		return nil
+	}
+
+	requestsToJoin, err := m.communitiesManager.GetCommunityRequestsToJoinWithRevealedAddresses(community.ID())
+	if err != nil {
+		return nil
+	}
+
+	state.Response.AddRequestsToJoinCommunity(requestsToJoin)
 
 	return nil
 }
