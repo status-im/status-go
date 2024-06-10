@@ -317,7 +317,7 @@ func (s *Service) GetOldestTimestampAsync(requestID int32, addresses []common.Ad
 		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
 			res.ErrorCode = ErrorCodeTaskCanceled
 		} else if err == nil {
-			res.Timestamp = result.(int64)
+			res.Timestamp = int64(result.(uint64))
 			res.ErrorCode = ErrorCodeSuccess
 		}
 
