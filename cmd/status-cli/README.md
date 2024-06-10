@@ -30,7 +30,7 @@ You can also run `make status-cli` in the root directory to build the binary.
 ./status-cli serve -n charlie -p 8565 -a <alice-pubkey>
 ```
 
-You can send direct messages through terminal or JSON RPC.
+You can send direct messages through JSON RPC. If you also want to send messages through terminal enable `interactive` mode (with the `-i` flag)
 
 JSON RPC examples:
 

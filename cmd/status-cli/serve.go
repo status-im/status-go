@@ -32,6 +32,8 @@ func serve(cCtx *cli.Context) error {
 	port := cCtx.Int(PortFlag)
 	apiModules := cCtx.String(APIModulesFlag)
 	telemetryUrl := cCtx.String(TelemetryServerURLFlag)
+	interactive := cCtx.Bool(InteractiveFlag)
+	dest := cCtx.String(AddFlag)
 
 	cli, err := start(name, port, apiModules, telemetryUrl)
 	if err != nil {
@@ -55,7 +57,7 @@ func serve(cCtx *cli.Context) error {
 				logger.Infof("message received: %v (ID=%v)", message.Text, message.ID)
 				// if request contact, accept it
 				if message.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT {
-					if err = cli.sendContactRequestAcceptance(cCtx.Context, message.ID); err != nil {
+					if err := cli.sendContactRequestAcceptance(cCtx.Context, message.ID); err != nil {
 						logger.Errorf("accepting contact request: %v", err)
 						return
 					}
@@ -65,7 +67,6 @@ func serve(cCtx *cli.Context) error {
 	}))
 
 	// Send contact request
-	dest := cCtx.String(AddFlag)
 	if dest != "" {
 		err := cli.sendContactRequest(cCtx.Context, dest)
 		if err != nil {
@@ -76,17 +77,16 @@ func serve(cCtx *cli.Context) error {
 	// nightly testrunner looks for this log to consider node as started
 	logger.Info("retrieve messages...")
 
-	ctx, cancel := context.WithCancel(cCtx.Context)
-	go func() {
-		// Wait for signal to exit
-		sig := make(chan os.Signal, 1)
-		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-		<-sig
-		cancel()
-	}()
-
-	// Send message if mutual contact exists
-	interactiveSendMessageLoop(ctx, cli)
+	if interactive {
+		ctx, cancel := context.WithCancel(cCtx.Context)
+		go func() {
+			waitForSigExit()
+			cancel()
+		}()
+		interactiveSendMessageLoop(ctx, cli)
+	} else {
+		waitForSigExit()
+	}
 
 	logger.Info("Exiting")
 
@@ -98,4 +98,10 @@ type MobileSignalEvent struct {
 	Event struct {
 		Messages []*common.Message `json:"messages"`
 	} `json:"event"`
+}
+
+func waitForSigExit() {
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	<-sig
 }
