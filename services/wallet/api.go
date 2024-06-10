@@ -68,7 +68,19 @@ func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) 
 	if err != nil {
 		return nil, err
 	}
-	return api.reader.GetWalletToken(ctx, addresses, currency)
+
+	activeNetworks, err := api.s.rpcClient.NetworkManager.GetActiveNetworks()
+	if err != nil {
+		return nil, err
+	}
+
+	chainIDs := wcommon.NetworksToChainIDs(activeNetworks)
+	clients, err := api.s.rpcClient.EthClients(chainIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.reader.GetWalletToken(ctx, clients, addresses, currency)
 }
 
 // GetBalancesByChain return a map with key as chain id and value as map of account address and map of token address and balance
@@ -83,7 +95,18 @@ func (api *API) GetBalancesByChain(ctx context.Context, chainIDs []uint64, addre
 }
 
 func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
-	return api.reader.FetchOrGetCachedWalletBalances(ctx, addresses)
+	activeNetworks, err := api.s.rpcClient.NetworkManager.GetActiveNetworks()
+	if err != nil {
+		return nil, err
+	}
+
+	chainIDs := wcommon.NetworksToChainIDs(activeNetworks)
+	clients, err := api.s.rpcClient.EthClients(chainIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.reader.FetchOrGetCachedWalletBalances(ctx, clients, addresses)
 }
 
 type DerivedAddress struct {

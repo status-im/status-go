@@ -8,6 +8,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+type TokenBalancesStorage interface {
+	SaveTokens(tokens map[common.Address][]Token) error
+	GetTokens() (map[common.Address][]Token, error)
+}
+
 type Persistence struct {
 	db *sql.DB
 }
