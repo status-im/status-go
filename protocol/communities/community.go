@@ -511,7 +511,6 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				Color:                   c.Identity.Color,
 				Description:             c.Identity.Description,
 				Permissions:             c.Permissions,
-				Members:                 c.Members,
 				CanPost:                 canPost,
 				CanView:                 canView,
 				CanPostReactions:        canPostReactions,
@@ -520,6 +519,10 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				CategoryID:              c.CategoryId,
 				HideIfPermissionsNotMet: c.HideIfPermissionsNotMet,
 				Position:                int(c.Position),
+			}
+
+			if chat.TokenGated {
+				chat.Members = c.Members
 			}
 			communityItem.Chats[id] = chat
 		}

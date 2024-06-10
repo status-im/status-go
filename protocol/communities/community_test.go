@@ -2,6 +2,7 @@ package communities
 
 import (
 	"crypto/ecdsa"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -981,4 +982,100 @@ func (s *CommunitySuite) removedChatCommunityDescription(org *Community) *protob
 	delete(description.Chats, testChatID1)
 
 	return description
+}
+
+func (s *CommunitySuite) TestMarshalJSON() {
+	community := s.buildCommunity(&s.identity.PublicKey)
+	channelID := community.ChatID(testChatID1)
+	_, err := community.UpsertTokenPermission(&protobuf.CommunityTokenPermission{
+		Id:            "A",
+		Type:          protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
+		TokenCriteria: []*protobuf.TokenCriteria{},
+		ChatIds:       []string{channelID},
+	})
+	s.Require().NoError(err)
+
+	s.Require().True(community.ChannelEncrypted(testChatID1))
+
+	communityDescription := community.config.CommunityDescription
+	ownerKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	memberKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// returns true if the user is the owner
+
+	communityDescription.Members = make(map[string]*protobuf.CommunityMember)
+	communityDescription.Members[common.PubkeyToHex(&ownerKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}}
+	communityDescription.Members[common.PubkeyToHex(&memberKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ADMIN}}
+	communityDescription.Chats[testChatID1] = &protobuf.CommunityChat{Members: make(map[string]*protobuf.CommunityMember), Identity: &protobuf.ChatIdentity{}}
+	communityDescription.Chats[testChatID1].Members[common.PubkeyToHex(&ownerKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}}
+
+	// Test token gated community
+	s.Require().True(community.ChannelEncrypted(testChatID1))
+	communityJSON, err := json.Marshal(community)
+	s.Require().NoError(err)
+
+	var communityData map[string]interface{}
+	err = json.Unmarshal(communityJSON, &communityData)
+	s.Require().NoError(err)
+	s.Require().NotNil(communityData["chats"])
+
+	expectedChats := map[string]interface{}{}
+	expectedChat := map[string]interface{}{
+		"canPost":                 true,
+		"canPostReactions":        true,
+		"categoryID":              "",
+		"canView":                 true,
+		"color":                   "",
+		"description":             "",
+		"emoji":                   "",
+		"hideIfPermissionsNotMet": false,
+		"members": map[string]interface{}{
+			common.PubkeyToHex(&ownerKey.PublicKey): map[string]interface{}{
+				"roles": []interface{}{float64(1)},
+			},
+		},
+		"id":                      testChatID1,
+		"name":                    "",
+		"permissions":             nil,
+		"position":                float64(0),
+		"tokenGated":              true,
+		"viewersCanPostReactions": false,
+	}
+
+	expectedChats[testChatID1] = expectedChat
+	s.Require().Equal(expectedChats, communityData["chats"])
+
+	// Test token gated community
+	community.config.CommunityDescription.TokenPermissions = nil
+	communityJSON, err = json.Marshal(community)
+	s.Require().NoError(err)
+
+	err = json.Unmarshal(communityJSON, &communityData)
+	s.Require().NoError(err)
+	s.Require().NotNil(communityData["chats"])
+
+	expectedChats = map[string]interface{}{}
+	expectedChat = map[string]interface{}{
+		"canPost":                 true,
+		"canPostReactions":        true,
+		"categoryID":              "",
+		"canView":                 true,
+		"color":                   "",
+		"description":             "",
+		"emoji":                   "",
+		"hideIfPermissionsNotMet": false,
+		"id":                      testChatID1,
+		"members":                 nil,
+		"name":                    "",
+		"permissions":             nil,
+		"position":                float64(0),
+		"tokenGated":              false,
+		"viewersCanPostReactions": false,
+	}
+
+	expectedChats[testChatID1] = expectedChat
+	s.Require().Equal(expectedChats, communityData["chats"])
 }
