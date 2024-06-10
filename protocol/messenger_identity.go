@@ -150,8 +150,8 @@ func (m *Messenger) setInstallationHostname() error {
 			if err != nil {
 				return err
 			}
-			// REVIEW(ilmotta) imd.Name is always empty in this else branch, so why do
-			// we concatenate it?
+			// NOTE: imd.Name is always empty in this else branch, which leads to the
+			// result of Sprintf having a trailing whitespace.
 			imd.Name = fmt.Sprintf("%s %s", hn, imd.Name)
 		}
 	}
