@@ -3,6 +3,7 @@ package router
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"sort"
@@ -350,24 +351,51 @@ func validateInputData(input *RouteInputParams) error {
 		}
 	}
 
-	if input.FromLockedAmount != nil && len(input.FromLockedAmount) > 0 {
-		for chainID, amount := range input.FromLockedAmount {
-			if input.TestnetMode {
-				if !supportedTestNetworks[chainID] {
-					return errors.New("locked amount is not supported for the selected network")
-				}
-			} else {
-				if !supportedNetworks[chainID] {
-					return errors.New("locked amount is not supported for the selected network")
-				}
-			}
-
-			if amount == nil || amount.ToInt().Sign() < 0 {
-				return errors.New("locked amount must be positive")
-			}
-		}
+	if err := validateFromLockedAmount(input.FromLockedAmount, input.TestnetMode); err != nil {
+		return err
 	}
 
+	return nil
+}
+
+func validateFromLockedAmount(fromLockedAmount map[uint64]*hexutil.Big, isTestnetMode bool) error {
+	if fromLockedAmount == nil || len(fromLockedAmount) == 0 {
+		return nil
+	}
+
+	chainIDSet := make(map[uint64]bool)
+	excludedChainCount := 0
+
+	for chainID, amount := range fromLockedAmount {
+		if isTestnetMode {
+			if !supportedTestNetworks[chainID] {
+				return errors.New("locked amount is not supported for the selected network")
+			}
+		} else {
+			if !supportedNetworks[chainID] {
+				return errors.New("locked amount is not supported for the selected network")
+			}
+		}
+
+		// Check locked amount is not negative
+		if amount == nil || amount.ToInt().Sign() < 0 {
+			return errors.New("locked amount must not be negative")
+		}
+
+		// Check if locked chain ID is a duplicate
+		if _, exists := chainIDSet[chainID]; exists {
+			// Handle duplicate chain ID
+			return fmt.Errorf("a chain ID may only appear once, duplicate chain ID found '%d'", chainID)
+		}
+		chainIDSet[chainID] = amount.ToInt().Sign() > 0
+		if !chainIDSet[chainID] {
+			excludedChainCount++
+		}
+	}
+	if (!isTestnetMode && excludedChainCount == len(supportedNetworks)) ||
+		(isTestnetMode && excludedChainCount == len(supportedTestNetworks)) {
+		return errors.New("all supported chains are excluded, routing impossible")
+	}
 	return nil
 }
 
