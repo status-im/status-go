@@ -8,7 +8,7 @@ import (
 )
 
 type MultipathProcessorTxArgs struct {
-	Name              string
+	Name              string `json:"bridgeName"`
 	ChainID           uint64
 	TransferTx        *transactions.SendTxArgs
 	HopTx             *HopBridgeTxArgs
