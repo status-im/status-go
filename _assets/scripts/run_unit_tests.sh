@@ -128,7 +128,9 @@ grep -h -v "^mode:" ./**/*.coverage.out >> c.out
 rm -rf ./**/*.coverage.out
 
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
-	cc-test-reporter after-build --prefix=github.com/status-im/status-go
+  # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
+  GIT_COMMIT=$(git log | grep -m1 -oE '[^ ]+$')
+  cc-test-reporter after-build --prefix=github.com/status-im/status-go
 fi
 
 shopt -s globstar nullglob # Enable recursive globbing
