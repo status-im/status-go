@@ -3693,7 +3693,8 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 
 	// TODO: handle shard
 	err = m.handleCommunityDescription(messageState, signer, &cd, syncCommunity.Description, signer, nil)
-	if err != nil {
+	// Even if the Description is outdated we should proceed in order to sync settings and joined state
+	if err != nil && err != communities.ErrInvalidCommunityDescriptionClockOutdated {
 		logger.Debug("m.handleCommunityDescription error", zap.Error(err))
 		return err
 	}
