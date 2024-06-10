@@ -1130,11 +1130,9 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 		return nil, err
 	}
 
-	response := o.emptyCommunityChanges()
-
 	// Enables processing of identical clocks. Identical descriptions may be reprocessed upon subsequent receipt of the previously missing encryption key.
 	if description.Clock < o.config.CommunityDescription.Clock {
-		return response, nil
+		return nil, ErrInvalidCommunityDescriptionClockOutdated
 	}
 
 	originCommunity := o.CreateDeepCopy()
@@ -1145,6 +1143,8 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 	if newControlNode != nil {
 		o.setControlNode(newControlNode)
 	}
+
+	response := o.emptyCommunityChanges()
 
 	// We only calculate changes if we joined/spectated the community or we requested access, otherwise not interested
 	if o.config.Joined || o.config.Spectated || o.config.RequestedToJoinAt > 0 {
