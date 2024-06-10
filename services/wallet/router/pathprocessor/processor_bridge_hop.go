@@ -164,6 +164,14 @@ func (c *HopBridgeProcessor) getAppropriateABI(contractType string, chainID uint
 }
 
 func (h *HopBridgeProcessor) PackTxInputData(params ProcessorInputParams, contractType string) ([]byte, error) {
+	if contractType == "" {
+		_, ct, err := hop.GetContractAddress(params.FromChain.ChainID, params.FromToken.Symbol)
+		if err != nil {
+			return []byte{}, err
+		}
+		contractType = ct
+	}
+
 	abi, err := h.getAppropriateABI(contractType, params.FromChain.ChainID, params.FromToken)
 	if err != nil {
 		return []byte{}, err
