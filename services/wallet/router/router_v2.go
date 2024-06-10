@@ -471,7 +471,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 					var l1FeeWei uint64
 					if input.SendType.needL1Fee() {
 
-						txInputData, err := pProcessor.PackTxInputData(ProcessorInputParams, "")
+						txInputData, err := pProcessor.PackTxInputData(ProcessorInputParams)
 						if err != nil {
 							continue
 						}

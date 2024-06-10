@@ -160,18 +160,18 @@ func (mr *MockPathProcessorMockRecorder) Name() *gomock.Call {
 }
 
 // PackTxInputData mocks base method.
-func (m *MockPathProcessor) PackTxInputData(params pathprocessor.ProcessorInputParams, contractType string) ([]byte, error) {
+func (m *MockPathProcessor) PackTxInputData(params pathprocessor.ProcessorInputParams) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PackTxInputData", params, contractType)
+	ret := m.ctrl.Call(m, "PackTxInputData", params)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PackTxInputData indicates an expected call of PackTxInputData.
-func (mr *MockPathProcessorMockRecorder) PackTxInputData(params, contractType interface{}) *gomock.Call {
+func (mr *MockPathProcessorMockRecorder) PackTxInputData(params interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PackTxInputData", reflect.TypeOf((*MockPathProcessor)(nil).PackTxInputData), params, contractType)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PackTxInputData", reflect.TypeOf((*MockPathProcessor)(nil).PackTxInputData), params)
 }
 
 // Send mocks base method.

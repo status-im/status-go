@@ -38,7 +38,7 @@ func (s *TransferProcessor) CalculateFees(params ProcessorInputParams) (*big.Int
 	return ZeroBigIntValue, ZeroBigIntValue, nil
 }
 
-func (s *TransferProcessor) PackTxInputData(params ProcessorInputParams, contractType string) ([]byte, error) {
+func (s *TransferProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	if params.FromToken.IsNative() {
 		return []byte("eth_sendRawTransaction"), nil
 	} else {
@@ -57,7 +57,7 @@ func (s *TransferProcessor) EstimateGas(params ProcessorInputParams) (uint64, er
 	estimation := uint64(0)
 	var err error
 
-	input, err := s.PackTxInputData(params, "")
+	input, err := s.PackTxInputData(params)
 	if err != nil {
 		return 0, err
 	}

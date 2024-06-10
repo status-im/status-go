@@ -46,7 +46,7 @@ func (s *ERC721Processor) CalculateFees(params ProcessorInputParams) (*big.Int, 
 	return ZeroBigIntValue, ZeroBigIntValue, nil
 }
 
-func (s *ERC721Processor) PackTxInputData(params ProcessorInputParams, contractType string) ([]byte, error) {
+func (s *ERC721Processor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	abi, err := abi.JSON(strings.NewReader(collectibles.CollectiblesMetaData.ABI))
 	if err != nil {
 		return []byte{}, err
@@ -72,7 +72,7 @@ func (s *ERC721Processor) EstimateGas(params ProcessorInputParams) (uint64, erro
 
 	value := new(big.Int)
 
-	input, err := s.PackTxInputData(params, "")
+	input, err := s.PackTxInputData(params)
 	if err != nil {
 		return 0, err
 	}

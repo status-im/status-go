@@ -20,7 +20,7 @@ type PathProcessor interface {
 	// calculates the fees for the bridge and returns the amount BonderFee and TokenFee (used for bridges)
 	CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error)
 	// Pack the method for sending tx and method call's data
-	PackTxInputData(params ProcessorInputParams, contractType string) ([]byte, error)
+	PackTxInputData(params ProcessorInputParams) ([]byte, error)
 	EstimateGas(params ProcessorInputParams) (uint64, error)
 	CalculateAmountOut(params ProcessorInputParams) (*big.Int, error)
 	Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types.Hash, error)

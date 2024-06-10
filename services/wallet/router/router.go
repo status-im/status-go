@@ -632,7 +632,7 @@ func (r *Router) SuggestedRoutes(
 
 					var l1GasFeeWei uint64
 					if sendType.needL1Fee() {
-						txInputData, err := pProcessor.PackTxInputData(ProcessorInputParams, "")
+						txInputData, err := pProcessor.PackTxInputData(ProcessorInputParams)
 						if err != nil {
 							continue
 						}

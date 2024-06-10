@@ -49,7 +49,7 @@ func (s *ENSReleaseProcessor) CalculateFees(params ProcessorInputParams) (*big.I
 	return ZeroBigIntValue, ZeroBigIntValue, nil
 }
 
-func (s *ENSReleaseProcessor) PackTxInputData(params ProcessorInputParams, contractType string) ([]byte, error) {
+func (s *ENSReleaseProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	registrarABI, err := abi.JSON(strings.NewReader(registrar.UsernameRegistrarABI))
 	if err != nil {
 		return []byte{}, err
@@ -64,7 +64,7 @@ func (s *ENSReleaseProcessor) EstimateGas(params ProcessorInputParams) (uint64, 
 		return 0, err
 	}
 
-	input, err := s.PackTxInputData(params, "")
+	input, err := s.PackTxInputData(params)
 	if err != nil {
 		return 0, err
 	}
@@ -93,7 +93,7 @@ func (s *ENSReleaseProcessor) EstimateGas(params ProcessorInputParams) (uint64, 
 
 func (s *ENSReleaseProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
 	toAddr := types.Address(params.ToAddr)
-	inputData, err := s.PackTxInputData(params, "")
+	inputData, err := s.PackTxInputData(params)
 	if err != nil {
 		return nil, err
 	}

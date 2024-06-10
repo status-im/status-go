@@ -202,7 +202,7 @@ func (s *CelerBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.
 	return ZeroBigIntValue, new(big.Int).Add(baseFee, percFee), nil
 }
 
-func (c *CelerBridgeProcessor) PackTxInputData(params ProcessorInputParams, contractType string) ([]byte, error) {
+func (c *CelerBridgeProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	abi, err := abi.JSON(strings.NewReader(celer.CelerABI))
 	if err != nil {
 		return []byte{}, err
@@ -231,7 +231,7 @@ func (c *CelerBridgeProcessor) PackTxInputData(params ProcessorInputParams, cont
 func (s *CelerBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
 	value := new(big.Int)
 
-	input, err := s.PackTxInputData(params, "")
+	input, err := s.PackTxInputData(params)
 	if err != nil {
 		return 0, err
 	}
