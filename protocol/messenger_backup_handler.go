@@ -304,22 +304,27 @@ func (m *Messenger) handleWatchOnlyAccount(message *protobuf.SyncAccount) error 
 
 func (m *Messenger) handleSyncedCommunities(state *ReceivedMessageState, message *protobuf.Backup) []error {
 	var errors []error
+	handledCommunities := make(map[string]struct{})
 	for _, syncCommunity := range message.Communities {
+		idString := string(syncCommunity.GetId())
+
 		err := m.handleSyncInstallationCommunity(state, syncCommunity, nil)
 		if err != nil {
 			errors = append(errors, err)
 		}
 
-		err = m.requestCommunityKeys(state, syncCommunity)
+		_, alreadyHandled := handledCommunities[idString]
+		err = m.requestCommunityKeysAndSharedAddresses(state, syncCommunity, alreadyHandled)
 		if err != nil {
 			errors = append(errors, err)
 		}
+		handledCommunities[idString] = struct{}{}
 	}
 
 	return errors
 }
 
-func (m *Messenger) requestCommunityKeys(state *ReceivedMessageState, syncCommunity *protobuf.SyncInstallationCommunity) error {
+func (m *Messenger) requestCommunityKeysAndSharedAddresses(state *ReceivedMessageState, syncCommunity *protobuf.SyncInstallationCommunity, alreadyHandled bool) error {
 	if !syncCommunity.Joined {
 		return nil
 	}
@@ -333,6 +338,35 @@ func (m *Messenger) requestCommunityKeys(state *ReceivedMessageState, syncCommun
 		return communities.ErrOrgNotFound
 	}
 
+	// Only need to send the request for shared addresses once
+	if !alreadyHandled {
+		// Send a request to get back our previous shared addresses
+		request := &protobuf.CommunitySharedAddressesRequest{
+			CommunityId: syncCommunity.Id,
+		}
+
+		payload, err := proto.Marshal(request)
+		if err != nil {
+			return err
+		}
+
+		rawMessage := &common.RawMessage{
+			Payload:             payload,
+			Sender:              m.identity,
+			CommunityID:         community.ID(),
+			SkipEncryptionLayer: true,
+			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_SHARED_ADDRESSES_REQUEST,
+		}
+
+		_, err = m.SendMessageToControlNode(community, rawMessage)
+
+		if err != nil {
+			m.logger.Error("failed to request shared addresses", zap.String("communityId", community.IDString()), zap.Error(err))
+			return err
+		}
+	}
+
+	// If the community is encrypted or one channel is, ask for the encryption keys back
 	isEncrypted := syncCommunity.Encrypted || len(syncCommunity.EncryptionKeysV2) > 0
 	if !isEncrypted {
 		// check if we have encrypted channels
