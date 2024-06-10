@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -12,17 +13,15 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-
-	"github.com/urfave/cli/v2"
 )
 
-func (cli *StatusCLI) sendContactRequest(cCtx *cli.Context, toID string) error {
+func (cli *StatusCLI) sendContactRequest(ctx context.Context, toID string) error {
 	cli.logger.Info("send contact request, contact public key: ", toID)
 	request := &requests.SendContactRequest{
 		ID:      toID,
 		Message: "Hello!",
 	}
-	resp, err := cli.messenger.SendContactRequest(cCtx.Context, request)
+	resp, err := cli.messenger.SendContactRequest(ctx, request)
 	cli.logger.Info("function SendContactRequest response.messages: ", resp.Messages())
 	if err != nil {
 		return err
@@ -31,9 +30,9 @@ func (cli *StatusCLI) sendContactRequest(cCtx *cli.Context, toID string) error {
 	return nil
 }
 
-func (cli *StatusCLI) sendContactRequestAcceptance(cCtx *cli.Context, msgID string) error {
+func (cli *StatusCLI) sendContactRequestAcceptance(ctx context.Context, msgID string) error {
 	cli.logger.Info("accept contact request, message ID: ", msgID)
-	resp, err := cli.messenger.AcceptContactRequest(cCtx.Context, &requests.AcceptContactRequest{ID: types.Hex2Bytes(msgID)})
+	resp, err := cli.messenger.AcceptContactRequest(ctx, &requests.AcceptContactRequest{ID: types.Hex2Bytes(msgID)})
 	if err != nil {
 		return err
 	}
@@ -102,48 +101,75 @@ func (cli *StatusCLI) retrieveMessagesLoop(ctx context.Context, tick time.Durati
 	}
 }
 
-func (cli *StatusCLI) sendMessageLoop(ctx context.Context, tick time.Duration, wg *sync.WaitGroup, sem chan struct{}, cancel context.CancelFunc) {
-	defer wg.Done()
-
-	ticker := time.NewTicker(tick)
-	defer ticker.Stop()
-
+// interactiveSendMessageLoop reads input from stdin and sends it as a direct message to the first mutual contact.
+//
+// If multiple CLIs are provided, it will send messages in a round-robin fashion:
+// 1st input message will be from Alice, 2nd from Bob, 3rd from Alice, and so on.
+func interactiveSendMessageLoop(ctx context.Context, clis ...*StatusCLI) {
 	reader := bufio.NewReader(os.Stdin)
+	i := -1
+	n := len(clis)
+	if n == 0 {
+		slog.Error("at least 1 CLI needed")
+		return
+	}
 	for {
-		select {
-		case <-ticker.C:
-			if len(cli.messenger.MutualContacts()) == 0 {
-				continue
-			}
-			sem <- struct{}{}
-			cli.logger.Info("Enter your message to send: (type 'quit' or 'q' to exit)")
-			message, err := reader.ReadString('\n')
-			if err != nil {
-				<-sem
-				cli.logger.Error("failed to read input", err)
-				continue
-			}
+		i++
+		if i >= n {
+			i = 0
+		}
+		cli := clis[i] // round robin cli selection
 
-			message = strings.TrimSpace(message)
-			if message == "quit" || message == "q" || strings.Contains(message, "\x03") {
-				cancel()
-				<-sem
+		if len(cli.messenger.MutualContacts()) == 0 {
+			// waits for 1 second before trying again
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		cli.logger.Info("Enter your message to send: (type 'quit' or 'q' to exit)")
+
+		message, err := readInput(ctx, reader)
+		if err != nil {
+			if err == context.Canceled {
 				return
 			}
-			if message == "" {
-				<-sem
-				continue
-			}
-
-			err = cli.sendDirectMessage(ctx, message)
-			time.Sleep(WaitingInterval)
-			<-sem
-			if err != nil {
-				cli.logger.Error("failed to send direct message: ", err)
-				continue
-			}
-		case <-ctx.Done():
+			cli.logger.Error("failed to read input", err)
+			continue
+		}
+		message = strings.TrimSpace(message)
+		if message == "quit" || message == "q" || strings.Contains(message, "\x03") {
 			return
 		}
+		if message == "" {
+			continue
+		}
+		if err = cli.sendDirectMessage(ctx, message); err != nil {
+			cli.logger.Error("failed to send direct message: ", err)
+			continue
+		}
+	}
+}
+
+// readInput reads input from the reader and respects context cancellation
+func readInput(ctx context.Context, reader *bufio.Reader) (string, error) {
+	inputCh := make(chan string, 1)
+	errCh := make(chan error, 1)
+
+	// Start a goroutine to read input
+	go func() {
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			errCh <- err
+			return
+		}
+		inputCh <- input
+	}()
+
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case input := <-inputCh:
+		return input, nil
+	case err := <-errCh:
+		return "", err
 	}
 }

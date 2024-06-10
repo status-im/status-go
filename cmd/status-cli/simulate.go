@@ -39,13 +39,13 @@ func simulate(cCtx *cli.Context) error {
 	apiModules := cCtx.String(APIModulesFlag)
 	telemetryUrl := cCtx.String(TelemetryServerURLFlag)
 
-	alice, err := start(cCtx, "Alice", 0, apiModules, telemetryUrl)
+	alice, err := start("Alice", 0, apiModules, telemetryUrl)
 	if err != nil {
 		return err
 	}
 	defer alice.stop()
 
-	charlie, err := start(cCtx, "Charlie", 0, apiModules, telemetryUrl)
+	charlie, err := start("Charlie", 0, apiModules, telemetryUrl)
 	if err != nil {
 		return err
 	}
@@ -63,27 +63,23 @@ func simulate(cCtx *cli.Context) error {
 	// Send contact request from Alice to Charlie, charlie accept the request
 	time.Sleep(WaitingInterval)
 	destID := charlie.messenger.GetSelfContact().ID
-	err = alice.sendContactRequest(cCtx, destID)
+	err = alice.sendContactRequest(ctx, destID)
 	if err != nil {
 		return err
 	}
 
 	msgID := <-msgCh
-	err = charlie.sendContactRequestAcceptance(cCtx, msgID)
+	err = charlie.sendContactRequestAcceptance(ctx, msgID)
 	if err != nil {
 		return err
 	}
+	time.Sleep(WaitingInterval)
 
 	// Send DM between alice to charlie
 	interactive := cCtx.Bool(InteractiveFlag)
 	if interactive {
-		sem := make(chan struct{}, 1)
-		wg.Add(1)
-		go alice.sendMessageLoop(ctx, SendInterval, &wg, sem, cancel)
-		wg.Add(1)
-		go charlie.sendMessageLoop(ctx, SendInterval, &wg, sem, cancel)
+		interactiveSendMessageLoop(ctx, alice, charlie)
 	} else {
-		time.Sleep(WaitingInterval)
 		for i := 0; i < cCtx.Int(CountFlag); i++ {
 			err = alice.sendDirectMessage(ctx, fmt.Sprintf("message from alice, number: %d", i+1))
 			if err != nil {
