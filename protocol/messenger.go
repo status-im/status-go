@@ -726,6 +726,11 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 	m.started = true
 
+	err := m.InitFilters()
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now().UnixMilli()
 	if err := m.settings.CheckAndDeleteExpiredKeypairsAndAccounts(uint64(now)); err != nil {
 		return nil, err
@@ -1663,9 +1668,27 @@ func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
 	}()
 }
 
-// Init analyzes chats and contacts in order to setup filters
+func (m *Messenger) InitInstallations() error {
+	installations, err := m.encryptor.GetOurInstallations(&m.identity.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	for _, installation := range installations {
+		m.allInstallations.Store(installation.ID, installation)
+	}
+
+	err = m.setInstallationHostname()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// InitFilters analyzes chats and contacts in order to setup filters
 // which are responsible for retrieving messages.
-func (m *Messenger) Init() error {
+func (m *Messenger) InitFilters() error {
 
 	// Seed the for color generation
 	rand.Seed(time.Now().Unix())
@@ -1850,20 +1873,6 @@ func (m *Messenger) Init() error {
 			continue
 		}
 		publicKeys = append(publicKeys, publicKey)
-	}
-
-	installations, err := m.encryptor.GetOurInstallations(&m.identity.PublicKey)
-	if err != nil {
-		return err
-	}
-
-	for _, installation := range installations {
-		m.allInstallations.Store(installation.ID, installation)
-	}
-
-	err = m.setInstallationHostname()
-	if err != nil {
-		return err
 	}
 
 	_, err = m.transport.InitFilters(filtersToInit, publicKeys)
