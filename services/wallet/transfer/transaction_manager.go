@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/router/bridge"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -43,7 +43,7 @@ type TransactionManager struct {
 	eventFeed      *event.Feed
 
 	multiTransactionForKeycardSigning *MultiTransaction
-	multipathTransactionsData         []*pathprocessor.MultipathProcessorTxArgs
+	transactionsBridgeData            []*bridge.TransactionBridge
 	transactionsForKeycardSigning     map[common.Hash]*TransactionDescription
 }
 

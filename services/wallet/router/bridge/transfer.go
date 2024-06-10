@@ -1,4 +1,4 @@
-package pathprocessor
+package bridge
 
 import (
 	"context"
@@ -17,28 +17,28 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-type TransferProcessor struct {
+type TransferBridge struct {
 	rpcClient  *rpc.Client
 	transactor transactions.TransactorIface
 }
 
-func NewTransferProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface) *TransferProcessor {
-	return &TransferProcessor{rpcClient: rpcClient, transactor: transactor}
+func NewTransferBridge(rpcClient *rpc.Client, transactor transactions.TransactorIface) *TransferBridge {
+	return &TransferBridge{rpcClient: rpcClient, transactor: transactor}
 }
 
-func (s *TransferProcessor) Name() string {
-	return ProcessorTransferName
+func (s *TransferBridge) Name() string {
+	return TransferName
 }
 
-func (s *TransferProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
+func (s *TransferBridge) AvailableFor(params BridgeParams) (bool, error) {
 	return params.FromChain.ChainID == params.ToChain.ChainID && params.FromToken != nil && params.ToToken == nil, nil
 }
 
-func (s *TransferProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
-	return ZeroBigIntValue, ZeroBigIntValue, nil
+func (s *TransferBridge) CalculateFees(params BridgeParams) (*big.Int, *big.Int, error) {
+	return big.NewInt(0), big.NewInt(0), nil
 }
 
-func (s *TransferProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
+func (s *TransferBridge) PackTxInputData(params BridgeParams) ([]byte, error) {
 	if params.FromToken.IsNative() {
 		return []byte("eth_sendRawTransaction"), nil
 	} else {
@@ -53,7 +53,7 @@ func (s *TransferProcessor) PackTxInputData(params ProcessorInputParams) ([]byte
 	}
 }
 
-func (s *TransferProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *TransferBridge) EstimateGas(params BridgeParams) (uint64, error) {
 	estimation := uint64(0)
 	var err error
 
@@ -92,10 +92,10 @@ func (s *TransferProcessor) EstimateGas(params ProcessorInputParams) (uint64, er
 	return uint64(increasedEstimation), nil
 }
 
-func (s *TransferProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
+func (s *TransferBridge) BuildTx(params BridgeParams) (*ethTypes.Transaction, error) {
 	toAddr := types.Address(params.ToAddr)
 	if params.FromToken.IsNative() {
-		sendArgs := &MultipathProcessorTxArgs{
+		sendArgs := &TransactionBridge{
 			TransferTx: &transactions.SendTxArgs{
 				From:  types.Address(params.FromAddr),
 				To:    &toAddr,
@@ -118,11 +118,11 @@ func (s *TransferProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Tran
 	if err != nil {
 		return nil, err
 	}
-	sendArgs := &MultipathProcessorTxArgs{
+	sendArgs := &TransactionBridge{
 		TransferTx: &transactions.SendTxArgs{
 			From:  types.Address(params.FromAddr),
 			To:    &toAddr,
-			Value: (*hexutil.Big)(ZeroBigIntValue),
+			Value: (*hexutil.Big)(big.NewInt(0)),
 			Data:  input,
 		},
 		ChainID: params.FromChain.ChainID,
@@ -131,18 +131,18 @@ func (s *TransferProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Tran
 	return s.BuildTransaction(sendArgs)
 }
 
-func (s *TransferProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
+func (s *TransferBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
 	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, *sendArgs.TransferTx, verifiedAccount)
 }
 
-func (s *TransferProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error) {
+func (s *TransferBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error) {
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, *sendArgs.TransferTx)
 }
 
-func (s *TransferProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
+func (s *TransferBridge) CalculateAmountOut(params BridgeParams) (*big.Int, error) {
 	return params.AmountIn, nil
 }
 
-func (s *TransferProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
+func (s *TransferBridge) GetContractAddress(params BridgeParams) (common.Address, error) {
 	return common.Address{}, nil
 }

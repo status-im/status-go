@@ -124,7 +124,7 @@ func (api *API) GetRegistrarAddress(ctx context.Context, chainID uint64) (common
 }
 
 func (api *API) Resolver(ctx context.Context, chainID uint64, username string) (*common.Address, error) {
-	err := ValidateENSUsername(username)
+	err := validateENSUsername(username)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (api *API) Resolver(ctx context.Context, chainID uint64, username string) (
 	}
 
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	resolver, err := registry.Resolver(callOpts, NameHash(username))
+	resolver, err := registry.Resolver(callOpts, nameHash(username))
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func (api *API) GetName(ctx context.Context, chainID uint64, address common.Addr
 }
 
 func (api *API) OwnerOf(ctx context.Context, chainID uint64, username string) (*common.Address, error) {
-	err := ValidateENSUsername(username)
+	err := validateENSUsername(username)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (api *API) OwnerOf(ctx context.Context, chainID uint64, username string) (*
 	}
 
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	owner, err := registry.Owner(callOpts, NameHash(username))
+	owner, err := registry.Owner(callOpts, nameHash(username))
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +172,7 @@ func (api *API) OwnerOf(ctx context.Context, chainID uint64, username string) (*
 }
 
 func (api *API) ContentHash(ctx context.Context, chainID uint64, username string) ([]byte, error) {
-	err := ValidateENSUsername(username)
+	err := validateENSUsername(username)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +188,7 @@ func (api *API) ContentHash(ctx context.Context, chainID uint64, username string
 	}
 
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	contentHash, err := resolver.Contenthash(callOpts, NameHash(username))
+	contentHash, err := resolver.Contenthash(callOpts, nameHash(username))
 	if err != nil {
 		return nil, nil
 	}
@@ -197,7 +197,7 @@ func (api *API) ContentHash(ctx context.Context, chainID uint64, username string
 }
 
 func (api *API) PublicKeyOf(ctx context.Context, chainID uint64, username string) (string, error) {
-	err := ValidateENSUsername(username)
+	err := validateENSUsername(username)
 	if err != nil {
 		return "", err
 	}
@@ -213,7 +213,7 @@ func (api *API) PublicKeyOf(ctx context.Context, chainID uint64, username string
 	}
 
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	pubKey, err := resolver.Pubkey(callOpts, NameHash(username))
+	pubKey, err := resolver.Pubkey(callOpts, nameHash(username))
 	if err != nil {
 		return "", err
 	}
@@ -221,7 +221,7 @@ func (api *API) PublicKeyOf(ctx context.Context, chainID uint64, username string
 }
 
 func (api *API) AddressOf(ctx context.Context, chainID uint64, username string) (*common.Address, error) {
-	err := ValidateENSUsername(username)
+	err := validateENSUsername(username)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +237,7 @@ func (api *API) AddressOf(ctx context.Context, chainID uint64, username string) 
 	}
 
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	addr, err := resolver.Addr(callOpts, NameHash(username))
+	addr, err := resolver.Addr(callOpts, nameHash(username))
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +308,7 @@ func (api *API) ExpireAt(ctx context.Context, chainID uint64, username string) (
 	}
 
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	expTime, err := registrar.GetExpirationTime(callOpts, UsernameToLabel(username))
+	expTime, err := registrar.GetExpirationTime(callOpts, usernameToLabel(username))
 	if err != nil {
 		return "", err
 	}
@@ -348,7 +348,7 @@ func (api *API) Release(ctx context.Context, chainID uint64, txArgs transactions
 	}
 
 	txOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
-	tx, err := registrar.Release(txOpts, UsernameToLabel(username))
+	tx, err := registrar.Release(txOpts, usernameToLabel(username))
 	if err != nil {
 		return "", err
 	}
@@ -382,7 +382,7 @@ func (api *API) ReleasePrepareTxCallMsg(ctx context.Context, chainID uint64, txA
 		return ethereum.CallMsg{}, err
 	}
 
-	data, err := registrarABI.Pack("release", UsernameToLabel(username))
+	data, err := registrarABI.Pack("release", usernameToLabel(username))
 	if err != nil {
 		return ethereum.CallMsg{}, err
 	}
@@ -414,7 +414,7 @@ func (api *API) ReleaseEstimate(ctx context.Context, chainID uint64, txArgs tran
 		return 0, err
 	}
 
-	data, err := registrarABI.Pack("release", UsernameToLabel(username))
+	data, err := registrarABI.Pack("release", usernameToLabel(username))
 	if err != nil {
 		return 0, err
 	}
@@ -459,8 +459,8 @@ func (api *API) Register(ctx context.Context, chainID uint64, txArgs transaction
 		return "", err
 	}
 
-	x, y := ExtractCoordinates(pubkey)
-	extraData, err := registrarABI.Pack("register", UsernameToLabel(username), common.Address(txArgs.From), x, y)
+	x, y := extractCoordinates(pubkey)
+	extraData, err := registrarABI.Pack("register", usernameToLabel(username), common.Address(txArgs.From), x, y)
 	if err != nil {
 		return "", err
 	}
@@ -517,8 +517,8 @@ func (api *API) RegisterPrepareTxCallMsg(ctx context.Context, chainID uint64, tx
 		return ethereum.CallMsg{}, err
 	}
 
-	x, y := ExtractCoordinates(pubkey)
-	extraData, err := registrarABI.Pack("register", UsernameToLabel(username), common.Address(txArgs.From), x, y)
+	x, y := extractCoordinates(pubkey)
+	extraData, err := registrarABI.Pack("register", usernameToLabel(username), common.Address(txArgs.From), x, y)
 	if err != nil {
 		return ethereum.CallMsg{}, err
 	}
@@ -578,7 +578,7 @@ func (api *API) RegisterEstimate(ctx context.Context, chainID uint64, txArgs tra
 }
 
 func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, password string, username string, pubkey string) (string, error) {
-	err := ValidateENSUsername(username)
+	err := validateENSUsername(username)
 	if err != nil {
 		return "", err
 	}
@@ -593,9 +593,9 @@ func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactio
 		return "", err
 	}
 
-	x, y := ExtractCoordinates(pubkey)
+	x, y := extractCoordinates(pubkey)
 	txOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
-	tx, err := resolver.SetPubkey(txOpts, NameHash(username), x, y)
+	tx, err := resolver.SetPubkey(txOpts, nameHash(username), x, y)
 	if err != nil {
 		return "", err
 	}
@@ -624,18 +624,18 @@ func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactio
 }
 
 func (api *API) SetPubKeyPrepareTxCallMsg(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (ethereum.CallMsg, error) {
-	err := ValidateENSUsername(username)
+	err := validateENSUsername(username)
 	if err != nil {
 		return ethereum.CallMsg{}, err
 	}
-	x, y := ExtractCoordinates(pubkey)
+	x, y := extractCoordinates(pubkey)
 
 	resolverABI, err := abi.JSON(strings.NewReader(resolver.PublicResolverABI))
 	if err != nil {
 		return ethereum.CallMsg{}, err
 	}
 
-	data, err := resolverABI.Pack("setPubkey", NameHash(username), x, y)
+	data, err := resolverABI.Pack("setPubkey", nameHash(username), x, y)
 	if err != nil {
 		return ethereum.CallMsg{}, err
 	}

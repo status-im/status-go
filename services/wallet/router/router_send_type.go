@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/market"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/router/bridge"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
@@ -99,19 +99,19 @@ func (s SendType) needL1Fee() bool {
 	return s != ENSRegister && s != ENSRelease && s != ENSSetPubKey && s != StickersBuy
 }
 
-func (s SendType) canUseProcessor(p pathprocessor.PathProcessor) bool {
-	pathProcessorName := p.Name()
+func (s SendType) canUseBridge(b bridge.Bridge) bool {
+	bridgeName := b.Name()
 	switch s {
 	case ERC721Transfer:
-		return pathProcessorName == pathprocessor.ProcessorERC721Name
+		return bridgeName == bridge.ERC721TransferName
 	case ERC1155Transfer:
-		return pathProcessorName == pathprocessor.ProcessorERC1155Name
+		return bridgeName == bridge.ERC1155TransferName
 	case ENSRegister:
-		return pathProcessorName == pathprocessor.ProcessorENSRegisterName
+		return bridgeName == bridge.ENSRegisterName
 	case ENSRelease:
-		return pathProcessorName == pathprocessor.ProcessorENSReleaseName
+		return bridgeName == bridge.ENSReleaseName
 	case ENSSetPubKey:
-		return pathProcessorName == pathprocessor.ProcessorENSPublicKeyName
+		return bridgeName == bridge.ENSPublicKeyName
 	default:
 		return true
 	}
@@ -169,7 +169,7 @@ func (s SendType) isAvailableFor(network *params.Network) bool {
 func (s SendType) EstimateGas(ensService *ens.Service, stickersService *stickers.Service, network *params.Network, from common.Address, tokenID string) uint64 {
 	tx := transactions.SendTxArgs{
 		From:  (types.Address)(from),
-		Value: (*hexutil.Big)(pathprocessor.ZeroBigIntValue),
+		Value: (*hexutil.Big)(bridge.ZeroBigIntValue),
 	}
 	switch s {
 	case ENSRegister:

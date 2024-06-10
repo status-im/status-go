@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-func NameHash(name string) common.Hash {
+func nameHash(name string) common.Hash {
 	node := common.Hash{}
 
 	if len(name) > 0 {
@@ -24,7 +24,7 @@ func NameHash(name string) common.Hash {
 	return node
 }
 
-func ValidateENSUsername(username string) error {
+func validateENSUsername(username string) error {
 	if !strings.HasSuffix(username, ".eth") {
 		return fmt.Errorf("username must end with .eth")
 	}
@@ -32,7 +32,7 @@ func ValidateENSUsername(username string) error {
 	return nil
 }
 
-func UsernameToLabel(username string) [32]byte {
+func usernameToLabel(username string) [32]byte {
 	usernameHashed := crypto.Keccak256([]byte(username))
 	var label [32]byte
 	copy(label[:], usernameHashed)
@@ -40,7 +40,7 @@ func UsernameToLabel(username string) [32]byte {
 	return label
 }
 
-func ExtractCoordinates(pubkey string) ([32]byte, [32]byte) {
+func extractCoordinates(pubkey string) ([32]byte, [32]byte) {
 	x, _ := hex.DecodeString(pubkey[4:68])
 	y, _ := hex.DecodeString(pubkey[68:132])
 

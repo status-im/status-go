@@ -1,4 +1,4 @@
-package pathprocessor
+package bridge
 
 import (
 	"context"
@@ -21,14 +21,14 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-type ENSPublicKeyProcessor struct {
+type ENSPublicKeyBridge struct {
 	contractMaker *contracts.ContractMaker
 	transactor    transactions.TransactorIface
 	ensService    *ens.Service
 }
 
-func NewENSPublicKeyProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, ensService *ens.Service) *ENSPublicKeyProcessor {
-	return &ENSPublicKeyProcessor{
+func NewENSPublicKeyBridge(rpcClient *rpc.Client, transactor transactions.TransactorIface, ensService *ens.Service) *ENSPublicKeyBridge {
+	return &ENSPublicKeyBridge{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,
 		},
@@ -37,29 +37,29 @@ func NewENSPublicKeyProcessor(rpcClient *rpc.Client, transactor transactions.Tra
 	}
 }
 
-func (s *ENSPublicKeyProcessor) Name() string {
-	return ProcessorENSPublicKeyName
+func (s *ENSPublicKeyBridge) Name() string {
+	return ENSPublicKeyName
 }
 
-func (s *ENSPublicKeyProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
+func (s *ENSPublicKeyBridge) AvailableFor(params BridgeParams) (bool, error) {
 	return params.FromChain.ChainID == walletCommon.EthereumMainnet || params.FromChain.ChainID == walletCommon.EthereumSepolia, nil
 }
 
-func (s *ENSPublicKeyProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
+func (s *ENSPublicKeyBridge) CalculateFees(params BridgeParams) (*big.Int, *big.Int, error) {
 	return ZeroBigIntValue, ZeroBigIntValue, nil
 }
 
-func (s *ENSPublicKeyProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
+func (s *ENSPublicKeyBridge) PackTxInputData(params BridgeParams) ([]byte, error) {
 	resolverABI, err := abi.JSON(strings.NewReader(resolver.PublicResolverABI))
 	if err != nil {
 		return []byte{}, err
 	}
 
-	x, y := ens.ExtractCoordinates(params.PublicKey)
-	return resolverABI.Pack("setPubkey", ens.NameHash(params.Username), x, y)
+	x, y := extractCoordinates(params.PublicKey)
+	return resolverABI.Pack("setPubkey", nameHash(params.Username), x, y)
 }
 
-func (s *ENSPublicKeyProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *ENSPublicKeyBridge) EstimateGas(params BridgeParams) (uint64, error) {
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
 		return 0, err
@@ -92,14 +92,14 @@ func (s *ENSPublicKeyProcessor) EstimateGas(params ProcessorInputParams) (uint64
 	return uint64(increasedEstimation), nil
 }
 
-func (s *ENSPublicKeyProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
+func (s *ENSPublicKeyBridge) BuildTx(params BridgeParams) (*ethTypes.Transaction, error) {
 	toAddr := types.Address(params.ToAddr)
 	inputData, err := s.PackTxInputData(params)
 	if err != nil {
 		return nil, err
 	}
 
-	sendArgs := &MultipathProcessorTxArgs{
+	sendArgs := &TransactionBridge{
 		TransferTx: &transactions.SendTxArgs{
 			From:  types.Address(params.FromAddr),
 			To:    &toAddr,
@@ -112,19 +112,19 @@ func (s *ENSPublicKeyProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.
 	return s.BuildTransaction(sendArgs)
 }
 
-func (s *ENSPublicKeyProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
+func (s *ENSPublicKeyBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
 	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, *sendArgs.TransferTx, verifiedAccount)
 }
 
-func (s *ENSPublicKeyProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error) {
+func (s *ENSPublicKeyBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error) {
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, *sendArgs.TransferTx)
 }
 
-func (s *ENSPublicKeyProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
+func (s *ENSPublicKeyBridge) CalculateAmountOut(params BridgeParams) (*big.Int, error) {
 	return params.AmountIn, nil
 }
 
-func (s *ENSPublicKeyProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
+func (s *ENSPublicKeyBridge) GetContractAddress(params BridgeParams) (common.Address, error) {
 	addr, err := s.ensService.API().Resolver(context.Background(), params.FromChain.ChainID, params.Username)
 	if err != nil {
 		return common.Address{}, err

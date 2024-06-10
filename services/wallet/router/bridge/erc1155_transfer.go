@@ -1,4 +1,4 @@
-package pathprocessor
+package bridge
 
 import (
 	"context"
@@ -19,35 +19,35 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-type ERC1155TxArgs struct {
+type ERC1155TransferTxArgs struct {
 	transactions.SendTxArgs
 	TokenID   *hexutil.Big   `json:"tokenId"`
 	Recipient common.Address `json:"recipient"`
 	Amount    *hexutil.Big   `json:"amount"`
 }
 
-type ERC1155Processor struct {
+type ERC1155TransferBridge struct {
 	rpcClient  *rpc.Client
 	transactor transactions.TransactorIface
 }
 
-func NewERC1155Processor(rpcClient *rpc.Client, transactor transactions.TransactorIface) *ERC1155Processor {
-	return &ERC1155Processor{rpcClient: rpcClient, transactor: transactor}
+func NewERC1155TransferBridge(rpcClient *rpc.Client, transactor transactions.TransactorIface) *ERC1155TransferBridge {
+	return &ERC1155TransferBridge{rpcClient: rpcClient, transactor: transactor}
 }
 
-func (s *ERC1155Processor) Name() string {
-	return ProcessorERC1155Name
+func (s *ERC1155TransferBridge) Name() string {
+	return ERC1155TransferName
 }
 
-func (s *ERC1155Processor) AvailableFor(params ProcessorInputParams) (bool, error) {
+func (s *ERC1155TransferBridge) AvailableFor(params BridgeParams) (bool, error) {
 	return params.FromChain.ChainID == params.ToChain.ChainID && params.ToToken == nil, nil
 }
 
-func (s *ERC1155Processor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
-	return ZeroBigIntValue, ZeroBigIntValue, nil
+func (s *ERC1155TransferBridge) CalculateFees(params BridgeParams) (*big.Int, *big.Int, error) {
+	return big.NewInt(0), big.NewInt(0), nil
 }
 
-func (s *ERC1155Processor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
+func (s *ERC1155TransferBridge) PackTxInputData(params BridgeParams) ([]byte, error) {
 	abi, err := abi.JSON(strings.NewReader(ierc1155.Ierc1155ABI))
 	if err != nil {
 		return []byte{}, err
@@ -67,7 +67,7 @@ func (s *ERC1155Processor) PackTxInputData(params ProcessorInputParams) ([]byte,
 	)
 }
 
-func (s *ERC1155Processor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *ERC1155TransferBridge) EstimateGas(params BridgeParams) (uint64, error) {
 	ethClient, err := s.rpcClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, err
@@ -95,7 +95,7 @@ func (s *ERC1155Processor) EstimateGas(params ProcessorInputParams) (uint64, err
 	return uint64(increasedEstimation), nil
 }
 
-func (s *ERC1155Processor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
+func (s *ERC1155TransferBridge) BuildTx(params BridgeParams) (*ethTypes.Transaction, error) {
 	contractAddress := types.Address(params.FromToken.Address)
 
 	// We store ERC1155 Token ID using big.Int.String() in token.Symbol
@@ -104,8 +104,8 @@ func (s *ERC1155Processor) BuildTx(params ProcessorInputParams) (*ethTypes.Trans
 		return nil, fmt.Errorf("failed to convert ERC1155's Symbol %s to big.Int", params.FromToken.Symbol)
 	}
 
-	sendArgs := &MultipathProcessorTxArgs{
-		ERC1155TransferTx: &ERC1155TxArgs{
+	sendArgs := &TransactionBridge{
+		ERC1155TransferTx: &ERC1155TransferTxArgs{
 			SendTxArgs: transactions.SendTxArgs{
 				From:  types.Address(params.FromAddr),
 				To:    &contractAddress,
@@ -122,7 +122,7 @@ func (s *ERC1155Processor) BuildTx(params ProcessorInputParams) (*ethTypes.Trans
 	return s.BuildTransaction(sendArgs)
 }
 
-func (s *ERC1155Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
+func (s *ERC1155TransferBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
 	ethClient, err := s.rpcClient.EthClient(sendArgs.ChainID)
 	if err != nil {
 		return tx, err
@@ -151,7 +151,7 @@ func (s *ERC1155Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signe
 	return tx, err
 }
 
-func (s *ERC1155Processor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
+func (s *ERC1155TransferBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
 	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.ERC1155TransferTx.From, verifiedAccount))
 	if err != nil {
 		return hash, err
@@ -159,14 +159,14 @@ func (s *ERC1155Processor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAcco
 	return types.Hash(tx.Hash()), nil
 }
 
-func (s *ERC1155Processor) BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error) {
+func (s *ERC1155TransferBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error) {
 	return s.sendOrBuild(sendArgs, nil)
 }
 
-func (s *ERC1155Processor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
+func (s *ERC1155TransferBridge) CalculateAmountOut(params BridgeParams) (*big.Int, error) {
 	return params.AmountIn, nil
 }
 
-func (s *ERC1155Processor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
+func (s *ERC1155TransferBridge) GetContractAddress(params BridgeParams) (common.Address, error) {
 	return params.FromToken.Address, nil
 }

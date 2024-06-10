@@ -26,7 +26,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/market"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/router/bridge"
 	"github.com/status-im/status-go/services/wallet/token"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
@@ -148,7 +148,7 @@ func filterRoutes(routes [][]*Path, amountIn *big.Int, fromLockedAmount map[uint
 		fromIncluded := make(map[uint64]bool)
 		fromExcluded := make(map[uint64]bool)
 		for chainID, amount := range fromLockedAmount {
-			if amount.ToInt().Cmp(pathprocessor.ZeroBigIntValue) == 0 {
+			if amount.ToInt().Cmp(bridge.ZeroBigIntValue) == 0 {
 				fromExcluded[chainID] = false
 			} else {
 				fromIncluded[chainID] = false
@@ -259,7 +259,7 @@ func newSuggestedRoutes(
 		rest := new(big.Int).Set(amountIn)
 		for _, path := range best {
 			diff := new(big.Int).Sub(rest, path.MaxAmountIn.ToInt())
-			if diff.Cmp(pathprocessor.ZeroBigIntValue) >= 0 {
+			if diff.Cmp(bridge.ZeroBigIntValue) >= 0 {
 				path.AmountIn = (*hexutil.Big)(path.MaxAmountIn.ToInt())
 			} else {
 				path.AmountIn = (*hexutil.Big)(new(big.Int).Set(rest))
@@ -276,26 +276,26 @@ func newSuggestedRoutes(
 
 func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager, marketManager *market.Manager,
 	collectibles *collectibles.Service, collectiblesManager *collectibles.Manager, ensService *ens.Service, stickersService *stickers.Service) *Router {
-	processors := make(map[string]pathprocessor.PathProcessor)
-	transfer := pathprocessor.NewTransferProcessor(rpcClient, transactor)
-	erc721Transfer := pathprocessor.NewERC721Processor(rpcClient, transactor)
-	erc1155Transfer := pathprocessor.NewERC1155Processor(rpcClient, transactor)
-	cbridge := pathprocessor.NewCelerBridgeProcessor(rpcClient, transactor, tokenManager)
-	hop := pathprocessor.NewHopBridgeProcessor(rpcClient, transactor, tokenManager)
-	paraswap := pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
-	ensRegister := pathprocessor.NewENSRegisterProcessor(rpcClient, transactor, ensService)
-	ensRelease := pathprocessor.NewENSReleaseProcessor(rpcClient, transactor, ensService)
-	ensPublicKey := pathprocessor.NewENSPublicKeyProcessor(rpcClient, transactor, ensService)
+	bridges := make(map[string]bridge.Bridge)
+	transfer := bridge.NewTransferBridge(rpcClient, transactor)
+	erc721Transfer := bridge.NewERC721TransferBridge(rpcClient, transactor)
+	erc1155Transfer := bridge.NewERC1155TransferBridge(rpcClient, transactor)
+	cbridge := bridge.NewCbridge(rpcClient, transactor, tokenManager)
+	hop := bridge.NewHopBridge(rpcClient, transactor, tokenManager)
+	paraswap := bridge.NewSwapParaswap(rpcClient, transactor, tokenManager)
+	ensRegister := bridge.NewENSRegisterBridge(rpcClient, transactor, ensService)
+	ensRelease := bridge.NewENSReleaseBridge(rpcClient, transactor, ensService)
+	ensPublicKey := bridge.NewENSPublicKeyBridge(rpcClient, transactor, ensService)
 
-	processors[transfer.Name()] = transfer
-	processors[erc721Transfer.Name()] = erc721Transfer
-	processors[hop.Name()] = hop
-	processors[cbridge.Name()] = cbridge
-	processors[erc1155Transfer.Name()] = erc1155Transfer
-	processors[paraswap.Name()] = paraswap
-	processors[ensRegister.Name()] = ensRegister
-	processors[ensRelease.Name()] = ensRelease
-	processors[ensPublicKey.Name()] = ensPublicKey
+	bridges[transfer.Name()] = transfer
+	bridges[erc721Transfer.Name()] = erc721Transfer
+	bridges[hop.Name()] = hop
+	bridges[cbridge.Name()] = cbridge
+	bridges[erc1155Transfer.Name()] = erc1155Transfer
+	bridges[paraswap.Name()] = paraswap
+	bridges[ensRegister.Name()] = ensRegister
+	bridges[ensRelease.Name()] = ensRelease
+	bridges[ensPublicKey.Name()] = ensPublicKey
 
 	return &Router{
 		rpcClient:           rpcClient,
@@ -306,7 +306,7 @@ func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, token
 		ensService:          ensService,
 		stickersService:     stickersService,
 		feesManager:         &FeeManager{rpcClient},
-		pathProcessors:      processors,
+		bridges:             bridges,
 	}
 }
 
@@ -314,8 +314,8 @@ func (r *Router) GetFeesManager() *FeeManager {
 	return r.feesManager
 }
 
-func (r *Router) GetPathProcessors() map[string]pathprocessor.PathProcessor {
-	return r.pathProcessors
+func (r *Router) GetBridges() map[string]bridge.Bridge {
+	return r.bridges
 }
 
 func containsNetworkChainID(network *params.Network, chainIDs []uint64) bool {
@@ -337,7 +337,7 @@ type Router struct {
 	ensService          *ens.Service
 	stickersService     *stickers.Service
 	feesManager         *FeeManager
-	pathProcessors      map[string]pathprocessor.PathProcessor
+	bridges             map[string]bridge.Bridge
 }
 
 func (r *Router) requireApproval(ctx context.Context, sendType SendType, approvalContractAddress *common.Address, account common.Address, network *params.Network, token *token.Token, amountIn *big.Int) (
@@ -359,7 +359,7 @@ func (r *Router) requireApproval(ctx context.Context, sendType SendType, approva
 		return false, nil, 0, 0, err
 	}
 
-	if approvalContractAddress == nil || *approvalContractAddress == pathprocessor.ZeroAddress {
+	if approvalContractAddress == nil || *approvalContractAddress == bridge.ZeroAddress {
 		return false, nil, 0, 0, nil
 	}
 
@@ -393,7 +393,7 @@ func (r *Router) requireApproval(ctx context.Context, sendType SendType, approva
 	estimate, err := ethClient.EstimateGas(context.Background(), ethereum.CallMsg{
 		From:  account,
 		To:    &token.Address,
-		Value: pathprocessor.ZeroBigIntValue,
+		Value: big.NewInt(0),
 		Data:  data,
 	})
 	if err != nil {
@@ -546,15 +546,13 @@ func (r *Router) SuggestedRoutes(
 			maxFees := gasFees.feeFor(gasFeeMode)
 
 			estimatedTime := r.feesManager.TransactionEstimatedTime(ctx, network.ChainID, maxFees)
-			for _, pProcessor := range r.pathProcessors {
-				// Skip processors that are added because of the Router V2, to not break the current functionality
-				if pProcessor.Name() == pathprocessor.ProcessorENSRegisterName ||
-					pProcessor.Name() == pathprocessor.ProcessorENSReleaseName ||
-					pProcessor.Name() == pathprocessor.ProcessorENSPublicKeyName {
+			for _, brdg := range r.bridges {
+				// Skip bridges that are added because of the Router V2, to not break the current functionality
+				if brdg.Name() == bridge.ENSRegisterName || brdg.Name() == bridge.ENSReleaseName || brdg.Name() == bridge.ENSPublicKeyName {
 					continue
 				}
 
-				if !sendType.canUseProcessor(pProcessor) {
+				if !sendType.canUseBridge(brdg) {
 					continue
 				}
 
@@ -578,7 +576,7 @@ func (r *Router) SuggestedRoutes(
 						continue
 					}
 
-					ProcessorInputParams := pathprocessor.ProcessorInputParams{
+					bridgeParams := bridge.BridgeParams{
 						FromChain: network,
 						ToChain:   dest,
 						FromToken: token,
@@ -588,19 +586,19 @@ func (r *Router) SuggestedRoutes(
 						AmountIn:  amountIn,
 					}
 
-					can, err := pProcessor.AvailableFor(ProcessorInputParams)
+					can, err := brdg.AvailableFor(bridgeParams)
 					if err != nil || !can {
 						continue
 					}
-					if maxAmountIn.ToInt().Cmp(pathprocessor.ZeroBigIntValue) == 0 {
+					if maxAmountIn.ToInt().Cmp(big.NewInt(0)) == 0 {
 						continue
 					}
 
-					bonderFees, tokenFees, err := pProcessor.CalculateFees(ProcessorInputParams)
+					bonderFees, tokenFees, err := brdg.CalculateFees(bridgeParams)
 					if err != nil {
 						continue
 					}
-					if bonderFees.Cmp(pathprocessor.ZeroBigIntValue) != 0 {
+					if bonderFees.Cmp(bridge.ZeroBigIntValue) != 0 {
 						if maxAmountIn.ToInt().Cmp(amountIn) >= 0 {
 							if bonderFees.Cmp(amountIn) >= 0 {
 								continue
@@ -613,7 +611,7 @@ func (r *Router) SuggestedRoutes(
 					}
 					gasLimit := uint64(0)
 					if sendType.isTransfer(false) {
-						gasLimit, err = pProcessor.EstimateGas(ProcessorInputParams)
+						gasLimit, err = brdg.EstimateGas(bridgeParams)
 						if err != nil {
 							continue
 						}
@@ -621,7 +619,7 @@ func (r *Router) SuggestedRoutes(
 						gasLimit = sendType.EstimateGas(r.ensService, r.stickersService, network, addrFrom, tokenID)
 					}
 
-					approvalContractAddress, err := pProcessor.GetContractAddress(ProcessorInputParams)
+					approvalContractAddress, err := brdg.GetContractAddress(bridgeParams)
 					if err != nil {
 						continue
 					}
@@ -632,7 +630,7 @@ func (r *Router) SuggestedRoutes(
 
 					var l1GasFeeWei uint64
 					if sendType.needL1Fee() {
-						txInputData, err := pProcessor.PackTxInputData(ProcessorInputParams)
+						txInputData, err := brdg.PackTxInputData(bridgeParams)
 						if err != nil {
 							continue
 						}
@@ -682,12 +680,12 @@ func (r *Router) SuggestedRoutes(
 					cost.Add(cost, l1GasCost)
 					mu.Lock()
 					candidates = append(candidates, &Path{
-						BridgeName:              pProcessor.Name(),
+						BridgeName:              brdg.Name(),
 						From:                    network,
 						To:                      dest,
 						MaxAmountIn:             maxAmountIn,
-						AmountIn:                (*hexutil.Big)(pathprocessor.ZeroBigIntValue),
-						AmountOut:               (*hexutil.Big)(pathprocessor.ZeroBigIntValue),
+						AmountIn:                (*hexutil.Big)(bridge.ZeroBigIntValue),
+						AmountOut:               (*hexutil.Big)(bridge.ZeroBigIntValue),
 						GasAmount:               gasLimit,
 						GasFees:                 gasFees,
 						BonderFees:              (*hexutil.Big)(bonderFees),
@@ -712,7 +710,7 @@ func (r *Router) SuggestedRoutes(
 	suggestedRoutes.TokenPrice = prices[tokenID]
 	suggestedRoutes.NativeChainTokenPrice = prices["ETH"]
 	for _, path := range suggestedRoutes.Best {
-		ProcessorInputParams := pathprocessor.ProcessorInputParams{
+		bridgeParams := bridge.BridgeParams{
 			FromChain: path.From,
 			ToChain:   path.To,
 			AmountIn:  path.AmountIn.ToInt(),
@@ -721,7 +719,7 @@ func (r *Router) SuggestedRoutes(
 			},
 		}
 
-		amountOut, err := r.pathProcessors[path.BridgeName].CalculateAmountOut(ProcessorInputParams)
+		amountOut, err := r.bridges[path.BridgeName].CalculateAmountOut(bridgeParams)
 		if err != nil {
 			continue
 		}

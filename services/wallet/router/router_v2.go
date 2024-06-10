@@ -11,10 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/wallet/async"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/router/bridge"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
 )
 
@@ -52,7 +51,7 @@ type RouteInputParams struct {
 }
 
 type PathV2 struct {
-	ProcessorName  string
+	BridgeName     string
 	FromChain      *params.Network    // Source chain
 	ToChain        *params.Network    // Destination chain
 	FromToken      *walletToken.Token // Token on the source chain
@@ -133,7 +132,7 @@ func newSuggestedRoutesV2(
 		rest := new(big.Int).Set(amountIn)
 		for _, path := range best {
 			diff := new(big.Int).Sub(rest, path.AmountIn.ToInt())
-			if diff.Cmp(pathprocessor.ZeroBigIntValue) >= 0 {
+			if diff.Cmp(bridge.ZeroBigIntValue) >= 0 {
 				path.AmountIn = (*hexutil.Big)(path.AmountIn.ToInt())
 			} else {
 				path.AmountIn = (*hexutil.Big)(new(big.Int).Set(rest))
@@ -235,7 +234,7 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 				pathCost = new(big.Float).Mul(txFeeInEth, nativeTokenPrice)
 			}
 
-			if path.TxBonderFees != nil && path.TxBonderFees.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+			if path.TxBonderFees != nil && path.TxBonderFees.ToInt().Cmp(bridge.ZeroBigIntValue) > 0 {
 				path.requiredTokenBalance.Add(path.requiredTokenBalance, path.TxBonderFees.ToInt())
 				pathCost.Add(pathCost, new(big.Float).Mul(
 					new(big.Float).Quo(new(big.Float).SetInt(path.TxBonderFees.ToInt()), tokenDenominator),
@@ -243,7 +242,7 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 
 			}
 
-			if path.TxL1Fee != nil && path.TxL1Fee.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+			if path.TxL1Fee != nil && path.TxL1Fee.ToInt().Cmp(bridge.ZeroBigIntValue) > 0 {
 				l1FeeInWei := path.TxL1Fee.ToInt()
 				l1FeeInEth := gweiToEth(weiToGwei(l1FeeInWei))
 
@@ -251,7 +250,7 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 				pathCost.Add(pathCost, new(big.Float).Mul(l1FeeInEth, nativeTokenPrice))
 			}
 
-			if path.TxTokenFees != nil && path.TxTokenFees.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 && path.FromToken != nil {
+			if path.TxTokenFees != nil && path.TxTokenFees.ToInt().Cmp(bridge.ZeroBigIntValue) > 0 && path.FromToken != nil {
 				path.requiredTokenBalance.Add(path.requiredTokenBalance, path.TxTokenFees.ToInt())
 				pathCost.Add(pathCost, new(big.Float).Mul(
 					new(big.Float).Quo(new(big.Float).SetInt(path.TxTokenFees.ToInt()), tokenDenominator),
@@ -295,11 +294,11 @@ func validateInputData(input *RouteInputParams) error {
 			return errors.New("username and public key are required for ENSRegister")
 		}
 		if input.TestnetMode {
-			if input.TokenID != pathprocessor.SttSymbol {
+			if input.TokenID != bridge.SttSymbol {
 				return errors.New("only STT is supported for ENSRegister on testnet")
 			}
 		} else {
-			if input.TokenID != pathprocessor.SntSymbol {
+			if input.TokenID != bridge.SntSymbol {
 				return errors.New("only SNT is supported for ENSRegister")
 			}
 		}
@@ -309,12 +308,6 @@ func validateInputData(input *RouteInputParams) error {
 	if input.SendType == ENSRelease {
 		if input.Username == "" {
 			return errors.New("username is required for ENSRelease")
-		}
-	}
-
-	if input.SendType == ENSSetPubKey {
-		if input.Username == "" || input.PublicKey == "" || ens.ValidateENSUsername(input.Username) != nil {
-			return errors.New("username and public key are required for ENSSetPubKey")
 		}
 	}
 
@@ -405,8 +398,8 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 				return err
 			}
 
-			for _, pProcessor := range r.pathProcessors {
-				if !input.SendType.canUseProcessor(pProcessor) {
+			for _, brdg := range r.bridges {
+				if !input.SendType.canUseBridge(brdg) {
 					continue
 				}
 
@@ -431,7 +424,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						continue
 					}
 
-					ProcessorInputParams := pathprocessor.ProcessorInputParams{
+					bridgeParams := bridge.BridgeParams{
 						FromChain: network,
 						ToChain:   dest,
 						FromToken: token,
@@ -444,22 +437,22 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						PublicKey: input.PublicKey,
 					}
 
-					can, err := pProcessor.AvailableFor(ProcessorInputParams)
+					can, err := brdg.AvailableFor(bridgeParams)
 					if err != nil || !can {
 						continue
 					}
 
-					bonderFees, tokenFees, err := pProcessor.CalculateFees(ProcessorInputParams)
+					bonderFees, tokenFees, err := brdg.CalculateFees(bridgeParams)
 					if err != nil {
 						continue
 					}
 
-					gasLimit, err := pProcessor.EstimateGas(ProcessorInputParams)
+					gasLimit, err := brdg.EstimateGas(bridgeParams)
 					if err != nil {
 						continue
 					}
 
-					approvalContractAddress, err := pProcessor.GetContractAddress(ProcessorInputParams)
+					approvalContractAddress, err := brdg.GetContractAddress(bridgeParams)
 					if err != nil {
 						continue
 					}
@@ -471,7 +464,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 					var l1FeeWei uint64
 					if input.SendType.needL1Fee() {
 
-						txInputData, err := pProcessor.PackTxInputData(ProcessorInputParams)
+						txInputData, err := brdg.PackTxInputData(bridgeParams)
 						if err != nil {
 							continue
 						}
@@ -495,7 +488,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						selctedPriorityFee = priorityFees.Low
 					}
 
-					amountOut, err := pProcessor.CalculateAmountOut(ProcessorInputParams)
+					amountOut, err := brdg.CalculateAmountOut(bridgeParams)
 					if err != nil {
 						continue
 					}
@@ -509,7 +502,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 
 					mu.Lock()
 					candidates = append(candidates, &PathV2{
-						ProcessorName:  pProcessor.Name(),
+						BridgeName:     brdg.Name(),
 						FromChain:      network,
 						ToChain:        network,
 						FromToken:      token,
@@ -556,7 +549,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 	// check the best route for the required balances
 	for _, path := range suggestedRoutes.Best {
 
-		if path.requiredTokenBalance != nil && path.requiredTokenBalance.Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+		if path.requiredTokenBalance != nil && path.requiredTokenBalance.Cmp(big.NewInt(0)) > 0 {
 			tokenBalance := big.NewInt(1)
 			if input.SendType == ERC1155Transfer {
 				tokenBalance, err = r.getERC1155Balance(ctx, path.FromChain, path.FromToken, input.AddrFrom)

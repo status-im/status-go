@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/router/bridge"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
@@ -35,7 +35,7 @@ func (tm *TransactionManager) UpdateMultiTransaction(multiTransaction *MultiTran
 }
 
 func (tm *TransactionManager) CreateMultiTransactionFromCommand(command *MultiTransactionCommand,
-	data []*pathprocessor.MultipathProcessorTxArgs) (*MultiTransaction, error) {
+	data []*bridge.TransactionBridge) (*MultiTransaction, error) {
 
 	multiTransaction := multiTransactionFromCommand(command)
 
@@ -46,7 +46,7 @@ func (tm *TransactionManager) CreateMultiTransactionFromCommand(command *MultiTr
 	return multiTransaction, nil
 }
 
-func (tm *TransactionManager) SendTransactionForSigningToKeycard(ctx context.Context, multiTransaction *MultiTransaction, data []*pathprocessor.MultipathProcessorTxArgs, pathProcessors map[string]pathprocessor.PathProcessor) error {
+func (tm *TransactionManager) SendTransactionForSigningToKeycard(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge) error {
 	acc, err := tm.accountsDB.GetAccountByAddress(types.Address(multiTransaction.FromAddress))
 	if err != nil {
 		return err
@@ -62,8 +62,8 @@ func (tm *TransactionManager) SendTransactionForSigningToKeycard(ctx context.Con
 	}
 
 	tm.multiTransactionForKeycardSigning = multiTransaction
-	tm.multipathTransactionsData = data
-	hashes, err := tm.buildTransactions(pathProcessors)
+	tm.transactionsBridgeData = data
+	hashes, err := tm.buildTransactions(bridges)
 	if err != nil {
 		return err
 	}
@@ -73,9 +73,9 @@ func (tm *TransactionManager) SendTransactionForSigningToKeycard(ctx context.Con
 	return nil
 }
 
-func (tm *TransactionManager) SendTransactions(ctx context.Context, multiTransaction *MultiTransaction, data []*pathprocessor.MultipathProcessorTxArgs, pathProcessors map[string]pathprocessor.PathProcessor, account *account.SelectedExtKey) (*MultiTransactionCommandResult, error) {
+func (tm *TransactionManager) SendTransactions(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, account *account.SelectedExtKey) (*MultiTransactionCommandResult, error) {
 	updateDataFromMultiTx(data, multiTransaction)
-	hashes, err := sendTransactions(data, pathProcessors, account)
+	hashes, err := sendTransactions(data, bridges, account)
 	if err != nil {
 		return nil, err
 	}

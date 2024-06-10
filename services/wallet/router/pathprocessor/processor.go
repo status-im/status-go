@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/wallet/router/bridge"
 	"github.com/status-im/status-go/services/wallet/token"
 )
 
@@ -23,9 +24,9 @@ type PathProcessor interface {
 	PackTxInputData(params ProcessorInputParams) ([]byte, error)
 	EstimateGas(params ProcessorInputParams) (uint64, error)
 	CalculateAmountOut(params ProcessorInputParams) (*big.Int, error)
-	Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types.Hash, error)
+	Send(sendArgs *bridge.TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error)
 	GetContractAddress(params ProcessorInputParams) (common.Address, error)
-	BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error)
+	BuildTransaction(sendArgs *bridge.TransactionBridge) (*ethTypes.Transaction, error)
 	BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error)
 }
 

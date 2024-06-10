@@ -25,7 +25,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/onramp"
 	"github.com/status-im/status-go/services/wallet/router"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/router/bridge"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -581,7 +581,7 @@ func (api *API) SendTransactionWithSignature(ctx context.Context, chainID uint64
 	return api.s.transactionManager.SendTransactionWithSignature(chainID, params, sig)
 }
 
-func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionCommand *transfer.MultiTransactionCommand, data []*pathprocessor.MultipathProcessorTxArgs, password string) (*transfer.MultiTransactionCommandResult, error) {
+func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionCommand *transfer.MultiTransactionCommand, data []*bridge.TransactionBridge, password string) (*transfer.MultiTransactionCommandResult, error) {
 	log.Debug("[WalletAPI:: CreateMultiTransaction] create multi transaction")
 
 	cmd, err := api.s.transactionManager.CreateMultiTransactionFromCommand(multiTransactionCommand, data)
@@ -595,7 +595,7 @@ func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionComm
 			return nil, err
 		}
 
-		cmdRes, err := api.s.transactionManager.SendTransactions(ctx, cmd, data, api.router.GetPathProcessors(), selectedAccount)
+		cmdRes, err := api.s.transactionManager.SendTransactions(ctx, cmd, data, api.router.GetBridges(), selectedAccount)
 		if err != nil {
 			return nil, err
 		}
@@ -608,7 +608,7 @@ func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionComm
 		return cmdRes, nil
 	}
 
-	return nil, api.s.transactionManager.SendTransactionForSigningToKeycard(ctx, cmd, data, api.router.GetPathProcessors())
+	return nil, api.s.transactionManager.SendTransactionForSigningToKeycard(ctx, cmd, data, api.router.GetBridges())
 }
 
 func (api *API) ProceedWithTransactionsSignatures(ctx context.Context, signatures map[string]transfer.SignatureDetails) (*transfer.MultiTransactionCommandResult, error) {

@@ -1,4 +1,4 @@
-package pathprocessor
+package bridge
 
 import (
 	"context"
@@ -18,29 +18,29 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-type SwapParaswapTxArgs struct {
+type SwapTxArgs struct {
 	transactions.SendTxArgs
 	ChainID uint64 `json:"chainId"`
 }
 
-type SwapParaswapProcessor struct {
+type SwapParaswap struct {
 	paraswapClient *paraswap.ClientV5
 	priceRoute     paraswap.Route
 	transactor     transactions.TransactorIface
 }
 
-func NewSwapParaswapProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *walletToken.Manager) *SwapParaswapProcessor {
-	return &SwapParaswapProcessor{
+func NewSwapParaswap(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *walletToken.Manager) *SwapParaswap {
+	return &SwapParaswap{
 		paraswapClient: paraswap.NewClientV5(walletCommon.EthereumMainnet),
 		transactor:     transactor,
 	}
 }
 
-func (s *SwapParaswapProcessor) Name() string {
-	return ProcessorSwapParaswapName
+func (s *SwapParaswap) Name() string {
+	return SwapParaswapName
 }
 
-func (s *SwapParaswapProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
+func (s *SwapParaswap) AvailableFor(params BridgeParams) (bool, error) {
 	if params.FromToken == nil || params.ToToken == nil {
 		return false, errors.New("token and toToken cannot be nil")
 	}
@@ -85,16 +85,16 @@ func (s *SwapParaswapProcessor) AvailableFor(params ProcessorInputParams) (bool,
 	return true, nil
 }
 
-func (s *SwapParaswapProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
-	return ZeroBigIntValue, ZeroBigIntValue, nil
+func (s *SwapParaswap) CalculateFees(params BridgeParams) (*big.Int, *big.Int, error) {
+	return big.NewInt(0), big.NewInt(0), nil
 }
 
-func (s *SwapParaswapProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
+func (s *SwapParaswap) PackTxInputData(params BridgeParams) ([]byte, error) {
 	// not sure what we can do here since we're using the api to build the transaction
 	return []byte{}, nil
 }
 
-func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *SwapParaswap) EstimateGas(params BridgeParams) (uint64, error) {
 	priceRoute, err := s.paraswapClient.FetchPriceRoute(context.Background(), params.FromToken.Address, params.FromToken.Decimals,
 		params.ToToken.Address, params.ToToken.Decimals, params.AmountIn, params.FromAddr, params.ToAddr)
 	if err != nil {
@@ -106,7 +106,7 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams) (uint64
 	return priceRoute.GasCost.Uint64(), nil
 }
 
-func (s *SwapParaswapProcessor) GetContractAddress(params ProcessorInputParams) (address common.Address, err error) {
+func (s *SwapParaswap) GetContractAddress(params BridgeParams) (address common.Address, err error) {
 	if params.FromChain.ChainID == walletCommon.EthereumMainnet {
 		address = common.HexToAddress("0x216b4b4ba9f3e719726886d34a177484278bfcae")
 	} else if params.FromChain.ChainID == walletCommon.ArbitrumMainnet {
@@ -119,10 +119,10 @@ func (s *SwapParaswapProcessor) GetContractAddress(params ProcessorInputParams) 
 	return
 }
 
-func (s *SwapParaswapProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
+func (s *SwapParaswap) BuildTx(params BridgeParams) (*ethTypes.Transaction, error) {
 	toAddr := types.Address(params.ToAddr)
-	sendArgs := &MultipathProcessorTxArgs{
-		SwapTx: &SwapParaswapTxArgs{
+	sendArgs := &TransactionBridge{
+		SwapTx: &SwapTxArgs{
 			SendTxArgs: transactions.SendTxArgs{
 				From:   types.Address(params.FromAddr),
 				To:     &toAddr,
@@ -137,7 +137,7 @@ func (s *SwapParaswapProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.
 	return s.BuildTransaction(sendArgs)
 }
 
-func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorTxArgs) error {
+func (s *SwapParaswap) prepareTransaction(sendArgs *TransactionBridge) error {
 	tx, err := s.paraswapClient.BuildTransaction(context.Background(), s.priceRoute.SrcTokenAddress, s.priceRoute.SrcTokenDecimals, s.priceRoute.SrcAmount.Int,
 		s.priceRoute.DestTokenAddress, s.priceRoute.DestTokenDecimals, s.priceRoute.DestAmount.Int, common.Address(sendArgs.SwapTx.From), common.Address(*sendArgs.SwapTx.To), s.priceRoute.RawPriceRoute)
 	if err != nil {
@@ -172,7 +172,7 @@ func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorT
 	return nil
 }
 
-func (s *SwapParaswapProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error) {
+func (s *SwapParaswap) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error) {
 	err := s.prepareTransaction(sendArgs)
 	if err != nil {
 		return nil, err
@@ -180,10 +180,10 @@ func (s *SwapParaswapProcessor) BuildTransaction(sendArgs *MultipathProcessorTxA
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, sendArgs.SwapTx.SendTxArgs)
 }
 
-func (s *SwapParaswapProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
+func (s *SwapParaswap) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
 
-	txBridgeArgs := &MultipathProcessorTxArgs{
-		SwapTx: &SwapParaswapTxArgs{
+	txBridgeArgs := &TransactionBridge{
+		SwapTx: &SwapTxArgs{
 			SendTxArgs: transactions.SendTxArgs{
 				From:               sendArgs.SwapTx.From,
 				To:                 sendArgs.SwapTx.To,
@@ -201,6 +201,6 @@ func (s *SwapParaswapProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifie
 	return s.transactor.SendTransactionWithChainID(txBridgeArgs.ChainID, txBridgeArgs.SwapTx.SendTxArgs, verifiedAccount)
 }
 
-func (s *SwapParaswapProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
+func (s *SwapParaswap) CalculateAmountOut(params BridgeParams) (*big.Int, error) {
 	return s.priceRoute.DestAmount.Int, nil
 }

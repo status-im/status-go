@@ -5,14 +5,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/router/bridge"
 )
 
-func (tm *TransactionManager) buildTransactions(pathProcessors map[string]pathprocessor.PathProcessor) ([]string, error) {
+func (tm *TransactionManager) buildTransactions(bridges map[string]bridge.Bridge) ([]string, error) {
 	tm.transactionsForKeycardSigning = make(map[common.Hash]*TransactionDescription)
 	var hashes []string
-	for _, bridgeTx := range tm.multipathTransactionsData {
-		builtTx, err := pathProcessors[bridgeTx.Name].BuildTransaction(bridgeTx)
+	for _, bridgeTx := range tm.transactionsBridgeData {
+		builtTx, err := bridges[bridgeTx.BridgeName].BuildTransaction(bridgeTx)
 		if err != nil {
 			return hashes, err
 		}
