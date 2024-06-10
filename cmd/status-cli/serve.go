@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/status-im/status-go/protocol/common"
@@ -34,7 +33,7 @@ func serve(cCtx *cli.Context) error {
 	apiModules := cCtx.String(APIModulesFlag)
 	telemetryUrl := cCtx.String(TelemetryServerURLFlag)
 
-	cli, err := start(cCtx, name, port, apiModules, telemetryUrl)
+	cli, err := start(name, port, apiModules, telemetryUrl)
 	if err != nil {
 		return err
 	}
@@ -45,18 +44,18 @@ func serve(cCtx *cli.Context) error {
 	// and the retrieve messages loop is started when starting a node, so we needed a different appproach,
 	// alternatively we could have implemented another notification mechanism in the messenger, but this signal is already in place
 	msignal.SetMobileSignalHandler(msignal.MobileSignalHandler(func(s []byte) {
-		if strings.Contains(string(s), `"type":"messages.new"`) {
-			var resp MobileSignalEvent
-			if err := json.Unmarshal(s, &resp); err != nil {
-				logger.Errorf("unmarshaling 'messages.new' response: %v", err)
-				return
-			}
+		var ev MobileSignalEvent
+		if err := json.Unmarshal(s, &ev); err != nil {
+			logger.Errorf("unmarshaling signal event: %v", err)
+			return
+		}
 
-			for _, message := range resp.Event.Messages {
+		if ev.Type == msignal.EventNewMessages {
+			for _, message := range ev.Event.Messages {
 				logger.Infof("message received: %v (ID=%v)", message.Text, message.ID)
 				// if request contact, accept it
 				if message.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT {
-					if err = cli.sendContactRequestAcceptance(cCtx, message.ID); err != nil {
+					if err = cli.sendContactRequestAcceptance(cCtx.Context, message.ID); err != nil {
 						logger.Errorf("accepting contact request: %v", err)
 						return
 					}
@@ -68,7 +67,7 @@ func serve(cCtx *cli.Context) error {
 	// Send contact request
 	dest := cCtx.String(AddFlag)
 	if dest != "" {
-		err := cli.sendContactRequest(cCtx, dest)
+		err := cli.sendContactRequest(cCtx.Context, dest)
 		if err != nil {
 			return err
 		}
@@ -87,7 +86,7 @@ func serve(cCtx *cli.Context) error {
 	}()
 
 	// Send message if mutual contact exists
-	cli.sendMessageLoop2(ctx)
+	interactiveSendMessageLoop(ctx, cli)
 
 	logger.Info("Exiting")
 
