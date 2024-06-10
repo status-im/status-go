@@ -163,15 +163,16 @@ func (c *HopBridgeProcessor) getAppropriateABI(contractType string, chainID uint
 	return abi.ABI{}, errors.New("not available for contract type")
 }
 
-func (h *HopBridgeProcessor) PackTxInputData(params ProcessorInputParams, contractType string) ([]byte, error) {
-	if contractType == "" {
-		_, ct, err := hop.GetContractAddress(params.FromChain.ChainID, params.FromToken.Symbol)
-		if err != nil {
-			return []byte{}, err
-		}
-		contractType = ct
+func (h *HopBridgeProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
+	_, contractType, err := hop.GetContractAddress(params.FromChain.ChainID, params.FromToken.Symbol)
+	if err != nil {
+		return []byte{}, err
 	}
 
+	return h.packTxInputDataInternally(params, contractType)
+}
+
+func (h *HopBridgeProcessor) packTxInputDataInternally(params ProcessorInputParams, contractType string) ([]byte, error) {
 	abi, err := h.getAppropriateABI(contractType, params.FromChain.ChainID, params.FromToken)
 	if err != nil {
 		return []byte{}, err
@@ -204,7 +205,7 @@ func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64, e
 		return 0, err
 	}
 
-	input, err := h.PackTxInputData(params, contractType)
+	input, err := h.packTxInputDataInternally(params, contractType)
 	if err != nil {
 		return 0, err
 	}

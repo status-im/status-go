@@ -89,7 +89,7 @@ func (s *SwapParaswapProcessor) CalculateFees(params ProcessorInputParams) (*big
 	return ZeroBigIntValue, ZeroBigIntValue, nil
 }
 
-func (s *SwapParaswapProcessor) PackTxInputData(params ProcessorInputParams, contractType string) ([]byte, error) {
+func (s *SwapParaswapProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	// not sure what we can do here since we're using the api to build the transaction
 	return []byte{}, nil
 }
