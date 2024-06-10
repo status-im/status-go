@@ -4,7 +4,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/services/wallet/router/bridge"
+	"github.com/status-im/status-go/services/wallet/bridge"
 
 	"go.uber.org/zap"
 )
