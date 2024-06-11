@@ -20,6 +20,7 @@ const AddFlag = "add"
 const PortFlag = "port"
 const APIModulesFlag = "api-modules"
 const TelemetryServerURLFlag = "telemetry-server-url"
+const KeyUIDFlag = "key-uid"
 
 const RetrieveInterval = 300 * time.Millisecond
 const SendInterval = 1 * time.Second
@@ -113,7 +114,7 @@ func main() {
 				},
 			},
 			{
-				Name:    "servelast",
+				Name:    "serve-account",
 				Aliases: []string{"sl"},
 				Usage:   "Start a server with the lastest input name's account\n\n  E.g.: if last time you created an account with name 'Alice',\n  you can start the server with 'Alice' account by running 'servelast -n Alice'",
 				Flags: []cli.Flag{
@@ -122,6 +123,11 @@ func main() {
 						Aliases:  []string{"n"},
 						Usage:    "Name of the existing user",
 						Required: true,
+					},
+					&cli.StringFlag{
+						Name:    KeyUIDFlag,
+						Aliases: []string{"kid"},
+						Usage:   "Key ID of the existing user (if not provided the last account will be used)",
 					},
 					&cli.BoolFlag{
 						Name:    InteractiveFlag,

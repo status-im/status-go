@@ -48,8 +48,17 @@ curl -XPOST http://127.0.0.1:8565 -H 'Content-type: application/json' -d '{"json
 curl -XPOST http://127.0.0.1:8545 -H 'Content-type: application/json' -d '{"jsonrpc":"2.0","method":"wakuext_sendOneToOneMessage","params":[{"id": "0x042c0ce856c41ad6d3f651a84c83f646cdafdf3a26a3d69bce3a6ccf59b23b5a366c12162045d5066abad7912741a6e6c6e8e11e7826c4c850a1de7a2bae24a79c", "message": "Im fine, and you?"}],"id":1}'
 ```
 
+### Run `serve-account` command
 
-### Run `simulate` command:
+The `./status-cli serve` command will generate a new account, it will print in the console the key UID of that account, if you want to re-run that created account (i.e.: run the account with the same public key), you can do so with this command:
+
+```bash
+./status-cli serve-account -n alice -kid 0x02887ff8dddb774ad836c00c8fd30ef9bc45d6b23f1f8cad1bff07d09cb378c3
+```
+
+You will need the same name and key
+
+### Run `simulate` command
 
 ```bash
 # simulate DM between two accounts

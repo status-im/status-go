@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wakuv2ext"
 
@@ -33,7 +34,7 @@ func setupLogger(file string) *zap.Logger {
 	return logutils.ZapLogger()
 }
 
-func start(name string, port int, apiModules string, telemetryUrl string, useLastAccount bool) (*StatusCLI, error) {
+func start(name string, port int, apiModules string, telemetryUrl string, useLastAccount bool, keyUID string) (*StatusCLI, error) {
 	var (
 		rootDataDir = fmt.Sprintf("./test-%s", strings.ToLower(name))
 		password    = "some-password"
@@ -44,13 +45,15 @@ func start(name string, port int, apiModules string, telemetryUrl string, useLas
 
 	backend := api.NewGethStatusBackend()
 	if useLastAccount {
-		if err := getLastAccountAndLogin(backend, name, rootDataDir, password); err != nil {
+		if err := getAccountAndLogin(backend, name, rootDataDir, password, keyUID); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := createAccountAndLogin(backend, name, rootDataDir, password, apiModules, telemetryUrl, port); err != nil {
+		acc, err := createAccountAndLogin(backend, name, rootDataDir, password, apiModules, telemetryUrl, port)
+		if err != nil {
 			return nil, err
 		}
+		nlog.Infof("account created, key UID: %v", acc.KeyUID)
 	}
 
 	wakuService := backend.StatusNode().WakuV2ExtService()
@@ -77,7 +80,7 @@ func start(name string, port int, apiModules string, telemetryUrl string, useLas
 	return &data, nil
 }
 
-func getLastAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password string) error {
+func getAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password string, keyUID string) error {
 	b.UpdateRootDataDir(rootDataDir)
 	if err := b.OpenAccounts(); err != nil {
 		return fmt.Errorf("name '%v' might not have an account: trying to find: %v: %w", name, rootDataDir, err)
@@ -90,16 +93,30 @@ func getLastAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, passwor
 		return errors.New("no accounts found")
 	}
 
+	acc := accs[0] // use last if no keyUID is provided
+	if keyUID != "" {
+		found := false
+		for _, a := range accs {
+			if a.KeyUID == keyUID {
+				acc = a
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("account not found for keyUID: %v", keyUID)
+		}
+	}
+
 	return b.LoginAccount(&requests.Login{
 		Password: password,
-		KeyUID:   accs[0].KeyUID,
+		KeyUID:   acc.KeyUID,
 	})
 }
 
-func createAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password, apiModules, telemetryUrl string, port int) error {
-
+func createAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password, apiModules, telemetryUrl string, port int) (*multiaccounts.Account, error) {
 	if err := os.MkdirAll(rootDataDir, os.ModePerm); err != nil {
-		return err
+		return nil, err
 	}
 
 	req := &requests.CreateAccount{
@@ -116,10 +133,7 @@ func createAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password
 		},
 		TelemetryServerURL: telemetryUrl,
 	}
-	if _, err := b.CreateAccountAndLogin(req); err != nil {
-		return err
-	}
-	return nil
+	return b.CreateAccountAndLogin(req)
 }
 
 func (cli *StatusCLI) stop() {

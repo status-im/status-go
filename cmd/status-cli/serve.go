@@ -34,8 +34,9 @@ func serve(cCtx *cli.Context, useLastAccount bool) error {
 	telemetryUrl := cCtx.String(TelemetryServerURLFlag)
 	interactive := cCtx.Bool(InteractiveFlag)
 	dest := cCtx.String(AddFlag)
+	keyUID := cCtx.String(KeyUIDFlag)
 
-	cli, err := start(name, port, apiModules, telemetryUrl, useLastAccount)
+	cli, err := start(name, port, apiModules, telemetryUrl, useLastAccount, keyUID)
 	if err != nil {
 		return err
 	}
