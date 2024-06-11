@@ -492,3 +492,8 @@ func (db RawMessagesPersistence) UpdateRawMessageSent(id string, sent bool) erro
 	_, err := db.db.Exec("UPDATE raw_messages SET sent = ? WHERE id = ?", sent, id)
 	return err
 }
+
+func (db RawMessagesPersistence) UpdateRawMessageLastSent(id string, lastSent uint64) error {
+	_, err := db.db.Exec("UPDATE raw_messages SET last_sent = ? WHERE id = ?", lastSent, id)
+	return err
+}

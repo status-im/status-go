@@ -203,3 +203,7 @@ func (m *Messenger) RawMessageByID(id string) (*common.RawMessage, error) {
 func (m *Messenger) UpdateRawMessageSent(id string, sent bool) error {
 	return m.persistence.UpdateRawMessageSent(id, sent)
 }
+
+func (m *Messenger) UpdateRawMessageLastSent(id string, lastSent uint64) error {
+	return m.persistence.UpdateRawMessageLastSent(id, lastSent)
+}
