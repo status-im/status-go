@@ -43,7 +43,7 @@ var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWa
 
 var DefaultFleet = params.FleetShardsTest
 
-func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
+func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
 
 	s := &settings.Settings{}
@@ -52,8 +52,8 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	s.LogLevel = &logLevel
 	s.ProfilePicturesShowTo = settings.ProfilePicturesShowToEveryone
 	s.ProfilePicturesVisibility = settings.ProfilePicturesVisibilityEveryone
-	s.KeyUID = generatedAccountInfo.KeyUID
-	s.Address = types.HexToAddress(generatedAccountInfo.Address)
+	s.KeyUID = keyUID
+	s.Address = types.HexToAddress(address)
 	s.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)
 	s.URLUnfurlingMode = settings.URLUnfurlingAlwaysAsk
 

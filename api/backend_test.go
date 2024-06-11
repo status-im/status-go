@@ -1073,7 +1073,7 @@ func TestConvertAccount(t *testing.T) {
 	found = keystoreContainsFileForAccount(keyStoreDir, chatAddress)
 	require.True(t, found)
 
-	defaultSettings, err := defaultSettings(genAccInfo, derivedAccounts)
+	defaultSettings, err := defaultSettings(genAccInfo.KeyUID, genAccInfo.Address, derivedAccounts)
 	require.NoError(t, err)
 	nodeConfig, err := defaultNodeConfig(defaultSettings.InstallationID, &requests.CreateAccount{
 		LogLevel: defaultSettings.LogLevel,
@@ -1681,4 +1681,164 @@ func TestCreateAccountPathsValidation(t *testing.T) {
 	err = request.Validate(validation)
 	require.NoError(t, err)
 	require.Equal(t, tmpdir, request.RootDataDir)
+}
+
+func TestRestoreKeycardAccountAndLogin(t *testing.T) {
+	//storeToKeychain := false
+	//recoverAccount := true
+
+	exampleKeycardEvent := map[string]interface{}{
+		"error":       "",
+		"instanceUID": "a84599394887b742eed9a99d3834a797",
+		"applicationInfo": map[string]interface{}{
+			"initialized":    false,
+			"instanceUID":    "",
+			"version":        0,
+			"availableSlots": 0,
+			"keyUID":         "",
+		},
+		"seedPhraseIndexes": []interface{}{},
+		"freePairingSlots":  0,
+		"keyUid":            "0x579324c53f347e18961c775a00ec13ed7d59a225b1859d5125ff36b450b8778d",
+		"pinRetries":        0,
+		"pukRetries":        0,
+		"cardMetadata": map[string]interface{}{
+			"name":           "",
+			"walletAccounts": []interface{}{},
+		},
+		"generatedWalletAccount": map[string]interface{}{
+			"address":    "",
+			"publicKey":  "",
+			"privateKey": "",
+		},
+		"generatedWalletAccounts": []interface{}{},
+		"txSignature": map[string]interface{}{
+			"r": "",
+			"s": "",
+			"v": "",
+		},
+		"eip1581Key": map[string]interface{}{
+			"address":    "0xA8d50f0B3bc581298446be8FBfF5c71684Ea6c01",
+			"publicKey":  "0x040d7e6e3761ab3d17c220e484ede2f3fa02998b859d4d0e9d34216c6e41b03dc94996fdea23a9233092cee50a768e7428d5de7bd42e8e32c10d6b0e36b10f0e7a",
+			"privateKey": "",
+		},
+		"encryptionKey": map[string]interface{}{
+			"address":    "0x1ec12f2b323ddDD076A1127cEc8FA0B592c46cD3",
+			"publicKey":  "0x04c4b16f670b51702dc130673bf9c64ffd1f69383cef2127dfa05031b9b1359120f7342134af9a350465126a85e87cb003b7c4f93d2ba2ff98bb73277b119c7a87",
+			"privateKey": "68c830d5b327382a65e6c302594744ec0d28b01d1ea8124f49714f05c9625ddd"},
+		"masterKey": map[string]interface{}{
+			"address":    "0xbf9dE86774051537b2192Ce9c8d2496f129bA24b",
+			"publicKey":  "0x040d909a07ecca18bbfa7d53d10a86bd956f54b8b446eabd94940e642ae18421b516ec5b63677c4ce65e0e266b58bdb716d8266b25356154eb61713ecb23824075",
+			"privateKey": "",
+		},
+		"walletKey": map[string]interface{}{
+			"address":    "0xB9E1998e1A8854887CA327D1aF5894B6CB0AC07D",
+			"publicKey":  "0x04c16e7748f34e0ab2c9c13350d7872d928e942934dd8b8abd3fb12b8c742a5ee8cf0919731e800907068afec25f577bde3a9c534795e359ee48097e4e55f4aaca",
+			"privateKey": "",
+		},
+		"walletRootKey": map[string]interface{}{
+			"address":    "0xFf59db9F2f97Db7104A906C390D33C342a1309C8",
+			"publicKey":  "0x04c436532398e19ed14b4eb41545b82014435d60e7db4449a371fd80d0d5cd557f60d81f6c2b35ca5440aa60934c23b70489b0e7963e63ec66b51a7e52db711262",
+			"privateKey": "",
+		},
+		"whisperKey": map[string]interface{}{
+			"address":    "0xBa122B9c0Ef560813b5D2C0961094aC36289f846",
+			"publicKey":  "0x0441468c39b579259676350b9736b01cdadb740f67bfd022fa2b985123b1d66fc3191cfe73205e3d3d84148f0248f9a2978afeeda16d7c3db90bd2579f0de33459",
+			"privateKey": "5a42b4f15ff1a5da95d116442ce11a31e9020f562224bf60b1d8d3a99d90653d",
+		},
+		"masterKeyAddress": "",
+	}
+
+	exampleRequest := map[string]interface{}{
+		"mnemonic":    "",
+		"fetchBackup": true,
+		"createAccountRequest": map[string]interface{}{
+			"rootDataDir":   "/Users/igorsirotin/Repositories/Status/status-desktop/Status/data/",
+			"kdfIterations": 256000,
+			"deviceName":    "",
+			"displayName":   "",
+			"password":      "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+			"imagePath":     "",
+			"imageCropRectangle": map[string]interface{}{
+				"ax": 0, "ay": 0, "bx": 0, "by": 0},
+			"customizationColor":       "primary",
+			"emoji":                    "",
+			"wakuV2Nameserver":         nil,
+			"wakuV2LightClient":        false,
+			"logLevel":                 "DEBUG",
+			"logFilePath":              "",
+			"logEnabled":               false,
+			"previewPrivacy":           true,
+			"verifyTransactionURL":     nil,
+			"verifyENSURL":             nil,
+			"verifyENSContractAddress": nil,
+			"verifyTransactionChainID": nil,
+			"upstreamConfig":           "",
+			"networkID":                nil,
+			"walletSecretsConfig": map[string]interface{}{"poktToken": "849214fd2f85acead08f5184",
+				"infuraToken":                 "220a1abb4b6943a093c35d0ce4fb0732",
+				"infuraSecret":                "",
+				"openseaApiKey":               "",
+				"raribleMainnetApiKey":        "",
+				"raribleTestnetApiKey":        "",
+				"alchemyEthereumMainnetToken": "",
+				"alchemyEthereumGoerliToken":  "",
+				"alchemyEthereumSepoliaToken": "",
+				"alchemyArbitrumMainnetToken": "",
+				"alchemyArbitrumGoerliToken":  "",
+				"alchemyArbitrumSepoliaToken": "",
+				"alchemyOptimismMainnetToken": "",
+				"alchemyOptimismGoerliToken":  "",
+				"alchemyOptimismSepoliaToken": "",
+			},
+			"torrentConfigEnabled":   false,
+			"torrentConfigPort":      0,
+			"keycardInstanceUID":     "a84599394887b742eed9a99d3834a797",
+			"keycardPairingDataFile": "/Users/igorsirotin/Repositories/Status/status-desktop/Status/data/keycard/pairings.json",
+		},
+	}
+
+	require.NotNil(t, exampleKeycardEvent)
+	require.NotNil(t, exampleRequest)
+
+	utils.Init()
+	tmpdir := t.TempDir()
+
+	conf, err := params.NewNodeConfig(tmpdir, 1777)
+	require.NoError(t, err)
+
+	backend := NewGethStatusBackend()
+
+	require.NoError(t, backend.AccountManager().InitKeystore(conf.KeyStoreDir))
+	backend.UpdateRootDataDir(conf.DataDir)
+
+	require.NoError(t, backend.OpenAccounts())
+
+	keycardPairingDataFile := exampleRequest["createAccountRequest"].(map[string]interface{})["keycardPairingDataFile"].(string)
+
+	request := &requests.RestoreKeycardAccount{
+		KeyUID:              exampleKeycardEvent["keyUid"].(string),
+		Address:             exampleKeycardEvent["masterKey"].(map[string]interface{})["address"].(string),
+		WhisperPrivateKey:   exampleKeycardEvent["whisperKey"].(map[string]interface{})["privateKey"].(string),
+		WhisperPublicKey:    exampleKeycardEvent["whisperKey"].(map[string]interface{})["publicKey"].(string),
+		WhisperAddress:      exampleKeycardEvent["whisperKey"].(map[string]interface{})["address"].(string),
+		WalletPublicKey:     exampleKeycardEvent["walletKey"].(map[string]interface{})["publicKey"].(string),
+		WalletAddress:       exampleKeycardEvent["walletKey"].(map[string]interface{})["address"].(string),
+		WalletRootAddress:   exampleKeycardEvent["walletRootKey"].(map[string]interface{})["address"].(string),
+		Eip1581Address:      exampleKeycardEvent["eip1581Key"].(map[string]interface{})["address"].(string),
+		EncryptionPublicKey: exampleKeycardEvent["encryptionKey"].(map[string]interface{})["publicKey"].(string),
+
+		CreateAccount: requests.CreateAccount{
+			DisplayName:            "User-1",
+			Password:               "password123",
+			CustomizationColor:     "#ffffff",
+			RootDataDir:            tmpdir,
+			KeycardInstanceUID:     exampleKeycardEvent["instanceUID"].(string),
+			KeycardPairingDataFile: &keycardPairingDataFile,
+		},
+	}
+
+	acc, err := backend.RestoreKeycardAccountAndLogin(request)
+	require.NoError(t, err)
+	require.NotNil(t, acc)
 }

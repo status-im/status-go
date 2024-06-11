@@ -1306,6 +1306,71 @@ func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAcco
 	return response.account, nil
 }
 
+func (b *GethStatusBackend) RestoreKeycardAccountAndLogin(request *requests.RestoreKeycardAccount) (*multiaccounts.Account, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	keyStoreDir, err := b.initKeyStoreDirWithAccount(request.RootDataDir, request.KeyUID)
+	if err != nil {
+		return nil, err
+	}
+
+	derivedAddresses := map[string]generator.AccountInfo{
+		pathDefaultChat: {
+			Address:    request.WhisperAddress,
+			PublicKey:  request.WhisperPublicKey,
+			PrivateKey: request.WhisperPrivateKey,
+		},
+		pathWalletRoot: {
+			Address: request.WalletRootAddress,
+		},
+		pathDefaultWallet: {
+			Address:   request.WalletAddress,
+			PublicKey: request.WalletPublicKey,
+		},
+		pathEIP1581: {
+			Address: request.Eip1581Address,
+		},
+		pathEncryption: {
+			PublicKey: request.EncryptionPublicKey,
+		},
+	}
+
+	input := &prepareAccountInput{
+		customizationColorClock: 0,
+		accountID:               "", // empty for keycard
+		keyUID:                  request.KeyUID,
+		address:                 request.Address,
+		mnemonic:                "",
+		restoringAccount:        true,
+		derivedAddresses:        derivedAddresses,
+		fetchBackup:             request.FetchBackup, // WARNING: Ensure this value is correct
+		keyStoreDir:             keyStoreDir,
+	}
+
+	response, err := b.prepareNodeAccount(&request.CreateAccount, input)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.StartNodeWithAccountAndInitialConfig(
+		*response.account,
+		request.Password,
+		*response.settings,
+		response.nodeConfig,
+		response.subAccounts,
+		response.chatPrivateKey, //request.WhisperPrivateKey,
+	)
+
+	if err != nil {
+		b.log.Error("start node", err)
+		return nil, errors.Wrap(err, "failed to start node")
+	}
+
+	return response.account, nil
+}
+
 func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error) {
 	accountGenerator := b.accountManager.AccountsGenerator()
 
@@ -1317,7 +1382,20 @@ func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error)
 	return info.KeyUID, nil
 }
 
-type generateAccountResponse struct {
+type prepareAccountInput struct {
+	customizationColorClock uint64
+	accountID               string
+	keyUID                  string
+	address                 string
+	mnemonic                string
+	restoringAccount        bool
+	derivedAddresses        map[string]generator.AccountInfo
+	fetchBackup             bool
+	keyStoreDir             string
+	opts                    []params.Option
+}
+
+type accountBundle struct {
 	account        *multiaccounts.Account
 	settings       *settings.Settings
 	nodeConfig     *params.NodeConfig
@@ -1325,9 +1403,7 @@ type generateAccountResponse struct {
 	chatPrivateKey *ecdsa.PrivateKey
 }
 
-func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, fetchBackup bool, request *requests.CreateAccount, opts ...params.Option) (*generateAccountResponse, error) {
-	response := &generateAccountResponse{}
-
+func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, fetchBackup bool, request *requests.CreateAccount, opts ...params.Option) (*accountBundle, error) {
 	info, err := b.generateAccountInfo(mnemonic)
 	if err != nil {
 		return nil, err
@@ -1343,62 +1419,60 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		return nil, err
 	}
 
+	input := &prepareAccountInput{
+		customizationColorClock: customizationColorClock,
+		accountID:               info.ID,
+		keyUID:                  info.KeyUID,
+		address:                 info.Address,
+		mnemonic:                info.Mnemonic,
+		restoringAccount:        mnemonic != "",
+		derivedAddresses:        derivedAddresses,
+		fetchBackup:             fetchBackup,
+		keyStoreDir:             keyStoreDir,
+		opts:                    opts,
+	}
+
+	return b.prepareNodeAccount(request, input)
+}
+
+func (b *GethStatusBackend) prepareNodeAccount(request *requests.CreateAccount, input *prepareAccountInput) (*accountBundle, error) {
+	var err error
+	response := &accountBundle{}
+
 	if request.KeycardInstanceUID != "" {
-		encryption := derivedAddresses[pathEncryption]
-		request.Password = encryption.PublicKey
+		request.Password = input.derivedAddresses[pathEncryption].PublicKey
 	}
 
 	if request.KeycardInstanceUID == "" {
-		err = b.storeAccount(info.ID, request.Password, paths)
+		err = b.storeAccount(input.accountID, request.Password, paths)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	response.account, info, err = b.generateAccount(*info, customizationColorClock, request)
+	response.account, err = b.buildAccount(request, input)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to build account")
 	}
 
-	response.settings, err = b.prepareSettings(*info, derivedAddresses, request, mnemonic)
+	response.settings, err = b.prepareSettings(request, input)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to prepare settings")
 	}
 
-	processBackedupMessages := mnemonic != "" && fetchBackup
-	response.nodeConfig, err = b.prepareConfig(processBackedupMessages, response.account.KeyUID, keyStoreDir, request, opts...)
+	response.nodeConfig, err = b.prepareConfig(request, input, response.settings.InstallationID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to prepare node config")
 	}
 
-	response.subAccounts, err = b.prepareSubAccounts(mnemonic, response.account.KeyUID, derivedAddresses, request)
+	response.subAccounts, err = b.prepareSubAccounts(request, input)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to prepare sub accounts")
 	}
 
-	if request.KeycardInstanceUID != "" {
-		kp := wallet.NewKeycardPairings()
-		kp.SetKeycardPairingsFile(response.nodeConfig.KeycardPairingDataFile)
-		pairings, err := kp.GetPairings()
-		if err != nil {
-			return nil, err
-		}
-
-		keycard, ok := pairings[request.KeycardInstanceUID]
-		if !ok {
-			return nil, errors.New("keycard not found in pairings file")
-		}
-
-		response.settings.KeycardInstanceUID = request.KeycardInstanceUID
-		response.settings.KeycardPairedOn = time.Now().Unix()
-		response.settings.KeycardPairing = keycard.Key
-		response.account.KeycardPairing = keycard.Key
-
-		privateKeyHex := strings.TrimPrefix(derivedAddresses[pathDefaultChat].PrivateKey, "0x")
-		response.chatPrivateKey, err = crypto.HexToECDSA(privateKeyHex)
-		if err != nil {
-			return nil, err
-		}
+	response, err = b.prepareForKeycard(request, input, response)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to prepare for keycard")
 	}
 
 	return response, nil
@@ -1452,23 +1526,23 @@ func (b *GethStatusBackend) storeAccount(id string, password string, paths []str
 	return nil
 }
 
-func (b *GethStatusBackend) generateAccount(info generator.GeneratedAccountInfo, customizationColorClock uint64, request *requests.CreateAccount) (*multiaccounts.Account, *generator.GeneratedAccountInfo, error) {
+func (b *GethStatusBackend) buildAccount(request *requests.CreateAccount, input *prepareAccountInput) (*multiaccounts.Account, error) {
 	err := b.OpenAccounts()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	account := multiaccounts.Account{
-		KeyUID:                  info.KeyUID,
+	acc := &multiaccounts.Account{
+		KeyUID:                  input.keyUID,
 		Name:                    request.DisplayName,
 		CustomizationColor:      multiacccommon.CustomizationColor(request.CustomizationColor),
-		CustomizationColorClock: customizationColorClock,
+		CustomizationColorClock: input.customizationColorClock,
 		KDFIterations:           request.KdfIterations,
 		Timestamp:               time.Now().Unix(),
 	}
 
-	if account.KDFIterations == 0 {
-		account.KDFIterations = dbsetup.ReducedKDFIterationsNumber
+	if acc.KDFIterations == 0 {
+		acc.KDFIterations = dbsetup.ReducedKDFIterationsNumber
 	}
 
 	if request.ImagePath != "" {
@@ -1487,16 +1561,16 @@ func (b *GethStatusBackend) generateAccount(info generator.GeneratedAccountInfo,
 			imageCropRectangle.Ax, imageCropRectangle.Ay, imageCropRectangle.Bx, imageCropRectangle.By)
 
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		account.Images = iis
+		acc.Images = iis
 	}
 
-	return &account, &info, nil
+	return acc, nil
 }
 
-func (b *GethStatusBackend) prepareSettings(info generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, request *requests.CreateAccount, mnemonic string) (*settings.Settings, error) {
-	settings, err := defaultSettings(info, derivedAddresses)
+func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, input *prepareAccountInput) (*settings.Settings, error) {
+	settings, err := defaultSettings(input.keyUID, input.address, input.derivedAddresses)
 	if err != nil {
 		return nil, err
 	}
@@ -1507,9 +1581,20 @@ func (b *GethStatusBackend) prepareSettings(info generator.GeneratedAccountInfo,
 	settings.CurrentNetwork = request.CurrentNetwork
 	settings.TestNetworksEnabled = request.TestNetworksEnabled
 
-	// If restoring an account, we don't set the mnemonic
-	if mnemonic == "" {
-		settings.Mnemonic = &info.Mnemonic
+	/*
+		 Case 1. Generating new account
+			mnemonic +
+			omit +
+		 Case 2. Restoring from seed phrase
+			mnemonic -
+			omit -
+		 Case 3. Login with keycard (account not generated, but need to fetch backup)
+			mnemonic -
+			omit -
+	*/
+
+	if !input.restoringAccount {
+		settings.Mnemonic = &input.mnemonic
 		settings.OmitTransfersHistoryScan = true
 		// TODO(rasom): uncomment it as soon as address will be properly
 		// marked as shown on mobile client
@@ -1519,25 +1604,25 @@ func (b *GethStatusBackend) prepareSettings(info generator.GeneratedAccountInfo,
 	return settings, nil
 }
 
-func (b *GethStatusBackend) prepareConfig(processBackedupMessages bool, installationID string, userKeyStoreDir string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
-	nodeConfig, err := defaultNodeConfig(installationID, request, opts...)
+func (b *GethStatusBackend) prepareConfig(request *requests.CreateAccount, input *prepareAccountInput, installationID string) (*params.NodeConfig, error) {
+	nodeConfig, err := defaultNodeConfig(installationID, request, input.opts...)
 	if err != nil {
 		return nil, err
 	}
-	nodeConfig.ProcessBackedupMessages = processBackedupMessages
+	nodeConfig.ProcessBackedupMessages = input.fetchBackup
 
 	// when we set nodeConfig.KeyStoreDir, value of nodeConfig.KeyStoreDir should not contain the rootDataDir
 	// loadNodeConfig will add rootDataDir to nodeConfig.KeyStoreDir
-	nodeConfig.KeyStoreDir = userKeyStoreDir
+	nodeConfig.KeyStoreDir = input.keyStoreDir
 
 	return nodeConfig, nil
 }
 
-func (b *GethStatusBackend) prepareSubAccounts(mnemonic, keyUID string, derivedAddresses map[string]generator.AccountInfo, request *requests.CreateAccount) ([]*accounts.Account, error) {
-	walletDerivedAccount := derivedAddresses[pathDefaultWallet]
+func (b *GethStatusBackend) prepareSubAccounts(request *requests.CreateAccount, input *prepareAccountInput) ([]*accounts.Account, error) {
+	walletDerivedAccount := input.derivedAddresses[pathDefaultWallet]
 	walletAccount := &accounts.Account{
 		PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
-		KeyUID:    keyUID,
+		KeyUID:    input.keyUID,
 		Address:   types.HexToAddress(walletDerivedAccount.Address),
 		ColorID:   multiacccommon.CustomizationColor(request.CustomizationColor),
 		Emoji:     request.Emoji,
@@ -1546,14 +1631,14 @@ func (b *GethStatusBackend) prepareSubAccounts(mnemonic, keyUID string, derivedA
 		Name:      walletAccountDefaultName,
 	}
 
-	if mnemonic == "" {
+	if input.restoringAccount {
 		walletAccount.AddressWasNotShown = true
 	}
 
-	chatDerivedAccount := derivedAddresses[pathDefaultChat]
+	chatDerivedAccount := input.derivedAddresses[pathDefaultChat]
 	chatAccount := &accounts.Account{
 		PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
-		KeyUID:    keyUID,
+		KeyUID:    input.keyUID,
 		Address:   types.HexToAddress(chatDerivedAccount.Address),
 		Name:      request.DisplayName,
 		Chat:      true,
@@ -1561,6 +1646,37 @@ func (b *GethStatusBackend) prepareSubAccounts(mnemonic, keyUID string, derivedA
 	}
 
 	return []*accounts.Account{walletAccount, chatAccount}, nil
+}
+
+func (b *GethStatusBackend) prepareForKeycard(request *requests.CreateAccount, input *prepareAccountInput, response *accountBundle) (*accountBundle, error) {
+	if request.KeycardInstanceUID == "" {
+		return response, nil
+	}
+
+	kp := wallet.NewKeycardPairings()
+	kp.SetKeycardPairingsFile(response.nodeConfig.KeycardPairingDataFile)
+	pairings, err := kp.GetPairings()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get keycard pairings")
+	}
+
+	keycard, ok := pairings[request.KeycardInstanceUID]
+	if !ok {
+		return nil, errors.New("keycard not found in pairings file")
+	}
+
+	response.settings.KeycardInstanceUID = request.KeycardInstanceUID
+	response.settings.KeycardPairedOn = time.Now().Unix()
+	response.settings.KeycardPairing = keycard.Key
+	response.account.KeycardPairing = keycard.Key
+
+	privateKeyHex := strings.TrimPrefix(input.derivedAddresses[pathDefaultChat].PrivateKey, "0x")
+	response.chatPrivateKey, err = crypto.HexToECDSA(privateKeyHex)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse chat private key hex")
+	}
+
+	return response, nil
 }
 
 func (b *GethStatusBackend) getDerivedAddresses(id string) (map[string]generator.AccountInfo, error) {
@@ -1799,7 +1915,7 @@ func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(
 // StartNodeWithAccountAndInitialConfig is used after account and config was generated.
 // In current setup account name and config is generated on the client side. Once/if it will be generated on
 // status-go side this flow can be simplified.
-// TODO: Consider passing generateAccountResponse here directly
+// TODO: Consider passing accountBundle here directly
 func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	account multiaccounts.Account,
 	password string,
