@@ -200,6 +200,7 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 
 	// Only certain types of messages can be deleted
 	if message.ContentType != protobuf.ChatMessage_TEXT_PLAIN &&
+		message.ContentType != protobuf.ChatMessage_BRIDGE_MESSAGE &&
 		message.ContentType != protobuf.ChatMessage_STICKER &&
 		message.ContentType != protobuf.ChatMessage_EMOJI &&
 		message.ContentType != protobuf.ChatMessage_IMAGE &&

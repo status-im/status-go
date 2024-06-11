@@ -61,6 +61,40 @@ func (s *MessengerDeleteMessageForEveryoneSuite) newMessenger() *Messenger {
 	return messenger
 }
 
+func (s *MessengerDeleteMessageForEveryoneSuite) testSendAndDeleteMessage(messageToSend *common.Message, shouldError bool) {
+	ctx := context.Background()
+	sendResponse, err := s.bob.SendChatMessage(ctx, messageToSend)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	response, err := WaitOnMessengerResponse(s.moderator, func(response *MessengerResponse) bool {
+		return len(response.Messages()) > 0
+	}, "messages not received")
+	s.Require().NoError(err)
+	message := response.Messages()[0]
+	s.Require().Equal(messageToSend.Text, message.Text)
+
+	deleteMessageResponse, err := s.moderator.DeleteMessageAndSend(ctx, message.ID)
+	if shouldError {
+		s.Require().Error(err)
+		return
+	}
+	s.Require().NoError(err)
+
+	response, err = WaitOnMessengerResponse(s.bob, func(response *MessengerResponse) bool {
+		return len(response.RemovedMessages()) > 0
+	}, "removed messages not received")
+	s.Require().Equal(deleteMessageResponse.RemovedMessages()[0].DeletedBy, contactIDFromPublicKey(s.moderator.IdentityPublicKey()))
+
+	s.Require().NoError(err)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+	s.Require().True(response.ActivityCenterNotifications()[0].Deleted)
+
+	message, err = s.bob.MessageByID(message.ID)
+	s.Require().NoError(err)
+	s.Require().True(message.Deleted)
+}
+
 func (s *MessengerDeleteMessageForEveryoneSuite) TestDeleteMessageForEveryone() {
 	community := s.createCommunity()
 	communityChat := s.createCommunityChat(community)
@@ -90,36 +124,34 @@ func (s *MessengerDeleteMessageForEveryoneSuite) TestDeleteMessageForEveryone() 
 	}, "community description changed message not received")
 	s.Require().NoError(err)
 
-	ctx := context.Background()
+	// // Normal message
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = communityChat.ID
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = "some text"
-	_, err = s.bob.SendChatMessage(ctx, inputMessage)
-	s.Require().NoError(err)
 
-	response, err = WaitOnMessengerResponse(s.moderator, func(response *MessengerResponse) bool {
-		return len(response.Messages()) > 0
-	}, "messages not received")
-	s.Require().NoError(err)
-	message := response.Messages()[0]
-	s.Require().Equal(inputMessage.Text, message.Text)
+	s.testSendAndDeleteMessage(inputMessage, false)
 
-	deleteMessageResponse, err := s.moderator.DeleteMessageAndSend(ctx, message.ID)
-	s.Require().NoError(err)
+	// // Bridge message
+	bridgeMessage := buildTestMessage(*communityChat)
+	bridgeMessage.ContentType = protobuf.ChatMessage_BRIDGE_MESSAGE
+	bridgeMessage.Payload = &protobuf.ChatMessage_BridgeMessage{
+		BridgeMessage: &protobuf.BridgeMessage{
+			BridgeName:      "discord",
+			UserName:        "user1",
+			UserAvatar:      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
+			UserID:          "123",
+			Content:         "text1",
+			MessageID:       "456",
+			ParentMessageID: "789",
+		},
+	}
+	s.testSendAndDeleteMessage(bridgeMessage, false)
 
-	response, err = WaitOnMessengerResponse(s.bob, func(response *MessengerResponse) bool {
-		return len(response.RemovedMessages()) > 0
-	}, "removed messages not received")
-	s.Require().Equal(deleteMessageResponse.RemovedMessages()[0].DeletedBy, contactIDFromPublicKey(s.moderator.IdentityPublicKey()))
-
-	s.Require().NoError(err)
-	s.Require().Len(response.ActivityCenterNotifications(), 1)
-	s.Require().True(response.ActivityCenterNotifications()[0].Deleted)
-
-	message, err = s.bob.MessageByID(message.ID)
-	s.Require().NoError(err)
-	s.Require().True(message.Deleted)
+	// Gap message cannot be deleted
+	gapMessage := buildTestMessage(*communityChat)
+	gapMessage.ContentType = protobuf.ChatMessage_SYSTEM_MESSAGE_GAP
+	s.testSendAndDeleteMessage(gapMessage, true)
 }
 
 func (s *MessengerDeleteMessageForEveryoneSuite) createCommunity() *communities.Community {
