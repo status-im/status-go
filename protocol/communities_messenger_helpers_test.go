@@ -71,6 +71,11 @@ func (m *TokenManagerMock) GetBalancesByChain(ctx context.Context, accounts, tok
 	return *m.Balances, nil
 }
 
+func (m *TokenManagerMock) GetCachedBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
+	time.Sleep(100 * time.Millisecond) // simulate response time
+	return *m.Balances, nil
+}
+
 func (m *TokenManagerMock) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *walletToken.Token {
 	time.Sleep(100 * time.Millisecond) // simulate response time
 	return nil
@@ -79,6 +84,11 @@ func (m *TokenManagerMock) FindOrCreateTokenByAddress(ctx context.Context, chain
 type CollectiblesManagerMock struct {
 	Balances                     *map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
 	collectibleOwnershipResponse map[string][]thirdparty.AccountBalance
+}
+
+func (m *CollectiblesManagerMock) FetchCachedBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID,
+	ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
+	return m.FetchBalancesByOwnerAndContractAddress(ctx, chainID, ownerAddress, contractAddresses)
 }
 
 func (m *CollectiblesManagerMock) FetchBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID,

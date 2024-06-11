@@ -284,6 +284,12 @@ func (api *API) GetCryptoOnRamps(ctx context.Context) ([]onramp.CryptoOnRamp, er
    Collectibles API Start
 */
 
+func (api *API) FetchCachedBalancesByOwnerAndContractAddress(ctx context.Context, chainID wcommon.ChainID, ownerAddress common.Address, contractAddresses []common.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
+	log.Debug("call to FetchCachedBalancesByOwnerAndContractAddress")
+
+	return api.s.collectiblesManager.FetchCachedBalancesByOwnerAndContractAddress(ctx, chainID, ownerAddress, contractAddresses)
+}
+
 func (api *API) FetchBalancesByOwnerAndContractAddress(ctx context.Context, chainID wcommon.ChainID, ownerAddress common.Address, contractAddresses []common.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
 	log.Debug("call to FetchBalancesByOwnerAndContractAddress")
 
