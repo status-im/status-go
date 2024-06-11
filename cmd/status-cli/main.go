@@ -109,7 +109,33 @@ func main() {
 				Usage:   "Start a server to send and receive messages",
 				Flags:   ServeFlags,
 				Action: func(cCtx *cli.Context) error {
-					return serve(cCtx)
+					return serve(cCtx, false)
+				},
+			},
+			{
+				Name:    "servelast",
+				Aliases: []string{"sl"},
+				Usage:   "Start a server with the lastest input name's account\n\n  E.g.: if last time you created an account with name 'Alice',\n  you can start the server with 'Alice' account by running 'servelast -n Alice'",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     NameFlag,
+						Aliases:  []string{"n"},
+						Usage:    "Name of the existing user",
+						Required: true,
+					},
+					&cli.BoolFlag{
+						Name:    InteractiveFlag,
+						Aliases: []string{"i"},
+						Usage:   "Use interactive mode to input the messages",
+					},
+					&cli.StringFlag{
+						Name:    AddFlag,
+						Aliases: []string{"a"},
+						Usage:   "Add a friend with the public key",
+					},
+				},
+				Action: func(cCtx *cli.Context) error {
+					return serve(cCtx, true)
 				},
 			},
 		},

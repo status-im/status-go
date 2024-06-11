@@ -33,37 +33,24 @@ func setupLogger(file string) *zap.Logger {
 	return logutils.ZapLogger()
 }
 
-func start(name string, port int, apiModules string, telemetryUrl string) (*StatusCLI, error) {
-	namedLogger := logger.Named(name)
-	namedLogger.Info("starting messager")
-
-	_ = setupLogger(name)
-
-	path := fmt.Sprintf("./test-%s", strings.ToLower(name))
-	err := os.MkdirAll(path, os.ModePerm)
-	if err != nil {
-		return nil, err
-	}
+func start(name string, port int, apiModules string, telemetryUrl string, useLastAccount bool) (*StatusCLI, error) {
+	var (
+		rootDataDir = fmt.Sprintf("./test-%s", strings.ToLower(name))
+		password    = "some-password"
+	)
+	setupLogger(name)
+	nlog := logger.Named(name)
+	nlog.Info("starting messager")
 
 	backend := api.NewGethStatusBackend()
-
-	createAccountRequest := &requests.CreateAccount{
-		DisplayName:        name,
-		CustomizationColor: "#ffffff",
-		Emoji:              "some",
-		Password:           "some-password",
-		RootDataDir:        fmt.Sprintf("./test-%s", strings.ToLower(name)),
-		LogFilePath:        "log",
-		APIConfig: &requests.APIConfig{
-			APIModules: apiModules,
-			HTTPHost:   "127.0.0.1",
-			HTTPPort:   port,
-		},
-		TelemetryServerURL: telemetryUrl,
-	}
-	_, err = backend.CreateAccountAndLogin(createAccountRequest)
-	if err != nil {
-		return nil, err
+	if useLastAccount {
+		if err := getLastAccountAndLogin(backend, name, rootDataDir, password); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := createAccountAndLogin(backend, name, rootDataDir, password, apiModules, telemetryUrl, port); err != nil {
+			return nil, err
+		}
 	}
 
 	wakuService := backend.StatusNode().WakuV2ExtService()
@@ -73,23 +60,66 @@ func start(name string, port int, apiModules string, telemetryUrl string) (*Stat
 	wakuAPI := wakuv2ext.NewPublicAPI(wakuService)
 
 	messenger := wakuAPI.Messenger()
-	_, err = wakuAPI.StartMessenger()
-	if err != nil {
+	if _, err := wakuAPI.StartMessenger(); err != nil {
 		return nil, err
 	}
 
-	namedLogger.Info("messenger started, public key: ", messenger.IdentityPublicKeyString())
-
+	nlog.Info("messenger started, public key: ", messenger.IdentityPublicKeyString())
 	time.Sleep(WaitingInterval)
 
 	data := StatusCLI{
 		name:      name,
 		messenger: messenger,
 		backend:   backend,
-		logger:    namedLogger,
+		logger:    nlog,
 	}
 
 	return &data, nil
+}
+
+func getLastAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password string) error {
+	b.UpdateRootDataDir(rootDataDir)
+	if err := b.OpenAccounts(); err != nil {
+		return fmt.Errorf("name '%v' might not have an account: trying to find: %v: %w", name, rootDataDir, err)
+	}
+	accs, err := b.GetAccounts()
+	if err != nil {
+		return err
+	}
+	if len(accs) == 0 {
+		return errors.New("no accounts found")
+	}
+
+	return b.LoginAccount(&requests.Login{
+		Password: password,
+		KeyUID:   accs[0].KeyUID,
+	})
+}
+
+func createAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password, apiModules, telemetryUrl string, port int) error {
+
+	if err := os.MkdirAll(rootDataDir, os.ModePerm); err != nil {
+		return err
+	}
+
+	req := &requests.CreateAccount{
+		DisplayName:        name,
+		CustomizationColor: "#ffffff",
+		Emoji:              "some",
+		Password:           password,
+		RootDataDir:        rootDataDir,
+		LogFilePath:        "log",
+		APIConfig: &requests.APIConfig{
+			APIModules: apiModules,
+			HTTPHost:   "127.0.0.1",
+			HTTPPort:   port,
+		},
+		TelemetryServerURL: telemetryUrl,
+	}
+	if _, err := b.CreateAccountAndLogin(req); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (cli *StatusCLI) stop() {

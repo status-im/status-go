@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func serve(cCtx *cli.Context) error {
+func serve(cCtx *cli.Context, useLastAccount bool) error {
 	rawLogger, err := zap.NewDevelopment()
 	if err != nil {
 		log.Fatalf("Error initializing logger: %v", err)
@@ -35,7 +35,7 @@ func serve(cCtx *cli.Context) error {
 	interactive := cCtx.Bool(InteractiveFlag)
 	dest := cCtx.String(AddFlag)
 
-	cli, err := start(name, port, apiModules, telemetryUrl)
+	cli, err := start(name, port, apiModules, telemetryUrl, useLastAccount)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func serve(cCtx *cli.Context) error {
 	msignal.SetMobileSignalHandler(msignal.MobileSignalHandler(func(s []byte) {
 		var ev MobileSignalEvent
 		if err := json.Unmarshal(s, &ev); err != nil {
-			logger.Errorf("unmarshaling signal event: %v", err)
+			logger.Error("unmarshaling signal event", zap.Error(err), zap.String("event", string(s)))
 			return
 		}
 
