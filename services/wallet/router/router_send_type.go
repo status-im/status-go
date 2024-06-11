@@ -43,6 +43,10 @@ func (s SendType) IsEnsTransfer() bool {
 	return s == ENSRegister || s == ENSRelease || s == ENSSetPubKey
 }
 
+func (s SendType) IsStickersTransfer() bool {
+	return s == StickersBuy
+}
+
 func (s SendType) FetchPrices(marketManager *market.Manager, tokenID string) (map[string]float64, error) {
 	symbols := []string{tokenID, "ETH"}
 	if s.IsCollectiblesTransfer() {
@@ -96,7 +100,7 @@ func (s SendType) isTransfer(routerV2Logic bool) bool {
 }
 
 func (s SendType) needL1Fee() bool {
-	return s != ENSRegister && s != ENSRelease && s != ENSSetPubKey && s != StickersBuy
+	return !s.IsEnsTransfer() && !s.IsStickersTransfer()
 }
 
 func (s SendType) canUseProcessor(p pathprocessor.PathProcessor) bool {
@@ -112,22 +116,23 @@ func (s SendType) canUseProcessor(p pathprocessor.PathProcessor) bool {
 		return pathProcessorName == pathprocessor.ProcessorENSReleaseName
 	case ENSSetPubKey:
 		return pathProcessorName == pathprocessor.ProcessorENSPublicKeyName
+	case StickersBuy:
+		return pathProcessorName == pathprocessor.ProcessorStickersBuyName
 	default:
 		return true
 	}
 }
 
 func (s SendType) isAvailableBetween(from, to *params.Network) bool {
-	if s.IsCollectiblesTransfer() || s.IsEnsTransfer() {
+	if s.IsCollectiblesTransfer() ||
+		s.IsEnsTransfer() ||
+		s.IsStickersTransfer() ||
+		s == Swap {
 		return from.ChainID == to.ChainID
 	}
 
 	if s == Bridge {
 		return from.ChainID != to.ChainID
-	}
-
-	if s == Swap {
-		return from.ChainID == to.ChainID
 	}
 
 	return true
@@ -153,7 +158,7 @@ func (s SendType) isAvailableFor(network *params.Network) bool {
 		return swapAllowedNetworks[network.ChainID]
 	}
 
-	if s.IsEnsTransfer() {
+	if s.IsEnsTransfer() || s.IsStickersTransfer() {
 		return network.ChainID == walletCommon.EthereumMainnet || network.ChainID == walletCommon.EthereumSepolia
 	}
 

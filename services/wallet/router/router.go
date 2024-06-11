@@ -286,6 +286,7 @@ func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, token
 	ensRegister := pathprocessor.NewENSRegisterProcessor(rpcClient, transactor, ensService)
 	ensRelease := pathprocessor.NewENSReleaseProcessor(rpcClient, transactor, ensService)
 	ensPublicKey := pathprocessor.NewENSPublicKeyProcessor(rpcClient, transactor, ensService)
+	buyStickers := pathprocessor.NewStickersBuyProcessor(rpcClient, transactor, stickersService)
 
 	processors[transfer.Name()] = transfer
 	processors[erc721Transfer.Name()] = erc721Transfer
@@ -296,6 +297,7 @@ func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, token
 	processors[ensRegister.Name()] = ensRegister
 	processors[ensRelease.Name()] = ensRelease
 	processors[ensPublicKey.Name()] = ensPublicKey
+	processors[buyStickers.Name()] = buyStickers
 
 	return &Router{
 		rpcClient:           rpcClient,
@@ -342,7 +344,7 @@ type Router struct {
 
 func (r *Router) requireApproval(ctx context.Context, sendType SendType, approvalContractAddress *common.Address, account common.Address, network *params.Network, token *token.Token, amountIn *big.Int) (
 	bool, *big.Int, uint64, uint64, error) {
-	if sendType.IsCollectiblesTransfer() || sendType.IsEnsTransfer() {
+	if sendType.IsCollectiblesTransfer() || sendType.IsEnsTransfer() || sendType.IsStickersTransfer() {
 		return false, nil, 0, 0, nil
 	}
 
@@ -550,7 +552,8 @@ func (r *Router) SuggestedRoutes(
 				// Skip processors that are added because of the Router V2, to not break the current functionality
 				if pProcessor.Name() == pathprocessor.ProcessorENSRegisterName ||
 					pProcessor.Name() == pathprocessor.ProcessorENSReleaseName ||
-					pProcessor.Name() == pathprocessor.ProcessorENSPublicKeyName {
+					pProcessor.Name() == pathprocessor.ProcessorENSPublicKeyName ||
+					pProcessor.Name() == pathprocessor.ProcessorStickersBuyName {
 					continue
 				}
 

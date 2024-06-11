@@ -27,4 +27,5 @@ const (
 	ProcessorENSRegisterName  = "ENSRegister"
 	ProcessorENSReleaseName   = "ENSRelease"
 	ProcessorENSPublicKeyName = "ENSPublicKey"
+	ProcessorStickersBuyName  = "StickersBuy"
 )
