@@ -227,7 +227,7 @@ func (s *MessengerRawMessageResendTest) TestMessageResend() {
 	rawMessage, err := s.bobMessenger.RawMessageByID(ids[0])
 	s.Require().NoError(err)
 	s.Require().NotNil(rawMessage)
-	s.Require().NoError(s.bobMessenger.UpdateRawMessageSent(rawMessage.ID, false, 0))
+	s.Require().NoError(s.bobMessenger.UpdateRawMessageSent(rawMessage.ID, false))
 	err = tt.RetryWithBackOff(func() error {
 		rawMessage, err := s.bobMessenger.RawMessageByID(ids[0])
 		s.Require().NoError(err)

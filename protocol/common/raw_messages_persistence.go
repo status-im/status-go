@@ -488,7 +488,7 @@ func (db *RawMessagesPersistence) RemoveMessageSegmentsCompletedOlderThan(timest
 	return err
 }
 
-func (db RawMessagesPersistence) UpdateRawMessageSent(id string, sent bool, lastSent uint64) error {
-	_, err := db.db.Exec("UPDATE raw_messages SET sent = ?, last_sent = ? WHERE id = ?", sent, lastSent, id)
+func (db RawMessagesPersistence) UpdateRawMessageSent(id string, sent bool) error {
+	_, err := db.db.Exec("UPDATE raw_messages SET sent = ? WHERE id = ?", sent, id)
 	return err
 }

@@ -73,7 +73,7 @@ func TestUpdateRawMessageSent(t *testing.T) {
 	require.True(t, rawMessage.Sent)
 	require.Greater(t, rawMessage.LastSent, uint64(0))
 
-	err = p.UpdateRawMessageSent(rawMessageID, false, 0)
+	err = p.UpdateRawMessageSent(rawMessageID, false)
 	require.NoError(t, err)
 
 	m, err := p.RawMessageByID(rawMessageID)
