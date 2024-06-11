@@ -1113,19 +1113,8 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
 func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Hash, pubsubTopic string) []gethcommon.Hash {
 	selectedPeer := w.storePeerID
 	if selectedPeer == "" {
-		selectedPeers, err := w.node.PeerManager().SelectPeers(
-			peermanager.PeerSelectionCriteria{
-				SelectionType: peermanager.Automatic,
-				Proto:         store.StoreQueryID_v300,
-				PubsubTopics:  []string{pubsubTopic},
-				Ctx:           ctx,
-			},
-		)
-		if err != nil {
-			w.logger.Error("could not select peers", zap.Error(err))
-			return []gethcommon.Hash{}
-		}
-		selectedPeer = selectedPeers[0]
+		w.logger.Error("no store peer id available", zap.String("pubsubTopic", pubsubTopic))
+		return []gethcommon.Hash{}
 	}
 
 	var opts []store.RequestOption
