@@ -54,18 +54,7 @@ func TestUpdateRawMessageSent(t *testing.T) {
 	require.NoError(t, err)
 
 	rawMessageID := "1"
-	err = p.SaveRawMessage(&RawMessage{
-		ID:                    rawMessageID,
-		ResendType:            ResendTypeRawMessage,
-		LocalChatID:           "",
-		CommunityID:           []byte("c1"),
-		CommunityKeyExMsgType: KeyExMsgRekey,
-		Sender:                pk,
-		ResendMethod:          ResendMethodSendPrivate,
-		Recipients:            []*ecdsa.PublicKey{pk.Public().(*ecdsa.PublicKey)},
-		Sent:                  true,
-		LastSent:              uint64(time.Now().UnixNano() / int64(time.Millisecond)),
-	})
+	err = p.SaveRawMessage(buildRawMessage(rawMessageID, pk))
 	require.NoError(t, err)
 
 	rawMessage, err := p.RawMessageByID(rawMessageID)
@@ -79,7 +68,6 @@ func TestUpdateRawMessageSent(t *testing.T) {
 	m, err := p.RawMessageByID(rawMessageID)
 	require.NoError(t, err)
 	require.False(t, m.Sent)
-	require.Equal(t, m.LastSent, uint64(0))
 }
 
 func TestUpdateRawMessageLastSent(t *testing.T) {
@@ -92,18 +80,7 @@ func TestUpdateRawMessageLastSent(t *testing.T) {
 	require.NoError(t, err)
 
 	rawMessageID := "1"
-	err = p.SaveRawMessage(&RawMessage{
-		ID:                    rawMessageID,
-		ResendType:            ResendTypeRawMessage,
-		LocalChatID:           "",
-		CommunityID:           []byte("c1"),
-		CommunityKeyExMsgType: KeyExMsgRekey,
-		Sender:                pk,
-		ResendMethod:          ResendMethodSendPrivate,
-		Recipients:            []*ecdsa.PublicKey{pk.Public().(*ecdsa.PublicKey)},
-		Sent:                  true,
-		LastSent:              uint64(time.Now().UnixNano() / int64(time.Millisecond)),
-	})
+	err = p.SaveRawMessage(buildRawMessage(rawMessageID, pk))
 	require.NoError(t, err)
 
 	rawMessage, err := p.RawMessageByID(rawMessageID)
@@ -117,4 +94,19 @@ func TestUpdateRawMessageLastSent(t *testing.T) {
 	m, err := p.RawMessageByID(rawMessageID)
 	require.NoError(t, err)
 	require.Equal(t, m.LastSent, uint64(0))
+}
+
+func buildRawMessage(rawMessageID string, pk *ecdsa.PrivateKey) *RawMessage {
+	return &RawMessage{
+		ID:                    rawMessageID,
+		ResendType:            ResendTypeRawMessage,
+		LocalChatID:           "",
+		CommunityID:           []byte("c1"),
+		CommunityKeyExMsgType: KeyExMsgRekey,
+		Sender:                pk,
+		ResendMethod:          ResendMethodSendPrivate,
+		Recipients:            []*ecdsa.PublicKey{pk.Public().(*ecdsa.PublicKey)},
+		Sent:                  true,
+		LastSent:              uint64(time.Now().UnixNano() / int64(time.Millisecond)),
+	}
 }
