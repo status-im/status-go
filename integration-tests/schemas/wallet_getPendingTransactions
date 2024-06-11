@@ -1,0 +1,91 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "string"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "items": {
+                "properties": {
+                    "additionalData": {
+                        "type": "string"
+                    },
+                    "autoDelete": {
+                        "type": "boolean"
+                    },
+                    "data": {
+                        "type": "string"
+                    },
+                    "from": {
+                        "type": "string"
+                    },
+                    "gasLimit": {
+                        "type": "string"
+                    },
+                    "gasPrice": {
+                        "type": "string"
+                    },
+                    "hash": {
+                        "type": "string"
+                    },
+                    "multi_transaction_id": {
+                        "type": "integer"
+                    },
+                    "network_id": {
+                        "type": "integer"
+                    },
+                    "nonce": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "symbol": {
+                        "type": "string"
+                    },
+                    "timestamp": {
+                        "type": "integer"
+                    },
+                    "to": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "value": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "additionalData",
+                    "autoDelete",
+                    "data",
+                    "from",
+                    "gasLimit",
+                    "gasPrice",
+                    "hash",
+                    "multi_transaction_id",
+                    "network_id",
+                    "nonce",
+                    "status",
+                    "symbol",
+                    "timestamp",
+                    "to",
+                    "type",
+                    "value"
+                ],
+                "type": "object"
+            },
+            "type": "array"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}

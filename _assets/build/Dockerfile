@@ -1,5 +1,5 @@
 # Build status-go in a Go builder container
-FROM golang:1.20-alpine3.18 as builder
+FROM golang:1.21-alpine3.18 as builder
 
 
 RUN apk add --no-cache make gcc g++ musl-dev linux-headers
@@ -24,9 +24,11 @@ LABEL description="status-go is an underlying part of Status - a browser, messen
 
 RUN apk add --no-cache ca-certificates bash libgcc libstdc++
 RUN mkdir -p /static/keys
+RUN mkdir -p /static/configs
 
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/$build_target /usr/local/bin/
 COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static/keys/
+COPY --from=builder /go/src/github.com/status-im/status-go/integration-tests/config.json /static/configs/
 
 RUN ln -s /usr/local/bin/$build_target /usr/local/bin/entrypoint
 

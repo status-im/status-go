@@ -1,0 +1,56 @@
+services:
+
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    platform: linux/amd64
+    command:
+      - anvil --host 0.0.0.0
+    ports:
+      - 8545:8545
+  
+  deploy-sntv2:
+    environment:
+      - API_KEY_ETHERSCAN="" # value isn't used, but env var is required
+    depends_on:
+      - anvil
+    image: ghcr.io/foundry-rs/foundry:latest
+    platform: linux/amd64
+    working_dir: /usr/local/bin/status-network-token-v2
+    command:
+      - forge clean && forge build && forge script script/Deploy.s.sol --broadcast --fork-url http://anvil:8545 --private-key="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    volumes:
+      - ${PATH_TO_CONTRACT_REPOS}/status-network-token-v2:/usr/local/bin/status-network-token-v2
+
+  deploy-communities-contracts:
+    environment:
+    # values arn't used, but env vars are required
+      - API_KEY_ETHERSCAN=""
+      - API_KEY_ARBISCAN=""
+      - API_KEY_OPTIMISTIC_ETHERSCAN=""
+    depends_on:
+      - anvil
+      - deploy-sntv2
+    image: ghcr.io/foundry-rs/foundry:latest
+    platform: linux/amd64
+    working_dir: /usr/local/bin/communities-contracts
+    command:
+      - forge clean && forge build && forge script script/DeployContracts.s.sol --broadcast --fork-url http://anvil:8545 --private-key="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    volumes:
+      - ${PATH_TO_CONTRACT_REPOS}/communities-contracts:/usr/local/bin/communities-contracts
+
+  status-go:
+    build:
+      context: ../
+      dockerfile: _assets/build/Dockerfile
+      args:
+        build_tags: gowaku_no_rln
+        build_target: statusd
+        build_flags: -ldflags="-X github.com/status-im/status-go/params.Version= -X github.com/status-im/status-go/params.GitCommit=11f83780d -X github.com/status-im/status-go/params.IpfsGatewayURL=https://ipfs.status.im/ -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true"
+    ports:
+      - 3333:3333
+      - 8080:8080
+      - 30303:30303
+      - 30303:30303/udp
+      - 30304:30304/udp
+    entrypoint: ["statusd", "-c", "/static/configs/config.json", "--seed-phrase=test test test test test test test test test test test junk", "--password=Strong12345"]
+
