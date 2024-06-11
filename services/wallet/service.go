@@ -102,7 +102,7 @@ func NewService(
 
 	communityManager := community.NewManager(db, mediaServer, feed)
 	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
-	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer, feed, accountFeed, accountsDB)
+	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer, feed, accountFeed, accountsDB, token.NewPersistence(db))
 	tokenManager.Start()
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(transfer.NewMultiTransactionDB(db), gethManager, transactor, config, accountsDB, pendingTxManager, feed)
@@ -113,7 +113,7 @@ func NewService(
 	cryptoCompare := cryptocompare.NewClient()
 	coingecko := coingecko.NewClient()
 	marketManager := market.NewManager(cryptoCompare, coingecko, feed)
-	reader := NewReader(tokenManager, marketManager, communityManager, NewPersistence(db), feed)
+	reader := NewReader(tokenManager, marketManager, communityManager, token.NewPersistence(db), feed)
 	history := history.NewService(db, accountsDB, accountFeed, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
 

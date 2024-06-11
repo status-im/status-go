@@ -97,18 +97,19 @@ type ManagerInterface interface {
 
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
 type Manager struct {
-	db                *sql.DB
-	RPCClient         *rpc.Client
-	ContractMaker     *contracts.ContractMaker
-	networkManager    *network.Manager
-	stores            []store // Set on init, not changed afterwards
-	communityTokensDB *communitytokensdatabase.Database
-	communityManager  *community.Manager
-	mediaServer       *server.MediaServer
-	walletFeed        *event.Feed
-	accountFeed       *event.Feed
-	accountWatcher    *accountsevent.Watcher
-	accountsDB        *accounts.Database
+	db                   *sql.DB
+	RPCClient            *rpc.Client
+	ContractMaker        *contracts.ContractMaker
+	networkManager       *network.Manager
+	stores               []store // Set on init, not changed afterwards
+	communityTokensDB    *communitytokensdatabase.Database
+	communityManager     *community.Manager
+	mediaServer          *server.MediaServer
+	walletFeed           *event.Feed
+	accountFeed          *event.Feed
+	accountWatcher       *accountsevent.Watcher
+	accountsDB           *accounts.Database
+	tokenBalancesStorage TokenBalancesStorage
 
 	tokens []*Token
 
@@ -166,24 +167,26 @@ func NewTokenManager(
 	walletFeed *event.Feed,
 	accountFeed *event.Feed,
 	accountsDB *accounts.Database,
+	tokenBalancesStorage TokenBalancesStorage,
 ) *Manager {
 	maker, _ := contracts.NewContractMaker(RPCClient)
 	stores := []store{newUniswapStore(), newDefaultStore()}
 	tokens := prepareTokens(networkManager, stores)
 
 	return &Manager{
-		db:                db,
-		RPCClient:         RPCClient,
-		ContractMaker:     maker,
-		networkManager:    networkManager,
-		communityManager:  communityManager,
-		stores:            stores,
-		communityTokensDB: communitytokensdatabase.NewCommunityTokensDatabase(appDB),
-		tokens:            tokens,
-		mediaServer:       mediaServer,
-		walletFeed:        walletFeed,
-		accountFeed:       accountFeed,
-		accountsDB:        accountsDB,
+		db:                   db,
+		RPCClient:            RPCClient,
+		ContractMaker:        maker,
+		networkManager:       networkManager,
+		communityManager:     communityManager,
+		stores:               stores,
+		communityTokensDB:    communitytokensdatabase.NewCommunityTokensDatabase(appDB),
+		tokens:               tokens,
+		mediaServer:          mediaServer,
+		walletFeed:           walletFeed,
+		accountFeed:          accountFeed,
+		accountsDB:           accountsDB,
+		tokenBalancesStorage: tokenBalancesStorage,
 	}
 }
 
@@ -359,13 +362,43 @@ func (tm *Manager) MarkAsPreviouslyOwnedToken(token *Token, owner common.Address
 	if (owner == common.Address{}) {
 		return false, errors.New("owner is nil")
 	}
-	count := 0
-	err := tm.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM token_balances WHERE user_address = ? AND token_address = ? AND chain_id = ?)`, owner.Hex(), token.Address.Hex(), token.ChainID).Scan(&count)
-	if err != nil || count > 0 {
+
+	tokens, err := tm.tokenBalancesStorage.GetTokens()
+	if err != nil {
 		return false, err
 	}
-	_, err = tm.db.Exec(`INSERT INTO token_balances(user_address,token_name,token_symbol,token_address,token_decimals,chain_id,token_decimals,raw_balance,balance) VALUES (?,?,?,?,?,?,?,?,?)`, owner.Hex(), token.Name, token.Symbol, token.Address.Hex(), token.Decimals, token.ChainID, 0, "0", "0")
-	return true, err
+
+	if tokens[owner] == nil {
+		tokens[owner] = make([]StorageToken, 0)
+	} else {
+		for _, t := range tokens[owner] {
+			if t.Address == token.Address && t.ChainID == token.ChainID && t.Symbol == token.Symbol {
+				log.Info("Token already marked as previously owned", "token", token, "owner", owner)
+				return false, nil
+			}
+		}
+	}
+
+	// append token to the list of tokens
+	tokens[owner] = append(tokens[owner], StorageToken{
+		Token: *token,
+		BalancesPerChain: map[uint64]ChainBalance{
+			token.ChainID: {
+				RawBalance: "0",
+				Balance:    &big.Float{},
+				Address:    token.Address,
+				ChainID:    token.ChainID,
+			},
+		},
+	})
+
+	// save the updated list of tokens
+	err = tm.tokenBalancesStorage.SaveTokens(tokens)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *Token, address common.Address) {
@@ -916,37 +949,20 @@ func (tm *Manager) GetTokenHistoricalBalance(account common.Address, chainID uin
 	return &balance, nil
 }
 
-func (tm *Manager) GetPreviouslyOwnedTokens() (map[common.Address][]*Token, error) {
-	tokenMap := make(map[common.Address][]*Token)
-	rows, err := tm.db.Query("SELECT user_address, token_name, token_symbol, token_address, token_decimals, chain_id FROM token_balances")
+func (tm *Manager) GetPreviouslyOwnedTokens() (map[common.Address][]Token, error) {
+	storageTokens, err := tm.tokenBalancesStorage.GetTokens()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	for rows.Next() {
-		token := &Token{}
-		var addressStr, tokenAddressStr string
-		err := rows.Scan(&addressStr, &token.Name, &token.Symbol, &tokenAddressStr, &token.Decimals, &token.ChainID)
-		if err != nil {
-			return nil, err
+	tokens := make(map[common.Address][]Token)
+	for account, storageToken := range storageTokens {
+		for _, token := range storageToken {
+			tokens[account] = append(tokens[account], token.Token)
 		}
-		address := common.HexToAddress(addressStr)
-		if (address == common.Address{}) {
-			continue
-		}
-		token.Address = common.HexToAddress(tokenAddressStr)
-		if (token.Address == common.Address{}) {
-			continue
-		}
-
-		if _, ok := tokenMap[address]; !ok {
-			tokenMap[address] = make([]*Token, 0)
-		}
-		tokenMap[address] = append(tokenMap[address], token)
 	}
 
-	return tokenMap, nil
+	return tokens, nil
 }
 
 func (tm *Manager) removeTokenBalances(account common.Address) error {

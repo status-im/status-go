@@ -46,7 +46,7 @@ func belongsToMandatoryTokens(symbol string) bool {
 	return false
 }
 
-func NewReader(tokenManager *token.Manager, marketManager *market.Manager, communityManager *community.Manager, persistence TokenBalancesStorage, walletFeed *event.Feed) *Reader {
+func NewReader(tokenManager *token.Manager, marketManager *market.Manager, communityManager *community.Manager, persistence token.TokenBalancesStorage, walletFeed *event.Feed) *Reader {
 	return &Reader{
 		tokenManager:        tokenManager,
 		marketManager:       marketManager,
@@ -59,7 +59,7 @@ func NewReader(tokenManager *token.Manager, marketManager *market.Manager, commu
 type Reader struct {
 	tokenManager                   *token.Manager
 	marketManager                  *market.Manager
-	persistence                    TokenBalancesStorage
+	persistence                    token.TokenBalancesStorage
 	walletFeed                     *event.Feed
 	cancel                         context.CancelFunc
 	walletEventsWatcher            *walletevent.Watcher
@@ -67,42 +67,6 @@ type Reader struct {
 	reloadDelayTimer               *time.Timer
 	refreshBalanceCache            bool
 	rw                             sync.RWMutex
-}
-
-type TokenMarketValues struct {
-	MarketCap       float64 `json:"marketCap"`
-	HighDay         float64 `json:"highDay"`
-	LowDay          float64 `json:"lowDay"`
-	ChangePctHour   float64 `json:"changePctHour"`
-	ChangePctDay    float64 `json:"changePctDay"`
-	ChangePct24hour float64 `json:"changePct24hour"`
-	Change24hour    float64 `json:"change24hour"`
-	Price           float64 `json:"price"`
-	HasError        bool    `json:"hasError"`
-}
-
-type ChainBalance struct {
-	RawBalance     string         `json:"rawBalance"`
-	Balance        *big.Float     `json:"balance"`
-	Balance1DayAgo string         `json:"balance1DayAgo"`
-	Address        common.Address `json:"address"`
-	ChainID        uint64         `json:"chainId"`
-	HasError       bool           `json:"hasError"`
-}
-
-type Token struct {
-	Name                    string                       `json:"name"`
-	Symbol                  string                       `json:"symbol"`
-	Decimals                uint                         `json:"decimals"`
-	BalancesPerChain        map[uint64]ChainBalance      `json:"balancesPerChain"`
-	Description             string                       `json:"description"`
-	AssetWebsiteURL         string                       `json:"assetWebsiteUrl"`
-	BuiltOn                 string                       `json:"builtOn"`
-	MarketValuesPerCurrency map[string]TokenMarketValues `json:"marketValuesPerCurrency"`
-	PegSymbol               string                       `json:"pegSymbol"`
-	Verified                bool                         `json:"verified"`
-	Image                   string                       `json:"image,omitempty"`
-	CommunityData           *community.Data              `json:"community_data,omitempty"`
 }
 
 func splitVerifiedTokens(tokens []*token.Token) ([]*token.Token, []*token.Token) {
@@ -292,7 +256,7 @@ func (r *Reader) invalidateBalanceCache() {
 	r.refreshBalanceCache = true
 }
 
-func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address) (map[common.Address][]Token, error) {
+func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address) (map[common.Address][]token.StorageToken, error) {
 	cachedTokens, err := r.getCachedWalletTokensWithoutMarketData()
 	if err != nil {
 		return nil, err
@@ -331,7 +295,7 @@ func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, clients map
 	return tokens, err
 }
 
-func isBalanceUpdateNeededAnyway(cachedTokens map[common.Address][]Token, addresses []common.Address, chainIDs []uint64) bool {
+func isBalanceUpdateNeededAnyway(cachedTokens map[common.Address][]token.StorageToken, addresses []common.Address, chainIDs []uint64) bool {
 	updateAnyway := false
 	for _, address := range addresses {
 		if res, ok := cachedTokens[address]; !ok || len(res) == 0 {
@@ -359,7 +323,7 @@ func isBalanceUpdateNeededAnyway(cachedTokens map[common.Address][]Token, addres
 	return updateAnyway
 }
 
-func tokensToBalancesPerChain(cachedTokens map[common.Address][]Token) map[uint64]map[common.Address]map[common.Address]*hexutil.Big {
+func tokensToBalancesPerChain(cachedTokens map[common.Address][]token.StorageToken) map[uint64]map[common.Address]map[common.Address]*hexutil.Big {
 	cachedBalancesPerChain := map[uint64]map[common.Address]map[common.Address]*hexutil.Big{}
 	for address, tokens := range cachedTokens {
 		for _, token := range tokens {
@@ -380,10 +344,6 @@ func tokensToBalancesPerChain(cachedTokens map[common.Address][]Token) map[uint6
 	return cachedBalancesPerChain
 }
 
-func (r *Reader) FetchBalances(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses, tokenAddresses []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
-	return r.fetchBalances(ctx, clients, addresses, tokenAddresses)
-}
-
 func (r *Reader) fetchBalances(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address, tokenAddresses []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
 	latestBalances, err := r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
 	if err != nil {
@@ -396,16 +356,16 @@ func (r *Reader) fetchBalances(ctx context.Context, clients map[uint64]chain.Cli
 
 func toChainBalance(
 	balances map[uint64]map[common.Address]map[common.Address]*hexutil.Big,
-	token *token.Token,
+	tok *token.Token,
 	address common.Address,
 	decimals uint,
-	cachedTokens map[common.Address][]Token,
+	cachedTokens map[common.Address][]token.StorageToken,
 	clients map[uint64]chain.ClientInterface,
 	isMandatoryToken bool,
-) *ChainBalance {
+) *token.ChainBalance {
 	hexBalance := &big.Int{}
 	if balances != nil {
-		hexBalance = balances[token.ChainID][address][token.Address].ToInt()
+		hexBalance = balances[tok.ChainID][address][tok.Address].ToInt()
 	}
 
 	balance := big.NewFloat(0.0)
@@ -417,26 +377,26 @@ func toChainBalance(
 	}
 
 	hasError := false
-	if client, ok := clients[token.ChainID]; ok {
+	if client, ok := clients[tok.ChainID]; ok {
 		hasError = !client.IsConnected()
 	}
 
-	isVisible := balance.Cmp(big.NewFloat(0.0)) > 0 || isCachedToken(cachedTokens, address, token.Symbol, token.ChainID)
+	isVisible := balance.Cmp(big.NewFloat(0.0)) > 0 || isCachedToken(cachedTokens, address, tok.Symbol, tok.ChainID)
 	if !isVisible && !isMandatoryToken {
 		return nil
 	}
 
-	return &ChainBalance{
+	return &token.ChainBalance{
 		RawBalance:     hexBalance.String(),
 		Balance:        balance,
 		Balance1DayAgo: "0",
-		Address:        token.Address,
-		ChainID:        token.ChainID,
+		Address:        tok.Address,
+		ChainID:        tok.ChainID,
 		HasError:       hasError,
 	}
 }
 
-func (r *Reader) getBalance1DayAgo(balance *ChainBalance, dayAgoTimestamp int64, symbol string, address common.Address) (*big.Int, error) {
+func (r *Reader) getBalance1DayAgo(balance *token.ChainBalance, dayAgoTimestamp int64, symbol string, address common.Address) (*big.Int, error) {
 	balance1DayAgo, err := r.tokenManager.GetTokenHistoricalBalance(address, balance.ChainID, symbol, dayAgoTimestamp)
 	if err != nil {
 		log.Error("tokenManager.GetTokenHistoricalBalance error", "err", err)
@@ -446,16 +406,16 @@ func (r *Reader) getBalance1DayAgo(balance *ChainBalance, dayAgoTimestamp int64,
 	return balance1DayAgo, nil
 }
 
-func (r *Reader) balancesToTokensByAddress(clients map[uint64]chain.ClientInterface, addresses []common.Address, allTokens []*token.Token, balances map[uint64]map[common.Address]map[common.Address]*hexutil.Big, cachedTokens map[common.Address][]Token) (map[common.Address][]Token, error) {
+func (r *Reader) balancesToTokensByAddress(clients map[uint64]chain.ClientInterface, addresses []common.Address, allTokens []*token.Token, balances map[uint64]map[common.Address]map[common.Address]*hexutil.Big, cachedTokens map[common.Address][]token.StorageToken) (map[common.Address][]token.StorageToken, error) {
 	verifiedTokens, unverifiedTokens := splitVerifiedTokens(allTokens)
 
-	result := make(map[common.Address][]Token)
+	result := make(map[common.Address][]token.StorageToken)
 	dayAgoTimestamp := time.Now().Add(-24 * time.Hour).Unix()
 
 	for _, address := range addresses {
 		for _, tokenList := range [][]*token.Token{verifiedTokens, unverifiedTokens} {
 			for symbol, tokens := range getTokenBySymbols(tokenList) {
-				balancesPerChain := make(map[uint64]ChainBalance)
+				balancesPerChain := make(map[uint64]token.ChainBalance)
 				decimals := tokens[0].Decimals
 				isMandatoryToken := belongsToMandatoryTokens(symbol)
 				for _, token := range tokens {
@@ -469,15 +429,17 @@ func (r *Reader) balancesToTokensByAddress(clients map[uint64]chain.ClientInterf
 					}
 				}
 
-				walletToken := Token{
-					Name:             tokens[0].Name,
-					Symbol:           symbol,
+				walletToken := token.StorageToken{
+					Token: token.Token{
+						Name:          tokens[0].Name,
+						Symbol:        symbol,
+						Decimals:      decimals,
+						PegSymbol:     token.GetTokenPegSymbol(symbol),
+						Verified:      tokens[0].Verified,
+						CommunityData: tokens[0].CommunityData,
+						Image:         tokens[0].Image,
+					},
 					BalancesPerChain: balancesPerChain,
-					Decimals:         decimals,
-					PegSymbol:        token.GetTokenPegSymbol(symbol),
-					Verified:         tokens[0].Verified,
-					CommunityData:    tokens[0].CommunityData,
-					Image:            tokens[0].Image,
 				}
 
 				result[address] = append(result[address], walletToken)
@@ -488,7 +450,7 @@ func (r *Reader) balancesToTokensByAddress(clients map[uint64]chain.ClientInterf
 	return result, nil
 }
 
-func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address, currency string) (map[common.Address][]Token, error) {
+func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address, currency string) (map[common.Address][]token.StorageToken, error) {
 	cachedTokens, err := r.getCachedWalletTokensWithoutMarketData()
 	if err != nil {
 		return nil, err
@@ -514,16 +476,16 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 
 	verifiedTokens, unverifiedTokens := splitVerifiedTokens(allTokens)
 	tokenSymbols := make([]string, 0)
-	result := make(map[common.Address][]Token)
+	result := make(map[common.Address][]token.StorageToken)
 
 	for _, address := range addresses {
 		for _, tokenList := range [][]*token.Token{verifiedTokens, unverifiedTokens} {
 			for symbol, tokens := range getTokenBySymbols(tokenList) {
-				balancesPerChain := make(map[uint64]ChainBalance)
+				balancesPerChain := make(map[uint64]token.ChainBalance)
 				decimals := tokens[0].Decimals
 				isVisible := false
-				for _, token := range tokens {
-					hexBalance := balances[token.ChainID][address][token.Address]
+				for _, tok := range tokens {
+					hexBalance := balances[tok.ChainID][address][tok.Address]
 					balance := big.NewFloat(0.0)
 					if hexBalance != nil {
 						balance = new(big.Float).Quo(
@@ -532,17 +494,17 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 						)
 					}
 					hasError := false
-					if client, ok := clients[token.ChainID]; ok {
+					if client, ok := clients[tok.ChainID]; ok {
 						hasError = err != nil || !client.IsConnected()
 					}
 					if !isVisible {
-						isVisible = balance.Cmp(big.NewFloat(0.0)) > 0 || isCachedToken(cachedTokens, address, token.Symbol, token.ChainID)
+						isVisible = balance.Cmp(big.NewFloat(0.0)) > 0 || isCachedToken(cachedTokens, address, tok.Symbol, tok.ChainID)
 					}
-					balancesPerChain[token.ChainID] = ChainBalance{
+					balancesPerChain[tok.ChainID] = token.ChainBalance{
 						RawBalance: hexBalance.ToInt().String(),
 						Balance:    balance,
-						Address:    token.Address,
-						ChainID:    token.ChainID,
+						Address:    tok.Address,
+						ChainID:    tok.ChainID,
 						HasError:   hasError,
 					}
 				}
@@ -551,15 +513,17 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 					continue
 				}
 
-				walletToken := Token{
-					Name:             tokens[0].Name,
-					Symbol:           symbol,
+				walletToken := token.StorageToken{
+					Token: token.Token{
+						Name:          tokens[0].Name,
+						Symbol:        symbol,
+						Decimals:      decimals,
+						PegSymbol:     token.GetTokenPegSymbol(symbol),
+						Verified:      tokens[0].Verified,
+						CommunityData: tokens[0].CommunityData,
+						Image:         tokens[0].Image,
+					},
 					BalancesPerChain: balancesPerChain,
-					Decimals:         decimals,
-					PegSymbol:        token.GetTokenPegSymbol(symbol),
-					Verified:         tokens[0].Verified,
-					CommunityData:    tokens[0].CommunityData,
-					Image:            tokens[0].Image,
 				}
 
 				tokenSymbols = append(tokenSymbols, symbol)
@@ -610,32 +574,32 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 	}
 
 	for address, tokens := range result {
-		for index, token := range tokens {
-			marketValuesPerCurrency := make(map[string]TokenMarketValues)
+		for index, tok := range tokens {
+			marketValuesPerCurrency := make(map[string]token.TokenMarketValues)
 			for _, currency := range currencies {
-				if _, ok := tokenMarketValues[token.Symbol]; !ok {
+				if _, ok := tokenMarketValues[tok.Symbol]; !ok {
 					continue
 				}
-				marketValuesPerCurrency[currency] = TokenMarketValues{
-					MarketCap:       tokenMarketValues[token.Symbol].MKTCAP,
-					HighDay:         tokenMarketValues[token.Symbol].HIGHDAY,
-					LowDay:          tokenMarketValues[token.Symbol].LOWDAY,
-					ChangePctHour:   tokenMarketValues[token.Symbol].CHANGEPCTHOUR,
-					ChangePctDay:    tokenMarketValues[token.Symbol].CHANGEPCTDAY,
-					ChangePct24hour: tokenMarketValues[token.Symbol].CHANGEPCT24HOUR,
-					Change24hour:    tokenMarketValues[token.Symbol].CHANGE24HOUR,
-					Price:           prices[token.Symbol][currency],
+				marketValuesPerCurrency[currency] = token.TokenMarketValues{
+					MarketCap:       tokenMarketValues[tok.Symbol].MKTCAP,
+					HighDay:         tokenMarketValues[tok.Symbol].HIGHDAY,
+					LowDay:          tokenMarketValues[tok.Symbol].LOWDAY,
+					ChangePctHour:   tokenMarketValues[tok.Symbol].CHANGEPCTHOUR,
+					ChangePctDay:    tokenMarketValues[tok.Symbol].CHANGEPCTDAY,
+					ChangePct24hour: tokenMarketValues[tok.Symbol].CHANGEPCT24HOUR,
+					Change24hour:    tokenMarketValues[tok.Symbol].CHANGE24HOUR,
+					Price:           prices[tok.Symbol][currency],
 					HasError:        !r.marketManager.IsConnected,
 				}
 			}
 
-			if _, ok := tokenDetails[token.Symbol]; !ok {
+			if _, ok := tokenDetails[tok.Symbol]; !ok {
 				continue
 			}
 
-			result[address][index].Description = tokenDetails[token.Symbol].Description
-			result[address][index].AssetWebsiteURL = tokenDetails[token.Symbol].AssetWebsiteURL
-			result[address][index].BuiltOn = tokenDetails[token.Symbol].BuiltOn
+			result[address][index].Description = tokenDetails[tok.Symbol].Description
+			result[address][index].AssetWebsiteURL = tokenDetails[tok.Symbol].AssetWebsiteURL
+			result[address][index].BuiltOn = tokenDetails[tok.Symbol].BuiltOn
 			result[address][index].MarketValuesPerCurrency = marketValuesPerCurrency
 		}
 	}
@@ -645,7 +609,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 	return result, r.persistence.SaveTokens(result)
 }
 
-func isCachedToken(cachedTokens map[common.Address][]Token, address common.Address, symbol string, chainID uint64) bool {
+func isCachedToken(cachedTokens map[common.Address][]token.StorageToken, address common.Address, symbol string, chainID uint64) bool {
 	if tokens, ok := cachedTokens[address]; ok {
 		for _, t := range tokens {
 			if t.Symbol != symbol {
@@ -662,7 +626,7 @@ func isCachedToken(cachedTokens map[common.Address][]Token, address common.Addre
 
 // getCachedWalletTokensWithoutMarketData returns the latest fetched balances, minus
 // price information
-func (r *Reader) getCachedWalletTokensWithoutMarketData() (map[common.Address][]Token, error) {
+func (r *Reader) getCachedWalletTokensWithoutMarketData() (map[common.Address][]token.StorageToken, error) {
 	return r.persistence.GetTokens()
 }
 

@@ -63,7 +63,7 @@ func (api *API) SetPairingsJSONFileContent(content []byte) error {
 }
 
 // Used by mobile
-func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
+func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]token.StorageToken, error) {
 	currency, err := api.s.accountsDB.GetCurrency()
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func (api *API) GetBalancesByChain(ctx context.Context, chainIDs []uint64, addre
 	return api.s.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokens)
 }
 
-func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
+func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]token.StorageToken, error) {
 	activeNetworks, err := api.s.rpcClient.NetworkManager.GetActiveNetworks()
 	if err != nil {
 		return nil, err
