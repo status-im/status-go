@@ -1015,7 +1015,7 @@ github.com/waku-org/go-discover/discover/v5wire
 github.com/waku-org/go-libp2p-rendezvous
 github.com/waku-org/go-libp2p-rendezvous/db
 github.com/waku-org/go-libp2p-rendezvous/pb
-# github.com/waku-org/go-waku v0.8.1-0.20240607100504-389b359e4382
+# github.com/waku-org/go-waku v0.8.1-0.20240611095408-d5f29e595aaa
 ## explicit; go 1.21
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/tests

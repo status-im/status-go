@@ -66,12 +66,12 @@ func (mgr *FilterManager) addFilter(filterID string, f *common.Filter) {
 	mgr.Lock()
 	defer mgr.Unlock()
 	contentFilter := mgr.buildContentFilter(f.PubsubTopic, f.ContentTopics)
-	mgr.logger.Debug("adding filter", zap.String("filterID", filterID), zap.Stringer("contentFilter", contentFilter))
+	mgr.logger.Debug("adding filter", zap.String("filter-id", filterID), zap.Stringer("content-filter", contentFilter))
 
 	if mgr.peersAvailable {
 		go mgr.subscribeAndRunLoop(filterConfig{filterID, contentFilter})
 	} else {
-		mgr.logger.Debug("queuing filter as not online", zap.String("filterID", filterID), zap.Stringer("contentFilter", contentFilter))
+		mgr.logger.Debug("queuing filter as not online", zap.String("filter-id", filterID), zap.Stringer("content-filter", contentFilter))
 		mgr.filterQueue <- filterConfig{filterID, contentFilter}
 	}
 }
@@ -80,28 +80,27 @@ func (mgr *FilterManager) subscribeAndRunLoop(f filterConfig) {
 	ctx, cancel := context.WithCancel(mgr.ctx)
 	config := api.FilterConfig{MaxPeers: mgr.cfg.MinPeersForFilter}
 
-	sub, err := api.Subscribe(ctx, mgr.node, f.contentFilter, config, mgr.logger)
+	sub, err := api.Subscribe(ctx, mgr.node, f.contentFilter, config, mgr.logger, mgr.peersAvailable)
 	mgr.Lock()
 	mgr.filters[f.ID] = SubDetails{cancel, sub}
 	mgr.Unlock()
 	if err == nil {
-		mgr.logger.Debug("subscription successful, running loop", zap.String("filterID", f.ID), zap.Stringer("contentFilter", f.contentFilter))
+		mgr.logger.Debug("subscription successful, running loop", zap.String("filter-id", f.ID), zap.Stringer("content-filter", f.contentFilter))
 		mgr.runFilterSubscriptionLoop(sub)
 	} else {
-		mgr.logger.Debug("subscription fail, queuing it", zap.String("filterID", f.ID), zap.Stringer("contentFilter", f.contentFilter))
-		mgr.filterQueue <- f
+		mgr.logger.Error("subscription fail, need to debug issue", zap.String("filter-id", f.ID), zap.Stringer("content-filter", f.contentFilter), zap.Error(err))
 	}
 }
 
 func (mgr *FilterManager) onConnectionStatusChange(pubsubTopic string, newStatus bool) {
-	mgr.logger.Debug("inside onConnectionStatusChange", zap.Bool("newStatus", newStatus),
-		zap.Int("filtersCount", len(mgr.filters)), zap.Int("filterQueueLen", len(mgr.filterQueue)))
-	//TODO: Move this logic to a regular loop which checks if peers are available and subscribes.
+	mgr.logger.Debug("inside on connection status change", zap.Bool("new-status", newStatus),
+		zap.Int("filters count", len(mgr.filters)), zap.Int("filter-queue-len", len(mgr.filterQueue)))
+	//TODO: Needs optimization because only on transition from offline to online should trigger this logic.
 	if newStatus { //Online
 		if len(mgr.filterQueue) > 0 {
 			//Check if any filter subs are pending and subscribe them
 			for filter := range mgr.filterQueue {
-				mgr.logger.Debug("subscribing from filterQueue", zap.String("filterID", filter.ID), zap.Stringer("contentFilter", filter.contentFilter))
+				mgr.logger.Debug("subscribing from filter queue", zap.String("filter-id", filter.ID), zap.Stringer("content-filter", filter.contentFilter))
 				go mgr.subscribeAndRunLoop(filter)
 				if len(mgr.filterQueue) == 0 {
 					mgr.logger.Debug("filter queue empty")
@@ -109,23 +108,22 @@ func (mgr *FilterManager) onConnectionStatusChange(pubsubTopic string, newStatus
 				}
 			}
 		}
-	} else if !newStatus && mgr.peersAvailable { //Offline
-		mgr.logger.Info("going offline, removing all filter subscriptions")
-		mgr.Lock()
-		for filterID, subDetails := range mgr.filters {
-			mgr.logger.Debug("unsubscribing filter", zap.String("filterID", filterID), zap.Stringer("contentFilter", subDetails.sub.ContentFilter))
-			subDetails.sub.Unsubscribe()
-			mgr.filterQueue <- filterConfig{filterID, subDetails.sub.ContentFilter}
-		}
-		mgr.Unlock()
 	}
+	//if !newStatus && mgr.peersAvailable || newStatus && !mgr.peersAvailable { //Offline or online
+	//mgr.logger.Info("node status change, notifying all filter subscriptions", zap.Bool("new-status", newStatus))
+	mgr.Lock()
+	for _, subDetails := range mgr.filters {
+		subDetails.sub.SetNodeState(newStatus)
+	}
+	mgr.Unlock()
+	//}
 	mgr.peersAvailable = newStatus
 }
 
 func (mgr *FilterManager) removeFilter(filterID string) {
 	mgr.Lock()
 	defer mgr.Unlock()
-	mgr.logger.Debug("removing filter", zap.String("filterID", filterID))
+	mgr.logger.Debug("removing filter", zap.String("filter-id", filterID))
 
 	subDetails, ok := mgr.filters[filterID]
 	if ok {
@@ -134,7 +132,7 @@ func (mgr *FilterManager) removeFilter(filterID string) {
 		// this will also close api.Sub
 		subDetails.cancel()
 	} else {
-		mgr.logger.Debug("filter removal: lifecycle goroutine not found", zap.String("filterID", filterID))
+		mgr.logger.Debug("filter removal: filter not found", zap.String("filter-id", filterID))
 	}
 }
 
@@ -151,16 +149,16 @@ func (mgr *FilterManager) runFilterSubscriptionLoop(sub *api.Sub) {
 	for {
 		select {
 		case <-mgr.ctx.Done():
-			mgr.logger.Debug("subscription loop ended", zap.Stringer("contentFilter", sub.ContentFilter))
+			mgr.logger.Debug("subscription loop ended", zap.Stringer("content-filter", sub.ContentFilter))
 			return
 		case env, ok := <-sub.DataCh:
 			if ok {
 				err := (mgr.onNewEnvelopes)(env)
 				if err != nil {
-					mgr.logger.Error("OnNewEnvelopes error", zap.Error(err))
+					mgr.logger.Error("invoking onNewEnvelopes error", zap.Error(err))
 				}
 			} else {
-				mgr.logger.Debug("filter sub is closed", zap.Any("cf", sub.ContentFilter))
+				mgr.logger.Debug("filter sub is closed", zap.Any("content-filter", sub.ContentFilter))
 				return
 			}
 		}

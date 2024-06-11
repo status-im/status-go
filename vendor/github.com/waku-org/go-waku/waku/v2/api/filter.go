@@ -29,19 +29,21 @@ func (fc FilterConfig) String() string {
 }
 
 type Sub struct {
-	ContentFilter protocol.ContentFilter
-	DataCh        chan *protocol.Envelope
-	Config        FilterConfig
-	subs          subscription.SubscriptionSet
-	wf            *filter.WakuFilterLightNode
-	ctx           context.Context
-	cancel        context.CancelFunc
-	log           *zap.Logger
-	closing       chan string
+	ContentFilter         protocol.ContentFilter
+	DataCh                chan *protocol.Envelope
+	Config                FilterConfig
+	subs                  subscription.SubscriptionSet
+	wf                    *filter.WakuFilterLightNode
+	ctx                   context.Context
+	cancel                context.CancelFunc
+	log                   *zap.Logger
+	closing               chan string
+	isNodeOnline          bool //indicates if node has connectivity, this helps subscribe loop takes decision as to resubscribe or not.
+	resubscribeInProgress bool
 }
 
 // Subscribe
-func Subscribe(ctx context.Context, wf *filter.WakuFilterLightNode, contentFilter protocol.ContentFilter, config FilterConfig, log *zap.Logger) (*Sub, error) {
+func Subscribe(ctx context.Context, wf *filter.WakuFilterLightNode, contentFilter protocol.ContentFilter, config FilterConfig, log *zap.Logger, online bool) (*Sub, error) {
 	sub := new(Sub)
 	sub.wf = wf
 	sub.ctx, sub.cancel = context.WithCancel(ctx)
@@ -50,14 +52,17 @@ func Subscribe(ctx context.Context, wf *filter.WakuFilterLightNode, contentFilte
 	sub.ContentFilter = contentFilter
 	sub.Config = config
 	sub.log = log.Named("filter-api")
-	sub.log.Debug("filter subscribe params", zap.Int("maxPeers", config.MaxPeers), zap.Stringer("contentFilter", contentFilter))
-	subs, err := sub.subscribe(contentFilter, sub.Config.MaxPeers)
-	sub.closing = make(chan string, config.MaxPeers)
-	if err != nil {
-		return nil, err
+	sub.log.Debug("filter subscribe params", zap.Int("max-peers", config.MaxPeers), zap.Stringer("content-filter", contentFilter))
+	sub.isNodeOnline = online
+	sub.closing = make(chan string, 5)
+
+	if online {
+		subs, err := sub.subscribe(contentFilter, sub.Config.MaxPeers)
+		if err == nil {
+			sub.multiplex(subs)
+		}
 	}
-	sub.multiplex(subs)
-	go sub.waitOnSubClose()
+	go sub.subscriptionLoop()
 	return sub, nil
 }
 
@@ -65,32 +70,49 @@ func (apiSub *Sub) Unsubscribe() {
 	apiSub.cancel()
 }
 
-func (apiSub *Sub) waitOnSubClose() {
+func (apiSub *Sub) SetNodeState(online bool) {
+	apiSub.isNodeOnline = online
+}
+
+func (apiSub *Sub) subscriptionLoop() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 	for {
 		select {
+		case <-ticker.C:
+			if apiSub.isNodeOnline && len(apiSub.subs) < apiSub.Config.MaxPeers && !apiSub.resubscribeInProgress {
+				apiSub.closing <- ""
+			}
 		case <-apiSub.ctx.Done():
-			apiSub.log.Debug("apiSub context: Done()")
+			apiSub.log.Debug("apiSub context: done")
 			apiSub.cleanup()
 			return
 		case subId := <-apiSub.closing:
-			//trigger closing and resubscribe flow for subscription.
-			apiSub.closeAndResubscribe(subId)
-
+			apiSub.resubscribeInProgress = true
+			//trigger resubscribe flow for subscription.
+			apiSub.checkAndResubscribe(subId)
 		}
 	}
 }
 
-func (apiSub *Sub) closeAndResubscribe(subId string) {
-	apiSub.log.Debug("sub closeAndResubscribe", zap.String("subID", subId))
+func (apiSub *Sub) checkAndResubscribe(subId string) {
+	var failedPeer peer.ID
+	if subId != "" {
+		apiSub.log.Debug("subscription close and resubscribe", zap.String("sub-id", subId), zap.Stringer("content-filter", apiSub.ContentFilter))
 
-	apiSub.subs[subId].Close()
-	failedPeer := apiSub.subs[subId].PeerID
-	delete(apiSub.subs, subId)
-	apiSub.resubscribe(failedPeer)
+		apiSub.subs[subId].Close()
+		failedPeer = apiSub.subs[subId].PeerID
+		delete(apiSub.subs, subId)
+	}
+	apiSub.log.Debug("subscription status", zap.Int("sub-count", len(apiSub.subs)), zap.Stringer("content-filter", apiSub.ContentFilter))
+	if apiSub.isNodeOnline && len(apiSub.subs) < apiSub.Config.MaxPeers {
+		apiSub.resubscribe(failedPeer)
+	}
+	apiSub.resubscribeInProgress = false
 }
 
 func (apiSub *Sub) cleanup() {
-	apiSub.log.Debug("Cleaning up subscription", zap.Stringer("config", apiSub.Config))
+	apiSub.log.Debug("cleaning up subscription", zap.Stringer("config", apiSub.Config))
 
 	for _, s := range apiSub.subs {
 		_, err := apiSub.wf.UnsubscribeWithSubscription(apiSub.ctx, s)
@@ -100,25 +122,25 @@ func (apiSub *Sub) cleanup() {
 		}
 	}
 	close(apiSub.DataCh)
-
 }
 
 // Attempts to resubscribe on topics that lack subscriptions
 func (apiSub *Sub) resubscribe(failedPeer peer.ID) {
 	// Re-subscribe asynchronously
 	existingSubCount := len(apiSub.subs)
-	apiSub.log.Debug("subscribing again", zap.Stringer("contentFilter", apiSub.ContentFilter), zap.Int("numPeers", apiSub.Config.MaxPeers-existingSubCount))
+	apiSub.log.Debug("subscribing again", zap.Stringer("content-filter", apiSub.ContentFilter), zap.Int("num-peers", apiSub.Config.MaxPeers-existingSubCount))
 	var peersToExclude peer.IDSlice
-	peersToExclude = append(peersToExclude, failedPeer)
+	if failedPeer != "" { //little hack, couldn't find a better way to do it
+		peersToExclude = append(peersToExclude, failedPeer)
+	}
 	for _, sub := range apiSub.subs {
 		peersToExclude = append(peersToExclude, sub.PeerID)
 	}
 	subs, err := apiSub.subscribe(apiSub.ContentFilter, apiSub.Config.MaxPeers-existingSubCount, peersToExclude...)
 	if err != nil {
+		apiSub.log.Debug("failed to resubscribe for filter", zap.Stringer("content-filter", apiSub.ContentFilter), zap.Error(err))
 		return
-	} //Not handling scenario where all requested subs are not received as that will get handled in next cycle.
-
-	apiSub.log.Debug("resubscribe(): before range newSubs")
+	} //Not handling scenario where all requested subs are not received as that should get handled from user of the API.
 
 	apiSub.multiplex(subs)
 }
@@ -131,24 +153,22 @@ func (apiSub *Sub) subscribe(contentFilter protocol.ContentFilter, peerCount int
 		options = append(options, filter.WithPeer(p))
 	}
 	if len(peersToExclude) > 0 {
-		apiSub.log.Debug("subscribing with peersToExclude", zap.Stringer("peersToExclude", peersToExclude[0]))
+		apiSub.log.Debug("subscribing with peers to exclude", zap.Stringers("excluded-peers", peersToExclude))
 		options = append(options, filter.WithPeersToExclude(peersToExclude...))
 	}
 	subs, err := apiSub.wf.Subscribe(apiSub.ctx, contentFilter, options...)
 
 	if err != nil {
+		//Inform of error, so that resubscribe can be triggered if required
+		apiSub.closing <- ""
 		if len(subs) > 0 {
-			// Partial Failure, for now proceed as we don't expect this to happen wrt specific topics.
-			// Rather it can happen in case subscription with one of the peer fails.
-			// This can further get automatically handled at resubscribe,
-			apiSub.log.Error("partial failure in Filter subscribe", zap.Error(err), zap.Int("successCount", len(subs)))
+			// Partial Failure, which means atleast 1 subscription is successful
+			apiSub.log.Debug("partial failure in filter subscribe", zap.Error(err), zap.Int("success-count", len(subs)))
 			return subs, nil
 		}
-		// In case of complete subscription failure, application or user needs to handle and probably retry based on error
 		// TODO: Once filter error handling indicates specific error, this can be addressed based on the error at this layer.
 		return nil, err
 	}
-
 	return subs, nil
 }
 
@@ -159,7 +179,7 @@ func (apiSub *Sub) multiplex(subs []*subscription.SubscriptionDetails) {
 	for _, subDetails := range subs {
 		apiSub.subs[subDetails.ID] = subDetails
 		go func(subDetails *subscription.SubscriptionDetails) {
-			apiSub.log.Debug("New multiplex", zap.String("subID", subDetails.ID))
+			apiSub.log.Debug("new multiplex", zap.String("sub-id", subDetails.ID))
 			for env := range subDetails.C {
 				apiSub.DataCh <- env
 			}
@@ -169,7 +189,7 @@ func (apiSub *Sub) multiplex(subs []*subscription.SubscriptionDetails) {
 			case <-apiSub.ctx.Done():
 				return
 			case <-subDetails.Closing:
-				apiSub.log.Debug("sub closing", zap.String("subID", subDetails.ID))
+				apiSub.log.Debug("sub closing", zap.String("sub-id", subDetails.ID))
 
 				apiSub.closing <- subDetails.ID
 			}

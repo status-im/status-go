@@ -62,6 +62,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/legacy_store/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
+	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/connection"
@@ -488,7 +489,7 @@ func (w *Waku) GetStats() types.StatsSummary {
 	}
 }
 
-/* func (w *Waku) runPeerExchangeLoop() {
+func (w *Waku) runPeerExchangeLoop() {
 	defer w.wg.Done()
 	if !w.cfg.EnablePeerExchangeClient {
 		// Currently peer exchange client is only used for light nodes
@@ -532,7 +533,7 @@ func (w *Waku) GetStats() types.StatsSummary {
 			}
 		}
 	}
-} */
+}
 
 func (w *Waku) GetPubsubTopic(topic string) string {
 	if topic == "" || !w.cfg.UseShardAsDefaultTopic {
@@ -1069,19 +1070,24 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, query legacy_store.Que
 }
 
 func (w *Waku) lightClientConnectionStatus() {
-	w.connStatusMu.Lock()
 
 	peers := w.node.Host().Network().Peers()
-	peersByPubSubTopic := w.node.Host().Peerstore().(wps.WakuPeerstore).PeersByPubSubTopics(w.cfg.DefaultShardedPubsubTopics)
-
+	//peersByPubSubTopic := w.node.Host().Peerstore().(wps.WakuPeerstore).PeersByPubSubTopics(w.cfg.DefaultShardedPubsubTopics)
 	w.logger.Debug("peer stats",
-		zap.Int("peersCount", len(peers)), zap.Int("peersByPubSubTopic", len(peersByPubSubTopic)))
+		zap.Int("peersCount", len(peers))) //, zap.Int("peersByPubSubTopic", len(peersByPubSubTopic)))
 	subs := w.node.FilterLightnode().Subscriptions()
 	w.logger.Debug("filter subs count", zap.Int("count", len(subs)))
 	isOnline := false
 	if len(peers) > 0 {
 		isOnline = true
 	}
+	//TODOL needs fixing, right now invoking everytime.
+	//Trigger FilterManager to take care of any pending filter subscriptions
+	//TODO: Pass pubsubTopic based on topicHealth notif received.
+	go w.filterManager.onConnectionStatusChange(w.cfg.DefaultShardPubsubTopic, isOnline)
+
+	w.connStatusMu.Lock()
+
 	connStatus := types.ConnStatus{
 		IsOnline: isOnline,
 		Peers:    FormatPeerStats(w.node),
@@ -1095,11 +1101,8 @@ func (w *Waku) lightClientConnectionStatus() {
 	if w.onPeerStats != nil {
 		w.onPeerStats(connStatus)
 	}
-	//TODOL needs fixing, right now invoking everytime.
-	//Trigger FilterManager to take care of any pending filter subscriptions
-	//TODO: Pass pubsubTopic based on topicHealth notif received.
-	go w.filterManager.onConnectionStatusChange(w.cfg.DefaultShardPubsubTopic, isOnline)
 
+	//TODO:Analyze if we need to discover and connect to peers with peerExchange loop enabled.
 	if w.offline && isOnline {
 		if err := w.discoverAndConnectPeers(); err != nil {
 			w.logger.Error("failed to add wakuv2 peers", zap.Error(err))
@@ -1147,7 +1150,7 @@ func (w *Waku) Start() error {
 		}
 	}
 
-	w.wg.Add(1)
+	w.wg.Add(2)
 
 	go func() {
 		defer w.wg.Done()
@@ -1195,7 +1198,7 @@ func (w *Waku) Start() error {
 	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL)
 	//TODO: commenting for now so that only fleet nodes are used.
 	//Need to uncomment once filter peer scoring etc is implemented.
-	//go w.runPeerExchangeLoop()
+	go w.runPeerExchangeLoop()
 
 	if w.cfg.LightClient {
 		// Create FilterManager that will main peer connectivity
