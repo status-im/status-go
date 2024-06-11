@@ -19,6 +19,7 @@
 package wakuv2
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
@@ -64,6 +65,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
@@ -81,6 +83,9 @@ const requestTimeout = 30 * time.Second
 const bootnodesQueryBackoffMs = 200
 const bootnodesMaxRetries = 7
 const cacheTTL = 20 * time.Minute
+const maxHashQueryLength = 100
+const hashQueryInterval = 5 * time.Second
+const messageSentPeriod = 5 // in seconds
 
 type ITelemetryClient interface {
 	PushReceivedEnvelope(*protocol.Envelope)
@@ -124,6 +129,11 @@ type Waku struct {
 
 	storeMsgIDs   map[gethcommon.Hash]bool // Map of the currently processing ids
 	storeMsgIDsMu sync.RWMutex
+
+	sendMsgIDs   map[string]map[gethcommon.Hash]uint32
+	sendMsgIDsMu sync.RWMutex
+
+	storePeerID peer.ID
 
 	topicHealthStatusChan   chan peermanager.TopicHealthStatus
 	connStatusSubscriptions map[string]*types.ConnStatusSubscription
@@ -205,6 +215,8 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		storeMsgIDs:                     make(map[gethcommon.Hash]bool),
 		timesource:                      ts,
 		storeMsgIDsMu:                   sync.RWMutex{},
+		sendMsgIDs:                      make(map[string]map[gethcommon.Hash]uint32),
+		sendMsgIDsMu:                    sync.RWMutex{},
 		logger:                          logger,
 		discV5BootstrapNodes:            cfg.DiscV5BootstrapNodes,
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
@@ -960,23 +972,98 @@ func (w *Waku) broadcast() {
 	}
 }
 
+func (w *Waku) checkIfMessagesStored() {
+	ticker := time.NewTicker(hashQueryInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-w.ctx.Done():
+			w.logger.Debug("stop the look for message stored check")
+			return
+		case <-ticker.C:
+			w.sendMsgIDsMu.Lock()
+			w.logger.Debug("running loop for messages stored check", zap.Any("messageIds", w.sendMsgIDs))
+			pubsubTopics := make([]string, 0, len(w.sendMsgIDs))
+			pubsubMessageIds := make([][]gethcommon.Hash, 0, len(w.sendMsgIDs))
+			for pubsubTopic, subMsgs := range w.sendMsgIDs {
+				var queryMsgIds []gethcommon.Hash
+				for msgID, sendTime := range subMsgs {
+					if len(queryMsgIds) >= maxHashQueryLength {
+						break
+					}
+					// message is sent 5 seconds ago, check if it's stored
+					if uint32(w.timesource.Now().Unix()) > sendTime+messageSentPeriod {
+						queryMsgIds = append(queryMsgIds, msgID)
+					}
+				}
+				w.logger.Debug("store query for message hashes", zap.Any("queryMsgIds", queryMsgIds), zap.String("pubsubTopic", pubsubTopic))
+				if len(queryMsgIds) > 0 {
+					pubsubTopics = append(pubsubTopics, pubsubTopic)
+					pubsubMessageIds = append(pubsubMessageIds, queryMsgIds)
+				}
+			}
+			w.sendMsgIDsMu.Unlock()
+
+			pubsubProcessedMessages := make([][]gethcommon.Hash, len(pubsubTopics))
+			for i, pubsubTopic := range pubsubTopics {
+				processedMessages := w.messageHashBasedQuery(w.ctx, pubsubMessageIds[i], pubsubTopic)
+				pubsubProcessedMessages[i] = processedMessages
+			}
+
+			w.sendMsgIDsMu.Lock()
+			for i, pubsubTopic := range pubsubTopics {
+				subMsgs, ok := w.sendMsgIDs[pubsubTopic]
+				if !ok {
+					continue
+				}
+				for _, hash := range pubsubProcessedMessages[i] {
+					delete(subMsgs, hash)
+					if len(subMsgs) == 0 {
+						delete(w.sendMsgIDs, pubsubTopic)
+					} else {
+						w.sendMsgIDs[pubsubTopic] = subMsgs
+					}
+				}
+			}
+			w.logger.Debug("messages for next store hash query", zap.Any("messageIds", w.sendMsgIDs))
+			w.sendMsgIDsMu.Unlock()
+
+		}
+	}
+}
+
+func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
+	w.sendMsgIDsMu.Lock()
+	defer w.sendMsgIDsMu.Unlock()
+	for pubsubTopic, subMsgs := range w.sendMsgIDs {
+		for _, hash := range hashes {
+			delete(subMsgs, hash)
+			if len(subMsgs) == 0 {
+				delete(w.sendMsgIDs, pubsubTopic)
+			} else {
+				w.sendMsgIDs[pubsubTopic] = subMsgs
+			}
+		}
+	}
+}
+
+func (w *Waku) SetStorePeerID(peerID peer.ID) {
+	w.storePeerID = peerID
+}
+
 type publishFn = func(envelope *protocol.Envelope, logger *zap.Logger) error
 
 func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publishFn, logger *zap.Logger) {
 	defer w.wg.Done()
 
-	var event common.EventType
 	if err := publishFn(envelope, logger); err != nil {
 		logger.Error("could not send message", zap.Error(err))
-		event = common.EventEnvelopeExpired
-	} else {
-		event = common.EventEnvelopeSent
+		w.SendEnvelopeEvent(common.EnvelopeEvent{
+			Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
+			Event: common.EventEnvelopeExpired,
+		})
 	}
-
-	w.SendEnvelopeEvent(common.EnvelopeEvent{
-		Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
-		Event: event,
-	})
 }
 
 // Send injects a message into the waku send queue, to be distributed in the
@@ -1005,12 +1092,74 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
 	alreadyCached := w.envelopeCache.Has(gethcommon.BytesToHash(envelope.Hash().Bytes()))
 	w.poolMu.Unlock()
 	if !alreadyCached {
-		recvMessage := common.NewReceivedMessage(envelope, common.RelayedMessageType)
+		recvMessage := common.NewReceivedMessage(envelope, common.SendMessageType)
 		w.postEvent(recvMessage) // notify the local node about the new message
 		w.addEnvelope(recvMessage)
 	}
 
 	return envelope.Hash().Bytes(), nil
+}
+
+// ctx, peer, r.PubsubTopic, contentTopics, uint64(r.From), uint64(r.To), options, processEnvelopes
+func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Hash, pubsubTopic string) []gethcommon.Hash {
+	selectedPeer := w.storePeerID
+	if selectedPeer == "" {
+		w.logger.Error("no store peer id available", zap.String("pubsubTopic", pubsubTopic))
+		return []gethcommon.Hash{}
+	}
+
+	var opts []store.RequestOption
+	requestID := protocol.GenerateRequestID()
+	opts = append(opts, store.WithRequestID(requestID))
+	opts = append(opts, store.WithPeer(selectedPeer))
+	opts = append(opts, store.WithPaging(false, maxHashQueryLength))
+	opts = append(opts, store.IncludeData(false))
+
+	messageHashes := make([]pb.MessageHash, len(hashes))
+	for i, hash := range hashes {
+		messageHashes[i] = pb.ToMessageHash(hash.Bytes())
+	}
+
+	w.logger.Debug("store.queryByHash request", zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", selectedPeer), zap.Any("messageHashes", messageHashes))
+
+	result, err := w.node.Store().QueryByHash(ctx, messageHashes, opts...)
+	if err != nil {
+		w.logger.Error("store.queryByHash failed", zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", selectedPeer), zap.Error(err))
+		return []gethcommon.Hash{}
+	}
+
+	w.logger.Debug("store.queryByHash result", zap.String("requestID", hexutil.Encode(requestID)), zap.Int("messages", len(result.Messages())))
+
+	var ackHashes []gethcommon.Hash
+	var missedHashes []gethcommon.Hash
+	for _, hash := range hashes {
+		found := false
+		for _, msg := range result.Messages() {
+			if bytes.Equal(msg.GetMessageHash(), hash.Bytes()) {
+				found = true
+				break
+			}
+		}
+
+		if found {
+			ackHashes = append(ackHashes, hash)
+			w.SendEnvelopeEvent(common.EnvelopeEvent{
+				Hash:  hash,
+				Event: common.EventEnvelopeSent,
+			})
+		} else {
+			missedHashes = append(missedHashes, hash)
+			w.SendEnvelopeEvent(common.EnvelopeEvent{
+				Hash:  hash,
+				Event: common.EventEnvelopeExpired,
+			})
+		}
+	}
+
+	w.logger.Debug("ack message hashes", zap.Any("ackHashes", ackHashes))
+	w.logger.Debug("missed message hashes", zap.Any("missedHashes", missedHashes))
+
+	return append(ackHashes, missedHashes...)
 }
 
 func (w *Waku) Query(ctx context.Context, peerID peer.ID, query legacy_store.Query, cursor *storepb.Index, opts []legacy_store.HistoryRequestOption, processEnvelopes bool) (*storepb.Index, int, error) {
@@ -1220,6 +1369,8 @@ func (w *Waku) Start() error {
 
 	go w.broadcast()
 
+	go w.checkIfMessagesStored()
+
 	// we should wait `seedBootnodesForDiscV5` shutdown smoothly before set w.ctx to nil within `w.Stop()`
 	w.wg.Add(1)
 	go w.seedBootnodesForDiscV5()
@@ -1353,7 +1504,7 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage, processImmediately bool)
 	if !alreadyCached || !envelope.Value().Processed.Load() {
 		if processImmediately {
 			logger.Debug("immediately processing envelope")
-			w.processReceivedMessage(recvMessage)
+			w.processMessage(recvMessage)
 		} else {
 			logger.Debug("posting event")
 			w.postEvent(recvMessage) // notify the local node about the new message
@@ -1378,12 +1529,12 @@ func (w *Waku) processQueueLoop() {
 		case <-w.ctx.Done():
 			return
 		case e := <-w.msgQueue:
-			w.processReceivedMessage(e)
+			w.processMessage(e)
 		}
 	}
 }
 
-func (w *Waku) processReceivedMessage(e *common.ReceivedMessage) {
+func (w *Waku) processMessage(e *common.ReceivedMessage) {
 	logger := w.logger.With(
 		zap.Stringer("envelopeHash", e.Envelope.Hash()),
 		zap.String("pubsubTopic", e.PubsubTopic),
@@ -1397,6 +1548,18 @@ func (w *Waku) processReceivedMessage(e *common.ReceivedMessage) {
 		w.storeMsgIDsMu.Lock()
 		w.storeMsgIDs[e.Hash()] = true
 		w.storeMsgIDsMu.Unlock()
+	}
+
+	ephemeral := e.Envelope.Message().Ephemeral
+	if e.MsgType == common.SendMessageType && (ephemeral == nil || !*ephemeral) {
+		w.sendMsgIDsMu.Lock()
+		subMsgs, ok := w.sendMsgIDs[e.PubsubTopic]
+		if !ok {
+			subMsgs = make(map[gethcommon.Hash]uint32)
+		}
+		subMsgs[e.Hash()] = e.Sent
+		w.sendMsgIDs[e.PubsubTopic] = subMsgs
+		w.sendMsgIDsMu.Unlock()
 	}
 
 	matched := w.filters.NotifyWatchers(e)

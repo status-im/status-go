@@ -25,38 +25,10 @@ import (
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/wallet/bigint"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/waku"
 )
-
-type CollectiblesManagerMock struct {
-	response map[thirdparty.CollectibleUniqueID][]thirdparty.AccountBalance
-}
-
-func (m *CollectiblesManagerMock) FetchBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID,
-	ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
-	return nil, errors.New("FetchBalancesByOwnerAndContractAddress is not implemented for testCollectiblesManager")
-}
-
-func (m *CollectiblesManagerMock) GetCollectibleOwnership(requestedID thirdparty.CollectibleUniqueID) ([]thirdparty.AccountBalance, error) {
-	// NOTE: TokenID inside of thirdparty.CollectibleUniqueID is a pointer so m.response[id] is now working
-	for id, balances := range m.response {
-		if id.ContractID.Address == requestedID.ContractID.Address &&
-			id.ContractID.ChainID == requestedID.ContractID.ChainID {
-			return balances, nil
-		}
-	}
-	return []thirdparty.AccountBalance{}, nil
-}
-
-func (m *CollectiblesManagerMock) SetResponse(id thirdparty.CollectibleUniqueID, balances []thirdparty.AccountBalance) {
-	if m.response == nil {
-		m.response = map[thirdparty.CollectibleUniqueID][]thirdparty.AccountBalance{}
-	}
-	m.response[id] = balances
-}
 
 func TestMessengerProfileShowcaseSuite(t *testing.T) { // nolint: deadcode,unused
 	suite.Run(t, new(TestMessengerProfileShowcase))
@@ -215,7 +187,7 @@ func (s *TestMessengerProfileShowcase) TestSaveAndGetProfileShowcasePreferences(
 			TxTimestamp: 0,
 		},
 	}
-	s.collectiblesMock.SetResponse(collectibleID, balances)
+	s.collectiblesMock.SetCollectibleOwnershipResponse(collectibleID, balances)
 
 	err = s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().NoError(err)
@@ -286,7 +258,7 @@ func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesW
 			TxTimestamp: 0,
 		},
 	}
-	s.collectiblesMock.SetResponse(collectibleID, balances)
+	s.collectiblesMock.SetCollectibleOwnershipResponse(collectibleID, balances)
 
 	err = s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().Equal(errorAccountVisibilityLowerThanCollectible, err)
@@ -469,7 +441,7 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 			TxTimestamp: 32443424,
 		},
 	}
-	s.collectiblesMock.SetResponse(collectibleID, balances)
+	s.collectiblesMock.SetCollectibleOwnershipResponse(collectibleID, balances)
 
 	err = s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().NoError(err)

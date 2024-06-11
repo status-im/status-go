@@ -12,7 +12,7 @@ import (
 // EnvelopeSignalHandler sends signals when envelope is sent or expired.
 type EnvelopeSignalHandler struct{}
 
-// EnvelopeSent triggered when envelope delivered atleast to 1 peer.
+// EnvelopeSent triggered when envelope delivered at least to 1 peer.
 func (h EnvelopeSignalHandler) EnvelopeSent(identifiers [][]byte) {
 	signal.SendEnvelopeSent(identifiers)
 }
@@ -51,21 +51,21 @@ func (h PublisherSignalHandler) Stats(stats types.StatsSummary) {
 	signal.SendStats(stats)
 }
 
-// MessengerSignalHandler sends signals on messenger events
+// MessengerSignalsHandler sends signals on messenger events
 type MessengerSignalsHandler struct{}
 
 // MessageDelivered passes information that message was delivered
-func (m MessengerSignalsHandler) MessageDelivered(chatID string, messageID string) {
+func (m *MessengerSignalsHandler) MessageDelivered(chatID string, messageID string) {
 	signal.SendMessageDelivered(chatID, messageID)
 }
 
 // BackupPerformed passes information that a backup was performed
-func (m MessengerSignalsHandler) BackupPerformed(lastBackup uint64) {
+func (m *MessengerSignalsHandler) BackupPerformed(lastBackup uint64) {
 	signal.SendBackupPerformed(lastBackup)
 }
 
-// MessageDelivered passes info about community that was requested before
-func (m MessengerSignalsHandler) CommunityInfoFound(community *communities.Community) {
+// CommunityInfoFound passes info about community that was requested before
+func (m *MessengerSignalsHandler) CommunityInfoFound(community *communities.Community) {
 	signal.SendCommunityInfoFound(community)
 }
 

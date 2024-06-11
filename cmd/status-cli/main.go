@@ -76,6 +76,11 @@ var ServeFlags = append([]cli.Flag{
 		Value:   8545,
 		Usage:   "HTTP Server port to listen on",
 	},
+	&cli.BoolFlag{
+		Name:    InteractiveFlag,
+		Aliases: []string{"i"},
+		Usage:   "Use interactive mode to input the messages",
+	},
 }, CommonFlags...)
 
 var logger *zap.SugaredLogger

@@ -15,8 +15,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/wallet/bridge"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -43,7 +43,7 @@ type TransactionManager struct {
 	eventFeed      *event.Feed
 
 	multiTransactionForKeycardSigning *MultiTransaction
-	transactionsBridgeData            []*bridge.TransactionBridge
+	multipathTransactionsData         []*pathprocessor.MultipathProcessorTxArgs
 	transactionsForKeycardSigning     map[common.Hash]*TransactionDescription
 }
 
@@ -84,6 +84,7 @@ const (
 	MultiTransactionSend = iota
 	MultiTransactionSwap
 	MultiTransactionBridge
+	MultiTransactionApprove
 	MultiTransactionTypeInvalid = 255
 )
 

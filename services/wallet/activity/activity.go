@@ -57,9 +57,9 @@ type Entry struct {
 	activityType    Type
 	activityStatus  Status
 	amountOut       *hexutil.Big // Used for activityType SendAT, SwapAT, BridgeAT
-	amountIn        *hexutil.Big // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
+	amountIn        *hexutil.Big // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT, ApproveAT
 	tokenOut        *Token       // Used for activityType SendAT, SwapAT, BridgeAT
-	tokenIn         *Token       // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
+	tokenIn         *Token       // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT, ApproveAT
 	symbolOut       *string
 	symbolIn        *string
 	sender          *eth.Address
@@ -260,6 +260,8 @@ func multiTransactionTypeToActivityType(mtType transfer.MultiTransactionType) Ty
 		return SwapAT
 	} else if mtType == transfer.MultiTransactionBridge {
 		return BridgeAT
+	} else if mtType == transfer.MultiTransactionApprove {
+		return ApproveAT
 	}
 	panic("unknown multi transaction type")
 }
@@ -321,6 +323,8 @@ func activityTypesToMultiTransactionTypes(trTypes []Type) []transfer.MultiTransa
 			mtType = transfer.MultiTransactionSwap
 		} else if t == BridgeAT {
 			mtType = transfer.MultiTransactionBridge
+		} else if t == ApproveAT {
+			mtType = transfer.MultiTransactionApprove
 		} else {
 			continue
 		}
@@ -648,7 +652,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 
 			mtInAmount, mtOutAmount := getMtInAndOutAmounts(dbMtFromAmount, dbMtToAmount)
 
-			// Extract activity type: SendAT/SwapAT/BridgeAT
+			// Extract activity type: SendAT/SwapAT/BridgeAT/ApproveAT
 			activityType := multiTransactionTypeToActivityType(transfer.MultiTransactionType(dbMtType.Byte))
 
 			if outChainIDDB.Valid && outChainIDDB.Int64 != 0 {

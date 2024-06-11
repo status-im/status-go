@@ -22,6 +22,7 @@ type MessageType int
 const (
 	RelayedMessageType MessageType = iota
 	StoreMessageType
+	SendMessageType
 )
 
 // MessageParams specifies the exact way a message should be wrapped
@@ -46,7 +47,7 @@ type ReceivedMessage struct {
 	Padding   []byte
 	Signature []byte
 
-	Sent uint32           // Time when the message was posted into the network
+	Sent uint32           // Time when the message was posted into the network in seconds
 	Src  *ecdsa.PublicKey // Message recipient (identity used to decode the message)
 	Dst  *ecdsa.PublicKey // Message recipient (identity used to decode the message)
 

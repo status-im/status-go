@@ -113,6 +113,7 @@ type Messenger struct {
 	pushNotificationClient    *pushnotificationclient.Client
 	pushNotificationServer    *pushnotificationserver.Server
 	communitiesManager        *communities.Manager
+	archiveManager            communities.ArchiveService
 	communitiesKeyDistributor communities.KeyDistributor
 	accountsManager           account.Manager
 	mentionsManager           *MentionManager
@@ -492,7 +493,25 @@ func NewMessenger(
 		encryptor: encryptionProtocol,
 	}
 
-	communitiesManager, err := communities.NewManager(identity, installationID, database, encryptionProtocol, logger, ensVerifier, c.communityTokensService, transp, transp, communitiesKeyDistributor, c.torrentConfig, managerOptions...)
+	communitiesManager, err := communities.NewManager(identity, installationID, database, encryptionProtocol, logger, ensVerifier, c.communityTokensService, transp, transp, communitiesKeyDistributor, managerOptions...)
+	if err != nil {
+		return nil, err
+	}
+
+	amc := &communities.ArchiveManagerConfig{
+		TorrentConfig: c.torrentConfig,
+		Logger:        logger,
+		Persistence:   communitiesManager.GetPersistence(),
+		Transport:     transp,
+		Identity:      identity,
+		Encryptor:     encryptionProtocol,
+		Publisher:     communitiesManager,
+	}
+
+	// Depending on the OS go will choose whether to use the "communities/manager_archive_nop.go" or
+	// "communities/manager_archive.go" version of this function based on the build instructions for those files.
+	// See those file for more details.
+	archiveManager := communities.NewArchiveManager(amc)
 	if err != nil {
 		return nil, err
 	}
@@ -527,6 +546,7 @@ func NewMessenger(
 		pushNotificationServer:     pushNotificationServer,
 		communitiesManager:         communitiesManager,
 		communitiesKeyDistributor:  communitiesKeyDistributor,
+		archiveManager:             archiveManager,
 		accountsManager:            c.accountsManager,
 		ensVerifier:                ensVerifier,
 		featureFlags:               c.featureFlags,
@@ -572,6 +592,7 @@ func NewMessenger(
 			ensVerifier.Stop,
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
+			archiveManager.Stop,
 			encryptionProtocol.Stop,
 			func() error {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -705,6 +726,11 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 	m.started = true
 
+	err := m.InitFilters()
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now().UnixMilli()
 	if err := m.settings.CheckAndDeleteExpiredKeypairsAndAccounts(uint64(now)); err != nil {
 		return nil, err
@@ -821,7 +847,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	if m.torrentClientReady() {
+	if m.archiveManager.IsReady() {
 		available := m.SubscribeMailserverAvailable()
 		go func() {
 			<-available
@@ -910,9 +936,9 @@ func (m *Messenger) handleConnectionChange(online bool) {
 		}
 	}
 
-	// Update Communities manager
-	if m.communitiesManager != nil {
-		m.communitiesManager.SetOnline(online)
+	// Update torrent manager
+	if m.archiveManager != nil {
+		m.archiveManager.SetOnline(online)
 	}
 
 	// Publish contact code
@@ -1218,8 +1244,10 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 // context 'public-chat' will attach only the 'thumbnail' IdentityImage
 // context 'private-chat' will attach all IdentityImage
 func (m *Messenger) createChatIdentity(context ChatContext) (*protobuf.ChatIdentity, error) {
-	m.logger.Info(fmt.Sprintf("account keyUID '%s'", m.account.KeyUID))
-	m.logger.Info(fmt.Sprintf("context '%s'", context))
+	m.logger.Info("called createChatIdentity",
+		zap.String("account keyUID", m.account.KeyUID),
+		zap.String("context", string(context)),
+	)
 
 	displayName, err := m.settings.DisplayName()
 	if err != nil {
@@ -1640,9 +1668,27 @@ func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
 	}()
 }
 
-// Init analyzes chats and contacts in order to setup filters
+func (m *Messenger) InitInstallations() error {
+	installations, err := m.encryptor.GetOurInstallations(&m.identity.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	for _, installation := range installations {
+		m.allInstallations.Store(installation.ID, installation)
+	}
+
+	err = m.setInstallationHostname()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// InitFilters analyzes chats and contacts in order to setup filters
 // which are responsible for retrieving messages.
-func (m *Messenger) Init() error {
+func (m *Messenger) InitFilters() error {
 
 	// Seed the for color generation
 	rand.Seed(time.Now().Unix())
@@ -1827,20 +1873,6 @@ func (m *Messenger) Init() error {
 			continue
 		}
 		publicKeys = append(publicKeys, publicKey)
-	}
-
-	installations, err := m.encryptor.GetOurInstallations(&m.identity.PublicKey)
-	if err != nil {
-		return err
-	}
-
-	for _, installation := range installations {
-		m.allInstallations.Store(installation.ID, installation)
-	}
-
-	err = m.setInstallationHostname()
-	if err != nil {
-		return err
 	}
 
 	_, err = m.transport.InitFilters(filtersToInit, publicKeys)
@@ -3735,11 +3767,11 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 
 	importMessagesToSave := messageState.Response.DiscordMessages()
 	if len(importMessagesToSave) > 0 {
-		m.communitiesManager.LogStdout(fmt.Sprintf("saving %d discord messages", len(importMessagesToSave)))
+		m.logger.Debug("saving discord messages", zap.Int("count", len(importMessagesToSave)))
 		m.handleImportMessagesMutex.Lock()
 		err := m.persistence.SaveDiscordMessages(importMessagesToSave)
 		if err != nil {
-			m.communitiesManager.LogStdout("failed to save discord messages", zap.Error(err))
+			m.logger.Debug("failed to save discord messages", zap.Error(err))
 			m.handleImportMessagesMutex.Unlock()
 			return err
 		}
@@ -3748,11 +3780,11 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 
 	messageAttachmentsToSave := messageState.Response.DiscordMessageAttachments()
 	if len(messageAttachmentsToSave) > 0 {
-		m.communitiesManager.LogStdout(fmt.Sprintf("saving %d discord message attachments", len(messageAttachmentsToSave)))
+		m.logger.Debug("saving discord message attachments", zap.Int("count", len(messageAttachmentsToSave)))
 		m.handleImportMessagesMutex.Lock()
 		err := m.persistence.SaveDiscordMessageAttachments(messageAttachmentsToSave)
 		if err != nil {
-			m.communitiesManager.LogStdout("failed to save discord message attachments", zap.Error(err))
+			m.logger.Debug("failed to save discord message attachments", zap.Error(err))
 			m.handleImportMessagesMutex.Unlock()
 			return err
 		}
@@ -3761,7 +3793,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 
 	messagesToSave := messageState.Response.Messages()
 	if len(messagesToSave) > 0 {
-		m.communitiesManager.LogStdout(fmt.Sprintf("saving %d app messages", len(messagesToSave)))
+		m.logger.Debug("saving %d app messages", zap.Int("count", len(messagesToSave)))
 		m.handleMessagesMutex.Lock()
 		err := m.SaveMessages(messagesToSave)
 		if err != nil {
@@ -4649,7 +4681,7 @@ func (m *Messenger) MarkAllReadInCommunity(ctx context.Context, communityID stri
 			m.allChats.Store(chat.ID, chat)
 			response.AddChat(chat)
 		} else {
-			err = errors.New(fmt.Sprintf("chat with chatID %s not found", chatID))
+			err = fmt.Errorf("chat with chatID %s not found", chatID)
 		}
 	}
 	return response, err

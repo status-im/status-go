@@ -6,9 +6,11 @@ import (
 	"image"
 	"image/png"
 	"os"
+	"runtime"
 	"testing"
 
 	userimage "github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 
 	"github.com/stretchr/testify/suite"
@@ -402,4 +404,24 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 	s.Require().NoError(err)
 	s.Require().NoError(bob2.Shutdown())
 	s.Require().NoError(alice.Shutdown())
+}
+
+func (s *MessengerInstallationSuite) TestInitInstallations() {
+	m, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
+	s.Require().NoError(err)
+
+	// m.InitInstallations is already called when we set-up the messenger for
+	// testing, thus this test has no act phase.
+	// err = m.InitInstallations()
+
+	// We get one installation when the messenger initializes installations
+	// correctly.
+	s.Require().Equal(1, m.allInstallations.Len())
+
+	deviceName, err := server.GetDeviceName()
+	s.Require().NoError(err)
+	installation, ok := m.allInstallations.Load(m.installationID)
+	s.Require().True(ok)
+	s.Require().Equal(deviceName+" ", installation.InstallationMetadata.Name)
+	s.Require().Equal(runtime.GOOS, installation.InstallationMetadata.DeviceType)
 }

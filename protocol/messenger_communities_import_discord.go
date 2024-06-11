@@ -684,7 +684,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			chunksCount := len(discordMessageChunks)
 
 			for ii, msgs := range discordMessageChunks {
-				m.communitiesManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d discord messages", ii+1, chunksCount, len(msgs)))
+				m.logger.Debug(fmt.Sprintf("saving %d/%d chunk with %d discord messages", ii+1, chunksCount, len(msgs)))
 				err := m.persistence.SaveDiscordMessages(msgs)
 				if err != nil {
 					m.cleanUpImportChannel(request.CommunityID.String(), newChat.ID)
@@ -727,7 +727,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			chunksCount = len(messageChunks)
 
 			for ii, msgs := range messageChunks {
-				m.communitiesManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d app messages", ii+1, chunksCount, len(msgs)))
+				m.logger.Debug(fmt.Sprintf("saving %d/%d chunk with %d app messages", ii+1, chunksCount, len(msgs)))
 				err := m.persistence.SaveMessages(msgs)
 				if err != nil {
 					m.cleanUpImportChannel(request.CommunityID.String(), request.DiscordChannelID)
@@ -791,7 +791,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 				go func(id string, author *protobuf.DiscordMessageAuthor) {
 					defer wg.Done()
 
-					m.communitiesManager.LogStdout(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
+					m.logger.Debug(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
 					imagePayload, err := discord.DownloadAvatarAsset(author.AvatarUrl)
 					if err != nil {
 						errmsg := fmt.Sprintf("Couldn't download profile avatar '%s': %s", author.AvatarUrl, err.Error())
@@ -845,7 +845,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 					defer wg.Done()
 					for ii, attachment := range attachments {
 
-						m.communitiesManager.LogStdout(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
+						m.logger.Debug(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
 
 						assetPayload, contentType, err := discord.DownloadAsset(attachment.Url)
 						if err != nil {
@@ -889,7 +889,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			chunksCount = len(attachmentChunks)
 
 			for ii, attachments := range attachmentChunks {
-				m.communitiesManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d discord message attachments", ii+1, chunksCount, len(attachments)))
+				m.logger.Debug(fmt.Sprintf("saving %d/%d chunk with %d discord message attachments", ii+1, chunksCount, len(attachments)))
 				err := m.persistence.SaveDiscordMessageAttachments(attachments)
 				if err != nil {
 					importProgress.AddTaskError(discord.DownloadAssetsTask, discord.Warning(err.Error()))
@@ -944,7 +944,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 
 			wakuMessages := append(wakuChatMessages, wakuPinMessages...)
 
-			topics, err := m.communitiesManager.GetCommunityChatsTopics(request.CommunityID)
+			topics, err := m.archiveManager.GetCommunityChatsTopics(request.CommunityID)
 			if err != nil {
 				m.logger.Error("failed to get community chat topics", zap.Error(err))
 				continue
@@ -953,7 +953,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			startDate := time.Unix(int64(exportData.OldestMessageTimestamp), 0)
 			endDate := time.Now()
 
-			_, err = m.communitiesManager.CreateHistoryArchiveTorrentFromMessages(
+			_, err = m.archiveManager.CreateHistoryArchiveTorrentFromMessages(
 				request.CommunityID,
 				wakuMessages,
 				topics,
@@ -971,13 +971,13 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 				m.logger.Error("Failed to get community settings", zap.Error(err))
 				continue
 			}
-			if m.torrentClientReady() && communitySettings.HistoryArchiveSupportEnabled {
+			if m.archiveManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
 
-				err = m.communitiesManager.SeedHistoryArchiveTorrent(request.CommunityID)
+				err = m.archiveManager.SeedHistoryArchiveTorrent(request.CommunityID)
 				if err != nil {
 					m.logger.Error("failed to seed history archive", zap.Error(err))
 				}
-				go m.communitiesManager.StartHistoryArchiveTasksInterval(community, messageArchiveInterval)
+				go m.archiveManager.StartHistoryArchiveTasksInterval(community, messageArchiveInterval)
 			}
 		}
 
@@ -1460,7 +1460,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			chunksCount := len(discordMessageChunks)
 
 			for ii, msgs := range discordMessageChunks {
-				m.communitiesManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d discord messages", ii+1, chunksCount, len(msgs)))
+				m.logger.Debug(fmt.Sprintf("saving %d/%d chunk with %d discord messages", ii+1, chunksCount, len(msgs)))
 				err = m.persistence.SaveDiscordMessages(msgs)
 				if err != nil {
 					m.cleanUpImport(communityID)
@@ -1503,7 +1503,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			chunksCount = len(messageChunks)
 
 			for ii, msgs := range messageChunks {
-				m.communitiesManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d app messages", ii+1, chunksCount, len(msgs)))
+				m.logger.Debug(fmt.Sprintf("saving %d/%d chunk with %d app messages", ii+1, chunksCount, len(msgs)))
 				err = m.persistence.SaveMessages(msgs)
 				if err != nil {
 					m.cleanUpImport(communityID)
@@ -1563,7 +1563,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				go func(id string, author *protobuf.DiscordMessageAuthor) {
 					defer wg.Done()
 
-					m.communitiesManager.LogStdout(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
+					m.logger.Debug(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
 					imagePayload, err := discord.DownloadAvatarAsset(author.AvatarUrl)
 					if err != nil {
 						errmsg := fmt.Sprintf("Couldn't download profile avatar '%s': %s", author.AvatarUrl, err.Error())
@@ -1615,7 +1615,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 					defer wg.Done()
 					for ii, attachment := range attachments {
 
-						m.communitiesManager.LogStdout(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
+						m.logger.Debug(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
 
 						assetPayload, contentType, err := discord.DownloadAsset(attachment.Url)
 						if err != nil {
@@ -1659,7 +1659,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			chunksCount = len(attachmentChunks)
 
 			for ii, attachments := range attachmentChunks {
-				m.communitiesManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d discord message attachments", ii+1, chunksCount, len(attachments)))
+				m.logger.Debug(fmt.Sprintf("saving %d/%d chunk with %d discord message attachments", ii+1, chunksCount, len(attachments)))
 				err = m.persistence.SaveDiscordMessageAttachments(attachments)
 				if err != nil {
 					m.cleanUpImport(communityID)
@@ -1714,7 +1714,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 			wakuMessages := append(wakuChatMessages, wakuPinMessages...)
 
-			topics, err := m.communitiesManager.GetCommunityChatsTopics(discordCommunity.ID())
+			topics, err := m.archiveManager.GetCommunityChatsTopics(discordCommunity.ID())
 			if err != nil {
 				m.logger.Error("failed to get community chat topics", zap.Error(err))
 				continue
@@ -1723,7 +1723,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			startDate := time.Unix(int64(exportData.OldestMessageTimestamp), 0)
 			endDate := time.Now()
 
-			_, err = m.communitiesManager.CreateHistoryArchiveTorrentFromMessages(
+			_, err = m.archiveManager.CreateHistoryArchiveTorrentFromMessages(
 				discordCommunity.ID(),
 				wakuMessages,
 				topics,
@@ -1737,13 +1737,13 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				continue
 			}
 
-			if m.torrentClientReady() && communitySettings.HistoryArchiveSupportEnabled {
+			if m.archiveManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
 
-				err = m.communitiesManager.SeedHistoryArchiveTorrent(discordCommunity.ID())
+				err = m.archiveManager.SeedHistoryArchiveTorrent(discordCommunity.ID())
 				if err != nil {
 					m.logger.Error("failed to seed history archive", zap.Error(err))
 				}
-				go m.communitiesManager.StartHistoryArchiveTasksInterval(discordCommunity, messageArchiveInterval)
+				go m.archiveManager.StartHistoryArchiveTasksInterval(discordCommunity, messageArchiveInterval)
 			}
 		}
 

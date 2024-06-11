@@ -3624,6 +3624,10 @@ func (t *testPermissionChecker) CheckPermissions(permissionsParsedData *communit
 	return &communities.CheckPermissionsResponse{Satisfied: true}, nil
 }
 
+func (t *testPermissionChecker) CheckPermissionsWithPreFetchedData(permissionsParsedData *communities.PreParsedCommunityPermissionsData, accountsAndChainIDs []*communities.AccountChainIDsCombination, shortcircuit bool, collectiblesOwners communities.CollectiblesOwners) (*communities.CheckPermissionsResponse, error) {
+	return &communities.CheckPermissionsResponse{Satisfied: true}, nil
+}
+
 func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 	community, chat := createEncryptedCommunity(&s.Suite, s.owner)
 	s.Require().True(community.Encrypted())
@@ -4549,4 +4553,67 @@ func (s *MessengerCommunitiesSuite) TestAliceDidNotProcessOutdatedCommunityReque
 	requestToJoinResponse.Clock = requestToJoinResponse.Clock + 1
 	err = s.alice.HandleCommunityRequestToJoinResponse(state, requestToJoinResponse, nil)
 	s.Require().NoError(err)
+}
+
+func (s *MessengerCommunitiesSuite) TestIgnoreOutdatedCommunityDescription() {
+	community, _ := s.createCommunity()
+	wrappedDescription1, err := community.ToProtocolMessageBytes()
+	s.Require().NoError(err)
+	signer, description1, err := communities.UnwrapCommunityDescriptionMessage(wrappedDescription1)
+	s.Require().NoError(err)
+
+	_, err = community.AddMember(&s.alice.identity.PublicKey, []protobuf.CommunityMember_Roles{})
+	s.Require().NoError(err)
+	wrappedDescription2, err := community.ToProtocolMessageBytes()
+	s.Require().NoError(err)
+	_, description2, err := communities.UnwrapCommunityDescriptionMessage(wrappedDescription2)
+	s.Require().NoError(err)
+
+	_, err = community.AddMember(&s.bob.identity.PublicKey, []protobuf.CommunityMember_Roles{})
+	s.Require().NoError(err)
+	wrappedDescription3, err := community.ToProtocolMessageBytes()
+	s.Require().NoError(err)
+	_, description3, err := communities.UnwrapCommunityDescriptionMessage(wrappedDescription3)
+	s.Require().NoError(err)
+
+	s.Require().Less(description1.Clock, description2.Clock)
+	s.Require().Less(description2.Clock, description3.Clock)
+
+	// Handle first community description
+	{
+		messageState := s.bob.buildMessageState()
+		err = s.bob.handleCommunityDescription(messageState, signer, description1, wrappedDescription1, nil, nil)
+		s.Require().NoError(err)
+		s.Require().Len(messageState.Response.Communities(), 1)
+		s.Require().Equal(description1.Clock, messageState.Response.Communities()[0].Clock())
+	}
+
+	// Handle third community description
+	{
+		messageState := s.bob.buildMessageState()
+		err = s.bob.handleCommunityDescription(messageState, signer, description3, wrappedDescription3, nil, nil)
+		s.Require().NoError(err)
+		s.Require().Len(messageState.Response.Communities(), 1)
+		s.Require().Equal(description3.Clock, messageState.Response.Communities()[0].Clock())
+
+		communityFromDB, err := s.bob.communitiesManager.GetByID(community.ID())
+		s.Require().NoError(err)
+		s.Require().Equal(description3.Clock, communityFromDB.Clock())
+		s.Require().Len(communityFromDB.Members(), 3)
+	}
+
+	// Handle second (out of order) community description
+	// It should be ignored
+	{
+		messageState := s.bob.buildMessageState()
+		err = s.bob.handleCommunityDescription(messageState, signer, description2, wrappedDescription2, nil, nil)
+		s.Require().Len(messageState.Response.Communities(), 0)
+		s.Require().Len(messageState.Response.CommunityChanges, 0)
+		s.Require().ErrorIs(err, communities.ErrInvalidCommunityDescriptionClockOutdated)
+
+		communityFromDB, err := s.bob.communitiesManager.GetByID(community.ID())
+		s.Require().NoError(err)
+		s.Require().Equal(description3.Clock, communityFromDB.Clock())
+		s.Require().Len(communityFromDB.Members(), 3)
+	}
 }

@@ -13,10 +13,10 @@ import (
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/services/wallet/bridge"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/market"
+	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
@@ -99,17 +99,19 @@ func (s SendType) needL1Fee() bool {
 	return s != ENSRegister && s != ENSRelease && s != ENSSetPubKey && s != StickersBuy
 }
 
-func (s SendType) canUseBridge(b bridge.Bridge) bool {
-	bridgeName := b.Name()
+func (s SendType) canUseProcessor(p pathprocessor.PathProcessor) bool {
+	pathProcessorName := p.Name()
 	switch s {
 	case ERC721Transfer:
-		return bridgeName == bridge.ERC721TransferName
+		return pathProcessorName == pathprocessor.ProcessorERC721Name
 	case ERC1155Transfer:
-		return bridgeName == bridge.ERC1155TransferName
+		return pathProcessorName == pathprocessor.ProcessorERC1155Name
 	case ENSRegister:
-		return bridgeName == bridge.ENSRegisterName
+		return pathProcessorName == pathprocessor.ProcessorENSRegisterName
 	case ENSRelease:
-		return bridgeName == bridge.ENSReleaseName
+		return pathProcessorName == pathprocessor.ProcessorENSReleaseName
+	case ENSSetPubKey:
+		return pathProcessorName == pathprocessor.ProcessorENSPublicKeyName
 	default:
 		return true
 	}
@@ -167,7 +169,7 @@ func (s SendType) isAvailableFor(network *params.Network) bool {
 func (s SendType) EstimateGas(ensService *ens.Service, stickersService *stickers.Service, network *params.Network, from common.Address, tokenID string) uint64 {
 	tx := transactions.SendTxArgs{
 		From:  (types.Address)(from),
-		Value: (*hexutil.Big)(bridge.ZeroBigIntValue),
+		Value: (*hexutil.Big)(pathprocessor.ZeroBigIntValue),
 	}
 	switch s {
 	case ENSRegister:

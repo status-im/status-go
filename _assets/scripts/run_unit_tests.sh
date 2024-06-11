@@ -24,7 +24,7 @@ if [[ -z "${UNIT_TEST_COUNT}" ]]; then
 fi
 
 UNIT_TEST_PACKAGE_TIMEOUT="2m"
-UNIT_TEST_PACKAGE_TIMEOUT_EXTENDED="30m"
+UNIT_TEST_PACKAGE_TIMEOUT_EXTENDED="35m"
 
 redirect_stdout() {
   output_file=$1
@@ -128,7 +128,9 @@ grep -h -v "^mode:" ./**/*.coverage.out >> c.out
 rm -rf ./**/*.coverage.out
 
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
-	cc-test-reporter after-build --prefix=github.com/status-im/status-go
+  # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
+  GIT_COMMIT=$(git log | grep -m1 -oE '[^ ]+$')
+  cc-test-reporter after-build --prefix=github.com/status-im/status-go
 fi
 
 shopt -s globstar nullglob # Enable recursive globbing

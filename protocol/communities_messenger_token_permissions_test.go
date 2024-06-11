@@ -158,6 +158,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	s.bobWaku = nil
 	s.aliceWaku = nil
 
+	s.resetMockedBalances()
+
 	s.logger = tt.MustCreateTestLogger()
 
 	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, false, []string{"owner", "bob", "alice"})
@@ -178,9 +180,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	s.Require().NoError(err)
 	_, err = s.alice.Start()
 	s.Require().NoError(err)
-
-	s.resetMockedBalances()
-
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
@@ -1602,15 +1601,15 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 	s.Require().Equal(msg.Text, response.Messages()[0].Text)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivilegedRoleInOpenCommunity(permissionType protobuf.CommunityTokenPermission_Type) {
+func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivilegedRoleInOpenCommunity(permissionType protobuf.CommunityTokenPermission_Type, tokenType protobuf.CommunityTokenType) {
 	community, _ := s.createCommunity()
 
 	createTokenPermission := &requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
 		Type:        permissionType,
 		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
-				Type:              protobuf.CommunityTokenType_ERC20,
+			{
+				Type:              tokenType,
 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
 				Symbol:            "TEST",
 				AmountInWei:       "100000000000000000000",
@@ -1705,23 +1704,31 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().False(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInOpenCommunity() {
-	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN)
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInOpenCommunity_ERC20() {
+	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN, protobuf.CommunityTokenType_ERC20)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInOpenCommunity() {
-	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInOpenCommunity_ERC721() {
+	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN, protobuf.CommunityTokenType_ERC721)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivilegedRoleInClosedCommunity(permissionType protobuf.CommunityTokenPermission_Type) {
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInOpenCommunity_ERC20() {
+	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, protobuf.CommunityTokenType_ERC20)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInOpenCommunity_ERC721() {
+	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, protobuf.CommunityTokenType_ERC721)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivilegedRoleInClosedCommunity(permissionType protobuf.CommunityTokenPermission_Type, tokenType protobuf.CommunityTokenType) {
 	community, _ := s.createCommunity()
 
 	createTokenPermission := &requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
 		Type:        permissionType,
 		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
-				Type:              protobuf.CommunityTokenType_ERC20,
+			{
+				Type:              tokenType,
 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
 				Symbol:            "TEST",
 				AmountInWei:       "100000000000000000000",
@@ -1740,8 +1747,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 		CommunityID: community.ID(),
 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
 		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
-				Type:              protobuf.CommunityTokenType_ERC20,
+			{
+				Type:              tokenType,
 				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
 				Symbol:            "TEST2",
 				AmountInWei:       "100000000000000000000",
@@ -1876,12 +1883,20 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().False(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInClosedCommunity() {
-	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN)
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInClosedCommunity_ERC20() {
+	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN, protobuf.CommunityTokenType_ERC20)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInClosedCommunity() {
-	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInClosedCommunity_ERC721() {
+	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN, protobuf.CommunityTokenType_ERC721)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInClosedCommunity_ERC20() {
+	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, protobuf.CommunityTokenType_ERC20)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInClosedCommunity_ERC721() {
+	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, protobuf.CommunityTokenType_ERC721)
 }
 
 func checkRoleBasedOnThePermissionType(permissionType protobuf.CommunityTokenPermission_Type, member *ecdsa.PublicKey, community *communities.Community) bool {
@@ -2265,12 +2280,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	}
 
 	// Share archive directory between all users
-	s.owner.communitiesManager.SetTorrentConfig(&torrentConfig)
-	s.bob.communitiesManager.SetTorrentConfig(&torrentConfig)
+	s.owner.archiveManager.SetTorrentConfig(&torrentConfig)
+	s.bob.archiveManager.SetTorrentConfig(&torrentConfig)
 	s.owner.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
 	s.bob.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
 
-	archiveIDs, err := s.owner.communitiesManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, community.Encrypted())
+	archiveIDs, err := s.owner.archiveManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, community.Encrypted())
 	s.Require().NoError(err)
 	s.Require().Len(archiveIDs, 1)
 
@@ -2302,12 +2317,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	// https://github.com/status-im/status-go/blob/6c82a6c2be7ebed93bcae3b9cf5053da3820de50/protocol/communities/manager.go#L4403
 
 	// Ensure owner has archive
-	archiveIndex, err := s.owner.communitiesManager.LoadHistoryArchiveIndexFromFile(s.owner.identity, community.ID())
+	archiveIndex, err := s.owner.archiveManager.LoadHistoryArchiveIndexFromFile(s.owner.identity, community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(archiveIndex.Archives, 1)
 
 	// Ensure bob has archive (because they share same local directory)
-	archiveIndex, err = s.bob.communitiesManager.LoadHistoryArchiveIndexFromFile(s.bob.identity, community.ID())
+	archiveIndex, err = s.bob.archiveManager.LoadHistoryArchiveIndexFromFile(s.bob.identity, community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(archiveIndex.Archives, 1)
 
@@ -2315,7 +2330,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 
 	// Save message archive ID as in
 	// https://github.com/status-im/status-go/blob/6c82a6c2be7ebed93bcae3b9cf5053da3820de50/protocol/communities/manager.go#L4325-L4336
-	err = s.bob.communitiesManager.SaveMessageArchiveID(community.ID(), archiveHash)
+	err = s.bob.archiveManager.SaveMessageArchiveID(community.ID(), archiveHash)
 	s.Require().NoError(err)
 
 	// Import archive
@@ -2367,4 +2382,74 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	receivedMessage1, ok := response.messages[message1.ID]
 	s.Require().True(ok)
 	s.Require().Equal(messageText1, receivedMessage1.Text)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestDeleteChannelWithTokenPermission() {
+	// Setup community with two permitted channels
+	community, firstChat := s.createCommunity()
+
+	response, err := s.owner.CreateCommunityChat(community.ID(), &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "new channel",
+			Emoji:       "",
+			Description: "chat created after joining the community",
+		},
+	})
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	secondChat := response.Chats()[0]
+
+	channelPermission := &requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
+		ChatIds:     []string{firstChat.ID, secondChat.ID},
+		TokenCriteria: []*protobuf.TokenCriteria{
+			{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
+				Symbol:            "TEST2",
+				AmountInWei:       "200000000000000000000",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+
+	response, err = s.owner.CreateCommunityTokenPermission(channelPermission)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	// Make sure both channels are covered with permission
+	community, err = s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(community.Chats(), 2)
+	s.Require().Len(community.TokenPermissions(), 1)
+	for _, permission := range community.TokenPermissions() {
+		s.Require().Len(permission.ChatIds, 2)
+		s.Require().True(permission.HasChat(firstChat.ID))
+		s.Require().True(permission.HasChat(secondChat.ID))
+	}
+
+	// Delete first community channel
+	response, err = s.owner.DeleteCommunityChat(community.ID(), firstChat.ID)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	community = response.Communities()[0]
+	s.Require().Len(community.Chats(), 1)
+	for _, permission := range community.TokenPermissions() {
+		s.Require().Len(permission.ChatIds, 1)
+		s.Require().False(permission.HasChat(firstChat.ID))
+		s.Require().True(permission.HasChat(secondChat.ID))
+	}
+
+	// Delete second community channel
+	response, err = s.owner.DeleteCommunityChat(community.ID(), secondChat.ID)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	community = response.Communities()[0]
+	s.Require().Len(community.Chats(), 0)
+	s.Require().Len(community.TokenPermissions(), 0)
 }

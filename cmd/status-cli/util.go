@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wakuv2ext"
 
-	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 )
 
@@ -34,7 +33,7 @@ func setupLogger(file string) *zap.Logger {
 	return logutils.ZapLogger()
 }
 
-func start(cCtx *cli.Context, name string, port int, apiModules string, telemetryUrl string) (*StatusCLI, error) {
+func start(name string, port int, apiModules string, telemetryUrl string) (*StatusCLI, error) {
 	namedLogger := logger.Named(name)
 	namedLogger.Info("starting messager")
 

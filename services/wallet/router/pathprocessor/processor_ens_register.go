@@ -1,4 +1,4 @@
-package bridge
+package pathprocessor
 
 import (
 	"context"
@@ -22,14 +22,14 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-type ENSRegisterBridge struct {
+type ENSRegisterProcessor struct {
 	contractMaker *contracts.ContractMaker
 	transactor    transactions.TransactorIface
 	ensService    *ens.Service
 }
 
-func NewENSRegisterBridge(rpcClient *rpc.Client, transactor transactions.TransactorIface, ensService *ens.Service) *ENSRegisterBridge {
-	return &ENSRegisterBridge{
+func NewENSRegisterProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, ensService *ens.Service) *ENSRegisterProcessor {
+	return &ENSRegisterProcessor{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,
 		},
@@ -39,11 +39,11 @@ func NewENSRegisterBridge(rpcClient *rpc.Client, transactor transactions.Transac
 	}
 }
 
-func (s *ENSRegisterBridge) Name() string {
-	return ENSRegisterName
+func (s *ENSRegisterProcessor) Name() string {
+	return ProcessorENSRegisterName
 }
 
-func (s *ENSRegisterBridge) GetPriceForRegisteringEnsName(chainID uint64) (*big.Int, error) {
+func (s *ENSRegisterProcessor) GetPriceForRegisteringEnsName(chainID uint64) (*big.Int, error) {
 	registryAddr, err := s.ensService.API().GetRegistrarAddress(context.Background(), chainID)
 	if err != nil {
 		return nil, err
@@ -57,15 +57,15 @@ func (s *ENSRegisterBridge) GetPriceForRegisteringEnsName(chainID uint64) (*big.
 	return registrar.GetPrice(callOpts)
 }
 
-func (s *ENSRegisterBridge) AvailableFor(params BridgeParams) (bool, error) {
+func (s *ENSRegisterProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
 	return params.FromChain.ChainID == walletCommon.EthereumMainnet || params.FromChain.ChainID == walletCommon.EthereumSepolia, nil
 }
 
-func (s *ENSRegisterBridge) CalculateFees(params BridgeParams) (*big.Int, *big.Int, error) {
-	return big.NewInt(0), big.NewInt(0), nil
+func (s *ENSRegisterProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
+	return ZeroBigIntValue, ZeroBigIntValue, nil
 }
 
-func (s *ENSRegisterBridge) PackTxInputData(params BridgeParams, contractType string) ([]byte, error) {
+func (s *ENSRegisterProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	price, err := s.GetPriceForRegisteringEnsName(params.FromChain.ChainID)
 	if err != nil {
 		return []byte{}, err
@@ -76,8 +76,8 @@ func (s *ENSRegisterBridge) PackTxInputData(params BridgeParams, contractType st
 		return []byte{}, err
 	}
 
-	x, y := extractCoordinates(params.PublicKey)
-	extraData, err := registrarABI.Pack("register", usernameToLabel(params.Username), params.FromAddr, x, y)
+	x, y := ens.ExtractCoordinates(params.PublicKey)
+	extraData, err := registrarABI.Pack("register", ens.UsernameToLabel(params.Username), params.FromAddr, x, y)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -95,13 +95,13 @@ func (s *ENSRegisterBridge) PackTxInputData(params BridgeParams, contractType st
 	return sntABI.Pack("approveAndCall", registryAddr, price, extraData)
 }
 
-func (s *ENSRegisterBridge) EstimateGas(params BridgeParams) (uint64, error) {
+func (s *ENSRegisterProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
 		return 0, err
 	}
 
-	input, err := s.PackTxInputData(params, "")
+	input, err := s.PackTxInputData(params)
 	if err != nil {
 		return 0, err
 	}
@@ -114,7 +114,7 @@ func (s *ENSRegisterBridge) EstimateGas(params BridgeParams) (uint64, error) {
 	msg := ethereum.CallMsg{
 		From:  params.FromAddr,
 		To:    &contractAddress,
-		Value: big.NewInt(0),
+		Value: ZeroBigIntValue,
 		Data:  input,
 	}
 
@@ -128,14 +128,14 @@ func (s *ENSRegisterBridge) EstimateGas(params BridgeParams) (uint64, error) {
 	return uint64(increasedEstimation), nil
 }
 
-func (s *ENSRegisterBridge) BuildTx(params BridgeParams) (*ethTypes.Transaction, error) {
+func (s *ENSRegisterProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
 	toAddr := types.Address(params.ToAddr)
-	inputData, err := s.PackTxInputData(params, "")
+	inputData, err := s.PackTxInputData(params)
 	if err != nil {
 		return nil, err
 	}
 
-	sendArgs := &TransactionBridge{
+	sendArgs := &MultipathProcessorTxArgs{
 		TransferTx: &transactions.SendTxArgs{
 			From:  types.Address(params.FromAddr),
 			To:    &toAddr,
@@ -148,18 +148,18 @@ func (s *ENSRegisterBridge) BuildTx(params BridgeParams) (*ethTypes.Transaction,
 	return s.BuildTransaction(sendArgs)
 }
 
-func (s *ENSRegisterBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
+func (s *ENSRegisterProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
 	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, *sendArgs.TransferTx, verifiedAccount)
 }
 
-func (s *ENSRegisterBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error) {
+func (s *ENSRegisterProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error) {
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, *sendArgs.TransferTx)
 }
 
-func (s *ENSRegisterBridge) CalculateAmountOut(params BridgeParams) (*big.Int, error) {
+func (s *ENSRegisterProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
 	return params.AmountIn, nil
 }
 
-func (s *ENSRegisterBridge) GetContractAddress(params BridgeParams) (common.Address, error) {
+func (s *ENSRegisterProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
 	return snt.ContractAddress(params.FromChain.ChainID)
 }

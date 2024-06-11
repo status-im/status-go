@@ -426,6 +426,11 @@ func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 			m.logger.Info("mailserver available", zap.String("address", m.mailserverCycle.activeMailserver.UniqueID()))
 			m.EmitMailserverAvailable()
 			signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver.Address, m.mailserverCycle.activeMailserver.ID)
+			peerID, err := m.mailserverCycle.activeMailserver.PeerID()
+			if err != nil {
+				m.logger.Error("could not decode the peer id of mailserver", zap.Error(err))
+			}
+			m.transport.SetStorePeerID(peerID)
 
 			// Query mailserver
 			if m.config.codeControlFlags.AutoRequestHistoricMessages {

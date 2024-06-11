@@ -4,7 +4,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/services/wallet/bridge"
+	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 
 	"go.uber.org/zap"
 )
@@ -89,7 +89,7 @@ func setupRouteValidationMapsV2(fromLockedAmount map[uint64]*hexutil.Big) (map[u
 	fromExcluded := make(map[uint64]bool)
 
 	for chainID, amount := range fromLockedAmount {
-		if amount.ToInt().Cmp(bridge.ZeroBigIntValue) <= 0 {
+		if amount.ToInt().Cmp(pathprocessor.ZeroBigIntValue) <= 0 {
 			fromExcluded[chainID] = false
 		} else {
 			fromIncluded[chainID] = false

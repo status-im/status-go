@@ -16,9 +16,9 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/wallet/bridge"
-	"github.com/status-im/status-go/services/wallet/bridge/mock_bridge"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/router/pathprocessor/mock_pathprocessor"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions"
@@ -35,9 +35,9 @@ func deepCopy(tx *transactions.SendTxArgs) *transactions.SendTxArgs {
 	}
 }
 
-func deepCopyTransactionBridgeWithTransferTx(tx *bridge.TransactionBridge) *bridge.TransactionBridge {
-	return &bridge.TransactionBridge{
-		BridgeName:        tx.BridgeName,
+func deepCopyTransactionBridgeWithTransferTx(tx *pathprocessor.MultipathProcessorTxArgs) *pathprocessor.MultipathProcessorTxArgs {
+	return &pathprocessor.MultipathProcessorTxArgs{
+		Name:              tx.Name,
 		ChainID:           tx.ChainID,
 		TransferTx:        deepCopy(tx.TransferTx),
 		HopTx:             tx.HopTx,
@@ -68,7 +68,7 @@ func setupAccount(_ *testing.T, address common.Address) *account.SelectedExtKey 
 	}
 }
 
-func setupTransactionData(_ *testing.T, transactor transactions.TransactorIface) (*MultiTransaction, []*bridge.TransactionBridge, map[string]bridge.Bridge, []*bridge.TransactionBridge) {
+func setupTransactionData(_ *testing.T, transactor transactions.TransactorIface) (*MultiTransaction, []*pathprocessor.MultipathProcessorTxArgs, map[string]pathprocessor.PathProcessor, []*pathprocessor.MultipathProcessorTxArgs) {
 	SetMultiTransactionIDGenerator(StaticIDCounter())
 
 	// Create mock data for the test
@@ -77,14 +77,14 @@ func setupTransactionData(_ *testing.T, transactor transactions.TransactorIface)
 
 	// Initialize the bridges
 	var rpcClient *rpc.Client = nil
-	bridges := make(map[string]bridge.Bridge)
-	transferBridge := bridge.NewTransferBridge(rpcClient, transactor)
+	bridges := make(map[string]pathprocessor.PathProcessor)
+	transferBridge := pathprocessor.NewTransferProcessor(rpcClient, transactor)
 	bridges[transferBridge.Name()] = transferBridge
 
-	data := []*bridge.TransactionBridge{
+	data := []*pathprocessor.MultipathProcessorTxArgs{
 		{
-			ChainID:    1,
-			BridgeName: transferBridge.Name(),
+			ChainID: 1,
+			Name:    transferBridge.Name(),
 			TransferTx: &transactions.SendTxArgs{
 				From:  types.Address(ethTransfer.From),
 				To:    (*types.Address)(&ethTransfer.To),
@@ -95,8 +95,8 @@ func setupTransactionData(_ *testing.T, transactor transactions.TransactorIface)
 			},
 		},
 		{
-			ChainID:    420,
-			BridgeName: transferBridge.Name(),
+			ChainID: 420,
+			Name:    transferBridge.Name(),
 			TransferTx: &transactions.SendTxArgs{
 				From:  types.Address(ethTransfer.From),
 				To:    (*types.Address)(&ethTransfer.To),
@@ -108,10 +108,10 @@ func setupTransactionData(_ *testing.T, transactor transactions.TransactorIface)
 		},
 	}
 
-	expectedData := make([]*bridge.TransactionBridge, 0)
+	expectedData := make([]*pathprocessor.MultipathProcessorTxArgs, 0)
 	for _, tx := range data {
 		txCopy := deepCopyTransactionBridgeWithTransferTx(tx)
-		updateDataFromMultiTx([]*bridge.TransactionBridge{txCopy}, &multiTransaction)
+		updateDataFromMultiTx([]*pathprocessor.MultipathProcessorTxArgs{txCopy}, &multiTransaction)
 		expectedData = append(expectedData, txCopy)
 	}
 
@@ -140,11 +140,11 @@ func TestSendTransactionsETHFailOnBridge(t *testing.T) {
 	multiTransaction, data, _, _ := setupTransactionData(t, transactor)
 
 	// Initialize the bridges
-	bridges := make(map[string]bridge.Bridge)
-	transferBridge := mock_bridge.NewMockBridge(ctrl)
+	bridges := make(map[string]pathprocessor.PathProcessor)
+	transferBridge := mock_pathprocessor.NewMockPathProcessor(ctrl)
 
 	// Set bridge name for the mock to the one used in data
-	transferBridge.EXPECT().Name().Return(data[0].BridgeName).AnyTimes()
+	transferBridge.EXPECT().Name().Return(data[0].Name).AnyTimes()
 	bridges[transferBridge.Name()] = transferBridge
 
 	expectedErr := transactions.ErrInvalidTxSender // Any error to verify

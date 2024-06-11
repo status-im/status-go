@@ -7,6 +7,9 @@ import (
 	"errors"
 	"math/big"
 
+	// used for embedding the sql query in the binary
+	_ "embed"
+
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -40,6 +43,12 @@ type EntryDetails struct {
 	TotalFees    *hexutil.Big        `json:"totalFees,omitempty"`
 }
 
+//go:embed multiTxDetails.sql
+var queryMultiTxDetailsString string
+
+//go:embed txDetails.sql
+var queryTxDetailsString string
+
 func protocolTypeFromDBType(dbType string) (protocolType *ProtocolType) {
 	protocolType = new(ProtocolType)
 	switch common.Type(dbType) {
@@ -62,24 +71,7 @@ func getMultiTxDetails(ctx context.Context, db *sql.DB, multiTxID int) (*EntryDe
 		return nil, errors.New("invalid tx id")
 	}
 
-	// Extracting tx only when values are not null to prevent errors during the scan.
-	rows, err := db.QueryContext(ctx, `
-	SELECT
-		tx_hash,
-		blk_number,
-		network_id,
-		type,
-		account_nonce,
-		contract_address,
-		CASE 
-			WHEN json_extract(tx, '$.gas') = '0x0' THEN NULL
-			ELSE transfers.tx
-		END as tx,
-		base_gas_fee
-	FROM
-		transfers
-	WHERE
-		multi_transaction_id = ?;`, multiTxID)
+	rows, err := db.QueryContext(ctx, queryMultiTxDetailsString, multiTxID, multiTxID)
 	if err != nil {
 		return nil, err
 	}
@@ -95,10 +87,11 @@ func getMultiTxDetails(ctx context.Context, db *sql.DB, multiTxID int) (*EntryDe
 		var contractTypeDB sql.NullString
 		var chainIDDB, nonceDB, blockNumber sql.NullInt64
 		var transferHashDB, contractAddressDB sql.RawBytes
-		var baseGasFees string
+		var baseGasFees *string
+		var baseGasFeesDB sql.NullString
 		tx := &types.Transaction{}
 		nullableTx := sqlite.JSONBlob{Data: tx}
-		err := rows.Scan(&transferHashDB, &blockNumber, &chainIDDB, &contractTypeDB, &nonceDB, &contractAddressDB, &nullableTx, &baseGasFees)
+		err := rows.Scan(&transferHashDB, &blockNumber, &chainIDDB, &contractTypeDB, &nonceDB, &contractAddressDB, &nullableTx, &baseGasFeesDB)
 		if err != nil {
 			return nil, err
 		}
@@ -108,6 +101,10 @@ func getMultiTxDetails(ctx context.Context, db *sql.DB, multiTxID int) (*EntryDe
 			chainID = chainIDDB.Int64
 		}
 		chainDetails := getChainDetails(chainID, &chainDetailsList)
+
+		if baseGasFeesDB.Valid {
+			baseGasFees = common.NewAndSet(baseGasFeesDB.String)
+		}
 
 		if len(transferHashDB) > 0 {
 			chainDetails.Hash = eth.BytesToHash(transferHashDB)
@@ -132,8 +129,10 @@ func getMultiTxDetails(ctx context.Context, db *sql.DB, multiTxID int) (*EntryDe
 			input = "0x" + hex.EncodeToString(tx.Data())
 			maxFeePerGas = (*hexutil.Big)(tx.GasFeeCap())
 			gasLimit = tx.Gas()
-			baseGasFees, _ := new(big.Int).SetString(baseGasFees, 0)
-			totalFees = (*hexutil.Big)(getTotalFees(tx, baseGasFees))
+			if baseGasFees != nil {
+				baseGasFees, _ := new(big.Int).SetString(*baseGasFees, 0)
+				totalFees = (*hexutil.Big)(getTotalFees(tx, baseGasFees))
+			}
 		}
 	}
 	if err = rows.Err(); err != nil {
@@ -164,19 +163,7 @@ func getTxDetails(ctx context.Context, db *sql.DB, id string) (*EntryDetails, er
 	if len(id) == 0 {
 		return nil, errors.New("invalid tx id")
 	}
-	rows, err := db.QueryContext(ctx, `
-	SELECT
-		tx_hash,
-		blk_number,
-		network_id,
-		account_nonce,
-		tx,
-		contract_address,
-		base_gas_fee
-	FROM
-		transfers
-	WHERE
-		hash = ?;`, eth.HexToHash(id))
+	rows, err := db.QueryContext(ctx, queryTxDetailsString, eth.HexToHash(id))
 	if err != nil {
 		return nil, err
 	}

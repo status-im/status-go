@@ -2,6 +2,7 @@ package communities
 
 import (
 	"reflect"
+	"slices"
 
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -44,6 +45,18 @@ func (p *CommunityTokenPermission) Equals(other *CommunityTokenPermission) bool 
 	}
 
 	return reflect.DeepEqual(p.ChatIds, other.ChatIds)
+}
+
+func (p *CommunityTokenPermission) HasChat(chatId string) bool {
+	return slices.Contains(p.ChatIds, chatId)
+}
+
+func (p *CommunityTokenPermission) ChatIdsAsMap() map[string]struct{} {
+	chats := map[string]struct{}{}
+	for _, id := range p.GetChatIds() {
+		chats[id] = struct{}{}
+	}
+	return chats
 }
 
 func compareTokenCriteria(a, b *protobuf.TokenCriteria) bool {

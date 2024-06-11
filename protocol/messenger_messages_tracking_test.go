@@ -172,7 +172,7 @@ func (s *MessengerMessagesTrackingSuite) testMessageMarkedAsSent(textSize int) {
 	// Message should be marked as sent eventually
 	err = tt.RetryWithBackOff(func() error {
 		rawMessage, err = s.bob.persistence.RawMessageByID(inputMessage.ID)
-		if err != nil || !rawMessage.Sent {
+		if err != nil || rawMessage.SendCount < 1 {
 			return errors.New("message not marked as sent")
 		}
 		return nil

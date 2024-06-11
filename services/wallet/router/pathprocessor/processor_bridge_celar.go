@@ -1,4 +1,4 @@
-package bridge
+package pathprocessor
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/wallet/bridge/cbridge"
+	"github.com/status-im/status-go/services/wallet/router/pathprocessor/cbridge"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
@@ -36,7 +36,7 @@ const (
 	maxSlippage = uint32(1000)
 )
 
-type CBridgeTxArgs struct {
+type CelerBridgeTxArgs struct {
 	transactions.SendTxArgs
 	ChainID   uint64         `json:"chainId"`
 	Symbol    string         `json:"symbol"`
@@ -44,7 +44,7 @@ type CBridgeTxArgs struct {
 	Amount    *hexutil.Big   `json:"amount"`
 }
 
-type CBridge struct {
+type CelerBridgeProcessor struct {
 	rpcClient          *rpc.Client
 	httpClient         *thirdparty.HTTPClient
 	transactor         transactions.TransactorIface
@@ -53,8 +53,8 @@ type CBridge struct {
 	testTransferConfig *cbridge.GetTransferConfigsResponse
 }
 
-func NewCbridge(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *token.Manager) *CBridge {
-	return &CBridge{
+func NewCelerBridgeProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *token.Manager) *CelerBridgeProcessor {
+	return &CelerBridgeProcessor{
 		rpcClient:    rpcClient,
 		httpClient:   thirdparty.NewHTTPClient(),
 		transactor:   transactor,
@@ -62,11 +62,11 @@ func NewCbridge(rpcClient *rpc.Client, transactor transactions.TransactorIface, 
 	}
 }
 
-func (s *CBridge) Name() string {
-	return CBridgeName
+func (s *CelerBridgeProcessor) Name() string {
+	return ProcessorBridgeCelerName
 }
 
-func (s *CBridge) estimateAmt(from, to *params.Network, amountIn *big.Int, symbol string) (*cbridge.EstimateAmtResponse, error) {
+func (s *CelerBridgeProcessor) estimateAmt(from, to *params.Network, amountIn *big.Int, symbol string) (*cbridge.EstimateAmtResponse, error) {
 	base := baseURL
 	if from.IsTest {
 		base = testBaseURL
@@ -94,7 +94,7 @@ func (s *CBridge) estimateAmt(from, to *params.Network, amountIn *big.Int, symbo
 	return &res, nil
 }
 
-func (s *CBridge) getTransferConfig(isTest bool) (*cbridge.GetTransferConfigsResponse, error) {
+func (s *CelerBridgeProcessor) getTransferConfig(isTest bool) (*cbridge.GetTransferConfigsResponse, error) {
 	if !isTest && s.prodTransferConfig != nil {
 		return s.prodTransferConfig, nil
 	}
@@ -126,7 +126,7 @@ func (s *CBridge) getTransferConfig(isTest bool) (*cbridge.GetTransferConfigsRes
 	return &res, nil
 }
 
-func (s *CBridge) AvailableFor(params BridgeParams) (bool, error) {
+func (s *CelerBridgeProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
 	if params.FromChain.ChainID == params.ToChain.ChainID || params.ToToken != nil {
 		return false, nil
 	}
@@ -185,7 +185,7 @@ func (s *CBridge) AvailableFor(params BridgeParams) (bool, error) {
 	return true, nil
 }
 
-func (s *CBridge) CalculateFees(params BridgeParams) (*big.Int, *big.Int, error) {
+func (s *CelerBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
 	amt, err := s.estimateAmt(params.FromChain, params.ToChain, params.AmountIn, params.FromToken.Symbol)
 	if err != nil {
 		return nil, nil, err
@@ -199,10 +199,10 @@ func (s *CBridge) CalculateFees(params BridgeParams) (*big.Int, *big.Int, error)
 		return nil, nil, errors.New("failed to parse percentage fee")
 	}
 
-	return big.NewInt(0), new(big.Int).Add(baseFee, percFee), nil
+	return ZeroBigIntValue, new(big.Int).Add(baseFee, percFee), nil
 }
 
-func (c *CBridge) PackTxInputData(params BridgeParams, contractType string) ([]byte, error) {
+func (c *CelerBridgeProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	abi, err := abi.JSON(strings.NewReader(celer.CelerABI))
 	if err != nil {
 		return []byte{}, err
@@ -228,10 +228,10 @@ func (c *CBridge) PackTxInputData(params BridgeParams, contractType string) ([]b
 	}
 }
 
-func (s *CBridge) EstimateGas(params BridgeParams) (uint64, error) {
+func (s *CelerBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
 	value := new(big.Int)
 
-	input, err := s.PackTxInputData(params, "")
+	input, err := s.PackTxInputData(params)
 	if err != nil {
 		return 0, err
 	}
@@ -270,10 +270,10 @@ func (s *CBridge) EstimateGas(params BridgeParams) (uint64, error) {
 	return uint64(increasedEstimation), nil
 }
 
-func (s *CBridge) BuildTx(params BridgeParams) (*ethTypes.Transaction, error) {
+func (s *CelerBridgeProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
 	toAddr := types.Address(params.ToAddr)
-	sendArgs := &TransactionBridge{
-		CbridgeTx: &CBridgeTxArgs{
+	sendArgs := &MultipathProcessorTxArgs{
+		CbridgeTx: &CelerBridgeTxArgs{
 			SendTxArgs: transactions.SendTxArgs{
 				From:  types.Address(params.FromAddr),
 				To:    &toAddr,
@@ -291,7 +291,7 @@ func (s *CBridge) BuildTx(params BridgeParams) (*ethTypes.Transaction, error) {
 	return s.BuildTransaction(sendArgs)
 }
 
-func (s *CBridge) GetContractAddress(params BridgeParams) (common.Address, error) {
+func (s *CelerBridgeProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
 	transferConfig, err := s.getTransferConfig(params.FromChain.IsTest)
 	if err != nil {
 		return common.Address{}, err
@@ -309,7 +309,7 @@ func (s *CBridge) GetContractAddress(params BridgeParams) (common.Address, error
 	return common.Address{}, errors.New("contract not found")
 }
 
-func (s *CBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (*ethTypes.Transaction, error) {
+func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn) (*ethTypes.Transaction, error) {
 	fromChain := s.rpcClient.NetworkManager.Find(sendArgs.ChainID)
 	if fromChain == nil {
 		return nil, errors.New("network not found")
@@ -318,7 +318,7 @@ func (s *CBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerF
 	if token == nil {
 		return nil, errors.New("token not found")
 	}
-	addrs, err := s.GetContractAddress(BridgeParams{
+	addrs, err := s.GetContractAddress(ProcessorInputParams{
 		FromChain: fromChain,
 	})
 	if err != nil {
@@ -357,7 +357,7 @@ func (s *CBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerF
 	)
 }
 
-func (s *CBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
+func (s *CelerBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
 	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.CbridgeTx.From, verifiedAccount))
 	if err != nil {
 		return types.HexToHash(""), err
@@ -366,11 +366,11 @@ func (s *CBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.Sel
 	return types.Hash(tx.Hash()), nil
 }
 
-func (s *CBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error) {
+func (s *CelerBridgeProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error) {
 	return s.sendOrBuild(sendArgs, nil)
 }
 
-func (s *CBridge) CalculateAmountOut(params BridgeParams) (*big.Int, error) {
+func (s *CelerBridgeProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
 	amt, err := s.estimateAmt(params.FromChain, params.ToChain, params.AmountIn, params.FromToken.Symbol)
 	if err != nil {
 		return nil, err

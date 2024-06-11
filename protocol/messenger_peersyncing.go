@@ -38,10 +38,19 @@ func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 		messageID := messageIDBytes.String()
 		//mark messages as delivered
 
+		m.logger.Debug("got datasync acknowledge for message", zap.String("ack", hex.EncodeToString(ack)), zap.String("messageID", messageID))
+
 		err = m.UpdateMessageOutgoingStatus(messageID, common.OutgoingStatusDelivered)
 		if err != nil {
 			m.logger.Debug("Can't set message status as delivered", zap.Error(err))
 		}
+
+		err = m.UpdateRawMessageSent(messageID, true)
+		if err != nil {
+			m.logger.Debug("can't set raw message as sent", zap.Error(err))
+		}
+
+		m.transport.ConfirmMessageDelivered(messageID)
 
 		//send signal to client that message status updated
 		if m.config.messengerSignalsHandler != nil {

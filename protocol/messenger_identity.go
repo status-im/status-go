@@ -150,6 +150,8 @@ func (m *Messenger) setInstallationHostname() error {
 			if err != nil {
 				return err
 			}
+			// NOTE: imd.Name is always empty in this else branch, which leads to the
+			// result of Sprintf having a trailing whitespace.
 			imd.Name = fmt.Sprintf("%s %s", hn, imd.Name)
 		}
 	}

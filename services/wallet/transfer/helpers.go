@@ -14,8 +14,8 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/services/wallet/bridge"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 )
 
 func rowsToMultiTransactions(rows *sql.Rows) ([]*MultiTransaction, error) {
@@ -121,7 +121,7 @@ func multiTransactionFromCommand(command *MultiTransactionCommand) *MultiTransac
 	return multiTransaction
 }
 
-func updateDataFromMultiTx(data []*bridge.TransactionBridge, multiTransaction *MultiTransaction) {
+func updateDataFromMultiTx(data []*pathprocessor.MultipathProcessorTxArgs, multiTransaction *MultiTransaction) {
 	for _, tx := range data {
 		if tx.TransferTx != nil {
 			tx.TransferTx.MultiTransactionID = multiTransaction.ID
@@ -150,12 +150,12 @@ func updateDataFromMultiTx(data []*bridge.TransactionBridge, multiTransaction *M
 	}
 }
 
-func sendTransactions(data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, account *account.SelectedExtKey) (
+func sendTransactions(data []*pathprocessor.MultipathProcessorTxArgs, pathProcessors map[string]pathprocessor.PathProcessor, account *account.SelectedExtKey) (
 	map[uint64][]types.Hash, error) {
 
 	hashes := make(map[uint64][]types.Hash)
 	for _, tx := range data {
-		hash, err := bridges[tx.BridgeName].Send(tx, account)
+		hash, err := pathProcessors[tx.Name].Send(tx, account)
 		if err != nil {
 			return nil, err // TODO: One of transfers within transaction could have been sent. Need to notify user about it
 		}
