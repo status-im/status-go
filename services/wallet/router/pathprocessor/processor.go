@@ -42,4 +42,5 @@ type ProcessorInputParams struct {
 	BonderFee *big.Int
 	Username  string
 	PublicKey string
+	PackID    *big.Int
 }
