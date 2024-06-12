@@ -4371,6 +4371,7 @@ func (s *MessengerCommunitiesSuite) TestFetchSerializedCommunities() {
 			},
 		},
 	}
+	// #nosec G101
 	tokenImageInBase64 := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/tdgBUgAAAAASUVORK5CYII="
 	description.CommunityTokensMetadata = []*protobuf.CommunityTokenMetadata{
 		{
@@ -4432,7 +4433,10 @@ func (s *MessengerCommunitiesSuite) fetchImage(fullURL string) ([]byte, error) {
 
 	client := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{
+				MinVersion:         tls.VersionTLS12,
+				InsecureSkipVerify: true, // nolint: gosec
+			},
 		},
 	}
 
