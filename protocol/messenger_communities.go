@@ -3371,6 +3371,73 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 		}
 	}
 
+	return m.handleMissingCommunityAndChannelsEncryptionKeys(communityResponse)
+}
+
+func (m *Messenger) handleMissingCommunityAndChannelsEncryptionKeys(communityResponse *communities.CommunityResponse) error {
+	community := communityResponse.Community
+
+	if community.IsControlNode() {
+		return nil
+	}
+
+	addresses, err := m.getSharedAddresses(community.ID(), []string{})
+	if err != nil {
+		return err
+	}
+
+	if len(addresses) == 0 {
+		return nil
+	}
+
+	requestKeys := false
+	for channelId := range communityResponse.Changes.ChatsModified {
+		chatId := community.ChatID(channelId)
+
+		if !community.ChannelEncrypted(channelId) || community.HideChannelIfPermissionsNotMet(channelId) || community.ChannelHasMembers(channelId) {
+			continue
+		}
+
+		response, err := m.communitiesManager.CheckChannelPermissions(community.ID(), chatId, addresses)
+		if err != nil {
+			return err
+		}
+
+		requestKeys = response.ViewAndPostPermissions.Satisfied || response.ViewOnlyPermissions.Satisfied
+
+		if requestKeys {
+			break
+		}
+	}
+
+	if !requestKeys {
+		return nil
+	}
+
+	request := &protobuf.CommunityEncryptionKeysRequest{
+		CommunityId: community.ID(),
+	}
+
+	payload, err := proto.Marshal(request)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := &common.RawMessage{
+		Payload:             payload,
+		Sender:              m.identity,
+		CommunityID:         community.ID(),
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_ENCRYPTION_KEYS_REQUEST,
+	}
+
+	_, err = m.SendMessageToControlNode(community, rawMessage)
+
+	if err != nil {
+		m.logger.Error("failed to request missing community encryption keys", zap.String("communityId", community.IDString()), zap.Error(err))
+		return err
+	}
+
 	return nil
 }
 
