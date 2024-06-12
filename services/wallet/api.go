@@ -35,7 +35,7 @@ import (
 
 func NewAPI(s *Service) *API {
 	router := router.NewRouter(s.GetRPCClient(), s.GetTransactor(), s.GetTokenManager(), s.GetMarketManager(), s.GetCollectiblesService(),
-		s.GetCollectiblesManager(), s.GetEnsService(), s.GetStickersService())
+		s.GetCollectiblesManager(), s.GetEnsService(), s.GetStickersService(), s.FeatureFlags())
 	return &API{s, s.reader, router}
 }
 

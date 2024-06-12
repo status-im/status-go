@@ -18,6 +18,7 @@ import (
 	gaspriceoracle "github.com/status-im/status-go/contracts/gas-price-oracle"
 	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/params"
+	protocolCommon "github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/stickers"
@@ -275,12 +276,12 @@ func newSuggestedRoutes(
 }
 
 func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager, marketManager *market.Manager,
-	collectibles *collectibles.Service, collectiblesManager *collectibles.Manager, ensService *ens.Service, stickersService *stickers.Service) *Router {
+	collectibles *collectibles.Service, collectiblesManager *collectibles.Manager, ensService *ens.Service, stickersService *stickers.Service,
+	featureFlags *protocolCommon.FeatureFlags) *Router {
 	processors := make(map[string]pathprocessor.PathProcessor)
 	transfer := pathprocessor.NewTransferProcessor(rpcClient, transactor)
 	erc721Transfer := pathprocessor.NewERC721Processor(rpcClient, transactor)
 	erc1155Transfer := pathprocessor.NewERC1155Processor(rpcClient, transactor)
-	cbridge := pathprocessor.NewCelerBridgeProcessor(rpcClient, transactor, tokenManager)
 	hop := pathprocessor.NewHopBridgeProcessor(rpcClient, transactor, tokenManager)
 	paraswap := pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
 	ensRegister := pathprocessor.NewENSRegisterProcessor(rpcClient, transactor, ensService)
@@ -291,13 +292,18 @@ func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, token
 	processors[transfer.Name()] = transfer
 	processors[erc721Transfer.Name()] = erc721Transfer
 	processors[hop.Name()] = hop
-	processors[cbridge.Name()] = cbridge
 	processors[erc1155Transfer.Name()] = erc1155Transfer
 	processors[paraswap.Name()] = paraswap
 	processors[ensRegister.Name()] = ensRegister
 	processors[ensRelease.Name()] = ensRelease
 	processors[ensPublicKey.Name()] = ensPublicKey
 	processors[buyStickers.Name()] = buyStickers
+
+	if featureFlags.EnableCelerBridge {
+		// TODO: Celar Bridge is out of scope for 2.30, check it thoroughly once we decide to include it again
+		cbridge := pathprocessor.NewCelerBridgeProcessor(rpcClient, transactor, tokenManager)
+		processors[cbridge.Name()] = cbridge
+	}
 
 	return &Router{
 		rpcClient:           rpcClient,
@@ -309,6 +315,7 @@ func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, token
 		stickersService:     stickersService,
 		feesManager:         &FeeManager{rpcClient},
 		pathProcessors:      processors,
+		featureFlags:        featureFlags,
 	}
 }
 
@@ -340,6 +347,7 @@ type Router struct {
 	stickersService     *stickers.Service
 	feesManager         *FeeManager
 	pathProcessors      map[string]pathprocessor.PathProcessor
+	featureFlags        *protocolCommon.FeatureFlags
 }
 
 func (r *Router) requireApproval(ctx context.Context, sendType SendType, approvalContractAddress *common.Address, account common.Address, network *params.Network, token *token.Token, amountIn *big.Int) (
