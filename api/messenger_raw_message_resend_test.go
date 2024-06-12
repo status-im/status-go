@@ -22,6 +22,8 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/utils"
+	"github.com/status-im/status-go/signal"
+	tutils "github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/wakuv2"
 
 	"github.com/stretchr/testify/suite"
@@ -29,6 +31,7 @@ import (
 
 type MessengerRawMessageResendTest struct {
 	suite.Suite
+	logger         *zap.Logger
 	aliceBackend   *GethStatusBackend
 	bobBackend     *GethStatusBackend
 	aliceMessenger *protocol.Messenger
@@ -43,8 +46,13 @@ func TestMessengerRawMessageResendTestSuite(t *testing.T) {
 }
 
 func (s *MessengerRawMessageResendTest) SetupTest() {
-	logger, err := zap.NewDevelopment()
+	tutils.Init()
+
+	var err error
+	s.logger, err = zap.NewDevelopment()
 	s.Require().NoError(err)
+
+	signal.SetMobileSignalHandler(nil)
 
 	exchangeNodeConfig := &wakuv2.Config{
 		Port:                     0,
@@ -54,7 +62,7 @@ func (s *MessengerRawMessageResendTest) SetupTest() {
 		UseShardAsDefaultTopic:   true,
 		DefaultShardPubsubTopic:  shard.DefaultShardPubsubTopic(),
 	}
-	s.exchangeBootNode, err = wakuv2.New(nil, "", exchangeNodeConfig, logger.Named("pxServerNode"), nil, nil, nil, nil)
+	s.exchangeBootNode, err = wakuv2.New(nil, "", exchangeNodeConfig, s.logger.Named("pxServerNode"), nil, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(s.exchangeBootNode.Start())
 
