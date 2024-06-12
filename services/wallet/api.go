@@ -14,10 +14,12 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet/activity"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	wcommon "github.com/status-im/status-go/services/wallet/common"
@@ -770,4 +772,25 @@ func (api *API) DisconnectWalletConnectSession(ctx context.Context, topic wallet
 func (api *API) GetWalletConnectDapps(ctx context.Context, validAtTimestamp int64, testChains bool) ([]walletconnect.DBDApp, error) {
 	log.Debug("wallet.api.GetWalletConnectDapps", "validAtTimestamp", validAtTimestamp, "testChains", testChains)
 	return walletconnect.GetActiveDapps(api.s.db, validAtTimestamp, testChains)
+}
+
+// signTypedDataV4 dApps use it to execute "eth_signTypedData_v4" requests
+func (api *API) SignTypedDataV4(typedJson string, address string, password string) (types.HexBytes, error) {
+	account, err := api.getVerifiedWalletAccount(address, password)
+	if err != nil {
+		return types.HexBytes{}, err
+	}
+	var typed signercore.TypedData
+	err = json.Unmarshal([]byte(typedJson), &typed)
+	if err != nil {
+		return types.HexBytes{}, err
+	}
+
+	// This is not used down the line but required by the typeddata.SignTypedDataV4 function call
+	chain := new(big.Int).SetUint64(api.s.config.NetworkID)
+	sig, err := typeddata.SignTypedDataV4(typed, account.AccountKey.PrivateKey, chain)
+	if err != nil {
+		return types.HexBytes{}, err
+	}
+	return types.HexBytes(sig), err
 }
