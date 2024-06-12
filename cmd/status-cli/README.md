@@ -98,6 +98,7 @@ Logs are recorded in file `*.log` and terminal.
 
 ```bash
 # notice we need both the name and the key id (not the pub key here)
+# the key id will be pressent in the logs when a new account is created, same as the public key
 ./status-cli serve -n bobby -kid <bob_key_id>
 ```
 
@@ -107,6 +108,7 @@ Have two CLIs running (`alice` and `bobby`)
 
 ```bash
 # 1. (alice) create community
+# this call will return the community id
 curl --request POST \
   --url http://127.0.0.1:5500/ \
   --header 'Content-type: application/json' \
@@ -124,7 +126,7 @@ curl --request POST \
  "id": 1
 }'
 
-# 2. (bobby & alice) fetch community
+# 2. (bobby & alice) fetch community (use communityId from step 1 response)
 curl --request POST \
   --url http://127.0.0.1:5501/ \
   --header 'Content-type: application/json' \
@@ -141,7 +143,8 @@ curl --request POST \
  "id": 1
 }'
 
-# 3. (bobby) request to join community
+# 3. (bobby) request to join community (use communityId from step 1 response)
+# this call will return the requestsToJoinCommunity.id
 curl --request POST \
   --url http://127.0.0.1:5501/ \
   --header 'Content-type: application/json' \
@@ -156,7 +159,8 @@ curl --request POST \
  "id": 1
 }'
 
-# 4. (alice) accept request to join community from bobby
+# 4. (alice) accept request to join community from bobby (use requestsToJoinCommunity.id from step 3 response)
+# in the response you can see the community id and the chats' ids for that community ($.result.communities[*].chats[*].id)
 curl --request POST \
   --url http://127.0.0.1:5500/ \
   --header 'Content-type: application/json' \
@@ -172,7 +176,7 @@ curl --request POST \
 }'
 
 # 5. (alice) send chat message (bobby should receive it)
-# chatId is the community id concatenated to the chat id
+# chatId is the community id concatenated to the chat id (from step 4 response)
 curl --request POST \
   --url http://127.0.0.1:5500/ \
   --header 'Content-type: application/json' \
@@ -189,7 +193,7 @@ curl --request POST \
  "id": 1
 }'
 
-# 6. (bobby) leave the community
+# 6. (bobby) leave the community (use communityId from step 1 response)
 curl --request POST \
   --url http://127.0.0.1:5501/ \
   --header 'Content-type: application/json' \
@@ -213,7 +217,8 @@ curl --request POST \
 Have two CLIs running (`alice` and `bobby`)
 
 ```bash
-# 1. (alice) create the group chat including bobby in it, save the id of the response
+# 1. (alice) create the group chat including bobby's public key in it, 
+# the response will have the group chat id to send messages to it
 curl --request POST \
   --url http://127.0.0.1:8545/ \
   --header 'Content-type: application/json' \
@@ -230,7 +235,7 @@ curl --request POST \
  "id": 1
 }'
 
-# 2. (alice) send the message to the id of the group chat
+# 2. (alice) send the message to the id of the group chat (from step 1 response)
 curl --request POST \
   --url http://127.0.0.1:5500/ \
   --header 'Content-type: application/json' \
