@@ -34,6 +34,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/typeddata"
+	"github.com/status-im/status-go/services/wallet"
 	walletservice "github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
@@ -1684,8 +1685,8 @@ func TestCreateAccountPathsValidation(t *testing.T) {
 }
 
 func TestRestoreKeycardAccountAndLogin(t *testing.T) {
-	//storeToKeychain := false
-	//recoverAccount := true
+	utils.Init()
+	tmpdir := t.TempDir()
 
 	exampleKeycardEvent := map[string]interface{}{
 		"error":       "",
@@ -1753,7 +1754,7 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 		"mnemonic":    "",
 		"fetchBackup": true,
 		"createAccountRequest": map[string]interface{}{
-			"rootDataDir":   "/Users/igorsirotin/Repositories/Status/status-desktop/Status/data/",
+			"rootDataDir":   tmpdir,
 			"kdfIterations": 256000,
 			"deviceName":    "",
 			"displayName":   "",
@@ -1775,8 +1776,9 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 			"verifyTransactionChainID": nil,
 			"upstreamConfig":           "",
 			"networkID":                nil,
-			"walletSecretsConfig": map[string]interface{}{"poktToken": "849214fd2f85acead08f5184",
-				"infuraToken":                 "220a1abb4b6943a093c35d0ce4fb0732",
+			"walletSecretsConfig": map[string]interface{}{
+				"poktToken":                   "1234567890",
+				"infuraToken":                 "1234567890",
 				"infuraSecret":                "",
 				"openseaApiKey":               "",
 				"raribleMainnetApiKey":        "",
@@ -1794,15 +1796,12 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 			"torrentConfigEnabled":   false,
 			"torrentConfigPort":      0,
 			"keycardInstanceUID":     "a84599394887b742eed9a99d3834a797",
-			"keycardPairingDataFile": "/Users/igorsirotin/Repositories/Status/status-desktop/Status/data/keycard/pairings.json",
+			"keycardPairingDataFile": path.Join(tmpdir, DefaultKeycardPairingDataFile),
 		},
 	}
 
 	require.NotNil(t, exampleKeycardEvent)
 	require.NotNil(t, exampleRequest)
-
-	utils.Init()
-	tmpdir := t.TempDir()
 
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
@@ -1815,6 +1814,12 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 	require.NoError(t, backend.OpenAccounts())
 
 	keycardPairingDataFile := exampleRequest["createAccountRequest"].(map[string]interface{})["keycardPairingDataFile"].(string)
+
+	kp := wallet.NewKeycardPairings()
+	kp.SetKeycardPairingsFile(keycardPairingDataFile)
+
+	err = kp.SetPairingsJSONFileContent([]byte(`{"a84599394887b742eed9a99d3834a797":{"key":"785d52957b05482477728380d9b4bbb5dc9a8ed978ab4a4098e1a279c855d3c6","index":1}}`))
+	require.NoError(t, err)
 
 	request := &requests.RestoreAccount{
 		Keycard: &requests.KeycardData{

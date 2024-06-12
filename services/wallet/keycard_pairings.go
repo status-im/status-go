@@ -56,6 +56,10 @@ func (kp *KeycardPairings) GetPairings() (map[string]KeycardPairing, error) {
 		return nil, err
 	}
 
+	if len(content) == 0 {
+		return nil, os.ErrNotExist
+	}
+
 	pairings := make(map[string]KeycardPairing)
 	err = json.Unmarshal(content, &pairings)
 	if err != nil {
