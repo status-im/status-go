@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math/big"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/helpers"
@@ -611,4 +613,41 @@ func TestConfirmMessageDelivered(t *testing.T) {
 
 	require.NoError(t, aliceNode.Stop())
 	require.NoError(t, bobNode.Stop())
+}
+
+func TestOnlineChecker(t *testing.T) {
+	w, err := New(nil, "shards.staging", nil, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.False(t, w.onlineChecker.IsOnline())
+
+	w.ConnectionChanged(connection.State{Offline: false})
+	require.True(t, w.onlineChecker.IsOnline())
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		<-w.connectionChanged
+		require.True(t, true)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	w.ConnectionChanged(connection.State{Offline: true})
+	require.False(t, w.onlineChecker.IsOnline())
+
+	// Test lightnode online checker
+	config := &Config{}
+	config.ClusterID = 16
+	config.LightClient = true
+	lightNode, err := New(nil, "shards.staging", config, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	err = lightNode.Start()
+	require.NoError(t, err)
+
+	require.False(t, lightNode.onlineChecker.IsOnline())
+
+	lightNode.filterManager.addFilter("test", &common.Filter{})
+
 }

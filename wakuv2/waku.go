@@ -56,6 +56,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/metrics"
 
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
+	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
@@ -75,7 +76,6 @@ import (
 	"github.com/status-im/status-go/wakuv2/persistence"
 
 	node "github.com/waku-org/go-waku/waku/v2/node"
-	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 )
 
@@ -91,7 +91,7 @@ const messageExpiredPerid = 10 // in seconds
 const maxRelayPeers = 300
 
 type SentEnvelope struct {
-	Envelope      *v2protocol.Envelope
+	Envelope      *protocol.Envelope
 	PublishMethod PublishMethod
 }
 
@@ -101,7 +101,7 @@ type ErrorSendingEnvelope struct {
 }
 
 type ITelemetryClient interface {
-	PushReceivedEnvelope(receivedEnvelope *v2protocol.Envelope)
+	PushReceivedEnvelope(receivedEnvelope *protocol.Envelope)
 	PushSentEnvelope(sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
 }
@@ -156,6 +156,7 @@ type Waku struct {
 	topicHealthStatusChan   chan peermanager.TopicHealthStatus
 	connStatusSubscriptions map[string]*types.ConnStatusSubscription
 	connStatusMu            sync.Mutex
+	onlineChecker           *onlinechecker.DefaultOnlineChecker
 
 	logger *zap.Logger
 
@@ -165,9 +166,6 @@ type Waku struct {
 	// seededBootnodesForDiscV5 indicates whether we manage to retrieve discovery
 	// bootnodes successfully
 	seededBootnodesForDiscV5 bool
-
-	// offline indicates whether we have detected connectivity
-	offline bool
 
 	// connectionChanged is channel that notifies when connectivity has changed
 	connectionChanged chan struct{}
@@ -242,6 +240,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		discV5BootstrapNodes:            cfg.DiscV5BootstrapNodes,
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 		onPeerStats:                     onPeerStats,
+		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
 	}
 
 	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
@@ -1327,13 +1326,13 @@ func (w *Waku) lightClientConnectionStatus() {
 	}
 
 	//TODO:Analyze if we need to discover and connect to peers with peerExchange loop enabled.
-	if w.offline && isOnline {
+	if !w.onlineChecker.IsOnline() && isOnline {
 		if err := w.discoverAndConnectPeers(); err != nil {
 			w.logger.Error("failed to add wakuv2 peers", zap.Error(err))
 		}
 	}
 
-	w.offline = !isOnline
+	w.onlineChecker.SetOnline(isOnline)
 }
 
 // Start implements node.Service, starting the background data propagation thread
@@ -1802,7 +1801,7 @@ func (w *Waku) StopDiscV5() error {
 }
 
 func (w *Waku) ConnectionChanged(state connection.State) {
-	if !state.Offline && w.offline {
+	if !state.Offline && !w.onlineChecker.IsOnline() {
 		select {
 		case w.connectionChanged <- struct{}{}:
 		default:
@@ -1810,7 +1809,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 		}
 	}
 
-	w.offline = state.Offline
+	w.onlineChecker.SetOnline(!state.Offline)
 }
 
 // seedBootnodesForDiscV5 tries to fetch bootnodes

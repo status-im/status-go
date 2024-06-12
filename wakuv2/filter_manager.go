@@ -10,6 +10,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/waku-org/go-waku/waku/v2/api"
+	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 )
@@ -32,7 +33,7 @@ type FilterManager struct {
 	onNewEnvelopes func(env *protocol.Envelope) error
 	logger         *zap.Logger
 	node           *filter.WakuFilterLightNode
-	peersAvailable bool
+	onlineChecker  *onlinechecker.DefaultOnlineChecker
 	filterQueue    chan filterConfig
 }
 type SubDetails struct {
@@ -56,8 +57,10 @@ func newFilterManager(ctx context.Context, logger *zap.Logger, cfg *Config, onNe
 	mgr.onNewEnvelopes = onNewEnvelopes
 	mgr.filters = make(map[string]SubDetails)
 	mgr.node = node
-	mgr.peersAvailable = false
 	mgr.filterQueue = make(chan filterConfig, filterQueueSize)
+	mgr.onlineChecker = onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker)
+
+	mgr.node.SetOnlineChecker(mgr.onlineChecker)
 
 	return mgr
 }
@@ -68,7 +71,7 @@ func (mgr *FilterManager) addFilter(filterID string, f *common.Filter) {
 	contentFilter := mgr.buildContentFilter(f.PubsubTopic, f.ContentTopics)
 	mgr.logger.Debug("adding filter", zap.String("filter-id", filterID), zap.Stringer("content-filter", contentFilter))
 
-	if mgr.peersAvailable {
+	if mgr.onlineChecker.IsOnline() {
 		go mgr.subscribeAndRunLoop(filterConfig{filterID, contentFilter})
 	} else {
 		mgr.logger.Debug("queuing filter as not online", zap.String("filter-id", filterID), zap.Stringer("content-filter", contentFilter))
@@ -80,7 +83,7 @@ func (mgr *FilterManager) subscribeAndRunLoop(f filterConfig) {
 	ctx, cancel := context.WithCancel(mgr.ctx)
 	config := api.FilterConfig{MaxPeers: mgr.cfg.MinPeersForFilter}
 
-	sub, err := api.Subscribe(ctx, mgr.node, f.contentFilter, config, mgr.logger, mgr.peersAvailable)
+	sub, err := api.Subscribe(ctx, mgr.node, f.contentFilter, config, mgr.logger)
 	mgr.Lock()
 	mgr.filters[f.ID] = SubDetails{cancel, sub}
 	mgr.Unlock()
@@ -109,12 +112,8 @@ func (mgr *FilterManager) onConnectionStatusChange(pubsubTopic string, newStatus
 			}
 		}
 	}
-	mgr.Lock()
-	for _, subDetails := range mgr.filters {
-		subDetails.sub.SetNodeState(newStatus)
-	}
-	mgr.Unlock()
-	mgr.peersAvailable = newStatus
+
+	mgr.onlineChecker.SetOnline(newStatus)
 }
 
 func (mgr *FilterManager) removeFilter(filterID string) {
