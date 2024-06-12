@@ -83,27 +83,27 @@ Logs are recorded in file `*.log` and terminal.
 
 ## JSON-RPC use cases
 
-### Start two CLIs and making them contacts
+### Start two CLIs adding each other as contacts
 
 ```bash
 # terminal 1 (alice)
-./status-cli serve -n alice -p5500
+./status-cli serve -n alice -p 5500
 # note the public key and the key id from the output
 
-# terminal 2 (bob)
-./status-cli serve -n bob -p5501 -a <alice_pub_key>
+# terminal 2 (bobby)
+./status-cli serve -n bobby -p 5501 -a <alice_pub_key>
 ```
 
 ## Restart any existing account
 
 ```bash
-# notice we need the key id not the pub key here
-./status-cli serve -n bob -kid <bob_key_id>
+# notice we need both the name and the key id (not the pub key here)
+./status-cli serve -n bobby -kid <bob_key_id>
 ```
 
 ### Create community
 
-Have two CLIs running (`alice` and `bob`)
+Have two CLIs running (`alice` and `bobby`)
 
 ```bash
 # 1. (alice) create community
@@ -124,7 +124,7 @@ curl --request POST \
  "id": 1
 }'
 
-# 2. (bob & alice) fetch community
+# 2. (bobby & alice) fetch community
 curl --request POST \
   --url http://127.0.0.1:5501/ \
   --header 'Content-type: application/json' \
@@ -141,7 +141,7 @@ curl --request POST \
  "id": 1
 }'
 
-# 3. (bob) request to join community
+# 3. (bobby) request to join community
 curl --request POST \
   --url http://127.0.0.1:5501/ \
   --header 'Content-type: application/json' \
@@ -156,7 +156,7 @@ curl --request POST \
  "id": 1
 }'
 
-# 4. (alice) accept request to join community from bob
+# 4. (alice) accept request to join community from bobby
 curl --request POST \
   --url http://127.0.0.1:5500/ \
   --header 'Content-type: application/json' \
@@ -171,7 +171,7 @@ curl --request POST \
  "id": 1
 }'
 
-# 5. (alice) send chat message (bob should receive it)
+# 5. (alice) send chat message (bobby should receive it)
 # chatId is the community id concatenated to the chat id
 curl --request POST \
   --url http://127.0.0.1:5500/ \
@@ -189,7 +189,7 @@ curl --request POST \
  "id": 1
 }'
 
-# 6. (bob) leave the community
+# 6. (bobby) leave the community
 curl --request POST \
   --url http://127.0.0.1:5501/ \
   --header 'Content-type: application/json' \
@@ -203,17 +203,17 @@ curl --request POST \
 }'
 
 # Optional:
-# 7. (bob & alice) fetch community again and verify the members (curl from step 2.)
-# 8. Instead of creating a community always you can restart alice and bob and proceed from step 2. Alice is the owner
+# 7. (bobby & alice) fetch community again and verify the members (curl from step 2.)
+# 8. Instead of creating a community always you can restart alice and bobby and proceed from step 2. Alice is the owner
 
 ```
 
 ### Private group chat
 
-Have two CLIs running (`alice` and `bob`)
+Have two CLIs running (`alice` and `bobby`)
 
 ```bash
-# 1. (alice) create the group chat including bob in it, save the id of the response
+# 1. (alice) create the group chat including bobby in it, save the id of the response
 curl --request POST \
   --url http://127.0.0.1:8545/ \
   --header 'Content-type: application/json' \
