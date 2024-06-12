@@ -42,22 +42,24 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 		walletDB:        walletDB,
 	}
 	s.SetHandlers(HandlerPatternMap{
-		accountImagesPath:              handleAccountImages(s.multiaccountsDB, s.logger),
-		accountInitialsPath:            handleAccountInitials(s.multiaccountsDB, s.logger),
-		audioPath:                      handleAudio(s.db, s.logger),
-		contactImagesPath:              handleContactImages(s.db, s.logger),
-		discordAttachmentsPath:         handleDiscordAttachment(s.db, s.logger),
-		discordAuthorsPath:             handleDiscordAuthorAvatar(s.db, s.logger),
-		generateQRCode:                 handleQRCodeGeneration(s.multiaccountsDB, s.logger),
-		imagesPath:                     handleImage(s.db, s.logger),
-		ipfsPath:                       handleIPFS(s.downloader, s.logger),
-		LinkPreviewThumbnailPath:       handleLinkPreviewThumbnail(s.db, s.logger),
-		LinkPreviewFaviconPath:         handleLinkPreviewFavicon(s.db, s.logger),
-		StatusLinkPreviewThumbnailPath: handleStatusLinkPreviewThumbnail(s.db, s.logger),
-		communityTokenImagesPath:       handleCommunityTokenImages(s.db, s.logger),
-		walletCommunityImagesPath:      handleWalletCommunityImages(s.walletDB, s.logger),
-		walletCollectionImagesPath:     handleWalletCollectionImages(s.walletDB, s.logger),
-		walletCollectibleImagesPath:    handleWalletCollectibleImages(s.walletDB, s.logger),
+		accountImagesPath:                   handleAccountImages(s.multiaccountsDB, s.logger),
+		accountInitialsPath:                 handleAccountInitials(s.multiaccountsDB, s.logger),
+		audioPath:                           handleAudio(s.db, s.logger),
+		contactImagesPath:                   handleContactImages(s.db, s.logger),
+		discordAttachmentsPath:              handleDiscordAttachment(s.db, s.logger),
+		discordAuthorsPath:                  handleDiscordAuthorAvatar(s.db, s.logger),
+		generateQRCode:                      handleQRCodeGeneration(s.multiaccountsDB, s.logger),
+		imagesPath:                          handleImage(s.db, s.logger),
+		ipfsPath:                            handleIPFS(s.downloader, s.logger),
+		LinkPreviewThumbnailPath:            handleLinkPreviewThumbnail(s.db, s.logger),
+		LinkPreviewFaviconPath:              handleLinkPreviewFavicon(s.db, s.logger),
+		StatusLinkPreviewThumbnailPath:      handleStatusLinkPreviewThumbnail(s.db, s.logger),
+		communityTokenImagesPath:            handleCommunityTokenImages(s.db, s.logger),
+		communityDescriptionImagesPath:      handleCommunityDescriptionImagesPath(s.db, s.logger),
+		communityDescriptionTokenImagesPath: handleCommunityDescriptionTokenImagesPath(s.db, s.logger),
+		walletCommunityImagesPath:           handleWalletCommunityImages(s.walletDB, s.logger),
+		walletCollectionImagesPath:          handleWalletCollectionImages(s.walletDB, s.logger),
+		walletCollectibleImagesPath:         handleWalletCollectibleImages(s.walletDB, s.logger),
 	})
 
 	return s, nil
@@ -162,6 +164,28 @@ func (s *MediaServer) MakeCommunityTokenImagesURL(communityID string, chainID ui
 	u.RawQuery = url.Values{
 		"communityID": {communityID},
 		"chainID":     {strconv.FormatUint(chainID, 10)},
+		"symbol":      {symbol},
+	}.Encode()
+
+	return u.String()
+}
+
+func (s *MediaServer) MakeCommunityImageURL(communityID, name string) string {
+	u := s.MakeBaseURL()
+	u.Path = communityDescriptionImagesPath
+	u.RawQuery = url.Values{
+		"communityID": {communityID},
+		"name":        {name},
+	}.Encode()
+
+	return u.String()
+}
+
+func (s *MediaServer) MakeCommunityDescriptionTokenImageURL(communityID, symbol string) string {
+	u := s.MakeBaseURL()
+	u.Path = communityDescriptionTokenImagesPath
+	u.RawQuery = url.Values{
+		"communityID": {communityID},
 		"symbol":      {symbol},
 	}.Encode()
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -396,6 +397,13 @@ func (api *PublicAPI) SetInstallationName(installationID string, name string) er
 // Communities returns a list of communities that are stored
 func (api *PublicAPI) Communities(parent context.Context) ([]*communities.Community, error) {
 	return api.service.messenger.Communities()
+}
+
+// FetchSerializedCommunities returns a list of serialized communities.
+// The key difference from the Communities function is that it uses MediaServer
+// to construct image URLs for all the images rather than using base64 encoding.
+func (api *PublicAPI) FetchSerializedCommunities(parent context.Context) ([]json.RawMessage, error) {
+	return api.service.messenger.FetchSerializedCommunities()
 }
 
 // JoinedCommunities returns a list of communities that the user has joined

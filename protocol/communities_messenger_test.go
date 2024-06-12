@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"reflect"
 	"strings"
@@ -4346,6 +4348,100 @@ func (s *MessengerCommunitiesSuite) sendImageToCommunity(sender *Messenger, chat
 		s.Require().NoError(err)
 	}
 	return sentMessage
+}
+
+func (s *MessengerCommunitiesSuite) TestFetchSerializedCommunities() {
+	community, _ := s.createCommunity()
+	addMediaServer := func(messenger *Messenger) {
+		mediaServer, err := server.NewMediaServer(messenger.database, nil, nil, nil)
+		s.Require().NoError(err)
+		s.Require().NoError(mediaServer.Start())
+		messenger.httpServer = mediaServer
+	}
+	addMediaServer(s.owner)
+
+	// update community description
+	description := community.Description()
+	identImageName := "small"
+	identImagePayload := []byte("123")
+	description.Identity = &protobuf.ChatIdentity{
+		Images: map[string]*protobuf.IdentityImage{
+			identImageName: {
+				Payload: identImagePayload,
+			},
+		},
+	}
+	tokenImageInBase64 := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/tdgBUgAAAAASUVORK5CYII="
+	description.CommunityTokensMetadata = []*protobuf.CommunityTokenMetadata{
+		{
+			Image:  tokenImageInBase64,
+			Symbol: "STT",
+		},
+	}
+	description.Clock = description.Clock + 1
+	community.Edit(description)
+	s.Require().NoError(s.owner.communitiesManager.SaveCommunity(community))
+
+	// check edit was successful
+	b, err := s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(b)
+	s.Len(b.Description().CommunityTokensMetadata, 1)
+	s.Equal(tokenImageInBase64, b.Description().CommunityTokensMetadata[0].Image)
+	s.Len(b.Description().Identity.Images, 1)
+	s.Equal(identImagePayload, b.Description().Identity.Images[identImageName].Payload)
+
+	c, err := s.owner.FetchSerializedCommunities()
+	s.Require().NoError(err)
+	s.Require().Len(c, 1)
+	d, err := json.Marshal(c)
+	s.Require().NoError(err)
+
+	var communityData []struct {
+		Images                  map[string]string `json:"images"`
+		CommunityTokensMetadata []struct {
+			Image  string `json:"image"`
+			Symbol string `json:"symbol"`
+		} `json:"communityTokensMetadata"`
+	}
+	err = json.Unmarshal(d, &communityData)
+	s.Require().NoError(err)
+	// Check community description image
+	s.Require().NotEmpty(communityData[0].Images[identImageName])
+	s.T().Log(fmt.Sprintf("Image URL (%s):", identImageName), communityData[0].Images[identImageName])
+	e, err := s.fetchImage(communityData[0].Images[identImageName])
+	s.Require().NoError(err)
+	s.Require().Equal(identImagePayload, e)
+
+	// Check communityTokensMetadata image
+	s.Require().NotEmpty(communityData[0].CommunityTokensMetadata)
+	s.T().Log("Community Token Metadata Image:", communityData[0].CommunityTokensMetadata[0].Image)
+	s.T().Log("Community Token Metadata Symbol:", communityData[0].CommunityTokensMetadata[0].Symbol)
+	f, err := s.fetchImage(communityData[0].CommunityTokensMetadata[0].Image)
+	s.Require().NoError(err)
+	tokenImagePayload, err := images.GetPayloadFromURI(tokenImageInBase64)
+	s.Require().NoError(err)
+	s.Require().Equal(tokenImagePayload, f)
+}
+
+func (s *MessengerCommunitiesSuite) fetchImage(fullURL string) ([]byte, error) {
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return ioutil.ReadAll(resp.Body)
 }
 
 func (s *MessengerCommunitiesSuite) TestMemberMessagesHasImageLink() {
