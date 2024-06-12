@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
+	protocolCommon "github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/ens"
@@ -170,6 +171,11 @@ func NewService(
 
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed, pendingTxManager)
 
+	featureFlags := &protocolCommon.FeatureFlags{}
+	if config.WalletConfig.EnableCelerBridge {
+		featureFlags.EnableCelerBridge = true
+	}
+
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -198,6 +204,7 @@ func NewService(
 		blockChainState:       blockChainState,
 		keycardPairings:       NewKeycardPairings(),
 		config:                config,
+		featureFlags:          featureFlags,
 	}
 }
 
@@ -231,6 +238,7 @@ type Service struct {
 	blockChainState       *blockchainstate.BlockChainState
 	keycardPairings       *KeycardPairings
 	config                *params.NodeConfig
+	featureFlags          *protocolCommon.FeatureFlags
 }
 
 // Start signals transmitter.
@@ -292,6 +300,10 @@ func (s *Service) KeycardPairings() *KeycardPairings {
 
 func (s *Service) Config() *params.NodeConfig {
 	return s.config
+}
+
+func (s *Service) FeatureFlags() *protocolCommon.FeatureFlags {
+	return s.featureFlags
 }
 
 func (s *Service) GetRPCClient() *rpc.Client {
