@@ -4,17 +4,30 @@ import (
 	"errors"
 )
 
-var ErrRestoreAccountInvalidMnemonic = errors.New("restore-account: invalid mnemonic")
+var (
+	ErrRestoreAccountInvalidMnemonic    = errors.New("restore-account: no mnemonic or keycard is set")
+	ErrRestoreAccountMnemonicAndKeycard = errors.New("restore-account: both mnemonic and keycard info are set")
+)
 
 type RestoreAccount struct {
-	Mnemonic    string `json:"mnemonic"`
-	FetchBackup bool   `json:"fetchBackup"`
+	Mnemonic string `json:"mnemonic"`
+
+	// Keycard info can be set instead of Mnemonic.
+	// This is to log in using a keycard with existing account.
+	Keycard *KeycardData `json:"keycard"`
+
+	FetchBackup bool `json:"fetchBackup"`
+
 	CreateAccount
 }
 
 func (c *RestoreAccount) Validate() error {
-	if len(c.Mnemonic) == 0 {
+	if len(c.Mnemonic) == 0 && c.Keycard == nil {
 		return ErrRestoreAccountInvalidMnemonic
+	}
+
+	if len(c.Mnemonic) > 0 && c.Keycard != nil {
+		return ErrRestoreAccountMnemonicAndKeycard
 	}
 
 	return c.CreateAccount.Validate(&CreateAccountValidation{
@@ -22,9 +35,7 @@ func (c *RestoreAccount) Validate() error {
 	})
 }
 
-type RestoreKeycardAccount struct {
-	FetchBackup bool `json:"fetchBackup"`
-
+type KeycardData struct {
 	KeyUID              string `json:"keyUID"`
 	Address             string `json:"address"`
 	WhisperPrivateKey   string `json:"whisperPrivateKey"`
@@ -35,12 +46,4 @@ type RestoreKeycardAccount struct {
 	WalletRootAddress   string `json:"walletRootAddress"`
 	Eip1581Address      string `json:"eip1581Address"`
 	EncryptionPublicKey string `json:"encryptionPublicKey"`
-
-	CreateAccount
-}
-
-func (c *RestoreKeycardAccount) Validate() error {
-	return c.CreateAccount.Validate(&CreateAccountValidation{
-		AllowEmptyDisplayName: true,
-	})
 }

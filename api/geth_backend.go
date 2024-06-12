@@ -1306,42 +1306,42 @@ func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAcco
 	return response.account, nil
 }
 
-func (b *GethStatusBackend) RestoreKeycardAccountAndLogin(request *requests.RestoreKeycardAccount) (*multiaccounts.Account, error) {
+func (b *GethStatusBackend) RestoreKeycardAccountAndLogin(request *requests.RestoreAccount) (*multiaccounts.Account, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
 
-	keyStoreDir, err := b.initKeyStoreDirWithAccount(request.RootDataDir, request.KeyUID)
+	keyStoreDir, err := b.initKeyStoreDirWithAccount(request.RootDataDir, request.Keycard.KeyUID)
 	if err != nil {
 		return nil, err
 	}
 
 	derivedAddresses := map[string]generator.AccountInfo{
 		pathDefaultChat: {
-			Address:    request.WhisperAddress,
-			PublicKey:  request.WhisperPublicKey,
-			PrivateKey: request.WhisperPrivateKey,
+			Address:    request.Keycard.WhisperAddress,
+			PublicKey:  request.Keycard.WhisperPublicKey,
+			PrivateKey: request.Keycard.WhisperPrivateKey,
 		},
 		pathWalletRoot: {
-			Address: request.WalletRootAddress,
+			Address: request.Keycard.WalletRootAddress,
 		},
 		pathDefaultWallet: {
-			Address:   request.WalletAddress,
-			PublicKey: request.WalletPublicKey,
+			Address:   request.Keycard.WalletAddress,
+			PublicKey: request.Keycard.WalletPublicKey,
 		},
 		pathEIP1581: {
-			Address: request.Eip1581Address,
+			Address: request.Keycard.Eip1581Address,
 		},
 		pathEncryption: {
-			PublicKey: request.EncryptionPublicKey,
+			PublicKey: request.Keycard.EncryptionPublicKey,
 		},
 	}
 
 	input := &prepareAccountInput{
 		customizationColorClock: 0,
 		accountID:               "", // empty for keycard
-		keyUID:                  request.KeyUID,
-		address:                 request.Address,
+		keyUID:                  request.Keycard.KeyUID,
+		address:                 request.Keycard.Address,
 		mnemonic:                "",
 		restoringAccount:        true,
 		derivedAddresses:        derivedAddresses,

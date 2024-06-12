@@ -339,7 +339,13 @@ func RestoreAccountAndLogin(requestJSON string) string {
 
 	api.RunAsync(func() error {
 		log.Debug("starting a node and restoring account")
-		_, err := statusBackend.RestoreAccountAndLogin(&request)
+
+		if request.Keycard != nil {
+			_, err = statusBackend.RestoreKeycardAccountAndLogin(&request)
+		} else {
+			_, err = statusBackend.RestoreAccountAndLogin(&request)
+		}
+
 		if err != nil {
 			log.Error("failed to restore account", "error", err)
 			return err
@@ -347,6 +353,7 @@ func RestoreAccountAndLogin(requestJSON string) string {
 		log.Debug("started a node, and restored account")
 		return nil
 	})
+
 	return makeJSONResponse(nil)
 }
 

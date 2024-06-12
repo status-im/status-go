@@ -1816,18 +1816,19 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 
 	keycardPairingDataFile := exampleRequest["createAccountRequest"].(map[string]interface{})["keycardPairingDataFile"].(string)
 
-	request := &requests.RestoreKeycardAccount{
-		KeyUID:              exampleKeycardEvent["keyUid"].(string),
-		Address:             exampleKeycardEvent["masterKey"].(map[string]interface{})["address"].(string),
-		WhisperPrivateKey:   exampleKeycardEvent["whisperKey"].(map[string]interface{})["privateKey"].(string),
-		WhisperPublicKey:    exampleKeycardEvent["whisperKey"].(map[string]interface{})["publicKey"].(string),
-		WhisperAddress:      exampleKeycardEvent["whisperKey"].(map[string]interface{})["address"].(string),
-		WalletPublicKey:     exampleKeycardEvent["walletKey"].(map[string]interface{})["publicKey"].(string),
-		WalletAddress:       exampleKeycardEvent["walletKey"].(map[string]interface{})["address"].(string),
-		WalletRootAddress:   exampleKeycardEvent["walletRootKey"].(map[string]interface{})["address"].(string),
-		Eip1581Address:      exampleKeycardEvent["eip1581Key"].(map[string]interface{})["address"].(string),
-		EncryptionPublicKey: exampleKeycardEvent["encryptionKey"].(map[string]interface{})["publicKey"].(string),
-
+	request := &requests.RestoreAccount{
+		Keycard: &requests.KeycardData{
+			KeyUID:              exampleKeycardEvent["keyUid"].(string),
+			Address:             exampleKeycardEvent["masterKey"].(map[string]interface{})["address"].(string),
+			WhisperPrivateKey:   exampleKeycardEvent["whisperKey"].(map[string]interface{})["privateKey"].(string),
+			WhisperPublicKey:    exampleKeycardEvent["whisperKey"].(map[string]interface{})["publicKey"].(string),
+			WhisperAddress:      exampleKeycardEvent["whisperKey"].(map[string]interface{})["address"].(string),
+			WalletPublicKey:     exampleKeycardEvent["walletKey"].(map[string]interface{})["publicKey"].(string),
+			WalletAddress:       exampleKeycardEvent["walletKey"].(map[string]interface{})["address"].(string),
+			WalletRootAddress:   exampleKeycardEvent["walletRootKey"].(map[string]interface{})["address"].(string),
+			Eip1581Address:      exampleKeycardEvent["eip1581Key"].(map[string]interface{})["address"].(string),
+			EncryptionPublicKey: exampleKeycardEvent["encryptionKey"].(map[string]interface{})["publicKey"].(string),
+		},
 		CreateAccount: requests.CreateAccount{
 			DisplayName:            "User-1",
 			Password:               "password123",
