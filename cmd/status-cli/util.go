@@ -34,7 +34,7 @@ func setupLogger(file string) *zap.Logger {
 	return logutils.ZapLogger()
 }
 
-func start(name string, port int, apiModules string, telemetryUrl string, useLastAccount bool, keyUID string) (*StatusCLI, error) {
+func start(name string, port int, apiModules string, telemetryUrl string, useExistingAccount bool, keyUID string) (*StatusCLI, error) {
 	var (
 		rootDataDir = fmt.Sprintf("./test-%s", strings.ToLower(name))
 		password    = "some-password"
@@ -44,7 +44,7 @@ func start(name string, port int, apiModules string, telemetryUrl string, useLas
 	nlog.Info("starting messager")
 
 	backend := api.NewGethStatusBackend()
-	if useLastAccount {
+	if useExistingAccount {
 		if err := getAccountAndLogin(backend, name, rootDataDir, password, keyUID); err != nil {
 			return nil, err
 		}

@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func serve(cCtx *cli.Context, useLastAccount bool) error {
+func serve(cCtx *cli.Context, useExistingAccount bool) error {
 	rawLogger, err := zap.NewDevelopment()
 	if err != nil {
 		log.Fatalf("Error initializing logger: %v", err)
@@ -36,7 +36,7 @@ func serve(cCtx *cli.Context, useLastAccount bool) error {
 	dest := cCtx.String(AddFlag)
 	keyUID := cCtx.String(KeyUIDFlag)
 
-	cli, err := start(name, port, apiModules, telemetryUrl, useLastAccount, keyUID)
+	cli, err := start(name, port, apiModules, telemetryUrl, useExistingAccount, keyUID)
 	if err != nil {
 		return err
 	}
