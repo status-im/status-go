@@ -589,7 +589,7 @@ func (r *Router) SuggestedRoutes(
 						continue
 					}
 
-					ProcessorInputParams := pathprocessor.ProcessorInputParams{
+					processorInputParams := pathprocessor.ProcessorInputParams{
 						FromChain: network,
 						ToChain:   dest,
 						FromToken: token,
@@ -599,7 +599,7 @@ func (r *Router) SuggestedRoutes(
 						AmountIn:  amountIn,
 					}
 
-					can, err := pProcessor.AvailableFor(ProcessorInputParams)
+					can, err := pProcessor.AvailableFor(processorInputParams)
 					if err != nil || !can {
 						continue
 					}
@@ -607,7 +607,7 @@ func (r *Router) SuggestedRoutes(
 						continue
 					}
 
-					bonderFees, tokenFees, err := pProcessor.CalculateFees(ProcessorInputParams)
+					bonderFees, tokenFees, err := pProcessor.CalculateFees(processorInputParams)
 					if err != nil {
 						continue
 					}
@@ -624,7 +624,7 @@ func (r *Router) SuggestedRoutes(
 					}
 					gasLimit := uint64(0)
 					if sendType.isTransfer(false) {
-						gasLimit, err = pProcessor.EstimateGas(ProcessorInputParams)
+						gasLimit, err = pProcessor.EstimateGas(processorInputParams)
 						if err != nil {
 							continue
 						}
@@ -632,7 +632,7 @@ func (r *Router) SuggestedRoutes(
 						gasLimit = sendType.EstimateGas(r.ensService, r.stickersService, network, addrFrom, tokenID)
 					}
 
-					approvalContractAddress, err := pProcessor.GetContractAddress(ProcessorInputParams)
+					approvalContractAddress, err := pProcessor.GetContractAddress(processorInputParams)
 					if err != nil {
 						continue
 					}
@@ -643,7 +643,7 @@ func (r *Router) SuggestedRoutes(
 
 					var l1GasFeeWei uint64
 					if sendType.needL1Fee() {
-						txInputData, err := pProcessor.PackTxInputData(ProcessorInputParams)
+						txInputData, err := pProcessor.PackTxInputData(processorInputParams)
 						if err != nil {
 							continue
 						}
@@ -723,7 +723,7 @@ func (r *Router) SuggestedRoutes(
 	suggestedRoutes.TokenPrice = prices[tokenID]
 	suggestedRoutes.NativeChainTokenPrice = prices["ETH"]
 	for _, path := range suggestedRoutes.Best {
-		ProcessorInputParams := pathprocessor.ProcessorInputParams{
+		processorInputParams := pathprocessor.ProcessorInputParams{
 			FromChain: path.From,
 			ToChain:   path.To,
 			AmountIn:  path.AmountIn.ToInt(),
@@ -732,7 +732,7 @@ func (r *Router) SuggestedRoutes(
 			},
 		}
 
-		amountOut, err := r.pathProcessors[path.BridgeName].CalculateAmountOut(ProcessorInputParams)
+		amountOut, err := r.pathProcessors[path.BridgeName].CalculateAmountOut(processorInputParams)
 		if err != nil {
 			continue
 		}

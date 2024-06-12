@@ -24,6 +24,7 @@ type Route struct {
 	DestTokenAddress  common.Address  `json:"destToken"`
 	DestTokenDecimals uint            `json:"destDecimals"`
 	RawPriceRoute     json.RawMessage `json:"rawPriceRoute"`
+	Side              SwapSide        `json:"side"`
 }
 
 type PriceRouteResponse struct {
@@ -33,7 +34,7 @@ type PriceRouteResponse struct {
 
 func (c *ClientV5) FetchPriceRoute(ctx context.Context, srcTokenAddress common.Address, srcTokenDecimals uint,
 	destTokenAddress common.Address, destTokenDecimals uint, amountWei *big.Int, addressFrom common.Address,
-	addressTo common.Address) (Route, error) {
+	addressTo common.Address, side SwapSide) (Route, error) {
 
 	params := netUrl.Values{}
 	params.Add("srcToken", srcTokenAddress.Hex())
@@ -44,7 +45,7 @@ func (c *ClientV5) FetchPriceRoute(ctx context.Context, srcTokenAddress common.A
 	// params.Add("receiver", addressTo.Hex())  // at this point paraswap doesn't allow swap and transfer transaction
 	params.Add("network", strconv.FormatUint(c.chainID, 10))
 	params.Add("amount", amountWei.String())
-	params.Add("side", "SELL")
+	params.Add("side", string(side))
 
 	url := pricesURL
 	response, err := c.httpClient.DoGetRequest(ctx, url, params)

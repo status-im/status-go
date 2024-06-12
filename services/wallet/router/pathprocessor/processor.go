@@ -37,6 +37,7 @@ type ProcessorInputParams struct {
 	FromToken *token.Token
 	ToToken   *token.Token
 	AmountIn  *big.Int
+	AmountOut *big.Int
 
 	// extra params
 	BonderFee *big.Int

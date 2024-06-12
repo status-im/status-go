@@ -38,6 +38,7 @@ type RouteInputParams struct {
 	AddrFrom             common.Address          `json:"addrFrom" validate:"required"`
 	AddrTo               common.Address          `json:"addrTo" validate:"required"`
 	AmountIn             *hexutil.Big            `json:"amountIn" validate:"required"`
+	AmountOut            *hexutil.Big            `json:"amountOut"`
 	TokenID              string                  `json:"tokenID" validate:"required"`
 	ToTokenID            string                  `json:"toTokenID"`
 	DisabledFromChainIDs []uint64                `json:"disabledFromChainIDs"`
@@ -326,6 +327,30 @@ func validateInputData(input *RouteInputParams) error {
 		}
 	}
 
+	if input.SendType == Swap {
+		if input.ToTokenID == "" {
+			return errors.New("toTokenID is required for Swap")
+		}
+		if input.TokenID == input.ToTokenID {
+			return errors.New("tokenID and toTokenID must be different")
+		}
+
+		// we can do this check, cause AmountIn is required in `RouteInputParams`
+		if input.AmountIn.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 &&
+			input.AmountOut != nil &&
+			input.AmountOut.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+			return errors.New("only one of amountIn or amountOut can be set")
+		}
+
+		if input.AmountIn.ToInt().Sign() < 0 {
+			return errors.New("amountIn must be positive")
+		}
+
+		if input.AmountOut != nil && input.AmountOut.ToInt().Sign() < 0 {
+			return errors.New("amountOut must be positive")
+		}
+	}
+
 	if input.FromLockedAmount != nil && len(input.FromLockedAmount) > 0 {
 		for chainID, amount := range input.FromLockedAmount {
 			if input.TestnetMode {
@@ -414,6 +439,22 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 			}
 
 			for _, pProcessor := range r.pathProcessors {
+				// With the condition below we're eliminating `Swap` as potential path that can participate in calculating the best route
+				// once we decide to inlcude `Swap` in the calculation we need to update `canUseProcessor` function.
+				// This also applies to including another (Celer) bridge in the calculation.
+				// TODO:
+				// this algorithm, includeing finding the best route, has to be updated to include more bridges and one (for now) or more swap options
+				// it means that candidates should not be treated linearly, but improve the logic to have multiple routes with different processors of the same type.
+				// Example:
+				// Routes for sending SNT from Ethereum to Optimism can be:
+				// 1. Swap SNT(mainnet) to ETH(mainnet); then bridge via Hop ETH(mainnet) to ETH(opt); then Swap ETH(opt) to SNT(opt); then send SNT (opt) to the destination
+				// 2. Swap SNT(mainnet) to ETH(mainnet); then bridge via Celer ETH(mainnet) to ETH(opt); then Swap ETH(opt) to SNT(opt); then send SNT (opt) to the destination
+				// 3. Swap SNT(mainnet) to USDC(mainnet); then bridge via Hop USDC(mainnet) to USDC(opt); then Swap USDC(opt) to SNT(opt); then send SNT (opt) to the destination
+				// 4. Swap SNT(mainnet) to USDC(mainnet); then bridge via Celer USDC(mainnet) to USDC(opt); then Swap USDC(opt) to SNT(opt); then send SNT (opt) to the destination
+				// 5. ...
+				// 6. ...
+				//
+				// With the current routing algorithm atm we're not able to generate all possible routes.
 				if !input.SendType.canUseProcessor(pProcessor) {
 					continue
 				}
@@ -439,7 +480,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						continue
 					}
 
-					ProcessorInputParams := pathprocessor.ProcessorInputParams{
+					processorInputParams := pathprocessor.ProcessorInputParams{
 						FromChain: network,
 						ToChain:   dest,
 						FromToken: token,
@@ -447,28 +488,29 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						ToAddr:    input.AddrTo,
 						FromAddr:  input.AddrFrom,
 						AmountIn:  amountToSend,
+						AmountOut: input.AmountOut.ToInt(),
 
 						Username:  input.Username,
 						PublicKey: input.PublicKey,
 						PackID:    input.PackID.Int,
 					}
 
-					can, err := pProcessor.AvailableFor(ProcessorInputParams)
+					can, err := pProcessor.AvailableFor(processorInputParams)
 					if err != nil || !can {
 						continue
 					}
 
-					bonderFees, tokenFees, err := pProcessor.CalculateFees(ProcessorInputParams)
+					bonderFees, tokenFees, err := pProcessor.CalculateFees(processorInputParams)
 					if err != nil {
 						continue
 					}
 
-					gasLimit, err := pProcessor.EstimateGas(ProcessorInputParams)
+					gasLimit, err := pProcessor.EstimateGas(processorInputParams)
 					if err != nil {
 						continue
 					}
 
-					approvalContractAddress, err := pProcessor.GetContractAddress(ProcessorInputParams)
+					approvalContractAddress, err := pProcessor.GetContractAddress(processorInputParams)
 					if err != nil {
 						continue
 					}
@@ -480,7 +522,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 					var l1FeeWei uint64
 					if input.SendType.needL1Fee() {
 
-						txInputData, err := pProcessor.PackTxInputData(ProcessorInputParams)
+						txInputData, err := pProcessor.PackTxInputData(processorInputParams)
 						if err != nil {
 							continue
 						}
@@ -504,7 +546,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						selctedPriorityFee = priorityFees.Low
 					}
 
-					amountOut, err := pProcessor.CalculateAmountOut(ProcessorInputParams)
+					amountOut, err := pProcessor.CalculateAmountOut(processorInputParams)
 					if err != nil {
 						continue
 					}
