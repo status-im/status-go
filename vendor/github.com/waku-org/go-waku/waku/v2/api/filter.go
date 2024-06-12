@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
@@ -40,22 +41,23 @@ type Sub struct {
 	closing               chan string
 	isNodeOnline          bool //indicates if node has connectivity, this helps subscribe loop takes decision as to resubscribe or not.
 	resubscribeInProgress bool
+	id                    string
 }
 
 // Subscribe
 func Subscribe(ctx context.Context, wf *filter.WakuFilterLightNode, contentFilter protocol.ContentFilter, config FilterConfig, log *zap.Logger, online bool) (*Sub, error) {
 	sub := new(Sub)
+	sub.id = uuid.NewString()
 	sub.wf = wf
 	sub.ctx, sub.cancel = context.WithCancel(ctx)
 	sub.subs = make(subscription.SubscriptionSet)
 	sub.DataCh = make(chan *protocol.Envelope, MultiplexChannelBuffer)
 	sub.ContentFilter = contentFilter
 	sub.Config = config
-	sub.log = log.Named("filter-api")
-	sub.log.Debug("filter subscribe params", zap.Int("max-peers", config.MaxPeers), zap.Stringer("content-filter", contentFilter))
+	sub.log = log.Named("filter-api").With(zap.String("apisub-id", sub.id), zap.Stringer("content-filter", sub.ContentFilter))
+	sub.log.Debug("filter subscribe params", zap.Int("max-peers", config.MaxPeers))
 	sub.isNodeOnline = online
-	sub.closing = make(chan string, 5)
-
+	sub.closing = make(chan string, config.MaxPeers)
 	if online {
 		subs, err := sub.subscribe(contentFilter, sub.Config.MaxPeers)
 		if err == nil {
@@ -80,7 +82,8 @@ func (apiSub *Sub) subscriptionLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			if apiSub.isNodeOnline && len(apiSub.subs) < apiSub.Config.MaxPeers && !apiSub.resubscribeInProgress {
+			if apiSub.isNodeOnline && len(apiSub.subs) < apiSub.Config.MaxPeers &&
+				!apiSub.resubscribeInProgress && len(apiSub.closing) < apiSub.Config.MaxPeers {
 				apiSub.closing <- ""
 			}
 		case <-apiSub.ctx.Done():
@@ -96,6 +99,7 @@ func (apiSub *Sub) subscriptionLoop() {
 }
 
 func (apiSub *Sub) checkAndResubscribe(subId string) {
+
 	var failedPeer peer.ID
 	if subId != "" {
 		apiSub.log.Debug("subscription close and resubscribe", zap.String("sub-id", subId), zap.Stringer("content-filter", apiSub.ContentFilter))
@@ -128,7 +132,7 @@ func (apiSub *Sub) cleanup() {
 func (apiSub *Sub) resubscribe(failedPeer peer.ID) {
 	// Re-subscribe asynchronously
 	existingSubCount := len(apiSub.subs)
-	apiSub.log.Debug("subscribing again", zap.Stringer("content-filter", apiSub.ContentFilter), zap.Int("num-peers", apiSub.Config.MaxPeers-existingSubCount))
+	apiSub.log.Debug("subscribing again", zap.Int("num-peers", apiSub.Config.MaxPeers-existingSubCount))
 	var peersToExclude peer.IDSlice
 	if failedPeer != "" { //little hack, couldn't find a better way to do it
 		peersToExclude = append(peersToExclude, failedPeer)
@@ -138,7 +142,7 @@ func (apiSub *Sub) resubscribe(failedPeer peer.ID) {
 	}
 	subs, err := apiSub.subscribe(apiSub.ContentFilter, apiSub.Config.MaxPeers-existingSubCount, peersToExclude...)
 	if err != nil {
-		apiSub.log.Debug("failed to resubscribe for filter", zap.Stringer("content-filter", apiSub.ContentFilter), zap.Error(err))
+		apiSub.log.Debug("failed to resubscribe for filter", zap.Error(err))
 		return
 	} //Not handling scenario where all requested subs are not received as that should get handled from user of the API.
 
@@ -160,20 +164,21 @@ func (apiSub *Sub) subscribe(contentFilter protocol.ContentFilter, peerCount int
 
 	if err != nil {
 		//Inform of error, so that resubscribe can be triggered if required
-		apiSub.closing <- ""
+		if len(apiSub.closing) < apiSub.Config.MaxPeers {
+			apiSub.closing <- ""
+		}
 		if len(subs) > 0 {
 			// Partial Failure, which means atleast 1 subscription is successful
 			apiSub.log.Debug("partial failure in filter subscribe", zap.Error(err), zap.Int("success-count", len(subs)))
 			return subs, nil
 		}
-		// TODO: Once filter error handling indicates specific error, this can be addressed based on the error at this layer.
+		// TODO: Once filter error handling indicates specific error, this can be handled better.
 		return nil, err
 	}
 	return subs, nil
 }
 
 func (apiSub *Sub) multiplex(subs []*subscription.SubscriptionDetails) {
-
 	// Multiplex onto single channel
 	// Goroutines will exit once sub channels are closed
 	for _, subDetails := range subs {
@@ -190,7 +195,6 @@ func (apiSub *Sub) multiplex(subs []*subscription.SubscriptionDetails) {
 				return
 			case <-subDetails.Closing:
 				apiSub.log.Debug("sub closing", zap.String("sub-id", subDetails.ID))
-
 				apiSub.closing <- subDetails.ID
 			}
 		}(subDetails)

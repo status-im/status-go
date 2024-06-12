@@ -112,6 +112,7 @@ func (s *SubscriptionDetails) SetClosing() {
 	s.Lock()
 	defer s.Unlock()
 	if !s.Closed {
+		s.Closed = true
 		s.Closing <- true
 	}
 }
