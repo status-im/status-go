@@ -20,7 +20,8 @@ import (
 
 type SwapParaswapTxArgs struct {
 	transactions.SendTxArgs
-	ChainID uint64 `json:"chainId"`
+	ChainID            uint64  `json:"chainId"`
+	SlippagePercentage float32 `json:"slippagePercentage"`
 }
 
 type SwapParaswapProcessor struct {
@@ -95,8 +96,13 @@ func (s *SwapParaswapProcessor) PackTxInputData(params ProcessorInputParams) ([]
 }
 
 func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+	swapSide := paraswap.SellSide
+	if params.AmountOut != nil && params.AmountOut.Cmp(ZeroBigIntValue) > 0 {
+		swapSide = paraswap.BuySide
+	}
+
 	priceRoute, err := s.paraswapClient.FetchPriceRoute(context.Background(), params.FromToken.Address, params.FromToken.Decimals,
-		params.ToToken.Address, params.ToToken.Decimals, params.AmountIn, params.FromAddr, params.ToAddr)
+		params.ToToken.Address, params.ToToken.Decimals, params.AmountIn, params.FromAddr, params.ToAddr, swapSide)
 	if err != nil {
 		return 0, err
 	}
@@ -138,8 +144,12 @@ func (s *SwapParaswapProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.
 }
 
 func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorTxArgs) error {
+	slippageBP := uint(sendArgs.SwapTx.SlippagePercentage * 100) // convert to basis points
+
 	tx, err := s.paraswapClient.BuildTransaction(context.Background(), s.priceRoute.SrcTokenAddress, s.priceRoute.SrcTokenDecimals, s.priceRoute.SrcAmount.Int,
-		s.priceRoute.DestTokenAddress, s.priceRoute.DestTokenDecimals, s.priceRoute.DestAmount.Int, common.Address(sendArgs.SwapTx.From), common.Address(*sendArgs.SwapTx.To), s.priceRoute.RawPriceRoute)
+		s.priceRoute.DestTokenAddress, s.priceRoute.DestTokenDecimals, s.priceRoute.DestAmount.Int, slippageBP,
+		common.Address(sendArgs.SwapTx.From), common.Address(*sendArgs.SwapTx.To),
+		s.priceRoute.RawPriceRoute, s.priceRoute.Side)
 	if err != nil {
 		return err
 	}

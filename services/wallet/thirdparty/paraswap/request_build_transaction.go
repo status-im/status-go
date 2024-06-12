@@ -24,20 +24,29 @@ type Transaction struct {
 }
 
 func (c *ClientV5) BuildTransaction(ctx context.Context, srcTokenAddress common.Address, srcTokenDecimals uint, srcAmountWei *big.Int,
-	destTokenAddress common.Address, destTokenDecimals uint, destAmountWei *big.Int,
-	addressFrom common.Address, addressTo common.Address, priceRoute json.RawMessage) (Transaction, error) {
+	destTokenAddress common.Address, destTokenDecimals uint, destAmountWei *big.Int, slippageBasisPoints uint,
+	addressFrom common.Address, addressTo common.Address, priceRoute json.RawMessage, side SwapSide) (Transaction, error) {
 
 	params := map[string]interface{}{}
 	params["srcToken"] = srcTokenAddress.Hex()
 	params["srcDecimals"] = srcTokenDecimals
-	params["srcAmount"] = srcAmountWei.String()
 	params["destToken"] = destTokenAddress.Hex()
 	params["destDecimals"] = destTokenDecimals
-	// params["destAmount"] = destAmountWei.String()
 	params["userAddress"] = addressFrom.Hex()
 	// params["receiver"] = addressTo.Hex() // at this point paraswap doesn't allow swap and transfer transaction
-	params["slippage"] = "500"
 	params["priceRoute"] = priceRoute
+
+	if slippageBasisPoints > 0 {
+		params["slippage"] = slippageBasisPoints
+		if side == SellSide {
+			params["srcAmount"] = srcAmountWei.String()
+		} else {
+			params["destAmount"] = destAmountWei.String()
+		}
+	} else {
+		params["srcAmount"] = srcAmountWei.String()
+		params["destAmount"] = destAmountWei.String()
+	}
 
 	url := fmt.Sprintf(transactionsURL, c.chainID)
 	response, err := c.httpClient.DoPostRequest(ctx, url, params)

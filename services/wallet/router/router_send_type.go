@@ -103,9 +103,15 @@ func (s SendType) needL1Fee() bool {
 	return !s.IsEnsTransfer() && !s.IsStickersTransfer()
 }
 
+// canUseProcessor is used to check if certain SendType can be used with a given path processor
 func (s SendType) canUseProcessor(p pathprocessor.PathProcessor) bool {
 	pathProcessorName := p.Name()
 	switch s {
+	case Bridge:
+		return pathProcessorName == pathprocessor.ProcessorBridgeHopName ||
+			pathProcessorName == pathprocessor.ProcessorBridgeCelerName
+	case Swap:
+		return pathProcessorName == pathprocessor.ProcessorSwapParaswapName
 	case ERC721Transfer:
 		return pathProcessorName == pathprocessor.ProcessorERC721Name
 	case ERC1155Transfer:

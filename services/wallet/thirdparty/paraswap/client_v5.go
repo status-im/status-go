@@ -2,6 +2,13 @@ package paraswap
 
 import "github.com/status-im/status-go/services/wallet/thirdparty"
 
+type SwapSide string
+
+const (
+	SellSide = SwapSide("SELL")
+	BuySide  = SwapSide("BUY")
+)
+
 type ClientV5 struct {
 	httpClient *thirdparty.HTTPClient
 	chainID    uint64
