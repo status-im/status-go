@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wakuv2ext"
 
@@ -33,37 +34,26 @@ func setupLogger(file string) *zap.Logger {
 	return logutils.ZapLogger()
 }
 
-func start(name string, port int, apiModules string, telemetryUrl string) (*StatusCLI, error) {
-	namedLogger := logger.Named(name)
-	namedLogger.Info("starting messager")
-
-	_ = setupLogger(name)
-
-	path := fmt.Sprintf("./test-%s", strings.ToLower(name))
-	err := os.MkdirAll(path, os.ModePerm)
-	if err != nil {
-		return nil, err
-	}
+func start(name string, port int, apiModules string, telemetryUrl string, useExistingAccount bool, keyUID string) (*StatusCLI, error) {
+	var (
+		rootDataDir = fmt.Sprintf("./test-%s", strings.ToLower(name))
+		password    = "some-password"
+	)
+	setupLogger(name)
+	nlog := logger.Named(name)
+	nlog.Info("starting messager")
 
 	backend := api.NewGethStatusBackend()
-
-	createAccountRequest := &requests.CreateAccount{
-		DisplayName:        name,
-		CustomizationColor: "#ffffff",
-		Emoji:              "some",
-		Password:           "some-password",
-		RootDataDir:        fmt.Sprintf("./test-%s", strings.ToLower(name)),
-		LogFilePath:        "log",
-		APIConfig: &requests.APIConfig{
-			APIModules: apiModules,
-			HTTPHost:   "127.0.0.1",
-			HTTPPort:   port,
-		},
-		TelemetryServerURL: telemetryUrl,
-	}
-	_, err = backend.CreateAccountAndLogin(createAccountRequest)
-	if err != nil {
-		return nil, err
+	if useExistingAccount {
+		if err := getAccountAndLogin(backend, name, rootDataDir, password, keyUID); err != nil {
+			return nil, err
+		}
+	} else {
+		acc, err := createAccountAndLogin(backend, name, rootDataDir, password, apiModules, telemetryUrl, port)
+		if err != nil {
+			return nil, err
+		}
+		nlog.Infof("account created, key UID: %v", acc.KeyUID)
 	}
 
 	wakuService := backend.StatusNode().WakuV2ExtService()
@@ -73,23 +63,77 @@ func start(name string, port int, apiModules string, telemetryUrl string) (*Stat
 	wakuAPI := wakuv2ext.NewPublicAPI(wakuService)
 
 	messenger := wakuAPI.Messenger()
-	_, err = wakuAPI.StartMessenger()
-	if err != nil {
+	if _, err := wakuAPI.StartMessenger(); err != nil {
 		return nil, err
 	}
 
-	namedLogger.Info("messenger started, public key: ", messenger.IdentityPublicKeyString())
-
+	nlog.Info("messenger started, public key: ", messenger.IdentityPublicKeyString())
 	time.Sleep(WaitingInterval)
 
 	data := StatusCLI{
 		name:      name,
 		messenger: messenger,
 		backend:   backend,
-		logger:    namedLogger,
+		logger:    nlog,
 	}
 
 	return &data, nil
+}
+
+func getAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password string, keyUID string) error {
+	b.UpdateRootDataDir(rootDataDir)
+	if err := b.OpenAccounts(); err != nil {
+		return fmt.Errorf("name '%v' might not have an account: trying to find: %v: %w", name, rootDataDir, err)
+	}
+	accs, err := b.GetAccounts()
+	if err != nil {
+		return err
+	}
+	if len(accs) == 0 {
+		return errors.New("no accounts found")
+	}
+
+	acc := accs[0] // use last if no keyUID is provided
+	if keyUID != "" {
+		found := false
+		for _, a := range accs {
+			if a.KeyUID == keyUID {
+				acc = a
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("account not found for keyUID: %v", keyUID)
+		}
+	}
+
+	return b.LoginAccount(&requests.Login{
+		Password: password,
+		KeyUID:   acc.KeyUID,
+	})
+}
+
+func createAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password, apiModules, telemetryUrl string, port int) (*multiaccounts.Account, error) {
+	if err := os.MkdirAll(rootDataDir, os.ModePerm); err != nil {
+		return nil, err
+	}
+
+	req := &requests.CreateAccount{
+		DisplayName:        name,
+		CustomizationColor: "#ffffff",
+		Emoji:              "some",
+		Password:           password,
+		RootDataDir:        rootDataDir,
+		LogFilePath:        "log",
+		APIConfig: &requests.APIConfig{
+			APIModules: apiModules,
+			HTTPHost:   "127.0.0.1",
+			HTTPPort:   port,
+		},
+		TelemetryServerURL: telemetryUrl,
+	}
+	return b.CreateAccountAndLogin(req)
 }
 
 func (cli *StatusCLI) stop() {
