@@ -163,6 +163,10 @@ func (m *testCollectiblesManager) FetchCollectibleOwnersByContractAddress(ctx co
 	return ret, nil
 }
 
+func (m *testCollectiblesManager) FetchCachedBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
+	return m.response[uint64(chainID)][ownerAddress], nil
+}
+
 type testTokenManager struct {
 	response map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
 }
@@ -190,6 +194,10 @@ func (m *testTokenManager) GetAllChainIDs() ([]uint64, error) {
 }
 
 func (m *testTokenManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
+	return m.response, nil
+}
+
+func (m *testTokenManager) GetCachedBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error) {
 	return m.response, nil
 }
 

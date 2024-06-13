@@ -1,0 +1,23 @@
+{
+    "DataDir": "/tmp/status-go-data",
+    "NodeKey": "b5c65bcfdb02261052b71cb5f6dec095d0e10df649b4a2b7d881e55e306cbebc",
+    "Rendezvous": false,
+    "NoDiscovery": false,
+    "ListenAddr": "0.0.0.0:30303",
+    "HTTPEnabled": true,
+    "HTTPHost": "0.0.0.0",
+    "HTTPPort": 3333,
+    "APIModules": "eth,admin,wallet",
+    "WalletConfig": {
+      "Enabled": true
+    },
+    "WakuConfig": {
+        "Enabled": false
+    },
+    "Networks": [
+        {
+            "ChainID": 31337,
+            "RPCURL": "http://anvil:8545"
+        }
+    ]
+}

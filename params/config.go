@@ -819,6 +819,16 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 		c.WakuConfig.MinimumPoW = WakuMinimumPoW
 	}
 
+	// Ensure TorrentConfig is valid
+	if c.TorrentConfig.Enabled {
+		if c.TorrentConfig.DataDir == "" {
+			c.TorrentConfig.DataDir = filepath.Join(c.RootDataDir, ArchivesRelativePath)
+		}
+		if c.TorrentConfig.TorrentDir == "" {
+			c.TorrentConfig.TorrentDir = filepath.Join(c.RootDataDir, TorrentTorrentsRelativePath)
+		}
+	}
+
 	return c.setDefaultPushNotificationsServers()
 }
 
@@ -1124,7 +1134,7 @@ func (c *TorrentConfig) Validate(validate *validator.Validate) error {
 		return err
 	}
 
-	if c.Enabled && c.DataDir == "" || c.TorrentDir == "" {
+	if c.Enabled && (c.DataDir == "" || c.TorrentDir == "") {
 		return fmt.Errorf("TorrentConfig.DataDir and TorrentConfig.TorrentDir cannot be \"\"")
 	}
 	return nil

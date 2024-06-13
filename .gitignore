@@ -101,3 +101,11 @@ test-bob/
 
 # Nix
 /.nix-gcroots/
+
+# integration-tests
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.envrc
+report/results.xml

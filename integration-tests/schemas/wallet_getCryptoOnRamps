@@ -1,0 +1,66 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "string"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "items": {
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "fees": {
+                        "type": "string"
+                    },
+                    "hostname": {
+                        "type": "string"
+                    },
+                    "logoUrl": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "params": {
+                        "type": "null"
+                    },
+                    "recurrentSiteUrl": {
+                        "type": "string"
+                    },
+                    "siteUrl": {
+                        "type": "string"
+                    },
+                    "supportedChainIds": {
+                        "items": {
+                            "type": "integer"
+                        },
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "description",
+                    "fees",
+                    "hostname",
+                    "logoUrl",
+                    "name",
+                    "params",
+                    "recurrentSiteUrl",
+                    "siteUrl",
+                    "supportedChainIds"
+                ],
+                "type": "object"
+            },
+            "type": "array"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}

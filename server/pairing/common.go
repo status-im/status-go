@@ -347,8 +347,8 @@ func setDefaultNodeConfig(c *params.NodeConfig) error {
 	c.TorrentConfig = params.TorrentConfig{
 		Enabled:    specifiedTorrentConfigEnabled,
 		Port:       specifiedTorrentConfigPort,
-		DataDir:    filepath.Join(c.RootDataDir, api.DefaultArchivesRelativePath),
-		TorrentDir: filepath.Join(c.RootDataDir, api.DefaultTorrentTorrentsRelativePath),
+		DataDir:    filepath.Join(c.RootDataDir, params.ArchivesRelativePath),
+		TorrentDir: filepath.Join(c.RootDataDir, params.TorrentTorrentsRelativePath),
 	}
 
 	return nil

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
@@ -963,4 +964,64 @@ func (tm *Manager) onAccountsChange(changedAddresses []common.Address, eventType
 			}
 		}
 	}
+}
+
+func (tm *Manager) GetCachedBalancesByChain(accounts, tokenAddresses []common.Address, chainIDs []uint64) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
+	accountStrings := make([]string, len(accounts))
+	for i, account := range accounts {
+		accountStrings[i] = fmt.Sprintf("'%s'", account.Hex())
+	}
+
+	tokenAddressStrings := make([]string, len(tokenAddresses))
+	for i, tokenAddress := range tokenAddresses {
+		tokenAddressStrings[i] = fmt.Sprintf("'%s'", tokenAddress.Hex())
+	}
+
+	chainIDStrings := make([]string, len(chainIDs))
+	for i, chainID := range chainIDs {
+		chainIDStrings[i] = fmt.Sprintf("%d", chainID)
+	}
+
+	query := `SELECT chain_id, user_address, token_address, balance 
+			  	FROM token_balances 
+				WHERE user_address IN (` + strings.Join(accountStrings, ",") + `) 
+					AND token_address IN (` + strings.Join(tokenAddressStrings, ",") + `) 
+					AND chain_id IN (` + strings.Join(chainIDStrings, ",") + `)`
+
+	rows, err := tm.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ret := make(map[uint64]map[common.Address]map[common.Address]*hexutil.Big)
+
+	for rows.Next() {
+		var chainID uint64
+		var userAddressStr, tokenAddressStr string
+		var balanceStr string
+
+		err := rows.Scan(&chainID, &userAddressStr, &tokenAddressStr, &balanceStr)
+		if err != nil {
+			return nil, err
+		}
+
+		num := new(hexutil.Big)
+		_, ok := num.ToInt().SetString(balanceStr, 0)
+		if !ok {
+			return ret, nil
+		}
+
+		if ret[chainID] == nil {
+			ret[chainID] = make(map[common.Address]map[common.Address]*hexutil.Big)
+		}
+
+		if ret[chainID][common.HexToAddress(userAddressStr)] == nil {
+			ret[chainID][common.HexToAddress(userAddressStr)] = make(map[common.Address]*hexutil.Big)
+		}
+
+		ret[chainID][common.HexToAddress(userAddressStr)][common.HexToAddress(tokenAddressStr)] = num
+	}
+
+	return ret, nil
 }

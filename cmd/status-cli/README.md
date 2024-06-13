@@ -38,6 +38,9 @@ JSON RPC examples:
 # get waku info
 curl -XPOST http://127.0.0.1:8545 -H 'Content-type: application/json' -d '{"jsonrpc":"2.0","method":"waku_info","params":[],"id":1}'
 
+# get peer info
+curl --request POST --url http://127.0.0.1:8545 --header 'Content-type: application/json' --data '{"jsonrpc": "2.0", "method": "wakuext_peers", "params": [], "id": 1}'
+
 # send contact request from charlie to alice (use -a flag will automatacally send contact request when starting)
 curl -XPOST http://127.0.0.1:8565 -H 'Content-type: application/json' -d '{"jsonrpc":"2.0","method":"wakuext_sendContactRequest","params":[{"id": "0x0436470da23039f10c1588bc6b9fcbd4b815bf9fae4dc09c0fb05a7eaaf1670b5dbdbc757630d54bf2f8be45a796304dc42506c3f4172f499f610a9ed85d9b0d4c", "message": "hello"}],"id":1}'
 
@@ -48,8 +51,17 @@ curl -XPOST http://127.0.0.1:8565 -H 'Content-type: application/json' -d '{"json
 curl -XPOST http://127.0.0.1:8545 -H 'Content-type: application/json' -d '{"jsonrpc":"2.0","method":"wakuext_sendOneToOneMessage","params":[{"id": "0x042c0ce856c41ad6d3f651a84c83f646cdafdf3a26a3d69bce3a6ccf59b23b5a366c12162045d5066abad7912741a6e6c6e8e11e7826c4c850a1de7a2bae24a79c", "message": "Im fine, and you?"}],"id":1}'
 ```
 
+### Run `serve-account` command
 
-### Run `simulate` command:
+The `./status-cli serve` command will generate a new account, it will print in the console the key UID of that account, if you want to re-run that created account (i.e.: run the account with the same public key), you can do so with this command:
+
+```bash
+./status-cli serve-account -n alice -kid 0x02887ff8dddb774ad836c00c8fd30ef9bc45d6b23f1f8cad1bff07d09cb378c3
+```
+
+You will need the same name and key
+
+### Run `simulate` command
 
 ```bash
 # simulate DM between two accounts
@@ -68,3 +80,174 @@ curl -XPOST http://127.0.0.1:8545 -H 'Content-type: application/json' -d '{"json
 You can run the commands with `--light` to work as a light client.
 
 Logs are recorded in file `*.log` and terminal.
+
+## JSON-RPC use cases
+
+### Start two CLIs adding each other as contacts
+
+```bash
+# terminal 1 (alice)
+./status-cli serve -n alice -p 5500
+# note the public key and the key id from the output
+
+# terminal 2 (bobby)
+./status-cli serve -n bobby -p 5501 -a <alice_pub_key>
+```
+
+## Restart any existing account
+
+```bash
+# notice we need both the name and the key id (not the pub key here)
+# the key id will be pressent in the logs when a new account is created, same as the public key
+./status-cli serve -n bobby -kid <bob_key_id>
+```
+
+### Create community
+
+Have two CLIs running (`alice` and `bobby`)
+
+```bash
+# 1. (alice) create community
+# this call will return the community id
+curl --request POST \
+  --url http://127.0.0.1:5500/ \
+  --header 'Content-type: application/json' \
+  --data '{
+ "jsonrpc": "2.0",
+ "method": "wakuext_createCommunity",
+ "params": [
+  {
+   "membership": 3,
+   "name": "cli-test-1",
+   "color": "#ffffff",
+   "description": "cli-test-1"  
+  }
+ ],
+ "id": 1
+}'
+
+# 2. (bobby & alice) fetch community (use communityId from step 1 response)
+curl --request POST \
+  --url http://127.0.0.1:5501/ \
+  --header 'Content-type: application/json' \
+  --data '{
+ "jsonrpc": "2.0",
+ "method": "wakuext_fetchCommunity",
+ "params": [
+  {
+   "communityKey": "0x02bea5af5779d5f742f2419cc0d819d3ce33adb922e8e90bdf3533fd121d52d4bc",
+   "waitForResponse": true,
+   "tryDatabase": true
+  }
+ ],
+ "id": 1
+}'
+
+# 3. (bobby) request to join community (use communityId from step 1 response)
+# this call will return the requestsToJoinCommunity.id
+curl --request POST \
+  --url http://127.0.0.1:5501/ \
+  --header 'Content-type: application/json' \
+  --data '{
+ "jsonrpc": "2.0",
+ "method": "wakuext_requestToJoinCommunity",
+ "params": [
+  {
+   "communityId": "0x02bea5af5779d5f742f2419cc0d819d3ce33adb922e8e90bdf3533fd121d52d4bc"
+  }
+ ],
+ "id": 1
+}'
+
+# 4. (alice) accept request to join community from bobby (use requestsToJoinCommunity.id from step 3 response)
+# in the response you can see the community id and the chats' ids for that community ($.result.communities[*].chats[*].id)
+curl --request POST \
+  --url http://127.0.0.1:5500/ \
+  --header 'Content-type: application/json' \
+  --data '{
+ "jsonrpc": "2.0",
+ "method": "wakuext_acceptRequestToJoinCommunity",
+ "params": [
+  {
+   "id": "0x1b828fe8c778403268ffcf80b892f8be46cf9a85ba2c9f479bfb0c0a807a71f4"
+  }
+ ],
+ "id": 1
+}'
+
+# 5. (alice) send chat message (bobby should receive it)
+# chatId is the community id concatenated to the chat id (from step 4 response)
+curl --request POST \
+  --url http://127.0.0.1:5500/ \
+  --header 'Content-type: application/json' \
+  --data '{
+ "jsonrpc": "2.0",
+ "method": "wakuext_sendChatMessage",
+ "params": [
+  {
+   "chatId": "0x02bea5af5779d5f742f2419cc0d819d3ce33adb922e8e90bdf3533fd121d52d4bcdfe601d1-096c-4201-b692-fcdb81ef0cec",
+   "text": "hello there",
+   "contentType": 1
+  }
+ ],
+ "id": 1
+}'
+
+# 6. (bobby) leave the community (use communityId from step 1 response)
+curl --request POST \
+  --url http://127.0.0.1:5501/ \
+  --header 'Content-type: application/json' \
+  --data '{
+ "jsonrpc": "2.0",
+ "method": "wakuext_leaveCommunity",
+ "params": [
+  "0x02bea5af5779d5f742f2419cc0d819d3ce33adb922e8e90bdf3533fd121d52d4bc"
+ ],
+ "id": 1
+}'
+
+# Optional:
+# 7. (bobby & alice) fetch community again and verify the members (curl from step 2.)
+# 8. Instead of creating a community always you can restart alice and bobby and proceed from step 2. Alice is the owner
+
+```
+
+### Private group chat
+
+Have two CLIs running (`alice` and `bobby`)
+
+```bash
+# 1. (alice) create the group chat including bobby's public key in it, 
+# the response will have the group chat id to send messages to it
+curl --request POST \
+  --url http://127.0.0.1:8545/ \
+  --header 'Content-type: application/json' \
+  --data '{
+ "jsonrpc": "2.0",
+ "method": "wakuext_createGroupChatWithMembers",
+ "params": [
+  null,
+  "group-chat-name",
+  [
+   "0x04d3c86dfc77b195b705e1831935066076018aa0d7c40044829801ebbfe9b06480ce4662072bf16a3ca7cb8f6289207614deceaf7d33e099dfc9281610375fec08"
+  ]
+ ],
+ "id": 1
+}'
+
+# 2. (alice) send the message to the id of the group chat (from step 1 response)
+curl --request POST \
+  --url http://127.0.0.1:5500/ \
+  --header 'Content-type: application/json' \
+  --data '{
+ "jsonrpc": "2.0",
+ "method": "wakuext_sendGroupChatMessage",
+ "params": [
+  {
+   "id": "8291eae1-338c-4481-9997-04edd2d2bbed-0x0490cbce029eaf094c7f2dcf1feb2d60e91ab1498847eb29fa98cc5ea5a36666b3f9ada142f3080f5074abd942c863438f6af9475f30781790c7e36f9acd2ac93e",
+   "message": "hello"
+  }
+ ],
+ "id": 1
+}'
+```

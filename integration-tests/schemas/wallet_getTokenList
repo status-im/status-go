@@ -1,0 +1,94 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "string"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "properties": {
+                "data": {
+                    "items": {
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "source": {
+                                "type": "string"
+                            },
+                            "tokens": {
+                                "items": {
+                                    "properties": {
+                                        "address": {
+                                            "type": "string"
+                                        },
+                                        "chainId": {
+                                            "type": "integer"
+                                        },
+                                        "decimals": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "pegSymbol": {
+                                            "type": "string"
+                                        },
+                                        "symbol": {
+                                            "type": "string"
+                                        },
+                                        "tokenListId": {
+                                            "type": "string"
+                                        },
+                                        "verified": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "address",
+                                        "chainId",
+                                        "decimals",
+                                        "name",
+                                        "pegSymbol",
+                                        "symbol",
+                                        "tokenListId",
+                                        "verified"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": "array"
+                            },
+                            "version": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "source",
+                            "tokens",
+                            "version"
+                        ],
+                        "type": "object"
+                    },
+                    "type": "array"
+                },
+                "updatedAt": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "data",
+                "updatedAt"
+            ],
+            "type": "object"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}

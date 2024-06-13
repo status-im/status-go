@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
@@ -47,8 +48,9 @@ type RouteInputParams struct {
 	TestnetMode          bool                    `json:"testnetMode"`
 
 	// For send types like EnsRegister, EnsRelease, EnsSetPubKey, StickersBuy
-	Username  string `json:"username"`
-	PublicKey string `json:"publicKey"`
+	Username  string         `json:"username"`
+	PublicKey string         `json:"publicKey"`
+	PackID    *bigint.BigInt `json:"packID"`
 }
 
 type PathV2 struct {
@@ -318,6 +320,12 @@ func validateInputData(input *RouteInputParams) error {
 		}
 	}
 
+	if input.SendType == StickersBuy {
+		if input.PackID == nil {
+			return errors.New("packID is required for StickersBuy")
+		}
+	}
+
 	if input.FromLockedAmount != nil && len(input.FromLockedAmount) > 0 {
 		for chainID, amount := range input.FromLockedAmount {
 			if input.TestnetMode {
@@ -442,6 +450,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 
 						Username:  input.Username,
 						PublicKey: input.PublicKey,
+						PackID:    input.PackID.Int,
 					}
 
 					can, err := pProcessor.AvailableFor(ProcessorInputParams)

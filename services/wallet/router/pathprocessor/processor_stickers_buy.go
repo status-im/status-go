@@ -13,70 +13,62 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts"
-	"github.com/status-im/status-go/contracts/registrar"
 	"github.com/status-im/status-go/contracts/snt"
+	stickersContracts "github.com/status-im/status-go/contracts/stickers"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/services/stickers"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/transactions"
 )
 
-type ENSRegisterProcessor struct {
-	contractMaker *contracts.ContractMaker
-	transactor    transactions.TransactorIface
-	ensService    *ens.Service
+type StickersBuyProcessor struct {
+	contractMaker   *contracts.ContractMaker
+	transactor      transactions.TransactorIface
+	stickersService *stickers.Service
 }
 
-func NewENSRegisterProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, ensService *ens.Service) *ENSRegisterProcessor {
-	return &ENSRegisterProcessor{
+func NewStickersBuyProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, stickersService *stickers.Service) *StickersBuyProcessor {
+	return &StickersBuyProcessor{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,
 		},
-		transactor: transactor,
-		ensService: ensService,
+		transactor:      transactor,
+		stickersService: stickersService,
 	}
 }
 
-func (s *ENSRegisterProcessor) Name() string {
-	return ProcessorENSRegisterName
+func (s *StickersBuyProcessor) Name() string {
+	return ProcessorStickersBuyName
 }
 
-func (s *ENSRegisterProcessor) GetPriceForRegisteringEnsName(chainID uint64) (*big.Int, error) {
-	registryAddr, err := s.ensService.API().GetRegistrarAddress(context.Background(), chainID)
-	if err != nil {
-		return nil, err
-	}
-	registrar, err := s.contractMaker.NewUsernameRegistrar(chainID, registryAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
-	return registrar.GetPrice(callOpts)
-}
-
-func (s *ENSRegisterProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
+func (s *StickersBuyProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
 	return params.FromChain.ChainID == walletCommon.EthereumMainnet || params.FromChain.ChainID == walletCommon.EthereumSepolia, nil
 }
 
-func (s *ENSRegisterProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
+func (s *StickersBuyProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
 	return ZeroBigIntValue, ZeroBigIntValue, nil
 }
 
-func (s *ENSRegisterProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
-	price, err := s.GetPriceForRegisteringEnsName(params.FromChain.ChainID)
+func (s *StickersBuyProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
+	stickerType, err := s.contractMaker.NewStickerType(params.FromChain.ChainID)
 	if err != nil {
 		return []byte{}, err
 	}
 
-	registrarABI, err := abi.JSON(strings.NewReader(registrar.UsernameRegistrarABI))
+	callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
+
+	packInfo, err := stickerType.GetPackData(callOpts, params.PackID)
 	if err != nil {
 		return []byte{}, err
 	}
 
-	x, y := ens.ExtractCoordinates(params.PublicKey)
-	extraData, err := registrarABI.Pack("register", ens.UsernameToLabel(params.Username), params.FromAddr, x, y)
+	stickerMarketABI, err := abi.JSON(strings.NewReader(stickersContracts.StickerMarketABI))
+	if err != nil {
+		return []byte{}, err
+	}
+
+	extraData, err := stickerMarketABI.Pack("buyToken", params.PackID, params.FromAddr, packInfo.Price)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -86,15 +78,15 @@ func (s *ENSRegisterProcessor) PackTxInputData(params ProcessorInputParams) ([]b
 		return []byte{}, err
 	}
 
-	registryAddr, err := s.ensService.API().GetRegistrarAddress(context.Background(), params.FromChain.ChainID)
+	stickerMarketAddress, err := stickersContracts.StickerMarketContractAddress(params.FromChain.ChainID)
 	if err != nil {
 		return []byte{}, err
 	}
 
-	return sntABI.Pack("approveAndCall", registryAddr, price, extraData)
+	return sntABI.Pack("approveAndCall", stickerMarketAddress, packInfo.Price, extraData)
 }
 
-func (s *ENSRegisterProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *StickersBuyProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
 		return 0, err
@@ -127,7 +119,7 @@ func (s *ENSRegisterProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 	return uint64(increasedEstimation), nil
 }
 
-func (s *ENSRegisterProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
+func (s *StickersBuyProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
 	toAddr := types.Address(params.ToAddr)
 	inputData, err := s.PackTxInputData(params)
 	if err != nil {
@@ -147,18 +139,18 @@ func (s *ENSRegisterProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.T
 	return s.BuildTransaction(sendArgs)
 }
 
-func (s *ENSRegisterProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
+func (s *StickersBuyProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
 	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, *sendArgs.TransferTx, verifiedAccount)
 }
 
-func (s *ENSRegisterProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error) {
+func (s *StickersBuyProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error) {
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, *sendArgs.TransferTx)
 }
 
-func (s *ENSRegisterProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
+func (s *StickersBuyProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
 	return params.AmountIn, nil
 }
 
-func (s *ENSRegisterProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
+func (s *StickersBuyProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
 	return snt.ContractAddress(params.FromChain.ChainID)
 }

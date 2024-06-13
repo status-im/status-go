@@ -253,3 +253,64 @@ func randomNodeConfig() *params.NodeConfig {
 		},
 	}
 }
+
+func TestConfigValidate(t *testing.T) {
+	// GIVEN
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	tmpdir := t.TempDir()
+	nodeConfig, err := params.NewNodeConfig(tmpdir, 1777)
+
+	require.NoError(t, err)
+	require.NoError(t, nodeConfig.Validate())
+	require.NoError(t, nodecfg.SaveNodeConfig(db, nodeConfig))
+
+	// WHEN
+	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
+	require.NoError(t, err)
+
+	// THEN
+	require.NoError(t, dbNodeConfig.Validate())
+}
+
+func TestRepairLoadedTorrentConfig(t *testing.T) {
+	// GIVEN
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	tmpdir := t.TempDir()
+	nodeConfig, err := params.NewNodeConfig(tmpdir, 1777)
+	require.NoError(t, err)
+
+	require.NoError(t, nodeConfig.Validate())
+
+	// Write config to db
+	require.NoError(t, nodecfg.SaveNodeConfig(db, nodeConfig))
+
+	// WHEN: Corrupt the torrent config data as described in the ticket
+	// (https://github.com/status-im/status-desktop/issues/14643)
+	// Write invalid torrent config to database
+	nodeConfig.TorrentConfig.DataDir = ""
+	nodeConfig.TorrentConfig.TorrentDir = ""
+	nodeConfig.TorrentConfig.Enabled = true
+	require.Error(t, nodeConfig.Validate())
+
+	_, err = db.Exec(`INSERT OR REPLACE INTO torrent_config (
+    		enabled, port, data_dir, torrent_dir, synthetic_id
+		) VALUES (?, ?, ?, ?, 'id')`,
+		nodeConfig.TorrentConfig.Enabled,
+		nodeConfig.TorrentConfig.Port,
+		nodeConfig.TorrentConfig.DataDir,
+		nodeConfig.TorrentConfig.TorrentDir,
+	)
+	require.NoError(t, err)
+
+	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
+	require.NoError(t, err)
+
+	// THEN The invalid torrent config should be repaired
+	require.Error(t, dbNodeConfig.Validate())
+	require.NoError(t, dbNodeConfig.UpdateWithDefaults())
+	require.NoError(t, dbNodeConfig.Validate())
+}
