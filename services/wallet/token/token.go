@@ -93,6 +93,9 @@ type storeMap = map[uint64]addressTokenMap
 type ManagerInterface interface {
 	LookupTokenIdentity(chainID uint64, address common.Address, native bool) *Token
 	LookupToken(chainID *uint64, tokenSymbol string) (token *Token, isNative bool)
+	GetTokensByChainIDs(chainIDs []uint64) ([]*Token, error)
+	GetBalancesByChain(parent context.Context, clients map[uint64]chain.ClientInterface, accounts, tokens []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error)
+	GetTokenHistoricalBalance(account common.Address, chainID uint64, symbol string, timestamp int64) (*big.Int, error)
 }
 
 // Manager is used for accessing token store. It changes the token store based on overridden tokens

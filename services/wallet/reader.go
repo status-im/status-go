@@ -7,19 +7,19 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
-	"golang.org/x/exp/maps"
 )
 
 // WalletTickReload emitted every 15mn to reload the wallet balance and history
@@ -46,7 +46,7 @@ func belongsToMandatoryTokens(symbol string) bool {
 	return false
 }
 
-func NewReader(tokenManager *token.Manager, marketManager *market.Manager, communityManager *community.Manager, persistence token.TokenBalancesStorage, walletFeed *event.Feed) *Reader {
+func NewReader(tokenManager token.ManagerInterface, marketManager *market.Manager, persistence token.TokenBalancesStorage, walletFeed *event.Feed) *Reader {
 	return &Reader{
 		tokenManager:        tokenManager,
 		marketManager:       marketManager,
@@ -57,7 +57,7 @@ func NewReader(tokenManager *token.Manager, marketManager *market.Manager, commu
 }
 
 type Reader struct {
-	tokenManager                   *token.Manager
+	tokenManager                   token.ManagerInterface
 	marketManager                  *market.Manager
 	persistence                    token.TokenBalancesStorage
 	walletFeed                     *event.Feed
@@ -205,12 +205,12 @@ func (r *Reader) stopWalletEventsWatcher() {
 }
 
 func (r *Reader) tokensCachedForAddresses(addresses []common.Address) bool {
-	for _, address := range addresses {
-		cachedTokens, err := r.getCachedWalletTokensWithoutMarketData()
-		if err != nil {
-			return false
-		}
+	cachedTokens, err := r.getCachedWalletTokensWithoutMarketData()
+	if err != nil {
+		return false
+	}
 
+	for _, address := range addresses {
 		_, ok := cachedTokens[address]
 		if !ok {
 			return false
@@ -257,45 +257,21 @@ func (r *Reader) invalidateBalanceCache() {
 }
 
 func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address) (map[common.Address][]token.StorageToken, error) {
+	needFetch := !r.isBalanceCacheValid(addresses) || r.isBalanceUpdateNeededAnyway(clients, addresses)
+	if needFetch {
+		return r.FetchBalances(ctx, clients, addresses)
+	}
+
+	return r.GetCachedBalances(clients, addresses)
+}
+
+func (r *Reader) isBalanceUpdateNeededAnyway(clients map[uint64]chain.ClientInterface, addresses []common.Address) bool {
 	cachedTokens, err := r.getCachedWalletTokensWithoutMarketData()
 	if err != nil {
-		return nil, err
+		return true
 	}
 
 	chainIDs := maps.Keys(clients)
-	allTokens, err := r.tokenManager.GetTokensByChainIDs(chainIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	var balances map[uint64]map[common.Address]map[common.Address]*hexutil.Big
-	needFetch := !r.isBalanceCacheValid(addresses) || isBalanceUpdateNeededAnyway(cachedTokens, addresses, chainIDs)
-	if needFetch {
-		tokenAddresses := getTokenAddresses(allTokens)
-		balances, err = r.fetchBalances(ctx, clients, addresses, tokenAddresses)
-		if err != nil {
-			log.Error("failed to update balances", "err", err)
-			return nil, err
-		}
-	} else {
-		balances = tokensToBalancesPerChain(cachedTokens)
-	}
-
-	tokens, err := r.balancesToTokensByAddress(clients, addresses, allTokens, balances, cachedTokens)
-
-	if needFetch {
-		err := r.persistence.SaveTokens(tokens)
-		if err != nil {
-			log.Error("failed to save tokens", "err", err) // Do not return error, as it is not critical
-		}
-
-		r.updateTokenUpdateTimestamp(addresses)
-		r.balanceRefreshed()
-	}
-	return tokens, err
-}
-
-func isBalanceUpdateNeededAnyway(cachedTokens map[common.Address][]token.StorageToken, addresses []common.Address, chainIDs []uint64) bool {
 	updateAnyway := false
 	for _, address := range addresses {
 		if res, ok := cachedTokens[address]; !ok || len(res) == 0 {
@@ -360,7 +336,7 @@ func toChainBalance(
 	address common.Address,
 	decimals uint,
 	cachedTokens map[common.Address][]token.StorageToken,
-	clients map[uint64]chain.ClientInterface,
+	hasError bool,
 	isMandatoryToken bool,
 ) *token.ChainBalance {
 	hexBalance := &big.Int{}
@@ -374,11 +350,6 @@ func toChainBalance(
 			new(big.Float).SetInt(hexBalance),
 			big.NewFloat(math.Pow(10, float64(decimals))),
 		)
-	}
-
-	hasError := false
-	if client, ok := clients[tok.ChainID]; ok {
-		hasError = !client.IsConnected()
 	}
 
 	isVisible := balance.Cmp(big.NewFloat(0.0)) > 0 || isCachedToken(cachedTokens, address, tok.Symbol, tok.ChainID)
@@ -406,7 +377,7 @@ func (r *Reader) getBalance1DayAgo(balance *token.ChainBalance, dayAgoTimestamp 
 	return balance1DayAgo, nil
 }
 
-func (r *Reader) balancesToTokensByAddress(clients map[uint64]chain.ClientInterface, addresses []common.Address, allTokens []*token.Token, balances map[uint64]map[common.Address]map[common.Address]*hexutil.Big, cachedTokens map[common.Address][]token.StorageToken) (map[common.Address][]token.StorageToken, error) {
+func (r *Reader) balancesToTokensByAddress(connectedPerChain map[uint64]bool, addresses []common.Address, allTokens []*token.Token, balances map[uint64]map[common.Address]map[common.Address]*hexutil.Big, cachedTokens map[common.Address][]token.StorageToken) map[common.Address][]token.StorageToken {
 	verifiedTokens, unverifiedTokens := splitVerifiedTokens(allTokens)
 
 	result := make(map[common.Address][]token.StorageToken)
@@ -415,25 +386,16 @@ func (r *Reader) balancesToTokensByAddress(clients map[uint64]chain.ClientInterf
 	for _, address := range addresses {
 		for _, tokenList := range [][]*token.Token{verifiedTokens, unverifiedTokens} {
 			for symbol, tokens := range getTokenBySymbols(tokenList) {
-				balancesPerChain := make(map[uint64]token.ChainBalance)
-				decimals := tokens[0].Decimals
-				isMandatoryToken := belongsToMandatoryTokens(symbol)
-				for _, token := range tokens {
-					balance := toChainBalance(balances, token, address, decimals, cachedTokens, clients, isMandatoryToken)
-					if balance != nil {
-						balance1DayAgo, _ := r.getBalance1DayAgo(balance, dayAgoTimestamp, symbol, address) // Ignore error
-						if balance1DayAgo != nil {
-							balance.Balance1DayAgo = balance1DayAgo.String()
-						}
-						balancesPerChain[token.ChainID] = *balance
-					}
+				balancesPerChain := r.createBalancePerChainPerSymbol(address, balances, tokens, cachedTokens, connectedPerChain, dayAgoTimestamp)
+				if balancesPerChain == nil {
+					continue
 				}
 
 				walletToken := token.StorageToken{
 					Token: token.Token{
 						Name:          tokens[0].Name,
 						Symbol:        symbol,
-						Decimals:      decimals,
+						Decimals:      tokens[0].Decimals,
 						PegSymbol:     token.GetTokenPegSymbol(symbol),
 						Verified:      tokens[0].Verified,
 						CommunityData: tokens[0].CommunityData,
@@ -447,7 +409,43 @@ func (r *Reader) balancesToTokensByAddress(clients map[uint64]chain.ClientInterf
 		}
 	}
 
-	return result, nil
+	return result
+}
+
+// For tokens with single symbol, create a chain balance for each chain
+func (r *Reader) createBalancePerChainPerSymbol(
+	address common.Address,
+	balances map[uint64]map[common.Address]map[common.Address]*hexutil.Big,
+	tokens []*token.Token,
+	cachedTokens map[common.Address][]token.StorageToken,
+	clientConnectionPerChain map[uint64]bool,
+	dayAgoTimestamp int64,
+) map[uint64]token.ChainBalance {
+	var balancesPerChain map[uint64]token.ChainBalance
+	decimals := tokens[0].Decimals
+	isMandatoryToken := belongsToMandatoryTokens(tokens[0].Symbol) // we expect all tokens in the list to have the same symbol
+	for _, tok := range tokens {
+		hasError := false
+		if connected, ok := clientConnectionPerChain[tok.ChainID]; ok {
+			hasError = !connected
+		}
+
+		// TODO: Avoid passing the entire balances map to toChainBalance. Iterate over the balances map once and pass the balance per address per token to toChainBalance
+		balance := toChainBalance(balances, tok, address, decimals, cachedTokens, hasError, isMandatoryToken)
+		if balance != nil {
+			balance1DayAgo, _ := r.getBalance1DayAgo(balance, dayAgoTimestamp, tok.Symbol, address) // Ignore error
+			if balance1DayAgo != nil {
+				balance.Balance1DayAgo = balance1DayAgo.String()
+			}
+
+			if balancesPerChain == nil {
+				balancesPerChain = make(map[uint64]token.ChainBalance)
+			}
+			balancesPerChain[tok.ChainID] = *balance
+		}
+	}
+
+	return balancesPerChain
 }
 
 func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address, currency string) (map[common.Address][]token.StorageToken, error) {
@@ -634,4 +632,62 @@ func (r *Reader) updateTokenUpdateTimestamp(addresses []common.Address) {
 	for _, address := range addresses {
 		r.lastWalletTokenUpdateTimestamp.Store(address, time.Now().Unix())
 	}
+}
+
+func (r *Reader) FetchBalances(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address) (map[common.Address][]token.StorageToken, error) {
+	cachedTokens, err := r.getCachedWalletTokensWithoutMarketData()
+	if err != nil {
+		return nil, err
+	}
+
+	chainIDs := maps.Keys(clients)
+	allTokens, err := r.tokenManager.GetTokensByChainIDs(chainIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	connectedPerChain := map[uint64]bool{}
+	for chainID, client := range clients {
+		connectedPerChain[chainID] = client.IsConnected()
+	}
+
+	tokenAddresses := getTokenAddresses(allTokens)
+	balances, err := r.fetchBalances(ctx, clients, addresses, tokenAddresses)
+	if err != nil {
+		log.Error("failed to update balances", "err", err)
+		return nil, err
+	}
+
+	tokens := r.balancesToTokensByAddress(connectedPerChain, addresses, allTokens, balances, cachedTokens)
+
+	err = r.persistence.SaveTokens(tokens)
+	if err != nil {
+		log.Error("failed to save tokens", "err", err) // Do not return error, as it is not critical
+	}
+
+	r.updateTokenUpdateTimestamp(addresses)
+	r.balanceRefreshed()
+
+	return tokens, err
+}
+
+func (r *Reader) GetCachedBalances(clients map[uint64]chain.ClientInterface, addresses []common.Address) (map[common.Address][]token.StorageToken, error) {
+	cachedTokens, err := r.getCachedWalletTokensWithoutMarketData()
+	if err != nil {
+		return nil, err
+	}
+
+	chainIDs := maps.Keys(clients)
+	allTokens, err := r.tokenManager.GetTokensByChainIDs(chainIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	connectedPerChain := map[uint64]bool{}
+	for chainID, client := range clients {
+		connectedPerChain[chainID] = client.IsConnected()
+	}
+
+	balances := tokensToBalancesPerChain(cachedTokens)
+	return r.balancesToTokensByAddress(connectedPerChain, addresses, allTokens, balances, cachedTokens), nil
 }

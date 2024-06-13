@@ -8,10 +8,12 @@ import (
 	"time"
 
 	eth "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -68,6 +70,18 @@ func (m *mockTokenManager) LookupTokenIdentity(chainID uint64, address eth.Addre
 func (m *mockTokenManager) LookupToken(chainID *uint64, tokenSymbol string) (tkn *token.Token, isNative bool) {
 	args := m.Called(chainID, tokenSymbol)
 	return args.Get(0).(*token.Token), args.Bool(1)
+}
+
+func (m *mockTokenManager) GetBalancesByChain(parent context.Context, clients map[uint64]chain.ClientInterface, accounts, tokens []eth.Address) (map[uint64]map[eth.Address]map[eth.Address]*hexutil.Big, error) {
+	return nil, nil // Not used here
+}
+
+func (m *mockTokenManager) GetTokensByChainIDs(chainIDs []uint64) ([]*token.Token, error) {
+	return nil, nil // Not used here
+}
+
+func (m *mockTokenManager) GetTokenHistoricalBalance(account eth.Address, chainID uint64, symbol string, timestamp int64) (*big.Int, error) {
+	return nil, nil // Not used here
 }
 
 type testState struct {
