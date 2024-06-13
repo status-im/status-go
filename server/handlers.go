@@ -1069,6 +1069,7 @@ func handleCommunityDescriptionTokenImagesPath(db *sql.DB, logger *zap.Logger) h
 
 		if len(params["symbol"]) == 0 {
 			logger.Error("[handleCommunityDescriptionTokenImagesPath] no symbol")
+			return
 		}
 		symbol := params["symbol"][0]
 

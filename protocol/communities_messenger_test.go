@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strings"
@@ -4409,20 +4410,96 @@ func (s *MessengerCommunitiesSuite) TestFetchSerializedCommunities() {
 	s.Require().NoError(err)
 	// Check community description image
 	s.Require().NotEmpty(communityData[0].Images[identImageName])
-	s.T().Log(fmt.Sprintf("Image URL (%s):", identImageName), communityData[0].Images[identImageName])
-	e, err := s.fetchImage(communityData[0].Images[identImageName])
+	imageUrl := communityData[0].Images[identImageName]
+	s.T().Log(fmt.Sprintf("Image URL (%s):", identImageName), imageUrl)
+	e, err := s.fetchImage(imageUrl)
 	s.Require().NoError(err)
 	s.Require().Equal(identImagePayload, e)
 
+	imageUrlWithoutCommunityID, err := s.removeUrlParam(imageUrl, "communityID")
+	s.Require().NoError(err)
+	e, err = s.fetchImage(imageUrlWithoutCommunityID)
+	s.Require().NoError(err)
+	s.Require().Len(e, 0)
+
+	imageUrlWithWrongCommunityID, err := s.updateUrlParam(imageUrl, "communityID", "0x0")
+	s.Require().NoError(err)
+	e, err = s.fetchImage(imageUrlWithWrongCommunityID)
+	s.Require().NoError(err)
+	s.Require().Len(e, 0)
+
 	// Check communityTokensMetadata image
 	s.Require().NotEmpty(communityData[0].CommunityTokensMetadata)
-	s.T().Log("Community Token Metadata Image:", communityData[0].CommunityTokensMetadata[0].Image)
+	tokenImageUrl := communityData[0].CommunityTokensMetadata[0].Image
+	s.T().Log("Community Token Metadata Image:", tokenImageUrl)
 	s.T().Log("Community Token Metadata Symbol:", communityData[0].CommunityTokensMetadata[0].Symbol)
-	f, err := s.fetchImage(communityData[0].CommunityTokensMetadata[0].Image)
+	f, err := s.fetchImage(tokenImageUrl)
 	s.Require().NoError(err)
 	tokenImagePayload, err := images.GetPayloadFromURI(tokenImageInBase64)
 	s.Require().NoError(err)
 	s.Require().Equal(tokenImagePayload, f)
+
+	tokenImageUrlWithoutCommunityID, err := s.removeUrlParam(tokenImageUrl, "communityID")
+	s.Require().NoError(err)
+	f, err = s.fetchImage(tokenImageUrlWithoutCommunityID)
+	s.Require().NoError(err)
+	s.Require().Len(f, 0)
+
+	tokenImageUrlWithWrongCommunityID, err := s.updateUrlParam(tokenImageUrl, "communityID", "0x0")
+	s.Require().NoError(err)
+	f, err = s.fetchImage(tokenImageUrlWithWrongCommunityID)
+	s.Require().NoError(err)
+	s.Require().Len(f, 0)
+
+	tokenImageUrlWithoutSymbol, err := s.removeUrlParam(tokenImageUrl, "symbol")
+	s.Require().NoError(err)
+	f, err = s.fetchImage(tokenImageUrlWithoutSymbol)
+	s.Require().NoError(err)
+	s.Require().Len(f, 0)
+
+	tokenImageUrlWithWrongSymbol, err := s.updateUrlParam(tokenImageUrl, "symbol", "WRONG")
+	s.Require().NoError(err)
+	f, err = s.fetchImage(tokenImageUrlWithWrongSymbol)
+	s.Require().NoError(err)
+	s.Require().Len(f, 0)
+}
+
+func (s *MessengerCommunitiesSuite) updateUrlParam(rawURL string, name, val string) (string, error) {
+	// Parse the raw URL
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+
+	// Parse the query parameters
+	queryParams := parsedURL.Query()
+
+	// Update the communityID parameter to 0x0
+	queryParams.Set(name, val)
+
+	// Re-encode the query parameters
+	parsedURL.RawQuery = queryParams.Encode()
+
+	return parsedURL.String(), nil
+}
+
+func (s *MessengerCommunitiesSuite) removeUrlParam(rawURL, name string) (string, error) {
+	// Parse the raw URL
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+
+	// Parse the query parameters
+	queryParams := parsedURL.Query()
+
+	// Remove the communityID parameter
+	queryParams.Del(name)
+
+	// Re-encode the query parameters
+	parsedURL.RawQuery = queryParams.Encode()
+
+	return parsedURL.String(), nil
 }
 
 func (s *MessengerCommunitiesSuite) fetchImage(fullURL string) ([]byte, error) {
