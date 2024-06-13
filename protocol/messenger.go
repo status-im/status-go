@@ -299,6 +299,7 @@ func NewMessenger(
 	node types.Node,
 	installationID string,
 	peerStore *mailservers.PeerStore,
+	version string,
 	opts ...Option,
 ) (*Messenger, error) {
 	var messenger *Messenger
@@ -428,10 +429,11 @@ func NewMessenger(
 
 	var telemetryClient *telemetry.Client
 	if c.telemetryServerURL != "" {
-		telemetryClient = telemetry.NewClient(logger, c.telemetryServerURL, c.account.KeyUID, nodeName)
+		telemetryClient = telemetry.NewClient(logger, c.telemetryServerURL, c.account.KeyUID, nodeName, version)
 		if c.wakuService != nil {
 			c.wakuService.SetStatusTelemetryClient(telemetryClient)
 		}
+		go telemetryClient.Start(messenger.ctx)
 	}
 
 	// Initialize push notification server
@@ -3861,7 +3863,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			statusMessages := handleMessagesResponse.StatusMessages
 
 			if m.telemetryClient != nil {
-				go m.telemetryClient.PushReceivedMessages(filter, shhMessage, statusMessages)
+				m.telemetryClient.PushReceivedMessages(telemetry.ReceivedMessages{
+					Filter:     filter,
+					SSHMessage: shhMessage,
+					Messages:   statusMessages,
+				})
 			}
 
 			err = m.handleDatasyncMetadata(handleMessagesResponse)

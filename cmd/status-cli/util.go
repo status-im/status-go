@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wakuv2ext"
+	"github.com/status-im/status-go/telemetry"
 
 	"go.uber.org/zap"
 )
@@ -41,7 +43,7 @@ func start(name string, port int, apiModules string, telemetryUrl string, useExi
 	)
 	setupLogger(name)
 	nlog := logger.Named(name)
-	nlog.Info("starting messager")
+	nlog.Info("starting messenger")
 
 	backend := api.NewGethStatusBackend()
 	if useExistingAccount {
@@ -59,6 +61,12 @@ func start(name string, port int, apiModules string, telemetryUrl string, useExi
 	wakuService := backend.StatusNode().WakuV2ExtService()
 	if wakuService == nil {
 		return nil, errors.New("waku service is not available")
+	}
+
+	if telemetryUrl != "" {
+		telemetryClient := telemetry.NewClient(nlog.Desugar(), telemetryUrl, backend.SelectedAccountKeyID(), name, "cli")
+		go telemetryClient.Start(context.Background())
+		backend.StatusNode().WakuV2Service().SetStatusTelemetryClient(telemetryClient)
 	}
 	wakuAPI := wakuv2ext.NewPublicAPI(wakuService)
 

@@ -92,6 +92,7 @@ func newTestMessenger(waku types.Waku, config testMessengerConfig) (*Messenger, 
 		&testNode{shh: waku},
 		uuid.New().String(),
 		nil,
+		"testVersion",
 		options...,
 	)
 	if err != nil {

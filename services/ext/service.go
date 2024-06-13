@@ -174,6 +174,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 		s.n,
 		s.config.ShhextConfig.InstallationID,
 		s.peerStore,
+		params.Version,
 		options...,
 	)
 	if err != nil {
