@@ -8,12 +8,13 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
+
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/transport"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
 func (m *Messenger) GetCurrentUserStatus() (*UserStatus, error) {
@@ -234,7 +235,7 @@ func (m *Messenger) SetUserStatus(ctx context.Context, newStatus int, newCustomT
 	return m.sendUserStatus(ctx, *currStatus)
 }
 
-func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *protobuf.StatusUpdate, statusMessage *v1protocol.StatusMessage) error {
+func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *protobuf.StatusUpdate) error {
 	if err := ValidateStatusUpdate(message); err != nil {
 		return err
 	}
@@ -264,6 +265,13 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *pro
 			return err
 		}
 		state.Response.AddStatusUpdate(statusUpdate)
+		if (statusUpdate.StatusType == int(protobuf.StatusUpdate_AUTOMATIC) ||
+			statusUpdate.StatusType == int(protobuf.StatusUpdate_ALWAYS_ONLINE) ||
+			statusUpdate.StatusType == int(protobuf.StatusUpdate_INACTIVE)) &&
+			statusUpdate.Clock > uint64(time.Now().Unix())-10 {
+			m.logger.Debug("reset data sync for peer", zap.String("public_key", statusUpdate.PublicKey), zap.Uint64("clock", statusUpdate.Clock))
+			m.resetDataSyncPeer <- datasyncpeer.PublicKeyToPeerID(*state.CurrentMessageState.PublicKey)
+		}
 	}
 
 	return nil

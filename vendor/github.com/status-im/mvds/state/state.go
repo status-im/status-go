@@ -26,4 +26,5 @@ type SyncState interface {
 	Remove(id MessageID, peer PeerID) error
 	All(epoch int64) ([]State, error)
 	Map(epoch int64, process func(State) State) error
+	MapWithPeerId(peerID PeerID, process func(State) State) error
 }

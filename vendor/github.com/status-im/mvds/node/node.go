@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"sync/atomic"
 	"time"
 
@@ -30,6 +31,19 @@ const (
 
 // CalculateNextEpoch is a function used to calculate the next `SendEpoch` for a given message.
 type CalculateNextEpoch func(count uint64, epoch int64) int64
+
+type Status int
+
+const (
+	ONLINE Status = iota
+	OFFLINE
+)
+
+type PeerStatus struct {
+	PeerID state.PeerID
+	Status Status
+	Time   int64
+}
 
 // Node represents an MVDS node, it runs all the logic like sending and receiving protocol messages.
 type Node struct {
@@ -56,6 +70,8 @@ type Node struct {
 
 	subscription chan protobuf.Message
 
+	resetDataSyncPeer chan state.PeerID
+
 	logger *zap.Logger
 }
 
@@ -65,6 +81,7 @@ func NewPersistentNode(
 	id state.PeerID,
 	mode Mode,
 	nextEpoch CalculateNextEpoch,
+	resetDataSyncPeer chan state.PeerID,
 	logger *zap.Logger,
 ) (*Node, error) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -73,18 +90,19 @@ func NewPersistentNode(
 	}
 
 	node := Node{
-		ID:               id,
-		ctx:              ctx,
-		cancel:           cancel,
-		store:            store.NewPersistentMessageStore(db),
-		transport:        st,
-		peers:            peers.NewSQLitePersistence(db),
-		syncState:        state.NewPersistentSyncState(db),
-		payloads:         newPayloads(),
-		epochPersistence: newEpochSQLitePersistence(db),
-		nextEpoch:        nextEpoch,
-		logger:           logger.With(zap.Namespace("mvds")),
-		mode:             mode,
+		ID:                id,
+		ctx:               ctx,
+		cancel:            cancel,
+		store:             store.NewPersistentMessageStore(db),
+		transport:         st,
+		peers:             peers.NewSQLitePersistence(db),
+		syncState:         state.NewPersistentSyncState(db),
+		payloads:          newPayloads(),
+		epochPersistence:  newEpochSQLitePersistence(db),
+		nextEpoch:         nextEpoch,
+		resetDataSyncPeer: resetDataSyncPeer,
+		logger:            logger.With(zap.Namespace("mvds")),
+		mode:              mode,
 	}
 	if currentEpoch, err := node.epochPersistence.Get(id); err != nil {
 		return nil, err
@@ -168,6 +186,8 @@ func (n *Node) Start(duration time.Duration) {
 			case <-n.ctx.Done():
 				n.logger.Info("Watch stopped")
 				return
+			case peerID := <-n.resetDataSyncPeer:
+				n.resetPeerEpoch(peerID)
 			default:
 				p := n.transport.Watch()
 				go n.onPayload(p.Sender, p.Payload)
@@ -547,6 +567,14 @@ func (n *Node) updateSendEpoch(s state.State) state.State {
 	s.SendCount += 1
 	s.SendEpoch = n.nextEpoch(s.SendCount, n.epoch)
 	return s
+}
+
+func (n *Node) resetPeerEpoch(peer state.PeerID) {
+	n.syncState.MapWithPeerId(peer, func(s state.State) state.State {
+		s.SendCount = 1
+		s.SendEpoch = n.epoch + int64(rand.Intn(60))
+		return s
+	})
 }
 
 func toMessageID(b []byte) state.MessageID {
