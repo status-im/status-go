@@ -296,15 +296,16 @@ func (s *ManagerSuite) TestRetrieveCollectibles() {
 	var tokenBalances []thirdparty.TokenBalance
 
 	var tokenCriteria = []*protobuf.TokenCriteria{
-		&protobuf.TokenCriteria{
+		{
 			ContractAddresses: contractAddresses,
 			TokenIds:          []uint64{tokenID},
 			Type:              protobuf.CommunityTokenType_ERC721,
+			AmountInWei:       "1",
 		},
 	}
 
 	var permissions = []*CommunityTokenPermission{
-		&CommunityTokenPermission{
+		{
 			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
 				Id:            "some-id",
 				Type:          protobuf.CommunityTokenPermission_BECOME_MEMBER,
@@ -316,7 +317,7 @@ func (s *ManagerSuite) TestRetrieveCollectibles() {
 	preParsedPermissions := preParsedCommunityPermissionsData(permissions)
 
 	accountChainIDsCombination := []*AccountChainIDsCombination{
-		&AccountChainIDsCombination{
+		{
 			Address:  gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32"),
 			ChainIDs: []uint64{chainID},
 		},
