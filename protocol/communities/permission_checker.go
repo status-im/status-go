@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 
 	"go.uber.org/zap"
@@ -221,6 +222,158 @@ func (p *DefaultPermissionChecker) checkPermissionsOrDefault(permissions []*Comm
 type ownedERC721TokensGetter = func(walletAddresses []gethcommon.Address, tokenRequirements map[uint64]map[string]*protobuf.TokenCriteria, chainIDs []uint64) (CollectiblesByChain, error)
 type balancesByChainGetter = func(ctx context.Context, accounts, tokens []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error)
 
+func (p *DefaultPermissionChecker) checkTokenRequirement(
+	tokenRequirement *protobuf.TokenCriteria,
+	accounts []gethcommon.Address, ownedERC20TokenBalances BalancesByChain, ownedERC721Tokens CollectiblesByChain,
+	accountsChainIDsCombinations map[gethcommon.Address]map[uint64]bool,
+) (TokenRequirementResponse, error) {
+	tokenRequirementResponse := TokenRequirementResponse{TokenCriteria: tokenRequirement}
+
+	switch tokenRequirement.Type {
+
+	case protobuf.CommunityTokenType_ERC721:
+
+		if len(ownedERC721Tokens) == 0 {
+			return tokenRequirementResponse, nil
+		}
+
+		// Limit NFTs count to uint32
+		requiredCount, err := strconv.ParseUint(tokenRequirement.AmountInWei, 10, 32)
+		if err != nil {
+			return tokenRequirementResponse, fmt.Errorf("invalid ERC721 amount: %s", tokenRequirement.AmountInWei)
+		}
+		accumulatedCount := uint64(0)
+
+		for chainID, addressStr := range tokenRequirement.ContractAddresses {
+			contractAddress := gethcommon.HexToAddress(addressStr)
+			if _, exists := ownedERC721Tokens[chainID]; !exists || len(ownedERC721Tokens[chainID]) == 0 {
+				continue
+			}
+
+			for account := range ownedERC721Tokens[chainID] {
+				if _, exists := ownedERC721Tokens[chainID][account]; !exists {
+					continue
+				}
+
+				tokenBalances := ownedERC721Tokens[chainID][account][contractAddress]
+				accumulatedCount += uint64(len(tokenBalances))
+
+				if len(tokenBalances) > 0 {
+					// 'account' owns some TokenID owned from contract 'address'
+					if _, exists := accountsChainIDsCombinations[account]; !exists {
+						accountsChainIDsCombinations[account] = make(map[uint64]bool)
+					}
+
+					// account has balance > 0 on this chain for this token, so let's add it the chain IDs
+					accountsChainIDsCombinations[account][chainID] = true
+
+					if len(tokenRequirement.TokenIds) == 0 {
+						// no specific tokenId of this collection is needed
+
+						if accumulatedCount >= requiredCount {
+							tokenRequirementResponse.Satisfied = true
+							return tokenRequirementResponse, nil
+						}
+					}
+
+					for _, tokenID := range tokenRequirement.TokenIds {
+						tokenIDBigInt := new(big.Int).SetUint64(tokenID)
+
+						for _, asset := range tokenBalances {
+							if asset.TokenID.Cmp(tokenIDBigInt) == 0 && asset.Balance.Sign() > 0 {
+								tokenRequirementResponse.Satisfied = true
+								return tokenRequirementResponse, nil
+							}
+						}
+					}
+				}
+			}
+		}
+
+	case protobuf.CommunityTokenType_ERC20:
+
+		if len(ownedERC20TokenBalances) == 0 {
+			return tokenRequirementResponse, nil
+		}
+
+		accumulatedBalance := new(big.Int)
+
+	chainIDLoopERC20:
+		for chainID, address := range tokenRequirement.ContractAddresses {
+			if _, exists := ownedERC20TokenBalances[chainID]; !exists || len(ownedERC20TokenBalances[chainID]) == 0 {
+				continue chainIDLoopERC20
+			}
+			contractAddress := gethcommon.HexToAddress(address)
+			for account := range ownedERC20TokenBalances[chainID] {
+				if _, exists := ownedERC20TokenBalances[chainID][account][contractAddress]; !exists {
+					continue
+				}
+
+				value := ownedERC20TokenBalances[chainID][account][contractAddress]
+
+				if _, exists := accountsChainIDsCombinations[account]; !exists {
+					accountsChainIDsCombinations[account] = make(map[uint64]bool)
+				}
+
+				if value.ToInt().Cmp(big.NewInt(0)) > 0 {
+					// account has balance > 0 on this chain for this token, so let's add it the chain IDs
+					accountsChainIDsCombinations[account][chainID] = true
+				}
+
+				// check if adding current chain account balance to accumulated balance
+				// satisfies required amount
+				prevBalance := accumulatedBalance
+				accumulatedBalance.Add(prevBalance, value.ToInt())
+
+				requiredAmount, success := new(big.Int).SetString(tokenRequirement.AmountInWei, 10)
+				if !success {
+					return tokenRequirementResponse, fmt.Errorf("amountInWeis value is incorrect: %s", tokenRequirement.AmountInWei)
+				}
+
+				if accumulatedBalance.Cmp(requiredAmount) != -1 {
+					tokenRequirementResponse.Satisfied = true
+					return tokenRequirementResponse, nil
+				}
+			}
+		}
+
+	case protobuf.CommunityTokenType_ENS:
+
+		for _, account := range accounts {
+			ownedENSNames, err := p.getOwnedENS([]gethcommon.Address{account})
+			if err != nil {
+				return tokenRequirementResponse, err
+			}
+
+			if _, exists := accountsChainIDsCombinations[account]; !exists {
+				accountsChainIDsCombinations[account] = make(map[uint64]bool)
+			}
+
+			if !strings.HasPrefix(tokenRequirement.EnsPattern, "*.") {
+				for _, ownedENS := range ownedENSNames {
+					if ownedENS == tokenRequirement.EnsPattern {
+						accountsChainIDsCombinations[account][walletcommon.EthereumMainnet] = true
+						tokenRequirementResponse.Satisfied = true
+						return tokenRequirementResponse, nil
+					}
+				}
+			} else {
+				parentName := tokenRequirement.EnsPattern[2:]
+				for _, ownedENS := range ownedENSNames {
+					if strings.HasSuffix(ownedENS, parentName) {
+						accountsChainIDsCombinations[account][walletcommon.EthereumMainnet] = true
+						tokenRequirementResponse.Satisfied = true
+						return tokenRequirementResponse, nil
+					}
+				}
+			}
+		}
+
+	}
+
+	return tokenRequirementResponse, nil
+}
+
 func (p *DefaultPermissionChecker) checkPermissions(permissionsParsedData *PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool,
 	getOwnedERC721Tokens ownedERC721TokensGetter, getBalancesByChain balancesByChainGetter) (*CheckPermissionsResponse, error) {
 
@@ -281,7 +434,6 @@ func (p *DefaultPermissionChecker) checkPermissions(permissionsParsedData *PrePa
 	accountsChainIDsCombinations := make(map[gethcommon.Address]map[uint64]bool)
 
 	for _, tokenPermission := range permissionsParsedData.Permissions {
-
 		permissionRequirementsMet := true
 		response.Permissions[tokenPermission.Id] = &PermissionTokenCriteriaResult{Role: tokenPermission.Type}
 
@@ -289,146 +441,17 @@ func (p *DefaultPermissionChecker) checkPermissions(permissionsParsedData *PrePa
 		// If only one is not met, the entire permission is marked
 		// as not fulfilled
 		for _, tokenRequirement := range tokenPermission.TokenCriteria {
-
-			tokenRequirementMet := false
-			tokenRequirementResponse := TokenRequirementResponse{TokenCriteria: tokenRequirement}
-
-			if tokenRequirement.Type == protobuf.CommunityTokenType_ERC721 {
-				if len(ownedERC721Tokens) == 0 {
-
-					response.Permissions[tokenPermission.Id].TokenRequirements = append(response.Permissions[tokenPermission.Id].TokenRequirements, tokenRequirementResponse)
-					response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, false)
-					continue
-				}
-
-			chainIDLoopERC721:
-				for chainID, addressStr := range tokenRequirement.ContractAddresses {
-					contractAddress := gethcommon.HexToAddress(addressStr)
-					if _, exists := ownedERC721Tokens[chainID]; !exists || len(ownedERC721Tokens[chainID]) == 0 {
-						continue chainIDLoopERC721
-					}
-
-					for account := range ownedERC721Tokens[chainID] {
-						if _, exists := ownedERC721Tokens[chainID][account]; !exists {
-							continue
-						}
-
-						tokenBalances := ownedERC721Tokens[chainID][account][contractAddress]
-						if len(tokenBalances) > 0 {
-							// 'account' owns some TokenID owned from contract 'address'
-							if _, exists := accountsChainIDsCombinations[account]; !exists {
-								accountsChainIDsCombinations[account] = make(map[uint64]bool)
-							}
-
-							if len(tokenRequirement.TokenIds) == 0 {
-								// no specific tokenId of this collection is needed
-								tokenRequirementMet = true
-								accountsChainIDsCombinations[account][chainID] = true
-								break chainIDLoopERC721
-							}
-
-						tokenIDsLoop:
-							for _, tokenID := range tokenRequirement.TokenIds {
-								tokenIDBigInt := new(big.Int).SetUint64(tokenID)
-
-								for _, asset := range tokenBalances {
-									if asset.TokenID.Cmp(tokenIDBigInt) == 0 && asset.Balance.Sign() > 0 {
-										tokenRequirementMet = true
-										accountsChainIDsCombinations[account][chainID] = true
-										break tokenIDsLoop
-									}
-								}
-							}
-						}
-					}
-				}
-			} else if tokenRequirement.Type == protobuf.CommunityTokenType_ERC20 {
-				if len(ownedERC20TokenBalances) == 0 {
-					response.Permissions[tokenPermission.Id].TokenRequirements = append(response.Permissions[tokenPermission.Id].TokenRequirements, tokenRequirementResponse)
-					response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, false)
-					continue
-				}
-
-				accumulatedBalance := new(big.Int)
-
-			chainIDLoopERC20:
-				for chainID, address := range tokenRequirement.ContractAddresses {
-					if _, exists := ownedERC20TokenBalances[chainID]; !exists || len(ownedERC20TokenBalances[chainID]) == 0 {
-						continue chainIDLoopERC20
-					}
-					contractAddress := gethcommon.HexToAddress(address)
-					for account := range ownedERC20TokenBalances[chainID] {
-						if _, exists := ownedERC20TokenBalances[chainID][account][contractAddress]; !exists {
-							continue
-						}
-
-						value := ownedERC20TokenBalances[chainID][account][contractAddress]
-
-						if _, exists := accountsChainIDsCombinations[account]; !exists {
-							accountsChainIDsCombinations[account] = make(map[uint64]bool)
-						}
-
-						if value.ToInt().Cmp(big.NewInt(0)) > 0 {
-							// account has balance > 0 on this chain for this token, so let's add it the chain IDs
-							accountsChainIDsCombinations[account][chainID] = true
-						}
-
-						// check if adding current chain account balance to accumulated balance
-						// satisfies required amount
-						prevBalance := accumulatedBalance
-						accumulatedBalance.Add(prevBalance, value.ToInt())
-
-						requiredAmount, success := new(big.Int).SetString(tokenRequirement.AmountInWei, 10)
-						if !success {
-							return nil, fmt.Errorf("amountInWeis value is incorrect: %s", tokenRequirement.AmountInWei)
-						}
-
-						if accumulatedBalance.Cmp(requiredAmount) != -1 {
-							tokenRequirementMet = true
-							if shortcircuit {
-								break chainIDLoopERC20
-							}
-						}
-					}
-				}
-
-			} else if tokenRequirement.Type == protobuf.CommunityTokenType_ENS {
-
-				for _, account := range accounts {
-					ownedENSNames, err := p.getOwnedENS([]gethcommon.Address{account})
-					if err != nil {
-						return nil, err
-					}
-
-					if _, exists := accountsChainIDsCombinations[account]; !exists {
-						accountsChainIDsCombinations[account] = make(map[uint64]bool)
-					}
-
-					if !strings.HasPrefix(tokenRequirement.EnsPattern, "*.") {
-						for _, ownedENS := range ownedENSNames {
-							if ownedENS == tokenRequirement.EnsPattern {
-								tokenRequirementMet = true
-								accountsChainIDsCombinations[account][walletcommon.EthereumMainnet] = true
-							}
-						}
-					} else {
-						parentName := tokenRequirement.EnsPattern[2:]
-						for _, ownedENS := range ownedENSNames {
-							if strings.HasSuffix(ownedENS, parentName) {
-								tokenRequirementMet = true
-								accountsChainIDsCombinations[account][walletcommon.EthereumMainnet] = true
-							}
-						}
-					}
-				}
+			tokenRequirementResponse, err := p.checkTokenRequirement(tokenRequirement, accounts, ownedERC20TokenBalances, ownedERC721Tokens, accountsChainIDsCombinations)
+			if err != nil {
+				p.logger.Error("failed to check token requirement", zap.Error(err))
 			}
-			if !tokenRequirementMet {
+
+			if !tokenRequirementResponse.Satisfied {
 				permissionRequirementsMet = false
 			}
 
-			tokenRequirementResponse.Satisfied = tokenRequirementMet
 			response.Permissions[tokenPermission.Id].TokenRequirements = append(response.Permissions[tokenPermission.Id].TokenRequirements, tokenRequirementResponse)
-			response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, tokenRequirementMet)
+			response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, tokenRequirementResponse.Satisfied)
 		}
 		response.Permissions[tokenPermission.Id].ID = tokenPermission.Id
 

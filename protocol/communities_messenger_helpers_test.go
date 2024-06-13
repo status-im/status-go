@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
-	"math/big"
 	"sync"
 	"time"
 
@@ -25,7 +24,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
@@ -55,7 +53,7 @@ func (m *AccountManagerMock) DeleteAccount(address types.Address) error {
 }
 
 type TokenManagerMock struct {
-	Balances *map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
+	Balances *communities.BalancesByChain
 }
 
 func (m *TokenManagerMock) GetAllChainIDs() ([]uint64, error) {
@@ -82,7 +80,7 @@ func (m *TokenManagerMock) FindOrCreateTokenByAddress(ctx context.Context, chain
 }
 
 type CollectiblesManagerMock struct {
-	Balances                     *map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
+	Collectibles                 *communities.CollectiblesByChain
 	collectibleOwnershipResponse map[string][]thirdparty.AccountBalance
 }
 
@@ -94,7 +92,7 @@ func (m *CollectiblesManagerMock) FetchCachedBalancesByOwnerAndContractAddress(c
 func (m *CollectiblesManagerMock) FetchBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID,
 	ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
 	ret := make(thirdparty.TokenBalancesPerContractAddress)
-	accountsBalances, ok := (*m.Balances)[uint64(chainID)]
+	accountsBalances, ok := (*m.Collectibles)[uint64(chainID)]
 	if !ok {
 		return ret, nil
 	}
@@ -107,14 +105,7 @@ func (m *CollectiblesManagerMock) FetchBalancesByOwnerAndContractAddress(ctx con
 	for _, contractAddress := range contractAddresses {
 		balance, ok := balances[contractAddress]
 		if ok {
-			ret[contractAddress] = []thirdparty.TokenBalance{
-				{
-					TokenID: &bigint.BigInt{},
-					Balance: &bigint.BigInt{
-						Int: (*big.Int)(balance),
-					},
-				},
-			}
+			ret[contractAddress] = balance
 		}
 	}
 
@@ -135,24 +126,17 @@ func (m *CollectiblesManagerMock) FetchCollectibleOwnersByContractAddress(ctx co
 		ContractAddress: contractAddress,
 		Owners:          []thirdparty.CollectibleOwner{},
 	}
-	accountsBalances, ok := (*m.Balances)[uint64(chainID)]
+	accountsBalances, ok := (*m.Collectibles)[uint64(chainID)]
 	if !ok {
 		return ret, nil
 	}
 
-	for wallet, collectiblesBalance := range accountsBalances {
-		balance, ok := collectiblesBalance[contractAddress]
+	for wallet, balances := range accountsBalances {
+		balance, ok := balances[contractAddress]
 		if ok {
 			ret.Owners = append(ret.Owners, thirdparty.CollectibleOwner{
-				OwnerAddress: wallet,
-				TokenBalances: []thirdparty.TokenBalance{
-					{
-						TokenID: &bigint.BigInt{},
-						Balance: &bigint.BigInt{
-							Int: (*big.Int)(balance),
-						},
-					},
-				},
+				OwnerAddress:  wallet,
+				TokenBalances: balance,
 			})
 		}
 	}
@@ -256,7 +240,8 @@ type testCommunitiesMessengerConfig struct {
 
 	password            string
 	walletAddresses     []string
-	mockedBalances      *map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
+	mockedBalances      *communities.BalancesByChain
+	mockedCollectibles  *communities.CollectiblesByChain
 	collectiblesService communities.CommunityTokensServiceInterface
 }
 
@@ -323,7 +308,7 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku types.Waku, config testCom
 	}
 
 	collectiblesManagerMock := &CollectiblesManagerMock{
-		Balances: config.mockedBalances,
+		Collectibles: config.mockedCollectibles,
 	}
 
 	options := []Option{
