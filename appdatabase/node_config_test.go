@@ -154,6 +154,9 @@ func randomNodeConfig() *params.NodeConfig {
 		HTTPPort:                  randomInt(math.MaxInt64),
 		HTTPVirtualHosts:          randomStringSlice(),
 		HTTPCors:                  randomStringSlice(),
+		WSEnabled:                 false, // NOTE: leaving ws field idle since we are moving away from the storing the whole config
+		WSHost:                    "",
+		WSPort:                    0,
 		IPCEnabled:                randomBool(),
 		IPCFile:                   randomString(),
 		LogEnabled:                randomBool(),

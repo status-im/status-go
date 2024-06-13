@@ -14,6 +14,8 @@ type Login struct {
 	BandwidthStatsEnabled bool   `json:"bandwidthStatsEnabled"`
 
 	WalletSecretsConfig
+
+	APIConfig *APIConfig `json:"apiConfig"`
 }
 
 func (c *Login) Validate() error {
