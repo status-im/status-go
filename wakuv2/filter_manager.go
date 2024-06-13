@@ -109,14 +109,11 @@ func (mgr *FilterManager) onConnectionStatusChange(pubsubTopic string, newStatus
 			}
 		}
 	}
-	//if !newStatus && mgr.peersAvailable || newStatus && !mgr.peersAvailable { //Offline or online
-	//mgr.logger.Info("node status change, notifying all filter subscriptions", zap.Bool("new-status", newStatus))
 	mgr.Lock()
 	for _, subDetails := range mgr.filters {
 		subDetails.sub.SetNodeState(newStatus)
 	}
 	mgr.Unlock()
-	//}
 	mgr.peersAvailable = newStatus
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"math/big"
 	"os"
 	"testing"
@@ -388,7 +387,6 @@ func TestWakuV2Filter(t *testing.T) {
 	// Mock peers going down
 	_, err = w.node.FilterLightnode().UnsubscribeWithSubscription(w.ctx, subscriptions[0])
 	require.NoError(t, err)
-
 
 	time.Sleep(10 * time.Second)
 

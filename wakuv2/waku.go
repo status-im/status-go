@@ -271,6 +271,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 
 	if cfg.LightClient {
 		opts = append(opts, node.WithWakuFilterLightNode())
+		cfg.EnablePeerExchangeClient = false //TODO: Need to fix: Disabling for now to test only with fleet nodes.
 	} else {
 		relayOpts := []pubsub.Option{
 			pubsub.WithMaxMessageSize(int(waku.cfg.MaxMessageSize)),
@@ -1222,7 +1223,7 @@ func (w *Waku) lightClientConnectionStatus() {
 
 	peers := w.node.Host().Network().Peers()
 	w.logger.Debug("peer stats",
-		zap.Int("peersCount", len(peers))) 
+		zap.Int("peersCount", len(peers)))
 	subs := w.node.FilterLightnode().Subscriptions()
 	w.logger.Debug("filter subs count", zap.Int("count", len(subs)))
 	isOnline := false
