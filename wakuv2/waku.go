@@ -271,6 +271,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 
 	if cfg.LightClient {
 		opts = append(opts, node.WithWakuFilterLightNode())
+		cfg.EnablePeerExchangeClient = false //Need to remove: Disabling to test only with fleet nodes.
 	} else {
 		relayOpts := []pubsub.Option{
 			pubsub.WithMaxMessageSize(int(waku.cfg.MaxMessageSize)),
