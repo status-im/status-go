@@ -1221,9 +1221,8 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, query legacy_store.Que
 func (w *Waku) lightClientConnectionStatus() {
 
 	peers := w.node.Host().Network().Peers()
-	//peersByPubSubTopic := w.node.Host().Peerstore().(wps.WakuPeerstore).PeersByPubSubTopics(w.cfg.DefaultShardedPubsubTopics)
 	w.logger.Debug("peer stats",
-		zap.Int("peersCount", len(peers))) //, zap.Int("peersByPubSubTopic", len(peersByPubSubTopic)))
+		zap.Int("peersCount", len(peers))) 
 	subs := w.node.FilterLightnode().Subscriptions()
 	w.logger.Debug("filter subs count", zap.Int("count", len(subs)))
 	isOnline := false

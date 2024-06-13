@@ -326,7 +326,6 @@ func TestWakuV2Filter(t *testing.T) {
 	if envEnrTreeAddress != "" {
 		enrTreeAddress = envEnrTreeAddress
 	}
-	//enrTreeAddress = "/ip4/100.118.238.47/tcp/30304/p2p/16Uiu2HAmBUejhH3b9nqTkSyj3TJck9AoMZoVJ2WYbuakc7MhU5cm"
 	config := &Config{}
 	setDefaultConfig(config, true)
 	config.Port = 0
@@ -363,7 +362,6 @@ func TestWakuV2Filter(t *testing.T) {
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{[]byte{1, 2, 3, 4}}),
 	}
 
-	fmt.Println("### Subscribe")
 	_, err = w.Subscribe(filter)
 	require.NoError(t, err)
 
@@ -380,7 +378,6 @@ func TestWakuV2Filter(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
-	fmt.Println("### Check")
 	// Ensure there is at least 1 active filter subscription
 	subscriptions := w.node.FilterLightnode().Subscriptions()
 	require.Greater(t, len(subscriptions), 0)
@@ -392,7 +389,6 @@ func TestWakuV2Filter(t *testing.T) {
 	_, err = w.node.FilterLightnode().UnsubscribeWithSubscription(w.ctx, subscriptions[0])
 	require.NoError(t, err)
 
-	//subscriptions[0].Close()
 
 	time.Sleep(10 * time.Second)
 
