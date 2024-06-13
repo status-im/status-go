@@ -75,6 +75,7 @@ import (
 	"github.com/status-im/status-go/wakuv2/persistence"
 
 	node "github.com/waku-org/go-waku/waku/v2/node"
+	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 )
 
@@ -87,9 +88,14 @@ const maxHashQueryLength = 100
 const hashQueryInterval = 5 * time.Second
 const messageSentPeriod = 5 // in seconds
 
+type SentEnvelope struct {
+	Envelope      *v2protocol.Envelope
+	PublishMethod PublishMethod
+}
+
 type ITelemetryClient interface {
-	PushReceivedEnvelope(*protocol.Envelope)
-	PushSentEnvelope(*protocol.Envelope, PublishMethod)
+	PushReceivedEnvelope(receivedEnvelope *v2protocol.Envelope)
+	PushSentEnvelope(sentEnvelope SentEnvelope)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -1001,7 +1007,7 @@ func (w *Waku) broadcast() {
 				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
 					err := sendFn(env, logger)
 					if err == nil {
-						w.statusTelemetryClient.PushSentEnvelope(env, publishMethod)
+						w.statusTelemetryClient.PushSentEnvelope(SentEnvelope{Envelope: env, PublishMethod: publishMethod})
 					}
 					// else {
 					// TODO: send error from Relay or LightPush to Telemetry
