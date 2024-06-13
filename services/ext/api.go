@@ -395,6 +395,7 @@ func (api *PublicAPI) SetInstallationName(installationID string, name string) er
 }
 
 // Communities returns a list of communities that are stored
+// Deprecated: Use FetchSerializedCommunities instead
 func (api *PublicAPI) Communities(parent context.Context) ([]*communities.Community, error) {
 	return api.service.messenger.Communities()
 }
