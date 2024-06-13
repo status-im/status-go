@@ -13,7 +13,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
@@ -49,9 +48,9 @@ type RouteInputParams struct {
 	TestnetMode          bool                    `json:"testnetMode"`
 
 	// For send types like EnsRegister, EnsRelease, EnsSetPubKey, StickersBuy
-	Username  string         `json:"username"`
-	PublicKey string         `json:"publicKey"`
-	PackID    *bigint.BigInt `json:"packID"`
+	Username  string       `json:"username"`
+	PublicKey string       `json:"publicKey"`
+	PackID    *hexutil.Big `json:"packID"`
 }
 
 type PathV2 struct {
@@ -492,7 +491,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 
 						Username:  input.Username,
 						PublicKey: input.PublicKey,
-						PackID:    input.PackID.Int,
+						PackID:    input.PackID.ToInt(),
 					}
 
 					can, err := pProcessor.AvailableFor(processorInputParams)
