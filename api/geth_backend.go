@@ -1884,15 +1884,6 @@ func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(
 	subaccs []*accounts.Account,
 	keyHex string,
 ) error {
-	b.log.Info("<<< SaveAccountAndStartNodeWithKey",
-		"account", account,
-		"settings", settings,
-		"nodecfg", nodecfg,
-		"subaccs", subaccs,
-		"keyHex", keyHex,
-		"password", password,
-	)
-
 	err := enrichMultiAccountBySubAccounts(&account, subaccs)
 	if err != nil {
 		return err
@@ -1924,8 +1915,6 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	subaccs []*accounts.Account,
 	chatKey *ecdsa.PrivateKey,
 ) error {
-	b.log.Info("<<< node config", "config", nodecfg)
-
 	err := enrichMultiAccountBySubAccounts(&account, subaccs)
 	if err != nil {
 		return err

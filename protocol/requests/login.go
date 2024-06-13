@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	ErrLoginInvalidKeyUID                           = errors.New("login: invalid key-uid")
-	ErrCreateAccountInvalidKeycardWhisperPrivateKey = errors.New("create-account: invalid keycard whisper private key")
+	ErrLoginInvalidKeyUID                   = errors.New("login: invalid key-uid")
+	ErrLoginInvalidKeycardWhisperPrivateKey = errors.New("login: invalid keycard whisper private key")
 )
 
 type Login struct {
@@ -40,7 +40,7 @@ func (c *Login) Validate() error {
 	if c.KeycardWhisperPrivateKey != "" {
 		_, err := parsePrivateKey(c.KeycardWhisperPrivateKey)
 		if err != nil {
-			return ErrCreateAccountInvalidKeycardWhisperPrivateKey
+			return ErrLoginInvalidKeycardWhisperPrivateKey
 		}
 	}
 

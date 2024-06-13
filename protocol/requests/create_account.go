@@ -76,7 +76,7 @@ type CreateAccount struct {
 	APIConfig *APIConfig `json:"apiConfig"`
 
 	KeycardInstanceUID     string  `json:"keycardInstanceUID"`
-	KeycardPairingDataFile *string `json:"keycardPairingDataFile"` // WARNING: Do we actually need to pass it from client?
+	KeycardPairingDataFile *string `json:"keycardPairingDataFile"`
 }
 
 type WalletSecretsConfig struct {
