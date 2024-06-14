@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 
+	"github.com/forPelevin/gomoji"
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/protocol/common"
@@ -69,8 +70,11 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 			// use original text as fallback
 			replacedText = request.Text
 		}
+
+		contentType := request.ContentType
+
 		editMessage.Text = replacedText
-		editMessage.ContentType = request.ContentType
+		editMessage.ContentType = contentType
 		editMessage.ChatId = message.ChatId
 		editMessage.MessageId = message.ID
 		editMessage.Clock = clock
@@ -381,11 +385,17 @@ func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message 
 		message.GetBridgeMessage().Content = editMessage.Text
 	}
 
+	contentType := editMessage.ContentType
+
 	message.EditedAt = editMessage.Clock
 	message.UnfurledLinks = editMessage.UnfurledLinks
 	message.UnfurledStatusLinks = editMessage.UnfurledStatusLinks
+
 	if editMessage.ContentType != protobuf.ChatMessage_UNKNOWN_CONTENT_TYPE {
-		message.ContentType = editMessage.ContentType
+		if contentType == protobuf.ChatMessage_EMOJI && gomoji.RemoveEmojis(message.Text) != "" {
+			contentType = protobuf.ChatMessage_TEXT_PLAIN
+		}
+		message.ContentType = contentType
 	}
 
 	// Save original message as edit so we can retrieve history

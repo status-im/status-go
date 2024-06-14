@@ -90,6 +90,69 @@ func (s *MessengerEditMessageSuite) TestEditMessage() {
 	s.Require().Equal(ErrInvalidEditOrDeleteAuthor, err)
 }
 
+func (s *MessengerEditMessageSuite) TestEditEmojiMessage() {
+	theirMessenger := s.newMessenger()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err := theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestEmojiMessage(*theirChat)
+
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+
+	ogMessage := sendResponse.Messages()[0]
+
+	messageID, err := types.DecodeHex(ogMessage.ID)
+	s.Require().NoError(err)
+
+	editedText := "edited text"
+	editedMessage := &requests.EditMessage{
+		ID:          messageID,
+		Text:        editedText,
+		ContentType: protobuf.ChatMessage_EMOJI,
+	}
+
+	sendResponse, err = theirMessenger.EditMessage(context.Background(), editedMessage)
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+	s.Require().NotEmpty(sendResponse.Messages()[0].EditedAt)
+	s.Require().Equal(sendResponse.Messages()[0].Text, editedText)
+	s.Require().Len(sendResponse.Chats(), 1)
+	s.Require().NotNil(sendResponse.Chats()[0].LastMessage)
+	s.Require().NotEmpty(sendResponse.Chats()[0].LastMessage.EditedAt)
+
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().NotEmpty(response.Messages()[0].EditedAt)
+	s.Require().Equal(response.Messages()[0].ContentType, protobuf.ChatMessage_TEXT_PLAIN)
+	s.Require().False(response.Messages()[0].New)
+
+}
+
 func (s *MessengerEditMessageSuite) TestEditBridgeMessage() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)

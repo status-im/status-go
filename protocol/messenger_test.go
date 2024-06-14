@@ -226,6 +226,28 @@ func buildTestMessage(chat Chat) *common.Message {
 	return message
 }
 
+func buildTestEmojiMessage(chat Chat) *common.Message {
+	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
+	message := common.NewMessage()
+	message.Text = "test-emoji"
+	message.ChatId = chat.ID
+	message.Clock = clock
+	message.Timestamp = timestamp
+	message.WhisperTimestamp = clock
+	message.LocalChatID = chat.ID
+	message.ContentType = protobuf.ChatMessage_EMOJI
+	switch chat.ChatType {
+	case ChatTypePublic, ChatTypeProfile:
+		message.MessageType = protobuf.MessageType_PUBLIC_GROUP
+	case ChatTypeOneToOne:
+		message.MessageType = protobuf.MessageType_ONE_TO_ONE
+	case ChatTypePrivateGroupChat:
+		message.MessageType = protobuf.MessageType_PRIVATE_GROUP
+	}
+
+	return message
+}
+
 func buildTestGapMessage(chat Chat) *common.Message {
 	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
 	message := common.NewMessage()
