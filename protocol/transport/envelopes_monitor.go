@@ -172,7 +172,6 @@ func (m *EnvelopesMonitor) handleEnvelopeEvents() {
 	events := make(chan types.EnvelopeEvent, 100) // must be buffered to prevent blocking waku
 	sub := m.w.SubscribeEnvelopeEvents(events)
 	defer func() {
-		close(events)
 		sub.Unsubscribe()
 	}()
 	for {
