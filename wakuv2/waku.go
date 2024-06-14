@@ -1349,6 +1349,11 @@ func (w *Waku) Start() error {
 		defer w.wg.Done()
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
+
+		peerCountTimer := time.NewTimer(0) // fire immediately
+		defer peerCountTimer.Stop()
+
+		peerCount := 0
 		for {
 			select {
 			case <-w.ctx.Done():
@@ -1360,6 +1365,20 @@ func (w *Waku) Start() error {
 				//This would get fixed as part of https://github.com/waku-org/go-waku/issues/1114
 				if w.cfg.LightClient {
 					w.lightClientConnectionStatus()
+				}
+			case <-peerCountTimer.C:
+				peerCountTimer.Reset(3 * time.Second)
+				newPeerCount := len(w.node.Host().Network().Peers())
+				if newPeerCount != peerCount && w.onPeerStats != nil {
+					peerCount = newPeerCount
+					// TODO: `IsOnline` is not implemented correctly here, however
+					// this is not a problem because Desktop ignores that value.
+					// This should be fixed to as part of issue
+					// https://github.com/status-im/status-go/issues/4628
+					w.onPeerStats(types.ConnStatus{
+						IsOnline: true,
+						Peers:    FormatPeerStats(w.node),
+					})
 				}
 			case c := <-w.topicHealthStatusChan:
 				w.connStatusMu.Lock()
