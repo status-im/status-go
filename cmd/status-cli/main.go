@@ -21,6 +21,7 @@ const PortFlag = "port"
 const APIModulesFlag = "api-modules"
 const TelemetryServerURLFlag = "telemetry-server-url"
 const KeyUIDFlag = "key-uid"
+const DebugLevel = "debug"
 
 const RetrieveInterval = 300 * time.Millisecond
 const SendInterval = 1 * time.Second
@@ -42,6 +43,12 @@ var CommonFlags = []cli.Flag{
 		Name:    TelemetryServerURLFlag,
 		Aliases: []string{"t"},
 		Usage:   "Telemetry server URL",
+	},
+	&cli.BoolFlag{
+		Name:    DebugLevel,
+		Aliases: []string{"d"},
+		Usage:   "Enable CLI's debug level logging",
+		Value:   false,
 	},
 }
 
@@ -139,6 +146,12 @@ func main() {
 						Aliases: []string{"a"},
 						Usage:   "Add a friend with the public key",
 					},
+					&cli.BoolFlag{
+						Name:    DebugLevel,
+						Aliases: []string{"d"},
+						Usage:   "Enable CLI's debug level logging",
+						Value:   false,
+					},
 				},
 				Action: func(cCtx *cli.Context) error {
 					return serve(cCtx, true)
@@ -148,6 +161,6 @@ func main() {
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		logger.Fatal(err)
+		zap.L().Fatal("main", zap.Error(err))
 	}
 }

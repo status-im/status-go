@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/telemetry"
+	"github.com/urfave/cli/v2"
 
 	"go.uber.org/zap"
 )
@@ -30,32 +31,31 @@ func setupLogger(file string) *zap.Logger {
 		CompressRotated: true,
 	}
 	if err := logutils.OverrideRootLogWithConfig(logSettings, false); err != nil {
-		logger.Fatalf("Error initializing logger: %v", err)
+		zap.S().Fatalf("Error initializing logger: %v", err)
 	}
-
 	return logutils.ZapLogger()
 }
 
-func start(name string, port int, apiModules string, telemetryUrl string, useExistingAccount bool, keyUID string) (*StatusCLI, error) {
+func start(name string, port int, apiModules string, telemetryUrl string, useExistingAccount bool, keyUID string, logger *zap.SugaredLogger) (*StatusCLI, error) {
 	var (
 		rootDataDir = fmt.Sprintf("./test-%s", strings.ToLower(name))
 		password    = "some-password"
 	)
 	setupLogger(name)
-	nlog := logger.Named(name)
-	nlog.Info("starting messenger")
+	logger.Info("starting messenger")
 
 	backend := api.NewGethStatusBackend()
 	if useExistingAccount {
 		if err := getAccountAndLogin(backend, name, rootDataDir, password, keyUID); err != nil {
 			return nil, err
 		}
+		logger.Infof("existing account, key UID: %v", keyUID)
 	} else {
 		acc, err := createAccountAndLogin(backend, name, rootDataDir, password, apiModules, telemetryUrl, port)
 		if err != nil {
 			return nil, err
 		}
-		nlog.Infof("account created, key UID: %v", acc.KeyUID)
+		logger.Infof("account created, key UID: %v", acc.KeyUID)
 	}
 
 	wakuService := backend.StatusNode().WakuV2ExtService()
@@ -64,7 +64,7 @@ func start(name string, port int, apiModules string, telemetryUrl string, useExi
 	}
 
 	if telemetryUrl != "" {
-		telemetryClient := telemetry.NewClient(nlog.Desugar(), telemetryUrl, backend.SelectedAccountKeyID(), name, "cli")
+		telemetryClient := telemetry.NewClient(logger.Desugar(), telemetryUrl, backend.SelectedAccountKeyID(), name, "cli")
 		go telemetryClient.Start(context.Background())
 		backend.StatusNode().WakuV2Service().SetStatusTelemetryClient(telemetryClient)
 	}
@@ -75,14 +75,14 @@ func start(name string, port int, apiModules string, telemetryUrl string, useExi
 		return nil, err
 	}
 
-	nlog.Info("messenger started, public key: ", messenger.IdentityPublicKeyString())
+	logger.Info("messenger started, public key: ", messenger.IdentityPublicKeyString())
 	time.Sleep(WaitingInterval)
 
 	data := StatusCLI{
 		name:      name,
 		messenger: messenger,
 		backend:   backend,
-		logger:    nlog,
+		logger:    logger,
 	}
 
 	return &data, nil
@@ -147,6 +147,32 @@ func createAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password
 func (cli *StatusCLI) stop() {
 	err := cli.backend.StopNode()
 	if err != nil {
-		logger.Error(err)
+		cli.logger.Error(err)
 	}
+}
+
+func getSLogger(debug bool) (*zap.SugaredLogger, error) {
+	at := zap.NewAtomicLevel()
+	if debug {
+		at.SetLevel(zap.DebugLevel)
+	}
+	at.SetLevel(zap.InfoLevel)
+	config := zap.NewDevelopmentConfig()
+	config.Level = at
+	rawLogger, err := config.Build()
+	if err != nil {
+		return nil, fmt.Errorf("initializing logger: %v", err)
+	}
+	return rawLogger.Sugar(), nil
+}
+
+func flagsUsed(cCtx *cli.Context) string {
+	var sb strings.Builder
+	for _, flag := range cCtx.Command.Flags {
+		if flag != nil && len(flag.Names()) > 0 {
+			fName := flag.Names()[0]
+			fmt.Fprintf(&sb, "\t-%s %v\n", fName, cCtx.Value(fName))
+		}
+	}
+	return sb.String()
 }

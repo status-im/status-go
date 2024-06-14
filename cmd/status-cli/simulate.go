@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"sync"
@@ -24,28 +23,24 @@ func simulate(cCtx *cli.Context) error {
 		cancel()
 	}()
 
-	rawLogger, err := zap.NewDevelopment()
+	logger, err := getSLogger(cCtx.Bool(DebugLevel))
 	if err != nil {
-		log.Fatalf("Error initializing logger: %v", err)
+		zap.S().Fatalf("Error initializing logger: %v", err)
 	}
-	logger = rawLogger.Sugar()
 
-	logger.Info("Running simulate command, flags passed:")
-	for _, flag := range SimulateFlags {
-		logger.Infof("-%s %v", flag.Names()[0], cCtx.Value(flag.Names()[0]))
-	}
+	logger.Infof("Running %v command, with:\n%v", cCtx.Command, flagsUsed(cCtx))
 
 	// Start messengers
 	apiModules := cCtx.String(APIModulesFlag)
 	telemetryUrl := cCtx.String(TelemetryServerURLFlag)
 
-	alice, err := start("Alice", 0, apiModules, telemetryUrl, false, "")
+	alice, err := start("Alice", 0, apiModules, telemetryUrl, false, "", logger.Named("alice"))
 	if err != nil {
 		return err
 	}
 	defer alice.stop()
 
-	charlie, err := start("Charlie", 0, apiModules, telemetryUrl, false, "")
+	charlie, err := start("Charlie", 0, apiModules, telemetryUrl, false, "", logger.Named("charlie"))
 	if err != nil {
 		return err
 	}
