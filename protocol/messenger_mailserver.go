@@ -22,7 +22,7 @@ import (
 
 const (
 	initialStoreNodeRequestPageSize = 4
-	defaultStoreNodeRequestPageSize = 20
+	defaultStoreNodeRequestPageSize = 50
 
 	// tolerance is how many seconds of potentially out-of-order messages we want to fetch
 	tolerance uint32 = 60
