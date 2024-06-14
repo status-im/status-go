@@ -88,7 +88,7 @@ func NewWakuFilterLightNode(broadcaster relay.Broadcaster, pm *peermanager.PeerM
 	wf.pm = pm
 	wf.CommonService = service.NewCommonService()
 	wf.metrics = newMetrics(reg)
-	wf.peerPingInterval = 5 * time.Second
+	wf.peerPingInterval = 1 * time.Minute
 	return wf
 }
 
@@ -591,7 +591,7 @@ func (wf *WakuFilterLightNode) UnsubscribeWithSubscription(ctx context.Context, 
 	sub.Close()
 
 	result := &WakuFilterPushResult{}
-
+	wf.log.Debug("unsubscribing subscription", zap.String("sub-id", sub.ID), zap.Stringer("content-filter", sub.ContentFilter))
 	if !wf.subscriptions.Has(sub.PeerID, sub.ContentFilter) {
 		// Last sub for this [peer, contentFilter] pair
 		err = wf.unsubscribeFromServer(ctx, params.requestID, sub.PeerID, sub.ContentFilter)
@@ -599,6 +599,8 @@ func (wf *WakuFilterLightNode) UnsubscribeWithSubscription(ctx context.Context, 
 			Err:    err,
 			PeerID: sub.PeerID,
 		})
+		wf.log.Debug("unsubscribed subscription", zap.String("sub-id", sub.ID), zap.Stringer("content-filter", sub.ContentFilter), zap.Error(err))
+
 	}
 	return result, err
 

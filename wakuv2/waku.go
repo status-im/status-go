@@ -278,6 +278,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 
 	if cfg.LightClient {
 		opts = append(opts, node.WithWakuFilterLightNode())
+		cfg.EnablePeerExchangeClient = false //TODO: Need to fix: Disabling for now to test only with fleet nodes.
 	} else {
 		relayOpts := []pubsub.Option{
 			pubsub.WithMaxMessageSize(int(waku.cfg.MaxMessageSize)),
@@ -430,7 +431,7 @@ func (w *Waku) discoverAndConnectPeers() error {
 	fnApply := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
 		defer wg.Done()
 		if len(d.PeerInfo.Addrs) != 0 {
-			go w.connect(d.PeerInfo, wps.DNSDiscovery)
+			go w.connect(d.PeerInfo, d.ENR, wps.DNSDiscovery)
 		}
 	}
 
@@ -457,17 +458,17 @@ func (w *Waku) discoverAndConnectPeers() error {
 				continue
 			}
 
-			go w.connect(*peerInfo, wps.Static)
+			go w.connect(*peerInfo, nil, wps.Static)
 		}
 	}
 
 	return nil
 }
 
-func (w *Waku) connect(peerInfo peer.AddrInfo, origin wps.Origin) {
+func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origin) {
 	// Connection will be prunned eventually by the connection manager if needed
 	// The peer connector in go-waku uses Connect, so it will execute identify as part of its
-	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, []string{w.cfg.DefaultShardPubsubTopic}, nil, true)
+	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
 }
 
 func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
@@ -538,7 +539,7 @@ func (w *Waku) runPeerExchangeLoop() {
 					}
 					// Attempt to connect to the peers.
 					// Peers will be added to the libp2p peer store thanks to identify
-					go w.connect(discoveredNode.PeerInfo, wps.DNSDiscovery)
+					go w.connect(discoveredNode.PeerInfo, discoveredNode.ENR, wps.DNSDiscovery)
 					peers = append(peers, discoveredNode.PeerID)
 				}
 			}
@@ -904,7 +905,7 @@ func (w *Waku) Subscribe(f *common.Filter) (string, error) {
 	}
 
 	if w.cfg.LightClient {
-		w.filterManager.eventChan <- FilterEvent{eventType: FilterEventAdded, filterID: id}
+		w.filterManager.addFilter(id, f)
 	}
 
 	return id, nil
@@ -918,19 +919,10 @@ func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 	}
 
 	if w.cfg.LightClient {
-		w.filterManager.eventChan <- FilterEvent{eventType: FilterEventRemoved, filterID: id}
+		w.filterManager.removeFilter(id)
 	}
 
 	return nil
-}
-
-// Used for testing
-func (w *Waku) getFilterStats() FilterSubs {
-	ch := make(chan FilterSubs)
-	w.filterManager.eventChan <- FilterEvent{eventType: FilterEventGetStats, ch: ch}
-	stats := <-ch
-
-	return stats
 }
 
 // GetFilter returns the filter by id.
@@ -1271,6 +1263,48 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, query legacy_store.Que
 	return result.Cursor(), len(result.Messages), nil
 }
 
+func (w *Waku) lightClientConnectionStatus() {
+
+	peers := w.node.Host().Network().Peers()
+	w.logger.Debug("peer stats",
+		zap.Int("peersCount", len(peers)))
+	subs := w.node.FilterLightnode().Subscriptions()
+	w.logger.Debug("filter subs count", zap.Int("count", len(subs)))
+	isOnline := false
+	if len(peers) > 0 {
+		isOnline = true
+	}
+	//TODOL needs fixing, right now invoking everytime.
+	//Trigger FilterManager to take care of any pending filter subscriptions
+	//TODO: Pass pubsubTopic based on topicHealth notif received.
+	go w.filterManager.onConnectionStatusChange(w.cfg.DefaultShardPubsubTopic, isOnline)
+
+	w.connStatusMu.Lock()
+
+	connStatus := types.ConnStatus{
+		IsOnline: isOnline,
+		Peers:    FormatPeerStats(w.node),
+	}
+	for k, subs := range w.connStatusSubscriptions {
+		if !subs.Send(connStatus) {
+			delete(w.connStatusSubscriptions, k)
+		}
+	}
+	w.connStatusMu.Unlock()
+	if w.onPeerStats != nil {
+		w.onPeerStats(connStatus)
+	}
+
+	//TODO:Analyze if we need to discover and connect to peers with peerExchange loop enabled.
+	if w.offline && isOnline {
+		if err := w.discoverAndConnectPeers(); err != nil {
+			w.logger.Error("failed to add wakuv2 peers", zap.Error(err))
+		}
+	}
+
+	w.offline = !isOnline
+}
+
 // Start implements node.Service, starting the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Start() error {
@@ -1313,10 +1347,20 @@ func (w *Waku) Start() error {
 
 	go func() {
 		defer w.wg.Done()
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-w.ctx.Done():
 				return
+			case <-ticker.C:
+				//TODO: Need to fix.
+				// Temporary changes for lightNodes to have health check based on connected peers.
+				//This needs to be enhanced to be based on healthy Filter and lightPush peers available for each shard.
+				//This would get fixed as part of https://github.com/waku-org/go-waku/issues/1114
+				if w.cfg.LightClient {
+					w.lightClientConnectionStatus()
+				}
 			case c := <-w.topicHealthStatusChan:
 				w.connStatusMu.Lock()
 
@@ -1345,19 +1389,16 @@ func (w *Waku) Start() error {
 	}()
 
 	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL)
+	//TODO: commenting for now so that only fleet nodes are used.
+	//Need to uncomment once filter peer scoring etc is implemented.
 	go w.runPeerExchangeLoop()
 
 	if w.cfg.LightClient {
 		// Create FilterManager that will main peer connectivity
 		// for installed filters
-		w.filterManager = newFilterManager(w.ctx, w.logger,
-			func(id string) *common.Filter { return w.GetFilter(id) },
-			w.cfg,
+		w.filterManager = newFilterManager(w.ctx, w.logger, w.cfg,
 			func(env *protocol.Envelope) error { return w.OnNewEnvelopes(env, common.RelayedMessageType, false) },
-			w.node)
-
-		w.wg.Add(1)
-		go w.filterManager.runFilterLoop(&w.wg)
+			w.node.FilterLightnode())
 	}
 
 	err = w.setupRelaySubscriptions()
@@ -1777,6 +1818,7 @@ func (w *Waku) seedBootnodesForDiscV5() {
 				retries = 0
 				lastTry = now()
 			}
+
 		case <-w.ctx.Done():
 			w.wg.Done()
 			w.logger.Debug("bootnode seeding stopped")

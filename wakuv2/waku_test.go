@@ -23,28 +23,42 @@ import (
 	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
-	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
-
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/wakuv2/common"
+	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
+	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
+	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
+	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 )
 
 var testENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.shards.nodes.status.im"
 
+func setDefaultConfig(config *Config, lightMode bool) {
+	config.ClusterID = 16
+	config.UseShardAsDefaultTopic = true
+
+	if lightMode {
+		config.EnablePeerExchangeClient = true
+		config.LightClient = true
+		config.EnableDiscV5 = false
+	} else {
+		config.EnableDiscV5 = true
+		config.EnablePeerExchangeServer = true
+		config.LightClient = false
+		config.EnablePeerExchangeClient = false
+	}
+}
+
 func TestDiscoveryV5(t *testing.T) {
 	config := &Config{}
-	config.EnableDiscV5 = true
+	setDefaultConfig(config, false)
 	config.DiscV5BootstrapNodes = []string{testENRBootstrap}
 	config.DiscoveryLimit = 20
-	config.ClusterID = 16
-	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
+	w, err := New(nil, "shards.staging", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, w.Start())
@@ -64,7 +78,7 @@ func TestDiscoveryV5(t *testing.T) {
 
 func TestRestartDiscoveryV5(t *testing.T) {
 	config := &Config{}
-	config.EnableDiscV5 = true
+	setDefaultConfig(config, false)
 	// Use wrong discv5 bootstrap address, to simulate being offline
 	config.DiscV5BootstrapNodes = []string{"enrtree://AOGECG2SPND25EEFMAJ5WF3KSGJNSGV356DSTL2YVLLZWIV6SAYBM@1.1.1.2"}
 	config.DiscoveryLimit = 20
@@ -74,7 +88,6 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, w.Start())
-
 	require.False(t, w.seededBootnodesForDiscV5)
 
 	options := func(b *backoff.ExponentialBackOff) {
@@ -111,17 +124,15 @@ func TestRestartDiscoveryV5(t *testing.T) {
 }
 
 func TestBasicWakuV2(t *testing.T) {
-	enrTreeAddress := testENRBootstrap
+	enrTreeAddress := testENRBootstrap //"enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
 	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
 	if envEnrTreeAddress != "" {
 		enrTreeAddress = envEnrTreeAddress
 	}
 
 	config := &Config{}
+	setDefaultConfig(config, false)
 	config.Port = 0
-	config.ClusterID = 16
-	config.UseShardAsDefaultTopic = true
-	config.EnableDiscV5 = true
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
 	config.WakuNodes = []string{enrTreeAddress}
@@ -148,7 +159,7 @@ func TestBasicWakuV2(t *testing.T) {
 
 	// Sanity check, not great, but it's probably helpful
 	err = tt.RetryWithBackOff(func() error {
-		if len(w.Peers()) > 2 {
+		if len(w.Peers()) < 2 {
 			return errors.New("no peers discovered")
 		}
 		return nil
@@ -176,6 +187,7 @@ func TestBasicWakuV2(t *testing.T) {
 		Version:      proto.Uint32(0),
 		Timestamp:    &msgTimestamp,
 	})
+
 	require.NoError(t, err)
 
 	time.Sleep(1 * time.Second)
@@ -313,47 +325,49 @@ func TestWakuV2Filter(t *testing.T) {
 	if envEnrTreeAddress != "" {
 		enrTreeAddress = envEnrTreeAddress
 	}
-
 	config := &Config{}
-	config.ClusterID = 16
+	setDefaultConfig(config, true)
 	config.Port = 0
-	config.LightClient = true
-	config.KeepAliveInterval = 1
+	config.KeepAliveInterval = 0
 	config.MinPeersForFilter = 2
-	config.EnableDiscV5 = true
+
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
 	config.WakuNodes = []string{enrTreeAddress}
-	fleet := "status.test" // Need a name fleet so that LightClient is not set to false
-	w, err := New(nil, fleet, config, nil, nil, nil, nil, nil)
+	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 
 	options := func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 10 * time.Second
 	}
-
+	time.Sleep(10 * time.Second) //TODO: Check if we can remove this sleep.
 	// Sanity check, not great, but it's probably helpful
 	err = tt.RetryWithBackOff(func() error {
-		if len(w.Peers()) > 2 {
+		peers, err := w.node.PeerManager().FilterPeersByProto(nil, nil, filter.FilterSubscribeID_v20beta1)
+		if err != nil {
+			return err
+		}
+		if len(peers) < 2 {
 			return errors.New("no peers discovered")
 		}
 		return nil
 	}, options)
 	require.NoError(t, err)
-
+	testPubsubTopic := "/waku/2/rs/16/32"
 	filter := &common.Filter{
 		Messages:      common.NewMemoryMessageStore(),
+		PubsubTopic:   testPubsubTopic,
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{[]byte{1, 2, 3, 4}}),
 	}
 
-	filterID, err := w.Subscribe(filter)
+	_, err = w.Subscribe(filter)
 	require.NoError(t, err)
 
 	msgTimestamp := w.timestamp()
 	contentTopic := maps.Keys(filter.ContentTopics)[0]
 
-	_, err = w.Send("", &pb.WakuMessage{
+	_, err = w.Send(testPubsubTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: contentTopic.ContentTopic(),
 		Version:      proto.Uint32(0),
@@ -361,41 +375,37 @@ func TestWakuV2Filter(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	time.Sleep(15 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// Ensure there is at least 1 active filter subscription
 	subscriptions := w.node.FilterLightnode().Subscriptions()
 	require.Greater(t, len(subscriptions), 0)
 
-	// Ensure there are some active peers for this filter subscription
-	stats := w.getFilterStats()
-	require.Greater(t, len(stats[filterID]), 0)
-
 	messages := filter.Retrieve()
 	require.Len(t, messages, 1)
 
 	// Mock peers going down
-	isFilterSubAliveBak := w.filterManager.isFilterSubAlive
-	w.filterManager.config.MinPeersForFilter = 0
-	w.filterManager.isFilterSubAlive = func(sub *subscription.SubscriptionDetails) error {
-		return errors.New("peer down")
-	}
+	_, err = w.node.FilterLightnode().UnsubscribeWithSubscription(w.ctx, subscriptions[0])
+	require.NoError(t, err)
 
-	time.Sleep(5 * time.Second)
-
-	// Ensure there are 0 active peers now
-
-	stats = w.getFilterStats()
-	require.Len(t, stats[filterID], 0)
-
-	// Reconnect
-	w.filterManager.config.MinPeersForFilter = 2
-	w.filterManager.isFilterSubAlive = isFilterSubAliveBak
 	time.Sleep(10 * time.Second)
 
-	// Ensure there are some active peers now
-	stats = w.getFilterStats()
-	require.Greater(t, len(stats[filterID]), 0)
+	// Ensure there is at least 1 active filter subscription
+	subscriptions = w.node.FilterLightnode().Subscriptions()
+	require.Greater(t, len(subscriptions), 0)
+
+	// Ensure that messages are retrieved with a fresh sub
+	_, err = w.Send(testPubsubTopic, &pb.WakuMessage{
+		Payload:      []byte{1, 2, 3, 4, 5, 6},
+		ContentTopic: contentTopic.ContentTopic(),
+		Version:      proto.Uint32(0),
+		Timestamp:    &msgTimestamp,
+	})
+	require.NoError(t, err)
+	time.Sleep(10 * time.Second)
+
+	messages = filter.Retrieve()
+	require.Len(t, messages, 1)
 
 	require.NoError(t, w.Stop())
 }

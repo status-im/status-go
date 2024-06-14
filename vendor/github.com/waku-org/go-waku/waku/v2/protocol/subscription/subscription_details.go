@@ -29,7 +29,7 @@ type SubscriptionDetails struct {
 	mapRef  *SubscriptionsMap
 	Closed  bool `json:"-"`
 	once    sync.Once
-	Closing chan struct{}
+	Closing chan bool
 
 	PeerID        peer.ID                 `json:"peerID"`
 	ContentFilter protocol.ContentFilter  `json:"contentFilters"`
@@ -99,12 +99,22 @@ func (s *SubscriptionDetails) CloseC() {
 		defer s.Unlock()
 		s.Closed = true
 		close(s.C)
+		close(s.Closing)
 	})
 }
 
 func (s *SubscriptionDetails) Close() error {
 	s.CloseC()
 	return s.mapRef.Delete(s)
+}
+
+func (s *SubscriptionDetails) SetClosing() {
+	s.Lock()
+	defer s.Unlock()
+	if !s.Closed {
+		s.Closed = true
+		s.Closing <- true
+	}
 }
 
 func (s *SubscriptionDetails) MarshalJSON() ([]byte, error) {
