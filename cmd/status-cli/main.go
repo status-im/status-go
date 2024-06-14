@@ -21,6 +21,7 @@ const PortFlag = "port"
 const APIModulesFlag = "api-modules"
 const TelemetryServerURLFlag = "telemetry-server-url"
 const KeyUIDFlag = "key-uid"
+const DebugLevel = "debug"
 
 const RetrieveInterval = 300 * time.Millisecond
 const SendInterval = 1 * time.Second
@@ -42,6 +43,12 @@ var CommonFlags = []cli.Flag{
 		Name:    TelemetryServerURLFlag,
 		Aliases: []string{"t"},
 		Usage:   "Telemetry server URL",
+	},
+	&cli.BoolFlag{
+		Name:    DebugLevel,
+		Aliases: []string{"d"},
+		Usage:   "Enable CLI's debug level logging",
+		Value:   false,
 	},
 }
 
@@ -84,8 +91,6 @@ var ServeFlags = append([]cli.Flag{
 	},
 }, CommonFlags...)
 
-var logger *zap.SugaredLogger
-
 type StatusCLI struct {
 	name      string
 	messenger *protocol.Messenger
@@ -110,7 +115,7 @@ func main() {
 				Usage:   "Start a server to send and receive messages",
 				Flags:   ServeFlags,
 				Action: func(cCtx *cli.Context) error {
-					return serve(cCtx, false)
+					return serve(cCtx)
 				},
 			},
 			{
@@ -125,29 +130,37 @@ func main() {
 						Required: true,
 					},
 					&cli.StringFlag{
-						Name:    KeyUIDFlag,
-						Aliases: []string{"kid"},
-						Usage:   "Key ID of the existing user (if not provided the last account will be used)",
+						Name:     KeyUIDFlag,
+						Aliases:  []string{"kid"},
+						Usage:    "Key ID of the existing user (find them under '<data-dir>/keystore' on in logs when using the 'serve' command)",
+						Required: true,
 					},
 					&cli.BoolFlag{
 						Name:    InteractiveFlag,
 						Aliases: []string{"i"},
 						Usage:   "Use interactive mode to input the messages",
+						Value:   false,
 					},
 					&cli.StringFlag{
 						Name:    AddFlag,
 						Aliases: []string{"a"},
 						Usage:   "Add a friend with the public key",
 					},
+					&cli.BoolFlag{
+						Name:    DebugLevel,
+						Aliases: []string{"d"},
+						Usage:   "Enable CLI's debug level logging",
+						Value:   false,
+					},
 				},
 				Action: func(cCtx *cli.Context) error {
-					return serve(cCtx, true)
+					return serve(cCtx)
 				},
 			},
 		},
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		logger.Fatal(err)
+		zap.L().Fatal("main", zap.Error(err))
 	}
 }

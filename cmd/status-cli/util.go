@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
@@ -15,7 +17,7 @@ import (
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/telemetry"
 
-	"go.uber.org/zap"
+	"github.com/urfave/cli/v2"
 )
 
 func setupLogger(file string) *zap.Logger {
@@ -30,32 +32,31 @@ func setupLogger(file string) *zap.Logger {
 		CompressRotated: true,
 	}
 	if err := logutils.OverrideRootLogWithConfig(logSettings, false); err != nil {
-		logger.Fatalf("Error initializing logger: %v", err)
+		zap.S().Fatalf("Error initializing logger: %v", err)
 	}
-
 	return logutils.ZapLogger()
 }
 
-func start(name string, port int, apiModules string, telemetryUrl string, useExistingAccount bool, keyUID string) (*StatusCLI, error) {
+func start(name string, port int, apiModules string, telemetryUrl string, keyUID string, logger *zap.SugaredLogger) (*StatusCLI, error) {
 	var (
 		rootDataDir = fmt.Sprintf("./test-%s", strings.ToLower(name))
 		password    = "some-password"
 	)
 	setupLogger(name)
-	nlog := logger.Named(name)
-	nlog.Info("starting messenger")
+	logger.Info("starting messenger")
 
 	backend := api.NewGethStatusBackend()
-	if useExistingAccount {
+	if keyUID != "" {
 		if err := getAccountAndLogin(backend, name, rootDataDir, password, keyUID); err != nil {
 			return nil, err
 		}
+		logger.Infof("existing account, key UID: %v", keyUID)
 	} else {
 		acc, err := createAccountAndLogin(backend, name, rootDataDir, password, apiModules, telemetryUrl, port)
 		if err != nil {
 			return nil, err
 		}
-		nlog.Infof("account created, key UID: %v", acc.KeyUID)
+		logger.Infof("account created, key UID: %v", acc.KeyUID)
 	}
 
 	wakuService := backend.StatusNode().WakuV2ExtService()
@@ -64,7 +65,11 @@ func start(name string, port int, apiModules string, telemetryUrl string, useExi
 	}
 
 	if telemetryUrl != "" {
-		telemetryClient := telemetry.NewClient(nlog.Desugar(), telemetryUrl, backend.SelectedAccountKeyID(), name, "cli")
+		telemetryLogger, err := getLogger(true)
+		if err != nil {
+			return nil, err
+		}
+		telemetryClient := telemetry.NewClient(telemetryLogger, telemetryUrl, backend.SelectedAccountKeyID(), name, "cli")
 		go telemetryClient.Start(context.Background())
 		backend.StatusNode().WakuV2Service().SetStatusTelemetryClient(telemetryClient)
 	}
@@ -75,14 +80,14 @@ func start(name string, port int, apiModules string, telemetryUrl string, useExi
 		return nil, err
 	}
 
-	nlog.Info("messenger started, public key: ", messenger.IdentityPublicKeyString())
+	logger.Info("messenger started, public key: ", messenger.IdentityPublicKeyString())
 	time.Sleep(WaitingInterval)
 
 	data := StatusCLI{
 		name:      name,
 		messenger: messenger,
 		backend:   backend,
-		logger:    nlog,
+		logger:    logger,
 	}
 
 	return &data, nil
@@ -101,19 +106,17 @@ func getAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password st
 		return errors.New("no accounts found")
 	}
 
-	acc := accs[0] // use last if no keyUID is provided
-	if keyUID != "" {
-		found := false
-		for _, a := range accs {
-			if a.KeyUID == keyUID {
-				acc = a
-				found = true
-				break
-			}
+	var acc multiaccounts.Account
+	found := false
+	for _, a := range accs {
+		if a.KeyUID == keyUID {
+			acc = a
+			found = true
+			break
 		}
-		if !found {
-			return fmt.Errorf("account not found for keyUID: %v", keyUID)
-		}
+	}
+	if !found {
+		return fmt.Errorf("account not found for keyUID: %v", keyUID)
 	}
 
 	return b.LoginAccount(&requests.Login{
@@ -147,6 +150,41 @@ func createAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password
 func (cli *StatusCLI) stop() {
 	err := cli.backend.StopNode()
 	if err != nil {
-		logger.Error(err)
+		cli.logger.Error(err)
 	}
+}
+
+func getLogger(debug bool) (*zap.Logger, error) {
+	at := zap.NewAtomicLevel()
+	if debug {
+		at.SetLevel(zap.DebugLevel)
+	} else {
+		at.SetLevel(zap.InfoLevel)
+	}
+	config := zap.NewDevelopmentConfig()
+	config.Level = at
+	rawLogger, err := config.Build()
+	if err != nil {
+		return nil, fmt.Errorf("initializing logger: %v", err)
+	}
+	return rawLogger, nil
+}
+
+func getSLogger(debug bool) (*zap.SugaredLogger, error) {
+	l, err := getLogger(debug)
+	if err != nil {
+		return nil, err
+	}
+	return l.Sugar(), nil
+}
+
+func flagsUsed(cCtx *cli.Context) string {
+	var sb strings.Builder
+	for _, flag := range cCtx.Command.Flags {
+		if flag != nil && len(flag.Names()) > 0 {
+			fName := flag.Names()[0]
+			fmt.Fprintf(&sb, "\t-%s %v\n", fName, cCtx.Value(fName))
+		}
+	}
+	return sb.String()
 }

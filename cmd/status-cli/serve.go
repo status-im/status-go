@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,18 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func serve(cCtx *cli.Context, useExistingAccount bool) error {
-	rawLogger, err := zap.NewDevelopment()
-	if err != nil {
-		log.Fatalf("Error initializing logger: %v", err)
-	}
-	logger = rawLogger.Sugar()
-
-	logger.Info("Running serve command, flags passed:")
-	for _, flag := range ServeFlags {
-		logger.Infof("-%s %v", flag.Names()[0], cCtx.Value(flag.Names()[0]))
-	}
-
+func serve(cCtx *cli.Context) error {
 	name := cCtx.String(NameFlag)
 	port := cCtx.Int(PortFlag)
 	apiModules := cCtx.String(APIModulesFlag)
@@ -35,8 +23,18 @@ func serve(cCtx *cli.Context, useExistingAccount bool) error {
 	interactive := cCtx.Bool(InteractiveFlag)
 	dest := cCtx.String(AddFlag)
 	keyUID := cCtx.String(KeyUIDFlag)
+	isDebugLevel := cCtx.Bool(DebugLevel)
+	cmdName := cCtx.Command.Name
 
-	cli, err := start(name, port, apiModules, telemetryUrl, useExistingAccount, keyUID)
+	logger, err := getSLogger(isDebugLevel)
+	if err != nil {
+		zap.S().Fatalf("Error initializing logger: %v", err)
+	}
+	logger.Infof("Running %v command, with:\n%v", cmdName, flagsUsed(cCtx))
+
+	logger = logger.Named(name)
+
+	cli, err := start(name, port, apiModules, telemetryUrl, keyUID, logger)
 	if err != nil {
 		return err
 	}
@@ -47,14 +45,20 @@ func serve(cCtx *cli.Context, useExistingAccount bool) error {
 	// and the retrieve messages loop is started when starting a node, so we needed a different appproach,
 	// alternatively we could have implemented another notification mechanism in the messenger, but this signal is already in place
 	msignal.SetMobileSignalHandler(msignal.MobileSignalHandler(func(s []byte) {
-		var ev MobileSignalEvent
-		if err := json.Unmarshal(s, &ev); err != nil {
-			logger.Error("unmarshaling signal event", zap.Error(err), zap.String("event", string(s)))
+		var evt EventType
+		if err := json.Unmarshal(s, &evt); err != nil {
+			logger.Error("unmarshaling event type", zap.Error(err), zap.String("event", string(s)))
 			return
 		}
 
-		if ev.Type == msignal.EventNewMessages {
-			for _, message := range ev.Event.Messages {
+		switch evt.Type {
+		case msignal.EventNewMessages:
+			var ev EventNewMessages
+			if err := json.Unmarshal(evt.Event, &ev); err != nil {
+				logger.Error("unmarshaling new message event", zap.Error(err), zap.Any("event", evt.Event))
+				return
+			}
+			for _, message := range ev.Messages {
 				logger.Infof("message received: %v (ID=%v)", message.Text, message.ID)
 				// if request contact, accept it
 				if message.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT {
@@ -64,6 +68,8 @@ func serve(cCtx *cli.Context, useExistingAccount bool) error {
 					}
 				}
 			}
+		default:
+			logger.Debugf("received event type '%v'\t%v", evt.Type, string(evt.Event))
 		}
 	}))
 
@@ -94,11 +100,13 @@ func serve(cCtx *cli.Context, useExistingAccount bool) error {
 	return nil
 }
 
-type MobileSignalEvent struct {
-	Type  string `json:"type"`
-	Event struct {
-		Messages []*common.Message `json:"messages"`
-	} `json:"event"`
+type EventType struct {
+	Type  string          `json:"type"`
+	Event json.RawMessage `json:"event"`
+}
+
+type EventNewMessages struct {
+	Messages []*common.Message `json:"messages"`
 }
 
 func waitForSigExit() {
