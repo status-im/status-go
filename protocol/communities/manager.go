@@ -3296,6 +3296,22 @@ func (m *Manager) checkChannelPermissions(viewOnlyPreParsedPermissions *PreParse
 		return nil, err
 	}
 
+	// viewOnlyPermissionsResponse, err := m.PermissionChecker.CheckCachedPermissions(viewOnlyPreParsedPermissions, accountsAndChainIDs, shortcircuit)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// viewAndPostPermissionsResponse, err := m.PermissionChecker.CheckCachedPermissions(viewAndPostPreParsedPermissions, accountsAndChainIDs, shortcircuit)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// if community.IsControlNode() {
+	// 	adminOrTokenPermissionsResponse, err = p.CheckPermissions(preParsedPermissions, accountsAndChainIDs, false)
+	// } else {
+	// 	adminOrTokenPermissionsResponse, err = p.CheckCachedPermissions(preParsedPermissions, accountsAndChainIDs, false)
+	// }
+
 	hasViewOnlyPermissions := viewOnlyPreParsedPermissions != nil
 	hasViewAndPostPermissions := viewAndPostPreParsedPermissions != nil
 

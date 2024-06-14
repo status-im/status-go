@@ -668,6 +668,18 @@ func (o *Community) getChatMember(pk *ecdsa.PublicKey, chatID string) *protobuf.
 	return chat.Members[key]
 }
 
+func (o *Community) ChannelHasMembers(channelId string) bool {
+	chat, ok := o.config.CommunityDescription.Chats[channelId]
+
+	return ok && len(chat.Members) > 0
+}
+
+func (o *Community) HideChannelIfPermissionsNotMet(channelId string) bool {
+	chat, ok := o.config.CommunityDescription.Chats[channelId]
+
+	return ok && chat.HideIfPermissionsNotMet
+}
+
 func (o *Community) hasMember(pk *ecdsa.PublicKey) bool {
 
 	member := o.getMember(pk)
