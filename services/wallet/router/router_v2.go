@@ -561,7 +561,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 					candidates = append(candidates, &PathV2{
 						ProcessorName:  pProcessor.Name(),
 						FromChain:      network,
-						ToChain:        network,
+						ToChain:        dest,
 						FromToken:      token,
 						AmountIn:       (*hexutil.Big)(amountToSend),
 						AmountInLocked: amountLocked,
