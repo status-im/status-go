@@ -470,7 +470,7 @@ func (r *Router) SuggestedRoutes(
 	tokenID string,
 	toTokenID string,
 	disabledFromChainIDs,
-	disabledToChaindIDs,
+	disabledToChainIDs,
 	preferedChainIDs []uint64,
 	gasFeeMode GasFeeMode,
 	fromLockedAmount map[uint64]*hexutil.Big,
@@ -585,7 +585,7 @@ func (r *Router) SuggestedRoutes(
 					if len(preferedChainIDs) > 0 && !containsNetworkChainID(dest, preferedChainIDs) {
 						continue
 					}
-					if containsNetworkChainID(dest, disabledToChaindIDs) {
+					if containsNetworkChainID(dest, disabledToChainIDs) {
 						continue
 					}
 
