@@ -172,6 +172,8 @@ type Waku struct {
 	onPeerStats                     func(types.ConnStatus)
 
 	statusTelemetryClient ITelemetryClient
+
+	defaultShardInfo protocol.RelayShards
 }
 
 func (w *Waku) SetStatusTelemetryClient(client ITelemetryClient) {
@@ -283,7 +285,12 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 
 	if cfg.LightClient {
 		opts = append(opts, node.WithWakuFilterLightNode())
-		cfg.EnablePeerExchangeClient = false //TODO: Need to fix: Disabling for now to test only with fleet nodes.
+		shards, err := protocol.TopicsToRelayShards(cfg.DefaultShardPubsubTopic)
+		if err != nil {
+			logger.Error("FATAL ERROR: failed to parse relay shards", zap.Error(err))
+			return nil, errors.New("failed to parse relay shard, invalid pubsubTopic configuration")
+		}
+		waku.defaultShardInfo = shards[0]
 	} else {
 		relayOpts := []pubsub.Option{
 			pubsub.WithMaxMessageSize(int(waku.cfg.MaxMessageSize)),
@@ -551,7 +558,8 @@ func (w *Waku) runPeerExchangeLoop() {
 			w.dnsAddressCacheLock.RUnlock()
 
 			if len(peers) != 0 {
-				err := w.node.PeerExchange().Request(w.ctx, w.cfg.DiscoveryLimit, peer_exchange.WithAutomaticPeerSelection(peers...))
+				err := w.node.PeerExchange().Request(w.ctx, w.cfg.DiscoveryLimit, peer_exchange.WithAutomaticPeerSelection(peers...),
+					peer_exchange.FilterByShard(int(w.defaultShardInfo.ClusterID), int(w.defaultShardInfo.ShardIDs[0])))
 				if err != nil {
 					w.logger.Error("couldnt request peers via peer exchange", zap.Error(err))
 				}
