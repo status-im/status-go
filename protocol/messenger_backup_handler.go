@@ -302,29 +302,36 @@ func (m *Messenger) handleWatchOnlyAccount(message *protobuf.SyncAccount) error 
 	return nil
 }
 
+func syncInstallationCommunitiesSet(communities []*protobuf.SyncInstallationCommunity) map[string]*protobuf.SyncInstallationCommunity {
+	ret := map[string]*protobuf.SyncInstallationCommunity{}
+	for _, c := range communities {
+		id := string(c.GetId())
+		prevC, ok := ret[id]
+		if !ok || prevC.Clock < c.Clock {
+			ret[id] = c
+		}
+	}
+	return ret
+}
+
 func (m *Messenger) handleSyncedCommunities(state *ReceivedMessageState, message *protobuf.Backup) []error {
 	var errors []error
-	handledCommunities := make(map[string]struct{})
-	for _, syncCommunity := range message.Communities {
-		idString := string(syncCommunity.GetId())
-
+	for _, syncCommunity := range syncInstallationCommunitiesSet(message.Communities) {
 		err := m.handleSyncInstallationCommunity(state, syncCommunity, nil)
 		if err != nil {
 			errors = append(errors, err)
 		}
 
-		_, alreadyHandled := handledCommunities[idString]
-		err = m.requestCommunityKeysAndSharedAddresses(state, syncCommunity, alreadyHandled)
+		err = m.requestCommunityKeysAndSharedAddresses(state, syncCommunity)
 		if err != nil {
 			errors = append(errors, err)
 		}
-		handledCommunities[idString] = struct{}{}
 	}
 
 	return errors
 }
 
-func (m *Messenger) requestCommunityKeysAndSharedAddresses(state *ReceivedMessageState, syncCommunity *protobuf.SyncInstallationCommunity, alreadyHandled bool) error {
+func (m *Messenger) requestCommunityKeysAndSharedAddresses(state *ReceivedMessageState, syncCommunity *protobuf.SyncInstallationCommunity) error {
 	if !syncCommunity.Joined {
 		return nil
 	}
@@ -338,32 +345,29 @@ func (m *Messenger) requestCommunityKeysAndSharedAddresses(state *ReceivedMessag
 		return communities.ErrOrgNotFound
 	}
 
-	// Only need to send the request for shared addresses once
-	if !alreadyHandled {
-		// Send a request to get back our previous shared addresses
-		request := &protobuf.CommunitySharedAddressesRequest{
-			CommunityId: syncCommunity.Id,
-		}
+	// Send a request to get back our previous shared addresses
+	request := &protobuf.CommunitySharedAddressesRequest{
+		CommunityId: syncCommunity.Id,
+	}
 
-		payload, err := proto.Marshal(request)
-		if err != nil {
-			return err
-		}
+	payload, err := proto.Marshal(request)
+	if err != nil {
+		return err
+	}
 
-		rawMessage := &common.RawMessage{
-			Payload:             payload,
-			Sender:              m.identity,
-			CommunityID:         community.ID(),
-			SkipEncryptionLayer: true,
-			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_SHARED_ADDRESSES_REQUEST,
-		}
+	rawMessage := &common.RawMessage{
+		Payload:             payload,
+		Sender:              m.identity,
+		CommunityID:         community.ID(),
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_SHARED_ADDRESSES_REQUEST,
+	}
 
-		_, err = m.SendMessageToControlNode(community, rawMessage)
+	_, err = m.SendMessageToControlNode(community, rawMessage)
 
-		if err != nil {
-			m.logger.Error("failed to request shared addresses", zap.String("communityId", community.IDString()), zap.Error(err))
-			return err
-		}
+	if err != nil {
+		m.logger.Error("failed to request shared addresses", zap.String("communityId", community.IDString()), zap.Error(err))
+		return err
 	}
 
 	// If the community is encrypted or one channel is, ask for the encryption keys back
