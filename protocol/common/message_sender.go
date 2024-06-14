@@ -126,7 +126,7 @@ func (s *MessageSender) SetHandleSharedSecrets(handler func([]*sharedsecret.Secr
 	s.handleSharedSecrets = handler
 }
 
-func (s *MessageSender) StartDatasync(peerID chan state.PeerID, handler func(peer state.PeerID, payload *datasyncproto.Payload) error) error {
+func (s *MessageSender) StartDatasync(statusChangeEvent chan datasyncnode.PeerStatusChangeEvent, handler func(peer state.PeerID, payload *datasyncproto.Payload) error) error {
 	if !s.datasyncEnabled {
 		return nil
 	}
@@ -138,7 +138,7 @@ func (s *MessageSender) StartDatasync(peerID chan state.PeerID, handler func(pee
 		datasyncpeer.PublicKeyToPeerID(s.identity.PublicKey),
 		datasyncnode.BATCH,
 		datasync.CalculateSendTime,
-		peerID,
+		statusChangeEvent,
 		s.logger,
 	)
 	if err != nil {

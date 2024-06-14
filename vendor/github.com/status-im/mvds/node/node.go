@@ -32,17 +32,19 @@ const (
 // CalculateNextEpoch is a function used to calculate the next `SendEpoch` for a given message.
 type CalculateNextEpoch func(count uint64, epoch int64) int64
 
-type Status int
+type EventStatus int
 
 const (
-	ONLINE Status = iota
+	ONLINE EventStatus = iota
 	OFFLINE
 )
 
-type PeerStatus struct {
-	PeerID state.PeerID
-	Status Status
-	Time   int64
+const FreshEventPeriod = 10 // seconds
+
+type PeerStatusChangeEvent struct {
+	PeerID    state.PeerID
+	Status    EventStatus
+	EventTime uint64
 }
 
 // Node represents an MVDS node, it runs all the logic like sending and receiving protocol messages.
@@ -70,7 +72,7 @@ type Node struct {
 
 	subscription chan protobuf.Message
 
-	resetDataSyncPeer chan state.PeerID
+	peerStatusChangeEvent chan PeerStatusChangeEvent
 
 	logger *zap.Logger
 }
@@ -81,7 +83,7 @@ func NewPersistentNode(
 	id state.PeerID,
 	mode Mode,
 	nextEpoch CalculateNextEpoch,
-	resetDataSyncPeer chan state.PeerID,
+	peerStatusChangeEvent chan PeerStatusChangeEvent,
 	logger *zap.Logger,
 ) (*Node, error) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -90,19 +92,19 @@ func NewPersistentNode(
 	}
 
 	node := Node{
-		ID:                id,
-		ctx:               ctx,
-		cancel:            cancel,
-		store:             store.NewPersistentMessageStore(db),
-		transport:         st,
-		peers:             peers.NewSQLitePersistence(db),
-		syncState:         state.NewPersistentSyncState(db),
-		payloads:          newPayloads(),
-		epochPersistence:  newEpochSQLitePersistence(db),
-		nextEpoch:         nextEpoch,
-		resetDataSyncPeer: resetDataSyncPeer,
-		logger:            logger.With(zap.Namespace("mvds")),
-		mode:              mode,
+		ID:                    id,
+		ctx:                   ctx,
+		cancel:                cancel,
+		store:                 store.NewPersistentMessageStore(db),
+		transport:             st,
+		peers:                 peers.NewSQLitePersistence(db),
+		syncState:             state.NewPersistentSyncState(db),
+		payloads:              newPayloads(),
+		epochPersistence:      newEpochSQLitePersistence(db),
+		nextEpoch:             nextEpoch,
+		peerStatusChangeEvent: peerStatusChangeEvent,
+		logger:                logger.With(zap.Namespace("mvds")),
+		mode:                  mode,
 	}
 	if currentEpoch, err := node.epochPersistence.Get(id); err != nil {
 		return nil, err
@@ -199,9 +201,11 @@ func (n *Node) Start(duration time.Duration) {
 			case <-n.ctx.Done():
 				n.logger.Info("reset data sync for peer stopped")
 				return
-			case peerID := <-n.resetDataSyncPeer:
-				n.logger.Debug("resetting peer epoch", zap.String("peerID", hex.EncodeToString(peerID[:4])), zap.ByteString("nodeID", peerID[:]))
-				n.resetPeerEpoch(peerID)
+			case event := <-n.peerStatusChangeEvent:
+				if event.Status == ONLINE && event.EventTime > uint64(time.Now().Unix())-FreshEventPeriod {
+					n.logger.Debug("resetting peer epoch", zap.String("peerID", hex.EncodeToString(event.PeerID[:4])))
+					n.resetPeerEpoch(event.PeerID)
+				}
 			}
 		}
 	}()

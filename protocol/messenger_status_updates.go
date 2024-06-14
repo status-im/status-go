@@ -8,6 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	datasyncnode "github.com/status-im/mvds/node"
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -265,12 +266,15 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *pro
 			return err
 		}
 		state.Response.AddStatusUpdate(statusUpdate)
-		if (statusUpdate.StatusType == int(protobuf.StatusUpdate_AUTOMATIC) ||
+		if statusUpdate.StatusType == int(protobuf.StatusUpdate_AUTOMATIC) ||
 			statusUpdate.StatusType == int(protobuf.StatusUpdate_ALWAYS_ONLINE) ||
-			statusUpdate.StatusType == int(protobuf.StatusUpdate_INACTIVE)) &&
-			statusUpdate.Clock > uint64(time.Now().Unix())-10 {
+			statusUpdate.StatusType == int(protobuf.StatusUpdate_INACTIVE) {
 			m.logger.Debug("reset data sync for peer", zap.String("public_key", statusUpdate.PublicKey), zap.Uint64("clock", statusUpdate.Clock))
-			m.resetDataSyncPeer <- datasyncpeer.PublicKeyToPeerID(*state.CurrentMessageState.PublicKey)
+			m.mvdsStatusChangeEvent <- datasyncnode.PeerStatusChangeEvent{
+				PeerID:    datasyncpeer.PublicKeyToPeerID(*state.CurrentMessageState.PublicKey),
+				Status:    datasyncnode.ONLINE,
+				EventTime: statusUpdate.Clock,
+			}
 		}
 	}
 
