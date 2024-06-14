@@ -175,7 +175,12 @@ pipeline {
       }
     }
     success { script { github.notifyPR(true) } }
-    failure { script { github.notifyPR(false) } }
+    failure { 
+      script { 
+        github.notifyPR(false) 
+        archiveArtifacts('**/test_*.log')
+      }
+    }
     cleanup {
       dir(env.TMPDIR) { deleteDir() }
       sh "make git-clean"
