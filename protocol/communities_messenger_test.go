@@ -4351,7 +4351,7 @@ func (s *MessengerCommunitiesSuite) sendImageToCommunity(sender *Messenger, chat
 	return sentMessage
 }
 
-func (s *MessengerCommunitiesSuite) TestFetchSerializedCommunities() {
+func (s *MessengerCommunitiesSuite) TestSerializedCommunities() {
 	community, _ := s.createCommunity()
 	addMediaServer := func(messenger *Messenger) {
 		mediaServer, err := server.NewMediaServer(messenger.database, nil, nil, nil)
@@ -4393,7 +4393,7 @@ func (s *MessengerCommunitiesSuite) TestFetchSerializedCommunities() {
 	s.Len(b.Description().Identity.Images, 1)
 	s.Equal(identImagePayload, b.Description().Identity.Images[identImageName].Payload)
 
-	c, err := s.owner.FetchSerializedCommunities()
+	c, err := s.owner.SerializedCommunities()
 	s.Require().NoError(err)
 	s.Require().Len(c, 1)
 	d, err := json.Marshal(c)

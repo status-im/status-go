@@ -4843,7 +4843,7 @@ func (m *Messenger) CreateResponseWithACNotification(communityID string, acType 
 	return response, nil
 }
 
-func (m *Messenger) FetchSerializedCommunities() ([]json.RawMessage, error) {
+func (m *Messenger) SerializedCommunities() ([]json.RawMessage, error) {
 	cs, err := m.Communities()
 	if err != nil {
 		return nil, err
