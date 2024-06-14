@@ -1,6 +1,7 @@
 package pathprocessor
 
 import (
+	"fmt"
 	"math/big"
 
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
@@ -16,4 +17,11 @@ func getSigner(chainID uint64, from types.Address, verifiedAccount *account.Sele
 		s := ethTypes.NewLondonSigner(new(big.Int).SetUint64(chainID))
 		return ethTypes.SignTx(tx, s, verifiedAccount.AccountKey.PrivateKey)
 	}
+}
+
+func makeKey(fromChain, toChain uint64, fromTokenSymbol, toTokenSymbol string) string {
+	if fromTokenSymbol != "" || toTokenSymbol != "" {
+		return fmt.Sprintf("%d-%d-%s-%s", fromChain, toChain, fromTokenSymbol, toTokenSymbol)
+	}
+	return fmt.Sprintf("%d-%d", fromChain, toChain)
 }

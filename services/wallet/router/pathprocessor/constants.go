@@ -13,10 +13,13 @@ var (
 
 const (
 	IncreaseEstimatedGasFactor = 1.1
+	SevenDaysInSeconds         = 60 * 60 * 24 * 7
 
-	EthSymbol = "ETH"
-	SntSymbol = "SNT"
-	SttSymbol = "STT"
+	EthSymbol  = "ETH"
+	SntSymbol  = "SNT"
+	SttSymbol  = "STT"
+	UsdcSymbol = "USDC"
+	HopSymbol  = "HOP"
 
 	ProcessorTransferName     = "Transfer"
 	ProcessorBridgeHopName    = "Hop"

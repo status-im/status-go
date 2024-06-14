@@ -107,6 +107,10 @@ func (s SendType) needL1Fee() bool {
 func (s SendType) canUseProcessor(p pathprocessor.PathProcessor) bool {
 	pathProcessorName := p.Name()
 	switch s {
+	case Transfer:
+		return pathProcessorName == pathprocessor.ProcessorTransferName ||
+			pathProcessorName == pathprocessor.ProcessorBridgeHopName ||
+			pathProcessorName == pathprocessor.ProcessorBridgeCelerName
 	case Bridge:
 		return pathProcessorName == pathprocessor.ProcessorBridgeHopName ||
 			pathProcessorName == pathprocessor.ProcessorBridgeCelerName

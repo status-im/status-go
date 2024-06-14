@@ -3,8 +3,10 @@ package pathprocessor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"strconv"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -21,24 +23,32 @@ import (
 type SwapParaswapTxArgs struct {
 	transactions.SendTxArgs
 	ChainID            uint64  `json:"chainId"`
+	ChainIDTo          uint64  `json:"chainIdFrom"`
+	TokenIDFrom        string  `json:"tokenIdFrom"`
+	TokenIDTo          string  `json:"tokenIdTo"`
 	SlippagePercentage float32 `json:"slippagePercentage"`
 }
 
 type SwapParaswapProcessor struct {
 	paraswapClient *paraswap.ClientV5
-	priceRoute     paraswap.Route
 	transactor     transactions.TransactorIface
+	priceRoute     sync.Map // [fromChainName-toChainName-fromTokenSymbol-toTokenSymbol, paraswap.Route]
 }
 
 func NewSwapParaswapProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *walletToken.Manager) *SwapParaswapProcessor {
 	return &SwapParaswapProcessor{
 		paraswapClient: paraswap.NewClientV5(walletCommon.EthereumMainnet),
 		transactor:     transactor,
+		priceRoute:     sync.Map{},
 	}
 }
 
 func (s *SwapParaswapProcessor) Name() string {
 	return ProcessorSwapParaswapName
+}
+
+func (s *SwapParaswapProcessor) Clear() {
+	s.priceRoute = sync.Map{}
 }
 
 func (s *SwapParaswapProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
@@ -107,7 +117,8 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams) (uint64
 		return 0, err
 	}
 
-	s.priceRoute = priceRoute
+	key := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol)
+	s.priceRoute.Store(key, &priceRoute)
 
 	return priceRoute.GasCost.Uint64(), nil
 }
@@ -146,10 +157,17 @@ func (s *SwapParaswapProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.
 func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorTxArgs) error {
 	slippageBP := uint(sendArgs.SwapTx.SlippagePercentage * 100) // convert to basis points
 
-	tx, err := s.paraswapClient.BuildTransaction(context.Background(), s.priceRoute.SrcTokenAddress, s.priceRoute.SrcTokenDecimals, s.priceRoute.SrcAmount.Int,
-		s.priceRoute.DestTokenAddress, s.priceRoute.DestTokenDecimals, s.priceRoute.DestAmount.Int, slippageBP,
+	key := makeKey(sendArgs.SwapTx.ChainID, sendArgs.SwapTx.ChainIDTo, sendArgs.SwapTx.TokenIDFrom, sendArgs.SwapTx.TokenIDTo)
+	priceRouteIns, ok := s.priceRoute.Load(key)
+	if !ok {
+		return errors.New("price route not found")
+	}
+	priceRoute := priceRouteIns.(*paraswap.Route)
+
+	tx, err := s.paraswapClient.BuildTransaction(context.Background(), priceRoute.SrcTokenAddress, priceRoute.SrcTokenDecimals, priceRoute.SrcAmount.Int,
+		priceRoute.DestTokenAddress, priceRoute.DestTokenDecimals, priceRoute.DestAmount.Int, slippageBP,
 		common.Address(sendArgs.SwapTx.From), common.Address(*sendArgs.SwapTx.To),
-		s.priceRoute.RawPriceRoute, s.priceRoute.Side)
+		priceRoute.RawPriceRoute, priceRoute.Side)
 	if err != nil {
 		return err
 	}
@@ -213,5 +231,12 @@ func (s *SwapParaswapProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifie
 }
 
 func (s *SwapParaswapProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
-	return s.priceRoute.DestAmount.Int, nil
+	key := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol)
+	priceRouteIns, ok := s.priceRoute.Load(key)
+	if !ok {
+		return nil, errors.New("price route not found")
+	}
+	priceRoute := priceRouteIns.(*paraswap.Route)
+
+	return priceRoute.DestAmount.Int, nil
 }

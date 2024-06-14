@@ -220,8 +220,13 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 		for _, path := range route {
 			tokenDenominator := big.NewFloat(math.Pow(10, float64(path.FromToken.Decimals)))
 
-			path.requiredTokenBalance = new(big.Int).Set(path.AmountIn.ToInt())
+			path.requiredTokenBalance = big.NewInt(0)
 			path.requiredNativeBalance = big.NewInt(0)
+			if path.FromToken.IsNative() {
+				path.requiredNativeBalance.Add(path.requiredNativeBalance, path.AmountIn.ToInt())
+			} else {
+				path.requiredTokenBalance.Add(path.requiredTokenBalance, path.AmountIn.ToInt())
+			}
 
 			// ecaluate the cost of the path
 			pathCost := big.NewFloat(0)
@@ -237,7 +242,11 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 			}
 
 			if path.TxBonderFees != nil && path.TxBonderFees.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
-				path.requiredTokenBalance.Add(path.requiredTokenBalance, path.TxBonderFees.ToInt())
+				if path.FromToken.IsNative() {
+					path.requiredNativeBalance.Add(path.requiredNativeBalance, path.TxBonderFees.ToInt())
+				} else {
+					path.requiredTokenBalance.Add(path.requiredTokenBalance, path.TxBonderFees.ToInt())
+				}
 				pathCost.Add(pathCost, new(big.Float).Mul(
 					new(big.Float).Quo(new(big.Float).SetInt(path.TxBonderFees.ToInt()), tokenDenominator),
 					new(big.Float).SetFloat64(tokenPrice)))
@@ -253,7 +262,11 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 			}
 
 			if path.TxTokenFees != nil && path.TxTokenFees.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 && path.FromToken != nil {
-				path.requiredTokenBalance.Add(path.requiredTokenBalance, path.TxTokenFees.ToInt())
+				if path.FromToken.IsNative() {
+					path.requiredNativeBalance.Add(path.requiredNativeBalance, path.TxTokenFees.ToInt())
+				} else {
+					path.requiredTokenBalance.Add(path.requiredTokenBalance, path.TxTokenFees.ToInt())
+				}
 				pathCost.Add(pathCost, new(big.Float).Mul(
 					new(big.Float).Quo(new(big.Float).SetInt(path.TxTokenFees.ToInt()), tokenDenominator),
 					new(big.Float).SetFloat64(tokenPrice)))
@@ -350,6 +363,13 @@ func validateInputData(input *RouteInputParams) error {
 	}
 
 	if input.FromLockedAmount != nil && len(input.FromLockedAmount) > 0 {
+		suppNetworks := copyMap(supportedNetworks)
+		if input.TestnetMode {
+			suppNetworks = copyMap(supportedTestNetworks)
+		}
+
+		totalLockedAmount := big.NewInt(0)
+
 		for chainID, amount := range input.FromLockedAmount {
 			if input.TestnetMode {
 				if !supportedTestNetworks[chainID] {
@@ -361,9 +381,19 @@ func validateInputData(input *RouteInputParams) error {
 				}
 			}
 
+			delete(suppNetworks, chainID)
+
+			totalLockedAmount = new(big.Int).Add(totalLockedAmount, amount.ToInt())
+
 			if amount == nil || amount.ToInt().Sign() < 0 {
 				return errors.New("locked amount must be positive")
 			}
+		}
+
+		if totalLockedAmount.Cmp(input.AmountIn.ToInt()) > 0 {
+			return errors.New("locked amount exceeds the total amount to send")
+		} else if totalLockedAmount.Cmp(input.AmountIn.ToInt()) < 0 && len(suppNetworks) == 0 {
+			return errors.New("locked amount is less than the total amount to send, but all networks are locked")
 		}
 	}
 
@@ -371,20 +401,35 @@ func validateInputData(input *RouteInputParams) error {
 }
 
 func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams) (*SuggestedRoutesV2, error) {
+	// clear all processors
+	for _, processor := range r.pathProcessors {
+		if clearable, ok := processor.(pathprocessor.PathProcessorClearable); ok {
+			clearable.Clear()
+		}
+	}
+
 	err := validateInputData(input)
 	if err != nil {
 		return nil, err
 	}
 
+	candidates, err := r.resolveCandidates(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.resolveRoutes(ctx, input, candidates)
+}
+
+func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams) (candidates []*PathV2, err error) {
 	networks, err := r.rpcClient.NetworkManager.Get(false)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		group      = async.NewAtomicGroup(ctx)
-		mu         sync.Mutex
-		candidates = make([]*PathV2, 0)
+		group = async.NewAtomicGroup(ctx)
+		mu    sync.Mutex
 	)
 
 	for networkIdx := range networks {
@@ -420,8 +465,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 		if lockedAmount, ok := input.FromLockedAmount[network.ChainID]; ok {
 			amountToSend = lockedAmount.ToInt()
 			amountLocked = true
-		}
-		if len(input.FromLockedAmount) > 0 {
+		} else if len(input.FromLockedAmount) > 0 {
 			for chainID, lockedAmount := range input.FromLockedAmount {
 				if chainID == network.ChainID {
 					continue
@@ -481,7 +525,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						ToAddr:    input.AddrTo,
 						FromAddr:  input.AddrFrom,
 						AmountIn:  amountToSend,
-						AmountOut: input.AmountOut.ToInt(),
+						AmountOut: amountToSend,
 
 						Username:  input.Username,
 						PublicKey: input.PublicKey,
@@ -507,14 +551,13 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 					if err != nil {
 						continue
 					}
-					approvalRequired, approvalAmountRequired, approvalGasLimit, l1ApprovalFee, err := r.requireApproval(ctx, input.SendType, &approvalContractAddress, input.AddrFrom, network, token, amountToSend)
+					approvalRequired, approvalAmountRequired, approvalGasLimit, l1ApprovalFee, err := r.requireApproval(ctx, input.SendType, &approvalContractAddress, processorInputParams)
 					if err != nil {
 						continue
 					}
 
 					var l1FeeWei uint64
 					if input.SendType.needL1Fee() {
-
 						txInputData, err := pProcessor.PackTxInputData(processorInputParams)
 						if err != nil {
 							continue
@@ -577,7 +620,10 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 	}
 
 	group.Wait()
+	return candidates, nil
+}
 
+func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, candidates []*PathV2) (*SuggestedRoutesV2, error) {
 	prices, err := input.SendType.FetchPrices(r.marketManager, input.TokenID)
 	if err != nil {
 		return nil, err
