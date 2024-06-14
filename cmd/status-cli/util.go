@@ -8,14 +8,16 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/telemetry"
+
 	"github.com/urfave/cli/v2"
-	"go.uber.org/zap"
 )
 
 func setupLogger(file string) *zap.Logger {
