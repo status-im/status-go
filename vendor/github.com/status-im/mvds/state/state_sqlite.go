@@ -114,7 +114,7 @@ func (p *sqliteSyncState) AllByPeerID(peerID PeerID) ([]State, error) {
 			mvds_states
 		WHERE
 			peer_id = ?
-	`, peerID)
+	`, peerID[:])
 	if err != nil {
 		return nil, err
 	}

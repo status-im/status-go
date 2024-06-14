@@ -186,11 +186,22 @@ func (n *Node) Start(duration time.Duration) {
 			case <-n.ctx.Done():
 				n.logger.Info("Watch stopped")
 				return
-			case peerID := <-n.resetDataSyncPeer:
-				n.resetPeerEpoch(peerID)
 			default:
 				p := n.transport.Watch()
 				go n.onPayload(p.Sender, p.Payload)
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case <-n.ctx.Done():
+				n.logger.Info("reset data sync for peer stopped")
+				return
+			case peerID := <-n.resetDataSyncPeer:
+				n.logger.Debug("resetting peer epoch", zap.String("peerID", hex.EncodeToString(peerID[:4])), zap.ByteString("nodeID", peerID[:]))
+				n.resetPeerEpoch(peerID)
 			}
 		}
 	}()
@@ -569,10 +580,16 @@ func (n *Node) updateSendEpoch(s state.State) state.State {
 	return s
 }
 
-func (n *Node) resetPeerEpoch(peer state.PeerID) {
-	n.syncState.MapWithPeerId(peer, func(s state.State) state.State {
-		s.SendCount = 1
+func (n *Node) resetPeerEpoch(peerID state.PeerID) {
+	n.syncState.MapWithPeerId(peerID, func(s state.State) state.State {
 		s.SendEpoch = n.epoch + int64(rand.Intn(60))
+		n.logger.Debug("resetEpoch",
+			zap.String("groupID", hex.EncodeToString(s.GroupID[:4])),
+			zap.String("messageID", hex.EncodeToString(s.MessageID[:4])),
+			zap.String("peerID", hex.EncodeToString(peerID[:4])),
+			zap.String("peerID", hex.EncodeToString(s.PeerID[:4])),
+			zap.Int64("epoch", s.SendEpoch),
+		)
 		return s
 	})
 }
