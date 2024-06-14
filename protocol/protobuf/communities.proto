@@ -295,3 +295,12 @@ message CommunityUpdateGrant {
 message CommunityEncryptionKeysRequest {
   bytes community_id = 1;
 }
+
+message CommunitySharedAddressesRequest {
+  bytes community_id = 1;
+}
+
+message CommunitySharedAddressesResponse {
+  bytes community_id = 1;
+  repeated RevealedAccount revealed_accounts = 3;
+}

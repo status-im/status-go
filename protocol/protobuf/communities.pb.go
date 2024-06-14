@@ -2753,6 +2753,108 @@ func (x *CommunityEncryptionKeysRequest) GetCommunityId() []byte {
 	return nil
 }
 
+type CommunitySharedAddressesRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	CommunityId []byte `protobuf:"bytes,1,opt,name=community_id,json=communityId,proto3" json:"community_id,omitempty"`
+}
+
+func (x *CommunitySharedAddressesRequest) Reset() {
+	*x = CommunitySharedAddressesRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_communities_proto_msgTypes[33]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CommunitySharedAddressesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommunitySharedAddressesRequest) ProtoMessage() {}
+
+func (x *CommunitySharedAddressesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_communities_proto_msgTypes[33]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommunitySharedAddressesRequest.ProtoReflect.Descriptor instead.
+func (*CommunitySharedAddressesRequest) Descriptor() ([]byte, []int) {
+	return file_communities_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *CommunitySharedAddressesRequest) GetCommunityId() []byte {
+	if x != nil {
+		return x.CommunityId
+	}
+	return nil
+}
+
+type CommunitySharedAddressesResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	CommunityId      []byte             `protobuf:"bytes,1,opt,name=community_id,json=communityId,proto3" json:"community_id,omitempty"`
+	RevealedAccounts []*RevealedAccount `protobuf:"bytes,3,rep,name=revealed_accounts,json=revealedAccounts,proto3" json:"revealed_accounts,omitempty"`
+}
+
+func (x *CommunitySharedAddressesResponse) Reset() {
+	*x = CommunitySharedAddressesResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_communities_proto_msgTypes[34]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CommunitySharedAddressesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommunitySharedAddressesResponse) ProtoMessage() {}
+
+func (x *CommunitySharedAddressesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_communities_proto_msgTypes[34]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommunitySharedAddressesResponse.ProtoReflect.Descriptor instead.
+func (*CommunitySharedAddressesResponse) Descriptor() ([]byte, []int) {
+	return file_communities_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *CommunitySharedAddressesResponse) GetCommunityId() []byte {
+	if x != nil {
+		return x.CommunityId
+	}
+	return nil
+}
+
+func (x *CommunitySharedAddressesResponse) GetRevealedAccounts() []*RevealedAccount {
+	if x != nil {
+		return x.RevealedAccounts
+	}
+	return nil
+}
+
 var File_communities_proto protoreflect.FileDescriptor
 
 var file_communities_proto_rawDesc = []byte{
@@ -3267,9 +3369,22 @@ var file_communities_proto_rawDesc = []byte{
 	0x75, 0x6e, 0x69, 0x74, 0x79, 0x45, 0x6e, 0x63, 0x72, 0x79, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x4b,
 	0x65, 0x79, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x21, 0x0a, 0x0c, 0x63, 0x6f,
 	0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c,
-	0x52, 0x0b, 0x63, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x49, 0x64, 0x42, 0x0d, 0x5a,
-	0x0b, 0x2e, 0x2f, 0x3b, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x62, 0x06, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x33,
+	0x52, 0x0b, 0x63, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x49, 0x64, 0x22, 0x44, 0x0a,
+	0x1f, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x53, 0x68, 0x61, 0x72, 0x65, 0x64,
+	0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x65, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
+	0x12, 0x21, 0x0a, 0x0c, 0x63, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x5f, 0x69, 0x64,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0b, 0x63, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74,
+	0x79, 0x49, 0x64, 0x22, 0x8d, 0x01, 0x0a, 0x20, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74,
+	0x79, 0x53, 0x68, 0x61, 0x72, 0x65, 0x64, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x65, 0x73,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x21, 0x0a, 0x0c, 0x63, 0x6f, 0x6d, 0x6d,
+	0x75, 0x6e, 0x69, 0x74, 0x79, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0b,
+	0x63, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x74, 0x79, 0x49, 0x64, 0x12, 0x46, 0x0a, 0x11, 0x72,
+	0x65, 0x76, 0x65, 0x61, 0x6c, 0x65, 0x64, 0x5f, 0x61, 0x63, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x73,
+	0x18, 0x03, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x19, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
+	0x66, 0x2e, 0x52, 0x65, 0x76, 0x65, 0x61, 0x6c, 0x65, 0x64, 0x41, 0x63, 0x63, 0x6f, 0x75, 0x6e,
+	0x74, 0x52, 0x10, 0x72, 0x65, 0x76, 0x65, 0x61, 0x6c, 0x65, 0x64, 0x41, 0x63, 0x63, 0x6f, 0x75,
+	0x6e, 0x74, 0x73, 0x42, 0x0d, 0x5a, 0x0b, 0x2e, 0x2f, 0x3b, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62,
+	0x75, 0x66, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -3285,7 +3400,7 @@ func file_communities_proto_rawDescGZIP() []byte {
 }
 
 var file_communities_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_communities_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
+var file_communities_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
 var file_communities_proto_goTypes = []interface{}{
 	(CommunityMember_Roles)(0),                    // 0: protobuf.CommunityMember.Roles
 	(CommunityMember_ChannelRole)(0),              // 1: protobuf.CommunityMember.ChannelRole
@@ -3325,69 +3440,72 @@ var file_communities_proto_goTypes = []interface{}{
 	(*DeleteCommunityMemberMessages)(nil),         // 35: protobuf.DeleteCommunityMemberMessages
 	(*CommunityUpdateGrant)(nil),                  // 36: protobuf.CommunityUpdateGrant
 	(*CommunityEncryptionKeysRequest)(nil),        // 37: protobuf.CommunityEncryptionKeysRequest
-	nil,                                           // 38: protobuf.CommunityTokenMetadata.ContractAddressesEntry
-	nil,                                           // 39: protobuf.TokenCriteria.ContractAddressesEntry
-	nil,                                           // 40: protobuf.CommunityDescription.MembersEntry
-	nil,                                           // 41: protobuf.CommunityDescription.ChatsEntry
-	nil,                                           // 42: protobuf.CommunityDescription.CategoriesEntry
-	nil,                                           // 43: protobuf.CommunityDescription.TokenPermissionsEntry
-	nil,                                           // 44: protobuf.CommunityDescription.BannedMembersEntry
-	nil,                                           // 45: protobuf.CommunityDescription.PrivateDataEntry
-	nil,                                           // 46: protobuf.CommunityChat.MembersEntry
-	nil,                                           // 47: protobuf.WakuMessageArchiveIndex.ArchivesEntry
-	nil,                                           // 48: protobuf.CommunityUpdateGrant.GrantsEntry
-	(CommunityTokenType)(0),                       // 49: protobuf.CommunityTokenType
-	(*ChatIdentity)(nil),                          // 50: protobuf.ChatIdentity
-	(*Shard)(nil),                                 // 51: protobuf.Shard
+	(*CommunitySharedAddressesRequest)(nil),       // 38: protobuf.CommunitySharedAddressesRequest
+	(*CommunitySharedAddressesResponse)(nil),      // 39: protobuf.CommunitySharedAddressesResponse
+	nil,                                           // 40: protobuf.CommunityTokenMetadata.ContractAddressesEntry
+	nil,                                           // 41: protobuf.TokenCriteria.ContractAddressesEntry
+	nil,                                           // 42: protobuf.CommunityDescription.MembersEntry
+	nil,                                           // 43: protobuf.CommunityDescription.ChatsEntry
+	nil,                                           // 44: protobuf.CommunityDescription.CategoriesEntry
+	nil,                                           // 45: protobuf.CommunityDescription.TokenPermissionsEntry
+	nil,                                           // 46: protobuf.CommunityDescription.BannedMembersEntry
+	nil,                                           // 47: protobuf.CommunityDescription.PrivateDataEntry
+	nil,                                           // 48: protobuf.CommunityChat.MembersEntry
+	nil,                                           // 49: protobuf.WakuMessageArchiveIndex.ArchivesEntry
+	nil,                                           // 50: protobuf.CommunityUpdateGrant.GrantsEntry
+	(CommunityTokenType)(0),                       // 51: protobuf.CommunityTokenType
+	(*ChatIdentity)(nil),                          // 52: protobuf.ChatIdentity
+	(*Shard)(nil),                                 // 53: protobuf.Shard
 }
 var file_communities_proto_depIdxs = []int32{
 	0,  // 0: protobuf.CommunityMember.roles:type_name -> protobuf.CommunityMember.Roles
 	17, // 1: protobuf.CommunityMember.revealed_accounts:type_name -> protobuf.RevealedAccount
 	1,  // 2: protobuf.CommunityMember.channel_role:type_name -> protobuf.CommunityMember.ChannelRole
-	38, // 3: protobuf.CommunityTokenMetadata.contract_addresses:type_name -> protobuf.CommunityTokenMetadata.ContractAddressesEntry
-	49, // 4: protobuf.CommunityTokenMetadata.tokenType:type_name -> protobuf.CommunityTokenType
+	40, // 3: protobuf.CommunityTokenMetadata.contract_addresses:type_name -> protobuf.CommunityTokenMetadata.ContractAddressesEntry
+	51, // 4: protobuf.CommunityTokenMetadata.tokenType:type_name -> protobuf.CommunityTokenType
 	2,  // 5: protobuf.CommunityTokenAction.action_type:type_name -> protobuf.CommunityTokenAction.ActionType
 	3,  // 6: protobuf.CommunityPermissions.access:type_name -> protobuf.CommunityPermissions.Access
-	39, // 7: protobuf.TokenCriteria.contract_addresses:type_name -> protobuf.TokenCriteria.ContractAddressesEntry
-	49, // 8: protobuf.TokenCriteria.type:type_name -> protobuf.CommunityTokenType
+	41, // 7: protobuf.TokenCriteria.contract_addresses:type_name -> protobuf.TokenCriteria.ContractAddressesEntry
+	51, // 8: protobuf.TokenCriteria.type:type_name -> protobuf.CommunityTokenType
 	4,  // 9: protobuf.CommunityTokenPermission.type:type_name -> protobuf.CommunityTokenPermission.Type
 	10, // 10: protobuf.CommunityTokenPermission.token_criteria:type_name -> protobuf.TokenCriteria
-	40, // 11: protobuf.CommunityDescription.members:type_name -> protobuf.CommunityDescription.MembersEntry
+	42, // 11: protobuf.CommunityDescription.members:type_name -> protobuf.CommunityDescription.MembersEntry
 	9,  // 12: protobuf.CommunityDescription.permissions:type_name -> protobuf.CommunityPermissions
-	50, // 13: protobuf.CommunityDescription.identity:type_name -> protobuf.ChatIdentity
-	41, // 14: protobuf.CommunityDescription.chats:type_name -> protobuf.CommunityDescription.ChatsEntry
-	42, // 15: protobuf.CommunityDescription.categories:type_name -> protobuf.CommunityDescription.CategoriesEntry
+	52, // 13: protobuf.CommunityDescription.identity:type_name -> protobuf.ChatIdentity
+	43, // 14: protobuf.CommunityDescription.chats:type_name -> protobuf.CommunityDescription.ChatsEntry
+	44, // 15: protobuf.CommunityDescription.categories:type_name -> protobuf.CommunityDescription.CategoriesEntry
 	14, // 16: protobuf.CommunityDescription.admin_settings:type_name -> protobuf.CommunityAdminSettings
-	43, // 17: protobuf.CommunityDescription.token_permissions:type_name -> protobuf.CommunityDescription.TokenPermissionsEntry
+	45, // 17: protobuf.CommunityDescription.token_permissions:type_name -> protobuf.CommunityDescription.TokenPermissionsEntry
 	7,  // 18: protobuf.CommunityDescription.community_tokens_metadata:type_name -> protobuf.CommunityTokenMetadata
-	44, // 19: protobuf.CommunityDescription.banned_members:type_name -> protobuf.CommunityDescription.BannedMembersEntry
-	45, // 20: protobuf.CommunityDescription.privateData:type_name -> protobuf.CommunityDescription.PrivateDataEntry
-	46, // 21: protobuf.CommunityChat.members:type_name -> protobuf.CommunityChat.MembersEntry
+	46, // 19: protobuf.CommunityDescription.banned_members:type_name -> protobuf.CommunityDescription.BannedMembersEntry
+	47, // 20: protobuf.CommunityDescription.privateData:type_name -> protobuf.CommunityDescription.PrivateDataEntry
+	48, // 21: protobuf.CommunityChat.members:type_name -> protobuf.CommunityChat.MembersEntry
 	9,  // 22: protobuf.CommunityChat.permissions:type_name -> protobuf.CommunityPermissions
-	50, // 23: protobuf.CommunityChat.identity:type_name -> protobuf.ChatIdentity
+	52, // 23: protobuf.CommunityChat.identity:type_name -> protobuf.ChatIdentity
 	17, // 24: protobuf.CommunityRequestToJoin.revealed_accounts:type_name -> protobuf.RevealedAccount
 	17, // 25: protobuf.CommunityEditSharedAddresses.revealed_accounts:type_name -> protobuf.RevealedAccount
 	12, // 26: protobuf.CommunityRequestToJoinResponse.community:type_name -> protobuf.CommunityDescription
-	51, // 27: protobuf.CommunityRequestToJoinResponse.shard:type_name -> protobuf.Shard
+	53, // 27: protobuf.CommunityRequestToJoinResponse.shard:type_name -> protobuf.Shard
 	26, // 28: protobuf.WakuMessageArchive.metadata:type_name -> protobuf.WakuMessageArchiveMetadata
 	25, // 29: protobuf.WakuMessageArchive.messages:type_name -> protobuf.WakuMessage
 	26, // 30: protobuf.WakuMessageArchiveIndexMetadata.metadata:type_name -> protobuf.WakuMessageArchiveMetadata
-	47, // 31: protobuf.WakuMessageArchiveIndex.archives:type_name -> protobuf.WakuMessageArchiveIndex.ArchivesEntry
+	49, // 31: protobuf.WakuMessageArchiveIndex.archives:type_name -> protobuf.WakuMessageArchiveIndex.ArchivesEntry
 	32, // 32: protobuf.CommunityStorenodes.storenodes:type_name -> protobuf.Storenode
 	34, // 33: protobuf.DeleteCommunityMemberMessages.messages:type_name -> protobuf.DeleteCommunityMemberMessage
-	48, // 34: protobuf.CommunityUpdateGrant.grants:type_name -> protobuf.CommunityUpdateGrant.GrantsEntry
-	6,  // 35: protobuf.CommunityDescription.MembersEntry.value:type_name -> protobuf.CommunityMember
-	15, // 36: protobuf.CommunityDescription.ChatsEntry.value:type_name -> protobuf.CommunityChat
-	16, // 37: protobuf.CommunityDescription.CategoriesEntry.value:type_name -> protobuf.CommunityCategory
-	11, // 38: protobuf.CommunityDescription.TokenPermissionsEntry.value:type_name -> protobuf.CommunityTokenPermission
-	13, // 39: protobuf.CommunityDescription.BannedMembersEntry.value:type_name -> protobuf.CommunityBanInfo
-	6,  // 40: protobuf.CommunityChat.MembersEntry.value:type_name -> protobuf.CommunityMember
-	28, // 41: protobuf.WakuMessageArchiveIndex.ArchivesEntry.value:type_name -> protobuf.WakuMessageArchiveIndexMetadata
-	42, // [42:42] is the sub-list for method output_type
-	42, // [42:42] is the sub-list for method input_type
-	42, // [42:42] is the sub-list for extension type_name
-	42, // [42:42] is the sub-list for extension extendee
-	0,  // [0:42] is the sub-list for field type_name
+	50, // 34: protobuf.CommunityUpdateGrant.grants:type_name -> protobuf.CommunityUpdateGrant.GrantsEntry
+	17, // 35: protobuf.CommunitySharedAddressesResponse.revealed_accounts:type_name -> protobuf.RevealedAccount
+	6,  // 36: protobuf.CommunityDescription.MembersEntry.value:type_name -> protobuf.CommunityMember
+	15, // 37: protobuf.CommunityDescription.ChatsEntry.value:type_name -> protobuf.CommunityChat
+	16, // 38: protobuf.CommunityDescription.CategoriesEntry.value:type_name -> protobuf.CommunityCategory
+	11, // 39: protobuf.CommunityDescription.TokenPermissionsEntry.value:type_name -> protobuf.CommunityTokenPermission
+	13, // 40: protobuf.CommunityDescription.BannedMembersEntry.value:type_name -> protobuf.CommunityBanInfo
+	6,  // 41: protobuf.CommunityChat.MembersEntry.value:type_name -> protobuf.CommunityMember
+	28, // 42: protobuf.WakuMessageArchiveIndex.ArchivesEntry.value:type_name -> protobuf.WakuMessageArchiveIndexMetadata
+	43, // [43:43] is the sub-list for method output_type
+	43, // [43:43] is the sub-list for method input_type
+	43, // [43:43] is the sub-list for extension type_name
+	43, // [43:43] is the sub-list for extension extendee
+	0,  // [0:43] is the sub-list for field type_name
 }
 
 func init() { file_communities_proto_init() }
@@ -3795,6 +3913,30 @@ func file_communities_proto_init() {
 				return nil
 			}
 		}
+		file_communities_proto_msgTypes[33].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CommunitySharedAddressesRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_communities_proto_msgTypes[34].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CommunitySharedAddressesResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -3802,7 +3944,7 @@ func file_communities_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_communities_proto_rawDesc,
 			NumEnums:      5,
-			NumMessages:   44,
+			NumMessages:   46,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
