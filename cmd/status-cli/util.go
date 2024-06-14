@@ -64,7 +64,11 @@ func start(name string, port int, apiModules string, telemetryUrl string, useExi
 	}
 
 	if telemetryUrl != "" {
-		telemetryClient := telemetry.NewClient(logger.Desugar(), telemetryUrl, backend.SelectedAccountKeyID(), name, "cli")
+		telemetryLogger, err := getLogger(true)
+		if err != nil {
+			return nil, err
+		}
+		telemetryClient := telemetry.NewClient(telemetryLogger, telemetryUrl, backend.SelectedAccountKeyID(), name, "cli")
 		go telemetryClient.Start(context.Background())
 		backend.StatusNode().WakuV2Service().SetStatusTelemetryClient(telemetryClient)
 	}
@@ -151,19 +155,28 @@ func (cli *StatusCLI) stop() {
 	}
 }
 
-func getSLogger(debug bool) (*zap.SugaredLogger, error) {
+func getLogger(debug bool) (*zap.Logger, error) {
 	at := zap.NewAtomicLevel()
 	if debug {
 		at.SetLevel(zap.DebugLevel)
+	} else {
+		at.SetLevel(zap.InfoLevel)
 	}
-	at.SetLevel(zap.InfoLevel)
 	config := zap.NewDevelopmentConfig()
 	config.Level = at
 	rawLogger, err := config.Build()
 	if err != nil {
 		return nil, fmt.Errorf("initializing logger: %v", err)
 	}
-	return rawLogger.Sugar(), nil
+	return rawLogger, nil
+}
+
+func getSLogger(debug bool) (*zap.SugaredLogger, error) {
+	l, err := getLogger(debug)
+	if err != nil {
+		return nil, err
+	}
+	return l.Sugar(), nil
 }
 
 func flagsUsed(cCtx *cli.Context) string {
