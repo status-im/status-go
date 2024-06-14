@@ -4465,40 +4465,26 @@ func (s *MessengerCommunitiesSuite) TestFetchSerializedCommunities() {
 }
 
 func (s *MessengerCommunitiesSuite) updateUrlParam(rawURL string, name, val string) (string, error) {
-	// Parse the raw URL
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
 		return "", err
 	}
 
-	// Parse the query parameters
 	queryParams := parsedURL.Query()
-
-	// Update the communityID parameter to 0x0
 	queryParams.Set(name, val)
-
-	// Re-encode the query parameters
 	parsedURL.RawQuery = queryParams.Encode()
-
 	return parsedURL.String(), nil
 }
 
 func (s *MessengerCommunitiesSuite) removeUrlParam(rawURL, name string) (string, error) {
-	// Parse the raw URL
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
 		return "", err
 	}
 
-	// Parse the query parameters
 	queryParams := parsedURL.Query()
-
-	// Remove the communityID parameter
 	queryParams.Del(name)
-
-	// Re-encode the query parameters
 	parsedURL.RawQuery = queryParams.Encode()
-
 	return parsedURL.String(), nil
 }
 
