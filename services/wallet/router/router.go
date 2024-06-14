@@ -350,21 +350,22 @@ type Router struct {
 	featureFlags        *protocolCommon.FeatureFlags
 }
 
-func (r *Router) requireApproval(ctx context.Context, sendType SendType, approvalContractAddress *common.Address, account common.Address, network *params.Network, token *token.Token, amountIn *big.Int) (
+func (r *Router) requireApproval(ctx context.Context, sendType SendType, approvalContractAddress *common.Address, params pathprocessor.ProcessorInputParams) (
 	bool, *big.Int, uint64, uint64, error) {
 	if sendType.IsCollectiblesTransfer() || sendType.IsEnsTransfer() || sendType.IsStickersTransfer() {
 		return false, nil, 0, 0, nil
 	}
 
-	if token.IsNative() {
+	if params.FromToken.IsNative() {
 		return false, nil, 0, 0, nil
 	}
+
 	contractMaker, err := contracts.NewContractMaker(r.rpcClient)
 	if err != nil {
 		return false, nil, 0, 0, err
 	}
 
-	contract, err := contractMaker.NewERC20(network.ChainID, token.Address)
+	contract, err := contractMaker.NewERC20(params.FromChain.ChainID, params.FromToken.Address)
 	if err != nil {
 		return false, nil, 0, 0, err
 	}
@@ -375,17 +376,17 @@ func (r *Router) requireApproval(ctx context.Context, sendType SendType, approva
 
 	allowance, err := contract.Allowance(&bind.CallOpts{
 		Context: ctx,
-	}, account, *approvalContractAddress)
+	}, params.FromAddr, *approvalContractAddress)
 
 	if err != nil {
 		return false, nil, 0, 0, err
 	}
 
-	if allowance.Cmp(amountIn) >= 0 {
+	if allowance.Cmp(params.AmountIn) >= 0 {
 		return false, nil, 0, 0, nil
 	}
 
-	ethClient, err := r.rpcClient.EthClient(network.ChainID)
+	ethClient, err := r.rpcClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return false, nil, 0, 0, err
 	}
@@ -395,14 +396,14 @@ func (r *Router) requireApproval(ctx context.Context, sendType SendType, approva
 		return false, nil, 0, 0, err
 	}
 
-	data, err := erc20ABI.Pack("approve", approvalContractAddress, amountIn)
+	data, err := erc20ABI.Pack("approve", approvalContractAddress, params.AmountIn)
 	if err != nil {
 		return false, nil, 0, 0, err
 	}
 
 	estimate, err := ethClient.EstimateGas(context.Background(), ethereum.CallMsg{
-		From:  account,
-		To:    &token.Address,
+		From:  params.FromAddr,
+		To:    &params.FromToken.Address,
 		Value: pathprocessor.ZeroBigIntValue,
 		Data:  data,
 	})
@@ -412,7 +413,7 @@ func (r *Router) requireApproval(ctx context.Context, sendType SendType, approva
 
 	// fetching l1 fee
 	var l1Fee uint64
-	oracleContractAddress, err := gaspriceoracle.ContractAddress(network.ChainID)
+	oracleContractAddress, err := gaspriceoracle.ContractAddress(params.FromChain.ChainID)
 	if err == nil {
 		oracleContract, err := gaspriceoracle.NewGaspriceoracleCaller(oracleContractAddress, ethClient)
 		if err != nil {
@@ -425,7 +426,7 @@ func (r *Router) requireApproval(ctx context.Context, sendType SendType, approva
 		l1Fee = l1FeeResult.Uint64()
 	}
 
-	return true, amountIn, estimate, l1Fee, nil
+	return true, params.AmountIn, estimate, l1Fee, nil
 }
 
 func (r *Router) getBalance(ctx context.Context, network *params.Network, token *token.Token, account common.Address) (*big.Int, error) {
@@ -636,7 +637,7 @@ func (r *Router) SuggestedRoutes(
 					if err != nil {
 						continue
 					}
-					approvalRequired, approvalAmountRequired, approvalGasLimit, l1ApprovalFee, err := r.requireApproval(ctx, sendType, &approvalContractAddress, addrFrom, network, token, amountIn)
+					approvalRequired, approvalAmountRequired, approvalGasLimit, l1ApprovalFee, err := r.requireApproval(ctx, sendType, &approvalContractAddress, processorInputParams)
 					if err != nil {
 						continue
 					}

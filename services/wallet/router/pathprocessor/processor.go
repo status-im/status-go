@@ -13,20 +13,31 @@ import (
 )
 
 type PathProcessor interface {
-	// returns the name of the bridge
+	// Name returns the name of the bridge
 	Name() string
-	// checks if the bridge is available for the given networks/tokens
+	// AvailableFor checks if the bridge is available for the given networks/tokens
 	AvailableFor(params ProcessorInputParams) (bool, error)
-	// calculates the fees for the bridge and returns the amount BonderFee and TokenFee (used for bridges)
+	// CalculateFees calculates the fees for the bridge and returns the amount BonderFee and TokenFee (used for bridges)
 	CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error)
-	// Pack the method for sending tx and method call's data
+	// PackTxInputData packs tx for sending
 	PackTxInputData(params ProcessorInputParams) ([]byte, error)
+	// EstimateGas estimates the gas
 	EstimateGas(params ProcessorInputParams) (uint64, error)
+	// CalculateAmountOut calculates the amount out
 	CalculateAmountOut(params ProcessorInputParams) (*big.Int, error)
+	// Send sends the tx
 	Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types.Hash, error)
+	// GetContractAddress returns the contract address
 	GetContractAddress(params ProcessorInputParams) (common.Address, error)
+	// BuildTransaction builds the transaction based on MultipathProcessorTxArgs
 	BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error)
+	// BuildTx builds the transaction based on ProcessorInputParams
 	BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error)
+}
+
+type PathProcessorClearable interface {
+	// Clear clears the local cache
+	Clear()
 }
 
 type ProcessorInputParams struct {
