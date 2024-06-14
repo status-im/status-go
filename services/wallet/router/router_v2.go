@@ -41,7 +41,7 @@ type RouteInputParams struct {
 	TokenID              string                  `json:"tokenID" validate:"required"`
 	ToTokenID            string                  `json:"toTokenID"`
 	DisabledFromChainIDs []uint64                `json:"disabledFromChainIDs"`
-	DisabledToChaindIDs  []uint64                `json:"disabledToChaindIDs"`
+	DisabledToChainIDs   []uint64                `json:"disabledToChainIDs"`
 	GasFeeMode           GasFeeMode              `json:"gasFeeMode" validate:"required"`
 	FromLockedAmount     map[uint64]*hexutil.Big `json:"fromLockedAmount"`
 	TestnetMode          bool                    `json:"testnetMode"`
@@ -469,7 +469,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						continue
 					}
 
-					if containsNetworkChainID(dest, input.DisabledToChaindIDs) {
+					if containsNetworkChainID(dest, input.DisabledToChainIDs) {
 						continue
 					}
 
