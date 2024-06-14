@@ -115,7 +115,7 @@ func main() {
 				Usage:   "Start a server to send and receive messages",
 				Flags:   ServeFlags,
 				Action: func(cCtx *cli.Context) error {
-					return serve(cCtx, false)
+					return serve(cCtx)
 				},
 			},
 			{
@@ -130,14 +130,16 @@ func main() {
 						Required: true,
 					},
 					&cli.StringFlag{
-						Name:    KeyUIDFlag,
-						Aliases: []string{"kid"},
-						Usage:   "Key ID of the existing user (if not provided the last account will be used)",
+						Name:     KeyUIDFlag,
+						Aliases:  []string{"kid"},
+						Usage:    "Key ID of the existing user (find them under '<data-dir>/keystore' on in logs when using the 'serve' command)",
+						Required: true,
 					},
 					&cli.BoolFlag{
 						Name:    InteractiveFlag,
 						Aliases: []string{"i"},
 						Usage:   "Use interactive mode to input the messages",
+						Value:   false,
 					},
 					&cli.StringFlag{
 						Name:    AddFlag,
@@ -152,7 +154,7 @@ func main() {
 					},
 				},
 				Action: func(cCtx *cli.Context) error {
-					return serve(cCtx, true)
+					return serve(cCtx)
 				},
 			},
 		},

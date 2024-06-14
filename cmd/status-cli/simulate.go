@@ -34,13 +34,13 @@ func simulate(cCtx *cli.Context) error {
 	apiModules := cCtx.String(APIModulesFlag)
 	telemetryUrl := cCtx.String(TelemetryServerURLFlag)
 
-	alice, err := start("Alice", 0, apiModules, telemetryUrl, false, "", logger.Named("alice"))
+	alice, err := start("Alice", 0, apiModules, telemetryUrl, "", logger.Named("alice"))
 	if err != nil {
 		return err
 	}
 	defer alice.stop()
 
-	charlie, err := start("Charlie", 0, apiModules, telemetryUrl, false, "", logger.Named("charlie"))
+	charlie, err := start("Charlie", 0, apiModules, telemetryUrl, "", logger.Named("charlie"))
 	if err != nil {
 		return err
 	}

@@ -15,7 +15,6 @@ import (
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/telemetry"
 	"github.com/urfave/cli/v2"
-
 	"go.uber.org/zap"
 )
 
@@ -36,7 +35,7 @@ func setupLogger(file string) *zap.Logger {
 	return logutils.ZapLogger()
 }
 
-func start(name string, port int, apiModules string, telemetryUrl string, useExistingAccount bool, keyUID string, logger *zap.SugaredLogger) (*StatusCLI, error) {
+func start(name string, port int, apiModules string, telemetryUrl string, keyUID string, logger *zap.SugaredLogger) (*StatusCLI, error) {
 	var (
 		rootDataDir = fmt.Sprintf("./test-%s", strings.ToLower(name))
 		password    = "some-password"
@@ -45,7 +44,7 @@ func start(name string, port int, apiModules string, telemetryUrl string, useExi
 	logger.Info("starting messenger")
 
 	backend := api.NewGethStatusBackend()
-	if useExistingAccount {
+	if keyUID != "" {
 		if err := getAccountAndLogin(backend, name, rootDataDir, password, keyUID); err != nil {
 			return nil, err
 		}
@@ -105,19 +104,17 @@ func getAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password st
 		return errors.New("no accounts found")
 	}
 
-	acc := accs[0] // use last if no keyUID is provided
-	if keyUID != "" {
-		found := false
-		for _, a := range accs {
-			if a.KeyUID == keyUID {
-				acc = a
-				found = true
-				break
-			}
+	var acc multiaccounts.Account
+	found := false
+	for _, a := range accs {
+		if a.KeyUID == keyUID {
+			acc = a
+			found = true
+			break
 		}
-		if !found {
-			return fmt.Errorf("account not found for keyUID: %v", keyUID)
-		}
+	}
+	if !found {
+		return fmt.Errorf("account not found for keyUID: %v", keyUID)
 	}
 
 	return b.LoginAccount(&requests.Login{

@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func serve(cCtx *cli.Context, useExistingAccount bool) error {
+func serve(cCtx *cli.Context) error {
 	name := cCtx.String(NameFlag)
 	port := cCtx.Int(PortFlag)
 	apiModules := cCtx.String(APIModulesFlag)
@@ -34,7 +34,7 @@ func serve(cCtx *cli.Context, useExistingAccount bool) error {
 
 	logger = logger.Named(name)
 
-	cli, err := start(name, port, apiModules, telemetryUrl, useExistingAccount, keyUID, logger)
+	cli, err := start(name, port, apiModules, telemetryUrl, keyUID, logger)
 	if err != nil {
 		return err
 	}
