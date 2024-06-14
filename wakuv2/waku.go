@@ -1841,7 +1841,7 @@ func (w *Waku) restartDiscV5() error {
 
 	if w.node.DiscV5().ErrOnNotRunning() != nil {
 		w.logger.Info("is not started restarting")
-		err := w.node.DiscV5().Start(ctx)
+		err := w.node.DiscV5().Start(w.ctx)
 		if err != nil {
 			w.logger.Error("Could not start DiscV5", zap.Error(err))
 		}
@@ -1855,7 +1855,7 @@ func (w *Waku) restartDiscV5() error {
 		default:
 		}
 
-		err := w.node.DiscV5().Start(ctx)
+		err := w.node.DiscV5().Start(w.ctx)
 		if err != nil {
 			w.logger.Error("Could not start DiscV5", zap.Error(err))
 		}
