@@ -42,7 +42,6 @@ type RouteInputParams struct {
 	ToTokenID            string                  `json:"toTokenID"`
 	DisabledFromChainIDs []uint64                `json:"disabledFromChainIDs"`
 	DisabledToChaindIDs  []uint64                `json:"disabledToChaindIDs"`
-	PreferedChainIDs     []uint64                `json:"preferedChainIDs"`
 	GasFeeMode           GasFeeMode              `json:"gasFeeMode" validate:"required"`
 	FromLockedAmount     map[uint64]*hexutil.Big `json:"fromLockedAmount"`
 	TestnetMode          bool                    `json:"testnetMode"`
@@ -467,10 +466,6 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 					}
 
 					if !input.SendType.isAvailableBetween(network, dest) {
-						continue
-					}
-
-					if len(input.PreferedChainIDs) > 0 && !containsNetworkChainID(dest, input.PreferedChainIDs) {
 						continue
 					}
 
