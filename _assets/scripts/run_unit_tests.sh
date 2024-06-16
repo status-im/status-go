@@ -79,14 +79,23 @@ run_test_for_package() {
     gotestsum_flags="${gotestsum_flags} --junitfile=${report_file} --rerun-fails-report=${rerun_report_file}"
   fi
 
-  gotestsum --packages="${package}" ${gotestsum_flags} -- \
+  # Cleanup previous coverage reports
+  rm -f ${package_dir}/coverage.out.rerun.*
+
+  PACKAGE_DIR=${package_dir} gotestsum --packages="${package}" ${gotestsum_flags} --raw-command -- \
+    ./_assets/scripts/test-with-coverage.sh \
+    ${package} \
     -v ${GOTEST_EXTRAFLAGS} \
     -timeout "${package_timeout}" \
     -count 1 \
-    -tags "${BUILD_TAGS}" \
-    -covermode=atomic \
-    -coverprofile="${coverage_file}" | \
+    -tags "${BUILD_TAGS}" |
     redirect_stdout "${output_file}"
+
+  # Merge package coverage results
+  gocovmerge ${package_dir}/coverage.out.rerun.* > ${coverage_file}
+
+  # Cleanup coverage reports
+  rm -f ${package_dir}/coverage.out.rerun.*
 
   local go_test_exit=$?
   echo "${go_test_exit}" > "${exit_code_file}"
