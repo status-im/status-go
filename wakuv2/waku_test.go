@@ -23,16 +23,17 @@ import (
 	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/wakuv2/common"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
+	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/wakuv2/common"
 )
 
 var testENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.shards.nodes.status.im"
