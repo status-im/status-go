@@ -1294,7 +1294,8 @@ func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAcco
 		*response.account,
 		request.Password,
 		*response.settings,
-		response.nodeConfig, response.subAccounts,
+		response.nodeConfig,
+		response.subAccounts,
 		response.chatPrivateKey,
 	)
 
@@ -1581,18 +1582,6 @@ func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, inp
 	settings.CurrentNetwork = request.CurrentNetwork
 	settings.TestNetworksEnabled = request.TestNetworksEnabled
 
-	/*
-		 Case 1. Generating new account
-			mnemonic +
-			omit +
-		 Case 2. Restoring from seed phrase
-			mnemonic -
-			omit -
-		 Case 3. Login with keycard (account not generated, but need to fetch backup)
-			mnemonic -
-			omit -
-	*/
-
 	if !input.restoringAccount {
 		settings.Mnemonic = &input.mnemonic
 		settings.OmitTransfersHistoryScan = true
@@ -1621,18 +1610,15 @@ func (b *GethStatusBackend) prepareConfig(request *requests.CreateAccount, input
 func (b *GethStatusBackend) prepareSubAccounts(request *requests.CreateAccount, input *prepareAccountInput) ([]*accounts.Account, error) {
 	walletDerivedAccount := input.derivedAddresses[pathDefaultWallet]
 	walletAccount := &accounts.Account{
-		PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
-		KeyUID:    input.keyUID,
-		Address:   types.HexToAddress(walletDerivedAccount.Address),
-		ColorID:   multiacccommon.CustomizationColor(request.CustomizationColor),
-		Emoji:     request.Emoji,
-		Wallet:    true,
-		Path:      pathDefaultWallet,
-		Name:      walletAccountDefaultName,
-	}
-
-	if input.restoringAccount {
-		walletAccount.AddressWasNotShown = true
+		PublicKey:          types.Hex2Bytes(walletDerivedAccount.PublicKey),
+		KeyUID:             input.keyUID,
+		Address:            types.HexToAddress(walletDerivedAccount.Address),
+		ColorID:            multiacccommon.CustomizationColor(request.CustomizationColor),
+		Emoji:              request.Emoji,
+		Wallet:             true,
+		Path:               pathDefaultWallet,
+		Name:               walletAccountDefaultName,
+		AddressWasNotShown: !input.restoringAccount,
 	}
 
 	chatDerivedAccount := input.derivedAddresses[pathDefaultChat]
