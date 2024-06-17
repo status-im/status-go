@@ -36,6 +36,10 @@ func (m *Messenger) ListenAddresses() ([]string, error) {
 	return m.transport.ListenAddresses()
 }
 
+func (m *Messenger) ENR() (string, error) {
+	return m.transport.ENR()
+}
+
 // Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected
 func (m *Messenger) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
 	return m.transport.SubscribeToPubsubTopic(topic, optPublicKey)

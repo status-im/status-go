@@ -92,6 +92,8 @@ type Waku interface {
 
 	ListenAddresses() ([]string, error)
 
+	ENR() (string, error)
+
 	Peers() map[string]WakuV2Peer
 
 	StartDiscV5() error

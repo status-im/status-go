@@ -651,6 +651,10 @@ func (t *Transport) ListenAddresses() ([]string, error) {
 	return t.waku.ListenAddresses()
 }
 
+func (t *Transport) ENR() (string, error) {
+	return t.waku.ENR()
+}
+
 func (t *Transport) AddStorePeer(address string) (peer.ID, error) {
 	return t.waku.AddStorePeer(address)
 }

@@ -283,6 +283,11 @@ func (w *gethWakuV2Wrapper) ListenAddresses() ([]string, error) {
 	return w.waku.ListenAddresses(), nil
 }
 
+// ENR function only added for compatibility with waku V2
+func (w *gethWakuV2Wrapper) ENR() (string, error) {
+	return w.waku.ENR()
+}
+
 func (w *gethWakuV2Wrapper) DropPeer(peerID string) error {
 	return w.waku.DropPeer(peerID)
 }

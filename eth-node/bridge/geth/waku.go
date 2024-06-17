@@ -109,6 +109,11 @@ func (w *GethWakuWrapper) ListenAddresses() ([]string, error) {
 	return nil, errors.New("not available in WakuV1")
 }
 
+// ENR function only added for compatibility with waku V2
+func (w *GethWakuWrapper) ENR() (string, error) {
+	return "", errors.New("not available in WakuV1")
+}
+
 // PeerCount function only added for compatibility with waku V2
 func (w *GethWakuWrapper) DropPeer(peerID string) error {
 	return errors.New("not available in WakuV1")
