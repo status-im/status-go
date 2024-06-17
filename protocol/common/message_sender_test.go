@@ -361,3 +361,20 @@ func (s *MessageSenderSuite) TestHandleSegmentMessages() {
 	_, err = s.sender.HandleMessages(message)
 	s.Require().ErrorIs(err, ErrMessageSegmentsAlreadyCompleted)
 }
+
+func (s *MessageSenderSuite) TestGetEphemeralKey() {
+	keyMap := make(map[string]bool)
+	for i := 0; i < maxMessageSenderEphemeralKeys; i++ {
+		key, err := s.sender.GetEphemeralKey()
+		s.Require().NoError(err)
+		s.Require().NotNil(key)
+		keyMap[PubkeyToHex(&key.PublicKey)] = true
+	}
+	s.Require().Len(keyMap, maxMessageSenderEphemeralKeys)
+	// Add one more
+	key, err := s.sender.GetEphemeralKey()
+	s.Require().NoError(err)
+	s.Require().NotNil(key)
+
+	s.Require().True(keyMap[PubkeyToHex(&key.PublicKey)])
+}

@@ -1375,12 +1375,7 @@ func (c *Client) SendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 
 	c.config.Logger.Debug("actionable info", zap.Int("count", len(actionableInfos)))
 
-	// add ephemeral key and listen to it
-	ephemeralKey, err := crypto.GenerateKey()
-	if err != nil {
-		return nil, err
-	}
-	_, err = c.messageSender.AddEphemeralKey(ephemeralKey)
+	ephemeralKey, err := c.messageSender.GetEphemeralKey()
 	if err != nil {
 		return nil, err
 	}
@@ -1688,7 +1683,7 @@ func (c *Client) queryPushNotificationInfo(publicKey *ecdsa.PublicKey) error {
 		return err
 	}
 
-	ephemeralKey, err := crypto.GenerateKey()
+	ephemeralKey, err := c.messageSender.GetEphemeralKey()
 	if err != nil {
 		return err
 	}
@@ -1699,11 +1694,6 @@ func (c *Client) queryPushNotificationInfo(publicKey *ecdsa.PublicKey) error {
 		// we don't want to wrap in an encryption layer message
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY,
-	}
-
-	_, err = c.messageSender.AddEphemeralKey(ephemeralKey)
-	if err != nil {
-		return err
 	}
 
 	// this is the topic of message
