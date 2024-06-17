@@ -200,6 +200,7 @@ func (s *SwapParaswapProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifie
 				MultiTransactionID: sendArgs.SwapTx.MultiTransactionID,
 				Symbol:             sendArgs.SwapTx.Symbol,
 			},
+			SlippagePercentage: sendArgs.SwapTx.SlippagePercentage,
 		},
 	}
 
