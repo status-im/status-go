@@ -427,15 +427,6 @@ func NewMessenger(
 		anonMetricsServer.Logger = logger
 	}
 
-	var telemetryClient *telemetry.Client
-	if c.telemetryServerURL != "" {
-		telemetryClient = telemetry.NewClient(logger, c.telemetryServerURL, c.account.KeyUID, nodeName, version)
-		if c.wakuService != nil {
-			c.wakuService.SetStatusTelemetryClient(telemetryClient)
-		}
-		go telemetryClient.Start(messenger.ctx)
-	}
-
 	// Initialize push notification server
 	var pushNotificationServer *pushnotificationserver.Server
 	if c.pushNotificationServerConfig != nil && c.pushNotificationServerConfig.Enabled {
@@ -531,6 +522,15 @@ func NewMessenger(
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+
+	var telemetryClient *telemetry.Client
+	if c.telemetryServerURL != "" {
+		telemetryClient = telemetry.NewClient(logger, c.telemetryServerURL, c.account.KeyUID, nodeName, version)
+		if c.wakuService != nil {
+			c.wakuService.SetStatusTelemetryClient(telemetryClient)
+		}
+		go telemetryClient.Start(ctx)
+	}
 
 	messenger = &Messenger{
 		config:                     &c,
