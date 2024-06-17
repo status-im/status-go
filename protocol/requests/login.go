@@ -24,7 +24,11 @@ type Login struct {
 	
 	KeycardWhisperPrivateKey string `json:"keycardWhisperPrivateKey"`
 
-	// Mnemonic is used when the keycard is lost. When non-empty, mnemonic is used to generate required keypairs and:
+	// Mnemonic allows to log in to an account when password is lost.
+	// This is needed for the "Lost keycard -> Start using without keycard" flow, when a keycard account database
+	// exists locally, but now the keycard is lost. In this case client is responsible for calling
+	// `convertToRegularAccount` after a successful login. This could be improved in the future.
+	// When non-empty, mnemonic is used to generate required keypairs and:
 	// - Password is ignored and replaced with encryption private key
 	// - KeycardWhisperPrivateKey is ignored and replaced with chat private key
 	Mnemonic string `json:"mnemonic"`
