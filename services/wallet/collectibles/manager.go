@@ -926,14 +926,13 @@ func (o *Manager) checkConnectionStatus(chainID walletCommon.ChainID) {
 
 	// If no chain in statuses, add it
 	statusVal, ok := o.statuses.Load(chainID.String())
-	status := statusVal.(*connection.Status)
 	if !ok {
-		status = connection.NewStatus()
+		status := connection.NewStatus()
 		status.SetIsConnected(false)
 		o.statuses.Store(chainID.String(), status)
 		o.updateStatusNotifier()
 	} else {
-		status.SetIsConnected(false)
+		statusVal.(*connection.Status).SetIsConnected(false)
 	}
 }
 
