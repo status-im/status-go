@@ -101,18 +101,21 @@ func (api *API) Resolver(ctx context.Context, chainID uint64, username string) (
 func (api *API) OwnerOf(ctx context.Context, chainID uint64, username string) (*common.Address, error) {
 	err := validateENSUsername(username)
 	if err != nil {
+		log.Error("invalid ENS username", "username", username)
 		return nil, err
 	}
 
 	registry, err := api.contractMaker.NewRegistry(chainID)
 	if err != nil {
+		log.Error("failed to obtain registry contract", "error", err)
 		return nil, err
 	}
 
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
 	owner, err := registry.Owner(callOpts, nameHash(username))
 	if err != nil {
-		return nil, nil
+		log.Error("failed to obtain owner of ENS username", "error", err)
+		return nil, err
 	}
 
 	return &owner, nil
