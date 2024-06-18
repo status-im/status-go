@@ -323,31 +323,31 @@ func validateInputData(input *RouteInputParams) error {
 
 	if input.SendType == StickersBuy {
 		if input.PackID == nil {
-			return errors.New("packID is required for StickersBuy")
+			return ErrorStickersBuyRequires
 		}
 	}
 
 	if input.SendType == Swap {
 		if input.ToTokenID == "" {
-			return errors.New("toTokenID is required for Swap")
+			return ErrorSwapRequires
 		}
 		if input.TokenID == input.ToTokenID {
-			return errors.New("tokenID and toTokenID must be different")
+			return ErrorSwapTokenIDMustBeDifferent
 		}
 
 		// we can do this check, cause AmountIn is required in `RouteInputParams`
 		if input.AmountIn.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 &&
 			input.AmountOut != nil &&
 			input.AmountOut.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
-			return errors.New("only one of amountIn or amountOut can be set")
+			return ErrorSwapAmountInAmountOutMustBeExclusive
 		}
 
 		if input.AmountIn.ToInt().Sign() < 0 {
-			return errors.New("amountIn must be positive")
+			return ErrorSwapAmountInMustBePositive
 		}
 
 		if input.AmountOut != nil && input.AmountOut.ToInt().Sign() < 0 {
-			return errors.New("amountOut must be positive")
+			return ErrorSwapAmountOutMustBePositive
 		}
 	}
 

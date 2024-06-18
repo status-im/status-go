@@ -1,7 +1,6 @@
 package router
 
 import (
-	"errors"
 	"math/big"
 	"testing"
 
@@ -130,6 +129,60 @@ func TestValidateInputData(t *testing.T) {
 			expectedError: ErrorENSSetPubKeyRequires,
 		},
 		{
+			name: "StickersBuy missing packID",
+			input: &RouteInputParams{
+				SendType: StickersBuy,
+			},
+			expectedError: ErrorStickersBuyRequires,
+		},
+		{
+			name: "Swap missing toTokenID",
+			input: &RouteInputParams{
+				SendType: Swap,
+			},
+			expectedError: ErrorSwapRequires,
+		},
+		{
+			name: "Swap tokenID equal to toTokenID",
+			input: &RouteInputParams{
+				SendType:  Swap,
+				TokenID:   "token",
+				ToTokenID: "token",
+			},
+			expectedError: ErrorSwapTokenIDMustBeDifferent,
+		},
+		{
+			name: "Swap both amountIn and amountOut set",
+			input: &RouteInputParams{
+				SendType:  Swap,
+				TokenID:   "token1",
+				ToTokenID: "token2",
+				AmountIn:  (*hexutil.Big)(big.NewInt(100)),
+				AmountOut: (*hexutil.Big)(big.NewInt(100)),
+			},
+			expectedError: ErrorSwapAmountInAmountOutMustBeExclusive,
+		},
+		{
+			name: "Swap negative amountIn",
+			input: &RouteInputParams{
+				SendType:  Swap,
+				TokenID:   "token1",
+				ToTokenID: "token2",
+				AmountIn:  (*hexutil.Big)(big.NewInt(-100)),
+			},
+			expectedError: ErrorSwapAmountInMustBePositive,
+		},
+		{
+			name: "Swap negative amountOut",
+			input: &RouteInputParams{
+				SendType:  Swap,
+				TokenID:   "token1",
+				ToTokenID: "token2",
+				AmountOut: (*hexutil.Big)(big.NewInt(-100)),
+			},
+			expectedError: ErrorSwapAmountOutMustBePositive,
+		},
+		{
 			name: "fromLockedAmount with supported network on testnet",
 			input: &RouteInputParams{
 				FromLockedAmount: map[uint64]*hexutil.Big{
@@ -156,7 +209,7 @@ func TestValidateInputData(t *testing.T) {
 				},
 				TestnetMode: true,
 			},
-			expectedError: errors.New("locked amount is not supported for the selected network"),
+			expectedError: ErrorLockedAmountNotSupportedNetwork,
 		},
 		{
 			name: "fromLockedAmount with unsupported network on testnet",
@@ -166,7 +219,7 @@ func TestValidateInputData(t *testing.T) {
 				},
 				TestnetMode: true,
 			},
-			expectedError: errors.New("locked amount is not supported for the selected network"),
+			expectedError: ErrorLockedAmountNotSupportedNetwork,
 		},
 		{
 			name: "fromLockedAmount with unsupported network on mainnet",
