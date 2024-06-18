@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/registrar"
 	"github.com/status-im/status-go/contracts/snt"
+	statusErrors "github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens"
@@ -45,11 +46,11 @@ func (s *ENSRegisterProcessor) Name() string {
 func (s *ENSRegisterProcessor) GetPriceForRegisteringEnsName(chainID uint64) (*big.Int, error) {
 	registryAddr, err := s.ensService.API().GetRegistrarAddress(context.Background(), chainID)
 	if err != nil {
-		return nil, err
+		return nil, statusErrors.CreateErrorResponseFromError(err)
 	}
 	registrar, err := s.contractMaker.NewUsernameRegistrar(chainID, registryAddr)
 	if err != nil {
-		return nil, err
+		return nil, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
@@ -67,47 +68,56 @@ func (s *ENSRegisterProcessor) CalculateFees(params ProcessorInputParams) (*big.
 func (s *ENSRegisterProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	price, err := s.GetPriceForRegisteringEnsName(params.FromChain.ChainID)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	registrarABI, err := abi.JSON(strings.NewReader(registrar.UsernameRegistrarABI))
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	x, y := ens.ExtractCoordinates(params.PublicKey)
 	extraData, err := registrarABI.Pack("register", ens.UsernameToLabel(params.Username), params.FromAddr, x, y)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	sntABI, err := abi.JSON(strings.NewReader(snt.SNTABI))
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	registryAddr, err := s.ensService.API().GetRegistrarAddress(context.Background(), params.FromChain.ChainID)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	return sntABI.Pack("approveAndCall", registryAddr, price, extraData)
 }
 
 func (s *ENSRegisterProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+	if params.TestsMode {
+		if params.TestEstimationMap != nil {
+			if val, ok := params.TestEstimationMap[s.Name()]; ok {
+				return val, nil
+			}
+		}
+		return 0, ErrNoEstimationFound
+	}
+
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
-		return 0, err
+		return 0, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	input, err := s.PackTxInputData(params)
 	if err != nil {
-		return 0, err
+		return 0, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
-		return 0, err
+		return 0, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	msg := ethereum.CallMsg{
@@ -119,7 +129,7 @@ func (s *ENSRegisterProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 
 	estimation, err := ethClient.EstimateGas(context.Background(), msg)
 	if err != nil {
-		return 0, err
+		return 0, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
@@ -131,7 +141,7 @@ func (s *ENSRegisterProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.T
 	toAddr := types.Address(params.ToAddr)
 	inputData, err := s.PackTxInputData(params)
 	if err != nil {
-		return nil, err
+		return nil, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	sendArgs := &MultipathProcessorTxArgs{

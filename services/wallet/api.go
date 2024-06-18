@@ -36,8 +36,49 @@ import (
 )
 
 func NewAPI(s *Service) *API {
-	router := router.NewRouter(s.GetRPCClient(), s.GetTransactor(), s.GetTokenManager(), s.GetMarketManager(), s.GetCollectiblesService(),
-		s.GetCollectiblesManager(), s.GetEnsService(), s.GetStickersService(), s.FeatureFlags())
+	rpcClient := s.GetRPCClient()
+	transactor := s.GetTransactor()
+	tokenManager := s.GetTokenManager()
+	ensService := s.GetEnsService()
+	stickersService := s.GetStickersService()
+	featureFlags := s.FeatureFlags()
+
+	router := router.NewRouter(rpcClient, transactor, tokenManager, s.GetMarketManager(), s.GetCollectiblesService(),
+		s.GetCollectiblesManager(), ensService, stickersService)
+
+	transfer := pathprocessor.NewTransferProcessor(rpcClient, transactor)
+	router.AddPathProcessor(transfer)
+
+	erc721Transfer := pathprocessor.NewERC721Processor(rpcClient, transactor)
+	router.AddPathProcessor(erc721Transfer)
+
+	erc1155Transfer := pathprocessor.NewERC1155Processor(rpcClient, transactor)
+	router.AddPathProcessor(erc1155Transfer)
+
+	hop := pathprocessor.NewHopBridgeProcessor(rpcClient, transactor, tokenManager)
+	router.AddPathProcessor(hop)
+
+	if featureFlags.EnableCelerBridge {
+		// TODO: Celar Bridge is out of scope for 2.30, check it thoroughly once we decide to include it again
+		cbridge := pathprocessor.NewCelerBridgeProcessor(rpcClient, transactor, tokenManager)
+		router.AddPathProcessor(cbridge)
+	}
+
+	paraswap := pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
+	router.AddPathProcessor(paraswap)
+
+	ensRegister := pathprocessor.NewENSRegisterProcessor(rpcClient, transactor, ensService)
+	router.AddPathProcessor(ensRegister)
+
+	ensRelease := pathprocessor.NewENSReleaseProcessor(rpcClient, transactor, ensService)
+	router.AddPathProcessor(ensRelease)
+
+	ensPublicKey := pathprocessor.NewENSPublicKeyProcessor(rpcClient, transactor, ensService)
+	router.AddPathProcessor(ensPublicKey)
+
+	buyStickers := pathprocessor.NewStickersBuyProcessor(rpcClient, transactor, stickersService)
+	router.AddPathProcessor(buyStickers)
+
 	return &API{s, s.reader, router}
 }
 
@@ -464,12 +505,6 @@ func (api *API) GetSuggestedRoutes(
 
 func (api *API) GetSuggestedRoutesV2(ctx context.Context, input *router.RouteInputParams) (*router.SuggestedRoutesV2, error) {
 	log.Debug("call to GetSuggestedRoutesV2")
-	testnetMode, err := api.s.rpcClient.NetworkManager.GetTestNetworksEnabled()
-	if err != nil {
-		return nil, err
-	}
-
-	input.TestnetMode = testnetMode
 
 	return api.router.SuggestedRoutesV2(ctx, input)
 }

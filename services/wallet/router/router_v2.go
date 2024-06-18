@@ -2,7 +2,6 @@ package router
 
 import (
 	"context"
-	"errors"
 	"math"
 	"math/big"
 	"sort"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/wallet/async"
@@ -44,12 +44,29 @@ type RouteInputParams struct {
 	DisabledToChainIDs   []uint64                `json:"disabledToChainIDs"`
 	GasFeeMode           GasFeeMode              `json:"gasFeeMode" validate:"required"`
 	FromLockedAmount     map[uint64]*hexutil.Big `json:"fromLockedAmount"`
-	TestnetMode          bool                    `json:"testnetMode"`
+	testnetMode          bool
 
 	// For send types like EnsRegister, EnsRelease, EnsSetPubKey, StickersBuy
 	Username  string       `json:"username"`
 	PublicKey string       `json:"publicKey"`
 	PackID    *hexutil.Big `json:"packID"`
+
+	// TODO: Remove two fields below once we implement a better solution for tests
+	// Currently used for tests only
+	testsMode  bool
+	testParams *routerTestParams
+}
+
+type routerTestParams struct {
+	tokenFrom             *walletToken.Token
+	tokenPrices           map[string]float64
+	estimationMap         map[string]uint64   // [processor-name, estimated-value]
+	bonderFeeMap          map[string]*big.Int // [token-symbol, bonder-fee]
+	suggestedFees         *SuggestedFees
+	baseFee               *big.Int
+	balanceMap            map[string]*big.Int // [token-symbol, balance]
+	approvalGasEstimation uint64
+	approvalL1Fee         uint64
 }
 
 type PathV2 struct {
@@ -306,15 +323,15 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 func validateInputData(input *RouteInputParams) error {
 	if input.SendType == ENSRegister {
 		if input.Username == "" || input.PublicKey == "" {
-			return errors.New("username and public key are required for ENSRegister")
+			return ErrUsernameAndPubKeyRequiredForENSRegister
 		}
-		if input.TestnetMode {
+		if input.testnetMode {
 			if input.TokenID != pathprocessor.SttSymbol {
-				return errors.New("only STT is supported for ENSRegister on testnet")
+				return ErrOnlySTTSupportedForENSRegisterOnTestnet
 			}
 		} else {
 			if input.TokenID != pathprocessor.SntSymbol {
-				return errors.New("only SNT is supported for ENSRegister")
+				return ErrOnlySTTSupportedForENSReleaseOnTestnet
 			}
 		}
 		return nil
@@ -322,62 +339,62 @@ func validateInputData(input *RouteInputParams) error {
 
 	if input.SendType == ENSRelease {
 		if input.Username == "" {
-			return errors.New("username is required for ENSRelease")
+			return ErrUsernameRequiredForENSRelease
 		}
 	}
 
 	if input.SendType == ENSSetPubKey {
 		if input.Username == "" || input.PublicKey == "" || ens.ValidateENSUsername(input.Username) != nil {
-			return errors.New("username and public key are required for ENSSetPubKey")
+			return ErrUsernameAndPubKeyRequiredForENSSetPubKey
 		}
 	}
 
 	if input.SendType == StickersBuy {
 		if input.PackID == nil {
-			return errors.New("packID is required for StickersBuy")
+			return ErrPackIDRequiredForStickersBuy
 		}
 	}
 
 	if input.SendType == Swap {
 		if input.ToTokenID == "" {
-			return errors.New("toTokenID is required for Swap")
+			return ErrToTokenIDRequiredForSwap
 		}
 		if input.TokenID == input.ToTokenID {
-			return errors.New("tokenID and toTokenID must be different")
+			return ErrTokenIDAndToTokenIDDifferent
 		}
 
 		// we can do this check, cause AmountIn is required in `RouteInputParams`
 		if input.AmountIn.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 &&
 			input.AmountOut != nil &&
 			input.AmountOut.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
-			return errors.New("only one of amountIn or amountOut can be set")
+			return ErrOnlyOneOfAmountInOrOutSet
 		}
 
 		if input.AmountIn.ToInt().Sign() < 0 {
-			return errors.New("amountIn must be positive")
+			return ErrAmountInMustBePositive
 		}
 
 		if input.AmountOut != nil && input.AmountOut.ToInt().Sign() < 0 {
-			return errors.New("amountOut must be positive")
+			return ErrAmountOutMustBePositive
 		}
 	}
 
 	if input.FromLockedAmount != nil && len(input.FromLockedAmount) > 0 {
 		suppNetworks := copyMap(supportedNetworks)
-		if input.TestnetMode {
+		if input.testnetMode {
 			suppNetworks = copyMap(supportedTestNetworks)
 		}
 
 		totalLockedAmount := big.NewInt(0)
 
 		for chainID, amount := range input.FromLockedAmount {
-			if input.TestnetMode {
+			if input.testnetMode {
 				if !supportedTestNetworks[chainID] {
-					return errors.New("locked amount is not supported for the selected network")
+					return ErrLockedAmountNotSupportedForNetwork
 				}
 			} else {
 				if !supportedNetworks[chainID] {
-					return errors.New("locked amount is not supported for the selected network")
+					return ErrLockedAmountNotSupportedForNetwork
 				}
 			}
 
@@ -386,14 +403,14 @@ func validateInputData(input *RouteInputParams) error {
 			totalLockedAmount = new(big.Int).Add(totalLockedAmount, amount.ToInt())
 
 			if amount == nil || amount.ToInt().Sign() < 0 {
-				return errors.New("locked amount must be positive")
+				return ErrLockedAmountMustBePositive
 			}
 		}
 
 		if totalLockedAmount.Cmp(input.AmountIn.ToInt()) > 0 {
-			return errors.New("locked amount exceeds the total amount to send")
+			return ErrLockedAmountExceedsTotalSendAmount
 		} else if totalLockedAmount.Cmp(input.AmountIn.ToInt()) < 0 && len(suppNetworks) == 0 {
-			return errors.New("locked amount is less than the total amount to send, but all networks are locked")
+			return ErrLockedAmountLessThanSendAmountAllNetworks
 		}
 	}
 
@@ -410,21 +427,33 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 
 	err := validateInputData(input)
 	if err != nil {
-		return nil, err
+		return nil, errors.CreateErrorResponseFromError(err)
 	}
+
+	testnetMode, err := r.rpcClient.NetworkManager.GetTestNetworksEnabled()
+	if err != nil {
+		return nil, errors.CreateErrorResponseFromError(err)
+	}
+
+	input.testnetMode = testnetMode
 
 	candidates, err := r.resolveCandidates(ctx, input)
 	if err != nil {
-		return nil, err
+		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
 	return r.resolveRoutes(ctx, input, candidates)
 }
 
 func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams) (candidates []*PathV2, err error) {
-	networks, err := r.rpcClient.NetworkManager.Get(false)
+	var (
+		testsMode = input.testsMode && input.testParams != nil
+		networks  []*params.Network
+	)
+
+	networks, err = r.rpcClient.NetworkManager.Get(false)
 	if err != nil {
-		return nil, err
+		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
 	var (
@@ -434,7 +463,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams)
 
 	for networkIdx := range networks {
 		network := networks[networkIdx]
-		if network.IsTest != input.TestnetMode {
+		if network.IsTest != input.testnetMode {
 			continue
 		}
 
@@ -451,7 +480,11 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams)
 			toToken *walletToken.Token
 		)
 
-		token = input.SendType.FindToken(r.tokenManager, r.collectiblesService, input.AddrFrom, network, input.TokenID)
+		if testsMode {
+			token = input.testParams.tokenFrom
+		} else {
+			token = input.SendType.FindToken(r.tokenManager, r.collectiblesService, input.AddrFrom, network, input.TokenID)
+		}
 		if token == nil {
 			continue
 		}
@@ -476,7 +509,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams)
 
 		group.Add(func(c context.Context) error {
 			if err != nil {
-				return err
+				return errors.CreateErrorResponseFromError(err)
 			}
 
 			for _, pProcessor := range r.pathProcessors {
@@ -501,7 +534,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams)
 				}
 
 				for _, dest := range networks {
-					if dest.IsTest != input.TestnetMode {
+					if dest.IsTest != input.testnetMode {
 						continue
 					}
 
@@ -530,6 +563,13 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams)
 						Username:  input.Username,
 						PublicKey: input.PublicKey,
 						PackID:    input.PackID.ToInt(),
+					}
+					if input.testsMode {
+						processorInputParams.TestsMode = input.testsMode
+						processorInputParams.TestEstimationMap = input.testParams.estimationMap
+						processorInputParams.TestBonderFeeMap = input.testParams.bonderFeeMap
+						processorInputParams.TestApprovalGasEstimation = input.testParams.approvalGasEstimation
+						processorInputParams.TestApprovalL1Fee = input.testParams.approvalL1Fee
 					}
 
 					can, err := pProcessor.AvailableFor(processorInputParams)
@@ -566,9 +606,14 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams)
 						l1FeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, txInputData)
 					}
 
-					fees, err := r.feesManager.SuggestedFees(ctx, network.ChainID)
-					if err != nil {
-						continue
+					var fees *SuggestedFees
+					if testsMode {
+						fees = input.testParams.suggestedFees
+					} else {
+						fees, err = r.feesManager.SuggestedFees(ctx, network.ChainID)
+						if err != nil {
+							continue
+						}
 					}
 
 					amountOut, err := pProcessor.CalculateAmountOut(processorInputParams)
@@ -623,48 +668,65 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams)
 	return candidates, nil
 }
 
-func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, candidates []*PathV2) (*SuggestedRoutesV2, error) {
-	prices, err := input.SendType.FetchPrices(r.marketManager, input.TokenID)
-	if err != nil {
-		return nil, err
+func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, candidates []*PathV2) (suggestedRoutes *SuggestedRoutesV2, err error) {
+	var prices map[string]float64
+	if input.testsMode {
+		prices = input.testParams.tokenPrices
+	} else {
+		prices, err = input.SendType.FetchPrices(r.marketManager, input.TokenID)
+		if err != nil {
+			return nil, errors.CreateErrorResponseFromError(err)
+		}
 	}
 
-	suggestedRoutes := newSuggestedRoutesV2(input.AmountIn.ToInt(), candidates, input.FromLockedAmount, prices[input.TokenID], prices["ETH"])
+	suggestedRoutes = newSuggestedRoutesV2(input.AmountIn.ToInt(), candidates, input.FromLockedAmount, prices[input.TokenID], prices[pathprocessor.EthSymbol])
 
 	// check the best route for the required balances
 	for _, path := range suggestedRoutes.Best {
-
 		if path.requiredTokenBalance != nil && path.requiredTokenBalance.Cmp(pathprocessor.ZeroBigIntValue) > 0 {
 			tokenBalance := big.NewInt(1)
-			if input.SendType == ERC1155Transfer {
-				tokenBalance, err = r.getERC1155Balance(ctx, path.FromChain, path.FromToken, input.AddrFrom)
-				if err != nil {
-					return nil, err
+			if input.testsMode {
+				if val, ok := input.testParams.balanceMap[path.FromToken.Symbol]; ok {
+					tokenBalance = val
 				}
-			} else if input.SendType != ERC721Transfer {
-				tokenBalance, err = r.getBalance(ctx, path.FromChain, path.FromToken, input.AddrFrom)
-				if err != nil {
-					return nil, err
+			} else {
+				if input.SendType == ERC1155Transfer {
+					tokenBalance, err = r.getERC1155Balance(ctx, path.FromChain, path.FromToken, input.AddrFrom)
+					if err != nil {
+						return nil, errors.CreateErrorResponseFromError(err)
+					}
+				} else if input.SendType != ERC721Transfer {
+					tokenBalance, err = r.getBalance(ctx, path.FromChain, path.FromToken, input.AddrFrom)
+					if err != nil {
+						return nil, errors.CreateErrorResponseFromError(err)
+					}
 				}
 			}
 
 			if tokenBalance.Cmp(path.requiredTokenBalance) == -1 {
-				return suggestedRoutes, errors.New("not enough token balance")
+				return suggestedRoutes, ErrNotEnoughTokenBalance
 			}
 		}
 
-		nativeToken := r.tokenManager.FindToken(path.FromChain, path.FromChain.NativeCurrencySymbol)
-		if nativeToken == nil {
-			return nil, errors.New("native token not found")
-		}
+		nativeBalance := big.NewInt(0)
+		if input.testsMode {
+			if val, ok := input.testParams.balanceMap[pathprocessor.EthSymbol]; ok {
+				nativeBalance = val
+			}
+		} else {
+			nativeToken := r.tokenManager.FindToken(path.FromChain, path.FromChain.NativeCurrencySymbol)
+			if nativeToken == nil {
+				return nil, ErrNativeTokenNotFound
+			}
 
-		nativeBalance, err := r.getBalance(ctx, path.FromChain, nativeToken, input.AddrFrom)
-		if err != nil {
-			return nil, err
+			nativeBalance, err = r.getBalance(ctx, path.FromChain, nativeToken, input.AddrFrom)
+			if err != nil {
+				return nil, errors.CreateErrorResponseFromError(err)
+			}
 		}
 
 		if nativeBalance.Cmp(path.requiredNativeBalance) == -1 {
-			return suggestedRoutes, errors.New("not enough native balance")
+			return suggestedRoutes, ErrNotEnoughNativeBalance
 		}
 	}
 
