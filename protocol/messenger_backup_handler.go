@@ -317,7 +317,7 @@ func syncInstallationCommunitiesSet(communities []*protobuf.SyncInstallationComm
 func (m *Messenger) handleSyncedCommunities(state *ReceivedMessageState, message *protobuf.Backup) []error {
 	var errors []error
 	for _, syncCommunity := range syncInstallationCommunitiesSet(message.Communities) {
-		err := m.handleSyncInstallationCommunity(state, syncCommunity, nil)
+		err := m.handleSyncInstallationCommunity(state, syncCommunity)
 		if err != nil {
 			errors = append(errors, err)
 		}

@@ -1065,16 +1065,18 @@ func advertiseCommunityToUserOldWay(s *suite.Suite, community *communities.Commu
 	s.Require().NoError(err)
 
 	// Ensure community is received
-	response, err := WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		user,
 		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0
+			if len(r.Communities()) != 1 {
+				return false
+			}
+			c := r.Communities()[0]
+			return c.IDString() == community.IDString() && c.Clock() >= community.Clock()
 		},
-		"event sender did not receive community request to join",
+		"no community received",
 	)
 	s.Require().NoError(err)
-	communityInResponse := response.Communities()[0]
-	s.Require().Equal(community.ID(), communityInResponse.ID())
 }
 
 func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger) {

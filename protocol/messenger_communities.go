@@ -3694,10 +3694,10 @@ func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, co
 }
 
 func (m *Messenger) HandleSyncInstallationCommunity(messageState *ReceivedMessageState, syncCommunity *protobuf.SyncInstallationCommunity, statusMessage *v1protocol.StatusMessage) error {
-	return m.handleSyncInstallationCommunity(messageState, syncCommunity, nil)
+	return m.handleSyncInstallationCommunity(messageState, syncCommunity)
 }
 
-func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessageState, syncCommunity *protobuf.SyncInstallationCommunity, statusMessage *v1protocol.StatusMessage) error {
+func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessageState, syncCommunity *protobuf.SyncInstallationCommunity) error {
 	logger := m.logger.Named("handleSyncInstallationCommunity")
 
 	// Should handle community
@@ -3785,6 +3785,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 		logger.Debug("m.handleCommunityDescription error", zap.Error(err))
 		return err
 	}
+	descriptionOutdated := err == communities.ErrInvalidCommunityDescriptionClockOutdated
 
 	if syncCommunity.Settings != nil {
 		err = m.HandleSyncCommunitySettings(messageState, syncCommunity.Settings, nil)
@@ -3812,7 +3813,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 	}
 
 	// if we are not waiting for approval, join or leave the community
-	if !pending {
+	if !pending && !descriptionOutdated {
 		var mr *MessengerResponse
 		if syncCommunity.Joined {
 			mr, err = m.joinCommunity(context.Background(), syncCommunity.Id, false)
