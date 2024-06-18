@@ -644,6 +644,8 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		b.config.WakuV2Config.Nameserver = request.WakuV2Nameserver
 	}
 
+	b.config.ShhextConfig.BandwidthStatsEnabled = request.BandwidthStatsEnabled
+
 	b.overrideNetworks(b.config, request)
 
 	err = b.setupLogSettings()
