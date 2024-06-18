@@ -92,7 +92,7 @@ run_test_for_package() {
     redirect_stdout "${output_file}"
 
   # Merge package coverage results
-  gocovmerge ${package_dir}/coverage.out.rerun.* > ${coverage_file}
+  go run ./cmd/test-coverage-utils/gocovmerge.go ${package_dir}/coverage.out.rerun.* > ${coverage_file}
 
   # Cleanup coverage reports
   rm -f ${package_dir}/coverage.out.rerun.*

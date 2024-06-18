@@ -366,7 +366,6 @@ test-unit: export UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE ?= \
 test-unit: export UNIT_TEST_PACKAGES_WITH_EXTENDED_TIMEOUT ?= \
 	github.com/status-im/status-go/protocol
 test-unit: ##@tests Run unit and integration tests
-	go install github.com/wadey/gocovmerge@latest
 	./_assets/scripts/run_unit_tests.sh
 
 test-unit-race: export GOTEST_EXTRAFLAGS=-race
