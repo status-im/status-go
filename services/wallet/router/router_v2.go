@@ -295,15 +295,15 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 func validateInputData(input *RouteInputParams) error {
 	if input.SendType == ENSRegister {
 		if input.Username == "" || input.PublicKey == "" {
-			return errors.New("username and public key are required for ENSRegister")
+			return ErrorENSRegisterRequires
 		}
 		if input.TestnetMode {
 			if input.TokenID != pathprocessor.SttSymbol {
-				return errors.New("only STT is supported for ENSRegister on testnet")
+				return ErrorENSRegisterTestNetSTTOnly
 			}
 		} else {
 			if input.TokenID != pathprocessor.SntSymbol {
-				return errors.New("only SNT is supported for ENSRegister")
+				return ErrorENSRegisterSNTOnly
 			}
 		}
 		return nil
@@ -311,13 +311,13 @@ func validateInputData(input *RouteInputParams) error {
 
 	if input.SendType == ENSRelease {
 		if input.Username == "" {
-			return errors.New("username is required for ENSRelease")
+			return ErrorENSReleaseRequires
 		}
 	}
 
 	if input.SendType == ENSSetPubKey {
 		if input.Username == "" || input.PublicKey == "" || ens.ValidateENSUsername(input.Username) != nil {
-			return errors.New("username and public key are required for ENSSetPubKey")
+			return ErrorENSSetPubKeyRequires
 		}
 	}
 
@@ -369,17 +369,17 @@ func validateFromLockedAmount(fromLockedAmount map[uint64]*hexutil.Big, isTestne
 	for chainID, amount := range fromLockedAmount {
 		if isTestnetMode {
 			if !supportedTestNetworks[chainID] {
-				return errors.New("locked amount is not supported for the selected network")
+				return ErrorLockedAmountNotSupportedNetwork
 			}
 		} else {
 			if !supportedNetworks[chainID] {
-				return errors.New("locked amount is not supported for the selected network")
+				return ErrorLockedAmountNotSupportedNetwork
 			}
 		}
 
 		// Check locked amount is not negative
 		if amount == nil || amount.ToInt().Sign() < 0 {
-			return errors.New("locked amount must not be negative")
+			return ErrorLockedAmountNotNegative
 		}
 
 		// Check if locked chain ID is a duplicate
@@ -394,7 +394,7 @@ func validateFromLockedAmount(fromLockedAmount map[uint64]*hexutil.Big, isTestne
 	}
 	if (!isTestnetMode && excludedChainCount == len(supportedNetworks)) ||
 		(isTestnetMode && excludedChainCount == len(supportedTestNetworks)) {
-		return errors.New("all supported chains are excluded, routing impossible")
+		return ErrorLockedAmountExcludesAllSupported
 	}
 	return nil
 }

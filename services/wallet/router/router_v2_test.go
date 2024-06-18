@@ -47,7 +47,7 @@ func TestValidateInputData(t *testing.T) {
 				TokenID:     pathprocessor.SttSymbol,
 				TestnetMode: true,
 			},
-			expectedError: errors.New("username and public key are required for ENSRegister"),
+			expectedError: ErrorENSRegisterRequires,
 		},
 		{
 			name: "ENSRegister missing public key",
@@ -57,7 +57,7 @@ func TestValidateInputData(t *testing.T) {
 				TokenID:     pathprocessor.SttSymbol,
 				TestnetMode: true,
 			},
-			expectedError: errors.New("username and public key are required for ENSRegister"),
+			expectedError: ErrorENSRegisterRequires,
 		},
 		{
 			name: "ENSRegister invalid token on testnet",
@@ -68,7 +68,7 @@ func TestValidateInputData(t *testing.T) {
 				TokenID:     "invalidtoken",
 				TestnetMode: true,
 			},
-			expectedError: errors.New("only STT is supported for ENSRegister on testnet"),
+			expectedError: ErrorENSRegisterTestNetSTTOnly,
 		},
 		{
 			name: "ENSRegister invalid token on mainnet",
@@ -78,7 +78,7 @@ func TestValidateInputData(t *testing.T) {
 				PublicKey: "validpublickey",
 				TokenID:   "invalidtoken",
 			},
-			expectedError: errors.New("only SNT is supported for ENSRegister"),
+			expectedError: ErrorENSRegisterSNTOnly,
 		},
 		{
 			name: "ENSRelease valid data",
@@ -93,7 +93,7 @@ func TestValidateInputData(t *testing.T) {
 			input: &RouteInputParams{
 				SendType: ENSRelease,
 			},
-			expectedError: errors.New("username is required for ENSRelease"),
+			expectedError: ErrorENSReleaseRequires,
 		},
 		{
 			name: "ENSSetPubKey valid data",
@@ -110,7 +110,7 @@ func TestValidateInputData(t *testing.T) {
 				SendType:  ENSSetPubKey,
 				PublicKey: "validpublickey",
 			},
-			expectedError: errors.New("username and public key are required for ENSSetPubKey"),
+			expectedError: ErrorENSSetPubKeyRequires,
 		},
 		{
 			name: "ENSSetPubKey missing public key",
@@ -118,7 +118,7 @@ func TestValidateInputData(t *testing.T) {
 				SendType: ENSSetPubKey,
 				Username: "validusername",
 			},
-			expectedError: errors.New("username and public key are required for ENSSetPubKey"),
+			expectedError: ErrorENSSetPubKeyRequires,
 		},
 		{
 			name: "ENSSetPubKey invalid ENS username",
@@ -127,7 +127,7 @@ func TestValidateInputData(t *testing.T) {
 				Username:  "invalidusername",
 				PublicKey: "validpublickey",
 			},
-			expectedError: errors.New("username and public key are required for ENSSetPubKey"),
+			expectedError: ErrorENSSetPubKeyRequires,
 		},
 		{
 			name: "fromLockedAmount with supported network on testnet",
@@ -175,7 +175,7 @@ func TestValidateInputData(t *testing.T) {
 					999: (*hexutil.Big)(big.NewInt(10)),
 				},
 			},
-			expectedError: errors.New("locked amount is not supported for the selected network"),
+			expectedError: ErrorLockedAmountNotSupportedNetwork,
 		},
 		{
 			name: "fromLockedAmount with negative amount",
@@ -184,7 +184,7 @@ func TestValidateInputData(t *testing.T) {
 					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(-10)),
 				},
 			},
-			expectedError: errors.New("locked amount must not be negative"),
+			expectedError: ErrorLockedAmountNotNegative,
 		},
 		{
 			name: "fromLockedAmount with zero amount",
@@ -214,7 +214,7 @@ func TestValidateInputData(t *testing.T) {
 					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(0)),
 				},
 			},
-			expectedError: errors.New("all supported chains are excluded, routing impossible"),
+			expectedError: ErrorLockedAmountExcludesAllSupported,
 		},
 		{
 			name: "fromLockedAmount with all supported test networks with zero amount",
@@ -226,7 +226,7 @@ func TestValidateInputData(t *testing.T) {
 				},
 				TestnetMode: true,
 			},
-			expectedError: errors.New("all supported chains are excluded, routing impossible"),
+			expectedError: ErrorLockedAmountExcludesAllSupported,
 		},
 	}
 
