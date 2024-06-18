@@ -1444,6 +1444,10 @@ func (b *GethStatusBackend) prepareNodeAccount(request *requests.CreateAccount, 
 		request.Password = input.derivedAddresses[pathEncryption].PublicKey
 	}
 
+	// NOTE: I intentionally left this condition separately and not an `else` branch. Technically it's an `else`,
+	// 		 but the statements inside are not the opposite statement of the first statement. It's just kinda like this:
+	// 		 - replace password when we're using keycard
+	// 		 - store account when we're not using keycard
 	if request.KeycardInstanceUID == "" {
 		err = b.storeAccount(input.accountID, request.Password, paths)
 		if err != nil {

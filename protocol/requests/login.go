@@ -29,7 +29,7 @@ type Login struct {
 	// exists locally, but now the keycard is lost. In this case client is responsible for calling
 	// `convertToRegularAccount` after a successful login. This could be improved in the future.
 	// When non-empty, mnemonic is used to generate required keypairs and:
-	// - Password is ignored and replaced with encryption private key
+	// - Password is ignored and replaced with encryption public key
 	// - KeycardWhisperPrivateKey is ignored and replaced with chat private key
 	Mnemonic string `json:"mnemonic"`
 
