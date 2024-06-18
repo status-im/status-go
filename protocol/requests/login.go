@@ -8,9 +8,10 @@ type Login struct {
 	Password string `json:"password"`
 	KeyUID   string `json:"keyUid"`
 
-	KdfIterations    int    `json:"kdfIterations"`
-	RuntimeLogLevel  string `json:"runtimeLogLevel"`
-	WakuV2Nameserver string `json:"wakuV2Nameserver"`
+	KdfIterations         int    `json:"kdfIterations"`
+	RuntimeLogLevel       string `json:"runtimeLogLevel"`
+	WakuV2Nameserver      string `json:"wakuV2Nameserver"`
+	BandwidthStatsEnabled bool   `json:"bandwidthStatsEnabled"`
 
 	WalletSecretsConfig
 }
