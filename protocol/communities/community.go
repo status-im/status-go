@@ -260,6 +260,10 @@ func (o *Community) MarshalJSONWithMediaServer(mediaServer *server.MediaServer) 
 	if o.config.MemberIdentity == nil {
 		return nil, errors.New("member identity not set")
 	}
+
+	type Image struct {
+		Uri string `json:"uri"`
+	}
 	communityItem := struct {
 		ID                          types.HexBytes                       `json:"id"`
 		MemberRole                  protobuf.CommunityMember_Roles       `json:"memberRole"`
@@ -276,7 +280,7 @@ func (o *Community) MarshalJSONWithMediaServer(mediaServer *server.MediaServer) 
 		Tags                        []CommunityTag                       `json:"tags"`
 		Chats                       map[string]CommunityChat             `json:"chats"`
 		Categories                  map[string]CommunityCategory         `json:"categories"`
-		Images                      map[string]string                    `json:"images"`
+		Images                      map[string]Image                     `json:"images"`
 		Permissions                 *protobuf.CommunityPermissions       `json:"permissions"`
 		Members                     map[string]*protobuf.CommunityMember `json:"members"`
 		CanRequestAccess            bool                                 `json:"canRequestAccess"`
@@ -391,9 +395,9 @@ func (o *Community) MarshalJSONWithMediaServer(mediaServer *server.MediaServer) 
 			communityItem.Description = o.config.CommunityDescription.Identity.Description
 			for t := range o.config.CommunityDescription.Identity.Images {
 				if communityItem.Images == nil {
-					communityItem.Images = make(map[string]string)
+					communityItem.Images = make(map[string]Image)
 				}
-				communityItem.Images[t] = mediaServer.MakeCommunityImageURL(o.IDString(), t)
+				communityItem.Images[t] = Image{Uri: mediaServer.MakeCommunityImageURL(o.IDString(), t)}
 			}
 		}
 

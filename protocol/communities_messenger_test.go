@@ -4399,8 +4399,11 @@ func (s *MessengerCommunitiesSuite) TestSerializedCommunities() {
 	d, err := json.Marshal(c)
 	s.Require().NoError(err)
 
+	type Image struct {
+		Uri string `json:"uri"`
+	}
 	var communityData []struct {
-		Images                  map[string]string `json:"images"`
+		Images                  map[string]Image `json:"images"`
 		CommunityTokensMetadata []struct {
 			Image  string `json:"image"`
 			Symbol string `json:"symbol"`
@@ -4410,19 +4413,19 @@ func (s *MessengerCommunitiesSuite) TestSerializedCommunities() {
 	s.Require().NoError(err)
 	// Check community description image
 	s.Require().NotEmpty(communityData[0].Images[identImageName])
-	imageUrl := communityData[0].Images[identImageName]
-	s.T().Log(fmt.Sprintf("Image URL (%s):", identImageName), imageUrl)
-	e, err := s.fetchImage(imageUrl)
+	image := communityData[0].Images[identImageName]
+	s.T().Log(fmt.Sprintf("Image URL (%s):", identImageName), image)
+	e, err := s.fetchImage(image.Uri)
 	s.Require().NoError(err)
 	s.Require().Equal(identImagePayload, e)
 
-	imageUrlWithoutCommunityID, err := s.removeUrlParam(imageUrl, "communityID")
+	imageUrlWithoutCommunityID, err := s.removeUrlParam(image.Uri, "communityID")
 	s.Require().NoError(err)
 	e, err = s.fetchImage(imageUrlWithoutCommunityID)
 	s.Require().NoError(err)
 	s.Require().Len(e, 0)
 
-	imageUrlWithWrongCommunityID, err := s.updateUrlParam(imageUrl, "communityID", "0x0")
+	imageUrlWithWrongCommunityID, err := s.updateUrlParam(image.Uri, "communityID", "0x0")
 	s.Require().NoError(err)
 	e, err = s.fetchImage(imageUrlWithWrongCommunityID)
 	s.Require().NoError(err)
