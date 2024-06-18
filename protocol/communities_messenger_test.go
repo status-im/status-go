@@ -3088,6 +3088,56 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_ImportCommunity() {
 	s.Require().NoError(err)
 }
 
+func (s *MessengerCommunitiesSuite) TestSyncCommunity_OutdatedDescription() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+
+	// Spectate community
+	_, err := s.alice.SpectateCommunity(community.ID())
+	s.Require().NoError(err)
+
+	// Update alice's community reference
+	community, err = s.alice.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().False(community.Joined())
+	s.Require().True(community.Spectated())
+
+	// Create sync message for later
+	syncCommunityMsg, err := s.alice.buildSyncInstallationCommunity(community, 1)
+	s.Require().NoError(err)
+	s.Require().False(syncCommunityMsg.Joined)
+	s.Require().True(syncCommunityMsg.Spectated)
+
+	// Join community
+	s.joinCommunity(community, s.owner, s.alice)
+
+	// Update owner's community reference
+	community, err = s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.HasMember(s.alice.IdentityPublicKey()))
+
+	// Create another device
+	aliceOtherDevice := s.createOtherDevice(s.alice)
+	defer TearDownMessenger(&s.Suite, aliceOtherDevice)
+
+	// Make other device receive community
+	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, aliceOtherDevice)
+	community, err = aliceOtherDevice.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.Joined())
+
+	// Then make other device handle sync message with outdated community description
+	messageState := aliceOtherDevice.buildMessageState()
+	err = aliceOtherDevice.handleSyncInstallationCommunity(messageState, syncCommunityMsg)
+	s.Require().NoError(err)
+
+	// Then community should not be left
+	community, err = aliceOtherDevice.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.Joined())
+	s.Require().False(community.Spectated())
+}
+
 func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 	// Create a community
 	createCommunityReq := &requests.CreateCommunity{

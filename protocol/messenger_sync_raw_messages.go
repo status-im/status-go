@@ -116,7 +116,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.handleSyncInstallationCommunity(state, &message, nil)
+			err = m.handleSyncInstallationCommunity(state, &message)
 			if err != nil {
 				m.logger.Error("failed to handleSyncCommunity when HandleSyncRawMessages", zap.Error(err))
 				continue

@@ -3117,32 +3117,42 @@ func (m *Messenger) propagateSyncInstallationCommunityWithHRKeys(msg *protobuf.S
 	return nil
 }
 
+func (m *Messenger) buildSyncInstallationCommunity(community *communities.Community, clock uint64) (*protobuf.SyncInstallationCommunity, error) {
+	communitySettings, err := m.communitiesManager.GetCommunitySettingsByID(community.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	syncControlNode, err := m.communitiesManager.GetSyncControlNode(community.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	syncMessage, err := community.ToSyncInstallationCommunityProtobuf(clock, communitySettings, syncControlNode)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.propagateSyncInstallationCommunityWithHRKeys(syncMessage, community)
+	if err != nil {
+		return nil, err
+	}
+
+	return syncMessage, nil
+}
+
 func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Community, rawMessageHandler RawMessageHandler) error {
 	logger := m.logger.Named("syncCommunity")
 	if !m.hasPairedDevices() {
 		logger.Debug("device has no paired devices")
 		return nil
 	}
+
 	logger.Debug("device has paired device(s)")
 
 	clock, chat := m.getLastClockWithRelatedChat()
 
-	communitySettings, err := m.communitiesManager.GetCommunitySettingsByID(community.ID())
-	if err != nil {
-		return err
-	}
-
-	syncControlNode, err := m.communitiesManager.GetSyncControlNode(community.ID())
-	if err != nil {
-		return err
-	}
-
-	syncMessage, err := community.ToSyncInstallationCommunityProtobuf(clock, communitySettings, syncControlNode)
-	if err != nil {
-		return err
-	}
-
-	err = m.propagateSyncInstallationCommunityWithHRKeys(syncMessage, community)
+	syncMessage, err := m.buildSyncInstallationCommunity(community, clock)
 	if err != nil {
 		return err
 	}
