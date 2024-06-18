@@ -1484,6 +1484,10 @@ func (api *PublicAPI) ListenAddresses() ([]string, error) {
 	return api.service.messenger.ListenAddresses()
 }
 
+func (api *PublicAPI) Enr() (string, error) {
+	return api.service.messenger.ENR()
+}
+
 func (api *PublicAPI) ChangeIdentityImageShowTo(showTo settings.ProfilePicturesShowToType) error {
 	err := api.service.accountsDB.SaveSettingField(settings.ProfilePicturesShowTo, showTo)
 	if err != nil {

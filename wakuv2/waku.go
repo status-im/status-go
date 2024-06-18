@@ -1692,6 +1692,15 @@ func (w *Waku) ListenAddresses() []string {
 	return result
 }
 
+func (w *Waku) ENR() (string, error) {
+	enr := w.node.ENR()
+	if enr == nil {
+		return "", errors.New("enr not available")
+	}
+
+	return enr.String(), nil
+}
+
 func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) error {
 	topic = w.GetPubsubTopic(topic)
 
