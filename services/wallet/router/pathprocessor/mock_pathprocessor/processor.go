@@ -116,6 +116,18 @@ func (mr *MockPathProcessorMockRecorder) CalculateFees(params interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateFees", reflect.TypeOf((*MockPathProcessor)(nil).CalculateFees), params)
 }
 
+// Clear mocks base method.
+func (m *MockPathProcessor) Clear() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Clear")
+}
+
+// Clear indicates an expected call of Clear.
+func (mr *MockPathProcessorMockRecorder) Clear() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Clear", reflect.TypeOf((*MockPathProcessor)(nil).Clear))
+}
+
 // EstimateGas mocks base method.
 func (m *MockPathProcessor) EstimateGas(params pathprocessor.ProcessorInputParams) (uint64, error) {
 	m.ctrl.T.Helper()

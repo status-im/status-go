@@ -12,6 +12,7 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts/ierc20"
+	statusErrors "github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/transactions"
@@ -31,7 +32,16 @@ func (s *TransferProcessor) Name() string {
 }
 
 func (s *TransferProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
-	return params.FromChain.ChainID == params.ToChain.ChainID && params.FromToken != nil && params.ToToken == nil, nil
+	if params.FromChain == nil || params.ToChain == nil {
+		return false, ErrNoChainSet
+	}
+	if params.FromToken == nil {
+		return false, ErrNoTokenSet
+	}
+	if params.ToToken != nil {
+		return false, ErrToTokenShouldNotBeSet
+	}
+	return params.FromChain.ChainID == params.ToChain.ChainID, nil
 }
 
 func (s *TransferProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
@@ -44,7 +54,7 @@ func (s *TransferProcessor) PackTxInputData(params ProcessorInputParams) ([]byte
 	} else {
 		abi, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
 		if err != nil {
-			return []byte{}, err
+			return []byte{}, statusErrors.CreateErrorResponseFromError(err)
 		}
 		return abi.Pack("transfer",
 			params.ToAddr,
@@ -54,23 +64,32 @@ func (s *TransferProcessor) PackTxInputData(params ProcessorInputParams) ([]byte
 }
 
 func (s *TransferProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+	if params.TestsMode {
+		if params.TestEstimationMap != nil {
+			if val, ok := params.TestEstimationMap[s.Name()]; ok {
+				return val, nil
+			}
+		}
+		return 0, ErrNoEstimationFound
+	}
+
 	estimation := uint64(0)
 	var err error
 
 	input, err := s.PackTxInputData(params)
 	if err != nil {
-		return 0, err
+		return 0, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	if params.FromToken.IsNative() {
 		estimation, err = s.transactor.EstimateGas(params.FromChain, params.FromAddr, params.ToAddr, params.AmountIn, input)
 		if err != nil {
-			return 0, err
+			return 0, statusErrors.CreateErrorResponseFromError(err)
 		}
 	} else {
 		ethClient, err := s.rpcClient.EthClient(params.FromChain.ChainID)
 		if err != nil {
-			return 0, err
+			return 0, statusErrors.CreateErrorResponseFromError(err)
 		}
 
 		ctx := context.Background()
@@ -83,7 +102,7 @@ func (s *TransferProcessor) EstimateGas(params ProcessorInputParams) (uint64, er
 
 		estimation, err = ethClient.EstimateGas(ctx, msg)
 		if err != nil {
-			return 0, err
+			return 0, statusErrors.CreateErrorResponseFromError(err)
 		}
 
 	}
@@ -109,14 +128,14 @@ func (s *TransferProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Tran
 	}
 	abi, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
 	if err != nil {
-		return nil, err
+		return nil, statusErrors.CreateErrorResponseFromError(err)
 	}
 	input, err := abi.Pack("transfer",
 		params.ToAddr,
 		params.AmountIn,
 	)
 	if err != nil {
-		return nil, err
+		return nil, statusErrors.CreateErrorResponseFromError(err)
 	}
 	sendArgs := &MultipathProcessorTxArgs{
 		TransferTx: &transactions.SendTxArgs{

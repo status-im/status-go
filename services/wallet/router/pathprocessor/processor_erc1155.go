@@ -14,6 +14,7 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts/ierc1155"
+	statusErrors "github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/transactions"
@@ -50,12 +51,12 @@ func (s *ERC1155Processor) CalculateFees(params ProcessorInputParams) (*big.Int,
 func (s *ERC1155Processor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	abi, err := abi.JSON(strings.NewReader(ierc1155.Ierc1155ABI))
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	id, success := big.NewInt(0).SetString(params.FromToken.Symbol, 0)
 	if !success {
-		return []byte{}, fmt.Errorf("failed to convert %s to big.Int", params.FromToken.Symbol)
+		return []byte{}, statusErrors.CreateErrorResponseFromError(fmt.Errorf("failed to convert %s to big.Int", params.FromToken.Symbol))
 	}
 
 	return abi.Pack("safeTransferFrom",
@@ -68,16 +69,25 @@ func (s *ERC1155Processor) PackTxInputData(params ProcessorInputParams) ([]byte,
 }
 
 func (s *ERC1155Processor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+	if params.TestsMode {
+		if params.TestEstimationMap != nil {
+			if val, ok := params.TestEstimationMap[s.Name()]; ok {
+				return val, nil
+			}
+		}
+		return 0, ErrNoEstimationFound
+	}
+
 	ethClient, err := s.rpcClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
-		return 0, err
+		return 0, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	value := new(big.Int)
 
 	input, err := s.PackTxInputData(params)
 	if err != nil {
-		return 0, err
+		return 0, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	msg := ethereum.CallMsg{
@@ -89,7 +99,7 @@ func (s *ERC1155Processor) EstimateGas(params ProcessorInputParams) (uint64, err
 
 	estimation, err := ethClient.EstimateGas(context.Background(), msg)
 	if err != nil {
-		return 0, err
+		return 0, statusErrors.CreateErrorResponseFromError(err)
 	}
 	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
 	return uint64(increasedEstimation), nil
@@ -101,7 +111,7 @@ func (s *ERC1155Processor) BuildTx(params ProcessorInputParams) (*ethTypes.Trans
 	// We store ERC1155 Token ID using big.Int.String() in token.Symbol
 	tokenID, success := new(big.Int).SetString(params.FromToken.Symbol, 10)
 	if !success {
-		return nil, fmt.Errorf("failed to convert ERC1155's Symbol %s to big.Int", params.FromToken.Symbol)
+		return nil, statusErrors.CreateErrorResponseFromError(fmt.Errorf("failed to convert ERC1155's Symbol %s to big.Int", params.FromToken.Symbol))
 	}
 
 	sendArgs := &MultipathProcessorTxArgs{
@@ -125,17 +135,17 @@ func (s *ERC1155Processor) BuildTx(params ProcessorInputParams) (*ethTypes.Trans
 func (s *ERC1155Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
 	ethClient, err := s.rpcClient.EthClient(sendArgs.ChainID)
 	if err != nil {
-		return tx, err
+		return tx, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	contract, err := ierc1155.NewIerc1155(common.Address(*sendArgs.ERC1155TransferTx.To), ethClient)
 	if err != nil {
-		return tx, err
+		return tx, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	nonce, err := s.transactor.NextNonce(s.rpcClient, sendArgs.ChainID, sendArgs.ERC1155TransferTx.From)
 	if err != nil {
-		return tx, err
+		return tx, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	argNonce := hexutil.Uint64(nonce)
@@ -148,13 +158,17 @@ func (s *ERC1155Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signe
 		sendArgs.ERC1155TransferTx.Amount.ToInt(),
 		[]byte{},
 	)
-	return tx, err
+	if err != nil {
+		return tx, statusErrors.CreateErrorResponseFromError(err)
+	}
+
+	return tx, nil
 }
 
 func (s *ERC1155Processor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
 	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.ERC1155TransferTx.From, verifiedAccount))
 	if err != nil {
-		return hash, err
+		return hash, statusErrors.CreateErrorResponseFromError(err)
 	}
 	return types.Hash(tx.Hash()), nil
 }

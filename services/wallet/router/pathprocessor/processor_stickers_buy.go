@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/snt"
 	stickersContracts "github.com/status-im/status-go/contracts/stickers"
+	statusErrors "github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/stickers"
@@ -53,53 +54,62 @@ func (s *StickersBuyProcessor) CalculateFees(params ProcessorInputParams) (*big.
 func (s *StickersBuyProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	stickerType, err := s.contractMaker.NewStickerType(params.FromChain.ChainID)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
 
 	packInfo, err := stickerType.GetPackData(callOpts, params.PackID)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	stickerMarketABI, err := abi.JSON(strings.NewReader(stickersContracts.StickerMarketABI))
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	extraData, err := stickerMarketABI.Pack("buyToken", params.PackID, params.FromAddr, packInfo.Price)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	sntABI, err := abi.JSON(strings.NewReader(snt.SNTABI))
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	stickerMarketAddress, err := stickersContracts.StickerMarketContractAddress(params.FromChain.ChainID)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	return sntABI.Pack("approveAndCall", stickerMarketAddress, packInfo.Price, extraData)
 }
 
 func (s *StickersBuyProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+	if params.TestsMode {
+		if params.TestEstimationMap != nil {
+			if val, ok := params.TestEstimationMap[s.Name()]; ok {
+				return val, nil
+			}
+		}
+		return 0, ErrNoEstimationFound
+	}
+
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
-		return 0, err
+		return 0, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	input, err := s.PackTxInputData(params)
 	if err != nil {
-		return 0, err
+		return 0, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
-		return 0, err
+		return 0, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	msg := ethereum.CallMsg{
@@ -111,7 +121,7 @@ func (s *StickersBuyProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 
 	estimation, err := ethClient.EstimateGas(context.Background(), msg)
 	if err != nil {
-		return 0, err
+		return 0, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
@@ -123,7 +133,7 @@ func (s *StickersBuyProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.T
 	toAddr := types.Address(params.ToAddr)
 	inputData, err := s.PackTxInputData(params)
 	if err != nil {
-		return nil, err
+		return nil, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	sendArgs := &MultipathProcessorTxArgs{

@@ -55,4 +55,11 @@ type ProcessorInputParams struct {
 	Username  string
 	PublicKey string
 	PackID    *big.Int
+
+	// for testing purposes
+	TestsMode                 bool
+	TestEstimationMap         map[string]uint64   // [brifge-name, estimated-value]
+	TestBonderFeeMap          map[string]*big.Int // [token-symbol, bonder-fee]
+	TestApprovalGasEstimation uint64
+	TestApprovalL1Fee         uint64
 }

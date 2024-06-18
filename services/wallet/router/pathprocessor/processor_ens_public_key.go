@@ -2,7 +2,6 @@ package pathprocessor
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"strings"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/resolver"
+	statusErrors "github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens"
@@ -52,7 +52,7 @@ func (s *ENSPublicKeyProcessor) CalculateFees(params ProcessorInputParams) (*big
 func (s *ENSPublicKeyProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	resolverABI, err := abi.JSON(strings.NewReader(resolver.PublicResolverABI))
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	x, y := ens.ExtractCoordinates(params.PublicKey)
@@ -60,14 +60,23 @@ func (s *ENSPublicKeyProcessor) PackTxInputData(params ProcessorInputParams) ([]
 }
 
 func (s *ENSPublicKeyProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+	if params.TestsMode {
+		if params.TestEstimationMap != nil {
+			if val, ok := params.TestEstimationMap[s.Name()]; ok {
+				return val, nil
+			}
+		}
+		return 0, ErrNoEstimationFound
+	}
+
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
-		return 0, err
+		return 0, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	input, err := s.PackTxInputData(params)
 	if err != nil {
-		return 0, err
+		return 0, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)
@@ -84,7 +93,7 @@ func (s *ENSPublicKeyProcessor) EstimateGas(params ProcessorInputParams) (uint64
 
 	estimation, err := ethClient.EstimateGas(context.Background(), msg)
 	if err != nil {
-		return 0, err
+		return 0, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
@@ -96,7 +105,7 @@ func (s *ENSPublicKeyProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.
 	toAddr := types.Address(params.ToAddr)
 	inputData, err := s.PackTxInputData(params)
 	if err != nil {
-		return nil, err
+		return nil, statusErrors.CreateErrorResponseFromError(err)
 	}
 
 	sendArgs := &MultipathProcessorTxArgs{
@@ -127,10 +136,10 @@ func (s *ENSPublicKeyProcessor) CalculateAmountOut(params ProcessorInputParams) 
 func (s *ENSPublicKeyProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
 	addr, err := s.ensService.API().Resolver(context.Background(), params.FromChain.ChainID, params.Username)
 	if err != nil {
-		return common.Address{}, err
+		return common.Address{}, statusErrors.CreateErrorResponseFromError(err)
 	}
 	if *addr == ZeroAddress {
-		return common.Address{}, errors.New("ENS resolver not found")
+		return common.Address{}, ErrENSResolverNotFound
 	}
 	return *addr, nil
 }
