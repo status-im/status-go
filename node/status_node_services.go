@@ -177,9 +177,15 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 		b.RegisterLifecycle(services[i])
 	}
 
+	b.registerCallRPC()
+
 	b.services = services
 
 	return nil
+}
+
+func (b *StatusNode) registerCallRPC() {
+	b.RegisterLifecycle(NewRPCAPI(b))
 }
 
 func (b *StatusNode) RegisterLifecycle(s common.StatusService) {
