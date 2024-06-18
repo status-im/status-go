@@ -52,6 +52,7 @@ func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 		c.BridgeConfig.Enabled, c.WalletConfig.Enabled, c.LocalNotificationsConfig.Enabled,
 		c.BrowsersConfig.Enabled, c.PermissionsConfig.Enabled, c.MailserversConfig.Enabled,
 		c.SwarmConfig.Enabled, c.MailServerRegistryAddress, c.Web3ProviderConfig.Enabled,
+		c.ConnectorConfig.Enabled,
 	)
 	return err
 }
@@ -456,7 +457,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		&nodecfg.ListenAddr, &nodecfg.AdvertiseAddr, &nodecfg.Name, &nodecfg.Version, &nodecfg.APIModules, &nodecfg.TLSEnabled, &nodecfg.MaxPeers, &nodecfg.MaxPendingPeers,
 		&nodecfg.EnableStatusService, &nodecfg.BridgeConfig.Enabled, &nodecfg.WalletConfig.Enabled, &nodecfg.LocalNotificationsConfig.Enabled,
 		&nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled, &nodecfg.MailserversConfig.Enabled, &nodecfg.SwarmConfig.Enabled,
-		&nodecfg.MailServerRegistryAddress, &nodecfg.Web3ProviderConfig.Enabled,
+		&nodecfg.MailServerRegistryAddress, &nodecfg.Web3ProviderConfig.Enabled, &nodecfg.ConnectorConfig.Enabled,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
