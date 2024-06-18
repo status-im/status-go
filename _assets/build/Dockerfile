@@ -14,7 +14,7 @@ ADD . .
 RUN make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" SHELL="/bin/sh"
 
 # Copy the binary to the second image
-FROM alpine:3.18
+FROM alpine:3
 
 ARG build_target=statusgo
 
