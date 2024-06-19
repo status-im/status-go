@@ -1006,7 +1006,7 @@ func (c *ClientWithFallback) SetWalletNotifier(notifier func(chainId uint64, mes
 func (c *ClientWithFallback) toggleConnectionState(err error) {
 	connected := true
 	if err != nil {
-		if !isVMError(err) && !errors.Is(ErrRequestsOverLimit, err) {
+		if !isVMError(err) && !errors.Is(err, ErrRequestsOverLimit) {
 			connected = false
 		}
 	}
