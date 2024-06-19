@@ -36,6 +36,8 @@ const (
 	EventOwnedCollectiblesFilteringDone walletevent.EventType = "wallet-owned-collectibles-filtering-done"
 	EventGetCollectiblesDetailsDone     walletevent.EventType = "wallet-get-collectibles-details-done"
 	EventGetCollectionSocialsDone       walletevent.EventType = "wallet-get-collection-socials-done"
+	EventSearchCollectiblesDone         walletevent.EventType = "wallet-search-collectibles-done"
+	EventSearchCollectionsDone          walletevent.EventType = "wallet-search-collections-done"
 )
 
 type OwnershipUpdateMessage struct {
@@ -48,15 +50,6 @@ type CollectionSocialsMessage struct {
 	ID      thirdparty.ContractID         `json:"id"`
 	Socials *thirdparty.CollectionSocials `json:"socials"`
 }
-
-type CollectibleDataType byte
-
-const (
-	CollectibleDataTypeUniqueID CollectibleDataType = iota
-	CollectibleDataTypeHeader
-	CollectibleDataTypeDetails
-	CollectibleDataTypeCommunityHeader
-)
 
 type FetchType byte
 
@@ -84,6 +77,14 @@ var (
 	}
 	getCollectiblesDataTask = async.TaskType{
 		ID:     2,
+		Policy: async.ReplacementPolicyCancelOld,
+	}
+	searchCollectiblesTask = async.TaskType{
+		ID:     3,
+		Policy: async.ReplacementPolicyCancelOld,
+	}
+	searchCollectionsTask = async.TaskType{
+		ID:     4,
 		Policy: async.ReplacementPolicyCancelOld,
 	}
 )
@@ -164,6 +165,36 @@ type GetOwnedCollectiblesReturnType struct {
 
 type GetCollectiblesByUniqueIDReturnType struct {
 	collectibles []Collectible
+}
+
+type SearchCollectiblesResponse struct {
+	Collectibles   []Collectible `json:"collectibles"`
+	NextCursor     string        `json:"nextCursor"`
+	PreviousCursor string        `json:"previousCursor"`
+	Provider       string        `json:"provider"`
+	ErrorCode      ErrorCode     `json:"errorCode"`
+}
+
+type SearchCollectiblesReturnType struct {
+	collectibles   []Collectible
+	nextCursor     string
+	previousCursor string
+	provider       string
+}
+
+type SearchCollectionsReturnType struct {
+	collections    []Collection
+	nextCursor     string
+	previousCursor string
+	provider       string
+}
+
+type SearchCollectionsResponse struct {
+	Collections    []Collection `json:"collections"`
+	NextCursor     string       `json:"nextCursor"`
+	PreviousCursor string       `json:"previousCursor"`
+	Provider       string       `json:"provider"`
+	ErrorCode      ErrorCode    `json:"errorCode"`
 }
 
 func (s *Service) GetOwnedCollectibles(
@@ -324,6 +355,108 @@ func (s *Service) GetCollectiblesByUniqueIDAsync(
 	})
 }
 
+func (s *Service) SearchCollectibles(
+	ctx context.Context,
+	params SearchCollectiblesParams,
+	dataType CollectibleDataType) (*SearchCollectiblesReturnType, error) {
+	cc, err := s.manager.SearchCollectibles(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	collectibles, err := fullCollectiblesDataToDataType(cc.Items, dataType)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SearchCollectiblesReturnType{
+		collectibles:   collectibles,
+		nextCursor:     cc.NextCursor,
+		previousCursor: cc.PreviousCursor,
+		provider:       cc.Provider,
+	}, nil
+}
+
+func (s *Service) SearchCollectiblesAsync(
+	requestID int32,
+	params SearchCollectiblesParams,
+	dataType CollectibleDataType) {
+	s.scheduler.Enqueue(requestID, searchCollectiblesTask, func(ctx context.Context) (interface{}, error) {
+		return s.SearchCollectibles(ctx, params, dataType)
+	}, func(result interface{}, taskType async.TaskType, err error) {
+		res := SearchCollectiblesResponse{
+			ErrorCode: ErrorCodeFailed,
+		}
+
+		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
+			res.ErrorCode = ErrorCodeTaskCanceled
+		} else if err == nil {
+			fnRet := result.(*SearchCollectiblesReturnType)
+
+			if err == nil {
+				res.Collectibles = fnRet.collectibles
+				res.NextCursor = fnRet.nextCursor
+				res.PreviousCursor = fnRet.previousCursor
+				res.Provider = fnRet.provider
+				res.ErrorCode = ErrorCodeSuccess
+			}
+		}
+
+		s.sendResponseEvent(&requestID, EventSearchCollectiblesDone, res, err)
+	})
+}
+
+func (s *Service) SearchCollections(
+	ctx context.Context,
+	params SearchCollectionsParams,
+	dataType CollectionDataType) (*SearchCollectionsReturnType, error) {
+	cc, err := s.manager.SearchCollections(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	collections, err := collectionsDataToDataType(cc.Items, dataType)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SearchCollectionsReturnType{
+		collections:    collections,
+		nextCursor:     cc.NextCursor,
+		previousCursor: cc.PreviousCursor,
+		provider:       cc.Provider,
+	}, nil
+}
+
+func (s *Service) SearchCollectionsAsync(
+	requestID int32,
+	params SearchCollectionsParams,
+	dataType CollectionDataType) {
+	s.scheduler.Enqueue(requestID, searchCollectionsTask, func(ctx context.Context) (interface{}, error) {
+		return s.SearchCollections(ctx, params, dataType)
+	}, func(result interface{}, taskType async.TaskType, err error) {
+		res := SearchCollectionsResponse{
+			ErrorCode: ErrorCodeFailed,
+		}
+
+		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
+			res.ErrorCode = ErrorCodeTaskCanceled
+		} else if err == nil {
+			fnRet := result.(*SearchCollectionsReturnType)
+
+			if err == nil {
+				res.Collections = fnRet.collections
+				res.NextCursor = fnRet.nextCursor
+				res.PreviousCursor = fnRet.previousCursor
+				res.Provider = fnRet.provider
+				res.ErrorCode = ErrorCodeSuccess
+			}
+		}
+
+		s.sendResponseEvent(&requestID, EventSearchCollectionsDone, res, err)
+	})
+}
+
 func (s *Service) RefetchOwnedCollectibles() {
 	s.controller.RefetchOwnedCollectibles()
 }
@@ -409,14 +542,7 @@ func (s *Service) collectibleIDsToDataType(ctx context.Context, ids []thirdparty
 		if err != nil {
 			return nil, err
 		}
-		switch dataType {
-		case CollectibleDataTypeHeader:
-			return fullCollectiblesDataToHeaders(collectibles), nil
-		case CollectibleDataTypeDetails:
-			return fullCollectiblesDataToDetails(collectibles), nil
-		case CollectibleDataTypeCommunityHeader:
-			return fullCollectiblesDataToCommunityHeader(collectibles), nil
-		}
+		return fullCollectiblesDataToDataType(collectibles, dataType)
 	}
 	return nil, errors.New("unknown data type")
 }
