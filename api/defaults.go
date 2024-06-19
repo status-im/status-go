@@ -35,7 +35,7 @@ const DefaultLogLevel = "ERROR"
 const DefaultMaxPeers = 20
 const DefaultMaxPendingPeers = 20
 const DefaultListenAddr = ":0"
-const DefaultMaxMessageDeliveryAttempts = 6
+const DefaultMaxMessageDeliveryAttempts = 3
 const DefaultVerifyTransactionChainID = 1
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
