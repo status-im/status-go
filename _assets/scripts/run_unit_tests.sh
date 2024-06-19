@@ -114,6 +114,8 @@ fi
 
 echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
 
+rm -rf ./**/*.coverage.out
+
 for package in ${UNIT_TEST_PACKAGES}; do
   for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
     if ! is_parallelizable "${package}" || [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
@@ -132,9 +134,9 @@ for package in ${UNIT_TEST_PACKAGES}; do
 done
 
 # Gather test coverage results
+rm -f c.out
 echo "mode: atomic" > c.out
-grep -h -v "^mode:" ./**/*.coverage.out >> c.out
-rm -rf ./**/*.coverage.out
+grep -r -h -v "^mode:" --include "*.coverage.out" >> c.out
 
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
   # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
