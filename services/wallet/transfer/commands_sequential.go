@@ -1119,47 +1119,34 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *asyn
 		ranges = append(ranges, []*big.Int{fromNum, toNum})
 	}
 
-	for _, rangeItem := range ranges {
-		log.Debug("range item", "r", rangeItem, "n", c.chainClient.NetworkID(), "a", account)
-
-		// Each account has its own limit and a global limit for all accounts
-		accountTag := transferHistoryTag + "_" + account.String()
-		chainClient := chain.ClientWithTag(c.chainClient, accountTag, transferHistoryTag)
+	if len(ranges) > 0 {
 		storage := chain.NewLimitsDBStorage(c.db.client)
 		limiter := chain.NewRequestLimiter(storage)
-
-		// Check if limit is already reached, then skip the comamnd
-		if allow, _ := limiter.Allow(accountTag); !allow {
-			log.Debug("fetchHistoryBlocksForAccount limit reached", "account", account, "chain", c.chainClient.NetworkID())
-			continue
+		chainClient, _ := createChainClientWithLimiter(c.chainClient, account, limiter)
+		if chainClient == nil {
+			chainClient = c.chainClient
 		}
 
-		err := limiter.SetLimit(accountTag, transferHistoryLimitPerAccount, chain.LimitInfinitely)
-		if err != nil {
-			log.Error("fetchHistoryBlocksForAccount SetLimit", "error", err, "accountTag", accountTag)
-		}
-		err = limiter.SetLimit(transferHistoryTag, transferHistoryLimit, transferHistoryLimitPeriod)
-		if err != nil {
-			log.Error("fetchHistoryBlocksForAccount SetLimit", "error", err, "groupTag", transferHistoryTag)
-		}
-		chainClient.SetLimiter(limiter)
+		for _, rangeItem := range ranges {
+			log.Debug("range item", "r", rangeItem, "n", c.chainClient.NetworkID(), "a", account)
 
-		fbc := &findBlocksCommand{
-			accounts:                  []common.Address{account},
-			db:                        c.db,
-			accountsDB:                c.accountsDB,
-			blockRangeDAO:             c.blockRangeDAO,
-			chainClient:               chainClient,
-			balanceCacher:             c.balanceCacher,
-			feed:                      c.feed,
-			noLimit:                   false,
-			fromBlockNumber:           rangeItem[0],
-			toBlockNumber:             rangeItem[1],
-			tokenManager:              c.tokenManager,
-			blocksLoadedCh:            blocksLoadedCh,
-			defaultNodeBlockChunkSize: DefaultNodeBlockChunkSize,
+			fbc := &findBlocksCommand{
+				accounts:                  []common.Address{account},
+				db:                        c.db,
+				accountsDB:                c.accountsDB,
+				blockRangeDAO:             c.blockRangeDAO,
+				chainClient:               chainClient,
+				balanceCacher:             c.balanceCacher,
+				feed:                      c.feed,
+				noLimit:                   false,
+				fromBlockNumber:           rangeItem[0],
+				toBlockNumber:             rangeItem[1],
+				tokenManager:              c.tokenManager,
+				blocksLoadedCh:            blocksLoadedCh,
+				defaultNodeBlockChunkSize: DefaultNodeBlockChunkSize,
+			}
+			group.Add(fbc.Command())
 		}
-		group.Add(fbc.Command())
 	}
 
 	return nil
@@ -1317,4 +1304,43 @@ func nextRange(maxRangeSize int, prevFrom, zeroBlockNumber *big.Int) (*big.Int, 
 	log.Debug("next range end", "from", from, "to", to, "zeroBlockNumber", zeroBlockNumber)
 
 	return from, to
+}
+
+func accountLimiterTag(account common.Address) string {
+	return transferHistoryTag + "_" + account.String()
+}
+
+func createChainClientWithLimiter(client chain.ClientInterface, account common.Address, limiter chain.RequestLimiter) (chain.ClientInterface, error) {
+	// Each account has its own limit and a global limit for all accounts
+	accountTag := accountLimiterTag(account)
+	chainClient := chain.ClientWithTag(client, accountTag, transferHistoryTag)
+
+	// Check if limit is already reached, then skip the comamnd
+	if allow, err := limiter.Allow(accountTag); !allow {
+		log.Info("fetchHistoryBlocksForAccount limit reached", "account", account, "chain", chainClient.NetworkID(), "error", err)
+		return nil, err
+	}
+
+	if allow, err := limiter.Allow(transferHistoryTag); !allow {
+		log.Info("fetchHistoryBlocksForAccount common limit reached", "chain", chainClient.NetworkID(), "error", err)
+		return nil, err
+	}
+
+	limit, _ := limiter.GetLimit(accountTag)
+	if limit == nil {
+		err := limiter.SetLimit(accountTag, transferHistoryLimitPerAccount, chain.LimitInfinitely)
+		if err != nil {
+			log.Error("fetchHistoryBlocksForAccount SetLimit", "error", err, "accountTag", accountTag)
+		}
+	}
+
+	// Here total limit per day is overwriten on each app start, that still saves us RPC calls, but allows to proceed
+	// after app restart if the limit was reached. Currently there is no way to reset the limit from UI
+	err := limiter.SetLimit(transferHistoryTag, transferHistoryLimit, transferHistoryLimitPeriod)
+	if err != nil {
+		log.Error("fetchHistoryBlocksForAccount SetLimit", "error", err, "groupTag", transferHistoryTag)
+	}
+	chainClient.SetLimiter(limiter)
+
+	return chainClient, nil
 }

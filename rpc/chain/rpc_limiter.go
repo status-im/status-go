@@ -2,6 +2,7 @@ package chain
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -21,7 +22,7 @@ const (
 )
 
 var (
-	ErrRequestsOverLimit = fmt.Errorf("number of requests over limit")
+	ErrRequestsOverLimit = errors.New("number of requests over limit")
 )
 
 type callerOnWait struct {
@@ -32,6 +33,7 @@ type callerOnWait struct {
 type LimitsStorage interface {
 	Get(tag string) (*LimitData, error)
 	Set(data *LimitData) error
+	Delete(tag string) error
 }
 
 type InMemRequestsMapStorage struct {
@@ -57,6 +59,11 @@ func (s *InMemRequestsMapStorage) Set(data *LimitData) error {
 	}
 
 	s.data.Store(data.Tag, data)
+	return nil
+}
+
+func (s *InMemRequestsMapStorage) Delete(tag string) error {
+	s.data.Delete(tag)
 	return nil
 }
 
@@ -91,6 +98,10 @@ func (s *LimitsDBStorage) Set(data *LimitData) error {
 	return s.db.UpdateRPCLimit(*data)
 }
 
+func (s *LimitsDBStorage) Delete(tag string) error {
+	return s.db.DeleteRPCLimit(tag)
+}
+
 type LimitData struct {
 	Tag       string
 	CreatedAt time.Time
@@ -102,6 +113,7 @@ type LimitData struct {
 type RequestLimiter interface {
 	SetLimit(tag string, maxRequests int, interval time.Duration) error
 	GetLimit(tag string) (*LimitData, error)
+	DeleteLimit(tag string) error
 	Allow(tag string) (bool, error)
 }
 
@@ -135,6 +147,16 @@ func (rl *RPCRequestLimiter) GetLimit(tag string) (*LimitData, error) {
 	return data, nil
 }
 
+func (rl *RPCRequestLimiter) DeleteLimit(tag string) error {
+	err := rl.storage.Delete(tag)
+	if err != nil {
+		log.Error("Failed to delete request data from storage", "error", err)
+		return err
+	}
+
+	return nil
+}
+
 func (rl *RPCRequestLimiter) saveToStorage(tag string, maxRequests int, interval time.Duration, numReqs int, timestamp time.Time) error {
 	data := &LimitData{
 		Tag:       tag,
@@ -166,13 +188,9 @@ func (rl *RPCRequestLimiter) Allow(tag string) (bool, error) {
 		return true, nil
 	}
 
-	// Check if a number of requests is over the limit within the interval
-	if time.Since(data.CreatedAt) < data.Period || data.Period.Milliseconds() == LimitInfinitely {
-		if data.NumReqs >= data.MaxReqs {
-			return false, nil
-		}
-
-		err := rl.saveToStorage(tag, data.MaxReqs, data.Period, data.NumReqs+1, data.CreatedAt)
+	// Check if the interval has passed and reset the number of requests
+	if time.Since(data.CreatedAt) >= data.Period && data.Period.Milliseconds() != LimitInfinitely {
+		err = rl.saveToStorage(tag, data.MaxReqs, data.Period, 0, time.Now())
 		if err != nil {
 			return true, err
 		}
@@ -180,13 +198,18 @@ func (rl *RPCRequestLimiter) Allow(tag string) (bool, error) {
 		return true, nil
 	}
 
-	// Reset the number of requests if the interval has passed
-	err = rl.saveToStorage(tag, data.MaxReqs, data.Period, 0, time.Now())
-	if err != nil {
-		return true, err // still allow if failed to save
+	// Check if a number of requests is over the limit within the interval
+	if time.Since(data.CreatedAt) < data.Period || data.Period.Milliseconds() == LimitInfinitely {
+		if data.NumReqs >= data.MaxReqs {
+			log.Info("Number of requests over limit", "tag", tag, "numReqs", data.NumReqs, "maxReqs", data.MaxReqs, "period", data.Period, "createdAt", data.CreatedAt)
+			return false, ErrRequestsOverLimit
+		}
+
+		return true, rl.saveToStorage(tag, data.MaxReqs, data.Period, data.NumReqs+1, data.CreatedAt)
 	}
 
-	return true, nil
+	// Reset the number of requests if the interval has passed
+	return true, rl.saveToStorage(tag, data.MaxReqs, data.Period, 0, time.Now()) // still allow the request if failed to save as not critical
 }
 
 type RPCRpsLimiter struct {

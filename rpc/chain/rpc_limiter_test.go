@@ -55,6 +55,33 @@ func TestGetLimit(t *testing.T) {
 	require.Equal(t, data, ret)
 }
 
+func TestDeleteLimit(t *testing.T) {
+	storage, rl := setupTest()
+
+	// Define test inputs
+	tag := "testTag"
+	data := &LimitData{
+		Tag:     tag,
+		Period:  time.Second,
+		MaxReqs: 10,
+		NumReqs: 1,
+	}
+	err := storage.Set(data)
+	require.NoError(t, err)
+
+	// Call the DeleteLimit method
+	err = rl.DeleteLimit(tag)
+	require.NoError(t, err)
+
+	// Verify that the data was deleted from storage
+	limit, _ := storage.Get(tag)
+	require.Nil(t, limit)
+
+	// Test double delete
+	err = rl.DeleteLimit(tag)
+	require.NoError(t, err)
+}
+
 func TestAllowWithinPeriod(t *testing.T) {
 	storage, rl := setupTest()
 
@@ -84,7 +111,7 @@ func TestAllowWithinPeriod(t *testing.T) {
 
 	// Call the Allow method again
 	allow, err := rl.Allow(tag)
-	require.NoError(t, err)
+	require.ErrorIs(t, err, ErrRequestsOverLimit)
 	require.False(t, allow)
 }
 
@@ -135,7 +162,7 @@ func TestAllowRestrictInfinitelyWhenLimitReached(t *testing.T) {
 
 	// Call the Allow method
 	allow, err := rl.Allow(tag)
-	require.NoError(t, err)
+	require.ErrorIs(t, err, ErrRequestsOverLimit)
 
 	// Verify the result
 	require.False(t, allow)
