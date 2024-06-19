@@ -14,8 +14,9 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/wakuv2"
 
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
+
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
 type TelemetryType string

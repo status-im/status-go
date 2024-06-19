@@ -102,6 +102,7 @@ require (
 	golang.org/x/net v0.25.0
 	golang.org/x/text v0.15.0
 	golang.org/x/time v0.5.0
+	golang.org/x/tools v0.21.0
 )
 
 require (
@@ -279,7 +280,6 @@ require (
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/term v0.20.0 // indirect
-	golang.org/x/tools v0.21.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect
