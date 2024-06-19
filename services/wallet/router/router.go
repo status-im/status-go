@@ -51,7 +51,7 @@ type Path struct {
 	AmountInLocked          bool
 	AmountOut               *hexutil.Big
 	GasAmount               uint64
-	GasFees                 *SuggestedFees
+	GasFees                 *SuggestedFeesGwei
 	BonderFees              *hexutil.Big
 	TokenFees               *big.Float
 	Cost                    *big.Float
@@ -522,7 +522,7 @@ func (r *Router) SuggestedRoutes(
 		}
 
 		group.Add(func(c context.Context) error {
-			gasFees, err := r.feesManager.SuggestedFees(ctx, network.ChainID)
+			gasFees, err := r.feesManager.SuggestedFeesGwei(ctx, network.ChainID)
 			if err != nil {
 				return err
 			}
@@ -555,7 +555,7 @@ func (r *Router) SuggestedRoutes(
 			}
 			maxFees := gasFees.feeFor(gasFeeMode)
 
-			estimatedTime := r.feesManager.TransactionEstimatedTime(ctx, network.ChainID, maxFees)
+			estimatedTime := r.feesManager.TransactionEstimatedTime(ctx, network.ChainID, gweiToWei(maxFees))
 			for _, pProcessor := range r.pathProcessors {
 				// Skip processors that are added because of the Router V2, to not break the current functionality
 				if pProcessor.Name() == pathprocessor.ProcessorENSRegisterName ||

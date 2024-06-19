@@ -23,8 +23,8 @@ import (
 )
 
 type CommunityTokenFees struct {
-	GasUnits      uint64                `json:"gasUnits"`
-	SuggestedFees *router.SuggestedFees `json:"suggestedFees"`
+	GasUnits      uint64                    `json:"gasUnits"`
+	SuggestedFees *router.SuggestedFeesGwei `json:"suggestedFees"`
 }
 
 func weiToGwei(val *big.Int) *big.Float {
@@ -356,7 +356,7 @@ func (s *Service) mintTokensGasUnits(ctx context.Context, chainID uint64, contra
 }
 
 func (s *Service) prepareCommunityTokenFees(ctx context.Context, from common.Address, to *common.Address, gasUnits uint64, chainID uint64) (*CommunityTokenFees, error) {
-	suggestedFees, err := s.feeManager.SuggestedFees(ctx, chainID)
+	suggestedFees, err := s.feeManager.SuggestedFeesGwei(ctx, chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -373,7 +373,7 @@ func (s *Service) prepareCommunityTokenFees(ctx context.Context, from common.Add
 	}, nil
 }
 
-func (s *Service) suggestedFeesToSendTxArgs(from common.Address, to *common.Address, gas uint64, suggestedFees *router.SuggestedFees) transactions.SendTxArgs {
+func (s *Service) suggestedFeesToSendTxArgs(from common.Address, to *common.Address, gas uint64, suggestedFees *router.SuggestedFeesGwei) transactions.SendTxArgs {
 	sendArgs := transactions.SendTxArgs{}
 	sendArgs.From = types.Address(from)
 	sendArgs.To = (*types.Address)(to)
