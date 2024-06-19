@@ -396,9 +396,9 @@ func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[st
 	return api.s.marketManager.FetchTokenDetails(symbols)
 }
 
-func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*router.SuggestedFees, error) {
+func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*router.SuggestedFeesGwei, error) {
 	log.Debug("call to GetSuggestedFees")
-	return api.router.GetFeesManager().SuggestedFees(ctx, chainID)
+	return api.router.GetFeesManager().SuggestedFeesGwei(ctx, chainID)
 }
 
 func (api *API) GetEstimatedLatestBlockNumber(ctx context.Context, chainID uint64) (uint64, error) {
@@ -409,7 +409,12 @@ func (api *API) GetEstimatedLatestBlockNumber(ctx context.Context, chainID uint6
 // @deprecated
 func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Float) (router.TransactionEstimation, error) {
 	log.Debug("call to getTransactionEstimatedTime")
-	return api.router.GetFeesManager().TransactionEstimatedTime(ctx, chainID, maxFeePerGas), nil
+	return api.router.GetFeesManager().TransactionEstimatedTime(ctx, chainID, gweiToWei(maxFeePerGas)), nil
+}
+
+func gweiToWei(val *big.Float) *big.Int {
+	res, _ := new(big.Float).Mul(val, big.NewFloat(1000000000)).Int(nil)
+	return res
 }
 
 func (api *API) GetSuggestedRoutes(

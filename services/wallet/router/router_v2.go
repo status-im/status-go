@@ -62,10 +62,10 @@ type PathV2 struct {
 	AmountInLocked bool               // Is the amount locked
 	AmountOut      *hexutil.Big       // Amount that will be received on the destination chain
 
-	SuggestedPriorityFees *PriorityFees // Suggested priority fees for the transaction
+	SuggestedLevelsForMaxFeesPerGas *MaxFeesLevels // Suggested max fees for the transaction
 
 	TxBaseFee     *hexutil.Big // Base fee for the transaction
-	TxPriorityFee *hexutil.Big // Priority fee for the transaction, by default we're using the Medium priority fee
+	TxPriorityFee *hexutil.Big // Priority fee for the transaction
 	TxGasAmount   uint64       // Gas used for the transaction
 	TxBonderFees  *hexutil.Big // Bonder fees for the transaction - used for Hop bridge
 	TxTokenFees   *hexutil.Big // Token fees for the transaction - used for bridges (represent the difference between the amount in and the amount out)
@@ -432,7 +432,6 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 		}
 
 		group.Add(func(c context.Context) error {
-			client, err := r.rpcClient.EthClient(network.ChainID)
 			if err != nil {
 				return err
 			}
@@ -529,20 +528,9 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						l1FeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, txInputData)
 					}
 
-					baseFee, err := r.feesManager.getBaseFee(ctx, client)
+					fees, err := r.feesManager.SuggestedFees(ctx, network.ChainID)
 					if err != nil {
 						continue
-					}
-
-					priorityFees, err := r.feesManager.getPriorityFees(ctx, client, baseFee)
-					if err != nil {
-						continue
-					}
-					selctedPriorityFee := priorityFees.Medium
-					if input.GasFeeMode == GasFeeHigh {
-						selctedPriorityFee = priorityFees.High
-					} else if input.GasFeeMode == GasFeeLow {
-						selctedPriorityFee = priorityFees.Low
 					}
 
 					amountOut, err := pProcessor.CalculateAmountOut(processorInputParams)
@@ -550,8 +538,8 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						continue
 					}
 
-					maxFeesPerGas := new(big.Float)
-					maxFeesPerGas.Add(new(big.Float).SetInt(baseFee), new(big.Float).SetInt(selctedPriorityFee))
+					maxFeesPerGas := fees.feeFor(input.GasFeeMode)
+
 					estimatedTime := r.feesManager.TransactionEstimatedTime(ctx, network.ChainID, maxFeesPerGas)
 					if approvalRequired && estimatedTime < MoreThanFiveMinutes {
 						estimatedTime += 1
@@ -567,10 +555,10 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						AmountInLocked: amountLocked,
 						AmountOut:      (*hexutil.Big)(amountOut),
 
-						SuggestedPriorityFees: &priorityFees,
+						SuggestedLevelsForMaxFeesPerGas: fees.MaxFeesLevels,
 
-						TxBaseFee:     (*hexutil.Big)(baseFee),
-						TxPriorityFee: (*hexutil.Big)(selctedPriorityFee),
+						TxBaseFee:     (*hexutil.Big)(fees.BaseFee),
+						TxPriorityFee: (*hexutil.Big)(fees.MaxPriorityFeePerGas),
 						TxGasAmount:   gasLimit,
 						TxBonderFees:  (*hexutil.Big)(bonderFees),
 						TxTokenFees:   (*hexutil.Big)(tokenFees),
@@ -579,14 +567,13 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 						ApprovalRequired:        approvalRequired,
 						ApprovalAmountRequired:  (*hexutil.Big)(approvalAmountRequired),
 						ApprovalContractAddress: &approvalContractAddress,
-						ApprovalBaseFee:         (*hexutil.Big)(baseFee),
-						ApprovalPriorityFee:     (*hexutil.Big)(selctedPriorityFee),
+						ApprovalBaseFee:         (*hexutil.Big)(fees.BaseFee),
+						ApprovalPriorityFee:     (*hexutil.Big)(fees.MaxPriorityFeePerGas),
 						ApprovalGasAmount:       approvalGasLimit,
 						ApprovalL1Fee:           (*hexutil.Big)(big.NewInt(int64(l1ApprovalFee))),
 
 						EstimatedTime: estimatedTime,
-					},
-					)
+					})
 					mu.Unlock()
 				}
 			}
