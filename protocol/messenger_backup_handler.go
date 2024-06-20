@@ -114,20 +114,23 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 		Profile: &wakusync.BackedUpProfile{},
 	}
 
-	if err := utils.ValidateDisplayName(&message.DisplayName); err != nil {
-		return err
-	}
-
-	err := m.SaveSyncDisplayName(message.DisplayName, message.DisplayNameClock)
-	if err != nil && err != errors.ErrNewClockOlderThanCurrent {
-		return err
-	}
-
-	response.SetDisplayName(message.DisplayName)
-
-	// if we already have a newer clock, then we don't need to update the display name
-	if err == errors.ErrNewClockOlderThanCurrent {
+	err := utils.ValidateDisplayName(&message.DisplayName)
+	if err != nil {
+		// Print a warning and set the display name to the account name, but don't stop the recovery
+		m.logger.Warn("invalid display name found", zap.Error(err))
 		response.SetDisplayName(m.account.Name)
+	} else {
+		err = m.SaveSyncDisplayName(message.DisplayName, message.DisplayNameClock)
+		if err != nil && err != errors.ErrNewClockOlderThanCurrent {
+			return err
+		}
+
+		response.SetDisplayName(message.DisplayName)
+
+		// if we already have a newer clock, then we don't need to update the display name
+		if err == errors.ErrNewClockOlderThanCurrent {
+			response.SetDisplayName(m.account.Name)
+		}
 	}
 
 	syncWithBackedUpImages := false

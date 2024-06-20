@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appmetrics"
+	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/deprecation"
@@ -867,6 +868,25 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	err = m.garbageCollectRemovedSavedAddresses()
 	if err != nil {
 		return nil, err
+	}
+
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return nil, err
+	}
+	if err := utils.ValidateDisplayName(&displayName); err != nil {
+		// Somehow a wrong display name was saved. We need to update it so that others accept our messages
+		pubKey, err := m.settings.GetPublicKey()
+		if err != nil {
+			return nil, err
+		}
+		replacementDisplayName := pubKey[:12]
+		m.logger.Warn("unaccepted display name was saved to the setting, reverting to pubkey substring", zap.String("displayName", displayName), zap.String("replacement", replacementDisplayName))
+
+		if err := m.SetDisplayName(replacementDisplayName); err != nil {
+			// We do not return the error as we do not want to block the login for it
+			m.logger.Warn("error setting display name", zap.Error(err))
+		}
 	}
 
 	return response, nil
