@@ -21,7 +21,6 @@
 */**/.DS_Store
 .ethtest
 */**/*tx_database*
-*/**/*dapps*
 vendor/github.com/ethereum/go-ethereum/vendor
 node_modules/
 tags
