@@ -2,6 +2,7 @@ package router
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -443,17 +444,17 @@ func validateFromLockedAmount(fromLockedAmount map[uint64]*hexutil.Big, isTestne
 	for chainID, amount := range fromLockedAmount {
 		if isTestnetMode {
 			if !supportedTestNetworks[chainID] {
-				return ErrorLockedAmountNotSupportedNetwork
+				return errors.New("locked amount is not supported for the selected network")
 			}
 		} else {
 			if !supportedNetworks[chainID] {
-				return ErrorLockedAmountNotSupportedNetwork
+				return errors.New("locked amount is not supported for the selected network")
 			}
 		}
 
 		// Check locked amount is not negative
 		if amount == nil || amount.ToInt().Sign() < 0 {
-			return ErrorLockedAmountNotNegative
+			return errors.New("locked amount must not be negative")
 		}
 
 		// Check if locked chain ID is a duplicate
@@ -468,7 +469,7 @@ func validateFromLockedAmount(fromLockedAmount map[uint64]*hexutil.Big, isTestne
 	}
 	if (!isTestnetMode && excludedChainCount == len(supportedNetworks)) ||
 		(isTestnetMode && excludedChainCount == len(supportedTestNetworks)) {
-		return ErrorLockedAmountExcludesAllSupported
+		return errors.New("all supported chains are excluded, routing impossible")
 	}
 	return nil
 }
