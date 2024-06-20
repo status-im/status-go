@@ -135,8 +135,7 @@ done
 
 # Gather test coverage results
 rm -f c.out
-echo "mode: atomic" > c.out
-grep -r -h -v "^mode:" --include "*.coverage.out" >> c.out
+go run ./cmd/test-coverage-utils/gocovmerge.go $(find -iname "*.coverage.out") >> c.out
 
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
   # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds

@@ -4,4 +4,5 @@ coverage_file_path="$(mktemp coverage.out.rerun.XXXXXXXXXX --tmpdir="${PACKAGE_D
 go test -json \
   -covermode=atomic \
   -coverprofile="${coverage_file_path}" \
+  -coverpkg ./... \
   "$@"
