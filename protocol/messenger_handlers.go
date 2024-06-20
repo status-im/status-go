@@ -5,7 +5,7 @@
 package protocol
 
 import (
-	"errors"
+        "errors"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"

@@ -39,11 +39,12 @@ func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 		max_peers, max_pending_peers, enable_status_service, enable_ntp_sync,
 		bridge_enabled, wallet_enabled, local_notifications_enabled,
 		browser_enabled, permissions_enabled, mailservers_enabled,
-		swarm_enabled, mailserver_registry_address, web3provider_enabled, synthetic_id
+		swarm_enabled, mailserver_registry_address, web3provider_enabled, connector_enabled,
+		synthetic_id
 	) VALUES (
 		?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 		?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-		?, ?, ?, ?, ?, 'id'
+		?, ?, ?, ?, ?, ?, 'id'
 	)`,
 		c.NetworkID, c.DataDir, c.KeyStoreDir, c.NodeKey, c.NoDiscovery, c.Rendezvous,
 		c.ListenAddr, c.AdvertiseAddr, c.Name, c.Version, c.APIModules,
@@ -52,6 +53,7 @@ func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 		c.BridgeConfig.Enabled, c.WalletConfig.Enabled, c.LocalNotificationsConfig.Enabled,
 		c.BrowsersConfig.Enabled, c.PermissionsConfig.Enabled, c.MailserversConfig.Enabled,
 		c.SwarmConfig.Enabled, c.MailServerRegistryAddress, c.Web3ProviderConfig.Enabled,
+		c.ConnectorConfig.Enabled,
 	)
 	return err
 }
@@ -449,14 +451,14 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		listen_addr, advertise_addr, name, version, api_modules, tls_enabled, max_peers, max_pending_peers,
 		enable_status_service, bridge_enabled, wallet_enabled, local_notifications_enabled,
 		browser_enabled, permissions_enabled, mailservers_enabled, swarm_enabled,
-		mailserver_registry_address, web3provider_enabled FROM node_config
+		mailserver_registry_address, web3provider_enabled, connector_enabled FROM node_config
 		WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.NetworkID, &nodecfg.DataDir, &nodecfg.KeyStoreDir, &nodecfg.NodeKey, &nodecfg.NoDiscovery, &nodecfg.Rendezvous,
 		&nodecfg.ListenAddr, &nodecfg.AdvertiseAddr, &nodecfg.Name, &nodecfg.Version, &nodecfg.APIModules, &nodecfg.TLSEnabled, &nodecfg.MaxPeers, &nodecfg.MaxPendingPeers,
 		&nodecfg.EnableStatusService, &nodecfg.BridgeConfig.Enabled, &nodecfg.WalletConfig.Enabled, &nodecfg.LocalNotificationsConfig.Enabled,
 		&nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled, &nodecfg.MailserversConfig.Enabled, &nodecfg.SwarmConfig.Enabled,
-		&nodecfg.MailServerRegistryAddress, &nodecfg.Web3ProviderConfig.Enabled,
+		&nodecfg.MailServerRegistryAddress, &nodecfg.Web3ProviderConfig.Enabled, &nodecfg.ConnectorConfig.Enabled,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
