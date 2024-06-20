@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.8.18'
+library 'status-jenkins-lib@v1.9.0'
 
 pipeline {
   agent { label 'linux && x86_64 && nix-2.19' }
@@ -64,7 +64,7 @@ pipeline {
 
     stage('Upload') {
       steps { script {
-        env.PKG_URL = s3.uploadArtifact(ARTIFACT)
+        env.PKG_URL = s5cmd.upload(ARTIFACT)
       } }
     }
   } // stages
