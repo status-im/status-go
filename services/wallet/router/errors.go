@@ -24,4 +24,5 @@ var (
 	ErrNotEnoughTokenBalance                     = &errors.ErrorResponse{Code: errors.ErrorCode("WR-016"), Details: "not enough token balance"}
 	ErrNotEnoughNativeBalance                    = &errors.ErrorResponse{Code: errors.ErrorCode("WR-017"), Details: "not enough native balance"}
 	ErrNativeTokenNotFound                       = &errors.ErrorResponse{Code: errors.ErrorCode("WR-018"), Details: "native token not found"}
+	ErrDisabledChainFoundAmongLockedNetworks     = &errors.ErrorResponse{Code: errors.ErrorCode("WR-019"), Details: "disabled chain found among locked networks"}
 )
