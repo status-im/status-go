@@ -48,7 +48,7 @@ func (tmr *SignalsTransmitter) Start() error {
 				return
 			case event := <-events:
 				if !event.Type.IsInternal() {
-					signal.SendWalletEvent(event)
+					signal.SendWalletEvent(signal.Wallet, event)
 				}
 			}
 		}

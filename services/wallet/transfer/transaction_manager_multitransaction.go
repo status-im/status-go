@@ -68,7 +68,7 @@ func (tm *TransactionManager) SendTransactionForSigningToKeycard(ctx context.Con
 		return err
 	}
 
-	signal.SendTransactionsForSigningEvent(hashes)
+	signal.SendWalletEvent(signal.SignTransactions, hashes)
 
 	return nil
 }
