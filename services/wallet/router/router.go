@@ -288,11 +288,16 @@ func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, token
 		stickersService:     stickersService,
 		feesManager:         &FeeManager{rpcClient},
 		pathProcessors:      processors,
+		scheduler:           async.NewScheduler(),
 	}
 }
 
 func (r *Router) AddPathProcessor(processor pathprocessor.PathProcessor) {
 	r.pathProcessors[processor.Name()] = processor
+}
+
+func (r *Router) Stop() {
+	r.scheduler.Stop()
 }
 
 func (r *Router) GetFeesManager() *FeeManager {
@@ -323,6 +328,7 @@ type Router struct {
 	stickersService     *stickers.Service
 	feesManager         *FeeManager
 	pathProcessors      map[string]pathprocessor.PathProcessor
+	scheduler           *async.Scheduler
 }
 
 func (r *Router) requireApproval(ctx context.Context, sendType SendType, approvalContractAddress *common.Address, params pathprocessor.ProcessorInputParams) (
@@ -709,6 +715,9 @@ func (r *Router) SuggestedRoutes(
 			AmountIn:  path.AmountIn.ToInt(),
 			FromToken: &token.Token{
 				Symbol: tokenID,
+			},
+			ToToken: &token.Token{
+				Symbol: toTokenID,
 			},
 		}
 
