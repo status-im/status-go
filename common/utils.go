@@ -66,9 +66,5 @@ func IsENSName(displayName string) bool {
 		return false
 	}
 
-	if strings.HasSuffix(displayName, ".eth") {
-		return true
-	}
-
-	return false
+	return strings.HasSuffix(displayName, ".eth")
 }

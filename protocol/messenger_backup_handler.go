@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -111,6 +112,10 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 
 	response := wakusync.WakuBackedUpDataResponse{
 		Profile: &wakusync.BackedUpProfile{},
+	}
+
+	if err := utils.ValidateDisplayName(&message.DisplayName); err != nil {
+		return err
 	}
 
 	err := m.SaveSyncDisplayName(message.DisplayName, message.DisplayNameClock)
