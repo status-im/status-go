@@ -288,11 +288,16 @@ func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, token
 		stickersService:     stickersService,
 		feesManager:         &FeeManager{rpcClient},
 		pathProcessors:      processors,
+		scheduler:           async.NewScheduler(),
 	}
 }
 
 func (r *Router) AddPathProcessor(processor pathprocessor.PathProcessor) {
 	r.pathProcessors[processor.Name()] = processor
+}
+
+func (r *Router) Stop() {
+	r.scheduler.Stop()
 }
 
 func (r *Router) GetFeesManager() *FeeManager {
@@ -303,9 +308,9 @@ func (r *Router) GetPathProcessors() map[string]pathprocessor.PathProcessor {
 	return r.pathProcessors
 }
 
-func containsNetworkChainID(network *params.Network, chainIDs []uint64) bool {
-	for _, chainID := range chainIDs {
-		if chainID == network.ChainID {
+func containsNetworkChainID(chainID uint64, chainIDs []uint64) bool {
+	for _, cID := range chainIDs {
+		if cID == chainID {
 			return true
 		}
 	}
@@ -323,6 +328,7 @@ type Router struct {
 	stickersService     *stickers.Service
 	feesManager         *FeeManager
 	pathProcessors      map[string]pathprocessor.PathProcessor
+	scheduler           *async.Scheduler
 }
 
 func (r *Router) requireApproval(ctx context.Context, sendType SendType, approvalContractAddress *common.Address, params pathprocessor.ProcessorInputParams) (
@@ -478,7 +484,7 @@ func (r *Router) SuggestedRoutes(
 			continue
 		}
 
-		if containsNetworkChainID(network, disabledFromChainIDs) {
+		if containsNetworkChainID(network.ChainID, disabledFromChainIDs) {
 			continue
 		}
 
@@ -562,10 +568,10 @@ func (r *Router) SuggestedRoutes(
 						continue
 					}
 
-					if len(preferedChainIDs) > 0 && !containsNetworkChainID(dest, preferedChainIDs) {
+					if len(preferedChainIDs) > 0 && !containsNetworkChainID(dest.ChainID, preferedChainIDs) {
 						continue
 					}
-					if containsNetworkChainID(dest, disabledToChainIDs) {
+					if containsNetworkChainID(dest.ChainID, disabledToChainIDs) {
 						continue
 					}
 
@@ -709,6 +715,9 @@ func (r *Router) SuggestedRoutes(
 			AmountIn:  path.AmountIn.ToInt(),
 			FromToken: &token.Token{
 				Symbol: tokenID,
+			},
+			ToToken: &token.Token{
+				Symbol: toTokenID,
 			},
 		}
 

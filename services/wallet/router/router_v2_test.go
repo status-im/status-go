@@ -67,9 +67,9 @@ var (
 		BaseFee:              big.NewInt(testBaseFee),
 		MaxPriorityFeePerGas: big.NewInt(testPriorityFeeLow),
 		MaxFeesLevels: &MaxFeesLevels{
-			Low:    big.NewInt(testPriorityFeeLow),
-			Medium: big.NewInt(testPriorityFeeMedium),
-			High:   big.NewInt(testPriorityFeeHigh),
+			Low:    (*hexutil.Big)(big.NewInt(testPriorityFeeLow)),
+			Medium: (*hexutil.Big)(big.NewInt(testPriorityFeeMedium)),
+			High:   (*hexutil.Big)(big.NewInt(testPriorityFeeHigh)),
 		},
 		EIP1559Enabled: false,
 	}

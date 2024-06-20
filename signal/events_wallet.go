@@ -5,6 +5,7 @@ type SignalType string
 const (
 	Wallet           = SignalType("wallet")
 	SignTransactions = SignalType("wallet.sign.transactions")
+	SuggestedRoutes  = SignalType("wallet.suggested.routes")
 )
 
 // SendWalletEvent sends event from services/wallet/events.

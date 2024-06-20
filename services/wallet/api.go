@@ -94,6 +94,7 @@ func (api *API) StartWallet(ctx context.Context) error {
 }
 
 func (api *API) StopWallet(ctx context.Context) error {
+	api.router.Stop()
 	return api.s.Stop()
 }
 
@@ -507,6 +508,18 @@ func (api *API) GetSuggestedRoutesV2(ctx context.Context, input *router.RouteInp
 	log.Debug("call to GetSuggestedRoutesV2")
 
 	return api.router.SuggestedRoutesV2(ctx, input)
+}
+
+func (api *API) GetSuggestedRoutesV2Async(ctx context.Context, input *router.RouteInputParams) {
+	log.Debug("call to GetSuggestedRoutesV2Async")
+
+	api.router.SuggestedRoutesV2Async(input)
+}
+
+func (api *API) StopSuggestedRoutesV2AsyncCalcualtion(ctx context.Context) {
+	log.Debug("call to StopSuggestedRoutesV2AsyncCalcualtion")
+
+	api.router.StopSuggestedRoutesV2AsyncCalcualtion()
 }
 
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
