@@ -88,8 +88,10 @@ run_test_for_package() {
     -v ${GOTEST_EXTRAFLAGS} \
     -timeout "${package_timeout}" \
     -count 1 \
-    -tags "${BUILD_TAGS}" |
+    -tags "${BUILD_TAGS}" | \
     redirect_stdout "${output_file}"
+
+  local go_test_exit=$?
 
   # Merge package coverage results
   go run ./cmd/test-coverage-utils/gocovmerge.go ${package_dir}/coverage.out.rerun.* > ${coverage_file}
@@ -97,7 +99,6 @@ run_test_for_package() {
   # Cleanup coverage reports
   rm -f ${package_dir}/coverage.out.rerun.*
 
-  local go_test_exit=$?
   echo "${go_test_exit}" > "${exit_code_file}"
   if [[ "${go_test_exit}" -ne 0 ]]; then
     if [[ "${CI}" == 'true' ]]; then
