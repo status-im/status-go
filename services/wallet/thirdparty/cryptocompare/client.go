@@ -12,6 +12,7 @@ import (
 )
 
 const baseURL = "https://min-api.cryptocompare.com"
+const CryptoCompareStatusProxyURL = "https://cryptocompare.test.api.status.im"
 const extraParamStatus = "Status.im"
 
 type HistoricalPricesContainer struct {
@@ -35,11 +36,20 @@ type MarketValuesContainer struct {
 
 type Client struct {
 	httpClient *thirdparty.HTTPClient
+	baseURL    string
 }
 
 func NewClient() *Client {
 	return &Client{
 		httpClient: thirdparty.NewHTTPClient(),
+		baseURL:    baseURL,
+	}
+}
+
+func NewClientWithURL(url string) *Client {
+	return &Client{
+		httpClient: thirdparty.NewHTTPClient(),
+		baseURL:    url,
 	}
 }
 
@@ -55,7 +65,7 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 		params.Add("tsyms", strings.Join(realCurrencies, ","))
 		params.Add("extraParams", extraParamStatus)
 
-		url := fmt.Sprintf("%s/data/pricemulti", baseURL)
+		url := fmt.Sprintf("%s/data/pricemulti", c.baseURL)
 		response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
 		if err != nil {
 			return nil, err
@@ -78,7 +88,7 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 }
 
 func (c *Client) FetchTokenDetails(symbols []string) (map[string]thirdparty.TokenDetails, error) {
-	url := fmt.Sprintf("%s/data/all/coinlist", baseURL)
+	url := fmt.Sprintf("%s/data/all/coinlist", c.baseURL)
 	response, err := c.httpClient.DoGetRequest(context.Background(), url, nil)
 	if err != nil {
 		return nil, err
@@ -111,7 +121,7 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 		params.Add("tsyms", realCurrency)
 		params.Add("extraParams", extraParamStatus)
 
-		url := fmt.Sprintf("%s/data/pricemultifull", baseURL)
+		url := fmt.Sprintf("%s/data/pricemultifull", c.baseURL)
 		response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
 		if err != nil {
 			return nil, err
@@ -144,7 +154,7 @@ func (c *Client) FetchHistoricalHourlyPrices(symbol string, currency string, lim
 	params.Add("limit", fmt.Sprintf("%d", limit))
 	params.Add("extraParams", extraParamStatus)
 
-	url := fmt.Sprintf("%s/data/v2/histohour", baseURL)
+	url := fmt.Sprintf("%s/data/v2/histohour", c.baseURL)
 	response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
 	if err != nil {
 		return item, err
@@ -172,7 +182,7 @@ func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limi
 	params.Add("allData", fmt.Sprintf("%v", allData))
 	params.Add("extraParams", extraParamStatus)
 
-	url := fmt.Sprintf("%s/data/v2/histoday", baseURL)
+	url := fmt.Sprintf("%s/data/v2/histoday", c.baseURL)
 	response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
 	if err != nil {
 		return item, err

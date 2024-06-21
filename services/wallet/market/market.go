@@ -4,11 +4,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/afex/hystrix-go/hystrix"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/circuitbreaker"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -25,18 +25,19 @@ type DataPoint struct {
 type DataPerTokenAndCurrency = map[string]map[string]DataPoint
 
 type Manager struct {
-	main            thirdparty.MarketDataProvider
-	fallback        thirdparty.MarketDataProvider
 	feed            *event.Feed
 	priceCache      DataPerTokenAndCurrency
 	priceCacheLock  sync.RWMutex
 	IsConnected     bool
 	LastCheckedAt   int64
 	IsConnectedLock sync.RWMutex
+	circuitbreaker  *circuitbreaker.CircuitBreaker
+	providers       []thirdparty.MarketDataProvider
 }
 
-func NewManager(main thirdparty.MarketDataProvider, fallback thirdparty.MarketDataProvider, feed *event.Feed) *Manager {
-	hystrix.ConfigureCommand("marketClient", hystrix.CommandConfig{
+func NewManager(providers []thirdparty.MarketDataProvider, feed *event.Feed) *Manager {
+	cb := circuitbreaker.NewCircuitBreaker(circuitbreaker.Config{
+		CommandName:           "marketClient",
 		Timeout:               10000,
 		MaxConcurrentRequests: 100,
 		SleepWindow:           300000,
@@ -44,12 +45,12 @@ func NewManager(main thirdparty.MarketDataProvider, fallback thirdparty.MarketDa
 	})
 
 	return &Manager{
-		main:          main,
-		fallback:      fallback,
-		feed:          feed,
-		priceCache:    make(DataPerTokenAndCurrency),
-		IsConnected:   true,
-		LastCheckedAt: time.Now().Unix(),
+		feed:           feed,
+		priceCache:     make(DataPerTokenAndCurrency),
+		IsConnected:    true,
+		LastCheckedAt:  time.Now().Unix(),
+		circuitbreaker: cb,
+		providers:      providers,
 	}
 }
 
@@ -72,101 +73,81 @@ func (pm *Manager) setIsConnected(value bool) {
 	pm.IsConnected = value
 }
 
-func (pm *Manager) makeCall(main func() (any, error), fallback func() (any, error)) (any, error) {
-	resultChan := make(chan any, 1)
-	errChan := hystrix.Go("marketClient", func() error {
-		res, err := main()
-		if err != nil {
-			return err
-		}
-		pm.setIsConnected(true)
-		resultChan <- res
-		return nil
-	}, func(err error) error {
-		if pm.fallback == nil {
-			return err
-		}
-
-		res, err := fallback()
-		if err != nil {
-			pm.setIsConnected(false)
-			return err
-		}
-		pm.setIsConnected(true)
-		resultChan <- res
-		return nil
-	})
-	select {
-	case result := <-resultChan:
-		return result, nil
-	case err := <-errChan:
-
-		return nil, err
+func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(provider thirdparty.MarketDataProvider) (interface{}, error)) (interface{}, error) {
+	cmd := circuitbreaker.Command{}
+	for _, provider := range providers {
+		provider := provider
+		cmd.Add(circuitbreaker.NewFunctor(func() ([]interface{}, error) {
+			result, err := f(provider)
+			return []interface{}{result}, err
+		}))
 	}
+
+	result := pm.circuitbreaker.Execute(cmd)
+	pm.setIsConnected(result.Error() == nil)
+
+	if result.Error() != nil {
+		log.Error("Error fetching prices", "error", result.Error())
+		return nil, result.Error()
+	}
+
+	return result.Result()[0], nil
 }
 
 func (pm *Manager) FetchHistoricalDailyPrices(symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
-	prices, err := pm.makeCall(
-		func() (any, error) {
-			return pm.main.FetchHistoricalDailyPrices(symbol, currency, limit, allData, aggregate)
-		},
-		func() (any, error) {
-			return pm.fallback.FetchHistoricalDailyPrices(symbol, currency, limit, allData, aggregate)
-		},
-	)
+	result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
+		return provider.FetchHistoricalDailyPrices(symbol, currency, limit, allData, aggregate)
+	})
+
 	if err != nil {
+		log.Error("Error fetching prices", "error", err)
 		return nil, err
 	}
 
-	return prices.([]thirdparty.HistoricalPrice), nil
+	prices := result.([]thirdparty.HistoricalPrice)
+	return prices, nil
 }
 
 func (pm *Manager) FetchHistoricalHourlyPrices(symbol string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
-	prices, err := pm.makeCall(
-		func() (any, error) {
-			return pm.main.FetchHistoricalHourlyPrices(symbol, currency, limit, aggregate)
-		},
-		func() (any, error) {
-			return pm.fallback.FetchHistoricalHourlyPrices(symbol, currency, limit, aggregate)
-		},
-	)
+	result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
+		return provider.FetchHistoricalHourlyPrices(symbol, currency, limit, aggregate)
+	})
+
 	if err != nil {
+		log.Error("Error fetching prices", "error", err)
 		return nil, err
 	}
 
-	return prices.([]thirdparty.HistoricalPrice), nil
+	prices := result.([]thirdparty.HistoricalPrice)
+	return prices, nil
 }
 
 func (pm *Manager) FetchTokenMarketValues(symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
-	marketValues, err := pm.makeCall(
-		func() (any, error) {
-			return pm.main.FetchTokenMarketValues(symbols, currency)
-		},
-		func() (any, error) {
-			return pm.fallback.FetchTokenMarketValues(symbols, currency)
-		},
-	)
+	result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
+		return provider.FetchTokenMarketValues(symbols, currency)
+	})
+
 	if err != nil {
+		log.Error("Error fetching prices", "error", err)
 		return nil, err
 	}
 
-	return marketValues.(map[string]thirdparty.TokenMarketValues), nil
+	marketValues := result.(map[string]thirdparty.TokenMarketValues)
+	return marketValues, nil
 }
 
 func (pm *Manager) FetchTokenDetails(symbols []string) (map[string]thirdparty.TokenDetails, error) {
-	tokenDetails, err := pm.makeCall(
-		func() (any, error) {
-			return pm.main.FetchTokenDetails(symbols)
-		},
-		func() (any, error) {
-			return pm.fallback.FetchTokenDetails(symbols)
-		},
-	)
+	result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
+		return provider.FetchTokenDetails(symbols)
+	})
+
 	if err != nil {
+		log.Error("Error fetching prices", "error", err)
 		return nil, err
 	}
 
-	return tokenDetails.(map[string]thirdparty.TokenDetails), nil
+	tokenDetails := result.(map[string]thirdparty.TokenDetails)
+	return tokenDetails, nil
 }
 
 func (pm *Manager) FetchPrice(symbol string, currency string) (float64, error) {
@@ -183,20 +164,16 @@ func (pm *Manager) FetchPrice(symbol string, currency string) (float64, error) {
 }
 
 func (pm *Manager) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
-	result, err := pm.makeCall(
-		func() (any, error) {
-			return pm.main.FetchPrices(symbols, currencies)
-		},
-		func() (any, error) {
-			return pm.fallback.FetchPrices(symbols, currencies)
-		},
-	)
+	response, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
+		return provider.FetchPrices(symbols, currencies)
+	})
 
 	if err != nil {
+		log.Error("Error fetching prices", "error", err)
 		return nil, err
 	}
 
-	prices := result.(map[string]map[string]float64)
+	prices := response.(map[string]map[string]float64)
 	pm.updatePriceCache(prices)
 	return prices, nil
 }
