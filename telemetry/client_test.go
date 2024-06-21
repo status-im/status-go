@@ -67,7 +67,7 @@ func createClient(t *testing.T, mockServerURL string) *Client {
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)
 	}
-	return NewClient(logger, mockServerURL, "testUID", "testNode", "1.0", 500*time.Millisecond)
+	return NewClient(logger, mockServerURL, "testUID", "testNode", "1.0", WithSendPeriod(500*time.Millisecond))
 }
 
 func withMockServer(t *testing.T, expectedType TelemetryType, testFunc func(t *testing.T, client *Client, wg *sync.WaitGroup)) {

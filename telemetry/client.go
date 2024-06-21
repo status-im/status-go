@@ -74,12 +74,16 @@ type Client struct {
 	sendPeriod         time.Duration
 }
 
-func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName string, version string, sendPeriod ...time.Duration) *Client {
-	period := 10 * time.Second
-	if len(sendPeriod) > 0 {
-		period = sendPeriod[0]
+type TelemetryClientOption func(*Client)
+
+func WithSendPeriod(sendPeriod time.Duration) TelemetryClientOption {
+	return func(c *Client) {
+		c.sendPeriod = sendPeriod
 	}
-	return &Client{
+}
+
+func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName string, version string, opts ...TelemetryClientOption) *Client {
+	client := &Client{
 		serverURL:          serverURL,
 		httpClient:         &http.Client{Timeout: time.Minute},
 		logger:             logger,
@@ -91,8 +95,14 @@ func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName str
 		telemetryCache:     make([]TelemetryRequest, 0),
 		nextId:             0,
 		nextIdLock:         sync.Mutex{},
-		sendPeriod:         period,
+		sendPeriod:         10 * time.Second, // default value
 	}
+
+	for _, opt := range opts {
+		opt(client)
+	}
+
+	return client
 }
 
 func (c *Client) Start(ctx context.Context) {
