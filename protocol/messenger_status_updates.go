@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	datasyncnode "github.com/status-im/mvds/node"
+
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
