@@ -19,6 +19,7 @@ pipeline {
 
   options {
     timestamps()
+    ansiColor('xterm')
     /* Prevent Jenkins jobs from running forever */
     timeout(time: 10, unit: 'MINUTES')
     disableConcurrentBuilds()
