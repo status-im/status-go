@@ -15,6 +15,13 @@ import (
 
 func simulate(cCtx *cli.Context) error {
 	ctx, cancel := context.WithCancel(cCtx.Context)
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		cancel()
+		os.Exit(1)
+	}()
 
 	go func() {
 		sig := make(chan os.Signal, 1)
