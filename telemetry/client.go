@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -36,15 +37,15 @@ type TelemetryRequest struct {
 }
 
 func (c *Client) PushReceivedMessages(receivedMessages ReceivedMessages) {
-	c.receivedMessagesCh <- receivedMessages
+	c.processAndPushTelemetry(receivedMessages)
 }
 
 func (c *Client) PushSentEnvelope(sentEnvelope wakuv2.SentEnvelope) {
-	c.sentEnvelopeCh <- sentEnvelope
+	c.processAndPushTelemetry(sentEnvelope)
 }
 
 func (c *Client) PushReceivedEnvelope(receivedEnvelope *v2protocol.Envelope) {
-	c.receivedEnvelopeCh <- receivedEnvelope
+	c.processAndPushTelemetry(receivedEnvelope)
 }
 
 type ReceivedMessages struct {
@@ -60,10 +61,10 @@ type Client struct {
 	keyUID             string
 	nodeName           string
 	version            string
-	receivedMessagesCh chan ReceivedMessages
-	receivedEnvelopeCh chan *v2protocol.Envelope
-	sentEnvelopeCh     chan wakuv2.SentEnvelope
 	telemetryCh        chan TelemetryRequest
+	telemetryCacheLock sync.Mutex
+	telemetryCache     []TelemetryRequest
+	nextIdLock         sync.Mutex
 	nextId             int
 	sendPeriod         time.Duration
 }
@@ -76,34 +77,28 @@ func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName str
 		keyUID:             keyUID,
 		nodeName:           nodeName,
 		version:            version,
-		receivedMessagesCh: make(chan ReceivedMessages),
-		receivedEnvelopeCh: make(chan *v2protocol.Envelope),
-		sentEnvelopeCh:     make(chan wakuv2.SentEnvelope),
 		telemetryCh:        make(chan TelemetryRequest),
+		telemetryCacheLock: sync.Mutex{},
+		telemetryCache:     make([]TelemetryRequest, 0),
 		nextId:             0,
+		nextIdLock:         sync.Mutex{},
 		sendPeriod:         10 * time.Second,
 	}
 }
 
-func (c *Client) CollectAndProcessTelemetry(ctx context.Context) {
+func (c *Client) Start(ctx context.Context) {
 	go func() {
 		for {
 			select {
-			case receivedMessages := <-c.receivedMessagesCh:
-				c.processAndPushTelemetry(receivedMessages)
-			case receivedEnvelope := <-c.receivedEnvelopeCh:
-				c.processAndPushTelemetry(receivedEnvelope)
-			case sentEnvelope := <-c.sentEnvelopeCh:
-				c.processAndPushTelemetry(sentEnvelope)
+			case telemetryRequest := <-c.telemetryCh:
+				c.telemetryCacheLock.Lock()
+				c.telemetryCache = append(c.telemetryCache, telemetryRequest)
+				c.telemetryCacheLock.Unlock()
 			case <-ctx.Done():
 				return
 			}
 		}
 	}()
-}
-
-func (c *Client) Start(ctx context.Context) {
-	go c.CollectAndProcessTelemetry(ctx)
 	go func() {
 		ticker := time.NewTicker(c.sendPeriod)
 		defer ticker.Stop()
@@ -111,16 +106,12 @@ func (c *Client) Start(ctx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				var telemetryRequests []TelemetryRequest
-				collecting := true
-				for collecting {
-					select {
-					case telemetryRequest := <-c.telemetryCh:
-						telemetryRequests = append(telemetryRequests, telemetryRequest)
-					default:
-						collecting = false
-					}
-				}
+				c.telemetryCacheLock.Lock()
+				telemetryRequests := make([]TelemetryRequest, len(c.telemetryCache))
+				copy(telemetryRequests, c.telemetryCache)
+				c.telemetryCache = nil
+				c.telemetryCacheLock.Unlock()
+
 				if len(telemetryRequests) > 0 {
 					c.pushTelemetryRequest(telemetryRequests)
 				}
@@ -128,6 +119,7 @@ func (c *Client) Start(ctx context.Context) {
 				return
 			}
 		}
+
 	}()
 }
 
@@ -157,8 +149,10 @@ func (c *Client) processAndPushTelemetry(data interface{}) {
 		return
 	}
 
-	c.nextId++
 	c.telemetryCh <- telemetryRequest
+	c.nextIdLock.Lock()
+	c.nextId++
+	c.nextIdLock.Unlock()
 }
 
 func (c *Client) pushTelemetryRequest(request []TelemetryRequest) {
