@@ -30,6 +30,7 @@ const (
 	basePath                       = "/messages"
 	imagesPath                     = basePath + "/images"
 	audioPath                      = basePath + "/audio"
+	imagePreviewPath               = "/image-preview"
 	ipfsPath                       = "/ipfs"
 	discordAuthorsPath             = "/discord/authors"
 	discordAttachmentsPath         = basePath + "/discord/attachments"
@@ -1150,6 +1151,40 @@ func handleWalletCollectibleImages(db *sql.DB, logger *zap.Logger) http.HandlerF
 		_, err = w.Write(image)
 		if err != nil {
 			logger.Error("failed to write wallet collectible image", zap.Error(err))
+
+		}
+	}
+}
+func handleImagePreviewFromURL(logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		params, err := parseImagePreviewParams(r.URL.Query())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			logger.Error("failed to parse params", zap.Error(err))
+			return
+		}
+
+		imageBuffer, err := generateImagePreviewFromURL(params, logger)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			logger.Error("failed to generate preview image", zap.Error(err))
+			return
+		}
+
+		mime, err := images.GetProtobufImageMime(imageBuffer.Bytes())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			logger.Error("failed to get wallet collectible image mime", zap.Error(err))
+		}
+
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "max-age=3600")
+
+		_, err = w.Write(imageBuffer.Bytes())
+		if err != nil {
+			message := "couldn't send preview image"
+			http.Error(w, message, http.StatusInternalServerError)
+			logger.Error(message, zap.Error(err))
 		}
 	}
 }
