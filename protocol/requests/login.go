@@ -21,7 +21,7 @@ type Login struct {
 	RuntimeLogLevel       string `json:"runtimeLogLevel"`
 	WakuV2Nameserver      string `json:"wakuV2Nameserver"`
 	BandwidthStatsEnabled bool   `json:"bandwidthStatsEnabled"`
-	
+
 	KeycardWhisperPrivateKey string `json:"keycardWhisperPrivateKey"`
 
 	// Mnemonic allows to log in to an account when password is lost.
