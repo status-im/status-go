@@ -39,7 +39,8 @@ func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 		max_peers, max_pending_peers, enable_status_service, enable_ntp_sync,
 		bridge_enabled, wallet_enabled, local_notifications_enabled,
 		browser_enabled, permissions_enabled, mailservers_enabled,
-		swarm_enabled, mailserver_registry_address, web3provider_enabled, synthetic_id
+		swarm_enabled, mailserver_registry_address, web3provider_enabled, connector_enabled,
+		synthetic_id
 	) VALUES (
 		?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 		?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
@@ -450,7 +451,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		listen_addr, advertise_addr, name, version, api_modules, tls_enabled, max_peers, max_pending_peers,
 		enable_status_service, bridge_enabled, wallet_enabled, local_notifications_enabled,
 		browser_enabled, permissions_enabled, mailservers_enabled, swarm_enabled,
-		mailserver_registry_address, web3provider_enabled FROM node_config
+		mailserver_registry_address, web3provider_enabled, connector_enabled FROM node_config
 		WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.NetworkID, &nodecfg.DataDir, &nodecfg.KeyStoreDir, &nodecfg.NodeKey, &nodecfg.NoDiscovery, &nodecfg.Rendezvous,
