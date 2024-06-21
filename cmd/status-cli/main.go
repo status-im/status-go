@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"time"
 
@@ -168,6 +169,6 @@ func main() {
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		zap.L().Fatal("main", zap.Error(err))
+		log.Fatal(err)
 	}
 }
