@@ -272,7 +272,7 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *pro
 			m.logger.Debug("reset data sync for peer", zap.String("public_key", statusUpdate.PublicKey), zap.Uint64("clock", statusUpdate.Clock))
 			m.mvdsStatusChangeEvent <- datasyncnode.PeerStatusChangeEvent{
 				PeerID:    datasyncpeer.PublicKeyToPeerID(*state.CurrentMessageState.PublicKey),
-				Status:    datasyncnode.ONLINE,
+				Status:    datasyncnode.OnlineStatus,
 				EventTime: statusUpdate.Clock,
 			}
 		}

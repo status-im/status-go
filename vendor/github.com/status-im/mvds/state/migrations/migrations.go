@@ -2,6 +2,8 @@
 // sources:
 // 1565341329_initial_schema.down.sql (24B)
 // 1565341329_initial_schema.up.sql (294B)
+// 1718939515_index_peer_id.down.sql (46B)
+// 1718939515_index_peer_id.up.sql (76B)
 // doc.go (377B)
 
 package migrations
@@ -12,6 +14,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +24,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -29,7 +32,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -85,7 +88,7 @@ func _1565341329_initial_schemaDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1565341329_initial_schema.down.sql", size: 24, mode: os.FileMode(0644), modTime: time.Unix(1704726726, 0)}
+	info := bindataFileInfo{name: "1565341329_initial_schema.down.sql", size: 24, mode: os.FileMode(0644), modTime: time.Unix(1706497287, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x20, 0x56, 0x1a, 0x0, 0xc5, 0x81, 0xb3, 0xeb, 0x2a, 0xae, 0xed, 0xbb, 0x68, 0x51, 0x68, 0xc7, 0xe3, 0x31, 0xe, 0x1, 0x3e, 0xd2, 0x85, 0x9e, 0x6d, 0x55, 0xad, 0x55, 0xd6, 0x2f, 0x29, 0xca}}
 	return a, nil
 }
@@ -105,8 +108,48 @@ func _1565341329_initial_schemaUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1565341329_initial_schema.up.sql", size: 294, mode: os.FileMode(0644), modTime: time.Unix(1704726726, 0)}
+	info := bindataFileInfo{name: "1565341329_initial_schema.up.sql", size: 294, mode: os.FileMode(0644), modTime: time.Unix(1706497287, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3e, 0xa5, 0x37, 0x9d, 0x3f, 0xf3, 0xc9, 0xc8, 0x12, 0x74, 0x79, 0x74, 0xff, 0xfd, 0xb1, 0x5f, 0x13, 0xaf, 0xf2, 0x50, 0x14, 0x9f, 0xdf, 0xc8, 0xc5, 0xa7, 0xc3, 0xf5, 0xa4, 0x8e, 0x8a, 0xf6}}
+	return a, nil
+}
+
+var __1718939515_index_peer_idDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x09\xf2\x0f\x50\xf0\xf4\x73\x71\x8d\x50\xf0\x74\x53\x70\x8d\xf0\x0c\x0e\x09\x56\xc8\x4c\xa9\x88\xcf\x2d\x4b\x29\x8e\x2f\x2e\x49\x2c\x49\x2d\x8e\x2f\x48\x4d\x2d\x8a\xcf\x4c\xb1\xe6\x02\x04\x00\x00\xff\xff\x7e\x04\x3e\x34\x2e\x00\x00\x00")
+
+func _1718939515_index_peer_idDownSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1718939515_index_peer_idDownSql,
+		"1718939515_index_peer_id.down.sql",
+	)
+}
+
+func _1718939515_index_peer_idDownSql() (*asset, error) {
+	bytes, err := _1718939515_index_peer_idDownSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1718939515_index_peer_id.down.sql", size: 46, mode: os.FileMode(0644), modTime: time.Unix(1718939687, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd3, 0x82, 0xd8, 0x4a, 0xc6, 0xf3, 0xbc, 0x7d, 0x4d, 0x81, 0x96, 0x91, 0x8f, 0x4d, 0x84, 0x1c, 0x26, 0xdb, 0x59, 0xb3, 0x4f, 0x14, 0xfb, 0x65, 0x8d, 0x58, 0xc4, 0xe2, 0x23, 0x20, 0x19, 0x16}}
+	return a, nil
+}
+
+var __1718939515_index_peer_idUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x0e\x72\x75\x0c\x71\x55\xf0\xf4\x73\x71\x8d\x50\xf0\x74\x53\xf0\xf3\x0f\x51\x70\x8d\xf0\x0c\x0e\x09\x56\xc8\x4c\xa9\x88\xcf\x2d\x4b\x29\x8e\x2f\x2e\x49\x2c\x49\x2d\x8e\x2f\x48\x4d\x2d\x8a\xcf\x4c\x51\xf0\xf7\x53\x40\x12\xd6\x80\x0a\x6b\x5a\x73\x01\x02\x00\x00\xff\xff\x74\xa6\x2f\x6d\x4c\x00\x00\x00")
+
+func _1718939515_index_peer_idUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1718939515_index_peer_idUpSql,
+		"1718939515_index_peer_id.up.sql",
+	)
+}
+
+func _1718939515_index_peer_idUpSql() (*asset, error) {
+	bytes, err := _1718939515_index_peer_idUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1718939515_index_peer_id.up.sql", size: 76, mode: os.FileMode(0644), modTime: time.Unix(1718939763, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x54, 0x95, 0xa4, 0xe3, 0x3d, 0x8a, 0xa2, 0x7a, 0x89, 0x6, 0xc6, 0x47, 0x73, 0x4, 0xe6, 0x7c, 0xda, 0x50, 0xa2, 0x97, 0x1f, 0x1f, 0x31, 0x45, 0xd8, 0x8b, 0x16, 0x5e, 0xc3, 0xdd, 0x5b, 0x5a}}
 	return a, nil
 }
 
@@ -125,7 +168,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 377, mode: os.FileMode(0644), modTime: time.Unix(1704726726, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 377, mode: os.FileMode(0644), modTime: time.Unix(1706497287, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xef, 0xaf, 0xdf, 0xcf, 0x65, 0xae, 0x19, 0xfc, 0x9d, 0x29, 0xc1, 0x91, 0xaf, 0xb5, 0xd5, 0xb1, 0x56, 0xf3, 0xee, 0xa8, 0xba, 0x13, 0x65, 0xdb, 0xab, 0xcf, 0x4e, 0xac, 0x92, 0xe9, 0x60, 0xf1}}
 	return a, nil
 }
@@ -222,24 +265,25 @@ func AssetNames() []string {
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
 	"1565341329_initial_schema.down.sql": _1565341329_initial_schemaDownSql,
-	"1565341329_initial_schema.up.sql":   _1565341329_initial_schemaUpSql,
-	"doc.go":                             docGo,
-}
 
-// AssetDebug is true if the assets were built with the debug flag enabled.
-const AssetDebug = false
+	"1565341329_initial_schema.up.sql": _1565341329_initial_schemaUpSql,
+
+	"1718939515_index_peer_id.down.sql": _1718939515_index_peer_idDownSql,
+
+	"1718939515_index_peer_id.up.sql": _1718939515_index_peer_idUpSql,
+
+	"doc.go": docGo,
+}
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//
-//	data/
-//	  foo.txt
-//	  img/
-//	    a.png
-//	    b.png
-//
+//     data/
+//       foo.txt
+//       img/
+//         a.png
+//         b.png
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -272,9 +316,11 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"1565341329_initial_schema.down.sql": {_1565341329_initial_schemaDownSql, map[string]*bintree{}},
-	"1565341329_initial_schema.up.sql":   {_1565341329_initial_schemaUpSql, map[string]*bintree{}},
-	"doc.go":                             {docGo, map[string]*bintree{}},
+	"1565341329_initial_schema.down.sql": &bintree{_1565341329_initial_schemaDownSql, map[string]*bintree{}},
+	"1565341329_initial_schema.up.sql":   &bintree{_1565341329_initial_schemaUpSql, map[string]*bintree{}},
+	"1718939515_index_peer_id.down.sql":  &bintree{_1718939515_index_peer_idDownSql, map[string]*bintree{}},
+	"1718939515_index_peer_id.up.sql":    &bintree{_1718939515_index_peer_idUpSql, map[string]*bintree{}},
+	"doc.go":                             &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
@@ -291,7 +337,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}

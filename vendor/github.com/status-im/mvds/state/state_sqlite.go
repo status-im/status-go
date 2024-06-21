@@ -10,6 +10,8 @@ var (
 	ErrStateNotFound = errors.New("state not found")
 )
 
+const BatchResetEpochMessages = 100
+
 // Verify that SyncState interface is implemented.
 var _ SyncState = (*sqliteSyncState)(nil)
 
@@ -104,7 +106,7 @@ func (p *sqliteSyncState) All(epoch int64) ([]State, error) {
 	return result, nil
 }
 
-func (p *sqliteSyncState) AllByPeerID(peerID PeerID) ([]State, error) {
+func (p *sqliteSyncState) QueryByPeerID(peerID PeerID, limit int) ([]State, error) {
 	var result []State
 
 	rows, err := p.db.Query(`
@@ -114,7 +116,8 @@ func (p *sqliteSyncState) AllByPeerID(peerID PeerID) ([]State, error) {
 			mvds_states
 		WHERE
 			peer_id = ?
-	`, peerID[:])
+		LIMIT ?
+	`, peerID[:], limit)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +189,7 @@ func (p *sqliteSyncState) Map(epoch int64, process func(State) State) error {
 }
 
 func (p *sqliteSyncState) MapWithPeerId(peerID PeerID, process func(State) State) error {
-	states, err := p.AllByPeerID(peerID)
+	states, err := p.QueryByPeerID(peerID, BatchResetEpochMessages)
 	if err != nil {
 		return err
 	}

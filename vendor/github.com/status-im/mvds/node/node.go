@@ -35,8 +35,8 @@ type CalculateNextEpoch func(count uint64, epoch int64) int64
 type EventStatus int
 
 const (
-	ONLINE EventStatus = iota
-	OFFLINE
+	OnlineStatus EventStatus = iota
+	OfflineStatus
 )
 
 const FreshEventPeriod = 10 // seconds
@@ -202,7 +202,7 @@ func (n *Node) Start(duration time.Duration) {
 				n.logger.Info("reset data sync for peer stopped")
 				return
 			case event := <-n.peerStatusChangeEvent:
-				if event.Status == ONLINE && event.EventTime > uint64(time.Now().Unix())-FreshEventPeriod {
+				if event.Status == OnlineStatus && event.EventTime > uint64(time.Now().Unix())-FreshEventPeriod {
 					n.logger.Debug("resetting peer epoch", zap.String("peerID", hex.EncodeToString(event.PeerID[:4])))
 					n.resetPeerEpoch(event.PeerID)
 				}
@@ -587,13 +587,6 @@ func (n *Node) updateSendEpoch(s state.State) state.State {
 func (n *Node) resetPeerEpoch(peerID state.PeerID) {
 	n.syncState.MapWithPeerId(peerID, func(s state.State) state.State {
 		s.SendEpoch = n.epoch + int64(rand.Intn(60))
-		n.logger.Debug("resetEpoch",
-			zap.String("groupID", hex.EncodeToString(s.GroupID[:4])),
-			zap.String("messageID", hex.EncodeToString(s.MessageID[:4])),
-			zap.String("peerID", hex.EncodeToString(peerID[:4])),
-			zap.String("peerID", hex.EncodeToString(s.PeerID[:4])),
-			zap.Int64("epoch", s.SendEpoch),
-		)
 		return s
 	})
 }
