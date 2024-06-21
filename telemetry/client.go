@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -22,11 +23,12 @@ import (
 type TelemetryType string
 
 const (
-	ProtocolStatsMetric    TelemetryType = "ProtocolStats"
-	ReceivedEnvelopeMetric TelemetryType = "ReceivedEnvelope"
-	SentEnvelopeMetric     TelemetryType = "SentEnvelope"
-	UpdateEnvelopeMetric   TelemetryType = "UpdateEnvelope"
-	ReceivedMessagesMetric TelemetryType = "ReceivedMessages"
+	ProtocolStatsMetric        TelemetryType = "ProtocolStats"
+	ReceivedEnvelopeMetric     TelemetryType = "ReceivedEnvelope"
+	SentEnvelopeMetric         TelemetryType = "SentEnvelope"
+	UpdateEnvelopeMetric       TelemetryType = "UpdateEnvelope"
+	ReceivedMessagesMetric     TelemetryType = "ReceivedMessages"
+	ErrorSendingEnvelopeMetric TelemetryType = "ErrorSendingEnvelope"
 )
 
 type TelemetryRequest struct {
@@ -36,15 +38,19 @@ type TelemetryRequest struct {
 }
 
 func (c *Client) PushReceivedMessages(receivedMessages ReceivedMessages) {
-	c.receivedMessagesCh <- receivedMessages
+	c.processAndPushTelemetry(receivedMessages)
 }
 
 func (c *Client) PushSentEnvelope(sentEnvelope wakuv2.SentEnvelope) {
-	c.sentEnvelopeCh <- sentEnvelope
+	c.processAndPushTelemetry(sentEnvelope)
 }
 
 func (c *Client) PushReceivedEnvelope(receivedEnvelope *v2protocol.Envelope) {
-	c.receivedEnvelopeCh <- receivedEnvelope
+	c.processAndPushTelemetry(receivedEnvelope)
+}
+
+func (c *Client) PushErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSendingEnvelope) {
+	c.processAndPushTelemetry(errorSendingEnvelope)
 }
 
 type ReceivedMessages struct {
@@ -60,15 +66,19 @@ type Client struct {
 	keyUID             string
 	nodeName           string
 	version            string
-	receivedMessagesCh chan ReceivedMessages
-	receivedEnvelopeCh chan *v2protocol.Envelope
-	sentEnvelopeCh     chan wakuv2.SentEnvelope
 	telemetryCh        chan TelemetryRequest
+	telemetryCacheLock sync.Mutex
+	telemetryCache     []TelemetryRequest
+	nextIdLock         sync.Mutex
 	nextId             int
 	sendPeriod         time.Duration
 }
 
-func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName string, version string) *Client {
+func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName string, version string, sendPeriod ...time.Duration) *Client {
+	period := 10 * time.Second
+	if len(sendPeriod) > 0 {
+		period = sendPeriod[0]
+	}
 	return &Client{
 		serverURL:          serverURL,
 		httpClient:         &http.Client{Timeout: time.Minute},
@@ -76,34 +86,29 @@ func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName str
 		keyUID:             keyUID,
 		nodeName:           nodeName,
 		version:            version,
-		receivedMessagesCh: make(chan ReceivedMessages),
-		receivedEnvelopeCh: make(chan *v2protocol.Envelope),
-		sentEnvelopeCh:     make(chan wakuv2.SentEnvelope),
 		telemetryCh:        make(chan TelemetryRequest),
+		telemetryCacheLock: sync.Mutex{},
+		telemetryCache:     make([]TelemetryRequest, 0),
 		nextId:             0,
-		sendPeriod:         10 * time.Second,
+		nextIdLock:         sync.Mutex{},
+		sendPeriod:         period,
 	}
 }
 
-func (c *Client) CollectAndProcessTelemetry(ctx context.Context) {
+func (c *Client) Start(ctx context.Context) {
 	go func() {
+
 		for {
 			select {
-			case receivedMessages := <-c.receivedMessagesCh:
-				c.processAndPushTelemetry(receivedMessages)
-			case receivedEnvelope := <-c.receivedEnvelopeCh:
-				c.processAndPushTelemetry(receivedEnvelope)
-			case sentEnvelope := <-c.sentEnvelopeCh:
-				c.processAndPushTelemetry(sentEnvelope)
+			case telemetryRequest := <-c.telemetryCh:
+				c.telemetryCacheLock.Lock()
+				c.telemetryCache = append(c.telemetryCache, telemetryRequest)
+				c.telemetryCacheLock.Unlock()
 			case <-ctx.Done():
 				return
 			}
 		}
 	}()
-}
-
-func (c *Client) Start(ctx context.Context) {
-	go c.CollectAndProcessTelemetry(ctx)
 	go func() {
 		ticker := time.NewTicker(c.sendPeriod)
 		defer ticker.Stop()
@@ -111,16 +116,12 @@ func (c *Client) Start(ctx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				var telemetryRequests []TelemetryRequest
-				collecting := true
-				for collecting {
-					select {
-					case telemetryRequest := <-c.telemetryCh:
-						telemetryRequests = append(telemetryRequests, telemetryRequest)
-					default:
-						collecting = false
-					}
-				}
+				c.telemetryCacheLock.Lock()
+				telemetryRequests := make([]TelemetryRequest, len(c.telemetryCache))
+				copy(telemetryRequests, c.telemetryCache)
+				c.telemetryCache = nil
+				c.telemetryCacheLock.Unlock()
+
 				if len(telemetryRequests) > 0 {
 					c.pushTelemetryRequest(telemetryRequests)
 				}
@@ -128,6 +129,7 @@ func (c *Client) Start(ctx context.Context) {
 				return
 			}
 		}
+
 	}()
 }
 
@@ -152,13 +154,21 @@ func (c *Client) processAndPushTelemetry(data interface{}) {
 			TelemetryType: SentEnvelopeMetric,
 			TelemetryData: c.ProcessSentEnvelope(v),
 		}
+	case wakuv2.ErrorSendingEnvelope:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: ErrorSendingEnvelopeMetric,
+			TelemetryData: c.ProcessErrorSendingEnvelope(v),
+		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
 		return
 	}
 
-	c.nextId++
 	c.telemetryCh <- telemetryRequest
+	c.nextIdLock.Lock()
+	c.nextId++
+	c.nextIdLock.Unlock()
 }
 
 func (c *Client) pushTelemetryRequest(request []TelemetryRequest) {
@@ -218,6 +228,23 @@ func (c *Client) ProcessSentEnvelope(sentEnvelope wakuv2.SentEnvelope) *json.Raw
 		"nodeName":      c.nodeName,
 		"publishMethod": sentEnvelope.PublishMethod.String(),
 		"statusVersion": c.version,
+	}
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
+func (c *Client) ProcessErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSendingEnvelope) *json.RawMessage {
+	postBody := map[string]interface{}{
+		"messageHash":   errorSendingEnvelope.SentEnvelope.Envelope.Hash().String(),
+		"sentAt":        uint32(errorSendingEnvelope.SentEnvelope.Envelope.Message().GetTimestamp() / int64(time.Second)),
+		"pubsubTopic":   errorSendingEnvelope.SentEnvelope.Envelope.PubsubTopic(),
+		"topic":         errorSendingEnvelope.SentEnvelope.Envelope.Message().ContentTopic,
+		"senderKeyUID":  c.keyUID,
+		"nodeName":      c.nodeName,
+		"publishMethod": errorSendingEnvelope.SentEnvelope.PublishMethod.String(),
+		"statusVersion": c.version,
+		"error":         errorSendingEnvelope.Error.Error(),
 	}
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)

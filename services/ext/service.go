@@ -464,7 +464,7 @@ func buildMessengerOptions(
 	}
 
 	if settings.TelemetryServerURL != "" {
-		options = append(options, protocol.WithTelemetry(settings.TelemetryServerURL))
+		options = append(options, protocol.WithTelemetry(settings.TelemetryServerURL, time.Duration(settings.TelemetrySendPeriodMs)*time.Millisecond))
 	}
 
 	if settings.PushNotificationsServerEnabled {

@@ -94,9 +94,15 @@ type SentEnvelope struct {
 	PublishMethod PublishMethod
 }
 
+type ErrorSendingEnvelope struct {
+	Error        error
+	SentEnvelope SentEnvelope
+}
+
 type ITelemetryClient interface {
 	PushReceivedEnvelope(receivedEnvelope *v2protocol.Envelope)
 	PushSentEnvelope(sentEnvelope SentEnvelope)
+	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -978,6 +984,7 @@ func (w *Waku) broadcast() {
 			var publishMethod PublishMethod
 			if w.cfg.SkipPublishToTopic {
 				// For now only used in testing to simulate going offline
+				publishMethod = LightPush
 				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
 					return errors.New("test send failure")
 				}
@@ -1005,11 +1012,9 @@ func (w *Waku) broadcast() {
 					err := sendFn(env, logger)
 					if err == nil {
 						w.statusTelemetryClient.PushSentEnvelope(SentEnvelope{Envelope: env, PublishMethod: publishMethod})
+					} else {
+						w.statusTelemetryClient.PushErrorSendingEnvelope(ErrorSendingEnvelope{Error: err, SentEnvelope: SentEnvelope{Envelope: env, PublishMethod: publishMethod}})
 					}
-					// else {
-					// TODO: send error from Relay or LightPush to Telemetry
-					// w.statusTelemetryClient.PushError(err)
-					// }
 					return err
 				}
 			}

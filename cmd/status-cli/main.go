@@ -22,6 +22,7 @@ const APIModulesFlag = "api-modules"
 const TelemetryServerURLFlag = "telemetry-server-url"
 const KeyUIDFlag = "key-uid"
 const DebugLevel = "debug"
+const MessageFailureFlag = "fail"
 
 const RetrieveInterval = 300 * time.Millisecond
 const SendInterval = 1 * time.Second
@@ -63,6 +64,12 @@ var SimulateFlags = append([]cli.Flag{
 		Aliases: []string{"c"},
 		Value:   1,
 		Usage:   "How many messages to sent from each user",
+	},
+	&cli.BoolFlag{
+		Name:    MessageFailureFlag,
+		Aliases: []string{"f"},
+		Usage:   "Causes messages to fail about 25% of the time",
+		Value:   false,
 	},
 }, CommonFlags...)
 
