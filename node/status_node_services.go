@@ -37,7 +37,6 @@ import (
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
 	"github.com/status-im/status-go/services/communitytokens"
-	"github.com/status-im/status-go/services/connector"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/gif"
@@ -100,7 +99,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
 	services = appendIf(config.Web3ProviderConfig.Enabled, services, b.providerService(accDB))
-	services = appendIf(config.ConnectorConfig.Enabled, services, b.connectorService())
 	services = append(services, b.gifService(accDB))
 	services = append(services, b.ChatService(accDB))
 
@@ -425,13 +423,6 @@ func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfi
 			Tolerance: wakuCfg.RateLimitTolerance,
 		},
 	)
-}
-
-func (b *StatusNode) connectorService() *connector.Service {
-	if b.connectorSrvc == nil {
-		b.connectorSrvc = connector.NewService(b.rpcClient, b.connectorSrvc)
-	}
-	return b.connectorSrvc
 }
 
 func (b *StatusNode) rpcFiltersService() *rpcfilters.Service {

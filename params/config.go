@@ -483,9 +483,6 @@ type NodeConfig struct {
 	// (desktop provider API)
 	Web3ProviderConfig Web3ProviderConfig
 
-	// ConnectorConfig extra configuration for connector.Service
-	ConnectorConfig ConnectorConfig
-
 	// SwarmConfig extra configuration for Swarm and ENS
 	SwarmConfig SwarmConfig `json:"SwarmConfig," validate:"structonly"`
 
@@ -571,11 +568,6 @@ type MailserversConfig struct {
 
 // ProviderConfig extra configuration for provider.Service
 type Web3ProviderConfig struct {
-	Enabled bool
-}
-
-// ConnectorConfig extra configuration for provider.Service
-type ConnectorConfig struct {
 	Enabled bool
 }
 
