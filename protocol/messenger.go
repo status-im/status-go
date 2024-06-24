@@ -1458,7 +1458,7 @@ func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.Verification
 
 // watchConnectionChange checks the connection status and call handleConnectionChange when this changes
 func (m *Messenger) watchConnectionChange() {
-	state := false
+	state := m.Online()
 
 	processNewState := func(newState bool) {
 		if state == newState {
@@ -1495,11 +1495,9 @@ func (m *Messenger) watchConnectionChange() {
 	}
 
 	m.logger.Debug("watching connection changes")
-	m.Online()
 	m.handleConnectionChange(state)
 
 	waku, err := m.node.GetWakuV2(nil)
-
 	if err != nil {
 		// No waku v2, we can't watch connection changes
 		// Instead we will poll the connection status.
@@ -3889,7 +3887,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 			for _, msg := range statusMessages {
 				logger := logger.With(zap.String("message-id", msg.ApplicationLayer.ID.String()))
-				logger.Info("processing message")
+
 				publicKey := msg.SigPubKey()
 
 				m.handleInstallations(msg.EncryptionLayer.Installations)
@@ -3901,7 +3899,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 				senderID := contactIDFromPublicKey(publicKey)
 				ownID := contactIDFromPublicKey(m.IdentityPublicKey())
-				m.logger.Info("processing message", zap.Any("type", msg.ApplicationLayer.Type), zap.String("senderID", senderID))
+				logger.Info("processing message", zap.Any("type", msg.ApplicationLayer.Type), zap.String("senderID", senderID))
 
 				if senderID == ownID {
 					// Skip own messages of certain types

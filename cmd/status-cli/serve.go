@@ -68,6 +68,13 @@ func serve(cCtx *cli.Context) error {
 					}
 				}
 			}
+		case "local-notifications":
+			var ev LocalNotification
+			if err := json.Unmarshal(evt.Event, &ev); err != nil {
+				logger.Error("unmarshaling local notification event", zap.Error(err), zap.Any("event", evt.Event))
+				return
+			}
+			logger.Infof("local notification: %v, title: %v, id: %v", ev.Category, ev.Title, ev.ID)
 		default:
 			logger.Debugf("received event type '%v'\t%v", evt.Type, string(evt.Event))
 		}
@@ -107,6 +114,12 @@ type EventType struct {
 
 type EventNewMessages struct {
 	Messages []*common.Message `json:"messages"`
+}
+
+type LocalNotification struct {
+	ID       string `json:"id"`
+	Title    string `json:"title"`
+	Category string `json:"category"`
 }
 
 func waitForSigExit() {
