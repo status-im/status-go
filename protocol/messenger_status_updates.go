@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/transport"
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
 func (m *Messenger) GetCurrentUserStatus() (*UserStatus, error) {
@@ -237,7 +238,7 @@ func (m *Messenger) SetUserStatus(ctx context.Context, newStatus int, newCustomT
 	return m.sendUserStatus(ctx, *currStatus)
 }
 
-func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *protobuf.StatusUpdate) error {
+func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *protobuf.StatusUpdate, statusMessage *v1protocol.StatusMessage) error {
 	if err := ValidateStatusUpdate(message); err != nil {
 		return err
 	}

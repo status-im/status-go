@@ -761,7 +761,7 @@ func (m *Messenger) handleStatusUpdateProtobuf(messageState *ReceivedMessageStat
 
 	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.ApplicationLayer.Type, p)
 
-	return m.HandleStatusUpdate(messageState, p)
+	return m.HandleStatusUpdate(messageState, p, msg)
 	
 }
 
