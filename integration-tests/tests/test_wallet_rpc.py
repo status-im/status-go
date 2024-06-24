@@ -2,13 +2,13 @@ import random
 import pytest
 import jsonschema
 import json
-from conftest import option, user_1, user_2
+from conftest import option
 from test_cases import RpcTestCase, TransactionTestCase
 
 
 @pytest.mark.wallet
 @pytest.mark.tx
-class TestTransactionRpc(TransactionTestCase):
+class TestWalletTxRpc(TransactionTestCase):
 
     @pytest.mark.parametrize(
         "method, params",
@@ -48,7 +48,7 @@ class TestTransactionRpc(TransactionTestCase):
 
 
 @pytest.mark.wallet
-class TestRpc(RpcTestCase):
+class TestWalletRpc(RpcTestCase):
 
     @pytest.mark.parametrize(
         "method, params",
