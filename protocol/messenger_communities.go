@@ -4843,6 +4843,22 @@ func (m *Messenger) CreateResponseWithACNotification(communityID string, acType 
 	return response, nil
 }
 
+func (m *Messenger) SerializedCommunities() ([]json.RawMessage, error) {
+	cs, err := m.Communities()
+	if err != nil {
+		return nil, err
+	}
+	res := make([]json.RawMessage, 0, len(cs))
+	for _, c := range cs {
+		b, err := c.MarshalJSONWithMediaServer(m.httpServer)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, b)
+	}
+	return res, nil
+}
+
 // SendMessageToControlNode sends a message to the control node of the community.
 // use pointer to rawMessage to get the message ID and other updated properties.
 func (m *Messenger) SendMessageToControlNode(community *communities.Community, rawMessage *common.RawMessage) ([]byte, error) {

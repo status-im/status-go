@@ -14,6 +14,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/golang/protobuf/proto"
+
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/protobuf"
+
 	"go.uber.org/zap"
 
 	eth_common "github.com/ethereum/go-ethereum/common"
@@ -27,16 +32,18 @@ import (
 )
 
 const (
-	basePath                       = "/messages"
-	imagesPath                     = basePath + "/images"
-	audioPath                      = basePath + "/audio"
-	ipfsPath                       = "/ipfs"
-	discordAuthorsPath             = "/discord/authors"
-	discordAttachmentsPath         = basePath + "/discord/attachments"
-	LinkPreviewThumbnailPath       = "/link-preview/thumbnail"
-	LinkPreviewFaviconPath         = "/link-preview/favicon"
-	StatusLinkPreviewThumbnailPath = "/status-link-preview/thumbnail"
-	communityTokenImagesPath       = "/communityTokenImages"
+	basePath                            = "/messages"
+	imagesPath                          = basePath + "/images"
+	audioPath                           = basePath + "/audio"
+	ipfsPath                            = "/ipfs"
+	discordAuthorsPath                  = "/discord/authors"
+	discordAttachmentsPath              = basePath + "/discord/attachments"
+	LinkPreviewThumbnailPath            = "/link-preview/thumbnail"
+	LinkPreviewFaviconPath              = "/link-preview/favicon"
+	StatusLinkPreviewThumbnailPath      = "/status-link-preview/thumbnail"
+	communityTokenImagesPath            = "/communityTokenImages"
+	communityDescriptionImagesPath      = "/communityDescriptionImages"
+	communityDescriptionTokenImagesPath = "/communityDescriptionTokenImages"
 
 	walletBasePath              = "/wallet"
 	walletCommunityImagesPath   = walletBasePath + "/communityImages"
@@ -991,6 +998,131 @@ func handleCommunityTokenImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc
 			logger.Error("failed to write community token image", zap.Error(err))
 		}
 	}
+}
+
+func handleCommunityDescriptionImagesPath(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		params := r.URL.Query()
+
+		if len(params["communityID"]) == 0 {
+			logger.Error("[handleCommunityDescriptionImagesPath] no communityID")
+			return
+		}
+		communityID := params["communityID"][0]
+
+		name := ""
+		if len(params["name"]) > 0 {
+			name = params["name"][0]
+		}
+
+		err, communityDescription := getCommunityDescription(db, communityID, logger)
+		if err != nil {
+			return
+		}
+		if communityDescription.Identity == nil {
+			logger.Error("no identity in community description", zap.String("community id", communityID))
+			return
+		}
+
+		var imagePayload []byte
+		for t, i := range communityDescription.Identity.Images {
+			if t == name {
+				imagePayload = i.Payload
+			}
+		}
+		if imagePayload == nil {
+			logger.Error("can't find community description image", zap.String("community id", communityID), zap.String("name", name))
+			return
+		}
+
+		mime, err := images.GetProtobufImageMime(imagePayload)
+		if err != nil {
+			logger.Error("failed to get community image mime", zap.String("community id", communityID), zap.Error(err))
+		}
+
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-store")
+		_, err = w.Write(imagePayload)
+		if err != nil {
+			logger.Error("failed to write community image", zap.String("community id", communityID), zap.Error(err))
+		}
+	}
+}
+
+func handleCommunityDescriptionTokenImagesPath(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		params := r.URL.Query()
+
+		if len(params["communityID"]) == 0 {
+			logger.Error("[handleCommunityDescriptionTokenImagesPath] no communityID")
+			return
+		}
+		communityID := params["communityID"][0]
+
+		if len(params["symbol"]) == 0 {
+			logger.Error("[handleCommunityDescriptionTokenImagesPath] no symbol")
+			return
+		}
+		symbol := params["symbol"][0]
+
+		err, communityDescription := getCommunityDescription(db, communityID, logger)
+		if err != nil {
+			return
+		}
+
+		var foundToken *protobuf.CommunityTokenMetadata
+		for _, m := range communityDescription.CommunityTokensMetadata {
+			if m.GetSymbol() == symbol {
+				foundToken = m
+			}
+		}
+		if foundToken == nil {
+			logger.Error("can't find community description token image", zap.String("community id", communityID), zap.String("symbol", symbol))
+			return
+		}
+
+		imagePayload, err := images.GetPayloadFromURI(foundToken.Image)
+		if err != nil {
+			logger.Error("failed to get community description token image payload", zap.Error(err))
+			return
+		}
+		mime, err := images.GetProtobufImageMime(imagePayload)
+		if err != nil {
+			logger.Error("failed to get community description token image mime", zap.String("community id", communityID), zap.String("symbol", symbol), zap.Error(err))
+		}
+
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-store")
+		_, err = w.Write(imagePayload)
+		if err != nil {
+			logger.Error("failed to write community description token image", zap.String("community id", communityID), zap.String("symbol", symbol), zap.Error(err))
+		}
+	}
+}
+
+// getCommunityDescription returns the latest community description from the cache.
+// NOTE: you should ensure preprocessDescription is called before this function.
+func getCommunityDescription(db *sql.DB, communityID string, logger *zap.Logger) (error, *protobuf.CommunityDescription) {
+	var descriptionBytes []byte
+	err := db.QueryRow(`SELECT description FROM encrypted_community_description_cache WHERE community_id = ? ORDER BY clock DESC LIMIT 1`, types.Hex2Bytes(communityID)).Scan(&descriptionBytes)
+	if err != nil {
+		logger.Error("failed to find community description", zap.String("community id", communityID), zap.Error(err))
+		return err, nil
+	}
+	communityDescription := new(protobuf.CommunityDescription)
+	err = proto.Unmarshal(descriptionBytes, communityDescription)
+	if err != nil {
+		logger.Error("failed to unmarshal community description", zap.String("community id", communityID), zap.Error(err))
+	}
+	return err, communityDescription
 }
 
 func handleWalletCommunityImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
