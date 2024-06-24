@@ -247,7 +247,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain",
 			input: &RouteInputParams{
-				testnetMode: false,
+				TestnetMode: false,
 				SendType:    Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
@@ -330,7 +330,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - No Specific FromChain - Specific Single ToChain",
 			input: &RouteInputParams{
-				testnetMode:        false,
+				TestnetMode:        false,
 				SendType:           Transfer,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
@@ -379,7 +379,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - No Specific FromChain - Specific Multiple ToChain",
 			input: &RouteInputParams{
-				testnetMode:        false,
+				TestnetMode:        false,
 				SendType:           Transfer,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
@@ -446,7 +446,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - Specific Single FromChain - No Specific ToChain",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -496,7 +496,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - Specific Multiple FromChain - No Specific ToChain",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -563,7 +563,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - Specific Single FromChain - Specific Single ToChain - Same Chains",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -601,7 +601,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - Specific Single FromChain - Specific Single ToChain - Different Chains",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -639,7 +639,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - Specific Multiple FromChain - Specific Multiple ToChain - Single Common Chain",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -677,7 +677,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - Specific Multiple FromChain - Specific Multiple ToChain - Multiple Common Chains",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -733,7 +733,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - Specific Multiple FromChain - Specific Multiple ToChain - No Common Chains",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -771,7 +771,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - All FromChains Disabled - All ToChains Disabled",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -803,7 +803,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain - Single Chain LockedAmount",
 			input: &RouteInputParams{
-				testnetMode: false,
+				TestnetMode: false,
 				SendType:    Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
@@ -899,7 +899,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - No Specific FromChain - Specific ToChain - Single Chain LockedAmount",
 			input: &RouteInputParams{
-				testnetMode:        false,
+				TestnetMode:        false,
 				SendType:           Transfer,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
@@ -955,7 +955,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain - Multiple Chains LockedAmount",
 			input: &RouteInputParams{
-				testnetMode: false,
+				TestnetMode: false,
 				SendType:    Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
@@ -1052,7 +1052,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain - All Chains LockedAmount",
 			input: &RouteInputParams{
-				testnetMode: false,
+				TestnetMode: false,
 				SendType:    Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
@@ -1150,7 +1150,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain - All Chains LockedAmount with insufficient amount",
 			input: &RouteInputParams{
-				testnetMode: false,
+				TestnetMode: false,
 				SendType:    Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
@@ -1185,7 +1185,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain - LockedAmount exceeds sending amount",
 			input: &RouteInputParams{
-				testnetMode: false,
+				TestnetMode: false,
 				SendType:    Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
@@ -1219,7 +1219,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ERC20 transfer - No Specific FromChain - No Specific ToChain",
 			input: &RouteInputParams{
-				testnetMode: false,
+				TestnetMode: false,
 				SendType:    Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
@@ -1303,7 +1303,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ERC20 transfer - No Specific FromChain - Specific Single ToChain",
 			input: &RouteInputParams{
-				testnetMode:        false,
+				TestnetMode:        false,
 				SendType:           Transfer,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
@@ -1352,7 +1352,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ERC20 transfer - No Specific FromChain - Specific Multiple ToChain",
 			input: &RouteInputParams{
-				testnetMode:        false,
+				TestnetMode:        false,
 				SendType:           Transfer,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
@@ -1419,7 +1419,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ERC20 transfer - Specific Single FromChain - No Specific ToChain",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -1468,7 +1468,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ERC20 transfer - Specific Multiple FromChain - No Specific ToChain",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -1535,7 +1535,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ERC20 transfer - Specific Single FromChain - Specific Single ToChain - Same Chains",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -1573,7 +1573,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ERC20 transfer - Specific Single FromChain - Specific Single ToChain - Different Chains",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -1611,7 +1611,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ERC20 transfer - Specific Multiple FromChain - Specific Multiple ToChain - Single Common Chain",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -1649,7 +1649,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ERC20 transfer - Specific Multiple FromChain - Specific Multiple ToChain - Multiple Common Chains",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -1705,7 +1705,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ERC20 transfer - Specific Multiple FromChain - Specific Multiple ToChain - No Common Chains",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -1743,7 +1743,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "ERC20 transfer - All FromChains Disabled - All ToChains Disabled",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -1774,7 +1774,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "Bridge - No Specific FromChain - No Specific ToChain",
 			input: &RouteInputParams{
-				testnetMode: false,
+				TestnetMode: false,
 				SendType:    Bridge,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
@@ -1840,7 +1840,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "Bridge - No Specific FromChain - Specific Single ToChain",
 			input: &RouteInputParams{
-				testnetMode:        false,
+				TestnetMode:        false,
 				SendType:           Bridge,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
@@ -1883,7 +1883,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "Bridge - No Specific FromChain - Specific Multiple ToChain",
 			input: &RouteInputParams{
-				testnetMode:        false,
+				TestnetMode:        false,
 				SendType:           Bridge,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
@@ -1938,7 +1938,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "Bridge - Specific Single FromChain - No Specific ToChain",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -1981,7 +1981,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "Bridge - Specific Multiple FromChain - No Specific ToChain",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -2036,7 +2036,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "Bridge - Specific Single FromChain - Specific Single ToChain - Same Chains",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -2067,7 +2067,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "Bridge - Specific Single FromChain - Specific Single ToChain - Different Chains",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -2105,7 +2105,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "Bridge - Specific Multiple FromChain - Specific Multiple ToChain - Single Common Chain",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -2136,7 +2136,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "Bridge - Specific Multiple FromChain - Specific Multiple ToChain - Multiple Common Chains",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -2180,7 +2180,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "Bridge - Specific Multiple FromChain - Specific Multiple ToChain - No Common Chains",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -2218,7 +2218,7 @@ func TestRouterV2(t *testing.T) {
 		{
 			name: "Bridge - All FromChains Disabled - All ToChains Disabled",
 			input: &RouteInputParams{
-				testnetMode:          false,
+				TestnetMode:          false,
 				SendType:             Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
@@ -2250,8 +2250,13 @@ func TestRouterV2(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			networks := []*params.Network{
+				{
+					ChainID: 1,
+				},
+			}
 
-			routes, err := router.SuggestedRoutesV2(context.Background(), tt.input)
+			routes, err := router.SuggestedRoutesV2(context.Background(), tt.input, networks)
 
 			if tt.expectedError != nil {
 				assert.Error(t, err)

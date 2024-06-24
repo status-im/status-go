@@ -44,7 +44,7 @@ type RouteInputParams struct {
 	DisabledToChainIDs   []uint64                `json:"disabledToChainIDs"`
 	GasFeeMode           GasFeeMode              `json:"gasFeeMode" validate:"required"`
 	FromLockedAmount     map[uint64]*hexutil.Big `json:"fromLockedAmount"`
-	testnetMode          bool
+	TestnetMode          bool
 
 	// For send types like EnsRegister, EnsRelease, EnsSetPubKey, StickersBuy
 	Username  string       `json:"username"`
@@ -335,7 +335,7 @@ func validateInputData(input *RouteInputParams) error {
 		if input.Username == "" || input.PublicKey == "" {
 			return ErrUsernameAndPubKeyRequiredForENSRegister
 		}
-		if input.testnetMode {
+		if input.TestnetMode {
 			if input.TokenID != pathprocessor.SttSymbol {
 				return ErrOnlySTTSupportedForENSRegisterOnTestnet
 			}
@@ -391,14 +391,14 @@ func validateInputData(input *RouteInputParams) error {
 
 	if input.FromLockedAmount != nil && len(input.FromLockedAmount) > 0 {
 		suppNetworks := copyMap(supportedNetworks)
-		if input.testnetMode {
+		if input.TestnetMode {
 			suppNetworks = copyMap(supportedTestNetworks)
 		}
 
 		totalLockedAmount := big.NewInt(0)
 
 		for chainID, amount := range input.FromLockedAmount {
-			if input.testnetMode {
+			if input.TestnetMode {
 				if !supportedTestNetworks[chainID] {
 					return ErrLockedAmountNotSupportedForNetwork
 				}
@@ -427,7 +427,7 @@ func validateInputData(input *RouteInputParams) error {
 	return nil
 }
 
-func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams) (*SuggestedRoutesV2, error) {
+func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams, networks []*params.Network) (*SuggestedRoutesV2, error) {
 	// clear all processors
 	for _, processor := range r.pathProcessors {
 		if clearable, ok := processor.(pathprocessor.PathProcessorClearable); ok {
@@ -440,14 +440,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
-	testnetMode, err := r.rpcClient.NetworkManager.GetTestNetworksEnabled()
-	if err != nil {
-		return nil, errors.CreateErrorResponseFromError(err)
-	}
-
-	input.testnetMode = testnetMode
-
-	candidates, err := r.resolveCandidates(ctx, input)
+	candidates, err := r.resolveCandidates(ctx, input, networks)
 	if err != nil {
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
@@ -455,16 +448,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 	return r.resolveRoutes(ctx, input, candidates)
 }
 
-func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams) (candidates []*PathV2, err error) {
-	var (
-		networks []*params.Network
-	)
-
-	networks, err = r.rpcClient.NetworkManager.Get(false)
-	if err != nil {
-		return nil, errors.CreateErrorResponseFromError(err)
-	}
-
+func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams, networks []*params.Network) (candidates []*PathV2, err error) {
 	var (
 		group = async.NewAtomicGroup(ctx)
 		mu    sync.Mutex
@@ -486,7 +470,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams)
 }
 
 func validateInput(input *RouteInputParams, network *params.Network) bool {
-	if network.IsTest != input.testnetMode {
+	if network.IsTest != input.TestnetMode {
 		return false
 	}
 
@@ -541,13 +525,15 @@ func (r *Router) resolveCandidatesForNetwork(ctx context.Context, input *RouteIn
 		if !input.SendType.canUseProcessor(pProcessor) {
 			continue
 		}
-		candidates = append(candidates, r.resolveCandidatesForProcessor(ctx, input, network, token, toToken, amountToSend, amountLocked, pProcessor, networks)...)
+
+		rCandidates := r.CandidateResolver.resolveCandidatesForProcessor(ctx, input, network, token, toToken, amountToSend, amountLocked, pProcessor, networks)
+		candidates = append(candidates, rCandidates...)
 	}
 
 	return candidates
 }
 
-func (r *Router) resolveCandidatesForProcessor(ctx context.Context, input *RouteInputParams, network *params.Network, token, toToken *walletToken.Token, amountToSend *big.Int, amountLocked bool, pProcessor pathprocessor.PathProcessor, networks []*params.Network) []*PathV2 {
+func (r *DefaultCandidateResolver) resolveCandidatesForProcessor(ctx context.Context, input *RouteInputParams, network *params.Network, token, toToken *walletToken.Token, amountToSend *big.Int, amountLocked bool, pProcessor pathprocessor.PathProcessor, networks []*params.Network) []*PathV2 {
 	candidates := make([]*PathV2, 0)
 	// With the condition below we're eliminating `Swap` as potential path that can participate in calculating the best route
 	// once we decide to inlcude `Swap` in the calculation we need to update `canUseProcessor` function.
@@ -595,25 +581,16 @@ func (r *Router) resolveCandidatesForProcessor(ctx context.Context, input *Route
 			continue
 		}
 
-		var l1FeeWei uint64
-		if input.SendType.needL1Fee() {
-			l1FeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, calc.txInputData)
-		}
-
 		approvalRequired, approvalAmountRequired, approvalGasLimit, l1ApprovalFee, err := r.requireApproval(ctx, input.SendType, &calc.approvalContractAddress, processorInputParams)
 		if err != nil {
 			continue
 		}
 
-		var fees *SuggestedFees
-		fees, err = r.feesManager.SuggestedFees(ctx, network.ChainID)
+		fees, l1FeeWei, estimatedTime, err := r.Estimator.Estimate(ctx, network.ChainID, calc.txInputData, input.SendType.needL1Fee(), input.GasFeeMode)
 		if err != nil {
 			continue
 		}
 
-		maxFeesPerGas := fees.feeFor(input.GasFeeMode)
-
-		estimatedTime := r.feesManager.TransactionEstimatedTime(ctx, network.ChainID, maxFeesPerGas)
 		if approvalRequired && estimatedTime < MoreThanFiveMinutes {
 			estimatedTime += 1
 		}

@@ -459,7 +459,12 @@ func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[st
 
 func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*router.SuggestedFeesGwei, error) {
 	log.Debug("call to GetSuggestedFees")
-	return api.router.GetFeesManager().SuggestedFeesGwei(ctx, chainID)
+	fees, err := api.router.GetFeesManager().SuggestedFees(ctx, chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	return router.ConvertFeesToGwei(fees), nil
 }
 
 func (api *API) GetEstimatedLatestBlockNumber(ctx context.Context, chainID uint64) (uint64, error) {
@@ -506,7 +511,19 @@ func (api *API) GetSuggestedRoutes(
 func (api *API) GetSuggestedRoutesV2(ctx context.Context, input *router.RouteInputParams) (*router.SuggestedRoutesV2, error) {
 	log.Debug("call to GetSuggestedRoutesV2")
 
-	return api.router.SuggestedRoutesV2(ctx, input)
+	testMode, err := api.s.rpcClient.NetworkManager.GetTestNetworksEnabled()
+	if err != nil {
+		return nil, err
+	}
+
+	input.TestnetMode = testMode
+
+	networks, err := api.s.rpcClient.NetworkManager.Get(false)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.router.SuggestedRoutesV2(ctx, input, networks)
 }
 
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)

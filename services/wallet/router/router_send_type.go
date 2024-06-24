@@ -67,7 +67,7 @@ func (s SendType) FetchPrices(marketManager *market.Manager, tokenID string) (ma
 	return prices, nil
 }
 
-func (s SendType) FindToken(tokenManager *token.Manager, collectibles *collectibles.Service, account common.Address, network *params.Network, tokenID string) *token.Token {
+func (s SendType) FindToken(tokenManager token.ManagerInterface, collectibles *collectibles.Service, account common.Address, network *params.Network, tokenID string) *token.Token {
 	if !s.IsCollectiblesTransfer() {
 		return tokenManager.FindToken(network, tokenID)
 	}

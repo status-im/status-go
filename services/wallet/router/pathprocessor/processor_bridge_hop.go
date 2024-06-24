@@ -110,7 +110,8 @@ type HopBridgeProcessor struct {
 	httpClient    *thirdparty.HTTPClient
 	tokenManager  *token.Manager
 	contractMaker *contracts.ContractMaker
-	bonderFee     *sync.Map // [fromChainName-toChainName]BonderFee
+	bonderFee     *sync.Map   // [fromChainName-toChainName]BonderFee
+	rpcClient     *rpc.Client // TODO replace with rpc.ClientInterface
 }
 
 func NewHopBridgeProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *token.Manager) *HopBridgeProcessor {
@@ -120,6 +121,7 @@ func NewHopBridgeProcessor(rpcClient *rpc.Client, transactor transactions.Transa
 		transactor:    transactor,
 		tokenManager:  tokenManager,
 		bonderFee:     &sync.Map{},
+		rpcClient:     rpcClient,
 	}
 }
 
@@ -299,14 +301,14 @@ func (h *HopBridgeProcessor) GetContractAddress(params ProcessorInputParams) (co
 }
 
 func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
-	fromChain := h.contractMaker.RPCClient.NetworkManager.Find(sendArgs.ChainID)
+	fromChain := h.rpcClient.NetworkManager.Find(sendArgs.ChainID)
 	if fromChain == nil {
 		return tx, fmt.Errorf("ChainID not supported %d", sendArgs.ChainID)
 	}
 
 	token := h.tokenManager.FindToken(fromChain, sendArgs.HopTx.Symbol)
 
-	nonce, err := h.transactor.NextNonce(h.contractMaker.RPCClient, fromChain.ChainID, sendArgs.HopTx.From)
+	nonce, err := h.transactor.NextNonce(h.rpcClient, fromChain.ChainID, sendArgs.HopTx.From)
 	if err != nil {
 		return tx, statusErrors.CreateErrorResponseFromError(err)
 	}
