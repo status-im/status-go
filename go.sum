@@ -2036,6 +2036,8 @@ github.com/status-im/migrate/v4 v4.6.2-status.3 h1:Khwjb59NzniloUr5i9s9AtkEyqBbQ
 github.com/status-im/migrate/v4 v4.6.2-status.3/go.mod h1:c/kc90n47GZu/58nnz1OMLTf7uE4Da4gZP5qmU+A/v8=
 github.com/status-im/mvds v0.0.27-0.20240621031914-01453d0dfea5 h1:kEwoHFjKWylrUAEV9JGdYwfzPOjc+ydthxSc9LUWfuY=
 github.com/status-im/mvds v0.0.27-0.20240621031914-01453d0dfea5/go.mod h1:2fiAx0q9XYIPKYRq2B1oiO9zZESy/n4D32gWw6lMDsE=
+github.com/status-im/mvds v0.0.27-0.20240624014816-2dd6758177e5 h1:+yVCBKrEwMRsZupZJgzlmI52Sa/8KSzUD5cPAkDe7+Y=
+github.com/status-im/mvds v0.0.27-0.20240624014816-2dd6758177e5/go.mod h1:2fiAx0q9XYIPKYRq2B1oiO9zZESy/n4D32gWw6lMDsE=
 github.com/status-im/notify v1.0.2-status h1:x8wev0Sh8H8KAf4bVcv+L0dVHldBESOKUlqRqRY7uL8=
 github.com/status-im/notify v1.0.2-status/go.mod h1:gF3zSOrafR9DQEWSE8TjfI9NkooDxbyT4UgRGKZA0lc=
 github.com/status-im/rendezvous v1.3.8-0.20240110194857-cc5be22bf83e h1:pCOHeAYmYttXQBCn+6u01bs5d/W3XslxmplFhru4X1Y=
