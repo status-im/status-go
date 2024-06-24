@@ -6,6 +6,8 @@
 // 1616691080_add_wakuV2_keys.up.sql (111B)
 // 1634723014_add_wakuV2_keys.up.sql (125B)
 // doc.go (393B)
+// exit_code_1.txt (4B)
+// test_1.log (0)
 
 package sqlite
 
@@ -88,7 +90,7 @@ func _1561059284_add_waku_keysDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1561059284_add_waku_keys.down.sql", size: 22, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "1561059284_add_waku_keys.down.sql", size: 22, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe5, 0x2a, 0x7e, 0x9, 0xa3, 0xdd, 0xc6, 0x3, 0xfa, 0xaa, 0x98, 0xa0, 0x26, 0x5e, 0x67, 0x43, 0xe6, 0x20, 0xfd, 0x10, 0xfd, 0x60, 0x89, 0x17, 0x13, 0x87, 0x1b, 0x44, 0x36, 0x79, 0xb6, 0x60}}
 	return a, nil
 }
@@ -108,7 +110,7 @@ func _1561059284_add_waku_keysUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1561059284_add_waku_keys.up.sql", size: 109, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "1561059284_add_waku_keys.up.sql", size: 109, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa9, 0x5c, 0x8, 0x32, 0xef, 0x12, 0x88, 0x21, 0xd, 0x7a, 0x42, 0x4d, 0xe7, 0x2d, 0x6c, 0x99, 0xb6, 0x1, 0xf1, 0xba, 0x2c, 0x40, 0x8d, 0xa9, 0x4b, 0xe6, 0xc4, 0x21, 0xec, 0x47, 0x6b, 0xf7}}
 	return a, nil
 }
@@ -128,7 +130,7 @@ func _1616691080_add_wakuv2_keysDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1616691080_add_wakuV2_keys.down.sql", size: 24, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "1616691080_add_wakuV2_keys.down.sql", size: 24, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x42, 0xb6, 0x23, 0x70, 0xb8, 0x63, 0x18, 0x61, 0xea, 0x35, 0x6e, 0xae, 0xe9, 0x71, 0x89, 0xa, 0xa5, 0x72, 0xa2, 0x64, 0xaa, 0x45, 0x1, 0xf, 0xfc, 0xee, 0x1b, 0xd9, 0xd2, 0x27, 0xf4, 0xe2}}
 	return a, nil
 }
@@ -148,7 +150,7 @@ func _1616691080_add_wakuv2_keysUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1616691080_add_wakuV2_keys.up.sql", size: 111, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "1616691080_add_wakuV2_keys.up.sql", size: 111, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x10, 0xf0, 0x97, 0x25, 0xfe, 0x96, 0x2c, 0xa8, 0x62, 0x4a, 0x71, 0x75, 0xff, 0x5f, 0x43, 0x1e, 0x71, 0x53, 0xf1, 0xde, 0xf, 0xcf, 0xcd, 0x87, 0x15, 0x61, 0x9d, 0x25, 0x2e, 0xaf, 0x18, 0x99}}
 	return a, nil
 }
@@ -168,7 +170,7 @@ func _1634723014_add_wakuv2_keysUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1634723014_add_wakuV2_keys.up.sql", size: 125, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "1634723014_add_wakuV2_keys.up.sql", size: 125, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7e, 0xe1, 0x7a, 0x1e, 0x6, 0xad, 0x1b, 0x37, 0xdb, 0xea, 0x94, 0xaf, 0xe0, 0x7d, 0xc9, 0xd6, 0xda, 0x52, 0x71, 0x8a, 0x44, 0xb3, 0xa6, 0x7b, 0x1e, 0x90, 0xdb, 0x1e, 0x5a, 0xa, 0x40, 0x26}}
 	return a, nil
 }
@@ -188,8 +190,48 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 393, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 393, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa8, 0x22, 0x63, 0x1, 0xf1, 0xb5, 0xd4, 0x48, 0xa8, 0x75, 0x3f, 0xa8, 0x3, 0x83, 0x19, 0x1, 0x27, 0xa2, 0xe8, 0x9, 0x94, 0x46, 0x61, 0xf, 0xcb, 0xb5, 0x5e, 0xbd, 0x35, 0xd5, 0x6e, 0x51}}
+	return a, nil
+}
+
+var _exit_code_1Txt = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x32\x34\x32\xe7\x02\x04\x00\x00\xff\xff\x0c\x38\xee\x3e\x04\x00\x00\x00")
+
+func exit_code_1TxtBytes() ([]byte, error) {
+	return bindataRead(
+		_exit_code_1Txt,
+		"exit_code_1.txt",
+	)
+}
+
+func exit_code_1Txt() (*asset, error) {
+	bytes, err := exit_code_1TxtBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "exit_code_1.txt", size: 4, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x74, 0x3c, 0x78, 0x50, 0xcc, 0xcf, 0xba, 0x5e, 0x53, 0xa9, 0x0, 0x26, 0x63, 0xec, 0x1d, 0xdd, 0x10, 0x79, 0x31, 0x5a, 0x98, 0xbd, 0xbf, 0xdd, 0xe1, 0xe, 0x60, 0x44, 0xf5, 0x6a, 0xbe, 0xfe}}
+	return a, nil
+}
+
+var _test_1Log = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x01\x00\x00\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00")
+
+func test_1LogBytes() ([]byte, error) {
+	return bindataRead(
+		_test_1Log,
+		"test_1.log",
+	)
+}
+
+func test_1Log() (*asset, error) {
+	bytes, err := test_1LogBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "test_1.log", size: 0, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
 
@@ -290,6 +332,8 @@ var _bindata = map[string]func() (*asset, error){
 	"1616691080_add_wakuV2_keys.up.sql":   _1616691080_add_wakuv2_keysUpSql,
 	"1634723014_add_wakuV2_keys.up.sql":   _1634723014_add_wakuv2_keysUpSql,
 	"doc.go":                              docGo,
+	"exit_code_1.txt":                     exit_code_1Txt,
+	"test_1.log":                          test_1Log,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -344,6 +388,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1616691080_add_wakuV2_keys.up.sql":   {_1616691080_add_wakuv2_keysUpSql, map[string]*bintree{}},
 	"1634723014_add_wakuV2_keys.up.sql":   {_1634723014_add_wakuv2_keysUpSql, map[string]*bintree{}},
 	"doc.go":                              {docGo, map[string]*bintree{}},
+	"exit_code_1.txt":                     {exit_code_1Txt, map[string]*bintree{}},
+	"test_1.log":                          {test_1Log, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
