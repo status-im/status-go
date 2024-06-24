@@ -694,6 +694,8 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		b.log.Info("failed to update account")
 		return err
 	}
+	nbConnections := b.appDB.Stats().MaxOpenConnections
+	b.log.Info(fmt.Sprintf("Max connections: %d", nbConnections))
 
 	return nil
 }
