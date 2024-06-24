@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 
@@ -160,4 +162,92 @@ func TestSaveTokens(t *testing.T) {
 	require.Equal(t, actualToken3.BalancesPerChain[chain1].Balance.String(), "0.4")
 	require.Equal(t, actualToken3.BalancesPerChain[chain1].Address, tokenAddress1)
 	require.Equal(t, actualToken3.BalancesPerChain[chain1].ChainID, chain1)
+}
+
+func TestGetCachedBalancesByChain(t *testing.T) {
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+
+	require.NoError(t, err)
+	require.NotNil(t, db)
+
+	persistence := NewPersistence(db)
+	require.NotNil(t, persistence)
+
+	tokens := make(map[common.Address][]StorageToken)
+	address1 := common.HexToAddress("0xdAC17F958D2ee523a2206206994597C13D831ec7")
+	address2 := common.HexToAddress("0x5e4e65926ba27467555eb562121fac00d24e9dd2")
+
+	tokenAddress1 := common.HexToAddress("0xDb8d79C775452a3929b86ac5DEaB3e9d38e1c006")
+	tokenAddress2 := common.HexToAddress("0xDb8d79C775452a3929b86ac5DEaB3e9d38e1c005")
+
+	var chain1 uint64 = 1
+	var chain2 uint64 = 2
+
+	token1 := StorageToken{
+		Token: Token{
+			Name:     "token-1",
+			Symbol:   "TT1",
+			Decimals: 18,
+		},
+		BalancesPerChain: make(map[uint64]ChainBalance),
+		Description:      "description-1",
+		AssetWebsiteURL:  "url-1",
+	}
+
+	token1.BalancesPerChain[chain1] = ChainBalance{
+		RawBalance: "1",
+		// min eth number (not zero)
+		Balance: big.NewFloat(0.000000000000000001),
+		Address: tokenAddress1,
+		ChainID: chain1,
+	}
+
+	token2 := StorageToken{
+		Token: Token{
+			Name:     "token-2",
+			Symbol:   "TT2",
+			Decimals: 10,
+		},
+		BalancesPerChain: make(map[uint64]ChainBalance),
+		Description:      "description-2",
+		AssetWebsiteURL:  "url-2",
+	}
+
+	token2.BalancesPerChain[chain2] = ChainBalance{
+		RawBalance: "1000000000000000000",
+		Balance:    big.NewFloat(1),
+		Address:    tokenAddress2,
+		ChainID:    chain1,
+	}
+
+	tokens[address1] = []StorageToken{token1}
+	tokens[address2] = []StorageToken{token2}
+
+	require.NoError(t, persistence.SaveTokens(tokens))
+
+	tokenManager := NewTokenManager(db, nil, community.NewManager(db, nil, nil), network.NewManager(db), db, nil, nil, nil, nil, persistence)
+
+	// Verify that the token balance was inserted correctly
+	var count int
+	err = db.QueryRow(`SELECT count(*) FROM token_balances`).Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 2, count)
+
+	nonExistingAddress := common.HexToAddress("0xaAC17F958D2ee523a2206206994597C13D831ec8")
+	result, err := tokenManager.GetCachedBalancesByChain([]common.Address{nonExistingAddress}, []common.Address{tokenAddress1}, []uint64{chain1})
+	require.NoError(t, err)
+	require.Len(t, result, 0)
+
+	result, err = tokenManager.GetCachedBalancesByChain([]common.Address{address1}, []common.Address{tokenAddress1}, []uint64{chain1})
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+
+	require.Equal(t, result[chain1][address1][tokenAddress1].ToInt(), big.NewInt(1))
+
+	result, err = tokenManager.GetCachedBalancesByChain([]common.Address{address1, address2}, []common.Address{tokenAddress2, tokenAddress1}, []uint64{chain1, chain2})
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+
+	require.Equal(t, result[chain1][address1][tokenAddress1].ToInt(), big.NewInt(1))
+	require.Equal(t, result[chain2][address2][tokenAddress2].ToInt(), big.NewInt(1000000000000000000))
 }
