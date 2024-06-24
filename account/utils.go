@@ -4,8 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/status-im/status-go/cmd/extkeys"
+
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/multiaccounts"
 )
 

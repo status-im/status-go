@@ -7,12 +7,13 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/status-im/status-go/cmd/extkeys"
+
 	"github.com/pborman/uuid"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/extkeys"
 )
 
 var (

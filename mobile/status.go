@@ -9,6 +9,8 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/status-im/status-go/cmd/extkeys"
+
 	validator "gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -24,7 +26,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
-	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"

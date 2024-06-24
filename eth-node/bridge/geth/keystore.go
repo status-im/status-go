@@ -5,12 +5,14 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/status-im/status-go/cmd/extkeys"
+	extkeys2 "github.com/status-im/status-go/extkeys"
+
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/extkeys"
 )
 
 type gethKeyStoreAdapter struct {
@@ -18,7 +20,7 @@ type gethKeyStoreAdapter struct {
 }
 
 // WrapKeyStore creates a types.KeyStore wrapper over a keystore.KeyStore object
-func WrapKeyStore(keystore *keystore.KeyStore) types.KeyStore {
+func WrapKeyStore(keystore *keystore.KeyStore) *gethKeyStoreAdapter {
 	return &gethKeyStoreAdapter{keystore: keystore}
 }
 
@@ -28,12 +30,12 @@ func (k *gethKeyStoreAdapter) ImportECDSA(priv *ecdsa.PrivateKey, passphrase str
 }
 
 func (k *gethKeyStoreAdapter) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, passphrase string) (types.Account, error) {
-	gethAccount, err := k.keystore.ImportSingleExtendedKey(extKey, passphrase)
+	gethAccount, err := k.keystore.ImportSingleExtendedKey((*extkeys2.ExtendedKey)(extKey), passphrase)
 	return accountFrom(gethAccount), err
 }
 
 func (k *gethKeyStoreAdapter) ImportExtendedKeyForPurpose(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey, passphrase string) (types.Account, error) {
-	gethAccount, err := k.keystore.ImportExtendedKeyForPurpose(keyPurpose, extKey, passphrase)
+	gethAccount, err := k.keystore.ImportExtendedKeyForPurpose(extkeys2.KeyPurpose(keyPurpose), (*extkeys2.ExtendedKey)(extKey), passphrase)
 	return accountFrom(gethAccount), err
 }
 
@@ -97,7 +99,7 @@ func keyFrom(k *keystore.Key) *types.Key {
 		ID:              k.Id,
 		Address:         types.Address(k.Address),
 		PrivateKey:      k.PrivateKey,
-		ExtendedKey:     k.ExtendedKey,
+		ExtendedKey:     (*extkeys.ExtendedKey)(k.ExtendedKey),
 		SubAccountIndex: k.SubAccountIndex,
 	}
 }
