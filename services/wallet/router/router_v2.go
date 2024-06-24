@@ -69,6 +69,16 @@ type routerTestParams struct {
 	approvalL1Fee         uint64
 }
 
+type processorRouteCalculations struct {
+	can                     bool
+	bonderFees              *big.Int
+	tokenFees               *big.Int
+	gasLimit                uint64
+	approvalContractAddress common.Address
+	txInputData             []byte
+	amountOut               *big.Int
+}
+
 type PathV2 struct {
 	ProcessorName  string
 	FromChain      *params.Network    // Source chain
@@ -447,8 +457,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 
 func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams) (candidates []*PathV2, err error) {
 	var (
-		testsMode = input.testsMode && input.testParams != nil
-		networks  []*params.Network
+		networks []*params.Network
 	)
 
 	networks, err = r.rpcClient.NetworkManager.Get(false)
@@ -463,209 +472,233 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams)
 
 	for networkIdx := range networks {
 		network := networks[networkIdx]
-		if network.IsTest != input.testnetMode {
-			continue
-		}
-
-		if containsNetworkChainID(network, input.DisabledFromChainIDs) {
-			continue
-		}
-
-		if !input.SendType.isAvailableFor(network) {
-			continue
-		}
-
-		var (
-			token   *walletToken.Token
-			toToken *walletToken.Token
-		)
-
-		if testsMode {
-			token = input.testParams.tokenFrom
-		} else {
-			token = input.SendType.FindToken(r.tokenManager, r.collectiblesService, input.AddrFrom, network, input.TokenID)
-		}
-		if token == nil {
-			continue
-		}
-
-		if input.SendType == Swap {
-			toToken = input.SendType.FindToken(r.tokenManager, r.collectiblesService, common.Address{}, network, input.ToTokenID)
-		}
-
-		amountLocked := false
-		amountToSend := input.AmountIn.ToInt()
-		if lockedAmount, ok := input.FromLockedAmount[network.ChainID]; ok {
-			amountToSend = lockedAmount.ToInt()
-			amountLocked = true
-		} else if len(input.FromLockedAmount) > 0 {
-			for chainID, lockedAmount := range input.FromLockedAmount {
-				if chainID == network.ChainID {
-					continue
-				}
-				amountToSend = new(big.Int).Sub(amountToSend, lockedAmount.ToInt())
-			}
-		}
-
 		group.Add(func(c context.Context) error {
-			if err != nil {
-				return errors.CreateErrorResponseFromError(err)
-			}
-
-			for _, pProcessor := range r.pathProcessors {
-				// With the condition below we're eliminating `Swap` as potential path that can participate in calculating the best route
-				// once we decide to inlcude `Swap` in the calculation we need to update `canUseProcessor` function.
-				// This also applies to including another (Celer) bridge in the calculation.
-				// TODO:
-				// this algorithm, includeing finding the best route, has to be updated to include more bridges and one (for now) or more swap options
-				// it means that candidates should not be treated linearly, but improve the logic to have multiple routes with different processors of the same type.
-				// Example:
-				// Routes for sending SNT from Ethereum to Optimism can be:
-				// 1. Swap SNT(mainnet) to ETH(mainnet); then bridge via Hop ETH(mainnet) to ETH(opt); then Swap ETH(opt) to SNT(opt); then send SNT (opt) to the destination
-				// 2. Swap SNT(mainnet) to ETH(mainnet); then bridge via Celer ETH(mainnet) to ETH(opt); then Swap ETH(opt) to SNT(opt); then send SNT (opt) to the destination
-				// 3. Swap SNT(mainnet) to USDC(mainnet); then bridge via Hop USDC(mainnet) to USDC(opt); then Swap USDC(opt) to SNT(opt); then send SNT (opt) to the destination
-				// 4. Swap SNT(mainnet) to USDC(mainnet); then bridge via Celer USDC(mainnet) to USDC(opt); then Swap USDC(opt) to SNT(opt); then send SNT (opt) to the destination
-				// 5. ...
-				// 6. ...
-				//
-				// With the current routing algorithm atm we're not able to generate all possible routes.
-				if !input.SendType.canUseProcessor(pProcessor) {
-					continue
-				}
-
-				for _, dest := range networks {
-					if dest.IsTest != input.testnetMode {
-						continue
-					}
-
-					if !input.SendType.isAvailableFor(network) {
-						continue
-					}
-
-					if !input.SendType.isAvailableBetween(network, dest) {
-						continue
-					}
-
-					if containsNetworkChainID(dest, input.DisabledToChainIDs) {
-						continue
-					}
-
-					processorInputParams := pathprocessor.ProcessorInputParams{
-						FromChain: network,
-						ToChain:   dest,
-						FromToken: token,
-						ToToken:   toToken,
-						ToAddr:    input.AddrTo,
-						FromAddr:  input.AddrFrom,
-						AmountIn:  amountToSend,
-						AmountOut: amountToSend,
-
-						Username:  input.Username,
-						PublicKey: input.PublicKey,
-						PackID:    input.PackID.ToInt(),
-					}
-					if input.testsMode {
-						processorInputParams.TestsMode = input.testsMode
-						processorInputParams.TestEstimationMap = input.testParams.estimationMap
-						processorInputParams.TestBonderFeeMap = input.testParams.bonderFeeMap
-						processorInputParams.TestApprovalGasEstimation = input.testParams.approvalGasEstimation
-						processorInputParams.TestApprovalL1Fee = input.testParams.approvalL1Fee
-					}
-
-					can, err := pProcessor.AvailableFor(processorInputParams)
-					if err != nil || !can {
-						continue
-					}
-
-					bonderFees, tokenFees, err := pProcessor.CalculateFees(processorInputParams)
-					if err != nil {
-						continue
-					}
-
-					gasLimit, err := pProcessor.EstimateGas(processorInputParams)
-					if err != nil {
-						continue
-					}
-
-					approvalContractAddress, err := pProcessor.GetContractAddress(processorInputParams)
-					if err != nil {
-						continue
-					}
-					approvalRequired, approvalAmountRequired, approvalGasLimit, l1ApprovalFee, err := r.requireApproval(ctx, input.SendType, &approvalContractAddress, processorInputParams)
-					if err != nil {
-						continue
-					}
-
-					var l1FeeWei uint64
-					if input.SendType.needL1Fee() {
-						txInputData, err := pProcessor.PackTxInputData(processorInputParams)
-						if err != nil {
-							continue
-						}
-
-						l1FeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, txInputData)
-					}
-
-					var fees *SuggestedFees
-					if testsMode {
-						fees = input.testParams.suggestedFees
-					} else {
-						fees, err = r.feesManager.SuggestedFees(ctx, network.ChainID)
-						if err != nil {
-							continue
-						}
-					}
-
-					amountOut, err := pProcessor.CalculateAmountOut(processorInputParams)
-					if err != nil {
-						continue
-					}
-
-					maxFeesPerGas := fees.feeFor(input.GasFeeMode)
-
-					estimatedTime := r.feesManager.TransactionEstimatedTime(ctx, network.ChainID, maxFeesPerGas)
-					if approvalRequired && estimatedTime < MoreThanFiveMinutes {
-						estimatedTime += 1
-					}
-
-					mu.Lock()
-					candidates = append(candidates, &PathV2{
-						ProcessorName:  pProcessor.Name(),
-						FromChain:      network,
-						ToChain:        dest,
-						FromToken:      token,
-						AmountIn:       (*hexutil.Big)(amountToSend),
-						AmountInLocked: amountLocked,
-						AmountOut:      (*hexutil.Big)(amountOut),
-
-						SuggestedLevelsForMaxFeesPerGas: fees.MaxFeesLevels,
-
-						TxBaseFee:     (*hexutil.Big)(fees.BaseFee),
-						TxPriorityFee: (*hexutil.Big)(fees.MaxPriorityFeePerGas),
-						TxGasAmount:   gasLimit,
-						TxBonderFees:  (*hexutil.Big)(bonderFees),
-						TxTokenFees:   (*hexutil.Big)(tokenFees),
-						TxL1Fee:       (*hexutil.Big)(big.NewInt(int64(l1FeeWei))),
-
-						ApprovalRequired:        approvalRequired,
-						ApprovalAmountRequired:  (*hexutil.Big)(approvalAmountRequired),
-						ApprovalContractAddress: &approvalContractAddress,
-						ApprovalBaseFee:         (*hexutil.Big)(fees.BaseFee),
-						ApprovalPriorityFee:     (*hexutil.Big)(fees.MaxPriorityFeePerGas),
-						ApprovalGasAmount:       approvalGasLimit,
-						ApprovalL1Fee:           (*hexutil.Big)(big.NewInt(int64(l1ApprovalFee))),
-
-						EstimatedTime: estimatedTime,
-					})
-					mu.Unlock()
-				}
-			}
+			candidatesForNetwork := r.resolveCandidatesForNetwork(ctx, input, network, networks)
+			mu.Lock()
+			candidates = append(candidates, candidatesForNetwork...)
+			mu.Unlock()
 			return nil
 		})
 	}
 
 	group.Wait()
 	return candidates, nil
+}
+
+func validateInput(input *RouteInputParams, network *params.Network) bool {
+	if network.IsTest != input.testnetMode {
+		return false
+	}
+
+	if containsNetworkChainID(network, input.DisabledFromChainIDs) {
+		return false
+	}
+
+	if !input.SendType.isAvailableFor(network) {
+		return false
+	}
+
+	return true
+}
+
+func (r *Router) resolveCandidatesForNetwork(ctx context.Context, input *RouteInputParams, network *params.Network, networks []*params.Network) []*PathV2 {
+	candidates := make([]*PathV2, 0)
+
+	if !validateInput(input, network) {
+		return nil
+	}
+
+	var (
+		token   *walletToken.Token
+		toToken *walletToken.Token
+	)
+
+	token = input.SendType.FindToken(r.tokenManager, r.collectiblesService, input.AddrFrom, network, input.TokenID)
+	if token == nil {
+		return nil
+	}
+
+	if input.SendType == Swap {
+		toToken = input.SendType.FindToken(r.tokenManager, r.collectiblesService, common.Address{}, network, input.ToTokenID)
+	}
+
+	amountLocked := false
+	amountToSend := input.AmountIn.ToInt()
+	if lockedAmount, ok := input.FromLockedAmount[network.ChainID]; ok {
+		amountToSend = lockedAmount.ToInt()
+		amountLocked = true
+	} else if len(input.FromLockedAmount) > 0 {
+		for chainID, lockedAmount := range input.FromLockedAmount {
+			if chainID == network.ChainID {
+				continue
+			}
+			amountToSend = new(big.Int).Sub(amountToSend, lockedAmount.ToInt())
+		}
+	}
+
+	for _, pProcessor := range r.pathProcessors {
+		// With the current routing algorithm atm we're not able to generate all possible routes.
+		if !input.SendType.canUseProcessor(pProcessor) {
+			continue
+		}
+		candidates = append(candidates, r.resolveCandidatesForProcessor(ctx, input, network, token, toToken, amountToSend, amountLocked, pProcessor, networks)...)
+	}
+
+	return candidates
+}
+
+func (r *Router) resolveCandidatesForProcessor(ctx context.Context, input *RouteInputParams, network *params.Network, token, toToken *walletToken.Token, amountToSend *big.Int, amountLocked bool, pProcessor pathprocessor.PathProcessor, networks []*params.Network) []*PathV2 {
+	candidates := make([]*PathV2, 0)
+	// With the condition below we're eliminating `Swap` as potential path that can participate in calculating the best route
+	// once we decide to inlcude `Swap` in the calculation we need to update `canUseProcessor` function.
+	// This also applies to including another (Celer) bridge in the calculation.
+	// TODO:
+	// this algorithm, includeing finding the best route, has to be updated to include more bridges and one (for now) or more swap options
+	// it means that candidates should not be treated linearly, but improve the logic to have multiple routes with different processors of the same type.
+	// Example:
+	// Routes for sending SNT from Ethereum to Optimism can be:
+	// 1. Swap SNT(mainnet) to ETH(mainnet); then bridge via Hop ETH(mainnet) to ETH(opt); then Swap ETH(opt) to SNT(opt); then send SNT (opt) to the destination
+	// 2. Swap SNT(mainnet) to ETH(mainnet); then bridge via Celer ETH(mainnet) to ETH(opt); then Swap ETH(opt) to SNT(opt); then send SNT (opt) to the destination
+	// 3. Swap SNT(mainnet) to USDC(mainnet); then bridge via Hop USDC(mainnet) to USDC(opt); then Swap USDC(opt) to SNT(opt); then send SNT (opt) to the destination
+	// 4. Swap SNT(mainnet) to USDC(mainnet); then bridge via Celer USDC(mainnet) to USDC(opt); then Swap USDC(opt) to SNT(opt); then send SNT (opt) to the destination
+	// 5. ...
+	// 6. ...
+	//
+	// With the current routing algorithm atm we're not able to generate all possible routes.
+
+	for _, dest := range networks {
+		if !validateInput(input, dest) {
+			continue
+		}
+
+		if !input.SendType.isAvailableBetween(network, dest) {
+			continue
+		}
+
+		processorInputParams := pathprocessor.ProcessorInputParams{
+			FromChain: network,
+			ToChain:   dest,
+			FromToken: token,
+			ToToken:   toToken,
+			ToAddr:    input.AddrTo,
+			FromAddr:  input.AddrFrom,
+			AmountIn:  amountToSend,
+			AmountOut: amountToSend,
+
+			Username:  input.Username,
+			PublicKey: input.PublicKey,
+			PackID:    input.PackID.ToInt(),
+		}
+
+		calc, err := resolveCandidatesForProcessorParams(processorInputParams, pProcessor, input.SendType.needL1Fee())
+		if err != nil {
+			continue
+		}
+
+		var l1FeeWei uint64
+		if input.SendType.needL1Fee() {
+			l1FeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, calc.txInputData)
+		}
+
+		approvalRequired, approvalAmountRequired, approvalGasLimit, l1ApprovalFee, err := r.requireApproval(ctx, input.SendType, &calc.approvalContractAddress, processorInputParams)
+		if err != nil {
+			continue
+		}
+
+		var fees *SuggestedFees
+		fees, err = r.feesManager.SuggestedFees(ctx, network.ChainID)
+		if err != nil {
+			continue
+		}
+
+		maxFeesPerGas := fees.feeFor(input.GasFeeMode)
+
+		estimatedTime := r.feesManager.TransactionEstimatedTime(ctx, network.ChainID, maxFeesPerGas)
+		if approvalRequired && estimatedTime < MoreThanFiveMinutes {
+			estimatedTime += 1
+		}
+
+		candidates = append(candidates, &PathV2{
+			ProcessorName:  pProcessor.Name(),
+			FromChain:      network,
+			ToChain:        dest,
+			FromToken:      token,
+			AmountIn:       (*hexutil.Big)(amountToSend),
+			AmountInLocked: amountLocked,
+			AmountOut:      (*hexutil.Big)(calc.amountOut),
+
+			SuggestedLevelsForMaxFeesPerGas: fees.MaxFeesLevels,
+
+			TxBaseFee:     (*hexutil.Big)(fees.BaseFee),
+			TxPriorityFee: (*hexutil.Big)(fees.MaxPriorityFeePerGas),
+			TxGasAmount:   calc.gasLimit,
+			TxBonderFees:  (*hexutil.Big)(calc.bonderFees),
+			TxTokenFees:   (*hexutil.Big)(calc.tokenFees),
+			TxL1Fee:       (*hexutil.Big)(big.NewInt(int64(l1FeeWei))),
+
+			ApprovalRequired:        approvalRequired,
+			ApprovalAmountRequired:  (*hexutil.Big)(approvalAmountRequired),
+			ApprovalContractAddress: &calc.approvalContractAddress,
+			ApprovalBaseFee:         (*hexutil.Big)(fees.BaseFee),
+			ApprovalPriorityFee:     (*hexutil.Big)(fees.MaxPriorityFeePerGas),
+			ApprovalGasAmount:       approvalGasLimit,
+			ApprovalL1Fee:           (*hexutil.Big)(big.NewInt(int64(l1ApprovalFee))),
+
+			EstimatedTime: estimatedTime,
+		})
+	}
+
+	return candidates
+}
+
+func resolveCandidatesForProcessorParams(processorInputParams pathprocessor.ProcessorInputParams, pProcessor pathprocessor.PathProcessor, needL1Fee bool) (*processorRouteCalculations, error) {
+	processorCalculations := processorRouteCalculations{}
+	can, err := pProcessor.AvailableFor(processorInputParams)
+	if err != nil || !can {
+		return nil, err
+	}
+
+	processorCalculations.can = can
+
+	bonderFees, tokenFees, err := pProcessor.CalculateFees(processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+
+	processorCalculations.bonderFees = bonderFees
+	processorCalculations.tokenFees = tokenFees
+
+	gasLimit, err := pProcessor.EstimateGas(processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+
+	processorCalculations.gasLimit = gasLimit
+
+	approvalContractAddress, err := pProcessor.GetContractAddress(processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+
+	processorCalculations.approvalContractAddress = approvalContractAddress
+
+	if needL1Fee {
+		txInputData, err := pProcessor.PackTxInputData(processorInputParams)
+		if err != nil {
+			return nil, err
+		}
+
+		processorCalculations.txInputData = txInputData
+	}
+
+	amountOut, err := pProcessor.CalculateAmountOut(processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+
+	processorCalculations.amountOut = amountOut
+
+	return &processorCalculations, nil
 }
 
 func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, candidates []*PathV2) (suggestedRoutes *SuggestedRoutesV2, err error) {
