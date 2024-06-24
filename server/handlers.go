@@ -499,23 +499,23 @@ func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *
 		if accColorHash == nil {
 			if parsed.PublicKey == "" {
 				logger.Error("handleAccountInitialsImpl: no public key, can't draw ring", zap.String("keyUid", parsed.KeyUID), zap.Error(err))
-				return
 			}
 
 			accColorHash, err = colorhash.GenerateFor(parsed.PublicKey)
 			if err != nil {
 				logger.Error("handleAccountInitialsImpl: failed to generate color hash from pubkey", zap.String("keyUid", parsed.KeyUID), zap.Error(err))
-				return
 			}
 		}
 
-		payload, err = ring.DrawRing(&ring.DrawRingParam{
-			Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: payload, Height: parsed.BgSize, Width: parsed.BgSize, RingWidth: parsed.RingWidth,
-		})
+		if accColorHash != nil {
+			payload, err = ring.DrawRing(&ring.DrawRingParam{
+				Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: payload, Height: parsed.BgSize, Width: parsed.BgSize, RingWidth: parsed.RingWidth,
+			})
 
-		if err != nil {
-			logger.Error("failed to draw ring for account identity", zap.Error(err))
-			return
+			if err != nil {
+				logger.Error("handleAccountInitialsImpl: failed to draw ring for account identity", zap.Error(err))
+				return
+			}
 		}
 	}
 
