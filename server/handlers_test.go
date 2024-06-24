@@ -3,10 +3,16 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"image/color"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"testing"
+
+	"github.com/status-im/status-go/common/dbsetup"
+	"github.com/status-im/status-go/multiaccounts"
+	mc "github.com/status-im/status-go/multiaccounts/common"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
@@ -544,4 +550,44 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 			}
 		})
 	}
+}
+
+// TestHandleAccountInitialsImpl tests the handleAccountInitialsImpl function
+// given an account without public key, and request to generate ring with keyUID of the account,
+// it should still response with a valid image without ring rather than response with empty image
+func (s *HandlersSuite) TestHandleAccountInitialsImpl() {
+	dbFile := filepath.Join(s.T().TempDir(), "accounts-tests-")
+	db, err := multiaccounts.InitializeDB(dbFile)
+	s.Require().NoError(err)
+	defer db.Close()
+	keyUID := "0x1"
+	name := "Lopsided Goodnatured Bedbug"
+	expected := multiaccounts.Account{Name: name, KeyUID: keyUID, CustomizationColor: mc.CustomizationColorBlue, ColorHash: nil, ColorID: 10, KDFIterations: dbsetup.ReducedKDFIterationsNumber, Timestamp: 1712856359}
+	s.Require().NoError(db.SaveAccount(expected))
+	accounts, err := db.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Len(accounts, 1)
+	s.Require().Equal(expected, accounts[0])
+
+	w := httptest.NewRecorder()
+	f, err := filepath.Abs("../_assets/tests/UbuntuMono-Regular.ttf")
+	s.Require().NoError(err)
+	p := ImageParams{
+		Ring:           true,
+		RingWidth:      1,
+		KeyUID:         keyUID,
+		InitialsLength: 2,
+		BgColor:        color.Transparent,
+		Color:          color.Transparent,
+		FontFile:       f,
+		BgSize:         1,
+		FontSize:       1,
+		UppercaseRatio: 1.0,
+	}
+	handleAccountInitialsImpl(db, s.logger, w, p)
+	s.Require().Equal(http.StatusOK, w.Code)
+	s.Require().Equal("image/png", w.Header().Get("Content-Type"))
+	n, err := w.Result().Body.Read(make([]byte, 100))
+	s.Require().NoError(err)
+	s.Require().Greater(n, 0)
 }
