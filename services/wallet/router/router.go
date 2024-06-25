@@ -274,11 +274,14 @@ func newSuggestedRoutes(
 	}
 }
 
-func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager, marketManager *market.Manager,
+func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager token.ManagerInterface, marketManager *market.Manager,
 	collectibles *collectibles.Service, collectiblesManager *collectibles.Manager, ensService *ens.Service, stickersService *stickers.Service) *Router {
 	processors := make(map[string]pathprocessor.PathProcessor)
 
+	feesManager := &FeeManager{rpcClient}
 	return &Router{
+		Estimator:           NewDefaultEstimator(feesManager),
+		CandidateResolver:   NewDefaultCandidateResolver(rpcClient, feesManager, processors),
 		rpcClient:           rpcClient,
 		tokenManager:        tokenManager,
 		marketManager:       marketManager,
@@ -286,7 +289,7 @@ func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, token
 		collectiblesManager: collectiblesManager,
 		ensService:          ensService,
 		stickersService:     stickersService,
-		feesManager:         &FeeManager{rpcClient},
+		feesManager:         feesManager,
 		pathProcessors:      processors,
 	}
 }
@@ -295,7 +298,7 @@ func (r *Router) AddPathProcessor(processor pathprocessor.PathProcessor) {
 	r.pathProcessors[processor.Name()] = processor
 }
 
-func (r *Router) GetFeesManager() *FeeManager {
+func (r *Router) GetFeesManager() FeeManagerInterface {
 	return r.feesManager
 }
 
@@ -313,19 +316,30 @@ func containsNetworkChainID(network *params.Network, chainIDs []uint64) bool {
 	return false
 }
 
+type Estimator interface {
+	Estimate(ctx context.Context, chainID uint64, txInputData []byte, needL1Fee bool, gasFeeMode GasFeeMode) (suggestedFees *SuggestedFees, l1FeeWei uint64, timeEstimatation TransactionEstimation, err error)
+}
+
+type CandidateResolver interface {
+	resolveCandidatesForProcessor(ctx context.Context, input *RouteInputParams, network *params.Network, token, toToken *walletToken.Token, amountToSend *big.Int, amountLocked bool, pProcessor pathprocessor.PathProcessor, networks []*params.Network) []*PathV2
+	requireApproval(ctx context.Context, sendType SendType, approvalContractAddress *common.Address, params pathprocessor.ProcessorInputParams) (bool, *big.Int, uint64, uint64, error)
+}
+
 type Router struct {
+	Estimator
+	CandidateResolver
 	rpcClient           *rpc.Client
-	tokenManager        *token.Manager
+	tokenManager        token.ManagerInterface
 	marketManager       *market.Manager
 	collectiblesService *collectibles.Service
 	collectiblesManager *collectibles.Manager
 	ensService          *ens.Service
 	stickersService     *stickers.Service
-	feesManager         *FeeManager
+	feesManager         FeeManagerInterface
 	pathProcessors      map[string]pathprocessor.PathProcessor
 }
 
-func (r *Router) requireApproval(ctx context.Context, sendType SendType, approvalContractAddress *common.Address, params pathprocessor.ProcessorInputParams) (
+func (r *DefaultCandidateResolver) requireApproval(ctx context.Context, sendType SendType, approvalContractAddress *common.Address, params pathprocessor.ProcessorInputParams) (
 	bool, *big.Int, uint64, uint64, error) {
 	if sendType.IsCollectiblesTransfer() || sendType.IsEnsTransfer() || sendType.IsStickersTransfer() {
 		return false, nil, 0, 0, nil
@@ -502,10 +516,12 @@ func (r *Router) SuggestedRoutes(
 		}
 
 		group.Add(func(c context.Context) error {
-			gasFees, err := r.feesManager.SuggestedFeesGwei(ctx, network.ChainID)
+			gasFeesWei, err := r.feesManager.SuggestedFees(ctx, network.ChainID)
 			if err != nil {
 				return err
 			}
+
+			gasFees := ConvertFeesToGwei(gasFeesWei)
 
 			// Default value is 1 as in case of erc721 as we built the token we are sure the account owns it
 			balance := big.NewInt(1)
@@ -720,4 +736,50 @@ func (r *Router) SuggestedRoutes(
 	}
 
 	return suggestedRoutes, nil
+}
+
+type DefaultEstimator struct {
+	feesManager FeeManagerInterface
+}
+
+func NewDefaultEstimator(feesManager FeeManagerInterface) *DefaultEstimator {
+	return &DefaultEstimator{
+		feesManager: feesManager,
+	}
+}
+
+func (d *DefaultEstimator) Estimate(ctx context.Context, chainID uint64, txInputData []byte, needL1Fee bool, gasFeeMode GasFeeMode) (suggestedFees *SuggestedFees, l1FeeWei uint64, timeEstimatation TransactionEstimation, err error) {
+	if needL1Fee {
+		l1FeeWei, _ = d.feesManager.GetL1Fee(ctx, chainID, txInputData)
+	}
+
+	var fees *SuggestedFees
+	fees, err = d.feesManager.SuggestedFees(ctx, chainID)
+	if err != nil {
+		return nil, 0, Unknown, err
+	}
+
+	maxFeesPerGas := fees.feeFor(gasFeeMode)
+	estimatedTime := d.feesManager.TransactionEstimatedTime(ctx, chainID, maxFeesPerGas)
+	return fees, l1FeeWei, estimatedTime, nil
+}
+
+type DefaultCandidateResolver struct {
+	Estimator      Estimator
+	rpcClient      rpc.ClientInterface
+	feesManager    FeeManagerInterface
+	pathProcessors map[string]pathprocessor.PathProcessor
+}
+
+func NewDefaultCandidateResolver(
+	rpcClient rpc.ClientInterface,
+	feesManager FeeManagerInterface,
+	pathProcessors map[string]pathprocessor.PathProcessor,
+) *DefaultCandidateResolver {
+	return &DefaultCandidateResolver{
+		Estimator:      NewDefaultEstimator(feesManager),
+		rpcClient:      rpcClient,
+		feesManager:    feesManager,
+		pathProcessors: pathProcessors,
+	}
 }

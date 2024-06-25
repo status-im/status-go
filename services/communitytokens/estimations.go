@@ -356,10 +356,12 @@ func (s *Service) mintTokensGasUnits(ctx context.Context, chainID uint64, contra
 }
 
 func (s *Service) prepareCommunityTokenFees(ctx context.Context, from common.Address, to *common.Address, gasUnits uint64, chainID uint64) (*CommunityTokenFees, error) {
-	suggestedFees, err := s.feeManager.SuggestedFeesGwei(ctx, chainID)
+	suggestedFeesWei, err := s.feeManager.SuggestedFees(ctx, chainID)
 	if err != nil {
 		return nil, err
 	}
+
+	suggestedFees := router.ConvertFeesToGwei(suggestedFeesWei)
 
 	txArgs := s.suggestedFeesToSendTxArgs(from, to, gasUnits, suggestedFees)
 

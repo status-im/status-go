@@ -9,82 +9,67 @@ import (
 	big "math/big"
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
-
 	common "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+	gomock "github.com/golang/mock/gomock"
+	params "github.com/status-im/status-go/params"
 	chain "github.com/status-im/status-go/rpc/chain"
 	token "github.com/status-im/status-go/services/wallet/token"
 )
 
-// MockManagerInterface is a mock of ManagerInterface interface
+// MockManagerInterface is a mock of ManagerInterface interface.
 type MockManagerInterface struct {
 	ctrl     *gomock.Controller
 	recorder *MockManagerInterfaceMockRecorder
 }
 
-// MockManagerInterfaceMockRecorder is the mock recorder for MockManagerInterface
+// MockManagerInterfaceMockRecorder is the mock recorder for MockManagerInterface.
 type MockManagerInterfaceMockRecorder struct {
 	mock *MockManagerInterface
 }
 
-// NewMockManagerInterface creates a new mock instance
+// NewMockManagerInterface creates a new mock instance.
 func NewMockManagerInterface(ctrl *gomock.Controller) *MockManagerInterface {
 	mock := &MockManagerInterface{ctrl: ctrl}
 	mock.recorder = &MockManagerInterfaceMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockManagerInterface) EXPECT() *MockManagerInterfaceMockRecorder {
 	return m.recorder
 }
 
-// LookupTokenIdentity mocks base method
-func (m *MockManagerInterface) LookupTokenIdentity(chainID uint64, address common.Address, native bool) *token.Token {
+// FindToken mocks base method.
+func (m *MockManagerInterface) FindToken(network *params.Network, tokenSymbol string) *token.Token {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LookupTokenIdentity", chainID, address, native)
+	ret := m.ctrl.Call(m, "FindToken", network, tokenSymbol)
 	ret0, _ := ret[0].(*token.Token)
 	return ret0
 }
 
-// LookupTokenIdentity indicates an expected call of LookupTokenIdentity
-func (mr *MockManagerInterfaceMockRecorder) LookupTokenIdentity(chainID, address, native interface{}) *gomock.Call {
+// FindToken indicates an expected call of FindToken.
+func (mr *MockManagerInterfaceMockRecorder) FindToken(network, tokenSymbol interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LookupTokenIdentity", reflect.TypeOf((*MockManagerInterface)(nil).LookupTokenIdentity), chainID, address, native)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindToken", reflect.TypeOf((*MockManagerInterface)(nil).FindToken), network, tokenSymbol)
 }
 
-// LookupToken mocks base method
-func (m *MockManagerInterface) LookupToken(chainID *uint64, tokenSymbol string) (*token.Token, bool) {
+// GetBalance mocks base method.
+func (m *MockManagerInterface) GetBalance(ctx context.Context, client chain.ClientInterface, account, token common.Address) (*big.Int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LookupToken", chainID, tokenSymbol)
-	ret0, _ := ret[0].(*token.Token)
-	ret1, _ := ret[1].(bool)
-	return ret0, ret1
-}
-
-// LookupToken indicates an expected call of LookupToken
-func (mr *MockManagerInterfaceMockRecorder) LookupToken(chainID, tokenSymbol interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LookupToken", reflect.TypeOf((*MockManagerInterface)(nil).LookupToken), chainID, tokenSymbol)
-}
-
-// GetTokensByChainIDs mocks base method
-func (m *MockManagerInterface) GetTokensByChainIDs(chainIDs []uint64) ([]*token.Token, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetTokensByChainIDs", chainIDs)
-	ret0, _ := ret[0].([]*token.Token)
+	ret := m.ctrl.Call(m, "GetBalance", ctx, client, account, token)
+	ret0, _ := ret[0].(*big.Int)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetTokensByChainIDs indicates an expected call of GetTokensByChainIDs
-func (mr *MockManagerInterfaceMockRecorder) GetTokensByChainIDs(chainIDs interface{}) *gomock.Call {
+// GetBalance indicates an expected call of GetBalance.
+func (mr *MockManagerInterfaceMockRecorder) GetBalance(ctx, client, account, token interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTokensByChainIDs", reflect.TypeOf((*MockManagerInterface)(nil).GetTokensByChainIDs), chainIDs)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalance", reflect.TypeOf((*MockManagerInterface)(nil).GetBalance), ctx, client, account, token)
 }
 
-// GetBalancesByChain mocks base method
+// GetBalancesByChain mocks base method.
 func (m *MockManagerInterface) GetBalancesByChain(parent context.Context, clients map[uint64]chain.ClientInterface, accounts, tokens []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBalancesByChain", parent, clients, accounts, tokens)
@@ -93,13 +78,13 @@ func (m *MockManagerInterface) GetBalancesByChain(parent context.Context, client
 	return ret0, ret1
 }
 
-// GetBalancesByChain indicates an expected call of GetBalancesByChain
+// GetBalancesByChain indicates an expected call of GetBalancesByChain.
 func (mr *MockManagerInterfaceMockRecorder) GetBalancesByChain(parent, clients, accounts, tokens interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalancesByChain", reflect.TypeOf((*MockManagerInterface)(nil).GetBalancesByChain), parent, clients, accounts, tokens)
 }
 
-// GetTokenHistoricalBalance mocks base method
+// GetTokenHistoricalBalance mocks base method.
 func (m *MockManagerInterface) GetTokenHistoricalBalance(account common.Address, chainID uint64, symbol string, timestamp int64) (*big.Int, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetTokenHistoricalBalance", account, chainID, symbol, timestamp)
@@ -108,8 +93,52 @@ func (m *MockManagerInterface) GetTokenHistoricalBalance(account common.Address,
 	return ret0, ret1
 }
 
-// GetTokenHistoricalBalance indicates an expected call of GetTokenHistoricalBalance
+// GetTokenHistoricalBalance indicates an expected call of GetTokenHistoricalBalance.
 func (mr *MockManagerInterfaceMockRecorder) GetTokenHistoricalBalance(account, chainID, symbol, timestamp interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTokenHistoricalBalance", reflect.TypeOf((*MockManagerInterface)(nil).GetTokenHistoricalBalance), account, chainID, symbol, timestamp)
+}
+
+// GetTokensByChainIDs mocks base method.
+func (m *MockManagerInterface) GetTokensByChainIDs(chainIDs []uint64) ([]*token.Token, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTokensByChainIDs", chainIDs)
+	ret0, _ := ret[0].([]*token.Token)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetTokensByChainIDs indicates an expected call of GetTokensByChainIDs.
+func (mr *MockManagerInterfaceMockRecorder) GetTokensByChainIDs(chainIDs interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTokensByChainIDs", reflect.TypeOf((*MockManagerInterface)(nil).GetTokensByChainIDs), chainIDs)
+}
+
+// LookupToken mocks base method.
+func (m *MockManagerInterface) LookupToken(chainID *uint64, tokenSymbol string) (*token.Token, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LookupToken", chainID, tokenSymbol)
+	ret0, _ := ret[0].(*token.Token)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// LookupToken indicates an expected call of LookupToken.
+func (mr *MockManagerInterfaceMockRecorder) LookupToken(chainID, tokenSymbol interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LookupToken", reflect.TypeOf((*MockManagerInterface)(nil).LookupToken), chainID, tokenSymbol)
+}
+
+// LookupTokenIdentity mocks base method.
+func (m *MockManagerInterface) LookupTokenIdentity(chainID uint64, address common.Address, native bool) *token.Token {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LookupTokenIdentity", chainID, address, native)
+	ret0, _ := ret[0].(*token.Token)
+	return ret0
+}
+
+// LookupTokenIdentity indicates an expected call of LookupTokenIdentity.
+func (mr *MockManagerInterfaceMockRecorder) LookupTokenIdentity(chainID, address, native interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LookupTokenIdentity", reflect.TypeOf((*MockManagerInterface)(nil).LookupTokenIdentity), chainID, address, native)
 }

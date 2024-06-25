@@ -37,6 +37,7 @@ type Handler func(context.Context, uint64, ...interface{}) (interface{}, error)
 
 type ClientInterface interface {
 	AbstractEthClient(chainID common.ChainID) (chain.BatchCallClient, error)
+	EthClient(chainID uint64) (chain.ClientInterface, error)
 }
 
 // Client represents RPC client with custom routing

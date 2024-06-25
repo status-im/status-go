@@ -16,10 +16,10 @@ import (
 )
 
 type ContractMaker struct {
-	RPCClient *rpc.Client
+	RPCClient rpc.ClientInterface
 }
 
-func NewContractMaker(client *rpc.Client) (*ContractMaker, error) {
+func NewContractMaker(client rpc.ClientInterface) (*ContractMaker, error) {
 	if client == nil {
 		return nil, errors.New("could not initialize ContractMaker with an rpc client")
 	}

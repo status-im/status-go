@@ -101,6 +101,12 @@ type FeeHistory struct {
 	BaseFeePerGas []string `json:"baseFeePerGas"`
 }
 
+type FeeManagerInterface interface {
+	SuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error)
+	TransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Int) TransactionEstimation
+	GetL1Fee(ctx context.Context, chainID uint64, input []byte) (uint64, error)
+}
+
 type FeeManager struct {
 	RPCClient *rpc.Client
 }
@@ -166,11 +172,7 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*Sugges
 	}, nil
 }
 
-func (f *FeeManager) SuggestedFeesGwei(ctx context.Context, chainID uint64) (*SuggestedFeesGwei, error) {
-	fees, err := f.SuggestedFees(ctx, chainID)
-	if err != nil {
-		return nil, err
-	}
+func ConvertFeesToGwei(fees *SuggestedFees) *SuggestedFeesGwei {
 	return &SuggestedFeesGwei{
 		GasPrice:             weiToGwei(fees.GasPrice),
 		BaseFee:              weiToGwei(fees.BaseFee),
@@ -179,7 +181,7 @@ func (f *FeeManager) SuggestedFeesGwei(ctx context.Context, chainID uint64) (*Su
 		MaxFeePerGasMedium:   weiToGwei(fees.MaxFeesLevels.Medium),
 		MaxFeePerGasHigh:     weiToGwei(fees.MaxFeesLevels.High),
 		EIP1559Enabled:       fees.EIP1559Enabled,
-	}, nil
+	}
 }
 
 func (f *FeeManager) getBaseFee(ctx context.Context, client chain.ClientInterface) (*big.Int, error) {
