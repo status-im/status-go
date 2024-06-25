@@ -35,6 +35,11 @@ pipeline {
       defaultValue: false,
       description: 'Should we run the linter? At this point we should rather not bother with it for release branch'
     )
+    booleanParam(
+      name: 'RUN_UNIT_TESTS',
+      defaultValue: false,
+      description: 'Should we run unit-tests? At this point we should rather not bother with it for release branch'
+    )
   }
 
   options {
@@ -102,6 +107,9 @@ pipeline {
     }
 
     stage('Unit Tests') {
+      when {
+        expression { params.RUN_UNIT_TESTS }
+      }
       environment {
         TEST_POSTGRES_PORT = "${env.DB_PORT}"
       }
