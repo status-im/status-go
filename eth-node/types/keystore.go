@@ -3,7 +3,7 @@ package types
 import (
 	"crypto/ecdsa"
 
-	"github.com/status-im/status-go/extkeys"
+	"github.com/siddarthkay/extkeys"
 )
 
 type KeyStore interface {

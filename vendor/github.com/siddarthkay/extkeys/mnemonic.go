@@ -131,10 +131,6 @@ func (m *Mnemonic) AvailableLanguages() []Language {
 	return languages
 }
 
-//func (m *Mnemonic) DetectLanguage(phrase string) (Language, bool) {
-//
-//}
-
 // MnemonicSeed creates and returns a binary seed from the mnemonic.
 // We use the PBKDF2 function with a mnemonic sentence (in UTF-8 NFKD)
 // used as the password and the string SALT + passphrase (again in UTF-8 NFKD) used as the salt.

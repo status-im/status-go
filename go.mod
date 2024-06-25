@@ -91,6 +91,7 @@ require (
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.2
 	github.com/schollz/peerdiscovery v1.7.0
+	github.com/siddarthkay/extkeys v1.0.0
 	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
 	github.com/urfave/cli/v2 v2.27.2
 	github.com/waku-org/go-waku v0.8.1-0.20240612113959-d9dc91a162d9

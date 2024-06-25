@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/status-im/status-go/extkeys"
+	"github.com/siddarthkay/extkeys"
 )
 
 type Key struct {

@@ -904,6 +904,9 @@ github.com/shirou/gopsutil/internal/common
 # github.com/shopspring/decimal v1.2.0
 ## explicit; go 1.13
 github.com/shopspring/decimal
+# github.com/siddarthkay/extkeys v1.0.0
+## explicit; go 1.21
+github.com/siddarthkay/extkeys
 # github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
 ## explicit; go 1.18
 github.com/siphiuel/lc-proxy-wrapper
