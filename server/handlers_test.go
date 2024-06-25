@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/status-im/status-go/eth-node/crypto"
+
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/multiaccounts"
 	mc "github.com/status-im/status-go/multiaccounts/common"
@@ -553,9 +555,9 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 }
 
 // TestHandleAccountInitialsImpl tests the handleAccountInitialsImpl function
-// given an account without public key, and request to generate ring with keyUID of the account,
-// it should still response with a valid image without ring rather than response with empty image
 func (s *HandlersSuite) TestHandleAccountInitialsImpl() {
+	// given an account without public key, and request to generate ring with keyUID of the account,
+	// it should still response with a valid image without ring rather than response with empty image
 	dbFile := filepath.Join(s.T().TempDir(), "accounts-tests-")
 	db, err := multiaccounts.InitializeDB(dbFile)
 	s.Require().NoError(err)
@@ -590,4 +592,12 @@ func (s *HandlersSuite) TestHandleAccountInitialsImpl() {
 	n, err := w.Result().Body.Read(make([]byte, 100))
 	s.Require().NoError(err)
 	s.Require().Greater(n, 0)
+
+	// pass a public key to generate ring
+	k, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	p.PublicKey = common.PubkeyToHex(&k.PublicKey)
+	w = httptest.NewRecorder()
+	handleAccountInitialsImpl(db, s.logger, w, p)
+	s.Require().Equal(http.StatusOK, w.Code)
 }
