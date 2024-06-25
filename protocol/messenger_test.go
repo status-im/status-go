@@ -70,7 +70,7 @@ func (n *testNode) GetWaku(_ interface{}) (types.Waku, error) {
 }
 
 func (n *testNode) GetWakuV2(_ interface{}) (types.Waku, error) {
-	return n.shh, nil
+	return nil, errors.New("No waku v2 support")
 }
 
 func (n *testNode) GetWhisper(_ interface{}) (types.Whisper, error) {

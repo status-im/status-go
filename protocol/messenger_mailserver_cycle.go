@@ -434,14 +434,7 @@ func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 
 			// Query mailserver
 			if m.config.codeControlFlags.AutoRequestHistoricMessages {
-				go func() {
-					_, err := m.performMailserverRequest(&ms, func(_ mailservers.Mailserver) (*MessengerResponse, error) {
-						return m.RequestAllHistoricMessages(false, false)
-					})
-					if err != nil {
-						m.logger.Error("could not perform mailserver request", zap.Error(err))
-					}
-				}()
+				m.asyncRequestAllHistoricMessages()
 			}
 		}
 	}
@@ -587,12 +580,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 				}
 				// Query mailserver
 				if m.config.codeControlFlags.AutoRequestHistoricMessages {
-					go func() {
-						_, err := m.RequestAllHistoricMessages(false, true)
-						if err != nil {
-							m.logger.Error("failed to request historic messages", zap.Error(err))
-						}
-					}()
+					m.asyncRequestAllHistoricMessages()
 				}
 			} else {
 				m.mailPeersMutex.Unlock()
