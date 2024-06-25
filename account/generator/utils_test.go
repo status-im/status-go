@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/siddarthkay/extkeys"
+
 	"github.com/status-im/status-go/eth-node/types"
 )
 

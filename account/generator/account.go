@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/siddarthkay/extkeys"
+
 	accountJson "github.com/status-im/status-go/account/json"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"

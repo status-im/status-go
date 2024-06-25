@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/siddarthkay/extkeys"
+
 	"github.com/status-im/status-go/eth-node/types"
 )
 

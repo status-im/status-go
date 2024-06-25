@@ -10,6 +10,7 @@ import (
 	"github.com/pborman/uuid"
 
 	"github.com/siddarthkay/extkeys"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/eth-node/types"

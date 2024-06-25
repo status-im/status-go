@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/zxcvbn-go/scoring"
 
 	"github.com/siddarthkay/extkeys"
+
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/api"

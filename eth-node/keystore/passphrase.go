@@ -17,6 +17,7 @@ import (
 	"golang.org/x/crypto/scrypt"
 
 	"github.com/siddarthkay/extkeys"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 )
