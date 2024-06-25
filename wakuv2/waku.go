@@ -87,6 +87,7 @@ const cacheTTL = 20 * time.Minute
 const maxHashQueryLength = 100
 const hashQueryInterval = 5 * time.Second
 const messageSentPeriod = 5 // in seconds
+const maxRelayPeers = 300
 
 type SentEnvelope struct {
 	Envelope      *v2protocol.Envelope
@@ -262,7 +263,6 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		node.WithHostAddress(hostAddr),
 		node.WithTopicHealthStatusChannel(waku.topicHealthStatusChan),
 		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
-		node.WithMaxPeerConnections(cfg.DiscoveryLimit),
 		node.WithLogger(logger),
 		node.WithLogLevel(logger.Level()),
 		node.WithClusterID(cfg.ClusterID),
@@ -277,15 +277,16 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		}
 		opts = append(opts, node.WithDiscoveryV5(uint(cfg.UDPPort), bootnodes, cfg.AutoUpdate))
 	}
-
+	shards, err := protocol.TopicsToRelayShards(cfg.DefaultShardPubsubTopic)
+	if err != nil {
+		logger.Error("FATAL ERROR: failed to parse relay shards", zap.Error(err))
+		return nil, errors.New("failed to parse relay shard, invalid pubsubTopic configuration")
+	}
+	waku.defaultShardInfo = shards[0]
 	if cfg.LightClient {
 		opts = append(opts, node.WithWakuFilterLightNode())
-		shards, err := protocol.TopicsToRelayShards(cfg.DefaultShardPubsubTopic)
-		if err != nil {
-			logger.Error("FATAL ERROR: failed to parse relay shards", zap.Error(err))
-			return nil, errors.New("failed to parse relay shard, invalid pubsubTopic configuration")
-		}
 		waku.defaultShardInfo = shards[0]
+		opts = append(opts, node.WithMaxPeerConnections(cfg.DiscoveryLimit))
 	} else {
 		relayOpts := []pubsub.Option{
 			pubsub.WithMaxMessageSize(int(waku.cfg.MaxMessageSize)),
@@ -296,6 +297,8 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		}
 
 		opts = append(opts, node.WithWakuRelayAndMinPeers(waku.cfg.MinPeersForRelay, relayOpts...))
+		opts = append(opts, node.WithMaxPeerConnections(maxRelayPeers))
+		cfg.EnablePeerExchangeClient = true //Enabling this until discv5 issues are resolved. This will enable more peers to be connected for relay mesh.
 	}
 
 	if cfg.EnableStore {
