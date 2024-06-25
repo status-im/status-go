@@ -38,7 +38,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/google/uuid"
-	"github.com/status-im/status-go/extkeys"
+	"github.com/siddarthkay/extkeys"
 )
 
 var (

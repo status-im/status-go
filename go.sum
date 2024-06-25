@@ -751,7 +751,6 @@ github.com/envoyproxy/go-control-plane v0.10.1/go.mod h1:AY7fTTXNdv/aJ2O5jwpxAPO
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
 github.com/envoyproxy/protoc-gen-validate v0.6.2/go.mod h1:2t7qjJNvHPx8IjnBOzl9E9/baC+qXE/TeeyBRzgJDws=
 github.com/etcd-io/bbolt v1.3.3/go.mod h1:ZF2nL25h33cCyBtcyWeZ2/I3HQOfTP+0PIEvHjkjCrw=
-github.com/ethereum/go-ethereum v1.9.5/go.mod h1:PwpWDrCLZrV+tfrhqqF6kPknbISMHaJv9Ln3kPCZLwY=
 github.com/ethereum/go-ethereum v1.10.4/go.mod h1:nEE0TP5MtxGzOMd7egIrbPJMQBnhVU3ELNxhBglIzhg=
 github.com/ethereum/go-ethereum v1.10.16/go.mod h1:Anj6cxczl+AHy63o4X9O8yWNHuN5wMpfb8MAnHkWn7Y=
 github.com/evanphx/json-patch v4.9.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
@@ -2021,8 +2020,8 @@ github.com/spf13/viper v1.4.0/go.mod h1:PTJ7Z/lr49W6bUbkmS1V3by4uWynFiR9p7+dSq/y
 github.com/spf13/viper v1.7.0/go.mod h1:8WkrPz2fc9jxqZNCJI/76HCieCp4Q8HaLFoCha5qpdg=
 github.com/status-im/doubleratchet v3.0.0+incompatible h1:aJ1ejcSERpSzmWZBgtfYtiU2nF0Q8ZkGyuEPYETXkCY=
 github.com/status-im/doubleratchet v3.0.0+incompatible/go.mod h1:1sqR0+yhiM/bd+wrdX79AOt2csZuJOni0nUDzKNuqOU=
-github.com/status-im/go-ethereum v1.10.25-status.14 h1:fYIVUc/589fXDuK6re6jwezcBz6QP+xFeErW/SWbZK4=
-github.com/status-im/go-ethereum v1.10.25-status.14/go.mod h1:Dt4K5JYMhJRdtXJwBEyGZLZn9iz/chSOZyjVmt5ZhwQ=
+github.com/status-im/go-ethereum v1.10.25-status.14.0.20240625133752-6da35e043ff9 h1:O6OJtyj8ClFac8pjzHYIS3L9eOmwQOKZzVHEz5TLPHU=
+github.com/status-im/go-ethereum v1.10.25-status.14.0.20240625133752-6da35e043ff9/go.mod h1:lud2LfwVS8Djn/MSnVgGEq+dGlEmdq43DjClE0ywOKo=
 github.com/status-im/go-multiaddr-ethv4 v1.2.5 h1:pN+ey6wYKbvNNu5/xq9+VL0N8Yq0pZUTbZp0URg+Yn4=
 github.com/status-im/go-multiaddr-ethv4 v1.2.5/go.mod h1:Fhe/18yWU5QwlAYiOO3Bb1BLe0bn5YobcNBHsjRr4kk=
 github.com/status-im/go-sqlcipher/v4 v4.5.4-status.2 h1:Oi9JTAI2DZEe5UKlpUcvKBCCSn3ULsLIrix7jPnEoPE=
@@ -2044,8 +2043,6 @@ github.com/status-im/rendezvous v1.3.8-0.20240110194857-cc5be22bf83e h1:pCOHeAYm
 github.com/status-im/rendezvous v1.3.8-0.20240110194857-cc5be22bf83e/go.mod h1:LEPENTHDBGCxXVZx6FEKNKN+tfPaIK+lmiGv1DxkJW4=
 github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088 h1:ClCAP2FPCvl8hGMhbUx/tq/sOu2wibztAa5jAvQEe4Q=
 github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088/go.mod h1:+92j1tN27DypDeBFxkg0uzkqfh1bNHTZe3Bv2PjvxpM=
-github.com/status-im/status-go/extkeys v1.1.2 h1:FSjARgDathJ3rIapJt851LsIXP9Oyuu2M2jPJKuzloU=
-github.com/status-im/status-go/extkeys v1.1.2/go.mod h1:hCmFzb2jiiVF2voZKYbzuhOQiHHCmyLJsZJXrFFg7BY=
 github.com/status-im/tcp-shaker v1.1.1-status h1:TnVeeWlq2SKCWotHc4Vi6qZQfY8TTe3VLmu1xpEFYhg=
 github.com/status-im/tcp-shaker v1.1.1-status/go.mod h1:RYo/itke1oU5k/6sj9DNM3QAwtE5rZSgg5JnkOv83hk=
 github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857 h1:sPkzT7Z7uLmejOsBRlZ0kwDWpqjpHJsp834o5nbhqho=
@@ -2310,7 +2307,6 @@ golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586/go.mod h1:yigFU9vqHzYiE8U
 golang.org/x/crypto v0.0.0-20190909091759-094676da4a83/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
 golang.org/x/crypto v0.0.0-20190911031432-227b76d455e7/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
 golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
-golang.org/x/crypto v0.0.0-20191122220453-ac88ee75c92c/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/crypto v0.0.0-20200115085410-6d4e4cb37c7d/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/crypto v0.0.0-20200221231518-2aa609cf4a9d/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/crypto v0.0.0-20200302210943-78000ba7a073/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
