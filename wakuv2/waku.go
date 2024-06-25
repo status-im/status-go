@@ -85,8 +85,9 @@ const bootnodesQueryBackoffMs = 200
 const bootnodesMaxRetries = 7
 const cacheTTL = 20 * time.Minute
 const maxHashQueryLength = 100
-const hashQueryInterval = 5 * time.Second
-const messageSentPeriod = 5 // in seconds
+const hashQueryInterval = 3 * time.Second
+const messageSentPeriod = 3    // in seconds
+const messageExpiredPerid = 10 // in seconds
 
 type SentEnvelope struct {
 	Envelope      *v2protocol.Envelope
@@ -1031,8 +1032,10 @@ func (w *Waku) checkIfMessagesStored() {
 			w.logger.Debug("running loop for messages stored check", zap.Any("messageIds", w.sendMsgIDs))
 			pubsubTopics := make([]string, 0, len(w.sendMsgIDs))
 			pubsubMessageIds := make([][]gethcommon.Hash, 0, len(w.sendMsgIDs))
+			pubsubMessageTime := make([][]uint32, 0, len(w.sendMsgIDs))
 			for pubsubTopic, subMsgs := range w.sendMsgIDs {
 				var queryMsgIds []gethcommon.Hash
+				var queryMsgTime []uint32
 				for msgID, sendTime := range subMsgs {
 					if len(queryMsgIds) >= maxHashQueryLength {
 						break
@@ -1040,19 +1043,21 @@ func (w *Waku) checkIfMessagesStored() {
 					// message is sent 5 seconds ago, check if it's stored
 					if uint32(w.timesource.Now().Unix()) > sendTime+messageSentPeriod {
 						queryMsgIds = append(queryMsgIds, msgID)
+						queryMsgTime = append(queryMsgTime, sendTime)
 					}
 				}
 				w.logger.Debug("store query for message hashes", zap.Any("queryMsgIds", queryMsgIds), zap.String("pubsubTopic", pubsubTopic))
 				if len(queryMsgIds) > 0 {
 					pubsubTopics = append(pubsubTopics, pubsubTopic)
 					pubsubMessageIds = append(pubsubMessageIds, queryMsgIds)
+					pubsubMessageTime = append(pubsubMessageTime, queryMsgTime)
 				}
 			}
 			w.sendMsgIDsMu.Unlock()
 
 			pubsubProcessedMessages := make([][]gethcommon.Hash, len(pubsubTopics))
 			for i, pubsubTopic := range pubsubTopics {
-				processedMessages := w.messageHashBasedQuery(w.ctx, pubsubMessageIds[i], pubsubTopic)
+				processedMessages := w.messageHashBasedQuery(w.ctx, pubsubMessageIds[i], pubsubMessageTime[i], pubsubTopic)
 				pubsubProcessedMessages[i] = processedMessages
 			}
 
@@ -1146,7 +1151,7 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
 }
 
 // ctx, peer, r.PubsubTopic, contentTopics, uint64(r.From), uint64(r.To), options, processEnvelopes
-func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Hash, pubsubTopic string) []gethcommon.Hash {
+func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Hash, relayTime []uint32, pubsubTopic string) []gethcommon.Hash {
 	selectedPeer := w.storePeerID
 	if selectedPeer == "" {
 		w.logger.Error("no store peer id available", zap.String("pubsubTopic", pubsubTopic))
@@ -1177,7 +1182,7 @@ func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Ha
 
 	var ackHashes []gethcommon.Hash
 	var missedHashes []gethcommon.Hash
-	for _, hash := range hashes {
+	for i, hash := range hashes {
 		found := false
 		for _, msg := range result.Messages() {
 			if bytes.Equal(msg.GetMessageHash(), hash.Bytes()) {
@@ -1192,7 +1197,9 @@ func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Ha
 				Hash:  hash,
 				Event: common.EventEnvelopeSent,
 			})
-		} else {
+		}
+
+		if !found && uint32(w.timesource.Now().Unix()) > relayTime[i]+messageExpiredPerid {
 			missedHashes = append(missedHashes, hash)
 			w.SendEnvelopeEvent(common.EnvelopeEvent{
 				Hash:  hash,
