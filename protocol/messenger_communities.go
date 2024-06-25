@@ -2739,7 +2739,10 @@ func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommu
 	}
 
 	if community.IsControlNode() {
-		m.communitiesManager.StartMembersReevaluationLoop(community.ID(), true)
+		err = m.communitiesManager.ScheduleMembersReevaluation(community.ID())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// ensure HRkeys are synced

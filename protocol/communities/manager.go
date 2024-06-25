@@ -1449,7 +1449,9 @@ func (m *Manager) ScheduleMembersReevaluation(communityID types.HexBytes) error 
 func (m *Manager) scheduleMembersReevaluation(communityID types.HexBytes, forceImmediateReevaluation bool) error {
 	t, exists := m.membersReevaluationTasks.Load(communityID.String())
 	if !exists {
-		return errors.New("reevaluation task doesn't exist")
+		// No reevaluation task yet. We start the loop which will create it
+		m.StartMembersReevaluationLoop(communityID, true)
+		return nil
 	}
 
 	task, ok := t.(*membersReevaluationTask)
