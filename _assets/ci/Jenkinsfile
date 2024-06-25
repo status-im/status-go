@@ -1,4 +1,5 @@
-library 'status-jenkins-lib@v1.3.3'
+#!/usr/bin/env groovy
+library 'status-jenkins-lib@v1.8.10'
 
 pipeline {
   agent { label 'linux' }
@@ -17,6 +18,8 @@ pipeline {
   }
 
   options {
+    /* Prevent Jenkins jobs from running forever */
+    timeout(time: 40, unit: 'MINUTES')
     disableConcurrentBuilds()
     /* Go requires a certain directory structure */
     checkoutToSubdirectory('src/github.com/status-im/status-go')
@@ -24,6 +27,7 @@ pipeline {
     buildDiscarder(logRotator(
       numToKeepStr: '5',
       daysToKeepStr: '30',
+      artifactNumToKeepStr: '1',
     ))
   }
 

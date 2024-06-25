@@ -1,7 +1,8 @@
-library 'status-jenkins-lib@v1.3.3'
+#!/usr/bin/env groovy
+library 'status-jenkins-lib@v1.8.10'
 
 pipeline {
-  agent { label 'linux && x86_64 && go-1.18' }
+  agent { label 'linux && x86_64' }
 
   parameters {
     string(
@@ -9,58 +10,118 @@ pipeline {
       defaultValue: 'develop',
       description: 'Name of branch to build.'
     )
+    string(
+      name: 'UNIT_TEST_COUNT',
+      defaultValue: getDefaultUnitTestCount(),
+      description: 'How many times to run tests?'
+    )
+    booleanParam(
+      name: 'UNIT_TEST_FAILFAST',
+      defaultValue: getDefaultUnitTestFailfast(),
+      description: 'Should the job fail fast on first test failure?'
+    )
+    booleanParam(
+      name: 'UNIT_TEST_RERUN_FAILS',
+      defaultValue: getDefaultUnitTestRerunFails(),
+      description: 'Should the job rerun failed tests?'
+    )
+    booleanParam(
+      name: 'UNIT_TEST_USE_DEVELOPMENT_LOGGER',
+      defaultValue: getDefaultUnitTestUseDevelopmentLogger(),
+      description: 'Should the job use detailed logging for tests, potentially generating large logs?'
+    )
   }
 
   options {
     timestamps()
+    /* Prevent Jenkins jobs from running forever */
+    timeout(time: getDefaultTimeout(), unit: 'MINUTES')
     disableConcurrentBuilds()
-    /* Go requires a certain directory structure */
-    checkoutToSubdirectory('src/github.com/status-im/status-go')
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
       numToKeepStr: '5',
       daysToKeepStr: '30',
+      artifactNumToKeepStr: '1',
     ))
   }
 
   environment {
-    TARGET = 'linux'
-    GOPATH = "${env.WORKSPACE}"
-    PATH   = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
-    REPO   = 'src/github.com/status-im/status-go'
+    PLATFORM = 'tests'
+    DB_CONT  = "status-go-test-db-${env.EXECUTOR_NUMBER.toInteger() + 1}"
+    DB_PORT  = "${5432 + env.EXECUTOR_NUMBER.toInteger()}"
+    TMPDIR   = "${WORKSPACE_TMP}"
+    GOPATH   = "${WORKSPACE_TMP}/go"
+    GOCACHE  = "${WORKSPACE_TMP}/gocache"
+    PATH     = "${PATH}:${GOPATH}/bin"
+    REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
   }
 
   stages {
-    stage('Prep') { steps { dir(env.REPO) { script {
-      println("Version:    ${utils.getVersion()}")
-      println("Git Branch: ${utils.branchName()}")
-      println("Git Commit: ${utils.gitCommit()}")
-    } } } }
-
-    stage('Setup') { steps { dir(env.REPO) {
-      sh 'make setup-build install-modvendor'
-    } } }
-
-    stage('Vendoring check') { steps { dir(env.REPO) {
-      /* fail build if vendoring hasn't been done */
-      sh 'make vendor'
-      sh 'git diff --exit-code --no-color --stat vendor/'
-    } } }
-
-    stage('Lint') { steps { dir(env.REPO) {
-      sh 'make lint'
-    } } }
-
-    stage('Canary') { steps { dir(env.REPO) {
-      sh 'make canary-test'
-    } } }
-
-    stage('Unit Tests') { steps { script { dir(env.REPO) {
-      docker.image('postgres:9.6-alpine').withRun(
-        '-e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432'
-      ) { c ->
-        sh 'make test-unit V=1'
+    stage('Prep') {
+      steps { /* Go needs to find status-go in GOPATH. */
+        sh "mkdir -p \$(dirname ${REPO_SRC})"
+        sh "ln -s ${WORKSPACE} ${REPO_SRC}"
       }
-    } } } }
+    }
+
+    stage('Vendor Check') {
+      steps { script {
+        nix.shell('make vendor', pure: false)
+        /* fail build if vendoring hasn't been done */
+        nix.shell('git diff --exit-code --no-color --stat vendor/')
+      } }
+    }
+
+    stage('Migration') {
+      when { // https://github.com/status-im/status-go/issues/4993#issuecomment-2022685544
+        expression { !isTestNightlyJob() }
+      }
+      steps { script {
+        nix.shell('make migration-check', pure: false)
+      } }
+    }
+
+    stage('Lint') {
+      steps { script {
+        nix.shell('make lint', pure: true)
+      } }
+    }
+
+    stage('Canary') {
+      steps { script {
+        nix.shell('make canary-test', pure: true)
+      } }
+    }
+
+    stage('Unit Tests') {
+      environment {
+        TEST_POSTGRES_PORT = "${env.DB_PORT}"
+      }
+      steps { script {
+        db = docker.image('postgres:9.6-alpine').withRun([
+          "--name=${DB_CONT}",
+          "--env=POSTGRES_HOST_AUTH_METHOD=trust",
+          "--publish=${DB_PORT}:${DB_PORT}",
+        ].join(' '), "-p ${DB_PORT}") { c ->
+          nix.shell('make generate-handlers', pure: true)
+          nix.shell('make test-unit V=1', pure: false)
+        }
+      } }
+      post { cleanup { /* Leftover DB containers. */
+        sh "docker rm ${DB_CONT} || true"
+      } }
+    }
   } // stages
 } // pipeline
+
+def isTestNightlyJob() { env.JOB_BASE_NAME == 'tests-nightly' }
+
+def getDefaultUnitTestCount() { isTestNightlyJob() ? '20' : '1' }
+
+def getDefaultUnitTestRerunFails() { isTestNightlyJob() ? false : true }
+
+def getDefaultUnitTestUseDevelopmentLogger() { isTestNightlyJob() ? false : true }
+
+def getDefaultUnitTestFailfast() { isTestNightlyJob() ? false : true }
+
+def getDefaultTimeout() { isTestNightlyJob() ? 5*60 : 50 }

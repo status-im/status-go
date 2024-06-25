@@ -1,4 +1,5 @@
-library 'status-jenkins-lib@v1.3.3'
+#!/usr/bin/env groovy
+library 'status-jenkins-lib@v1.8.10'
 
 pipeline {
   agent { label 'linux' }
@@ -14,10 +15,17 @@ pipeline {
       defaultValue: false,
       description: 'Enable to create build for release.',
     )
+    string(
+      name: 'RELEASE_IMAGE_TAG',
+      description: 'Release Docker image tag.',
+      defaultValue: params.RELEASE_IMAGE_TAG ?: 'deploy-test',
+    )
   }
 
   options {
     timestamps()
+    /* Prevent Jenkins jobs from running forever */
+    timeout(time: 10, unit: 'MINUTES')
     disableConcurrentBuilds()
     /* Go requires a certain directory structure */
     checkoutToSubdirectory('src/github.com/status-im/status-go')
@@ -25,32 +33,34 @@ pipeline {
     buildDiscarder(logRotator(
       numToKeepStr: '5',
       daysToKeepStr: '30',
+      artifactNumToKeepStr: '1',
     ))
   }
 
   environment {
-    TARGET = "docker"
-    REPO   = "${env.WORKSPACE}/src/github.com/status-im/status-go"
-    GOPATH = "${env.WORKSPACE}"
-    PATH   = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
-    /* docker image settings */
-    IMAGE_NAME  = "statusteam/status-go"
-    IMAGE_TAG   = "deploy-test"
+    PLATFORM = "docker"
+    REPO     = "${env.WORKSPACE}/src/github.com/status-im/status-go"
+    GOPATH   = "${env.WORKSPACE}"
+    GOCACHE  = "${WORKSPACE_TMP}/gocache"
+    PATH     = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
+    /* Makefile parameters */
+    DOCKER_IMAGE_NAME = 'statusteam/status-go'
+    DOCKER_IMAGE_CUSTOM_TAG = "ci-build-${utils.gitCommit()}"
   }
 
   stages {
     stage('Prep') { steps { dir(env.REPO) { script {
-      println("Output: ${env.IMAGE_NAME}:${env.IMAGE_TAG}")
+      println("Output: ${env.DOCKER_IMAGE_NAME}:${env.RELEASE_IMAGE_TAG}")
     } } } }
 
     stage('Build') { steps { dir(env.REPO) { script {
       sh 'make docker-image'
-      image = docker.image("${env.IMAGE_NAME}:v${utils.getVersion()}")
+      image = docker.image("${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_CUSTOM_TAG}")
     } } } }
 
     stage('Push') { steps { dir(env.REPO) { script {
       withDockerRegistry([credentialsId: "dockerhub-statusteam-auto", url: ""]) {
-        image.push()
+        image.push("v${utils.getVersion()}-${utils.gitCommit()}")
       }
     } } } }
 
@@ -58,7 +68,7 @@ pipeline {
       when { expression { params.RELEASE == true } }
       steps { dir(env.REPO) { script {
         withDockerRegistry([credentialsId: "dockerhub-statusteam-auto", url: ""]) {
-          image.push(env.IMAGE_TAG)
+          image.push(env.RELEASE_IMAGE_TAG)
         }
     } } } }
   } // stages

@@ -1,7 +1,8 @@
-library 'status-jenkins-lib@v1.3.3'
+#!/usr/bin/env groovy
+library 'status-jenkins-lib@v1.8.10'
 
 pipeline {
-  agent { label 'linux && x86_64 && go-1.18' }
+  agent { label 'linux && x86_64' }
 
   parameters {
     string(
@@ -18,57 +19,64 @@ pipeline {
 
   options {
     timestamps()
+    /* Prevent Jenkins jobs from running forever */
+    timeout(time: 10, unit: 'MINUTES')
     disableConcurrentBuilds()
-    /* Go requires a certain directory structure */
-    checkoutToSubdirectory('src/github.com/status-im/status-go')
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
       numToKeepStr: '5',
       daysToKeepStr: '30',
+      artifactNumToKeepStr: '1',
     ))
   }
 
   environment {
-    TARGET = 'linux'
-    REPO   = "${env.WORKSPACE}/src/github.com/status-im/status-go"
-    GOPATH = "${env.WORKSPACE}"
-    PATH   = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
+    PLATFORM = 'linux'
+    TMPDIR   = "${WORKSPACE_TMP}"
+    GOPATH   = "${WORKSPACE_TMP}/go"
+    GOCACHE  = "${WORKSPACE_TMP}/gocache"
+    PATH     = "${PATH}:${GOPATH}/bin"
+    REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
+    ARTIFACT = utils.pkgFilename(name: "status-go", type: "desktop", ext: "zip", version: null)
   }
 
   stages {
-    stage('Prep') { steps { dir(env.REPO) { script {
-      env.ARTIFACT = "${env.WORKSPACE}/" + utils.pkgFilename(
-        name: "status-go",
-        type: "desktop",
-        ext: "zip"
-      )
-      println("Output: ${env.ARTIFACT}")
-    } } } }
-
-    stage('Setup') { steps { dir(env.REPO) {
-      sh 'make setup-build'
-    } } }
+    stage('Setup') {
+      steps { /* Go needs to find status-go in GOPATH. */
+        sh "mkdir -p \$(dirname ${REPO_SRC})"
+        sh "ln -s ${WORKSPACE} ${REPO_SRC}"
+      }
+    }
 
     /* Sanity-check C bindings */
-    stage('Sanity check bindings') { steps { dir(env.REPO) {
-      sh 'make statusgo-library'
-    } } }
+    stage('Build Static Lib') {
+      steps { script {
+        nix.shell('make statusgo-library', pure: false)
+      } }
+    }
 
-    stage('Compress') { steps { dir(env.REPO) {
-      sh "zip -q -r ${env.ARTIFACT} . -x *.git"
-    } } }
+    stage('Build Shared Lib') {
+      steps { script {
+        nix.shell('make statusgo-shared-library', pure: false)
+      } }
+    }
 
-    stage('Archive') { steps {
-      archiveArtifacts(env.ARTIFACT.minus("${env.WORKSPACE}/"))
-    } }
+    stage('Archive') {
+      steps {
+        sh "zip -q -r ${ARTIFACT} build/bin"
+        archiveArtifacts(ARTIFACT)
+      }
+    }
 
-    stage('Upload') { steps { script {
-      env.PKG_URL = s3.uploadArtifact(env.ARTIFACT)
-    } } }
+    stage('Upload') {
+      steps { script {
+        env.PKG_URL = s3.uploadArtifact(ARTIFACT)
+      } }
+    }
   } // stages
   post {
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
-    always { dir(env.REPO) { sh 'make clean' } }
+    cleanup { sh 'make deep-clean' }
   } // post
 } // pipeline

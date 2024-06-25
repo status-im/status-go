@@ -1,7 +1,8 @@
-library 'status-jenkins-lib@v1.3.3'
+#!/usr/bin/env groovy
+library 'status-jenkins-lib@v1.8.10'
 
 pipeline {
-  agent { label 'macos && x86_64 && go-1.18' }
+  agent { label 'macos && aarch64 && xcode-15.1 && nix-2.19' }
 
   parameters {
     string(
@@ -18,60 +19,62 @@ pipeline {
 
   options {
     timestamps()
+    /* Prevent Jenkins jobs from running forever */
+    timeout(time: 10, unit: 'MINUTES')
     disableConcurrentBuilds()
-    /* Go requires a certain directory structure */
-    checkoutToSubdirectory('src/github.com/status-im/status-go')
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
       numToKeepStr: '5',
       daysToKeepStr: '30',
+      artifactNumToKeepStr: '1',
     ))
   }
 
   environment {
+    PLATFORM = 'ios'
+    TMPDIR   = "${WORKSPACE_TMP}"
+    GOPATH   = "${WORKSPACE_TMP}/go"
+    GOCACHE  = "${WORKSPACE_TMP}/gocache"
+    PATH     = "${PATH}:${GOPATH}/bin"
+    REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
+    ARTIFACT = utils.pkgFilename(name: "status-go", type: "ios", ext: "zip", version: null)
     /* fix for gomobile complaining about missing packages */
     CGO_ENABLED = "1"
-    /* Other stuff */
-    TARGET = 'ios'
-    GOPATH = "${env.WORKSPACE}"
-    REPO   = "${env.WORKSPACE}/src/github.com/status-im/status-go"
-    PATH   = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
   }
 
   stages {
-    stage('Prep') { steps { dir(env.REPO) { script {
-      env.ARTIFACT = "${env.WORKSPACE}/" + utils.pkgFilename(
-        name: "status-go",
-        type: "ios",
-        ext: "zip"
-      )
-      println("Output: ${env.ARTIFACT}")
-    } } } }
-
-    stage('Setup') { steps { dir(env.REPO) {
-      sh 'unset TMPDIR && make setup-build'
-    } } }
-
-    stage('Compile') { steps { dir(env.REPO) {
-      sh 'make statusgo-ios'
-      sh 'go get golang.org/x/tools/go/packages'
-      dir('build/bin') {
-        sh 'zip -r status-go-ios.zip Statusgo.framework'
-        sh "cp status-go-ios.zip ${env.ARTIFACT}"
+    stage('Prep') {
+      steps { /* Go needs to find status-go in GOPATH. */
+        sh "mkdir -p \$(dirname ${REPO_SRC})"
+        sh "ln -s ${WORKSPACE} ${REPO_SRC}"
       }
-    } } }
+    }
 
-    stage('Archive') { steps {
-      archiveArtifacts(env.ARTIFACT.minus("${env.WORKSPACE}/"))
-    } }
+    stage('Compile') {
+      steps { script {
+        nix.shell('make statusgo-ios', pure: false, sandbox: false)
+      } }
+    }
 
-    stage('Upload') { steps { script {
-      env.PKG_URL = s3.uploadArtifact(env.ARTIFACT)
-    } } }
+    stage('Archive') {
+      steps {
+        dir('build/bin') {
+          sh 'zip -r status-go-ios.zip Statusgo.xcframework'
+          sh "mv status-go-ios.zip ${WORKSPACE}/${ARTIFACT}"
+        }
+        archiveArtifacts(ARTIFACT)
+      }
+    }
+
+    stage('Upload') {
+      steps { script {
+        env.PKG_URL = s3.uploadArtifact(ARTIFACT)
+      } }
+    }
   } // stages
   post {
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
-    always { dir(env.REPO) { sh 'make clean' } }
+    cleanup { sh 'make deep-clean' }
   } // post
 } // pipeline

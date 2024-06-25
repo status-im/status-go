@@ -1,67 +1,6 @@
 .PHONY: statusgo statusd-prune all test clean help
 .PHONY: statusgo-android statusgo-ios
 
-RELEASE_TAG := v$(shell cat VERSION)
-RELEASE_BRANCH := develop
-RELEASE_DIR := /tmp/release-$(RELEASE_TAG)
-PRE_RELEASE := "1"
-RELEASE_TYPE := $(shell if [ $(PRE_RELEASE) = "0" ] ; then echo release; else echo pre-release ; fi)
-GOLANGCI_BINARY=golangci-lint
-IPFS_GATEWAY_URL ?= https://ipfs.status.im/
-
-ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
- detected_OS := Windows
-else
- detected_OS := $(strip $(shell uname))
-endif
-
-ifeq ($(detected_OS),Darwin)
- GOBIN_SHARED_LIB_EXT := dylib
-  # Building on M1 is still not supported, so in the meantime we crosscompile by default to amd64
-  ifeq ("$(shell sysctl -nq hw.optional.arm64)","1")
-    FORCE_ARCH ?= amd64
-    GOBIN_SHARED_LIB_CFLAGS=CGO_ENABLED=1 GOOS=darwin GOARCH=$(FORCE_ARCH)
-  endif
-else ifeq ($(detected_OS),Windows)
- GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS=""
- GOBIN_SHARED_LIB_EXT := dll
-else
- GOBIN_SHARED_LIB_EXT := so
- GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,-soname,libstatus.so.0"
-endif
-
-help: ##@other Show this help
-	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
-
-CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
-GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
-GOPATH ?= $(HOME)/go
-GIT_COMMIT = $(shell git rev-parse --short HEAD)
-AUTHOR ?= $(shell git config user.email || echo $$USER)
-
-ENABLE_METRICS ?= true
-BUILD_FLAGS ?= $(shell echo "-ldflags='\
-	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
-	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
-	-X github.com/status-im/status-go/params.IpfsGatewayURL=$(IPFS_GATEWAY_URL) \
-	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)'")
-BUILD_FLAGS_MOBILE ?= $(shell echo "-ldflags='\
-	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
-	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
-	-X github.com/status-im/status-go/params.IpfsGatewayURL=$(IPFS_GATEWAY_URL)'")
-
-networkid ?= StatusChain
-gotest_extraflags =
-
-DOCKER_IMAGE_NAME ?= statusteam/status-go
-BOOTNODE_IMAGE_NAME ?= statusteam/bootnode
-STATUSD_PRUNE_IMAGE_NAME ?= statusteam/statusd-prune
-
-DOCKER_IMAGE_CUSTOM_TAG ?= $(RELEASE_TAG)
-
-DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
-DOCKER_TEST_IMAGE = golang:1.13
-
 # This is a code for automatic help generator.
 # It supports ANSI colors and categories.
 # To add new item into help output, simply add comments
@@ -83,41 +22,164 @@ HELP_FUN = \
 			   print "\n"; \
 		   }
 
-statusgo: ##@build Build status-go as statusd server
+help: SHELL := /bin/sh
+help: ##@other Show this help
+	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
+
+RELEASE_TAG := v$(file < VERSION)
+RELEASE_DIR := /tmp/release-$(RELEASE_TAG)
+GOLANGCI_BINARY=golangci-lint
+IPFS_GATEWAY_URL ?= https://ipfs.status.im/
+
+ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
+ detected_OS := Windows
+else
+ detected_OS := $(strip $(shell uname))
+endif
+
+ifeq ($(detected_OS),Darwin)
+ GOBIN_SHARED_LIB_EXT := dylib
+ GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin
+else ifeq ($(detected_OS),Windows)
+ GOBIN_SHARED_LIB_EXT := dll
+ GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS=""
+else
+ GOBIN_SHARED_LIB_EXT := so
+ GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,-soname,libstatus.so.0"
+endif
+
+CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
+export GOPATH ?= $(HOME)/go
+
+GIT_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
+GIT_COMMIT := $(call sh, git rev-parse --short HEAD)
+GIT_AUTHOR := $(call sh, git config user.email || echo $$USER)
+
+ENABLE_METRICS ?= true
+BUILD_TAGS ?= gowaku_no_rln
+define BUILD_FLAGS ?=
+	-ldflags="\
+	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
+	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
+	-X github.com/status-im/status-go/params.IpfsGatewayURL=$(IPFS_GATEWAY_URL) \
+	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)"
+endef
+
+define BUILD_FLAGS_MOBILE ?=
+	-ldflags="\
+	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
+	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
+	-X github.com/status-im/status-go/params.IpfsGatewayURL=$(IPFS_GATEWAY_URL)"
+endef
+
+networkid ?= StatusChain
+
+DOCKER_IMAGE_NAME ?= statusteam/status-go
+BOOTNODE_IMAGE_NAME ?= statusteam/bootnode
+STATUSD_PRUNE_IMAGE_NAME ?= statusteam/statusd-prune
+
+DOCKER_IMAGE_CUSTOM_TAG ?= $(RELEASE_TAG)
+
+DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
+DOCKER_TEST_IMAGE = golang:1.13
+
+GO_CMD_PATHS := $(filter-out library, $(wildcard cmd/*))
+GO_CMD_NAMES := $(notdir $(GO_CMD_PATHS))
+GO_CMD_BUILDS := $(addprefix build/bin/, $(GO_CMD_NAMES))
+
+# Our custom config is located in nix/nix.conf
+export NIX_USER_CONF_FILES = $(PWD)/nix/nix.conf
+# Location of symlinks to derivations that should not be garbage collected
+export _NIX_GCROOTS = ./.nix-gcroots
+
+#----------------
+# Nix targets
+#----------------
+
+# Use $(call sh, <COMMAND>) instead of $(shell <COMMAND>) to avoid
+# invoking a Nix shell when normal shell will suffice, it's faster.
+# This works because it's defined before we set SHELL to Nix one.
+define sh
+$(shell $(1))
+endef
+
+SHELL := ./nix/scripts/shell.sh
+shell: export TARGET ?= default
+shell: ##@prepare Enter into a pre-configured shell
+ifndef IN_NIX_SHELL
+	@ENTER_NIX_SHELL
+else
+	@echo "${YELLOW}Nix shell is already active$(RESET)"
+endif
+
+nix-repl: SHELL := /bin/sh
+nix-repl: ##@nix Start an interactive Nix REPL
+	nix repl shell.nix
+
+nix-gc-protected: SHELL := /bin/sh
+nix-gc-protected:
+	@echo -e "$(YELLOW)The following paths are protected:$(RESET)" && \
+	ls -1 $(_NIX_GCROOTS) | sed 's/^/ - /'
+
+
+nix-upgrade: SHELL := /bin/sh
+nix-upgrade: ##@nix Upgrade Nix interpreter to current version.
+	nix/scripts/upgrade.sh
+
+nix-gc: nix-gc-protected ##@nix Garbage collect all packages older than 20 days from /nix/store
+	nix-store --gc
+
+nix-clean: ##@nix Remove all status-mobile build artifacts from /nix/store
+	nix/scripts/clean.sh
+
+nix-purge: SHELL := /bin/sh
+nix-purge: ##@nix Completely remove Nix setup, including /nix directory
+	nix/scripts/purge.sh
+
+#----------------
+# General targets
+#----------------
+all: $(GO_CMD_NAMES)
+
+.PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
+$(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
-		-o $(GOBIN)/statusd ./cmd/statusd
-	@echo "Compilation done."
-	@echo "Run \"build/bin/statusd -h\" to view available commands."
+		-o ./$@ ./cmd/$(notdir $@) ;\
+	echo "Compilation done." ;\
+	echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
+
+bootnode: ##@build Build discovery v5 bootnode using status-go deps
+bootnode: build/bin/bootnode
+
+node-canary: ##@build Build P2P node canary using status-go deps
+node-canary: build/bin/node-canary
+
+statusgo: ##@build Build status-go as statusd server
+statusgo: build/bin/statusd
+statusd: statusgo
 
 statusd-prune: ##@statusd-prune Build statusd-prune
-	go build -o $(GOBIN)/statusd-prune -v ./cmd/statusd-prune
-	@echo "Compilation done."
-	@echo "Run \"build/bin/statusd-prune -h\" to view available commands."
+statusd-prune: build/bin/statusd-prune
 
+spiff-workflow: ##@build Build node for SpiffWorkflow BPMN software
+spiff-workflow: build/bin/spiff-workflow
+
+status-cli: ##@build Build status-cli to send messages
+status-cli: build/bin/status-cli
+
+statusd-prune-docker-image: SHELL := /bin/sh
 statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
 	@echo "Building docker image for ststusd-prune..."
 	docker build --file _assets/build/Dockerfile-prune . \
 		--label "commit=$(GIT_COMMIT)" \
-		--label "author=$(AUTHOR)" \
+		--label "author=$(GIT_AUTHOR)" \
 		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(STATUSD_PRUNE_IMAGE_NAME):latest
 
-bootnode: ##@build Build discovery v5 bootnode using status-go deps
-	go build -v \
-		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
-		-o $(GOBIN)/bootnode ./cmd/bootnode/
-	@echo "Compilation done."
-
-node-canary: ##@build Build P2P node canary using status-go deps
-	go build -v \
-		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
-		-o $(GOBIN)/node-canary ./cmd/node-canary/
-	@echo "Compilation done."
-
 statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
-	@ls -ld $(GOBIN)/statusgo-*
+	@ls -ld build/bin/statusgo-*
 
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
@@ -125,6 +187,7 @@ statusgo-android: ##@cross-compile Build status-go for Android
 	gomobile init; \
 	gomobile bind -v \
 		-target=android -ldflags="-s -w" \
+		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS_MOBILE) \
 		-o build/bin/statusgo.aar \
 		github.com/status-im/status-go/mobile
@@ -136,75 +199,89 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 	gomobile init; \
 	gomobile bind -v \
 		-target=ios -ldflags="-s -w" \
+		-tags 'nowatchdog $(BUILD_TAGS)' \
 		$(BUILD_FLAGS_MOBILE) \
-		-o build/bin/Statusgo.framework \
+		-o build/bin/Statusgo.xcframework \
 		github.com/status-im/status-go/mobile
-	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
+	@echo "iOS framework cross compilation done in build/bin/Statusgo.xcframework"
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
-	mkdir -p $(GOBIN)/statusgo-lib
-	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
+	mkdir -p build/bin/statusgo-lib
+	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
 	@echo "Building static library..."
 	go build \
+		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-archive \
-		-o $(GOBIN)/libstatus.a \
-		$(GOBIN)/statusgo-lib
+		-o build/bin/libstatus.a \
+		./build/bin/statusgo-lib
 	@echo "Static library built:"
-	@ls -la $(GOBIN)/libstatus.*
+	@ls -la build/bin/libstatus.*
 
 statusgo-shared-library: ##@cross-compile Build status-go as shared library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
-	mkdir -p $(GOBIN)/statusgo-lib
-	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
+	mkdir -p build/bin/statusgo-lib
+	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
 	@echo "Building shared library..."
+	@echo "Tags: $(BUILD_TAGS)"
 	$(GOBIN_SHARED_LIB_CFLAGS) $(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build \
+		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-shared \
-		-o $(GOBIN)/libstatus.$(GOBIN_SHARED_LIB_EXT) \
-		$(GOBIN)/statusgo-lib
+		-o build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT) \
+		./build/bin/statusgo-lib
 ifeq ($(detected_OS),Linux)
-	cd $(GOBIN) && \
+	cd build/bin && \
 	ls -lah . && \
 	mv ./libstatus.$(GOBIN_SHARED_LIB_EXT) ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 && \
 	ln -s ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 ./libstatus.$(GOBIN_SHARED_LIB_EXT)
 endif
 	@echo "Shared library built:"
-	@ls -la $(GOBIN)/libstatus.*
+	@ls -la build/bin/libstatus.*
 
+docker-image: SHELL := /bin/sh
+docker-image: BUILD_TARGET ?= statusd
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
 	docker build --file _assets/build/Dockerfile . \
-		--build-arg "build_tags=$(BUILD_TAGS)" \
-		--build-arg "build_flags=$(BUILD_FLAGS)" \
-		--label "commit=$(GIT_COMMIT)" \
-		--label "author=$(AUTHOR)" \
+		--build-arg 'build_tags=$(BUILD_TAGS)' \
+		--build-arg 'build_flags=$(BUILD_FLAGS)' \
+		--build-arg 'build_target=$(BUILD_TARGET)' \
+		--label 'commit=$(GIT_COMMIT)' \
+		--label 'author=$(GIT_AUTHOR)' \
 		-t $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(DOCKER_IMAGE_NAME):latest
 
+bootnode-image: SHELL := /bin/sh
 bootnode-image:
 	@echo "Building docker image for bootnode..."
 	docker build --file _assets/build/Dockerfile-bootnode . \
-		--build-arg "build_tags=$(BUILD_TAGS)" \
-		--build-arg "build_flags=$(BUILD_FLAGS)" \
-		--label "commit=$(GIT_COMMIT)" \
-		--label "author=$(AUTHOR)" \
+		--build-arg 'build_tags=$(BUILD_TAGS)' \
+		--build-arg 'build_flags=$(BUILD_FLAGS)' \
+		--label 'commit=$(GIT_COMMIT)' \
+		--label 'author=$(GIT_AUTHOR)' \
 		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(BOOTNODE_IMAGE_NAME):latest
 
+push-docker-images: SHELL := /bin/sh
 push-docker-images: docker-image bootnode-image
 	docker push $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
 	docker push $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
 
+clean-docker-images: SHELL := /bin/sh
 clean-docker-images:
-	docker rmi -f $(shell docker image ls --filter="reference=$(DOCKER_IMAGE_NAME)" --quiet)
+	docker rmi -f $$(docker image ls --filter="reference=$(DOCKER_IMAGE_NAME)" --quiet)
 
 # See https://www.gnu.org/software/make/manual/html_node/Target_002dspecific.html to understand this magic.
+push-docker-images-latest: SHELL := /bin/sh
 push-docker-images-latest: GIT_BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
 push-docker-images-latest: GIT_LOCAL  = $(shell git rev-parse @)
 push-docker-images-latest: GIT_REMOTE = $(shell git fetch -q && git rev-parse remotes/origin/develop || echo 'NO_DEVELOP')
-push-docker-images-latest: docker-image bootnode-image
+push-docker-images-latest:
+	echo $(GIT_BRANCH)
+	echo $(GIT_LOCAL)
+	echo $(GIT_REMOTE)
 	@echo "Pushing latest docker images..."
 	@echo "Checking git branch..."
 ifneq ("$(GIT_BRANCH)", "develop")
@@ -219,55 +296,22 @@ endif
 	docker push $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
 
 setup: ##@setup Install all tools
-setup: setup-check setup-build setup-dev tidy
-
-setup-check: ##@setup Check if Go compiler is installed.
-ifeq (, $(shell which go))
-	$(error "No Go compiler found! Make sure to install 1.18.0 or newer.")
-endif
+setup: setup-dev
 
 setup-dev: ##@setup Install all necessary tools for development
-setup-dev: install-lint install-mock install-modvendor install-protobuf tidy install-os-deps
+setup-dev:
+	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
-setup-build: ##@setup Install all necessary build tools
-setup-build: install-lint install-release install-gomobile
-
-install-os-deps: ##@install Operating System Dependencies
-	_assets/scripts/install_deps.sh
-
-install-gomobile: install-xtools
-install-gomobile: ##@install Go Mobile Build Tools
-	GO111MODULE=on  go install golang.org/x/mobile/cmd/...@5d9a3325
-	GO111MODULE=on  go mod download golang.org/x/exp@ec7cb31e
-	GO111MODULE=off go get -d golang.org/x/mobile/cmd/gobind
-
-install-lint: ##@install Install Linting Tools
-	GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
-
-install-mock: ##@install Install Module Mocking Tools
-	GO111MODULE=on go install github.com/golang/mock/mockgen@v1.4.4
-
-install-modvendor: ##@install Install Module Vendoring Tool
-	GO111MODULE=on go install github.com/goware/modvendor@v0.5.0
-
-install-protobuf: ##@install Install Protobuf Generation Tools
-	GO111MODULE=on go install github.com/kevinburke/go-bindata/go-bindata@v3.13.0
-	GO111MODULE=on go install github.com/golang/protobuf/protoc-gen-go@v1.3.4
-
-install-release: ##@install Install Github Release Tools
-	GO111MODULE=on go install github.com/c4milo/github-release@v1.1.0
-
-install-xtools: ##@install Install Miscellaneous Go Tools
-	GO111MODULE=on go install golang.org/x/tools/go/packages/...@v0.1.5
-
+generate-handlers:
+	go generate ./_assets/generate_handlers/
 generate: ##@other Regenerate assets and other auto-generated stuff
-	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/...
+	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/... ./walletdatabase/... ./_assets/generate_handlers
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)
 	mv build/bin/statusgo.aar $(RELEASE_DIR)/status-go-android.aar
-	zip -r build/bin/Statusgo.framework.zip build/bin/Statusgo.framework
-	mv build/bin/Statusgo.framework.zip $(RELEASE_DIR)/status-go-ios.zip
+	zip -r build/bin/Statusgo.xcframework.zip build/bin/Statusgo.xcframework
+	mv build/bin/Statusgo.xcframework.zip $(RELEASE_DIR)/status-go-ios.zip
 	zip -r $(RELEASE_DIR)/status-go-desktop.zip . -x *.git*
 	${MAKE} clean
 
@@ -280,6 +324,7 @@ lint-fix:
 		-and -not -name '*.pb.go' \
 		-and -not -name 'bindata*' \
 		-and -not -name 'migrations.go' \
+		-and -not -name 'messenger_handlers.go' \
 		-and -not -wholename '*/vendor/*' \
 		-exec goimports \
 		-local 'github.com/ethereum/go-ethereum,github.com/status-im/status-go,github.com/status-im/markdown' \
@@ -292,27 +337,41 @@ mock: ##@other Regenerate mocks
 	mockgen -package=peer         -destination=services/peer/discoverer_mock.go      -source=services/peer/service.go
 
 docker-test: ##@tests Run tests in a docker container with golang.
-	docker run --privileged --rm -it -v "$(shell pwd):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
+	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
 
 test: test-unit ##@tests Run basic, short tests during development
 
-test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
+test-unit: export BUILD_TAGS ?=
+test-unit: export UNIT_TEST_COUNT ?= 1
+test-unit: export UNIT_TEST_FAILFAST ?= true
+test-unit: export UNIT_TEST_RERUN_FAILS ?= true
+test-unit: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
+test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | \
 	grep -v /vendor | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
-	grep -v /transactions/fake )
+	grep -v /transactions/fake | \
+	grep -E -v '/wakuv2(/.*|$$)')
+test-unit: export UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE ?= \
+	github.com/status-im/status-go/api \
+	github.com/status-im/status-go/mailserver \
+	github.com/status-im/status-go/multiaccounts/settings \
+	github.com/status-im/status-go/node \
+	github.com/status-im/status-go/services/wakuext
+test-unit: export UNIT_TEST_PACKAGES_WITH_EXTENDED_TIMEOUT ?= \
+	github.com/status-im/status-go/protocol
 test-unit: ##@tests Run unit and integration tests
 	go test -timeout 20m -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
 	cd ./waku && go test -timeout 20m -v -failfast ./... $(gotest_extraflags)
 
-test-unit-race: gotest_extraflags=-race
+test-unit-race: export GOTEST_EXTRAFLAGS=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
 
 test-e2e: ##@tests Run e2e tests
 	# order: reliability then alphabetical
 	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
 
-test-e2e-race: gotest_extraflags=-race
+test-e2e-race: export GOTEST_EXTRAFLAGS=-race
 test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
 canary-test: node-canary
@@ -320,8 +379,7 @@ canary-test: node-canary
 	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.prod.json
 
 lint:
-	@echo "lint"
-	@golangci-lint --exclude=SA1019 run ./... --deadline=5m
+	golangci-lint run ./...
 
 ci: lint canary-test test-unit test-e2e ##@tests Run all linters and tests at once
 
@@ -329,9 +387,11 @@ ci-race: lint canary-test test-unit test-e2e-race ##@tests Run all linters and t
 
 clean: ##@other Cleanup
 	rm -fr build/bin/* mailserver-config.json
+
+git-clean:
 	git clean -xf
 
-deep-clean: clean
+deep-clean: clean git-clean
 	rm -Rdf .ethereumtest/StatusChain
 
 tidy:
@@ -375,8 +435,35 @@ clean-mailserver-docker: ##@Easy Clean your Docker container running a mailserve
 
 migration: DEFAULT_MIGRATION_PATH := appdatabase/migrations/sql
 migration:
-	touch $(DEFAULT_MIGRATION_PATH)/$(shell date +%s)_$(D).up.sql
+	touch $(DEFAULT_MIGRATION_PATH)/$$(date '+%s')_$(D).up.sql
+
+migration-check:
+	bash _assets/scripts/migration_check.sh
+
+migration-wallet: DEFAULT_WALLET_MIGRATION_PATH := walletdatabase/migrations/sql
+migration-wallet:
+	touch $(DEFAULT_WALLET_MIGRATION_PATH)/$$(date +%s)_$(D).up.sql
+
+install-git-hooks:
+	@ln -sf $(if $(filter $(detected_OS), Linux),-r,) \
+		$(GIT_ROOT)/_assets/hooks/* $(GIT_ROOT)/.git/hooks
+
+-include install-git-hooks
+.PHONY: install-git-hooks
 
 migration-protocol: DEFAULT_PROTOCOL_PATH := protocol/migrations/sqlite
 migration-protocol:
-	touch $(DEFAULT_PROTOCOL_PATH)/$(shell date +%s)_$(D).up.sql
+	touch $(DEFAULT_PROTOCOL_PATH)/$$(date +%s)_$(D).up.sql
+
+PROXY_WRAPPER_PATH = $(CURDIR)/vendor/github.com/siphiuel/lc-proxy-wrapper
+-include $(PROXY_WRAPPER_PATH)/Makefile.vars
+
+#export VERIF_PROXY_OUT_PATH = $(CURDIR)/vendor/github.com/siphiuel/lc-proxy-wrapper
+build-verif-proxy:
+	$(MAKE) -C $(NIMBUS_ETH1_PATH) libverifproxy
+
+build-verif-proxy-wrapper:
+	$(MAKE) -C $(VERIF_PROXY_OUT_PATH) build-verif-proxy-wrapper
+
+test-verif-proxy-wrapper:
+	CGO_CFLAGS="$(CGO_CFLAGS)" go test -v github.com/status-im/status-go/rpc -tags gowaku_skip_migrations,nimbus_light_client -run ^TestProxySuite$$ -testify.m TestRun -ldflags $(LDFLAGS)
