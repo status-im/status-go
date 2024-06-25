@@ -256,7 +256,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	w.metadata = metadata
 
 	//Initialize peer manager.
-	w.peermanager = peermanager.NewPeerManager(w.opts.maxPeerConnections, w.opts.peerStoreCapacity, metadata, w.log)
+	w.peermanager = peermanager.NewPeerManager(w.opts.maxPeerConnections, w.opts.peerStoreCapacity, metadata, params.enableRelay, w.log)
 
 	w.peerConnector, err = peermanager.NewPeerConnectionStrategy(w.peermanager, discoveryConnectTimeout, w.log)
 	if err != nil {
@@ -554,9 +554,9 @@ func (w *WakuNode) watchENRChanges(ctx context.Context) {
 				currNodeVal := w.localNode.Node().String()
 				if prevNodeVal != currNodeVal {
 					if prevNodeVal == "" {
-						w.log.Info("enr record", logging.ENode("enr", w.localNode.Node()))
+						w.log.Info("local node enr record", logging.ENode("enr", w.localNode.Node()))
 					} else {
-						w.log.Info("new enr record", logging.ENode("enr", w.localNode.Node()))
+						w.log.Info("local node new enr record", logging.ENode("enr", w.localNode.Node()))
 					}
 					prevNodeVal = currNodeVal
 				}
