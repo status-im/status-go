@@ -1001,10 +1001,10 @@ func (tm *Manager) GetCachedBalancesByChain(accounts, tokenAddresses []common.Ad
 		chainIDStrings[i] = fmt.Sprintf("%d", chainID)
 	}
 
-	query := `SELECT chain_id, user_address, token_address, balance 
-			  	FROM token_balances 
-				WHERE user_address IN (` + strings.Join(accountStrings, ",") + `) 
-					AND token_address IN (` + strings.Join(tokenAddressStrings, ",") + `) 
+	query := `SELECT chain_id, user_address, token_address, raw_balance
+			  	FROM token_balances
+				WHERE user_address IN (` + strings.Join(accountStrings, ",") + `)
+					AND token_address IN (` + strings.Join(tokenAddressStrings, ",") + `)
 					AND chain_id IN (` + strings.Join(chainIDStrings, ",") + `)`
 
 	rows, err := tm.db.Query(query)
@@ -1018,15 +1018,15 @@ func (tm *Manager) GetCachedBalancesByChain(accounts, tokenAddresses []common.Ad
 	for rows.Next() {
 		var chainID uint64
 		var userAddressStr, tokenAddressStr string
-		var balanceStr string
+		var rawBalance string
 
-		err := rows.Scan(&chainID, &userAddressStr, &tokenAddressStr, &balanceStr)
+		err := rows.Scan(&chainID, &userAddressStr, &tokenAddressStr, &rawBalance)
 		if err != nil {
 			return nil, err
 		}
 
 		num := new(hexutil.Big)
-		_, ok := num.ToInt().SetString(balanceStr, 0)
+		_, ok := num.ToInt().SetString(rawBalance, 10)
 		if !ok {
 			return ret, nil
 		}
