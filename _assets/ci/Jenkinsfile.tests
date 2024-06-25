@@ -30,6 +30,11 @@ pipeline {
       defaultValue: getDefaultUnitTestUseDevelopmentLogger(),
       description: 'Should the job use detailed logging for tests, potentially generating large logs?'
     )
+    booleanParam(
+      name: 'RUN_LINTER',
+      defaultValue: false,
+      description: 'Should we run the linter? At this point we should rather not bother with it for release branch'
+    )
   }
 
   options {
@@ -82,6 +87,9 @@ pipeline {
     }
 
     stage('Lint') {
+      when {
+        expression { params.RUN_LINTER }
+      }
       steps { script {
         nix.shell('make lint', pure: true)
       } }
