@@ -1568,13 +1568,9 @@ func (m *Messenger) watchConnectionChange() {
 		return
 	}
 
-	subscription, err := waku.SubscribeToConnStatusChanges()
-	if err != nil {
-		// Log error and fallback to polling
-		m.logger.Error("failed to subscribe to connection status changes", zap.Error(err))
-		go pollConnectionStatus()
-		return
-	}
+	// Wakuv2 is not going to return an error
+	// from SubscribeToConnStatusChanges
+	subscription, _ := waku.SubscribeToConnStatusChanges()
 
 	go subscribedConnectionStatus(subscription)
 }
