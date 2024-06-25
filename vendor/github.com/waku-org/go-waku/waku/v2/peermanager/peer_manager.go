@@ -433,6 +433,11 @@ func (pm *PeerManager) AddDiscoveredPeer(p service.PeerData, connectNow bool) {
 	//Check if the peer is already present, if so skip adding
 	_, err := pm.host.Peerstore().(wps.WakuPeerstore).Origin(p.AddrInfo.ID)
 	if err == nil {
+		//Add addresses if existing addresses have expired
+		existingAddrs := pm.host.Peerstore().Addrs(p.AddrInfo.ID)
+		if len(existingAddrs) == 0 {
+			pm.host.Peerstore().AddAddrs(p.AddrInfo.ID, p.AddrInfo.Addrs, peerstore.AddressTTL)
+		}
 		enr, err := pm.host.Peerstore().(wps.WakuPeerstore).ENR(p.AddrInfo.ID)
 		// Verifying if the enr record is more recent (DiscV5 and peer exchange can return peers already seen)
 		if err == nil {
@@ -474,8 +479,8 @@ func (pm *PeerManager) AddDiscoveredPeer(p service.PeerData, connectNow bool) {
 	}
 }
 
-// addPeer adds peer to only the peerStore.
-// It also sets additional metadata such as origin, ENR and supported protocols
+// addPeer adds peer to the peerStore.
+// It also sets additional metadata such as origin and supported protocols
 func (pm *PeerManager) addPeer(ID peer.ID, addrs []ma.Multiaddr, origin wps.Origin, pubSubTopics []string, protocols ...protocol.ID) error {
 	if pm.maxPeers <= pm.host.Peerstore().Peers().Len() {
 		pm.logger.Error("could not add peer as peer store capacity is reached", logging.HostID("peer", ID), zap.Int("capacity", pm.maxPeers))

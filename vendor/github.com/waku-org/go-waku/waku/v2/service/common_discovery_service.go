@@ -19,7 +19,10 @@ type PeerData struct {
 
 type CommonDiscoveryService struct {
 	commonService *CommonService
-	channel       chan PeerData
+
+	channel         chan PeerData
+	channelIsClosed bool
+	channelMutex    sync.Mutex
 }
 
 func NewCommonDiscoveryService() *CommonDiscoveryService {
@@ -32,7 +35,10 @@ func (sp *CommonDiscoveryService) Start(ctx context.Context, fn func() error) er
 	return sp.commonService.Start(ctx, func() error {
 		// currently is used in discv5,peerConnector,rendevzous for returning new discovered Peers to peerConnector for connecting with them
 		// mutex protection for this operation
+		sp.channelMutex.Lock()
 		sp.channel = make(chan PeerData)
+		sp.channelIsClosed = false
+		sp.channelMutex.Unlock()
 		return fn()
 	})
 }
@@ -42,7 +48,10 @@ func (sp *CommonDiscoveryService) Stop(stopFn func()) {
 		stopFn()
 		sp.WaitGroup().Wait() // waitgroup is waited here so that channel can be closed after all the go rountines have stopped in service.
 		// there is a wait in the CommonService too
+		sp.channelMutex.Lock()
 		close(sp.channel)
+		sp.channelIsClosed = true
+		sp.channelMutex.Unlock()
 	})
 }
 func (sp *CommonDiscoveryService) GetListeningChan() <-chan PeerData {
@@ -52,6 +61,14 @@ func (sp *CommonDiscoveryService) PushToChan(data PeerData) bool {
 	if err := sp.ErrOnNotRunning(); err != nil {
 		return false
 	}
+
+	sp.channelMutex.Lock()
+	defer sp.channelMutex.Unlock()
+
+	if sp.channelIsClosed {
+		return false
+	}
+
 	select {
 	case sp.channel <- data:
 		return true

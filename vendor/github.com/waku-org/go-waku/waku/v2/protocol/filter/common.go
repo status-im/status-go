@@ -5,10 +5,11 @@ import (
 	"time"
 )
 
-const DefaultMaxSubscriptions = 1000
+const DefaultMaxSubscribers = 20
 const MaxCriteriaPerSubscription = 1000
-const MaxContentTopicsPerRequest = 30
+const MaxContentTopicsPerRequest = 100
 const MessagePushTimeout = 20 * time.Second
+const DefaultIdleSubscriptionTimeout = 5 * time.Minute
 
 type FilterError struct {
 	Code    int
