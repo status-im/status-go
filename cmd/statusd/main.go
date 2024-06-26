@@ -100,8 +100,6 @@ func init() {
 
 // nolint:gocyclo
 func main() {
-	fmt.Println("this new line doesn't affect test coverage")
-
 	colors := terminal.IsTerminal(int(os.Stdin.Fd()))
 	if err := logutils.OverrideRootLog(true, "ERROR", logutils.FileOptions{}, colors); err != nil {
 		stdlog.Fatalf("Error initializing logger: %v", err)
