@@ -74,6 +74,9 @@ type CreateAccount struct {
 	TelemetryServerURL string `json:"telemetryServerURL"`
 
 	APIConfig *APIConfig `json:"apiConfig"`
+
+	KeycardInstanceUID     string  `json:"keycardInstanceUID"`
+	KeycardPairingDataFile *string `json:"keycardPairingDataFile"`
 }
 
 type WalletSecretsConfig struct {

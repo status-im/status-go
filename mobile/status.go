@@ -237,7 +237,7 @@ func login(accountData, password, configJSON string) error {
 			return statusBackend.LoggedIn(account.KeyUID, err)
 		}
 
-		err = statusBackend.StartNodeWithAccount(account, password, &conf)
+		err = statusBackend.StartNodeWithAccount(account, password, &conf, nil)
 		if err != nil {
 			log.Error("failed to start a node", "key-uid", account.KeyUID, "error", err)
 			return err
@@ -339,7 +339,13 @@ func RestoreAccountAndLogin(requestJSON string) string {
 
 	api.RunAsync(func() error {
 		log.Debug("starting a node and restoring account")
-		_, err := statusBackend.RestoreAccountAndLogin(&request)
+
+		if request.Keycard != nil {
+			_, err = statusBackend.RestoreKeycardAccountAndLogin(&request)
+		} else {
+			_, err = statusBackend.RestoreAccountAndLogin(&request)
+		}
+
 		if err != nil {
 			log.Error("failed to restore account", "error", err)
 			return err
@@ -347,6 +353,7 @@ func RestoreAccountAndLogin(requestJSON string) string {
 		log.Debug("started a node, and restored account")
 		return nil
 	})
+
 	return makeJSONResponse(nil)
 }
 
@@ -382,7 +389,7 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 
 	api.RunAsync(func() error {
 		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
-		err := statusBackend.StartNodeWithAccountAndInitialConfig(account, password, settings, &conf, subaccs)
+		err := statusBackend.StartNodeWithAccountAndInitialConfig(account, password, settings, &conf, subaccs, nil)
 		if err != nil {
 			log.Error("failed to start node and save account", "key-uid", account.KeyUID, "error", err)
 			return err
@@ -419,7 +426,8 @@ func InitKeystore(keydir string) string {
 	return makeJSONResponse(err)
 }
 
-// SaveAccountAndLoginWithKeycard saves account in status-go database..
+// SaveAccountAndLoginWithKeycard saves account in status-go database.
+// Deprecated: Use CreateAndAccountAndLogin with required keycard properties.
 func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJSON, subaccountData string, keyHex string) string {
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(accountData), &account)
@@ -457,6 +465,7 @@ func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJ
 
 // LoginWithKeycard initializes an account with a chat key and encryption key used for PFS.
 // It purges all the previous identities from Whisper, and injects the key as shh identity.
+// Deprecated: Use LoginAccount instead.
 func LoginWithKeycard(accountData, password, keyHex string, configJSON string) string {
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(accountData), &account)

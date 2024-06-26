@@ -328,6 +328,9 @@ type NodeConfig struct {
 	KeyStoreDir string `validate:"required"`
 
 	// KeycardPairingDataFile is the file where we keep keycard pairings data.
+	// It's specified by clients (and not in status-go) when creating a new account,
+	// because this file is initialized by status-keycard-go and we need to use it before initializing the node.
+	// I guess proper way would be to ask status-go for the file path, or just duplicate the file path in both backend and client.
 	// note: this field won't be saved into db, it's local to the device.
 	KeycardPairingDataFile string
 

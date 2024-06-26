@@ -21,6 +21,7 @@ import (
 const pathWalletRoot = "m/44'/60'/0'/0"
 const pathEIP1581 = "m/43'/60'/1581'"
 const pathDefaultChat = pathEIP1581 + "/0'/0"
+const pathEncryption = pathEIP1581 + "/1'/0"
 const pathDefaultWallet = pathWalletRoot + "/0"
 const defaultMnemonicLength = 12
 const shardsTestClusterID = 16
@@ -38,11 +39,11 @@ const DefaultListenAddr = ":0"
 const DefaultMaxMessageDeliveryAttempts = 3
 const DefaultVerifyTransactionChainID = 1
 
-var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
+var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet, pathEncryption}
 
 var DefaultFleet = params.FleetShardsTest
 
-func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
+func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
 
 	s := &settings.Settings{}
@@ -51,8 +52,8 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	s.LogLevel = &logLevel
 	s.ProfilePicturesShowTo = settings.ProfilePicturesShowToEveryone
 	s.ProfilePicturesVisibility = settings.ProfilePicturesVisibilityEveryone
-	s.KeyUID = generatedAccountInfo.KeyUID
-	s.Address = types.HexToAddress(generatedAccountInfo.Address)
+	s.KeyUID = keyUID
+	s.Address = types.HexToAddress(address)
 	s.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)
 	s.URLUnfurlingMode = settings.URLUnfurlingAlwaysAsk
 
@@ -222,8 +223,11 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	nodeConfig.LogDir = request.LogFilePath
 	nodeConfig.LogLevel = DefaultLogLevel
 	nodeConfig.DataDir = DefaultDataDir
-	nodeConfig.KeycardPairingDataFile = DefaultKeycardPairingDataFile
 	nodeConfig.ProcessBackedupMessages = false
+	nodeConfig.KeycardPairingDataFile = DefaultKeycardPairingDataFile
+	if request.KeycardPairingDataFile != nil {
+		nodeConfig.KeycardPairingDataFile = *request.KeycardPairingDataFile
+	}
 
 	if request.LogLevel != nil {
 		nodeConfig.LogLevel = *request.LogLevel
