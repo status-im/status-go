@@ -15,6 +15,11 @@ import (
 	"github.com/status-im/status-go/rpc"
 )
 
+type ContractMakerIface interface {
+	NewEthScan(chainID uint64) (*ethscan.BalanceScanner, uint, error)
+	// TODO extend with other contracts
+}
+
 type ContractMaker struct {
 	RPCClient *rpc.Client
 }
