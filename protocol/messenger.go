@@ -1459,12 +1459,14 @@ func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.Verification
 // watchConnectionChange checks the connection status and call handleConnectionChange when this changes
 func (m *Messenger) watchConnectionChange() {
 	state := m.Online()
-	// lastCheck helps us recognizing when computer was offline because of sleep, lid closed, etc.
+	// lastCheck, sleepDetention and keepAlive helps us recognizing when computer was offline because of sleep, lid closed, etc.
 	lastCheck := time.Now().Unix()
+	sleepDetentionInSecs := int64(20)
+	keepAlivePeriod := 15 * time.Second // must be lower than sleepDetentionInSecs
 
 	processNewState := func(newState bool) {
 		now := time.Now().Unix()
-		force := now-lastCheck > 20
+		force := now-lastCheck > sleepDetentionInSecs
 		lastCheck = now
 		if !force && state == newState {
 			return
@@ -1489,7 +1491,7 @@ func (m *Messenger) watchConnectionChange() {
 
 	subscribedConnectionStatus := func(subscription *types.ConnStatusSubscription) {
 		defer subscription.Unsubscribe()
-		ticker := time.NewTicker(15 * time.Second)
+		ticker := time.NewTicker(keepAlivePeriod)
 		defer ticker.Stop()
 		for {
 			select {
