@@ -135,8 +135,11 @@ for package in ${UNIT_TEST_PACKAGES}; do
 done
 
 # Gather test coverage results
-rm -f c.out
-go run ./cmd/test-coverage-utils/gocovmerge.go $(find -iname "*.coverage.out") >> c.out
+rm -f c.out c-full.out
+go run ./cmd/test-coverage-utils/gocovmerge.go $(find -iname "*.coverage.out") >> c-full.out
+
+# Filter out test coverage for packages in ./cmd
+grep -v '^github.com/status-im/status-go/cmd/' c-full.out > c.out
 
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
   # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
