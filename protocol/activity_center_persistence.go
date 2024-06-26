@@ -12,7 +12,7 @@ import (
 )
 
 const allFieldsForTableActivityCenterNotification = `id, timestamp, notification_type, chat_id, read, dismissed, accepted, message, author,
-    reply_message, community_id, membership_status, contact_verification_status, token_data, deleted, updated_at`
+    reply_message, community_id, membership_status, contact_verification_status, token_data, wallet_provider_session_topic, dapp_url, dapp_name, dapp_icon_url, deleted, updated_at`
 
 var emptyNotifications = make([]*ActivityCenterNotification, 0)
 
@@ -147,11 +147,15 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 			accepted,
 			dismissed,
 			token_data,
+			wallet_provider_session_topic,
+			dapp_url,
+			dapp_name,
+			dapp_icon_url,
 			deleted,
-		    updated_at,
-			installation_id
+			updated_at,
+		    installation_id
 		)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 		`,
 		notification.ID,
 		notification.Timestamp,
@@ -167,6 +171,10 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		notification.Accepted,
 		notification.Dismissed,
 		encodedTokenData,
+		notification.WalletProviderSessionTopic,
+		notification.DAppURL,
+		notification.DAppName,
+		notification.DAppIconURL,
 		notification.Deleted,
 		notification.UpdatedAt,
 		notification.InstallationID,
@@ -213,6 +221,10 @@ func (db sqlitePersistence) parseRowFromTableActivityCenterNotification(rows *sq
 			&notification.MembershipStatus,
 			&notification.ContactVerificationStatus,
 			&tokenDataBytes,
+			&notification.WalletProviderSessionTopic,
+			&notification.DAppURL,
+			&notification.DAppName,
+			&notification.DAppIconURL,
 			&notification.Deleted,
 			&notification.UpdatedAt,
 		)
@@ -291,9 +303,12 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 		&name,
 		&author,
 		&tokenDataBytes,
+		&notification.WalletProviderSessionTopic,
+		&notification.DAppURL,
+		&notification.DAppName,
+		&notification.DAppIconURL,
 		&notification.UpdatedAt,
-		&installationID,
-	)
+	    &installationID)
 
 	if err != nil {
 		return nil, err
@@ -387,6 +402,10 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 			&name,
 			&author,
 			&tokenDataBytes,
+			&notification.WalletProviderSessionTopic,
+			&notification.DAppURL,
+			&notification.DAppName,
+			&notification.DAppIconURL,
 			&latestCursor,
 			&notification.UpdatedAt,
 			&installationID,
@@ -554,6 +573,10 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	c.name,
 	a.author,
 	a.token_data,
+	a.wallet_provider_session_topic,
+	a.dapp_url,
+	a.dapp_name,
+	a.dapp_icon_url,
 	substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || hex(a.id) as cursor,
 	a.updated_at,
 	a.installation_id
@@ -676,6 +699,10 @@ func (db sqlitePersistence) GetActivityCenterNotificationsByID(ids []types.HexBy
 		c.name,
 		a.author,
 		a.token_data,
+		a.wallet_provider_session_topic,
+		a.dapp_url,
+		a.dapp_name,
+		a.dapp_icon_url,
 		substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || hex(a.id) as cursor,
 		a.updated_at,
 		a.installation_id
@@ -718,6 +745,10 @@ func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes)
 		c.name,
 		a.author,
 		a.token_data,
+		a.wallet_provider_session_topic,
+		a.dapp_url,
+		a.dapp_name,
+		a.dapp_icon_url,
 		a.updated_at,
 		a.installation_id
 		FROM activity_center_notifications a
@@ -1353,6 +1384,10 @@ func (db sqlitePersistence) ActiveContactRequestNotification(contactID string) (
 			c.name,
 			a.author,
 			a.token_data,
+			a.wallet_provider_session_topic,
+			a.dapp_url,
+			a.dapp_name,
+			a.dapp_icon_url,
 			a.updated_at,
 			a.installation_id
 		FROM activity_center_notifications a

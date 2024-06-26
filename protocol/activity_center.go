@@ -42,6 +42,8 @@ const (
 	ActivityCenterNotificationTypeCommunityUnbanned
 	ActivityCenterNotificationTypeNewInstallationReceived
 	ActivityCenterNotificationTypeNewInstallationCreated
+	ActivityCenterNotificationTypeDAppConnected
+	ActivityCenterNotificationTypeDAppDisconnected
 )
 
 type ActivityCenterMembershipStatus int
@@ -103,8 +105,12 @@ type ActivityCenterNotification struct {
 	TokenData                 *ActivityTokenData             `json:"tokenData"`
 	//Used for synchronization. Each update should increment the UpdatedAt.
 	//The value should represent the time when the update occurred.
-	UpdatedAt     uint64            `json:"updatedAt"`
-	AlbumMessages []*common.Message `json:"albumMessages"`
+	UpdatedAt                  uint64            `json:"updatedAt"`
+	AlbumMessages              []*common.Message `json:"albumMessages"`
+	WalletProviderSessionTopic string            `json:"walletProviderSessionTopic"`
+	DAppURL                    string            `json:"dappURL,omitempty"`
+	DAppName                   string            `json:"dappName,omitempty"`
+	DAppIconURL                string            `json:"dappIconURL,omitempty"`
 }
 
 func (n *ActivityCenterNotification) IncrementUpdatedAt(timesource common.TimeSource) {
