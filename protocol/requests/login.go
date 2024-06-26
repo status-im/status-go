@@ -34,6 +34,8 @@ type Login struct {
 	Mnemonic string `json:"mnemonic"`
 
 	WalletSecretsConfig
+
+	APIConfig *APIConfig `json:"apiConfig"`
 }
 
 func (c *Login) Validate() error {

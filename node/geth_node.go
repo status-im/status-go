@@ -94,7 +94,6 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 			MaxPeers:        maxPeers,
 			MaxPendingPeers: maxPendingPeers,
 		},
-		HTTPModules: config.FormatAPIModules(),
 	}
 
 	if config.IPCEnabled {
@@ -107,10 +106,17 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 	}
 
 	if config.HTTPEnabled {
+		nc.HTTPModules = config.FormatAPIModules()
 		nc.HTTPHost = config.HTTPHost
 		nc.HTTPPort = config.HTTPPort
 		nc.HTTPVirtualHosts = config.HTTPVirtualHosts
 		nc.HTTPCors = config.HTTPCors
+	}
+
+	if config.WSEnabled {
+		nc.WSModules = config.FormatAPIModules()
+		nc.WSHost = config.WSHost
+		nc.WSPort = config.WSPort
 	}
 
 	if config.ClusterConfig.Enabled {

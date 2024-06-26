@@ -138,9 +138,10 @@ func createAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password
 		RootDataDir:        rootDataDir,
 		LogFilePath:        "log",
 		APIConfig: &requests.APIConfig{
-			APIModules: apiModules,
-			HTTPHost:   "127.0.0.1",
-			HTTPPort:   port,
+			APIModules:  apiModules,
+			HTTPEnabled: true,
+			HTTPHost:    "127.0.0.1",
+			HTTPPort:    port,
 		},
 		TelemetryServerURL: telemetryUrl,
 	}

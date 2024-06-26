@@ -375,6 +375,15 @@ type NodeConfig struct {
 	// HTTPPort is the TCP port number on which to start the Geth's HTTP RPC server.
 	HTTPPort int
 
+	// WSEnabled specifies whether the Websocket RPC server is to be enabled by default.
+	WSEnabled bool
+
+	// WSHost is the host interface on which to start Geth's Websocket RPC server.
+	WSHost string
+
+	// WSPort is the TCP port number on which to start the Geth's Websocket RPC server.
+	WSPort int
+
 	// HTTPVirtualHosts is the list of virtual hostnames which are allowed on incoming requests.
 	// This is by default {'localhost'}. Using this prevents attacks like
 	// DNS rebinding, which bypasses SOP by simply masquerading as being within the same

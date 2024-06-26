@@ -215,6 +215,19 @@ func buildWalletConfig(request *requests.WalletSecretsConfig) params.WalletConfi
 	return walletConfig
 }
 
+func overrideApiConfig(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
+	nodeConfig.APIModules = config.APIModules
+	nodeConfig.ConnectorConfig.Enabled = config.ConnectorEnabled
+
+	nodeConfig.HTTPEnabled = config.HTTPEnabled
+	nodeConfig.HTTPHost = config.HTTPHost
+	nodeConfig.HTTPPort = config.HTTPPort
+
+	nodeConfig.WSEnabled = config.WSEnabled
+	nodeConfig.WSHost = config.WSHost
+	nodeConfig.WSPort = config.WSPort
+}
+
 func defaultNodeConfig(installationID string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
@@ -339,10 +352,7 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	}
 
 	if request.APIConfig != nil {
-		nodeConfig.HTTPEnabled = true
-		nodeConfig.HTTPHost = request.APIConfig.HTTPHost
-		nodeConfig.HTTPPort = request.APIConfig.HTTPPort
-		nodeConfig.APIModules = request.APIConfig.APIModules
+		overrideApiConfig(nodeConfig, request.APIConfig)
 	}
 
 	for _, opt := range opts {

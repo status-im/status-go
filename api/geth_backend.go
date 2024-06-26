@@ -601,6 +601,10 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 
 	b.overrideNetworks(b.config, request)
 
+	if request.APIConfig != nil {
+		overrideApiConfig(b.config, request.APIConfig)
+	}
+
 	err = b.setupLogSettings()
 	if err != nil {
 		return errors.Wrap(err, "failed to setup log settings")
