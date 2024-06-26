@@ -525,7 +525,7 @@ func NewMessenger(
 
 	var telemetryClient *telemetry.Client
 	if c.telemetryServerURL != "" {
-		telemetryClient = telemetry.NewClient(logger, c.telemetryServerURL, c.account.KeyUID, nodeName, version)
+		telemetryClient = telemetry.NewClient(logger, c.telemetryServerURL, c.account.KeyUID, nodeName, version, c.telemetrySendPeriod)
 		if c.wakuService != nil {
 			c.wakuService.SetStatusTelemetryClient(telemetryClient)
 		}
