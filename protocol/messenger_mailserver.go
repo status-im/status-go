@@ -379,6 +379,37 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 	return allResponses, nil
 }
 
+const missingMessageCheckPeriod = 30 * time.Second
+
+func (m *Messenger) checkForMissingMessagesLoop() {
+	t := time.NewTicker(missingMessageCheckPeriod)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-m.quit:
+			return
+
+		case <-t.C:
+			filters := m.transport.Filters()
+			filtersByMs := m.SplitFiltersByStoreNode(filters)
+			for communityID, filtersForMs := range filtersByMs {
+				ms := m.getActiveMailserver(communityID)
+				if ms == nil {
+					continue
+				}
+
+				peerID, err := ms.PeerID()
+				if err != nil {
+					m.logger.Error("could not obtain the peerID")
+					return
+				}
+				m.transport.SetCriteriaForMissingMessageVerification(peerID, filtersForMs)
+			}
+		}
+	}
+}
+
 func getPrioritizedBatches() []int {
 	return []int{1, 5, 10}
 }

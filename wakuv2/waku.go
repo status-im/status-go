@@ -125,6 +125,9 @@ type Waku struct {
 	sendQueue           chan *protocol.Envelope
 	msgQueue            chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 
+	topicInterest   map[string]TopicInterest // Track message verification requests and when was the last time a pubsub topic was verified for missing messages
+	topicInterestMu sync.Mutex
+
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -214,6 +217,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		sendQueue:                       make(chan *protocol.Envelope, 1000),
 		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
 		connStatusSubscriptions:         make(map[string]*types.ConnStatusSubscription),
+		topicInterest:                   make(map[string]TopicInterest),
 		ctx:                             ctx,
 		cancel:                          cancel,
 		wg:                              sync.WaitGroup{},
@@ -1343,7 +1347,7 @@ func (w *Waku) Start() error {
 		}
 	}
 
-	w.wg.Add(2)
+	w.wg.Add(3)
 
 	go func() {
 		defer w.wg.Done()
@@ -1411,6 +1415,7 @@ func (w *Waku) Start() error {
 	//TODO: commenting for now so that only fleet nodes are used.
 	//Need to uncomment once filter peer scoring etc is implemented.
 	go w.runPeerExchangeLoop()
+	go w.checkForMissingMessages()
 
 	if w.cfg.LightClient {
 		// Create FilterManager that will main peer connectivity

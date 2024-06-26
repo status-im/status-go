@@ -122,6 +122,8 @@ type Waku interface {
 
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
 
+	SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []string) error
+
 	// MinPow returns the PoW value required by this node.
 	MinPow() float64
 	// BloomFilter returns the aggregated bloom filter for all the topics of interest.
