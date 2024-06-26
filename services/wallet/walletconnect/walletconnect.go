@@ -183,17 +183,17 @@ func (p *SessionProposal) ValidateProposal() bool {
 }
 
 // AddSession adds a new active session to the database
-func AddSession(db *sql.DB, networks []params.Network, session_json string) error {
+func AddSession(db *sql.DB, networks []params.Network, session_json string) (Session, error) {
 	var session Session
 	err := json.Unmarshal([]byte(session_json), &session)
 	if err != nil {
-		return fmt.Errorf("unmarshal session: %v", err)
+		return session, fmt.Errorf("unmarshal session: %v", err)
 	}
 
 	chains := supportedChainsInSession(session)
 	testChains, err := areTestChains(networks, chains)
 	if err != nil {
-		return fmt.Errorf("areTestChains: %v", err)
+		return session, fmt.Errorf("areTestChains: %v", err)
 	}
 
 	rowEntry := DBSession{
@@ -213,7 +213,7 @@ func AddSession(db *sql.DB, networks []params.Network, session_json string) erro
 		rowEntry.IconURL = session.Peer.Metadata.Icons[0]
 	}
 
-	return UpsertSession(db, rowEntry)
+	return session, UpsertSession(db, rowEntry)
 }
 
 // areTestChains assumes chains to tests are all testnets or all mainnets

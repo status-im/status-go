@@ -395,7 +395,7 @@ func Test_AddSession(t *testing.T) {
 		{ChainID: uint64(chainID), IsTest: true},
 	}
 	timestampBeforeAddSession := time.Now().Unix()
-	err := AddSession(db, networks, sessionJSON)
+	_, err := AddSession(db, networks, sessionJSON)
 	assert.NoError(t, err)
 
 	// Validate that session was written correctly to the database

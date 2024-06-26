@@ -217,6 +217,7 @@ func NewService(
 		keycardPairings:       NewKeycardPairings(),
 		config:                config,
 		featureFlags:          featureFlags,
+		injectedMessenger:     nil,
 	}
 }
 
@@ -251,6 +252,7 @@ type Service struct {
 	keycardPairings       *KeycardPairings
 	config                *params.NodeConfig
 	featureFlags          *protocolCommon.FeatureFlags
+	injectedMessenger     InjectedMessenger
 }
 
 // Start signals transmitter.
@@ -348,4 +350,8 @@ func (s *Service) GetEnsService() *ens.Service {
 
 func (s *Service) GetStickersService() *stickers.Service {
 	return s.stickers
+}
+
+func (s *Service) InjectMessenger(injectedMessenger InjectedMessenger) {
+	s.injectedMessenger = injectedMessenger
 }
