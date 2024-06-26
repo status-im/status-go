@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.8.10'
+library 'status-jenkins-lib@v1.8.18'
 
 pipeline {
   agent { label 'macos && aarch64 && xcode-15.1 && nix-2.19' }

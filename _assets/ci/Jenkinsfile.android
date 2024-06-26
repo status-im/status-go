@@ -1,8 +1,8 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.8.10'
+library 'status-jenkins-lib@v1.8.18'
 
 pipeline {
-  agent { label 'linux && x86_64 && nix-2.14' }
+  agent { label 'linux && x86_64 && nix-2.19' }
 
   parameters {
     string(
