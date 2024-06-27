@@ -37,6 +37,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -271,22 +272,23 @@ type CommunityTokensServiceInterface interface {
 }
 
 type DefaultTokenManager struct {
-	tokenManager *token.Manager
+	tokenManager   *token.Manager
+	networkManager network.ManagerInterface
 }
 
-func NewDefaultTokenManager(tm *token.Manager) *DefaultTokenManager {
-	return &DefaultTokenManager{tokenManager: tm}
+func NewDefaultTokenManager(tm *token.Manager, nm network.ManagerInterface) *DefaultTokenManager {
+	return &DefaultTokenManager{tokenManager: tm, networkManager: nm}
 }
 
 type BalancesByChain = map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
 
 func (m *DefaultTokenManager) GetAllChainIDs() ([]uint64, error) {
-	networks, err := m.tokenManager.RPCClient.NetworkManager.Get(false)
+	networks, err := m.networkManager.Get(false)
 	if err != nil {
 		return nil, err
 	}
 
-	areTestNetworksEnabled, err := m.tokenManager.RPCClient.NetworkManager.GetTestNetworksEnabled()
+	areTestNetworksEnabled, err := m.networkManager.GetTestNetworksEnabled()
 	if err != nil {
 		return nil, err
 	}

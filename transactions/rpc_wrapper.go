@@ -16,11 +16,11 @@ import (
 
 // rpcWrapper wraps provides convenient interface for ethereum RPC APIs we need for sending transactions
 type rpcWrapper struct {
-	RPCClient *rpc.Client
+	RPCClient rpc.ClientInterface
 	chainID   uint64
 }
 
-func newRPCWrapper(client *rpc.Client, chainID uint64) *rpcWrapper {
+func newRPCWrapper(client rpc.ClientInterface, chainID uint64) *rpcWrapper {
 	return &rpcWrapper{RPCClient: client, chainID: chainID}
 }
 

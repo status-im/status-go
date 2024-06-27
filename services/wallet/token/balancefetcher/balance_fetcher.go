@@ -18,7 +18,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/async"
 )
 
-var nativeChainAddress = common.HexToAddress("0x")
+var NativeChainAddress = common.HexToAddress("0x")
 var requestTimeout = 20 * time.Second
 
 const (
@@ -26,7 +26,6 @@ const (
 )
 
 type BalanceFetcher interface {
-	FetchBalancesForChain(parent context.Context, client chain.ClientInterface, accounts, tokens []common.Address, atBlocks map[uint64]*big.Int) (map[common.Address]map[common.Address]*hexutil.Big, error)
 	GetTokenBalanceAt(ctx context.Context, client chain.ClientInterface, account common.Address, token common.Address, blockNumber *big.Int) (*big.Int, error)
 	GetBalancesAtByChain(parent context.Context, clients map[uint64]chain.ClientInterface, accounts, tokens []common.Address, atBlocks map[uint64]*big.Int) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error)
 	GetBalancesByChain(parent context.Context, clients map[uint64]chain.ClientInterface, accounts, tokens []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error)
@@ -44,7 +43,7 @@ func NewDefaultBalanceFetcher(contractMaker contracts.ContractMakerIface) *Defau
 	}
 }
 
-func (bf *DefaultBalanceFetcher) FetchBalancesForChain(parent context.Context, client chain.ClientInterface, accounts, tokens []common.Address, atBlocks map[uint64]*big.Int) (map[common.Address]map[common.Address]*hexutil.Big, error) {
+func (bf *DefaultBalanceFetcher) fetchBalancesForChain(parent context.Context, client chain.ClientInterface, accounts, tokens []common.Address, atBlock *big.Int) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	var (
 		group = async.NewAtomicGroup(parent)
 		mu    sync.Mutex
@@ -61,14 +60,7 @@ func (bf *DefaultBalanceFetcher) FetchBalancesForChain(parent context.Context, c
 			}
 
 			for token, balance := range tokenBalance {
-				if _, ok := balances[account][token]; !ok {
-					zeroHex := hexutil.Big(*big.NewInt(0))
-					balances[account][token] = &zeroHex
-				}
-
-				sum := big.NewInt(0).Add(balances[account][token].ToInt(), balance.ToInt())
-				sumHex := hexutil.Big(*sum)
-				balances[account][token] = &sumHex
+				balances[account][token] = balance
 			}
 		}
 	}
@@ -79,12 +71,10 @@ func (bf *DefaultBalanceFetcher) FetchBalancesForChain(parent context.Context, c
 		return nil, err
 	}
 
-	atBlock := atBlocks[client.NetworkID()]
-
 	fetchChainBalance := false
 
 	for _, token := range tokens {
-		if token == nativeChainAddress {
+		if token == NativeChainAddress {
 			fetchChainBalance = true
 		}
 	}
@@ -117,7 +107,7 @@ func (bf *DefaultBalanceFetcher) FetchBalancesForChain(parent context.Context, c
 				if atBlock == nil || big.NewInt(int64(availableAtBlock)).Cmp(atBlock) < 0 {
 					accTokenBalance, err = bf.FetchTokenBalancesWithScanContract(ctx, ethScanContract, account, chunk, atBlock)
 				} else {
-					accTokenBalance, err = bf.FetchTokenBalancesWithTokenContracts(ctx, client, account, chunk, atBlock)
+					accTokenBalance, err = bf.fetchTokenBalancesWithTokenContracts(ctx, client, account, chunk, atBlock)
 				}
 
 				if err != nil {
@@ -138,7 +128,7 @@ func (bf *DefaultBalanceFetcher) FetchBalancesForChain(parent context.Context, c
 	return balances, group.Error()
 }
 
-func (bf *DefaultBalanceFetcher) FetchChainBalances(parent context.Context, accounts []common.Address, ethScanContract *ethscan.BalanceScanner, atBlock *big.Int) (map[common.Address]map[common.Address]*hexutil.Big, error) {
+func (bf *DefaultBalanceFetcher) FetchChainBalances(parent context.Context, accounts []common.Address, ethScanContract ethscan.BalanceScannerIface, atBlock *big.Int) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	accTokenBalance := make(map[common.Address]map[common.Address]*hexutil.Big)
 
 	ctx, cancel := context.WithTimeout(parent, requestTimeout)
@@ -160,13 +150,13 @@ func (bf *DefaultBalanceFetcher) FetchChainBalances(parent context.Context, acco
 			accTokenBalance[account] = make(map[common.Address]*hexutil.Big)
 		}
 
-		accTokenBalance[account][nativeChainAddress] = (*hexutil.Big)(balance)
+		accTokenBalance[account][NativeChainAddress] = (*hexutil.Big)(balance)
 	}
 
 	return accTokenBalance, nil
 }
 
-func (bf *DefaultBalanceFetcher) FetchTokenBalancesWithScanContract(ctx context.Context, ethScanContract *ethscan.BalanceScanner, account common.Address, chunk []common.Address, atBlock *big.Int) (map[common.Address]map[common.Address]*hexutil.Big, error) {
+func (bf *DefaultBalanceFetcher) FetchTokenBalancesWithScanContract(ctx context.Context, ethScanContract ethscan.BalanceScannerIface, account common.Address, chunk []common.Address, atBlock *big.Int) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	accTokenBalance := make(map[common.Address]map[common.Address]*hexutil.Big)
 	res, err := ethScanContract.TokensBalance(&bind.CallOpts{
 		Context:     ctx,
@@ -178,7 +168,7 @@ func (bf *DefaultBalanceFetcher) FetchTokenBalancesWithScanContract(ctx context.
 	}
 
 	if len(res) != len(chunk) {
-		log.Error("can't fetch erc20 token balance 7", "account", account, "error", "response not complete")
+		log.Error("can't fetch erc20 token balance 7", "account", account, "error", "response not complete", "expected", len(chunk), "got", len(res))
 		return nil, errors.New("response not complete")
 	}
 
@@ -198,7 +188,7 @@ func (bf *DefaultBalanceFetcher) FetchTokenBalancesWithScanContract(ctx context.
 	return accTokenBalance, nil
 }
 
-func (bf *DefaultBalanceFetcher) FetchTokenBalancesWithTokenContracts(ctx context.Context, client chain.ClientInterface, account common.Address, chunk []common.Address, atBlock *big.Int) (map[common.Address]map[common.Address]*hexutil.Big, error) {
+func (bf *DefaultBalanceFetcher) fetchTokenBalancesWithTokenContracts(ctx context.Context, client chain.ClientInterface, account common.Address, chunk []common.Address, atBlock *big.Int) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	accTokenBalance := make(map[common.Address]map[common.Address]*hexutil.Big)
 	for _, token := range chunk {
 		balance, err := bf.GetTokenBalanceAt(ctx, client, account, token, atBlock)
@@ -220,7 +210,7 @@ func (bf *DefaultBalanceFetcher) FetchTokenBalancesWithTokenContracts(ctx contex
 }
 
 func (bf *DefaultBalanceFetcher) GetTokenBalanceAt(ctx context.Context, client chain.ClientInterface, account common.Address, token common.Address, blockNumber *big.Int) (*big.Int, error) {
-	caller, err := ierc20.NewIERC20Caller(token, client)
+	caller, err := bf.contractMaker.NewERC20Caller(client.NetworkID(), token)
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +260,7 @@ func (bf *DefaultBalanceFetcher) GetChainBalance(ctx context.Context, client cha
 }
 
 func (bf *DefaultBalanceFetcher) GetBalance(ctx context.Context, client chain.ClientInterface, account common.Address, token common.Address) (*big.Int, error) {
-	if token == nativeChainAddress {
+	if token == NativeChainAddress {
 		return bf.GetChainBalance(ctx, client, account)
 	}
 
@@ -305,12 +295,15 @@ func (bf *DefaultBalanceFetcher) GetBalancesAtByChain(parent context.Context, cl
 		// Keep the reference to the client. DO NOT USE A LOOP, the client will be overridden in the coroutine
 		client := clients[clientIdx]
 
-		balances, err := bf.FetchBalancesForChain(parent, client, accounts, tokens, atBlocks)
-		if err != nil {
-			return nil, err
-		}
+		group.Add(func(parent context.Context) error {
+			balances, err := bf.fetchBalancesForChain(parent, client, accounts, tokens, atBlocks[client.NetworkID()])
+			if err != nil {
+				return nil
+			}
 
-		updateBalance(client.NetworkID(), balances)
+			updateBalance(client.NetworkID(), balances)
+			return nil
+		})
 	}
 	select {
 	case <-group.WaitAsync():

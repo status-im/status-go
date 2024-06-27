@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/exp/slices" // since 1.21, this is in the standard library
@@ -29,6 +30,8 @@ import (
 	"github.com/status-im/status-go/contracts/ierc20"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc/chain"
+	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
+	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
@@ -1295,6 +1298,7 @@ func (m *MockETHClient) BatchCallContext(ctx context.Context, b []rpc.BatchElem)
 
 type MockChainClient struct {
 	mock.Mock
+	mock_client.MockClientInterface
 
 	clients map[walletcommon.ChainID]*MockETHClient
 }
@@ -1360,7 +1364,11 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 
 	address := common.HexToAddress("0x1234")
 	chainClient := newMockChainClient()
-	tracker := transactions.NewPendingTxTracker(db, chainClient, nil, &event.Feed{}, transactions.PendingCheckInterval)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	rpcClient := mock_rpcclient.NewMockClientInterface(ctrl)
+	rpcClient.EXPECT().AbstractEthClient(tc.NetworkID()).Return(chainClient, nil).AnyTimes()
+	tracker := transactions.NewPendingTxTracker(db, rpcClient, nil, &event.Feed{}, transactions.PendingCheckInterval)
 	accDB, err := accounts.NewDB(appdb)
 	require.NoError(t, err)
 

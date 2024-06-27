@@ -346,6 +346,8 @@ mock: ##@other Regenerate mocks
 	mockgen -package=mock_client     -destination=rpc/chain/mock/client/client.go              -source=rpc/chain/client.go
 	mockgen -package=mock_token      -destination=services/wallet/token/mock/token/tokenmanager.go -source=services/wallet/token/token.go
 	mockgen -package=mock_balance_persistence -destination=services/wallet/token/mock/balance_persistence/balance_persistence.go -source=services/wallet/token/balance_persistence.go
+	mockgen -package=mock_network      -destination=rpc/network/mock/network.go -source=rpc/network/network.go
+	mockgen -package=mock_rpcclient     -destination=rpc/mock/client/client.go              -source=rpc/client.go
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}

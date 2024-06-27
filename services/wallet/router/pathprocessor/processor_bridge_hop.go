@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -106,20 +107,22 @@ func (bf *BonderFee) UnmarshalJSON(data []byte) error {
 }
 
 type HopBridgeProcessor struct {
-	transactor    transactions.TransactorIface
-	httpClient    *thirdparty.HTTPClient
-	tokenManager  *token.Manager
-	contractMaker *contracts.ContractMaker
-	bonderFee     *sync.Map // [fromChainName-toChainName]BonderFee
+	transactor     transactions.TransactorIface
+	httpClient     *thirdparty.HTTPClient
+	tokenManager   *token.Manager
+	contractMaker  *contracts.ContractMaker
+	networkManager network.ManagerInterface
+	bonderFee      *sync.Map // [fromChainName-toChainName]BonderFee
 }
 
-func NewHopBridgeProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *token.Manager) *HopBridgeProcessor {
+func NewHopBridgeProcessor(rpcClient rpc.ClientInterface, transactor transactions.TransactorIface, tokenManager *token.Manager, networkManager network.ManagerInterface) *HopBridgeProcessor {
 	return &HopBridgeProcessor{
-		contractMaker: &contracts.ContractMaker{RPCClient: rpcClient},
-		httpClient:    thirdparty.NewHTTPClient(),
-		transactor:    transactor,
-		tokenManager:  tokenManager,
-		bonderFee:     &sync.Map{},
+		contractMaker:  &contracts.ContractMaker{RPCClient: rpcClient},
+		httpClient:     thirdparty.NewHTTPClient(),
+		transactor:     transactor,
+		tokenManager:   tokenManager,
+		networkManager: networkManager,
+		bonderFee:      &sync.Map{},
 	}
 }
 
@@ -299,7 +302,7 @@ func (h *HopBridgeProcessor) GetContractAddress(params ProcessorInputParams) (co
 }
 
 func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
-	fromChain := h.contractMaker.RPCClient.NetworkManager.Find(sendArgs.ChainID)
+	fromChain := h.networkManager.Find(sendArgs.ChainID)
 	if fromChain == nil {
 		return tx, fmt.Errorf("ChainID not supported %d", sendArgs.ChainID)
 	}
