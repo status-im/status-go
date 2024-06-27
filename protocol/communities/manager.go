@@ -2213,7 +2213,7 @@ func (m *Manager) preprocessDescription(id types.HexBytes, description *protobuf
 	upgradeTokenPermissions(description)
 
 	// Workaround for https://github.com/status-im/status-desktop/issues/12188
-	hydrateChannelsMembers(types.EncodeHex(id), description)
+	hydrateChannelsMembers(description)
 
 	return response, description, m.persistence.SaveDecryptedCommunityDescription(id, response, description)
 }

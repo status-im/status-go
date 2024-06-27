@@ -1667,7 +1667,7 @@ func (o *Community) marshaledDescription() ([]byte, error) {
 
 	// This is only workaround to lower the size of the message that goes over the wire,
 	// see https://github.com/status-im/status-desktop/issues/12188
-	dehydrateChannelsMembers(o.IDString(), clone)
+	dehydrateChannelsMembers(clone)
 
 	if o.encryptor != nil {
 		err := encryptDescription(o.encryptor, o, clone)
@@ -1714,28 +1714,19 @@ func (o *Community) ToProtocolMessageBytes() ([]byte, error) {
 	return o.toProtocolMessageBytes()
 }
 
-func channelHasTokenPermissions(communityID string, channelID string, permissions map[string]*protobuf.CommunityTokenPermission) bool {
-	for _, tokenPermission := range permissions {
-		if includes(tokenPermission.ChatIds, communityID+channelID) {
-			return true
-		}
-	}
-	return false
-}
-
-func dehydrateChannelsMembers(communityID string, description *protobuf.CommunityDescription) {
+func dehydrateChannelsMembers(description *protobuf.CommunityDescription) {
 	// To save space, we don't attach members for channels without permissions,
 	// otherwise the message will hit waku msg size limit.
 	for channelID, channel := range description.Chats {
-		if !channelHasTokenPermissions(communityID, channelID, description.TokenPermissions) {
+		if !channelEncrypted(ChatID(description.ID, channelID), description.TokenPermissions) {
 			channel.Members = map[string]*protobuf.CommunityMember{} // clean members
 		}
 	}
 }
 
-func hydrateChannelsMembers(communityID string, description *protobuf.CommunityDescription) {
+func hydrateChannelsMembers(description *protobuf.CommunityDescription) {
 	for channelID, channel := range description.Chats {
-		if !channelHasTokenPermissions(communityID, channelID, description.TokenPermissions) {
+		if !channelEncrypted(ChatID(description.ID, channelID), description.TokenPermissions) {
 			channel.Members = make(map[string]*protobuf.CommunityMember)
 			for pubKey, member := range description.Members {
 				channel.Members[pubKey] = member
@@ -1935,13 +1926,11 @@ func (o *Community) HasTokenPermissions() bool {
 	return len(o.tokenPermissions()) > 0
 }
 
-func (o *Community) channelEncrypted(channelID string) bool {
-	chatID := o.ChatID(channelID)
-
+func channelEncrypted(chatID string, permissions map[string]*protobuf.CommunityTokenPermission) bool {
 	hasPermission := false
 	viewableByEveryone := false
 
-	for _, p := range o.tokenPermissions() {
+	for _, p := range permissions {
 		if !includes(p.ChatIds, chatID) {
 			continue
 		}
@@ -1956,6 +1945,10 @@ func (o *Community) channelEncrypted(channelID string) bool {
 	}
 
 	return hasPermission && !viewableByEveryone
+}
+
+func (o *Community) channelEncrypted(channelID string) bool {
+	return channelEncrypted(o.ChatID(channelID), o.config.CommunityDescription.TokenPermissions)
 }
 
 func (o *Community) ChannelEncrypted(channelID string) bool {
@@ -2429,8 +2422,12 @@ func (o *Community) populateChatWithAllMembers(chatID string) (*CommunityChanges
 	return result, nil
 }
 
+func ChatID(communityID, channelID string) string {
+	return communityID + channelID
+}
+
 func (o *Community) ChatID(channelID string) string {
-	return o.IDString() + channelID
+	return ChatID(o.IDString(), channelID)
 }
 
 func (o *Community) ChatIDs() (chatIDs []string) {
