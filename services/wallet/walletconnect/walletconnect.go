@@ -191,7 +191,7 @@ func AddSession(db *sql.DB, networks []params.Network, session_json string) erro
 	}
 
 	rowEntry := DBSession{
-		Topic:            session.PairingTopic,
+		Topic:            session.Topic,
 		Disconnected:     false,
 		SessionJSON:      session_json,
 		Expiry:           session.Expiry,
