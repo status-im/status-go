@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"encoding/json"
 
@@ -385,15 +386,42 @@ func Test_AddSession(t *testing.T) {
 
 	// Add session for testnet
 	expiry := 1716581732
-	sessionJSON := getSessionJSONFor([]int{11155111}, expiry)
+	chainID := 11155111
+	sessionJSON := getSessionJSONFor([]int{chainID}, expiry)
 	networks := []params.Network{
 		{ChainID: 1, IsTest: false},
-		{ChainID: 11155111, IsTest: true},
+		{ChainID: uint64(chainID), IsTest: true},
 	}
+	timestampBeforeAddSession := time.Now().Unix()
 	err := AddSession(db, networks, sessionJSON)
 	assert.NoError(t, err)
+
+	// Validate that session was written correctly to the database
+	sessions, err := GetSessions(db)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(sessions))
+
+	sessJSONObj := map[string]interface{}{}
+	err = json.Unmarshal([]byte(sessionJSON), &sessJSONObj)
+	assert.NoError(t, err)
+
+	assert.Equal(t, false, sessions[0].Disconnected)
+	assert.Equal(t, sessionJSON, sessions[0].SessionJSON)
+	assert.Equal(t, int64(expiry), sessions[0].Expiry)
+	assert.GreaterOrEqual(t, sessions[0].CreatedTimestamp, timestampBeforeAddSession)
+	assert.Equal(t, sessJSONObj["pairingTopic"], string(sessions[0].PairingTopic))
+	assert.Equal(t, sessJSONObj["topic"], string(sessions[0].Topic))
+	assert.Equal(t, true, sessions[0].TestChains)
+
+	metadata := sessJSONObj["peer"].(map[string]interface{})["metadata"].(map[string]interface{})
+	assert.Equal(t, metadata["url"], sessions[0].URL)
+	assert.Equal(t, metadata["name"], sessions[0].Name)
+	assert.Equal(t, metadata["icons"].([]interface{})[0], sessions[0].IconURL)
 
 	dapps, err := GetActiveDapps(db, int64(expiry-1), true)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(dapps))
+	assert.Equal(t, sessions[0].URL, dapps[0].URL)
+	assert.Equal(t, sessions[0].Name, dapps[0].Name)
+	assert.Equal(t, sessions[0].IconURL, dapps[0].IconURL)
 }
