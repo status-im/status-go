@@ -220,7 +220,7 @@ func TestRouterV2(t *testing.T) {
 	erc1155Transfer := pathprocessor.NewERC1155Processor(nil, nil)
 	router.AddPathProcessor(erc1155Transfer)
 
-	hop := pathprocessor.NewHopBridgeProcessor(nil, nil, nil)
+	hop := pathprocessor.NewHopBridgeProcessor(nil, nil, nil, nil)
 	router.AddPathProcessor(hop)
 
 	paraswap := pathprocessor.NewSwapParaswapProcessor(nil, nil, nil)

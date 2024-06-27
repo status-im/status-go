@@ -16,15 +16,17 @@ import (
 )
 
 type ContractMakerIface interface {
-	NewEthScan(chainID uint64) (*ethscan.BalanceScanner, uint, error)
+	NewEthScan(chainID uint64) (ethscan.BalanceScannerIface, uint, error)
+	NewERC20(chainID uint64, contractAddr common.Address) (ierc20.IERC20Iface, error)
+	NewERC20Caller(chainID uint64, contractAddr common.Address) (ierc20.IERC20CallerIface, error)
 	// TODO extend with other contracts
 }
 
 type ContractMaker struct {
-	RPCClient *rpc.Client
+	RPCClient rpc.ClientInterface
 }
 
-func NewContractMaker(client *rpc.Client) (*ContractMaker, error) {
+func NewContractMaker(client rpc.ClientInterface) (*ContractMaker, error) {
 	if client == nil {
 		return nil, errors.New("could not initialize ContractMaker with an rpc client")
 	}
@@ -72,7 +74,7 @@ func (c *ContractMaker) NewUsernameRegistrar(chainID uint64, contractAddr common
 	)
 }
 
-func (c *ContractMaker) NewERC20(chainID uint64, contractAddr common.Address) (*ierc20.IERC20, error) {
+func (c *ContractMaker) NewERC20(chainID uint64, contractAddr common.Address) (ierc20.IERC20Iface, error) {
 	backend, err := c.RPCClient.EthClient(chainID)
 	if err != nil {
 		return nil, err
@@ -82,6 +84,14 @@ func (c *ContractMaker) NewERC20(chainID uint64, contractAddr common.Address) (*
 		contractAddr,
 		backend,
 	)
+}
+func (c *ContractMaker) NewERC20Caller(chainID uint64, contractAddr common.Address) (ierc20.IERC20CallerIface, error) {
+	backend, err := c.RPCClient.EthClient(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	return ierc20.NewIERC20Caller(contractAddr, backend)
 }
 
 func (c *ContractMaker) NewSNT(chainID uint64) (*snt.SNT, error) {
@@ -166,7 +176,7 @@ func (c *ContractMaker) NewDirectory(chainID uint64) (*directory.Directory, erro
 	)
 }
 
-func (c *ContractMaker) NewEthScan(chainID uint64) (*ethscan.BalanceScanner, uint, error) {
+func (c *ContractMaker) NewEthScan(chainID uint64) (ethscan.BalanceScannerIface, uint, error) {
 	contractAddr, err := ethscan.ContractAddress(chainID)
 	if err != nil {
 		return nil, 0, err

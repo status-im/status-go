@@ -309,7 +309,7 @@ func TestPathProcessors(t *testing.T) {
 				if processorName == ProcessorTransferName {
 					processor = NewTransferProcessor(nil, nil)
 				} else if processorName == ProcessorBridgeHopName {
-					processor = NewHopBridgeProcessor(nil, nil, nil)
+					processor = NewHopBridgeProcessor(nil, nil, nil, nil)
 				} else if processorName == ProcessorSwapParaswapName {
 					processor = NewSwapParaswapProcessor(nil, nil, nil)
 				}

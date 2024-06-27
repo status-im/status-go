@@ -81,6 +81,14 @@ func (nq *networksQuery) exec(db *sql.DB) ([]*params.Network, error) {
 	return res, err
 }
 
+type ManagerInterface interface {
+	Get(onlyEnabled bool) ([]*params.Network, error)
+	GetAll() ([]*params.Network, error)
+	Find(chainID uint64) *params.Network
+	GetConfiguredNetworks() []params.Network
+	GetTestNetworksEnabled() (bool, error)
+}
+
 type Manager struct {
 	db                 *sql.DB
 	configuredNetworks []params.Network

@@ -16,6 +16,8 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/rpc/chain"
+	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor/mock_pathprocessor"
@@ -174,15 +176,21 @@ func TestSendTransactionsETHFailOnTransactor(t *testing.T) {
 
 func TestWatchTransaction(t *testing.T) {
 	tm, _, _ := setupTransactionManager(t)
-	chainID := uint64(1)
+	chainID := uint64(777) // GeneratePendingTransaction uses this chainID
 	pendingTxTimeout = 2 * time.Millisecond
 
 	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	chainClient := transactions.NewMockChainClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	rpcClient := mock_rpcclient.NewMockClientInterface(ctrl)
+	rpcClient.EXPECT().AbstractEthClient(wallet_common.ChainID(chainID)).DoAndReturn(func(chainID wallet_common.ChainID) (chain.BatchCallClient, error) {
+		return chainClient.AbstractEthClient(chainID)
+	}).AnyTimes()
 	eventFeed := &event.Feed{}
 	// For now, pending tracker is not interface, so we have to use a real one
-	tm.pendingTracker = transactions.NewPendingTxTracker(walletDB, chainClient, nil, eventFeed, pendingTxTimeout)
+	tm.pendingTracker = transactions.NewPendingTxTracker(walletDB, rpcClient, nil, eventFeed, pendingTxTimeout)
 	tm.eventFeed = eventFeed
 
 	// Create a context with timeout
@@ -219,16 +227,22 @@ func TestWatchTransaction(t *testing.T) {
 
 func TestWatchTransaction_Timeout(t *testing.T) {
 	tm, _, _ := setupTransactionManager(t)
-	chainID := uint64(1)
+	chainID := uint64(777) // GeneratePendingTransaction uses this chainID
 	transactionHash := common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
 	pendingTxTimeout = 2 * time.Millisecond
 
 	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	chainClient := transactions.NewMockChainClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	rpcClient := mock_rpcclient.NewMockClientInterface(gomock.NewController(t))
+	rpcClient.EXPECT().AbstractEthClient(wallet_common.ChainID(chainID)).DoAndReturn(func(chainID wallet_common.ChainID) (chain.BatchCallClient, error) {
+		return chainClient.AbstractEthClient(chainID)
+	}).AnyTimes()
 	eventFeed := &event.Feed{}
 	// For now, pending tracker is not interface, so we have to use a real one
-	tm.pendingTracker = transactions.NewPendingTxTracker(walletDB, chainClient, nil, eventFeed, pendingTxTimeout)
+	tm.pendingTracker = transactions.NewPendingTxTracker(walletDB, rpcClient, nil, eventFeed, pendingTxTimeout)
 	tm.eventFeed = eventFeed
 
 	// Create a context with timeout

@@ -97,9 +97,9 @@ type ManagerInterface interface {
 type Manager struct {
 	balancefetcher.BalanceFetcher
 	db                   *sql.DB
-	RPCClient            *rpc.Client
+	RPCClient            rpc.ClientInterface
 	ContractMaker        *contracts.ContractMaker
-	networkManager       *network.Manager
+	networkManager       network.ManagerInterface
 	stores               []store // Set on init, not changed afterwards
 	communityTokensDB    *communitytokensdatabase.Database
 	communityManager     *community.Manager
@@ -130,7 +130,7 @@ func mergeTokens(sliceLists [][]*Token) []*Token {
 	return res
 }
 
-func prepareTokens(networkManager *network.Manager, stores []store) []*Token {
+func prepareTokens(networkManager network.ManagerInterface, stores []store) []*Token {
 	tokens := make([]*Token, 0)
 
 	networks, err := networkManager.GetAll()
@@ -158,9 +158,9 @@ func prepareTokens(networkManager *network.Manager, stores []store) []*Token {
 
 func NewTokenManager(
 	db *sql.DB,
-	RPCClient *rpc.Client,
+	RPCClient rpc.ClientInterface,
 	communityManager *community.Manager,
-	networkManager *network.Manager,
+	networkManager network.ManagerInterface,
 	appDB *sql.DB,
 	mediaServer *server.MediaServer,
 	walletFeed *event.Feed,
@@ -173,10 +173,10 @@ func NewTokenManager(
 	tokens := prepareTokens(networkManager, stores)
 
 	return &Manager{
-		BalanceFetcher: balancefetcher.NewDefaultBalanceFetcher(maker),
-		db:             db,
-		RPCClient:      RPCClient,
-		// ContractMaker:        maker,
+		BalanceFetcher:       balancefetcher.NewDefaultBalanceFetcher(maker),
+		db:                   db,
+		RPCClient:            RPCClient,
+		ContractMaker:        maker,
 		networkManager:       networkManager,
 		communityManager:     communityManager,
 		stores:               stores,

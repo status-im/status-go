@@ -8,10 +8,9 @@ import (
 	big "math/big"
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
-
 	common "github.com/ethereum/go-ethereum/common"
 	types "github.com/ethereum/go-ethereum/core/types"
+	gomock "github.com/golang/mock/gomock"
 	account "github.com/status-im/status-go/account"
 	types0 "github.com/status-im/status-go/eth-node/types"
 	params "github.com/status-im/status-go/params"
@@ -89,7 +88,7 @@ func (mr *MockTransactorIfaceMockRecorder) EstimateGas(network, from, to, value,
 }
 
 // NextNonce mocks base method.
-func (m *MockTransactorIface) NextNonce(rpcClient *rpc.Client, chainID uint64, from types0.Address) (uint64, error) {
+func (m *MockTransactorIface) NextNonce(rpcClient rpc.ClientInterface, chainID uint64, from types0.Address) (uint64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NextNonce", rpcClient, chainID, from)
 	ret0, _ := ret[0].(uint64)

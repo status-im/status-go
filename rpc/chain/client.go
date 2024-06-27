@@ -28,7 +28,7 @@ type BatchCallClient interface {
 }
 
 type ChainInterface interface {
-	BatchCallContext(ctx context.Context, b []rpc.BatchElem) error
+	BatchCallClient
 	HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error)
 	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
 	BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error)

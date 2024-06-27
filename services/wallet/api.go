@@ -55,7 +55,7 @@ func NewAPI(s *Service) *API {
 	erc1155Transfer := pathprocessor.NewERC1155Processor(rpcClient, transactor)
 	router.AddPathProcessor(erc1155Transfer)
 
-	hop := pathprocessor.NewHopBridgeProcessor(rpcClient, transactor, tokenManager)
+	hop := pathprocessor.NewHopBridgeProcessor(rpcClient, transactor, tokenManager, rpcClient.NetworkManager)
 	router.AddPathProcessor(hop)
 
 	if featureFlags.EnableCelerBridge {
