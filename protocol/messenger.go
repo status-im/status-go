@@ -574,7 +574,7 @@ func NewMessenger(
 		peersyncingOffers:       make(map[string]uint64),
 		peersyncingRequests:     make(map[string]uint64),
 		peerStore:               peerStore,
-		mvdsStatusChangeEvent:   make(chan datasyncnode.PeerStatusChangeEvent, 3),
+		mvdsStatusChangeEvent:   make(chan datasyncnode.PeerStatusChangeEvent, 5),
 		verificationDatabase:    verification.NewPersistence(database),
 		mailserverCycle: mailserverCycle{
 			peers:                     make(map[string]peerStatus),

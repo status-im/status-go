@@ -272,11 +272,16 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *pro
 			statusUpdate.StatusType == int(protobuf.StatusUpdate_ALWAYS_ONLINE) ||
 			statusUpdate.StatusType == int(protobuf.StatusUpdate_INACTIVE) {
 			m.logger.Debug("reset data sync for peer", zap.String("public_key", statusUpdate.PublicKey), zap.Uint64("clock", statusUpdate.Clock))
-			m.mvdsStatusChangeEvent <- datasyncnode.PeerStatusChangeEvent{
+			select {
+			case m.mvdsStatusChangeEvent <- datasyncnode.PeerStatusChangeEvent{
 				PeerID:    datasyncpeer.PublicKeyToPeerID(*state.CurrentMessageState.PublicKey),
 				Status:    datasyncnode.OnlineStatus,
 				EventTime: statusUpdate.Clock,
+			}:
+			default:
+				m.logger.Debug("mvdsStatusChangeEvent channel is full")
 			}
+
 		}
 	}
 
