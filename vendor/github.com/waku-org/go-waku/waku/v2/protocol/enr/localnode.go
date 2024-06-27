@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/multiformats/go-multiaddr"
+	"go.uber.org/zap"
 )
 
 func NewLocalnode(priv *ecdsa.PrivateKey) (*enode.LocalNode, error) {
@@ -71,6 +72,10 @@ func WithWakuBitfield(flags WakuEnrBitfield) ENROption {
 
 func WithIP(ipAddr *net.TCPAddr) ENROption {
 	return func(localnode *enode.LocalNode) (err error) {
+		if ipAddr.Port == 0 {
+			return ErrNoPortAvailable
+		}
+
 		localnode.SetStaticIP(ipAddr.IP)
 		localnode.Set(enr.TCP(uint16(ipAddr.Port))) // TODO: ipv6?
 		return nil
@@ -91,11 +96,15 @@ func WithUDPPort(udpPort uint) ENROption {
 	}
 }
 
-func Update(localnode *enode.LocalNode, enrOptions ...ENROption) error {
+func Update(logger *zap.Logger, localnode *enode.LocalNode, enrOptions ...ENROption) error {
 	for _, opt := range enrOptions {
 		err := opt(localnode)
 		if err != nil {
-			return err
+			if errors.Is(err, ErrNoPortAvailable) {
+				logger.Warn("no tcp port available. ENR will not contain tcp key")
+			} else {
+				return err
+			}
 		}
 	}
 	return nil
@@ -120,9 +129,7 @@ func writeMultiaddressField(localnode *enode.LocalNode, addrAggr []multiaddr.Mul
 		fieldRaw = append(fieldRaw, maRaw...)
 	}
 
-	if len(fieldRaw) != 0 && len(fieldRaw) <= 100 { // Max length for multiaddr field before triggering the 300 bytes limit
-		localnode.Set(enr.WithEntry(MultiaddrENRField, fieldRaw))
-	}
+	localnode.Set(enr.WithEntry(MultiaddrENRField, fieldRaw))
 
 	// This is to trigger the signing record err due to exceeding 300bytes limit
 	_ = localnode.Node()
