@@ -840,6 +840,12 @@ func (api *API) DisconnectWalletConnectSession(ctx context.Context, topic wallet
 	return walletconnect.DisconnectSession(api.s.db, topic)
 }
 
+// GetWalletConnectActiveSessions returns all active wallet connect sessions
+func (api *API) GetWalletConnectActiveSessions(ctx context.Context, validAtTimestamp int64) ([]walletconnect.DBSession, error) {
+	log.Debug("wallet.api.GetWalletConnectActiveSessions")
+	return walletconnect.GetActiveSessions(api.s.db, validAtTimestamp)
+}
+
 // GetWalletConnectDapps returns all active wallet connect dapps
 // Active dApp are those having active sessions (not expired and not disconnected)
 func (api *API) GetWalletConnectDapps(ctx context.Context, validAtTimestamp int64, testChains bool) ([]walletconnect.DBDApp, error) {

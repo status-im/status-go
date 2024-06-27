@@ -7,19 +7,9 @@ import (
 	"database/sql"
 
 	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
 
 	"github.com/stretchr/testify/require"
 )
-
-func setupTestDB(t *testing.T) (db *sql.DB, close func()) {
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
-	return db, func() {
-		require.NoError(t, db.Close())
-	}
-}
 
 type urlOverride *string
 type timestampOverride *int64
@@ -102,7 +92,7 @@ func insertTestData(t *testing.T, db *sql.DB, entries []DBSession) {
 }
 
 func TestInsertUpdateAndGetSession(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	entry := generateTestData(make([]testSession, 1))[0]
@@ -128,7 +118,7 @@ func TestInsertUpdateAndGetSession(t *testing.T) {
 }
 
 func TestInsertAndGetSessionsByPairingTopic(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	generatedSessions := generateTestData(make([]testSession, 4))
@@ -158,7 +148,7 @@ func TestInsertAndGetSessionsByPairingTopic(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	entries := generateTestData(make([]testSession, 3))
@@ -178,7 +168,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestGetActiveSessions(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	// insert two disconnected and three active sessions
@@ -195,7 +185,7 @@ func TestGetActiveSessions(t *testing.T) {
 }
 
 func TestDeleteSession(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	entries := generateTestData(make([]testSession, 3))
@@ -233,7 +223,7 @@ func at(i int) timestampOverride {
 
 // TestGetActiveDapps_JoinWorksAsExpected also validates that GetActiveDapps returns the dapps in the order of the last first time added
 func TestGetActiveDapps_JoinWorksAsExpected(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	not := common.NewAndSet(false)
@@ -262,7 +252,7 @@ func TestGetActiveDapps_JoinWorksAsExpected(t *testing.T) {
 
 // TestGetActiveDapps_ActiveWorksAsExpected tests the combination of disconnected and expired sessions
 func TestGetActiveDapps_ActiveWorksAsExpected(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	not := common.NewAndSet(false)
@@ -290,7 +280,7 @@ func TestGetActiveDapps_ActiveWorksAsExpected(t *testing.T) {
 
 // TestGetActiveDapps_TestChainsWorksAsExpected tests the combination of disconnected and expired sessions
 func TestGetActiveDapps_TestChainsWorksAsExpected(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	not := common.NewAndSet(false)
@@ -316,7 +306,7 @@ func TestGetActiveDapps_TestChainsWorksAsExpected(t *testing.T) {
 
 // TestGetDapps_EmptyDB tests that an empty database will return an empty list
 func TestGetDapps_EmptyDB(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	entries := generateTestData([]testSession{})
@@ -331,7 +321,7 @@ func TestGetDapps_EmptyDB(t *testing.T) {
 
 // TestGetDapps_OrphanDapps tests that missing session will place the dapp at the end
 func TestGetDapps_OrphanDapps(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	not := common.NewAndSet(false)
@@ -357,7 +347,7 @@ func TestGetDapps_OrphanDapps(t *testing.T) {
 }
 
 func TestDisconnectSession(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	not := common.NewAndSet(false)

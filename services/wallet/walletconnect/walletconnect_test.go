@@ -380,7 +380,7 @@ func Test_caip10Accounts(t *testing.T) {
 
 // Test_AddSession validates that the new added session is active (not expired and not disconnected)
 func Test_AddSession(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	// Add session for testnet
