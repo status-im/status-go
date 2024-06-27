@@ -427,7 +427,7 @@ func (p *Protocol) EncryptCommunityGrants(privateKey *ecdsa.PrivateKey, recipien
 	grants := make(map[uint32][]byte)
 
 	for recipientKey, grant := range recipientGrants {
-		sharedKey, err := generateSharedKey(privateKey, recipientKey)
+		sharedKey, err := GenerateSharedKey(privateKey, recipientKey)
 		if err != nil {
 			return nil, err
 		}
@@ -452,7 +452,7 @@ func (p *Protocol) DecryptCommunityGrant(myIdentityKey *ecdsa.PrivateKey, sender
 		return nil, errors.New("can't find related grant in the map")
 	}
 
-	sharedKey, err := generateSharedKey(myIdentityKey, senderKey)
+	sharedKey, err := GenerateSharedKey(myIdentityKey, senderKey)
 	if err != nil {
 		return nil, err
 	}

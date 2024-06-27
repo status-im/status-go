@@ -52,7 +52,7 @@ type Config struct {
 	Logger                              *zap.Logger
 	RequestedToJoinAt                   uint64
 	RequestsToJoin                      []*RequestToJoin
-	MemberIdentity                      *ecdsa.PublicKey
+	MemberIdentity                      *ecdsa.PrivateKey
 	EventsData                          *EventsData
 	Shard                               *shard.Shard
 	PubsubTopicPrivateKey               *ecdsa.PrivateKey
@@ -115,6 +115,7 @@ type CommunityChat struct {
 	CategoryID              string                               `json:"categoryID"`
 	TokenGated              bool                                 `json:"tokenGated"`
 	HideIfPermissionsNotMet bool                                 `json:"hideIfPermissionsNotMet"`
+	MissingEncryptionKey    bool                                 `json:"missingEncryptionKey"`
 }
 
 type CommunityCategory struct {
@@ -189,15 +190,15 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		for id, c := range o.config.CommunityDescription.Chats {
 			// NOTE: Here `CanPost` is only set for ChatMessage and Emoji reactions. But it can be different for pin/etc.
 			// Consider adding more properties to `CommunityChat` to reflect that.
-			canPost, err := o.CanPost(o.config.MemberIdentity, id, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
+			canPost, err := o.CanPost(o.MemberIdentity(), id, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
 			if err != nil {
 				return nil, err
 			}
-			canPostReactions, err := o.CanPost(o.config.MemberIdentity, id, protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
+			canPostReactions, err := o.CanPost(o.MemberIdentity(), id, protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
 			if err != nil {
 				return nil, err
 			}
-			canView := o.CanView(o.config.MemberIdentity, id)
+			canView := o.CanView(o.MemberIdentity(), id)
 
 			chat := CommunityChat{
 				ID:                      id,
@@ -314,10 +315,10 @@ func (o *Community) MarshalJSONWithMediaServer(mediaServer *server.MediaServer) 
 		Joined:                      o.config.Joined,
 		JoinedAt:                    o.config.JoinedAt,
 		Spectated:                   o.config.Spectated,
-		CanRequestAccess:            o.CanRequestAccess(o.config.MemberIdentity),
+		CanRequestAccess:            o.CanRequestAccess(o.MemberIdentity()),
 		CanJoin:                     o.canJoin(),
-		CanManageUsers:              o.CanManageUsers(o.config.MemberIdentity),
-		CanDeleteMessageForEveryone: o.CanDeleteMessageForEveryone(o.config.MemberIdentity),
+		CanManageUsers:              o.CanManageUsers(o.MemberIdentity()),
+		CanDeleteMessageForEveryone: o.CanDeleteMessageForEveryone(o.MemberIdentity()),
 		RequestedToJoinAt:           o.RequestedToJoinAt(),
 		IsMember:                    o.isMember(),
 		Muted:                       o.config.Muted,
@@ -342,15 +343,15 @@ func (o *Community) MarshalJSONWithMediaServer(mediaServer *server.MediaServer) 
 		for id, c := range o.config.CommunityDescription.Chats {
 			// NOTE: Here `CanPost` is only set for ChatMessage. But it can be different for reactions/pin/etc.
 			// Consider adding more properties to `CommunityChat` to reflect that.
-			canPost, err := o.CanPost(o.config.MemberIdentity, id, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
+			canPost, err := o.CanPost(o.MemberIdentity(), id, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
 			if err != nil {
 				return nil, err
 			}
-			canPostReactions, err := o.CanPost(o.config.MemberIdentity, id, protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
+			canPostReactions, err := o.CanPost(o.MemberIdentity(), id, protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
 			if err != nil {
 				return nil, err
 			}
-			canView := o.CanView(o.config.MemberIdentity, id)
+			canView := o.CanView(o.MemberIdentity(), id)
 
 			chat := CommunityChat{
 				ID:                      id,
@@ -368,6 +369,7 @@ func (o *Community) MarshalJSONWithMediaServer(mediaServer *server.MediaServer) 
 				CategoryID:              c.CategoryId,
 				HideIfPermissionsNotMet: c.HideIfPermissionsNotMet,
 				Position:                int(c.Position),
+				MissingEncryptionKey:    !o.IsMemberInChat(o.MemberIdentity(), id) && o.IsMemberLikelyInChat(id),
 			}
 			communityItem.Chats[id] = chat
 		}
@@ -466,10 +468,10 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Joined:                      o.config.Joined,
 		JoinedAt:                    o.config.JoinedAt,
 		Spectated:                   o.config.Spectated,
-		CanRequestAccess:            o.CanRequestAccess(o.config.MemberIdentity),
+		CanRequestAccess:            o.CanRequestAccess(o.MemberIdentity()),
 		CanJoin:                     o.canJoin(),
-		CanManageUsers:              o.CanManageUsers(o.config.MemberIdentity),
-		CanDeleteMessageForEveryone: o.CanDeleteMessageForEveryone(o.config.MemberIdentity),
+		CanManageUsers:              o.CanManageUsers(o.MemberIdentity()),
+		CanDeleteMessageForEveryone: o.CanDeleteMessageForEveryone(o.MemberIdentity()),
 		RequestedToJoinAt:           o.RequestedToJoinAt(),
 		IsMember:                    o.isMember(),
 		Muted:                       o.config.Muted,
@@ -494,15 +496,15 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		for id, c := range o.config.CommunityDescription.Chats {
 			// NOTE: Here `CanPost` is only set for ChatMessage. But it can be different for reactions/pin/etc.
 			// Consider adding more properties to `CommunityChat` to reflect that.
-			canPost, err := o.CanPost(o.config.MemberIdentity, id, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
+			canPost, err := o.CanPost(o.MemberIdentity(), id, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
 			if err != nil {
 				return nil, err
 			}
-			canPostReactions, err := o.CanPost(o.config.MemberIdentity, id, protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
+			canPostReactions, err := o.CanPost(o.MemberIdentity(), id, protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
 			if err != nil {
 				return nil, err
 			}
-			canView := o.CanView(o.config.MemberIdentity, id)
+			canView := o.CanView(o.MemberIdentity(), id)
 
 			chat := CommunityChat{
 				ID:                      id,
@@ -519,6 +521,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				CategoryID:              c.CategoryId,
 				HideIfPermissionsNotMet: c.HideIfPermissionsNotMet,
 				Position:                int(c.Position),
+				MissingEncryptionKey:    !o.IsMemberInChat(o.MemberIdentity(), id) && o.IsMemberLikelyInChat(id),
 			}
 
 			if chat.TokenGated {
@@ -898,6 +901,32 @@ func (o *Community) IsMemberInChat(pk *ecdsa.PublicKey, chatID string) bool {
 	return o.getChatMember(pk, chatID) != nil
 }
 
+// Uses bloom filter members list to estimate presence in the channel.
+// False positive rate is 0.1%.
+func (o *Community) IsMemberLikelyInChat(chatID string) bool {
+	if o.IsControlNode() || o.IsPrivilegedMember(o.MemberIdentity()) || !o.channelEncrypted(chatID) {
+		return true
+	}
+
+	chat, ok := o.config.CommunityDescription.Chats[chatID]
+	if !ok {
+		return false
+	}
+
+	// For communities controlled by clients that haven't updated to newer version yet we assume no membership.
+	if chat.MembersList == nil {
+		return false
+	}
+
+	res, err := verifyMembershipWithBloomFilter(chat.MembersList, o.config.MemberIdentity, o.ControlNode(), chatID, o.Clock())
+	if err != nil {
+		o.config.Logger.Error("failed to estimate membership", zap.Error(err))
+		return false
+	}
+
+	return res
+}
+
 func (o *Community) RemoveUserFromChat(pk *ecdsa.PublicKey, chatID string) (*protobuf.CommunityDescription, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
@@ -975,7 +1004,7 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 func (o *Community) RemoveAllUsersFromOrg() *CommunityChanges {
 	o.increaseClock()
 
-	myPublicKey := common.PubkeyToHex(o.config.MemberIdentity)
+	myPublicKey := common.PubkeyToHex(o.MemberIdentity())
 	member := o.config.CommunityDescription.Members[myPublicKey]
 
 	membersToRemove := o.config.CommunityDescription.Members
@@ -1274,7 +1303,7 @@ func (o *Community) MuteTill() time.Time {
 }
 
 func (o *Community) MemberIdentity() *ecdsa.PublicKey {
-	return o.config.MemberIdentity
+	return &o.config.MemberIdentity.PublicKey
 }
 
 // UpdateCommunityDescription will update the community to the new community description and return a list of changes
@@ -1412,15 +1441,15 @@ func (o *Community) IsControlNode() bool {
 }
 
 func (o *Community) IsOwner() bool {
-	return o.IsMemberOwner(o.config.MemberIdentity)
+	return o.IsMemberOwner(o.MemberIdentity())
 }
 
 func (o *Community) IsTokenMaster() bool {
-	return o.IsMemberTokenMaster(o.config.MemberIdentity)
+	return o.IsMemberTokenMaster(o.MemberIdentity())
 }
 
 func (o *Community) IsAdmin() bool {
-	return o.IsMemberAdmin(o.config.MemberIdentity)
+	return o.IsMemberAdmin(o.MemberIdentity())
 }
 
 func (o *Community) GetPrivilegedMembers() []*ecdsa.PublicKey {
@@ -1460,15 +1489,15 @@ func (o *Community) GetFilteredPrivilegedMembers(skipMembers map[string]struct{}
 }
 
 func (o *Community) HasPermissionToSendCommunityEvents() bool {
-	return !o.IsControlNode() && o.hasRoles(o.config.MemberIdentity, manageCommunityRoles())
+	return !o.IsControlNode() && o.hasRoles(o.MemberIdentity(), manageCommunityRoles())
 }
 
 func (o *Community) hasPermissionToSendCommunityEvent(event protobuf.CommunityEvent_EventType) bool {
-	return !o.IsControlNode() && canRolesPerformEvent(o.rolesOf(o.config.MemberIdentity), event)
+	return !o.IsControlNode() && canRolesPerformEvent(o.rolesOf(o.MemberIdentity()), event)
 }
 
 func (o *Community) hasPermissionToSendTokenPermissionCommunityEvent(event protobuf.CommunityEvent_EventType, permissionType protobuf.CommunityTokenPermission_Type) bool {
-	roles := o.rolesOf(o.config.MemberIdentity)
+	roles := o.rolesOf(o.MemberIdentity())
 	return !o.IsControlNode() && canRolesPerformEvent(roles, event) && canRolesModifyPermission(roles, permissionType)
 }
 
@@ -1671,6 +1700,11 @@ func (o *Community) marshaledDescription() ([]byte, error) {
 	// This is only workaround to lower the size of the message that goes over the wire,
 	// see https://github.com/status-im/status-desktop/issues/12188
 	dehydrateChannelsMembers(clone)
+
+	err := generateBloomFiltersForChannels(clone, o.PrivateKey())
+	if err != nil {
+		o.config.Logger.Error("failed to generate bloom filters", zap.Error(err))
+	}
 
 	if o.encryptor != nil {
 		err := encryptDescription(o.encryptor, o, clone)
@@ -2256,11 +2290,11 @@ func (o *Community) CanDeleteMessageForEveryone(pk *ecdsa.PublicKey) bool {
 }
 
 func (o *Community) isMember() bool {
-	return o.hasMember(o.config.MemberIdentity)
+	return o.hasMember(o.MemberIdentity())
 }
 
 func (o *Community) CanMemberIdentityPost(chatID string, messageType protobuf.ApplicationMetadataMessage_Type) (bool, error) {
-	return o.CanPost(o.config.MemberIdentity, chatID, messageType)
+	return o.CanPost(o.MemberIdentity(), chatID, messageType)
 }
 
 // CanJoin returns whether a user can join the community, only if it's

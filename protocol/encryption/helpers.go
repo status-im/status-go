@@ -66,7 +66,7 @@ func encrypt(plaintext []byte, key []byte, reader io.Reader) ([]byte, error) {
 	return gcm.Seal(nonce, nonce, plaintext, nil), nil
 }
 
-func generateSharedKey(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) ([]byte, error) {
+func GenerateSharedKey(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) ([]byte, error) {
 
 	const encryptedPayloadKeyLength = 16
 
@@ -87,7 +87,7 @@ func buildGroupRekeyMessage(privateKey *ecdsa.PrivateKey, groupID []byte, timest
 
 	for _, k := range keys {
 
-		sharedKey, err := generateSharedKey(privateKey, k)
+		sharedKey, err := GenerateSharedKey(privateKey, k)
 		if err != nil {
 			return nil, err
 		}
@@ -138,7 +138,7 @@ func decryptGroupRekeyMessage(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.Pub
 		return nil, nil
 	}
 
-	sharedKey, err := generateSharedKey(privateKey, publicKey)
+	sharedKey, err := GenerateSharedKey(privateKey, publicKey)
 	if err != nil {
 		return nil, err
 	}

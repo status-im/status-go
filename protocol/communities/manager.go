@@ -845,7 +845,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		Logger:               m.logger,
 		Joined:               true,
 		JoinedAt:             time.Now().Unix(),
-		MemberIdentity:       &m.identity.PublicKey,
+		MemberIdentity:       m.identity,
 		CommunityDescription: description,
 		Shard:                nil,
 		LastOpenedAt:         0,
@@ -1709,7 +1709,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 			Logger:               m.logger,
 			Joined:               true,
 			JoinedAt:             time.Now().Unix(),
-			MemberIdentity:       &m.identity.PublicKey,
+			MemberIdentity:       m.identity,
 			CommunityDescription: description,
 			LastOpenedAt:         0,
 		}
@@ -2134,7 +2134,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 			CommunityDescription:                processedDescription,
 			Logger:                              m.logger,
 			CommunityDescriptionProtocolMessage: payload,
-			MemberIdentity:                      &m.identity.PublicKey,
+			MemberIdentity:                      m.identity,
 			ID:                                  pubKey,
 			ControlNode:                         signer,
 			Shard:                               shard.FromProtobuff(communityShard),
@@ -3851,7 +3851,7 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 		descriptionEncryptor = m
 	}
 
-	return recordBundleToCommunity(r, &m.identity.PublicKey, m.installationID, m.logger, m.timesource, descriptionEncryptor, func(community *Community) error {
+	return recordBundleToCommunity(r, m.identity, m.installationID, m.logger, m.timesource, descriptionEncryptor, func(community *Community) error {
 		_, description, err := m.preprocessDescription(community.ID(), community.config.CommunityDescription)
 		if err != nil {
 			return err

@@ -144,6 +144,13 @@ message CommunityChat {
   int32 position = 5;
   bool viewers_can_post_reactions = 6;
   bool hide_if_permissions_not_met = 7;
+  CommunityBloomFilter members_list = 8;
+}
+
+message CommunityBloomFilter {
+  bytes data = 1;
+  uint64 m = 2;
+  uint64 k = 3;
 }
 
 message CommunityCategory {

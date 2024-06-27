@@ -1208,6 +1208,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 	)
 	s.Require().NoError(err)
 
+	// bob should not be in the bloom filter list
+	community, err = s.bob.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().False(community.IsMemberLikelyInChat(chat.CommunityChatID()))
+
 	// make bob satisfy channel criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, channelPermissionRequest.TokenCriteria[0])
 	defer s.resetMockedBalances() // reset mocked balances, this test in run with different test cases
@@ -1244,6 +1249,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+
+	// bob should be in the bloom filter list
+	community, err = s.bob.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.IsMemberLikelyInChat(chat.CommunityChatID()))
 
 	// bob can/can't post reactions
 	response, err = s.bob.SendEmojiReaction(context.Background(), chat.ID, msg.ID, protobuf.EmojiReaction_THUMBS_UP)

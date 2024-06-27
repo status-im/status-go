@@ -30,7 +30,7 @@ func createTestCommunity(identity *ecdsa.PrivateKey) (*Community, error) {
 		ControlNode:    &identity.PublicKey,
 		ControlDevice:  true,
 		Joined:         true,
-		MemberIdentity: &identity.PublicKey,
+		MemberIdentity: identity,
 	}
 
 	return New(config, &TimeSourceStub{}, &DescriptionEncryptorMock{})

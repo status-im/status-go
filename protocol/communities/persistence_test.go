@@ -48,7 +48,7 @@ func (s *PersistenceSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	s.db = &Persistence{db: db, recordBundleToCommunity: func(r *CommunityRecordBundle) (*Community, error) {
-		return recordBundleToCommunity(r, &s.identity.PublicKey, "", nil, &TimeSourceStub{}, &DescriptionEncryptorMock{}, nil)
+		return recordBundleToCommunity(r, s.identity, "", nil, &TimeSourceStub{}, &DescriptionEncryptorMock{}, nil)
 	}}
 }
 
@@ -259,7 +259,7 @@ func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Communi
 	s.Require().NoError(err, "crypto.GenerateKey shouldn't give any error")
 
 	com, err := New(Config{
-		MemberIdentity: &identity.PublicKey,
+		MemberIdentity: identity,
 		PrivateKey:     comPrivKey,
 		ControlNode:    &comPrivKey.PublicKey,
 		ControlDevice:  true,
