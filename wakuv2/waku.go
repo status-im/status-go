@@ -282,6 +282,10 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		logger.Error("FATAL ERROR: failed to parse relay shards", zap.Error(err))
 		return nil, errors.New("failed to parse relay shard, invalid pubsubTopic configuration")
 	}
+	if len(shards) == 0 { //Hack so that tests don't fail. TODO: Need to remove this once tests are changed to use proper cluster and shard.
+		shardInfo := protocol.RelayShards{ClusterID: 0, ShardIDs: []uint16{0}}
+		shards = append(shards, shardInfo)
+	}
 	waku.defaultShardInfo = shards[0]
 	if cfg.LightClient {
 		opts = append(opts, node.WithWakuFilterLightNode())
