@@ -8,13 +8,13 @@ import (
 )
 
 type DBSession struct {
-	Topic            Topic
-	Disconnected     bool
-	SessionJSON      string
-	Expiry           int64
-	CreatedTimestamp int64
-	PairingTopic     Topic
-	TestChains       bool
+	Topic            Topic  `json:"topic"`
+	Disconnected     bool   `json:"disconnected"`
+	SessionJSON      string `json:"sessionJson"`
+	Expiry           int64  `json:"expiry"`
+	CreatedTimestamp int64  `json:"createdTimestamp"`
+	PairingTopic     Topic  `json:"pairingTopic"`
+	TestChains       bool   `json:"testChains"`
 	DBDApp
 }
 
