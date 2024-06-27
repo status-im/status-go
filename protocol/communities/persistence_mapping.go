@@ -71,7 +71,7 @@ func recordToRequestToJoin(r *RequestToJoinRecord) *RequestToJoin {
 	}
 }
 
-func recordBundleToCommunity(r *CommunityRecordBundle, memberIdentity *ecdsa.PublicKey, installationID string,
+func recordBundleToCommunity(r *CommunityRecordBundle, memberIdentity *ecdsa.PrivateKey, installationID string,
 	logger *zap.Logger, timesource common.TimeSource, encryptor DescriptionEncryptor, initializer func(*Community) error) (*Community, error) {
 	var privateKey *ecdsa.PrivateKey
 	var controlNode *ecdsa.PublicKey

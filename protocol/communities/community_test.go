@@ -390,7 +390,7 @@ func (s *CommunitySuite) TestValidateRequestToJoin() {
 		},
 		{
 			name:    "not admin",
-			config:  Config{MemberIdentity: signer, CommunityDescription: description},
+			config:  Config{MemberIdentity: key, CommunityDescription: description},
 			signer:  signer,
 			request: request,
 			err:     ErrNotAdmin,
@@ -813,7 +813,7 @@ func (s *CommunitySuite) emptyCommunityDescriptionWithChat() *protobuf.Community
 
 func (s *CommunitySuite) newConfig(identity *ecdsa.PrivateKey, description *protobuf.CommunityDescription) Config {
 	return Config{
-		MemberIdentity:       &identity.PublicKey,
+		MemberIdentity:       identity,
 		ID:                   &identity.PublicKey,
 		CommunityDescription: description,
 		PrivateKey:           identity,
@@ -998,7 +998,7 @@ func (s *CommunitySuite) TestMarshalJSON() {
 	s.Require().True(community.ChannelEncrypted(testChatID1))
 
 	communityDescription := community.config.CommunityDescription
-	ownerKey, err := crypto.GenerateKey()
+	ownerKey := s.identity
 	s.Require().NoError(err)
 
 	memberKey, err := crypto.GenerateKey()
@@ -1043,6 +1043,7 @@ func (s *CommunitySuite) TestMarshalJSON() {
 		"position":                float64(0),
 		"tokenGated":              true,
 		"viewersCanPostReactions": false,
+		"missingEncryptionKey":    false,
 	}
 
 	expectedChats[testChatID1] = expectedChat
@@ -1074,6 +1075,7 @@ func (s *CommunitySuite) TestMarshalJSON() {
 		"position":                float64(0),
 		"tokenGated":              false,
 		"viewersCanPostReactions": false,
+		"missingEncryptionKey":    false,
 	}
 
 	expectedChats[testChatID1] = expectedChat
