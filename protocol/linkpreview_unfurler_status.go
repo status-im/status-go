@@ -59,8 +59,12 @@ func (u *StatusUnfurler) buildContactData(publicKey string) (*common.StatusConta
 
 	// If no contact found locally, fetch it from waku
 	if contact == nil {
-		if contact, err = u.m.FetchContact(contactID, true); err != nil {
+		contact, err = u.m.FetchContact(contactID, true)
+		if err != nil {
 			return nil, fmt.Errorf("failed to request contact info from mailserver for public key '%s': %w", publicKey, err)
+		}
+		if contact == nil {
+			return nil, fmt.Errorf("contact wasn't found at the store node %s", publicKey)
 		}
 	}
 
