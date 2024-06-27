@@ -1075,7 +1075,7 @@ func (m *Messenger) ConnectionChanged(state connection.State) {
 	}
 
 	if m.connectionState.Offline && !state.Offline {
-		err := m.sender.StartDatasync(m.sendDataSync)
+		err := m.sender.StartDatasync(m.mvdsStatusChangeEvent, m.sendDataSync)
 		if err != nil {
 			m.logger.Error("failed to start datasync", zap.Error(err))
 		}

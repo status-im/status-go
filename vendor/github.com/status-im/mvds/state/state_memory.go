@@ -59,3 +59,16 @@ func (s *memorySyncState) Map(epoch int64, process func(State) State) error {
 
 	return nil
 }
+
+func (s *memorySyncState) MapWithPeerId(peerID PeerID, process func(State) State) error {
+	s.Lock()
+	defer s.Unlock()
+
+	for i, state := range s.state {
+		if state.PeerID == peerID {
+			s.state[i] = process(state)
+		}
+	}
+
+	return nil
+}

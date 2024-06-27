@@ -10,6 +10,8 @@ var (
 	ErrStateNotFound = errors.New("state not found")
 )
 
+const BatchResetEpochMessages = 100
+
 // Verify that SyncState interface is implemented.
 var _ SyncState = (*sqliteSyncState)(nil)
 
@@ -104,6 +106,52 @@ func (p *sqliteSyncState) All(epoch int64) ([]State, error) {
 	return result, nil
 }
 
+func (p *sqliteSyncState) QueryByPeerID(peerID PeerID, limit int) ([]State, error) {
+	var result []State
+
+	rows, err := p.db.Query(`
+		SELECT 
+			type, send_count, send_epoch, group_id, peer_id, message_id 
+		FROM
+			mvds_states
+		WHERE
+			peer_id = ?
+		LIMIT ?
+	`, peerID[:], limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			state                      State
+			groupID, peerID, messageID []byte
+		)
+		err := rows.Scan(
+			&state.Type,
+			&state.SendCount,
+			&state.SendEpoch,
+			&groupID,
+			&peerID,
+			&messageID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if len(groupID) > 0 {
+			val := GroupID{}
+			copy(val[:], groupID)
+			state.GroupID = &val
+		}
+		copy(state.PeerID[:], peerID)
+		copy(state.MessageID[:], messageID)
+
+		result = append(result, state)
+	}
+
+	return result, nil
+}
+
 func (p *sqliteSyncState) Map(epoch int64, process func(State) State) error {
 	states, err := p.All(epoch)
 	if err != nil {
@@ -117,6 +165,38 @@ func (p *sqliteSyncState) Map(epoch int64, process func(State) State) error {
 			log.Printf("%v", err)
 			continue
 		}
+		newState := process(state)
+		if newState != state {
+			updated = append(updated, newState)
+		}
+	}
+
+	if len(updated) == 0 {
+		return nil
+	}
+
+	tx, err := p.db.Begin()
+	if err != nil {
+		return err
+	}
+	for _, state := range updated {
+		if err := updateInTx(tx, state); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (p *sqliteSyncState) MapWithPeerId(peerID PeerID, process func(State) State) error {
+	states, err := p.QueryByPeerID(peerID, BatchResetEpochMessages)
+	if err != nil {
+		return err
+	}
+
+	var updated []State
+
+	for _, state := range states {
 		newState := process(state)
 		if newState != state {
 			updated = append(updated, newState)

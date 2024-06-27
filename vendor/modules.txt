@@ -931,7 +931,7 @@ github.com/status-im/migrate/v4/database/postgres
 github.com/status-im/migrate/v4/database/sqlcipher
 github.com/status-im/migrate/v4/internal/url
 github.com/status-im/migrate/v4/source/go_bindata
-# github.com/status-im/mvds v0.0.27-0.20240528050259-27702bea5ab7
+# github.com/status-im/mvds v0.0.27-0.20240624014816-2dd6758177e5
 ## explicit; go 1.19
 github.com/status-im/mvds/node
 github.com/status-im/mvds/node/migrations

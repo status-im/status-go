@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +22,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -29,7 +30,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -85,7 +86,7 @@ func _1565447861_initial_schemaDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1565447861_initial_schema.down.sql", size: 28, mode: os.FileMode(0644), modTime: time.Unix(1704726726, 0)}
+	info := bindataFileInfo{name: "1565447861_initial_schema.down.sql", size: 28, mode: os.FileMode(0644), modTime: time.Unix(1706497287, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x92, 0x55, 0x8d, 0x3, 0x68, 0x1a, 0x9c, 0xd7, 0xc7, 0xb4, 0x5a, 0xb1, 0x27, 0x47, 0xf4, 0xc6, 0x8d, 0x85, 0xbb, 0xae, 0xb6, 0x69, 0xc5, 0xbc, 0x21, 0xba, 0xc0, 0xc6, 0x2a, 0xc8, 0xb2, 0xf7}}
 	return a, nil
 }
@@ -105,7 +106,7 @@ func _1565447861_initial_schemaUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1565447861_initial_schema.up.sql", size: 140, mode: os.FileMode(0644), modTime: time.Unix(1704726726, 0)}
+	info := bindataFileInfo{name: "1565447861_initial_schema.up.sql", size: 140, mode: os.FileMode(0644), modTime: time.Unix(1706497287, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x21, 0x13, 0xbf, 0x64, 0x18, 0xf7, 0xe2, 0xd8, 0xb5, 0x7d, 0x8, 0xf1, 0x66, 0xb9, 0xb3, 0x49, 0x68, 0xe2, 0xa2, 0xea, 0x90, 0x11, 0x70, 0x9c, 0x15, 0x28, 0x3f, 0x3f, 0x90, 0x3c, 0x76, 0xf}}
 	return a, nil
 }
@@ -125,7 +126,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 377, mode: os.FileMode(0644), modTime: time.Unix(1704726726, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 377, mode: os.FileMode(0644), modTime: time.Unix(1706497287, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xef, 0xaf, 0xdf, 0xcf, 0x65, 0xae, 0x19, 0xfc, 0x9d, 0x29, 0xc1, 0x91, 0xaf, 0xb5, 0xd5, 0xb1, 0x56, 0xf3, 0xee, 0xa8, 0xba, 0x13, 0x65, 0xdb, 0xab, 0xcf, 0x4e, 0xac, 0x92, 0xe9, 0x60, 0xf1}}
 	return a, nil
 }
@@ -222,24 +223,21 @@ func AssetNames() []string {
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
 	"1565447861_initial_schema.down.sql": _1565447861_initial_schemaDownSql,
-	"1565447861_initial_schema.up.sql":   _1565447861_initial_schemaUpSql,
-	"doc.go":                             docGo,
-}
 
-// AssetDebug is true if the assets were built with the debug flag enabled.
-const AssetDebug = false
+	"1565447861_initial_schema.up.sql": _1565447861_initial_schemaUpSql,
+
+	"doc.go": docGo,
+}
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//
-//	data/
-//	  foo.txt
-//	  img/
-//	    a.png
-//	    b.png
-//
+//     data/
+//       foo.txt
+//       img/
+//         a.png
+//         b.png
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -272,9 +270,9 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"1565447861_initial_schema.down.sql": {_1565447861_initial_schemaDownSql, map[string]*bintree{}},
-	"1565447861_initial_schema.up.sql":   {_1565447861_initial_schemaUpSql, map[string]*bintree{}},
-	"doc.go":                             {docGo, map[string]*bintree{}},
+	"1565447861_initial_schema.down.sql": &bintree{_1565447861_initial_schemaDownSql, map[string]*bintree{}},
+	"1565447861_initial_schema.up.sql":   &bintree{_1565447861_initial_schemaUpSql, map[string]*bintree{}},
+	"doc.go":                             &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
@@ -291,7 +289,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}

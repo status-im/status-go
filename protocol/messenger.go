@@ -21,6 +21,8 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
+	datasyncnode "github.com/status-im/mvds/node"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
@@ -191,6 +193,8 @@ type Messenger struct {
 	peersyncing         *peersyncing.PeerSyncing
 	peersyncingOffers   map[string]uint64
 	peersyncingRequests map[string]uint64
+
+	mvdsStatusChangeEvent chan datasyncnode.PeerStatusChangeEvent
 }
 
 type connStatus int
@@ -570,6 +574,7 @@ func NewMessenger(
 		peersyncingOffers:       make(map[string]uint64),
 		peersyncingRequests:     make(map[string]uint64),
 		peerStore:               peerStore,
+		mvdsStatusChangeEvent:   make(chan datasyncnode.PeerStatusChangeEvent, 5),
 		verificationDatabase:    verification.NewPersistence(database),
 		mailserverCycle: mailserverCycle{
 			peers:                     make(map[string]peerStatus),
@@ -775,7 +780,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 
 	// set shared secret handles
 	m.sender.SetHandleSharedSecrets(m.handleSharedSecrets)
-	if err := m.sender.StartDatasync(m.sendDataSync); err != nil {
+	if err := m.sender.StartDatasync(m.mvdsStatusChangeEvent, m.sendDataSync); err != nil {
 		return nil, err
 	}
 
