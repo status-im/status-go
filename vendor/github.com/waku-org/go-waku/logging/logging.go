@@ -8,6 +8,7 @@ package logging
 
 import (
 	"encoding/hex"
+	"fmt"
 	"net"
 	"time"
 
@@ -146,4 +147,9 @@ func TCPAddr(key string, ip net.IP, port int) zap.Field {
 // UDPAddr creates a field for UDP v4/v6 address and port
 func UDPAddr(key string, ip net.IP, port int) zap.Field {
 	return zap.Stringer(key, &net.UDPAddr{IP: ip, Port: port})
+}
+
+func Uint64(key string, value uint64) zap.Field {
+	valueStr := fmt.Sprintf("%v", value)
+	return zap.String(key, valueStr)
 }

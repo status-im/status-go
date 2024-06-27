@@ -44,6 +44,8 @@ const UserAgent string = "go-waku"
 const defaultMinRelayPeersToPublish = 0
 
 const DefaultMaxConnectionsPerIP = 5
+const DefaultMaxConnections = 300
+const DefaultMaxPeerStoreCapacity = 300
 
 type WakuNodeParameters struct {
 	hostAddr            *net.TCPAddr
@@ -124,9 +126,10 @@ type WakuNodeOption func(*WakuNodeParameters) error
 // Default options used in the libp2p node
 var DefaultWakuNodeOptions = []WakuNodeOption{
 	WithPrometheusRegisterer(prometheus.NewRegistry()),
-	WithMaxPeerConnections(50),
+	WithMaxPeerConnections(DefaultMaxConnections),
 	WithMaxConnectionsPerIP(DefaultMaxConnectionsPerIP),
 	WithCircuitRelayParams(2*time.Second, 3*time.Minute),
+	WithPeerStoreCapacity(DefaultMaxPeerStoreCapacity),
 }
 
 // MultiAddresses return the list of multiaddresses configured in the node

@@ -125,27 +125,30 @@ func (wakuM *WakuMetadata) Request(ctx context.Context, peerID peer.ID) (*protoc
 
 	writer := pbio.NewDelimitedWriter(stream)
 	reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
+	logger.Debug("sending metadata request")
 
 	err = writer.WriteMsg(request)
 	if err != nil {
 		logger.Error("writing request", zap.Error(err))
 		if err := stream.Reset(); err != nil {
-			wakuM.log.Error("resetting connection", zap.Error(err))
+			logger.Error("resetting connection", zap.Error(err))
 		}
 		return nil, err
 	}
+	logger.Debug("sent metadata request")
 
 	response := &pb.WakuMetadataResponse{}
 	err = reader.ReadMsg(response)
 	if err != nil {
 		logger.Error("reading response", zap.Error(err))
 		if err := stream.Reset(); err != nil {
-			wakuM.log.Error("resetting connection", zap.Error(err))
+			logger.Error("resetting connection", zap.Error(err))
 		}
 		return nil, err
 	}
 
 	stream.Close()
+	logger.Debug("received metadata response")
 
 	if response.ClusterId == nil {
 		return nil, errors.New("node did not provide a waku clusterid")
@@ -163,6 +166,7 @@ func (wakuM *WakuMetadata) Request(ctx context.Context, peerID peer.ID) (*protoc
 			rShardIDs = append(rShardIDs, uint16(i))
 		}
 	}
+	logger.Debug("getting remote cluster and shards")
 
 	rs, err := protocol.NewRelayShards(rClusterID, rShardIDs...)
 	if err != nil {
@@ -176,7 +180,7 @@ func (wakuM *WakuMetadata) onRequest(ctx context.Context) func(network.Stream) {
 	return func(stream network.Stream) {
 		logger := wakuM.log.With(logging.HostID("peer", stream.Conn().RemotePeer()))
 		request := &pb.WakuMetadataRequest{}
-
+		logger.Debug("received metadata request from peer")
 		writer := pbio.NewDelimitedWriter(stream)
 		reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
 
@@ -184,11 +188,10 @@ func (wakuM *WakuMetadata) onRequest(ctx context.Context) func(network.Stream) {
 		if err != nil {
 			logger.Error("reading request", zap.Error(err))
 			if err := stream.Reset(); err != nil {
-				wakuM.log.Error("resetting connection", zap.Error(err))
+				logger.Error("resetting connection", zap.Error(err))
 			}
 			return
 		}
-
 		response := new(pb.WakuMetadataResponse)
 
 		clusterID, shards, err := wakuM.ClusterAndShards()
@@ -205,10 +208,11 @@ func (wakuM *WakuMetadata) onRequest(ctx context.Context) func(network.Stream) {
 		if err != nil {
 			logger.Error("writing response", zap.Error(err))
 			if err := stream.Reset(); err != nil {
-				wakuM.log.Error("resetting connection", zap.Error(err))
+				logger.Error("resetting connection", zap.Error(err))
 			}
 			return
 		}
+		logger.Debug("sent metadata response to peer")
 
 		stream.Close()
 	}
@@ -248,14 +252,15 @@ func (wakuM *WakuMetadata) disconnectPeer(peerID peer.ID, reason error) {
 // Connected is called when a connection is opened
 func (wakuM *WakuMetadata) Connected(n network.Network, cc network.Conn) {
 	go func() {
+		wakuM.log.Debug("peer connected", zap.Stringer("peer", cc.RemotePeer()))
 		// Metadata verification is done only if a clusterID is specified
 		if wakuM.clusterID == 0 {
 			return
 		}
 
 		peerID := cc.RemotePeer()
-
 		shard, err := wakuM.Request(wakuM.ctx, peerID)
+
 		if err != nil {
 			wakuM.disconnectPeer(peerID, err)
 			return
