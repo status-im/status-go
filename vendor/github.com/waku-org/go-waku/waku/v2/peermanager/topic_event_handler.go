@@ -48,7 +48,9 @@ func (pm *PeerManager) handleNewRelayTopicSubscription(pubsubTopic string, topic
 
 	pm.checkAndUpdateTopicHealth(pm.subRelayTopics[pubsubTopic])
 
-	if connectedPeers >= waku_proto.GossipSubDMin { //TODO: Use a config rather than hard-coding.
+	//Leaving this logic based on gossipSubDMin as this is a good start for a subscribed topic.
+	// subsequent connectivity loop iteration would initiate more connections which should take it towards a healthy mesh.
+	if connectedPeers >= waku_proto.GossipSubDMin {
 		// Should we use optimal number or define some sort of a config for the node to choose from?
 		// A desktop node may choose this to be 4-6, whereas a service node may choose this to be 8-12 based on resources it has
 		// or bandwidth it can support.
@@ -70,7 +72,7 @@ func (pm *PeerManager) handleNewRelayTopicSubscription(pubsubTopic string, topic
 		}
 		//For now all peers are being given same priority,
 		// Later we may want to choose peers that have more shards in common over others.
-		pm.connectToPeers(notConnectedPeers[0:numPeersToConnect])
+		pm.connectToSpecifiedPeers(notConnectedPeers[0:numPeersToConnect])
 	} else {
 		triggerDiscovery = true
 	}
