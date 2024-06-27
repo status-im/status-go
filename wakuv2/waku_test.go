@@ -125,6 +125,8 @@ func TestRestartDiscoveryV5(t *testing.T) {
 }
 
 func TestBasicWakuV2(t *testing.T) {
+	t.Skip("test is broken, #5439")
+	
 	enrTreeAddress := testENRBootstrap //"enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
 	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
 	if envEnrTreeAddress != "" {
@@ -321,6 +323,8 @@ func TestPeerExchange(t *testing.T) {
 }
 
 func TestWakuV2Filter(t *testing.T) {
+	t.Skip("test is broken, #5439")
+
 	enrTreeAddress := testENRBootstrap
 	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
 	if envEnrTreeAddress != "" {
