@@ -358,11 +358,13 @@ test-unit: export UNIT_TEST_FAILFAST ?= true
 test-unit: export UNIT_TEST_RERUN_FAILS ?= true
 test-unit: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
 test-unit: export UNIT_TEST_REPORT_CODECLIMATE ?= false
-test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | \
+test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | grep -E '/waku(/.*|$$)|/wakuv2(/.*|$$)') \
+	$(call sh, go list ./... | \
 	grep -v /vendor | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
 	grep -v /transactions/fake | \
+	grep -E -v '/waku(/.*|$$)' | \
 	grep -E -v '/wakuv2(/.*|$$)')
 test-unit: export UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE ?= \
 	github.com/status-im/status-go/api \
