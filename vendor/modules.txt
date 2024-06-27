@@ -137,9 +137,12 @@ github.com/benbjohnson/immutable
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
-# github.com/bits-and-blooms/bitset v1.2.0
-## explicit; go 1.14
+# github.com/bits-and-blooms/bitset v1.13.0
+## explicit; go 1.16
 github.com/bits-and-blooms/bitset
+# github.com/bits-and-blooms/bloom/v3 v3.7.0
+## explicit; go 1.16
+github.com/bits-and-blooms/bloom/v3
 # github.com/bradfitz/iter v0.0.0-20191230175014-e8f45d346db8
 ## explicit; go 1.11
 github.com/bradfitz/iter
