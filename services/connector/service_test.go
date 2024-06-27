@@ -15,7 +15,8 @@ import (
 )
 
 func TestNewService(t *testing.T) {
-	db, _ := createDB(t)
+	db, close := createDB(t)
+	defer close()
 
 	txServiceMockCtrl := gomock.NewController(t)
 	server, _ := fake.NewTestServer(txServiceMockCtrl)
@@ -31,7 +32,7 @@ func TestNewService(t *testing.T) {
 	require.NoError(t, err)
 
 	mockConnectorService := &Service{}
-	service := NewService(rpcClient, mockConnectorService)
+	service := NewService(db, rpcClient, mockConnectorService)
 
 	assert.NotNil(t, service)
 	assert.Equal(t, rpcClient, service.rpcClient)
@@ -39,13 +40,19 @@ func TestNewService(t *testing.T) {
 }
 
 func TestService_Start(t *testing.T) {
-	service := NewService(&rpc.Client{}, &Service{})
+	db, close := createDB(t)
+	defer close()
+
+	service := NewService(db, &rpc.Client{}, &Service{})
 	err := service.Start()
 	assert.NoError(t, err)
 }
 
 func TestService_Stop(t *testing.T) {
-	service := NewService(&rpc.Client{}, &Service{})
+	db, close := createDB(t)
+	defer close()
+
+	service := NewService(db, &rpc.Client{}, &Service{})
 	err := service.Stop()
 	assert.NoError(t, err)
 }
@@ -63,7 +70,10 @@ func TestService_APIs(t *testing.T) {
 }
 
 func TestService_Protocols(t *testing.T) {
-	service := NewService(&rpc.Client{}, &Service{})
+	db, close := createDB(t)
+	defer close()
+
+	service := NewService(db, &rpc.Client{}, &Service{})
 	protocols := service.Protocols()
 	assert.Nil(t, protocols)
 }

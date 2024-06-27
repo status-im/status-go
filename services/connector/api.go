@@ -3,6 +3,9 @@ package connector
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/status-im/status-go/services/connector/commands"
+	persistence "github.com/status-im/status-go/services/connector/database"
 )
 
 type API struct {
@@ -19,15 +22,8 @@ func NewAPI(s *Service) *API {
 	}
 }
 
-type RPCRequest struct {
-	JSONRPC string        `json:"jsonrpc"`
-	ID      int           `json:"id"`
-	Method  string        `json:"method"`
-	Params  []interface{} `json:"params"`
-}
-
 func (api *API) CallRPC(inputJSON string) (string, error) {
-	var request RPCRequest
+	var request commands.RPCRequest
 
 	err := json.Unmarshal([]byte(inputJSON), &request)
 	if err != nil {
@@ -35,8 +31,12 @@ func (api *API) CallRPC(inputJSON string) (string, error) {
 	}
 
 	if command, exists := api.r.GetCommand(request.Method); exists {
-		return command.Execute(inputJSON)
+		return command.Execute(request)
 	}
 
 	return api.s.rpcClient.CallRaw(inputJSON), nil
+}
+
+func (api *API) RecallDAppPermission(origin string) error {
+	return persistence.DeleteDApp(api.s.db, origin)
 }

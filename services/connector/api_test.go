@@ -9,15 +9,15 @@ import (
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
 	statusRPC "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions/fake"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 func createDB(t *testing.T) (*sql.DB, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "provider-tests-")
+	db, cleanup, err := helpers.SetupTestSQLDB(walletdatabase.DbInitializer{}, "provider-tests-")
 	require.NoError(t, err)
 	return db, func() { require.NoError(t, cleanup()) }
 }
@@ -38,7 +38,7 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 	rpcClient, err := statusRPC.NewClient(client, 1, upstreamConfig, nil, db)
 	require.NoError(t, err)
 
-	service := NewService(rpcClient, nil)
+	service := NewService(db, rpcClient, nil)
 
 	return NewAPI(service), cancel
 }

@@ -429,7 +429,7 @@ func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfi
 
 func (b *StatusNode) connectorService() *connector.Service {
 	if b.connectorSrvc == nil {
-		b.connectorSrvc = connector.NewService(b.rpcClient, b.connectorSrvc)
+		b.connectorSrvc = connector.NewService(b.walletDB, b.rpcClient, b.connectorSrvc)
 	}
 	return b.connectorSrvc
 }
