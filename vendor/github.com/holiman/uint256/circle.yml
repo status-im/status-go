@@ -19,14 +19,14 @@ commands:
 
 jobs:
 
-  go114:
+  go121:
     docker:
-      - image: cimg/go:1.14
+      - image: cimg/go:1.21
     steps:
       - run:
           name: "Install tools"
           command: |
-            curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.23.8
+            curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.51.1
       - checkout
       - run:
           name: "Lint"
@@ -40,18 +40,16 @@ jobs:
           command: bash <(curl -s https://codecov.io/bash)
       - restore_cache:
           keys:
-            - corpus
+            - corpus-v3
       - run:
           name: "Fuzzing"
           command: |
-            go get -u github.com/dvyukov/go-fuzz/go-fuzz github.com/dvyukov/go-fuzz/go-fuzz-build
-            go-fuzz-build
-            timeout --preserve-status --signal INT 1m go-fuzz -procs=2
-            test ! "$(ls crashers)"
+            GOCACHE=/home/circleci/project/corpus-v3 go test . -run - -fuzz FuzzBase10StringCompare -fuzztime 30s
+            GOCACHE=/home/circleci/project/corpus-v3 go test . -run - -fuzz FuzzDecimal -fuzztime 30s
       - save_cache:
-          key: corpus-{{ epoch }}
+          key: corpus-v3-{{ epoch }}
           paths:
-            - corpus
+            - corpus-v3
       - run:
           name: "Benchmark"
           command: go test -run=- -bench=. -benchmem
@@ -78,17 +76,16 @@ jobs:
           name: "Test (PPC64 emulation)"
           command: qemu-ppc64-static uint256.test.ppc64 -test.v
 
-
-  go113:
+  go120:
     docker:
-      - image: cimg/go:1.13
+      - image: cimg/go:1.20
     steps:
       - checkout
       - test
 
-  go112:
+  go119:
     docker:
-      - image: cimg/go:1.12
+      - image: cimg/go:1.19
     steps:
       - checkout
       - test
@@ -99,9 +96,9 @@ workflows:
   version: 2
   uint256:
     jobs:
-      - go114
-      - go113
-      - go112
+      - go121
+      - go120
+      - go119
       - bigendian:
           requires:
-            - go114
+            - go121

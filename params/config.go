@@ -1218,8 +1218,6 @@ func LesTopic(netid int) string {
 	switch netid {
 	case 1:
 		return LESDiscoveryIdentifier + types.Bytes2Hex(params.MainnetGenesisHash.Bytes()[:8])
-	case 5:
-		return LESDiscoveryIdentifier + types.Bytes2Hex(params.RinkebyGenesisHash.Bytes()[:8])
 	default:
 		return ""
 	}

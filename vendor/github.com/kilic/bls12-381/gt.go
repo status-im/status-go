@@ -42,7 +42,7 @@ func NewGT() *GT {
 
 // Q returns group order in big.Int.
 func (g *GT) Q() *big.Int {
-	return new(big.Int).Set(q)
+	return new(big.Int).Set(qBig)
 }
 
 // FromBytes expects 576 byte input and returns target group element
@@ -66,7 +66,7 @@ func (g *GT) ToBytes(e *E) []byte {
 // IsValid checks whether given target group element is in correct subgroup.
 func (g *GT) IsValid(e *E) bool {
 	r := g.New()
-	g.fp12.exp(r, e, q)
+	g.fp12.exp(r, e, qBig)
 	return r.isOne()
 }
 

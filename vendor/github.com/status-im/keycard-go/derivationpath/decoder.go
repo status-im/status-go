@@ -73,8 +73,6 @@ func (d *decoder) parse() (StartingPoint, []uint32, error) {
 			return d.start, d.path, err
 		}
 	}
-
-	return d.start, d.path, nil
 }
 
 func (d *decoder) readByte() (byte, error) {
@@ -168,7 +166,7 @@ func (d *decoder) parseSeparator() error {
 		return d.saveSegment()
 	}
 
-	return fmt.Errorf("expected %s, got %s", string(tokenSeparator), string(b))
+	return fmt.Errorf("expected %c, got %c", tokenSeparator, b)
 }
 
 func (d *decoder) parseSegment() error {

@@ -19,11 +19,13 @@ package node
 import (
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -40,15 +42,22 @@ type httpConfig struct {
 	CorsAllowedOrigins []string
 	Vhosts             []string
 	prefix             string // path prefix on which to mount http handler
-	jwtSecret          []byte // optional JWT secret
+	rpcEndpointConfig
 }
 
 // wsConfig is the JSON-RPC/Websocket configuration
 type wsConfig struct {
-	Origins   []string
-	Modules   []string
-	prefix    string // path prefix on which to mount ws handler
-	jwtSecret []byte // optional JWT secret
+	Origins []string
+	Modules []string
+	prefix  string // path prefix on which to mount ws handler
+	rpcEndpointConfig
+}
+
+type rpcEndpointConfig struct {
+	jwtSecret              []byte // optional JWT secret
+	batchItemLimit         int
+	batchResponseSizeLimit int
+	httpBodyLimit          int
 }
 
 type rpcHandler struct {
@@ -105,7 +114,7 @@ func (h *httpServer) setListenAddr(host string, port int) error {
 	}
 
 	h.host, h.port = host, port
-	h.endpoint = fmt.Sprintf("%s:%d", host, port)
+	h.endpoint = net.JoinHostPort(host, fmt.Sprintf("%d", port))
 	return nil
 }
 
@@ -196,6 +205,7 @@ func (h *httpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
 	// if http-rpc is enabled, try to serve request
 	rpc := h.httpHandler.Load().(*rpcHandler)
 	if rpc != nil {
@@ -290,11 +300,15 @@ func (h *httpServer) enableRPC(apis []rpc.API, config httpConfig) error {
 	defer h.mu.Unlock()
 
 	if h.rpcAllowed() {
-		return fmt.Errorf("JSON-RPC over HTTP is already enabled")
+		return errors.New("JSON-RPC over HTTP is already enabled")
 	}
 
 	// Create RPC server and handler.
 	srv := rpc.NewServer()
+	srv.SetBatchLimits(config.batchItemLimit, config.batchResponseSizeLimit)
+	if config.httpBodyLimit > 0 {
+		srv.SetHTTPBodyLimit(config.httpBodyLimit)
+	}
 	if err := RegisterApis(apis, config.Modules, srv); err != nil {
 		return err
 	}
@@ -322,10 +336,14 @@ func (h *httpServer) enableWS(apis []rpc.API, config wsConfig) error {
 	defer h.mu.Unlock()
 
 	if h.wsAllowed() {
-		return fmt.Errorf("JSON-RPC over WebSocket is already enabled")
+		return errors.New("JSON-RPC over WebSocket is already enabled")
 	}
 	// Create RPC server and handler.
 	srv := rpc.NewServer()
+	srv.SetBatchLimits(config.batchItemLimit, config.batchResponseSizeLimit)
+	if config.httpBodyLimit > 0 {
+		srv.SetHTTPBodyLimit(config.httpBodyLimit)
+	}
 	if err := RegisterApis(apis, config.Modules, srv); err != nil {
 		return err
 	}
@@ -462,17 +480,94 @@ var gzPool = sync.Pool{
 }
 
 type gzipResponseWriter struct {
-	io.Writer
-	http.ResponseWriter
+	resp http.ResponseWriter
+
+	gz            *gzip.Writer
+	contentLength uint64 // total length of the uncompressed response
+	written       uint64 // amount of written bytes from the uncompressed response
+	hasLength     bool   // true if uncompressed response had Content-Length
+	inited        bool   // true after init was called for the first time
+}
+
+// init runs just before response headers are written. Among other things, this function
+// also decides whether compression will be applied at all.
+func (w *gzipResponseWriter) init() {
+	if w.inited {
+		return
+	}
+	w.inited = true
+
+	hdr := w.resp.Header()
+	length := hdr.Get("content-length")
+	if len(length) > 0 {
+		if n, err := strconv.ParseUint(length, 10, 64); err != nil {
+			w.hasLength = true
+			w.contentLength = n
+		}
+	}
+
+	// Setting Transfer-Encoding to "identity" explicitly disables compression. net/http
+	// also recognizes this header value and uses it to disable "chunked" transfer
+	// encoding, trimming the header from the response. This means downstream handlers can
+	// set this without harm, even if they aren't wrapped by newGzipHandler.
+	//
+	// In go-ethereum, we use this signal to disable compression for certain error
+	// responses which are flushed out close to the write deadline of the response. For
+	// these cases, we want to avoid chunked transfer encoding and compression because
+	// they require additional output that may not get written in time.
+	passthrough := hdr.Get("transfer-encoding") == "identity"
+	if !passthrough {
+		w.gz = gzPool.Get().(*gzip.Writer)
+		w.gz.Reset(w.resp)
+		hdr.Del("content-length")
+		hdr.Set("content-encoding", "gzip")
+	}
+}
+
+func (w *gzipResponseWriter) Header() http.Header {
+	return w.resp.Header()
 }
 
 func (w *gzipResponseWriter) WriteHeader(status int) {
-	w.Header().Del("Content-Length")
-	w.ResponseWriter.WriteHeader(status)
+	w.init()
+	w.resp.WriteHeader(status)
 }
 
 func (w *gzipResponseWriter) Write(b []byte) (int, error) {
-	return w.Writer.Write(b)
+	w.init()
+
+	if w.gz == nil {
+		// Compression is disabled.
+		return w.resp.Write(b)
+	}
+
+	n, err := w.gz.Write(b)
+	w.written += uint64(n)
+	if w.hasLength && w.written >= w.contentLength {
+		// The HTTP handler has finished writing the entire uncompressed response. Close
+		// the gzip stream to ensure the footer will be seen by the client in case the
+		// response is flushed after this call to write.
+		err = w.gz.Close()
+	}
+	return n, err
+}
+
+func (w *gzipResponseWriter) Flush() {
+	if w.gz != nil {
+		w.gz.Flush()
+	}
+	if f, ok := w.resp.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (w *gzipResponseWriter) close() {
+	if w.gz == nil {
+		return
+	}
+	w.gz.Close()
+	gzPool.Put(w.gz)
+	w.gz = nil
 }
 
 func newGzipHandler(next http.Handler) http.Handler {
@@ -482,15 +577,10 @@ func newGzipHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		w.Header().Set("Content-Encoding", "gzip")
+		wrapper := &gzipResponseWriter{resp: w}
+		defer wrapper.close()
 
-		gz := gzPool.Get().(*gzip.Writer)
-		defer gzPool.Put(gz)
-
-		gz.Reset(w)
-		defer gz.Close()
-
-		next.ServeHTTP(&gzipResponseWriter{ResponseWriter: w, Writer: gz}, r)
+		next.ServeHTTP(wrapper, r)
 	})
 }
 

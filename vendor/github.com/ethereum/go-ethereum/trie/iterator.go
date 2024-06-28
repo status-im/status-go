@@ -22,8 +22,15 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/core/types"
 )
+
+// NodeResolver is used for looking up trie nodes before reaching into the real
+// persistent layer. This is not mandatory, rather is an optimization for cases
+// where trie nodes can be recovered from some external mechanism without reading
+// from disk. In those cases, this resolver allows short circuiting accesses and
+// returning them from memory.
+type NodeResolver func(owner common.Hash, path []byte, hash common.Hash) []byte
 
 // Iterator is a key-value trie iterator that traverses a Trie.
 type Iterator struct {
@@ -107,8 +114,8 @@ type NodeIterator interface {
 	// to the value after calling Next.
 	LeafProof() [][]byte
 
-	// AddResolver sets an intermediate database to use for looking up trie nodes
-	// before reaching into the real persistent layer.
+	// AddResolver sets a node resolver to use for looking up trie nodes before
+	// reaching into the real persistent layer.
 	//
 	// This is not required for normal operation, rather is an optimization for
 	// cases where trie nodes can be recovered from some external mechanism without
@@ -118,7 +125,7 @@ type NodeIterator interface {
 	// Before adding a similar mechanism to any other place in Geth, consider
 	// making trie.Database an interface and wrapping at that level. It's a huge
 	// refactor, but it could be worth it if another occurrence arises.
-	AddResolver(ethdb.KeyValueReader)
+	AddResolver(NodeResolver)
 }
 
 // nodeIteratorState represents the iteration state at one particular node of the
@@ -137,7 +144,8 @@ type nodeIterator struct {
 	path  []byte               // Path to the current node
 	err   error                // Failure set in case of an internal error in the iterator
 
-	resolver ethdb.KeyValueReader // Optional intermediate resolver above the disk layer
+	resolver NodeResolver         // optional node resolver for avoiding disk hits
+	pool     []*nodeIteratorState // local pool for iteratorstates
 }
 
 // errIteratorEnd is stored in nodeIterator.err when iteration is done.
@@ -154,7 +162,7 @@ func (e seekError) Error() string {
 }
 
 func newNodeIterator(trie *Trie, start []byte) NodeIterator {
-	if trie.Hash() == emptyRoot {
+	if trie.Hash() == types.EmptyRootHash {
 		return &nodeIterator{
 			trie: trie,
 			err:  errIteratorEnd,
@@ -165,7 +173,25 @@ func newNodeIterator(trie *Trie, start []byte) NodeIterator {
 	return it
 }
 
-func (it *nodeIterator) AddResolver(resolver ethdb.KeyValueReader) {
+func (it *nodeIterator) putInPool(item *nodeIteratorState) {
+	if len(it.pool) < 40 {
+		item.node = nil
+		it.pool = append(it.pool, item)
+	}
+}
+
+func (it *nodeIterator) getFromPool() *nodeIteratorState {
+	idx := len(it.pool) - 1
+	if idx < 0 {
+		return new(nodeIteratorState)
+	}
+	el := it.pool[idx]
+	it.pool[idx] = nil
+	it.pool = it.pool[:idx]
+	return el
+}
+
+func (it *nodeIterator) AddResolver(resolver NodeResolver) {
 	it.resolver = resolver
 }
 
@@ -296,7 +322,7 @@ func (it *nodeIterator) seek(prefix []byte) error {
 func (it *nodeIterator) init() (*nodeIteratorState, error) {
 	root := it.trie.Hash()
 	state := &nodeIteratorState{node: it.trie.root, index: -1}
-	if root != emptyRoot {
+	if root != types.EmptyRootHash {
 		state.hash = root
 	}
 	return state, state.resolve(it, nil)
@@ -369,7 +395,7 @@ func (it *nodeIterator) peekSeek(seekKey []byte) (*nodeIteratorState, *int, []by
 
 func (it *nodeIterator) resolveHash(hash hashNode, path []byte) (node, error) {
 	if it.resolver != nil {
-		if blob, err := it.resolver.Get(hash); err == nil && len(blob) > 0 {
+		if blob := it.resolver(it.trie.owner, path, common.BytesToHash(hash)); len(blob) > 0 {
 			if resolved, err := decodeNode(hash, blob); err == nil {
 				return resolved, nil
 			}
@@ -380,12 +406,19 @@ func (it *nodeIterator) resolveHash(hash hashNode, path []byte) (node, error) {
 	// loaded blob will be tracked, while it's not required here since
 	// all loaded nodes won't be linked to trie at all and track nodes
 	// may lead to out-of-memory issue.
-	return it.trie.reader.node(path, common.BytesToHash(hash))
+	blob, err := it.trie.reader.node(path, common.BytesToHash(hash))
+	if err != nil {
+		return nil, err
+	}
+	// The raw-blob format nodes are loaded either from the
+	// clean cache or the database, they are all in their own
+	// copy and safe to use unsafe decoder.
+	return mustDecodeNodeUnsafe(hash, blob), nil
 }
 
 func (it *nodeIterator) resolveBlob(hash hashNode, path []byte) ([]byte, error) {
 	if it.resolver != nil {
-		if blob, err := it.resolver.Get(hash); err == nil && len(blob) > 0 {
+		if blob := it.resolver(it.trie.owner, path, common.BytesToHash(hash)); len(blob) > 0 {
 			return blob, nil
 		}
 	}
@@ -394,7 +427,7 @@ func (it *nodeIterator) resolveBlob(hash hashNode, path []byte) ([]byte, error) 
 	// loaded blob will be tracked, while it's not required here since
 	// all loaded nodes won't be linked to trie at all and track nodes
 	// may lead to out-of-memory issue.
-	return it.trie.reader.nodeBlob(path, common.BytesToHash(hash))
+	return it.trie.reader.node(path, common.BytesToHash(hash))
 }
 
 func (st *nodeIteratorState) resolve(it *nodeIterator, path []byte) error {
@@ -409,8 +442,9 @@ func (st *nodeIteratorState) resolve(it *nodeIterator, path []byte) error {
 	return nil
 }
 
-func findChild(n *fullNode, index int, path []byte, ancestor common.Hash) (node, *nodeIteratorState, []byte, int) {
+func (it *nodeIterator) findChild(n *fullNode, index int, ancestor common.Hash) (node, *nodeIteratorState, []byte, int) {
 	var (
+		path      = it.path
 		child     node
 		state     *nodeIteratorState
 		childPath []byte
@@ -419,13 +453,12 @@ func findChild(n *fullNode, index int, path []byte, ancestor common.Hash) (node,
 		if n.Children[index] != nil {
 			child = n.Children[index]
 			hash, _ := child.cache()
-			state = &nodeIteratorState{
-				hash:    common.BytesToHash(hash),
-				node:    child,
-				parent:  ancestor,
-				index:   -1,
-				pathlen: len(path),
-			}
+			state = it.getFromPool()
+			state.hash = common.BytesToHash(hash)
+			state.node = child
+			state.parent = ancestor
+			state.index = -1
+			state.pathlen = len(path)
 			childPath = append(childPath, path...)
 			childPath = append(childPath, byte(index))
 			return child, state, childPath, index
@@ -438,7 +471,7 @@ func (it *nodeIterator) nextChild(parent *nodeIteratorState, ancestor common.Has
 	switch node := parent.node.(type) {
 	case *fullNode:
 		// Full node, move to the first non-nil child.
-		if child, state, path, index := findChild(node, parent.index+1, it.path, ancestor); child != nil {
+		if child, state, path, index := it.findChild(node, parent.index+1, ancestor); child != nil {
 			parent.index = index - 1
 			return state, path, true
 		}
@@ -446,13 +479,12 @@ func (it *nodeIterator) nextChild(parent *nodeIteratorState, ancestor common.Has
 		// Short node, return the pointer singleton child
 		if parent.index < 0 {
 			hash, _ := node.Val.cache()
-			state := &nodeIteratorState{
-				hash:    common.BytesToHash(hash),
-				node:    node.Val,
-				parent:  ancestor,
-				index:   -1,
-				pathlen: len(it.path),
-			}
+			state := it.getFromPool()
+			state.hash = common.BytesToHash(hash)
+			state.node = node.Val
+			state.parent = ancestor
+			state.index = -1
+			state.pathlen = len(it.path)
 			path := append(it.path, node.Key...)
 			return state, path, true
 		}
@@ -466,7 +498,7 @@ func (it *nodeIterator) nextChildAt(parent *nodeIteratorState, ancestor common.H
 	switch n := parent.node.(type) {
 	case *fullNode:
 		// Full node, move to the first non-nil child before the desired key position
-		child, state, path, index := findChild(n, parent.index+1, it.path, ancestor)
+		child, state, path, index := it.findChild(n, parent.index+1, ancestor)
 		if child == nil {
 			// No more children in this fullnode
 			return parent, it.path, false
@@ -478,7 +510,7 @@ func (it *nodeIterator) nextChildAt(parent *nodeIteratorState, ancestor common.H
 		}
 		// The child is before the seek position. Try advancing
 		for {
-			nextChild, nextState, nextPath, nextIndex := findChild(n, index+1, it.path, ancestor)
+			nextChild, nextState, nextPath, nextIndex := it.findChild(n, index+1, ancestor)
 			// If we run out of children, or skipped past the target, return the
 			// previous one
 			if nextChild == nil || bytes.Compare(nextPath, key) >= 0 {
@@ -492,13 +524,12 @@ func (it *nodeIterator) nextChildAt(parent *nodeIteratorState, ancestor common.H
 		// Short node, return the pointer singleton child
 		if parent.index < 0 {
 			hash, _ := n.Val.cache()
-			state := &nodeIteratorState{
-				hash:    common.BytesToHash(hash),
-				node:    n.Val,
-				parent:  ancestor,
-				index:   -1,
-				pathlen: len(it.path),
-			}
+			state := it.getFromPool()
+			state.hash = common.BytesToHash(hash)
+			state.node = n.Val
+			state.parent = ancestor
+			state.index = -1
+			state.pathlen = len(it.path)
 			path := append(it.path, n.Key...)
 			return state, path, true
 		}
@@ -519,6 +550,8 @@ func (it *nodeIterator) pop() {
 	it.path = it.path[:last.pathlen]
 	it.stack[len(it.stack)-1] = nil
 	it.stack = it.stack[:len(it.stack)-1]
+	// last is now unused
+	it.putInPool(last)
 }
 
 func compareNodes(a, b NodeIterator) int {
@@ -589,7 +622,7 @@ func (it *differenceIterator) NodeBlob() []byte {
 	return it.b.NodeBlob()
 }
 
-func (it *differenceIterator) AddResolver(resolver ethdb.KeyValueReader) {
+func (it *differenceIterator) AddResolver(resolver NodeResolver) {
 	panic("not implemented")
 }
 
@@ -704,7 +737,7 @@ func (it *unionIterator) NodeBlob() []byte {
 	return (*it.items)[0].NodeBlob()
 }
 
-func (it *unionIterator) AddResolver(resolver ethdb.KeyValueReader) {
+func (it *unionIterator) AddResolver(resolver NodeResolver) {
 	panic("not implemented")
 }
 

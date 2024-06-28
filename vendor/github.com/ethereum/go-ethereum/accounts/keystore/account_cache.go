@@ -27,10 +27,11 @@ import (
 	"sync"
 	"time"
 
-	mapset "github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"golang.org/x/exp/slices"
 )
 
 // Minimum amount of time between cache reloads. This limit applies if the platform does
@@ -38,11 +39,10 @@ import (
 // exist yet, the code will attempt to create a watcher at most this often.
 const minReloadInterval = 2 * time.Second
 
-type accountsByURL []accounts.Account
-
-func (s accountsByURL) Len() int           { return len(s) }
-func (s accountsByURL) Less(i, j int) bool { return s[i].URL.Cmp(s[j].URL) < 0 }
-func (s accountsByURL) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+// byURL defines the sorting order for accounts.
+func byURL(a, b accounts.Account) int {
+	return a.URL.Cmp(b.URL)
+}
 
 // AmbiguousAddrError is returned when attempting to unlock
 // an address for which more than one file exists.
@@ -67,7 +67,7 @@ type accountCache struct {
 	keydir   string
 	watcher  *watcher
 	mu       sync.Mutex
-	all      accountsByURL
+	all      []accounts.Account
 	byAddr   map[common.Address][]accounts.Account
 	throttle *time.Timer
 	notify   chan struct{}
@@ -79,7 +79,7 @@ func newAccountCache(keydir string) (*accountCache, chan struct{}) {
 		keydir: keydir,
 		byAddr: make(map[common.Address][]accounts.Account),
 		notify: make(chan struct{}, 1),
-		fileC:  fileCache{all: mapset.NewThreadUnsafeSet()},
+		fileC:  fileCache{all: mapset.NewThreadUnsafeSet[string]()},
 	}
 	ac.watcher = newWatcher(ac)
 	return ac, ac.notify
@@ -194,7 +194,7 @@ func (ac *accountCache) find(a accounts.Account) (accounts.Account, error) {
 	default:
 		err := &AmbiguousAddrError{Addr: a.Address, Matches: make([]accounts.Account, len(matches))}
 		copy(err.Matches, matches)
-		sort.Sort(accountsByURL(err.Matches))
+		slices.SortFunc(err.Matches, byURL)
 		return accounts.Account{}, err
 	}
 }
@@ -283,16 +283,15 @@ func (ac *accountCache) scanAccounts() error {
 	// Process all the file diffs
 	start := time.Now()
 
-	for _, p := range creates.ToSlice() {
-		if a := readAccount(p.(string)); a != nil {
+	for _, path := range creates.ToSlice() {
+		if a := readAccount(path); a != nil {
 			ac.add(*a)
 		}
 	}
-	for _, p := range deletes.ToSlice() {
-		ac.deleteByFile(p.(string))
+	for _, path := range deletes.ToSlice() {
+		ac.deleteByFile(path)
 	}
-	for _, p := range updates.ToSlice() {
-		path := p.(string)
+	for _, path := range updates.ToSlice() {
 		ac.deleteByFile(path)
 		if a := readAccount(path); a != nil {
 			ac.add(*a)

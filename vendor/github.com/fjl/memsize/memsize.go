@@ -18,7 +18,7 @@ func Scan(v interface{}) Sizes {
 		panic("value to scan must be non-nil pointer")
 	}
 
-	stopTheWorld("memsize scan")
+	stopTheWorld(stwReadMemStats)
 	defer startTheWorld()
 
 	ctx := newContext()

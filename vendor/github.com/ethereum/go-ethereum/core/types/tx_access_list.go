@@ -17,9 +17,11 @@
 package types
 
 import (
+	"bytes"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 //go:generate go run github.com/fjl/gencodec -type AccessTuple -out gen_access_tuple.go
@@ -29,8 +31,8 @@ type AccessList []AccessTuple
 
 // AccessTuple is the element type of an access list.
 type AccessTuple struct {
-	Address     common.Address `json:"address"        gencodec:"required"`
-	StorageKeys []common.Hash  `json:"storageKeys"    gencodec:"required"`
+	Address     common.Address `json:"address"     gencodec:"required"`
+	StorageKeys []common.Hash  `json:"storageKeys" gencodec:"required"`
 }
 
 // StorageKeys returns the total number of storage keys in the access list.
@@ -105,7 +107,6 @@ func (tx *AccessListTx) gasFeeCap() *big.Int    { return tx.GasPrice }
 func (tx *AccessListTx) value() *big.Int        { return tx.Value }
 func (tx *AccessListTx) nonce() uint64          { return tx.Nonce }
 func (tx *AccessListTx) to() *common.Address    { return tx.To }
-func (tx *AccessListTx) isSystemTx() bool       { return false }
 
 func (tx *AccessListTx) effectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int {
 	return dst.Set(tx.GasPrice)
@@ -117,4 +118,12 @@ func (tx *AccessListTx) rawSignatureValues() (v, r, s *big.Int) {
 
 func (tx *AccessListTx) setSignatureValues(chainID, v, r, s *big.Int) {
 	tx.ChainID, tx.V, tx.R, tx.S = chainID, v, r, s
+}
+
+func (tx *AccessListTx) encode(b *bytes.Buffer) error {
+	return rlp.Encode(b, tx)
+}
+
+func (tx *AccessListTx) decode(input []byte) error {
+	return rlp.DecodeBytes(input, tx)
 }

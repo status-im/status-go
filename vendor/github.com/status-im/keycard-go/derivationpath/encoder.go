@@ -8,20 +8,20 @@ import (
 )
 
 func Encode(rawPath []uint32) string {
-	segments := []string{string(tokenMaster)}
+	segments := []string{string(rune(tokenMaster))}
 
 	for _, i := range rawPath {
 		suffix := ""
 
 		if i >= hardenedStart {
 			i = i - hardenedStart
-			suffix = string(tokenHardened)
+			suffix = string(rune(tokenHardened))
 		}
 
 		segments = append(segments, fmt.Sprintf("%d%s", i, suffix))
 	}
 
-	return strings.Join(segments, string(tokenSeparator))
+	return strings.Join(segments, string(rune(tokenSeparator)))
 }
 
 func EncodeFromBytes(data []byte) (string, error) {

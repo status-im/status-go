@@ -5,12 +5,18 @@
 package uint256
 
 import (
+	"database/sql"
+	"database/sql/driver"
+	"encoding"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"math/bits"
+	"strings"
 )
 
 const (
@@ -24,8 +30,22 @@ const (
 	_ uint = -(maxWords & ^(4 | 8))       // maxWords is 4 or 8.
 )
 
+// Compile time interface checks
+var (
+	_ driver.Valuer            = (*Int)(nil)
+	_ sql.Scanner              = (*Int)(nil)
+	_ encoding.TextMarshaler   = (*Int)(nil)
+	_ encoding.TextUnmarshaler = (*Int)(nil)
+	_ json.Marshaler           = (*Int)(nil)
+	_ json.Unmarshaler         = (*Int)(nil)
+)
+
 // ToBig returns a big.Int version of z.
+// Return `nil` if z is nil
 func (z *Int) ToBig() *big.Int {
+	if z == nil {
+		return nil
+	}
 	b := new(big.Int)
 	switch maxWords { // Compile-time check.
 	case 4: // 64-bit architectures.
@@ -45,10 +65,77 @@ func (z *Int) ToBig() *big.Int {
 
 // FromBig is a convenience-constructor from big.Int.
 // Returns a new Int and whether overflow occurred.
+// OBS: If b is `nil`, this method returns `nil, false`
 func FromBig(b *big.Int) (*Int, bool) {
+	if b == nil {
+		return nil, false
+	}
 	z := &Int{}
 	overflow := z.SetFromBig(b)
 	return z, overflow
+}
+
+// MustFromBig is a convenience-constructor from big.Int.
+// Returns a new Int and panics if overflow occurred.
+// OBS: If b is `nil`, this method does _not_ panic, but
+// instead returns `nil`
+func MustFromBig(b *big.Int) *Int {
+	if b == nil {
+		return nil
+	}
+	z := &Int{}
+	if z.SetFromBig(b) {
+		panic("overflow")
+	}
+	return z
+}
+
+// Float64 returns the float64 value nearest to x.
+//
+// Note: The `big.Float` version of `Float64` also returns an 'Accuracy', indicating
+// whether the value was too small or too large to be represented by a
+// `float64`. However, the `uint256` type is unable to represent values
+// out of scope (|x| < math.SmallestNonzeroFloat64 or |x| > math.MaxFloat64),
+// therefore this method does not return any accuracy.
+func (z *Int) Float64() float64 {
+	if z.IsUint64() {
+		return float64(z.Uint64())
+	}
+	// See [1] for a detailed walkthrough of IEEE 754 conversion
+	//
+	// 1: https://www.wikihow.com/Convert-a-Number-from-Decimal-to-IEEE-754-Floating-Point-Representation
+
+	bitlen := uint64(z.BitLen())
+
+	// Normalize the number, by shifting it so that the MSB is shifted out.
+	y := new(Int).Lsh(z, uint(1+256-bitlen))
+	// The number with the leading 1 shifted out is the fraction.
+	fraction := y[3]
+
+	// The exp is calculated from the number of shifts, adjusted with the bias.
+	// double-precision uses 1023 as bias
+	biased_exp := 1023 + bitlen - 1
+
+	// The IEEE 754 double-precision layout is as follows:
+	//  1 sign bit (we don't bother with this, since it's always zero for uints)
+	// 11 exponent bits
+	// 52 fraction bits
+	// --------
+	// 64 bits
+
+	return math.Float64frombits(biased_exp<<52 | fraction>>12)
+}
+
+// SetFromHex sets z from the given string, interpreted as a hexadecimal number.
+// OBS! This method is _not_ strictly identical to the (*big.Int).SetString(..., 16) method.
+// Notable differences:
+// - This method _require_ "0x" or "0X" prefix.
+// - This method does not accept zero-prefixed hex, e.g. "0x0001"
+// - This method does not accept underscore input, e.g. "100_000",
+// - This method does not accept negative zero as valid, e.g "-0x0",
+//   - (this method does not accept any negative input as valid)
+func (z *Int) SetFromHex(hex string) error {
+	return z.fromHex(hex)
 }
 
 // fromHex is the internal implementation of parsing a hex-string.
@@ -56,10 +143,10 @@ func (z *Int) fromHex(hex string) error {
 	if err := checkNumberS(hex); err != nil {
 		return err
 	}
-
 	if len(hex) > 66 {
 		return ErrBig256Range
 	}
+	z.Clear()
 	end := len(hex)
 	for i := 0; i < 4; i++ {
 		start := end - 16
@@ -90,9 +177,25 @@ func FromHex(hex string) (*Int, error) {
 	return &z, nil
 }
 
-// UnmarshalText implements encoding.TextUnmarshaler
+// MustFromHex is a convenience-constructor to create an Int from
+// a hexadecimal string.
+// Returns a new Int and panics if any error occurred.
+func MustFromHex(hex string) *Int {
+	var z Int
+	if err := z.fromHex(hex); err != nil {
+		panic(err)
+	}
+	return &z
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler. This method
+// can unmarshal either hexadecimal or decimal.
+// - For hexadecimal, the input _must_ be prefixed with 0x or 0X
 func (z *Int) UnmarshalText(input []byte) error {
-	return z.fromHex(string(input))
+	if len(input) >= 2 && input[0] == '0' && (input[1] == 'x' || input[1] == 'X') {
+		return z.fromHex(string(input))
+	}
+	return z.fromDecimal(string(input))
 }
 
 // SetFromBig converts a big.Int to Int and sets the value to z.
@@ -147,7 +250,6 @@ func (z *Int) SetFromBig(b *big.Int) bool {
 // specification of minimum digits precision, output field
 // width, space or zero padding, and '-' for left or right
 // justification.
-//
 func (z *Int) Format(s fmt.State, ch rune) {
 	z.ToBig().Format(s, ch)
 }
@@ -438,6 +540,55 @@ func bigEndianUint56(b []byte) uint64 {
 		uint64(b[2])<<32 | uint64(b[1])<<40 | uint64(b[0])<<48
 }
 
+// MarshalSSZTo implements the fastssz.Marshaler interface and serializes the
+// integer into an already pre-allocated buffer.
+func (z *Int) MarshalSSZTo(dst []byte) ([]byte, error) {
+	if len(dst) < 32 {
+		return nil, fmt.Errorf("%w: have %d, want %d bytes", ErrBadBufferLength, len(dst), 32)
+	}
+	binary.LittleEndian.PutUint64(dst[0:8], z[0])
+	binary.LittleEndian.PutUint64(dst[8:16], z[1])
+	binary.LittleEndian.PutUint64(dst[16:24], z[2])
+	binary.LittleEndian.PutUint64(dst[24:32], z[3])
+
+	return dst[32:], nil
+}
+
+// MarshalSSZ implements the fastssz.Marshaler interface and returns the integer
+// marshalled into a newly allocated byte slice.
+func (z *Int) MarshalSSZ() ([]byte, error) {
+	blob := make([]byte, 32)
+	_, _ = z.MarshalSSZTo(blob) // ignore error, cannot fail, surely have 32 byte space in blob
+	return blob, nil
+}
+
+// SizeSSZ implements the fastssz.Marshaler interface and returns the byte size
+// of the 256 bit int.
+func (*Int) SizeSSZ() int {
+	return 32
+}
+
+// UnmarshalSSZ implements the fastssz.Unmarshaler interface and parses an encoded
+// integer into the local struct.
+func (z *Int) UnmarshalSSZ(buf []byte) error {
+	if len(buf) != 32 {
+		return fmt.Errorf("%w: have %d, want %d bytes", ErrBadEncodedLength, len(buf), 32)
+	}
+	z[0] = binary.LittleEndian.Uint64(buf[0:8])
+	z[1] = binary.LittleEndian.Uint64(buf[8:16])
+	z[2] = binary.LittleEndian.Uint64(buf[16:24])
+	z[3] = binary.LittleEndian.Uint64(buf[24:32])
+
+	return nil
+}
+
+// HashTreeRoot implements the fastssz.HashRoot interface's non-dependent part.
+func (z *Int) HashTreeRoot() ([32]byte, error) {
+	var hash [32]byte
+	_, _ = z.MarshalSSZTo(hash[:]) // ignore error, cannot fail
+	return hash, nil
+}
+
 // EncodeRLP implements the rlp.Encoder interface from go-ethereum
 // and writes the RLP encoding of z to w.
 func (z *Int) EncodeRLP(w io.Writer) error {
@@ -466,21 +617,36 @@ func (z *Int) EncodeRLP(w io.Writer) error {
 }
 
 // MarshalText implements encoding.TextMarshaler
+// MarshalText marshals using the decimal representation (compatible with big.Int)
 func (z *Int) MarshalText() ([]byte, error) {
-	return []byte(z.Hex()), nil
+	return []byte(z.Dec()), nil
 }
 
-// UnmarshalJSON implements json.Unmarshaler.
+// MarshalJSON implements json.Marshaler.
+// MarshalJSON marshals using the 'decimal string' representation. This is _not_ compatible
+// with big.Int: big.Int marshals into JSON 'native' numeric format.
+//
+// The JSON  native format is, on some platforms, (e.g. javascript), limited to 53-bit large
+// integer space. Thus, U256 uses string-format, which is not compatible with
+// big.int (big.Int refuses to unmarshal a string representation).
+func (z *Int) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + z.Dec() + `"`), nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler. UnmarshalJSON accepts either
+// - Quoted string: either hexadecimal OR decimal
+// - Not quoted string: only decimal
 func (z *Int) UnmarshalJSON(input []byte) error {
 	if len(input) < 2 || input[0] != '"' || input[len(input)-1] != '"' {
-		return ErrNonString
+		// if not quoted, it must be decimal
+		return z.fromDecimal(string(input))
 	}
 	return z.UnmarshalText(input[1 : len(input)-1])
 }
 
-// String returns the hex encoding of b.
+// String returns the decimal encoding of b.
 func (z *Int) String() string {
-	return z.Hex()
+	return z.Dec()
 }
 
 const (
@@ -525,14 +691,69 @@ func (z *Int) Hex() string {
 	return string(output[64-nibbles:])
 }
 
+// Scan implements the database/sql Scanner interface.
+// It decodes a string, because that is what postgres uses for its numeric type
+func (dst *Int) Scan(src interface{}) error {
+	if src == nil {
+		dst.Clear()
+		return nil
+	}
+	switch src := src.(type) {
+	case string:
+		return dst.scanScientificFromString(src)
+	case []byte:
+		return dst.scanScientificFromString(string(src))
+	}
+	return errors.New("unsupported type")
+}
+
+func (dst *Int) scanScientificFromString(src string) error {
+	if len(src) == 0 {
+		dst.Clear()
+		return nil
+	}
+	idx := strings.IndexByte(src, 'e')
+	if idx == -1 {
+		return dst.SetFromDecimal(src)
+	}
+	if err := dst.SetFromDecimal(src[:idx]); err != nil {
+		return err
+	}
+	if src[(idx+1):] == "0" {
+		return nil
+	}
+	exp := new(Int)
+	if err := exp.SetFromDecimal(src[(idx + 1):]); err != nil {
+		return err
+	}
+	if exp.GtUint64(77) { // 10**78 is larger than 2**256
+		return ErrBig256Range
+	}
+	exp.Exp(NewInt(10), exp)
+	if _, overflow := dst.MulOverflow(dst, exp); overflow {
+		return ErrBig256Range
+	}
+	return nil
+}
+
+// Value implements the database/sql/driver Valuer interface.
+// It encodes a base 10 string.
+// In Postgres, this will work with both integer and the Numeric/Decimal types
+// In MariaDB/MySQL, this will work with the Numeric/Decimal types up to 65 digits, however any more and you should use either VarChar or Char(79)
+// In SqLite, use TEXT
+func (src *Int) Value() (driver.Value, error) {
+	return src.Dec(), nil
+}
+
 var (
-	ErrEmptyString   = errors.New("empty hex string")
-	ErrSyntax        = errors.New("invalid hex string")
-	ErrMissingPrefix = errors.New("hex string without 0x prefix")
-	ErrEmptyNumber   = errors.New("hex string \"0x\"")
-	ErrLeadingZero   = errors.New("hex number with leading zero digits")
-	ErrBig256Range   = errors.New("hex number > 256 bits")
-	ErrNonString     = errors.New("non-string")
+	ErrEmptyString      = errors.New("empty hex string")
+	ErrSyntax           = errors.New("invalid hex string")
+	ErrMissingPrefix    = errors.New("hex string without 0x prefix")
+	ErrEmptyNumber      = errors.New("hex string \"0x\"")
+	ErrLeadingZero      = errors.New("hex number with leading zero digits")
+	ErrBig256Range      = errors.New("hex number > 256 bits")
+	ErrBadBufferLength  = errors.New("bad ssz buffer length")
+	ErrBadEncodedLength = errors.New("bad ssz encoded length")
 )
 
 func checkNumberS(input string) error {

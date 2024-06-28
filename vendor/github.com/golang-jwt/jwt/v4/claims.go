@@ -56,7 +56,7 @@ func (c RegisteredClaims) Valid() error {
 	// default value in Go, let's not fail the verification for them.
 	if !c.VerifyExpiresAt(now, false) {
 		delta := now.Sub(c.ExpiresAt.Time)
-		vErr.Inner = fmt.Errorf("%s by %v", delta, ErrTokenExpired)
+		vErr.Inner = fmt.Errorf("%s by %s", ErrTokenExpired, delta)
 		vErr.Errors |= ValidationErrorExpired
 	}
 
@@ -149,7 +149,7 @@ func (c StandardClaims) Valid() error {
 	// default value in Go, let's not fail the verification for them.
 	if !c.VerifyExpiresAt(now, false) {
 		delta := time.Unix(now, 0).Sub(time.Unix(c.ExpiresAt, 0))
-		vErr.Inner = fmt.Errorf("%s by %v", delta, ErrTokenExpired)
+		vErr.Inner = fmt.Errorf("%s by %s", ErrTokenExpired, delta)
 		vErr.Errors |= ValidationErrorExpired
 	}
 
@@ -265,9 +265,5 @@ func verifyIss(iss string, cmp string, required bool) bool {
 	if iss == "" {
 		return !required
 	}
-	if subtle.ConstantTimeCompare([]byte(iss), []byte(cmp)) != 0 {
-		return true
-	} else {
-		return false
-	}
+	return subtle.ConstantTimeCompare([]byte(iss), []byte(cmp)) != 0
 }

@@ -137,7 +137,7 @@ func (ks keyStorePassphrase) JoinPath(filename string) string {
 	return filepath.Join(ks.keysDirPath, filename)
 }
 
-// Encryptdata encrypts the data given as 'data' with the password 'auth'.
+// EncryptDataV3 encrypts the data given as 'data' with the password 'auth'.
 func EncryptDataV3(data, auth []byte, scryptN, scryptP int) (CryptoJSON, error) {
 	salt := make([]byte, 32)
 	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
@@ -301,10 +301,13 @@ func DecryptKey(keyjson []byte, auth string) (*Key, error) {
 	if err != nil {
 		return nil, err
 	}
-	key := crypto.ToECDSAUnsafe(keyBytes)
+	key, err := crypto.ToECDSA(keyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("invalid key: %w", err)
+	}
 	id, err := uuid.FromBytes(keyId)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid UUID: %w", err)
 	}
 	return &Key{
 		Id:              id,

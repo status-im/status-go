@@ -22,15 +22,15 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/trie"
+	"github.com/ethereum/go-ethereum/triedb"
 )
 
 var (
@@ -103,7 +103,7 @@ type Snapshot interface {
 
 	// Account directly retrieves the account associated with a particular hash in
 	// the snapshot slim data format.
-	Account(hash common.Hash) (*Account, error)
+	Account(hash common.Hash) (*types.SlimAccount, error)
 
 	// AccountRLP directly retrieves the account RLP associated with a particular
 	// hash in the snapshot slim data format.
@@ -168,7 +168,7 @@ type Config struct {
 type Tree struct {
 	config Config                   // Snapshots configurations
 	diskdb ethdb.KeyValueStore      // Persistent database to store the snapshot
-	triedb *trie.Database           // In-memory cache to access the trie through
+	triedb *triedb.Database         // In-memory cache to access the trie through
 	layers map[common.Hash]snapshot // Collection of all known layers
 	lock   sync.RWMutex
 
@@ -187,11 +187,12 @@ type Tree struct {
 // If the memory layers in the journal do not match the disk layer (e.g. there is
 // a gap) or the journal is missing, there are two repair cases:
 //
-//   - if the 'recovery' parameter is true, all memory diff-layers will be discarded.
-//     This case happens when the snapshot is 'ahead' of the state trie.
+//   - if the 'recovery' parameter is true, memory diff-layers and the disk-layer
+//     will all be kept. This case happens when the snapshot is 'ahead' of the
+//     state trie.
 //   - otherwise, the entire snapshot is considered invalid and will be recreated on
 //     a background thread.
-func New(config Config, diskdb ethdb.KeyValueStore, triedb *trie.Database, root common.Hash) (*Tree, error) {
+func New(config Config, diskdb ethdb.KeyValueStore, triedb *triedb.Database, root common.Hash) (*Tree, error) {
 	// Create a new, empty snapshot tree
 	snap := &Tree{
 		config: config,
@@ -199,15 +200,15 @@ func New(config Config, diskdb ethdb.KeyValueStore, triedb *trie.Database, root 
 		triedb: triedb,
 		layers: make(map[common.Hash]snapshot),
 	}
-	// Create the building waiter iff the background generation is allowed
-	if !config.NoBuild && !config.AsyncBuild {
-		defer snap.waitBuild()
-	}
 	// Attempt to load a previously persisted snapshot and rebuild one if failed
 	head, disabled, err := loadSnapshot(diskdb, triedb, root, config.CacheSize, config.Recovery, config.NoBuild)
 	if disabled {
 		log.Warn("Snapshot maintenance disabled (syncing)")
 		return snap, nil
+	}
+	// Create the building waiter iff the background generation is allowed
+	if !config.NoBuild && !config.AsyncBuild {
+		defer snap.waitBuild()
 	}
 	if err != nil {
 		log.Warn("Failed to load snapshot", "err", err)
@@ -257,6 +258,14 @@ func (t *Tree) Disable() {
 	for _, layer := range t.layers {
 		switch layer := layer.(type) {
 		case *diskLayer:
+
+			layer.lock.RLock()
+			generating := layer.genMarker != nil
+			layer.lock.RUnlock()
+			if !generating {
+				// Generator is already aborted or finished
+				break
+			}
 			// If the base layer is generating, abort it
 			if layer.genAbort != nil {
 				abort := make(chan *generatorStats)
@@ -271,7 +280,7 @@ func (t *Tree) Disable() {
 		case *diffLayer:
 			// If the layer is a simple diff, simply mark as stale
 			layer.lock.Lock()
-			atomic.StoreUint32(&layer.stale, 1)
+			layer.stale.Store(true)
 			layer.lock.Unlock()
 
 		default:
@@ -563,7 +572,7 @@ func diffToDisk(bottom *diffLayer) *diskLayer {
 			// Ensure we don't delete too much data blindly (contract can be
 			// huge). It's ok to flush, the root will go missing in case of a
 			// crash and we'll detect and regenerate the snapshot.
-			if batch.ValueSize() > ethdb.IdealBatchSize {
+			if batch.ValueSize() > 64*1024*1024 {
 				if err := batch.Write(); err != nil {
 					log.Crit("Failed to write storage deletions", "err", err)
 				}
@@ -589,7 +598,7 @@ func diffToDisk(bottom *diffLayer) *diskLayer {
 		// Ensure we don't write too much data blindly. It's ok to flush, the
 		// root will go missing in case of a crash and we'll detect and regen
 		// the snapshot.
-		if batch.ValueSize() > ethdb.IdealBatchSize {
+		if batch.ValueSize() > 64*1024*1024 {
 			if err := batch.Write(); err != nil {
 				log.Crit("Failed to write storage deletions", "err", err)
 			}
@@ -653,6 +662,13 @@ func diffToDisk(bottom *diffLayer) *diskLayer {
 		go res.generate(stats)
 	}
 	return res
+}
+
+// Release releases resources
+func (t *Tree) Release() {
+	if dl := t.disklayer(); dl != nil {
+		dl.Release()
+	}
 }
 
 // Journal commits an entire diff hierarchy to disk into a single journal entry.
@@ -725,7 +741,7 @@ func (t *Tree) Rebuild(root common.Hash) {
 		case *diffLayer:
 			// If the layer is a simple diff, simply mark as stale
 			layer.lock.Lock()
-			atomic.StoreUint32(&layer.stale, 1)
+			layer.stale.Store(true)
 			layer.lock.Unlock()
 
 		default:
@@ -775,14 +791,14 @@ func (t *Tree) Verify(root common.Hash) error {
 	}
 	defer acctIt.Release()
 
-	got, err := generateTrieRoot(nil, acctIt, common.Hash{}, stackTrieGenerate, func(db ethdb.KeyValueWriter, accountHash, codeHash common.Hash, stat *generateStats) (common.Hash, error) {
+	got, err := generateTrieRoot(nil, "", acctIt, common.Hash{}, stackTrieGenerate, func(db ethdb.KeyValueWriter, accountHash, codeHash common.Hash, stat *generateStats) (common.Hash, error) {
 		storageIt, err := t.StorageIterator(root, accountHash, common.Hash{})
 		if err != nil {
 			return common.Hash{}, err
 		}
 		defer storageIt.Release()
 
-		hash, err := generateTrieRoot(nil, storageIt, accountHash, stackTrieGenerate, nil, stat, false)
+		hash, err := generateTrieRoot(nil, "", storageIt, accountHash, stackTrieGenerate, nil, stat, false)
 		if err != nil {
 			return common.Hash{}, err
 		}
@@ -850,4 +866,22 @@ func (t *Tree) DiskRoot() common.Hash {
 	defer t.lock.Unlock()
 
 	return t.diskRoot()
+}
+
+// Size returns the memory usage of the diff layers above the disk layer and the
+// dirty nodes buffered in the disk layer. Currently, the implementation uses a
+// special diff layer (the first) as an aggregator simulating a dirty buffer, so
+// the second return will always be 0. However, this will be made consistent with
+// the pathdb, which will require a second return.
+func (t *Tree) Size() (diffs common.StorageSize, buf common.StorageSize) {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	var size common.StorageSize
+	for _, layer := range t.layers {
+		if layer, ok := layer.(*diffLayer); ok {
+			size += common.StorageSize(layer.memory)
+		}
+	}
+	return size, 0
 }

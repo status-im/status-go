@@ -10,7 +10,7 @@ x86 optimized base field is generated with [kilic/fp](https://github.com/kilic/f
 
 #### Scalar Field
 
-Standart big.Int module is currently used for scalar field implementation. x86 optimized faster field implementation is planned to be added.
+Both standart big.Int module and x86 optimized implementation are available for scalar field elements and opereations.
 
 #### Serialization
 
@@ -22,9 +22,9 @@ Hashing to curve implementations for both G1 and G2 follows `_XMD:SHA-256_SSWU_R
 
 #### Benchmarks
 
-on _3.1 GHz i5_
+on _2.3 GHz i7_
 
 ```
-BenchmarkPairing  1034837 ns/op
+BenchmarkPairing  882553 ns/op
 ```
 

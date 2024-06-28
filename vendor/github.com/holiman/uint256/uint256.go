@@ -9,6 +9,7 @@ package uint256
 import (
 	"encoding/binary"
 	"math"
+	"math/big"
 	"math/bits"
 )
 
@@ -195,10 +196,66 @@ func (z *Int) AddOverflow(x, y *Int) (*Int, bool) {
 // AddMod sets z to the sum ( x+y ) mod m, and returns z.
 // If m == 0, z is set to 0 (OBS: differs from the big.Int)
 func (z *Int) AddMod(x, y, m *Int) *Int {
+
+	// Fast path for m >= 2^192, with x and y at most slightly bigger than m.
+	// This is always the case when x and y are already reduced modulo such m.
+
+	if (m[3] != 0) && (x[3] <= m[3]) && (y[3] <= m[3]) {
+		var (
+			gteC1 uint64
+			gteC2 uint64
+			tmpX  Int
+			tmpY  Int
+			res   Int
+		)
+
+		// reduce x/y modulo m if they are gte m
+		tmpX[0], gteC1 = bits.Sub64(x[0], m[0], gteC1)
+		tmpX[1], gteC1 = bits.Sub64(x[1], m[1], gteC1)
+		tmpX[2], gteC1 = bits.Sub64(x[2], m[2], gteC1)
+		tmpX[3], gteC1 = bits.Sub64(x[3], m[3], gteC1)
+
+		tmpY[0], gteC2 = bits.Sub64(y[0], m[0], gteC2)
+		tmpY[1], gteC2 = bits.Sub64(y[1], m[1], gteC2)
+		tmpY[2], gteC2 = bits.Sub64(y[2], m[2], gteC2)
+		tmpY[3], gteC2 = bits.Sub64(y[3], m[3], gteC2)
+
+		if gteC1 == 0 {
+			x = &tmpX
+		}
+		if gteC2 == 0 {
+			y = &tmpY
+		}
+		var (
+			c1  uint64
+			c2  uint64
+			tmp Int
+		)
+
+		res[0], c1 = bits.Add64(x[0], y[0], c1)
+		res[1], c1 = bits.Add64(x[1], y[1], c1)
+		res[2], c1 = bits.Add64(x[2], y[2], c1)
+		res[3], c1 = bits.Add64(x[3], y[3], c1)
+
+		tmp[0], c2 = bits.Sub64(res[0], m[0], c2)
+		tmp[1], c2 = bits.Sub64(res[1], m[1], c2)
+		tmp[2], c2 = bits.Sub64(res[2], m[2], c2)
+		tmp[3], c2 = bits.Sub64(res[3], m[3], c2)
+
+		// final sub was unnecessary
+		if c1 == 0 && c2 != 0 {
+			copy((*z)[:], res[:])
+			return z
+		}
+
+		copy((*z)[:], tmp[:])
+		return z
+	}
+
 	if m.IsZero() {
 		return z.Clear()
 	}
-	if z == m { // z is an alias for m  // TODO: Understand why needed and add tests for all "division" methods.
+	if z == m { // z is an alias for m and will be overwritten by AddOverflow before m is read
 		m = m.Clone()
 	}
 	if _, overflow := z.AddOverflow(x, y); overflow {
@@ -475,6 +532,11 @@ func udivrem(quot, u []uint64, d *Int) (rem Int) {
 		}
 	}
 
+	if uLen < dLen {
+		copy(rem[:], u)
+		return rem
+	}
+
 	var unStorage [9]uint64
 	un := unStorage[:uLen+1]
 	un[uLen] = u[uLen-1] >> (64 - shift)
@@ -550,8 +612,20 @@ func (z *Int) Mod(x, y *Int) *Int {
 	}
 
 	var quot Int
-	rem := udivrem(quot[:], x[:], y)
-	return z.Set(&rem)
+	*z = udivrem(quot[:], x[:], y)
+	return z
+}
+
+// DivMod sets z to the quotient x div y and m to the modulus x mod y and returns the pair (z, m) for y != 0.
+// If y == 0, both z and m are set to 0 (OBS: differs from the big.Int)
+func (z *Int) DivMod(x, y, m *Int) (*Int, *Int) {
+	if y.IsZero() {
+		return z.Clear(), m.Clear()
+	}
+	var quot Int
+	*m = udivrem(quot[:], x[:], y)
+	*z = quot
+	return z, m
 }
 
 // SMod interprets x and y as two's complement signed integers,
@@ -576,14 +650,21 @@ func (z *Int) SMod(x, y *Int) *Int {
 	return z
 }
 
-// MulMod calculates the modulo-m multiplication of x and y and
-// returns z.
+// MulModWithReciprocal calculates the modulo-m multiplication of x and y
+// and returns z, using the reciprocal of m provided as the mu parameter.
+// Use uint256.Reciprocal to calculate mu from m.
 // If m == 0, z is set to 0 (OBS: differs from the big.Int)
-func (z *Int) MulMod(x, y, m *Int) *Int {
+func (z *Int) MulModWithReciprocal(x, y, m *Int, mu *[5]uint64) *Int {
 	if x.IsZero() || y.IsZero() || m.IsZero() {
 		return z.Clear()
 	}
 	p := umul(x, y)
+
+	if m[3] != 0 {
+		r := reduce4(p, m, *mu)
+		return z.Set(&r)
+	}
+
 	var (
 		pl Int
 		ph Int
@@ -601,12 +682,61 @@ func (z *Int) MulMod(x, y, m *Int) *Int {
 	return z.Set(&rem)
 }
 
+// MulMod calculates the modulo-m multiplication of x and y and
+// returns z.
+// If m == 0, z is set to 0 (OBS: differs from the big.Int)
+func (z *Int) MulMod(x, y, m *Int) *Int {
+	if x.IsZero() || y.IsZero() || m.IsZero() {
+		return z.Clear()
+	}
+	p := umul(x, y)
+
+	if m[3] != 0 {
+		mu := Reciprocal(m)
+		r := reduce4(p, m, mu)
+		return z.Set(&r)
+	}
+
+	var (
+		pl Int
+		ph Int
+	)
+	copy(pl[:], p[:4])
+	copy(ph[:], p[4:])
+
+	// If the multiplication is within 256 bits use Mod().
+	if ph.IsZero() {
+		return z.Mod(&pl, m)
+	}
+
+	var quot [8]uint64
+	rem := udivrem(quot[:], p[:], m)
+	return z.Set(&rem)
+}
+
+// MulDivOverflow calculates (x*y)/d with full precision, returns z and whether overflow occurred in multiply process (result does not fit to 256-bit).
+// computes 512-bit multiplication and 512 by 256 division.
+func (z *Int) MulDivOverflow(x, y, d *Int) (*Int, bool) {
+	if x.IsZero() || y.IsZero() || d.IsZero() {
+		return z.Clear(), false
+	}
+	p := umul(x, y)
+
+	var quot [8]uint64
+	udivrem(quot[:], p[:], d)
+
+	copy(z[:], quot[:4])
+
+	return z, (quot[4] | quot[5] | quot[6] | quot[7]) != 0
+}
+
 // Abs interprets x as a two's complement signed number,
 // and sets z to the absolute value
-//   Abs(0)        = 0
-//   Abs(1)        = 1
-//   Abs(2**255)   = -2**255
-//   Abs(2**256-1) = -1
+//
+//	Abs(0)        = 0
+//	Abs(1)        = 1
+//	Abs(2**255)   = -2**255
+//	Abs(2**256-1) = -1
 func (z *Int) Abs(x *Int) *Int {
 	if x[3] < 0x8000000000000000 {
 		return z.Set(x)
@@ -646,9 +776,11 @@ func (z *Int) SDiv(n, d *Int) *Int {
 }
 
 // Sign returns:
+//
 //	-1 if z <  0
 //	 0 if z == 0
 //	+1 if z >  0
+//
 // Where z is interpreted as a two's complement signed number
 func (z *Int) Sign() int {
 	if z.IsZero() {
@@ -783,18 +915,55 @@ func (z *Int) Eq(x *Int) bool {
 
 // Cmp compares z and x and returns:
 //
-//   -1 if z <  x
-//    0 if z == x
-//   +1 if z >  x
-//
+//	-1 if z <  x
+//	 0 if z == x
+//	+1 if z >  x
 func (z *Int) Cmp(x *Int) (r int) {
-	if z.Gt(x) {
-		return 1
-	}
-	if z.Lt(x) {
+	// z < x <=> z - x < 0 i.e. when subtraction overflows.
+	d0, carry := bits.Sub64(z[0], x[0], 0)
+	d1, carry := bits.Sub64(z[1], x[1], carry)
+	d2, carry := bits.Sub64(z[2], x[2], carry)
+	d3, carry := bits.Sub64(z[3], x[3], carry)
+	if carry == 1 {
 		return -1
 	}
-	return 0
+	if d0|d1|d2|d3 == 0 {
+		return 0
+	}
+	return 1
+}
+
+// CmpUint64 compares z and x and returns:
+//
+//	-1 if z <  x
+//	 0 if z == x
+//	+1 if z >  x
+func (z *Int) CmpUint64(x uint64) int {
+	if z[0] > x || (z[1]|z[2]|z[3]) != 0 {
+		return 1
+	}
+	if z[0] == x {
+		return 0
+	}
+	return -1
+}
+
+// CmpBig compares z and x and returns:
+//
+//	-1 if z <  x
+//	 0 if z == x
+//	+1 if z >  x
+func (z *Int) CmpBig(x *big.Int) (r int) {
+	// If x is negative, it's surely smaller (z > x)
+	if x.Sign() == -1 {
+		return 1
+	}
+	y := new(Int)
+	if y.SetFromBig(x) { // overflow
+		// z < x
+		return -1
+	}
+	return z.Cmp(y)
 }
 
 // LtUint64 returns true if z is smaller than n
@@ -1113,8 +1282,9 @@ func (z *Int) Exp(base, exponent *Int) *Int {
 
 // ExtendSign extends length of two’s complement signed integer,
 // sets z to
-//  - x if byteNum > 31
-//  - x interpreted as a signed number with sign-bit at (byteNum*8+7), extended to the full 256 bits
+//   - x if byteNum > 31
+//   - x interpreted as a signed number with sign-bit at (byteNum*8+7), extended to the full 256 bits
+//
 // and returns z.
 func (z *Int) ExtendSign(x, byteNum *Int) *Int {
 	if byteNum.GtUint64(31) {
@@ -1131,4 +1301,77 @@ func (z *Int) ExtendSign(x, byteNum *Int) *Int {
 		z.And(x, mask)
 	}
 	return z
+}
+
+// Sqrt sets z to ⌊√x⌋, the largest integer such that z² ≤ x, and returns z.
+func (z *Int) Sqrt(x *Int) *Int {
+	// This implementation of Sqrt is based on big.Int (see math/big/nat.go).
+	if x.LtUint64(2) {
+		return z.Set(x)
+	}
+	var (
+		z1 = &Int{1, 0, 0, 0}
+		z2 = &Int{}
+	)
+	// Start with value known to be too large and repeat "z = ⌊(z + ⌊x/z⌋)/2⌋" until it stops getting smaller.
+	z1 = z1.Lsh(z1, uint(x.BitLen()+1)/2) // must be ≥ √x
+	for {
+		z2 = z2.Div(x, z1)
+		z2 = z2.Add(z2, z1)
+		{ //z2 = z2.Rsh(z2, 1) -- the code below does a 1-bit rsh faster
+			a := z2[3] << 63
+			z2[3] = z2[3] >> 1
+			b := z2[2] << 63
+			z2[2] = (z2[2] >> 1) | a
+			a = z2[1] << 63
+			z2[1] = (z2[1] >> 1) | b
+			z2[0] = (z2[0] >> 1) | a
+		}
+		// end of inlined bitshift
+
+		if z2.Cmp(z1) >= 0 {
+			// z1 is answer.
+			return z.Set(z1)
+		}
+		z1, z2 = z2, z1
+	}
+}
+
+var (
+	// pows64 contains 10^0 ... 10^19
+	pows64 = [20]uint64{
+		1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
+	}
+	// pows contain 10 ** 20 ... 10 ** 80
+	pows = [60]Int{
+		Int{7766279631452241920, 5, 0, 0}, Int{3875820019684212736, 54, 0, 0}, Int{1864712049423024128, 542, 0, 0}, Int{200376420520689664, 5421, 0, 0}, Int{2003764205206896640, 54210, 0, 0}, Int{1590897978359414784, 542101, 0, 0}, Int{15908979783594147840, 5421010, 0, 0}, Int{11515845246265065472, 54210108, 0, 0}, Int{4477988020393345024, 542101086, 0, 0}, Int{7886392056514347008, 5421010862, 0, 0}, Int{5076944270305263616, 54210108624, 0, 0}, Int{13875954555633532928, 542101086242, 0, 0}, Int{9632337040368467968, 5421010862427, 0, 0},
+		Int{4089650035136921600, 54210108624275, 0, 0}, Int{4003012203950112768, 542101086242752, 0, 0}, Int{3136633892082024448, 5421010862427522, 0, 0}, Int{12919594847110692864, 54210108624275221, 0, 0}, Int{68739955140067328, 542101086242752217, 0, 0}, Int{687399551400673280, 5421010862427522170, 0, 0}, Int{6873995514006732800, 17316620476856118468, 2, 0}, Int{13399722918938673152, 7145508105175220139, 29, 0}, Int{4870020673419870208, 16114848830623546549, 293, 0}, Int{11806718586779598848, 13574535716559052564, 2938, 0},
+		Int{7386721425538678784, 6618148649623664334, 29387, 0}, Int{80237960548581376, 10841254275107988496, 293873, 0}, Int{802379605485813760, 16178822382532126880, 2938735, 0}, Int{8023796054858137600, 14214271235644855872, 29387358, 0}, Int{6450984253743169536, 13015503840481697412, 293873587, 0}, Int{9169610316303040512, 1027829888850112811, 2938735877, 0}, Int{17909126868192198656, 10278298888501128114, 29387358770, 0}, Int{13070572018536022016, 10549268516463523069, 293873587705, 0}, Int{1578511669393358848, 13258964796087472617, 2938735877055, 0}, Int{15785116693933588480, 3462439444907864858, 29387358770557, 0},
+		Int{10277214349659471872, 16177650375369096972, 293873587705571, 0}, Int{10538423128046960640, 14202551164014556797, 2938735877055718, 0}, Int{13150510911921848320, 12898303124178706663, 29387358770557187, 0}, Int{2377900603251621888, 18302566799529756941, 293873587705571876, 0}, Int{5332261958806667264, 17004971331911604867, 2938735877055718769, 0}, Int{16429131440647569408, 4029016655730084128, 10940614696847636083, 1}, Int{16717361816799281152, 3396678409881738056, 17172426599928602752, 15}, Int{1152921504606846976, 15520040025107828953, 5703569335900062977, 159}, Int{11529215046068469760, 7626447661401876602, 1695461137871974930, 1593}, Int{4611686018427387904, 2477500319180559562, 16954611378719749304, 15930}, Int{9223372036854775808, 6328259118096044006, 3525417123811528497, 159309},
+		Int{0, 7942358959831785217, 16807427164405733357, 1593091}, Int{0, 5636613303479645706, 2053574980671369030, 15930919}, Int{0, 1025900813667802212, 2089005733004138687, 159309191}, Int{0, 10259008136678022120, 2443313256331835254, 1593091911}, Int{0, 10356360998232463120, 5986388489608800929, 15930919111}, Int{0, 11329889613776873120, 4523652674959354447, 159309191113}, Int{0, 2618431695511421504, 8343038602174441244, 1593091911132}, Int{0, 7737572881404663424, 9643409726906205977, 15930919111324}, Int{0, 3588752519208427776, 4200376900514301694, 159309191113245}, Int{0, 17440781118374726144, 5110280857723913709, 1593091911132452}, Int{0, 8387114520361296896, 14209320429820033867, 15930919111324522}, Int{0, 10084168908774762496, 12965995782233477362, 159309191113245227}, Int{0, 8607968719199866880, 532749306367912313, 1593091911132452277}, Int{0, 12292710897160462336, 5327493063679123134, 15930919111324522770}, Int{0, 12246644529347313664, 16381442489372128114, 11735238523568814774}, Int{0, 11785980851215826944, 16240472304044868218, 6671920793430838052},
+	}
+)
+
+// Log10 returns the log in base 10, floored to nearest integer.
+// **OBS** This method returns '0' for '0', not `-Inf`.
+func (z *Int) Log10() uint {
+	// The following algorithm is taken from "Bit twiddling hacks"
+	// https://graphics.stanford.edu/~seander/bithacks.html#IntegerLog10
+	//
+	// The idea is that log10(z) = log2(z) / log2(10)
+	// log2(z) trivially is z.Bitlen()
+	// 1/log2(10) is a constant ~ 1233 / 4096. The approximation is correct up to 5 digit after
+	// the decimal point and it seems no further refinement is needed.
+	// Our tests check all boundary cases anyway.
+
+	bitlen := z.BitLen()
+	if bitlen == 0 {
+		return 0
+	}
+
+	t := (bitlen + 1) * 1233 >> 12
+	if bitlen <= 64 && z[0] < pows64[t] || t >= 20 && z.Lt(&pows[t-20]) {
+		return uint(t - 1)
+	}
+	return uint(t)
 }

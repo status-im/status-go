@@ -27,7 +27,7 @@ import (
 // If z is equal to one the point is considered as in affine form.
 type PointG2 [3]fe2
 
-// Set copies valeus of one point to another.
+// Set copies values of one point to another.
 func (p *PointG2) Set(p2 *PointG2) *PointG2 {
 	p[0].set(&p2[0])
 	p[1].set(&p2[1])
@@ -121,7 +121,7 @@ func (g *G2) FromBytes(in []byte) (*PointG2, error) {
 	return p, nil
 }
 
-// DecodePoint given encoded (x, y) coordinates in 256 bytes returns a valid G1 Point.
+// DecodePoint given encoded (x, y) coordinates in 256 bytes returns a valid G2 Point.
 func (g *G2) DecodePoint(in []byte) (*PointG2, error) {
 	if len(in) != 256 {
 		return nil, errors.New("invalid g2 point length")
@@ -267,7 +267,7 @@ func (g *G2) Affine(p *PointG2) *PointG2 {
 
 // Add adds two G2 points p1, p2 and assigns the result to point at first argument.
 func (g *G2) Add(r, p1, p2 *PointG2) *PointG2 {
-	// http://www.hyperelliptic.org/EFD/gp/auto-shortw-jacobian-0.html#addition-add-2007-bl
+	// http://www.hyperelliptic.org/EFD/g1p/auto-shortw-jacobian-0.html#addition-add-2007-bl
 	if g.IsZero(p1) {
 		return r.Set(p2)
 	}
@@ -315,7 +315,7 @@ func (g *G2) Add(r, p1, p2 *PointG2) *PointG2 {
 
 // Double doubles a G2 point p and assigns the result to the point at first argument.
 func (g *G2) Double(r, p *PointG2) *PointG2 {
-	// http://www.hyperelliptic.org/EFD/gp/auto-shortw-jacobian-0.html#doubling-dbl-2009-l
+	// http://www.hyperelliptic.org/EFD/g1p/auto-shortw-jacobian-0.html#doubling-dbl-2009-l
 	if g.IsZero(p) {
 		return r.Set(p)
 	}

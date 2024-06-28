@@ -63,6 +63,10 @@ var (
 	// have enough funds for transfer(topmost call only).
 	ErrInsufficientFundsForTransfer = errors.New("insufficient funds for transfer")
 
+	// ErrMaxInitCodeSizeExceeded is returned if creation transaction provides the init code bigger
+	// than init code size limit.
+	ErrMaxInitCodeSizeExceeded = errors.New("max initcode size exceeded")
+
 	// ErrInsufficientFunds is returned if the total cost of executing a transaction
 	// is higher than the balance of the user's account.
 	ErrInsufficientFunds = errors.New("insufficient funds for gas * price + value")
@@ -96,4 +100,14 @@ var (
 
 	// ErrSenderNoEOA is returned if the sender of a transaction is a contract.
 	ErrSenderNoEOA = errors.New("sender not an eoa")
+
+	// ErrBlobFeeCapTooLow is returned if the transaction fee cap is less than the
+	// blob gas fee of the block.
+	ErrBlobFeeCapTooLow = errors.New("max fee per blob gas less than block blob gas fee")
+
+	// ErrMissingBlobHashes is returned if a blob transaction has no blob hashes.
+	ErrMissingBlobHashes = errors.New("blob transaction missing blob hashes")
+
+	// ErrBlobTxCreate is returned if a blob transaction has no explicit to field.
+	ErrBlobTxCreate = errors.New("blob transaction of type create")
 )
