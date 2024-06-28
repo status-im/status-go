@@ -208,6 +208,7 @@ type Settings struct {
 	GifFavorites                        *json.RawMessage              `json:"gifs/favorite-gifs"`
 	OpenseaEnabled                      bool                          `json:"opensea-enabled?,omitempty"`
 	TelemetryServerURL                  string                        `json:"telemetry-server-url,omitempty"`
+	TelemetrySendPeriodMs               int                           `json:"telemetry-send-period-ms,omitempty"`
 	LastBackup                          uint64                        `json:"last-backup,omitempty"`
 	BackupEnabled                       bool                          `json:"backup-enabled?,omitempty"`
 	AutoMessageEnabled                  bool                          `json:"auto-message-enabled?,omitempty"`

@@ -3,7 +3,9 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"log/slog"
+	"math/big"
 	"os"
 	"strings"
 	"sync"
@@ -41,7 +43,30 @@ func (cli *StatusCLI) sendContactRequestAcceptance(ctx context.Context, msgID st
 	return nil
 }
 
-func (cli *StatusCLI) sendDirectMessage(ctx context.Context, text string) error {
+func (cli *StatusCLI) randomFailure() func() {
+	nBig, err := rand.Int(rand.Reader, big.NewInt(100))
+	if err != nil {
+		cli.logger.Error("failed to generate random number", "err", err)
+		return nil
+	}
+	n := nBig.Int64()
+	if n >= 40 {
+		return nil
+	}
+
+	cli.backend.StatusNode().WakuV2Service().SkipPublishToTopic(true)
+
+	return func() {
+		cli.backend.StatusNode().WakuV2Service().SkipPublishToTopic(false)
+	}
+}
+
+func (cli *StatusCLI) sendDirectMessage(ctx context.Context, text string, options ...bool) error {
+	randomFailure := false
+	if len(options) > 0 {
+		randomFailure = options[0]
+	}
+
 	if len(cli.messenger.MutualContacts()) == 0 {
 		return nil
 	}
@@ -58,8 +83,20 @@ func (cli *StatusCLI) sendDirectMessage(ctx context.Context, text string) error 
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = text
 
+	shouldFail := false
+	if randomFailure {
+		if postFailure := cli.randomFailure(); postFailure != nil {
+			defer postFailure()
+			shouldFail = true
+		}
+	}
 	resp, err := cli.messenger.SendChatMessage(ctx, inputMessage)
 	if err != nil {
+		if shouldFail {
+			cli.logger.Info("simulating message failure")
+			cli.logger.Error("error sending message", "err", err)
+			return nil
+		}
 		return err
 	}
 

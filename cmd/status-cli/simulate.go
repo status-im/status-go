@@ -33,6 +33,7 @@ func simulate(cCtx *cli.Context) error {
 	// Start messengers
 	apiModules := cCtx.String(APIModulesFlag)
 	telemetryUrl := cCtx.String(TelemetryServerURLFlag)
+	failMessages := cCtx.Bool(MessageFailureFlag)
 
 	alice, err := start("Alice", 0, apiModules, telemetryUrl, "", logger.Named("alice"))
 	if err != nil {
@@ -76,13 +77,13 @@ func simulate(cCtx *cli.Context) error {
 		interactiveSendMessageLoop(ctx, alice, charlie)
 	} else {
 		for i := 0; i < cCtx.Int(CountFlag); i++ {
-			err = alice.sendDirectMessage(ctx, fmt.Sprintf("message from alice, number: %d", i+1))
+			err = alice.sendDirectMessage(ctx, fmt.Sprintf("message from alice, number: %d", i+1), failMessages)
 			if err != nil {
 				return err
 			}
 			time.Sleep(WaitingInterval)
 
-			err = charlie.sendDirectMessage(ctx, fmt.Sprintf("message from charlie, number: %d", i+1))
+			err = charlie.sendDirectMessage(ctx, fmt.Sprintf("message from charlie, number: %d", i+1), failMessages)
 			if err != nil {
 				return err
 			}

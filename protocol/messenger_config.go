@@ -112,8 +112,9 @@ type config struct {
 
 	messengerSignalsHandler MessengerSignalsHandler
 
-	telemetryServerURL string
-	wakuService        *wakuv2.Waku
+	telemetryServerURL  string
+	telemetrySendPeriod time.Duration
+	wakuService         *wakuv2.Waku
 
 	messageResendMinDelay time.Duration
 	messageResendMaxCount int
@@ -258,9 +259,10 @@ func WithAnonMetricsServerConfig(anonMetricsServerConfig *anonmetrics.ServerConf
 	}
 }
 
-func WithTelemetry(serverURL string) Option {
+func WithTelemetry(serverURL string, sendPeriod time.Duration) Option {
 	return func(c *config) error {
 		c.telemetryServerURL = serverURL
+		c.telemetrySendPeriod = sendPeriod
 		return nil
 	}
 }
