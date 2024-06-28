@@ -55,7 +55,7 @@ func (pm *PeerManager) discoverOnDemand(cluster uint16,
 
 	wakuProtoInfo, ok := pm.wakuprotoToENRFieldMap[wakuProtocol]
 	if !ok {
-		pm.logger.Error("cannot do on demand discovery for non-waku protocol", zap.String("protocol", string(wakuProtocol)))
+		pm.logger.Info("cannot do on demand discovery for non-waku protocol", zap.String("protocol", string(wakuProtocol)))
 		return nil, errors.New("cannot do on demand discovery for non-waku protocol")
 	}
 	iterator, err := pm.discoveryService.PeerIterator(

@@ -256,7 +256,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	w.metadata = metadata
 
 	//Initialize peer manager.
-	w.peermanager = peermanager.NewPeerManager(w.opts.maxPeerConnections, w.opts.peerStoreCapacity, metadata, w.log)
+	w.peermanager = peermanager.NewPeerManager(w.opts.maxPeerConnections, w.opts.peerStoreCapacity, metadata, params.enableRelay, w.log)
 
 	w.peerConnector, err = peermanager.NewPeerConnectionStrategy(w.peermanager, discoveryConnectTimeout, w.log)
 	if err != nil {
@@ -554,9 +554,9 @@ func (w *WakuNode) watchENRChanges(ctx context.Context) {
 				currNodeVal := w.localNode.Node().String()
 				if prevNodeVal != currNodeVal {
 					if prevNodeVal == "" {
-						w.log.Info("enr record", logging.ENode("enr", w.localNode.Node()))
+						w.log.Info("local node enr record", logging.ENode("enr", w.localNode.Node()))
 					} else {
-						w.log.Info("new enr record", logging.ENode("enr", w.localNode.Node()))
+						w.log.Info("local node new enr record", logging.ENode("enr", w.localNode.Node()))
 					}
 					prevNodeVal = currNodeVal
 				}
@@ -893,13 +893,26 @@ func (w *WakuNode) findRelayNodes(ctx context.Context) {
 		rand.Shuffle(len(peers), func(i, j int) { peers[i], peers[j] = peers[j], peers[i] })
 
 		for _, p := range peers {
+			pENR, err := w.Host().Peerstore().(wps.WakuPeerstore).ENR(p.ID)
+			if err != nil {
+				w.log.Debug("could not get ENR for the peer, skipping for circuit-relay", zap.Stringer("peer", p.ID), zap.Error(err))
+				continue
+			}
+			rs, err := enr.RelayShardList(pENR.Record())
+			if err != nil || rs == nil {
+				w.log.Debug("could not get shard info for the peer from ENR, skipping for circuit-relay", zap.Stringer("peer", p.ID), zap.Error(err))
+				continue
+			}
+			if rs.ClusterID != w.ClusterID() {
+				w.log.Debug("clusterID mismatch for the peer, skipping for circuit-relay", zap.Stringer("peer", p.ID), zap.Error(err))
+				continue
+			}
 			info := w.Host().Peerstore().PeerInfo(p.ID)
 			supportedProtocols, err := w.Host().Peerstore().SupportsProtocols(p.ID, proto.ProtoIDv2Hop)
 			if err != nil {
 				w.log.Error("could not check supported protocols", zap.Error(err))
 				continue
 			}
-
 			if len(supportedProtocols) == 0 {
 				continue
 			}

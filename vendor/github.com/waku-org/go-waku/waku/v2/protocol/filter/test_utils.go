@@ -164,7 +164,7 @@ func (s *FilterTestSuite) GetWakuFilterLightNode() LightNodeData {
 	s.Require().NoError(err)
 	b := relay.NewBroadcaster(10)
 	s.Require().NoError(b.Start(context.Background()))
-	pm := peermanager.NewPeerManager(5, 5, nil, s.Log)
+	pm := peermanager.NewPeerManager(5, 5, nil, true, s.Log)
 	filterPush := NewWakuFilterLightNode(b, pm, timesource.NewDefaultClock(), prometheus.DefaultRegisterer, s.Log)
 	filterPush.SetHost(host)
 	pm.SetHost(host)

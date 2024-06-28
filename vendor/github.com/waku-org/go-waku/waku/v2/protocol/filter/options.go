@@ -204,7 +204,7 @@ func WithPeerManager(pm *peermanager.PeerManager) Option {
 
 func DefaultOptions() []Option {
 	return []Option{
-		WithTimeout(5 * time.Minute),
-		WithMaxSubscribers(DefaultMaxSubscriptions),
+		WithTimeout(DefaultIdleSubscriptionTimeout),
+		WithMaxSubscribers(DefaultMaxSubscribers),
 	}
 }
