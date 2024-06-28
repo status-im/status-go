@@ -23,6 +23,12 @@ func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.M
 	options = append(options, wenr.WithUDPPort(udpPort))
 	options = append(options, wenr.WithWakuBitfield(wakuFlags))
 
+	// Reset ENR fields
+	wenr.DeleteField(localnode, wenr.MultiaddrENRField)
+	wenr.DeleteField(localnode, enr.TCP(0).ENRKey())
+	wenr.DeleteField(localnode, enr.IPv4{}.ENRKey())
+	wenr.DeleteField(localnode, enr.IPv6{}.ENRKey())
+
 	if advertiseAddr != nil {
 		// An advertised address disables libp2p address updates
 		// and discv5 predictions
@@ -244,7 +250,6 @@ func selectCircuitRelayListenAddresses(ctx context.Context, addresses []ma.Multi
 
 	return result, nil
 }
-
 
 func filter0Port(addresses []ma.Multiaddr) ([]ma.Multiaddr, error) {
 	var result []ma.Multiaddr

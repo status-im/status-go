@@ -54,12 +54,12 @@ type WakuPeerExchange struct {
 // NewWakuPeerExchange returns a new instance of WakuPeerExchange struct
 // Takes an optional peermanager if WakuPeerExchange is being created along with WakuNode.
 // If using libp2p host, then pass peermanager as nil
-func NewWakuPeerExchange(disc *discv5.DiscoveryV5, peerConnector PeerConnector, pm *peermanager.PeerManager, reg prometheus.Registerer, log *zap.Logger, opts ...Option) (*WakuPeerExchange, error) {
+func NewWakuPeerExchange(disc *discv5.DiscoveryV5, clusterID uint16, peerConnector PeerConnector, pm *peermanager.PeerManager, reg prometheus.Registerer, log *zap.Logger, opts ...Option) (*WakuPeerExchange, error) {
 	wakuPX := new(WakuPeerExchange)
 	wakuPX.disc = disc
 	wakuPX.metrics = newMetrics(reg)
 	wakuPX.log = log.Named("wakupx")
-	wakuPX.enrCache = newEnrCache(MaxCacheSize)
+	wakuPX.enrCache = newEnrCache(MaxCacheSize, clusterID)
 	wakuPX.peerConnector = peerConnector
 	wakuPX.pm = pm
 	wakuPX.CommonService = service.NewCommonService()
