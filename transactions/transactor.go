@@ -226,6 +226,7 @@ func (t *Transactor) sendTransaction(rpcWrapper *rpcWrapper, from common.Address
 
 func (t *Transactor) SendTransactionWithSignature(from common.Address, symbol string,
 	multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) (hash types.Hash, err error) {
+	log.Info("CL Transactor log", "bigint chainID", tx.ChainId(), "uint64 chainID", tx.ChainId().Uint64())
 	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, tx.ChainId().Uint64())
 
 	return t.sendTransaction(rpcWrapper, from, symbol, multiTransactionID, tx)

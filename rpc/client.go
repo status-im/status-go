@@ -153,7 +153,7 @@ func (c *Client) getRPCRpsLimiter(URL string) (*chain.RPCRpsLimiter, error) {
 }
 
 func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, error) {
-	fmt.Println("getClientUsingCache", chainID)
+	log.Info("CL getClientUsingCache", "chainID", chainID)
 	c.rpcClientsMutex.Lock()
 	defer c.rpcClientsMutex.Unlock()
 	if rpcClient, ok := c.rpcClients[chainID]; ok {
