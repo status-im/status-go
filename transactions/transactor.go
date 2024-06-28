@@ -166,10 +166,13 @@ func (t *Transactor) AddSignatureToTransaction(chainID uint64, tx *gethtypes.Tra
 
 	log.Info("CL AddSignatureToTransaction2", "chainID ", chID, " txType ", tx.Type())
 	signer := gethtypes.NewLondonSigner(chID)
+	log.Info("CL signer.ChainID()", "chainID", signer.ChainID())
+	log.Info("CL signer.", "chainID", tx.ChainId())
 	txWithSignature, err := tx.WithSignature(signer, sig)
 	if err != nil {
 		return nil, err
 	}
+	log.Info("CL signer.", "chainID", txWithSignature.ChainId())
 
 	return txWithSignature, nil
 }
