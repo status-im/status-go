@@ -21,6 +21,8 @@ func simulate(cCtx *cli.Context) error {
 		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 		<-sig
 		cancel()
+		time.Sleep(1 * time.Second)
+		os.Exit(1)
 	}()
 
 	logger, err := getSLogger(cCtx.Bool(DebugLevel))
