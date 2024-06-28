@@ -115,7 +115,8 @@ func TestClient_ProcessReceivedMessages(t *testing.T) {
 		}
 
 		// Send the telemetry request
-		client.pushTelemetryRequest([]TelemetryRequest{telemetryRequest})
+		err := client.pushTelemetryRequest([]TelemetryRequest{telemetryRequest})
+		require.NoError(t, err)
 	})
 }
 
@@ -136,7 +137,8 @@ func TestClient_ProcessReceivedEnvelope(t *testing.T) {
 		}
 
 		// Send the telemetry request
-		client.pushTelemetryRequest([]TelemetryRequest{telemetryRequest})
+		err := client.pushTelemetryRequest([]TelemetryRequest{telemetryRequest})
+		require.NoError(t, err)
 	})
 }
 
@@ -160,7 +162,8 @@ func TestClient_ProcessSentEnvelope(t *testing.T) {
 		}
 
 		// Send the telemetry request
-		client.pushTelemetryRequest([]TelemetryRequest{telemetryRequest})
+		err := client.pushTelemetryRequest([]TelemetryRequest{telemetryRequest})
+		require.NoError(t, err)
 	})
 }
 
