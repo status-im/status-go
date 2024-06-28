@@ -38,7 +38,8 @@ import (
 	"github.com/status-im/status-go/wakuv2/common"
 )
 
-var testENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.shards.nodes.status.im"
+var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.shards.nodes.status.im"
+var testBootENRBootstrap = "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"
 
 func setDefaultConfig(config *Config, lightMode bool) {
 	config.ClusterID = 16
@@ -59,7 +60,7 @@ func setDefaultConfig(config *Config, lightMode bool) {
 func TestDiscoveryV5(t *testing.T) {
 	config := &Config{}
 	setDefaultConfig(config, false)
-	config.DiscV5BootstrapNodes = []string{testENRBootstrap}
+	config.DiscV5BootstrapNodes = []string{testStoreENRBootstrap}
 	config.DiscoveryLimit = 20
 	w, err := New(nil, "shards.staging", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
@@ -107,7 +108,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 
 	require.Error(t, err)
 
-	w.discV5BootstrapNodes = []string{testENRBootstrap}
+	w.discV5BootstrapNodes = []string{testStoreENRBootstrap}
 
 	options = func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 90 * time.Second
@@ -127,9 +128,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 }
 
 func TestBasicWakuV2(t *testing.T) {
-	t.Skip("test is broken, #5439")
-
-	enrTreeAddress := testENRBootstrap //"enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
+	enrTreeAddress := testStoreENRBootstrap //"enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
 	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
 	if envEnrTreeAddress != "" {
 		enrTreeAddress = envEnrTreeAddress
@@ -325,15 +324,15 @@ func TestPeerExchange(t *testing.T) {
 }
 
 func TestWakuV2Filter(t *testing.T) {
-	t.Skip("test is broken, #5439")
 
-	enrTreeAddress := testENRBootstrap
+	enrTreeAddress := testBootENRBootstrap
 	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
 	if envEnrTreeAddress != "" {
 		enrTreeAddress = envEnrTreeAddress
 	}
 	config := &Config{}
 	setDefaultConfig(config, true)
+	config.EnablePeerExchangeClient = false
 	config.Port = 0
 	config.KeepAliveInterval = 0
 	config.MinPeersForFilter = 2
@@ -349,6 +348,7 @@ func TestWakuV2Filter(t *testing.T) {
 		b.MaxElapsedTime = 10 * time.Second
 	}
 	time.Sleep(10 * time.Second) //TODO: Check if we can remove this sleep.
+
 	// Sanity check, not great, but it's probably helpful
 	err = tt.RetryWithBackOff(func() error {
 		peers, err := w.node.PeerManager().FilterPeersByProto(nil, nil, filter.FilterSubscribeID_v20beta1)
@@ -362,10 +362,13 @@ func TestWakuV2Filter(t *testing.T) {
 	}, options)
 	require.NoError(t, err)
 	testPubsubTopic := "/waku/2/rs/16/32"
+	contentTopicBytes := make([]byte, 4)
+	_, err = rand.Read(contentTopicBytes)
+	require.NoError(t, err)
 	filter := &common.Filter{
 		Messages:      common.NewMemoryMessageStore(),
 		PubsubTopic:   testPubsubTopic,
-		ContentTopics: common.NewTopicSetFromBytes([][]byte{[]byte{1, 2, 3, 4}}),
+		ContentTopics: common.NewTopicSetFromBytes([][]byte{contentTopicBytes}),
 	}
 
 	_, err = w.Subscribe(filter)
@@ -381,7 +384,6 @@ func TestWakuV2Filter(t *testing.T) {
 		Timestamp:    &msgTimestamp,
 	})
 	require.NoError(t, err)
-
 	time.Sleep(5 * time.Second)
 
 	// Ensure there is at least 1 active filter subscription
