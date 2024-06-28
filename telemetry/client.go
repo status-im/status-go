@@ -147,7 +147,7 @@ func (c *Client) Start(ctx context.Context) {
 						sendPeriod = c.sendPeriod
 					}
 				}
-				timer = time.NewTimer(sendPeriod)
+				timer.Reset(sendPeriod)
 			case <-ctx.Done():
 				return
 			}
@@ -208,10 +208,14 @@ func (c *Client) pushTelemetryRequest(request []TelemetryRequest) error {
 		c.logger.Error("Error marshaling telemetry data", zap.Error(err))
 		return err
 	}
-	_, err = c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
+	res, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		c.logger.Error("Error sending telemetry data", zap.Error(err))
 		return err
+	}
+	if res.StatusCode != http.StatusOK {
+		c.logger.Error("Error sending telemetry data", zap.Int("statusCode", res.StatusCode))
+		return fmt.Errorf("status code %d", res.StatusCode)
 	}
 
 	c.telemetryRetryCache = nil
@@ -219,7 +223,6 @@ func (c *Client) pushTelemetryRequest(request []TelemetryRequest) error {
 }
 
 func (c *Client) ProcessReceivedMessages(receivedMessages ReceivedMessages) *json.RawMessage {
-	c.logger.Debug("Pushing received messages to telemetry server")
 	var postBody []map[string]interface{}
 	for _, message := range receivedMessages.Messages {
 		postBody = append(postBody, map[string]interface{}{
