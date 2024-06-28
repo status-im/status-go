@@ -248,6 +248,8 @@ func (tm *TransactionManager) BuildRawTransaction(chainID uint64, sendArgs trans
 }
 
 func (tm *TransactionManager) SendTransactionWithSignature(chainID uint64, sendArgs transactions.SendTxArgs, signature []byte) (hash types.Hash, err error) {
+	fmt.Println("SendTransactionWithSignature", chainID)
+
 	txWithSignature, err := tm.transactor.BuildTransactionWithSignature(chainID, sendArgs, signature)
 	if err != nil {
 		return hash, err

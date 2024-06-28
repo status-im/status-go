@@ -635,6 +635,7 @@ func (api *API) BuildRawTransaction(ctx context.Context, chainID uint64, sendTxA
 
 func (api *API) SendTransactionWithSignature(ctx context.Context, chainID uint64, txType transactions.PendingTrxType,
 	sendTxArgsJSON string, signature string) (hash types.Hash, err error) {
+	fmt.Println("wallet_sendTransactionWithSignature", chainID)
 	log.Debug("[WalletAPI::SendTransactionWithSignature]", "chainID", chainID, "txType", txType, "sendTxArgsJSON", sendTxArgsJSON, "signature", signature)
 	sig, err := hex.DecodeString(signature)
 	if err != nil {
