@@ -18,6 +18,7 @@ import (
 	"github.com/libp2p/go-msgio/pbio"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waku-org/go-waku/logging"
+	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
@@ -45,7 +46,8 @@ var (
 type WakuFilterLightNode struct {
 	*service.CommonService
 	h                host.Host
-	broadcaster      relay.Broadcaster //TODO: Move the broadcast functionality outside of relay client to a higher SDK layer.s
+	broadcaster      relay.Broadcaster //TODO: Move the broadcast functionality outside of relay client to a higher SDK layer.
+	onlineChecker    onlinechecker.OnlineChecker
 	timesource       timesource.Timesource
 	metrics          Metrics
 	log              *zap.Logger
@@ -79,12 +81,19 @@ func (arr *WakuFilterPushResult) Errors() []WakuFilterPushError {
 // Note that broadcaster is optional.
 // Takes an optional peermanager if WakuFilterLightnode is being created along with WakuNode.
 // If using libp2p host, then pass peermanager as nil
-func NewWakuFilterLightNode(broadcaster relay.Broadcaster, pm *peermanager.PeerManager,
-	timesource timesource.Timesource, reg prometheus.Registerer, log *zap.Logger) *WakuFilterLightNode {
+func NewWakuFilterLightNode(
+	broadcaster relay.Broadcaster,
+	pm *peermanager.PeerManager,
+	timesource timesource.Timesource,
+	onlineChecker onlinechecker.OnlineChecker,
+	reg prometheus.Registerer,
+	log *zap.Logger,
+) *WakuFilterLightNode {
 	wf := new(WakuFilterLightNode)
 	wf.log = log.Named("filterv2-lightnode")
 	wf.broadcaster = broadcaster
 	wf.timesource = timesource
+	wf.onlineChecker = onlineChecker
 	wf.pm = pm
 	wf.CommonService = service.NewCommonService()
 	wf.metrics = newMetrics(reg)
@@ -700,4 +709,12 @@ func (wf *WakuFilterLightNode) UnsubscribeAll(ctx context.Context, opts ...Filte
 	}
 
 	return wf.unsubscribeAll(ctx, opts...)
+}
+
+func (wf *WakuFilterLightNode) OnlineChecker() onlinechecker.OnlineChecker {
+	return wf.onlineChecker
+}
+
+func (wf *WakuFilterLightNode) SetOnlineChecker(onlineChecker onlinechecker.OnlineChecker) {
+	wf.onlineChecker = onlineChecker
 }
