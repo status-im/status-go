@@ -156,6 +156,7 @@ func (t *Transactor) ValidateAndBuildTransaction(chainID uint64, sendArgs SendTx
 }
 
 func (t *Transactor) AddSignatureToTransaction(chainID uint64, tx *gethtypes.Transaction, sig []byte) (*gethtypes.Transaction, error) {
+	log.Info("CL AddSignatureToTransaction", "chainID", chainID)
 	if len(sig) != ValidSignatureSize {
 		return nil, ErrInvalidSignatureSize
 	}
@@ -163,6 +164,7 @@ func (t *Transactor) AddSignatureToTransaction(chainID uint64, tx *gethtypes.Tra
 	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
 	chID := big.NewInt(int64(rpcWrapper.chainID))
 
+	log.Info("CL AddSignatureToTransaction2", "chainID ", chID, " txType ", tx.Type())
 	signer := gethtypes.NewLondonSigner(chID)
 	txWithSignature, err := tx.WithSignature(signer, sig)
 	if err != nil {
@@ -226,8 +228,8 @@ func (t *Transactor) sendTransaction(rpcWrapper *rpcWrapper, from common.Address
 
 func (t *Transactor) SendTransactionWithSignature(from common.Address, symbol string,
 	multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) (hash types.Hash, err error) {
-	log.Info("CL Transactor log", "bigint chainID", tx.ChainId(), "uint64 chainID", tx.ChainId().Int64())
-	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, uint64(tx.ChainId().Int64()))
+	log.Info("CL Transactor log", "bigint chainID", tx.ChainId(), "uint64 chainID", tx.ChainId().Uint64())
+	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, tx.ChainId().Uint64())
 
 	return t.sendTransaction(rpcWrapper, from, symbol, multiTransactionID, tx)
 }
@@ -236,6 +238,7 @@ func (t *Transactor) SendTransactionWithSignature(from common.Address, symbol st
 // It's different from eth_sendRawTransaction because it receives a signature and not a serialized transaction with signature.
 // Since the transactions is already signed, we assume it was validated and used the right nonce.
 func (t *Transactor) BuildTransactionWithSignature(chainID uint64, args SendTxArgs, sig []byte) (*gethtypes.Transaction, error) {
+	log.Info("CL BuildTransactionWithSignature", "chainID", chainID)
 	if !args.Valid() {
 		return nil, ErrInvalidSendTxArgs
 	}
@@ -254,10 +257,13 @@ func (t *Transactor) BuildTransactionWithSignature(chainID uint64, args SendTxAr
 		return nil, &ErrBadNonce{tx.Nonce(), expectedNonce}
 	}
 
+	log.Info("CL BuildTransactionWithSignature2", "chainID", chainID)
+
 	txWithSignature, err := t.AddSignatureToTransaction(chainID, tx, sig)
 	if err != nil {
 		return nil, err
 	}
+	log.Info("CL BuildTransactionWithSignature", "tx chainID", tx.ChainId())
 
 	return txWithSignature, nil
 }

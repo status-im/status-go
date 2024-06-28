@@ -647,6 +647,7 @@ func (api *API) SendTransactionWithSignature(ctx context.Context, chainID uint64
 	if err != nil {
 		return hash, err
 	}
+	log.Info("CL wallet_sendTransactionWithSignature2", "chainID", chainID)
 	return api.s.transactionManager.SendTransactionWithSignature(chainID, params, sig)
 }
 
