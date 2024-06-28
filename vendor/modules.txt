@@ -211,8 +211,8 @@ github.com/edsrzf/mmap-go
 ## explicit; go 1.14
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.14
-## explicit; go 1.17
+# github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.14.0.20240625133752-6da35e043ff9
+## explicit; go 1.21
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
 github.com/ethereum/go-ethereum/accounts/abi
@@ -904,6 +904,9 @@ github.com/shirou/gopsutil/internal/common
 # github.com/shopspring/decimal v1.2.0
 ## explicit; go 1.13
 github.com/shopspring/decimal
+# github.com/siddarthkay/extkeys v1.0.0
+## explicit; go 1.21
+github.com/siddarthkay/extkeys
 # github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
 ## explicit; go 1.18
 github.com/siphiuel/lc-proxy-wrapper
@@ -949,9 +952,6 @@ github.com/status-im/mvds/transport
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-go/extkeys v1.1.2
-## explicit; go 1.13
-github.com/status-im/status-go/extkeys
 # github.com/status-im/tcp-shaker v1.1.1-status
 ## explicit; go 1.13
 github.com/status-im/tcp-shaker
