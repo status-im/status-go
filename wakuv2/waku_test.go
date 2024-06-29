@@ -343,7 +343,7 @@ func TestWakuV2Filter(t *testing.T) {
 	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
-
+	w.filterManager.filterSubBatchDuration = 1 * time.Second
 	options := func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 10 * time.Second
 	}
