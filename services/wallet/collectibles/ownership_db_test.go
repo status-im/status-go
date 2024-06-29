@@ -271,12 +271,12 @@ func TestUpdateOwnership(t *testing.T) {
 		{
 			Address:     ownerAddress2,
 			Balance:     commonBalanceAddress2,
-			TxTimestamp: unknownUpdateTimestamp,
+			TxTimestamp: InvalidTimestamp,
 		},
 		{
 			Address:     ownerAddress3,
 			Balance:     commonBalanceAddress3,
-			TxTimestamp: unknownUpdateTimestamp,
+			TxTimestamp: InvalidTimestamp,
 		},
 	}
 
@@ -387,7 +387,7 @@ func TestLargeTokenID(t *testing.T) {
 		{
 			Address:     ownerAddress,
 			Balance:     balance,
-			TxTimestamp: unknownUpdateTimestamp,
+			TxTimestamp: InvalidTimestamp,
 		},
 	}
 
@@ -471,10 +471,10 @@ func TestCollectibleTransferID(t *testing.T) {
 	}
 
 	// Even though the first collectible has a TransferID set, since there's no matching entry in the transfers table it
-	// should return unknownUpdateTimestamp
+	// should return InvalidTimestamp
 	firstOwnership, err := oDB.GetOwnership(firstCollectibleID)
 	require.NoError(t, err)
-	require.Equal(t, unknownUpdateTimestamp, firstOwnership[0].TxTimestamp)
+	require.Equal(t, InvalidTimestamp, firstOwnership[0].TxTimestamp)
 
 	trs, _, _ := transfer.GenerateTestTransfers(t, oDB.db, 1, 5)
 	trs[0].To = ownerAddress1
