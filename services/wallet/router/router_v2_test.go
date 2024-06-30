@@ -74,9 +74,13 @@ var (
 		EIP1559Enabled: false,
 	}
 
-	testBalanceMap = map[string]*big.Int{
-		pathprocessor.EthSymbol:  big.NewInt(testAmount2ETHInWei),
-		pathprocessor.UsdcSymbol: big.NewInt(testAmount100USDC),
+	testBalanceMapPerChain = map[string]*big.Int{
+		makeTestBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount2ETHInWei),
+		makeTestBalanceKey(walletCommon.EthereumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
+		makeTestBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount2ETHInWei),
+		makeTestBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
+		makeTestBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount2ETHInWei),
+		makeTestBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
 	}
 )
 
@@ -203,9 +207,8 @@ func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
 	return db, func() { require.NoError(t, cleanup()) }
 }
 
-func TestRouterV2(t *testing.T) {
-	db, stop := setupTestNetworkDB(t)
-	defer stop()
+func setupRouter(t *testing.T) (*Router, func()) {
+	db, cleanTmpDb := setupTestNetworkDB(t)
 
 	client, _ := rpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, defaultNetworks, db)
 
@@ -238,6 +241,13 @@ func TestRouterV2(t *testing.T) {
 	buyStickers := pathprocessor.NewStickersBuyProcessor(nil, nil, nil)
 	router.AddPathProcessor(buyStickers)
 
+	return router, cleanTmpDb
+}
+
+func TestRouterV2(t *testing.T) {
+	router, cleanTmpDb := setupRouter(t)
+	defer cleanTmpDb()
+
 	tests := []struct {
 		name               string
 		input              *RouteInputParams
@@ -263,7 +273,7 @@ func TestRouterV2(t *testing.T) {
 					},
 					tokenPrices:           testTokenPrices,
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -348,7 +358,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -397,7 +407,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -464,7 +474,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:   testTokenPrices,
 					baseFee:       big.NewInt(testBaseFee),
 					suggestedFees: testSuggestedFees,
-					balanceMap:    testBalanceMap,
+					balanceMap:    testBalanceMapPerChain,
 
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
@@ -514,7 +524,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -582,7 +592,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -620,7 +630,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -658,7 +668,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -696,7 +706,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -752,7 +762,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -790,7 +800,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:   testTokenPrices,
 					baseFee:       big.NewInt(testBaseFee),
 					suggestedFees: testSuggestedFees,
-					balanceMap:    testBalanceMap,
+					balanceMap:    testBalanceMapPerChain,
 
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
@@ -823,7 +833,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -921,7 +931,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -976,7 +986,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1074,7 +1084,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1172,7 +1182,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1206,7 +1216,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1236,7 +1246,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1321,7 +1331,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1370,7 +1380,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1437,7 +1447,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1486,7 +1496,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1554,7 +1564,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1592,7 +1602,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1630,7 +1640,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1668,7 +1678,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1724,7 +1734,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1762,7 +1772,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1791,7 +1801,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1858,7 +1868,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1901,7 +1911,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1956,7 +1966,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -1999,7 +2009,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -2055,7 +2065,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -2086,7 +2096,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -2124,7 +2134,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -2155,7 +2165,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -2199,7 +2209,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -2237,7 +2247,7 @@ func TestRouterV2(t *testing.T) {
 					tokenPrices:           testTokenPrices,
 					baseFee:               big.NewInt(testBaseFee),
 					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMap,
+					balanceMap:            testBalanceMapPerChain,
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -2264,6 +2274,315 @@ func TestRouterV2(t *testing.T) {
 				for _, c := range routes.Candidates {
 					found := false
 					for _, expC := range tt.expectedCandidates {
+						if c.ProcessorName == expC.ProcessorName &&
+							c.FromChain.ChainID == expC.FromChain.ChainID &&
+							c.ToChain.ChainID == expC.ToChain.ChainID &&
+							c.ApprovalRequired == expC.ApprovalRequired &&
+							(expC.AmountOut == nil || c.AmountOut.ToInt().Cmp(expC.AmountOut.ToInt()) == 0) {
+							found = true
+							break
+						}
+					}
+
+					assert.True(t, found)
+				}
+			}
+		})
+	}
+}
+
+func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
+	router, cleanTmpDb := setupRouter(t)
+	defer cleanTmpDb()
+
+	tests := []struct {
+		name               string
+		input              *RouteInputParams
+		expectedCandidates []*PathV2
+		expectedBest       []*PathV2
+		expectedError      error
+	}{
+		{
+			name: "ERC20 transfer - Specific FromChain - Specific ToChain - Not Enough Token Balance",
+			input: &RouteInputParams{
+				testnetMode:          false,
+				SendType:             Transfer,
+				AddrFrom:             common.HexToAddress("0x1"),
+				AddrTo:               common.HexToAddress("0x2"),
+				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount100USDC)),
+				TokenID:              pathprocessor.UsdcSymbol,
+				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.UsdcSymbol,
+						Decimals: 6,
+					},
+					tokenPrices:           testTokenPrices,
+					suggestedFees:         testSuggestedFees,
+					balanceMap:            map[string]*big.Int{},
+					estimationMap:         testEstimationMap,
+					bonderFeeMap:          testBbonderFeeMap,
+					approvalGasEstimation: testApprovalGasEstimation,
+					approvalL1Fee:         testApprovalL1Fee,
+				},
+			},
+			expectedError: ErrNotEnoughTokenBalance,
+			expectedCandidates: []*PathV2{
+				{
+					ProcessorName:         pathprocessor.ProcessorTransferName,
+					FromChain:             &optimism,
+					ToChain:               &optimism,
+					ApprovalRequired:      false,
+					requiredTokenBalance:  big.NewInt(testAmount100USDC),
+					requiredNativeBalance: big.NewInt((testBaseFee + testPriorityFeeLow) * testApprovalGasEstimation),
+				},
+			},
+		},
+		{
+			name: "ERC20 transfer - Specific FromChain - Specific ToChain - Not Enough Native Balance",
+			input: &RouteInputParams{
+				testnetMode:          false,
+				SendType:             Transfer,
+				AddrFrom:             common.HexToAddress("0x1"),
+				AddrTo:               common.HexToAddress("0x2"),
+				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount100USDC)),
+				TokenID:              pathprocessor.UsdcSymbol,
+				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.UsdcSymbol,
+						Decimals: 6,
+					},
+					tokenPrices:   testTokenPrices,
+					suggestedFees: testSuggestedFees,
+					balanceMap: map[string]*big.Int{
+						makeTestBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
+					},
+					estimationMap:         testEstimationMap,
+					bonderFeeMap:          testBbonderFeeMap,
+					approvalGasEstimation: testApprovalGasEstimation,
+					approvalL1Fee:         testApprovalL1Fee,
+				},
+			},
+			expectedError: ErrNotEnoughNativeBalance,
+			expectedCandidates: []*PathV2{
+				{
+					ProcessorName:         pathprocessor.ProcessorTransferName,
+					FromChain:             &optimism,
+					ToChain:               &optimism,
+					ApprovalRequired:      false,
+					requiredTokenBalance:  big.NewInt(testAmount100USDC),
+					requiredNativeBalance: big.NewInt((testBaseFee + testPriorityFeeLow) * testApprovalGasEstimation),
+				},
+			},
+		},
+		{
+			name: "ERC20 transfer - No Specific FromChain - Specific ToChain - Not Enough Token Balance Across All Chains",
+			input: &RouteInputParams{
+				testnetMode:        false,
+				SendType:           Transfer,
+				AddrFrom:           common.HexToAddress("0x1"),
+				AddrTo:             common.HexToAddress("0x2"),
+				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount100USDC)),
+				TokenID:            pathprocessor.UsdcSymbol,
+				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.UsdcSymbol,
+						Decimals: 6,
+					},
+					tokenPrices:           testTokenPrices,
+					suggestedFees:         testSuggestedFees,
+					balanceMap:            map[string]*big.Int{},
+					estimationMap:         testEstimationMap,
+					bonderFeeMap:          testBbonderFeeMap,
+					approvalGasEstimation: testApprovalGasEstimation,
+					approvalL1Fee:         testApprovalL1Fee,
+				},
+			},
+			expectedError: ErrNotEnoughTokenBalance,
+			expectedCandidates: []*PathV2{
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &mainnet,
+					ToChain:          &optimism,
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorTransferName,
+					FromChain:        &optimism,
+					ToChain:          &optimism,
+					ApprovalRequired: false,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &arbitrum,
+					ToChain:          &optimism,
+					ApprovalRequired: true,
+				},
+			},
+		},
+		{
+			name: "ERC20 transfer - No Specific FromChain - Specific ToChain - Enough Token Balance On Arbitrum Chain But Not Enough Native Balance",
+			input: &RouteInputParams{
+				testnetMode:        false,
+				SendType:           Transfer,
+				AddrFrom:           common.HexToAddress("0x1"),
+				AddrTo:             common.HexToAddress("0x2"),
+				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount100USDC)),
+				TokenID:            pathprocessor.UsdcSymbol,
+				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.UsdcSymbol,
+						Decimals: 6,
+					},
+					tokenPrices:   testTokenPrices,
+					suggestedFees: testSuggestedFees,
+					balanceMap: map[string]*big.Int{
+						makeTestBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
+					},
+					estimationMap:         testEstimationMap,
+					bonderFeeMap:          testBbonderFeeMap,
+					approvalGasEstimation: testApprovalGasEstimation,
+					approvalL1Fee:         testApprovalL1Fee,
+				},
+			},
+			expectedError: ErrNotEnoughNativeBalance,
+			expectedCandidates: []*PathV2{
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &mainnet,
+					ToChain:          &optimism,
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:         pathprocessor.ProcessorTransferName,
+					FromChain:             &optimism,
+					ToChain:               &optimism,
+					ApprovalRequired:      false,
+					requiredTokenBalance:  big.NewInt(testAmount100USDC),
+					requiredNativeBalance: big.NewInt((testBaseFee + testPriorityFeeLow) * testApprovalGasEstimation),
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &arbitrum,
+					ToChain:          &optimism,
+					ApprovalRequired: true,
+				},
+			},
+		},
+		{
+			name: "ERC20 transfer - No Specific FromChain - Specific ToChain - Enough Token Balance On Arbitrum Chain And Enough Native Balance On Arbitrum Chain",
+			input: &RouteInputParams{
+				testnetMode:        false,
+				SendType:           Transfer,
+				AddrFrom:           common.HexToAddress("0x1"),
+				AddrTo:             common.HexToAddress("0x2"),
+				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount100USDC)),
+				TokenID:            pathprocessor.UsdcSymbol,
+				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.UsdcSymbol,
+						Decimals: 6,
+					},
+					tokenPrices:   testTokenPrices,
+					suggestedFees: testSuggestedFees,
+					balanceMap: map[string]*big.Int{
+						makeTestBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
+						makeTestBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount1ETHInWei),
+					},
+					estimationMap:         testEstimationMap,
+					bonderFeeMap:          testBbonderFeeMap,
+					approvalGasEstimation: testApprovalGasEstimation,
+					approvalL1Fee:         testApprovalL1Fee,
+				},
+			},
+			expectedCandidates: []*PathV2{
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &mainnet,
+					ToChain:          &optimism,
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:         pathprocessor.ProcessorTransferName,
+					FromChain:             &optimism,
+					ToChain:               &optimism,
+					ApprovalRequired:      false,
+					requiredTokenBalance:  big.NewInt(testAmount100USDC),
+					requiredNativeBalance: big.NewInt((testBaseFee + testPriorityFeeLow) * testApprovalGasEstimation),
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &arbitrum,
+					ToChain:          &optimism,
+					ApprovalRequired: true,
+				},
+			},
+			expectedBest: []*PathV2{
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &arbitrum,
+					ToChain:          &optimism,
+					ApprovalRequired: true,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			routes, err := router.SuggestedRoutesV2(context.Background(), tt.input)
+
+			if tt.expectedError != nil {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedError, err)
+				assert.NotNil(t, routes)
+				assert.Equal(t, len(tt.expectedCandidates), len(routes.Candidates))
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, len(tt.expectedCandidates), len(routes.Candidates))
+				assert.Equal(t, len(tt.expectedBest), len(routes.Best))
+
+				for _, c := range routes.Candidates {
+					found := false
+					for _, expC := range tt.expectedCandidates {
+						if c.ProcessorName == expC.ProcessorName &&
+							c.FromChain.ChainID == expC.FromChain.ChainID &&
+							c.ToChain.ChainID == expC.ToChain.ChainID &&
+							c.ApprovalRequired == expC.ApprovalRequired &&
+							(expC.AmountOut == nil || c.AmountOut.ToInt().Cmp(expC.AmountOut.ToInt()) == 0) {
+							found = true
+							break
+						}
+					}
+
+					assert.True(t, found)
+				}
+
+				for _, c := range routes.Best {
+					found := false
+					for _, expC := range tt.expectedBest {
 						if c.ProcessorName == expC.ProcessorName &&
 							c.FromChain.ChainID == expC.FromChain.ChainID &&
 							c.ToChain.ChainID == expC.ToChain.ChainID &&
