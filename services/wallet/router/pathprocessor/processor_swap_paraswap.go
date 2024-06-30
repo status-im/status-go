@@ -22,7 +22,7 @@ import (
 type SwapParaswapTxArgs struct {
 	transactions.SendTxArgs
 	ChainID            uint64  `json:"chainId"`
-	ChainIDTo          uint64  `json:"chainIdFrom"`
+	ChainIDTo          uint64  `json:"chainIdTo"`
 	TokenIDFrom        string  `json:"tokenIdFrom"`
 	TokenIDTo          string  `json:"tokenIdTo"`
 	SlippagePercentage float32 `json:"slippagePercentage"`
@@ -162,7 +162,10 @@ func (s *SwapParaswapProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.
 				Data:   types.HexBytes("0x0"),
 				Symbol: params.FromToken.Symbol,
 			},
-			ChainID: params.FromChain.ChainID,
+			ChainID:     params.FromChain.ChainID,
+			ChainIDTo:   params.ToChain.ChainID,
+			TokenIDFrom: params.FromToken.Symbol,
+			TokenIDTo:   params.ToToken.Symbol,
 		},
 	}
 
@@ -224,25 +227,12 @@ func (s *SwapParaswapProcessor) BuildTransaction(sendArgs *MultipathProcessorTxA
 }
 
 func (s *SwapParaswapProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
-
-	txBridgeArgs := &MultipathProcessorTxArgs{
-		SwapTx: &SwapParaswapTxArgs{
-			SendTxArgs: transactions.SendTxArgs{
-				From:               sendArgs.SwapTx.From,
-				To:                 sendArgs.SwapTx.To,
-				MultiTransactionID: sendArgs.SwapTx.MultiTransactionID,
-				Symbol:             sendArgs.SwapTx.Symbol,
-			},
-			SlippagePercentage: sendArgs.SwapTx.SlippagePercentage,
-		},
-	}
-
-	err := s.prepareTransaction(txBridgeArgs)
+	err := s.prepareTransaction(sendArgs)
 	if err != nil {
 		return types.Hash{}, statusErrors.CreateErrorResponseFromError(err)
 	}
 
-	return s.transactor.SendTransactionWithChainID(txBridgeArgs.ChainID, txBridgeArgs.SwapTx.SendTxArgs, verifiedAccount)
+	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, sendArgs.SwapTx.SendTxArgs, verifiedAccount)
 }
 
 func (s *SwapParaswapProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {

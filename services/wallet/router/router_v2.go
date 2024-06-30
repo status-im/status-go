@@ -94,7 +94,8 @@ type PathV2 struct {
 	ProcessorName  string
 	FromChain      *params.Network    // Source chain
 	ToChain        *params.Network    // Destination chain
-	FromToken      *walletToken.Token // Token on the source chain
+	FromToken      *walletToken.Token // Source token
+	ToToken        *walletToken.Token // Destination token, set if applicable
 	AmountIn       *hexutil.Big       // Amount that will be sent from the source chain
 	AmountInLocked bool               // Is the amount locked
 	AmountOut      *hexutil.Big       // Amount that will be received on the destination chain
@@ -664,6 +665,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams)
 						FromChain:      network,
 						ToChain:        dest,
 						FromToken:      token,
+						ToToken:        toToken,
 						AmountIn:       (*hexutil.Big)(amountToSend),
 						AmountInLocked: amountLocked,
 						AmountOut:      (*hexutil.Big)(amountOut),
