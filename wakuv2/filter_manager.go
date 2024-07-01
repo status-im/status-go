@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/status-im/status-go/wakuv2/common"
 
 	"go.uber.org/zap"
