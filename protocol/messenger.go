@@ -801,7 +801,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.updateCommunitiesActiveMembersPeriodically()
 	m.schedulePublishGrantsForControlledCommunities()
 	m.handleENSVerificationSubscription(ensSubscription)
-	m.watchConnectionChange()
 	m.watchChatsAndCommunitiesToUnmute()
 	m.watchCommunitiesToUnmute()
 	m.watchExpiredMessages()
@@ -849,12 +848,17 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	go m.checkForMissingMessagesLoop()
-
 	controlledCommunities, err := m.communitiesManager.Controlled()
 	if err != nil {
 		return nil, err
 	}
+
+	msAvailable := m.SubscribeMailserverAvailable()
+	go func() {
+		<-msAvailable
+		m.checkForMissingMessagesLoop()
+		m.watchConnectionChange()
+	}()
 
 	if m.archiveManager.IsReady() {
 		available := m.SubscribeMailserverAvailable()
@@ -958,9 +962,12 @@ func (m *Messenger) handleConnectionChange(online bool) {
 		m.shouldPublishContactCode = false
 	}
 
-	// Start fetching messages from store nodes
 	if online && m.config.codeControlFlags.AutoRequestHistoricMessages {
-		m.asyncRequestAllHistoricMessages()
+		if m.transport.WakuVersion() == 2 {
+			m.transport.TriggerCheckForMissingMessages()
+		} else {
+			m.asyncRequestAllHistoricMessages()
+		}
 	}
 
 	// Update ENS verifier

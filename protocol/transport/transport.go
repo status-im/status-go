@@ -742,6 +742,15 @@ func (t *Transport) SetStorePeerID(peerID peer.ID) {
 	t.waku.SetStorePeerID(peerID)
 }
 
+func (t *Transport) TriggerCheckForMissingMessages() {
+	if t.waku.Version() < 2 {
+		return
+	}
+	if err := t.waku.TriggerCheckForMissingMessages(); err != nil {
+		t.logger.Error("failed to trigger check for missing messages", zap.Error(err))
+	}
+}
+
 func (t *Transport) SetCriteriaForMissingMessageVerification(peerID peer.ID, filters []*Filter) {
 	if t.waku.Version() != 2 {
 		return

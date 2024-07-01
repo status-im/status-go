@@ -382,32 +382,46 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 const missingMessageCheckPeriod = 30 * time.Second
 
 func (m *Messenger) checkForMissingMessagesLoop() {
-	t := time.NewTicker(missingMessageCheckPeriod)
-	defer t.Stop()
+	setCriteria := func() error {
+		filters := m.transport.Filters()
+		filtersByMs := m.SplitFiltersByStoreNode(filters)
+		for communityID, filtersForMs := range filtersByMs {
+			ms := m.getActiveMailserver(communityID)
+			if ms == nil {
+				continue
+			}
 
-	for {
-		select {
-		case <-m.quit:
-			return
+			peerID, err := ms.PeerID()
+			if err != nil {
+				return fmt.Errorf("could not obtain the peerID")
+			}
+			m.transport.SetCriteriaForMissingMessageVerification(peerID, filtersForMs)
+		}
+		return nil
+	}
 
-		case <-t.C:
-			filters := m.transport.Filters()
-			filtersByMs := m.SplitFiltersByStoreNode(filters)
-			for communityID, filtersForMs := range filtersByMs {
-				ms := m.getActiveMailserver(communityID)
-				if ms == nil {
-					continue
-				}
+	// set criteria for the first time
+	if err := setCriteria(); err != nil {
+		m.logger.Error("setting criteria for missing message notification", zap.Error(err))
+		return
+	}
 
-				peerID, err := ms.PeerID()
-				if err != nil {
-					m.logger.Error("could not obtain the peerID")
+	go func() {
+		t := time.NewTicker(missingMessageCheckPeriod)
+		defer t.Stop()
+
+		for {
+			select {
+			case <-m.quit:
+				return
+			case <-t.C:
+				if err := setCriteria(); err != nil {
+					m.logger.Error("setting criteria for missing message notification", zap.Error(err))
 					return
 				}
-				m.transport.SetCriteriaForMissingMessageVerification(peerID, filtersForMs)
 			}
 		}
-	}
+	}()
 }
 
 func getPrioritizedBatches() []int {

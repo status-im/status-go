@@ -124,6 +124,8 @@ type Waku interface {
 
 	SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []string) error
 
+	TriggerCheckForMissingMessages() error
+
 	// MinPow returns the PoW value required by this node.
 	MinPow() float64
 	// BloomFilter returns the aggregated bloom filter for all the topics of interest.

@@ -71,7 +71,7 @@ func (w *Waku) SetTopicsToVerifyForMissingMessages(peerID peer.ID, pubsubTopic s
 		peerID:        peerID,
 		pubsubTopic:   pubsubTopic,
 		contentTopics: contentTopics,
-		lastChecked:   w.timesource.Now().Add(delay),
+		lastChecked:   w.timesource.Now().Add(-24*time.Hour - delay), // first check of 24 hours back
 		ctx:           ctx,
 		cancel:        cancel,
 	}
@@ -94,40 +94,58 @@ func (w *Waku) SetTopicsToVerifyForMissingMessages(peerID peer.ID, pubsubTopic s
 	w.topicInterest[pubsubTopic] = newMissingMessageRequest
 }
 
+// TriggerCheckForMissingMessages triggers on-demand the check for missing messages, useful when we come back online or from sleep
+func (w *Waku) TriggerCheckForMissingMessages() {
+	select {
+	case w.checkForMissingMessagesTrigger <- struct{}{}:
+	default:
+	}
+}
+
 func (w *Waku) checkForMissingMessages() {
 	defer w.wg.Done()
 	defer w.logger.Debug("checkForMissingMessages - done")
 
-	t := time.NewTicker(time.Minute)
+	period := time.Minute
+	t := time.NewTicker(period)
 	defer t.Stop()
 
 	var semaphore = make(chan struct{}, 5)
+
+	fetchHistory := func() {
+		w.topicInterestMu.Lock()
+		defer w.topicInterestMu.Unlock()
+
+		for _, request := range w.topicInterest {
+			select {
+			case <-w.ctx.Done():
+				return
+			default:
+				semaphore <- struct{}{}
+				go func(r TopicInterest) {
+					w.fetchHistory(r)
+					<-semaphore
+				}(request)
+			}
+		}
+	}
+
 	for {
 		select {
+		case <-w.checkForMissingMessagesTrigger:
+			w.logger.Debug("checking for missing messages on-demand...")
+			t.Reset(period)
+			fetchHistory()
 		case <-t.C:
 			w.logger.Debug("checking for missing messages...")
-			w.topicInterestMu.Lock()
-			for _, request := range w.topicInterest {
-				select {
-				case <-w.ctx.Done():
-					return
-				default:
-					semaphore <- struct{}{}
-					go func(r TopicInterest) {
-						w.FetchHistory(r)
-						<-semaphore
-					}(request)
-				}
-			}
-			w.topicInterestMu.Unlock()
-
+			fetchHistory()
 		case <-w.ctx.Done():
 			return
 		}
 	}
 }
 
-func (w *Waku) FetchHistory(missingHistoryRequest TopicInterest) {
+func (w *Waku) fetchHistory(missingHistoryRequest TopicInterest) {
 	for i := 0; i < len(missingHistoryRequest.contentTopics); i += maxContentTopicsPerRequest {
 		j := i + maxContentTopicsPerRequest
 		if j > len(missingHistoryRequest.contentTopics) {
@@ -179,19 +197,22 @@ func (w *Waku) storeQueryWithRetry(ctx context.Context, queryFunc func(ctx conte
 }
 
 func (w *Waku) fetchMessagesBatch(missingHistoryRequest TopicInterest, batchFrom int, batchTo int, now time.Time) error {
+	timeStart := proto.Int64(missingHistoryRequest.lastChecked.Add(-delay).UnixNano())
+	timeEnd := proto.Int64(now.Add(-delay).UnixNano())
+
 	logger := w.logger.With(
 		zap.Stringer("peerID", missingHistoryRequest.peerID),
 		zap.Strings("contentTopics", missingHistoryRequest.contentTopics[batchFrom:batchTo]),
 		zap.String("pubsubTopic", missingHistoryRequest.pubsubTopic),
-		logutils.WakuMessageTimestamp("from", proto.Int64(missingHistoryRequest.lastChecked.UnixNano())),
-		logutils.WakuMessageTimestamp("to", proto.Int64(now.UnixNano())),
+		logutils.WakuMessageTimestamp("from", timeStart),
+		logutils.WakuMessageTimestamp("to", timeEnd),
 	)
 
 	result, err := w.storeQueryWithRetry(missingHistoryRequest.ctx, func(ctx context.Context) (*store.Result, error) {
 		return w.node.Store().Query(ctx, store.FilterCriteria{
 			ContentFilter: protocol.NewContentFilter(missingHistoryRequest.pubsubTopic, missingHistoryRequest.contentTopics[batchFrom:batchTo]...),
-			TimeStart:     proto.Int64(missingHistoryRequest.lastChecked.Add(-delay).UnixNano()),
-			TimeEnd:       proto.Int64(now.Add(-delay).UnixNano()),
+			TimeStart:     timeStart,
+			TimeEnd:       timeEnd,
 		}, store.WithPeer(missingHistoryRequest.peerID), store.WithPaging(false, 100), store.IncludeData(false))
 	}, logger, "retrieving history to check for missing messages")
 	if err != nil {

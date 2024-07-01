@@ -127,6 +127,10 @@ func (w *GethWakuWrapper) SetCriteriaForMissingMessageVerification(peerID peer.I
 	return errors.New("not available in WakuV1")
 }
 
+func (w *GethWakuWrapper) TriggerCheckForMissingMessages() error {
+	return errors.New("not available in WakuV1")
+}
+
 // Peers function only added for compatibility with waku V2
 func (w *GethWakuWrapper) Peers() map[string]types.WakuV2Peer {
 	p := make(map[string]types.WakuV2Peer)

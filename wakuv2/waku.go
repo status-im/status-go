@@ -178,6 +178,9 @@ type Waku struct {
 
 	statusTelemetryClient ITelemetryClient
 
+	// to trigger missing messages check on-demand
+	checkForMissingMessagesTrigger chan struct{} // TODO pablo maybe accept the from/to parameters here
+
 	defaultShardInfo protocol.RelayShards
 }
 
@@ -240,6 +243,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		discV5BootstrapNodes:            cfg.DiscV5BootstrapNodes,
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 		onPeerStats:                     onPeerStats,
+		checkForMissingMessagesTrigger:  make(chan struct{}),
 		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
 	}
 
