@@ -71,7 +71,7 @@ func (w *Waku) SetTopicsToVerifyForMissingMessages(peerID peer.ID, pubsubTopic s
 		peerID:        peerID,
 		pubsubTopic:   pubsubTopic,
 		contentTopics: contentTopics,
-		lastChecked:   w.timesource.Now().Add(delay),
+		lastChecked:   w.timesource.Now().Add(-delay),
 		ctx:           ctx,
 		cancel:        cancel,
 	}
