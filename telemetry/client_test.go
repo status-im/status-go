@@ -3,9 +3,11 @@ package telemetry
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -20,6 +22,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/wakuv2"
 )
@@ -28,7 +31,7 @@ var (
 	testContentTopic = "/waku/1/0x12345679/rfc26"
 )
 
-func createMockServer(t *testing.T, wg *sync.WaitGroup, expectedType TelemetryType) *httptest.Server {
+func createMockServer(t *testing.T, wg *sync.WaitGroup, expectedType TelemetryType, expectedCondition func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool)) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			t.Errorf("Expected 'POST' request, got '%s'", r.Method)
@@ -44,18 +47,41 @@ func createMockServer(t *testing.T, wg *sync.WaitGroup, expectedType TelemetryTy
 			t.Fatal(err)
 		}
 
-		if len(received) != 1 {
-			t.Errorf("Unexpected data received: %+v", received)
-		} else {
-			if received[0].TelemetryType != expectedType {
-				t.Errorf("Unexpected telemetry type: got %v, want %v", received[0].TelemetryType, expectedType)
-			} else {
-				// If the data is as expected, respond with success
-				t.Log("Responding with success")
+		if expectedCondition != nil {
+			shouldSucceed, shouldFail := expectedCondition(received)
+			if shouldFail {
+				w.WriteHeader(http.StatusInternalServerError)
+				t.Fail()
+				return
+			}
+			if !shouldSucceed {
 				w.WriteHeader(http.StatusOK)
-				wg.Done()
+				return
+			}
+		} else {
+			if len(received) != 1 {
+				t.Errorf("Unexpected data received: %+v", received)
+			} else {
+				if received[0].TelemetryType != expectedType {
+					t.Errorf("Unexpected telemetry type: got %v, want %v", received[0].TelemetryType, expectedType)
+				}
 			}
 		}
+		// If the data is as expected, respond with success
+		t.Log("Responding with success")
+		responseBody := []map[string]interface{}{
+			{"status": "created"},
+		}
+		body, err := json.Marshal(responseBody)
+		if err != nil {
+			t.Fatalf("Failed to marshal response body: %v", err)
+		}
+		w.WriteHeader(http.StatusCreated)
+		_, err = w.Write(body)
+		if err != nil {
+			t.Fatalf("Failed to write response body: %v", err)
+		}
+		wg.Done()
 	}))
 }
 
@@ -69,11 +95,13 @@ func createClient(t *testing.T, mockServerURL string) *Client {
 	return NewClient(logger, mockServerURL, "testUID", "testNode", "1.0", WithSendPeriod(100*time.Millisecond))
 }
 
-func withMockServer(t *testing.T, expectedType TelemetryType, testFunc func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup)) {
+type expectedCondition func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool)
+
+func withMockServer(t *testing.T, expectedType TelemetryType, expectedCondition expectedCondition, testFunc func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup)) {
 	var wg sync.WaitGroup
 	wg.Add(1) // Expecting one request
 
-	mockServer := createMockServer(t, &wg, expectedType)
+	mockServer := createMockServer(t, &wg, expectedType, expectedCondition)
 	defer mockServer.Close()
 
 	client := createClient(t, mockServer.URL)
@@ -88,7 +116,7 @@ func withMockServer(t *testing.T, expectedType TelemetryType, testFunc func(ctx 
 }
 
 func TestClient_ProcessReceivedMessages(t *testing.T) {
-	withMockServer(t, ReceivedMessagesMetric, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+	withMockServer(t, ReceivedMessagesMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
 		// Create a telemetry request to send
 		data := ReceivedMessages{
 			Filter: transport.Filter{
@@ -117,7 +145,7 @@ func TestClient_ProcessReceivedMessages(t *testing.T) {
 }
 
 func TestClient_ProcessReceivedEnvelope(t *testing.T) {
-	withMockServer(t, ReceivedEnvelopeMetric, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+	withMockServer(t, ReceivedEnvelopeMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
 		// Create a telemetry request to send
 		envelope := v2protocol.NewEnvelope(&pb.WakuMessage{
 			Payload:      []byte{1, 2, 3, 4, 5},
@@ -133,7 +161,7 @@ func TestClient_ProcessReceivedEnvelope(t *testing.T) {
 }
 
 func TestClient_ProcessSentEnvelope(t *testing.T) {
-	withMockServer(t, SentEnvelopeMetric, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+	withMockServer(t, SentEnvelopeMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
 		// Create a telemetry request to send
 		sentEnvelope := wakuv2.SentEnvelope{
 			Envelope: v2protocol.NewEnvelope(&pb.WakuMessage{
@@ -156,7 +184,7 @@ var (
 )
 
 func TestTelemetryUponPublishError(t *testing.T) {
-	withMockServer(t, ErrorSendingEnvelopeMetric, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+	withMockServer(t, ErrorSendingEnvelopeMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
 		enrTreeAddress := testENRBootstrap
 		envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
 		if envEnrTreeAddress != "" {
@@ -228,7 +256,19 @@ func TestRetryCache(t *testing.T) {
 		} else {
 			t.Log("Counter reached, responding with success")
 			if len(received) == 4 {
-				w.WriteHeader(http.StatusOK)
+				w.WriteHeader(http.StatusCreated)
+				responseBody := []map[string]interface{}{
+					{"status": "created"},
+				}
+				body, err := json.Marshal(responseBody)
+				if err != nil {
+					t.Fatalf("Failed to marshal response body: %v", err)
+				}
+				w.WriteHeader(http.StatusCreated)
+				_, err = w.Write(body)
+				if err != nil {
+					t.Fatalf("Failed to write response body: %v", err)
+				}
 				wg.Done()
 			} else {
 				t.Fatalf("Expected 4 metrics, got %d", len(received)-1)
@@ -294,4 +334,55 @@ func TestRetryCacheCleanup(t *testing.T) {
 	time.Sleep(210 * time.Millisecond)
 
 	require.Equal(t, 5001, len(client.telemetryRetryCache))
+}
+func setDefaultConfig(config *wakuv2.Config, lightMode bool) {
+	config.ClusterID = 16
+	config.UseShardAsDefaultTopic = true
+
+	if lightMode {
+		config.EnablePeerExchangeClient = true
+		config.LightClient = true
+		config.EnableDiscV5 = false
+	} else {
+		config.EnableDiscV5 = true
+		config.EnablePeerExchangeServer = true
+		config.LightClient = false
+		config.EnablePeerExchangeClient = false
+	}
+}
+
+var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.shards.nodes.status.im"
+
+func TestPeerCount(t *testing.T) {
+	expectedCondition := func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool) {
+		found := slices.ContainsFunc(received, func(req TelemetryRequest) bool {
+			t.Log(req)
+			return req.TelemetryType == PeerCountMetric
+		})
+		return found, false
+	}
+	withMockServer(t, PeerCountMetric, expectedCondition, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+		config := &wakuv2.Config{}
+		setDefaultConfig(config, false)
+		config.DiscV5BootstrapNodes = []string{testStoreENRBootstrap}
+		config.DiscoveryLimit = 20
+		w, err := wakuv2.New(nil, "shards.staging", config, nil, nil, nil, nil, nil)
+		require.NoError(t, err)
+
+		w.SetStatusTelemetryClient(client)
+		client.Start(ctx)
+
+		require.NoError(t, w.Start())
+
+		err = tt.RetryWithBackOff(func() error {
+			if len(w.Peers()) == 0 {
+				return errors.New("no peers discovered")
+			}
+			return nil
+		})
+
+		require.NoError(t, err)
+
+		require.NotEqual(t, 0, len(w.Peers()))
+	})
 }

@@ -106,6 +106,7 @@ type ITelemetryClient interface {
 	PushReceivedEnvelope(receivedEnvelope *protocol.Envelope)
 	PushSentEnvelope(sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
+	PushPeerCount(peerCount int)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -1383,6 +1384,10 @@ func (w *Waku) Start() error {
 
 				if w.onPeerStats != nil {
 					w.onPeerStats(latestConnStatus)
+				}
+
+				if w.statusTelemetryClient != nil {
+					w.statusTelemetryClient.PushPeerCount(w.PeerCount())
 				}
 
 				//TODO: analyze if we need to discover and connect to peers with peerExchange loop enabled.
