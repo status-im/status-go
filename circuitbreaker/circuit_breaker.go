@@ -1,8 +1,8 @@
 package circuitbreaker
 
 import (
+	"context"
 	"fmt"
-	"strings"
 
 	"github.com/afex/hystrix-go/hystrix"
 )
@@ -23,11 +23,14 @@ func (cr CommandResult) Error() error {
 }
 
 type Command struct {
+	ctx      context.Context
 	functors []*Functor
+	cancel   bool
 }
 
-func NewCommand(functors []*Functor) *Command {
+func NewCommand(ctx context.Context, functors []*Functor) *Command {
 	return &Command{
+		ctx:      ctx,
 		functors: functors,
 	}
 }
@@ -40,8 +43,11 @@ func (cmd *Command) IsEmpty() bool {
 	return len(cmd.functors) == 0
 }
 
+func (cmd *Command) Cancel() {
+	cmd.cancel = true
+}
+
 type Config struct {
-	CommandName            string
 	Timeout                int
 	MaxConcurrentRequests  int
 	RequestVolumeThreshold int
@@ -60,76 +66,72 @@ func NewCircuitBreaker(config Config) *CircuitBreaker {
 }
 
 type Functor struct {
-	Exec FallbackFunc
+	exec        FallbackFunc
+	circuitName string
 }
 
-func NewFunctor(exec FallbackFunc) *Functor {
+func NewFunctor(exec FallbackFunc, circuitName string) *Functor {
 	return &Functor{
-		Exec: exec,
+		exec:        exec,
+		circuitName: circuitName,
 	}
 }
 
-// This a blocking function
-func (eh *CircuitBreaker) Execute(cmd Command) CommandResult {
-	resultChan := make(chan CommandResult, 1)
-	var result CommandResult
+// Executes the command in its circuit if set.
+// If the command's circuit is not configured, the circuit of the CircuitBreaker is used.
+// This is a blocking function.
+func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
+	if cmd == nil || cmd.IsEmpty() {
+		return CommandResult{err: fmt.Errorf("command is nil or empty")}
+	}
 
-	for i := 0; i < len(cmd.functors); i += 2 {
-		f1 := cmd.functors[i]
-		var f2 *Functor
-		if i+1 < len(cmd.functors) {
-			f2 = cmd.functors[i+1]
+	var result CommandResult
+	ctx := cmd.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	for _, f := range cmd.functors {
+		if cmd.cancel {
+			break
 		}
 
-		circuitName := fmt.Sprintf("%s_%d", eh.config.CommandName, i)
-		if hystrix.GetCircuitSettings()[circuitName] == nil {
-			hystrix.ConfigureCommand(circuitName, hystrix.CommandConfig{
-				Timeout:                eh.config.Timeout,
-				MaxConcurrentRequests:  eh.config.MaxConcurrentRequests,
-				RequestVolumeThreshold: eh.config.RequestVolumeThreshold,
-				SleepWindow:            eh.config.SleepWindow,
-				ErrorPercentThreshold:  eh.config.ErrorPercentThreshold,
+		if hystrix.GetCircuitSettings()[f.circuitName] == nil {
+			hystrix.ConfigureCommand(f.circuitName, hystrix.CommandConfig{
+				Timeout:                cb.config.Timeout,
+				MaxConcurrentRequests:  cb.config.MaxConcurrentRequests,
+				RequestVolumeThreshold: cb.config.RequestVolumeThreshold,
+				SleepWindow:            cb.config.SleepWindow,
+				ErrorPercentThreshold:  cb.config.ErrorPercentThreshold,
 			})
 		}
 
-		// If circuit is the same for all functions, in case of len(cmd.functors) > 2,
-		// main and fallback providers are different next run if first two fail,
-		// which causes health issues for both main and fallback and ErrorPercentThreshold
-		// is reached faster than it should be.
-		errChan := hystrix.Go(circuitName, func() error {
-			res, err := f1.Exec()
-			// Write to resultChan only if success
+		err := hystrix.DoC(ctx, f.circuitName, func(ctx context.Context) error {
+			res, err := f.exec()
+			// Write to result only if success
 			if err == nil {
-				resultChan <- CommandResult{res: res, err: err}
+				result = CommandResult{res: res}
 			}
 			return err
-		}, func(err error) error {
-			// In case of concurrency, we should not execute the fallback
-			if f2 == nil || err == hystrix.ErrMaxConcurrency {
-				return err
-			}
-			res, err := f2.Exec()
-			if err == nil {
-				resultChan <- CommandResult{res: res, err: err}
-			}
-			return err
-		})
+		}, nil)
 
-		select {
-		case result = <-resultChan:
-			if result.err == nil {
-				return result
-			}
-		case err := <-errChan:
-			result = CommandResult{err: err}
-
-			// In case of max concurrency, we should delay the execution and stop iterating over fallbacks
-			// No error unwrapping here, so use strings.Contains
-			if strings.Contains(err.Error(), hystrix.ErrMaxConcurrency.Error()) {
-				return result
-			}
+		if err == nil {
+			break
 		}
+
+		// Accumulate errors
+		if result.err != nil {
+			result.err = fmt.Errorf("%w, %s.error: %w", result.err, f.circuitName, err)
+		} else {
+			result.err = fmt.Errorf("%s.error: %w", f.circuitName, err)
+		}
+		// Lets abuse every provider with the same amount of MaxConcurrentRequests,
+		// keep iterating even in case of ErrMaxConcurrency error
 	}
 
 	return result
+}
+
+func (cb *CircuitBreaker) Config() Config {
+	return cb.config
 }
