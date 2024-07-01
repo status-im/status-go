@@ -137,7 +137,7 @@ func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 	s.Require().NoError(err)
 	s.Require().NotNil(mediaServer)
 	s.Require().NoError(mediaServer.Start())
-	alice.httpServer = mediaServer
+	alice.SetMediaServer(mediaServer)
 
 	// Create a community
 	community, chat := s.createCommunity(bob)

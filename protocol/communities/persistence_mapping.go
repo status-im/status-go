@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/common/shard"
+	"github.com/status-im/status-go/server"
 )
 
 func communityToRecord(community *Community) (*CommunityRecord, error) {
@@ -71,8 +72,16 @@ func recordToRequestToJoin(r *RequestToJoinRecord) *RequestToJoin {
 	}
 }
 
-func recordBundleToCommunity(r *CommunityRecordBundle, memberIdentity *ecdsa.PrivateKey, installationID string,
-	logger *zap.Logger, timesource common.TimeSource, encryptor DescriptionEncryptor, initializer func(*Community) error) (*Community, error) {
+func recordBundleToCommunity(
+	r *CommunityRecordBundle,
+	memberIdentity *ecdsa.PrivateKey,
+	installationID string,
+	logger *zap.Logger,
+	timesource common.TimeSource,
+	encryptor DescriptionEncryptor,
+	mediaServer server.MediaServerInterface,
+	initializer func(*Community) error,
+) (*Community, error) {
 	var privateKey *ecdsa.PrivateKey
 	var controlNode *ecdsa.PublicKey
 	var err error
@@ -139,7 +148,7 @@ func recordBundleToCommunity(r *CommunityRecordBundle, memberIdentity *ecdsa.Pri
 		Shard:                               s,
 	}
 
-	community, err := New(config, timesource, encryptor)
+	community, err := New(config, timesource, encryptor, mediaServer)
 	if err != nil {
 		return nil, err
 	}

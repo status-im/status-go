@@ -217,7 +217,7 @@ func (s *TestMessengerPrepareMessageSuite) Test_WHEN_MessageContainsImage_THEN_P
 	mediaServer, err := server.NewMediaServer(s.m.database, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(mediaServer.Start())
-	s.m.httpServer = mediaServer
+	s.m.SetMediaServer(mediaServer)
 
 	// WHEN: message is prepared
 	loadedMessage, err := s.m.MessageByID(message.ID)

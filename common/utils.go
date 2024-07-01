@@ -3,6 +3,7 @@ package common
 import (
 	"crypto/ecdsa"
 	"errors"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -70,5 +71,16 @@ func IsENSName(displayName string) bool {
 		return true
 	}
 
+	return false
+}
+
+func IsNil(i interface{}) bool {
+	if i == nil {
+		return true
+	}
+	switch reflect.TypeOf(i).Kind() {
+	case reflect.Ptr, reflect.Interface:
+		return reflect.ValueOf(i).IsNil()
+	}
 	return false
 }

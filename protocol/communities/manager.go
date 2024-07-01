@@ -38,6 +38,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -107,6 +108,7 @@ type Manager struct {
 	PermissionChecker        PermissionChecker
 	keyDistributor           KeyDistributor
 	communityLock            *CommunityLock
+	mediaServer              server.MediaServerInterface
 }
 
 type CommunityLock struct {
@@ -380,7 +382,20 @@ type OwnerVerifier interface {
 	SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error)
 }
 
-func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, ensverifier *ens.Verifier, ownerVerifier OwnerVerifier, transport *transport.Transport, timesource common.TimeSource, keyDistributor KeyDistributor, opts ...ManagerOption) (*Manager, error) {
+func NewManager(
+	identity *ecdsa.PrivateKey,
+	installationID string,
+	db *sql.DB,
+	encryptor *encryption.Protocol,
+	logger *zap.Logger,
+	ensverifier *ens.Verifier,
+	ownerVerifier OwnerVerifier,
+	transport *transport.Transport,
+	timesource common.TimeSource,
+	keyDistributor KeyDistributor,
+	mediaServer server.MediaServerInterface,
+	opts ...ManagerOption,
+) (*Manager, error) {
 	if identity == nil {
 		return nil, errors.New("empty identity")
 	}
@@ -412,6 +427,7 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 		timesource:     timesource,
 		keyDistributor: keyDistributor,
 		communityLock:  NewCommunityLock(logger),
+		mediaServer:    mediaServer,
 	}
 
 	manager.persistence = &Persistence{
@@ -440,7 +456,6 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 	}
 
 	if ensverifier != nil {
-
 		sub := ensverifier.Subscribe()
 		manager.ensSubscription = sub
 		manager.ensVerifier = ensverifier
@@ -488,6 +503,10 @@ type CommunityResponse struct {
 	Changes         *CommunityChanges                      `json:"changes"`
 	RequestsToJoin  []*RequestToJoin                       `json:"requestsToJoin"`
 	FailedToDecrypt []*CommunityPrivateDataFailedToDecrypt `json:"-"`
+}
+
+func (m *Manager) SetMediaServer(mediaServer server.MediaServerInterface) {
+	m.mediaServer = mediaServer
 }
 
 func (m *Manager) Subscribe() chan *Subscription {
@@ -856,7 +875,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	if m.encryptor != nil {
 		descriptionEncryptor = m
 	}
-	community, err := New(config, m.timesource, descriptionEncryptor)
+	community, err := New(config, m.timesource, descriptionEncryptor, m.mediaServer)
 	if err != nil {
 		return nil, err
 	}
@@ -1079,7 +1098,6 @@ func (m *Manager) reevaluateMembers(communityID types.HexBytes) (*Community, map
 		}
 
 		revealedAccount, memberHasWallet := membersAccounts[memberKey]
-
 		if !memberHasWallet {
 			result.membersToRemove[memberKey] = struct{}{}
 			continue
@@ -1725,7 +1743,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 		if m.encryptor != nil {
 			descriptionEncryptor = m
 		}
-		community, err = New(config, m.timesource, descriptionEncryptor)
+		community, err = New(config, m.timesource, descriptionEncryptor, m.mediaServer)
 		if err != nil {
 			return nil, err
 		}
@@ -2151,7 +2169,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		if m.encryptor != nil {
 			descriptionEncryptor = m
 		}
-		community, err = New(config, m.timesource, descriptionEncryptor)
+		community, err = New(config, m.timesource, descriptionEncryptor, m.mediaServer)
 		if err != nil {
 			return nil, err
 		}
@@ -3890,7 +3908,7 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 		descriptionEncryptor = m
 	}
 
-	return recordBundleToCommunity(r, m.identity, m.installationID, m.logger, m.timesource, descriptionEncryptor, func(community *Community) error {
+	initializer := func(community *Community) error {
 		_, description, err := m.preprocessDescription(community.ID(), community.config.CommunityDescription)
 		if err != nil {
 			return err
@@ -3918,7 +3936,18 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 		}
 
 		return nil
-	})
+	}
+
+	return recordBundleToCommunity(
+		r,
+		m.identity,
+		m.installationID,
+		m.logger,
+		m.timesource,
+		descriptionEncryptor,
+		m.mediaServer,
+		initializer,
+	)
 }
 
 func (m *Manager) GetByID(id []byte) (*Community, error) {

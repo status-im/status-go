@@ -499,7 +499,20 @@ func NewMessenger(
 		encryptor: encryptionProtocol,
 	}
 
-	communitiesManager, err := communities.NewManager(identity, installationID, database, encryptionProtocol, logger, ensVerifier, c.communityTokensService, transp, transp, communitiesKeyDistributor, managerOptions...)
+	communitiesManager, err := communities.NewManager(
+		identity,
+		installationID,
+		database,
+		encryptionProtocol,
+		logger,
+		ensVerifier,
+		c.communityTokensService,
+		transp,
+		transp,
+		communitiesKeyDistributor,
+		c.httpServer,
+		managerOptions...,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -929,6 +942,11 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	return response, nil
+}
+
+func (m *Messenger) SetMediaServer(server *server.MediaServer) {
+	m.httpServer = server
+	m.communitiesManager.SetMediaServer(server)
 }
 
 func (m *Messenger) IdentityPublicKey() *ecdsa.PublicKey {
