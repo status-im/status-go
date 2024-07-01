@@ -4352,15 +4352,15 @@ func (s *MessengerCommunitiesSuite) sendImageToCommunity(sender *Messenger, chat
 }
 
 func (s *MessengerCommunitiesSuite) TestSerializedCommunities() {
-	community, _ := s.createCommunity()
 	addMediaServer := func(messenger *Messenger) {
 		mediaServer, err := server.NewMediaServer(messenger.database, nil, nil, nil)
 		s.Require().NoError(err)
 		s.Require().NoError(mediaServer.Start())
-		messenger.httpServer = mediaServer
+		messenger.SetMediaServer(mediaServer)
 	}
 	addMediaServer(s.owner)
 
+	community, _ := s.createCommunity()
 	// update community description
 	description := community.Description()
 	identImageName := "small"
@@ -4393,7 +4393,7 @@ func (s *MessengerCommunitiesSuite) TestSerializedCommunities() {
 	s.Len(b.Description().Identity.Images, 1)
 	s.Equal(identImagePayload, b.Description().Identity.Images[identImageName].Payload)
 
-	c, err := s.owner.SerializedCommunities()
+	c, err := s.owner.Communities()
 	s.Require().NoError(err)
 	s.Require().Len(c, 1)
 	d, err := json.Marshal(c)
@@ -4516,17 +4516,16 @@ func (s *MessengerCommunitiesSuite) fetchImage(fullURL string) ([]byte, error) {
 
 func (s *MessengerCommunitiesSuite) TestMemberMessagesHasImageLink() {
 	// GIVEN
-	community, communityChat := s.createCommunity()
-
 	addMediaServer := func(messenger *Messenger) {
 		mediaServer, err := server.NewMediaServer(messenger.database, nil, nil, nil)
 		s.Require().NoError(err)
 		s.Require().NoError(mediaServer.Start())
-		messenger.httpServer = mediaServer
+		messenger.SetMediaServer(mediaServer)
 	}
 	addMediaServer(s.alice)
 	addMediaServer(s.bob)
 	addMediaServer(s.owner)
+	community, communityChat := s.createCommunity()
 
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 

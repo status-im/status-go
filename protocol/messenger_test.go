@@ -2269,7 +2269,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	s.Require().NoError(err)
 	err = httpServer.SetPort(9876)
 	s.NoError(err)
-	s.m.httpServer = httpServer
+	s.m.SetMediaServer(httpServer)
 
 	chat := CreatePublicChat("test-chat", s.m.transport)
 	err = s.m.SaveChat(chat)

@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/api/multiformat"
+	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -65,13 +66,14 @@ type EventsData struct {
 }
 
 type Community struct {
-	config     *Config
-	mutex      sync.Mutex
-	timesource common.TimeSource
-	encryptor  DescriptionEncryptor
+	config      *Config
+	mutex       sync.Mutex
+	timesource  common.TimeSource
+	encryptor   DescriptionEncryptor
+	mediaServer server.MediaServerInterface
 }
 
-func New(config Config, timesource common.TimeSource, encryptor DescriptionEncryptor) (*Community, error) {
+func New(config Config, timesource common.TimeSource, encryptor DescriptionEncryptor, mediaServer server.MediaServerInterface) (*Community, error) {
 	if config.MemberIdentity == nil {
 		return nil, errors.New("no member identity")
 	}
@@ -92,7 +94,12 @@ func New(config Config, timesource common.TimeSource, encryptor DescriptionEncry
 		config.CommunityDescription = &protobuf.CommunityDescription{}
 	}
 
-	return &Community{config: &config, timesource: timesource, encryptor: encryptor}, nil
+	return &Community{
+		config:      &config,
+		timesource:  timesource,
+		encryptor:   encryptor,
+		mediaServer: mediaServer,
+	}, nil
 }
 
 type CommunityAdminSettings struct {
@@ -257,7 +264,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 	return json.Marshal(communityItem)
 }
 
-func (o *Community) MarshalJSONWithMediaServer(mediaServer *server.MediaServer) ([]byte, error) {
+func (o *Community) MarshalJSON() ([]byte, error) {
 	if o.config.MemberIdentity == nil {
 		return nil, errors.New("member identity not set")
 	}
@@ -360,159 +367,6 @@ func (o *Community) MarshalJSONWithMediaServer(mediaServer *server.MediaServer) 
 				Color:                   c.Identity.Color,
 				Description:             c.Identity.Description,
 				Permissions:             c.Permissions,
-				Members:                 c.Members,
-				CanPost:                 canPost,
-				CanView:                 canView,
-				CanPostReactions:        canPostReactions,
-				ViewersCanPostReactions: c.ViewersCanPostReactions,
-				TokenGated:              o.channelEncrypted(id),
-				CategoryID:              c.CategoryId,
-				HideIfPermissionsNotMet: c.HideIfPermissionsNotMet,
-				Position:                int(c.Position),
-				MissingEncryptionKey:    !o.IsMemberInChat(o.MemberIdentity(), id) && o.IsMemberLikelyInChat(id),
-			}
-			communityItem.Chats[id] = chat
-		}
-		communityItem.TokenPermissions = o.tokenPermissions()
-		communityItem.PendingAndBannedMembers = o.PendingAndBannedMembers()
-		communityItem.Members = o.config.CommunityDescription.Members
-		communityItem.Permissions = o.config.CommunityDescription.Permissions
-		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
-		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
-
-		// update token meta image to url rather than base64 image
-		var tokenMetadata []*protobuf.CommunityTokenMetadata
-		for _, m := range o.config.CommunityDescription.CommunityTokensMetadata {
-			copyM := proto.Clone(m).(*protobuf.CommunityTokenMetadata)
-			copyM.Image = mediaServer.MakeCommunityDescriptionTokenImageURL(o.IDString(), copyM.GetSymbol())
-			tokenMetadata = append(tokenMetadata, copyM)
-		}
-		communityItem.CommunityTokensMetadata = tokenMetadata
-
-		communityItem.ActiveMembersCount = o.config.CommunityDescription.ActiveMembersCount
-
-		if o.config.CommunityDescription.Identity != nil {
-			communityItem.Name = o.Name()
-			communityItem.Color = o.config.CommunityDescription.Identity.Color
-			communityItem.Description = o.config.CommunityDescription.Identity.Description
-			for t := range o.config.CommunityDescription.Identity.Images {
-				if communityItem.Images == nil {
-					communityItem.Images = make(map[string]Image)
-				}
-				communityItem.Images[t] = Image{Uri: mediaServer.MakeCommunityImageURL(o.IDString(), t)}
-			}
-		}
-
-		communityItem.CommunityAdminSettings = CommunityAdminSettings{
-			PinMessageAllMembersEnabled: false,
-		}
-
-		if o.config.CommunityDescription.AdminSettings != nil {
-			communityItem.CommunityAdminSettings.PinMessageAllMembersEnabled = o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled
-		}
-	}
-	return json.Marshal(communityItem)
-}
-
-func (o *Community) MarshalJSON() ([]byte, error) {
-	if o.config.MemberIdentity == nil {
-		return nil, errors.New("member identity not set")
-	}
-	communityItem := struct {
-		ID                          types.HexBytes                       `json:"id"`
-		MemberRole                  protobuf.CommunityMember_Roles       `json:"memberRole"`
-		IsControlNode               bool                                 `json:"isControlNode"`
-		Verified                    bool                                 `json:"verified"`
-		Joined                      bool                                 `json:"joined"`
-		JoinedAt                    int64                                `json:"joinedAt"`
-		Spectated                   bool                                 `json:"spectated"`
-		RequestedAccessAt           int                                  `json:"requestedAccessAt"`
-		Name                        string                               `json:"name"`
-		Description                 string                               `json:"description"`
-		IntroMessage                string                               `json:"introMessage"`
-		OutroMessage                string                               `json:"outroMessage"`
-		Tags                        []CommunityTag                       `json:"tags"`
-		Chats                       map[string]CommunityChat             `json:"chats"`
-		Categories                  map[string]CommunityCategory         `json:"categories"`
-		Images                      map[string]images.IdentityImage      `json:"images"`
-		Permissions                 *protobuf.CommunityPermissions       `json:"permissions"`
-		Members                     map[string]*protobuf.CommunityMember `json:"members"`
-		CanRequestAccess            bool                                 `json:"canRequestAccess"`
-		CanManageUsers              bool                                 `json:"canManageUsers"`              //TODO: we can remove this
-		CanDeleteMessageForEveryone bool                                 `json:"canDeleteMessageForEveryone"` //TODO: we can remove this
-		CanJoin                     bool                                 `json:"canJoin"`
-		Color                       string                               `json:"color"`
-		RequestedToJoinAt           uint64                               `json:"requestedToJoinAt,omitempty"`
-		IsMember                    bool                                 `json:"isMember"`
-		Muted                       bool                                 `json:"muted"`
-		MuteTill                    time.Time                            `json:"muteTill,omitempty"`
-		CommunityAdminSettings      CommunityAdminSettings               `json:"adminSettings"`
-		Encrypted                   bool                                 `json:"encrypted"`
-		PendingAndBannedMembers     map[string]CommunityMemberState      `json:"pendingAndBannedMembers"`
-		TokenPermissions            map[string]*CommunityTokenPermission `json:"tokenPermissions"`
-		CommunityTokensMetadata     []*protobuf.CommunityTokenMetadata   `json:"communityTokensMetadata"`
-		ActiveMembersCount          uint64                               `json:"activeMembersCount"`
-		PubsubTopic                 string                               `json:"pubsubTopic"`
-		PubsubTopicKey              string                               `json:"pubsubTopicKey"`
-		Shard                       *shard.Shard                         `json:"shard"`
-		LastOpenedAt                int64                                `json:"lastOpenedAt"`
-		Clock                       uint64                               `json:"clock"`
-	}{
-		ID:                          o.ID(),
-		Clock:                       o.Clock(),
-		MemberRole:                  o.MemberRole(o.MemberIdentity()),
-		IsControlNode:               o.IsControlNode(),
-		Verified:                    o.config.Verified,
-		Chats:                       make(map[string]CommunityChat),
-		Categories:                  make(map[string]CommunityCategory),
-		Joined:                      o.config.Joined,
-		JoinedAt:                    o.config.JoinedAt,
-		Spectated:                   o.config.Spectated,
-		CanRequestAccess:            o.CanRequestAccess(o.MemberIdentity()),
-		CanJoin:                     o.canJoin(),
-		CanManageUsers:              o.CanManageUsers(o.MemberIdentity()),
-		CanDeleteMessageForEveryone: o.CanDeleteMessageForEveryone(o.MemberIdentity()),
-		RequestedToJoinAt:           o.RequestedToJoinAt(),
-		IsMember:                    o.isMember(),
-		Muted:                       o.config.Muted,
-		MuteTill:                    o.config.MuteTill,
-		Tags:                        o.Tags(),
-		Encrypted:                   o.Encrypted(),
-		PubsubTopic:                 o.PubsubTopic(),
-		PubsubTopicKey:              o.PubsubTopicKey(),
-		Shard:                       o.Shard(),
-		LastOpenedAt:                o.config.LastOpenedAt,
-	}
-	if o.config.CommunityDescription != nil {
-		for id, c := range o.config.CommunityDescription.Categories {
-			category := CommunityCategory{
-				ID:       id,
-				Name:     c.Name,
-				Position: int(c.Position),
-			}
-			communityItem.Encrypted = o.Encrypted()
-			communityItem.Categories[id] = category
-		}
-		for id, c := range o.config.CommunityDescription.Chats {
-			// NOTE: Here `CanPost` is only set for ChatMessage. But it can be different for reactions/pin/etc.
-			// Consider adding more properties to `CommunityChat` to reflect that.
-			canPost, err := o.CanPost(o.MemberIdentity(), id, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
-			if err != nil {
-				return nil, err
-			}
-			canPostReactions, err := o.CanPost(o.MemberIdentity(), id, protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
-			if err != nil {
-				return nil, err
-			}
-			canView := o.CanView(o.MemberIdentity(), id)
-
-			chat := CommunityChat{
-				ID:                      id,
-				Name:                    c.Identity.DisplayName,
-				Emoji:                   c.Identity.Emoji,
-				Color:                   c.Identity.Color,
-				Description:             c.Identity.Description,
-				Permissions:             c.Permissions,
 				CanPost:                 canPost,
 				CanView:                 canView,
 				CanPostReactions:        canPostReactions,
@@ -535,18 +389,32 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		communityItem.Permissions = o.config.CommunityDescription.Permissions
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
-		communityItem.CommunityTokensMetadata = o.config.CommunityDescription.CommunityTokensMetadata
+
+		// update token meta image to url rather than base64 image
+		var tokenMetadata []*protobuf.CommunityTokenMetadata
+
+		if !utils.IsNil(o.mediaServer) {
+			for _, m := range o.config.CommunityDescription.CommunityTokensMetadata {
+				copyM := proto.Clone(m).(*protobuf.CommunityTokenMetadata)
+				copyM.Image = o.mediaServer.MakeCommunityDescriptionTokenImageURL(o.IDString(), copyM.GetSymbol())
+				tokenMetadata = append(tokenMetadata, copyM)
+			}
+			communityItem.CommunityTokensMetadata = tokenMetadata
+		}
 		communityItem.ActiveMembersCount = o.config.CommunityDescription.ActiveMembersCount
 
 		if o.config.CommunityDescription.Identity != nil {
 			communityItem.Name = o.Name()
 			communityItem.Color = o.config.CommunityDescription.Identity.Color
 			communityItem.Description = o.config.CommunityDescription.Identity.Description
-			for t, i := range o.config.CommunityDescription.Identity.Images {
-				if communityItem.Images == nil {
-					communityItem.Images = make(map[string]images.IdentityImage)
+
+			if !utils.IsNil(o.mediaServer) {
+				for t := range o.config.CommunityDescription.Identity.Images {
+					if communityItem.Images == nil {
+						communityItem.Images = make(map[string]Image)
+					}
+					communityItem.Images[t] = Image{Uri: o.mediaServer.MakeCommunityImageURL(o.IDString(), t)}
 				}
-				communityItem.Images[t] = images.IdentityImage{Name: t, Payload: i.Payload}
 			}
 		}
 
