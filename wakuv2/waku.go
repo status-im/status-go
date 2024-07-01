@@ -1718,6 +1718,17 @@ func (w *Waku) Peers() map[string]types.WakuV2Peer {
 	return FormatPeerStats(w.node)
 }
 
+func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
+	if w.cfg.LightClient {
+		return nil, errors.New("only available in relay mode")
+	}
+
+	return &types.PeerList{
+		FullMeshPeers: w.node.Relay().PubSub().Router().(*pubsub.GossipSubRouter).MeshPeers(topic),
+		AllPeers:      w.node.Relay().PubSub().ListPeers(topic),
+	}, nil
+}
+
 func (w *Waku) ListenAddresses() []string {
 	addrs := w.node.ListenAddresses()
 	var result []string

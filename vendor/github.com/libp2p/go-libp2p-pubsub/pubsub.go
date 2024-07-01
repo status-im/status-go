@@ -1420,3 +1420,7 @@ type addRelayReq struct {
 	topic string
 	resp  chan RelayCancelFunc
 }
+
+func (p *PubSub) Router() PubSubRouter {
+	return p.rt
+}

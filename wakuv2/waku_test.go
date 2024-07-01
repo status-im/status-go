@@ -127,6 +127,26 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	require.NoError(t, w.Stop())
 }
 
+func TestRelayPeers(t *testing.T) {
+	config := &Config{}
+	setDefaultConfig(config, false)
+	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, w.Start())
+	_, err = w.RelayPeersByTopic(config.DefaultShardPubsubTopic)
+	require.NoError(t, err)
+
+	// Ensure function returns an error for lightclient
+	config = &Config{}
+	config.ClusterID = 16
+	config.LightClient = true
+	w, err = New(nil, "", config, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, w.Start())
+	_, err = w.RelayPeersByTopic(config.DefaultShardPubsubTopic)
+	require.Error(t, err)
+}
+
 func TestBasicWakuV2(t *testing.T) {
 	t.Skip("flaky test")
 
@@ -347,6 +367,7 @@ func TestWakuV2Filter(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 	w.filterManager.filterSubBatchDuration = 1 * time.Second
+
 	options := func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 10 * time.Second
 	}

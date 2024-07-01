@@ -1489,6 +1489,10 @@ func (api *PublicAPI) Peers() map[string]types.WakuV2Peer {
 	return api.service.messenger.Peers()
 }
 
+func (api *PublicAPI) RelayPeersByTopic(topic string) (*types.PeerList, error) {
+	return api.service.messenger.RelayPeersByTopic(topic)
+}
+
 func (api *PublicAPI) ListenAddresses() ([]string, error) {
 	return api.service.messenger.ListenAddresses()
 }

@@ -652,6 +652,10 @@ func (t *Transport) ListenAddresses() ([]string, error) {
 	return t.waku.ListenAddresses()
 }
 
+func (t *Transport) RelayPeersByTopic(topic string) (*types.PeerList, error) {
+	return t.waku.RelayPeersByTopic(topic)
+}
+
 func (t *Transport) ENR() (string, error) {
 	return t.waku.ENR()
 }
