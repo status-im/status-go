@@ -44,6 +44,7 @@ message CommunityTokenMetadata {
   string symbol = 5;
   string name = 6;
   uint32 decimals = 7;
+  string version = 8;
 }
 
 message CommunityTokenAction {
