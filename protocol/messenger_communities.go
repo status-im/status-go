@@ -3554,7 +3554,7 @@ func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communiti
 	}
 
 	// Unsubscribing from existing shard
-	if community.Shard() != nil {
+	if community.Shard() != nil && community.Shard() != shard.FromProtobuff(message.GetShard()) {
 		err := m.unsubscribeFromShard(community.Shard())
 		if err != nil {
 			return err
@@ -3567,12 +3567,14 @@ func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communiti
 	if err != nil {
 		return err
 	}
+	//Update community filters in case of change of shard
+	if community.Shard() != shard.FromProtobuff(message.GetShard()) {
+		err = m.UpdateCommunityFilters(community)
+		if err != nil {
+			return err
+		}
 
-	err = m.UpdateCommunityFilters(community)
-	if err != nil {
-		return err
 	}
-
 	return nil
 }
 
