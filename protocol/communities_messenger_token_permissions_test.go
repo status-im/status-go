@@ -375,6 +375,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityTokensMetadata(
 		TokenType:         protobuf.CommunityTokenType_ERC721,
 		Symbol:            "SMB",
 		Decimals:          3,
+		Version:           "1.0.0",
 	}
 
 	_, err := community.AddCommunityTokensMetadata(newToken)
@@ -389,6 +390,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityTokensMetadata(
 	s.Require().Equal(tokensMetadata[0].Symbol, newToken.Symbol)
 	s.Require().Equal(tokensMetadata[0].Name, newToken.Name)
 	s.Require().Equal(tokensMetadata[0].Decimals, newToken.Decimals)
+	s.Require().Equal(tokensMetadata[0].Version, newToken.Version)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSTokenPermission() {

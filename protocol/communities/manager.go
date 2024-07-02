@@ -569,6 +569,7 @@ func (m *Manager) fillMissingCommunityTokens() error {
 				TokenType:         token.TokenType,
 				Name:              token.Name,
 				Decimals:          uint32(token.Decimals),
+				Version:           token.Version,
 			}
 			modified, err := community.UpsertCommunityTokensMetadata(tokenMetadata)
 			if err != nil {
@@ -4268,6 +4269,7 @@ func (m *Manager) AddCommunityToken(token *community_token.CommunityToken, clock
 		TokenType:         token.TokenType,
 		Name:              token.Name,
 		Decimals:          uint32(token.Decimals),
+		Version:           token.Version,
 	}
 	_, err = community.AddCommunityTokensMetadata(tokenMetadata)
 	if err != nil {
@@ -4508,6 +4510,7 @@ func (m *Manager) FetchCommunityToken(community *Community, tokenMetadata *proto
 		DeployState:        community_token.Deployed,
 		Base64Image:        tokenMetadata.Image,
 		Decimals:           int(tokenMetadata.Decimals),
+		Version:            tokenMetadata.Version,
 	}
 
 	switch tokenMetadata.TokenType {
