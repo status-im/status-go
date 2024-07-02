@@ -1,18 +1,24 @@
 package walletconnect
 
 import (
+	"crypto/ecdsa"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -246,4 +252,36 @@ func caip10Accounts(accounts []*accounts.Account, chains []uint64) []string {
 		}
 	}
 	return addresses
+}
+
+func SafeSignTypedDataForDApps(typedJson string, privateKey *ecdsa.PrivateKey, chainID uint64, legacy bool) (types.HexBytes, error) {
+	// Parse the data for both legacy and non-legacy cases to validate the chain
+	var typed typeddata.TypedData
+	err := json.Unmarshal([]byte(typedJson), &typed)
+	if err != nil {
+		return types.HexBytes{}, err
+	}
+
+	chain := new(big.Int).SetUint64(chainID)
+	if err := typed.ValidateChainID(chain); err != nil {
+		return types.HexBytes{}, err
+	}
+
+	var sig hexutil.Bytes
+	if legacy {
+		sig, err = typeddata.Sign(typed, privateKey, chain)
+	} else {
+		var typedV4 signercore.TypedData
+		err = json.Unmarshal([]byte(typedJson), &typedV4)
+		if err != nil {
+			return types.HexBytes{}, err
+		}
+
+		sig, err = typeddata.SignTypedDataV4(typedV4, privateKey, chain)
+	}
+	if err != nil {
+		return types.HexBytes{}, err
+	}
+
+	return types.HexBytes(sig), err
 }

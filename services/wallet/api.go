@@ -16,6 +16,7 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/network"
@@ -853,8 +854,20 @@ func (api *API) GetWalletConnectDapps(ctx context.Context, validAtTimestamp int6
 	return walletconnect.GetActiveDapps(api.s.db, validAtTimestamp, testChains)
 }
 
-// signTypedDataV4 dApps use it to execute "eth_signTypedData_v4" requests
+// HashMessageEIP191 is used for hashing dApps requests for "personal_sign" and "eth_sign"
+// in a safe manner following the EIP-191 version 0x45 for signing on the client side.
+func (api *API) HashMessageEIP191(ctx context.Context, message types.HexBytes) types.Hash {
+	log.Debug("wallet.api.HashMessageEIP191", "len(data)", len(message))
+	safeMsg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(message), string(message))
+	return crypto.Keccak256Hash([]byte(safeMsg))
+}
+
+// SignTypedDataV4 dApps use it to execute "eth_signTypedData_v4" requests
+// the formatted typed data will be prefixed with \x19\x01 based on the EIP-712
+// @deprecated
 func (api *API) SignTypedDataV4(typedJson string, address string, password string) (types.HexBytes, error) {
+	log.Debug("wallet.api.SignTypedDataV4", "len(typedJson)", len(typedJson), "address", address, "len(password)", len(password))
+
 	account, err := api.getVerifiedWalletAccount(address, password)
 	if err != nil {
 		return types.HexBytes{}, err
@@ -872,6 +885,22 @@ func (api *API) SignTypedDataV4(typedJson string, address string, password strin
 		return types.HexBytes{}, err
 	}
 	return types.HexBytes(sig), err
+}
+
+// SafeSignTypedDataForDApps is used to execute requests for "eth_signTypedData"
+// if legacy is true else "eth_signTypedData_v4"
+// the formatted typed data won't be prefixed in case of legacy calls, as the
+// old dApps implementation expects
+// the chain is validate for both cases
+func (api *API) SafeSignTypedDataForDApps(typedJson string, address string, password string, chainID uint64, legacy bool) (types.HexBytes, error) {
+	log.Debug("wallet.api.SafeSignTypedDataForDApps", "len(typedJson)", len(typedJson), "address", address, "len(password)", len(password), "chainID", chainID, "legacy", legacy)
+
+	account, err := api.getVerifiedWalletAccount(address, password)
+	if err != nil {
+		return types.HexBytes{}, err
+	}
+
+	return walletconnect.SafeSignTypedDataForDApps(typedJson, account.AccountKey.PrivateKey, chainID, legacy)
 }
 
 func (api *API) RestartWalletReloadTimer(ctx context.Context) error {
