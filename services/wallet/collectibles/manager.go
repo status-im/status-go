@@ -64,10 +64,10 @@ type Manager struct {
 
 	mediaServer *server.MediaServer
 
-	statuses        *sync.Map
-	statusNotifier  *connection.StatusNotifier
-	feed            *event.Feed
-	circuitBreakers sync.Map
+	statuses       *sync.Map
+	statusNotifier *connection.StatusNotifier
+	feed           *event.Feed
+	circuitBreaker *circuitbreaker.CircuitBreaker
 }
 
 func NewManager(
@@ -80,6 +80,14 @@ func NewManager(
 
 	ownershipDB := NewOwnershipDB(db)
 	statuses := initStatuses(ownershipDB)
+
+	cb := circuitbreaker.NewCircuitBreaker(circuitbreaker.Config{
+		Timeout:                10000,
+		MaxConcurrentRequests:  100,
+		RequestVolumeThreshold: 25,
+		SleepWindow:            300000,
+		ErrorPercentThreshold:  25,
+	})
 
 	return &Manager{
 		rpcClient: rpcClient,
@@ -95,6 +103,7 @@ func NewManager(
 		statuses:           statuses,
 		statusNotifier:     createStatusNotifier(statuses, feed),
 		feed:               feed,
+		circuitBreaker:     cb,
 	}
 }
 
@@ -202,7 +211,7 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(ctx context.Context, ch
 func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
 	defer o.checkConnectionStatus(chainID)
 
-	cmd := circuitbreaker.Command{}
+	cmd := circuitbreaker.NewCommand(ctx, nil)
 	for _, provider := range o.providers.AccountOwnershipProviders {
 		if !provider.IsChainSupported(chainID) {
 			continue
@@ -219,7 +228,7 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, c
 					log.Error("FetchAllAssetsByOwnerAndContractAddress failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
 				}
 				return []interface{}{assetContainer}, err
-			},
+			}, getCircuitName(provider, chainID),
 		)
 		cmd.Add(f)
 	}
@@ -228,7 +237,7 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, c
 		return nil, ErrNoProvidersAvailableForChainID
 	}
 
-	cmdRes := o.getCircuitBreaker(chainID).Execute(cmd)
+	cmdRes := o.circuitBreaker.Execute(cmd)
 	if cmdRes.Error() != nil {
 		log.Error("FetchAllAssetsByOwnerAndContractAddress failed for", "chainID", chainID, "err", cmdRes.Error())
 		return nil, cmdRes.Error()
@@ -246,7 +255,7 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, c
 func (o *Manager) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
 	defer o.checkConnectionStatus(chainID)
 
-	cmd := circuitbreaker.Command{}
+	cmd := circuitbreaker.NewCommand(ctx, nil)
 	for _, provider := range o.providers.AccountOwnershipProviders {
 		if !provider.IsChainSupported(chainID) {
 			continue
@@ -263,7 +272,7 @@ func (o *Manager) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommo
 					log.Error("FetchAllAssetsByOwner failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
 				}
 				return []interface{}{assetContainer}, err
-			},
+			}, getCircuitName(provider, chainID),
 		)
 		cmd.Add(f)
 	}
@@ -272,7 +281,7 @@ func (o *Manager) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommo
 		return nil, ErrNoProvidersAvailableForChainID
 	}
 
-	cmdRes := o.getCircuitBreaker(chainID).Execute(cmd)
+	cmdRes := o.circuitBreaker.Execute(cmd)
 	if cmdRes.Error() != nil {
 		log.Error("FetchAllAssetsByOwner failed for", "chainID", chainID, "err", cmdRes.Error())
 		return nil, cmdRes.Error()
@@ -439,7 +448,7 @@ func (o *Manager) FetchMissingAssetsByCollectibleUniqueID(ctx context.Context, u
 }
 
 func (o *Manager) fetchMissingAssetsForChainByCollectibleUniqueID(ctx context.Context, chainID walletCommon.ChainID, idsToFetch []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
-	cmd := circuitbreaker.Command{}
+	cmd := circuitbreaker.NewCommand(ctx, nil)
 	for _, provider := range o.providers.CollectibleDataProviders {
 		if !provider.IsChainSupported(chainID) {
 			continue
@@ -453,14 +462,14 @@ func (o *Manager) fetchMissingAssetsForChainByCollectibleUniqueID(ctx context.Co
 			}
 
 			return []any{fetchedAssets}, err
-		}))
+		}, getCircuitName(provider, chainID)))
 	}
 
 	if cmd.IsEmpty() {
 		return nil, ErrNoProvidersAvailableForChainID // lets not stop the group if no providers are available for the chain
 	}
 
-	cmdRes := o.getCircuitBreaker(chainID).Execute(cmd)
+	cmdRes := o.circuitBreaker.Execute(cmd)
 	if cmdRes.Error() != nil {
 		log.Error("fetchMissingAssetsForChainByCollectibleUniqueID failed for", "chainID", chainID, "err", cmdRes.Error())
 		return nil, cmdRes.Error()
@@ -482,7 +491,7 @@ func (o *Manager) FetchCollectionsDataByContractID(ctx context.Context, ids []th
 		group.Add(func(ctx context.Context) error {
 			defer o.checkConnectionStatus(chainID)
 
-			cmd := circuitbreaker.Command{}
+			cmd := circuitbreaker.NewCommand(ctx, nil)
 			for _, provider := range o.providers.CollectionDataProviders {
 				if !provider.IsChainSupported(chainID) {
 					continue
@@ -492,14 +501,14 @@ func (o *Manager) FetchCollectionsDataByContractID(ctx context.Context, ids []th
 				cmd.Add(circuitbreaker.NewFunctor(func() ([]any, error) {
 					fetchedCollections, err := provider.FetchCollectionsDataByContractID(ctx, idsToFetch)
 					return []any{fetchedCollections}, err
-				}))
+				}, getCircuitName(provider, chainID)))
 			}
 
 			if cmd.IsEmpty() {
 				return nil
 			}
 
-			cmdRes := o.getCircuitBreaker(chainID).Execute(cmd)
+			cmdRes := o.circuitBreaker.Execute(cmd)
 			if cmdRes.Error() != nil {
 				log.Error("FetchCollectionsDataByContractID failed for", "chainID", chainID, "err", cmdRes.Error())
 				return cmdRes.Error()
@@ -536,7 +545,7 @@ func (o *Manager) GetCollectibleOwnership(id thirdparty.CollectibleUniqueID) ([]
 func (o *Manager) FetchCollectibleOwnersByContractAddress(ctx context.Context, chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
 	defer o.checkConnectionStatus(chainID)
 
-	cmd := circuitbreaker.Command{}
+	cmd := circuitbreaker.NewCommand(ctx, nil)
 	for _, provider := range o.providers.ContractOwnershipProviders {
 		if !provider.IsChainSupported(chainID) {
 			continue
@@ -549,14 +558,14 @@ func (o *Manager) FetchCollectibleOwnersByContractAddress(ctx context.Context, c
 				log.Error("FetchCollectibleOwnersByContractAddress failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
 			}
 			return []any{res}, err
-		}))
+		}, getCircuitName(provider, chainID)))
 	}
 
 	if cmd.IsEmpty() {
 		return nil, ErrNoProvidersAvailableForChainID
 	}
 
-	cmdRes := o.getCircuitBreaker(chainID).Execute(cmd)
+	cmdRes := o.circuitBreaker.Execute(cmd)
 	if cmdRes.Error() != nil {
 		log.Error("FetchCollectibleOwnersByContractAddress failed for", "chainID", chainID, "err", cmdRes.Error())
 		return nil, cmdRes.Error()
@@ -969,22 +978,6 @@ func (o *Manager) signalUpdatedCollectiblesData(ids []thirdparty.CollectibleUniq
 	}
 }
 
-func (o *Manager) getCircuitBreaker(chainID walletCommon.ChainID) *circuitbreaker.CircuitBreaker {
-	cb, ok := o.circuitBreakers.Load(chainID.String())
-	if !ok {
-		cb = circuitbreaker.NewCircuitBreaker(circuitbreaker.Config{
-			CommandName:            chainID.String(),
-			Timeout:                10000,
-			MaxConcurrentRequests:  100,
-			RequestVolumeThreshold: 25,
-			SleepWindow:            300000,
-			ErrorPercentThreshold:  25,
-		})
-		o.circuitBreakers.Store(chainID.String(), cb)
-	}
-	return cb.(*circuitbreaker.CircuitBreaker)
-}
-
 func (o *Manager) SearchCollectibles(ctx context.Context, chainID walletCommon.ChainID, text string, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
 	defer o.checkConnectionStatus(chainID)
 
@@ -1100,7 +1093,7 @@ func (o *Manager) getOrFetchSocialsForCollection(_ context.Context, contractID t
 }
 
 func (o *Manager) fetchSocialsForCollection(ctx context.Context, contractID thirdparty.ContractID) (*thirdparty.CollectionSocials, error) {
-	cmd := circuitbreaker.Command{}
+	cmd := circuitbreaker.NewCommand(ctx, nil)
 	for _, provider := range o.providers.CollectibleDataProviders {
 		if !provider.IsChainSupported(contractID.ChainID) {
 			continue
@@ -1113,14 +1106,14 @@ func (o *Manager) fetchSocialsForCollection(ctx context.Context, contractID thir
 				log.Error("FetchCollectionSocials failed for", "provider", provider.ID(), "chainID", contractID.ChainID, "err", err)
 			}
 			return []interface{}{socials}, err
-		}))
+		}, getCircuitName(provider, contractID.ChainID)))
 	}
 
 	if cmd.IsEmpty() {
 		return nil, ErrNoProvidersAvailableForChainID // lets not stop the group if no providers are available for the chain
 	}
 
-	cmdRes := o.getCircuitBreaker(contractID.ChainID).Execute(cmd)
+	cmdRes := o.circuitBreaker.Execute(cmd)
 	if cmdRes.Error() != nil {
 		log.Error("fetchSocialsForCollection failed for", "chainID", contractID.ChainID, "err", cmdRes.Error())
 		return nil, cmdRes.Error()
@@ -1162,4 +1155,10 @@ func createStatusNotifier(statuses *sync.Map, feed *event.Feed) *connection.Stat
 		EventCollectiblesConnectionStatusChanged,
 		feed,
 	)
+}
+
+// Different providers have API keys per chain or per testnet/mainnet.
+// Proper implementation should respect that. For now, the safest solution is to use the provider ID and chain ID as the key.
+func getCircuitName(provider thirdparty.CollectibleProvider, chainID walletCommon.ChainID) string {
+	return provider.ID() + chainID.String()
 }

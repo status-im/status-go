@@ -364,3 +364,7 @@ func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limi
 
 	return result, nil
 }
+
+func (c *Client) ID() string {
+	return "coingecko"
+}

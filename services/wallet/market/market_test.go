@@ -36,6 +36,10 @@ func (mpp *MockPriceProvider) FetchTokenDetails(symbols []string) (map[string]th
 	return nil, errors.New("not implmented")
 }
 
+func (mpp *MockPriceProvider) ID() string {
+	return "MockPriceProvider"
+}
+
 func (mpp *MockPriceProvider) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
 	res := make(map[string]map[string]float64)
 	for _, symbol := range symbols {

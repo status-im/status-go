@@ -198,3 +198,7 @@ func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limi
 
 	return item, nil
 }
+
+func (c *Client) ID() string {
+	return "cryptocompare"
+}

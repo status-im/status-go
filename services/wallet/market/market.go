@@ -1,6 +1,7 @@
 package market
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -37,7 +38,6 @@ type Manager struct {
 
 func NewManager(providers []thirdparty.MarketDataProvider, feed *event.Feed) *Manager {
 	cb := circuitbreaker.NewCircuitBreaker(circuitbreaker.Config{
-		CommandName:           "marketClient",
 		Timeout:               10000,
 		MaxConcurrentRequests: 100,
 		SleepWindow:           300000,
@@ -74,13 +74,13 @@ func (pm *Manager) setIsConnected(value bool) {
 }
 
 func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(provider thirdparty.MarketDataProvider) (interface{}, error)) (interface{}, error) {
-	cmd := circuitbreaker.Command{}
+	cmd := circuitbreaker.NewCommand(context.Background(), nil)
 	for _, provider := range providers {
 		provider := provider
 		cmd.Add(circuitbreaker.NewFunctor(func() ([]interface{}, error) {
 			result, err := f(provider)
 			return []interface{}{result}, err
-		}))
+		}, provider.ID()))
 	}
 
 	result := pm.circuitbreaker.Execute(cmd)

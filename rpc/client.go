@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
@@ -112,7 +113,11 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		if err != nil {
 			return nil, fmt.Errorf("get RPC limiter: %s", err)
 		}
-		c.upstream = chain.NewSimpleClient(limiter, upstreamClient, upstreamChainID)
+		hostPortUpstream, err := extractHostAndPortFromURL(c.upstreamURL)
+		if err != nil {
+			hostPortUpstream = "upstream"
+		}
+		c.upstream = chain.NewSimpleClient(*chain.NewEthClient(ethclient.NewClient(upstreamClient), limiter, upstreamClient, hostPortUpstream), upstreamChainID)
 	}
 
 	c.router = newRouter(c.upstreamEnabled)
@@ -138,6 +143,15 @@ func extractLastParamFromURL(inputURL string) (string, error) {
 	lastSegment := pathSegments[len(pathSegments)-1]
 
 	return lastSegment, nil
+}
+
+func extractHostAndPortFromURL(inputURL string) (string, error) {
+	parsedURL, err := url.Parse(inputURL)
+	if err != nil {
+		return "", err
+	}
+
+	return parsedURL.Host, nil
 }
 
 func (c *Client) getRPCRpsLimiter(URL string) (*chain.RPCRpsLimiter, error) {
@@ -183,6 +197,15 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 		return nil, fmt.Errorf("get RPC limiter: %s", err)
 	}
 
+	hostPortMain, err := extractHostAndPortFromURL(network.RPCURL)
+	if err != nil {
+		hostPortMain = "main"
+	}
+
+	ethClients := []*chain.EthClient{
+		chain.NewEthClient(ethclient.NewClient(rpcClient), rpcLimiter, rpcClient, hostPortMain),
+	}
+
 	var (
 		rpcFallbackClient  *gethrpc.Client
 		rpcFallbackLimiter *chain.RPCRpsLimiter
@@ -197,9 +220,15 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 		if err != nil {
 			return nil, fmt.Errorf("get RPC fallback limiter: %s", err)
 		}
+		hostPortFallback, err := extractHostAndPortFromURL(network.FallbackURL)
+		if err != nil {
+			hostPortFallback = "fallback"
+		}
+
+		ethClients = append(ethClients, chain.NewEthClient(ethclient.NewClient(rpcFallbackClient), rpcFallbackLimiter, rpcFallbackClient, hostPortFallback))
 	}
 
-	client := chain.NewClient(rpcLimiter, rpcClient, rpcFallbackLimiter, rpcFallbackClient, chainID)
+	client := chain.NewClient(ethClients, chainID)
 	client.WalletNotifier = c.walletNotifier
 	c.rpcClients[chainID] = client
 	return client, nil
@@ -260,7 +289,11 @@ func (c *Client) UpdateUpstreamURL(url string) error {
 		return err
 	}
 	c.Lock()
-	c.upstream = chain.NewSimpleClient(rpsLimiter, rpcClient, c.UpstreamChainID)
+	hostPortUpstream, err := extractHostAndPortFromURL(url)
+	if err != nil {
+		hostPortUpstream = "upstream"
+	}
+	c.upstream = chain.NewSimpleClient(*chain.NewEthClient(ethclient.NewClient(rpcClient), rpsLimiter, rpcClient, hostPortUpstream), c.UpstreamChainID)
 	c.upstreamURL = url
 	c.Unlock()
 
