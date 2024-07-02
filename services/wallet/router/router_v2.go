@@ -141,7 +141,7 @@ type ErrorResponseWithUUID struct {
 	ErrorResponse error
 }
 
-type GraphV2 = []*NodeV2
+type GraphV2 []*NodeV2
 
 type NodeV2 struct {
 	Path     *PathV2
@@ -380,14 +380,14 @@ func validateInputData(input *RouteInputParams) error {
 			return ErrSwapTokenIDMustBeDifferent
 		}
 
-		// we can do this check, cause AmountIn is required in `RouteInputParams`
-		if input.AmountIn.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 &&
+		if input.AmountIn != nil &&
 			input.AmountOut != nil &&
+			input.AmountIn.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 &&
 			input.AmountOut.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
 			return ErrSwapAmountInAmountOutMustBeExclusive
 		}
 
-		if input.AmountIn.ToInt().Sign() < 0 {
+		if input.AmountIn != nil && input.AmountIn.ToInt().Sign() < 0 {
 			return ErrSwapAmountInMustBePositive
 		}
 
