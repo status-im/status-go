@@ -270,7 +270,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		}
 	}
 
-	w.peerExchange, err = peer_exchange.NewWakuPeerExchange(w.DiscV5(), w.peerConnector, w.peermanager, w.opts.prometheusReg, w.log)
+	w.peerExchange, err = peer_exchange.NewWakuPeerExchange(w.DiscV5(), w.opts.clusterID, w.peerConnector, w.peermanager, w.opts.prometheusReg, w.log)
 	if err != nil {
 		return nil, err
 	}
