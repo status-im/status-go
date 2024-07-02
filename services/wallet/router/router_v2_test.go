@@ -3,7 +3,6 @@ package router
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"math/big"
 	"testing"
 
@@ -2636,7 +2635,7 @@ func TestValidateInputData(t *testing.T) {
 				TokenID:     pathprocessor.SttSymbol,
 				testnetMode: true,
 			},
-			expectedError: errors.New("username and public key are required for ENSRegister"),
+			expectedError: ErrENSRegisterRequiresUsernameAndPubKey,
 		},
 		{
 			name: "ENSRegister missing public key",
@@ -2646,7 +2645,7 @@ func TestValidateInputData(t *testing.T) {
 				TokenID:     pathprocessor.SttSymbol,
 				testnetMode: true,
 			},
-			expectedError: errors.New("username and public key are required for ENSRegister"),
+			expectedError: ErrENSRegisterRequiresUsernameAndPubKey,
 		},
 		{
 			name: "ENSRegister invalid token on testnet",
@@ -2657,7 +2656,7 @@ func TestValidateInputData(t *testing.T) {
 				TokenID:     "invalidtoken",
 				testnetMode: true,
 			},
-			expectedError: errors.New("only STT is supported for ENSRegister on testnet"),
+			expectedError: ErrENSRegisterTestnetSTTOnly,
 		},
 		{
 			name: "ENSRegister invalid token on mainnet",
@@ -2667,7 +2666,7 @@ func TestValidateInputData(t *testing.T) {
 				PublicKey: "validpublickey",
 				TokenID:   "invalidtoken",
 			},
-			expectedError: errors.New("only SNT is supported for ENSRegister"),
+			expectedError: ErrENSRegisterMainnetSNTOnly,
 		},
 		{
 			name: "ENSRelease valid data",
@@ -2682,7 +2681,7 @@ func TestValidateInputData(t *testing.T) {
 			input: &RouteInputParams{
 				SendType: ENSRelease,
 			},
-			expectedError: errors.New("username is required for ENSRelease"),
+			expectedError: ErrENSReleaseRequiresUsername,
 		},
 		{
 			name: "ENSSetPubKey valid data",
@@ -2699,7 +2698,7 @@ func TestValidateInputData(t *testing.T) {
 				SendType:  ENSSetPubKey,
 				PublicKey: "validpublickey",
 			},
-			expectedError: errors.New("username and public key are required for ENSSetPubKey"),
+			expectedError: ErrENSSetPubKeyRequiresUsernameAndPubKey,
 		},
 		{
 			name: "ENSSetPubKey missing public key",
@@ -2707,7 +2706,7 @@ func TestValidateInputData(t *testing.T) {
 				SendType: ENSSetPubKey,
 				Username: "validusername",
 			},
-			expectedError: errors.New("username and public key are required for ENSSetPubKey"),
+			expectedError: ErrENSSetPubKeyRequiresUsernameAndPubKey,
 		},
 		{
 			name: "ENSSetPubKey invalid ENS username",
@@ -2716,21 +2715,21 @@ func TestValidateInputData(t *testing.T) {
 				Username:  "invalidusername",
 				PublicKey: "validpublickey",
 			},
-			expectedError: errors.New("username and public key are required for ENSSetPubKey"),
+			expectedError: ErrENSSetPubKeyInvalidUsername,
 		},
 		{
 			name: "StickersBuy missing packID",
 			input: &RouteInputParams{
 				SendType: StickersBuy,
 			},
-			expectedError: errors.New("packID is required for StickersBuy"),
+			expectedError: ErrStickersBuyRequiresPackID,
 		},
 		{
 			name: "Swap missing toTokenID",
 			input: &RouteInputParams{
 				SendType: Swap,
 			},
-			expectedError: errors.New("toTokenID is required for Swap"),
+			expectedError: ErrSwapRequiresToTokenID,
 		},
 		{
 			name: "Swap tokenID equal to toTokenID",
@@ -2739,7 +2738,7 @@ func TestValidateInputData(t *testing.T) {
 				TokenID:   "token",
 				ToTokenID: "token",
 			},
-			expectedError: errors.New("tokenID and toTokenID must be different"),
+			expectedError: ErrSwapTokenIDMustBeDifferent,
 		},
 		{
 			name: "Swap both amountIn and amountOut set",
@@ -2750,7 +2749,7 @@ func TestValidateInputData(t *testing.T) {
 				AmountIn:  (*hexutil.Big)(big.NewInt(100)),
 				AmountOut: (*hexutil.Big)(big.NewInt(100)),
 			},
-			expectedError: errors.New("only one of amountIn or amountOut can be set"),
+			expectedError: ErrSwapAmountInAmountOutMustBeExclusive,
 		},
 		{
 			name: "Swap negative amountIn",
@@ -2760,7 +2759,7 @@ func TestValidateInputData(t *testing.T) {
 				ToTokenID: "token2",
 				AmountIn:  (*hexutil.Big)(big.NewInt(-100)),
 			},
-			expectedError: errors.New("amountIn must be positive"),
+			expectedError: ErrSwapAmountInMustBePositive,
 		},
 		{
 			name: "Swap negative amountOut",
@@ -2770,7 +2769,7 @@ func TestValidateInputData(t *testing.T) {
 				ToTokenID: "token2",
 				AmountOut: (*hexutil.Big)(big.NewInt(-100)),
 			},
-			expectedError: errors.New("amountOut must be positive"),
+			expectedError: ErrSwapAmountOutMustBePositive,
 		},
 		{
 			name: "fromLockedAmount with supported network on testnet",
@@ -2799,7 +2798,7 @@ func TestValidateInputData(t *testing.T) {
 				},
 				testnetMode: true,
 			},
-			expectedError: errors.New("locked amount is not supported for the selected network"),
+			expectedError: ErrLockedAmountNotSupportedForNetwork,
 		},
 		{
 			name: "fromLockedAmount with unsupported network on testnet",
@@ -2809,7 +2808,7 @@ func TestValidateInputData(t *testing.T) {
 				},
 				testnetMode: true,
 			},
-			expectedError: errors.New("locked amount is not supported for the selected network"),
+			expectedError: ErrLockedAmountNotSupportedForNetwork,
 		},
 		{
 			name: "fromLockedAmount with unsupported network on mainnet",
@@ -2818,7 +2817,7 @@ func TestValidateInputData(t *testing.T) {
 					999: (*hexutil.Big)(big.NewInt(10)),
 				},
 			},
-			expectedError: errors.New("locked amount is not supported for the selected network"),
+			expectedError: ErrLockedAmountNotSupportedForNetwork,
 		},
 		{
 			name: "fromLockedAmount with negative amount",
@@ -2827,7 +2826,7 @@ func TestValidateInputData(t *testing.T) {
 					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(-10)),
 				},
 			},
-			expectedError: errors.New("locked amount must not be negative"),
+			expectedError: ErrLockedAmountNotNegative,
 		},
 		{
 			name: "fromLockedAmount with zero amount",
@@ -2857,7 +2856,7 @@ func TestValidateInputData(t *testing.T) {
 					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(0)),
 				},
 			},
-			expectedError: errors.New("all supported chains are excluded, routing impossible"),
+			expectedError: ErrLockedAmountExcludesAllSupported,
 		},
 		{
 			name: "fromLockedAmount with all supported test networks with zero amount",
@@ -2869,7 +2868,7 @@ func TestValidateInputData(t *testing.T) {
 				},
 				testnetMode: true,
 			},
-			expectedError: errors.New("all supported chains are excluded, routing impossible"),
+			expectedError: ErrLockedAmountExcludesAllSupported,
 		},
 	}
 

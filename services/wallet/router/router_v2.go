@@ -336,15 +336,15 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 func validateInputData(input *RouteInputParams) error {
 	if input.SendType == ENSRegister {
 		if input.Username == "" || input.PublicKey == "" {
-			return ErrUsernameAndPubKeyRequiredForENSRegister
+			return ErrENSRegisterRequiresUsernameAndPubKey
 		}
 		if input.testnetMode {
 			if input.TokenID != pathprocessor.SttSymbol {
-				return ErrOnlySTTSupportedForENSRegisterOnTestnet
+				return ErrENSRegisterTestnetSTTOnly
 			}
 		} else {
 			if input.TokenID != pathprocessor.SntSymbol {
-				return ErrOnlySTTSupportedForENSReleaseOnTestnet
+				return ErrENSRegisterMainnetSNTOnly
 			}
 		}
 		return nil
@@ -352,43 +352,47 @@ func validateInputData(input *RouteInputParams) error {
 
 	if input.SendType == ENSRelease {
 		if input.Username == "" {
-			return ErrUsernameRequiredForENSRelease
+			return ErrENSReleaseRequiresUsername
 		}
 	}
 
 	if input.SendType == ENSSetPubKey {
-		if input.Username == "" || input.PublicKey == "" || ens.ValidateENSUsername(input.Username) != nil {
-			return ErrUsernameAndPubKeyRequiredForENSSetPubKey
+		if input.Username == "" || input.PublicKey == "" {
+			return ErrENSSetPubKeyRequiresUsernameAndPubKey
+		}
+
+		if ens.ValidateENSUsername(input.Username) != nil {
+			return ErrENSSetPubKeyInvalidUsername
 		}
 	}
 
 	if input.SendType == StickersBuy {
 		if input.PackID == nil {
-			return ErrPackIDRequiredForStickersBuy
+			return ErrStickersBuyRequiresPackID
 		}
 	}
 
 	if input.SendType == Swap {
 		if input.ToTokenID == "" {
-			return ErrToTokenIDRequiredForSwap
+			return ErrSwapRequiresToTokenID
 		}
 		if input.TokenID == input.ToTokenID {
-			return ErrTokenIDAndToTokenIDDifferent
+			return ErrSwapTokenIDMustBeDifferent
 		}
 
 		// we can do this check, cause AmountIn is required in `RouteInputParams`
 		if input.AmountIn.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 &&
 			input.AmountOut != nil &&
 			input.AmountOut.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
-			return ErrOnlyOneOfAmountInOrOutSet
+			return ErrSwapAmountInAmountOutMustBeExclusive
 		}
 
 		if input.AmountIn.ToInt().Sign() < 0 {
-			return ErrAmountInMustBePositive
+			return ErrSwapAmountInMustBePositive
 		}
 
 		if input.AmountOut != nil && input.AmountOut.ToInt().Sign() < 0 {
-			return ErrAmountOutMustBePositive
+			return ErrSwapAmountOutMustBePositive
 		}
 	}
 
@@ -419,7 +423,7 @@ func validateInputData(input *RouteInputParams) error {
 			totalLockedAmount = new(big.Int).Add(totalLockedAmount, amount.ToInt())
 
 			if amount == nil || amount.ToInt().Sign() < 0 {
-				return ErrLockedAmountMustBePositive
+				return ErrLockedAmountNotNegative
 			}
 		}
 
