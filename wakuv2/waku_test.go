@@ -371,7 +371,7 @@ func TestWakuV2Filter(t *testing.T) {
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{contentTopicBytes}),
 	}
 
-	_, err = w.Subscribe(filter)
+	fID, err := w.Subscribe(filter)
 	require.NoError(t, err)
 
 	msgTimestamp := w.timestamp()
@@ -415,7 +415,8 @@ func TestWakuV2Filter(t *testing.T) {
 
 	messages = filter.Retrieve()
 	require.Len(t, messages, 1)
-
+	err = w.Unsubscribe(context.Background(), fID)
+	require.NoError(t, err)
 	require.NoError(t, w.Stop())
 }
 
