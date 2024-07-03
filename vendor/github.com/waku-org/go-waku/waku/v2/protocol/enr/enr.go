@@ -120,7 +120,8 @@ func Multiaddress(node *enode.Node) (peer.ID, []multiaddr.Multiaddr, error) {
 		maRaw := multiaddrRaw[offset+2 : offset+2+int(maSize)]
 		addr, err := multiaddr.NewMultiaddrBytes(maRaw)
 		if err != nil {
-			return "", nil, fmt.Errorf("invalid multiaddress field length")
+			// The value is not a multiaddress. Ignoring...
+			continue
 		}
 
 		hostInfoStr := fmt.Sprintf("/p2p/%s", peerID.String())
