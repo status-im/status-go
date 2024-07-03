@@ -65,7 +65,7 @@ func (p *Path) Equal(o *Path) bool {
 	return p.From.ChainID == o.From.ChainID && p.To.ChainID == o.To.ChainID
 }
 
-type Graph = []*Node
+type Graph []*Node
 
 type Node struct {
 	Path     *Path

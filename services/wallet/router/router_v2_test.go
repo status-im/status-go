@@ -2669,6 +2669,39 @@ func TestValidateInputData(t *testing.T) {
 			expectedError: ErrENSRegisterMainnetSNTOnly,
 		},
 		{
+			name: "ENSRegister valid data with mixed case username on mainnet",
+			input: &RouteInputParams{
+				SendType:  ENSRegister,
+				Username:  "ValidUsername.eth",
+				PublicKey: "validpublickey",
+				TokenID:   pathprocessor.SntSymbol,
+			},
+			expectedError: nil,
+		},
+		/*
+			TODO we should introduce proper ENS validation
+			{
+				name: "ENSRegister with special characters in username",
+				input: &RouteInputParams{
+					SendType:  ENSRegister,
+					Username:  "validuser!@#name.eth",
+					PublicKey: "validpublickey",
+					TokenID:   pathprocessor.SntSymbol,
+				},
+				expectedError: ErrENSSetPubKeyInvalidUsername,
+			},
+			{
+				name: "ENSRegister with leading and trailing spaces in username",
+				input: &RouteInputParams{
+					SendType:  ENSRegister,
+					Username:  " validusername.eth ",
+					PublicKey: "validpublickey",
+					TokenID:   pathprocessor.SntSymbol,
+				},
+				expectedError: ErrENSSetPubKeyInvalidUsername,
+			},
+		*/
+		{
 			name: "ENSRelease valid data",
 			input: &RouteInputParams{
 				SendType: ENSRelease,
@@ -2772,12 +2805,53 @@ func TestValidateInputData(t *testing.T) {
 			expectedError: ErrSwapAmountOutMustBePositive,
 		},
 		{
+			name: "Swap with very large amountIn",
+			input: &RouteInputParams{
+				SendType:  Swap,
+				TokenID:   "token1",
+				ToTokenID: "token2",
+				AmountIn:  (*hexutil.Big)(big.NewInt(1e18)),
+			},
+			expectedError: nil,
+		},
+		{
+			name: "Swap with very large amountOut",
+			input: &RouteInputParams{
+				SendType:  Swap,
+				TokenID:   "token1",
+				ToTokenID: "token2",
+				AmountOut: (*hexutil.Big)(big.NewInt(1e18)),
+			},
+			expectedError: nil,
+		},
+		{
+			name: "Swap with very small amountIn",
+			input: &RouteInputParams{
+				SendType:  Swap,
+				TokenID:   "token1",
+				ToTokenID: "token2",
+				AmountIn:  (*hexutil.Big)(big.NewInt(1)),
+			},
+			expectedError: nil,
+		},
+		{
+			name: "Swap with very small amountOut",
+			input: &RouteInputParams{
+				SendType:  Swap,
+				TokenID:   "token1",
+				ToTokenID: "token2",
+				AmountOut: (*hexutil.Big)(big.NewInt(1)),
+			},
+			expectedError: nil,
+		},
+		{
 			name: "fromLockedAmount with supported network on testnet",
 			input: &RouteInputParams{
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.EthereumSepolia: (*hexutil.Big)(big.NewInt(10)),
 				},
 				testnetMode: true,
+				AmountIn:    (*hexutil.Big)(big.NewInt(20)),
 			},
 			expectedError: nil,
 		},
@@ -2787,6 +2861,7 @@ func TestValidateInputData(t *testing.T) {
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(10)),
 				},
+				AmountIn: (*hexutil.Big)(big.NewInt(20)),
 			},
 			expectedError: nil,
 		},
@@ -2834,6 +2909,7 @@ func TestValidateInputData(t *testing.T) {
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(0)),
 				},
+				AmountIn: (*hexutil.Big)(big.NewInt(20)),
 			},
 			expectedError: nil,
 		},
@@ -2844,6 +2920,7 @@ func TestValidateInputData(t *testing.T) {
 					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(0)),
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(0)),
 				},
+				AmountIn: (*hexutil.Big)(big.NewInt(20)),
 			},
 			expectedError: nil,
 		},
@@ -2855,6 +2932,7 @@ func TestValidateInputData(t *testing.T) {
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(0)),
 					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(0)),
 				},
+				AmountIn: (*hexutil.Big)(big.NewInt(20)),
 			},
 			expectedError: ErrLockedAmountExcludesAllSupported,
 		},
@@ -2867,8 +2945,64 @@ func TestValidateInputData(t *testing.T) {
 					walletCommon.ArbitrumSepolia: (*hexutil.Big)(big.NewInt(0)),
 				},
 				testnetMode: true,
+				AmountIn:    (*hexutil.Big)(big.NewInt(20)),
 			},
 			expectedError: ErrLockedAmountExcludesAllSupported,
+		},
+		{
+			name: "fromLockedAmount with mixed supported and unsupported networks on testnet",
+			input: &RouteInputParams{
+				FromLockedAmount: map[uint64]*hexutil.Big{
+					walletCommon.EthereumSepolia: (*hexutil.Big)(big.NewInt(10)),
+					999:                          (*hexutil.Big)(big.NewInt(10)),
+				},
+				testnetMode: true,
+			},
+			expectedError: ErrLockedAmountNotSupportedForNetwork,
+		},
+		{
+			name: "fromLockedAmount with mixed supported and unsupported networks on mainnet",
+			input: &RouteInputParams{
+				FromLockedAmount: map[uint64]*hexutil.Big{
+					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(10)),
+					999:                          (*hexutil.Big)(big.NewInt(10)),
+				},
+			},
+			expectedError: ErrLockedAmountNotSupportedForNetwork,
+		},
+		{
+			name: "fromLockedAmount with null map on testnet",
+			input: &RouteInputParams{
+				FromLockedAmount: nil,
+				testnetMode:      true,
+				AmountIn:         (*hexutil.Big)(big.NewInt(20)),
+			},
+			expectedError: nil,
+		},
+		{
+			name: "fromLockedAmount with null map on mainnet",
+			input: &RouteInputParams{
+				FromLockedAmount: nil,
+				AmountIn:         (*hexutil.Big)(big.NewInt(20)),
+			},
+			expectedError: nil,
+		},
+		{
+			name: "fromLockedAmount with empty map on testnet",
+			input: &RouteInputParams{
+				FromLockedAmount: map[uint64]*hexutil.Big{},
+				testnetMode:      true,
+				AmountIn:         (*hexutil.Big)(big.NewInt(20)),
+			},
+			expectedError: nil,
+		},
+		{
+			name: "fromLockedAmount with empty map on mainnet",
+			input: &RouteInputParams{
+				FromLockedAmount: map[uint64]*hexutil.Big{},
+				AmountIn:         (*hexutil.Big)(big.NewInt(20)),
+			},
+			expectedError: nil,
 		},
 	}
 
