@@ -21,6 +21,8 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
+	"github.com/status-im/status-go/centralizedmetrics"
+	"github.com/status-im/status-go/centralizedmetrics/providers"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
@@ -48,6 +50,53 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
+type InitializeApplicationResponse struct {
+	Accounts               []multiaccounts.Account         `json:"accounts"`
+	CentralizedMetricsInfo *centralizedmetrics.MetricsInfo `json:"centralizedMetricsInfo"`
+}
+
+func InitializeApplication(requestJSON string) string {
+	var request requests.InitializeApplication
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	// initialize metrics
+	providers.MixpanelAppID = request.MixpanelAppID
+	providers.MixpanelToken = request.MixpanelToken
+
+	datadir := request.DataDir
+
+	statusBackend.UpdateRootDataDir(datadir)
+	err = statusBackend.OpenAccounts()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	accs, err := statusBackend.GetAccounts()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	centralizedMetricsInfo, err := statusBackend.CentralizedMetricsInfo()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	response := &InitializeApplicationResponse{
+		Accounts:               accs,
+		CentralizedMetricsInfo: centralizedMetricsInfo,
+	}
+	data, err := json.Marshal(response)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return string(data)
+}
+
+// DEPRECATED: use InitializeApplication
 // OpenAccounts opens database and returns accounts list.
 func OpenAccounts(datadir string) string {
 	statusBackend.UpdateRootDataDir(datadir)
@@ -1355,4 +1404,46 @@ func GetRandomMnemonic() string {
 		return makeJSONResponse(err)
 	}
 	return mnemonic
+}
+
+func ToggleCentralizedMetrics(requestJSON string) string {
+	var request requests.ToggleCentralizedMetrics
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = statusBackend.ToggleCentralizedMetrics(request.Enabled)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return ""
+}
+
+func AddCentralizedMetric(requestJSON string) string {
+	var request requests.AddCentralizedMetric
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	metric := request.Metric
+
+	metric.EnsureID()
+	err = statusBackend.AddCentralizedMetric(*metric)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return metric.ID
 }

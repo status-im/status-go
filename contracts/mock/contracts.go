@@ -7,8 +7,9 @@ package mock_contracts
 import (
 	reflect "reflect"
 
-	common "github.com/ethereum/go-ethereum/common"
 	gomock "github.com/golang/mock/gomock"
+
+	common "github.com/ethereum/go-ethereum/common"
 	ethscan "github.com/status-im/status-go/contracts/ethscan"
 	ierc20 "github.com/status-im/status-go/contracts/ierc20"
 )

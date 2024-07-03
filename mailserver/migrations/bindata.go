@@ -2,9 +2,7 @@
 // sources:
 // 1557732988_initialize_db.down.sql (72B)
 // 1557732988_initialize_db.up.sql (278B)
-// exit_code_1.txt (4B)
 // static.go (198B)
-// test_1.log (0)
 
 package migrations
 
@@ -87,7 +85,7 @@ func _1557732988_initialize_dbDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1557732988_initialize_db.down.sql", size: 72, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "1557732988_initialize_db.down.sql", size: 72, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x77, 0x40, 0x78, 0xb7, 0x71, 0x3c, 0x20, 0x3b, 0xc9, 0xb, 0x2f, 0x49, 0xe4, 0xff, 0x1c, 0x84, 0x54, 0xa1, 0x30, 0xe3, 0x90, 0xf8, 0x73, 0xda, 0xb0, 0x2a, 0xea, 0x8e, 0xf1, 0x82, 0xe7, 0xd2}}
 	return a, nil
 }
@@ -107,28 +105,8 @@ func _1557732988_initialize_dbUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1557732988_initialize_db.up.sql", size: 278, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "1557732988_initialize_db.up.sql", size: 278, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf5, 0x85, 0x41, 0x7a, 0xba, 0x4f, 0xa3, 0x43, 0xc0, 0x63, 0xfa, 0x2c, 0xd1, 0xc5, 0xbb, 0x20, 0xa0, 0x64, 0xa8, 0x3b, 0x65, 0x82, 0xa2, 0x14, 0x28, 0x18, 0x7c, 0x8b, 0x3a, 0x7a, 0xfd, 0xe0}}
-	return a, nil
-}
-
-var _exit_code_1Txt = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x32\x34\x32\xe7\x02\x04\x00\x00\xff\xff\x0c\x38\xee\x3e\x04\x00\x00\x00")
-
-func exit_code_1TxtBytes() ([]byte, error) {
-	return bindataRead(
-		_exit_code_1Txt,
-		"exit_code_1.txt",
-	)
-}
-
-func exit_code_1Txt() (*asset, error) {
-	bytes, err := exit_code_1TxtBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "exit_code_1.txt", size: 4, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x74, 0x3c, 0x78, 0x50, 0xcc, 0xcf, 0xba, 0x5e, 0x53, 0xa9, 0x0, 0x26, 0x63, 0xec, 0x1d, 0xdd, 0x10, 0x79, 0x31, 0x5a, 0x98, 0xbd, 0xbf, 0xdd, 0xe1, 0xe, 0x60, 0x44, 0xf5, 0x6a, 0xbe, 0xfe}}
 	return a, nil
 }
 
@@ -147,28 +125,8 @@ func staticGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "static.go", size: 198, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "static.go", size: 198, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb, 0xd2, 0xfd, 0xbf, 0xe5, 0xff, 0xcb, 0x54, 0xec, 0x41, 0x23, 0x7b, 0xc0, 0xeb, 0x55, 0xb8, 0x69, 0xd7, 0x57, 0xf1, 0x83, 0x13, 0x88, 0x55, 0xd9, 0x73, 0xdc, 0x93, 0xee, 0x23, 0xe3, 0xe9}}
-	return a, nil
-}
-
-var _test_1Log = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x01\x00\x00\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00")
-
-func test_1LogBytes() ([]byte, error) {
-	return bindataRead(
-		_test_1Log,
-		"test_1.log",
-	)
-}
-
-func test_1Log() (*asset, error) {
-	bytes, err := test_1LogBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "test_1.log", size: 0, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
 
@@ -265,9 +223,7 @@ func AssetNames() []string {
 var _bindata = map[string]func() (*asset, error){
 	"1557732988_initialize_db.down.sql": _1557732988_initialize_dbDownSql,
 	"1557732988_initialize_db.up.sql":   _1557732988_initialize_dbUpSql,
-	"exit_code_1.txt":                   exit_code_1Txt,
 	"static.go":                         staticGo,
-	"test_1.log":                        test_1Log,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -318,9 +274,7 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"1557732988_initialize_db.down.sql": {_1557732988_initialize_dbDownSql, map[string]*bintree{}},
 	"1557732988_initialize_db.up.sql":   {_1557732988_initialize_dbUpSql, map[string]*bintree{}},
-	"exit_code_1.txt":                   {exit_code_1Txt, map[string]*bintree{}},
 	"static.go":                         {staticGo, map[string]*bintree{}},
-	"test_1.log":                        {test_1Log, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

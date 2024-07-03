@@ -487,6 +487,10 @@ func (db *Database) DeleteIdentityImage(keyUID string) error {
 	return err
 }
 
+func (db *Database) DB() *sql.DB {
+	return db.db
+}
+
 func valueOr(value error, or error) error {
 	if value != nil {
 		return value

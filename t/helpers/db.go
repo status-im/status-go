@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/status-im/status-go/common/dbsetup"
+	"github.com/status-im/status-go/multiaccounts"
 )
 
 const kdfIterationsNumberForTests = 1
@@ -38,6 +39,15 @@ func SetupTestMemorySQLDB(dbInit dbsetup.DatabaseInitializer) (*sql.DB, error) {
 	}
 
 	return db, nil
+}
+
+func SetupTestMemorySQLAccountsDB(dbInit dbsetup.DatabaseInitializer) (*sql.DB, error) {
+	db, err := multiaccounts.InitializeDB(dbsetup.InMemoryPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return db.DB(), nil
 }
 
 func ColumnExists(db *sql.DB, tableName string, columnName string) (bool, error) {
