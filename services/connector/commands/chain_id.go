@@ -1,24 +1,29 @@
 package commands
 
 import (
-	"encoding/json"
-	"fmt"
+	"database/sql"
+
+	persistence "github.com/status-im/status-go/services/connector/database"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 type ChainIDCommand struct {
-	RpcClient RPCClientInterface
+	Db *sql.DB
 }
 
 func (c *ChainIDCommand) Execute(request RPCRequest) (string, error) {
-	chainsRequest := RPCRequest{
-		Method: "eth_chainId",
-		Params: []interface{}{},
+	if err := request.checkDAppData(); err != nil {
+		return "", err
 	}
 
-	requestJSON, err := json.Marshal(chainsRequest)
+	dApp, err := persistence.SelectDAppByUrl(c.Db, request.Origin)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %v", err)
+		return "", err
 	}
 
-	return c.RpcClient.CallRaw(string(requestJSON)), nil
+	if dApp == nil {
+		return "", ErrDAppIsNotPermittedByUser
+	}
+
+	return walletCommon.ChainID(dApp.ChainID).String(), nil
 }

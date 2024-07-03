@@ -16,6 +16,7 @@ var testDApp = DApp{
 	URL:           "https://test-dapp-url.com",
 	IconURL:       "https://test-dapp-icon-url.com",
 	SharedAccount: "0x1234567890",
+	ChainID:       0x1,
 }
 
 func setupTestDB(t *testing.T) (db *sql.DB, close func()) {

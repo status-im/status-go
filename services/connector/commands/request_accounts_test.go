@@ -8,19 +8,10 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/params"
+	persistence "github.com/status-im/status-go/services/connector/database"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
-
-type RPCClientMock struct {
-	response string
-}
-
-func (c *RPCClientMock) CallRaw(request string) string {
-	return c.response
-}
-
-func (c *RPCClientMock) SetResponse(response string) {
-	c.response = response
-}
 
 func TestFailToRequestAccountsWithMissingDAppFields(t *testing.T) {
 	db, close := setupTestDB(t)
@@ -48,8 +39,21 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 
 	rpcClient := &RPCClientMock{}
 
+	nm := NetworkManagerMock{}
+	nm.SetNetworks([]*params.Network{
+		{
+			ChainID: walletCommon.OptimismMainnet,
+			Layer:   2,
+		},
+		{
+			ChainID: walletCommon.EthereumMainnet,
+			Layer:   1,
+		},
+	})
+
 	cmd := &RequestAccountsCommand{
-		RpcClient: rpcClient,
+		RpcClient:      rpcClient,
+		NetworkManager: &nm,
 		AccountsCommand: AccountsCommand{
 			Db: db,
 		}}
@@ -85,6 +89,14 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, result.Accounts, 1)
 	assert.Equal(t, accountAddress.Hex(), result.Accounts[0])
+
+	// Check dApp in the database
+	dApp, err := persistence.SelectDAppByUrl(db, request.Origin)
+	assert.NoError(t, err)
+	assert.Equal(t, request.DAppName, dApp.Name)
+	assert.Equal(t, request.DAppIconUrl, dApp.IconURL)
+	assert.Equal(t, accountAddress.Hex(), dApp.SharedAccount)
+	assert.Equal(t, walletCommon.EthereumMainnet, dApp.ChainID)
 
 	// Setting empty response here to ensure that the account is not requested again
 	rpcClient.SetResponse("")

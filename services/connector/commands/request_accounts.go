@@ -13,10 +13,12 @@ import (
 var (
 	ErrAccountsRequestDeniedByUser = errors.New("accounts request denied by user")
 	ErrNoAccountsAvailable         = errors.New("no accounts available")
+	ErrNoDefaultNetworkAvailable   = errors.New("no default network available")
 )
 
 type RequestAccountsCommand struct {
-	RpcClient RPCClientInterface
+	RpcClient      RPCClientInterface
+	NetworkManager NetworkManagerInterface
 	AccountsCommand
 }
 
@@ -57,8 +59,22 @@ func (c *RequestAccountsCommand) requestAccountForDApp() (string, error) {
 	return rawResponse.Result[0].Address.Hex(), nil
 }
 
+func (c *RequestAccountsCommand) getDefaultChainID() (uint64, error) {
+	networks, err := c.NetworkManager.GetActiveNetworks()
+	if err != nil {
+		return 0, err
+	}
+
+	for _, network := range networks {
+		if network.Layer == 1 {
+			return network.ChainID, nil
+		}
+	}
+	return 0, ErrNoDefaultNetworkAvailable
+}
+
 func (c *RequestAccountsCommand) Execute(request RPCRequest) (string, error) {
-	if err := c.checkDAppData(request); err != nil {
+	if err := request.checkDAppData(); err != nil {
 		return "", err
 	}
 
@@ -74,11 +90,17 @@ func (c *RequestAccountsCommand) Execute(request RPCRequest) (string, error) {
 			return "", err
 		}
 
+		chainID, err := c.getDefaultChainID()
+		if err != nil {
+			return "", err
+		}
+
 		dApp = &persistence.DApp{
 			URL:           request.Origin,
 			Name:          request.DAppName,
 			IconURL:       request.DAppIconUrl,
 			SharedAccount: account,
+			ChainID:       chainID,
 		}
 
 		err = persistence.UpsertDApp(c.Db, dApp)

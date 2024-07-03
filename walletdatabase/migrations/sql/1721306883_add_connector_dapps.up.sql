@@ -5,5 +5,6 @@ CREATE TABLE IF NOT EXISTS connector_dapps (
     url TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     shared_account TEXT NOT NULL,
+    chain_id UNSIGNED BIGINT NOT NULL,
     icon_url TEXT
 ) WITHOUT ROWID;

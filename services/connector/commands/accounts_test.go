@@ -87,6 +87,7 @@ func TestGetAccountForPermittedDApp(t *testing.T) {
 		Name:          request.DAppName,
 		IconURL:       request.DAppIconUrl,
 		SharedAccount: "0x6d0aa2a774b74bb1d36f97700315adf962c69fcg",
+		ChainID:       0x1,
 	}
 
 	err := persistence.UpsertDApp(db, &dApp)

@@ -16,6 +16,24 @@ type API struct {
 func NewAPI(s *Service) *API {
 	r := NewCommandRegistry()
 
+	r.Register("eth_sendTransaction", &commands.SendTransactionCommand{})
+	r.Register("eth_sign", &commands.SignCommand{})
+
+	// Accounts querry and dapp permissions
+	r.Register("eth_accounts", &commands.AccountsCommand{Db: s.db})
+	r.Register("eth_requestAccounts", &commands.RequestAccountsCommand{
+		RpcClient:       s.rpcClient,
+		AccountsCommand: commands.AccountsCommand{Db: s.db},
+		NetworkManager:  s.rpcClient.NetworkManager,
+	})
+
+	// Active chain per dapp management
+	r.Register("eth_chainId", &commands.ChainIDCommand{Db: s.db})
+	r.Register("wallet_switchEthereumChain", &commands.SwitchEthereumChainCommand{
+		Db:             s.db,
+		NetworkManager: s.rpcClient.NetworkManager,
+	})
+
 	return &API{
 		s: s,
 		r: r,
