@@ -525,7 +525,7 @@ func (s *Service) SetSignerPubKey(ctx context.Context, chainID uint64, contractA
 		common.Address(txArgs.From),
 		common.HexToAddress(contractAddress),
 		transactions.SetSignerPublicKey,
-		transactions.AutoDelete,
+		transactions.Keep,
 		"",
 	)
 	if err != nil {
