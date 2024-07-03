@@ -15,6 +15,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/rpc/chain"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
 	"github.com/status-im/status-go/services/wallet/testutils"
@@ -165,8 +166,9 @@ func setupReader(t *testing.T) (*Reader, *mock_token.MockManagerInterface, *mock
 	mockCtrl := gomock.NewController(t)
 	mockTokenManager := mock_token.NewMockManagerInterface(mockCtrl)
 	tokenBalanceStorage := mock_balance_persistence.NewMockTokenBalancesStorage(mockCtrl)
+	eventsFeed := &event.Feed{}
 
-	return NewReader(mockTokenManager, nil, tokenBalanceStorage, nil), mockTokenManager, tokenBalanceStorage, mockCtrl
+	return NewReader(mockTokenManager, nil, tokenBalanceStorage, eventsFeed), mockTokenManager, tokenBalanceStorage, mockCtrl
 }
 
 func TestGetCachedWalletTokensWithoutMarketData(t *testing.T) {
@@ -1022,4 +1024,19 @@ func TestFetchBalances(t *testing.T) {
 	}
 
 	require.True(t, reader.isBalanceCacheValid(addresses))
+}
+
+func TestReaderRestart(t *testing.T) {
+	reader, _, _, mockCtrl := setupReader(t)
+	defer mockCtrl.Finish()
+
+	err := reader.Start()
+	require.NoError(t, err)
+	require.NotNil(t, reader.walletEventsWatcher)
+	previousWalletEventsWatcher := reader.walletEventsWatcher
+
+	err = reader.Restart()
+	require.NoError(t, err)
+	require.NotNil(t, reader.walletEventsWatcher)
+	require.NotEqual(t, previousWalletEventsWatcher, reader.walletEventsWatcher)
 }

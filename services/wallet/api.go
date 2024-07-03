@@ -819,3 +819,7 @@ func (api *API) SignTypedDataV4(typedJson string, address string, password strin
 	}
 	return types.HexBytes(sig), err
 }
+
+func (api *API) RestartWalletReloadTimer(ctx context.Context) error {
+	return api.s.reader.Restart()
+}

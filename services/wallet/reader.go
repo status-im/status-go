@@ -143,6 +143,11 @@ func (r *Reader) Stop() {
 	r.lastWalletTokenUpdateTimestamp = sync.Map{}
 }
 
+func (r *Reader) Restart() error {
+	r.Stop()
+	return r.Start()
+}
+
 func (r *Reader) triggerWalletReload() {
 	r.cancelDelayedWalletReload()
 
