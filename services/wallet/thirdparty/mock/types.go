@@ -8,6 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+
 	thirdparty "github.com/status-im/status-go/services/wallet/thirdparty"
 )
 

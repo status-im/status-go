@@ -3,8 +3,6 @@
 // 1619446565_postgres_make_anon_metrics_table.down.sql (24B)
 // 1619446565_postgres_make_anon_metrics_table.up.sql (443B)
 // doc.go (400B)
-// exit_code_1.txt (4B)
-// test_1.log (0)
 
 package migrations
 
@@ -87,7 +85,7 @@ func _1619446565_postgres_make_anon_metrics_tableDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1619446565_postgres_make_anon_metrics_table.down.sql", size: 24, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "1619446565_postgres_make_anon_metrics_table.down.sql", size: 24, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x75, 0xea, 0x1, 0x74, 0xe6, 0xa3, 0x11, 0xd0, 0x86, 0x87, 0x7e, 0x31, 0xb4, 0x1a, 0x27, 0x5d, 0xda, 0x77, 0xa3, 0xf5, 0x1d, 0x88, 0x79, 0xcf, 0xd5, 0x95, 0x75, 0xd, 0x47, 0xa1, 0x90, 0x5}}
 	return a, nil
 }
@@ -107,7 +105,7 @@ func _1619446565_postgres_make_anon_metrics_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1619446565_postgres_make_anon_metrics_table.up.sql", size: 443, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "1619446565_postgres_make_anon_metrics_table.up.sql", size: 443, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd5, 0xdc, 0x72, 0x28, 0x3c, 0xf6, 0x94, 0xb0, 0x47, 0x3d, 0xca, 0x55, 0x3d, 0xf7, 0x83, 0xb8, 0x7d, 0x2f, 0x1e, 0x98, 0xb7, 0xde, 0xa, 0xff, 0xa0, 0x52, 0x60, 0x83, 0x56, 0xc5, 0xd1, 0xa2}}
 	return a, nil
 }
@@ -127,48 +125,8 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 400, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 400, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf0, 0xa9, 0x91, 0x6, 0x5d, 0x91, 0xf7, 0x39, 0x3d, 0xc3, 0xf8, 0x5e, 0x4f, 0x7e, 0x7a, 0x8c, 0x60, 0x68, 0x66, 0x7d, 0x52, 0xe4, 0xd8, 0x23, 0x84, 0x55, 0x2c, 0x38, 0xa1, 0x64, 0xe7, 0xe6}}
-	return a, nil
-}
-
-var _exit_code_1Txt = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x32\x34\x32\xe7\x02\x04\x00\x00\xff\xff\x0c\x38\xee\x3e\x04\x00\x00\x00")
-
-func exit_code_1TxtBytes() ([]byte, error) {
-	return bindataRead(
-		_exit_code_1Txt,
-		"exit_code_1.txt",
-	)
-}
-
-func exit_code_1Txt() (*asset, error) {
-	bytes, err := exit_code_1TxtBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "exit_code_1.txt", size: 4, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x74, 0x3c, 0x78, 0x50, 0xcc, 0xcf, 0xba, 0x5e, 0x53, 0xa9, 0x0, 0x26, 0x63, 0xec, 0x1d, 0xdd, 0x10, 0x79, 0x31, 0x5a, 0x98, 0xbd, 0xbf, 0xdd, 0xe1, 0xe, 0x60, 0x44, 0xf5, 0x6a, 0xbe, 0xfe}}
-	return a, nil
-}
-
-var _test_1Log = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x01\x00\x00\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00")
-
-func test_1LogBytes() ([]byte, error) {
-	return bindataRead(
-		_test_1Log,
-		"test_1.log",
-	)
-}
-
-func test_1Log() (*asset, error) {
-	bytes, err := test_1LogBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "test_1.log", size: 0, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
 
@@ -265,9 +223,7 @@ func AssetNames() []string {
 var _bindata = map[string]func() (*asset, error){
 	"1619446565_postgres_make_anon_metrics_table.down.sql": _1619446565_postgres_make_anon_metrics_tableDownSql,
 	"1619446565_postgres_make_anon_metrics_table.up.sql":   _1619446565_postgres_make_anon_metrics_tableUpSql,
-	"doc.go":          docGo,
-	"exit_code_1.txt": exit_code_1Txt,
-	"test_1.log":      test_1Log,
+	"doc.go": docGo,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -318,9 +274,7 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"1619446565_postgres_make_anon_metrics_table.down.sql": {_1619446565_postgres_make_anon_metrics_tableDownSql, map[string]*bintree{}},
 	"1619446565_postgres_make_anon_metrics_table.up.sql":   {_1619446565_postgres_make_anon_metrics_tableUpSql, map[string]*bintree{}},
-	"doc.go":          {docGo, map[string]*bintree{}},
-	"exit_code_1.txt": {exit_code_1Txt, map[string]*bintree{}},
-	"test_1.log":      {test_1Log, map[string]*bintree{}},
+	"doc.go": {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

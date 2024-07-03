@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+
 	chain "github.com/status-im/status-go/rpc/chain"
 	common "github.com/status-im/status-go/services/wallet/common"
 )

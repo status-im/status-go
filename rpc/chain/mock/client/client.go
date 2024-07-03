@@ -9,11 +9,12 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	gomock "github.com/golang/mock/gomock"
+
 	ethereum "github.com/ethereum/go-ethereum"
 	common "github.com/ethereum/go-ethereum/common"
 	types "github.com/ethereum/go-ethereum/core/types"
 	rpc "github.com/ethereum/go-ethereum/rpc"
-	gomock "github.com/golang/mock/gomock"
 	chain "github.com/status-im/status-go/rpc/chain"
 )
 

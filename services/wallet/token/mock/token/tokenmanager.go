@@ -9,9 +9,10 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	gomock "github.com/golang/mock/gomock"
+
 	common "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
-	gomock "github.com/golang/mock/gomock"
 	chain "github.com/status-im/status-go/rpc/chain"
 	token "github.com/status-im/status-go/services/wallet/token"
 )
