@@ -4,36 +4,29 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	mock_thirdparty "github.com/status-im/status-go/services/wallet/thirdparty/mock"
 )
 
 type MockPriceProvider struct {
+	mock_thirdparty.MockMarketDataProvider
 	mockPrices map[string]map[string]float64
 }
 
-func NewMockPriceProvider() *MockPriceProvider {
-	return &MockPriceProvider{}
+func NewMockPriceProvider(ctrl *gomock.Controller) *MockPriceProvider {
+	return &MockPriceProvider{
+		MockMarketDataProvider: *mock_thirdparty.NewMockMarketDataProvider(ctrl),
+	}
 }
 
 func (mpp *MockPriceProvider) setMockPrices(prices map[string]map[string]float64) {
 	mpp.mockPrices = prices
-}
-
-func (mpp *MockPriceProvider) FetchHistoricalDailyPrices(symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
-	return nil, errors.New("not implmented")
-}
-func (mpp *MockPriceProvider) FetchHistoricalHourlyPrices(symbol string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
-	return nil, errors.New("not implmented")
-}
-func (mpp *MockPriceProvider) FetchTokenMarketValues(symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
-	return nil, errors.New("not implmented")
-}
-func (mpp *MockPriceProvider) FetchTokenDetails(symbols []string) (map[string]thirdparty.TokenDetails, error) {
-	return nil, errors.New("not implmented")
 }
 
 func (mpp *MockPriceProvider) ID() string {
@@ -85,7 +78,9 @@ var mockPrices = map[string]map[string]float64{
 }
 
 func TestPrice(t *testing.T) {
-	priceProvider := NewMockPriceProvider()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	priceProvider := NewMockPriceProvider(ctrl)
 	priceProvider.setMockPrices(mockPrices)
 
 	manager := setupTestPrice(t, []thirdparty.MarketDataProvider{priceProvider, priceProvider})
@@ -128,7 +123,9 @@ func TestPrice(t *testing.T) {
 }
 
 func TestFetchPriceErrorFirstProvider(t *testing.T) {
-	priceProvider := NewMockPriceProvider()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	priceProvider := NewMockPriceProvider(ctrl)
 	priceProvider.setMockPrices(mockPrices)
 	priceProviderWithError := &MockPriceProviderWithError{}
 	symbols := []string{"BTC", "ETH"}
@@ -142,4 +139,47 @@ func TestFetchPriceErrorFirstProvider(t *testing.T) {
 			require.Equal(t, rst[symbol][currency], mockPrices[symbol][currency])
 		}
 	}
+}
+
+func TestFetchTokenMarketValues(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	symbols := []string{"BTC", "ETH"}
+	currency := "EUR"
+	expectedMarketValues := map[string]thirdparty.TokenMarketValues{
+		"BTC": {
+			MKTCAP:          1000000000,
+			HIGHDAY:         1.23456,
+			LOWDAY:          1.00000,
+			CHANGEPCTHOUR:   0.1,
+			CHANGEPCTDAY:    0.2,
+			CHANGEPCT24HOUR: 0.3,
+			CHANGE24HOUR:    0.4,
+		},
+		"ETH": {
+			MKTCAP:          2000000000,
+			HIGHDAY:         4.56789,
+			LOWDAY:          4.00000,
+			CHANGEPCTHOUR:   0.5,
+			CHANGEPCTDAY:    0.6,
+			CHANGEPCT24HOUR: 0.7,
+			CHANGE24HOUR:    0.8,
+		},
+	}
+
+	// Can't use fake provider, because the key {receiver, method} will be different, no match
+	provider := mock_thirdparty.NewMockMarketDataProvider(ctrl)
+	provider.EXPECT().ID().Return("MockPriceProvider").AnyTimes()
+	provider.EXPECT().FetchTokenMarketValues(symbols, currency).Return(expectedMarketValues, nil)
+	manager := setupTestPrice(t, []thirdparty.MarketDataProvider{provider})
+	marketValues, err := manager.FetchTokenMarketValues(symbols, currency)
+	require.NoError(t, err)
+	require.Equal(t, expectedMarketValues, marketValues)
+
+	// Test error
+	provider.EXPECT().FetchTokenMarketValues(symbols, currency).Return(nil, errors.New("error"))
+	marketValues, err = manager.FetchTokenMarketValues(symbols, currency)
+	require.Error(t, err)
+	require.Nil(t, marketValues)
 }

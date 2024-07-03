@@ -131,7 +131,3 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 
 	return result
 }
-
-func (cb *CircuitBreaker) Config() Config {
-	return cb.config
-}

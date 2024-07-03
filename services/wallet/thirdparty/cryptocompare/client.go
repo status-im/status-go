@@ -138,7 +138,7 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 		}
 
 		for _, symbol := range smbls {
-			item[symbol] = container.Raw[utils.GetRealSymbol(symbol)][utils.GetRealSymbol(currency)]
+			item[symbol] = container.Raw[utils.GetRealSymbol(symbol)][realCurrency]
 		}
 	}
 	return item, nil

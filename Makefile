@@ -345,6 +345,7 @@ mock: ##@other Regenerate mocks
 	mockgen -package=mock_bridge     -destination=services/wallet/bridge/mock_bridge/bridge.go -source=services/wallet/bridge/bridge.go
 	mockgen -package=mock_client     -destination=rpc/chain/mock/client/client.go              -source=rpc/chain/client.go
 	mockgen -package=mock_token      -destination=services/wallet/token/mock/token/tokenmanager.go -source=services/wallet/token/token.go
+	mockgen -package=mock_thirdparty -destination=services/wallet/thirdparty/mock/types.go -source=services/wallet/thirdparty/types.go
 	mockgen -package=mock_balance_persistence -destination=services/wallet/token/mock/balance_persistence/balance_persistence.go -source=services/wallet/token/balance_persistence.go
 	mockgen -package=mock_network      -destination=rpc/network/mock/network.go -source=rpc/network/network.go
 	mockgen -package=mock_rpcclient     -destination=rpc/mock/client/client.go              -source=rpc/client.go

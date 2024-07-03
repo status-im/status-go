@@ -201,9 +201,10 @@ func TestCircuitBreaker_CommandCancel(t *testing.T) {
 	prov1Called := 0
 	prov2Called := 0
 
+	var ctx context.Context
 	expectedErr := errors.New("provider 1 failed")
-	// These are executed sequentially
-	cmd := NewCommand(context.TODO(), nil)
+
+	cmd := NewCommand(ctx, nil)
 	cmd.Add(NewFunctor(func() ([]interface{}, error) {
 		prov1Called++
 		cmd.Cancel()
@@ -215,9 +216,17 @@ func TestCircuitBreaker_CommandCancel(t *testing.T) {
 	}, circuitName+"2"))
 
 	result := cb.Execute(cmd)
-	t.Log(result.Error())
 	require.True(t, errors.Is(result.Error(), expectedErr))
 
 	assert.Equal(t, 1, prov1Called)
 	assert.Equal(t, 0, prov2Called)
+}
+
+func TestCircuitBreaker_EmptyOrNilCommand(t *testing.T) {
+	cb := NewCircuitBreaker(Config{})
+	cmd := NewCommand(context.TODO(), nil)
+	result := cb.Execute(cmd)
+	require.Error(t, result.Error())
+	result = cb.Execute(nil)
+	require.Error(t, result.Error())
 }
