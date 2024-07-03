@@ -2,7 +2,6 @@ package router
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -11,7 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	sErrors "github.com/status-im/status-go/errors"
+	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/wallet/async"
@@ -396,84 +395,59 @@ func validateInputData(input *RouteInputParams) error {
 		}
 	}
 
-	if input.FromLockedAmount != nil && len(input.FromLockedAmount) > 0 {
-		suppNetworks := copyMap(supportedNetworks)
-		if input.testnetMode {
-			suppNetworks = copyMap(supportedTestNetworks)
-		}
-
-		totalLockedAmount := big.NewInt(0)
-
-		for chainID, amount := range input.FromLockedAmount {
-			if containsNetworkChainID(chainID, input.DisabledFromChainIDs) {
-				return ErrDisabledChainFoundAmongLockedNetworks
-			}
-			if input.testnetMode {
-				if !supportedTestNetworks[chainID] {
-					return ErrLockedAmountNotSupportedForNetwork
-				}
-			} else {
-				if !supportedNetworks[chainID] {
-					return ErrLockedAmountNotSupportedForNetwork
-				}
-			}
-
-			delete(suppNetworks, chainID)
-
-			totalLockedAmount = new(big.Int).Add(totalLockedAmount, amount.ToInt())
-
-			if amount == nil || amount.ToInt().Sign() < 0 {
-				return ErrLockedAmountNotNegative
-			}
-		}
-
-		if totalLockedAmount.Cmp(input.AmountIn.ToInt()) > 0 {
-			return ErrLockedAmountExceedsTotalSendAmount
-		} else if totalLockedAmount.Cmp(input.AmountIn.ToInt()) < 0 && len(suppNetworks) == 0 {
-			return ErrLockedAmountLessThanSendAmountAllNetworks
-		}
-	}
-
-	return validateFromLockedAmount(input.FromLockedAmount, input.testnetMode)
+	return validateFromLockedAmount(input)
 }
 
-func validateFromLockedAmount(fromLockedAmount map[uint64]*hexutil.Big, isTestnetMode bool) error {
-	if fromLockedAmount == nil || len(fromLockedAmount) == 0 {
+func validateFromLockedAmount(input *RouteInputParams) error {
+	if input.FromLockedAmount == nil || len(input.FromLockedAmount) == 0 {
 		return nil
 	}
 
-	chainIDSet := make(map[uint64]bool)
+	var suppNetworks map[uint64]bool
+	if input.testnetMode {
+		suppNetworks = copyMap(supportedTestNetworks)
+	} else {
+		suppNetworks = copyMap(supportedNetworks)
+	}
+
+	totalLockedAmount := big.NewInt(0)
 	excludedChainCount := 0
 
-	for chainID, amount := range fromLockedAmount {
-		if isTestnetMode {
+	for chainID, amount := range input.FromLockedAmount {
+		if containsNetworkChainID(chainID, input.DisabledFromChainIDs) {
+			return ErrDisabledChainFoundAmongLockedNetworks
+		}
+
+		if input.testnetMode {
 			if !supportedTestNetworks[chainID] {
-				return errors.New("locked amount is not supported for the selected network")
+				return ErrLockedAmountNotSupportedForNetwork
 			}
 		} else {
 			if !supportedNetworks[chainID] {
-				return errors.New("locked amount is not supported for the selected network")
+				return ErrLockedAmountNotSupportedForNetwork
 			}
 		}
 
-		// Check locked amount is not negative
 		if amount == nil || amount.ToInt().Sign() < 0 {
-			return errors.New("locked amount must not be negative")
+			return ErrLockedAmountNotNegative
 		}
 
-		// Check if locked chain ID is a duplicate
-		if _, exists := chainIDSet[chainID]; exists {
-			// Handle duplicate chain ID
-			return fmt.Errorf("a chain ID may only appear once, duplicate chain ID found '%d'", chainID)
-		}
-		chainIDSet[chainID] = amount.ToInt().Sign() > 0
-		if !chainIDSet[chainID] {
+		if !(amount.ToInt().Sign() > 0) {
 			excludedChainCount++
 		}
+		delete(suppNetworks, chainID)
+		totalLockedAmount = new(big.Int).Add(totalLockedAmount, amount.ToInt())
 	}
-	if (!isTestnetMode && excludedChainCount == len(supportedNetworks)) ||
-		(isTestnetMode && excludedChainCount == len(supportedTestNetworks)) {
-		return errors.New("all supported chains are excluded, routing impossible")
+
+	if (!input.testnetMode && excludedChainCount == len(supportedNetworks)) ||
+		(input.testnetMode && excludedChainCount == len(supportedTestNetworks)) {
+		return ErrLockedAmountExcludesAllSupported
+	}
+
+	if totalLockedAmount.Cmp(input.AmountIn.ToInt()) > 0 {
+		return ErrLockedAmountExceedsTotalSendAmount
+	} else if totalLockedAmount.Cmp(input.AmountIn.ToInt()) < 0 && len(suppNetworks) == 0 {
+		return ErrLockedAmountLessThanSendAmountAllNetworks
 	}
 	return nil
 }
@@ -485,7 +459,7 @@ func (r *Router) SuggestedRoutesV2Async(input *RouteInputParams) {
 		if err != nil {
 			errResponse := &ErrorResponseWithUUID{
 				Uuid:          input.Uuid,
-				ErrorResponse: sErrors.CreateErrorResponseFromError(err),
+				ErrorResponse: errors.CreateErrorResponseFromError(err),
 			}
 			signal.SendWalletEvent(signal.SuggestedRoutes, errResponse)
 			return
@@ -501,7 +475,7 @@ func (r *Router) StopSuggestedRoutesV2AsyncCalcualtion() {
 func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams) (*SuggestedRoutesV2, error) {
 	testnetMode, err := r.rpcClient.NetworkManager.GetTestNetworksEnabled()
 	if err != nil {
-		return nil, sErrors.CreateErrorResponseFromError(err)
+		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
 	input.testnetMode = testnetMode
@@ -515,12 +489,12 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 
 	err = validateInputData(input)
 	if err != nil {
-		return nil, sErrors.CreateErrorResponseFromError(err)
+		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
 	candidates, err := r.resolveCandidates(ctx, input)
 	if err != nil {
-		return nil, sErrors.CreateErrorResponseFromError(err)
+		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
 	return r.resolveRoutes(ctx, input, candidates)
@@ -534,7 +508,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams)
 
 	networks, err = r.rpcClient.NetworkManager.Get(false)
 	if err != nil {
-		return nil, sErrors.CreateErrorResponseFromError(err)
+		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
 	var (
@@ -757,12 +731,12 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute []*
 				if input.SendType == ERC1155Transfer {
 					tokenBalance, err = r.getERC1155Balance(ctx, path.FromChain, path.FromToken, input.AddrFrom)
 					if err != nil {
-						return sErrors.CreateErrorResponseFromError(err)
+						return errors.CreateErrorResponseFromError(err)
 					}
 				} else if input.SendType != ERC721Transfer {
 					tokenBalance, err = r.getBalance(ctx, path.FromChain, path.FromToken, input.AddrFrom)
 					if err != nil {
-						return sErrors.CreateErrorResponseFromError(err)
+						return errors.CreateErrorResponseFromError(err)
 					}
 				}
 			}
@@ -783,7 +757,7 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute []*
 
 			nativeBalance, err = r.getBalance(ctx, path.FromChain, nativeToken, input.AddrFrom)
 			if err != nil {
-				return sErrors.CreateErrorResponseFromError(err)
+				return errors.CreateErrorResponseFromError(err)
 			}
 		}
 
@@ -829,7 +803,7 @@ func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, can
 	} else {
 		prices, err = input.SendType.FetchPrices(r.marketManager, input.TokenID)
 		if err != nil {
-			return nil, sErrors.CreateErrorResponseFromError(err)
+			return nil, errors.CreateErrorResponseFromError(err)
 		}
 	}
 
@@ -852,7 +826,7 @@ func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, can
 				allRoutes = removeBestRouteFromAllRouters(allRoutes, best)
 				continue
 			} else {
-				return suggestedRoutes, sErrors.CreateErrorResponseFromError(err)
+				return suggestedRoutes, errors.CreateErrorResponseFromError(err)
 			}
 		}
 
