@@ -3,9 +3,9 @@ package types
 import (
 	"crypto/ecdsa"
 
-	"github.com/google/uuid"
+	"github.com/status-im/status-go/cmd/extkeys"
 
-	"github.com/status-im/status-go/extkeys"
+	"github.com/google/uuid"
 )
 
 type Key struct {

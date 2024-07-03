@@ -55,7 +55,6 @@ require (
 	github.com/status-im/migrate/v4 v4.6.2-status.3
 	github.com/status-im/mvds v0.0.27-0.20240624014816-2dd6758177e5
 	github.com/status-im/rendezvous v1.3.8-0.20240110194857-cc5be22bf83e
-	github.com/status-im/status-go/extkeys v1.1.2
 	github.com/status-im/tcp-shaker v1.1.1-status
 	github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
 	github.com/stretchr/testify v1.9.0
@@ -81,6 +80,8 @@ require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/afex/hystrix-go v0.0.0-20180502004556-fa1af6a1f4f5
 	github.com/andybalholm/brotli v1.0.5
+	github.com/btcsuite/btcd v0.22.1
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/gorilla/sessions v1.2.1
 	github.com/ipfs/go-log/v2 v2.5.1
@@ -92,6 +93,7 @@ require (
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.2
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
+	github.com/status-im/status-go/extkeys v1.1.2
 	github.com/urfave/cli/v2 v2.27.2
 	github.com/waku-org/go-waku v0.8.1-0.20240628140035-3604bf39ad28
 	github.com/wk8/go-ordered-map/v2 v2.1.7
@@ -133,9 +135,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.2.0 // indirect
 	github.com/bradfitz/iter v0.0.0-20191230175014-e8f45d346db8 // indirect
-	github.com/btcsuite/btcd v0.22.1 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
-	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect

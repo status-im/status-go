@@ -13,6 +13,9 @@ import (
 	"sync"
 	"time"
 
+	extkeys "github.com/status-im/status-go/cmd/extkeys"
+	extkeys2 "github.com/status-im/status-go/extkeys"
+
 	"github.com/google/uuid"
 
 	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
@@ -23,7 +26,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
@@ -560,7 +562,7 @@ func (m *DefaultManager) ReEncryptKey(rawKey []byte, pass string, newPass string
 		Id:              decryptedKey.ID,
 		Address:         gethcommon.Address(decryptedKey.Address),
 		PrivateKey:      decryptedKey.PrivateKey,
-		ExtendedKey:     decryptedKey.ExtendedKey,
+		ExtendedKey:     (*extkeys2.ExtendedKey)(decryptedKey.ExtendedKey),
 		SubAccountIndex: decryptedKey.SubAccountIndex,
 	}
 
