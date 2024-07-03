@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/multiformats/go-multiaddr"
@@ -26,16 +27,32 @@ type ENROption func(*enode.LocalNode) error
 
 func WithMultiaddress(multiaddrs ...multiaddr.Multiaddr) ENROption {
 	return func(localnode *enode.LocalNode) (err error) {
-
 		// Randomly shuffle multiaddresses
 		rand.Shuffle(len(multiaddrs), func(i, j int) { multiaddrs[i], multiaddrs[j] = multiaddrs[j], multiaddrs[i] })
+
+		// Testing how many multiaddresses we can write before we exceed the limit
+		// By simulating what the localnode does when signing the enr, but without
+		// causing a panic
+
+		privk, err := crypto.GenerateKey()
+		if err != nil {
+			return err
+		}
 
 		// Adding extra multiaddresses. Should probably not exceed the enr max size of 300bytes
 		failedOnceWritingENR := false
 		couldWriteENRatLeastOnce := false
 		successIdx := -1
 		for i := len(multiaddrs); i > 0; i-- {
-			err = writeMultiaddressField(localnode, multiaddrs[0:i])
+			cpy := localnode.Node().Record() // Record() creates a copy for the current iteration
+			// Copy all the entries that might not have been written in the ENR record due to the
+			// async nature of localnode.Set
+			for _, entry := range localnode.Entries() {
+				cpy.Set(entry)
+			}
+			cpy.Set(enr.WithEntry(MultiaddrENRField, marshalMultiaddress(multiaddrs[0:i])))
+			cpy.SetSeq(localnode.Seq() + 1)
+			err = enode.SignV4(cpy, privk)
 			if err == nil {
 				couldWriteENRatLeastOnce = true
 				successIdx = i
@@ -46,10 +63,7 @@ func WithMultiaddress(multiaddrs ...multiaddr.Multiaddr) ENROption {
 
 		if failedOnceWritingENR && couldWriteENRatLeastOnce {
 			// Could write a subset of multiaddresses but not all
-			err = writeMultiaddressField(localnode, multiaddrs[0:successIdx])
-			if err != nil {
-				return errors.New("could not write new ENR")
-			}
+			writeMultiaddressField(localnode, multiaddrs[0:successIdx])
 		}
 
 		return nil
@@ -110,15 +124,7 @@ func Update(logger *zap.Logger, localnode *enode.LocalNode, enrOptions ...ENROpt
 	return nil
 }
 
-func writeMultiaddressField(localnode *enode.LocalNode, addrAggr []multiaddr.Multiaddr) (err error) {
-	defer func() {
-		if e := recover(); e != nil {
-			// Deleting the multiaddr entry, as we could not write it succesfully
-			localnode.Delete(enr.WithEntry(MultiaddrENRField, struct{}{}))
-			err = errors.New("could not write enr record")
-		}
-	}()
-
+func marshalMultiaddress(addrAggr []multiaddr.Multiaddr) []byte {
 	var fieldRaw []byte
 	for _, addr := range addrAggr {
 		maRaw := addr.Bytes()
@@ -128,11 +134,14 @@ func writeMultiaddressField(localnode *enode.LocalNode, addrAggr []multiaddr.Mul
 		fieldRaw = append(fieldRaw, maSize...)
 		fieldRaw = append(fieldRaw, maRaw...)
 	}
+	return fieldRaw
+}
 
+func writeMultiaddressField(localnode *enode.LocalNode, addrAggr []multiaddr.Multiaddr) {
+	fieldRaw := marshalMultiaddress(addrAggr)
 	localnode.Set(enr.WithEntry(MultiaddrENRField, fieldRaw))
+}
 
-	// This is to trigger the signing record err due to exceeding 300bytes limit
-	_ = localnode.Node()
-
-	return nil
+func DeleteField(localnode *enode.LocalNode, field string) {
+	localnode.Delete(enr.WithEntry(field, struct{}{}))
 }

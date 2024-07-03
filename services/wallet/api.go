@@ -94,6 +94,7 @@ func (api *API) StartWallet(ctx context.Context) error {
 }
 
 func (api *API) StopWallet(ctx context.Context) error {
+	api.router.Stop()
 	return api.s.Stop()
 }
 
@@ -509,6 +510,18 @@ func (api *API) GetSuggestedRoutesV2(ctx context.Context, input *router.RouteInp
 	return api.router.SuggestedRoutesV2(ctx, input)
 }
 
+func (api *API) GetSuggestedRoutesV2Async(ctx context.Context, input *router.RouteInputParams) {
+	log.Debug("call to GetSuggestedRoutesV2Async")
+
+	api.router.SuggestedRoutesV2Async(input)
+}
+
+func (api *API) StopSuggestedRoutesV2AsyncCalcualtion(ctx context.Context) {
+	log.Debug("call to StopSuggestedRoutesV2AsyncCalcualtion")
+
+	api.router.StopSuggestedRoutesV2AsyncCalcualtion()
+}
+
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
 func (api *API) GetDerivedAddresses(ctx context.Context, password string, derivedFrom string, paths []string) ([]*DerivedAddress, error) {
 	info, err := api.s.gethManager.AccountsGenerator().LoadAccount(derivedFrom, password)
@@ -825,6 +838,12 @@ func (api *API) AddWalletConnectSession(ctx context.Context, session_json string
 func (api *API) DisconnectWalletConnectSession(ctx context.Context, topic walletconnect.Topic) error {
 	log.Debug("wallet.api.DisconnectWalletConnectSession", "topic", topic)
 	return walletconnect.DisconnectSession(api.s.db, topic)
+}
+
+// GetWalletConnectActiveSessions returns all active wallet connect sessions
+func (api *API) GetWalletConnectActiveSessions(ctx context.Context, validAtTimestamp int64) ([]walletconnect.DBSession, error) {
+	log.Debug("wallet.api.GetWalletConnectActiveSessions")
+	return walletconnect.GetActiveSessions(api.s.db, validAtTimestamp)
 }
 
 // GetWalletConnectDapps returns all active wallet connect dapps

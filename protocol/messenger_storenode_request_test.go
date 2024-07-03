@@ -633,6 +633,20 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfo() {
 	s.fetchProfile(s.bob, s.owner.selfContact.ID, s.owner.selfContact)
 }
 
+func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfoError() {
+	s.createOwner()
+	defer s.tearDownOwner()
+	// Non-existent contact used by QA team for e2e autotests: (https://github.com/status-im/status-desktop/issues/15297)
+	fetchedContact, err := s.owner.FetchContact("0x04e972b2a794c315e16411fc0930a65bffffe4f885341683f4532fbbd883a447d849ac0be63d6a4f721affa0d0408160974ff831408433972de2c4556ef06d1ae1", true)
+	s.Require().Nil(fetchedContact)
+	s.Require().Nil(err)
+
+	u := "https://status.app/u/iwWACgoKCHNxdWlzaGVyAw==#zQ3shvMPZSyaUbjBjaNpNP1bPGsGpQDp59dZ4Gmz7UEy5o791"
+	response, err := s.owner.UnfurlURLs(nil, []string{u})
+	s.Require().NoError(err)
+	s.Require().Len(response.LinkPreviews, 0)
+}
+
 // TestSequentialUpdates checks that making updates to the community
 // immediately results in new store node fetched information.
 // Before adding storeNodeSubscription we had problems with the test setup that we didn't have a mechanism to wait for store node to

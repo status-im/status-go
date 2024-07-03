@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.8.18'
+library 'status-jenkins-lib@v1.9.1'
 
 pipeline {
   agent { label 'macos && aarch64 && xcode-15.1 && nix-2.19' }
@@ -19,6 +19,7 @@ pipeline {
 
   options {
     timestamps()
+    ansiColor('xterm')
     /* Prevent Jenkins jobs from running forever */
     timeout(time: 10, unit: 'MINUTES')
     disableConcurrentBuilds()

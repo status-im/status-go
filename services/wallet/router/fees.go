@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/params"
 	gaspriceoracle "github.com/status-im/status-go/contracts/gas-price-oracle"
@@ -25,9 +26,9 @@ const (
 )
 
 type MaxFeesLevels struct {
-	Low    *big.Int `json:"low"`
-	Medium *big.Int `json:"medium"`
-	High   *big.Int `json:"high"`
+	Low    *hexutil.Big `json:"low"`
+	Medium *hexutil.Big `json:"medium"`
+	High   *hexutil.Big `json:"high"`
 }
 
 type SuggestedFees struct {
@@ -59,14 +60,14 @@ func (s *SuggestedFees) feeFor(mode GasFeeMode) *big.Int {
 	}
 
 	if mode == GasFeeLow {
-		return s.MaxFeesLevels.Low
+		return s.MaxFeesLevels.Low.ToInt()
 	}
 
 	if mode == GasFeeHigh {
-		return s.MaxFeesLevels.High
+		return s.MaxFeesLevels.High.ToInt()
 	}
 
-	return s.MaxFeesLevels.Medium
+	return s.MaxFeesLevels.Medium.ToInt()
 }
 
 func (s *SuggestedFeesGwei) feeFor(mode GasFeeMode) *big.Float {
@@ -140,9 +141,9 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*Sugges
 			BaseFee:              big.NewInt(0),
 			MaxPriorityFeePerGas: big.NewInt(0),
 			MaxFeesLevels: &MaxFeesLevels{
-				Low:    big.NewInt(0),
-				Medium: big.NewInt(0),
-				High:   big.NewInt(0),
+				Low:    (*hexutil.Big)(big.NewInt(0)),
+				Medium: (*hexutil.Big)(big.NewInt(0)),
+				High:   (*hexutil.Big)(big.NewInt(0)),
 			},
 			EIP1559Enabled: false,
 		}, nil
@@ -158,9 +159,9 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*Sugges
 		BaseFee:              baseFee,
 		MaxPriorityFeePerGas: maxPriorityFeePerGas,
 		MaxFeesLevels: &MaxFeesLevels{
-			Low:    new(big.Int).Add(baseFee, maxPriorityFeePerGas),
-			Medium: new(big.Int).Add(new(big.Int).Mul(baseFee, big.NewInt(2)), maxPriorityFeePerGas),
-			High:   new(big.Int).Add(new(big.Int).Mul(baseFee, big.NewInt(3)), maxPriorityFeePerGas),
+			Low:    (*hexutil.Big)(new(big.Int).Add(baseFee, maxPriorityFeePerGas)),
+			Medium: (*hexutil.Big)(new(big.Int).Add(new(big.Int).Mul(baseFee, big.NewInt(2)), maxPriorityFeePerGas)),
+			High:   (*hexutil.Big)(new(big.Int).Add(new(big.Int).Mul(baseFee, big.NewInt(3)), maxPriorityFeePerGas)),
 		},
 		EIP1559Enabled: true,
 	}, nil
@@ -175,9 +176,9 @@ func (f *FeeManager) SuggestedFeesGwei(ctx context.Context, chainID uint64) (*Su
 		GasPrice:             weiToGwei(fees.GasPrice),
 		BaseFee:              weiToGwei(fees.BaseFee),
 		MaxPriorityFeePerGas: weiToGwei(fees.MaxPriorityFeePerGas),
-		MaxFeePerGasLow:      weiToGwei(fees.MaxFeesLevels.Low),
-		MaxFeePerGasMedium:   weiToGwei(fees.MaxFeesLevels.Medium),
-		MaxFeePerGasHigh:     weiToGwei(fees.MaxFeesLevels.High),
+		MaxFeePerGasLow:      weiToGwei(fees.MaxFeesLevels.Low.ToInt()),
+		MaxFeePerGasMedium:   weiToGwei(fees.MaxFeesLevels.Medium.ToInt()),
+		MaxFeePerGasHigh:     weiToGwei(fees.MaxFeesLevels.High.ToInt()),
 		EIP1559Enabled:       fees.EIP1559Enabled,
 	}, nil
 }

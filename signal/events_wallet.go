@@ -1,19 +1,14 @@
 package signal
 
+type SignalType string
+
 const (
-	walletEvent = "wallet"
+	Wallet           = SignalType("wallet")
+	SignTransactions = SignalType("wallet.sign.transactions")
+	SuggestedRoutes  = SignalType("wallet.suggested.routes")
 )
 
-type UnsignedTransactions struct {
-	Type         string   `json:"type"`
-	Transactions []string `json:"transactions"`
-}
-
 // SendWalletEvent sends event from services/wallet/events.
-func SendWalletEvent(event interface{}) {
-	send(walletEvent, event)
-}
-
-func SendTransactionsForSigningEvent(transactions []string) {
-	send(walletEvent, UnsignedTransactions{Type: "sing-transactions", Transactions: transactions})
+func SendWalletEvent(signalType SignalType, event interface{}) {
+	send(string(signalType), event)
 }
