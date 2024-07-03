@@ -458,28 +458,13 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 
 					m.processCommunityChanges(state)
 
-					response, err := m.saveDataAndPrepareResponse(state)
+					_, err = m.saveDataAndPrepareResponse(state)
 					if err != nil {
 						m.logger.Error("failed to save data and prepare response")
 					}
 
-					// control node changed and we were kicked out. It now awaits our addresses
-					if communityResponse.Changes.ControlNodeChanged != nil && communityResponse.Changes.MemberKicked {
-						requestToJoin, err := m.sendSharedAddressToControlNode(communityResponse.Community.ControlNode(), communityResponse.Community)
-
-						if err != nil {
-							m.logger.Error("share address to control node failed", zap.String("id", types.EncodeHex(communityResponse.Community.ID())), zap.Error(err))
-
-							if err == communities.ErrRevealedAccountsAbsent || err == communities.ErrNoRevealedAccountsSignature {
-								m.AddActivityCenterNotificationToResponse(communityResponse.Community.IDString(), ActivityCenterNotificationTypeShareAccounts, response)
-							}
-						} else {
-							state.Response.AddRequestToJoinCommunity(requestToJoin)
-						}
-					}
-
 					if m.config.messengerSignalsHandler != nil {
-						m.config.messengerSignalsHandler.MessengerResponse(response)
+						m.config.messengerSignalsHandler.MessengerResponse(state.Response)
 					}
 				}
 
@@ -4750,6 +4735,9 @@ func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) 
 				m.logger.Error("cannot merge join community response", zap.Error(err))
 				continue
 			}
+		} else if changes.MemberSoftKicked {
+			m.leaveCommunityOnSoftKick(changes.Community, messageState.Response)
+			m.shareRevealedAccountsOnSoftKick(changes.Community, messageState.Response)
 
 		} else if changes.MemberKicked {
 			notificationType := ActivityCenterNotificationTypeCommunityKicked
@@ -4809,6 +4797,8 @@ func (m *Messenger) PromoteSelfToControlNode(communityID types.HexBytes) (*Messe
 	if m.config.messengerSignalsHandler != nil {
 		m.config.messengerSignalsHandler.MessengerResponse(&response)
 	}
+
+	go m.communitiesManager.StartMembersReevaluationLoop(community.ID(), false)
 
 	return &response, nil
 }
@@ -4900,30 +4890,26 @@ func (m *Messenger) AddActivityCenterNotificationToResponse(communityID string, 
 }
 
 func (m *Messenger) leaveCommunityDueToKickOrBan(changes *communities.CommunityChanges, acType ActivityCenterType, stateResponse *MessengerResponse) {
-	// during the ownership change kicked user must stay in the spectate mode
-	ownerhipChange := changes.ControlNodeChanged != nil
-	response, err := m.kickedOutOfCommunity(changes.Community.ID(), ownerhipChange)
+	response, err := m.kickedOutOfCommunity(changes.Community.ID(), false)
 	if err != nil {
 		m.logger.Error("cannot leave community", zap.Error(err))
 		return
 	}
 
-	if !ownerhipChange {
-		// Activity Center notification
-		notification := &ActivityCenterNotification{
-			ID:          types.FromHex(uuid.New().String()),
-			Type:        acType,
-			Timestamp:   m.getTimesource().GetCurrentTime(),
-			CommunityID: changes.Community.IDString(),
-			Read:        false,
-			UpdatedAt:   m.GetCurrentTimeInMillis(),
-		}
+	// Activity Center notification
+	notification := &ActivityCenterNotification{
+		ID:          types.FromHex(uuid.New().String()),
+		Type:        acType,
+		Timestamp:   m.getTimesource().GetCurrentTime(),
+		CommunityID: changes.Community.IDString(),
+		Read:        false,
+		UpdatedAt:   m.GetCurrentTimeInMillis(),
+	}
 
-		err = m.addActivityCenterNotification(response, notification, nil)
-		if err != nil {
-			m.logger.Error("failed to save notification", zap.Error(err))
-			return
-		}
+	err = m.addActivityCenterNotification(response, notification, nil)
+	if err != nil {
+		m.logger.Error("failed to save notification", zap.Error(err))
+		return
 	}
 
 	if err := stateResponse.Merge(response); err != nil {
@@ -5034,4 +5020,28 @@ func (m *Messenger) HandleDeleteCommunityMemberMessages(state *ReceivedMessageSt
 	}
 
 	return state.Response.Merge(deleteMessagesResponse)
+}
+
+func (m *Messenger) leaveCommunityOnSoftKick(community *communities.Community, messengerResponse *MessengerResponse) {
+	response, err := m.kickedOutOfCommunity(community.ID(), true)
+	if err != nil {
+		m.logger.Error("member soft kick error", zap.String("communityID", types.EncodeHex(community.ID())), zap.Error(err))
+	}
+
+	if err := messengerResponse.Merge(response); err != nil {
+		m.logger.Error("cannot merge leaveCommunityOnSoftKick response", zap.String("communityID", types.EncodeHex(community.ID())), zap.Error(err))
+	}
+}
+
+func (m *Messenger) shareRevealedAccountsOnSoftKick(community *communities.Community, messengerResponse *MessengerResponse) {
+	requestToJoin, err := m.sendSharedAddressToControlNode(community.ControlNode(), community)
+	if err != nil {
+		m.logger.Error("share address to control node failed", zap.String("id", types.EncodeHex(community.ID())), zap.Error(err))
+
+		if err == communities.ErrRevealedAccountsAbsent || err == communities.ErrNoRevealedAccountsSignature {
+			m.AddActivityCenterNotificationToResponse(community.IDString(), ActivityCenterNotificationTypeShareAccounts, messengerResponse)
+		}
+	} else {
+		messengerResponse.AddRequestToJoinCommunity(requestToJoin)
+	}
 }

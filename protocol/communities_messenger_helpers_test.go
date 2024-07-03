@@ -5,6 +5,8 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
+	"math/big"
+	"strconv"
 	"sync"
 	"time"
 
@@ -24,6 +26,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
@@ -661,4 +664,39 @@ func waitOnCommunitiesEvent(user *Messenger, condition func(*communities.Subscri
 	}()
 
 	return errCh
+}
+
+func makeAddressSatisfyTheCriteria(s *suite.Suite, mockedBalances communities.BalancesByChain, mockedCollectibles communities.CollectiblesByChain,
+	chainID uint64, address string, criteria *protobuf.TokenCriteria) {
+
+	walletAddress := gethcommon.HexToAddress(address)
+	contractAddress := gethcommon.HexToAddress(criteria.ContractAddresses[chainID])
+	switch criteria.Type {
+	case protobuf.CommunityTokenType_ERC20:
+		balance, ok := new(big.Int).SetString(criteria.AmountInWei, 10)
+		s.Require().True(ok)
+
+		mockedBalances[chainID][walletAddress][contractAddress] = (*hexutil.Big)(balance)
+
+	case protobuf.CommunityTokenType_ERC721:
+		amount, err := strconv.ParseUint(criteria.AmountInWei, 10, 32)
+		s.Require().NoError(err)
+
+		balances := []thirdparty.TokenBalance{}
+		for i := uint64(0); i < amount; i++ {
+			balances = append(balances, thirdparty.TokenBalance{
+				TokenID: &bigint.BigInt{
+					Int: new(big.Int).SetUint64(i + 1),
+				},
+				Balance: &bigint.BigInt{
+					Int: new(big.Int).SetUint64(1),
+				},
+			})
+		}
+
+		mockedCollectibles[chainID][walletAddress][contractAddress] = balances
+
+	case protobuf.CommunityTokenType_ENS:
+		// not implemented
+	}
 }

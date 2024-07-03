@@ -1073,6 +1073,7 @@ func (m *Manager) reevaluateMembers(communityID types.HexBytes) (*Community, map
 		}
 
 		revealedAccount, memberHasWallet := membersAccounts[memberKey]
+
 		if !memberHasWallet {
 			result.membersToRemove[memberKey] = struct{}{}
 			continue
@@ -2222,6 +2223,8 @@ func (m *Manager) preprocessDescription(id types.HexBytes, description *protobuf
 
 func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte, newControlNode *ecdsa.PublicKey) (*CommunityResponse, error) {
 	prevClock := community.config.CommunityDescription.Clock
+	prevResendAccountsClock := community.config.CommunityDescription.ResendAccountsClock
+
 	changes, err := community.UpdateCommunityDescription(description, payload, newControlNode)
 	if err != nil {
 		return nil, err
@@ -2283,6 +2286,8 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		if changes.HasMemberLeft(pkString) {
 			// If we joined previously the community, that means we have been kicked
 			changes.MemberKicked = community.Joined()
+			// soft kick member on community owner change or on ResendAccountsClock change
+			changes.MemberSoftKicked = changes.ControlNodeChanged != nil || prevResendAccountsClock < community.Description().ResendAccountsClock
 		}
 	}
 
@@ -4593,6 +4598,30 @@ func (m *Manager) createCommunityTokenPermission(request *requests.CreateCommuni
 
 }
 
+func (m *Manager) RemoveUsersWithoutRevealedAccounts(community *Community, clock uint64) (*CommunityChanges, error) {
+	membersAccounts, err := m.persistence.GetCommunityRequestsToJoinRevealedAddresses(community.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	myPk := common.PubkeyToHex(&m.identity.PublicKey)
+	membersToRemove := make(map[string]*protobuf.CommunityMember)
+	for pk, member := range community.Members() {
+		if myPk == pk {
+			continue
+		}
+		if _, exists := membersAccounts[pk]; !exists {
+			membersToRemove[pk] = member
+		}
+	}
+
+	if len(membersToRemove) > 0 {
+		community.SetResendAccountsClock(clock)
+	}
+
+	return community.RemoveSpecificUsersFromOrg(membersToRemove), nil
+}
+
 func (m *Manager) PromoteSelfToControlNode(community *Community, clock uint64) (*CommunityChanges, error) {
 	if community == nil {
 		return nil, ErrOrgNotFound
@@ -4610,7 +4639,14 @@ func (m *Manager) PromoteSelfToControlNode(community *Community, clock uint64) (
 		return community.RemoveAllUsersFromOrg(), m.saveAndPublish(community)
 	}
 
-	return community.emptyCommunityChanges(), m.saveAndPublish(community)
+	// if control node device was changed, check that we own all members revealed accounts
+	// members without revealed accounts will be soft kicked
+	changes, err := m.RemoveUsersWithoutRevealedAccounts(community, clock)
+	if err != nil {
+		return nil, err
+	}
+
+	return changes, m.saveAndPublish(community)
 }
 
 func (m *Manager) promoteSelfToControlNode(community *Community, clock uint64) (bool, error) {

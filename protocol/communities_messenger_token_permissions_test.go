@@ -6,7 +6,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
 	"strconv"
 	"strings"
@@ -32,7 +31,6 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
@@ -247,37 +245,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) sendChatMessage(sender *Mess
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) makeAddressSatisfyTheCriteria(chainID uint64, address string, criteria *protobuf.TokenCriteria) {
-	walletAddress := gethcommon.HexToAddress(address)
-	contractAddress := gethcommon.HexToAddress(criteria.ContractAddresses[chainID])
-
-	switch criteria.Type {
-	case protobuf.CommunityTokenType_ERC20:
-		balance, ok := new(big.Int).SetString(criteria.AmountInWei, 10)
-		s.Require().True(ok)
-
-		s.mockedBalances[chainID][walletAddress][contractAddress] = (*hexutil.Big)(balance)
-
-	case protobuf.CommunityTokenType_ERC721:
-		amount, err := strconv.ParseUint(criteria.AmountInWei, 10, 32)
-		s.Require().NoError(err)
-
-		balances := []thirdparty.TokenBalance{}
-		for i := uint64(0); i < amount; i++ {
-			balances = append(balances, thirdparty.TokenBalance{
-				TokenID: &bigint.BigInt{
-					Int: new(big.Int).SetUint64(i + 1),
-				},
-				Balance: &bigint.BigInt{
-					Int: new(big.Int).SetUint64(1),
-				},
-			})
-		}
-
-		s.mockedCollectibles[chainID][walletAddress][contractAddress] = balances
-
-	case protobuf.CommunityTokenType_ENS:
-		// not implemented
-	}
+	makeAddressSatisfyTheCriteria(&s.Suite, s.mockedBalances, s.mockedCollectibles, chainID, address, criteria)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) resetMockedBalances() {
