@@ -7,12 +7,12 @@
     "HTTPEnabled": true,
     "HTTPHost": "0.0.0.0",
     "HTTPPort": 3333,
-    "APIModules": "eth,admin,wallet",
+    "APIModules": "eth,admin,wallet,waku,wakuext,wakuv2",
     "WalletConfig": {
       "Enabled": true
     },
     "WakuConfig": {
-        "Enabled": false
+        "Enabled": true
     },
     "Networks": [
         {
