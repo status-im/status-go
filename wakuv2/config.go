@@ -44,7 +44,6 @@ type Config struct {
 	Port                             int              `toml:",omitempty"`
 	EnablePeerExchangeServer         bool             `toml:",omitempty"` // PeerExchange server makes sense only when discv5 is running locally as it will have a cache of peers that it can respond to in case a PeerExchange request comes from the PeerExchangeClient
 	EnablePeerExchangeClient         bool             `toml:",omitempty"`
-	KeepAliveInterval                int              `toml:",omitempty"`
 	MinPeersForRelay                 int              `toml:",omitempty"` // Indicates the minimum number of peers required for using Relay Protocol
 	MinPeersForFilter                int              `toml:",omitempty"` // Indicates the minimum number of peers required for using Filter Protocol
 	LightClient                      bool             `toml:",omitempty"` // Indicates if the node is a light client
@@ -87,7 +86,6 @@ var DefaultConfig = Config{
 	MaxMessageSize:    common.DefaultMaxMessageSize,
 	Host:              "0.0.0.0",
 	Port:              0,
-	KeepAliveInterval: 10, // second
 	DiscoveryLimit:    20,
 	MinPeersForRelay:  1, // TODO: determine correct value with Vac team
 	MinPeersForFilter: 2, // TODO: determine correct value with Vac team and via testing
@@ -105,10 +103,6 @@ func setDefaults(cfg *Config) *Config {
 
 	if cfg.Host == "" {
 		cfg.Host = DefaultConfig.Host
-	}
-
-	if cfg.KeepAliveInterval == 0 {
-		cfg.KeepAliveInterval = DefaultConfig.KeepAliveInterval
 	}
 
 	if cfg.DiscoveryLimit == 0 {

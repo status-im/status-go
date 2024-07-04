@@ -206,10 +206,10 @@ func insertTorrentConfig(tx *sql.Tx, c *params.NodeConfig) error {
 func insertWakuV2ConfigPreMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO wakuv2_config (
-		enabled, host, port, keep_alive_interval, light_client, full_node, discovery_limit, data_dir,
+		enabled, host, port, light_client, full_node, discovery_limit, data_dir,
 		max_message_size, enable_confirmations, peer_exchange, enable_discv5, udp_port,  auto_update, synthetic_id
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
-		c.WakuV2Config.Enabled, c.WakuV2Config.Host, c.WakuV2Config.Port, c.WakuV2Config.KeepAliveInterval, c.WakuV2Config.LightClient, c.WakuV2Config.FullNode, c.WakuV2Config.DiscoveryLimit, c.WakuV2Config.DataDir,
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
+		c.WakuV2Config.Enabled, c.WakuV2Config.Host, c.WakuV2Config.Port, c.WakuV2Config.LightClient, c.WakuV2Config.FullNode, c.WakuV2Config.DiscoveryLimit, c.WakuV2Config.DataDir,
 		c.WakuV2Config.MaxMessageSize, c.WakuV2Config.EnableConfirmations, c.WakuV2Config.PeerExchange, c.WakuV2Config.EnableDiscV5, c.WakuV2Config.UDPPort, c.WakuV2Config.AutoUpdate,
 	)
 	if err != nil {
@@ -676,12 +676,12 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	}
 
 	err = tx.QueryRow(`
-	SELECT enabled, host, port, keep_alive_interval, light_client, full_node, discovery_limit, data_dir,
+	SELECT enabled, host, port, light_client, full_node, discovery_limit, data_dir,
 	max_message_size, enable_confirmations, peer_exchange, enable_discv5, udp_port, auto_update,
 	enable_store, store_capacity, store_seconds, use_shard_default_topic, enable_missing_message_verification
 	FROM wakuv2_config WHERE synthetic_id = 'id'
 	`).Scan(
-		&nodecfg.WakuV2Config.Enabled, &nodecfg.WakuV2Config.Host, &nodecfg.WakuV2Config.Port, &nodecfg.WakuV2Config.KeepAliveInterval, &nodecfg.WakuV2Config.LightClient, &nodecfg.WakuV2Config.FullNode,
+		&nodecfg.WakuV2Config.Enabled, &nodecfg.WakuV2Config.Host, &nodecfg.WakuV2Config.Port, &nodecfg.WakuV2Config.LightClient, &nodecfg.WakuV2Config.FullNode,
 		&nodecfg.WakuV2Config.DiscoveryLimit, &nodecfg.WakuV2Config.DataDir, &nodecfg.WakuV2Config.MaxMessageSize, &nodecfg.WakuV2Config.EnableConfirmations,
 		&nodecfg.WakuV2Config.PeerExchange, &nodecfg.WakuV2Config.EnableDiscV5, &nodecfg.WakuV2Config.UDPPort, &nodecfg.WakuV2Config.AutoUpdate,
 		&nodecfg.WakuV2Config.EnableStore, &nodecfg.WakuV2Config.StoreCapacity, &nodecfg.WakuV2Config.StoreSeconds, &nodecfg.WakuV2Config.UseShardAsDefaultTopic,

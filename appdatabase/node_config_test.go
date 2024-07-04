@@ -215,7 +215,6 @@ func randomNodeConfig() *params.NodeConfig {
 			Enabled:             randomBool(),
 			Host:                randomString(),
 			Port:                randomInt(math.MaxInt64),
-			KeepAliveInterval:   randomInt(math.MaxInt64),
 			LightClient:         randomBool(),
 			FullNode:            randomBool(),
 			DiscoveryLimit:      randomInt(math.MaxInt64),

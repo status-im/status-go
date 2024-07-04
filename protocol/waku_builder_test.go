@@ -1,10 +1,13 @@
 package protocol
 
 import (
+	"crypto/ecdsa"
 	"database/sql"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
+
+	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/appdatabase"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
@@ -19,6 +22,7 @@ type testWakuV2Config struct {
 	enableStore            bool
 	useShardAsDefaultTopic bool
 	clusterID              uint16
+	nodekey                []byte
 }
 
 func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
@@ -29,6 +33,11 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 		EnablePeerExchangeServer: true,
 		EnablePeerExchangeClient: false,
 		EnableDiscV5:             false,
+	}
+
+	var nodeKey *ecdsa.PrivateKey
+	if len(cfg.nodekey) != 0 {
+		nodeKey, _ = crypto.ToECDSA(cfg.nodekey)
 	}
 
 	var db *sql.DB
@@ -44,7 +53,7 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 	}
 
 	wakuNode, err := waku2.New(
-		nil,
+		nodeKey,
 		"",
 		wakuConfig,
 		cfg.logger,

@@ -70,6 +70,7 @@ type WakuProtoInfo struct {
 type PeerManager struct {
 	peerConnector          *PeerConnectionStrategy
 	metadata               *metadata.WakuMetadata
+	relay                  *relay.WakuRelay
 	maxPeers               int
 	maxRelayPeers          int
 	logger                 *zap.Logger
@@ -123,7 +124,8 @@ func inAndOutRelayPeers(relayPeers int) (int, int) {
 // Also returns the healthyPeerCount
 func (pm *PeerManager) checkAndUpdateTopicHealth(topic *NodeTopicDetails) int {
 	healthyPeerCount := 0
-	for _, p := range topic.topic.ListPeers() {
+
+	for _, p := range pm.relay.PubSub().MeshPeers(topic.topic.String()) {
 		if pm.host.Network().Connectedness(p) == network.Connected {
 			pThreshold, err := pm.host.Peerstore().(wps.WakuPeerstore).Score(p)
 			if err == nil {
@@ -143,8 +145,8 @@ func (pm *PeerManager) checkAndUpdateTopicHealth(topic *NodeTopicDetails) int {
 			}
 		}
 	}
+
 	//Update topic's health
-	//TODO: This should be done based on number of full-mesh peers.
 	oldHealth := topic.healthStatus
 	if healthyPeerCount < 1 { //Ideally this check should be done with minPeersForRelay, but leaving it as is for now.
 		topic.healthStatus = UnHealthy
@@ -176,7 +178,7 @@ func (pm *PeerManager) TopicHealth(pubsubTopic string) (TopicHealth, error) {
 }
 
 // NewPeerManager creates a new peerManager instance.
-func NewPeerManager(maxConnections int, maxPeers int, metadata *metadata.WakuMetadata, relayEnabled bool, logger *zap.Logger) *PeerManager {
+func NewPeerManager(maxConnections int, maxPeers int, metadata *metadata.WakuMetadata, relay *relay.WakuRelay, relayEnabled bool, logger *zap.Logger) *PeerManager {
 	var inPeersTarget, outPeersTarget, maxRelayPeers int
 	if relayEnabled {
 		maxRelayPeers, _ := relayAndServicePeers(maxConnections)
@@ -194,6 +196,7 @@ func NewPeerManager(maxConnections int, maxPeers int, metadata *metadata.WakuMet
 	pm := &PeerManager{
 		logger:                 logger.Named("peer-manager"),
 		metadata:               metadata,
+		relay:                  relay,
 		maxRelayPeers:          maxRelayPeers,
 		InPeersTarget:          inPeersTarget,
 		OutPeersTarget:         outPeersTarget,

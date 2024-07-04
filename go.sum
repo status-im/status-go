@@ -2139,12 +2139,12 @@ github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae/go.mod h1:DD4vA1
 github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f/go.mod h1:DD4vA1DwXk04H54A1oHXtwZmA0grkVMdPxx/VGLCah0=
 github.com/waku-org/go-discover v0.0.0-20240506173252-4912704efdc5 h1:4K3IS97JryAEV8pRXB//qPcg+8bPXl/O+AOLt3FeCKc=
 github.com/waku-org/go-discover v0.0.0-20240506173252-4912704efdc5/go.mod h1:eBHgM6T4EG0RZzxpxKy+rGz/6Dw2Nd8DWxS0lm9ESDw=
-github.com/waku-org/go-libp2p-pubsub v0.0.0-20240701005450-b4513d154445 h1:V5f5NGsf/UwlJENmJjHGD9lr+3/Bz4ZZ6mL61tvtxgg=
-github.com/waku-org/go-libp2p-pubsub v0.0.0-20240701005450-b4513d154445/go.mod h1:QEb+hEV9WL9wCiUAnpY29FZR6W3zK8qYlaml8R4q6gQ=
+github.com/waku-org/go-libp2p-pubsub v0.0.0-20240703191659-2cbb09eac9b5 h1:9u16Et17jSGWM3mQhlIOZYiG+O+rlX5BsrBumw5flxk=
+github.com/waku-org/go-libp2p-pubsub v0.0.0-20240703191659-2cbb09eac9b5/go.mod h1:QEb+hEV9WL9wCiUAnpY29FZR6W3zK8qYlaml8R4q6gQ=
 github.com/waku-org/go-libp2p-rendezvous v0.0.0-20240110193335-a67d1cc760a0 h1:R4YYx2QamhBRl/moIxkDCNW+OP7AHbyWLBygDc/xIMo=
 github.com/waku-org/go-libp2p-rendezvous v0.0.0-20240110193335-a67d1cc760a0/go.mod h1:EhZP9fee0DYjKH/IOQvoNSy1tSHp2iZadsHGphcAJgY=
-github.com/waku-org/go-waku v0.8.1-0.20240701141800-5b5ea977afe0 h1:3Idg7XvXc9iQpUyg8KNKgZnziHJRs3xm7EDJHFzC9to=
-github.com/waku-org/go-waku v0.8.1-0.20240701141800-5b5ea977afe0/go.mod h1:hkW5zXyM/ZIMDPniVooTk4dOGwY+OzrB0Q6fx+1sLpo=
+github.com/waku-org/go-waku v0.8.1-0.20240705124012-8df5a0337a1e h1:aqZA60QlYiMBcgqHEx6ksof4A6+KspMIqoXu/ACXmKU=
+github.com/waku-org/go-waku v0.8.1-0.20240705124012-8df5a0337a1e/go.mod h1:nLQmeqztw19wmJI9rpXY6Lx81yYE/qOAd1qZsrAK2A8=
 github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59 h1:jisj+OCI6QydLtFq3Pyhu49wl9ytPN7oAHjMfepHDrA=
 github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59/go.mod h1:1PdBdPzyTaKt3VnpAHk3zj+r9dXPFOr3IHZP9nFle6E=
 github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230916172309-ee0ee61dde2b h1:KgZVhsLkxsj5gb/FfndSCQu6VYwALrCOgYI3poR95yE=
