@@ -140,9 +140,13 @@ func (s *MessengerCommunitiesShardingSuite) TestPostToCommunityChat() {
 		s.testPostToCommunityChat(shard, community, chat)
 	}
 
-	// Members should continue to receive messages in a community if sharding is disabled after it was previously enabled.
+	// Members should continue to receive messages in a community if it is moved back to default shard.
 	{
-		s.testPostToCommunityChat(nil, community, chat)
+		shard := &shard.Shard{
+			Cluster: shard.MainStatusShardCluster,
+			Index:   32,
+		}
+		s.testPostToCommunityChat(shard, community, chat)
 	}
 }
 

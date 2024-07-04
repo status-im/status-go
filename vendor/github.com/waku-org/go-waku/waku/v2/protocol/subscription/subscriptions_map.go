@@ -130,9 +130,9 @@ func (sub *SubscriptionsMap) Has(peerID peer.ID, cf protocol.ContentFilter) bool
 
 	return true
 }
-func (sub *SubscriptionsMap) Delete(subscription *SubscriptionDetails) error {
-	sub.Lock()
-	defer sub.Unlock()
+
+// Caller has to acquire lock before invoking this method.This is done to avoid possible deadlock
+func (sub *SubscriptionsMap) DeleteNoLock(subscription *SubscriptionDetails) error {
 
 	peerSubscription, ok := sub.items[subscription.PeerID]
 	if !ok {
