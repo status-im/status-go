@@ -424,11 +424,15 @@ func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) 
 		if accName.Valid {
 			acc.Name = accName.String
 		}
-		if accColorID.Valid {
+		if accColorID.Valid && accColorID.String != "" {
 			acc.ColorID = common.CustomizationColor(accColorID.String)
+		} else {
+			acc.ColorID = common.CustomizationColor("blue")
 		}
-		if accEmoji.Valid {
+		if accEmoji.Valid && accEmoji.String != "" {
 			acc.Emoji = accEmoji.String
+		} else {
+			acc.Emoji = "🙂"
 		}
 		if accWallet.Valid {
 			acc.Wallet = accWallet.Bool
