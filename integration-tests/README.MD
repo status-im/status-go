@@ -22,10 +22,10 @@ Integration tests for status-go
 ### Running dev RPC (anvil with contracts)
 - In `integration-tests` run `docker compose -f docker-compose.anvil.yml up --remove-orphans --build`, as result:
     * an [anvil](https://book.getfoundry.sh/reference/anvil/) container with ChainID 31337 exposed on `0.0.0.0:8545` will start running
-    * all Status-im contracts will be deployed to the network
+    * Status-im contracts will be deployed to the network
 
 ### Run tests
-- In `integration-tests` run `docker compose -f docker-compose.anvil.yml -f docker-compose.test.status-go.yml up --remove-orphans`, as result:
+- In `integration-tests` run `docker compose -f docker-compose.anvil.yml -f docker-compose.test.status-go.yml up --build --remove-orphans`, as result:
     * a container with [status-go as daemon](https://github.com/status-im/status-go/issues/5175) will be created with APIModules exposed on `0.0.0.0:3333`
     * status-go will use [anvil](https://book.getfoundry.sh/reference/anvil/) as RPCURL with ChainID 31337 
     * all Status-im contracts will be deployed to the network
