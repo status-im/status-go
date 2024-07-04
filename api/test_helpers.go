@@ -10,6 +10,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/requests"
 
 	"github.com/stretchr/testify/require"
 )
@@ -98,4 +99,14 @@ func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend,
 	})
 
 	return
+}
+
+// Only for tests
+func overrideApiConfigTest(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
+	overrideApiConfigProd(nodeConfig, config)
+	nodeConfig.HTTPVirtualHosts = config.HTTPVirtualHosts
+}
+
+func OverrideApiConfigTest() {
+	overrideApiConfig = overrideApiConfigTest
 }

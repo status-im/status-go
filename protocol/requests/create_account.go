@@ -21,14 +21,15 @@ type ImageCropRectangle struct {
 }
 
 type APIConfig struct {
-	APIModules       string `json:"apiModules"`
-	ConnectorEnabled bool   `json:"connectorEnabled"`
-	HTTPEnabled      bool   `json:"httpEnabled"`
-	HTTPHost         string `json:"httpHost"`
-	HTTPPort         int    `json:"httpPort"`
-	WSEnabled        bool   `json:"wsEnabled"`
-	WSHost           string `json:"wsHost"`
-	WSPort           int    `json:"wsPort"`
+	APIModules       string   `json:"apiModules"`
+	ConnectorEnabled bool     `json:"connectorEnabled"`
+	HTTPEnabled      bool     `json:"httpEnabled"`
+	HTTPHost         string   `json:"httpHost"`
+	HTTPPort         int      `json:"httpPort"`
+	HTTPVirtualHosts []string `json:"httpVirtualHosts"`
+	WSEnabled        bool     `json:"wsEnabled"`
+	WSHost           string   `json:"wsHost"`
+	WSPort           int      `json:"wsPort"`
 }
 
 type CreateAccount struct {
