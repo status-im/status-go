@@ -3567,7 +3567,7 @@ func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communiti
 	if err != nil {
 		return err
 	}
-	//Update community filters in case of change of shard
+	// Update community filters in case of change of shard
 	if community.Shard() != shard.FromProtobuff(message.GetShard()) {
 		err = m.UpdateCommunityFilters(community)
 		if err != nil {
