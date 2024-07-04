@@ -36,14 +36,25 @@ func simulate(cCtx *cli.Context) error {
 	apiModules := cCtx.String(APIModulesFlag)
 	telemetryUrl := cCtx.String(TelemetryServerURLFlag)
 	failMessages := cCtx.Bool(MessageFailureFlag)
+	fleet := cCtx.String(FleetFlag)
 
-	alice, err := start("Alice", 0, apiModules, telemetryUrl, "", logger.Named("alice"))
+	alice, err := start(StartParams{
+		Name:         "Alice",
+		APIModules:   apiModules,
+		TelemetryURL: telemetryUrl,
+		Fleet:        fleet,
+	}, logger.Named("alice"))
 	if err != nil {
 		return err
 	}
 	defer alice.stop()
 
-	charlie, err := start("Charlie", 0, apiModules, telemetryUrl, "", logger.Named("charlie"))
+	charlie, err := start(StartParams{
+		Name:         "Charlie",
+		APIModules:   apiModules,
+		TelemetryURL: telemetryUrl,
+		Fleet:        fleet,
+	}, logger.Named("charlie"))
 	if err != nil {
 		return err
 	}

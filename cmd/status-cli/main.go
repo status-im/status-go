@@ -22,6 +22,7 @@ const PortFlag = "port"
 const APIModulesFlag = "api-modules"
 const TelemetryServerURLFlag = "telemetry-server-url"
 const KeyUIDFlag = "key-uid"
+const FleetFlag = "fleet"
 const DebugLevel = "debug"
 const MessageFailureFlag = "fail"
 
@@ -51,6 +52,13 @@ var CommonFlags = []cli.Flag{
 		Aliases: []string{"d"},
 		Usage:   "Enable CLI's debug level logging",
 		Value:   false,
+	},
+	&cli.StringFlag{
+		Name:     FleetFlag,
+		Aliases:  []string{"f"},
+		Usage:    "The fleet to use for the node, e.g.: shards.staging, shards.test",
+		Value:    "shards.staging",
+		Required: false,
 	},
 }
 
