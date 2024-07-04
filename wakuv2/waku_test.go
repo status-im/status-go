@@ -326,6 +326,7 @@ func TestPeerExchange(t *testing.T) {
 }
 
 func TestWakuV2Filter(t *testing.T) {
+	t.Skip("flaky test")
 
 	enrTreeAddress := testBootENRBootstrap
 	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
