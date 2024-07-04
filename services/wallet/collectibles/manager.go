@@ -584,7 +584,7 @@ func (o *Manager) fetchTokenURI(ctx context.Context, id thirdparty.CollectibleUn
 
 	if err != nil {
 		for _, errorPrefix := range noTokenURIErrorPrefixes {
-			if strings.HasPrefix(err.Error(), errorPrefix) {
+			if strings.Contains(err.Error(), errorPrefix) {
 				// Contract doesn't support "TokenURI" method
 				return "", nil
 			}
