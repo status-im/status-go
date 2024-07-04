@@ -260,7 +260,6 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 			// ecaluate the cost of the path
 			pathCost := big.NewFloat(0)
 			nativeTokenPrice := new(big.Float).SetFloat64(nativeChainTokenPrice)
-
 			if path.TxBaseFee != nil && path.TxPriorityFee != nil {
 				feePerGas := new(big.Int).Add(path.TxBaseFee.ToInt(), path.TxPriorityFee.ToInt())
 				txFeeInWei := new(big.Int).Mul(feePerGas, big.NewInt(int64(path.TxGasAmount)))
@@ -269,7 +268,6 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 				path.requiredNativeBalance.Add(path.requiredNativeBalance, txFeeInWei)
 				pathCost = new(big.Float).Mul(txFeeInEth, nativeTokenPrice)
 			}
-
 			if path.TxBonderFees != nil && path.TxBonderFees.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
 				if path.FromToken.IsNative() {
 					path.requiredNativeBalance.Add(path.requiredNativeBalance, path.TxBonderFees.ToInt())
@@ -281,7 +279,6 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 					new(big.Float).SetFloat64(tokenPrice)))
 
 			}
-
 			if path.TxL1Fee != nil && path.TxL1Fee.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
 				l1FeeInWei := path.TxL1Fee.ToInt()
 				l1FeeInEth := gweiToEth(weiToGwei(l1FeeInWei))
@@ -289,7 +286,6 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 				path.requiredNativeBalance.Add(path.requiredNativeBalance, l1FeeInWei)
 				pathCost.Add(pathCost, new(big.Float).Mul(l1FeeInEth, nativeTokenPrice))
 			}
-
 			if path.TxTokenFees != nil && path.TxTokenFees.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 && path.FromToken != nil {
 				if path.FromToken.IsNative() {
 					path.requiredNativeBalance.Add(path.requiredNativeBalance, path.TxTokenFees.ToInt())
@@ -300,7 +296,6 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 					new(big.Float).Quo(new(big.Float).SetInt(path.TxTokenFees.ToInt()), tokenDenominator),
 					new(big.Float).SetFloat64(tokenPrice)))
 			}
-
 			if path.ApprovalRequired {
 				if path.ApprovalBaseFee != nil && path.ApprovalPriorityFee != nil {
 					feePerGas := new(big.Int).Add(path.ApprovalBaseFee.ToInt(), path.ApprovalPriorityFee.ToInt())
@@ -657,15 +652,16 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams)
 						continue
 					}
 
-					var l1FeeWei uint64
-					if input.SendType.needL1Fee() {
-						txInputData, err := pProcessor.PackTxInputData(processorInputParams)
-						if err != nil {
-							continue
-						}
+					// TODO: keep l1 fees at 0 until we have the correct algorithm, as we do base fee x 2 that should cover the l1 fees
+					var l1FeeWei uint64 = 0
+					// if input.SendType.needL1Fee() {
+					// 	txInputData, err := pProcessor.PackTxInputData(processorInputParams)
+					// 	if err != nil {
+					// 		continue
+					// 	}
 
-						l1FeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, txInputData)
-					}
+					// 	l1FeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, txInputData)
+					// }
 
 					amountOut, err := pProcessor.CalculateAmountOut(processorInputParams)
 					if err != nil {

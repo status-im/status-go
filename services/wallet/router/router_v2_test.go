@@ -2455,6 +2455,8 @@ func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
 					suggestedFees: testSuggestedFees,
 					balanceMap: map[string]*big.Int{
 						makeTestBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
+						makeTestBalanceKey(walletCommon.EthereumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
+						makeTestBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
 					},
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
