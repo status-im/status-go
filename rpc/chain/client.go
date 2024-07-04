@@ -197,17 +197,13 @@ func (c *ClientWithFallback) Close() {
 }
 
 func isVMError(err error) bool {
-	if strings.HasPrefix(err.Error(), "execution reverted") {
-		return true
-	}
 	if strings.Contains(err.Error(), core.ErrInsufficientFunds.Error()) {
 		return true
 	}
 	for _, vmError := range propagateErrors {
-		if err == vmError {
+		if strings.Contains(err.Error(), vmError.Error()) {
 			return true
 		}
-
 	}
 	return false
 }
