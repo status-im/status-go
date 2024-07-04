@@ -491,7 +491,11 @@ test-verif-proxy-wrapper:
 
 run-integration-tests: SHELL := /bin/sh
 run-integration-tests:
-	docker-compose -f integration-tests/docker-compose.anvil.yml -f integration-tests/docker-compose.test.status-go.yml up --remove-orphans --build
+	docker-compose -f integration-tests/docker-compose.anvil.yml -f integration-tests/docker-compose.test.status-go.yml up -d --build --remove-orphans; \
+	docker-compose -f integration-tests/docker-compose.anvil.yml -f integration-tests/docker-compose.test.status-go.yml logs -f tests-rpc; \
+	exit_code=$$(docker inspect integration-tests_tests-rpc_1 -f '{{.State.ExitCode}}'); \
+	docker-compose -f integration-tests/docker-compose.anvil.yml -f integration-tests/docker-compose.test.status-go.yml down; \
+	exit $$exit_code
 
 run-anvil: SHELL := /bin/sh
 run-anvil:

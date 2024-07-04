@@ -14,3 +14,21 @@ services:
       - 30303:30303/udp
       - 30304:30304/udp
     entrypoint: ["statusd", "-c", "/static/configs/config.json", "--seed-phrase=test test test test test test test test test test test junk", "--password=Strong12345"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -X POST --data '{\"jsonrpc\":\"2.0\",\"method\":\"net_version\",\"params\":[],\"id\":1}' -H 'Content-Type: application/json' http://0.0.0.0:3333 || exit 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 120
+
+  tests-rpc:
+    depends_on:
+      status-go:
+        condition: service_healthy
+      deploy-communities-contracts:
+        condition: service_completed_successfully
+    build:
+      context: .
+      dockerfile: Dockerfile.tests-rpc
+    entrypoint: ["pytest", "-m", "wallet", "--rpc_url=http://status-go:3333"]
+    volumes:
+      - .:/tests-rpc
