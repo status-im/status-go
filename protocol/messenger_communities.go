@@ -572,7 +572,7 @@ func (m *Messenger) HandleCommunityEncryptionKeysRequest(state *ReceivedMessageS
 		return communities.ErrNotControlNode
 	}
 	signer := state.CurrentMessageState.PublicKey
-	return m.handleCommunityEncryptionKeysRequest(community, signer)
+	return m.handleCommunityEncryptionKeysRequest(community, message.ChatIds, signer)
 }
 
 func (m *Messenger) HandleCommunitySharedAddressesRequest(state *ReceivedMessageState, message *protobuf.CommunitySharedAddressesRequest, statusMessage *v1protocol.StatusMessage) error {
@@ -602,7 +602,7 @@ func (m *Messenger) HandleCommunityTokenAction(state *ReceivedMessageState, mess
 	return m.communityTokensService.ProcessCommunityTokenAction(message)
 }
 
-func (m *Messenger) handleCommunityEncryptionKeysRequest(community *communities.Community, signer *ecdsa.PublicKey) error {
+func (m *Messenger) handleCommunityEncryptionKeysRequest(community *communities.Community, channelIDs []string, signer *ecdsa.PublicKey) error {
 	if !community.HasMember(signer) {
 		return communities.ErrMemberNotFound
 	}
@@ -623,7 +623,17 @@ func (m *Messenger) handleCommunityEncryptionKeysRequest(community *communities.
 		}
 	}
 
+	requestedChannelIDs := map[string]bool{}
+	for _, channelID := range channelIDs {
+		requestedChannelIDs[channelID] = true
+	}
+
 	for channelID, channel := range community.Chats() {
+		// Skip channels that weren't requested
+		if len(requestedChannelIDs) > 0 && !requestedChannelIDs[channelID] {
+			continue
+		}
+
 		channelMembers := channel.GetMembers()
 		member, exists := channelMembers[pkStr]
 		if exists && community.ChannelEncrypted(channelID) {
@@ -5029,4 +5039,70 @@ func (m *Messenger) shareRevealedAccountsOnSoftKick(community *communities.Commu
 	} else {
 		messengerResponse.AddRequestToJoinCommunity(requestToJoin)
 	}
+}
+
+func (m *Messenger) requestCommunityEncryptionKeys(community *communities.Community, channelIDs []string) error {
+	m.logger.Debug("request community encryption keys",
+		zap.String("communityID", community.IDString()),
+		zap.Strings("channels", channelIDs))
+
+	request := &protobuf.CommunityEncryptionKeysRequest{
+		CommunityId: community.ID(),
+		ChatIds:     channelIDs,
+	}
+
+	payload, err := proto.Marshal(request)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := &common.RawMessage{
+		Payload:             payload,
+		Sender:              m.identity,
+		CommunityID:         community.ID(),
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_ENCRYPTION_KEYS_REQUEST,
+	}
+
+	_, err = m.SendMessageToControlNode(community, rawMessage)
+	return err
+}
+
+func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
+	logger := m.logger.Named("requestMissingCommunityChannelsHRKeysLoop")
+
+	go func() {
+		for {
+			select {
+			case <-time.After(5 * time.Minute):
+				communitiesChannels, err := m.communitiesManager.DetermineChannelsForHRKeysRequest()
+				if err != nil {
+					logger.Error("failed to determine channels for encryption keys request", zap.Error(err))
+					continue
+				}
+
+				for _, cc := range communitiesChannels {
+					err := m.requestCommunityEncryptionKeys(cc.Community, cc.ChannelIDs)
+					if err != nil {
+						logger.Error("failed to request channels' encryption keys",
+							zap.String("communityID", cc.Community.IDString()),
+							zap.Strings("channelIDs", cc.ChannelIDs),
+							zap.Error(err))
+						continue
+					}
+
+					err = m.communitiesManager.UpdateEncryptionKeysRequests(cc.Community.ID(), cc.ChannelIDs)
+					if err != nil {
+						logger.Error("failed to update channels' encryption keys requests",
+							zap.String("communityID", cc.Community.IDString()),
+							zap.Strings("channelIDs", cc.ChannelIDs),
+							zap.Error(err))
+					}
+				}
+
+			case <-m.quit:
+				return
+			}
+		}
+	}()
 }

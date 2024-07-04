@@ -375,7 +375,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				CategoryID:              c.CategoryId,
 				HideIfPermissionsNotMet: c.HideIfPermissionsNotMet,
 				Position:                int(c.Position),
-				MissingEncryptionKey:    !o.IsMemberInChat(o.MemberIdentity(), id) && o.IsMemberLikelyInChat(id),
+				MissingEncryptionKey:    o.HasMissingEncryptionKey(id),
 			}
 
 			if chat.TokenGated {
@@ -771,11 +771,15 @@ func (o *Community) HasMember(pk *ecdsa.PublicKey) bool {
 	return o.hasMember(pk)
 }
 
+func (o *Community) isMemberInChat(pk *ecdsa.PublicKey, chatID string) bool {
+	return o.getChatMember(pk, chatID) != nil
+}
+
 func (o *Community) IsMemberInChat(pk *ecdsa.PublicKey, chatID string) bool {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	return o.getChatMember(pk, chatID) != nil
+	return o.isMemberInChat(pk, chatID)
 }
 
 // Uses bloom filter members list to estimate presence in the channel.
@@ -1903,6 +1907,15 @@ func (o *Community) ChannelEncrypted(channelID string) bool {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 	return o.channelEncrypted(channelID)
+}
+
+func (o *Community) HasMissingEncryptionKey(channelID string) bool {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	return o.channelEncrypted(channelID) &&
+		!o.isMemberInChat(o.MemberIdentity(), channelID) &&
+		o.IsMemberLikelyInChat(channelID)
 }
 
 func TokenPermissionsByType(permissions map[string]*CommunityTokenPermission, permissionType protobuf.CommunityTokenPermission_Type) []*CommunityTokenPermission {

@@ -303,6 +303,7 @@ message CommunityUpdateGrant {
 
 message CommunityEncryptionKeysRequest {
   bytes community_id = 1;
+  repeated string chat_ids = 2;
 }
 
 message CommunitySharedAddressesRequest {
