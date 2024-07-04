@@ -2283,11 +2283,14 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 			changes.ShouldMemberJoin = hasPendingRequest
 		}
 
-		if changes.HasMemberLeft(pkString) {
+		if changes.HasMemberLeft(pkString) && community.Joined() {
+			softKick := !changes.IsMemberBanned(pkString) &&
+				(changes.ControlNodeChanged != nil || prevResendAccountsClock < community.Description().ResendAccountsClock)
+
 			// If we joined previously the community, that means we have been kicked
-			changes.MemberKicked = community.Joined()
-			// soft kick member on community owner change or on ResendAccountsClock change
-			changes.MemberSoftKicked = changes.ControlNodeChanged != nil || prevResendAccountsClock < community.Description().ResendAccountsClock
+			changes.MemberKicked = !softKick
+			// soft kick previously joined member on community owner change or on ResendAccountsClock change
+			changes.MemberSoftKicked = softKick
 		}
 	}
 
@@ -4605,13 +4608,13 @@ func (m *Manager) RemoveUsersWithoutRevealedAccounts(community *Community, clock
 	}
 
 	myPk := common.PubkeyToHex(&m.identity.PublicKey)
-	membersToRemove := make(map[string]*protobuf.CommunityMember)
-	for pk, member := range community.Members() {
+	membersToRemove := []string{}
+	for pk := range community.Members() {
 		if myPk == pk {
 			continue
 		}
 		if _, exists := membersAccounts[pk]; !exists {
-			membersToRemove[pk] = member
+			membersToRemove = append(membersToRemove, pk)
 		}
 	}
 
@@ -4619,7 +4622,7 @@ func (m *Manager) RemoveUsersWithoutRevealedAccounts(community *Community, clock
 		community.SetResendAccountsClock(clock)
 	}
 
-	return community.RemoveSpecificUsersFromOrg(membersToRemove), nil
+	return community.RemoveMembersFromOrg(membersToRemove), nil
 }
 
 func (m *Manager) PromoteSelfToControlNode(community *Community, clock uint64) (*CommunityChanges, error) {
