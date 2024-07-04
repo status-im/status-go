@@ -138,6 +138,7 @@ func TestService_UpdateCollectibleInfo(t *testing.T) {
 	args := []arg{
 		{5, "0xA2838FDA19EB6EED3F8B9EFF411D4CD7D2DE0313", "0x0D", nil, nil},
 		{5, "0xA2838FDA19EB6EED3F8B9EFF411D4CD7D2DE0313", "0x762AD3E4934E687F8701F24C7274E5209213FD6208FF952ACEB325D028866949", nil, nil},
+		{5, "0xA2838FDA19EB6EED3F8B9EFF411D4CD7D2DE0313", "0x762AD3E4934E687F8701F24C7274E5209213FD6208FF952ACEB325D028866949", nil, nil},
 		{5, "0x3d6afaa395c31fcd391fe3d562e75fe9e8ec7e6a", "", nil, nil},
 		{5, "0xA2838FDA19EB6EED3F8B9EFF411D4CD7D2DE0313", "0x0F", nil, nil},
 	}
@@ -157,20 +158,25 @@ func TestService_UpdateCollectibleInfo(t *testing.T) {
 	state.collectiblesMock.On("FetchAssetsByCollectibleUniqueID", []thirdparty.CollectibleUniqueID{
 		{
 			ContractID: thirdparty.ContractID{
-				ChainID: args[3].chainID,
-				Address: *args[3].tokenAddress},
-			TokenID: &bigint.BigInt{Int: args[3].tokenID},
+				ChainID: args[4].chainID,
+				Address: *args[4].tokenAddress},
+			TokenID: &bigint.BigInt{Int: args[4].tokenID},
 		}, {
 			ContractID: thirdparty.ContractID{
 				ChainID: args[1].chainID,
 				Address: *args[1].tokenAddress},
 			TokenID: &bigint.BigInt{Int: args[1].tokenID},
+		}, {
+			ContractID: thirdparty.ContractID{
+				ChainID: args[0].chainID,
+				Address: *args[0].tokenAddress},
+			TokenID: &bigint.BigInt{Int: args[0].tokenID},
 		},
 	}).Return([]thirdparty.FullCollectibleData{
 		{
 			CollectibleData: thirdparty.CollectibleData{
-				Name:     "Test 2",
-				ImageURL: "test://url/2"},
+				Name:     "Test 4",
+				ImageURL: "test://url/4"},
 			CollectionData: nil,
 		}, {
 			CollectibleData: thirdparty.CollectibleData{
@@ -178,9 +184,15 @@ func TestService_UpdateCollectibleInfo(t *testing.T) {
 				ImageURL: "test://url/1"},
 			CollectionData: nil,
 		},
+		{
+			CollectibleData: thirdparty.CollectibleData{
+				Name:     "Test 0",
+				ImageURL: "test://url/0"},
+			CollectionData: nil,
+		},
 	}, nil).Once()
 
-	state.service.FilterActivityAsync(0, append(fromAddresses, toAddresses...), allNetworksFilter(), Filter{}, 0, 3)
+	state.service.FilterActivityAsync(0, append(fromAddresses, toAddresses...), allNetworksFilter(), Filter{}, 0, 10)
 
 	filterResponseCount := 0
 	var updates []EntryData
@@ -193,7 +205,7 @@ func TestService_UpdateCollectibleInfo(t *testing.T) {
 				payload, err := walletevent.GetPayload[FilterResponse](res)
 				require.NoError(t, err)
 				require.Equal(t, ErrorCodeSuccess, payload.ErrorCode)
-				require.Equal(t, 3, len(payload.Activities))
+				require.Equal(t, 5, len(payload.Activities))
 				filterResponseCount++
 			case EventActivityFilteringUpdate:
 				err := walletevent.ExtractPayload(res, &updates)
@@ -205,11 +217,13 @@ func TestService_UpdateCollectibleInfo(t *testing.T) {
 	}
 
 	require.Equal(t, 1, filterResponseCount)
-	require.Equal(t, 2, len(updates))
-	require.Equal(t, "Test 2", *updates[0].NftName)
-	require.Equal(t, "test://url/2", *updates[0].NftURL)
+	require.Equal(t, 3, len(updates))
+	require.Equal(t, "Test 4", *updates[0].NftName)
+	require.Equal(t, "test://url/4", *updates[0].NftURL)
 	require.Equal(t, "Test 1", *updates[1].NftName)
 	require.Equal(t, "test://url/1", *updates[1].NftURL)
+	require.Equal(t, "Test 0", *updates[2].NftName)
+	require.Equal(t, "test://url/0", *updates[2].NftURL)
 
 	sub.Unsubscribe()
 }

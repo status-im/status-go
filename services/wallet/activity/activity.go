@@ -587,11 +587,15 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			inAmount, outAmount := getTrInAndOutAmounts(activityType, dbTrAmount, dbPTrAmount)
 
 			// Extract tokens and chains
-			var involvedToken *Token
+			var tokenContractAddress eth.Address
 			if tokenAddress != nil && *tokenAddress != ZeroAddress {
-				involvedToken = &Token{TokenType: Erc20, ChainID: common.ChainID(chainID.Int64), TokenID: tokenID, Address: *tokenAddress}
-			} else {
-				involvedToken = &Token{TokenType: Native, ChainID: common.ChainID(chainID.Int64), TokenID: tokenID}
+				tokenContractAddress = *tokenAddress
+			}
+			involvedToken := &Token{
+				TokenType: transferTypeToTokenType(transferType),
+				ChainID:   common.ChainID(chainID.Int64),
+				Address:   tokenContractAddress,
+				TokenID:   tokenID,
 			}
 
 			entry = newActivityEntryWithSimpleTransaction(
@@ -782,6 +786,25 @@ func contractTypeFromDBType(dbType string) (transferType *TransferType) {
 		return nil
 	}
 	return transferType
+}
+
+func transferTypeToTokenType(transferType *TransferType) TokenType {
+	if transferType == nil {
+		return Native
+	}
+	switch *transferType {
+	case TransferTypeEth:
+		return Native
+	case TransferTypeErc20:
+		return Erc20
+	case TransferTypeErc721:
+		return Erc721
+	case TransferTypeErc1155:
+		return Erc1155
+	default:
+		log.Error(fmt.Sprintf("unexpected transfer type %d", transferType))
+	}
+	return Native
 }
 
 // lookupAndFillInTokens ignores NFTs

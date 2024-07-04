@@ -218,13 +218,23 @@ func (s *Service) getActivityDetails(ctx context.Context, entries []Entry) ([]*E
 	var err error
 	ids := make([]thirdparty.CollectibleUniqueID, 0)
 	entriesForIds := make([]*Entry, 0)
+
+	idExists := func(ids []thirdparty.CollectibleUniqueID, id *thirdparty.CollectibleUniqueID) bool {
+		for _, existingID := range ids {
+			if existingID.Same(id) {
+				return true
+			}
+		}
+		return false
+	}
+
 	for i := range entries {
 		if !entries[i].isNFT() {
 			continue
 		}
 
 		id := entries[i].anyIdentity()
-		if id == nil {
+		if id == nil || idExists(ids, id) {
 			continue
 		}
 
