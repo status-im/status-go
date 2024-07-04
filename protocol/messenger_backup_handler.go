@@ -393,25 +393,7 @@ func (m *Messenger) requestCommunityKeysAndSharedAddresses(state *ReceivedMessag
 	}
 
 	if isEncrypted {
-		request := &protobuf.CommunityEncryptionKeysRequest{
-			CommunityId: syncCommunity.Id,
-		}
-
-		payload, err := proto.Marshal(request)
-		if err != nil {
-			return err
-		}
-
-		rawMessage := &common.RawMessage{
-			Payload:             payload,
-			Sender:              m.identity,
-			CommunityID:         community.ID(),
-			SkipEncryptionLayer: true,
-			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_ENCRYPTION_KEYS_REQUEST,
-		}
-
-		_, err = m.SendMessageToControlNode(community, rawMessage)
-
+		err = m.requestCommunityEncryptionKeys(community, nil)
 		if err != nil {
 			m.logger.Error("failed to request community encryption keys", zap.String("communityId", community.IDString()), zap.Error(err))
 			return err

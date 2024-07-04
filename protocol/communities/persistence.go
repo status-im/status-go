@@ -72,6 +72,13 @@ type CommunityRecordBundle struct {
 	installationID *string
 }
 
+type EncryptionKeysRequestRecord struct {
+	communityID    []byte
+	channelID      string
+	requestedAt    int64
+	requestedCount uint
+}
+
 const OR = " OR "
 const communitiesBaseQuery = `
 	SELECT
@@ -2091,4 +2098,102 @@ func (p *Persistence) GetCommunityRequestsToJoinRevealedAddresses(communityID []
 	}
 
 	return accounts, nil
+}
+
+func (p *Persistence) GetEncryptionKeyRequests(communityID []byte, channelIDs map[string]struct{}) (map[string]*EncryptionKeysRequestRecord, error) {
+	result := map[string]*EncryptionKeysRequestRecord{}
+
+	query := "SELECT channel_id, requested_at, requested_count FROM community_encryption_keys_requests WHERE community_id = ? AND channel_id IN (?" + strings.Repeat(",?", len(channelIDs)-1) + ")"
+
+	args := make([]interface{}, 0, len(channelIDs)+1)
+	args = append(args, communityID)
+	for channelID := range channelIDs {
+		args = append(args, channelID)
+	}
+
+	rows, err := p.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var channelID string
+		var requestedAt int64
+		var requestedCount uint
+		err := rows.Scan(&channelID, &requestedAt, &requestedCount)
+		if err != nil {
+			return nil, err
+		}
+		result[channelID] = &EncryptionKeysRequestRecord{
+			communityID:    communityID,
+			channelID:      channelID,
+			requestedAt:    requestedAt,
+			requestedCount: requestedCount,
+		}
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (p *Persistence) UpdateAndPruneEncryptionKeyRequests(communityID types.HexBytes, channelIDs []string, requestedAt int64) error {
+	tx, err := p.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	if len(channelIDs) == 0 {
+		deleteQuery := "DELETE FROM community_encryption_keys_requests WHERE community_id = ?"
+		_, err = tx.Exec(deleteQuery, communityID)
+		return err
+	}
+
+	// Delete entries that do not match the channelIDs list
+	deleteQuery := "DELETE FROM community_encryption_keys_requests WHERE community_id = ? AND channel_id NOT IN (?" + strings.Repeat(",?", len(channelIDs)-1) + ")"
+	args := make([]interface{}, 0, len(channelIDs)+1)
+	args = append(args, communityID)
+	for _, channelID := range channelIDs {
+		args = append(args, channelID)
+	}
+	_, err = tx.Exec(deleteQuery, args...)
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(`
+        INSERT INTO community_encryption_keys_requests (community_id, channel_id, requested_at, requested_count)
+        VALUES (?, ?, ?, 1)
+        ON CONFLICT(community_id, channel_id)
+        DO UPDATE SET
+            requested_at = excluded.requested_at,
+            requested_count = community_encryption_keys_requests.requested_count + 1
+        WHERE excluded.requested_at > community_encryption_keys_requests.requested_at
+    `)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, channelID := range channelIDs {
+		_, err := stmt.Exec(communityID, channelID, requestedAt)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

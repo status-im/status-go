@@ -848,6 +848,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 	m.startMessageSegmentsCleanupLoop()
 	m.startHashRatchetEncryptedMessagesCleanupLoop()
+	m.startRequestMissingCommunityChannelsHRKeysLoop()
 
 	if err := m.cleanTopics(); err != nil {
 		return nil, err
