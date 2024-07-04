@@ -2,14 +2,15 @@
 , pkgs ? import ./pkgs.nix { inherit config; } }:
 
 let
-  inherit (pkgs) lib stdenv;
+  inherit (pkgs) lib stdenv callPackage;
   /* No Android SDK for Darwin aarch64. */
   isMacM1 = stdenv.isDarwin && stdenv.isAarch64;
+
   /* Lock requires Xcode verison. */
-  xcodeWrapper = pkgs.xcodeenv.composeXcodeWrapper {
-    version = "14.3";
-    allowHigher = true;
+  xcodeWrapper = callPackage ./pkgs/xcodeenv/compose-xcodewrapper.nix { } {
+      versions = ["14.3" "15.1" "15.2" "15.3" "15.4"];
   };
+
   /* Gomobile also needs the Xcode wrapper. */
   gomobileMod = pkgs.gomobile.override {
     inherit xcodeWrapper;
