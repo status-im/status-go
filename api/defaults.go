@@ -43,6 +43,8 @@ var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWa
 
 var DefaultFleet = params.FleetShardsTest
 
+var overrideApiConfig = overrideApiConfigProd
+
 func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
 
@@ -215,13 +217,14 @@ func buildWalletConfig(request *requests.WalletSecretsConfig) params.WalletConfi
 	return walletConfig
 }
 
-func overrideApiConfig(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
+func overrideApiConfigProd(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
 	nodeConfig.APIModules = config.APIModules
 	nodeConfig.ConnectorConfig.Enabled = config.ConnectorEnabled
 
 	nodeConfig.HTTPEnabled = config.HTTPEnabled
 	nodeConfig.HTTPHost = config.HTTPHost
 	nodeConfig.HTTPPort = config.HTTPPort
+	nodeConfig.HTTPVirtualHosts = config.HTTPVirtualHosts
 
 	nodeConfig.WSEnabled = config.WSEnabled
 	nodeConfig.WSHost = config.WSHost

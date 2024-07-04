@@ -215,6 +215,7 @@ func main() {
 					HTTPEnabled:      config.HTTPEnabled,
 					HTTPHost:         config.HTTPHost,
 					HTTPPort:         config.HTTPPort,
+					HTTPVirtualHosts: config.HTTPVirtualHosts,
 					WSEnabled:        config.WSEnabled,
 					WSHost:           config.WSHost,
 					WSPort:           config.WSPort,
@@ -224,6 +225,8 @@ func main() {
 				TestOverrideNetworks: config.Networks,
 			},
 		}
+
+		api.OverrideApiConfigTest()
 
 		_, err := backend.RestoreAccountAndLogin(&request)
 		if err != nil {

@@ -7,6 +7,7 @@
     "HTTPEnabled": true,
     "HTTPHost": "0.0.0.0",
     "HTTPPort": 3333,
+    "HTTPVirtualHosts": ["*", "status-go"],
     "APIModules": "eth,admin,wallet",
     "WalletConfig": {
       "Enabled": true
