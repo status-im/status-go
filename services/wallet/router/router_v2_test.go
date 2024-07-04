@@ -30,6 +30,7 @@ const (
 	testBonderFeeETH      = 150000000000000
 	testBonderFeeUSDC     = 10000
 
+	testAmount0Point1ETHInWei = 100000000000000000
 	testAmount0Point2ETHInWei = 200000000000000000
 	testAmount0Point3ETHInWei = 300000000000000000
 	testAmount0Point4ETHInWei = 400000000000000000
@@ -38,6 +39,8 @@ const (
 	testAmount0Point8ETHInWei = 800000000000000000
 	testAmount1ETHInWei       = 1000000000000000000
 	testAmount2ETHInWei       = 2000000000000000000
+	testAmount3ETHInWei       = 3000000000000000000
+	testAmount5ETHInWei       = 5000000000000000000
 
 	testAmount1USDC   = 1000000
 	testAmount100USDC = 100000000
@@ -75,12 +78,12 @@ var (
 	}
 
 	testBalanceMapPerChain = map[string]*big.Int{
-		makeTestBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount2ETHInWei),
-		makeTestBalanceKey(walletCommon.EthereumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
-		makeTestBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount2ETHInWei),
-		makeTestBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
-		makeTestBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount2ETHInWei),
-		makeTestBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
+		makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount2ETHInWei),
+		makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
+		makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount2ETHInWei),
+		makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
+		makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount2ETHInWei),
+		makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
 	}
 )
 
@@ -199,6 +202,46 @@ var defaultNetworks = []params.Network{
 	optimismSepolia,
 	arbitrum,
 	arbitrumSepolia,
+}
+
+func amountOptionEqual(a, b amountOption) bool {
+	return a.amount.Cmp(b.amount) == 0 && a.locked == b.locked
+}
+
+func contains(slice []amountOption, val amountOption) bool {
+	for _, item := range slice {
+		if amountOptionEqual(item, val) {
+			return true
+		}
+	}
+	return false
+}
+
+func amountOptionsMapsEqual(map1, map2 map[uint64][]amountOption) bool {
+	if len(map1) != len(map2) {
+		return false
+	}
+
+	for key, slice1 := range map1 {
+		slice2, ok := map2[key]
+		if !ok || len(slice1) != len(slice2) {
+			return false
+		}
+
+		for _, val1 := range slice1 {
+			if !contains(slice2, val1) {
+				return false
+			}
+		}
+
+		for _, val2 := range slice2 {
+			if !contains(slice1, val2) {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
@@ -1782,6 +1825,204 @@ func TestRouterV2(t *testing.T) {
 			expectedCandidates: []*PathV2{},
 		},
 		{
+			name: "ERC20 transfer - All FromChains - No Locked Amount - Enough Token Balance Across All Chains",
+			input: &RouteInputParams{
+				testnetMode: false,
+				SendType:    Transfer,
+				AddrFrom:    common.HexToAddress("0x1"),
+				AddrTo:      common.HexToAddress("0x2"),
+				AmountIn:    (*hexutil.Big)(big.NewInt(2.5 * testAmount100USDC)),
+				TokenID:     pathprocessor.UsdcSymbol,
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.UsdcSymbol,
+						Decimals: 6,
+					},
+					tokenPrices:           testTokenPrices,
+					baseFee:               big.NewInt(testBaseFee),
+					suggestedFees:         testSuggestedFees,
+					balanceMap:            testBalanceMapPerChain,
+					estimationMap:         testEstimationMap,
+					bonderFeeMap:          testBbonderFeeMap,
+					approvalGasEstimation: testApprovalGasEstimation,
+					approvalL1Fee:         testApprovalL1Fee,
+				},
+			},
+			expectedCandidates: []*PathV2{
+				{
+					ProcessorName:    pathprocessor.ProcessorTransferName,
+					FromChain:        &mainnet,
+					ToChain:          &mainnet,
+					AmountOut:        (*hexutil.Big)(big.NewInt(2.5 * testAmount100USDC)),
+					ApprovalRequired: false,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorTransferName,
+					FromChain:        &mainnet,
+					ToChain:          &mainnet,
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC)),
+					ApprovalRequired: false,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &mainnet,
+					ToChain:          &optimism,
+					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &mainnet,
+					ToChain:          &optimism,
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &mainnet,
+					ToChain:          &arbitrum,
+					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &mainnet,
+					ToChain:          &arbitrum,
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorTransferName,
+					FromChain:        &optimism,
+					ToChain:          &optimism,
+					AmountOut:        (*hexutil.Big)(big.NewInt(0.5 * testAmount100USDC)),
+					ApprovalRequired: false,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorTransferName,
+					FromChain:        &optimism,
+					ToChain:          &optimism,
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC)),
+					ApprovalRequired: false,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorTransferName,
+					FromChain:        &optimism,
+					ToChain:          &optimism,
+					AmountOut:        (*hexutil.Big)(big.NewInt(2.5 * testAmount100USDC)),
+					ApprovalRequired: false,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &optimism,
+					ToChain:          &mainnet,
+					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &optimism,
+					ToChain:          &mainnet,
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &optimism,
+					ToChain:          &mainnet,
+					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &optimism,
+					ToChain:          &arbitrum,
+					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &optimism,
+					ToChain:          &arbitrum,
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &optimism,
+					ToChain:          &arbitrum,
+					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorTransferName,
+					FromChain:        &arbitrum,
+					ToChain:          &arbitrum,
+					AmountOut:        (*hexutil.Big)(big.NewInt(0.5 * testAmount100USDC)),
+					ApprovalRequired: false,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorTransferName,
+					FromChain:        &arbitrum,
+					ToChain:          &arbitrum,
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC)),
+					ApprovalRequired: false,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorTransferName,
+					FromChain:        &arbitrum,
+					ToChain:          &arbitrum,
+					AmountOut:        (*hexutil.Big)(big.NewInt(2.5 * testAmount100USDC)),
+					ApprovalRequired: false,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &arbitrum,
+					ToChain:          &mainnet,
+					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &arbitrum,
+					ToChain:          &mainnet,
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &arbitrum,
+					ToChain:          &mainnet,
+					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &arbitrum,
+					ToChain:          &optimism,
+					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &arbitrum,
+					ToChain:          &optimism,
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &arbitrum,
+					ToChain:          &optimism,
+					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
+					ApprovalRequired: true,
+				},
+			},
+		},
+		{
 			name: "Bridge - No Specific FromChain - No Specific ToChain",
 			input: &RouteInputParams{
 				testnetMode: false,
@@ -2321,9 +2562,11 @@ func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            map[string]*big.Int{},
+					tokenPrices:   testTokenPrices,
+					suggestedFees: testSuggestedFees,
+					balanceMap: map[string]*big.Int{
+						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(0),
+					},
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -2364,7 +2607,8 @@ func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
 					tokenPrices:   testTokenPrices,
 					suggestedFees: testSuggestedFees,
 					balanceMap: map[string]*big.Int{
-						makeTestBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
+						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
+						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
 					},
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
@@ -2402,9 +2646,16 @@ func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            map[string]*big.Int{},
+					tokenPrices:   testTokenPrices,
+					suggestedFees: testSuggestedFees,
+					balanceMap: map[string]*big.Int{
+						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.UsdcSymbol): big.NewInt(0),
+						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
+						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(0),
+						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(0),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
+					},
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
 					approvalGasEstimation: testApprovalGasEstimation,
@@ -2454,9 +2705,12 @@ func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
 					tokenPrices:   testTokenPrices,
 					suggestedFees: testSuggestedFees,
 					balanceMap: map[string]*big.Int{
-						makeTestBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
-						makeTestBalanceKey(walletCommon.EthereumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
-						makeTestBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
+						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
+						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
+						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
+						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
 					},
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
@@ -2509,8 +2763,8 @@ func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
 					tokenPrices:   testTokenPrices,
 					suggestedFees: testSuggestedFees,
 					balanceMap: map[string]*big.Int{
-						makeTestBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
-						makeTestBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount1ETHInWei),
 					},
 					estimationMap:         testEstimationMap,
 					bonderFeeMap:          testBbonderFeeMap,
@@ -2602,420 +2856,441 @@ func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
 	}
 }
 
-func TestValidateInputData(t *testing.T) {
-	testCases := []struct {
-		name          string
-		input         *RouteInputParams
-		expectedError error
+func TestAmountOptions(t *testing.T) {
+	router, cleanTmpDb := setupRouter(t)
+	defer cleanTmpDb()
+
+	tests := []struct {
+		name                  string
+		input                 *RouteInputParams
+		expectedAmountOptions map[uint64][]amountOption
 	}{
 		{
-			name: "ENSRegister valid data on testnet",
+			name: "Transfer - Single From Chain - No Locked Amount",
 			input: &RouteInputParams{
-				SendType:    ENSRegister,
-				Username:    "validusername.eth",
-				PublicKey:   "validpublickey",
-				TokenID:     pathprocessor.SttSymbol,
-				testnetMode: true,
-			},
-			expectedError: nil,
-		},
-		{
-			name: "ENSRegister valid data on mainnet",
-			input: &RouteInputParams{
-				SendType:  ENSRegister,
-				Username:  "validusername.eth",
-				PublicKey: "validpublickey",
-				TokenID:   pathprocessor.SntSymbol,
-			},
-			expectedError: nil,
-		},
-		{
-			name: "ENSRegister missing username",
-			input: &RouteInputParams{
-				SendType:    ENSRegister,
-				PublicKey:   "validpublickey",
-				TokenID:     pathprocessor.SttSymbol,
-				testnetMode: true,
-			},
-			expectedError: ErrENSRegisterRequiresUsernameAndPubKey,
-		},
-		{
-			name: "ENSRegister missing public key",
-			input: &RouteInputParams{
-				SendType:    ENSRegister,
-				Username:    "validusername.eth",
-				TokenID:     pathprocessor.SttSymbol,
-				testnetMode: true,
-			},
-			expectedError: ErrENSRegisterRequiresUsernameAndPubKey,
-		},
-		{
-			name: "ENSRegister invalid token on testnet",
-			input: &RouteInputParams{
-				SendType:    ENSRegister,
-				Username:    "validusername.eth",
-				PublicKey:   "validpublickey",
-				TokenID:     "invalidtoken",
-				testnetMode: true,
-			},
-			expectedError: ErrENSRegisterTestnetSTTOnly,
-		},
-		{
-			name: "ENSRegister invalid token on mainnet",
-			input: &RouteInputParams{
-				SendType:  ENSRegister,
-				Username:  "validusername.eth",
-				PublicKey: "validpublickey",
-				TokenID:   "invalidtoken",
-			},
-			expectedError: ErrENSRegisterMainnetSNTOnly,
-		},
-		{
-			name: "ENSRegister valid data with mixed case username on mainnet",
-			input: &RouteInputParams{
-				SendType:  ENSRegister,
-				Username:  "ValidUsername.eth",
-				PublicKey: "validpublickey",
-				TokenID:   pathprocessor.SntSymbol,
-			},
-			expectedError: nil,
-		},
-		/*
-			TODO we should introduce proper ENS validation
-			{
-				name: "ENSRegister with special characters in username",
-				input: &RouteInputParams{
-					SendType:  ENSRegister,
-					Username:  "validuser!@#name.eth",
-					PublicKey: "validpublickey",
-					TokenID:   pathprocessor.SntSymbol,
+				testnetMode:          false,
+				SendType:             Transfer,
+				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
+				TokenID:              pathprocessor.EthSymbol,
+				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.EthSymbol,
+						Decimals: 18,
+					},
+					balanceMap: map[string]*big.Int{},
 				},
-				expectedError: ErrENSSetPubKeyInvalidUsername,
 			},
-			{
-				name: "ENSRegister with leading and trailing spaces in username",
-				input: &RouteInputParams{
-					SendType:  ENSRegister,
-					Username:  " validusername.eth ",
-					PublicKey: "validpublickey",
-					TokenID:   pathprocessor.SntSymbol,
+			expectedAmountOptions: map[uint64][]amountOption{
+				walletCommon.OptimismMainnet: {
+					{
+						amount: big.NewInt(testAmount1ETHInWei),
+						locked: false,
+					},
 				},
-				expectedError: ErrENSSetPubKeyInvalidUsername,
 			},
-		*/
-		{
-			name: "ENSRelease valid data",
-			input: &RouteInputParams{
-				SendType: ENSRelease,
-				Username: "validusername.eth",
-			},
-			expectedError: nil,
 		},
 		{
-			name: "ENSRelease missing username",
+			name: "Transfer - Single From Chain - Locked Amount To Single Chain Equal Total Amount",
 			input: &RouteInputParams{
-				SendType: ENSRelease,
-			},
-			expectedError: ErrENSReleaseRequiresUsername,
-		},
-		{
-			name: "ENSSetPubKey valid data",
-			input: &RouteInputParams{
-				SendType:  ENSSetPubKey,
-				Username:  "validusername.eth",
-				PublicKey: "validpublickey",
-			},
-			expectedError: nil,
-		},
-		{
-			name: "ENSSetPubKey missing username",
-			input: &RouteInputParams{
-				SendType:  ENSSetPubKey,
-				PublicKey: "validpublickey",
-			},
-			expectedError: ErrENSSetPubKeyRequiresUsernameAndPubKey,
-		},
-		{
-			name: "ENSSetPubKey missing public key",
-			input: &RouteInputParams{
-				SendType: ENSSetPubKey,
-				Username: "validusername",
-			},
-			expectedError: ErrENSSetPubKeyRequiresUsernameAndPubKey,
-		},
-		{
-			name: "ENSSetPubKey invalid ENS username",
-			input: &RouteInputParams{
-				SendType:  ENSSetPubKey,
-				Username:  "invalidusername",
-				PublicKey: "validpublickey",
-			},
-			expectedError: ErrENSSetPubKeyInvalidUsername,
-		},
-		{
-			name: "StickersBuy missing packID",
-			input: &RouteInputParams{
-				SendType: StickersBuy,
-			},
-			expectedError: ErrStickersBuyRequiresPackID,
-		},
-		{
-			name: "Swap missing toTokenID",
-			input: &RouteInputParams{
-				SendType: Swap,
-			},
-			expectedError: ErrSwapRequiresToTokenID,
-		},
-		{
-			name: "Swap tokenID equal to toTokenID",
-			input: &RouteInputParams{
-				SendType:  Swap,
-				TokenID:   "token",
-				ToTokenID: "token",
-			},
-			expectedError: ErrSwapTokenIDMustBeDifferent,
-		},
-		{
-			name: "Swap both amountIn and amountOut set",
-			input: &RouteInputParams{
-				SendType:  Swap,
-				TokenID:   "token1",
-				ToTokenID: "token2",
-				AmountIn:  (*hexutil.Big)(big.NewInt(100)),
-				AmountOut: (*hexutil.Big)(big.NewInt(100)),
-			},
-			expectedError: ErrSwapAmountInAmountOutMustBeExclusive,
-		},
-		{
-			name: "Swap negative amountIn",
-			input: &RouteInputParams{
-				SendType:  Swap,
-				TokenID:   "token1",
-				ToTokenID: "token2",
-				AmountIn:  (*hexutil.Big)(big.NewInt(-100)),
-			},
-			expectedError: ErrSwapAmountInMustBePositive,
-		},
-		{
-			name: "Swap negative amountOut",
-			input: &RouteInputParams{
-				SendType:  Swap,
-				TokenID:   "token1",
-				ToTokenID: "token2",
-				AmountOut: (*hexutil.Big)(big.NewInt(-100)),
-			},
-			expectedError: ErrSwapAmountOutMustBePositive,
-		},
-		{
-			name: "Swap with very large amountIn",
-			input: &RouteInputParams{
-				SendType:  Swap,
-				TokenID:   "token1",
-				ToTokenID: "token2",
-				AmountIn:  (*hexutil.Big)(big.NewInt(1e18)),
-			},
-			expectedError: nil,
-		},
-		{
-			name: "Swap with very large amountOut",
-			input: &RouteInputParams{
-				SendType:  Swap,
-				TokenID:   "token1",
-				ToTokenID: "token2",
-				AmountOut: (*hexutil.Big)(big.NewInt(1e18)),
-			},
-			expectedError: nil,
-		},
-		{
-			name: "Swap with very small amountIn",
-			input: &RouteInputParams{
-				SendType:  Swap,
-				TokenID:   "token1",
-				ToTokenID: "token2",
-				AmountIn:  (*hexutil.Big)(big.NewInt(1)),
-			},
-			expectedError: nil,
-		},
-		{
-			name: "Swap with very small amountOut",
-			input: &RouteInputParams{
-				SendType:  Swap,
-				TokenID:   "token1",
-				ToTokenID: "token2",
-				AmountOut: (*hexutil.Big)(big.NewInt(1)),
-			},
-			expectedError: nil,
-		},
-		{
-			name: "fromLockedAmount with supported network on testnet",
-			input: &RouteInputParams{
+				testnetMode:          false,
+				SendType:             Transfer,
+				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
+				TokenID:              pathprocessor.EthSymbol,
+				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.EthereumSepolia: (*hexutil.Big)(big.NewInt(10)),
+					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				},
-				testnetMode: true,
-				AmountIn:    (*hexutil.Big)(big.NewInt(20)),
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.EthSymbol,
+						Decimals: 18,
+					},
+					balanceMap: map[string]*big.Int{},
+				},
 			},
-			expectedError: nil,
+			expectedAmountOptions: map[uint64][]amountOption{
+				walletCommon.OptimismMainnet: {
+					{
+						amount: big.NewInt(testAmount1ETHInWei),
+						locked: true,
+					},
+				},
+			},
 		},
 		{
-			name: "fromLockedAmount with supported network on mainnet",
+			name: "Transfer - Multiple From Chains - Locked Amount To Single Chain Is Less Than Total Amount",
 			input: &RouteInputParams{
+				testnetMode:          false,
+				SendType:             Transfer,
+				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount2ETHInWei)),
+				TokenID:              pathprocessor.EthSymbol,
+				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet},
 				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(10)),
+					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				},
-				AmountIn: (*hexutil.Big)(big.NewInt(20)),
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.EthSymbol,
+						Decimals: 18,
+					},
+					balanceMap: map[string]*big.Int{},
+				},
 			},
-			expectedError: nil,
+			expectedAmountOptions: map[uint64][]amountOption{
+				walletCommon.OptimismMainnet: {
+					{
+						amount: big.NewInt(testAmount1ETHInWei),
+						locked: true,
+					},
+				},
+				walletCommon.ArbitrumMainnet: {
+					{
+						amount: big.NewInt(testAmount1ETHInWei),
+						locked: false,
+					},
+				},
+			},
 		},
 		{
-			name: "fromLockedAmount with supported mainnet network while in test mode",
+			name: "Transfer - Multiple From Chains - Locked Amount To Multiple Chains",
 			input: &RouteInputParams{
+				testnetMode:          false,
+				SendType:             Transfer,
+				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount2ETHInWei)),
+				TokenID:              pathprocessor.EthSymbol,
+				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet},
 				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(10)),
+					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
+					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				},
-				testnetMode: true,
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.EthSymbol,
+						Decimals: 18,
+					},
+					balanceMap: map[string]*big.Int{},
+				},
 			},
-			expectedError: ErrLockedAmountNotSupportedForNetwork,
+			expectedAmountOptions: map[uint64][]amountOption{
+				walletCommon.OptimismMainnet: {
+					{
+						amount: big.NewInt(testAmount1ETHInWei),
+						locked: true,
+					},
+				},
+				walletCommon.ArbitrumMainnet: {
+					{
+						amount: big.NewInt(testAmount1ETHInWei),
+						locked: true,
+					},
+				},
+			},
 		},
 		{
-			name: "fromLockedAmount with unsupported network on testnet",
+			name: "Transfer - All From Chains - Locked Amount To Multiple Chains Equal Total Amount",
 			input: &RouteInputParams{
+				testnetMode: false,
+				SendType:    Transfer,
+				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount2ETHInWei)),
+				TokenID:     pathprocessor.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
-					999: (*hexutil.Big)(big.NewInt(10)),
+					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
+					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				},
-				testnetMode: true,
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.EthSymbol,
+						Decimals: 18,
+					},
+					balanceMap: map[string]*big.Int{},
+				},
 			},
-			expectedError: ErrLockedAmountNotSupportedForNetwork,
+			expectedAmountOptions: map[uint64][]amountOption{
+				walletCommon.OptimismMainnet: {
+					{
+						amount: big.NewInt(testAmount1ETHInWei),
+						locked: true,
+					},
+				},
+				walletCommon.ArbitrumMainnet: {
+					{
+						amount: big.NewInt(testAmount1ETHInWei),
+						locked: true,
+					},
+				},
+			},
 		},
 		{
-			name: "fromLockedAmount with unsupported network on mainnet",
+			name: "Transfer - All From Chains - Locked Amount To Multiple Chains Is Less Than Total Amount",
 			input: &RouteInputParams{
+				testnetMode: false,
+				SendType:    Transfer,
+				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount5ETHInWei)),
+				TokenID:     pathprocessor.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
-					999: (*hexutil.Big)(big.NewInt(10)),
+					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
+					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
+				},
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.EthSymbol,
+						Decimals: 18,
+					},
+					balanceMap: map[string]*big.Int{},
 				},
 			},
-			expectedError: ErrLockedAmountNotSupportedForNetwork,
+			expectedAmountOptions: map[uint64][]amountOption{
+				walletCommon.OptimismMainnet: {
+					{
+						amount: big.NewInt(testAmount1ETHInWei),
+						locked: true,
+					},
+				},
+				walletCommon.ArbitrumMainnet: {
+					{
+						amount: big.NewInt(testAmount1ETHInWei),
+						locked: true,
+					},
+				},
+				walletCommon.EthereumMainnet: {
+					{
+						amount: big.NewInt(testAmount3ETHInWei),
+						locked: false,
+					},
+				},
+			},
 		},
 		{
-			name: "fromLockedAmount with negative amount",
+			name: "Transfer - All From Chain - No Locked Amount - Enough Token Balance If All Chains Are Used",
 			input: &RouteInputParams{
+				testnetMode: false,
+				SendType:    Transfer,
+				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount3ETHInWei)),
+				TokenID:     pathprocessor.EthSymbol,
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.EthSymbol,
+						Decimals: 18,
+					},
+					balanceMap: map[string]*big.Int{
+						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
+					},
+				},
+			},
+			expectedAmountOptions: map[uint64][]amountOption{
+				walletCommon.OptimismMainnet: {
+					{
+						amount: big.NewInt(testAmount3ETHInWei),
+						locked: false,
+					},
+					{
+						amount: big.NewInt(testAmount1ETHInWei),
+						locked: false,
+					},
+				},
+				walletCommon.ArbitrumMainnet: {
+					{
+						amount: big.NewInt(testAmount3ETHInWei),
+						locked: false,
+					},
+					{
+						amount: big.NewInt(testAmount1ETHInWei),
+						locked: false,
+					},
+				},
+				walletCommon.EthereumMainnet: {
+					{
+						amount: big.NewInt(testAmount3ETHInWei),
+						locked: false,
+					},
+					{
+						amount: big.NewInt(testAmount1ETHInWei),
+						locked: false,
+					},
+				},
+			},
+		},
+		{
+			name: "Transfer - All From Chain - Locked Amount To Single Chain - Enough Token Balance If All Chains Are Used",
+			input: &RouteInputParams{
+				testnetMode: false,
+				SendType:    Transfer,
+				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount3ETHInWei)),
+				TokenID:     pathprocessor.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(-10)),
+					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei)),
+				},
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.EthSymbol,
+						Decimals: 18,
+					},
+					balanceMap: map[string]*big.Int{
+						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount2ETHInWei),
+						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount3ETHInWei),
+					},
 				},
 			},
-			expectedError: ErrLockedAmountNotNegative,
+			expectedAmountOptions: map[uint64][]amountOption{
+				walletCommon.OptimismMainnet: {
+					{
+						amount: big.NewInt(testAmount0Point5ETHInWei),
+						locked: true,
+					},
+				},
+				walletCommon.ArbitrumMainnet: {
+					{
+						amount: big.NewInt(testAmount2ETHInWei + testAmount0Point5ETHInWei),
+						locked: false,
+					},
+					{
+						amount: big.NewInt(testAmount0Point5ETHInWei),
+						locked: false,
+					},
+				},
+				walletCommon.EthereumMainnet: {
+					{
+						amount: big.NewInt(testAmount2ETHInWei + testAmount0Point5ETHInWei),
+						locked: false,
+					},
+					{
+						amount: big.NewInt(testAmount2ETHInWei),
+						locked: false,
+					},
+				},
+			},
 		},
 		{
-			name: "fromLockedAmount with zero amount",
+			name: "Transfer - All From Chain - Locked Amount To Multiple Chains - Enough Token Balance If All Chains Are Used",
 			input: &RouteInputParams{
+				testnetMode: false,
+				SendType:    Transfer,
+				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount3ETHInWei)),
+				TokenID:     pathprocessor.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(0)),
+					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei)),
+					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				},
-				AmountIn: (*hexutil.Big)(big.NewInt(20)),
-			},
-			expectedError: nil,
-		},
-		{
-			name: "fromLockedAmount with zero amounts",
-			input: &RouteInputParams{
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(0)),
-					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(0)),
-				},
-				AmountIn: (*hexutil.Big)(big.NewInt(20)),
-			},
-			expectedError: nil,
-		},
-		{
-			name: "fromLockedAmount with all supported networks with zero amount",
-			input: &RouteInputParams{
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(0)),
-					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(0)),
-					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(0)),
-				},
-				AmountIn: (*hexutil.Big)(big.NewInt(20)),
-			},
-			expectedError: ErrLockedAmountExcludesAllSupported,
-		},
-		{
-			name: "fromLockedAmount with all supported test networks with zero amount",
-			input: &RouteInputParams{
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.EthereumSepolia: (*hexutil.Big)(big.NewInt(0)),
-					walletCommon.OptimismSepolia: (*hexutil.Big)(big.NewInt(0)),
-					walletCommon.ArbitrumSepolia: (*hexutil.Big)(big.NewInt(0)),
-				},
-				testnetMode: true,
-				AmountIn:    (*hexutil.Big)(big.NewInt(20)),
-			},
-			expectedError: ErrLockedAmountExcludesAllSupported,
-		},
-		{
-			name: "fromLockedAmount with mixed supported and unsupported networks on testnet",
-			input: &RouteInputParams{
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.EthereumSepolia: (*hexutil.Big)(big.NewInt(10)),
-					999:                          (*hexutil.Big)(big.NewInt(10)),
-				},
-				testnetMode: true,
-			},
-			expectedError: ErrLockedAmountNotSupportedForNetwork,
-		},
-		{
-			name: "fromLockedAmount with mixed supported and unsupported networks on mainnet",
-			input: &RouteInputParams{
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(10)),
-					999:                          (*hexutil.Big)(big.NewInt(10)),
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.EthSymbol,
+						Decimals: 18,
+					},
+					balanceMap: map[string]*big.Int{
+						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount2ETHInWei),
+						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount3ETHInWei),
+					},
 				},
 			},
-			expectedError: ErrLockedAmountNotSupportedForNetwork,
+			expectedAmountOptions: map[uint64][]amountOption{
+				walletCommon.OptimismMainnet: {
+					{
+						amount: big.NewInt(testAmount0Point5ETHInWei),
+						locked: true,
+					},
+				},
+				walletCommon.ArbitrumMainnet: {
+					{
+						amount: big.NewInt(testAmount1ETHInWei + testAmount0Point5ETHInWei),
+						locked: false,
+					},
+				},
+				walletCommon.EthereumMainnet: {
+					{
+						amount: big.NewInt(testAmount1ETHInWei),
+						locked: true,
+					},
+				},
+			},
 		},
 		{
-			name: "fromLockedAmount with null map on testnet",
+			name: "Transfer - All From Chain - No Locked Amount - Not Enough Token Balance",
 			input: &RouteInputParams{
-				FromLockedAmount: nil,
-				testnetMode:      true,
-				AmountIn:         (*hexutil.Big)(big.NewInt(20)),
+				testnetMode: false,
+				SendType:    Transfer,
+				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount5ETHInWei)),
+				TokenID:     pathprocessor.EthSymbol,
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.EthSymbol,
+						Decimals: 18,
+					},
+					balanceMap: map[string]*big.Int{
+						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
+					},
+				},
 			},
-			expectedError: nil,
-		},
-		{
-			name: "fromLockedAmount with null map on mainnet",
-			input: &RouteInputParams{
-				FromLockedAmount: nil,
-				AmountIn:         (*hexutil.Big)(big.NewInt(20)),
+			expectedAmountOptions: map[uint64][]amountOption{
+				walletCommon.OptimismMainnet: {
+					{
+						amount: big.NewInt(testAmount5ETHInWei),
+						locked: false,
+					},
+				},
+				walletCommon.ArbitrumMainnet: {
+					{
+						amount: big.NewInt(testAmount5ETHInWei),
+						locked: false,
+					},
+				},
+				walletCommon.EthereumMainnet: {
+					{
+						amount: big.NewInt(testAmount5ETHInWei),
+						locked: false,
+					},
+				},
 			},
-			expectedError: nil,
-		},
-		{
-			name: "fromLockedAmount with empty map on testnet",
-			input: &RouteInputParams{
-				FromLockedAmount: map[uint64]*hexutil.Big{},
-				testnetMode:      true,
-				AmountIn:         (*hexutil.Big)(big.NewInt(20)),
-			},
-			expectedError: nil,
-		},
-		{
-			name: "fromLockedAmount with empty map on mainnet",
-			input: &RouteInputParams{
-				FromLockedAmount: map[uint64]*hexutil.Big{},
-				AmountIn:         (*hexutil.Big)(big.NewInt(20)),
-			},
-			expectedError: nil,
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			err := validateInputData(tc.input)
-			if tc.expectedError == nil {
-				assert.NoError(t, err)
-			} else {
-				assert.EqualError(t, err, tc.expectedError.Error())
-			}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			selectedFromChains, _, err := router.getSelectedChains(tt.input)
+			assert.NoError(t, err)
+
+			amountOptions, err := router.findOptionsForSendingAmount(tt.input, selectedFromChains, tt.input.testParams.balanceMap)
+			assert.NoError(t, err)
+
+			assert.Equal(t, len(tt.expectedAmountOptions), len(amountOptions))
+			assert.True(t, amountOptionsMapsEqual(tt.expectedAmountOptions, amountOptions))
 		})
 	}
 }
