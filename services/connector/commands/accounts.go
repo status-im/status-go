@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/status-im/status-go/eth-node/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
 )
 
@@ -13,12 +14,12 @@ type AccountsCommand struct {
 }
 
 type AccountsResponse struct {
-	Accounts []string `json:"accounts"`
+	Accounts []types.Address `json:"accounts"`
 }
 
 func (c *AccountsCommand) dAppToAccountsResponse(dApp *persistence.DApp) (string, error) {
 	response := AccountsResponse{
-		Accounts: []string{dApp.SharedAccount},
+		Accounts: []types.Address{dApp.SharedAccount},
 	}
 	responseJSON, err := json.Marshal(response)
 	if err != nil {
@@ -29,11 +30,12 @@ func (c *AccountsCommand) dAppToAccountsResponse(dApp *persistence.DApp) (string
 }
 
 func (c *AccountsCommand) Execute(request RPCRequest) (string, error) {
-	if err := request.checkDAppData(); err != nil {
+	dAppData, err := request.getDAppData()
+	if err != nil {
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDAppByUrl(c.Db, request.Origin)
+	dApp, err := persistence.SelectDAppByUrl(c.Db, dAppData.Origin)
 	if err != nil {
 		return "", err
 	}

@@ -3,7 +3,9 @@ package commands
 import (
 	"errors"
 
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/transactions"
 )
 
 // errors
@@ -28,6 +30,17 @@ type RPCCommand interface {
 	Execute(request RPCRequest) (string, error)
 }
 
+type DAppData struct {
+	Origin      string
+	DAppName    string
+	DAppIconUrl string
+}
+
+type ClientSideHandlerInterface interface {
+	RequestShareAccountForDApp(dApp *DAppData) (types.Address, error)
+	RequestSendTransaction(dApp *DAppData, txArgs *transactions.SendTxArgs) (types.Hash, error)
+}
+
 type NetworkManagerInterface interface {
 	GetActiveNetworks() ([]*params.Network, error)
 }
@@ -36,23 +49,14 @@ type RPCClientInterface interface {
 	CallRaw(body string) string
 }
 
-func (r *RPCRequest) checkDAppData() error {
+func (r *RPCRequest) getDAppData() (*DAppData, error) {
 	if r.Origin == "" || r.DAppName == "" {
-		return ErrRequestMissingDAppData
+		return nil, ErrRequestMissingDAppData
 	}
 
-	return nil
-}
-
-func (r *RPCRequest) getChainID() (uint64, error) {
-	if r.Params == nil || len(r.Params) == 0 {
-		return 0, ErrEmptyRPCParams
-	}
-
-	// First, try to assert it as float64 (which is the default for numbers in JSON)
-	chainIDFloat, ok := r.Params[0].(float64)
-	if !ok {
-		return 0, ErrNoChainIDInParams
-	}
-	return uint64(chainIDFloat), nil
+	return &DAppData{
+		Origin:      r.Origin,
+		DAppName:    r.DAppName,
+		DAppIconUrl: r.DAppIconUrl,
+	}, nil
 }

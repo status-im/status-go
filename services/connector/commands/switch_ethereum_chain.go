@@ -20,6 +20,19 @@ type SwitchEthereumChainCommand struct {
 	Db             *sql.DB
 }
 
+func (r *RPCRequest) getChainID() (uint64, error) {
+	if r.Params == nil || len(r.Params) == 0 {
+		return 0, ErrEmptyRPCParams
+	}
+
+	// First, try to assert it as float64 (which is the default for numbers in JSON)
+	chainIDFloat, ok := r.Params[0].(float64)
+	if !ok {
+		return 0, ErrNoChainIDInParams
+	}
+	return uint64(chainIDFloat), nil
+}
+
 func (c *SwitchEthereumChainCommand) getSupportedChainIDs() ([]uint64, error) {
 	activeNetworks, err := c.NetworkManager.GetActiveNetworks()
 	if err != nil {
@@ -39,7 +52,8 @@ func (c *SwitchEthereumChainCommand) getSupportedChainIDs() ([]uint64, error) {
 }
 
 func (c *SwitchEthereumChainCommand) Execute(request RPCRequest) (string, error) {
-	if err := request.checkDAppData(); err != nil {
+	dAppData, err := request.getDAppData()
+	if err != nil {
 		return "", err
 	}
 
@@ -57,7 +71,7 @@ func (c *SwitchEthereumChainCommand) Execute(request RPCRequest) (string, error)
 		return "", ErrUnsupportedNetwork
 	}
 
-	dApp, err := persistence.SelectDAppByUrl(c.Db, request.Origin)
+	dApp, err := persistence.SelectDAppByUrl(c.Db, dAppData.Origin)
 	if err != nil {
 		return "", err
 	}

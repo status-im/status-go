@@ -16,13 +16,20 @@ type API struct {
 func NewAPI(s *Service) *API {
 	r := NewCommandRegistry()
 
-	r.Register("eth_sendTransaction", &commands.SendTransactionCommand{})
+	clientHandler := &commands.ClientSideHandler{
+		RpcClient: s.rpcClient,
+	}
+
+	r.Register("eth_sendTransaction", &commands.SendTransactionCommand{
+		Db:            s.db,
+		ClientHandler: clientHandler,
+	})
 	r.Register("eth_sign", &commands.SignCommand{})
 
 	// Accounts querry and dapp permissions
 	r.Register("eth_accounts", &commands.AccountsCommand{Db: s.db})
 	r.Register("eth_requestAccounts", &commands.RequestAccountsCommand{
-		RpcClient:       s.rpcClient,
+		ClientHandler:   clientHandler,
 		AccountsCommand: commands.AccountsCommand{Db: s.db},
 		NetworkManager:  s.rpcClient.NetworkManager,
 	})

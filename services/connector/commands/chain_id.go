@@ -12,11 +12,12 @@ type ChainIDCommand struct {
 }
 
 func (c *ChainIDCommand) Execute(request RPCRequest) (string, error) {
-	if err := request.checkDAppData(); err != nil {
+	dAppData, err := request.getDAppData()
+	if err != nil {
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDAppByUrl(c.Db, request.Origin)
+	dApp, err := persistence.SelectDAppByUrl(c.Db, dAppData.Origin)
 	if err != nil {
 		return "", err
 	}

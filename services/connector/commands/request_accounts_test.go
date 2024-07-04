@@ -52,11 +52,14 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 	})
 
 	cmd := &RequestAccountsCommand{
-		RpcClient:      rpcClient,
+		ClientHandler: &ClientSideHandler{
+			RpcClient: rpcClient,
+		},
 		NetworkManager: &nm,
 		AccountsCommand: AccountsCommand{
 			Db: db,
-		}}
+		},
+	}
 
 	request := RPCRequest{
 		JSONRPC:     "2.0",

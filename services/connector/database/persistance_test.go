@@ -5,6 +5,7 @@ import (
 
 	"database/sql"
 
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 
@@ -15,7 +16,7 @@ var testDApp = DApp{
 	Name:          "Test DApp",
 	URL:           "https://test-dapp-url.com",
 	IconURL:       "https://test-dapp-icon-url.com",
-	SharedAccount: "0x1234567890",
+	SharedAccount: types.HexToAddress("0x1234567890"),
 	ChainID:       0x1,
 }
 

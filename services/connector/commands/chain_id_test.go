@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/status-im/status-go/eth-node/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
@@ -74,7 +75,7 @@ func TestGetChainIdForPermittedDApp(t *testing.T) {
 		URL:           request.Origin,
 		Name:          request.DAppName,
 		IconURL:       request.DAppIconUrl,
-		SharedAccount: "0x6d0aa2a774b74bb1d36f97700315adf962c69fcg",
+		SharedAccount: types.HexToAddress("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"),
 		ChainID:       0x1,
 	}
 
