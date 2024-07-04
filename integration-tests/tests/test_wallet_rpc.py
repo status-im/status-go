@@ -41,7 +41,7 @@ class TestTransactionRpc(TransactionTestCase):
         
         # how to create schema:
         # from schema_builder import CustomSchemaBuilder
-        # CustomSchemaBuilder("wallet_createMultiTransaction").create_schema(response.json())
+        # CustomSchemaBuilder(method).create_schema(response.json())
         
         with open(f"{option.base_dir}/schemas/wallet_createMultiTransaction", "r") as schema:
             jsonschema.validate(instance=response.json(), schema=json.load(schema))

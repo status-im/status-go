@@ -8,7 +8,82 @@
             "type": "string"
         },
         "result": {
-            "type": "null"
+            "items": {
+                "properties": {
+                    "Prod": {
+                        "properties": {
+                            "chainColor": {
+                                "type": "string"
+                            },
+                            "chainId": {
+                                "type": "integer"
+                            },
+                            "chainName": {
+                                "type": "string"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "fallbackURL": {
+                                "type": "string"
+                            },
+                            "isTest": {
+                                "type": "boolean"
+                            },
+                            "layer": {
+                                "type": "integer"
+                            },
+                            "nativeCurrencyDecimals": {
+                                "type": "integer"
+                            },
+                            "originalFallbackURL": {
+                                "type": "string"
+                            },
+                            "originalRpcUrl": {
+                                "type": "string"
+                            },
+                            "relatedChainId": {
+                                "type": "integer"
+                            },
+                            "rpcUrl": {
+                                "type": "string"
+                            },
+                            "shortName": {
+                                "type": "string"
+                            },
+                            "tokenOverrides": {
+                                "type": "null"
+                            }
+                        },
+                        "required": [
+                            "chainColor",
+                            "chainId",
+                            "chainName",
+                            "enabled",
+                            "fallbackURL",
+                            "isTest",
+                            "layer",
+                            "nativeCurrencyDecimals",
+                            "originalFallbackURL",
+                            "originalRpcUrl",
+                            "relatedChainId",
+                            "rpcUrl",
+                            "shortName",
+                            "tokenOverrides"
+                        ],
+                        "type": "object"
+                    },
+                    "Test": {
+                        "type": "null"
+                    }
+                },
+                "required": [
+                    "Prod",
+                    "Test"
+                ],
+                "type": "object"
+            },
+            "type": "array"
         }
     },
     "required": [
