@@ -141,9 +141,13 @@ go run ./cmd/test-coverage-utils/gocovmerge.go $(find -iname "*.coverage.out") >
 # Filter out test coverage for packages in ./cmd
 grep -v '^github.com/status-im/status-go/cmd/' c-full.out > c.out
 
+# Generate HTML coverage report
+go tool cover -html c.out -o test-coverage.html
+
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
   # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
   GIT_COMMIT=$(git log | grep -m1 -oE '[^ ]+$')
+  cc-test-reporter format-coverage --prefix=github.com/status-im/status-go # To generate 'coverage/codeclimate.json'
   cc-test-reporter after-build --prefix=github.com/status-im/status-go
 fi
 
