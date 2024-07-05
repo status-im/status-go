@@ -427,7 +427,7 @@ func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) 
 		if accColorID.Valid && accColorID.String != "" {
 			acc.ColorID = common.CustomizationColor(accColorID.String)
 		} else {
-			acc.ColorID = common.CustomizationColor("blue")
+			acc.ColorID = common.CustomizationColor(common.CustomizationColorBlue)
 		}
 		if accEmoji.Valid && accEmoji.String != "" {
 			acc.Emoji = accEmoji.String
