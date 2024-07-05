@@ -21,6 +21,10 @@ func getNonCommunityCollectible() thirdparty.FullCollectibleData {
 	return c
 }
 
+func getCollection() thirdparty.CollectionData {
+	return thirdparty.GenerateTestCollectionsData(1)[0]
+}
+
 func TestFullCollectibleToHeader(t *testing.T) {
 	communityCollectible := getCommunityCollectible()
 	communityHeader := fullCollectibleDataToHeader(communityCollectible)
@@ -81,4 +85,20 @@ func TestFullCollectiblesToCommunityHeader(t *testing.T) {
 
 	communityHeaders := fullCollectiblesDataToCommunityHeader(collectibles)
 	require.Equal(t, 5, len(communityHeaders))
+}
+
+func TestCollectionDataToDetails(t *testing.T) {
+	collection := getCollection()
+	collectionDetails := collectionDataToDetails(collection)
+
+	require.Equal(t, CollectionDataTypeDetails, collectionDetails.DataType)
+	require.Equal(t, collection.ID, collectionDetails.ID)
+	require.Equal(t, collection.ContractType, collectionDetails.ContractType)
+	require.Equal(t, collection.CommunityID, collectionDetails.CommunityID)
+	require.NotEmpty(t, collectionDetails.CollectionData)
+	require.Equal(t, collection.Provider, collectionDetails.CollectionData.Name)
+	require.Equal(t, collection.Slug, collectionDetails.CollectionData.Slug)
+	require.Equal(t, collection.ImageURL, collectionDetails.CollectionData.ImageURL)
+
+	require.NotEmpty(t, collectionDetails)
 }

@@ -401,14 +401,16 @@ func (api *API) FetchCollectibleOwnersByContractAddress(ctx context.Context, cha
 	return api.s.collectiblesManager.FetchCollectibleOwnersByContractAddress(ctx, chainID, contractAddress)
 }
 
-func (api *API) SearchCollectibles(ctx context.Context, chainID wcommon.ChainID, text string, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
-	log.Debug("call to SearchCollectibles")
-	return api.s.collectiblesManager.SearchCollectibles(ctx, chainID, text, cursor, limit, providerID)
+func (api *API) SearchCollectiblesAsync(requestID int32, params collectibles.SearchCollectiblesParams, dataType collectibles.CollectibleDataType) error {
+	log.Debug("call to SearchCollectiblesAsync")
+	api.s.collectibles.SearchCollectiblesAsync(requestID, params, dataType)
+	return nil
 }
 
-func (api *API) SearchCollections(ctx context.Context, chainID wcommon.ChainID, text string, cursor string, limit int, providerID string) (*thirdparty.CollectionDataContainer, error) {
-	log.Debug("call to SearchCollections")
-	return api.s.collectiblesManager.SearchCollections(ctx, chainID, text, cursor, limit, providerID)
+func (api *API) SearchCollectionsAsync(requestID int32, params collectibles.SearchCollectionsParams, dataType collectibles.CollectionDataType) error {
+	log.Debug("call to SearchCollectionsAsync")
+	api.s.collectibles.SearchCollectionsAsync(requestID, params, dataType)
+	return nil
 }
 
 /*

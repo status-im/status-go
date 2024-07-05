@@ -51,6 +51,24 @@ type ManagerInterface interface {
 	FetchCollectionSocialsAsync(contractID thirdparty.ContractID) error
 }
 
+type SearchCollectionsParams struct {
+	ChainID         walletCommon.ChainID `json:"chain_id"`
+	ContractAddress common.Address       `json:"contract_address"`
+	Text            string               `json:"text"`
+	Cursor          string               `json:"cursor"`
+	Limit           int                  `json:"limit"`
+	ProviderID      string               `json:"provider_id"`
+}
+
+type SearchCollectiblesParams struct {
+	ChainID         walletCommon.ChainID `json:"chain_id"`
+	ContractAddress common.Address       `json:"contract_address"`
+	Text            string               `json:"text"`
+	Cursor          string               `json:"cursor"`
+	Limit           int                  `json:"limit"`
+	ProviderID      string               `json:"provider_id"`
+}
+
 type Manager struct {
 	rpcClient *rpc.Client
 	providers thirdparty.CollectibleProviders
@@ -985,25 +1003,56 @@ func (o *Manager) getCircuitBreaker(chainID walletCommon.ChainID) *circuitbreake
 	return cb.(*circuitbreaker.CircuitBreaker)
 }
 
-func (o *Manager) SearchCollectibles(ctx context.Context, chainID walletCommon.ChainID, text string, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
-	defer o.checkConnectionStatus(chainID)
+func getTokenID(text string) *big.Int {
+	// Check if the text has the format "#TokenID"
+	if strings.HasPrefix(text, "#") {
+		tokenID, ok := big.NewInt(0).SetString(text[1:], 10)
+		if ok {
+			return tokenID
+		}
+	}
+	return nil
+}
 
+func (o *Manager) SearchCollectibles(ctx context.Context, params SearchCollectiblesParams) (*thirdparty.FullCollectibleDataContainer, error) {
+	defer o.checkConnectionStatus(params.ChainID)
+
+	// If string is a tokenID, return the collectible data for that item
+	if tokenID := getTokenID(params.Text); tokenID != nil {
+		id := thirdparty.CollectibleUniqueID{ContractID: thirdparty.ContractID{ChainID: params.ChainID, Address: params.ContractAddress}, TokenID: &bigint.BigInt{Int: tokenID}}
+
+		collectibles, err := o.FetchAssetsByCollectibleUniqueID(ctx, []thirdparty.CollectibleUniqueID{id}, false)
+		if err != nil {
+			return nil, err
+		}
+
+		return &thirdparty.FullCollectibleDataContainer{
+			Items:          collectibles,
+			NextCursor:     "",
+			PreviousCursor: "",
+			Provider:       "",
+		}, nil
+	}
+
+	// If string is empty, return some list of collectibles for that chain
+	// TODO (#13951): Use dedicated endpoint for empty string case. For now rely on search endpoint to handle it.
+
+	// Search using search providers
 	anyProviderAvailable := false
 	for _, provider := range o.providers.SearchProviders {
-		if !provider.IsChainSupported(chainID) {
+		if !provider.IsChainSupported(params.ChainID) {
 			continue
 		}
 		anyProviderAvailable = true
-		if providerID != thirdparty.FetchFromAnyProvider && providerID != provider.ID() {
+		if params.ProviderID != thirdparty.FetchFromAnyProvider && params.ProviderID != provider.ID() {
 			continue
 		}
 
-		// TODO (#13951): Be smarter about how we handle the user-entered string
-		collections := []common.Address{}
+		collections := []common.Address{params.ContractAddress}
 
-		container, err := provider.SearchCollectibles(ctx, chainID, collections, text, cursor, limit)
+		container, err := provider.SearchCollectibles(ctx, params.ChainID, collections, params.Text, params.Cursor, params.Limit)
 		if err != nil {
-			log.Error("FetchAllAssetsByOwner failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+			log.Error("SearchCollectibles failed for", "provider", provider.ID(), "chainID", params.ChainID, "err", err)
 			continue
 		}
 
@@ -1021,23 +1070,46 @@ func (o *Manager) SearchCollectibles(ctx context.Context, chainID walletCommon.C
 	return nil, ErrNoProvidersAvailableForChainID
 }
 
-func (o *Manager) SearchCollections(ctx context.Context, chainID walletCommon.ChainID, query string, cursor string, limit int, providerID string) (*thirdparty.CollectionDataContainer, error) {
-	defer o.checkConnectionStatus(chainID)
+func (o *Manager) SearchCollections(ctx context.Context, params SearchCollectionsParams) (*thirdparty.CollectionDataContainer, error) {
+	defer o.checkConnectionStatus(params.ChainID)
 
+	// If string is a contract address, return the collection data for that item
+	if common.IsHexAddress(params.Text) {
+		id := thirdparty.ContractID{ChainID: params.ChainID, Address: common.HexToAddress(params.Text)}
+
+		collections, err := o.FetchCollectionsDataByContractID(ctx, []thirdparty.ContractID{id})
+		if err != nil {
+			return nil, err
+		}
+
+		return &thirdparty.CollectionDataContainer{
+			Items:          collections,
+			NextCursor:     "",
+			PreviousCursor: "",
+			Provider:       "",
+		}, nil
+	}
+
+	// If string is empty, return some list of collections for that chain
+	if params.Text == "" {
+		// TODO (#13951): Use dedicated endpoint. For now we use some common string and search
+		params.Text = "ape"
+	}
+
+	// Search using search providers
 	anyProviderAvailable := false
 	for _, provider := range o.providers.SearchProviders {
-		if !provider.IsChainSupported(chainID) {
+		if !provider.IsChainSupported(params.ChainID) {
 			continue
 		}
 		anyProviderAvailable = true
-		if providerID != thirdparty.FetchFromAnyProvider && providerID != provider.ID() {
+		if params.ProviderID != thirdparty.FetchFromAnyProvider && params.ProviderID != provider.ID() {
 			continue
 		}
 
-		// TODO (#13951): Be smarter about how we handle the user-entered string
-		container, err := provider.SearchCollections(ctx, chainID, query, cursor, limit)
+		container, err := provider.SearchCollections(ctx, params.ChainID, params.Text, params.Cursor, params.Limit)
 		if err != nil {
-			log.Error("FetchAllAssetsByOwner failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+			log.Error("SearchCollections failed for", "provider", provider.ID(), "chainID", params.ChainID, "err", err)
 			continue
 		}
 

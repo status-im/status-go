@@ -1,9 +1,27 @@
 package collectibles
 
 import (
+	"errors"
+
 	"github.com/status-im/status-go/protocol/communities/token"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+)
+
+type CollectibleDataType byte
+
+const (
+	CollectibleDataTypeUniqueID CollectibleDataType = iota
+	CollectibleDataTypeHeader
+	CollectibleDataTypeDetails
+	CollectibleDataTypeCommunityHeader
+)
+
+type CollectionDataType byte
+
+const (
+	CollectionDataTypeContractID CollectionDataType = iota
+	CollectionDataTypeDetails
 )
 
 // Combined Collection+Collectible info, used to display a detailed view of a collectible
@@ -18,6 +36,14 @@ type Collectible struct {
 	IsFirst         bool                           `json:"is_first,omitempty"`
 	LatestTxHash    string                         `json:"latest_tx_hash,omitempty"`
 	ReceivedAmount  float64                        `json:"received_amount,omitempty"`
+}
+
+type Collection struct {
+	DataType       CollectionDataType    `json:"data_type"`
+	ID             thirdparty.ContractID `json:"id"`
+	CommunityID    string                `json:"community_id"`
+	ContractType   w_common.ContractType `json:"contract_type"`
+	CollectionData *CollectionData       `json:"collection_data,omitempty"`
 }
 
 type CollectibleData struct {
@@ -96,6 +122,26 @@ func getContractType(c thirdparty.FullCollectibleData) w_common.ContractType {
 		return c.CollectionData.ContractType
 	}
 	return w_common.ContractTypeUnknown
+}
+
+func fullCollectibleDataToID(c thirdparty.FullCollectibleData) Collectible {
+	ret := Collectible{
+		DataType:     CollectibleDataTypeUniqueID,
+		ID:           c.CollectibleData.ID,
+		ContractType: getContractType(c),
+	}
+	return ret
+}
+
+func fullCollectiblesDataToID(data []thirdparty.FullCollectibleData) []Collectible {
+	res := make([]Collectible, 0, len(data))
+
+	for _, c := range data {
+		id := fullCollectibleDataToID(c)
+		res = append(res, id)
+	}
+
+	return res
 }
 
 func fullCollectibleDataToHeader(c thirdparty.FullCollectibleData) Collectible {
@@ -201,6 +247,73 @@ func fullCollectiblesDataToCommunityHeader(data []thirdparty.FullCollectibleData
 	}
 
 	return res
+}
+
+func fullCollectiblesDataToDataType(collectibles []thirdparty.FullCollectibleData, dataType CollectibleDataType) ([]Collectible, error) {
+	switch dataType {
+	case CollectibleDataTypeUniqueID:
+		return fullCollectiblesDataToID(collectibles), nil
+	case CollectibleDataTypeHeader:
+		return fullCollectiblesDataToHeaders(collectibles), nil
+	case CollectibleDataTypeDetails:
+		return fullCollectiblesDataToDetails(collectibles), nil
+	case CollectibleDataTypeCommunityHeader:
+		return fullCollectiblesDataToCommunityHeader(collectibles), nil
+	}
+	return nil, errors.New("unknown data type")
+}
+
+func collectionDataToID(c thirdparty.CollectionData) Collection {
+	ret := Collection{
+		DataType:     CollectionDataTypeContractID,
+		ID:           c.ID,
+		CommunityID:  c.CommunityID,
+		ContractType: c.ContractType,
+	}
+	return ret
+}
+
+func collectionsDataToID(data []thirdparty.CollectionData) []Collection {
+	res := make([]Collection, 0, len(data))
+
+	for _, c := range data {
+		id := collectionDataToID(c)
+		res = append(res, id)
+	}
+
+	return res
+}
+
+func collectionDataToDetails(c thirdparty.CollectionData) Collection {
+	collectionData := thirdpartyCollectionDataToCollectionData(&c)
+	return Collection{
+		DataType:       CollectionDataTypeDetails,
+		ID:             c.ID,
+		CommunityID:    c.CommunityID,
+		ContractType:   c.ContractType,
+		CollectionData: &collectionData,
+	}
+}
+
+func collectionsDataToDetails(data []thirdparty.CollectionData) []Collection {
+	res := make([]Collection, 0, len(data))
+
+	for _, c := range data {
+		details := collectionDataToDetails(c)
+		res = append(res, details)
+	}
+
+	return res
+}
+
+func collectionsDataToDataType(collections []thirdparty.CollectionData, dataType CollectionDataType) ([]Collection, error) {
+	switch dataType {
+	case CollectionDataTypeContractID:
+		return collectionsDataToID(collections), nil
+	case CollectionDataTypeDetails:
+		return collectionsDataToDetails(collections), nil
+	}
+	return nil, errors.New("unknown data type")
 }
 
 func communityInfoToData(communityID string, community *thirdparty.CommunityInfo, communityCollectible *thirdparty.CollectibleCommunityInfo) CommunityData {
