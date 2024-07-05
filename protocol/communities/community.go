@@ -2384,7 +2384,7 @@ func (o *Community) RequestsToJoin() []*RequestToJoin {
 	return o.config.RequestsToJoin
 }
 
-func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.CommunityMember_Roles) (*CommunityChanges, error) {
+func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.CommunityMember_Roles, lastUpdateClock uint64) (*CommunityChanges, error) {
 	if !o.IsControlNode() {
 		return nil, ErrNotControlNode
 	}
@@ -2397,11 +2397,12 @@ func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.Commu
 	}
 
 	if _, ok := o.config.CommunityDescription.Members[memberKey]; !ok {
-		o.config.CommunityDescription.Members[memberKey] = &protobuf.CommunityMember{Roles: roles}
+		o.config.CommunityDescription.Members[memberKey] = &protobuf.CommunityMember{Roles: roles, LastUpdateClock: lastUpdateClock}
 		changes.MembersAdded[memberKey] = o.config.CommunityDescription.Members[memberKey]
 	}
 
 	o.increaseClock()
+
 	return changes, nil
 }
 
@@ -2504,21 +2505,6 @@ func (o *Community) ChatIDs() (chatIDs []string) {
 
 func (o *Community) AllowsAllMembersToPinMessage() bool {
 	return o.config.CommunityDescription.AdminSettings != nil && o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled
-}
-
-func (o *Community) AddMemberWithRevealedAccounts(dbRequest *RequestToJoin, roles []protobuf.CommunityMember_Roles, accounts []*protobuf.RevealedAccount) (*CommunityChanges, error) {
-	o.mutex.Lock()
-	defer o.mutex.Unlock()
-
-	if !o.IsControlNode() {
-		return nil, ErrNotControlNode
-	}
-
-	changes := o.addMemberWithRevealedAccounts(dbRequest.PublicKey, roles, accounts, dbRequest.Clock)
-
-	o.increaseClock()
-
-	return changes, nil
 }
 
 func (o *Community) CreateDeepCopy() *Community {
@@ -2751,25 +2737,6 @@ func (o *Community) deleteTokenPermission(permissionID string) (*CommunityChange
 	changes.TokenPermissionsRemoved[permissionID] = NewCommunityTokenPermission(permission)
 
 	return changes, nil
-}
-
-func (o *Community) addMemberWithRevealedAccounts(memberKey string, roles []protobuf.CommunityMember_Roles, accounts []*protobuf.RevealedAccount, clock uint64) *CommunityChanges {
-	changes := o.emptyCommunityChanges()
-
-	if o.config.CommunityDescription.Members == nil {
-		o.config.CommunityDescription.Members = make(map[string]*protobuf.CommunityMember)
-	}
-
-	if _, ok := o.config.CommunityDescription.Members[memberKey]; !ok {
-		o.config.CommunityDescription.Members[memberKey] = &protobuf.CommunityMember{Roles: roles}
-		changes.MembersAdded[memberKey] = o.config.CommunityDescription.Members[memberKey]
-	}
-
-	o.config.CommunityDescription.Members[memberKey].RevealedAccounts = accounts
-	o.config.CommunityDescription.Members[memberKey].LastUpdateClock = clock
-	changes.MemberWalletsAdded[memberKey] = o.config.CommunityDescription.Members[memberKey].RevealedAccounts
-
-	return changes
 }
 
 func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) (adminEventCreated bool, err error) {

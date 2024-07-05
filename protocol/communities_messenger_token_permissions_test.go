@@ -2186,7 +2186,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissi
 		s.Require().NoError(err)
 		err = s.owner.communitiesManager.SaveRequestToJoinRevealedAddresses(requestId, requestToJoin.RevealedAccounts)
 		s.Require().NoError(err)
-		_, err = community.AddMember(&privateKey.PublicKey, communityRole)
+		_, err = community.AddMember(&privateKey.PublicKey, communityRole, requestToJoin.Clock)
 		s.Require().NoError(err)
 		_, err = community.AddMemberToChat(chat.CommunityChatID(), &privateKey.PublicKey, communityRole, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
 		s.Require().NoError(err)

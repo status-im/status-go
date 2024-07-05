@@ -303,7 +303,7 @@ func (s *MessengerSuite) TestMarkMessageWithNotificationAsUnreadInCommunityChatS
 	community := response.Communities()[0]
 	communityChat := response.Chats()[0]
 
-	_, err = community.AddMember(&s.m.identity.PublicKey, []protobuf.CommunityMember_Roles{})
+	_, err = community.AddMember(&s.m.identity.PublicKey, []protobuf.CommunityMember_Roles{}, community.Clock())
 	s.Require().NoError(err)
 
 	err = other.communitiesManager.SaveCommunity(community)
