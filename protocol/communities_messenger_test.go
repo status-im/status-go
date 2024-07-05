@@ -2283,7 +2283,7 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
 	communityChat := response.Chats()[0]
 
 	// Add Alice to the community before sharing it
-	_, err = community.AddMember(&s.alice.identity.PublicKey, []protobuf.CommunityMember_Roles{})
+	_, err = community.AddMember(&s.alice.identity.PublicKey, []protobuf.CommunityMember_Roles{}, community.Clock())
 	s.Require().NoError(err)
 
 	err = s.bob.communitiesManager.SaveCommunity(community)
@@ -4778,14 +4778,14 @@ func (s *MessengerCommunitiesSuite) TestIgnoreOutdatedCommunityDescription() {
 	signer, description1, err := communities.UnwrapCommunityDescriptionMessage(wrappedDescription1)
 	s.Require().NoError(err)
 
-	_, err = community.AddMember(&s.alice.identity.PublicKey, []protobuf.CommunityMember_Roles{})
+	_, err = community.AddMember(&s.alice.identity.PublicKey, []protobuf.CommunityMember_Roles{}, community.Clock())
 	s.Require().NoError(err)
 	wrappedDescription2, err := community.ToProtocolMessageBytes()
 	s.Require().NoError(err)
 	_, description2, err := communities.UnwrapCommunityDescriptionMessage(wrappedDescription2)
 	s.Require().NoError(err)
 
-	_, err = community.AddMember(&s.bob.identity.PublicKey, []protobuf.CommunityMember_Roles{})
+	_, err = community.AddMember(&s.bob.identity.PublicKey, []protobuf.CommunityMember_Roles{}, community.Clock())
 	s.Require().NoError(err)
 	wrappedDescription3, err := community.ToProtocolMessageBytes()
 	s.Require().NoError(err)

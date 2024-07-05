@@ -2807,7 +2807,7 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 			memberRoles = []protobuf.CommunityMember_Roles{role}
 		}
 
-		_, err = community.AddMember(pk, memberRoles)
+		_, err = community.AddMember(pk, memberRoles, dbRequest.Clock)
 		if err != nil {
 			return nil, err
 		}
@@ -3693,7 +3693,7 @@ func (m *Manager) AddMemberOwnerToCommunity(communityID types.HexBytes, pk *ecds
 		return nil, err
 	}
 
-	_, err = community.AddMember(pk, []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER})
+	_, err = community.AddMember(pk, []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}, community.Clock())
 	if err != nil {
 		return nil, err
 	}
@@ -4677,7 +4677,7 @@ func (m *Manager) promoteSelfToControlNode(community *Community, clock uint64) (
 
 	if exists := community.HasMember(&m.identity.PublicKey); !exists {
 		ownerRole := []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}
-		_, err = community.AddMember(&m.identity.PublicKey, ownerRole)
+		_, err = community.AddMember(&m.identity.PublicKey, ownerRole, community.Clock())
 		if err != nil {
 			return false, err
 		}
