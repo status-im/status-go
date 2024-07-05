@@ -50,3 +50,4 @@ var ErrNoFreeSpaceForHistoryArchives = errors.New("history archive: No free spac
 var ErrPermissionToJoinNotSatisfied = errors.New("permission to join not satisfied")
 var ErrBannedMemberNotFound = errors.New("banned member not found")
 var ErrGrantMemberPublicKeyIsDifferent = errors.New("grant member public key is different")
+var ErrEditSharedAddressesRequestOutdated = errors.New("outdated edit shares addresses request")
