@@ -436,7 +436,7 @@ func createOnRequestCommunity(s *suite.Suite, owner *Messenger) (*communities.Co
 
 func createCommunityConfigurable(s *suite.Suite, owner *Messenger, permission protobuf.CommunityPermissions_Access) (*communities.Community, *Chat) {
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+		Membership:  permission,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
