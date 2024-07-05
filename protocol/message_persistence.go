@@ -43,6 +43,9 @@ var basicInsertDiscordMessageAuthorQuery = `INSERT OR REPLACE INTO discord_messa
 var cursor = "substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id"
 var cursorField = cursor + " as cursor"
 
+var caseSensitiveSearchCond = "(m1.text LIKE '%' || ? || '%' OR bm.content LIKE '%' || ? || '%' OR dm.content LIKE '%' || ? || '%')"
+var caseInsensitiveSearchCond = "(LOWER(m1.text) LIKE LOWER('%' || ? || '%') OR LOWER(bm.content) LIKE LOWER('%' || ? || '%') OR LOWER(dm.content) LIKE LOWER('%' || ? || '%'))"
+
 func (db sqlitePersistence) buildMessagesQueryWithAdditionalFields(additionalSelectFields, whereAndTheRest string) string {
 	allFields := db.tableUserMessagesAllFieldsJoin()
 	if additionalSelectFields != "" {
@@ -1002,9 +1005,9 @@ func (db sqlitePersistence) AllMessageByChatIDWhichMatchTerm(chatID string, sear
 
 	searchCond := ""
 	if caseSensitive {
-		searchCond = "AND m1.text LIKE '%' || ? || '%'"
+		searchCond = "AND " + caseSensitiveSearchCond
 	} else {
-		searchCond = "AND LOWER(m1.text) LIKE LOWER('%' || ? || '%')"
+		searchCond = "AND " + caseInsensitiveSearchCond
 	}
 
 	where := fmt.Sprintf(`
@@ -1015,7 +1018,10 @@ func (db sqlitePersistence) AllMessageByChatIDWhichMatchTerm(chatID string, sear
 	query := db.buildMessagesQueryWithAdditionalFields(cursorField, where)
 	rows, err := db.db.Query(
 		query,
-		chatID, searchTerm,
+		chatID,
+		searchTerm,
+		searchTerm,
+		searchTerm,
 	)
 
 	if err != nil {
@@ -1051,9 +1057,9 @@ func (db sqlitePersistence) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(com
 
 	searchCond := ""
 	if caseSensitive {
-		searchCond = "m1.text LIKE '%' || ? || '%'"
+		searchCond = caseSensitiveSearchCond
 	} else {
-		searchCond = "LOWER(m1.text) LIKE LOWER('%' || ? || '%')"
+		searchCond = caseInsensitiveSearchCond
 	}
 
 	finalCond := "AND %s AND %s"
@@ -1071,6 +1077,8 @@ func (db sqlitePersistence) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(com
 	var parameters []string
 	parameters = append(parameters, chatIds...)
 	parameters = append(parameters, communityIds...)
+	parameters = append(parameters, searchTerm)
+	parameters = append(parameters, searchTerm)
 	parameters = append(parameters, searchTerm)
 
 	idsArgs := make([]interface{}, 0, len(parameters))
