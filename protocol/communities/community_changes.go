@@ -48,6 +48,11 @@ type CommunityChanges struct {
 
 	// MemberKicked indicates whether the user has been kicked out
 	MemberKicked bool `json:"memberRemoved"`
+
+	// MemberSoftKicked indicates whether the user has been kicked out due to lack of specific data
+	// No kick AC notification will be generated and member will join automatically
+	// as soon as he provides missing data
+	MemberSoftKicked bool `json:"memberSoftRemoved"`
 }
 
 func EmptyCommunityChanges() *CommunityChanges {

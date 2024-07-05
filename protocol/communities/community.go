@@ -953,26 +953,10 @@ func (o *Community) RemoveUserFromChat(pk *ecdsa.PublicKey, chatID string) (*pro
 	return o.config.CommunityDescription, nil
 }
 
-func (o *Community) removeMemberFromOrg(pk *ecdsa.PublicKey) {
-	if !o.hasMember(pk) {
-		return
-	}
-
-	key := common.PubkeyToHex(pk)
-
-	// Remove from org
-	delete(o.config.CommunityDescription.Members, key)
-
-	// Remove from chats
-	for _, chat := range o.config.CommunityDescription.Chats {
-		delete(chat.Members, key)
-	}
-}
-
 func (o *Community) RemoveOurselvesFromOrg(pk *ecdsa.PublicKey) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
-	o.removeMemberFromOrg(pk)
+	_ = o.RemoveMembersFromOrg([]string{common.PubkeyToHex(pk)})
 	o.increaseClock()
 }
 
@@ -988,8 +972,10 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 		return nil, ErrCannotRemoveOwnerOrAdmin
 	}
 
+	pkStr := common.PubkeyToHex(pk)
+
 	if o.IsControlNode() {
-		o.removeMemberFromOrg(pk)
+		_ = o.RemoveMembersFromOrg([]string{pkStr})
 		o.increaseClock()
 	} else {
 		err := o.addNewCommunityEvent(o.ToKickCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
@@ -999,6 +985,44 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 	}
 
 	return o.config.CommunityDescription, nil
+}
+
+func (o *Community) RemoveMembersFromOrg(membersToRemove []string) *CommunityChanges {
+	changes := o.emptyCommunityChanges()
+
+	if len(membersToRemove) == 0 {
+		return changes
+	}
+
+	for _, pk := range membersToRemove {
+		member, exists := o.config.CommunityDescription.Members[pk]
+		if exists {
+			changes.MembersRemoved[pk] = member
+			delete(o.config.CommunityDescription.Members, pk)
+		}
+	}
+
+	if len(changes.MembersRemoved) == 0 {
+		return changes
+	}
+
+	for chatID, chat := range o.config.CommunityDescription.Chats {
+		chatMembersToRemove := make(map[string]*protobuf.CommunityMember)
+		for _, pk := range membersToRemove {
+			chatMember, exists := chat.Members[pk]
+			if exists {
+				chatMembersToRemove[pk] = chatMember
+				delete(chat.Members, pk)
+			}
+		}
+
+		changes.ChatsModified[chatID] = &CommunityChatChanges{
+			ChatModified:   chat,
+			MembersRemoved: chatMembersToRemove,
+		}
+	}
+
+	return changes
 }
 
 func (o *Community) RemoveAllUsersFromOrg() *CommunityChanges {
@@ -1656,6 +1680,10 @@ func (o *Community) setPrivateKey(pk *ecdsa.PrivateKey) {
 	if pk != nil {
 		o.config.PrivateKey = pk
 	}
+}
+
+func (o *Community) SetResendAccountsClock(clock uint64) {
+	o.config.CommunityDescription.ResendAccountsClock = clock
 }
 
 func (o *Community) ControlNode() *ecdsa.PublicKey {
@@ -2753,11 +2781,7 @@ func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) (adminEventCr
 	}
 
 	if o.IsControlNode() {
-		pk, err := common.HexToPubkey(dbRequest.PublicKey)
-		if err != nil {
-			return false, err
-		}
-		o.removeMemberFromOrg(pk)
+		o.RemoveMembersFromOrg([]string{dbRequest.PublicKey})
 		o.increaseClock()
 	} else {
 		err = o.addNewCommunityEvent(o.ToCommunityRequestToJoinRejectCommunityEvent(dbRequest.PublicKey, dbRequest.ToCommunityRequestToJoinProtobuf()))

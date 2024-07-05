@@ -123,7 +123,8 @@ message CommunityDescription {
   uint64 active_members_count = 17;
   string ID = 18;
   map<string,CommunityBanInfo>banned_members = 19;
-
+  // request to resend revealed addresses
+  uint64 resend_accounts_clock = 20;
   // key is hash ratchet key_id + seq_no
   map<string, bytes> privateData = 100;
 }
