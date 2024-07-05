@@ -468,7 +468,6 @@ func (api *API) GetEstimatedLatestBlockNumber(ctx context.Context, chainID uint6
 	return api.s.blockChainState.GetEstimatedLatestBlockNumber(ctx, chainID)
 }
 
-// @deprecated
 func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Float) (router.TransactionEstimation, error) {
 	log.Debug("call to getTransactionEstimatedTime")
 	return api.router.GetFeesManager().TransactionEstimatedTime(ctx, chainID, gweiToWei(maxFeePerGas)), nil
