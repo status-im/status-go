@@ -67,14 +67,45 @@ func (m *TokenManagerMock) GetAllChainIDs() ([]uint64, error) {
 	return chainIDs, nil
 }
 
+func (m *TokenManagerMock) getBalanceBasedOnParams(accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big {
+	retBalances := make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	retBalances[testChainID1] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+
+	for _, chainId := range chainIDs {
+		if _, exists := retBalances[chainId]; !exists {
+			retBalances[chainId] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+		}
+		if storedAccounts, exists := (*m.Balances)[chainId]; exists {
+			for _, account := range accounts {
+				if _, exists := retBalances[chainId][account]; !exists {
+					retBalances[chainId][account] = make(map[gethcommon.Address]*hexutil.Big)
+				}
+				if storedTokenAddresses, exists := storedAccounts[account]; exists {
+					for _, tokenAddress := range tokenAddresses {
+						if _, exists := retBalances[chainId][account][tokenAddress]; !exists {
+							retBalances[chainId][account] = make(map[gethcommon.Address]*hexutil.Big)
+						}
+
+						if balance, exists := storedTokenAddresses[tokenAddress]; exists {
+							retBalances[chainId][account][tokenAddress] = balance
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return retBalances
+}
+
 func (m *TokenManagerMock) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
 	time.Sleep(100 * time.Millisecond) // simulate response time
-	return *m.Balances, nil
+	return m.getBalanceBasedOnParams(accounts, tokenAddresses, chainIDs), nil
 }
 
 func (m *TokenManagerMock) GetCachedBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
 	time.Sleep(100 * time.Millisecond) // simulate response time
-	return *m.Balances, nil
+	return m.getBalanceBasedOnParams(accounts, tokenAddresses, chainIDs), nil
 }
 
 func (m *TokenManagerMock) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *walletToken.Token {
