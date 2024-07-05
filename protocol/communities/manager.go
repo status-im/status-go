@@ -973,6 +973,11 @@ func (rmr reevaluateMemberRole) hasChangedToPrivileged() bool {
 	return rmr.hasChanged() && rmr.old == protobuf.CommunityMember_ROLE_NONE
 }
 
+func (rmr reevaluateMemberRole) hasChangedPrivilegedRole() bool {
+	return (rmr.old == protobuf.CommunityMember_ROLE_ADMIN && rmr.new == protobuf.CommunityMember_ROLE_TOKEN_MASTER) ||
+		(rmr.old == protobuf.CommunityMember_ROLE_TOKEN_MASTER && rmr.new == protobuf.CommunityMember_ROLE_ADMIN)
+}
+
 type reevaluateMembersResult struct {
 	membersToRemove             map[string]struct{}
 	membersRoles                map[string]*reevaluateMemberRole
@@ -984,7 +989,7 @@ func (rmr *reevaluateMembersResult) newPrivilegedRoles() (map[protobuf.Community
 	result := map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey{}
 
 	for memberKey, roles := range rmr.membersRoles {
-		if roles.hasChangedToPrivileged() {
+		if roles.hasChangedToPrivileged() || roles.hasChangedPrivilegedRole() {
 			memberPubKey, err := common.HexToPubkey(memberKey)
 			if err != nil {
 				return nil, err
