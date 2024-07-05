@@ -6,17 +6,24 @@ package protobuf;
 import "communities.proto";
 import "pairing.proto";
 
+message SyncCommunityEditSharedAddresses {
+  string public_key = 1;
+  CommunityEditSharedAddresses edit_shared_address = 2;
+}
+
 message CommunityPrivilegedUserSyncMessage {
   uint64 clock = 1;
   EventType type = 2;
   bytes community_id = 3;
   map<string,CommunityRequestToJoin> request_to_join = 4;
   repeated SyncCommunityRequestsToJoin sync_requests_to_join = 5;
+  SyncCommunityEditSharedAddresses sync_edit_shared_addresses = 6;
 
   enum EventType {
     UNKNOWN = 0;
     CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN = 1;
     CONTROL_NODE_REJECT_REQUEST_TO_JOIN = 2;
     CONTROL_NODE_ALL_SYNC_REQUESTS_TO_JOIN = 3;
+    CONTROL_NODE_MEMBER_EDIT_SHARED_ADDRESSES = 4;
   }
 }

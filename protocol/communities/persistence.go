@@ -1764,15 +1764,6 @@ func (p *Persistence) AllNonApprovedCommunitiesRequestsToJoin() ([]*RequestToJoi
 	return nonApprovedRequestsToJoin, nil
 }
 
-func (p *Persistence) RemoveAllCommunityRequestsToJoinWithRevealedAddressesExceptPublicKey(pk string, communityID []byte) error {
-	_, err := p.db.Exec(`
-	DELETE FROM communities_requests_to_join_revealed_addresses
-		WHERE request_id IN (SELECT id FROM communities_requests_to_join WHERE community_id = ? AND public_key != ?);
-	DELETE FROM communities_requests_to_join
-		WHERE community_id = ? AND public_key != ?;`, communityID, pk, communityID, pk)
-	return err
-}
-
 func (p *Persistence) SaveCommunityShard(communityID types.HexBytes, shard *shard.Shard, clock uint64) error {
 	var cluster, index *uint16
 

@@ -1514,7 +1514,7 @@ func (m *Manager) reevaluateCommunityMembersPermissions(communityID types.HexByt
 		return err
 	}
 
-	return m.shareRequestsToJoinWithNewPrivilegedMembers(community, newPrivilegedMembers)
+	return m.ShareRequestsToJoinWithPrivilegedMembers(community, newPrivilegedMembers)
 }
 
 func (m *Manager) DeleteCommunity(id types.HexBytes) error {
@@ -2649,7 +2649,6 @@ func (m *Manager) DeletePendingRequestToJoin(request *RequestToJoin) error {
 	return nil
 }
 
-// UpdateClockInRequestToJoin method is used for testing
 func (m *Manager) UpdateClockInRequestToJoin(id types.HexBytes, clock uint64) error {
 	return m.persistence.UpdateClockInRequestToJoin(id, clock)
 }
@@ -2853,7 +2852,7 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 
 			newPrivilegedMember := make(map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey)
 			newPrivilegedMember[memberRole] = []*ecdsa.PublicKey{pk}
-			if err = m.shareRequestsToJoinWithNewPrivilegedMembers(community, newPrivilegedMember); err != nil {
+			if err = m.ShareRequestsToJoinWithPrivilegedMembers(community, newPrivilegedMember); err != nil {
 				return nil, err
 			}
 		}
@@ -3124,10 +3123,17 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 		return err
 	}
 
-	if err := community.ValidateEditSharedAddresses(signer, request); err != nil {
+	if !community.IsControlNode() {
+		return ErrNotOwner
+	}
+
+	publicKey := common.PubkeyToHex(signer)
+
+	if err := community.ValidateEditSharedAddresses(publicKey, request); err != nil {
 		return err
 	}
 
+	community.UpdateMemberLastUpdateClock(publicKey, request.Clock)
 	// verify if revealed addresses indeed belong to requester
 	for _, revealedAccount := range request.RevealedAccounts {
 		recoverParams := account.RecoverParams{
@@ -3145,18 +3151,7 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 		}
 	}
 
-	requestToJoin := &RequestToJoin{
-		PublicKey:        common.PubkeyToHex(signer),
-		CommunityID:      community.ID(),
-		RevealedAccounts: request.RevealedAccounts,
-	}
-	requestToJoin.CalculateID()
-
-	err = m.persistence.RemoveRequestToJoinRevealedAddresses(requestToJoin.ID)
-	if err != nil {
-		return err
-	}
-	err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin.ID, requestToJoin.RevealedAccounts)
+	err = m.handleCommunityEditSharedAddresses(publicKey, request.CommunityId, request.RevealedAccounts, request.Clock)
 	if err != nil {
 		return err
 	}
@@ -3170,7 +3165,37 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 		m.publish(&Subscription{Community: community})
 	}
 
+	subscriptionMsg := &CommunityPrivilegedMemberSyncMessage{
+		CommunityPrivateKey: community.PrivateKey(),
+		Receivers:           community.GetTokenMasterMembers(),
+		CommunityPrivilegedUserSyncMessage: &protobuf.CommunityPrivilegedUserSyncMessage{
+			Type:        protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_MEMBER_EDIT_SHARED_ADDRESSES,
+			CommunityId: community.ID(),
+			SyncEditSharedAddresses: &protobuf.SyncCommunityEditSharedAddresses{
+				PublicKey:         common.PubkeyToHex(signer),
+				EditSharedAddress: request,
+			},
+		},
+	}
+
+	m.publish(&Subscription{CommunityPrivilegedMemberSyncMessage: subscriptionMsg})
+
 	return nil
+}
+
+func (m *Manager) handleCommunityEditSharedAddresses(publicKey string, communityID types.HexBytes, revealedAccounts []*protobuf.RevealedAccount, clock uint64) error {
+	requestToJoinID := CalculateRequestID(publicKey, communityID)
+	err := m.UpdateClockInRequestToJoin(requestToJoinID, clock)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.RemoveRequestToJoinRevealedAddresses(requestToJoinID)
+	if err != nil {
+		return err
+	}
+
+	return m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoinID, revealedAccounts)
 }
 
 func calculateChainIDsSet(accountsAndChainIDs []*AccountChainIDsCombination, requirementsChainIDs map[uint64]bool) []uint64 {
@@ -4588,6 +4613,11 @@ func (m *Manager) ValidateCommunityPrivilegedUserSyncMessage(message *protobuf.C
 		if message.SyncRequestsToJoin == nil || len(message.SyncRequestsToJoin) == 0 {
 			return errors.New("invalid sync requests to join in CommunityPrivilegedUserSyncMessage message")
 		}
+	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_MEMBER_EDIT_SHARED_ADDRESSES:
+		if message.SyncEditSharedAddresses == nil || len(message.CommunityId) == 0 ||
+			len(message.SyncEditSharedAddresses.PublicKey) == 0 || message.SyncEditSharedAddresses.EditSharedAddress == nil {
+			return errors.New("invalid edit shared adresses in CommunityPrivilegedUserSyncMessage message")
+		}
 	}
 
 	return nil
@@ -4770,7 +4800,7 @@ func (m *Manager) handleCommunityEvents(community *Community) error {
 	return nil
 }
 
-func (m *Manager) shareRequestsToJoinWithNewPrivilegedMembers(community *Community, newPrivilegedMembers map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey) error {
+func (m *Manager) ShareRequestsToJoinWithPrivilegedMembers(community *Community, privilegedMembers map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey) error {
 	requestsToJoin, err := m.GetCommunityRequestsToJoinWithRevealedAddresses(community.ID())
 	if err != nil {
 		return err
@@ -4801,7 +4831,7 @@ func (m *Manager) shareRequestsToJoinWithNewPrivilegedMembers(community *Communi
 		CommunityPrivateKey: community.PrivateKey(),
 	}
 
-	for role, members := range newPrivilegedMembers {
+	for role, members := range privilegedMembers {
 		if len(members) == 0 {
 			continue
 		}

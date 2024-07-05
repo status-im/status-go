@@ -682,6 +682,15 @@ func (m *Messenger) handleCommunitySharedAddressesRequest(state *ReceivedMessage
 		return err
 	}
 
+	if community.IsPrivilegedMember(signer) {
+		memberRole := community.MemberRole(signer)
+		newPrivilegedMember := make(map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey)
+		newPrivilegedMember[memberRole] = []*ecdsa.PublicKey{signer}
+		if err = m.communitiesManager.ShareRequestsToJoinWithPrivilegedMembers(community, newPrivilegedMember); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -1656,23 +1665,6 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 		return nil, err
 	}
 
-	// send edit message also to TokenMasters and Owners
-	skipMembers := make(map[string]struct{})
-	skipMembers[common.PubkeyToHex(&m.identity.PublicKey)] = struct{}{}
-
-	privilegedMembers := community.GetFilteredPrivilegedMembers(skipMembers)
-	for role, members := range privilegedMembers {
-		if len(members) == 0 || (role != protobuf.CommunityMember_ROLE_TOKEN_MASTER && role != protobuf.CommunityMember_ROLE_OWNER) {
-			continue
-		}
-		for _, member := range members {
-			rawMessage.Recipients = append(rawMessage.Recipients, member)
-			_, err := m.sender.SendPrivate(context.Background(), member, &rawMessage)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
 	if _, err = m.UpsertRawMessageToWatch(&rawMessage); err != nil {
 		return nil, err
 	}
@@ -3573,6 +3565,10 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 		return err
 	}
 
+	if community.IsControlNode() {
+		return nil
+	}
+
 	// Currently this type of msg coming from the control node.
 	// If it will change in the future, check that events types starting from
 	// CONTROL_NODE were sent by a control node
@@ -3590,18 +3586,23 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN:
 		fallthrough
 	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_REJECT_REQUEST_TO_JOIN:
-		requestsToJoin, err := m.communitiesManager.HandleRequestToJoinPrivilegedUserSyncMessage(message, community.ID())
+		requestsToJoin, err := m.communitiesManager.HandleRequestToJoinPrivilegedUserSyncMessage(message, community)
 		if err != nil {
-			return nil
+			return err
 		}
 		state.Response.AddRequestsToJoinCommunity(requestsToJoin)
 
 	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ALL_SYNC_REQUESTS_TO_JOIN:
-		nonAcceptedRequestsToJoin, err := m.communitiesManager.HandleSyncAllRequestToJoinForNewPrivilegedMember(message, community.ID())
+		nonAcceptedRequestsToJoin, err := m.communitiesManager.HandleSyncAllRequestToJoinForNewPrivilegedMember(message, community)
 		if err != nil {
-			return nil
+			return err
 		}
 		state.Response.AddRequestsToJoinCommunity(nonAcceptedRequestsToJoin)
+	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_MEMBER_EDIT_SHARED_ADDRESSES:
+		err = m.communitiesManager.HandleEditSharedAddressesPrivilegedUserSyncMessage(message, community)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

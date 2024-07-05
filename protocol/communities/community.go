@@ -683,6 +683,15 @@ func (o *Community) Members() map[string]*protobuf.CommunityMember {
 	return nil
 }
 
+func (o *Community) UpdateMemberLastUpdateClock(publicKey string, clock uint64) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if member, exists := o.config.CommunityDescription.Members[publicKey]; exists {
+		member.LastUpdateClock = clock
+	}
+}
+
 func (o *Community) MembersCount() int {
 	if o != nil &&
 		o.config != nil &&
@@ -1434,26 +1443,21 @@ func (o *Community) ValidateRequestToJoin(signer *ecdsa.PublicKey, request *prot
 }
 
 // ValidateRequestToJoin validates a request, checks that the right permissions are applied
-func (o *Community) ValidateEditSharedAddresses(signer *ecdsa.PublicKey, request *protobuf.CommunityEditSharedAddresses) error {
+func (o *Community) ValidateEditSharedAddresses(signer string, request *protobuf.CommunityEditSharedAddresses) error {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
-
-	// If we are not owner, fuggetaboutit
-	if !o.IsControlNode() {
-		return ErrNotOwner
-	}
 
 	if len(request.RevealedAccounts) == 0 {
 		return errors.New("no addresses were shared")
 	}
 
-	member, exists := o.config.CommunityDescription.Members[common.PubkeyToHex(signer)]
+	member, exists := o.config.CommunityDescription.Members[signer]
 	if !exists {
 		return errors.New("signer is not a community member")
 	}
 
 	if request.Clock < member.LastUpdateClock {
-		return errors.New("edit request is older than the last one we have. Ignore")
+		return ErrEditSharedAddressesRequestOutdated
 	}
 
 	return nil
@@ -1474,6 +1478,17 @@ func (o *Community) IsTokenMaster() bool {
 
 func (o *Community) IsAdmin() bool {
 	return o.IsMemberAdmin(o.MemberIdentity())
+}
+
+func (o *Community) GetTokenMasterMembers() []*ecdsa.PublicKey {
+	tokenMasterMembers := make([]*ecdsa.PublicKey, 0)
+	members := o.GetMemberPubkeys()
+	for _, member := range members {
+		if o.IsMemberTokenMaster(member) {
+			tokenMasterMembers = append(tokenMasterMembers, member)
+		}
+	}
+	return tokenMasterMembers
 }
 
 func (o *Community) GetPrivilegedMembers() []*ecdsa.PublicKey {
