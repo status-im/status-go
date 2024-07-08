@@ -62,7 +62,7 @@ func (c *SendTransactionCommand) Execute(request RPCRequest) (string, error) {
 		return "", ErrParamsFromAddressIsNotShared
 	}
 
-	hash, err := c.ClientHandler.RequestSendTransaction(dAppData, params)
+	hash, err := c.ClientHandler.RequestSendTransaction(dAppData, dApp.ChainID, params)
 	if err != nil {
 		return "", err
 	}

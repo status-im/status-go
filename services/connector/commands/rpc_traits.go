@@ -31,14 +31,20 @@ type RPCCommand interface {
 }
 
 type DAppData struct {
-	Origin      string
-	DAppName    string
-	DAppIconUrl string
+	Origin  string
+	Name    string
+	IconUrl string
+}
+
+type ConnectorSendTransactionFinishedArgs struct {
+	Hash  types.Hash
+	Error *error
 }
 
 type ClientSideHandlerInterface interface {
 	RequestShareAccountForDApp(dApp *DAppData) (types.Address, error)
-	RequestSendTransaction(dApp *DAppData, txArgs *transactions.SendTxArgs) (types.Hash, error)
+	RequestSendTransaction(dApp *DAppData, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error)
+	ConnectorSendTransactionFinished(args ConnectorSendTransactionFinishedArgs) error
 }
 
 type NetworkManagerInterface interface {
@@ -55,8 +61,8 @@ func (r *RPCRequest) getDAppData() (*DAppData, error) {
 	}
 
 	return &DAppData{
-		Origin:      r.Origin,
-		DAppName:    r.DAppName,
-		DAppIconUrl: r.DAppIconUrl,
+		Origin:  r.Origin,
+		Name:    r.DAppName,
+		IconUrl: r.DAppIconUrl,
 	}, nil
 }

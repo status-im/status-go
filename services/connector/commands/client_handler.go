@@ -3,13 +3,30 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
+)
+
+var (
+	WalletResponseMaxInterval = 20 * time.Minute
+
+	ErrWalletResponseTimeout = fmt.Errorf("timeout waiting for wallet response")
 )
 
 type ClientSideHandler struct {
 	RpcClient RPCClientInterface
+
+	sendTransactionResponseChannel chan ConnectorSendTransactionFinishedArgs
+}
+
+func NewClientSideHandler(rpcClient RPCClientInterface) *ClientSideHandler {
+	return &ClientSideHandler{
+		RpcClient:                      rpcClient,
+		sendTransactionResponseChannel: make(chan ConnectorSendTransactionFinishedArgs, 1), // Buffer of 1 to avoid blocking
+	}
 }
 
 func (c *ClientSideHandler) RequestShareAccountForDApp(dApp *DAppData) (types.Address, error) {
@@ -43,7 +60,27 @@ func (c *ClientSideHandler) RequestShareAccountForDApp(dApp *DAppData) (types.Ad
 	return rawResponse.Result[0].Address, nil
 }
 
-func (c *ClientSideHandler) RequestSendTransaction(dApp *DAppData, txArgs *transactions.SendTxArgs) (types.Hash, error) {
-	// TODO: implement popup on the UI
-	return types.Hash{}, nil
+func (c *ClientSideHandler) RequestSendTransaction(dApp *DAppData, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error) {
+	txArgsJson, err := json.Marshal(txArgs)
+	if err != nil {
+		return types.Hash{}, fmt.Errorf("failed to marshal txArgs: %v", err)
+	}
+
+	signal.SendConnectorSendTransaction(dApp.Origin, chainID, string(txArgsJson))
+
+	select {
+	case response := <-c.sendTransactionResponseChannel:
+		if response.Error != nil {
+			return types.Hash{}, *response.Error
+		}
+		return response.Hash, nil
+	case <-time.After(WalletResponseMaxInterval):
+		return types.Hash{}, ErrWalletResponseTimeout
+	}
+}
+
+func (c *ClientSideHandler) ConnectorSendTransactionFinished(args ConnectorSendTransactionFinishedArgs) error {
+	// Notify RequestSendTransaction with hash or error
+	c.sendTransactionResponseChannel <- args
+	return nil
 }

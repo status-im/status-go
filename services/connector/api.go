@@ -11,25 +11,24 @@ import (
 type API struct {
 	s *Service
 	r *CommandRegistry
+	c *commands.ClientSideHandler
 }
 
 func NewAPI(s *Service) *API {
 	r := NewCommandRegistry()
 
-	clientHandler := &commands.ClientSideHandler{
-		RpcClient: s.rpcClient,
-	}
+	c := commands.NewClientSideHandler(s.rpcClient)
 
 	r.Register("eth_sendTransaction", &commands.SendTransactionCommand{
 		Db:            s.db,
-		ClientHandler: clientHandler,
+		ClientHandler: c,
 	})
 	r.Register("eth_sign", &commands.SignCommand{})
 
 	// Accounts querry and dapp permissions
 	r.Register("eth_accounts", &commands.AccountsCommand{Db: s.db})
 	r.Register("eth_requestAccounts", &commands.RequestAccountsCommand{
-		ClientHandler:   clientHandler,
+		ClientHandler:   c,
 		AccountsCommand: commands.AccountsCommand{Db: s.db},
 		NetworkManager:  s.rpcClient.NetworkManager,
 	})
@@ -44,6 +43,7 @@ func NewAPI(s *Service) *API {
 	return &API{
 		s: s,
 		r: r,
+		c: c,
 	}
 }
 
@@ -64,4 +64,8 @@ func (api *API) CallRPC(inputJSON string) (string, error) {
 
 func (api *API) RecallDAppPermission(origin string) error {
 	return persistence.DeleteDApp(api.s.db, origin)
+}
+
+func (api *API) ConnectorSendTransactionFinished(args commands.ConnectorSendTransactionFinishedArgs) error {
+	return api.c.ConnectorSendTransactionFinished(args)
 }

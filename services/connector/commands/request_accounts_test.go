@@ -52,9 +52,7 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 	})
 
 	cmd := &RequestAccountsCommand{
-		ClientHandler: &ClientSideHandler{
-			RpcClient: rpcClient,
-		},
+		ClientHandler:  NewClientSideHandler(rpcClient),
 		NetworkManager: &nm,
 		AccountsCommand: AccountsCommand{
 			Db: db,
@@ -91,14 +89,14 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Len(t, result.Accounts, 1)
-	assert.Equal(t, accountAddress.Hex(), result.Accounts[0])
+	assert.Equal(t, accountAddress, result.Accounts[0])
 
 	// Check dApp in the database
 	dApp, err := persistence.SelectDAppByUrl(db, request.Origin)
 	assert.NoError(t, err)
 	assert.Equal(t, request.DAppName, dApp.Name)
 	assert.Equal(t, request.DAppIconUrl, dApp.IconURL)
-	assert.Equal(t, accountAddress.Hex(), dApp.SharedAccount)
+	assert.Equal(t, accountAddress, dApp.SharedAccount)
 	assert.Equal(t, walletCommon.EthereumMainnet, dApp.ChainID)
 
 	// Setting empty response here to ensure that the account is not requested again
@@ -111,5 +109,5 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Len(t, result.Accounts, 1)
-	assert.Equal(t, accountAddress.Hex(), result.Accounts[0])
+	assert.Equal(t, accountAddress, result.Accounts[0])
 }

@@ -1,6 +1,10 @@
 package commands
 
-import "github.com/status-im/status-go/params"
+import (
+	"encoding/json"
+
+	"github.com/status-im/status-go/params"
+)
 
 type RPCClientMock struct {
 	response string
@@ -8,6 +12,11 @@ type RPCClientMock struct {
 
 type NetworkManagerMock struct {
 	networks []*params.Network
+}
+
+type EventType struct {
+	Type  string          `json:"type"`
+	Event json.RawMessage `json:"event"`
 }
 
 func (c *RPCClientMock) CallRaw(request string) string {

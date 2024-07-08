@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"slices"
+	"strconv"
 
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -25,12 +26,23 @@ func (r *RPCRequest) getChainID() (uint64, error) {
 		return 0, ErrEmptyRPCParams
 	}
 
-	// First, try to assert it as float64 (which is the default for numbers in JSON)
-	chainIDFloat, ok := r.Params[0].(float64)
-	if !ok {
+	switch v := r.Params[0].(type) {
+	case float64:
+		return uint64(v), nil
+	case int:
+		return uint64(v), nil
+	case uint64:
+		return v, nil
+	case string:
+		// Try to parse the string to an integer
+		parsed, err := strconv.ParseUint(v, 10, 64)
+		if err != nil {
+			return 0, ErrNoChainIDInParams
+		}
+		return parsed, nil
+	default:
 		return 0, ErrNoChainIDInParams
 	}
-	return uint64(chainIDFloat), nil
 }
 
 func (c *SwitchEthereumChainCommand) getSupportedChainIDs() ([]uint64, error) {
