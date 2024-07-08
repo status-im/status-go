@@ -17,16 +17,10 @@ func TestFailToRequestAccountsWithMissingDAppFields(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()
 
-	cmd := &RequestAccountsCommand{AccountsCommand: AccountsCommand{
-		Db: db,
-	}}
+	cmd := &RequestAccountsCommand{AccountsCommand: AccountsCommand{Db: db}}
 
-	request := RPCRequest{
-		JSONRPC: "2.0",
-		ID:      1,
-		Method:  "eth_requestAccounts",
-		Params:  []interface{}{},
-	}
+	// Missing DApp fields
+	request := constructRPCRequest("eth_requestAccounts", []interface{}{}, nil)
 
 	result, err := cmd.Execute(request)
 	assert.Equal(t, err, ErrRequestMissingDAppData)
@@ -59,15 +53,7 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 		},
 	}
 
-	request := RPCRequest{
-		JSONRPC:     "2.0",
-		ID:          1,
-		Method:      "eth_requestAccounts",
-		Params:      []interface{}{},
-		Origin:      "http://testDAppURL",
-		DAppName:    "testDAppName",
-		DAppIconUrl: "http://testDAppIconUrl",
-	}
+	request := constructRPCRequest("eth_requestAccounts", []interface{}{}, &testDAppData)
 
 	accountAddress := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
 

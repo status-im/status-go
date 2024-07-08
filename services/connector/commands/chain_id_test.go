@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/status-im/status-go/eth-node/types"
-	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
 
@@ -14,16 +13,10 @@ func TestFailToGetChainIdWithMissingDAppFields(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()
 
-	cmd := &ChainIDCommand{
-		Db: db,
-	}
+	cmd := &ChainIDCommand{Db: db}
 
-	request := RPCRequest{
-		JSONRPC: "2.0",
-		ID:      1,
-		Method:  "eth_chainId",
-		Params:  []interface{}{},
-	}
+	// Missing DApp fields
+	request := constructRPCRequest("eth_chainId", []interface{}{}, nil)
 
 	result, err := cmd.Execute(request)
 	assert.Equal(t, err, ErrRequestMissingDAppData)
@@ -34,19 +27,9 @@ func TestFailToGetChainIdForUnpermittedDApp(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()
 
-	cmd := &ChainIDCommand{
-		Db: db,
-	}
+	cmd := &ChainIDCommand{Db: db}
 
-	request := RPCRequest{
-		JSONRPC:     "2.0",
-		ID:          1,
-		Method:      "eth_chainId",
-		Params:      []interface{}{},
-		Origin:      "http://testDAppURL",
-		DAppName:    "testDAppName",
-		DAppIconUrl: "http://testDAppIconUrl",
-	}
+	request := constructRPCRequest("eth_chainId", []interface{}{}, &testDAppData)
 
 	result, err := cmd.Execute(request)
 	assert.Equal(t, err, ErrDAppIsNotPermittedByUser)
@@ -57,32 +40,17 @@ func TestGetChainIdForPermittedDApp(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()
 
-	cmd := &ChainIDCommand{
-		Db: db,
-	}
+	cmd := &ChainIDCommand{Db: db}
 
-	request := RPCRequest{
-		JSONRPC:     "2.0",
-		ID:          1,
-		Method:      "eth_chainId",
-		Params:      []interface{}{},
-		Origin:      "http://testDAppURL",
-		DAppName:    "testDAppName",
-		DAppIconUrl: "http://testDAppIconUrl",
-	}
+	sharedAccount := types.HexToAddress("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg")
+	chainID := uint64(0x123)
 
-	dApp := persistence.DApp{
-		URL:           request.Origin,
-		Name:          request.DAppName,
-		IconURL:       request.DAppIconUrl,
-		SharedAccount: types.HexToAddress("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"),
-		ChainID:       0x1,
-	}
-
-	err := persistence.UpsertDApp(db, &dApp)
+	err := persistDAppData(db, testDAppData, sharedAccount, chainID)
 	assert.NoError(t, err)
+
+	request := constructRPCRequest("eth_chainId", []interface{}{}, &testDAppData)
 
 	response, err := cmd.Execute(request)
 	assert.NoError(t, err)
-	assert.Equal(t, walletCommon.ChainID(dApp.ChainID).String(), response)
+	assert.Equal(t, walletCommon.ChainID(chainID).String(), response)
 }

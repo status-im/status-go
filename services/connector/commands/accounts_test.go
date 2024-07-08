@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/eth-node/types"
-	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -26,16 +25,10 @@ func TestFailToGetAccountWithMissingDAppFields(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()
 
-	cmd := &AccountsCommand{
-		Db: db,
-	}
+	cmd := &AccountsCommand{Db: db}
 
-	request := RPCRequest{
-		JSONRPC: "2.0",
-		ID:      1,
-		Method:  "eth_accounts",
-		Params:  []interface{}{},
-	}
+	// Missing DApp fields
+	request := constructRPCRequest("eth_accounts", []interface{}{}, nil)
 
 	result, err := cmd.Execute(request)
 	assert.Equal(t, err, ErrRequestMissingDAppData)
@@ -46,19 +39,9 @@ func TestFailToGetAccountForUnpermittedDApp(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()
 
-	cmd := &AccountsCommand{
-		Db: db,
-	}
+	cmd := &AccountsCommand{Db: db}
 
-	request := RPCRequest{
-		JSONRPC:     "2.0",
-		ID:          1,
-		Method:      "eth_accounts",
-		Params:      []interface{}{},
-		Origin:      "http://testDAppURL",
-		DAppName:    "testDAppName",
-		DAppIconUrl: "http://testDAppIconUrl",
-	}
+	request := constructRPCRequest("eth_accounts", []interface{}{}, &testDAppData)
 
 	result, err := cmd.Execute(request)
 	assert.Equal(t, err, ErrDAppIsNotPermittedByUser)
@@ -69,30 +52,14 @@ func TestGetAccountForPermittedDApp(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()
 
-	cmd := &AccountsCommand{
-		Db: db,
-	}
+	cmd := &AccountsCommand{Db: db}
 
-	request := RPCRequest{
-		JSONRPC:     "2.0",
-		ID:          1,
-		Method:      "eth_accounts",
-		Params:      []interface{}{},
-		Origin:      "http://testDAppURL",
-		DAppName:    "testDAppName",
-		DAppIconUrl: "http://testDAppIconUrl",
-	}
+	sharedAccount := types.HexToAddress("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg")
 
-	dApp := persistence.DApp{
-		URL:           request.Origin,
-		Name:          request.DAppName,
-		IconURL:       request.DAppIconUrl,
-		SharedAccount: types.HexToAddress("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"),
-		ChainID:       0x1,
-	}
-
-	err := persistence.UpsertDApp(db, &dApp)
+	err := persistDAppData(db, testDAppData, sharedAccount, 0x123)
 	assert.NoError(t, err)
+
+	request := constructRPCRequest("eth_accounts", []interface{}{}, &testDAppData)
 
 	response, err := cmd.Execute(request)
 	assert.NoError(t, err)
@@ -102,5 +69,5 @@ func TestGetAccountForPermittedDApp(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Len(t, result.Accounts, 1)
-	assert.Equal(t, dApp.SharedAccount, result.Accounts[0])
+	assert.Equal(t, sharedAccount, result.Accounts[0])
 }

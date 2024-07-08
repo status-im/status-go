@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"database/sql"
 	"encoding/json"
 	"testing"
 	"time"
@@ -10,28 +9,9 @@ import (
 
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/eth-node/types"
-	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
-
-func testDAppData(db *sql.DB, sharedAccount types.Address) (DAppData, error) {
-	dAppData := DAppData{
-		Origin:  "http://testDAppURL",
-		Name:    "testDAppName",
-		IconUrl: "http://testDAppIconUrl",
-	}
-
-	dApp := persistence.DApp{
-		URL:           dAppData.Origin,
-		Name:          dAppData.Name,
-		IconURL:       dAppData.IconUrl,
-		SharedAccount: sharedAccount,
-		ChainID:       0x1,
-	}
-
-	return dAppData, persistence.UpsertDApp(db, &dApp)
-}
 
 func prepareSendRequest(dApp DAppData, from types.Address) (RPCRequest, error) {
 	sendArgs := transactions.SendTxArgs{
@@ -48,17 +28,7 @@ func prepareSendRequest(dApp DAppData, from types.Address) (RPCRequest, error) {
 	params := make([]interface{}, 1)
 	params[0] = string(sendArgsJSON)
 
-	request := RPCRequest{
-		JSONRPC:     "2.0",
-		ID:          1,
-		Method:      "eth_sendTransaction",
-		Params:      params,
-		Origin:      dApp.Origin,
-		DAppName:    dApp.Name,
-		DAppIconUrl: dApp.IconUrl,
-	}
-
-	return request, nil
+	return constructRPCRequest("eth_sendTransaction", params, &dApp), nil
 }
 
 func TestFailToSendTransactionWithoutPermittedDApp(t *testing.T) {
@@ -68,13 +38,7 @@ func TestFailToSendTransactionWithoutPermittedDApp(t *testing.T) {
 	cmd := &SendTransactionCommand{Db: db}
 
 	// Don't save dApp in the database
-	dAppData := DAppData{
-		Origin:  "http://testDAppURL",
-		Name:    "testDAppName",
-		IconUrl: "http://testDAppIconUrl",
-	}
-
-	request, err := prepareSendRequest(dAppData, types.Address{0x1})
+	request, err := prepareSendRequest(testDAppData, types.Address{0x1})
 	assert.NoError(t, err)
 
 	_, err = cmd.Execute(request)
@@ -87,10 +51,10 @@ func TestFailToSendTransactionWithWrongAddress(t *testing.T) {
 
 	cmd := &SendTransactionCommand{Db: db}
 
-	dAppData, err := testDAppData(db, types.Address{0x01})
+	err := persistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
 	assert.NoError(t, err)
 
-	request, err := prepareSendRequest(dAppData, types.Address{0x02})
+	request, err := prepareSendRequest(testDAppData, types.Address{0x02})
 	assert.NoError(t, err)
 
 	_, err = cmd.Execute(request)
@@ -108,10 +72,10 @@ func TestSendTransactionWithSignalTimout(t *testing.T) {
 		ClientHandler: clientHandler,
 	}
 
-	dAppData, err := testDAppData(db, types.Address{0x01})
+	err := persistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
 	assert.NoError(t, err)
 
-	request, err := prepareSendRequest(dAppData, types.Address{0x01})
+	request, err := prepareSendRequest(testDAppData, types.Address{0x01})
 	assert.NoError(t, err)
 
 	backupWalletResponseMaxInterval := WalletResponseMaxInterval
@@ -135,10 +99,10 @@ func TestSendTransactionWithSignalSucceed(t *testing.T) {
 		ClientHandler: clientHandler,
 	}
 
-	dAppData, err := testDAppData(db, types.Address{0x01})
+	err := persistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
 	assert.NoError(t, err)
 
-	request, err := prepareSendRequest(dAppData, types.Address{0x01})
+	request, err := prepareSendRequest(testDAppData, types.Address{0x01})
 	assert.NoError(t, err)
 
 	go func() {

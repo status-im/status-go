@@ -11,6 +11,7 @@ import (
 
 	"github.com/status-im/status-go/params"
 	statusRPC "github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/connector/commands"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions/fake"
 	"github.com/status-im/status-go/walletdatabase"
@@ -48,45 +49,36 @@ func TestCallRPC(t *testing.T) {
 	defer cancel()
 
 	tests := []struct {
-		request          string
-		expectError      bool
-		expectedContains string
-		notContains      bool
+		request     string
+		expectError error
 	}{
 		{
-			request:          "{\"method\": \"eth_blockNumber\", \"params\": []}",
-			expectError:      false,
-			expectedContains: "does not exist/is not available",
-			notContains:      true,
+			request:     "{\"method\": \"eth_chainId\", \"params\": []}",
+			expectError: commands.ErrRequestMissingDAppData,
 		},
 		{
-			request:          "{\"method\": \"eth_blockNumbers\", \"params\": []}",
-			expectError:      false,
-			expectedContains: "does not exist/is not available",
-			notContains:      false,
+			request:     "{\"method\": \"eth_accounts\", \"params\": []}",
+			expectError: commands.ErrRequestMissingDAppData,
 		},
 		{
-			request:          "",
-			expectError:      true,
-			expectedContains: "does not exist/is not available",
-			notContains:      true,
+			request:     "{\"method\": \"eth_requestAccounts\", \"params\": []}",
+			expectError: commands.ErrRequestMissingDAppData,
+		},
+		{
+			request:     "{\"method\": \"eth_sendTransaction\", \"params\": []}",
+			expectError: commands.ErrRequestMissingDAppData,
+		},
+		{
+			request:     "{\"method\": \"wallet_switchEthereumChain\", \"params\": []}",
+			expectError: commands.ErrRequestMissingDAppData,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.request, func(t *testing.T) {
-			response, err := api.CallRPC(tt.request)
-			if tt.expectError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				require.NotEmpty(t, response)
-				if tt.notContains {
-					require.NotContains(t, response, tt.expectedContains)
-				} else {
-					require.Contains(t, response, tt.expectedContains)
-				}
-			}
+			_, err := api.CallRPC(tt.request)
+			require.Error(t, err)
+			require.Equal(t, tt.expectError, err)
 		})
 	}
 }
