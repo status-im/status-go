@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/wakusync"
 
 	"github.com/stretchr/testify/suite"
@@ -226,6 +227,31 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().NoError(err)
 	s.Require().NotEmpty(lastBackup)
 	s.Require().Equal(clock, lastBackup)
+}
+
+func (s *MessengerBackupSuite) TestBackupProfileWithInvalidDisplayName() {
+	// Create bob1
+	bob1 := s.m
+
+	state := ReceivedMessageState{
+		Response: &MessengerResponse{},
+	}
+
+	err := bob1.HandleBackup(
+		&state,
+		&protobuf.Backup{
+			Profile: &protobuf.BackedUpProfile{
+				DisplayName: "bad-display-name_eth",
+			},
+			Clock: 1,
+		},
+		&v1protocol.StatusMessage{},
+	)
+	// The backup will still work, but the display name will be skipped
+	s.Require().NoError(err)
+	storedBob1DisplayName, err := bob1.settings.DisplayName()
+	s.Require().NoError(err)
+	s.Require().Equal("", storedBob1DisplayName)
 }
 
 func (s *MessengerBackupSuite) TestBackupSettings() {
