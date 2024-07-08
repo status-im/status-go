@@ -20,7 +20,7 @@ func TestFailToSwitchEthereumChainWithMissingDAppFields(t *testing.T) {
 	request := constructRPCRequest("wallet_switchEthereumChain", []interface{}{}, nil)
 
 	result, err := cmd.Execute(request)
-	assert.Equal(t, err, ErrRequestMissingDAppData)
+	assert.Equal(t, ErrRequestMissingDAppData, err)
 	assert.Empty(t, result)
 }
 
@@ -33,7 +33,7 @@ func TestFailToSwitchEthereumChainWithNoChainId(t *testing.T) {
 	request := constructRPCRequest("wallet_switchEthereumChain", []interface{}{}, &testDAppData)
 
 	_, err := cmd.Execute(request)
-	assert.Equal(t, err, ErrEmptyRPCParams)
+	assert.Equal(t, ErrEmptyRPCParams, err)
 }
 
 func TestFailToSwitchEthereumChainWithUnsupportedChainId(t *testing.T) {
@@ -58,7 +58,7 @@ func TestFailToSwitchEthereumChainWithUnsupportedChainId(t *testing.T) {
 	request := constructRPCRequest("wallet_switchEthereumChain", params, &testDAppData)
 
 	_, err := cmd.Execute(request)
-	assert.Equal(t, err, ErrUnsupportedNetwork)
+	assert.Equal(t, ErrUnsupportedNetwork, err)
 }
 
 func TestSwitchEthereumChain(t *testing.T) {

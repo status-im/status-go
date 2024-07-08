@@ -17,7 +17,7 @@ type API struct {
 func NewAPI(s *Service) *API {
 	r := NewCommandRegistry()
 
-	c := commands.NewClientSideHandler(s.rpcClient)
+	c := commands.NewClientSideHandler()
 
 	r.Register("eth_sendTransaction", &commands.SendTransactionCommand{
 		Db:            s.db,
@@ -66,6 +66,10 @@ func (api *API) RecallDAppPermission(origin string) error {
 	return persistence.DeleteDApp(api.s.db, origin)
 }
 
-func (api *API) ConnectorSendTransactionFinished(args commands.ConnectorSendTransactionFinishedArgs) error {
-	return api.c.ConnectorSendTransactionFinished(args)
+func (api *API) SendTransactionFinished(args commands.SendTransactionFinishedArgs) error {
+	return api.c.SendTransactionFinished(args)
+}
+
+func (api *API) RequestAccountsFinished(args commands.RequestAccountsFinishedArgs) error {
+	return api.c.RequestAccountsFinished(args)
 }

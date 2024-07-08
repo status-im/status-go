@@ -19,7 +19,7 @@ func TestFailToGetChainIdWithMissingDAppFields(t *testing.T) {
 	request := constructRPCRequest("eth_chainId", []interface{}{}, nil)
 
 	result, err := cmd.Execute(request)
-	assert.Equal(t, err, ErrRequestMissingDAppData)
+	assert.Equal(t, ErrRequestMissingDAppData, err)
 	assert.Empty(t, result)
 }
 
@@ -32,7 +32,7 @@ func TestFailToGetChainIdForUnpermittedDApp(t *testing.T) {
 	request := constructRPCRequest("eth_chainId", []interface{}{}, &testDAppData)
 
 	result, err := cmd.Execute(request)
-	assert.Equal(t, err, ErrDAppIsNotPermittedByUser)
+	assert.Equal(t, ErrDAppIsNotPermittedByUser, err)
 	assert.Empty(t, result)
 }
 

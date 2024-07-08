@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"slices"
-	"strconv"
 
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -26,23 +25,11 @@ func (r *RPCRequest) getChainID() (uint64, error) {
 		return 0, ErrEmptyRPCParams
 	}
 
-	switch v := r.Params[0].(type) {
-	case float64:
-		return uint64(v), nil
-	case int:
-		return uint64(v), nil
-	case uint64:
-		return v, nil
-	case string:
-		// Try to parse the string to an integer
-		parsed, err := strconv.ParseUint(v, 10, 64)
-		if err != nil {
-			return 0, ErrNoChainIDInParams
-		}
-		return parsed, nil
-	default:
+	value, ok := r.Params[0].(uint64)
+	if !ok {
 		return 0, ErrNoChainIDInParams
 	}
+	return value, nil
 }
 
 func (c *SwitchEthereumChainCommand) getSupportedChainIDs() ([]uint64, error) {
@@ -64,10 +51,11 @@ func (c *SwitchEthereumChainCommand) getSupportedChainIDs() ([]uint64, error) {
 }
 
 func (c *SwitchEthereumChainCommand) Execute(request RPCRequest) (string, error) {
-	dAppData, err := request.getDAppData()
+	err := request.Validate()
 	if err != nil {
 		return "", err
 	}
+	dAppData := request.GetDAppData()
 
 	requestedChainID, err := request.getChainID()
 	if err != nil {

@@ -31,7 +31,7 @@ func TestFailToGetAccountWithMissingDAppFields(t *testing.T) {
 	request := constructRPCRequest("eth_accounts", []interface{}{}, nil)
 
 	result, err := cmd.Execute(request)
-	assert.Equal(t, err, ErrRequestMissingDAppData)
+	assert.Equal(t, ErrRequestMissingDAppData, err)
 	assert.Empty(t, result)
 }
 
@@ -44,7 +44,7 @@ func TestFailToGetAccountForUnpermittedDApp(t *testing.T) {
 	request := constructRPCRequest("eth_accounts", []interface{}{}, &testDAppData)
 
 	result, err := cmd.Execute(request)
-	assert.Equal(t, err, ErrDAppIsNotPermittedByUser)
+	assert.Equal(t, ErrDAppIsNotPermittedByUser, err)
 	assert.Empty(t, result)
 }
 

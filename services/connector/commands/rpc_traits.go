@@ -36,15 +36,22 @@ type DAppData struct {
 	IconUrl string
 }
 
-type ConnectorSendTransactionFinishedArgs struct {
+type RequestAccountsFinishedArgs struct {
+	Accounts []types.Address
+	Error    *error
+}
+
+type SendTransactionFinishedArgs struct {
 	Hash  types.Hash
 	Error *error
 }
 
 type ClientSideHandlerInterface interface {
-	RequestShareAccountForDApp(dApp *DAppData) (types.Address, error)
-	RequestSendTransaction(dApp *DAppData, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error)
-	ConnectorSendTransactionFinished(args ConnectorSendTransactionFinishedArgs) error
+	RequestShareAccountForDApp(dApp DAppData) (types.Address, error)
+	RequestSendTransaction(dApp DAppData, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error)
+
+	RequestAccountsFinished(args RequestAccountsFinishedArgs) error
+	SendTransactionFinished(args SendTransactionFinishedArgs) error
 }
 
 type NetworkManagerInterface interface {
@@ -55,14 +62,17 @@ type RPCClientInterface interface {
 	CallRaw(body string) string
 }
 
-func (r *RPCRequest) getDAppData() (*DAppData, error) {
+func (r *RPCRequest) Validate() error {
 	if r.Origin == "" || r.DAppName == "" {
-		return nil, ErrRequestMissingDAppData
+		return ErrRequestMissingDAppData
 	}
+	return nil
+}
 
-	return &DAppData{
+func (r *RPCRequest) GetDAppData() DAppData {
+	return DAppData{
 		Origin:  r.Origin,
 		Name:    r.DAppName,
 		IconUrl: r.DAppIconUrl,
-	}, nil
+	}
 }

@@ -14,53 +14,40 @@ var (
 	WalletResponseMaxInterval = 20 * time.Minute
 
 	ErrWalletResponseTimeout = fmt.Errorf("timeout waiting for wallet response")
+	ErrEmptyAccountsShared   = fmt.Errorf("empty accounts were shared by wallet")
 )
 
 type ClientSideHandler struct {
-	RpcClient RPCClientInterface
-
-	sendTransactionResponseChannel chan ConnectorSendTransactionFinishedArgs
+	requestAccountsResponseChannel chan RequestAccountsFinishedArgs
+	sendTransactionResponseChannel chan SendTransactionFinishedArgs
 }
 
-func NewClientSideHandler(rpcClient RPCClientInterface) *ClientSideHandler {
+func NewClientSideHandler() *ClientSideHandler {
 	return &ClientSideHandler{
-		RpcClient:                      rpcClient,
-		sendTransactionResponseChannel: make(chan ConnectorSendTransactionFinishedArgs, 1), // Buffer of 1 to avoid blocking
+		// Buffer of 1 to avoid blocking
+		sendTransactionResponseChannel: make(chan SendTransactionFinishedArgs, 1),
+		requestAccountsResponseChannel: make(chan RequestAccountsFinishedArgs, 1),
 	}
 }
 
-func (c *ClientSideHandler) RequestShareAccountForDApp(dApp *DAppData) (types.Address, error) {
-	// NOTE: this is temporary implementation, actual code should invoke popup on the UI
+func (c *ClientSideHandler) RequestShareAccountForDApp(dApp DAppData) (types.Address, error) {
+	signal.SendConnectorSendRequestAccounts(dApp.Origin, dApp.Name, dApp.IconUrl)
 
-	// TODO: emit a request accounts signal and hang on wallet response
-	if false {
-		return types.Address{}, ErrAccountsRequestDeniedByUser
+	select {
+	case response := <-c.requestAccountsResponseChannel:
+		if response.Error != nil {
+			return types.Address{}, *response.Error
+		}
+		if len(response.Accounts) == 0 {
+			return types.Address{}, ErrEmptyAccountsShared
+		}
+		return response.Accounts[0], nil
+	case <-time.After(WalletResponseMaxInterval):
+		return types.Address{}, ErrWalletResponseTimeout
 	}
-
-	accountsRequest := RPCRequest{
-		Method: "accounts_getAccounts",
-		Params: []interface{}{},
-	}
-
-	requestJSON, err := json.Marshal(accountsRequest)
-	if err != nil {
-		return types.Address{}, fmt.Errorf("failed to marshal request: %v", err)
-	}
-
-	responseJSON := c.RpcClient.CallRaw(string(requestJSON))
-	var rawResponse RawAccountsResponse
-	err = json.Unmarshal([]byte(responseJSON), &rawResponse)
-	if err != nil {
-		return types.Address{}, fmt.Errorf("failed to unmarshal response: %v", err)
-	}
-
-	if len(rawResponse.Result) < 1 {
-		return types.Address{}, ErrNoAccountsAvailable
-	}
-	return rawResponse.Result[0].Address, nil
 }
 
-func (c *ClientSideHandler) RequestSendTransaction(dApp *DAppData, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error) {
+func (c *ClientSideHandler) RequestSendTransaction(dApp DAppData, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error) {
 	txArgsJson, err := json.Marshal(txArgs)
 	if err != nil {
 		return types.Hash{}, fmt.Errorf("failed to marshal txArgs: %v", err)
@@ -79,7 +66,13 @@ func (c *ClientSideHandler) RequestSendTransaction(dApp *DAppData, chainID uint6
 	}
 }
 
-func (c *ClientSideHandler) ConnectorSendTransactionFinished(args ConnectorSendTransactionFinishedArgs) error {
+func (c *ClientSideHandler) RequestAccountsFinished(args RequestAccountsFinishedArgs) error {
+	// Notify RequestShareAccountForDApp with address or error
+	c.requestAccountsResponseChannel <- args
+	return nil
+}
+
+func (c *ClientSideHandler) SendTransactionFinished(args SendTransactionFinishedArgs) error {
 	// Notify RequestSendTransaction with hash or error
 	c.sendTransactionResponseChannel <- args
 	return nil

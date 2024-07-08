@@ -3,14 +3,15 @@ package commands
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/signal"
 )
 
 func TestFailToRequestAccountsWithMissingDAppFields(t *testing.T) {
@@ -23,15 +24,35 @@ func TestFailToRequestAccountsWithMissingDAppFields(t *testing.T) {
 	request := constructRPCRequest("eth_requestAccounts", []interface{}{}, nil)
 
 	result, err := cmd.Execute(request)
-	assert.Equal(t, err, ErrRequestMissingDAppData)
+	assert.Equal(t, ErrRequestMissingDAppData, err)
 	assert.Empty(t, result)
+}
+
+func TestRequestAccountsWithSignalTimout(t *testing.T) {
+	db, close := setupTestDB(t)
+	defer close()
+
+	clientHandler := NewClientSideHandler()
+
+	cmd := &RequestAccountsCommand{
+		ClientHandler:   clientHandler,
+		AccountsCommand: AccountsCommand{Db: db},
+	}
+
+	request, err := prepareSendRequest(testDAppData, types.Address{0x01})
+	assert.NoError(t, err)
+
+	backupWalletResponseMaxInterval := WalletResponseMaxInterval
+	WalletResponseMaxInterval = 1 * time.Millisecond
+
+	_, err = cmd.Execute(request)
+	assert.Equal(t, ErrWalletResponseTimeout, err)
+	WalletResponseMaxInterval = backupWalletResponseMaxInterval
 }
 
 func TestRequestAccountsTwoTimes(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()
-
-	rpcClient := &RPCClientMock{}
 
 	nm := NetworkManagerMock{}
 	nm.SetNetworks([]*params.Network{
@@ -45,27 +66,36 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 		},
 	})
 
+	clientHandler := NewClientSideHandler()
+
 	cmd := &RequestAccountsCommand{
-		ClientHandler:  NewClientSideHandler(rpcClient),
-		NetworkManager: &nm,
-		AccountsCommand: AccountsCommand{
-			Db: db,
-		},
+		ClientHandler:   clientHandler,
+		NetworkManager:  &nm,
+		AccountsCommand: AccountsCommand{Db: db},
 	}
 
 	request := constructRPCRequest("eth_requestAccounts", []interface{}{}, &testDAppData)
 
 	accountAddress := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
 
-	acountsResponse := &RawAccountsResponse{
-		JSONRPC: "2.0",
-		ID:      1,
-		Result:  []accounts.Account{{Address: accountAddress}},
-	}
-	acountsResponseJSON, err := json.Marshal(acountsResponse)
-	assert.NoError(t, err)
+	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+		var evt EventType
+		err := json.Unmarshal(s, &evt)
+		assert.NoError(t, err)
 
-	rpcClient.SetResponse(string(acountsResponseJSON))
+		switch evt.Type {
+		case signal.EventConnectorSendRequestAccounts:
+			var ev signal.ConnectorSendRequestAccounts
+			err := json.Unmarshal(evt.Event, &ev)
+			assert.NoError(t, err)
+
+			err = clientHandler.RequestAccountsFinished(RequestAccountsFinishedArgs{
+				Accounts: []types.Address{accountAddress},
+				Error:    nil,
+			})
+			assert.NoError(t, err)
+		}
+	}))
 
 	response, err := cmd.Execute(request)
 	assert.NoError(t, err)
@@ -85,9 +115,7 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 	assert.Equal(t, accountAddress, dApp.SharedAccount)
 	assert.Equal(t, walletCommon.EthereumMainnet, dApp.ChainID)
 
-	// Setting empty response here to ensure that the account is not requested again
-	rpcClient.SetResponse("")
-
+	// This should not invoke UI side
 	response, err = cmd.Execute(request)
 	assert.NoError(t, err)
 

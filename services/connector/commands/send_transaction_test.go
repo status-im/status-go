@@ -65,7 +65,7 @@ func TestSendTransactionWithSignalTimout(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()
 
-	clientHandler := NewClientSideHandler(&RPCClientMock{})
+	clientHandler := NewClientSideHandler()
 
 	cmd := &SendTransactionCommand{
 		Db:            db,
@@ -82,7 +82,7 @@ func TestSendTransactionWithSignalTimout(t *testing.T) {
 	WalletResponseMaxInterval = 1 * time.Millisecond
 
 	_, err = cmd.Execute(request)
-	assert.Equal(t, err, ErrWalletResponseTimeout)
+	assert.Equal(t, ErrWalletResponseTimeout, err)
 	WalletResponseMaxInterval = backupWalletResponseMaxInterval
 }
 
@@ -92,7 +92,7 @@ func TestSendTransactionWithSignalSucceed(t *testing.T) {
 
 	fakedTransactionHash := types.Hash{0x051}
 
-	clientHandler := NewClientSideHandler(&RPCClientMock{})
+	clientHandler := NewClientSideHandler()
 
 	cmd := &SendTransactionCommand{
 		Db:            db,
@@ -105,26 +105,24 @@ func TestSendTransactionWithSignalSucceed(t *testing.T) {
 	request, err := prepareSendRequest(testDAppData, types.Address{0x01})
 	assert.NoError(t, err)
 
-	go func() {
-		signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
-			var evt EventType
-			err := json.Unmarshal(s, &evt)
+	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+		var evt EventType
+		err := json.Unmarshal(s, &evt)
+		assert.NoError(t, err)
+
+		switch evt.Type {
+		case signal.EventConnectorSendTransaction:
+			var ev signal.ConnectorSendTransactionSignal
+			err := json.Unmarshal(evt.Event, &ev)
 			assert.NoError(t, err)
 
-			switch evt.Type {
-			case signal.EventConnectorSendTransaction:
-				var ev signal.ConnectorSendTransactionSignal
-				err := json.Unmarshal(evt.Event, &ev)
-				assert.NoError(t, err)
-
-				err = clientHandler.ConnectorSendTransactionFinished(ConnectorSendTransactionFinishedArgs{
-					Hash:  fakedTransactionHash,
-					Error: nil,
-				})
-				assert.NoError(t, err)
-			}
-		}))
-	}()
+			err = clientHandler.SendTransactionFinished(SendTransactionFinishedArgs{
+				Hash:  fakedTransactionHash,
+				Error: nil,
+			})
+			assert.NoError(t, err)
+		}
+	}))
 
 	response, err := cmd.Execute(request)
 	assert.NoError(t, err)

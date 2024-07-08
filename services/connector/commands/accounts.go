@@ -30,10 +30,11 @@ func (c *AccountsCommand) dAppToAccountsResponse(dApp *persistence.DApp) (string
 }
 
 func (c *AccountsCommand) Execute(request RPCRequest) (string, error) {
-	dAppData, err := request.getDAppData()
+	err := request.Validate()
 	if err != nil {
 		return "", err
 	}
+	dAppData := request.GetDAppData()
 
 	dApp, err := persistence.SelectDAppByUrl(c.Db, dAppData.Origin)
 	if err != nil {
