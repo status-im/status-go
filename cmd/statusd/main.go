@@ -233,6 +233,45 @@ func main() {
 			logger.Error("failed to import account", "error", err)
 			return
 		}
+
+		appDB, walletDB, err := openDatabases(config.DataDir + "/" + installationID.String())
+		if err != nil {
+			log.Error("failed to open databases")
+			return
+		}
+
+		options := []protocol.Option{
+			protocol.WithDatabase(appDB),
+			protocol.WithWalletDatabase(walletDB),
+			protocol.WithTorrentConfig(&config.TorrentConfig),
+			protocol.WithWalletConfig(&config.WalletConfig),
+			protocol.WithAccountManager(backend.AccountManager()),
+		}
+
+		messenger, err := protocol.NewMessenger(
+			config.Name,
+			identity,
+			gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()),
+			installationID.String(),
+			nil,
+			config.Version,
+			options...,
+		)
+
+		if err != nil {
+			logger.Error("failed to create messenger", "error", err)
+			return
+		}
+
+		_, err = messenger.Start()
+		if err != nil {
+			logger.Error("failed to start messenger", "error", err)
+			return
+		}
+
+		interruptCh := haltOnInterruptSignal(backend.StatusNode())
+		go retrieveMessagesLoop(messenger, 300*time.Millisecond, interruptCh)
+
 	} else {
 		appDB, walletDB, err := startNode(config, backend, installationID)
 		if err != nil {
