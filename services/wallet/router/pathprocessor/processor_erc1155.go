@@ -151,8 +151,9 @@ func (s *ERC1155Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signe
 	argNonce := hexutil.Uint64(nonce)
 	sendArgs.ERC1155TransferTx.Nonce = &argNonce
 	txOpts := sendArgs.ERC1155TransferTx.ToTransactOpts(signerFn)
+	from := common.Address(sendArgs.ERC1155TransferTx.From)
 	tx, err = contract.SafeTransferFrom(
-		txOpts, common.Address(sendArgs.ERC1155TransferTx.From),
+		txOpts, from,
 		sendArgs.ERC1155TransferTx.Recipient,
 		sendArgs.ERC1155TransferTx.TokenID.ToInt(),
 		sendArgs.ERC1155TransferTx.Amount.ToInt(),
@@ -161,7 +162,10 @@ func (s *ERC1155Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signe
 	if err != nil {
 		return tx, statusErrors.CreateErrorResponseFromError(err)
 	}
-
+	err = s.transactor.StoreAndTrackPendingTx(from, sendArgs.ERC1155TransferTx.Symbol, sendArgs.ChainID, sendArgs.ERC1155TransferTx.MultiTransactionID, tx)
+	if err != nil {
+		return tx, statusErrors.CreateErrorResponseFromError(err)
+	}
 	return tx, nil
 }
 

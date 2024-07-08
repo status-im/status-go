@@ -55,6 +55,7 @@ type TransactorIface interface {
 	SendRawTransaction(chainID uint64, rawTx string) error
 	BuildTransactionWithSignature(chainID uint64, args SendTxArgs, sig []byte) (*gethtypes.Transaction, error)
 	SendTransactionWithSignature(from common.Address, symbol string, multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) (hash types.Hash, err error)
+	StoreAndTrackPendingTx(from common.Address, symbol string, chainID uint64, multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) error
 }
 
 // Transactor validates, signs transactions.
@@ -202,6 +203,15 @@ func createPendingTransaction(from common.Address, symbol string, chainID uint64
 	return
 }
 
+func (t *Transactor) StoreAndTrackPendingTx(from common.Address, symbol string, chainID uint64, multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) error {
+	if t.pendingTracker == nil {
+		return nil
+	}
+
+	pTx := createPendingTransaction(from, symbol, chainID, multiTransactionID, tx)
+	return t.pendingTracker.StoreAndTrackPendingTx(pTx)
+}
+
 func (t *Transactor) sendTransaction(rpcWrapper *rpcWrapper, from common.Address, symbol string,
 	multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) (hash types.Hash, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
@@ -211,14 +221,9 @@ func (t *Transactor) sendTransaction(rpcWrapper *rpcWrapper, from common.Address
 		return hash, err
 	}
 
-	if t.pendingTracker != nil {
-
-		tx := createPendingTransaction(from, symbol, rpcWrapper.chainID, multiTransactionID, tx)
-
-		err := t.pendingTracker.StoreAndTrackPendingTx(tx)
-		if err != nil {
-			return hash, err
-		}
+	err = t.StoreAndTrackPendingTx(from, symbol, rpcWrapper.chainID, multiTransactionID, tx)
+	if err != nil {
+		return hash, err
 	}
 
 	return types.Hash(tx.Hash()), nil

@@ -557,7 +557,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 				} else if trType.Byte == toTrType {
 					at := ReceiveAT
 					if fromAddress == ZeroAddress && transferType != nil {
-						if *transferType == TransferTypeErc721 || (*transferType == TransferTypeErc20 && methodHash.Valid && (communityMintEvent || sliceContains(inputDataMethods, methodHash.String))) {
+						if *transferType == TransferTypeErc721 || *transferType == TransferTypeErc1155 || (*transferType == TransferTypeErc20 && methodHash.Valid && (communityMintEvent || sliceContains(inputDataMethods, methodHash.String))) {
 							at = MintAT
 						}
 					}
@@ -776,6 +776,8 @@ func contractTypeFromDBType(dbType string) (transferType *TransferType) {
 		*transferType = TransferTypeErc20
 	case common.Erc721Transfer:
 		*transferType = TransferTypeErc721
+	case common.Erc1155Transfer:
+		*transferType = TransferTypeErc1155
 	default:
 		return nil
 	}

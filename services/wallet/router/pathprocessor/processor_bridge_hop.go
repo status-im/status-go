@@ -341,18 +341,26 @@ func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, sig
 
 	switch contractType {
 	case hop.CctpL1Bridge:
-		return h.sendCctpL1BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
+		tx, err = h.sendCctpL1BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
 	case hop.L1Bridge:
-		return h.sendL1BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, token, bonderFee)
+		tx, err = h.sendL1BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, token, bonderFee)
 	case hop.L2AmmWrapper:
-		return h.sendL2AmmWrapperTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
+		tx, err = h.sendL2AmmWrapperTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
 	case hop.CctpL2Bridge:
-		return h.sendCctpL2BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
+		tx, err = h.sendCctpL2BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
 	case hop.L2Bridge:
-		return h.sendL2BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
+		tx, err = h.sendL2BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
+	default:
+		return tx, ErrContractTypeNotSupported
 	}
-
-	return tx, ErrContractTypeNotSupported
+	if err != nil {
+		return tx, statusErrors.CreateErrorResponseFromError(err)
+	}
+	err = h.transactor.StoreAndTrackPendingTx(txOpts.From, sendArgs.HopTx.Symbol, sendArgs.ChainID, sendArgs.HopTx.MultiTransactionID, tx)
+	if err != nil {
+		return tx, statusErrors.CreateErrorResponseFromError(err)
+	}
+	return tx, nil
 }
 
 func (h *HopBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {

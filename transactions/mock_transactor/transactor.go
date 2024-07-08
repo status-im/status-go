@@ -162,6 +162,20 @@ func (mr *MockTransactorIfaceMockRecorder) SendTransactionWithSignature(from, sy
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendTransactionWithSignature", reflect.TypeOf((*MockTransactorIface)(nil).SendTransactionWithSignature), from, symbol, multiTransactionID, tx)
 }
 
+// StoreAndTrackPendingTx mocks base method.
+func (m *MockTransactorIface) StoreAndTrackPendingTx(from common.Address, symbol string, chainID uint64, multiTransactionID common0.MultiTransactionIDType, tx *types.Transaction) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StoreAndTrackPendingTx", from, symbol, chainID, multiTransactionID, tx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StoreAndTrackPendingTx indicates an expected call of StoreAndTrackPendingTx.
+func (mr *MockTransactorIfaceMockRecorder) StoreAndTrackPendingTx(from, symbol, chainID, multiTransactionID, tx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreAndTrackPendingTx", reflect.TypeOf((*MockTransactorIface)(nil).StoreAndTrackPendingTx), from, symbol, chainID, multiTransactionID, tx)
+}
+
 // ValidateAndBuildTransaction mocks base method.
 func (m *MockTransactorIface) ValidateAndBuildTransaction(chainID uint64, sendArgs transactions.SendTxArgs) (*types.Transaction, error) {
 	m.ctrl.T.Helper()

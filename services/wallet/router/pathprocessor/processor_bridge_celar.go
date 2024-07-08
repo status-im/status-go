@@ -344,9 +344,10 @@ func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, s
 		return nil, statusErrors.CreateErrorResponseFromError(err)
 	}
 
+	var tx *ethTypes.Transaction
 	txOpts := sendArgs.CbridgeTx.ToTransactOpts(signerFn)
 	if token.IsNative() {
-		return contract.SendNative(
+		tx, err = contract.SendNative(
 			txOpts,
 			sendArgs.CbridgeTx.Recipient,
 			(*big.Int)(sendArgs.CbridgeTx.Amount),
@@ -354,17 +355,25 @@ func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, s
 			uint64(time.Now().UnixMilli()),
 			maxSlippage,
 		)
+	} else {
+		tx, err = contract.Send(
+			txOpts,
+			sendArgs.CbridgeTx.Recipient,
+			token.Address,
+			(*big.Int)(sendArgs.CbridgeTx.Amount),
+			sendArgs.CbridgeTx.ChainID,
+			uint64(time.Now().UnixMilli()),
+			maxSlippage,
+		)
 	}
-
-	return contract.Send(
-		txOpts,
-		sendArgs.CbridgeTx.Recipient,
-		token.Address,
-		(*big.Int)(sendArgs.CbridgeTx.Amount),
-		sendArgs.CbridgeTx.ChainID,
-		uint64(time.Now().UnixMilli()),
-		maxSlippage,
-	)
+	if err != nil {
+		return tx, statusErrors.CreateErrorResponseFromError(err)
+	}
+	err = s.transactor.StoreAndTrackPendingTx(txOpts.From, sendArgs.CbridgeTx.Symbol, sendArgs.ChainID, sendArgs.CbridgeTx.MultiTransactionID, tx)
+	if err != nil {
+		return tx, statusErrors.CreateErrorResponseFromError(err)
+	}
+	return tx, nil
 }
 
 func (s *CelerBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
