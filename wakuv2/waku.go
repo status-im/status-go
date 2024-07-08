@@ -1373,7 +1373,7 @@ func (w *Waku) Start() error {
 		}
 	}
 
-	w.wg.Add(3)
+	w.wg.Add(2)
 
 	go func() {
 		defer w.wg.Done()
@@ -1441,7 +1441,11 @@ func (w *Waku) Start() error {
 	//TODO: commenting for now so that only fleet nodes are used.
 	//Need to uncomment once filter peer scoring etc is implemented.
 	go w.runPeerExchangeLoop()
-	go w.checkForMissingMessages()
+
+	if w.cfg.EnableMissingMessageVerification {
+		w.wg.Add(1)
+		go w.checkForMissingMessages()
+	}
 
 	if w.cfg.LightClient {
 		// Create FilterManager that will main peer connectivity
