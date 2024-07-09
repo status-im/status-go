@@ -152,7 +152,7 @@ func TestClient_ProcessSentEnvelope(t *testing.T) {
 }
 
 var (
-	testENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.shards.nodes.status.im"
+	testENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.status.nodes.status.im"
 )
 
 func TestTelemetryUponPublishError(t *testing.T) {
