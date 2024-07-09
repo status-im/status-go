@@ -331,6 +331,7 @@ func (c *Client) CallContext(ctx context.Context, result interface{}, chainID ui
 		return c.callMethod(ctx, result, chainID, handler, args...)
 	}
 
+	log.Info("eth RPC call", "result", result, "method", method, "chainID", chainID, "args", args)
 	return c.CallContextIgnoringLocalHandlers(ctx, result, chainID, method, args...)
 }
 
