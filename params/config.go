@@ -217,6 +217,9 @@ type WakuV2Config struct {
 
 	// UseShardAsDefaultTopic indicates whether the default shard should be used instead of the default relay topic
 	UseShardAsDefaultTopic bool
+
+	// EnableMissingMessageVerification indicates whether the storenodes must be queried periodically to retrieve any missing message
+	EnableMissingMessageVerification bool
 }
 
 // ----------

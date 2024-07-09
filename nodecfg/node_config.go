@@ -203,7 +203,7 @@ func insertTorrentConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
-func insertWakuV2Config(tx *sql.Tx, c *params.NodeConfig) error {
+func insertWakuV2ConfigPreMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO wakuv2_config (
 		enabled, host, port, keep_alive_interval, light_client, full_node, discovery_limit, data_dir,
@@ -234,24 +234,19 @@ func setWakuV2CustomNodes(tx *sql.Tx, customNodes map[string]string) error {
 	return nil
 }
 
-func insertWakuV2StoreConfig(tx *sql.Tx, c *params.NodeConfig) error {
+func insertWakuV2ConfigPostMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	UPDATE wakuv2_config
-	SET enable_store = ?, store_capacity = ?, store_seconds = ?
+	SET enable_store = ?,
+		store_capacity = ?,
+		store_seconds = ?,
+		use_shard_default_topic = ?,
+		enable_missing_message_verification = ?
 	WHERE synthetic_id = 'id'`,
 		c.WakuV2Config.EnableStore, c.WakuV2Config.StoreCapacity, c.WakuV2Config.StoreSeconds,
+		c.WakuV2Config.UseShardAsDefaultTopic, c.WakuV2Config.EnableMissingMessageVerification,
 	)
 
-	return err
-}
-
-func insertWakuV2ShardConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	_, err := tx.Exec(`
-	UPDATE wakuv2_config
-	SET use_shard_default_topic = ?
-	WHERE synthetic_id = 'id'`,
-		c.WakuV2Config.UseShardAsDefaultTopic,
-	)
 	if err != nil {
 		return err
 	}
@@ -266,7 +261,7 @@ func insertWakuV2ShardConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
-func insertWakuConfig(tx *sql.Tx, c *params.NodeConfig) error {
+func insertWakuV1Config(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO waku_config (
 		enabled, light_client, full_node, enable_mailserver, data_dir, minimum_pow, mailserver_password, mailserver_rate_limit, mailserver_data_retention,
@@ -351,8 +346,8 @@ func nodeConfigUpgradeInserts() []insertFn {
 		insertRequireTopics,
 		insertPushNotificationsServerConfig,
 		insertShhExtConfig,
-		insertWakuConfig,
-		insertWakuV2Config,
+		insertWakuV1Config,
+		insertWakuV2ConfigPreMigration,
 	}
 }
 
@@ -375,11 +370,10 @@ func nodeConfigNormalInserts() []insertFn {
 		insertRequireTopics,
 		insertPushNotificationsServerConfig,
 		insertShhExtConfig,
-		insertWakuConfig,
-		insertWakuV2Config,
+		insertWakuV1Config,
+		insertWakuV2ConfigPreMigration,
 		insertTorrentConfig,
-		insertWakuV2StoreConfig,
-		insertWakuV2ShardConfig,
+		insertWakuV2ConfigPostMigration,
 	}
 }
 
@@ -684,13 +678,14 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	err = tx.QueryRow(`
 	SELECT enabled, host, port, keep_alive_interval, light_client, full_node, discovery_limit, data_dir,
 	max_message_size, enable_confirmations, peer_exchange, enable_discv5, udp_port, auto_update,
-	enable_store, store_capacity, store_seconds, use_shard_default_topic
+	enable_store, store_capacity, store_seconds, use_shard_default_topic, enable_missing_message_verification
 	FROM wakuv2_config WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.WakuV2Config.Enabled, &nodecfg.WakuV2Config.Host, &nodecfg.WakuV2Config.Port, &nodecfg.WakuV2Config.KeepAliveInterval, &nodecfg.WakuV2Config.LightClient, &nodecfg.WakuV2Config.FullNode,
 		&nodecfg.WakuV2Config.DiscoveryLimit, &nodecfg.WakuV2Config.DataDir, &nodecfg.WakuV2Config.MaxMessageSize, &nodecfg.WakuV2Config.EnableConfirmations,
 		&nodecfg.WakuV2Config.PeerExchange, &nodecfg.WakuV2Config.EnableDiscV5, &nodecfg.WakuV2Config.UDPPort, &nodecfg.WakuV2Config.AutoUpdate,
 		&nodecfg.WakuV2Config.EnableStore, &nodecfg.WakuV2Config.StoreCapacity, &nodecfg.WakuV2Config.StoreSeconds, &nodecfg.WakuV2Config.UseShardAsDefaultTopic,
+		&nodecfg.WakuV2Config.EnableMissingMessageVerification,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
