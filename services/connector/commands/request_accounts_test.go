@@ -15,13 +15,14 @@ import (
 )
 
 func TestFailToRequestAccountsWithMissingDAppFields(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	cmd := &RequestAccountsCommand{AccountsCommand: AccountsCommand{Db: db}}
 
 	// Missing DApp fields
-	request := constructRPCRequest("eth_requestAccounts", []interface{}{}, nil)
+	request, err := ConstructRPCRequest("eth_requestAccounts", []interface{}{}, nil)
+	assert.NoError(t, err)
 
 	result, err := cmd.Execute(request)
 	assert.Equal(t, ErrRequestMissingDAppData, err)
@@ -29,7 +30,7 @@ func TestFailToRequestAccountsWithMissingDAppFields(t *testing.T) {
 }
 
 func TestRequestAccountsWithSignalTimout(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	clientHandler := NewClientSideHandler()
@@ -39,7 +40,7 @@ func TestRequestAccountsWithSignalTimout(t *testing.T) {
 		AccountsCommand: AccountsCommand{Db: db},
 	}
 
-	request, err := prepareSendRequest(testDAppData, types.Address{0x01})
+	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x01})
 	assert.NoError(t, err)
 
 	backupWalletResponseMaxInterval := WalletResponseMaxInterval
@@ -51,7 +52,7 @@ func TestRequestAccountsWithSignalTimout(t *testing.T) {
 }
 
 func TestRequestAccountsTwoTimes(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	nm := NetworkManagerMock{}
@@ -74,7 +75,8 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 		AccountsCommand: AccountsCommand{Db: db},
 	}
 
-	request := constructRPCRequest("eth_requestAccounts", []interface{}{}, &testDAppData)
+	request, err := ConstructRPCRequest("eth_requestAccounts", []interface{}{}, &testDAppData)
+	assert.NoError(t, err)
 
 	accountAddress := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
 

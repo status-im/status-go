@@ -11,8 +11,9 @@ import (
 
 // errors
 var (
-	ErrNoActiveNetworks   = errors.New("no active networks")
-	ErrUnsupportedNetwork = errors.New("unsupported network")
+	ErrNoActiveNetworks     = errors.New("no active networks")
+	ErrUnsupportedNetwork   = errors.New("unsupported network")
+	ErrNoChainIDParamsFound = errors.New("no chain id in params found")
 )
 
 type SwitchEthereumChainCommand struct {
@@ -25,11 +26,18 @@ func (r *RPCRequest) getChainID() (uint64, error) {
 		return 0, ErrEmptyRPCParams
 	}
 
-	value, ok := r.Params[0].(uint64)
-	if !ok {
-		return 0, ErrNoChainIDInParams
+	switch v := r.Params[0].(type) {
+	case float64:
+		return uint64(v), nil
+	case int:
+		return uint64(v), nil
+	case int64:
+		return uint64(v), nil
+	case uint64:
+		return v, nil
+	default:
+		return 0, ErrNoChainIDParamsFound
 	}
-	return value, nil
 }
 
 func (c *SwitchEthereumChainCommand) getSupportedChainIDs() ([]uint64, error) {

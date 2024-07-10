@@ -1,9 +1,6 @@
 package connector
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/status-im/status-go/services/connector/commands"
 	persistence "github.com/status-im/status-go/services/connector/database"
 )
@@ -16,28 +13,26 @@ type API struct {
 
 func NewAPI(s *Service) *API {
 	r := NewCommandRegistry()
-
 	c := commands.NewClientSideHandler()
 
 	r.Register("eth_sendTransaction", &commands.SendTransactionCommand{
 		Db:            s.db,
 		ClientHandler: c,
 	})
-	r.Register("eth_sign", &commands.SignCommand{})
 
 	// Accounts querry and dapp permissions
 	r.Register("eth_accounts", &commands.AccountsCommand{Db: s.db})
 	r.Register("eth_requestAccounts", &commands.RequestAccountsCommand{
 		ClientHandler:   c,
 		AccountsCommand: commands.AccountsCommand{Db: s.db},
-		NetworkManager:  s.rpcClient.NetworkManager,
+		NetworkManager:  s.nm,
 	})
 
 	// Active chain per dapp management
 	r.Register("eth_chainId", &commands.ChainIDCommand{Db: s.db})
 	r.Register("wallet_switchEthereumChain", &commands.SwitchEthereumChainCommand{
 		Db:             s.db,
-		NetworkManager: s.rpcClient.NetworkManager,
+		NetworkManager: s.nm,
 	})
 
 	return &API{
@@ -48,18 +43,16 @@ func NewAPI(s *Service) *API {
 }
 
 func (api *API) CallRPC(inputJSON string) (string, error) {
-	var request commands.RPCRequest
-
-	err := json.Unmarshal([]byte(inputJSON), &request)
+	request, err := commands.RPCRequestFromJSON(inputJSON)
 	if err != nil {
-		return "", fmt.Errorf("error unmarshalling JSON: %v", err)
+		return "", err
 	}
 
 	if command, exists := api.r.GetCommand(request.Method); exists {
 		return command.Execute(request)
 	}
 
-	return api.s.rpcClient.CallRaw(inputJSON), nil
+	return api.s.rpc.CallRaw(inputJSON), nil
 }
 
 func (api *API) RecallDAppPermission(origin string) error {

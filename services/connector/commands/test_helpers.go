@@ -3,10 +3,15 @@ package commands
 import (
 	"database/sql"
 	"encoding/json"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	persistence "github.com/status-im/status-go/services/connector/database"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 var testDAppData = DAppData{
@@ -44,7 +49,15 @@ func (nm *NetworkManagerMock) SetNetworks(networks []*params.Network) {
 	nm.networks = networks
 }
 
-func persistDAppData(db *sql.DB, dAppData DAppData, sharedAccount types.Address, chainID uint64) error {
+func SetupTestDB(t *testing.T) (db *sql.DB, close func()) {
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+	return db, func() {
+		require.NoError(t, db.Close())
+	}
+}
+
+func PersistDAppData(db *sql.DB, dAppData DAppData, sharedAccount types.Address, chainID uint64) error {
 	dApp := persistence.DApp{
 		URL:           dAppData.Origin,
 		Name:          dAppData.Name,
@@ -56,7 +69,7 @@ func persistDAppData(db *sql.DB, dAppData DAppData, sharedAccount types.Address,
 	return persistence.UpsertDApp(db, &dApp)
 }
 
-func constructRPCRequest(method string, params []interface{}, dAppData *DAppData) RPCRequest {
+func ConstructRPCRequest(method string, params []interface{}, dAppData *DAppData) (RPCRequest, error) {
 	request := RPCRequest{
 		JSONRPC: "2.0",
 		ID:      1,
@@ -70,5 +83,5 @@ func constructRPCRequest(method string, params []interface{}, dAppData *DAppData
 		request.DAppIconUrl = dAppData.IconUrl
 	}
 
-	return request
+	return request, nil
 }

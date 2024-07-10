@@ -11,13 +11,14 @@ import (
 )
 
 func TestFailToSwitchEthereumChainWithMissingDAppFields(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	cmd := &SwitchEthereumChainCommand{Db: db}
 
 	// Missing DApp fields
-	request := constructRPCRequest("wallet_switchEthereumChain", []interface{}{}, nil)
+	request, err := ConstructRPCRequest("wallet_switchEthereumChain", []interface{}{}, nil)
+	assert.NoError(t, err)
 
 	result, err := cmd.Execute(request)
 	assert.Equal(t, ErrRequestMissingDAppData, err)
@@ -25,19 +26,20 @@ func TestFailToSwitchEthereumChainWithMissingDAppFields(t *testing.T) {
 }
 
 func TestFailToSwitchEthereumChainWithNoChainId(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	cmd := &SwitchEthereumChainCommand{Db: db}
 
-	request := constructRPCRequest("wallet_switchEthereumChain", []interface{}{}, &testDAppData)
+	request, err := ConstructRPCRequest("wallet_switchEthereumChain", []interface{}{}, &testDAppData)
+	assert.NoError(t, err)
 
-	_, err := cmd.Execute(request)
+	_, err = cmd.Execute(request)
 	assert.Equal(t, ErrEmptyRPCParams, err)
 }
 
 func TestFailToSwitchEthereumChainWithUnsupportedChainId(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	nm := NetworkManagerMock{}
@@ -55,14 +57,15 @@ func TestFailToSwitchEthereumChainWithUnsupportedChainId(t *testing.T) {
 	params := make([]interface{}, 1)
 	params[0] = walletCommon.BinanceTestChainID // some unrecoginzed chain id
 
-	request := constructRPCRequest("wallet_switchEthereumChain", params, &testDAppData)
+	request, err := ConstructRPCRequest("wallet_switchEthereumChain", params, &testDAppData)
+	assert.NoError(t, err)
 
-	_, err := cmd.Execute(request)
+	_, err = cmd.Execute(request)
 	assert.Equal(t, ErrUnsupportedNetwork, err)
 }
 
 func TestSwitchEthereumChain(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	nm := NetworkManagerMock{}
@@ -83,9 +86,10 @@ func TestSwitchEthereumChain(t *testing.T) {
 	params := make([]interface{}, 1)
 	params[0] = walletCommon.EthereumMainnet
 
-	request := constructRPCRequest("wallet_switchEthereumChain", params, &testDAppData)
+	request, err := ConstructRPCRequest("wallet_switchEthereumChain", params, &testDAppData)
+	assert.NoError(t, err)
 
-	err := persistDAppData(db, testDAppData, types.HexToAddress("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"), walletCommon.EthereumMainnet)
+	err = PersistDAppData(db, testDAppData, types.HexToAddress("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"), walletCommon.EthereumMainnet)
 	assert.NoError(t, err)
 
 	response, err := cmd.Execute(request)

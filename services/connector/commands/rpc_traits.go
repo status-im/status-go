@@ -1,7 +1,9 @@
 package commands
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
@@ -13,7 +15,6 @@ var (
 	ErrRequestMissingDAppData   = errors.New("request missing dApp data")
 	ErrDAppIsNotPermittedByUser = errors.New("dApp is not permitted by user")
 	ErrEmptyRPCParams           = errors.New("empty rpc params")
-	ErrNoChainIDInParams        = errors.New("no chain id in params")
 )
 
 type RPCRequest struct {
@@ -60,6 +61,16 @@ type NetworkManagerInterface interface {
 
 type RPCClientInterface interface {
 	CallRaw(body string) string
+}
+
+func RPCRequestFromJSON(inputJSON string) (RPCRequest, error) {
+	var request RPCRequest
+
+	err := json.Unmarshal([]byte(inputJSON), &request)
+	if err != nil {
+		return RPCRequest{}, fmt.Errorf("error unmarshalling JSON: %v", err)
+	}
+	return request, nil
 }
 
 func (r *RPCRequest) Validate() error {

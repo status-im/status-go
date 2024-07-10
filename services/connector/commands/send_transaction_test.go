@@ -13,32 +13,38 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-func prepareSendRequest(dApp DAppData, from types.Address) (RPCRequest, error) {
+func prepareSendTransactionRequest(dApp DAppData, from types.Address) (RPCRequest, error) {
 	sendArgs := transactions.SendTxArgs{
 		From:  from,
 		To:    &types.Address{0x02},
 		Value: &hexutil.Big{},
 		Data:  types.HexBytes("0x0"),
 	}
+
 	sendArgsJSON, err := json.Marshal(sendArgs)
 	if err != nil {
 		return RPCRequest{}, err
 	}
 
-	params := make([]interface{}, 1)
-	params[0] = string(sendArgsJSON)
+	var sendArgsMap map[string]interface{}
+	err = json.Unmarshal(sendArgsJSON, &sendArgsMap)
+	if err != nil {
+		return RPCRequest{}, err
+	}
 
-	return constructRPCRequest("eth_sendTransaction", params, &dApp), nil
+	params := []interface{}{sendArgsMap}
+
+	return ConstructRPCRequest("eth_sendTransaction", params, &dApp)
 }
 
 func TestFailToSendTransactionWithoutPermittedDApp(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	cmd := &SendTransactionCommand{Db: db}
 
 	// Don't save dApp in the database
-	request, err := prepareSendRequest(testDAppData, types.Address{0x1})
+	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x1})
 	assert.NoError(t, err)
 
 	_, err = cmd.Execute(request)
@@ -46,15 +52,15 @@ func TestFailToSendTransactionWithoutPermittedDApp(t *testing.T) {
 }
 
 func TestFailToSendTransactionWithWrongAddress(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	cmd := &SendTransactionCommand{Db: db}
 
-	err := persistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
+	err := PersistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
 	assert.NoError(t, err)
 
-	request, err := prepareSendRequest(testDAppData, types.Address{0x02})
+	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x02})
 	assert.NoError(t, err)
 
 	_, err = cmd.Execute(request)
@@ -62,7 +68,7 @@ func TestFailToSendTransactionWithWrongAddress(t *testing.T) {
 }
 
 func TestSendTransactionWithSignalTimout(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	clientHandler := NewClientSideHandler()
@@ -72,10 +78,10 @@ func TestSendTransactionWithSignalTimout(t *testing.T) {
 		ClientHandler: clientHandler,
 	}
 
-	err := persistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
+	err := PersistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
 	assert.NoError(t, err)
 
-	request, err := prepareSendRequest(testDAppData, types.Address{0x01})
+	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x01})
 	assert.NoError(t, err)
 
 	backupWalletResponseMaxInterval := WalletResponseMaxInterval
@@ -87,7 +93,7 @@ func TestSendTransactionWithSignalTimout(t *testing.T) {
 }
 
 func TestSendTransactionWithSignalSucceed(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	fakedTransactionHash := types.Hash{0x051}
@@ -99,10 +105,10 @@ func TestSendTransactionWithSignalSucceed(t *testing.T) {
 		ClientHandler: clientHandler,
 	}
 
-	err := persistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
+	err := PersistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
 	assert.NoError(t, err)
 
-	request, err := prepareSendRequest(testDAppData, types.Address{0x01})
+	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x01})
 	assert.NoError(t, err)
 
 	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {

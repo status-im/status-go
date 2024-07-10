@@ -4,14 +4,15 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/transactions"
 )
 
 var (
-	ErrNoSendTransactionParams      = errors.New("no send transaction params")
 	ErrParamsFromAddressIsNotShared = errors.New("from parameter address is not dApp's shared account")
+	ErrNoTransactionParamsFound     = errors.New("no transaction in params found")
 )
 
 type SendTransactionCommand struct {
@@ -24,18 +25,23 @@ func (r *RPCRequest) getSendTransactionParams() (*transactions.SendTxArgs, error
 		return nil, ErrEmptyRPCParams
 	}
 
-	paramsRaw, ok := r.Params[0].(string)
+	paramMap, ok := r.Params[0].(map[string]interface{})
 	if !ok {
-		return nil, ErrNoSendTransactionParams
+		return nil, ErrNoTransactionParamsFound
 	}
 
-	params := &transactions.SendTxArgs{}
-	err := json.Unmarshal([]byte(paramsRaw), params)
+	paramBytes, err := json.Marshal(paramMap)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error marshalling first transaction param: %v", err)
 	}
 
-	return params, nil
+	var sendTxArgs transactions.SendTxArgs
+	err = json.Unmarshal(paramBytes, &sendTxArgs)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshalling first transaction param to SendTxArgs: %v", err)
+	}
+
+	return &sendTxArgs, nil
 }
 
 func (c *SendTransactionCommand) Execute(request RPCRequest) (string, error) {

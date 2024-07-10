@@ -10,13 +10,14 @@ import (
 )
 
 func TestFailToGetChainIdWithMissingDAppFields(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	cmd := &ChainIDCommand{Db: db}
 
 	// Missing DApp fields
-	request := constructRPCRequest("eth_chainId", []interface{}{}, nil)
+	request, err := ConstructRPCRequest("eth_chainId", []interface{}{}, nil)
+	assert.NoError(t, err)
 
 	result, err := cmd.Execute(request)
 	assert.Equal(t, ErrRequestMissingDAppData, err)
@@ -24,12 +25,13 @@ func TestFailToGetChainIdWithMissingDAppFields(t *testing.T) {
 }
 
 func TestFailToGetChainIdForUnpermittedDApp(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	cmd := &ChainIDCommand{Db: db}
 
-	request := constructRPCRequest("eth_chainId", []interface{}{}, &testDAppData)
+	request, err := ConstructRPCRequest("eth_chainId", []interface{}{}, &testDAppData)
+	assert.NoError(t, err)
 
 	result, err := cmd.Execute(request)
 	assert.Equal(t, ErrDAppIsNotPermittedByUser, err)
@@ -37,7 +39,7 @@ func TestFailToGetChainIdForUnpermittedDApp(t *testing.T) {
 }
 
 func TestGetChainIdForPermittedDApp(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	cmd := &ChainIDCommand{Db: db}
@@ -45,10 +47,11 @@ func TestGetChainIdForPermittedDApp(t *testing.T) {
 	sharedAccount := types.HexToAddress("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg")
 	chainID := uint64(0x123)
 
-	err := persistDAppData(db, testDAppData, sharedAccount, chainID)
+	err := PersistDAppData(db, testDAppData, sharedAccount, chainID)
 	assert.NoError(t, err)
 
-	request := constructRPCRequest("eth_chainId", []interface{}{}, &testDAppData)
+	request, err := ConstructRPCRequest("eth_chainId", []interface{}{}, &testDAppData)
+	assert.NoError(t, err)
 
 	response, err := cmd.Execute(request)
 	assert.NoError(t, err)
