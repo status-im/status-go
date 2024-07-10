@@ -302,6 +302,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		opts = append(opts, node.WithWakuFilterLightNode())
 		waku.defaultShardInfo = shards[0]
 		opts = append(opts, node.WithMaxPeerConnections(cfg.DiscoveryLimit))
+		cfg.EnableStoreConfirmationForMessagesSent = false
 	} else {
 		relayOpts := []pubsub.Option{
 			pubsub.WithMaxMessageSize(int(waku.cfg.MaxMessageSize)),
@@ -314,6 +315,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		opts = append(opts, node.WithWakuRelayAndMinPeers(waku.cfg.MinPeersForRelay, relayOpts...))
 		opts = append(opts, node.WithMaxPeerConnections(maxRelayPeers))
 		cfg.EnablePeerExchangeClient = true //Enabling this until discv5 issues are resolved. This will enable more peers to be connected for relay mesh.
+		cfg.EnableStoreConfirmationForMessagesSent = true
 	}
 
 	if cfg.EnableStore {
@@ -1045,7 +1047,9 @@ func (w *Waku) broadcast() {
 func (w *Waku) checkIfMessagesStored() {
 	ticker := time.NewTicker(hashQueryInterval)
 	defer ticker.Stop()
-
+	if !w.cfg.EnableStoreConfirmationForMessagesSent {
+		return
+	}
 	for {
 		select {
 		case <-w.ctx.Done():
@@ -1108,6 +1112,9 @@ func (w *Waku) checkIfMessagesStored() {
 }
 
 func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
+	if !w.cfg.EnableStoreConfirmationForMessagesSent {
+		return
+	}
 	w.sendMsgIDsMu.Lock()
 	defer w.sendMsgIDsMu.Unlock()
 	for pubsubTopic, subMsgs := range w.sendMsgIDs {
@@ -1137,6 +1144,14 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publishFn,
 			Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
 			Event: common.EventEnvelopeExpired,
 		})
+		return
+	} else {
+		if !w.cfg.EnableStoreConfirmationForMessagesSent {
+			w.SendEnvelopeEvent(common.EnvelopeEvent{
+				Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
+				Event: common.EventEnvelopeSent,
+			})
+		}
 	}
 }
 
@@ -1611,7 +1626,7 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 	}
 
 	ephemeral := e.Envelope.Message().Ephemeral
-	if e.MsgType == common.SendMessageType && (ephemeral == nil || !*ephemeral) {
+	if w.cfg.EnableStoreConfirmationForMessagesSent && e.MsgType == common.SendMessageType && (ephemeral == nil || !*ephemeral) {
 		w.sendMsgIDsMu.Lock()
 		subMsgs, ok := w.sendMsgIDs[e.PubsubTopic]
 		if !ok {
