@@ -269,14 +269,13 @@ func (interceptor EnvelopeEventsInterceptor) EnvelopeSent(identifiers [][]byte) 
 			message, err := interceptor.Messenger.MessageByID(messageID)
 			if err != nil {
 				interceptor.Messenger.logger.Error("failed to query message outgoing status", zap.Error(err))
-			} else {
-				if message.OutgoingStatus == common.OutgoingStatusDelivered {
-					// We don't want to send the signal if the message was already marked as delivered
-					continue
-				} else {
-					signalIDs = append(signalIDs, identifierBytes)
-				}
+				continue
 			}
+			if message.OutgoingStatus == common.OutgoingStatusDelivered {
+				// We don't want to send the signal if the message was already marked as delivered
+				continue
+			}
+			signalIDs = append(signalIDs, identifierBytes)
 		}
 		interceptor.EnvelopeEventsHandler.EnvelopeSent(signalIDs)
 	} else {
