@@ -217,6 +217,9 @@ type WakuV2Config struct {
 
 	// EnableMissingMessageVerification indicates whether the storenodes must be queried periodically to retrieve any missing message
 	EnableMissingMessageVerification bool
+
+	// EnableMissingMessageVerification indicates whether storenodes must be queried periodically to confirm if messages sent are actually propagated in the network
+	EnableStoreConfirmationForMessagesSent bool
 }
 
 // ----------

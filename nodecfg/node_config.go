@@ -241,10 +241,12 @@ func insertWakuV2ConfigPostMigration(tx *sql.Tx, c *params.NodeConfig) error {
 		store_capacity = ?,
 		store_seconds = ?,
 		use_shard_default_topic = ?,
-		enable_missing_message_verification = ?
+		enable_missing_message_verification = ?,
+		enable_store_confirmation_for_messages_sent = ?
 	WHERE synthetic_id = 'id'`,
 		c.WakuV2Config.EnableStore, c.WakuV2Config.StoreCapacity, c.WakuV2Config.StoreSeconds,
 		c.WakuV2Config.UseShardAsDefaultTopic, c.WakuV2Config.EnableMissingMessageVerification,
+		c.WakuV2Config.EnableStoreConfirmationForMessagesSent,
 	)
 
 	if err != nil {
@@ -678,14 +680,15 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	err = tx.QueryRow(`
 	SELECT enabled, host, port, light_client, full_node, discovery_limit, data_dir,
 	max_message_size, enable_confirmations, peer_exchange, enable_discv5, udp_port, auto_update,
-	enable_store, store_capacity, store_seconds, use_shard_default_topic, enable_missing_message_verification
+	enable_store, store_capacity, store_seconds, use_shard_default_topic, enable_missing_message_verification,
+	enable_store_confirmation_for_messages_sent
 	FROM wakuv2_config WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.WakuV2Config.Enabled, &nodecfg.WakuV2Config.Host, &nodecfg.WakuV2Config.Port, &nodecfg.WakuV2Config.LightClient, &nodecfg.WakuV2Config.FullNode,
 		&nodecfg.WakuV2Config.DiscoveryLimit, &nodecfg.WakuV2Config.DataDir, &nodecfg.WakuV2Config.MaxMessageSize, &nodecfg.WakuV2Config.EnableConfirmations,
 		&nodecfg.WakuV2Config.PeerExchange, &nodecfg.WakuV2Config.EnableDiscV5, &nodecfg.WakuV2Config.UDPPort, &nodecfg.WakuV2Config.AutoUpdate,
 		&nodecfg.WakuV2Config.EnableStore, &nodecfg.WakuV2Config.StoreCapacity, &nodecfg.WakuV2Config.StoreSeconds, &nodecfg.WakuV2Config.UseShardAsDefaultTopic,
-		&nodecfg.WakuV2Config.EnableMissingMessageVerification,
+		&nodecfg.WakuV2Config.EnableMissingMessageVerification, &nodecfg.WakuV2Config.EnableStoreConfirmationForMessagesSent,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
