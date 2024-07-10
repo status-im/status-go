@@ -330,7 +330,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 
 	if !cfg.LightClient {
 		opts = append(opts, node.WithWakuFilterFullNode(filter.WithMaxSubscribers(20)))
-		opts = append(opts, node.WithLightPush())
+		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(1, 1)))
 	}
 
 	if appDB != nil {

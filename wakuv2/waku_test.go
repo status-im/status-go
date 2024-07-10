@@ -25,6 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
+	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
@@ -550,7 +551,11 @@ func TestWakuV2Store(t *testing.T) {
 }
 
 func waitForPeerConnection(t *testing.T, peerID string, peerCh chan []string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	waitForPeerConnectionWithTimeout(t, peerID, peerCh, 3*time.Second)
+}
+
+func waitForPeerConnectionWithTimeout(t *testing.T, peerID string, peerCh chan []string, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	for {
 		select {
@@ -675,5 +680,106 @@ func TestOnlineChecker(t *testing.T) {
 	require.False(t, lightNode.onlineChecker.IsOnline())
 
 	lightNode.filterManager.addFilter("test", &common.Filter{})
+
+}
+
+func TestLightpushRateLimit(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
+	config0 := &Config{}
+	setDefaultConfig(config0, false)
+	w0PeersCh := make(chan []string, 5) // buffered not to block on the send side
+
+	// Start the relayu node
+	w0, err := New(nil, "", config0, logger.Named("relayNode"), nil, nil, nil, func(cs types.ConnStatus) {
+		w0PeersCh <- maps.Keys(cs.Peers)
+	})
+	require.NoError(t, err)
+	require.NoError(t, w0.Start())
+	defer func() {
+		require.NoError(t, w0.Stop())
+		close(w0PeersCh)
+	}()
+
+	contentTopics := common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}})
+	filter := &common.Filter{
+		PubsubTopic:   config0.DefaultShardPubsubTopic,
+		Messages:      common.NewMemoryMessageStore(),
+		ContentTopics: contentTopics,
+	}
+
+	_, err = w0.Subscribe(filter)
+	require.NoError(t, err)
+
+	config1 := &Config{}
+	setDefaultConfig(config1, false)
+	w1PeersCh := make(chan []string, 5) // buffered not to block on the send side
+
+	// Start the full node
+	w1, err := New(nil, "", config1, logger.Named("fullNode"), nil, nil, nil, func(cs types.ConnStatus) {
+		w1PeersCh <- maps.Keys(cs.Peers)
+	})
+	require.NoError(t, err)
+	require.NoError(t, w1.Start())
+	defer func() {
+		require.NoError(t, w1.Stop())
+		close(w1PeersCh)
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	//Connect the relay peer and full node
+	err = w1.node.DialPeer(ctx, w0.node.ListenAddresses()[0].String())
+	require.NoError(t, err)
+
+	err = tt.RetryWithBackOff(func() error {
+		if len(w1.Peers()) == 0 {
+			return errors.New("no peers discovered")
+		}
+		return nil
+	})
+	require.NoError(t, err)
+
+	config2 := &Config{}
+	setDefaultConfig(config2, true)
+	w2PeersCh := make(chan []string, 5) // buffered not to block on the send side
+
+	// Start the light node
+	w2, err := New(nil, "", config2, logger.Named("lightNode"), nil, nil, nil, func(cs types.ConnStatus) {
+		w2PeersCh <- maps.Keys(cs.Peers)
+	})
+	require.NoError(t, err)
+	require.NoError(t, w2.Start())
+	defer func() {
+		require.NoError(t, w2.Stop())
+		close(w2PeersCh)
+	}()
+
+	//Use this instead of DialPeer to make sure the peer is added to PeerStore and can be selected for Lighpush
+	w2.node.AddDiscoveredPeer(w1.PeerID(), w1.node.ListenAddresses(), wps.Static, w1.cfg.DefaultShardedPubsubTopics, w1.node.ENR(), true)
+
+	waitForPeerConnectionWithTimeout(t, w2.node.ID(), w1PeersCh, 5*time.Second)
+
+	event := make(chan common.EnvelopeEvent, 10)
+	w2.SubscribeEnvelopeEvents(event)
+
+	for i := range [4]int{} {
+		msgTimestamp := w2.timestamp()
+		_, err := w2.Send(config2.DefaultShardPubsubTopic, &pb.WakuMessage{
+			Payload:      []byte{1, 2, 3, 4, 5, 6, byte(i)},
+			ContentTopic: maps.Keys(contentTopics)[0].ContentTopic(),
+			Version:      proto.Uint32(0),
+			Timestamp:    &msgTimestamp,
+		})
+
+		require.NoError(t, err)
+
+		time.Sleep(550 * time.Millisecond)
+
+	}
+
+	messages := filter.Retrieve()
+	require.Len(t, messages, 2)
 
 }
