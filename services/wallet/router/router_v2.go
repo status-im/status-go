@@ -133,9 +133,13 @@ type SuggestedRoutesV2 struct {
 	NativeChainTokenPrice float64
 }
 
-type ErrorResponseWithUUID struct {
-	Uuid          string
-	ErrorResponse error
+type SuggestedRoutesV2Response struct {
+	Uuid                  string                `json:"Uuid"`
+	Best                  []*PathV2             `json:"Best,omitempty"`
+	Candidates            []*PathV2             `json:"Candidates,omitempty"`
+	TokenPrice            *float64              `json:"TokenPrice,omitempty"`
+	NativeChainTokenPrice *float64              `json:"NativeChainTokenPrice,omitempty"`
+	ErrorResponse         *errors.ErrorResponse `json:"ErrorResponse,omitempty"`
 }
 
 type GraphV2 []*NodeV2
@@ -449,15 +453,23 @@ func (r *Router) SuggestedRoutesV2Async(input *RouteInputParams) {
 	r.scheduler.Enqueue(routerTask, func(ctx context.Context) (interface{}, error) {
 		return r.SuggestedRoutesV2(ctx, input)
 	}, func(result interface{}, taskType async.TaskType, err error) {
-		if err != nil {
-			errResponse := &ErrorResponseWithUUID{
-				Uuid:          input.Uuid,
-				ErrorResponse: errors.CreateErrorResponseFromError(err),
-			}
-			signal.SendWalletEvent(signal.SuggestedRoutes, errResponse)
-			return
+		routesResponse := SuggestedRoutesV2Response{
+			Uuid: input.Uuid,
 		}
-		signal.SendWalletEvent(signal.SuggestedRoutes, result)
+
+		if err != nil {
+			errorResponse := errors.CreateErrorResponseFromError(err)
+			routesResponse.ErrorResponse = errorResponse.(*errors.ErrorResponse)
+		}
+
+		if suggestedRoutes, ok := result.(*SuggestedRoutesV2); ok && suggestedRoutes != nil {
+			routesResponse.Best = suggestedRoutes.Best
+			routesResponse.Candidates = suggestedRoutes.Candidates
+			routesResponse.TokenPrice = &suggestedRoutes.TokenPrice
+			routesResponse.NativeChainTokenPrice = &suggestedRoutes.NativeChainTokenPrice
+		}
+
+		signal.SendWalletEvent(signal.SuggestedRoutes, routesResponse)
 	})
 }
 
