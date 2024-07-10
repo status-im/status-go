@@ -1050,11 +1050,12 @@ func (w *Waku) broadcast() {
 }
 
 func (w *Waku) checkIfMessagesStored() {
-	ticker := time.NewTicker(hashQueryInterval)
-	defer ticker.Stop()
 	if !w.cfg.EnableStoreConfirmationForMessagesSent {
 		return
 	}
+
+	ticker := time.NewTicker(hashQueryInterval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-w.ctx.Done():
