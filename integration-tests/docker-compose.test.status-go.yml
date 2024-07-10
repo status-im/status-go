@@ -21,6 +21,7 @@ services:
       retries: 120
 
   tests-rpc:
+    user: ${INTEGRATION_TESTS_DOCKER_UID}
     depends_on:
       status-go:
         condition: service_healthy
