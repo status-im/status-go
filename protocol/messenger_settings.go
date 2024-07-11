@@ -16,6 +16,20 @@ func (m *Messenger) SetStoreConfirmationForMessagesSent(request *requests.SetSto
 	return nodecfg.SetStoreConfirmationForMessagesSent(m.database, request.Enabled)
 }
 
+func (m *Messenger) SetSyncingOnMobileNetwork(request *requests.SetSyncingOnMobileNetwork) error {
+	if err := request.Validate(); err != nil {
+		return err
+	}
+	err := m.settings.SetSyncingOnMobileNetwork(request.Enabled)
+	if err != nil {
+		return err
+	}
+	if request.Enabled {
+		m.asyncRequestAllHistoricMessages()
+	}
+	return nil
+}
+
 func (m *Messenger) SetLogLevel(request *requests.SetLogLevel) error {
 	if err := request.Validate(); err != nil {
 		return err

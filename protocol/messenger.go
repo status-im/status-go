@@ -739,6 +739,8 @@ func (m *Messenger) ToForeground() {
 	if m.httpServer != nil {
 		m.httpServer.ToForeground()
 	}
+
+	m.asyncRequestAllHistoricMessages()
 }
 
 func (m *Messenger) ToBackground() {

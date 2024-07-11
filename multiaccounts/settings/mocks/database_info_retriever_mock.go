@@ -206,6 +206,14 @@ func (m *MockDatabaseSettingsManager) SetPeerSyncingEnabled(value bool) error {
 	return ret0
 }
 
+// SetSyncingOnMobileNetwork mocks base method.
+func (m *MockDatabaseSettingsManager) SetSyncingOnMobileNetwork(value bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetSyncingOnMobile", value)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
 // SetPeerSyncingEnabled indicates an expected call of SetPeerSyncingEnabled.
 func (mr *MockDatabaseSettingsManagerMockRecorder) SetPeerSyncingEnabled(value interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
