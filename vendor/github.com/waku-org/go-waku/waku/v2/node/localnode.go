@@ -338,6 +338,14 @@ func (w *WakuNode) setupENR(ctx context.Context, addrs []ma.Multiaddr) error {
 
 }
 
+func (w *WakuNode) SetRelayShards(rs protocol.RelayShards) error {
+	err := wenr.Update(w.log, w.localNode, wenr.WithWakuRelaySharding(rs))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (w *WakuNode) watchTopicShards(ctx context.Context) error {
 	evtRelaySubscribed, err := w.Relay().Events().Subscribe(new(relay.EvtRelaySubscribed))
 	if err != nil {

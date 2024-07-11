@@ -457,16 +457,25 @@ func (w *WakuNode) Start(ctx context.Context) error {
 	}
 
 	w.filterLightNode.SetHost(host)
+
+	err = w.setupENR(ctx, w.ListenAddresses())
+	if err != nil {
+		return err
+	}
+
 	if w.opts.enableFilterLightNode {
 		err := w.filterLightNode.Start(ctx)
 		if err != nil {
 			return err
 		}
-	}
-
-	err = w.setupENR(ctx, w.ListenAddresses())
-	if err != nil {
-		return err
+		//TODO: setting this up temporarily to improve connectivity success for lightNode in status.
+		//This will have to be removed or changed with community sharding will be implemented.
+		if w.opts.shards != nil {
+			err = w.SetRelayShards(*w.opts.shards)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	w.peerExchange.SetHost(host)

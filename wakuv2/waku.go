@@ -91,6 +91,7 @@ const messageExpiredPerid = 10 // in seconds
 const maxRelayPeers = 300
 const randomPeersKeepAliveInterval = 5 * time.Second
 const allPeersKeepAliveInterval = 5 * time.Minute
+const PeersToPublishForLightpush = 2
 
 type SentEnvelope struct {
 	Envelope      *protocol.Envelope
@@ -304,6 +305,8 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		waku.defaultShardInfo = shards[0]
 		opts = append(opts, node.WithMaxPeerConnections(cfg.DiscoveryLimit))
 		cfg.EnableStoreConfirmationForMessagesSent = false
+		//TODO: temporary work-around to improve lightClient connectivity, need to be removed once community sharding is implemented
+		opts = append(opts, node.WithPubSubTopics(cfg.DefaultShardedPubsubTopics))
 	} else {
 		relayOpts := []pubsub.Option{
 			pubsub.WithMaxMessageSize(int(waku.cfg.MaxMessageSize)),
@@ -1014,7 +1017,7 @@ func (w *Waku) broadcast() {
 				publishMethod = LightPush
 				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
 					logger.Info("publishing message via lightpush")
-					_, err := w.node.Lightpush().Publish(w.ctx, env.Message(), lightpush.WithPubSubTopic(env.PubsubTopic()))
+					_, err := w.node.Lightpush().Publish(w.ctx, env.Message(), lightpush.WithPubSubTopic(env.PubsubTopic()), lightpush.WithMaxPeers(PeersToPublishForLightpush))
 					return err
 				}
 			} else {
@@ -1050,11 +1053,12 @@ func (w *Waku) broadcast() {
 }
 
 func (w *Waku) checkIfMessagesStored() {
-	ticker := time.NewTicker(hashQueryInterval)
-	defer ticker.Stop()
 	if !w.cfg.EnableStoreConfirmationForMessagesSent {
 		return
 	}
+
+	ticker := time.NewTicker(hashQueryInterval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-w.ctx.Done():

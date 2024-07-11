@@ -12,6 +12,10 @@ func (m *Messenger) SetLightClient(request *requests.SetLightClient) error {
 	return nodecfg.SetLightClient(m.database, request.Enabled)
 }
 
+func (m *Messenger) SetStoreConfirmationForMessagesSent(request *requests.SetStoreConfirmationForMessagesSent) error {
+	return nodecfg.SetStoreConfirmationForMessagesSent(m.database, request.Enabled)
+}
+
 func (m *Messenger) SetLogLevel(request *requests.SetLogLevel) error {
 	if err := request.Validate(); err != nil {
 		return err

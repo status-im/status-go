@@ -49,8 +49,10 @@ type CreateAccount struct {
 	CustomizationColor string              `json:"customizationColor"`
 	Emoji              string              `json:"emoji"`
 
-	WakuV2Nameserver  *string `json:"wakuV2Nameserver"`
-	WakuV2LightClient bool    `json:"wakuV2LightClient"`
+	WakuV2Nameserver                             *string `json:"wakuV2Nameserver"`
+	WakuV2LightClient                            bool    `json:"wakuV2LightClient"`
+	WakuV2EnableStoreConfirmationForMessagesSent bool    `json:"wakuV2EnableStoreConfirmationForMessagesSent"`
+	WakuV2Fleet                                  string  `json:"wakuV2Fleet"`
 
 	LogLevel    *string `json:"logLevel"`
 	LogFilePath string  `json:"logFilePath"` // absolute path

@@ -1613,13 +1613,16 @@ func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, inp
 	settings.PreviewPrivacy = request.PreviewPrivacy
 	settings.CurrentNetwork = request.CurrentNetwork
 	settings.TestNetworksEnabled = request.TestNetworksEnabled
-
 	if !input.restoringAccount {
 		settings.Mnemonic = &input.mnemonic
 		settings.OmitTransfersHistoryScan = true
 		// TODO(rasom): uncomment it as soon as address will be properly
 		// marked as shown on mobile client
 		//settings.MnemonicWasNotShown = true
+	}
+
+	if request.WakuV2Fleet != "" {
+		settings.Fleet = &request.WakuV2Fleet
 	}
 
 	return settings, nil

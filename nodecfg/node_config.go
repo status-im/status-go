@@ -797,6 +797,11 @@ func SetLightClient(db *sql.DB, enabled bool) error {
 	return err
 }
 
+func SetStoreConfirmationForMessagesSent(db *sql.DB, enabled bool) error {
+	_, err := db.Exec(`UPDATE wakuv2_config SET enable_store_confirmation_for_messages_sent = ?`, enabled)
+	return err
+}
+
 func SetLogLevel(db *sql.DB, logLevel string) error {
 	_, err := db.Exec(`UPDATE log_config SET log_level = ?`, logLevel)
 	return err
