@@ -1985,7 +1985,7 @@ func (gs *GossipSubRouter) getPeers(topic string, count int, filter func(peer.ID
 	return peers
 }
 
-func (gs *GossipSubRouter) MeshPeers(topic string) []peer.ID {
+func (gs *GossipSubRouter) meshPeers(topic string) []peer.ID {
 	peers, ok := gs.mesh[topic]
 	if !ok {
 		return nil

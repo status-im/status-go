@@ -161,9 +161,6 @@ type WakuV2Config struct {
 	// Port number in which to start libp2p protocol (0 for random)
 	Port int
 
-	// Interval of time in seconds to send a ping to peers to keep the connection to them alive
-	KeepAliveInterval int
-
 	// LightClient should be true if the node will not relay messages and only rely on lightpush/filter nodes
 	LightClient bool
 

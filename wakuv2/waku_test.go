@@ -357,7 +357,6 @@ func TestWakuV2Filter(t *testing.T) {
 	setDefaultConfig(config, true)
 	config.EnablePeerExchangeClient = false
 	config.Port = 0
-	config.KeepAliveInterval = 0
 	config.MinPeersForFilter = 2
 
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
@@ -455,7 +454,6 @@ func TestWakuV2Store(t *testing.T) {
 		EnableStore:            false,
 		StoreCapacity:          100,
 		StoreSeconds:           3600,
-		KeepAliveInterval:      10,
 	}
 	w1PeersCh := make(chan []string, 100) // buffered not to block on the send side
 
@@ -482,7 +480,6 @@ func TestWakuV2Store(t *testing.T) {
 		EnableStore:            true,
 		StoreCapacity:          100,
 		StoreSeconds:           3600,
-		KeepAliveInterval:      10,
 	}
 
 	// Start the second Waku node
@@ -512,6 +509,8 @@ func TestWakuV2Store(t *testing.T) {
 
 	_, err = w2.Subscribe(filter)
 	require.NoError(t, err)
+
+	time.Sleep(2 * time.Second)
 
 	// Send a message from the first node
 	msgTimestamp := w1.CurrentTime().UnixNano()
@@ -654,7 +653,7 @@ func TestOnlineChecker(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		<-w.connectionChanged
+		<-w.goingOnline
 		require.True(t, true)
 	}()
 
