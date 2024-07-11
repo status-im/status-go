@@ -831,7 +831,7 @@ func (ids *idService) consumeMessage(mes *pb.Identify, c network.Conn, isPush bo
 	ids.Host.Peerstore().UpdateAddrs(p, peerstore.TempAddrTTL, 0)
 	ids.addrMu.Unlock()
 
-	log.Debugf("%s received listen addrs for %s: %s", c.LocalPeer(), c.RemotePeer(), lmaddrs)
+	log.Debugf("%s received listen addrs for %s: %s", c.LocalPeer(), c.RemotePeer(), addrs)
 
 	// get protocol versions
 	pv := mes.GetProtocolVersion()
@@ -1064,18 +1064,23 @@ func (nn *netNotifiee) Disconnected(_ network.Network, c network.Conn) {
 func (nn *netNotifiee) Listen(n network.Network, a ma.Multiaddr)      {}
 func (nn *netNotifiee) ListenClose(n network.Network, a ma.Multiaddr) {}
 
-// filterAddrs filters the address slice based on the remove multiaddr:
-// * if it's a localhost address, no filtering is applied
-// * if it's a local network address, all localhost addresses are filtered out
-// * if it's a public address, all localhost and local network addresses are filtered out
+// filterAddrs filters the address slice based on the remote multiaddr:
+//   - if it's a localhost address, no filtering is applied
+//   - if it's a private network address, all localhost addresses are filtered out
+//   - if it's a public address, all non-public addresses are filtered out
+//   - if none of the above, (e.g. discard prefix), no filtering is applied.
+//     We can't do anything meaningful here so we do nothing.
 func filterAddrs(addrs []ma.Multiaddr, remote ma.Multiaddr) []ma.Multiaddr {
-	if manet.IsIPLoopback(remote) {
+	switch {
+	case manet.IsIPLoopback(remote):
+		return addrs
+	case manet.IsPrivateAddr(remote):
+		return ma.FilterAddrs(addrs, func(a ma.Multiaddr) bool { return !manet.IsIPLoopback(a) })
+	case manet.IsPublicAddr(remote):
+		return ma.FilterAddrs(addrs, manet.IsPublicAddr)
+	default:
 		return addrs
 	}
-	if manet.IsPrivateAddr(remote) {
-		return ma.FilterAddrs(addrs, func(a ma.Multiaddr) bool { return !manet.IsIPLoopback(a) })
-	}
-	return ma.FilterAddrs(addrs, manet.IsPublicAddr)
 }
 
 func trimHostAddrList(addrs []ma.Multiaddr, maxSize int) []ma.Multiaddr {

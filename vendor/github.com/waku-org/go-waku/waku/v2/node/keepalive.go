@@ -174,23 +174,3 @@ func (w *WakuNode) tryPing(ctx context.Context, peerID peer.ID, logger *zap.Logg
 	}
 	return true
 }
-
-func (w *WakuNode) getRelayPeers() []peer.ID {
-	relayPeers := make(map[peer.ID]struct{})
-	for _, t := range w.Relay().Topics() {
-		for _, p := range w.Relay().PubSub().ListPeers(t) {
-			relayPeers[p] = struct{}{}
-		}
-	}
-	return maps.Keys(relayPeers)
-}
-
-func (w *WakuNode) getFullMeshPeers() []peer.ID {
-	meshPeers := make(map[peer.ID]struct{})
-	for _, t := range w.Relay().Topics() {
-		for _, p := range w.Relay().PubSub().MeshPeers(t) {
-			meshPeers[p] = struct{}{}
-		}
-	}
-	return maps.Keys(meshPeers)
-}
