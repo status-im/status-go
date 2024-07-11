@@ -1426,6 +1426,18 @@ func ToggleCentralizedMetrics(requestJSON string) string {
 	return ""
 }
 
+func CentralizedMetricsInfo() string {
+	metricsInfo, err := statusBackend.CentralizedMetricsInfo()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	data, err := json.Marshal(metricsInfo)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return string(data)
+}
+
 func AddCentralizedMetric(requestJSON string) string {
 	var request requests.AddCentralizedMetric
 	err := json.Unmarshal([]byte(requestJSON), &request)
