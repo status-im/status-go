@@ -341,6 +341,11 @@ func TestPeerExchange(t *testing.T) {
 	}, options)
 	require.NoError(t, err)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	require.NoError(t, discV5Node.node.PeerExchange().Request(ctx, 1))
+	require.Error(t, discV5Node.node.PeerExchange().Request(ctx, 1)) //should fail due to rate limit
+
 	require.NoError(t, lightNode.Stop())
 	require.NoError(t, pxServerNode.Stop())
 	require.NoError(t, discV5Node.Stop())

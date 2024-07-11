@@ -340,6 +340,10 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		}
 	}
 
+	if cfg.EnablePeerExchangeServer {
+		opts = append(opts, node.WithPeerExchange(peer_exchange.WithRateLimiter(1, 1)))
+	}
+
 	waku.options = opts
 	waku.logger.Info("setup the go-waku node successfully")
 
@@ -1325,14 +1329,7 @@ func (w *Waku) Start() error {
 		}
 	}
 
-	if w.cfg.EnablePeerExchangeServer {
-		err := w.node.PeerExchange().Start(w.ctx)
-		if err != nil {
-			return err
-		}
-	}
-
-	w.wg.Add(2)
+	w.wg.Add(3)
 
 	go func() {
 		defer w.wg.Done()
