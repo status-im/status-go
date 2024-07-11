@@ -91,6 +91,7 @@ const messageExpiredPerid = 10 // in seconds
 const maxRelayPeers = 300
 const randomPeersKeepAliveInterval = 5 * time.Second
 const allPeersKeepAliveInterval = 5 * time.Minute
+const PeersToPublishForLightpush = 2
 
 type SentEnvelope struct {
 	Envelope      *protocol.Envelope
@@ -1013,7 +1014,7 @@ func (w *Waku) broadcast() {
 				publishMethod = LightPush
 				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
 					logger.Info("publishing message via lightpush")
-					_, err := w.node.Lightpush().Publish(w.ctx, env.Message(), lightpush.WithPubSubTopic(env.PubsubTopic()))
+					_, err := w.node.Lightpush().Publish(w.ctx, env.Message(), lightpush.WithPubSubTopic(env.PubsubTopic()), lightpush.WithMaxPeers(PeersToPublishForLightpush))
 					return err
 				}
 			} else {
