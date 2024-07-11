@@ -114,10 +114,13 @@ func (t *Transactor) NextNonce(rpcClient rpc.ClientInterface, chainID uint64, fr
 			if err != nil {
 				return 0, err
 			}
+			fmt.Println("!!! Nonce: ", nonce)
+			fmt.Println("!!! countOfPendingTXs: ", countOfPendingTXs)
 			return nonce + countOfPendingTXs, nil
 		}
 	}
 
+	fmt.Println("!!! Nonce: ", nonce)
 	return nonce, err
 }
 
@@ -487,7 +490,7 @@ func (t *Transactor) buildTransactionWithOverrides(nonce uint64, value *big.Int,
 			}
 		}
 		tx = gethtypes.NewTx(txData)
-		t.logNewTx(args, gas, gasPrice, value)
+		t.logNewTx(args, gas, gasPrice, value, nonce)
 	} else {
 		if args.IsDynamicFeeTx() {
 			gasTipCap := (*big.Int)(args.MaxPriorityFeePerGas)
@@ -511,13 +514,14 @@ func (t *Transactor) buildTransactionWithOverrides(nonce uint64, value *big.Int,
 	return tx
 }
 
-func (t *Transactor) logNewTx(args SendTxArgs, gas uint64, gasPrice *big.Int, value *big.Int) {
+func (t *Transactor) logNewTx(args SendTxArgs, gas uint64, gasPrice *big.Int, value *big.Int, nonce uint64) {
 	t.log.Info("New transaction",
 		"From", args.From,
 		"To", *args.To,
 		"Gas", gas,
 		"GasPrice", gasPrice,
 		"Value", value,
+		"Nonce", nonce,
 	)
 }
 
