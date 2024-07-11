@@ -38,8 +38,8 @@ import (
 	"github.com/status-im/status-go/wakuv2/common"
 )
 
-var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.shards.nodes.status.im"
-var testBootENRBootstrap = "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"
+var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.status.nodes.status.im"
+var testBootENRBootstrap = "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.staging.status.nodes.status.im"
 
 func setDefaultConfig(config *Config, lightMode bool) {
 	config.ClusterID = 16
@@ -150,7 +150,7 @@ func TestRelayPeers(t *testing.T) {
 func TestBasicWakuV2(t *testing.T) {
 	t.Skip("flaky test")
 
-	enrTreeAddress := testStoreENRBootstrap //"enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
+	enrTreeAddress := testStoreENRBootstrap
 	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
 	if envEnrTreeAddress != "" {
 		enrTreeAddress = envEnrTreeAddress

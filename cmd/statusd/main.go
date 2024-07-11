@@ -72,7 +72,7 @@ var (
 			"Select fleet: %s (default %s)",
 			[]string{
 				params.FleetProd,
-				params.FleetShardsStaging,
+				params.FleetStatusStaging,
 				params.FleetShardsTest,
 				params.FleetStatusProd,
 				params.FleetStatusTest,

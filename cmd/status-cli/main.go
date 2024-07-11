@@ -56,8 +56,8 @@ var CommonFlags = []cli.Flag{
 	&cli.StringFlag{
 		Name:     FleetFlag,
 		Aliases:  []string{"f"},
-		Usage:    "The fleet to use for the node, e.g.: shards.staging, shards.test",
-		Value:    "shards.staging",
+		Usage:    "The fleet to use for the node, e.g.: status.staging, shards.test",
+		Value:    "status.staging",
 		Required: false,
 	},
 }
