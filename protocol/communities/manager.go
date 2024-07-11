@@ -22,6 +22,7 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/account"
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -3082,9 +3083,20 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 			if err != nil {
 				return nil, nil, err
 			}
+
+			m.logger.Debug("<<< HandleCommunityRequestToJoin recover signature",
+				zap.String("address", types.HexToAddress(revealedAccount.Address).String()),
+				zap.String("signature", types.EncodeHex(revealedAccount.Signature)),
+				zap.String("signer", types.EncodeHex(crypto.CompressPubkey(signer))),
+				zap.String("communityID", community.ID().String()),
+				zap.String("requestToJoinID", requestToJoin.ID.String()),
+				zap.Any("recoverParams", recoverParams),
+			)
+
 			if !matching {
 				// if ownership of only one wallet address cannot be verified,
 				// we mark the request as cancelled and stop
+
 				requestToJoin.State = RequestToJoinStateDeclined
 				return community, requestToJoin, nil
 			}
@@ -3098,6 +3110,10 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 		}
 
 		if existingRequestToJoin != nil {
+			m.logger.Debug("<<< not nil existingRequestToJoin",
+				zap.Any("existingRequestToJoin", existingRequestToJoin),
+			)
+
 			// request to join was already processed by privileged user
 			// and waits to get confirmation for its decision
 			if existingRequestToJoin.State == RequestToJoinStateDeclinedPending {
@@ -3114,8 +3130,15 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 			}
 		}
 
+		m.logger.Debug("<<< ALMOST THERE",
+			zap.Bool("autoAccept", community.AutoAccept()),
+			zap.Int("membersCount", community.MembersCount()),
+			zap.Bool("hasMember", community.HasMember(signer)),
+		)
+
 		// Check if we reached the limit, if we did, change the community setting to be On Request
 		if community.AutoAccept() && community.MembersCount() >= maxNbMembers {
+			m.logger.Debug("<<< limit reached, require manual accept")
 			community.EditPermissionAccess(protobuf.CommunityPermissions_MANUAL_ACCEPT)
 			err = m.saveAndPublish(community)
 			if err != nil {
@@ -3128,6 +3151,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 		// More specifically, CommunityRequestToLeave may be delivered later than CommunityRequestToJoin, or not delivered at all
 		acceptAutomatically := community.AutoAccept() || community.HasMember(signer)
 		if acceptAutomatically {
+			m.logger.Debug("<<< auto accept request to join")
 			// Don't check permissions here,
 			// it will be done further in the processing pipeline.
 			requestToJoin.State = RequestToJoinStateAccepted

@@ -1536,6 +1536,13 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, re
 		return err
 	}
 
+	m.logger.Debug("<<< Messenger.HandleCommunityRequestToJoin",
+		zap.String("community", community.IDString()),
+		zap.Any("requestToJoin", requestToJoin),
+		zap.Any("requestToJoinProto", requestToJoinProto),
+		zap.Error(err),
+	)
+
 	switch requestToJoin.State {
 	case communities.RequestToJoinStatePending:
 		contact, _ := state.AllContacts.Load(contactIDFromPublicKey(signer))

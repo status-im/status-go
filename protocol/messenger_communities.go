@@ -1421,8 +1421,9 @@ func (m *Messenger) SignData(signParams []account.SignParams) ([]string, error) 
 func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommunity) (*MessengerResponse, error) {
 	// TODO: Because of changes that need to be done in tests, calling this function and providing `request` without `AddressesToReveal`
 	//       is not an error, but it should be.
-	logger := m.logger.Named("RequestToJoinCommunity")
+	logger := m.logger.Named("<<< RequestToJoinCommunity")
 	logger.Debug("Addresses to reveal", zap.Any("Addresses:", request.AddressesToReveal))
+	logger.Debug("Request to join community", zap.Any("request", request))
 
 	if err := request.Validate(len(request.AddressesToReveal) > 0); err != nil {
 		logger.Debug("request failed to validate", zap.Error(err), zap.Any("request", request))
