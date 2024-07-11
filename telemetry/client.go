@@ -140,7 +140,7 @@ func (c *Client) Start(ctx context.Context) {
 				if len(telemetryRequests) > 0 {
 					err := c.pushTelemetryRequest(telemetryRequests)
 					if err != nil {
-						if sendPeriod < 60 { //Stop the growing if the timer is > 60s to at least retry every minute
+						if sendPeriod < 60*time.Second { //Stop the growing if the timer is > 60s to at least retry every minute
 							sendPeriod = sendPeriod * 2
 						}
 					} else {
@@ -196,8 +196,8 @@ func (c *Client) processAndPushTelemetry(data interface{}) {
 
 // This is assuming to not run concurrently as we are not locking the `telemetryRetryCache`
 func (c *Client) pushTelemetryRequest(request []TelemetryRequest) error {
-	if len(c.telemetryRetryCache)+len(request) > MaxRetryCache { //Limit the size of the cache to not grow the slice indefinitely in case the Telemetry server is gone for longer time
-		removeNum := len(c.telemetryRetryCache) + len(request) - MaxRetryCache
+	if len(c.telemetryRetryCache) > MaxRetryCache { //Limit the size of the cache to not grow the slice indefinitely in case the Telemetry server is gone for longer time
+		removeNum := len(c.telemetryRetryCache) - MaxRetryCache
 		c.telemetryRetryCache = c.telemetryRetryCache[removeNum:]
 	}
 	c.telemetryRetryCache = append(c.telemetryRetryCache, request...)
