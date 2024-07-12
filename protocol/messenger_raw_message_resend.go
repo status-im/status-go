@@ -65,12 +65,7 @@ func (m *Messenger) processMessageID(id string) (*common.RawMessage, bool, error
 		return nil, false, errors.Wrap(err, "Can't get raw message by ID")
 	}
 
-	shouldResend, err := m.shouldResendMessage(rawMessage, m.getTimesource())
-	if err != nil {
-		m.logger.Error("Can't check if message should be resent", zap.Error(err))
-		return rawMessage, false, err
-	}
-
+	shouldResend := m.shouldResendMessage(rawMessage, m.getTimesource())
 	if !shouldResend {
 		return rawMessage, false, nil
 	}
@@ -137,15 +132,16 @@ func (m *Messenger) handleOtherResendMethods(rawMessage *common.RawMessage) (boo
 	return true, m.reSendRawMessage(context.Background(), rawMessage.ID)
 }
 
-func (m *Messenger) shouldResendMessage(message *common.RawMessage, t common.TimeSource) (bool, error) {
+func (m *Messenger) shouldResendMessage(message *common.RawMessage, t common.TimeSource) bool {
 	if m.featureFlags.ResendRawMessagesDisabled {
-		return false, nil
+		return false
 	}
 	//exponential backoff depends on how many attempts to send message already made
 	power := math.Pow(2, float64(message.SendCount-1))
 	backoff := uint64(power) * uint64(m.config.messageResendMinDelay.Milliseconds())
 	backoffElapsed := t.GetCurrentTime() > (message.LastSent + backoff)
-	return backoffElapsed, nil
+
+	return backoffElapsed
 }
 
 // pull a message from the database and send it again
@@ -182,6 +178,17 @@ func (m *Messenger) UpsertRawMessageToWatch(rawMessage *common.RawMessage) (*com
 		return nil, err
 	}
 	return rawMessage, nil
+}
+
+// AddRawMessageToWatch check if RawMessage is correct and insert the rawMessage to the database
+// relate watch method: Messenger#watchExpiredMessages
+func (m *Messenger) AddRawMessageToWatch(rawMessage *common.RawMessage) (*common.RawMessage, error) {
+	if err := m.sender.ValidateRawMessage(rawMessage); err != nil {
+		m.logger.Error("Can't add raw message to watch", zap.String("messageID", rawMessage.ID), zap.Error(err))
+		return nil, err
+	}
+
+	return m.UpsertRawMessageToWatch(rawMessage)
 }
 
 func (m *Messenger) upsertRawMessageToWatch(rawMessage *common.RawMessage) {

@@ -1497,7 +1497,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := &common.RawMessage{
 		Payload:             payload,
 		CommunityID:         community.ID(),
 		ResendType:          common.ResendTypeRawMessage,
@@ -1506,30 +1506,32 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
 	}
 
-	_, err = m.SendMessageToControlNode(community, &rawMessage)
+	_, err = m.SendMessageToControlNode(community, rawMessage)
 	if err != nil {
 		return nil, err
 	}
 
+	if _, err = m.AddRawMessageToWatch(rawMessage); err != nil {
+		return nil, err
+	}
+
 	if !community.AutoAccept() {
-		privilegedMembers := community.GetFilteredPrivilegedMembers(map[string]struct{}{})
+		privilegedMembersSorted := community.GetFilteredPrivilegedMembers(map[string]struct{}{m.IdentityPublicKeyString(): {}})
+		privMembersArray := []*ecdsa.PublicKey{}
 
-		for _, member := range privilegedMembers[protobuf.CommunityMember_ROLE_OWNER] {
-			rawMessage.Recipients = append(rawMessage.Recipients, member)
-			_, err := m.sender.SendPrivate(context.Background(), member, &rawMessage)
-			if err != nil {
-				return nil, err
-			}
-		}
-		for _, member := range privilegedMembers[protobuf.CommunityMember_ROLE_TOKEN_MASTER] {
-			rawMessage.Recipients = append(rawMessage.Recipients, member)
-			_, err := m.sender.SendPrivate(context.Background(), member, &rawMessage)
-			if err != nil {
-				return nil, err
-			}
+		if rawMessage.ResendMethod != common.ResendMethodSendPrivate {
+			privMembersArray = append(privMembersArray, privilegedMembersSorted[protobuf.CommunityMember_ROLE_OWNER]...)
 		}
 
-		// don't send revealed addresses to admins
+		privMembersArray = append(privMembersArray, privilegedMembersSorted[protobuf.CommunityMember_ROLE_TOKEN_MASTER]...)
+		privMembersArray = append(privMembersArray, privilegedMembersSorted[protobuf.CommunityMember_ROLE_ADMIN]...)
+
+		rawMessage.ResendMethod = common.ResendMethodSendPrivate
+		rawMessage.ID = ""
+		rawMessage.Recipients = privMembersArray
+
+		// don't send revealed addresses to privileged members
+		// tokenMaster and owner without community private key will receive them from control node
 		requestToJoinProto.RevealedAccounts = make([]*protobuf.RevealedAccount, 0)
 		payload, err = proto.Marshal(requestToJoinProto)
 		if err != nil {
@@ -1537,17 +1539,18 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		}
 		rawMessage.Payload = payload
 
-		for _, member := range privilegedMembers[protobuf.CommunityMember_ROLE_ADMIN] {
-			rawMessage.Recipients = append(rawMessage.Recipients, member)
-			_, err := m.sender.SendPrivate(context.Background(), member, &rawMessage)
+		for _, member := range rawMessage.Recipients {
+			_, err := m.sender.SendPrivate(context.Background(), member, rawMessage)
 			if err != nil {
 				return nil, err
 			}
 		}
-	}
 
-	if _, err = m.UpsertRawMessageToWatch(&rawMessage); err != nil {
-		return nil, err
+		if len(rawMessage.Recipients) > 0 {
+			if _, err = m.AddRawMessageToWatch(rawMessage); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	response := &MessengerResponse{}
@@ -1681,7 +1684,7 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 		return nil, err
 	}
 
-	if _, err = m.UpsertRawMessageToWatch(&rawMessage); err != nil {
+	if _, err = m.AddRawMessageToWatch(&rawMessage); err != nil {
 		return nil, err
 	}
 
@@ -1724,8 +1727,9 @@ func (m *Messenger) PublishTokenActionToPrivilegedMembers(communityID []byte, ch
 
 	allRecipients := privilegedMembers[protobuf.CommunityMember_ROLE_OWNER]
 	allRecipients = append(allRecipients, privilegedMembers[protobuf.CommunityMember_ROLE_TOKEN_MASTER]...)
+	rawMessage.Recipients = allRecipients
 
-	for _, recipient := range allRecipients {
+	for _, recipient := range rawMessage.Recipients {
 		_, err := m.sender.SendPrivate(context.Background(), recipient, &rawMessage)
 		if err != nil {
 			return err
@@ -1733,8 +1737,7 @@ func (m *Messenger) PublishTokenActionToPrivilegedMembers(communityID []byte, ch
 	}
 
 	if len(allRecipients) > 0 {
-		rawMessage.Recipients = allRecipients
-		if _, err = m.UpsertRawMessageToWatch(&rawMessage); err != nil {
+		if _, err = m.AddRawMessageToWatch(&rawMessage); err != nil {
 			return err
 		}
 	}
@@ -1885,22 +1888,47 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 		return nil, err
 	}
 
+	// NOTE: rawMessage.ID is generated from payload + sender + messageType
+	// rawMessage.ID will be the same for control node and privileged members, but for
+	// community without owner token resend type is different
+	// in order not to override msg to control node by message for privileged members,
+	// we skip storing the same message for privileged members
+	avoidDuplicateWatchingForPrivilegedMembers := community.AutoAccept() || rawMessage.ResendMethod != common.ResendMethodSendPrivate
+	if avoidDuplicateWatchingForPrivilegedMembers {
+		if _, err = m.AddRawMessageToWatch(&rawMessage); err != nil {
+			return nil, err
+		}
+	}
+
 	if !community.AutoAccept() {
 		// send cancelation to community admins also
 		rawMessage.Payload = payload
+		rawMessage.ResendMethod = common.ResendMethodSendPrivate
 
-		privilegedMembers := community.GetPrivilegedMembers()
-		for _, privilegedMember := range privilegedMembers {
-			rawMessage.Recipients = append(rawMessage.Recipients, privilegedMember)
+		privilegedMembersSorted := community.GetFilteredPrivilegedMembers(map[string]struct{}{m.IdentityPublicKeyString(): {}})
+		privMembersArray := privilegedMembersSorted[protobuf.CommunityMember_ROLE_TOKEN_MASTER]
+		privMembersArray = append(privMembersArray, privilegedMembersSorted[protobuf.CommunityMember_ROLE_ADMIN]...)
+
+		if !avoidDuplicateWatchingForPrivilegedMembers {
+			// control node was added to the recipients during 'SendMessageToControlNode'
+			rawMessage.Recipients = append(rawMessage.Recipients, privMembersArray...)
+		} else {
+			privMembersArray = append(privMembersArray, privilegedMembersSorted[protobuf.CommunityMember_ROLE_OWNER]...)
+			rawMessage.Recipients = privMembersArray
+		}
+
+		for _, privilegedMember := range privMembersArray {
 			_, err := m.sender.SendPrivate(context.Background(), privilegedMember, &rawMessage)
 			if err != nil {
 				return nil, err
 			}
 		}
-	}
 
-	if _, err = m.UpsertRawMessageToWatch(&rawMessage); err != nil {
-		return nil, err
+		if !avoidDuplicateWatchingForPrivilegedMembers {
+			if _, err = m.AddRawMessageToWatch(&rawMessage); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	response := &MessengerResponse{}
@@ -2012,7 +2040,7 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			return nil, err
 		}
 
-		if _, err = m.UpsertRawMessageToWatch(rawMessage); err != nil {
+		if _, err = m.AddRawMessageToWatch(rawMessage); err != nil {
 			return nil, err
 		}
 	}
@@ -2200,7 +2228,7 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 			return nil, err
 		}
 
-		if _, err = m.UpsertRawMessageToWatch(&rawMessage); err != nil {
+		if _, err = m.AddRawMessageToWatch(&rawMessage); err != nil {
 			return nil, err
 		}
 	}
@@ -3686,7 +3714,7 @@ func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, co
 		return nil, err
 	}
 
-	_, err = m.UpsertRawMessageToWatch(&rawMessage)
+	_, err = m.AddRawMessageToWatch(&rawMessage)
 
 	return requestToJoin, err
 }

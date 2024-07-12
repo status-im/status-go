@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
-
+	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -55,11 +55,12 @@ func (s *MessengerRawMessageResendTest) SetupTest() {
 	signal.SetMobileSignalHandler(nil)
 
 	exchangeNodeConfig := &wakuv2.Config{
-		Port:                     0,
-		EnableDiscV5:             true,
-		EnablePeerExchangeServer: true,
-		ClusterID:                16,
-		DefaultShardPubsubTopic:  shard.DefaultShardPubsubTopic(),
+		Port:                                   0,
+		EnableDiscV5:                           true,
+		EnablePeerExchangeServer:               true,
+		ClusterID:                              16,
+		DefaultShardPubsubTopic:                shard.DefaultShardPubsubTopic(),
+		EnableStoreConfirmationForMessagesSent: false,
 	}
 	s.exchangeBootNode, err = wakuv2.New(nil, "", exchangeNodeConfig, s.logger.Named("pxServerNode"), nil, nil, nil, nil)
 	s.Require().NoError(err)
@@ -208,14 +209,9 @@ func (s *MessengerRawMessageResendTest) setCreateAccountRequest(displayName, roo
 	}
 }
 
-// TestMessageSent tests if ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN is in state `sent` without resending
-func (s *MessengerRawMessageResendTest) TestMessageSent() {
-	ids, err := s.bobMessenger.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN)
-	s.Require().NoError(err)
-	s.Require().Len(ids, 1)
-
-	err = tt.RetryWithBackOff(func() error {
-		rawMessage, err := s.bobMessenger.RawMessageByID(ids[0])
+func (s *MessengerRawMessageResendTest) waitForMessageSent(messageID string) {
+	err := tt.RetryWithBackOff(func() error {
+		rawMessage, err := s.bobMessenger.RawMessageByID(messageID)
 		s.Require().NoError(err)
 		s.Require().NotNil(rawMessage)
 		if rawMessage.SendCount > 0 {
@@ -226,16 +222,31 @@ func (s *MessengerRawMessageResendTest) TestMessageSent() {
 	s.Require().NoError(err)
 }
 
+// TestMessageSent tests if ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN is in state `sent` without resending
+func (s *MessengerRawMessageResendTest) TestMessageSent() {
+	ids, err := s.bobMessenger.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN)
+	s.Require().NoError(err)
+	s.Require().Len(ids, 1)
+
+	s.waitForMessageSent(ids[0])
+}
+
 // TestMessageResend tests if ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN is resent
 func (s *MessengerRawMessageResendTest) TestMessageResend() {
 	ids, err := s.bobMessenger.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN)
 	s.Require().NoError(err)
 	s.Require().Len(ids, 1)
+	// wait for Sent status for already sent message to make sure that sent message was delivered
+	// before testing resend
+	s.waitForMessageSent(ids[0])
+
 	rawMessage, err := s.bobMessenger.RawMessageByID(ids[0])
 	s.Require().NoError(err)
 	s.Require().NotNil(rawMessage)
+
 	s.Require().NoError(s.bobMessenger.UpdateRawMessageSent(rawMessage.ID, false))
 	s.Require().NoError(s.bobMessenger.UpdateRawMessageLastSent(rawMessage.ID, 0))
+
 	err = tt.RetryWithBackOff(func() error {
 		rawMessage, err := s.bobMessenger.RawMessageByID(ids[0])
 		s.Require().NoError(err)
@@ -253,6 +264,47 @@ func (s *MessengerRawMessageResendTest) TestMessageResend() {
 		}
 		return errors.New("community request to join not received")
 	}, s.aliceMessenger)
+}
+
+func (s *MessengerRawMessageResendTest) TestInvalidRawMessageToWatchDoesNotProduceResendLoop() {
+	ids, err := s.bobMessenger.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN)
+	s.Require().NoError(err)
+	s.Require().Len(ids, 1)
+
+	s.waitForMessageSent(ids[0])
+
+	rawMessage, err := s.bobMessenger.RawMessageByID(ids[0])
+	s.Require().NoError(err)
+
+	requestToJoinProto := &protobuf.CommunityRequestToJoin{}
+	err = proto.Unmarshal(rawMessage.Payload, requestToJoinProto)
+	s.Require().NoError(err)
+
+	requestToJoinProto.DisplayName = "invalid_ID"
+	payload, err := proto.Marshal(requestToJoinProto)
+	s.Require().NoError(err)
+	rawMessage.Payload = payload
+
+	_, err = s.bobMessenger.AddRawMessageToWatch(rawMessage)
+	s.Require().Error(err, common.ErrModifiedRawMessage)
+
+	// simulate storing msg with modified payload, but old message ID
+	_, err = s.bobMessenger.UpsertRawMessageToWatch(rawMessage)
+	s.Require().NoError(err)
+	s.Require().NoError(s.bobMessenger.UpdateRawMessageSent(rawMessage.ID, false))
+	s.Require().NoError(s.bobMessenger.UpdateRawMessageLastSent(rawMessage.ID, 0))
+
+	// check counter increased for invalid message to escape the loop
+	err = tt.RetryWithBackOff(func() error {
+		rawMessage, err := s.bobMessenger.RawMessageByID(ids[0])
+		s.Require().NoError(err)
+		s.Require().NotNil(rawMessage)
+		if rawMessage.SendCount < 2 {
+			return errors.New("message ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN was not resent yet")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
 }
 
 // To be removed in https://github.com/status-im/status-go/issues/4437
