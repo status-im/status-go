@@ -142,6 +142,7 @@
 // 1716891408_add_community_token_transaction_hash.up.sql (65B)
 // 1719906191_add_community_token_version.up.sql (65B)
 // 1720636181_add_community_encryption_keys_requests.up.sql (236B)
+// 1721222369_add_shared_addresses.up.sql (98B)
 // README.md (554B)
 // doc.go (870B)
 
@@ -3051,6 +3052,26 @@ func _1720636181_add_community_encryption_keys_requestsUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1721222369_add_shared_addressesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\x31\x0e\xc2\x30\x0c\x05\xd0\x9d\x53\xfc\x7b\x30\xb9\xc4\x9d\x4c\x23\x41\x3a\x5b\x15\x35\x22\x48\x6d\x44\x1c\xdf\x9f\x47\x52\xf8\x81\x42\x93\x30\x5e\xed\x38\xe2\xac\xa3\x9a\x6b\xb7\x5f\x98\x0f\xd7\xd1\xf4\xdb\xea\x09\x4a\x09\xb7\x2c\xeb\x7d\x81\x7f\xb6\x6e\xfa\x8e\x11\xdd\x74\xdb\xf7\x6e\xee\xe6\x98\x72\x16\xa6\x05\x89\x67\x5a\xa5\x60\x26\x79\xf2\xf5\xf2\x0f\x00\x00\xff\xff\x9e\xa2\x57\x79\x62\x00\x00\x00")
+
+func _1721222369_add_shared_addressesUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1721222369_add_shared_addressesUpSql,
+		"1721222369_add_shared_addresses.up.sql",
+	)
+}
+
+func _1721222369_add_shared_addressesUpSql() (*asset, error) {
+	bytes, err := _1721222369_add_shared_addressesUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1721222369_add_shared_addresses.up.sql", size: 98, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6a, 0x12, 0x2, 0xed, 0xf4, 0xc7, 0xe3, 0xc8, 0x65, 0x43, 0x81, 0x34, 0x86, 0x1b, 0xc8, 0xfb, 0x22, 0x12, 0xd6, 0x1d, 0xe2, 0xa4, 0xec, 0xf4, 0x93, 0x5f, 0x92, 0x1, 0x53, 0x10, 0xb2, 0x70}}
+	return a, nil
+}
+
 var _readmeMd = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x54\x91\xc1\xce\xd3\x30\x10\x84\xef\x7e\x8a\x91\x7a\x01\xa9\x2a\x8f\xc0\x0d\x71\x82\x03\x48\x1c\xc9\x36\x9e\x36\x96\x1c\x6f\xf0\xae\x93\xe6\xed\x91\xa3\xc2\xdf\xff\x66\xed\xd8\x33\xdf\x78\x4f\xa7\x13\xbe\xea\x06\x57\x6c\x35\x39\x31\xa7\x7b\x15\x4f\x5a\xec\x73\x08\xbf\x08\x2d\x79\x7f\x4a\x43\x5b\x86\x17\xfd\x8c\x21\xea\x56\x5e\x47\x90\x4a\x14\x75\x48\xde\x64\x37\x2c\x6a\x96\xae\x99\x48\x05\xf6\x27\x77\x13\xad\x08\xae\x8a\x51\xe7\x25\xf3\xf1\xa9\x9f\xf9\x58\x58\x2c\xad\xbc\xe0\x8b\x56\xf0\x21\x5d\xeb\x4c\x95\xb3\xae\x84\x60\xd4\xdc\xe6\x82\x5d\x1b\x36\x6d\x39\x62\x92\xf5\xb8\x11\xdb\x92\xd3\x28\xce\xe0\x13\xe1\x72\xcd\x3c\x63\xd4\x65\x87\xae\xac\xe8\xc3\x28\x2e\x67\x44\x66\x3a\x21\x25\xa2\x72\xac\x14\x67\xbc\x84\x9f\x53\x32\x8c\x52\x70\x25\x56\xd6\xfd\x8d\x05\x37\xad\x30\x9d\x9f\xa6\x86\x0f\xcd\x58\x7f\xcf\x34\x93\x3b\xed\x90\x9f\xa4\x1f\xcf\x30\x85\x4d\x07\x58\xaf\x7f\x25\xc4\x9d\xf3\x72\x64\x84\xd0\x7f\xf9\x9b\x3a\x2d\x84\xef\x85\x48\x66\x8d\xd8\x88\x9b\x8c\x8c\x98\x5b\xf6\x74\x14\x4e\x33\x0d\xc9\xe0\x93\x38\xda\x12\xc5\x69\xbd\xe4\xf0\x2e\x7a\x78\x07\x1c\xfe\x13\x9f\x91\x29\x31\x95\x7b\x7f\x62\x59\x37\xb4\xe5\x5e\x25\xfe\x33\xee\xd5\x53\x71\xd6\xda\x3a\xd8\xcb\xde\x2e\xf8\xa1\x90\x55\x53\x0c\xc7\xaa\x0d\xe9\x76\x14\x29\x1c\x7b\x68\xdd\x2f\xe1\x6f\x00\x00\x00\xff\xff\x3c\x0a\xc2\xfe\x2a\x02\x00\x00")
 
 func readmeMdBytes() ([]byte, error) {
@@ -3324,8 +3345,9 @@ var _bindata = map[string]func() (*asset, error){
 	"1716891408_add_community_token_transaction_hash.up.sql":                      _1716891408_add_community_token_transaction_hashUpSql,
 	"1719906191_add_community_token_version.up.sql":                               _1719906191_add_community_token_versionUpSql,
 	"1720636181_add_community_encryption_keys_requests.up.sql":                    _1720636181_add_community_encryption_keys_requestsUpSql,
-	"README.md": readmeMd,
-	"doc.go":    docGo,
+	"1721222369_add_shared_addresses.up.sql":                                      _1721222369_add_shared_addressesUpSql,
+	"README.md":                                                                   readmeMd,
+	"doc.go":                                                                      docGo,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -3516,8 +3538,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1716891408_add_community_token_transaction_hash.up.sql":                      {_1716891408_add_community_token_transaction_hashUpSql, map[string]*bintree{}},
 	"1719906191_add_community_token_version.up.sql":                               {_1719906191_add_community_token_versionUpSql, map[string]*bintree{}},
 	"1720636181_add_community_encryption_keys_requests.up.sql":                    {_1720636181_add_community_encryption_keys_requestsUpSql, map[string]*bintree{}},
-	"README.md": {readmeMd, map[string]*bintree{}},
-	"doc.go":    {docGo, map[string]*bintree{}},
+	"1721222369_add_shared_addresses.up.sql":                                      {_1721222369_add_shared_addressesUpSql, map[string]*bintree{}},
+	"README.md":                                                                   {readmeMd, map[string]*bintree{}},
+	"doc.go":                                                                      {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

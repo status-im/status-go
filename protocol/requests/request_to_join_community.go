@@ -15,11 +15,12 @@ var ErrRequestToJoinNoAirdropAddressAmongAddressesToReveal = errors.New("request
 var ErrRequestToJoinCommunityInvalidSignature = errors.New("request-to-join-community: invalid signature")
 
 type RequestToJoinCommunity struct {
-	CommunityID       types.HexBytes   `json:"communityId"`
-	ENSName           string           `json:"ensName"`
-	AddressesToReveal []string         `json:"addressesToReveal"`
-	Signatures        []types.HexBytes `json:"signatures"` // the order of signatures should match the order of addresses
-	AirdropAddress    string           `json:"airdropAddress"`
+	CommunityID          types.HexBytes   `json:"communityId"`
+	ENSName              string           `json:"ensName"`
+	AddressesToReveal    []string         `json:"addressesToReveal"`
+	Signatures           []types.HexBytes `json:"signatures"` // the order of signatures should match the order of addresses
+	AirdropAddress       string           `json:"airdropAddress"`
+	ShareFutureAddresses bool             `json:"shareFutureAddresses"`
 }
 
 func (j *RequestToJoinCommunity) Validate(full bool) error {

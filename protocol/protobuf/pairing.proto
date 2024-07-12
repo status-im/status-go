@@ -155,6 +155,7 @@ message SyncCommunityRequestsToJoin {
   uint64 state = 7;
   repeated RevealedAccount revealed_accounts = 8;
   uint32 customization_color = 9;
+  bool share_future_addresses = 10;
 }
 
 message SyncCommunityControlNode {
