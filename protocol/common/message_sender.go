@@ -213,7 +213,9 @@ func (s *MessageSender) SendPubsubTopicKey(
 		return nil, err
 	}
 
-	rawMessage.ID = types.EncodeHex(messageID)
+	if err = s.setMessageID(messageID, rawMessage); err != nil {
+		return nil, err
+	}
 
 	// Notify before dispatching, otherwise the dispatch subscription might happen
 	// earlier than the scheduled
@@ -247,12 +249,14 @@ func (s *MessageSender) SendGroup(
 	}
 
 	// Calculate messageID first and set on raw message
-	wrappedMessage, err := s.wrapMessageV1(&rawMessage)
+	messageID, err := s.getMessageID(&rawMessage)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to wrap message")
+		return nil, err
 	}
-	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
-	rawMessage.ID = types.EncodeHex(messageID)
+
+	if err = s.setMessageID(messageID, &rawMessage); err != nil {
+		return nil, err
+	}
 
 	// We call it only once, and we nil the function after so it doesn't get called again
 	if rawMessage.BeforeDispatch != nil {
@@ -278,8 +282,40 @@ func (s *MessageSender) getMessageID(rawMessage *RawMessage) (types.HexBytes, er
 	}
 
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
-
 	return messageID, nil
+}
+
+func (s *MessageSender) ValidateRawMessage(rawMessage *RawMessage) error {
+	id, err := s.getMessageID(rawMessage)
+	if err != nil {
+		return err
+	}
+	messageID := types.EncodeHex(id)
+
+	return s.validateMessageID(messageID, rawMessage)
+
+}
+
+func (s *MessageSender) validateMessageID(messageID string, rawMessage *RawMessage) error {
+	if len(rawMessage.ID) > 0 && rawMessage.ID != messageID {
+		s.logger.Error("failed to validate message ID, RawMessage content was modified",
+			zap.String("prevID", rawMessage.ID),
+			zap.String("newID", messageID),
+			zap.Any("contentType", rawMessage.MessageType))
+		return ErrModifiedRawMessage
+	}
+	return nil
+}
+
+func (s *MessageSender) setMessageID(messageID types.HexBytes, rawMessage *RawMessage) error {
+	msgID := types.EncodeHex(messageID)
+
+	if err := s.validateMessageID(msgID, rawMessage); err != nil {
+		return err
+	}
+
+	rawMessage.ID = msgID
+	return nil
 }
 
 func ShouldCommunityMessageBeEncrypted(msgType protobuf.ApplicationMetadataMessage_Type) bool {
@@ -308,7 +344,10 @@ func (s *MessageSender) sendCommunity(
 	if err != nil {
 		return nil, err
 	}
-	rawMessage.ID = types.EncodeHex(messageID)
+
+	if err = s.setMessageID(messageID, rawMessage); err != nil {
+		return nil, err
+	}
 
 	if rawMessage.BeforeDispatch != nil {
 		if err := rawMessage.BeforeDispatch(rawMessage); err != nil {
@@ -418,7 +457,11 @@ func (s *MessageSender) sendPrivate(
 	}
 
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
-	rawMessage.ID = types.EncodeHex(messageID)
+
+	if err = s.setMessageID(messageID, rawMessage); err != nil {
+		return nil, err
+	}
+
 	if rawMessage.BeforeDispatch != nil {
 		if err := rawMessage.BeforeDispatch(rawMessage); err != nil {
 			return nil, err
@@ -479,7 +522,7 @@ func (s *MessageSender) sendPrivate(
 		}
 
 		s.logger.Debug("sent-message: private skipProtocolLayer",
-			zap.Strings("recipient", PubkeysToHex(rawMessage.Recipients)),
+			zap.String("recipient", PubkeyToHex(recipient)),
 			zap.String("messageID", messageID.String()),
 			zap.String("messageType", "private"),
 			zap.Any("contentType", rawMessage.MessageType),
@@ -499,7 +542,7 @@ func (s *MessageSender) sendPrivate(
 		}
 
 		s.logger.Debug("sent-message: private without datasync",
-			zap.Strings("recipient", PubkeysToHex(rawMessage.Recipients)),
+			zap.String("recipient", PubkeyToHex(recipient)),
 			zap.String("messageID", messageID.String()),
 			zap.Any("contentType", rawMessage.MessageType),
 			zap.String("messageType", "private"),
@@ -723,7 +766,10 @@ func (s *MessageSender) SendPublic(
 	newMessage.PubsubTopic = rawMessage.PubsubTopic
 
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
-	rawMessage.ID = types.EncodeHex(messageID)
+
+	if err = s.setMessageID(messageID, &rawMessage); err != nil {
+		return nil, err
+	}
 
 	if rawMessage.BeforeDispatch != nil {
 		if err := rawMessage.BeforeDispatch(&rawMessage); err != nil {
