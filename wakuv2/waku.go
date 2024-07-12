@@ -1329,7 +1329,7 @@ func (w *Waku) Start() error {
 		}
 	}
 
-	w.wg.Add(3)
+	w.wg.Add(2)
 
 	go func() {
 		defer w.wg.Done()
