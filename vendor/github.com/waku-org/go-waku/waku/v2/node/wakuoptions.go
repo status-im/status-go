@@ -31,6 +31,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/rendezvous"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
@@ -102,7 +103,8 @@ type WakuNodeParameters struct {
 	discV5bootnodes  []*enode.Node
 	discV5autoUpdate bool
 
-	enablePeerExchange bool
+	enablePeerExchange  bool
+	peerExchangeOptions []peer_exchange.Option
 
 	enableRLN                    bool
 	rlnRelayMemIndex             *uint
@@ -411,9 +413,10 @@ func WithDiscoveryV5(udpPort uint, bootnodes []*enode.Node, autoUpdate bool) Wak
 }
 
 // WithPeerExchange is a WakuOption used to enable Peer Exchange
-func WithPeerExchange() WakuNodeOption {
+func WithPeerExchange(options ...peer_exchange.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enablePeerExchange = true
+		params.peerExchangeOptions = options
 		return nil
 	}
 }

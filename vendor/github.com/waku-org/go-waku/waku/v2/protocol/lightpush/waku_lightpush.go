@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -187,7 +188,7 @@ func (wakuLP *WakuLightPush) reply(stream network.Stream, responsePushRPC *pb.Pu
 }
 
 // request sends a message via lightPush protocol to either a specified peer or peer that is selected.
-func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, params *lightPushRequestParameters) (*pb.PushResponse, error) {
+func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, params *lightPushRequestParameters, peer peer.ID) (*pb.PushResponse, error) {
 	if params == nil {
 		return nil, errors.New("lightpush params are mandatory")
 	}
@@ -196,9 +197,9 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, p
 		return nil, ErrInvalidID
 	}
 
-	logger := wakuLP.log.With(logging.HostID("peer", params.selectedPeer))
+	logger := wakuLP.log.With(logging.HostID("peer", peer))
 
-	stream, err := wakuLP.h.NewStream(ctx, params.selectedPeer, LightPushID_v20beta1)
+	stream, err := wakuLP.h.NewStream(ctx, peer, LightPushID_v20beta1)
 	if err != nil {
 		logger.Error("creating stream to peer", zap.Error(err))
 		wakuLP.metrics.RecordError(dialFailure)
@@ -281,10 +282,10 @@ func (wakuLP *WakuLightPush) handleOpts(ctx context.Context, message *wpb.WakuMe
 			return nil, err
 		}
 		wakuLP.pm.Connect(pData)
-		params.selectedPeer = pData.AddrInfo.ID
+		params.selectedPeers = append(params.selectedPeers, pData.AddrInfo.ID)
 	}
-
-	if params.pm != nil && params.selectedPeer == "" {
+	reqPeerCount := params.maxPeers - len(params.selectedPeers)
+	if params.pm != nil && reqPeerCount > 0 {
 		var selectedPeers peer.IDSlice
 		//TODO: update this to work with multiple peer selection
 		selectedPeers, err = wakuLP.pm.SelectPeers(
@@ -293,17 +294,17 @@ func (wakuLP *WakuLightPush) handleOpts(ctx context.Context, message *wpb.WakuMe
 				Proto:         LightPushID_v20beta1,
 				PubsubTopics:  []string{params.pubsubTopic},
 				SpecificPeers: params.preferredPeers,
+				MaxPeers:      reqPeerCount,
 				Ctx:           ctx,
 			},
 		)
 		if err == nil {
-			params.selectedPeer = selectedPeers[0]
+			params.selectedPeers = append(params.selectedPeers, selectedPeers...)
 		}
-
 	}
-	if params.selectedPeer == "" {
+	if len(params.selectedPeers) == 0 {
 		if err != nil {
-			params.log.Error("selecting peer", zap.Error(err))
+			params.log.Error("selecting peers", zap.Error(err))
 			wakuLP.metrics.RecordError(peerNotFoundFailure)
 			return nil, ErrNoPeersAvailable
 		}
@@ -327,25 +328,41 @@ func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *wpb.WakuMessa
 	req.Message = message
 	req.PubsubTopic = params.pubsubTopic
 
-	logger := message.Logger(wakuLP.log, params.pubsubTopic).With(logging.HostID("peerID", params.selectedPeer))
+	logger := message.Logger(wakuLP.log, params.pubsubTopic).With(zap.Stringers("peerIDs", params.selectedPeers))
 
 	logger.Debug("publishing message")
-
-	response, err := wakuLP.request(ctx, req, params)
-	if err != nil {
-		logger.Error("could not publish message", zap.Error(err))
-		return wpb.MessageHash{}, err
+	var wg sync.WaitGroup
+	var responses []*pb.PushResponse
+	for _, peerID := range params.selectedPeers {
+		wg.Add(1)
+		go func(id peer.ID) {
+			defer wg.Done()
+			response, err := wakuLP.request(ctx, req, params, id)
+			if err != nil {
+				logger.Error("could not publish message", zap.Error(err), zap.Stringer("peer", id))
+			}
+			responses = append(responses, response)
+		}(peerID)
 	}
-
-	if response.IsSuccess {
-		hash := message.Hash(params.pubsubTopic)
-		utils.MessagesLogger("lightpush").Debug("waku.lightpush published", logging.HexBytes("hash", hash[:]))
-		return hash, nil
-	}
-
+	wg.Wait()
+	var successCount int
 	errMsg := "lightpush error"
-	if response.Info != nil {
-		errMsg = *response.Info
+
+	for _, response := range responses {
+		if response.GetIsSuccess() {
+			successCount++
+		} else {
+			if response.GetInfo() != "" {
+				errMsg += *response.Info
+			}
+		}
+	}
+
+	//in case of partial failure, should we retry here or build a layer above that takes care of these things?
+	if successCount > 0 {
+		hash := message.Hash(params.pubsubTopic)
+		utils.MessagesLogger("lightpush").Debug("waku.lightpush published", logging.HexBytes("hash", hash[:]), zap.Int("num-peers", len(responses)))
+		return hash, nil
 	}
 
 	return wpb.MessageHash{}, errors.New(errMsg)

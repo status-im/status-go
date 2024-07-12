@@ -29,7 +29,8 @@ func WithRateLimiter(r rate.Limit, b int) Option {
 type lightPushRequestParameters struct {
 	host              host.Host
 	peerAddr          multiaddr.Multiaddr
-	selectedPeer      peer.ID
+	selectedPeers     peer.IDSlice
+	maxPeers          int
 	peerSelectionType peermanager.PeerSelection
 	preferredPeers    peer.IDSlice
 	requestID         []byte
@@ -41,10 +42,17 @@ type lightPushRequestParameters struct {
 // RequestOption is the type of options accepted when performing LightPush protocol requests
 type RequestOption func(*lightPushRequestParameters) error
 
+func WithMaxPeers(num int) RequestOption {
+	return func(params *lightPushRequestParameters) error {
+		params.maxPeers = num
+		return nil
+	}
+}
+
 // WithPeer is an option used to specify the peerID to push a waku message to
 func WithPeer(p peer.ID) RequestOption {
 	return func(params *lightPushRequestParameters) error {
-		params.selectedPeer = p
+		params.selectedPeers = append(params.selectedPeers, p)
 		if params.peerAddr != nil {
 			return errors.New("peerAddr and peerId options are mutually exclusive")
 		}
@@ -58,7 +66,7 @@ func WithPeer(p peer.ID) RequestOption {
 func WithPeerAddr(pAddr multiaddr.Multiaddr) RequestOption {
 	return func(params *lightPushRequestParameters) error {
 		params.peerAddr = pAddr
-		if params.selectedPeer != "" {
+		if len(params.selectedPeers) != 0 {
 			return errors.New("peerAddr and peerId options are mutually exclusive")
 		}
 		return nil
@@ -127,5 +135,6 @@ func DefaultOptions(host host.Host) []RequestOption {
 	return []RequestOption{
 		WithAutomaticRequestID(),
 		WithAutomaticPeerSelection(),
+		WithMaxPeers(1), //keeping default as 2 for status use-case
 	}
 }
