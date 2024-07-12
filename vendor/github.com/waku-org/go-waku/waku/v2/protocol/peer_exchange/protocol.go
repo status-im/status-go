@@ -100,6 +100,9 @@ func (wakuPX *WakuPeerExchange) onRequest() func(network.Stream) {
 			wakuPX.metrics.RecordError(rateLimitFailure)
 			wakuPX.log.Error("exceeds the rate limit")
 			// TODO: peer exchange protocol should contain an err field
+			if err := stream.Reset(); err != nil {
+				wakuPX.log.Error("resetting connection", zap.Error(err))
+			}
 			return
 		}
 
