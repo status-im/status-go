@@ -266,3 +266,32 @@ func TestRetryCache(t *testing.T) {
 
 	require.Equal(t, 0, len(client.telemetryRetryCache))
 }
+
+func TestRetryCacheCleanup(t *testing.T) {
+	client := createClient(t, "")
+	client.Start(context.Background())
+
+	for i := 0; i < 6000; i++ {
+		client.PushReceivedEnvelope(v2protocol.NewEnvelope(&pb.WakuMessage{
+			Payload:      []byte{1, 2, 3, 4, 5},
+			ContentTopic: testContentTopic,
+			Version:      proto.Uint32(0),
+			Timestamp:    proto.Int64(time.Now().Unix()),
+		}, 0, ""))
+	}
+
+	time.Sleep(110 * time.Millisecond)
+
+	require.Equal(t, 6000, len(client.telemetryRetryCache))
+
+	client.PushReceivedEnvelope(v2protocol.NewEnvelope(&pb.WakuMessage{
+		Payload:      []byte{1, 2, 3, 4, 5},
+		ContentTopic: testContentTopic,
+		Version:      proto.Uint32(0),
+		Timestamp:    proto.Int64(time.Now().Unix()),
+	}, 0, ""))
+
+	time.Sleep(210 * time.Millisecond)
+
+	require.Equal(t, 5001, len(client.telemetryRetryCache))
+}
