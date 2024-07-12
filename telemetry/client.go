@@ -29,6 +29,7 @@ const (
 	UpdateEnvelopeMetric       TelemetryType = "UpdateEnvelope"
 	ReceivedMessagesMetric     TelemetryType = "ReceivedMessages"
 	ErrorSendingEnvelopeMetric TelemetryType = "ErrorSendingEnvelope"
+	PeerCountMetric            TelemetryType = "PeerCount"
 
 	MaxRetryCache = 5000
 )
@@ -55,10 +56,18 @@ func (c *Client) PushErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSendi
 	c.processAndPushTelemetry(errorSendingEnvelope)
 }
 
+func (c *Client) PushPeerCount(peerCount int) {
+	c.processAndPushTelemetry(PeerCount{PeerCount: peerCount})
+}
+
 type ReceivedMessages struct {
 	Filter     transport.Filter
 	SSHMessage *types.Message
 	Messages   []*v1protocol.StatusMessage
+}
+
+type PeerCount struct {
+	PeerCount int
 }
 
 type Client struct {
@@ -183,6 +192,12 @@ func (c *Client) processAndPushTelemetry(data interface{}) {
 			TelemetryType: ErrorSendingEnvelopeMetric,
 			TelemetryData: c.ProcessErrorSendingEnvelope(v),
 		}
+	case PeerCount:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: PeerCountMetric,
+			TelemetryData: c.ProcessPeerCount(v),
+		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
 		return
@@ -213,9 +228,15 @@ func (c *Client) pushTelemetryRequest(request []TelemetryRequest) error {
 		c.logger.Error("Error sending telemetry data", zap.Error(err))
 		return err
 	}
-	if res.StatusCode != http.StatusOK {
-		c.logger.Error("Error sending telemetry data", zap.Int("statusCode", res.StatusCode))
-		return fmt.Errorf("status code %d", res.StatusCode)
+	defer res.Body.Close()
+	var responseBody []map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&responseBody); err != nil {
+		c.logger.Error("Error decoding response body", zap.Error(err))
+		return err
+	}
+	if res.StatusCode != http.StatusCreated {
+		c.logger.Error("Error sending telemetry data", zap.Int("statusCode", res.StatusCode), zap.Any("responseBody", responseBody))
+		return fmt.Errorf("status code %d, response body: %v", res.StatusCode, responseBody)
 	}
 
 	c.telemetryRetryCache = nil
@@ -286,6 +307,19 @@ func (c *Client) ProcessErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSe
 		"publishMethod": errorSendingEnvelope.SentEnvelope.PublishMethod.String(),
 		"statusVersion": c.version,
 		"error":         errorSendingEnvelope.Error.Error(),
+	}
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
+func (c *Client) ProcessPeerCount(peerCount PeerCount) *json.RawMessage {
+	postBody := map[string]interface{}{
+		"peerCount":     peerCount.PeerCount,
+		"nodeName":      c.nodeName,
+		"nodeKeyUID":    c.keyUID,
+		"statusVersion": c.version,
+		"timestamp":     time.Now().Unix(),
 	}
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
