@@ -151,7 +151,18 @@ func (m *Messenger) cycleMailservers() {
 		m.disconnectActiveMailserver()
 	}
 
-	err := m.findNewMailserver()
+	useMailserver, err := m.settings.CanUseMailservers()
+	if err != nil {
+		m.logger.Error("failed to get use mailservers", zap.Error(err))
+		return
+	}
+
+	if !useMailserver {
+		m.logger.Info("Skipping mailserver search due to useMailserver being false")
+		return
+	}
+
+	err = m.findNewMailserver()
 	if err != nil {
 		m.logger.Error("Error getting new mailserver", zap.Error(err))
 	}
