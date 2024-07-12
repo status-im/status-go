@@ -4019,14 +4019,15 @@ func (m *Manager) SaveRequestToJoinAndCommunity(requestToJoin *RequestToJoin, co
 func (m *Manager) CreateRequestToJoin(request *requests.RequestToJoinCommunity, customizationColor multiaccountscommon.CustomizationColor) *RequestToJoin {
 	clock := uint64(time.Now().Unix())
 	requestToJoin := &RequestToJoin{
-		PublicKey:          common.PubkeyToHex(&m.identity.PublicKey),
-		Clock:              clock,
-		ENSName:            request.ENSName,
-		CommunityID:        request.CommunityID,
-		State:              RequestToJoinStatePending,
-		Our:                true,
-		RevealedAccounts:   make([]*protobuf.RevealedAccount, 0),
-		CustomizationColor: customizationColor,
+		PublicKey:            common.PubkeyToHex(&m.identity.PublicKey),
+		Clock:                clock,
+		ENSName:              request.ENSName,
+		CommunityID:          request.CommunityID,
+		State:                RequestToJoinStatePending,
+		Our:                  true,
+		RevealedAccounts:     make([]*protobuf.RevealedAccount, 0),
+		CustomizationColor:   customizationColor,
+		ShareFutureAddresses: request.ShareFutureAddresses,
 	}
 
 	requestToJoin.CalculateID()
