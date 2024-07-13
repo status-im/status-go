@@ -112,6 +112,7 @@ type ITelemetryClient interface {
 	PushSentEnvelope(sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
 	PushPeerCount(peerCount int)
+	PushPeerConnFailures(peerConnFailures map[string]int)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -1275,7 +1276,9 @@ func (w *Waku) Start() error {
 				}
 
 				if w.statusTelemetryClient != nil {
+					connFailures := FormatPeerConnFailures(w.node)
 					w.statusTelemetryClient.PushPeerCount(w.PeerCount())
+					w.statusTelemetryClient.PushPeerConnFailures(connFailures)
 				}
 
 				w.ConnectionChanged(connection.State{
@@ -1951,6 +1954,18 @@ func FormatPeerStats(wakuNode *node.WakuNode) map[string]types.WakuV2Peer {
 
 func (w *Waku) StoreNode() *store.WakuStore {
 	return w.node.Store()
+}
+
+func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
+	p := make(map[string]int)
+	for _, peerID := range wakuNode.Host().Network().Peers() {
+		peerInfo := wakuNode.Host().Peerstore().PeerInfo(peerID)
+		connFailures := wakuNode.Host().Peerstore().(wps.WakuPeerstore).ConnFailures(peerInfo)
+		if connFailures > 0 {
+			p[peerID.String()] = connFailures
+		}
+	}
+	return p
 }
 
 func (w *Waku) LegacyStoreNode() legacy_store.Store {

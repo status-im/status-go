@@ -109,8 +109,6 @@ func (w *Waku) broadcast() {
 			}
 		}
 
-		fn = w.limiter.ThrottlePublishFn(w.ctx, fn)
-
 		// Wraps the publish function with a call to the telemetry client
 		if w.statusTelemetryClient != nil {
 			sendFn := fn
@@ -124,6 +122,9 @@ func (w *Waku) broadcast() {
 				return err
 			}
 		}
+
+		// Wraps the publish function with rate limiter
+		fn = w.limiter.ThrottlePublishFn(w.ctx, fn)
 
 		w.wg.Add(1)
 		go w.publishEnvelope(envelope, fn, logger)
