@@ -48,8 +48,8 @@ var (
 	seedPhrase       = flag.String("seed-phrase", "", "Seed phrase")
 	version          = flag.Bool("version", false, "Print version and dump configuration")
 	communityID      = flag.String("community-id", "", "The id of the community")
-	shardCluster     = flag.Int("shard-cluster", shard.UndefinedShardValue, "The shard cluster in which the of the community is published")
-	shardIndex       = flag.Int("shard-index", shard.UndefinedShardValue, "The shard index in which the community is published")
+	shardCluster     = flag.Int("shard-cluster", shard.MainStatusShardCluster, "The shard cluster in which the of the community is published")
+	shardIndex       = flag.Int("shard-index", shard.DefaultShardIndex, "The shard index in which the community is published")
 	chatID           = flag.String("chat-id", "", "The id of the chat")
 
 	dataDir   = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
@@ -149,7 +149,7 @@ func main() {
 	messenger := wakuextservice.Messenger()
 
 	var s *shard.Shard = nil
-	if shardCluster != nil && shardIndex != nil && *shardCluster != shard.UndefinedShardValue && *shardIndex != shard.UndefinedShardValue {
+	if shardCluster != nil && shardIndex != nil {
 		s = &shard.Shard{
 			Cluster: uint16(*shardCluster),
 			Index:   uint16(*shardIndex),

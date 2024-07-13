@@ -29,11 +29,11 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/wakuv2/common"
@@ -44,7 +44,6 @@ var testBootENRBootstrap = "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJ
 
 func setDefaultConfig(config *Config, lightMode bool) {
 	config.ClusterID = 16
-	config.UseShardAsDefaultTopic = true
 
 	if lightMode {
 		config.EnablePeerExchangeClient = true
@@ -197,7 +196,7 @@ func TestBasicWakuV2(t *testing.T) {
 	filter := &common.Filter{
 		PubsubTopic:   config.DefaultShardPubsubTopic,
 		Messages:      common.NewMemoryMessageStore(),
-		ContentTopics: common.NewTopicSetFromBytes([][]byte{[]byte{1, 2, 3, 4}}),
+		ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
 	}
 
 	_, err = w.Subscribe(filter)
@@ -452,14 +451,13 @@ func TestWakuV2Filter(t *testing.T) {
 func TestWakuV2Store(t *testing.T) {
 	// Configuration for the first Waku node
 	config1 := &Config{
-		Port:                   0,
-		UseShardAsDefaultTopic: true,
-		ClusterID:              16,
-		EnableDiscV5:           false,
-		DiscoveryLimit:         20,
-		EnableStore:            false,
-		StoreCapacity:          100,
-		StoreSeconds:           3600,
+		Port:           0,
+		ClusterID:      16,
+		EnableDiscV5:   false,
+		DiscoveryLimit: 20,
+		EnableStore:    false,
+		StoreCapacity:  100,
+		StoreSeconds:   3600,
 	}
 	w1PeersCh := make(chan []string, 100) // buffered not to block on the send side
 
@@ -478,14 +476,13 @@ func TestWakuV2Store(t *testing.T) {
 	sql2, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 	config2 := &Config{
-		Port:                   0,
-		UseShardAsDefaultTopic: true,
-		ClusterID:              16,
-		EnableDiscV5:           false,
-		DiscoveryLimit:         20,
-		EnableStore:            true,
-		StoreCapacity:          100,
-		StoreSeconds:           3600,
+		Port:           0,
+		ClusterID:      16,
+		EnableDiscV5:   false,
+		DiscoveryLimit: 20,
+		EnableStore:    true,
+		StoreCapacity:  100,
+		StoreSeconds:   3600,
 	}
 
 	// Start the second Waku node
@@ -622,7 +619,7 @@ func TestConfirmMessageDelivered(t *testing.T) {
 	msgTimestamp := aliceNode.timestamp()
 	contentTopic := maps.Keys(filter.ContentTopics)[0]
 
-	_, err = aliceNode.Send(relay.DefaultWakuTopic, &pb.WakuMessage{
+	_, err = aliceNode.Send(shard.DefaultShardPubsubTopic(), &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: contentTopic.ContentTopic(),
 		Version:      proto.Uint32(0),

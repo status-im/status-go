@@ -592,9 +592,10 @@ func (w *Waku) runPeerExchangeLoop() {
 }
 
 func (w *Waku) GetPubsubTopic(topic string) string {
-	if topic == "" || !w.cfg.UseShardAsDefaultTopic {
+	if topic == "" {
 		topic = w.cfg.DefaultShardPubsubTopic
 	}
+
 	return topic
 }
 
@@ -1928,7 +1929,7 @@ func (w *Waku) AddStorePeer(address string) (peer.ID, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, wps.Static, []string{}, legacy_store.StoreID_v20beta4)
+	peerID, err := w.node.AddPeer(addr, wps.Static, w.cfg.DefaultShardedPubsubTopics, legacy_store.StoreID_v20beta4)
 	if err != nil {
 		return "", err
 	}
@@ -1945,7 +1946,7 @@ func (w *Waku) AddRelayPeer(address string) (peer.ID, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, wps.Static, []string{}, relay.WakuRelayID_v200)
+	peerID, err := w.node.AddPeer(addr, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
 	if err != nil {
 		return "", err
 	}

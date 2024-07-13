@@ -59,7 +59,6 @@ func (s *MessengerRawMessageResendTest) SetupTest() {
 		EnableDiscV5:             true,
 		EnablePeerExchangeServer: true,
 		ClusterID:                16,
-		UseShardAsDefaultTopic:   true,
 		DefaultShardPubsubTopic:  shard.DefaultShardPubsubTopic(),
 	}
 	s.exchangeBootNode, err = wakuv2.New(nil, "", exchangeNodeConfig, s.logger.Named("pxServerNode"), nil, nil, nil, nil)

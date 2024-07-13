@@ -4797,7 +4797,7 @@ func (s *MessengerCommunitiesSuite) TestIgnoreOutdatedCommunityDescription() {
 	// Handle first community description
 	{
 		messageState := s.bob.buildMessageState()
-		err = s.bob.handleCommunityDescription(messageState, signer, description1, wrappedDescription1, nil, nil)
+		err = s.bob.handleCommunityDescription(messageState, signer, description1, wrappedDescription1, nil, community.Shard().Protobuffer())
 		s.Require().NoError(err)
 		s.Require().Len(messageState.Response.Communities(), 1)
 		s.Require().Equal(description1.Clock, messageState.Response.Communities()[0].Clock())
@@ -4806,7 +4806,7 @@ func (s *MessengerCommunitiesSuite) TestIgnoreOutdatedCommunityDescription() {
 	// Handle third community description
 	{
 		messageState := s.bob.buildMessageState()
-		err = s.bob.handleCommunityDescription(messageState, signer, description3, wrappedDescription3, nil, nil)
+		err = s.bob.handleCommunityDescription(messageState, signer, description3, wrappedDescription3, nil, community.Shard().Protobuffer())
 		s.Require().NoError(err)
 		s.Require().Len(messageState.Response.Communities(), 1)
 		s.Require().Equal(description3.Clock, messageState.Response.Communities()[0].Clock())
@@ -4821,7 +4821,7 @@ func (s *MessengerCommunitiesSuite) TestIgnoreOutdatedCommunityDescription() {
 	// It should be ignored
 	{
 		messageState := s.bob.buildMessageState()
-		err = s.bob.handleCommunityDescription(messageState, signer, description2, wrappedDescription2, nil, nil)
+		err = s.bob.handleCommunityDescription(messageState, signer, description2, wrappedDescription2, nil, community.Shard().Protobuffer())
 		s.Require().Len(messageState.Response.Communities(), 0)
 		s.Require().Len(messageState.Response.CommunityChanges, 0)
 		s.Require().ErrorIs(err, communities.ErrInvalidCommunityDescriptionClockOutdated)

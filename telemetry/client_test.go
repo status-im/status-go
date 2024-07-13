@@ -198,7 +198,6 @@ func TestTelemetryUponPublishError(t *testing.T) {
 		wakuConfig.EnableDiscV5 = false
 		wakuConfig.DiscV5BootstrapNodes = []string{enrTreeAddress}
 		wakuConfig.DiscoveryLimit = 20
-		wakuConfig.UseShardAsDefaultTopic = true
 		wakuConfig.ClusterID = 16
 		wakuConfig.WakuNodes = []string{enrTreeAddress}
 		wakuConfig.TelemetryServerURL = client.serverURL
@@ -337,7 +336,6 @@ func TestRetryCacheCleanup(t *testing.T) {
 }
 func setDefaultConfig(config *wakuv2.Config, lightMode bool) {
 	config.ClusterID = 16
-	config.UseShardAsDefaultTopic = true
 
 	if lightMode {
 		config.EnablePeerExchangeClient = true

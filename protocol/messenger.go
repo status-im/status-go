@@ -1757,12 +1757,10 @@ func (m *Messenger) InitFilters() error {
 
 	logger := m.logger.With(zap.String("site", "Init"))
 
-	if m.useShards() {
-		// Community requests will arrive in this pubsub topic
-		err := m.SubscribeToPubsubTopic(shard.DefaultNonProtectedPubsubTopic(), nil)
-		if err != nil {
-			return err
-		}
+	// Community requests will arrive in this pubsub topic
+	err := m.SubscribeToPubsubTopic(shard.DefaultNonProtectedPubsubTopic(), nil)
+	if err != nil {
+		return err
 	}
 
 	var (
