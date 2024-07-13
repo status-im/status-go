@@ -27,6 +27,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
+	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
@@ -53,6 +54,7 @@ type WakuNodeParameters struct {
 	hostAddr            *net.TCPAddr
 	maxConnectionsPerIP int
 	clusterID           uint16
+	shards              *protocol.RelayShards
 	dns4Domain          string
 	advertiseAddrs      []multiaddr.Multiaddr
 	multiAddr           []multiaddr.Multiaddr
@@ -313,6 +315,23 @@ func WithPrivateKey(privKey *ecdsa.PrivateKey) WakuNodeOption {
 func WithClusterID(clusterID uint16) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.clusterID = clusterID
+		return nil
+	}
+}
+
+func WithPubSubTopics(topics []string) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		rs, err := protocol.TopicsToRelayShards(topics...)
+		if err != nil {
+			return err
+		}
+		if len(rs) == 0 {
+			return nil
+		}
+		if rs[0].ClusterID != params.clusterID {
+			return errors.New("pubsubtopics have different clusterID than configured clusterID")
+		}
+		params.shards = &rs[0] //Only consider 0 as a node can only support 1 cluster as of now
 		return nil
 	}
 }

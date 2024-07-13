@@ -328,9 +328,9 @@ func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *wpb.WakuMessa
 	req.Message = message
 	req.PubsubTopic = params.pubsubTopic
 
-	logger := message.Logger(wakuLP.log, params.pubsubTopic).With(zap.Stringers("peerIDs", params.selectedPeers))
+	logger := message.Logger(wakuLP.log, params.pubsubTopic)
 
-	logger.Debug("publishing message")
+	logger.Debug("publishing message", zap.Stringers("peers", params.selectedPeers))
 	var wg sync.WaitGroup
 	var responses []*pb.PushResponse
 	for _, peerID := range params.selectedPeers {
