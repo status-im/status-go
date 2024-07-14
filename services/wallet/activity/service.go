@@ -217,7 +217,7 @@ func (s *Service) getActivityDetails(ctx context.Context, entries []Entry) ([]*E
 	res := make([]*EntryData, 0)
 	var err error
 	ids := make([]thirdparty.CollectibleUniqueID, 0)
-	entriesForIds := make([]*Entry, 0)
+	entriesForIds := make(map[string][]*Entry)
 
 	idExists := func(ids []thirdparty.CollectibleUniqueID, id *thirdparty.CollectibleUniqueID) bool {
 		for _, existingID := range ids {
@@ -234,12 +234,14 @@ func (s *Service) getActivityDetails(ctx context.Context, entries []Entry) ([]*E
 		}
 
 		id := entries[i].anyIdentity()
-		if id == nil || idExists(ids, id) {
+		if id == nil {
 			continue
 		}
 
-		ids = append(ids, *id)
-		entriesForIds = append(entriesForIds, &entries[i])
+		entriesForIds[id.HashKey()] = append(entriesForIds[id.HashKey()], &entries[i])
+		if !idExists(ids, id) {
+			ids = append(ids, *id)
+		}
 	}
 
 	if len(ids) == 0 {
@@ -255,25 +257,33 @@ func (s *Service) getActivityDetails(ctx context.Context, entries []Entry) ([]*E
 	}
 
 	for _, col := range colData {
-		data := &EntryData{
-			NftName: w_common.NewAndSet(col.CollectibleData.Name),
-			NftURL:  w_common.NewAndSet(col.CollectibleData.ImageURL),
-		}
+		nftName := w_common.NewAndSet(col.CollectibleData.Name)
+		nftURL := w_common.NewAndSet(col.CollectibleData.ImageURL)
 		for i := range ids {
-			if col.CollectibleData.ID.Same(&ids[i]) {
-				if entriesForIds[i].payloadType == MultiTransactionPT {
-					data.ID = w_common.NewAndSet(entriesForIds[i].id)
+			if !col.CollectibleData.ID.Same(&ids[i]) {
+				continue
+			}
+
+			entryList, ok := entriesForIds[ids[i].HashKey()]
+			if !ok {
+				continue
+			}
+			for _, e := range entryList {
+				data := &EntryData{
+					NftName: nftName,
+					NftURL:  nftURL,
+				}
+				if e.payloadType == MultiTransactionPT {
+					data.ID = w_common.NewAndSet(e.id)
 				} else {
-					data.Transaction = entriesForIds[i].transaction
+					data.Transaction = e.transaction
 				}
 
-				data.PayloadType = entriesForIds[i].payloadType
+				data.PayloadType = e.payloadType
+				res = append(res, data)
 			}
 		}
-
-		res = append(res, data)
 	}
-
 	return res, nil
 }
 

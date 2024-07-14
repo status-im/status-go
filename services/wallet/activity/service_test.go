@@ -175,17 +175,35 @@ func TestService_UpdateCollectibleInfo(t *testing.T) {
 	}).Return([]thirdparty.FullCollectibleData{
 		{
 			CollectibleData: thirdparty.CollectibleData{
+				ID: thirdparty.CollectibleUniqueID{
+					ContractID: thirdparty.ContractID{
+						ChainID: args[4].chainID,
+						Address: *args[4].tokenAddress},
+					TokenID: &bigint.BigInt{Int: args[4].tokenID},
+				},
 				Name:     "Test 4",
 				ImageURL: "test://url/4"},
 			CollectionData: nil,
 		}, {
 			CollectibleData: thirdparty.CollectibleData{
+				ID: thirdparty.CollectibleUniqueID{
+					ContractID: thirdparty.ContractID{
+						ChainID: args[1].chainID,
+						Address: *args[1].tokenAddress},
+					TokenID: &bigint.BigInt{Int: args[1].tokenID},
+				},
 				Name:     "Test 1",
 				ImageURL: "test://url/1"},
 			CollectionData: nil,
 		},
 		{
 			CollectibleData: thirdparty.CollectibleData{
+				ID: thirdparty.CollectibleUniqueID{
+					ContractID: thirdparty.ContractID{
+						ChainID: args[0].chainID,
+						Address: *args[0].tokenAddress},
+					TokenID: &bigint.BigInt{Int: args[0].tokenID},
+				},
 				Name:     "Test 0",
 				ImageURL: "test://url/0"},
 			CollectionData: nil,
@@ -216,14 +234,17 @@ func TestService_UpdateCollectibleInfo(t *testing.T) {
 		}
 	}
 
+	// FetchAssetsByCollectibleUniqueID will receive only unique ids, while number of entries can be bigger
 	require.Equal(t, 1, filterResponseCount)
-	require.Equal(t, 3, len(updates))
+	require.Equal(t, 4, len(updates))
 	require.Equal(t, "Test 4", *updates[0].NftName)
 	require.Equal(t, "test://url/4", *updates[0].NftURL)
 	require.Equal(t, "Test 1", *updates[1].NftName)
 	require.Equal(t, "test://url/1", *updates[1].NftURL)
-	require.Equal(t, "Test 0", *updates[2].NftName)
-	require.Equal(t, "test://url/0", *updates[2].NftURL)
+	require.Equal(t, "Test 1", *updates[2].NftName)
+	require.Equal(t, "test://url/1", *updates[2].NftURL)
+	require.Equal(t, "Test 0", *updates[3].NftName)
+	require.Equal(t, "test://url/0", *updates[3].NftURL)
 
 	sub.Unsubscribe()
 }
