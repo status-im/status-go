@@ -10,7 +10,7 @@ import (
 
 const (
 	eip712Domain = "EIP712Domain"
-	chainIDKey   = "chainId"
+	ChainIDKey   = "chainId"
 )
 
 // Types define fields for each composite type.
@@ -73,13 +73,13 @@ func (t TypedData) Validate() error {
 
 // ValidateChainID accept chain as big integer and verifies if typed data belongs to the same chain.
 func (t TypedData) ValidateChainID(chain *big.Int) error {
-	if _, exist := t.Domain[chainIDKey]; !exist {
-		return fmt.Errorf("domain misses chain key %s", chainIDKey)
+	if _, exist := t.Domain[ChainIDKey]; !exist {
+		return fmt.Errorf("domain misses chain key %s", ChainIDKey)
 	}
 	var chainID int64
-	if err := json.Unmarshal(t.Domain[chainIDKey], &chainID); err != nil {
+	if err := json.Unmarshal(t.Domain[ChainIDKey], &chainID); err != nil {
 		var chainIDString string
-		if err = json.Unmarshal(t.Domain[chainIDKey], &chainIDString); err != nil {
+		if err = json.Unmarshal(t.Domain[ChainIDKey], &chainIDString); err != nil {
 			return err
 		}
 		if chainID, err = strconv.ParseInt(chainIDString, 0, 64); err != nil {

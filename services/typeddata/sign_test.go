@@ -17,11 +17,11 @@ func TestChainIDValidation(t *testing.T) {
 	for _, tc := range []testCase{
 		{
 			"ChainIDMismatch",
-			map[string]json.RawMessage{chainIDKey: json.RawMessage("1")},
+			map[string]json.RawMessage{ChainIDKey: json.RawMessage("1")},
 		},
 		{
 			"ChainIDNotAnInt",
-			map[string]json.RawMessage{chainIDKey: json.RawMessage(`"aa"`)},
+			map[string]json.RawMessage{ChainIDKey: json.RawMessage(`"aa"`)},
 		},
 		{
 			"NoChainIDKey",
