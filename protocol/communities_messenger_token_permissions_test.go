@@ -163,7 +163,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 
 	s.logger = tt.MustCreateTestLogger()
 
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, false, []string{"owner", "bob", "alice"})
+	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "bob", "alice"})
 
 	s.ownerWaku = wakuNodes[0]
 	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, s.ownerWaku, "owner", []Option{})
@@ -465,10 +465,9 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	var err error
 
 	cfg := testWakuV2Config{
-		logger:                 s.logger.Named("store-node-waku"),
-		enableStore:            false,
-		useShardAsDefaultTopic: false,
-		clusterID:              shard.UndefinedShardValue,
+		logger:      s.logger.Named("store-node-waku"),
+		enableStore: false,
+		clusterID:   shard.MainStatusShardCluster,
 	}
 	wakuStoreNode := NewTestWakuV2(&s.Suite, cfg)
 
@@ -480,7 +479,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 
 	// Create messengers
 
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, false, []string{"owner", "bob"})
+	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "bob"})
 	s.ownerWaku = wakuNodes[0]
 	s.bobWaku = wakuNodes[1]
 

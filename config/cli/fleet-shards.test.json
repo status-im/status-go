@@ -28,7 +28,6 @@
     ]
   },
   "WakuV2Config": {
-    "Enabled": true,
-    "UseShardAsDefaultTopic": true
+    "Enabled": true
   }
 }

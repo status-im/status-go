@@ -133,7 +133,6 @@ func WithAutomaticRequestID() RequestOption {
 // DefaultOptions are the default options to be used when using the lightpush protocol
 func DefaultOptions(host host.Host) []RequestOption {
 	return []RequestOption{
-		WithAutomaticRequestID(),
 		WithAutomaticPeerSelection(),
 		WithMaxPeers(1), //keeping default as 2 for status use-case
 	}

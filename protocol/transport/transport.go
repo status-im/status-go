@@ -165,8 +165,8 @@ func (t *Transport) LoadFilters(filters []*Filter) ([]*Filter, error) {
 	return t.filters.InitWithFilters(filters)
 }
 
-func (t *Transport) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize, useShards bool) ([]*Filter, error) {
-	return t.filters.InitCommunityFilters(communityFiltersToInitialize, useShards)
+func (t *Transport) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize) ([]*Filter, error) {
+	return t.filters.InitCommunityFilters(communityFiltersToInitialize)
 }
 
 func (t *Transport) RemoveFilters(filters []*Filter) error {

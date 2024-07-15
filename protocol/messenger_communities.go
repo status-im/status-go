@@ -156,6 +156,7 @@ func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) err
 	messageID, err := m.sender.SendPublic(context.Background(), org.IDString(), rawMessage)
 	if err == nil {
 		m.logger.Debug("published community",
+			zap.String("pubsubTopic", org.PubsubTopic()),
 			zap.String("communityID", org.IDString()),
 			zap.String("messageID", hexutil.Encode(messageID)),
 			zap.Uint64("clock", org.Clock()),
@@ -2423,16 +2424,8 @@ func (m *Messenger) DeleteCommunityChat(communityID types.HexBytes, chatID strin
 	return response, nil
 }
 
-func (m *Messenger) useShards() bool {
-	nodeConfig, err := m.settings.GetNodeConfig()
-	if err != nil {
-		return false
-	}
-	return nodeConfig.WakuV2Config.UseShardAsDefaultTopic
-}
-
 func (m *Messenger) InitCommunityFilters(communityFiltersToInitialize []transport.CommunityFilterToInitialize) ([]*transport.Filter, error) {
-	return m.transport.InitCommunityFilters(communityFiltersToInitialize, m.useShards())
+	return m.transport.InitCommunityFilters(communityFiltersToInitialize)
 }
 
 func (m *Messenger) DefaultFilters(o *communities.Community) []transport.FiltersToInitialize {
@@ -2449,12 +2442,7 @@ func (m *Messenger) DefaultFilters(o *communities.Community) []transport.Filters
 		{ChatID: updatesChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: mlChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
-	}
-
-	if m.useShards() {
-		filters = append(filters, transport.FiltersToInitialize{ChatID: uncompressedPubKey, PubsubTopic: shard.DefaultNonProtectedPubsubTopic()})
-	} else {
-		filters = append(filters, transport.FiltersToInitialize{ChatID: uncompressedPubKey, PubsubTopic: communityPubsubTopic})
+		{ChatID: uncompressedPubKey, PubsubTopic: shard.DefaultNonProtectedPubsubTopic()},
 	}
 
 	return filters
@@ -3769,7 +3757,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 		return err
 	}
 
-	// TODO: handle shard
+	// Passing shard as nil so that defaultProtected shard 32 is considered
 	err = m.handleCommunityDescription(messageState, signer, &cd, syncCommunity.Description, signer, nil)
 	// Even if the Description is outdated we should proceed in order to sync settings and joined state
 	if err != nil && err != communities.ErrInvalidCommunityDescriptionClockOutdated {

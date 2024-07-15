@@ -145,7 +145,7 @@ type CommunityFilterToInitialize struct {
 	PrivKey *ecdsa.PrivateKey
 }
 
-func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize, useShards bool) ([]*Filter, error) {
+func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize) ([]*Filter, error) {
 	var filters []*Filter
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
@@ -158,12 +158,8 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 		}
 
 		topics := make([]string, 0)
-		if useShards {
-			topics = append(topics, shard.DefaultNonProtectedPubsubTopic())
-		} else {
-			topics = append(topics, "") // empty PubsubTopic means default pubsub topic,
-			// to be overridden with proper value in Waku layer
-		}
+		topics = append(topics, shard.DefaultNonProtectedPubsubTopic())
+		topics = append(topics, communityFilter.Shard.PubsubTopic())
 
 		for _, pubsubTopic := range topics {
 			pk := &cf.PrivKey.PublicKey
@@ -174,7 +170,7 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 				return nil, err
 
 			}
-			filterID := identityStr + "-admin"
+			filterID := identityStr + "-admin" + pubsubTopic
 			filter := &Filter{
 				ChatID:       filterID,
 				FilterID:     rawFilter.FilterID,
@@ -187,7 +183,7 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 
 			f.filters[filterID] = filter
 
-			f.logger.Debug("registering filter for", zap.String("chatID", filterID), zap.String("type", "community"), zap.String("topic", rawFilter.Topic.String()))
+			f.logger.Debug("registering filter for", zap.String("chatID", filterID), zap.String("type", "community"), zap.String("pubsubTopic", pubsubTopic), zap.String("contentTopic", rawFilter.Topic.String()))
 
 			filters = append(filters, filter)
 		}
@@ -543,6 +539,17 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 	defer f.mutex.Unlock()
 
 	if chat, ok := f.filters[chatID]; ok {
+		if chat.PubsubTopic != pubsubTopic {
+			f.logger.Debug("updating pubsub topic for filter",
+				zap.String("chatID", chatID),
+				zap.String("type", "public"),
+				zap.String("oldTOpic", chat.PubsubTopic),
+				zap.String("newTopic", pubsubTopic),
+			)
+			chat.PubsubTopic = pubsubTopic
+			f.filters[chatID] = chat
+		}
+
 		return chat, nil
 	}
 

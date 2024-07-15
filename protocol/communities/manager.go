@@ -2155,6 +2155,12 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		if err != nil {
 			return nil, err
 		}
+		var cShard *shard.Shard
+		if communityShard == nil {
+			cShard = &shard.Shard{Cluster: shard.MainStatusShardCluster, Index: shard.DefaultShardIndex}
+		} else {
+			cShard = shard.FromProtobuff(communityShard)
+		}
 		config := Config{
 			CommunityDescription:                processedDescription,
 			Logger:                              m.logger,
@@ -2162,7 +2168,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 			MemberIdentity:                      m.identity,
 			ID:                                  pubKey,
 			ControlNode:                         signer,
-			Shard:                               shard.FromProtobuff(communityShard),
+			Shard:                               cShard,
 		}
 
 		var descriptionEncryptor DescriptionEncryptor

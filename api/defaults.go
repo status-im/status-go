@@ -155,7 +155,6 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 
 	if fleet == params.FleetShardsTest {
 		nodeConfig.ClusterConfig.ClusterID = shardsTestClusterID
-		nodeConfig.WakuV2Config.UseShardAsDefaultTopic = true
 	}
 
 	return nil

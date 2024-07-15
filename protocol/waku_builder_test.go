@@ -18,16 +18,14 @@ import (
 )
 
 type testWakuV2Config struct {
-	logger                 *zap.Logger
-	enableStore            bool
-	useShardAsDefaultTopic bool
-	clusterID              uint16
-	nodekey                []byte
+	logger      *zap.Logger
+	enableStore bool
+	clusterID   uint16
+	nodekey     []byte
 }
 
 func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 	wakuConfig := &waku2.Config{
-		UseShardAsDefaultTopic:   cfg.useShardAsDefaultTopic,
 		ClusterID:                cfg.clusterID,
 		LightClient:              false,
 		EnablePeerExchangeServer: true,
@@ -41,12 +39,10 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 	}
 
 	var db *sql.DB
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	s.Require().NoError(err)
 
 	if cfg.enableStore {
-		var err error
-		db, err = helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-		s.Require().NoError(err)
-
 		wakuConfig.EnableStore = true
 		wakuConfig.StoreCapacity = 200
 		wakuConfig.StoreSeconds = 200
@@ -65,21 +61,24 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 	s.Require().NoError(err)
 
 	err = wakuNode.Start()
+	if cfg.enableStore {
+		err := wakuNode.SubscribeToPubsubTopic(shard.DefaultNonProtectedPubsubTopic(), nil)
+		s.Require().NoError(err)
+	}
 	s.Require().NoError(err)
 
 	return wakuNode
 }
 
-func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, useShardAsDefaultTopic bool, nodeNames []string) []types.Waku {
+func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []string) []types.Waku {
 	nodes := make([]*waku2.Waku, len(nodeNames))
 	wrappers := make([]types.Waku, len(nodes))
 
 	for i, name := range nodeNames {
 		nodes[i] = NewTestWakuV2(s, testWakuV2Config{
-			logger:                 parentLogger.Named("waku-" + name),
-			enableStore:            false,
-			useShardAsDefaultTopic: useShardAsDefaultTopic,
-			clusterID:              shard.UndefinedShardValue, // FIXME: why it was 0 here?
+			logger:      parentLogger.Named("waku-" + name),
+			enableStore: false,
+			clusterID:   shard.MainStatusShardCluster,
 		})
 	}
 

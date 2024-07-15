@@ -147,6 +147,17 @@ func (wf *WakuFilterLightNode) Stop() {
 	})
 }
 
+func (wf *WakuFilterLightNode) unsubscribeWithoutSubscription(cf protocol.ContentFilter, peerID peer.ID) {
+	err := wf.request(
+		wf.Context(),
+		protocol.GenerateRequestID(),
+		pb.FilterSubscribeRequest_UNSUBSCRIBE_ALL,
+		cf, peerID)
+	if err != nil {
+		wf.log.Warn("could not unsubscribe from peer", logging.HostID("peerID", peerID), zap.Error(err))
+	}
+}
+
 func (wf *WakuFilterLightNode) onRequest(ctx context.Context) func(network.Stream) {
 	return func(stream network.Stream) {
 		peerID := stream.Conn().RemotePeer()
@@ -156,6 +167,9 @@ func (wf *WakuFilterLightNode) onRequest(ctx context.Context) func(network.Strea
 		if !wf.subscriptions.IsSubscribedTo(peerID) {
 			logger.Warn("received message push from unknown peer", logging.HostID("peerID", peerID))
 			wf.metrics.RecordError(unknownPeerMessagePush)
+			//Send a wildcard unsubscribe to this peer so that further requests are not forwarded to us
+			//This could be happening due to https://github.com/waku-org/go-waku/issues/1124
+			go wf.unsubscribeWithoutSubscription(protocol.ContentFilter{}, peerID)
 			if err := stream.Reset(); err != nil {
 				wf.log.Error("resetting connection", zap.Error(err))
 			}
@@ -199,22 +213,24 @@ func (wf *WakuFilterLightNode) onRequest(ctx context.Context) func(network.Strea
 		}
 
 		logger = messagePush.WakuMessage.Logger(logger, pubSubTopic)
-
-		if !wf.subscriptions.Has(peerID, protocol.NewContentFilter(pubSubTopic, messagePush.WakuMessage.ContentTopic)) {
+		cf := protocol.NewContentFilter(pubSubTopic, messagePush.WakuMessage.ContentTopic)
+		if !wf.subscriptions.Has(peerID, cf) {
 			logger.Warn("received messagepush with invalid subscription parameters")
+			//Unsubscribe from that peer for the contentTopic, possibly due to https://github.com/waku-org/go-waku/issues/1124
+			go wf.unsubscribeWithoutSubscription(cf, peerID)
 			wf.metrics.RecordError(invalidSubscriptionMessage)
 			return
 		}
 
 		wf.metrics.RecordMessage()
 
-		wf.notify(peerID, pubSubTopic, messagePush.WakuMessage)
+		wf.notify(ctx, peerID, pubSubTopic, messagePush.WakuMessage)
 
 		logger.Info("received message push")
 	}
 }
 
-func (wf *WakuFilterLightNode) notify(remotePeerID peer.ID, pubsubTopic string, msg *wpb.WakuMessage) {
+func (wf *WakuFilterLightNode) notify(ctx context.Context, remotePeerID peer.ID, pubsubTopic string, msg *wpb.WakuMessage) {
 	envelope := protocol.NewEnvelope(msg, wf.timesource.Now().UnixNano(), pubsubTopic)
 
 	if wf.broadcaster != nil {
@@ -222,7 +238,7 @@ func (wf *WakuFilterLightNode) notify(remotePeerID peer.ID, pubsubTopic string, 
 		wf.broadcaster.Submit(envelope)
 	}
 	// Notify filter subscribers
-	wf.subscriptions.Notify(remotePeerID, envelope)
+	wf.subscriptions.Notify(ctx, remotePeerID, envelope)
 }
 
 func (wf *WakuFilterLightNode) request(ctx context.Context, requestID []byte,

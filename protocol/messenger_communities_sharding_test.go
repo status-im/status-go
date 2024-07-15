@@ -39,10 +39,9 @@ type MessengerCommunitiesShardingSuite struct {
 func (s *MessengerCommunitiesShardingSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, true, []string{"owner", "alice"})
+	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "alice"})
 
 	nodeConfig := defaultTestCommunitiesMessengerNodeConfig()
-	nodeConfig.WakuV2Config.UseShardAsDefaultTopic = true
 
 	s.ownerWaku = wakuNodes[0]
 	s.owner = newTestCommunitiesMessenger(&s.Suite, s.ownerWaku, testCommunitiesMessengerConfig{

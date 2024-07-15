@@ -23,8 +23,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-
 	"github.com/status-im/status-go/protocol/common/shard"
 
 	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
@@ -63,7 +61,6 @@ type Config struct {
 	TelemetrySendPeriodMs                  int              `toml:",omitempty"` // Number of milliseconds to wait between sending requests to telemetry service
 	DefaultShardPubsubTopic                string           `toml:",omitempty"` // Pubsub topic to be used by default for messages that do not have a topic assigned (depending whether sharding is used or not)
 	DefaultShardedPubsubTopics             []string         `toml:", omitempty"`
-	UseShardAsDefaultTopic                 bool             `toml:",omitempty"`
 	ClusterID                              uint16           `toml:",omitempty"`
 	EnableConfirmations                    bool             `toml:",omitempty"` // Enable sending message confirmations
 	SkipPublishToTopic                     bool             `toml:",omitempty"` // Used in testing
@@ -119,14 +116,10 @@ func setDefaults(cfg *Config) *Config {
 	}
 
 	if cfg.DefaultShardPubsubTopic == "" {
-		if cfg.UseShardAsDefaultTopic {
-			cfg.DefaultShardPubsubTopic = shard.DefaultShardPubsubTopic()
-			//For now populating with both used shards, but this can be populated from user subscribed communities etc once community sharding is implemented
-			cfg.DefaultShardedPubsubTopics = append(cfg.DefaultShardedPubsubTopics, shard.DefaultShardPubsubTopic())
-			cfg.DefaultShardedPubsubTopics = append(cfg.DefaultShardedPubsubTopics, shard.DefaultNonProtectedPubsubTopic())
-		} else {
-			cfg.DefaultShardPubsubTopic = relay.DefaultWakuTopic
-		}
+		cfg.DefaultShardPubsubTopic = shard.DefaultShardPubsubTopic()
+		//For now populating with both used shards, but this can be populated from user subscribed communities etc once community sharding is implemented
+		cfg.DefaultShardedPubsubTopics = append(cfg.DefaultShardedPubsubTopics, shard.DefaultShardPubsubTopic())
+		cfg.DefaultShardedPubsubTopics = append(cfg.DefaultShardedPubsubTopics, shard.DefaultNonProtectedPubsubTopic())
 	}
 
 	return cfg

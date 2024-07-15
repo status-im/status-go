@@ -86,10 +86,9 @@ func (s *MessengerStoreNodeCommunitySuite) TearDown() {
 
 func (s *MessengerStoreNodeCommunitySuite) createStore(name string) (*waku2.Waku, string) {
 	cfg := testWakuV2Config{
-		logger:                 s.logger.Named(name),
-		enableStore:            true,
-		useShardAsDefaultTopic: false,
-		clusterID:              shard.UndefinedShardValue,
+		logger:      s.logger.Named(name),
+		enableStore: true,
+		clusterID:   shard.MainStatusShardCluster,
 	}
 
 	storeNode := NewTestWakuV2(&s.Suite, cfg)
@@ -104,10 +103,9 @@ func (s *MessengerStoreNodeCommunitySuite) newMessenger(name, storenodeAddress s
 
 	logger := s.logger.Named(name)
 	cfg := testWakuV2Config{
-		logger:                 logger,
-		enableStore:            false,
-		useShardAsDefaultTopic: false,
-		clusterID:              shard.UndefinedShardValue,
+		logger:      logger,
+		enableStore: false,
+		clusterID:   shard.MainStatusShardCluster,
 	}
 	wakuV2 := NewTestWakuV2(&s.Suite, cfg)
 	wakuV2Wrapper := gethbridge.NewGethWakuV2Wrapper(wakuV2)
