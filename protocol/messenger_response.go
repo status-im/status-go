@@ -46,7 +46,6 @@ type SeenUnseenMessages struct {
 
 type MessengerResponse struct {
 	Contacts                      []*Contact
-	Installations                 []*multidevice.Installation
 	Invitations                   []*GroupChatInvitation
 	CommunityChanges              []*communities.CommunityChanges
 	AnonymousMetrics              []*appmetrics.AppMetric
@@ -68,6 +67,7 @@ type MessengerResponse struct {
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
+	installations                    map[string]*multidevice.Installation
 	notifications                    map[string]*localnotifications.Notification
 	requestsToJoinCommunity          map[string]*communities.RequestToJoin
 	chats                            map[string]*Chat
@@ -143,7 +143,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		SeenAndUnseenMessages            []*SeenUnseenMessages                   `json:"seenAndUnseenMessages,omitempty"`
 	}{
 		Contacts:                r.Contacts,
-		Installations:           r.Installations,
+		Installations:           r.Installations(),
 		Invitations:             r.Invitations,
 		CommunityChanges:        r.CommunityChanges,
 		RequestsToJoinCommunity: r.RequestsToJoinCommunity(),
@@ -194,6 +194,14 @@ func (r *MessengerResponse) Chats() []*Chat {
 		chats = append(chats, chat)
 	}
 	return chats
+}
+
+func (r *MessengerResponse) Installations() []*multidevice.Installation {
+	var is []*multidevice.Installation
+	for _, i := range r.installations {
+		is = append(is, i)
+	}
+	return is
 }
 
 func (r *MessengerResponse) RemovedChats() []string {
@@ -301,7 +309,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.Bookmarks)+
 		len(r.clearedHistories)+
 		len(r.Settings)+
-		len(r.Installations)+
+		len(r.installations)+
 		len(r.Invitations)+
 		len(r.emojiReactions)+
 		len(r.communities)+
@@ -358,7 +366,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddActivityCenterNotifications(response.ActivityCenterNotifications())
 	r.SetActivityCenterState(response.ActivityCenterState())
 	r.AddEmojiReactions(response.EmojiReactions())
-	r.AddInstallations(response.Installations)
+	r.AddInstallations(response.Installations())
 	r.AddSavedAddresses(response.SavedAddresses())
 	r.AddEnsUsernameDetails(response.EnsUsernameDetails())
 	r.AddRequestsToJoinCommunity(response.RequestsToJoinCommunity())
@@ -796,14 +804,11 @@ func (r *MessengerResponse) AddContacts(contacts []*Contact) {
 
 func (r *MessengerResponse) AddInstallation(i *multidevice.Installation) {
 
-	for idx, i1 := range r.Installations {
-		if i1.ID == i.ID {
-			r.Installations[idx] = i
-			return
-		}
+	if len(r.installations) == 0 {
+		r.installations = make(map[string]*multidevice.Installation)
 	}
+	r.installations[i.ID+i.Identity] = i
 
-	r.Installations = append(r.Installations, i)
 }
 
 func (r *MessengerResponse) AddInstallations(installations []*multidevice.Installation) {
