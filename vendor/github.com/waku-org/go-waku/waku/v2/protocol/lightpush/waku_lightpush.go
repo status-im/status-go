@@ -189,13 +189,6 @@ func (wakuLP *WakuLightPush) reply(stream network.Stream, responsePushRPC *pb.Pu
 
 // request sends a message via lightPush protocol to either a specified peer or peer that is selected.
 func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, params *lightPushRequestParameters, peer peer.ID) (*pb.PushResponse, error) {
-	if params == nil {
-		return nil, errors.New("lightpush params are mandatory")
-	}
-
-	if len(params.requestID) == 0 {
-		return nil, ErrInvalidID
-	}
 
 	logger := wakuLP.log.With(logging.HostID("peer", peer))
 
@@ -336,8 +329,10 @@ func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *wpb.WakuMessa
 	for _, peerID := range params.selectedPeers {
 		wg.Add(1)
 		go func(id peer.ID) {
+			paramsValue := *params
+			paramsValue.requestID = protocol.GenerateRequestID()
 			defer wg.Done()
-			response, err := wakuLP.request(ctx, req, params, id)
+			response, err := wakuLP.request(ctx, req, &paramsValue, id)
 			if err != nil {
 				logger.Error("could not publish message", zap.Error(err), zap.Stringer("peer", id))
 			}
