@@ -30,20 +30,17 @@ func NewClientSideHandler() *ClientSideHandler {
 	}
 }
 
-func (c *ClientSideHandler) RequestShareAccountForDApp(dApp DAppData) (types.Address, error) {
+func (c *ClientSideHandler) RequestShareAccountForDApp(dApp DAppData, chainIDs []uint64) (types.Address, uint64, error) {
 	signal.SendConnectorSendRequestAccounts(dApp.Origin, dApp.Name, dApp.IconUrl)
 
 	select {
 	case response := <-c.requestAccountsResponseChannel:
 		if response.Error != nil {
-			return types.Address{}, *response.Error
+			return types.Address{}, 0, *response.Error
 		}
-		if len(response.Accounts) == 0 {
-			return types.Address{}, ErrEmptyAccountsShared
-		}
-		return response.Accounts[0], nil
+		return response.Account, response.ChainID, nil
 	case <-time.After(WalletResponseMaxInterval):
-		return types.Address{}, ErrWalletResponseTimeout
+		return types.Address{}, 0, ErrWalletResponseTimeout
 	}
 }
 

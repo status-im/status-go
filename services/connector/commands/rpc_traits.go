@@ -32,23 +32,24 @@ type RPCCommand interface {
 }
 
 type DAppData struct {
-	Origin  string
-	Name    string
-	IconUrl string
+	Origin  string `json:"origin"`
+	Name    string `json:"name"`
+	IconUrl string `json:"iconUrl"`
 }
 
 type RequestAccountsFinishedArgs struct {
-	Accounts []types.Address
-	Error    *error
+	Account types.Address `json:"account"`
+	ChainID uint64        `json:"chainId"`
+	Error   *error        `json:"error"`
 }
 
 type SendTransactionFinishedArgs struct {
-	Hash  types.Hash
-	Error *error
+	Hash  types.Hash `json:"hash"`
+	Error *error     `json:"error"`
 }
 
 type ClientSideHandlerInterface interface {
-	RequestShareAccountForDApp(dApp DAppData) (types.Address, error)
+	RequestShareAccountForDApp(dApp DAppData, chainIDs []uint64) (types.Address, uint64, error)
 	RequestSendTransaction(dApp DAppData, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error)
 
 	RequestAccountsFinished(args RequestAccountsFinishedArgs) error

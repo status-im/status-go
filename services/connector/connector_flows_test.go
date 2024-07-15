@@ -57,8 +57,9 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 			assert.NoError(t, err)
 
 			err = api.RequestAccountsFinished(commands.RequestAccountsFinishedArgs{
-				Accounts: []types.Address{accountAddress},
-				Error:    nil,
+				Account: accountAddress,
+				ChainID: 0x1,
+				Error:   nil,
 			})
 			assert.NoError(t, err)
 		case signal.EventConnectorSendTransaction:

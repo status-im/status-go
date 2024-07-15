@@ -2,6 +2,7 @@ package commands
 
 import (
 	"errors"
+	"slices"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	persistence "github.com/status-im/status-go/services/connector/database"
@@ -11,7 +12,7 @@ import (
 var (
 	ErrAccountsRequestDeniedByUser = errors.New("accounts request denied by user")
 	ErrNoAccountsAvailable         = errors.New("no accounts available")
-	ErrNoDefaultNetworkAvailable   = errors.New("no default network available")
+	ErrNotSupportedNetwork         = errors.New("not supported network")
 )
 
 type RequestAccountsCommand struct {
@@ -26,18 +27,17 @@ type RawAccountsResponse struct {
 	Result  []accounts.Account `json:"result"`
 }
 
-func (c *RequestAccountsCommand) getDefaultChainID() (uint64, error) {
+func (c *RequestAccountsCommand) getActiveChainIDs() ([]uint64, error) {
 	networks, err := c.NetworkManager.GetActiveNetworks()
 	if err != nil {
-		return 0, err
+		return []uint64{}, err
 	}
 
-	for _, network := range networks {
-		if network.Layer == 1 {
-			return network.ChainID, nil
-		}
+	chainIDs := make([]uint64, len(networks))
+	for i, network := range networks {
+		chainIDs[i] = network.ChainID
 	}
-	return 0, ErrNoDefaultNetworkAvailable
+	return chainIDs, nil
 }
 
 func (c *RequestAccountsCommand) Execute(request RPCRequest) (string, error) {
@@ -54,14 +54,18 @@ func (c *RequestAccountsCommand) Execute(request RPCRequest) (string, error) {
 
 	// FIXME: this may have a security issue in case some malicious software tries to fake the origin
 	if dApp == nil {
-		account, err := c.ClientHandler.RequestShareAccountForDApp(dAppData)
+		chainIDs, err := c.getActiveChainIDs()
 		if err != nil {
 			return "", err
 		}
 
-		chainID, err := c.getDefaultChainID()
+		account, chainID, err := c.ClientHandler.RequestShareAccountForDApp(dAppData, chainIDs)
 		if err != nil {
 			return "", err
+		}
+
+		if !slices.Contains(chainIDs, chainID) {
+			return "", ErrNotSupportedNetwork
 		}
 
 		dApp = &persistence.DApp{

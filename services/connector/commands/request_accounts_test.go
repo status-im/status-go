@@ -35,9 +35,13 @@ func TestRequestAccountsWithSignalTimeout(t *testing.T) {
 
 	clientHandler := NewClientSideHandler()
 
+	nm := NetworkManagerMock{}
+	nm.SetNetworks([]*params.Network{})
+
 	cmd := &RequestAccountsCommand{
 		ClientHandler:   clientHandler,
 		AccountsCommand: AccountsCommand{Db: db},
+		NetworkManager:  &nm,
 	}
 
 	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x01})
@@ -92,8 +96,9 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 			assert.NoError(t, err)
 
 			err = clientHandler.RequestAccountsFinished(RequestAccountsFinishedArgs{
-				Accounts: []types.Address{accountAddress},
-				Error:    nil,
+				Account: accountAddress,
+				ChainID: walletCommon.EthereumMainnet,
+				Error:   nil,
 			})
 			assert.NoError(t, err)
 		}
