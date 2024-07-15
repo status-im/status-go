@@ -29,7 +29,7 @@ func TestFailToRequestAccountsWithMissingDAppFields(t *testing.T) {
 	assert.Empty(t, result)
 }
 
-func TestRequestAccountsWithSignalTimout(t *testing.T) {
+func TestRequestAccountsWithSignalTimeout(t *testing.T) {
 	db, close := SetupTestDB(t)
 	defer close()
 
@@ -78,7 +78,7 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 	request, err := ConstructRPCRequest("eth_requestAccounts", []interface{}{}, &testDAppData)
 	assert.NoError(t, err)
 
-	accountAddress := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
+	accountAddress := types.Address{0x03}
 
 	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
 		var evt EventType

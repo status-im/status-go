@@ -20,7 +20,7 @@ func NewAPI(s *Service) *API {
 		ClientHandler: c,
 	})
 
-	// Accounts querry and dapp permissions
+	// Accounts query and dapp permissions
 	r.Register("eth_accounts", &commands.AccountsCommand{Db: s.db})
 	r.Register("eth_requestAccounts", &commands.RequestAccountsCommand{
 		ClientHandler:   c,
