@@ -42,6 +42,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"golang.org/x/crypto/pbkdf2"
+	"golang.org/x/time/rate"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -90,7 +91,9 @@ const messageExpiredPerid = 10 // in seconds
 const maxRelayPeers = 300
 const randomPeersKeepAliveInterval = 5 * time.Second
 const allPeersKeepAliveInterval = 5 * time.Minute
-const PeersToPublishForLightpush = 2
+const peersToPublishForLightpush = 2
+const publishingLimiterRate = rate.Limit(3)
+const publishingLimiterBurst = 5
 
 type SentEnvelope struct {
 	Envelope      *protocol.Envelope
@@ -155,6 +158,8 @@ type Waku struct {
 	sendMsgIDsMu sync.RWMutex
 
 	storePeerID peer.ID
+
+	limiter *rate.Limiter
 
 	topicHealthStatusChan   chan peermanager.TopicHealthStatus
 	connectionNotifChan     chan node.PeerConnection
@@ -247,6 +252,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 		onPeerStats:                     onPeerStats,
 		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
+		limiter:                         rate.NewLimiter(publishingLimiterRate, publishingLimiterBurst),
 	}
 
 	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
@@ -1014,7 +1020,7 @@ func (w *Waku) broadcast() {
 				publishMethod = LightPush
 				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
 					logger.Info("publishing message via lightpush")
-					_, err := w.node.Lightpush().Publish(w.ctx, env.Message(), lightpush.WithPubSubTopic(env.PubsubTopic()), lightpush.WithMaxPeers(PeersToPublishForLightpush))
+					_, err := w.node.Lightpush().Publish(w.ctx, env.Message(), lightpush.WithPubSubTopic(env.PubsubTopic()), lightpush.WithMaxPeers(peersToPublishForLightpush))
 					return err
 				}
 			} else {
@@ -1143,6 +1149,13 @@ type publishFn = func(envelope *protocol.Envelope, logger *zap.Logger) error
 
 func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publishFn, logger *zap.Logger) {
 	defer w.wg.Done()
+
+	if err := w.limiter.Wait(w.ctx); err != nil {
+		if !errors.Is(err, context.Canceled) {
+			w.logger.Error("could not send message (limiter)", zap.Error(err))
+		}
+		return
+	}
 
 	if err := publishFn(envelope, logger); err != nil {
 		logger.Error("could not send message", zap.Error(err))
