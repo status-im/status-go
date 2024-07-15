@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -19,6 +20,25 @@ var emptyNotifications = make([]*ActivityCenterNotification, 0)
 func (db sqlitePersistence) DeleteActivityCenterNotificationByID(id []byte, updatedAt uint64) error {
 	_, err := db.db.Exec(`UPDATE activity_center_notifications SET deleted = 1, updated_at = ? WHERE id = ? AND NOT deleted`, updatedAt, id)
 	return err
+}
+
+func findNextLastMessage(notifications []*ActivityCenterNotification, messageID string) *common.Message {
+	var otherLastMessageNotifications []*ActivityCenterNotification
+	var nextLastMessage *common.Message
+	for _, notification := range notifications {
+		if notification.LastMessage != nil && notification.LastMessage.ID != messageID {
+			otherLastMessageNotifications = append(otherLastMessageNotifications, notification)
+		}
+	}
+
+	if len(otherLastMessageNotifications) > 0 {
+		sort.Slice(otherLastMessageNotifications, func(i, j int) bool {
+			return otherLastMessageNotifications[i].Timestamp > otherLastMessageNotifications[j].Timestamp
+		})
+		nextLastMessage = otherLastMessageNotifications[0].LastMessage
+	}
+
+	return nextLastMessage
 }
 
 func (db sqlitePersistence) DeleteActivityCenterNotificationForMessage(chatID string, messageID string, updatedAt uint64) ([]*ActivityCenterNotification, error) {
@@ -59,11 +79,16 @@ func (db sqlitePersistence) DeleteActivityCenterNotificationForMessage(chatID st
 		matchNotifications = append(matchNotifications, a)
 	}
 
-	for _, notification := range notifications {
-		if notification.LastMessage != nil && notification.LastMessage.ID == messageID {
-			withNotification(notification)
-		}
+	nextLastMessage := findNextLastMessage(notifications, messageID)
 
+	var updatedNotifications []*ActivityCenterNotification
+
+	for _, notification := range notifications {
+		if notification.LastMessage != nil && notification.Message != nil && notification.Message.ID != messageID && notification.LastMessage.ID == messageID {
+			notification.LastMessage = nextLastMessage
+			notification.UpdatedAt = updatedAt
+			updatedNotifications = append(updatedNotifications, notification)
+		}
 		if notification.Message != nil && notification.Message.ID == messageID {
 			withNotification(notification)
 		}
@@ -79,13 +104,21 @@ func (db sqlitePersistence) DeleteActivityCenterNotificationForMessage(chatID st
 		inVector := strings.Repeat("?, ", len(ids)-1) + "?"
 		query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1, deleted = 1, updated_at = ? WHERE id IN (" + inVector + ")" // nolint: gosec
 		_, err = tx.Exec(query, args...)
-		return matchNotifications, err
+		if err != nil {
+			return matchNotifications, err
+		}
+	}
+
+	for _, notification := range updatedNotifications {
+		if _, err := db.saveActivityCenterNotification(notification, false, tx); err != nil {
+			return matchNotifications, err
+		}
 	}
 
 	return matchNotifications, nil
 }
 
-func (db sqlitePersistence) SaveActivityCenterNotification(notification *ActivityCenterNotification, updateState bool) (int64, error) {
+func (db sqlitePersistence) saveActivityCenterNotification(notification *ActivityCenterNotification, updateState bool, otherTx *sql.Tx) (int64, error) {
 	var tx *sql.Tx
 	var err error
 
@@ -94,18 +127,22 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		return 0, err
 	}
 
-	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return 0, err
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
+	if otherTx != nil {
+		tx = otherTx
+	} else {
+		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+		if err != nil {
+			return 0, err
 		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
+		defer func() {
+			if err == nil {
+				err = tx.Commit()
+				return
+			}
+			// don't shadow original error
+			_ = tx.Rollback()
+		}()
+	}
 
 	// encode message
 	var encodedMessage []byte
@@ -187,6 +224,10 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 	}
 
 	return n, nil
+}
+
+func (db sqlitePersistence) SaveActivityCenterNotification(notification *ActivityCenterNotification, updateState bool) (int64, error) {
+	return db.saveActivityCenterNotification(notification, updateState, nil)
 }
 
 func (db sqlitePersistence) parseRowFromTableActivityCenterNotification(rows *sql.Rows, withNotification func(notification *ActivityCenterNotification)) ([]*ActivityCenterNotification, error) {

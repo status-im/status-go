@@ -205,17 +205,21 @@ func (s *ActivityCenterPersistenceTestSuite) Test_DeleteActivityCenterNotificati
 	}
 
 	// Test: soft delete the notifications that have Message.ID == messages[1].ID
-	// or LastMessage.ID == chat.LastMessage.
 	_, err = p.DeleteActivityCenterNotificationForMessage(chat.ID, messages[1].ID, currentMilliseconds())
 	s.Require().NoError(err)
 
-	for _, id := range []types.HexBytes{nID2, nID3} {
-		notif, err = p.GetActivityCenterNotificationByID(id)
-		s.Require().NoError(err, notif.ID)
-		s.Require().True(notif.Deleted, notif.ID)
-		s.Require().True(notif.Dismissed, notif.ID)
-		s.Require().True(notif.Read, notif.ID)
-	}
+	notif, err = p.GetActivityCenterNotificationByID(nID2)
+	s.Require().NoError(err, notif.ID)
+	s.Require().True(notif.Deleted, notif.ID)
+	s.Require().True(notif.Dismissed, notif.ID)
+	s.Require().True(notif.Read, notif.ID)
+
+	// LastMessage.ID == chat.LastMessage.ID should not be affected
+	notif, err = p.GetActivityCenterNotificationByID(nID3)
+	s.Require().NoError(err)
+	s.Require().False(notif.Deleted)
+	s.Require().False(notif.Dismissed)
+	s.Require().False(notif.Read)
 
 	notif, err = p.GetActivityCenterNotificationByID(nID4)
 	s.Require().NoError(err)
