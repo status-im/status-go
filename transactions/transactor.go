@@ -281,7 +281,7 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 	gasPrice := (*big.Int)(args.GasPrice)
 	gasFeeCap := (*big.Int)(args.MaxFeePerGas)
 	gasTipCap := (*big.Int)(args.MaxPriorityFeePerGas)
-	if args.GasPrice == nil && args.MaxFeePerGas == nil {
+	if args.GasPrice == nil && args.MaxFeePerGas == nil && args.MaxPriorityFeePerGas == nil {
 		ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 		defer cancel()
 		gasPrice, err = t.rpcWrapper.SuggestGasPrice(ctx)
@@ -306,7 +306,7 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 			gethTo = common.Address(*args.To)
 			gethToPtr = &gethTo
 		}
-		if args.GasPrice == nil {
+		if args.IsDynamicFeeTx() {
 			gas, err = t.rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
 				From:      common.Address(args.From),
 				To:        gethToPtr,
@@ -334,7 +334,7 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 	newNonce := hexutil.Uint64(nonce)
 	newGas := hexutil.Uint64(gas)
 	validatedArgs.Nonce = &newNonce
-	if args.GasPrice != nil {
+	if args.IsDynamicFeeTx() {
 		validatedArgs.GasPrice = (*hexutil.Big)(gasPrice)
 	} else {
 		validatedArgs.MaxPriorityFeePerGas = (*hexutil.Big)(gasTipCap)
@@ -380,6 +380,7 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 	defer cancel()
 
 	gasPrice := (*big.Int)(args.GasPrice)
+	// GasPrice should be estimated only for LegacyTx
 	if !args.IsDynamicFeeTx() && args.GasPrice == nil {
 		gasPrice, err = rpcWrapper.SuggestGasPrice(ctx)
 		if err != nil {
@@ -391,7 +392,7 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 	var gas uint64
 	if args.Gas != nil {
 		gas = uint64(*args.Gas)
-	} else if args.Gas == nil && !args.IsDynamicFeeTx() {
+	} else {
 		ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
 		defer cancel()
 
@@ -403,13 +404,26 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 			gethTo = common.Address(*args.To)
 			gethToPtr = &gethTo
 		}
-		gas, err = rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
-			From:     common.Address(args.From),
-			To:       gethToPtr,
-			GasPrice: gasPrice,
-			Value:    value,
-			Data:     args.GetInput(),
-		})
+		if args.IsDynamicFeeTx() {
+			gasFeeCap := (*big.Int)(args.MaxFeePerGas)
+			gasTipCap := (*big.Int)(args.MaxPriorityFeePerGas)
+			gas, err = t.rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
+				From:      common.Address(args.From),
+				To:        gethToPtr,
+				GasFeeCap: gasFeeCap,
+				GasTipCap: gasTipCap,
+				Value:     value,
+				Data:      args.GetInput(),
+			})
+		} else {
+			gas, err = t.rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
+				From:     common.Address(args.From),
+				To:       gethToPtr,
+				GasPrice: gasPrice,
+				Value:    value,
+				Data:     args.GetInput(),
+			})
+		}
 		if err != nil {
 			return tx, err
 		}
