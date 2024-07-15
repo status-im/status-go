@@ -287,7 +287,7 @@ func PairDevices(s *suite.Suite, device1, device2 *Messenger) {
 	response, err = WaitOnMessengerResponse(
 		device2,
 		func(r *MessengerResponse) bool {
-			for _, installation := range r.Installations {
+			for _, installation := range r.Installations() {
 				if installation.ID == device1.installationID {
 					return installation.InstallationMetadata != nil &&
 						i.InstallationMetadata.Name == installation.InstallationMetadata.Name &&

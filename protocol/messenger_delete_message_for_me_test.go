@@ -90,12 +90,12 @@ func (s *MessengerDeleteMessageForMeSuite) Pair() {
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		s.alice1,
-		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Installations()) > 0 },
 		"installation not received",
 	)
 
 	s.Require().NoError(err)
-	actualInstallation := response.Installations[0]
+	actualInstallation := response.Installations()[0]
 	s.Require().Equal(s.alice2.installationID, actualInstallation.ID)
 	s.Require().NotNil(actualInstallation.InstallationMetadata)
 	s.Require().Equal("alice2", actualInstallation.InstallationMetadata.Name)

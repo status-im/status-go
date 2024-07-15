@@ -110,12 +110,12 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Installations()) > 0 },
 		"installation not received",
 	)
 
 	s.Require().NoError(err)
-	actualInstallation := response.Installations[0]
+	actualInstallation := response.Installations()[0]
 	s.Require().Equal(alicesOtherDevice.installationID, actualInstallation.ID)
 	s.Require().NotNil(actualInstallation.InstallationMetadata)
 	s.Require().Equal("alice's-other-device", actualInstallation.InstallationMetadata.Name)
@@ -330,12 +330,12 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Installations()) > 0 },
 		"installation not received",
 	)
 
 	s.Require().NoError(err)
-	actualInstallation := response.Installations[0]
+	actualInstallation := response.Installations()[0]
 	s.Require().Equal(alicesOtherDevice.installationID, actualInstallation.ID)
 	s.Require().NotNil(actualInstallation.InstallationMetadata)
 	s.Require().Equal("alice's-other-device", actualInstallation.InstallationMetadata.Name)
@@ -520,12 +520,12 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Installations()) > 0 },
 		"installation not received",
 	)
 
 	s.Require().NoError(err)
-	actualInstallation := response.Installations[0]
+	actualInstallation := response.Installations()[0]
 	s.Require().Equal(alicesOtherDevice.installationID, actualInstallation.ID)
 	s.Require().NotNil(actualInstallation.InstallationMetadata)
 	s.Require().Equal("alice's-other-device", actualInstallation.InstallationMetadata.Name)
