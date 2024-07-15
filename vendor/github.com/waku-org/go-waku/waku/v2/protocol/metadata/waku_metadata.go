@@ -117,8 +117,6 @@ func (wakuM *WakuMetadata) Request(ctx context.Context, peerID peer.ID) (*pb.Wak
 	request := &pb.WakuMetadataRequest{}
 	request.ClusterId = clusterID
 	request.Shards = shards
-	// TODO: remove with nwaku 0.28 deployment
-	request.ShardsDeprecated = shards // nolint: staticcheck
 
 	writer := pbio.NewDelimitedWriter(stream)
 	reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
@@ -173,8 +171,6 @@ func (wakuM *WakuMetadata) onRequest(ctx context.Context) func(network.Stream) {
 		} else {
 			response.ClusterId = clusterID
 			response.Shards = shards
-			// TODO: remove with nwaku 0.28 deployment
-			response.ShardsDeprecated = shards // nolint: staticcheck
 		}
 
 		err = writer.WriteMsg(response)
@@ -245,14 +241,6 @@ func (wakuM *WakuMetadata) Connected(n network.Network, cc network.Conn) {
 		rClusterID := uint16(*response.ClusterId)
 		var rs protocol.RelayShards
 
-		if _, err = wakuM.h.Peerstore().SupportsProtocols(peerID, relay.WakuRelayID_v200); err == nil {
-			wakuM.log.Debug("light peer only checking clusterID")
-			if rClusterID != wakuM.clusterID {
-				wakuM.disconnectPeer(peerID, errors.New("different clusterID reported"))
-			}
-			return
-		}
-
 		wakuM.log.Debug("relay peer checking cluster and shards")
 
 		var rShardIDs []uint16
@@ -261,9 +249,12 @@ func (wakuM *WakuMetadata) Connected(n network.Network, cc network.Conn) {
 				rShardIDs = append(rShardIDs, uint16(i))
 			}
 		} else {
-			// TODO: remove with nwaku 0.28 deployment
-			for _, i := range response.ShardsDeprecated { // nolint: staticcheck
-				rShardIDs = append(rShardIDs, uint16(i))
+			if proto, err := wakuM.h.Peerstore().FirstSupportedProtocol(peerID, relay.WakuRelayID_v200); err == nil && proto == "" {
+				wakuM.log.Debug("light peer only checking clusterID")
+				if rClusterID != wakuM.clusterID {
+					wakuM.disconnectPeer(peerID, errors.New("different clusterID reported"))
+				}
+				return
 			}
 		}
 		wakuM.log.Debug("getting remote cluster and shards")
