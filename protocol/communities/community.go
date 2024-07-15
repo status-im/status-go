@@ -1666,7 +1666,7 @@ func dehydrateChannelsMembers(description *protobuf.CommunityDescription) {
 	// To save space, we don't attach members for channels without permissions,
 	// otherwise the message will hit waku msg size limit.
 	for channelID, channel := range description.Chats {
-		if !channelEncrypted(ChatID(description.ID, channelID), description.TokenPermissions) {
+		if !channelHasPermissions(ChatID(description.ID, channelID), description.TokenPermissions) {
 			channel.Members = map[string]*protobuf.CommunityMember{} // clean members
 		}
 	}
@@ -1674,7 +1674,7 @@ func dehydrateChannelsMembers(description *protobuf.CommunityDescription) {
 
 func hydrateChannelsMembers(description *protobuf.CommunityDescription) {
 	for channelID, channel := range description.Chats {
-		if !channelEncrypted(ChatID(description.ID, channelID), description.TokenPermissions) {
+		if !channelHasPermissions(ChatID(description.ID, channelID), description.TokenPermissions) {
 			channel.Members = make(map[string]*protobuf.CommunityMember)
 			for pubKey, member := range description.Members {
 				channel.Members[pubKey] = member
@@ -1872,6 +1872,16 @@ func (o *Community) HasTokenPermissions() bool {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 	return len(o.tokenPermissions()) > 0
+}
+
+func channelHasPermissions(chatID string, permissions map[string]*protobuf.CommunityTokenPermission) bool {
+	for _, p := range permissions {
+		if includes(p.ChatIds, chatID) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func channelEncrypted(chatID string, permissions map[string]*protobuf.CommunityTokenPermission) bool {

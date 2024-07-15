@@ -1037,6 +1037,77 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 	}
 }
 
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestAnnouncementsChannelPermissions() {
+	community, chat := s.createCommunity()
+
+	// bob joins the community
+	s.advertiseCommunityTo(community, s.bob)
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
+
+	// setup view channel permission
+	channelPermissionRequest := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+		ChatIds:     []string{chat.ID},
+	}
+
+	response, err := s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().False(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
+
+	// bob should be in the bloom filter list since everyone has access to readonly channels
+	community, err = s.bob.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.IsMemberLikelyInChat(chat.CommunityChatID()))
+
+	// force owner to reevaluate channel members
+	// in production it will happen automatically, by periodic check
+	err = s.owner.communitiesManager.ForceMembersReevaluation(community.ID())
+	s.Require().NoError(err)
+
+	// bob receives community changes
+	_, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			c, err := s.bob.GetCommunityByID(community.ID())
+			if err != nil {
+				return false
+			}
+			if c == nil {
+				return false
+			}
+			channel := c.Chats()[chat.CommunityChatID()]
+
+			if channel == nil || len(channel.Members) != 2 {
+				return false
+			}
+			member := channel.Members[s.bob.IdentityPublicKeyString()]
+			return member != nil && member.ChannelRole == protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
+		},
+		"no community that satisfies criteria",
+	)
+	s.Require().NoError(err)
+
+	// bob should be in the bloom filter list
+	community, err = s.bob.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.IsMemberLikelyInChat(chat.CommunityChatID()))
+
+	// bob can't post
+	msg := &common.Message{
+		ChatMessage: &protobuf.ChatMessage{
+			ChatId:      chat.ID,
+			ContentType: protobuf.ChatMessage_TEXT_PLAIN,
+			Text:        "I can't post on read-only channel",
+		},
+	}
+
+	_, err = s.bob.SendChatMessage(context.Background(), msg)
+	s.Require().Error(err)
+	s.Require().Contains(err.Error(), "can't post")
+}
+
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestSearchMessageinPermissionedChannel() {
 	community, chat := s.createCommunity()
 
