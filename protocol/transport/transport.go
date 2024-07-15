@@ -289,6 +289,7 @@ func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage
 	newMessage.Topic = filter.ContentTopic
 	newMessage.PubsubTopic = filter.PubsubTopic
 
+	// TODO: set priority
 	return t.api.Post(ctx, *newMessage)
 }
 
@@ -310,6 +311,7 @@ func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage 
 	newMessage.PubsubTopic = filter.PubsubTopic
 	newMessage.PublicKey = nil
 
+	// TODO: set priority
 	return t.api.Post(ctx, *newMessage)
 }
 
@@ -327,6 +329,7 @@ func (t *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *
 	newMessage.Topic = filter.ContentTopic
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
+	// TODO: set priority
 	return t.api.Post(ctx, *newMessage)
 }
 
@@ -344,6 +347,7 @@ func (t *Transport) SendPrivateOnPersonalTopic(ctx context.Context, newMessage *
 	newMessage.Topic = filter.ContentTopic
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
+	// TODO: set priority
 	return t.api.Post(ctx, *newMessage)
 }
 
@@ -370,8 +374,7 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.
 	newMessage.Topic = filter.ContentTopic
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
-	t.logger.Debug("SENDING message", zap.Binary("topic", filter.ContentTopic[:]))
-
+	// TODO: set priority
 	return t.api.Post(ctx, *newMessage)
 }
 

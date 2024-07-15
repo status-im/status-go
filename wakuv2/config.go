@@ -66,6 +66,7 @@ type Config struct {
 	SkipPublishToTopic                     bool             `toml:",omitempty"` // Used in testing
 	EnableMissingMessageVerification       bool             `toml:",omitempty"`
 	EnableStoreConfirmationForMessagesSent bool             `toml:",omitempty"` //Flag that enables checking with store node for sent message confimration
+	UseThrottledPublish                    bool             `toml:",omitempty"` // Flag that indicates whether a rate limited priority queue will be used to send messages or not
 }
 
 func (c *Config) Validate(logger *zap.Logger) error {

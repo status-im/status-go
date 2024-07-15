@@ -222,7 +222,7 @@ func TestTelemetryUponPublishError(t *testing.T) {
 		}
 
 		// This should result in a single request sent by the telemetry client
-		_, err = w.Send(wakuConfig.DefaultShardPubsubTopic, msg)
+		_, err = w.Send(wakuConfig.DefaultShardPubsubTopic, msg, nil)
 		require.NoError(t, err)
 	})
 }

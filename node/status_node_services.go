@@ -338,6 +338,7 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			ClusterID:                              nodeConfig.ClusterConfig.ClusterID,
 			EnableMissingMessageVerification:       nodeConfig.WakuV2Config.EnableMissingMessageVerification,
 			EnableStoreConfirmationForMessagesSent: nodeConfig.WakuV2Config.EnableStoreConfirmationForMessagesSent,
+			UseThrottledPublish:                    true,
 		}
 
 		// Configure peer exchange and discv5 settings based on node type
