@@ -428,10 +428,28 @@ func Test_AddSession(t *testing.T) {
 	assert.Equal(t, sessions[0].IconURL, dapps[0].IconURL)
 }
 
-func generateTypedDataJson(chainID int, skipField bool) string {
+type typedDataParams struct {
+	chainID           int
+	skipField         bool
+	excludeChainID    bool
+	wrongContractType bool
+}
+
+func generateTypedDataJson(p typedDataParams) string {
 	optionalKeyValueField := ""
-	if !skipField {
-		optionalKeyValueField = `,"verifyingContract": "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"`
+	if !p.skipField {
+		if p.wrongContractType {
+			optionalKeyValueField = `,"verifyingContract": true`
+		} else {
+			optionalKeyValueField = `,"verifyingContract": "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"`
+		}
+	}
+
+	chainIDSchemeEntry := ""
+	chainIDDataEntry := ""
+	if !p.excludeChainID {
+		chainIDSchemeEntry = `{"name": "chainId", "type": "uint256"},`
+		chainIDDataEntry = `,"chainId": ` + strconv.Itoa(p.chainID)
 	}
 
 	typedData := `{
@@ -439,7 +457,7 @@ func generateTypedDataJson(chainID int, skipField bool) string {
 			"EIP712Domain": [
 				{"name": "name", "type": "string"},
 				{"name": "version", "type": "string"},
-				{"name": "chainId", "type": "uint256"},
+				` + chainIDSchemeEntry + `
 				{"name": "verifyingContract", "type": "address"}
 			],
 			"Person": [
@@ -455,8 +473,8 @@ func generateTypedDataJson(chainID int, skipField bool) string {
 		"primaryType": "Mail",
 		"domain": {
 			"name": "Ether Mail",
-			"version": "1",
-			"chainId": ` + strconv.Itoa(chainID) + `
+			"version": "1"
+			` + chainIDDataEntry + `
 			` + optionalKeyValueField + `
 		},
 		"message": {
@@ -492,7 +510,9 @@ func TestSafeSignTypedDataForDApps(t *testing.T) {
 		{
 			name: "sign_typed_data",
 			args: args{
-				typedJson:  generateTypedDataJson(1, false),
+				typedJson: generateTypedDataJson(typedDataParams{
+					chainID: 1,
+				}),
 				privateKey: privateKey,
 				chainID:    1,
 				legacy:     false,
@@ -502,7 +522,9 @@ func TestSafeSignTypedDataForDApps(t *testing.T) {
 		{
 			name: "sign_typed_data_legacy",
 			args: args{
-				typedJson:  generateTypedDataJson(1, false),
+				typedJson: generateTypedDataJson(typedDataParams{
+					chainID: 1,
+				}),
 				privateKey: privateKey,
 				chainID:    1,
 				legacy:     true,
@@ -512,7 +534,10 @@ func TestSafeSignTypedDataForDApps(t *testing.T) {
 		{
 			name: "sign_typed_data_invalid_json",
 			args: args{
-				typedJson:  `{"invalid": "json"`,
+				typedJson: generateTypedDataJson(typedDataParams{
+					chainID:           1,
+					wrongContractType: true,
+				}),
 				privateKey: privateKey,
 				chainID:    1,
 				legacy:     false,
@@ -520,9 +545,21 @@ func TestSafeSignTypedDataForDApps(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "sign_typed_data_invalid_json_legacy",
+			args: args{
+				typedJson:  `{"invalid": "json"`,
+				privateKey: privateKey,
+				chainID:    1,
+				legacy:     true,
+			},
+			wantErr: true,
+		},
+		{
 			name: "sign_typed_data_invalid_chain_id",
 			args: args{
-				typedJson:  generateTypedDataJson(1, false),
+				typedJson: generateTypedDataJson(typedDataParams{
+					chainID: 1,
+				}),
 				privateKey: privateKey,
 				chainID:    2,
 				legacy:     false,
@@ -532,12 +569,28 @@ func TestSafeSignTypedDataForDApps(t *testing.T) {
 		{
 			name: "sign_typed_data_missing_field",
 			args: args{
-				typedJson:  generateTypedDataJson(1, true),
+				typedJson: generateTypedDataJson(typedDataParams{
+					chainID:   1,
+					skipField: true,
+				}),
 				privateKey: privateKey,
 				chainID:    1,
 				legacy:     false,
 			},
 			wantErr: true,
+		},
+		{
+			name: "sign_typed_data_exclude_chain_id",
+			args: args{
+				typedJson: generateTypedDataJson(typedDataParams{
+					chainID:        1,
+					excludeChainID: true,
+				}),
+				privateKey: privateKey,
+				chainID:    1,
+				legacy:     false,
+			},
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {

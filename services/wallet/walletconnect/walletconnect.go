@@ -263,14 +263,18 @@ func SafeSignTypedDataForDApps(typedJson string, privateKey *ecdsa.PrivateKey, c
 	}
 
 	chain := new(big.Int).SetUint64(chainID)
-	if err := typed.ValidateChainID(chain); err != nil {
-		return types.HexBytes{}, err
-	}
 
 	var sig hexutil.Bytes
 	if legacy {
 		sig, err = typeddata.Sign(typed, privateKey, chain)
 	} else {
+		// Validate chainID if part of the typed data
+		if _, exist := typed.Domain[typeddata.ChainIDKey]; exist {
+			if err := typed.ValidateChainID(chain); err != nil {
+				return types.HexBytes{}, err
+			}
+		}
+
 		var typedV4 signercore.TypedData
 		err = json.Unmarshal([]byte(typedJson), &typedV4)
 		if err != nil {
