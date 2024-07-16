@@ -281,7 +281,7 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 	gasPrice := (*big.Int)(args.GasPrice)
 	gasFeeCap := (*big.Int)(args.MaxFeePerGas)
 	gasTipCap := (*big.Int)(args.MaxPriorityFeePerGas)
-	if args.GasPrice == nil && args.MaxFeePerGas == nil && args.MaxPriorityFeePerGas == nil {
+	if args.GasPrice == nil && !args.IsDynamicFeeTx() {
 		ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 		defer cancel()
 		gasPrice, err = t.rpcWrapper.SuggestGasPrice(ctx)
