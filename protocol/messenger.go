@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appmetrics"
+	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/deprecation"
@@ -258,18 +259,26 @@ func (m *Messenger) ResolvePrimaryName(mentionID string) (string, error) {
 // EnvelopeSent triggered when envelope delivered at least to 1 peer.
 func (interceptor EnvelopeEventsInterceptor) EnvelopeSent(identifiers [][]byte) {
 	if interceptor.Messenger != nil {
-		var ids []string
+		signalIDs := make([][]byte, 0, len(identifiers))
 		for _, identifierBytes := range identifiers {
-			ids = append(ids, types.EncodeHex(identifierBytes))
-		}
+			messageID := types.EncodeHex(identifierBytes)
+			err := interceptor.Messenger.processSentMessage(messageID)
+			if err != nil {
+				interceptor.Messenger.logger.Info("messenger failed to process sent messages", zap.Error(err))
+			}
 
-		err := interceptor.Messenger.processSentMessages(ids)
-		if err != nil {
-			interceptor.Messenger.logger.Info("messenger failed to process sent messages", zap.Error(err))
+			message, err := interceptor.Messenger.MessageByID(messageID)
+			if err != nil {
+				interceptor.Messenger.logger.Error("failed to query message outgoing status", zap.Error(err))
+				continue
+			}
+			if message.OutgoingStatus == common.OutgoingStatusDelivered {
+				// We don't want to send the signal if the message was already marked as delivered
+				continue
+			}
+			signalIDs = append(signalIDs, identifierBytes)
 		}
-
-		// We notify the client, regardless whether we were able to mark them as sent
-		interceptor.EnvelopeEventsHandler.EnvelopeSent(identifiers)
+		interceptor.EnvelopeEventsHandler.EnvelopeSent(signalIDs)
 	} else {
 		// NOTE(rasom): In case if interceptor.Messenger is not nil and
 		// some error occurred on processing sent message we don't want
@@ -472,7 +481,7 @@ func NewMessenger(
 		managerOptions = append(managerOptions, communities.WithTokenManager(c.tokenManager))
 	} else if c.rpcClient != nil {
 		tokenManager := token.NewTokenManager(c.walletDb, c.rpcClient, community.NewManager(database, c.httpServer, nil), c.rpcClient.NetworkManager, database, c.httpServer, nil, nil, nil, token.NewPersistence(c.walletDb))
-		managerOptions = append(managerOptions, communities.WithTokenManager(communities.NewDefaultTokenManager(tokenManager)))
+		managerOptions = append(managerOptions, communities.WithTokenManager(communities.NewDefaultTokenManager(tokenManager, c.rpcClient.NetworkManager)))
 	}
 
 	if c.walletConfig != nil {
@@ -490,7 +499,20 @@ func NewMessenger(
 		encryptor: encryptionProtocol,
 	}
 
-	communitiesManager, err := communities.NewManager(identity, installationID, database, encryptionProtocol, logger, ensVerifier, c.communityTokensService, transp, transp, communitiesKeyDistributor, managerOptions...)
+	communitiesManager, err := communities.NewManager(
+		identity,
+		installationID,
+		database,
+		encryptionProtocol,
+		logger,
+		ensVerifier,
+		c.communityTokensService,
+		transp,
+		transp,
+		communitiesKeyDistributor,
+		c.httpServer,
+		managerOptions...,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -681,35 +703,33 @@ func (m *Messenger) EnableBackedupMessagesProcessing() {
 	m.processBackedupMessages = true
 }
 
-func (m *Messenger) processSentMessages(ids []string) error {
+func (m *Messenger) processSentMessage(id string) error {
 	if m.connectionState.Offline {
 		return errors.New("Can't mark message as sent while offline")
 	}
 
-	for _, id := range ids {
-		rawMessage, err := m.persistence.RawMessageByID(id)
-		// If we have no raw message, we create a temporary one, so that
-		// the sent status is preserved
-		if err == sql.ErrNoRows || rawMessage == nil {
-			rawMessage = &common.RawMessage{
-				ID:          id,
-				MessageType: protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
-			}
-		} else if err != nil {
-			return errors.Wrapf(err, "Can't get raw message with id %v", id)
+	rawMessage, err := m.persistence.RawMessageByID(id)
+	// If we have no raw message, we create a temporary one, so that
+	// the sent status is preserved
+	if err == sql.ErrNoRows || rawMessage == nil {
+		rawMessage = &common.RawMessage{
+			ID:          id,
+			MessageType: protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		}
+	} else if err != nil {
+		return errors.Wrapf(err, "Can't get raw message with id %v", id)
+	}
 
-		rawMessage.Sent = true
+	rawMessage.Sent = true
 
-		err = m.persistence.SaveRawMessage(rawMessage)
-		if err != nil {
-			return errors.Wrapf(err, "Can't save raw message marked as sent")
-		}
+	err = m.persistence.SaveRawMessage(rawMessage)
+	if err != nil {
+		return errors.Wrapf(err, "Can't save raw message marked as sent")
+	}
 
-		err = m.UpdateMessageOutgoingStatus(id, common.OutgoingStatusSent)
-		if err != nil {
-			return err
-		}
+	err = m.UpdateMessageOutgoingStatus(id, common.OutgoingStatusSent)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -906,7 +926,31 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return nil, err
+	}
+	if err := utils.ValidateDisplayName(&displayName); err != nil {
+		// Somehow a wrong display name was saved. We need to update it so that others accept our messages
+		pubKey, err := m.settings.GetPublicKey()
+		if err != nil {
+			return nil, err
+		}
+		replacementDisplayName := pubKey[:12]
+		m.logger.Warn("unaccepted display name was saved to the setting, reverting to pubkey substring", zap.String("displayName", displayName), zap.String("replacement", replacementDisplayName))
+
+		if err := m.SetDisplayName(replacementDisplayName); err != nil {
+			// We do not return the error as we do not want to block the login for it
+			m.logger.Warn("error setting display name", zap.Error(err))
+		}
+	}
+
 	return response, nil
+}
+
+func (m *Messenger) SetMediaServer(server *server.MediaServer) {
+	m.httpServer = server
+	m.communitiesManager.SetMediaServer(server)
 }
 
 func (m *Messenger) IdentityPublicKey() *ecdsa.PublicKey {
@@ -1720,12 +1764,10 @@ func (m *Messenger) InitFilters() error {
 
 	logger := m.logger.With(zap.String("site", "Init"))
 
-	if m.useShards() {
-		// Community requests will arrive in this pubsub topic
-		err := m.SubscribeToPubsubTopic(shard.DefaultNonProtectedPubsubTopic(), nil)
-		if err != nil {
-			return err
-		}
+	// Community requests will arrive in this pubsub topic
+	err := m.SubscribeToPubsubTopic(shard.DefaultNonProtectedPubsubTopic(), nil)
+	if err != nil {
+		return err
 	}
 
 	var (

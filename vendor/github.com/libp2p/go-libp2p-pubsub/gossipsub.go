@@ -688,7 +688,6 @@ func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.
 		log.Debugf("IHAVE: peer %s has advertised too many times (%d) within this heartbeat interval; ignoring", p, gs.peerhave[p])
 		return nil
 	}
-
 	if gs.iasked[p] >= gs.params.MaxIHaveLength {
 		log.Debugf("IHAVE: peer %s has already advertised too many messages (%d); ignoring", p, gs.iasked[p])
 		return nil
@@ -706,7 +705,14 @@ func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.
 			continue
 		}
 
-		for _, mid := range ihave.GetMessageIDs() {
+	checkIwantMsgsLoop:
+		for msgIdx, mid := range ihave.GetMessageIDs() {
+			// prevent remote peer from sending too many msg_ids on a single IHAVE message
+			if msgIdx >= gs.params.MaxIHaveLength {
+				log.Debugf("IHAVE: peer %s has sent IHAVE on topic %s with too many messages (%d); ignoring remaining msgs", p, topic, len(ihave.MessageIDs))
+				break checkIwantMsgsLoop
+			}
+
 			if gs.p.seenMessage(mid) {
 				continue
 			}
@@ -1977,6 +1983,22 @@ func (gs *GossipSubRouter) getPeers(topic string, count int, filter func(peer.ID
 	}
 
 	return peers
+}
+
+func (gs *GossipSubRouter) meshPeers(topic string) []peer.ID {
+	peers, ok := gs.mesh[topic]
+	if !ok {
+		return nil
+	}
+
+	result := make([]peer.ID, len(peers))
+	i := 0
+	for p := range peers {
+		result[i] = p
+		i++
+	}
+
+	return result
 }
 
 // WithDefaultTagTracer returns the tag tracer of the GossipSubRouter as a PubSub option.

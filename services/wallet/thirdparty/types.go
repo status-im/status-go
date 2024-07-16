@@ -29,6 +29,7 @@ type TokenDetails struct {
 }
 
 type MarketDataProvider interface {
+	ID() string
 	FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error)
 	FetchHistoricalDailyPrices(symbol string, currency string, limit int, allData bool, aggregate int) ([]HistoricalPrice, error)
 	FetchHistoricalHourlyPrices(symbol string, currency string, limit int, aggregate int) ([]HistoricalPrice, error)

@@ -89,6 +89,9 @@ const hashQueryInterval = 3 * time.Second
 const messageSentPeriod = 3    // in seconds
 const messageExpiredPerid = 10 // in seconds
 const maxRelayPeers = 300
+const randomPeersKeepAliveInterval = 5 * time.Second
+const allPeersKeepAliveInterval = 5 * time.Minute
+const PeersToPublishForLightpush = 2
 
 type SentEnvelope struct {
 	Envelope      *protocol.Envelope
@@ -104,6 +107,7 @@ type ITelemetryClient interface {
 	PushReceivedEnvelope(receivedEnvelope *protocol.Envelope)
 	PushSentEnvelope(sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
+	PushPeerCount(peerCount int)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -154,6 +158,7 @@ type Waku struct {
 	storePeerID peer.ID
 
 	topicHealthStatusChan   chan peermanager.TopicHealthStatus
+	connectionNotifChan     chan node.PeerConnection
 	connStatusSubscriptions map[string]*types.ConnStatusSubscription
 	connStatusMu            sync.Mutex
 	onlineChecker           *onlinechecker.DefaultOnlineChecker
@@ -167,8 +172,8 @@ type Waku struct {
 	// bootnodes successfully
 	seededBootnodesForDiscV5 bool
 
-	// connectionChanged is channel that notifies when connectivity has changed
-	connectionChanged chan struct{}
+	// goingOnline is channel that notifies when connectivity has changed from offline to online
+	goingOnline chan struct{}
 
 	// discV5BootstrapNodes is the ENR to be used to fetch bootstrap nodes for discovery
 	discV5BootstrapNodes []string
@@ -227,6 +232,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		msgQueue:                        make(chan *common.ReceivedMessage, messageQueueLimit),
 		sendQueue:                       make(chan *protocol.Envelope, 1000),
 		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
+		connectionNotifChan:             make(chan node.PeerConnection),
 		connStatusSubscriptions:         make(map[string]*types.ConnStatusSubscription),
 		topicInterest:                   make(map[string]TopicInterest),
 		ctx:                             ctx,
@@ -263,10 +269,6 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		return nil, fmt.Errorf("failed to setup the network interface: %v", err)
 	}
 
-	if cfg.KeepAliveInterval == 0 {
-		cfg.KeepAliveInterval = DefaultConfig.KeepAliveInterval
-	}
-
 	libp2pOpts := node.DefaultLibP2POptions
 	libp2pOpts = append(libp2pOpts, libp2p.BandwidthReporter(waku.bandwidthCounter))
 	libp2pOpts = append(libp2pOpts, libp2p.NATPortMap())
@@ -275,8 +277,9 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		node.WithLibP2POptions(libp2pOpts...),
 		node.WithPrivateKey(nodeKey),
 		node.WithHostAddress(hostAddr),
+		node.WithConnectionNotification(waku.connectionNotifChan),
 		node.WithTopicHealthStatusChannel(waku.topicHealthStatusChan),
-		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
+		node.WithKeepAlive(randomPeersKeepAliveInterval, allPeersKeepAliveInterval),
 		node.WithLogger(logger),
 		node.WithLogLevel(logger.Level()),
 		node.WithClusterID(cfg.ClusterID),
@@ -305,6 +308,9 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		opts = append(opts, node.WithWakuFilterLightNode())
 		waku.defaultShardInfo = shards[0]
 		opts = append(opts, node.WithMaxPeerConnections(cfg.DiscoveryLimit))
+		cfg.EnableStoreConfirmationForMessagesSent = false
+		//TODO: temporary work-around to improve lightClient connectivity, need to be removed once community sharding is implemented
+		opts = append(opts, node.WithPubSubTopics(cfg.DefaultShardedPubsubTopics))
 	} else {
 		relayOpts := []pubsub.Option{
 			pubsub.WithMaxMessageSize(int(waku.cfg.MaxMessageSize)),
@@ -317,6 +323,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		opts = append(opts, node.WithWakuRelayAndMinPeers(waku.cfg.MinPeersForRelay, relayOpts...))
 		opts = append(opts, node.WithMaxPeerConnections(maxRelayPeers))
 		cfg.EnablePeerExchangeClient = true //Enabling this until discv5 issues are resolved. This will enable more peers to be connected for relay mesh.
+		cfg.EnableStoreConfirmationForMessagesSent = true
 	}
 
 	if cfg.EnableStore {
@@ -333,7 +340,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 
 	if !cfg.LightClient {
 		opts = append(opts, node.WithWakuFilterFullNode(filter.WithMaxSubscribers(20)))
-		opts = append(opts, node.WithLightPush())
+		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(1, 1)))
 	}
 
 	if appDB != nil {
@@ -341,6 +348,10 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if cfg.EnablePeerExchangeServer {
+		opts = append(opts, node.WithPeerExchange(peer_exchange.WithRateLimiter(1, 1)))
 	}
 
 	waku.options = opts
@@ -585,9 +596,10 @@ func (w *Waku) runPeerExchangeLoop() {
 }
 
 func (w *Waku) GetPubsubTopic(topic string) string {
-	if topic == "" || !w.cfg.UseShardAsDefaultTopic {
+	if topic == "" {
 		topic = w.cfg.DefaultShardPubsubTopic
 	}
+
 	return topic
 }
 
@@ -1010,7 +1022,7 @@ func (w *Waku) broadcast() {
 				publishMethod = LightPush
 				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
 					logger.Info("publishing message via lightpush")
-					_, err := w.node.Lightpush().Publish(w.ctx, env.Message(), lightpush.WithPubSubTopic(env.PubsubTopic()))
+					_, err := w.node.Lightpush().Publish(w.ctx, env.Message(), lightpush.WithPubSubTopic(env.PubsubTopic()), lightpush.WithMaxPeers(PeersToPublishForLightpush))
 					return err
 				}
 			} else {
@@ -1046,9 +1058,12 @@ func (w *Waku) broadcast() {
 }
 
 func (w *Waku) checkIfMessagesStored() {
+	if !w.cfg.EnableStoreConfirmationForMessagesSent {
+		return
+	}
+
 	ticker := time.NewTicker(hashQueryInterval)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case <-w.ctx.Done():
@@ -1111,6 +1126,9 @@ func (w *Waku) checkIfMessagesStored() {
 }
 
 func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
+	if !w.cfg.EnableStoreConfirmationForMessagesSent {
+		return
+	}
 	w.sendMsgIDsMu.Lock()
 	defer w.sendMsgIDsMu.Unlock()
 	for pubsubTopic, subMsgs := range w.sendMsgIDs {
@@ -1140,6 +1158,14 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publishFn,
 			Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
 			Event: common.EventEnvelopeExpired,
 		})
+		return
+	} else {
+		if !w.cfg.EnableStoreConfirmationForMessagesSent {
+			w.SendEnvelopeEvent(common.EnvelopeEvent{
+				Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
+				Event: common.EventEnvelopeSent,
+			})
+		}
 	}
 }
 
@@ -1297,48 +1323,6 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, query legacy_store.Que
 	return result.Cursor(), len(result.Messages), nil
 }
 
-func (w *Waku) lightClientConnectionStatus() {
-
-	peers := w.node.Host().Network().Peers()
-	w.logger.Debug("peer stats",
-		zap.Int("peersCount", len(peers)))
-	subs := w.node.FilterLightnode().Subscriptions()
-	w.logger.Debug("filter subs count", zap.Int("count", len(subs)))
-	isOnline := false
-	if len(peers) > 0 {
-		isOnline = true
-	}
-	//TODOL needs fixing, right now invoking everytime.
-	//Trigger FilterManager to take care of any pending filter subscriptions
-	//TODO: Pass pubsubTopic based on topicHealth notif received.
-	go w.filterManager.onConnectionStatusChange(w.cfg.DefaultShardPubsubTopic, isOnline)
-
-	w.connStatusMu.Lock()
-
-	connStatus := types.ConnStatus{
-		IsOnline: isOnline,
-		Peers:    FormatPeerStats(w.node),
-	}
-	for k, subs := range w.connStatusSubscriptions {
-		if !subs.Send(connStatus) {
-			delete(w.connStatusSubscriptions, k)
-		}
-	}
-	w.connStatusMu.Unlock()
-	if w.onPeerStats != nil {
-		w.onPeerStats(connStatus)
-	}
-
-	//TODO:Analyze if we need to discover and connect to peers with peerExchange loop enabled.
-	if !w.onlineChecker.IsOnline() && isOnline {
-		if err := w.discoverAndConnectPeers(); err != nil {
-			w.logger.Error("failed to add wakuv2 peers", zap.Error(err))
-		}
-	}
-
-	w.onlineChecker.SetOnline(isOnline)
-}
-
 // Start implements node.Service, starting the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Start() error {
@@ -1351,7 +1335,7 @@ func (w *Waku) Start() error {
 		return fmt.Errorf("failed to create a go-waku node: %v", err)
 	}
 
-	w.connectionChanged = make(chan struct{})
+	w.goingOnline = make(chan struct{})
 
 	if err = w.node.Start(w.ctx); err != nil {
 		return fmt.Errorf("failed to start go-waku node: %v", err)
@@ -1370,57 +1354,44 @@ func (w *Waku) Start() error {
 		}
 	}
 
-	if w.cfg.EnablePeerExchangeServer {
-		err := w.node.PeerExchange().Start(w.ctx)
-		if err != nil {
-			return err
-		}
-	}
-
-	w.wg.Add(3)
+	w.wg.Add(2)
 
 	go func() {
 		defer w.wg.Done()
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
 
-		peerCountTimer := time.NewTimer(0) // fire immediately
-		defer peerCountTimer.Stop()
-
-		peerCount := 0
 		for {
 			select {
 			case <-w.ctx.Done():
 				return
-			case <-ticker.C:
-				//TODO: Need to fix.
-				// Temporary changes for lightNodes to have health check based on connected peers.
-				//This needs to be enhanced to be based on healthy Filter and lightPush peers available for each shard.
-				//This would get fixed as part of https://github.com/waku-org/go-waku/issues/1114
+
+			case <-w.topicHealthStatusChan:
+				// TODO: https://github.com/status-im/status-go/issues/4628
+
+			case <-w.connectionNotifChan:
+
+				isOnline := len(w.node.Host().Network().Peers()) > 0
+
 				if w.cfg.LightClient {
-					w.lightClientConnectionStatus()
+					// TODO: Temporary changes for lightNodes to have health check based on connected peers.
+					//This needs to be enhanced to be based on healthy Filter and lightPush peers available for each shard.
+					//This would get fixed as part of https://github.com/waku-org/go-waku/issues/1114
+
+					subs := w.node.FilterLightnode().Subscriptions()
+					w.logger.Debug("filter subs count", zap.Int("count", len(subs)))
+
+					//TODO: needs fixing, right now invoking everytime.
+					//Trigger FilterManager to take care of any pending filter subscriptions
+					//TODO: Pass pubsubTopic based on topicHealth notif received.
+					go w.filterManager.onConnectionStatusChange(w.cfg.DefaultShardPubsubTopic, isOnline)
+
 				}
-			case <-peerCountTimer.C:
-				peerCountTimer.Reset(3 * time.Second)
-				newPeerCount := len(w.node.Host().Network().Peers())
-				if newPeerCount != peerCount && w.onPeerStats != nil {
-					peerCount = newPeerCount
-					// TODO: `IsOnline` is not implemented correctly here, however
-					// this is not a problem because Desktop ignores that value.
-					// This should be fixed to as part of issue
-					// https://github.com/status-im/status-go/issues/4628
-					w.onPeerStats(types.ConnStatus{
-						IsOnline: true,
-						Peers:    FormatPeerStats(w.node),
-					})
-				}
-			case c := <-w.topicHealthStatusChan:
 				w.connStatusMu.Lock()
 
-				// TODO: https://github.com/status-im/status-go/issues/4628
-				// This code is not using the topic health status correctly.
-				// It assumes we are using a single pubsub topic for now
-				latestConnStatus := formatConnStatus(w.node, c)
+				latestConnStatus := types.ConnStatus{
+					IsOnline: isOnline,
+					Peers:    FormatPeerStats(w.node),
+				}
+
 				w.logger.Debug("peer stats",
 					zap.Int("peersCount", len(latestConnStatus.Peers)),
 					zap.Any("stats", latestConnStatus))
@@ -1429,9 +1400,22 @@ func (w *Waku) Start() error {
 						delete(w.connStatusSubscriptions, k)
 					}
 				}
+
 				w.connStatusMu.Unlock()
+
 				if w.onPeerStats != nil {
 					w.onPeerStats(latestConnStatus)
+				}
+
+				if w.statusTelemetryClient != nil {
+					w.statusTelemetryClient.PushPeerCount(w.PeerCount())
+				}
+
+				//TODO: analyze if we need to discover and connect to peers with peerExchange loop enabled.
+				if !w.onlineChecker.IsOnline() && isOnline {
+					if err := w.discoverAndConnectPeers(); err != nil {
+						w.logger.Error("failed to add wakuv2 peers", zap.Error(err))
+					}
 				}
 
 				w.ConnectionChanged(connection.State{
@@ -1445,7 +1429,11 @@ func (w *Waku) Start() error {
 	//TODO: commenting for now so that only fleet nodes are used.
 	//Need to uncomment once filter peer scoring etc is implemented.
 	go w.runPeerExchangeLoop()
-	go w.checkForMissingMessages()
+
+	if w.cfg.EnableMissingMessageVerification {
+		w.wg.Add(1)
+		go w.checkForMissingMessages()
+	}
 
 	if w.cfg.LightClient {
 		// Create FilterManager that will main peer connectivity
@@ -1520,7 +1508,7 @@ func (w *Waku) Stop() error {
 		}
 	}
 
-	close(w.connectionChanged)
+	close(w.goingOnline)
 	w.wg.Wait()
 
 	w.ctx = nil
@@ -1649,7 +1637,7 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 	}
 
 	ephemeral := e.Envelope.Message().Ephemeral
-	if e.MsgType == common.SendMessageType && (ephemeral == nil || !*ephemeral) {
+	if w.cfg.EnableStoreConfirmationForMessagesSent && e.MsgType == common.SendMessageType && (ephemeral == nil || !*ephemeral) {
 		w.sendMsgIDsMu.Lock()
 		subMsgs, ok := w.sendMsgIDs[e.PubsubTopic]
 		if !ok {
@@ -1716,6 +1704,17 @@ func (w *Waku) PeerCount() int {
 
 func (w *Waku) Peers() map[string]types.WakuV2Peer {
 	return FormatPeerStats(w.node)
+}
+
+func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
+	if w.cfg.LightClient {
+		return nil, errors.New("only available in relay mode")
+	}
+
+	return &types.PeerList{
+		FullMeshPeers: w.node.Relay().PubSub().MeshPeers(topic),
+		AllPeers:      w.node.Relay().PubSub().ListPeers(topic),
+	}, nil
 }
 
 func (w *Waku) ListenAddresses() []string {
@@ -1807,7 +1806,7 @@ func (w *Waku) StopDiscV5() error {
 func (w *Waku) ConnectionChanged(state connection.State) {
 	if !state.Offline && !w.onlineChecker.IsOnline() {
 		select {
-		case w.connectionChanged <- struct{}{}:
+		case w.goingOnline <- struct{}{}:
 		default:
 			w.logger.Warn("could not write on connection changed channel")
 		}
@@ -1869,7 +1868,7 @@ func (w *Waku) seedBootnodesForDiscV5() {
 
 			}
 		// If we go online, trigger immediately
-		case <-w.connectionChanged:
+		case <-w.goingOnline:
 			if w.cfg.EnableDiscV5 {
 				if canQuery() {
 					err := w.restartDiscV5()
@@ -1934,7 +1933,7 @@ func (w *Waku) AddStorePeer(address string) (peer.ID, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, wps.Static, []string{}, legacy_store.StoreID_v20beta4)
+	peerID, err := w.node.AddPeer(addr, wps.Static, w.cfg.DefaultShardedPubsubTopics, legacy_store.StoreID_v20beta4)
 	if err != nil {
 		return "", err
 	}
@@ -1951,7 +1950,7 @@ func (w *Waku) AddRelayPeer(address string) (peer.ID, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, wps.Static, []string{}, relay.WakuRelayID_v200)
+	peerID, err := w.node.AddPeer(addr, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
 	if err != nil {
 		return "", err
 	}
@@ -2060,18 +2059,6 @@ func FormatPeerStats(wakuNode *node.WakuNode) map[string]types.WakuV2Peer {
 		p[k.String()] = wakuV2Peer
 	}
 	return p
-}
-
-func formatConnStatus(wakuNode *node.WakuNode, c peermanager.TopicHealthStatus) types.ConnStatus {
-	isOnline := true
-	if c.Health == peermanager.UnHealthy {
-		isOnline = false
-	}
-
-	return types.ConnStatus{
-		IsOnline: isOnline,
-		Peers:    FormatPeerStats(wakuNode),
-	}
 }
 
 func (w *Waku) StoreNode() legacy_store.Store {

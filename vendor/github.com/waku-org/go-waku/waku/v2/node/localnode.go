@@ -23,6 +23,12 @@ func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.M
 	options = append(options, wenr.WithUDPPort(udpPort))
 	options = append(options, wenr.WithWakuBitfield(wakuFlags))
 
+	// Reset ENR fields
+	wenr.DeleteField(localnode, wenr.MultiaddrENRField)
+	wenr.DeleteField(localnode, enr.TCP(0).ENRKey())
+	wenr.DeleteField(localnode, enr.IPv4{}.ENRKey())
+	wenr.DeleteField(localnode, enr.IPv6{}.ENRKey())
+
 	if advertiseAddr != nil {
 		// An advertised address disables libp2p address updates
 		// and discv5 predictions
@@ -234,17 +240,24 @@ func selectWSListenAddresses(addresses []ma.Multiaddr) ([]ma.Multiaddr, error) {
 
 func selectCircuitRelayListenAddresses(ctx context.Context, addresses []ma.Multiaddr) ([]ma.Multiaddr, error) {
 	var result []ma.Multiaddr
+
 	for _, addr := range addresses {
 		addr, err := decapsulateCircuitRelayAddr(ctx, addr)
 		if err != nil {
 			continue
 		}
+
+		_, noWS := addr.ValueForProtocol(ma.P_WSS)
+		_, noWSS := addr.ValueForProtocol(ma.P_WS)
+		if noWS == nil || noWSS == nil { // WS or WSS found
+			continue
+		}
+
 		result = append(result, addr)
 	}
 
 	return result, nil
 }
-
 
 func filter0Port(addresses []ma.Multiaddr) ([]ma.Multiaddr, error) {
 	var result []ma.Multiaddr
@@ -323,6 +336,14 @@ func (w *WakuNode) setupENR(ctx context.Context, addrs []ma.Multiaddr) error {
 
 	return nil
 
+}
+
+func (w *WakuNode) SetRelayShards(rs protocol.RelayShards) error {
+	err := wenr.Update(w.log, w.localNode, wenr.WithWakuRelaySharding(rs))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (w *WakuNode) watchTopicShards(ctx context.Context) error {

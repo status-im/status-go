@@ -27,10 +27,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
+	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/rendezvous"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
@@ -52,6 +54,7 @@ type WakuNodeParameters struct {
 	hostAddr            *net.TCPAddr
 	maxConnectionsPerIP int
 	clusterID           uint16
+	shards              *protocol.RelayShards
 	dns4Domain          string
 	advertiseAddrs      []multiaddr.Multiaddr
 	multiAddr           []multiaddr.Multiaddr
@@ -102,7 +105,8 @@ type WakuNodeParameters struct {
 	discV5bootnodes  []*enode.Node
 	discV5autoUpdate bool
 
-	enablePeerExchange bool
+	enablePeerExchange  bool
+	peerExchangeOptions []peer_exchange.Option
 
 	enableRLN                    bool
 	rlnRelayMemIndex             *uint
@@ -114,7 +118,8 @@ type WakuNodeParameters struct {
 	rlnTreePath                  string
 	rlnMembershipContractAddress common.Address
 
-	keepAliveInterval time.Duration
+	keepAliveRandomPeersInterval time.Duration
+	keepAliveAllPeersInterval    time.Duration
 
 	enableLightPush bool
 
@@ -314,6 +319,23 @@ func WithClusterID(clusterID uint16) WakuNodeOption {
 	}
 }
 
+func WithPubSubTopics(topics []string) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		rs, err := protocol.TopicsToRelayShards(topics...)
+		if err != nil {
+			return err
+		}
+		if len(rs) == 0 {
+			return nil
+		}
+		if rs[0].ClusterID != params.clusterID {
+			return errors.New("pubsubtopics have different clusterID than configured clusterID")
+		}
+		params.shards = &rs[0] //Only consider 0 as a node can only support 1 cluster as of now
+		return nil
+	}
+}
+
 // WithMaxConnectionsPerIP sets the max number of allowed peers from the same IP
 func WithMaxConnectionsPerIP(limit int) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
@@ -410,9 +432,10 @@ func WithDiscoveryV5(udpPort uint, bootnodes []*enode.Node, autoUpdate bool) Wak
 }
 
 // WithPeerExchange is a WakuOption used to enable Peer Exchange
-func WithPeerExchange() WakuNodeOption {
+func WithPeerExchange(options ...peer_exchange.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enablePeerExchange = true
+		params.peerExchangeOptions = options
 		return nil
 	}
 }
@@ -476,10 +499,14 @@ func WithLightPush(lightpushOpts ...lightpush.Option) WakuNodeOption {
 }
 
 // WithKeepAlive is a WakuNodeOption used to set the interval of time when
-// each peer will be ping to keep the TCP connection alive
-func WithKeepAlive(t time.Duration) WakuNodeOption {
+// each peer will be ping to keep the TCP connection alive. Option accepts two
+// intervals, the `randomPeersInterval`, which will be used to ping full mesh
+// peers (if using relay) and random connected peers, and `allPeersInterval`
+// which is used to ping all connected peers
+func WithKeepAlive(randomPeersInterval time.Duration, allPeersInterval time.Duration) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
-		params.keepAliveInterval = t
+		params.keepAliveRandomPeersInterval = randomPeersInterval
+		params.keepAliveAllPeersInterval = allPeersInterval
 		return nil
 	}
 }

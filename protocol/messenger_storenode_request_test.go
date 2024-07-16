@@ -155,10 +155,9 @@ func (s *MessengerStoreNodeRequestSuite) TearDown() {
 
 func (s *MessengerStoreNodeRequestSuite) createStore() {
 	cfg := testWakuV2Config{
-		logger:                 s.logger.Named("store-waku"),
-		enableStore:            true,
-		useShardAsDefaultTopic: false,
-		clusterID:              shard.UndefinedShardValue,
+		logger:      s.logger.Named("store-waku"),
+		enableStore: true,
+		clusterID:   shard.MainStatusShardCluster,
 	}
 
 	s.wakuStoreNode = NewTestWakuV2(&s.Suite, cfg)
@@ -174,10 +173,9 @@ func (s *MessengerStoreNodeRequestSuite) tearDownOwner() {
 func (s *MessengerStoreNodeRequestSuite) createOwner() {
 
 	cfg := testWakuV2Config{
-		logger:                 s.logger.Named("owner-waku"),
-		enableStore:            false,
-		useShardAsDefaultTopic: false,
-		clusterID:              shard.UndefinedShardValue,
+		logger:      s.logger.Named("owner-waku"),
+		enableStore: false,
+		clusterID:   shard.MainStatusShardCluster,
 	}
 
 	wakuV2 := NewTestWakuV2(&s.Suite, cfg)
@@ -196,10 +194,9 @@ func (s *MessengerStoreNodeRequestSuite) createOwner() {
 
 func (s *MessengerStoreNodeRequestSuite) createBob() {
 	cfg := testWakuV2Config{
-		logger:                 s.logger.Named("bob-waku"),
-		enableStore:            false,
-		useShardAsDefaultTopic: false,
-		clusterID:              shard.UndefinedShardValue,
+		logger:      s.logger.Named("bob-waku"),
+		enableStore: false,
+		clusterID:   shard.MainStatusShardCluster,
 	}
 	wakuV2 := NewTestWakuV2(&s.Suite, cfg)
 	s.bobWaku = gethbridge.NewGethWakuV2Wrapper(wakuV2)
@@ -633,6 +630,20 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfo() {
 	s.fetchProfile(s.bob, s.owner.selfContact.ID, s.owner.selfContact)
 }
 
+func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfoError() {
+	s.createOwner()
+	defer s.tearDownOwner()
+	// Non-existent contact used by QA team for e2e autotests: (https://github.com/status-im/status-desktop/issues/15297)
+	fetchedContact, err := s.owner.FetchContact("0x04e972b2a794c315e16411fc0930a65bffffe4f885341683f4532fbbd883a447d849ac0be63d6a4f721affa0d0408160974ff831408433972de2c4556ef06d1ae1", true)
+	s.Require().Nil(fetchedContact)
+	s.Require().Nil(err)
+
+	u := "https://status.app/u/iwWACgoKCHNxdWlzaGVyAw==#zQ3shvMPZSyaUbjBjaNpNP1bPGsGpQDp59dZ4Gmz7UEy5o791"
+	response, err := s.owner.UnfurlURLs(nil, []string{u})
+	s.Require().NoError(err)
+	s.Require().Len(response.LinkPreviews, 0)
+}
+
 // TestSequentialUpdates checks that making updates to the community
 // immediately results in new store node fetched information.
 // Before adding storeNodeSubscription we had problems with the test setup that we didn't have a mechanism to wait for store node to
@@ -677,24 +688,33 @@ func (s *MessengerStoreNodeRequestSuite) TestSequentialUpdates() {
 func (s *MessengerStoreNodeRequestSuite) TestRequestShardAndCommunityInfo() {
 	s.createOwner()
 	s.createBob()
-
 	community := s.createCommunity(s.owner)
+
+	topicPrivKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
 
 	expectedShard := &shard.Shard{
 		Cluster: shard.MainStatusShardCluster,
 		Index:   23,
 	}
 
+	err = s.wakuStoreNode.SubscribeToPubsubTopic(expectedShard.PubsubTopic(), &topicPrivKey.PublicKey)
+	s.Require().NoError(err)
+
+	topicPrivKeyBytes := crypto.FromECDSA(topicPrivKey)
+	h := types.HexBytes(topicPrivKeyBytes)
+
 	shardRequest := &requests.SetCommunityShard{
 		CommunityID: community.ID(),
 		Shard:       expectedShard,
+		PrivateKey:  &h,
 	}
 
 	shardTopic := transport.CommunityShardInfoTopic(community.IDString())
 	contentContentTopic := wakuV2common.BytesToTopic(transport.ToTopic(shardTopic))
 	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(&contentContentTopic)
 
-	_, err := s.owner.SetCommunityShard(shardRequest)
+	_, err = s.owner.SetCommunityShard(shardRequest)
 	s.Require().NoError(err)
 
 	s.waitForEnvelopes(storeNodeSubscription, 1)
@@ -817,13 +837,12 @@ type testFetchRealCommunityExampleTokenInfo struct {
 }
 
 var testFetchRealCommunityExample = []struct {
-	CommunityID            string
-	CommunityURL           string       // If set, takes precedence over CommunityID
-	CommunityShard         *shard.Shard // WARNING: I didn't test a sharded community
-	Fleet                  string
-	UseShardAsDefaultTopic bool
-	ClusterID              uint16
-	UserPrivateKeyString   string // When empty a new user will be created
+	CommunityID          string
+	CommunityURL         string       // If set, takes precedence over CommunityID
+	CommunityShard       *shard.Shard // WARNING: I didn't test a sharded community
+	Fleet                string
+	ClusterID            uint16
+	UserPrivateKeyString string // When empty a new user will be created
 	// Optional request parameters
 	CustomOptions []StoreNodeRequestOption
 	// Setup OwnerPublicKey and CommunityTokens if the community has owner token
@@ -838,19 +857,17 @@ var testFetchRealCommunityExample = []struct {
 }{
 	{
 		//Example 1, status.prod fleet
-		CommunityID:            "0x03073514d4c14a7d10ae9fc9b0f05abc904d84166a6ac80add58bf6a3542a4e50a",
-		CommunityShard:         nil,
-		Fleet:                  params.FleetStatusProd,
-		UseShardAsDefaultTopic: false,
-		ClusterID:              shard.UndefinedShardValue,
+		CommunityID:    "0x03073514d4c14a7d10ae9fc9b0f05abc904d84166a6ac80add58bf6a3542a4e50a",
+		CommunityShard: nil,
+		Fleet:          params.FleetStatusProd,
+		ClusterID:      shard.MainStatusShardCluster,
 	},
 	{
 		// Example 3, shards.test fleet
 		// https://status.app/c/CxiACi8KFGFwIHJlcSAxIHN0dCBiZWMgbWVtEgdkc2Fkc2FkGAMiByM0MzYwREYqAxkrHAM=#zQ3shwDYZHtrLE7NqoTGjTWzWUu6hom5D4qxfskLZfgfyGRyL
-		CommunityID:            "0x03f64be95ed5c925022265f9250f538f65ed3dcf6e4ef6c139803dc02a3487ae7b",
-		Fleet:                  params.FleetShardsTest,
-		UseShardAsDefaultTopic: true,
-		ClusterID:              shard.MainStatusShardCluster,
+		CommunityID: "0x03f64be95ed5c925022265f9250f538f65ed3dcf6e4ef6c139803dc02a3487ae7b",
+		Fleet:       params.FleetShardsTest,
+		ClusterID:   shard.MainStatusShardCluster,
 
 		CheckExpectedEnvelopes: true,
 		ExpectedShardEnvelopes: []string{
@@ -953,7 +970,6 @@ var testFetchRealCommunityExample = []struct {
 		//Example 1, shards.test fleet
 		CommunityID:            "0x02471dd922756a3a50b623e59cf3b99355d6587e43d5c517eb55f9aea9d3fe9fe9",
 		Fleet:                  params.FleetShardsTest,
-		UseShardAsDefaultTopic: true,
 		ClusterID:              shard.MainStatusShardCluster,
 		CheckExpectedEnvelopes: true,
 		ExpectedShardEnvelopes: []string{
@@ -970,9 +986,8 @@ var testFetchRealCommunityExample = []struct {
 	{
 		CommunityURL: "https://status.app/c/G4IAAMQn9ucHF-V3W5Ouuy0xf0BtTjlwCANJEmwB2CG5p2xKUYzK_l37kzXulUppltT1t6mBcCEJsljRoGrKCP7rWommQomrMA2gBN7RrvCMkFqQwnCNzkNYWrLG85E6GVoM_nolTtfIzl53J1N-tj8fz4_TnO4IIw==#zQ3shZeEJqTC1xhGUjxuS4rtHSrhJ8vUYp64v6qWkLpvdy9L9",
 		//CommunityID:            "0x02b5bdaf5a25fcfe2ee14c501fab1836b8de57f61621080c3d52073d16de0d98d6",
-		Fleet:                  params.FleetShardsTest,
-		UseShardAsDefaultTopic: true,
-		OwnerPublicKey:         "0x04953f5f0d355b37c39d1d6460a31ed1114455f8263b3fd1b84406c5f12c9eb7dfb76ba7513b92186010928254984fe98aee069b4c7e20f9ea3da497c3ae769477",
+		Fleet:          params.FleetShardsTest,
+		OwnerPublicKey: "0x04953f5f0d355b37c39d1d6460a31ed1114455f8263b3fd1b84406c5f12c9eb7dfb76ba7513b92186010928254984fe98aee069b4c7e20f9ea3da497c3ae769477",
 		CommunityTokens: []testFetchRealCommunityExampleTokenInfo{
 			{
 				ChainID:         10,
@@ -1015,7 +1030,6 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 	communityID := exampleToRun.CommunityID
 	communityShard := exampleToRun.CommunityShard
 	fleet := exampleToRun.Fleet
-	useShardAsDefaultTopic := exampleToRun.UseShardAsDefaultTopic
 	clusterID := exampleToRun.ClusterID
 	userPrivateKeyString := exampleToRun.UserPrivateKeyString
 	ownerPublicKey := exampleToRun.OwnerPublicKey
@@ -1067,10 +1081,9 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 			messengerLogger := s.logger.Named(fmt.Sprintf("user-messenger-%d", i))
 
 			cfg := testWakuV2Config{
-				logger:                 wakuLogger,
-				enableStore:            false,
-				useShardAsDefaultTopic: useShardAsDefaultTopic,
-				clusterID:              clusterID,
+				logger:      wakuLogger,
+				enableStore: false,
+				clusterID:   clusterID,
 			}
 			wakuV2 := NewTestWakuV2(&s.Suite, cfg)
 			userWaku := gethbridge.NewGethWakuV2Wrapper(wakuV2)

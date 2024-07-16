@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -106,20 +107,22 @@ func (bf *BonderFee) UnmarshalJSON(data []byte) error {
 }
 
 type HopBridgeProcessor struct {
-	transactor    transactions.TransactorIface
-	httpClient    *thirdparty.HTTPClient
-	tokenManager  *token.Manager
-	contractMaker *contracts.ContractMaker
-	bonderFee     *sync.Map // [fromChainName-toChainName]BonderFee
+	transactor     transactions.TransactorIface
+	httpClient     *thirdparty.HTTPClient
+	tokenManager   *token.Manager
+	contractMaker  *contracts.ContractMaker
+	networkManager network.ManagerInterface
+	bonderFee      *sync.Map // [fromChainName-toChainName]BonderFee
 }
 
-func NewHopBridgeProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *token.Manager) *HopBridgeProcessor {
+func NewHopBridgeProcessor(rpcClient rpc.ClientInterface, transactor transactions.TransactorIface, tokenManager *token.Manager, networkManager network.ManagerInterface) *HopBridgeProcessor {
 	return &HopBridgeProcessor{
-		contractMaker: &contracts.ContractMaker{RPCClient: rpcClient},
-		httpClient:    thirdparty.NewHTTPClient(),
-		transactor:    transactor,
-		tokenManager:  tokenManager,
-		bonderFee:     &sync.Map{},
+		contractMaker:  &contracts.ContractMaker{RPCClient: rpcClient},
+		httpClient:     thirdparty.NewHTTPClient(),
+		transactor:     transactor,
+		tokenManager:   tokenManager,
+		networkManager: networkManager,
+		bonderFee:      &sync.Map{},
 	}
 }
 
@@ -299,7 +302,7 @@ func (h *HopBridgeProcessor) GetContractAddress(params ProcessorInputParams) (co
 }
 
 func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
-	fromChain := h.contractMaker.RPCClient.NetworkManager.Find(sendArgs.ChainID)
+	fromChain := h.networkManager.Find(sendArgs.ChainID)
 	if fromChain == nil {
 		return tx, fmt.Errorf("ChainID not supported %d", sendArgs.ChainID)
 	}
@@ -338,18 +341,26 @@ func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, sig
 
 	switch contractType {
 	case hop.CctpL1Bridge:
-		return h.sendCctpL1BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
+		tx, err = h.sendCctpL1BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
 	case hop.L1Bridge:
-		return h.sendL1BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, token, bonderFee)
+		tx, err = h.sendL1BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, token, bonderFee)
 	case hop.L2AmmWrapper:
-		return h.sendL2AmmWrapperTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
+		tx, err = h.sendL2AmmWrapperTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
 	case hop.CctpL2Bridge:
-		return h.sendCctpL2BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
+		tx, err = h.sendCctpL2BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
 	case hop.L2Bridge:
-		return h.sendL2BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
+		tx, err = h.sendL2BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
+	default:
+		return tx, ErrContractTypeNotSupported
 	}
-
-	return tx, ErrContractTypeNotSupported
+	if err != nil {
+		return tx, statusErrors.CreateErrorResponseFromError(err)
+	}
+	err = h.transactor.StoreAndTrackPendingTx(txOpts.From, sendArgs.HopTx.Symbol, sendArgs.ChainID, sendArgs.HopTx.MultiTransactionID, tx)
+	if err != nil {
+		return tx, statusErrors.CreateErrorResponseFromError(err)
+	}
+	return tx, nil
 }
 
 func (h *HopBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {

@@ -148,10 +148,14 @@ func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signer
 	argNonce := hexutil.Uint64(nonce)
 	sendArgs.ERC721TransferTx.Nonce = &argNonce
 	txOpts := sendArgs.ERC721TransferTx.ToTransactOpts(signerFn)
-
-	tx, err = contract.SafeTransferFrom(txOpts, common.Address(sendArgs.ERC721TransferTx.From),
+	from := common.Address(sendArgs.ERC721TransferTx.From)
+	tx, err = contract.SafeTransferFrom(txOpts, from,
 		sendArgs.ERC721TransferTx.Recipient,
 		sendArgs.ERC721TransferTx.TokenID.ToInt())
+	if err != nil {
+		return tx, statusErrors.CreateErrorResponseFromError(err)
+	}
+	err = s.transactor.StoreAndTrackPendingTx(from, sendArgs.ERC721TransferTx.Symbol, sendArgs.ChainID, sendArgs.ERC721TransferTx.MultiTransactionID, tx)
 	if err != nil {
 		return tx, statusErrors.CreateErrorResponseFromError(err)
 	}

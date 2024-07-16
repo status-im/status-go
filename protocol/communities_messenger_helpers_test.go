@@ -5,6 +5,8 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
+	"math/big"
+	"strconv"
 	"sync"
 	"time"
 
@@ -24,6 +26,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
@@ -64,14 +67,45 @@ func (m *TokenManagerMock) GetAllChainIDs() ([]uint64, error) {
 	return chainIDs, nil
 }
 
+func (m *TokenManagerMock) getBalanceBasedOnParams(accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big {
+	retBalances := make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	retBalances[testChainID1] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+
+	for _, chainId := range chainIDs {
+		if _, exists := retBalances[chainId]; !exists {
+			retBalances[chainId] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+		}
+		if storedAccounts, exists := (*m.Balances)[chainId]; exists {
+			for _, account := range accounts {
+				if _, exists := retBalances[chainId][account]; !exists {
+					retBalances[chainId][account] = make(map[gethcommon.Address]*hexutil.Big)
+				}
+				if storedTokenAddresses, exists := storedAccounts[account]; exists {
+					for _, tokenAddress := range tokenAddresses {
+						if _, exists := retBalances[chainId][account][tokenAddress]; !exists {
+							retBalances[chainId][account] = make(map[gethcommon.Address]*hexutil.Big)
+						}
+
+						if balance, exists := storedTokenAddresses[tokenAddress]; exists {
+							retBalances[chainId][account][tokenAddress] = balance
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return retBalances
+}
+
 func (m *TokenManagerMock) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
 	time.Sleep(100 * time.Millisecond) // simulate response time
-	return *m.Balances, nil
+	return m.getBalanceBasedOnParams(accounts, tokenAddresses, chainIDs), nil
 }
 
 func (m *TokenManagerMock) GetCachedBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
 	time.Sleep(100 * time.Millisecond) // simulate response time
-	return *m.Balances, nil
+	return m.getBalanceBasedOnParams(accounts, tokenAddresses, chainIDs), nil
 }
 
 func (m *TokenManagerMock) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *walletToken.Token {
@@ -402,7 +436,7 @@ func createOnRequestCommunity(s *suite.Suite, owner *Messenger) (*communities.Co
 
 func createCommunityConfigurable(s *suite.Suite, owner *Messenger, permission protobuf.CommunityPermissions_Access) (*communities.Community, *Chat) {
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+		Membership:  permission,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -440,8 +474,7 @@ func advertiseCommunityTo(s *suite.Suite, community *communities.Community, owne
 	messageState := user.buildMessageState()
 	messageState.CurrentMessageState = &CurrentMessageState{}
 	messageState.CurrentMessageState.PublicKey = &user.identity.PublicKey
-	// TODO: handle shards?
-	err = user.handleCommunityDescription(messageState, signer, description, wrappedCommunity, nil, nil)
+	err = user.handleCommunityDescription(messageState, signer, description, wrappedCommunity, nil, community.Shard().Protobuffer())
 	s.Require().NoError(err)
 }
 
@@ -661,4 +694,39 @@ func waitOnCommunitiesEvent(user *Messenger, condition func(*communities.Subscri
 	}()
 
 	return errCh
+}
+
+func makeAddressSatisfyTheCriteria(s *suite.Suite, mockedBalances communities.BalancesByChain, mockedCollectibles communities.CollectiblesByChain,
+	chainID uint64, address string, criteria *protobuf.TokenCriteria) {
+
+	walletAddress := gethcommon.HexToAddress(address)
+	contractAddress := gethcommon.HexToAddress(criteria.ContractAddresses[chainID])
+	switch criteria.Type {
+	case protobuf.CommunityTokenType_ERC20:
+		balance, ok := new(big.Int).SetString(criteria.AmountInWei, 10)
+		s.Require().True(ok)
+
+		mockedBalances[chainID][walletAddress][contractAddress] = (*hexutil.Big)(balance)
+
+	case protobuf.CommunityTokenType_ERC721:
+		amount, err := strconv.ParseUint(criteria.AmountInWei, 10, 32)
+		s.Require().NoError(err)
+
+		balances := []thirdparty.TokenBalance{}
+		for i := uint64(0); i < amount; i++ {
+			balances = append(balances, thirdparty.TokenBalance{
+				TokenID: &bigint.BigInt{
+					Int: new(big.Int).SetUint64(i + 1),
+				},
+				Balance: &bigint.BigInt{
+					Int: new(big.Int).SetUint64(1),
+				},
+			})
+		}
+
+		mockedCollectibles[chainID][walletAddress][contractAddress] = balances
+
+	case protobuf.CommunityTokenType_ENS:
+		// not implemented
+	}
 }

@@ -28,6 +28,8 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/centralizedmetrics"
+	centralizedmetricscommon "github.com/status-im/status-go/centralizedmetrics/common"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -99,6 +101,7 @@ type GethStatusBackend struct {
 	log                      log.Logger
 	allowAllRPC              bool // used only for tests, disables api method restrictions
 	LocalPairingStateManager *statecontrol.ProcessStateManager
+	centralizedMetrics       *centralizedmetrics.MetricService
 }
 
 // NewGethStatusBackend create a new GethStatusBackend instance
@@ -172,16 +175,6 @@ func (b *GethStatusBackend) GetMultiaccountDB() *multiaccounts.Database {
 	return b.multiaccountsDB
 }
 
-func (b *GethStatusBackend) InitializeAccounts(rootDirectory string) error {
-	b.UpdateRootDataDir(rootDirectory)
-	manager := b.AccountManager()
-	keystoreDir := filepath.Join(rootDirectory, keystoreRelativePath)
-	if err := manager.InitKeystore(keystoreDir); err != nil {
-		return err
-	}
-	return b.OpenAccounts()
-}
-
 func (b *GethStatusBackend) OpenAccounts() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -194,6 +187,13 @@ func (b *GethStatusBackend) OpenAccounts() error {
 		return err
 	}
 	b.multiaccountsDB = db
+
+	b.centralizedMetrics = centralizedmetrics.NewDefaultMetricService(b.multiaccountsDB.DB())
+	err = b.centralizedMetrics.EnsureStarted()
+	if err != nil {
+		return err
+	}
+
 	// Probably we should iron out a bit better how to create/dispose of the status-service
 	b.statusNode.SetMultiaccountsDB(db)
 
@@ -204,6 +204,30 @@ func (b *GethStatusBackend) OpenAccounts() error {
 	}
 
 	return nil
+}
+
+func (b *GethStatusBackend) CentralizedMetricsInfo() (*centralizedmetrics.MetricsInfo, error) {
+	if b.centralizedMetrics == nil {
+		return nil, errors.New("centralized metrics not initialized")
+	}
+
+	return b.centralizedMetrics.Info()
+}
+
+func (b *GethStatusBackend) ToggleCentralizedMetrics(isEnabled bool) error {
+	if b.centralizedMetrics == nil {
+		return errors.New("centralized metrics nil")
+	}
+
+	return b.centralizedMetrics.ToggleEnabled(isEnabled)
+}
+
+func (b *GethStatusBackend) AddCentralizedMetric(metric centralizedmetricscommon.Metric) error {
+	if b.centralizedMetrics == nil {
+		return errors.New("centralized metrics nil")
+	}
+	return b.centralizedMetrics.AddMetric(metric)
+
 }
 
 func (b *GethStatusBackend) GetAccounts() ([]multiaccounts.Account, error) {
@@ -1589,13 +1613,16 @@ func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, inp
 	settings.PreviewPrivacy = request.PreviewPrivacy
 	settings.CurrentNetwork = request.CurrentNetwork
 	settings.TestNetworksEnabled = request.TestNetworksEnabled
-
 	if !input.restoringAccount {
 		settings.Mnemonic = &input.mnemonic
 		settings.OmitTransfersHistoryScan = true
 		// TODO(rasom): uncomment it as soon as address will be properly
 		// marked as shown on mobile client
 		//settings.MnemonicWasNotShown = true
+	}
+
+	if request.WakuV2Fleet != "" {
+		settings.Fleet = &request.WakuV2Fleet
 	}
 
 	return settings, nil

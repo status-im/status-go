@@ -150,6 +150,8 @@ func (m *StoreNodeRequestManager) FetchCommunities(communities []communities.Com
 	return outErr
 }
 
+// FetchContact - similar to FetchCommunity
+// If a `nil` contact and a `nil` error are returned, it means that the contact wasn't found at the store node.
 func (m *StoreNodeRequestManager) FetchContact(contactID string, opts []StoreNodeRequestOption) (*Contact, StoreNodeRequestStats, error) {
 
 	cfg := buildStoreNodeRequestConfig(opts)

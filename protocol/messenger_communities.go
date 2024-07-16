@@ -156,6 +156,7 @@ func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) err
 	messageID, err := m.sender.SendPublic(context.Background(), org.IDString(), rawMessage)
 	if err == nil {
 		m.logger.Debug("published community",
+			zap.String("pubsubTopic", org.PubsubTopic()),
 			zap.String("communityID", org.IDString()),
 			zap.String("messageID", hexutil.Encode(messageID)),
 			zap.Uint64("clock", org.Clock()),
@@ -458,28 +459,13 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 
 					m.processCommunityChanges(state)
 
-					response, err := m.saveDataAndPrepareResponse(state)
+					_, err = m.saveDataAndPrepareResponse(state)
 					if err != nil {
 						m.logger.Error("failed to save data and prepare response")
 					}
 
-					// control node changed and we were kicked out. It now awaits our addresses
-					if communityResponse.Changes.ControlNodeChanged != nil && communityResponse.Changes.MemberKicked {
-						requestToJoin, err := m.sendSharedAddressToControlNode(communityResponse.Community.ControlNode(), communityResponse.Community)
-
-						if err != nil {
-							m.logger.Error("share address to control node failed", zap.String("id", types.EncodeHex(communityResponse.Community.ID())), zap.Error(err))
-
-							if err == communities.ErrRevealedAccountsAbsent || err == communities.ErrNoRevealedAccountsSignature {
-								m.AddActivityCenterNotificationToResponse(communityResponse.Community.IDString(), ActivityCenterNotificationTypeShareAccounts, response)
-							}
-						} else {
-							state.Response.AddRequestToJoinCommunity(requestToJoin)
-						}
-					}
-
 					if m.config.messengerSignalsHandler != nil {
-						m.config.messengerSignalsHandler.MessengerResponse(response)
+						m.config.messengerSignalsHandler.MessengerResponse(state.Response)
 					}
 				}
 
@@ -695,6 +681,15 @@ func (m *Messenger) handleCommunitySharedAddressesRequest(state *ReceivedMessage
 	_, err = m.sender.SendPrivate(context.Background(), signer, &rawMessage)
 	if err != nil {
 		return err
+	}
+
+	if community.IsPrivilegedMember(signer) {
+		memberRole := community.MemberRole(signer)
+		newPrivilegedMember := make(map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey)
+		newPrivilegedMember[memberRole] = []*ecdsa.PublicKey{signer}
+		if err = m.communitiesManager.ShareRequestsToJoinWithPrivilegedMembers(community, newPrivilegedMember); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -1671,23 +1666,6 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 		return nil, err
 	}
 
-	// send edit message also to TokenMasters and Owners
-	skipMembers := make(map[string]struct{})
-	skipMembers[common.PubkeyToHex(&m.identity.PublicKey)] = struct{}{}
-
-	privilegedMembers := community.GetFilteredPrivilegedMembers(skipMembers)
-	for role, members := range privilegedMembers {
-		if len(members) == 0 || (role != protobuf.CommunityMember_ROLE_TOKEN_MASTER && role != protobuf.CommunityMember_ROLE_OWNER) {
-			continue
-		}
-		for _, member := range members {
-			rawMessage.Recipients = append(rawMessage.Recipients, member)
-			_, err := m.sender.SendPrivate(context.Background(), member, &rawMessage)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
 	if _, err = m.UpsertRawMessageToWatch(&rawMessage); err != nil {
 		return nil, err
 	}
@@ -2446,16 +2424,8 @@ func (m *Messenger) DeleteCommunityChat(communityID types.HexBytes, chatID strin
 	return response, nil
 }
 
-func (m *Messenger) useShards() bool {
-	nodeConfig, err := m.settings.GetNodeConfig()
-	if err != nil {
-		return false
-	}
-	return nodeConfig.WakuV2Config.UseShardAsDefaultTopic
-}
-
 func (m *Messenger) InitCommunityFilters(communityFiltersToInitialize []transport.CommunityFilterToInitialize) ([]*transport.Filter, error) {
-	return m.transport.InitCommunityFilters(communityFiltersToInitialize, m.useShards())
+	return m.transport.InitCommunityFilters(communityFiltersToInitialize)
 }
 
 func (m *Messenger) DefaultFilters(o *communities.Community) []transport.FiltersToInitialize {
@@ -2472,12 +2442,7 @@ func (m *Messenger) DefaultFilters(o *communities.Community) []transport.Filters
 		{ChatID: updatesChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: mlChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
-	}
-
-	if m.useShards() {
-		filters = append(filters, transport.FiltersToInitialize{ChatID: uncompressedPubKey, PubsubTopic: shard.DefaultNonProtectedPubsubTopic()})
-	} else {
-		filters = append(filters, transport.FiltersToInitialize{ChatID: uncompressedPubKey, PubsubTopic: communityPubsubTopic})
+		{ChatID: uncompressedPubKey, PubsubTopic: shard.DefaultNonProtectedPubsubTopic()},
 	}
 
 	return filters
@@ -3554,7 +3519,7 @@ func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communiti
 	}
 
 	// Unsubscribing from existing shard
-	if community.Shard() != nil {
+	if community.Shard() != nil && community.Shard() != shard.FromProtobuff(message.GetShard()) {
 		err := m.unsubscribeFromShard(community.Shard())
 		if err != nil {
 			return err
@@ -3567,12 +3532,14 @@ func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communiti
 	if err != nil {
 		return err
 	}
+	// Update community filters in case of change of shard
+	if community.Shard() != shard.FromProtobuff(message.GetShard()) {
+		err = m.UpdateCommunityFilters(community)
+		if err != nil {
+			return err
+		}
 
-	err = m.UpdateCommunityFilters(community)
-	if err != nil {
-		return err
 	}
-
 	return nil
 }
 
@@ -3584,6 +3551,10 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 	community, err := m.communitiesManager.GetByID(message.CommunityId)
 	if err != nil {
 		return err
+	}
+
+	if community.IsControlNode() {
+		return nil
 	}
 
 	// Currently this type of msg coming from the control node.
@@ -3603,18 +3574,23 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN:
 		fallthrough
 	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_REJECT_REQUEST_TO_JOIN:
-		requestsToJoin, err := m.communitiesManager.HandleRequestToJoinPrivilegedUserSyncMessage(message, community.ID())
+		requestsToJoin, err := m.communitiesManager.HandleRequestToJoinPrivilegedUserSyncMessage(message, community)
 		if err != nil {
-			return nil
+			return err
 		}
 		state.Response.AddRequestsToJoinCommunity(requestsToJoin)
 
 	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ALL_SYNC_REQUESTS_TO_JOIN:
-		nonAcceptedRequestsToJoin, err := m.communitiesManager.HandleSyncAllRequestToJoinForNewPrivilegedMember(message, community.ID())
+		nonAcceptedRequestsToJoin, err := m.communitiesManager.HandleSyncAllRequestToJoinForNewPrivilegedMember(message, community)
 		if err != nil {
-			return nil
+			return err
 		}
 		state.Response.AddRequestsToJoinCommunity(nonAcceptedRequestsToJoin)
+	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_MEMBER_EDIT_SHARED_ADDRESSES:
+		err = m.communitiesManager.HandleEditSharedAddressesPrivilegedUserSyncMessage(message, community)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -3781,7 +3757,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 		return err
 	}
 
-	// TODO: handle shard
+	// Passing shard as nil so that defaultProtected shard 32 is considered
 	err = m.handleCommunityDescription(messageState, signer, &cd, syncCommunity.Description, signer, nil)
 	// Even if the Description is outdated we should proceed in order to sync settings and joined state
 	if err != nil && err != communities.ErrInvalidCommunityDescriptionClockOutdated {
@@ -4748,6 +4724,9 @@ func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) 
 				m.logger.Error("cannot merge join community response", zap.Error(err))
 				continue
 			}
+		} else if changes.MemberSoftKicked {
+			m.leaveCommunityOnSoftKick(changes.Community, messageState.Response)
+			m.shareRevealedAccountsOnSoftKick(changes.Community, messageState.Response)
 
 		} else if changes.MemberKicked {
 			notificationType := ActivityCenterNotificationTypeCommunityKicked
@@ -4808,6 +4787,8 @@ func (m *Messenger) PromoteSelfToControlNode(communityID types.HexBytes) (*Messe
 		m.config.messengerSignalsHandler.MessengerResponse(&response)
 	}
 
+	m.communitiesManager.StartMembersReevaluationLoop(community.ID(), false)
+
 	return &response, nil
 }
 
@@ -4846,22 +4827,6 @@ func (m *Messenger) CreateResponseWithACNotification(communityID string, acType 
 	return response, nil
 }
 
-func (m *Messenger) SerializedCommunities() ([]json.RawMessage, error) {
-	cs, err := m.Communities()
-	if err != nil {
-		return nil, err
-	}
-	res := make([]json.RawMessage, 0, len(cs))
-	for _, c := range cs {
-		b, err := c.MarshalJSONWithMediaServer(m.httpServer)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, b)
-	}
-	return res, nil
-}
-
 // SendMessageToControlNode sends a message to the control node of the community.
 // use pointer to rawMessage to get the message ID and other updated properties.
 func (m *Messenger) SendMessageToControlNode(community *communities.Community, rawMessage *common.RawMessage) ([]byte, error) {
@@ -4898,30 +4863,26 @@ func (m *Messenger) AddActivityCenterNotificationToResponse(communityID string, 
 }
 
 func (m *Messenger) leaveCommunityDueToKickOrBan(changes *communities.CommunityChanges, acType ActivityCenterType, stateResponse *MessengerResponse) {
-	// during the ownership change kicked user must stay in the spectate mode
-	ownerhipChange := changes.ControlNodeChanged != nil
-	response, err := m.kickedOutOfCommunity(changes.Community.ID(), ownerhipChange)
+	response, err := m.kickedOutOfCommunity(changes.Community.ID(), false)
 	if err != nil {
 		m.logger.Error("cannot leave community", zap.Error(err))
 		return
 	}
 
-	if !ownerhipChange {
-		// Activity Center notification
-		notification := &ActivityCenterNotification{
-			ID:          types.FromHex(uuid.New().String()),
-			Type:        acType,
-			Timestamp:   m.getTimesource().GetCurrentTime(),
-			CommunityID: changes.Community.IDString(),
-			Read:        false,
-			UpdatedAt:   m.GetCurrentTimeInMillis(),
-		}
+	// Activity Center notification
+	notification := &ActivityCenterNotification{
+		ID:          types.FromHex(uuid.New().String()),
+		Type:        acType,
+		Timestamp:   m.getTimesource().GetCurrentTime(),
+		CommunityID: changes.Community.IDString(),
+		Read:        false,
+		UpdatedAt:   m.GetCurrentTimeInMillis(),
+	}
 
-		err = m.addActivityCenterNotification(response, notification, nil)
-		if err != nil {
-			m.logger.Error("failed to save notification", zap.Error(err))
-			return
-		}
+	err = m.addActivityCenterNotification(response, notification, nil)
+	if err != nil {
+		m.logger.Error("failed to save notification", zap.Error(err))
+		return
 	}
 
 	if err := stateResponse.Merge(response); err != nil {
@@ -5032,4 +4993,28 @@ func (m *Messenger) HandleDeleteCommunityMemberMessages(state *ReceivedMessageSt
 	}
 
 	return state.Response.Merge(deleteMessagesResponse)
+}
+
+func (m *Messenger) leaveCommunityOnSoftKick(community *communities.Community, messengerResponse *MessengerResponse) {
+	response, err := m.kickedOutOfCommunity(community.ID(), true)
+	if err != nil {
+		m.logger.Error("member soft kick error", zap.String("communityID", types.EncodeHex(community.ID())), zap.Error(err))
+	}
+
+	if err := messengerResponse.Merge(response); err != nil {
+		m.logger.Error("cannot merge leaveCommunityOnSoftKick response", zap.String("communityID", types.EncodeHex(community.ID())), zap.Error(err))
+	}
+}
+
+func (m *Messenger) shareRevealedAccountsOnSoftKick(community *communities.Community, messengerResponse *MessengerResponse) {
+	requestToJoin, err := m.sendSharedAddressToControlNode(community.ControlNode(), community)
+	if err != nil {
+		m.logger.Error("share address to control node failed", zap.String("id", types.EncodeHex(community.ID())), zap.Error(err))
+
+		if err == communities.ErrRevealedAccountsAbsent || err == communities.ErrNoRevealedAccountsSignature {
+			m.AddActivityCenterNotificationToResponse(community.IDString(), ActivityCenterNotificationTypeShareAccounts, messengerResponse)
+		}
+	} else {
+		messengerResponse.AddRequestToJoinCommunity(requestToJoin)
+	}
 }

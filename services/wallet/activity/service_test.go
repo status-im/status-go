@@ -7,17 +7,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
 	eth "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/chain"
+	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
+	mock_token "github.com/status-im/status-go/services/wallet/token/mock/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/t/helpers"
@@ -53,45 +56,15 @@ func (m *mockCollectiblesManager) FetchCollectionSocialsAsync(contractID thirdpa
 	return nil
 }
 
-// mockTokenManager implements the token.ManagerInterface
-type mockTokenManager struct {
-	mock.Mock
-}
-
-func (m *mockTokenManager) LookupTokenIdentity(chainID uint64, address eth.Address, native bool) *token.Token {
-	args := m.Called(chainID, address, native)
-	res := args.Get(0)
-	if res == nil {
-		return nil
-	}
-	return res.(*token.Token)
-}
-
-func (m *mockTokenManager) LookupToken(chainID *uint64, tokenSymbol string) (tkn *token.Token, isNative bool) {
-	args := m.Called(chainID, tokenSymbol)
-	return args.Get(0).(*token.Token), args.Bool(1)
-}
-
-func (m *mockTokenManager) GetBalancesByChain(parent context.Context, clients map[uint64]chain.ClientInterface, accounts, tokens []eth.Address) (map[uint64]map[eth.Address]map[eth.Address]*hexutil.Big, error) {
-	return nil, nil // Not used here
-}
-
-func (m *mockTokenManager) GetTokensByChainIDs(chainIDs []uint64) ([]*token.Token, error) {
-	return nil, nil // Not used here
-}
-
-func (m *mockTokenManager) GetTokenHistoricalBalance(account eth.Address, chainID uint64, symbol string, timestamp int64) (*big.Int, error) {
-	return nil, nil // Not used here
-}
-
 type testState struct {
 	service          *Service
 	eventFeed        *event.Feed
-	tokenMock        *mockTokenManager
+	tokenMock        *mock_token.MockManagerInterface
 	collectiblesMock *mockCollectiblesManager
 	close            func()
 	pendingTracker   *transactions.PendingTxTracker
 	chainClient      *transactions.MockChainClient
+	rpcClient        *mock_rpcclient.MockClientInterface
 }
 
 func setupTestService(tb testing.TB) (state testState) {
@@ -104,20 +77,26 @@ func setupTestService(tb testing.TB) (state testState) {
 	require.NoError(tb, err)
 
 	state.eventFeed = new(event.Feed)
-	state.tokenMock = &mockTokenManager{}
+	mockCtrl := gomock.NewController(tb)
+	state.tokenMock = mock_token.NewMockManagerInterface(mockCtrl)
 	state.collectiblesMock = &mockCollectiblesManager{}
 
 	state.chainClient = transactions.NewMockChainClient()
+	state.rpcClient = mock_rpcclient.NewMockClientInterface(mockCtrl)
+	state.rpcClient.EXPECT().AbstractEthClient(gomock.Any()).DoAndReturn(func(chainID common.ChainID) (chain.BatchCallClient, error) {
+		return state.chainClient.AbstractEthClient(chainID)
+	}).AnyTimes()
 
 	// Ensure we process pending transactions as needed, only once
 	pendingCheckInterval := time.Second
-	state.pendingTracker = transactions.NewPendingTxTracker(db, state.chainClient, nil, state.eventFeed, pendingCheckInterval)
+	state.pendingTracker = transactions.NewPendingTxTracker(db, state.rpcClient, nil, state.eventFeed, pendingCheckInterval)
 
 	state.service = NewService(db, accountsDB, state.tokenMock, state.collectiblesMock, state.eventFeed, state.pendingTracker)
 	state.service.debounceDuration = 0
 	state.close = func() {
 		require.NoError(tb, state.pendingTracker.Stop())
 		require.NoError(tb, db.Close())
+		defer mockCtrl.Finish()
 	}
 
 	return state
@@ -168,13 +147,13 @@ func TestService_UpdateCollectibleInfo(t *testing.T) {
 	sub := state.eventFeed.Subscribe(ch)
 
 	// Expect one call for the fungible token
-	state.tokenMock.On("LookupTokenIdentity", uint64(5), eth.HexToAddress("0x3d6afaa395c31fcd391fe3d562e75fe9e8ec7e6a"), false).Return(
+	state.tokenMock.EXPECT().LookupTokenIdentity(uint64(5), eth.HexToAddress("0x3d6afaa395c31fcd391fe3d562e75fe9e8ec7e6a"), false).Return(
 		&token.Token{
 			ChainID: 5,
 			Address: eth.HexToAddress("0x3d6afaa395c31fcd391fe3d562e75fe9e8ec7e6a"),
 			Symbol:  "STT",
-		}, false,
-	).Once()
+		},
+	).Times(1)
 	state.collectiblesMock.On("FetchAssetsByCollectibleUniqueID", []thirdparty.CollectibleUniqueID{
 		{
 			ContractID: thirdparty.ContractID{
@@ -296,21 +275,21 @@ func setupTransactions(t *testing.T, state testState, txCount int, testTxs []tra
 
 	allAddresses = append(append(allAddresses, fromTrs...), toTrs...)
 
-	state.tokenMock.On("LookupTokenIdentity", mock.Anything, mock.Anything, mock.Anything).Return(
+	state.tokenMock.EXPECT().LookupTokenIdentity(gomock.Any(), gomock.Any(), gomock.Any()).Return(
 		&token.Token{
 			ChainID: 5,
 			Address: eth.Address{},
 			Symbol:  "ETH",
-		}, true,
-	).Times(0)
+		},
+	).AnyTimes()
 
-	state.tokenMock.On("LookupToken", mock.Anything, mock.Anything).Return(
+	state.tokenMock.EXPECT().LookupToken(gomock.Any(), gomock.Any()).Return(
 		&token.Token{
 			ChainID: 5,
 			Address: eth.Address{},
 			Symbol:  "ETH",
 		}, true,
-	).Times(0)
+	).AnyTimes()
 
 	return allAddresses, pendings, ch, func() {
 		sub.Unsubscribe()

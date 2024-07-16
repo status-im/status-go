@@ -39,10 +39,9 @@ type MessengerCommunitiesShardingSuite struct {
 func (s *MessengerCommunitiesShardingSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, true, []string{"owner", "alice"})
+	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "alice"})
 
 	nodeConfig := defaultTestCommunitiesMessengerNodeConfig()
-	nodeConfig.WakuV2Config.UseShardAsDefaultTopic = true
 
 	s.ownerWaku = wakuNodes[0]
 	s.owner = newTestCommunitiesMessenger(&s.Suite, s.ownerWaku, testCommunitiesMessengerConfig{
@@ -140,9 +139,13 @@ func (s *MessengerCommunitiesShardingSuite) TestPostToCommunityChat() {
 		s.testPostToCommunityChat(shard, community, chat)
 	}
 
-	// Members should continue to receive messages in a community if sharding is disabled after it was previously enabled.
+	// Members should continue to receive messages in a community if it is moved back to default shard.
 	{
-		s.testPostToCommunityChat(nil, community, chat)
+		shard := &shard.Shard{
+			Cluster: shard.MainStatusShardCluster,
+			Index:   32,
+		}
+		s.testPostToCommunityChat(shard, community, chat)
 	}
 }
 

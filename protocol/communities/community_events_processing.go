@@ -239,11 +239,7 @@ func (o *Community) applyEvent(communityEvent CommunityEvent) error {
 
 	case protobuf.CommunityEvent_COMMUNITY_MEMBER_KICK:
 		if o.IsControlNode() {
-			pk, err := common.HexToPubkey(communityEvent.MemberToAction)
-			if err != nil {
-				return err
-			}
-			o.removeMemberFromOrg(pk)
+			_ = o.RemoveMembersFromOrg([]string{communityEvent.MemberToAction})
 		}
 	case protobuf.CommunityEvent_COMMUNITY_MEMBER_BAN:
 		if o.IsControlNode() {

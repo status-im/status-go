@@ -60,7 +60,7 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *Ar
 	logger, err := zap.NewDevelopment()
 	s.Require().NoError(err)
 
-	m, err := NewManager(key, "", db, nil, logger, nil, ownerVerifier, nil, &TimeSourceStub{}, nil)
+	m, err := NewManager(key, "", db, nil, logger, nil, ownerVerifier, nil, &TimeSourceStub{}, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
@@ -226,7 +226,7 @@ func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollect
 		WithTokenManager(tm),
 	}
 
-	m, err := NewManager(key, "", db, nil, nil, nil, nil, nil, &TimeSourceStub{}, nil, options...)
+	m, err := NewManager(key, "", db, nil, nil, nil, nil, nil, &TimeSourceStub{}, nil, nil, options...)
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 

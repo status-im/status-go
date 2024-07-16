@@ -3846,7 +3846,7 @@ func (m *Messenger) HandlePushNotificationRequest(state *ReceivedMessageState, m
 }
 
 func (m *Messenger) HandleCommunityDescription(state *ReceivedMessageState, message *protobuf.CommunityDescription, statusMessage *v1protocol.StatusMessage) error {
-	// TODO: handle shard
+	// shard passed as nil since it is handled within by using default shard
 	err := m.handleCommunityDescription(state, state.CurrentMessageState.PublicKey, message, statusMessage.EncryptionLayer.Payload, nil, nil)
 	if err != nil {
 		m.logger.Warn("failed to handle CommunityDescription", zap.Error(err))

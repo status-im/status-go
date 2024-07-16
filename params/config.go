@@ -161,9 +161,6 @@ type WakuV2Config struct {
 	// Port number in which to start libp2p protocol (0 for random)
 	Port int
 
-	// Interval of time in seconds to send a ping to peers to keep the connection to them alive
-	KeepAliveInterval int
-
 	// LightClient should be true if the node will not relay messages and only rely on lightpush/filter nodes
 	LightClient bool
 
@@ -215,8 +212,11 @@ type WakuV2Config struct {
 
 	TelemetryServerURL string
 
-	// UseShardAsDefaultTopic indicates whether the default shard should be used instead of the default relay topic
-	UseShardAsDefaultTopic bool
+	// EnableMissingMessageVerification indicates whether the storenodes must be queried periodically to retrieve any missing message
+	EnableMissingMessageVerification bool
+
+	// EnableMissingMessageVerification indicates whether storenodes must be queried periodically to confirm if messages sent are actually propagated in the network
+	EnableStoreConfirmationForMessagesSent bool
 }
 
 // ----------

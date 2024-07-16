@@ -24,8 +24,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/wakuv2/common"
 )
 
@@ -58,7 +57,7 @@ func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
 	}
 
 	found := false
-	candidates := w.filters.GetWatchersByTopic(relay.DefaultWakuTopic, t1)
+	candidates := w.filters.GetWatchersByTopic(shard.DefaultShardPubsubTopic(), t1)
 	for _, f := range candidates {
 		if maps.Equal(f.ContentTopics, common.NewTopicSet(crit.ContentTopics)) {
 			found = true

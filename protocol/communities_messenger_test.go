@@ -2283,7 +2283,7 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
 	communityChat := response.Chats()[0]
 
 	// Add Alice to the community before sharing it
-	_, err = community.AddMember(&s.alice.identity.PublicKey, []protobuf.CommunityMember_Roles{})
+	_, err = community.AddMember(&s.alice.identity.PublicKey, []protobuf.CommunityMember_Roles{}, community.Clock())
 	s.Require().NoError(err)
 
 	err = s.bob.communitiesManager.SaveCommunity(community)
@@ -4352,15 +4352,15 @@ func (s *MessengerCommunitiesSuite) sendImageToCommunity(sender *Messenger, chat
 }
 
 func (s *MessengerCommunitiesSuite) TestSerializedCommunities() {
-	community, _ := s.createCommunity()
 	addMediaServer := func(messenger *Messenger) {
 		mediaServer, err := server.NewMediaServer(messenger.database, nil, nil, nil)
 		s.Require().NoError(err)
 		s.Require().NoError(mediaServer.Start())
-		messenger.httpServer = mediaServer
+		messenger.SetMediaServer(mediaServer)
 	}
 	addMediaServer(s.owner)
 
+	community, _ := s.createCommunity()
 	// update community description
 	description := community.Description()
 	identImageName := "small"
@@ -4393,7 +4393,7 @@ func (s *MessengerCommunitiesSuite) TestSerializedCommunities() {
 	s.Len(b.Description().Identity.Images, 1)
 	s.Equal(identImagePayload, b.Description().Identity.Images[identImageName].Payload)
 
-	c, err := s.owner.SerializedCommunities()
+	c, err := s.owner.Communities()
 	s.Require().NoError(err)
 	s.Require().Len(c, 1)
 	d, err := json.Marshal(c)
@@ -4516,17 +4516,16 @@ func (s *MessengerCommunitiesSuite) fetchImage(fullURL string) ([]byte, error) {
 
 func (s *MessengerCommunitiesSuite) TestMemberMessagesHasImageLink() {
 	// GIVEN
-	community, communityChat := s.createCommunity()
-
 	addMediaServer := func(messenger *Messenger) {
 		mediaServer, err := server.NewMediaServer(messenger.database, nil, nil, nil)
 		s.Require().NoError(err)
 		s.Require().NoError(mediaServer.Start())
-		messenger.httpServer = mediaServer
+		messenger.SetMediaServer(mediaServer)
 	}
 	addMediaServer(s.alice)
 	addMediaServer(s.bob)
 	addMediaServer(s.owner)
+	community, communityChat := s.createCommunity()
 
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 
@@ -4778,14 +4777,14 @@ func (s *MessengerCommunitiesSuite) TestIgnoreOutdatedCommunityDescription() {
 	signer, description1, err := communities.UnwrapCommunityDescriptionMessage(wrappedDescription1)
 	s.Require().NoError(err)
 
-	_, err = community.AddMember(&s.alice.identity.PublicKey, []protobuf.CommunityMember_Roles{})
+	_, err = community.AddMember(&s.alice.identity.PublicKey, []protobuf.CommunityMember_Roles{}, community.Clock())
 	s.Require().NoError(err)
 	wrappedDescription2, err := community.ToProtocolMessageBytes()
 	s.Require().NoError(err)
 	_, description2, err := communities.UnwrapCommunityDescriptionMessage(wrappedDescription2)
 	s.Require().NoError(err)
 
-	_, err = community.AddMember(&s.bob.identity.PublicKey, []protobuf.CommunityMember_Roles{})
+	_, err = community.AddMember(&s.bob.identity.PublicKey, []protobuf.CommunityMember_Roles{}, community.Clock())
 	s.Require().NoError(err)
 	wrappedDescription3, err := community.ToProtocolMessageBytes()
 	s.Require().NoError(err)
@@ -4798,7 +4797,7 @@ func (s *MessengerCommunitiesSuite) TestIgnoreOutdatedCommunityDescription() {
 	// Handle first community description
 	{
 		messageState := s.bob.buildMessageState()
-		err = s.bob.handleCommunityDescription(messageState, signer, description1, wrappedDescription1, nil, nil)
+		err = s.bob.handleCommunityDescription(messageState, signer, description1, wrappedDescription1, nil, community.Shard().Protobuffer())
 		s.Require().NoError(err)
 		s.Require().Len(messageState.Response.Communities(), 1)
 		s.Require().Equal(description1.Clock, messageState.Response.Communities()[0].Clock())
@@ -4807,7 +4806,7 @@ func (s *MessengerCommunitiesSuite) TestIgnoreOutdatedCommunityDescription() {
 	// Handle third community description
 	{
 		messageState := s.bob.buildMessageState()
-		err = s.bob.handleCommunityDescription(messageState, signer, description3, wrappedDescription3, nil, nil)
+		err = s.bob.handleCommunityDescription(messageState, signer, description3, wrappedDescription3, nil, community.Shard().Protobuffer())
 		s.Require().NoError(err)
 		s.Require().Len(messageState.Response.Communities(), 1)
 		s.Require().Equal(description3.Clock, messageState.Response.Communities()[0].Clock())
@@ -4822,7 +4821,7 @@ func (s *MessengerCommunitiesSuite) TestIgnoreOutdatedCommunityDescription() {
 	// It should be ignored
 	{
 		messageState := s.bob.buildMessageState()
-		err = s.bob.handleCommunityDescription(messageState, signer, description2, wrappedDescription2, nil, nil)
+		err = s.bob.handleCommunityDescription(messageState, signer, description2, wrappedDescription2, nil, community.Shard().Protobuffer())
 		s.Require().Len(messageState.Response.Communities(), 0)
 		s.Require().Len(messageState.Response.CommunityChanges, 0)
 		s.Require().ErrorIs(err, communities.ErrInvalidCommunityDescriptionClockOutdated)

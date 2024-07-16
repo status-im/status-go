@@ -44,6 +44,7 @@ message CommunityTokenMetadata {
   string symbol = 5;
   string name = 6;
   uint32 decimals = 7;
+  string version = 8;
 }
 
 message CommunityTokenAction {
@@ -123,7 +124,8 @@ message CommunityDescription {
   uint64 active_members_count = 17;
   string ID = 18;
   map<string,CommunityBanInfo>banned_members = 19;
-
+  // request to resend revealed addresses
+  uint64 resend_accounts_clock = 20;
   // key is hash ratchet key_id + seq_no
   map<string, bytes> privateData = 100;
 }
@@ -144,6 +146,13 @@ message CommunityChat {
   int32 position = 5;
   bool viewers_can_post_reactions = 6;
   bool hide_if_permissions_not_met = 7;
+  CommunityBloomFilter members_list = 8;
+}
+
+message CommunityBloomFilter {
+  bytes data = 1;
+  uint64 m = 2;
+  uint64 k = 3;
 }
 
 message CommunityCategory {

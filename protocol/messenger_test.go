@@ -2167,7 +2167,7 @@ func (s *MessengerSuite) TestSentEventTracking() {
 	s.False(rawMessage.Sent)
 
 	//when message sent, its sent field should be true after we got confirmation
-	err = s.m.processSentMessages([]string{inputMessage.ID})
+	err = s.m.processSentMessage(inputMessage.ID)
 	s.NoError(err)
 
 	rawMessage, err = s.m.persistence.RawMessageByID(inputMessage.ID)
@@ -2269,7 +2269,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	s.Require().NoError(err)
 	err = httpServer.SetPort(9876)
 	s.NoError(err)
-	s.m.httpServer = httpServer
+	s.m.SetMediaServer(httpServer)
 
 	chat := CreatePublicChat("test-chat", s.m.transport)
 	err = s.m.SaveChat(chat)
@@ -2392,7 +2392,7 @@ func (s *MessengerSuite) TestMessageSent() {
 	s.False(rawMessage.Sent)
 
 	//imitate chat message sent
-	err = s.m.processSentMessages([]string{inputMessage.ID})
+	err = s.m.processSentMessage(inputMessage.ID)
 	s.NoError(err)
 
 	rawMessage, err = s.m.persistence.RawMessageByID(inputMessage.ID)
@@ -2402,8 +2402,7 @@ func (s *MessengerSuite) TestMessageSent() {
 }
 
 func (s *MessengerSuite) TestProcessSentMessages() {
-	ids := []string{"a"}
-	err := s.m.processSentMessages(ids)
+	err := s.m.processSentMessage("a")
 	s.Require().NoError(err)
 }
 

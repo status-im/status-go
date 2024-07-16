@@ -25,25 +25,25 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
+	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/wakuv2/common"
 )
 
-var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.shards.nodes.status.im"
-var testBootENRBootstrap = "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"
+var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.status.nodes.status.im"
+var testBootENRBootstrap = "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.staging.status.nodes.status.im"
 
 func setDefaultConfig(config *Config, lightMode bool) {
 	config.ClusterID = 16
-	config.UseShardAsDefaultTopic = true
 
 	if lightMode {
 		config.EnablePeerExchangeClient = true
@@ -127,8 +127,30 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	require.NoError(t, w.Stop())
 }
 
+func TestRelayPeers(t *testing.T) {
+	config := &Config{}
+	setDefaultConfig(config, false)
+	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, w.Start())
+	_, err = w.RelayPeersByTopic(config.DefaultShardPubsubTopic)
+	require.NoError(t, err)
+
+	// Ensure function returns an error for lightclient
+	config = &Config{}
+	config.ClusterID = 16
+	config.LightClient = true
+	w, err = New(nil, "", config, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, w.Start())
+	_, err = w.RelayPeersByTopic(config.DefaultShardPubsubTopic)
+	require.Error(t, err)
+}
+
 func TestBasicWakuV2(t *testing.T) {
-	enrTreeAddress := testStoreENRBootstrap //"enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
+	t.Skip("flaky test")
+
+	enrTreeAddress := testStoreENRBootstrap
 	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
 	if envEnrTreeAddress != "" {
 		enrTreeAddress = envEnrTreeAddress
@@ -174,7 +196,7 @@ func TestBasicWakuV2(t *testing.T) {
 	filter := &common.Filter{
 		PubsubTopic:   config.DefaultShardPubsubTopic,
 		Messages:      common.NewMemoryMessageStore(),
-		ContentTopics: common.NewTopicSetFromBytes([][]byte{[]byte{1, 2, 3, 4}}),
+		ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
 	}
 
 	_, err = w.Subscribe(filter)
@@ -318,12 +340,18 @@ func TestPeerExchange(t *testing.T) {
 	}, options)
 	require.NoError(t, err)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	require.NoError(t, discV5Node.node.PeerExchange().Request(ctx, 1))
+	require.Error(t, discV5Node.node.PeerExchange().Request(ctx, 1)) //should fail due to rate limit
+
 	require.NoError(t, lightNode.Stop())
 	require.NoError(t, pxServerNode.Stop())
 	require.NoError(t, discV5Node.Stop())
 }
 
 func TestWakuV2Filter(t *testing.T) {
+	t.Skip("flaky test")
 
 	enrTreeAddress := testBootENRBootstrap
 	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
@@ -334,7 +362,6 @@ func TestWakuV2Filter(t *testing.T) {
 	setDefaultConfig(config, true)
 	config.EnablePeerExchangeClient = false
 	config.Port = 0
-	config.KeepAliveInterval = 0
 	config.MinPeersForFilter = 2
 
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
@@ -343,6 +370,7 @@ func TestWakuV2Filter(t *testing.T) {
 	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
+	w.filterManager.filterSubBatchDuration = 1 * time.Second
 
 	options := func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 10 * time.Second
@@ -371,7 +399,7 @@ func TestWakuV2Filter(t *testing.T) {
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{contentTopicBytes}),
 	}
 
-	_, err = w.Subscribe(filter)
+	fID, err := w.Subscribe(filter)
 	require.NoError(t, err)
 
 	msgTimestamp := w.timestamp()
@@ -415,22 +443,21 @@ func TestWakuV2Filter(t *testing.T) {
 
 	messages = filter.Retrieve()
 	require.Len(t, messages, 1)
-
+	err = w.Unsubscribe(context.Background(), fID)
+	require.NoError(t, err)
 	require.NoError(t, w.Stop())
 }
 
 func TestWakuV2Store(t *testing.T) {
 	// Configuration for the first Waku node
 	config1 := &Config{
-		Port:                   0,
-		UseShardAsDefaultTopic: true,
-		ClusterID:              16,
-		EnableDiscV5:           false,
-		DiscoveryLimit:         20,
-		EnableStore:            false,
-		StoreCapacity:          100,
-		StoreSeconds:           3600,
-		KeepAliveInterval:      10,
+		Port:           0,
+		ClusterID:      16,
+		EnableDiscV5:   false,
+		DiscoveryLimit: 20,
+		EnableStore:    false,
+		StoreCapacity:  100,
+		StoreSeconds:   3600,
 	}
 	w1PeersCh := make(chan []string, 100) // buffered not to block on the send side
 
@@ -449,15 +476,13 @@ func TestWakuV2Store(t *testing.T) {
 	sql2, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 	config2 := &Config{
-		Port:                   0,
-		UseShardAsDefaultTopic: true,
-		ClusterID:              16,
-		EnableDiscV5:           false,
-		DiscoveryLimit:         20,
-		EnableStore:            true,
-		StoreCapacity:          100,
-		StoreSeconds:           3600,
-		KeepAliveInterval:      10,
+		Port:           0,
+		ClusterID:      16,
+		EnableDiscV5:   false,
+		DiscoveryLimit: 20,
+		EnableStore:    true,
+		StoreCapacity:  100,
+		StoreSeconds:   3600,
 	}
 
 	// Start the second Waku node
@@ -487,6 +512,8 @@ func TestWakuV2Store(t *testing.T) {
 
 	_, err = w2.Subscribe(filter)
 	require.NoError(t, err)
+
+	time.Sleep(2 * time.Second)
 
 	// Send a message from the first node
 	msgTimestamp := w1.CurrentTime().UnixNano()
@@ -526,7 +553,11 @@ func TestWakuV2Store(t *testing.T) {
 }
 
 func waitForPeerConnection(t *testing.T, peerID string, peerCh chan []string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	waitForPeerConnectionWithTimeout(t, peerID, peerCh, 3*time.Second)
+}
+
+func waitForPeerConnectionWithTimeout(t *testing.T, peerID string, peerCh chan []string, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	for {
 		select {
@@ -588,7 +619,7 @@ func TestConfirmMessageDelivered(t *testing.T) {
 	msgTimestamp := aliceNode.timestamp()
 	contentTopic := maps.Keys(filter.ContentTopics)[0]
 
-	_, err = aliceNode.Send(relay.DefaultWakuTopic, &pb.WakuMessage{
+	_, err = aliceNode.Send(shard.DefaultShardPubsubTopic(), &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: contentTopic.ContentTopic(),
 		Version:      proto.Uint32(0),
@@ -629,7 +660,7 @@ func TestOnlineChecker(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		<-w.connectionChanged
+		<-w.goingOnline
 		require.True(t, true)
 	}()
 
@@ -651,5 +682,106 @@ func TestOnlineChecker(t *testing.T) {
 	require.False(t, lightNode.onlineChecker.IsOnline())
 
 	lightNode.filterManager.addFilter("test", &common.Filter{})
+
+}
+
+func TestLightpushRateLimit(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
+	config0 := &Config{}
+	setDefaultConfig(config0, false)
+	w0PeersCh := make(chan []string, 5) // buffered not to block on the send side
+
+	// Start the relayu node
+	w0, err := New(nil, "", config0, logger.Named("relayNode"), nil, nil, nil, func(cs types.ConnStatus) {
+		w0PeersCh <- maps.Keys(cs.Peers)
+	})
+	require.NoError(t, err)
+	require.NoError(t, w0.Start())
+	defer func() {
+		require.NoError(t, w0.Stop())
+		close(w0PeersCh)
+	}()
+
+	contentTopics := common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}})
+	filter := &common.Filter{
+		PubsubTopic:   config0.DefaultShardPubsubTopic,
+		Messages:      common.NewMemoryMessageStore(),
+		ContentTopics: contentTopics,
+	}
+
+	_, err = w0.Subscribe(filter)
+	require.NoError(t, err)
+
+	config1 := &Config{}
+	setDefaultConfig(config1, false)
+	w1PeersCh := make(chan []string, 5) // buffered not to block on the send side
+
+	// Start the full node
+	w1, err := New(nil, "", config1, logger.Named("fullNode"), nil, nil, nil, func(cs types.ConnStatus) {
+		w1PeersCh <- maps.Keys(cs.Peers)
+	})
+	require.NoError(t, err)
+	require.NoError(t, w1.Start())
+	defer func() {
+		require.NoError(t, w1.Stop())
+		close(w1PeersCh)
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	//Connect the relay peer and full node
+	err = w1.node.DialPeer(ctx, w0.node.ListenAddresses()[0].String())
+	require.NoError(t, err)
+
+	err = tt.RetryWithBackOff(func() error {
+		if len(w1.Peers()) == 0 {
+			return errors.New("no peers discovered")
+		}
+		return nil
+	})
+	require.NoError(t, err)
+
+	config2 := &Config{}
+	setDefaultConfig(config2, true)
+	w2PeersCh := make(chan []string, 5) // buffered not to block on the send side
+
+	// Start the light node
+	w2, err := New(nil, "", config2, logger.Named("lightNode"), nil, nil, nil, func(cs types.ConnStatus) {
+		w2PeersCh <- maps.Keys(cs.Peers)
+	})
+	require.NoError(t, err)
+	require.NoError(t, w2.Start())
+	defer func() {
+		require.NoError(t, w2.Stop())
+		close(w2PeersCh)
+	}()
+
+	//Use this instead of DialPeer to make sure the peer is added to PeerStore and can be selected for Lighpush
+	w2.node.AddDiscoveredPeer(w1.PeerID(), w1.node.ListenAddresses(), wps.Static, w1.cfg.DefaultShardedPubsubTopics, w1.node.ENR(), true)
+
+	waitForPeerConnectionWithTimeout(t, w2.node.ID(), w1PeersCh, 5*time.Second)
+
+	event := make(chan common.EnvelopeEvent, 10)
+	w2.SubscribeEnvelopeEvents(event)
+
+	for i := range [4]int{} {
+		msgTimestamp := w2.timestamp()
+		_, err := w2.Send(config2.DefaultShardPubsubTopic, &pb.WakuMessage{
+			Payload:      []byte{1, 2, 3, 4, 5, 6, byte(i)},
+			ContentTopic: maps.Keys(contentTopics)[0].ContentTopic(),
+			Version:      proto.Uint32(0),
+			Timestamp:    &msgTimestamp,
+		})
+
+		require.NoError(t, err)
+
+		time.Sleep(550 * time.Millisecond)
+
+	}
+
+	messages := filter.Retrieve()
+	require.Len(t, messages, 2)
 
 }

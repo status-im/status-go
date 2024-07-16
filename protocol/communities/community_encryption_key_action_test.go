@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -30,10 +31,10 @@ func createTestCommunity(identity *ecdsa.PrivateKey) (*Community, error) {
 		ControlNode:    &identity.PublicKey,
 		ControlDevice:  true,
 		Joined:         true,
-		MemberIdentity: &identity.PublicKey,
+		MemberIdentity: identity,
 	}
 
-	return New(config, &TimeSourceStub{}, &DescriptionEncryptorMock{})
+	return New(config, &TimeSourceStub{}, &DescriptionEncryptorMock{}, nil)
 }
 
 func TestCommunityEncryptionKeyActionSuite(t *testing.T) {
@@ -506,12 +507,12 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Members
 			modified := origin.CreateDeepCopy()
 
 			for _, member := range tc.originMembers {
-				_, err := origin.AddMember(member, []protobuf.CommunityMember_Roles{})
+				_, err := origin.AddMember(member, []protobuf.CommunityMember_Roles{}, origin.Clock())
 				s.Require().NoError(err)
 			}
 
 			for _, member := range tc.modifiedMembers {
-				_, err := modified.AddMember(member, []protobuf.CommunityMember_Roles{})
+				_, err := modified.AddMember(member, []protobuf.CommunityMember_Roles{}, origin.Clock())
 				s.Require().NoError(err)
 			}
 
@@ -608,7 +609,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 				s.Require().NoError(err)
 			}
 			for _, member := range tc.originMembers {
-				_, err := origin.AddMember(member, []protobuf.CommunityMember_Roles{})
+				_, err := origin.AddMember(member, []protobuf.CommunityMember_Roles{}, origin.Clock())
 				s.Require().NoError(err)
 			}
 
@@ -617,7 +618,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 				s.Require().NoError(err)
 			}
 			for _, member := range tc.modifiedMembers {
-				_, err := modified.AddMember(member, []protobuf.CommunityMember_Roles{})
+				_, err := modified.AddMember(member, []protobuf.CommunityMember_Roles{}, origin.Clock())
 				s.Require().NoError(err)
 			}
 
@@ -759,7 +760,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 				s.Require().NoError(err)
 			}
 			for _, member := range tc.originMembers {
-				_, err := origin.AddMember(member, []protobuf.CommunityMember_Roles{})
+				_, err := origin.AddMember(member, []protobuf.CommunityMember_Roles{}, origin.Clock())
 				s.Require().NoError(err)
 				_, err = origin.AddMemberToChat(channelID, member, []protobuf.CommunityMember_Roles{}, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
 				s.Require().NoError(err)
@@ -770,7 +771,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 				s.Require().NoError(err)
 			}
 			for _, member := range tc.modifiedMembers {
-				_, err := modified.AddMember(member, []protobuf.CommunityMember_Roles{})
+				_, err := modified.AddMember(member, []protobuf.CommunityMember_Roles{}, origin.Clock())
 				s.Require().NoError(err)
 				_, err = modified.AddMemberToChat(channelID, member, []protobuf.CommunityMember_Roles{}, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
 				s.Require().NoError(err)
@@ -832,7 +833,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestNilOrigin() {
 func (s *CommunityEncryptionKeyActionSuite) TestControlNodeChange() {
 	channelID := "1234"
 	chatID := types.EncodeHex(crypto.CompressPubkey(&s.identity.PublicKey)) + channelID
-
+	clock := uint64(time.Now().Unix())
 	testCases := []struct {
 		name            string
 		permissions     []*protobuf.CommunityTokenPermission
@@ -874,8 +875,8 @@ func (s *CommunityEncryptionKeyActionSuite) TestControlNodeChange() {
 				CommunityKeyAction: EncryptionKeyAction{
 					ActionType: EncryptionKeyRekey,
 					Members: map[string]*protobuf.CommunityMember{
-						s.member1Key: &protobuf.CommunityMember{},
-						s.member2Key: &protobuf.CommunityMember{},
+						s.member1Key: &protobuf.CommunityMember{LastUpdateClock: clock},
+						s.member2Key: &protobuf.CommunityMember{LastUpdateClock: clock},
 					},
 				},
 				ChannelKeysActions: map[string]EncryptionKeyAction{
@@ -935,8 +936,12 @@ func (s *CommunityEncryptionKeyActionSuite) TestControlNodeChange() {
 				CommunityKeyAction: EncryptionKeyAction{
 					ActionType: EncryptionKeyRekey,
 					Members: map[string]*protobuf.CommunityMember{
-						s.member1Key: &protobuf.CommunityMember{},
-						s.member2Key: &protobuf.CommunityMember{},
+						s.member1Key: &protobuf.CommunityMember{
+							LastUpdateClock: clock,
+						},
+						s.member2Key: &protobuf.CommunityMember{
+							LastUpdateClock: clock,
+						},
 					},
 				},
 				ChannelKeysActions: map[string]EncryptionKeyAction{
@@ -968,7 +973,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestControlNodeChange() {
 				s.Require().NoError(err)
 			}
 			for _, member := range tc.members {
-				_, err := origin.AddMember(member, []protobuf.CommunityMember_Roles{})
+				_, err := origin.AddMember(member, []protobuf.CommunityMember_Roles{}, clock)
 				s.Require().NoError(err)
 			}
 			for _, member := range tc.channelMembers {

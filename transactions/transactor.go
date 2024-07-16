@@ -46,7 +46,7 @@ func (e *ErrBadNonce) Error() string {
 
 // Transactor is an interface that defines the methods for validating and sending transactions.
 type TransactorIface interface {
-	NextNonce(rpcClient *rpc.Client, chainID uint64, from types.Address) (uint64, error)
+	NextNonce(rpcClient rpc.ClientInterface, chainID uint64, from types.Address) (uint64, error)
 	EstimateGas(network *params.Network, from common.Address, to common.Address, value *big.Int, input []byte) (uint64, error)
 	SendTransaction(sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error)
 	SendTransactionWithChainID(chainID uint64, sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error)
@@ -55,6 +55,7 @@ type TransactorIface interface {
 	SendRawTransaction(chainID uint64, rawTx string) error
 	BuildTransactionWithSignature(chainID uint64, args SendTxArgs, sig []byte) (*gethtypes.Transaction, error)
 	SendTransactionWithSignature(from common.Address, symbol string, multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) (hash types.Hash, err error)
+	StoreAndTrackPendingTx(from common.Address, symbol string, chainID uint64, multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) error
 }
 
 // Transactor validates, signs transactions.
@@ -96,7 +97,7 @@ func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 	t.rpcCallTimeout = timeout
 }
 
-func (t *Transactor) NextNonce(rpcClient *rpc.Client, chainID uint64, from types.Address) (uint64, error) {
+func (t *Transactor) NextNonce(rpcClient rpc.ClientInterface, chainID uint64, from types.Address) (uint64, error) {
 	wrapper := newRPCWrapper(rpcClient, chainID)
 	ctx := context.Background()
 	nonce, err := wrapper.PendingNonceAt(ctx, common.Address(from))
@@ -202,6 +203,15 @@ func createPendingTransaction(from common.Address, symbol string, chainID uint64
 	return
 }
 
+func (t *Transactor) StoreAndTrackPendingTx(from common.Address, symbol string, chainID uint64, multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) error {
+	if t.pendingTracker == nil {
+		return nil
+	}
+
+	pTx := createPendingTransaction(from, symbol, chainID, multiTransactionID, tx)
+	return t.pendingTracker.StoreAndTrackPendingTx(pTx)
+}
+
 func (t *Transactor) sendTransaction(rpcWrapper *rpcWrapper, from common.Address, symbol string,
 	multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) (hash types.Hash, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
@@ -211,14 +221,9 @@ func (t *Transactor) sendTransaction(rpcWrapper *rpcWrapper, from common.Address
 		return hash, err
 	}
 
-	if t.pendingTracker != nil {
-
-		tx := createPendingTransaction(from, symbol, rpcWrapper.chainID, multiTransactionID, tx)
-
-		err := t.pendingTracker.StoreAndTrackPendingTx(tx)
-		if err != nil {
-			return hash, err
-		}
+	err = t.StoreAndTrackPendingTx(from, symbol, rpcWrapper.chainID, multiTransactionID, tx)
+	if err != nil {
+		return hash, err
 	}
 
 	return types.Hash(tx.Hash()), nil

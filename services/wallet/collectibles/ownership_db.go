@@ -3,7 +3,6 @@ package collectibles
 import (
 	"database/sql"
 	"fmt"
-	"math"
 	"math/big"
 	"sync"
 
@@ -29,8 +28,6 @@ func NewOwnershipDB(sqlDb *sql.DB) *OwnershipDB {
 		db: sqlDb,
 	}
 }
-
-const unknownUpdateTimestamp = int64(math.MaxInt64)
 
 const selectOwnershipColumns = "chain_id, contract_address, token_id"
 
@@ -565,7 +562,7 @@ func (o *OwnershipDB) GetOwnership(id thirdparty.CollectibleUniqueID) ([]thirdpa
 		LEFT JOIN transfers t ON
 			c.transfer_id = t.hash
 		WHERE
-		c.chain_id = ? AND c.contract_address = ? AND c.token_id = ?`, unknownUpdateTimestamp)
+                c.chain_id = ? AND c.contract_address = ? AND c.token_id = ?`, InvalidTimestamp)
 
 	stmt, err := o.db.Prepare(query)
 	if err != nil {

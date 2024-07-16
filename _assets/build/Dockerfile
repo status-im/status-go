@@ -22,7 +22,7 @@ LABEL maintainer="support@status.im"
 LABEL source="https://github.com/status-im/status-go"
 LABEL description="status-go is an underlying part of Status - a browser, messenger, and gateway to a decentralized world."
 
-RUN apk add --no-cache ca-certificates bash libgcc libstdc++
+RUN apk add --no-cache ca-certificates bash libgcc libstdc++ curl
 RUN mkdir -p /static/keys
 RUN mkdir -p /static/configs
 

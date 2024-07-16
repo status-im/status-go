@@ -32,6 +32,10 @@ func (m *Messenger) Peers() map[string]types.WakuV2Peer {
 	return m.transport.Peers()
 }
 
+func (m *Messenger) RelayPeersByTopic(topic string) (*types.PeerList, error) {
+	return m.transport.RelayPeersByTopic(topic)
+}
+
 func (m *Messenger) ListenAddresses() ([]string, error) {
 	return m.transport.ListenAddresses()
 }

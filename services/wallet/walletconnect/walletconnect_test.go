@@ -1,17 +1,20 @@
 package walletconnect
 
 import (
+	"crypto/ecdsa"
+	"encoding/json"
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
-	"encoding/json"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func getSessionJSONFor(chains []int, expiry int) string {
@@ -380,20 +383,174 @@ func Test_caip10Accounts(t *testing.T) {
 
 // Test_AddSession validates that the new added session is active (not expired and not disconnected)
 func Test_AddSession(t *testing.T) {
-	db, close := setupTestDB(t)
+	db, close := SetupTestDB(t)
 	defer close()
 
 	// Add session for testnet
 	expiry := 1716581732
-	sessionJSON := getSessionJSONFor([]int{11155111}, expiry)
+	chainID := 11155111
+	sessionJSON := getSessionJSONFor([]int{chainID}, expiry)
 	networks := []params.Network{
 		{ChainID: 1, IsTest: false},
-		{ChainID: 11155111, IsTest: true},
+		{ChainID: uint64(chainID), IsTest: true},
 	}
+	timestampBeforeAddSession := time.Now().Unix()
 	err := AddSession(db, networks, sessionJSON)
 	assert.NoError(t, err)
+
+	// Validate that session was written correctly to the database
+	sessions, err := GetSessions(db)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(sessions))
+
+	sessJSONObj := map[string]interface{}{}
+	err = json.Unmarshal([]byte(sessionJSON), &sessJSONObj)
+	assert.NoError(t, err)
+
+	assert.Equal(t, false, sessions[0].Disconnected)
+	assert.Equal(t, sessionJSON, sessions[0].SessionJSON)
+	assert.Equal(t, int64(expiry), sessions[0].Expiry)
+	assert.GreaterOrEqual(t, sessions[0].CreatedTimestamp, timestampBeforeAddSession)
+	assert.Equal(t, sessJSONObj["pairingTopic"], string(sessions[0].PairingTopic))
+	assert.Equal(t, sessJSONObj["topic"], string(sessions[0].Topic))
+	assert.Equal(t, true, sessions[0].TestChains)
+
+	metadata := sessJSONObj["peer"].(map[string]interface{})["metadata"].(map[string]interface{})
+	assert.Equal(t, metadata["url"], sessions[0].URL)
+	assert.Equal(t, metadata["name"], sessions[0].Name)
+	assert.Equal(t, metadata["icons"].([]interface{})[0], sessions[0].IconURL)
 
 	dapps, err := GetActiveDapps(db, int64(expiry-1), true)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(dapps))
+	assert.Equal(t, sessions[0].URL, dapps[0].URL)
+	assert.Equal(t, sessions[0].Name, dapps[0].Name)
+	assert.Equal(t, sessions[0].IconURL, dapps[0].IconURL)
+}
+
+func generateTypedDataJson(chainID int, skipField bool) string {
+	optionalKeyValueField := ""
+	if !skipField {
+		optionalKeyValueField = `,"verifyingContract": "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"`
+	}
+
+	typedData := `{
+		"types": {
+			"EIP712Domain": [
+				{"name": "name", "type": "string"},
+				{"name": "version", "type": "string"},
+				{"name": "chainId", "type": "uint256"},
+				{"name": "verifyingContract", "type": "address"}
+			],
+			"Person": [
+				{"name": "name", "type": "string"},
+				{"name": "wallet", "type": "address"}
+			],
+			"Mail": [
+				{"name": "from", "type": "Person"},
+				{"name": "to", "type": "Person"},
+				{"name": "contents", "type": "string"}
+			]
+		},
+		"primaryType": "Mail",
+		"domain": {
+			"name": "Ether Mail",
+			"version": "1",
+			"chainId": ` + strconv.Itoa(chainID) + `
+			` + optionalKeyValueField + `
+		},
+		"message": {
+			"from": {
+				"name": "Cow",
+				"wallet": "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826"
+			},
+			"to": {
+				"name": "Bob",
+				"wallet": "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB"
+			},
+			"contents": "Hello, Bob!"
+		}
+	}`
+	return typedData
+}
+
+func TestSafeSignTypedDataForDApps(t *testing.T) {
+	// 0x4f1B9Ee595bF612480ADAF623Ec583f623ae802d
+	privateKey, err := crypto.HexToECDSA("efe79ae971aa8bb612de9de7c65b9224ab1b6a69e6ec733ec92110f100c7244a")
+	require.NoError(t, err)
+	type args struct {
+		typedJson  string
+		privateKey *ecdsa.PrivateKey
+		chainID    uint64
+		legacy     bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "sign_typed_data",
+			args: args{
+				typedJson:  generateTypedDataJson(1, false),
+				privateKey: privateKey,
+				chainID:    1,
+				legacy:     false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "sign_typed_data_legacy",
+			args: args{
+				typedJson:  generateTypedDataJson(1, false),
+				privateKey: privateKey,
+				chainID:    1,
+				legacy:     true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "sign_typed_data_invalid_json",
+			args: args{
+				typedJson:  `{"invalid": "json"`,
+				privateKey: privateKey,
+				chainID:    1,
+				legacy:     false,
+			},
+			wantErr: true,
+		},
+		{
+			name: "sign_typed_data_invalid_chain_id",
+			args: args{
+				typedJson:  generateTypedDataJson(1, false),
+				privateKey: privateKey,
+				chainID:    2,
+				legacy:     false,
+			},
+			wantErr: true,
+		},
+		{
+			name: "sign_typed_data_missing_field",
+			args: args{
+				typedJson:  generateTypedDataJson(1, true),
+				privateKey: privateKey,
+				chainID:    1,
+				legacy:     false,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := SafeSignTypedDataForDApps(tt.args.typedJson, tt.args.privateKey, tt.args.chainID, tt.args.legacy)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SafeSignTypedDataForDApps() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr {
+				require.NotEmpty(t, got)
+				require.Len(t, got, 65)
+			}
+		})
+	}
 }

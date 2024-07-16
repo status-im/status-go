@@ -40,9 +40,7 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 
 	service := NewService(rpcClient, nil)
 
-	return &API{
-		s: service,
-	}, cancel
+	return NewAPI(service), cancel
 }
 
 func TestCallRPC(t *testing.T) {
@@ -51,21 +49,25 @@ func TestCallRPC(t *testing.T) {
 
 	tests := []struct {
 		request          string
+		expectError      bool
 		expectedContains string
 		notContains      bool
 	}{
 		{
 			request:          "{\"method\": \"eth_blockNumber\", \"params\": []}",
+			expectError:      false,
 			expectedContains: "does not exist/is not available",
 			notContains:      true,
 		},
 		{
 			request:          "{\"method\": \"eth_blockNumbers\", \"params\": []}",
+			expectError:      false,
 			expectedContains: "does not exist/is not available",
 			notContains:      false,
 		},
 		{
 			request:          "",
+			expectError:      true,
 			expectedContains: "does not exist/is not available",
 			notContains:      true,
 		},
@@ -74,12 +76,16 @@ func TestCallRPC(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.request, func(t *testing.T) {
 			response, err := api.CallRPC(tt.request)
-			require.NoError(t, err)
-			require.NotEmpty(t, response)
-			if tt.notContains {
-				require.NotContains(t, response, tt.expectedContains)
+			if tt.expectError {
+				require.Error(t, err)
 			} else {
-				require.Contains(t, response, tt.expectedContains)
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
+				if tt.notContains {
+					require.NotContains(t, response, tt.expectedContains)
+				} else {
+					require.Contains(t, response, tt.expectedContains)
+				}
 			}
 		})
 	}

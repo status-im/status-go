@@ -222,7 +222,7 @@ func (w *Waku) fetchMessagesBatch(missingHistoryRequest TopicInterest, batchFrom
 		return err
 	}
 
-	var missingMessages []pb.MessageHash
+	var missingHashes []pb.MessageHash
 
 	for !result.IsComplete() {
 		for _, mkv := range result.Messages() {
@@ -235,7 +235,7 @@ func (w *Waku) fetchMessagesBatch(missingHistoryRequest TopicInterest, batchFrom
 				continue
 			}
 
-			missingMessages = append(missingMessages, hash)
+			missingHashes = append(missingHashes, hash)
 		}
 
 		result, err = w.storeQueryWithRetry(missingHistoryRequest.ctx, func(ctx context.Context) (*store.Result, error) {
@@ -252,13 +252,13 @@ func (w *Waku) fetchMessagesBatch(missingHistoryRequest TopicInterest, batchFrom
 		}
 	}
 
-	if len(missingMessages) == 0 {
+	if len(missingHashes) == 0 {
 		// Nothing to do here
 		return nil
 	}
 
 	result, err = w.storeQueryWithRetry(missingHistoryRequest.ctx, func(ctx context.Context) (*store.Result, error) {
-		return w.node.Store().QueryByHash(ctx, missingMessages, store.WithPeer(missingHistoryRequest.peerID), store.WithPaging(false, 100))
+		return w.node.Store().QueryByHash(ctx, missingHashes, store.WithPeer(missingHistoryRequest.peerID), store.WithPaging(false, 100))
 	}, logger, "retrieving missing messages")
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {

@@ -31,8 +31,8 @@ type candidateBase struct {
 
 	resolvedAddr net.Addr
 
-	lastSent     atomic.Int64
-	lastReceived atomic.Int64
+	lastSent     atomic.Value
+	lastReceived atomic.Value
 	conn         net.PacketConn
 
 	currAgent *Agent
@@ -400,27 +400,27 @@ func (c *candidateBase) String() string {
 // LastReceived returns a time.Time indicating the last time
 // this candidate was received
 func (c *candidateBase) LastReceived() time.Time {
-	if lastReceived := c.lastReceived.Load(); lastReceived != 0 {
-		return time.Unix(0, lastReceived)
+	if lastReceived, ok := c.lastReceived.Load().(time.Time); ok {
+		return lastReceived
 	}
 	return time.Time{}
 }
 
 func (c *candidateBase) setLastReceived(t time.Time) {
-	c.lastReceived.Store(t.UnixNano())
+	c.lastReceived.Store(t)
 }
 
 // LastSent returns a time.Time indicating the last time
 // this candidate was sent
 func (c *candidateBase) LastSent() time.Time {
-	if lastSent := c.lastSent.Load(); lastSent != 0 {
-		return time.Unix(0, lastSent)
+	if lastSent, ok := c.lastSent.Load().(time.Time); ok {
+		return lastSent
 	}
 	return time.Time{}
 }
 
 func (c *candidateBase) setLastSent(t time.Time) {
-	c.lastSent.Store(t.UnixNano())
+	c.lastSent.Store(t)
 }
 
 func (c *candidateBase) seen(outbound bool) {

@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/telemetry"
@@ -37,22 +38,31 @@ func setupLogger(file string) *zap.Logger {
 	return logutils.ZapLogger()
 }
 
-func start(name string, port int, apiModules string, telemetryUrl string, keyUID string, logger *zap.SugaredLogger) (*StatusCLI, error) {
+type StartParams struct {
+	Name         string
+	Port         int
+	APIModules   string
+	TelemetryURL string
+	KeyUID       string
+	Fleet        string
+}
+
+func start(p StartParams, logger *zap.SugaredLogger) (*StatusCLI, error) {
 	var (
-		rootDataDir = fmt.Sprintf("./test-%s", strings.ToLower(name))
+		rootDataDir = fmt.Sprintf("./test-%s", strings.ToLower(p.Name))
 		password    = "some-password"
 	)
-	setupLogger(name)
+	setupLogger(p.Name)
 	logger.Info("starting messenger")
 
 	backend := api.NewGethStatusBackend()
-	if keyUID != "" {
-		if err := getAccountAndLogin(backend, name, rootDataDir, password, keyUID); err != nil {
+	if p.KeyUID != "" {
+		if err := getAccountAndLogin(backend, p.Name, rootDataDir, password, p.KeyUID); err != nil {
 			return nil, err
 		}
-		logger.Infof("existing account, key UID: %v", keyUID)
+		logger.Infof("existing account, key UID: %v", p.KeyUID)
 	} else {
-		acc, err := createAccountAndLogin(backend, name, rootDataDir, password, apiModules, telemetryUrl, port)
+		acc, err := createAccountAndLogin(backend, rootDataDir, password, p)
 		if err != nil {
 			return nil, err
 		}
@@ -64,12 +74,12 @@ func start(name string, port int, apiModules string, telemetryUrl string, keyUID
 		return nil, errors.New("waku service is not available")
 	}
 
-	if telemetryUrl != "" {
+	if p.TelemetryURL != "" {
 		telemetryLogger, err := getLogger(true)
 		if err != nil {
 			return nil, err
 		}
-		telemetryClient := telemetry.NewClient(telemetryLogger, telemetryUrl, backend.SelectedAccountKeyID(), name, "cli")
+		telemetryClient := telemetry.NewClient(telemetryLogger, p.TelemetryURL, backend.SelectedAccountKeyID(), p.Name, "cli")
 		go telemetryClient.Start(context.Background())
 		backend.StatusNode().WakuV2Service().SetStatusTelemetryClient(telemetryClient)
 	}
@@ -84,7 +94,7 @@ func start(name string, port int, apiModules string, telemetryUrl string, keyUID
 	time.Sleep(WaitingInterval)
 
 	data := StatusCLI{
-		name:      name,
+		name:      p.Name,
 		messenger: messenger,
 		backend:   backend,
 		logger:    logger,
@@ -125,27 +135,31 @@ func getAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password st
 	})
 }
 
-func createAccountAndLogin(b *api.GethStatusBackend, name, rootDataDir, password, apiModules, telemetryUrl string, port int) (*multiaccounts.Account, error) {
+func createAccountAndLogin(b *api.GethStatusBackend, rootDataDir, password string, p StartParams) (*multiaccounts.Account, error) {
 	if err := os.MkdirAll(rootDataDir, os.ModePerm); err != nil {
 		return nil, err
 	}
 
 	req := &requests.CreateAccount{
-		DisplayName:        name,
+		DisplayName:        p.Name,
 		CustomizationColor: "#ffffff",
 		Emoji:              "some",
 		Password:           password,
 		RootDataDir:        rootDataDir,
 		LogFilePath:        "log",
 		APIConfig: &requests.APIConfig{
-			APIModules:  apiModules,
+			APIModules:  p.APIModules,
 			HTTPEnabled: true,
 			HTTPHost:    "127.0.0.1",
-			HTTPPort:    port,
+			HTTPPort:    p.Port,
 		},
-		TelemetryServerURL: telemetryUrl,
+		TelemetryServerURL: p.TelemetryURL,
 	}
-	return b.CreateAccountAndLogin(req)
+	return b.CreateAccountAndLogin(req,
+		params.WithFleet(p.Fleet),
+		params.WithDiscV5BootstrapNodes(params.DefaultDiscV5Nodes(p.Fleet)),
+		params.WithWakuNodes(params.DefaultWakuNodes(p.Fleet)),
+	)
 }
 
 func (cli *StatusCLI) stop() {

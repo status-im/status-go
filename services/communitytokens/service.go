@@ -173,7 +173,6 @@ func (s *Service) handleRemoteDestructCollectible(status string, pendingTransact
 }
 
 func (s *Service) handleBurnCommunityToken(status string, pendingTransaction *transactions.PendingTransaction) (*token.CommunityToken, error) {
-
 	if status == transactions.Success {
 		// get new max supply and update database
 		newMaxSupply, err := s.maxSupply(context.Background(), uint64(pendingTransaction.ChainID), pendingTransaction.To.String())
@@ -525,7 +524,7 @@ func (s *Service) SetSignerPubKey(ctx context.Context, chainID uint64, contractA
 		common.Address(txArgs.From),
 		common.HexToAddress(contractAddress),
 		transactions.SetSignerPublicKey,
-		transactions.AutoDelete,
+		transactions.Keep,
 		"",
 	)
 	if err != nil {
@@ -573,6 +572,11 @@ func (s *Service) maxSupply(ctx context.Context, chainID uint64, contractAddress
 func (s *Service) CreateCommunityTokenAndSave(chainID int, deploymentParameters DeploymentParameters,
 	deployerAddress string, contractAddress string, tokenType protobuf.CommunityTokenType, privilegesLevel token.PrivilegesLevel, transactionHash string) (*token.CommunityToken, error) {
 
+	contractVersion := ""
+	if privilegesLevel == token.CommunityLevel {
+		contractVersion = s.currentVersion()
+	}
+
 	tokenToSave := &token.CommunityToken{
 		TokenType:          tokenType,
 		CommunityID:        deploymentParameters.CommunityID,
@@ -591,6 +595,7 @@ func (s *Service) CreateCommunityTokenAndSave(chainID int, deploymentParameters 
 		PrivilegesLevel:    privilegesLevel,
 		Base64Image:        deploymentParameters.Base64Image,
 		TransactionHash:    transactionHash,
+		Version:            contractVersion,
 	}
 
 	return s.Messenger.SaveCommunityToken(tokenToSave, deploymentParameters.CroppedImage)

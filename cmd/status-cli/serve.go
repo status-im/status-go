@@ -24,6 +24,7 @@ func serve(cCtx *cli.Context) error {
 	dest := cCtx.String(AddFlag)
 	keyUID := cCtx.String(KeyUIDFlag)
 	isDebugLevel := cCtx.Bool(DebugLevel)
+	fleet := cCtx.String(FleetFlag)
 	cmdName := cCtx.Command.Name
 
 	logger, err := getSLogger(isDebugLevel)
@@ -34,7 +35,14 @@ func serve(cCtx *cli.Context) error {
 
 	logger = logger.Named(name)
 
-	cli, err := start(name, port, apiModules, telemetryUrl, keyUID, logger)
+	cli, err := start(StartParams{
+		Name:         name,
+		Port:         port,
+		APIModules:   apiModules,
+		TelemetryURL: telemetryUrl,
+		KeyUID:       keyUID,
+		Fleet:        fleet,
+	}, logger)
 	if err != nil {
 		return err
 	}

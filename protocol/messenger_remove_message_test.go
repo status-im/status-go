@@ -502,7 +502,7 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessageReplyToImage() {
 	s.Require().NotNil(mediaServer)
 	s.Require().NoError(mediaServer.Start())
 
-	theirMessenger.httpServer = mediaServer
+	theirMessenger.SetMediaServer(mediaServer)
 
 	// We reply to our own message with an image
 	imageMessage, err := buildImageWithoutAlbumIDMessage(*theirChat)
@@ -555,7 +555,7 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessageForMeReplyToImage() {
 	s.Require().NotNil(mediaServer)
 	s.Require().NoError(mediaServer.Start())
 
-	theirMessenger.httpServer = mediaServer
+	theirMessenger.SetMediaServer(mediaServer)
 
 	// We reply to our own message with an image
 	imageMessage, err := buildImageWithoutAlbumIDMessage(*theirChat)

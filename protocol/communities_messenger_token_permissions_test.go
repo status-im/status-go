@@ -6,7 +6,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
 	"strconv"
 	"strings"
@@ -32,7 +31,6 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
@@ -165,7 +163,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 
 	s.logger = tt.MustCreateTestLogger()
 
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, false, []string{"owner", "bob", "alice"})
+	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "bob", "alice"})
 
 	s.ownerWaku = wakuNodes[0]
 	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, s.ownerWaku, "owner", []Option{})
@@ -247,37 +245,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) sendChatMessage(sender *Mess
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) makeAddressSatisfyTheCriteria(chainID uint64, address string, criteria *protobuf.TokenCriteria) {
-	walletAddress := gethcommon.HexToAddress(address)
-	contractAddress := gethcommon.HexToAddress(criteria.ContractAddresses[chainID])
-
-	switch criteria.Type {
-	case protobuf.CommunityTokenType_ERC20:
-		balance, ok := new(big.Int).SetString(criteria.AmountInWei, 10)
-		s.Require().True(ok)
-
-		s.mockedBalances[chainID][walletAddress][contractAddress] = (*hexutil.Big)(balance)
-
-	case protobuf.CommunityTokenType_ERC721:
-		amount, err := strconv.ParseUint(criteria.AmountInWei, 10, 32)
-		s.Require().NoError(err)
-
-		balances := []thirdparty.TokenBalance{}
-		for i := uint64(0); i < amount; i++ {
-			balances = append(balances, thirdparty.TokenBalance{
-				TokenID: &bigint.BigInt{
-					Int: new(big.Int).SetUint64(i + 1),
-				},
-				Balance: &bigint.BigInt{
-					Int: new(big.Int).SetUint64(1),
-				},
-			})
-		}
-
-		s.mockedCollectibles[chainID][walletAddress][contractAddress] = balances
-
-	case protobuf.CommunityTokenType_ENS:
-		// not implemented
-	}
+	makeAddressSatisfyTheCriteria(&s.Suite, s.mockedBalances, s.mockedCollectibles, chainID, address, criteria)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) resetMockedBalances() {
@@ -407,6 +375,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityTokensMetadata(
 		TokenType:         protobuf.CommunityTokenType_ERC721,
 		Symbol:            "SMB",
 		Decimals:          3,
+		Version:           "1.0.0",
 	}
 
 	_, err := community.AddCommunityTokensMetadata(newToken)
@@ -421,6 +390,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityTokensMetadata(
 	s.Require().Equal(tokensMetadata[0].Symbol, newToken.Symbol)
 	s.Require().Equal(tokensMetadata[0].Name, newToken.Name)
 	s.Require().Equal(tokensMetadata[0].Decimals, newToken.Decimals)
+	s.Require().Equal(tokensMetadata[0].Version, newToken.Version)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSTokenPermission() {
@@ -486,193 +456,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 	}
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSharedAddress() {
-	community, _ := s.createCommunity()
-	s.advertiseCommunityTo(community, s.alice)
-	s.advertiseCommunityTo(community, s.bob)
-
-	s.joinCommunity(community, s.alice, alicePassword, []string{})
-	s.joinCommunity(community, s.bob, bobPassword, []string{})
-
-	community, err := s.owner.GetCommunityByID(community.ID())
-	s.Require().NoError(err)
-
-	s.Require().Equal(3, community.MembersCount())
-
-	// Check owner's DB for revealed accounts
-	for pubKey := range community.Members() {
-		if pubKey != common.PubkeyToHex(&s.owner.identity.PublicKey) {
-			revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), pubKey)
-			s.Require().NoError(err)
-			switch pubKey {
-			case common.PubkeyToHex(&s.alice.identity.PublicKey):
-				s.Require().Len(revealedAccounts, 2)
-				s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
-				s.Require().Equal(revealedAccounts[1].Address, aliceAddress2)
-				s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
-			case common.PubkeyToHex(&s.bob.identity.PublicKey):
-				s.Require().Len(revealedAccounts, 1)
-				s.Require().Equal(revealedAccounts[0].Address, bobAddress)
-				s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
-			default:
-				s.Require().Fail("pubKey does not match expected keys")
-			}
-		}
-	}
-
-	// Check Bob's DB for revealed accounts
-	revealedAccountsInBobsDB, err := s.bob.communitiesManager.GetRevealedAddresses(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
-	s.Require().NoError(err)
-	s.Require().Len(revealedAccountsInBobsDB, 1)
-	s.Require().Equal(revealedAccountsInBobsDB[0].Address, bobAddress)
-	s.Require().Equal(true, revealedAccountsInBobsDB[0].IsAirdropAddress)
-
-	// Check Alices's DB for revealed accounts
-	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
-	s.Require().NoError(err)
-	s.Require().Len(revealedAccountsInAlicesDB, 2)
-	s.Require().Equal(revealedAccountsInAlicesDB[0].Address, aliceAddress1)
-	s.Require().Equal(revealedAccountsInAlicesDB[1].Address, aliceAddress2)
-	s.Require().Equal(true, revealedAccountsInAlicesDB[0].IsAirdropAddress)
-}
-
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSelectedSharedAddress() {
-	community, _ := s.createCommunity()
-	s.advertiseCommunityTo(community, s.alice)
-
-	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress2})
-
-	community, err := s.owner.GetCommunityByID(community.ID())
-	s.Require().NoError(err)
-
-	s.Require().Equal(2, community.MembersCount())
-
-	alicePubkey := common.PubkeyToHex(&s.alice.identity.PublicKey)
-
-	// Check owner's DB for revealed accounts
-	revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-	s.Require().NoError(err)
-	s.Require().Len(revealedAccounts, 1)
-	s.Require().Equal(revealedAccounts[0].Address, aliceAddress2)
-	s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
-
-	// Check Alice's DB for revealed accounts
-	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-	s.Require().NoError(err)
-	s.Require().Len(revealedAccountsInAlicesDB, 1)
-	s.Require().Equal(revealedAccountsInAlicesDB[0].Address, aliceAddress2)
-	s.Require().Equal(true, revealedAccountsInAlicesDB[0].IsAirdropAddress)
-}
-
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersMultipleSelectedSharedAddresses() {
-	community, _ := s.createCommunity()
-	s.advertiseCommunityTo(community, s.alice)
-
-	s.joinCommunityWithAirdropAddress(community, s.alice, alicePassword, []string{aliceAddress1, aliceAddress2}, aliceAddress2)
-
-	community, err := s.owner.GetCommunityByID(community.ID())
-	s.Require().NoError(err)
-
-	s.Require().Equal(2, community.MembersCount())
-
-	alicePubkey := common.PubkeyToHex(&s.alice.identity.PublicKey)
-
-	// Check owner's DB for revealed accounts
-	revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-	s.Require().NoError(err)
-	s.Require().Len(revealedAccounts, 2)
-	s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
-	s.Require().Equal(revealedAccounts[1].Address, aliceAddress2)
-	s.Require().Equal(true, revealedAccounts[1].IsAirdropAddress)
-
-	// Check Alice's DB for revealed accounts
-	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-	s.Require().NoError(err)
-	s.Require().Len(revealedAccountsInAlicesDB, 2)
-	s.Require().Equal(revealedAccountsInAlicesDB[0].Address, aliceAddress1)
-	s.Require().Equal(revealedAccountsInAlicesDB[1].Address, aliceAddress2)
-	s.Require().Equal(true, revealedAccountsInAlicesDB[1].IsAirdropAddress)
-}
-
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
-	community, _ := s.createCommunity()
-	s.advertiseCommunityTo(community, s.alice)
-
-	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress2})
-
-	community, err := s.owner.GetCommunityByID(community.ID())
-	s.Require().NoError(err)
-	s.Require().Equal(2, community.MembersCount())
-
-	alicePubkey := common.PubkeyToHex(&s.alice.identity.PublicKey)
-
-	revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-	s.Require().NoError(err)
-
-	s.Require().Len(revealedAccounts, 1)
-	s.Require().Equal(revealedAccounts[0].Address, aliceAddress2)
-	s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
-
-	alicesRevealedAccounts, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-	s.Require().NoError(err)
-	s.Require().Len(alicesRevealedAccounts, 1)
-	s.Require().Equal(alicesRevealedAccounts[0].Address, aliceAddress2)
-	s.Require().Equal(true, alicesRevealedAccounts[0].IsAirdropAddress)
-
-	request := &requests.EditSharedAddresses{CommunityID: community.ID(), AddressesToReveal: []string{aliceAddress1}, AirdropAddress: aliceAddress1}
-
-	signingParams, err := s.alice.GenerateJoiningCommunityRequestsForSigning(common.PubkeyToHex(&s.alice.identity.PublicKey), community.ID(), request.AddressesToReveal)
-	s.Require().NoError(err)
-
-	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(alicePassword)))
-	for i := range signingParams {
-		signingParams[i].Password = passwdHash
-	}
-	signatures, err := s.alice.SignData(signingParams)
-	s.Require().NoError(err)
-
-	updateAddresses := len(request.AddressesToReveal) == 0
-	if updateAddresses {
-		request.AddressesToReveal = make([]string, len(signingParams))
-	}
-	for i := range signingParams {
-		request.AddressesToReveal[i] = signingParams[i].Address
-		request.Signatures = append(request.Signatures, types.FromHex(signatures[i]))
-	}
-	if updateAddresses {
-		request.AirdropAddress = request.AddressesToReveal[0]
-	}
-
-	response, err := s.alice.EditSharedAddressesForCommunity(request)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	// Retrieve address change
-	err = tt.RetryWithBackOff(func() error {
-		response, err := s.owner.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("no communities in response (address change reception)")
-		}
-		return nil
-	})
-	s.Require().NoError(err)
-	revealedAccounts, err = s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-	s.Require().NoError(err)
-
-	s.Require().Len(revealedAccounts, 1)
-	s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
-	s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
-
-	alicesRevealedAccounts, err = s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-	s.Require().NoError(err)
-	s.Require().Len(alicesRevealedAccounts, 1)
-	s.Require().Equal(alicesRevealedAccounts[0].Address, aliceAddress1)
-	s.Require().Equal(true, alicesRevealedAccounts[0].IsAirdropAddress)
-}
-
 // NOTE(cammellos): Disabling for now as flaky, for some reason does not pass on CI, but passes locally
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions() {
 	s.T().Skip("flaky test")
@@ -682,10 +465,9 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	var err error
 
 	cfg := testWakuV2Config{
-		logger:                 s.logger.Named("store-node-waku"),
-		enableStore:            false,
-		useShardAsDefaultTopic: false,
-		clusterID:              shard.UndefinedShardValue,
+		logger:      s.logger.Named("store-node-waku"),
+		enableStore: false,
+		clusterID:   shard.MainStatusShardCluster,
 	}
 	wakuStoreNode := NewTestWakuV2(&s.Suite, cfg)
 
@@ -697,7 +479,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 
 	// Create messengers
 
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, false, []string{"owner", "bob"})
+	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "bob"})
 	s.ownerWaku = wakuNodes[0]
 	s.bobWaku = wakuNodes[1]
 
@@ -911,57 +693,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPe
 	s.Require().NoError(err)
 	s.Require().Len(revealedAccounts, 1)
 	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
-}
-
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestSharedAddressesReturnsRevealedAccount() {
-	community, _ := s.createCommunity()
-
-	permissionRequest := requests.CreateCommunityTokenPermission{
-		CommunityID: community.ID(),
-		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
-		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
-				Type:              protobuf.CommunityTokenType_ERC20,
-				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
-				Symbol:            "TEST",
-				AmountInWei:       "100000000000000000000",
-				Decimals:          uint64(18),
-			},
-		},
-	}
-
-	response, err := s.owner.CreateCommunityTokenPermission(&permissionRequest)
-	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
-
-	s.advertiseCommunityTo(community, s.alice)
-
-	s.joinCommunity(community, s.alice, alicePassword, []string{})
-
-	revealedAccounts, err := s.alice.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
-	s.Require().NoError(err)
-
-	revealedAddressesMap := make(map[string]struct{}, len(revealedAccounts))
-	for _, acc := range revealedAccounts {
-		revealedAddressesMap[acc.Address] = struct{}{}
-	}
-
-	s.Require().Len(revealedAddressesMap, 2)
-	s.Require().Contains(revealedAddressesMap, aliceAddress1)
-	s.Require().Contains(revealedAddressesMap, aliceAddress2)
-
-	sharedAddresses, err := s.alice.getSharedAddresses(community.ID(), []string{})
-	s.Require().NoError(err)
-	s.Require().Len(sharedAddresses, 2)
-
-	sharedAddressesMap := make(map[string]struct{}, len(sharedAddresses))
-	for _, acc := range sharedAddresses {
-		sharedAddressesMap[acc.String()] = struct{}{}
-	}
-
-	s.Require().Len(sharedAddressesMap, 2)
-	s.Require().Contains(sharedAddressesMap, aliceAddress1)
-	s.Require().Contains(sharedAddressesMap, aliceAddress2)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWithMemberAndAdminPermission() {
@@ -1208,6 +939,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 	)
 	s.Require().NoError(err)
 
+	// bob should not be in the bloom filter list
+	community, err = s.bob.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().False(community.IsMemberLikelyInChat(chat.CommunityChatID()))
+
 	// make bob satisfy channel criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, channelPermissionRequest.TokenCriteria[0])
 	defer s.resetMockedBalances() // reset mocked balances, this test in run with different test cases
@@ -1244,6 +980,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+
+	// bob should be in the bloom filter list
+	community, err = s.bob.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.IsMemberLikelyInChat(chat.CommunityChatID()))
 
 	// bob can/can't post reactions
 	response, err = s.bob.SendEmojiReaction(context.Background(), chat.ID, msg.ID, protobuf.EmojiReaction_THUMBS_UP)
@@ -1294,6 +1035,77 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 			s.testViewChannelPermissions(tc.viewersCanPostReactions)
 		})
 	}
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestAnnouncementsChannelPermissions() {
+	community, chat := s.createCommunity()
+
+	// bob joins the community
+	s.advertiseCommunityTo(community, s.bob)
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
+
+	// setup view channel permission
+	channelPermissionRequest := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+		ChatIds:     []string{chat.ID},
+	}
+
+	response, err := s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().False(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
+
+	// bob should be in the bloom filter list since everyone has access to readonly channels
+	community, err = s.bob.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.IsMemberLikelyInChat(chat.CommunityChatID()))
+
+	// force owner to reevaluate channel members
+	// in production it will happen automatically, by periodic check
+	err = s.owner.communitiesManager.ForceMembersReevaluation(community.ID())
+	s.Require().NoError(err)
+
+	// bob receives community changes
+	_, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			c, err := s.bob.GetCommunityByID(community.ID())
+			if err != nil {
+				return false
+			}
+			if c == nil {
+				return false
+			}
+			channel := c.Chats()[chat.CommunityChatID()]
+
+			if channel == nil || len(channel.Members) != 2 {
+				return false
+			}
+			member := channel.Members[s.bob.IdentityPublicKeyString()]
+			return member != nil && member.ChannelRole == protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
+		},
+		"no community that satisfies criteria",
+	)
+	s.Require().NoError(err)
+
+	// bob should be in the bloom filter list
+	community, err = s.bob.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.IsMemberLikelyInChat(chat.CommunityChatID()))
+
+	// bob can't post
+	msg := &common.Message{
+		ChatMessage: &protobuf.ChatMessage{
+			ChatId:      chat.ID,
+			ContentType: protobuf.ChatMessage_TEXT_PLAIN,
+			Text:        "I can't post on read-only channel",
+		},
+	}
+
+	_, err = s.bob.SendChatMessage(context.Background(), msg)
+	s.Require().Error(err)
+	s.Require().Contains(err.Error(), "can't post")
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestSearchMessageinPermissionedChannel() {
@@ -2118,46 +1930,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 	s.Require().Len(response.Messages(), 1)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendSharedAddressesOnBackupRestore() {
-	community, _ := s.createCommunity()
-
-	// bob joins the community
-	s.advertiseCommunityTo(community, s.bob)
-	s.joinCommunity(community, s.bob, bobPassword, []string{})
-
-	currentBobSharedAddresses, err := s.bob.GetRevealedAccounts(community.ID(), s.bob.IdentityPublicKeyString())
-	s.Require().NoError(err)
-
-	// Simulate backup creation and handling backup message
-	// As a result, bob sends request to resend encryption keys to the owner
-	clock, _ := s.bob.getLastClockWithRelatedChat()
-
-	community, err = s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-
-	backupMessage, err := s.bob.backupCommunity(community, clock)
-	s.Require().NoError(err)
-
-	err = s.bob.HandleBackup(s.bob.buildMessageState(), backupMessage, nil)
-	s.Require().NoError(err)
-
-	// Owner will receive the request for addresses and send them back to Bob
-	response, err := WaitOnMessengerResponse(
-		s.bob,
-		func(r *MessengerResponse) bool {
-			_, _ = s.owner.RetrieveAll()
-			return len(r.requestsToJoinCommunity) > 0
-		},
-		"request to join not received",
-	)
-	s.Require().NoError(err)
-
-	requestID := communities.CalculateRequestID(common.PubkeyToHex(&s.bob.identity.PublicKey), community.ID())
-	requestToJoin, ok := response.requestsToJoinCommunity[requestID.String()]
-	s.Require().Equal(true, ok)
-	s.Require().Equal(currentBobSharedAddresses, requestToJoin.RevealedAccounts)
-}
-
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissionsPerformance() {
 	// This test is created for a performance degradation tracking for reevaluateMember permissions
 	// current scenario mostly track channels permissions reevaluating, but feel free to expand it to
@@ -2206,7 +1978,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissi
 		s.Require().NoError(err)
 		err = s.owner.communitiesManager.SaveRequestToJoinRevealedAddresses(requestId, requestToJoin.RevealedAccounts)
 		s.Require().NoError(err)
-		_, err = community.AddMember(&privateKey.PublicKey, communityRole)
+		_, err = community.AddMember(&privateKey.PublicKey, communityRole, requestToJoin.Clock)
 		s.Require().NoError(err)
 		_, err = community.AddMemberToChat(chat.CommunityChatID(), &privateKey.PublicKey, communityRole, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
 		s.Require().NoError(err)

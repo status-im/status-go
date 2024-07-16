@@ -18,6 +18,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/metadata/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
 )
 
@@ -59,11 +60,6 @@ func (wakuM *WakuMetadata) SetHost(h host.Host) {
 
 // Start inits the metadata protocol
 func (wakuM *WakuMetadata) Start(ctx context.Context) error {
-	if wakuM.clusterID == 0 {
-		wakuM.log.Warn("no clusterID is specified. Protocol will not be initialized")
-		return nil
-	}
-
 	ctx, cancel := context.WithCancel(ctx)
 
 	wakuM.ctx = ctx
@@ -83,6 +79,7 @@ func (wakuM *WakuMetadata) RelayShard() (*protocol.RelayShards, error) {
 }
 
 func (wakuM *WakuMetadata) ClusterAndShards() (*uint32, []uint32, error) {
+
 	shard, err := wakuM.RelayShard()
 	if err != nil {
 		return nil, nil, err
@@ -100,7 +97,7 @@ func (wakuM *WakuMetadata) ClusterAndShards() (*uint32, []uint32, error) {
 	return &u32ClusterID, shards, nil
 }
 
-func (wakuM *WakuMetadata) Request(ctx context.Context, peerID peer.ID) (*protocol.RelayShards, error) {
+func (wakuM *WakuMetadata) Request(ctx context.Context, peerID peer.ID) (*pb.WakuMetadataResponse, error) {
 	logger := wakuM.log.With(logging.HostID("peer", peerID))
 
 	stream, err := wakuM.h.NewStream(ctx, peerID, MetadataID_v1)
@@ -120,8 +117,6 @@ func (wakuM *WakuMetadata) Request(ctx context.Context, peerID peer.ID) (*protoc
 	request := &pb.WakuMetadataRequest{}
 	request.ClusterId = clusterID
 	request.Shards = shards
-	// TODO: remove with nwaku 0.28 deployment
-	request.ShardsDeprecated = shards // nolint: staticcheck
 
 	writer := pbio.NewDelimitedWriter(stream)
 	reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
@@ -149,31 +144,7 @@ func (wakuM *WakuMetadata) Request(ctx context.Context, peerID peer.ID) (*protoc
 
 	stream.Close()
 	logger.Debug("received metadata response")
-
-	if response.ClusterId == nil {
-		return nil, errors.New("node did not provide a waku clusterid")
-	}
-
-	rClusterID := uint16(*response.ClusterId)
-	var rShardIDs []uint16
-	if len(response.Shards) != 0 {
-		for _, i := range response.Shards {
-			rShardIDs = append(rShardIDs, uint16(i))
-		}
-	} else {
-		// TODO: remove with nwaku 0.28 deployment
-		for _, i := range response.ShardsDeprecated { // nolint: staticcheck
-			rShardIDs = append(rShardIDs, uint16(i))
-		}
-	}
-	logger.Debug("getting remote cluster and shards")
-
-	rs, err := protocol.NewRelayShards(rClusterID, rShardIDs...)
-	if err != nil {
-		return nil, err
-	}
-
-	return &rs, nil
+	return response, nil
 }
 
 func (wakuM *WakuMetadata) onRequest(ctx context.Context) func(network.Stream) {
@@ -200,8 +171,6 @@ func (wakuM *WakuMetadata) onRequest(ctx context.Context) func(network.Stream) {
 		} else {
 			response.ClusterId = clusterID
 			response.Shards = shards
-			// TODO: remove with nwaku 0.28 deployment
-			response.ShardsDeprecated = shards // nolint: staticcheck
 		}
 
 		err = writer.WriteMsg(response)
@@ -259,14 +228,44 @@ func (wakuM *WakuMetadata) Connected(n network.Network, cc network.Conn) {
 		}
 
 		peerID := cc.RemotePeer()
-		shard, err := wakuM.Request(wakuM.ctx, peerID)
+		response, err := wakuM.Request(wakuM.ctx, peerID)
+		if err != nil {
+			wakuM.disconnectPeer(peerID, err)
+			return
+		}
+		if response.ClusterId == nil {
+			wakuM.disconnectPeer(peerID, errors.New("node did not provide a waku clusterid"))
+			return
+		}
 
+		rClusterID := uint16(*response.ClusterId)
+		var rs protocol.RelayShards
+
+		wakuM.log.Debug("relay peer checking cluster and shards")
+
+		var rShardIDs []uint16
+		if len(response.Shards) != 0 {
+			for _, i := range response.Shards {
+				rShardIDs = append(rShardIDs, uint16(i))
+			}
+		} else {
+			if proto, err := wakuM.h.Peerstore().FirstSupportedProtocol(peerID, relay.WakuRelayID_v200); err == nil && proto == "" {
+				wakuM.log.Debug("light peer only checking clusterID")
+				if rClusterID != wakuM.clusterID {
+					wakuM.disconnectPeer(peerID, errors.New("different clusterID reported"))
+				}
+				return
+			}
+		}
+		wakuM.log.Debug("getting remote cluster and shards")
+		//if peer supports relay, then check for both clusterID and shards.
+		rs, err = protocol.NewRelayShards(rClusterID, rShardIDs...)
 		if err != nil {
 			wakuM.disconnectPeer(peerID, err)
 			return
 		}
 
-		if shard.ClusterID != wakuM.clusterID {
+		if rs.ClusterID != wakuM.clusterID {
 			wakuM.disconnectPeer(peerID, errors.New("different clusterID reported"))
 			return
 		}
@@ -274,7 +273,7 @@ func (wakuM *WakuMetadata) Connected(n network.Network, cc network.Conn) {
 		// Store shards so they're used to verify if a relay peer supports the same shards we do
 		wakuM.peerShardsMutex.Lock()
 		defer wakuM.peerShardsMutex.Unlock()
-		wakuM.peerShards[peerID] = shard.ShardIDs
+		wakuM.peerShards[peerID] = rs.ShardIDs
 	}()
 }
 

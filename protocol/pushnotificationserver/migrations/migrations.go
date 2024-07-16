@@ -5,8 +5,6 @@
 // 1598419937_add_push_notifications_table.down.sql (51B)
 // 1598419937_add_push_notifications_table.up.sql (104B)
 // doc.go (402B)
-// exit_code_1.txt (4B)
-// test_1.log (0)
 
 package migrations
 
@@ -89,7 +87,7 @@ func _1593601728_initial_schemaDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1593601728_initial_schema.down.sql", size: 200, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "1593601728_initial_schema.down.sql", size: 200, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x88, 0x8a, 0x61, 0x81, 0x57, 0x45, 0x9b, 0x97, 0x9b, 0x1f, 0xf6, 0x94, 0x8a, 0x20, 0xb3, 0x2b, 0xff, 0x69, 0x49, 0xf4, 0x58, 0xcc, 0xd0, 0x55, 0xcc, 0x9a, 0x8b, 0xb6, 0x7f, 0x29, 0x53, 0xc1}}
 	return a, nil
 }
@@ -109,7 +107,7 @@ func _1593601728_initial_schemaUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1593601728_initial_schema.up.sql", size: 675, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "1593601728_initial_schema.up.sql", size: 675, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfd, 0x61, 0x90, 0x79, 0xd9, 0x14, 0x65, 0xe9, 0x96, 0x53, 0x17, 0x33, 0x54, 0xeb, 0x8b, 0x5d, 0x95, 0x99, 0x10, 0x36, 0x58, 0xdd, 0xb2, 0xbf, 0x45, 0xd9, 0xbb, 0xc4, 0x92, 0xe, 0xce, 0x2}}
 	return a, nil
 }
@@ -129,7 +127,7 @@ func _1598419937_add_push_notifications_tableDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1598419937_add_push_notifications_table.down.sql", size: 51, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "1598419937_add_push_notifications_table.down.sql", size: 51, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc, 0x98, 0xc8, 0x30, 0x45, 0x5b, 0xc5, 0x7d, 0x13, 0x5d, 0xe7, 0xc8, 0x23, 0x43, 0xf7, 0xdc, 0x9c, 0xe2, 0xdd, 0x63, 0xf0, 0xb7, 0x16, 0x40, 0xc, 0xda, 0xb9, 0x16, 0x70, 0x2b, 0x5a, 0x7e}}
 	return a, nil
 }
@@ -149,7 +147,7 @@ func _1598419937_add_push_notifications_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1598419937_add_push_notifications_table.up.sql", size: 104, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "1598419937_add_push_notifications_table.up.sql", size: 104, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x2, 0x3e, 0xef, 0xf, 0xc2, 0xdf, 0xbc, 0x99, 0x7a, 0xc2, 0xd3, 0x64, 0x4f, 0x4c, 0x7e, 0xfc, 0x2e, 0x8c, 0xa7, 0x54, 0xd3, 0x4d, 0x25, 0x98, 0x41, 0xbc, 0xea, 0xd7, 0x2, 0xc1, 0xd0, 0x52}}
 	return a, nil
 }
@@ -169,48 +167,8 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 402, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 402, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf1, 0x48, 0xd2, 0x42, 0xd0, 0x5f, 0xf4, 0x53, 0xfe, 0xa5, 0x44, 0xc, 0x8b, 0x6b, 0xed, 0xca, 0xc, 0xc0, 0xd8, 0x2e, 0x90, 0x87, 0x5b, 0x92, 0x6d, 0xa1, 0xf8, 0x15, 0x23, 0x96, 0xdb, 0x11}}
-	return a, nil
-}
-
-var _exit_code_1Txt = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x32\x34\x32\xe7\x02\x04\x00\x00\xff\xff\x0c\x38\xee\x3e\x04\x00\x00\x00")
-
-func exit_code_1TxtBytes() ([]byte, error) {
-	return bindataRead(
-		_exit_code_1Txt,
-		"exit_code_1.txt",
-	)
-}
-
-func exit_code_1Txt() (*asset, error) {
-	bytes, err := exit_code_1TxtBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "exit_code_1.txt", size: 4, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x74, 0x3c, 0x78, 0x50, 0xcc, 0xcf, 0xba, 0x5e, 0x53, 0xa9, 0x0, 0x26, 0x63, 0xec, 0x1d, 0xdd, 0x10, 0x79, 0x31, 0x5a, 0x98, 0xbd, 0xbf, 0xdd, 0xe1, 0xe, 0x60, 0x44, 0xf5, 0x6a, 0xbe, 0xfe}}
-	return a, nil
-}
-
-var _test_1Log = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x01\x00\x00\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00")
-
-func test_1LogBytes() ([]byte, error) {
-	return bindataRead(
-		_test_1Log,
-		"test_1.log",
-	)
-}
-
-func test_1Log() (*asset, error) {
-	bytes, err := test_1LogBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "test_1.log", size: 0, mode: os.FileMode(0664), modTime: time.Unix(1700000000, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
 
@@ -309,9 +267,7 @@ var _bindata = map[string]func() (*asset, error){
 	"1593601728_initial_schema.up.sql":                 _1593601728_initial_schemaUpSql,
 	"1598419937_add_push_notifications_table.down.sql": _1598419937_add_push_notifications_tableDownSql,
 	"1598419937_add_push_notifications_table.up.sql":   _1598419937_add_push_notifications_tableUpSql,
-	"doc.go":          docGo,
-	"exit_code_1.txt": exit_code_1Txt,
-	"test_1.log":      test_1Log,
+	"doc.go": docGo,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -364,9 +320,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1593601728_initial_schema.up.sql":                 {_1593601728_initial_schemaUpSql, map[string]*bintree{}},
 	"1598419937_add_push_notifications_table.down.sql": {_1598419937_add_push_notifications_tableDownSql, map[string]*bintree{}},
 	"1598419937_add_push_notifications_table.up.sql":   {_1598419937_add_push_notifications_tableUpSql, map[string]*bintree{}},
-	"doc.go":          {docGo, map[string]*bintree{}},
-	"exit_code_1.txt": {exit_code_1Txt, map[string]*bintree{}},
-	"test_1.log":      {test_1Log, map[string]*bintree{}},
+	"doc.go": {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

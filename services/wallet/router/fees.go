@@ -148,7 +148,6 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*Sugges
 			EIP1559Enabled: false,
 		}, nil
 	}
-
 	baseFee, err := f.getBaseFee(ctx, backend)
 	if err != nil {
 		return nil, err
@@ -190,19 +189,17 @@ func (f *FeeManager) getBaseFee(ctx context.Context, client chain.ClientInterfac
 	}
 
 	chainID := client.NetworkID()
-
 	config := params.MainnetChainConfig
 	switch chainID {
-	case common.EthereumSepolia:
-	case common.OptimismSepolia:
-	case common.ArbitrumSepolia:
+	case common.EthereumSepolia,
+		common.OptimismSepolia,
+		common.ArbitrumSepolia:
 		config = params.SepoliaChainConfig
-	case common.EthereumGoerli:
-	case common.OptimismGoerli:
-	case common.ArbitrumGoerli:
+	case common.EthereumGoerli,
+		common.OptimismGoerli,
+		common.ArbitrumGoerli:
 		config = params.GoerliChainConfig
 	}
-
 	baseFee := misc.CalcBaseFee(config, header)
 	return baseFee, nil
 }

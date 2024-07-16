@@ -65,7 +65,7 @@ func (p *Path) Equal(o *Path) bool {
 	return p.From.ChainID == o.From.ChainID && p.To.ChainID == o.To.ChainID
 }
 
-type Graph = []*Node
+type Graph []*Node
 
 type Node struct {
 	Path     *Path
@@ -414,8 +414,8 @@ func (r *Router) requireApproval(ctx context.Context, sendType SendType, approva
 	return true, params.AmountIn, estimate, l1Fee, nil
 }
 
-func (r *Router) getBalance(ctx context.Context, network *params.Network, token *token.Token, account common.Address) (*big.Int, error) {
-	client, err := r.rpcClient.EthClient(network.ChainID)
+func (r *Router) getBalance(ctx context.Context, chainID uint64, token *token.Token, account common.Address) (*big.Int, error) {
+	client, err := r.rpcClient.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -521,7 +521,7 @@ func (r *Router) SuggestedRoutes(
 					return err
 				}
 			} else if sendType != ERC721Transfer {
-				balance, err = r.getBalance(ctx, network, token, addrFrom)
+				balance, err = r.getBalance(ctx, network.ChainID, token, addrFrom)
 				if err != nil {
 					return err
 				}
@@ -535,7 +535,7 @@ func (r *Router) SuggestedRoutes(
 				maxAmountIn = amount
 			}
 
-			nativeBalance, err := r.getBalance(ctx, network, nativeToken, addrFrom)
+			nativeBalance, err := r.getBalance(ctx, network.ChainID, nativeToken, addrFrom)
 			if err != nil {
 				return err
 			}

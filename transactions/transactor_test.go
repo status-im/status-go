@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
@@ -370,4 +371,12 @@ func (s *TransactorSuite) TestHashTransaction() {
 	s.Equal(remoteNonce, *newArgs.Nonce)
 
 	s.NotEqual(common.Hash{}, hash)
+}
+
+func (s *TransactorSuite) TestStoreAndTrackPendingTx() {
+	s.Nil(s.manager.pendingTracker)
+
+	// Empty tracker doesn't produce error
+	err := s.manager.StoreAndTrackPendingTx(common.Address{}, "", 0, wallet_common.MultiTransactionIDType(0), nil)
+	s.NoError(err)
 }

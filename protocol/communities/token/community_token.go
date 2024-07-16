@@ -39,4 +39,5 @@ type CommunityToken struct {
 	Deployer           string                      `json:"deployer"`
 	PrivilegesLevel    PrivilegesLevel             `json:"privilegesLevel"`
 	TransactionHash    string                      `json:"transactionHash"`
+	Version            string                      `json:"version"`
 }

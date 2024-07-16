@@ -43,6 +43,8 @@ var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWa
 
 var DefaultFleet = params.FleetShardsTest
 
+var overrideApiConfig = overrideApiConfigProd
+
 func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
 
@@ -137,8 +139,9 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 		Host:           "0.0.0.0",
 		AutoUpdate:     true,
 		// mobile may need override following options
-		LightClient: specifiedWakuV2Config.LightClient,
-		Nameserver:  specifiedWakuV2Config.Nameserver,
+		LightClient:                            specifiedWakuV2Config.LightClient,
+		EnableStoreConfirmationForMessagesSent: specifiedWakuV2Config.EnableStoreConfirmationForMessagesSent,
+		Nameserver:                             specifiedWakuV2Config.Nameserver,
 	}
 
 	clusterConfig, err := params.LoadClusterConfigFromFleet(fleet)
@@ -152,7 +155,6 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 
 	if fleet == params.FleetShardsTest {
 		nodeConfig.ClusterConfig.ClusterID = shardsTestClusterID
-		nodeConfig.WakuV2Config.UseShardAsDefaultTopic = true
 	}
 
 	return nil
@@ -215,13 +217,14 @@ func buildWalletConfig(request *requests.WalletSecretsConfig) params.WalletConfi
 	return walletConfig
 }
 
-func overrideApiConfig(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
+func overrideApiConfigProd(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
 	nodeConfig.APIModules = config.APIModules
 	nodeConfig.ConnectorConfig.Enabled = config.ConnectorEnabled
 
 	nodeConfig.HTTPEnabled = config.HTTPEnabled
 	nodeConfig.HTTPHost = config.HTTPHost
 	nodeConfig.HTTPPort = config.HTTPPort
+	nodeConfig.HTTPVirtualHosts = config.HTTPVirtualHosts
 
 	nodeConfig.WSEnabled = config.WSEnabled
 	nodeConfig.WSHost = config.WSHost
@@ -286,13 +289,22 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 
 	nodeConfig.ListenAddr = DefaultListenAddr
 
-	err := SetDefaultFleet(nodeConfig)
+	fleet := request.WakuV2Fleet
+	if fleet == "" {
+		fleet = DefaultFleet
+	}
+
+	err := SetFleet(fleet, nodeConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	if request.WakuV2LightClient {
 		nodeConfig.WakuV2Config.LightClient = true
+	}
+
+	if request.WakuV2EnableStoreConfirmationForMessagesSent {
+		nodeConfig.WakuV2Config.EnableStoreConfirmationForMessagesSent = true
 	}
 
 	if request.WakuV2Nameserver != nil {

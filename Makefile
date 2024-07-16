@@ -345,7 +345,10 @@ mock: ##@other Regenerate mocks
 	mockgen -package=mock_bridge     -destination=services/wallet/bridge/mock_bridge/bridge.go -source=services/wallet/bridge/bridge.go
 	mockgen -package=mock_client     -destination=rpc/chain/mock/client/client.go              -source=rpc/chain/client.go
 	mockgen -package=mock_token      -destination=services/wallet/token/mock/token/tokenmanager.go -source=services/wallet/token/token.go
+	mockgen -package=mock_thirdparty -destination=services/wallet/thirdparty/mock/types.go -source=services/wallet/thirdparty/types.go
 	mockgen -package=mock_balance_persistence -destination=services/wallet/token/mock/balance_persistence/balance_persistence.go -source=services/wallet/token/balance_persistence.go
+	mockgen -package=mock_network      -destination=rpc/network/mock/network.go -source=rpc/network/network.go
+	mockgen -package=mock_rpcclient     -destination=rpc/mock/client/client.go              -source=rpc/client.go
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
@@ -487,9 +490,15 @@ build-verif-proxy-wrapper:
 test-verif-proxy-wrapper:
 	CGO_CFLAGS="$(CGO_CFLAGS)" go test -v github.com/status-im/status-go/rpc -tags gowaku_skip_migrations,nimbus_light_client -run ^TestProxySuite$$ -testify.m TestRun -ldflags $(LDFLAGS)
 
+
 run-integration-tests: SHELL := /bin/sh
+run-integration-tests: export INTEGRATION_TESTS_DOCKER_UID ?= $(shell id -u $$USER)
 run-integration-tests:
-	docker-compose -f integration-tests/docker-compose.anvil.yml -f integration-tests/docker-compose.test.status-go.yml up --remove-orphans --build
+	docker-compose -f integration-tests/docker-compose.anvil.yml -f integration-tests/docker-compose.test.status-go.yml up -d --build --remove-orphans; \
+	docker-compose -f integration-tests/docker-compose.anvil.yml -f integration-tests/docker-compose.test.status-go.yml logs -f tests-rpc; \
+	exit_code=$$(docker inspect integration-tests_tests-rpc_1 -f '{{.State.ExitCode}}'); \
+	docker-compose -f integration-tests/docker-compose.anvil.yml -f integration-tests/docker-compose.test.status-go.yml down; \
+	exit $$exit_code
 
 run-anvil: SHELL := /bin/sh
 run-anvil:

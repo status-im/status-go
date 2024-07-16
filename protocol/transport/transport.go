@@ -165,8 +165,8 @@ func (t *Transport) LoadFilters(filters []*Filter) ([]*Filter, error) {
 	return t.filters.InitWithFilters(filters)
 }
 
-func (t *Transport) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize, useShards bool) ([]*Filter, error) {
-	return t.filters.InitCommunityFilters(communityFiltersToInitialize, useShards)
+func (t *Transport) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize) ([]*Filter, error) {
+	return t.filters.InitCommunityFilters(communityFiltersToInitialize)
 }
 
 func (t *Transport) RemoveFilters(filters []*Filter) error {
@@ -650,6 +650,10 @@ func (t *Transport) StopDiscV5() error {
 
 func (t *Transport) ListenAddresses() ([]string, error) {
 	return t.waku.ListenAddresses()
+}
+
+func (t *Transport) RelayPeersByTopic(topic string) (*types.PeerList, error) {
+	return t.waku.RelayPeersByTopic(topic)
 }
 
 func (t *Transport) ENR() (string, error) {

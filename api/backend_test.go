@@ -834,13 +834,16 @@ func TestLoginAccount(t *testing.T) {
 		RootDataDir:        tmpdir,
 		LogFilePath:        tmpdir + "/log",
 		WakuV2Nameserver:   &nameserver,
+		WakuV2Fleet:        "status.staging",
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
 		if strings.Contains(string(data), signal.EventLoggedIn) {
+			require.Contains(t, string(data), "status.staging")
 			c <- struct{}{}
 		}
 	})
+	defer signal.SetMobileSignalHandler(nil)
 	waitForLogin := func(chan interface{}) {
 		select {
 		case <-c:

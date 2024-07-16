@@ -29,6 +29,9 @@ const (
 	UpdateEnvelopeMetric       TelemetryType = "UpdateEnvelope"
 	ReceivedMessagesMetric     TelemetryType = "ReceivedMessages"
 	ErrorSendingEnvelopeMetric TelemetryType = "ErrorSendingEnvelope"
+	PeerCountMetric            TelemetryType = "PeerCount"
+
+	MaxRetryCache = 5000
 )
 
 type TelemetryRequest struct {
@@ -53,25 +56,34 @@ func (c *Client) PushErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSendi
 	c.processAndPushTelemetry(errorSendingEnvelope)
 }
 
+func (c *Client) PushPeerCount(peerCount int) {
+	c.processAndPushTelemetry(PeerCount{PeerCount: peerCount})
+}
+
 type ReceivedMessages struct {
 	Filter     transport.Filter
 	SSHMessage *types.Message
 	Messages   []*v1protocol.StatusMessage
 }
 
+type PeerCount struct {
+	PeerCount int
+}
+
 type Client struct {
-	serverURL          string
-	httpClient         *http.Client
-	logger             *zap.Logger
-	keyUID             string
-	nodeName           string
-	version            string
-	telemetryCh        chan TelemetryRequest
-	telemetryCacheLock sync.Mutex
-	telemetryCache     []TelemetryRequest
-	nextIdLock         sync.Mutex
-	nextId             int
-	sendPeriod         time.Duration
+	serverURL           string
+	httpClient          *http.Client
+	logger              *zap.Logger
+	keyUID              string
+	nodeName            string
+	version             string
+	telemetryCh         chan TelemetryRequest
+	telemetryCacheLock  sync.Mutex
+	telemetryCache      []TelemetryRequest
+	telemetryRetryCache []TelemetryRequest
+	nextIdLock          sync.Mutex
+	nextId              int
+	sendPeriod          time.Duration
 }
 
 type TelemetryClientOption func(*Client)
@@ -84,18 +96,19 @@ func WithSendPeriod(sendPeriod time.Duration) TelemetryClientOption {
 
 func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName string, version string, opts ...TelemetryClientOption) *Client {
 	client := &Client{
-		serverURL:          serverURL,
-		httpClient:         &http.Client{Timeout: time.Minute},
-		logger:             logger,
-		keyUID:             keyUID,
-		nodeName:           nodeName,
-		version:            version,
-		telemetryCh:        make(chan TelemetryRequest),
-		telemetryCacheLock: sync.Mutex{},
-		telemetryCache:     make([]TelemetryRequest, 0),
-		nextId:             0,
-		nextIdLock:         sync.Mutex{},
-		sendPeriod:         10 * time.Second, // default value
+		serverURL:           serverURL,
+		httpClient:          &http.Client{Timeout: time.Minute},
+		logger:              logger,
+		keyUID:              keyUID,
+		nodeName:            nodeName,
+		version:             version,
+		telemetryCh:         make(chan TelemetryRequest),
+		telemetryCacheLock:  sync.Mutex{},
+		telemetryCache:      make([]TelemetryRequest, 0),
+		telemetryRetryCache: make([]TelemetryRequest, 0),
+		nextId:              0,
+		nextIdLock:          sync.Mutex{},
+		sendPeriod:          10 * time.Second, // default value
 	}
 
 	for _, opt := range opts {
@@ -120,12 +133,13 @@ func (c *Client) Start(ctx context.Context) {
 		}
 	}()
 	go func() {
-		ticker := time.NewTicker(c.sendPeriod)
-		defer ticker.Stop()
+		sendPeriod := c.sendPeriod
+		timer := time.NewTimer(sendPeriod)
+		defer timer.Stop()
 
 		for {
 			select {
-			case <-ticker.C:
+			case <-timer.C:
 				c.telemetryCacheLock.Lock()
 				telemetryRequests := make([]TelemetryRequest, len(c.telemetryCache))
 				copy(telemetryRequests, c.telemetryCache)
@@ -133,8 +147,16 @@ func (c *Client) Start(ctx context.Context) {
 				c.telemetryCacheLock.Unlock()
 
 				if len(telemetryRequests) > 0 {
-					c.pushTelemetryRequest(telemetryRequests)
+					err := c.pushTelemetryRequest(telemetryRequests)
+					if err != nil {
+						if sendPeriod < 60*time.Second { //Stop the growing if the timer is > 60s to at least retry every minute
+							sendPeriod = sendPeriod * 2
+						}
+					} else {
+						sendPeriod = c.sendPeriod
+					}
 				}
+				timer.Reset(sendPeriod)
 			case <-ctx.Done():
 				return
 			}
@@ -170,6 +192,12 @@ func (c *Client) processAndPushTelemetry(data interface{}) {
 			TelemetryType: ErrorSendingEnvelopeMetric,
 			TelemetryData: c.ProcessErrorSendingEnvelope(v),
 		}
+	case PeerCount:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: PeerCountMetric,
+			TelemetryData: c.ProcessPeerCount(v),
+		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
 		return
@@ -181,17 +209,41 @@ func (c *Client) processAndPushTelemetry(data interface{}) {
 	c.nextIdLock.Unlock()
 }
 
-func (c *Client) pushTelemetryRequest(request []TelemetryRequest) {
+// This is assuming to not run concurrently as we are not locking the `telemetryRetryCache`
+func (c *Client) pushTelemetryRequest(request []TelemetryRequest) error {
+	if len(c.telemetryRetryCache) > MaxRetryCache { //Limit the size of the cache to not grow the slice indefinitely in case the Telemetry server is gone for longer time
+		removeNum := len(c.telemetryRetryCache) - MaxRetryCache
+		c.telemetryRetryCache = c.telemetryRetryCache[removeNum:]
+	}
+	c.telemetryRetryCache = append(c.telemetryRetryCache, request...)
+
 	url := fmt.Sprintf("%s/record-metrics", c.serverURL)
-	body, _ := json.Marshal(request)
-	_, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
+	body, err := json.Marshal(c.telemetryRetryCache)
+	if err != nil {
+		c.logger.Error("Error marshaling telemetry data", zap.Error(err))
+		return err
+	}
+	res, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		c.logger.Error("Error sending telemetry data", zap.Error(err))
+		return err
 	}
+	defer res.Body.Close()
+	var responseBody []map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&responseBody); err != nil {
+		c.logger.Error("Error decoding response body", zap.Error(err))
+		return err
+	}
+	if res.StatusCode != http.StatusCreated {
+		c.logger.Error("Error sending telemetry data", zap.Int("statusCode", res.StatusCode), zap.Any("responseBody", responseBody))
+		return fmt.Errorf("status code %d, response body: %v", res.StatusCode, responseBody)
+	}
+
+	c.telemetryRetryCache = nil
+	return nil
 }
 
 func (c *Client) ProcessReceivedMessages(receivedMessages ReceivedMessages) *json.RawMessage {
-	c.logger.Debug("Pushing received messages to telemetry server")
 	var postBody []map[string]interface{}
 	for _, message := range receivedMessages.Messages {
 		postBody = append(postBody, map[string]interface{}{
@@ -255,6 +307,19 @@ func (c *Client) ProcessErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSe
 		"publishMethod": errorSendingEnvelope.SentEnvelope.PublishMethod.String(),
 		"statusVersion": c.version,
 		"error":         errorSendingEnvelope.Error.Error(),
+	}
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
+func (c *Client) ProcessPeerCount(peerCount PeerCount) *json.RawMessage {
+	postBody := map[string]interface{}{
+		"peerCount":     peerCount.PeerCount,
+		"nodeName":      c.nodeName,
+		"nodeKeyUID":    c.keyUID,
+		"statusVersion": c.version,
+		"timestamp":     time.Now().Unix(),
 	}
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)

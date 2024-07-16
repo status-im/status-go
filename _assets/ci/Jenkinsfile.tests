@@ -134,7 +134,7 @@ pipeline {
             nix.shell('make test-unit V=1', pure: false)
           }
           sh "mv c.out test-coverage.out"
-          archiveArtifacts('test-coverage.out, coverage/codeclimate.json')
+          archiveArtifacts('test-coverage.out, coverage/codeclimate.json, test-coverage.html')
         }
       } }
       post { cleanup { /* Leftover DB containers. */

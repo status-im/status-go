@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -33,8 +34,9 @@ const (
 	whisperLargeSizePoW = 0.000002
 	// largeSizeInBytes is when should we be using a lower POW.
 	// Roughly this is 50KB
-	largeSizeInBytes = 50000
-	whisperPoWTime   = 5
+	largeSizeInBytes              = 50000
+	whisperPoWTime                = 5
+	maxMessageSenderEphemeralKeys = 3
 )
 
 // RekeyCompatibility indicates whether we should be sending
@@ -1245,15 +1247,37 @@ func (s *MessageSender) JoinPublic(id string) (*transport.Filter, error) {
 	return s.transport.JoinPublic(id)
 }
 
-// AddEphemeralKey adds an ephemeral key that we will be listening to
-// note that we never removed them from now, as waku/whisper does not
-// recalculate topics on removal, so effectively there's no benefit.
-// On restart they will be gone.
-func (s *MessageSender) AddEphemeralKey(privateKey *ecdsa.PrivateKey) (*transport.Filter, error) {
+func (s *MessageSender) getRandomEphemeralKey() *ecdsa.PrivateKey {
+	k := rand.Intn(len(s.ephemeralKeys)) //nolint: gosec
+	for _, key := range s.ephemeralKeys {
+		if k == 0 {
+			return key
+		}
+		k--
+	}
+	return nil
+}
+
+func (s *MessageSender) GetEphemeralKey() (*ecdsa.PrivateKey, error) {
 	s.ephemeralKeysMutex.Lock()
+	if len(s.ephemeralKeys) >= maxMessageSenderEphemeralKeys {
+		s.ephemeralKeysMutex.Unlock()
+		return s.getRandomEphemeralKey(), nil
+	}
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		s.ephemeralKeysMutex.Unlock()
+		return nil, err
+	}
+
 	s.ephemeralKeys[types.EncodeHex(crypto.FromECDSAPub(&privateKey.PublicKey))] = privateKey
 	s.ephemeralKeysMutex.Unlock()
-	return s.transport.LoadKeyFilters(privateKey)
+	_, err = s.transport.LoadKeyFilters(privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return privateKey, nil
 }
 
 func MessageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*types.NewMessage, error) {

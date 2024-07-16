@@ -25,6 +25,11 @@ type WakuV2Peer struct {
 	Addresses []string      `json:"addresses"`
 }
 
+type PeerList struct {
+	FullMeshPeers []peer.ID `json:"fullMesh"`
+	AllPeers      []peer.ID `json:"all"`
+}
+
 type ConnStatusSubscription struct {
 	sync.RWMutex
 
@@ -91,6 +96,8 @@ type Waku interface {
 	PeerCount() int
 
 	ListenAddresses() ([]string, error)
+
+	RelayPeersByTopic(topic string) (*PeerList, error)
 
 	ENR() (string, error)
 

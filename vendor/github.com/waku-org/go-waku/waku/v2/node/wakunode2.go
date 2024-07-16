@@ -116,9 +116,6 @@ type WakuNode struct {
 	addressChangesSub event.Subscription
 	enrChangeCh       chan struct{}
 
-	keepAliveMutex sync.Mutex
-	keepAliveFails map[peer.ID]int
-
 	cancel context.CancelFunc
 	wg     *sync.WaitGroup
 
@@ -193,7 +190,6 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	w.opts = params
 	w.log = params.logger.Named("node2")
 	w.wg = &sync.WaitGroup{}
-	w.keepAliveFails = make(map[peer.ID]int)
 	w.wakuFlag = enr.NewWakuEnrBitfield(w.opts.enableLightPush, w.opts.enableFilterFullNode, w.opts.enableStore, w.opts.enableRelay)
 	w.circuitRelayNodes = make(chan peer.AddrInfo)
 	w.metrics = newMetrics(params.prometheusReg)
@@ -255,8 +251,14 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	metadata := metadata.NewWakuMetadata(w.opts.clusterID, w.localNode, w.log)
 	w.metadata = metadata
 
+	relay := relay.NewWakuRelay(w.bcaster, w.opts.minRelayPeersToPublish, w.timesource, w.opts.prometheusReg, w.log,
+		relay.WithPubSubOptions(w.opts.pubsubOpts),
+		relay.WithMaxMsgSize(w.opts.maxMsgSizeBytes))
+
+	w.relay = relay
+
 	//Initialize peer manager.
-	w.peermanager = peermanager.NewPeerManager(w.opts.maxPeerConnections, w.opts.peerStoreCapacity, metadata, params.enableRelay, w.log)
+	w.peermanager = peermanager.NewPeerManager(w.opts.maxPeerConnections, w.opts.peerStoreCapacity, metadata, relay, params.enableRelay, w.log)
 
 	w.peerConnector, err = peermanager.NewPeerConnectionStrategy(w.peermanager, w.opts.onlineChecker, discoveryConnectTimeout, w.log)
 	if err != nil {
@@ -270,15 +272,12 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		}
 	}
 
-	w.peerExchange, err = peer_exchange.NewWakuPeerExchange(w.DiscV5(), w.peerConnector, w.peermanager, w.opts.prometheusReg, w.log)
+	w.peerExchange, err = peer_exchange.NewWakuPeerExchange(w.DiscV5(), w.opts.clusterID, w.peerConnector, w.peermanager, w.opts.prometheusReg, w.log, w.opts.peerExchangeOptions...)
 	if err != nil {
 		return nil, err
 	}
 
 	w.rendezvous = rendezvous.NewRendezvous(w.opts.rendezvousDB, w.peerConnector, w.log)
-	w.relay = relay.NewWakuRelay(w.bcaster, w.opts.minRelayPeersToPublish, w.timesource, w.opts.prometheusReg, w.log,
-		relay.WithPubSubOptions(w.opts.pubsubOpts),
-		relay.WithMaxMsgSize(w.opts.maxMsgSizeBytes))
 
 	if w.opts.enableRelay {
 		err = w.setupRLNRelay()
@@ -379,9 +378,9 @@ func (w *WakuNode) Start(ctx context.Context) error {
 		return err
 	}
 
-	if w.opts.keepAliveInterval > time.Duration(0) {
+	if w.opts.keepAliveRandomPeersInterval > time.Duration(0) || w.opts.keepAliveAllPeersInterval > time.Duration(0) {
 		w.wg.Add(1)
-		go w.startKeepAlive(ctx, w.opts.keepAliveInterval)
+		go w.startKeepAlive(ctx, w.opts.keepAliveRandomPeersInterval, w.opts.keepAliveAllPeersInterval)
 	}
 
 	w.metadata.SetHost(host)
@@ -458,16 +457,25 @@ func (w *WakuNode) Start(ctx context.Context) error {
 	}
 
 	w.filterLightNode.SetHost(host)
+
+	err = w.setupENR(ctx, w.ListenAddresses())
+	if err != nil {
+		return err
+	}
+
 	if w.opts.enableFilterLightNode {
 		err := w.filterLightNode.Start(ctx)
 		if err != nil {
 			return err
 		}
-	}
-
-	err = w.setupENR(ctx, w.ListenAddresses())
-	if err != nil {
-		return err
+		//TODO: setting this up temporarily to improve connectivity success for lightNode in status.
+		//This will have to be removed or changed with community sharding will be implemented.
+		if w.opts.shards != nil {
+			err = w.SetRelayShards(*w.opts.shards)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	w.peerExchange.SetHost(host)

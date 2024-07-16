@@ -71,8 +71,12 @@ func Subscribe(ctx context.Context, wf *filter.WakuFilterLightNode, contentFilte
 	return sub, nil
 }
 
-func (apiSub *Sub) Unsubscribe() {
-	apiSub.cancel()
+func (apiSub *Sub) Unsubscribe(contentFilter protocol.ContentFilter) {
+	_, err := apiSub.wf.Unsubscribe(apiSub.ctx, contentFilter)
+	//Not reading result unless we want to do specific error handling?
+	if err != nil {
+		apiSub.log.Debug("failed to unsubscribe", zap.Error(err), zap.Stringer("content-filter", contentFilter))
+	}
 }
 
 func (apiSub *Sub) subscriptionLoop() {

@@ -21,14 +21,15 @@ type ImageCropRectangle struct {
 }
 
 type APIConfig struct {
-	APIModules       string `json:"apiModules"`
-	ConnectorEnabled bool   `json:"connectorEnabled"`
-	HTTPEnabled      bool   `json:"httpEnabled"`
-	HTTPHost         string `json:"httpHost"`
-	HTTPPort         int    `json:"httpPort"`
-	WSEnabled        bool   `json:"wsEnabled"`
-	WSHost           string `json:"wsHost"`
-	WSPort           int    `json:"wsPort"`
+	APIModules       string   `json:"apiModules"`
+	ConnectorEnabled bool     `json:"connectorEnabled"`
+	HTTPEnabled      bool     `json:"httpEnabled"`
+	HTTPHost         string   `json:"httpHost"`
+	HTTPPort         int      `json:"httpPort"`
+	HTTPVirtualHosts []string `json:"httpVirtualHosts"`
+	WSEnabled        bool     `json:"wsEnabled"`
+	WSHost           string   `json:"wsHost"`
+	WSPort           int      `json:"wsPort"`
 }
 
 type CreateAccount struct {
@@ -48,8 +49,10 @@ type CreateAccount struct {
 	CustomizationColor string              `json:"customizationColor"`
 	Emoji              string              `json:"emoji"`
 
-	WakuV2Nameserver  *string `json:"wakuV2Nameserver"`
-	WakuV2LightClient bool    `json:"wakuV2LightClient"`
+	WakuV2Nameserver                             *string `json:"wakuV2Nameserver"`
+	WakuV2LightClient                            bool    `json:"wakuV2LightClient"`
+	WakuV2EnableStoreConfirmationForMessagesSent bool    `json:"wakuV2EnableStoreConfirmationForMessagesSent"`
+	WakuV2Fleet                                  string  `json:"wakuV2Fleet"`
 
 	LogLevel    *string `json:"logLevel"`
 	LogFilePath string  `json:"logFilePath"` // absolute path

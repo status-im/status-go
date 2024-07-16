@@ -121,10 +121,12 @@ func (m *PeerstoreManager) background(ctx context.Context, sub event.Subscriptio
 					// Check that the peer is actually not connected at this point.
 					// This avoids a race condition where the Connected notification
 					// is processed after this time has fired.
-					if m.network.Connectedness(p) != network.Connected {
+					switch m.network.Connectedness(p) {
+					case network.Connected, network.Limited:
+					default:
 						m.pstore.RemovePeer(p)
-						delete(disconnected, p)
 					}
+					delete(disconnected, p)
 				}
 			}
 		case <-ctx.Done():
