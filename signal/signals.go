@@ -15,6 +15,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
 // MobileSignalHandler is a simple callback function that gets called when any signal is received
@@ -22,6 +23,12 @@ type MobileSignalHandler func([]byte)
 
 // storing the current signal handler here
 var mobileSignalHandler MobileSignalHandler
+
+// SignalBlocklist is an optional set of signals that should be blocklisted,
+// i.e. not sent.
+type SignalBlocklist map[string]struct{}
+
+var signalBlocklist SignalBlocklist
 
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/signal")
@@ -40,6 +47,41 @@ func NewEnvelope(typ string, event interface{}) *Envelope {
 	}
 }
 
+// isSignalBlocklisted returns true when a signal type is present in the
+// blocklist, or when not found, if the signal type and event type are present.
+//
+// The convention is that clients can specify a particular event type from any
+// signal by concatenating a forward slash.
+//
+// Example for signal "wallet" and event type
+// "wallet-collectible-status-changed":
+//
+//	"wallet/wallet-collectible-status-changed"
+func isSignalBlocklisted(signal *Envelope, event any) bool {
+	if len(signalBlocklist) > 0 {
+		// If the signal type is in the blocklist, then "send" is a nop.
+		if _, ok := signalBlocklist[signal.Type]; ok {
+			logger.Info("imotta - Signal blocklisted", "signal", signal.Type)
+			return true
+		}
+
+		// A signal may encompass an event, in which case we need to concretely
+		// check the type of the event.
+		//
+		// THIS DOES NOT WORK because it creates a circular dependency and the
+		// compiler will complaint.
+		if e, ok := event.(walletevent.Event); ok {
+			name := signal.Type + "/" + string(e.Type)
+			logger.Info("imotta - Signal blocklisted", "signal", name)
+			if _, ok := signalBlocklist[name]; ok {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // send sends application signal (in JSON) upwards to application (via default notification handler)
 func send(typ string, event interface{}) {
 	signal := NewEnvelope(typ, event)
@@ -48,6 +90,11 @@ func send(typ string, event interface{}) {
 		logger.Error("Marshalling signal envelope", "error", err)
 		return
 	}
+
+	if isSignalBlocklisted(signal, event) {
+		return
+	}
+
 	// If a Go implementation of signal handler is set, let's use it.
 	if mobileSignalHandler != nil {
 		mobileSignalHandler(data)
@@ -109,6 +156,10 @@ func TriggerTestSignal() {
 // this function uses pure go implementation
 func SetMobileSignalHandler(handler MobileSignalHandler) {
 	mobileSignalHandler = handler
+}
+
+func SetSignalBlocklist(blocklist SignalBlocklist) {
+	signalBlocklist = blocklist
 }
 
 // SetSignalEventCallback set callback

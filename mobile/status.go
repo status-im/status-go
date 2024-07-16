@@ -782,6 +782,25 @@ func StopLocalNotifications() string {
 	return makeJSONResponse(err)
 }
 
+// SetSignalBlocklist sets a blocklist of signal types that can turn signal.send
+// a nop.
+func SetSignalBlocklist(requestJSON string) string {
+	var request requests.SetSignalBlocklist
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	// Index by signal type.
+	blocklist := make(signal.SignalBlocklist)
+	for _, v := range request.Blocklist {
+		blocklist[v] = struct{}{}
+	}
+	signal.SetSignalBlocklist(blocklist)
+
+	return makeJSONResponse(nil)
+}
+
 // SetMobileSignalHandler setup geth callback to notify about new signal
 // used for gomobile builds
 func SetMobileSignalHandler(handler SignalHandler) {
