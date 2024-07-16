@@ -58,6 +58,7 @@ func (m *Messenger) sendPublicCommunityShardInfo(community *communities.Communit
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_SHARD_INFO,
 		PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(), // it must be sent always to default shard pubsub topic
+		Priority:            &common.HighPriority,
 	}
 
 	chatName := transport.CommunityShardInfoTopic(community.IDString())

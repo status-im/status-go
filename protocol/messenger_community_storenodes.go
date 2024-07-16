@@ -51,6 +51,7 @@ func (m *Messenger) sendCommunityPublicStorenodesInfo(community *communities.Com
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_STORENODES_INFO,
 		PubsubTopic:         community.PubsubTopic(),
+		Priority:            &common.HighPriority,
 	}
 
 	_, err = m.sender.SendPublic(context.Background(), community.IDString(), rawMessage)

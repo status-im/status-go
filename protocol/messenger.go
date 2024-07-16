@@ -1079,6 +1079,7 @@ func (m *Messenger) publishContactCode() error {
 		LocalChatID: contactCodeTopic,
 		MessageType: protobuf.ApplicationMetadataMessage_CONTACT_CODE_ADVERTISEMENT,
 		Payload:     payload,
+		Priority:    &common.LowPriority,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -1185,6 +1186,7 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		LocalChatID: chat.ID,
 		MessageType: protobuf.ApplicationMetadataMessage_CHAT_IDENTITY,
 		Payload:     payload,
+		Priority:    &common.LowPriority,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

@@ -2,6 +2,7 @@ package wakuv2
 
 import (
 	"container/heap"
+	"context"
 	"errors"
 
 	"go.uber.org/zap"
@@ -117,8 +118,6 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]b
 }
 
 func (w *Waku) handleEnvelopePriority() {
-	defer w.wg.Done()
-
 	if !w.cfg.UseThrottledPublish {
 		return
 	}
@@ -192,5 +191,40 @@ func (w *Waku) broadcast() {
 
 		w.wg.Add(1)
 		go w.publishEnvelope(envelope, fn, logger)
+	}
+}
+
+type publishFn = func(envelope *protocol.Envelope, logger *zap.Logger) error
+
+func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publishFn, logger *zap.Logger) {
+	defer w.wg.Done()
+
+	if w.cfg.UseThrottledPublish {
+		if err := w.limiter.Wait(w.ctx); err != nil {
+			if !errors.Is(err, context.Canceled) {
+				w.logger.Error("could not send message (limiter)", zap.Error(err))
+			}
+			w.SendEnvelopeEvent(common.EnvelopeEvent{
+				Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
+				Event: common.EventEnvelopeExpired,
+			})
+			return
+		}
+	}
+
+	if err := publishFn(envelope, logger); err != nil {
+		logger.Error("could not send message", zap.Error(err))
+		w.SendEnvelopeEvent(common.EnvelopeEvent{
+			Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
+			Event: common.EventEnvelopeExpired,
+		})
+		return
+	} else {
+		if !w.cfg.EnableStoreConfirmationForMessagesSent {
+			w.SendEnvelopeEvent(common.EnvelopeEvent{
+				Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
+				Event: common.EventEnvelopeSent,
+			})
+		}
 	}
 }

@@ -142,6 +142,7 @@ func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) err
 		CommunityID:         org.ID(),
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
 		PubsubTopic:         org.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		Priority:            &common.HighPriority,
 	}
 	if org.Encrypted() {
 		members := org.GetMemberPubkeys()
@@ -180,6 +181,7 @@ func (m *Messenger) publishCommunityEvents(community *communities.Community, msg
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE,
 		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		Priority:            &common.LowPriority,
 	}
 
 	// TODO: resend in case of failure?
@@ -775,6 +777,7 @@ func (m *Messenger) publishGroupGrantMessage(community *communities.Community, t
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_UPDATE_GRANT,
 		PubsubTopic:         community.PubsubTopic(),
+		Priority:            &common.LowPriority,
 	}
 
 	_, err = m.sender.SendPublic(context.Background(), community.IDString(), rawMessage)
@@ -1507,6 +1510,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
 		PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
+		Priority:            &common.HighPriority,
 	}
 
 	_, err = m.SendMessageToControlNode(community, rawMessage)
@@ -1884,6 +1888,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
 		PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
 		ResendType:          common.ResendTypeRawMessage,
+		Priority:            &common.HighPriority,
 	}
 
 	_, err = m.SendMessageToControlNode(community, &rawMessage)
@@ -2031,6 +2036,7 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			ResendType:          common.ResendTypeRawMessage,
 			ResendMethod:        common.ResendMethodSendPrivate,
 			Recipients:          []*ecdsa.PublicKey{pk},
+			Priority:            &common.HighPriority,
 		}
 
 		if community.Encrypted() {
@@ -2224,6 +2230,7 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
 			PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in the community pubsub topic
 			ResendType:          common.ResendTypeRawMessage,
+			Priority:            &common.HighPriority,
 		}
 
 		_, err = m.SendMessageToControlNode(community, &rawMessage)
@@ -4225,6 +4232,7 @@ func (m *Messenger) dispatchMagnetlinkMessage(communityID string) error {
 		MessageType:          protobuf.ApplicationMetadataMessage_COMMUNITY_MESSAGE_ARCHIVE_MAGNETLINK,
 		SkipGroupMessageWrap: true,
 		PubsubTopic:          community.PubsubTopic(),
+		Priority:             &common.LowPriority,
 	}
 
 	_, err = m.sender.SendPublic(context.Background(), chatID, rawMessage)

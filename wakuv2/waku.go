@@ -31,6 +31,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/jellydator/ttlcache/v3"
@@ -256,15 +257,20 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 		onPeerStats:                     onPeerStats,
 		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
-		limiter:                         rate.NewLimiter(publishingLimiterRate, publishingLimiterBurst),
+		envelopePriorityQueue:           make(envelopePriorityQueue, 0),
+		envelopeToSendAvailable:         make(chan struct{}),
+		throttledPrioritySendQueue:      make(chan *envelopePriority, 1000),
+		sendQueue:                       make(chan *protocol.Envelope, 1000),
 	}
 
 	if cfg.UseThrottledPublish {
-		waku.envelopePriorityQueue = make(envelopePriorityQueue, 0)
-		waku.envelopeToSendAvailable = make(chan struct{}, 1000)
-		waku.throttledPrioritySendQueue = make(chan *envelopePriority, 1000)
-	} else {
-		waku.sendQueue = make(chan *protocol.Envelope, 1000)
+		if testing.Testing() {
+			// To avoid delaying the tests, we set up an infinite rate limiter, basically
+			// disabling the rate limit functionality
+			waku.limiter = rate.NewLimiter(rate.Inf, 0)
+		} else {
+			waku.limiter = rate.NewLimiter(publishingLimiterRate, publishingLimiterBurst)
+		}
 	}
 
 	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
@@ -1087,35 +1093,6 @@ func (w *Waku) SetStorePeerID(peerID peer.ID) {
 	w.storePeerID = peerID
 }
 
-type publishFn = func(envelope *protocol.Envelope, logger *zap.Logger) error
-
-func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publishFn, logger *zap.Logger) {
-	defer w.wg.Done()
-
-	if err := w.limiter.Wait(w.ctx); err != nil {
-		if !errors.Is(err, context.Canceled) {
-			w.logger.Error("could not send message (limiter)", zap.Error(err))
-		}
-		return
-	}
-
-	if err := publishFn(envelope, logger); err != nil {
-		logger.Error("could not send message", zap.Error(err))
-		w.SendEnvelopeEvent(common.EnvelopeEvent{
-			Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
-			Event: common.EventEnvelopeExpired,
-		})
-		return
-	} else {
-		if !w.cfg.EnableStoreConfirmationForMessagesSent {
-			w.SendEnvelopeEvent(common.EnvelopeEvent{
-				Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
-				Event: common.EventEnvelopeSent,
-			})
-		}
-	}
-}
-
 // ctx, peer, r.PubsubTopic, contentTopics, uint64(r.From), uint64(r.To), options, processEnvelopes
 func (w *Waku) messageHashBasedQuery(ctx context.Context, hashes []gethcommon.Hash, relayTime []uint32, pubsubTopic string) []gethcommon.Hash {
 	selectedPeer := w.storePeerID
@@ -1265,9 +1242,7 @@ func (w *Waku) Start() error {
 		}
 	}
 
-	w.wg.Add(3)
-
-	go w.handleEnvelopePriority()
+	w.wg.Add(2)
 
 	go func() {
 		defer w.wg.Done()
@@ -1347,6 +1322,8 @@ func (w *Waku) Start() error {
 	}
 
 	go w.broadcast()
+
+	go w.handleEnvelopePriority()
 
 	go w.checkIfMessagesStored()
 
