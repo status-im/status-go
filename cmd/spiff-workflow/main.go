@@ -291,6 +291,7 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.NetworkID = 1
 	nodeConfig.LogLevel = "DEBUG"
+	// FIXME: should be absolute path https://github.com/status-im/status-go/issues/5563
 	nodeConfig.DataDir = api.DefaultDataDir
 	nodeConfig.HTTPEnabled = true
 	nodeConfig.HTTPPort = 8545

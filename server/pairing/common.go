@@ -298,6 +298,7 @@ func setDefaultNodeConfig(c *params.NodeConfig) error {
 	c.LogFile = api.DefaultLogFile
 
 	c.Name = api.DefaultNodeName
+	// FIXME: should be absolute path https://github.com/status-im/status-go/issues/5563
 	c.DataDir = api.DefaultDataDir
 	c.KeycardPairingDataFile = api.DefaultKeycardPairingDataFile
 	c.Rendezvous = false

@@ -392,6 +392,7 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.NetworkID = 1
 	nodeConfig.LogLevel = "ERROR"
+	// FIXME: should be absolute path https://github.com/status-im/status-go/issues/5563
 	nodeConfig.DataDir = api.DefaultDataDir
 	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
 		Enabled: true,

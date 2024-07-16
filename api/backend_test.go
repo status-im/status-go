@@ -30,6 +30,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/node"
+	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
@@ -1503,6 +1504,55 @@ func TestSetFleet(t *testing.T) {
 	require.Equal(t, b.config.ClusterConfig.WakuNodes, params.DefaultWakuNodes(params.FleetShardsTest))
 
 	require.NoError(t, b.Logout())
+}
+
+func TestAddWakuNode(t *testing.T) {
+	// GIVEN - add custom waku node
+	utils.Init()
+	password := "some-password"
+	tmpdir := t.TempDir()
+
+	b := NewGethStatusBackend()
+	defer func() {
+		require.NoError(t, b.StopNode())
+	}()
+
+	createAccountRequest := &requests.CreateAccount{
+		DisplayName:        "some-display-name",
+		CustomizationColor: "#ffffff",
+		Password:           password,
+		RootDataDir:        tmpdir,
+		LogFilePath:        tmpdir + "/log",
+	}
+	newAccount, err := b.CreateAccountAndLogin(createAccountRequest)
+	require.NoError(t, err)
+
+	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(b.appDB)
+	require.NoError(t, err)
+	wakuNodesBeforeChanges := dbNodeConfig.ClusterConfig.WakuNodes
+
+	// WHEN - adding custom waku node
+	testWakuNodeEnrtree := "enrtree://ANEDLO25QVUGJOUTQFRYKWX6P4Z4GKVESBMHML7DZ6YK4LGS5FC5O@prod.wakuv2.nodes.status.im"
+	err = nodecfg.SaveNewWakuNode(b.appDB, testWakuNodeEnrtree)
+	require.NoError(t, err)
+
+	dbNodeConfig, err = nodecfg.GetNodeConfigFromDB(b.appDB)
+	require.NoError(t, err)
+	require.Contains(t, dbNodeConfig.ClusterConfig.WakuNodes, testWakuNodeEnrtree)
+
+	require.NoError(t, b.Logout())
+
+	// THEN - after relogin node is still there
+	loginAccountRequest := &requests.Login{
+		KeyUID:   newAccount.KeyUID,
+		Password: password,
+	}
+	require.NoError(t, b.LoginAccount(loginAccountRequest))
+
+	dbNodeConfig, err = nodecfg.GetNodeConfigFromDB(b.appDB)
+	require.NoError(t, err)
+	require.Len(t, dbNodeConfig.ClusterConfig.WakuNodes, len(wakuNodesBeforeChanges)+1)
+	require.Contains(t, dbNodeConfig.ClusterConfig.WakuNodes, testWakuNodeEnrtree)
 }
 
 func TestWalletConfigOnLoginAccount(t *testing.T) {

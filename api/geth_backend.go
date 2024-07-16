@@ -2016,7 +2016,7 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 			inputNodeCfg.ShhextConfig.InstallationID = conf.ShhextConfig.InstallationID
 		}
 
-		conf, err = b.OverwriteNodeConfigValues(conf, inputNodeCfg)
+		conf, err = b.OverwriteNodeConfigValues(inputNodeCfg, conf)
 		if err != nil {
 			return err
 		}
@@ -2029,8 +2029,26 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 	// What's cached is usually outdated so we overwrite it here.
 	conf.Version = params.Version
 	conf.RootDataDir = b.rootDataDir
-	conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
-	conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
+
+	// FIXME: should be consistent https://github.com/status-im/status-go/issues/5563
+	isAbsPathInside := func(path, root string) bool {
+		absRoot, err := filepath.Abs(root)
+		if err != nil {
+			return false
+		}
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return false
+		}
+		return strings.HasPrefix(absPath, absRoot)
+	}
+
+	if !isAbsPathInside(conf.DataDir, b.rootDataDir) {
+		conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
+	}
+	if !isAbsPathInside(conf.KeyStoreDir, b.rootDataDir) {
+		conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
+	}
 
 	if _, err = os.Stat(conf.RootDataDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(conf.RootDataDir, os.ModePerm); err != nil {
