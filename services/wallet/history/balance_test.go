@@ -471,6 +471,47 @@ func TestBalance_addEdgePoints(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "addToNonEmptyData",
+			fields: fields{
+				db: walletDB,
+			},
+			args: args{
+				chainID:       111,
+				currency:      "SNT",
+				addresses:     []common.Address{common.Address{1}},
+				fromTimestamp: 1,
+				toTimestamp:   2,
+				data: []*entry{
+					{
+						chainID:     111,
+						balance:     big.NewInt(2),
+						timestamp:   2,
+						block:       big.NewInt(2),
+						tokenSymbol: "SNT",
+						address:     common.Address{1},
+					},
+				},
+			},
+			wantRes: []*entry{
+				{
+					chainID:     111,
+					balance:     big.NewInt(0),
+					timestamp:   1,
+					tokenSymbol: "SNT",
+					address:     common.Address{1},
+				},
+				{
+					chainID:     111,
+					balance:     big.NewInt(2),
+					timestamp:   2,
+					block:       big.NewInt(2),
+					tokenSymbol: "SNT",
+					address:     common.Address{1},
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

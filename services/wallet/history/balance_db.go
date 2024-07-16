@@ -64,7 +64,7 @@ func (b *BalanceDB) add(entry *entry) error {
 }
 
 func (b *BalanceDB) getEntriesWithoutBalances(chainID uint64, address common.Address) (entries []*entry, err error) {
-	rows, err := b.db.Query("SELECT blk_number, tr.timestamp, token_address from transfers tr LEFT JOIN balance_history bh ON bh.block = tr.blk_number WHERE tr.network_id = ? AND tr.address = ? AND tr.type != 'erc721' AND bh.block IS NULL",
+	rows, err := b.db.Query("SELECT blk_number, tr.timestamp, token_address from transfers tr LEFT JOIN balance_history bh ON bh.block = tr.blk_number WHERE tr.network_id = ? AND tr.address = ? AND tr.type != 'erc721' AND tr.type !='erc1155' AND bh.block IS NULL",
 		chainID, address)
 	if err == sql.ErrNoRows {
 		return nil, nil

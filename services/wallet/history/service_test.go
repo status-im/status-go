@@ -226,18 +226,18 @@ func Test_entriesToDataPoints(t *testing.T) {
 					},
 					// Padding
 					{
-						chainID:   0,
-						balance:   big.NewInt(6),
+						chainID:   3,
+						balance:   big.NewInt(3),
 						timestamp: 2,
 					},
 					{
-						chainID:   0,
-						balance:   big.NewInt(6),
+						chainID:   3,
+						balance:   big.NewInt(3),
 						timestamp: 3,
 					},
 					{
-						chainID:   0,
-						balance:   big.NewInt(6),
+						chainID:   3,
+						balance:   big.NewInt(3),
 						timestamp: 4,
 					},
 					// Right edge - same timestamp
@@ -304,16 +304,36 @@ func Test_entriesToDataPoints(t *testing.T) {
 						timestamp: 2,
 						address:   common.Address{1},
 					},
+					// padding - duplicate last point, just update timestamp
+					{
+						chainID:   1,
+						balance:   big.NewInt(1),
+						timestamp: 3,
+						address:   common.Address{1},
+					},
+					{
+						chainID:   1,
+						balance:   big.NewInt(1),
+						timestamp: 4,
+						address:   common.Address{1},
+					},
+					{
+						chainID:   1,
+						balance:   big.NewInt(1),
+						timestamp: 5,
+						address:   common.Address{1},
+					},
+					// real points
 					{
 						chainID:   1,
 						balance:   big.NewInt(2),
-						timestamp: 3,
+						timestamp: 6,
 						address:   common.Address{2},
 					},
 					{
 						chainID:   1,
 						balance:   big.NewInt(4),
-						timestamp: 4,
+						timestamp: 7,
 						address:   common.Address{2},
 					},
 				},
@@ -327,13 +347,27 @@ func Test_entriesToDataPoints(t *testing.T) {
 					Balance:   (*hexutil.Big)(big.NewInt(12)),
 					Timestamp: 2,
 				},
+				// padding
 				{
-					Balance:   (*hexutil.Big)(big.NewInt(8)),
+					Balance:   (*hexutil.Big)(big.NewInt(12)),
 					Timestamp: 3,
 				},
 				{
-					Balance:   (*hexutil.Big)(big.NewInt(10)),
+					Balance:   (*hexutil.Big)(big.NewInt(12)),
 					Timestamp: 4,
+				},
+				{
+					Balance:   (*hexutil.Big)(big.NewInt(12)),
+					Timestamp: 5,
+				},
+				// real points
+				{
+					Balance:   (*hexutil.Big)(big.NewInt(8)),
+					Timestamp: 6,
+				},
+				{
+					Balance:   (*hexutil.Big)(big.NewInt(10)),
+					Timestamp: 7,
 				},
 			},
 			wantErr: false,
@@ -344,11 +378,11 @@ func Test_entriesToDataPoints(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := entriesToDataPoints(tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("entriesToDataPoints() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("entriesToDataPoints() name: %s, error = %v, wantErr = %v", tt.name, err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("entriesToDataPoints() = %v, want %v", got, tt.want)
+				t.Errorf("entriesToDataPoints() name: %s, got: %v, want: %v", tt.name, got, tt.want)
 			}
 		})
 	}

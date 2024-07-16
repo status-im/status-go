@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"reflect"
@@ -42,6 +43,10 @@ const (
 type ValuePoint struct {
 	Value     float64 `json:"value"`
 	Timestamp uint64  `json:"time"`
+}
+
+func (vp *ValuePoint) String() string {
+	return fmt.Sprintf("%d: %f", vp.Timestamp, vp.Value)
 }
 
 type Service struct {
@@ -136,14 +141,10 @@ func (s *Service) mergeChainsBalances(chainIDs []uint64, addresses []common.Addr
 		return allData[i].timestamp < allData[j].timestamp
 	})
 
-	log.Debug("Sorted balances", "len", len(allData))
-	for _, entry := range allData {
-		log.Debug("Sorted balances", "entry", entry)
-	}
-
 	// Add padding points to make chart look nice
+	numEdgePoints := 2 * len(chainIDs) // 2 edge points per chain
 	if len(allData) < minPointsForGraph {
-		allData, _ = addPaddingPoints(tokenSymbol, addresses, toTimestamp, allData, minPointsForGraph)
+		allData, _ = addPaddingPoints(tokenSymbol, addresses, toTimestamp, allData, minPointsForGraph+numEdgePoints)
 	}
 
 	return entriesToDataPoints(allData)
@@ -171,9 +172,6 @@ func entriesToDataPoints(data []*entry) ([]*DataPoint, error) {
 	updateBalanceMap := func(balanceMap map[AddressKey]*big.Int, entries []*entry) map[AddressKey]*big.Int {
 		// Update balance map for this timestamp
 		for _, entry := range entries {
-			if entry.chainID == 0 {
-				continue
-			}
 			key := AddressKey{
 				Address: entry.address,
 				ChainID: entry.chainID,
@@ -433,7 +431,7 @@ func (s *Service) addEntriesToDB(ctx context.Context, client chain.ClientInterfa
 
 			if balance == nil {
 				balance, err = client.BalanceAt(ctx, common.Address(address), entry.block)
-				if balance == nil {
+				if err != nil {
 					log.Error("Error getting balance", "chainID", network.ChainID, "address", address.String(), "err", err, "unwrapped", errors.Unwrap(err))
 					return err
 				}
@@ -546,17 +544,10 @@ func transfersToEntries(address common.Address, block *big.Int, transfers []tran
 	entries := make([]*entry, 0)
 
 	for _, transfer := range transfers {
-		if transfer.Address != address {
-			panic("Address mismatch") // coding error
-		}
-
-		if transfer.BlockNumber.Cmp(block) != 0 {
-			panic("Block number mismatch") // coding error
-		}
 		entry := &entry{
 			chainID:      transfer.NetworkID,
 			address:      transfer.Address,
-			tokenAddress: transfer.Receipt.ContractAddress,
+			tokenAddress: transfer.Log.Address,
 			block:        transfer.BlockNumber,
 			timestamp:    (int64)(transfer.Timestamp),
 		}
