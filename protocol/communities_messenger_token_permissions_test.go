@@ -20,6 +20,7 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -2314,3 +2315,111 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestDeleteChannelWithTokenPe
 	s.Require().Len(community.Chats(), 0)
 	s.Require().Len(community.TokenPermissions(), 0)
 }
+
+//func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityKeycardRequestToJoin() {
+//	const keycardMnemonic = "prefer warrior leader system metal road shuffle walk pupil retreat two travel"
+//	const password = "1234567890"
+//	const walletAddress = "0xAe1717034cAbac1c587ed5332DB2E7C1022aa848"
+//
+//	//s.accManager = NewGethManager()
+//
+//	accountManager := account.NewGethManager()
+//	info, err := accountManager.AccountsGenerator().ImportMnemonic(keycardMnemonic, "")
+//	s.Require().NoError(err)
+//
+//	backend, defers, err := setupWalletTest(t, password)
+//
+//	db, err := accounts.NewDB(backend.appDB)
+//
+//	err = db.SaveOrUpdateKeypair(&accounts.Keypair{
+//		KeyUID: keyUID,
+//		Name:   "private key keypair",
+//		Type:   accounts.KeypairTypeKey,
+//		Accounts: []*accounts.Account{
+//			&accounts.Account{
+//				Address: address,
+//				KeyUID:  keyUID,
+//			},
+//		},
+//	})
+//	s.Require().NoError(err)
+//
+//	privateKeyBytes, err := hexutil.Decode(info.PrivateKey)
+//	s.Require().NoError(err)
+//
+//	privateKey, err := crypto.ToECDSA(privateKeyBytes)
+//	s.Require().NoError(err)
+//
+//	//keycard := s.newMessengerWithKey(privateKey)
+//	//s.Require().NotNil(keycard)
+//
+//	keycard := newTestCommunitiesMessenger(&s.Suite, s.aliceWaku, testCommunitiesMessengerConfig{
+//		testMessengerConfig: testMessengerConfig{
+//			privateKey: privateKey,
+//			logger:     s.logger,
+//			extraOptions: []Option{
+//				WithAccountManager(accountManager),
+//			},
+//		},
+//		password:            password,
+//		walletAddresses:     []string{walletAddress},
+//		mockedBalances:      &s.mockedBalances,
+//		mockedCollectibles:  &s.mockedCollectibles,
+//		collectiblesService: s.collectiblesServiceMock,
+//	})
+//
+//	// Owner: create community
+//	community, _ := s.createCommunity()
+//	s.advertiseCommunityTo(community, keycard)
+//	//s.joinCommunity(community, s.owner, keycard)
+//
+//	// Join community
+//	request := &requests.RequestToJoinCommunity{
+//		CommunityID:       community.ID(),
+//		AddressesToReveal: []string{walletAddress},
+//		AirdropAddress:    walletAddress,
+//	}
+//	//joinCommunity(&s.Suite, community, s.owner, keycard, request, password)
+//
+//	//from joinCommunity:
+//	signingParams, err := keycard.GenerateJoiningCommunityRequestsForSigning(
+//		common.PubkeyToHex(&keycard.identity.PublicKey),
+//		community.ID(),
+//		request.AddressesToReveal)
+//
+//	s.Require().NoError(err)
+//
+//	var signatures = make([]string, len(signingParams))
+//
+//	for i := range signingParams {
+//		param := signingParams[i]
+//
+//		verifiedAccount, err := accountManager.GetVerifiedWalletAccount(keycard.settings, param.Address, param.Password)
+//		s.Require().NoError(err)
+//
+//		signature, err := accountManager.Sign(param, verifiedAccount)
+//		s.Require().NoError(err)
+//
+//		signatures[i] = types.EncodeHex(signature)
+//		signingParams[i].Password = password
+//	}
+//	//signatures, err := keycard.SignData(signingParams)
+//	//s.Require().NoError(err)
+//
+//	updateAddresses := len(request.AddressesToReveal) == 0
+//	if updateAddresses {
+//		request.AddressesToReveal = make([]string, len(signingParams))
+//	}
+//	for i := range signingParams {
+//		request.AddressesToReveal[i] = signingParams[i].Address
+//		request.Signatures = append(request.Signatures, types.FromHex(signatures[i]))
+//	}
+//	if updateAddresses {
+//		request.AirdropAddress = request.AddressesToReveal[0]
+//	}
+//
+//	s.logger.Info("<<< request to join ready",
+//		zap.Any("signingParams", signingParams),
+//		zap.Any("request", request),
+//	)
+//}
