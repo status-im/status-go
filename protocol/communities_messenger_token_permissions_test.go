@@ -200,9 +200,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, waku types.Waku, name string, extraOptions []Option) *Messenger {
-	communityManagerOptions := []communities.ManagerOption{
-		communities.WithAllowForcingCommunityMembersReevaluation(true),
-	}
+	communityManagerOptions := []communities.ManagerOption{}
 	extraOptions = append(extraOptions, WithCommunityManagerOptions(communityManagerOptions))
 
 	return newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
@@ -1970,7 +1968,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissi
 	// force owner to reevaluate channel members
 	// in production it will happen automatically, by periodic check
 	start := time.Now()
-	_, _, err = s.owner.communitiesManager.ReevaluateMembers(community.ID())
+	err = s.owner.communitiesManager.ForceMembersReevaluation(community.ID())
 	s.Require().NoError(err)
 
 	elapsed := time.Since(start)

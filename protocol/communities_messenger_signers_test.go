@@ -98,9 +98,7 @@ func (s *MessengerCommunitiesSignersSuite) TearDownTest() {
 }
 
 func (s *MessengerCommunitiesSignersSuite) newMessenger(password string, walletAddresses []string) *Messenger {
-	communityManagerOptions := []communities.ManagerOption{
-		communities.WithAllowForcingCommunityMembersReevaluation(true),
-	}
+	communityManagerOptions := []communities.ManagerOption{}
 
 	return newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
