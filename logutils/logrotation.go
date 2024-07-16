@@ -1,6 +1,8 @@
 package logutils
 
 import (
+	"log/slog"
+
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -19,12 +21,12 @@ type FileOptions struct {
 }
 
 // FileHandlerWithRotation instantiates log.Handler with a configured rotation
-func FileHandlerWithRotation(opts FileOptions, format log.Format) log.Handler {
+func FileHandlerWithRotation(opts FileOptions, terminal bool) slog.Handler {
 	logger := &lumberjack.Logger{
 		Filename:   opts.Filename,
 		MaxSize:    opts.MaxSize,
 		MaxBackups: opts.MaxBackups,
 		Compress:   opts.Compress,
 	}
-	return log.StreamHandler(logger, format)
+	return log.NewTerminalHandler(logger, terminal)
 }

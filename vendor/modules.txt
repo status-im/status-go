@@ -334,7 +334,7 @@ github.com/elastic/gosigar/sys/windows
 # github.com/ethereum/c-kzg-4844 v1.0.0
 ## explicit; go 1.19
 github.com/ethereum/c-kzg-4844/bindings/go
-# github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v0.0.0-20240313123658-2e7d027a10f8
+# github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.12.1-0.20240716143414-62aea0233d47
 ## explicit; go 1.20
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
@@ -1380,9 +1380,6 @@ golang.org/x/exp/constraints
 golang.org/x/exp/maps
 golang.org/x/exp/rand
 golang.org/x/exp/slices
-golang.org/x/exp/slog
-golang.org/x/exp/slog/internal
-golang.org/x/exp/slog/internal/buffer
 # golang.org/x/image v0.0.0-20210220032944-ac19c3e999fb
 ## explicit; go 1.12
 golang.org/x/image/bmp
