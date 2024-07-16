@@ -72,82 +72,73 @@ func (b *Balance) get(ctx context.Context, chainID uint64, currency string, addr
 func (b *Balance) addEdgePoints(chainID uint64, currency string, addresses []common.Address, fromTimestamp, toTimestamp uint64, data []*entry) (res []*entry, err error) {
 	log.Debug("Adding edge points", "chainID", chainID, "currency", currency, "address", addresses, "fromTimestamp", fromTimestamp)
 
+	if len(addresses) == 0 {
+		return nil, errors.New("addresses must not be empty")
+	}
+
 	res = data
 
-	for _, address := range addresses {
-		var firstEntry *entry
+	var firstEntry *entry
 
-		if len(data) > 0 {
-			for _, entry := range data {
-				if entry.address == address {
-					firstEntry = entry
-					break
-				}
-			}
+	if len(data) > 0 {
+		firstEntry = data[0]
+	} else {
+		firstEntry = &entry{
+			chainID:     chainID,
+			address:     addresses[0],
+			tokenSymbol: currency,
+			timestamp:   int64(fromTimestamp),
 		}
-		if firstEntry == nil {
-			firstEntry = &entry{
+	}
+
+	previous, err := b.db.getEntryPreviousTo(firstEntry)
+	if err != nil {
+		return nil, err
+	}
+
+	firstTimestamp, lastTimestamp := timestampBoundaries(fromTimestamp, toTimestamp, data)
+
+	if previous != nil {
+		previous.timestamp = int64(firstTimestamp) // We might need to use another minimal offset respecting the time interval
+		previous.block = nil
+		res = append([]*entry{previous}, res...)
+	} else {
+		// Add a zero point at the beginning to draw a line from
+		res = append([]*entry{
+			{
 				chainID:     chainID,
-				address:     address,
+				address:     addresses[0],
 				tokenSymbol: currency,
-				timestamp:   int64(fromTimestamp),
-			}
-		}
+				timestamp:   int64(firstTimestamp),
+				balance:     big.NewInt(0),
+			},
+		}, res...)
+	}
 
-		previous, err := b.db.getEntryPreviousTo(firstEntry)
-		if err != nil {
-			return nil, err
-		}
-
-		firstTimestamp, lastTimestamp := timestampBoundaries(fromTimestamp, toTimestamp, address, data)
-
-		if previous != nil {
-			previous.timestamp = int64(firstTimestamp) // We might need to use another minimal offset respecting the time interval
-			previous.block = nil
-			res = append([]*entry{previous}, res...)
-		} else {
-			// Add a zero point at the beginning to draw a line from
-			res = append([]*entry{
-				{
-					chainID:     chainID,
-					address:     address,
-					tokenSymbol: currency,
-					timestamp:   int64(firstTimestamp),
-					balance:     big.NewInt(0),
-				},
-			}, res...)
-		}
-
-		if res[len(res)-1].timestamp < int64(lastTimestamp) {
-			// Add a last point to draw a line to
-			res = append(res, &entry{
-				chainID:     chainID,
-				address:     address,
-				tokenSymbol: currency,
-				timestamp:   int64(lastTimestamp),
-				balance:     res[len(res)-1].balance,
-			})
-		}
+	lastPoint := res[len(res)-1]
+	if lastPoint.timestamp < int64(lastTimestamp) {
+		// Add a last point to draw a line to
+		res = append(res, &entry{
+			chainID:     chainID,
+			address:     lastPoint.address,
+			tokenSymbol: currency,
+			timestamp:   int64(lastTimestamp),
+			balance:     lastPoint.balance,
+		})
 	}
 
 	return res, nil
 }
 
-func timestampBoundaries(fromTimestamp, toTimestamp uint64, address common.Address, data []*entry) (firstTimestamp, lastTimestamp uint64) {
+func timestampBoundaries(fromTimestamp, toTimestamp uint64, data []*entry) (firstTimestamp, lastTimestamp uint64) {
 	firstTimestamp = fromTimestamp
 	if fromTimestamp == 0 {
 		if len(data) > 0 {
-			for _, entry := range data {
-				if entry.address == address {
-					if entry.timestamp == 0 {
-						panic("data[0].timestamp must never be 0")
-					}
-					firstTimestamp = uint64(entry.timestamp) - 1
-					break
-				}
+			if data[0].timestamp == 0 {
+				panic("data[0].timestamp must never be 0")
 			}
-		}
-		if firstTimestamp == fromTimestamp {
+			firstTimestamp = uint64(data[0].timestamp) - 1
+		} else {
 			firstTimestamp = genesisTimestamp
 		}
 	}
@@ -197,6 +188,7 @@ func addPaddingPoints(currency string, addresses []common.Address, toTimestamp u
 				tokenSymbol: currency,
 				timestamp:   paddingTimestamp,
 				balance:     data[j-1].balance, // take the previous balance
+				chainID:     data[j-1].chainID,
 			}
 			res[index] = entry
 

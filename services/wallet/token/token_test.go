@@ -296,7 +296,7 @@ func TestGetTokenHistoricalBalance(t *testing.T) {
 
 	// Test multiple values. Must return the most recent one
 	historyBalance.SetInt64(int64(100))
-	_, err = manager.db.Exec("INSERT INTO balance_history (currency, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", testSymbol, chainID, account, timestamp-200, (*bigint.SQLBigIntBytes)(historyBalance), block)
+	_, err = manager.db.Exec("INSERT INTO balance_history (currency, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", testSymbol, chainID, account, timestamp-200, (*bigint.SQLBigIntBytes)(historyBalance), block+1)
 	require.NoError(t, err)
 
 	historyBalance.SetInt64(int64(50))
@@ -306,7 +306,7 @@ func TestGetTokenHistoricalBalance(t *testing.T) {
 
 	historyBalance.SetInt64(int64(50))
 	chainID = uint64(2)
-	_, err = manager.db.Exec("INSERT INTO balance_history (currency, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", testSymbol, chainID, account, timestamp-1, (*bigint.SQLBigIntBytes)(historyBalance), block)
+	_, err = manager.db.Exec("INSERT INTO balance_history (currency, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", testSymbol, chainID, account, timestamp-1, (*bigint.SQLBigIntBytes)(historyBalance), block+2)
 	require.NoError(t, err)
 
 	chainID = uint64(1)
