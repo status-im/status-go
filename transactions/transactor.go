@@ -334,7 +334,7 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 	newNonce := hexutil.Uint64(nonce)
 	newGas := hexutil.Uint64(gas)
 	validatedArgs.Nonce = &newNonce
-	if args.IsDynamicFeeTx() {
+	if !args.IsDynamicFeeTx() {
 		validatedArgs.GasPrice = (*hexutil.Big)(gasPrice)
 	} else {
 		validatedArgs.MaxPriorityFeePerGas = (*hexutil.Big)(gasTipCap)
