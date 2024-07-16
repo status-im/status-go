@@ -91,14 +91,14 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 
 		switch evt.Type {
 		case signal.EventConnectorSendRequestAccounts:
-			var ev signal.ConnectorSendRequestAccounts
+			var ev signal.ConnectorSendRequestAccountsSignal
 			err := json.Unmarshal(evt.Event, &ev)
 			assert.NoError(t, err)
 
-			err = clientHandler.RequestAccountsFinished(RequestAccountsFinishedArgs{
-				Account: accountAddress,
-				ChainID: walletCommon.EthereumMainnet,
-				Error:   nil,
+			err = clientHandler.RequestAccountsAccepted(RequestAccountsAcceptedArgs{
+				RequestID: ev.RequestID,
+				Account:   accountAddress,
+				ChainID:   walletCommon.EthereumMainnet,
 			})
 			assert.NoError(t, err)
 		}
@@ -115,7 +115,7 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 	assert.Equal(t, accountAddress, result.Accounts[0])
 
 	// Check dApp in the database
-	dApp, err := persistence.SelectDAppByUrl(db, request.Origin)
+	dApp, err := persistence.SelectDAppByUrl(db, request.DAppUrl)
 	assert.NoError(t, err)
 	assert.Equal(t, request.DAppName, dApp.Name)
 	assert.Equal(t, request.DAppIconUrl, dApp.IconURL)

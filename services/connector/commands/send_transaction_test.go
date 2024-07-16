@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-func prepareSendTransactionRequest(dApp DAppData, from types.Address) (RPCRequest, error) {
+func prepareSendTransactionRequest(dApp signal.ConnectorDApp, from types.Address) (RPCRequest, error) {
 	sendArgs := transactions.SendTxArgs{
 		From:  from,
 		To:    &types.Address{0x02},
@@ -122,9 +122,8 @@ func TestSendTransactionWithSignalSucceed(t *testing.T) {
 			err := json.Unmarshal(evt.Event, &ev)
 			assert.NoError(t, err)
 
-			err = clientHandler.SendTransactionFinished(SendTransactionFinishedArgs{
-				Hash:  fakedTransactionHash,
-				Error: nil,
+			err = clientHandler.SendTransactionAccepted(SendTransactionAcceptedArgs{
+				Hash: fakedTransactionHash,
 			})
 			assert.NoError(t, err)
 		}

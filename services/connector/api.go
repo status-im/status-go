@@ -59,10 +59,18 @@ func (api *API) RecallDAppPermission(origin string) error {
 	return persistence.DeleteDApp(api.s.db, origin)
 }
 
-func (api *API) SendTransactionFinished(args commands.SendTransactionFinishedArgs) error {
-	return api.c.SendTransactionFinished(args)
+func (api *API) RequestAccountsAccepted(args commands.RequestAccountsAcceptedArgs) error {
+	return api.c.RequestAccountsAccepted(args)
 }
 
-func (api *API) RequestAccountsFinished(args commands.RequestAccountsFinishedArgs) error {
-	return api.c.RequestAccountsFinished(args)
+func (api *API) RequestAccountsRejected(args commands.RejectedArgs) error {
+	return api.c.RequestAccountsRejected(args)
+}
+
+func (api *API) SendTransactionAccepted(args commands.SendTransactionAcceptedArgs) error {
+	return api.c.SendTransactionAccepted(args)
+}
+
+func (api *API) SendTransactionRejected(args commands.RejectedArgs) error {
+	return api.c.SendTransactionRejected(args)
 }

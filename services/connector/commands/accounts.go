@@ -34,9 +34,8 @@ func (c *AccountsCommand) Execute(request RPCRequest) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dAppData := request.GetDAppData()
 
-	dApp, err := persistence.SelectDAppByUrl(c.Db, dAppData.Origin)
+	dApp, err := persistence.SelectDAppByUrl(c.Db, request.DAppUrl)
 	if err != nil {
 		return "", err
 	}

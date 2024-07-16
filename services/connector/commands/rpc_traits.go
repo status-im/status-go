@@ -7,6 +7,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -22,7 +23,7 @@ type RPCRequest struct {
 	ID          int           `json:"id"`
 	Method      string        `json:"method"`
 	Params      []interface{} `json:"params"`
-	Origin      string        `json:"origin"`
+	DAppUrl     string        `json:"dAppUrl"`
 	DAppName    string        `json:"dAppName"`
 	DAppIconUrl string        `json:"dAppIconUrl"`
 }
@@ -31,29 +32,29 @@ type RPCCommand interface {
 	Execute(request RPCRequest) (string, error)
 }
 
-type DAppData struct {
-	Origin  string `json:"origin"`
-	Name    string `json:"name"`
-	IconUrl string `json:"iconUrl"`
+type RequestAccountsAcceptedArgs struct {
+	RequestID string        `json:"requestId"`
+	Account   types.Address `json:"account"`
+	ChainID   uint64        `json:"chainId"`
 }
 
-type RequestAccountsFinishedArgs struct {
-	Account types.Address `json:"account"`
-	ChainID uint64        `json:"chainId"`
-	Error   *error        `json:"error"`
+type SendTransactionAcceptedArgs struct {
+	RequestID string     `json:"requestId"`
+	Hash      types.Hash `json:"hash"`
 }
 
-type SendTransactionFinishedArgs struct {
-	Hash  types.Hash `json:"hash"`
-	Error *error     `json:"error"`
+type RejectedArgs struct {
+	RequestID string `json:"requestId"`
 }
 
 type ClientSideHandlerInterface interface {
-	RequestShareAccountForDApp(dApp DAppData, chainIDs []uint64) (types.Address, uint64, error)
-	RequestSendTransaction(dApp DAppData, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error)
+	RequestShareAccountForDApp(dApp signal.ConnectorDApp) (types.Address, uint64, error)
+	RequestSendTransaction(dApp signal.ConnectorDApp, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error)
 
-	RequestAccountsFinished(args RequestAccountsFinishedArgs) error
-	SendTransactionFinished(args SendTransactionFinishedArgs) error
+	RequestAccountsAccepted(args RequestAccountsAcceptedArgs) error
+	RequestAccountsRejected(args RejectedArgs) error
+	SendTransactionAccepted(args SendTransactionAcceptedArgs) error
+	SendTransactionRejected(args RejectedArgs) error
 }
 
 type NetworkManagerInterface interface {
@@ -75,16 +76,8 @@ func RPCRequestFromJSON(inputJSON string) (RPCRequest, error) {
 }
 
 func (r *RPCRequest) Validate() error {
-	if r.Origin == "" || r.DAppName == "" {
+	if r.DAppUrl == "" || r.DAppName == "" {
 		return ErrRequestMissingDAppData
 	}
 	return nil
-}
-
-func (r *RPCRequest) GetDAppData() DAppData {
-	return DAppData{
-		Origin:  r.Origin,
-		Name:    r.DAppName,
-		IconUrl: r.DAppIconUrl,
-	}
 }

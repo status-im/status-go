@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	persistence "github.com/status-im/status-go/services/connector/database"
+	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -49,9 +50,8 @@ func (c *SendTransactionCommand) Execute(request RPCRequest) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dAppData := request.GetDAppData()
 
-	dApp, err := persistence.SelectDAppByUrl(c.Db, dAppData.Origin)
+	dApp, err := persistence.SelectDAppByUrl(c.Db, request.DAppUrl)
 	if err != nil {
 		return "", err
 	}
@@ -69,7 +69,11 @@ func (c *SendTransactionCommand) Execute(request RPCRequest) (string, error) {
 		return "", ErrParamsFromAddressIsNotShared
 	}
 
-	hash, err := c.ClientHandler.RequestSendTransaction(dAppData, dApp.ChainID, params)
+	hash, err := c.ClientHandler.RequestSendTransaction(signal.ConnectorDApp{
+		URL:     request.DAppUrl,
+		Name:    request.DAppName,
+		IconURL: request.DAppIconUrl,
+	}, dApp.ChainID, params)
 	if err != nil {
 		return "", err
 	}

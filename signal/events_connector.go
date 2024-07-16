@@ -9,32 +9,38 @@ const (
 	EventConnectorSendTransaction     = "connector.sendTransaction"
 )
 
-// ConnectorSendRequestAccounts is triggered when a request for accounts is sent.
-type ConnectorSendRequestAccounts struct {
-	DAppUrl     string `json:"dAppUrl"`
-	DAppName    string `json:"dAppName"`
-	DAppIconUrl string `json:"dAppIconUrl"`
+type ConnectorDApp struct {
+	URL     string `json:"url"`
+	Name    string `json:"name"`
+	IconURL string `json:"iconUrl"`
+}
+
+// ConnectorSendRequestAccountsSignal is triggered when a request for accounts is sent.
+type ConnectorSendRequestAccountsSignal struct {
+	ConnectorDApp
+	RequestID string `json:"requestID"`
 }
 
 // ConnectorSendTransactionSignal is triggered when a transaction is requested to be sent.
 type ConnectorSendTransactionSignal struct {
-	DAppUrl string `json:"dAppUrl"`
-	ChainID uint64 `json:"chainID"`
-	TxArgs  string `json:"txArgs"`
+	ConnectorDApp
+	RequestID string `json:"requestID"`
+	ChainID   uint64 `json:"chainID"`
+	TxArgs    string `json:"txArgs"`
 }
 
-func SendConnectorSendRequestAccounts(dAppUrl string, dAppName string, dAppIconUrl string) {
-	send(EventConnectorSendRequestAccounts, ConnectorSendRequestAccounts{
-		DAppUrl:     dAppUrl,
-		DAppName:    dAppName,
-		DAppIconUrl: dAppIconUrl,
+func SendConnectorSendRequestAccounts(dApp ConnectorDApp, requestID string) {
+	send(EventConnectorSendRequestAccounts, ConnectorSendRequestAccountsSignal{
+		ConnectorDApp: dApp,
+		RequestID:     requestID,
 	})
 }
 
-func SendConnectorSendTransaction(dAppUrl string, chainID uint64, txArgs string) {
+func SendConnectorSendTransaction(dApp ConnectorDApp, chainID uint64, txArgs string, requestID string) {
 	send(EventConnectorSendTransaction, ConnectorSendTransactionSignal{
-		DAppUrl: dAppUrl,
-		ChainID: chainID,
-		TxArgs:  hex.EncodeToString([]byte(txArgs)),
+		ConnectorDApp: dApp,
+		RequestID:     requestID,
+		ChainID:       chainID,
+		TxArgs:        hex.EncodeToString([]byte(txArgs)),
 	})
 }

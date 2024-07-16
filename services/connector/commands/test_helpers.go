@@ -10,14 +10,15 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	persistence "github.com/status-im/status-go/services/connector/database"
+	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
-var testDAppData = DAppData{
-	Origin:  "http://testDAppURL",
+var testDAppData = signal.ConnectorDApp{
+	URL:     "http://testDAppURL",
 	Name:    "testDAppName",
-	IconUrl: "http://testDAppIconUrl",
+	IconURL: "http://testDAppIconUrl",
 }
 
 type RPCClientMock struct {
@@ -57,19 +58,19 @@ func SetupTestDB(t *testing.T) (db *sql.DB, close func()) {
 	}
 }
 
-func PersistDAppData(db *sql.DB, dAppData DAppData, sharedAccount types.Address, chainID uint64) error {
-	dApp := persistence.DApp{
-		URL:           dAppData.Origin,
-		Name:          dAppData.Name,
-		IconURL:       dAppData.IconUrl,
+func PersistDAppData(db *sql.DB, dApp signal.ConnectorDApp, sharedAccount types.Address, chainID uint64) error {
+	dAppDb := persistence.DApp{
+		URL:           dApp.URL,
+		Name:          dApp.Name,
+		IconURL:       dApp.IconURL,
 		SharedAccount: sharedAccount,
 		ChainID:       chainID,
 	}
 
-	return persistence.UpsertDApp(db, &dApp)
+	return persistence.UpsertDApp(db, &dAppDb)
 }
 
-func ConstructRPCRequest(method string, params []interface{}, dAppData *DAppData) (RPCRequest, error) {
+func ConstructRPCRequest(method string, params []interface{}, dApp *signal.ConnectorDApp) (RPCRequest, error) {
 	request := RPCRequest{
 		JSONRPC: "2.0",
 		ID:      1,
@@ -77,10 +78,10 @@ func ConstructRPCRequest(method string, params []interface{}, dAppData *DAppData
 		Params:  params,
 	}
 
-	if dAppData != nil {
-		request.Origin = dAppData.Origin
-		request.DAppName = dAppData.Name
-		request.DAppIconUrl = dAppData.IconUrl
+	if dApp != nil {
+		request.DAppUrl = dApp.URL
+		request.DAppName = dApp.Name
+		request.DAppIconUrl = dApp.IconURL
 	}
 
 	return request, nil

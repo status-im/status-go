@@ -36,7 +36,7 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 	api := NewAPI(service)
 
 	// Try to request accounts without permission
-	request := "{\"method\":\"eth_accounts\",\"params\":[],\"origin\":\"http://testDAppURL123\",\"dAppName\":\"testDAppName\",\"dAppIconUrl\":\"http://testDAppIconUrl\"}"
+	request := "{\"method\":\"eth_accounts\",\"params\":[],\"dAppUrl\":\"http://testDAppURL123\",\"dAppName\":\"testDAppName\",\"dAppIconUrl\":\"http://testDAppIconUrl\"}"
 	response, err := api.CallRPC(request)
 	assert.Empty(t, response)
 	assert.Error(t, err)
@@ -52,14 +52,14 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 
 		switch evt.Type {
 		case signal.EventConnectorSendRequestAccounts:
-			var ev signal.ConnectorSendRequestAccounts
+			var ev signal.ConnectorSendRequestAccountsSignal
 			err := json.Unmarshal(evt.Event, &ev)
 			assert.NoError(t, err)
 
-			err = api.RequestAccountsFinished(commands.RequestAccountsFinishedArgs{
-				Account: accountAddress,
-				ChainID: 0x1,
-				Error:   nil,
+			err = api.RequestAccountsAccepted(commands.RequestAccountsAcceptedArgs{
+				RequestID: ev.RequestID,
+				Account:   accountAddress,
+				ChainID:   0x1,
 			})
 			assert.NoError(t, err)
 		case signal.EventConnectorSendTransaction:
@@ -67,16 +67,16 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 			err := json.Unmarshal(evt.Event, &ev)
 			assert.NoError(t, err)
 
-			err = api.SendTransactionFinished(commands.SendTransactionFinishedArgs{
-				Hash:  expectedHash,
-				Error: nil,
+			err = api.SendTransactionAccepted(commands.SendTransactionAcceptedArgs{
+				RequestID: ev.RequestID,
+				Hash:      expectedHash,
 			})
 			assert.NoError(t, err)
 		}
 	}))
 
 	// Request accounts, now for real
-	request = "{\"method\": \"eth_requestAccounts\", \"params\": [], \"origin\": \"http://testDAppURL123\", \"dAppName\": \"testDAppName\", \"dAppIconUrl\": \"http://testDAppIconUrl\" }"
+	request = "{\"method\": \"eth_requestAccounts\", \"params\": [], \"dAppUrl\": \"http://testDAppURL123\", \"dAppName\": \"testDAppName\", \"dAppIconUrl\": \"http://testDAppIconUrl\" }"
 	expectedResponse := strings.ToLower(fmt.Sprintf(`{"accounts":["%s"]}`, accountAddress.Hex()))
 	response, err = api.CallRPC(request)
 	assert.NoError(t, err)
@@ -84,27 +84,27 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 
 	// Request to switch ethereum chain
 	expectedChainId := 0x5
-	request = fmt.Sprintf("{\"method\": \"wallet_switchEthereumChain\", \"params\": [%d], \"origin\": \"http://testDAppURL123\", \"dAppName\": \"testDAppName\", \"dAppIconUrl\": \"http://testDAppIconUrl\" }", expectedChainId)
+	request = fmt.Sprintf("{\"method\": \"wallet_switchEthereumChain\", \"params\": [%d], \"dAppUrl\": \"http://testDAppURL123\", \"dAppName\": \"testDAppName\", \"dAppIconUrl\": \"http://testDAppIconUrl\" }", expectedChainId)
 	expectedResponse = fmt.Sprintf(`%d`, expectedChainId)
 	response, err = api.CallRPC(request)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)
 
 	// Check if the chain was switched
-	request = "{\"method\": \"eth_chainId\", \"params\": [], \"origin\": \"http://testDAppURL123\", \"dAppName\": \"testDAppName\", \"dAppIconUrl\": \"http://testDAppIconUrl\" }"
+	request = "{\"method\": \"eth_chainId\", \"params\": [], \"dAppUrl\": \"http://testDAppURL123\", \"dAppName\": \"testDAppName\", \"dAppIconUrl\": \"http://testDAppIconUrl\" }"
 	response, err = api.CallRPC(request)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)
 
 	// Check the account after switching chain
-	request = "{\"method\": \"eth_accounts\", \"params\": [], \"origin\": \"http://testDAppURL123\", \"dAppName\": \"testDAppName\", \"dAppIconUrl\": \"http://testDAppIconUrl\" }"
+	request = "{\"method\": \"eth_accounts\", \"params\": [], \"dAppUrl\": \"http://testDAppURL123\", \"dAppName\": \"testDAppName\", \"dAppIconUrl\": \"http://testDAppIconUrl\" }"
 	expectedResponse = strings.ToLower(fmt.Sprintf(`{"accounts":["%s"]}`, accountAddress.Hex()))
 	response, err = api.CallRPC(request)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)
 
 	// Send transaction
-	request = fmt.Sprintf("{\"method\": \"eth_sendTransaction\", \"params\":[{\"from\":\"%s\",\"to\":\"0x0200000000000000000000000000000000000000\",\"gas\":null,\"gasPrice\":null,\"value\":\"0x0\",\"nonce\":null,\"maxFeePerGas\":null,\"maxPriorityFeePerGas\":null,\"input\":\"0x\",\"data\":\"0x307830\",\"MultiTransactionID\":0,\"Symbol\":\"\"}], \"origin\": \"http://testDAppURL123\", \"dAppName\": \"testDAppName\", \"dAppIconUrl\": \"http://testDAppIconUrl\" }", accountAddress.Hex())
+	request = fmt.Sprintf("{\"method\": \"eth_sendTransaction\", \"params\":[{\"from\":\"%s\",\"to\":\"0x0200000000000000000000000000000000000000\",\"gas\":null,\"gasPrice\":null,\"value\":\"0x0\",\"nonce\":null,\"maxFeePerGas\":null,\"maxPriorityFeePerGas\":null,\"input\":\"0x\",\"data\":\"0x307830\",\"MultiTransactionID\":0,\"Symbol\":\"\"}], \"dAppUrl\": \"http://testDAppURL123\", \"dAppName\": \"testDAppName\", \"dAppIconUrl\": \"http://testDAppIconUrl\" }", accountAddress.Hex())
 	expectedResponse = expectedHash.Hex()
 	response, err = api.CallRPC(request)
 	assert.NoError(t, err)

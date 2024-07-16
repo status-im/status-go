@@ -63,7 +63,6 @@ func (c *SwitchEthereumChainCommand) Execute(request RPCRequest) (string, error)
 	if err != nil {
 		return "", err
 	}
-	dAppData := request.GetDAppData()
 
 	requestedChainID, err := request.getChainID()
 	if err != nil {
@@ -79,7 +78,7 @@ func (c *SwitchEthereumChainCommand) Execute(request RPCRequest) (string, error)
 		return "", ErrUnsupportedNetwork
 	}
 
-	dApp, err := persistence.SelectDAppByUrl(c.Db, dAppData.Origin)
+	dApp, err := persistence.SelectDAppByUrl(c.Db, request.DAppUrl)
 	if err != nil {
 		return "", err
 	}
