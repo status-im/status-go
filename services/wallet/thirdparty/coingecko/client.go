@@ -172,7 +172,7 @@ func (c *Client) getTokens() (map[string][]GeckoToken, error) {
 	params.Add("include_platform", "true")
 
 	url := c.tokensURL
-	response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
+	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +216,7 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 	params.Add("vs_currencies", strings.Join(currencies, ","))
 
 	url := fmt.Sprintf("%ssimple/price", baseURL)
-	response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
+	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +281,7 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 	params.Add("price_change_percentage", "1h,24h")
 
 	url := fmt.Sprintf("%scoins/markets", baseURL)
-	response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
+	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +343,7 @@ func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limi
 	params.Add("days", "30")
 
 	url := fmt.Sprintf("%scoins/%s/market_chart", baseURL, id)
-	response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
+	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, nil)
 	if err != nil {
 		return nil, err
 	}

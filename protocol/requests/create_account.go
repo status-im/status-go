@@ -95,8 +95,6 @@ type WalletSecretsConfig struct {
 	RaribleMainnetAPIKey string `json:"raribleMainnetApiKey"`
 	RaribleTestnetAPIKey string `json:"raribleTestnetApiKey"`
 
-	// Testing
-	GanacheURL                  string `json:"ganacheURL"`
 	AlchemyEthereumMainnetToken string `json:"alchemyEthereumMainnetToken"`
 	AlchemyEthereumGoerliToken  string `json:"alchemyEthereumGoerliToken"`
 	AlchemyEthereumSepoliaToken string `json:"alchemyEthereumSepoliaToken"`
@@ -106,6 +104,11 @@ type WalletSecretsConfig struct {
 	AlchemyOptimismMainnetToken string `json:"alchemyOptimismMainnetToken"`
 	AlchemyOptimismGoerliToken  string `json:"alchemyOptimismGoerliToken"`
 	AlchemyOptimismSepoliaToken string `json:"alchemyOptimismSepoliaToken"`
+	StatusProxyMarketUser       string `json:"statusProxyMarketUser"`
+	StatusProxyMarketPassword   string `json:"statusProxyMarketPassword"`
+
+	// Testing
+	GanacheURL string `json:"ganacheURL"`
 }
 
 func (c *CreateAccount) Validate(validation *CreateAccountValidation) error {

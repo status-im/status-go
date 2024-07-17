@@ -551,14 +551,16 @@ type Network struct {
 
 // WalletConfig extra configuration for wallet.Service.
 type WalletConfig struct {
-	Enabled              bool
-	OpenseaAPIKey        string            `json:"OpenseaAPIKey"`
-	RaribleMainnetAPIKey string            `json:"RaribleMainnetAPIKey"`
-	RaribleTestnetAPIKey string            `json:"RaribleTestnetAPIKey"`
-	AlchemyAPIKeys       map[uint64]string `json:"AlchemyAPIKeys"`
-	InfuraAPIKey         string            `json:"InfuraAPIKey"`
-	InfuraAPIKeySecret   string            `json:"InfuraAPIKeySecret"`
-	EnableCelerBridge    bool              `json:"EnableCelerBridge"`
+	Enabled                   bool
+	OpenseaAPIKey             string            `json:"OpenseaAPIKey"`
+	RaribleMainnetAPIKey      string            `json:"RaribleMainnetAPIKey"`
+	RaribleTestnetAPIKey      string            `json:"RaribleTestnetAPIKey"`
+	AlchemyAPIKeys            map[uint64]string `json:"AlchemyAPIKeys"`
+	InfuraAPIKey              string            `json:"InfuraAPIKey"`
+	InfuraAPIKeySecret        string            `json:"InfuraAPIKeySecret"`
+	StatusProxyMarketUser     string            `json:"StatusProxyMarketUser"`
+	StatusProxyMarketPassword string            `json:"StatusProxyMarketPassword"`
+	EnableCelerBridge         bool              `json:"EnableCelerBridge"`
 }
 
 // LocalNotificationsConfig extra configuration for localnotifications.Service.
