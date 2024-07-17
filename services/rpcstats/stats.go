@@ -11,8 +11,12 @@ type RPCUsageStats struct {
 }
 
 var stats *RPCUsageStats
+var mu sync.Mutex
 
 func getInstance() *RPCUsageStats {
+	mu.Lock()
+	defer mu.Unlock()
+
 	if stats == nil {
 		stats = &RPCUsageStats{}
 		stats.counterPerMethod = &sync.Map{}
