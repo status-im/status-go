@@ -111,6 +111,7 @@ type MultiTransactionCommand struct {
 	FromAsset   string               `json:"fromAsset"`
 	ToAsset     string               `json:"toAsset"`
 	FromAmount  *hexutil.Big         `json:"fromAmount"`
+	ToAmount    *hexutil.Big         `json:"toAmount"`
 	Type        MultiTransactionType `json:"type"`
 }
 

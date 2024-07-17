@@ -102,6 +102,10 @@ func addSignaturesToTransactions(transactions map[common.Hash]*TransactionDescri
 }
 
 func multiTransactionFromCommand(command *MultiTransactionCommand) *MultiTransaction {
+	toAmount := new(hexutil.Big)
+	if command.ToAmount != nil {
+		toAmount = command.ToAmount
+	}
 	multiTransaction := NewMultiTransaction(
 		/* Timestamp:     */ uint64(time.Now().Unix()),
 		/* FromNetworkID: */ 0,
@@ -113,7 +117,7 @@ func multiTransactionFromCommand(command *MultiTransactionCommand) *MultiTransac
 		/* FromAsset:     */ command.FromAsset,
 		/* ToAsset:       */ command.ToAsset,
 		/* FromAmount:    */ command.FromAmount,
-		/* ToAmount:      */ new(hexutil.Big),
+		/* ToAmount:      */ toAmount,
 		/* Type:		  */ command.Type,
 		/* CrossTxID:	  */ "",
 	)

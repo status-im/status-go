@@ -39,8 +39,12 @@ func (tm *TransactionManager) CreateMultiTransactionFromCommand(command *MultiTr
 
 	multiTransaction := multiTransactionFromCommand(command)
 
-	if multiTransaction.Type == MultiTransactionSend && multiTransaction.FromNetworkID == 0 && len(data) == 1 {
-		multiTransaction.FromNetworkID = data[0].ChainID
+	// Set network for single chain transactions
+	switch multiTransaction.Type {
+	case MultiTransactionSend, MultiTransactionApprove, MultiTransactionSwap:
+		if multiTransaction.FromNetworkID == wallet_common.UnknownChainID && len(data) == 1 {
+			multiTransaction.FromNetworkID = data[0].ChainID
+		}
 	}
 
 	return multiTransaction, nil
