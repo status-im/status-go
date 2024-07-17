@@ -25,7 +25,6 @@ func NewAPI(s *Service) *API {
 	r.Register("eth_requestAccounts", &commands.RequestAccountsCommand{
 		ClientHandler:   c,
 		AccountsCommand: commands.AccountsCommand{Db: s.db},
-		NetworkManager:  s.nm,
 	})
 
 	// Active chain per dapp management

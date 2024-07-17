@@ -79,9 +79,9 @@ func ConstructRPCRequest(method string, params []interface{}, dApp *signal.Conne
 	}
 
 	if dApp != nil {
-		request.DAppUrl = dApp.URL
-		request.DAppName = dApp.Name
-		request.DAppIconUrl = dApp.IconURL
+		request.URL = dApp.URL
+		request.Name = dApp.Name
+		request.IconURL = dApp.IconURL
 	}
 
 	return request, nil

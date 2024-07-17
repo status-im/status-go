@@ -15,8 +15,7 @@ var (
 )
 
 type RequestAccountsCommand struct {
-	NetworkManager NetworkManagerInterface
-	ClientHandler  ClientSideHandlerInterface
+	ClientHandler ClientSideHandlerInterface
 	AccountsCommand
 }
 
@@ -32,7 +31,7 @@ func (c *RequestAccountsCommand) Execute(request RPCRequest) (string, error) {
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDAppByUrl(c.Db, request.DAppUrl)
+	dApp, err := persistence.SelectDAppByUrl(c.Db, request.URL)
 	if err != nil {
 		return "", err
 	}
@@ -40,18 +39,18 @@ func (c *RequestAccountsCommand) Execute(request RPCRequest) (string, error) {
 	// FIXME: this may have a security issue in case some malicious software tries to fake the origin
 	if dApp == nil {
 		account, chainID, err := c.ClientHandler.RequestShareAccountForDApp(signal.ConnectorDApp{
-			URL:     request.DAppUrl,
-			Name:    request.DAppName,
-			IconURL: request.DAppIconUrl,
+			URL:     request.URL,
+			Name:    request.Name,
+			IconURL: request.IconURL,
 		})
 		if err != nil {
 			return "", err
 		}
 
 		dApp = &persistence.DApp{
-			URL:           request.DAppUrl,
-			Name:          request.DAppName,
-			IconURL:       request.DAppIconUrl,
+			URL:           request.URL,
+			Name:          request.Name,
+			IconURL:       request.IconURL,
 			SharedAccount: account,
 			ChainID:       chainID,
 		}

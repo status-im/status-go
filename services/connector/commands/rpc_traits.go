@@ -19,13 +19,13 @@ var (
 )
 
 type RPCRequest struct {
-	JSONRPC     string        `json:"jsonrpc"`
-	ID          int           `json:"id"`
-	Method      string        `json:"method"`
-	Params      []interface{} `json:"params"`
-	DAppUrl     string        `json:"dAppUrl"`
-	DAppName    string        `json:"dAppName"`
-	DAppIconUrl string        `json:"dAppIconUrl"`
+	JSONRPC string        `json:"jsonrpc"`
+	ID      int           `json:"id"`
+	Method  string        `json:"method"`
+	Params  []interface{} `json:"params"`
+	URL     string        `json:"url"`
+	Name    string        `json:"name"`
+	IconURL string        `json:"iconUrl"`
 }
 
 type RPCCommand interface {
@@ -76,7 +76,7 @@ func RPCRequestFromJSON(inputJSON string) (RPCRequest, error) {
 }
 
 func (r *RPCRequest) Validate() error {
-	if r.DAppUrl == "" || r.DAppName == "" {
+	if r.URL == "" || r.Name == "" {
 		return ErrRequestMissingDAppData
 	}
 	return nil

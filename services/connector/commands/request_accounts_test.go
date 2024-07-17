@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/params"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"
@@ -35,13 +34,9 @@ func TestRequestAccountsWithSignalTimeout(t *testing.T) {
 
 	clientHandler := NewClientSideHandler()
 
-	nm := NetworkManagerMock{}
-	nm.SetNetworks([]*params.Network{})
-
 	cmd := &RequestAccountsCommand{
 		ClientHandler:   clientHandler,
 		AccountsCommand: AccountsCommand{Db: db},
-		NetworkManager:  &nm,
 	}
 
 	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x01})
@@ -55,27 +50,14 @@ func TestRequestAccountsWithSignalTimeout(t *testing.T) {
 	WalletResponseMaxInterval = backupWalletResponseMaxInterval
 }
 
-func TestRequestAccountsTwoTimes(t *testing.T) {
+func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
 	db, close := SetupTestDB(t)
 	defer close()
-
-	nm := NetworkManagerMock{}
-	nm.SetNetworks([]*params.Network{
-		{
-			ChainID: walletCommon.OptimismMainnet,
-			Layer:   2,
-		},
-		{
-			ChainID: walletCommon.EthereumMainnet,
-			Layer:   1,
-		},
-	})
 
 	clientHandler := NewClientSideHandler()
 
 	cmd := &RequestAccountsCommand{
 		ClientHandler:   clientHandler,
-		NetworkManager:  &nm,
 		AccountsCommand: AccountsCommand{Db: db},
 	}
 
@@ -115,10 +97,10 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 	assert.Equal(t, accountAddress, result.Accounts[0])
 
 	// Check dApp in the database
-	dApp, err := persistence.SelectDAppByUrl(db, request.DAppUrl)
+	dApp, err := persistence.SelectDAppByUrl(db, request.URL)
 	assert.NoError(t, err)
-	assert.Equal(t, request.DAppName, dApp.Name)
-	assert.Equal(t, request.DAppIconUrl, dApp.IconURL)
+	assert.Equal(t, request.Name, dApp.Name)
+	assert.Equal(t, request.IconURL, dApp.IconURL)
 	assert.Equal(t, accountAddress, dApp.SharedAccount)
 	assert.Equal(t, walletCommon.EthereumMainnet, dApp.ChainID)
 
@@ -131,4 +113,41 @@ func TestRequestAccountsTwoTimes(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, result.Accounts, 1)
 	assert.Equal(t, accountAddress, result.Accounts[0])
+}
+
+func TestRequestAccountsRejected(t *testing.T) {
+	db, close := SetupTestDB(t)
+	defer close()
+
+	clientHandler := NewClientSideHandler()
+
+	cmd := &RequestAccountsCommand{
+		ClientHandler:   clientHandler,
+		AccountsCommand: AccountsCommand{Db: db},
+	}
+
+	request, err := ConstructRPCRequest("eth_requestAccounts", []interface{}{}, &testDAppData)
+	assert.NoError(t, err)
+
+	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+		var evt EventType
+		err := json.Unmarshal(s, &evt)
+		assert.NoError(t, err)
+
+		switch evt.Type {
+		case signal.EventConnectorSendRequestAccounts:
+			var ev signal.ConnectorSendRequestAccountsSignal
+			err := json.Unmarshal(evt.Event, &ev)
+			assert.NoError(t, err)
+
+			err = clientHandler.RequestAccountsRejected(RejectedArgs{
+				RequestID: ev.RequestID,
+			})
+			assert.NoError(t, err)
+		}
+	}))
+
+	_, err = cmd.Execute(request)
+	assert.Equal(t, ErrRequestAccountsRejectedByUser, err)
+
 }

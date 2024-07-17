@@ -1,9 +1,5 @@
 package signal
 
-import (
-	"encoding/hex"
-)
-
 const (
 	EventConnectorSendRequestAccounts = "connector.sendRequestAccounts"
 	EventConnectorSendTransaction     = "connector.sendTransaction"
@@ -18,14 +14,14 @@ type ConnectorDApp struct {
 // ConnectorSendRequestAccountsSignal is triggered when a request for accounts is sent.
 type ConnectorSendRequestAccountsSignal struct {
 	ConnectorDApp
-	RequestID string `json:"requestID"`
+	RequestID string `json:"requestId"`
 }
 
 // ConnectorSendTransactionSignal is triggered when a transaction is requested to be sent.
 type ConnectorSendTransactionSignal struct {
 	ConnectorDApp
-	RequestID string `json:"requestID"`
-	ChainID   uint64 `json:"chainID"`
+	RequestID string `json:"requestId"`
+	ChainID   uint64 `json:"chainId"`
 	TxArgs    string `json:"txArgs"`
 }
 
@@ -41,6 +37,6 @@ func SendConnectorSendTransaction(dApp ConnectorDApp, chainID uint64, txArgs str
 		ConnectorDApp: dApp,
 		RequestID:     requestID,
 		ChainID:       chainID,
-		TxArgs:        hex.EncodeToString([]byte(txArgs)),
+		TxArgs:        txArgs,
 	})
 }

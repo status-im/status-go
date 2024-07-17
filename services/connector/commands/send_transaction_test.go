@@ -92,7 +92,7 @@ func TestSendTransactionWithSignalTimout(t *testing.T) {
 	WalletResponseMaxInterval = backupWalletResponseMaxInterval
 }
 
-func TestSendTransactionWithSignalSucceed(t *testing.T) {
+func TestSendTransactionWithSignalAccepted(t *testing.T) {
 	db, close := SetupTestDB(t)
 	defer close()
 
@@ -123,7 +123,8 @@ func TestSendTransactionWithSignalSucceed(t *testing.T) {
 			assert.NoError(t, err)
 
 			err = clientHandler.SendTransactionAccepted(SendTransactionAcceptedArgs{
-				Hash: fakedTransactionHash,
+				Hash:      fakedTransactionHash,
+				RequestID: ev.RequestID,
 			})
 			assert.NoError(t, err)
 		}
@@ -132,4 +133,43 @@ func TestSendTransactionWithSignalSucceed(t *testing.T) {
 	response, err := cmd.Execute(request)
 	assert.NoError(t, err)
 	assert.Equal(t, response, fakedTransactionHash.String())
+}
+
+func TestSendTransactionWithSignalRejected(t *testing.T) {
+	db, close := SetupTestDB(t)
+	defer close()
+
+	clientHandler := NewClientSideHandler()
+
+	cmd := &SendTransactionCommand{
+		Db:            db,
+		ClientHandler: clientHandler,
+	}
+
+	err := PersistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
+	assert.NoError(t, err)
+
+	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x01})
+	assert.NoError(t, err)
+
+	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+		var evt EventType
+		err := json.Unmarshal(s, &evt)
+		assert.NoError(t, err)
+
+		switch evt.Type {
+		case signal.EventConnectorSendTransaction:
+			var ev signal.ConnectorSendTransactionSignal
+			err := json.Unmarshal(evt.Event, &ev)
+			assert.NoError(t, err)
+
+			err = clientHandler.SendTransactionRejected(RejectedArgs{
+				RequestID: ev.RequestID,
+			})
+			assert.NoError(t, err)
+		}
+	}))
+
+	_, err = cmd.Execute(request)
+	assert.Equal(t, ErrSendTransactionRejectedByUser, err)
 }

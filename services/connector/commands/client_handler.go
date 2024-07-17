@@ -1,8 +1,11 @@
 package commands
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -13,11 +16,12 @@ import (
 var (
 	WalletResponseMaxInterval = 20 * time.Minute
 
-	ErrWalletResponseTimeout         = fmt.Errorf("timeout waiting for wallet response")
-	ErrEmptyAccountsShared           = fmt.Errorf("empty accounts were shared by wallet")
-	ErrRequestAccountsRejectedByUser = fmt.Errorf("request accounts was rejected by user")
-	ErrSendTransactionRejectedByUser = fmt.Errorf("send transaction was rejected by user")
-	ErrEmptyRequestID                = fmt.Errorf("empty requestID")
+	ErrWalletResponseTimeout                  = fmt.Errorf("timeout waiting for wallet response")
+	ErrEmptyAccountsShared                    = fmt.Errorf("empty accounts were shared by wallet")
+	ErrRequestAccountsRejectedByUser          = fmt.Errorf("request accounts was rejected by user")
+	ErrSendTransactionRejectedByUser          = fmt.Errorf("send transaction was rejected by user")
+	ErrEmptyRequestID                         = fmt.Errorf("empty requestID")
+	ErrAnotherConnectorOperationIsAwaitingFor = fmt.Errorf("another connector operation is awaiting for user input")
 )
 
 type MessageType int
@@ -34,20 +38,37 @@ type Message struct {
 }
 
 type ClientSideHandler struct {
-	responseChannel chan Message
+	responseChannel  chan Message
+	isRequestRunning int32
 }
 
 func NewClientSideHandler() *ClientSideHandler {
 	return &ClientSideHandler{
-		responseChannel: make(chan Message, 1), // Buffer of 1 to avoid blocking
+		responseChannel:  make(chan Message, 1), // Buffer of 1 to avoid blocking
+		isRequestRunning: 0,
 	}
 }
 
 func (c *ClientSideHandler) generateRequestID(dApp signal.ConnectorDApp) string {
-	return fmt.Sprintf("%d%s", time.Now().UnixMilli(), dApp.URL)
+	rawID := fmt.Sprintf("%d%s", time.Now().UnixMilli(), dApp.URL)
+	hash := sha256.Sum256([]byte(rawID))
+	return hex.EncodeToString(hash[:])
+}
+
+func (c *ClientSideHandler) setRequestRunning() bool {
+	return atomic.CompareAndSwapInt32(&c.isRequestRunning, 0, 1)
+}
+
+func (c *ClientSideHandler) clearRequestRunning() {
+	atomic.StoreInt32(&c.isRequestRunning, 0)
 }
 
 func (c *ClientSideHandler) RequestShareAccountForDApp(dApp signal.ConnectorDApp) (types.Address, uint64, error) {
+	if !c.setRequestRunning() {
+		return types.Address{}, 0, ErrAnotherConnectorOperationIsAwaitingFor
+	}
+	defer c.clearRequestRunning()
+
 	requestID := c.generateRequestID(dApp)
 	signal.SendConnectorSendRequestAccounts(dApp, requestID)
 
@@ -75,6 +96,11 @@ func (c *ClientSideHandler) RequestShareAccountForDApp(dApp signal.ConnectorDApp
 }
 
 func (c *ClientSideHandler) RequestSendTransaction(dApp signal.ConnectorDApp, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error) {
+	if !c.setRequestRunning() {
+		return types.Hash{}, ErrAnotherConnectorOperationIsAwaitingFor
+	}
+	defer c.clearRequestRunning()
+
 	txArgsJson, err := json.Marshal(txArgs)
 	if err != nil {
 		return types.Hash{}, fmt.Errorf("failed to marshal txArgs: %v", err)

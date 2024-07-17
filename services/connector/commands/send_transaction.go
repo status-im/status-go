@@ -51,7 +51,7 @@ func (c *SendTransactionCommand) Execute(request RPCRequest) (string, error) {
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDAppByUrl(c.Db, request.DAppUrl)
+	dApp, err := persistence.SelectDAppByUrl(c.Db, request.URL)
 	if err != nil {
 		return "", err
 	}
@@ -70,9 +70,9 @@ func (c *SendTransactionCommand) Execute(request RPCRequest) (string, error) {
 	}
 
 	hash, err := c.ClientHandler.RequestSendTransaction(signal.ConnectorDApp{
-		URL:     request.DAppUrl,
-		Name:    request.DAppName,
-		IconURL: request.DAppIconUrl,
+		URL:     request.URL,
+		Name:    request.Name,
+		IconURL: request.IconURL,
 	}, dApp.ChainID, params)
 	if err != nil {
 		return "", err
