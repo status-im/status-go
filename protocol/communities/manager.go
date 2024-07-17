@@ -3079,12 +3079,20 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 				Signature: types.EncodeHex(revealedAccount.Signature),
 			}
 
-			matching, err := m.accountsManager.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
+			recoveredAddress, err := m.accountsManager.Recover(recoverParams)
 			if err != nil {
 				return nil, nil, err
 			}
 
+			//matching, err := m.accountsManager.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
+			//if err != nil {
+			//	return nil, nil, err
+			//}
+
+			matching := recoveredAddress == types.HexToAddress(revealedAccount.Address)
+
 			m.logger.Debug("<<< HandleCommunityRequestToJoin recover signature",
+				zap.String("recoveredAddress", recoveredAddress.String()),
 				zap.String("address", types.HexToAddress(revealedAccount.Address).String()),
 				zap.String("signature", types.EncodeHex(revealedAccount.Signature)),
 				zap.String("signer", types.EncodeHex(crypto.CompressPubkey(signer))),

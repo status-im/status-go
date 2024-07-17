@@ -13,17 +13,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-
 	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/google/uuid"
+	"github.com/status-im/status-go/extkeys"
+
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
@@ -82,6 +82,7 @@ type RecoverParams struct {
 type Manager interface {
 	GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*SelectedExtKey, error)
 	Sign(rpcParams SignParams, verifiedAccount *SelectedExtKey) (result types.HexBytes, err error)
+	Recover(rpcParams RecoverParams) (types.Address, error)
 	CanRecover(rpcParams RecoverParams, revealedAddress types.Address) (bool, error)
 	DeleteAccount(address types.Address) error
 }
@@ -733,6 +734,12 @@ func (m *DefaultManager) Recover(rpcParams RecoverParams) (addr types.Address, e
 
 func (m *DefaultManager) CanRecover(rpcParams RecoverParams, revealedAddress types.Address) (bool, error) {
 	recovered, err := m.Recover(rpcParams)
+	log.Info("<<< CanRecover",
+		"rpcParams", rpcParams,
+		"revealedAddress", revealedAddress,
+		"recovered", recovered,
+		"err", err,
+	)
 	if err != nil {
 		return false, err
 	}
