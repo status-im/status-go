@@ -333,3 +333,7 @@ func (w *GethWakuWrapper) ConfirmMessageDelivered(hashes []common.Hash) {
 
 func (w *GethWakuWrapper) SetStorePeerID(peerID peer.ID) {
 }
+
+func (w *GethWakuWrapper) PeerID() peer.ID {
+	return w.waku.PeerID()
+}

@@ -17,6 +17,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
@@ -359,8 +360,10 @@ func NewMessenger(
 
 	// Initialize transport layer.
 	var transp *transport.Transport
+	var peerId peer.ID
 
 	if waku, err := node.GetWaku(nil); err == nil && waku != nil {
+		peerId = waku.PeerID()
 		transp, err = transport.NewTransport(
 			waku,
 			identity,
@@ -379,6 +382,7 @@ func NewMessenger(
 		if err != nil || wakuV2 == nil {
 			return nil, errors.Wrap(err, "failed to find Whisper and Waku V1/V2 services")
 		}
+		peerId = wakuV2.PeerID()
 		transp, err = transport.NewTransport(
 			wakuV2,
 			identity,
@@ -552,7 +556,7 @@ func NewMessenger(
 
 	var telemetryClient *telemetry.Client
 	if c.telemetryServerURL != "" {
-		telemetryClient = telemetry.NewClient(logger, c.telemetryServerURL, c.account.KeyUID, nodeName, version)
+		telemetryClient = telemetry.NewClient(logger, c.telemetryServerURL, c.account.KeyUID, nodeName, peerId.String(), version)
 		if c.wakuService != nil {
 			c.wakuService.SetStatusTelemetryClient(telemetryClient)
 		}

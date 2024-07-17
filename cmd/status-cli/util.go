@@ -79,7 +79,8 @@ func start(p StartParams, logger *zap.SugaredLogger) (*StatusCLI, error) {
 		if err != nil {
 			return nil, err
 		}
-		telemetryClient := telemetry.NewClient(telemetryLogger, p.TelemetryURL, backend.SelectedAccountKeyID(), p.Name, "cli")
+		waku := backend.StatusNode().WakuService()
+		telemetryClient := telemetry.NewClient(telemetryLogger, p.TelemetryURL, backend.SelectedAccountKeyID(), p.Name, waku.PeerID().String(), "cli")
 		go telemetryClient.Start(context.Background())
 		backend.StatusNode().WakuV2Service().SetStatusTelemetryClient(telemetryClient)
 	}
