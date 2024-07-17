@@ -92,12 +92,13 @@ func (s *TransactorSuite) setupTransactionPoolAPI(args SendTxArgs, returnNonce, 
 		} else {
 			usedGasPrice = (*big.Int)(args.GasPrice)
 		}
-		if args.Gas == nil {
-			s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(testGas, nil)
-			usedGas = testGas
-		} else {
-			usedGas = *args.Gas
-		}
+	}
+
+	if args.Gas == nil {
+		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(testGas, nil)
+		usedGas = testGas
+	} else {
+		usedGas = *args.Gas
 	}
 	// Prepare the transaction and RLP encode it.
 	data := s.rlpEncodeTx(args, s.nodeConfig, account, &resultNonce, usedGas, usedGasPrice)
@@ -211,6 +212,114 @@ func (s *TransactorSuite) TestGasValues() {
 			s.False(reflect.DeepEqual(hash, common.Hash{}))
 		})
 	}
+}
+
+func (s *TransactorSuite) setupBuildTransactionMocks(args SendTxArgs, account *account.SelectedExtKey) {
+	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), gomock.Eq(common.Address(account.Address)), gethrpc.PendingBlockNumber).Return(&testNonce, nil)
+
+	if !args.IsDynamicFeeTx() && args.GasPrice == nil {
+		s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(testGasPrice, nil)
+	}
+
+	if args.Gas == nil {
+		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(testGas, nil)
+	}
+}
+
+func (s *TransactorSuite) TestBuildAndValidateTransaction() {
+	key, _ := gethcrypto.GenerateKey()
+	selectedAccount := &account.SelectedExtKey{
+		Address:    account.FromAddress(utils.TestConfig.Account1.WalletAddress),
+		AccountKey: &types.Key{PrivateKey: key},
+	}
+
+	chainID := s.nodeConfig.NetworkID
+	fromAddress := account.FromAddress(utils.TestConfig.Account1.WalletAddress)
+	toAddress := account.ToAddress(utils.TestConfig.Account2.WalletAddress)
+	value := (*hexutil.Big)(big.NewInt(10))
+
+	expectedGasPrice := (*big.Int)(testGasPrice)
+	expectedGas := uint64(testGas)
+	expectedNonce := uint64(testNonce)
+
+	s.T().Run("DynamicFeeTransaction", func(t *testing.T) {
+		s.SetupTest()
+
+		gas := hexutil.Uint64(21000)
+		args := SendTxArgs{
+			From:                 fromAddress,
+			To:                   toAddress,
+			Gas:                  &gas,
+			Value:                value,
+			MaxFeePerGas:         testGasPrice,
+			MaxPriorityFeePerGas: testGasPrice,
+		}
+		s.setupBuildTransactionMocks(args, selectedAccount)
+
+		tx, err := s.manager.ValidateAndBuildTransaction(chainID, args)
+		s.NoError(err)
+		s.Equal(tx.Gas(), uint64(gas), "The gas shouldn't be estimated, but should use the gas from the Tx")
+		s.Equal(tx.GasFeeCap(), expectedGasPrice, "The maxFeePerGas should be the same as in the original Tx")
+		s.Equal(tx.GasTipCap(), expectedGasPrice, "The maxPriorityFeePerGas should be the same as in the original Tx")
+		s.Equal(tx.Type(), uint8(gethtypes.DynamicFeeTxType), "The transaction type should be DynamicFeeTxType")
+	})
+
+	s.T().Run("DynamicFeeTransaction with gas estimation", func(t *testing.T) {
+		s.SetupTest()
+		args := SendTxArgs{
+			From:                 fromAddress,
+			To:                   toAddress,
+			Value:                value,
+			MaxFeePerGas:         testGasPrice,
+			MaxPriorityFeePerGas: testGasPrice,
+		}
+		s.setupBuildTransactionMocks(args, selectedAccount)
+
+		tx, err := s.manager.ValidateAndBuildTransaction(chainID, args)
+		s.NoError(err)
+		s.Equal(tx.Gas(), expectedGas, "The gas should be estimated if not present in the original Tx")
+		s.Equal(tx.Nonce(), expectedNonce, "The nonce should be added if not present in the original Tx")
+		s.Equal(tx.GasFeeCap(), expectedGasPrice, "The maxFeePerGas should be the same as in the original Tx")
+		s.Equal(tx.GasTipCap(), expectedGasPrice, "The maxPriorityFeePerGas should be the same as in the original Tx")
+		s.Equal(tx.Type(), uint8(gethtypes.DynamicFeeTxType), "The transaction type should be DynamicFeeTxType")
+	})
+
+	s.T().Run("LegacyTransaction", func(t *testing.T) {
+		s.SetupTest()
+
+		gas := hexutil.Uint64(21000)
+		gasPrice := (*hexutil.Big)(big.NewInt(10))
+		args := SendTxArgs{
+			From:     fromAddress,
+			To:       toAddress,
+			Value:    value,
+			Gas:      &gas,
+			GasPrice: gasPrice,
+		}
+		s.setupBuildTransactionMocks(args, selectedAccount)
+
+		tx, err := s.manager.ValidateAndBuildTransaction(chainID, args)
+		s.NoError(err)
+		s.Equal(tx.Gas(), uint64(gas), "The gas shouldn't be estimated, but should use the gas from the Tx")
+		s.Equal(tx.GasPrice(), expectedGasPrice, "The gasPrice should be the same as in the original Tx")
+		s.Equal(tx.Type(), uint8(gethtypes.LegacyTxType), "The transaction type should be LegacyTxType")
+	})
+	s.T().Run("LegacyTransaction without gas estimation", func(t *testing.T) {
+		s.SetupTest()
+
+		args := SendTxArgs{
+			From:  fromAddress,
+			To:    toAddress,
+			Value: value,
+		}
+		s.setupBuildTransactionMocks(args, selectedAccount)
+
+		tx, err := s.manager.ValidateAndBuildTransaction(chainID, args)
+		s.NoError(err)
+		s.Equal(tx.Gas(), expectedGas, "The gas should be estimated if not present in the original Tx")
+		s.Equal(tx.GasPrice(), expectedGasPrice, "The gasPrice should be estimated if not present in the original Tx")
+		s.Equal(tx.Type(), uint8(gethtypes.LegacyTxType), "The transaction type should be LegacyTxType")
+	})
 }
 
 func (s *TransactorSuite) TestArgsValidation() {
