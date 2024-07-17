@@ -353,22 +353,22 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 		if accColorHash == nil {
 			if parsed.PublicKey == "" {
 				logger.Error("handleAccountImagesImpl: no public key for color hash", zap.String("keyUid", parsed.KeyUID))
-				return
 			}
 
 			accColorHash, err = colorhash.GenerateFor(parsed.PublicKey)
 			if err != nil {
 				logger.Error("handleAccountImagesImpl: could not generate color hash", zap.String("keyUid", parsed.KeyUID), zap.Error(err))
-				return
 			}
 		}
 
-		payload, err = ring.DrawRing(&ring.DrawRingParam{
-			Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: payload, Height: identityImage.Height, Width: identityImage.Width, RingWidth: parsed.RingWidth * enlargeRatio,
-		})
-		if err != nil {
-			logger.Error("handleAccountImagesImpl: failed to draw ring for account identity", zap.Error(err))
-			return
+		if accColorHash != nil {
+			payload, err = ring.DrawRing(&ring.DrawRingParam{
+				Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: payload, Height: identityImage.Height, Width: identityImage.Width, RingWidth: parsed.RingWidth * enlargeRatio,
+			})
+			if err != nil {
+				logger.Error("handleAccountImagesImpl: failed to draw ring for account identity", zap.Error(err))
+				return
+			}
 		}
 	}
 
@@ -642,7 +642,7 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 		}
 
 		if parsed.Ring && parsed.RingWidth == 0 {
-			logger.Error("handleAccountImagesImpl: no ringWidth.")
+			logger.Error("handleContactImages: no ringWidth.")
 			return
 		}
 
@@ -692,7 +692,7 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 		if parsed.IndicatorSize != 0 {
 			payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize*enlargeRatio, parsed.IndicatorBorder*enlargeRatio, parsed.IndicatorCenterToEdge*enlargeRatio)
 			if err != nil {
-				logger.Error("handleAccountImagesImpl: failed to draw status-indicator for initials", zap.Error(err))
+				logger.Error("handleContactImages: failed to draw status-indicator for initials", zap.Error(err))
 				return
 			}
 		}
