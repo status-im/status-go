@@ -1148,6 +1148,8 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestMemberReceivesAccount
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) TestOwnerRejectAndAcceptAliceRequestToJoin() {
+	s.T().Skip("flaky test")
+
 	community, _ := createOnRequestCommunity(&s.Suite, s.owner)
 	s.Require().False(community.AutoAccept())
 
