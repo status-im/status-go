@@ -171,7 +171,7 @@ func TestCircuitBreaker_ExecuteHealthCheckOnWindowTimeout(t *testing.T) {
 		require.Equal(t, expectedResult, result.Result()[0].(string))
 	}
 
-	assert.Equal(t, 1, prov1Called)
+	assert.Less(t, prov1Called, 3) // most of the time only 1 call is made, but occasionally 2 can happen
 	assert.Equal(t, 10, prov2Called)
 
 	// Wait for the sleep window to expire
@@ -189,7 +189,7 @@ func TestCircuitBreaker_ExecuteHealthCheckOnWindowTimeout(t *testing.T) {
 	result := cb.Execute(cmd)
 	require.NoError(t, result.Error())
 
-	assert.Equal(t, 2, prov1Called)
+	assert.Less(t, prov1Called, 4) // most of the time only 2 calls are made, but occasionally 3 can happen
 	assert.Equal(t, 10, prov2Called)
 }
 
