@@ -725,6 +725,8 @@ func getTrInAndOutAmounts(activityType Type, trAmount sql.NullString, pTrAmount 
 
 	if ok {
 		switch activityType {
+		case ApproveAT:
+			fallthrough
 		case ContractDeploymentAT:
 			fallthrough
 		case SendAT:

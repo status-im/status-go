@@ -120,10 +120,64 @@ func setupTransactionData(_ *testing.T, transactor transactions.TransactorIface)
 	return &multiTransaction, data, bridges, expectedData
 }
 
+func setupApproveTransactionData(_ *testing.T, transactor transactions.TransactorIface) (*MultiTransaction, []*pathprocessor.MultipathProcessorTxArgs, map[string]pathprocessor.PathProcessor, []*pathprocessor.MultipathProcessorTxArgs) {
+	SetMultiTransactionIDGenerator(StaticIDCounter())
+
+	// Create mock data for the test
+	tokenTransfer := generateTestTransfer(4)
+	multiTransaction := GenerateTestApproveMultiTransaction(tokenTransfer)
+
+	// Initialize the bridges
+	var rpcClient *rpc.Client = nil
+	bridges := make(map[string]pathprocessor.PathProcessor)
+	transferBridge := pathprocessor.NewTransferProcessor(rpcClient, transactor)
+	bridges[transferBridge.Name()] = transferBridge
+
+	data := []*pathprocessor.MultipathProcessorTxArgs{
+		{
+			//ChainID: 1, // This will be set by transaction manager
+			Name: transferBridge.Name(),
+			TransferTx: &transactions.SendTxArgs{
+				From:  types.Address(tokenTransfer.From),
+				To:    (*types.Address)(&tokenTransfer.To),
+				Value: (*hexutil.Big)(big.NewInt(tokenTransfer.Value)),
+				Data:  types.HexBytes("0x0"),
+				// Symbol: multiTransaction.FromAsset, // This will be set by transaction manager
+				// MultiTransactionID: multiTransaction.ID, // This will be set by transaction manager
+			},
+		},
+	}
+
+	expectedData := make([]*pathprocessor.MultipathProcessorTxArgs, 0)
+	for _, tx := range data {
+		txCopy := deepCopyTransactionBridgeWithTransferTx(tx)
+		updateDataFromMultiTx([]*pathprocessor.MultipathProcessorTxArgs{txCopy}, &multiTransaction)
+		expectedData = append(expectedData, txCopy)
+	}
+
+	return &multiTransaction, data, bridges, expectedData
+}
+
 func TestSendTransactionsETHSuccess(t *testing.T) {
 	tm, transactor, _ := setupTransactionManager(t)
 	account := setupAccount(t, common.HexToAddress("0x1234567890abcdef1234567890abcdef12345678"))
 	multiTransaction, data, bridges, expectedData := setupTransactionData(t, transactor)
+
+	// Verify that the SendTransactionWithChainID method is called for each transaction with proper arguments
+	// Return values are not checked, because they must be checked in Transactor tests
+	for _, tx := range expectedData {
+		transactor.EXPECT().SendTransactionWithChainID(tx.ChainID, *(tx.TransferTx), account).Return(types.Hash{}, nil)
+	}
+
+	// Call the SendTransactions method
+	_, err := tm.SendTransactions(context.Background(), multiTransaction, data, bridges, account)
+	require.NoError(t, err)
+}
+
+func TestSendTransactionsApproveSuccess(t *testing.T) {
+	tm, transactor, _ := setupTransactionManager(t)
+	account := setupAccount(t, common.HexToAddress("0x1234567890abcdef1234567890abcdef12345678"))
+	multiTransaction, data, bridges, expectedData := setupApproveTransactionData(t, transactor)
 
 	// Verify that the SendTransactionWithChainID method is called for each transaction with proper arguments
 	// Return values are not checked, because they must be checked in Transactor tests
@@ -257,4 +311,44 @@ func TestWatchTransaction_Timeout(t *testing.T) {
 	// Call the WatchTransaction method
 	err = tm.WatchTransaction(ctx, chainID, transactionHash)
 	require.ErrorIs(t, err, ErrWatchPendingTxTimeout)
+}
+
+func TestCreateMultiTransactionFromCommand(t *testing.T) {
+	tm, _, _ := setupTransactionManager(t)
+
+	var command *MultiTransactionCommand
+
+	// Test types that should get chainID from the data
+	mtTypes := []MultiTransactionType{MultiTransactionSend, MultiTransactionApprove, MultiTransactionSwap}
+
+	for _, mtType := range mtTypes {
+		fromAmount := hexutil.Big(*big.NewInt(1000000000000000000))
+		toAmount := hexutil.Big(*big.NewInt(123))
+		command = &MultiTransactionCommand{
+			Type:        mtType,
+			FromAddress: common.HexToAddress("0x1234567890abcdef1234567890abcdef12345678"),
+			ToAddress:   common.HexToAddress("0xabcdef1234567890abcdef1234567890abcdef12"),
+			FromAsset:   "DAI",
+			ToAsset:     "USDT",
+			FromAmount:  &fromAmount,
+			ToAmount:    &toAmount,
+		}
+
+		data := make([]*pathprocessor.MultipathProcessorTxArgs, 0)
+		data = append(data, &pathprocessor.MultipathProcessorTxArgs{
+			ChainID: 1,
+		})
+
+		multiTransaction, err := tm.CreateMultiTransactionFromCommand(command, data)
+		require.NoError(t, err)
+		require.NotNil(t, multiTransaction)
+		require.Equal(t, command.FromAddress, multiTransaction.FromAddress)
+		require.Equal(t, command.ToAddress, multiTransaction.ToAddress)
+		require.Equal(t, command.FromAsset, multiTransaction.FromAsset)
+		require.Equal(t, command.ToAsset, multiTransaction.ToAsset)
+		require.Equal(t, command.FromAmount, multiTransaction.FromAmount)
+		require.Equal(t, command.ToAmount, multiTransaction.ToAmount)
+		require.Equal(t, command.Type, multiTransaction.Type)
+		require.Equal(t, data[0].ChainID, multiTransaction.FromNetworkID)
+	}
 }

@@ -240,16 +240,18 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 
 			c.processUnknownErc20CommunityTransactions(ctx, allTransfers)
 
-			err = c.processMultiTransactions(ctx, allTransfers)
-			if err != nil {
-				log.Error("processMultiTransactions error", "error", err)
-				return err
-			}
-
 			if len(allTransfers) > 0 {
+				// First, try to match to any pre-existing pending/multi-transaction
 				err := c.saveAndConfirmPending(allTransfers, blockNum)
 				if err != nil {
 					log.Error("saveAndConfirmPending error", "error", err)
+					return err
+				}
+
+				// Check if multi transaction needs to be created
+				err = c.processMultiTransactions(ctx, allTransfers)
+				if err != nil {
+					log.Error("processMultiTransactions error", "error", err)
 					return err
 				}
 			} else {
@@ -467,6 +469,11 @@ func (c *transfersCommand) processMultiTransactions(ctx context.Context, allTran
 	// Detect / Generate multitransactions
 	// Iterate over all detected transactions
 	for _, tx := range txByTxHash {
+		// Check if already matched to a multi transaction
+		if tx[0].MultiTransactionID > 0 {
+			continue
+		}
+
 		// Then check for a Swap transaction
 		txProcessed, err := c.checkAndProcessSwapMultiTx(ctx, tx)
 		if err != nil {
