@@ -28,8 +28,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"go.uber.org/zap"
 
