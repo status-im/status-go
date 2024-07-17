@@ -1326,6 +1326,13 @@ func (m *Messenger) SetMutePropertyOnChatsByCategory(request *requests.MuteCateg
 // Each hash needs to be signed.
 // The order of retuned hashes corresponds to the order of addresses in addressesToReveal.
 func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string, isEdit bool) ([]account.SignParams, error) {
+	m.logger.Debug("<<< generateCommunityRequestsForSigning",
+		zap.String("memberPubKey", memberPubKey),
+		zap.String("communityID", types.EncodeHex(communityID)),
+		zap.Any("addressesToReveal", addressesToReveal),
+		zap.Bool("isEdit", isEdit),
+	)
+
 	walletAccounts, err := m.settings.GetActiveAccounts()
 	if err != nil {
 		return nil, err
@@ -1340,6 +1347,11 @@ func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, com
 		return false
 	}
 
+	var requestID []byte
+	if !isEdit {
+		requestID = communities.CalculateRequestID(memberPubKey, communityID)
+	}
+
 	msgsToSign := make([]account.SignParams, 0)
 	for _, walletAccount := range walletAccounts {
 		if walletAccount.Chat || walletAccount.Type == accounts.AccountTypeWatch {
@@ -1350,15 +1362,18 @@ func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, com
 			continue
 		}
 
-		requestID := []byte{}
-		if !isEdit {
-			requestID = communities.CalculateRequestID(memberPubKey, communityID)
-		}
 		msgsToSign = append(msgsToSign, account.SignParams{
 			Data:    types.EncodeHex(crypto.Keccak256(m.IdentityPublicKeyCompressed(), communityID, requestID)),
 			Address: walletAccount.Address.Hex(),
 		})
 	}
+
+	m.logger.Debug("<<< generateCommunityRequestsForSigning",
+		zap.Any("msgsToSign", msgsToSign),
+		zap.String("publicKey", types.EncodeHex(m.IdentityPublicKeyCompressed())),
+		zap.String("communityID", communityID.String()),
+		zap.String("requestID", types.EncodeHex(requestID)),
+	)
 
 	return msgsToSign, nil
 }
