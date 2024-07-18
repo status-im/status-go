@@ -1,6 +1,8 @@
 package pathprocessor
 
 import (
+	"context"
+
 	"github.com/status-im/status-go/errors"
 )
 
@@ -30,4 +32,66 @@ var (
 	ErrFromAndToChainsMustBeDifferent = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-022"), Details: "from and to chains must be different"}
 	ErrFromAndToChainsMustBeSame      = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-023"), Details: "from and to chains must be same"}
 	ErrFromAndToTokensMustBeDifferent = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-024"), Details: "from and to tokens must be different"}
+	ErrTransferCustomError            = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-025"), Details: "Transfer custom error"}
+	ErrERC721TransferCustomError      = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-026"), Details: "ERC721Transfer custom error"}
+	ErrERC1155TransferCustomError     = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-027"), Details: "ERC1155Transfer custom error"}
+	ErrBridgeHopCustomError           = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-028"), Details: "Hop custom error"}
+	ErrBridgeCellerCustomError        = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-029"), Details: "CBridge custom error"}
+	ErrSwapParaswapCustomError        = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-030"), Details: "Paraswap custom error"}
+	ErrENSRegisterCustomError         = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-031"), Details: "ENSRegister custom error"}
+	ErrENSReleaseCustomError          = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-032"), Details: "ENSRelease custom error"}
+	ErrENSPublicKeyCustomError        = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-033"), Details: "ENSPublicKey custom error"}
+	ErrStickersBuyCustomError         = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-034"), Details: "StickersBuy custom error"}
+	ErrContextCancelled               = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-035"), Details: "context cancelled"}
+	ErrContextDeadlineExceeded        = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-036"), Details: "context deadline exceeded"}
+	ErrPriceTimeout                   = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-037"), Details: "price timeout"}
+	ErrNotEnoughLiquidity             = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-038"), Details: "not enough liquidity"}
 )
+
+func createErrorResponse(processorName string, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	genericErrResp := errors.CreateErrorResponseFromError(err).(*errors.ErrorResponse)
+
+	if genericErrResp.Code != errors.GenericErrorCode {
+		return genericErrResp
+	}
+
+	switch genericErrResp.Details {
+	case context.Canceled.Error():
+		return ErrContextCancelled
+	case context.DeadlineExceeded.Error():
+		return ErrContextDeadlineExceeded
+	}
+
+	var customErrResp *errors.ErrorResponse
+	switch processorName {
+	case ProcessorTransferName:
+		customErrResp = ErrTransferCustomError
+	case ProcessorERC721Name:
+		customErrResp = ErrERC721TransferCustomError
+	case ProcessorERC1155Name:
+		customErrResp = ErrERC1155TransferCustomError
+	case ProcessorBridgeHopName:
+		customErrResp = ErrBridgeHopCustomError
+	case ProcessorBridgeCelerName:
+		customErrResp = ErrBridgeCellerCustomError
+	case ProcessorSwapParaswapName:
+		customErrResp = ErrSwapParaswapCustomError
+	case ProcessorENSRegisterName:
+		customErrResp = ErrENSRegisterCustomError
+	case ProcessorENSReleaseName:
+		customErrResp = ErrENSReleaseCustomError
+	case ProcessorENSPublicKeyName:
+		customErrResp = ErrENSPublicKeyCustomError
+	case ProcessorStickersBuyName:
+		customErrResp = ErrStickersBuyCustomError
+	default:
+		return genericErrResp
+	}
+
+	customErrResp.Details = genericErrResp.Details
+	return customErrResp
+}

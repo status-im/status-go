@@ -60,6 +60,9 @@ func amountOptionsMapsEqual(map1, map2 map[uint64][]amountOption) bool {
 
 func assertPathsEqual(t *testing.T, expected, actual []*PathV2) {
 	assert.Equal(t, len(expected), len(actual))
+	if len(expected) == 0 {
+		return
+	}
 
 	for _, c := range actual {
 		found := false
@@ -167,7 +170,11 @@ func TestRouterV2(t *testing.T) {
 			if tt.expectedError != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tt.expectedError.Error(), err.Error())
-				assert.Nil(t, routes)
+				if routes == nil {
+					assert.Empty(t, tt.expectedCandidates)
+				} else {
+					assertPathsEqual(t, tt.expectedCandidates, routes.Candidates)
+				}
 			} else {
 				assert.NoError(t, err)
 				assertPathsEqual(t, tt.expectedCandidates, routes.Candidates)

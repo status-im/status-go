@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/account"
-	statusErrors "github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -40,6 +39,16 @@ func NewSwapParaswapProcessor(rpcClient *rpc.Client, transactor transactions.Tra
 		transactor:     transactor,
 		priceRoute:     sync.Map{},
 	}
+}
+
+func createSwapParaswapErrorResponse(err error) error {
+	switch err.Error() {
+	case "Price Timeout":
+		return ErrPriceTimeout
+	case "No routes found with enough liquidity":
+		return ErrNotEnoughLiquidity
+	}
+	return createErrorResponse(ProcessorSwapParaswapName, err)
 }
 
 func (s *SwapParaswapProcessor) Name() string {
@@ -73,7 +82,7 @@ func (s *SwapParaswapProcessor) AvailableFor(params ProcessorInputParams) (bool,
 	if searchForToToken || searchForToken {
 		tokensList, err := s.paraswapClient.FetchTokensList(context.Background())
 		if err != nil {
-			return false, statusErrors.CreateErrorResponseFromError(err)
+			return false, createSwapParaswapErrorResponse(err)
 		}
 
 		for _, t := range tokensList {
@@ -129,7 +138,7 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams) (uint64
 	priceRoute, err := s.paraswapClient.FetchPriceRoute(context.Background(), params.FromToken.Address, params.FromToken.Decimals,
 		params.ToToken.Address, params.ToToken.Decimals, params.AmountIn, params.FromAddr, params.ToAddr, swapSide)
 	if err != nil {
-		return 0, statusErrors.CreateErrorResponseFromError(err)
+		return 0, createSwapParaswapErrorResponse(err)
 	}
 
 	key := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol)
@@ -187,7 +196,7 @@ func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorT
 		common.Address(sendArgs.SwapTx.From), common.Address(*sendArgs.SwapTx.To),
 		priceRoute.RawPriceRoute, priceRoute.Side)
 	if err != nil {
-		return statusErrors.CreateErrorResponseFromError(err)
+		return createSwapParaswapErrorResponse(err)
 	}
 
 	value, ok := new(big.Int).SetString(tx.Value, 10)
@@ -197,7 +206,7 @@ func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorT
 
 	gas, err := strconv.ParseUint(tx.Gas, 10, 64)
 	if err != nil {
-		return statusErrors.CreateErrorResponseFromError(err)
+		return createSwapParaswapErrorResponse(err)
 	}
 
 	gasPrice, ok := new(big.Int).SetString(tx.GasPrice, 10)
@@ -221,7 +230,7 @@ func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorT
 func (s *SwapParaswapProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error) {
 	err := s.prepareTransaction(sendArgs)
 	if err != nil {
-		return nil, statusErrors.CreateErrorResponseFromError(err)
+		return nil, createSwapParaswapErrorResponse(err)
 	}
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, sendArgs.SwapTx.SendTxArgs)
 }
@@ -229,7 +238,7 @@ func (s *SwapParaswapProcessor) BuildTransaction(sendArgs *MultipathProcessorTxA
 func (s *SwapParaswapProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
 	err := s.prepareTransaction(sendArgs)
 	if err != nil {
-		return types.Hash{}, statusErrors.CreateErrorResponseFromError(err)
+		return types.Hash{}, createSwapParaswapErrorResponse(err)
 	}
 
 	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, sendArgs.SwapTx.SendTxArgs, verifiedAccount)

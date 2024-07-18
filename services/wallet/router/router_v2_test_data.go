@@ -772,6 +772,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
+			expectedError:      ErrNoBestRouteFound,
 			expectedCandidates: []*PathV2{},
 		},
 		{
@@ -1760,6 +1761,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
+			expectedError:      ErrNoBestRouteFound,
 			expectedCandidates: []*PathV2{},
 		},
 		{
@@ -2258,6 +2260,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
+			expectedError:      ErrNoBestRouteFound,
 			expectedCandidates: []*PathV2{},
 		},
 		{
@@ -2329,6 +2332,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
+			expectedError:      ErrNoBestRouteFound,
 			expectedCandidates: []*PathV2{},
 		},
 		{
@@ -2445,6 +2449,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
+			expectedError:      ErrNoBestRouteFound,
 			expectedCandidates: []*PathV2{},
 		},
 	}

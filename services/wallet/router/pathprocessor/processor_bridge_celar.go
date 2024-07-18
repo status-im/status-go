@@ -22,7 +22,6 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 
-	statusErrors "github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor/cbridge"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -63,6 +62,10 @@ func NewCelerBridgeProcessor(rpcClient *rpc.Client, transactor transactions.Tran
 	}
 }
 
+func createBridgeCellerErrorResponse(err error) error {
+	return createErrorResponse(ProcessorBridgeCelerName, err)
+}
+
 func (s *CelerBridgeProcessor) Name() string {
 	return ProcessorBridgeCelerName
 }
@@ -84,13 +87,13 @@ func (s *CelerBridgeProcessor) estimateAmt(from, to *params.Network, amountIn *b
 	url := fmt.Sprintf("%s/v2/estimateAmt", base)
 	response, err := s.httpClient.DoGetRequest(context.Background(), url, params)
 	if err != nil {
-		return nil, statusErrors.CreateErrorResponseFromError(err)
+		return nil, createBridgeCellerErrorResponse(err)
 	}
 
 	var res cbridge.EstimateAmtResponse
 	err = json.Unmarshal(response, &res)
 	if err != nil {
-		return nil, statusErrors.CreateErrorResponseFromError(err)
+		return nil, createBridgeCellerErrorResponse(err)
 	}
 	return &res, nil
 }
@@ -111,13 +114,13 @@ func (s *CelerBridgeProcessor) getTransferConfig(isTest bool) (*cbridge.GetTrans
 	url := fmt.Sprintf("%s/v2/getTransferConfigs", base)
 	response, err := s.httpClient.DoGetRequest(context.Background(), url, nil)
 	if err != nil {
-		return nil, statusErrors.CreateErrorResponseFromError(err)
+		return nil, createBridgeCellerErrorResponse(err)
 	}
 
 	var res cbridge.GetTransferConfigsResponse
 	err = json.Unmarshal(response, &res)
 	if err != nil {
-		return nil, statusErrors.CreateErrorResponseFromError(err)
+		return nil, createBridgeCellerErrorResponse(err)
 	}
 	if isTest {
 		s.testTransferConfig = &res
@@ -134,10 +137,10 @@ func (s *CelerBridgeProcessor) AvailableFor(params ProcessorInputParams) (bool, 
 
 	transferConfig, err := s.getTransferConfig(params.FromChain.IsTest)
 	if err != nil {
-		return false, statusErrors.CreateErrorResponseFromError(err)
+		return false, createBridgeCellerErrorResponse(err)
 	}
 	if transferConfig.Err != nil {
-		return false, statusErrors.CreateErrorResponseFromError(errors.New(transferConfig.Err.Msg))
+		return false, createBridgeCellerErrorResponse(errors.New(transferConfig.Err.Msg))
 	}
 
 	var fromAvailable *cbridge.Chain
@@ -189,7 +192,7 @@ func (s *CelerBridgeProcessor) AvailableFor(params ProcessorInputParams) (bool, 
 func (s *CelerBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
 	amt, err := s.estimateAmt(params.FromChain, params.ToChain, params.AmountIn, params.FromToken.Symbol)
 	if err != nil {
-		return nil, nil, statusErrors.CreateErrorResponseFromError(err)
+		return nil, nil, createBridgeCellerErrorResponse(err)
 	}
 	baseFee, ok := new(big.Int).SetString(amt.BaseFee, 10)
 	if !ok {
@@ -206,7 +209,7 @@ func (s *CelerBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.
 func (c *CelerBridgeProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	abi, err := abi.JSON(strings.NewReader(celer.CelerABI))
 	if err != nil {
-		return []byte{}, statusErrors.CreateErrorResponseFromError(err)
+		return []byte{}, createBridgeCellerErrorResponse(err)
 	}
 
 	if params.FromToken.IsNative() {
@@ -243,17 +246,17 @@ func (s *CelerBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 
 	input, err := s.PackTxInputData(params)
 	if err != nil {
-		return 0, statusErrors.CreateErrorResponseFromError(err)
+		return 0, createBridgeCellerErrorResponse(err)
 	}
 
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
-		return 0, statusErrors.CreateErrorResponseFromError(err)
+		return 0, createBridgeCellerErrorResponse(err)
 	}
 
 	ethClient, err := s.rpcClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
-		return 0, statusErrors.CreateErrorResponseFromError(err)
+		return 0, createBridgeCellerErrorResponse(err)
 	}
 
 	ctx := context.Background()
@@ -273,7 +276,7 @@ func (s *CelerBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 			// this is an error we're facing otherwise: `execution reverted: ERC20: transfer amount exceeds allowance`
 			estimation = 350000
 		} else {
-			return 0, statusErrors.CreateErrorResponseFromError(err)
+			return 0, createBridgeCellerErrorResponse(err)
 		}
 	}
 	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
@@ -304,10 +307,10 @@ func (s *CelerBridgeProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.T
 func (s *CelerBridgeProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
 	transferConfig, err := s.getTransferConfig(params.FromChain.IsTest)
 	if err != nil {
-		return common.Address{}, statusErrors.CreateErrorResponseFromError(err)
+		return common.Address{}, createBridgeCellerErrorResponse(err)
 	}
 	if transferConfig.Err != nil {
-		return common.Address{}, statusErrors.CreateErrorResponseFromError(errors.New(transferConfig.Err.Msg))
+		return common.Address{}, createBridgeCellerErrorResponse(errors.New(transferConfig.Err.Msg))
 	}
 
 	for _, chain := range transferConfig.Chains {
@@ -332,16 +335,16 @@ func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, s
 		FromChain: fromChain,
 	})
 	if err != nil {
-		return nil, statusErrors.CreateErrorResponseFromError(err)
+		return nil, createBridgeCellerErrorResponse(err)
 	}
 
 	backend, err := s.rpcClient.EthClient(sendArgs.ChainID)
 	if err != nil {
-		return nil, statusErrors.CreateErrorResponseFromError(err)
+		return nil, createBridgeCellerErrorResponse(err)
 	}
 	contract, err := celer.NewCeler(addrs, backend)
 	if err != nil {
-		return nil, statusErrors.CreateErrorResponseFromError(err)
+		return nil, createBridgeCellerErrorResponse(err)
 	}
 
 	var tx *ethTypes.Transaction
@@ -367,11 +370,11 @@ func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, s
 		)
 	}
 	if err != nil {
-		return tx, statusErrors.CreateErrorResponseFromError(err)
+		return tx, createBridgeCellerErrorResponse(err)
 	}
 	err = s.transactor.StoreAndTrackPendingTx(txOpts.From, sendArgs.CbridgeTx.Symbol, sendArgs.ChainID, sendArgs.CbridgeTx.MultiTransactionID, tx)
 	if err != nil {
-		return tx, statusErrors.CreateErrorResponseFromError(err)
+		return tx, createBridgeCellerErrorResponse(err)
 	}
 	return tx, nil
 }
@@ -379,7 +382,7 @@ func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, s
 func (s *CelerBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
 	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.CbridgeTx.From, verifiedAccount))
 	if err != nil {
-		return types.HexToHash(""), statusErrors.CreateErrorResponseFromError(err)
+		return types.HexToHash(""), createBridgeCellerErrorResponse(err)
 	}
 
 	return types.Hash(tx.Hash()), nil
@@ -392,10 +395,10 @@ func (s *CelerBridgeProcessor) BuildTransaction(sendArgs *MultipathProcessorTxAr
 func (s *CelerBridgeProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
 	amt, err := s.estimateAmt(params.FromChain, params.ToChain, params.AmountIn, params.FromToken.Symbol)
 	if err != nil {
-		return nil, statusErrors.CreateErrorResponseFromError(err)
+		return nil, createBridgeCellerErrorResponse(err)
 	}
 	if amt.Err != nil {
-		return nil, statusErrors.CreateErrorResponseFromError(err)
+		return nil, createBridgeCellerErrorResponse(err)
 	}
 	amountOut, _ := new(big.Int).SetString(amt.EqValueTokenAmt, 10)
 	return amountOut, nil
