@@ -9,13 +9,14 @@ import (
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc"
 	statusRPC "github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/connector/commands"
 	"github.com/status-im/status-go/transactions/fake"
 )
 
 func TestNewService(t *testing.T) {
-	db, _ := createDB(t)
+	db, close := createDB(t)
+	defer close()
 
 	txServiceMockCtrl := gomock.NewController(t)
 	server, _ := fake.NewTestServer(txServiceMockCtrl)
@@ -30,22 +31,26 @@ func TestNewService(t *testing.T) {
 	rpcClient, err := statusRPC.NewClient(client, 1, upstreamConfig, nil, db)
 	require.NoError(t, err)
 
-	mockConnectorService := &Service{}
-	service := NewService(rpcClient, mockConnectorService)
+	service := NewService(db, rpcClient, rpcClient.NetworkManager)
 
 	assert.NotNil(t, service)
-	assert.Equal(t, rpcClient, service.rpcClient)
-	assert.Equal(t, mockConnectorService, service.connectorSrvc)
+	assert.Equal(t, rpcClient.NetworkManager, service.nm)
 }
 
 func TestService_Start(t *testing.T) {
-	service := NewService(&rpc.Client{}, &Service{})
+	db, close := createDB(t)
+	defer close()
+
+	service := NewService(db, &commands.RPCClientMock{}, &commands.NetworkManagerMock{})
 	err := service.Start()
 	assert.NoError(t, err)
 }
 
 func TestService_Stop(t *testing.T) {
-	service := NewService(&rpc.Client{}, &Service{})
+	db, close := createDB(t)
+	defer close()
+
+	service := NewService(db, &commands.RPCClientMock{}, &commands.NetworkManagerMock{})
 	err := service.Stop()
 	assert.NoError(t, err)
 }
@@ -63,7 +68,10 @@ func TestService_APIs(t *testing.T) {
 }
 
 func TestService_Protocols(t *testing.T) {
-	service := NewService(&rpc.Client{}, &Service{})
+	db, close := createDB(t)
+	defer close()
+
+	service := NewService(db, &commands.RPCClientMock{}, &commands.NetworkManagerMock{})
 	protocols := service.Protocols()
 	assert.Nil(t, protocols)
 }

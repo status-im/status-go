@@ -117,6 +117,8 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 		nc.WSModules = config.FormatAPIModules()
 		nc.WSHost = config.WSHost
 		nc.WSPort = config.WSPort
+		// FIXME: this is a temporary solution to allow all origins
+		nc.WSOrigins = []string{"*"}
 	}
 
 	if config.ClusterConfig.Enabled {

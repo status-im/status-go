@@ -1,22 +1,26 @@
 package connector
 
 import (
+	"database/sql"
+
 	"github.com/ethereum/go-ethereum/p2p"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/connector/commands"
 )
 
-func NewService(rpcClient *rpc.Client, connectorSrvc *Service) *Service {
+func NewService(db *sql.DB, rpc commands.RPCClientInterface, nm commands.NetworkManagerInterface) *Service {
 	return &Service{
-		rpcClient:     rpcClient,
-		connectorSrvc: connectorSrvc,
+		db:  db,
+		rpc: rpc,
+		nm:  nm,
 	}
 }
 
 type Service struct {
-	rpcClient     *rpc.Client
-	connectorSrvc *Service
+	db  *sql.DB
+	rpc commands.RPCClientInterface
+	nm  commands.NetworkManagerInterface
 }
 
 func (s *Service) Start() error {
