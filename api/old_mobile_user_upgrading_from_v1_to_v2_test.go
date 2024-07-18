@@ -120,6 +120,7 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) loginMobileUser() {
 }
 
 func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLoginAndMigrationsStillWorkWithExistingMobileUser() {
+
 	s.loginMobileUser()
 	s.loginMobileUser() // Login twice to catch weird errors that only appear after logout
 }
