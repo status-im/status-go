@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -96,6 +97,7 @@ func WithSendPeriod(sendPeriod time.Duration) TelemetryClientOption {
 }
 
 func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName string, peerId string, version string, opts ...TelemetryClientOption) *Client {
+	serverURL = strings.TrimRight(serverURL, "/")
 	client := &Client{
 		serverURL:           serverURL,
 		httpClient:          &http.Client{Timeout: time.Minute},
