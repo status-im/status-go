@@ -8,6 +8,8 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 const transactionsURL = "https://apiv5.paraswap.io/transactions/%d"
@@ -46,6 +48,11 @@ func (c *ClientV5) BuildTransaction(ctx context.Context, srcTokenAddress common.
 	} else {
 		params["srcAmount"] = srcAmountWei.String()
 		params["destAmount"] = destAmountWei.String()
+	}
+	params["partner"] = c.partnerID
+	if c.partnerAddress != walletCommon.ZeroAddress && c.partnerFeePcnt > 0 {
+		params["partnerAddress"] = c.partnerAddress.Hex()
+		params["partnerFeeBps"] = uint(c.partnerFeePcnt * 100)
 	}
 
 	url := fmt.Sprintf(transactionsURL, c.chainID)

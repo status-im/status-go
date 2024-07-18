@@ -3,6 +3,8 @@ package common
 import (
 	"strconv"
 	"time"
+
+	ethCommon "github.com/ethereum/go-ethereum/common"
 )
 
 type MultiTransactionIDType int64
@@ -26,6 +28,10 @@ const (
 	ArbitrumSepolia    uint64 = 421614
 	BinanceChainID     uint64 = 56 // obsolete?
 	BinanceTestChainID uint64 = 97 // obsolete?
+)
+
+var (
+	ZeroAddress = ethCommon.HexToAddress("0x0000000000000000000000000000000000000000")
 )
 
 type ContractType byte
