@@ -33,11 +33,37 @@ type SwapParaswapProcessor struct {
 	priceRoute     sync.Map // [fromChainName-toChainName-fromTokenSymbol-toTokenSymbol, paraswap.Route]
 }
 
+const (
+	partnerID = "status.app"
+)
+
+func getPartnerAddressAndFeePcnt(chainID uint64) (common.Address, float64) {
+	const partnerFeePcnt = 0.7
+
+	switch chainID {
+	case walletCommon.EthereumMainnet:
+		return common.HexToAddress("0xd9abc564bfabefa88a6C2723d78124579600F568"), partnerFeePcnt
+	case walletCommon.OptimismMainnet:
+		return common.HexToAddress("0xE9B59dC0b30cd4646430c25de0111D651c395775"), partnerFeePcnt
+	case walletCommon.ArbitrumMainnet:
+		return common.HexToAddress("0x9a8278e856C0B191B9daa2d7DD1f7B28268E4DA2"), partnerFeePcnt
+	}
+	return common.Address{}, 0
+}
+
 func NewSwapParaswapProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *walletToken.Manager) *SwapParaswapProcessor {
+	defaultChainID := walletCommon.EthereumMainnet
+	partnerAddress, partnerFeePcnt := getPartnerAddressAndFeePcnt(defaultChainID)
+
 	return &SwapParaswapProcessor{
-		paraswapClient: paraswap.NewClientV5(walletCommon.EthereumMainnet),
-		transactor:     transactor,
-		priceRoute:     sync.Map{},
+		paraswapClient: paraswap.NewClientV5(
+			defaultChainID,
+			partnerID,
+			partnerAddress,
+			partnerFeePcnt,
+		),
+		transactor: transactor,
+		priceRoute: sync.Map{},
 	}
 }
 
@@ -75,7 +101,11 @@ func (s *SwapParaswapProcessor) AvailableFor(params ProcessorInputParams) (bool,
 		return false, ErrFromAndToTokensMustBeDifferent
 	}
 
-	s.paraswapClient.SetChainID(params.FromChain.ChainID)
+	chainID := params.FromChain.ChainID
+	partnerAddress, partnerFeePcnt := getPartnerAddressAndFeePcnt(chainID)
+	s.paraswapClient.SetChainID(chainID)
+	s.paraswapClient.SetPartnerAddress(partnerAddress)
+	s.paraswapClient.SetPartnerFeePcnt(partnerFeePcnt)
 
 	searchForToken := params.FromToken.Address == ZeroAddress
 	searchForToToken := params.ToToken.Address == ZeroAddress
@@ -109,6 +139,23 @@ func (s *SwapParaswapProcessor) AvailableFor(params ProcessorInputParams) (bool,
 	}
 
 	return true, nil
+}
+
+func calcReceivedAmountAndFee(baseDestAmount *big.Int, feePcnt float64) (destAmount *big.Int, destFee *big.Int) {
+	destAmount = new(big.Int).Set(baseDestAmount)
+	destFee = new(big.Int).SetUint64(0)
+
+	if feePcnt > 0 {
+		baseDestAmountFloat := new(big.Float).SetInt(baseDestAmount)
+		feePcntFloat := big.NewFloat(feePcnt / 100.0)
+
+		destFeeFloat := new(big.Float).Set(baseDestAmountFloat)
+		destFeeFloat = destFeeFloat.Mul(destFeeFloat, feePcntFloat)
+		destFeeFloat.Int(destFee)
+
+		destAmount = destAmount.Sub(destAmount, destFee)
+	}
+	return
 }
 
 func (s *SwapParaswapProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
@@ -252,5 +299,8 @@ func (s *SwapParaswapProcessor) CalculateAmountOut(params ProcessorInputParams) 
 	}
 	priceRoute := priceRouteIns.(*paraswap.Route)
 
-	return priceRoute.DestAmount.Int, nil
+	_, partnerFeePcnt := getPartnerAddressAndFeePcnt(params.FromChain.ChainID)
+	destAmount, _ := calcReceivedAmountAndFee(priceRoute.DestAmount.Int, partnerFeePcnt)
+
+	return destAmount, nil
 }

@@ -46,6 +46,7 @@ func (c *ClientV5) FetchPriceRoute(ctx context.Context, srcTokenAddress common.A
 	params.Add("network", strconv.FormatUint(c.chainID, 10))
 	params.Add("amount", amountWei.String())
 	params.Add("side", string(side))
+	params.Add("partner", c.partnerID)
 
 	url := pricesURL
 	response, err := c.httpClient.DoGetRequest(ctx, url, params)
