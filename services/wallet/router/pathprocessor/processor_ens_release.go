@@ -13,7 +13,6 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/registrar"
-	statusErrors "github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens"
@@ -37,6 +36,10 @@ func NewENSReleaseProcessor(rpcClient *rpc.Client, transactor transactions.Trans
 	}
 }
 
+func createENSReleaseErrorResponse(err error) error {
+	return createErrorResponse(ProcessorENSReleaseName, err)
+}
+
 func (s *ENSReleaseProcessor) Name() string {
 	return ProcessorENSReleaseName
 }
@@ -52,7 +55,7 @@ func (s *ENSReleaseProcessor) CalculateFees(params ProcessorInputParams) (*big.I
 func (s *ENSReleaseProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	registrarABI, err := abi.JSON(strings.NewReader(registrar.UsernameRegistrarABI))
 	if err != nil {
-		return []byte{}, statusErrors.CreateErrorResponseFromError(err)
+		return []byte{}, createENSReleaseErrorResponse(err)
 	}
 
 	return registrarABI.Pack("release", ens.UsernameToLabel(params.Username))
@@ -70,17 +73,17 @@ func (s *ENSReleaseProcessor) EstimateGas(params ProcessorInputParams) (uint64, 
 
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
-		return 0, statusErrors.CreateErrorResponseFromError(err)
+		return 0, createENSReleaseErrorResponse(err)
 	}
 
 	input, err := s.PackTxInputData(params)
 	if err != nil {
-		return 0, statusErrors.CreateErrorResponseFromError(err)
+		return 0, createENSReleaseErrorResponse(err)
 	}
 
 	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
-		return 0, statusErrors.CreateErrorResponseFromError(err)
+		return 0, createENSReleaseErrorResponse(err)
 	}
 
 	msg := ethereum.CallMsg{
@@ -92,7 +95,7 @@ func (s *ENSReleaseProcessor) EstimateGas(params ProcessorInputParams) (uint64, 
 
 	estimation, err := ethClient.EstimateGas(context.Background(), msg)
 	if err != nil {
-		return 0, statusErrors.CreateErrorResponseFromError(err)
+		return 0, createENSReleaseErrorResponse(err)
 	}
 
 	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
@@ -104,7 +107,7 @@ func (s *ENSReleaseProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Tr
 	toAddr := types.Address(params.ToAddr)
 	inputData, err := s.PackTxInputData(params)
 	if err != nil {
-		return nil, statusErrors.CreateErrorResponseFromError(err)
+		return nil, createENSReleaseErrorResponse(err)
 	}
 
 	sendArgs := &MultipathProcessorTxArgs{

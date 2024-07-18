@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ens"
@@ -119,6 +120,11 @@ type PathV2 struct {
 
 	requiredTokenBalance  *big.Int
 	requiredNativeBalance *big.Int
+}
+
+type ProcessorError struct {
+	ProcessorName string
+	Error         error
 }
 
 func (p *PathV2) Equal(o *PathV2) bool {
@@ -507,12 +513,24 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
-	candidates, err := r.resolveCandidates(ctx, input, selectedFromChains, selectedTohains, balanceMap)
+	candidates, processorErrors, err := r.resolveCandidates(ctx, input, selectedFromChains, selectedTohains, balanceMap)
 	if err != nil {
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
-	return r.resolveRoutes(ctx, input, candidates, balanceMap)
+	suggestedRoutes, err := r.resolveRoutes(ctx, input, candidates, balanceMap)
+
+	if err == nil && (suggestedRoutes == nil || len(suggestedRoutes.Best) == 0) {
+		// No best route found, but no error given.
+		if len(processorErrors) > 0 {
+			// Return one of the path processor errors if present.
+			err = errors.CreateErrorResponseFromError(processorErrors[0].Error)
+		} else {
+			err = ErrNoBestRouteFound
+		}
+	}
+
+	return suggestedRoutes, err
 }
 
 // getBalanceMapForTokenOnChains returns the balance map for passed address, where the key is in format "chainID-tokenSymbol" and
@@ -722,7 +740,7 @@ func (r *Router) getSelectedChains(input *RouteInputParams) (selectedFromChains 
 }
 
 func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams, selectedFromChains []*params.Network,
-	selectedTohains []*params.Network, balanceMap map[string]*big.Int) (candidates []*PathV2, err error) {
+	selectedTohains []*params.Network, balanceMap map[string]*big.Int) (candidates []*PathV2, processorErrors []*ProcessorError, err error) {
 	var (
 		testsMode = input.testsMode && input.testParams != nil
 		group     = async.NewAtomicGroup(ctx)
@@ -731,7 +749,23 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 
 	crossChainAmountOptions, err := r.findOptionsForSendingAmount(input, selectedFromChains, balanceMap)
 	if err != nil {
-		return nil, errors.CreateErrorResponseFromError(err)
+		return nil, nil, errors.CreateErrorResponseFromError(err)
+	}
+
+	appendProcessorErrorFn := func(processorName string, err error) {
+		log.Error("routerv2.resolveCandidates error", "processor", processorName, "err", err)
+		mu.Lock()
+		defer mu.Unlock()
+		processorErrors = append(processorErrors, &ProcessorError{
+			ProcessorName: processorName,
+			Error:         err,
+		})
+	}
+
+	appendPathFn := func(path *PathV2) {
+		mu.Lock()
+		defer mu.Unlock()
+		candidates = append(candidates, path)
 	}
 
 	for networkIdx := range selectedFromChains {
@@ -825,26 +859,34 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 						}
 
 						can, err := pProcessor.AvailableFor(processorInputParams)
-						if err != nil || !can {
+						if err != nil {
+							appendProcessorErrorFn(pProcessor.Name(), err)
+							continue
+						}
+						if !can {
 							continue
 						}
 
 						bonderFees, tokenFees, err := pProcessor.CalculateFees(processorInputParams)
 						if err != nil {
+							appendProcessorErrorFn(pProcessor.Name(), err)
 							continue
 						}
 
 						gasLimit, err := pProcessor.EstimateGas(processorInputParams)
 						if err != nil {
+							appendProcessorErrorFn(pProcessor.Name(), err)
 							continue
 						}
 
 						approvalContractAddress, err := pProcessor.GetContractAddress(processorInputParams)
 						if err != nil {
+							appendProcessorErrorFn(pProcessor.Name(), err)
 							continue
 						}
 						approvalRequired, approvalAmountRequired, approvalGasLimit, l1ApprovalFee, err := r.requireApproval(ctx, input.SendType, &approvalContractAddress, processorInputParams)
 						if err != nil {
+							appendProcessorErrorFn(pProcessor.Name(), err)
 							continue
 						}
 
@@ -861,6 +903,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 
 						amountOut, err := pProcessor.CalculateAmountOut(processorInputParams)
 						if err != nil {
+							appendProcessorErrorFn(pProcessor.Name(), err)
 							continue
 						}
 
@@ -871,8 +914,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 							estimatedTime += 1
 						}
 
-						mu.Lock()
-						candidates = append(candidates, &PathV2{
+						appendPathFn(&PathV2{
 							ProcessorName:  pProcessor.Name(),
 							FromChain:      network,
 							ToChain:        dest,
@@ -901,7 +943,6 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 
 							EstimatedTime: estimatedTime,
 						})
-						mu.Unlock()
 					}
 				}
 			}
@@ -910,7 +951,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 	}
 
 	group.Wait()
-	return candidates, nil
+	return candidates, processorErrors, nil
 }
 
 func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute []*PathV2, input *RouteInputParams, balanceMap map[string]*big.Int) (err error) {

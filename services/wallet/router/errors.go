@@ -28,4 +28,5 @@ var (
 	ErrENSSetPubKeyInvalidUsername               = &errors.ErrorResponse{Code: errors.ErrorCode("WR-020"), Details: "a valid username, ending in '.eth', is required for ENSSetPubKey"}
 	ErrLockedAmountExcludesAllSupported          = &errors.ErrorResponse{Code: errors.ErrorCode("WR-021"), Details: "all supported chains are excluded, routing impossible"}
 	ErrTokenNotFound                             = &errors.ErrorResponse{Code: errors.ErrorCode("WR-022"), Details: "token not found"}
+	ErrNoBestRouteFound                          = &errors.ErrorResponse{Code: errors.ErrorCode("WR-023"), Details: "no best route found"}
 )
