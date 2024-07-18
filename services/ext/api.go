@@ -1862,6 +1862,11 @@ func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteComm
 	return api.service.messenger.DeleteCommunityMemberMessages(request)
 }
 
+// Returns a list of currencies for user's selection
+func (api *PublicAPI) GetCurrencies() []*protocol.Currency {
+	return protocol.GetCurrencies()
+}
+
 // -----
 // HELPER
 // -----
