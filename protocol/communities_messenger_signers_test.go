@@ -798,10 +798,10 @@ func (s *MessengerCommunitiesSignersSuite) TestWithMintedOwnerTokenApplyCommunit
 	response, err := s.john.CreateCommunityTokenPermission(&request)
 	s.Require().NoError(err)
 	s.Require().Len(response.CommunityChanges, 1)
-	s.Require().Len(response.CommunityChanges[0].TokenPermissionsAdded, 1)
+	s.Require().Len(response.CommunityChanges[0].TokenPermissions.Added, 1)
 
 	addedPermission := func() *communities.CommunityTokenPermission {
-		for _, permission := range response.CommunityChanges[0].TokenPermissionsAdded {
+		for _, permission := range response.CommunityChanges[0].TokenPermissions.Added {
 			return permission
 		}
 		return nil

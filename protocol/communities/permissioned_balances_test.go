@@ -292,7 +292,7 @@ func (s *ManagerSuite) Test_GetPermissionedBalances() {
 	}
 	_, changes, err := m.CreateCommunityTokenPermission(permissionRequest)
 	s.Require().NoError(err)
-	s.Require().Len(changes.TokenPermissionsAdded, 1)
+	s.Require().Len(changes.TokenPermissions.Added, 1)
 
 	permissionRequest = &requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
@@ -310,7 +310,7 @@ func (s *ManagerSuite) Test_GetPermissionedBalances() {
 	}
 	_, changes, err = m.CreateCommunityTokenPermission(permissionRequest)
 	s.Require().NoError(err)
-	s.Require().Len(changes.TokenPermissionsAdded, 1)
+	s.Require().Len(changes.TokenPermissions.Added, 1)
 
 	tokenManager.setResponse(chainID, accountAddress, erc20ETHAddress, 42)
 	collectiblesManager.setResponse(chainID, accountAddress, erc721Address, []thirdparty.TokenBalance{

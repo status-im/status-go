@@ -1217,7 +1217,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 	response, err = s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.CommunityChanges[0].TokenPermissionsAdded, 1)
+	s.Require().Len(response.CommunityChanges[0].TokenPermissions.Added, 1)
 	s.Require().True(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
 
 	err = <-waitOnBobToBeKickedFromChannel
@@ -1308,7 +1308,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().True(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
-	s.Require().Len(response.CommunityChanges[0].TokenPermissionsModified, 1)
+	s.Require().Len(response.CommunityChanges[0].TokenPermissions.Modified, 1)
 
 	waitOnBobAddedToChannelAsPoster := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
 		channel, ok := sub.Community.Chats()[chat.CommunityChatID()]

@@ -1384,7 +1384,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 	s.Require().NoError(err)
 
 	var viewOnlyPermissionID string
-	for permissionID := range changes.TokenPermissionsAdded {
+	for permissionID := range changes.TokenPermissions.Added {
 		viewOnlyPermissionID = permissionID
 	}
 
@@ -1467,7 +1467,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 	s.Require().NoError(err)
 
 	var viewAndPostPermissionID string
-	for permissionID := range changes.TokenPermissionsAdded {
+	for permissionID := range changes.TokenPermissions.Added {
 		viewAndPostPermissionID = permissionID
 	}
 
