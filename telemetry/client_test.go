@@ -92,7 +92,7 @@ func createClient(t *testing.T, mockServerURL string) *Client {
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)
 	}
-	return NewClient(logger, mockServerURL, "testUID", "testNode", "16Uiu2HAkvWiyFsgRhuJEb9JfjYxEkoHLgnUQmr1N5mKWnYjxYRVm", "1.0", WithSendPeriod(100*time.Millisecond))
+	return NewClient(logger, mockServerURL, "testUID", "testNode", "1.0", WithSendPeriod(100*time.Millisecond), WithPeerID("16Uiu2HAkvWiyFsgRhuJEb9JfjYxEkoHLgnUQmr1N5mKWnYjxYRVm"))
 }
 
 type expectedCondition func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool)

@@ -96,7 +96,13 @@ func WithSendPeriod(sendPeriod time.Duration) TelemetryClientOption {
 	}
 }
 
-func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName string, peerId string, version string, opts ...TelemetryClientOption) *Client {
+func WithPeerID(peerId string) TelemetryClientOption {
+	return func(c *Client) {
+		c.peerId = peerId
+	}
+}
+
+func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName string, version string, opts ...TelemetryClientOption) *Client {
 	serverURL = strings.TrimRight(serverURL, "/")
 	client := &Client{
 		serverURL:           serverURL,
@@ -104,7 +110,6 @@ func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName str
 		logger:              logger,
 		keyUID:              keyUID,
 		nodeName:            nodeName,
-		peerId:              peerId,
 		version:             version,
 		telemetryCh:         make(chan TelemetryRequest),
 		telemetryCacheLock:  sync.Mutex{},
