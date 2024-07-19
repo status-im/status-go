@@ -3190,8 +3190,7 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 	}
 
 	subscriptionMsg := &CommunityPrivilegedMemberSyncMessage{
-		CommunityPrivateKey: community.PrivateKey(),
-		Receivers:           community.GetTokenMasterMembers(),
+		Receivers: community.GetTokenMasterMembers(),
 		CommunityPrivilegedUserSyncMessage: &protobuf.CommunityPrivilegedUserSyncMessage{
 			Type:        protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_MEMBER_EDIT_SHARED_ADDRESSES,
 			CommunityId: community.ID(),
@@ -4863,9 +4862,7 @@ func (m *Manager) ShareRequestsToJoinWithPrivilegedMembers(community *Community,
 		SyncRequestsToJoin: syncRequestsWithRevealedAccounts,
 	}
 
-	subscriptionMsg := &CommunityPrivilegedMemberSyncMessage{
-		CommunityPrivateKey: community.PrivateKey(),
-	}
+	subscriptionMsg := &CommunityPrivilegedMemberSyncMessage{}
 
 	for role, members := range privilegedMembers {
 		if len(members) == 0 {
@@ -4919,9 +4916,7 @@ func (m *Manager) shareAcceptedRequestToJoinWithPrivilegedMembers(community *Com
 	skipMembers[common.PubkeyToHex(&m.identity.PublicKey)] = struct{}{}
 	skipMembers[common.PubkeyToHex(pk)] = struct{}{}
 
-	subscriptionMsg := &CommunityPrivilegedMemberSyncMessage{
-		CommunityPrivateKey: community.PrivateKey(),
-	}
+	subscriptionMsg := &CommunityPrivilegedMemberSyncMessage{}
 
 	fileredPrivilegedMembers := community.GetFilteredPrivilegedMembers(skipMembers)
 	for role, members := range fileredPrivilegedMembers {

@@ -18,7 +18,6 @@ var ErrOutdatedSharedRequestToJoinClock = errors.New("outdated clock in shared r
 var ErrOutdatedSharedRequestToJoinState = errors.New("outdated state in shared request to join")
 
 type CommunityPrivilegedMemberSyncMessage struct {
-	CommunityPrivateKey                *ecdsa.PrivateKey
 	Receivers                          []*ecdsa.PublicKey
 	CommunityPrivilegedUserSyncMessage *protobuf.CommunityPrivilegedUserSyncMessage
 }

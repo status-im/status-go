@@ -188,8 +188,13 @@ func (m *Messenger) publishCommunityEvents(community *communities.Community, msg
 }
 
 func (m *Messenger) publishCommunityPrivilegedMemberSyncMessage(msg *communities.CommunityPrivilegedMemberSyncMessage) error {
+	community, err := m.GetCommunityByID(msg.CommunityPrivilegedUserSyncMessage.CommunityId)
+	if err != nil {
+		return err
+	}
 
-	m.logger.Debug("publishing privileged user sync message", zap.Any("event", msg))
+	m.logger.Debug("publishing privileged user sync message",
+		zap.Any("receivers", msg.Receivers), zap.Any("type", msg.CommunityPrivilegedUserSyncMessage.Type))
 
 	payload, err := proto.Marshal(msg.CommunityPrivilegedUserSyncMessage)
 	if err != nil {
@@ -198,7 +203,7 @@ func (m *Messenger) publishCommunityPrivilegedMemberSyncMessage(msg *communities
 
 	rawMessage := &common.RawMessage{
 		Payload:             payload,
-		Sender:              msg.CommunityPrivateKey, // if empty, sender private key will be used in SendPrivate
+		Sender:              community.PrivateKey(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
 	}
