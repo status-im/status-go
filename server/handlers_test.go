@@ -3,10 +3,20 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"image/color"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"testing"
+
+	"github.com/status-im/status-go/images"
+
+	"github.com/status-im/status-go/eth-node/crypto"
+
+	"github.com/status-im/status-go/common/dbsetup"
+	"github.com/status-im/status-go/multiaccounts"
+	mc "github.com/status-im/status-go/multiaccounts/common"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
@@ -544,4 +554,110 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 			}
 		})
 	}
+}
+
+func (s *HandlersSuite) validateResponse(w *httptest.ResponseRecorder) {
+	s.Require().Equal(http.StatusOK, w.Code)
+	s.Require().Equal("image/png", w.Header().Get("Content-Type"))
+	n, err := w.Result().Body.Read(make([]byte, 100))
+	s.Require().NoError(err)
+	s.Require().Greater(n, 0)
+}
+
+// TestHandleAccountInitialsImpl tests the handleAccountInitialsImpl function
+func (s *HandlersSuite) TestHandleAccountInitialsImpl() {
+	// given an account without public key, and request to generate ring with keyUID of the account,
+	// it should still response with a valid image without ring rather than response with empty image
+	dbFile := filepath.Join(s.T().TempDir(), "accounts-tests-")
+	db, err := multiaccounts.InitializeDB(dbFile)
+	s.Require().NoError(err)
+	defer db.Close()
+	keyUID := "0x1"
+	name := "Lopsided Goodnatured Bedbug"
+	expected := multiaccounts.Account{Name: name, KeyUID: keyUID, CustomizationColor: mc.CustomizationColorBlue, ColorHash: nil, ColorID: 10, KDFIterations: dbsetup.ReducedKDFIterationsNumber, Timestamp: 1712856359}
+	s.Require().NoError(db.SaveAccount(expected))
+	accounts, err := db.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Len(accounts, 1)
+	s.Require().Equal(expected, accounts[0])
+
+	w := httptest.NewRecorder()
+	f, err := filepath.Abs("../_assets/tests/UbuntuMono-Regular.ttf")
+	s.Require().NoError(err)
+	p := ImageParams{
+		Ring:           true,
+		RingWidth:      1,
+		KeyUID:         keyUID,
+		InitialsLength: 2,
+		BgColor:        color.Transparent,
+		Color:          color.Transparent,
+		FontFile:       f,
+		BgSize:         1,
+		FontSize:       1,
+		UppercaseRatio: 1.0,
+	}
+	handleAccountInitialsImpl(db, s.logger, w, p)
+	s.validateResponse(w)
+
+	// pass a public key to generate ring
+	k, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	p.PublicKey = common.PubkeyToHex(&k.PublicKey)
+	w = httptest.NewRecorder()
+	handleAccountInitialsImpl(db, s.logger, w, p)
+	s.Require().Equal(http.StatusOK, w.Code)
+}
+
+// TestHandleAccountImagesImpl tests the handleAccountImagesImpl function
+func (s *HandlersSuite) TestHandleAccountImagesImpl() {
+	// given an account with identity images and without public key, and request to generate ring with keyUID of the account,
+	// it should still response with a valid image without ring rather than response with empty image
+	dbFile := filepath.Join(s.T().TempDir(), "accounts-tests-")
+	db, err := multiaccounts.InitializeDB(dbFile)
+	s.Require().NoError(err)
+	defer db.Close()
+	keyUID := "0x1"
+	name := "Lopsided Goodnatured Bedbug"
+	expected := multiaccounts.Account{
+		Name:               name,
+		KeyUID:             keyUID,
+		CustomizationColor: mc.CustomizationColorBlue,
+		ColorHash:          nil,
+		ColorID:            10,
+		KDFIterations:      dbsetup.ReducedKDFIterationsNumber,
+		Timestamp:          1712856359,
+		Images:             images.SampleIdentityImageForQRCode(),
+	}
+	s.Require().NoError(db.SaveAccount(expected))
+	accounts, err := db.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Len(accounts, 1)
+	s.Require().Equal(expected, accounts[0])
+
+	w := httptest.NewRecorder()
+	f, err := filepath.Abs("../_assets/tests/UbuntuMono-Regular.ttf")
+	s.Require().NoError(err)
+	p := ImageParams{
+		Ring:           true,
+		RingWidth:      1,
+		KeyUID:         keyUID,
+		InitialsLength: 2,
+		BgColor:        color.Transparent,
+		Color:          color.Transparent,
+		FontFile:       f,
+		BgSize:         1,
+		FontSize:       1,
+		UppercaseRatio: 1.0,
+		ImageName:      images.LargeDimName,
+	}
+	handleAccountImagesImpl(db, s.logger, w, p)
+	s.validateResponse(w)
+
+	// pass a public key to generate ring
+	k, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	p.PublicKey = common.PubkeyToHex(&k.PublicKey)
+	w = httptest.NewRecorder()
+	handleAccountImagesImpl(db, s.logger, w, p)
+	s.Require().Equal(http.StatusOK, w.Code)
 }
