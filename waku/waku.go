@@ -1600,7 +1600,7 @@ func (w *Waku) Clean() error {
 }
 
 func (w *Waku) PeerID() peer.ID {
-	return peer.NewPeerRecord().PeerID //FIXME!!!
+	panic("not implemented")
 }
 
 // validatePrivateKey checks the format of the given private key.
