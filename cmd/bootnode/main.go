@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 
@@ -47,12 +48,12 @@ func main() {
 	flag.Var(&nursery, "n", "These nodes are used to connect to the network if the table is empty and there are no known nodes in the database.")
 	flag.Parse()
 
-	glogger := log.NewGlogHandler(log.StreamHandler(os.Stderr, log.TerminalFormat(false)))
-	glogger.Verbosity(log.Lvl(*verbosity))
+	glogger := log.NewGlogHandler(log.NewTerminalHandler(os.Stderr, false))
+	glogger.Verbosity(slog.Level(*verbosity))
 	if err = glogger.Vmodule(*vmodule); err != nil {
 		log.Crit("Failed to set glog verbosity", "value", *vmodule, "err", err)
 	}
-	log.Root().SetHandler(glogger)
+	log.SetDefault(log.NewLogger(glogger))
 
 	if len(*genKeyFile) != 0 {
 		log.Info("Generating key file", "path", *genKeyFile)
