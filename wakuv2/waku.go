@@ -529,9 +529,7 @@ func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
 				w.bandwidthCounter.Reset()
 			}
 
-			storeStats := w.bandwidthCounter.GetBandwidthForProtocol(legacy_store.StoreID_v20beta4)
-			relayStats := w.bandwidthCounter.GetBandwidthForProtocol(relay.WakuRelayID_v200)
-			go telemetry.PushProtocolStats(relayStats, storeStats)
+			go telemetry.PushProtocolStats(w.bandwidthCounter.GetBandwidthByProtocol())
 		}
 	}
 }
