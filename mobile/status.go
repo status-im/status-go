@@ -1423,7 +1423,7 @@ func ToggleCentralizedMetrics(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	return ""
+	return makeJSONResponse(nil)
 }
 
 func CentralizedMetricsInfo() string {
