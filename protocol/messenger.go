@@ -363,7 +363,6 @@ func NewMessenger(
 	var peerId peer.ID
 
 	if waku, err := node.GetWaku(nil); err == nil && waku != nil {
-		peerId = waku.PeerID()
 		transp, err = transport.NewTransport(
 			waku,
 			identity,
