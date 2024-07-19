@@ -73,7 +73,7 @@ func OverrideRootLog(enabled bool, levelStr string, fileOpts FileOptions, termin
 			// Docs: https://pkg.go.dev/gopkg.in/natefinch/lumberjack.v2@v2.0.0#readme-cleaning-up-old-log-files
 			fileOpts.MaxBackups = 1
 		}
-		handler = FileHandlerWithRotation(fileOpts, terminal)
+		handler = FileHandlerWithRotation(fileOpts, level, terminal)
 	} else {
 		handler = log.NewTerminalHandlerWithLevel(os.Stderr, level, terminal)
 	}

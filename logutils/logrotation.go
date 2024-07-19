@@ -21,12 +21,12 @@ type FileOptions struct {
 }
 
 // FileHandlerWithRotation instantiates log.Handler with a configured rotation
-func FileHandlerWithRotation(opts FileOptions, terminal bool) slog.Handler {
+func FileHandlerWithRotation(opts FileOptions, level slog.Level, terminal bool) slog.Handler {
 	logger := &lumberjack.Logger{
 		Filename:   opts.Filename,
 		MaxSize:    opts.MaxSize,
 		MaxBackups: opts.MaxBackups,
 		Compress:   opts.Compress,
 	}
-	return log.NewTerminalHandler(logger, terminal)
+	return log.NewTerminalHandlerWithLevel(logger, level, terminal)
 }
