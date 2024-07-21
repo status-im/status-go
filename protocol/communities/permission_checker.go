@@ -625,20 +625,21 @@ func CollectibleAddressesFromPreParsedPermissionsData(communityPermissions map[p
 		if permissionsData != nil {
 			allPermissionsData = append(allPermissionsData, permissionsData)
 		}
-	for _, permissionsData := range channelPermissions {
-		if permissionsData != nil {
-			allPermissionsData = append(allPermissionsData, permissionsData)
-		}
-	}
-
-	for _, data := range allPermissionsData {
-		for chainID, contractAddresses := range data.Erc721TokenRequirements {
-			if ret[walletcommon.ChainID(chainID)] == nil {
-				ret[walletcommon.ChainID(chainID)] = make(map[gethcommon.Address]struct{})
+		for _, permissionsData := range channelPermissions {
+			if permissionsData != nil {
+				allPermissionsData = append(allPermissionsData, permissionsData)
 			}
+		}
 
-			for contractAddress := range contractAddresses {
-				ret[walletcommon.ChainID(chainID)][gethcommon.HexToAddress(contractAddress)] = struct{}{}
+		for _, data := range allPermissionsData {
+			for chainID, contractAddresses := range data.Erc721TokenRequirements {
+				if ret[walletcommon.ChainID(chainID)] == nil {
+					ret[walletcommon.ChainID(chainID)] = make(map[gethcommon.Address]struct{})
+				}
+
+				for contractAddress := range contractAddresses {
+					ret[walletcommon.ChainID(chainID)][gethcommon.HexToAddress(contractAddress)] = struct{}{}
+				}
 			}
 		}
 	}

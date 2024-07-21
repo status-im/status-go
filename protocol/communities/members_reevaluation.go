@@ -322,146 +322,229 @@ func NewTokenPermissionChangesByType(all TokenPermissionChanges) (*tokenPermissi
 	return result, nil
 }
 
-func (m *Manager) reevaluateMembers2(communityID types.HexBytes, changes TokenPermissionChanges) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
+type membersReevaluationState struct {
+	community               *Community
+	permissionChangesByType *tokenPermissionChangesByType
+	collectiblesOwners      CollectiblesOwners
+	membersAccounts         map[string][]*protobuf.RevealedAccount
+
+	result reevaluateMembersResult
+}
+
+func (m *Manager) buildMembersReevaluationContext(communityID types.HexBytes, changes TokenPermissionChanges) (*membersReevaluationState, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if !community.IsControlNode() {
-		return nil, nil, ErrNotEnoughPermissions
+		return nil, ErrNotEnoughPermissions
 	}
 
-	changesByType, err := NewTokenPermissionChangesByType(changes)
+	permissionChangesByType, err := NewTokenPermissionChangesByType(changes)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	membersAccounts, err := m.persistence.GetCommunityRequestsToJoinRevealedAddresses(community.ID())
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	result := &reevaluateMembersResult{
-		membersToRemove:             map[string]struct{}{},
-		membersRoles:                map[string]*reevaluateMemberRole{},
-		membersToRemoveFromChannels: map[string]map[string]struct{}{},
-		membersToAddToChannels:      map[string]map[string]protobuf.CommunityMember_ChannelRole{},
-	}
+	return &membersReevaluationState{
+		community:               community,
+		permissionChangesByType: permissionChangesByType,
+		collectiblesOwners:      CollectiblesOwners{},
+		membersAccounts:         membersAccounts,
+		result: reevaluateMembersResult{
+			membersToRemove:             map[string]struct{}{},
+			membersRoles:                map[string]*reevaluateMemberRole{},
+			membersToRemoveFromChannels: map[string]map[string]struct{}{},
+			membersToAddToChannels:      map[string]map[string]protobuf.CommunityMember_ChannelRole{},
+		},
+	}, nil
+}
 
-	collectiblesOwners := CollectiblesOwners{}
-	fetchCollectiblesIfNeeded := func(communityData map[protobuf.CommunityTokenPermission_Type]*PreParsedCommunityPermissionsData, channelData map[string]*PreParsedCommunityPermissionsData) error {
-		collectiblesToFetch := map[walletcommon.ChainID]map[gethcommon.Address]struct{}{}
+func (m *Manager) fetchCollectiblesIfNeeded(ctx *membersReevaluationState, communityData map[protobuf.CommunityTokenPermission_Type]*PreParsedCommunityPermissionsData, channelData map[string]*PreParsedCommunityPermissionsData) error {
+	collectiblesToFetch := map[walletcommon.ChainID]map[gethcommon.Address]struct{}{}
 
-		for chainID, addresses := range CollectibleAddressesFromPreParsedPermissionsData(communityData, channelData) {
-			_, ok := collectiblesOwners[chainID]
+	for chainID, addresses := range CollectibleAddressesFromPreParsedPermissionsData(communityData, channelData) {
+		_, ok := ctx.collectiblesOwners[chainID]
+		if !ok {
+			collectiblesToFetch[chainID] = addresses
+			continue
+		}
+
+		for address := range addresses {
+			_, ok := ctx.collectiblesOwners[chainID][address]
 			if !ok {
-				collectiblesToFetch[chainID] = addresses
-				continue
-			}
-
-			for address := range addresses {
-				_, ok := collectiblesOwners[chainID][address]
-				if !ok {
-					collectiblesToFetch[chainID][address] = struct{}{}
-				}
+				collectiblesToFetch[chainID][address] = struct{}{}
 			}
 		}
+	}
 
-		if len(collectiblesToFetch) == 0 {
-			return nil
+	if len(collectiblesToFetch) == 0 {
+		return nil
+	}
+
+	fetchedCollectibles, err := m.fetchCollectiblesOwners(collectiblesToFetch)
+	if err != nil {
+		return err
+	}
+
+	// Merge fetched collectibles
+	for chainID, ownersRhs := range fetchedCollectibles {
+		ownersLhs, ok := ctx.collectiblesOwners[chainID]
+		if !ok {
+			ctx.collectiblesOwners[chainID] = ownersRhs
+			continue
+		}
+		for address, ownership := range ownersRhs {
+			ownersLhs[address] = ownership
+		}
+	}
+
+	return nil
+}
+
+func (m *Manager) reevaluateMemberRole(
+	ctx *membersReevaluationState,
+	community *Community,
+	memberKey string,
+	accountsAndChainIDs []*AccountChainIDsCombination) (bool, error) {
+
+	reprocessAll := len(ctx.permissionChangesByType.BecomeTokenMaster.Modified) > 0 || len(ctx.permissionChangesByType.BecomeTokenMaster.Removed) > 0
+	if reprocessAll {
+		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(community.tokenPermissions(), protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+		err := m.fetchCollectiblesIfNeeded(ctx, communityPermissionsPreParsedData, channelPermissionsPreParsedData)
+		if err != nil {
+			return false, err
 		}
 
-		fetchedCollectibles, err := m.fetchCollectiblesOwners(collectiblesToFetch)
+		becomeTokenMasterPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER]
+		if becomeTokenMasterPermissions != nil {
+			permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(becomeTokenMasterPermissions, accountsAndChainIDs, true, ctx.collectiblesOwners)
+			if err != nil {
+				return false, err
+			}
+
+			if permissionResponse.Satisfied {
+				ctx.result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
+				// Skip further validation if user has TokenMaster permissions
+				return true, nil
+			}
+		}
+	} else if len(ctx.permissionChangesByType.BecomeTokenMaster.Added) > 0 {
+		if ctx.result.membersRoles[memberKey].old == protobuf.CommunityMember_ROLE_TOKEN_MASTER {
+			// There is no need to check the permission, it was already satisfied without this new additional permission
+			ctx.result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
+			return true, nil
+		}
+
+		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(ctx.permissionChangesByType.BecomeTokenMaster.Added, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+		err := m.fetchCollectiblesIfNeeded(ctx, communityPermissionsPreParsedData, channelPermissionsPreParsedData)
+		if err != nil {
+			return false, err
+		}
+
+		becomeTokenMasterPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER]
+		permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(becomeTokenMasterPermissions, accountsAndChainIDs, true, ctx.collectiblesOwners)
+		if err != nil {
+			return false, err
+		}
+
+		if permissionResponse.Satisfied {
+			ctx.result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
+			// Skip further validation if user has TokenMaster permissions
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (m *Manager) reevaluateMember(ctx *membersReevaluationState, memberKey string) error {
+	memberPubKey, err := common.HexToPubkey(memberKey)
+	if err != nil {
+		return err
+	}
+
+	if memberKey == common.PubkeyToHex(&m.identity.PublicKey) || ctx.community.IsMemberOwner(memberPubKey) {
+		return nil
+	}
+
+	revealedAccount, memberHasWallet := ctx.membersAccounts[memberKey]
+	if !memberHasWallet {
+		ctx.result.membersToRemove[memberKey] = struct{}{}
+		return nil
+	}
+
+	accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(revealedAccount)
+
+	ctx.result.membersRoles[memberKey] = &reevaluateMemberRole{
+		old: ctx.community.MemberRole(memberPubKey),
+		new: protobuf.CommunityMember_ROLE_NONE,
+	}
+
+	reprocessAll := len(ctx.permissionChangesByType.BecomeTokenMaster.Modified) > 0 || len(ctx.permissionChangesByType.BecomeTokenMaster.Removed) > 0
+	if reprocessAll {
+		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(ctx.community.tokenPermissions(), protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+		err = m.fetchCollectiblesIfNeeded(ctx, communityPermissionsPreParsedData, channelPermissionsPreParsedData)
 		if err != nil {
 			return err
 		}
 
-		// Merge fetched collectibles
-		for chainID, ownersRhs := range fetchedCollectibles {
-			ownersLhs, ok := collectiblesOwners[chainID]
-			if !ok {
-				collectiblesOwners[chainID] = ownersRhs
-				continue
-			}
-			for address, ownership := range ownersRhs {
-				ownersLhs[address] = ownership
-			}
-		}
-
-		return nil
-	}
-
-	for memberKey := range community.Members() {
-		memberPubKey, err := common.HexToPubkey(memberKey)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if memberKey == common.PubkeyToHex(&m.identity.PublicKey) || community.IsMemberOwner(memberPubKey) {
-			continue
-		}
-
-		revealedAccount, memberHasWallet := membersAccounts[memberKey]
-		if !memberHasWallet {
-			result.membersToRemove[memberKey] = struct{}{}
-			continue
-		}
-
-		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(revealedAccount)
-
-		result.membersRoles[memberKey] = &reevaluateMemberRole{
-			old: community.MemberRole(memberPubKey),
-			new: protobuf.CommunityMember_ROLE_NONE,
-		}
-
-		reprocessAll := len(changesByType.BecomeTokenMaster.Modified) > 0 || len(changesByType.BecomeTokenMaster.Removed) > 0
-		if reprocessAll {
-			communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(community.tokenPermissions(), protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
-			err = fetchCollectiblesIfNeeded(communityPermissionsPreParsedData, channelPermissionsPreParsedData)
+		becomeTokenMasterPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER]
+		if becomeTokenMasterPermissions != nil {
+			permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(becomeTokenMasterPermissions, accountsAndChainIDs, true, ctx.collectiblesOwners)
 			if err != nil {
-				return nil, nil, err
-			}
-
-			becomeTokenMasterPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER]
-			if becomeTokenMasterPermissions != nil {
-				permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(becomeTokenMasterPermissions, accountsAndChainIDs, true, collectiblesOwners)
-				if err != nil {
-					return nil, nil, err
-				}
-
-				if permissionResponse.Satisfied {
-					result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
-					// Skip further validation if user has TokenMaster permissions
-					continue
-				}
-			}
-		} else if len(changesByType.BecomeTokenMaster.Added) > 0 {
-			if result.membersRoles[memberKey].old == protobuf.CommunityMember_ROLE_TOKEN_MASTER {
-				// There is no need to check the permission, it was already satisfied without this new additional permission
-				result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
-				continue
-			}
-
-			communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(changesByType.BecomeTokenMaster.Added, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
-			err = fetchCollectiblesIfNeeded(communityPermissionsPreParsedData, channelPermissionsPreParsedData)
-			if err != nil {
-				return nil, nil, err
-			}
-
-			becomeTokenMasterPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER]
-			permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(becomeTokenMasterPermissions, accountsAndChainIDs, true, collectiblesOwners)
-			if err != nil {
-				return nil, nil, err
+				return err
 			}
 
 			if permissionResponse.Satisfied {
-				result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
+				ctx.result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
 				// Skip further validation if user has TokenMaster permissions
-				continue
+				return nil
 			}
+		}
+	} else if len(ctx.permissionChangesByType.BecomeTokenMaster.Added) > 0 {
+		if ctx.result.membersRoles[memberKey].old == protobuf.CommunityMember_ROLE_TOKEN_MASTER {
+			// There is no need to check the permission, it was already satisfied without this new additional permission
+			ctx.result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
+			return nil
+		}
+
+		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(ctx.permissionChangesByType.BecomeTokenMaster.Added, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+		err = m.fetchCollectiblesIfNeeded(ctx, communityPermissionsPreParsedData, channelPermissionsPreParsedData)
+		if err != nil {
+			return err
+		}
+
+		becomeTokenMasterPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER]
+		permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(becomeTokenMasterPermissions, accountsAndChainIDs, true, ctx.collectiblesOwners)
+		if err != nil {
+			return err
+		}
+
+		if permissionResponse.Satisfied {
+			ctx.result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
+			// Skip further validation if user has TokenMaster permissions
+			return nil
 		}
 	}
 
-	return nil, nil, nil
+	return nil
+}
+
+func (m *Manager) reevaluateMembers2(communityID types.HexBytes, changes TokenPermissionChanges) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
+	ctx, err := m.buildMembersReevaluationContext(communityID, changes)
+
+	for memberKey := range ctx.community.Members() {
+		err := m.reevaluateMember(ctx, memberKey)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return nil, nil, err
 }
