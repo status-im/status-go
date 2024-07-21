@@ -59,6 +59,14 @@ type TokenPermissionChanges struct {
 	Removed  TokenPermissions `json:"removed"`
 }
 
+func NewTokenPermissionChanges() TokenPermissionChanges {
+	return TokenPermissionChanges{
+		Added:    TokenPermissions{},
+		Modified: TokenPermissions{},
+		Removed:  TokenPermissions{},
+	}
+}
+
 func EmptyCommunityChanges() *CommunityChanges {
 	return &CommunityChanges{
 		MembersAdded:    make(map[string]*protobuf.CommunityMember),

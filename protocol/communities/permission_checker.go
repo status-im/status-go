@@ -600,6 +600,23 @@ func PreParsePermissionsData(permissions map[string]*CommunityTokenPermission) (
 	return communityPermissionsPreParsedData, channelPermissionsPreParsedData
 }
 
+func PreParsePermissionsDataByType(permissions map[string]*CommunityTokenPermission, t protobuf.CommunityTokenPermission_Type) (map[protobuf.CommunityTokenPermission_Type]*PreParsedCommunityPermissionsData, map[string]*PreParsedCommunityPermissionsData) {
+	communityPermissionsPreParsedData := map[protobuf.CommunityTokenPermission_Type]*PreParsedCommunityPermissionsData{}
+	channelPermissionsPreParsedData := map[string]*PreParsedCommunityPermissionsData{}
+
+	permissionsByType := TokenPermissionsByType(permissions, t)
+	switch t {
+	case protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, protobuf.CommunityTokenPermission_BECOME_ADMIN, protobuf.CommunityTokenPermission_BECOME_MEMBER:
+		communityPermissionsPreParsedData[t] = preParsedCommunityPermissionsData(permissionsByType)
+	case protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL:
+		for _, permission := range permissionsByType {
+			channelPermissionsPreParsedData[permission.Id] = preParsedCommunityPermissionsData([]*CommunityTokenPermission{permission})
+		}
+	}
+
+	return communityPermissionsPreParsedData, channelPermissionsPreParsedData
+}
+
 func CollectibleAddressesFromPreParsedPermissionsData(communityPermissions map[protobuf.CommunityTokenPermission_Type]*PreParsedCommunityPermissionsData, channelPermissions map[string]*PreParsedCommunityPermissionsData) map[walletcommon.ChainID]map[gethcommon.Address]struct{} {
 	ret := make(map[walletcommon.ChainID]map[gethcommon.Address]struct{})
 
@@ -608,7 +625,6 @@ func CollectibleAddressesFromPreParsedPermissionsData(communityPermissions map[p
 		if permissionsData != nil {
 			allPermissionsData = append(allPermissionsData, permissionsData)
 		}
-	}
 	for _, permissionsData := range channelPermissions {
 		if permissionsData != nil {
 			allPermissionsData = append(allPermissionsData, permissionsData)
