@@ -33,6 +33,7 @@ type MetricService struct {
 	done       chan bool
 	started    bool
 	wg         sync.WaitGroup
+	interval   time.Duration
 }
 
 func NewDefaultMetricService(db *sql.DB) *MetricService {
@@ -45,7 +46,7 @@ func NewMetricService(repository MetricRepository, processor common.MetricProces
 	return &MetricService{
 		repository: repository,
 		processor:  processor,
-		ticker:     time.NewTicker(interval),
+		interval:   interval,
 		done:       make(chan bool),
 	}
 }
@@ -54,6 +55,7 @@ func (s *MetricService) Start() {
 	if s.started {
 		return
 	}
+	s.ticker = time.NewTicker(s.interval)
 	s.wg.Add(1)
 	s.started = true
 	go func() {
