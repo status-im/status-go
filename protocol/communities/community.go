@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -2375,6 +2376,10 @@ func (o *Community) populateChatWithAllMembers(chatID string) (*CommunityChanges
 
 func ChatID(communityID, channelID string) string {
 	return communityID + channelID
+}
+
+func ChannelID(communityID, chatID string) string {
+	return strings.TrimPrefix(chatID, communityID)
 }
 
 func (o *Community) ChatID(channelID string) string {

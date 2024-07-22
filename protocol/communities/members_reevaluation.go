@@ -322,6 +322,47 @@ func NewTokenPermissionChangesByType(all TokenPermissionChanges) (*tokenPermissi
 	return result, nil
 }
 
+func (t *tokenPermissionChangesByType) byChannel(communityID string) map[string]*tokenPermissionChangesByType {
+	result := map[string]*tokenPermissionChangesByType{}
+
+	populate := func(changes TokenPermissions, append func(channelID string, id string, p *CommunityTokenPermission)) {
+		for id, p := range changes {
+			for _, chatID := range p.ChatIds {
+				channelID := ChannelID(communityID, chatID)
+				_, ok := result[channelID]
+				if !ok {
+					result[channelID] = &tokenPermissionChangesByType{
+						CanViewAndPostChannel: NewTokenPermissionChanges(),
+						CanViewChannel:        NewTokenPermissionChanges(),
+					}
+				}
+				append(channelID, id, p)
+			}
+		}
+	}
+
+	populate(t.CanViewAndPostChannel.Added, func(channelID, id string, p *CommunityTokenPermission) {
+		result[channelID].CanViewAndPostChannel.Added[id] = p
+	})
+	populate(t.CanViewAndPostChannel.Modified, func(channelID, id string, p *CommunityTokenPermission) {
+		result[channelID].CanViewAndPostChannel.Modified[id] = p
+	})
+	populate(t.CanViewAndPostChannel.Removed, func(channelID, id string, p *CommunityTokenPermission) {
+		result[channelID].CanViewAndPostChannel.Removed[id] = p
+	})
+	populate(t.CanViewChannel.Added, func(channelID, id string, p *CommunityTokenPermission) {
+		result[channelID].CanViewChannel.Added[id] = p
+	})
+	populate(t.CanViewChannel.Modified, func(channelID, id string, p *CommunityTokenPermission) {
+		result[channelID].CanViewChannel.Modified[id] = p
+	})
+	populate(t.CanViewChannel.Removed, func(channelID, id string, p *CommunityTokenPermission) {
+		result[channelID].CanViewChannel.Removed[id] = p
+	})
+
+	return result
+}
+
 type membersReevaluationState struct {
 	community               *Community
 	permissionChangesByType *tokenPermissionChangesByType
@@ -413,61 +454,122 @@ func (m *Manager) reevaluateMemberRole(
 	accountsAndChainIDs []*AccountChainIDsCombination,
 	role protobuf.CommunityMember_Roles) (bool, error) {
 
-	changedPermissions := func() *TokenPermissionChanges {
+	permissions, permissionType := func() (*TokenPermissionChanges, protobuf.CommunityTokenPermission_Type) {
 		switch role {
 		case protobuf.CommunityMember_ROLE_TOKEN_MASTER:
-			return &state.permissionChangesByType.BecomeTokenMaster
+			return &state.permissionChangesByType.BecomeTokenMaster, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER
 		case protobuf.CommunityMember_ROLE_ADMIN:
-			return &state.permissionChangesByType.BecomeAdmin
+			return &state.permissionChangesByType.BecomeAdmin, protobuf.CommunityTokenPermission_BECOME_ADMIN
 		case protobuf.CommunityMember_ROLE_NONE:
-			return &state.permissionChangesByType.BecomeMember
+			return &state.permissionChangesByType.BecomeMember, protobuf.CommunityTokenPermission_BECOME_MEMBER
 		}
-		return nil
+		return nil, protobuf.CommunityTokenPermission_UNKNOWN_TOKEN_PERMISSION
 	}()
 
-	reprocessAll := len(state.permissionChangesByType.BecomeTokenMaster.Modified) > 0 || len(state.permissionChangesByType.BecomeTokenMaster.Removed) > 0
+	reprocessAll := len(permissions.Modified) > 0 || len(permissions.Removed) > 0
 	if reprocessAll {
-		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(state.community.tokenPermissions(), protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(state.community.tokenPermissions(), permissionType)
 		err := m.fetchCollectiblesIfNeeded(state, communityPermissionsPreParsedData, channelPermissionsPreParsedData)
 		if err != nil {
 			return false, err
 		}
 
-		becomeTokenMasterPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER]
-		if becomeTokenMasterPermissions != nil {
-			permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(becomeTokenMasterPermissions, accountsAndChainIDs, true, state.collectiblesOwners)
+		preParsedData := communityPermissionsPreParsedData[permissionType]
+		if preParsedData != nil {
+			permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(preParsedData, accountsAndChainIDs, true, state.collectiblesOwners)
 			if err != nil {
 				return false, err
 			}
 
-			if permissionResponse.Satisfied {
-				state.result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
-				// Skip further validation if user has TokenMaster permissions
-				return true, nil
-			}
+			return permissionResponse.Satisfied, nil
 		}
-	} else if len(state.permissionChangesByType.BecomeTokenMaster.Added) > 0 {
-		if state.result.membersRoles[memberKey].old == protobuf.CommunityMember_ROLE_TOKEN_MASTER {
-			// There is no need to check the permission, it was already satisfied without this new additional permission
-			state.result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
+	} else if len(permissions.Added) > 0 {
+		if role == protobuf.CommunityMember_ROLE_NONE || state.result.membersRoles[memberKey].old == role {
+			// There is no need to check the permissions, it was already satisfied before
 			return true, nil
 		}
 
-		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(state.permissionChangesByType.BecomeTokenMaster.Added, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(permissions.Added, permissionType)
 		err := m.fetchCollectiblesIfNeeded(state, communityPermissionsPreParsedData, channelPermissionsPreParsedData)
 		if err != nil {
 			return false, err
 		}
 
-		becomeTokenMasterPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER]
-		permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(becomeTokenMasterPermissions, accountsAndChainIDs, true, state.collectiblesOwners)
+		preParsedData := communityPermissionsPreParsedData[permissionType]
+		permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(preParsedData, accountsAndChainIDs, true, state.collectiblesOwners)
 		if err != nil {
 			return false, err
 		}
 
 		if permissionResponse.Satisfied {
-			state.result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
-			// Skip further validation if user has TokenMaster permissions
+			return true, nil
+		}
+	}
+
+	return state.result.membersRoles[memberKey].old == role, nil
+}
+
+func (m *Manager) reevaluateMemberChannelRole(
+	state *membersReevaluationState,
+	channelID string,
+	memberKey string,
+	accountsAndChainIDs []*AccountChainIDsCombination,
+	changes *tokenPermissionChangesByType,
+	role protobuf.CommunityMember_ChannelRole) (bool, error) {
+
+	permissions, permissionType := func() (*TokenPermissionChanges, protobuf.CommunityTokenPermission_Type) {
+		switch role {
+		case protobuf.CommunityMember_CHANNEL_ROLE_POSTER:
+			return &changes.CanViewAndPostChannel, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL
+		case protobuf.CommunityMember_CHANNEL_ROLE_VIEWER:
+			return &changes.CanViewChannel, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL
+		}
+		return nil, 0
+	}()
+
+	reprocessAll := len(permissions.Modified) > 0 || len(permissions.Removed) > 0
+	if reprocessAll {
+		channelTokenPermissionsByType := func() map[string]*CommunityTokenPermission {
+			result := map[string]*CommunityTokenPermission{}
+			for _, p := range state.community.ChannelTokenPermissionsByType(channelID, permissionType) {
+				result[p.Id] = p
+			}
+			return result
+		}()
+		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(channelTokenPermissionsByType, permissionType)
+		err := m.fetchCollectiblesIfNeeded(state, communityPermissionsPreParsedData, channelPermissionsPreParsedData)
+		if err != nil {
+			return false, err
+		}
+
+		preParsedData := communityPermissionsPreParsedData[permissionType]
+		if preParsedData != nil {
+			permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(preParsedData, accountsAndChainIDs, true, state.collectiblesOwners)
+			if err != nil {
+				return false, err
+			}
+
+			return permissionResponse.Satisfied, nil
+		}
+	} else if len(permissions.Added) > 0 {
+		if state.result.membersRoles[memberKey].old == role {
+			// There is no need to check the permissions, it was already satisfied before
+			return true, nil
+		}
+
+		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(permissions.Added, permissionType)
+		err := m.fetchCollectiblesIfNeeded(state, communityPermissionsPreParsedData, channelPermissionsPreParsedData)
+		if err != nil {
+			return false, err
+		}
+
+		preParsedData := communityPermissionsPreParsedData[permissionType]
+		permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(preParsedData, accountsAndChainIDs, true, state.collectiblesOwners)
+		if err != nil {
+			return false, err
+		}
+
+		if permissionResponse.Satisfied {
 			return true, nil
 		}
 	}
@@ -498,51 +600,35 @@ func (m *Manager) reevaluateMember(state *membersReevaluationState, memberKey st
 		new: protobuf.CommunityMember_ROLE_NONE,
 	}
 
-	reprocessAll := len(state.permissionChangesByType.BecomeTokenMaster.Modified) > 0 || len(state.permissionChangesByType.BecomeTokenMaster.Removed) > 0
-	if reprocessAll {
-		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(state.community.tokenPermissions(), protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
-		err = m.fetchCollectiblesIfNeeded(state, communityPermissionsPreParsedData, channelPermissionsPreParsedData)
+	rolesOrder := []protobuf.CommunityMember_Roles{
+		protobuf.CommunityMember_ROLE_TOKEN_MASTER,
+		protobuf.CommunityMember_ROLE_ADMIN,
+		protobuf.CommunityMember_ROLE_NONE,
+	}
+
+	satisfied := false
+	for _, role := range rolesOrder {
+		satisfied, err = m.reevaluateMemberRole(state, memberKey, accountsAndChainIDs, role)
 		if err != nil {
 			return err
 		}
-
-		becomeTokenMasterPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER]
-		if becomeTokenMasterPermissions != nil {
-			permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(becomeTokenMasterPermissions, accountsAndChainIDs, true, state.collectiblesOwners)
-			if err != nil {
-				return err
-			}
-
-			if permissionResponse.Satisfied {
-				state.result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
-				// Skip further validation if user has TokenMaster permissions
-				return nil
-			}
+		if satisfied {
+			state.result.membersRoles[memberKey].new = role
+			break
 		}
-	} else if len(state.permissionChangesByType.BecomeTokenMaster.Added) > 0 {
-		if state.result.membersRoles[memberKey].old == protobuf.CommunityMember_ROLE_TOKEN_MASTER {
-			// There is no need to check the permission, it was already satisfied without this new additional permission
-			state.result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
-			return nil
-		}
+	}
 
-		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(state.permissionChangesByType.BecomeTokenMaster.Added, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
-		err = m.fetchCollectiblesIfNeeded(state, communityPermissionsPreParsedData, channelPermissionsPreParsedData)
-		if err != nil {
-			return err
-		}
+	if state.result.membersRoles[memberKey].isPrivileged() {
+		return nil
+	}
 
-		becomeTokenMasterPermissions := communityPermissionsPreParsedData[protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER]
-		permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(becomeTokenMasterPermissions, accountsAndChainIDs, true, state.collectiblesOwners)
-		if err != nil {
-			return err
-		}
+	if !satisfied {
+		state.result.membersToRemove[memberKey] = struct{}{}
+		return nil
+	}
 
-		if permissionResponse.Satisfied {
-			state.result.membersRoles[memberKey].new = protobuf.CommunityMember_ROLE_TOKEN_MASTER
-			// Skip further validation if user has TokenMaster permissions
-			return nil
-		}
+	changesByChannel := state.permissionChangesByType.byChannel(state.community.IDString())
+	for channelID, changes := range changesByChannel {
 	}
 
 	return nil
