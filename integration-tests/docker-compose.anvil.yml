@@ -4,8 +4,6 @@ services:
     platform: linux/amd64
     command:
       - anvil --host 0.0.0.0
-    ports:
-      - 8545:8545
 
   deploy-sntv2:
     platform: linux/amd64
