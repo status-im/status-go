@@ -50,9 +50,17 @@ func NewMetricService(repository MetricRepository, processor common.MetricProces
 	}
 }
 
-func (s *MetricService) Start() {
+func (s *MetricService) IsRunning() bool {
+	return s.started
+}
+
+func (s *MetricService) Start() error {
 	if s.started {
-		return
+		return nil
+	}
+	err := s.repository.ToggleEnabled(true)
+	if err != nil {
+		return err
 	}
 	s.wg.Add(1)
 	s.started = true
@@ -67,16 +75,22 @@ func (s *MetricService) Start() {
 			}
 		}
 	}()
+	return nil
 }
 
-func (s *MetricService) Stop() {
+func (s *MetricService) Stop() error {
 	if !s.started {
-		return
+		return nil
+	}
+	err := s.repository.ToggleEnabled(false)
+	if err != nil {
+		return err
 	}
 	s.ticker.Stop()
 	s.done <- true
 	s.wg.Wait()
 	s.started = false
+	return nil
 }
 
 func (s *MetricService) EnsureStarted() error {
@@ -92,19 +106,6 @@ func (s *MetricService) EnsureStarted() error {
 
 func (s *MetricService) Info() (*MetricsInfo, error) {
 	return s.repository.Info()
-}
-
-func (s *MetricService) ToggleEnabled(isEnabled bool) error {
-	err := s.repository.ToggleEnabled(isEnabled)
-	if err != nil {
-		return err
-	}
-	if isEnabled {
-		s.Start()
-	} else {
-		s.Stop()
-	}
-	return nil
 }
 
 func (s *MetricService) AddMetric(metric common.Metric) error {
