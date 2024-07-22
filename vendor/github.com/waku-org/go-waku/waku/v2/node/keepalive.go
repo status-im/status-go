@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
@@ -23,6 +24,17 @@ const maxAllowedPingFailures = 2
 const sleepDetectionIntervalFactor = 3
 
 const maxPeersToPing = 10
+
+const maxAllowedSubsequentPingFailures = 2
+
+func disconnectAllPeers(host host.Host, logger *zap.Logger) {
+	for _, p := range host.Network().Peers() {
+		err := host.Network().ClosePeer(p)
+		if err != nil {
+			logger.Debug("closing conn to peer", zap.Error(err))
+		}
+	}
+}
 
 // startKeepAlive creates a go routine that periodically pings connected peers.
 // This is necessary because TCP connections are automatically closed due to inactivity,
@@ -54,6 +66,7 @@ func (w *WakuNode) startKeepAlive(ctx context.Context, randomPeersPingDuration t
 
 	sleepDetectionInterval := int64(randomPeersPingDuration) * sleepDetectionIntervalFactor
 
+	var iterationFailure int
 	for {
 		peersToPing := []peer.ID{}
 
@@ -72,12 +85,12 @@ func (w *WakuNode) startKeepAlive(ctx context.Context, randomPeersPingDuration t
 			if difference > sleepDetectionInterval {
 				lastTimeExecuted = w.timesource.Now()
 				w.log.Warn("keep alive hasnt been executed recently. Killing all connections")
-				for _, p := range w.host.Network().Peers() {
-					err := w.host.Network().ClosePeer(p)
-					if err != nil {
-						w.log.Debug("closing conn to peer", zap.Error(err))
-					}
-				}
+				disconnectAllPeers(w.host, w.log)
+				continue
+			} else if iterationFailure >= maxAllowedSubsequentPingFailures {
+				iterationFailure = 0
+				w.log.Warn("Pinging random peers failed, node is likely disconnected. Killing all connections")
+				disconnectAllPeers(w.host, w.log)
 				continue
 			}
 
@@ -118,16 +131,31 @@ func (w *WakuNode) startKeepAlive(ctx context.Context, randomPeersPingDuration t
 
 		pingWg := sync.WaitGroup{}
 		pingWg.Add(len(peersToPing))
+		pingResultChan := make(chan bool, len(peersToPing))
 		for _, p := range peersToPing {
-			go w.pingPeer(ctx, &pingWg, p)
+			go w.pingPeer(ctx, &pingWg, p, pingResultChan)
 		}
 		pingWg.Wait()
+		close(pingResultChan)
+
+		failureCounter := 0
+		for couldPing := range pingResultChan {
+			if !couldPing {
+				failureCounter++
+			}
+		}
+
+		if len(peersToPing) > 0 && failureCounter == len(peersToPing) {
+			iterationFailure++
+		} else {
+			iterationFailure = 0
+		}
 
 		lastTimeExecuted = w.timesource.Now()
 	}
 }
 
-func (w *WakuNode) pingPeer(ctx context.Context, wg *sync.WaitGroup, peerID peer.ID) {
+func (w *WakuNode) pingPeer(ctx context.Context, wg *sync.WaitGroup, peerID peer.ID, resultChan chan bool) {
 	defer wg.Done()
 
 	logger := w.log.With(logging.HostID("peer", peerID))
@@ -135,17 +163,20 @@ func (w *WakuNode) pingPeer(ctx context.Context, wg *sync.WaitGroup, peerID peer
 	for i := 0; i < maxAllowedPingFailures; i++ {
 		if w.host.Network().Connectedness(peerID) != network.Connected {
 			// Peer is no longer connected. No need to ping
+			resultChan <- false
 			return
 		}
 
 		logger.Debug("pinging")
 
 		if w.tryPing(ctx, peerID, logger) {
+			resultChan <- true
 			return
 		}
 	}
 
 	if w.host.Network().Connectedness(peerID) != network.Connected {
+		resultChan <- false
 		return
 	}
 
@@ -153,6 +184,8 @@ func (w *WakuNode) pingPeer(ctx context.Context, wg *sync.WaitGroup, peerID peer
 	if err := w.host.Network().ClosePeer(peerID); err != nil {
 		logger.Debug("closing conn to peer", zap.Error(err))
 	}
+
+	resultChan <- false
 }
 
 func (w *WakuNode) tryPing(ctx context.Context, peerID peer.ID, logger *zap.Logger) bool {
