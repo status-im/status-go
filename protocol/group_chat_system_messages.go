@@ -15,11 +15,11 @@ var defaultSystemMessagesTranslations = new(systemMessageTranslationsMap)
 
 func init() {
 	defaultSystemMessagesTranslationSet := map[protobuf.MembershipUpdateEvent_EventType]string{
-		protobuf.MembershipUpdateEvent_CHAT_CREATED:   "{{from}} created the group {{name}}",
+		protobuf.MembershipUpdateEvent_CHAT_CREATED:   "{{from}} created the group",
 		protobuf.MembershipUpdateEvent_NAME_CHANGED:   "{{from}} changed the group's name to {{name}}",
 		protobuf.MembershipUpdateEvent_MEMBERS_ADDED:  "{{from}} has added {{members}}",
 		protobuf.MembershipUpdateEvent_ADMINS_ADDED:   "{{from}} has made {{members}} admin",
-		protobuf.MembershipUpdateEvent_MEMBER_REMOVED: "{{member}} left the group",
+		protobuf.MembershipUpdateEvent_MEMBER_REMOVED: "{{member}} was removed",
 		protobuf.MembershipUpdateEvent_ADMIN_REMOVED:  "{{member}} is not admin anymore",
 		protobuf.MembershipUpdateEvent_COLOR_CHANGED:  "{{from}} changed the group's color",
 		protobuf.MembershipUpdateEvent_IMAGE_CHANGED:  "{{from}} changed the group's image",
