@@ -1,7 +1,8 @@
 -- Step 1: Create a temporary table to store unique records
 CREATE TABLE IF NOT EXISTS balance_history_temp AS
-SELECT DISTINCT chain_id, address, currency, block, timestamp, balance
-FROM balance_history;
+SELECT DISTINCT chain_id, address, currency, block, MAX(timestamp) as timestamp, balance
+FROM balance_history
+GROUP BY chain_id, address, currency, block;
 
 -- Step 2: Truncate the original table
 DELETE FROM balance_history;

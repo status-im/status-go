@@ -30,7 +30,7 @@
 // 1715839555_rename_chain_prefixes.up.sql (259B)
 // 1716313614_add_rpc_limits_table.up.sql (203B)
 // 1716912885_add_wallet_connect_dapps.up.sql (750B)
-// 1721136888_recreate_indices_balance_history_remove_dups.up.sql (861B)
+// 1721136888_recreate_indices_balance_history_remove_dups.up.sql (923B)
 // 1721306883_add_connector_dapps.up.sql (360B)
 // doc.go (94B)
 
@@ -42,6 +42,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,7 +52,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -59,7 +60,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -700,7 +701,7 @@ func _1716912885_add_wallet_connect_dappsUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __1721136888_recreate_indices_balance_history_remove_dupsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xac\x92\xcd\xae\x9b\x30\x14\x84\xf7\x7e\x8a\x59\x36\x12\x59\xf4\x6f\x43\x56\x29\x38\x92\xa5\x14\x5a\x70\xa4\xec\x90\x31\x27\x8d\x15\x62\x53\x63\x16\xbc\x7d\x45\x52\xaa\x08\x55\xca\x55\x74\x1f\xe0\x7c\xa3\xef\xcc\xac\xd7\x28\x03\x75\xf8\x18\x23\xf1\xa4\x02\x41\x21\xd0\xb5\x73\x5e\xf9\x11\x41\xd5\x2d\x21\x38\xf4\xc1\x79\xc2\x60\xcd\xef\x81\xe0\x49\x3b\xdf\xf4\x2c\x29\xf8\x56\x72\xc8\xed\xb7\x3d\x87\xd8\x21\xcb\x25\xf8\x51\x94\xb2\x44\xad\x5a\x65\x35\x55\x67\x33\x5d\x8e\xd5\x84\xc4\xb6\x64\x25\xdf\xf3\x44\x22\x15\xa5\x14\x59\x22\xa1\xcf\xca\xd8\xca\x34\x11\x54\xd3\x78\xea\xfb\x08\x7a\xf0\x9e\xac\x1e\x23\xd4\xad\xd3\x97\x08\xc1\x5c\xa9\x0f\xea\xda\x45\x33\x96\xed\x8a\xfc\xfb\x32\x63\xc3\xd8\x2c\xf3\x29\x86\xf4\x83\xd5\x93\x4e\x38\x13\x9c\x37\xbf\x8c\x55\xed\xdd\x87\xa5\x7c\xcf\x25\xc7\x13\xc8\xe7\x18\xc2\xf6\xe4\xc3\x42\x1b\xb5\xd2\x17\x18\x1b\xdc\xff\xd8\x22\x2b\x79\x21\x21\x32\x99\x2f\xd9\xf8\xf0\x9a\xed\x6a\xfe\xda\x3b\x3e\xeb\x56\xc8\x83\xec\x97\x18\xa9\x77\xdd\xcd\x68\x51\x3f\x4b\x8b\xfc\xc7\xdf\x92\x9f\x50\xbe\xc6\x28\x48\xdf\x67\x34\x91\x8c\x6d\x8c\xa6\x7f\x43\x39\x64\xe2\xe7\x81\x43\x64\x29\x3f\x3e\xd9\x8b\x69\xc8\x06\x73\x1a\x2b\xb2\xc1\x8f\xc8\xb3\x57\x9e\xb9\xda\xcc\xc9\x6f\x89\x3c\x99\x36\x90\xbf\x05\x1a\xea\x5f\x8c\x7c\x28\x60\xb5\x61\x7f\x02\x00\x00\xff\xff\x4e\xfa\x92\xa6\x5d\x03\x00\x00")
+var __1721136888_recreate_indices_balance_history_remove_dupsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x9c\x92\x3f\x6f\xdb\x30\x10\xc5\x77\x7e\x8a\x37\xc6\x80\x32\xf4\xdf\x22\x4f\x8e\xc5\x14\x04\x1c\x29\x95\x68\xc0\x9d\x0c\x8a\xba\xd4\x44\x64\x52\x25\xa9\x41\xdf\xbe\x90\x53\x05\x86\x62\x20\x86\xc7\x1b\xee\xfd\x70\xbf\x7b\xf7\xf7\xa8\x22\x75\xf8\x92\x62\xed\x49\x45\x82\x42\xa4\x63\xe7\xbc\xf2\x03\xa2\xaa\x5b\x42\x74\x08\xd1\x79\x42\x6f\xcd\xdf\x9e\xe0\x49\x3b\xdf\x04\xb6\x2e\xf9\x4a\x72\xc8\xd5\xc3\x86\x43\x3c\x22\x2f\x24\xf8\x4e\x54\xb2\x42\xad\x5a\x65\x35\xed\x0f\x66\xdc\x1c\xf6\x63\x24\x56\x15\xab\xf8\x86\xaf\x25\x32\x51\x49\x91\xaf\x25\xf4\x41\x19\xbb\x37\x4d\x02\xd5\x34\x9e\x42\x48\xa0\x7b\xef\xc9\xea\x21\x41\xdd\x3a\xfd\x9a\xe0\x69\xb5\xbb\x8b\xe6\x48\x21\xaa\x63\xb7\x80\x0a\x78\x9f\x92\x09\xc4\x1e\xcb\xe2\x69\x4e\x65\x3f\xcb\x62\xfb\x8c\x87\xdf\x57\x60\x96\x8c\x4d\x2a\xbe\xa6\x90\xbe\xb7\x7a\x94\x11\x0f\x04\xe7\xcd\x1f\x63\x55\xfb\x66\x83\x65\x7c\xc3\x25\xc7\x25\xe0\x59\xc8\xb7\x14\xc2\x06\xf2\x71\x26\x0d\xb5\xd2\xaf\x30\x36\xba\x4b\xd9\x22\xaf\x78\x29\x21\x72\x59\xcc\xb3\x71\x77\x8d\xab\x8f\x66\x16\x93\xf3\xdb\xd6\x2f\x8a\x3d\xbd\xf3\xec\xd8\xef\x29\x32\xef\xba\xd3\x45\xb3\xf2\xb0\xac\x2c\x9e\xff\x57\xe4\x93\x94\x1f\x29\x4a\xd2\x6f\x25\x1c\x93\x8c\x6d\x8c\xa6\xf7\x9a\x6d\x73\xf1\x6b\xcb\x21\xf2\x8c\xef\x3e\x69\x9b\x69\xc8\x46\xf3\x32\xec\xc9\x46\x3f\xa0\xc8\x6f\x91\xb9\x58\x4e\xe4\x6b\x90\x2f\xa6\x8d\xe4\x4f\x40\x43\xe1\x46\xe4\xd9\x03\x16\x4b\xf6\x2f\x00\x00\xff\xff\x7c\x93\x07\x81\x9b\x03\x00\x00")
 
 func _1721136888_recreate_indices_balance_history_remove_dupsUpSqlBytes() ([]byte, error) {
 	return bindataRead(
@@ -715,8 +716,8 @@ func _1721136888_recreate_indices_balance_history_remove_dupsUpSql() (*asset, er
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1721136888_recreate_indices_balance_history_remove_dups.up.sql", size: 861, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x10, 0x61, 0x2d, 0xbc, 0x57, 0xf8, 0x2, 0x5d, 0xa7, 0xab, 0xdd, 0xf1, 0x5a, 0x9f, 0xb6, 0x3c, 0xe, 0x7, 0x39, 0x45, 0xd4, 0x85, 0x79, 0x23, 0xa7, 0xb3, 0x61, 0xe1, 0x96, 0x8b, 0x2d, 0x14}}
+	info := bindataFileInfo{name: "1721136888_recreate_indices_balance_history_remove_dups.up.sql", size: 923, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x67, 0x30, 0xcd, 0x9, 0x20, 0x8a, 0x51, 0x9a, 0x36, 0xdc, 0x7e, 0xb1, 0xbd, 0x43, 0x8b, 0xcf, 0x4a, 0xa5, 0x67, 0x2a, 0xda, 0xf, 0xe5, 0x65, 0xea, 0xa9, 0xca, 0xc1, 0x54, 0x4e, 0xbe, 0x6f}}
 	return a, nil
 }
 
@@ -851,55 +852,82 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"1691753758_initial.up.sql":                                                     _1691753758_initialUpSql,
-	"1692701329_add_collectibles_and_collections_data_cache.up.sql":                 _1692701329_add_collectibles_and_collections_data_cacheUpSql,
-	"1692701339_add_scope_to_pending.up.sql":                                        _1692701339_add_scope_to_pendingUpSql,
-	"1694540071_add_collectibles_ownership_update_timestamp.up.sql":                 _1694540071_add_collectibles_ownership_update_timestampUpSql,
-	"1694692748_add_raw_balance_to_token_balances.up.sql":                           _1694692748_add_raw_balance_to_token_balancesUpSql,
-	"1695133989_add_community_id_to_collectibles_and_collections_data_cache.up.sql": _1695133989_add_community_id_to_collectibles_and_collections_data_cacheUpSql,
-	"1695932536_balance_history_v2.up.sql":                                          _1695932536_balance_history_v2UpSql,
-	"1696853635_input_data.up.sql":                                                  _1696853635_input_dataUpSql,
-	"1698117918_add_community_id_to_tokens.up.sql":                                  _1698117918_add_community_id_to_tokensUpSql,
-	"1698257443_add_community_metadata_to_wallet_db.up.sql":                         _1698257443_add_community_metadata_to_wallet_dbUpSql,
-	"1699987075_add_timestamp_and_state_to_community_data_cache.up.sql":             _1699987075_add_timestamp_and_state_to_community_data_cacheUpSql,
-	"1700414564_add_wallet_connect_pairings_table.up.sql":                           _1700414564_add_wallet_connect_pairings_tableUpSql,
-	"1701101493_add_token_blocks_range.up.sql":                                      _1701101493_add_token_blocks_rangeUpSql,
-	"1702467441_wallet_connect_sessions_instead_of_pairings.up.sql":                 _1702467441_wallet_connect_sessions_instead_of_pairingsUpSql,
-	"1702577524_add_community_collections_and_collectibles_images_cache.up.sql":     _1702577524_add_community_collections_and_collectibles_images_cacheUpSql,
-	"1702867707_add_balance_to_collectibles_ownership_cache.up.sql":                 _1702867707_add_balance_to_collectibles_ownership_cacheUpSql,
-	"1703686612_add_color_to_saved_addresses.up.sql":                                _1703686612_add_color_to_saved_addressesUpSql,
-	"1704701942_remove_favourite_and_change_primary_key_for_saved_addresses.up.sql": _1704701942_remove_favourite_and_change_primary_key_for_saved_addressesUpSql,
-	"1704913491_add_type_and_tx_timestamp_to_collectibles_ownership_cache.up.sql":   _1704913491_add_type_and_tx_timestamp_to_collectibles_ownership_cacheUpSql,
-	"1705664490_add_balance_check_fields_blocks_ranges_sequential.up.sql":           _1705664490_add_balance_check_fields_blocks_ranges_sequentialUpSql,
-	"1706531789_remove_gasfee-only-eth-transfers.up.sql":                            _1706531789_remove_gasfeeOnlyEthTransfersUpSql,
-	"1707160323_add_contract_type_table.up.sql":                                     _1707160323_add_contract_type_tableUpSql,
-	"1708089811_add_nullable_fiesl_blocks_ranges.up.sql":                            _1708089811_add_nullable_fiesl_blocks_rangesUpSql,
-	"1710189541_add_nonce_to_pending_transactions.up.sql":                           _1710189541_add_nonce_to_pending_transactionsUpSql,
-	"1712567001_add_soulbound_collectible_cache.up.sql":                             _1712567001_add_soulbound_collectible_cacheUpSql,
-	"1714670633_add_id_to_multi_transaction_table.up.sql":                           _1714670633_add_id_to_multi_transaction_tableUpSql,
-	"1715637927_add_collection_socials.up.sql":                                      _1715637927_add_collection_socialsUpSql,
-	"1715839555_rename_chain_prefixes.up.sql":                                       _1715839555_rename_chain_prefixesUpSql,
-	"1716313614_add_rpc_limits_table.up.sql":                                        _1716313614_add_rpc_limits_tableUpSql,
-	"1716912885_add_wallet_connect_dapps.up.sql":                                    _1716912885_add_wallet_connect_dappsUpSql,
-	"1721136888_recreate_indices_balance_history_remove_dups.up.sql":                _1721136888_recreate_indices_balance_history_remove_dupsUpSql,
-	"1721306883_add_connector_dapps.up.sql":                                         _1721306883_add_connector_dappsUpSql,
-	"doc.go":                                                                        docGo,
-}
+	"1691753758_initial.up.sql": _1691753758_initialUpSql,
 
-// AssetDebug is true if the assets were built with the debug flag enabled.
-const AssetDebug = false
+	"1692701329_add_collectibles_and_collections_data_cache.up.sql": _1692701329_add_collectibles_and_collections_data_cacheUpSql,
+
+	"1692701339_add_scope_to_pending.up.sql": _1692701339_add_scope_to_pendingUpSql,
+
+	"1694540071_add_collectibles_ownership_update_timestamp.up.sql": _1694540071_add_collectibles_ownership_update_timestampUpSql,
+
+	"1694692748_add_raw_balance_to_token_balances.up.sql": _1694692748_add_raw_balance_to_token_balancesUpSql,
+
+	"1695133989_add_community_id_to_collectibles_and_collections_data_cache.up.sql": _1695133989_add_community_id_to_collectibles_and_collections_data_cacheUpSql,
+
+	"1695932536_balance_history_v2.up.sql": _1695932536_balance_history_v2UpSql,
+
+	"1696853635_input_data.up.sql": _1696853635_input_dataUpSql,
+
+	"1698117918_add_community_id_to_tokens.up.sql": _1698117918_add_community_id_to_tokensUpSql,
+
+	"1698257443_add_community_metadata_to_wallet_db.up.sql": _1698257443_add_community_metadata_to_wallet_dbUpSql,
+
+	"1699987075_add_timestamp_and_state_to_community_data_cache.up.sql": _1699987075_add_timestamp_and_state_to_community_data_cacheUpSql,
+
+	"1700414564_add_wallet_connect_pairings_table.up.sql": _1700414564_add_wallet_connect_pairings_tableUpSql,
+
+	"1701101493_add_token_blocks_range.up.sql": _1701101493_add_token_blocks_rangeUpSql,
+
+	"1702467441_wallet_connect_sessions_instead_of_pairings.up.sql": _1702467441_wallet_connect_sessions_instead_of_pairingsUpSql,
+
+	"1702577524_add_community_collections_and_collectibles_images_cache.up.sql": _1702577524_add_community_collections_and_collectibles_images_cacheUpSql,
+
+	"1702867707_add_balance_to_collectibles_ownership_cache.up.sql": _1702867707_add_balance_to_collectibles_ownership_cacheUpSql,
+
+	"1703686612_add_color_to_saved_addresses.up.sql": _1703686612_add_color_to_saved_addressesUpSql,
+
+	"1704701942_remove_favourite_and_change_primary_key_for_saved_addresses.up.sql": _1704701942_remove_favourite_and_change_primary_key_for_saved_addressesUpSql,
+
+	"1704913491_add_type_and_tx_timestamp_to_collectibles_ownership_cache.up.sql": _1704913491_add_type_and_tx_timestamp_to_collectibles_ownership_cacheUpSql,
+
+	"1705664490_add_balance_check_fields_blocks_ranges_sequential.up.sql": _1705664490_add_balance_check_fields_blocks_ranges_sequentialUpSql,
+
+	"1706531789_remove_gasfee-only-eth-transfers.up.sql": _1706531789_remove_gasfeeOnlyEthTransfersUpSql,
+
+	"1707160323_add_contract_type_table.up.sql": _1707160323_add_contract_type_tableUpSql,
+
+	"1708089811_add_nullable_fiesl_blocks_ranges.up.sql": _1708089811_add_nullable_fiesl_blocks_rangesUpSql,
+
+	"1710189541_add_nonce_to_pending_transactions.up.sql": _1710189541_add_nonce_to_pending_transactionsUpSql,
+
+	"1712567001_add_soulbound_collectible_cache.up.sql": _1712567001_add_soulbound_collectible_cacheUpSql,
+
+	"1714670633_add_id_to_multi_transaction_table.up.sql": _1714670633_add_id_to_multi_transaction_tableUpSql,
+
+	"1715637927_add_collection_socials.up.sql": _1715637927_add_collection_socialsUpSql,
+
+	"1715839555_rename_chain_prefixes.up.sql": _1715839555_rename_chain_prefixesUpSql,
+
+	"1716313614_add_rpc_limits_table.up.sql": _1716313614_add_rpc_limits_tableUpSql,
+
+	"1716912885_add_wallet_connect_dapps.up.sql": _1716912885_add_wallet_connect_dappsUpSql,
+
+	"1721136888_recreate_indices_balance_history_remove_dups.up.sql": _1721136888_recreate_indices_balance_history_remove_dupsUpSql,
+
+	"1721306883_add_connector_dapps.up.sql": _1721306883_add_connector_dappsUpSql,
+
+	"doc.go": docGo,
+}
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//
-//	data/
-//	  foo.txt
-//	  img/
-//	    a.png
-//	    b.png
-//
+//     data/
+//       foo.txt
+//       img/
+//         a.png
+//         b.png
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -932,39 +960,39 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"1691753758_initial.up.sql":                                                     {_1691753758_initialUpSql, map[string]*bintree{}},
-	"1692701329_add_collectibles_and_collections_data_cache.up.sql":                 {_1692701329_add_collectibles_and_collections_data_cacheUpSql, map[string]*bintree{}},
-	"1692701339_add_scope_to_pending.up.sql":                                        {_1692701339_add_scope_to_pendingUpSql, map[string]*bintree{}},
-	"1694540071_add_collectibles_ownership_update_timestamp.up.sql":                 {_1694540071_add_collectibles_ownership_update_timestampUpSql, map[string]*bintree{}},
-	"1694692748_add_raw_balance_to_token_balances.up.sql":                           {_1694692748_add_raw_balance_to_token_balancesUpSql, map[string]*bintree{}},
-	"1695133989_add_community_id_to_collectibles_and_collections_data_cache.up.sql": {_1695133989_add_community_id_to_collectibles_and_collections_data_cacheUpSql, map[string]*bintree{}},
-	"1695932536_balance_history_v2.up.sql":                                          {_1695932536_balance_history_v2UpSql, map[string]*bintree{}},
-	"1696853635_input_data.up.sql":                                                  {_1696853635_input_dataUpSql, map[string]*bintree{}},
-	"1698117918_add_community_id_to_tokens.up.sql":                                  {_1698117918_add_community_id_to_tokensUpSql, map[string]*bintree{}},
-	"1698257443_add_community_metadata_to_wallet_db.up.sql":                         {_1698257443_add_community_metadata_to_wallet_dbUpSql, map[string]*bintree{}},
-	"1699987075_add_timestamp_and_state_to_community_data_cache.up.sql":             {_1699987075_add_timestamp_and_state_to_community_data_cacheUpSql, map[string]*bintree{}},
-	"1700414564_add_wallet_connect_pairings_table.up.sql":                           {_1700414564_add_wallet_connect_pairings_tableUpSql, map[string]*bintree{}},
-	"1701101493_add_token_blocks_range.up.sql":                                      {_1701101493_add_token_blocks_rangeUpSql, map[string]*bintree{}},
-	"1702467441_wallet_connect_sessions_instead_of_pairings.up.sql":                 {_1702467441_wallet_connect_sessions_instead_of_pairingsUpSql, map[string]*bintree{}},
-	"1702577524_add_community_collections_and_collectibles_images_cache.up.sql":     {_1702577524_add_community_collections_and_collectibles_images_cacheUpSql, map[string]*bintree{}},
-	"1702867707_add_balance_to_collectibles_ownership_cache.up.sql":                 {_1702867707_add_balance_to_collectibles_ownership_cacheUpSql, map[string]*bintree{}},
-	"1703686612_add_color_to_saved_addresses.up.sql":                                {_1703686612_add_color_to_saved_addressesUpSql, map[string]*bintree{}},
-	"1704701942_remove_favourite_and_change_primary_key_for_saved_addresses.up.sql": {_1704701942_remove_favourite_and_change_primary_key_for_saved_addressesUpSql, map[string]*bintree{}},
-	"1704913491_add_type_and_tx_timestamp_to_collectibles_ownership_cache.up.sql":   {_1704913491_add_type_and_tx_timestamp_to_collectibles_ownership_cacheUpSql, map[string]*bintree{}},
-	"1705664490_add_balance_check_fields_blocks_ranges_sequential.up.sql":           {_1705664490_add_balance_check_fields_blocks_ranges_sequentialUpSql, map[string]*bintree{}},
-	"1706531789_remove_gasfee-only-eth-transfers.up.sql":                            {_1706531789_remove_gasfeeOnlyEthTransfersUpSql, map[string]*bintree{}},
-	"1707160323_add_contract_type_table.up.sql":                                     {_1707160323_add_contract_type_tableUpSql, map[string]*bintree{}},
-	"1708089811_add_nullable_fiesl_blocks_ranges.up.sql":                            {_1708089811_add_nullable_fiesl_blocks_rangesUpSql, map[string]*bintree{}},
-	"1710189541_add_nonce_to_pending_transactions.up.sql":                           {_1710189541_add_nonce_to_pending_transactionsUpSql, map[string]*bintree{}},
-	"1712567001_add_soulbound_collectible_cache.up.sql":                             {_1712567001_add_soulbound_collectible_cacheUpSql, map[string]*bintree{}},
-	"1714670633_add_id_to_multi_transaction_table.up.sql":                           {_1714670633_add_id_to_multi_transaction_tableUpSql, map[string]*bintree{}},
-	"1715637927_add_collection_socials.up.sql":                                      {_1715637927_add_collection_socialsUpSql, map[string]*bintree{}},
-	"1715839555_rename_chain_prefixes.up.sql":                                       {_1715839555_rename_chain_prefixesUpSql, map[string]*bintree{}},
-	"1716313614_add_rpc_limits_table.up.sql":                                        {_1716313614_add_rpc_limits_tableUpSql, map[string]*bintree{}},
-	"1716912885_add_wallet_connect_dapps.up.sql":                                    {_1716912885_add_wallet_connect_dappsUpSql, map[string]*bintree{}},
-	"1721136888_recreate_indices_balance_history_remove_dups.up.sql":                {_1721136888_recreate_indices_balance_history_remove_dupsUpSql, map[string]*bintree{}},
-	"1721306883_add_connector_dapps.up.sql":                                         {_1721306883_add_connector_dappsUpSql, map[string]*bintree{}},
-	"doc.go":                                                                        {docGo, map[string]*bintree{}},
+	"1691753758_initial.up.sql":                                                     &bintree{_1691753758_initialUpSql, map[string]*bintree{}},
+	"1692701329_add_collectibles_and_collections_data_cache.up.sql":                 &bintree{_1692701329_add_collectibles_and_collections_data_cacheUpSql, map[string]*bintree{}},
+	"1692701339_add_scope_to_pending.up.sql":                                        &bintree{_1692701339_add_scope_to_pendingUpSql, map[string]*bintree{}},
+	"1694540071_add_collectibles_ownership_update_timestamp.up.sql":                 &bintree{_1694540071_add_collectibles_ownership_update_timestampUpSql, map[string]*bintree{}},
+	"1694692748_add_raw_balance_to_token_balances.up.sql":                           &bintree{_1694692748_add_raw_balance_to_token_balancesUpSql, map[string]*bintree{}},
+	"1695133989_add_community_id_to_collectibles_and_collections_data_cache.up.sql": &bintree{_1695133989_add_community_id_to_collectibles_and_collections_data_cacheUpSql, map[string]*bintree{}},
+	"1695932536_balance_history_v2.up.sql":                                          &bintree{_1695932536_balance_history_v2UpSql, map[string]*bintree{}},
+	"1696853635_input_data.up.sql":                                                  &bintree{_1696853635_input_dataUpSql, map[string]*bintree{}},
+	"1698117918_add_community_id_to_tokens.up.sql":                                  &bintree{_1698117918_add_community_id_to_tokensUpSql, map[string]*bintree{}},
+	"1698257443_add_community_metadata_to_wallet_db.up.sql":                         &bintree{_1698257443_add_community_metadata_to_wallet_dbUpSql, map[string]*bintree{}},
+	"1699987075_add_timestamp_and_state_to_community_data_cache.up.sql":             &bintree{_1699987075_add_timestamp_and_state_to_community_data_cacheUpSql, map[string]*bintree{}},
+	"1700414564_add_wallet_connect_pairings_table.up.sql":                           &bintree{_1700414564_add_wallet_connect_pairings_tableUpSql, map[string]*bintree{}},
+	"1701101493_add_token_blocks_range.up.sql":                                      &bintree{_1701101493_add_token_blocks_rangeUpSql, map[string]*bintree{}},
+	"1702467441_wallet_connect_sessions_instead_of_pairings.up.sql":                 &bintree{_1702467441_wallet_connect_sessions_instead_of_pairingsUpSql, map[string]*bintree{}},
+	"1702577524_add_community_collections_and_collectibles_images_cache.up.sql":     &bintree{_1702577524_add_community_collections_and_collectibles_images_cacheUpSql, map[string]*bintree{}},
+	"1702867707_add_balance_to_collectibles_ownership_cache.up.sql":                 &bintree{_1702867707_add_balance_to_collectibles_ownership_cacheUpSql, map[string]*bintree{}},
+	"1703686612_add_color_to_saved_addresses.up.sql":                                &bintree{_1703686612_add_color_to_saved_addressesUpSql, map[string]*bintree{}},
+	"1704701942_remove_favourite_and_change_primary_key_for_saved_addresses.up.sql": &bintree{_1704701942_remove_favourite_and_change_primary_key_for_saved_addressesUpSql, map[string]*bintree{}},
+	"1704913491_add_type_and_tx_timestamp_to_collectibles_ownership_cache.up.sql":   &bintree{_1704913491_add_type_and_tx_timestamp_to_collectibles_ownership_cacheUpSql, map[string]*bintree{}},
+	"1705664490_add_balance_check_fields_blocks_ranges_sequential.up.sql":           &bintree{_1705664490_add_balance_check_fields_blocks_ranges_sequentialUpSql, map[string]*bintree{}},
+	"1706531789_remove_gasfee-only-eth-transfers.up.sql":                            &bintree{_1706531789_remove_gasfeeOnlyEthTransfersUpSql, map[string]*bintree{}},
+	"1707160323_add_contract_type_table.up.sql":                                     &bintree{_1707160323_add_contract_type_tableUpSql, map[string]*bintree{}},
+	"1708089811_add_nullable_fiesl_blocks_ranges.up.sql":                            &bintree{_1708089811_add_nullable_fiesl_blocks_rangesUpSql, map[string]*bintree{}},
+	"1710189541_add_nonce_to_pending_transactions.up.sql":                           &bintree{_1710189541_add_nonce_to_pending_transactionsUpSql, map[string]*bintree{}},
+	"1712567001_add_soulbound_collectible_cache.up.sql":                             &bintree{_1712567001_add_soulbound_collectible_cacheUpSql, map[string]*bintree{}},
+	"1714670633_add_id_to_multi_transaction_table.up.sql":                           &bintree{_1714670633_add_id_to_multi_transaction_tableUpSql, map[string]*bintree{}},
+	"1715637927_add_collection_socials.up.sql":                                      &bintree{_1715637927_add_collection_socialsUpSql, map[string]*bintree{}},
+	"1715839555_rename_chain_prefixes.up.sql":                                       &bintree{_1715839555_rename_chain_prefixesUpSql, map[string]*bintree{}},
+	"1716313614_add_rpc_limits_table.up.sql":                                        &bintree{_1716313614_add_rpc_limits_tableUpSql, map[string]*bintree{}},
+	"1716912885_add_wallet_connect_dapps.up.sql":                                    &bintree{_1716912885_add_wallet_connect_dappsUpSql, map[string]*bintree{}},
+	"1721136888_recreate_indices_balance_history_remove_dups.up.sql":                &bintree{_1721136888_recreate_indices_balance_history_remove_dupsUpSql, map[string]*bintree{}},
+	"1721306883_add_connector_dapps.up.sql":                                         &bintree{_1721306883_add_connector_dappsUpSql, map[string]*bintree{}},
+	"doc.go":                                                                        &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
@@ -981,7 +1009,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}
