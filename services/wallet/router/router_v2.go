@@ -638,6 +638,15 @@ func (r *Router) getCrossChainsOptionsForSendingAmount(input *RouteInputParams, 
 
 		amountLocked := false
 		amountToSend := input.AmountIn.ToInt()
+
+		if amountToSend.Cmp(pathprocessor.ZeroBigIntValue) == 0 {
+			finalCrossChainAmountOptions[selectedFromChain.ChainID] = append(finalCrossChainAmountOptions[selectedFromChain.ChainID], amountOption{
+				amount: amountToSend,
+				locked: false,
+			})
+			continue
+		}
+
 		lockedAmount, fromChainLocked := input.FromLockedAmount[selectedFromChain.ChainID]
 		if fromChainLocked {
 			amountToSend = lockedAmount.ToInt()
@@ -823,6 +832,10 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 					//
 					// With the current routing algorithm atm we're not able to generate all possible routes.
 					if !input.SendType.canUseProcessor(pProcessor) {
+						continue
+					}
+
+					if !input.SendType.processZeroAmountInProcessor(amountOption.amount, input.AmountOut.ToInt(), pProcessor.Name()) {
 						continue
 					}
 

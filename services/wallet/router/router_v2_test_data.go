@@ -208,6 +208,54 @@ type normalTestParams struct {
 func getNormalTestParamsList() []normalTestParams {
 	return []normalTestParams{
 		{
+			name: "ETH transfer - No Specific FromChain - No Specific ToChain - 0 AmountIn",
+			input: &RouteInputParams{
+				testnetMode: false,
+				Uuid:        uuid.NewString(),
+				SendType:    Transfer,
+				AddrFrom:    common.HexToAddress("0x1"),
+				AddrTo:      common.HexToAddress("0x2"),
+				AmountIn:    (*hexutil.Big)(big.NewInt(0)),
+				TokenID:     pathprocessor.EthSymbol,
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.EthSymbol,
+						Decimals: 18,
+					},
+					tokenPrices:           testTokenPrices,
+					suggestedFees:         testSuggestedFees,
+					balanceMap:            testBalanceMapPerChain,
+					estimationMap:         testEstimationMap,
+					bonderFeeMap:          testBbonderFeeMap,
+					approvalGasEstimation: testApprovalGasEstimation,
+					approvalL1Fee:         testApprovalL1Fee,
+				},
+			},
+			expectedCandidates: []*PathV2{
+				{
+					ProcessorName:    pathprocessor.ProcessorTransferName,
+					FromChain:        &mainnet,
+					ToChain:          &mainnet,
+					ApprovalRequired: false,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorTransferName,
+					FromChain:        &optimism,
+					ToChain:          &optimism,
+					ApprovalRequired: false,
+				},
+				{
+					ProcessorName:    pathprocessor.ProcessorTransferName,
+					FromChain:        &arbitrum,
+					ToChain:          &arbitrum,
+					ApprovalRequired: false,
+				},
+			},
+		},
+		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain",
 			input: &RouteInputParams{
 				testnetMode: false,

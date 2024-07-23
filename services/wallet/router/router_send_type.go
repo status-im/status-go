@@ -133,6 +133,24 @@ func (s SendType) canUseProcessor(p pathprocessor.PathProcessor) bool {
 	}
 }
 
+func (s SendType) processZeroAmountInProcessor(amountIn *big.Int, amountOut *big.Int, processorName string) bool {
+	if amountIn.Cmp(pathprocessor.ZeroBigIntValue) == 0 {
+		if s == Transfer {
+			if processorName != pathprocessor.ProcessorTransferName {
+				return false
+			}
+		} else if s == Swap {
+			if amountOut.Cmp(pathprocessor.ZeroBigIntValue) == 0 {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (s SendType) isAvailableBetween(from, to *params.Network) bool {
 	if s.IsCollectiblesTransfer() ||
 		s.IsEnsTransfer() ||

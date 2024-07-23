@@ -438,7 +438,7 @@ func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.In
 	// Remove token fee from bonder fee as said here:
 	// https://docs.hop.exchange/v/developer-docs/api/api#get-v1-quote
 	// `bonderFee` - The suggested bonder fee for the amount in. The bonder fee also includes the cost of the destination transaction fee.
-	tokenFee := ZeroBigIntValue //new(big.Int).Sub(h.bonderFee.AmountIn.Int, h.bonderFee.EstimatedRecieved.Int)
+	tokenFee := new(big.Int).Sub(bonderFee.AmountIn.Int, bonderFee.EstimatedRecieved.Int)
 
 	return bonderFee.BonderFee.Int, tokenFee, nil
 }
