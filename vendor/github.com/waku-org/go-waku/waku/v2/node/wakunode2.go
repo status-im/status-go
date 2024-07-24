@@ -799,6 +799,17 @@ func (w *WakuNode) ClosePeerByAddress(address string) error {
 	return w.ClosePeerById(info.ID)
 }
 
+func (w *WakuNode) DisconnectAllPeers() {
+	w.host.Network().StopNotify(w.connectionNotif)
+	for _, peerID := range w.host.Network().Peers() {
+		err := w.ClosePeerById(peerID)
+		if err != nil {
+			w.log.Info("failed to close peer", zap.Stringer("peer", peerID), zap.Error(err))
+		}
+	}
+	w.host.Network().Notify(w.connectionNotif)
+}
+
 // ClosePeerById is used to close a connection to a peer
 func (w *WakuNode) ClosePeerById(id peer.ID) error {
 	err := w.host.Network().ClosePeer(id)

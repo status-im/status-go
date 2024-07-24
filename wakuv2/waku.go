@@ -161,6 +161,7 @@ type Waku struct {
 	connStatusSubscriptions map[string]*types.ConnStatusSubscription
 	connStatusMu            sync.Mutex
 	onlineChecker           *onlinechecker.DefaultOnlineChecker
+	state                   connection.State
 
 	logger *zap.Logger
 
@@ -1771,42 +1772,39 @@ func (w *Waku) StopDiscV5() error {
 	return nil
 }
 
-func (w *Waku) disconnectAllPeers() {
-	for _, peerID := range w.node.Host().Network().Peers() {
-		err := w.node.ClosePeerById(peerID)
-		if err != nil {
-			w.logger.Info("failed to close peer", zap.Stringer("peer", peerID), zap.Error(err))
-		}
-	}
-}
-
 func (w *Waku) ConnectionChanged(state connection.State) {
 	isOnline := !state.Offline
 	if w.cfg.LightClient {
 		//TODO: Update this as per  https://github.com/waku-org/go-waku/issues/1114
 		//Trigger FilterManager to take care of any pending filter subscriptions
 		go w.filterManager.onConnectionStatusChange(w.cfg.DefaultShardPubsubTopic, isOnline)
-	}
 
-	//TODO: analyze if we need to discover and connect to peers with peerExchange loop enabled.
-	if !w.onlineChecker.IsOnline() && isOnline {
-		go w.discoverAndConnectPeers()
-	}
-
-	//If connection state is reported by something other than peerCount becoming 0, disconnect all peers
-	if state.Offline && len(w.node.Host().Network().Peers()) > 0 {
-		go w.disconnectAllPeers()
-	}
-
-	if !w.cfg.LightClient && isOnline && !w.onlineChecker.IsOnline() {
-		select {
-		case w.goingOnline <- struct{}{}:
-		default:
-			w.logger.Warn("could not write on connection changed channel")
+		//If connection state is reported by something other than peerCount becoming 0 e.g from mobile app, disconnect all peers
+		if (state.Offline && len(w.node.Host().Network().Peers()) > 0) ||
+			(w.state.Type != state.Type && !w.state.Offline && !state.Offline) { // network switched between wifi and cellular
+			w.logger.Info("connection switched or offline detected via mobile, disconnecting all peers")
+			w.node.DisconnectAllPeers()
+			if w.cfg.LightClient {
+				w.filterManager.networkChange()
+			}
 		}
 	}
 
-	w.onlineChecker.SetOnline(isOnline)
+	if isOnline && !w.onlineChecker.IsOnline() {
+		//TODO: analyze if we need to discover and connect to peers with peerExchange loop enabled.
+		w.discoverAndConnectPeers()
+		if !w.cfg.LightClient {
+			select {
+			case w.goingOnline <- struct{}{}:
+			default:
+				w.logger.Warn("could not write on connection changed channel")
+			}
+			//for lightClient state is updated in filterManager.
+			w.onlineChecker.SetOnline(isOnline)
+		}
+	}
+
+	w.state = state
 }
 
 // seedBootnodesForDiscV5 tries to fetch bootnodes
