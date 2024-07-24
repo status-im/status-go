@@ -18,32 +18,37 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 )
 
-const pathWalletRoot = "m/44'/60'/0'/0"
-const pathEIP1581 = "m/43'/60'/1581'"
-const pathDefaultChat = pathEIP1581 + "/0'/0"
-const pathEncryption = pathEIP1581 + "/1'/0"
-const pathDefaultWallet = pathWalletRoot + "/0"
-const defaultMnemonicLength = 12
-const shardsTestClusterID = 16
-const walletAccountDefaultName = "Account 1"
-const keystoreRelativePath = "keystore"
-const DefaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
+const (
+	pathWalletRoot           = "m/44'/60'/0'/0"
+	pathEIP1581              = "m/43'/60'/1581'"
+	pathDefaultChat          = pathEIP1581 + "/0'/0"
+	pathEncryption           = pathEIP1581 + "/1'/0"
+	pathDefaultWallet        = pathWalletRoot + "/0"
+	defaultMnemonicLength    = 12
+	shardsTestClusterID      = 16
+	walletAccountDefaultName = "Account 1"
+	keystoreRelativePath     = "keystore"
 
-const DefaultDataDir = "/ethereum/mainnet_rpc"
-const DefaultNodeName = "StatusIM"
-const DefaultLogFile = "geth.log"
-const DefaultLogLevel = "ERROR"
-const DefaultMaxPeers = 20
-const DefaultMaxPendingPeers = 20
-const DefaultListenAddr = ":0"
-const DefaultMaxMessageDeliveryAttempts = 3
-const DefaultVerifyTransactionChainID = 1
+	DefaultKeycardPairingDataFile     = "/ethereum/mainnet_rpc/keycard/pairings.json"
+	DefaultDataDir                    = "/ethereum/mainnet_rpc"
+	DefaultNodeName                   = "StatusIM"
+	DefaultLogFile                    = "geth.log"
+	DefaultLogLevel                   = "ERROR"
+	DefaultMaxPeers                   = 20
+	DefaultMaxPendingPeers            = 20
+	DefaultListenAddr                 = ":0"
+	DefaultMaxMessageDeliveryAttempts = 3
+	DefaultVerifyTransactionChainID   = 1
+	DefaultCurrentNetwork             = "mainnet_rpc"
+)
 
-var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet, pathEncryption}
+var (
+	paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet, pathEncryption}
 
-var DefaultFleet = params.FleetStatusProd
+    DefaultFleet = params.FleetStatusProd
 
-var overrideApiConfig = overrideApiConfigProd
+	overrideApiConfig = overrideApiConfigProd
+)
 
 func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
@@ -77,7 +82,7 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	s.SigningPhrase = signingPhrase
 
 	s.SendPushNotifications = true
-	s.InstallationID = uuid.New().String()
+	s.InstallationID = GenerateInstallationID()
 	s.UseMailservers = true
 
 	s.PreviewPrivacy = true
@@ -102,7 +107,7 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	}
 	networkRawMessage := json.RawMessage(networksJSON)
 	s.Networks = &networkRawMessage
-	s.CurrentNetwork = "mainnet_rpc"
+	s.CurrentNetwork = DefaultCurrentNetwork
 
 	s.TokenGroupByCommunity = false
 	s.ShowCommunityAssetWhenSendingTokens = true
@@ -246,9 +251,10 @@ func overrideApiConfigProd(nodeConfig *params.NodeConfig, config *requests.APICo
 	nodeConfig.WSPort = config.WSPort
 }
 
-func defaultNodeConfig(installationID string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
+func DefaultNodeConfig(installationID string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
+	nodeConfig.RootDataDir = request.RootDataDir
 	nodeConfig.LogEnabled = request.LogEnabled
 	nodeConfig.LogFile = DefaultLogFile
 	nodeConfig.LogDir = request.LogFilePath
@@ -395,6 +401,12 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	return nodeConfig, nil
 }
 
+func DefaultKeystorePath(rootDataDir string, keyUID string) (string, string) {
+	relativePath := filepath.Join(keystoreRelativePath, keyUID)
+	absolutePath := filepath.Join(rootDataDir, relativePath)
+	return relativePath, absolutePath
+}
+
 func buildSigningPhrase() (string, error) {
 	length := big.NewInt(int64(len(dictionary)))
 	a, err := rand.Int(rand.Reader, length)
@@ -420,6 +432,10 @@ func randomWalletEmoji() (string, error) {
 		return "", err
 	}
 	return animalsAndNatureEmojis[index.Int64()], nil
+}
+
+func GenerateInstallationID() string {
+	return uuid.New().String()
 }
 
 var animalsAndNatureEmojis = []string{

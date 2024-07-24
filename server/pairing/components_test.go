@@ -54,7 +54,10 @@ func (tpsc *TestPairingServerComponents) SetupPairingServerComponents(t *testing
 
 	tpsc.SS, err = NewSenderServer(nil, &SenderServerConfig{ServerConfig: sc, SenderConfig: &SenderConfig{}})
 	require.NoError(t, err)
-	tpsc.RS, err = NewReceiverServer(nil, &ReceiverServerConfig{ServerConfig: sc, ReceiverConfig: &ReceiverConfig{}})
+	tpsc.RS, err = NewReceiverServer(nil, &ReceiverServerConfig{
+		ServerConfig:   sc,
+		ReceiverConfig: &ReceiverConfig{},
+	})
 	require.NoError(t, err)
 }
 

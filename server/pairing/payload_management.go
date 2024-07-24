@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+// FIXME: Reuse api.keystoreRelativePath.
 const keystoreDir = "keystore"
 
 var (
