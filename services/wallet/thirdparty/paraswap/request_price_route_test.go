@@ -101,15 +101,17 @@ func TestUnmarshallPriceRoute(t *testing.T) {
 	responseData := []byte(fmt.Sprintf(`{"priceRoute":%s}`, string(data)))
 
 	route := Route{
-		GasCost:           &bigint.BigInt{Int: big.NewInt(111435)},
-		SrcAmount:         &bigint.BigInt{Int: big.NewInt(1000000000000000000)},
-		SrcTokenAddress:   common.HexToAddress("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"),
-		SrcTokenDecimals:  18,
-		DestAmount:        &bigint.BigInt{Int: big.NewInt(1000000000000000000)},
-		DestTokenAddress:  common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
-		DestTokenDecimals: 18,
-		Side:              SellSide,
-		RawPriceRoute:     data,
+		GasCost:            &bigint.BigInt{Int: big.NewInt(111435)},
+		SrcAmount:          &bigint.BigInt{Int: big.NewInt(1000000000000000000)},
+		SrcTokenAddress:    common.HexToAddress("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"),
+		SrcTokenDecimals:   18,
+		DestAmount:         &bigint.BigInt{Int: big.NewInt(1000000000000000000)},
+		DestTokenAddress:   common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
+		DestTokenDecimals:  18,
+		Side:               SellSide,
+		RawPriceRoute:      data,
+		ContractAddress:    common.HexToAddress("0x485D2446711E141D2C8a94bC24BeaA5d5A110D74"),
+		TokenTransferProxy: common.HexToAddress("0x3e7d31751347BAacf35945074a4a4A41581B2271"),
 	}
 
 	receivedRoute, err := handlePriceRouteResponse(responseData)

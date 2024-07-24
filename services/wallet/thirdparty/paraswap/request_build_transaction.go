@@ -12,7 +12,7 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
 
-const transactionsURL = "https://apiv5.paraswap.io/transactions/%d"
+const transactionsURL = "https://api.paraswap.io/transactions/%d"
 
 type Transaction struct {
 	From     string `json:"from"`

@@ -21,14 +21,16 @@ import (
 
 func TestParaswapWithPartnerFee(t *testing.T) {
 	testPriceRoute := &paraswap.Route{
-		GasCost:           &bigint.BigInt{Int: big.NewInt(500)},
-		SrcAmount:         &bigint.BigInt{Int: big.NewInt(1000)},
-		SrcTokenAddress:   common.HexToAddress("0x123"),
-		SrcTokenDecimals:  18,
-		DestAmount:        &bigint.BigInt{Int: big.NewInt(2000)},
-		DestTokenAddress:  common.HexToAddress("0x465"),
-		DestTokenDecimals: 6,
-		Side:              paraswap.SellSide,
+		GasCost:            &bigint.BigInt{Int: big.NewInt(500)},
+		SrcAmount:          &bigint.BigInt{Int: big.NewInt(1000)},
+		SrcTokenAddress:    common.HexToAddress("0x123"),
+		SrcTokenDecimals:   18,
+		DestAmount:         &bigint.BigInt{Int: big.NewInt(2000)},
+		DestTokenAddress:   common.HexToAddress("0x465"),
+		DestTokenDecimals:  6,
+		Side:               paraswap.SellSide,
+		ContractAddress:    common.HexToAddress("0x789"),
+		TokenTransferProxy: common.HexToAddress("0xabc"),
 	}
 
 	processor := NewSwapParaswapProcessor(nil, nil, nil)
@@ -72,6 +74,11 @@ func TestParaswapWithPartnerFee(t *testing.T) {
 			require.NotNil(t, amountOut)
 			require.Equal(t, testPriceRoute.DestAmount.Uint64(), amountOut.Uint64())
 		}
+
+		// Check contract address
+		contractAddress, err := processor.GetContractAddress(testInputParams)
+		require.NoError(t, err)
+		require.Equal(t, testPriceRoute.TokenTransferProxy, contractAddress)
 	}
 }
 
