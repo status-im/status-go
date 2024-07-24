@@ -450,7 +450,7 @@ func (h *HopBridgeProcessor) CalculateAmountOut(params ProcessorInputParams) (*b
 		return nil, ErrNoBonderFeeFound
 	}
 	bonderFee := bonderFeeIns.(*BonderFee)
-	return bonderFee.EstimatedRecieved.Int, nil
+	return bonderFee.AmountOutMin.Int, nil
 }
 
 func (h *HopBridgeProcessor) packCctpL1BridgeTx(abi abi.ABI, toChainID uint64, to common.Address, bonderFee *BonderFee) ([]byte, error) {

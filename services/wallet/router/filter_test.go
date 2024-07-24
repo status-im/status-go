@@ -979,7 +979,6 @@ func TestFilterRoutesV2(t *testing.T) {
 			},
 			expectedRoutes: [][]*PathV2{
 				{pathC1A1, pathC2A2},
-				{pathC1A1, pathC2A1, pathC3A1},
 			},
 		},
 		{

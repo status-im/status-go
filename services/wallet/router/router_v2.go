@@ -81,8 +81,9 @@ type routerTestParams struct {
 }
 
 type amountOption struct {
-	amount *big.Int
-	locked bool
+	amount       *big.Int
+	locked       bool
+	subtractFees bool
 }
 
 func makeBalanceKey(chainID uint64, symbol string) string {
@@ -99,27 +100,35 @@ type PathV2 struct {
 	AmountInLocked bool               // Is the amount locked
 	AmountOut      *hexutil.Big       // Amount that will be received on the destination chain
 
-	SuggestedLevelsForMaxFeesPerGas *MaxFeesLevels // Suggested max fees for the transaction
+	SuggestedLevelsForMaxFeesPerGas *MaxFeesLevels // Suggested max fees for the transaction (in ETH WEI)
+	MaxFeesPerGas                   *hexutil.Big   // Max fees per gas (determined by client via GasFeeMode, in ETH WEI)
 
-	TxBaseFee     *hexutil.Big // Base fee for the transaction
-	TxPriorityFee *hexutil.Big // Priority fee for the transaction
+	TxBaseFee     *hexutil.Big // Base fee for the transaction (in ETH WEI)
+	TxPriorityFee *hexutil.Big // Priority fee for the transaction (in ETH WEI)
 	TxGasAmount   uint64       // Gas used for the transaction
-	TxBonderFees  *hexutil.Big // Bonder fees for the transaction - used for Hop bridge
-	TxTokenFees   *hexutil.Big // Token fees for the transaction - used for bridges (represent the difference between the amount in and the amount out)
-	TxL1Fee       *hexutil.Big // L1 fee for the transaction - used for for transactions placed on L2 chains
+	TxBonderFees  *hexutil.Big // Bonder fees for the transaction - used for Hop bridge (in selected token)
+	TxTokenFees   *hexutil.Big // Token fees for the transaction - used for bridges (represent the difference between the amount in and the amount out, in selected token)
+
+	TxFee   *hexutil.Big // fee for the transaction (includes tx fee only, doesn't include approval fees, l1 fees, l1 approval fees, token fees or bonders fees, in ETH WEI)
+	TxL1Fee *hexutil.Big // L1 fee for the transaction - used for for transactions placed on L2 chains (in ETH WEI)
 
 	ApprovalRequired        bool            // Is approval required for the transaction
 	ApprovalAmountRequired  *hexutil.Big    // Amount required for the approval transaction
 	ApprovalContractAddress *common.Address // Address of the contract that needs to be approved
-	ApprovalBaseFee         *hexutil.Big    // Base fee for the approval transaction
-	ApprovalPriorityFee     *hexutil.Big    // Priority fee for the approval transaction
+	ApprovalBaseFee         *hexutil.Big    // Base fee for the approval transaction (in ETH WEI)
+	ApprovalPriorityFee     *hexutil.Big    // Priority fee for the approval transaction (in ETH WEI)
 	ApprovalGasAmount       uint64          // Gas used for the approval transaction
-	ApprovalL1Fee           *hexutil.Big    // L1 fee for the approval transaction - used for for transactions placed on L2 chains
+
+	ApprovalFee   *hexutil.Big // Total fee for the approval transaction (includes approval tx fees only, doesn't include approval l1 fees, in ETH WEI)
+	ApprovalL1Fee *hexutil.Big // L1 fee for the approval transaction - used for for transactions placed on L2 chains (in ETH WEI)
+
+	TxTotalFee *hexutil.Big // Total fee for the transaction (includes tx fees, approval fees, l1 fees, l1 approval fees, in ETH WEI)
 
 	EstimatedTime TransactionEstimation
 
-	requiredTokenBalance  *big.Int
-	requiredNativeBalance *big.Int
+	requiredTokenBalance  *big.Int // (in selected token)
+	requiredNativeBalance *big.Int // (in ETH WEI)
+	subtractFees          bool
 }
 
 type ProcessorError struct {
@@ -249,7 +258,7 @@ func (n NodeV2) buildAllRoutesV2() [][]*PathV2 {
 	return res
 }
 
-func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice float64) []*PathV2 {
+func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeTokenPrice float64) []*PathV2 {
 	var best []*PathV2
 	bestCost := big.NewFloat(math.Inf(1))
 	for _, route := range routes {
@@ -257,69 +266,39 @@ func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeChainTokenPrice fl
 		for _, path := range route {
 			tokenDenominator := big.NewFloat(math.Pow(10, float64(path.FromToken.Decimals)))
 
-			path.requiredTokenBalance = big.NewInt(0)
-			path.requiredNativeBalance = big.NewInt(0)
-			if path.FromToken.IsNative() {
-				path.requiredNativeBalance.Add(path.requiredNativeBalance, path.AmountIn.ToInt())
-			} else {
-				path.requiredTokenBalance.Add(path.requiredTokenBalance, path.AmountIn.ToInt())
+			// calculate the cost of the path
+			nativeTokenPrice := new(big.Float).SetFloat64(nativeTokenPrice)
+
+			// tx fee
+			txFeeInEth := gweiToEth(weiToGwei(path.TxFee.ToInt()))
+			pathCost := new(big.Float).Mul(txFeeInEth, nativeTokenPrice)
+
+			if path.TxL1Fee.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+				txL1FeeInEth := gweiToEth(weiToGwei(path.TxL1Fee.ToInt()))
+				pathCost.Add(pathCost, new(big.Float).Mul(txL1FeeInEth, nativeTokenPrice))
 			}
 
-			// ecaluate the cost of the path
-			pathCost := big.NewFloat(0)
-			nativeTokenPrice := new(big.Float).SetFloat64(nativeChainTokenPrice)
-			if path.TxBaseFee != nil && path.TxPriorityFee != nil {
-				feePerGas := new(big.Int).Add(path.TxBaseFee.ToInt(), path.TxPriorityFee.ToInt())
-				txFeeInWei := new(big.Int).Mul(feePerGas, big.NewInt(int64(path.TxGasAmount)))
-				txFeeInEth := gweiToEth(weiToGwei(txFeeInWei))
-
-				path.requiredNativeBalance.Add(path.requiredNativeBalance, txFeeInWei)
-				pathCost = new(big.Float).Mul(txFeeInEth, nativeTokenPrice)
-			}
 			if path.TxBonderFees != nil && path.TxBonderFees.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
-				if path.FromToken.IsNative() {
-					path.requiredNativeBalance.Add(path.requiredNativeBalance, path.TxBonderFees.ToInt())
-				} else {
-					path.requiredTokenBalance.Add(path.requiredTokenBalance, path.TxBonderFees.ToInt())
-				}
 				pathCost.Add(pathCost, new(big.Float).Mul(
 					new(big.Float).Quo(new(big.Float).SetInt(path.TxBonderFees.ToInt()), tokenDenominator),
 					new(big.Float).SetFloat64(tokenPrice)))
 
 			}
-			if path.TxL1Fee != nil && path.TxL1Fee.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
-				l1FeeInWei := path.TxL1Fee.ToInt()
-				l1FeeInEth := gweiToEth(weiToGwei(l1FeeInWei))
 
-				path.requiredNativeBalance.Add(path.requiredNativeBalance, l1FeeInWei)
-				pathCost.Add(pathCost, new(big.Float).Mul(l1FeeInEth, nativeTokenPrice))
-			}
 			if path.TxTokenFees != nil && path.TxTokenFees.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 && path.FromToken != nil {
-				if path.FromToken.IsNative() {
-					path.requiredNativeBalance.Add(path.requiredNativeBalance, path.TxTokenFees.ToInt())
-				} else {
-					path.requiredTokenBalance.Add(path.requiredTokenBalance, path.TxTokenFees.ToInt())
-				}
 				pathCost.Add(pathCost, new(big.Float).Mul(
 					new(big.Float).Quo(new(big.Float).SetInt(path.TxTokenFees.ToInt()), tokenDenominator),
 					new(big.Float).SetFloat64(tokenPrice)))
 			}
+
 			if path.ApprovalRequired {
-				if path.ApprovalBaseFee != nil && path.ApprovalPriorityFee != nil {
-					feePerGas := new(big.Int).Add(path.ApprovalBaseFee.ToInt(), path.ApprovalPriorityFee.ToInt())
-					txFeeInWei := new(big.Int).Mul(feePerGas, big.NewInt(int64(path.ApprovalGasAmount)))
-					txFeeInEth := gweiToEth(weiToGwei(txFeeInWei))
+				// tx approval fee
+				approvalFeeInEth := gweiToEth(weiToGwei(path.ApprovalFee.ToInt()))
+				pathCost.Add(pathCost, new(big.Float).Mul(approvalFeeInEth, nativeTokenPrice))
 
-					path.requiredNativeBalance.Add(path.requiredNativeBalance, txFeeInWei)
-					pathCost.Add(pathCost, new(big.Float).Mul(txFeeInEth, nativeTokenPrice))
-				}
-
-				if path.ApprovalL1Fee != nil {
-					l1FeeInWei := path.ApprovalL1Fee.ToInt()
-					l1FeeInEth := gweiToEth(weiToGwei(l1FeeInWei))
-
-					path.requiredNativeBalance.Add(path.requiredNativeBalance, l1FeeInWei)
-					pathCost.Add(pathCost, new(big.Float).Mul(l1FeeInEth, nativeTokenPrice))
+				if path.ApprovalL1Fee.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+					approvalL1FeeInEth := gweiToEth(weiToGwei(path.ApprovalL1Fee.ToInt()))
+					pathCost.Add(pathCost, new(big.Float).Mul(approvalL1FeeInEth, nativeTokenPrice))
 				}
 			}
 
@@ -610,8 +589,9 @@ func (r *Router) getOptionsForAmoutToSplitAccrossChainsForProcessingChain(input 
 		if tokenBalance.Cmp(pathprocessor.ZeroBigIntValue) > 0 {
 			if tokenBalance.Cmp(amountToSplit) <= 0 {
 				crossChainAmountOptions[chain.ChainID] = append(crossChainAmountOptions[chain.ChainID], amountOption{
-					amount: tokenBalance,
-					locked: false,
+					amount:       tokenBalance,
+					locked:       false,
+					subtractFees: true, // for chains where we're taking the full balance, we want to subtract the fees
 				})
 				amountToSplit = new(big.Int).Sub(amountToSplit, tokenBalance)
 			} else if amountToSplit.Cmp(pathprocessor.ZeroBigIntValue) > 0 {
@@ -927,6 +907,43 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 							estimatedTime += 1
 						}
 
+						// calculate ETH fees
+						ethTotalFees := big.NewInt(0)
+						txFeeInWei := new(big.Int).Mul(maxFeesPerGas, big.NewInt(int64(gasLimit)))
+						ethTotalFees.Add(ethTotalFees, txFeeInWei)
+
+						txL1FeeInWei := big.NewInt(0)
+						if l1FeeWei > 0 {
+							txL1FeeInWei = big.NewInt(int64(l1FeeWei))
+							ethTotalFees.Add(ethTotalFees, txL1FeeInWei)
+						}
+
+						approvalFeeInWei := big.NewInt(0)
+						approvalL1FeeInWei := big.NewInt(0)
+						if approvalRequired {
+							approvalFeeInWei.Mul(maxFeesPerGas, big.NewInt(int64(approvalGasLimit)))
+							ethTotalFees.Add(ethTotalFees, approvalFeeInWei)
+
+							if l1ApprovalFee > 0 {
+								approvalL1FeeInWei = big.NewInt(int64(l1ApprovalFee))
+								ethTotalFees.Add(ethTotalFees, approvalL1FeeInWei)
+							}
+						}
+
+						// calculate required balances (bonder and token fees are already included in the amountIn by Hop bridge (once we include Celar we need to check how they handle the fees))
+						requiredNativeBalance := big.NewInt(0)
+						requiredTokenBalance := big.NewInt(0)
+
+						if token.IsNative() {
+							requiredNativeBalance.Add(requiredNativeBalance, amountOption.amount)
+							if !amountOption.subtractFees {
+								requiredNativeBalance.Add(requiredNativeBalance, ethTotalFees)
+							}
+						} else {
+							requiredTokenBalance.Add(requiredTokenBalance, amountOption.amount)
+							requiredNativeBalance.Add(requiredNativeBalance, ethTotalFees)
+						}
+
 						appendPathFn(&PathV2{
 							ProcessorName:  pProcessor.Name(),
 							FromChain:      network,
@@ -938,13 +955,16 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 							AmountOut:      (*hexutil.Big)(amountOut),
 
 							SuggestedLevelsForMaxFeesPerGas: fees.MaxFeesLevels,
+							MaxFeesPerGas:                   (*hexutil.Big)(maxFeesPerGas),
 
 							TxBaseFee:     (*hexutil.Big)(fees.BaseFee),
 							TxPriorityFee: (*hexutil.Big)(fees.MaxPriorityFeePerGas),
 							TxGasAmount:   gasLimit,
 							TxBonderFees:  (*hexutil.Big)(bonderFees),
 							TxTokenFees:   (*hexutil.Big)(tokenFees),
-							TxL1Fee:       (*hexutil.Big)(big.NewInt(int64(l1FeeWei))),
+
+							TxFee:   (*hexutil.Big)(txFeeInWei),
+							TxL1Fee: (*hexutil.Big)(txL1FeeInWei),
 
 							ApprovalRequired:        approvalRequired,
 							ApprovalAmountRequired:  (*hexutil.Big)(approvalAmountRequired),
@@ -952,9 +972,17 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 							ApprovalBaseFee:         (*hexutil.Big)(fees.BaseFee),
 							ApprovalPriorityFee:     (*hexutil.Big)(fees.MaxPriorityFeePerGas),
 							ApprovalGasAmount:       approvalGasLimit,
-							ApprovalL1Fee:           (*hexutil.Big)(big.NewInt(int64(l1ApprovalFee))),
+
+							ApprovalFee:   (*hexutil.Big)(approvalFeeInWei),
+							ApprovalL1Fee: (*hexutil.Big)(approvalL1FeeInWei),
+
+							TxTotalFee: (*hexutil.Big)(ethTotalFees),
 
 							EstimatedTime: estimatedTime,
+
+							subtractFees:          amountOption.subtractFees,
+							requiredTokenBalance:  requiredTokenBalance,
+							requiredNativeBalance: requiredNativeBalance,
 						})
 					}
 				}
@@ -993,7 +1021,8 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute []*
 }
 
 func removeBestRouteFromAllRouters(allRoutes [][]*PathV2, best []*PathV2) [][]*PathV2 {
-	for i, route := range allRoutes {
+	for i := len(allRoutes) - 1; i >= 0; i-- {
+		route := allRoutes[i]
 		routeFound := true
 		for _, p := range route {
 			found := false
@@ -1031,13 +1060,13 @@ func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, can
 	}
 
 	tokenPrice := prices[input.TokenID]
-	nativeChainTokenPrice := prices[pathprocessor.EthSymbol]
+	nativeTokenPrice := prices[pathprocessor.EthSymbol]
 
 	var allRoutes [][]*PathV2
-	suggestedRoutes, allRoutes = newSuggestedRoutesV2(input.Uuid, input.AmountIn.ToInt(), candidates, input.FromLockedAmount, tokenPrice, nativeChainTokenPrice)
+	suggestedRoutes, allRoutes = newSuggestedRoutesV2(input.Uuid, input.AmountIn.ToInt(), candidates, input.FromLockedAmount, tokenPrice, nativeTokenPrice)
 
 	for len(allRoutes) > 0 {
-		best := findBestV2(allRoutes, tokenPrice, nativeChainTokenPrice)
+		best := findBestV2(allRoutes, tokenPrice, nativeTokenPrice)
 
 		err := r.checkBalancesForTheBestRoute(ctx, best, input, balanceMap)
 		if err != nil {
@@ -1057,6 +1086,22 @@ func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, can
 			sort.Slice(best, func(i, j int) bool {
 				return best[i].AmountInLocked
 			})
+
+			// At this point we have to do the final check and update the amountIn (subtracting fees) if complete balance is going to be sent for native token (ETH)
+			for _, path := range best {
+				if path.subtractFees && path.FromToken.IsNative() {
+					path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.TxFee.ToInt())
+					if path.TxL1Fee.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+						path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.TxL1Fee.ToInt())
+					}
+					if path.ApprovalRequired {
+						path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.ApprovalFee.ToInt())
+						if path.ApprovalL1Fee.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+							path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.ApprovalL1Fee.ToInt())
+						}
+					}
+				}
+			}
 		}
 		suggestedRoutes.Best = best
 		break
