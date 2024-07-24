@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-const tokensURL = "https://apiv5.paraswap.io/tokens/%d" // nolint: gosec
+const tokensURL = "https://api.paraswap.io/tokens/%d" // nolint: gosec
 
 type Token struct {
 	Symbol   string `json:"symbol"`

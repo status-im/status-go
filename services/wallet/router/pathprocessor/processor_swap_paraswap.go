@@ -197,16 +197,15 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams) (uint64
 }
 
 func (s *SwapParaswapProcessor) GetContractAddress(params ProcessorInputParams) (address common.Address, err error) {
-	if params.FromChain.ChainID == walletCommon.EthereumMainnet {
-		address = common.HexToAddress("0x216b4b4ba9f3e719726886d34a177484278bfcae")
-	} else if params.FromChain.ChainID == walletCommon.ArbitrumMainnet {
-		address = common.HexToAddress("0x216b4b4ba9f3e719726886d34a177484278bfcae")
-	} else if params.FromChain.ChainID == walletCommon.OptimismMainnet {
-		address = common.HexToAddress("0x216b4b4ba9f3e719726886d34a177484278bfcae")
-	} else {
-		err = ErrContractNotFound
+	key := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol)
+	priceRouteIns, ok := s.priceRoute.Load(key)
+	if !ok {
+		err = ErrPriceRouteNotFound
+		return
 	}
-	return
+	priceRoute := priceRouteIns.(*paraswap.Route)
+
+	return priceRoute.TokenTransferProxy, nil
 }
 
 func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorTxArgs) error {

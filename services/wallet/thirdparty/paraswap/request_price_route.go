@@ -13,18 +13,20 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
-const pricesURL = "https://apiv5.paraswap.io/prices"
+const pricesURL = "https://api.paraswap.io/prices"
 
 type Route struct {
-	GasCost           *bigint.BigInt  `json:"gasCost"`
-	SrcAmount         *bigint.BigInt  `json:"srcAmount"`
-	SrcTokenAddress   common.Address  `json:"srcToken"`
-	SrcTokenDecimals  uint            `json:"srcDecimals"`
-	DestAmount        *bigint.BigInt  `json:"destAmount"`
-	DestTokenAddress  common.Address  `json:"destToken"`
-	DestTokenDecimals uint            `json:"destDecimals"`
-	RawPriceRoute     json.RawMessage `json:"rawPriceRoute"`
-	Side              SwapSide        `json:"side"`
+	GasCost            *bigint.BigInt  `json:"gasCost"`
+	SrcAmount          *bigint.BigInt  `json:"srcAmount"`
+	SrcTokenAddress    common.Address  `json:"srcToken"`
+	SrcTokenDecimals   uint            `json:"srcDecimals"`
+	DestAmount         *bigint.BigInt  `json:"destAmount"`
+	DestTokenAddress   common.Address  `json:"destToken"`
+	DestTokenDecimals  uint            `json:"destDecimals"`
+	RawPriceRoute      json.RawMessage `json:"rawPriceRoute"`
+	Side               SwapSide        `json:"side"`
+	ContractAddress    common.Address  `json:"contractAddress"`
+	TokenTransferProxy common.Address  `json:"tokenTransferProxy"`
 }
 
 type PriceRouteResponse struct {
@@ -48,7 +50,7 @@ func (c *ClientV5) FetchPriceRoute(ctx context.Context, srcTokenAddress common.A
 	params.Add("side", string(side))
 	params.Add("partner", c.partnerID)
 	params.Add("excludeContractMethodsWithoutFeeModel", "true")
-	params.Add("excludeDEXS", "AugustusRFQ") // This DEX causes issues when creating the transaction
+	params.Add("version", "6.2")
 
 	url := pricesURL
 	response, err := c.httpClient.DoGetRequest(ctx, url, params, nil)
