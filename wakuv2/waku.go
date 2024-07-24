@@ -1388,6 +1388,7 @@ func (w *Waku) Start() error {
 				}
 
 				w.ConnectionChanged(connection.State{
+					Type:    w.state.Type, //setting state type as previous one since there won't be a change here
 					Offline: !latestConnStatus.IsOnline,
 				})
 			}
