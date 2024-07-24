@@ -1792,19 +1792,21 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 	}
 
 	if isOnline && !w.onlineChecker.IsOnline() {
-		//TODO: analyze if we need to discover and connect to peers with peerExchange loop enabled.
-		w.discoverAndConnectPeers()
 		if !w.cfg.LightClient {
+			//TODO: analyze if we need to discover and connect to peers with peerExchange loop enabled.
+			w.discoverAndConnectPeers()
 			select {
 			case w.goingOnline <- struct{}{}:
 			default:
 				w.logger.Warn("could not write on connection changed channel")
 			}
-			//for lightClient state is updated in filterManager.
-			w.onlineChecker.SetOnline(isOnline)
+
 		}
 	}
-
+	if !w.cfg.LightClient {
+		//for lightClient state is updated in filterManager.
+		w.onlineChecker.SetOnline(isOnline)
+	}
 	w.state = state
 }
 
