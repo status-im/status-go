@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -328,19 +329,21 @@ func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *wpb.WakuMessa
 
 	logger.Debug("publishing message", zap.Stringers("peers", params.selectedPeers))
 	var wg sync.WaitGroup
-	var responses []*pb.PushResponse
-	for _, peerID := range params.selectedPeers {
+	responses := make([]*pb.PushResponse, params.selectedPeers.Len())
+	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	for i, peerID := range params.selectedPeers {
 		wg.Add(1)
-		go func(id peer.ID) {
+		go func(index int, id peer.ID) {
 			paramsValue := *params
 			paramsValue.requestID = protocol.GenerateRequestID()
 			defer wg.Done()
-			response, err := wakuLP.request(ctx, req, &paramsValue, id)
+			response, err := wakuLP.request(reqCtx, req, &paramsValue, id)
 			if err != nil {
 				logger.Error("could not publish message", zap.Error(err), zap.Stringer("peer", id))
 			}
-			responses = append(responses, response)
-		}(peerID)
+			responses[index] = response
+		}(i, peerID)
 	}
 	wg.Wait()
 	var successCount int

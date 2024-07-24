@@ -111,7 +111,7 @@ func (mgr *FilterManager) addFilter(filterID string, f *common.Filter) {
 
 	afilter, ok := mgr.incompleteFilterBatch[f.PubsubTopic]
 	if !ok {
-		//no existing batch for pubsubTopic
+		// no existing batch for pubsubTopic
 		mgr.logger.Debug("new pubsubTopic batch", zap.String("topic", f.PubsubTopic))
 		cf := mgr.buildContentFilter(f.PubsubTopic, f.ContentTopics)
 		afilter = filterConfig{uuid.NewString(), cf}
@@ -120,9 +120,9 @@ func (mgr *FilterManager) addFilter(filterID string, f *common.Filter) {
 	} else {
 		mgr.logger.Debug("existing pubsubTopic batch", zap.String("agg-filter-id", afilter.ID), zap.String("topic", f.PubsubTopic))
 		if len(afilter.contentFilter.ContentTopics)+len(f.ContentTopics) > filterSubBatchSize {
-			//filter batch limit is hit
+			// filter batch limit is hit
 			if mgr.onlineChecker.IsOnline() {
-				//node is online, go ahead and subscribe the batch
+				// node is online, go ahead and subscribe the batch
 				mgr.logger.Debug("crossed pubsubTopic batchsize and online, subscribing to filters", zap.String("agg-filter-id", afilter.ID), zap.String("topic", f.PubsubTopic), zap.Int("batch-size", len(afilter.contentFilter.ContentTopics)+len(f.ContentTopics)))
 				go mgr.subscribeAndRunLoop(afilter)
 			} else {
@@ -136,7 +136,7 @@ func (mgr *FilterManager) addFilter(filterID string, f *common.Filter) {
 			mgr.incompleteFilterBatch[f.PubsubTopic] = afilter
 			mgr.filterConfigs[filterID] = filterConfig{afilter.ID, cf}
 		} else {
-			//add to existing batch as batch limit not reached
+			// add to existing batch as batch limit not reached
 			var contentTopics []string
 			for _, ct := range maps.Keys(f.ContentTopics) {
 				afilter.contentFilter.ContentTopics[ct.ContentTopic()] = struct{}{}
@@ -165,14 +165,14 @@ func (mgr *FilterManager) subscribeAndRunLoop(f filterConfig) {
 }
 
 func (mgr *FilterManager) networkChange() {
-	mgr.node.PingPeers() //Ping all peers to check if subscriptions are alive
+	mgr.node.PingPeers() // ping all peers to check if subscriptions are alive
 }
 
 func (mgr *FilterManager) onConnectionStatusChange(pubsubTopic string, newStatus bool) {
 	subs := mgr.node.Subscriptions()
 	mgr.logger.Debug("inside on connection status change", zap.Bool("new-status", newStatus),
 		zap.Int("agg filters count", len(mgr.filterSubscriptions)), zap.Int("filter subs count", len(subs)))
-	if newStatus && !mgr.onlineChecker.IsOnline() { //switched from offline to Online
+	if newStatus && !mgr.onlineChecker.IsOnline() { // switched from offline to Online
 		mgr.networkChange()
 		mgr.logger.Debug("switching from offline to online")
 		mgr.Lock()
@@ -180,7 +180,7 @@ func (mgr *FilterManager) onConnectionStatusChange(pubsubTopic string, newStatus
 			for af := range mgr.waitingToSubQueue {
 				// TODO: change the below logic once topic specific health is implemented for lightClients
 				if pubsubTopic == "" || pubsubTopic == af.contentFilter.PubsubTopic {
-					// Check if any filter subs are pending and subscribe them
+					// check if any filter subs are pending and subscribe them
 					mgr.logger.Debug("subscribing from filter queue", zap.String("filter-id", af.ID), zap.Stringer("content-filter", af.contentFilter))
 					go mgr.subscribeAndRunLoop(af)
 				} else {

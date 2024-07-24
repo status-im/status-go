@@ -339,7 +339,7 @@ func (wakuM *WakuMetadata) DisconnectPeerOnShardMismatch(ctx context.Context, pe
 		return err
 	}
 
-	if !rs.ContainsAnyShard(rs.ClusterID, peerShards) {
+	if rs != nil && !rs.ContainsAnyShard(rs.ClusterID, peerShards) {
 		wakuM.log.Info("shard mismatch", logging.HostID("peerID", peerID), zap.Uint16("clusterID", rs.ClusterID), zap.Uint16s("ourShardIDs", rs.ShardIDs), zap.Uint16s("theirShardIDs", peerShards))
 		wakuM.disconnect(peerID)
 		return errors.New("shard mismatch")

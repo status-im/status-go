@@ -1773,38 +1773,38 @@ func (w *Waku) StopDiscV5() error {
 	return nil
 }
 
+func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
+	//If connection state is reported by something other than peerCount becoming 0 e.g from mobile app, disconnect all peers
+	if (state.Offline && len(w.node.Host().Network().Peers()) > 0) ||
+		(w.state.Type != state.Type && !w.state.Offline && !state.Offline) { // network switched between wifi and cellular
+		w.logger.Info("connection switched or offline detected via mobile, disconnecting all peers")
+		w.node.DisconnectAllPeers()
+		if w.cfg.LightClient {
+			w.filterManager.networkChange()
+		}
+	}
+}
+
 func (w *Waku) ConnectionChanged(state connection.State) {
 	isOnline := !state.Offline
 	if w.cfg.LightClient {
 		//TODO: Update this as per  https://github.com/waku-org/go-waku/issues/1114
-		//Trigger FilterManager to take care of any pending filter subscriptions
+		// trigger FilterManager to take care of any pending filter subscriptions
 		go w.filterManager.onConnectionStatusChange(w.cfg.DefaultShardPubsubTopic, isOnline)
-
-		//If connection state is reported by something other than peerCount becoming 0 e.g from mobile app, disconnect all peers
-		if (state.Offline && len(w.node.Host().Network().Peers()) > 0) ||
-			(w.state.Type != state.Type && !w.state.Offline && !state.Offline) { // network switched between wifi and cellular
-			w.logger.Info("connection switched or offline detected via mobile, disconnecting all peers")
-			w.node.DisconnectAllPeers()
-			if w.cfg.LightClient {
-				w.filterManager.networkChange()
-			}
-		}
-	}
-
-	if isOnline && !w.onlineChecker.IsOnline() {
-		if !w.cfg.LightClient {
-			//TODO: analyze if we need to discover and connect to peers with peerExchange loop enabled.
+		w.handleNetworkChangeFromApp(state)
+	} else {
+		// for lightClient state update and onlineChange is handled in filterManager.
+		// going online
+		if isOnline && !w.onlineChecker.IsOnline() {
+			//TODO: analyze if we need to discover and connect to peers for relay.
 			w.discoverAndConnectPeers()
 			select {
 			case w.goingOnline <- struct{}{}:
 			default:
 				w.logger.Warn("could not write on connection changed channel")
 			}
-
 		}
-	}
-	if !w.cfg.LightClient {
-		//for lightClient state is updated in filterManager.
+		// update state
 		w.onlineChecker.SetOnline(isOnline)
 	}
 	w.state = state

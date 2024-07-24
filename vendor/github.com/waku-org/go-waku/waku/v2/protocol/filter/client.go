@@ -407,21 +407,35 @@ func (wf *WakuFilterLightNode) Subscribe(ctx context.Context, contentFilter prot
 
 		paramsCopy := params.Copy()
 		paramsCopy.selectedPeers = selectedPeers
-		for _, peer := range selectedPeers {
-			err := wf.request(
-				ctx,
-				params.requestID,
-				pb.FilterSubscribeRequest_SUBSCRIBE,
-				cFilter,
-				peer)
-			if err != nil {
-				wf.log.Error("Failed to subscribe", zap.String("pubSubTopic", pubSubTopic), zap.Strings("contentTopics", cTopics),
-					zap.Error(err))
-				failedContentTopics = append(failedContentTopics, cTopics...)
-				continue
+		var wg sync.WaitGroup
+		reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		tmpSubs := make([]*subscription.SubscriptionDetails, len(selectedPeers))
+		for i, peerID := range selectedPeers {
+			wg.Add(1)
+			go func(index int, ID peer.ID) {
+				defer wg.Done()
+				err := wf.request(
+					reqCtx,
+					params.requestID,
+					pb.FilterSubscribeRequest_SUBSCRIBE,
+					cFilter,
+					ID)
+				if err != nil {
+					wf.log.Error("Failed to subscribe", zap.String("pubSubTopic", pubSubTopic), zap.Strings("contentTopics", cTopics),
+						zap.Error(err))
+					failedContentTopics = append(failedContentTopics, cTopics...)
+				} else {
+					wf.log.Debug("subscription successful", zap.String("pubSubTopic", pubSubTopic), zap.Strings("contentTopics", cTopics), zap.Stringer("peer", ID))
+					tmpSubs[index] = wf.subscriptions.NewSubscription(ID, cFilter)
+				}
+			}(i, peerID)
+		}
+		wg.Wait()
+		for _, sub := range tmpSubs {
+			if sub != nil {
+				subscriptions = append(subscriptions, sub)
 			}
-			wf.log.Debug("subscription successful", zap.String("pubSubTopic", pubSubTopic), zap.Strings("contentTopics", cTopics), zap.Stringer("peer", peer))
-			subscriptions = append(subscriptions, wf.subscriptions.NewSubscription(peer, cFilter))
 		}
 	}
 
