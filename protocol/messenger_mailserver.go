@@ -98,7 +98,7 @@ func (m *Messenger) connectToNewMailserverAndWait() error {
 	}
 	// If pinned mailserver is not nil, no need to disconnect and wait for it to be available
 	if pinnedMailserver == nil {
-		m.disconnectActiveMailserver()
+		m.disconnectActiveMailserver(graylistBackoff)
 	}
 
 	return m.findNewMailserver()
@@ -1045,12 +1045,11 @@ func (m *Messenger) ToggleUseMailservers(value bool) error {
 		return err
 	}
 
+	m.disconnectActiveMailserver(backoffByUserAction)
 	if value {
 		m.cycleMailservers()
 		return nil
 	}
-
-	m.disconnectActiveMailserver()
 	return nil
 }
 
@@ -1060,6 +1059,7 @@ func (m *Messenger) SetPinnedMailservers(mailservers map[string]string) error {
 		return err
 	}
 
+	m.disconnectActiveMailserver(backoffByUserAction)
 	m.cycleMailservers()
 	return nil
 }
