@@ -47,6 +47,8 @@ func (c *ClientV5) FetchPriceRoute(ctx context.Context, srcTokenAddress common.A
 	params.Add("amount", amountWei.String())
 	params.Add("side", string(side))
 	params.Add("partner", c.partnerID)
+	params.Add("excludeContractMethodsWithoutFeeModel", "true")
+	params.Add("excludeDEXS", "AugustusRFQ") // This DEX causes issues when creating the transaction
 
 	url := pricesURL
 	response, err := c.httpClient.DoGetRequest(ctx, url, params)
