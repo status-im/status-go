@@ -26,6 +26,7 @@ import (
 
 const defaultBackoff = 10 * time.Second
 const graylistBackoff = 3 * time.Minute
+const backoffByUserAction = 0
 const isAndroidEmulator = runtime.GOOS == "android" && runtime.GOARCH == "amd64"
 const findNearestMailServer = !isAndroidEmulator
 const overrideDNS = runtime.GOOS == "android" || runtime.GOOS == "ios"
@@ -98,10 +99,10 @@ func (m *Messenger) StartMailserverCycle(mailservers []mailservers.Mailserver) e
 func (m *Messenger) DisconnectActiveMailserver() {
 	m.mailserverCycle.Lock()
 	defer m.mailserverCycle.Unlock()
-	m.disconnectActiveMailserver()
+	m.disconnectActiveMailserver(graylistBackoff)
 }
 
-func (m *Messenger) disconnectMailserver() error {
+func (m *Messenger) disconnectMailserver(backoffDuration time.Duration) error {
 	if m.mailserverCycle.activeMailserver == nil {
 		m.logger.Info("no active mailserver")
 		return nil
@@ -111,13 +112,14 @@ func (m *Messenger) disconnectMailserver() error {
 	pInfo, ok := m.mailserverCycle.peers[m.mailserverCycle.activeMailserver.ID]
 	if ok {
 		pInfo.status = disconnected
-		pInfo.canConnectAfter = time.Now().Add(graylistBackoff)
+
+		pInfo.canConnectAfter = time.Now().Add(backoffDuration)
 		m.mailserverCycle.peers[m.mailserverCycle.activeMailserver.ID] = pInfo
 	} else {
 		m.mailserverCycle.peers[m.mailserverCycle.activeMailserver.ID] = peerStatus{
 			status:          disconnected,
 			mailserver:      *m.mailserverCycle.activeMailserver,
-			canConnectAfter: time.Now().Add(graylistBackoff),
+			canConnectAfter: time.Now().Add(backoffDuration),
 		}
 	}
 	m.mailPeersMutex.Unlock()
@@ -136,8 +138,8 @@ func (m *Messenger) disconnectMailserver() error {
 	return nil
 }
 
-func (m *Messenger) disconnectActiveMailserver() {
-	err := m.disconnectMailserver()
+func (m *Messenger) disconnectActiveMailserver(backoffDuration time.Duration) {
+	err := m.disconnectMailserver(backoffDuration)
 	if err != nil {
 		m.logger.Error("failed to disconnect mailserver", zap.Error(err))
 	}
@@ -148,7 +150,7 @@ func (m *Messenger) cycleMailservers() {
 	m.logger.Info("Automatically switching mailserver")
 
 	if m.mailserverCycle.activeMailserver != nil {
-		m.disconnectActiveMailserver()
+		m.disconnectActiveMailserver(graylistBackoff)
 	}
 
 	useMailserver, err := m.settings.CanUseMailservers()
@@ -620,7 +622,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 
 				signal.SendMailserverNotWorking()
 				m.penalizeMailserver(m.mailserverCycle.activeMailserver.ID)
-				m.disconnectActiveMailserver()
+				m.disconnectActiveMailserver(graylistBackoff)
 			}
 		}
 
