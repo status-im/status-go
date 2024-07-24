@@ -1622,6 +1622,8 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 		zap.Int64("timestamp", e.Envelope.Message().GetTimestamp()),
 	)
 
+	logger.Debug("waku.processMessage")
+
 	if e.MsgType == common.StoreMessageType {
 		// We need to insert it first, and then remove it if not matched,
 		// as messages are processed asynchronously

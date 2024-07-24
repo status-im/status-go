@@ -248,6 +248,7 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
 		if matched && decodedMsg != nil {
 			log.Debug("processing message: decrypted", "envelopeHash", recvMessage.Hash().Hex())
 			if watcher.Src == nil || IsPubKeyEqual(decodedMsg.Src, watcher.Src) {
+				log.Debug("processing message: triggering watcher", "envelopeHash", recvMessage.Hash().Hex())
 				watcher.Trigger(decodedMsg)
 			}
 		}
@@ -276,6 +277,10 @@ func (f *Filter) Trigger(msg *ReceivedMessage) {
 // to a filter.
 func (f *Filter) Retrieve() []*ReceivedMessage {
 	msgs, err := f.Messages.Pop()
+	log.Debug("Retrieve messages from filter",
+		"filter", f.id,
+		"msgsCount", len(msgs),
+	)
 	if err != nil {
 		log.Error("failed to retrieve messages from filter store", "error", err)
 		return nil

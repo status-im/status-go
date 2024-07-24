@@ -232,8 +232,10 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 			logger.Warn("failed to fetch messages", zap.Error(err))
 			continue
 		}
+
 		// Don't pull from filters we don't listen to
 		if !filter.Listen {
+			logger.Debug("skip filter as not listened", zap.String("filterID", filter.FilterID))
 			for _, msg := range msgs {
 				t.waku.MarkP2PMessageAsProcessed(common.BytesToHash(msg.Hash))
 			}
@@ -249,6 +251,11 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 			id := types.EncodeHex(msgs[i].Hash)
 			ids[i] = id
 		}
+
+		logger.Debug("retrieved raw messages",
+			zap.String("filterID", filter.FilterID),
+			zap.Any("ids", ids),
+		)
 
 		hits, err := t.cache.Hits(ids)
 		if err != nil {

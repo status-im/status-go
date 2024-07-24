@@ -3442,7 +3442,9 @@ func (m *Messenger) SyncVerificationRequest(ctx context.Context, vr *verificatio
 // RetrieveAll retrieves messages from all filters, processes them and returns a
 // MessengerResponse to the client
 func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
+	m.logger.Debug("RetrieveAll start")
 	chatWithMessages, err := m.transport.RetrieveRawAll()
+	m.logger.Debug("RetrieveAll end", zap.Any("chatWithMessages", chatWithMessages))
 	if err != nil {
 		return nil, err
 	}
@@ -3451,6 +3453,7 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 }
 
 func (m *Messenger) StartRetrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
+	m.logger.Debug("starting RetrieveMessagesLoop")
 	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer m.shutdownWaitGroup.Done()
@@ -3468,6 +3471,7 @@ func (m *Messenger) StartRetrieveMessagesLoop(tick time.Duration, cancel <-chan 
 }
 
 func (m *Messenger) ProcessAllMessages() {
+	m.logger.Debug("ProcessAllMessages")
 	response, err := m.RetrieveAll()
 	if err != nil {
 		m.logger.Error("failed to retrieve raw messages", zap.Error(err))
@@ -3888,6 +3892,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	messageState := m.buildMessageState()
 
 	logger := m.logger.With(zap.String("site", "RetrieveAll"))
+	logger.Debug("handleRetrievedMessages",
+		zap.Any("chatWithMessages", chatWithMessages),
+	)
 
 	controlledCommunitiesChatIDs, err := m.communitiesManager.GetOwnedCommunitiesChatIDs()
 	if err != nil {

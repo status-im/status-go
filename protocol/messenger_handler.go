@@ -2134,6 +2134,13 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
 	}
 
+	logger.Debug("received chat message",
+		zap.String("messageID", receivedMessage.ID),
+		zap.String("from", receivedMessage.From),
+		zap.Any("contentType", receivedMessage.ContentType),
+		zap.Bool("forceSeen", forceSeen),
+	)
+
 	// is the message coming from us?
 	isSyncMessage := common.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey)
 

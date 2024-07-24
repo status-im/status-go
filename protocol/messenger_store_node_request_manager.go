@@ -373,7 +373,11 @@ func (r *storeNodeRequest) finalize() {
 func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32) {
 	logger := r.manager.logger.With(
 		zap.Any("requestID", r.requestID),
-		zap.Int("envelopesCount", envelopesCount))
+		zap.Int("envelopesCount", envelopesCount),
+		zap.String("contentTopic", r.contentTopic.String()),
+	)
+
+	logger.Debug("shouldFetchNextPage")
 
 	r.result.stats.FetchedEnvelopesCount += envelopesCount
 	r.result.stats.FetchedPagesCount++
