@@ -165,9 +165,12 @@ func (mgr *FilterManager) subscribeAndRunLoop(f filterConfig) {
 }
 
 func (mgr *FilterManager) onConnectionStatusChange(pubsubTopic string, newStatus bool) {
+	subs := mgr.node.Subscriptions()
+	mgr.logger.Debug("filter subs count", zap.Int("count", len(subs)))
 	mgr.logger.Debug("inside on connection status change", zap.Bool("new-status", newStatus),
 		zap.Int("agg filters count", len(mgr.filterSubscriptions)))
 	if newStatus && !mgr.onlineChecker.IsOnline() { //switched from offline to Online
+		go mgr.node.PingPeers() //Ping all peers to check if subscriptions are alive
 		mgr.logger.Debug("switching from offline to online")
 		mgr.Lock()
 		if len(mgr.waitingToSubQueue) > 0 {

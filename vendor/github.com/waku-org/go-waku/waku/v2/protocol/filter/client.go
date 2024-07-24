@@ -242,7 +242,7 @@ func (wf *WakuFilterLightNode) notify(ctx context.Context, remotePeerID peer.ID,
 }
 
 func (wf *WakuFilterLightNode) request(ctx context.Context, requestID []byte,
-	reqType pb.FilterSubscribeRequest_FilterSubscribeType, contentFilter protocol.ContentFilter, peer peer.ID) error {
+	reqType pb.FilterSubscribeRequest_FilterSubscribeType, contentFilter protocol.ContentFilter, peerID peer.ID) error {
 	request := &pb.FilterSubscribeRequest{
 		RequestId:           hex.EncodeToString(requestID),
 		FilterSubscribeType: reqType,
@@ -255,11 +255,14 @@ func (wf *WakuFilterLightNode) request(ctx context.Context, requestID []byte,
 		return err
 	}
 
-	logger := wf.log.With(logging.HostID("peerID", peer))
+	logger := wf.log.With(logging.HostID("peerID", peerID))
 
-	stream, err := wf.h.NewStream(ctx, peer, FilterSubscribeID_v20beta1)
+	stream, err := wf.h.NewStream(ctx, peerID, FilterSubscribeID_v20beta1)
 	if err != nil {
 		wf.metrics.RecordError(dialFailure)
+		if ps, ok := wf.h.Peerstore().(peerstore.WakuPeerstore); ok {
+			ps.AddConnFailure(peer.AddrInfo{ID: peerID})
+		}
 		return err
 	}
 

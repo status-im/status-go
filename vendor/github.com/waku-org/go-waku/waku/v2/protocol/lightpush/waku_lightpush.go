@@ -188,14 +188,17 @@ func (wakuLP *WakuLightPush) reply(stream network.Stream, responsePushRPC *pb.Pu
 }
 
 // request sends a message via lightPush protocol to either a specified peer or peer that is selected.
-func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, params *lightPushRequestParameters, peer peer.ID) (*pb.PushResponse, error) {
+func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, params *lightPushRequestParameters, peerID peer.ID) (*pb.PushResponse, error) {
 
-	logger := wakuLP.log.With(logging.HostID("peer", peer))
+	logger := wakuLP.log.With(logging.HostID("peer", peerID))
 
-	stream, err := wakuLP.h.NewStream(ctx, peer, LightPushID_v20beta1)
+	stream, err := wakuLP.h.NewStream(ctx, peerID, LightPushID_v20beta1)
 	if err != nil {
 		logger.Error("creating stream to peer", zap.Error(err))
 		wakuLP.metrics.RecordError(dialFailure)
+		if ps, ok := wakuLP.h.Peerstore().(peerstore.WakuPeerstore); ok {
+			ps.AddConnFailure(peer.AddrInfo{ID: peerID})
+		}
 		return nil, err
 	}
 	pushRequestRPC := &pb.PushRpc{RequestId: hex.EncodeToString(params.requestID), Request: req}

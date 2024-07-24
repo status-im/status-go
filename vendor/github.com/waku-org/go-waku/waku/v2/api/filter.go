@@ -14,7 +14,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const FilterPingTimeout = 5 * time.Second
 const MultiplexChannelBuffer = 100
 
 type FilterConfig struct {

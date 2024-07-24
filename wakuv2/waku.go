@@ -228,7 +228,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		msgQueue:                        make(chan *common.ReceivedMessage, messageQueueLimit),
 		sendQueue:                       make(chan *protocol.Envelope, 1000),
 		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
-		connectionNotifChan:             make(chan node.PeerConnection),
+		connectionNotifChan:             make(chan node.PeerConnection, 20),
 		connStatusSubscriptions:         make(map[string]*types.ConnStatusSubscription),
 		topicInterest:                   make(map[string]TopicInterest),
 		ctx:                             ctx,
@@ -461,7 +461,7 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 	return nil
 }
 
-func (w *Waku) discoverAndConnectPeers() error {
+func (w *Waku) discoverAndConnectPeers() {
 	fnApply := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
 		defer wg.Done()
 		if len(d.PeerInfo.Addrs) != 0 {
@@ -495,8 +495,6 @@ func (w *Waku) discoverAndConnectPeers() error {
 			go w.connect(*peerInfo, nil, wps.Static)
 		}
 	}
-
-	return nil
 }
 
 func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origin) {
@@ -1336,9 +1334,7 @@ func (w *Waku) Start() error {
 
 	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", w.node.Host().ID()))
 
-	if err = w.discoverAndConnectPeers(); err != nil {
-		return fmt.Errorf("failed to add wakuv2 peers: %v", err)
-	}
+	w.discoverAndConnectPeers()
 
 	if w.cfg.EnableDiscV5 {
 		err := w.node.DiscV5().Start(w.ctx)
@@ -1364,20 +1360,6 @@ func (w *Waku) Start() error {
 
 				isOnline := len(w.node.Host().Network().Peers()) > 0
 
-				if w.cfg.LightClient {
-					// TODO: Temporary changes for lightNodes to have health check based on connected peers.
-					//This needs to be enhanced to be based on healthy Filter and lightPush peers available for each shard.
-					//This would get fixed as part of https://github.com/waku-org/go-waku/issues/1114
-
-					subs := w.node.FilterLightnode().Subscriptions()
-					w.logger.Debug("filter subs count", zap.Int("count", len(subs)))
-
-					//TODO: needs fixing, right now invoking everytime.
-					//Trigger FilterManager to take care of any pending filter subscriptions
-					//TODO: Pass pubsubTopic based on topicHealth notif received.
-					go w.filterManager.onConnectionStatusChange(w.cfg.DefaultShardPubsubTopic, isOnline)
-
-				}
 				w.connStatusMu.Lock()
 
 				latestConnStatus := types.ConnStatus{
@@ -1402,13 +1384,6 @@ func (w *Waku) Start() error {
 
 				if w.statusTelemetryClient != nil {
 					w.statusTelemetryClient.PushPeerCount(w.PeerCount())
-				}
-
-				//TODO: analyze if we need to discover and connect to peers with peerExchange loop enabled.
-				if !w.onlineChecker.IsOnline() && isOnline {
-					if err := w.discoverAndConnectPeers(); err != nil {
-						w.logger.Error("failed to add wakuv2 peers", zap.Error(err))
-					}
 				}
 
 				w.ConnectionChanged(connection.State{
@@ -1796,8 +1771,34 @@ func (w *Waku) StopDiscV5() error {
 	return nil
 }
 
+func (w *Waku) disconnectAllPeers() {
+	for _, peerID := range w.node.Host().Network().Peers() {
+		err := w.node.ClosePeerById(peerID)
+		if err != nil {
+			w.logger.Info("failed to close peer", zap.Stringer("peer", peerID), zap.Error(err))
+		}
+	}
+}
+
 func (w *Waku) ConnectionChanged(state connection.State) {
-	if !state.Offline && !w.onlineChecker.IsOnline() {
+	isOnline := !state.Offline
+	if w.cfg.LightClient {
+		//TODO: Update this as per  https://github.com/waku-org/go-waku/issues/1114
+		//Trigger FilterManager to take care of any pending filter subscriptions
+		go w.filterManager.onConnectionStatusChange(w.cfg.DefaultShardPubsubTopic, isOnline)
+	}
+
+	//TODO: analyze if we need to discover and connect to peers with peerExchange loop enabled.
+	if !w.onlineChecker.IsOnline() && isOnline {
+		go w.discoverAndConnectPeers()
+	}
+
+	//If connection state is reported by something other than peerCount becoming 0, disconnect all peers
+	if state.Offline && len(w.node.Host().Network().Peers()) > 0 {
+		go w.disconnectAllPeers()
+	}
+
+	if !w.cfg.LightClient && isOnline && !w.onlineChecker.IsOnline() {
 		select {
 		case w.goingOnline <- struct{}{}:
 		default:
@@ -1805,7 +1806,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 		}
 	}
 
-	w.onlineChecker.SetOnline(!state.Offline)
+	w.onlineChecker.SetOnline(isOnline)
 }
 
 // seedBootnodesForDiscV5 tries to fetch bootnodes

@@ -15,6 +15,7 @@ import (
 	"github.com/libp2p/go-msgio/pbio"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/waku-org/go-waku/logging"
+	"github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/metadata/pb"
@@ -103,6 +104,9 @@ func (wakuM *WakuMetadata) Request(ctx context.Context, peerID peer.ID) (*pb.Wak
 	stream, err := wakuM.h.NewStream(ctx, peerID, MetadataID_v1)
 	if err != nil {
 		logger.Error("creating stream to peer", zap.Error(err))
+		if ps, ok := wakuM.h.Peerstore().(peerstore.WakuPeerstore); ok {
+			ps.AddConnFailure(peer.AddrInfo{ID: peerID})
+		}
 		return nil, err
 	}
 
