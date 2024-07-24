@@ -1478,13 +1478,13 @@ func TestSetFleet(t *testing.T) {
 
 	accountsDB, err := b.accountsDB()
 	require.NoError(t, err)
-	err = accountsDB.SaveSettingField(settings.Fleet, params.FleetShardsTest)
+	err = accountsDB.SaveSettingField(settings.Fleet, params.FleetStatusProd)
 	require.NoError(t, err)
 
 	savedSettings, err = b.GetSettings()
 	require.NoError(t, err)
 	require.NotEmpty(t, savedSettings.Fleet)
-	require.Equal(t, params.FleetShardsTest, *savedSettings.Fleet)
+	require.Equal(t, params.FleetStatusProd, *savedSettings.Fleet)
 
 	require.NoError(t, b.Logout())
 
@@ -1500,7 +1500,7 @@ func TestSetFleet(t *testing.T) {
 		t.FailNow()
 	}
 	// Check is using the right fleet
-	require.Equal(t, b.config.ClusterConfig.WakuNodes, params.DefaultWakuNodes(params.FleetShardsTest))
+	require.Equal(t, b.config.ClusterConfig.WakuNodes, params.DefaultWakuNodes(params.FleetStatusProd))
 
 	require.NoError(t, b.Logout())
 }

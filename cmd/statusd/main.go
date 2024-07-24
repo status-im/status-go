@@ -73,7 +73,6 @@ var (
 			[]string{
 				params.FleetProd,
 				params.FleetStatusStaging,
-				params.FleetShardsTest,
 				params.FleetStatusProd,
 				params.FleetStatusTest,
 				params.FleetWakuSandbox,
