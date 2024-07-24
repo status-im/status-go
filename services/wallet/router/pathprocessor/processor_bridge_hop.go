@@ -305,9 +305,9 @@ func (h *HopBridgeProcessor) GetContractAddress(params ProcessorInputParams) (co
 }
 
 func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
-	fromChain := h.networkManager.Find(sendArgs.ChainID)
+	fromChain := h.networkManager.Find(sendArgs.HopTx.ChainID)
 	if fromChain == nil {
-		return tx, fmt.Errorf("ChainID not supported %d", sendArgs.ChainID)
+		return tx, fmt.Errorf("ChainID not supported %d", sendArgs.HopTx.ChainID)
 	}
 
 	token := h.tokenManager.FindToken(fromChain, sendArgs.HopTx.Symbol)
@@ -344,22 +344,22 @@ func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, sig
 
 	switch contractType {
 	case hop.CctpL1Bridge:
-		tx, err = h.sendCctpL1BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
+		tx, err = h.sendCctpL1BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainIDTo, sendArgs.HopTx.Recipient, txOpts, bonderFee)
 	case hop.L1Bridge:
-		tx, err = h.sendL1BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, token, bonderFee)
+		tx, err = h.sendL1BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainIDTo, sendArgs.HopTx.Recipient, txOpts, token, bonderFee)
 	case hop.L2AmmWrapper:
-		tx, err = h.sendL2AmmWrapperTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
+		tx, err = h.sendL2AmmWrapperTx(contractAddress, ethClient, sendArgs.HopTx.ChainIDTo, sendArgs.HopTx.Recipient, txOpts, bonderFee)
 	case hop.CctpL2Bridge:
-		tx, err = h.sendCctpL2BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
+		tx, err = h.sendCctpL2BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainIDTo, sendArgs.HopTx.Recipient, txOpts, bonderFee)
 	case hop.L2Bridge:
-		tx, err = h.sendL2BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainID, sendArgs.HopTx.Recipient, txOpts, bonderFee)
+		tx, err = h.sendL2BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainIDTo, sendArgs.HopTx.Recipient, txOpts, bonderFee)
 	default:
 		return tx, ErrContractTypeNotSupported
 	}
 	if err != nil {
 		return tx, createBridgeHopErrorResponse(err)
 	}
-	err = h.transactor.StoreAndTrackPendingTx(txOpts.From, sendArgs.HopTx.Symbol, sendArgs.ChainID, sendArgs.HopTx.MultiTransactionID, tx)
+	err = h.transactor.StoreAndTrackPendingTx(txOpts.From, sendArgs.HopTx.Symbol, sendArgs.HopTx.ChainID, sendArgs.HopTx.MultiTransactionID, tx)
 	if err != nil {
 		return tx, createBridgeHopErrorResponse(err)
 	}
@@ -367,7 +367,7 @@ func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, sig
 }
 
 func (h *HopBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
-	tx, err := h.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.HopTx.From, verifiedAccount))
+	tx, err := h.sendOrBuild(sendArgs, getSigner(sendArgs.HopTx.ChainID, sendArgs.HopTx.From, verifiedAccount))
 	if err != nil {
 		return types.Hash{}, createBridgeHopErrorResponse(err)
 	}
