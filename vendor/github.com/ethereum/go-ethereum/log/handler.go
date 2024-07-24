@@ -37,11 +37,12 @@ func (h *discardHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 }
 
 type TerminalHandler struct {
-	mu       sync.Mutex
-	wr       io.Writer
-	lvl      slog.Level
-	useColor bool
-	attrs    []slog.Attr
+	mu        sync.Mutex
+	wr        io.Writer
+	lvl       slog.Level
+	useColor  bool
+	addSource bool
+	attrs     []slog.Attr
 	// fieldPadding is a map with maximum field value lengths seen until now
 	// to allow padding log contexts in a bit smarter way.
 	fieldPadding map[string]int
@@ -73,10 +74,22 @@ func NewTerminalHandlerWithLevel(wr io.Writer, lvl slog.Level, useColor bool) *T
 	}
 }
 
+// NewTerminalHandlerWithSource returns the same handler as NewTerminalHandler
+// but with added source info set
+func NewTerminalHandlerWithSource(wr io.Writer, lvl slog.Level, useColor bool) *TerminalHandler {
+	return &TerminalHandler{
+		wr:           wr,
+		lvl:          lvl,
+		useColor:     useColor,
+		addSource:    true,
+		fieldPadding: make(map[string]int),
+	}
+}
+
 func (h *TerminalHandler) Handle(_ context.Context, r slog.Record) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	buf := h.format(h.buf, r, h.useColor)
+	buf := h.format(h.buf, r, h.useColor, h.addSource)
 	h.wr.Write(buf)
 	h.buf = buf[:0]
 	return nil
@@ -139,6 +152,23 @@ func LogfmtHandlerWithLevel(wr io.Writer, level slog.Level) slog.Handler {
 	})
 }
 
+func LogfmtHandlerWithSource(wr io.Writer) slog.Handler {
+	return slog.NewTextHandler(wr, &slog.HandlerOptions{
+		ReplaceAttr: builtinReplaceLogfmt,
+		AddSource:   true,
+	})
+}
+
+// LogfmtHandlerWithLevel returns the same handler as LogfmtHandler but it only outputs
+// records which are less than or equal to the specified verbosity level.
+func LogfmtHandlerWithSourceAndLevel(wr io.Writer, level slog.Level) slog.Handler {
+	return slog.NewTextHandler(wr, &slog.HandlerOptions{
+		ReplaceAttr: builtinReplaceLogfmt,
+		AddSource:   true,
+		Level:       &leveler{level},
+	})
+}
+
 func builtinReplaceLogfmt(_ []string, attr slog.Attr) slog.Attr {
 	return builtinReplace(nil, attr, true)
 }
@@ -161,6 +191,15 @@ func builtinReplace(_ []string, attr slog.Attr, logfmt bool) slog.Attr {
 		if l, ok := attr.Value.Any().(slog.Level); ok {
 			attr = slog.Any("lvl", LevelString(l))
 			return attr
+		}
+	case slog.SourceKey:
+		if l, ok := attr.Value.Any().(slog.Source); ok {
+			sourceInfo := fmt.Sprintf("%s:%d", l.File, l.Line)
+			if logfmt {
+				return slog.String("src", sourceInfo)
+			} else {
+				return slog.Attr{Key: "src", Value: slog.StringValue(sourceInfo)}
+			}
 		}
 	}
 

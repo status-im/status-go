@@ -132,6 +132,11 @@ func (ln *LocalNode) Seq() uint64 {
 	return ln.seq
 }
 
+// Returns the entries stored in the localnode
+func (ln *LocalNode) Entries() map[string]enr.Entry {
+	return ln.entries
+}
+
 // ID returns the local node ID.
 func (ln *LocalNode) ID() ID {
 	return ln.id

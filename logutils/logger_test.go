@@ -2,7 +2,7 @@ package logutils
 
 import (
 	"bytes"
-	"os"
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,8 +12,8 @@ import (
 
 func TestPrintOrigins(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
-	handler := log.NewTerminalHandler(os.Stderr, false)
+	handler := log.LogfmtHandlerWithSourceAndLevel(buf, slog.LevelDebug)
 	require.NoError(t, enableRootLog("debug", handler))
 	log.Debug("hello")
-	require.Contains(t, buf.String(), "logutils/logger_test.go:16")
+	require.Contains(t, buf.String(), "logutils/logger_test.go:17")
 }

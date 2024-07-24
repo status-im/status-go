@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"math/big"
 	"reflect"
+	"runtime"
 	"strconv"
 	"time"
 	"unicode/utf8"
@@ -30,7 +31,14 @@ type TerminalStringer interface {
 	TerminalString() string
 }
 
-func (h *TerminalHandler) format(buf []byte, r slog.Record, usecolor bool) []byte {
+func (h *TerminalHandler) source(r slog.Record) string {
+	fs := runtime.CallersFrames([]uintptr{r.PC})
+	f, _ := fs.Next()
+
+	return fmt.Sprintf("%s:%d", f.File, f.Line)
+}
+
+func (h *TerminalHandler) format(buf []byte, r slog.Record, usecolor bool, addSource bool) []byte {
 	msg := escapeMessage(r.Message)
 	var color = ""
 	if usecolor {
@@ -64,6 +72,11 @@ func (h *TerminalHandler) format(buf []byte, r slog.Record, usecolor bool) []byt
 	b.WriteString("[")
 	writeTimeTermFormat(b, r.Time)
 	b.WriteString("] ")
+	if addSource {
+		b.WriteString("[")
+		b.WriteString(h.source(r))
+		b.WriteString("]")
+	}
 	b.WriteString(msg)
 
 	// try to justify the log output for short messages

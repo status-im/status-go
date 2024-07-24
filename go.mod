@@ -4,7 +4,7 @@ go 1.21
 
 toolchain go1.21.8
 
-replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.12.1-0.20240716143414-62aea0233d47
+replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.12.1-0.20240724120051-6f474ac420bb
 
 replace github.com/rjeczalik/notify => github.com/status-im/notify v1.0.2-status
 

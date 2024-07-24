@@ -13,9 +13,7 @@ import (
 
 func TestNewZapAdapter(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
-	logger := log.New()
-	handler := log.StreamHandler(buf, log.LogfmtFormat())
-	logger.SetHandler(handler)
+	logger := log.NewLogger(log.LogfmtHandler(buf))
 
 	cfg := zap.NewDevelopmentConfig()
 	adapter := NewZapAdapter(logger, cfg.Level)
@@ -26,7 +24,7 @@ func TestNewZapAdapter(t *testing.T) {
 	zapLogger.
 		With(zap.Error(errors.New("some error"))).
 		Error("some message with error level")
-	require.Contains(t, buf.String(), `lvl=eror msg="some message with error level" error="some error`)
+	require.Contains(t, buf.String(), `lvl=error msg="some message with error level" error="some error`)
 
 	buf.Reset()
 	zapLogger.
@@ -44,9 +42,8 @@ func TestNewZapAdapter(t *testing.T) {
 
 func TestNewZapLoggerWithAdapter(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
-	logger := log.New()
-	handler := log.StreamHandler(buf, log.LogfmtFormat())
-	logger.SetHandler(handler)
+
+	logger := log.NewLogger(log.LogfmtHandler(buf))
 
 	zapLogger, err := NewZapLoggerWithAdapter(logger)
 	require.NoError(t, err)
@@ -55,18 +52,16 @@ func TestNewZapLoggerWithAdapter(t *testing.T) {
 	zapLogger.
 		With(zap.Error(errors.New("some error"))).
 		Error("some message with error level")
-	require.Contains(t, buf.String(), `lvl=eror msg="some message with error level" error="some error`)
+	require.Contains(t, buf.String(), `lvl=error msg="some message with error level" error="some error`)
 }
 
 func TestZapLoggerTerminalFormat(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
-	logger := log.New()
-	handler := log.StreamHandler(buf, log.TerminalFormat(false))
-	logger.SetHandler(handler)
+	logger := log.NewLoggerWithOpts(log.LogfmtHandlerWithSource(buf), &log.LoggerOptions{AddSource: true, SkipCallers: 2})
 
 	zapLogger, err := NewZapLoggerWithAdapter(logger)
 	require.NoError(t, err)
 
 	zapLogger.Info("some message with error level")
-	require.Contains(t, buf.String(), `logutils/zap_adapter_test.go:70`)
+	require.Contains(t, buf.String(), `logutils/zap_adapter_test.go:65`)
 }
