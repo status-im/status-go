@@ -75,7 +75,7 @@ var (
 	// ErrDBNotAvailable is returned if a method is called before the DB is available for usage
 	ErrDBNotAvailable = errors.New("DB is unavailable")
 	// ErrConfigNotAvailable is returned if a method is called before the nodeconfig is set
-	ErrConfigNotAvailable = errors.New("NodeConfig is not available")
+	ErrConfigNotAvailable = errors.New("nodeConfig is not available")
 )
 
 var _ StatusBackend = (*GethStatusBackend)(nil)
@@ -1340,7 +1340,7 @@ func (b *GethStatusBackend) RestoreKeycardAccountAndLogin(request *requests.Rest
 		return nil, err
 	}
 
-	keyStoreDir, err := b.initKeyStoreDirWithAccount(request.RootDataDir, request.Keycard.KeyUID)
+	keyStoreDir, err := b.InitKeyStoreDirWithAccount(request.RootDataDir, request.Keycard.KeyUID)
 	if err != nil {
 		return nil, err
 	}
@@ -1438,7 +1438,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		return nil, err
 	}
 
-	keyStoreDir, err := b.initKeyStoreDirWithAccount(request.RootDataDir, info.KeyUID)
+	keyStoreDir, err := b.InitKeyStoreDirWithAccount(request.RootDataDir, info.KeyUID)
 	if err != nil {
 		return nil, err
 	}
@@ -1508,15 +1508,17 @@ func (b *GethStatusBackend) prepareNodeAccount(request *requests.CreateAccount, 
 		return nil, errors.Wrap(err, "failed to prepare for keycard")
 	}
 
+	b.log.Info("<<< prepareNodeAccount", "settings", response.settings, "nodeConfig", response.nodeConfig)
+
 	return response, nil
 }
 
-func (b *GethStatusBackend) initKeyStoreDirWithAccount(rootDataDir, keyUID string) (string, error) {
+func (b *GethStatusBackend) InitKeyStoreDirWithAccount(rootDataDir, keyUID string) (string, error) {
 	b.UpdateRootDataDir(rootDataDir)
-	keystoreDir := keystoreRelativePath
-	userKeyStoreDir := filepath.Join(keystoreDir, keyUID)
+	userKeyStoreRelativePath := filepath.Join(keystoreRelativePath, keyUID)
+	keystoreAbsolutePath := filepath.Join(b.rootDataDir, userKeyStoreRelativePath)
 	// Initialize keystore dir with account
-	return userKeyStoreDir, b.accountManager.InitKeystore(filepath.Join(b.rootDataDir, userKeyStoreDir))
+	return userKeyStoreRelativePath, b.accountManager.InitKeystore(keystoreAbsolutePath)
 }
 
 func (b *GethStatusBackend) generateAccountInfo(mnemonic string) (*generator.GeneratedAccountInfo, error) {
@@ -1629,7 +1631,7 @@ func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, inp
 }
 
 func (b *GethStatusBackend) prepareConfig(request *requests.CreateAccount, input *prepareAccountInput, installationID string) (*params.NodeConfig, error) {
-	nodeConfig, err := defaultNodeConfig(installationID, request, input.opts...)
+	nodeConfig, err := DefaultNodeConfig(installationID, request, input.opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2024,7 +2026,7 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 
 	// Start WakuV1 if WakuV2 is not enabled
 	conf.WakuConfig.Enabled = !conf.WakuV2Config.Enabled
-	// NodeConfig.Version should be taken from params.Version
+	// nodeConfig.Version should be taken from params.Version
 	// which is set at the compile time.
 	// What's cached is usually outdated so we overwrite it here.
 	conf.Version = params.Version

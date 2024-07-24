@@ -311,7 +311,7 @@ type UpstreamRPCConfig struct {
 }
 
 // ----------
-// NodeConfig
+// nodeConfig
 // ----------
 
 // NodeConfig stores configuration options for a node
@@ -918,7 +918,7 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		MaxPeers:               25,
 		MaxPendingPeers:        0,
 		IPCFile:                "geth.ipc",
-		log:                    log.New("package", "status-go/params.NodeConfig"),
+		log:                    log.New("package", "status-go/params.nodeConfig"),
 		LogFile:                "",
 		LogLevel:               "ERROR",
 		NoDiscovery:            true,

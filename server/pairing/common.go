@@ -10,8 +10,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/google/uuid"
-
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
 
@@ -126,15 +124,15 @@ func validateAndVerifyNodeConfig(s interface{}, receiverConfig *ReceiverConfig) 
 		return err
 	}
 
-	if receiverConfig.NodeConfig == nil {
+	if receiverConfig.nodeConfig == nil {
 		return fmt.Errorf("node config is required for receiver config")
 	}
 
-	if receiverConfig.NodeConfig.RootDataDir == "" {
+	if receiverConfig.nodeConfig.RootDataDir == "" {
 		return fmt.Errorf("root data dir is required for node config")
 	}
 
-	return receiverConfig.NodeConfig.Validate()
+	return receiverConfig.nodeConfig.Validate()
 }
 
 func emptyDir(dir string) error {
@@ -320,7 +318,7 @@ func setDefaultNodeConfig(c *params.NodeConfig) error {
 	}
 
 	if specifiedInstallationID == "" {
-		specifiedInstallationID = uuid.New().String()
+		specifiedInstallationID = api.GenerateInstallationID()
 	}
 
 	c.ShhextConfig = params.ShhextConfig{

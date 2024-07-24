@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -12,9 +11,8 @@ import (
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/protobuf"
-
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -88,39 +86,15 @@ func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) (rm
 	return
 }
 
-func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload, nodeConfig *params.NodeConfig, settingCurrentNetwork, deviceType string, deviceName string, rmp *RawMessagesPayload) (err error) {
-	account := accountPayload.multiaccount
+func (s *SyncRawMessageHandler) HandleRawMessage(
+	accountPayload *AccountPayload,
+	createAccountRequest *requests.CreateAccount,
+	deviceType string,
+	rmp *RawMessagesPayload) (err error) {
 
 	activeAccount, _ := s.backend.GetActiveAccount()
 	if activeAccount == nil { // not login yet
-		s.backend.UpdateRootDataDir(nodeConfig.RootDataDir)
-		// because client don't know keyUID before received data, we need help client to update keystore dir
-		keystoreDir := filepath.Join(nodeConfig.KeyStoreDir, account.KeyUID)
-		nodeConfig.KeyStoreDir = keystoreDir
-
-		var chatKey *ecdsa.PrivateKey
-		if accountPayload.chatKey != "" {
-			chatKeyHex := strings.Trim(accountPayload.chatKey, "0x")
-			chatKey, err = ethcrypto.HexToECDSA(chatKeyHex)
-			if err != nil {
-				return err
-			}
-		}
-
-		if accountPayload.exist {
-			err = s.backend.StartNodeWithAccount(*account, accountPayload.password, nodeConfig, chatKey)
-		} else {
-			accountManager := s.backend.AccountManager()
-			err = accountManager.InitKeystore(filepath.Join(nodeConfig.RootDataDir, keystoreDir))
-			if err != nil {
-				return err
-			}
-			rmp.setting.DeviceName = deviceName
-			rmp.setting.InstallationID = nodeConfig.ShhextConfig.InstallationID
-			rmp.setting.CurrentNetwork = settingCurrentNetwork
-
-			err = s.backend.StartNodeWithAccountAndInitialConfig(*account, accountPayload.password, *rmp.setting, nodeConfig, rmp.profileKeypair.Accounts, chatKey)
-		}
+		err = s.login(accountPayload, createAccountRequest, rmp)
 		if err != nil {
 			return err
 		}
@@ -151,4 +125,47 @@ func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload,
 	}
 
 	return nil
+}
+
+func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAccountRequest *requests.CreateAccount, rmp *RawMessagesPayload) error {
+	account := accountPayload.multiaccount
+	installationID := api.GenerateInstallationID()
+	nodeConfig, err := api.DefaultNodeConfig(installationID, createAccountRequest)
+	if err != nil {
+		return err
+	}
+
+	keystoreRelativePath, err := s.backend.InitKeyStoreDirWithAccount(nodeConfig.RootDataDir, account.KeyUID)
+	nodeConfig.KeyStoreDir = keystoreRelativePath
+
+	if err != nil {
+		return err
+	}
+
+	var chatKey *ecdsa.PrivateKey // TODO: Set this chatKey to LoginAccount request
+	if accountPayload.chatKey != "" {
+		chatKeyHex := strings.Trim(accountPayload.chatKey, "0x")
+		chatKey, err = ethcrypto.HexToECDSA(chatKeyHex)
+		if err != nil {
+			return err
+		}
+	}
+
+	if accountPayload.exist {
+		return s.backend.StartNodeWithAccount(*account, accountPayload.password, nodeConfig, chatKey)
+	}
+
+	// Override some of received settings
+	rmp.setting.DeviceName = createAccountRequest.DeviceName
+	rmp.setting.InstallationID = installationID
+	rmp.setting.CurrentNetwork = api.DefaultCurrentNetwork
+
+	return s.backend.StartNodeWithAccountAndInitialConfig(
+		*account,
+		accountPayload.password,
+		*rmp.setting,
+		nodeConfig,
+		rmp.profileKeypair.Accounts,
+		chatKey,
+	)
 }

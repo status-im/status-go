@@ -297,7 +297,7 @@ func StartUpReceiverServer(backend *api.GethStatusBackend, configJSON string) (s
 		return "", err
 	}
 	receiverConf := conf.ReceiverConfig
-	if err = setDefaultNodeConfig(receiverConf.NodeConfig); err != nil {
+	if err = setDefaultNodeConfig(receiverConf.nodeConfig); err != nil {
 		return "", err
 	}
 	err = validateAndVerifyNodeConfig(conf, receiverConf)

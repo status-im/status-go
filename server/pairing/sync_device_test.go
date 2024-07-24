@@ -111,6 +111,9 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *ap
 	settings, err := defaultSettings(generatedAccountInfo.GeneratedAccountInfo, derivedAddresses, nil)
 	require.NoError(s.T(), err)
 
+	settings.Name, err = common.RandomAlphabeticalString(8)
+	s.Require().NoError(err)
+
 	account.Name = settings.Name
 
 	nodeConfig, err := nodeConfigForLocalPairSync(settings.InstallationID, account.KeyUID, tmpdir)
@@ -197,7 +200,7 @@ func (s *SyncDeviceSuite) pairAccounts(serverBackend *api.GethStatusBackend, ser
 			KeystorePath:          clientKeystoreDir,
 			DeviceType:            "desktop",
 			KDFIterations:         expectedKDFIterations,
-			NodeConfig:            clientNodeConfig,
+			nodeConfig:            clientNodeConfig,
 			SettingCurrentNetwork: currentNetwork,
 		},
 		ClientConfig: new(ClientConfig),
@@ -296,7 +299,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	serverKeystoreDir := filepath.Join(serverTmpDir, keystoreDir)
 	serverPayloadSourceConfig := &ReceiverServerConfig{
 		ReceiverConfig: &ReceiverConfig{
-			NodeConfig:            serverNodeConfig,
+			nodeConfig:            serverNodeConfig,
 			KeystorePath:          serverKeystoreDir,
 			DeviceType:            "desktop",
 			KDFIterations:         expectedKDFIterations,
@@ -367,8 +370,8 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 
 	serverActiveAccount, err := serverBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), serverActiveAccount.Name, clientActiveAccount.Name)
-	require.Equal(s.T(), serverActiveAccount.KDFIterations, expectedKDFIterations)
+	require.Equal(s.T(), clientActiveAccount.Name, serverActiveAccount.Name)
+	require.Equal(s.T(), expectedKDFIterations, serverActiveAccount.KDFIterations)
 
 	serverMessenger := serverBackend.Messenger()
 	clientMessenger := clientBackend.Messenger()
@@ -474,7 +477,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 			KeystorePath:          clientKeystoreDir,
 			DeviceType:            "iphone",
 			KDFIterations:         expectedKDFIterations,
-			NodeConfig:            clientNodeConfig,
+			nodeConfig:            clientNodeConfig,
 			SettingCurrentNetwork: currentNetwork,
 		},
 		ClientConfig: new(ClientConfig),
@@ -1329,7 +1332,7 @@ func (s *SyncDeviceSuite) TestPreventLoggedInAccountLocalPairingClientAsReceiver
 			KeystorePath:          clientKeystoreDir,
 			DeviceType:            "iphone",
 			KDFIterations:         expectedKDFIterations,
-			NodeConfig:            clientNodeConfig,
+			nodeConfig:            clientNodeConfig,
 			SettingCurrentNetwork: currentNetwork,
 		},
 		ClientConfig: new(ClientConfig),
@@ -1356,7 +1359,7 @@ func (s *SyncDeviceSuite) TestPreventLoggedInAccountLocalPairingClientAsSender()
 	serverKeystoreDir := filepath.Join(serverTmpDir, keystoreDir)
 	serverPayloadSourceConfig := &ReceiverServerConfig{
 		ReceiverConfig: &ReceiverConfig{
-			NodeConfig:            serverNodeConfig,
+			nodeConfig:            serverNodeConfig,
 			KeystorePath:          serverKeystoreDir,
 			DeviceType:            "desktop",
 			KDFIterations:         expectedKDFIterations,

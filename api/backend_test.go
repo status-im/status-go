@@ -1183,7 +1183,7 @@ func TestConvertAccount(t *testing.T) {
 
 	defaultSettings, err := defaultSettings(genAccInfo.KeyUID, genAccInfo.Address, derivedAccounts)
 	require.NoError(t, err)
-	nodeConfig, err := defaultNodeConfig(defaultSettings.InstallationID, &requests.CreateAccount{
+	nodeConfig, err := DefaultNodeConfig(defaultSettings.InstallationID, &requests.CreateAccount{
 		LogLevel: defaultSettings.LogLevel,
 	})
 	require.NoError(t, err)

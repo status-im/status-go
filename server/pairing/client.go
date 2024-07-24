@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"runtime"
 
 	"go.uber.org/zap"
 
@@ -523,14 +524,10 @@ func setupReceivingClient(backend *api.GethStatusBackend, cs, configJSON string)
 	if err != nil {
 		return nil, err
 	}
-	receiverConf := conf.ReceiverConfig
-	if err = setDefaultNodeConfig(receiverConf.NodeConfig); err != nil {
-		return nil, err
-	}
-	err = validateAndVerifyNodeConfig(conf, receiverConf)
-	if err != nil {
-		return nil, err
-	}
+
+	// This is a temporal solution to allow clients not to pass DeviceType.
+	// Check DeviceType deprecation reason for more info.
+	conf.ReceiverConfig.DeviceType = runtime.GOOS
 
 	// ignore err because we allow no active account here
 	activeAccount, _ := backend.GetActiveAccount()
