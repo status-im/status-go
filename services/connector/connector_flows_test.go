@@ -77,7 +77,7 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 
 	// Request accounts, now for real
 	request = "{\"method\": \"eth_requestAccounts\", \"params\": [], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }"
-	expectedResponse := strings.ToLower(fmt.Sprintf(`{"accounts":["%s"]}`, accountAddress.Hex()))
+	expectedResponse := strings.ToLower(fmt.Sprintf(`["%s"]`, accountAddress.Hex()))
 	response, err = api.CallRPC(request)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)
@@ -98,7 +98,7 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 
 	// Check the account after switching chain
 	request = "{\"method\": \"eth_accounts\", \"params\": [], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }"
-	expectedResponse = strings.ToLower(fmt.Sprintf(`{"accounts":["%s"]}`, accountAddress.Hex()))
+	expectedResponse = strings.ToLower(fmt.Sprintf(`["%s"]`, accountAddress.Hex()))
 	response, err = api.CallRPC(request)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)

@@ -13,15 +13,9 @@ type AccountsCommand struct {
 	Db *sql.DB
 }
 
-type AccountsResponse struct {
-	Accounts []types.Address `json:"accounts"`
-}
-
 func (c *AccountsCommand) dAppToAccountsResponse(dApp *persistence.DApp) (string, error) {
-	response := AccountsResponse{
-		Accounts: []types.Address{dApp.SharedAccount},
-	}
-	responseJSON, err := json.Marshal(response)
+	addresses := []types.Address{dApp.SharedAccount}
+	responseJSON, err := json.Marshal(addresses)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal response: %v", err)
 	}

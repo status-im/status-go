@@ -55,10 +55,11 @@ func TestGetAccountForPermittedDApp(t *testing.T) {
 	response, err := cmd.Execute(request)
 	assert.NoError(t, err)
 
-	result := &AccountsResponse{}
-	err = json.Unmarshal([]byte(response), result)
+	// Unmarshal the response into a slice of addresses
+	var result []types.Address
+	err = json.Unmarshal([]byte(response), &result)
 
 	assert.NoError(t, err)
-	assert.Len(t, result.Accounts, 1)
-	assert.Equal(t, sharedAccount, result.Accounts[0])
+	assert.Len(t, result, 1)
+	assert.Equal(t, sharedAccount, result[0])
 }
