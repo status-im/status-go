@@ -32,6 +32,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	accountssvc "github.com/status-im/status-go/services/accounts"
+	appgeneral "github.com/status-im/status-go/services/app-general"
 	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
@@ -130,6 +131,7 @@ type StatusNode struct {
 	updatesSrvc            *updates.Service
 	pendingTracker         *transactions.PendingTxTracker
 	connectorSrvc          *connector.Service
+	appGeneralSrvc         *appgeneral.Service
 
 	walletFeed event.Feed
 }
@@ -493,6 +495,7 @@ func (n *StatusNode) stop() error {
 	n.connectorSrvc = nil
 	n.publicMethods = make(map[string]bool)
 	n.pendingTracker = nil
+	n.appGeneralSrvc = nil
 	n.log.Debug("status node stopped")
 	return nil
 }

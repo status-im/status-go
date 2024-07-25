@@ -33,6 +33,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	"github.com/status-im/status-go/services/accounts/settingsevent"
+	appgeneral "github.com/status-im/status-go/services/app-general"
 	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
@@ -87,6 +88,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, b.subscriptionService())
 	services = append(services, b.rpcStatsService())
 	services = append(services, b.appmetricsService())
+	services = append(services, b.appgeneralService())
 	services = append(services, b.peerService())
 	services = append(services, b.personalService())
 	services = append(services, b.statusPublicService())
@@ -560,6 +562,13 @@ func (b *StatusNode) appmetricsService() common.StatusService {
 		b.appMetricsSrvc = appmetricsservice.NewService(appmetrics.NewDB(b.appDB))
 	}
 	return b.appMetricsSrvc
+}
+
+func (b *StatusNode) appgeneralService() *appgeneral.Service {
+	if b.appGeneralSrvc == nil {
+		b.appGeneralSrvc = appgeneral.New()
+	}
+	return b.appGeneralSrvc
 }
 
 func (b *StatusNode) WalletService() *wallet.Service {
