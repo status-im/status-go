@@ -387,9 +387,13 @@ func validateFromLockedAmount(input *RouteInputParams) error {
 
 	var suppNetworks map[uint64]bool
 	if input.testnetMode {
-		suppNetworks = copyMap(supportedTestNetworks)
+		suppNetworks = copyMapGeneric(supportedTestNetworks, nil).(map[uint64]bool)
 	} else {
-		suppNetworks = copyMap(supportedNetworks)
+		suppNetworks = copyMapGeneric(supportedNetworks, nil).(map[uint64]bool)
+	}
+
+	if suppNetworks == nil {
+		return ErrCannotCheckLockedAmounts
 	}
 
 	totalLockedAmount := big.NewInt(0)
@@ -996,22 +1000,41 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 }
 
 func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute []*PathV2, input *RouteInputParams, balanceMap map[string]*big.Int) (err error) {
+	balanceMapCopy := copyMapGeneric(balanceMap, func(v interface{}) interface{} {
+		return new(big.Int).Set(v.(*big.Int))
+	}).(map[string]*big.Int)
+	if balanceMapCopy == nil {
+		return ErrCannotCheckReceiverBalance
+	}
+
 	// check the best route for the required balances
 	for _, path := range bestRoute {
 		if path.requiredTokenBalance != nil && path.requiredTokenBalance.Cmp(pathprocessor.ZeroBigIntValue) > 0 {
-			if tokenBalance, ok := balanceMap[makeBalanceKey(path.FromChain.ChainID, path.FromToken.Symbol)]; ok {
+			key := makeBalanceKey(path.FromChain.ChainID, path.FromToken.Symbol)
+			if tokenBalance, ok := balanceMapCopy[key]; ok {
 				if tokenBalance.Cmp(path.requiredTokenBalance) == -1 {
-					return ErrNotEnoughTokenBalance
+					err := &errors.ErrorResponse{
+						Code:    ErrNotEnoughTokenBalance.Code,
+						Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, path.FromToken.Symbol, path.FromChain.ChainID),
+					}
+					return err
 				}
+				balanceMapCopy[key].Sub(tokenBalance, path.requiredTokenBalance)
 			} else {
 				return ErrTokenNotFound
 			}
 		}
 
-		if nativeBalance, ok := balanceMap[makeBalanceKey(path.FromChain.ChainID, pathprocessor.EthSymbol)]; ok {
+		key := makeBalanceKey(path.FromChain.ChainID, pathprocessor.EthSymbol)
+		if nativeBalance, ok := balanceMapCopy[key]; ok {
 			if nativeBalance.Cmp(path.requiredNativeBalance) == -1 {
-				return ErrNotEnoughNativeBalance
+				err := &errors.ErrorResponse{
+					Code:    ErrNotEnoughNativeBalance.Code,
+					Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, pathprocessor.EthSymbol, path.FromChain.ChainID),
+				}
+				return err
 			}
+			balanceMapCopy[key].Sub(nativeBalance, path.requiredNativeBalance)
 		} else {
 			return ErrNativeTokenNotFound
 		}

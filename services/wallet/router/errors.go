@@ -21,12 +21,14 @@ var (
 	ErrLockedAmountNotNegative                   = &errors.ErrorResponse{Code: errors.ErrorCode("WR-013"), Details: "locked amount must not be negative"}
 	ErrLockedAmountExceedsTotalSendAmount        = &errors.ErrorResponse{Code: errors.ErrorCode("WR-014"), Details: "locked amount exceeds the total amount to send"}
 	ErrLockedAmountLessThanSendAmountAllNetworks = &errors.ErrorResponse{Code: errors.ErrorCode("WR-015"), Details: "locked amount is less than the total amount to send, but all networks are locked"}
-	ErrNotEnoughTokenBalance                     = &errors.ErrorResponse{Code: errors.ErrorCode("WR-016"), Details: "not enough token balance"}
-	ErrNotEnoughNativeBalance                    = &errors.ErrorResponse{Code: errors.ErrorCode("WR-017"), Details: "not enough native balance"}
+	ErrNotEnoughTokenBalance                     = &errors.ErrorResponse{Code: errors.ErrorCode("WR-016"), Details: "{\"token\": %s, \"chainId\": %d}"}
+	ErrNotEnoughNativeBalance                    = &errors.ErrorResponse{Code: errors.ErrorCode("WR-017"), Details: "{\"token\": %s, \"chainId\": %d}"}
 	ErrNativeTokenNotFound                       = &errors.ErrorResponse{Code: errors.ErrorCode("WR-018"), Details: "native token not found"}
 	ErrDisabledChainFoundAmongLockedNetworks     = &errors.ErrorResponse{Code: errors.ErrorCode("WR-019"), Details: "disabled chain found among locked networks"}
 	ErrENSSetPubKeyInvalidUsername               = &errors.ErrorResponse{Code: errors.ErrorCode("WR-020"), Details: "a valid username, ending in '.eth', is required for ENSSetPubKey"}
 	ErrLockedAmountExcludesAllSupported          = &errors.ErrorResponse{Code: errors.ErrorCode("WR-021"), Details: "all supported chains are excluded, routing impossible"}
 	ErrTokenNotFound                             = &errors.ErrorResponse{Code: errors.ErrorCode("WR-022"), Details: "token not found"}
 	ErrNoBestRouteFound                          = &errors.ErrorResponse{Code: errors.ErrorCode("WR-023"), Details: "no best route found"}
+	ErrCannotCheckReceiverBalance                = &errors.ErrorResponse{Code: errors.ErrorCode("WR-024"), Details: "cannot check receiver balance"}
+	ErrCannotCheckLockedAmounts                  = &errors.ErrorResponse{Code: errors.ErrorCode("WR-025"), Details: "cannot check locked amounts"}
 )
