@@ -543,7 +543,7 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 			f.logger.Debug("updating pubsub topic for filter",
 				zap.String("chatID", chatID),
 				zap.String("type", "public"),
-				zap.String("oldTOpic", chat.PubsubTopic),
+				zap.String("oldTopic", chat.PubsubTopic),
 				zap.String("newTopic", pubsubTopic),
 			)
 			chat.PubsubTopic = pubsubTopic
