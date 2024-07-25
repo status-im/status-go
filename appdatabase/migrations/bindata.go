@@ -117,6 +117,7 @@
 // 1720466921_missing_message_verification.up.sql (167B)
 // 1720557751_rename_staging.up.sql (3.258kB)
 // 1720606449_enable_store_confirmation_for_messages_sent.up.sql (191B)
+// 1721923258_migrate_pre_v1_accounts_colors.up.sql (78B)
 // doc.go (94B)
 
 package migrations
@@ -2525,6 +2526,26 @@ func _1720606449_enable_store_confirmation_for_messages_sentUpSql() (*asset, err
 	return a, nil
 }
 
+var __1721923258_migrate_pre_v1_accounts_colorsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x0a\x0d\x70\x71\x0c\x71\x55\xc8\x4e\xad\x2c\x48\xcc\x2c\x2a\x8e\x4f\x4c\x4e\xce\x2f\xcd\x2b\x29\xe6\x0a\x76\x0d\x51\x48\xce\xcf\xc9\x2f\x52\xb0\x55\x50\x2f\xc8\xcc\xcb\x56\xe7\x0a\xf7\x70\x0d\x72\x45\x08\x16\xa5\x27\x25\x6a\x98\x99\xeb\x58\x9a\xe9\x18\x19\x19\xeb\x18\x6a\xaa\x5b\x03\x02\x00\x00\xff\xff\x38\xbb\x5e\x2e\x4e\x00\x00\x00")
+
+func _1721923258_migrate_pre_v1_accounts_colorsUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1721923258_migrate_pre_v1_accounts_colorsUpSql,
+		"1721923258_migrate_pre_v1_accounts_colors.up.sql",
+	)
+}
+
+func _1721923258_migrate_pre_v1_accounts_colorsUpSql() (*asset, error) {
+	bytes, err := _1721923258_migrate_pre_v1_accounts_colorsUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1721923258_migrate_pre_v1_accounts_colors.up.sql", size: 78, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe6, 0xc2, 0x80, 0xdf, 0x3b, 0xa9, 0xa1, 0xf, 0xf7, 0x94, 0x9c, 0x50, 0x4, 0x90, 0x4a, 0x4c, 0x5c, 0xe6, 0xbf, 0xd9, 0x86, 0x3f, 0x17, 0x5e, 0x93, 0xae, 0x84, 0x97, 0xa1, 0xce, 0x1c, 0xe1}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xcb\x41\x0e\x02\x31\x08\x05\xd0\x7d\x4f\xf1\x2f\x00\xe8\xca\xc4\xc4\xc3\xa0\x43\x08\x19\x5b\xc6\x96\xfb\xc7\x4d\xdf\xfe\x5d\xfa\x39\xd5\x0d\xeb\xf7\x6d\x4d\xc4\xf3\xe9\x36\x6c\x6a\x19\x3c\xe9\x1d\xe3\xd0\x52\x50\xcf\xa3\xa2\xdb\xeb\xfe\xb8\x6d\xa0\xeb\x74\xf4\xf0\xa9\x15\x39\x16\x28\xc1\x2c\x7b\xb0\x27\x58\xda\x3f\x00\x00\xff\xff\x57\xd4\xd5\x90\x5e\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -2753,6 +2774,7 @@ var _bindata = map[string]func() (*asset, error){
 	"1720466921_missing_message_verification.up.sql":                           _1720466921_missing_message_verificationUpSql,
 	"1720557751_rename_staging.up.sql":                                         _1720557751_rename_stagingUpSql,
 	"1720606449_enable_store_confirmation_for_messages_sent.up.sql":            _1720606449_enable_store_confirmation_for_messages_sentUpSql,
+	"1721923258_migrate_pre_v1_accounts_colors.up.sql":                         _1721923258_migrate_pre_v1_accounts_colorsUpSql,
 	"doc.go": docGo,
 }
 
@@ -2919,6 +2941,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1720466921_missing_message_verification.up.sql":                           {_1720466921_missing_message_verificationUpSql, map[string]*bintree{}},
 	"1720557751_rename_staging.up.sql":                                         {_1720557751_rename_stagingUpSql, map[string]*bintree{}},
 	"1720606449_enable_store_confirmation_for_messages_sent.up.sql":            {_1720606449_enable_store_confirmation_for_messages_sentUpSql, map[string]*bintree{}},
+	"1721923258_migrate_pre_v1_accounts_colors.up.sql":                         {_1721923258_migrate_pre_v1_accounts_colorsUpSql, map[string]*bintree{}},
 	"doc.go": {docGo, map[string]*bintree{}},
 }}
 
