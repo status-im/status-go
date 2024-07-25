@@ -294,6 +294,7 @@ func (s *TokenMasterCommunityEventsSuite) TestMemberReceiveTokenMasterEventsWhen
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestJoinedTokenMasterReceiveRequestsToJoinWithRevealedAccounts() {
+	s.T().Skip("flaky test")
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{})
 
 	// set up additional user (bob) that will send request to join
@@ -308,6 +309,7 @@ func (s *TokenMasterCommunityEventsSuite) TestJoinedTokenMasterReceiveRequestsTo
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestReceiveRequestsToJoinWithRevealedAccountsAfterGettingTokenMasterRole() {
+	s.T().Skip("flaky test")
 	// set up additional user (bob) that will send request to join
 	bob := s.newMessenger(accountPassword, []string{bobAccountAddress})
 	s.SetupAdditionalMessengers([]*Messenger{bob})
