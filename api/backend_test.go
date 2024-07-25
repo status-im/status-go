@@ -940,6 +940,7 @@ func TestFinishPairingThroughSeedPhraseProcess(t *testing.T) {
 	require.Empty(t, acc2.Name)
 	require.Empty(t, s2.DisplayName)
 	db2, err := accounts.NewDB(b2.appDB)
+	require.NoError(t, err)
 	n, err = db2.GetSettingLastSynced(settings.DisplayName)
 	require.NoError(t, err)
 	require.True(t, n == 0)
