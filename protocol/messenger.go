@@ -3445,8 +3445,9 @@ func (m *Messenger) SyncVerificationRequest(ctx context.Context, vr *verificatio
 // MessengerResponse to the client
 func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 	m.logger.Debug("RetrieveAll start")
+	defer m.logger.Debug("RetrieveAll end")
+
 	chatWithMessages, err := m.transport.RetrieveRawAll()
-	m.logger.Debug("RetrieveAll end", zap.Any("chatWithMessages", chatWithMessages))
 	if err != nil {
 		return nil, err
 	}
@@ -3900,7 +3901,13 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 	return nil
 }
 
+var handleRetrievedMessagesCounter = atomic.NewInt32(0)
+
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message, storeWakuMessages bool, fromArchive bool) (*MessengerResponse, error) {
+	counter := handleRetrievedMessagesCounter.Inc()
+
+	m.logger.Debug("handleRetrievedMessages start", zap.Int32("counter", counter))
+	defer m.logger.Debug("handleRetrievedMessages end", zap.Int32("counter", counter))
 
 	m.handleMessagesMutex.Lock()
 	defer m.handleMessagesMutex.Unlock()

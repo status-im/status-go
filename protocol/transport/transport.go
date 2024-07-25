@@ -17,6 +17,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -223,6 +224,9 @@ func (t *Transport) GetStats() types.StatsSummary {
 }
 
 func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
+	t.logger.Debug("RetrieveRawAll start")
+	defer t.logger.Debug("RetrieveRawAll end")
+
 	result := make(map[Filter][]*types.Message)
 	logger := t.logger.With(zap.String("site", "retrieveRawAll"))
 
