@@ -1,6 +1,7 @@
 package router
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -2499,6 +2500,90 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedError:      ErrNoBestRouteFound,
 			expectedCandidates: []*PathV2{},
+		},
+		{
+			name: "ETH transfer - Not Enough Native Balance",
+			input: &RouteInputParams{
+				testnetMode:          false,
+				Uuid:                 uuid.NewString(),
+				SendType:             Transfer,
+				AddrFrom:             common.HexToAddress("0x1"),
+				AddrTo:               common.HexToAddress("0x2"),
+				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount3ETHInWei)),
+				TokenID:              pathprocessor.EthSymbol,
+				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.EthSymbol,
+						Decimals: 18,
+					},
+					tokenPrices:           testTokenPrices,
+					suggestedFees:         testSuggestedFees,
+					balanceMap:            testBalanceMapPerChain,
+					estimationMap:         testEstimationMap,
+					bonderFeeMap:          testBbonderFeeMap,
+					approvalGasEstimation: testApprovalGasEstimation,
+					approvalL1Fee:         testApprovalL1Fee,
+				},
+			},
+			expectedError: &errors.ErrorResponse{
+				Code:    ErrNotEnoughNativeBalance.Code,
+				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, pathprocessor.EthSymbol, walletCommon.EthereumMainnet),
+			},
+			expectedCandidates: []*PathV2{
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &mainnet,
+					ToChain:          &optimism,
+					ApprovalRequired: false,
+				},
+			},
+		},
+		{
+			name: "ETH transfer - Not Enough Native Balance",
+			input: &RouteInputParams{
+				testnetMode:          false,
+				Uuid:                 uuid.NewString(),
+				SendType:             Transfer,
+				AddrFrom:             common.HexToAddress("0x1"),
+				AddrTo:               common.HexToAddress("0x2"),
+				AmountIn:             (*hexutil.Big)(big.NewInt(5 * testAmount100USDC)),
+				TokenID:              pathprocessor.UsdcSymbol,
+				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.UsdcSymbol,
+						Decimals: 6,
+					},
+					tokenPrices:           testTokenPrices,
+					suggestedFees:         testSuggestedFees,
+					balanceMap:            testBalanceMapPerChain,
+					estimationMap:         testEstimationMap,
+					bonderFeeMap:          testBbonderFeeMap,
+					approvalGasEstimation: testApprovalGasEstimation,
+					approvalL1Fee:         testApprovalL1Fee,
+				},
+			},
+			expectedError: &errors.ErrorResponse{
+				Code:    ErrNotEnoughTokenBalance.Code,
+				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, pathprocessor.UsdcSymbol, walletCommon.EthereumMainnet),
+			},
+			expectedCandidates: []*PathV2{
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &mainnet,
+					ToChain:          &optimism,
+					ApprovalRequired: true,
+				},
+			},
 		},
 	}
 }

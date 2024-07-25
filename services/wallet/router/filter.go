@@ -2,6 +2,7 @@ package router
 
 import (
 	"math/big"
+	"reflect"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
@@ -20,6 +21,19 @@ func init() {
 }
 
 func filterRoutesV2(routes [][]*PathV2, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) [][]*PathV2 {
+	for i := len(routes) - 1; i >= 0; i-- {
+		routeAmount := big.NewInt(0)
+		for _, p := range routes[i] {
+			routeAmount.Add(routeAmount, p.AmountIn.ToInt())
+		}
+
+		if routeAmount.Cmp(amountIn) == 0 {
+			continue
+		}
+
+		routes = append(routes[:i], routes[i+1:]...)
+	}
+
 	if len(fromLockedAmount) == 0 {
 		return routes
 	}
@@ -43,7 +57,7 @@ func filterNetworkComplianceV2(routes [][]*PathV2, fromLockedAmount map[uint64]*
 		}
 
 		// Create fresh copies of the maps for each route check, because they are manipulated
-		if isValidForNetworkComplianceV2(route, copyMap(fromIncluded), copyMap(fromExcluded)) {
+		if isValidForNetworkComplianceV2(route, copyMapGeneric(fromIncluded, nil).(map[uint64]bool), copyMapGeneric(fromExcluded, nil).(map[uint64]bool)) {
 			filteredRoutes = append(filteredRoutes, route)
 		}
 	}
@@ -56,6 +70,10 @@ func isValidForNetworkComplianceV2(route []*PathV2, fromIncluded, fromExcluded m
 		zap.Any("fromIncluded", fromIncluded),
 		zap.Any("fromExcluded", fromExcluded),
 	)
+
+	if fromIncluded == nil || fromExcluded == nil {
+		return false
+	}
 
 	for _, path := range route {
 		if path == nil || path.FromChain == nil {
@@ -114,6 +132,10 @@ func filterCapacityValidationV2(routes [][]*PathV2, amountIn *big.Int, fromLocke
 func hasSufficientCapacityV2(route []*PathV2, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) bool {
 	for _, path := range route {
 		if amount, ok := fromLockedAmount[path.FromChain.ChainID]; ok {
+			if path.AmountIn.ToInt().Cmp(amount.ToInt()) != 0 {
+				logger.Debug("Amount in does not match locked amount", zap.Any("path", path))
+				return false
+			}
 			requiredAmountIn := new(big.Int).Sub(amountIn, amount.ToInt())
 			restAmountIn := calculateRestAmountInV2(route, path)
 
@@ -121,11 +143,7 @@ func hasSufficientCapacityV2(route []*PathV2, amountIn *big.Int, fromLockedAmoun
 			logger.Debug("Required amount in", zap.String("requiredAmountIn", requiredAmountIn.String()))
 			logger.Debug("Rest amount in", zap.String("restAmountIn", restAmountIn.String()))
 
-			if restAmountIn.Cmp(requiredAmountIn) >= 0 {
-				path.AmountIn = amount
-				path.AmountInLocked = true
-				logger.Debug("Path has sufficient capacity", zap.Any("path", path))
-			} else {
+			if restAmountIn.Cmp(requiredAmountIn) < 0 {
 				logger.Debug("Path does not have sufficient capacity", zap.Any("path", path))
 				return false
 			}
@@ -145,11 +163,21 @@ func calculateRestAmountInV2(route []*PathV2, excludePath *PathV2) *big.Int {
 	return restAmountIn
 }
 
-// copyMap creates a copy of the given map[uint64]bool
-func copyMap(original map[uint64]bool) map[uint64]bool {
-	c := make(map[uint64]bool)
-	for k, v := range original {
-		c[k] = v
+// copyMapGeneric creates a copy of any map, if the deepCopyValue function is provided, it will be used to copy values.
+func copyMapGeneric(original interface{}, deepCopyValueFn func(interface{}) interface{}) interface{} {
+	originalVal := reflect.ValueOf(original)
+	if originalVal.Kind() != reflect.Map {
+		return nil
 	}
-	return c
+
+	newMap := reflect.MakeMap(originalVal.Type())
+	for iter := originalVal.MapRange(); iter.Next(); {
+		if deepCopyValueFn != nil {
+			newMap.SetMapIndex(iter.Key(), reflect.ValueOf(deepCopyValueFn(iter.Value().Interface())))
+		} else {
+			newMap.SetMapIndex(iter.Key(), iter.Value())
+		}
+	}
+
+	return newMap.Interface()
 }

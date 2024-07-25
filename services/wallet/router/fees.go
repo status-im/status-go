@@ -54,27 +54,23 @@ type SuggestedFeesGwei struct {
 	EIP1559Enabled       bool       `json:"eip1559Enabled"`
 }
 
-func (s *SuggestedFees) feeFor(mode GasFeeMode) *big.Int {
-	if !s.EIP1559Enabled {
-		return s.GasPrice
-	}
-
+func (m *MaxFeesLevels) feeFor(mode GasFeeMode) *big.Int {
 	if mode == GasFeeLow {
-		return s.MaxFeesLevels.Low.ToInt()
+		return m.Low.ToInt()
 	}
 
 	if mode == GasFeeHigh {
-		return s.MaxFeesLevels.High.ToInt()
+		return m.High.ToInt()
 	}
 
-	return s.MaxFeesLevels.Medium.ToInt()
+	return m.Medium.ToInt()
+}
+
+func (s *SuggestedFees) feeFor(mode GasFeeMode) *big.Int {
+	return s.MaxFeesLevels.feeFor(mode)
 }
 
 func (s *SuggestedFeesGwei) feeFor(mode GasFeeMode) *big.Float {
-	if !s.EIP1559Enabled {
-		return s.GasPrice
-	}
-
 	if mode == GasFeeLow {
 		return s.MaxFeePerGasLow
 	}
@@ -141,9 +137,9 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*Sugges
 			BaseFee:              big.NewInt(0),
 			MaxPriorityFeePerGas: big.NewInt(0),
 			MaxFeesLevels: &MaxFeesLevels{
-				Low:    (*hexutil.Big)(big.NewInt(0)),
-				Medium: (*hexutil.Big)(big.NewInt(0)),
-				High:   (*hexutil.Big)(big.NewInt(0)),
+				Low:    (*hexutil.Big)(gasPrice),
+				Medium: (*hexutil.Big)(gasPrice),
+				High:   (*hexutil.Big)(gasPrice),
 			},
 			EIP1559Enabled: false,
 		}, nil
