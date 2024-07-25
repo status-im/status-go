@@ -909,6 +909,11 @@ func TestFinishPairingThroughSeedPhraseProcess(t *testing.T) {
 	s, err := b.GetSettings()
 	require.NoError(t, err)
 	mn := *s.Mnemonic
+	db, err := accounts.NewDB(b.appDB)
+	require.NoError(t, err)
+	n, err := db.GetSettingLastSynced(settings.DisplayName)
+	require.NoError(t, err)
+	require.True(t, n > 0)
 
 	// restore account acc as acc2 use Mnemonic from acc
 	restoreRequest := &requests.RestoreAccount{
@@ -934,6 +939,10 @@ func TestFinishPairingThroughSeedPhraseProcess(t *testing.T) {
 	require.Len(t, strings.Split(s2.Name, " "), 3)
 	require.Empty(t, acc2.Name)
 	require.Empty(t, s2.DisplayName)
+	db2, err := accounts.NewDB(b2.appDB)
+	n, err = db2.GetSettingLastSynced(settings.DisplayName)
+	require.NoError(t, err)
+	require.True(t, n == 0)
 
 	// pair installation
 	_, err = b2.Messenger().FinishPairingThroughSeedPhraseProcess(&requests.FinishPairingThroughSeedPhraseProcess{InstallationID: s.InstallationID})
