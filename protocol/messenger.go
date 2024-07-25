@@ -18,6 +18,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appmetrics"
 	utils "github.com/status-im/status-go/common"
@@ -3453,7 +3455,9 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 }
 
 func (m *Messenger) StartRetrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
-	m.logger.Debug("starting RetrieveMessagesLoop")
+	m.logger.Debug("RetrieveMessagesLoop start", zap.Duration("tick", tick))
+	defer m.logger.Debug("RetrieveMessagesLoop end")
+
 	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer m.shutdownWaitGroup.Done()
@@ -3462,16 +3466,25 @@ func (m *Messenger) StartRetrieveMessagesLoop(tick time.Duration, cancel <-chan 
 		for {
 			select {
 			case <-ticker.C:
+				m.logger.Debug("RetrieveMessagesLoop tick start")
 				m.ProcessAllMessages()
+				m.logger.Debug("RetrieveMessagesLoop tick end")
 			case <-cancel:
+				m.logger.Debug("RetrieveMessagesLoop cancel")
 				return
 			}
 		}
 	}()
 }
 
+var processAllMessagesCounter = atomic.NewInt32(0)
+
 func (m *Messenger) ProcessAllMessages() {
-	m.logger.Debug("ProcessAllMessages")
+	counter := processAllMessagesCounter.Inc()
+
+	m.logger.Debug("ProcessAllMessages start", zap.Int32("counter", counter))
+	defer m.logger.Debug("ProcessAllMessages end", zap.Int32("counter", counter))
+
 	response, err := m.RetrieveAll()
 	if err != nil {
 		m.logger.Error("failed to retrieve raw messages", zap.Error(err))
@@ -3481,6 +3494,9 @@ func (m *Messenger) ProcessAllMessages() {
 }
 
 func (m *Messenger) PublishMessengerResponse(response *MessengerResponse) {
+	m.logger.Debug("PublishMessengerResponse start")
+	defer m.logger.Debug("PublishMessengerResponse end")
+
 	if response.IsEmpty() {
 		return
 	}
