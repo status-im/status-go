@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
@@ -16,15 +17,45 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 )
 
-func (m *Messenger) EnableAndSyncInstallation(request *requests.EnableAndSyncInstallation) error {
+func (m *Messenger) EnableAndSyncInstallation(request *requests.EnableAndSyncInstallation) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
-		return err
+		return nil, err
 	}
 	err := m.EnableInstallation(request.InstallationID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return m.SyncDevices(context.Background(), "", "", nil)
+	response, err := m.SendPairInstallation(context.Background(), nil)
+	if err != nil {
+		return nil, err
+	}
+	err = m.SyncDevices(context.Background(), "", "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Delete AC notif
+	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(request.InstallationID))
+	if err != nil {
+		return nil, err
+	}
+
+	if notification != nil {
+		updatedAt := m.GetCurrentTimeInMillis()
+		notification.UpdatedAt = updatedAt
+		notification.Deleted = true
+		// we shouldn't sync deleted notification here,
+		// as the same user on different devices will receive the same message(CommunityCancelRequestToJoin) ?
+		err = m.persistence.DeleteActivityCenterNotificationByID(types.FromHex(request.InstallationID), updatedAt)
+		if err != nil {
+			m.logger.Error("failed to delete notification from Activity Center", zap.Error(err))
+			return nil, err
+		}
+
+		// sending signal to client to remove the activity center notification from UI
+		response.AddActivityCenterNotification(notification)
+	}
+	return response, nil
 }
 
 func (m *Messenger) FinishPairingThroughSeedPhraseProcess(request *requests.FinishPairingThroughSeedPhraseProcess) (*MessengerResponse, error) {
@@ -53,7 +84,26 @@ func (m *Messenger) FinishPairingThroughSeedPhraseProcess(request *requests.Fini
 		i.Enabled = true
 	}
 	m.allInstallations.Store(request.InstallationID, i)
-	return m.SendPairInstallation(context.Background(), nil)
+	response, err := m.SendPairInstallation(context.Background(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	notification := &ActivityCenterNotification{
+		ID:             types.FromHex(request.InstallationID),
+		Type:           ActivityCenterNotificationTypeNewInstallationCreated,
+		InstallationID: m.installationID, // Put our own installation ID, as we're the initiator of the pairing
+		Timestamp:      m.getTimesource().GetCurrentTime(),
+		Read:           false,
+		Deleted:        false,
+		UpdatedAt:      m.GetCurrentTimeInMillis(),
+	}
+
+	err = m.addActivityCenterNotification(response, notification, nil)
+	if err != nil {
+		return nil, err
+	}
+	return response, err
 }
 
 // SendPairInstallation sends a pair installation message
