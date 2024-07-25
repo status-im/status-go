@@ -152,9 +152,10 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 			dismissed,
 			token_data,
 			deleted,
-		    updated_at
+		    updated_at,
+			installation_id
 		)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 		`,
 		notification.ID,
 		notification.Timestamp,
@@ -172,6 +173,7 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		encodedTokenData,
 		notification.Deleted,
 		notification.UpdatedAt,
+		notification.InstallationID,
 	)
 	if err != nil {
 		return 0, err
@@ -273,6 +275,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 	var tokenDataBytes []byte
 	var name sql.NullString
 	var author sql.NullString
+	var installationID sql.NullString
 	notification := &ActivityCenterNotification{}
 	err := row.Scan(
 		&notification.ID,
@@ -292,7 +295,9 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 		&name,
 		&author,
 		&tokenDataBytes,
-		&notification.UpdatedAt)
+		&notification.UpdatedAt,
+		&installationID,
+	)
 
 	if err != nil {
 		return nil, err
@@ -312,6 +317,10 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 
 	if author.Valid {
 		notification.Author = author.String
+	}
+
+	if installationID.Valid {
+		notification.InstallationID = installationID.String
 	}
 
 	if len(tokenDataBytes) > 0 {
@@ -363,6 +372,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 		var tokenDataBytes []byte
 		var name sql.NullString
 		var author sql.NullString
+		var installationID sql.NullString
 		notification := &ActivityCenterNotification{}
 		err := rows.Scan(
 			&notification.ID,
@@ -382,7 +392,9 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 			&author,
 			&tokenDataBytes,
 			&latestCursor,
-			&notification.UpdatedAt)
+			&notification.UpdatedAt,
+			&installationID,
+		)
 		if err != nil {
 			return "", nil, err
 		}
@@ -401,6 +413,10 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 
 		if author.Valid {
 			notification.Author = author.String
+		}
+
+		if installationID.Valid {
+			notification.InstallationID = installationID.String
 		}
 
 		if len(tokenDataBytes) > 0 {
@@ -543,7 +559,8 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	a.author,
 	a.token_data,
 	substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || hex(a.id) as cursor,
-	a.updated_at
+	a.updated_at,
+	a.installation_id
 	FROM activity_center_notifications a
 	LEFT JOIN chats c
 	ON
@@ -664,7 +681,8 @@ func (db sqlitePersistence) GetActivityCenterNotificationsByID(ids []types.HexBy
 		a.author,
 		a.token_data,
 		substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || hex(a.id) as cursor,
-		a.updated_at
+		a.updated_at,
+		a.installation_id
 		FROM activity_center_notifications a
 		LEFT JOIN chats c
 		ON
@@ -704,7 +722,8 @@ func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes)
 		c.name,
 		a.author,
 		a.token_data,
-		a.updated_at
+		a.updated_at,
+		a.installation_id
 		FROM activity_center_notifications a
 		LEFT JOIN chats c
 		ON
@@ -1338,7 +1357,8 @@ func (db sqlitePersistence) ActiveContactRequestNotification(contactID string) (
 			c.name,
 			a.author,
 			a.token_data,
-			a.updated_at
+			a.updated_at,
+			a.installation_id
 		FROM activity_center_notifications a
 		LEFT JOIN chats c ON c.id = a.chat_id
 		WHERE a.author = ?

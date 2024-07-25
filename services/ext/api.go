@@ -1064,7 +1064,7 @@ func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) err
 	return api.service.messenger.SyncDevices(ctx, name, picture, nil)
 }
 
-func (api *PublicAPI) EnableAndSyncInstallation(request *requests.EnableAndSyncInstallation) error {
+func (api *PublicAPI) EnableAndSyncInstallation(request *requests.EnableAndSyncInstallation) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.EnableAndSyncInstallation(request)
 }
 
