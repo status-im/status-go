@@ -1,4 +1,4 @@
-FROM golang
+FROM golang:1.23rc2
 
 WORKDIR /peerdiscovery
 COPY . .
