@@ -37,6 +37,9 @@ func NewAPI(s *Service) *API {
 		NetworkManager: s.nm,
 	})
 
+	// Request permissions
+	r.Register("wallet_requestPermissions", &commands.RequestPermissionsCommand{})
+
 	return &API{
 		s: s,
 		r: r,
