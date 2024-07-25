@@ -2629,7 +2629,10 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedError: ErrNotEnoughTokenBalance,
+			expectedError: &errors.ErrorResponse{
+				Code:    ErrNotEnoughTokenBalance.Code,
+				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, pathprocessor.UsdcSymbol, walletCommon.OptimismMainnet),
+			},
 			expectedCandidates: []*PathV2{
 				{
 					ProcessorName:         pathprocessor.ProcessorTransferName,
@@ -2673,7 +2676,10 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedError: ErrNotEnoughNativeBalance,
+			expectedError: &errors.ErrorResponse{
+				Code:    ErrNotEnoughNativeBalance.Code,
+				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, pathprocessor.EthSymbol, walletCommon.OptimismMainnet),
+			},
 			expectedCandidates: []*PathV2{
 				{
 					ProcessorName:         pathprocessor.ProcessorTransferName,
@@ -2720,7 +2726,10 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedError: ErrNotEnoughTokenBalance,
+			expectedError: &errors.ErrorResponse{
+				Code:    ErrNotEnoughTokenBalance.Code,
+				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, pathprocessor.UsdcSymbol, walletCommon.EthereumMainnet),
+			},
 			expectedCandidates: []*PathV2{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
@@ -2777,7 +2786,10 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedError: ErrNotEnoughNativeBalance,
+			expectedError: &errors.ErrorResponse{
+				Code:    ErrNotEnoughNativeBalance.Code,
+				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, pathprocessor.EthSymbol, walletCommon.EthereumMainnet),
+			},
 			expectedCandidates: []*PathV2{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
