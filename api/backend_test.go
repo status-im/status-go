@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -16,6 +17,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/status-im/status-go/protocol/tt"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -878,6 +881,97 @@ func TestLoginAccount(t *testing.T) {
 	waitForLogin(c)
 
 	require.Equal(t, nameserver, b.config.WakuV2Config.Nameserver)
+}
+
+func TestFinishPairingThroughSeedPhraseProcess(t *testing.T) {
+	// create account acc
+	utils.Init()
+	displayName := "some-display-name"
+	password := "some-password"
+	tmpdir := t.TempDir()
+	nameserver := "8.8.8.8"
+	b := NewGethStatusBackend()
+	createAccountRequest := &requests.CreateAccount{
+		DisplayName:        displayName,
+		CustomizationColor: "#ffffff",
+		Emoji:              "some",
+		Password:           password,
+		RootDataDir:        tmpdir,
+		LogFilePath:        tmpdir + "/log",
+		WakuV2Nameserver:   &nameserver,
+		WakuV2Fleet:        "status.staging",
+	}
+	acc, err := b.CreateAccountAndLogin(createAccountRequest)
+	require.NoError(t, err)
+	require.NotNil(t, acc)
+	_, err = b.Messenger().Start()
+	require.NoError(t, err)
+	s, err := b.GetSettings()
+	require.NoError(t, err)
+	mn := *s.Mnemonic
+
+	// restore account acc as acc2 use Mnemonic from acc
+	restoreRequest := &requests.RestoreAccount{
+		Mnemonic:    mn,
+		FetchBackup: true,
+		CreateAccount: requests.CreateAccount{
+			Password:           password,
+			CustomizationColor: "0x000000",
+			RootDataDir:        t.TempDir(),
+		},
+	}
+	b2 := NewGethStatusBackend()
+	acc2, err := b2.RestoreAccountAndLogin(restoreRequest)
+	require.NoError(t, err)
+	require.NotNil(t, acc2)
+	_, err = b2.Messenger().Start()
+	require.NoError(t, err)
+	s2, err := b2.GetSettings()
+	require.NoError(t, err)
+
+	t.Logf("acc2 settings.name: %s", s2.Name)
+	// should be 3 words random name
+	require.Len(t, strings.Split(s2.Name, " "), 3)
+	require.Empty(t, acc2.Name)
+	require.Empty(t, s2.DisplayName)
+
+	// pair installation
+	_, err = b2.Messenger().FinishPairingThroughSeedPhraseProcess(&requests.FinishPairingThroughSeedPhraseProcess{InstallationID: s.InstallationID})
+	require.NoError(t, err)
+	// ensure acc received the installation from acc2
+	err = tt.RetryWithBackOff(func() error {
+		r, err := b.Messenger().RetrieveAll()
+		require.NoError(t, err)
+		if len(r.Installations()) > 0 {
+			return nil
+		}
+		return errors.New("new installation not received yet")
+	})
+	require.NoError(t, err)
+
+	// sync data from acc to acc2
+	err = b.Messenger().EnableAndSyncInstallation(&requests.EnableAndSyncInstallation{InstallationID: s2.InstallationID})
+	require.NoError(t, err)
+	// ensure acc2's display name get synced
+	err = tt.RetryWithBackOff(func() error {
+		r, err := b2.Messenger().RetrieveAll()
+		require.NoError(t, err)
+		for _, ss := range r.Settings {
+			if ss.GetDBName() == "display_name" {
+				return nil
+			}
+		}
+		return errors.New("display name setting not received yet")
+	})
+	require.NoError(t, err)
+
+	// check display name for acc2
+	s2, err = b2.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, displayName, s2.DisplayName)
+	acc2, err = b2.GetActiveAccount()
+	require.NoError(t, err)
+	require.Equal(t, displayName, acc2.Name)
 }
 
 func TestVerifyDatabasePassword(t *testing.T) {
