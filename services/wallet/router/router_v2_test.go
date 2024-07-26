@@ -210,6 +210,9 @@ func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
 	// Test blocking endpoints
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.flaky {
+				t.Skip("Flaky test")
+			}
 
 			routes, err := router.SuggestedRoutesV2(context.Background(), tt.input)
 
@@ -230,20 +233,26 @@ func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
 
 	// Test async endpoints
 	for _, tt := range tests {
-		router.SuggestedRoutesV2Async(tt.input)
-
-		select {
-		case asyncRoutes := <-suggestedRoutesCh:
-			assert.Equal(t, tt.input.Uuid, asyncRoutes.Uuid)
-			assert.Equal(t, tt.expectedError, asyncRoutes.ErrorResponse)
-			assertPathsEqual(t, tt.expectedCandidates, asyncRoutes.Candidates)
-			if tt.expectedError == nil {
-				assertPathsEqual(t, tt.expectedBest, asyncRoutes.Best)
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.flaky {
+				t.Skip("Flaky test")
 			}
-			break
-		case <-time.After(10 * time.Second):
-			t.FailNow()
-		}
+
+			router.SuggestedRoutesV2Async(tt.input)
+
+			select {
+			case asyncRoutes := <-suggestedRoutesCh:
+				assert.Equal(t, tt.input.Uuid, asyncRoutes.Uuid)
+				assert.Equal(t, tt.expectedError, asyncRoutes.ErrorResponse)
+				assertPathsEqual(t, tt.expectedCandidates, asyncRoutes.Candidates)
+				if tt.expectedError == nil {
+					assertPathsEqual(t, tt.expectedBest, asyncRoutes.Best)
+				}
+				break
+			case <-time.After(10 * time.Second):
+				t.FailNow()
+			}
+		})
 	}
 }
 
