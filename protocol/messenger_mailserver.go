@@ -1126,9 +1126,6 @@ func (m *Messenger) ConnectionChanged(state connection.State) {
 			m.logger.Error("failed to start datasync", zap.Error(err))
 		}
 	}
-	if !state.Offline {
-		m.asyncRequestAllHistoricMessages()
-	}
 
 	m.connectionState = state
 }
