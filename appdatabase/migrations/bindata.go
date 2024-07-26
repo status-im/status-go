@@ -117,6 +117,7 @@
 // 1720466921_missing_message_verification.up.sql (167B)
 // 1720557751_rename_staging.up.sql (3.258kB)
 // 1720606449_enable_store_confirmation_for_messages_sent.up.sql (191B)
+// 1721215212_create_keycard_and_accounts.up.sql (604B)
 // doc.go (94B)
 
 package migrations
@@ -2525,6 +2526,26 @@ func _1720606449_enable_store_confirmation_for_messages_sentUpSql() (*asset, err
 	return a, nil
 }
 
+var __1721215212_create_keycard_and_accountsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x84\x91\x4d\x4b\xc4\x30\x10\x86\xef\xf9\x15\xef\x71\x17\xa4\xe8\x79\xd9\xc3\xa2\x15\x2b\x35\x81\xb6\xe2\xb1\x84\x34\x48\x48\x4d\x4b\x93\x45\xfc\xf7\xb2\xf9\x30\xb5\xb8\x78\x4b\x66\x9e\xbe\xd3\x79\x52\xd1\xb6\x6c\x3a\x54\xb4\x63\xd0\xf2\x4b\xf0\x65\xb0\xd8\xc5\x53\x7f\x56\xc3\x4d\x2a\xf7\x86\x7f\xc8\x7c\x1b\x27\xa1\x65\xe8\x06\x6c\x9e\xac\x72\x6a\x32\x7b\xd2\x96\x75\x79\xdf\x11\x00\xb0\x45\xe2\x95\xb1\x8e\x1b\x21\x3d\x1c\x7b\x3e\xd1\x9f\x6f\x71\x6a\xb7\xd1\x39\x20\x7f\xe3\xb9\x34\x89\x3c\x36\xec\x05\x56\x3a\xa7\xcc\xbb\x85\x25\x6f\x4f\x65\x53\x5e\x99\x89\xaa\x05\x65\x1d\xe8\x6b\x5d\x13\xe0\x44\x1f\xae\x81\x17\xaa\xa2\xd8\x85\x35\xb0\x72\x01\x3f\x30\x69\xda\x1f\x08\xf9\x4b\x5f\xcf\x85\x98\xce\xc6\x6d\x3d\xc6\x72\xcf\x87\x61\x91\xd6\xfe\xf2\xa4\x8b\x35\x1a\x4a\x33\x2f\x22\x4a\xd2\xdc\x99\xab\x65\x95\xaf\x67\x4e\x9e\x59\x45\xf3\xcb\x69\x30\x1a\xc2\xfc\xff\x1e\x7d\x4a\xbc\x45\x3d\x97\xca\x27\x1f\x47\xe9\x70\xc4\x5d\x54\xb1\xc2\x36\xbb\xe7\xbd\x7f\x44\xc7\x9c\x7f\x24\xef\x0f\xdf\x01\x00\x00\xff\xff\x10\x4b\xf8\x55\x5c\x02\x00\x00")
+
+func _1721215212_create_keycard_and_accountsUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1721215212_create_keycard_and_accountsUpSql,
+		"1721215212_create_keycard_and_accounts.up.sql",
+	)
+}
+
+func _1721215212_create_keycard_and_accountsUpSql() (*asset, error) {
+	bytes, err := _1721215212_create_keycard_and_accountsUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1721215212_create_keycard_and_accounts.up.sql", size: 604, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf7, 0xde, 0x58, 0xfb, 0x43, 0x5a, 0xe8, 0xf1, 0xb5, 0x7a, 0x22, 0x50, 0xf7, 0xb, 0x1e, 0x2a, 0xa8, 0xd0, 0x5f, 0xe4, 0xdb, 0x76, 0x7, 0xf0, 0xe6, 0xe3, 0x6e, 0xc6, 0xae, 0xf6, 0x7, 0xe3}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xcb\x41\x0e\x02\x31\x08\x05\xd0\x7d\x4f\xf1\x2f\x00\xe8\xca\xc4\xc4\xc3\xa0\x43\x08\x19\x5b\xc6\x96\xfb\xc7\x4d\xdf\xfe\x5d\xfa\x39\xd5\x0d\xeb\xf7\x6d\x4d\xc4\xf3\xe9\x36\x6c\x6a\x19\x3c\xe9\x1d\xe3\xd0\x52\x50\xcf\xa3\xa2\xdb\xeb\xfe\xb8\x6d\xa0\xeb\x74\xf4\xf0\xa9\x15\x39\x16\x28\xc1\x2c\x7b\xb0\x27\x58\xda\x3f\x00\x00\xff\xff\x57\xd4\xd5\x90\x5e\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -2753,6 +2774,7 @@ var _bindata = map[string]func() (*asset, error){
 	"1720466921_missing_message_verification.up.sql":                           _1720466921_missing_message_verificationUpSql,
 	"1720557751_rename_staging.up.sql":                                         _1720557751_rename_stagingUpSql,
 	"1720606449_enable_store_confirmation_for_messages_sent.up.sql":            _1720606449_enable_store_confirmation_for_messages_sentUpSql,
+	"1721215212_create_keycard_and_accounts.up.sql":                            _1721215212_create_keycard_and_accountsUpSql,
 	"doc.go": docGo,
 }
 
@@ -2919,6 +2941,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1720466921_missing_message_verification.up.sql":                           {_1720466921_missing_message_verificationUpSql, map[string]*bintree{}},
 	"1720557751_rename_staging.up.sql":                                         {_1720557751_rename_stagingUpSql, map[string]*bintree{}},
 	"1720606449_enable_store_confirmation_for_messages_sent.up.sql":            {_1720606449_enable_store_confirmation_for_messages_sentUpSql, map[string]*bintree{}},
+	"1721215212_create_keycard_and_accounts.up.sql":                            {_1721215212_create_keycard_and_accountsUpSql, map[string]*bintree{}},
 	"doc.go": {docGo, map[string]*bintree{}},
 }}
 
