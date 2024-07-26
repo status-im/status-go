@@ -50,6 +50,7 @@ type DatabaseSettingsManager interface {
 	SetUseMailservers(value bool) error
 	SetTokenGroupByCommunity(value bool) error
 	SetPeerSyncingEnabled(value bool) error
+	SetSyncingOnMobileNetwork(value bool) error
 
 	CreateSettings(s Settings, n params.NodeConfig) error
 	SaveSetting(setting string, value interface{}) error

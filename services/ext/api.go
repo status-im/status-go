@@ -1526,6 +1526,10 @@ func (api *PublicAPI) TogglePeerSyncing(request *requests.TogglePeerSyncingReque
 	return api.service.messenger.TogglePeerSyncing(request)
 }
 
+func (api *PublicAPI) SetSyncingOnMobileNetwork(request *requests.SetSyncingOnMobileNetwork) error {
+	return api.service.messenger.SetSyncingOnMobileNetwork(request)
+}
+
 func (api *PublicAPI) SetPinnedMailservers(pinnedMailservers map[string]string) error {
 	return api.service.messenger.SetPinnedMailservers(pinnedMailservers)
 }

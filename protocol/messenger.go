@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appmetrics"
 	utils "github.com/status-im/status-go/common"
@@ -739,6 +740,8 @@ func (m *Messenger) ToForeground() {
 	if m.httpServer != nil {
 		m.httpServer.ToForeground()
 	}
+
+	m.asyncRequestAllHistoricMessages()
 }
 
 func (m *Messenger) ToBackground() {
@@ -1004,7 +1007,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 	}
 
 	// Start fetching messages from store nodes
-	if online && m.config.codeControlFlags.AutoRequestHistoricMessages {
+	if online {
 		m.asyncRequestAllHistoricMessages()
 	}
 
