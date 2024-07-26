@@ -2,6 +2,8 @@ package chainutils
 
 import (
 	"errors"
+	"fmt"
+	"strconv"
 
 	"github.com/status-im/status-go/params"
 )
@@ -10,7 +12,10 @@ type NetworkManagerInterface interface {
 	GetActiveNetworks() ([]*params.Network, error)
 }
 
-var ErrNoActiveNetworks = errors.New("no active networks available")
+var (
+	ErrNoActiveNetworks   = errors.New("no active networks available")
+	ErrUnsupportedNetwork = errors.New("unsupported network")
+)
 
 // GetSupportedChainIDs retrieves the chain IDs from the provided NetworkManager.
 func GetSupportedChainIDs(networkManager NetworkManagerInterface) ([]uint64, error) {
@@ -38,4 +43,15 @@ func GetDefaultChainID(networkManager NetworkManagerInterface) (uint64, error) {
 	}
 
 	return chainIDs[0], nil
+}
+
+func GetHexChainID(decimalStr string) (string, error) {
+	decimalValue, err := strconv.ParseInt(decimalStr, 10, 64)
+	if err != nil {
+		return "", ErrUnsupportedNetwork
+	}
+
+	hexStr := fmt.Sprintf(`0x%s`, strconv.FormatInt(decimalValue, 16))
+
+	return hexStr, nil
 }

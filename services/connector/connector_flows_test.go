@@ -83,9 +83,9 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 	assert.Equal(t, expectedResponse, response)
 
 	// Request to switch ethereum chain
-	expectedChainId := 0x5
-	request = fmt.Sprintf("{\"method\": \"wallet_switchEthereumChain\", \"params\": [%d], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }", expectedChainId)
-	expectedResponse = fmt.Sprintf(`%d`, expectedChainId)
+	expectedChainId := "0x5"
+	request = fmt.Sprintf("{\"method\": \"wallet_switchEthereumChain\", \"params\": [{\"chainId\": \"%s\"}], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }", expectedChainId)
+	expectedResponse = expectedChainId
 	response, err = api.CallRPC(request)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)
