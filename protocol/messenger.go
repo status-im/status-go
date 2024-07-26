@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appmetrics"
 	utils "github.com/status-im/status-go/common"
@@ -2552,7 +2553,6 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 
 	m.logger.Debug("inside sendChatMessage",
 		zap.String("id", message.ID),
-		zap.String("text", message.Text),
 		zap.String("from", message.From),
 		zap.String("displayName", message.DisplayName),
 		zap.String("ChatId", message.ChatId),
