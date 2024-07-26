@@ -1,19 +1,40 @@
 package commands
 
 import (
+	"database/sql"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/params"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
+
+func setupNetworks(db *sql.DB) *ChainIDCommand {
+	nm := NetworkManagerMock{}
+	nm.SetNetworks([]*params.Network{
+		{
+			ChainID: walletCommon.EthereumMainnet,
+		},
+		{
+			ChainID: walletCommon.EthereumGoerli,
+		},
+	})
+	cmd := &ChainIDCommand{
+		Db:             db,
+		NetworkManager: &nm,
+	}
+
+	return cmd
+}
 
 func TestFailToGetChainIdWithMissingDAppFields(t *testing.T) {
 	db, close := SetupTestDB(t)
 	defer close()
 
-	cmd := &ChainIDCommand{Db: db}
+	cmd := setupNetworks(db)
 
 	// Missing DApp fields
 	request, err := ConstructRPCRequest("eth_chainId", []interface{}{}, nil)
@@ -24,25 +45,25 @@ func TestFailToGetChainIdWithMissingDAppFields(t *testing.T) {
 	assert.Empty(t, result)
 }
 
-func TestFailToGetChainIdForUnpermittedDApp(t *testing.T) {
+func TestGetDefaultChainIdForUnpermittedDApp(t *testing.T) {
 	db, close := SetupTestDB(t)
 	defer close()
 
-	cmd := &ChainIDCommand{Db: db}
+	cmd := setupNetworks(db)
 
 	request, err := ConstructRPCRequest("eth_chainId", []interface{}{}, &testDAppData)
 	assert.NoError(t, err)
 
 	result, err := cmd.Execute(request)
-	assert.Equal(t, ErrDAppIsNotPermittedByUser, err)
-	assert.Empty(t, result)
+	assert.NoError(t, err)
+	assert.Equal(t, result, strconv.FormatUint(walletCommon.EthereumMainnet, 16))
 }
 
 func TestGetChainIdForPermittedDApp(t *testing.T) {
 	db, close := SetupTestDB(t)
 	defer close()
 
-	cmd := &ChainIDCommand{Db: db}
+	cmd := setupNetworks(db)
 
 	sharedAccount := types.HexToAddress("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg")
 	chainID := uint64(0x123)
