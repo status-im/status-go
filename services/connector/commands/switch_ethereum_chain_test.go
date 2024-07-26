@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -55,7 +56,9 @@ func TestFailToSwitchEthereumChainWithUnsupportedChainId(t *testing.T) {
 	}
 
 	params := make([]interface{}, 1)
-	params[0] = walletCommon.BinanceTestChainID // some unrecoginzed chain id
+	params[0] = map[string]interface{}{
+		"chainId": "0x1a343",
+	} // some unrecoginzed chain id
 
 	request, err := ConstructRPCRequest("wallet_switchEthereumChain", params, &testDAppData)
 	assert.NoError(t, err)
@@ -84,7 +87,9 @@ func TestSwitchEthereumChain(t *testing.T) {
 	}
 
 	params := make([]interface{}, 1)
-	params[0] = walletCommon.EthereumMainnet
+	params[0] = map[string]interface{}{
+		"chainId": "0x1",
+	}
 
 	request, err := ConstructRPCRequest("wallet_switchEthereumChain", params, &testDAppData)
 	assert.NoError(t, err)
@@ -94,5 +99,6 @@ func TestSwitchEthereumChain(t *testing.T) {
 
 	response, err := cmd.Execute(request)
 	assert.NoError(t, err)
-	assert.Equal(t, walletCommon.ChainID(walletCommon.EthereumMainnet).String(), response)
+	chainId := fmt.Sprintf(`0x%s`, walletCommon.ChainID(walletCommon.EthereumMainnet).String())
+	assert.Equal(t, chainId, response)
 }
