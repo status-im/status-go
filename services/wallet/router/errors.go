@@ -21,8 +21,8 @@ var (
 	ErrLockedAmountNotNegative                   = &errors.ErrorResponse{Code: errors.ErrorCode("WR-013"), Details: "locked amount must not be negative"}
 	ErrLockedAmountExceedsTotalSendAmount        = &errors.ErrorResponse{Code: errors.ErrorCode("WR-014"), Details: "locked amount exceeds the total amount to send"}
 	ErrLockedAmountLessThanSendAmountAllNetworks = &errors.ErrorResponse{Code: errors.ErrorCode("WR-015"), Details: "locked amount is less than the total amount to send, but all networks are locked"}
-	ErrNotEnoughTokenBalance                     = &errors.ErrorResponse{Code: errors.ErrorCode("WR-016"), Details: "{\"token\": %s, \"chainId\": %d}"}
-	ErrNotEnoughNativeBalance                    = &errors.ErrorResponse{Code: errors.ErrorCode("WR-017"), Details: "{\"token\": %s, \"chainId\": %d}"}
+	ErrNotEnoughTokenBalance                     = &errors.ErrorResponse{Code: errors.ErrorCode("WR-016"), Details: "{\"token\": \"%s\", \"chainId\": %d}"}
+	ErrNotEnoughNativeBalance                    = &errors.ErrorResponse{Code: errors.ErrorCode("WR-017"), Details: "{\"token\": \"%s\", \"chainId\": %d}"}
 	ErrNativeTokenNotFound                       = &errors.ErrorResponse{Code: errors.ErrorCode("WR-018"), Details: "native token not found"}
 	ErrDisabledChainFoundAmongLockedNetworks     = &errors.ErrorResponse{Code: errors.ErrorCode("WR-019"), Details: "disabled chain found among locked networks"}
 	ErrENSSetPubKeyInvalidUsername               = &errors.ErrorResponse{Code: errors.ErrorCode("WR-020"), Details: "a valid username, ending in '.eth', is required for ENSSetPubKey"}
