@@ -28,7 +28,10 @@ func NewAPI(s *Service) *API {
 	})
 
 	// Active chain per dapp management
-	r.Register("eth_chainId", &commands.ChainIDCommand{Db: s.db})
+	r.Register("eth_chainId", &commands.ChainIDCommand{
+		Db:             s.db,
+		NetworkManager: s.nm,
+	})
 	r.Register("wallet_switchEthereumChain", &commands.SwitchEthereumChainCommand{
 		Db:             s.db,
 		NetworkManager: s.nm,

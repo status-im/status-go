@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 
+	"github.com/status-im/status-go/services/connector/chainutils"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
@@ -41,21 +42,7 @@ func (r *RPCRequest) getChainID() (uint64, error) {
 }
 
 func (c *SwitchEthereumChainCommand) getSupportedChainIDs() ([]uint64, error) {
-	activeNetworks, err := c.NetworkManager.GetActiveNetworks()
-	if err != nil {
-		return nil, err
-	}
-
-	if len(activeNetworks) < 1 {
-		return nil, ErrNoActiveNetworks
-	}
-
-	chainIDs := make([]uint64, len(activeNetworks))
-	for i, network := range activeNetworks {
-		chainIDs[i] = network.ChainID
-	}
-
-	return chainIDs, nil
+	return chainutils.GetSupportedChainIDs(c.NetworkManager)
 }
 
 func (c *SwitchEthereumChainCommand) Execute(request RPCRequest) (string, error) {
