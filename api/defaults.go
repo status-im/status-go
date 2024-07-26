@@ -141,6 +141,7 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 		// mobile may need override following options
 		LightClient:                            specifiedWakuV2Config.LightClient,
 		EnableStoreConfirmationForMessagesSent: specifiedWakuV2Config.EnableStoreConfirmationForMessagesSent,
+		EnableMissingMessageVerification:       specifiedWakuV2Config.EnableMissingMessageVerification,
 		Nameserver:                             specifiedWakuV2Config.Nameserver,
 	}
 
@@ -301,6 +302,10 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 
 	if request.WakuV2LightClient {
 		nodeConfig.WakuV2Config.LightClient = true
+	}
+
+	if request.WakuV2EnableMissingMessageVerification {
+		nodeConfig.WakuV2Config.EnableMissingMessageVerification = true
 	}
 
 	if request.WakuV2EnableStoreConfirmationForMessagesSent {
