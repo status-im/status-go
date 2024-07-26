@@ -279,6 +279,8 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 		return nil, false, fmt.Errorf("invalid store node request type: %d", requestType)
 	}
 
+	filter.Ephemeral = true
+
 	return filter, true, nil
 }
 
