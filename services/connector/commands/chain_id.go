@@ -2,13 +2,16 @@ package commands
 
 import (
 	"database/sql"
+	"strconv"
 
+	"github.com/status-im/status-go/services/connector/chainutils"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 type ChainIDCommand struct {
-	Db *sql.DB
+	NetworkManager NetworkManagerInterface
+	Db             *sql.DB
 }
 
 func (c *ChainIDCommand) Execute(request RPCRequest) (string, error) {
@@ -23,7 +26,11 @@ func (c *ChainIDCommand) Execute(request RPCRequest) (string, error) {
 	}
 
 	if dApp == nil {
-		return "", ErrDAppIsNotPermittedByUser
+		defaultChainID, err := chainutils.GetDefaultChainID(c.NetworkManager)
+		if err != nil {
+			return "", err
+		}
+		return strconv.FormatUint(defaultChainID, 16), nil
 	}
 
 	return walletCommon.ChainID(dApp.ChainID).String(), nil
