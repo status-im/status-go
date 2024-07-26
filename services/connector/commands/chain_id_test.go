@@ -2,6 +2,7 @@ package commands
 
 import (
 	"database/sql"
+	"fmt"
 	"strconv"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/connector/chainutils"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
 
@@ -56,7 +58,9 @@ func TestGetDefaultChainIdForUnpermittedDApp(t *testing.T) {
 
 	result, err := cmd.Execute(request)
 	assert.NoError(t, err)
-	assert.Equal(t, result, strconv.FormatUint(walletCommon.EthereumMainnet, 16))
+	chainId, err := chainutils.GetHexChainID(strconv.FormatUint(walletCommon.EthereumMainnet, 16))
+	assert.NoError(t, err)
+	assert.Equal(t, result, chainId)
 }
 
 func TestGetChainIdForPermittedDApp(t *testing.T) {
@@ -76,5 +80,6 @@ func TestGetChainIdForPermittedDApp(t *testing.T) {
 
 	response, err := cmd.Execute(request)
 	assert.NoError(t, err)
-	assert.Equal(t, walletCommon.ChainID(chainID).String(), response)
+	chainId := fmt.Sprintf(`0x%s`, strconv.FormatUint(chainID, 16))
+	assert.Equal(t, chainId, response)
 }

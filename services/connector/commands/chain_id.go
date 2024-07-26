@@ -30,8 +30,19 @@ func (c *ChainIDCommand) Execute(request RPCRequest) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return strconv.FormatUint(defaultChainID, 16), nil
+
+		chainId, err := chainutils.GetHexChainID(strconv.FormatUint(defaultChainID, 16))
+		if err != nil {
+			return "", err
+		}
+
+		return chainId, nil
 	}
 
-	return walletCommon.ChainID(dApp.ChainID).String(), nil
+	chainId, err := chainutils.GetHexChainID(walletCommon.ChainID(dApp.ChainID).String())
+	if err != nil {
+		return "", err
+	}
+
+	return chainId, nil
 }
