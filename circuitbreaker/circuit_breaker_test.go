@@ -45,20 +45,20 @@ func TestCircuitBreaker_ExecuteMultipleFallbacksFail(t *testing.T) {
 		ErrorPercentThreshold:  10,
 	})
 
-	circuitName := ""
+	circuitName := fmt.Sprintf("ExecuteMultipleFallbacksFail_%d", time.Now().Nanosecond()) // unique name to avoid conflicts with go tests `-count` option
 	errSecProvFailed := errors.New("provider 2 failed")
 	errThirdProvFailed := errors.New("provider 3 failed")
 	cmd := NewCommand(context.TODO(), []*Functor{
 		NewFunctor(func() ([]interface{}, error) {
 			time.Sleep(100 * time.Millisecond) // will cause hystrix: timeout
 			return []any{success}, nil
-		}, circuitName),
+		}, circuitName+"1"),
 		NewFunctor(func() ([]interface{}, error) {
 			return nil, errSecProvFailed
-		}, circuitName),
+		}, circuitName+"2"),
 		NewFunctor(func() ([]interface{}, error) {
 			return nil, errThirdProvFailed
-		}, circuitName),
+		}, circuitName+"3"),
 	})
 
 	result := cb.Execute(cmd)

@@ -56,7 +56,8 @@ type Config struct {
 }
 
 type CircuitBreaker struct {
-	config Config
+	config             Config
+	circuitNameHandler func(string) string
 }
 
 func NewCircuitBreaker(config Config) *CircuitBreaker {
@@ -96,8 +97,13 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 			break
 		}
 
-		if hystrix.GetCircuitSettings()[f.circuitName] == nil {
-			hystrix.ConfigureCommand(f.circuitName, hystrix.CommandConfig{
+		circuitName := f.circuitName
+		if cb.circuitNameHandler != nil {
+			circuitName = cb.circuitNameHandler(circuitName)
+		}
+
+		if hystrix.GetCircuitSettings()[circuitName] == nil {
+			hystrix.ConfigureCommand(circuitName, hystrix.CommandConfig{
 				Timeout:                cb.config.Timeout,
 				MaxConcurrentRequests:  cb.config.MaxConcurrentRequests,
 				RequestVolumeThreshold: cb.config.RequestVolumeThreshold,
@@ -106,7 +112,7 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 			})
 		}
 
-		err := hystrix.DoC(ctx, f.circuitName, func(ctx context.Context) error {
+		err := hystrix.DoC(ctx, circuitName, func(ctx context.Context) error {
 			res, err := f.exec()
 			// Write to result only if success
 			if err == nil {
@@ -130,4 +136,8 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 	}
 
 	return result
+}
+
+func (c *CircuitBreaker) SetOverrideCircuitNameHandler(f func(string) string) {
+	c.circuitNameHandler = f
 }

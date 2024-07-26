@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/contracts/ierc1155"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -577,12 +578,15 @@ func (o *Manager) fetchTokenURI(ctx context.Context, id thirdparty.CollectibleUn
 	if id.TokenID == nil {
 		return "", errors.New("empty token ID")
 	}
+
 	backend, err := o.rpcClient.EthClient(uint64(id.ContractID.ChainID))
 	if err != nil {
 		return "", err
 	}
 
+	backend = getClientWithNoCircuitTripping(backend)
 	caller, err := collectibles.NewCollectiblesCaller(id.ContractID.Address, backend)
+
 	if err != nil {
 		return "", err
 	}
@@ -1161,4 +1165,29 @@ func createStatusNotifier(statuses *sync.Map, feed *event.Feed) *connection.Stat
 // Proper implementation should respect that. For now, the safest solution is to use the provider ID and chain ID as the key.
 func getCircuitName(provider thirdparty.CollectibleProvider, chainID walletCommon.ChainID) string {
 	return provider.ID() + chainID.String()
+}
+
+// As we don't use hystrix internal way of switching to another circuit, just its metrics,
+// we still can switch to another provider without tripping the circuit due to metrics.
+func getClientWithNoCircuitTripping(backend chain.ClientInterface) chain.ClientInterface {
+	copyable := backend.(chain.Copyable)
+	if copyable != nil {
+		backendCopy := copyable.Copy().(chain.ClientInterface)
+		hm := backendCopy.(chain.HealthMonitor)
+		if hm != nil {
+			cb := circuitbreaker.NewCircuitBreaker(circuitbreaker.Config{
+				Timeout:               20000,
+				MaxConcurrentRequests: 100,
+				SleepWindow:           300000,
+				ErrorPercentThreshold: 101, // Always healthy
+			})
+			cb.SetOverrideCircuitNameHandler(func(circuitName string) string {
+				return circuitName + "_tokenURI"
+			})
+			hm.SetCircuitBreaker(cb)
+			backend = backendCopy
+		}
+	}
+
+	return backend
 }

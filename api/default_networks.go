@@ -81,7 +81,7 @@ var sepolia = params.Network{
 var optimism = params.Network{
 	ChainID:                optimismChainID,
 	ChainName:              "Optimism",
-	RPCURL:                 "https://optimism-mainnet.rpc.grove.city/v1/",
+	RPCURL:                 "https://optimism-archival.rpc.grove.city/v1/",
 	FallbackURL:            "https://optimism-mainnet.infura.io/v3/",
 	BlockExplorerURL:       "https://optimistic.etherscan.io",
 	IconURL:                "network/Network=Optimism",
