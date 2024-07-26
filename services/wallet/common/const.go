@@ -44,7 +44,7 @@ const (
 )
 
 func (c ChainID) String() string {
-	return strconv.Itoa(int(c))
+	return strconv.FormatUint(uint64(c), 10)
 }
 
 func (c ChainID) IsMainnet() bool {
